@@ -369,6 +369,7 @@ int main(int argc, char *argv[])
 #endif
     }
 
+#ifdef RESAMPLE
     /* optional resampling of model amplitudes */
 
     //printf("frames=%d\n", frames);
@@ -379,6 +380,7 @@ int main(int argc, char *argv[])
         dump_quantised_model(&model);
 #endif
     }
+#endif
 
     /* option decimation to 20ms rate, which enables interpolation
        routine to synthesise in between frame */
