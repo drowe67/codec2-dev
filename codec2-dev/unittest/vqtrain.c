@@ -57,9 +57,6 @@ void zero(float v[], int k);
 void acc(float v1[], float v2[], int k);
 void norm(float v[], int k, long n);
 long quantise(float cb[], float vec[], int k, int m, float *se);
-void jnd(float x[], int k);
-
-float pi;
 
 /*-----------------------------------------------------------------------* \
 
@@ -81,8 +78,7 @@ int main(int argc, char *argv[]) {
     float  delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
-
-    pi = 4.0*atan(1.0);
+    int     ret;
 
     /* Interpret command line arguments */
 
@@ -123,7 +119,7 @@ int main(int argc, char *argv[]) {
     /* set up initial codebook state from samples of training set */
 
     rewind(ftrain);
-    fread(cb, sizeof(float), k*m, ftrain);
+    ret = fread(cb, sizeof(float), k*m, ftrain);
 
     /* main loop */
 
@@ -144,7 +140,7 @@ int main(int argc, char *argv[]) {
 	se = 0.0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
-	    fread(vec, sizeof(float), k, ftrain);
+	    ret = fread(vec, sizeof(float), k, ftrain);
 	    ind = quantise(cb, vec, k, m, &se);
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);
@@ -166,30 +162,6 @@ int main(int argc, char *argv[]) {
 	    }
 
     } while (delta > DELTAQ);
-
-    /* check % within JND */
-
-    {
-	long jnd;
-        int  cur_jnd;
-	float diff, jnd_thresh = 50.0*pi/4000.0;
-
-	jnd = 0;
-	se = 0.0;
-	rewind(ftrain);
-	for(i=0; i<J; i++) {
-	    fread(vec, sizeof(float), k, ftrain);
-	    ind = quantise(cb, vec, k, m, &se);
-	    cur_jnd = 0;
-	    for(j=0; j<k; j++) {
-		diff = cb[k*ind+j] - vec[j];
-		if (fabs(diff) > jnd_thresh)
-		    cur_jnd = 1;
-		if (cur_jnd) jnd++;
-	    }
-	}
-	printf("jnd %3.2f %%\n", 100.0*(float)jnd/(J*k));
-    }
 
     /* save codebook to disk */
 
@@ -327,18 +299,3 @@ long quantise(float cb[], float vec[], int k, int m, float *se)
    return(besti);
 }
 
-void jnd(float x[], int k) {
-    float lsp_hz, step = 100.0;
-    int   i;
-
-    for(i=0; i<k; i++) {
-	lsp_hz = x[i]*4000.0/pi;
-	lsp_hz = floor(lsp_hz/step + 0.5)*step;
-	x[i] = lsp_hz*pi/4000.0;
-	if (i) {
-	    if (x[i] == x[i-1])
-		x[i] += step*pi/4000.0;
-
-	}
-    }
-}

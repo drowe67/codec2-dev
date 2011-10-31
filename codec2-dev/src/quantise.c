@@ -120,7 +120,7 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
 									      
   lspd_quantise
 
-  Scalar lsp difference quantiser.
+  Scalar/VQ LSP difference quantiser.
 
 \*---------------------------------------------------------------------------*/
 
@@ -130,15 +130,19 @@ void lspd_quantise(
   int   order
 ) 
 {
-    int   i,k,m;
+    int   i,k,m,ncb, nlsp, index;
     float lsp_hz[LPC_MAX];
     float lsp__hz[LPC_MAX];
     float dlsp[LPC_MAX];
     float dlsp_[LPC_MAX];
-    float  wt[1];
+    float wt[LPC_MAX];
     const float *cb;
     float se;
     int   indexes[LPC_MAX];
+
+    for(i=0; i<LPC_ORD; i++) {
+	wt[i] = 1.0;
+    }
 
     /* convert from radians to Hz so we can use human readable
        frequencies */
@@ -150,7 +154,7 @@ void lspd_quantise(
     for(i=1; i<order; i++)
     	dlsp[i] = lsp_hz[i] - lsp_hz[i-1];
 
-    /* simple uniform scalar quantisers */
+    /* simple uniform scalar quantisers for LSP differences 1..4 */
 
     wt[0] = 1.0;
     for(i=0; i<4; i++) {
@@ -170,9 +174,39 @@ void lspd_quantise(
 	else
 	    lsp__hz[0] = dlsp_[0];
     }
+
+    /* VQ LSP differences 5..10 in log domain */
+
+    ncb = 4;
+    nlsp = 4;
+    k = lsp_cbd[ncb].k;
+    m = lsp_cbd[ncb].m;
+    cb = lsp_cbd[ncb].cb;
+    for(i=4; i<order; i++) {
+	dlsp[i] = log10((PI/4000.0)*dlsp[i]);
+	printf("%f ", dlsp[i]);
+    }
+    printf("\n");
+    index = quantise(cb, &dlsp[nlsp], &wt[nlsp], k, m, &se);
+    for(i=0; i<6; i++)
+ 	printf("%f ", cb[i]);
+    printf("\n");
+    printf("index = %d\n", index);
+    for(i=4; i<order; i++) {
+	dlsp_[i] = (4000.0/PI)*pow(10.0, cb[index*k+i-nlsp]);
+	printf("%f ", cb[index*k+i-nlsp]);
+	lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
+    }
+    printf("\n");
+    for(i=4; i<order; i++)
+ 	printf("%f ", dlsp_[i]);
+    printf("\n\n");
+
+    /*
     for(; i<order; i++)
     	lsp__hz[i] = lsp_hz[i];
-    
+    */
+
     /* convert back to radians */
 
     for(i=0; i<order; i++)

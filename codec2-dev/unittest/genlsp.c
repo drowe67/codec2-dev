@@ -31,6 +31,7 @@
 #define NW	279	/* frame size in samples 			*/
 #define	N  	80 	/* frame to frame shift				*/
 #define THRESH	40.0	/* threshold energy/sample for frame inclusion 	*/
+#define PI         3.141592654	/* mathematical constant                */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -132,7 +133,7 @@ int main(int argc, char *argv[]) {
 			fprintf(flsp,"%f ",log10(lsp[0]));
 			for(i=1; i<P; i++) {
 			    diff = lsp[i]-lsp[i-1];
-			    if (diff < 25.0) diff = 25.0;
+			    if (diff < (PI/4000.0)*25.0) diff = (PI/4000.0)*25.0;
 			    fprintf(flsp,"%f ",log10(diff));
 			}
 		    } 
