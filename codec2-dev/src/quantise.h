@@ -45,7 +45,8 @@ float decode_Wo(int index);
 void encode_lsps(int indexes[], float lsp[], int order);
 void decode_lsps(float lsp[], int indexes[], int order);
 void lspd_quantise(float lsp[], float lsp_[], int order);
-void lspdvq_quantise(float lsp[], float lsp_[], int order); 
+void lspvq_quantise(float lsp[], float lsp_[], int order); 
+void lspres_quantise(float lsp[], float lsp_[], int order);
 
 int encode_energy(float e);
 float decode_energy(int index);
@@ -75,9 +76,8 @@ float speech_to_uq_lsps(float lsp[],
 		        float w[],
 		        int   order
 			);
-void bw_expand_lsps(float lsp[],
-		    int   order
-		    );
+void bw_expand_lsps(float lsp[], int order);
+void locate_lsps_jnd_steps(float lsp[], int order);
 void decode_lsps(float lsp[], int indexes[], int order);
 
 #endif

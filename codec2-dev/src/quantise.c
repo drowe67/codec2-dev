@@ -59,38 +59,6 @@ int lsp_bits(int i) {
     return lsp_cb[i].log2m;
 }
 
-#if VECTOR_QUANTISATION
-/*---------------------------------------------------------------------------*\
-									      
-  quantise_uniform
-
-  Simulates uniform quantising of a float.
-
-\*---------------------------------------------------------------------------*/
-
-void quantise_uniform(float *val, float min, float max, int bits)
-{
-    int   levels = 1 << (bits-1);
-    float norm;
-    int   index;
-
-    /* hard limit to quantiser range */
-
-    printf("min: %f  max: %f  val: %f  ", min, max, val[0]);
-    if (val[0] < min) val[0] = min;
-    if (val[0] > max) val[0] = max;
-
-    norm = (*val - min)/(max-min);
-    printf("%f  norm: %f  ", val[0], norm);
-    index = fabs(levels*norm + 0.5);
-
-    *val = min + index*(max-min)/levels;
-
-    printf("index %d  val_: %f\n", index, val[0]);
-}
-
-#endif
-
 /*---------------------------------------------------------------------------*\
 
   quantise_init
@@ -127,13 +95,16 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
    float   beste;	/* best error so far		*/
    long	   j;
    int     i;
+   float   diff;
 
    besti = 0;
    beste = 1E32;
    for(j=0; j<m; j++) {
 	e = 0.0;
-	for(i=0; i<k; i++)
-	    e += pow((cb[j*k+i]-vec[i])*w[i],2.0);
+	for(i=0; i<k; i++) {
+	    diff = cb[j*k+i]-vec[i];
+	    e += pow(diff*w[i],2.0);
+	}
 	if (e < beste) {
 	    beste = e;
 	    besti = j;
@@ -182,7 +153,7 @@ void lspd_quantise(
     /* simple uniform scalar quantisers */
 
     wt[0] = 1.0;
-    for(i=0; i<order; i++) {
+    for(i=0; i<4; i++) {
 	if (i) 
 	    dlsp[i] = lsp_hz[i] - lsp__hz[i-1];	    
 	else
@@ -200,7 +171,7 @@ void lspd_quantise(
 	    lsp__hz[0] = dlsp_[0];
     }
     for(; i<order; i++)
-    	lsp__hz[i] = lsp__hz[i-1] + dlsp[i];
+    	lsp__hz[i] = lsp_hz[i];
     
     /* convert back to radians */
 
@@ -210,99 +181,129 @@ void lspd_quantise(
 
 /*---------------------------------------------------------------------------*\
 									      
-  lspd_vq_quantise
+  lspvq_quantise
 
-  Vector lsp difference quantiser.
+  Vector LSP quantiser.
 
 \*---------------------------------------------------------------------------*/
 
-void lspdvq_quantise(
+void lspvq_quantise(
   float lsp[], 
   float lsp_[],
   int   order
 ) 
 {
     int   i,k,m,ncb, nlsp;
-    float dlsp[LPC_MAX];
-    float dlsp_[LPC_MAX];
-    float  wt[LPC_ORD];
+    float  wt[LPC_ORD], lsp_hz[LPC_ORD];
     const float *cb;
     float se;
     int   index;
 
-    dlsp[0] = lsp[0];
-    for(i=1; i<order; i++)
-    	dlsp[i] = lsp[i] - lsp[i-1];
-
-    for(i=0; i<order; i++)
-    	dlsp_[i] = dlsp[i];
-
-    for(i=0; i<order; i++)
+    for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
-
-    /* scalar quantise dLSPs 1,2,3,4,5 */
-
-    for(i=0; i<5; i++) {
-	if (i) 
-	    dlsp[i] = (lsp[i] - lsp_[i-1])*4000.0/PI;	    
-	else
-	    dlsp[0] = lsp[0]*4000.0/PI;
-
-	k = lsp_cbdvq[i].k;
-	m = lsp_cbdvq[i].m;
-	cb = lsp_cbdvq[i].cb;
-	index = quantise(cb, &dlsp[i], wt, k, m, &se);
- 	dlsp_[i] = cb[index*k]*PI/4000.0;
-	
-	if (i) 
-	    lsp_[i] = lsp_[i-1] + dlsp_[i];
-	else
-	    lsp_[0] = dlsp_[0];
     }
-    dlsp[i] = lsp[i] - lsp_[i-1];
-    dlsp_[i] = dlsp[i];
 
-    //printf("lsp[0] %f lsp_[0] %f\n", lsp[0], lsp_[0]);
-    //printf("lsp[1] %f lsp_[1] %f\n", lsp[1], lsp_[1]);
+    /* scalar quantise LSPs 1,2,3,4 */
 
-#ifdef TT
-    /* VQ dLSPs 3,4,5 */
+    /* simple uniform scalar quantisers */
 
-    ncb = 2;
-    nlsp = 2;
-    k = lsp_cbdvq[ncb].k;
-    m = lsp_cbdvq[ncb].m;
-    cb = lsp_cbdvq[ncb].cb;
-    index = quantise(cb, &dlsp[nlsp], wt, k, m, &se);
-    dlsp_[nlsp] = cb[index*k];
-    dlsp_[nlsp+1] = cb[index*k+1];
-    dlsp_[nlsp+2] = cb[index*k+2];
+    for(i=0; i<4; i++) {
+	lsp_hz[i] = 4000.0*lsp[i]/PI;
+	k = lsp_cb[i].k;
+	m = lsp_cb[i].m;
+	cb = lsp_cb[i].cb;
+	index = quantise(cb, &lsp_hz[i], wt, k, m, &se);
+	lsp_[i] = cb[index*k]*PI/4000.0;
+    }
 
-    lsp_[0] = dlsp_[0];
-    for(i=1; i<5; i++)
-    	lsp_[i] = lsp_[i-1] + dlsp_[i];
-    dlsp[i] = lsp[i] - lsp_[i-1];
-    dlsp_[i] = dlsp[i];
+#define WGHT
+#ifdef WGHT
+    for(i=4; i<9; i++) {
+	wt[i] = 1.0/(lsp[i]-lsp[i-1]) + 1.0/(lsp[i+1]-lsp[i]);
+	//printf("wt[%d] = %f\n", i, wt[i]);
+    }
+    wt[9] = 2.0/(lsp[i]-lsp[i-1]);
 #endif
-    /* VQ dLSPs 6,7,8,9,10 */
 
-    ncb = 5;
-    nlsp = 5;
-    k = lsp_cbdvq[ncb].k;
-    m = lsp_cbdvq[ncb].m;
-    cb = lsp_cbdvq[ncb].cb;
-    index = quantise(cb, &dlsp[nlsp], wt, k, m, &se);
-    dlsp_[nlsp] = cb[index*k];
-    dlsp_[nlsp+1] = cb[index*k+1];
-    dlsp_[nlsp+2] = cb[index*k+2];
-    dlsp_[nlsp+3] = cb[index*k+3];
-    dlsp_[nlsp+4] = cb[index*k+4];
+    /* VQ LSPs 5,6,7,8,9,10 */
 
-    /* rebuild LSPs for dLSPs */
+    ncb = 4;
+    nlsp = 4;
+    k = lsp_cbvq[ncb].k;
+    m = lsp_cbvq[ncb].m;
+    cb = lsp_cbvq[ncb].cb;
+    index = quantise(cb, &lsp[nlsp], &wt[nlsp], k, m, &se);
+    lsp_[nlsp] = cb[index*k];
+    lsp_[nlsp+1] = cb[index*k+1];
+    lsp_[nlsp+2] = cb[index*k+2];
+    lsp_[nlsp+3] = cb[index*k+3];
+    lsp_[nlsp+4] = cb[index*k+4];
+    lsp_[nlsp+5] = cb[index*k+5];
+    lsp_[nlsp+6] = cb[index*k+6];
+}
 
-    lsp_[0] = dlsp_[0];
-    for(i=1; i<order; i++)
-    	lsp_[i] = lsp_[i-1] + dlsp_[i];
+/*---------------------------------------------------------------------------*\
+									      
+  lspres_quantise
+
+  Resonator model LSP quantiser.
+
+\*---------------------------------------------------------------------------*/
+
+void lspres_quantise(float lsps[], float lsps_[], int order) 
+{
+    int   i,k,m;
+    float  wt[LPC_ORD];
+    const float *cb;
+    float se = 0.0;
+    int   index;
+    float centre_hz, bw_hz, lsp_hz, bwe;
+
+    for(i=0; i<LPC_ORD; i++) {
+	wt[i] = 1.0;
+    }
+
+    /* use original values as default */
+
+    for(i=0; i<LPC_ORD; i++) {
+	lsps_[i] = lsps[i];
+    }
+
+    /* scalar quantise lsp 1 & 2 "pair" using resonator model */
+
+    centre_hz = (4000.0/PI)*(lsps[1] + lsps[0])/2.0;	    
+    k = lsp_cbres[0].k;
+    m = lsp_cbres[0].m;
+    cb = lsp_cbres[0].cb;
+    index = quantise(cb, &centre_hz, wt, k, m, &se);
+    centre_hz = cb[index*k];
+
+    bw_hz = (4000.0/PI)*(lsps[1] - lsps[0]);
+    k = lsp_cbres[1].k;
+    m = lsp_cbres[1].m;
+    cb = lsp_cbres[1].cb;
+    index = quantise(cb, &bw_hz, wt, k, m, &se);
+    bw_hz = cb[index*k];
+
+    lsps_[0] = (PI/4000.0)*(centre_hz - bw_hz/2);
+    lsps_[1] = (PI/4000.0)*(centre_hz + bw_hz/2);
+ 
+    /* scalar quantise lsp 3 & 4 */
+
+    k = lsp_cbres[2].k;
+    m = lsp_cbres[2].m;
+    cb = lsp_cbres[2].cb;
+    lsp_hz = (4000.0/PI)*lsps[2];
+    index = quantise(cb, &lsp_hz, wt, k, m, &se);
+    lsps_[2] = cb[index*k]*(PI/4000.0);
+
+    k = lsp_cbres[3].k;
+    m = lsp_cbres[3].m;
+    cb = lsp_cbres[3].cb;
+    lsp_hz = (4000.0/PI)*lsps[3];
+    index = quantise(cb, &lsp_hz, wt, k, m, &se);
+    lsps_[3] = cb[index*k]*(PI/4000.0);
+
 }
 
 void check_lsp_order(float lsp[], int lpc_order)
@@ -387,6 +388,7 @@ float lpc_model_amplitudes(
     for(i=0; i<order; i++)
 	lsp_hz[i] = (4000.0/PI)*lsp[i];
     
+#ifdef NOT_NOW
     /* simple uniform scalar quantisers */
 
     for(i=0; i<10; i++) {
@@ -396,6 +398,7 @@ float lpc_model_amplitudes(
 	index = quantise(cb, &lsp_hz[i], wt, k, m, &se);
 	lsp_hz[i] = cb[index*k];
     }
+#endif
     
     /* experiment: simulating uniform quantisation error
     for(i=0; i<order; i++)
@@ -407,7 +410,7 @@ float lpc_model_amplitudes(
 
     /* Bandwidth Expansion (BW).  Prevents any two LSPs getting too
        close together after quantisation.  We know from experiment
-       that LSP quantisation errors < 12.5Hz (25Hz setp size) are
+       that LSP quantisation errors < 12.5Hz (25Hz step size) are
        inaudible so we use that as the minimum LSP separation.
     */
 
@@ -682,7 +685,9 @@ void decode_lsps(float lsp[], int indexes[], int order)
 
     for(i=0; i<order; i++)
 	lsp[i] = (PI/4000.0)*lsp_hz[i];
+
 }
+
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -692,7 +697,7 @@ void decode_lsps(float lsp[], int indexes[], int order)
 
   Applies Bandwidth Expansion (BW) to a vector of LSPs.  Prevents any
   two LSPs getting too close together after quantisation.  We know
-  from experiment that LSP quantisation errors < 12.5Hz (25Hz setp
+  from experiment that LSP quantisation errors < 12.5Hz (25Hz step
   size) are inaudible so we use that as the minimum LSP separation.
 
 \*---------------------------------------------------------------------------*/
@@ -704,8 +709,15 @@ void bw_expand_lsps(float lsp[],
     int i;
 
     for(i=1; i<5; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(12.5/4000.0))
+	
+	/*
+	  if (lsp[i] - lsp[i-1] < PI*(12.5/4000.0))
 	    lsp[i] = lsp[i-1] + PI*(12.5/4000.0);
+	*/
+	
+	if ((lsp[i] - lsp[i-1]) < 12.5*(PI/4000))
+	    lsp[i] = lsp[i-1] + 12.5*(PI/4000.0);
+	
     }
 
     /* As quantiser gaps increased, larger BW expansion was required
@@ -722,6 +734,78 @@ void bw_expand_lsps(float lsp[],
 	    lsp[i] = lsp[i-1] + PI*(75.0/4000.0);
     }
 }
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: locate_lsps_jnd_steps()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 27/10/2011 
+
+  Applies a form of Bandwidth Expansion (BW) to a vector of LSPs.
+  Listening tests have determined that "quantising" the position of
+  each LSP to the non-linear steps below introduces a "just noticable
+  difference" in the synthesised speech.
+
+  This operation can be used before quantisation to limit the input
+  data to the quantiser to a number of discrete steps.
+
+  This operation can also be used during quantisation as a form of
+  hysteresis in the calculation of quantiser error.  For example if
+  the quantiser target of lsp1 is 500 Hz, candidate vectors with lsp1
+  of 515 and 495 Hz sound effectively the same.
+
+\*---------------------------------------------------------------------------*/
+
+void locate_lsps_jnd_steps(float lsps[], int order)
+{
+    int   i;
+    float lsp_hz, step;
+
+    assert(order == 10);
+
+    /* quantise to 25Hz steps */
+	    
+    step = 25;
+    for(i=0; i<2; i++) {
+	lsp_hz = lsps[i]*4000.0/PI;
+	lsp_hz = floor(lsp_hz/step + 0.5)*step;
+	lsps[i] = lsp_hz*PI/4000.0;
+	if (i) {
+	    if (lsps[i] == lsps[i-1])
+		lsps[i]   += step*PI/4000.0;
+
+	}
+    }
+
+    /* quantise to 50Hz steps */
+
+    step = 50;
+    for(i=2; i<4; i++) {
+	lsp_hz = lsps[i]*4000.0/PI;
+	lsp_hz = floor(lsp_hz/step + 0.5)*step;
+	lsps[i] = lsp_hz*PI/4000.0;
+	if (i) {
+	    if (lsps[i] == lsps[i-1])
+		lsps[i] += step*PI/4000.0;
+
+	}
+    }
+
+    /* quantise to 100Hz steps */
+
+    step = 100;
+    for(i=4; i<10; i++) {
+	lsp_hz = lsps[i]*4000.0/PI;
+	lsp_hz = floor(lsp_hz/step + 0.5)*step;
+	lsps[i] = lsp_hz*PI/4000.0;
+	if (i) {
+	    if (lsps[i] == lsps[i-1])
+		lsps[i] += step*PI/4000.0;
+
+	}
+    }
+}
+
 
 /*---------------------------------------------------------------------------*\
                                                        
