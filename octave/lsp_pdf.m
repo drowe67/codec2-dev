@@ -10,15 +10,16 @@ function lsp_pdf(lsp)
   figure(1);
   clf;
   [x,y] = hist(lsp(:,1),100);
-  plot(y*4000/pi,x,";1;");
+  plot(y*4000/pi,x,"+;1;");
   hold on;
-  for i=2:c
+  for i=2:5
     [x,y] = hist(lsp(:,i),100);
-    if (mod(i,2))
-        legend = sprintf(";%d;",i);
-    else
-        legend = sprintf("1;%d;",i);
-    endif
+    legend = sprintf("+%d;%d;",i,i);
+    plot(y*4000/pi,x,legend);
+  endfor
+  for i=6:c
+    [x,y] = hist(lsp(:,i),100);
+    legend = sprintf("+%d;%d;",i-5,i);
     plot(y*4000/pi,x,legend);
   endfor
   hold off;
@@ -83,4 +84,8 @@ function lsp_pdf(lsp)
   hold off;
   grid;
   axis([-200 200 0 16000]);
+
+  figure(4);
+  clf;
+  plot((4000/pi)*(lsp(2:r,3)-lsp(1:r-1,3)))
 endfunction
