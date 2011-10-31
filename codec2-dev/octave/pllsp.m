@@ -2,7 +2,7 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Plots a bunch of information realted to LSP quantisation:
+% Plots a bunch of information related to LSP quantisation:
 %   - speech file 
 %   - LSPs before and after quantisation
 %   - SNR for each frame
@@ -10,10 +10,10 @@
 % Note: there is a 160 sample (two frame delay) from the when a sample
 % enters the input buffer until it is at the centre of the analysis window
 
-function pl(rawfile, 
-	    dumpfile_prefix_lpc_only, 
-            dumpfile_prefix_lsp, 
-            start_f, end_f)
+function pllsp(rawfile, 
+	       dumpfile_prefix_lpc_only, 
+               dumpfile_prefix_lsp, 
+               start_f, end_f)
   
   fs=fopen(rawfile,"rb");
   s=fread(fs,Inf,"short");
