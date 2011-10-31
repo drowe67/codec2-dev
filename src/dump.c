@@ -50,6 +50,7 @@ static FILE *fe = NULL;
 static FILE *fsq = NULL;
 static FILE *fdec = NULL;
 static FILE *fsnr = NULL;
+static FILE *flpcsnr = NULL;
 static FILE *fak = NULL;
 static FILE *fbg = NULL;
 static FILE *fE = NULL;
@@ -93,6 +94,8 @@ void dump_off(){
 	fclose(fdec);
     if (fsnr != NULL)
 	fclose(fsnr);
+    if (flpcsnr != NULL)
+	fclose(flpcsnr);
     if (fak != NULL)
 	fclose(fak);
     if (fbg != NULL)
@@ -271,6 +274,20 @@ void dump_snr(float snr) {
     }
 
     fprintf(fsnr,"%f\n",snr);
+}
+
+void dump_lpc_snr(float snr) {
+    char s[MAX_STR];
+
+    if (!dumpon) return;
+
+    if (flpcsnr == NULL) {
+	sprintf(s,"%s_lpc_snr.txt", prefix);
+	flpcsnr = fopen(s, "wt");
+	assert(flpcsnr != NULL);
+    }
+    
+    fprintf(flpcsnr,"%f\n",snr);
 }
 
 void dump_Pw(COMP Pw[]) {

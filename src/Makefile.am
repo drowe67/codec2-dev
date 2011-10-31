@@ -35,19 +35,25 @@ CODEBOOKSD= \
 
 # lspd VQ quantisers
 
-CODEBOOKSDVQ= \
-  $D/dlsp1.txt \
-  $D/dlsp2.txt \
-  $D/dlsp3.txt \
-  $D/dlsp4.txt \
-  $D/dlsp5.txt \
-  ../unittest/lspd678910.txt
+CODEBOOKSVQ= \
+  $D/lsp1.txt \
+  $D/lsp2.txt \
+  $D/lsp3.txt \
+  $D/lsp4.txt \
+  $(top_srcdir)/unittest/lsp45678910.txt
+
+CODEBOOKSRES= \
+  $D/lspres_centre1.txt \
+  $D/lspres_bw1.txt \
+  $D/lsp3.txt \
+  $D/lsp4.txt
 
 noinst_PROGRAMS = generate_codebook
 
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
-codebookdvq.$(OBJEXT): codebookdvq.c
+codebookvq.$(OBJEXT): codebookvq.c
+codebookres.$(OBJEXT): codebookres.c
 
 codebook.lo: codebook.c
 
@@ -55,13 +61,16 @@ codebook.c: generate_codebook $(CODEBOOKS)
 	./generate_codebook lsp_cb $(CODEBOOKS) > codebook.c
 
 codebookd.c: generate_codebook $(CODEBOOKSD)
-	./generate_codebook  lsp_cbd $(CODEBOOKSD) > codebookd.c
+	./generate_codebook lsp_cbd $(CODEBOOKSD) > codebookd.c
 
-codebookdvq.c: generate_codebook $(CODEBOOKSDVQ)
-	./generate_codebook  lsp_cbdvq $(CODEBOOKSDVQ) > codebookdvq.c
+codebookvq.c: generate_codebook $(CODEBOOKSVQ)
+	./generate_codebook lsp_cbvq $(CODEBOOKSVQ) > codebookvq.c
+
+codebookres.c: generate_codebook $(CODEBOOKSRES)
+	./generate_codebook lsp_cbres $(CODEBOOKSRES) > codebookres.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookres.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -79,7 +88,8 @@ quantise.c \
 pack.c \
 codebook.c \
 codebookd.c \
-codebookdvq.c
+codebookvq.c \
+codebookres.c
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)
 libcodec2_la_LDFLAGS = $(LIBS)

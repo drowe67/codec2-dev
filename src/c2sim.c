@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
   float sum_snr;
 
   int lpc_model, order = LPC_ORD;
-  int lsp, lspd, lspdvq, lsp_quantiser;
+  int lsp, lspd, lspvq, lsp_quantiser, lspres;
   float ak[LPC_MAX];
   COMP  Sw_[FFT_ENC];
   COMP  Ew[FFT_ENC]; 
@@ -157,7 +157,8 @@ int main(int argc, char *argv[])
      "\t[--lpc Order]\n"
      "\t[--lsp]\n"
      "\t[--lspd]\n"
-     "\t[--lspdvq]\n"
+     "\t[--lspvq]\n"
+     "\t[--lspres]\n"
      "\t[--phase0]\n"
      "\t[--postfilter]\n"
      "\t[--hand_voicing]\n"
@@ -214,9 +215,11 @@ int main(int argc, char *argv[])
   if (lspd)
       assert(order == LPC_ORD);
 
-  lspdvq = switch_present("--lspdvq",argc,argv);
-  if (lspdvq)
+  lspvq = switch_present("--lspvq",argc,argv);
+  if (lspvq)
       assert(order == LPC_ORD);
+
+  lspres = switch_present("--lspres",argc,argv);
 
   phase0 = switch_present("--phase0",argc,argv);
   if (phase0) {
@@ -274,7 +277,8 @@ int main(int argc, char *argv[])
     if (phase0) {
 	float Wn[M];		        /* windowed speech samples */
 	float Rk[LPC_MAX+1];	        /* autocorrelation coeffs  */
-  	
+  	int ret;
+
 #ifdef DUMP
 	dump_phase(&model.phi[0], model.L);
 #endif
@@ -305,7 +309,7 @@ int main(int argc, char *argv[])
 	    model.phi[i] = 0;
 	
 	if (hand_voicing) {
-	    fscanf(fvoicing,"%d\n",&model.voiced);
+	    ret = fscanf(fvoicing,"%d\n",&model.voiced);
 	}
     }
 
@@ -313,35 +317,63 @@ int main(int argc, char *argv[])
 
     if (lpc_model) {
 	int   lsp_indexes[LPC_MAX];
+	float lsps_[LPC_ORD];
 
 	e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
+#ifdef DUMP
+	    dump_lsp(lsps);
+#endif
+
 	if (lsp) {
 	    encode_lsps(lsp_indexes, lsps, LPC_ORD);
-	    decode_lsps(lsps, lsp_indexes, LPC_ORD);
-	    bw_expand_lsps(lsps, LPC_ORD);
-	    lsp_to_lpc(lsps, ak, LPC_ORD);
+	    decode_lsps(lsps_, lsp_indexes, LPC_ORD);
+	    bw_expand_lsps(lsps_, LPC_ORD);
+	    lsp_to_lpc(lsps_, ak, LPC_ORD);
 	}
 
 	if (lspd) {
-	    float lsps_[LPC_ORD];
-
 	    lspd_quantise(lsps, lsps_, LPC_ORD);
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
  	}
 
-	if (lspdvq) {
-	    float lsps_[LPC_ORD];
-
-	    lspdvq_quantise(lsps, lsps_, LPC_ORD);
+	if (lspvq) {
+	    locate_lsps_jnd_steps(lsps, LPC_ORD);
+ 	    lspvq_quantise(lsps, lsps_, LPC_ORD);
+	    locate_lsps_jnd_steps(lsps_, LPC_ORD);
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
- 	}
+	}
 
+	if (lspres) {
+ 	    lspres_quantise(lsps, lsps_, LPC_ORD);
+	    //locate_lsps_jnd_steps(lsps_, LPC_ORD);
+	    bw_expand_lsps(lsps_, LPC_ORD);
+	    lsp_to_lpc(lsps_, ak, LPC_ORD);
+	    //printf("%f %f %f %f\n", lsps[0], lsps_[0], lsps[1], lsps_[1]);
+	}
+
+#ifdef DUMP
+	    dump_lsp(lsps_);
+#endif
 	e = decode_energy(encode_energy(e));
 	model.Wo = decode_Wo(encode_Wo(model.Wo));
 
 	aks_to_M2(ak, order, &model, e, &snr, 1); 
+#ifdef DUMP
+	dump_lpc_snr(snr);
+#endif
 	apply_lpc_correction(&model);
+	sum_snr += snr;
+#ifdef DUMP
+        dump_quantised_model(&model);
+#endif
+    }
+
+    /* optional resampling of model amplitudes */
+
+    //printf("frames=%d\n", frames);
+    if (resample) {
+	snr = resample_amp_nl(&model, resample, AresdB_prev);
 	sum_snr += snr;
 #ifdef DUMP
         dump_quantised_model(&model);

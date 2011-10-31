@@ -44,6 +44,7 @@ void dump_Pw(COMP Pw[]);
 void dump_lsp(float lsp[]);
 void dump_ak(float ak[], int order);
 void dump_E(float E);
+void dump_lpc_snr(float snr);
 
 /* phase modelling */
 
