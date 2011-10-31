@@ -44,7 +44,7 @@
 
 \*-----------------------------------------------------------------------*/
 
-#define	DELTAQ 	0.001		/* quiting distortion			*/
+#define	DELTAQ 	0.01		/* quiting distortion			*/
 #define	MAX_STR	80		/* maximum string length		*/
 
 /*-----------------------------------------------------------------------*\
@@ -57,8 +57,11 @@ void zero(float v[], int k);
 void acc(float v1[], float v2[], int k);
 void norm(float v[], int k, long n);
 long quantise(float cb[], float vec[], int k, int m, float *se);
+void jnd(float x[], int k);
 
-/*-----------------------------------------------------------------------*\
+float pi;
+
+/*-----------------------------------------------------------------------* \
 
 				MAIN
 
@@ -79,10 +82,12 @@ int main(int argc, char *argv[]) {
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
 
+    pi = 4.0*atan(1.0);
+
     /* Interpret command line arguments */
 
     if (argc != 5)	{
-	printf("usage: vqtrain TrainFile K M VQFile\n");
+	printf("usage: vqtrain TrainFile K(dimension) M(codebook size) VQFile\n");
 	exit(0);
     }
 
@@ -98,7 +103,7 @@ int main(int argc, char *argv[]) {
 
     k = atol(argv[2]);
     m = atol(argv[3]);
-    printf("dimension K=%ld  number of entries M=%ld\n", k,m);
+    printf("dimension K=%ld  number of entries M=%ld\n", k, m);
     vec = (float*)malloc(sizeof(float)*k);
     cb = (float*)malloc(sizeof(float)*k*m);
     cent = (float*)malloc(sizeof(float)*k*m);
@@ -150,7 +155,7 @@ int main(int argc, char *argv[]) {
 	printf("\r  Iteration %ld, Dn = %f, Delta = %e\n", j, Dn, delta);
 	j++;
 
-	/* determine new codebook from centriods */
+	/* determine new codebook from centroids */
 
 	if (delta > DELTAQ)
 	    for(i=0; i<m; i++) {
@@ -162,6 +167,30 @@ int main(int argc, char *argv[]) {
 
     } while (delta > DELTAQ);
 
+    /* check % within JND */
+
+    {
+	long jnd;
+        int  cur_jnd;
+	float diff, jnd_thresh = 50.0*pi/4000.0;
+
+	jnd = 0;
+	se = 0.0;
+	rewind(ftrain);
+	for(i=0; i<J; i++) {
+	    fread(vec, sizeof(float), k, ftrain);
+	    ind = quantise(cb, vec, k, m, &se);
+	    cur_jnd = 0;
+	    for(j=0; j<k; j++) {
+		diff = cb[k*ind+j] - vec[j];
+		if (fabs(diff) > jnd_thresh)
+		    cur_jnd = 1;
+		if (cur_jnd) jnd++;
+	    }
+	}
+	printf("jnd %3.2f %%\n", 100.0*(float)jnd/(J*k));
+    }
+
     /* save codebook to disk */
 
     fvq = fopen(argv[4],"wt");
@@ -170,7 +199,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    fprintf(fvq,"%d %d\n",k,m);
+    fprintf(fvq,"%ld %ld\n",k,m);
     for(j=0; j<m; j++) {
 	for(i=0; i<k; i++)
 	    fprintf(fvq,"%f  ",cb[j*k+i]);
@@ -277,13 +306,16 @@ long quantise(float cb[], float vec[], int k, int m, float *se)
    float   beste;	/* best error so far		*/
    long	   j;
    int     i;
+   float   diff;
 
    besti = 0;
    beste = 1E32;
    for(j=0; j<m; j++) {
 	e = 0.0;
-	for(i=0; i<k; i++)
-	    e += pow(cb[j*k+i]-vec[i],2.0);
+	for(i=0; i<k; i++) {
+	    diff = cb[j*k+i]-vec[i];
+	    e += pow(diff,2.0);
+	}
 	if (e < beste) {
 	    beste = e;
 	    besti = j;
@@ -295,3 +327,18 @@ long quantise(float cb[], float vec[], int k, int m, float *se)
    return(besti);
 }
 
+void jnd(float x[], int k) {
+    float lsp_hz, step = 100.0;
+    int   i;
+
+    for(i=0; i<k; i++) {
+	lsp_hz = x[i]*4000.0/pi;
+	lsp_hz = floor(lsp_hz/step + 0.5)*step;
+	x[i] = lsp_hz*pi/4000.0;
+	if (i) {
+	    if (x[i] == x[i-1])
+		x[i] += step*pi/4000.0;
+
+	}
+    }
+}

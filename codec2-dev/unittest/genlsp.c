@@ -61,17 +61,19 @@ int main(int argc, char *argv[]) {
     float  ak[P+1];	/* LPCs for current frame 			*/
     float  lsp[P];	/* LSPs for current frame 			*/
     float  E;		/* frame energy 				*/
+    long   f;		/* number of frames                             */
     long   af;		/* number frames with "active" speech 		*/
     float  Eres;	/* LPC residual energy 				*/
     int    i;
     int    roots;
     int    unstables;
-    int    lspd;
+    int    lspd, log;
+    float  diff;
 
     /* Initialise ------------------------------------------------------*/
 
     if (argc < 3) {
-	printf("usage: gentest RawFile LSPTextFile [--lspd]\n");
+	printf("usage: gentest RawFile LSPTextFile [--lspd] [--log]\n");
 	exit(0);
     }
 
@@ -90,13 +92,14 @@ int main(int argc, char *argv[]) {
     }
 
     lspd = switch_present("--lspd", argc, argv);
+    log = switch_present("--log", argc, argv);
 
     for(i=0; i<NW; i++)
 	Sn[i] = 0.0;
 
     /* Read SPC file, and determine aks[] for each frame ------------------*/
 
-    af = 0;
+    f = af = 0;
     unstables = 0;
     while(fread(buf,sizeof(short),N,fspc) == N) {
 
@@ -116,6 +119,7 @@ int main(int argc, char *argv[]) {
 
 	/* If energy high enough, include this frame */
 
+	f++;
 	if (E > THRESH) {
 	    af++;
 	    printf("Active Frame: %ld  unstables: %d\n",af, unstables);
@@ -124,10 +128,22 @@ int main(int argc, char *argv[]) {
 	    roots = lpc_to_lsp(ak, P , lsp, 5, LSP_DELTA1);
 	    if (roots == P) {
 		if (lspd) {
-		    fprintf(flsp,"%f ",lsp[0]);
-		    for(i=1; i<P; i++)
-			fprintf(flsp,"%f ",lsp[i]-lsp[i-1]);
+		    if (log) {
+			fprintf(flsp,"%f ",log10(lsp[0]));
+			for(i=1; i<P; i++) {
+			    diff = lsp[i]-lsp[i-1];
+			    if (diff < 25.0) diff = 25.0;
+			    fprintf(flsp,"%f ",log10(diff));
+			}
+		    } 
+		    else {
+			fprintf(flsp,"%f ",lsp[0]);
+			for(i=1; i<P; i++)
+			    fprintf(flsp,"%f ",lsp[i]-lsp[i-1]);
+		    }
+
 		    fprintf(flsp,"\n");
+		    
 		}
 		else {
 		    for(i=0; i<P; i++)
@@ -140,6 +156,7 @@ int main(int argc, char *argv[]) {
 	}
     }
 
+    printf("%3.2f %% active frames\n", 100.0*(float)af/f);
     fclose(fspc);
     fclose(flsp);
 
