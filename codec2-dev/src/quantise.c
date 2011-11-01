@@ -135,10 +135,13 @@ void lspd_quantise(
     float lsp__hz[LPC_MAX];
     float dlsp[LPC_MAX];
     float dlsp_[LPC_MAX];
+    float lsplog[LPC_MAX];
+    float lsplog_[LPC_MAX];
     float wt[LPC_MAX];
     const float *cb;
     float se;
     int   indexes[LPC_MAX];
+    float diff1,diff2;
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
@@ -175,7 +178,20 @@ void lspd_quantise(
 	    lsp__hz[0] = dlsp_[0];
     }
 
+#ifdef VQ
     /* VQ LSP differences 5..10 in log domain */
+
+    #define WGHT
+#ifdef WGHT
+    for(i=4; i<9; i++) {
+	diff1 = lsp[i]-lsp[i-1];
+	if (diff1 < (4000.0/PI)*200) diff1 = (PI/4000.0)*200;
+	if (diff2 < (4000.0/PI)*200) diff2 = (PI/4000.0)*200;
+	wt[i] = 2.0/diff1 + 1.0/diff2;
+	//printf("wt[%d] = %f\n", i, wt[i]);
+    }
+    wt[9] = 1.0/diff1;
+#endif
 
     ncb = 4;
     nlsp = 4;
@@ -183,24 +199,32 @@ void lspd_quantise(
     m = lsp_cbd[ncb].m;
     cb = lsp_cbd[ncb].cb;
     for(i=4; i<order; i++) {
-	dlsp[i] = log10((PI/4000.0)*dlsp[i]);
-	printf("%f ", dlsp[i]);
+	lsplog[i] = log10(lsp[i]);
+	//printf("%f ", lsp[i]);
     }
-    printf("\n");
-    index = quantise(cb, &dlsp[nlsp], &wt[nlsp], k, m, &se);
+    //printf("\n");
+    index = quantise(cb, &lsp[nlsp], &wt[nlsp], k, m, &se);
+    /*
     for(i=0; i<6; i++)
  	printf("%f ", cb[i]);
     printf("\n");
     printf("index = %d\n", index);
+    */
     for(i=4; i<order; i++) {
-	dlsp_[i] = (4000.0/PI)*pow(10.0, cb[index*k+i-nlsp]);
-	printf("%f ", cb[index*k+i-nlsp]);
-	lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
+	//lsplog_[i] = pow(10.0, cb[index*k+i-nlsp]);
+	//printf("%f ", cb[index*k+i-nlsp]);
+	//lsp__hz[i] = (4000.0/PI)*lsplog_[i];
+	//lsp__hz[i] = lsp_hz[i];
+	lsp__hz[i] = (4000.0/PI)*cb[index*k+i-nlsp];
     }
+    if ((lsp__hz[4] - lsp__hz[3]) < 100.0) 
+	lsp__hz[4] = lsp__hz[3] + 100.0;
+    /*
     printf("\n");
     for(i=4; i<order; i++)
- 	printf("%f ", dlsp_[i]);
+ 	printf("%f ", lsp__hz[i]);
     printf("\n\n");
+    */
 
     /*
     for(; i<order; i++)

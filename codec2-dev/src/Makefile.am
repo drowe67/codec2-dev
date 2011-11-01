@@ -26,7 +26,7 @@ CODEBOOKSD= \
   $D/dlsp2.txt \
   $D/dlsp3.txt \
   $D/dlsp4.txt \
-  $(top_srcdir)/unittest/lspdlog5-10_1024.txt
+  $(top_srcdir)/unittest/lsp45678910.txt
 
 # lspd VQ quantisers
 
