@@ -333,7 +333,9 @@ int main(int argc, char *argv[])
 	}
 
 	if (lspd) {
+	    locate_lsps_jnd_steps(lsps, LPC_ORD);
 	    lspd_quantise(lsps, lsps_, LPC_ORD);
+	    locate_lsps_jnd_steps(lsps_, LPC_ORD);
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
  	}
 

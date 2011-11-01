@@ -142,6 +142,7 @@ void lspd_quantise(
     float se;
     int   indexes[LPC_MAX];
     float diff1,diff2;
+    float centre_hz, bw_hz, bwe;
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
@@ -156,6 +157,7 @@ void lspd_quantise(
     dlsp[0] = lsp_hz[0];
     for(i=1; i<order; i++)
     	dlsp[i] = lsp_hz[i] - lsp_hz[i-1];
+
 
     /* simple uniform scalar quantisers for LSP differences 1..4 */
 
@@ -178,62 +180,34 @@ void lspd_quantise(
 	    lsp__hz[0] = dlsp_[0];
     }
 
-#ifdef VQ
-    /* VQ LSP differences 5..10 in log domain */
-
-    #define WGHT
+#define WGHT
 #ifdef WGHT
     for(i=4; i<9; i++) {
-	diff1 = lsp[i]-lsp[i-1];
-	if (diff1 < (4000.0/PI)*200) diff1 = (PI/4000.0)*200;
-	if (diff2 < (4000.0/PI)*200) diff2 = (PI/4000.0)*200;
-	wt[i] = 2.0/diff1 + 1.0/diff2;
+	wt[i] = 1.0/(lsp[i]-lsp[i-1]) + 1.0/(lsp[i+1]-lsp[i]);
 	//printf("wt[%d] = %f\n", i, wt[i]);
     }
-    wt[9] = 1.0/diff1;
+    wt[9] = 1.0/(lsp[i]-lsp[i-1]);
 #endif
+
+    /* VQ LSPs 5,6,7,8,9,10 */
 
     ncb = 4;
     nlsp = 4;
     k = lsp_cbd[ncb].k;
     m = lsp_cbd[ncb].m;
     cb = lsp_cbd[ncb].cb;
-    for(i=4; i<order; i++) {
-	lsplog[i] = log10(lsp[i]);
-	//printf("%f ", lsp[i]);
-    }
-    //printf("\n");
     index = quantise(cb, &lsp[nlsp], &wt[nlsp], k, m, &se);
-    /*
-    for(i=0; i<6; i++)
- 	printf("%f ", cb[i]);
-    printf("\n");
-    printf("index = %d\n", index);
-    */
-    for(i=4; i<order; i++) {
-	//lsplog_[i] = pow(10.0, cb[index*k+i-nlsp]);
-	//printf("%f ", cb[index*k+i-nlsp]);
-	//lsp__hz[i] = (4000.0/PI)*lsplog_[i];
-	//lsp__hz[i] = lsp_hz[i];
-	lsp__hz[i] = (4000.0/PI)*cb[index*k+i-nlsp];
-    }
-    if ((lsp__hz[4] - lsp__hz[3]) < 100.0) 
-	lsp__hz[4] = lsp__hz[3] + 100.0;
-    /*
-    printf("\n");
-    for(i=4; i<order; i++)
- 	printf("%f ", lsp__hz[i]);
-    printf("\n\n");
-    */
+    lsp_[nlsp] = cb[index*k];
+    lsp_[nlsp+1] = cb[index*k+1];
+    lsp_[nlsp+2] = cb[index*k+2];
+    lsp_[nlsp+3] = cb[index*k+3];
+    lsp_[nlsp+4] = cb[index*k+4];
+    lsp_[nlsp+5] = cb[index*k+5];
+    lsp_[nlsp+6] = cb[index*k+6];
 
-    /*
-    for(; i<order; i++)
-    	lsp__hz[i] = lsp_hz[i];
-    */
+   /* convert back to radians */
 
-    /* convert back to radians */
-
-    for(i=0; i<order; i++)
+    for(i=0; i<4; i++)
 	lsp_[i] = (PI/4000.0)*lsp__hz[i];
 }
 
@@ -280,7 +254,7 @@ void lspvq_quantise(
 	wt[i] = 1.0/(lsp[i]-lsp[i-1]) + 1.0/(lsp[i+1]-lsp[i]);
 	//printf("wt[%d] = %f\n", i, wt[i]);
     }
-    wt[9] = 2.0/(lsp[i]-lsp[i-1]);
+    wt[9] = 1.0/(lsp[i]-lsp[i-1]);
 #endif
 
     /* VQ LSPs 5,6,7,8,9,10 */
