@@ -43,12 +43,19 @@ CODEBOOKSRES= \
   $D/lsp3.txt \
   $D/lsp4.txt
 
-noinst_PROGRAMS = generate_codebook
+CODEBOOKSDT= \
+  $D/lspdt1-4.txt \
+  $D/lspdt5-10.txt
+
+noinst_PROGRAMS = generate_codebook genlspdtcb
 
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
 codebookvq.$(OBJEXT): codebookvq.c
 codebookres.$(OBJEXT): codebookres.c
+
+$(CODEBOOKSDT): genlspdtcb
+	./genlspdtcb
 
 codebook.lo: codebook.c
 
@@ -64,8 +71,11 @@ codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 codebookres.c: generate_codebook $(CODEBOOKSRES)
 	./generate_codebook lsp_cbres $(CODEBOOKSRES) > codebookres.c
 
+codebookdt.c: generate_codebook $(CODEBOOKSDT)
+	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
+
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookres.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookres.c codebookdt.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -84,7 +94,8 @@ pack.c \
 codebook.c \
 codebookd.c \
 codebookvq.c \
-codebookres.c
+codebookres.c \
+codebookdt.c
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)
 libcodec2_la_LDFLAGS = $(LIBS)
