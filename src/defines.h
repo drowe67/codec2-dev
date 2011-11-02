@@ -86,5 +86,6 @@ extern const struct lsp_codebook lsp_cb[];
 extern const struct lsp_codebook lsp_cbd[];
 extern const struct lsp_codebook lsp_cbvq[];
 extern const struct lsp_codebook lsp_cbres[];
+extern const struct lsp_codebook lsp_cbdt[];
 
 #endif

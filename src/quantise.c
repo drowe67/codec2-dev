@@ -135,14 +135,10 @@ void lspd_quantise(
     float lsp__hz[LPC_MAX];
     float dlsp[LPC_MAX];
     float dlsp_[LPC_MAX];
-    float lsplog[LPC_MAX];
-    float lsplog_[LPC_MAX];
     float wt[LPC_MAX];
     const float *cb;
     float se;
     int   indexes[LPC_MAX];
-    float diff1,diff2;
-    float centre_hz, bw_hz, bwe;
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
@@ -289,7 +285,7 @@ void lspres_quantise(float lsps[], float lsps_[], int order)
     const float *cb;
     float se = 0.0;
     int   index;
-    float centre_hz, bw_hz, lsp_hz, bwe;
+    float centre_hz, bw_hz, lsp_hz;
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
@@ -336,6 +332,59 @@ void lspres_quantise(float lsps[], float lsps_[], int order)
     index = quantise(cb, &lsp_hz, wt, k, m, &se);
     lsps_[3] = cb[index*k]*(PI/4000.0);
 
+}
+
+/*---------------------------------------------------------------------------*\
+									      
+  lspdt_quantise
+
+  LSP difference in time quantiser.
+
+\*---------------------------------------------------------------------------*/
+
+void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[]) 
+{
+    int   i,k,m;
+    float wt[LPC_ORD];
+    float lsps_dt[LPC_ORD];
+    const float *cb;
+    float se = 0.0;
+    int   index;
+
+    for(i=0; i<LPC_ORD; i++) {
+	wt[i] = 1.0;
+	lsps_[i] = lsps[i];
+    }
+
+    for(i=0; i<LPC_ORD; i++) {
+	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
+	//	printf("%f ", lsps_dt[i]);
+    }
+    printf("\n");
+    k = lsp_cbdt[0].k;
+    m = lsp_cbdt[0].m;
+    cb = lsp_cbdt[0].cb;
+    //printf("k %d  m %d  cb[0]\n", k, m, cb[0]);
+    index = quantise(cb, lsps_dt, wt, k, m, &se);
+    //printf("index %d\n", index);
+
+    for(i=0; i<4; i++) {
+ 	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i];
+	lsps__prev[i] = lsps_[i];
+    }
+
+    k = lsp_cbdt[1].k;
+    m = lsp_cbdt[1].m;
+    cb = lsp_cbdt[1].cb;
+    index = quantise(cb, &lsps_dt[4], wt, k, m, &se);
+    printf("index %d\n", index);
+    for(i=4; i<10; i++) {
+	printf("%f ", cb[index*k + i - 4]);
+ 	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i - 4];
+	lsps__prev[i] = lsps_[i];
+    }
+
+    printf("\n");
 }
 
 void check_lsp_order(float lsp[], int lpc_order)
@@ -391,10 +440,6 @@ float lpc_model_amplitudes(
   float lsp_hz[LPC_MAX];
   float lsp_[LPC_MAX];
   int   roots;                  /* number of LSP roots found */
-  int   index;
-  float se;
-  int   k,m;
-  const float * cb;
   float wt[LPC_MAX];
 
   for(i=0; i<M; i++)

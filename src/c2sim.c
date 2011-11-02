@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
   float sum_snr;
 
   int lpc_model, order = LPC_ORD;
-  int lsp, lspd, lspvq, lsp_quantiser, lspres;
+  int lsp, lspd, lspvq, lsp_quantiser, lspres, lspdt;
   float ak[LPC_MAX];
   COMP  Sw_[FFT_ENC];
   COMP  Ew[FFT_ENC]; 
@@ -120,6 +120,7 @@ int main(int argc, char *argv[])
   int decimate;
   float lsps[LPC_ORD];
   float prev_lsps[LPC_ORD];
+  float lsps__prev[LPC_ORD];
   float e, prev_e;
   float ak_interp[LPC_MAX];
 
@@ -144,6 +145,7 @@ int main(int argc, char *argv[])
   }
   for(i=0; i<LPC_ORD; i++) {
       prev_lsps[i] = i*PI/(LPC_ORD+1);
+      lsps__prev[i] = i*PI/(LPC_ORD+1);
   }
   e = prev_e = 1;
   hpf_states[0] = hpf_states[1] = 0.0;
@@ -159,6 +161,7 @@ int main(int argc, char *argv[])
      "\t[--lspd]\n"
      "\t[--lspvq]\n"
      "\t[--lspres]\n"
+     "\t[--lspdt]\n"
      "\t[--phase0]\n"
      "\t[--postfilter]\n"
      "\t[--hand_voicing]\n"
@@ -220,6 +223,7 @@ int main(int argc, char *argv[])
       assert(order == LPC_ORD);
 
   lspres = switch_present("--lspres",argc,argv);
+  lspdt = switch_present("--lspdt",argc,argv);
 
   phase0 = switch_present("--phase0",argc,argv);
   if (phase0) {
@@ -296,7 +300,7 @@ int main(int argc, char *argv[])
 	
 	/* determine voicing */
 
-	snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_Wo);
+	snr = est_voicing_mbe(&model, Sw, Sw_, Ew, W, prev_Wo);
 #ifdef DUMP
 	dump_Sw_(Sw_);
 	dump_Ew(Ew);
@@ -333,7 +337,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (lspd) {
-	    locate_lsps_jnd_steps(lsps, LPC_ORD);
+	    //locate_lsps_jnd_steps(lsps, LPC_ORD);
 	    lspd_quantise(lsps, lsps_, LPC_ORD);
 	    locate_lsps_jnd_steps(lsps_, LPC_ORD);
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
@@ -348,10 +352,30 @@ int main(int argc, char *argv[])
 
 	if (lspres) {
  	    lspres_quantise(lsps, lsps_, LPC_ORD);
-	    //locate_lsps_jnd_steps(lsps_, LPC_ORD);
-	    bw_expand_lsps(lsps_, LPC_ORD);
+	    locate_lsps_jnd_steps(lsps_, LPC_ORD);
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
-	    //printf("%f %f %f %f\n", lsps[0], lsps_[0], lsps[1], lsps_[1]);
+	}
+
+	if (lspdt) {
+#define ALTERNATE		
+#ifdef ALTERNATE
+	    if (frames%2) {
+		//locate_lsps_jnd_steps(lsps, LPC_ORD);
+		//lspvq_quantise(lsps, lsps_, LPC_ORD);
+		for(i=0; i<LPC_ORD; i++) {
+		    lsps_[i] = lsps[i];
+		    lsps__prev[i] = lsps_[i];
+		}
+
+	    }
+	    else {
+		lspdt_quantise(lsps, lsps_, lsps__prev);
+	    }
+#else
+	    lspdt_quantise(lsps, lsps_, lsps__prev);
+#endif
+	    //locate_lsps_jnd_steps(lsps_, LPC_ORD);
+	    lsp_to_lpc(lsps_, ak, LPC_ORD);
 	}
 
 #ifdef DUMP
