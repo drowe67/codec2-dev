@@ -121,6 +121,7 @@ int main(int argc, char *argv[])
   float lsps[LPC_ORD];
   float prev_lsps[LPC_ORD];
   float lsps__prev[LPC_ORD];
+  float lsps__prev2[LPC_ORD];
   float e, prev_e;
   float ak_interp[LPC_MAX];
 
@@ -145,7 +146,7 @@ int main(int argc, char *argv[])
   }
   for(i=0; i<LPC_ORD; i++) {
       prev_lsps[i] = i*PI/(LPC_ORD+1);
-      lsps__prev[i] = i*PI/(LPC_ORD+1);
+      lsps__prev[i] = lsps__prev2[i] = i*PI/(LPC_ORD+1);
   }
   e = prev_e = 1;
   hpf_states[0] = hpf_states[1] = 0.0;
@@ -300,7 +301,7 @@ int main(int argc, char *argv[])
 	
 	/* determine voicing */
 
-	snr = est_voicing_mbe(&model, Sw, Sw_, Ew, W, prev_Wo);
+	snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_Wo);
 #ifdef DUMP
 	dump_Sw_(Sw_);
 	dump_Ew(Ew);
@@ -356,26 +357,27 @@ int main(int argc, char *argv[])
 	    lsp_to_lpc(lsps_, ak, LPC_ORD);
 	}
 
-	if (lspdt) {
-#define ALTERNATE		
-#ifdef ALTERNATE
+	if (lspdt && !decimate) {
 	    if (frames%2) {
-		//locate_lsps_jnd_steps(lsps, LPC_ORD);
-		//lspvq_quantise(lsps, lsps_, LPC_ORD);
-		for(i=0; i<LPC_ORD; i++) {
-		    lsps_[i] = lsps[i];
-		    lsps__prev[i] = lsps_[i];
-		}
-
-	    }
-	    else {
 		lspdt_quantise(lsps, lsps_, lsps__prev);
+		bw_expand_lsps(lsps_, LPC_ORD);
+		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
-#else
-	    lspdt_quantise(lsps, lsps_, lsps__prev);
-#endif
-	    //locate_lsps_jnd_steps(lsps_, LPC_ORD);
-	    lsp_to_lpc(lsps_, ak, LPC_ORD);
+	    for(i=0; i<LPC_ORD; i++) {
+		lsps__prev[i] = lsps_[i];
+	    }
+	}
+
+	if (lspdt && decimate) {
+	    if ((frames%4) == 3) {
+		lspdt_quantise(lsps, lsps_, lsps__prev2);
+		bw_expand_lsps(lsps_, LPC_ORD);
+		lsp_to_lpc(lsps_, ak, LPC_ORD);
+	    }
+	    for(i=0; i<LPC_ORD; i++) {
+		lsps__prev2[i] = lsps__prev[i];
+		lsps__prev[i] = lsps_[i];
+	    }
 	}
 
 #ifdef DUMP

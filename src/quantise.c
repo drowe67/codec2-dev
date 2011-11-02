@@ -360,7 +360,7 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[])
 	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
 	//	printf("%f ", lsps_dt[i]);
     }
-    printf("\n");
+    //printf("\n");
     k = lsp_cbdt[0].k;
     m = lsp_cbdt[0].m;
     cb = lsp_cbdt[0].cb;
@@ -370,21 +370,19 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[])
 
     for(i=0; i<4; i++) {
  	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i];
-	lsps__prev[i] = lsps_[i];
     }
 
     k = lsp_cbdt[1].k;
     m = lsp_cbdt[1].m;
     cb = lsp_cbdt[1].cb;
     index = quantise(cb, &lsps_dt[4], wt, k, m, &se);
-    printf("index %d\n", index);
+    //printf("index %d\n", index);
     for(i=4; i<10; i++) {
-	printf("%f ", cb[index*k + i - 4]);
+	//printf("%f ", cb[index*k + i - 4]);
  	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i - 4];
-	lsps__prev[i] = lsps_[i];
     }
 
-    printf("\n");
+    //printf("\n");
 }
 
 void check_lsp_order(float lsp[], int lpc_order)
