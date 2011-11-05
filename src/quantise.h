@@ -33,6 +33,10 @@
 #define E_MIN_DB -10.0
 #define E_MAX_DB  40.0
 
+#define LSPDT_ALL  0
+#define LSPDT_LOW  1
+#define LSPDT_HIGH 2
+
 void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
@@ -47,7 +51,7 @@ void decode_lsps(float lsp[], int indexes[], int order);
 void lspd_quantise(float lsp[], float lsp_[], int order);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 
 void lspres_quantise(float lsp[], float lsp_[], int order);
-void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[]);
+void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 
 int encode_energy(float e);
 float decode_energy(int index);
