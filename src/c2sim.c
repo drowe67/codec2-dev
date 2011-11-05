@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
   float Sn_[2*N];	/* synthesised speech */
   int   i;		/* loop variable                         */
   int   frames;
-  float prev_Wo;
+  float prev_Wo, prev__Wo;
   float pitch;
   int   voiced1 = 0;
 
@@ -397,9 +397,9 @@ int main(int argc, char *argv[])
 
 	/* 
 	   When decimation is enabled we only send LSPs to the decoder
-	   on odd frames.  In this case we encode every second off
-	   frame (i.e. every 3rd frame) by quantising the difference
-	   between the 1st frames LSPs and this frames:
+	   on odd frames.  In the Delta-time LSPs case we encode every
+	   second odd frame (i.e. every 3rd frame) by quantising the
+	   difference between the 1st frames LSPs and this frames:
 
 	   10ms, frame 1: send "full" LSP frame
 	   20ms, frame 2: discard (interpolate at decoder)
@@ -518,6 +518,7 @@ int main(int argc, char *argv[])
 	if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
     }
     prev_Wo = TWO_PI/pitch;
+    prev__Wo = Wo;
   }
   fclose(fin);
 
