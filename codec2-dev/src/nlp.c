@@ -342,7 +342,7 @@ float post_process_sub_multiples(COMP Fw[],
 
 	lmax = 0;
 	lmax_bin = bmin;
-	for (b=bmin; b<=bmax; b++) 		/* look for maximum in interval */
+	for (b=bmin; b<=bmax; b++) 	     /* look for maximum in interval */
 	    if (Fw[b].real > lmax) {
 		lmax = Fw[b].real;
 		lmax_bin = b;

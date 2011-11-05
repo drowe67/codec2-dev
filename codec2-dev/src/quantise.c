@@ -338,11 +338,21 @@ void lspres_quantise(float lsps[], float lsps_[], int order)
 									      
   lspdt_quantise
 
-  LSP difference in time quantiser.
+  LSP difference in time quantiser.  Split VQ, encoding LSPs 1-4 with
+  one VQ, and LSPs 5-10 with a second.  Update of previous lsp memory
+  is done outside of this function to handle dT between 10 or 20ms
+  frames.
+
+  mode        action
+  ------------------
+
+  LSPDT_ALL   VQ LSPs 1-4 and 5-10
+  LSPDT_LOW   Just VQ LSPs 1-4, for LSPs 5-10 just copy previous
+  LSPDT_HIGH  Just VQ LSPs 5-10, for LSPs 1-4 just copy previous
 
 \*---------------------------------------------------------------------------*/
 
-void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[]) 
+void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode) 
 {
     int   i,k,m;
     float wt[LPC_ORD];
@@ -353,36 +363,37 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[])
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
-	lsps_[i] = lsps[i];
     }
 
     for(i=0; i<LPC_ORD; i++) {
 	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
-	//	printf("%f ", lsps_dt[i]);
-    }
-    //printf("\n");
-    k = lsp_cbdt[0].k;
-    m = lsp_cbdt[0].m;
-    cb = lsp_cbdt[0].cb;
-    //printf("k %d  m %d  cb[0]\n", k, m, cb[0]);
-    index = quantise(cb, lsps_dt, wt, k, m, &se);
-    //printf("index %d\n", index);
-
-    for(i=0; i<4; i++) {
- 	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i];
+	lsps_[i] = lsps__prev[i];
     }
 
-    k = lsp_cbdt[1].k;
-    m = lsp_cbdt[1].m;
-    cb = lsp_cbdt[1].cb;
-    index = quantise(cb, &lsps_dt[4], wt, k, m, &se);
-    //printf("index %d\n", index);
-    for(i=4; i<10; i++) {
-	//printf("%f ", cb[index*k + i - 4]);
- 	lsps_[i] = lsps__prev[i] + (PI/4000.0)*cb[index*k + i - 4];
+    /* VQ LSP dTs 1 to 4 */
+
+    if (mode != LSPDT_HIGH) {
+	k = lsp_cbdt[0].k;
+	m = lsp_cbdt[0].m;
+	cb = lsp_cbdt[0].cb;
+	index = quantise(cb, lsps_dt, wt, k, m, &se);
+
+	for(i=0; i<4; i++) {
+	    lsps_[i] += (PI/4000.0)*cb[index*k + i];
+	}
     }
 
-    //printf("\n");
+    /* VQ LSP dTs 6 to 10 */
+
+    if (mode != LSPDT_LOW) {
+	k = lsp_cbdt[1].k;
+	m = lsp_cbdt[1].m;
+	cb = lsp_cbdt[1].cb;
+	index = quantise(cb, &lsps_dt[4], wt, k, m, &se);
+	for(i=4; i<10; i++) {
+	    lsps_[i] += (PI/4000.0)*cb[index*k + i - 4];
+	}
+    }
 }
 
 void check_lsp_order(float lsp[], int lpc_order)
@@ -683,13 +694,7 @@ float speech_to_uq_lsps(float lsp[],
  
     roots = lpc_to_lsp(ak, order, lsp, 5, LSP_DELTA1);
     if (roots != order) {
-	/* for some reason LSP roots could not be found   */
-	/* some alpha testers are reporting this condition */
-	fprintf(stderr, "LSP roots not found!\nroots = %d\n", roots);
-	for(i=0; i<=order; i++)
-	    fprintf(stderr, "a[%d] = %f\n", i, ak[i]);	
-	
-	/* some benign LSP values we can use instead */
+	/* use some benign LSP values we can use instead */
 	for(i=0; i<order; i++)
 	    lsp[i] = (PI/order)*(float)i;
     }
