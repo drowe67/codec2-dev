@@ -788,15 +788,10 @@ void bw_expand_lsps(float lsp[],
 {
     int i;
 
-    for(i=1; i<5; i++) {
+    for(i=1; i<4; i++) {
 	
-	/*
-	  if (lsp[i] - lsp[i-1] < PI*(12.5/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(12.5/4000.0);
-	*/
-	
-	if ((lsp[i] - lsp[i-1]) < 12.5*(PI/4000))
-	    lsp[i] = lsp[i-1] + 12.5*(PI/4000.0);
+	if ((lsp[i] - lsp[i-1]) < 25*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + 50.0*(PI/4000.0);
 	
     }
 
@@ -805,13 +800,9 @@ void bw_expand_lsps(float lsp[],
        different quanstisers.
     */
 
-    for(i=5; i<8; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(25.0/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(25.0/4000.0);
-    }
-    for(i=8; i<order; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(75.0/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(75.0/4000.0);
+    for(i=4; i<order; i++) {
+	if (lsp[i] - lsp[i-1] < PI*(50.0/4000.0))
+	    lsp[i] = lsp[i-1] + PI*(100.0/4000.0);
     }
 }
 
@@ -937,7 +928,7 @@ int encode_energy(float e)
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/8/2010 
 
-  Decodes energy using a WO_BITS quantiser.
+  Decodes energy using a E_LEVELS quantiser.
 
 \*---------------------------------------------------------------------------*/
 
