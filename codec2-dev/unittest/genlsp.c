@@ -61,6 +61,7 @@ int main(int argc, char *argv[]) {
     float  Sn[NW];	/* float input speech samples 			*/
     float  ak[P+1];	/* LPCs for current frame 			*/
     float  lsp[P];	/* LSPs for current frame 			*/
+    float  lsp_prev[P];	/* LSPs for previous frame 			*/
     float  E;		/* frame energy 				*/
     long   f;		/* number of frames                             */
     long   af;		/* number frames with "active" speech 		*/
@@ -68,13 +69,13 @@ int main(int argc, char *argv[]) {
     int    i;
     int    roots;
     int    unstables;
-    int    lspd, log;
+    int    lspd, log, lspdt;
     float  diff;
 
     /* Initialise ------------------------------------------------------*/
 
     if (argc < 3) {
-	printf("usage: gentest RawFile LSPTextFile [--lspd] [--log]\n");
+	printf("usage: gentest RawFile LSPTextFile [--lspd] [--log] [--lspdt] \n");
 	exit(0);
     }
 
@@ -94,6 +95,7 @@ int main(int argc, char *argv[]) {
 
     lspd = switch_present("--lspd", argc, argv);
     log = switch_present("--log", argc, argv);
+    lspdt = switch_present("--lspdt", argc, argv);
 
     for(i=0; i<NW; i++)
 	Sn[i] = 0.0;
@@ -146,11 +148,26 @@ int main(int argc, char *argv[]) {
 		    fprintf(flsp,"\n");
 		    
 		}
-		else {
+		else if (lspdt) {
 		    for(i=0; i<P; i++)
-			fprintf(flsp,"%f ",lsp[i]);
+			fprintf(flsp,"%f ",lsp[i]-lsp_prev[i]);
 		    fprintf(flsp,"\n");
+		    
 		}
+		else {
+		    if (log) {
+			for(i=0; i<P; i++)
+			    fprintf(flsp,"%f ",log10(lsp[i]));
+			fprintf(flsp,"\n");
+		    }
+		    else {
+			for(i=0; i<P; i++)
+			    fprintf(flsp,"%f ",lsp[i]);
+			fprintf(flsp,"\n");
+		    }
+
+		}		
+		memcpy(lsp_prev, lsp, sizeof(lsp));
 	    }
 	    else 
 		unstables++;

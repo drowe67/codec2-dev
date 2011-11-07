@@ -26,16 +26,18 @@
 #ifndef __QUANTISE__
 #define __QUANTISE__
 
-#define WO_BITS   7
-#define WO_LEVELS (1<<WO_BITS)
-#define E_BITS    5
-#define E_LEVELS  (1<<E_BITS)
-#define E_MIN_DB -10.0
-#define E_MAX_DB  40.0
+#define WO_BITS     7
+#define WO_LEVELS   (1<<WO_BITS)
+#define WO_DT_BITS  3
 
-#define LSPDT_ALL  0
-#define LSPDT_LOW  1
-#define LSPDT_HIGH 2
+#define E_BITS      5
+#define E_LEVELS    (1<<E_BITS)
+#define E_MIN_DB   -10.0
+#define E_MAX_DB    40.0
+
+#define LSPDT_ALL   0
+#define LSPDT_LOW   1
+#define LSPDT_HIGH  2
 
 void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
@@ -45,6 +47,8 @@ void aks_to_M2(float ak[], int order, MODEL *model, float E, float *snr,
 
 int   encode_Wo(float Wo);
 float decode_Wo(int index);
+int encode_Wo_dt(float Wo, float prev_Wo);
+float decode_Wo_dt(int index, float prev_Wo);
 
 void encode_lsps(int indexes[], float lsp[], int order);
 void decode_lsps(float lsp[], int indexes[], int order);

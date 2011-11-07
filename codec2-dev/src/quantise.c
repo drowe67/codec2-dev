@@ -661,6 +661,78 @@ float decode_Wo(int index)
 
 /*---------------------------------------------------------------------------*\
                                                        
+  FUNCTION....: encode_Wo_dt()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 6 Nov 2011 
+
+  Encodes Wo difference from last frame.
+
+\*---------------------------------------------------------------------------*/
+
+int encode_Wo_dt(float Wo, float prev_Wo)
+{
+    int   index, mask, max_index, min_index;
+    float Wo_min = TWO_PI/P_MAX;
+    float Wo_max = TWO_PI/P_MIN;
+    float norm;
+
+    norm = (Wo - prev_Wo)/(Wo_max - Wo_min);
+    index = floor(WO_LEVELS * norm + 0.5);
+    //printf("ENC index: %d ", index);
+
+    /* hard limit */
+    
+    max_index = (1 << (WO_DT_BITS-1)) - 1;
+    min_index = - (max_index+1);
+    if (index > max_index) index = max_index;
+    if (index < min_index) index = min_index;
+    //printf("max_index: %d  min_index: %d hard index: %d ",
+    //	   max_index,  min_index, index);
+
+    /* mask so that only LSB WO_DT_BITS remain, bit WO_DT_BITS is the sign bit */
+
+    mask = ((1 << WO_DT_BITS) - 1);
+    index &= mask;
+    //printf("mask: 0x%x index: 0x%x\n", mask, index);
+
+    return index;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_Wo_dt()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 6 Nov 2011 
+
+  Decodes Wo using WO_DT_BITS difference from last frame.
+
+\*---------------------------------------------------------------------------*/
+
+float decode_Wo_dt(int index, float prev_Wo)
+{
+    float Wo_min = TWO_PI/P_MAX;
+    float Wo_max = TWO_PI/P_MIN;
+    float step;
+    float Wo;
+    int   mask;
+
+    /* sign extend index */
+    
+    //printf("DEC index: %d ");
+    if (index & (1 << (WO_DT_BITS-1))) {
+	mask = ~((1 << WO_DT_BITS) - 1);
+	index |= mask;
+    }
+    //printf("DEC mask: 0x%x  index: %d \n", mask, index);
+    
+    step = (Wo_max - Wo_min)/WO_LEVELS;
+    Wo   = prev_Wo + step*(index);
+
+    return Wo;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
   FUNCTION....: speech_to_uq_lsps()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/8/2010 
