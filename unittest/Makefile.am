@@ -22,33 +22,32 @@ vqtrain_SOURCES = vqtrain.c
 vqtrain_LDADD = $(lib_LTLIBRARIES) 
 vqtrain_LDFLAGS = $(LIBS)
 
+CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c ../src/codebookdt.c
+
 tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
 tnlp_LDFLAGS = $(LIBS)
 
-tinterp_SOURCES = tinterp.c ../src/sine.c ../src/fft.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c ../src/dump.c
+tinterp_SOURCES = tinterp.c ../src/sine.c ../src/fft.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c $(CODEBOOKS) ../src/dump.c
 tinterp_LDADD = $(lib_LTLIBRARIES) 
 tinterp_LDFLAGS = $(LIBS)
 
-tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c 
+tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 tquant_LDADD = $(lib_LTLIBRARIES) 
 tquant_LDFLAGS = $(LIBS)
 
 tcodec2_SOURCES = tcodec2.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
-../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c \
-../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c ../src/pack.c
+../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c $(CODEBOOKS)
 tcodec2_LDADD = $(lib_LTLIBRARIES) 
 tcodec2_LDFLAGS = $(LIBS)
 
 genbands_SOURCES = genbands.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
-../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c \
-../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/pack.c
+../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c $(CODEBOOKS) ../src/pack.c
 genbands_LDADD = $(lib_LTLIBRARIES) 
 genbands_LDFLAGS = $(LIBS)
 
 vq_clip_test_SOURCES = vq_clip_test.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
-../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c \
-../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c ../src/pack.c
+../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c $(CODEBOOKS) ../src/pack.c
 vq_clip_test_LDADD = $(lib_LTLIBRARIES) 
 vq_clip_test_LDFLAGS = $(LIBS)
 
