@@ -155,7 +155,7 @@ void lspd_quantise(
     	dlsp[i] = lsp_hz[i] - lsp_hz[i-1];
 
 
-    /* simple uniform scalar quantisers for LSP differences 1..4 */
+    /* scalar quantisers for LSP differences 1..4 */
 
     wt[0] = 1.0;
     for(i=0; i<4; i++) {
@@ -174,8 +174,11 @@ void lspd_quantise(
 	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
 	else
 	    lsp__hz[0] = dlsp_[0];
+	lsp_[i] = (PI/4000.0)*lsp_hz[i];
     }
 
+    //#define PREV_VQ
+#ifdef PREV_VQ
 #define WGHT
 #ifdef WGHT
     for(i=4; i<9; i++) {
@@ -199,12 +202,25 @@ void lspd_quantise(
     lsp_[nlsp+3] = cb[index*k+3];
     lsp_[nlsp+4] = cb[index*k+4];
     lsp_[nlsp+5] = cb[index*k+5];
-    lsp_[nlsp+6] = cb[index*k+6];
 
    /* convert back to radians */
 
     for(i=0; i<4; i++)
 	lsp_[i] = (PI/4000.0)*lsp__hz[i];
+#else
+    /* VQ LSPs 5,6,7,8,9,10 */
+
+    k = lsp_cbjnd[4].k;
+    m = lsp_cbjnd[4].m;
+    cb = lsp_cbjnd[4].cb;
+    index = quantise(cb, &lsp_hz[4], &wt[4], k, m, &se);
+    //printf("index = %4d: ", index);
+    for(i=4; i<LPC_ORD; i++) {
+	lsp_[i] = cb[index*k+i-4]*(PI/4000.0);
+	//printf("%4.f (%4.f) ", lsp_hz[i], cb[index*k+i-4]);
+    }
+    //printf("\n");
+#endif
 }
 
 /*---------------------------------------------------------------------------*\
@@ -235,7 +251,7 @@ void lspvq_quantise(
 
     /* simple uniform scalar quantisers */
 
-    for(i=0; i<4; i++) {
+   for(i=0; i<4; i++) {
 	lsp_hz[i] = 4000.0*lsp[i]/PI;
 	k = lsp_cb[i].k;
 	m = lsp_cb[i].m;
@@ -267,71 +283,58 @@ void lspvq_quantise(
     lsp_[nlsp+3] = cb[index*k+3];
     lsp_[nlsp+4] = cb[index*k+4];
     lsp_[nlsp+5] = cb[index*k+5];
-    lsp_[nlsp+6] = cb[index*k+6];
 }
 
 /*---------------------------------------------------------------------------*\
 									      
-  lspres_quantise
+  lspjnd_quantise
 
-  Resonator model LSP quantiser.
+  Experimental JND LSP quantiser.
 
 \*---------------------------------------------------------------------------*/
 
-void lspres_quantise(float lsps[], float lsps_[], int order) 
+void lspjnd_quantise(float lsps[], float lsps_[], int order) 
 {
     int   i,k,m;
-    float  wt[LPC_ORD];
+    float  wt[LPC_ORD], lsps_hz[LPC_ORD];
     const float *cb;
     float se = 0.0;
     int   index;
-    float centre_hz, bw_hz, lsp_hz;
-
+ 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
     }
 
-    /* use original values as default */
+    /* convert to Hz */
 
     for(i=0; i<LPC_ORD; i++) {
+	lsps_hz[i] = lsps[i]*(4000.0/PI);
 	lsps_[i] = lsps[i];
     }
 
-    /* scalar quantise lsp 1 & 2 "pair" using resonator model */
+    /* simple uniform scalar quantisers */
 
-    centre_hz = (4000.0/PI)*(lsps[1] + lsps[0])/2.0;	    
-    k = lsp_cbres[0].k;
-    m = lsp_cbres[0].m;
-    cb = lsp_cbres[0].cb;
-    index = quantise(cb, &centre_hz, wt, k, m, &se);
-    centre_hz = cb[index*k];
+    for(i=0; i<4; i++) {
+	k = lsp_cbjnd[i].k;
+	m = lsp_cbjnd[i].m;
+	cb = lsp_cbjnd[i].cb;
+	index = quantise(cb, &lsps_hz[i], wt, k, m, &se);
+	lsps_[i] = cb[index*k]*(PI/4000.0);
+    }
 
-    bw_hz = (4000.0/PI)*(lsps[1] - lsps[0]);
-    k = lsp_cbres[1].k;
-    m = lsp_cbres[1].m;
-    cb = lsp_cbres[1].cb;
-    index = quantise(cb, &bw_hz, wt, k, m, &se);
-    bw_hz = cb[index*k];
+    /* VQ LSPs 5,6,7,8,9,10 */
 
-    lsps_[0] = (PI/4000.0)*(centre_hz - bw_hz/2);
-    lsps_[1] = (PI/4000.0)*(centre_hz + bw_hz/2);
- 
-    /* scalar quantise lsp 3 & 4 */
-
-    k = lsp_cbres[2].k;
-    m = lsp_cbres[2].m;
-    cb = lsp_cbres[2].cb;
-    lsp_hz = (4000.0/PI)*lsps[2];
-    index = quantise(cb, &lsp_hz, wt, k, m, &se);
-    lsps_[2] = cb[index*k]*(PI/4000.0);
-
-    k = lsp_cbres[3].k;
-    m = lsp_cbres[3].m;
-    cb = lsp_cbres[3].cb;
-    lsp_hz = (4000.0/PI)*lsps[3];
-    index = quantise(cb, &lsp_hz, wt, k, m, &se);
-    lsps_[3] = cb[index*k]*(PI/4000.0);
-
+    k = lsp_cbjnd[4].k;
+    m = lsp_cbjnd[4].m;
+    cb = lsp_cbjnd[4].cb;
+    index = quantise(cb, &lsps_hz[4], &wt[4], k, m, &se);
+    //printf("k = %d m = %d c[0] %f cb[k] %f\n", k,m,cb[0],cb[k]);
+    //printf("index = %4d: ", index);
+    for(i=4; i<LPC_ORD; i++) {
+	lsps_[i] = cb[index*k+i-4]*(PI/4000.0);
+	//printf("%4.f (%4.f) ", lsps_hz[i], cb[index*k+i-4]);
+    }
+    //printf("\n");
 }
 
 /*---------------------------------------------------------------------------*\
