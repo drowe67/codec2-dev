@@ -37,22 +37,24 @@ CODEBOOKSVQ= \
   $D/lsp4.txt \
   $(top_srcdir)/unittest/lsp45678910.txt
 
-CODEBOOKSRES= \
-  $D/lspres_centre1.txt \
-  $D/lspres_bw1.txt \
+CODEBOOKSJND= \
+  $D/lsp1.txt \
+  $D/lsp2.txt \
   $D/lsp3.txt \
-  $D/lsp4.txt
+  $D/lsp4.txt \
+  $(top_srcdir)/unittest/lspjnd5-10.txt
 
 CODEBOOKSDT= \
   $D/lspdt1-4.txt \
   $D/lspdt5-10.txt
+
 
 noinst_PROGRAMS = generate_codebook genlspdtcb
 
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
 codebookvq.$(OBJEXT): codebookvq.c
-codebookres.$(OBJEXT): codebookres.c
+codebookjnd.$(OBJEXT): codebookjnd.c
 
 $(CODEBOOKSDT): genlspdtcb
 	./genlspdtcb
@@ -68,14 +70,14 @@ codebookd.c: generate_codebook $(CODEBOOKSD)
 codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 	./generate_codebook lsp_cbvq $(CODEBOOKSVQ) > codebookvq.c
 
-codebookres.c: generate_codebook $(CODEBOOKSRES)
-	./generate_codebook lsp_cbres $(CODEBOOKSRES) > codebookres.c
+codebookjnd.c: generate_codebook $(CODEBOOKSJND)
+	./generate_codebook lsp_cbjnd $(CODEBOOKSJND) > codebookjnd.c
 
 codebookdt.c: generate_codebook $(CODEBOOKSDT)
 	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookres.c codebookdt.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -94,7 +96,7 @@ pack.c \
 codebook.c \
 codebookd.c \
 codebookvq.c \
-codebookres.c \
+codebookjnd.c \
 codebookdt.c
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)

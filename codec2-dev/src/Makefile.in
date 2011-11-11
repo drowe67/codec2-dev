@@ -69,7 +69,7 @@ am_libcodec2_la_OBJECTS = libcodec2_la-dump.lo libcodec2_la-lpc.lo \
 	libcodec2_la-phase.lo libcodec2_la-quantise.lo \
 	libcodec2_la-pack.lo libcodec2_la-codebook.lo \
 	libcodec2_la-codebookd.lo libcodec2_la-codebookvq.lo \
-	libcodec2_la-codebookres.lo libcodec2_la-codebookdt.lo
+	libcodec2_la-codebookjnd.lo libcodec2_la-codebookdt.lo
 libcodec2_la_OBJECTS = $(am_libcodec2_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
@@ -255,11 +255,12 @@ CODEBOOKSVQ = \
   $D/lsp4.txt \
   $(top_srcdir)/unittest/lsp45678910.txt
 
-CODEBOOKSRES = \
-  $D/lspres_centre1.txt \
-  $D/lspres_bw1.txt \
+CODEBOOKSJND = \
+  $D/lsp1.txt \
+  $D/lsp2.txt \
   $D/lsp3.txt \
-  $D/lsp4.txt
+  $D/lsp4.txt \
+  $(top_srcdir)/unittest/lspjnd5-10.txt
 
 CODEBOOKSDT = \
   $D/lspdt1-4.txt \
@@ -282,7 +283,7 @@ pack.c \
 codebook.c \
 codebookd.c \
 codebookvq.c \
-codebookres.c \
+codebookjnd.c \
 codebookdt.c
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)
@@ -447,7 +448,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebook.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookdt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookres.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookjnd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookvq.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codec2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-dump.Plo@am__quote@
@@ -596,12 +597,12 @@ libcodec2_la-codebookvq.lo: codebookvq.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-codebookvq.lo `test -f 'codebookvq.c' || echo '$(srcdir)/'`codebookvq.c
 
-libcodec2_la-codebookres.lo: codebookres.c
-@am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-codebookres.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-codebookres.Tpo" -c -o libcodec2_la-codebookres.lo `test -f 'codebookres.c' || echo '$(srcdir)/'`codebookres.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libcodec2_la-codebookres.Tpo" "$(DEPDIR)/libcodec2_la-codebookres.Plo"; else rm -f "$(DEPDIR)/libcodec2_la-codebookres.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='codebookres.c' object='libcodec2_la-codebookres.lo' libtool=yes @AMDEPBACKSLASH@
+libcodec2_la-codebookjnd.lo: codebookjnd.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-codebookjnd.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-codebookjnd.Tpo" -c -o libcodec2_la-codebookjnd.lo `test -f 'codebookjnd.c' || echo '$(srcdir)/'`codebookjnd.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libcodec2_la-codebookjnd.Tpo" "$(DEPDIR)/libcodec2_la-codebookjnd.Plo"; else rm -f "$(DEPDIR)/libcodec2_la-codebookjnd.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='codebookjnd.c' object='libcodec2_la-codebookjnd.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-codebookres.lo `test -f 'codebookres.c' || echo '$(srcdir)/'`codebookres.c
+@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-codebookjnd.lo `test -f 'codebookjnd.c' || echo '$(srcdir)/'`codebookjnd.c
 
 libcodec2_la-codebookdt.lo: codebookdt.c
 @am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-codebookdt.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-codebookdt.Tpo" -c -o libcodec2_la-codebookdt.lo `test -f 'codebookdt.c' || echo '$(srcdir)/'`codebookdt.c; \
@@ -816,7 +817,7 @@ uninstall-am: uninstall-binPROGRAMS uninstall-info-am \
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
 codebookvq.$(OBJEXT): codebookvq.c
-codebookres.$(OBJEXT): codebookres.c
+codebookjnd.$(OBJEXT): codebookjnd.c
 
 $(CODEBOOKSDT): genlspdtcb
 	./genlspdtcb
@@ -832,14 +833,14 @@ codebookd.c: generate_codebook $(CODEBOOKSD)
 codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 	./generate_codebook lsp_cbvq $(CODEBOOKSVQ) > codebookvq.c
 
-codebookres.c: generate_codebook $(CODEBOOKSRES)
-	./generate_codebook lsp_cbres $(CODEBOOKSRES) > codebookres.c
+codebookjnd.c: generate_codebook $(CODEBOOKSJND)
+	./generate_codebook lsp_cbjnd $(CODEBOOKSJND) > codebookjnd.c
 
 codebookdt.c: generate_codebook $(CODEBOOKSDT)
 	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookres.c codebookdt.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

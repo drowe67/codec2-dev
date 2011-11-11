@@ -7,7 +7,7 @@
 
 #include "defines.h"
 
-  /* ../src/codebook/lsp1.txt */
+  /* codebook/lsp1.txt */
 static const float codes0[] = {
   225,
   250,
@@ -26,7 +26,7 @@ static const float codes0[] = {
   575,
   600
 };
-  /* ../src/codebook/lsp2.txt */
+  /* codebook/lsp2.txt */
 static const float codes1[] = {
   325,
   350,
@@ -45,7 +45,7 @@ static const float codes1[] = {
   675,
   700
 };
-  /* ../src/codebook/lsp3.txt */
+  /* codebook/lsp3.txt */
 static const float codes2[] = {
   500,
   550,
@@ -64,7 +64,7 @@ static const float codes2[] = {
   1200,
   1250
 };
-  /* ../src/codebook/lsp4.txt */
+  /* codebook/lsp4.txt */
 static const float codes3[] = {
   700,
   800,
@@ -4184,28 +4184,28 @@ static const float codes4[] = {
 };
 
 const struct lsp_codebook lsp_cbvq[] = {
-  /* ../src/codebook/lsp1.txt */
+  /* codebook/lsp1.txt */
   {
     1,
     4,
     16,
     codes0
   },
-  /* ../src/codebook/lsp2.txt */
+  /* codebook/lsp2.txt */
   {
     1,
     4,
     16,
     codes1
   },
-  /* ../src/codebook/lsp3.txt */
+  /* codebook/lsp3.txt */
   {
     1,
     4,
     16,
     codes2
   },
-  /* ../src/codebook/lsp4.txt */
+  /* codebook/lsp4.txt */
   {
     1,
     4,
