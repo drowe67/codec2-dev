@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-bin_PROGRAMS = genres genlsp extract vqtrain tnlp tinterp tquant tcodec2
+bin_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2
 
 
 genres_SOURCES = genres.c ../src/lpc.c
@@ -22,7 +22,11 @@ vqtrain_SOURCES = vqtrain.c
 vqtrain_LDADD = $(lib_LTLIBRARIES) 
 vqtrain_LDFLAGS = $(LIBS)
 
-CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookres.c ../src/codebookdt.c
+vqtrainjnd_SOURCES = vqtrainjnd.c
+vqtrainjnd_LDADD = $(lib_LTLIBRARIES) 
+vqtrainjnd_LDFLAGS = $(LIBS)
+
+CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c
 
 tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
