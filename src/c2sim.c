@@ -353,8 +353,8 @@ int main(int argc, char *argv[])
 	    /* various LSP quantisation schemes */
 
 	    if (lsp) {
-		encode_lsps(lsp_indexes, lsps, LPC_ORD);
-		decode_lsps(lsps_, lsp_indexes, LPC_ORD);
+		encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
+		decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
 		bw_expand_lsps(lsps_, LPC_ORD);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
