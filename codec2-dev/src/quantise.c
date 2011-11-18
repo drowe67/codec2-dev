@@ -59,6 +59,10 @@ int lsp_bits(int i) {
     return lsp_cb[i].log2m;
 }
 
+int lspd_bits(int i) {
+    return lsp_cbd[i].log2m;
+}
+
 /*---------------------------------------------------------------------------*\
 
   quantise_init
@@ -130,7 +134,7 @@ void lspd_quantise(
   int   order
 ) 
 {
-    int   i,k,m,ncb, nlsp, index;
+    int   i,k,m,index;
     float lsp_hz[LPC_MAX];
     float lsp__hz[LPC_MAX];
     float dlsp[LPC_MAX];
@@ -779,16 +783,16 @@ float speech_to_uq_lsps(float lsp[],
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: encode_lsps()	     
+  FUNCTION....: encode_lsps_scalar()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/8/2010 
 
-  From a vector of unquantised (floating point) LSPs finds the quantised
-  LSP indexes.
+  Thirty-six bit sclar LSP quantiser. From a vector of unquantised
+  (floating point) LSPs finds the quantised LSP indexes.
 
 \*---------------------------------------------------------------------------*/
 
-void encode_lsps(int indexes[], float lsp[], int order)
+void encode_lsps_scalar(int indexes[], float lsp[], int order)
 {
     int    i,k,m;
     float  wt[1];
@@ -815,7 +819,7 @@ void encode_lsps(int indexes[], float lsp[], int order)
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: decode_lsps()	     
+  FUNCTION....: decode_lsps_scalar()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/8/2010 
 
@@ -824,7 +828,7 @@ void encode_lsps(int indexes[], float lsp[], int order)
 
 \*---------------------------------------------------------------------------*/
 
-void decode_lsps(float lsp[], int indexes[], int order)
+void decode_lsps_scalar(float lsp[], int indexes[], int order)
 {
     int    i,k;
     float  lsp_hz[LPC_MAX];
@@ -840,6 +844,190 @@ void decode_lsps(float lsp[], int indexes[], int order)
 
     for(i=0; i<order; i++)
 	lsp[i] = (PI/4000.0)*lsp_hz[i];
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_lsps_diff_freq_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 November 2011
+
+  Twenty-five bit LSP quantiser.  LSPs 1-4 are quantised with scalar
+  LSP differences (in frequency, i.e difference from the previous
+  LSP).  LSPs 5-10 are quantised with a VQ trained generated using
+  vqtrainjnd.c
+
+\*---------------------------------------------------------------------------*/
+
+void encode_lsps_diff_freq_vq(int indexes[], float lsp[], int order)
+{
+    int    i,k,m;
+    float  lsp_hz[LPC_MAX];
+    float lsp__hz[LPC_MAX];
+    float dlsp[LPC_MAX];
+    float dlsp_[LPC_MAX];
+    float wt[LPC_MAX];
+    const float * cb;
+    float se;
+
+    for(i=0; i<LPC_ORD; i++) {
+	wt[i] = 1.0;
+    }
+
+    /* convert from radians to Hz so we can use human readable
+       frequencies */
+
+    for(i=0; i<order; i++)
+	lsp_hz[i] = (4000.0/PI)*lsp[i];
+    
+    /* scalar quantisers for LSP differences 1..4 */
+
+    wt[0] = 1.0;
+    for(i=0; i<4; i++) {
+	if (i) 
+	    dlsp[i] = lsp_hz[i] - lsp__hz[i-1];	    
+	else
+	    dlsp[0] = lsp_hz[0];
+
+	k = lsp_cbd[i].k;
+	m = lsp_cbd[i].m;
+	cb = lsp_cbd[i].cb;
+	indexes[i] = quantise(cb, &dlsp[i], wt, k, m, &se);
+ 	dlsp_[i] = cb[indexes[i]*k];
+
+	if (i) 
+	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
+	else
+	    lsp__hz[0] = dlsp_[0];
+    }
+
+    /* VQ LSPs 5,6,7,8,9,10 */
+
+    k = lsp_cbjnd[4].k;
+    m = lsp_cbjnd[4].m;
+    cb = lsp_cbjnd[4].cb;
+    indexes[4] = quantise(cb, &lsp_hz[4], &wt[4], k, m, &se);
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_lsps_diff_freq_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 Nov 2011
+
+  From a vector of quantised LSP indexes, returns the quantised
+  (floating point) LSPs.
+
+\*---------------------------------------------------------------------------*/
+
+void decode_lsps_diff_freq_vq(float lsp_[], int indexes[], int order)
+{
+    int    i,k,m;
+    float  dlsp_[LPC_MAX];
+    float  lsp__hz[LPC_MAX];
+    const float * cb;
+
+    /* scalar LSP differences */
+
+    for(i=0; i<4; i++) {
+	cb = lsp_cbd[i].cb;
+	dlsp_[i] = cb[indexes[i]];
+	if (i) 
+	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
+	else
+	    lsp__hz[0] = dlsp_[0];
+    }
+
+    /* VQ */
+
+    k = lsp_cbjnd[4].k;
+    m = lsp_cbjnd[4].m;
+    cb = lsp_cbjnd[4].cb;
+    for(i=4; i<order; i++)
+	lsp__hz[i] = cb[indexes[4]*k+i-4];
+
+    /* convert back to radians */
+
+    for(i=0; i<order; i++)
+	lsp_[i] = (PI/4000.0)*lsp__hz[i];
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_lsps_diff_time_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 November 2011
+
+  Seven bit LSP quantiser.  The difference in LSPs 1-4 from a previous
+  frame are quantised with a hand constructed Just Noticable Differnce
+  (JND) VQ.  LSPs 5-10 are just repeated from the last frame.
+
+\*---------------------------------------------------------------------------*/
+
+void encode_lsps_diff_time_vq(int indexes[], 
+			      float lsps[], 
+			      float lsps__prev[], 
+			      int order)
+{
+    int    i,k,m;
+    float  lsps_dt[LPC_ORD];
+    float  wt[LPC_MAX];
+    const  float * cb;
+    float  se;
+
+    for(i=0; i<LPC_ORD; i++) {
+	wt[i] = 1.0;
+    }
+
+    /* Determine difference in time and convert from radians to Hz so
+       we can use human readable frequencies */
+
+    for(i=0; i<LPC_ORD; i++) {
+	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
+    }
+    
+    /* VQ LSP dTs 1 to 4 */
+
+    k = lsp_cbdt[0].k;
+    m = lsp_cbdt[0].m;
+    cb = lsp_cbdt[0].cb;
+    *indexes = quantise(cb, lsps_dt, wt, k, m, &se);
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_lsps_diff_time_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 Nov 2011
+
+  From a quantised LSP indexes, returns the quantised
+  (floating point) LSPs.
+
+\*---------------------------------------------------------------------------*/
+
+void decode_lsps_diff_time_vq(
+			      float lsps_[], 
+			      int indexes[], 
+			      float lsps__prev[],
+			      int order)
+{
+    int    i,k,m;
+    const  float * cb;
+
+    for(i=0; i<order; i++)
+	lsps_[i] = lsps__prev[i];
+
+    k = lsp_cbdt[0].k;
+    m = lsp_cbdt[0].m;
+    cb = lsp_cbdt[0].cb;
+
+    for(i=0; i<4; i++) {
+	lsps_[i] += (PI/4000.0)*cb[*indexes*k + i];
+    }
 
 }
 
@@ -1023,34 +1211,6 @@ float decode_energy(int index)
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: encode_amplitudes()	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 22/8/2010 
-
-  Time domain LPC is used model the amplitudes which are then
-  converted to LSPs and quantised.  So we don't actually encode the
-  amplitudes directly, rather we derive an equivalent representation
-  from the time domain speech.
-
-\*---------------------------------------------------------------------------*/
-
-void encode_amplitudes(int    lsp_indexes[], 
-		       int   *energy_index,
-		       MODEL *model, 
-		       float  Sn[], 
-		       float  w[])
-{
-    float lsps[LPC_ORD];
-    float ak[LPC_ORD+1];
-    float e;
-
-    e = speech_to_uq_lsps(lsps, ak, Sn, w, LPC_ORD);
-    encode_lsps(lsp_indexes, lsps, LPC_ORD);
-    *energy_index = encode_energy(e);
-}
-
-/*---------------------------------------------------------------------------*\
-                                                       
   FUNCTION....: decode_amplitudes()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/8/2010 
@@ -1070,7 +1230,7 @@ float decode_amplitudes(MODEL *model,
 {
     float snr;
 
-    decode_lsps(lsps, lsp_indexes, LPC_ORD);
+    decode_lsps_scalar(lsps, lsp_indexes, LPC_ORD);
     bw_expand_lsps(lsps, LPC_ORD);
     lsp_to_lpc(lsps, ak, LPC_ORD);
     *e = decode_energy(energy_index);

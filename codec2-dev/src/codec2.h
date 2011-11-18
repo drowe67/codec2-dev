@@ -29,13 +29,16 @@
 #ifndef __CODEC2__
 #define  __CODEC2__
 
-#define CODEC2_SAMPLES_PER_FRAME 160
-#define CODEC2_BITS_PER_FRAME     50
+#define CODEC2_MODE_2500 0
+#define CODEC2_MODE_1400 1
 
-void *codec2_create();
-void codec2_destroy(void *codec2_state);
-void codec2_encode(void *codec2_state, unsigned char * bits, short speech_in[]);
-void codec2_decode(void *codec2_state, short speech_out[],
-      const unsigned char * bits);
+struct CODEC2;
+
+struct CODEC2 *codec2_create(int mode);
+void codec2_destroy(struct CODEC2 *codec2_state);
+void codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
+void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
+int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
+int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
 
 #endif

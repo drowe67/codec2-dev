@@ -42,11 +42,12 @@
 
 int main(int argc, char *argv[])
 {
-    void *codec2;
-    FILE *fin;
-    FILE *fout;
-    short buf[CODEC2_SAMPLES_PER_FRAME];
-    unsigned char  bits[BITS_SIZE];
+    struct CODEC2 *codec2;
+    FILE          *fin;
+    FILE          *fout;
+    short         *buf;
+    unsigned char *bits;
+    int            nsam, nbit;
 
     if (argc != 3) {
 	printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);
@@ -68,15 +69,20 @@ int main(int argc, char *argv[])
     /* Note only one set of Codec 2 states is required for an encoder
        and decoder pair. */
 
-    codec2 = codec2_create();
+    codec2 = codec2_create(CODEC2_MODE_1400);
+    nsam = codec2_samples_per_frame(codec2);
+    buf = (short*)malloc(nsam*sizeof(short));
+    nbit = codec2_bits_per_frame(codec2);
+    bits = (unsigned char*)malloc(nbit*sizeof(char));
 
-    while(fread(buf, sizeof(short), CODEC2_SAMPLES_PER_FRAME, fin) == 
-	  CODEC2_SAMPLES_PER_FRAME) {
+    while(fread(buf, sizeof(short), nsam, fin) == nsam) {
 	codec2_encode(codec2, bits, buf);
 	codec2_decode(codec2, buf, bits);
-	fwrite(buf, sizeof(short), CODEC2_SAMPLES_PER_FRAME, fout);
+	fwrite(buf, sizeof(short), nsam, fout);
     }
 
+    free(buf);
+    free(bits);
     codec2_destroy(codec2);
 
     fclose(fin);
