@@ -45,30 +45,30 @@ int main(int argc, char *argv[])
     unsigned char *bits;
     int            nsam, nbit;
 
-    if (argc != 3) {
-	printf("usage: %s 2500|1400 InputRawspeechFile OutputBitFile\n", argv[0]);
-	printf("e.g    %s 1400 ../raw/hts1a.raw hts1a.c2\n", argv[0]);
+    if (argc != 4) {
+	printf("usage: c2enc 2500|1400 InputRawspeechFile OutputBitFile\n");
+	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	exit(1);
     }
  
     if (strcmp(argv[1],"1400") == 0)
-	mode = CODEC2_MODE_2500;
-    else if (strcmp(argv[1],"2500") == 0)
 	mode = CODEC2_MODE_1400;
+    else if (strcmp(argv[1],"2500") == 0)
+	mode = CODEC2_MODE_2500;
     else {
 	fprintf(stderr, "Error in mode: %s.  Must be 2500 or 1400\n", argv[1]);
 	exit(1);
     }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
+    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input bit file: %s: %s.\n",
          argv[1], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[3], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
+    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     nsam = codec2_samples_per_frame(codec2);
     nbit = codec2_bits_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
-    bits = (char*)malloc(nbit*sizeof(char));
+    bits = (unsigned char*)malloc(nbit*sizeof(char));
 
     while(fread(buf, sizeof(short), nsam, fin) == nsam) {
 	codec2_encode(codec2, bits, buf);

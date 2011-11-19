@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
     float lsps__prev2[LPC_ORD];
     float e, prev_e;
     float ak_interp[LPC_MAX];
+    int   lsp_indexes[LPC_MAX];
+    float lsps_[LPC_ORD];
 
     void *nlp_states;
     float hpf_states[2];
@@ -273,7 +275,7 @@ int main(int argc, char *argv[])
     sum_snr = 0;
     while(fread(buf,sizeof(short),N,fin)) {
 	frames++;
-	//printf("frame: %d", frames);
+	printf("frame: %d", frames);
 
 	/* Read input speech */
 
@@ -340,8 +342,6 @@ int main(int argc, char *argv[])
 	/* optional LPC model amplitudes and LSP quantisation -----------------*/
 
 	if (lpc_model) {
-	    int   lsp_indexes[LPC_MAX];
-	    float lsps_[LPC_ORD];
 
 	    e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
@@ -372,9 +372,9 @@ int main(int argc, char *argv[])
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
-	    /* we need lsp__prev[] for lspdt.  If no other
-	       LSP quantisation is used we use original LSPs 
-	       as there is no quantised version available. */
+	    /* we need lsp__prev[] for lspdt and decimate.  If no
+	       other LSP quantisation is used we use original LSPs as
+	       there is no quantised version available. */
 
 	    if (!lsp && !lspd && !lspvq && !lspres)
 		for(i=0; i<LPC_ORD; i++)
@@ -407,14 +407,14 @@ int main(int argc, char *argv[])
 	       of 4) by quantising the difference between the 1st
 	       frames LSPs and the 3rd frames:
 
-	       10ms, frame 1: send "full" LSP frame
-	       20ms, frame 2: discard (interpolate at decoder)
-	       30ms, frame 3: send LSPs differences between frame 3 and frame 1
-	       40ms, frame 4: discard (interpolate at decoder)
+	       10ms, frame 1: discard (interpolate at decoder)
+	       20ms, frame 2: send "full" LSP frame
+	       30ms, frame 3: discard (interpolate at decoder)
+	       40ms, frame 4: send LSPs differences between frame 4 and frame 2
 	    */
 
 	    if (lspdt && decimate) {
-		if ((frames%4) == 3) {
+		if ((frames%4) == 0) {
 		    lspdt_quantise(lsps, lsps_, lsps__prev2, lspdt_mode);
 		    bw_expand_lsps(lsps_, LPC_ORD);
 		    lsp_to_lpc(lsps_, ak, LPC_ORD);
@@ -435,16 +435,25 @@ int main(int argc, char *argv[])
 
 	    e = decode_energy(encode_energy(e));
 
-	    if (!decimate && dt && (frames % 2)) {
-		model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
-		model.L  = PI/model.Wo;
+	    if (!decimate) {
+		/* we send paams every 10ms, delta-time every 20ms */
+		if (dt && (frames % 2)) 
+		    model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
+		else
+		    model.Wo = decode_Wo(encode_Wo(model.Wo));
 	    }
 
-	    if (decimate && dt && ((frames % 4) == 3)) {
-		model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
-		model.L  = PI/model.Wo;
-		//printf("dWo");
+	    if (decimate) {
+		/* we send params every 20ms */
+		if (dt && ((frames % 4) == 3)) {
+		    /* delta-time every 40ms */
+		    model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
+		}
+		else
+		    model.Wo = decode_Wo(encode_Wo(model.Wo));		    
 	    }
+
+	    model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	   
 	    if (!decimate && !dt)
 		model.Wo = decode_Wo(encode_Wo(model.Wo));
@@ -489,16 +498,24 @@ int main(int argc, char *argv[])
 	    /* 
 	       Each 20ms we synthesise two 10ms frames:
 
-	       frame 1: interpolate frame 0 LSPs from frame -1 and frame 1
-	                synthesise frame 0 and frame 1 speech
-	       frame 2: discard except for voicing bit
-	       frame 3: interpolate frame 2 LSPs from frame 1 and frame 3
-	                synthesise frame 2 and frame 3 speech
-	       frame 4: discard except for voicing bit
+	       frame 1: discard except for voicing bit
+	       frame 2: interpolate frame 1 LSPs from frame 2 and frame 0
+	                synthesise frame 1 and frame 2 speech
+	       frame 3: discard except for voicing bit
+	       frame 4: interpolate frame 3 LSPs from frame 4 and frame 2
+	                synthesise frame 3 and frame 4 speech
 	    */
 
-	    if (frames%2) {
-		//printf("interp\n");
+	    if ((frames%2) == 0) {
+		printf("interp\n");
+		printf("Wo: %1.5f  L: %d e: %3.2f \n", model.Wo, model.L, e);
+		for(i=0; i<LPC_ORD; i++)
+		    printf("lsp_indexes: %d lsps_: %2.3f prev_lsps_: %2.3f\n", 
+			   lsp_indexes[i], lsps_[i], prev_lsps[i]);
+		printf("ak: ");
+		for(i=0; i<LPC_ORD; i++)
+		    printf("%2.3f  ", ak[i]);
+		printf("\n");
 
 		/* decode interpolated frame */
 
@@ -508,10 +525,17 @@ int main(int argc, char *argv[])
 		interpolate(&interp_model, &prev_model, &model);
 #else
 		interpolate_lsp(&interp_model, &prev_model, &model,
-				prev_lsps, prev_e, lsps, e, ak_interp);
+				prev_lsps, prev_e, lsps_, e, ak_interp);
 		apply_lpc_correction(&interp_model);
 #endif
-	    
+		printf("Wo: %1.5f  L: %d  prev_e: %3.2f\n", 
+		       interp_model.Wo, interp_model.L, prev_e);
+		printf("ak_interp: ");
+		for(i=0; i<LPC_ORD; i++)
+		    printf("%2.3f  ", ak_interp[i]);
+		printf("\n");
+		//if (frames==40) 
+		//    exit(0);
 		if (phase0)
 		    phase_synth_zero_order(&interp_model, ak_interp, ex_phase,
 					   order);	
@@ -535,7 +559,7 @@ int main(int argc, char *argv[])
 
 		prev_model = model;
 		for(i=0; i<LPC_ORD; i++)
-		    prev_lsps[i] = lsps[i];
+		    prev_lsps[i] = lsps_[i];
 		prev_e = e;
 	    }
 	    else {
