@@ -273,6 +273,9 @@ void codec2_encode_2500(struct CODEC2 *c2, unsigned char * bits, short speech[])
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
     encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
     energy_index = encode_energy(e);
+    //for(i=0; i<LPC_ORD; i++)
+    //	printf("lsp_indexes: %d lsps: %2.3f\n", lsp_indexes[i], lsps[i]);
+    //exit(0);
 
     pack(bits, &nbit, Wo_index, WO_BITS);
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
@@ -311,9 +314,11 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     int     i;
     unsigned int nbit = 0;
     MODEL   model_interp;
+    static  int frames;
 
+    printf("frame: %d\n", frames+=2);
     assert(c2 != NULL);
-
+    
     /* unpack bit stream to integer codes */
 
     Wo_index = unpack(bits, &nbit, WO_BITS);
@@ -340,6 +345,15 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     aks_to_M2(ak, LPC_ORD, &model, energy, &snr, 1); 
     apply_lpc_correction(&model);
 
+    printf("Wo: %1.5f  L: %d e: %3.2f \n", model.Wo, model.L, energy);
+    for(i=0; i<LPC_ORD; i++)
+    	printf("lsp_indexes: %d lsp_: %2.3f prev_lsp_: %2.3f\n", 
+	       lsp_indexes[i], lsps_[i], c2->prev_lsps_[i]);
+    printf("ak: ");
+    for(i=0; i<LPC_ORD; i++)
+    	printf("%2.3f  ", ak[i]);
+    printf("\n");
+    
     /* interpolate odd frame model parameters from adjacent frames */
 
     model.voiced = voiced2;
@@ -350,6 +364,14 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp(&model_interp, &c2->prev_model, &model,
     		    c2->prev_lsps_, c2->prev_energy, lsps_, energy, ak_interp);
     apply_lpc_correction(&model_interp);
+    printf("Wo: %1.5f  L: %d  prev_e: %3.2f\n", 
+	   model_interp.Wo, model_interp.L, c2->prev_energy );
+    printf("ak_interp: ");
+    for(i=0; i<LPC_ORD; i++)
+    	printf("%2.3f  ", ak_interp[i]);
+    printf("\n");
+    //if (frames ==40)
+    //	exit(0);
 
     /* synthesise two 10ms frames */
 
