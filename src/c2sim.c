@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     float Sn_[2*N];	/* synthesised speech */
     int   i;		/* loop variable                         */
     int   frames;
-    float prev_Wo, prev__Wo;
+    float prev_Wo, prev__Wo, uq_Wo, prev_uq_Wo;
     float pitch;
     int   voiced1 = 0;
 
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     for(i=0; i<2*N; i++)
 	Sn_[i] = 0;
 
-    prev_Wo = prev__Wo = TWO_PI/P_MAX;
+    prev_uq_Wo = prev_Wo = prev__Wo = TWO_PI/P_MAX;
 
     prev_model.Wo = TWO_PI/P_MIN;
     prev_model.L = floor(PI/prev_model.Wo);
@@ -286,14 +286,15 @@ int main(int argc, char *argv[])
  
 	/* Estimate pitch */
 
-	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_Wo);
+	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
-
+	
 	/* estimate model parameters --------------------------------------*/
 
 	dft_speech(Sw, Sn, w); 
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
+	uq_Wo = model.Wo;
 #ifdef DUMP 
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
 #endif
@@ -322,7 +323,9 @@ int main(int argc, char *argv[])
 	
 	    /* determine voicing */
 
-	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_Wo);
+	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_uq_Wo);
+	    printf("snr %3.2f v: %d Wo: %f prev_Wo: %f\n", snr, model.voiced,
+		   model.Wo, prev_uq_Wo);
 #ifdef DUMP
 	    dump_Sw_(Sw_);
 	    dump_Ew(Ew);
@@ -508,19 +511,26 @@ int main(int argc, char *argv[])
 
 	    if ((frames%2) == 0) {
 		printf("interp\n");
-		printf("Wo: %1.5f  L: %d e: %3.2f \n", model.Wo, model.L, e);
-		for(i=0; i<LPC_ORD; i++)
-		    printf("lsp_indexes: %d lsps_: %2.3f prev_lsps_: %2.3f\n", 
-			   lsp_indexes[i], lsps_[i], prev_lsps[i]);
-		printf("ak: ");
-		for(i=0; i<LPC_ORD; i++)
-		    printf("%2.3f  ", ak[i]);
+		printf("Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
+		       model.Wo, model.L, e, model.voiced);
+		//for(i=0; i<LPC_ORD; i++)
+		//    printf("lsp_indexes: %d lsps_: %2.3f prev_lsps_: %2.3f\n", 
+		//	   lsp_indexes[i], lsps_[i], prev_lsps[i]);
+		//printf("ak: ");
+		//for(i=0; i<LPC_ORD; i++)
+		//    printf("%2.3f  ", ak[i]);
+		//printf("\n");
+		printf("Am: ");
+		for(i=0; i<5; i++)
+		    printf("%2.3f  ", model.A[i]);
 		printf("\n");
 
 		/* decode interpolated frame */
 
 		interp_model.voiced = voiced1;
-
+		//printf("before Wo: %1.5f  L: %d  prev_e: %3.2f\n", 
+		//       prev_model.Wo, prev_model.L, prev_e);
+		
 #ifdef LOG_LIN_INTERP
 		interpolate(&interp_model, &prev_model, &model);
 #else
@@ -528,13 +538,18 @@ int main(int argc, char *argv[])
 				prev_lsps, prev_e, lsps_, e, ak_interp);
 		apply_lpc_correction(&interp_model);
 #endif
-		printf("Wo: %1.5f  L: %d  prev_e: %3.2f\n", 
-		       interp_model.Wo, interp_model.L, prev_e);
-		printf("ak_interp: ");
-		for(i=0; i<LPC_ORD; i++)
-		    printf("%2.3f  ", ak_interp[i]);
+		printf("Wo: %1.5f  L: %d  prev_e: %3.2f v1: %d pv: %d\n", 
+		       interp_model.Wo, interp_model.L, prev_e, voiced1,
+		       prev_model.voiced);
+		//printf("ak_interp: ");
+		//for(i=0; i<LPC_ORD; i++)
+		//    printf("%2.3f  ", ak_interp[i]);
+		//printf("\n");
+		printf("Am: ");
+		for(i=0; i<5; i++)
+		    printf("%2.3f  ", interp_model.A[i]);
 		printf("\n");
-		//if (frames==40) 
+		//if (frames == 6) 
 		//    exit(0);
 		if (phase0)
 		    phase_synth_zero_order(&interp_model, ak_interp, ex_phase,
@@ -574,8 +589,10 @@ int main(int argc, char *argv[])
 	    synth_one_frame(buf, &model, Sn_, Pn);
 	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
 	}
+
 	prev__Wo = prev_Wo;
-	prev_Wo = TWO_PI/pitch;
+	prev_Wo = model.Wo;
+	prev_uq_Wo = uq_Wo;
     }
 
     /* End Main Loop -----------------------------------------------------*/
