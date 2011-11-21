@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit;
+    int            nsam, nbit, nbyte;
 
     if (argc != 4) {
 	printf("usage: c2enc 2500|1400 InputRawspeechFile OutputBitFile\n");
@@ -78,7 +78,8 @@ int main(int argc, char *argv[])
     nsam = codec2_samples_per_frame(codec2);
     nbit = codec2_bits_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
-    bits = (unsigned char*)malloc(nbit*sizeof(char));
+    nbyte = (nbit + 7) / 8;
+    bits = (unsigned char*)malloc(nbyte*sizeof(char));
 
     while(fread(buf, sizeof(short), nsam, fin) == nsam) {
 	codec2_encode(codec2, bits, buf);

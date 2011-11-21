@@ -159,6 +159,12 @@ void interpolate_lsp(
     float lsps[LPC_ORD],e;
     float snr;
 
+    /* trap corner case where V est is probably wrong */
+
+    if (interp->voiced && !prev->voiced && !next->voiced) {
+	interp->voiced = 0;
+    }	
+   
     /* Wo depends on voicing of this and adjacent frames */
 
     if (interp->voiced) {
@@ -173,6 +179,10 @@ void interpolate_lsp(
 	interp->Wo = TWO_PI/P_MAX;
     }
     interp->L = PI/interp->Wo;
+
+    //printf("interp: prev_v: %d next_v: %d prev_Wo: %f next_Wo: %f\n",
+    //	   prev->voiced, next->voiced, prev->Wo, next->Wo);
+    //printf("interp: Wo: %1.5f  L: %d\n", interp->Wo, interp->L);
 
     /* interpolate LSPs */
 

@@ -455,7 +455,7 @@ float est_voicing_mbe(
     /* post processing, helps clean up some voicing errors ------------------*/
 
     /* 
-       Determine the ratio of low freancy to high frequency energy,
+       Determine the ratio of low freqency to high frequency energy,
        voiced speech tends to be dominated by low frequency energy,
        unvoiced by high frequency. This measure can be used to
        determine if we have made any gross errors.
@@ -578,7 +578,7 @@ void synthesise(
       Nov 2010 - found that synthesis using time domain cos() functions
       gives better results for synthesis frames greater than 10ms.  Inverse
       FFT synthesis using a 512 pt FFT works well for 10ms window.  I think
-      (but am not sure) that the problem is realted to the quantisation of
+      (but am not sure) that the problem is related to the quantisation of
       the harmonic frequencies to the FFT bin size, e.g. there is a 
       8000/512 Hz step between FFT bins.  For some reason this makes
       the speech from longer frame > 10ms sound poor.  The effect can also
