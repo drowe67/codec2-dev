@@ -26,6 +26,9 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #ifndef __CODEC2__
 #define  __CODEC2__
 
@@ -42,3 +45,8 @@ int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
 int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
 
 #endif
+
+#ifdef __cplusplus
+}
+#endif
+
