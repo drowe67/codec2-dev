@@ -31,16 +31,16 @@ function pllsp(rawfile,
 
   figure(1);
   clf;
-  %subplot(211);
+  subplot(211);
   sp = s((start_f-2)*80:(end_f-2)*80);
   plot(sp);
 
-  %subplot(212);
-  %plot(lpc10_snr((start_f+1):end_f)-lsp_snr((start_f+1):end_f));
+  subplot(212);
+  plot(lpc10_snr((start_f+1):end_f)-lsp_snr((start_f+1):end_f));
 
   figure(2);
   plot((4000/pi)*lsp((start_f+1):end_f,:));
   hold on;
-  plot((4000/pi)*lsp_((start_f+1):end_f,:));
+  plot((4000/pi)*lsp_((start_f+1):end_f,:),'+-');
   hold off;
 endfunction
