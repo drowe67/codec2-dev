@@ -7,21 +7,17 @@ function phase2(samname, png)
   N = 16000;
 
   f=45;
-  model = load("../src/hts1a_model.txt");
+  model = load("../src/hts1a_phase_model.txt");
   phase = load("../src/hts1a_phase_phase.txt");
   Wo = model(f,1);
   P=2*pi/Wo;
   L = model(f,2);
   A = model(f,3:(L+2));
   phi = phase(f,1:L);
-  phi = zeros(1,L);
-  for m=L/2:L
-    phi(m) = 2*pi*rand(1,1);
-  end
 
   s = zeros(1,N);
 
-  for m=1:L
+  for m=1:L/2
     s_m = A(m)*cos(m*Wo*(0:(N-1)) + phi(m));
     s = s + s_m;
   endfor
