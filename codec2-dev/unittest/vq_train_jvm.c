@@ -35,7 +35,7 @@
 #include <math.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
-#define COEF 0.70f
+#define COEF 0.00f
 #define MAX_ENTRIES 16384
 
 void compute_weights(const float *x, float *w, int ndim)
@@ -52,20 +52,21 @@ void compute_weights(const float *x, float *w, int ndim)
   w[1]*=2;
 }
 
-int find_nearest(const float *codebook, int nb_entries, float *x, int ndim)
+int find_nearest(const float *codebook, int nb_entries, float *x, int ndim, float *min_dist)
 {
   int i, j;
-  float min_dist = 1e15;
   int nearest = 0;
+  
+  *min_dist = 1E15;
   
   for (i=0;i<nb_entries;i++)
   {
     float dist=0;
     for (j=0;j<ndim;j++)
       dist += (x[j]-codebook[i*ndim+j])*(x[j]-codebook[i*ndim+j]);
-    if (dist<min_dist)
+    if (dist<*min_dist)
     {
-      min_dist = dist;
+      *min_dist = dist;
       nearest = i;
     }
   }
@@ -97,7 +98,7 @@ int quantize_lsp(const float *x, const float *codebook1, const float *codebook2,
 {
   int i, n1, n2, n3;
   float err[ndim], err2[ndim], err3[ndim];
-  float w[ndim], w2[ndim], w3[ndim];
+  float w[ndim], w2[ndim], w3[ndim], min_dist;
   
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)
@@ -113,7 +114,7 @@ int quantize_lsp(const float *x, const float *codebook1, const float *codebook2,
   
   for (i=0;i<ndim;i++)
     err[i] = x[i]-COEF*xq[i];
-  n1 = find_nearest(codebook1, nb_entries, err, ndim);
+  n1 = find_nearest(codebook1, nb_entries, err, ndim, &min_dist);
   
   for (i=0;i<ndim;i++)
   {
@@ -157,13 +158,16 @@ void update(float *data, int nb_vectors, float *codebook, int nb_entries, int nd
   int i,j;
   int count[nb_entries];
   int nearest[nb_vectors];
-  
+  float min_dist;
+  float total_min_dist = 0;
+
   for (i=0;i<nb_entries;i++)
     count[i] = 0;
   
   for (i=0;i<nb_vectors;i++)
   {
-    nearest[i] = find_nearest(codebook, nb_entries, data+i*ndim, ndim);
+      nearest[i] = find_nearest(codebook, nb_entries, data+i*ndim, ndim, &min_dist);
+      total_min_dist += min_dist;
   }
   for (i=0;i<nb_entries*ndim;i++)
     codebook[i] = 0;
@@ -183,7 +187,7 @@ void update(float *data, int nb_vectors, float *codebook, int nb_entries, int nd
       codebook[i*ndim+j] *= (1./count[i]);
     w2 += (count[i]/(float)nb_vectors)*(count[i]/(float)nb_vectors);
   }
-  fprintf(stderr, "%f / %d\n", 1./w2, nb_entries);
+  fprintf(stderr, "%f / %d var = %f\n", 1./w2, nb_entries, total_min_dist/nb_vectors );
 }
 
 void update_weighted(float *data, float *weight, int nb_vectors, float *codebook, int nb_entries, int ndim)
@@ -228,6 +232,7 @@ void vq_train(float *data, int nb_vectors, float *codebook, int nb_entries, int 
 {
   int i, j, e;
   e = 1;
+
   for (j=0;j<ndim;j++)
     codebook[j] = 0;
   for (i=0;i<nb_vectors;i++)
@@ -235,8 +240,7 @@ void vq_train(float *data, int nb_vectors, float *codebook, int nb_entries, int 
       codebook[j] += data[i*ndim+j];
   for (j=0;j<ndim;j++)
     codebook[j] *= (1./nb_vectors);
-  
-  
+    
   while (e< nb_entries)
   {
     split(codebook, e, ndim);
@@ -278,7 +282,7 @@ int main(int argc, char **argv)
   float *data, *pred, *codebook, *codebook2, *codebook3;
   float *weight, *weight2, *weight3;
   float *delta, *delta2;
-  float tmp, err;
+  float tmp, err, min_dist, total_min_dist;
   int ret;
 
   printf("Jean-Marc Valin's Split VQ training program....\n");
@@ -303,12 +307,14 @@ int main(int argc, char **argv)
     {
 	ret = fscanf(ftrain, "%f ", &tmp);
     }
-    printf("\r%d lines",nb_vectors++);
+    nb_vectors++;
+    if ((nb_vectors % 1000) == 0)
+	printf("\r%d lines",nb_vectors);
   }
 
   rewind(ftrain);
 
-  printf("ndim %d nb_vectors %d nb_entries %d\n", ndim, nb_vectors, nb_entries);
+  printf("\nndim %d nb_vectors %d nb_entries %d\n", ndim, nb_vectors, nb_entries);
 
   data = malloc(nb_vectors*ndim*sizeof(*data));
   weight = malloc(nb_vectors*ndim*sizeof(*weight));
@@ -343,10 +349,11 @@ int main(int argc, char **argv)
     }
   }
 
-  /* initial predictor state */
+  /* 20ms (two frame gaps) initial predictor state */
 
-  for (i=0;i<ndim;i++)
-    pred[i] = data[i] - M_PI*(i+1)/(ndim+1);
+  for (i=0;i<ndim;i++) {
+    pred[i+ndim] = pred[i] = data[i] - M_PI*(i+1)/(ndim+1);
+  }
 
   /* generate predicted data for training */
 
@@ -364,9 +371,11 @@ int main(int argc, char **argv)
   
   delta = malloc(nb_vectors*ndim*sizeof(*data));
   err = 0;
+  total_min_dist = 0;
   for (i=0;i<nb_vectors;i++)
   {
-    int nearest = find_nearest(codebook, nb_entries, &pred[i*ndim], ndim);
+      int nearest = find_nearest(codebook, nb_entries, &pred[i*ndim], ndim, &min_dist);
+      total_min_dist += min_dist;
     for (j=0;j<ndim;j++)
     {
       //delta[i*ndim+j] = data[i*ndim+j] - codebook[nearest*ndim+j];
@@ -378,8 +387,9 @@ int main(int argc, char **argv)
     }
     //printf("\n");
   }
-  fprintf(stderr, "LSP RMS error: %f\n", sqrt(err/nb_vectors/ndim));
-
+  fprintf(stderr, "Stage 1 LSP RMS error: %f\n", sqrt(err/nb_vectors/ndim));
+  fprintf(stderr, "Stage 1 LSP variance.: %f\n", total_min_dist/nb_vectors);
+  
 #if 1
   vq_train(delta, nb_vectors, codebook2, nb_entries, ndim/2);
   vq_train(delta+ndim*nb_vectors/2, nb_vectors, codebook3, nb_entries, ndim/2);
@@ -387,28 +397,33 @@ int main(int argc, char **argv)
   vq_train_weighted(delta, weight2, nb_vectors, codebook2, nb_entries, ndim/2);
   vq_train_weighted(delta+ndim*nb_vectors/2, weight3, nb_vectors, codebook3, nb_entries, ndim/2);
 #endif
+
   err = 0;
-  
+  total_min_dist = 0; 
+ 
   delta2 = delta + nb_vectors*ndim/2;
 
   for (i=0;i<nb_vectors;i++)
   {
     int n1, n2;
-    n1 = find_nearest(codebook2, nb_entries, &delta[i*ndim/2], ndim/2);
+    n1 = find_nearest(codebook2, nb_entries, &delta[i*ndim/2], ndim/2, &min_dist);
     for (j=0;j<ndim/2;j++)
     {
       delta[i*ndim/2+j] = delta[i*ndim/2+j] - codebook2[n1*ndim/2+j];
       err += (delta[i*ndim/2+j])*(delta[i*ndim/2+j]);
     }
+    total_min_dist += min_dist;
 
-    n2 = find_nearest(codebook3, nb_entries, &delta2[i*ndim/2], ndim/2);
+    n2 = find_nearest(codebook3, nb_entries, &delta2[i*ndim/2], ndim/2, &min_dist);
     for (j=0;j<ndim/2;j++)
     {
       delta[i*ndim/2+j] = delta[i*ndim/2+j] - codebook2[n2*ndim/2+j];
       err += (delta2[i*ndim/2+j])*(delta2[i*ndim/2+j]);
     }
+    total_min_dist += min_dist;
   }
-  fprintf(stderr, "LSP RMS error stage 2: %f\n", sqrt(err/nb_vectors/ndim));
+  fprintf(stderr, "Stage 2 LSP RMS error: %f\n", sqrt(err/nb_vectors/ndim));
+  fprintf(stderr, "Stage 2 LSP Variance.: %f\n", total_min_dist/nb_vectors);
   
   float xq[ndim];
   for (i=0;i<ndim;i++)
@@ -423,6 +438,9 @@ int main(int argc, char **argv)
     printf("\n");*/
   }
   
+  /* save output tables to text files */
+
+  exit(0);
   for (i=0;i<nb_entries;i++)
   {
     for (j=0;j<ndim;j++)

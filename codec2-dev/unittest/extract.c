@@ -74,8 +74,10 @@ int main(int argc, char *argv[]) {
     lines = 0;
     while(!feof(ftext)) {
 	scan_line(ftext, buf, en);
-	fwrite(&buf[st-1], sizeof(float), en-st+1, ffloat);
-	printf("\r%ld lines",lines++);
+	if (!feof(ftext)) {
+	    fwrite(&buf[st-1], sizeof(float), en-st+1, ffloat);
+	    printf("\r%ld lines",lines++);
+	}
     }
     printf("\n");
 
