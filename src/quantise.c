@@ -178,7 +178,7 @@ void lspd_quantise(
 	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
 	else
 	    lsp__hz[0] = dlsp_[0];
-	lsp_[i] = (PI/4000.0)*lsp_hz[i];
+	lsp_[i] = (PI/4000.0)*lsp__hz[i];
     }
 
     //#define PREV_VQ
@@ -249,6 +249,7 @@ void lspvq_quantise(
 
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
+	lsp_hz[i] = 4000.0*lsp[i]/PI;
     }
 
     /* scalar quantise LSPs 1,2,3,4 */
@@ -256,7 +257,6 @@ void lspvq_quantise(
     /* simple uniform scalar quantisers */
 
    for(i=0; i<4; i++) {
-	lsp_hz[i] = 4000.0*lsp[i]/PI;
 	k = lsp_cb[i].k;
 	m = lsp_cb[i].m;
 	cb = lsp_cb[i].cb;
@@ -264,7 +264,7 @@ void lspvq_quantise(
 	lsp_[i] = cb[index*k]*PI/4000.0;
     }
 
-#define WGHT
+   //#define WGHT
 #ifdef WGHT
     for(i=4; i<9; i++) {
 	wt[i] = 1.0/(lsp[i]-lsp[i-1]) + 1.0/(lsp[i+1]-lsp[i]);
@@ -277,16 +277,14 @@ void lspvq_quantise(
 
     ncb = 4;
     nlsp = 4;
-    k = lsp_cbvq[ncb].k;
-    m = lsp_cbvq[ncb].m;
-    cb = lsp_cbvq[ncb].cb;
-    index = quantise(cb, &lsp[nlsp], &wt[nlsp], k, m, &se);
-    lsp_[nlsp] = cb[index*k];
-    lsp_[nlsp+1] = cb[index*k+1];
-    lsp_[nlsp+2] = cb[index*k+2];
-    lsp_[nlsp+3] = cb[index*k+3];
-    lsp_[nlsp+4] = cb[index*k+4];
-    lsp_[nlsp+5] = cb[index*k+5];
+    k = lsp_cbjnd[ncb].k;
+    m = lsp_cbjnd[ncb].m;
+    cb = lsp_cbjnd[ncb].cb;
+    index = quantise(cb, &lsp_hz[nlsp], &wt[nlsp], k, m, &se);
+    for(i=4; i<LPC_ORD; i++) {
+	lsp_[i] = cb[index*k+i-4]*(PI/4000.0);
+	//printf("%4.f (%4.f) ", lsp_hz[i], cb[index*k+i-4]);
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -341,6 +339,8 @@ void lspjnd_quantise(float lsps[], float lsps_[], int order)
     //printf("\n");
 }
 
+void compute_weights(const float *x, float *w, int ndim);
+
 /*---------------------------------------------------------------------------*\
 									      
   lspdt_quantise
@@ -368,15 +368,37 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
     float se = 0.0;
     int   index;
 
+    
     for(i=0; i<LPC_ORD; i++) {
 	wt[i] = 1.0;
     }
+    
+    //compute_weights(lsps, wt, LPC_ORD );
+
+#define DLSP_LIMIT 100.0
 
     for(i=0; i<LPC_ORD; i++) {
 	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
 	lsps_[i] = lsps__prev[i];
+	/*
+	if (lsps_dt[i] > DLSP_LIMIT) 
+	    lsps_dt[i] = DLSP_LIMIT;
+	if (lsps_dt[i] < -DLSP_LIMIT) 
+	    lsps_dt[i] = -DLSP_LIMIT;
+	*/
+	//lsps_[i] += (PI/4000)*lsps_dt[i];
+	
     }
 
+    k = lsp_cbdt[2].k;
+    m = lsp_cbdt[2].m;
+    cb = lsp_cbdt[2].cb;
+    index = quantise(cb, lsps_dt, wt, k, m, &se);
+    printf("k %d m %d\n", k, m);
+    for(i=0; i<LPC_ORD; i++) {
+	//lsps_[i] += (PI/4000.0)*cb[index*k + i];
+    }
+#ifdef TMP
     /* VQ LSP dTs 1 to 4 */
 
     if (mode != LSPDT_HIGH) {
@@ -401,6 +423,112 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
 	    lsps_[i] += (PI/4000.0)*cb[index*k + i - 4];
 	}
     }
+#endif
+}
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
+#define COEF 0.75f
+#define MAX_ENTRIES 16384
+
+void compute_weights(const float *x, float *w, int ndim)
+{
+  int i;
+  w[0] = MIN(x[0], x[1]-x[0]);
+  for (i=1;i<ndim-1;i++)
+    w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  
+  for (i=0;i<ndim;i++)
+    w[i] = 1./(.01+w[i]);
+  w[0]*=3;
+  w[1]*=2;
+}
+
+int find_nearest(const float *codebook, int nb_entries, float *x, int ndim)
+{
+  int i, j;
+  float min_dist = 1e15;
+  int nearest = 0;
+  
+  for (i=0;i<nb_entries;i++)
+  {
+    float dist=0;
+    for (j=0;j<ndim;j++)
+      dist += (x[j]-codebook[i*ndim+j])*(x[j]-codebook[i*ndim+j]);
+    if (dist<min_dist)
+    {
+      min_dist = dist;
+      nearest = i;
+    }
+  }
+  return nearest;
+}
+
+int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const float *w, int ndim)
+{
+  int i, j;
+  float min_dist = 1e15;
+  int nearest = 0;
+  
+  for (i=0;i<nb_entries;i++)
+  {
+    float dist=0;
+    for (j=0;j<ndim;j++)
+      dist += w[j]*(x[j]-codebook[i*ndim+j])*(x[j]-codebook[i*ndim+j]);
+    if (dist<min_dist)
+    {
+      min_dist = dist;
+      nearest = i;
+    }
+  }
+  return nearest;
+}
+
+void lspjvm_quantise(float *x, float *xq, int ndim)
+{
+  int i, n1, n2, n3;
+  float err[ndim], err2[ndim], err3[ndim];
+  float w[ndim], w2[ndim], w3[ndim];
+  const float *codebook1 = lsp_cbjvm[0].cb;
+  const float *codebook2 = lsp_cbjvm[1].cb;
+  const float *codebook3 = lsp_cbjvm[2].cb;
+
+  w[0] = MIN(x[0], x[1]-x[0]);
+  for (i=1;i<ndim-1;i++)
+    w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  
+  /*
+  for (i=0;i<ndim;i++)
+    w[i] = 1./(.003+w[i]);
+  w[0]*=3;
+  w[1]*=2;*/
+  compute_weights(x, w, ndim);
+  
+  for (i=0;i<ndim;i++)
+    err[i] = x[i]-COEF*xq[i];
+  n1 = find_nearest(codebook1, lsp_cbjvm[0].m, err, ndim);
+  
+  for (i=0;i<ndim;i++)
+  {
+    xq[i] = COEF*xq[i] + codebook1[ndim*n1+i];
+    err[i] -= codebook1[ndim*n1+i];
+  }
+  for (i=0;i<ndim/2;i++)
+  {
+    err2[i] = err[2*i];  
+    err3[i] = err[2*i+1];
+    w2[i] = w[2*i];  
+    w3[i] = w[2*i+1];
+  }
+  n2 = find_nearest_weighted(codebook2, lsp_cbjvm[1].m, err2, w2, ndim/2);
+  n3 = find_nearest_weighted(codebook3, lsp_cbjvm[2].m, err3, w3, ndim/2);
+  
+  for (i=0;i<ndim/2;i++)
+  {
+    xq[2*i] += codebook2[ndim*n2/2+i];
+    xq[2*i+1] += codebook3[ndim*n3/2+i];
+  }
 }
 
 void check_lsp_order(float lsp[], int lpc_order)
@@ -767,6 +895,12 @@ float speech_to_uq_lsps(float lsp[],
     autocorrelate(Wn, R, M, order);
     levinson_durbin(R, ak, order);
   
+    /* 15 Hz BW expansion as I can't hear the difference and it may help
+       help occasional fails in the LSP root finding */
+
+    for(i=0; i<=LPC_ORD; i++)
+	ak[i] *= pow(0.994,(float)i);
+
     E = 0.0;
     for(i=0; i<=order; i++)
 	E += ak[i]*R[i];
@@ -1053,7 +1187,7 @@ void bw_expand_lsps(float lsp[],
 
     for(i=1; i<4; i++) {
 	
-	if ((lsp[i] - lsp[i-1]) < 25*(PI/4000.0))
+	if ((lsp[i] - lsp[i-1]) < 50*(PI/4000.0))
 	    lsp[i] = lsp[i-1] + 50.0*(PI/4000.0);
 	
     }
@@ -1064,7 +1198,7 @@ void bw_expand_lsps(float lsp[],
     */
 
     for(i=4; i<order; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(50.0/4000.0))
+	if (lsp[i] - lsp[i-1] < PI*(100.0/4000.0))
 	    lsp[i] = lsp[i-1] + PI*(100.0/4000.0);
     }
 }

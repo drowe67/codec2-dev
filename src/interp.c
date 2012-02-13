@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "defines.h"
 #include "interp.h"
@@ -152,11 +153,12 @@ void interpolate_lsp(
   float  prev_e,    /* previous frames LPC energy                    */
   float *next_lsps, /* next frames LSPs                              */
   float  next_e,    /* next frames LPC energy                        */
-  float *ak_interp  /* interpolated aks for this frame                */
-		     )
+  float *ak_interp, /* interpolated aks for this frame               */
+  float *lsps_interp/* interpolated lsps for this frame              */
+)
 {
     int   l,i;
-    float lsps[LPC_ORD],e;
+    float e;
     float snr;
 
     /* trap corner case where V est is probably wrong */
@@ -180,22 +182,24 @@ void interpolate_lsp(
     }
     interp->L = PI/interp->Wo;
 
-    //printf("interp: prev_v: %d next_v: %d prev_Wo: %f next_Wo: %f\n",
+    //printf("  interp: prev_v: %d next_v: %d prev_Wo: %f next_Wo: %f\n",
     //	   prev->voiced, next->voiced, prev->Wo, next->Wo);
-    //printf("interp: Wo: %1.5f  L: %d\n", interp->Wo, interp->L);
+    //printf("  interp: Wo: %1.5f  L: %d\n", interp->Wo, interp->L);
 
     /* interpolate LSPs */
 
     for(i=0; i<LPC_ORD; i++) {
-	lsps[i] = (prev_lsps[i] + next_lsps[i])/2.0;
+	lsps_interp[i] = (prev_lsps[i] + next_lsps[i])/2.0;
     }
 
     /* Interpolate LPC energy in log domain */
 
     e = pow(10.0, (log10(prev_e) + log10(next_e))/2.0);
+    //printf("  interp: e: %f\n", e);
 
     /* convert back to amplitudes */
 
-    lsp_to_lpc(lsps, ak_interp, LPC_ORD);
+    lsp_to_lpc(lsps_interp, ak_interp, LPC_ORD);
     aks_to_M2(ak_interp, LPC_ORD, interp, e, &snr, 0); 
+    //printf("  interp: ak[1]: %f A[1] %f\n", ak_interp[1], interp->A[1]);
 }
