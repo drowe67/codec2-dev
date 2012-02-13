@@ -486,15 +486,19 @@ float est_voicing_mbe(
 	    model->voiced = 0;
 
 	/* If pitch is jumping about it's likely this is UV */
+	
+	/* 13 Feb 2012 - this seems to add some V errors so comment out for now.  Maybe
+	   double check on bg noise files
 
-	dF0 = (model->Wo - prev_Wo)*FS/TWO_PI;
-	if (fabs(dF0) > 15.0) 
-	    model->voiced = 0;
+	   dF0 = (model->Wo - prev_Wo)*FS/TWO_PI;
+	   if (fabs(dF0) > 15.0) 
+	   model->voiced = 0;
+	*/
 
 	/* A common source of Type 2 errors is the pitch estimator
 	   gives a low (50Hz) estimate for UV speech, which gives a
 	   good match with noise due to the close harmoonic spacing.
-	   These errors are much more common than people with 50Hz
+	   These errors are much more common than people with 50Hz3
 	   pitch, so we have just a small eratio threshold. */
 
 	sixty = 60.0*TWO_PI/FS;
@@ -592,6 +596,8 @@ void synthesise(
 #ifdef FFT_SYNTHESIS
     /* Now set up frequency domain synthesised speech */
     for(l=1; l<=model->L; l++) {
+    //for(l=model->L/2; l<=model->L; l++) {
+    //for(l=1; l<=model->L/4; l++) {
 	b = floor(l*model->Wo*FFT_DEC/TWO_PI + 0.5);
 	if (b > ((FFT_DEC/2)-1)) {
 		b = (FFT_DEC/2)-1;

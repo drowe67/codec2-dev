@@ -46,8 +46,13 @@ CODEBOOKSJND= \
 
 CODEBOOKSDT= \
   $D/lspdt1-4.txt \
-  $D/lspdt5-10.txt
+  $D/lspdt5-10.txt \
+  $D/lspdt1-10.txt
 
+CODEBOOKSJVM= \
+  $D/lspjvm1.txt \
+  $D/lspjvm2.txt \
+  $D/lspjvm3.txt
 
 noinst_PROGRAMS = generate_codebook genlspdtcb
 
@@ -55,6 +60,7 @@ codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
 codebookvq.$(OBJEXT): codebookvq.c
 codebookjnd.$(OBJEXT): codebookjnd.c
+codebookjvm.$(OBJEXT): codebookjvm.c
 
 $(CODEBOOKSDT): genlspdtcb
 	./genlspdtcb
@@ -76,8 +82,11 @@ codebookjnd.c: generate_codebook $(CODEBOOKSJND)
 codebookdt.c: generate_codebook $(CODEBOOKSDT)
 	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
 
+codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
+	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
+
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -97,6 +106,7 @@ codebook.c \
 codebookd.c \
 codebookvq.c \
 codebookjnd.c \
+codebookjvm.c \
 codebookdt.c
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)

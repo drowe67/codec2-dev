@@ -32,8 +32,6 @@
 #include <string.h>
 #include <errno.h>
 
-#define BITS_SIZE	((CODEC2_BITS_PER_FRAME + 7) / 8)
-
 int main(int argc, char *argv[])
 {
     int            mode;
@@ -62,14 +60,14 @@ int main(int argc, char *argv[])
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input bit file: %s: %s.\n",
-         argv[1], strerror(errno));
+         argv[2], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
-         argv[2], strerror(errno));
+         argv[3], strerror(errno));
 	exit(1);
     }
 
@@ -79,8 +77,8 @@ int main(int argc, char *argv[])
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
-
-    while(fread(bits, sizeof(char), nbit, fin) == nbit) {
+    
+    while(fread(bits, sizeof(char), nbyte, fin) == nbyte) {
 	codec2_decode(codec2, buf, bits);
  	fwrite(buf, sizeof(short), nsam, fout);
 	//if this is in a pipeline, we probably don't want the usual
