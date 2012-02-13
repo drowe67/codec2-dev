@@ -38,7 +38,8 @@ build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	vqtrain$(EXEEXT) vqtrainjnd$(EXEEXT) tnlp$(EXEEXT) \
-	tinterp$(EXEEXT) tquant$(EXEEXT) tcodec2$(EXEEXT)
+	tinterp$(EXEEXT) tquant$(EXEEXT) tcodec2$(EXEEXT) \
+	vq_train_jvm$(EXEEXT) scalarlsptest$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -61,7 +62,12 @@ genres_OBJECTS = $(am_genres_OBJECTS)
 genres_DEPENDENCIES =
 am__objects_1 = codebook.$(OBJEXT) codebookd.$(OBJEXT) \
 	codebookvq.$(OBJEXT) codebookjnd.$(OBJEXT) \
-	codebookdt.$(OBJEXT)
+	codebookdt.$(OBJEXT) codebookjvm.$(OBJEXT)
+am_scalarlsptest_OBJECTS = scalarlsptest.$(OBJEXT) quantise.$(OBJEXT) \
+	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
+	kiss_fft.$(OBJEXT) $(am__objects_1)
+scalarlsptest_OBJECTS = $(am_scalarlsptest_OBJECTS)
+scalarlsptest_DEPENDENCIES =
 am_tcodec2_OBJECTS = tcodec2.$(OBJEXT) quantise.$(OBJEXT) \
 	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) codec2.$(OBJEXT) sine.$(OBJEXT) \
@@ -84,6 +90,9 @@ am_tquant_OBJECTS = tquant.$(OBJEXT) quantise.$(OBJEXT) lpc.$(OBJEXT) \
 	$(am__objects_1)
 tquant_OBJECTS = $(am_tquant_OBJECTS)
 tquant_DEPENDENCIES =
+am_vq_train_jvm_OBJECTS = vq_train_jvm.$(OBJEXT)
+vq_train_jvm_OBJECTS = $(am_vq_train_jvm_OBJECTS)
+vq_train_jvm_DEPENDENCIES =
 am_vqtrain_OBJECTS = vqtrain.$(OBJEXT)
 vqtrain_OBJECTS = $(am_vqtrain_OBJECTS)
 vqtrain_DEPENDENCIES =
@@ -102,11 +111,13 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(tcodec2_SOURCES) $(tinterp_SOURCES) $(tnlp_SOURCES) \
-	$(tquant_SOURCES) $(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tinterp_SOURCES) \
+	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
 DIST_SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(tcodec2_SOURCES) $(tinterp_SOURCES) $(tnlp_SOURCES) \
-	$(tquant_SOURCES) $(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tinterp_SOURCES) \
+	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -233,7 +244,10 @@ vqtrain_LDFLAGS = $(LIBS)
 vqtrainjnd_SOURCES = vqtrainjnd.c
 vqtrainjnd_LDADD = $(lib_LTLIBRARIES) 
 vqtrainjnd_LDFLAGS = $(LIBS)
-CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c
+vq_train_jvm_SOURCES = vq_train_jvm.c
+vq_train_jvm_LDADD = $(lib_LTLIBRARIES) 
+vq_train_jvm_LDFLAGS = $(LIBS)
+CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c
 tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
 tnlp_LDFLAGS = $(LIBS)
@@ -248,6 +262,9 @@ tcodec2_SOURCES = tcodec2.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/d
 
 tcodec2_LDADD = $(lib_LTLIBRARIES) 
 tcodec2_LDFLAGS = $(LIBS)
+scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
+scalarlsptest_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -318,6 +335,9 @@ genlsp$(EXEEXT): $(genlsp_OBJECTS) $(genlsp_DEPENDENCIES)
 genres$(EXEEXT): $(genres_OBJECTS) $(genres_DEPENDENCIES) 
 	@rm -f genres$(EXEEXT)
 	$(LINK) $(genres_LDFLAGS) $(genres_OBJECTS) $(genres_LDADD) $(LIBS)
+scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES) 
+	@rm -f scalarlsptest$(EXEEXT)
+	$(LINK) $(scalarlsptest_LDFLAGS) $(scalarlsptest_OBJECTS) $(scalarlsptest_LDADD) $(LIBS)
 tcodec2$(EXEEXT): $(tcodec2_OBJECTS) $(tcodec2_DEPENDENCIES) 
 	@rm -f tcodec2$(EXEEXT)
 	$(LINK) $(tcodec2_LDFLAGS) $(tcodec2_OBJECTS) $(tcodec2_LDADD) $(LIBS)
@@ -330,6 +350,9 @@ tnlp$(EXEEXT): $(tnlp_OBJECTS) $(tnlp_DEPENDENCIES)
 tquant$(EXEEXT): $(tquant_OBJECTS) $(tquant_DEPENDENCIES) 
 	@rm -f tquant$(EXEEXT)
 	$(LINK) $(tquant_LDFLAGS) $(tquant_OBJECTS) $(tquant_LDADD) $(LIBS)
+vq_train_jvm$(EXEEXT): $(vq_train_jvm_OBJECTS) $(vq_train_jvm_DEPENDENCIES) 
+	@rm -f vq_train_jvm$(EXEEXT)
+	$(LINK) $(vq_train_jvm_LDFLAGS) $(vq_train_jvm_OBJECTS) $(vq_train_jvm_LDADD) $(LIBS)
 vqtrain$(EXEEXT): $(vqtrain_OBJECTS) $(vqtrain_DEPENDENCIES) 
 	@rm -f vqtrain$(EXEEXT)
 	$(LINK) $(vqtrain_LDFLAGS) $(vqtrain_OBJECTS) $(vqtrain_LDADD) $(LIBS)
@@ -347,6 +370,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookdt.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookjnd.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookjvm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookvq.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codec2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
@@ -363,11 +387,13 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postfilter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quantise.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcodec2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tinterp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tnlp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tquant.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vq_train_jvm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrain.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrainjnd.Po@am__quote@
 
@@ -476,6 +502,90 @@ kiss_fft.obj: ../src/kiss_fft.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o kiss_fft.obj `if test -f '../src/kiss_fft.c'; then $(CYGPATH_W) '../src/kiss_fft.c'; else $(CYGPATH_W) '$(srcdir)/../src/kiss_fft.c'; fi`
 
+codebook.o: ../src/codebook.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebook.o -MD -MP -MF "$(DEPDIR)/codebook.Tpo" -c -o codebook.o `test -f '../src/codebook.c' || echo '$(srcdir)/'`../src/codebook.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebook.Tpo" "$(DEPDIR)/codebook.Po"; else rm -f "$(DEPDIR)/codebook.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebook.c' object='codebook.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebook.o `test -f '../src/codebook.c' || echo '$(srcdir)/'`../src/codebook.c
+
+codebook.obj: ../src/codebook.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebook.obj -MD -MP -MF "$(DEPDIR)/codebook.Tpo" -c -o codebook.obj `if test -f '../src/codebook.c'; then $(CYGPATH_W) '../src/codebook.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebook.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebook.Tpo" "$(DEPDIR)/codebook.Po"; else rm -f "$(DEPDIR)/codebook.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebook.c' object='codebook.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebook.obj `if test -f '../src/codebook.c'; then $(CYGPATH_W) '../src/codebook.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebook.c'; fi`
+
+codebookd.o: ../src/codebookd.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookd.o -MD -MP -MF "$(DEPDIR)/codebookd.Tpo" -c -o codebookd.o `test -f '../src/codebookd.c' || echo '$(srcdir)/'`../src/codebookd.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookd.Tpo" "$(DEPDIR)/codebookd.Po"; else rm -f "$(DEPDIR)/codebookd.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookd.c' object='codebookd.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookd.o `test -f '../src/codebookd.c' || echo '$(srcdir)/'`../src/codebookd.c
+
+codebookd.obj: ../src/codebookd.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookd.obj -MD -MP -MF "$(DEPDIR)/codebookd.Tpo" -c -o codebookd.obj `if test -f '../src/codebookd.c'; then $(CYGPATH_W) '../src/codebookd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookd.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookd.Tpo" "$(DEPDIR)/codebookd.Po"; else rm -f "$(DEPDIR)/codebookd.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookd.c' object='codebookd.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookd.obj `if test -f '../src/codebookd.c'; then $(CYGPATH_W) '../src/codebookd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookd.c'; fi`
+
+codebookvq.o: ../src/codebookvq.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookvq.o -MD -MP -MF "$(DEPDIR)/codebookvq.Tpo" -c -o codebookvq.o `test -f '../src/codebookvq.c' || echo '$(srcdir)/'`../src/codebookvq.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookvq.Tpo" "$(DEPDIR)/codebookvq.Po"; else rm -f "$(DEPDIR)/codebookvq.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookvq.c' object='codebookvq.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookvq.o `test -f '../src/codebookvq.c' || echo '$(srcdir)/'`../src/codebookvq.c
+
+codebookvq.obj: ../src/codebookvq.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookvq.obj -MD -MP -MF "$(DEPDIR)/codebookvq.Tpo" -c -o codebookvq.obj `if test -f '../src/codebookvq.c'; then $(CYGPATH_W) '../src/codebookvq.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookvq.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookvq.Tpo" "$(DEPDIR)/codebookvq.Po"; else rm -f "$(DEPDIR)/codebookvq.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookvq.c' object='codebookvq.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookvq.obj `if test -f '../src/codebookvq.c'; then $(CYGPATH_W) '../src/codebookvq.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookvq.c'; fi`
+
+codebookjnd.o: ../src/codebookjnd.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjnd.o -MD -MP -MF "$(DEPDIR)/codebookjnd.Tpo" -c -o codebookjnd.o `test -f '../src/codebookjnd.c' || echo '$(srcdir)/'`../src/codebookjnd.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjnd.Tpo" "$(DEPDIR)/codebookjnd.Po"; else rm -f "$(DEPDIR)/codebookjnd.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjnd.c' object='codebookjnd.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjnd.o `test -f '../src/codebookjnd.c' || echo '$(srcdir)/'`../src/codebookjnd.c
+
+codebookjnd.obj: ../src/codebookjnd.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjnd.obj -MD -MP -MF "$(DEPDIR)/codebookjnd.Tpo" -c -o codebookjnd.obj `if test -f '../src/codebookjnd.c'; then $(CYGPATH_W) '../src/codebookjnd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjnd.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjnd.Tpo" "$(DEPDIR)/codebookjnd.Po"; else rm -f "$(DEPDIR)/codebookjnd.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjnd.c' object='codebookjnd.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjnd.obj `if test -f '../src/codebookjnd.c'; then $(CYGPATH_W) '../src/codebookjnd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjnd.c'; fi`
+
+codebookdt.o: ../src/codebookdt.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookdt.o -MD -MP -MF "$(DEPDIR)/codebookdt.Tpo" -c -o codebookdt.o `test -f '../src/codebookdt.c' || echo '$(srcdir)/'`../src/codebookdt.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookdt.Tpo" "$(DEPDIR)/codebookdt.Po"; else rm -f "$(DEPDIR)/codebookdt.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookdt.c' object='codebookdt.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookdt.o `test -f '../src/codebookdt.c' || echo '$(srcdir)/'`../src/codebookdt.c
+
+codebookdt.obj: ../src/codebookdt.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookdt.obj -MD -MP -MF "$(DEPDIR)/codebookdt.Tpo" -c -o codebookdt.obj `if test -f '../src/codebookdt.c'; then $(CYGPATH_W) '../src/codebookdt.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookdt.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookdt.Tpo" "$(DEPDIR)/codebookdt.Po"; else rm -f "$(DEPDIR)/codebookdt.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookdt.c' object='codebookdt.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookdt.obj `if test -f '../src/codebookdt.c'; then $(CYGPATH_W) '../src/codebookdt.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookdt.c'; fi`
+
+codebookjvm.o: ../src/codebookjvm.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjvm.o -MD -MP -MF "$(DEPDIR)/codebookjvm.Tpo" -c -o codebookjvm.o `test -f '../src/codebookjvm.c' || echo '$(srcdir)/'`../src/codebookjvm.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjvm.Tpo" "$(DEPDIR)/codebookjvm.Po"; else rm -f "$(DEPDIR)/codebookjvm.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjvm.c' object='codebookjvm.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjvm.o `test -f '../src/codebookjvm.c' || echo '$(srcdir)/'`../src/codebookjvm.c
+
+codebookjvm.obj: ../src/codebookjvm.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjvm.obj -MD -MP -MF "$(DEPDIR)/codebookjvm.Tpo" -c -o codebookjvm.obj `if test -f '../src/codebookjvm.c'; then $(CYGPATH_W) '../src/codebookjvm.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjvm.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjvm.Tpo" "$(DEPDIR)/codebookjvm.Po"; else rm -f "$(DEPDIR)/codebookjvm.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjvm.c' object='codebookjvm.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjvm.obj `if test -f '../src/codebookjvm.c'; then $(CYGPATH_W) '../src/codebookjvm.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjvm.c'; fi`
+
 codec2.o: ../src/codec2.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codec2.o -MD -MP -MF "$(DEPDIR)/codec2.Tpo" -c -o codec2.o `test -f '../src/codec2.c' || echo '$(srcdir)/'`../src/codec2.c; \
 @am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codec2.Tpo" "$(DEPDIR)/codec2.Po"; else rm -f "$(DEPDIR)/codec2.Tpo"; exit 1; fi
@@ -573,76 +683,6 @@ pack.obj: ../src/pack.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/pack.c' object='pack.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pack.obj `if test -f '../src/pack.c'; then $(CYGPATH_W) '../src/pack.c'; else $(CYGPATH_W) '$(srcdir)/../src/pack.c'; fi`
-
-codebook.o: ../src/codebook.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebook.o -MD -MP -MF "$(DEPDIR)/codebook.Tpo" -c -o codebook.o `test -f '../src/codebook.c' || echo '$(srcdir)/'`../src/codebook.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebook.Tpo" "$(DEPDIR)/codebook.Po"; else rm -f "$(DEPDIR)/codebook.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebook.c' object='codebook.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebook.o `test -f '../src/codebook.c' || echo '$(srcdir)/'`../src/codebook.c
-
-codebook.obj: ../src/codebook.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebook.obj -MD -MP -MF "$(DEPDIR)/codebook.Tpo" -c -o codebook.obj `if test -f '../src/codebook.c'; then $(CYGPATH_W) '../src/codebook.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebook.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebook.Tpo" "$(DEPDIR)/codebook.Po"; else rm -f "$(DEPDIR)/codebook.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebook.c' object='codebook.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebook.obj `if test -f '../src/codebook.c'; then $(CYGPATH_W) '../src/codebook.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebook.c'; fi`
-
-codebookd.o: ../src/codebookd.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookd.o -MD -MP -MF "$(DEPDIR)/codebookd.Tpo" -c -o codebookd.o `test -f '../src/codebookd.c' || echo '$(srcdir)/'`../src/codebookd.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookd.Tpo" "$(DEPDIR)/codebookd.Po"; else rm -f "$(DEPDIR)/codebookd.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookd.c' object='codebookd.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookd.o `test -f '../src/codebookd.c' || echo '$(srcdir)/'`../src/codebookd.c
-
-codebookd.obj: ../src/codebookd.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookd.obj -MD -MP -MF "$(DEPDIR)/codebookd.Tpo" -c -o codebookd.obj `if test -f '../src/codebookd.c'; then $(CYGPATH_W) '../src/codebookd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookd.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookd.Tpo" "$(DEPDIR)/codebookd.Po"; else rm -f "$(DEPDIR)/codebookd.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookd.c' object='codebookd.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookd.obj `if test -f '../src/codebookd.c'; then $(CYGPATH_W) '../src/codebookd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookd.c'; fi`
-
-codebookvq.o: ../src/codebookvq.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookvq.o -MD -MP -MF "$(DEPDIR)/codebookvq.Tpo" -c -o codebookvq.o `test -f '../src/codebookvq.c' || echo '$(srcdir)/'`../src/codebookvq.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookvq.Tpo" "$(DEPDIR)/codebookvq.Po"; else rm -f "$(DEPDIR)/codebookvq.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookvq.c' object='codebookvq.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookvq.o `test -f '../src/codebookvq.c' || echo '$(srcdir)/'`../src/codebookvq.c
-
-codebookvq.obj: ../src/codebookvq.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookvq.obj -MD -MP -MF "$(DEPDIR)/codebookvq.Tpo" -c -o codebookvq.obj `if test -f '../src/codebookvq.c'; then $(CYGPATH_W) '../src/codebookvq.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookvq.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookvq.Tpo" "$(DEPDIR)/codebookvq.Po"; else rm -f "$(DEPDIR)/codebookvq.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookvq.c' object='codebookvq.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookvq.obj `if test -f '../src/codebookvq.c'; then $(CYGPATH_W) '../src/codebookvq.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookvq.c'; fi`
-
-codebookjnd.o: ../src/codebookjnd.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjnd.o -MD -MP -MF "$(DEPDIR)/codebookjnd.Tpo" -c -o codebookjnd.o `test -f '../src/codebookjnd.c' || echo '$(srcdir)/'`../src/codebookjnd.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjnd.Tpo" "$(DEPDIR)/codebookjnd.Po"; else rm -f "$(DEPDIR)/codebookjnd.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjnd.c' object='codebookjnd.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjnd.o `test -f '../src/codebookjnd.c' || echo '$(srcdir)/'`../src/codebookjnd.c
-
-codebookjnd.obj: ../src/codebookjnd.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookjnd.obj -MD -MP -MF "$(DEPDIR)/codebookjnd.Tpo" -c -o codebookjnd.obj `if test -f '../src/codebookjnd.c'; then $(CYGPATH_W) '../src/codebookjnd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjnd.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookjnd.Tpo" "$(DEPDIR)/codebookjnd.Po"; else rm -f "$(DEPDIR)/codebookjnd.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookjnd.c' object='codebookjnd.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookjnd.obj `if test -f '../src/codebookjnd.c'; then $(CYGPATH_W) '../src/codebookjnd.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookjnd.c'; fi`
-
-codebookdt.o: ../src/codebookdt.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookdt.o -MD -MP -MF "$(DEPDIR)/codebookdt.Tpo" -c -o codebookdt.o `test -f '../src/codebookdt.c' || echo '$(srcdir)/'`../src/codebookdt.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookdt.Tpo" "$(DEPDIR)/codebookdt.Po"; else rm -f "$(DEPDIR)/codebookdt.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookdt.c' object='codebookdt.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookdt.o `test -f '../src/codebookdt.c' || echo '$(srcdir)/'`../src/codebookdt.c
-
-codebookdt.obj: ../src/codebookdt.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT codebookdt.obj -MD -MP -MF "$(DEPDIR)/codebookdt.Tpo" -c -o codebookdt.obj `if test -f '../src/codebookdt.c'; then $(CYGPATH_W) '../src/codebookdt.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookdt.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/codebookdt.Tpo" "$(DEPDIR)/codebookdt.Po"; else rm -f "$(DEPDIR)/codebookdt.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/codebookdt.c' object='codebookdt.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o codebookdt.obj `if test -f '../src/codebookdt.c'; then $(CYGPATH_W) '../src/codebookdt.c'; else $(CYGPATH_W) '$(srcdir)/../src/codebookdt.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

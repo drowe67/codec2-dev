@@ -1,10 +1,10 @@
 /*---------------------------------------------------------------------------*\
                                                                            
-  FILE........: lsptest.c   
+  FILE........: speexlsptest.c   
   AUTHOR......: David Rowe                                                      
   DATE CREATED: 24/8/09                                                   
                                                                           
-  Test Speech LPC to LSP conversion and quantisation.
+  Test LPC to LSP conversion and quantisation using Speex LSP quantiser.
                                                                           
 \*---------------------------------------------------------------------------*/
 

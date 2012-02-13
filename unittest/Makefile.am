@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-bin_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2
+bin_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2 vq_train_jvm scalarlsptest
 
 
 genres_SOURCES = genres.c ../src/lpc.c
@@ -26,7 +26,11 @@ vqtrainjnd_SOURCES = vqtrainjnd.c
 vqtrainjnd_LDADD = $(lib_LTLIBRARIES) 
 vqtrainjnd_LDFLAGS = $(LIBS)
 
-CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c
+vq_train_jvm_SOURCES = vq_train_jvm.c
+vq_train_jvm_LDADD = $(lib_LTLIBRARIES) 
+vq_train_jvm_LDFLAGS = $(LIBS)
+
+CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c
 
 tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
@@ -44,4 +48,8 @@ tcodec2_SOURCES = tcodec2.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/d
 ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c $(CODEBOOKS)
 tcodec2_LDADD = $(lib_LTLIBRARIES) 
 tcodec2_LDFLAGS = $(LIBS)
+
+scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
+scalarlsptest_LDFLAGS = $(LIBS)
 
