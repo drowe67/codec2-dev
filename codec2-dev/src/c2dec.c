@@ -40,9 +40,10 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit, nbyte;
+    int            nsam, nbit, nbyte, i, byte, frames, bit_errors;
+    float          ber, r;
 
-    if (argc != 4) {
+    if (argc < 4) {
 	printf("usage: c2dec 2500|1500|1125 InputBitFile OutputRawSpeechFile\n");
 	printf("e.g    c2dec 1500 hts1a.c2 hts1a_1500.raw\n");
 	exit(1);
@@ -73,22 +74,42 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    if (argc == 5)
+	ber = atof(argv[4]);
+    else
+	ber = 0.0;
+
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
     nbit = codec2_bits_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
-    
+    frames = bit_errors = 0;
+
     while(fread(bits, sizeof(char), nbyte, fin) == nbyte) {
+	frames++;
+	if (ber != 0.0) {
+	    for(i=0; i<nbit; i++) {
+		r = (float)rand()/RAND_MAX;
+		if (r < ber) {
+		    byte = i/8;
+		    //printf("nbyte %d nbit %d i %d byte %d\n", nbyte, nbit, i, byte);
+		    bits[byte] ^= 1 << (i - byte*8);
+		    bit_errors++;
+		}
+	    }
+	}
 	codec2_decode(codec2, buf, bits);
  	fwrite(buf, sizeof(short), nsam, fout);
 	//if this is in a pipeline, we probably don't want the usual
         //buffering to occur
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
-          
+        if (fin == stdin) fflush(stdin);         
     }
+
+    if (ber != 0.0)
+	printf("actual BER: %1.3f\n", (float)bit_errors/(frames*nbit));
 
     codec2_destroy(codec2);
 

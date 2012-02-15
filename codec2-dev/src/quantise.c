@@ -534,7 +534,7 @@ void check_lsp_order(float lsp[], int lpc_order)
 
     for(i=1; i<lpc_order; i++)
 	if (lsp[i] < lsp[i-1]) {
-	    printf("swap %d\n",i);
+	    //printf("swap %d\n",i);
 	    tmp = lsp[i-1];
 	    lsp[i-1] = lsp[i]-0.05;
 	    lsp[i] = tmp+0.05;
