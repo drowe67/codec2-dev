@@ -778,23 +778,23 @@ void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[])
 
     /* frame 1: - we just want voicing -------------------------------- */
 
-    printf("frame: %d\n", ++frames);
+    //printf("frame: %d\n", ++frames);
     analyse_one_frame(c2, &model, speech);
     voiced1 = model.voiced;
 
     /* frame 2: - predictive VQ LSP and Wo ---------------------------- */
 
-    printf("frame: %d\n", ++frames);
+    //printf("frame: %d\n", ++frames);
     analyse_one_frame(c2, &model, &speech[N]);
     voiced2 = model.voiced;
     
     Wo_index = encode_Wo(model.Wo);
 
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
-    printf("   lsps........: ");
-    for(i=0; i<LPC_ORD; i++)
-	printf("%5.3f  ", lsps[i]);
-    printf("\n");
+    //printf("   lsps........: ");
+    //for(i=0; i<LPC_ORD; i++)
+    //	printf("%5.3f  ", lsps[i]);
+    //printf("\n");
     encode_lsps_vq(lsp_indexes, lsps, lsps_, LPC_ORD);
     energy_index = encode_energy(e);
 
@@ -810,13 +810,13 @@ void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[])
 
     /* frame 3: - we just want voicing --------------------------------- */
 
-    printf("frame: %d\n", ++frames);
+    //printf("frame: %d\n", ++frames);
     analyse_one_frame(c2, &model, &speech[2*N]);
     voiced3 = model.voiced;
 
     /* frame 4: - voicing and delta Wo -----------------------------  */
 
-    printf("frame: %d\n", ++frames);
+    //printf("frame: %d\n", ++frames);
     analyse_one_frame(c2, &model, &speech[3*N]);
     voiced4 = model.voiced;
     
@@ -918,7 +918,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     apply_lpc_correction(&model_interp);
 
     frames += 2;
-    /* used for comparing to c2sim version  */
+    /* used for comparing to c2sim version  
        printf("frame: %d\n", frames);
     printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
 	   model_interp.Wo, model_interp.L, model_interp.voiced, c2->prev_energy);
@@ -938,7 +938,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<10; i++)
 	printf("%5.3f  ",model.A[i]);
     printf("\n");
-    
+    */
 
     /* synthesise frame 1 and frame 2 10ms frames */
 
@@ -989,7 +989,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     apply_lpc_correction(&model_interp);
 
     frames +=2;
-    /* used for comparing to c2sim version: */
+    /* used for comparing to c2sim version: 
     printf("frame: %d\n", frames);
 
     printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
@@ -1010,6 +1010,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<10; i++)
 	printf("%5.3f  ",model.A[i]);
     printf("\n");
+    */
 
     /* synthesise frame 3 and frame 4 10ms frames */
 
