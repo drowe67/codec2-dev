@@ -362,6 +362,7 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     /* decode even frame LSPs and model amplitudes */
 
     decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
+    check_lsp_order(lsps_, LPC_ORD);
     bw_expand_lsps(lsps_, LPC_ORD);
     lsp_to_lpc(lsps_, ak, LPC_ORD);
     energy = decode_energy(energy_index);
