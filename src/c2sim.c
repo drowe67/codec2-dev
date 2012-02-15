@@ -547,7 +547,7 @@ int main(int argc, char *argv[])
 	    */
 
 	    if ((frames%2) == 0) {
-		printf("frame: %d\n", frames);
+		//printf("frame: %d\n", frames);
 
 		/* decode interpolated frame */
 
@@ -560,7 +560,7 @@ int main(int argc, char *argv[])
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
 		apply_lpc_correction(&interp_model);
 
-		/* used to compare with c2enc/c2dec version */
+		/* used to compare with c2enc/c2dec version 
 
 		printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
 		       interp_model.Wo, interp_model.L, interp_model.voiced, prev_e);
@@ -580,7 +580,7 @@ int main(int argc, char *argv[])
 		for(i=0; i<10; i++)
 		    printf("%5.3f  ",model.A[i]);
 		printf("\n");
-		
+		*/
 			
 #ifdef DUMP
 		/* do dumping here so we get lsp dump file in correct order */
