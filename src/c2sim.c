@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
     nlp_states = nlp_create();
 
     if (argc < 2) {
-	fprintf(stderr, "\nCodec2 - 2400 bit/s speech codec - Simulation Program\n"
+	fprintf(stderr, "\nCodec2 - low bit rate speech codec - Simulation Program\n"
 		"\thttp://rowetel.com/codec2.html\n\n"
 		"usage: %s InputFile [-o OutputFile]\n"
 		"\t[--lpc Order]\n"
@@ -153,7 +153,8 @@ int main(int argc, char *argv[])
 		"\t[--dec]\n"
 		"\t[--dt]\n"
 		"\t[--2500]\n"
-		"\t[--1400]\n"
+		"\t[--1500]\n"
+		"\t[--1200]\n"
 		"\t[--dump DumpFilePrefix]\n", argv[0]);
 	exit(1);
     }
@@ -256,15 +257,23 @@ int main(int argc, char *argv[])
 	postfilt = 1;
 	decimate = 1;
     }
-    if (switch_present("--1400",argc,argv)) {
+    if (switch_present("--1500",argc,argv)) {
 	lpc_model = 1; order = 10;
-	lsp = 1; lspdt = 1; lspdt_mode = LSPDT_LOW;
+	lsp = 1; lspdt = 1;
 	phase0 = 1;
 	postfilt = 1;
 	decimate = 1;
 	dt = 1;
     }
 
+    if (switch_present("--1200",argc,argv)) {
+	lpc_model = 1; order = 10;
+	lspjvm = 1; lspdt = 1;
+	phase0 = 1;
+	postfilt = 1;
+	decimate = 1;
+	dt = 1;
+    }
     /*
       printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
 	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
@@ -386,19 +395,9 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (lspjvm) {
-		/* note assumes lsps_[] is last frames quantised lsps_ */
-		printf("\n");
+		/* Jean-marcs multi-stage VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);
-		for(i=0; i<10; i++)
-		    printf("%f ", lsps_[i]);
-		for(i=1; i<10; i++) {
-		    if (lsps_[i] < lsps_[i-1]) {
-			printf("unstable!\n");
-			exit(0);
-		    }
-		}
-			    
+		bw_expand_lsps(lsps_, LPC_ORD);			    
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
@@ -548,7 +547,7 @@ int main(int argc, char *argv[])
 	    */
 
 	    if ((frames%2) == 0) {
-		//printf("frame: %d\n", frames);
+		printf("frame: %d\n", frames);
 
 		/* decode interpolated frame */
 
@@ -561,7 +560,7 @@ int main(int argc, char *argv[])
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
 		apply_lpc_correction(&interp_model);
 
-		/* used to compare with c2enc/c2dec version
+		/* used to compare with c2enc/c2dec version */
 
 		printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
 		       interp_model.Wo, interp_model.L, interp_model.voiced, prev_e);
@@ -581,7 +580,7 @@ int main(int argc, char *argv[])
 		for(i=0; i<10; i++)
 		    printf("%5.3f  ",model.A[i]);
 		printf("\n");
-		*/
+		
 			
 #ifdef DUMP
 		/* do dumping here so we get lsp dump file in correct order */
@@ -635,7 +634,7 @@ int main(int argc, char *argv[])
 	prev__Wo = prev_Wo;
 	prev_Wo = model.Wo;
 	prev_uq_Wo = uq_Wo;
-	//if (frames == 44) {
+	//if (frames == 8) {
 	//    exit(0);
 	//}
     }

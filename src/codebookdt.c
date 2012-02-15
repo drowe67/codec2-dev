@@ -89,13 +89,7 @@ static const float codes0[] = {
   25,  0,  50,  50,
   -25,  25,  50,  50,
   0,  25,  50,  50,
-  25,  25,  50,  50,
-  50,  50,  50,  50,
-  100,  100,  100,  100,
-  200,  200,  200,  200,
-  300,  300,  300,  300,
-  -50,  -50,  -50,  -50,
-  -100,  -100,  -100,  -100
+  25,  25,  50,  50
 };
   /* codebook/lspdt5-10.txt */
 static const float codes1[] = {
@@ -1349,8 +1343,8 @@ const struct lsp_codebook lsp_cbdt[] = {
   /* codebook/lspdt1-4.txt */
   {
     4,
-    6.44294,
-    87,
+    6.33985,
+    81,
     codes0
   },
   /* codebook/lspdt5-10.txt */

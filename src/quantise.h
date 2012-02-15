@@ -36,6 +36,7 @@
 #define E_MAX_DB    40.0
 
 #define LSP_SCALAR_INDEXES    10
+#define LSP_PRED_VQ_INDEXES    3
 #define LSP_DIFF_FREQ_INDEXES  5
 #define LSP_DIFF_TIME_BITS     7
 
@@ -67,6 +68,9 @@ void decode_lsps_diff_time_vq(
 			      float lsp__prev[],
 			      int order);
 
+void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim);
+void decode_lsps_vq(int *indexes, float *xq, int ndim);
+
 void lspd_quantise(float lsp[], float lsp_[], int order);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
@@ -81,6 +85,7 @@ int  unpack(const unsigned char * bits, unsigned int *nbit, unsigned int index_b
 
 int lsp_bits(int i);
 int lspd_bits(int i);
+int lsp_pred_vq_bits(int i);
 
 void apply_lpc_correction(MODEL *model);
 float speech_to_uq_lsps(float lsp[],
