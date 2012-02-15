@@ -63,6 +63,10 @@ int lspd_bits(int i) {
     return lsp_cbd[i].log2m;
 }
 
+int lsp_pred_vq_bits(int i) {
+    return lsp_cbjvm[i].log2m;
+}
+
 /*---------------------------------------------------------------------------*\
 
   quantise_init
@@ -427,7 +431,6 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
 }
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
-#define COEF 0.75f
 #define MAX_ENTRIES 16384
 
 void compute_weights(const float *x, float *w, int ndim)
@@ -498,21 +501,14 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
   w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
   
-  /*
-  for (i=0;i<ndim;i++)
-    w[i] = 1./(.003+w[i]);
-  w[0]*=3;
-  w[1]*=2;*/
   compute_weights(x, w, ndim);
   
-  for (i=0;i<ndim;i++)
-    err[i] = x[i]-COEF*xq[i];
-  n1 = find_nearest(codebook1, lsp_cbjvm[0].m, err, ndim);
+  n1 = find_nearest(codebook1, lsp_cbjvm[0].m, x, ndim);
   
   for (i=0;i<ndim;i++)
   {
-    xq[i] = COEF*xq[i] + codebook1[ndim*n1+i];
-    err[i] -= codebook1[ndim*n1+i];
+    xq[i] = codebook1[ndim*n1+i];
+    err[i] = x[i] - xq[i];
   }
   for (i=0;i<ndim/2;i++)
   {
@@ -1163,6 +1159,86 @@ void decode_lsps_diff_time_vq(
 	lsps_[i] += (PI/4000.0)*cb[*indexes*k + i];
     }
 
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_lsps_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 Feb 2012
+
+  Multi-stage VQ LSP quantiser developed by Jean-Marc Valin.
+
+\*---------------------------------------------------------------------------*/
+
+void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim)
+{
+  int i, n1, n2, n3;
+  float err[ndim], err2[ndim], err3[ndim];
+  float w[ndim], w2[ndim], w3[ndim];
+  const float *codebook1 = lsp_cbjvm[0].cb;
+  const float *codebook2 = lsp_cbjvm[1].cb;
+  const float *codebook3 = lsp_cbjvm[2].cb;
+
+  w[0] = MIN(x[0], x[1]-x[0]);
+  for (i=1;i<ndim-1;i++)
+    w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  
+  compute_weights(x, w, ndim);
+  
+  n1 = find_nearest(codebook1, lsp_cbjvm[0].m, x, ndim);
+  
+  for (i=0;i<ndim;i++)
+  {
+    xq[i]  = codebook1[ndim*n1+i];
+    err[i] = x[i] - xq[i];
+  }
+  for (i=0;i<ndim/2;i++)
+  {
+    err2[i] = err[2*i];  
+    err3[i] = err[2*i+1];
+    w2[i] = w[2*i];  
+    w3[i] = w[2*i+1];
+  }
+  n2 = find_nearest_weighted(codebook2, lsp_cbjvm[1].m, err2, w2, ndim/2);
+  n3 = find_nearest_weighted(codebook3, lsp_cbjvm[2].m, err3, w3, ndim/2);
+  
+  indexes[0] = n1;
+  indexes[1] = n2;
+  indexes[2] = n3;
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_lsps_vq()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 15 Feb 2012
+
+\*---------------------------------------------------------------------------*/
+
+void decode_lsps_vq(int *indexes, float *xq, int ndim)
+{
+  int i, n1, n2, n3;
+  const float *codebook1 = lsp_cbjvm[0].cb;
+  const float *codebook2 = lsp_cbjvm[1].cb;
+  const float *codebook3 = lsp_cbjvm[2].cb;
+
+  n1 = indexes[0];
+  n2 = indexes[1];
+  n3 = indexes[2];
+
+  for (i=0;i<ndim;i++)
+  {
+    xq[i] = codebook1[ndim*n1+i];
+  }
+  for (i=0;i<ndim/2;i++)
+  {
+    xq[2*i] += codebook2[ndim*n2/2+i];
+    xq[2*i+1] += codebook3[ndim*n3/2+i];
+  }
 }
 
 

@@ -35,7 +35,7 @@
 #include <math.h>
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
-#define COEF 0.00f
+#define COEF 0.0f
 #define MAX_ENTRIES 16384
 
 void compute_weights(const float *x, float *w, int ndim)
@@ -284,11 +284,13 @@ int main(int argc, char **argv)
   float *delta, *delta2;
   float tmp, err, min_dist, total_min_dist;
   int ret;
+  char filename[256];
+  FILE *fcb;
 
   printf("Jean-Marc Valin's Split VQ training program....\n");
 
   if (argc != 5) {
-      printf("usage: %s TrainTextFile K(dimension) M(codebook size) VQFile\n", argv[0]);
+      printf("usage: %s TrainTextFile K(dimension) M(codebook size) VQFilesPrefix\n", argv[0]);
       exit(0);      
   }
   
@@ -357,10 +359,10 @@ int main(int argc, char **argv)
 
   /* generate predicted data for training */
 
-  for (i=1;i<nb_vectors;i++)
+  for (i=2;i<nb_vectors;i++)
   {
     for (j=0;j<ndim;j++)
-      pred[i*ndim+j] = data[i*ndim+j] - COEF*data[(i-1)*ndim+j];
+      pred[i*ndim+j] = data[i*ndim+j] - COEF*data[(i-2)*ndim+j];
   }
 
   VALGRIND_CHECK_MEM_IS_DEFINED(pred, nb_entries*ndim);
@@ -440,27 +442,38 @@ int main(int argc, char **argv)
   
   /* save output tables to text files */
 
-  exit(0);
+  sprintf(filename, "%s1.txt", argv[4]);
+  fcb = fopen(filename, "wt"); assert(fcb != NULL);
+  fprintf(fcb, "%d %d\n", ndim, nb_entries);
   for (i=0;i<nb_entries;i++)
   {
     for (j=0;j<ndim;j++)
-      printf("%f ", codebook[i*ndim+j]);
-    printf("\n");
+	fprintf(fcb, "%f ", codebook[i*ndim+j]);
+    fprintf(fcb, "\n");
   }
-  printf("\n");
+  fclose(fcb);
+
+  sprintf(filename, "%s2.txt", argv[4]);
+  fcb = fopen(filename, "wt"); assert(fcb != NULL);
+  fprintf(fcb, "%d %d\n", ndim/2, nb_entries);
   for (i=0;i<nb_entries;i++)
   {
     for (j=0;j<ndim/2;j++)
-      printf("%f ", codebook2[i*ndim/2+j]);
-    printf("\n");
+	fprintf(fcb, "%f ", codebook2[i*ndim/2+j]);
+    fprintf(fcb, "\n");
   }
-  printf("\n");
+  fclose(fcb);
+
+  sprintf(filename, "%s3.txt", argv[4]);
+  fcb = fopen(filename, "wt"); assert(fcb != NULL);
+  fprintf(fcb, "%d %d\n", ndim/2, nb_entries);
   for (i=0;i<nb_entries;i++)
   {
     for (j=0;j<ndim/2;j++)
-      printf("%f ", codebook2[i*ndim/2+j]);
-    printf("\n");
+      fprintf(fcb, "%f ", codebook3[i*ndim/2+j]);
+    fprintf(fcb, "\n");
   }
+  fclose(fcb);
 
   return 0;
 }
