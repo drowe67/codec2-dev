@@ -33,6 +33,8 @@
 #include <string.h>
 #include <errno.h>
 #include <math.h>
+#include <unistd.h>
+#include <getopt.h>
 
 #include "defines.h"
 #include "sine.h"
@@ -45,8 +47,8 @@
 #include "postfilter.h"
 #include "interp.h"
 
-int switch_present(char sw[],int argc, char *argv[]);
 void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[]);
+void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 /*---------------------------------------------------------------------------*\
                                                                           
@@ -56,7 +58,7 @@ void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[]);
 
 int main(int argc, char *argv[])
 {
-    FILE *fout;		/* output speech file                    */
+    FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
     short buf[N];		/* input/output buffer                   */
     float Sn[M];	        /* float input speech samples            */
@@ -72,30 +74,31 @@ int main(int argc, char *argv[])
     float pitch;
     int   voiced1 = 0;
     char  out_file[MAX_STR];
-    int   arg;
     float snr;
     float sum_snr;
 
-    int lpc_model, order = LPC_ORD;
-    int lsp, lspd, lspvq, lsp_quantiser, lspres, lspdt, lspdt_mode, dt, lspjvm;
-    int lspjnd;
+    int lpc_model = 0, order = LPC_ORD;
+    int lsp = 0, lspd = 0, lspvq = 0;
+    int lspres = 0;
+    int lspdt = 0, lspdt_mode = LSPDT_ALL;
+    int dt = 0, lspjvm = 0, lspjnd = 0;
     float ak[LPC_MAX];
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
  
-    int dump;
+    int dump = 0;
   
-    int phase0;
+    int phase0 = 0;
     float ex_phase[MAX_AMP+1];
 
     int   postfilt;
     float bg_est;
 
-    int   hand_voicing, phasetest;
+    int   hand_voicing = 0, phasetest = 0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
-    int decimate;
+    int decimate = 0;
     float lsps[LPC_ORD];
     float prev_lsps[LPC_ORD], prev_lsps_[LPC_ORD];
     float lsps__prev[LPC_ORD];
@@ -107,6 +110,32 @@ int main(int argc, char *argv[])
 
     void *nlp_states;
     float hpf_states[2];
+
+    char* opt_string = "ho:";
+    struct option long_options[] = {
+        { "lpc", required_argument, &lpc_model, 1 },
+        { "lspjnd", no_argument, &lspjnd, 1 },
+        { "lsp", no_argument, &lsp, 1 },
+        { "lspd", no_argument, &lspd, 1 },
+        { "lspvq", no_argument, &lspvq, 1 },
+        { "lspres", no_argument, &lspres, 1 },
+        { "lspdt", no_argument, &lspdt, 1 },
+        { "lspdt_mode", required_argument, NULL, 0 },
+        { "lspjvm", no_argument, &lspjvm, 1 },
+        { "phase0", no_argument, &phase0, 1 },
+        { "phasetest", no_argument, &phasetest, 1 },
+        // { "postfilter", no_argument, &postfilter, 1 },
+        { "hand_voicing", required_argument, &hand_voicing, 1 },
+        { "dec", no_argument, &decimate, 1 },
+        { "dt", no_argument, &dt, 1 },
+        { "rate", required_argument, NULL, 0 },
+#ifdef DUMP
+        { "dump", required_argument, &dump, 1 },
+#endif
+        { "help", no_argument, NULL, 'h' },
+        { NULL, no_argument, NULL, 0 }
+    };
+    int num_opts=sizeof(long_options)/sizeof(struct option);
     
     for(i=0; i<M; i++)
 	Sn[i] = 1.0;
@@ -135,145 +164,110 @@ int main(int argc, char *argv[])
     nlp_states = nlp_create();
 
     if (argc < 2) {
-	fprintf(stderr, "\nCodec2 - low bit rate speech codec - Simulation Program\n"
-		"\thttp://rowetel.com/codec2.html\n\n"
-		"usage: %s InputFile [-o OutputFile]\n"
-		"\t[--lpc Order]\n"
-		"\t[--lspjnd]\n"
-		"\t[--lsp]\n"
-		"\t[--lspd]\n"
-		"\t[--lspvq]\n"
-		"\t[--lspres]\n"
-		"\t[--lspdt]\n"
-		"\t[--lspdt_mode all|high|low]\n"
-		"\t[--lspjvm]"
-		"\t[--phase0]\n"
-		"\t[--postfilter]\n"
-		"\t[--hand_voicing]\n"
-		"\t[--dec]\n"
-		"\t[--dt]\n"
-		"\t[--2500]\n"
-		"\t[--1500]\n"
-		"\t[--1200]\n"
-		"\t[--dump DumpFilePrefix]\n", argv[0]);
-	exit(1);
+        print_help(long_options, num_opts, argv);
     }
 
     /* Interpret command line arguments -------------------------------------*/
 
+    /* Arguments */
+    while(1) {
+        int option_index = 0;
+        int opt = getopt_long(argc, argv, opt_string, 
+                    long_options, &option_index);
+        if (opt == -1)
+            break;
+        switch (opt) {
+         case 0:
+            if(strcmp(long_options[option_index].name, "lpc") == 0) {
+                order = atoi(optarg);
+                if((order < 4) || (order > 20)) {
+                    fprintf(stderr, "Error in LPC order: %s\n", optarg);
+                    exit(1);
+                }
+#ifdef DUMP
+            } else if(strcmp(long_options[option_index].name, "dump") == 0) {
+                if (dump) 
+	            dump_on(optarg);
+#endif
+            } else if(strcmp(long_options[option_index].name, "lsp") == 0
+                  || strcmp(long_options[option_index].name, "lspd") == 0
+                  || strcmp(long_options[option_index].name, "lspvq") == 0) {
+	        assert(order == LPC_ORD);
+            } else if(strcmp(long_options[option_index].name, "lspdt_mode") == 0) {
+	        if (strcmp(optarg,"all") == 0)
+	            lspdt_mode = LSPDT_ALL;
+	        else if (strcmp(optarg,"low") == 0)
+	            lspdt_mode = LSPDT_LOW;
+	        else if (strcmp(optarg,"high") == 0)
+	            lspdt_mode = LSPDT_HIGH;
+	        else {
+	            fprintf(stderr, "Error in lspdt_mode: %s\n", optarg);
+	            exit(1);
+	        }
+            } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
+	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
+	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "rate") == 0) {
+                if(strcmp(optarg,"2500") == 0) {
+	            lpc_model = 1; order = 10;
+	            lsp = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 1;
+                } else if(strcmp(optarg,"1500") == 0) {
+	            lpc_model = 1; order = 10;
+	            lsp = 1; lspdt = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 1;
+	            dt = 1;
+                } else if(strcmp(optarg,"1200") == 0) {
+	            lpc_model = 1; order = 10;
+	            lspjvm = 1; lspdt = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 1;
+	            dt = 1;
+                } else {
+                    fprintf(stderr, "Error: invalid output rate %s\n", optarg);
+                    exit(1);
+                }
+            }
+            break;
+
+         case 'h':
+            print_help(long_options, num_opts, argv);
+            break;
+
+         case 'o':
+	    if ((fout = fopen(optarg,"wb")) == NULL) {
+	        fprintf(stderr, "Error opening output speech file: %s: %s.\n",
+		    optarg, strerror(errno));
+	        exit(1);
+	    }
+	    strcpy(out_file,optarg);
+            break;
+
+         default:
+            /* This will never be reached */
+            break;
+        }
+    }
+
     /* Input file */
 
-    if ((fin = fopen(argv[1],"rb")) == NULL) {
+    if ((fin = fopen(argv[optind],"rb")) == NULL) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
-		argv[1], strerror(errno));
+		argv[optind], strerror(errno));
 	exit(1);
     }
 
-    /* Output file */
-
-    if ((arg = switch_present("-o",argc,argv))) {
-	if ((fout = fopen(argv[arg+1],"wb")) == NULL) {
-	    fprintf(stderr, "Error opening output speech file: %s: %s.\n",
-		    argv[arg+1], strerror(errno));
-	    exit(1);
-	}
-	strcpy(out_file,argv[arg+1]);
-    }
-    else
-	fout = NULL;
-
-    lpc_model = 0;
-    if ((arg = switch_present("--lpc",argc,argv))) {
-	lpc_model = 1;
-	order = atoi(argv[arg+1]);
-	if ((order < 4) || (order > 20)) {
-	    fprintf(stderr, "Error in lpc order: %d\n", order);
-	    exit(1);
-	}	  
-    }
-
-    dump = switch_present("--dump",argc,argv);
-#ifdef DUMP
-    if (dump) 
-	dump_on(argv[dump+1]);
-#endif
-
-    lspjnd = switch_present("--lspjnd",argc,argv);
-
-    lsp = switch_present("--lsp",argc,argv);
-    lsp_quantiser = 0;
-    if (lsp)
-	assert(order == LPC_ORD);
-
-    lspd = switch_present("--lspd",argc,argv);
-    if (lspd)
-	assert(order == LPC_ORD);
-
-    lspvq = switch_present("--lspvq",argc,argv);
-    if (lspvq)
-	assert(order == LPC_ORD);
-
-    lspres = switch_present("--lspres",argc,argv);
-
-    lspdt = switch_present("--lspdt",argc,argv);
-    if ( (arg = switch_present("--lspdt_mode",argc,argv))) {
-	if (strcmp(argv[arg+1],"all") == 0)
-	    lspdt_mode = LSPDT_ALL;
-	else if (strcmp(argv[arg+1],"low") == 0)
-	    lspdt_mode = LSPDT_LOW;
-	else if (strcmp(argv[arg+1],"high") == 0)
-	    lspdt_mode = LSPDT_HIGH;
-	else {
-	    fprintf(stderr, "Error in lspdt_mode: %d\n", lspdt_mode);
-	    exit(1);
-	}
-    }
-    else
-	lspdt_mode = LSPDT_ALL;
-
-    lspjvm = switch_present("--lspjvm",argc,argv);
-
-    phase0 = switch_present("--phase0",argc,argv);
-    phasetest = switch_present("--phasetest",argc,argv);
     ex_phase[0] = 0;
-
-    hand_voicing = switch_present("--hand_voicing",argc,argv);
-    if (hand_voicing) {
-	fvoicing = fopen(argv[hand_voicing+1],"rt");
-	assert(fvoicing != NULL);
-    }
-
     bg_est = 0.0;
-    postfilt = switch_present("--postfilter",argc,argv);
 
-    decimate = switch_present("--dec",argc,argv);
-
-    dt = switch_present("--dt",argc,argv);
-
-    if (switch_present("--2500",argc,argv)) {
-	lpc_model = 1; order = 10;
-	lsp = 1;
-	phase0 = 1;
-	postfilt = 1;
-	decimate = 1;
-    }
-    if (switch_present("--1500",argc,argv)) {
-	lpc_model = 1; order = 10;
-	lsp = 1; lspdt = 1;
-	phase0 = 1;
-	postfilt = 1;
-	decimate = 1;
-	dt = 1;
-    }
-
-    if (switch_present("--1200",argc,argv)) {
-	lpc_model = 1; order = 10;
-	lspjvm = 1; lspdt = 1;
-	phase0 = 1;
-	postfilt = 1;
-	decimate = 1;
-	dt = 1;
-    }
     /*
       printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
 	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
@@ -662,32 +656,6 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-/*---------------------------------------------------------------------------*\
-                                                                             
- switch_present()                                                            
-                                                                             
- Searches the command line arguments for a "switch".  If the switch is       
- found, returns the command line argument where it ws found, else returns    
- NULL.                                                                       
-                                                                             
-\*---------------------------------------------------------------------------*/
-
-int switch_present(
-		   char sw[],     /* switch in string form            */
-		   int argc,      /* number of command line arguments */
-		   char *argv[]   /* array of command line arguments in string 
-				     form */
-		   )
-{
-    int i;
-
-    for(i=1; i<argc; i++)
-	if (!strcmp(sw,argv[i]))
-	    return(i);
-
-    return 0;
-}
-
 void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[])
 {
     int     i;
@@ -703,4 +671,35 @@ void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[])
 	    buf[i] = Sn_[i];
     }
 
+}
+
+void print_help(const struct option* long_options, int num_opts, char* argv[])
+{
+	int i;
+	char *option_parameters;
+
+	fprintf(stderr, "\nCodec2 - low bit rate speech codec - Simulation Program\n"
+		"\thttp://rowetel.com/codec2.html\n\n"
+		"usage: %s [OPTIONS] <InputFile>\n\n"
+                "Options:\n"
+                "\t-o <OutputFile>\n", argv[0]);
+        for(i=0; i<num_opts-1; i++) {
+		if(long_options[i].has_arg == no_argument) {
+			option_parameters="";
+		} else if (strcmp("lpc", long_options[i].name) == 0) {
+			option_parameters = " <Order>";
+		} else if (strcmp("lspdt_mode", long_options[i].name) == 0) {
+			option_parameters = " <all|high|low>";
+		} else if (strcmp("hand_voicing", long_options[i].name) == 0) {
+			option_parameters = " <VoicingFile>";
+		} else if (strcmp("rate", long_options[i].name) == 0) {
+			option_parameters = " <2500|1500|1200>";
+		} else if (strcmp("dump", long_options[i].name) == 0) {
+			option_parameters = " <DumpFilePrefix>";
+		} else {
+			option_parameters = " <UNDOCUMENTED parameter>";
+		}
+		fprintf(stderr, "\t--%s%s\n", long_options[i].name, option_parameters);
+	}
+	exit(1);
 }
