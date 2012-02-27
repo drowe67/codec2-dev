@@ -1,12 +1,12 @@
 % fdmdv.m
 %
-% Frequency Divison Multiplexed Modem for Digital Voice.
+% Octave implementation of a Frequency Divison Multiplexed Modem for
+% Digital Voice (FMDV)over HF channels.
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Octave implementation of a G3PLX style FDMDV HF modem.
 
 clear all;
 rand('state',1); 
@@ -63,7 +63,7 @@ global gt_alpha5_root = real((ifft_GF_alpha5_root(1:Nfilter)));
 
 % generate Nc QPSK symbols from vector of (1,Nc*Nb) input bits
 
-function tx_symbols = qpsk_map(tx_bits)
+function tx_symbols = bits_to_qpsk(tx_bits)
   global Nc;
   global Nb;
 
@@ -75,7 +75,7 @@ function tx_symbols = qpsk_map(tx_bits)
 
   % map to (Nc,1) QPSK symbols
 
-  tx_symbols = 1 - 2*tx_bits_matrix(:,1) + j - 2j*tx_bits_matrix(:,2); 
+  tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2); 
 
 endfunction
 
@@ -212,7 +212,7 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt)
   % map phase to estimated optimum timing instant
 
   rx_timing = angle(x)*M/pi;
-
+  
   % sample right in the middle of the timing estimator window,
   % Nt assumed to be odd
 
@@ -222,7 +222,22 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt)
 endfunction
 
 
-% Main loop ----------------------------------------------------
+% convert symbols back to an array of bits
+
+function rx_bits = qpsk_to_bits(rx_symbols)
+  global Nc;
+  global Nb;
+
+  % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
+
+  rx_bits = zeros(1,Nc*Nb);
+  rx_bits(1:Nb:Nc*Nb) = real(rx_symbols) > 0;
+  rx_bits(2:Nb:Nc*Nb) = imag(rx_symbols) > 0;
+
+endfunction
+
+
+% Initialise ----------------------------------------------------
 
 global tx_filter_memory = zeros(Nc, Nfilter);
 global rx_filter_memory = zeros(Nc, Nfilter);
@@ -235,15 +250,52 @@ tx_filt = zeros(Nc,M);
 rx_symbols_log = zeros(Nc,1);
 rx_timing_log = 0;
 tx_pwr = 0;
+noise_pwr = 0;
+tx_bits = rand(1,Nc*Nb) > 0.5; 
+total_bit_errors = 0;
+
+
+% Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
+% Total power is sum of power in all FDM carriers
+
+C = 1;  % power of each FDM carrier (energy/sample)
+N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
+
+EbNo_dB = 3;
+
+% Eb  = Carrier power * symbol time / (bits/symbol)
+%     = C *(Rs/Fs) / 2
+Eb_dB = 10*log10(C) + 10*log10(Rs) - 10*log10(Fs) - 10*log10(2);
+
+No_dBHz = Eb_dB - EbNo_dB;
+
+% Noise power = Noise spectral density * bandwidth
+N_dB = No_dBHz + 10*log10(Fs);
+Ngain_dB = N_dB - 10*log10(N);
+Ngain = 10^(Ngain_dB/20);
+
+% C/No = Carrier Power/noise spectral denity
+%      = power per carrier*number of carriers / noise spectral denity
+CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
+
+% SNR in equivalent 2400 Hz SSB channel
+
+B = 2400;
+SNR = CNo_dB - 10*log10(B) 
+
+% Main loop ----------------------------------------------------
 
 for i=1:frames
-  tx_bits = rand(1,Nc*Nb) > 0.5; 
-  tx_symbols = qpsk_map(tx_bits);
+  tx_symbols = bits_to_qpsk(tx_bits);
   tx_baseband = tx_filter(tx_symbols);
   tx_fdm = fdm_upconvert(tx_baseband);
-  tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M*Nc);
+  tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M);
 
-  rx_baseband = fdm_downconvert(tx_fdm);
+  noise = Ngain/sqrt(2)*[randn(1,M) + j*randn(1,M)];
+  noise_pwr = 0.9*noise_pwr + 0.1*noise*noise'/M;
+  rx_fdm = tx_fdm + noise;
+
+  rx_baseband = fdm_downconvert(rx_fdm);
   rx_filt = rx_filter(rx_baseband);
 
   rx_filt_mem_timing(:,1:M*(Nt-1)) = rx_filt_mem_timing(:,M+1:M*Nt);
@@ -251,7 +303,18 @@ for i=1:frames
   [rx_symbols rx_timing] = rx_est_timing(rx_filt_mem_timing);
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
+
+  rx_bits = qpsk_to_bits(rx_symbols);
+
+  if (i > 20)
+    bit_errors = sum(xor(tx_bits,rx_bits));
+    total_bit_errors = total_bit_errors + bit_errors;
+  endif
 end
+
+ber = total_bit_errors/(frames*Nb*Nc);
+printf("Eb/No: %2.2f dB  %d bit errors  Measured BER: %1.4f  Theoretical BER: %1.4f\n", EbNo_dB, 
+       total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
 
 figure(1)
 clf;
