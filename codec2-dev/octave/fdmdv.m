@@ -1,15 +1,12 @@
+% fdmdv.m
+%
+% Frequency Divison Multiplexed Modem for Digital Voice.
+%
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
 % Octave implementation of a G3PLX style FDMDV HF modem.
-
-% TODO
-%   + handling sample slips, extra plus/minus samples
-%   + simulating sample clock offsets
-%   + timing, frequency offset get function
-%   + memory of recent tx and rx signal for spectrogram
-%   + scatter diagram get function
 
 clear all;
 rand('state',1); 
@@ -23,9 +20,10 @@ global Nc = 14;        % number of carriers
 global Nb = 2;         % Bits/symbol for QPSK modulation
 global Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
-global Nsym  = 8;      % number of symbols to filter over
+global Nsym  = 4;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
+global Nt = 5;         % number of symbols we estimate timing over
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
 
@@ -63,26 +61,40 @@ global gt_alpha5_root = real((ifft_GF_alpha5_root(1:Nfilter)));
 % Functions ----------------------------------------------------
 
 
+% generate Nc QPSK symbols from vector of (1,Nc*Nb) input bits
+
+function tx_symbols = qpsk_map(tx_bits)
+  global Nc;
+  global Nb;
+
+  % re-arrange as (Nc,Nb) matrix
+
+  tx_bits_matrix = zeros(Nc,Nb);
+  tx_bits_matrix(1:Nc,1) = tx_bits(1:Nb:Nb*Nc);
+  tx_bits_matrix(1:Nc,2) = tx_bits(2:Nb:Nb*Nc);
+
+  % map to (Nc,1) QPSK symbols
+
+  tx_symbols = 1 - 2*tx_bits_matrix(:,1) + j - 2j*tx_bits_matrix(:,2); 
+
+endfunction
+
+
 % Given Nc*Nb bits construct M samples (1 symbol) of Nc filtered
 % symbols streams
 
-function tx_baseband = tx_filter(tx_bits)
+function tx_baseband = tx_filter(tx_symbols)
   global Nc;
   global M;
   global tx_filter_memory;
   global Nfilter;
   global gt_alpha5_root;
-  global Fsep;
 
   tx_baseband = zeros(Nc,M);
 
-  % generate Nc QPSK symbols from Nc*Nb input bits
-
-  tx_symbols = 1 - 2*tx_bits(:,1) + j - 2j*tx_bits(:,2); 
-
   % tx filter each symbol, generate M filtered output samples for each symbol
 
-  tx_filter_memory(:,Nfilter) = tx_symbols;
+  tx_filter_memory(:,Nfilter) = sqrt(2)/2*tx_symbols;
   for i=1:M
     tx_baseband(:,i) = M*tx_filter_memory * gt_alpha5_root';
     tx_filter_memory(:,1:Nfilter-1) = tx_filter_memory(:,2:Nfilter);
@@ -159,7 +171,7 @@ function rx_baseband = fdm_downconvert(rx_fdm)
 endfunction
 
 
-% Receive filter each basband signal
+% Receive filter each baseband signal
 
 function rx_filt = rx_filter(rx_baseband)
   global Nc;
@@ -175,7 +187,7 @@ function rx_filt = rx_filter(rx_baseband)
 
   for i=1:M
     rx_filter_memory(:,Nfilter) = rx_baseband(:,i);
-    rx_filt(:,i) = M*rx_filter_memory * gt_alpha5_root';
+    rx_filt(:,i) = rx_filter_memory * gt_alpha5_root';
     rx_filter_memory(:,1:Nfilter-1) = rx_filter_memory(:,2:Nfilter);
   end
 endfunction
@@ -183,20 +195,30 @@ endfunction
 
 % Estimate optimum timing offset, output is 0...M-1
 
-function rx_timing = rx_est_timing(rx_filt)
+function [rx_symbols rx_timing] = rx_est_timing(rx_filt)
   global M;
+  global Nt;
+  global rx_filt_mem_timing;
 
   % sum envelopes of all carrier
 
-  env = sum(abs(rx_filt(:,1:M)));
+  env = sum(abs(rx_filt(:,:)));
+  [n m] = size(env);
 
-  % IDFT of frequnency M
+  % IDFT of frequency M
 
-  x = env * exp(j*2*pi*(0:M-1)/M)';
+  x = env * exp(j*2*pi*(0:m-1)/M)';
 
   % map phase to estimated optimum timing instant
 
   rx_timing = angle(x)*M/pi;
+
+  % sample right in the middle of the timing estimator window,
+  % Nt assumed to be odd
+
+  sample_instant = round(rx_timing) + 1+M*(floor(Nt/2)+1);
+  rx_symbols = rx_filt_mem_timing(:,sample_instant);
+
 endfunction
 
 
@@ -204,38 +226,48 @@ endfunction
 
 global tx_filter_memory = zeros(Nc, Nfilter);
 global rx_filter_memory = zeros(Nc, Nfilter);
+global phase_tx = zeros(Nc,1);
+global phase_rx = zeros(Nc,1);
+global rx_filt_mem_timing = zeros(Nc,M*Nt);
 
 frames = 100;
 tx_filt = zeros(Nc,M);
-global phase_tx = zeros(Nc,1);
-global phase_rx = zeros(Nc,1);
-rx_filt_log = zeros(Nc,M);
-rx_symbols = zeros(Nc,1);
-t = 1;
-rx_timing = 0.0;
+rx_symbols_log = zeros(Nc,1);
 rx_timing_log = 0;
+tx_pwr = 0;
 
 for i=1:frames
-  tx_bits = rand(Nc,Nb) > 0.5; 
-  tx_baseband = tx_filter(tx_bits);
+  tx_bits = rand(1,Nc*Nb) > 0.5; 
+  tx_symbols = qpsk_map(tx_bits);
+  tx_baseband = tx_filter(tx_symbols);
   tx_fdm = fdm_upconvert(tx_baseband);
+  tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M*Nc);
+
   rx_baseband = fdm_downconvert(tx_fdm);
   rx_filt = rx_filter(rx_baseband);
-  rx_filt_log = [rx_filt_log rx_filt];
-  rx_timing = 0.9*rx_timing + 0.1*rx_est_timing(rx_filt);
+
+  rx_filt_mem_timing(:,1:M*(Nt-1)) = rx_filt_mem_timing(:,M+1:M*Nt);
+  rx_filt_mem_timing(:,M*(Nt-1)+1:M*Nt) = rx_filt;
+  [rx_symbols rx_timing] = rx_est_timing(rx_filt_mem_timing);
   rx_timing_log = [rx_timing_log rx_timing];
-  rx_symbols = [rx_symbols rx_filt_log(:,t+floor(rx_timing))];
-  t = t + M;
+  rx_symbols_log = [rx_symbols_log rx_symbols];
 end
 
 figure(1)
 clf;
-plot(real(rx_symbols),imag(rx_symbols),'+')
+[n m] = size(rx_symbols_log);
+plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
 figure(2)
 clf;
 plot(rx_timing_log)
 
-% timing recovery - sum envelopes
+% TODO
+%   + handling sample slips, extra plus/minus samples
+%   + simulating sample clock offsets
+%   + timing, frequency offset get function
+%   + memory of recent tx and rx signal for spectrogram
+%   + scatter diagram get function
+
 % DPSK
 % add channel noise, phase offset, frequency offset, timing offset
 % measure Eb/No versus BER in AWGN
@@ -243,6 +275,6 @@ plot(rx_timing_log)
 % file I/O to test with Codec
 % sync recovery time
 % dump file type plotting & instrumentation
-% check error pattern is not bursty
-
+% determine if error pattern is bursty
+% HF channel simulation
 
