@@ -20,10 +20,11 @@ global Nc = 14;        % number of carriers
 global Nb = 2;         % Bits/symbol for QPSK modulation
 global Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
-global Nsym  = 4;      % number of symbols to filter over
+global Nsym  = 8;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
-global Nt = 5;         % number of symbols we estimate timing over
+global Nt = 9;         % number of symbols we estimate timing over
+global P = M/4;        % oversample factor used for some rx symbol filtering
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
 
@@ -31,7 +32,8 @@ global Nt = 5;         % number of symbols we estimate timing over
 
 alpha = 0.5;      % excess bandwidth
 n = -Nsym*Ts/2:T:Nsym*Ts/2;
-global Nfilter = Nsym*M + 1;
+global Nfilter = Nsym*M;
+global Nfiltertiming = Nfilter+M;
 
 sincNum = sin(pi*n/Ts); % numerator of the sinc function
 sincDen = (pi*n/Ts);    % denominator of the sinc function
@@ -92,14 +94,15 @@ function tx_baseband = tx_filter(tx_symbols)
 
   tx_baseband = zeros(Nc,M);
 
-  % tx filter each symbol, generate M filtered output samples for each symbol
+  % tx filter each symbol, generate M filtered output samples for each symbol.
+  % Efficient polyphase filter techniques used as tx_filter_memory is sparse
 
   tx_filter_memory(:,Nfilter) = sqrt(2)/2*tx_symbols;
   for i=1:M
-    tx_baseband(:,i) = M*tx_filter_memory * gt_alpha5_root';
-    tx_filter_memory(:,1:Nfilter-1) = tx_filter_memory(:,2:Nfilter);
-    tx_filter_memory(:,Nfilter) = zeros(Nc,1);
+    tx_baseband(:,i) = M*tx_filter_memory(:,M:M:Nfilter) * gt_alpha5_root(M-i+1:M:Nfilter)';
   end
+  tx_filter_memory(:,1:Nfilter-M) = tx_filter_memory(:,M+1:Nfilter);
+  tx_filter_memory(:,Nfilter-M+1:Nfilter) = zeros(Nc,M);
 endfunction
 
 
@@ -171,11 +174,12 @@ function rx_baseband = fdm_downconvert(rx_fdm)
 endfunction
 
 
-% Receive filter each baseband signal
+% Receive filter each baseband signal at oversample 
 
 function rx_filt = rx_filter(rx_baseband)
   global Nc;
   global M;
+  global P;
   global rx_filter_memory;
   global Nfilter;
   global gt_alpha5_root;
@@ -183,31 +187,42 @@ function rx_filt = rx_filter(rx_baseband)
 
   rx_filt = zeros(Nc,M);
 
-  % rx filter each symbol, generate M filtered output samples for each symbol
+  % rx filter each symbol, generate P filtered output samples for each symbol
+  % keep full M sample memory intact for later resampling of optimimum timing instant
 
-  for i=1:M
-    rx_filter_memory(:,Nfilter) = rx_baseband(:,i);
-    rx_filt(:,i) = rx_filter_memory * gt_alpha5_root';
-    rx_filter_memory(:,1:Nfilter-1) = rx_filter_memory(:,2:Nfilter);
+  N=M/P;
+  j=1;
+  for i=1:N:M
+    rx_filter_memory(:,Nfilter-N+1:Nfilter) = rx_baseband(:,i:i-1+N);
+    rx_filt(:,j) = rx_filter_memory * gt_alpha5_root';
+    rx_filter_memory(:,1:Nfilter-N) = rx_filter_memory(:,1+N:Nfilter);
+    j+=1;
   end
 endfunction
 
 
 % Estimate optimum timing offset, output is 0...M-1
 
-function [rx_symbols rx_timing] = rx_est_timing(rx_filt)
+% TODO
+% Are we really just estimating timing over one symbol but Nc carriers?
+% Get M sample re-sampling working
+
+function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   global M;
   global Nt;
   global rx_filt_mem_timing;
+  global P;
+  global Nfilter;
+  global Nfiltertiming;
 
-  % sum envelopes of all carrier
+  % sum envelopes of all carriers
 
   env = sum(abs(rx_filt(:,:)));
   [n m] = size(env);
 
   % IDFT of frequency M
 
-  x = env * exp(j*2*pi*(0:m-1)/M)';
+  x = env * exp(j*2*pi*(0:m-1)/P)';
 
   % map phase to estimated optimum timing instant
 
@@ -217,7 +232,9 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt)
   % Nt assumed to be odd
 
   sample_instant = round(rx_timing) + 1+M*(floor(Nt/2)+1);
-  rx_symbols = rx_filt_mem_timing(:,sample_instant);
+  %rx_filt_mem_timing(Nfiltertiming-M+1:Nfiltertiming) = rx_baseband;
+  %rx_symbols = rx_filt_mem_timing(sample_instant:sample_instant+Nfilter) * gt_alpha5_root';
+  rx_symbols = rx_filt_mem_timing(:,1);
 
 endfunction
 
@@ -253,7 +270,7 @@ tx_pwr = 0;
 noise_pwr = 0;
 tx_bits = rand(1,Nc*Nb) > 0.5; 
 total_bit_errors = 0;
-
+total_bits = 0;
 
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
@@ -261,16 +278,16 @@ total_bit_errors = 0;
 C = 1;  % power of each FDM carrier (energy/sample)
 N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
 
-EbNo_dB = 3;
+EbNo_dB = 40;
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
 %     = C *(Rs/Fs) / 2
-Eb_dB = 10*log10(C) + 10*log10(Rs) - 10*log10(Fs) - 10*log10(2);
+Eb_dB = 10*log10(C) + 10*log10(Rs) - 10*log10(Fs);
 
 No_dBHz = Eb_dB - EbNo_dB;
 
-% Noise power = Noise spectral density * bandwidth
-N_dB = No_dBHz + 10*log10(Fs);
+% Noise power = Noise spectral density * bandwidth;
+N_dB = No_dBHz + 10*log10(Fs) - 10*log10(2);
 Ngain_dB = N_dB - 10*log10(N);
 Ngain = 10^(Ngain_dB/20);
 
@@ -281,7 +298,7 @@ CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
 % SNR in equivalent 2400 Hz SSB channel
 
 B = 2400;
-SNR = CNo_dB - 10*log10(B) 
+SNR = CNo_dB - 10*log10(B);
 
 % Main loop ----------------------------------------------------
 
@@ -300,7 +317,7 @@ for i=1:frames
 
   rx_filt_mem_timing(:,1:M*(Nt-1)) = rx_filt_mem_timing(:,M+1:M*Nt);
   rx_filt_mem_timing(:,M*(Nt-1)+1:M*Nt) = rx_filt;
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt_mem_timing);
+  [rx_symbols rx_timing] = rx_est_timing(rx_filt_mem_timing, rx_filt_mem_timing);
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
 
@@ -309,10 +326,11 @@ for i=1:frames
   if (i > 20)
     bit_errors = sum(xor(tx_bits,rx_bits));
     total_bit_errors = total_bit_errors + bit_errors;
+    total_bits = total_bits + Nc*Nb;
   endif
 end
 
-ber = total_bit_errors/(frames*Nb*Nc);
+ber = total_bit_errors/total_bits;
 printf("Eb/No: %2.2f dB  %d bit errors  Measured BER: %1.4f  Theoretical BER: %1.4f\n", EbNo_dB, 
        total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
 
@@ -333,7 +351,6 @@ plot(rx_timing_log)
 
 % DPSK
 % add channel noise, phase offset, frequency offset, timing offset
-% measure Eb/No versus BER in AWGN
 % fading simulator
 % file I/O to test with Codec
 % sync recovery time
@@ -341,3 +358,11 @@ plot(rx_timing_log)
 % determine if error pattern is bursty
 % HF channel simulation
 
+% BER issues:
+%   QPSK mapping
+%   Single sided noise issues
+%   ISI between carriers due toe exces BW
+%   Crappy RN coeffs
+%   timing recovery off by one
+%   Use a true PR sequence
+%   Sensitivity to Fs
