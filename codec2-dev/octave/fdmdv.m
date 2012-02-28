@@ -24,7 +24,7 @@ global Nsym  = 8;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
 global Nt = 9;         % number of symbols we estimate timing over
-global P = M/4;        % oversample factor used for some rx symbol filtering
+global P = 4;          % oversample factor used for rx symbol filtering
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
 
@@ -33,7 +33,7 @@ global P = M/4;        % oversample factor used for some rx symbol filtering
 alpha = 0.5;      % excess bandwidth
 n = -Nsym*Ts/2:T:Nsym*Ts/2;
 global Nfilter = Nsym*M;
-global Nfiltertiming = Nfilter+M;
+global Nfiltertiming = M+Nfilter+M;
 
 sincNum = sin(pi*n/Ts); % numerator of the sinc function
 sincDen = (pi*n/Ts);    % denominator of the sinc function
@@ -174,7 +174,7 @@ function rx_baseband = fdm_downconvert(rx_fdm)
 endfunction
 
 
-% Receive filter each baseband signal at oversample 
+% Receive filter each baseband signal at oversample rate P
 
 function rx_filt = rx_filter(rx_baseband)
   global Nc;
@@ -185,10 +185,10 @@ function rx_filt = rx_filter(rx_baseband)
   global gt_alpha5_root;
   global Fsep;
 
-  rx_filt = zeros(Nc,M);
+  rx_filt = zeros(Nc,P);
 
-  % rx filter each symbol, generate P filtered output samples for each symbol
-  % keep full M sample memory intact for later resampling of optimimum timing instant
+  % rx filter each symbol, generate P filtered output samples for each symbol.
+  % Note we keep memory at rate M, it's just the filter output at rate P
 
   N=M/P;
   j=1;
@@ -201,40 +201,60 @@ function rx_filt = rx_filter(rx_baseband)
 endfunction
 
 
-% Estimate optimum timing offset, output is 0...M-1
+% Estimate optimum timing offset, and symbol receive symbols
 
-% TODO
-% Are we really just estimating timing over one symbol but Nc carriers?
-% Get M sample re-sampling working
 
 function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   global M;
   global Nt;
-  global rx_filt_mem_timing;
+  global rx_filter_mem_timing;
+  global rx_baseband_mem_timing;
   global P;
   global Nfilter;
   global Nfiltertiming;
+  global gt_alpha5_root;
+
+  % update buffer of Nt rate P filtered symbols
+
+  rx_filter_mem_timing(:,1:(Nt-1)*P) = rx_filter_mem_timing(:,P+1:Nt*P);
+  rx_filter_mem_timing(:,(Nt-1)*P+1:Nt*P) = rx_filt;
 
   % sum envelopes of all carriers
 
-  env = sum(abs(rx_filt(:,:)));
+  env = sum(abs(rx_filter_mem_timing(:,:)));
   [n m] = size(env);
 
-  % IDFT of frequency M
+  % The envelope has a frequency component at the symbol rate.  The
+  % phase of this frequency component indicates the timing.  So work out
+  % single DFT at frequency 2*pi/P
 
-  x = env * exp(j*2*pi*(0:m-1)/P)';
+  x = env * exp(-j*2*pi*(0:m-1)/P)';
 
-  % map phase to estimated optimum timing instant
+  % map phase to estimated optimum timing instant at rate M
+  % the M/2 + 1 part was adjusted by experment, I know not why....
 
-  rx_timing = angle(x)*M/pi;
-  
+  rx_timing = angle(x)*M/pi + M/2 + 1;
+  if (rx_timing > M)
+     rx_timing -= M;
+  end
+  if (rx_timing < -M)
+     rx_timing += M;
+  end
+
+  % rx_filt_mem_timing contains M + Nfilter + M samples of the
+  % baseband signal at rate M this enables us to resample the filtered
+  % rx symbol with M sample precision once we have rx_timing
+
+  rx_baseband_mem_timing(:,1:Nfiltertiming-M) = rx_baseband_mem_timing(:,M+1:Nfiltertiming);
+  rx_baseband_mem_timing(:,Nfiltertiming-M+1:Nfiltertiming) = rx_baseband;
+
   % sample right in the middle of the timing estimator window,
   % Nt assumed to be odd
 
-  sample_instant = round(rx_timing) + 1+M*(floor(Nt/2)+1);
-  %rx_filt_mem_timing(Nfiltertiming-M+1:Nfiltertiming) = rx_baseband;
-  %rx_symbols = rx_filt_mem_timing(sample_instant:sample_instant+Nfilter) * gt_alpha5_root';
-  rx_symbols = rx_filt_mem_timing(:,1);
+  s = round(rx_timing) + M;
+  %s = M-1;
+  rx_symbols = rx_baseband_mem_timing(:,s+1:s+Nfilter) * gt_alpha5_root';
+  %rx_symbols = rx_filter_mem_timing(:,P);
 
 endfunction
 
@@ -260,7 +280,8 @@ global tx_filter_memory = zeros(Nc, Nfilter);
 global rx_filter_memory = zeros(Nc, Nfilter);
 global phase_tx = zeros(Nc,1);
 global phase_rx = zeros(Nc,1);
-global rx_filt_mem_timing = zeros(Nc,M*Nt);
+global rx_filter_mem_timing = zeros(Nc, Nt*P);
+global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
 
 frames = 100;
 tx_filt = zeros(Nc,M);
@@ -268,7 +289,6 @@ rx_symbols_log = zeros(Nc,1);
 rx_timing_log = 0;
 tx_pwr = 0;
 noise_pwr = 0;
-tx_bits = rand(1,Nc*Nb) > 0.5; 
 total_bit_errors = 0;
 total_bits = 0;
 
@@ -278,7 +298,7 @@ total_bits = 0;
 C = 1;  % power of each FDM carrier (energy/sample)
 N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
 
-EbNo_dB = 40;
+EbNo_dB = 10;
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
 %     = C *(Rs/Fs) / 2
@@ -303,6 +323,7 @@ SNR = CNo_dB - 10*log10(B);
 % Main loop ----------------------------------------------------
 
 for i=1:frames
+  tx_bits = rand(1,Nc*Nb) > 0.5; 
   tx_symbols = bits_to_qpsk(tx_bits);
   tx_baseband = tx_filter(tx_symbols);
   tx_fdm = fdm_upconvert(tx_baseband);
@@ -315,9 +336,7 @@ for i=1:frames
   rx_baseband = fdm_downconvert(rx_fdm);
   rx_filt = rx_filter(rx_baseband);
 
-  rx_filt_mem_timing(:,1:M*(Nt-1)) = rx_filt_mem_timing(:,M+1:M*Nt);
-  rx_filt_mem_timing(:,M*(Nt-1)+1:M*Nt) = rx_filt;
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt_mem_timing, rx_filt_mem_timing);
+  [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
 
