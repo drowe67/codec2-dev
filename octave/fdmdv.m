@@ -20,10 +20,10 @@ global Nc = 14;        % number of carriers
 global Nb = 2;         % Bits/symbol for QPSK modulation
 global Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
-global Nsym  = 8;      % number of symbols to filter over
+global Nsym  = 4;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
-global Nt = 9;         % number of symbols we estimate timing over
+global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
@@ -115,26 +115,25 @@ function tx_fdm = fdm_upconvert(tx_filt)
   global Nc;
   global Fsep;
   global phase_tx;
+  global freq;
 
   tx_fdm = zeros(1,M);
 
   % Nc/2 tones below centre freq
   
   for c=1:Nc/2
-      carrier_freq = (-Nc/2 - 1 + c)*Fsep;
       for i=1:M
-        phase_tx(c) = phase_tx(c) + 2*pi*carrier_freq/Fs;
-	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*exp(j*phase_tx(c));
+        phase_tx(c) = phase_tx(c) * freq(c);
+	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*phase_tx(c);
       end
   end
 
   % Nc/2 tones above centre freq  
 
   for c=Nc/2+1:Nc
-      carrier_freq = (-Nc/2 + c)*Fsep;
       for i=1:M
-        phase_tx(c) = phase_tx(c) + 2*pi*carrier_freq/Fs;
-	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*exp(j*phase_tx(c));
+        phase_tx(c) = phase_tx(c) * freq(c);
+	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*phase_tx(c);
       end
   end
 
@@ -149,26 +148,25 @@ function rx_baseband = fdm_downconvert(rx_fdm)
   global Nc;
   global Fsep;
   global phase_rx;
+  global freq;
 
   rx_baseband = zeros(1,M);
 
   % Nc/2 tones below centre freq
   
   for c=1:Nc/2
-      carrier_freq = (-Nc/2 - 1 + c)*Fsep;
       for i=1:M
-        phase_rx(c) = phase_rx(c) + 2*pi*carrier_freq/Fs;
-	rx_baseband(c,i) = rx_fdm(i)*exp(-j*phase_rx(c));
+        phase_rx(c) = phase_rx(c) * freq(c);
+	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
   end
 
   % Nc/2 tones above centre freq  
 
   for c=Nc/2+1:Nc
-      carrier_freq = (-Nc/2 + c)*Fsep;
       for i=1:M
-        phase_rx(c) = phase_rx(c) + 2*pi*carrier_freq/Fs;
-	rx_baseband(c,i) = rx_fdm(i)*exp(-j*phase_rx(c));
+        phase_rx(c) = phase_rx(c) * freq(c);
+	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
   end
 endfunction
@@ -248,14 +246,28 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   rx_baseband_mem_timing(:,1:Nfiltertiming-M) = rx_baseband_mem_timing(:,M+1:Nfiltertiming);
   rx_baseband_mem_timing(:,Nfiltertiming-M+1:Nfiltertiming) = rx_baseband;
 
-  % sample right in the middle of the timing estimator window,
-  % Nt assumed to be odd
+  % sample right in the middle of the timing estimator window, by filtering
+  % at rate M
 
   s = round(rx_timing) + M;
-  %s = M-1;
   rx_symbols = rx_baseband_mem_timing(:,s+1:s+Nfilter) * gt_alpha5_root';
-  %rx_symbols = rx_filter_mem_timing(:,P);
 
+endfunction
+
+
+% Phase estimation function - probably won't work over a HF channel
+% Tries to operate over a sinle symbol but uses phase information from
+% all Nc carriers which should increase the SNR of phase estimate.
+% Maybe phase is coherent over a coupel of symbols in HF channel,not
+% sure but it's worth 3dB so worth experimenting or using coherent as
+% an option.
+
+function rx_phase = rx_est_phase(rx_symbols)
+
+  % modulation strip
+
+  rx_phase = angle(sum(rx_symbols .^ 4))/4;
+ 
 endfunction
 
 
@@ -278,14 +290,29 @@ endfunction
 
 global tx_filter_memory = zeros(Nc, Nfilter);
 global rx_filter_memory = zeros(Nc, Nfilter);
-global phase_tx = zeros(Nc,1);
-global phase_rx = zeros(Nc,1);
+
+% phasors used for up and down converters
+
+global freq = zeros(Nc,1);;
+for c=1:Nc/2
+  carrier_freq = (-Nc/2 - 1 + c)*Fsep;
+  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+end
+for c=Nc/2+1:Nc
+  carrier_freq = (-Nc/2 - 1 + c)*Fsep;
+  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+end
+
+global phase_tx = ones(Nc,1);
+global phase_rx = ones(Nc,1);
+
 global rx_filter_mem_timing = zeros(Nc, Nt*P);
 global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
 
 frames = 100;
 tx_filt = zeros(Nc,M);
 rx_symbols_log = zeros(Nc,1);
+rx_phase_log = 0;
 rx_timing_log = 0;
 tx_pwr = 0;
 noise_pwr = 0;
@@ -298,7 +325,7 @@ total_bits = 0;
 C = 1;  % power of each FDM carrier (energy/sample)
 N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
 
-EbNo_dB = 10;
+EbNo_dB = 400;
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
 %     = C *(Rs/Fs) / 2
@@ -338,8 +365,12 @@ for i=1:frames
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
   rx_timing_log = [rx_timing_log rx_timing];
-  rx_symbols_log = [rx_symbols_log rx_symbols];
 
+  %rx_phase = rx_est_phase(rx_symbols);
+  %rx_phase_log = [rx_phase_log rx_phase];
+  %rx_symbols = rx_symbols*exp(j*rx_phase);
+
+  rx_symbols_log = [rx_symbols_log rx_symbols];
   rx_bits = qpsk_to_bits(rx_symbols);
 
   if (i > 20)
@@ -359,9 +390,13 @@ clf;
 plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
 figure(2)
 clf;
+subplot(211)
 plot(rx_timing_log)
+subplot(212)
+plot(180/pi*unwrap(rx_phase_log))
 
 % TODO
+%   + state machine to sync on PR test and measure BER
 %   + handling sample slips, extra plus/minus samples
 %   + simulating sample clock offsets
 %   + timing, frequency offset get function
@@ -380,7 +415,7 @@ plot(rx_timing_log)
 % BER issues:
 %   QPSK mapping
 %   Single sided noise issues
-%   ISI between carriers due toe exces BW
+%   interference between carriers due to excess BW
 %   Crappy RN coeffs
 %   timing recovery off by one
 %   Use a true PR sequence
