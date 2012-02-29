@@ -76,6 +76,7 @@ void lspvq_quantise(float lsp[], float lsp_[], int order);
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
+void ge_quantise(float *x, float *xq);
 
 int encode_energy(float e);
 float decode_energy(int index);

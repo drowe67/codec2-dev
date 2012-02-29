@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
 {
     FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
-    short buf[N];		/* input/output buffer                   */
-    float Sn[M];	        /* float input speech samples            */
+    short buf[N];	/* input/output buffer                   */
+    float Sn[M];	/* float input speech samples            */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
@@ -99,17 +99,20 @@ int main(int argc, char *argv[])
 
     MODEL prev_model, interp_model;
     int decimate = 0;
-    float lsps[LPC_ORD];
-    float prev_lsps[LPC_ORD], prev_lsps_[LPC_ORD];
-    float lsps__prev[LPC_ORD];
-    float lsps__prev2[LPC_ORD];
+    float lsps[LPC_MAX];
+    float prev_lsps[LPC_MAX], prev_lsps_[LPC_MAX];
+    float lsps__prev[LPC_MAX];
+    float lsps__prev2[LPC_MAX];
     float e, prev_e;
     float ak_interp[LPC_MAX];
     int   lsp_indexes[LPC_MAX];
-    float lsps_[LPC_ORD];
+    float lsps_[LPC_MAX];
+    float Woe[2], Woe_[2];
 
     void *nlp_states;
     float hpf_states[2];
+    int   scalar_quant_Wo_e = 0;
+    int   vector_quant_Wo_e = 0;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -124,14 +127,16 @@ int main(int argc, char *argv[])
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "phasetest", no_argument, &phasetest, 1 },
-        // { "postfilter", no_argument, &postfilter, 1 },
+        { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
         { "dt", no_argument, &dt, 1 },
+        { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
+        { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
-#ifdef DUMP
+        #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
-#endif
+        #endif
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -167,9 +172,12 @@ int main(int argc, char *argv[])
         print_help(long_options, num_opts, argv);
     }
 
-    /* Interpret command line arguments -------------------------------------*/
+    /*----------------------------------------------------------------*\
 
-    /* Arguments */
+                     Interpret Command Line Arguments
+
+    \*----------------------------------------------------------------*/
+
     while(1) {
         int option_index = 0;
         int opt = getopt_long(argc, argv, opt_string, 
@@ -184,11 +192,11 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "Error in LPC order: %s\n", optarg);
                     exit(1);
                 }
-#ifdef DUMP
+            #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump) 
 	            dump_on(optarg);
-#endif
+            #endif
             } else if(strcmp(long_options[option_index].name, "lsp") == 0
                   || strcmp(long_options[option_index].name, "lspd") == 0
                   || strcmp(long_options[option_index].name, "lspvq") == 0) {
@@ -213,12 +221,14 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"2500") == 0) {
 	            lpc_model = 1; order = 10;
+		    scalar_quant_Wo_e = 1;
 	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
 	            decimate = 1;
-                } else if(strcmp(optarg,"1500") == 0) {
+               } else if(strcmp(optarg,"1500") == 0) {
 	            lpc_model = 1; order = 10;
+		    scalar_quant_Wo_e = 1;
 	            lsp = 1; lspdt = 1;
 	            phase0 = 1;
 	            postfilt = 1;
@@ -226,6 +236,7 @@ int main(int argc, char *argv[])
 	            dt = 1;
                 } else if(strcmp(optarg,"1200") == 0) {
 	            lpc_model = 1; order = 10;
+		    scalar_quant_Wo_e = 1;
 	            lspjvm = 1; lspdt = 1;
 	            phase0 = 1;
 	            postfilt = 1;
@@ -267,25 +278,31 @@ int main(int argc, char *argv[])
 
     ex_phase[0] = 0;
     bg_est = 0.0;
+    Woe_[0] = Woe_[1] = 1.0;
 
     /*
       printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
 	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
 	   decimate,dt);
     */
+
     /* Initialise ------------------------------------------------------------*/
 
     make_analysis_window(w,W);
     make_synthesis_window(Pn);
     quantise_init();
 
-    /* Main Loop ------------------------------------------------------------*/
+    /*----------------------------------------------------------------*\
+
+                            Main Loop
+
+    \*----------------------------------------------------------------*/
 
     frames = 0;
     sum_snr = 0;
     while(fread(buf,sizeof(short),N,fin)) {
 	frames++;
-	//printf("frame: %d\n", frames);
+	//printf("frame: %d ", frames);
 
 	/* Read input speech */
 
@@ -294,31 +311,38 @@ int main(int argc, char *argv[])
 	for(i=0; i<N; i++)
 	    Sn[i+M-N] = buf[i];
  
-	/* Estimate pitch */
+	/*------------------------------------------------------------*\
+
+                      Estimate Sinusoidal Model Parameters
+
+	\*------------------------------------------------------------*/
 
 	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 	
-	/* estimate model parameters --------------------------------------*/
-
 	dft_speech(Sw, Sn, w); 
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
 	uq_Wo = model.Wo;
-#ifdef DUMP 
+ 
+        #ifdef DUMP 
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
-#endif
+        #endif
 
-	/* optional zero-phase modelling ----------------------------------*/
+	/*------------------------------------------------------------*\
+
+                            Zero-phase modelling
+
+	\*------------------------------------------------------------*/
 
 	if (phase0) {
 	    float Wn[M];		        /* windowed speech samples */
 	    float Rk[LPC_MAX+1];	        /* autocorrelation coeffs  */
 	    int ret;
 
-#ifdef DUMP
+            #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
-#endif
+            #endif
 
 	    /* find aks here, these are overwritten if LPC modelling is enabled */
 
@@ -327,21 +351,20 @@ int main(int argc, char *argv[])
 	    autocorrelate(Wn,Rk,M,order);
 	    levinson_durbin(Rk,ak,order);
 
-#ifdef DUMP
+            #ifdef DUMP
 	    dump_ak(ak, LPC_ORD);
-#endif
+            #endif
 	
 	    /* determine voicing */
 
 	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_uq_Wo);
-
 	    //printf("snr %3.2f v: %d Wo: %f prev_Wo: %f\n", snr, model.voiced,
 	    //	   model.Wo, prev_uq_Wo);
-#ifdef DUMP
+            #ifdef DUMP
 	    dump_Sw_(Sw_);
 	    dump_Ew(Ew);
 	    dump_snr(snr);
-#endif
+            #endif
 
 	    /* just to make sure we are not cheating - kill all phases */
 
@@ -353,19 +376,23 @@ int main(int argc, char *argv[])
 	    }
 	}
 
-	/* optional LPC model amplitudes and LSP quantisation -----------------*/
+	/*------------------------------------------------------------*\
+
+	        LPC model amplitudes and LSP quantisation 
+
+	\*------------------------------------------------------------*/
 
 	if (lpc_model) {
 
 	    e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
-#ifdef DUMP
+            #ifdef DUMP
 	    /* dump order is different if we are decimating */
 	    if (!decimate)
 		dump_lsp(lsps);
 	    for(i=0; i<LPC_ORD; i++)
 		prev_lsps[i] = lsps[i];
-#endif
+            #endif
 
 	    /* various LSP quantisation schemes */
 
@@ -389,7 +416,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (lspjvm) {
-		/* Jean-marcs multi-stage VQ */
+		/* Jean-Marc's multi-stage VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
 		bw_expand_lsps(lsps_, LPC_ORD);			    
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
@@ -440,9 +467,13 @@ int main(int argc, char *argv[])
 		/* print previous LSPs to make sure we are using the right set */
 		if ((frames%4) == 0) {
 		    //printf("  lspdt ");  
-		    //lspdt_quantise(lsps, lsps_, lsps__prev2, lspdt_mode);
+                    //#define LSPDT		    
+                    #ifdef LSPDT		    
+		    lspdt_quantise(lsps, lsps_, lsps__prev2, lspdt_mode);
+                    #else
 		    for(i=0; i<LPC_ORD; i++)
 			lsps_[i] = lsps__prev2[i];		  
+                    #endif		    
 		    bw_expand_lsps(lsps_, LPC_ORD);
 		    lsp_to_lpc(lsps_, ak, LPC_ORD);
 		}
@@ -452,71 +483,78 @@ int main(int argc, char *argv[])
 		    lsps__prev[i] = lsps_[i];
 		}
 	    }
-#ifdef DUMP
+            #ifdef DUMP
 	    /* if using decimated (20ms) frames we dump interp
 	       LSPs below */
 	    if (!decimate)
 		dump_lsp(lsps_);
-#endif
+            #endif
 	
-	    /* We quantise energy and Wo when doing any form of LPC
-	       modelling.  This sounds transparent and saves an extra 
-	       command line switch to enable/disable. */
+	    if (scalar_quant_Wo_e) {
 
-	    e = decode_energy(encode_energy(e));
+		e = decode_energy(encode_energy(e));
 
-	    if (!decimate) {
-		/* we send params every 10ms, delta-time every 20ms */
-		if (dt && (frames % 2)) 
-		    model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
-		else
-		    model.Wo = decode_Wo(encode_Wo(model.Wo));
-	    }
-
-	    if (decimate) {
-		/* we send params every 20ms */
-		if (dt && ((frames % 4) == 0)) {
-		    /* delta-time every 40ms */
-		    model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
+		if (!decimate) {
+		    /* we send params every 10ms, delta-time every 20ms */
+		    if (dt && (frames % 2)) 
+			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
+		    else
+			model.Wo = decode_Wo(encode_Wo(model.Wo));
 		}
-		else
-		    model.Wo = decode_Wo(encode_Wo(model.Wo));		    
+
+		if (decimate) {
+		    /* we send params every 20ms */
+		    if (dt && ((frames % 4) == 0)) {
+			/* delta-time every 40ms */
+			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
+		    }
+		    else
+			model.Wo = decode_Wo(encode_Wo(model.Wo));		    
+		}
+
+		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
 
-	    model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
-	   
+	    if (vector_quant_Wo_e) {
+
+		/* JVM's experimental joint Wo & LPC energy quantiser */
+
+		Woe[0] = log10((model.Wo/PI)*4000.0/50.0)/log10(2);
+		Woe[1] = 10.0*log10(1e-4+e);
+		ge_quantise(Woe, Woe_);
+
+		/*
+		  x = log2(4000*Wo/(PI*50));
+		  2^x = 4000*Wo/(PI*50)
+		  Wo = (2^x)*(PI*50)/4000;
+		*/
+
+		model.Wo = pow(2.0, Woe_[0])*(PI*50.0)/4000.0;
+		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
+		e = pow(10.0, Woe_[1]/10.0);
+	    }
+
 	    aks_to_M2(ak, order, &model, e, &snr, 1); 
-	    apply_lpc_correction(&model);
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps
 	       and compare them,
 	    */
-#ifdef DUMP
+            #ifdef DUMP
 	    dump_lpc_snr(snr);
-#endif
+            #endif
 	    sum_snr += snr;
-#ifdef DUMP
+            #ifdef DUMP
 	    dump_quantised_model(&model);
-#endif
+            #endif
 	}
 
-#ifdef RESAMPLE
-	/* optional resampling of model amplitudes */
+	/*------------------------------------------------------------*\
 
-	//printf("frames=%d\n", frames);
-	if (resample) {
-	    snr = resample_amp_nl(&model, resample, AresdB_prev);
-	    sum_snr += snr;
-#ifdef DUMP
-	    dump_quantised_model(&model);
-#endif
-	}
-#endif
+                         Decimation to 20ms frame rate
 
-	/* option decimation to 20ms rate, which enables interpolation
-	   routine to synthesise in between frame ---------------------------*/
-  
+	\*------------------------------------------------------------*/
+
 	if (decimate) {
 	    float lsps_interp[LPC_ORD];
 
@@ -547,9 +585,6 @@ int main(int argc, char *argv[])
 
 		interp_model.voiced = voiced1;
 		
-#ifdef LOG_LIN_INTERP
-		interpolate(&interp_model, &prev_model, &model);
-#else
 		interpolate_lsp(&interp_model, &prev_model, &model,
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
 		apply_lpc_correction(&interp_model);
@@ -576,14 +611,14 @@ int main(int argc, char *argv[])
 		printf("\n");
 		*/
 			
-#ifdef DUMP
+                #ifdef DUMP
 		/* do dumping here so we get lsp dump file in correct order */
 		dump_lsp(prev_lsps);
 		dump_lsp(lsps_interp);
 		dump_lsp(lsps);
 		dump_lsp(lsps_);
-#endif
-#endif
+                #endif
+
 		if (phase0)
 		    phase_synth_zero_order(&interp_model, ak_interp, ex_phase,
 					   order);	
@@ -617,6 +652,8 @@ int main(int argc, char *argv[])
 	    }
 	}
 	else {
+	    /* no decimation - sythesise each 10ms frame immediately */
+
 	    if (phase0)
 	    	phase_synth_zero_order(&model, ak, ex_phase, order);	
 	    if (postfilt)
@@ -633,7 +670,11 @@ int main(int argc, char *argv[])
 	//}
     }
 
-    /* End Main Loop -----------------------------------------------------*/
+    /*----------------------------------------------------------------*\
+
+                            End Main Loop
+
+    \*----------------------------------------------------------------*/
 
     fclose(fin);
 
@@ -643,10 +684,10 @@ int main(int argc, char *argv[])
     if (lpc_model)
 	printf("SNR av = %5.2f dB\n", sum_snr/frames);
 
-#ifdef DUMP
+    #ifdef DUMP
     if (dump)
 	dump_off();
-#endif
+    #endif
 
     if (hand_voicing)
 	fclose(fvoicing);
