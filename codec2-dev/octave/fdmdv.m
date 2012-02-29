@@ -286,6 +286,52 @@ function rx_bits = qpsk_to_bits(rx_symbols)
 endfunction
 
 
+% returns nbits from a repeating sequence of random data
+
+function bits = get_test_bits(nbits)
+  global Ntest_bits;       % length of test sequence
+  global current_test_bit; 
+  global test_bits;
+
+  for i=1:nbits
+    bits(i) = test_bits(current_test_bit++);
+    if (current_test_bit > Ntest_bits)
+      current_test_bit = 1;
+    endif
+  end
+
+endfunction
+
+
+% Accepts nbits from rx and attempts to sync with test_bits sequence.
+% if sync OK measures bit errors
+
+function [sync bit_errors] = put_test_bits(rx_bits)
+  global Ntest_bits;       % length of test sequence
+  global test_bits;
+  global rx_test_bits_mem;
+
+  % Append to our memory
+
+  [m n] = size(rx_bits);
+  rx_test_bits_mem(1:Ntest_bits-n) = rx_test_bits_mem(n+1:Ntest_bits);
+  rx_test_bits_mem(Ntest_bits-n+1:Ntest_bits) = rx_bits;
+
+  % see how many bit errors we get when checked against test sequence
+
+  bit_errors = sum(xor(test_bits,rx_test_bits_mem));
+
+  % if less than a thresh we are aligned and in sync
+
+  ber =  bit_errors/Ntest_bits;
+  
+  sync = 0;
+  if (ber < 0.2)
+    sync = 1;
+  endif
+endfunction
+
+
 % Initialise ----------------------------------------------------
 
 global tx_filter_memory = zeros(Nc, Nfilter);
@@ -309,7 +355,7 @@ global phase_rx = ones(Nc,1);
 global rx_filter_mem_timing = zeros(Nc, Nt*P);
 global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
 
-frames = 100;
+frames = 200;
 tx_filt = zeros(Nc,M);
 rx_symbols_log = zeros(Nc,1);
 rx_phase_log = 0;
@@ -319,13 +365,18 @@ noise_pwr = 0;
 total_bit_errors = 0;
 total_bits = 0;
 
+global Ntest_bits = 100;     % length of test sequence
+global current_test_bit = 1; 
+global test_bits = rand(1,Ntest_bits) > 0.5;
+global rx_test_bits_mem = zeros(1,Ntest_bits);
+
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
 
 C = 1;  % power of each FDM carrier (energy/sample)
 N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
 
-EbNo_dB = 400;
+EbNo_dB = 2;
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
 %     = C *(Rs/Fs) / 2
@@ -347,10 +398,11 @@ CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
 B = 2400;
 SNR = CNo_dB - 10*log10(B);
 
+
 % Main loop ----------------------------------------------------
 
 for i=1:frames
-  tx_bits = rand(1,Nc*Nb) > 0.5; 
+  tx_bits = get_test_bits(Nc*Nb);
   tx_symbols = bits_to_qpsk(tx_bits);
   tx_baseband = tx_filter(tx_symbols);
   tx_fdm = fdm_upconvert(tx_baseband);
@@ -373,16 +425,22 @@ for i=1:frames
   rx_symbols_log = [rx_symbols_log rx_symbols];
   rx_bits = qpsk_to_bits(rx_symbols);
 
-  if (i > 20)
-    bit_errors = sum(xor(tx_bits,rx_bits));
+  [sync bit_errors] = put_test_bits(rx_bits);
+  if (sync == 1)
     total_bit_errors = total_bit_errors + bit_errors;
-    total_bits = total_bits + Nc*Nb;
-  endif
+    total_bits = total_bits + Ntest_bits;
+  end
+
+  %if (i > 20)
+  %  bit_errors = sum(xor(tx_bits,rx_bits));
+  %  total_bit_errors = total_bit_errors + bit_errors;
+  %  total_bits = total_bits + Nc*Nb;
+  %endif
 end
 
 ber = total_bit_errors/total_bits;
-printf("Eb/No: %2.2f dB  %d bit errors  Measured BER: %1.4f  Theoretical BER: %1.4f\n", EbNo_dB, 
-       total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
+printf("Eb/No: %2.2f dB  %d bits  %d errors  Meas BER: %1.4f  Theor BER: %1.4f\n", EbNo_dB, 
+      total_bits, total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
 
 figure(1)
 clf;
