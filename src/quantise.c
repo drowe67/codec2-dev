@@ -371,63 +371,31 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
     const float *cb;
     float se = 0.0;
     int   index;
-
     
+    //compute_weights(lsps, wt, LPC_ORD);
     for(i=0; i<LPC_ORD; i++) {
-	wt[i] = 1.0;
+    wt[i] = 1.0;
     }
-    
+ 
     //compute_weights(lsps, wt, LPC_ORD );
 
-#define DLSP_LIMIT 100.0
-
     for(i=0; i<LPC_ORD; i++) {
-	lsps_dt[i] = (4000/PI)*(lsps[i] - lsps__prev[i]);
+	lsps_dt[i] = lsps[i] - lsps__prev[i];
 	lsps_[i] = lsps__prev[i];
-	/*
-	if (lsps_dt[i] > DLSP_LIMIT) 
-	    lsps_dt[i] = DLSP_LIMIT;
-	if (lsps_dt[i] < -DLSP_LIMIT) 
-	    lsps_dt[i] = -DLSP_LIMIT;
-	*/
-	//lsps_[i] += (PI/4000)*lsps_dt[i];
-	
     }
 
-    k = lsp_cbdt[2].k;
-    m = lsp_cbdt[2].m;
-    cb = lsp_cbdt[2].cb;
+    //#define TRY_LSPDT_VQ
+#ifdef TRY_LSPDT_VQ
+    /* this actually improves speech a bit, but 40ms updates works surprsingly well.... */
+    k = lsp_cbdt[0].k;
+    m = lsp_cbdt[0].m;
+    cb = lsp_cbdt[0].cb;
     index = quantise(cb, lsps_dt, wt, k, m, &se);
-    printf("k %d m %d\n", k, m);
     for(i=0; i<LPC_ORD; i++) {
-	//lsps_[i] += (PI/4000.0)*cb[index*k + i];
-    }
-#ifdef TMP
-    /* VQ LSP dTs 1 to 4 */
-
-    if (mode != LSPDT_HIGH) {
-	k = lsp_cbdt[0].k;
-	m = lsp_cbdt[0].m;
-	cb = lsp_cbdt[0].cb;
-	index = quantise(cb, lsps_dt, wt, k, m, &se);
-
-	for(i=0; i<4; i++) {
-	    lsps_[i] += (PI/4000.0)*cb[index*k + i];
-	}
-    }
-
-    /* VQ LSP dTs 6 to 10 */
-
-    if (mode != LSPDT_LOW) {
-	k = lsp_cbdt[1].k;
-	m = lsp_cbdt[1].m;
-	cb = lsp_cbdt[1].cb;
-	index = quantise(cb, &lsps_dt[4], wt, k, m, &se);
-	for(i=4; i<10; i++) {
-	    lsps_[i] += (PI/4000.0)*cb[index*k + i - 4];
-	}
+	lsps_[i] += cb[index*k + i];
     }
 #endif
+
 }
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
@@ -443,8 +411,8 @@ void compute_weights(const float *x, float *w, int ndim)
   
   for (i=0;i<ndim;i++)
     w[i] = 1./(.01+w[i]);
-  w[0]*=3;
-  w[1]*=2;
+  //w[0]*=3;
+  //w[1]*=2;
 }
 
 int find_nearest(const float *codebook, int nb_entries, float *x, int ndim)
@@ -894,7 +862,7 @@ float speech_to_uq_lsps(float lsp[],
     /* 15 Hz BW expansion as I can't hear the difference and it may help
        help occasional fails in the LSP root finding */
 
-    for(i=0; i<=LPC_ORD; i++)
+    for(i=0; i<=order; i++)
 	ak[i] *= pow(0.994,(float)i);
 
     E = 0.0;
@@ -1449,3 +1417,85 @@ float decode_amplitudes(MODEL *model,
 
     return snr;
 }
+
+
+static float ge_coeff[2] = {0.8, 0.9};
+
+void compute_weights2(const float *x, const float *xp, float *w, int ndim)
+{
+  w[0] = 30;
+  w[1] = 1;
+  if (x[1]<0)
+  {
+     w[0] *= .6;
+     w[1] *= .3;
+  }
+  if (x[1]<-10)
+  {
+     w[0] *= .3;
+     w[1] *= .3;
+  }
+  /* Higher weight if pitch is stable */
+  if (fabs(x[0]-xp[0])<.2)
+  {
+     w[0] *= 2;
+     w[1] *= 1.5;
+  } else if (fabs(x[0]-xp[0])>.5) /* Lower if not stable */
+  {
+     w[0] *= .5;
+  }
+
+  /* Lower weight for low energy */
+  if (x[1] < xp[1]-10)
+  {
+     w[1] *= .5;
+  }
+  if (x[1] < xp[1]-20)
+  {
+     w[1] *= .5;
+  }
+
+  //w[0] = 30;
+  //w[1] = 1;
+  
+  /* Square the weights because it's applied on the squared error */
+  w[0] *= w[0];
+  w[1] *= w[1];
+
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: quantize_ge()	     
+  AUTHOR......: Jean-Marc Valin & David Rowe			      
+  DATE CREATED: 29 Feb 2012
+
+  Experimental joint Wo and LPC energy vector quantiser developed my
+  Jean-Marc Valin.
+  
+\*---------------------------------------------------------------------------*/
+
+void ge_quantise(float *x, float *xq)
+{
+  int          i, n1;
+  float        err[2];
+  float        w[2];
+  const float *codebook1 = ge_cb[0].cb;
+  int          nb_entries = ge_cb[0].m;
+  int          ndim = ge_cb[0].k;
+
+  //printf("ndim %d nb_entries %d\n", ndim, nb_entries);
+  compute_weights2(x, xq, w, ndim);
+  //exit(0);
+  for (i=0;i<ndim;i++)
+    err[i] = x[i]-ge_coeff[i]*xq[i];
+  n1 = find_nearest_weighted(codebook1, nb_entries, err, w, ndim);
+  
+  for (i=0;i<ndim;i++)
+  {
+    xq[i] = ge_coeff[i]*xq[i] + codebook1[ndim*n1+i];
+    err[i] -= codebook1[ndim*n1+i];
+  }
+
+}
+
