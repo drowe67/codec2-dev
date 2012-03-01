@@ -178,8 +178,10 @@ int main(int argc, char *argv[]) {
 	    ntrain++;
 
 	}
-	printf("\rtrain input vectors: %d unique vectors: %d",
-	       entry++, ntrain);
+	entry++;
+	if ((entry % 100) == 0)
+	    printf("\rtrain input vectors: %d unique vectors: %d",
+		   entry, ntrain);
     }
     printf("\n");
 
