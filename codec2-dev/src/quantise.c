@@ -863,6 +863,14 @@ float speech_to_uq_lsps(float lsp[],
     for(i=0; i<=order; i++)
 	E += ak[i]*R[i];
  
+    /* 15 Hz BW expansion as I can't hear the difference and it may help
+       help occasional fails in the LSP root finding.  Important to do this
+       after energy caluclation to avoid -ve energy values.
+    */
+
+    for(i=0; i<=order; i++)
+	ak[i] *= pow(0.994,(float)i);
+
     roots = lpc_to_lsp(ak, order, lsp, 5, LSP_DELTA1);
     if (roots != order) {
 	/* use some benign LSP values we can use instead */
