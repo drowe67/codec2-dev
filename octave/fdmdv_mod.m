@@ -7,15 +7,13 @@
 % Version 2
 %
 
-function tx_fdm = fdmdv_mod(wavefilename, nbits)
-
-% Main loop ----------------------------------------------------
+function tx_fdm = fdmdv_mod(rawfilename, nbits)
 
 fdmdv; % include modem code
 
 frames = floor(nbits/(Nc*Nb));
 tx_fdm = [];
-tx_gain = 1000;
+gain = 1000; % Sccle up to 16 bit shorts
 
 for i=1:frames
   tx_bits = get_test_bits(Nc*Nb);
@@ -24,6 +22,6 @@ for i=1:frames
   tx_fdm = [tx_fdm fdm_upconvert(tx_baseband)];
 end
 
-tx_fdm *= tx_gain;
-
-wavwrite(tx_fdm',8000,16,wavefilename)
+tx_fdm *= gain;
+fout = fopen(rawfilename,"wb");
+fwrite(fout, tx_fdm, "short");
