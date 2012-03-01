@@ -1,6 +1,6 @@
 % fdmdv.m
 %
-% Octave implementation of a Frequency Divison Multiplexed Modem for
+% Functions that implement a Frequency Divison Multiplexed Modem for
 % Digital Voice (FMDV)over HF channels.
 %
 % Copyright David Rowe 2012
@@ -8,11 +8,9 @@
 % Version 2
 %
 
-clear all;
-rand('state',1); 
-randn('state',1);
- 
-global Fs = 2000;      % sample rate in Hz
+% Constants
+
+global Fs = 8000;      % sample rate in Hz
 global T  = 1/Fs;      % sample period in seconds
 global Rs = 50;        % symbol rate in Hz
 global Ts = 1/Rs;      % symbol period in seconds
@@ -137,6 +135,7 @@ function tx_fdm = fdm_upconvert(tx_filt)
       end
   end
 
+  tx_fdm = real(tx_fdm);
 endfunction
 
 
@@ -341,140 +340,26 @@ global rx_filter_memory = zeros(Nc, Nfilter);
 
 global freq = zeros(Nc,1);;
 for c=1:Nc/2
-  carrier_freq = (-Nc/2 - 1 + c)*Fsep;
+  carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
   freq(c) = exp(j*2*pi*carrier_freq/Fs);
 end
 for c=Nc/2+1:Nc
-  carrier_freq = (-Nc/2 - 1 + c)*Fsep;
+  carrier_freq = (-Nc/2 + c)*Fsep + Fcentre;
   freq(c) = exp(j*2*pi*carrier_freq/Fs);
 end
 
 global phase_tx = ones(Nc,1);
 global phase_rx = ones(Nc,1);
 
+% Timing estimateor states
+
 global rx_filter_mem_timing = zeros(Nc, Nt*P);
 global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
 
-frames = 200;
-tx_filt = zeros(Nc,M);
-rx_symbols_log = zeros(Nc,1);
-rx_phase_log = 0;
-rx_timing_log = 0;
-tx_pwr = 0;
-noise_pwr = 0;
-total_bit_errors = 0;
-total_bits = 0;
+% Test bit stream state variables
 
 global Ntest_bits = 100;     % length of test sequence
 global current_test_bit = 1; 
 global test_bits = rand(1,Ntest_bits) > 0.5;
 global rx_test_bits_mem = zeros(1,Ntest_bits);
 
-% Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
-% Total power is sum of power in all FDM carriers
-
-C = 1;  % power of each FDM carrier (energy/sample)
-N = 1;  % total noise power (energy/sample) of noise source before scaling by Ngain
-
-EbNo_dB = 2;
-
-% Eb  = Carrier power * symbol time / (bits/symbol)
-%     = C *(Rs/Fs) / 2
-Eb_dB = 10*log10(C) + 10*log10(Rs) - 10*log10(Fs);
-
-No_dBHz = Eb_dB - EbNo_dB;
-
-% Noise power = Noise spectral density * bandwidth;
-N_dB = No_dBHz + 10*log10(Fs) - 10*log10(2);
-Ngain_dB = N_dB - 10*log10(N);
-Ngain = 10^(Ngain_dB/20);
-
-% C/No = Carrier Power/noise spectral denity
-%      = power per carrier*number of carriers / noise spectral denity
-CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
-
-% SNR in equivalent 2400 Hz SSB channel
-
-B = 2400;
-SNR = CNo_dB - 10*log10(B);
-
-
-% Main loop ----------------------------------------------------
-
-for i=1:frames
-  tx_bits = get_test_bits(Nc*Nb);
-  tx_symbols = bits_to_qpsk(tx_bits);
-  tx_baseband = tx_filter(tx_symbols);
-  tx_fdm = fdm_upconvert(tx_baseband);
-  tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M);
-
-  noise = Ngain/sqrt(2)*[randn(1,M) + j*randn(1,M)];
-  noise_pwr = 0.9*noise_pwr + 0.1*noise*noise'/M;
-  rx_fdm = tx_fdm + noise;
-
-  rx_baseband = fdm_downconvert(rx_fdm);
-  rx_filt = rx_filter(rx_baseband);
-
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
-  rx_timing_log = [rx_timing_log rx_timing];
-
-  %rx_phase = rx_est_phase(rx_symbols);
-  %rx_phase_log = [rx_phase_log rx_phase];
-  %rx_symbols = rx_symbols*exp(j*rx_phase);
-
-  rx_symbols_log = [rx_symbols_log rx_symbols];
-  rx_bits = qpsk_to_bits(rx_symbols);
-
-  [sync bit_errors] = put_test_bits(rx_bits);
-  if (sync == 1)
-    total_bit_errors = total_bit_errors + bit_errors;
-    total_bits = total_bits + Ntest_bits;
-  end
-
-  %if (i > 20)
-  %  bit_errors = sum(xor(tx_bits,rx_bits));
-  %  total_bit_errors = total_bit_errors + bit_errors;
-  %  total_bits = total_bits + Nc*Nb;
-  %endif
-end
-
-ber = total_bit_errors/total_bits;
-printf("Eb/No: %2.2f dB  %d bits  %d errors  Meas BER: %1.4f  Theor BER: %1.4f\n", EbNo_dB, 
-      total_bits, total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
-
-figure(1)
-clf;
-[n m] = size(rx_symbols_log);
-plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
-figure(2)
-clf;
-subplot(211)
-plot(rx_timing_log)
-subplot(212)
-plot(180/pi*unwrap(rx_phase_log))
-
-% TODO
-%   + state machine to sync on PR test and measure BER
-%   + handling sample slips, extra plus/minus samples
-%   + simulating sample clock offsets
-%   + timing, frequency offset get function
-%   + memory of recent tx and rx signal for spectrogram
-%   + scatter diagram get function
-
-% DPSK
-% add channel noise, phase offset, frequency offset, timing offset
-% fading simulator
-% file I/O to test with Codec
-% sync recovery time
-% dump file type plotting & instrumentation
-% determine if error pattern is bursty
-% HF channel simulation
-
-% BER issues:
-%   QPSK mapping
-%   Single sided noise issues
-%   interference between carriers due to excess BW
-%   Crappy RN coeffs
-%   timing recovery off by one
-%   Use a true PR sequence
-%   Sensitivity to Fs
