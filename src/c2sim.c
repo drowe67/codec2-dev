@@ -113,6 +113,8 @@ int main(int argc, char *argv[])
     float hpf_states[2];
     int   scalar_quant_Wo_e = 0;
     int   vector_quant_Wo_e = 0;
+    int   dump_pitch_e = 0;
+    FILE *fjvm = NULL;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -131,6 +133,7 @@ int main(int argc, char *argv[])
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
         { "dt", no_argument, &dt, 1 },
+        { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
@@ -218,7 +221,13 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-            } else if(strcmp(long_options[option_index].name, "rate") == 0) {
+             } else if(strcmp(long_options[option_index].name, "dump_pitch_e") == 0) {
+	        if ((fjvm = fopen(optarg,"wt")) == NULL) {
+	            fprintf(stderr, "Error opening pitch & energy dump file: %s: %s.\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+           } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"2500") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
@@ -358,6 +367,10 @@ int main(int argc, char *argv[])
 	    /* determine voicing */
 
 	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_uq_Wo);
+
+	    if (dump_pitch_e)
+		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
+
 	    //printf("snr %3.2f v: %d Wo: %f prev_Wo: %f\n", snr, model.voiced,
 	    //	   model.Wo, prev_uq_Wo);
             #ifdef DUMP
@@ -385,6 +398,24 @@ int main(int argc, char *argv[])
 	if (lpc_model) {
 
 	    e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
+
+	    /* tracking down -ve energy values with BW expansion */
+	    /*
+	    if (e < 0.0) {
+		int i;
+		FILE*f=fopen("x.txt","wt");
+		for(i=0; i<M; i++)
+		    fprintf(f,"%f\n", Sn[i]);
+		fclose(f);
+		printf("e = %f frames = %d\n", e, frames);
+		for(i=0; i<order; i++)
+		    printf("%f ", ak[i]);
+		exit(0);
+	    }
+	    */
+
+	    if (dump_pitch_e)
+		fprintf(fjvm, "%f\n", e);
 
             #ifdef DUMP
 	    /* dump order is different if we are decimating */
@@ -733,6 +764,8 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 			option_parameters = " <all|high|low>";
 		} else if (strcmp("hand_voicing", long_options[i].name) == 0) {
 			option_parameters = " <VoicingFile>";
+		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
+			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
 			option_parameters = " <2500|1500|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {

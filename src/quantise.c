@@ -859,12 +859,6 @@ float speech_to_uq_lsps(float lsp[],
     autocorrelate(Wn, R, M, order);
     levinson_durbin(R, ak, order);
   
-    /* 15 Hz BW expansion as I can't hear the difference and it may help
-       help occasional fails in the LSP root finding */
-
-    for(i=0; i<=order; i++)
-	ak[i] *= pow(0.994,(float)i);
-
     E = 0.0;
     for(i=0; i<=order; i++)
 	E += ak[i]*R[i];
