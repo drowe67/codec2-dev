@@ -63,7 +63,7 @@ global gt_alpha5_root = real((ifft_GF_alpha5_root(1:Nfilter)));
 
 % generate Nc QPSK symbols from vector of (1,Nc*Nb) input bits
 
-function tx_symbols = bits_to_qpsk(tx_bits)
+function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   global Nc;
   global Nb;
 
@@ -73,9 +73,29 @@ function tx_symbols = bits_to_qpsk(tx_bits)
   tx_bits_matrix(1:Nc,1) = tx_bits(1:Nb:Nb*Nc);
   tx_bits_matrix(1:Nc,2) = tx_bits(2:Nb:Nb*Nc);
 
-  % map to (Nc,1) QPSK symbols
+  if (strcmp(modulation,'dqpsk')) 
+    % map to (Nc,1) DQPSK symbols
 
-  tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2); 
+    for c=1:Nc
+      msb = tx_bits_matrix(c,1); lsb = tx_bits_matrix(c,2);
+
+      if ((msb == 0) && (lsb == 0))
+         tx_symbols(c) = prev_tx_symbols(c);
+      endif  
+      if ((msb == 0) && (lsb == 1))
+         tx_symbols(c) = j*prev_tx_symbols(c);
+      endif  
+      if ((msb == 1) && (lsb == 0))
+         tx_symbols(c) = -prev_tx_symbols(c);
+      endif  
+      if ((msb == 1) && (lsb == 1))
+         tx_symbols(c) = -j*prev_tx_symbols(c);
+      endif 
+  end
+  else
+    % QPSK mapping
+    tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2); 
+  endif
 
 endfunction
 
@@ -261,7 +281,7 @@ endfunction
 % sure but it's worth 3dB so worth experimenting or using coherent as
 % an option.
 
-function rx_phase = rx_est_phase(rx_symbols)
+function rx_phase = rx_est_phase(prev_rx_symbols, rx_symbols)
 
   % modulation strip
 
@@ -272,15 +292,42 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function rx_bits = qpsk_to_bits(rx_symbols)
+function rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
   global Nc;
   global Nb;
+  global Nb;
 
-  % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
+  if (strcmp(modulation,'dqpsk')) 
+    % extra 45 degree clockwise lets us use real and imag axis as
+    % decision boundaries
 
-  rx_bits = zeros(1,Nc*Nb);
-  rx_bits(1:Nb:Nc*Nb) = real(rx_symbols) > 0;
-  rx_bits(2:Nb:Nc*Nb) = imag(rx_symbols) > 0;
+    phase_difference = rx_symbols .* conj(prev_rx_symbols) * exp(j*pi/4);
+  
+    % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
+
+    for c=1:Nc
+      d = phase_difference(c);
+      if ((real(d) >= 0) && (imag(d) >= 0))
+         msb = 0; lsb = 0;
+      endif  
+      if ((real(d) < 0) && (imag(d) >= 0))
+         msb = 0; lsb = 1;
+      endif  
+      if ((real(d) < 0) && (imag(d) < 0))
+         msb = 1; lsb = 0;
+      endif
+      if ((real(d) >= 0) && (imag(d) < 0))
+         msb = 1; lsb = 1;
+      endif
+      rx_bits(2*(c-1)+1) = msb;
+      rx_bits(2*(c-1)+2) = lsb;
+    end
+  else
+    % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
+
+    rx_bits(1:Nb:Nc*Nb) = real(rx_symbols) > 0;
+    rx_bits(2:Nb:Nc*Nb) = imag(rx_symbols) > 0;
+  endif
 
 endfunction
 
@@ -358,7 +405,7 @@ global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
 
 % Test bit stream state variables
 
-global Ntest_bits = 100;     % length of test sequence
+global Ntest_bits = Nc*Nb*4;     % length of test sequence
 global current_test_bit = 1; 
 global test_bits = rand(1,Ntest_bits) > 0.5;
 global rx_test_bits_mem = zeros(1,Ntest_bits);
