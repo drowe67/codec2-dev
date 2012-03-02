@@ -13,7 +13,15 @@ fdmdv;               % load modem code
 rand('state',1); 
 randn('state',1);
  
+% Simulation Parameters --------------------------------------
+
 frames = 50;
+EbNo_dB = 40;
+Foff_hz = 1;
+modulation = 'dqpsk';
+
+% ------------------------------------------------------------
+
 tx_filt = zeros(Nc,M);
 rx_symbols_log = zeros(Nc,1);
 rx_phase_log = 0;
@@ -23,6 +31,9 @@ noise_pwr = 0;
 total_bit_errors = 0;
 total_bits = 0;
 rx_fdm_log = [];
+rx_bits_offset = zeros(Nc*Nb*2);
+prev_tx_symbols = ones(Nc,1)*exp(j*pi/4);
+prev_rx_symbols = ones(Nc,1)*exp(j*pi/4);
 
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
@@ -30,8 +41,6 @@ rx_fdm_log = [];
 C = 1;  % power of each FDM carrier (energy/sample)
 N = 1;  % total noise power (energy/sample) of noise source before scaling 
         % by Ngain
-
-EbNo_dB = 40;
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
 %     = C *(Rs/Fs) / 2
@@ -53,19 +62,30 @@ CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
 B = 2400;
 SNR = CNo_dB - 10*log10(B);
 
+phase_offset = 1;
+freq_offset = exp(j*2*pi*Foff_hz/Fs);
 
 % Main loop ----------------------------------------------------
 
 for i=1:frames
   tx_bits = get_test_bits(Nc*Nb);
-  tx_symbols = bits_to_qpsk(tx_bits);
+  %tx_bits = zeros(1,Nc*Nb);
+  %tx_bits = ones(1,Nc*Nb);
+  %tx_bits = [0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1];
+  %tx_bits = [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0];
+  tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation);
+  prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_fdm = fdm_upconvert(tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M);
 
   noise = Ngain/sqrt(2)*[randn(1,M) + j*randn(1,M)];
   noise_pwr = 0.9*noise_pwr + 0.1*noise*noise'/M;
-  rx_fdm = tx_fdm + noise;
+  for i=1:M
+    phase_offset *= freq_offset;
+    rx_fdm(i) = phase_offset*tx_fdm(i);
+  end
+  rx_fdm += noise;
   rx_fdm_log = [rx_fdm_log rx_fdm];
 
   rx_baseband = fdm_downconvert(rx_fdm);
@@ -78,8 +98,13 @@ for i=1:frames
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
-  rx_symbols_log = [rx_symbols_log rx_symbols];
-  rx_bits = qpsk_to_bits(rx_symbols);
+  if strcmp(modulation,'dqpsk')
+    rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
+  else
+    rx_symbols_log = [rx_symbols_log rx_symbols];
+  endif
+  rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  prev_rx_symbols = rx_symbols;
 
   [sync bit_errors] = put_test_bits(rx_bits);
   if (sync == 1)
@@ -123,6 +148,10 @@ plot(SdB(1:Fs/4))
 % dump file type plotting & instrumentation
 % determine if error pattern is bursty
 % HF channel simulation
+%
+% phase estimator not working too well and would need a UW
+% to resolve ambiguity.  But this is probably worth it for
+% 3dB.  Test with small freq offset
 
 % Implementation loss BER issues:
 %   QPSK mapping

@@ -13,11 +13,13 @@ fdmdv; % include modem code
 
 frames = floor(nbits/(Nc*Nb));
 tx_fdm = [];
-gain = 1000; % Sccle up to 16 bit shorts
+gain = 1000; % Scale up to 16 bit shorts
+prev_tx_symbols = ones(Nc,1)*exp(j*pi/4);
 
 for i=1:frames
   tx_bits = get_test_bits(Nc*Nb);
-  tx_symbols = bits_to_qpsk(tx_bits);
+  tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits,'dqpsk');
+  prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_fdm = [tx_fdm fdm_upconvert(tx_baseband)];
 end
@@ -25,3 +27,4 @@ end
 tx_fdm *= gain;
 fout = fopen(rawfilename,"wb");
 fwrite(fout, tx_fdm, "short");
+fclose(fout);
