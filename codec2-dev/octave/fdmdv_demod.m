@@ -11,6 +11,11 @@ function fdmdv_demod(rawfilename, nbits)
 
 fdmdv; % include modem code
 
+modulation = 'dqpsk';
+Foff_hz = 0;
+phase_offset = 1;
+freq_offset = exp(j*2*pi*Foff_hz/Fs);
+
 fin = fopen(rawfilename, "rb");
 rx_fdm = fread(fin, Inf, "short");
 gain = 1000;
@@ -18,8 +23,10 @@ rx_fdm /= gain;
 if (nargin == 1)
   frames = floor(length(rx_fdm)/M);
 else
-  frames = nbits/(Nc*Nb);
+    frames = nbits/(Nc*Nb);
 endif
+
+prev_rx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
 
 total_bit_errors = 0;
 total_bits = 0;
@@ -27,12 +34,15 @@ total_bits = 0;
 rx_timing_log = [];
 rx_symbols_log = [];
 rx_phase_log = [];
-prev_rx_symbols = ones(Nc,1)*exp(j*pi/4);
-modulation = 'dqpsk';
+sync_log = [];
 
 % Main loop ----------------------------------------------------
 
 for i=1:frames
+  for n=1:M
+    phase_offset *= freq_offset;
+    rx_fdm((i-1)*M+1+n) *= phase_offset;
+  end
   rx_baseband = fdm_downconvert(rx_fdm((i-1)*M+1:i*M));
   rx_filt = rx_filter(rx_baseband);
 
@@ -43,6 +53,7 @@ for i=1:frames
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
+
   if strcmp(modulation,'dqpsk')
     rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
   else
@@ -52,6 +63,7 @@ for i=1:frames
   prev_rx_symbols = rx_symbols;
 
   [sync bit_errors] = put_test_bits(rx_bits);
+  sync_log = [sync_log sync];
 
   if sync == 1
     total_bit_errors = total_bit_errors + bit_errors;
@@ -69,14 +81,18 @@ figure(1)
 clf;
 [n m] = size(rx_symbols_log);
 plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
+%plot(rx_fdm);
 figure(2)
 clf;
-subplot(311)
+%subplot(211)
 plot(rx_timing_log)
-subplot(312)
-Nfft=Fs;
-S=fft(rx_fdm,Nfft);
-SdB=20*log10(abs(S));
-plot(SdB(1:Fs/4))
-subplot(313)
-%plot(rx_phase_log)
+%subplot(212)
+%plot(sync_log)
+figure(3)
+clf;
+for i=1:Nc
+  subplot(4,4,i);
+  mx = max(abs(rx_symbols_log(i,20:m)));
+  plot(real(rx_symbols_log(i,20:m)),imag(rx_symbols_log(i,20:m)),'+')
+  axis([-mx mx -mx mx]);
+end
