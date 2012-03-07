@@ -8,6 +8,11 @@
 % Version 2
 %
 
+% reqd to mak sure we get same random bits at mod and demod
+
+rand('state',1); 
+randn('state',1);
+
 % Constants
 
 global Fs = 8000;      % sample rate in Hz
@@ -80,7 +85,7 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
       msb = tx_bits_matrix(c,1); lsb = tx_bits_matrix(c,2);
 
       if ((msb == 0) && (lsb == 0))
-         tx_symbols(c) = prev_tx_symbols(c);
+	  tx_symbols(c) = prev_tx_symbols(c);
       endif  
       if ((msb == 0) && (lsb == 1))
          tx_symbols(c) = j*prev_tx_symbols(c);
@@ -94,7 +99,7 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   end
   else
     % QPSK mapping
-    tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2); 
+    tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2);
   endif
 
 endfunction
@@ -145,7 +150,7 @@ function tx_fdm = fdm_upconvert(tx_filt)
 	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*phase_tx(c);
       end
   end
-
+  
   % Nc/2 tones above centre freq  
 
   for c=Nc/2+1:Nc
@@ -155,7 +160,19 @@ function tx_fdm = fdm_upconvert(tx_filt)
       end
   end
 
-  tx_fdm = real(tx_fdm);
+  % add centre pilot tone at twice amplitude of other tones
+
+  c = Nc+1;
+  for i=1:M
+    phase_tx(c) = phase_tx(c) * freq(c);
+    tx_fdm(i) = tx_fdm(i) + 1/sqrt(2)*phase_tx(c);
+  end
+ 
+  % Scale such that total Carrier power C of real(tx_fdm) = Nc
+  % we return the complex (single sided) signal to make frequency
+  % shifting for the purpose of testing easier
+
+  tx_fdm = sqrt(2)*tx_fdm;
 endfunction
 
 
@@ -218,8 +235,62 @@ function rx_filt = rx_filter(rx_baseband)
 endfunction
 
 
-% Estimate optimum timing offset, and symbol receive symbols
+% Estimate frequency offset of FDM signal by peak picking pilot
+% tone at Fcentre
 
+function foff = rx_est_freq_offset(rx_fdm)
+  global M;
+  global Nc;
+  global Fs;
+  global freq;
+  global phase_rx;
+  global Npilotbaseband;
+  global Npilotlpf;
+  global Npilotcoeff;
+  global pilot_baseband;
+  global pilot_lpf;
+  global pilot_coeff;
+
+  % down convert latest M samples of pilot
+
+  pilot_baseband(1:Npilotbaseband-M) = pilot_baseband(M+1:Npilotbaseband);
+  c = Nc+1;
+  for i=1:M
+    phase_rx(c) = phase_rx(c) * freq(c);
+    pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i) * phase_rx(c)';
+  end
+
+  % LPF cutoff 200Hz
+
+  pilot_lpf(1:Npilotlpf-M) = pilot_lpf(M+1:Npilotlpf);
+  j = 1;
+  for i = Npilotlpf-M+1:Npilotlpf
+    pilot_lpf(i) = pilot_baseband(j:j+Npilotcoeff) * pilot_coeff';
+    j++;
+  end
+
+  % decimate to improve DFT resolution, window and DFT
+
+  Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
+  Mpilotfft = 256;
+  s = pilot_lpf(1:Mpilot:Npilotlpf) .* hanning(Npilotlpf/Mpilot)';
+  S = abs(fft(s, Mpilotfft));
+
+  % peak pick and convert to Hz
+
+  [x ix] = max(S);
+  r = 2*200/Mpilotfft;     % maps FFT bin to frequency in Hz
+
+  if ix > Mpilotfft/2
+    foff = (ix - Mpilotfft - 1)*r;
+  else
+    foff = (ix - 1)*r;
+  endif
+
+endfunction
+
+
+% Estimate optimum timing offset, and symbol receive symbols
 
 function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   global M;
@@ -250,7 +321,7 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   % map phase to estimated optimum timing instant at rate M
   % the M/2 + 1 part was adjusted by experment, I know not why....
 
-  rx_timing = angle(x)*M/pi + M/2 + 1;
+  rx_timing = angle(x)*M/(2*pi) + M/4;
   if (rx_timing > M)
      rx_timing -= M;
   end
@@ -277,7 +348,7 @@ endfunction
 % Phase estimation function - probably won't work over a HF channel
 % Tries to operate over a sinle symbol but uses phase information from
 % all Nc carriers which should increase the SNR of phase estimate.
-% Maybe phase is coherent over a coupel of symbols in HF channel,not
+% Maybe phase is coherent over a couple of symbols in HF channel,not
 % sure but it's worth 3dB so worth experimenting or using coherent as
 % an option.
 
@@ -369,10 +440,10 @@ function [sync bit_errors] = put_test_bits(rx_bits)
 
   % if less than a thresh we are aligned and in sync
 
-  ber =  bit_errors/Ntest_bits;
+  ber = bit_errors/Ntest_bits;
   
   sync = 0;
-  if (ber < 0.2)
+  if (ber < 0.1)
     sync = 1;
   endif
 endfunction
@@ -385,7 +456,7 @@ global rx_filter_memory = zeros(Nc, Nfilter);
 
 % phasors used for up and down converters
 
-global freq = zeros(Nc,1);;
+global freq = zeros(Nc+1,1);;
 for c=1:Nc/2
   carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
   freq(c) = exp(j*2*pi*carrier_freq/Fs);
@@ -395,10 +466,21 @@ for c=Nc/2+1:Nc
   freq(c) = exp(j*2*pi*carrier_freq/Fs);
 end
 
-global phase_tx = ones(Nc,1);
-global phase_rx = ones(Nc,1);
+freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 
-% Timing estimateor states
+global phase_tx = ones(Nc+1,1);
+global phase_rx = ones(Nc+1,1);
+
+% Freq offset estimator states
+
+global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
+global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
+global Npilotbaseband = Npilotcoeff + M;                % number of pilot baseband samples reqd for pilot LPF
+global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
+global pilot_baseband = zeros(1, Npilotbaseband);       % pilot baseband samples
+global pilot_lpf      = zeros(1, Npilotlpf);            % LPC pilot samples
+
+% Timing estimator states
 
 global rx_filter_mem_timing = zeros(Nc, Nt*P);
 global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);

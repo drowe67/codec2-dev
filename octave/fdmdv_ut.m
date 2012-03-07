@@ -10,14 +10,12 @@
 clear all;
 
 fdmdv;               % load modem code
-rand('state',1); 
-randn('state',1);
  
 % Simulation Parameters --------------------------------------
 
-frames = 50;
-EbNo_dB = 40;
-Foff_hz = 1;
+frames = 100;
+EbNo_dB = 7.3;
+Foff_hz = 124;
 modulation = 'dqpsk';
 
 % ------------------------------------------------------------
@@ -31,64 +29,103 @@ noise_pwr = 0;
 total_bit_errors = 0;
 total_bits = 0;
 rx_fdm_log = [];
+rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
-prev_tx_symbols = ones(Nc,1)*exp(j*pi/4);
-prev_rx_symbols = ones(Nc,1)*exp(j*pi/4);
+prev_tx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
+prev_rx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
+foff_log = [];
+
+Ndelay = M+20;
+rx_fdm_delay = zeros(Ndelay,1);
 
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
 
-C = 1;  % power of each FDM carrier (energy/sample)
-N = 1;  % total noise power (energy/sample) of noise source before scaling 
-        % by Ngain
+C = 1; % power of each FDM carrier (energy/sample).  Total Carrier power should = Nc*C = Nc
+N = 1; % total noise power (energy/sample) of noise source across entire bandwidth
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
-%     = C *(Rs/Fs) / 2
-Eb_dB = 10*log10(C) + 10*log10(Rs) - 10*log10(Fs) - 10*log10(2);
+%     = C *(1/Rs) / 2
+Eb_dB = 10*log10(C) - 10*log10(Rs) - 10*log10(2);
 
 No_dBHz = Eb_dB - EbNo_dB;
 
-% Noise power = Noise spectral density * bandwidth;
-N_dB = No_dBHz + 10*log10(Fs);
+% Noise power = Noise spectral density * bandwidth
+% Noise power = Noise spectral density * Fs/2 for real signals
+N_dB = No_dBHz + 10*log10(Fs/2);
 Ngain_dB = N_dB - 10*log10(N);
 Ngain = 10^(Ngain_dB/20);
 
-% C/No = Carrier Power/noise spectral denity
-%      = power per carrier*number of carriers / noise spectral denity
+% C/No = Carrier Power/noise spectral density
+%      = power per carrier*number of carriers / noise spectral density
 CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
 
-% SNR in equivalent 2400 Hz SSB channel
+% SNR in equivalent 3000 Hz SSB channel
 
-B = 2400;
+B = 3000;
 SNR = CNo_dB - 10*log10(B);
 
 phase_offset = 1;
 freq_offset = exp(j*2*pi*Foff_hz/Fs);
+foff_phase = 1;
 
 % Main loop ----------------------------------------------------
 
 for i=1:frames
+
+  % -------------------
+  % Modulator
+  % -------------------
+
   tx_bits = get_test_bits(Nc*Nb);
-  %tx_bits = zeros(1,Nc*Nb);
-  %tx_bits = ones(1,Nc*Nb);
-  %tx_bits = [0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1];
-  %tx_bits = [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0];
   tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation);
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
-  tx_fdm = fdm_upconvert(tx_baseband);
-  tx_pwr = 0.9*tx_pwr + 0.1*tx_fdm*tx_fdm'/(M);
+  tx_fdm = fdm_upconvert(tx_baseband) + 2*cos(2*pi*(0:M-1)*Fcentre/Fs);
+  tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
-  noise = Ngain/sqrt(2)*[randn(1,M) + j*randn(1,M)];
-  noise_pwr = 0.9*noise_pwr + 0.1*noise*noise'/M;
+  % -------------------
+  % Channel simulation
+  % -------------------
+
+  % frequency offset
+
   for i=1:M
     phase_offset *= freq_offset;
-    rx_fdm(i) = phase_offset*tx_fdm(i);
+    rx_fdm(i) = phase_offset*real(tx_fdm(i));
   end
+
+  % AWGN noise
+
+  noise = Ngain*randn(1,M);
+  noise_pwr = 0.9*noise_pwr + 0.1*noise*noise'/M;
   rx_fdm += noise;
   rx_fdm_log = [rx_fdm_log rx_fdm];
 
-  rx_baseband = fdm_downconvert(rx_fdm);
+  % delay
+
+  rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
+  rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
+
+  % -------------------
+  % Demodulator
+  % -------------------
+
+  % frequency offset estimation and correction
+
+  foff = rx_est_freq_offset(rx_fdm);
+  foff_log = [ foff_log foff ];
+  foff_rect = exp(j*2*pi*foff/Fs);
+
+  for i=1:M
+    foff_phase *= foff_rect';
+    rx_fdm_delay(i) = rx_fdm_delay(i)*foff_phase;
+  end
+
+  % baseband processing
+
+  rx_baseband = fdm_downconvert(rx_fdm_delay(1:M));
+  rx_baseband_log = [rx_baseband_log rx_baseband];
   rx_filt = rx_filter(rx_baseband);
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
@@ -106,6 +143,8 @@ for i=1:frames
   rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   prev_rx_symbols = rx_symbols;
 
+  % count bit errors
+
   [sync bit_errors] = put_test_bits(rx_bits);
   if (sync == 1)
     total_bit_errors = total_bit_errors + bit_errors;
@@ -115,23 +154,28 @@ for i=1:frames
 end
 
 ber = total_bit_errors/total_bits;
-printf("Eb/No: %2.2f dB  %d bits  %d errors  Meas BER: %1.4f  Theor BER: %1.4f\n", EbNo_dB, 
-      total_bits, total_bit_errors, ber, 0.5*erfc(sqrt(10.^(EbNo_dB/10))));
+printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  QPSK BER (meas): %1.4f (%1.4f)\n", 
+       EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)),
+       total_bits, total_bit_errors, 0.5*erfc(sqrt(10.^(EbNo_dB/10))), ber );
 
 figure(1)
 clf;
 [n m] = size(rx_symbols_log);
 plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
+
 figure(2)
 clf;
 subplot(211)
 plot(rx_timing_log)
 subplot(212)
-Nfft=Fs;
-S=fft(rx_fdm_log,Nfft);
-SdB=20*log10(abs(S));
+%Nfft=Fs;
+%S=fft(rx_fdm_log,Nfft);
+%SdB=20*log10(abs(S));
 %plot(-Fs/2+1:Fs/2,fftshift(SdB))
-plot(SdB(1:Fs/4))
+%plot(SdB(1:Fs/4))
+plot(foff_log)
+
+
 
 % TODO
 %   + handling sample slips, extra plus/minus samples
@@ -163,3 +207,11 @@ plot(SdB(1:Fs/4))
 %   Sensitivity to Fs
 %   Try BPSK
 %   second term of QPSK eqn
+
+% Faster sync:
+%
+% 1/ Maybe Ask Bill how we can sync in less than 10 symbols?  What to
+% put in filter memories?  If high SNR should sync very quickly
+% Maybe start feeding in symbols to middle of filter memory?  Or do timing
+% sync before rx filtering at start?
+
