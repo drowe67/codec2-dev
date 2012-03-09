@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h>
+#include <assert.h>
 
 void scan_line(FILE *fp, float f[], int n);
 
@@ -110,8 +111,8 @@ void scan_line(FILE *fp, float f[], int n)
     char   *ps,*pe;
     int	   i;
 
-    fgets(s,MAX_STR,fp);
-    ps = pe = s;
+    ps = pe = fgets(s,MAX_STR,fp); 
+    assert(ps);
     for(i=0; i<n; i++) {
 	while( isspace(*pe)) pe++;
 	while( !isspace(*pe)) pe++;

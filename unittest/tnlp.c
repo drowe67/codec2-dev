@@ -116,7 +116,8 @@ char *argv[];
     if (dump) 
       dump_on(argv[dump+1]);
 #else
-#warning "Compile with -DDUMP if you expect to dump anything."
+/// TODO
+/// #warning "Compile with -DDUMP if you expect to dump anything."
 #endif
 
     nlp_states = nlp_create();

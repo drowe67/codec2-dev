@@ -130,22 +130,22 @@ int test2()
 	encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
 	energy_index = encode_energy(e);
 	nbit = 0;
-	pack(bits, &nbit, Wo_index, WO_BITS);
+	pack((unsigned char*)bits, (unsigned *)&nbit, Wo_index, WO_BITS);
 	for(i=0; i<LPC_ORD; i++) {
-	    pack(bits, &nbit, lsp_indexes[i], lsp_bits(i));
+	    pack((unsigned char*)bits, (unsigned *)&nbit, lsp_indexes[i], lsp_bits(i));
 	}
-	pack(bits, &nbit, energy_index, E_BITS);
-	pack(bits, &nbit, voiced1, 1);
-	pack(bits, &nbit, voiced2, 1);
+	pack((unsigned char*)bits, (unsigned *)&nbit, energy_index, E_BITS);
+	pack((unsigned char*)bits, (unsigned *)&nbit, voiced1, 1);
+	pack((unsigned char*)bits, (unsigned *)&nbit, voiced2, 1);
  
 	nbit = 0;
-	Wo_index = unpack(bits, &nbit, WO_BITS);
+	Wo_index = unpack((unsigned char*)bits, (unsigned *)&nbit, WO_BITS);
 	for(i=0; i<LPC_ORD; i++) {
-	    lsp_indexes[i] = unpack(bits, &nbit, lsp_bits(i));
+	    lsp_indexes[i] = unpack((unsigned char*)bits, (unsigned *)&nbit, lsp_bits(i));
 	}
-	energy_index = unpack(bits, &nbit, E_BITS);
-	voiced1 = unpack(bits, &nbit, 1);
-	voiced2 = unpack(bits, &nbit, 1);
+	energy_index = unpack((unsigned char*)bits, (unsigned *)&nbit, E_BITS);
+	voiced1 = unpack((unsigned char*)bits, (unsigned *)&nbit, 1);
+	voiced2 = unpack((unsigned char*)bits, (unsigned *)&nbit, 1);
 
 	model.Wo = decode_Wo(Wo_index);
 	model.L = PI/model.Wo;

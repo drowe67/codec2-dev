@@ -37,6 +37,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#include <assert.h>
 
 /*-----------------------------------------------------------------------*\
 

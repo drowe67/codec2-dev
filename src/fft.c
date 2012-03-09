@@ -76,7 +76,6 @@ fft (float x[], int n, int isign)
     {
       initialize_fft (n);
     }
-  int isReverse = 0;
   int c;
   for (c = 0; c < n * 2; c += 2)
     {
