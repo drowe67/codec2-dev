@@ -97,8 +97,9 @@ void load_amp(MODEL *model, char file[], int frame)
     f = fopen(file,"rt");
 
     for(i=0; i<frame; i++)
-	fgets(s, 1023, f);
+	ps = fgets(s, 1023, f);
 
+    /// can frame ever be 0? what if fgets fails?
     ps = s;
     ps = get_next_float(ps, &model->Wo);
     ps = get_next_int(ps, &model->L);
