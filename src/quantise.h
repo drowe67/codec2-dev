@@ -71,6 +71,7 @@ void decode_lsps_diff_time_vq(
 void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim);
 void decode_lsps_vq(int *indexes, float *xq, int ndim);
 
+long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
 void lspd_quantise(float lsp[], float lsp_[], int order);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
@@ -98,5 +99,11 @@ float speech_to_uq_lsps(float lsp[],
 void check_lsp_order(float lsp[], int lpc_order);
 void bw_expand_lsps(float lsp[], int order);
 void locate_lsps_jnd_steps(float lsp[], int order);
+float decode_amplitudes(MODEL *model, 
+			float  ak[],
+		        int    lsp_indexes[], 
+		        int    energy_index,
+			float  lsps[],
+			float *e);
 
 #endif

@@ -47,9 +47,9 @@ int main(int argc, char *argv[])
     int k,m;             /* LSP vector order and codebook size */     
     int    index;
     float  wt[1];        /* weighting (not used here for scalars) */
-    float *cb;           /* LSP quantiser codebook */
+    const float *cb;           /* LSP quantiser codebook */
     int i, ret;               
-    float  se, total_se; 
+    float  total_se; 
 
     if (argc < 2) {
 	printf("usage: %s InputFile\n", argv[0]);

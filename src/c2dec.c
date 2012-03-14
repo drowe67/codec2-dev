@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
     frames = bit_errors = 0;
 
-    while(fread(bits, sizeof(char), nbyte, fin) == nbyte) {
+    while(fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte) {
 	frames++;
 	if (ber != 0.0) {
 	    for(i=0; i<nbit; i++) {

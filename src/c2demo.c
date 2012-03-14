@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
     nbit = codec2_bits_per_frame(codec2);
     bits = (unsigned char*)malloc(nbit*sizeof(char));
 
-    while(fread(buf, sizeof(short), nsam, fin) == nsam) {
+    while(fread(buf, sizeof(short), nsam, fin) == (size_t)nsam) {
 	codec2_encode(codec2, bits, buf);
 	codec2_decode(codec2, buf, bits);
 	fwrite(buf, sizeof(short), nsam, fout);

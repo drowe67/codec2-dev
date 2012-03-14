@@ -157,7 +157,7 @@ void interpolate_lsp(
   float *lsps_interp/* interpolated lsps for this frame              */
 )
 {
-    int   l,i;
+    int   i;
     float e;
     float snr;
 

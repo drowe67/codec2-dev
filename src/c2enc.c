@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
 
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
     
-    while(fread(buf, sizeof(short), nsam, fin) == nsam) {
+    while(fread(buf, sizeof(short), nsam, fin) == (size_t)nsam) {
 	codec2_encode(codec2, bits, buf);
 	fwrite(bits, sizeof(char), nbyte, fout);
 	//if this is in a pipeline, we probably don't want the usual

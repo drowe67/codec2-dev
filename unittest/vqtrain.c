@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
     /* determine size of training set */
 
     J = 0;
-    while(fread(vec, sizeof(float), k, ftrain) == k)
+    while(fread(vec, sizeof(float), k, ftrain) == (size_t)k)
     J++;
     printf("J=%ld entries in training set\n", J);
 
