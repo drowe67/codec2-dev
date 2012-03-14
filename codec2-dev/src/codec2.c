@@ -307,7 +307,7 @@ void codec2_encode_2500(struct CODEC2 *c2, unsigned char * bits, short speech[])
     pack(bits, &nbit, voiced1, 1);
     pack(bits, &nbit, voiced2, 1);
     fprintf(stderr,"v2: %d  v1: %d\n", voiced2, voiced1);
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
 
 
@@ -351,7 +351,7 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     energy_index = unpack(bits, &nbit, E_BITS);
     voiced1 = unpack(bits, &nbit, 1);
     voiced2 = unpack(bits, &nbit, 1);
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 
     /* decode integer codes to model parameters */
 
@@ -541,7 +541,7 @@ void codec2_encode_1500(struct CODEC2 *c2, unsigned char * bits, short speech[])
     energy_index = unpack(bits, &nbit_tmp, E_BITS);
     // fprintf(stderr,"energy_index after: %d\n", energy_index);
 
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
     //if (frames == 36)
     //exit(0);
 }
@@ -661,7 +661,7 @@ void codec2_decode_1500(struct CODEC2 *c2, short speech[], const unsigned char *
     energy_index = unpack(bits, &nbit, E_BITS);
     voiced3 = unpack(bits, &nbit, 1);
     voiced4 = unpack(bits, &nbit, 1);
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 
     /* decode integer codes to model parameters */
 
@@ -772,7 +772,7 @@ void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[])
     unsigned int nbit = 0;
     unsigned int nbit_tmp;
     float   prev_Wo;
-    static  int frames;
+//    static  int frames;
 
     assert(c2 != NULL);
 
@@ -845,7 +845,7 @@ void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[])
     energy_index = unpack(bits, &nbit_tmp, E_BITS);
     // fprintf(stderr,"energy_index after: %d\n", energy_index);
 
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
     //if (frames == 8)
     //exit(0);
 }
@@ -964,7 +964,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     energy_index = unpack(bits, &nbit, E_BITS);
     voiced3 = unpack(bits, &nbit, 1);
     voiced4 = unpack(bits, &nbit, 1);
-    assert(nbit == codec2_bits_per_frame(c2));
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 
     /* decode integer codes to model parameters */
 

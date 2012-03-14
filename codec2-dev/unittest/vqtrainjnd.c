@@ -70,17 +70,16 @@ void locate_lsps_jnd_steps(float lsps[], float step, int k);
 \*-----------------------------------------------------------------------*/
 
 int main(int argc, char *argv[]) {
-    int   k,m;		/* dimension and codebook size			*/
+    int     k;		/* dimension and codebook size			*/
     float  *vec;	/* current vector 				*/
     int    *n;		/* number of vectors in this interval		*/
     int     J;		/* number of vectors in training set		*/
     int     i,j;
     FILE   *ftrain;	/* file containing training set			*/
-    int     ret;
     float  *train;      /* training database                            */
-    float  *pend_train; /* last entry                                   */
+    //float  *pend_train; /* last entry                                   */
     float  *pt;
-    int     ntrain, match, vec_exists, vec_index, entry;
+    int     ntrain, match, vec_exists, vec_index=0, entry;
     int     popular[MAX_POP], pop_thresh;
     FILE   *fvq;
     float   jnd;
@@ -117,7 +116,7 @@ int main(int argc, char *argv[]) {
     /* determine size of training set */
 
     J = 0;
-    while(fread(vec, sizeof(float), k, ftrain) == k)
+    while(fread(vec, sizeof(float), k, ftrain) == (size_t)k)
 	J++;
     printf("J=%d entries in training set\n", J);
     train = (float*)malloc(sizeof(float)*k*J);
@@ -140,7 +139,7 @@ int main(int argc, char *argv[]) {
     rewind(ftrain);
     ntrain = 0;
     entry = 0;
-    while(fread(vec, sizeof(float), k, ftrain) == k) {
+    while(fread(vec, sizeof(float), k, ftrain) == (size_t)k) {
 
 	/* convert to Hz */
 
@@ -241,7 +240,6 @@ int main(int argc, char *argv[]) {
 void locate_lsps_jnd_steps(float lsps[], float step, int k)
 {
     int   i;
-    float lsp_hz;
 
     for(i=0; i<k; i++) {
 	lsps[i] = floor(lsps[i]/step + 0.5)*step;

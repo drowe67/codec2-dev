@@ -86,8 +86,6 @@ int main(int argc, char *argv[])
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
  
-    int dump = 0;
-  
     int phase0 = 0;
     float ex_phase[MAX_AMP+1];
 

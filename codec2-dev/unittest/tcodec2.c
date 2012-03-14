@@ -195,9 +195,9 @@ int test3()
     assert(fout != NULL);
 
     while(fread(buf1, sizeof(short), 2*N, fin) == 2*N) {
-	codec2_encode(c2, bits, buf1);
+	codec2_encode(c2, (void*)bits, buf1);
 	fwrite(bits, sizeof(char), codec2_bits_per_frame(c2), fbits);
-	codec2_decode(c2, buf2, bits);
+	codec2_decode(c2, buf2, (void*)bits);
 	fwrite(buf2, sizeof(short), codec2_bits_per_frame(c2), fout);
     }
 
