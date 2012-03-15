@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
 
     if (argc < 2) {
 	printf("usage: %s InputFile\n", argv[0]);
-	exit(0);
+	exit(1);
     }
 
     if ((ftrain = fopen(argv[1],"rt")) == NULL) {

@@ -75,8 +75,8 @@ int main(int argc, char *argv[]) {
     /* Initialise ------------------------------------------------------*/
 
     if (argc < 3) {
-	printf("usage: gentest RawFile LSPTextFile [--lspd] [--log] [--lspdt] \n");
-	exit(0);
+	printf("usage: %s RawFile LSPTextFile [--lspd] [--log] [--lspdt] \n", argv[0]);
+	exit(1);
     }
 
     /* Open files */

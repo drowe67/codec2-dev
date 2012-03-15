@@ -291,7 +291,7 @@ int main(int argc, char **argv)
 
   if (argc != 5) {
       printf("usage: %s TrainTextFile K(dimension) M(codebook size) VQFilesPrefix\n", argv[0]);
-      exit(0);      
+      exit(1);      
   }
   
   ndim = atoi(argv[2]);

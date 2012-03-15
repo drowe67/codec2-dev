@@ -12,5 +12,11 @@
 #define __FFT__
 void fft(float x[], int n, int isign);
 
+void cleanup_fft(void)
+#ifdef __GNUC__
+    __attribute__ ((destructor))
+#endif
+    ;
+
 #endif	/* __FFT__ */
 

@@ -22,8 +22,8 @@ int main(int argc, char *argv[]) {
     short buf[N];
 
     if (argc != 3) {
-	printf("usage: mksine outputFile frequencyHz\n");
-	exit(0);
+	printf("usage: %s outputFile frequencyHz\n", argv[0]);
+	exit(1);
     }
 
     f = fopen(argv[1] ,"wb");

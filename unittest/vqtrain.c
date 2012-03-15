@@ -84,8 +84,8 @@ int main(int argc, char *argv[]) {
     /* Interpret command line arguments */
 
     if (argc != 5)	{
-	printf("usage: vqtrain TrainFile K(dimension) M(codebook size) VQFile\n");
-	exit(0);
+	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile\n", argv[0]);
+	exit(1);
     }
 
     /* Open training file */

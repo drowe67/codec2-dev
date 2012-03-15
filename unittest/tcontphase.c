@@ -102,8 +102,8 @@ char *argv[];
     float f0;
 
     if (argc < 3) {
-	printf("\nusage: tcontphase OutputRawSpeechFile F0\n");
-        exit(0);
+	printf("\nusage: %s OutputRawSpeechFile F0\n", argv[0]);
+        exit(1);
     }
 
     /* Output file */

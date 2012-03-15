@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 
   if (argc < 3) {
     printf("usage: %s InputFile ResidualFile\n", argv[0]);
-    exit(0);
+    exit(1);
   }
 
   /* Open files */

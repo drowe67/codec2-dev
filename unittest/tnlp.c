@@ -94,7 +94,7 @@ char *argv[];
     if (argc < 3) {
 	printf("\nusage: tnlp InputRawSpeechFile OutputPitchTextFile "
 	       "[--dump DumpFile]\n");
-        exit(0);
+        exit(1);
     }
 
     /* Input file */
