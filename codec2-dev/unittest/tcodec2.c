@@ -185,7 +185,10 @@ int test3()
     struct CODEC2 *c2;
 
     c2 = codec2_create(CODEC2_MODE_2500);
-    bits = (char*)malloc(codec2_bits_per_frame(c2));
+    int numBits  = codec2_bits_per_frame(c2);
+    int numBytes = (numBits+7)>>3;
+
+    bits = (char*)malloc(numBytes);
 
     fin = fopen("../raw/hts1a.raw", "rb");
     assert(fin != NULL);
@@ -196,9 +199,9 @@ int test3()
 
     while(fread(buf1, sizeof(short), 2*N, fin) == 2*N) {
 	codec2_encode(c2, (void*)bits, buf1);
-	fwrite(bits, sizeof(char), codec2_bits_per_frame(c2), fbits);
+	fwrite(bits, sizeof(char), numBytes, fbits);
 	codec2_decode(c2, buf2, (void*)bits);
-	fwrite(buf2, sizeof(short), codec2_bits_per_frame(c2), fout);
+	fwrite(buf2, sizeof(short), numBytes, fout);
     }
 
     free(bits);

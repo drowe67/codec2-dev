@@ -89,7 +89,7 @@ int main(int argc, char *argv[]) {
     if (argc != 6)	{
 	printf("usage: %s TrainFile K(dimension) JND popThresh VQFile\n", 
 	       argv[0]);
-	exit(0);
+	exit(1);
     }
 
     /* Open training file */

@@ -34,10 +34,10 @@
                                                                              
 \*---------------------------------------------------------------------------*/
 
-kiss_fft_cpx *fin;
-kiss_fft_cpx *fout;
-kiss_fft_cfg cfg_forward;
-kiss_fft_cfg cfg_reverse;
+kiss_fft_cpx *fin        = 0;
+kiss_fft_cpx *fout       = 0;
+kiss_fft_cfg cfg_forward = 0;
+kiss_fft_cfg cfg_reverse = 0;
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -51,6 +51,7 @@ kiss_fft_cfg cfg_reverse;
 void
 initialize_fft (int n)
 {
+  assert(!fin && !fout && !cfg_forward && !cfg_reverse);
   fin = KISS_FFT_MALLOC (n * sizeof (kiss_fft_cpx));
   assert(fin != NULL);
   fout = KISS_FFT_MALLOC (n * sizeof (kiss_fft_cpx));
@@ -97,4 +98,12 @@ fft (float x[], int n, int isign)
       x[c] = fout[(c) / 2].r;
       x[c + 1] = -fout[(c) / 2].i;
     }
+}
+
+void cleanup_fft(void)
+{
+    KISS_FFT_FREE(fin);
+    KISS_FFT_FREE(fout);
+    KISS_FFT_FREE(cfg_forward);
+    KISS_FFT_FREE(cfg_reverse);
 }

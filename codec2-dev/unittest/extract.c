@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
     long   lines;	/* lines read so far				*/
 
     if (argc != 5) {
-	printf("usage: extract TextFile FloatFile start(1 .. 10) end(1 .. 10)\n");
-	exit(0);
+	printf("usage: %s TextFile FloatFile start(1 .. 10) end(1 .. 10)\n", argv[0]);
+	exit(1);
     }
 
     /* read command line arguments and open files */
