@@ -58,8 +58,12 @@ while true ; do
   readchar=`dd bs=1 count=1 2>/dev/null`
   stty -cbreak
   if [ -n "$readchar" ] ; then
-    if [ $readchar == 'q' -o $readchar == 'Q' ] ; then
+    if [ x$readchar == 'xq' -o x$readchar == 'xQ' ] ; then
       exit 0
+    fi
+    if [ -z ${file[$readchar]} ] ; then
+        echo -n -e "\nUnknown input\n" $items"- "
+        continue
     fi
     if ( play --version ) >/dev/null 2>&1; then
       play -r 8000 -s -2 ${file[$readchar]} $dsp 2> /dev/null
