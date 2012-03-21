@@ -13,9 +13,9 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
+frames = 50;
 EbNo_dB = 7.3;
-Foff_hz = 124;
+Foff_hz = 0;
 modulation = 'dqpsk';
 
 % ------------------------------------------------------------
@@ -34,6 +34,7 @@ rx_bits_offset = zeros(Nc*Nb*2);
 prev_tx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
 prev_rx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
 foff_log = [];
+tx_baseband_log = [];
 
 Ndelay = M+20;
 rx_fdm_delay = zeros(Ndelay,1);
@@ -68,6 +69,7 @@ SNR = CNo_dB - 10*log10(B);
 phase_offset = 1;
 freq_offset = exp(j*2*pi*Foff_hz/Fs);
 foff_phase = 1;
+t = 0;
 
 % Main loop ----------------------------------------------------
 
@@ -81,7 +83,8 @@ for i=1:frames
   tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation);
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
-  tx_fdm = fdm_upconvert(tx_baseband) + 2*cos(2*pi*(0:M-1)*Fcentre/Fs);
+  tx_baseband_log = [tx_baseband_log tx_baseband];
+  tx_fdm = fdm_upconvert(tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
@@ -91,6 +94,9 @@ for i=1:frames
   % frequency offset
 
   for i=1:M
+    Foff = Foff_hz + 100*sin(t*2*pi/(300*Fs));
+    t++;
+    freq_offset = exp(j*2*pi*Foff/Fs);
     phase_offset *= freq_offset;
     rx_fdm(i) = phase_offset*real(tx_fdm(i));
   end
@@ -115,6 +121,7 @@ for i=1:frames
 
   foff = rx_est_freq_offset(rx_fdm);
   foff_log = [ foff_log foff ];
+  %foff = 0;
   foff_rect = exp(j*2*pi*foff/Fs);
 
   for i=1:M
@@ -167,13 +174,18 @@ figure(2)
 clf;
 subplot(211)
 plot(rx_timing_log)
+title('timing offset (samples)');
 subplot(212)
+plot(foff_log)
+title('Freq offset (Hz)');
+
+%figure(3)
+%clf;
 %Nfft=Fs;
 %S=fft(rx_fdm_log,Nfft);
 %SdB=20*log10(abs(S));
 %plot(-Fs/2+1:Fs/2,fftshift(SdB))
 %plot(SdB(1:Fs/4))
-plot(foff_log)
 
 
 
@@ -192,6 +204,8 @@ plot(foff_log)
 % dump file type plotting & instrumentation
 % determine if error pattern is bursty
 % HF channel simulation
+% Offset or pi/4 QPSK and tests with real tx HPA
+% real time SNR get function
 %
 % phase estimator not working too well and would need a UW
 % to resolve ambiguity.  But this is probably worth it for
