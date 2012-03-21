@@ -27,7 +27,9 @@
 */
 
 
+#ifdef VALGRIND
 #include <valgrind/memcheck.h>
+#endif
 
 #include <assert.h>
 #include <stdlib.h>
@@ -337,7 +339,10 @@ int main(int argc, char **argv)
     }
   }
   nb_vectors = i;
+
+#ifdef VALGRIND
   VALGRIND_CHECK_MEM_IS_DEFINED(data, nb_entries*ndim);
+#endif
 
   /* determine weights for each training vector */
 
@@ -365,7 +370,9 @@ int main(int argc, char **argv)
       pred[i*ndim+j] = data[i*ndim+j] - COEF*data[(i-2)*ndim+j];
   }
 
+#ifdef VALGRIND
   VALGRIND_CHECK_MEM_IS_DEFINED(pred, nb_entries*ndim);
+#endif
 
   /* train first stage */
 
