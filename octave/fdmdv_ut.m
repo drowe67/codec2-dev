@@ -15,13 +15,13 @@ fdmdv;               % load modem code
 
 frames = 50;
 EbNo_dB = 7.3;
-Foff_hz = 0;
+Foff_hz = -100;
 modulation = 'dqpsk';
 
 % ------------------------------------------------------------
 
 tx_filt = zeros(Nc,M);
-rx_symbols_log = zeros(Nc,1);
+rx_symbols_log = [];
 rx_phase_log = 0;
 rx_timing_log = 0;
 tx_pwr = 0;
@@ -31,8 +31,9 @@ total_bits = 0;
 rx_fdm_log = [];
 rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
-prev_tx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
-prev_rx_symbols = sqrt(2)*ones(Nc,1)*exp(j*pi/4);
+prev_tx_symbols = sqrt(2)*ones(Nc+1,1)*exp(j*pi/4);
+prev_tx_symbols(Nc+1) = 1;
+prev_rx_symbols = sqrt(2)*ones(Nc+1,1)*exp(j*pi/4);
 foff_log = [];
 tx_baseband_log = [];
 
@@ -84,7 +85,7 @@ for i=1:frames
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
-  tx_fdm = fdm_upconvert(tx_baseband);
+  [tx_fdm pilot] = fdm_upconvert(tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
@@ -94,8 +95,10 @@ for i=1:frames
   % frequency offset
 
   for i=1:M
-    Foff = Foff_hz + 100*sin(t*2*pi/(300*Fs));
-    t++;
+    % Time varying freq offset
+    % Foff = Foff_hz + 100*sin(t*2*pi/(300*Fs));
+    % t++;
+    Foff = Foff_hz;
     freq_offset = exp(j*2*pi*Foff/Fs);
     phase_offset *= freq_offset;
     rx_fdm(i) = phase_offset*real(tx_fdm(i));
@@ -119,7 +122,7 @@ for i=1:frames
 
   % frequency offset estimation and correction
 
-  foff = rx_est_freq_offset(rx_fdm);
+  foff = rx_est_freq_offset(rx_fdm, pilot);
   foff_log = [ foff_log foff ];
   %foff = 0;
   foff_rect = exp(j*2*pi*foff/Fs);
@@ -168,7 +171,7 @@ printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  QPSK BER (meas): %1.
 figure(1)
 clf;
 [n m] = size(rx_symbols_log);
-plot(real(rx_symbols_log(:,20:m)),imag(rx_symbols_log(:,20:m)),'+')
+plot(real(rx_symbols_log(1:Nc,20:m)),imag(rx_symbols_log(1:Nc,20:m)),'+')
 
 figure(2)
 clf;
