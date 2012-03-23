@@ -28,7 +28,7 @@ global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
 global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
-global pilot_phase = pi/4;% current phase of symbol used to make pilot carrier
+global pilot_bit = 0;  % current phase of symbol used to make pilot carrier
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
 
@@ -73,7 +73,7 @@ global gt_alpha5_root = real((ifft_GF_alpha5_root(1:Nfilter)));
 function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   global Nc;
   global Nb;
-  global pilot_phase;
+  global pilot_bit;
 
   % re-arrange as (Nc,Nb) matrix
 
@@ -108,8 +108,16 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   % +1 -1 +1 -1 BPSK sync carrier, once filtered becomes two spectral
   % lines at +/- Rs/2
  
-  pilot_phase *= -1;
-  tx_symbols(c+1) = pilot_phase;
+  if pilot_bit
+     tx_symbols(Nc+1) = -prev_tx_symbols(c+1);
+  else
+     tx_symbols(Nc+1) = prev_tx_symbols(c+1);
+  end
+  if pilot_bit 
+    pilot_bit = 0;
+  else
+    pilot_bit = 1;
+  end
 
 endfunction
 
@@ -141,7 +149,7 @@ endfunction
 % Construct FDM signal by frequency shifting each filtered symbol
 % stream
 
-function tx_fdm = fdm_upconvert(tx_filt)
+function [tx_fdm pilot] = fdm_upconvert(tx_filt)
   global Fs;
   global M;
   global Nc;
@@ -174,7 +182,8 @@ function tx_fdm = fdm_upconvert(tx_filt)
   c = Nc+1;
   for i=1:M
     phase_tx(c) = phase_tx(c) * freq(c);
-    tx_fdm(i) = tx_fdm(i) + 4*tx_filt(c,i)*phase_tx(c);
+    pilot(i) = sqrt(2)*2*tx_filt(c,i)*phase_tx(c);
+    tx_fdm(i) = tx_fdm(i) + pilot(i);
   end
  
   % Scale such that total Carrier power C of real(tx_fdm) = Nc.  This
@@ -215,6 +224,15 @@ function rx_baseband = fdm_downconvert(rx_fdm)
 	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
   end
+
+  % Pilot
+
+  c = Nc+1;
+  for i=1:M
+    phase_rx(c) = phase_rx(c) * freq(c);
+    rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
+  end
+
 endfunction
 
 
@@ -229,7 +247,7 @@ function rx_filt = rx_filter(rx_baseband)
   global gt_alpha5_root;
   global Fsep;
 
-  rx_filt = zeros(Nc,P);
+  rx_filt = zeros(Nc+1,P);
 
   % rx filter each symbol, generate P filtered output samples for each symbol.
   % Note we keep memory at rate M, it's just the filter output at rate P
@@ -245,10 +263,10 @@ function rx_filt = rx_filter(rx_baseband)
 endfunction
 
 
-% Estimate frequency offset of FDM signal by peak picking pilot
-% tone at Fcentre
+% Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
+% sensitive to pilot tone level wrt other carriers
 
-function foff = rx_est_freq_offset(rx_fdm)
+function foff = rx_est_freq_offset(rx_fdm, pilot)
   global M;
   global Nc;
   global Fs;
@@ -265,20 +283,15 @@ function foff = rx_est_freq_offset(rx_fdm)
   global pilot_coeff;
 
   % down convert latest M samples of pilot by multiplying by
-  % ideal two-tone BPSK signal
+  % ideal two-tone BPSK pilot signal
  
   pilot_baseband(1:Npilotbaseband-M) = pilot_baseband(M+1:Npilotbaseband);
   c = Nc+1;
   for i=1:M
-    phase_rx_pilot(1) *= freq_rx_pilot(1);
-    phase_rx_pilot(2) *= freq_rx_pilot(2);
-    % phase_rx_pilot(1) *= freq(c);
-    pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i) * (phase_rx_pilot(1) + phase_rx_pilot(2)); 
-    %pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i) * phase_rx_pilot(1); 
-    %pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i); 
+    pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i)*conj(pilot(i)); 
   end
 
-  % LPF cutoff 200Hz
+  % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
   pilot_lpf(1:Npilotlpf-M) = pilot_lpf(M+1:Npilotlpf);
   j = 1;
@@ -295,12 +308,11 @@ function foff = rx_est_freq_offset(rx_fdm)
   S = abs(fft(s, Mpilotfft));
 
   figure(3)
-  clf
-  subplot(211)
-  plot(real(pilot_baseband));
-  subplot(212)
-  plot(abs(fft(pilot_baseband)));
-  %plot(S);
+  %plot(real(pilot_baseband))
+  plot(real(s))
+  figure(4)
+  %plot(abs(fft(pilot_baseband)))
+  plot(S)
 
   % peak pick and convert to Hz
 
@@ -321,6 +333,7 @@ endfunction
 function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   global M;
   global Nt;
+  global Nc;
   global rx_filter_mem_timing;
   global rx_baseband_mem_timing;
   global P;
@@ -331,7 +344,7 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   % update buffer of Nt rate P filtered symbols
 
   rx_filter_mem_timing(:,1:(Nt-1)*P) = rx_filter_mem_timing(:,P+1:Nt*P);
-  rx_filter_mem_timing(:,(Nt-1)*P+1:Nt*P) = rx_filt;
+  rx_filter_mem_timing(:,(Nt-1)*P+1:Nt*P) = rx_filt(1:Nc,:);
 
   % sum envelopes of all carriers
 
@@ -372,7 +385,7 @@ endfunction
 
 
 % Phase estimation function - probably won't work over a HF channel
-% Tries to operate over a sinle symbol but uses phase information from
+% Tries to operate over a single symbol but uses phase information from
 % all Nc carriers which should increase the SNR of phase estimate.
 % Maybe phase is coherent over a couple of symbols in HF channel,not
 % sure but it's worth 3dB so worth experimenting or using coherent as
@@ -419,6 +432,7 @@ function rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
       rx_bits(2*(c-1)+1) = msb;
       rx_bits(2*(c-1)+2) = lsb;
     end
+
   else
     % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
 
@@ -478,7 +492,7 @@ endfunction
 % Initialise ----------------------------------------------------
 
 global tx_filter_memory = zeros(Nc+1, Nfilter);
-global rx_filter_memory = zeros(Nc, Nfilter);
+global rx_filter_memory = zeros(Nc+1, Nfilter);
 
 % phasors used for up and down converters
 
@@ -501,17 +515,17 @@ global phase_rx = ones(Nc+1,1);
 
 global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
 global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
-global Npilotbaseband = Npilotcoeff + 4*M;                % number of pilot baseband samples reqd for pilot LPF
+global Npilotbaseband = Npilotcoeff + 4*M;              % number of pilot baseband samples reqd for pilot LPF
 global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
 global pilot_baseband = zeros(1, Npilotbaseband);       % pilot baseband samples
 global pilot_lpf      = zeros(1, Npilotlpf);            % LPC pilot samples
 global phase_rx_pilot = [1 1];
-global freq_rx_pilot  = [ exp(-j*2*pi*(Fcentre-Rs/2)/Fs) exp(-j*2*pi*(Fcentre+Rs/2)/Fs) ];
+global freq_rx_pilot  = [ exp(-j*2*pi*(Fcentre-Rs/4)/Fs) exp(-j*2*pi*(Fcentre+Rs/4)/Fs) ];
 
 % Timing estimator states
 
 global rx_filter_mem_timing = zeros(Nc, Nt*P);
-global rx_baseband_mem_timing = zeros(Nc, Nfiltertiming);
+global rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
 
 % Test bit stream state variables
 
