@@ -3,8 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-bin_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2 vq_train_jvm scalarlsptest
-
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2 vq_train_jvm scalarlsptest
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 

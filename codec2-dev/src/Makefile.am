@@ -119,22 +119,8 @@ codebookge.c
 libcodec2_la_CFLAGS = $(AM_CFLAGS)
 libcodec2_la_LDFLAGS = $(LIBS)
 
-library_includedir = $(prefix)
-library_include_HEADERS	= codec2.h \
-defines.h \
-kiss_fft.h\
-_kiss_fft_guts.h \
-fft.h \
-interp.h \
-lsp.h \
-phase.h \
-quantise.h \
-comp.h \
-dump.h \
-lpc.h \
-nlp.h  \
-postfilter.h \
-sine.h
+library_includedir = $(prefix)/include
+library_include_HEADERS	= codec2.h
 
 bin_PROGRAMS = c2demo c2enc c2dec c2sim
 
