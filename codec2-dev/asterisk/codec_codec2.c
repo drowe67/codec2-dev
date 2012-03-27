@@ -18,7 +18,6 @@
  */
 
 /*** MODULEINFO
-	<depend>Codec 2</depend>
 	<support_level>core</support_level>
  ***/
 
@@ -29,24 +28,28 @@
 #include "asterisk/module.h"
 #include "asterisk/utils.h"
 
-#include "../formats/msgsm.h"
+#include <codec2.h>
 
 #define BUFFER_SAMPLES	  8000
 #define CODEC2_SAMPLES    160
 #define	CODEC2_FRAME_LEN  7
 
 /* Sample frame data */
+
 #include "asterisk/slin.h"
 #include "ex_codec2.h"
 
 struct codec2_translator_pvt {	        /* both codec2tolin and codec2togsm */
     struct CODEC2 *codec2;
-    int16_t buf[BUFFER_SAMPLES];	/* lintocodec2, temporary storage */
+    short  buf[BUFFER_SAMPLES];	/* lintocodec2, temporary storage */
 };
 
 static int codec2_new(struct ast_trans_pvt *pvt)
 {
-    pvt->pvt->codec2 = codec2_create(CODEC2_MODE_2500);	
+    struct codec2_translator_pvt *tmp = pvt->pvt;
+
+    tmp->codec2 = codec2_create(CODEC2_MODE_2500);
+	
     return 0;
 }
 
@@ -64,7 +67,7 @@ static int codec2tolin_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
 	len = CODEC2_SAMPLES;
 	src = f->data.ptr + x;
 
-	codec2_decode(codec2, dst + pvt->samples, src);
+	codec2_decode(tmp->codec2, dst + pvt->samples, src);
 
 	pvt->samples += CODEC2_SAMPLES;
 	pvt->datalen += 2 * CODEC2_SAMPLES;
@@ -73,7 +76,7 @@ static int codec2tolin_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
 }
 
 /*! \brief store samples into working buffer for later decode */
-static int  codec2togsm_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
+static int lintocodec2_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
 {
 	struct codec2_translator_pvt *tmp = pvt->pvt;
 
@@ -87,9 +90,9 @@ static int  codec2togsm_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
 }
 
 /*! \brief encode and produce a frame */
-static struct ast_frame *codec2togsm_frameout(struct ast_trans_pvt *pvt)
+static struct ast_frame *lintocodec2_frameout(struct ast_trans_pvt *pvt)
 {
-	struct gsm_translator_pvt *tmp = pvt->pvt;
+	struct codec2_translator_pvt *tmp = pvt->pvt;
 	int datalen = 0;
 	int samples = 0;
 
@@ -97,11 +100,11 @@ static struct ast_frame *codec2togsm_frameout(struct ast_trans_pvt *pvt)
 	if (pvt->samples < CODEC2_SAMPLES)
 		return NULL;
 	while (pvt->samples >= CODEC2_SAMPLES) {
-		/* Encode a frame of data */
-	    codec2_encode(tmp->codec2, pvt->outbuf.c + datalen, tmp->buf + samples);
-		datalen += CODEC2_FRAME_LEN;
-		samples += CODEC2_SAMPLES;
-		pvt->samples -= CODEC2_SAMPLES;
+	    /* Encode a frame of data */
+	    codec2_encode(tmp->codec2, (unsigned char*)(pvt->outbuf.c + datalen), tmp->buf + samples);
+	    datalen += CODEC2_FRAME_LEN;
+	    samples += CODEC2_SAMPLES;
+	    pvt->samples -= CODEC2_SAMPLES;
 	}
 
 	/* Move the data at the end of the buffer to the front */
@@ -115,7 +118,7 @@ static void codec2_destroy_stuff(struct ast_trans_pvt *pvt)
 {
 	struct codec2_translator_pvt *tmp = pvt->pvt;
 	if (tmp->codec2)
-		codec2_destroy(tmp->gsm);
+		codec2_destroy(tmp->codec2);
 }
 
 static struct ast_translator codec2tolin = {

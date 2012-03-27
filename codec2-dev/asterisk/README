@@ -5,9 +5,12 @@ todo:
 
 [ ] Patches for configure macro
 [ ] document 
+    + make install codec 2 somewhere
+    + ./configure Asterisk with Codec2 include and ibrary
+      CFLAGS=-I/home/david/tmp/codec2/include ./configure
     + install instructions
     + Asterisk version
     + configuration and demo
-    patch configure.ac
-    autoconf
-
+    + AST_FORMAT_GSM
+    + patch frames.h, AST_FORMAT_CODEC2
+    + support for different Codec 2 bit rates
