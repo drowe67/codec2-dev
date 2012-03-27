@@ -1,0 +1,13 @@
+README for codec2/asterisk
+Asterisk Codec 2 support
+
+todo:
+
+[ ] Patches for configure macro
+[ ] document 
+    + install instructions
+    + Asterisk version
+    + configuration and demo
+    patch configure.ac
+    autoconf
+
