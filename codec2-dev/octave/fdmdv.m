@@ -307,12 +307,12 @@ function foff = rx_est_freq_offset(rx_fdm, pilot)
   s = pilot_lpf(1:Mpilot:Npilotlpf) .* hanning(Npilotlpf/Mpilot)';
   S = abs(fft(s, Mpilotfft));
 
-  figure(3)
+  %figure(3)
   %plot(real(pilot_baseband))
-  plot(real(s))
-  figure(4)
+  %plot(real(s))
+  %figure(4)
   %plot(abs(fft(pilot_baseband)))
-  plot(S)
+  %plot(S)
 
   % peak pick and convert to Hz
 
@@ -402,7 +402,7 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
+function [rx_bits sync_bit] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
   global Nc;
   global Nb;
   global Nb;
@@ -411,7 +411,7 @@ function rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
     % extra 45 degree clockwise lets us use real and imag axis as
     % decision boundaries
 
-    phase_difference = rx_symbols .* conj(prev_rx_symbols) * exp(j*pi/4);
+    phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)) * exp(j*pi/4);
   
     % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
 
@@ -431,6 +431,15 @@ function rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
       endif
       rx_bits(2*(c-1)+1) = msb;
       rx_bits(2*(c-1)+2) = lsb;
+    end
+ 
+    % Extract DBPSK encoded Sync bit
+
+    phase_difference(Nc+1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
+    if (real(phase_difference(Nc+1)) < 0)
+      sync_bit = 0;
+    else
+      sync_bit = 1;
     end
 
   else
@@ -478,7 +487,7 @@ function [sync bit_errors] = put_test_bits(rx_bits)
 
   bit_errors = sum(xor(test_bits,rx_test_bits_mem));
 
-  % if less than a thresh we are aligned and in sync
+  % if less than a thresh we are aligned and in sync with test sequence
 
   ber = bit_errors/Ntest_bits;
   

@@ -13,7 +13,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 50;
+frames = 100;
 EbNo_dB = 7.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
@@ -36,12 +36,16 @@ prev_tx_symbols(Nc+1) = 1;
 prev_rx_symbols = sqrt(2)*ones(Nc+1,1)*exp(j*pi/4);
 foff_log = [];
 tx_baseband_log = [];
+tx_fdm_log = [];
+sync_log = [];
 
 Ndelay = M+20;
 rx_fdm_delay = zeros(Ndelay,1);
 
+% ---------------------------------------------------------------------
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
+% ---------------------------------------------------------------------
 
 C = 1; % power of each FDM carrier (energy/sample).  Total Carrier power should = Nc*C = Nc
 N = 1; % total noise power (energy/sample) of noise source across entire bandwidth
@@ -72,7 +76,9 @@ freq_offset = exp(j*2*pi*Foff_hz/Fs);
 foff_phase = 1;
 t = 0;
 
-% Main loop ----------------------------------------------------
+% ---------------------------------------------------------------------
+% Main loop 
+% ---------------------------------------------------------------------
 
 for i=1:frames
 
@@ -86,6 +92,7 @@ for i=1:frames
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
   [tx_fdm pilot] = fdm_upconvert(tx_baseband);
+  tx_fdm_log = [tx_fdm_log tx_fdm];
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
@@ -150,28 +157,39 @@ for i=1:frames
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
   endif
-  rx_bits = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   prev_rx_symbols = rx_symbols;
+  sync_log = [sync_log sync];
 
-  % count bit errors
+  % count bit errors if we find a test frame
 
-  [sync bit_errors] = put_test_bits(rx_bits);
-  if (sync == 1)
+  [test_frame_sync bit_errors] = put_test_bits(rx_bits);
+  if (test_frame_sync == 1)
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
   end
 
 end
 
+% ---------------------------------------------------------------------
+% Print Stats
+% ---------------------------------------------------------------------
+
+peak = max(real(tx_fdm_log));
 ber = total_bit_errors/total_bits;
-printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  QPSK BER (meas): %1.4f (%1.4f)\n", 
+printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  BER: (%1.4f) Pk/rms: %1.2f\n", 
        EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)),
-       total_bits, total_bit_errors, 0.5*erfc(sqrt(10.^(EbNo_dB/10))), ber );
+       total_bits, total_bit_errors, ber, peak/std(real(tx_fdm_log)) );
+
+% ---------------------------------------------------------------------
+% Plots
+% ---------------------------------------------------------------------
 
 figure(1)
 clf;
 [n m] = size(rx_symbols_log);
 plot(real(rx_symbols_log(1:Nc,20:m)),imag(rx_symbols_log(1:Nc,20:m)),'+')
+title('Scatter Diagram');
 
 figure(2)
 clf;
@@ -182,14 +200,12 @@ subplot(212)
 plot(foff_log)
 title('Freq offset (Hz)');
 
-%figure(3)
-%clf;
-%Nfft=Fs;
-%S=fft(rx_fdm_log,Nfft);
-%SdB=20*log10(abs(S));
-%plot(-Fs/2+1:Fs/2,fftshift(SdB))
-%plot(SdB(1:Fs/4))
-
+figure(3)
+clf;
+subplot(211)
+plot(real(tx_fdm_log));
+subplot(212)
+stem(sync_log)
 
 
 % TODO
