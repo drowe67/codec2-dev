@@ -82,6 +82,9 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   tx_bits_matrix(1:Nc,2) = tx_bits(2:Nb:Nb*Nc);
 
   if (strcmp(modulation,'dqpsk')) 
+ 
+
+  if 1
     % map to (Nc,1) DQPSK symbols
 
     for c=1:Nc
@@ -99,7 +102,22 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
       if ((msb == 1) && (lsb == 1))
          tx_symbols(c) = -j*prev_tx_symbols(c);
       endif 
+    end
+  else
+    % map to pi/4 DQPSK from spra341 Eq (6) & (7)
+
+    for c=1:Nc
+
+      msb = tx_bits_matrix(c,1); lsb = tx_bits_matrix(c,2);
+      a = 2*msb - 1;
+      b = 2*lsb - 1;
+      p = prev_tx_symbols(c);
+      inphase    = (real(p)*a - imag(p)*b)*0.707;
+      quadrature = (imag(p)*a + real(p)*b)*0.707;
+      tx_symbols(c) = inphase + j*quadrature;
+    end
   end
+
   else
     % QPSK mapping
     tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2);
@@ -492,7 +510,7 @@ function [sync bit_errors] = put_test_bits(rx_bits)
   ber = bit_errors/Ntest_bits;
   
   sync = 0;
-  if (ber < 0.1)
+  if (ber < 0.2)
     sync = 1;
   endif
 endfunction
@@ -517,7 +535,11 @@ end
 
 freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 
-global phase_tx = ones(Nc+1,1);
+% Spread initial FDM carrier phase out as far as possible.  
+% This really helped PAPR.  We don't need to adjust rx
+% phase a DPSK takes care of that
+
+global phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
 global phase_rx = ones(Nc+1,1);
 
 % Freq offset estimator states

@@ -17,6 +17,7 @@ frames = 100;
 EbNo_dB = 7.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
+hpa_clip = 10;
 
 % ------------------------------------------------------------
 
@@ -31,13 +32,14 @@ total_bits = 0;
 rx_fdm_log = [];
 rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
-prev_tx_symbols = sqrt(2)*ones(Nc+1,1)*exp(j*pi/4);
+prev_tx_symbols = sqrt(2)*ones(Nc+1,1);
 prev_tx_symbols(Nc+1) = 1;
-prev_rx_symbols = sqrt(2)*ones(Nc+1,1)*exp(j*pi/4);
+prev_rx_symbols = sqrt(2)*ones(Nc+1,1);
 foff_log = [];
 tx_baseband_log = [];
 tx_fdm_log = [];
 sync_log = [];
+bit_errors_log = [];
 
 Ndelay = M+20;
 rx_fdm_delay = zeros(Ndelay,1);
@@ -92,12 +94,19 @@ for i=1:frames
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
   [tx_fdm pilot] = fdm_upconvert(tx_baseband);
-  tx_fdm_log = [tx_fdm_log tx_fdm];
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
   % Channel simulation
   % -------------------
+
+  % HPA non-linearity
+
+  i = find(abs(tx_fdm) > hpa_clip);
+  tx_fdm(i) = hpa_clip*exp(j*angle(tx_fdm(i)));
+  tx_fdm_log = [tx_fdm_log tx_fdm];
+
+  rx_fdm = tx_fdm;
 
   % frequency offset
 
@@ -108,7 +117,7 @@ for i=1:frames
     Foff = Foff_hz;
     freq_offset = exp(j*2*pi*Foff/Fs);
     phase_offset *= freq_offset;
-    rx_fdm(i) = phase_offset*real(tx_fdm(i));
+    rx_fdm(i) = phase_offset*real(rx_fdm(i));
   end
 
   % AWGN noise
@@ -167,6 +176,9 @@ for i=1:frames
   if (test_frame_sync == 1)
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
+    bit_errors_log = [bit_errors_log bit_errors];
+  else
+    bit_errors_log = [bit_errors_log -1];
   end
 
 end
@@ -175,11 +187,16 @@ end
 % Print Stats
 % ---------------------------------------------------------------------
 
-peak = max(real(tx_fdm_log));
-ber = total_bit_errors/total_bits;
-printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  BER: (%1.4f) Pk/rms: %1.2f\n", 
+ber = total_bit_errors / total_bits;
+
+% Peak to Average Power Ratio from http://www.dsplog.com
+
+papr = max(tx_fdm_log.*conj(tx_fdm_log)) / mean(tx_fdm_log.*conj(tx_fdm_log));
+papr_dB = 10*log10(papr);
+
+printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  BER: (%1.4f) PAPR: %1.2f dB  SNR: %2.1f dB\n", 
        EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)),
-       total_bits, total_bit_errors, ber, peak/std(real(tx_fdm_log)) );
+       total_bits, total_bit_errors, ber, papr_dB, SNR );
 
 % ---------------------------------------------------------------------
 % Plots
@@ -204,9 +221,22 @@ figure(3)
 clf;
 subplot(211)
 plot(real(tx_fdm_log));
+title('FDM Tx Signal');
 subplot(212)
-stem(sync_log)
+Nfft=Fs;
+S=fft(rx_fdm_log,Nfft);
+SdB=20*log10(abs(S));
+plot(SdB(1:Fs/4))
+title('FDM Tx Spectrum');
 
+figure(4)
+clf;
+subplot(211)
+stem(sync_log)
+title('BPSK Sync')
+subplot(212)
+stem(bit_errors_log);
+title('Bit Errors for test data')
 
 % TODO
 %   + handling sample slips, extra plus/minus samples
