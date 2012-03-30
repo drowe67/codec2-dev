@@ -306,7 +306,7 @@ void codec2_encode_2500(struct CODEC2 *c2, unsigned char * bits, short speech[])
     pack(bits, &nbit, energy_index, E_BITS);
     pack(bits, &nbit, voiced1, 1);
     pack(bits, &nbit, voiced2, 1);
-    fprintf(stderr,"v2: %d  v1: %d\n", voiced2, voiced1);
+    //fprintf(stderr,"v2: %d  v1: %d\n", voiced2, voiced1);
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
 
@@ -339,7 +339,7 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     MODEL   model_interp;
     static  int frames;
 
-    fprintf(stderr,"frame: %d\n", frames+=2);
+    //fprintf(stderr,"frame: %d\n", frames+=2);
     assert(c2 != NULL);
     
     /* unpack bit stream to integer codes */
@@ -369,18 +369,18 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     aks_to_M2(ak, LPC_ORD, &model, energy, &snr, 1); 
     apply_lpc_correction(&model);
 
-    fprintf(stderr,"Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
-	   model.Wo, model.L, energy, voiced2 );
+    //fprintf(stderr,"Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
+    //	   model.Wo, model.L, energy, voiced2 );
     //for(i=0; i<LPC_ORD; i++)
     //	fprintf(stderr,"lsp_indexes: %d lsp_: %2.3f prev_lsp_: %2.3f\n", 
     //	       lsp_indexes[i], lsps_[i], c2->prev_lsps_[i]);
     //fprintf(stderr,"ak: ");
     //for(i=0; i<LPC_ORD; i++)
     //	fprintf(stderr,"%2.3f  ", ak[i]);
-    fprintf(stderr,"Am: ");
-    for(i=0; i<5; i++)
-    	fprintf(stderr,"%2.3f  ", model.A[i]);
-    fprintf(stderr,"\n");
+    //fprintf(stderr,"Am: ");
+    //for(i=0; i<5; i++)
+    //	fprintf(stderr,"%2.3f  ", model.A[i]);
+    //fprintf(stderr,"\n");
     
     /* interpolate odd frame model parameters from adjacent frames */
 
@@ -393,17 +393,17 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     		    c2->prev_lsps_, c2->prev_energy, lsps_, energy, ak_interp,
 		    lsps_interp);
     apply_lpc_correction(&model_interp);
-    fprintf(stderr,"Wo: %1.5f  L: %d prev_e: %3.2f v1: %d pv: %d\n", 
-	   model_interp.Wo, model_interp.L, c2->prev_energy, voiced1,
-	   c2->prev_model.voiced);
+    //fprintf(stderr,"Wo: %1.5f  L: %d prev_e: %3.2f v1: %d pv: %d\n", 
+    //	   model_interp.Wo, model_interp.L, c2->prev_energy, voiced1,
+    //	   c2->prev_model.voiced);
     //fprintf(stderr,"ak_interp: ");
     //for(i=0; i<LPC_ORD; i++)
     //	fprintf(stderr,"%2.3f  ", ak_interp[i]);
     //fprintf(stderr,"\n");
-    fprintf(stderr,"Am: ");
-    for(i=0; i<5; i++)
-    	fprintf(stderr,"%2.3f  ", model_interp.A[i]);
-    fprintf(stderr,"\n");
+    //fprintf(stderr,"Am: ");
+    //for(i=0; i<5; i++)
+    //	fprintf(stderr,"%2.3f  ", model_interp.A[i]);
+    //fprintf(stderr,"\n");
     //if (frames == 6)
     //	exit(0);
 
