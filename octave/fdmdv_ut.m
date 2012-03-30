@@ -17,7 +17,7 @@ frames = 100;
 EbNo_dB = 7.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
-hpa_clip = 10;
+hpa_clip = 100;
 
 % ------------------------------------------------------------
 
@@ -40,6 +40,16 @@ tx_baseband_log = [];
 tx_fdm_log = [];
 sync_log = [];
 bit_errors_log = [];
+
+% pilot states, used for copy of pilot at rx
+
+pilot_rx_bit = 0;
+pilot_symbol = sqrt(2);
+pilot_freq = freq(Nc+1);
+pilot_phase = 1;
+pilot_filter_mem = zeros(1, Nfilter);
+
+% fixed delay simuation
 
 Ndelay = M+20;
 rx_fdm_delay = zeros(Ndelay,1);
@@ -93,7 +103,7 @@ for i=1:frames
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
-  [tx_fdm pilot] = fdm_upconvert(tx_baseband);
+  [tx_fdm pilot_tx] = fdm_upconvert(tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
@@ -138,6 +148,7 @@ for i=1:frames
 
   % frequency offset estimation and correction
 
+  [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
   foff = rx_est_freq_offset(rx_fdm, pilot);
   foff_log = [ foff_log foff ];
   %foff = 0;

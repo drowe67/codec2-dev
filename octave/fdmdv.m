@@ -127,9 +127,9 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
   % lines at +/- Rs/2
  
   if pilot_bit
-     tx_symbols(Nc+1) = -prev_tx_symbols(c+1);
+     tx_symbols(Nc+1) = -prev_tx_symbols(Nc+1);
   else
-     tx_symbols(Nc+1) = prev_tx_symbols(c+1);
+     tx_symbols(Nc+1) = prev_tx_symbols(Nc+1);
   end
   if pilot_bit 
     pilot_bit = 0;
@@ -539,6 +539,7 @@ freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 % This really helped PAPR.  We don't need to adjust rx
 % phase a DPSK takes care of that
 
+%global phase_tx = ones(Nc+1,1);
 global phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
 global phase_rx = ones(Nc+1,1);
 
@@ -551,7 +552,6 @@ global Npilotlpf      = 4*M;                            % number of samples we D
 global pilot_baseband = zeros(1, Npilotbaseband);       % pilot baseband samples
 global pilot_lpf      = zeros(1, Npilotlpf);            % LPC pilot samples
 global phase_rx_pilot = [1 1];
-global freq_rx_pilot  = [ exp(-j*2*pi*(Fcentre-Rs/4)/Fs) exp(-j*2*pi*(Fcentre+Rs/4)/Fs) ];
 
 % Timing estimator states
 
@@ -564,4 +564,43 @@ global Ntest_bits = Nc*Nb*4;     % length of test sequence
 global current_test_bit = 1; 
 global test_bits = rand(1,Ntest_bits) > 0.5;
 global rx_test_bits_mem = zeros(1,Ntest_bits);
+
+% Generate M samples of DBPSK pilot signal for Freq offset estimation
+
+function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(bit, symbol, filter_mem, phase, freq)
+  global M;
+  global Nfilter;
+  global gt_alpha5_root;
+
+  % +1 -1 +1 -1 DBPSK sync carrier, once filtered becomes two spectral
+  % lines at +/- Rs/2
+ 
+  if bit
+     symbol = -symbol;
+  else
+     symbol = symbol;
+  end
+  if bit 
+    bit = 0;
+  else
+    bit = 1;
+  end
+
+  % filter DPSK symbol to create M baseband samples
+
+  filter_mem(Nfilter) = (sqrt(2)/2)*symbol;
+  for i=1:M
+    tx_baseband(i) = M*filter_mem(M:M:Nfilter) * gt_alpha5_root(M-i+1:M:Nfilter)';
+  end
+  filter_mem(1:Nfilter-M) = filter_mem(M+1:Nfilter);
+  filter_mem(Nfilter-M+1:Nfilter) = zeros(1,M);
+
+  % upconvert
+
+  for i=1:M
+    phase = phase * freq;
+    pilot_fdm(i) = sqrt(2)*2*tx_baseband(i)*phase;
+  end
+
+endfunction
 
