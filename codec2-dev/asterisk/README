@@ -5,12 +5,20 @@ todo:
 
 [ ] Patches for configure macro
 [ ] document 
-    + make install codec 2 somewhere
+    + make install codec 2:
+    david@bear:~/codec2-dev$ ./configure && make clean && sudo make install
+    david@bear:~/codec2-dev$ sudo ldconfig -v
     + ./configure Asterisk with Codec2 include and ibrary
       CFLAGS=-I/home/david/tmp/codec2/include ./configure
     + install instructions
     + Asterisk version
+
+    david@bear:~/asterisk-1.8.9.0$ make ASTLDFLAGS=-lcodec2
+
     + configuration and demo
     + AST_FORMAT_GSM
-    + patch frames.h, AST_FORMAT_CODEC2
+    + patch:
+        frames.h,
+        channel.c
+        frames.c
     + support for different Codec 2 bit rates
