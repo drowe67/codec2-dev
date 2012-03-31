@@ -10,10 +10,10 @@ Codec 2 is used to trunk calls between two Asterisk boxes:
 
 The two SIP phones are configiured for mulaw.
 
-Buildling
+Building
 ---------
 
-Asterisk must be pacthed so that the core understand Codec 2 frames.
+Asterisk must be patched so that the core understand Codec 2 frames.
 
 1/ First install Codec 2:
 
