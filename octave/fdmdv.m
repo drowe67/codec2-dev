@@ -28,7 +28,6 @@ global Fsep  = 75;     % Separation between carriers (Hz)
 global Fcentre = 1200; % Centre frequency, Nc/2 below this, N/c above (Hz)
 global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
-global pilot_bit = 0;  % current phase of symbol used to make pilot carrier
 
 % Generate root raised cosine (Root Nyquist) filter ---------------
 
@@ -165,9 +164,10 @@ endfunction
 
 
 % Construct FDM signal by frequency shifting each filtered symbol
-% stream
+% stream.  Returns complex signal so we can apply frequency offsets
+% easily.
 
-function [tx_fdm pilot] = fdm_upconvert(tx_filt)
+function tx_fdm = fdm_upconvert(tx_filt)
   global Fs;
   global M;
   global Nc;
@@ -200,7 +200,7 @@ function [tx_fdm pilot] = fdm_upconvert(tx_filt)
   c = Nc+1;
   for i=1:M
     phase_tx(c) = phase_tx(c) * freq(c);
-    pilot(i) = sqrt(2)*2*tx_filt(c,i)*phase_tx(c);
+    pilot(i) = 2*tx_filt(c,i)*phase_tx(c);
     tx_fdm(i) = tx_fdm(i) + pilot(i);
   end
  
@@ -209,7 +209,7 @@ function [tx_fdm pilot] = fdm_upconvert(tx_filt)
   % We return the complex (single sided) signal to make frequency
   % shifting for the purpose of testing easier
 
-  tx_fdm = sqrt(2)*tx_fdm;
+  tx_fdm = 2*tx_fdm;
 endfunction
 
 
@@ -292,7 +292,6 @@ function foff = rx_est_freq_offset(rx_fdm, pilot)
   global Fcentre;
   global freq;
   global freq_rx_pilot;
-  global phase_rx_pilot;
   global Npilotbaseband;
   global Npilotlpf;
   global Npilotcoeff;
@@ -476,14 +475,14 @@ function bits = get_test_bits(nbits)
   global Ntest_bits;       % length of test sequence
   global current_test_bit; 
   global test_bits;
-
+ 
   for i=1:nbits
     bits(i) = test_bits(current_test_bit++);
     if (current_test_bit > Ntest_bits)
       current_test_bit = 1;
     endif
   end
-
+ 
 endfunction
 
 
@@ -518,12 +517,18 @@ endfunction
 
 % Initialise ----------------------------------------------------
 
-global tx_filter_memory = zeros(Nc+1, Nfilter);
-global rx_filter_memory = zeros(Nc+1, Nfilter);
+global pilot_bit;
+pilot_bit = 0;     % current value of pilot bit
+
+global tx_filter_memory;
+tx_filter_memory = zeros(Nc+1, Nfilter);
+global rx_filter_memory;
+rx_filter_memory = zeros(Nc+1, Nfilter);
 
 % phasors used for up and down converters
 
-global freq = zeros(Nc+1,1);;
+global freq;
+freq = zeros(Nc+1,1);
 for c=1:Nc/2
   carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
   freq(c) = exp(j*2*pi*carrier_freq/Fs);
@@ -539,31 +544,44 @@ freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 % This really helped PAPR.  We don't need to adjust rx
 % phase a DPSK takes care of that
 
-%global phase_tx = ones(Nc+1,1);
-global phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
-global phase_rx = ones(Nc+1,1);
+global phase_tx;
+%phase_tx = ones(Nc+1,1);
+phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
+global phase_rx;
+phase_rx = ones(Nc+1,1);
 
-% Freq offset estimator states
+% Freq offset estimator constants
 
 global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
 global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
 global Npilotbaseband = Npilotcoeff + 4*M;              % number of pilot baseband samples reqd for pilot LPF
 global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
-global pilot_baseband = zeros(1, Npilotbaseband);       % pilot baseband samples
-global pilot_lpf      = zeros(1, Npilotlpf);            % LPC pilot samples
-global phase_rx_pilot = [1 1];
+
+% Freq offset estimator states constants
+
+global pilot_baseband;
+pilot_baseband = zeros(1, Npilotbaseband);              % pilot baseband samples
+global pilot_lpf
+pilot_lpf = zeros(1, Npilotlpf);                        % LPF pilot samples
 
 % Timing estimator states
 
-global rx_filter_mem_timing = zeros(Nc, Nt*P);
-global rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
+global rx_filter_mem_timing;
+rx_filter_mem_timing = zeros(Nc, Nt*P);
+global rx_baseband_mem_timing;
+rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
+
+% Test bit stream constants
+
+global Ntest_bits = Nc*Nb*4;     % length of test sequence
+global test_bits = rand(1,Ntest_bits) > 0.5;
 
 % Test bit stream state variables
 
-global Ntest_bits = Nc*Nb*4;     % length of test sequence
-global current_test_bit = 1; 
-global test_bits = rand(1,Ntest_bits) > 0.5;
-global rx_test_bits_mem = zeros(1,Ntest_bits);
+global current_test_bit = 1;
+current_test_bit = 1;
+global rx_test_bits_mem;
+rx_test_bits_mem = zeros(1,Ntest_bits);
 
 % Generate M samples of DBPSK pilot signal for Freq offset estimation
 
