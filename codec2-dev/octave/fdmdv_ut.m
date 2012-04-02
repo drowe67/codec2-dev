@@ -7,17 +7,15 @@
 % Version 2
 %
 
-clear all;
-
 fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
-EbNo_dB = 7.3;
-Foff_hz = -100;
+frames = 50;
+EbNo_dB = 73;
+Foff_hz = 0;
 modulation = 'dqpsk';
-hpa_clip = 100;
+hpa_clip = 150;
 
 % ------------------------------------------------------------
 
@@ -32,9 +30,8 @@ total_bits = 0;
 rx_fdm_log = [];
 rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
-prev_tx_symbols = sqrt(2)*ones(Nc+1,1);
-prev_tx_symbols(Nc+1) = 1;
-prev_rx_symbols = sqrt(2)*ones(Nc+1,1);
+prev_tx_symbols = ones(Nc+1,1);
+prev_rx_symbols = ones(Nc+1,1);
 foff_log = [];
 tx_baseband_log = [];
 tx_fdm_log = [];
@@ -92,7 +89,7 @@ t = 0;
 % Main loop 
 % ---------------------------------------------------------------------
 
-for i=1:frames
+for f=1:frames
 
   % -------------------
   % Modulator
@@ -103,20 +100,12 @@ for i=1:frames
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
-  [tx_fdm pilot_tx] = fdm_upconvert(tx_baseband);
+  tx_fdm = fdm_upconvert(tx_baseband);
   tx_pwr = 0.9*tx_pwr + 0.1*real(tx_fdm)*real(tx_fdm)'/(M);
 
   % -------------------
   % Channel simulation
   % -------------------
-
-  % HPA non-linearity
-
-  i = find(abs(tx_fdm) > hpa_clip);
-  tx_fdm(i) = hpa_clip*exp(j*angle(tx_fdm(i)));
-  tx_fdm_log = [tx_fdm_log tx_fdm];
-
-  rx_fdm = tx_fdm;
 
   % frequency offset
 
@@ -127,8 +116,17 @@ for i=1:frames
     Foff = Foff_hz;
     freq_offset = exp(j*2*pi*Foff/Fs);
     phase_offset *= freq_offset;
-    rx_fdm(i) = phase_offset*real(rx_fdm(i));
+    tx_fdm(i) = phase_offset*tx_fdm(i);
   end
+
+  tx_fdm = real(tx_fdm);
+
+  % HPA non-linearity
+
+  tx_fdm(find(abs(tx_fdm) > hpa_clip)) = hpa_clip;
+  tx_fdm_log = [tx_fdm_log tx_fdm];
+
+  rx_fdm = tx_fdm;
 
   % AWGN noise
 
@@ -137,10 +135,11 @@ for i=1:frames
   rx_fdm += noise;
   rx_fdm_log = [rx_fdm_log rx_fdm];
 
-  % delay
+  % Delay
 
-  rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
-  rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
+  %rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
+  %rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
+  rx_fdm_delay = rx_fdm;
 
   % -------------------
   % Demodulator
@@ -149,7 +148,7 @@ for i=1:frames
   % frequency offset estimation and correction
 
   [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
-  foff = rx_est_freq_offset(rx_fdm, pilot);
+  foff = rx_est_freq_offset(rx_fdm_delay, pilot);
   foff_log = [ foff_log foff ];
   %foff = 0;
   foff_rect = exp(j*2*pi*foff/Fs);
@@ -182,9 +181,10 @@ for i=1:frames
   sync_log = [sync_log sync];
 
   % count bit errors if we find a test frame
+  % Allow 15 frames for filter memories to fill and time est to settle
 
   [test_frame_sync bit_errors] = put_test_bits(rx_bits);
-  if (test_frame_sync == 1)
+  if ((test_frame_sync == 1) && (f > 15))
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
     bit_errors_log = [bit_errors_log bit_errors];
@@ -216,7 +216,8 @@ printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  BER: (%1.4f) PAPR: %
 figure(1)
 clf;
 [n m] = size(rx_symbols_log);
-plot(real(rx_symbols_log(1:Nc,20:m)),imag(rx_symbols_log(1:Nc,20:m)),'+')
+plot(real(rx_symbols_log(1:Nc+1,10:m)),imag(rx_symbols_log(1:Nc+1,10:m)),'+')
+axis([-2 2 -2 2]);
 title('Scatter Diagram');
 
 figure(2)
@@ -238,7 +239,7 @@ Nfft=Fs;
 S=fft(rx_fdm_log,Nfft);
 SdB=20*log10(abs(S));
 plot(SdB(1:Fs/4))
-title('FDM Tx Spectrum');
+title('FDM Rx Spectrum');
 
 figure(4)
 clf;
