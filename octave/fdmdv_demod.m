@@ -33,6 +33,7 @@ function fdmdv_demod(rawfilename, nbits)
   pilot_freq = freq(Nc+1);
   pilot_phase = 1;
   pilot_filter_mem = zeros(1, Nfilter);
+  prev_pilot = zeros(M,1);
 
   % BER stats
 
@@ -40,6 +41,8 @@ function fdmdv_demod(rawfilename, nbits)
   total_bits = 0;
   bit_errors_log = [];
   sync_log = [];
+  test_frame_sync_log = [];
+  test_frame_sync_state = 0;
 
   rx_symbols_log = [];
   rx_timing_log = [];
@@ -53,8 +56,10 @@ function fdmdv_demod(rawfilename, nbits)
     % frequency offset estimation and correction
 
     [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
-    foff = rx_est_freq_offset(rx_fdm, pilot);
+    foff = rx_est_freq_offset(rx_fdm, pilot, prev_pilot);
+    prev_pilot = pilot;
     foff_log = [ foff_log foff ];
+    foff = 0;
     foff_rect = exp(j*2*pi*foff/Fs);
 
     for i=1:M
@@ -80,15 +85,37 @@ function fdmdv_demod(rawfilename, nbits)
     sync_log = [sync_log sync];
 
     % count bit errors if we find a test frame
+    % Allow 15 frames for filter memories to fill and time est to settle
 
     [test_frame_sync bit_errors] = put_test_bits(rx_bits);
     if (test_frame_sync == 1 && f > 15)
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + Ntest_bits;
       bit_errors_log = [bit_errors_log bit_errors];
-    else
-      bit_errors_log = [bit_errors_log -1];
     end
+
+    % test frame sync state machine, just for more informative plots
+    
+    next_test_frame_sync_state = test_frame_sync_state;
+    if (test_frame_sync_state == 0)
+      if (test_frame_sync == 1)      
+        next_test_frame_sync_state = 1;
+	test_frame_count = 0;
+      end
+    end
+
+    if (test_frame_sync_state == 1)
+      % we only expect another test_frame_sync pulse every 4 symbols
+      test_frame_count++;
+      if (test_frame_count == 4)
+        test_frame_count = 0;
+        if ((test_frame_sync == 0))      
+          next_test_frame_sync_state = 0;
+        end
+      end
+    end
+    test_frame_sync_state = next_test_frame_sync_state;
+    test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
 
   end
 
@@ -134,11 +161,16 @@ function fdmdv_demod(rawfilename, nbits)
 
   figure(4)
   clf;
-  subplot(211)
+  subplot(311)
   stem(sync_log)
+  axis([0 frames 0 1.5]);
   title('BPSK Sync')
-  subplot(212)
+  subplot(312)
   stem(bit_errors_log);
-  title('Bit Errors for test data')
+  title('Bit Errors for test frames')
+  subplot(313)
+  plot(test_frame_sync_log);
+  axis([0 frames 0 1.5]);
+  title('Test Frame Sync')
 
 endfunction
