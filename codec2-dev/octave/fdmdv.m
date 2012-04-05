@@ -1,7 +1,7 @@
 % fdmdv.m
 %
 % Functions that implement a Frequency Divison Multiplexed Modem for
-% Digital Voice (FMDV)over HF channels.
+% Digital Voice (FDMDV) over HF channels.
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 
@@ -284,29 +284,44 @@ endfunction
 % Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
 % sensitive to pilot tone level wrt other carriers
 
-function foff = rx_est_freq_offset(rx_fdm, pilot)
+function foff = rx_est_freq_offset(rx_fdm, pilot, pilot_prev)
   global M;
-  global Nc;
-  global Fs;
-  global Rs;
-  global Fcentre;
-  global freq;
-  global freq_rx_pilot;
   global Npilotbaseband;
-  global Npilotlpf;
-  global Npilotcoeff;
-  global pilot_baseband;
-  global pilot_lpf;
-  global pilot_coeff;
+  global pilot_baseband1;
+  global pilot_baseband2;
+  global pilot_lpf1;
+  global pilot_lpf2;
 
   % down convert latest M samples of pilot by multiplying by
-  % ideal two-tone BPSK pilot signal
+  % ideal BPSK pilot signal we have generated locally
  
-  pilot_baseband(1:Npilotbaseband-M) = pilot_baseband(M+1:Npilotbaseband);
-  c = Nc+1;
+  pilot_baseband1(1:Npilotbaseband-M) = pilot_baseband1(M+1:Npilotbaseband);
+  pilot_baseband2(1:Npilotbaseband-M) = pilot_baseband2(M+1:Npilotbaseband);
   for i=1:M
-    pilot_baseband(Npilotbaseband-M+i) = rx_fdm(i)*conj(pilot(i)); 
+    pilot_baseband1(Npilotbaseband-M+i) = rx_fdm(i) * conj(pilot(i)); 
+    pilot_baseband2(Npilotbaseband-M+i) = rx_fdm(i) * conj(pilot_prev(i)); 
   end
+
+  [foff1 max1 pilot_lpf1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1);
+  [foff2 max2 pilot_lpf2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2);
+
+  if max1 > max2
+    foff = foff1;
+  else
+    foff = foff2;
+  end  
+endfunction
+
+
+% LPF and peak pick part of freq est, put in a function as we call it twice
+
+function  [foff imax pilot_lpf] = lpf_peak_pick(pilot_baseband, pilot_lpf)
+  global M;
+  global Npilotlpf;
+  global Npilotcoeff;
+  global Fs;
+  global Mpilotfft;
+  global pilot_coeff;
 
   % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
@@ -320,20 +335,12 @@ function foff = rx_est_freq_offset(rx_fdm, pilot)
   % decimate to improve DFT resolution, window and DFT
 
   Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
-  Mpilotfft = 256;
   s = pilot_lpf(1:Mpilot:Npilotlpf) .* hanning(Npilotlpf/Mpilot)';
   S = abs(fft(s, Mpilotfft));
 
-  %figure(3)
-  %plot(real(pilot_baseband))
-  %plot(real(s))
-  %figure(4)
-  %plot(abs(fft(pilot_baseband)))
-  %plot(S)
-
   % peak pick and convert to Hz
 
-  [x ix] = max(S);
+  [imax ix] = max(S);
   r = 2*200/Mpilotfft;     % maps FFT bin to frequency in Hz
   
   if ix > Mpilotfft/2
@@ -552,6 +559,7 @@ phase_rx = ones(Nc+1,1);
 
 % Freq offset estimator constants
 
+global Mpilotfft      = 256;
 global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
 global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
 global Npilotbaseband = Npilotcoeff + 4*M;              % number of pilot baseband samples reqd for pilot LPF
@@ -559,10 +567,14 @@ global Npilotlpf      = 4*M;                            % number of samples we D
 
 % Freq offset estimator states constants
 
-global pilot_baseband;
-pilot_baseband = zeros(1, Npilotbaseband);              % pilot baseband samples
-global pilot_lpf
-pilot_lpf = zeros(1, Npilotlpf);                        % LPF pilot samples
+global pilot_baseband1;
+global pilot_baseband2;
+pilot_baseband1 = zeros(1, Npilotbaseband);             % pilot baseband samples
+pilot_baseband2 = zeros(1, Npilotbaseband);             % pilot baseband samples
+global pilot_lpf1
+global pilot_lpf2
+pilot_lpf1 = zeros(1, Npilotlpf);                       % LPF pilot samples
+pilot_lpf2 = zeros(1, Npilotlpf);                       % LPF pilot samples
 
 % Timing estimator states
 
