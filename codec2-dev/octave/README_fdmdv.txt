@@ -13,6 +13,11 @@ TODO
     + do we need to logic to lose or gain a frame?
     + think so, add or remove samples, or a whole frame
 [ ] demod outputs ber (maybe after settling time)
+[ ] try interfering sine wave
+    + maybe swept
+    + does modem fall over?
+[ ] try non-flat channel, e.g. 3dB difference between hi and low tones
+    + make sure all estimators keep working
 [ ] try to run from shell script
 [ ] run a few tests
 [ ] start coding in C and repeat tests

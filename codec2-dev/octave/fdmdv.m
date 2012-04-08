@@ -547,9 +547,9 @@ end
 
 freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 
-% Spread initial FDM carrier phase out as far as possible.  
-% This really helped PAPR.  We don't need to adjust rx
-% phase a DPSK takes care of that
+% Spread initial FDM carrier phase out as far as possible.  This
+% helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
+% takes care of that.
 
 global phase_tx;
 %phase_tx = ones(Nc+1,1);
@@ -595,6 +595,7 @@ current_test_bit = 1;
 global rx_test_bits_mem;
 rx_test_bits_mem = zeros(1,Ntest_bits);
 
+
 % Generate M samples of DBPSK pilot signal for Freq offset estimation
 
 function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(bit, symbol, filter_mem, phase, freq)
@@ -634,3 +635,40 @@ function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(bit, symbo
 
 endfunction
 
+
+% Change the sample rate by a small amount, for example 1000ppm (ratio
+% = 1.001).  Always returns nout samples in buf_out, but uses a
+% variable number of input samples nin to accomodate the change in
+% sample rate.  nin is nominally set to nout, but may use nout +/- 2
+% samples to accomodate the different sample rates.  buf_in should be
+% of length nout+6 samples to accomodate this, and buf_in should be
+% updated externally based on the nin returned each time. "ratio" is
+% Fs_in/Fs_out, for example 48048/48000 = 1.001 (+1000ppm) or
+% 47952/48000 = 0.999 (-1000ppm).  Uses linear interpolation to
+% perform the resampling.  This requires a highly over-sampled signal,
+% for example 48000Hz sample rate for the modem signal centred on
+% 1kHz, otherwise linear interpolation will have a low pass filter effect
+% (for example an 8000Hz sample rate for modem signal centred on 1kHz
+% would cause problems).
+
+function [buf_out t nin] = resample(buf_in, t, ratio, nout)
+
+  for i=1:nout
+    c = floor(t);
+    a = t - c;
+    b = 1 - a;
+    buf_out(i) = buf_in(c)*b + buf_in(c+1)*a;
+    t += ratio;
+  end
+
+  t -= nout;
+  
+  % adjust nin and t so that on next call we start with 3 < t < 4,
+  % this gives us +/- 2 samples room to move before we hit start or
+  % end of buf_in
+
+  delta = floor(t - 3);
+  nin = nout + delta;
+  t -= delta;
+
+endfunction
