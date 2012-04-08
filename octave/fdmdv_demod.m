@@ -14,14 +14,8 @@ function fdmdv_demod(rawfilename, nbits)
   modulation = 'dqpsk';
 
   fin = fopen(rawfilename, "rb");
-  rx_fdm_buf = fread(fin, Inf, "short");
   gain = 1000;
-  rx_fdm_buf /= gain;
-  if (nargin == 1)
-    frames = floor(length(rx_fdm_buf)/M);
-  else
-    frames = nbits/(Nc*Nb);
-  endif
+  frames = nbits/(Nc*Nb);
 
   prev_rx_symbols = ones(Nc+1,1);
   foff_phase = 1;
@@ -48,10 +42,42 @@ function fdmdv_demod(rawfilename, nbits)
   rx_timing_log = [];
   foff_log = [];
 
+  % resampler states
+
+  t = 3;
+  ratio = 1.002;
+  F=6;
+  MF=M*F;
+  nin = MF;
+  nin_size = MF+6;
+  buf_in = zeros(1,nin_size);
+  rx_fdm_buf = [];
+
   % Main loop ----------------------------------------------------
 
   for f=1:frames
-    rx_fdm = rx_fdm_buf((f-1)*M+1:f*M);
+    % update buf_in memory
+
+    m = nin_size - nin;
+    for i=1:m
+      buf_in(i) = buf_in(i+nin);  
+    end
+    
+    % obtain n samples of the test input signal
+
+    for i=m+1:nin_size
+      buf_in(i) = fread(fin, 1, "short")/gain; 
+    end
+
+    [rx_fdm_mf t nin] = resample(buf_in, t, ratio, MF);
+    rx_fdm = rx_fdm_mf(1:F:MF);
+
+    %rx_fdm = buf_in(m+1:m+n);
+
+    %for i=1:M
+    %  rx_fdm(i) = fread(fin, 1, "short")/gain; 
+    %end
+    rx_fdm_buf = [rx_fdm_buf rx_fdm];
 
     % frequency offset estimation and correction
 
