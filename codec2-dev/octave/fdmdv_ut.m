@@ -43,14 +43,10 @@ sync_log = [];
 test_frame_sync_log = [];
 test_frame_sync_state = 0;
 
-% pilot states, used for copy of pilot at rx
+% pilot look up table, used for copy of pilot at rx
 
-pilot_rx_bit = 0;
-pilot_symbol = sqrt(2);
-pilot_freq = freq(Nc+1);
-pilot_phase = 1;
-pilot_filter_mem = zeros(1, Nfilter);
-prev_pilot = zeros(M,1);
+pilot_lut = generate_pilot_lut;
+pilot_lut_index = 1;
 
 % fixed delay simuation
 
@@ -153,7 +149,13 @@ for f=1:frames
 
   % frequency offset estimation and correction
 
-  [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
+  for i=1:M
+    pilot(i) = pilot_lut(pilot_lut_index);
+    pilot_lut_index++;
+    if pilot_lut_index > 4*M
+      pilot_lut_index = 1;
+    end
+  end
   foff = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot);
   prev_pilot = pilot;
   foff_log = [ foff_log foff ];
