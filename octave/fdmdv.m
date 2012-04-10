@@ -636,6 +636,43 @@ function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(bit, symbo
 endfunction
 
 
+% Generate a 4M sample vector of DBPSK pilot signal.  As the pilot signal
+% is periodic in 4M samples we can then use this vector as a look up table
+% for pilot signsl generation at the demod.
+
+function pilot_lut = generate_pilot_lut
+  global Nc;
+  global Nfilter;
+  global M;
+  global freq;
+
+  % pilot states
+
+  pilot_rx_bit = 0;
+  pilot_symbol = sqrt(2);
+  pilot_freq = freq(Nc+1);
+  pilot_phase = 1;
+  pilot_filter_mem = zeros(1, Nfilter);
+  prev_pilot = zeros(M,1);
+
+  pilot_lut = [];
+
+  F=8;
+
+  for f=1:F
+    [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
+    prev_pilot = pilot;
+    pilot_lut = [pilot_lut pilot];
+  end
+
+  % discard first 4 symbols as filer memory is filling, just keep last
+  % four symbols
+
+  pilot_lut = pilot_lut(4*M+1:M*F);
+
+endfunction
+
+
 % Change the sample rate by a small amount, for example 1000ppm (ratio
 % = 1.001).  Always returns nout samples in buf_out, but uses a
 % variable number of input samples nin to accomodate the change in
