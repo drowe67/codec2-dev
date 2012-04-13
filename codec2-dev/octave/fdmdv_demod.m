@@ -21,12 +21,6 @@ function fdmdv_demod(rawfilename, nbits)
   prev_rx_symbols = ones(Nc+1,1);
   foff_phase = 1;
 
-  % pilot LUT, used for copy of pilot at rx
-  
-  pilot_lut = generate_pilot_lut;
-  pilot_lut_index = 1;
-  prev_pilot_lut_index = 3*M+1;
-
   % BER stats
 
   total_bit_errors = 0;
@@ -46,7 +40,7 @@ function fdmdv_demod(rawfilename, nbits)
   nin = M; % timing correction for sample rate differences
   foff = 0;
   track_log = [];
-  track = 1;
+  track = 0;
   fest_state = 0;
 
   % Main loop ----------------------------------------------------
@@ -62,18 +56,7 @@ function fdmdv_demod(rawfilename, nbits)
 
     % frequency offset estimation and correction
 
-    for i=1:nin
-      pilot(i) = pilot_lut(pilot_lut_index);
-      pilot_lut_index++;
-      if pilot_lut_index > 4*M
-        pilot_lut_index = 1;
-      end
-      prev_pilot(i) = pilot_lut(prev_pilot_lut_index);
-      prev_pilot_lut_index++;
-      if prev_pilot_lut_index > 4*M
-        prev_pilot_lut_index = 1;
-      end
-    end
+    [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
     foff_coarse = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
     if track == 0
       foff  = foff_coarse;
@@ -117,7 +100,6 @@ function fdmdv_demod(rawfilename, nbits)
     track_log = [track_log track];
 
     % count bit errors if we find a test frame
-    % Allow 15 frames for filter memories to fill and time est to settle
 
     [test_frame_sync bit_errors] = put_test_bits(rx_bits);
     if (test_frame_sync == 1)
@@ -182,6 +164,9 @@ function fdmdv_demod(rawfilename, nbits)
   title('timing offset (samples)');
   subplot(212)
   plot(xt, foff_log)
+  hold on;
+  plot(xt, track_log*75, 'r');
+  hold off;
   title('Freq offset (Hz)');
   grid
 
@@ -213,8 +198,4 @@ function fdmdv_demod(rawfilename, nbits)
   axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
-  figure(5)
-  clf;
-  plot(xt, track_log);
-  axis([0 secs 0 1.5]);
 endfunction

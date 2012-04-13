@@ -45,12 +45,6 @@ sync_log = [];
 test_frame_sync_log = [];
 test_frame_sync_state = 0;
 
-% pilot look up table, used for copy of pilot at rx
-
-pilot_lut = generate_pilot_lut;
-pilot_lut_index = 1;
-prev_pilot_lut_index = 3*M+1;
-
 % fixed delay simuation
 
 Ndelay = M+20;
@@ -85,10 +79,16 @@ CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
 B = 3000;
 SNR = CNo_dB - 10*log10(B);
 
+% freq offset simulation states
+
 phase_offset = 1;
 freq_offset = exp(j*2*pi*Foff_hz/Fs);
 foff_phase = 1;
 t = 0;
+foff = 0;
+fest_state = 0;
+track = 0;
+track_log = [];
 
 % ---------------------------------------------------------------------
 % Main loop 
@@ -151,23 +151,15 @@ for f=1:frames
   % Demodulator
   % -------------------
 
-  % frequency offset estimation and correction
+  % frequency offset estimation and correction, need to call rx_est_freq_offset even in track
+  % mode to keep states updated
 
-  for i=1:M
-    pilot(i) = pilot_lut(pilot_lut_index);
-    pilot_lut_index++;
-    if pilot_lut_index > 4*M
-      pilot_lut_index = 1;
-    end
-    prev_pilot(i) = pilot_lut(prev_pilot_lut_index);
-    prev_pilot_lut_index++;
-    if prev_pilot_lut_index > 4*M
-      prev_pilot_lut_index = 1;
-    end
+  [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
+  foff_course = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
+  if track == 0
+    foff = foff_course;
   end
-  %foff = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
   foff_log = [ foff_log foff ];
-  %foff = 0;
   foff_rect = exp(j*2*pi*foff/Fs);
 
   for i=1:M
@@ -198,14 +190,21 @@ for f=1:frames
   prev_rx_symbols = rx_symbols;
   sync_log = [sync_log sync];
   
+  % freq est state machine
+
+  [track fest_state] = freq_state(sync, fest_state);
+  track_log = [track_log track];
+
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
 
   [test_frame_sync bit_errors] = put_test_bits(rx_bits);
-  if ((test_frame_sync == 1) && (f > 15))
+  if test_frame_sync == 1
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
     bit_errors_log = [bit_errors_log bit_errors];
+    else
+      bit_errors_log = [bit_errors_log 0];
   end
  
   % test frame sync state machine, just for more informative plots
@@ -265,6 +264,9 @@ plot(rx_timing_log)
 title('timing offset (samples)');
 subplot(212)
 plot(foff_log)
+hold on;
+plot(track_log*75, 'r');
+hold off;
 title('Freq offset (Hz)');
 
 figure(3)

@@ -4,7 +4,7 @@
 % Generate root raised cosine (Root Nyquist) filter coefficients
 % thanks http://www.dsplog.com/db-install/wp-content/uploads/2008/05/raised_cosine_filter.m
 
-function coeffs = gen_rn_coeffs(alpha, Rs, Nsym, M)
+function coeffs = gen_rn_coeffs(alpha, T, Rs, Nsym, M)
 
   Ts = 1/Rs;
 
