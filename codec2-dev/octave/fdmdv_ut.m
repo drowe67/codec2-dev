@@ -13,7 +13,7 @@ fdmdv;               % load modem code
 
 frames = 100;
 EbNo_dB = 7.3;
-Foff_hz = 10;
+Foff_hz = 0;
 modulation = 'dqpsk';
 hpa_clip = 150;
 
@@ -143,9 +143,9 @@ for f=1:frames
 
   % Delay
 
-  %rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
-  %rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
-  rx_fdm_delay = rx_fdm;
+  rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
+  rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
+  %rx_fdm_delay = rx_fdm;
 
   % -------------------
   % Demodulator
@@ -261,10 +261,10 @@ title('Scatter Diagram');
 figure(2)
 clf;
 subplot(211)
-plot(rx_timing_log(15:m))
+plot(rx_timing_log)
 title('timing offset (samples)');
 subplot(212)
-plot(foff_log(15:m))
+plot(foff_log)
 title('Freq offset (Hz)');
 
 figure(3)
@@ -292,44 +292,4 @@ subplot(313)
 plot(test_frame_sync_log);
 axis([0 frames 0 1.5]);
 title('Test Frame Sync')
-
-% TODO
-%   + handling sample slips, extra plus/minus samples
-%   + simulating sample clock offsets
-%   + timing, frequency offset get function
-%   + memory of recent tx and rx signal for spectrogram
-%   + scatter diagram get function
-
-% DPSK
-% add phase offset, frequency offset, timing offset
-% fading simulator
-% file I/O to test with Codec
-% code to measure sync recovery time
-% dump file type plotting & instrumentation
-% determine if error pattern is bursty
-% HF channel simulation
-% Offset or pi/4 QPSK and tests with real tx HPA
-% real time SNR get function
-%
-% phase estimator not working too well and would need a UW
-% to resolve ambiguity.  But this is probably worth it for
-% 3dB.  Test with small freq offset
-
-% Implementation loss BER issues:
-%   QPSK mapping
-%   Single sided noise issues
-%   interference between carriers due to excess BW
-%   Crappy RN coeffs
-%   timing recovery off by one
-%   Use a true PR sequence
-%   Sensitivity to Fs
-%   Try BPSK
-%   second term of QPSK eqn
-
-% Faster sync:
-%
-% 1/ Maybe Ask Bill how we can sync in less than 10 symbols?  What to
-% put in filter memories?  If high SNR should sync very quickly
-% Maybe start feeding in symbols to middle of filter memory?  Or do timing
-% sync before rx filtering at start?
 
