@@ -1,6 +1,6 @@
 % fdmdv_demod.m
 %
-% Demodulator function for FDMDV modem.  Requires 48kHz sample rate raw files
+% Demodulator function for FDMDV modem.  Requires 8kHz sample rate raw files
 % as input
 %
 % Copyright David Rowe 2012
@@ -25,7 +25,7 @@ function fdmdv_demod(rawfilename, nbits)
   
   pilot_lut = generate_pilot_lut;
   pilot_lut_index = 1;
-  prev_pilot = zeros(1,M);
+  prev_pilot_lut_index = 3*M+1;
 
   % BER stats
 
@@ -39,101 +39,93 @@ function fdmdv_demod(rawfilename, nbits)
   rx_symbols_log = [];
   rx_timing_log = [];
   foff_log = [];
+  rx_fdm_log = [];
 
-  % resampler states
+  % misc states
 
-  t = 3;
-  ratio = 1.000;
-  F=6;
-  MF=M*F;
-  nin = MF;
-  nin_size = MF+6;
-  buf_in = zeros(1,nin_size);
-  rx_fdm_buf = [];
-  ratio_log = [];
+  nin = M; % timing correction for sample rate differences
+  foff = 0;
+  track_log = [];
+  track = 1;
+  fest_state = 0;
 
   % Main loop ----------------------------------------------------
 
   for f=1:frames
-    % update buf_in memory
-
-    m = nin_size - nin;
-    for i=1:m
-      buf_in(i) = buf_in(i+nin);  
-    end
-    
     % obtain nin samples of the test input signal
-
-    for i=m+1:nin_size
-      buf_in(i) = fread(fin, 1, "short")/gain; 
+    
+    for i=1:nin
+      rx_fdm(i) = fread(fin, 1, "short")/gain; 
     end
 
-    % resample at 48kHz and decimate to 8kHz
-
-    [rx_fdm_mf t nin] = resample(buf_in, t, 1.0, MF);
-    rx_fdm = rx_fdm_mf(1:F:MF);
-
-    %rx_fdm = buf_in(m+1:m+n);
-
-    %for i=1:M
-    %  rx_fdm(i) = fread(fin, 1, "short")/gain; 
-    %end
-    rx_fdm_buf = [rx_fdm_buf rx_fdm];
+    rx_fdm_log = [rx_fdm_log rx_fdm(1:nin)];
 
     % frequency offset estimation and correction
 
-    for i=1:M
+    for i=1:nin
       pilot(i) = pilot_lut(pilot_lut_index);
       pilot_lut_index++;
       if pilot_lut_index > 4*M
         pilot_lut_index = 1;
       end
+      prev_pilot(i) = pilot_lut(prev_pilot_lut_index);
+      prev_pilot_lut_index++;
+      if prev_pilot_lut_index > 4*M
+        prev_pilot_lut_index = 1;
+      end
     end
-    foff = rx_est_freq_offset(rx_fdm, pilot, prev_pilot);
-    prev_pilot = pilot;
+    foff_coarse = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
+    if track == 0
+      foff  = foff_coarse;
+    end
     foff_log = [ foff_log foff ];
-    foff = 0;
     foff_rect = exp(j*2*pi*foff/Fs);
 
-    for i=1:M
+    for i=1:nin
       foff_phase *= foff_rect';
       rx_fdm(i) = rx_fdm(i)*foff_phase;
     end
 
     % baseband processing
 
-    rx_baseband = fdm_downconvert(rx_fdm);
-    rx_filt = rx_filter(rx_baseband);
+    rx_baseband = fdm_downconvert(rx_fdm, nin);
+    rx_filt = rx_filter(rx_baseband, nin);
 
-    [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
+    [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);
     rx_timing_log = [rx_timing_log rx_timing];
-    beta = 1E-7;
-    ratio += beta*rx_timing;
-    if (ratio > 1.002)
-       ratio = 1.002;
+    nin = M;
+    if rx_timing > 2*M/P
+       nin += M/P;
     end
-    if (ratio < 0.998)
-       ratio = 0.998;
+    if rx_timing < 0;
+       nin -= M/P;
     end
-    ratio_log = [ratio_log ratio];
 
     if strcmp(modulation,'dqpsk')
       rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
     else
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
-    [rx_bits sync] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits sync f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    foff -= 0.5*f_err;
     prev_rx_symbols = rx_symbols;
     sync_log = [sync_log sync];
+
+    % freq est state machine
+
+    [track fest_state] = freq_state(sync, fest_state);
+    track_log = [track_log track];
 
     % count bit errors if we find a test frame
     % Allow 15 frames for filter memories to fill and time est to settle
 
     [test_frame_sync bit_errors] = put_test_bits(rx_bits);
-    if (test_frame_sync == 1 && f > 15)
+    if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + Ntest_bits;
-      bit_errors_log = [bit_errors_log bit_errors];
+      bit_errors_log = [bit_errors_log bit_errors/Ntest_bits];
+    else
+      bit_errors_log = [bit_errors_log 0];
     end
 
     % test frame sync state machine, just for more informative plots
@@ -173,50 +165,56 @@ function fdmdv_demod(rawfilename, nbits)
   % Plots
   % ---------------------------------------------------------------------
 
+  xt = (1:frames)/Rs;
+  secs = frames/Rs;
+
   figure(1)
   clf;
   [n m] = size(rx_symbols_log);
-  plot(real(rx_symbols_log(1:Nc+1,10:m)),imag(rx_symbols_log(1:Nc+1,10:m)),'+')
+  plot(real(rx_symbols_log(1:Nc+1,15:m)),imag(rx_symbols_log(1:Nc+1,15:m)),'+')
   axis([-2 2 -2 2]);
   title('Scatter Diagram');
 
   figure(2)
   clf;
   subplot(211)
-  plot(rx_timing_log(15:m))
+  plot(xt, rx_timing_log)
   title('timing offset (samples)');
   subplot(212)
-  plot(foff_log)
+  plot(xt, foff_log)
   title('Freq offset (Hz)');
   grid
 
   figure(3)
   clf;
   subplot(211)
-  %plot(rx_fdm_buf);
-  %title('FDM Rx Signal');
-  plot(ratio_log-1);
-  title('Sampling Clock error (ppm)');
+  [a b] = size(rx_fdm_log);
+  xt1 = (1:b)/Fs;
+  plot(xt1, rx_fdm_log);
+  title('Rx FDM Signal');
   subplot(212)
   Nfft=Fs;
-  S=fft(rx_fdm_buf,Nfft);
+  S=fft(rx_fdm_log,Nfft);
   SdB=20*log10(abs(S));
   plot(SdB(1:Fs/4))
-  title('FDM Tx Spectrum');
+  title('FDM Rx Spectrum');
 
   figure(4)
   clf;
   subplot(311)
-  stem(sync_log)
-  axis([0 frames 0 1.5]);
+  stem(xt, sync_log)
+  axis([0 secs 0 1.5]);
   title('BPSK Sync')
   subplot(312)
-  stem(bit_errors_log);
+  stem(xt, bit_errors_log);
   title('Bit Errors for test frames')
   subplot(313)
-  plot(test_frame_sync_log);
-  axis([0 frames 0 1.5]);
+  plot(xt, test_frame_sync_log);
+  axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
-  mean(ratio_log)
+  figure(5)
+  clf;
+  plot(xt, track_log);
+  axis([0 secs 0 1.5]);
 endfunction

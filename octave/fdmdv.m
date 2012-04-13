@@ -82,8 +82,6 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
 
   if (strcmp(modulation,'dqpsk')) 
  
-
-  if 1
     % map to (Nc,1) DQPSK symbols
 
     for c=1:Nc
@@ -102,21 +100,6 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
          tx_symbols(c) = -j*prev_tx_symbols(c);
       endif 
     end
-  else
-    % map to pi/4 DQPSK from spra341 Eq (6) & (7)
-
-    for c=1:Nc
-
-      msb = tx_bits_matrix(c,1); lsb = tx_bits_matrix(c,2);
-      a = 2*msb - 1;
-      b = 2*lsb - 1;
-      p = prev_tx_symbols(c);
-      inphase    = (real(p)*a - imag(p)*b)*0.707;
-      quadrature = (imag(p)*a + real(p)*b)*0.707;
-      tx_symbols(c) = inphase + j*quadrature;
-    end
-  end
-
   else
     % QPSK mapping
     tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2);
@@ -215,7 +198,7 @@ endfunction
 
 % Frequency shift each modem carrier down to Nc baseband signals
 
-function rx_baseband = fdm_downconvert(rx_fdm)
+function rx_baseband = fdm_downconvert(rx_fdm, nin)
   global Fs;
   global M;
   global Nc;
@@ -223,12 +206,12 @@ function rx_baseband = fdm_downconvert(rx_fdm)
   global phase_rx;
   global freq;
 
-  rx_baseband = zeros(1,M);
+  rx_baseband = zeros(1,nin);
 
   % Nc/2 tones below centre freq
   
   for c=1:Nc/2
-      for i=1:M
+      for i=1:nin
         phase_rx(c) = phase_rx(c) * freq(c);
 	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
@@ -237,7 +220,7 @@ function rx_baseband = fdm_downconvert(rx_fdm)
   % Nc/2 tones above centre freq  
 
   for c=Nc/2+1:Nc
-      for i=1:M
+      for i=1:nin
         phase_rx(c) = phase_rx(c) * freq(c);
 	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
@@ -246,7 +229,7 @@ function rx_baseband = fdm_downconvert(rx_fdm)
   % Pilot
 
   c = Nc+1;
-  for i=1:M
+  for i=1:nin
     phase_rx(c) = phase_rx(c) * freq(c);
     rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
   end
@@ -256,7 +239,7 @@ endfunction
 
 % Receive filter each baseband signal at oversample rate P
 
-function rx_filt = rx_filter(rx_baseband)
+function rx_filt = rx_filter(rx_baseband, nin)
   global Nc;
   global M;
   global P;
@@ -265,14 +248,14 @@ function rx_filt = rx_filter(rx_baseband)
   global gt_alpha5_root;
   global Fsep;
 
-  rx_filt = zeros(Nc+1,P);
+  rx_filt = zeros(Nc+1,nin*P/M);
 
   % rx filter each symbol, generate P filtered output samples for each symbol.
   % Note we keep memory at rate M, it's just the filter output at rate P
 
   N=M/P;
   j=1;
-  for i=1:N:M
+  for i=1:N:nin
     rx_filter_memory(:,Nfilter-N+1:Nfilter) = rx_baseband(:,i:i-1+N);
     rx_filt(:,j) = rx_filter_memory * gt_alpha5_root';
     rx_filter_memory(:,1:Nfilter-N) = rx_filter_memory(:,1+N:Nfilter);
@@ -284,7 +267,7 @@ endfunction
 % Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
 % sensitive to pilot tone level wrt other carriers
 
-function foff = rx_est_freq_offset(rx_fdm, pilot, pilot_prev)
+function foff = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
   global M;
   global Npilotbaseband;
   global pilot_baseband1;
@@ -295,15 +278,15 @@ function foff = rx_est_freq_offset(rx_fdm, pilot, pilot_prev)
   % down convert latest M samples of pilot by multiplying by
   % ideal BPSK pilot signal we have generated locally
  
-  pilot_baseband1(1:Npilotbaseband-M) = pilot_baseband1(M+1:Npilotbaseband);
-  pilot_baseband2(1:Npilotbaseband-M) = pilot_baseband2(M+1:Npilotbaseband);
-  for i=1:M
-    pilot_baseband1(Npilotbaseband-M+i) = rx_fdm(i) * conj(pilot(i)); 
-    pilot_baseband2(Npilotbaseband-M+i) = rx_fdm(i) * conj(pilot_prev(i)); 
+  pilot_baseband1(1:Npilotbaseband-nin) = pilot_baseband1(nin+1:Npilotbaseband);
+  pilot_baseband2(1:Npilotbaseband-nin) = pilot_baseband2(nin+1:Npilotbaseband);
+  for i=1:nin
+    pilot_baseband1(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot(i)); 
+    pilot_baseband2(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot_prev(i)); 
   end
 
-  [foff1 max1 pilot_lpf1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1);
-  [foff2 max2 pilot_lpf2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2);
+  [foff1 max1 pilot_lpf1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin);
+  [foff2 max2 pilot_lpf2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin);
 
   if max1 > max2
     foff = foff1;
@@ -315,7 +298,7 @@ endfunction
 
 % LPF and peak pick part of freq est, put in a function as we call it twice
 
-function  [foff imax pilot_lpf] = lpf_peak_pick(pilot_baseband, pilot_lpf)
+function  [foff imax pilot_lpf] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
   global M;
   global Npilotlpf;
   global Npilotcoeff;
@@ -325,9 +308,9 @@ function  [foff imax pilot_lpf] = lpf_peak_pick(pilot_baseband, pilot_lpf)
 
   % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
-  pilot_lpf(1:Npilotlpf-M) = pilot_lpf(M+1:Npilotlpf);
+  pilot_lpf(1:Npilotlpf-nin) = pilot_lpf(nin+1:Npilotlpf);
   j = 1;
-  for i = Npilotlpf-M+1:Npilotlpf
+  for i = Npilotlpf-nin+1:Npilotlpf
     pilot_lpf(i) = pilot_baseband(j:j+Npilotcoeff) * pilot_coeff';
     j++;
   end
@@ -354,7 +337,7 @@ endfunction
 
 % Estimate optimum timing offset, and symbol receive symbols
 
-function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
+function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin)
   global M;
   global Nt;
   global Nc;
@@ -365,10 +348,22 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   global Nfiltertiming;
   global gt_alpha5_root;
 
+  % nin  adjust 
+  % --------------------------------
+  % 120  -1 (one less rate P sample)
+  % 160   0 (nominal)
+  % 200   1 (one more rate P sample)
+
+  adjust = P - nin*P/M;
+
   % update buffer of Nt rate P filtered symbols
 
-  rx_filter_mem_timing(:,1:(Nt-1)*P) = rx_filter_mem_timing(:,P+1:Nt*P);
-  rx_filter_mem_timing(:,(Nt-1)*P+1:Nt*P) = rx_filt(1:Nc,:);
+  rx_filter_mem_timing(:,1:(Nt-1)*P+adjust) = rx_filter_mem_timing(:,P+1-adjust:Nt*P);
+  %size((Nt-1)*P+1+adjust:Nt*P)
+  %size(rx_filt)
+  %adjust
+  %nin
+  rx_filter_mem_timing(:,(Nt-1)*P+1+adjust:Nt*P) = rx_filt(1:Nc,:);
 
   % sum envelopes of all carriers
 
@@ -396,8 +391,8 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband)
   % baseband signal at rate M this enables us to resample the filtered
   % rx symbol with M sample precision once we have rx_timing
 
-  rx_baseband_mem_timing(:,1:Nfiltertiming-M) = rx_baseband_mem_timing(:,M+1:Nfiltertiming);
-  rx_baseband_mem_timing(:,Nfiltertiming-M+1:Nfiltertiming) = rx_baseband;
+  rx_baseband_mem_timing(:,1:Nfiltertiming-nin) = rx_baseband_mem_timing(:,nin+1:Nfiltertiming);
+  rx_baseband_mem_timing(:,Nfiltertiming-nin+1:Nfiltertiming) = rx_baseband;
 
   % sample right in the middle of the timing estimator window, by filtering
   % at rate M
@@ -426,7 +421,7 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function [rx_bits sync_bit] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
+function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
   global Nc;
   global Nb;
   global Nb;
@@ -462,8 +457,10 @@ function [rx_bits sync_bit] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulati
     phase_difference(Nc+1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
     if (real(phase_difference(Nc+1)) < 0)
       sync_bit = 0;
+      f_err = imag(phase_difference(Nc+1));
     else
       sync_bit = 1;
+      f_err = -imag(phase_difference(Nc+1));
     end
 
   else
@@ -709,3 +706,82 @@ function [buf_out t nin] = resample(buf_in, t, ratio, nout)
   t -= delta;
 
 endfunction
+
+
+% freq offset state machine.  Moves between acquire and track states based
+% on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
+% when used continuously.  So we use it unit we have acquired the BPSK pilot,
+% then switch to a more robust tracking algorithm.  If we lose sync we switch
+% back to acquire mode for fast-requisition.
+
+function [track state] = freq_state(sync_bit, state)
+
+  % acquire state, look for 6 symbol 010101 sequence from sync bit
+
+  next_state = state;
+  if state == 0
+    if sync_bit == 0
+      next_state = 1;
+    end        
+  end
+  if state == 1
+    if sync_bit == 1
+      next_state = 2;
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 2
+    if sync_bit == 0
+      next_state = 3;
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 3
+    if sync_bit == 1
+      next_state = 4;
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 4
+    if sync_bit == 0
+      next_state = 5;
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 5
+    if sync_bit == 1
+      next_state = 6;
+    else 
+      next_state = 0;
+    end        
+  end
+
+  % states 6 and above are track mode, make sure we keep getting 0101 sync bit sequence
+
+  if state == 6
+    if sync_bit == 0
+      next_state = 7;
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 7
+    if sync_bit == 1
+      next_state = 6;
+    else 
+      next_state = 0;
+    end        
+  end
+
+  state = next_state;
+  if state >= 6
+    track = 1;
+  else
+    track = 0;
+  end
+endfunction
+
