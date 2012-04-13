@@ -29,83 +29,11 @@ global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
 global Nfilter = Nsym*M;
 global Nfiltertiming = M+Nfilter+M;
+alpha = 0.5;
 
 % root raised cosine (Root Nyquist) filter 
 
-global gt_alpha5_root = gen_rn_coeffs(alpha, Rs, Nsym, M);
-
-% Initialise ----------------------------------------------------
-
-global pilot_bit;
-pilot_bit = 0;     % current value of pilot bit
-
-global tx_filter_memory;
-tx_filter_memory = zeros(Nc+1, Nfilter);
-global rx_filter_memory;
-rx_filter_memory = zeros(Nc+1, Nfilter);
-
-% phasors used for up and down converters
-
-global freq;
-freq = zeros(Nc+1,1);
-for c=1:Nc/2
-  carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
-  freq(c) = exp(j*2*pi*carrier_freq/Fs);
-end
-for c=Nc/2+1:Nc
-  carrier_freq = (-Nc/2 + c)*Fsep + Fcentre;
-  freq(c) = exp(j*2*pi*carrier_freq/Fs);
-end
-
-freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
-
-% Spread initial FDM carrier phase out as far as possible.  This
-% helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
-% takes care of that.
-
-global phase_tx;
-%phase_tx = ones(Nc+1,1);
-phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
-global phase_rx;
-phase_rx = ones(Nc+1,1);
-
-% Freq offset estimator constants
-
-global Mpilotfft      = 256;
-global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
-global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
-global Npilotbaseband = Npilotcoeff + 4*M;              % number of pilot baseband samples reqd for pilot LPF
-global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
-
-% Freq offset estimator states 
-
-global pilot_baseband1;
-global pilot_baseband2;
-pilot_baseband1 = zeros(1, Npilotbaseband);             % pilot baseband samples
-pilot_baseband2 = zeros(1, Npilotbaseband);             % pilot baseband samples
-global pilot_lpf1
-global pilot_lpf2
-pilot_lpf1 = zeros(1, Npilotlpf);                       % LPF pilot samples
-pilot_lpf2 = zeros(1, Npilotlpf);                       % LPF pilot samples
-
-% Timing estimator states
-
-global rx_filter_mem_timing;
-rx_filter_mem_timing = zeros(Nc+1, Nt*P);
-global rx_baseband_mem_timing;
-rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
-
-% Test bit stream constants
-
-global Ntest_bits = Nc*Nb*4;     % length of test sequence
-global test_bits = rand(1,Ntest_bits) > 0.5;
-
-% Test bit stream state variables
-
-global current_test_bit = 1;
-current_test_bit = 1;
-global rx_test_bits_mem;
-rx_test_bits_mem = zeros(1,Ntest_bits);
+global gt_alpha5_root = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
 
 
 % Functions ----------------------------------------------------
@@ -606,7 +534,7 @@ endfunction
 % is periodic in 4M samples we can then use this vector as a look up table
 % for pilot signsl generation at the demod.
 
-function pilot_lut = generate_pilot_lut
+function pilot_lut = generate_pilot_lut()
   global Nc;
   global Nfilter;
   global M;
@@ -637,6 +565,28 @@ function pilot_lut = generate_pilot_lut
   pilot_lut = pilot_lut(4*M+1:M*F);
 
 endfunction
+
+
+% grab next pilot samples for freq offset estimation at demod
+
+function [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin)
+  global M;
+  global pilot_lut;
+
+  for i=1:nin
+    pilot(i) = pilot_lut(pilot_lut_index);
+    pilot_lut_index++;
+    if pilot_lut_index > 4*M
+      pilot_lut_index = 1;
+    end
+    prev_pilot(i) = pilot_lut(prev_pilot_lut_index);
+    prev_pilot_lut_index++;
+    if prev_pilot_lut_index > 4*M
+      prev_pilot_lut_index = 1;
+    end
+  end
+endfunction
+
 
 
 % Change the sample rate by a small amount, for example 1000ppm (ratio
@@ -753,4 +703,85 @@ function [track state] = freq_state(sync_bit, state)
     track = 0;
   end
 endfunction
+
+% Initialise ----------------------------------------------------
+
+global pilot_bit;
+pilot_bit = 0;     % current value of pilot bit
+
+global tx_filter_memory;
+tx_filter_memory = zeros(Nc+1, Nfilter);
+global rx_filter_memory;
+rx_filter_memory = zeros(Nc+1, Nfilter);
+
+% phasors used for up and down converters
+
+global freq;
+freq = zeros(Nc+1,1);
+for c=1:Nc/2
+  carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
+  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+end
+for c=Nc/2+1:Nc
+  carrier_freq = (-Nc/2 + c)*Fsep + Fcentre;
+  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+end
+
+freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
+
+% Spread initial FDM carrier phase out as far as possible.  This
+% helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
+% takes care of that.
+
+global phase_tx;
+%phase_tx = ones(Nc+1,1);
+phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
+global phase_rx;
+phase_rx = ones(Nc+1,1);
+
+% Freq offset estimator constants
+
+global Mpilotfft      = 256;
+global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
+global pilot_coeff    = fir1(Npilotcoeff, 200/(Fs/2))'; % 200Hz LPF
+global Npilotbaseband = Npilotcoeff + 4*M;              % number of pilot baseband samples reqd for pilot LPF
+global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
+
+% pilot LUT, used for copy of pilot at rx
+  
+global pilot_lut;
+pilot_lut = generate_pilot_lut();
+pilot_lut_index = 1;
+prev_pilot_lut_index = 3*M+1;
+
+% Freq offset estimator states 
+
+global pilot_baseband1;
+global pilot_baseband2;
+pilot_baseband1 = zeros(1, Npilotbaseband);             % pilot baseband samples
+pilot_baseband2 = zeros(1, Npilotbaseband);             % pilot baseband samples
+global pilot_lpf1
+global pilot_lpf2
+pilot_lpf1 = zeros(1, Npilotlpf);                       % LPF pilot samples
+pilot_lpf2 = zeros(1, Npilotlpf);                       % LPF pilot samples
+
+% Timing estimator states
+
+global rx_filter_mem_timing;
+rx_filter_mem_timing = zeros(Nc+1, Nt*P);
+global rx_baseband_mem_timing;
+rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
+
+% Test bit stream constants
+
+global Ntest_bits = Nc*Nb*4;     % length of test sequence
+global test_bits = rand(1,Ntest_bits) > 0.5;
+
+% Test bit stream state variables
+
+global current_test_bit = 1;
+current_test_bit = 1;
+global rx_test_bits_mem;
+rx_test_bits_mem = zeros(1,Ntest_bits);
+
 
