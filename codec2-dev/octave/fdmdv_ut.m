@@ -11,9 +11,9 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 50;
+frames = 100;
 EbNo_dB = 7.3;
-Foff_hz = 0;
+Foff_hz = 10;
 modulation = 'dqpsk';
 hpa_clip = 150;
 
@@ -30,6 +30,8 @@ rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
 prev_tx_symbols = ones(Nc+1,1);
 prev_rx_symbols = ones(Nc+1,1);
+f_err = 0;
+foff = 0;
 foff_log = [];
 tx_baseband_log = [];
 tx_fdm_log = [];
@@ -47,6 +49,7 @@ test_frame_sync_state = 0;
 
 pilot_lut = generate_pilot_lut;
 pilot_lut_index = 1;
+prev_pilot_lut_index = 3*M+1;
 
 % fixed delay simuation
 
@@ -111,11 +114,12 @@ for f=1:frames
 
   % frequency offset
 
+  %Foff_hz += 1/Rs;
+  Foff = Foff_hz;
   for i=1:M
     % Time varying freq offset
-    % Foff = Foff_hz + 100*sin(t*2*pi/(300*Fs));
-    % t++;
-    Foff = Foff_hz;
+    %Foff = Foff_hz + 100*sin(t*2*pi/(300*Fs));
+    %t++;
     freq_offset = exp(j*2*pi*Foff/Fs);
     phase_offset *= freq_offset;
     tx_fdm(i) = phase_offset*tx_fdm(i);
@@ -155,9 +159,13 @@ for f=1:frames
     if pilot_lut_index > 4*M
       pilot_lut_index = 1;
     end
+    prev_pilot(i) = pilot_lut(prev_pilot_lut_index);
+    prev_pilot_lut_index++;
+    if prev_pilot_lut_index > 4*M
+      prev_pilot_lut_index = 1;
+    end
   end
-  foff = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot);
-  prev_pilot = pilot;
+  %foff = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
   foff_log = [ foff_log foff ];
   %foff = 0;
   foff_rect = exp(j*2*pi*foff/Fs);
@@ -169,11 +177,11 @@ for f=1:frames
 
   % baseband processing
 
-  rx_baseband = fdm_downconvert(rx_fdm_delay(1:M));
+  rx_baseband = fdm_downconvert(rx_fdm_delay(1:M), M);
   rx_baseband_log = [rx_baseband_log rx_baseband];
-  rx_filt = rx_filter(rx_baseband);
+  rx_filt = rx_filter(rx_baseband, M);
 
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband);
+  [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, M);
   rx_timing_log = [rx_timing_log rx_timing];
 
   %rx_phase = rx_est_phase(rx_symbols);
@@ -185,10 +193,11 @@ for f=1:frames
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
   endif
-  [rx_bits sync] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  foff -= 0.5*f_err;
   prev_rx_symbols = rx_symbols;
   sync_log = [sync_log sync];
-
+  
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
 
@@ -246,16 +255,16 @@ figure(1)
 clf;
 [n m] = size(rx_symbols_log);
 plot(real(rx_symbols_log(1:Nc+1,15:m)),imag(rx_symbols_log(1:Nc+1,15:m)),'+')
-axis([-2 2 -2 2]);
+axis([-3 3 -3 3]);
 title('Scatter Diagram');
 
 figure(2)
 clf;
 subplot(211)
-plot(rx_timing_log)
+plot(rx_timing_log(15:m))
 title('timing offset (samples)');
 subplot(212)
-plot(foff_log)
+plot(foff_log(15:m))
 title('Freq offset (Hz)');
 
 figure(3)

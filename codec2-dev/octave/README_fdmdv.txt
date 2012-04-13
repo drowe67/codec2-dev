@@ -18,6 +18,7 @@ TODO
     + does modem fall over?
 [ ] try non-flat channel, e.g. 3dB difference between hi and low tones
     + make sure all estimators keep working
+[ ] test rx level sensitivity, i.e. 0 to 20dB attenuation
 [ ] try to run from shell script
 [ ] run a few tests
 [ ] start coding in C and repeat tests
