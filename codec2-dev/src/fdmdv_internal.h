@@ -31,6 +31,47 @@
 
 #include "comp.h"
 
+/*---------------------------------------------------------------------------*\
+                                                                             
+                               DEFINES
+
+\*---------------------------------------------------------------------------*/
+
+#define FS                    8000  /* sample rate in Hz                                                    */
+#define T                 (1.0/FS)  /* sample period in seconds                                             */
+#define RS                      50  /* symbol rate in Hz                                                    */
+#define NC                      14  /* number of carriers                                                   */
+#define NB                       2  /* Bits/symbol for QPSK modulation                                      */
+#define RB              (NC*RS*NB)  /* bit rate                                                             */
+#define M                  (FS/RS)  /* oversampling factor                                                  */
+#define NSYM                     4  /* number of symbols to filter over                                     */
+#define FSEP                    75  /* Separation between carriers (Hz)                                     */
+#define FCENTRE               1200  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
+#define NT                       5  /* number of symbols we estimate timing over                            */
+#define P                        4  /* oversample factor used for initial rx symbol filtering               */
+#define NFILTER            (NSYM*M) /* size of tx/rx filters at sampel rate M                               */
+#define NFILTERTIMING (M+Nfilter+M) /* filter memory used for resampling after timing estimation            */
+
+#define NTEST_BITS        (NC*NB*4) /* length of test bit sequence */
+
+/*---------------------------------------------------------------------------*\
+                                                                             
+                               STRUCT for States
+
+\*---------------------------------------------------------------------------*/
+
+struct FDMDV {
+    int  current_test_bit;
+    int  tx_pilot_bit;
+    COMP prev_tx_symbols[NC+1];
+};
+
+/*---------------------------------------------------------------------------*\
+                                                                             
+                              FUNCTION PROTOTYPES
+
+\*---------------------------------------------------------------------------*/
+
 void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit);
 
 #endif

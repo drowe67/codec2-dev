@@ -33,18 +33,31 @@
 extern "C" {
 #endif
 
+#define FDMDV_BITS_PER_FRAME     28
+#define FDMDV_SAMPLES_PER_FRAME 160
+
 struct FDMDV;
     
+struct FDMDV_STATS {
+    float  snr;          /* estimated SNR of rx signal  in dB                  */
+    COMP  *rx_symbols;   /* NC+1 latest received symbols, for scatter plot     */ 
+    int    fest_track;   /* == 0, freq est in acquire mode, == 1 in track mode */ 
+    float  foff;         /* estimated freq offset in Hz                        */       
+    float  timing;       /* timing offset 0..1 as fraction of symbol period    */
+    float  clock_offset; /* Estimated tx/rx sample clock offset in ppm         */
+};
+
+
 struct FDMDV *fdmdv_create(void);
 void          fdmdv_destroy(struct FDMDV *fdmdv_state);
     
-void          fdmdv_mod(struct FDMDV *fdmdv_state, int tx_bits[], COMP tx_fdm[]);
-void          fdmdv_demod(struct FDMDV *fdmdv_state, int tx_bits[], float rx_fdm[], int *nin);
+void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[]);
+void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync, float rx_fdm[], int *nin);
     
 void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
 void          fdmdv_put_test_bits(struct FDMDV *fdmdv_state, int rx_bits[]);
     
-float         fdmdv_get_snr(struct FDMDV *fdmdv_state);
+float         fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void          fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
 
 #endif
