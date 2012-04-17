@@ -28,46 +28,19 @@
 
 /*---------------------------------------------------------------------------*\
                                                                              
-                               DEFINES
-
-\*---------------------------------------------------------------------------*/
-
-#define FS                    8000  /* sample rate in Hz                                                    */
-#define T                   (1/Fs)  /* sample period in seconds                                             */
-#define RS                      50  /* symbol rate in Hz                                                    */
-#define NC                      14  /* number of carriers                                                   */
-#define NB                       2  /* Bits/symbol for QPSK modulation                                      */
-#define RB              (Nc*Rs*Nb)  /* bit rate                                                             */
-#define M                    Fs/Rs  /* oversampling factor                                                  */
-#define NSYM                     4  /* number of symbols to filter over                                     */
-#define FSEP                    75  /* Separation between carriers (Hz)                                     */
-#define FCENTRE               1200  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
-#define NT                       5  /* number of symbols we estimate timing over                            */
-#define P                        4  /* oversample factor used for initial rx symbol filtering               */
-#define NFILTER            (NSYM*M) /* size of tx/rx filters at sampel rate M                               */
-#define NFILTERTIMING (M+Nfilter+M) /* filter memory used for resampling after timing estimation            */
-
-#define NTEST_BITS        (Nc*Nb*4) /* length of test bit sequence */
-
-/*---------------------------------------------------------------------------*\
-                                                                             
-                               STRUCT for States
-
-\*---------------------------------------------------------------------------*/
-
-struct FDMDV {
-    int current_test_bit;
-};
-
-/*---------------------------------------------------------------------------*\
-                                                                             
                                INCLUDES
 
 \*---------------------------------------------------------------------------*/
 
+#include <assert.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <math.h>
+
+#include "fdmdv_internal.h"
 #include "fdmdv.h"
 #include "rn.h"
-#include "testbits.h"
+#include "test_bits.h"
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -111,7 +84,7 @@ static COMP cdot(COMP a[], COMP b[], int n)
     int  i;
     
     for(i=0; i<n; i++) 
-	res = cadd(res, cmult(a,b));
+	res = cadd(res, cmult(a[i], b[i]));
 
     return res;
 }
@@ -140,13 +113,23 @@ static void cbuf_shift_update(COMP buf[], COMP update[], int buflen, int updatel
 
 struct FDMDV *fdmdv_create(void)
 {
-    struct FDMDV *fdmdv;
+    struct FDMDV *f;
+    int           c;
 
-    fdmdv = (struct FDMDV*)malloc(sizeof(struct FDMDV));
-    if (fdmdv == NULL)
+    assert(FDMDV_BITS_PER_FRAME == NC*NB);
+    assert(FDMDV_SAMPLES_PER_FRAME == M);
+
+    f = (struct FDMDV*)malloc(sizeof(struct FDMDV));
+    if (f == NULL)
 	return NULL;
     
-    return fdmdv;
+    f->current_test_bit = 0;
+    f->tx_pilot_bit = 0;
+    for(c=0; c<NC+1; c++) {
+	f->prev_tx_symbols[c].real = 1.0;
+	f->prev_tx_symbols[c].imag = 0.0;
+    }
+    return f;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -167,6 +150,30 @@ void codec2_destroy(struct FDMDV *fdmdv)
 
 /*---------------------------------------------------------------------------*\
                                                        
+  FUNCTION....: fdmdv_get_test_bits()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 16/4/2012
+
+  Generate a frame of bits from a repeating sequence of random data.  OK so
+  it's not very random if it repeats but it makes syncing at the demod easier
+  for test purposes.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
+{
+    int i;
+
+    for(i=0; i<FDMDV_BITS_PER_FRAME; i++) {
+	tx_bits[i] = test_bits[f->current_test_bit];
+	f->current_test_bit++;
+	if (f->current_test_bit > (NTEST_BITS-1))
+	    f->current_test_bit = 0;
+    }
+ }
+
+/*---------------------------------------------------------------------------*\
+                                                       
   FUNCTION....: bits_to_dqpsk_symbols()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 16/4/2012
@@ -180,7 +187,6 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
 {
     int c, msb, lsb;
     COMP j = {0.0,1.0};
-    COMP minusj = {0.0,-1.0};
 
     /* map tx_bits to to Nc DQPSK symbols */
 
@@ -201,9 +207,9 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
        two spectral lines at +/- Rs/2 */
  
     if (*pilot_bit)
-	tx_symbols[Nc] = cneg(prev_tx_symbols[Nc]);
+	tx_symbols[NC] = cneg(prev_tx_symbols[NC]);
     else
-	tx_symbols[Nc] = prev_tx_symbols[Nc];
+	tx_symbols[NC] = prev_tx_symbols[NC];
 
     if (*pilot_bit) 
 	*pilot_bit = 0;

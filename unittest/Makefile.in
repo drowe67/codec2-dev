@@ -39,7 +39,7 @@ host_triplet = @host@
 noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	vqtrain$(EXEEXT) vqtrainjnd$(EXEEXT) tnlp$(EXEEXT) \
 	tinterp$(EXEEXT) tquant$(EXEEXT) tcodec2$(EXEEXT) \
-	vq_train_jvm$(EXEEXT) scalarlsptest$(EXEEXT)
+	vq_train_jvm$(EXEEXT) scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -74,6 +74,9 @@ am_tcodec2_OBJECTS = tcodec2.$(OBJEXT) quantise.$(OBJEXT) \
 	interp.$(OBJEXT) pack.$(OBJEXT) $(am__objects_1)
 tcodec2_OBJECTS = $(am_tcodec2_OBJECTS)
 tcodec2_DEPENDENCIES =
+am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT)
+tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
+tfdmdv_DEPENDENCIES =
 am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) fft.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) interp.$(OBJEXT) lpc.$(OBJEXT) \
 	lsp.$(OBJEXT) quantise.$(OBJEXT) $(am__objects_1) \
@@ -110,13 +113,15 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tinterp_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tfdmdv_SOURCES) \
+	$(tinterp_SOURCES) $(tnlp_SOURCES) $(tquant_SOURCES) \
+	$(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 DIST_SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tinterp_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(tcodec2_SOURCES) $(tfdmdv_SOURCES) \
+	$(tinterp_SOURCES) $(tnlp_SOURCES) $(tquant_SOURCES) \
+	$(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -264,6 +269,9 @@ tcodec2_LDFLAGS = $(LIBS)
 scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c
+tfdmdv_LDADD = $(lib_LTLIBRARIES) 
+tfdmdv_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -319,6 +327,9 @@ scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES)
 tcodec2$(EXEEXT): $(tcodec2_OBJECTS) $(tcodec2_DEPENDENCIES) 
 	@rm -f tcodec2$(EXEEXT)
 	$(LINK) $(tcodec2_LDFLAGS) $(tcodec2_OBJECTS) $(tcodec2_LDADD) $(LIBS)
+tfdmdv$(EXEEXT): $(tfdmdv_OBJECTS) $(tfdmdv_DEPENDENCIES) 
+	@rm -f tfdmdv$(EXEEXT)
+	$(LINK) $(tfdmdv_LDFLAGS) $(tfdmdv_OBJECTS) $(tfdmdv_LDADD) $(LIBS)
 tinterp$(EXEEXT): $(tinterp_OBJECTS) $(tinterp_DEPENDENCIES) 
 	@rm -f tinterp$(EXEEXT)
 	$(LINK) $(tinterp_LDFLAGS) $(tinterp_OBJECTS) $(tinterp_LDADD) $(LIBS)
@@ -354,6 +365,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codec2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genres.Po@am__quote@
@@ -369,6 +381,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcodec2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tfdmdv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tinterp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tnlp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tquant.Po@am__quote@
@@ -676,6 +689,20 @@ pack.obj: ../src/pack.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/pack.c' object='pack.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o pack.obj `if test -f '../src/pack.c'; then $(CYGPATH_W) '../src/pack.c'; else $(CYGPATH_W) '$(srcdir)/../src/pack.c'; fi`
+
+fdmdv.o: ../src/fdmdv.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fdmdv.o -MD -MP -MF "$(DEPDIR)/fdmdv.Tpo" -c -o fdmdv.o `test -f '../src/fdmdv.c' || echo '$(srcdir)/'`../src/fdmdv.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fdmdv.Tpo" "$(DEPDIR)/fdmdv.Po"; else rm -f "$(DEPDIR)/fdmdv.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fdmdv.c' object='fdmdv.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fdmdv.o `test -f '../src/fdmdv.c' || echo '$(srcdir)/'`../src/fdmdv.c
+
+fdmdv.obj: ../src/fdmdv.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fdmdv.obj -MD -MP -MF "$(DEPDIR)/fdmdv.Tpo" -c -o fdmdv.obj `if test -f '../src/fdmdv.c'; then $(CYGPATH_W) '../src/fdmdv.c'; else $(CYGPATH_W) '$(srcdir)/../src/fdmdv.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fdmdv.Tpo" "$(DEPDIR)/fdmdv.Po"; else rm -f "$(DEPDIR)/fdmdv.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fdmdv.c' object='fdmdv.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fdmdv.obj `if test -f '../src/fdmdv.c'; then $(CYGPATH_W) '../src/fdmdv.c'; else $(CYGPATH_W) '$(srcdir)/../src/fdmdv.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
