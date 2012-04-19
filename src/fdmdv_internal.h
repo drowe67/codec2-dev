@@ -44,15 +44,17 @@
 #define NB                       2  /* Bits/symbol for QPSK modulation                                      */
 #define RB              (NC*RS*NB)  /* bit rate                                                             */
 #define M                  (FS/RS)  /* oversampling factor                                                  */
-#define NSYM                     4  /* number of symbols to filter over                                     */
+#define NSYM                     6  /* number of symbols to filter over                                     */
 #define FSEP                    75  /* Separation between carriers (Hz)                                     */
 #define FCENTRE               1200  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
 #define NT                       5  /* number of symbols we estimate timing over                            */
 #define P                        4  /* oversample factor used for initial rx symbol filtering               */
-#define NFILTER            (NSYM*M) /* size of tx/rx filters at sampel rate M                               */
+#define NFILTER            (NSYM*M) /* size of tx/rx filters at sample rate M                               */
 #define NFILTERTIMING (M+Nfilter+M) /* filter memory used for resampling after timing estimation            */
 
 #define NTEST_BITS        (NC*NB*4) /* length of test bit sequence */
+
+#define PI              3.141592654
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -64,6 +66,9 @@ struct FDMDV {
     int  current_test_bit;
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
+    COMP tx_filter_memory[NC+1][NFILTER];
+    COMP phase_tx[NC+1];
+    COMP freq[NC+1];
 };
 
 /*---------------------------------------------------------------------------*\
@@ -73,5 +78,7 @@ struct FDMDV {
 \*---------------------------------------------------------------------------*/
 
 void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit);
+void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NFILTER]);
+void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[]);
 
 #endif

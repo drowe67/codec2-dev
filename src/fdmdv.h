@@ -33,6 +33,8 @@
 extern "C" {
 #endif
 
+#include "comp.h"
+
 #define FDMDV_BITS_PER_FRAME     28
 #define FDMDV_SAMPLES_PER_FRAME 160
 
@@ -47,11 +49,10 @@ struct FDMDV_STATS {
     float  clock_offset; /* Estimated tx/rx sample clock offset in ppm         */
 };
 
-
 struct FDMDV *fdmdv_create(void);
 void          fdmdv_destroy(struct FDMDV *fdmdv_state);
     
-void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[]);
+void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync);
 void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync, float rx_fdm[], int *nin);
     
 void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);

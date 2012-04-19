@@ -12,19 +12,23 @@ fdmdv; % load modem code
 % Generate reference vectors using Octave implementation of FDMDV modem
 
 passes = fails = 0;
-frames = 10;
+frames = 25;
 prev_tx_symbols = ones(Nc+1,1);
 tx_bits_log = [];
 tx_symbols_log = [];
+tx_baseband_log = [];
+tx_fdm_log = [];
 
 for f=1:frames
-
   tx_bits = get_test_bits(Nc*Nb);
   tx_bits_log = [tx_bits_log tx_bits];
   tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, 'dqpsk');
   prev_tx_symbols = tx_symbols;
   tx_symbols_log = [tx_symbols_log tx_symbols];
-
+  tx_baseband = tx_filter(tx_symbols);
+  tx_baseband_log = [tx_baseband_log tx_baseband];
+  tx_fdm = fdm_upconvert(tx_baseband);
+  tx_fdm_log = [tx_fdm_log tx_fdm];
 end
 
 % Compare to the output from the C version
@@ -33,13 +37,54 @@ load ../unittest/tfdmdv_out.txt
 
 figure(1)
 subplot(211)
-plot(tx_bits_log - tx_bits_tfdmdv);
+n = 28;
+stem(tx_bits_log_c(1:n));
+hold on;
+stem(tx_bits_log(1:n) - tx_bits_log_c(1:n),'g');
+hold off;
+axis([1 n -1.5 1.5])
 title('tx bits')
 subplot(212)
-plot(tx_symbols_log - tx_symbols_tfdmdv);
-title('tx symbols')
+stem(real(tx_symbols_log_c(1:n/2)));
+hold on;
+stem(tx_symbols_log(1:n/2) - tx_symbols_log_c(1:n/2),'g');
+hold off;
+axis([1 n/2 -1.5 1.5])
+title('tx symbols real')
 
-if sum(tx_bits_log - tx_bits_tfdmdv) == 0
+figure(2)
+clf;
+diff = tx_baseband_log - tx_baseband_log_c;
+subplot(211)
+c=3;
+plot(real(tx_baseband_log_c(c,:)));
+hold on;
+plot(real(sum(diff)),'g')
+hold off;
+title('tx baseband real')
+subplot(212)
+plot(imag(tx_baseband_log_c(c,:)));
+hold on;
+plot(imag(sum(diff)),'g')
+hold off;
+title('tx baseband imag')
+
+figure(3)
+clf
+subplot(211)
+plot(real(tx_fdm_log_c));
+hold on;
+plot(real(tx_fdm_log - tx_fdm_log_c),'g');
+hold off;
+title('tx fdm real')
+subplot(212)
+plot(imag(tx_fdm_log_c));
+hold on;
+plot(imag(tx_fdm_log - tx_fdm_log_c),'g');
+hold off;
+title('tx fdm imag')
+
+if sum(tx_bits_log - tx_bits_log_c) == 0
   printf("fdmdv_get_test_bits..: OK\n");
   passes++;
 else;
@@ -47,11 +92,19 @@ else;
   fails++;
 end
  
-if sum(tx_symbols_log - tx_symbols_tfdmdv) == 0
+if sum(tx_symbols_log - tx_symbols_log_c) == 0
   printf("bits_to_dqpsk_symbols: OK\n");
   passes++;
 else;
   printf("bits_to_dqpsk_symbols: FAIL\n");
+  fails++;
+end
+
+if sum(tx_baseband_log - tx_baseband_log_c) < 1E-3
+  printf("tx_filter............: OK\n");
+  passes++;
+else;
+  printf("tx_filter............: FAIL\n");
   fails++;
 end
 

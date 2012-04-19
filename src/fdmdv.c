@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------*\
                                                                              
   FILE........: fdmdv.c
-  AUTHOR......: David Rowe                                                          
+  AUTHOR......: David Rowe
   DATE CREATED: April 14 2012
                                                                              
   Functions that implement a Frequency Divison Multiplexed Modem for
@@ -114,7 +114,8 @@ static void cbuf_shift_update(COMP buf[], COMP update[], int buflen, int updatel
 struct FDMDV *fdmdv_create(void)
 {
     struct FDMDV *f;
-    int           c;
+    int           c, k;
+    float         carrier_freq;
 
     assert(FDMDV_BITS_PER_FRAME == NC*NB);
     assert(FDMDV_SAMPLES_PER_FRAME == M);
@@ -128,7 +129,35 @@ struct FDMDV *fdmdv_create(void)
     for(c=0; c<NC+1; c++) {
 	f->prev_tx_symbols[c].real = 1.0;
 	f->prev_tx_symbols[c].imag = 0.0;
+	for(k=0; k<NFILTER; k++) {
+	    f->tx_filter_memory[c][k].real = 0.0;
+	    f->tx_filter_memory[c][k].imag = 0.0;
+	}
+
+	/* Spread initial FDM carrier phase out as far as possible.
+           This helped PAPR for a few dB.  We don't need to adjust rx
+           phase as DQPSK takes care of that. */
+	
+	f->phase_tx[c].real = cos(2.0*PI*c/(NC+1));
+ 	f->phase_tx[c].imag = sin(2.0*PI*c/(NC+1));
+
+   }
+    
+    for(c=0; c<NC/2; c++) {
+	carrier_freq = (-NC/2 + c)*FSEP + FCENTRE;
+	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
     }
+
+    for(c=NC/2; c<NC; c++) {
+	carrier_freq = (-NC/2 + c + 1)*FSEP + FCENTRE;
+	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+    }
+	
+    f->freq[NC].real = cos(2.0*PI*FCENTRE/FS);
+    f->freq[NC].imag = sin(2.0*PI*FCENTRE/FS);
+
     return f;
 }
 
@@ -217,3 +246,124 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
 	*pilot_bit = 1;
 }
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: tx_filter()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 17/4/2012
+
+  Given NC*NB bits construct M samples (1 symbol) of NC filtered
+  symbols streams
+
+\*---------------------------------------------------------------------------*/
+
+void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NFILTER])
+{
+    int     c;
+    int     i,j,k;
+    float   acc;
+    COMP    gain;
+
+    gain.real = sqrt(2.0)/2.0;
+    gain.imag = 0.0;
+
+    for(c=0; c<NC+1; c++)
+	tx_filter_memory[c][NFILTER-1] = cmult(tx_symbols[c], gain);
+
+    /* 
+       tx filter each symbol, generate M filtered output samples for each symbol.
+       Efficient polyphase filter techniques used as tx_filter_memory is sparse
+    */
+
+    for(i=0; i<M; i++) {
+	for(c=0; c<NC+1; c++) {
+
+	    /* filter real sample of symbol for carrier c */
+
+	    acc = 0.0;
+	    for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
+		acc += M * tx_filter_memory[c][j].real * gt_alpha5_root[k];
+	    tx_baseband[c][i].real = acc;	
+
+	    /* filter imag sample of symbol for carrier c */
+
+	    acc = 0.0;
+	    for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
+		acc += M * tx_filter_memory[c][j].imag * gt_alpha5_root[k];
+	    tx_baseband[c][i].imag = acc;
+
+	}
+    }
+
+    /* shift memory, inserting zeros at end */
+
+    for(i=0; i<NFILTER-M; i++)
+	for(c=0; c<NC+1; c++)
+	    tx_filter_memory[c][i] = tx_filter_memory[c][i+M];
+
+    for(i=NFILTER-M; i<NFILTER; i++)
+	for(c=0; c<NC+1; c++) {
+	    tx_filter_memory[c][i].real = 0.0;
+	    tx_filter_memory[c][i].imag = 0.0;
+	}
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdm_upconvert()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 17/4/2012
+
+  Construct FDM signal by frequency shifting each filtered symbol
+  stream.  Returns complex signal so we can apply frequency offsets
+  easily.
+
+\*---------------------------------------------------------------------------*/
+
+void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq[])
+{
+    int  i,c;
+    COMP two = {2.0, 0.0};
+    COMP pilot;
+
+    for(i=0; i<M; i++) {
+	tx_fdm[i].real = 0.0;
+	tx_fdm[i].imag = 0.0;
+    }
+
+    /* Nc/2 tones below centre freq */
+  
+    for (c=0; c<NC/2; c++) 
+	for (i=0; i<M; i++) {
+	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
+	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
+	}
+
+    /* Nc/2 tones above centre freq */
+
+    for (c=NC/2; c<NC; c++) 
+	for (i=0; i<M; i++) {
+	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
+	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
+	}
+
+    /* add centre pilot tone  */
+
+    c = NC;
+    for (i=0; i<M; i++) {
+	phase_tx[c] = cmult(phase_tx[c],  freq[c]);
+	pilot = cmult(cmult(two, tx_baseband[c][i]), phase_tx[c]);
+	tx_fdm[i] = cadd(tx_fdm[i], pilot);
+    }
+
+    /*
+      Scale such that total Carrier power C of real(tx_fdm) = Nc.  This
+      excludes the power of the pilot tone.
+      We return the complex (single sided) signal to make frequency
+      shifting for the purpose of testing easier
+    */
+
+    for (i=0; i<M; i++) 
+	tx_fdm[i] = cmult(two, tx_fdm[i]);
+
+}
