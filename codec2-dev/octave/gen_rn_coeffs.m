@@ -27,7 +27,7 @@ function coeffs = gen_rn_coeffs(alpha, T, Rs, Nsym, M)
   Nfft = 4096;
   GF_alpha5 = fft(gt_alpha5,Nfft)/M;
 
-  % sqrt causes stop band to be amplifed, this hack pushes it down again
+  % sqrt causes stop band to be amplified, this hack pushes it down again
 
   for i=1:Nfft
     if (abs(GF_alpha5(i)) < 0.02)
