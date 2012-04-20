@@ -1,6 +1,8 @@
 % tfdmdv.m
 %
-% Octave script that evaluates the output of tfdmdv.c Unit Test program for FDMDV modem.
+% Octave script that tests the C port of the FDMDV modem.  This script loads
+% the output of unittest/tfdmdv.c and compares it to the output of the
+% reference versions of the same functions written in Octave.
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 
@@ -84,6 +86,21 @@ plot(imag(tx_fdm_log - tx_fdm_log_c),'g');
 hold off;
 title('tx fdm imag')
 
+figure(4)
+clf
+subplot(211)
+plot(real(pilot_lut_c));
+hold on;
+plot(real(pilot_lut - pilot_lut_c),'g');
+hold off;
+title('pilot lut real')
+subplot(212)
+plot(imag(pilot_lut_c));
+hold on;
+plot(imag(pilot_lut - pilot_lut_c),'g');
+hold off;
+title('pilot lut imag')
+
 if sum(tx_bits_log - tx_bits_log_c) == 0
   printf("fdmdv_get_test_bits..: OK\n");
   passes++;
@@ -105,6 +122,22 @@ if sum(tx_baseband_log - tx_baseband_log_c) < 1E-3
   passes++;
 else;
   printf("tx_filter............: FAIL\n");
+  fails++;
+end
+
+if sum(tx_fdm_log - tx_fdm_log_c) < 1E-3
+  printf("tx_fdm...............: OK\n");
+  passes++;
+else;
+  printf("tx_fdm...............: FAIL\n");
+  fails++;
+end
+
+if sum(pilot_lut - pilot_lut_c) < 1E-3
+  printf("pilot_lut............: OK\n");
+  passes++;
+else;
+  printf("pilot_lut............: FAIL\n");
   fails++;
 end
 
