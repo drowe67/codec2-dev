@@ -52,7 +52,7 @@ scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/ls
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
 
-tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
 

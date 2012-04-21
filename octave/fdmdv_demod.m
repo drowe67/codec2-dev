@@ -46,6 +46,7 @@ function fdmdv_demod(rawfilename, nbits)
   % Main loop ----------------------------------------------------
 
   for f=1:frames
+    
     % obtain nin samples of the test input signal
     
     for i=1:nin
@@ -134,7 +135,7 @@ function fdmdv_demod(rawfilename, nbits)
     test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
 
   end
-
+  
   % ---------------------------------------------------------------------
   % Print Stats
   % ---------------------------------------------------------------------
