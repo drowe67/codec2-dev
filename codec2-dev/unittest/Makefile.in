@@ -74,7 +74,8 @@ am_tcodec2_OBJECTS = tcodec2.$(OBJEXT) quantise.$(OBJEXT) \
 	interp.$(OBJEXT) pack.$(OBJEXT) $(am__objects_1)
 tcodec2_OBJECTS = $(am_tcodec2_OBJECTS)
 tcodec2_DEPENDENCIES =
-am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT)
+am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
+	kiss_fft.$(OBJEXT)
 tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
 tfdmdv_DEPENDENCIES =
 am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) fft.$(OBJEXT) \
@@ -269,7 +270,7 @@ tcodec2_LDFLAGS = $(LIBS)
 scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
-tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
 all: all-am

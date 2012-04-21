@@ -35,12 +35,16 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
 
 #include "fdmdv_internal.h"
 #include "fdmdv.h"
 #include "rn.h"
 #include "test_bits.h"
+#include "pilot_coeff.h"
+#include "fft.h"
+#include "hanning.h"
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -58,12 +62,32 @@ static COMP cneg(COMP a)
     return res;
 }
 
+static COMP cconj(COMP a)
+{
+    COMP res;
+
+    res.real = a.real;
+    res.imag = -a.imag;
+
+    return res;
+}
+
 static COMP cmult(COMP a, COMP b)
 {
     COMP res;
 
     res.real = a.real*b.real - a.imag*b.imag;
     res.imag = a.real*b.imag + a.imag*b.real;
+
+    return res;
+}
+
+static COMP fcmult(float a, COMP b)
+{
+    COMP res;
+
+    res.real = a*b.real;
+    res.imag = a*b.imag;
 
     return res;
 }
@@ -114,7 +138,7 @@ static void cbuf_shift_update(COMP buf[], COMP update[], int buflen, int updatel
 struct FDMDV *fdmdv_create(void)
 {
     struct FDMDV *f;
-    int           c, k;
+    int           c, i, k;
     float         carrier_freq;
 
     assert(FDMDV_BITS_PER_FRAME == NC*NB);
@@ -143,6 +167,8 @@ struct FDMDV *fdmdv_create(void)
 
    }
     
+    /* Set up frequency of each carrier */
+
     for(c=0; c<NC/2; c++) {
 	carrier_freq = (-NC/2 + c)*FSEP + FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
@@ -157,6 +183,24 @@ struct FDMDV *fdmdv_create(void)
 	
     f->freq[NC].real = cos(2.0*PI*FCENTRE/FS);
     f->freq[NC].imag = sin(2.0*PI*FCENTRE/FS);
+
+    /* Generate DBPSK pilot Look Up Table (LUT) */
+
+    generate_pilot_lut(f->pilot_lut, &f->freq[NC]);
+
+    /* Freq Offset estimation */
+
+    for(i=0; i<NPILOTBASEBAND; i++) {
+	f->pilot_baseband1[i].real = f->pilot_baseband2[i].real = 0.0;
+	f->pilot_baseband1[i].imag = f->pilot_baseband2[i].imag = 0.0;
+    }
+    f->pilot_lut_index = 0;
+    f->prev_pilot_lut_index = 3*M;
+    
+    for(i=0; i<NPILOTLPF; i++) {
+	f->pilot_lpf1[i].real = f->pilot_lpf2[i].real = 0.0;
+	f->pilot_lpf1[i].imag = f->pilot_lpf2[i].imag = 0.0;
+    }
 
     return f;
 }
@@ -366,4 +410,227 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
     for (i=0; i<M; i++) 
 	tx_fdm[i] = cmult(two, tx_fdm[i]);
 
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: generate_pilot_fdm()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 19/4/2012
+
+  Generate M samples of DBPSK pilot signal for Freq offset estimation
+
+\*---------------------------------------------------------------------------*/
+
+void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, 
+			float *filter_mem, COMP *phase, COMP *freq)
+{
+    int   i,j,k;
+    float tx_baseband[M];
+
+    /* +1 -1 +1 -1 DBPSK sync carrier, once filtered becomes (roughly)
+       two spectral lines at +/- RS/2 */
+ 
+    if (*bit)
+	*symbol = -*symbol;
+    else
+	*symbol = *symbol;
+    if (*bit) 
+	*bit = 0;
+    else
+	*bit = 1;
+
+    /* filter DPSK symbol to create M baseband samples */
+
+    filter_mem[NFILTER-1] = (sqrt(2)/2) * *symbol;
+    for(i=0; i<M; i++) {
+	tx_baseband[i] = 0.0; 
+	for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
+	    tx_baseband[i] += M * filter_mem[j] * gt_alpha5_root[k];
+    }
+
+    /* shift memory, inserting zeros at end */
+
+    for(i=0; i<NFILTER-M; i++)
+	filter_mem[i] = filter_mem[i+M];
+
+    for(i=NFILTER-M; i<NFILTER; i++)
+	filter_mem[i] = 0.0;
+
+    /* upconvert */
+
+    for(i=0; i<M; i++) {
+	*phase = cmult(*phase, *freq);
+	pilot_fdm[i].real = sqrt(2)*2*tx_baseband[i] * phase->real;
+	pilot_fdm[i].imag = sqrt(2)*2*tx_baseband[i] * phase->imag;
+    }
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: generate_pilot_lut()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 19/4/2012
+
+  Generate a 4M sample vector of DBPSK pilot signal.  As the pilot signal
+  is periodic in 4M samples we can then use this vector as a look up table
+  for pilot signal generation in the demod.
+
+\*---------------------------------------------------------------------------*/
+
+void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
+{
+    int   pilot_rx_bit = 0;
+    float pilot_symbol = sqrt(2.0);
+    COMP  pilot_phase  = {1.0, 0.0};
+    float pilot_filter_mem[NFILTER];
+    COMP  pilot[M];
+    int   i,f;
+
+    for(i=0; i<NFILTER; i++)
+	pilot_filter_mem[i] = 0.0;
+
+    /* discard first 4 symbols as filter memory is filling, just keep
+       last four symbols */
+
+    for(f=0; f<8; f++) {
+	generate_pilot_fdm(pilot, &pilot_rx_bit, &pilot_symbol, pilot_filter_mem, &pilot_phase, pilot_freq);
+	if (f >= 4)
+	    memcpy(&pilot_lut[M*(f-4)], pilot, M*sizeof(COMP));
+    }
+
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: lpf_peak_pick()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 20/4/2012
+
+  LPF and peak pick part of freq est, put in a function as we call it twice.
+
+\*---------------------------------------------------------------------------*/
+
+void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP s[], int nin)
+{
+    int   i,j,k;
+    int   mpilot;
+    float mag, imax;
+    int   ix;
+    float r;
+
+    /* LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset */
+
+    for(i=0; i<NPILOTLPF-nin; i++)
+	pilot_lpf[i] = pilot_lpf[nin+i];
+    for(i=NPILOTLPF-nin, j=0; i<NPILOTLPF; i++,j++) {
+	pilot_lpf[i].real = 0.0; pilot_lpf[i].imag = 0.0;
+	for(k=0; k<NPILOTCOEFF; k++)
+	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j+k]));
+    }
+
+    /* decimate to improve DFT resolution, window and DFT */
+
+    mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
+    for(i=0; i<MPILOTFFT; i++) {
+	s[i].real = 0.0; s[i].imag = 0.0;
+    }
+
+    for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
+	s[j] = fcmult(hanning[i], pilot_lpf[i]);
+	//s[j] = pilot_lpf[i];
+    }
+#ifdef TT
+    fft(&s[0].real, MPILOTFFT, 1);
+
+    /* peak pick and convert to Hz */
+
+    imax = 0.0;
+    ix = 0;
+    for(i=0; i<MPILOTFFT; i++) {
+	mag = s[i].real*s[i].real + s[i].imag*s[i].imag;
+	if (mag > imax) {
+	    imax = mag;
+	    ix = i;
+	}
+    }
+    r = 2.0*200.0/MPILOTFFT;     /* maps FFT bin to frequency in Hz */
+  
+    if (ix >= MPILOTFFT/2)
+	*foff = (ix - MPILOTFFT)*r;
+    else
+	*foff = (ix)*r;
+    *max = imax;
+#endif
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: rx_est_freq_offset()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 19/4/2012
+
+  Estimate frequency offset of FDM signal using BPSK pilot.  Note that
+  this algorithm is quite sensitive to pilot tone level wrt other
+  carriers, so test variations to the pilot amplitude carefully.
+
+\*---------------------------------------------------------------------------*/
+
+float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
+{
+    int  i,j;
+    COMP pilot[M+M/P];
+    COMP prev_pilot[M+M/P];
+    float foff, foff1, foff2;
+    float   max1, max2;
+
+    assert(nin <= M+M/P);
+
+    /* get pilot samples used for correlation/down conversion of rx signal */
+
+    for (i=0; i<nin; i++) {
+	pilot[i] = f->pilot_lut[f->pilot_lut_index];
+	f->pilot_lut_index++;
+	if (f->pilot_lut_index >= 4*M)
+	    f->pilot_lut_index = 0;
+	
+	prev_pilot[i] = f->pilot_lut[f->prev_pilot_lut_index];
+	f->prev_pilot_lut_index++;
+	if (f->prev_pilot_lut_index >= 4*M)
+	    f->prev_pilot_lut_index = 0;
+    }
+
+    /*
+      Down convert latest M samples of pilot by multiplying by ideal
+      BPSK pilot signal we have generated locally.  This peak of the
+      resulting signal is sensitive to the time shift between the
+      received and local version of the pilot, so we do it twice at
+      different time shifts and choose the maximum.
+    */
+
+    for(i=0; i<NPILOTBASEBAND-nin; i++) {
+	f->pilot_baseband1[i] = f->pilot_baseband1[i+nin];
+	f->pilot_baseband2[i] = f->pilot_baseband2[i+nin];
+    }
+
+    for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
+       	f->pilot_baseband1[j] = fcmult(rx_fdm[i], cconj(pilot[i]));
+	f->pilot_baseband2[j] = fcmult(rx_fdm[i], cconj(prev_pilot[i]));
+    }
+
+    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->s1, nin);
+    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->s2, nin);
+    //for(i=0; i<MPILOTFFT; i++) {
+    //	printf("%f %f\n", f->s1[i].real, f->s1[i].imag);
+    //}
+
+#ifdef T
+    if (max1 > max2)
+	foff = foff1;
+    else
+	foff = foff2;
+	
+    return foff;
+#endif
+    return 0;
 }
