@@ -13,6 +13,8 @@ fdmdv; % load modem code
  
 % Generate reference vectors using Octave implementation of FDMDV modem
 
+global passes;
+global fails;
 passes = fails = 0;
 frames = 25;
 prev_tx_symbols = ones(Nc+1,1);
@@ -27,8 +29,8 @@ pilot_baseband1_log = [];
 pilot_baseband2_log = [];
 pilot_lpf1_log = [];
 pilot_lpf2_log = [];
-s1_log = [];
-s2_log = [];
+S1_log = [];
+S2_log = [];
 
 for f=1:frames
 
@@ -50,14 +52,14 @@ for f=1:frames
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
 
-  [foff s1 s2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
+  [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
 
   pilot_baseband1_log = [pilot_baseband1_log pilot_baseband1];
   pilot_baseband2_log = [pilot_baseband2_log pilot_baseband2];
   pilot_lpf1_log = [pilot_lpf1_log pilot_lpf1];
   pilot_lpf2_log = [pilot_lpf2_log pilot_lpf2];
-  s1_log  = [s1_log s1];
-  s2_log  = [s2_log s2];
+  S1_log  = [S1_log S1];
+  S2_log  = [S2_log S2];
 
 end
 
@@ -128,69 +130,44 @@ plot_sig_and_error(5, 212, real(pilot_baseband2_log), real(pilot_baseband2_log -
 plot_sig_and_error(6, 211, real(pilot_lpf1_log), real(pilot_lpf1_log - pilot_lpf1_log_c), 'pilot lpf1 real' )
 plot_sig_and_error(6, 212, real(pilot_lpf2_log), real(pilot_lpf2_log - pilot_lpf2_log_c), 'pilot lpf2 real' )
 
-plot_sig_and_error(7, 211, real(s1_log), real(s1_log - s1_log_c), 's1 real' )
-plot_sig_and_error(7, 212, real(s2_log), real(s2_log - s2_log_c), 's2 real' )
+plot_sig_and_error(7, 211, real(S1_log), real(S1_log - S1_log_c), 'S1 real' )
+plot_sig_and_error(7, 212, imag(S1_log), imag(S1_log - S1_log_c), 'S1 imag' )
+
+plot_sig_and_error(8, 211, real(S2_log), real(S2_log - S2_log_c), 'S2 real' )
+plot_sig_and_error(8, 212, imag(S2_log), imag(S2_log - S2_log_c), 'S2 imag' )
 
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
 % ---------------------------------------------------------------------------------------
 
-if sum(tx_bits_log - tx_bits_log_c) == 0
-  printf("fdmdv_get_test_bits..: OK\n");
-  passes++;
-else;
-  printf("fdmdv_get_test_bits..: FAIL\n");
-  fails++;
-end
- 
-if sum(tx_symbols_log - tx_symbols_log_c) == 0
-  printf("bits_to_dqpsk_symbols: OK\n");
-  passes++;
-else;
-  printf("bits_to_dqpsk_symbols: FAIL\n");
-  fails++;
-end
+function check(a, b, test_name)
+  global passes;
+  global fails;
 
-if sum(tx_baseband_log - tx_baseband_log_c) < 1E-3
-  printf("tx_filter............: OK\n");
-  passes++;
-else;
-  printf("tx_filter............: FAIL\n");
-  fails++;
-end
+  [m n] = size(a);
+  printf("%s", test_name);
+  for i=1:(25-length(test_name))
+    printf(".");
+  end
+  printf(": ");  
 
-if sum(tx_fdm_log - tx_fdm_log_c) < 1E-3
-  printf("tx_fdm...............: OK\n");
-  passes++;
-else;
-  printf("tx_fdm...............: FAIL\n");
-  fails++;
-end
+  if sum(a - b)/n < 1E-3
+    printf("OK\n");
+    passes++;
+  else
+    printf("FAIL\n");
+    fails++;
+  end
+endfunction
 
-if sum(pilot_lut - pilot_lut_c) < 1E-3
-  printf("pilot_lut............: OK\n");
-  passes++;
-else;
-  printf("pilot_lut............: FAIL\n");
-  fails++;
-end
-
-[m n] = size(pilot_baseband1_log);
-if sum(pilot_baseband1_log - pilot_baseband1_log_c)/n < 1E-3
-  printf("pilot_baseband1_log..: OK\n");
-  passes++;
-else;
-  printf("pilot_baseband1_log..: FAIL\n");
-  fails++;
-end
-
-[m n] = size(pilot_baseband2_log);
-if sum(pilot_baseband2_log - pilot_baseband2_log_c)/n < 1E-3
-  printf("pilot_baseband2_log..: OK\n");
-  passes++;
-else;
-  printf("pilot_baseband2_log..: FAIL\n");
-  fails++;
-end
+check(tx_bits_log, tx_bits_log_c, 'fdmdv_get_test_bits');
+check(tx_symbols_log,  tx_symbols_log_c, 'bits_to_dqpsk_symbols');
+check(tx_baseband_log, tx_baseband_log_c, 'tx_filter');
+check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
+check(pilot_lut, pilot_lut_c, 'pilot_lut');
+check(pilot_baseband1_log, pilot_baseband1_log_c, 'pilot lpf1');
+check(pilot_baseband2_log, pilot_baseband2_log_c, 'pilot lpf2');
+check(S1_log, S1_log_c, 'S1');
+check(S2_log, S2_log_c, 'S2');
 
 printf("\npasses: %d fails: %d\n", passes, fails);

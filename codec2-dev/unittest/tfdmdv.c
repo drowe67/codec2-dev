@@ -60,8 +60,8 @@ int main(int argc, char *argv[])
     COMP          pilot_baseband2_log[NPILOTBASEBAND*FRAMES];
     COMP          pilot_lpf1_log[NPILOTLPF*FRAMES];
     COMP          pilot_lpf2_log[NPILOTLPF*FRAMES];
-    COMP          s1_log[32*FRAMES];
-    COMP          s2_log[32*FRAMES];
+    COMP          S1_log[MPILOTFFT*FRAMES];
+    COMP          S2_log[MPILOTFFT*FRAMES];
 
     FILE         *fout;
     int           f,c,i;
@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
 	memcpy(&pilot_baseband2_log[f*NPILOTBASEBAND], fdmdv->pilot_baseband2, sizeof(COMP)*NPILOTBASEBAND);
 	memcpy(&pilot_lpf1_log[f*NPILOTLPF], fdmdv->pilot_lpf1, sizeof(COMP)*NPILOTLPF);
 	memcpy(&pilot_lpf2_log[f*NPILOTLPF], fdmdv->pilot_lpf2, sizeof(COMP)*NPILOTLPF);
-	memcpy(&s1_log[f*32], fdmdv->s1, sizeof(COMP)*32);
-	memcpy(&s2_log[f*32], fdmdv->s2, sizeof(COMP)*32);
+	memcpy(&S1_log[f*MPILOTFFT], fdmdv->S1, sizeof(COMP)*MPILOTFFT);
+	memcpy(&S2_log[f*MPILOTFFT], fdmdv->S2, sizeof(COMP)*MPILOTFFT);
     }
 
     /* dump logs to Octave file for evaluation by tfdmdv.m Octave script */
@@ -115,8 +115,8 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "pilot_baseband2_log_c", pilot_baseband2_log, 1, NPILOTBASEBAND*FRAMES);  
     octave_save_complex(fout, "pilot_lpf1_log_c", pilot_lpf1_log, 1, NPILOTLPF*FRAMES);  
     octave_save_complex(fout, "pilot_lpf2_log_c", pilot_lpf2_log, 1, NPILOTLPF*FRAMES);  
-    octave_save_complex(fout, "s1_log_c", s1_log, 1, 32*FRAMES);  
-    octave_save_complex(fout, "s2_log_c", s2_log, 1, 32*FRAMES);  
+    octave_save_complex(fout, "S1_log_c", S1_log, 1, MPILOTFFT*FRAMES);  
+    octave_save_complex(fout, "S2_log_c", S2_log, 1, MPILOTFFT*FRAMES);  
     fclose(fout);
 
     codec2_destroy(fdmdv);
