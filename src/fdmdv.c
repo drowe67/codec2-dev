@@ -511,7 +511,7 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 
 \*---------------------------------------------------------------------------*/
 
-void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP s[], int nin)
+void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP S[], int nin)
 {
     int   i,j,k;
     int   mpilot;
@@ -533,22 +533,20 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lp
 
     mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
     for(i=0; i<MPILOTFFT; i++) {
-	s[i].real = 0.0; s[i].imag = 0.0;
+	S[i].real = 0.0; S[i].imag = 0.0;
+    }
+    for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
+	S[j] = fcmult(hanning[i], pilot_lpf[i]);
     }
 
-    for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
-	s[j] = fcmult(hanning[i], pilot_lpf[i]);
-	//s[j] = pilot_lpf[i];
-    }
-#ifdef TT
-    fft(&s[0].real, MPILOTFFT, 1);
+    fft(&S[0].real, MPILOTFFT, -1);
 
     /* peak pick and convert to Hz */
 
     imax = 0.0;
     ix = 0;
     for(i=0; i<MPILOTFFT; i++) {
-	mag = s[i].real*s[i].real + s[i].imag*s[i].imag;
+	mag = sqrt(S[i].real*S[i].real + S[i].imag*S[i].imag);
 	if (mag > imax) {
 	    imax = mag;
 	    ix = i;
@@ -561,7 +559,7 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lp
     else
 	*foff = (ix)*r;
     *max = imax;
-#endif
+
 }
 
 /*---------------------------------------------------------------------------*\
@@ -618,19 +616,13 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 	f->pilot_baseband2[j] = fcmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
-    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->s1, nin);
-    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->s2, nin);
-    //for(i=0; i<MPILOTFFT; i++) {
-    //	printf("%f %f\n", f->s1[i].real, f->s1[i].imag);
-    //}
+    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->S1, nin);
+    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->S2, nin);
 
-#ifdef T
     if (max1 > max2)
 	foff = foff1;
     else
 	foff = foff2;
 	
     return foff;
-#endif
-    return 0;
 }

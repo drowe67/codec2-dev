@@ -240,41 +240,6 @@ function rx_filt = rx_filter(rx_baseband, nin)
 endfunction
 
 
-% Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
-% sensitive to pilot tone level wrt other carriers
-
-function [foff s1 s2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
-  global M;
-  global Npilotbaseband;
-  global pilot_baseband1;
-  global pilot_baseband2;
-  global pilot_lpf1;
-  global pilot_lpf2;
-
-  % down convert latest nin samples of pilot by multiplying by
-  % ideal BPSK pilot signal we have generated locally.  This
-  % peak of the resulting signal is sensitive to the time shift between 
-  % the received and local version of the pilot, so we do it twice at
-  % different time shifts and choose the maximum.
- 
-  pilot_baseband1(1:Npilotbaseband-nin) = pilot_baseband1(nin+1:Npilotbaseband);
-  pilot_baseband2(1:Npilotbaseband-nin) = pilot_baseband2(nin+1:Npilotbaseband);
-  for i=1:nin
-    pilot_baseband1(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot(i)); 
-    pilot_baseband2(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot_prev(i)); 
-  end
-
-  [foff1 max1 pilot_lpf1 s1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin);
-  [foff2 max2 pilot_lpf2 s2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin);
-
-  if max1 > max2
-    foff = foff1;
-  else
-    foff = foff2;
-  end  
-endfunction
-
-
 % LPF and peak pick part of freq est, put in a function as we call it twice
 
 function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
@@ -299,7 +264,8 @@ function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
   Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
   h = hanning(Npilotlpf);
   s = pilot_lpf(1:Mpilot:Npilotlpf) .* h(1:Mpilot:Npilotlpf)';
-  S = abs(fft(s, Mpilotfft));
+  s = [s zeros(1,Mpilotfft-Npilotlpf/Mpilot)];
+  S = fft(s, Mpilotfft);
 
   % peak pick and convert to Hz
 
@@ -312,6 +278,41 @@ function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
     foff = (ix - 1)*r;
   endif
 
+endfunction
+
+
+% Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
+% sensitive to pilot tone level wrt other carriers
+
+function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
+  global M;
+  global Npilotbaseband;
+  global pilot_baseband1;
+  global pilot_baseband2;
+  global pilot_lpf1;
+  global pilot_lpf2;
+
+  % down convert latest nin samples of pilot by multiplying by
+  % ideal BPSK pilot signal we have generated locally.  This
+  % peak of the resulting signal is sensitive to the time shift between 
+  % the received and local version of the pilot, so we do it twice at
+  % different time shifts and choose the maximum.
+ 
+  pilot_baseband1(1:Npilotbaseband-nin) = pilot_baseband1(nin+1:Npilotbaseband);
+  pilot_baseband2(1:Npilotbaseband-nin) = pilot_baseband2(nin+1:Npilotbaseband);
+  for i=1:nin
+    pilot_baseband1(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot(i)); 
+    pilot_baseband2(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot_prev(i)); 
+  end
+
+  [foff1 max1 pilot_lpf1 S1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin);
+  [foff2 max2 pilot_lpf2 S2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin);
+
+  if max1 > max2
+    foff = foff1;
+  else
+    foff = foff2;
+  end  
 endfunction
 
 
