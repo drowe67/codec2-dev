@@ -172,7 +172,7 @@ function tx_fdm = fdm_upconvert(tx_filt)
 endfunction
 
 
-% Frequency shift each modem carrier down to Nc baseband signals
+% Frequency shift each modem carrier down to Nc+1 baseband signals
 
 function rx_baseband = fdm_downconvert(rx_fdm, nin)
   global Fs;

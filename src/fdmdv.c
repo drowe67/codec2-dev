@@ -156,6 +156,8 @@ struct FDMDV *fdmdv_create(void)
 	for(k=0; k<NFILTER; k++) {
 	    f->tx_filter_memory[c][k].real = 0.0;
 	    f->tx_filter_memory[c][k].imag = 0.0;
+	    f->rx_filter_memory[c][k].real = 0.0;
+	    f->rx_filter_memory[c][k].imag = 0.0;
 	}
 
 	/* Spread initial FDM carrier phase out as far as possible.
@@ -164,6 +166,8 @@ struct FDMDV *fdmdv_create(void)
 	
 	f->phase_tx[c].real = cos(2.0*PI*c/(NC+1));
  	f->phase_tx[c].imag = sin(2.0*PI*c/(NC+1));
+	f->phase_rx[c].real = 1.0;
+ 	f->phase_rx[c].imag = 0.0;
 
    }
     
@@ -546,7 +550,7 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lp
     imax = 0.0;
     ix = 0;
     for(i=0; i<MPILOTFFT; i++) {
-	mag = sqrt(S[i].real*S[i].real + S[i].imag*S[i].imag);
+	mag = S[i].real*S[i].real + S[i].imag*S[i].imag;
 	if (mag > imax) {
 	    imax = mag;
 	    ix = i;
@@ -600,7 +604,7 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 
     /*
       Down convert latest M samples of pilot by multiplying by ideal
-      BPSK pilot signal we have generated locally.  This peak of the
+      BPSK pilot signal we have generated locally.  The peak of the
       resulting signal is sensitive to the time shift between the
       received and local version of the pilot, so we do it twice at
       different time shifts and choose the maximum.
@@ -625,4 +629,100 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 	foff = foff2;
 	
     return foff;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdm_downconvert()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22/4/2012
+
+  Frequency shift each modem carrier down to Nc+1 baseband signals.
+
+\*---------------------------------------------------------------------------*/
+
+void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
+{
+    int  i,c;
+    COMP pilot;
+
+    /* maximum number of input samples to demod */
+
+    assert(nin < (M+M/P));
+
+    /* Nc/2 tones below centre freq */
+  
+    for (c=0; c<NC/2; c++) 
+	for (i=0; i<nin; i++) {
+	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
+	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
+	}
+
+    /* Nc/2 tones above centre freq */
+
+    for (c=NC/2; c<NC; c++) 
+	for (i=0; i<M; i++) {
+	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
+	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
+	}
+
+    /* add centre pilot tone  */
+
+    c = NC;
+    for (i=0; i<M; i++) {
+	phase_rx[c] = cmult(phase_rx[c],  freq[c]);
+	rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
+    }
+
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: rx_filter()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22/4/2012
+
+  Receive filter each baseband signal at oversample rate P.  Filtering at
+  rate P lowers CPU compared to rate M.
+
+  Depending on the number of input samples to the demod nin, we
+  produce P-1, P (usually), or P+1 filtered samples at rate P.  nin is
+  occasionally adjusted to compensate for timing slips due to
+  different tx and rx sample clocks.
+
+\*---------------------------------------------------------------------------*/
+
+void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin)
+{
+    int c, i,j,k,l;
+    int n=M/P;
+
+    /* rx filter each symbol, generate P filtered output samples for
+       each symbol.  Note we keep filter memory at rate M, it's just
+       the filter output at rate P */
+
+    for(i=0, j=0; i<nin; i+=n,j++) {
+
+	/* latest input sample */
+	
+	for(c=0; c<NC+1; c++)
+	    for(k=NFILTER-n,l=i; k<NFILTER; k++,l++)	
+		rx_filter_memory[c][k] = rx_baseband[c][l];
+	
+	/* convolution (filtering) */
+
+	for(c=0; c<NC+1; c++) {
+	    rx_filt[c][j].real = 0.0; rx_filt[c][j].imag = 0.0;
+	    for(k=0; k<NFILTER; k++) 
+		rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root[k], rx_filter_memory[c][k]));
+	}
+
+	/* make room for next input sample */
+	
+	for(c=0; c<NC+1; c++)
+	    for(k=0,l=n; k<NFILTER-n; k++,l++)	
+		rx_filter_memory[c][k] = rx_filter_memory[c][l];
+    }
+
+    assert(j <= (P+1)); /* check for any over runs */
 }
