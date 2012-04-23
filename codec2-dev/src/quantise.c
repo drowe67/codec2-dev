@@ -410,7 +410,7 @@ void compute_weights(const float *x, float *w, int ndim)
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
-  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], PI-x[ndim-1]);
   
   for (i=0;i<ndim;i++)
     w[i] = 1./(.01+w[i]);
@@ -470,7 +470,7 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
-  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], PI-x[ndim-1]);
   
   compute_weights(x, w, ndim);
   
@@ -1157,7 +1157,7 @@ void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim)
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
-  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
+  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], PI-x[ndim-1]);
   
   compute_weights(x, w, ndim);
   
