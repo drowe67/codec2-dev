@@ -197,10 +197,10 @@ float nlp(
   float  Sn[],			/* input speech vector */
   int    n,			/* frames shift (no. new samples in Sn[]) */
   int    m,			/* analysis window size */
-  int    pmin __attribute__((unused)), /* minimum pitch value */
+  int    pmin,                  /* minimum pitch value */
   int    pmax,			/* maximum pitch value */
   float *pitch,			/* estimated pitch period in samples */
-  COMP   Sw[] __attribute__((unused)), /* Freq domain version of Sn[] */
+  COMP   Sw[],                  /* Freq domain version of Sn[] */
   float *prev_Wo
 )
 {
@@ -307,7 +307,7 @@ float nlp(
 \*---------------------------------------------------------------------------*/
 
 float post_process_sub_multiples(COMP Fw[], 
-				 int pmin __attribute__((unused)), int pmax, float gmax, int gmax_bin,
+				 int pmin, int pmax, float gmax, int gmax_bin,
 				 float *prev_Wo)
 {
     int   min_bin, cmax_bin;

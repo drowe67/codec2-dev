@@ -166,10 +166,19 @@ struct FDMDV *fdmdv_create(void)
 	
 	f->phase_tx[c].real = cos(2.0*PI*c/(NC+1));
  	f->phase_tx[c].imag = sin(2.0*PI*c/(NC+1));
+
 	f->phase_rx[c].real = 1.0;
  	f->phase_rx[c].imag = 0.0;
 
-   }
+	for(k=0; k<NT*P; k++) {
+	    f->rx_filter_mem_timing[c][k].real = 0.0;
+	    f->rx_filter_mem_timing[c][k].imag = 0.0;
+	}
+ 	for(k=0; k<NFILTERTIMING; k++) {
+	    f->rx_baseband_mem_timing[c][k].real = 0.0;
+	    f->rx_baseband_mem_timing[c][k].imag = 0.0;
+	}
+  }
     
     /* Set up frequency of each carrier */
 
@@ -725,4 +734,107 @@ void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_f
     }
 
     assert(j <= (P+1)); /* check for any over runs */
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: rx_est_timing()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 23/4/2012
+
+  Estimate optimum timing offset, re-filter receive symbols at optimum
+  timing estimate.
+
+\*---------------------------------------------------------------------------*/
+
+float rx_est_timing(COMP rx_symbols[], 
+		    COMP rx_filt[NC+1][P+1], 
+		    COMP rx_baseband[NC+1][M+M/P], 
+		    COMP rx_filter_mem_timing[NC+1][NT*P], 
+		    float env[],
+		    COMP rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
+		    int nin)	 
+{
+    int   c,i,j,k;
+    int   adjust, s;
+    COMP  x, phase, freq;
+    float rx_timing;
+
+    /*
+      nin  adjust 
+      --------------------------------
+      120  -1 (one less rate P sample)
+      160   0 (nominal)
+      200   1 (one more rate P sample)
+    */
+
+    adjust = P - nin*P/M;
+
+    /* update buffer of NT rate P filtered symbols */
+    
+    for(c=0; c<NC+1; c++) 
+	for(i=0,j=P-adjust; i<(NT-1)*P+adjust; i++,j++)
+	    rx_filter_mem_timing[c][i] = rx_filter_mem_timing[c][j];
+    for(c=0; c<NC+1; c++) 
+	for(i=(NT-1)*P+adjust,j=0; i<NT*P; i++,j++)
+	    rx_filter_mem_timing[c][i] = rx_filt[c][j];
+	    
+    /* sum envelopes of all carriers */
+
+    for(i=0; i<NT*P; i++) {
+	env[i] = 0.0;
+	for(c=0; c<NC+1; c++)
+	    env[i] += sqrt(pow(rx_filter_mem_timing[c][i].real,2.0) + pow(rx_filter_mem_timing[c][i].imag,2.0));
+    }
+
+    /* The envelope has a frequency component at the symbol rate.  The
+       phase of this frequency component indicates the timing.  So work
+       out single DFT at frequency 2*pi/P */
+
+    x.real = 0.0; x.imag = 0.0;
+    freq.real = cos(2*PI/P);
+    freq.imag = sin(2*PI/P);
+    phase.real = 1.0;
+    phase.imag = 0.0;
+
+    for(i=0; i<NT*P; i++) {
+	x = cadd(x, fcmult(env[i], phase));
+	phase = cmult(phase, freq);
+    }
+
+    /* Map phase to estimated optimum timing instant at rate M.  The
+       M/4 part was adjusted by experiment, I know not why.... */
+    
+    rx_timing = atan2(x.imag, x.real)*M/(2*PI) + M/4;
+    if (rx_timing > M)
+	rx_timing -= M;
+    if (rx_timing < -M)
+	rx_timing += M;
+   
+    /* rx_filt_mem_timing contains M + Nfilter + M samples of the
+       baseband signal at rate M this enables us to resample the
+       filtered rx symbol with M sample precision once we have
+       rx_timing */
+
+    for(c=0; c<NC+1; c++) 
+	for(i=0,j=nin; i<NFILTERTIMING-nin; i++,j++)
+	    rx_baseband_mem_timing[c][i] = rx_filter_mem_timing[c][j];
+    for(c=0; c<NC+1; c++) 
+	for(i=NFILTERTIMING-nin,j=0; i<NFILTERTIMING; i++,j++)
+	    rx_baseband_mem_timing[c][i] = rx_baseband[c][j];
+
+    /* rx filter to get symbol for each carrier at estimated optimum
+       timing instant.  We use rate M filter memory to get fine timing
+       resolution. */
+
+    s = round(rx_timing) + M;
+    for(c=0; c<NC+1; c++) {
+	rx_symbols[c].real = 0.0;
+	rx_symbols[c].imag = 0.0;
+	for(k=s,j=0; k<s+NFILTER; k++,j++)
+	    rx_symbols[c] = cadd(rx_symbols[c], fcmult(gt_alpha5_root[j], rx_baseband_mem_timing[c][k]));
+    }
+    printf("rx_symbols[0] = %f %f\n", rx_symbols[0].real, rx_symbols[0].imag);
+	
+    return rx_timing;
 }
