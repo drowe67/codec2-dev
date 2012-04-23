@@ -242,7 +242,7 @@ void lspd_quantise(
 void lspvq_quantise(
   float lsp[], 
   float lsp_[],
-  int   order __attribute__((unused))
+  int   order
 ) 
 {
     int   i,k,m,ncb, nlsp;
@@ -299,7 +299,7 @@ void lspvq_quantise(
 
 \*---------------------------------------------------------------------------*/
 
-void lspjnd_quantise(float lsps[], float lsps_[], int order __attribute__((unused))) 
+void lspjnd_quantise(float lsps[], float lsps_[], int order) 
 {
     int   i,k,m;
     float  wt[LPC_ORD], lsps_hz[LPC_ORD];
@@ -363,7 +363,7 @@ void compute_weights(const float *x, float *w, int ndim);
 
 \*---------------------------------------------------------------------------*/
 
-void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode __attribute__((unused)))
+void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
 {
     int   i;
     float wt[LPC_ORD];
@@ -661,7 +661,7 @@ void aks_to_M2(
   MODEL *model,	/* sinusoidal model parameters for this frame */
   float  E,	/* energy term */
   float *snr,	/* signal to noise ratio for this frame in dB */
-  int    dump __attribute__((unused)) /* true to dump sample to dump file */
+  int    dump   /* true to dump sample to dump file */
 )
 {
   COMP Pw[FFT_DEC];	/* power spectrum */
@@ -1073,7 +1073,7 @@ void decode_lsps_diff_freq_vq(float lsp_[], int indexes[], int order)
 void encode_lsps_diff_time_vq(int indexes[], 
 			      float lsps[], 
 			      float lsps__prev[], 
-			      int order __attribute__((unused)))
+			      int order)
 {
     int    i,k,m;
     float  lsps_dt[LPC_ORD];
@@ -1426,7 +1426,7 @@ float decode_amplitudes(MODEL *model,
 
 static float ge_coeff[2] = {0.8, 0.9};
 
-void compute_weights2(const float *x, const float *xp, float *w, int ndim __attribute__((unused)))
+void compute_weights2(const float *x, const float *xp, float *w, int ndim)
 {
   w[0] = 30;
   w[1] = 1;

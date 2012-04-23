@@ -53,7 +53,7 @@
 
 #define NT                       5  /* number of symbols we estimate timing over                            */
 #define P                        4  /* oversample factor used for initial rx symbol filtering               */
-#define NFILTERTIMING (M+Nfilter+M) /* filter memory used for resampling after timing estimation            */
+#define NFILTERTIMING (M+NFILTER+M) /* filter memory used for resampling after timing estimation            */
 
 #define NTEST_BITS        (NC*NB*4) /* length of test bit sequence */
 
@@ -91,7 +91,8 @@ struct FDMDV {
 
     COMP phase_rx[NC+1];
     COMP rx_filter_memory[NC+1][NFILTER];
-
+    COMP rx_filter_mem_timing[NC+1][NT*P];
+    COMP rx_baseband_mem_timing[NC+1][NFILTERTIMING];
 };
 
 /*---------------------------------------------------------------------------*\
@@ -109,5 +110,12 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin);
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP S[], int nin);
 void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
+float rx_est_timing(COMP  rx_symbols[], 
+		   COMP  rx_filt[NC+1][P+1], 
+		   COMP  rx_baseband[NC+1][M+M/P], 
+		   COMP  rx_filter_mem_timing[NC+1][NT*P], 
+		   float env[],
+		   COMP  rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
+		   int   nin);	 
 
 #endif
