@@ -31,6 +31,9 @@ pilot_lpf1_log = [];
 pilot_lpf2_log = [];
 S1_log = [];
 S2_log = [];
+foff_log = [];
+rx_baseband_log = [];
+rx_filt_log = [];
 
 for f=1:frames
 
@@ -53,6 +56,7 @@ for f=1:frames
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
 
   [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
+  foff_log = [foff_log foff];
 
   pilot_baseband1_log = [pilot_baseband1_log pilot_baseband1];
   pilot_baseband2_log = [pilot_baseband2_log pilot_baseband2];
@@ -60,6 +64,11 @@ for f=1:frames
   pilot_lpf2_log = [pilot_lpf2_log pilot_lpf2];
   S1_log  = [S1_log S1];
   S2_log  = [S2_log S2];
+
+  rx_baseband = fdm_downconvert(rx_fdm, M);
+  rx_baseband_log = [rx_baseband_log rx_baseband];
+  rx_filt = rx_filter(rx_baseband, M);
+  rx_filt_log = [rx_filt_log rx_filt];
 
 end
 
@@ -136,6 +145,15 @@ plot_sig_and_error(7, 212, imag(S1_log), imag(S1_log - S1_log_c), 'S1 imag' )
 plot_sig_and_error(8, 211, real(S2_log), real(S2_log - S2_log_c), 'S2 real' )
 plot_sig_and_error(8, 212, imag(S2_log), imag(S2_log - S2_log_c), 'S2 imag' )
 
+plot_sig_and_error(9, 211, real(foff_log), real(foff_log - foff_log_c), 'Freq Offset' )
+
+c=10;
+plot_sig_and_error(10, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
+plot_sig_and_error(10, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
+
+plot_sig_and_error(11, 211, real(rx_filt_log(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt real' )
+plot_sig_and_error(11, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt imag' )
+
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
 % ---------------------------------------------------------------------------------------
@@ -169,5 +187,8 @@ check(pilot_baseband1_log, pilot_baseband1_log_c, 'pilot lpf1');
 check(pilot_baseband2_log, pilot_baseband2_log_c, 'pilot lpf2');
 check(S1_log, S1_log_c, 'S1');
 check(S2_log, S2_log_c, 'S2');
+check(foff_log, foff_log_c, 'rx_est_freq_offset');
+check(rx_baseband_log, rx_baseband_log_c, 'fdm_downconvert');
+check(rx_filt_log, rx_filt_log_c, 'fdm_downconvert');
 
 printf("\npasses: %d fails: %d\n", passes, fails);

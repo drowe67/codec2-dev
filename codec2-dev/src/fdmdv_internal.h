@@ -71,6 +71,7 @@
 
 struct FDMDV {
     int  current_test_bit;
+
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
     COMP tx_filter_memory[NC+1][NFILTER];
@@ -87,6 +88,10 @@ struct FDMDV {
     COMP pilot_lpf2[NPILOTLPF];
     COMP S1[MPILOTFFT];
     COMP S2[MPILOTFFT];
+
+    COMP phase_rx[NC+1];
+    COMP rx_filter_memory[NC+1][NFILTER];
+
 };
 
 /*---------------------------------------------------------------------------*\
@@ -102,5 +107,7 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);
 float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin);
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP S[], int nin);
+void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
+void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
 
 #endif
