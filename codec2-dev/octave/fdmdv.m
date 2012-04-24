@@ -318,7 +318,7 @@ endfunction
 
 % Estimate optimum timing offset, re-filter receive symbols
 
-function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin)
+function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
   global M;
   global Nt;
   global Nc;
@@ -365,7 +365,7 @@ function [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin)
      rx_timing += M;
   end
 
-  % rx_filt_mem_timing contains M + Nfilter + M samples of the
+  % rx_baseband_mem_timing contains M + Nfilter + M samples of the
   % baseband signal at rate M this enables us to resample the filtered
   % rx symbol with M sample precision once we have rx_timing
 

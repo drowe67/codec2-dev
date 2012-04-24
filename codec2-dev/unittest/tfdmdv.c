@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
 {
     struct FDMDV *fdmdv;
     int           tx_bits[FDMDV_BITS_PER_FRAME];
-    COMP          tx_symbols[(NC+1)];
-    COMP          tx_baseband[(NC+1)][M];
+    COMP          tx_symbols[NC+1];
+    COMP          tx_baseband[NC+1][M];
     COMP          tx_fdm[M];
     float         rx_fdm[M+M/P];
     float         foff;
@@ -58,6 +58,9 @@ int main(int argc, char *argv[])
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
+    float         rx_timing;
+    float         env[NT*P];
+    COMP          rx_symbols[NC+1];
 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
@@ -74,7 +77,10 @@ int main(int argc, char *argv[])
     int           rx_baseband_log_col_index;
     COMP          rx_filt_log[NC+1][(P+1)*FRAMES];
     int           rx_filt_log_col_index;
-
+    float         env_log[NT*P*FRAMES];
+    float         rx_timing_log[FRAMES];
+    COMP          rx_symbols_log[NC+1][FRAMES];
+			  
     FILE         *fout;
     int           f,c,i;
 
@@ -117,6 +123,7 @@ int main(int argc, char *argv[])
 	
 	fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
+	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
 
 	/* save log of outputs ------------------------------------------------------*/
 
@@ -135,7 +142,7 @@ int main(int argc, char *argv[])
 	memcpy(&pilot_lpf2_log[f*NPILOTLPF], fdmdv->pilot_lpf2, sizeof(COMP)*NPILOTLPF);
 	memcpy(&S1_log[f*MPILOTFFT], fdmdv->S1, sizeof(COMP)*MPILOTFFT);
 	memcpy(&S2_log[f*MPILOTFFT], fdmdv->S2, sizeof(COMP)*MPILOTFFT);
- 	memcpy(&foff_log[f], &foff, sizeof(float));
+ 	foff_log[f] = foff;
 
 	/* rx down conversion */
 
@@ -153,6 +160,12 @@ int main(int argc, char *argv[])
 	}
 	rx_filt_log_col_index += (P*M)/nin;
 
+	/* timing estimation */
+
+	memcpy(&env_log[NT*P*f], env, sizeof(float)*NT*P);
+	rx_timing_log[f] = rx_timing;
+	for(c=0; c<NC+1; c++)
+	    rx_symbols_log[c][f] = rx_symbols[c];
     }
 
     /* dump logs to Octave file for evaluation by tfdmdv.m Octave script */
@@ -174,6 +187,9 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "foff_log_c", foff_log, 1, FRAMES);  
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, (NC+1), rx_baseband_log_col_index, (M+M/P)*FRAMES);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, (NC+1), rx_filt_log_col_index, (P+1)*FRAMES);  
+    octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES);  
+    octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES);  
+    octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (NC+1), FRAMES, FRAMES);  
     fclose(fout);
 
     codec2_destroy(fdmdv);
