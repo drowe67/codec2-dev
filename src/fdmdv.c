@@ -818,11 +818,11 @@ float rx_est_timing(COMP rx_symbols[],
 
     for(c=0; c<NC+1; c++) 
 	for(i=0,j=nin; i<NFILTERTIMING-nin; i++,j++)
-	    rx_baseband_mem_timing[c][i] = rx_filter_mem_timing[c][j];
+	    rx_baseband_mem_timing[c][i] = rx_baseband_mem_timing[c][j];
     for(c=0; c<NC+1; c++) 
 	for(i=NFILTERTIMING-nin,j=0; i<NFILTERTIMING; i++,j++)
 	    rx_baseband_mem_timing[c][i] = rx_baseband[c][j];
-
+    
     /* rx filter to get symbol for each carrier at estimated optimum
        timing instant.  We use rate M filter memory to get fine timing
        resolution. */
