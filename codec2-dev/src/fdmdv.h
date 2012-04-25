@@ -56,7 +56,7 @@ void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[],
 void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync, float rx_fdm[], int *nin);
     
 void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
-void          fdmdv_put_test_bits(struct FDMDV *fdmdv_state, int rx_bits[]);
+void          fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bits[]);
     
 float         fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void          fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);

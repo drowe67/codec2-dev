@@ -18,6 +18,7 @@ global fails;
 passes = fails = 0;
 frames = 25;
 prev_tx_symbols = ones(Nc+1,1);
+prev_rx_symbols = ones(Nc+1,1);
 
 % Octave outputs we want to collect for comparison to C version
 
@@ -37,6 +38,9 @@ rx_filt_log = [];
 env_log = [];
 rx_timing_log = [];
 rx_symbols_log = [];
+rx_bits_log = []; 
+ferr_log = [];
+sync_bit_log = [];  
 
 for f=1:frames
 
@@ -70,12 +74,21 @@ for f=1:frames
 
   rx_baseband = fdm_downconvert(rx_fdm, M);
   rx_baseband_log = [rx_baseband_log rx_baseband];
+
   rx_filt = rx_filter(rx_baseband, M);
   rx_filt_log = [rx_filt_log rx_filt];
+
   [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, M);
   env_log = [env_log env];
+
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
+
+  [rx_bits sync_bit ferr] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  prev_rx_symbols = rx_symbols;
+  rx_bits_log = [rx_bits_log rx_bits]; 
+  ferr_log = [ferr_log ferr];
+  sync_bit_log = [sync_bit_log sync_bit];  
 end
 
 % Compare to the output from the C version
@@ -154,7 +167,7 @@ plot_sig_and_error(8, 212, imag(S2_log), imag(S2_log - S2_log_c), 'S2 imag' )
 plot_sig_and_error(9, 211, real(foff_log), real(foff_log - foff_log_c), 'Freq Offset' )
 plot_sig_and_error(9, 212, rx_timing_log, rx_timing_log - rx_timing_log_c, 'Rx Timing' )
 
-c=10;
+c=15;
 plot_sig_and_error(10, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
 plot_sig_and_error(10, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
 
@@ -163,6 +176,13 @@ plot_sig_and_error(11, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_f
 
 plot_sig_and_error(12, 211, env_log, env_log - env_log_c, 'env' )
 plot_sig_and_error(12, 212, real(rx_symbols_log(c,:)), real(rx_symbols_log(c,:) - rx_symbols_log_c(c,:)), 'rx symbols' )
+
+st=10*28;
+en = 12*28;
+stem_sig_and_error(13, 211, rx_bits_log_c(st:en), rx_bits_log(st:en) - rx_bits_log_c(st:en), 'RX bits', [1 en-st -1.5 1.5])
+
+plot_sig_and_error(14, 211, ferr_log, ferr_log - ferr_log_c, 'Fine freq error' )
+stem_sig_and_error(14, 212, sync_bit_log_c, sync_bit_log - sync_bit_log_c, 'Sync bit', [1 n -1.5 1.5])
 
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
@@ -198,10 +218,13 @@ check(pilot_baseband2_log, pilot_baseband2_log_c, 'pilot lpf2');
 check(S1_log, S1_log_c, 'S1');
 check(S2_log, S2_log_c, 'S2');
 check(foff_log, foff_log_c, 'rx_est_freq_offset');
-check(rx_baseband_log, rx_baseband_log_c, 'fdm_downconvert');
-check(rx_filt_log, rx_filt_log_c, 'fdm_downconvert');
+check(rx_baseband_log, rx_baseband_log_c, 'rx baseband');
+check(rx_filt_log, rx_filt_log_c, 'rx filt');
 check(env_log, env_log_c, 'env');
 check(rx_timing_log, rx_timing_log_c, 'rx_est_timing');
 check(rx_symbols_log, rx_symbols_log_c, 'rx_symbols');
+check(rx_bits_log, rx_bits_log_c, 'rx bits');
+check(ferr_log, ferr_log_c, 'fine freq error');
+check(sync_bit_log, sync_bit_log_c, 'sync bit');
 
 printf("\npasses: %d fails: %d\n", passes, fails);

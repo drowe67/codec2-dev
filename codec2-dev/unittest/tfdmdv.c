@@ -61,7 +61,10 @@ int main(int argc, char *argv[])
     float         rx_timing;
     float         env[NT*P];
     COMP          rx_symbols[NC+1];
-
+    int           rx_bits[FDMDV_BITS_PER_FRAME];
+    float         ferr;
+    int           sync_bit;
+ 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
     COMP          tx_baseband_log[(NC+1)][M*FRAMES];
@@ -80,7 +83,10 @@ int main(int argc, char *argv[])
     float         env_log[NT*P*FRAMES];
     float         rx_timing_log[FRAMES];
     COMP          rx_symbols_log[NC+1][FRAMES];
-			  
+    int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
+    float         ferr_log[FRAMES];
+    int           sync_bit_log[FRAMES];
+
     FILE         *fout;
     int           f,c,i;
 
@@ -106,7 +112,7 @@ int main(int argc, char *argv[])
 
 	/* demodulator ----------------------------------------*/
 
-	/* Freq offset estimation and correction */
+	/* freq offset estimation and correction */
 
 	foff = rx_est_freq_offset(fdmdv, rx_fdm, nin);
 
@@ -121,10 +127,14 @@ int main(int argc, char *argv[])
 	    rx_fdm_fcorr[i].imag = 0.0;
 	}
 	
+	/* baseband processing */
+
 	fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
-
+	ferr = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
+	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+	    
 	/* save log of outputs ------------------------------------------------------*/
 
 	memcpy(&tx_bits_log[FDMDV_BITS_PER_FRAME*f], tx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
@@ -166,9 +176,16 @@ int main(int argc, char *argv[])
 	rx_timing_log[f] = rx_timing;
 	for(c=0; c<NC+1; c++)
 	    rx_symbols_log[c][f] = rx_symbols[c];
+	
+	/* qpsk_to_bits() */
+
+	memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
+	ferr_log[f] = ferr;
+	sync_bit_log[f] = sync_bit;
     }
 
-    /* dump logs to Octave file for evaluation by tfdmdv.m Octave script */
+
+    /* dump logs to Octave file for evaluation by tfdmdv.m Octave script ------------------------*/
 
     fout = fopen("tfdmdv_out.txt","wt");
     assert(fout != NULL);
@@ -190,6 +207,9 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES);  
     octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES);  
     octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (NC+1), FRAMES, FRAMES);  
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
+    octave_save_float(fout, "ferr_log_c", ferr_log, 1, FRAMES);  
+    octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
     fclose(fout);
 
     codec2_destroy(fdmdv);

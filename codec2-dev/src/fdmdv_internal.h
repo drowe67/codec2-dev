@@ -71,6 +71,7 @@
 
 struct FDMDV {
     int  current_test_bit;
+    int  rx_test_bits_mem[NTEST_BITS];
 
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
@@ -93,6 +94,7 @@ struct FDMDV {
     COMP rx_filter_memory[NC+1][NFILTER];
     COMP rx_filter_mem_timing[NC+1][NT*P];
     COMP rx_baseband_mem_timing[NC+1][NFILTERTIMING];
+    COMP prev_rx_symbols[NC+1];
 };
 
 /*---------------------------------------------------------------------------*\
@@ -117,5 +119,7 @@ float rx_est_timing(COMP  rx_symbols[],
 		   float env[],
 		   COMP  rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
 		   int   nin);	 
+float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP prev_rx_symbols[], COMP rx_symbols[]);
+int freq_state(int sync_bit, int *state);
 
 #endif
