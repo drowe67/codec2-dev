@@ -30,7 +30,7 @@ rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
 prev_tx_symbols = ones(Nc+1,1);
 prev_rx_symbols = ones(Nc+1,1);
-f_err = 0;
+ferr = 0;
 foff = 0;
 foff_log = [];
 tx_baseband_log = [];
@@ -185,8 +185,8 @@ for f=1:frames
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
   endif
-  [rx_bits sync f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
-  foff -= 0.5*f_err;
+  [rx_bits sync ferr] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  foff -= 0.5*ferr;
   prev_rx_symbols = rx_symbols;
   sync_log = [sync_log sync];
   

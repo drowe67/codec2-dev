@@ -637,7 +637,7 @@ endfunction
 
 % freq offset state machine.  Moves between acquire and track states based
 % on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
-% when used continuously.  So we use it unit we have acquired the BPSK pilot,
+% when used continuously.  So we use it until we have acquired the BPSK pilot,
 % then switch to a more robust tracking algorithm.  If we lose sync we switch
 % back to acquire mode for fast-requisition.
 

@@ -15,13 +15,22 @@ TODO
 [ ] test rx level sensitivity, i.e. 0 to 20dB attenuation
 [ ] try to run from shell script
 [ ] arb bit stream input to Octave mod and demod
+[ ] make fine freq indep of amplitude
+    + use angle rather than imag corrd
 [ ] C port and UT framework
-    [ ] doumnent how to use
+    [ ] document how to use
+    [ ] demo modem C test program
+    [ ] freq corr in func, state vars in struct
+    [ ] fine freq est in func, statevars
+    [ ] demod in func with all vars
+    [ ] mod in func with all vars
+    [ ] check with ch impairments    
+    [ ] test with freq offsets
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
 [ ] block diagram
+    [ ] maybe in ascii art
 [ ] blog posts(s)
 [ ] Codec 2 web page update
-[ ] demo modem C test program
 
 Tests
 

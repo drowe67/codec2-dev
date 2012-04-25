@@ -149,10 +149,17 @@ struct FDMDV *fdmdv_create(void)
 	return NULL;
     
     f->current_test_bit = 0;
+    for(i=0; i<NTEST_BITS; i++)
+	f->rx_test_bits_mem[i] = 0;
+
     f->tx_pilot_bit = 0;
+
     for(c=0; c<NC+1; c++) {
 	f->prev_tx_symbols[c].real = 1.0;
 	f->prev_tx_symbols[c].imag = 0.0;
+	f->prev_rx_symbols[c].real = 1.0;
+	f->prev_rx_symbols[c].imag = 0.0;
+
 	for(k=0; k<NFILTER; k++) {
 	    f->tx_filter_memory[c][k].real = 0.0;
 	    f->tx_filter_memory[c][k].imag = 0.0;
@@ -201,7 +208,7 @@ struct FDMDV *fdmdv_create(void)
 
     generate_pilot_lut(f->pilot_lut, &f->freq[NC]);
 
-    /* Freq Offset estimation */
+    /* freq Offset estimation states */
 
     for(i=0; i<NPILOTBASEBAND; i++) {
 	f->pilot_baseband1[i].real = f->pilot_baseband2[i].real = 0.0;
@@ -834,7 +841,193 @@ float rx_est_timing(COMP rx_symbols[],
 	for(k=s,j=0; k<s+NFILTER; k++,j++)
 	    rx_symbols[c] = cadd(rx_symbols[c], fcmult(gt_alpha5_root[j], rx_baseband_mem_timing[c][k]));
     }
-    printf("rx_symbols[0] = %f %f\n", rx_symbols[0].real, rx_symbols[0].imag);
 	
     return rx_timing;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: qpsk_to_bits()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 24/4/2012
+
+  Convert DQPSK symbols back to an array of bits, extracts sync bit
+  from DBPSK pilot, and also uses pilot to estimate fine frequency
+  error.
+
+\*---------------------------------------------------------------------------*/
+
+float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP prev_rx_symbols[], COMP rx_symbols[])
+{
+    int   c;
+    COMP  phase_difference[NC+1];
+    COMP  pi_on_4;
+    COMP  d;
+    int   msb, lsb;
+    float ferr;
+
+    pi_on_4.real = cos(PI/4.0);
+    pi_on_4.imag = sin(PI/4.0);
+
+    /* Extra 45 degree clockwise lets us use real and imag axis as
+       decision boundaries */
+
+    for(c=0; c<NC; c++)
+	phase_difference[c] = cmult(cmult(rx_symbols[c], cconj(prev_rx_symbols[c])), pi_on_4);
+				    
+    /* map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits */
+
+    for (c=0; c<NC; c++) {
+      d = phase_difference[c];
+      if ((d.real >= 0) && (d.imag >= 0)) {
+         msb = 0; lsb = 0;
+      }
+      if ((d.real < 0) && (d.imag >= 0)) {
+         msb = 0; lsb = 1;
+      }
+      if ((d.real < 0) && (d.imag < 0)) {
+         msb = 1; lsb = 0;
+      }
+      if ((d.real >= 0) && (d.imag < 0)) {
+         msb = 1; lsb = 1;
+      }
+      rx_bits[2*c] = msb;
+      rx_bits[2*c+1] = lsb;
+    }
+ 
+    /* Extract DBPSK encoded Sync bit */
+
+    phase_difference[NC] = cmult(rx_symbols[NC], cconj(prev_rx_symbols[NC]));
+    if (phase_difference[NC].real < 0) {
+      *sync_bit = 0;
+      ferr = phase_difference[NC].imag;
+    }
+    else {
+      *sync_bit = 1;
+      ferr = -phase_difference[NC].imag;
+    }
+
+    return ferr;
+}
+ 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_put_test_bits()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 24/4/2012
+
+  Accepts nbits from rx and attempts to sync with test_bits sequence.
+  If sync OK measures bit errors.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bits[])
+{
+    int   i,j;
+    float ber;
+
+    /* Append to our memory */
+
+    for(i=0,j=FDMDV_BITS_PER_FRAME; i<NTEST_BITS-FDMDV_BITS_PER_FRAME; i++)
+	f->rx_test_bits_mem[i] = f->rx_test_bits_mem[j];
+    for(i=NTEST_BITS-FDMDV_BITS_PER_FRAME,j=0; i<NTEST_BITS; i++)
+	f->rx_test_bits_mem[i] = rx_bits[j];
+    
+    /* see how many bit errors we get when checked against test sequence */
+       
+    *bit_errors = 0;
+    for(i=0; i<FDMDV_BITS_PER_FRAME; i++)
+	*bit_errors += test_bits[i] ^ f->rx_test_bits_mem[i];
+
+    /* if less than a thresh we are aligned and in sync with test sequence */
+
+    ber = *bit_errors/NTEST_BITS;
+  
+    *sync = 0;
+    if (ber < 0.2)
+	*sync = 1;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: freq_state(()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 24/4/2012
+
+  Freq offset state machine.  Moves between acquire and track states based
+  on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
+  when used continuously.  So we use it until we have acquired the BPSK pilot,
+  then switch to a more robust tracking algorithm.  If we lose sync we switch
+  back to acquire mode for fast-requisition.
+
+\*---------------------------------------------------------------------------*/
+
+int freq_state(int sync_bit, int *state)
+{
+    int next_state, track;
+
+    /* acquire state, look for 6 symbol 010101 sequence from sync bit */
+
+    next_state = *state;
+    switch(*state) {
+    case 0:
+	if (sync_bit == 0)
+	    next_state = 1;
+	break;
+    case 1:
+	if (sync_bit == 1)
+	    next_state = 2;
+	else 
+	    next_state = 0;
+	break;
+    case 2:
+	if (sync_bit == 0)
+	    next_state = 3;
+	else 
+	    next_state = 0;
+	break;
+    case 3:
+	if (sync_bit == 1)
+	    next_state = 4;
+	else 
+	    next_state = 0;
+	break;
+    case 4:
+	if (sync_bit == 0)
+	    next_state = 5;
+	else 
+	    next_state = 0;
+	break;
+    case 5:
+	if (sync_bit == 1)
+	    next_state = 6;
+	else 
+	    next_state = 0;
+	break;
+	
+	/* states 6 and above are track mode, make sure we keep
+	   getting 0101 sync bit sequence */
+
+    case 6:
+	if (sync_bit == 0)
+	    next_state = 7;
+	else 
+	    next_state = 0;
+
+	break;
+    case 7:
+	if (sync_bit == 1)
+	    next_state = 6;
+	else 
+	    next_state = 0;
+	break;
+    }
+
+    *state = next_state;
+    if (*state >= 6)
+	track = 1;
+    else
+	track = 0;
+ 
+    return track;
 }
