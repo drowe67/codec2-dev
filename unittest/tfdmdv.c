@@ -5,14 +5,15 @@
   DATE CREATED: April 16 2012
                                                                              
   Tests for the C version of the FDMDV modem.  This program outputs a
-  file of Octave vectors that are loaded and compared to the
-  Octave version of thr modem by the Octave script tfmddv.m
+  file of Octave vectors that are loaded and automatically tested
+  against the Octave version of the modem by the Octave script
+  tfmddv.m
                                                                              
 \*---------------------------------------------------------------------------*/
 
 
 /*
-  Copyright (C) 2009 David Rowe
+  Copyright (C) 2012 David Rowe
 
   All rights reserved.
 
@@ -98,7 +99,9 @@ int main(int argc, char *argv[])
 
     for(f=0; f<FRAMES; f++) {
 
-	/* modulator -----------------------------------------*/
+	/* --------------------------------------------------------*\
+	                          Modulator
+	\*---------------------------------------------------------*/
 
 	fdmdv_get_test_bits(fdmdv, tx_bits);
 	bits_to_dqpsk_symbols(tx_symbols, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
@@ -110,22 +113,14 @@ int main(int argc, char *argv[])
 	    rx_fdm[i] = tx_fdm[i].real;
 	nin = M;
 
-	/* demodulator ----------------------------------------*/
+	/* --------------------------------------------------------*\
+	                        Demodulator
+	\*---------------------------------------------------------*/
 
 	/* freq offset estimation and correction */
 
 	foff = rx_est_freq_offset(fdmdv, rx_fdm, nin);
-
-	/* note this should be a C function with states in fdmdv */
-
-	foff_rect.real = cos(2.0*PI*foff/FS);
-	foff_rect.imag = sin(2.0*PI*foff/FS);
-	for(i=0; i<nin; i++) {
-	    //foff_phase_rect = cmult(foff_phase_rect, foff_rect);
-	    //rx_fdm_fcorr[i] = fcmult(rx_fdm[i], foff_phase_rect);
-	    rx_fdm_fcorr[i].real = rx_fdm[i];
-	    rx_fdm_fcorr[i].imag = 0.0;
-	}
+	freq_shift(rx_fdm_fcorr, rx_fdm, foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
 	
 	/* baseband processing */
 
@@ -135,7 +130,9 @@ int main(int argc, char *argv[])
 	ferr = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	    
-	/* save log of outputs ------------------------------------------------------*/
+	/* --------------------------------------------------------*\
+	                    Log each vector 
+	\*---------------------------------------------------------*/
 
 	memcpy(&tx_bits_log[FDMDV_BITS_PER_FRAME*f], tx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
 	memcpy(&tx_symbols_log[(NC+1)*f], tx_symbols, sizeof(COMP)*(NC+1));
@@ -185,7 +182,10 @@ int main(int argc, char *argv[])
     }
 
 
-    /* dump logs to Octave file for evaluation by tfdmdv.m Octave script ------------------------*/
+    /*---------------------------------------------------------*\
+               Dump logs to Octave file for evaluation 
+                      by tfdmdv.m Octave script
+    \*---------------------------------------------------------*/
 
     fout = fopen("tfdmdv_out.txt","wt");
     assert(fout != NULL);
@@ -260,7 +260,7 @@ void octave_save_complex(FILE *f, char name[], COMP data[], int rows, int cols, 
     fprintf(f, "# type: complex matrix\n");
     fprintf(f, "# rows: %d\n", rows);
     fprintf(f, "# columns: %d\n", cols);
-    printf("rows %d cols %d col_len %d\n", rows, cols, col_len);
+    
     for(r=0; r<rows; r++) {
 	for(c=0; c<cols; c++)
 	    fprintf(f, " (%f,%f)", data[r*col_len+c].real, data[r*col_len+c].imag);
