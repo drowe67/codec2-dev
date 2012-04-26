@@ -52,8 +52,8 @@ struct FDMDV_STATS {
 struct FDMDV *fdmdv_create(void);
 void          fdmdv_destroy(struct FDMDV *fdmdv_state);
     
-void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync);
-void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync, float rx_fdm[], int *nin);
+void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
+void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin);
     
 void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
 void          fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bits[]);

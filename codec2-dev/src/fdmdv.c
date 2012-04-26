@@ -222,6 +222,14 @@ struct FDMDV *fdmdv_create(void)
 	f->pilot_lpf1[i].imag = f->pilot_lpf2[i].imag = 0.0;
     }
 
+    f->foff_rect.real = 1.0;
+    f->foff_rect.imag = 0.0;
+    f->foff_phase_rect.real = 1.0;
+    f->foff_phase_rect.imag = 0.0;
+
+    f->fest_state = 0;
+    f->track = 0;
+
     return f;
 }
 
@@ -430,6 +438,31 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
     for (i=0; i<M; i++) 
 	tx_fdm[i] = cmult(two, tx_fdm[i]);
 
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_mod()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 26/4/2012
+
+  FDMDV modulator, take a frame of FDMDV_BITS_PER_FRAME bits and
+  generates a frame of FDMDV_SAMPLES_PER_FRAME modulated symbols.
+  Sync bit is returned to aid alignment of your next frame.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
+{
+    COMP          tx_symbols[NC+1];
+    COMP          tx_baseband[NC+1][M];
+
+    bits_to_dqpsk_symbols(tx_symbols, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
+    memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
+    tx_filter(tx_baseband, tx_symbols, fdmdv->tx_filter_memory);
+    fdm_upconvert(tx_fdm, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
+
+    *sync_bit = fdmdv->tx_pilot_bit;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -645,6 +678,29 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 	foff = foff2;
 	
     return foff;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: freq_shift()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 26/4/2012
+
+  Frequency shift modem signal.
+
+\*---------------------------------------------------------------------------*/
+
+void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect, COMP *foff_phase_rect, int nin)
+{
+    int i;
+
+    foff_rect->real = cos(2.0*PI*foff/FS);
+    foff_rect->imag = sin(2.0*PI*foff/FS);
+    for(i=0; i<nin; i++) {
+	*foff_phase_rect = cmult(*foff_phase_rect, cconj(*foff_rect));
+	rx_fdm_fcorr[i] = fcmult(rx_fdm[i], *foff_phase_rect);
+    }
+  
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1031,3 +1087,46 @@ int freq_state(int sync_bit, int *state)
  
     return track;
 }
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_demod()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 26/4/2012
+
+  FDMDV demodulator, take an array of FDMDV_SAMPLES_PER_FRAME
+  modulated symbols, returns an array of FDMDV_BITS_PER_FRAME bits,
+  plus the sync bit.  
+
+  The number of input samples nin will normally be M ==
+  FDMDV_SAMPLES_PER_FRAME.  However to adjust for differences in
+  transmit and receive sample clocks nin will occasionally be M-M/P,
+  or M+M/P.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin)
+{
+    float         foff;
+    COMP          rx_fdm_fcorr[M+M/P];
+    COMP          rx_baseband[NC+1][M+M/P];
+    COMP          rx_filt[NC+1][P+1];
+    float         rx_timing;
+    float         env[NT*P];
+    COMP          rx_symbols[NC+1];
+    float         ferr;
+
+    /* freq offset estimation and correction */
+
+    foff = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
+    freq_shift(rx_fdm_fcorr, rx_fdm, foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
+	
+    /* baseband processing */
+
+    fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
+    rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
+    rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    ferr = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
+    memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+}
+
