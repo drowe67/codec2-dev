@@ -222,13 +222,14 @@ struct FDMDV *fdmdv_create(void)
 	f->pilot_lpf1[i].imag = f->pilot_lpf2[i].imag = 0.0;
     }
 
+    f->foff = 0.0;
     f->foff_rect.real = 1.0;
     f->foff_rect.imag = 0.0;
     f->foff_phase_rect.real = 1.0;
     f->foff_phase_rect.imag = 0.0;
 
     f->fest_state = 0;
-    f->track = 0;
+    f->coarse_fine = COARSE;
 
     return f;
 }
@@ -1020,7 +1021,7 @@ void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bit
 
 int freq_state(int sync_bit, int *state)
 {
-    int next_state, track;
+    int next_state, coarse_fine;
 
     /* acquire state, look for 6 symbol 010101 sequence from sync bit */
 
@@ -1081,11 +1082,11 @@ int freq_state(int sync_bit, int *state)
 
     *state = next_state;
     if (*state >= 6)
-	track = 1;
+	coarse_fine = FINE;
     else
-	track = 0;
+	coarse_fine = COARSE;
  
-    return track;
+    return coarse_fine;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1107,7 +1108,7 @@ int freq_state(int sync_bit, int *state)
 
 void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin)
 {
-    float         foff;
+    float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
@@ -1118,15 +1119,20 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 
     /* freq offset estimation and correction */
 
-    foff = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
-    freq_shift(rx_fdm_fcorr, rx_fdm, foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
+    foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
+    if (fdmdv->coarse_fine == COARSE)
+	fdmdv->foff = foff_coarse;
+    freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
 	
     /* baseband processing */
 
     fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
     rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
-    ferr = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
+    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+
+    fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state);
+    fdmdv->foff  -= 0.5*foff_fine;
 }
 

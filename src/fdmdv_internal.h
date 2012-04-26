@@ -63,6 +63,11 @@
 #define NPILOTLPF                  (4*M)    /* number of samples we DFT pilot over, pilot est window */
 #define MPILOTFFT                    256
 
+/* freq offset sestimation states */
+
+#define COARSE                   0
+#define FINE                     1
+
 /*---------------------------------------------------------------------------*\
                                                                              
                                STRUCT for States
@@ -90,6 +95,7 @@ struct FDMDV {
     COMP S1[MPILOTFFT];
     COMP S2[MPILOTFFT];
 
+    float foff;
     COMP foff_rect;
     COMP foff_phase_rect;
     
@@ -100,7 +106,7 @@ struct FDMDV {
     COMP prev_rx_symbols[NC+1];
     
     int  fest_state;
-    int  track;
+    int  coarse_fine;
 };
 
 /*---------------------------------------------------------------------------*\

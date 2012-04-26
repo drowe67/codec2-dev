@@ -53,7 +53,6 @@ int main(int argc, char *argv[])
     COMP          tx_fdm[M];
     float         rx_fdm[M+M/P];
     float         foff_coarse;
-    float         foff;
     int           nin;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
@@ -88,7 +87,7 @@ int main(int argc, char *argv[])
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     float         foff_fine_log[FRAMES];
     int           sync_bit_log[FRAMES];
-    int           track_log[FRAMES];
+    int           coarse_fine_log[FRAMES];
 
     FILE         *fout;
     int           f,c,i;
@@ -121,9 +120,9 @@ int main(int argc, char *argv[])
 	/* freq offset estimation and correction */
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
-	if (fdmdv->track == 0)
-	    foff = foff_coarse;
-	freq_shift(rx_fdm_fcorr, rx_fdm, foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
+	if (fdmdv->coarse_fine == COARSE)
+	    fdmdv->foff = foff_coarse;
+	freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
 	
 	/* baseband processing */
 
@@ -132,8 +131,9 @@ int main(int argc, char *argv[])
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
-	fdmdv->track = freq_state(sync_bit, &fdmdv->fest_state);
-	
+	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state);
+	fdmdv->foff  -= 0.5*foff_fine;
+
 	/* --------------------------------------------------------*\
 	                    Log each vector 
 	\*---------------------------------------------------------*/
@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
 	memcpy(&S1_log[f*MPILOTFFT], fdmdv->S1, sizeof(COMP)*MPILOTFFT);
 	memcpy(&S2_log[f*MPILOTFFT], fdmdv->S2, sizeof(COMP)*MPILOTFFT);
  	foff_coarse_log[f] = foff_coarse;
- 	foff_log[f] = foff;
+ 	foff_log[f] = fdmdv->foff;
 
 	/* rx down conversion */
 
@@ -185,7 +185,7 @@ int main(int argc, char *argv[])
 	foff_fine_log[f] = foff_fine;
 	sync_bit_log[f] = sync_bit;
 
-	track_log[f] = fdmdv->track;
+	coarse_fine_log[f] = fdmdv->coarse_fine;
     }
 
 
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
     octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES);  
     octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
-    octave_save_int(fout, "track_log_c", track_log, 1, FRAMES);  
+    octave_save_int(fout, "coarse_fine_log_c", coarse_fine_log, 1, FRAMES);  
     fclose(fout);
 
     codec2_destroy(fdmdv);
