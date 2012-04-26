@@ -19,6 +19,9 @@ passes = fails = 0;
 frames = 25;
 prev_tx_symbols = ones(Nc+1,1);
 prev_rx_symbols = ones(Nc+1,1);
+foff_phase_rect = 1;
+track = 0;
+fest_state = 0;
 
 % Octave outputs we want to collect for comparison to C version
 
@@ -32,6 +35,8 @@ pilot_lpf1_log = [];
 pilot_lpf2_log = [];
 S1_log = [];
 S2_log = [];
+foff_coarse_log = [];
+foff_fine_log = [];
 foff_log = [];
 rx_baseband_log = [];
 rx_filt_log = [];
@@ -39,8 +44,8 @@ env_log = [];
 rx_timing_log = [];
 rx_symbols_log = [];
 rx_bits_log = []; 
-ferr_log = [];
 sync_bit_log = [];  
+track_log = [];
 
 for f=1:frames
 
@@ -62,8 +67,12 @@ for f=1:frames
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
 
-  [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
+  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
+  if track == 0
+    foff = foff_coarse;
+  end
   foff_log = [foff_log foff];
+  foff_coarse_log = [foff_coarse_log foff_coarse];
 
   pilot_baseband1_log = [pilot_baseband1_log pilot_baseband1];
   pilot_baseband2_log = [pilot_baseband2_log pilot_baseband2];
@@ -72,7 +81,14 @@ for f=1:frames
   S1_log  = [S1_log S1];
   S2_log  = [S2_log S2];
 
-  rx_baseband = fdm_downconvert(rx_fdm, M);
+  foff_rect = exp(j*2*pi*foff/Fs);
+
+  for i=1:M
+    foff_phase_rect *= foff_rect';
+    rx_fdm_fcorr(i) = rx_fdm(i)*foff_phase_rect;
+  end
+
+  rx_baseband = fdm_downconvert(rx_fdm_fcorr, M);
   rx_baseband_log = [rx_baseband_log rx_baseband];
 
   rx_filt = rx_filter(rx_baseband, M);
@@ -84,11 +100,16 @@ for f=1:frames
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
 
-  [rx_bits sync_bit ferr] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit foff_fine] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
   prev_rx_symbols = rx_symbols;
   rx_bits_log = [rx_bits_log rx_bits]; 
-  ferr_log = [ferr_log ferr];
+  foff_fine_log = [foff_fine_log foff_fine];
   sync_bit_log = [sync_bit_log sync_bit];  
+
+  % freq est state machine
+
+  [track fest_state] = freq_state(sync_bit, fest_state);
+  track_log = [track_log track];
 end
 
 % Compare to the output from the C version
@@ -164,25 +185,28 @@ plot_sig_and_error(7, 212, imag(S1_log), imag(S1_log - S1_log_c), 'S1 imag' )
 plot_sig_and_error(8, 211, real(S2_log), real(S2_log - S2_log_c), 'S2 real' )
 plot_sig_and_error(8, 212, imag(S2_log), imag(S2_log - S2_log_c), 'S2 imag' )
 
-plot_sig_and_error(9, 211, real(foff_log), real(foff_log - foff_log_c), 'Freq Offset' )
-plot_sig_and_error(9, 212, rx_timing_log, rx_timing_log - rx_timing_log_c, 'Rx Timing' )
+plot_sig_and_error(9, 211, foff_coarse_log, foff_coarse_log - foff_coarse_log_c, 'Coarse Freq Offset' )
+plot_sig_and_error(9, 212, foff_fine_log, foff_fine_log - foff_fine_log_c, 'Fine Freq Offset' )
+
+plot_sig_and_error(10, 211, foff_log, foff_log - foff_log_c, 'Freq Offset' )
+plot_sig_and_error(10, 212, track_log, track_log - track_log_c, 'Freq Track' )
 
 c=15;
-plot_sig_and_error(10, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
-plot_sig_and_error(10, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
+plot_sig_and_error(11, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
+plot_sig_and_error(11, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
 
-plot_sig_and_error(11, 211, real(rx_filt_log(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt real' )
-plot_sig_and_error(11, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt imag' )
+plot_sig_and_error(12, 211, real(rx_filt_log(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt real' )
+plot_sig_and_error(12, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt imag' )
 
-plot_sig_and_error(12, 211, env_log, env_log - env_log_c, 'env' )
-plot_sig_and_error(12, 212, real(rx_symbols_log(c,:)), real(rx_symbols_log(c,:) - rx_symbols_log_c(c,:)), 'rx symbols' )
+plot_sig_and_error(13, 211, env_log, env_log - env_log_c, 'env' )
+plot_sig_and_error(13, 212, real(rx_symbols_log(c,:)), real(rx_symbols_log(c,:) - rx_symbols_log_c(c,:)), 'rx symbols' )
 
 st=10*28;
 en = 12*28;
-stem_sig_and_error(13, 211, rx_bits_log_c(st:en), rx_bits_log(st:en) - rx_bits_log_c(st:en), 'RX bits', [1 en-st -1.5 1.5])
-
-plot_sig_and_error(14, 211, ferr_log, ferr_log - ferr_log_c, 'Fine freq error' )
+plot_sig_and_error(14, 211, rx_timing_log, rx_timing_log - rx_timing_log_c, 'Rx Timing' )
 stem_sig_and_error(14, 212, sync_bit_log_c, sync_bit_log - sync_bit_log_c, 'Sync bit', [1 n -1.5 1.5])
+
+stem_sig_and_error(15, 211, rx_bits_log_c(st:en), rx_bits_log(st:en) - rx_bits_log_c(st:en), 'RX bits', [1 en-st -1.5 1.5])
 
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
@@ -198,8 +222,8 @@ function check(a, b, test_name)
     printf(".");
   end
   printf(": ");  
-
-  if sum(a - b)/n < 1E-3
+  
+  if abs(sum(a - b))/n < 1E-3
     printf("OK\n");
     passes++;
   else
@@ -208,23 +232,24 @@ function check(a, b, test_name)
   end
 endfunction
 
-check(tx_bits_log, tx_bits_log_c, 'fdmdv_get_test_bits');
-check(tx_symbols_log,  tx_symbols_log_c, 'bits_to_dqpsk_symbols');
-check(tx_baseband_log, tx_baseband_log_c, 'tx_filter');
+check(tx_bits_log, tx_bits_log_c, 'tx_bits');
+check(tx_symbols_log,  tx_symbols_log_c, 'tx_symbols');
+check(tx_baseband_log, tx_baseband_log_c, 'tx_baseband');
 check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
 check(pilot_lut, pilot_lut_c, 'pilot_lut');
 check(pilot_baseband1_log, pilot_baseband1_log_c, 'pilot lpf1');
 check(pilot_baseband2_log, pilot_baseband2_log_c, 'pilot lpf2');
 check(S1_log, S1_log_c, 'S1');
 check(S2_log, S2_log_c, 'S2');
-check(foff_log, foff_log_c, 'rx_est_freq_offset');
+check(foff_coarse_log, foff_coarse_log_c, 'foff_coarse');
+check(foff_fine_log, foff_fine_log_c, 'foff_fine');
+check(foff_log, foff_log_c, 'foff');
 check(rx_baseband_log, rx_baseband_log_c, 'rx baseband');
 check(rx_filt_log, rx_filt_log_c, 'rx filt');
 check(env_log, env_log_c, 'env');
-check(rx_timing_log, rx_timing_log_c, 'rx_est_timing');
+check(rx_timing_log, rx_timing_log_c, 'rx_timing');
 check(rx_symbols_log, rx_symbols_log_c, 'rx_symbols');
 check(rx_bits_log, rx_bits_log_c, 'rx bits');
-check(ferr_log, ferr_log_c, 'fine freq error');
 check(sync_bit_log, sync_bit_log_c, 'sync bit');
 
 printf("\npasses: %d fails: %d\n", passes, fails);

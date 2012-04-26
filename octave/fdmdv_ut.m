@@ -185,7 +185,7 @@ for f=1:frames
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
   endif
-  [rx_bits sync ferr] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync foff_fine] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   foff -= 0.5*ferr;
   prev_rx_symbols = rx_symbols;
   sync_log = [sync_log sync];

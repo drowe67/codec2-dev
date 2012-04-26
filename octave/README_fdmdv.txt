@@ -6,6 +6,11 @@ sox -r 8000 -s -2 mod_dqpsk.raw -s -2 mod_dqpsk_8008hz.raw rate -h 8008
 
 TODO
 
+[ ] consider moving this file to root
+    [ ] sep SVN repo, automake etc?
+[ ] list each fdmdv.m script (ut, mod, demod) and Cprogram/src and what it does
+    [ ] example usage
+[ ] repair fdmdv_ut and mod/demod after new statres exposed and var renames
 [X] Get file based mod and demod working again
 [ ] try interfering sine wave
     + maybe swept
@@ -26,6 +31,7 @@ TODO
     [ ] mod in func with all vars
     [ ] check with ch impairments    
     [ ] test with freq offsets
+    [ ] measure execution speed
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
 [ ] block diagram
     [ ] maybe in ascii art

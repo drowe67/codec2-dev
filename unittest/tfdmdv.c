@@ -52,9 +52,8 @@ int main(int argc, char *argv[])
     COMP          tx_baseband[NC+1][M];
     COMP          tx_fdm[M];
     float         rx_fdm[M+M/P];
+    float         foff_coarse;
     float         foff;
-    COMP          foff_rect;
-    COMP          foff_phase_rect;
     int           nin;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
@@ -63,9 +62,10 @@ int main(int argc, char *argv[])
     float         env[NT*P];
     COMP          rx_symbols[NC+1];
     int           rx_bits[FDMDV_BITS_PER_FRAME];
-    float         ferr;
+    float         foff_fine;
     int           sync_bit;
- 
+    int           fest_state;
+
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
     COMP          tx_baseband_log[(NC+1)][M*FRAMES];
@@ -76,6 +76,7 @@ int main(int argc, char *argv[])
     COMP          pilot_lpf2_log[NPILOTLPF*FRAMES];
     COMP          S1_log[MPILOTFFT*FRAMES];
     COMP          S2_log[MPILOTFFT*FRAMES];
+    float         foff_coarse_log[FRAMES];
     float         foff_log[FRAMES];
     COMP          rx_baseband_log[(NC+1)][(M+M/P)*FRAMES];
     int           rx_baseband_log_col_index;
@@ -85,14 +86,14 @@ int main(int argc, char *argv[])
     float         rx_timing_log[FRAMES];
     COMP          rx_symbols_log[NC+1][FRAMES];
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
-    float         ferr_log[FRAMES];
+    float         foff_fine_log[FRAMES];
     int           sync_bit_log[FRAMES];
+    int           track_log[FRAMES];
 
     FILE         *fout;
     int           f,c,i;
 
     fdmdv = fdmdv_create();
-    foff_phase_rect.real = 0.0; foff_phase_rect.imag = 0.0;
 
     rx_baseband_log_col_index = 0;
     rx_filt_log_col_index = 0;
@@ -119,7 +120,9 @@ int main(int argc, char *argv[])
 
 	/* freq offset estimation and correction */
 
-	foff = rx_est_freq_offset(fdmdv, rx_fdm, nin);
+	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
+	if (fdmdv->track == 0)
+	    foff = foff_coarse;
 	freq_shift(rx_fdm_fcorr, rx_fdm, foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
 	
 	/* baseband processing */
@@ -127,9 +130,10 @@ int main(int argc, char *argv[])
 	fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
-	ferr = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
+	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
-	    
+	fdmdv->track = freq_state(sync_bit, &fdmdv->fest_state);
+	
 	/* --------------------------------------------------------*\
 	                    Log each vector 
 	\*---------------------------------------------------------*/
@@ -149,6 +153,7 @@ int main(int argc, char *argv[])
 	memcpy(&pilot_lpf2_log[f*NPILOTLPF], fdmdv->pilot_lpf2, sizeof(COMP)*NPILOTLPF);
 	memcpy(&S1_log[f*MPILOTFFT], fdmdv->S1, sizeof(COMP)*MPILOTFFT);
 	memcpy(&S2_log[f*MPILOTFFT], fdmdv->S2, sizeof(COMP)*MPILOTFFT);
+ 	foff_coarse_log[f] = foff_coarse;
  	foff_log[f] = foff;
 
 	/* rx down conversion */
@@ -177,8 +182,10 @@ int main(int argc, char *argv[])
 	/* qpsk_to_bits() */
 
 	memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
-	ferr_log[f] = ferr;
+	foff_fine_log[f] = foff_fine;
 	sync_bit_log[f] = sync_bit;
+
+	track_log[f] = fdmdv->track;
     }
 
 
@@ -202,14 +209,16 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "S1_log_c", S1_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);  
     octave_save_complex(fout, "S2_log_c", S2_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);  
     octave_save_float(fout, "foff_log_c", foff_log, 1, FRAMES);  
+    octave_save_float(fout, "foff_coarse_log_c", foff_coarse_log, 1, FRAMES);  
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, (NC+1), rx_baseband_log_col_index, (M+M/P)*FRAMES);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, (NC+1), rx_filt_log_col_index, (P+1)*FRAMES);  
     octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES);  
     octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES);  
     octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (NC+1), FRAMES, FRAMES);  
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
-    octave_save_float(fout, "ferr_log_c", ferr_log, 1, FRAMES);  
+    octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES);  
     octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
+    octave_save_int(fout, "track_log_c", track_log, 1, FRAMES);  
     fclose(fout);
 
     codec2_destroy(fdmdv);
