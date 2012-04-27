@@ -1132,7 +1132,9 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 
+    /* freq offset estimation state machine */
+
     fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state);
-    fdmdv->foff  -= 0.5*foff_fine;
+    fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 

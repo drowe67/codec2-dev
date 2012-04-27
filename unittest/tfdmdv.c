@@ -132,7 +132,7 @@ int main(int argc, char *argv[])
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state);
-	fdmdv->foff  -= 0.5*foff_fine;
+	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
 	/* --------------------------------------------------------*\
 	                    Log each vector 
