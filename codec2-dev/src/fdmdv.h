@@ -4,9 +4,15 @@
   AUTHOR......: David Rowe                                                          
   DATE CREATED: April 14 2012
                                                                              
-  Header file for a Frequency Divison Multiplexed Modem for Digital
-  Voice (FDMDV) over HF channels.
-                                                                             
+  A 1400 bit/s Frequency Divison Multiplexed Digital Voice (FDMDV)
+  modem.  Used for digital audio over HF SSB. The input and output
+  sample rate is 8000 Hz. See tfdmdv_mod.c and tfdmdv_demod.c for
+  example usage.
+                     
+  References:
+ 
+  [1] http://n1su.com/fdmdv/FDMDV_Docs_Rel_1_4b.pdf
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -35,8 +41,9 @@ extern "C" {
 
 #include "comp.h"
 
-#define FDMDV_BITS_PER_FRAME     28
-#define FDMDV_SAMPLES_PER_FRAME 160
+#define FDMDV_BITS_PER_FRAME      28  /* odd/even frames 56 bits, 1400 bit/s  */
+#define FDMDV_SAMPLES_PER_FRAME  160  /* 8000 Hz sample rate                  */
+#define FDMDV_SCALE             1000  /* suggested scaling for 16 bit shorts  */
 
 struct FDMDV;
     
