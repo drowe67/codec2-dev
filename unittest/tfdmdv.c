@@ -37,12 +37,9 @@
 
 #include "fdmdv_internal.h"
 #include "fdmdv.h"
+#include "octave.h"
 
 #define FRAMES 25
-
-void octave_save_int(FILE *f, char name[], int data[], int rows, int cols);
-void octave_save_float(FILE *f, char name[], float data[], int rows, int cols);
-void octave_save_complex(FILE *f, char name[], COMP data[], int rows, int cols, int col_len);
 
 int main(int argc, char *argv[])
 {
@@ -226,55 +223,3 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void octave_save_int(FILE *f, char name[], int data[], int rows, int cols)
-{
-    int r,c;
-
-    fprintf(f, "# name: %s\n", name);
-    fprintf(f, "# type: matrix\n");
-    fprintf(f, "# rows: %d\n", rows);
-    fprintf(f, "# columns: %d\n", cols);
-    
-    for(r=0; r<rows; r++) {
-	for(c=0; c<cols; c++)
-	    fprintf(f, " %d", data[r*cols+c]);
-	fprintf(f, "\n");
-    }
-
-    fprintf(f, "\n\n");
-}
-
-void octave_save_float(FILE *f, char name[], float data[], int rows, int cols)
-{
-    int r,c;
-
-    fprintf(f, "# name: %s\n", name);
-    fprintf(f, "# type: matrix\n");
-    fprintf(f, "# rows: %d\n", rows);
-    fprintf(f, "# columns: %d\n", cols);
-    
-    for(r=0; r<rows; r++) {
-	for(c=0; c<cols; c++)
-	    fprintf(f, " %f", data[r*cols+c]);
-	fprintf(f, "\n");
-    }
-
-    fprintf(f, "\n\n");
-}
-void octave_save_complex(FILE *f, char name[], COMP data[], int rows, int cols, int col_len)
-{
-    int r,c;
-
-    fprintf(f, "# name: %s\n", name);
-    fprintf(f, "# type: complex matrix\n");
-    fprintf(f, "# rows: %d\n", rows);
-    fprintf(f, "# columns: %d\n", cols);
-    
-    for(r=0; r<rows; r++) {
-	for(c=0; c<cols; c++)
-	    fprintf(f, " (%f,%f)", data[r*col_len+c].real, data[r*col_len+c].imag);
-	fprintf(f, "\n");
-    }
-
-    fprintf(f, "\n\n");
-}

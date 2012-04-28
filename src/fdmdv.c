@@ -4,8 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 14 2012
                                                                              
-  Functions that implement a Frequency Divison Multiplexed Modem for
-  Digital Voice (FDMDV) over HF channels.
+  Functions that implement the FDMDV modem.
                                                                              
 \*---------------------------------------------------------------------------*/
 
@@ -100,27 +99,6 @@ static COMP cadd(COMP a, COMP b)
     res.imag = a.imag + b.imag;
 
     return res;
-}
-
-static COMP cdot(COMP a[], COMP b[], int n)
-{
-    COMP res;
-    int  i;
-    
-    for(i=0; i<n; i++) 
-	res = cadd(res, cmult(a[i], b[i]));
-
-    return res;
-}
-
-static void cbuf_shift_update(COMP buf[], COMP update[], int buflen, int updatelen)
-{
-    int  i,j;
-    
-    for(i=0; i<buflen-updatelen; i++) 
-	buf[i] = buf[updatelen+i];
-    for(j=0; j<updatelen; j++) 
-	buf[i] = update[j];
 }
 
 /*---------------------------------------------------------------------------*\
@@ -717,7 +695,6 @@ void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect
 void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
 {
     int  i,c;
-    COMP pilot;
 
     /* maximum number of input samples to demod */
 
@@ -920,7 +897,7 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP prev_rx_symbols[], COMP rx
     COMP  phase_difference[NC+1];
     COMP  pi_on_4;
     COMP  d;
-    int   msb, lsb;
+    int   msb=0, lsb=0;
     float ferr;
 
     pi_on_4.real = cos(PI/4.0);
@@ -1115,8 +1092,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     float         rx_timing;
     float         env[NT*P];
     COMP          rx_symbols[NC+1];
-    float         ferr;
-
+ 
     /* freq offset estimation and correction */
 
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);

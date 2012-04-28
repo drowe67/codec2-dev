@@ -40,7 +40,7 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = generate_codebook$(EXEEXT) genlspdtcb$(EXEEXT)
 bin_PROGRAMS = c2demo$(EXEEXT) c2enc$(EXEEXT) c2dec$(EXEEXT) \
-	c2sim$(EXEEXT)
+	c2sim$(EXEEXT) fdmdv_mod$(EXEEXT)
 subdir = src
 DIST_COMMON = $(library_include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -87,6 +87,10 @@ c2enc_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_c2sim_OBJECTS = c2sim.$(OBJEXT)
 c2sim_OBJECTS = $(am_c2sim_OBJECTS)
 c2sim_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_fdmdv_mod_OBJECTS = fdmdv_mod.$(OBJEXT) fdmdv.$(OBJEXT) \
+	fft.$(OBJEXT) kiss_fft.$(OBJEXT) octave.$(OBJEXT)
+fdmdv_mod_OBJECTS = $(am_fdmdv_mod_OBJECTS)
+fdmdv_mod_LDADD = $(LDADD)
 generate_codebook_SOURCES = generate_codebook.c
 generate_codebook_OBJECTS = generate_codebook.$(OBJEXT)
 generate_codebook_LDADD = $(LDADD)
@@ -105,11 +109,11 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) $(c2demo_SOURCES) \
-	$(c2enc_SOURCES) $(c2sim_SOURCES) generate_codebook.c \
-	genlspdtcb.c
+	$(c2enc_SOURCES) $(c2sim_SOURCES) $(fdmdv_mod_SOURCES) \
+	generate_codebook.c genlspdtcb.c
 DIST_SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) \
 	$(c2demo_SOURCES) $(c2enc_SOURCES) $(c2sim_SOURCES) \
-	generate_codebook.c genlspdtcb.c
+	$(fdmdv_mod_SOURCES) generate_codebook.c genlspdtcb.c
 library_includeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(library_include_HEADERS)
 ETAGS = etags
@@ -312,6 +316,8 @@ c2dec_LDFLAGS = $(LIBS)
 c2sim_SOURCES = c2sim.c
 c2sim_LDADD = $(lib_LTLIBRARIES) 
 c2sim_LDFLAGS = $(LIBS)
+fdmdv_mod_SOURCES = fdmdv_mod.c fdmdv.c fft.c kiss_fft.c octave.c
+fdmdv_mod_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -421,6 +427,9 @@ c2enc$(EXEEXT): $(c2enc_OBJECTS) $(c2enc_DEPENDENCIES)
 c2sim$(EXEEXT): $(c2sim_OBJECTS) $(c2sim_DEPENDENCIES) 
 	@rm -f c2sim$(EXEEXT)
 	$(LINK) $(c2sim_LDFLAGS) $(c2sim_OBJECTS) $(c2sim_LDADD) $(LIBS)
+fdmdv_mod$(EXEEXT): $(fdmdv_mod_OBJECTS) $(fdmdv_mod_DEPENDENCIES) 
+	@rm -f fdmdv_mod$(EXEEXT)
+	$(LINK) $(fdmdv_mod_LDFLAGS) $(fdmdv_mod_OBJECTS) $(fdmdv_mod_LDADD) $(LIBS)
 generate_codebook$(EXEEXT): $(generate_codebook_OBJECTS) $(generate_codebook_DEPENDENCIES) 
 	@rm -f generate_codebook$(EXEEXT)
 	$(LINK) $(generate_codebook_LDFLAGS) $(generate_codebook_OBJECTS) $(generate_codebook_LDADD) $(LIBS)
@@ -438,8 +447,12 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2demo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2enc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2sim.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_mod.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebook.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookdt.Plo@am__quote@
@@ -460,6 +473,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-postfilter.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-quantise.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-sine.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
