@@ -52,6 +52,10 @@ TODO
     Count errors in two seconds of test frame data:
        $ ./fdmdv_get_test_bits - 2800 | ./fdmdv_put_test_bits -
 
+    Ten sconds of modem simulation with testframes;
+
+       $  ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | ./fdmdv_demod - - demod_dump.txt | ./fdmdv_put_test_bits -
+
 [ ] PAPR idea
     + automatically weak phases to reduce PAPR, e.g. slow variations in freq...
 
