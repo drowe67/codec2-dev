@@ -46,8 +46,6 @@
 
 #define MAX_FRAMES 50*60 /* 1 minute at 50 symbols/s */
 
-void dump_to_octave(struct FDMDV *fdmdv, FILE *f);
-
 int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
@@ -63,7 +61,7 @@ int main(int argc, char *argv[])
     int           state, next_state;
 
     int           frames;
-    FILE         *foct;
+    FILE         *foct = NULL;
     struct FDMDV_STATS stats;
     COMP          rx_symbols_log[FDMDV_NSYM][MAX_FRAMES];
     int           coarse_fine_log[MAX_FRAMES];
@@ -162,7 +160,7 @@ int main(int argc, char *argv[])
 
     /* Optional dump to Octave log file */
 
-    if ( (foct = fopen(argv[3],"wt")) == NULL ) {
+    if ( strcmp(argv[3],"|") && (foct = fopen(argv[3],"wt")) == NULL ) {
 	fprintf(stderr, "Error opening Octave dump file: %s: %s.\n",
 		argv[3], strerror(errno));
 	exit(1);

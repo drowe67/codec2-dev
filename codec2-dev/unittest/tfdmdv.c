@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 	fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
-	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
+	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
@@ -218,7 +218,7 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "coarse_fine_log_c", coarse_fine_log, 1, FRAMES);  
     fclose(fout);
 
-    codec2_destroy(fdmdv);
+    fdmdv_destroy(fdmdv);
 
     return 0;
 }

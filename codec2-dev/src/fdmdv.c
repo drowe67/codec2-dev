@@ -893,10 +893,9 @@ float rx_est_timing(COMP rx_symbols[],
 
 \*---------------------------------------------------------------------------*/
 
-float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP prev_rx_symbols[], COMP rx_symbols[])
+float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[])
 {
     int   c;
-    COMP  phase_difference[NC+1];
     COMP  pi_on_4;
     COMP  d;
     int   msb=0, lsb=0;
@@ -957,31 +956,36 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP prev_rx_symbols[], COMP rx
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bits[])
+void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[])
 {
     int   i,j;
     float ber;
 
     /* Append to our memory */
 
-    for(i=0,j=FDMDV_BITS_PER_FRAME; i<NTEST_BITS-FDMDV_BITS_PER_FRAME; i++)
+    for(i=0,j=FDMDV_BITS_PER_FRAME; i<NTEST_BITS-FDMDV_BITS_PER_FRAME; i++,j++)
 	f->rx_test_bits_mem[i] = f->rx_test_bits_mem[j];
-    for(i=NTEST_BITS-FDMDV_BITS_PER_FRAME,j=0; i<NTEST_BITS; i++)
+    for(i=NTEST_BITS-FDMDV_BITS_PER_FRAME,j=0; i<NTEST_BITS; i++,j++)
 	f->rx_test_bits_mem[i] = rx_bits[j];
     
     /* see how many bit errors we get when checked against test sequence */
        
     *bit_errors = 0;
-    for(i=0; i<FDMDV_BITS_PER_FRAME; i++)
+    for(i=0; i<NTEST_BITS; i++) {
 	*bit_errors += test_bits[i] ^ f->rx_test_bits_mem[i];
+	//printf("%d %d %d %d\n", i, test_bits[i], f->rx_test_bits_mem[i], test_bits[i] ^ f->rx_test_bits_mem[i]);
+    }
 
     /* if less than a thresh we are aligned and in sync with test sequence */
 
-    ber = *bit_errors/NTEST_BITS;
+    ber = (float)*bit_errors/NTEST_BITS;
   
     *sync = 0;
     if (ber < 0.2)
 	*sync = 1;
+   
+    *ntest_bits = NTEST_BITS;
+    
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1091,6 +1095,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
+    COMP          rx_symbols[NC+1];
     float         env[NT*P];
  
     /* freq offset estimation and correction */
@@ -1104,9 +1109,9 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 
     fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
-    fdmdv->rx_timing = rx_est_timing(fdmdv->rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
-    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, fdmdv->rx_symbols);
-    memcpy(fdmdv->prev_rx_symbols, fdmdv->rx_symbols, sizeof(COMP)*(NC+1));
+    fdmdv->rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+    memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 
     /* freq offset estimation state machine */
 
@@ -1138,12 +1143,11 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
     fdmdv_stats->rx_timing = fdmdv->rx_timing/M;
     fdmdv_stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
-    /* adjust for phase offset to make suitable for scatter plot */
-
     assert((NC+1) == FDMDV_NSYM);
 
-    for(c=0; c<NC+1; c++)
-	fdmdv_stats->rx_symbols[c] = cmult(cmult(fdmdv->rx_symbols[c], cconj(fdmdv->prev_rx_symbols[c])), pi_on_4);
+    for(c=0; c<NC+1; c++) {
+	fdmdv_stats->rx_symbols[c] = fdmdv->phase_difference[c];
+    }
 
 }
 

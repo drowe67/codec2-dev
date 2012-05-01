@@ -46,8 +46,11 @@ TODO
     $ ./fdmdv_mod test.c2 test.raw
     $ play -r 8000 -s -2 test.raw
     
-    Two seconds of test frame data out of sound device: 
+    Two seconds of test frame data modulated and sent out of sound device: 
        $ ./fdmdv_get_test_bits - 2800 | ./fdmdv_mod - - | play -t raw -r 8000 -s -2 -
+ 
+    Count errors in two seconds of test frame data:
+       $ ./fdmdv_get_test_bits - 2800 | ./fdmdv_put_test_bits -
 
 [ ] PAPR idea
     + automatically weak phases to reduce PAPR, e.g. slow variations in freq...
