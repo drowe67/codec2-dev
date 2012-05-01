@@ -11,7 +11,7 @@
                      
   References:
  
-  [1] http://n1su.com/fdmdv/FDMDV_Docs_Rel_1_4b.pdf
+    [1] http://n1su.com/fdmdv/FDMDV_Docs_Rel_1_4b.pdf
 
 \*---------------------------------------------------------------------------*/
 
@@ -44,16 +44,17 @@ extern "C" {
 #define FDMDV_BITS_PER_FRAME      28  /* odd/even frames 56 bits, 1400 bit/s  */
 #define FDMDV_SAMPLES_PER_FRAME  160  /* 8000 Hz sample rate                  */
 #define FDMDV_SCALE             1000  /* suggested scaling for 16 bit shorts  */
+#define FDMDV_NSYM                15
 
 struct FDMDV;
     
 struct FDMDV_STATS {
-    float  snr;          /* estimated SNR of rx signal  in dB                  */
-    COMP  *rx_symbols;   /* NC+1 latest received symbols, for scatter plot     */ 
-    int    fest_track;   /* == 0, freq est in acquire mode, == 1 in track mode */ 
-    float  foff;         /* estimated freq offset in Hz                        */       
-    float  timing;       /* timing offset 0..1 as fraction of symbol period    */
-    float  clock_offset; /* Estimated tx/rx sample clock offset in ppm         */
+    float  snr;                    /* estimated SNR of rx signal in dB                   */
+    COMP   rx_symbols[FDMDV_NSYM]; /* latest received symbols, for scatter plot          */ 
+    int    fest_coarse_fine;       /* freq est state, 0-coarse 1-fine                    */ 
+    float  foff;                   /* estimated freq offset in Hz                        */       
+    float  rx_timing;              /* timing offset -1..1 as fraction of symbol period   */
+    float  clock_offset;           /* Estimated tx/rx sample clock offset in ppm         */
 };
 
 struct FDMDV *fdmdv_create(void);
@@ -65,7 +66,7 @@ void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bi
 void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
 void          fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int rx_bits[]);
     
-float         fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
+void          fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void          fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
 
 #endif

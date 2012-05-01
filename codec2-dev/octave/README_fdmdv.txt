@@ -8,7 +8,7 @@ TODO
 
 [ ] consider moving this file to root
     [ ] sep SVN repo, automake etc?
-[ ] list each fdmdv.m script (ut, mod, demod) and Cprogram/src and what it does
+[ ] list each fdmdv.m script (ut, mod, demod) and C program/src and what it does
     [ ] example usage
 [ ] repair fdmdv_ut and mod/demod after new statres exposed and var renames
 [X] Get file based mod and demod working again
@@ -33,6 +33,10 @@ TODO
     [ ] test with freq offsets
     [ ] measure execution speed
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
+[ ] more positibe form of sync reqd for DV frames?
+    + like using track/acquire bit
+[ ] more robust track/acquite state machine?
+    + e.g. hang on thr fades?
 [ ] block diagram
     [ ] maybe in ascii art
 [ ] blog posts(s)

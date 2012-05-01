@@ -76,8 +76,12 @@
 \*---------------------------------------------------------------------------*/
 
 struct FDMDV {
+    /* test data (test frame) states */
+
     int  current_test_bit;
     int  rx_test_bits_mem[NTEST_BITS];
+
+    /* Modulator */
 
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
@@ -85,9 +89,13 @@ struct FDMDV {
     COMP phase_tx[NC+1];
     COMP freq[NC+1];
  
+    /* Pilot generation at demodulator */
+
     COMP pilot_lut[NPILOT_LUT];
     int  pilot_lut_index;
     int  prev_pilot_lut_index;
+
+    /* freq offset estimation states */
 
     COMP pilot_baseband1[NPILOTBASEBAND];
     COMP pilot_baseband2[NPILOTBASEBAND];
@@ -96,16 +104,24 @@ struct FDMDV {
     COMP S1[MPILOTFFT];
     COMP S2[MPILOTFFT];
 
+    /* freq offset correction states */
+
     float foff;
     COMP foff_rect;
     COMP foff_phase_rect;
     
-    COMP phase_rx[NC+1];
-    COMP rx_filter_memory[NC+1][NFILTER];
-    COMP rx_filter_mem_timing[NC+1][NT*P];
-    COMP rx_baseband_mem_timing[NC+1][NFILTERTIMING];
-    COMP prev_rx_symbols[NC+1];
+    /* Demodulator */
+
+    COMP  phase_rx[NC+1];
+    COMP  rx_filter_memory[NC+1][NFILTER];
+    COMP  rx_filter_mem_timing[NC+1][NT*P];
+    COMP  rx_baseband_mem_timing[NC+1][NFILTERTIMING];
+    float rx_timing;
+    COMP  rx_symbols[NC+1];
+    COMP  prev_rx_symbols[NC+1];
     
+    /* freq est state machine */
+
     int  fest_state;
     int  coarse_fine;
 };
