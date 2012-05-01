@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: tfdmdv_mod.c
+  FILE........: fdmdv_mod.c
   AUTHOR......: David Rowe  
   DATE CREATED: April 28 2012
                                                                              
@@ -37,7 +37,6 @@
 #include <errno.h>
 
 #include "fdmdv.h"
-#include "octave.h"
 
 #define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
 #define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
@@ -49,7 +48,7 @@ int main(int argc, char *argv[])
     char          packed_bits[BYTES_PER_CODEC_FRAME];
     int           tx_bits[2*FDMDV_BITS_PER_FRAME];
     COMP          tx_fdm[2*FDMDV_SAMPLES_PER_FRAME];
-    short         tx_fdm_scaled[FDMDV_SAMPLES_PER_FRAME];
+    short         tx_fdm_scaled[2*FDMDV_SAMPLES_PER_FRAME];
     int           frames;
     int           i, bit, byte;
     int           sync_bit;
@@ -117,7 +116,7 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
-    codec2_destroy(fdmdv);
+    fdmdv_destroy(fdmdv);
 
     return 0;
 }

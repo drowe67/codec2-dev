@@ -8,7 +8,7 @@
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits)
+function fdmdv_demod(rawfilename, nbits, pngname)
 
   fdmdv; % include modem code
 
@@ -58,7 +58,7 @@ function fdmdv_demod(rawfilename, nbits)
     % frequency offset estimation and correction
 
     [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
-    foff_coarse = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
+    [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
     if track == 0
       foff  = foff_coarse;
     end
@@ -199,4 +199,6 @@ function fdmdv_demod(rawfilename, nbits)
   axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
+
+  
 endfunction

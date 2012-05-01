@@ -760,6 +760,7 @@ function pilot_coeff_file(filename)
   fclose(f);
 endfunction
 
+
 % Saves hanning window coeffs to a text file in the form of a C array
 
 function hanning_file(filename)
@@ -777,6 +778,15 @@ function hanning_file(filename)
   fclose(f);
 endfunction
 
+
+function png_file(fig, pngfilename)
+  figure(fig);
+
+  pngname = sprintf("%s.png",pngfilename);
+  print(pngname, '-dpng', "-S500,500")
+  pngname = sprintf("%s_large.png",pngfilename);
+  print(pngname, '-dpng', "-S800,600")
+endfunction
 
 % Initialise ----------------------------------------------------
 

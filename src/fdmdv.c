@@ -222,7 +222,7 @@ struct FDMDV *fdmdv_create(void)
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_destroy(struct FDMDV *fdmdv)
+void fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
     free(fdmdv);
@@ -1089,9 +1089,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
-    float         rx_timing;
     float         env[NT*P];
-    COMP          rx_symbols[NC+1];
  
     /* freq offset estimation and correction */
 
@@ -1104,13 +1102,46 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 
     fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
-    rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
-    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, rx_symbols);
-    memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+    fdmdv->rx_timing = rx_est_timing(fdmdv->rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->prev_rx_symbols, fdmdv->rx_symbols);
+    memcpy(fdmdv->prev_rx_symbols, fdmdv->rx_symbols, sizeof(COMP)*(NC+1));
 
     /* freq offset estimation state machine */
 
     fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state);
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_get_demod_stats()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 1 May 2012
+
+  Fills a structure with a bunch of demod information.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
+{
+    COMP  pi_on_4;
+    int   c;
+
+    pi_on_4.real = cos(PI/4.0);
+    pi_on_4.imag = sin(PI/4.0);
+
+    fdmdv_stats->snr = 0.0; /* TODO - implement SNR estimation */
+    fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
+    fdmdv_stats->foff = fdmdv->foff;
+    fdmdv_stats->rx_timing = fdmdv->rx_timing/M;
+    fdmdv_stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
+
+    /* adjust for phase offset to make suitable for scatter plot */
+
+    assert((NC+1) == FDMDV_NSYM);
+
+    for(c=0; c<NC+1; c++)
+	fdmdv_stats->rx_symbols[c] = cmult(cmult(fdmdv->rx_symbols[c], cconj(fdmdv->prev_rx_symbols[c])), pi_on_4);
+
 }
 
