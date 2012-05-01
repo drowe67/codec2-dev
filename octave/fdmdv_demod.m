@@ -1,7 +1,7 @@
 % fdmdv_demod.m
 %
-% Demodulator function for FDMDV modem.  Requires 8kHz sample rate raw files
-% as input
+% Demodulator function for FDMDV modem (Octave version).  Requires
+% 8kHz sample rate raw files as input
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 

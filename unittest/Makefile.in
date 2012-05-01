@@ -75,7 +75,7 @@ am_tcodec2_OBJECTS = tcodec2.$(OBJEXT) quantise.$(OBJEXT) \
 tcodec2_OBJECTS = $(am_tcodec2_OBJECTS)
 tcodec2_DEPENDENCIES =
 am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT)
+	kiss_fft.$(OBJEXT) octave.$(OBJEXT)
 tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
 tfdmdv_DEPENDENCIES =
 am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) fft.$(OBJEXT) \
@@ -270,7 +270,7 @@ tcodec2_LDFLAGS = $(LIBS)
 scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
-tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c ../src/octave.c
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
 all: all-am
@@ -375,6 +375,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lpc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nlp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postfilter.Po@am__quote@
@@ -704,6 +705,20 @@ fdmdv.obj: ../src/fdmdv.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fdmdv.c' object='fdmdv.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fdmdv.obj `if test -f '../src/fdmdv.c'; then $(CYGPATH_W) '../src/fdmdv.c'; else $(CYGPATH_W) '$(srcdir)/../src/fdmdv.c'; fi`
+
+octave.o: ../src/octave.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT octave.o -MD -MP -MF "$(DEPDIR)/octave.Tpo" -c -o octave.o `test -f '../src/octave.c' || echo '$(srcdir)/'`../src/octave.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/octave.Tpo" "$(DEPDIR)/octave.Po"; else rm -f "$(DEPDIR)/octave.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/octave.c' object='octave.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o octave.o `test -f '../src/octave.c' || echo '$(srcdir)/'`../src/octave.c
+
+octave.obj: ../src/octave.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT octave.obj -MD -MP -MF "$(DEPDIR)/octave.Tpo" -c -o octave.obj `if test -f '../src/octave.c'; then $(CYGPATH_W) '../src/octave.c'; else $(CYGPATH_W) '$(srcdir)/../src/octave.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/octave.Tpo" "$(DEPDIR)/octave.Po"; else rm -f "$(DEPDIR)/octave.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/octave.c' object='octave.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o octave.obj `if test -f '../src/octave.c'; then $(CYGPATH_W) '../src/octave.c'; else $(CYGPATH_W) '$(srcdir)/../src/octave.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo
