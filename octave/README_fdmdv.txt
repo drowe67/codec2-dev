@@ -41,6 +41,16 @@ TODO
     [ ] maybe in ascii art
 [ ] blog posts(s)
 [ ] Codec 2 web page update
+[ ] examples of various combinations of fdmdv demos
+    $ ./fdmdv_get_test_bits test.c2 1400
+    $ ./fdmdv_mod test.c2 test.raw
+    $ play -r 8000 -s -2 test.raw
+    
+    Two seconds of test frame data out of sound device: 
+       $ ./fdmdv_get_test_bits - 2800 | ./fdmdv_mod - - | play -t raw -r 8000 -s -2 -
+
+[ ] PAPR idea
+    + automatically weak phases to reduce PAPR, e.g. slow variations in freq...
 
 Tests
 

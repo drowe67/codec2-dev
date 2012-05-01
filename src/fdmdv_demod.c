@@ -42,9 +42,9 @@
 #define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
 #define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
 
-/* lof of information we want to sump to Octave */
+/* lof of information we want to dump to Octave */
 
-#define MAX_FRAMES 50*60
+#define MAX_FRAMES 50*60 /* 1 minute at 50 symbols/s */
 
 void dump_to_octave(struct FDMDV *fdmdv, FILE *f);
 

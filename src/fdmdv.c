@@ -427,7 +427,9 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
   FDMDV modulator, take a frame of FDMDV_BITS_PER_FRAME bits and
   generates a frame of FDMDV_SAMPLES_PER_FRAME modulated symbols.
-  Sync bit is returned to aid alignment of your next frame.
+  Sync bit is returned to aid alignment of your next frame.  It is the
+  sync_bit (pilot bit) value that will be used for the next frame of
+  mosulatedsamples.
 
 \*---------------------------------------------------------------------------*/
 

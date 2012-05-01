@@ -1,14 +1,11 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: fdmdv_mod.c
+  FILE........: fdmdv_get_test_bits.c
   AUTHOR......: David Rowe  
-  DATE CREATED: April 28 2012
+  DATE CREATED: 1 May 2012
                                                                              
-  Given an input file of bits outputs a raw file (8kHz, 16 bit shorts)
-  of FDMDV modem samples ready to send over a HF radio channel.  The
-  input file is assumed to be arranged as codec frames of 56 bits (7
-  bytes) which we send as two 28 bit modem frames.
-                                                                             
+  Generates a file of packed test bits, useful for input to fdmdv_mod.
+
 \*---------------------------------------------------------------------------*/
 
 
@@ -43,47 +40,42 @@
 
 int main(int argc, char *argv[])
 {
-    FILE         *fin, *fout;
+    FILE         *fout;
     struct FDMDV *fdmdv;
     char          packed_bits[BYTES_PER_CODEC_FRAME];
     int           tx_bits[2*FDMDV_BITS_PER_FRAME];
-    COMP          tx_fdm[2*FDMDV_SAMPLES_PER_FRAME];
-    short         tx_fdm_scaled[2*FDMDV_SAMPLES_PER_FRAME];
-    int           frames;
-    int           i, bit, byte;
-    int           sync_bit;
+    int           n, i, bit, byte;
+    int           numBits, nCodecFrames;
 
     if (argc < 3) {
-	printf("usage: %s InputBitFile OutputModemRawFile\n", argv[0]);
-	printf("e.g    %s hts1a.c2 hts1a_fdmdv.raw\n", argv[0]);
+	printf("usage: %s OutputBitFile numBits\n", argv[0]);
+	printf("e.g    %s test.c2 1400\n", argv[0]);
 	exit(1);
     }
 
-    if (strcmp(argv[1], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input bit file: %s: %s.\n",
+    if (strcmp(argv[1], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[1],"wb")) == NULL ) {
+	fprintf(stderr, "Error opening output bit file: %s: %s.\n",
          argv[1], strerror(errno));
 	exit(1);
     }
 
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
-         argv[2], strerror(errno));
-	exit(1);
-    }
+    numBits = atoi(argv[2]);
+    nCodecFrames = numBits/BITS_PER_CODEC_FRAME;
 
     fdmdv = fdmdv_create();
-    frames = 0;
 
-    while(fread(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fin) == BYTES_PER_CODEC_FRAME) {
-	frames++;
+    for(n=0; n<nCodecFrames; n++) {
+
+	fdmdv_get_test_bits(fdmdv, tx_bits);
+	fdmdv_get_test_bits(fdmdv, &tx_bits[FDMDV_BITS_PER_FRAME]);
 	
-	/* unpack bits, MSB first */
+	/* pack bits, MSB received first  */
 
 	bit = 7; byte = 0;
+	memset(packed_bits, 0, BYTES_PER_CODEC_FRAME);
 	for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
-	    tx_bits[i] = (packed_bits[byte] >> bit) & 0x1;
+	    packed_bits[byte] |= (tx_bits[i] << bit);
 	    bit--;
 	    if (bit < 0) {
 		bit = 7;
@@ -92,31 +84,17 @@ int main(int argc, char *argv[])
 	}
 	assert(byte == BYTES_PER_CODEC_FRAME);
 
-	/* modulate even and odd frames */
-
-	fdmdv_mod(fdmdv, tx_fdm, tx_bits, &sync_bit);
-	assert(sync_bit == 1);
-
-	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_SAMPLES_PER_FRAME], &tx_bits[FDMDV_BITS_PER_FRAME], &sync_bit);
-	assert(sync_bit == 0);
-
-	/* scale and save to disk as shorts */
-
-	for(i=0; i<2*FDMDV_SAMPLES_PER_FRAME; i++)
-	    tx_fdm_scaled[i] = FDMDV_SCALE * tx_fdm[i].real;
-
- 	fwrite(tx_fdm_scaled, sizeof(short), 2*FDMDV_SAMPLES_PER_FRAME, fout);
-
+	fwrite(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fout);
+ 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
     }
 
-    fclose(fin);
     fclose(fout);
     fdmdv_destroy(fdmdv);
 
     return 0;
 }
+
