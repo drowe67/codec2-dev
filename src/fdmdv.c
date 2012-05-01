@@ -1131,11 +1131,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 
 void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 {
-    COMP  pi_on_4;
     int   c;
-
-    pi_on_4.real = cos(PI/4.0);
-    pi_on_4.imag = sin(PI/4.0);
 
     fdmdv_stats->snr = 0.0; /* TODO - implement SNR estimation */
     fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;

@@ -25,7 +25,7 @@ function fdmdv_demod_c(dumpfilename, bits)
 
   figure(1)
   clf;
-  plot(real(rx_symbols_log_c(1:Nc+1,30:frames)),imag(rx_symbols_log_c(1:Nc+1,30:frames)),'+')
+  plot(real(rx_symbols_log_c(1:Nc+1,15:frames)),imag(rx_symbols_log_c(1:Nc+1,15:frames)),'+')
   axis([-2 2 -2 2]);
   title('Scatter Diagram');
 
