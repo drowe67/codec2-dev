@@ -41,10 +41,12 @@ extern "C" {
 
 #include "comp.h"
 
-#define FDMDV_BITS_PER_FRAME      28  /* odd/even frames 56 bits, 1400 bit/s  */
-#define FDMDV_SAMPLES_PER_FRAME  160  /* 8000 Hz sample rate                  */
-#define FDMDV_SCALE             1000  /* suggested scaling for 16 bit shorts  */
-#define FDMDV_NSYM                15
+#define FDMDV_BITS_PER_FRAME          28  /* 20ms frames, 1400 bit/s                                        */
+#define FDMDV_NOM_SAMPLES_PER_FRAME  160  /* modulator output samples/frame and nominal demod samples/frame */
+                                          /* at 8000 Hz sample rate                                         */
+#define FDMDV_MAX_SAMPLES_PER_FRAME  200  /* max demod samples/frame, use this to allocate storage          */
+#define FDMDV_SCALE                 1000  /* suggested scaling for 16 bit shorts                            */
+#define FDMDV_NSYM                    15
 
 struct FDMDV;
     
@@ -53,7 +55,7 @@ struct FDMDV_STATS {
     COMP   rx_symbols[FDMDV_NSYM]; /* latest received symbols, for scatter plot          */ 
     int    fest_coarse_fine;       /* freq est state, 0-coarse 1-fine                    */ 
     float  foff;                   /* estimated freq offset in Hz                        */       
-    float  rx_timing;              /* timing offset -1..1 as fraction of symbol period   */
+    float  rx_timing;              /* estimated optimum timing offset in samples         */
     float  clock_offset;           /* Estimated tx/rx sample clock offset in ppm         */
 };
 

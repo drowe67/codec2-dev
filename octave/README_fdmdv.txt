@@ -57,7 +57,9 @@ TODO
        $  ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | ./fdmdv_demod - - demod_dump.txt | ./fdmdv_put_test_bits -
 
 [ ] PAPR idea
-    + automatically weak phases to reduce PAPR, e.g. slow variations in freq...
+    + automatically tweak phases to reduce PAPR, e.g. slow variations in freq...
+[ ] implement SNR and ppm measurements
+[ ] add help to each octave script & C program
 
 Tests
 
@@ -67,3 +69,4 @@ Tests
 [ ] mod_dqpsk_good_4dB_8008hz.raw
 [ ] mod_dqpsk_moderate_4dB_8008hz.raw
 [ ] mod_dqpsk_moderate_4dB_7992hz.raw
+[ ] time ....
