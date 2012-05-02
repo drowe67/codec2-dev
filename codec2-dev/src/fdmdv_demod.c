@@ -53,8 +53,8 @@ int main(int argc, char *argv[])
     char          packed_bits[BYTES_PER_CODEC_FRAME];
     int           rx_bits[FDMDV_BITS_PER_FRAME];
     int           codec_bits[2*FDMDV_BITS_PER_FRAME];
-    float         rx_fdm[FDMDV_SAMPLES_PER_FRAME];
-    short         rx_fdm_scaled[FDMDV_SAMPLES_PER_FRAME];
+    float         rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
     int           nin;
     int           sync_bit;
@@ -91,12 +91,12 @@ int main(int argc, char *argv[])
     fdmdv = fdmdv_create();
     frames = 0;
     state = 0;
-    nin = FDMDV_SAMPLES_PER_FRAME;
+    nin = FDMDV_NOM_SAMPLES_PER_FRAME;
 
     while(fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin)
     {
-	for(i=0; i<FDMDV_SAMPLES_PER_FRAME; i++)
-	    rx_fdm[i] = rx_fdm_scaled[i]/FDMDV_SCALE;
+	for(i=0; i<nin; i++)
+	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
 	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
 
 	/* log data for optional Octave dump */
@@ -160,17 +160,22 @@ int main(int argc, char *argv[])
 
     /* Optional dump to Octave log file */
 
-    if ( strcmp(argv[3],"|") && (foct = fopen(argv[3],"wt")) == NULL ) {
-	fprintf(stderr, "Error opening Octave dump file: %s: %s.\n",
-		argv[3], strerror(errno));
-	exit(1);
-    }
-    else {
-	octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, MAX_FRAMES, MAX_FRAMES);  
-	octave_save_float(foct, "foff_log_c", foff_log, 1, MAX_FRAMES);  
-	octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, MAX_FRAMES);  
-	octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, MAX_FRAMES);  
-	fclose(foct);
+    if (argc == 4) {
+
+	/* make sure 3rd arg is not just the pipe command */
+
+	if (strcmp(argv[3],"|")) {
+	    if ((foct = fopen(argv[3],"wt")) == NULL ) {
+		fprintf(stderr, "Error opening Octave dump file: %s: %s.\n",
+			argv[3], strerror(errno));
+		exit(1);
+	    }
+	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, MAX_FRAMES, MAX_FRAMES);  
+	    octave_save_float(foct, "foff_log_c", foff_log, 1, MAX_FRAMES);  
+	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, MAX_FRAMES);  
+	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, MAX_FRAMES);  
+	    fclose(foct);
+	}
     }
 
     fclose(fin);

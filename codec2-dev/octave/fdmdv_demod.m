@@ -50,15 +50,16 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     % obtain nin samples of the test input signal
     
     for i=1:nin
-      rx_fdm(i) = fread(fin, 1, "short")/gain; 
+      rx_fdm(i) = fread(fin, 1, "short")/gain;
     end
-
+    
     rx_fdm_log = [rx_fdm_log rx_fdm(1:nin)];
 
     % frequency offset estimation and correction
 
     [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
     [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
+    
     if track == 0
       foff  = foff_coarse;
     end
@@ -76,6 +77,7 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     rx_filt = rx_filter(rx_baseband, nin);
 
     [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);
+    
     rx_timing_log = [rx_timing_log rx_timing];
     nin = M;
     if rx_timing > 2*M/P

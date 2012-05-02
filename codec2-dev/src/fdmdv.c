@@ -120,7 +120,8 @@ struct FDMDV *fdmdv_create(void)
     float         carrier_freq;
 
     assert(FDMDV_BITS_PER_FRAME == NC*NB);
-    assert(FDMDV_SAMPLES_PER_FRAME == M);
+    assert(FDMDV_NOM_SAMPLES_PER_FRAME == M);
+    assert(FDMDV_MAX_SAMPLES_PER_FRAME == (M+M/P));
 
     f = (struct FDMDV*)malloc(sizeof(struct FDMDV));
     if (f == NULL)
@@ -700,7 +701,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 
     /* maximum number of input samples to demod */
 
-    assert(nin < (M+M/P));
+    assert(nin <= (M+M/P));
 
     /* Nc/2 tones below centre freq */
   
@@ -713,15 +714,15 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
     /* Nc/2 tones above centre freq */
 
     for (c=NC/2; c<NC; c++) 
-	for (i=0; i<M; i++) {
+	for (i=0; i<nin; i++) {
 	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
 	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
 	}
 
-    /* add centre pilot tone  */
+    /* centre pilot tone  */
 
     c = NC;
-    for (i=0; i<M; i++) {
+    for (i=0; i<nin; i++) {
 	phase_rx[c] = cmult(phase_rx[c],  freq[c]);
 	rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
     }
@@ -812,7 +813,7 @@ float rx_est_timing(COMP rx_symbols[],
     */
 
     adjust = P - nin*P/M;
-
+    
     /* update buffer of NT rate P filtered symbols */
     
     for(c=0; c<NC+1; c++) 
@@ -849,6 +850,8 @@ float rx_est_timing(COMP rx_symbols[],
        M/4 part was adjusted by experiment, I know not why.... */
     
     rx_timing = atan2(x.imag, x.real)*M/(2*PI) + M/4;
+    //printf("%f  %f\n", x.real, x.imag);
+    
     if (rx_timing > M)
 	rx_timing -= M;
     if (rx_timing < -M)
@@ -1100,7 +1103,9 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
  
     /* freq offset estimation and correction */
 
+    
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
+    
     if (fdmdv->coarse_fine == COARSE)
 	fdmdv->foff = foff_coarse;
     freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
@@ -1110,6 +1115,17 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
     fdmdv->rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    
+    /* adjust number of input samples to keep timing within bounds */
+
+    *nin = M;
+
+    if (fdmdv->rx_timing > 2*M/P)
+       *nin += M/P;
+    
+    if (fdmdv->rx_timing < 0)
+       *nin -= M/P;
+    
     foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 
@@ -1132,18 +1148,26 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 {
     int   c;
+    COMP  pi_on_4;
+
+    pi_on_4.real = cos(PI/4.0);
+    pi_on_4.imag = sin(PI/4.0);
 
     fdmdv_stats->snr = 0.0; /* TODO - implement SNR estimation */
     fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
     fdmdv_stats->foff = fdmdv->foff;
-    fdmdv_stats->rx_timing = fdmdv->rx_timing/M;
+    fdmdv_stats->rx_timing = fdmdv->rx_timing;
     fdmdv_stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
     assert((NC+1) == FDMDV_NSYM);
 
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<NC; c++) {
 	fdmdv_stats->rx_symbols[c] = fdmdv->phase_difference[c];
     }
+    
+    /* place pilots somewhere convenient on scatter diagram */
+
+    fdmdv_stats->rx_symbols[NC] = cmult(fdmdv->phase_difference[NC], pi_on_4);
 
 }
 

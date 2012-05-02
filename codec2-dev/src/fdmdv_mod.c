@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     struct FDMDV *fdmdv;
     char          packed_bits[BYTES_PER_CODEC_FRAME];
     int           tx_bits[2*FDMDV_BITS_PER_FRAME];
-    COMP          tx_fdm[2*FDMDV_SAMPLES_PER_FRAME];
-    short         tx_fdm_scaled[2*FDMDV_SAMPLES_PER_FRAME];
+    COMP          tx_fdm[2*FDMDV_NOM_SAMPLES_PER_FRAME];
+    short         tx_fdm_scaled[2*FDMDV_NOM_SAMPLES_PER_FRAME];
     int           frames;
     int           i, bit, byte;
     int           sync_bit;
@@ -97,15 +97,15 @@ int main(int argc, char *argv[])
 	fdmdv_mod(fdmdv, tx_fdm, tx_bits, &sync_bit);
 	assert(sync_bit == 1);
 
-	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_SAMPLES_PER_FRAME], &tx_bits[FDMDV_BITS_PER_FRAME], &sync_bit);
+	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[FDMDV_BITS_PER_FRAME], &sync_bit);
 	assert(sync_bit == 0);
 
 	/* scale and save to disk as shorts */
 
-	for(i=0; i<2*FDMDV_SAMPLES_PER_FRAME; i++)
+	for(i=0; i<2*FDMDV_NOM_SAMPLES_PER_FRAME; i++)
 	    tx_fdm_scaled[i] = FDMDV_SCALE * tx_fdm[i].real;
 
- 	fwrite(tx_fdm_scaled, sizeof(short), 2*FDMDV_SAMPLES_PER_FRAME, fout);
+ 	fwrite(tx_fdm_scaled, sizeof(short), 2*FDMDV_NOM_SAMPLES_PER_FRAME, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */

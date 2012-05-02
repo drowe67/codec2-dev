@@ -40,6 +40,7 @@
 #include "octave.h"
 
 #define FRAMES 25
+#define CHANNEL_BUF_SIZE (10*M)
 
 int main(int argc, char *argv[])
 {
@@ -48,9 +49,11 @@ int main(int argc, char *argv[])
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
     COMP          tx_fdm[M];
+    float         channel[CHANNEL_BUF_SIZE];
+    int           channel_count;
     float         rx_fdm[M+M/P];
     float         foff_coarse;
-    int           nin;
+    int           nin, next_nin;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
@@ -85,11 +88,14 @@ int main(int argc, char *argv[])
     float         foff_fine_log[FRAMES];
     int           sync_bit_log[FRAMES];
     int           coarse_fine_log[FRAMES];
+    int           nin_log[FRAMES];
 
     FILE         *fout;
-    int           f,c,i;
+    int           f,c,i,j;
 
     fdmdv = fdmdv_create();
+    next_nin = M;
+    channel_count = 0;
 
     rx_baseband_log_col_index = 0;
     rx_filt_log_col_index = 0;
@@ -106,10 +112,37 @@ int main(int argc, char *argv[])
 	tx_filter(tx_baseband, tx_symbols, fdmdv->tx_filter_memory);
 	fdm_upconvert(tx_fdm, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
 
-	for(i=0; i<M; i++)
-	    rx_fdm[i] = tx_fdm[i].real;
-	nin = M;
+	/* --------------------------------------------------------*\
+	                          Channel
+	\*---------------------------------------------------------*/
 
+	nin = next_nin;
+	/*
+	if (f == 2)
+	    nin = 120;
+	if (f == 3)
+	    nin = 200;
+	if ((f !=2) && (f != 3))
+            nin = M;
+	*/
+	/* add M tx samples to end of buffer */
+
+	assert((channel_count + M) < CHANNEL_BUF_SIZE);
+	for(i=0; i<M; i++)
+	    channel[channel_count+i] = tx_fdm[i].real;
+	channel_count += M;
+
+	/* take nin samples from start of buffer */
+
+	for(i=0; i<nin; i++)
+	    rx_fdm[i] = channel[i];
+
+	/* shift buffer back */
+
+	for(i=0,j=nin; j<channel_count; i++,j++)
+	    channel[i] = channel[j];
+	channel_count -= nin;
+ 
 	/* --------------------------------------------------------*\
 	                        Demodulator
 	\*---------------------------------------------------------*/
@@ -128,6 +161,15 @@ int main(int argc, char *argv[])
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+	
+	next_nin = M;
+	
+	if (rx_timing > 2*M/P)
+	    next_nin += M/P;
+    
+	if (rx_timing < 0)
+	    next_nin -= M/P;
+	
 	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
@@ -164,15 +206,16 @@ int main(int argc, char *argv[])
 	/* rx filtering */
 
 	for(c=0; c<NC+1; c++) {
-	    for(i=0; i<(P*M)/nin; i++)
+	    for(i=0; i<(P*nin)/M; i++)
 		rx_filt_log[c][rx_filt_log_col_index + i] = rx_filt[c][i]; 
 	}
-	rx_filt_log_col_index += (P*M)/nin;
+	rx_filt_log_col_index += (P*nin)/M;
 
 	/* timing estimation */
 
 	memcpy(&env_log[NT*P*f], env, sizeof(float)*NT*P);
 	rx_timing_log[f] = rx_timing;
+	nin_log[f] = nin;
 	for(c=0; c<NC+1; c++)
 	    rx_symbols_log[c][f] = rx_symbols[c];
 	
@@ -216,6 +259,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES);  
     octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
     octave_save_int(fout, "coarse_fine_log_c", coarse_fine_log, 1, FRAMES);  
+    octave_save_int(fout, "nin_log_c", nin_log, 1, FRAMES);  
     fclose(fout);
 
     fdmdv_destroy(fdmdv);
