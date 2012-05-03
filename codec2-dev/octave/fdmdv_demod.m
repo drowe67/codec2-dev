@@ -166,9 +166,9 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   plot(xt, rx_timing_log)
   title('timing offset (samples)');
   subplot(212)
-  plot(xt, foff_log)
+  plot(xt, foff_log, '-;freq offset;')
   hold on;
-  plot(xt, track_log*75, 'r');
+  plot(xt, track_log*75, 'r;course-fine;');
   hold off;
   title('Freq offset (Hz)');
   grid
@@ -181,11 +181,8 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   plot(xt1, rx_fdm_log);
   title('Rx FDM Signal');
   subplot(212)
-  Nfft=Fs;
-  S=fft(rx_fdm_log,Nfft);
-  SdB=20*log10(abs(S));
-  plot(SdB(1:Fs/4))
-  title('FDM Rx Spectrum');
+  spec(rx_fdm_log,8000);
+  title('FDM Rx Spectrogram');
 
   figure(4)
   clf;

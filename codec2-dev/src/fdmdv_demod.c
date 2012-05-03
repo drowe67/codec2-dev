@@ -8,6 +8,10 @@
   outputs a file of bits.  The output file is assumed to be arranged
   as codec frames of 56 bits (7 bytes) which are received as two 28
   bit modem frames.
+
+  Demod states can be optionally logged to an Octave file for display
+  using the Octave script fdmdv_demod_c.m.  This is useful for
+  checking demod performance.
                                                                              
 \*---------------------------------------------------------------------------*/
 
@@ -60,13 +64,17 @@ int main(int argc, char *argv[])
     int           sync_bit;
     int           state, next_state;
 
-    int           frames;
+    int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;
+    float         rx_fdm_log[FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES];
+    int           rx_fdm_log_col_index;
     COMP          rx_symbols_log[FDMDV_NSYM][MAX_FRAMES];
     int           coarse_fine_log[MAX_FRAMES];
     float         rx_timing_log[MAX_FRAMES];
     float         foff_log[MAX_FRAMES];
+    int           sync_bit_log[MAX_FRAMES];
+    int           rx_bits_log[FDMDV_BITS_PER_FRAME*MAX_FRAMES];
 
     if (argc < 3) {
 	printf("usage: %s InputModemRawFile OutputBitFile [OctaveDumpFile]\n", argv[0]);
@@ -89,9 +97,10 @@ int main(int argc, char *argv[])
     }
 
     fdmdv = fdmdv_create();
-    frames = 0;
+    f = 0;
     state = 0;
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+    rx_fdm_log_col_index = 0;
 
     while(fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin)
     {
@@ -101,14 +110,23 @@ int main(int argc, char *argv[])
 
 	/* log data for optional Octave dump */
 
-	if (frames < MAX_FRAMES) {
+	if (f < MAX_FRAMES) {
 	    fdmdv_get_demod_stats(fdmdv, &stats);
+
+	    /* log modem states for later dumping to Octave log file */
+
+	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(float)*nin);
+	    rx_fdm_log_col_index += nin;
+
 	    for(c=0; c<FDMDV_NSYM; c++)
-		rx_symbols_log[c][frames] = stats.rx_symbols[c];
-	    foff_log[frames] = stats.foff;
-	    rx_timing_log[frames] = stats.rx_timing;
-	    coarse_fine_log[frames] = stats.fest_coarse_fine;
-	    frames++;
+		rx_symbols_log[c][f] = stats.rx_symbols[c];
+	    foff_log[f] = stats.foff;
+	    rx_timing_log[f] = stats.rx_timing;
+	    coarse_fine_log[f] = stats.fest_coarse_fine;
+	    sync_bit_log[f] = sync_bit;
+	    memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
+
+	    f++;
 	}
 	else
 	    printf("MAX_FRAMES exceed in Octave log, log truncated\n");
@@ -170,10 +188,13 @@ int main(int argc, char *argv[])
 			argv[3], strerror(errno));
 		exit(1);
 	    }
-	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, MAX_FRAMES, MAX_FRAMES);  
-	    octave_save_float(foct, "foff_log_c", foff_log, 1, MAX_FRAMES);  
-	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, MAX_FRAMES);  
-	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, MAX_FRAMES);  
+	    octave_save_float(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
+	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, f, MAX_FRAMES);  
+	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
+	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
+	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, f);  
+	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*f);
+	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
 	    fclose(foct);
 	}
     }
