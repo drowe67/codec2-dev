@@ -58,8 +58,6 @@ References
 C Code
 ------
 
-src/fdmdv_demo.c
-
 src/fdmdv_mod.c - C version of modulator that takes a file of bits and
                   converts it to a raw file of modulated samples.
 
@@ -167,7 +165,7 @@ This introduces a simulated 1000ppm error:
 TODO
 ----
 
-[ ] consider moving this file to root
+[X] consider moving this file to root
     [ ] sep SVN repo, automake etc?
 [ ] list each fdmdv.m script (ut, mod, demod) and C program/src and what it does
     [ ] example usage
