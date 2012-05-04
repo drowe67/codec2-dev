@@ -1,6 +1,7 @@
 % fdmdv_ut.m
 %
-% Unit Test program for FDMDV modem.
+% Unit Test program for FDMDV modem.  Useful for general development as it has
+% both tx and rx sides, and basic AWGN channel simulation.
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 
@@ -155,7 +156,7 @@ for f=1:frames
   % mode to keep states updated
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
-  foff_course = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
+  [foff_course S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
   if track == 0
     foff = foff_course;
   end
@@ -242,7 +243,7 @@ ber = total_bit_errors / total_bits;
 papr = max(tx_fdm_log.*conj(tx_fdm_log)) / mean(tx_fdm_log.*conj(tx_fdm_log));
 papr_dB = 10*log10(papr);
 
-printf("Eb/No (meas): %2.2f (%2.2f) dB  %d bits  %d errors  BER: (%1.4f) PAPR: %1.2f dB  SNR: %2.1f dB\n", 
+printf("Eb/No (meas): %2.2f (%2.2f) dB\nbits........: %d\nerrors......: %d\nBER.........: %1.4f\nPAPR........: %1.2f dB\nSNR.........: %2.1f dB\n", 
        EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)),
        total_bits, total_bit_errors, ber, papr_dB, SNR );
 
@@ -263,9 +264,9 @@ subplot(211)
 plot(rx_timing_log)
 title('timing offset (samples)');
 subplot(212)
-plot(foff_log)
+plot(foff_log, '-;freq offset;')
 hold on;
-plot(track_log*75, 'r');
+plot(track_log*75, 'r;course-fine;');
 hold off;
 title('Freq offset (Hz)');
 

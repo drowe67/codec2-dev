@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------*\
                                                                              
   FILE........: fdmdv.h
-  AUTHOR......: David Rowe                                                          
+  AUTHOR......: David Rowe
   DATE CREATED: April 14 2012
                                                                              
-  A 1400 bit/s Frequency Divison Multiplexed Digital Voice (FDMDV)
-  modem.  Used for digital audio over HF SSB. The input and output
-  sample rate is 8000 Hz. See tfdmdv_mod.c and tfdmdv_demod.c for
-  example usage.
+  A 1400 bit/s Frequency Division Multiplexed Digital Voice (FDMDV)
+  modem.  Used for digital audio over HF SSB. See README_fdmdv.txt for
+  more information, and fdmdv_demo.c, fdmdv_mod.c and fdmdv_demod.c
+  for example usage.
                      
   References:
  
