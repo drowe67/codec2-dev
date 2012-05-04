@@ -6,6 +6,8 @@ For more information please see:
 
     http://rowetel.com/codec2.html
 
+Also included is a FDMDV modem, see README_fdmdv.txt
+
 Quickstart
 ----------
 
@@ -53,7 +55,7 @@ Debugging
 
 2/ To use gdb:
 
-  $ $ libtool --mode=execute gdb c2sim
+  $ libtool --mode=execute gdb c2sim
 
 Directories
 -----------

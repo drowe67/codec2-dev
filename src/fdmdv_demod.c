@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     float         rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
-    int           nin;
+    int           nin, nin_prev;
     int           sync_bit;
     int           state, next_state;
 
@@ -106,6 +106,7 @@ int main(int argc, char *argv[])
     {
 	for(i=0; i<nin; i++)
 	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
+	nin_prev = nin;
 	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
 
 	/* log data for optional Octave dump */
@@ -115,8 +116,8 @@ int main(int argc, char *argv[])
 
 	    /* log modem states for later dumping to Octave log file */
 
-	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(float)*nin);
-	    rx_fdm_log_col_index += nin;
+	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(float)*nin_prev);
+	    rx_fdm_log_col_index += nin_prev;
 
 	    for(c=0; c<FDMDV_NSYM; c++)
 		rx_symbols_log[c][f] = stats.rx_symbols[c];
