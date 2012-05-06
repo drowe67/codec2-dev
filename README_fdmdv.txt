@@ -12,7 +12,7 @@ based on [1].  Used for digital audio over HF SSB.
 The FDMDV modem was first implemented in GNU Octave, then ported to C.
 Algorithm development is generally easier in Octave, but for real time
 work we need the C version.  Automated units tests ensure the
-operation of the Octave and C versions are indentical.
+operation of the Octave and C versions are identical.
 
 Quickstart
 ----------
@@ -76,7 +76,7 @@ src/fdmdv-internal.h - internal states and constants for FDMDV modem,
                        shouldn't be exposed to application program.
 
 
-unittest/tfdmdv.c - Used to conjuction with unittest/tfdmdv.m to
+unittest/tfdmdv.c - Used to conjunction with unittest/tfdmdv.m to
                     automatically test C FDMDV functions against
                     Octave versions.
 
@@ -139,7 +139,7 @@ fdmdv_demod.m - Demodulator program that takes a raw file as input,
 
 fdmdv_demod_c.m - Takes an output text file from the C demod
                   fdmdv_demod.c and produces plots and measures BER.
-                  Useful for evaulating fdmdv_demod.c performance.
+                  Useful for evaluating fdmdv_demod.c performance.
                   The plots produced are identical to the Octave
                   version fdmdv_demod.m, allowing direct comparison of
                   the C and Octave versions.
@@ -147,9 +147,9 @@ fdmdv_demod_c.m - Takes an output text file from the C demod
 tfdmdv.m - Automatic tests that compare the Octave and C versions of
            the FDMDV modem functions.  First run unittest/tfdmdv, this
            will generate a text file with test vectors from the C
-           version.  Then run the Ocatve script tfdmdv and it will
+           version.  Then run the Octave script tfdmdv and it will
            generate Octave versions of the test vectors and compare
-           each vector with the C equivlalent.  Its plots the vectors
+           each vector with the C equivalent.  Its plots the vectors
            and and errors (green).  Its also produces an automatic
            check list based on test results.  If the Octave or C modem
            code is changed, this script should be used to ensure the
@@ -177,13 +177,11 @@ TODO
 [ ] try non-flat channel, e.g. 3dB difference between hi and low tones
     + make sure all estimators keep working
 [ ] test rx level sensitivity, i.e. 0 to 20dB attenuation
-[ ] try to run from shell script
-[ ] arb bit stream input to Octave mod and demod
 [ ] make fine freq indep of amplitude
     + use angle rather than imag corrd
 [ ] C port and UT framework
-    [ ] document how to use
-    [ ] demo modem C test program
+    [X] document how to use
+    [X] demo modem C test program
     [X] freq corr in func, state vars in struct
     [X] fine freq est in func, statevars
     [X] demod in func with all vars
@@ -194,10 +192,10 @@ TODO
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
 [ ] more positibe form of sync reqd for DV frames?
     + like using track/acquire bit
+    + when should we start decoding?
 [ ] more robust track/acquite state machine?
-    + e.g. hang on thr fades?
-[ ] block diagram
-    [ ] maybe in ascii art
+    + e.g. hang on thru the fades?
+[X] block diagram
 [ ] blog posts(s)
 [ ] Codec 2 web page update
 [ ] PAPR idea
