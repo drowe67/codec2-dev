@@ -1,6 +1,7 @@
 % fdmdv_mod.m
 %
-% Modulator function for FDMDV modem.
+% Modulator function for FDMDV modem, uses test frames as input and
+% outputs a raw file of 16 bit shorts at a sample rate of 8 kHz.
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 

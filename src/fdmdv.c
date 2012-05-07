@@ -109,7 +109,7 @@ static COMP cadd(COMP a, COMP b)
 
   Create and initialise an instance of the modem.  Returns a pointer
   to the modem states or NULL on failure.  One set of states is
-  sufficient for a full duuplex modem.
+  sufficient for a full duplex modem.
 
 \*---------------------------------------------------------------------------*/
 
@@ -259,8 +259,9 @@ void fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
   AUTHOR......: David Rowe			      
   DATE CREATED: 16/4/2012
 
-  Generate Nc+1 QPSK symbols from vector of (1,Nc*Nb) input tx_bits.
-  The Nc+1 symbol is the +1 -1 +1 .... BPSK sync carrier.
+  Maps bits to parallel DQPSK symbols. Generate Nc+1 QPSK symbols from
+  vector of (1,Nc*Nb) input tx_bits.  The Nc+1 symbol is the +1 -1 +1
+  .... BPSK sync carrier.
 
 \*---------------------------------------------------------------------------*/
 
@@ -304,8 +305,8 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
   AUTHOR......: David Rowe			      
   DATE CREATED: 17/4/2012
 
-  Given NC*NB bits construct M samples (1 symbol) of NC filtered
-  symbols streams
+  Given NC*NB bits construct M samples (1 symbol) of NC+1 filtered
+  symbols streams.
 
 \*---------------------------------------------------------------------------*/
 
@@ -428,9 +429,8 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
   FDMDV modulator, take a frame of FDMDV_BITS_PER_FRAME bits and
   generates a frame of FDMDV_SAMPLES_PER_FRAME modulated symbols.
-  Sync bit is returned to aid alignment of your next frame.  It is the
-  sync_bit (pilot bit) value that will be used for the next frame of
-  mosulatedsamples.
+  Sync bit is returned to aid alignment of your next frame.  The
+  sync_bit value returned will be used for the _next_ frame.
 
 \*---------------------------------------------------------------------------*/
 
@@ -453,7 +453,7 @@ void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
   AUTHOR......: David Rowe			      
   DATE CREATED: 19/4/2012
 
-  Generate M samples of DBPSK pilot signal for Freq offset estimation
+  Generate M samples of DBPSK pilot signal for Freq offset estimation.
 
 \*---------------------------------------------------------------------------*/
 
@@ -850,7 +850,6 @@ float rx_est_timing(COMP rx_symbols[],
        M/4 part was adjusted by experiment, I know not why.... */
     
     rx_timing = atan2(x.imag, x.real)*M/(2*PI) + M/4;
-    //printf("%f  %f\n", x.real, x.imag);
     
     if (rx_timing > M)
 	rx_timing -= M;
@@ -933,7 +932,7 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
       rx_bits[2*c+1] = lsb;
     }
  
-    /* Extract DBPSK encoded Sync bit */
+    /* Extract DBPSK encoded Sync bit and fine freq offset estimate */
 
     phase_difference[NC] = cmult(rx_symbols[NC], cconj(prev_rx_symbols[NC]));
     if (phase_difference[NC].real < 0) {
@@ -997,11 +996,12 @@ void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest
   AUTHOR......: David Rowe			      
   DATE CREATED: 24/4/2012
 
-  Freq offset state machine.  Moves between acquire and track states based
-  on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
-  when used continuously.  So we use it until we have acquired the BPSK pilot,
-  then switch to a more robust tracking algorithm.  If we lose sync we switch
-  back to acquire mode for fast-requisition.
+  Freq offset state machine.  Moves between coarse and fine states
+  based on BPSK pilot sequence.  Freq offset estimator occasionally
+  makes mistakes when used continuously.  So we use it until we have
+  acquired the BPSK pilot, then switch to a more robust "fine"
+  tracking algorithm.  If we lose sync we switch back to coarse mode
+  for fast-requisition of large frequency offsets.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1102,8 +1102,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     float         env[NT*P];
  
     /* freq offset estimation and correction */
-
-    
+   
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
     
     if (fdmdv->coarse_fine == COARSE)
@@ -1141,7 +1140,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
   AUTHOR......: David Rowe			      
   DATE CREATED: 1 May 2012
 
-  Fills a structure with a bunch of demod information.
+  Fills stats structure with a bunch of demod information.
 
 \*---------------------------------------------------------------------------*/
 

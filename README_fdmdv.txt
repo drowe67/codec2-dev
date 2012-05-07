@@ -53,7 +53,7 @@ References
 [1] http://n1su.com/fdmdv/FDMDV_Docs_Rel_1_4b.pdf
 [2] http://n1su.com/fdmdv/
 [3] http://www.rowetel.com/blog/?p=2433 "Testing a FDMDV Modem"
-[4] Need a web page or blog post that walks thru unit tests/development/test with pathsim
+[4] http://www.rowetel.com/blog/?p=2458 "FDMDV Modem Page" on David's web site
 
 C Code
 ------
