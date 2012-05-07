@@ -165,12 +165,6 @@ This introduces a simulated 1000ppm error:
 TODO
 ----
 
-[X] consider moving this file to root
-    [ ] sep SVN repo, automake etc?
-[ ] list each fdmdv.m script (ut, mod, demod) and C program/src and what it does
-    [ ] example usage
-[X] repair fdmdv_ut and mod/demod after new states exposed and var renames
-[X] Get file based mod and demod working again
 [ ] try interfering sine wave
     + maybe swept
     + does modem fall over?
@@ -179,36 +173,13 @@ TODO
 [ ] test rx level sensitivity, i.e. 0 to 20dB attenuation
 [ ] make fine freq indep of amplitude
     + use angle rather than imag corrd
-[ ] C port and UT framework
-    [X] document how to use
-    [X] demo modem C test program
-    [X] freq corr in func, state vars in struct
-    [X] fine freq est in func, statevars
-    [X] demod in func with all vars
-    [X] mod in func with all vars
-    [X] check with ch impairments    
-    [X] test with freq offsets
-    [X] measure execution speed
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
 [ ] more positibe form of sync reqd for DV frames?
     + like using track/acquire bit
     + when should we start decoding?
 [ ] more robust track/acquite state machine?
     + e.g. hang on thru the fades?
-[X] block diagram
-[ ] blog posts(s)
-[ ] Codec 2 web page update
 [ ] PAPR idea
     + automatically tweak phases to reduce PAPR, e.g. slow variations in freq...
 [ ] implement SNR and ppm measurements
-[ ] add help to each octave script & C program
 
-Tests
-
-[ ] fdmdv_demod('mod_dqpsk_8008hz.raw',1400*60);
-[ ] fdmdv_demod('mod_dqpsk_7992hz.raw',1400*60);
-[ ] mod_dqpsk_awgn_4dB_8008hz.raw
-[ ] mod_dqpsk_good_4dB_8008hz.raw
-[ ] mod_dqpsk_moderate_4dB_8008hz.raw
-[ ] mod_dqpsk_moderate_4dB_7992hz.raw
-[ ] time ....
