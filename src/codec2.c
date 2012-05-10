@@ -739,7 +739,7 @@ void codec2_decode_1500(struct CODEC2 *c2, short speech[], const unsigned char *
   Encodes 320 speech samples (40ms of speech) into 48 bits.  
 
   The codec2 algorithm actually operates internally on 10ms (80
-  sample) frames, so we run the encoding algorithm for times:
+  sample) frames, so we run the encoding algorithm four times:
 
   frame 0: just send voicing bit
   frame 1: predictive vector quantisation of LSPs and Wo and E
@@ -969,10 +969,12 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     /* decode integer codes to model parameters */
 
     model.Wo = decode_Wo_dt(delta_Wo_index, prev__Wo);
+    assert(model.Wo >= TWO_PI/P_MAX);
+    assert(model.Wo <= TWO_PI/P_MIN);
     model.L = PI/model.Wo;
     memset(&model.A, 0, (model.L+1)*sizeof(model.A[0]));
     energy = decode_energy(energy_index);
-
+    
     /* decode frame 4  */
 
     aks_to_M2(ak, LPC_ORD, &model, energy, &snr, 1); 

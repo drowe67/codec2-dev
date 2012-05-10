@@ -830,6 +830,12 @@ float decode_Wo_dt(int index, float prev_Wo)
     step = (Wo_max - Wo_min)/WO_LEVELS;
     Wo   = prev_Wo + step*(index);
 
+    /* bit errors can make us go out of range leading to all sorts of
+       probs like seg faults */
+
+    if (Wo > Wo_max) Wo = Wo_max;
+    if (Wo < Wo_min) Wo = Wo_min;
+
     return Wo;
 }
 

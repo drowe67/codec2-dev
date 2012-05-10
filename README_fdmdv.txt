@@ -165,6 +165,7 @@ This introduces a simulated 1000ppm error:
 TODO
 ----
 
+[ ] 48 kHz to and from 8 kHz routines to drive 48 kHz sound card audio
 [ ] try interfering sine wave
     + maybe swept
     + does modem fall over?
@@ -172,10 +173,10 @@ TODO
     + make sure all estimators keep working
 [ ] test rx level sensitivity, i.e. 0 to 20dB attenuation
 [ ] make fine freq indep of amplitude
-    + use angle rather than imag corrd
+    + use angle rather than imag coord
 [ ] document use of fdmdv_ut and fdmdv_demod + PathSim
-[ ] more positibe form of sync reqd for DV frames?
-    + like using track/acquire bit
+[ ] more positive form of sync reqd for DV frames?
+    + like using coarse_fine==1 to decode valid DV frame bit?
     + when should we start decoding?
 [ ] more robust track/acquite state machine?
     + e.g. hang on thru the fades?

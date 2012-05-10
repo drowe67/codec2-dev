@@ -44,6 +44,7 @@
 #include "pilot_coeff.h"
 #include "fft.h"
 #include "hanning.h"
+#include "os.h"
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -1168,5 +1169,71 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 
     fdmdv_stats->rx_symbols[NC] = cmult(fdmdv->phase_difference[NC], pi_on_4);
 
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_8_to_48()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 9 May 2012
+
+  Changes the sample rate of a signal from 8 to 48 kHz.  Experience
+  with PC based modems has shown that PC sound cards have a more
+  accurate sample clock when set for 48 kHz than 8 kHz.
+
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n samples
+  at the 48 kHz rate.  A memory of FDMDV_OS_TAPS/FDMDV_OS samples is reqd for
+  in8k[] (see example).
+
+  This is a classic polyphase upsampler.  We take the 8 kHz samples
+  and insert (FDMDV_OS-1) zeroes between each sample, then
+  FDMDV_OS_TAPS FIR low pass filter the signal at 4kHz.  As most of
+  the input samples are zeroes, we only need to multiply non-zero
+  input samples by filter coefficients.  The zero insertion and
+  filtering are combined in the code below and I'm too lazy to explain
+  it further right now....
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_8_to_48(float out48k[], float in8k[], int n)
+{
+    int i,j,k,l;
+
+    for(i=0; i<n; i++) {
+	for(j=0; j<FDMDV_OS; j++) {
+	    out48k[i*FDMDV_OS+j] = 0.0;
+	    for(k=0,l=0; k<FDMDV_OS_TAPS; k+=FDMDV_OS,l++)
+		out48k[i*FDMDV_OS+j] += fdmdv_os_filter[k+j]*in8k[i-l];
+	    
+	}
+    }	
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_48_to_8()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 9 May 2012
+
+  Changes the sample rate of a signal from 48 to 8 kHz.
+ 
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n
+  samples at the 48 kHz rate.  As above however a memory of
+  FDMDV_OS_TAPS samples is reqd for in48k[] (see example).
+
+  Low pass filter the 48 kHz signal at 4 kHz using the same filter as
+  the upsampler, then just output every FDMDV_OS-th filtered sample.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_48_to_8(float out8k[], float in48k[], int n)
+{
+    int i,j;
+
+    for(i=0; i<n; i++) {
+	out8k[i] = 0.0;
+	for(j=0; j<FDMDV_OS_TAPS; j++)
+	    out8k[i] += fdmdv_os_filter[j]*in48k[i*FDMDV_OS-j];
+    }
 }
 
