@@ -69,6 +69,11 @@
 #define FINE                     1
 #define TRACK_COEFF              0.5
 
+/* 8 to 48 kHz sample rate conversion */
+
+#define FDMDV_OS                 6         /* oversampling rate           */
+#define FDMDV_OS_TAPS           48         /* number of OS filter taps    */
+
 /*---------------------------------------------------------------------------*\
                                                                              
                                STRUCT for States
