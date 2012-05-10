@@ -1183,7 +1183,7 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 
   n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n samples
   at the 48 kHz rate.  A memory of FDMDV_OS_TAPS/FDMDV_OS samples is reqd for
-  in8k[] (see example).
+  in8k[] (see t48_8.c unit test as example).
 
   This is a classic polyphase upsampler.  We take the 8 kHz samples
   and insert (FDMDV_OS-1) zeroes between each sample, then
@@ -1220,7 +1220,7 @@ void fdmdv_8_to_48(float out48k[], float in8k[], int n)
  
   n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n
   samples at the 48 kHz rate.  As above however a memory of
-  FDMDV_OS_TAPS samples is reqd for in48k[] (see example).
+  FDMDV_OS_TAPS samples is reqd for in48k[] (see t48_8.c unit test as example).
 
   Low pass filter the 48 kHz signal at 4 kHz using the same filter as
   the upsampler, then just output every FDMDV_OS-th filtered sample.

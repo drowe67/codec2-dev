@@ -1,4 +1,20 @@
-/* Unit test for 48 to 8 kHz sample rate conversion functions */
+/* 
+   t48_8.c
+   David Rowe
+   May 10 2012
+
+   Unit test for 48 to 8 kHz sample rate conversion functions.  I
+   evaluated output by plotting using Octave and looking for jaggies:
+
+     pl("../unittest/out48.raw",1,3000)
+     pl("../unittest/out8.raw",1,3000)
+
+   Listening to it also shows up anything nasty:
+
+     $ play -s -2 -r 48000 out48.raw
+     $ play -s -2 -r 8000 out8.raw
+
+  */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -25,7 +41,7 @@ int main() {
     short out8k_short[N8];
     FILE *f8;
 
-    int i,f,t;
+    int i,f,t,t1;
     float freq = 505.0;
 
     f48 = fopen("out48.raw", "wb");
@@ -40,7 +56,7 @@ int main() {
     for(i=0; i<FDMDV_OS_TAPS; i++)
 	in48k[i] = 0.0;
 
-    t = 0;
+    t = t1 = 0;
     for(f=0; f<FRAMES; f++) {
 
 #ifdef DC
@@ -64,10 +80,14 @@ int main() {
 	    out48k_short[i] = (short)out48k[i];
 	fwrite(out48k_short, sizeof(short), N48, f48);
 	
+	/* add a 10 kHz spurious signal for fun, we want down sampler to
+	   knock this out */
+
+	for(i=0; i<N48; i++,t1++)
+	    in48k[i+FDMDV_OS_TAPS] = out48k[i] + 16000.0*cos(TWO_PI*t1*1E4/FS);
+
 	/* downsample and update filter memory */
 
-	for(i=0; i<N48; i++)
-	    in48k[i+FDMDV_OS_TAPS] = out48k[i];
 	fdmdv_48_to_8(out8k, &in48k[FDMDV_OS_TAPS], N8);
 	for(i=0; i<FDMDV_OS_TAPS; i++)
 	    in48k[i] = in48k[i+N48];
