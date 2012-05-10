@@ -1204,6 +1204,7 @@ void fdmdv_8_to_48(float out48k[], float in8k[], int n)
 	    out48k[i*FDMDV_OS+j] = 0.0;
 	    for(k=0,l=0; k<FDMDV_OS_TAPS; k+=FDMDV_OS,l++)
 		out48k[i*FDMDV_OS+j] += fdmdv_os_filter[k+j]*in8k[i-l];
+	    out48k[i*FDMDV_OS+j] *= FDMDV_OS;
 	    
 	}
     }	

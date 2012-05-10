@@ -48,6 +48,13 @@ extern "C" {
 #define FDMDV_SCALE                 1000  /* suggested scaling for 16 bit shorts                            */
 #define FDMDV_NSYM                    15
 
+/* 8 to 48 kHz sample rate conversion */
+
+#define FDMDV_OS                 6         /* oversampling rate           */
+#define FDMDV_OS_TAPS           48         /* number of OS filter taps    */
+
+/* FDMDV states and stats structures */
+
 struct FDMDV;
     
 struct FDMDV_STATS {

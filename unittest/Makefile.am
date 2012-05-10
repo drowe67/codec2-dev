@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2 vq_train_jvm scalarlsptest tfdmdv
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant tcodec2 vq_train_jvm scalarlsptest tfdmdv t48_8
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -56,3 +56,6 @@ tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c ../src/o
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
 
+t48_8_SOURCES = t48_8.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
+t48_8_LDADD = $(lib_LTLIBRARIES) 
+t48_8_LDFLAGS = $(LIBS)

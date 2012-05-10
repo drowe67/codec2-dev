@@ -166,6 +166,8 @@ TODO
 ----
 
 [ ] 48 kHz to and from 8 kHz routines to drive 48 kHz sound card audio
+[ ] implement SNR and ppm measurements in fdmdv_get_demod_stats()
+[ ] implement fdmdv_get_waterfall_line()
 [ ] try interfering sine wave
     + maybe swept
     + does modem fall over?
@@ -182,5 +184,4 @@ TODO
     + e.g. hang on thru the fades?
 [ ] PAPR idea
     + automatically tweak phases to reduce PAPR, e.g. slow variations in freq...
-[ ] implement SNR and ppm measurements
 
