@@ -47,6 +47,15 @@ $ cd src
     $ octave
     octave:1> fdmdv_ut
 
+5. NOTE: If you would like to play modem samples over the air please
+   convert the 8 kHz samples to 48 kHz.  Many PC sound cards have
+   wildly inaccurate sample clock rates when set to 8 kHz, but seem to
+   perform OK when set for 48 kHz.  If playing and recording files you
+   can use the sox utility:
+
+   $ sox -r 8000 -s -2 modem_sample_8kHz.raw -r 48000 modem_sample_48kHz.wav
+
+
 References
 ----------
 
