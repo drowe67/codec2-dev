@@ -55,6 +55,8 @@ $ cd src
 
    $ sox -r 8000 -s -2 modem_sample_8kHz.raw -r 48000 modem_sample_48kHz.wav
 
+   For real time applications, the fdmdv.[ch] library includes functions to
+   convert between 48 and 8 kHz sample rates.
 
 References
 ----------

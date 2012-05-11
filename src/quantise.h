@@ -44,6 +44,8 @@
 #define LSPDT_LOW   1
 #define LSPDT_HIGH  2
 
+#define WO_E_BITS   8
+
 void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
@@ -77,7 +79,10 @@ void lspvq_quantise(float lsp[], float lsp_[], int order);
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
-void ge_quantise(float *x, float *xq);
+
+void quantise_WoE(MODEL *model, float *e, float xq[]);
+int  encode_WoE(MODEL *model, float e, float xq[]);
+void decode_WoE(MODEL *model, float *e, float xq[], int n1);
 
 int encode_energy(float e);
 float decode_energy(int index);

@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     float ak_interp[LPC_MAX];
     int   lsp_indexes[LPC_MAX];
     float lsps_[LPC_MAX];
-    float Woe[2], Woe_[2];
+    float Woe_[2];
 
     void *nlp_states;
     float hpf_states[2];
@@ -236,6 +236,14 @@ int main(int argc, char *argv[])
                } else if(strcmp(optarg,"1500") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
+	            lsp = 1; lspdt = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 1;
+	            dt = 1;
+               } else if(strcmp(optarg,"1400") == 0) {
+	            lpc_model = 1; order = 10;
+		    vector_quant_Wo_e = 1;
 	            lsp = 1; lspdt = 1;
 	            phase0 = 1;
 	            postfilt = 1;
@@ -548,19 +556,10 @@ int main(int argc, char *argv[])
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
 
-		Woe[0] = log10((model.Wo/PI)*4000.0/50.0)/log10(2);
-		Woe[1] = 10.0*log10(1e-4+e);
-		ge_quantise(Woe, Woe_);
+		printf("\nWo %f e %f\n", model.Wo, e);
+		quantise_WoE(&model, &e, Woe_);
+		printf("Wo %f e %f\n", model.Wo, e);
 
-		/*
-		  x = log2(4000*Wo/(PI*50));
-		  2^x = 4000*Wo/(PI*50)
-		  Wo = (2^x)*(PI*50)/4000;
-		*/
-
-		model.Wo = pow(2.0, Woe_[0])*(PI*50.0)/4000.0;
-		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
-		e = pow(10.0, Woe_[1]/10.0);
 	    }
 
 	    aks_to_M2(ak, order, &model, e, &snr, 1); 
@@ -765,7 +764,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
 			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
-			option_parameters = " <2500|1500|1200>";
+			option_parameters = " <2500|1500|1400|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " <DumpFilePrefix>";
 		} else {

@@ -26,7 +26,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#define P 	10	/* LP order					*/
+#define P 	12	/* LP order					*/
 #define LSP_DELTA1 0.01 /* grid spacing for LSP root searches */
 #define NW	279	/* frame size in samples 			*/
 #define	N  	80 	/* frame to frame shift				*/

@@ -937,11 +937,11 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
 
     phase_difference[NC] = cmult(rx_symbols[NC], cconj(prev_rx_symbols[NC]));
     if (phase_difference[NC].real < 0) {
-      *sync_bit = 0;
+      *sync_bit = 1;
       ferr = phase_difference[NC].imag;
     }
     else {
-      *sync_bit = 1;
+      *sync_bit = 0;
       ferr = -phase_difference[NC].imag;
     }
 
