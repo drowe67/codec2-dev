@@ -69,3 +69,9 @@ Directories
   voicing  - hand-estimated voicing files, used for development
   wav      - speech files in wave file format
 
+TODO
+----
+
+[ ] Make sure we have separate state variables for enc and dec on
+    modes that use difference in time coding and have statesthat are
+    presevred from frame to frame.

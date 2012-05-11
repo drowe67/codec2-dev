@@ -434,10 +434,10 @@ function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, mo
 
     phase_difference(Nc+1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
     if (real(phase_difference(Nc+1)) < 0)
-      sync_bit = 0;
+      sync_bit = 1;
       f_err = imag(phase_difference(Nc+1));
     else
-      sync_bit = 1;
+      sync_bit = 0;
       f_err = -imag(phase_difference(Nc+1));
     end
 

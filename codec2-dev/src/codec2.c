@@ -59,6 +59,9 @@ struct CODEC2 {
     MODEL  prev_model;          /* previous frame's model parameters         */
     float  prev_lsps_[LPC_ORD]; /* previous frame's LSPs                     */
     float  prev_energy;         /* previous frame's LPC energy               */
+
+    float  xq_enc[2];           /* joint pitch and energy VQ states          */
+    float  xq_dec[2];
 };
 
 /*---------------------------------------------------------------------------*\
@@ -74,6 +77,8 @@ void codec2_encode_2500(struct CODEC2 *c2, unsigned char * bits, short speech[])
 void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_1500(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1500(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 
@@ -109,6 +114,7 @@ struct CODEC2 *codec2_create(int mode)
     assert(
 	   (mode == CODEC2_MODE_2500) || 
 	   (mode == CODEC2_MODE_1500) || 
+	   (mode == CODEC2_MODE_1400) || 
 	   (mode == CODEC2_MODE_1200)
 	   );
     c2->mode = mode;
@@ -140,6 +146,9 @@ struct CODEC2 *codec2_create(int mode)
 	free (c2);
 	return NULL;
     }
+
+    c2->xq_enc[0] = c2->xq_enc[1] = 0.0;
+    c2->xq_dec[0] = c2->xq_dec[1] = 0.0;
 
     return c2;
 }
@@ -176,6 +185,8 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 	return 50;
     if  (c2->mode == CODEC2_MODE_1500)
 	return 60;
+    if  (c2->mode == CODEC2_MODE_1400)
+	return 56;
     if  (c2->mode == CODEC2_MODE_1200)
 	return 48;
 
@@ -198,6 +209,8 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 160;
     if  (c2->mode == CODEC2_MODE_1500)
 	return 320;
+    if  (c2->mode == CODEC2_MODE_1400)
+	return 320;
     if  (c2->mode == CODEC2_MODE_1200)
 	return 320;
 
@@ -210,6 +223,7 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
     assert(
 	   (c2->mode == CODEC2_MODE_2500) || 
 	   (c2->mode == CODEC2_MODE_1500) || 
+	   (c2->mode == CODEC2_MODE_1400) || 
 	   (c2->mode == CODEC2_MODE_1200)
 	   );
 
@@ -217,6 +231,8 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 	codec2_encode_2500(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_1500)
 	codec2_encode_1500(c2, bits, speech);
+    if (c2->mode == CODEC2_MODE_1400)
+	codec2_encode_1400(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_1200)
 	codec2_encode_1200(c2, bits, speech);
 }
@@ -227,6 +243,7 @@ void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
     assert(
 	   (c2->mode == CODEC2_MODE_2500) || 
 	   (c2->mode == CODEC2_MODE_1500) || 
+	   (c2->mode == CODEC2_MODE_1400) || 
 	   (c2->mode == CODEC2_MODE_1200)
 	   );
 
@@ -234,6 +251,8 @@ void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
 	codec2_decode_2500(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_1500)
  	codec2_decode_1500(c2, speech, bits);
+    if (c2->mode == CODEC2_MODE_1400)
+ 	codec2_decode_1400(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_1200)
  	codec2_decode_1200(c2, speech, bits);
 }
@@ -337,7 +356,7 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
     int     i;
     unsigned int nbit = 0;
     MODEL   model_interp;
-    static  int frames;
+    //static  int frames;
 
     //fprintf(stderr,"frame: %d\n", frames+=2);
     assert(c2 != NULL);
@@ -426,15 +445,15 @@ void codec2_decode_2500(struct CODEC2 *c2, short speech[], const unsigned char *
   AUTHOR......: David Rowe			      
   DATE CREATED: Nov 14 2011 
 
-  Encodes 320 speech samples (40ms of speech) into 60 bits.  
+  Encodes 320 speech samples (40ms of speech) into 60 bits.
 
   The codec2 algorithm actually operates internally on 10ms (80
   sample) frames, so we run the encoding algorithm for times:
 
   frame 0: just send voicing bit
-  frame 1: scalar quantisation of LSPs and Wo and E
+  frame 1: scalar quantisation of LSPs, Wo and E
   frame 2: just send voicing bit
-  frame 3: delta-time quantisation Wo and E
+  frame 3: delta-time Wo and scalar E
 
   The bit allocation is:
 
@@ -551,9 +570,9 @@ void codec2_encode_1500(struct CODEC2 *c2, unsigned char * bits, short speech[])
                                                        
   FUNCTION....: codec2_decode_1500	     
   AUTHOR......: David Rowe			      
-  DATE CREATED: 16 Nov 2011
+  DATE CREATED: 11 May 2012
 
-  Decodes frames of 56 bits into 320 samples (40ms) of speech.
+  Decodes frames of 60 bits into 320 samples (40ms) of speech.
 
 \*---------------------------------------------------------------------------*/
 
@@ -729,6 +748,300 @@ void codec2_decode_1500(struct CODEC2 *c2, short speech[], const unsigned char *
     c2->prev_energy = energy;
 
 }
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: codec2_encode_1400	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: May 11 2012
+
+  Encodes 320 speech samples (40ms of speech) into 56 bits.
+
+  The codec2 algorithm actually operates internally on 10ms (80
+  sample) frames, so we run the encoding algorithm for times:
+
+  frame 0: just send voicing bit
+  frame 1: scalar quantisation of LSPs, joint VQ of Wo and E
+  frame 2: just send voicing bit
+  frame 3: joint VQ of Wo and E
+
+  The bit allocation is:
+
+    Parameter                      frame 2  frame 4   Total
+    -------------------------------------------------------
+    Harmonic magnitudes (LSPs)     36        0        36
+    Energy+Wo                       8        8        16
+    Voicing (10ms update)           2        2         4
+    TOTAL                          46       10        56
+ 
+\*---------------------------------------------------------------------------*/
+
+void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[])
+{
+    MODEL   model;
+    float   lsps[LPC_ORD], lsps_[LPC_ORD];
+    float   ak[LPC_ORD+1];
+    float   e;
+    int     voiced1, voiced2, voiced3, voiced4;
+    int     lsp_indexes[LPC_ORD];
+    int     WoE_index;
+    int     i;
+    unsigned int nbit = 0;
+    unsigned int nbit_tmp;
+    //static  int frames;
+
+    assert(c2 != NULL);
+
+    memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
+
+    /* frame 1: - we just want voicing -------------------------------- */
+
+    //fprintf(stderr,"frame: %d\n", ++frames);
+    analyse_one_frame(c2, &model, speech);
+    voiced1 = model.voiced;
+
+    /* frame 2: - full LSP, joint Wo & EE ----------------------------- */
+
+    //fprintf(stderr,"frame: %d\n", ++frames);
+    analyse_one_frame(c2, &model, &speech[N]);
+    voiced2 = model.voiced;
+    
+    e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
+    encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
+    WoE_index = encode_WoE(&model, e, c2->xq_enc);
+
+    for(i=0; i<LSP_SCALAR_INDEXES; i++) {
+	pack(bits, &nbit, lsp_indexes[i], lsp_bits(i));
+    }
+    pack(bits, &nbit, WoE_index, WO_E_BITS);
+    pack(bits, &nbit, voiced1, 1);
+    pack(bits, &nbit, voiced2, 1);
+
+    /* decode LSPs for testing */
+
+    decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
+    bw_expand_lsps(lsps_, LPC_ORD);
+    /*
+      fprintf(stderr,"\n  lsps_......: ");
+    for(i=0; i<LPC_ORD; i++)
+	fprintf(stderr,"%5.3f  ", lsps_[i]);
+    fprintf(stderr,"\n");
+    */
+
+    /* frame 3: - we just want voicing --------------------------------- */
+
+    //fprintf(stderr,"frame: %d\n", ++frames);
+    analyse_one_frame(c2, &model, &speech[2*N]);
+    voiced3 = model.voiced;
+
+    /* frame 4: - voicing and joint Wo & E ----------------------------  */
+
+    //fprintf(stderr,"frame: %d\n", ++frames);
+    analyse_one_frame(c2, &model, &speech[3*N]);
+    voiced4 = model.voiced;
+  
+    /* need to run this to get LPC energy */
+    e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
+
+    WoE_index = encode_WoE(&model, e, c2->xq_enc);
+
+    //fprintf(stderr,"  e: %f code: %d dec: %f \n", e, energy_index, decode_energy(energy_index));
+
+    nbit_tmp = nbit;
+    pack(bits, &nbit, WoE_index, WO_E_BITS);
+    pack(bits, &nbit, voiced3, 1);
+    pack(bits, &nbit, voiced4, 1);
+    //fprintf(stderr,"          00 16 24 32 40 48 56\n"); 
+    //fprintf(stderr,"nbit = %d %02x %02x %02x %02x %02x %02x %02x %02x\n", nbit, 
+    //	   bits[0], bits[1], bits[2], bits[3],
+    //	   bits[4], bits[5], bits[6], bits[7]);
+
+    //fprintf(stderr,"  nbit_tmp: %d ", nbit_tmp);
+    // fprintf(stderr,"energy_index after: %d\n", energy_index);
+
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
+    //if (frames == 36)
+    //exit(0);
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: codec2_decode_1400	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 11 May 2012
+
+  Decodes frames of 48 bits into 320 samples (40ms) of speech.
+
+\*---------------------------------------------------------------------------*/
+
+void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits)
+{
+    MODEL   model;
+    int     voiced1, voiced2, voiced3, voiced4;
+    int     lsp_indexes[LPC_ORD];
+    float   lsps_[LPC_ORD];
+    int     WoE_index;
+    float   energy;
+    float   snr;
+    float   ak[LPC_ORD+1];
+    float   ak_interp[LPC_ORD+1];
+    float   lsps_interp[LPC_ORD];
+    int     i;
+    unsigned int nbit = 0;
+    MODEL   model_interp;
+    static  int frames;
+    float   prev__Wo;
+
+    assert(c2 != NULL);
+
+    /* unpack frame 1 & 2 bit stream to integer codes */
+
+    for(i=0; i<LSP_SCALAR_INDEXES; i++) {
+	lsp_indexes[i] = unpack(bits, &nbit, lsp_bits(i));
+    }
+    WoE_index = unpack(bits, &nbit, WO_E_BITS);
+    voiced1 = unpack(bits, &nbit, 1);
+    voiced2 = unpack(bits, &nbit, 1);
+ 
+    /* decode codes to model parameters */
+
+    decode_WoE(&model, &energy, c2->xq_dec, WoE_index);
+    memset(&model.A, 0, (model.L+1)*sizeof(model.A[0]));
+
+    /* decode frame 2 LSPs and model amplitudes */
+
+    decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
+    check_lsp_order(lsps_, LPC_ORD);
+    bw_expand_lsps(lsps_, LPC_ORD);
+    lsp_to_lpc(lsps_, ak, LPC_ORD);
+    aks_to_M2(ak, LPC_ORD, &model, energy, &snr, 1); 
+    apply_lpc_correction(&model);
+
+    /* interpolate frame 1 model parameters from adjacent frames */
+
+    model.voiced = voiced2;
+    model_interp.voiced = voiced1;
+    model_interp.Wo = P_MAX/2;
+    memset(&model_interp.A, 0, MAX_AMP*sizeof(model_interp.A[0]));
+
+    interpolate_lsp(&model_interp, &c2->prev_model, &model,
+    		    c2->prev_lsps_, c2->prev_energy, lsps_, energy, ak_interp,
+		    lsps_interp);
+    apply_lpc_correction(&model_interp);
+
+    frames += 2;
+    /* used for comparing to c2sim version 
+       fprintf(stderr,"frame: %d\n", frames);
+    fprintf(stderr,"  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
+	   model_interp.Wo, model_interp.L, model_interp.voiced, c2->prev_energy);
+    fprintf(stderr,"  lsps_interp: ");
+    for(i=0; i<LPC_ORD; i++)
+	fprintf(stderr,"%5.3f  ", lsps_interp[i]);
+    fprintf(stderr,"\n  A..........: ");
+    for(i=0; i<10; i++)
+	fprintf(stderr,"%5.3f  ",model_interp.A[i]);
+
+    fprintf(stderr,"\n  Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
+	   model.Wo, model.L, energy, model.voiced);
+    fprintf(stderr,"  lsps_......: ");
+    for(i=0; i<LPC_ORD; i++)
+	fprintf(stderr,"%5.3f  ", lsps_[i]);
+    fprintf(stderr,"\n  A..........: ");
+    for(i=0; i<10; i++)
+	fprintf(stderr,"%5.3f  ",model.A[i]);
+    fprintf(stderr,"\n");
+    */
+
+    /* synthesise frame 1 and frame 2 10ms frames */
+
+    synthesise_one_frame(c2, speech, &model_interp, ak_interp);
+    //fprintf(stderr,"  buf[0] %d\n", speech[0]);
+    synthesise_one_frame(c2, &speech[N], &model, ak);
+    //fprintf(stderr,"  buf[0] %d\n", speech[N]);
+
+    /* update memories (decode states) for next time */
+
+    memcpy(&c2->prev_model, &model, sizeof(MODEL));
+    memcpy(c2->prev_lsps_, lsps_, sizeof(lsps_));
+    c2->prev_energy = energy;
+    prev__Wo = model.Wo;
+
+    /*--------------------------------------------------------------------*/
+
+    /* unpack frame 3 & 4 bit stream to integer codes */
+
+    WoE_index = unpack(bits, &nbit, WO_E_BITS);
+    voiced3 = unpack(bits, &nbit, 1);
+    voiced4 = unpack(bits, &nbit, 1);
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
+
+    /* decode integer codes to model parameters */
+
+    memset(&model.A, 0, (model.L+1)*sizeof(model.A[0]));
+
+    /* decode frame 4  */
+
+    decode_WoE(&model, &energy, c2->xq_dec, WoE_index);
+    aks_to_M2(ak, LPC_ORD, &model, energy, &snr, 1); 
+    apply_lpc_correction(&model);
+
+    /* interpolate frame 3 model parameters from adjacent frames */
+
+    model.voiced = voiced4;
+    model_interp.voiced = voiced3;
+    model_interp.Wo = P_MAX/2;
+    memset(&model_interp.A, 0, MAX_AMP*sizeof(model_interp.A[0]));
+
+    interpolate_lsp(&model_interp, &c2->prev_model, &model,
+    		    c2->prev_lsps_, c2->prev_energy, lsps_, energy, ak_interp,
+		    lsps_interp);
+    apply_lpc_correction(&model_interp);
+
+    frames +=2;
+    /* used for comparing to c2sim version:
+    fprintf(stderr,"frame: %d\n", frames);
+
+    fprintf(stderr,"  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
+	   model_interp.Wo, model_interp.L, model_interp.voiced, c2->prev_energy);
+    fprintf(stderr,"  lsps_interp: ");
+    for(i=0; i<LPC_ORD; i++)
+	fprintf(stderr,"%5.3f  ", lsps_interp[i]);
+    fprintf(stderr,"\n  A..........: ");
+    for(i=0; i<10; i++)
+	fprintf(stderr,"%5.3f  ",model_interp.A[i]);
+
+    fprintf(stderr,"\n  Wo: %1.5f  L: %d e_index: %d e: %3.2f v2: %d\n", 
+	   model.Wo, model.L, energy_index, energy, model.voiced);
+    fprintf(stderr,"  lsps_......: ");
+    for(i=0; i<LPC_ORD; i++)
+	fprintf(stderr,"%5.3f  ", lsps_[i]);
+    fprintf(stderr,"\n  A..........: ");
+    for(i=0; i<10; i++)
+	fprintf(stderr,"%5.3f  ",model.A[i]);
+    fprintf(stderr,"\n");
+    */
+
+    /* synthesise frame 3 and frame 4 10ms frames */
+
+    synthesise_one_frame(c2, &speech[2*N], &model_interp, ak_interp);
+    //fprintf(stderr,"  buf[0] %d\n", speech[2*N]);
+    synthesise_one_frame(c2, &speech[3*N], &model, ak);
+    //fprintf(stderr,"  buf[0] %d\n", speech[3*N]);
+ 
+    if (frames == 44) {
+    	//exit(0);
+    }
+
+    /* update memories (decode states) for next time */
+
+    memcpy(&c2->prev_model, &model, sizeof(MODEL));
+    memcpy(c2->prev_lsps_, lsps_, sizeof(lsps_));
+    c2->prev_energy = energy;
+
+}
+
 
 /*---------------------------------------------------------------------------*\
                                                        

@@ -1477,27 +1477,42 @@ void compute_weights2(const float *x, const float *xp, float *w, int ndim)
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: quantize_ge()	     
+  FUNCTION....: quantise_WoE()	     
   AUTHOR......: Jean-Marc Valin & David Rowe			      
   DATE CREATED: 29 Feb 2012
 
-  Experimental joint Wo and LPC energy vector quantiser developed my
-  Jean-Marc Valin.
+  Experimental joint Wo and LPC energy vector quantiser developed by
+  Jean-Marc Valin.  Exploits correlations between the difference in
+  the log pitch and log energy from frame to frame.  For example the
+  both the pitch and energy tend to only change by small amounts
+  during voiced speech, however it is important that these changes be
+  coded carefully.  During unvoiced speech they both change a lot but
+  the ear is less sensitve to errors so coarser quantisation is OK.
+
+  The ear is sensitive to log energy and loq pitch so we quantise in
+  thise domains.  That way the error measure used to quantise the
+  values is close to way the ear senses errors.
   
+  See http://jmspeex.livejournal.com/10446.html
+
 \*---------------------------------------------------------------------------*/
 
-void ge_quantise(float *x, float *xq)
+void quantise_WoE(MODEL *model, float *e, float xq[])
 {
   int          i, n1;
+  float        x[2];
   float        err[2];
   float        w[2];
   const float *codebook1 = ge_cb[0].cb;
   int          nb_entries = ge_cb[0].m;
   int          ndim = ge_cb[0].k;
+  float Wo_min = TWO_PI/P_MAX;
+  float Wo_max = TWO_PI/P_MIN;
 
-  //printf("ndim %d nb_entries %d\n", ndim, nb_entries);
+  x[0] = log10((model->Wo/PI)*4000.0/50.0)/log10(2);
+  x[1] = 10.0*log10(1e-4 + *e);
+
   compute_weights2(x, xq, w, ndim);
-  //exit(0);
   for (i=0;i<ndim;i++)
     err[i] = x[i]-ge_coeff[i]*xq[i];
   n1 = find_nearest_weighted(codebook1, nb_entries, err, w, ndim);
@@ -1508,5 +1523,103 @@ void ge_quantise(float *x, float *xq)
     err[i] -= codebook1[ndim*n1+i];
   }
 
+  /*
+    x = log2(4000*Wo/(PI*50));
+    2^x = 4000*Wo/(PI*50)
+    Wo = (2^x)*(PI*50)/4000;
+  */
+  
+  model->Wo = pow(2.0, xq[0])*(PI*50.0)/4000.0;
+
+  /* bit errors can make us go out of range leading to all sorts of
+     probs like seg faults */
+
+  if (model->Wo > Wo_max) model->Wo = Wo_max;
+  if (model->Wo < Wo_min) model->Wo = Wo_min;
+
+  model->L  = PI/model->Wo; /* if we quantise Wo re-compute L */
+
+  *e = pow(10.0, xq[1]/10.0);
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_WoE()	     
+  AUTHOR......: Jean-Marc Valin & David Rowe			      
+  DATE CREATED: 11 May 2012
+
+  Joint Wo and LPC energy vector quantiser developed my Jean-Marc
+  Valin.  Returns index, and updated states xq[].
+  
+\*---------------------------------------------------------------------------*/
+
+int encode_WoE(MODEL *model, float e, float xq[])
+{
+  int          i, n1;
+  float        x[2];
+  float        err[2];
+  float        w[2];
+  const float *codebook1 = ge_cb[0].cb;
+  int          nb_entries = ge_cb[0].m;
+  int          ndim = ge_cb[0].k;
+
+  assert((1<<WO_E_BITS) == nb_entries);
+
+  x[0] = log10((model->Wo/PI)*4000.0/50.0)/log10(2);
+  x[1] = 10.0*log10(1e-4 + e);
+
+  compute_weights2(x, xq, w, ndim);
+  for (i=0;i<ndim;i++)
+    err[i] = x[i]-ge_coeff[i]*xq[i];
+  n1 = find_nearest_weighted(codebook1, nb_entries, err, w, ndim);
+  
+  for (i=0;i<ndim;i++)
+  {
+    xq[i] = ge_coeff[i]*xq[i] + codebook1[ndim*n1+i];
+    err[i] -= codebook1[ndim*n1+i];
+  }
+
+  return n1;
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_WoE()	     
+  AUTHOR......: Jean-Marc Valin & David Rowe			      
+  DATE CREATED: 11 May 2012
+
+  Joint Wo and LPC energy vector quantiser developed my Jean-Marc
+  Valin.  Given index and states xq[], returns Wo & E, and updates
+  states xq[].
+  
+\*---------------------------------------------------------------------------*/
+
+void decode_WoE(MODEL *model, float *e, float xq[], int n1)
+{
+  int          i;
+  float        err[2];
+  const float *codebook1 = ge_cb[0].cb;
+  int          ndim = ge_cb[0].k;
+  float Wo_min = TWO_PI/P_MAX;
+  float Wo_max = TWO_PI/P_MIN;
+
+  for (i=0;i<ndim;i++)
+  {
+    xq[i] = ge_coeff[i]*xq[i] + codebook1[ndim*n1+i];
+    err[i] -= codebook1[ndim*n1+i];
+  }
+
+  model->Wo = pow(2.0, xq[0])*(PI*50.0)/4000.0;
+
+  /* bit errors can make us go out of range leading to all sorts of
+     probs like seg faults */
+
+  if (model->Wo > Wo_max) model->Wo = Wo_max;
+  if (model->Wo < Wo_min) model->Wo = Wo_min;
+
+  model->L  = PI/model->Wo; /* if we quantise Wo re-compute L */
+
+  *e = pow(10.0, xq[1]/10.0);
 }
 
