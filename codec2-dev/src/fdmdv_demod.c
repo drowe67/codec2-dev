@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;
-    float         rx_fdm_log[FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES];
+    float         *rx_fdm_log;
     int           rx_fdm_log_col_index;
     COMP          rx_symbols_log[FDMDV_NSYM][MAX_FRAMES];
     int           coarse_fine_log[MAX_FRAMES];
@@ -95,6 +95,12 @@ int main(int argc, char *argv[])
          argv[2], strerror(errno));
 	exit(1);
     }
+
+    /* this cause out of stack probs on windows as a regular variable
+       so let malloc it */
+
+    rx_fdm_log = (float*)malloc(sizeof(float)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
+    assert(rx_fdm_log != NULL);
 
     fdmdv = fdmdv_create();
     f = 0;
@@ -130,7 +136,7 @@ int main(int argc, char *argv[])
 	    f++;
 	}
 	else
-	    printf("MAX_FRAMES exceed in Octave log, log truncated\n");
+	    fprintf(stderr,"MAX_FRAMES exceed in Octave log, log truncated\n");
 
 	/* state machine to output codec bits only if we have a 0,1
 	   sync bit sequence */
@@ -202,6 +208,7 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
+    free(rx_fdm_log);
     fdmdv_destroy(fdmdv);
 
     return 0;
