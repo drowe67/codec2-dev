@@ -556,9 +556,9 @@ int main(int argc, char *argv[])
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
 
-		printf("\nWo %f e %f\n", model.Wo, e);
+		//printf("\nWo %f e %f\n", model.Wo, e);
 		quantise_WoE(&model, &e, Woe_);
-		printf("Wo %f e %f\n", model.Wo, e);
+		//printf("Wo %f e %f\n", model.Wo, e);
 
 	    }
 
