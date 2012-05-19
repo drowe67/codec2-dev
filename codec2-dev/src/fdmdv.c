@@ -102,6 +102,11 @@ static COMP cadd(COMP a, COMP b)
     return res;
 }
 
+static float cabsolute(COMP a)
+{
+    return sqrt(pow(a.real, 2.0) + pow(a.imag, 2.0));
+}
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdmdv_create	     
@@ -210,6 +215,11 @@ struct FDMDV *fdmdv_create(void)
 
     f->fest_state = 0;
     f->coarse_fine = COARSE;
+ 
+    for(c=0; c<NC+1; c++) {
+	f->sig_est[c] = 0.0;
+	f->noise_est[c] = 0.0;
+    }
 
     return f;
 }
@@ -829,7 +839,7 @@ float rx_est_timing(COMP rx_symbols[],
     for(i=0; i<NT*P; i++) {
 	env[i] = 0.0;
 	for(c=0; c<NC+1; c++)
-	    env[i] += sqrt(pow(rx_filter_mem_timing[c][i].real,2.0) + pow(rx_filter_mem_timing[c][i].imag,2.0));
+	    env[i] += cabsolute(rx_filter_mem_timing[c][i]);
     }
 
     /* The envelope has a frequency component at the symbol rate.  The
@@ -944,10 +954,68 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
       *sync_bit = 0;
       ferr = -phase_difference[NC].imag;
     }
+    
+    /* pilot carrier gets an extra pi/4 rotation to make it consistent
+       with other carriers, as we need it for snr_update and scatter
+       diagram */
+
+    phase_difference[NC] = cmult(phase_difference[NC], pi_on_4);
 
     return ferr;
 }
  
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: snr_update()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 17 May 2012
+
+  Given phase differences update estimates of signal and noise levels.
+
+\*---------------------------------------------------------------------------*/
+
+void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
+{
+    float s[NC+1];
+    COMP  refl_symbols[NC+1];
+    float n[NC+1];
+    COMP  pi_on_4;
+    int   c;
+
+    pi_on_4.real = cos(PI/4.0);
+    pi_on_4.imag = sin(PI/4.0);
+
+    /* mag of each symbol is distance from origin, this gives us a
+       vector of mags, one for each carrier. */
+
+    for(c=0; c<NC+1; c++)
+	s[c] = cabsolute(phase_difference[c]);
+
+    /* signal mag estimate for each carrier is a smoothed version of
+       instantaneous magntitude, this gives us a vector of smoothed
+       mag estimates, one for each carrier. */
+
+    for(c=0; c<NC+1; c++)
+	sig_est[c] = SNR_COEFF*sig_est[c] + (1.0 - SNR_COEFF)*s[c];
+
+    /* noise mag estimate is distance of current symbol from average
+       location of that symbol.  We reflect all symbols into the first
+       quadrant for convenience. */
+    
+    for(c=0; c<NC+1; c++) {
+	refl_symbols[c].real = fabs(phase_difference[c].real);
+	refl_symbols[c].imag = fabs(phase_difference[c].imag);    
+	n[c] = cabsolute(cadd(fcmult(sig_est[c], pi_on_4), cneg(refl_symbols[c])));
+    }
+     
+    /* noise mag estimate for each carrier is a smoothed version of
+       instantaneous noise mag, this gives us a vector of smoothed
+       noise power estimates, one for each carrier. */
+
+    for(c=0; c<NC+1; c++)
+	noise_est[c] = SNR_COEFF*noise_est[c] + (1 - SNR_COEFF)*n[c];
+}
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdmdv_put_test_bits()	     
@@ -1128,11 +1196,56 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
     
     foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
+    snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->phase_difference);
 
     /* freq offset estimation state machine */
 
     fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state);
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: calc_snr()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 17 May 2012
+
+  Calculate current SNR estimate (3000Hz noise BW)
+
+\*---------------------------------------------------------------------------*/
+
+float calc_snr(float sig_est[], float noise_est[])
+{
+    float S, SdB;
+    float mean, N50, N50dB, N3000dB;
+    float snr_dB;
+    int   c;
+   
+    S = 0.0;
+    for(c=0; c<NC+1; c++)
+	S += pow(sig_est[c], 2.0);
+    SdB = 10.0*log10(S);
+    
+    /* Average noise mag across all carriers and square to get an
+       average noise power.  This is an estimate of the noise power in
+       Rs = 50Hz of BW (note for raised root cosine filters Rs is the
+       noise BW of the filter) */
+
+    mean = 0.0;
+    for(c=0; c<NC+1; c++)
+	mean += noise_est[c];
+    mean /= (NC+1);
+    N50 = pow(mean, 2.0);
+    N50dB = 10.0*log10(N50);
+
+    /* Now multiply by (3000 Hz)/(50 Hz) to find the total noise power
+       in 3000 Hz */
+
+    N3000dB = N50dB + 10.0*log10(3000.0/RS);
+
+    snr_dB = SdB - N3000dB;
+
+    return snr_dB;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1148,12 +1261,8 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm
 void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 {
     int   c;
-    COMP  pi_on_4;
 
-    pi_on_4.real = cos(PI/4.0);
-    pi_on_4.imag = sin(PI/4.0);
-
-    fdmdv_stats->snr = 0.0; /* TODO - implement SNR estimation */
+    fdmdv_stats->snr_est = calc_snr(fdmdv->sig_est, fdmdv->noise_est);
     fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
     fdmdv_stats->foff = fdmdv->foff;
     fdmdv_stats->rx_timing = fdmdv->rx_timing;
@@ -1161,14 +1270,9 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 
     assert((NC+1) == FDMDV_NSYM);
 
-    for(c=0; c<NC; c++) {
+    for(c=0; c<NC+1; c++) {
 	fdmdv_stats->rx_symbols[c] = fdmdv->phase_difference[c];
     }
-    
-    /* place pilots somewhere convenient on scatter diagram */
-
-    fdmdv_stats->rx_symbols[NC] = cmult(fdmdv->phase_difference[NC], pi_on_4);
-
 }
 
 /*---------------------------------------------------------------------------*\

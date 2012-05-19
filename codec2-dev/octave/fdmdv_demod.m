@@ -30,10 +30,18 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   test_frame_sync_log = [];
   test_frame_sync_state = 0;
 
+  % SNR states
+
+  sig_est = zeros(Nc+1,1);
+  noise_est = zeros(Nc+1,1);
+
+  % logs of various states for plotting
+
   rx_symbols_log = [];
   rx_timing_log = [];
   foff_log = [];
   rx_fdm_log = [];
+  snr_est_log = [];
 
   % misc states
 
@@ -92,7 +100,10 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     else
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
-    [rx_bits sync f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits sync f_err pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
+    snr_est = calc_snr(sig_est, noise_est);
+    snr_est_log = [snr_est_log snr_est];
     foff -= 0.5*f_err;
     prev_rx_symbols = rx_symbols;
     sync_log = [sync_log sync];
@@ -198,6 +209,9 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
-
-  
+  figure(5)
+  clf;
+  plot(xt, snr_est_log);
+  title('SNR Estimates')
+ 
 endfunction

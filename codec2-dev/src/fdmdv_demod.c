@@ -75,6 +75,7 @@ int main(int argc, char *argv[])
     float         foff_log[MAX_FRAMES];
     int           sync_bit_log[MAX_FRAMES];
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*MAX_FRAMES];
+    float         snr_est_log[MAX_FRAMES];
 
     if (argc < 3) {
 	printf("usage: %s InputModemRawFile OutputBitFile [OctaveDumpFile]\n", argv[0]);
@@ -132,7 +133,7 @@ int main(int argc, char *argv[])
 	    coarse_fine_log[f] = stats.fest_coarse_fine;
 	    sync_bit_log[f] = sync_bit;
 	    memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
-
+	    snr_est_log[f] = stats.snr_est;
 	    f++;
 	}
 	else
@@ -202,6 +203,7 @@ int main(int argc, char *argv[])
 	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, f);  
 	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*f);
 	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
+	    octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
 	    fclose(foct);
 	}
     }

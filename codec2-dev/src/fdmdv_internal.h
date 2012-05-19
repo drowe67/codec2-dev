@@ -69,6 +69,8 @@
 #define FINE                     1
 #define TRACK_COEFF              0.5
 
+#define SNR_COEFF                0.9        /* SNR est averaging filter coeff */
+
 /*---------------------------------------------------------------------------*\
                                                                              
                                STRUCT for States
@@ -124,6 +126,11 @@ struct FDMDV {
 
     int  fest_state;
     int  coarse_fine;
+
+    /* SNR estimation states */
+
+    float sig_est[NC+1];
+    float noise_est[NC+1];
 };
 
 /*---------------------------------------------------------------------------*\
@@ -150,6 +157,8 @@ float rx_est_timing(COMP  rx_symbols[],
 		   COMP  rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
 		   int   nin);	 
 float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[]);
+void snr_update(float sig_est[], float noise_est[], COMP phase_difference[]);
 int freq_state(int sync_bit, int *state);
+float calc_snr(float sig_est[], float noise_est[]);
 
 #endif
