@@ -12,7 +12,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
+frames = 25;
 EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
@@ -45,6 +45,11 @@ bit_errors_log = [];
 sync_log = [];
 test_frame_sync_log = [];
 test_frame_sync_state = 0;
+
+% SNR estimation states
+
+sig_est = zeros(Nc+1,1);
+noise_est = zeros(Nc+1,1);
 
 % fixed delay simuation
 
@@ -90,6 +95,7 @@ foff = 0;
 fest_state = 0;
 track = 0;
 track_log = [];
+
 
 % ---------------------------------------------------------------------
 % Main loop 
@@ -181,12 +187,13 @@ for f=1:frames
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
+  [rx_bits sync foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   if strcmp(modulation,'dqpsk')
-    rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
+    %rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
+    rx_symbols_log = [rx_symbols_log pd];
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
   endif
-  [rx_bits sync foff_fine] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   foff -= 0.5*ferr;
   prev_rx_symbols = rx_symbols;
   sync_log = [sync_log sync];
@@ -195,6 +202,10 @@ for f=1:frames
 
   [track fest_state] = freq_state(sync, fest_state);
   track_log = [track_log track];
+
+  % Update SNR est
+
+  [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
 
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
@@ -238,14 +249,23 @@ end
 
 ber = total_bit_errors / total_bits;
 
-% Peak to Average Power Ratio from http://www.dsplog.com
+% Peak to Average Power Ratio calcs from http://www.dsplog.com
 
 papr = max(tx_fdm_log.*conj(tx_fdm_log)) / mean(tx_fdm_log.*conj(tx_fdm_log));
 papr_dB = 10*log10(papr);
 
-printf("Eb/No (meas): %2.2f (%2.2f) dB\nbits........: %d\nerrors......: %d\nBER.........: %1.4f\nPAPR........: %1.2f dB\nSNR.........: %2.1f dB\n", 
-       EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)),
-       total_bits, total_bit_errors, ber, papr_dB, SNR );
+% Note Eb/No set point is for Nc data carriers only, exclduing pilot.
+% This is convenient for testing BER versus Eb/No.  Measured Eb/No
+% includes power of pilot.  Similar for SNR, first number is SNR excluding
+% pilot pwr for Eb/No set point, 2nd value is measured SNR which will be a little
+% higher as pilot power is included.
+
+printf("Eb/No (meas): %2.2f (%2.2f) dB\n", EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)));
+printf("bits........: %d\n", total_bits);
+printf("errors......: %d\n", total_bit_errors);
+printf("BER.........: %1.4f\n",  ber);
+printf("PAPR........: %1.2f dB\n", papr_dB);
+printf("SNR...(meas): %2.2f (%2.2f) dB\n", SNR, calc_snr(sig_est, noise_est));
 
 % ---------------------------------------------------------------------
 % Plots

@@ -25,6 +25,8 @@ fest_state = 0;
 channel = [];
 channel_count = 0;
 next_nin = M;
+sig_est = zeros(Nc+1,1);
+noise_est = zeros(Nc+1,1);
 
 % Octave outputs we want to collect for comparison to C version
 
@@ -50,6 +52,8 @@ rx_bits_log = [];
 sync_bit_log = [];  
 coarse_fine_log = [];
 nin_log = [];
+sig_est_log = [];
+noise_est_log = [];
 
 for f=1:frames
 
@@ -128,7 +132,12 @@ for f=1:frames
   end
   nin_log = [nin_log nin];
 
-  [rx_bits sync_bit foff_fine] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+
+  [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
+  sig_est_log = [sig_est_log sig_est];
+  noise_est_log = [noise_est_log noise_est];
+
   prev_rx_symbols = rx_symbols;
   rx_bits_log = [rx_bits_log rx_bits]; 
   foff_fine_log = [foff_fine_log foff_fine];
@@ -242,6 +251,10 @@ stem_sig_and_error(14, 212, sync_bit_log_c, sync_bit_log - sync_bit_log_c, 'Sync
 stem_sig_and_error(15, 211, rx_bits_log_c(st:en), rx_bits_log(st:en) - rx_bits_log_c(st:en), 'RX bits', [1 en-st -1.5 1.5])
 stem_sig_and_error(15, 212, nin_log_c, nin_log - nin_log_c, 'nin')
 
+c = 1;
+plot_sig_and_error(16, 211, sig_est_log(c,:), sig_est_log(c,:) - sig_est_log_c(c,:), 'sig est for SNR' )
+plot_sig_and_error(16, 212, noise_est_log(c,:), noise_est_log(c,:) - noise_est_log_c(c,:), 'noise est for SNR' )
+
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
 % ---------------------------------------------------------------------------------------
@@ -287,5 +300,7 @@ check(rx_bits_log, rx_bits_log_c, 'rx bits');
 check(sync_bit_log, sync_bit_log_c, 'sync bit');
 check(coarse_fine_log, coarse_fine_log_c, 'coarse_fine');
 check(nin_log, nin_log_c, 'nin');
+check(sig_est_log, sig_est_log_c, 'sig_est');
+check(noise_est_log, noise_est_log_c, 'noise_est');
 
 printf("\npasses: %d fails: %d\n", passes, fails);

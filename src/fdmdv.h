@@ -58,7 +58,7 @@ extern "C" {
 struct FDMDV;
     
 struct FDMDV_STATS {
-    float  snr;                    /* estimated SNR of rx signal in dB                   */
+    float  snr_est;                /* estimated SNR of rx signal in dB (3 kHz noise BW)  */
     COMP   rx_symbols[FDMDV_NSYM]; /* latest received symbols, for scatter plot          */ 
     int    fest_coarse_fine;       /* freq est state, 0-coarse 1-fine                    */ 
     float  foff;                   /* estimated freq offset in Hz                        */       

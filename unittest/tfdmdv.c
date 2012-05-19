@@ -84,6 +84,8 @@ int main(int argc, char *argv[])
     float         env_log[NT*P*FRAMES];
     float         rx_timing_log[FRAMES];
     COMP          rx_symbols_log[NC+1][FRAMES];
+    float         sig_est_log[NC+1][FRAMES];
+    float         noise_est_log[NC+1][FRAMES];
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     float         foff_fine_log[FRAMES];
     int           sync_bit_log[FRAMES];
@@ -160,6 +162,7 @@ int main(int argc, char *argv[])
 	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+	snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	
 	next_nin = M;
@@ -222,6 +225,10 @@ int main(int argc, char *argv[])
 	/* qpsk_to_bits() */
 
 	memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
+	for(c=0; c<NC+1; c++) {
+	    sig_est_log[c][f] = fdmdv->sig_est[c];
+	    noise_est_log[c][f] = fdmdv->noise_est[c];
+	}
 	foff_fine_log[f] = foff_fine;
 	sync_bit_log[f] = sync_bit;
 
@@ -255,6 +262,8 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES, NT*P*FRAMES);  
     octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES, FRAMES);  
     octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (NC+1), FRAMES, FRAMES);  
+    octave_save_float(fout, "sig_est_log_c", (float*)sig_est_log, (NC+1), FRAMES, FRAMES);  
+    octave_save_float(fout, "noise_est_log_c", (float*)noise_est_log, (NC+1), FRAMES, FRAMES);  
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
     octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES, FRAMES);  
     octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  

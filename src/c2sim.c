@@ -113,6 +113,9 @@ int main(int argc, char *argv[])
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
     FILE *fjvm = NULL;
+    #ifdef DUMP
+    int   dump;
+    #endif
 
     char* opt_string = "ho:";
     struct option long_options[] = {

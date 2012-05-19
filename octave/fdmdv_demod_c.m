@@ -120,5 +120,9 @@ function fdmdv_demod_c(dumpfilename, bits)
   axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
+  figure(5)
+  clf;
+  plot(xt, snr_est_log_c(1:frames));
+  title('SNR Estimates')
 
 endfunction

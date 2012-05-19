@@ -6,7 +6,7 @@
 function phase2(samname, png)
   N = 16000;
 
-  f=45;
+  f=43;
   model = load("../src/hts1a_phase_model.txt");
   phase = load("../src/hts1a_phase_phase.txt");
   Wo = model(f,1);
@@ -14,10 +14,14 @@ function phase2(samname, png)
   L = model(f,2);
   A = model(f,3:(L+2));
   phi = phase(f,1:L);
+  phi = zeros(1,L);
+  phi(3) = -pi/2;
+  phi(4) = -pi/4;
+  phi(5) = pi/2;
 
   s = zeros(1,N);
 
-  for m=1:L/2
+  for m=3:5
     s_m = A(m)*cos(m*Wo*(0:(N-1)) + phi(m));
     s = s + s_m;
   endfor
@@ -25,6 +29,13 @@ function phase2(samname, png)
   figure(1);
   clf;
   plot(s(1:250));
+
+  figure(2);
+  clf;
+  subplot(211)
+  plot((1:L)*Wo*4000/pi, 20*log10(A),'+');
+  subplot(212)
+  plot((1:L)*Wo*4000/pi, phi,'+');
 
   fs=fopen(samname,"wb");
   fwrite(fs,s,"short");

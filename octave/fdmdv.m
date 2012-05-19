@@ -30,6 +30,7 @@ global P = 4;          % oversample factor used for rx symbol filtering
 global Nfilter = Nsym*M;
 global Nfiltertiming = M+Nfilter+M;
 alpha = 0.5;
+global snr_coeff = 0.9 % SNR est averaging filter coeff
 
 % root raised cosine (Root Nyquist) filter 
 
@@ -399,7 +400,7 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
+function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
   global Nc;
   global Nb;
   global Nb;
@@ -408,6 +409,7 @@ function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, mo
     % extra 45 degree clockwise lets us use real and imag axis as
     % decision boundaries
 
+    phase_difference = zeros(Nc+1,1);
     phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)) * exp(j*pi/4);
   
     % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
@@ -432,7 +434,7 @@ function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, mo
  
     % Extract DBPSK encoded Sync bit
 
-    phase_difference(Nc+1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
+    phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
     if (real(phase_difference(Nc+1)) < 0)
       sync_bit = 1;
       f_err = imag(phase_difference(Nc+1));
@@ -441,6 +443,10 @@ function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, mo
       f_err = -imag(phase_difference(Nc+1));
     end
 
+    % pilot carrier gets an extra pi/4 rotation to make it consistent with
+    % other carriers, as we need it for snr_update and scatter diagram
+
+    phase_difference(Nc+1) *= exp(j*pi/4);
   else
     % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
 
@@ -450,6 +456,65 @@ function [rx_bits sync_bit f_err] = qpsk_to_bits(prev_rx_symbols, rx_symbols, mo
 
 endfunction
 
+
+% given phase differences update estimates of signal and noise levels
+
+function [sig_est noise_est] = snr_update(sig_est, noise_est, phase_difference)
+    global snr_coeff;
+    global Nc;
+
+    % mag of each symbol is distance from origin, this gives us a
+    % vector of mags, one for each carrier.
+
+    s = abs(phase_difference);
+
+    % signal mag estimate for each carrier is a smoothed version
+    % of instantaneous magntitude, this gives us a vector of smoothed
+    % mag estimates, one for each carrier.
+
+    sig_est = snr_coeff*sig_est + (1 - snr_coeff)*s;
+
+    % noise mag estimate is distance of current symbol from average
+    % location of that symbol.  We reflect all symbols into the first
+    % quadrant for convenience.
+    
+    refl_symbols = abs(real(phase_difference)) + j*abs(imag(phase_difference));    
+    n = abs(exp(j*pi/4)*sig_est - refl_symbols);
+     
+    % noise mag estimate for each carrier is a smoothed version of
+    % instantaneous noise mag, this gives us a vector of smoothed
+    % noise power estimates, one for each carrier.
+
+    noise_est = snr_coeff*noise_est + (1 - snr_coeff)*n;
+endfunction
+
+
+% calculate current SNR estimate (3000Hz noise BW)
+
+function snr_dB = calc_snr(sig_est, noise_est)
+  global Rs;
+
+  % find total signal power by summing power in all carriers
+
+  S = sum(sig_est .^2);
+  SdB = 10*log10(S);
+
+  % Average noise mag across all carriers and square to get an average
+  % noise power.  This is an estimate of the noise power in Rs = 50Hz of
+  % BW (note for raised root cosine filters Rs is the noise BW of the
+  % filter)
+
+  N50 = mean(noise_est).^2;
+  N50dB = 10*log10(N50);
+
+  % Now multiply by (3000 Hz)/(50 Hz) to find the total noise power in
+  % 3000 Hz
+
+  N3000dB = N50dB + 10*log10(3000/Rs);
+
+  snr_dB = SdB - N3000dB;
+
+endfunction
 
 % returns nbits from a repeating sequence of random data
 
@@ -867,5 +932,4 @@ global current_test_bit = 1;
 current_test_bit = 1;
 global rx_test_bits_mem;
 rx_test_bits_mem = zeros(1,Ntest_bits);
-
 

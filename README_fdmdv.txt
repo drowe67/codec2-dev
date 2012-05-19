@@ -195,4 +195,4 @@ TODO
     + e.g. hang on thru the fades?
 [ ] PAPR idea
     + automatically tweak phases to reduce PAPR, e.g. slow variations in freq...
-
+[ ] why is pilot noise_est twice as big as other carriers
