@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     /* Note only one set of Codec 2 states is required for an encoder
        and decoder pair. */
 
-    codec2 = codec2_create(CODEC2_MODE_1500);
+    codec2 = codec2_create(CODEC2_MODE_1400);
     nsam = codec2_samples_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
     nbit = codec2_bits_per_frame(codec2);

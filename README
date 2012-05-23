@@ -1,8 +1,8 @@
 Codec 2 README
 --------------
 
-Codec 2 is an open source 2400 bit/s speech codec (LGPL licensed).
-For more information please see:
+Codec 2 is an open source (LGPL licensed) speech codec for 2400 bit/s
+and below.  For more information please see:
 
     http://rowetel.com/codec2.html
 
@@ -13,8 +13,8 @@ Quickstart
 
 1/ Listen to Codec 2:
 
-   $ cd codec2/src
-   $ make
+   $ ./configure && make
+   $ cd src
    $ ./c2demo ../raw/hts1a.raw hts1a_c2.raw
    $ ../script/menu.sh ../raw/hts1a.raw hts1a_c2.raw
 
@@ -25,8 +25,12 @@ Quickstart
 
 2/ Compress and Decompress a file:
 
-   $ ./c2enc ../raw/hts1a.raw hts1a_c2.bit
-   $ ./c2dec hts1a_c2.bit hts1a_c2.raw 
+   $ ./c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
+   $ ./c2dec 2400 hts1a_c2.bit hts1a_c2.raw 
+
+3/ Same thing with pipes:
+
+   $ ./c2enc 1400 ../raw/hts1a.raw - | ./c2dec 1400 - - | play -t raw -r 8000 -s -2 -
 
 Programs
 --------

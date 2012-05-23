@@ -1154,11 +1154,13 @@ void decode_lsps_diff_time_vq(
 void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim)
 {
   int i, n1, n2, n3;
-  float err[ndim], err2[ndim], err3[ndim];
-  float w[ndim], w2[ndim], w3[ndim];
+  float err[LPC_ORD], err2[LPC_ORD], err3[LPC_ORD];
+  float w[LPC_ORD], w2[LPC_ORD], w3[LPC_ORD];
   const float *codebook1 = lsp_cbjvm[0].cb;
   const float *codebook2 = lsp_cbjvm[1].cb;
   const float *codebook3 = lsp_cbjvm[2].cb;
+
+  assert(ndim <= LPC_ORD);
 
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)

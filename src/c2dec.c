@@ -44,21 +44,19 @@ int main(int argc, char *argv[])
     float          ber, r;
 
     if (argc < 4) {
-	printf("usage: c2dec 2500|1500|1400|1125 InputBitFile OutputRawSpeechFile\n");
-	printf("e.g    c2dec 1500 hts1a.c2 hts1a_1500.raw\n");
+	printf("usage: c2dec 2400|1400|1200 InputBitFile OutputRawSpeechFile\n");
+	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
 	exit(1);
     }
 
-    if (strcmp(argv[1],"2500") == 0)
-	mode = CODEC2_MODE_2500;
-    else if (strcmp(argv[1],"1500") == 0)
-	mode = CODEC2_MODE_1500;
+    if (strcmp(argv[1],"2400") == 0)
+	mode = CODEC2_MODE_2400;
     else if (strcmp(argv[1],"1400") == 0)
 	mode = CODEC2_MODE_1400;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 2500, 1500, 1400 or 1200\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 2400, 1400 or 1200\n", argv[1]);
 	exit(1);
     }
     
