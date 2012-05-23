@@ -67,7 +67,7 @@ int test1()
     float   ak[LPC_ORD+1];
     float   lsps[LPC_ORD];
 
-    c2 = codec2_create(CODEC2_MODE_2500);
+    c2 = codec2_create(CODEC2_MODE_2400);
 
     fin = fopen("../raw/hts1a.raw", "rb");
     assert(fin != NULL);
@@ -106,7 +106,7 @@ int test2()
     float   lsps[LPC_ORD];
     float   e;
        
-    c2 = codec2_create(CODEC2_MODE_2500);
+    c2 = codec2_create(CODEC2_MODE_2400);
     bits = (char*)malloc(codec2_bits_per_frame(c2));
     assert(bits != NULL);
     fin = fopen("../raw/hts1a.raw", "rb");
@@ -184,7 +184,7 @@ int test3()
     char   *bits;
     struct CODEC2 *c2;
 
-    c2 = codec2_create(CODEC2_MODE_2500);
+    c2 = codec2_create(CODEC2_MODE_2400);
     int numBits  = codec2_bits_per_frame(c2);
     int numBytes = (numBits+7)>>3;
 

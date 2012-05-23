@@ -32,10 +32,9 @@ extern "C" {
 #ifndef __CODEC2__
 #define  __CODEC2__
 
-#define CODEC2_MODE_2500 0
-#define CODEC2_MODE_1500 1
-#define CODEC2_MODE_1400 2
-#define CODEC2_MODE_1200 3
+#define CODEC2_MODE_2400 0
+#define CODEC2_MODE_1400 1
+#define CODEC2_MODE_1200 2
 
 struct CODEC2;
 

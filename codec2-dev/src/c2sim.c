@@ -229,7 +229,7 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
            } else if(strcmp(long_options[option_index].name, "rate") == 0) {
-                if(strcmp(optarg,"2500") == 0) {
+                if(strcmp(optarg,"2400") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
 	            lsp = 1;
@@ -272,13 +272,14 @@ int main(int argc, char *argv[])
             break;
 
          case 'o':
-	    if ((fout = fopen(optarg,"wb")) == NULL) {
+	     if (strcmp(optarg, "-") == 0) fout = stdout;
+	     else if ((fout = fopen(optarg,"wb")) == NULL) {
 	        fprintf(stderr, "Error opening output speech file: %s: %s.\n",
 		    optarg, strerror(errno));
 	        exit(1);
-	    }
-	    strcpy(out_file,optarg);
-            break;
+	     }
+	     strcpy(out_file,optarg);
+	     break;
 
          default:
             /* This will never be reached */
@@ -288,7 +289,7 @@ int main(int argc, char *argv[])
 
     /* Input file */
 
-    if ((fin = fopen(argv[optind],"rb")) == NULL) {
+     if ((fin = fopen(argv[optind],"rb")) == NULL) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
 		argv[optind], strerror(errno));
 	exit(1);
@@ -458,8 +459,12 @@ int main(int argc, char *argv[])
 	    if (lspjvm) {
 		/* Jean-Marc's multi-stage VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);			    
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+		{ 
+		    float lsps_bw[LPC_ORD];
+		    memcpy(lsps_bw, lsps_, sizeof(float)*LPC_ORD);
+		    bw_expand_lsps(lsps_bw, LPC_ORD);			    
+		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
+		}
 	    }
 
 	    /* we need lsp__prev[] for lspdt and decimate.  If no
@@ -767,7 +772,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
 			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
-			option_parameters = " <2500|1500|1400|1200>";
+			option_parameters = " <2400|1400|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " <DumpFilePrefix>";
 		} else {

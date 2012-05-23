@@ -203,3 +203,82 @@ void interpolate_lsp(
     aks_to_M2(ak_interp, LPC_ORD, interp, e, &snr, 0); 
     //printf("  interp: ak[1]: %f A[1] %f\n", ak_interp[1], interp->A[1]);
 }
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_Wo()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22 May 2012
+        
+  Interpolates centre 10ms sample of Wo and L samples given two
+  samples 20ms apart. Assumes voicing is available for centre
+  (interpolated) frame.
+  
+\*---------------------------------------------------------------------------*/
+
+void interp_Wo(
+  MODEL *interp,    /* interpolated model params                     */
+  MODEL *prev,      /* previous frames model params                  */
+  MODEL *next       /* next frames model params                      */
+	       )
+{
+    /* trap corner case where voicing est is probably wrong */
+
+    if (interp->voiced && !prev->voiced && !next->voiced) {
+	interp->voiced = 0;
+    }	
+   
+    /* Wo depends on voicing of this and adjacent frames */
+
+    if (interp->voiced) {
+	if (prev->voiced && next->voiced)
+	    interp->Wo = (prev->Wo + next->Wo)/2.0;
+	if (!prev->voiced && next->voiced)
+	    interp->Wo = next->Wo;
+	if (prev->voiced && !next->voiced)
+	    interp->Wo = prev->Wo;
+    }
+    else {
+	interp->Wo = TWO_PI/P_MAX;
+    }
+    interp->L = PI/interp->Wo;
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_energy()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22 May 2012
+        
+  Interpolates centre 10ms sample of energy given two samples 20ms
+  apart.
+  
+\*---------------------------------------------------------------------------*/
+
+float interp_energy(float prev_e, float next_e)
+{
+    return pow(10.0, (log10(prev_e) + log10(next_e))/2.0);
+ 
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interpolate_lsp_ver2()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22 May 2012
+        
+  Weighted interpolation of LSPs.
+  
+\*---------------------------------------------------------------------------*/
+
+void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight)
+{
+    int i;
+
+    for(i=0; i<LPC_ORD; i++)
+	interp[i] = (1.0 - weight)*prev[i] + weight*next[i];
+}
+

@@ -42,36 +42,34 @@ int main(int argc, char *argv[])
     short         *buf;
     unsigned char *bits;
     int            nsam, nbit, nbyte;
-
+ 
     if (argc != 4) {
-	printf("usage: c2enc 2500|1500|1400|1200 InputRawspeechFile OutputBitFile\n");
-	printf("e.g    c2enc 1500 ../raw/hts1a.raw hts1a.c2\n");
+	printf("usage: c2enc 2400|1400|1200 InputRawspeechFile OutputBitFile\n");
+	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	exit(1);
     }
  
-    if (strcmp(argv[1],"2500") == 0)
-	mode = CODEC2_MODE_2500;
-    else if (strcmp(argv[1],"1500") == 0)
-	mode = CODEC2_MODE_1500;
-    else if (strcmp(argv[1],"1400") == 0)
+    if (strcmp(argv[1],"2400") == 0)
+	mode = CODEC2_MODE_2400;
+     else if (strcmp(argv[1],"1400") == 0)
 	mode = CODEC2_MODE_1400;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 2500, 1500, 1400 or 1200\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 2400, 1400 or 1200\n", argv[1]);
 	exit(1);
     }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input bit file: %s: %s.\n",
+	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
+	fprintf(stderr, "Error opening output compressed bit file: %s: %s.\n",
          argv[3], strerror(errno));
 	exit(1);
     }
