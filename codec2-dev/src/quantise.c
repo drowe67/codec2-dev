@@ -461,8 +461,8 @@ int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const
 void lspjvm_quantise(float *x, float *xq, int ndim)
 {
   int i, n1, n2, n3;
-  float err[ndim], err2[ndim], err3[ndim];
-  float w[ndim], w2[ndim], w3[ndim];
+  float err[LPC_ORD], err2[LPC_ORD], err3[LPC_ORD];
+  float w[LPC_ORD], w2[LPC_ORD], w3[LPC_ORD];
   const float *codebook1 = lsp_cbjvm[0].cb;
   const float *codebook2 = lsp_cbjvm[1].cb;
   const float *codebook3 = lsp_cbjvm[2].cb;
@@ -498,18 +498,22 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
   }
 }
 
-void check_lsp_order(float lsp[], int lpc_order)
+int check_lsp_order(float lsp[], int lpc_order)
 {
     int   i;
     float tmp;
+    int   swaps = 0;
 
     for(i=1; i<lpc_order; i++)
 	if (lsp[i] < lsp[i-1]) {
 	    //printf("swap %d\n",i);
+	    swaps++;
 	    tmp = lsp[i-1];
 	    lsp[i-1] = lsp[i]-0.05;
 	    lsp[i] = tmp+0.05;
 	}
+
+    return swaps;
 }
 
 void force_min_lsp_dist(float lsp[], int lpc_order)
