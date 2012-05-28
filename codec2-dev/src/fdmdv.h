@@ -78,6 +78,9 @@ void          fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, i
 void          fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void          fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
 
+void          fdmdv_8_to_48(float out48k[], float in8k[], int n);
+void          fdmdv_48_to_8(float out8k[], float in48k[], int n);
+
 #endif
 
 #ifdef __cplusplus

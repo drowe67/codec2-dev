@@ -123,7 +123,7 @@ libcodec2_la_LDFLAGS = $(LIBS)
 library_includedir = $(prefix)/include
 library_include_HEADERS	= codec2.h
 
-bin_PROGRAMS = c2demo c2enc c2dec c2sim fdmdv_get_test_bits fdmdv_mod fdmdv_demod fdmdv_put_test_bits 
+bin_PROGRAMS = c2demo c2enc c2dec c2sim fdmdv_get_test_bits fdmdv_mod fdmdv_demod fdmdv_put_test_bits fdmdv_interleave
 
 c2demo_SOURCES = c2demo.c
 c2demo_LDADD = $(lib_LTLIBRARIES) 
@@ -152,4 +152,7 @@ fdmdv_demod_LDFLAGS = $(LIBS)
 
 fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c fft.c kiss_fft.c
 fdmdv_put_test_bits_LDFLAGS = $(LIBS)
+
+fdmdv_interleave_SOURCES = fdmdv_interleave.c
+fdmdv_interleave_LDFLAGS = $(LIBS)
 
