@@ -40,7 +40,7 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	vqtrain$(EXEEXT) vqtrainjnd$(EXEEXT) tnlp$(EXEEXT) \
 	tinterp$(EXEEXT) tquant$(EXEEXT) tcodec2$(EXEEXT) \
 	vq_train_jvm$(EXEEXT) scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) \
-	t48_8$(EXEEXT) lspsync$(EXEEXT)
+	t48_8$(EXEEXT) lspsync$(EXEEXT) create_interleaver$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -50,6 +50,9 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
+am_create_interleaver_OBJECTS = create_interleaver.$(OBJEXT)
+create_interleaver_OBJECTS = $(am_create_interleaver_OBJECTS)
+create_interleaver_DEPENDENCIES =
 am_extract_OBJECTS = extract.$(OBJEXT)
 extract_OBJECTS = $(am_extract_OBJECTS)
 extract_DEPENDENCIES =
@@ -125,16 +128,18 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(lspsync_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
-	$(tcodec2_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
-DIST_SOURCES = $(extract_SOURCES) $(genlsp_SOURCES) $(genres_SOURCES) \
-	$(lspsync_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
-	$(tcodec2_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
+	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tcodec2_SOURCES) \
+	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tnlp_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
+DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
+	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tcodec2_SOURCES) \
+	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tnlp_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -293,6 +298,9 @@ lspsync_SOURCES = lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/d
 
 lspsync_LDADD = $(lib_LTLIBRARIES) 
 lspsync_LDFLAGS = $(LIBS)
+create_interleaver_SOURCES = create_interleaver.c 
+create_interleaver_LDADD = $(lib_LTLIBRARIES) 
+create_interleaver_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -333,6 +341,9 @@ clean-noinstPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
+create_interleaver$(EXEEXT): $(create_interleaver_OBJECTS) $(create_interleaver_DEPENDENCIES) 
+	@rm -f create_interleaver$(EXEEXT)
+	$(LINK) $(create_interleaver_LDFLAGS) $(create_interleaver_OBJECTS) $(create_interleaver_LDADD) $(LIBS)
 extract$(EXEEXT): $(extract_OBJECTS) $(extract_DEPENDENCIES) 
 	@rm -f extract$(EXEEXT)
 	$(LINK) $(extract_LDFLAGS) $(extract_OBJECTS) $(extract_LDADD) $(LIBS)
@@ -390,6 +401,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookjvm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookvq.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codec2.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/create_interleaver.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@

@@ -41,7 +41,8 @@ host_triplet = @host@
 noinst_PROGRAMS = generate_codebook$(EXEEXT) genlspdtcb$(EXEEXT)
 bin_PROGRAMS = c2demo$(EXEEXT) c2enc$(EXEEXT) c2dec$(EXEEXT) \
 	c2sim$(EXEEXT) fdmdv_get_test_bits$(EXEEXT) fdmdv_mod$(EXEEXT) \
-	fdmdv_demod$(EXEEXT) fdmdv_put_test_bits$(EXEEXT)
+	fdmdv_demod$(EXEEXT) fdmdv_put_test_bits$(EXEEXT) \
+	fdmdv_interleave$(EXEEXT)
 subdir = src
 DIST_COMMON = $(library_include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -97,6 +98,9 @@ am_fdmdv_get_test_bits_OBJECTS = fdmdv_get_test_bits.$(OBJEXT) \
 	fdmdv.$(OBJEXT) fft.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_get_test_bits_OBJECTS = $(am_fdmdv_get_test_bits_OBJECTS)
 fdmdv_get_test_bits_LDADD = $(LDADD)
+am_fdmdv_interleave_OBJECTS = fdmdv_interleave.$(OBJEXT)
+fdmdv_interleave_OBJECTS = $(am_fdmdv_interleave_OBJECTS)
+fdmdv_interleave_LDADD = $(LDADD)
 am_fdmdv_mod_OBJECTS = fdmdv_mod.$(OBJEXT) fdmdv.$(OBJEXT) \
 	fft.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_mod_OBJECTS = $(am_fdmdv_mod_OBJECTS)
@@ -124,14 +128,15 @@ LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) $(c2demo_SOURCES) \
 	$(c2enc_SOURCES) $(c2sim_SOURCES) $(fdmdv_demod_SOURCES) \
-	$(fdmdv_get_test_bits_SOURCES) $(fdmdv_mod_SOURCES) \
-	$(fdmdv_put_test_bits_SOURCES) generate_codebook.c \
-	genlspdtcb.c
+	$(fdmdv_get_test_bits_SOURCES) $(fdmdv_interleave_SOURCES) \
+	$(fdmdv_mod_SOURCES) $(fdmdv_put_test_bits_SOURCES) \
+	generate_codebook.c genlspdtcb.c
 DIST_SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) \
 	$(c2demo_SOURCES) $(c2enc_SOURCES) $(c2sim_SOURCES) \
 	$(fdmdv_demod_SOURCES) $(fdmdv_get_test_bits_SOURCES) \
-	$(fdmdv_mod_SOURCES) $(fdmdv_put_test_bits_SOURCES) \
-	generate_codebook.c genlspdtcb.c
+	$(fdmdv_interleave_SOURCES) $(fdmdv_mod_SOURCES) \
+	$(fdmdv_put_test_bits_SOURCES) generate_codebook.c \
+	genlspdtcb.c
 library_includeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(library_include_HEADERS)
 ETAGS = etags
@@ -343,6 +348,8 @@ fdmdv_demod_SOURCES = fdmdv_demod.c fdmdv.c fft.c kiss_fft.c octave.c
 fdmdv_demod_LDFLAGS = $(LIBS)
 fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c fft.c kiss_fft.c
 fdmdv_put_test_bits_LDFLAGS = $(LIBS)
+fdmdv_interleave_SOURCES = fdmdv_interleave.c
+fdmdv_interleave_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -458,6 +465,9 @@ fdmdv_demod$(EXEEXT): $(fdmdv_demod_OBJECTS) $(fdmdv_demod_DEPENDENCIES)
 fdmdv_get_test_bits$(EXEEXT): $(fdmdv_get_test_bits_OBJECTS) $(fdmdv_get_test_bits_DEPENDENCIES) 
 	@rm -f fdmdv_get_test_bits$(EXEEXT)
 	$(LINK) $(fdmdv_get_test_bits_LDFLAGS) $(fdmdv_get_test_bits_OBJECTS) $(fdmdv_get_test_bits_LDADD) $(LIBS)
+fdmdv_interleave$(EXEEXT): $(fdmdv_interleave_OBJECTS) $(fdmdv_interleave_DEPENDENCIES) 
+	@rm -f fdmdv_interleave$(EXEEXT)
+	$(LINK) $(fdmdv_interleave_LDFLAGS) $(fdmdv_interleave_OBJECTS) $(fdmdv_interleave_LDADD) $(LIBS)
 fdmdv_mod$(EXEEXT): $(fdmdv_mod_OBJECTS) $(fdmdv_mod_DEPENDENCIES) 
 	@rm -f fdmdv_mod$(EXEEXT)
 	$(LINK) $(fdmdv_mod_LDFLAGS) $(fdmdv_mod_OBJECTS) $(fdmdv_mod_LDADD) $(LIBS)
@@ -484,6 +494,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_demod.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_get_test_bits.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_interleave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_mod.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_put_test_bits.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fft.Po@am__quote@
