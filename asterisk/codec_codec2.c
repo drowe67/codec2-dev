@@ -48,7 +48,7 @@ static int codec2_new(struct ast_trans_pvt *pvt)
 {
     struct codec2_translator_pvt *tmp = pvt->pvt;
 
-    tmp->codec2 = codec2_create(CODEC2_MODE_2500);
+    tmp->codec2 = codec2_create(CODEC2_MODE_2400);
 	
     return 0;
 }

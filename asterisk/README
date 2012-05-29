@@ -8,7 +8,7 @@ Codec 2 is used to trunk calls between two Asterisk boxes:
 
     A - SIP phone - Asterisk A - Codec2 - Asterisk B - SIP Phone - B
 
-The two SIP phones are configiured for mulaw.
+The two SIP phones are configured for mulaw.
 
 Building
 ---------
@@ -27,8 +27,8 @@ Asterisk must be patched so that the core understand Codec 2 frames.
 
     david@cool:~$ tar xvzf asterisk-1.8.9.0.tar.gz
     david@cool:~/asterisk-1.8.9.0$ patch -p4 < ~/codec2-dev/asterisk/asterisk-codec2.patch
-    david@cool:~/asterisk-1.8.9.0$ cp ~/codec2-dev/asterisk/codec2_codec2.c .
-    david@cool:~/asterisk-1.8.9.0$ cp ~/codec2-dev/asterisk/ex_codec2.h .
+    david@cool:~/asterisk-1.8.9.0$ cp ~/codec2-dev/asterisk/codec_codec2.c .
+    david@cool:~/asterisk-1.8.9.0$ cp ~/codec2-dev/asterisk/ex_codec2.h ./codecs
     david@cool:~/asterisk-1.8.9.0$ ./configure && make ASTLDFLAGS=-lcodec2
     david@cool:~/asterisk-1.8.9.0$ sudo make install
     david@cool:~/asterisk-1.8.9.0$ sudo make samples
