@@ -43,26 +43,7 @@
 #include "postfilter.h"
 #include "codec2.h"
 #include "lsp.h"
-
-struct CODEC2 {
-    int    mode;
-    float  w[M];	            /* time domain hamming window                */
-    COMP   W[FFT_ENC];	            /* DFT of w[]                                */
-    float  Pn[2*N];	            /* trapezoidal synthesis window              */
-    float  Sn[M];                   /* input speech                              */
-    float  hpf_states[2];           /* high pass filter states                   */
-    void  *nlp;                     /* pitch predictor states                    */
-    float  Sn_[2*N];	            /* synthesised output speech                 */
-    float  ex_phase;                /* excitation model phase track              */
-    float  bg_est;                  /* background noise estimate for post filter */
-    float  prev_Wo_enc;             /* previous frame's pitch estimate           */
-    MODEL  prev_model_dec;          /* previous frame's model parameters         */
-    float  prev_lsps_dec[LPC_ORD];  /* previous frame's LSPs                     */
-    float  prev_e_dec;              /* previous frame's LPC energy               */
-
-    float  xq_enc[2];               /* joint pitch and energy VQ states          */
-    float  xq_dec[2];
-};
+#include "codec2_internal.h"
 
 /*---------------------------------------------------------------------------*\
                                                        
