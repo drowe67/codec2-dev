@@ -2,10 +2,10 @@
 
   FILE........: codec2.h
   AUTHOR......: David Rowe
-  DATE CREATED: 21/8/2010
+  DATE CREATED: 21 August 2010
 
-  Codec2 fully quantised encoder and decoder functions.  If you want use 
-  codec2, these are the functions you need to call.
+  Codec 2 fully quantised encoder and decoder functions.  If you want use 
+  Codec 2, these are the functions you need to call.
 
 \*---------------------------------------------------------------------------*/
 
@@ -27,10 +27,21 @@
 */
 
 #ifdef __cplusplus
-extern "C" {
+  extern "C" {
 #endif
+
 #ifndef __CODEC2__
 #define  __CODEC2__
+
+#ifdef __WIN32__
+#ifdef __BUILDING_DLL__
+#define WIN32SUPPORT __declspec(dllexport) __stdcall
+#else
+#define WIN32SUPPORT __declspec(dllimport) __stdcall
+#endif
+#else
+#define WIN32SUPPORT
+#endif
 
 #define CODEC2_MODE_2400 0
 #define CODEC2_MODE_1400 1
@@ -38,12 +49,12 @@ extern "C" {
 
 struct CODEC2;
 
-struct CODEC2 *codec2_create(int mode);
-void codec2_destroy(struct CODEC2 *codec2_state);
-void codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
-void codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
-int  codec2_samples_per_frame(struct CODEC2 *codec2_state);
-int  codec2_bits_per_frame(struct CODEC2 *codec2_state);
+struct CODEC2 * WIN32SUPPORT codec2_create(int mode);
+void WIN32SUPPORT codec2_destroy(struct CODEC2 *codec2_state);
+void WIN32SUPPORT codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
+void WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
+int  WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *codec2_state);
+int  WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *codec2_state);
 
 #endif
 

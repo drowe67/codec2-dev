@@ -39,6 +39,16 @@
 extern "C" {
 #endif
 
+#ifdef __WIN32__
+#ifdef __BUILDING_DLL__
+#define WIN32SUPPORT __declspec(dllexport) __stdcall
+#else
+#define WIN32SUPPORT __declspec(dllimport) __stdcall
+#endif
+#else
+#define WIN32SUPPORT
+#endif
+
 #include "comp.h"
 
 #define FDMDV_BITS_PER_FRAME          28  /* 20ms frames, 1400 bit/s                                        */
@@ -66,20 +76,20 @@ struct FDMDV_STATS {
     float  clock_offset;           /* Estimated tx/rx sample clock offset in ppm         */
 };
 
-struct FDMDV *fdmdv_create(void);
-void          fdmdv_destroy(struct FDMDV *fdmdv_state);
+struct FDMDV * WIN32SUPPORT fdmdv_create(void);
+void           WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
     
-void          fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
-void          fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin);
+void           WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
+void           WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin);
     
-void          fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
-void          fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[]);
+void           WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
+void           WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[]);
     
-void          fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
-void          fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
+void           WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
+void           WIN32SUPPORT fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
 
-void          fdmdv_8_to_48(float out48k[], float in8k[], int n);
-void          fdmdv_48_to_8(float out8k[], float in48k[], int n);
+void           WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n);
+void           WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n);
 
 #endif
 

@@ -119,7 +119,7 @@ static float cabsolute(COMP a)
 
 \*---------------------------------------------------------------------------*/
 
-struct FDMDV *fdmdv_create(void)
+struct FDMDV * WIN32SUPPORT fdmdv_create(void)
 {
     struct FDMDV *f;
     int           c, i, k;
@@ -234,7 +234,7 @@ struct FDMDV *fdmdv_create(void)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_destroy(struct FDMDV *fdmdv)
+void WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
     free(fdmdv);
@@ -252,7 +252,7 @@ void fdmdv_destroy(struct FDMDV *fdmdv)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
+void WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 {
     int i;
 
@@ -445,7 +445,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
+void WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
@@ -1027,7 +1027,7 @@ void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[])
+void WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[])
 {
     int   i,j;
     float ber;
@@ -1161,7 +1161,7 @@ int freq_state(int sync_bit, int *state)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin)
+void WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin)
 {
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
@@ -1258,7 +1258,7 @@ float calc_snr(float sig_est[], float noise_est[])
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
+void WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 {
     int   c;
 
@@ -1299,7 +1299,7 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_8_to_48(float out48k[], float in8k[], int n)
+void WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 {
     int i,j,k,l;
 
@@ -1331,7 +1331,7 @@ void fdmdv_8_to_48(float out48k[], float in8k[], int n)
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_48_to_8(float out8k[], float in48k[], int n)
+void WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 {
     int i,j;
 
