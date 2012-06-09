@@ -6,8 +6,8 @@
                                                                              
   A 1400 bit/s Frequency Division Multiplexed Digital Voice (FDMDV)
   modem.  Used for digital audio over HF SSB. See README_fdmdv.txt for
-  more information, and fdmdv_demo.c, fdmdv_mod.c and fdmdv_demod.c
-  for example usage.
+  more information, and fdmdv_mod.c and fdmdv_demod.c for example
+  usage.
                      
   References:
  
@@ -39,14 +39,17 @@
 extern "C" {
 #endif
 
-#ifdef __WIN32__
-#ifdef __BUILDING_DLL__
-#define WIN32SUPPORT __declspec(dllexport) __stdcall
+/* set up the calling convention for DLL function import/export for
+   WIN32 cross compiling */
+
+#ifdef __CODEC2_WIN32__
+#ifdef __CODEC2_BUILDING_DLL__
+#define CODEC2_WIN32SUPPORT __declspec(dllexport) __stdcall
 #else
-#define WIN32SUPPORT __declspec(dllimport) __stdcall
+#define CODEC2_WIN32SUPPORT __declspec(dllimport) __stdcall
 #endif
 #else
-#define WIN32SUPPORT
+#define CODEC2_WIN32SUPPORT
 #endif
 
 #include "comp.h"
@@ -63,6 +66,10 @@ extern "C" {
 #define FDMDV_OS                 6         /* oversampling rate           */
 #define FDMDV_OS_TAPS           48         /* number of OS filter taps    */
 
+/* FFT points */
+
+#define FDMDV_NFFT             256
+
 /* FDMDV states and stats structures */
 
 struct FDMDV;
@@ -76,20 +83,20 @@ struct FDMDV_STATS {
     float  clock_offset;           /* Estimated tx/rx sample clock offset in ppm         */
 };
 
-struct FDMDV * WIN32SUPPORT fdmdv_create(void);
-void           WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
+struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void);
+void           CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
     
-void           WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
-void           WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin);
+void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
+void           CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin);
     
-void           WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
-void           WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[]);
+void           CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
+void           CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[]);
     
-void           WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
-void           WIN32SUPPORT fdmdv_get_waterfall_line(struct FDMDV *fdmdv_state, float magnitudes[], int *magnitude_points);
+void           CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
+void           CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *fdmdv_state, float mag_dB[], float rx_fdm[], int nin);
 
-void           WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n);
-void           WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n);
+void           CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n);
+void           CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n);
 
 #endif
 

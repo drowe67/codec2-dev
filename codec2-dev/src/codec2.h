@@ -33,14 +33,17 @@
 #ifndef __CODEC2__
 #define  __CODEC2__
 
-#ifdef __WIN32__
-#ifdef __BUILDING_DLL__
-#define WIN32SUPPORT __declspec(dllexport) __stdcall
+/* set up the calling convention for DLL function import/export for
+   WIN32 cross compiling */
+
+#ifdef __CODEC2_WIN32__
+#ifdef __CODEC2_BUILDING_DLL__
+#define CODEC2_WIN32SUPPORT __declspec(dllexport) __stdcall
 #else
-#define WIN32SUPPORT __declspec(dllimport) __stdcall
+#define CODEC2_WIN32SUPPORT __declspec(dllimport) __stdcall
 #endif
 #else
-#define WIN32SUPPORT
+#define CODEC2_WIN32SUPPORT
 #endif
 
 #define CODEC2_MODE_2400 0
@@ -49,12 +52,12 @@
 
 struct CODEC2;
 
-struct CODEC2 * WIN32SUPPORT codec2_create(int mode);
-void WIN32SUPPORT codec2_destroy(struct CODEC2 *codec2_state);
-void WIN32SUPPORT codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
-void WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
-int  WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *codec2_state);
-int  WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *codec2_state);
+struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode);
+void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *codec2_state);
+void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
+void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
+int  CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *codec2_state);
+int  CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *codec2_state);
 
 #endif
 

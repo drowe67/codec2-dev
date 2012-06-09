@@ -119,7 +119,7 @@ static float cabsolute(COMP a)
 
 \*---------------------------------------------------------------------------*/
 
-struct FDMDV * WIN32SUPPORT fdmdv_create(void)
+struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 {
     struct FDMDV *f;
     int           c, i, k;
@@ -221,6 +221,9 @@ struct FDMDV * WIN32SUPPORT fdmdv_create(void)
 	f->noise_est[c] = 0.0;
     }
 
+    for(i=0; i<2*FDMDV_NFFT; i++)
+	f->fft_buf[i] = 0.0;
+
     return f;
 }
 
@@ -234,7 +237,7 @@ struct FDMDV * WIN32SUPPORT fdmdv_create(void)
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
+void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
     free(fdmdv);
@@ -252,7 +255,7 @@ void WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
+void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 {
     int i;
 
@@ -445,7 +448,8 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
+void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], 
+				   int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
@@ -1027,7 +1031,9 @@ void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[])
+void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, 
+					     int *bit_errors, int *ntest_bits, 
+					     int rx_bits[])
 {
     int   i,j;
     float ber;
@@ -1161,7 +1167,8 @@ int freq_state(int sync_bit, int *state)
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], int *sync_bit, float rx_fdm[], int *nin)
+void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], 
+				     int *sync_bit, float rx_fdm[], int *nin)
 {
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
@@ -1258,7 +1265,8 @@ float calc_snr(float sig_est[], float noise_est[])
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
+void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv, 
+					       struct FDMDV_STATS *fdmdv_stats)
 {
     int   c;
 
@@ -1299,7 +1307,7 @@ void WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS 
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
+void CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 {
     int i,j,k,l;
 
@@ -1331,7 +1339,7 @@ void WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
+void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 {
     int i,j;
 
@@ -1339,6 +1347,52 @@ void WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 	out8k[i] = 0.0;
 	for(j=0; j<FDMDV_OS_TAPS; j++)
 	    out8k[i] += fdmdv_os_filter[j]*in48k[i*FDMDV_OS-j];
+    }
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_get_fft()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 9 June 2012
+
+  Performs a FFT on the received modem signal at the input of the
+  demod, returns the FDMDV_NFFT point magnitiude spectrum in dB.  0dB
+  is a signal with amplitude +/- 2^15.
+
+  The output can be used to plot a spectrum of the demod input.
+  Sucessive calls can be used to build up a waterfall or spectrogram
+  plot, but mapping the levels to colours.
+
+\*---------------------------------------------------------------------------*/
+
+void CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *f, float mag_dB[], float rx_fdm[], int nin) 
+{
+    int   i,j;
+    COMP  F[2*FDMDV_NFFT];
+    float fullscale_dB;
+
+    /* update buffer of input samples */
+
+    for(i=0; i<2*FDMDV_NFFT-nin; i++)
+	f->fft_buf[i] = f->fft_buf[i+nin];
+    for(j=0; j<nin; j++,i++)
+	f->fft_buf[i] = rx_fdm[j];
+
+    /* window and FFT */
+
+    for(i=0; i<2*FDMDV_NFFT; i++) {
+	F[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/FDMDV_NFFT));
+	F[i].imag = 0.0;
+    }
+    fft(&F[0].real, 2*FDMDV_NFFT, -1);
+
+    /* scale and convert to dB */
+
+    fullscale_dB = 20*log10(FDMDV_NFFT*32767.0);
+    for(i=0; i<FDMDV_NFFT; i++) {
+	mag_dB[i]  = 10*log10(F[i].real*F[i].real + F[i].imag*F[i].imag);
+	mag_dB[i] -= fullscale_dB;
     }
 }
 

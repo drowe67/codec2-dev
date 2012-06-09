@@ -81,7 +81,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 
 \*---------------------------------------------------------------------------*/
 
-struct CODEC2 * WIN32SUPPORT codec2_create(int mode)
+struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 {
     struct CODEC2 *c2;
     int            i,l;
@@ -141,7 +141,7 @@ struct CODEC2 * WIN32SUPPORT codec2_create(int mode)
 
 \*---------------------------------------------------------------------------*/
 
-void WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
+void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
     nlp_destroy(c2->nlp);
@@ -158,7 +158,7 @@ void WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
 
 \*---------------------------------------------------------------------------*/
 
-int WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
+int CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
     if (c2->mode == CODEC2_MODE_2400)
 	return 48;
     if  (c2->mode == CODEC2_MODE_1400)
@@ -180,7 +180,7 @@ int WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
 
 \*---------------------------------------------------------------------------*/
 
-int WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
+int CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
     if (c2->mode == CODEC2_MODE_2400)
 	return 160;
     if  (c2->mode == CODEC2_MODE_1400)
@@ -191,7 +191,7 @@ int WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
     return 0; /* shouldnt get here */
 }
 
-void WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
+void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 {
     assert(c2 != NULL);
     assert(
@@ -208,7 +208,7 @@ void WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, short sp
 	codec2_encode_1200(c2, bits, speech);
 }
 
-void WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
+void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
 {
     assert(c2 != NULL);
     assert(
