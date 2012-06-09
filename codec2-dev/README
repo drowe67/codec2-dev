@@ -72,6 +72,7 @@ Directories
   unittest - unit test source code
   voicing  - hand-estimated voicing files, used for development
   wav      - speech files in wave file format
+  win32    - Support for building Windows DLL version of Codec 2 and FDMDV libraries
 
 TODO
 ----
