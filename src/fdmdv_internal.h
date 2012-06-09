@@ -30,6 +30,7 @@
 #define __FDMDV_INTERNAL__
 
 #include "comp.h"
+#include "fdmdv.h"
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -131,6 +132,10 @@ struct FDMDV {
 
     float sig_est[NC+1];
     float noise_est[NC+1];
+
+    /* Buf for FFT/waterfall */
+
+    float fft_buf[2*FDMDV_NFFT];
 };
 
 /*---------------------------------------------------------------------------*\

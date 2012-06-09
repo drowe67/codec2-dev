@@ -18,7 +18,7 @@ CC_PREFIX = i586-mingw32msvc-
 DLLNAME = codec2.dll
 LIBNAME = codec2.lib
 
-CFLAGS  = -O2 -Wall -D__WIN32__
+CFLAGS  = -O2 -Wall -D__CODEC2_WIN32__
 
 HDRS = ../src/codec2.h ../src/fdmdv.h
 
@@ -30,7 +30,7 @@ $(DLLNAME): $(OBJS)
 	$(CC_PREFIX)gcc -shared -o $(DLLNAME) $(OBJS) -Wl,--out-implib,$(LIBNAME)
 
 %.o: ../src/%.c $(HDRS) Makefile
-	$(CC_PREFIX)gcc $(CFLAGS) -D__BUILDING_DLL__ -c $< -o $@
+	$(CC_PREFIX)gcc $(CFLAGS) -D__CODEC2_BUILDING_DLL__ -c $< -o $@
 
 c2demo.exe: ../src/c2demo.c $(DLLNAME) $(LIBNAME)
 	$(CC_PREFIX)gcc $(CFLAGS) $< -o $@ $(LIBNAME)
