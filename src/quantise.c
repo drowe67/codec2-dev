@@ -36,7 +36,7 @@
 #include "quantise.h"
 #include "lpc.h"
 #include "lsp.h"
-#include "fft.h"
+#include "kiss_fft.h"
 
 #define LSP_DELTA1 0.01         /* grid spacing for LSP root searches */
 
@@ -526,6 +526,7 @@ void force_min_lsp_dist(float lsp[], int lpc_order)
 	}
 }
 
+#ifdef NOT_USED
 /*---------------------------------------------------------------------------*\
 									      
   lpc_model_amplitudes
@@ -648,6 +649,7 @@ float lpc_model_amplitudes(
 
   return snr;
 }
+#endif
 
 /*---------------------------------------------------------------------------*\
                                                                          
@@ -660,15 +662,17 @@ float lpc_model_amplitudes(
 \*---------------------------------------------------------------------------*/
 
 void aks_to_M2(
-  float  ak[],	/* LPC's */
-  int    order,
-  MODEL *model,	/* sinusoidal model parameters for this frame */
-  float  E,	/* energy term */
-  float *snr,	/* signal to noise ratio for this frame in dB */
-  int    dump   /* true to dump sample to dump file */
+  kiss_fft_cfg  fft_dec_cfg, 
+  float         ak[],	     /* LPC's */
+  int           order,
+  MODEL        *model,	     /* sinusoidal model parameters for this frame */
+  float         E,	     /* energy term */
+  float        *snr,	     /* signal to noise ratio for this frame in dB */
+  int           dump         /* true to dump sample to dump file */
 )
 {
-  COMP Pw[FFT_DEC];	/* power spectrum */
+  COMP pw[FFT_DEC];	/* input to FFT for power spectrum */
+  COMP Pw[FFT_DEC];	/* output power spectrum */
   int i,m;		/* loop variables */
   int am,bm;		/* limits of current band */
   float r;		/* no. rads/bin */
@@ -681,22 +685,22 @@ void aks_to_M2(
   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
 
   for(i=0; i<FFT_DEC; i++) {
-    Pw[i].real = 0.0;
-    Pw[i].imag = 0.0; 
+    pw[i].real = 0.0;
+    pw[i].imag = 0.0; 
   }
 
   for(i=0; i<=order; i++)
-    Pw[i].real = ak[i];
-  fft(&Pw[0].real,FFT_DEC,1);
+    pw[i].real = ak[i];
+  kiss_fft(fft_dec_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
   for(i=0; i<FFT_DEC/2; i++)
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
-#ifdef DUMP
+  #ifdef DUMP
   if (dump) 
       dump_Pw(Pw);
-#endif
+  #endif
 
   /* Determine magnitudes by linear interpolation of P(w) -------------------*/
 
@@ -1404,6 +1408,7 @@ float decode_energy(int index)
     return e;
 }
 
+#ifdef NOT_USED
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: decode_amplitudes()	     
@@ -1415,7 +1420,8 @@ float decode_energy(int index)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_amplitudes(MODEL *model, 
+float decode_amplitudes(kiss_fft_cfg  fft_dec_cfg, 
+			MODEL *model, 
 			float  ak[],
 		        int    lsp_indexes[], 
 		        int    energy_index,
@@ -1434,7 +1440,7 @@ float decode_amplitudes(MODEL *model,
 
     return snr;
 }
-
+#endif
 
 static float ge_coeff[2] = {0.8, 0.9};
 
