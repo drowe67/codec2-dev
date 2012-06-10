@@ -39,6 +39,7 @@ struct CODEC2 {
     float         hpf_states[2];           /* high pass filter states                   */
     void         *nlp;                     /* pitch predictor states                    */
 
+    kiss_fft_cfg  fft_dec_cfg;             /* FFT config for decoder                    */
     float         Sn_[2*N];	           /* synthesised output speech                 */
     float         ex_phase;                /* excitation model phase track              */
     float         bg_est;                  /* background noise estimate for post filter */
