@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
 
     fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
     fft_dec_cfg = kiss_fft_alloc(FFT_DEC, 0, NULL, NULL);
-    make_analysis_window(fft_enc_cfg, w,W);
+    make_analysis_window(fft_enc_cfg, w, W);
     make_synthesis_window(Pn);
     quantise_init();
 
@@ -574,7 +574,7 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(ak, order, &model, e, &snr, 1); 
+	    aks_to_M2(fft_dec_cfg, ak, order, &model, e, &snr, 1); 
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps
@@ -625,7 +625,7 @@ int main(int argc, char *argv[])
 
 		interp_model.voiced = voiced1;
 		
-		interpolate_lsp(&interp_model, &prev_model, &model,
+		interpolate_lsp(fft_dec_cfg, &interp_model, &prev_model, &model,
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
 		apply_lpc_correction(&interp_model);
 
@@ -660,7 +660,7 @@ int main(int argc, char *argv[])
                 #endif
 
 		if (phase0)
-		    phase_synth_zero_order(&interp_model, ak_interp, ex_phase,
+		    phase_synth_zero_order(fft_dec_cfg, &interp_model, ak_interp, ex_phase,
 					   order);	
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
@@ -672,7 +672,7 @@ int main(int argc, char *argv[])
 		/* decode this frame */
 
 		if (phase0)
-		    phase_synth_zero_order(&model, ak, ex_phase, order);	
+		    phase_synth_zero_order(fft_dec_cfg, &model, ak, ex_phase, order);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
 		synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
@@ -695,7 +695,7 @@ int main(int argc, char *argv[])
 	    /* no decimation - sythesise each 10ms frame immediately */
 
 	    if (phase0)
-	    	phase_synth_zero_order(&model, ak, ex_phase, order);	
+	    	phase_synth_zero_order(fft_dec_cfg, &model, ak, ex_phase, order);	
 	    if (postfilt)
 		postfilter(&model, &bg_est);
 	    synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
