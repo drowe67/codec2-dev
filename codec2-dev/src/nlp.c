@@ -28,7 +28,7 @@
 #include "defines.h"
 #include "nlp.h"
 #include "dump.h"
-#include "fft.h"
+#include "kiss_fft.h"
 
 #include <assert.h>
 #include <math.h>
@@ -111,9 +111,10 @@ const float nlp_fir[] = {
 };
 
 typedef struct {
-    float sq[PMAX_M];	     /* squared speech samples */
-    float mem_x,mem_y;       /* memory for notch filter */
-    float mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
+    float         sq[PMAX_M];	     /* squared speech samples       */
+    float         mem_x,mem_y;       /* memory for notch filter      */
+    float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
+    kiss_fft_cfg  fft_cfg;           /* kiss FFT config              */
 } NLP;
 
 float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax);
@@ -145,20 +146,27 @@ void *nlp_create()
     for(i=0; i<NLP_NTAP; i++)
 	nlp->mem_fir[i] = 0.0;
 
+    nlp->fft_cfg = kiss_fft_alloc (PE_FFT_SIZE, 1, NULL, NULL);
+    assert(nlp->fft_cfg != NULL);
+
     return (void*)nlp;
 }
 
 /*---------------------------------------------------------------------------*\
                                                                              
-  nlp_destory()
+  nlp_destroy()
                                                                              
-  Initialisation function for NLP pitch estimator.
+  Shut down function for NLP pitch estimator.
 
 \*---------------------------------------------------------------------------*/
 
 void nlp_destroy(void *nlp_state)
 {
+    NLP   *nlp;
     assert(nlp_state != NULL);
+    nlp = (NLP*)nlp_state;
+
+    KISS_FFT_FREE(nlp->fft_cfg);
     free(nlp_state);
 }
 
@@ -205,8 +213,9 @@ float nlp(
 )
 {
     NLP   *nlp;
-    float  notch;		    /* current notch filter output */
-    COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal */
+    float  notch;		    /* current notch filter output    */
+    COMP   fw[PE_FFT_SIZE];	    /* DFT of squared signal (input)  */
+    COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal (output) */
     float  gmax;
     int    gmax_bin;
     int   i,j;
@@ -242,16 +251,17 @@ float nlp(
     /* Decimate and DFT */
 
     for(i=0; i<PE_FFT_SIZE; i++) {
-	Fw[i].real = 0.0;
-	Fw[i].imag = 0.0;
+	fw[i].real = 0.0;
+	fw[i].imag = 0.0;
     }
     for(i=0; i<m/DEC; i++) {
-	Fw[i].real = nlp->sq[i*DEC]*(0.5 - 0.5*cos(2*PI*i/(m/DEC-1)));
+	fw[i].real = nlp->sq[i*DEC]*(0.5 - 0.5*cos(2*PI*i/(m/DEC-1)));
     }
 #ifdef DUMP
     dump_dec(Fw);
 #endif
-    fft(&Fw[0].real,PE_FFT_SIZE,1);
+    kiss_fft (nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
+    //fft(&Fw[0].real,PE_FFT_SIZE,1);
     for(i=0; i<PE_FFT_SIZE; i++)
 	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
 
