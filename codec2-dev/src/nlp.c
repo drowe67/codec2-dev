@@ -260,7 +260,7 @@ float nlp(
 #ifdef DUMP
     dump_dec(Fw);
 #endif
-    kiss_fft (nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
+    kiss_fft(nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
     //fft(&Fw[0].real,PE_FFT_SIZE,1);
     for(i=0; i<PE_FFT_SIZE; i++)
 	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;

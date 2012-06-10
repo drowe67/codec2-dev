@@ -37,7 +37,7 @@
 
 #include "defines.h"
 #include "sine.h"
-#include "fft.h"
+#include "kiss_fft.h"
 
 #define HPF_BETA 0.125
 
@@ -66,9 +66,10 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax,
 
 \*---------------------------------------------------------------------------*/
 
-void make_analysis_window(float w[],COMP W[])
+void make_analysis_window(kiss_fft_cfg fft_enc_cfg, float w[], COMP W[])
 {
   float m;
+  COMP  wshift[FFT_ENC];
   COMP  temp;
   int   i,j;
 
@@ -123,15 +124,17 @@ void make_analysis_window(float w[],COMP W[])
   */
 
   for(i=0; i<FFT_ENC; i++) {
-    W[i].real = 0.0;
-    W[i].imag = 0.0;
+    wshift[i].real = 0.0;
+    wshift[i].imag = 0.0;
   }
   for(i=0; i<NW/2; i++)
-    W[i].real = w[i+M/2];
+    wshift[i].real = w[i+M/2];
   for(i=FFT_ENC-NW/2,j=M/2-NW/2; i<FFT_ENC; i++,j++)
-    W[i].real = w[j];
+   wshift[i].real = w[j];
 
-  fft(&W[0].real,FFT_ENC,-1);         /* "Numerical Recipes in C" FFT */
+  kiss_fft(fft_enc_cfg, (kiss_fft_cpx *)wshift, (kiss_fft_cpx *)W);
+
+    // fft(&W[0].real,FFT_ENC,-1);         /* "Numerical Recipes in C" FFT */
 
   /* 
       Re-arrange W[] to be symmetrical about FFT_ENC/2.  Makes later 
@@ -198,7 +201,7 @@ float hpf(float x, float states[])
 
 \*---------------------------------------------------------------------------*/
 
-void dft_speech(COMP Sw[], float Sn[], float w[])
+void dft_speech(kiss_fft_cfg fft_enc_cfg, COMP Sw[], float Sn[], float w[])
 {
   int i;
   
