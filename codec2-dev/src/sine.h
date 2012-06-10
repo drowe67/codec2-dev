@@ -40,6 +40,6 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[]);
 float est_voicing_mbe(MODEL *model, COMP Sw[], COMP W[], COMP Sw_[],COMP Ew[], 
 		      float prev_Wo);
 void make_synthesis_window(float Pn[]);
-void synthesise(float Sn_[], MODEL *model, float Pn[], int shift);
+void synthesise(kiss_fft_cfg fft_dec_cfg, float Sn_[], MODEL *model, float Pn[], int shift);
 
 #endif

@@ -47,7 +47,7 @@
 #include "postfilter.h"
 #include "interp.h"
 
-void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[]);
+void synth_one_frame(kiss_fft_cfg fft_dec_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 /*---------------------------------------------------------------------------*\
@@ -64,6 +64,7 @@ int main(int argc, char *argv[])
     float Sn[M];	/* float input speech samples            */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     kiss_fft_cfg  fft_enc_cfg;
+    kiss_fft_cfg  fft_dec_cfg;
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
@@ -309,6 +310,7 @@ int main(int argc, char *argv[])
     /* Initialise ------------------------------------------------------------*/
 
     fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
+    fft_dec_cfg = kiss_fft_alloc(FFT_DEC, 0, NULL, NULL);
     make_analysis_window(fft_enc_cfg, w,W);
     make_synthesis_window(Pn);
     quantise_init();
@@ -662,7 +664,7 @@ int main(int argc, char *argv[])
 					   order);	
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
-		synth_one_frame(buf, &interp_model, Sn_, Pn);
+		synth_one_frame(fft_dec_cfg, buf, &interp_model, Sn_, Pn);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -673,7 +675,7 @@ int main(int argc, char *argv[])
 		    phase_synth_zero_order(&model, ak, ex_phase, order);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
-		synth_one_frame(buf, &model, Sn_, Pn);
+		synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -696,7 +698,7 @@ int main(int argc, char *argv[])
 	    	phase_synth_zero_order(&model, ak, ex_phase, order);	
 	    if (postfilt)
 		postfilter(&model, &bg_est);
-	    synth_one_frame(buf, &model, Sn_, Pn);
+	    synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
 	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
 	}
 
@@ -735,11 +737,11 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(short buf[], MODEL *model, float Sn_[], float Pn[])
+void synth_one_frame(kiss_fft_cfg fft_dec_cfg, short buf[], MODEL *model, float Sn_[], float Pn[])
 {
     int     i;
 
-    synthesise(Sn_, model, Pn, 1);
+    synthesise(fft_dec_cfg, Sn_, model, Pn, 1);
 
     for(i=0; i<N; i++) {
 	if (Sn_[i] > 32767.0)

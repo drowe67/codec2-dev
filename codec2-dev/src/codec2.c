@@ -104,6 +104,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
     c2->fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
     make_analysis_window(c2->fft_enc_cfg, c2->w,c2->W);
     make_synthesis_window(c2->Pn);
+    c2->fft_dec_cfg = kiss_fft_alloc(FFT_DEC, 0, NULL, NULL);
     quantise_init();
     c2->prev_Wo_enc = 0.0;
     c2->bg_est = 0.0;
@@ -147,6 +148,7 @@ void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
     assert(c2 != NULL);
     nlp_destroy(c2->nlp);
     KISS_FFT_FREE(c2->fft_enc_cfg);
+    KISS_FFT_FREE(c2->fft_dec_cfg);
     free(c2);
 }
 
@@ -737,7 +739,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, float
 
     phase_synth_zero_order(model, ak, &c2->ex_phase, LPC_ORD);
     postfilter(model, &c2->bg_est);
-    synthesise(c2->Sn_, model, c2->Pn, 1);
+    synthesise(c2->fft_dec_cfg, c2->Sn_, model, c2->Pn, 1);
 
     for(i=0; i<N; i++) {
 	if (c2->Sn_[i] > 32767.0)

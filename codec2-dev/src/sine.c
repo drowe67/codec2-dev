@@ -134,8 +134,6 @@ void make_analysis_window(kiss_fft_cfg fft_enc_cfg, float w[], COMP W[])
 
   kiss_fft(fft_enc_cfg, (kiss_fft_cpx *)wshift, (kiss_fft_cpx *)W);
 
-    // fft(&W[0].real,FFT_ENC,-1);         /* "Numerical Recipes in C" FFT */
-
   /* 
       Re-arrange W[] to be symmetrical about FFT_ENC/2.  Makes later 
       analysis convenient.
@@ -203,11 +201,12 @@ float hpf(float x, float states[])
 
 void dft_speech(kiss_fft_cfg fft_enc_cfg, COMP Sw[], float Sn[], float w[])
 {
-  int i;
-  
+  int  i;
+  COMP sw[FFT_ENC];
+
   for(i=0; i<FFT_ENC; i++) {
-    Sw[i].real = 0.0;
-    Sw[i].imag = 0.0;
+    sw[i].real = 0.0;
+    sw[i].imag = 0.0;
   }
 
   /* Centre analysis window on time axis, we need to arrange input
@@ -216,14 +215,14 @@ void dft_speech(kiss_fft_cfg fft_enc_cfg, COMP Sw[], float Sn[], float w[])
   /* move 2nd half to start of FFT input vector */
 
   for(i=0; i<NW/2; i++)
-    Sw[i].real = Sn[i+M/2]*w[i+M/2];
+    sw[i].real = Sn[i+M/2]*w[i+M/2];
 
   /* move 1st half to end of FFT input vector */
 
   for(i=0; i<NW/2; i++)
-    Sw[FFT_ENC-NW/2+i].real = Sn[i+M/2-NW/2]*w[i+M/2-NW/2];
+    sw[FFT_ENC-NW/2+i].real = Sn[i+M/2-NW/2]*w[i+M/2-NW/2];
 
-  fft(&Sw[0].real,FFT_ENC,-1);
+  kiss_fft(fft_enc_cfg, (kiss_fft_cpx *)sw, (kiss_fft_cpx *)Sw);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -367,7 +366,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[])
 
     /* Estimate phase of harmonic */
 
-    model->phi[m] = atan2(Sw[b].imag,Sw[b].real);
+    model->phi[m] = atan2(-Sw[b].imag,Sw[b].real);
   }
 }
 
@@ -558,6 +557,7 @@ void make_synthesis_window(float Pn[])
 \*---------------------------------------------------------------------------*/
 
 void synthesise(
+  kiss_fft_cfg fft_dec_cfg, 
   float  Sn_[],		/* time domain synthesised signal              */
   MODEL *model,		/* ptr to model parameters for this frame      */
   float  Pn[],		/* time domain Parzen window                   */
@@ -566,6 +566,7 @@ void synthesise(
 {
     int   i,l,j,b;	/* loop variables */
     COMP  Sw_[FFT_DEC];	/* DFT of synthesised signal */
+    COMP  sw_[FFT_DEC];	/* synthesised signal */
 
     if (shift) {
 	/* Update memories */
@@ -606,14 +607,14 @@ void synthesise(
 		b = (FFT_DEC/2)-1;
 	}
 	Sw_[b].real = model->A[l]*cos(model->phi[l]);
-	Sw_[b].imag = model->A[l]*sin(model->phi[l]);
+	Sw_[b].imag = -model->A[l]*sin(model->phi[l]);
 	Sw_[FFT_DEC-b].real = Sw_[b].real;
 	Sw_[FFT_DEC-b].imag = -Sw_[b].imag;
     }
 
     /* Perform inverse DFT */
 
-    fft(&Sw_[0].real,FFT_DEC,1);
+    kiss_fft(fft_dec_cfg, (kiss_fft_cpx *)Sw_, (kiss_fft_cpx *)sw_);
 #else
     /*
        Direct time domain synthesis using the cos() function.  Works
@@ -634,14 +635,14 @@ void synthesise(
     /* Overlap add to previous samples */
 
     for(i=0; i<N-1; i++) {
-	Sn_[i] += Sw_[FFT_DEC-N+1+i].real*Pn[i];
+	Sn_[i] += sw_[FFT_DEC-N+1+i].real*Pn[i];
     }
 
     if (shift)
 	for(i=N-1,j=0; i<2*N; i++,j++)
-	    Sn_[i] = Sw_[j].real*Pn[i];
+	    Sn_[i] = sw_[j].real*Pn[i];
     else
 	for(i=N-1,j=0; i<2*N; i++,j++)
-	    Sn_[i] += Sw_[j].real*Pn[i];
+	    Sn_[i] += sw_[j].real*Pn[i];
 }
 
