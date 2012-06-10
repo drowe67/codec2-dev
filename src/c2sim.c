@@ -63,6 +63,7 @@ int main(int argc, char *argv[])
     short buf[N];	/* input/output buffer                   */
     float Sn[M];	/* float input speech samples            */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
+    kiss_fft_cfg  fft_enc_cfg;
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
@@ -307,7 +308,8 @@ int main(int argc, char *argv[])
 
     /* Initialise ------------------------------------------------------------*/
 
-    make_analysis_window(w,W);
+    fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
+    make_analysis_window(fft_enc_cfg, w,W);
     make_synthesis_window(Pn);
     quantise_init();
 
@@ -339,7 +341,7 @@ int main(int argc, char *argv[])
 	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 	
-	dft_speech(Sw, Sn, w); 
+	dft_speech(fft_enc_cfg, Sw, Sn, w); 
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
 	uq_Wo = model.Wo;
