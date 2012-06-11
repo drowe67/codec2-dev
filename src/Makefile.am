@@ -140,16 +140,16 @@ c2sim_SOURCES = c2sim.c
 c2sim_LDADD = $(lib_LTLIBRARIES) 
 c2sim_LDFLAGS = $(LIBS)
 
-fdmdv_get_test_bits_SOURCES = fdmdv_get_test_bits.c fdmdv.c fft.c kiss_fft.c
+fdmdv_get_test_bits_SOURCES = fdmdv_get_test_bits.c fdmdv.c kiss_fft.c
 fdmdv_get_test_bits_LDFLAGS = $(LIBS)
 
-fdmdv_mod_SOURCES = fdmdv_mod.c fdmdv.c fft.c kiss_fft.c
+fdmdv_mod_SOURCES = fdmdv_mod.c fdmdv.c kiss_fft.c
 fdmdv_mod_LDFLAGS = $(LIBS)
 
-fdmdv_demod_SOURCES = fdmdv_demod.c fdmdv.c fft.c kiss_fft.c octave.c
+fdmdv_demod_SOURCES = fdmdv_demod.c fdmdv.c kiss_fft.c octave.c
 fdmdv_demod_LDFLAGS = $(LIBS)
 
-fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c fft.c kiss_fft.c
+fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c kiss_fft.c
 fdmdv_put_test_bits_LDFLAGS = $(LIBS)
 
 fdmdv_interleave_SOURCES = fdmdv_interleave.c

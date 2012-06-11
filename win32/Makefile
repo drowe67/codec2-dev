@@ -22,7 +22,7 @@ CFLAGS  = -O2 -Wall -D__CODEC2_WIN32__
 
 HDRS = ../src/codec2.h ../src/fdmdv.h
 
-OBJS = dump.o lpc.o nlp.o postfilter.o sine.o codec2.o fdmdv.o fft.o kiss_fft.o interp.o lsp.o phase.o quantise.o pack.o codebook.o codebookd.o codebookvq.o codebookjnd.o codebookjvm.o codebookdt.o codebookge.o
+OBJS = dump.o lpc.o nlp.o postfilter.o sine.o codec2.o fdmdv.o kiss_fft.o interp.o lsp.o phase.o quantise.o pack.o codebook.o codebookd.o codebookvq.o codebookjnd.o codebookjvm.o codebookdt.o codebookge.o
 
 all: $(DLLNAME) c2demo.exe c2enc.exe c2dec.exe fdmdv_get_test_bits.exe fdmdv_mod.exe fdmdv_demod.exe fdmdv_put_test_bits.exe
 
