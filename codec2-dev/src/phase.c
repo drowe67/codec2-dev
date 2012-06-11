@@ -27,7 +27,7 @@
 
 #include "defines.h"
 #include "phase.h"
-#include "fft.h"
+#include "kiss_fft.h"
 #include "comp.h"
 #include "glottal.c"
 

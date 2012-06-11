@@ -67,44 +67,43 @@ am__objects_1 = codebook.$(OBJEXT) codebookd.$(OBJEXT) \
 	codebookdt.$(OBJEXT) codebookjvm.$(OBJEXT) \
 	codebookge.$(OBJEXT)
 am_lspsync_OBJECTS = lspsync.$(OBJEXT) quantise.$(OBJEXT) \
-	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT) codec2.$(OBJEXT) sine.$(OBJEXT) \
-	nlp.$(OBJEXT) postfilter.$(OBJEXT) phase.$(OBJEXT) \
-	interp.$(OBJEXT) pack.$(OBJEXT) $(am__objects_1)
+	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
+	codec2.$(OBJEXT) sine.$(OBJEXT) nlp.$(OBJEXT) \
+	postfilter.$(OBJEXT) phase.$(OBJEXT) interp.$(OBJEXT) \
+	pack.$(OBJEXT) $(am__objects_1)
 lspsync_OBJECTS = $(am_lspsync_OBJECTS)
 lspsync_DEPENDENCIES =
 am_scalarlsptest_OBJECTS = scalarlsptest.$(OBJEXT) quantise.$(OBJEXT) \
-	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT) $(am__objects_1)
+	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
+	$(am__objects_1)
 scalarlsptest_OBJECTS = $(am_scalarlsptest_OBJECTS)
 scalarlsptest_DEPENDENCIES =
-am_t48_8_OBJECTS = t48_8.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT)
+am_t48_8_OBJECTS = t48_8.$(OBJEXT) fdmdv.$(OBJEXT) kiss_fft.$(OBJEXT)
 t48_8_OBJECTS = $(am_t48_8_OBJECTS)
 t48_8_DEPENDENCIES =
-am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
+am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) octave.$(OBJEXT)
 tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
 tfdmdv_DEPENDENCIES =
-am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) fft.$(OBJEXT) \
+am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) interp.$(OBJEXT) lpc.$(OBJEXT) \
 	lsp.$(OBJEXT) quantise.$(OBJEXT) $(am__objects_1) \
 	dump.$(OBJEXT)
 tinterp_OBJECTS = $(am_tinterp_OBJECTS)
 tinterp_DEPENDENCIES =
 am_tlspsens_OBJECTS = tlspsens.$(OBJEXT) quantise.$(OBJEXT) \
-	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT) codec2.$(OBJEXT) sine.$(OBJEXT) \
-	nlp.$(OBJEXT) pack.$(OBJEXT) interp.$(OBJEXT) \
-	postfilter.$(OBJEXT) phase.$(OBJEXT) $(am__objects_1)
+	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
+	codec2.$(OBJEXT) sine.$(OBJEXT) nlp.$(OBJEXT) pack.$(OBJEXT) \
+	interp.$(OBJEXT) postfilter.$(OBJEXT) phase.$(OBJEXT) \
+	$(am__objects_1)
 tlspsens_OBJECTS = $(am_tlspsens_OBJECTS)
 tlspsens_DEPENDENCIES =
 am_tnlp_OBJECTS = tnlp.$(OBJEXT) sine.$(OBJEXT) nlp.$(OBJEXT) \
-	fft.$(OBJEXT) kiss_fft.$(OBJEXT) dump.$(OBJEXT)
+	kiss_fft.$(OBJEXT) dump.$(OBJEXT)
 tnlp_OBJECTS = $(am_tnlp_OBJECTS)
 tnlp_DEPENDENCIES =
 am_tquant_OBJECTS = tquant.$(OBJEXT) quantise.$(OBJEXT) lpc.$(OBJEXT) \
-	lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) kiss_fft.$(OBJEXT) \
+	lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
 	$(am__objects_1)
 tquant_OBJECTS = $(am_tquant_OBJECTS)
 tquant_DEPENDENCIES =
@@ -270,25 +269,25 @@ vq_train_jvm_SOURCES = vq_train_jvm.c
 vq_train_jvm_LDADD = $(lib_LTLIBRARIES) 
 vq_train_jvm_LDFLAGS = $(LIBS)
 CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c ../src/codebookge.c
-tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
+tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
 tnlp_LDFLAGS = $(LIBS)
-tinterp_SOURCES = tinterp.c ../src/sine.c ../src/fft.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c $(CODEBOOKS) ../src/dump.c
+tinterp_SOURCES = tinterp.c ../src/sine.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c $(CODEBOOKS) ../src/dump.c
 tinterp_LDADD = $(lib_LTLIBRARIES) 
 tinterp_LDFLAGS = $(LIBS)
-tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c $(CODEBOOKS)
 tquant_LDADD = $(lib_LTLIBRARIES) 
 tquant_LDFLAGS = $(LIBS)
-scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
-tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c ../src/octave.c
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/kiss_fft.c ../src/octave.c
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
-t48_8_SOURCES = t48_8.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
+t48_8_SOURCES = t48_8.c ../src/fdmdv.c ../src/kiss_fft.c
 t48_8_LDADD = $(lib_LTLIBRARIES) 
 t48_8_LDFLAGS = $(LIBS)
-lspsync_SOURCES = lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
+lspsync_SOURCES = lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c \
 ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c $(CODEBOOKS)
 
 lspsync_LDADD = $(lib_LTLIBRARIES) 
@@ -296,7 +295,7 @@ lspsync_LDFLAGS = $(LIBS)
 create_interleaver_SOURCES = create_interleaver.c 
 create_interleaver_LDADD = $(lib_LTLIBRARIES) 
 create_interleaver_LDFLAGS = $(LIBS)
-tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
+tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
 tlspsens_LDADD = $(lib_LTLIBRARIES) 
 tlspsens_LDFLAGS = $(LIBS)
 all: all-am
@@ -403,7 +402,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genres.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/interp.Po@am__quote@
@@ -505,20 +503,6 @@ dump.obj: ../src/dump.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/dump.c' object='dump.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o dump.obj `if test -f '../src/dump.c'; then $(CYGPATH_W) '../src/dump.c'; else $(CYGPATH_W) '$(srcdir)/../src/dump.c'; fi`
-
-fft.o: ../src/fft.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fft.o -MD -MP -MF "$(DEPDIR)/fft.Tpo" -c -o fft.o `test -f '../src/fft.c' || echo '$(srcdir)/'`../src/fft.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fft.Tpo" "$(DEPDIR)/fft.Po"; else rm -f "$(DEPDIR)/fft.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fft.c' object='fft.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fft.o `test -f '../src/fft.c' || echo '$(srcdir)/'`../src/fft.c
-
-fft.obj: ../src/fft.c
-@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fft.obj -MD -MP -MF "$(DEPDIR)/fft.Tpo" -c -o fft.obj `if test -f '../src/fft.c'; then $(CYGPATH_W) '../src/fft.c'; else $(CYGPATH_W) '$(srcdir)/../src/fft.c'; fi`; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fft.Tpo" "$(DEPDIR)/fft.Po"; else rm -f "$(DEPDIR)/fft.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fft.c' object='fft.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fft.obj `if test -f '../src/fft.c'; then $(CYGPATH_W) '../src/fft.c'; else $(CYGPATH_W) '$(srcdir)/../src/fft.c'; fi`
 
 kiss_fft.o: ../src/kiss_fft.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT kiss_fft.o -MD -MP -MF "$(DEPDIR)/kiss_fft.Tpo" -c -o kiss_fft.o `test -f '../src/kiss_fft.c' || echo '$(srcdir)/'`../src/kiss_fft.c; \

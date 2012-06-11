@@ -31,31 +31,31 @@ vq_train_jvm_LDFLAGS = $(LIBS)
 
 CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c ../src/codebookge.c
 
-tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/fft.c ../src/kiss_fft.c ../src/dump.c
+tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
 tnlp_LDFLAGS = $(LIBS)
 
-tinterp_SOURCES = tinterp.c ../src/sine.c ../src/fft.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c $(CODEBOOKS) ../src/dump.c
+tinterp_SOURCES = tinterp.c ../src/sine.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c $(CODEBOOKS) ../src/dump.c
 tinterp_LDADD = $(lib_LTLIBRARIES) 
 tinterp_LDFLAGS = $(LIBS)
 
-tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c $(CODEBOOKS)
 tquant_LDADD = $(lib_LTLIBRARIES) 
 tquant_LDFLAGS = $(LIBS)
 
-scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
+scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
 
-tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c ../src/octave.c
+tfdmdv_SOURCES = tfdmdv.c ../src/fdmdv.c ../src/kiss_fft.c ../src/octave.c
 tfdmdv_LDADD = $(lib_LTLIBRARIES) 
 tfdmdv_LDFLAGS = $(LIBS)
 
-t48_8_SOURCES = t48_8.c ../src/fdmdv.c ../src/fft.c ../src/kiss_fft.c
+t48_8_SOURCES = t48_8.c ../src/fdmdv.c ../src/kiss_fft.c
 t48_8_LDADD = $(lib_LTLIBRARIES) 
 t48_8_LDFLAGS = $(LIBS)
 
-lspsync_SOURCES = lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
+lspsync_SOURCES = lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c \
 ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c $(CODEBOOKS)
 lspsync_LDADD = $(lib_LTLIBRARIES) 
 lspsync_LDFLAGS = $(LIBS)
@@ -64,7 +64,7 @@ create_interleaver_SOURCES = create_interleaver.c
 create_interleaver_LDADD = $(lib_LTLIBRARIES) 
 create_interleaver_LDFLAGS = $(LIBS)
 
-tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
+tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
 tlspsens_LDADD = $(lib_LTLIBRARIES) 
 tlspsens_LDFLAGS = $(LIBS)
 

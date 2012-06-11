@@ -43,7 +43,6 @@
 #include "test_bits.h"
 #include "pilot_coeff.h"
 #include "kiss_fft.h"
-#include "fft.h"
 #include "hanning.h"
 #include "os.h"
 
@@ -227,6 +226,9 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 
     for(i=0; i<2*FDMDV_NFFT; i++)
 	f->fft_buf[i] = 0.0;
+    f->fft_cfg = kiss_fft_alloc (2*FDMDV_NFFT, 0, NULL, NULL);
+    assert(f->fft_cfg != NULL);
+
 
     return f;
 }
@@ -245,6 +247,7 @@ void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
     KISS_FFT_FREE(fdmdv->fft_pilot_cfg);
+    KISS_FFT_FREE(fdmdv->fft_cfg);
     free(fdmdv);
 }
 
@@ -1380,10 +1383,10 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 void CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *f, float mag_dB[], float rx_fdm[], int nin) 
 {
     int   i,j;
-    COMP  fft_io[2*FDMDV_NFFT];
+    COMP  fft_in[2*FDMDV_NFFT];
+    COMP  fft_out[2*FDMDV_NFFT];
     float fullscale_dB;
 
-#ifdef TT
     /* update buffer of input samples */
 
     for(i=0; i<2*FDMDV_NFFT-nin; i++)
@@ -1395,29 +1398,19 @@ void CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *f, float mag_dB[], float rx
     /* window and FFT */
 
     for(i=0; i<2*FDMDV_NFFT; i++) {
-	fft_io[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/(2*FDMDV_NFFT)));
-	fft_io[i].imag = 0.0;
+	fft_in[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/(2*FDMDV_NFFT)));
+	fft_in[i].imag = 0.0;
     }
-#endif
-    for(i=0; i<2*FDMDV_NFFT; i++) {
-	fft_io[i].real = 1.0;
-	fft_io[i].imag = 0.0;
-    }
-    //fft(&fft_io[0].real, 2*FDMDV_NFFT, -1);
-    printf("%d fft_io[%d] %f %f\n", FDMDV_NFFT,0, fft_io[0].real, fft_io[0].imag);
 
-#ifdef TMP
+    kiss_fft(f->fft_cfg, (kiss_fft_cpx *)fft_in, (kiss_fft_cpx *)fft_out);
 
     /* scale and convert to dB */
 
     fullscale_dB = 20.0*log10(FDMDV_NFFT*32767.0);
 
     for(i=0; i<FDMDV_NFFT; i++) {
-	mag_dB[i]  = 10.0*log10(F[i].real*F[i].real + F[i].imag*F[i].imag);
+	mag_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag);
 	mag_dB[i] -= fullscale_dB;
     }
-#endif
-    for(i=0; i<FDMDV_NFFT; i++)
-	mag_dB[i]  = 1;
 }
 

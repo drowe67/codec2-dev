@@ -90,22 +90,22 @@ am_c2sim_OBJECTS = c2sim.$(OBJEXT)
 c2sim_OBJECTS = $(am_c2sim_OBJECTS)
 c2sim_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_fdmdv_demod_OBJECTS = fdmdv_demod.$(OBJEXT) fdmdv.$(OBJEXT) \
-	fft.$(OBJEXT) kiss_fft.$(OBJEXT) octave.$(OBJEXT)
+	kiss_fft.$(OBJEXT) octave.$(OBJEXT)
 fdmdv_demod_OBJECTS = $(am_fdmdv_demod_OBJECTS)
 fdmdv_demod_LDADD = $(LDADD)
 am_fdmdv_get_test_bits_OBJECTS = fdmdv_get_test_bits.$(OBJEXT) \
-	fdmdv.$(OBJEXT) fft.$(OBJEXT) kiss_fft.$(OBJEXT)
+	fdmdv.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_get_test_bits_OBJECTS = $(am_fdmdv_get_test_bits_OBJECTS)
 fdmdv_get_test_bits_LDADD = $(LDADD)
 am_fdmdv_interleave_OBJECTS = fdmdv_interleave.$(OBJEXT)
 fdmdv_interleave_OBJECTS = $(am_fdmdv_interleave_OBJECTS)
 fdmdv_interleave_LDADD = $(LDADD)
 am_fdmdv_mod_OBJECTS = fdmdv_mod.$(OBJEXT) fdmdv.$(OBJEXT) \
-	fft.$(OBJEXT) kiss_fft.$(OBJEXT)
+	kiss_fft.$(OBJEXT)
 fdmdv_mod_OBJECTS = $(am_fdmdv_mod_OBJECTS)
 fdmdv_mod_LDADD = $(LDADD)
 am_fdmdv_put_test_bits_OBJECTS = fdmdv_put_test_bits.$(OBJEXT) \
-	fdmdv.$(OBJEXT) fft.$(OBJEXT) kiss_fft.$(OBJEXT)
+	fdmdv.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_put_test_bits_OBJECTS = $(am_fdmdv_put_test_bits_OBJECTS)
 fdmdv_put_test_bits_LDADD = $(LDADD)
 generate_codebook_SOURCES = generate_codebook.c
@@ -338,13 +338,13 @@ c2dec_LDFLAGS = $(LIBS)
 c2sim_SOURCES = c2sim.c
 c2sim_LDADD = $(lib_LTLIBRARIES) 
 c2sim_LDFLAGS = $(LIBS)
-fdmdv_get_test_bits_SOURCES = fdmdv_get_test_bits.c fdmdv.c fft.c kiss_fft.c
+fdmdv_get_test_bits_SOURCES = fdmdv_get_test_bits.c fdmdv.c kiss_fft.c
 fdmdv_get_test_bits_LDFLAGS = $(LIBS)
-fdmdv_mod_SOURCES = fdmdv_mod.c fdmdv.c fft.c kiss_fft.c
+fdmdv_mod_SOURCES = fdmdv_mod.c fdmdv.c kiss_fft.c
 fdmdv_mod_LDFLAGS = $(LIBS)
-fdmdv_demod_SOURCES = fdmdv_demod.c fdmdv.c fft.c kiss_fft.c octave.c
+fdmdv_demod_SOURCES = fdmdv_demod.c fdmdv.c kiss_fft.c octave.c
 fdmdv_demod_LDFLAGS = $(LIBS)
-fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c fft.c kiss_fft.c
+fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c kiss_fft.c
 fdmdv_put_test_bits_LDFLAGS = $(LIBS)
 fdmdv_interleave_SOURCES = fdmdv_interleave.c
 fdmdv_interleave_LDFLAGS = $(LIBS)
@@ -495,7 +495,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_interleave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_mod.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_put_test_bits.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
