@@ -101,7 +101,6 @@ postfilter.c \
 sine.c \
 codec2.c \
 fdmdv.c \
-fft.c \
 kiss_fft.c \
 interp.c \
 lsp.c \

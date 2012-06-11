@@ -48,7 +48,7 @@
 \*---------------------------------------------------------------------------*/
 
 void aks_to_H(
-              kiss_fft_cfg fft_dec_cfg, 
+              kiss_fft_cfg fft_fwd_cfg, 
 	      MODEL *model,	/* model parameters */
 	      float  aks[],	/* LPC's */
 	      float  G,	        /* energy term */
@@ -56,8 +56,8 @@ void aks_to_H(
 	      int    order
 )
 {
-  COMP  pw[FFT_DEC];	/* power spectrum (input) */
-  COMP  Pw[FFT_DEC];	/* power spectrum (output) */
+  COMP  pw[FFT_ENC];	/* power spectrum (input) */
+  COMP  Pw[FFT_ENC];	/* power spectrum (output) */
   int   i,m;		/* loop variables */
   int   am,bm;		/* limits of current band */
   float r;		/* no. rads/bin */
@@ -66,11 +66,11 @@ void aks_to_H(
   int   b;		/* centre bin of harmonic */
   float phi_;		/* phase of LPC spectra */
 
-  r = TWO_PI/(FFT_DEC);
+  r = TWO_PI/(FFT_ENC);
 
   /* Determine DFT of A(exp(jw)) ------------------------------------------*/
 
-  for(i=0; i<FFT_DEC; i++) {
+  for(i=0; i<FFT_ENC; i++) {
     pw[i].real = 0.0;
     pw[i].imag = 0.0;
   }
@@ -78,7 +78,7 @@ void aks_to_H(
   for(i=0; i<=order; i++)
     pw[i].real = aks[i];
 
-  kiss_fft(fft_dec_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
+  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
 
   /* Sample magnitude and phase at harmonics */
 
@@ -190,7 +190,7 @@ void aks_to_H(
 \*---------------------------------------------------------------------------*/
 
 void phase_synth_zero_order(
-    kiss_fft_cfg fft_dec_cfg,     
+    kiss_fft_cfg fft_fwd_cfg,     
     MODEL *model,
     float  aks[],
     float *ex_phase,            /* excitation phase of fundamental */
@@ -208,7 +208,7 @@ void phase_synth_zero_order(
   int   b;
 
   G = 1.0;
-  aks_to_H(fft_dec_cfg, model, aks, G, H, order);
+  aks_to_H(fft_fwd_cfg, model, aks, G, H, order);
 
   /* 
      Update excitation fundamental phase track, this sets the position

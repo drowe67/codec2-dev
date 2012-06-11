@@ -66,14 +66,13 @@ libcodec2_la_LIBADD =
 am_libcodec2_la_OBJECTS = libcodec2_la-dump.lo libcodec2_la-lpc.lo \
 	libcodec2_la-nlp.lo libcodec2_la-postfilter.lo \
 	libcodec2_la-sine.lo libcodec2_la-codec2.lo \
-	libcodec2_la-fdmdv.lo libcodec2_la-fft.lo \
-	libcodec2_la-kiss_fft.lo libcodec2_la-interp.lo \
-	libcodec2_la-lsp.lo libcodec2_la-phase.lo \
-	libcodec2_la-quantise.lo libcodec2_la-pack.lo \
-	libcodec2_la-codebook.lo libcodec2_la-codebookd.lo \
-	libcodec2_la-codebookvq.lo libcodec2_la-codebookjnd.lo \
-	libcodec2_la-codebookjvm.lo libcodec2_la-codebookdt.lo \
-	libcodec2_la-codebookge.lo
+	libcodec2_la-fdmdv.lo libcodec2_la-kiss_fft.lo \
+	libcodec2_la-interp.lo libcodec2_la-lsp.lo \
+	libcodec2_la-phase.lo libcodec2_la-quantise.lo \
+	libcodec2_la-pack.lo libcodec2_la-codebook.lo \
+	libcodec2_la-codebookd.lo libcodec2_la-codebookvq.lo \
+	libcodec2_la-codebookjnd.lo libcodec2_la-codebookjvm.lo \
+	libcodec2_la-codebookdt.lo libcodec2_la-codebookge.lo
 libcodec2_la_OBJECTS = $(am_libcodec2_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
@@ -309,7 +308,6 @@ postfilter.c \
 sine.c \
 codec2.c \
 fdmdv.c \
-fft.c \
 kiss_fft.c \
 interp.c \
 lsp.c \
@@ -511,7 +509,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codec2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-dump.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-fdmdv.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-interp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-kiss_fft.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-lpc.Plo@am__quote@
@@ -593,13 +590,6 @@ libcodec2_la-fdmdv.lo: fdmdv.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='fdmdv.c' object='libcodec2_la-fdmdv.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-fdmdv.lo `test -f 'fdmdv.c' || echo '$(srcdir)/'`fdmdv.c
-
-libcodec2_la-fft.lo: fft.c
-@am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-fft.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-fft.Tpo" -c -o libcodec2_la-fft.lo `test -f 'fft.c' || echo '$(srcdir)/'`fft.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libcodec2_la-fft.Tpo" "$(DEPDIR)/libcodec2_la-fft.Plo"; else rm -f "$(DEPDIR)/libcodec2_la-fft.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='fft.c' object='libcodec2_la-fft.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-fft.lo `test -f 'fft.c' || echo '$(srcdir)/'`fft.c
 
 libcodec2_la-kiss_fft.lo: kiss_fft.c
 @am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-kiss_fft.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-kiss_fft.Tpo" -c -o libcodec2_la-kiss_fft.lo `test -f 'kiss_fft.c' || echo '$(srcdir)/'`kiss_fft.c; \

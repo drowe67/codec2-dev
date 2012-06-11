@@ -662,7 +662,7 @@ float lpc_model_amplitudes(
 \*---------------------------------------------------------------------------*/
 
 void aks_to_M2(
-  kiss_fft_cfg  fft_dec_cfg, 
+  kiss_fft_cfg  fft_fwd_cfg, 
   float         ak[],	     /* LPC's */
   int           order,
   MODEL        *model,	     /* sinusoidal model parameters for this frame */
@@ -671,8 +671,8 @@ void aks_to_M2(
   int           dump         /* true to dump sample to dump file */
 )
 {
-  COMP pw[FFT_DEC];	/* input to FFT for power spectrum */
-  COMP Pw[FFT_DEC];	/* output power spectrum */
+  COMP pw[FFT_ENC];	/* input to FFT for power spectrum */
+  COMP Pw[FFT_ENC];	/* output power spectrum */
   int i,m;		/* loop variables */
   int am,bm;		/* limits of current band */
   float r;		/* no. rads/bin */
@@ -680,22 +680,22 @@ void aks_to_M2(
   float Am;		/* spectral amplitude sample */
   float signal, noise;
 
-  r = TWO_PI/(FFT_DEC);
+  r = TWO_PI/(FFT_ENC);
 
   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
 
-  for(i=0; i<FFT_DEC; i++) {
+  for(i=0; i<FFT_ENC; i++) {
     pw[i].real = 0.0;
     pw[i].imag = 0.0; 
   }
 
   for(i=0; i<=order; i++)
     pw[i].real = ak[i];
-  kiss_fft(fft_dec_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
+  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
-  for(i=0; i<FFT_DEC/2; i++)
+  for(i=0; i<FFT_ENC/2; i++)
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
   #ifdef DUMP
   if (dump) 
@@ -1420,7 +1420,7 @@ float decode_energy(int index)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_amplitudes(kiss_fft_cfg  fft_dec_cfg, 
+float decode_amplitudes(kiss_fft_cfg  fft_fwd_cfg, 
 			MODEL *model, 
 			float  ak[],
 		        int    lsp_indexes[], 

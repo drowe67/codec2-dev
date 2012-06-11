@@ -43,6 +43,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
     FILE   *fin;
     short   buf[N];
     struct  CODEC2 *c2;
+    kiss_fft_cfg  fft_fwd_cfg;
     MODEL   model;
     float   ak[LPC_ORD+1];
     float   lsps[LPC_ORD], e;
@@ -51,6 +52,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
     int     frames, i, mask, index;
 
     c2 = codec2_create(CODEC2_MODE_2400);
+    fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
 
     fin = fopen(raw_file_name, "rb");
     assert(fin != NULL);
@@ -91,7 +93,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
 	check_lsp_order(lsps, LPC_ORD);
 	bw_expand_lsps(lsps, LPC_ORD);
 	lsp_to_lpc(lsps, ak, LPC_ORD);
-	aks_to_M2(ak, LPC_ORD, &model, e, &snr, 1); 
+	aks_to_M2(fft_fwd_cfg, ak, LPC_ORD, &model, e, &snr, 1); 
 
 	snr_sum += snr;
 	frames++;
