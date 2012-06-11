@@ -38,10 +38,9 @@ build_triplet = @build@
 host_triplet = @host@
 noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	vqtrain$(EXEEXT) vqtrainjnd$(EXEEXT) tnlp$(EXEEXT) \
-	tinterp$(EXEEXT) tquant$(EXEEXT) tcodec2$(EXEEXT) \
-	vq_train_jvm$(EXEEXT) scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) \
-	t48_8$(EXEEXT) lspsync$(EXEEXT) create_interleaver$(EXEEXT) \
-	tlspsens$(EXEEXT)
+	tinterp$(EXEEXT) tquant$(EXEEXT) vq_train_jvm$(EXEEXT) \
+	scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) t48_8$(EXEEXT) \
+	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -83,13 +82,6 @@ am_t48_8_OBJECTS = t48_8.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
 	kiss_fft.$(OBJEXT)
 t48_8_OBJECTS = $(am_t48_8_OBJECTS)
 t48_8_DEPENDENCIES =
-am_tcodec2_OBJECTS = tcodec2.$(OBJEXT) quantise.$(OBJEXT) \
-	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) fft.$(OBJEXT) \
-	kiss_fft.$(OBJEXT) codec2.$(OBJEXT) sine.$(OBJEXT) \
-	nlp.$(OBJEXT) postfilter.$(OBJEXT) phase.$(OBJEXT) \
-	interp.$(OBJEXT) pack.$(OBJEXT) $(am__objects_1)
-tcodec2_OBJECTS = $(am_tcodec2_OBJECTS)
-tcodec2_DEPENDENCIES =
 am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) fft.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) octave.$(OBJEXT)
 tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
@@ -138,16 +130,16 @@ LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
 	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tcodec2_SOURCES) \
-	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tlspsens_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
+	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
 	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tcodec2_SOURCES) \
-	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tlspsens_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
+	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -287,11 +279,6 @@ tinterp_LDFLAGS = $(LIBS)
 tquant_SOURCES = tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 tquant_LDADD = $(lib_LTLIBRARIES) 
 tquant_LDFLAGS = $(LIBS)
-tcodec2_SOURCES = tcodec2.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c \
-../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c $(CODEBOOKS)
-
-tcodec2_LDADD = $(lib_LTLIBRARIES) 
-tcodec2_LDFLAGS = $(LIBS)
 scalarlsptest_SOURCES = scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/fft.c ../src/kiss_fft.c $(CODEBOOKS)
 scalarlsptest_LDADD = $(lib_LTLIBRARIES) 
 scalarlsptest_LDFLAGS = $(LIBS)
@@ -373,9 +360,6 @@ scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES)
 t48_8$(EXEEXT): $(t48_8_OBJECTS) $(t48_8_DEPENDENCIES) 
 	@rm -f t48_8$(EXEEXT)
 	$(LINK) $(t48_8_LDFLAGS) $(t48_8_OBJECTS) $(t48_8_LDADD) $(LIBS)
-tcodec2$(EXEEXT): $(tcodec2_OBJECTS) $(tcodec2_DEPENDENCIES) 
-	@rm -f tcodec2$(EXEEXT)
-	$(LINK) $(tcodec2_LDFLAGS) $(tcodec2_OBJECTS) $(tcodec2_LDADD) $(LIBS)
 tfdmdv$(EXEEXT): $(tfdmdv_OBJECTS) $(tfdmdv_DEPENDENCIES) 
 	@rm -f tfdmdv$(EXEEXT)
 	$(LINK) $(tfdmdv_LDFLAGS) $(tfdmdv_OBJECTS) $(tfdmdv_LDADD) $(LIBS)
@@ -436,7 +420,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t48_8.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tcodec2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tfdmdv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tinterp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tlspsens.Po@am__quote@

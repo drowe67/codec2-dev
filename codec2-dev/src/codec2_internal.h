@@ -31,7 +31,7 @@
 
 struct CODEC2 {
     int           mode;
-    kiss_fft_cfg  fft_enc_cfg;             /* FFT config for encoder                    */
+    kiss_fft_cfg  fft_fwd_cfg;             /* forward FFT config                        */
     float         w[M];	                   /* time domain hamming window                */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
     float         Pn[2*N];	           /* trapezoidal synthesis window              */
@@ -39,7 +39,7 @@ struct CODEC2 {
     float         hpf_states[2];           /* high pass filter states                   */
     void         *nlp;                     /* pitch predictor states                    */
 
-    kiss_fft_cfg  fft_dec_cfg;             /* FFT config for decoder                    */
+    kiss_fft_cfg  fft_inv_cfg;             /* inverse FFT config                        */
     float         Sn_[2*N];	           /* synthesised output speech                 */
     float         ex_phase;                /* excitation model phase track              */
     float         bg_est;                  /* background noise estimate for post filter */

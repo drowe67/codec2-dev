@@ -40,6 +40,7 @@
 #include "dump.h"
 #include "sine.h"
 #include "nlp.h"
+#include "kiss_fft.h"
 
 int   frames;
 
@@ -80,6 +81,7 @@ char *argv[];
     FILE *fin,*fout;
     short buf[N];
     float Sn[M];	        /* float input speech samples */
+    kiss_fft_cfg  fft_fwd_cfg;
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[] */
     float w[M];	                /* time domain hamming window */
     COMP  W[FFT_ENC];	        /* DFT of w[] */
@@ -121,7 +123,8 @@ char *argv[];
 #endif
 
     nlp_states = nlp_create();
-    make_analysis_window(w,W);
+    fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
+    make_analysis_window(fft_fwd_cfg, w, W);
 
     frames = 0;
     prev_Wo = 0;
@@ -134,7 +137,7 @@ char *argv[];
         Sn[i] = Sn[i+N];
       for(i=0; i<N; i++)
         Sn[i+M-N] = buf[i];
-      dft_speech(Sw, Sn, w);
+      dft_speech(fft_fwd_cfg, Sw, Sn, w);
 #ifdef DUMP
       dump_Sn(Sn); dump_Sw(Sw); 
 #endif

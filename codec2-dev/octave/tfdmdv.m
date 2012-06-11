@@ -270,7 +270,7 @@ function check(a, b, test_name)
   end
   printf(": ");  
   
-  if abs(sum(a - b))/n < 1E-3
+  if sum(abs(a - b))/n < 1E-3
     printf("OK\n");
     passes++;
   else

@@ -42,6 +42,7 @@
 #include "rn.h"
 #include "test_bits.h"
 #include "pilot_coeff.h"
+#include "kiss_fft.h"
 #include "fft.h"
 #include "hanning.h"
 #include "os.h"
@@ -195,6 +196,9 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 
     /* freq Offset estimation states */
 
+    f->fft_pilot_cfg = kiss_fft_alloc (MPILOTFFT, 0, NULL, NULL);
+    assert(f->fft_pilot_cfg != NULL);
+
     for(i=0; i<NPILOTBASEBAND; i++) {
 	f->pilot_baseband1[i].real = f->pilot_baseband2[i].real = 0.0;
 	f->pilot_baseband1[i].imag = f->pilot_baseband2[i].imag = 0.0;
@@ -240,6 +244,7 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
+    KISS_FFT_FREE(fdmdv->fft_pilot_cfg);
     free(fdmdv);
 }
 
@@ -561,10 +566,12 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 
 \*---------------------------------------------------------------------------*/
 
-void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP S[], int nin)
+void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], 
+		   COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin)
 {
     int   i,j,k;
     int   mpilot;
+    COMP  s[MPILOTFFT];
     float mag, imax;
     int   ix;
     float r;
@@ -583,13 +590,13 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lp
 
     mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
     for(i=0; i<MPILOTFFT; i++) {
-	S[i].real = 0.0; S[i].imag = 0.0;
+	s[i].real = 0.0; s[i].imag = 0.0;
     }
     for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
-	S[j] = fcmult(hanning[i], pilot_lpf[i]);
+	s[j] = fcmult(hanning[i], pilot_lpf[i]); 
     }
 
-    fft(&S[0].real, MPILOTFFT, -1);
+    kiss_fft(fft_pilot_cfg, (kiss_fft_cpx *)s, (kiss_fft_cpx *)S);
 
     /* peak pick and convert to Hz */
 
@@ -666,8 +673,8 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 	f->pilot_baseband2[j] = fcmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
-    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->S1, nin);
-    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->S2, nin);
+    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->fft_pilot_cfg, f->S1, nin);
+    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->fft_pilot_cfg, f->S2, nin);
 
     if (max1 > max2)
 	foff = foff1;
@@ -1396,7 +1403,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *f, float mag_dB[], float rx
 	fft_io[i].real = 1.0;
 	fft_io[i].imag = 0.0;
     }
-    fft(&fft_io[0].real, 2*FDMDV_NFFT, -1);
+    //fft(&fft_io[0].real, 2*FDMDV_NFFT, -1);
     printf("%d fft_io[%d] %f %f\n", FDMDV_NFFT,0, fft_io[0].real, fft_io[0].imag);
 
 #ifdef TMP

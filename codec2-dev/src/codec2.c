@@ -101,10 +101,10 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
     c2->hpf_states[0] = c2->hpf_states[1] = 0.0;
     for(i=0; i<2*N; i++)
 	c2->Sn_[i] = 0;
-    c2->fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
-    make_analysis_window(c2->fft_enc_cfg, c2->w,c2->W);
+    c2->fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
+    make_analysis_window(c2->fft_fwd_cfg, c2->w,c2->W);
     make_synthesis_window(c2->Pn);
-    c2->fft_dec_cfg = kiss_fft_alloc(FFT_DEC, 0, NULL, NULL);
+    c2->fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL);
     quantise_init();
     c2->prev_Wo_enc = 0.0;
     c2->bg_est = 0.0;
@@ -147,8 +147,8 @@ void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
     nlp_destroy(c2->nlp);
-    KISS_FFT_FREE(c2->fft_enc_cfg);
-    KISS_FFT_FREE(c2->fft_dec_cfg);
+    KISS_FFT_FREE(c2->fft_fwd_cfg);
+    KISS_FFT_FREE(c2->fft_inv_cfg);
     free(c2);
 }
 
@@ -356,7 +356,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_dec_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -528,7 +528,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_dec_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -705,7 +705,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_dec_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -737,9 +737,9 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, float
 {
     int     i;
 
-    phase_synth_zero_order(c2->fft_dec_cfg, model, ak, &c2->ex_phase, LPC_ORD);
+    phase_synth_zero_order(c2->fft_fwd_cfg, model, ak, &c2->ex_phase, LPC_ORD);
     postfilter(model, &c2->bg_est);
-    synthesise(c2->fft_dec_cfg, c2->Sn_, model, c2->Pn, 1);
+    synthesise(c2->fft_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
     for(i=0; i<N; i++) {
 	if (c2->Sn_[i] > 32767.0)
@@ -778,7 +778,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     for(i=0; i<N; i++)
       c2->Sn[i+M-N] = speech[i];
 
-    dft_speech(c2->fft_enc_cfg, Sw, c2->Sn, c2->w);
+    dft_speech(c2->fft_fwd_cfg, Sw, c2->Sn, c2->w);
 
     /* Estimate pitch */
 

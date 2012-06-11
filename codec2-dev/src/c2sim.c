@@ -47,7 +47,7 @@
 #include "postfilter.h"
 #include "interp.h"
 
-void synth_one_frame(kiss_fft_cfg fft_dec_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 /*---------------------------------------------------------------------------*\
@@ -63,8 +63,8 @@ int main(int argc, char *argv[])
     short buf[N];	/* input/output buffer                   */
     float Sn[M];	/* float input speech samples            */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
-    kiss_fft_cfg  fft_enc_cfg;
-    kiss_fft_cfg  fft_dec_cfg;
+    kiss_fft_cfg  fft_fwd_cfg;
+    kiss_fft_cfg  fft_inv_cfg;
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
@@ -309,9 +309,9 @@ int main(int argc, char *argv[])
 
     /* Initialise ------------------------------------------------------------*/
 
-    fft_enc_cfg = kiss_fft_alloc(FFT_ENC, 1, NULL, NULL);
-    fft_dec_cfg = kiss_fft_alloc(FFT_DEC, 0, NULL, NULL);
-    make_analysis_window(fft_enc_cfg, w, W);
+    fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
+    fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
+    make_analysis_window(fft_fwd_cfg, w, W);
     make_synthesis_window(Pn);
     quantise_init();
 
@@ -343,7 +343,7 @@ int main(int argc, char *argv[])
 	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 	
-	dft_speech(fft_enc_cfg, Sw, Sn, w); 
+	dft_speech(fft_fwd_cfg, Sw, Sn, w); 
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
 	uq_Wo = model.Wo;
@@ -574,7 +574,7 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(fft_dec_cfg, ak, order, &model, e, &snr, 1); 
+	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1); 
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps
@@ -625,7 +625,7 @@ int main(int argc, char *argv[])
 
 		interp_model.voiced = voiced1;
 		
-		interpolate_lsp(fft_dec_cfg, &interp_model, &prev_model, &model,
+		interpolate_lsp(fft_fwd_cfg, &interp_model, &prev_model, &model,
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
 		apply_lpc_correction(&interp_model);
 
@@ -660,11 +660,11 @@ int main(int argc, char *argv[])
                 #endif
 
 		if (phase0)
-		    phase_synth_zero_order(fft_dec_cfg, &interp_model, ak_interp, ex_phase,
+		    phase_synth_zero_order(fft_fwd_cfg, &interp_model, ak_interp, ex_phase,
 					   order);	
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
-		synth_one_frame(fft_dec_cfg, buf, &interp_model, Sn_, Pn);
+		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -672,10 +672,10 @@ int main(int argc, char *argv[])
 		/* decode this frame */
 
 		if (phase0)
-		    phase_synth_zero_order(fft_dec_cfg, &model, ak, ex_phase, order);	
+		    phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
-		synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
+		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -695,10 +695,10 @@ int main(int argc, char *argv[])
 	    /* no decimation - sythesise each 10ms frame immediately */
 
 	    if (phase0)
-	    	phase_synth_zero_order(fft_dec_cfg, &model, ak, ex_phase, order);	
+	    	phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
 	    if (postfilt)
 		postfilter(&model, &bg_est);
-	    synth_one_frame(fft_dec_cfg, buf, &model, Sn_, Pn);
+	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn);
 	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
 	}
 
@@ -737,11 +737,11 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(kiss_fft_cfg fft_dec_cfg, short buf[], MODEL *model, float Sn_[], float Pn[])
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[])
 {
     int     i;
 
-    synthesise(fft_dec_cfg, Sn_, model, Pn, 1);
+    synthesise(fft_inv_cfg, Sn_, model, Pn, 1);
 
     for(i=0; i<N; i++) {
 	if (Sn_[i] > 32767.0)

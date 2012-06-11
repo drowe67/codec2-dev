@@ -31,6 +31,7 @@
 
 #include "comp.h"
 #include "fdmdv.h"
+#include "kiss_fft.h"
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -100,6 +101,7 @@ struct FDMDV {
 
     /* freq offset estimation states */
 
+    kiss_fft_cfg fft_pilot_cfg;             
     COMP pilot_baseband1[NPILOTBASEBAND];
     COMP pilot_baseband2[NPILOTBASEBAND];
     COMP pilot_lpf1[NPILOTLPF];
@@ -150,7 +152,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_mem, COMP *phase, COMP *freq);
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);
 float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin);
-void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], COMP S[], int nin);
+void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin);
 void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect, COMP *foff_phase_rect, int nin);
 void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);

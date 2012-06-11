@@ -146,7 +146,7 @@ void *nlp_create()
     for(i=0; i<NLP_NTAP; i++)
 	nlp->mem_fir[i] = 0.0;
 
-    nlp->fft_cfg = kiss_fft_alloc (PE_FFT_SIZE, 1, NULL, NULL);
+    nlp->fft_cfg = kiss_fft_alloc (PE_FFT_SIZE, 0, NULL, NULL);
     assert(nlp->fft_cfg != NULL);
 
     return (void*)nlp;
@@ -257,17 +257,18 @@ float nlp(
     for(i=0; i<m/DEC; i++) {
 	fw[i].real = nlp->sq[i*DEC]*(0.5 - 0.5*cos(2*PI*i/(m/DEC-1)));
     }
-#ifdef DUMP
+    #ifdef DUMP
     dump_dec(Fw);
-#endif
+    #endif
+
     kiss_fft(nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
     for(i=0; i<PE_FFT_SIZE; i++)
 	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
 
-#ifdef DUMP
+    #ifdef DUMP
     dump_sq(nlp->sq);
     dump_Fw(Fw);
-#endif
+    #endif
 
     /* find global peak */
 

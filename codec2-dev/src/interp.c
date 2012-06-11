@@ -146,7 +146,7 @@ float sample_log_amp(MODEL *model, float w)
 \*---------------------------------------------------------------------------*/
 
 void interpolate_lsp(
-  kiss_fft_cfg  fft_dec_cfg, 
+  kiss_fft_cfg  fft_fwd_cfg, 
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
   MODEL *next,      /* next frames model params                      */
@@ -201,7 +201,7 @@ void interpolate_lsp(
     /* convert back to amplitudes */
 
     lsp_to_lpc(lsps_interp, ak_interp, LPC_ORD);
-    aks_to_M2(fft_dec_cfg, ak_interp, LPC_ORD, interp, e, &snr, 0); 
+    aks_to_M2(fft_fwd_cfg, ak_interp, LPC_ORD, interp, e, &snr, 0); 
     //printf("  interp: ak[1]: %f A[1] %f\n", ak_interp[1], interp->A[1]);
 }
 

@@ -66,7 +66,7 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax,
 
 \*---------------------------------------------------------------------------*/
 
-void make_analysis_window(kiss_fft_cfg fft_enc_cfg, float w[], COMP W[])
+void make_analysis_window(kiss_fft_cfg fft_fwd_cfg, float w[], COMP W[])
 {
   float m;
   COMP  wshift[FFT_ENC];
@@ -132,7 +132,7 @@ void make_analysis_window(kiss_fft_cfg fft_enc_cfg, float w[], COMP W[])
   for(i=FFT_ENC-NW/2,j=M/2-NW/2; i<FFT_ENC; i++,j++)
    wshift[i].real = w[j];
 
-  kiss_fft(fft_enc_cfg, (kiss_fft_cpx *)wshift, (kiss_fft_cpx *)W);
+  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)wshift, (kiss_fft_cpx *)W);
 
   /* 
       Re-arrange W[] to be symmetrical about FFT_ENC/2.  Makes later 
@@ -199,7 +199,7 @@ float hpf(float x, float states[])
 
 \*---------------------------------------------------------------------------*/
 
-void dft_speech(kiss_fft_cfg fft_enc_cfg, COMP Sw[], float Sn[], float w[])
+void dft_speech(kiss_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[])
 {
   int  i;
   COMP sw[FFT_ENC];
@@ -222,7 +222,7 @@ void dft_speech(kiss_fft_cfg fft_enc_cfg, COMP Sw[], float Sn[], float w[])
   for(i=0; i<NW/2; i++)
     sw[FFT_ENC-NW/2+i].real = Sn[i+M/2-NW/2]*w[i+M/2-NW/2];
 
-  kiss_fft(fft_enc_cfg, (kiss_fft_cpx *)sw, (kiss_fft_cpx *)Sw);
+  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)sw, (kiss_fft_cpx *)Sw);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -366,7 +366,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[])
 
     /* Estimate phase of harmonic */
 
-    model->phi[m] = atan2(-Sw[b].imag,Sw[b].real);
+    model->phi[m] = atan2(Sw[b].imag,Sw[b].real);
   }
 }
 
@@ -557,7 +557,7 @@ void make_synthesis_window(float Pn[])
 \*---------------------------------------------------------------------------*/
 
 void synthesise(
-  kiss_fft_cfg fft_dec_cfg, 
+  kiss_fft_cfg fft_inv_cfg, 
   float  Sn_[],		/* time domain synthesised signal              */
   MODEL *model,		/* ptr to model parameters for this frame      */
   float  Pn[],		/* time domain Parzen window                   */
@@ -607,14 +607,14 @@ void synthesise(
 		b = (FFT_DEC/2)-1;
 	}
 	Sw_[b].real = model->A[l]*cos(model->phi[l]);
-	Sw_[b].imag = -model->A[l]*sin(model->phi[l]);
+	Sw_[b].imag = model->A[l]*sin(model->phi[l]);
 	Sw_[FFT_DEC-b].real = Sw_[b].real;
 	Sw_[FFT_DEC-b].imag = -Sw_[b].imag;
     }
 
     /* Perform inverse DFT */
 
-    kiss_fft(fft_dec_cfg, (kiss_fft_cpx *)Sw_, (kiss_fft_cpx *)sw_);
+    kiss_fft(fft_inv_cfg, (kiss_fft_cpx *)Sw_, (kiss_fft_cpx *)sw_);
 #else
     /*
        Direct time domain synthesis using the cos() function.  Works
