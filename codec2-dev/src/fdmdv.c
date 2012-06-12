@@ -145,9 +145,12 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 	f->prev_rx_symbols[c].real = 1.0;
 	f->prev_rx_symbols[c].imag = 0.0;
 
-	for(k=0; k<NFILTER; k++) {
+	for(k=0; k<NSYM; k++) {
 	    f->tx_filter_memory[c][k].real = 0.0;
 	    f->tx_filter_memory[c][k].imag = 0.0;
+	}
+
+	for(k=0; k<NFILTER; k++) {
 	    f->rx_filter_memory[c][k].real = 0.0;
 	    f->rx_filter_memory[c][k].imag = 0.0;
 	}
@@ -332,7 +335,7 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
 
 \*---------------------------------------------------------------------------*/
 
-void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NFILTER])
+void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM])
 {
     int     c;
     int     i,j,k;
@@ -341,9 +344,14 @@ void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memo
 
     gain.real = sqrt(2.0)/2.0;
     gain.imag = 0.0;
-
+    
+    /*
     for(c=0; c<NC+1; c++)
 	tx_filter_memory[c][NFILTER-1] = cmult(tx_symbols[c], gain);
+    */
+    for(c=0; c<NC+1; c++)
+	tx_filter_memory[c][NSYM-1] = cmult(tx_symbols[c], gain);
+    
 
     /* 
        tx filter each symbol, generate M filtered output samples for each symbol.
@@ -356,14 +364,14 @@ void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memo
 	    /* filter real sample of symbol for carrier c */
 
 	    acc = 0.0;
-	    for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
+	    for(j=0,k=M-i-1; j<NSYM; j++,k+=M)
 		acc += M * tx_filter_memory[c][j].real * gt_alpha5_root[k];
 	    tx_baseband[c][i].real = acc;	
 
 	    /* filter imag sample of symbol for carrier c */
 
 	    acc = 0.0;
-	    for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
+	    for(j=0,k=M-i-1; j<NSYM; j++,k+=M)
 		acc += M * tx_filter_memory[c][j].imag * gt_alpha5_root[k];
 	    tx_baseband[c][i].imag = acc;
 
@@ -372,15 +380,14 @@ void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memo
 
     /* shift memory, inserting zeros at end */
 
-    for(i=0; i<NFILTER-M; i++)
+    for(i=0; i<NSYM-1; i++)
 	for(c=0; c<NC+1; c++)
-	    tx_filter_memory[c][i] = tx_filter_memory[c][i+M];
+	    tx_filter_memory[c][i] = tx_filter_memory[c][i+1];
 
-    for(i=NFILTER-M; i<NFILTER; i++)
-	for(c=0; c<NC+1; c++) {
-	    tx_filter_memory[c][i].real = 0.0;
-	    tx_filter_memory[c][i].imag = 0.0;
-	}
+    for(c=0; c<NC+1; c++) {
+	tx_filter_memory[c][NSYM-1].real = 0.0;
+	tx_filter_memory[c][NSYM-1].imag = 0.0;
+    }
 }
 
 /*---------------------------------------------------------------------------*\
