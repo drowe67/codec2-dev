@@ -137,7 +137,7 @@ struct FDMDV {
 
     /* Buf for FFT/waterfall */
 
-    float fft_buf[2*FDMDV_NFFT];
+    float fft_buf[2*FDMDV_NSPEC];
     kiss_fft_cfg fft_cfg;             
  };
 

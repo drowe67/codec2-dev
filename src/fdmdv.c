@@ -224,9 +224,9 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 	f->noise_est[c] = 0.0;
     }
 
-    for(i=0; i<2*FDMDV_NFFT; i++)
+    for(i=0; i<2*FDMDV_NSPEC; i++)
 	f->fft_buf[i] = 0.0;
-    f->fft_cfg = kiss_fft_alloc (2*FDMDV_NFFT, 0, NULL, NULL);
+    f->fft_cfg = kiss_fft_alloc (2*FDMDV_NSPEC, 0, NULL, NULL);
     assert(f->fft_cfg != NULL);
 
 
@@ -1362,55 +1362,63 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: fdmdv_get_fft()	     
+  FUNCTION....: fdmdv_get_rx_spectrum()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 9 June 2012
 
-  Performs a FFT on the received modem signal at the input of the
-  demod, returns the FDMDV_NFFT point magnitiude spectrum in dB.  0dB
-  is a signal with amplitude +/- 2^15.
+  Returns the FDMDV_NSPEC point magnitude spectrum of the rx signal in
+  dB. The spectral samples are scaled so that 0dB is the peak, a good
+  range for plotting is 0 to -40dB.
 
-  The output can be used to plot a spectrum of the demod input.
-  Sucessive calls can be used to build up a waterfall or spectrogram
+  Successive calls can be used to build up a waterfall or spectrogram
   plot, by mapping the received levels to colours.
 
-  The time-frequency resolution of the FFT can be adjusted by varying
-  FDMDV_NFFT.  Note that a 2*FDMDV_NFFT size FFT is reqd to get
-  FDMDV_NFFT output points.
+  The time-frequency resolution of the spectrum can be adjusted by varying
+  FDMDV_NSPEC.  Note that a 2*FDMDV_NSPEC size FFT is reqd to get
+  FDMDV_NSPEC output points. FDMDV_NSPEC must be a power of 2.
+
+  See octave/tfft_log.m for a demo real time spectral display using
+  Octave. This demo averages the output over time to get a smoother
+  display:
+
+     av = 0.9*av + 0.1*mag_dB
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_get_fft(struct FDMDV *f, float mag_dB[], float rx_fdm[], int nin) 
+void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[], 
+					       float rx_fdm[], int nin) 
 {
     int   i,j;
-    COMP  fft_in[2*FDMDV_NFFT];
-    COMP  fft_out[2*FDMDV_NFFT];
-    float fullscale_dB;
+    COMP  fft_in[2*FDMDV_NSPEC];
+    COMP  fft_out[2*FDMDV_NSPEC];
+    float full_scale_dB;
 
     /* update buffer of input samples */
 
-    for(i=0; i<2*FDMDV_NFFT-nin; i++)
+    for(i=0; i<2*FDMDV_NSPEC-nin; i++)
 	f->fft_buf[i] = f->fft_buf[i+nin];
     for(j=0; j<nin; j++,i++)
 	f->fft_buf[i] = rx_fdm[j];
-    assert(i == 2*FDMDV_NFFT);
+    assert(i == 2*FDMDV_NSPEC);
 
     /* window and FFT */
 
-    for(i=0; i<2*FDMDV_NFFT; i++) {
-	fft_in[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/(2*FDMDV_NFFT)));
+    for(i=0; i<2*FDMDV_NSPEC; i++) {
+	fft_in[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/(2*FDMDV_NSPEC)));
 	fft_in[i].imag = 0.0;
     }
 
     kiss_fft(f->fft_cfg, (kiss_fft_cpx *)fft_in, (kiss_fft_cpx *)fft_out);
 
+    /* FFT scales up a signal of level 1 FDMDV_NSPEC */
+
+    full_scale_dB = 20*log10(FDMDV_NSPEC);
+
     /* scale and convert to dB */
 
-    fullscale_dB = 20.0*log10(FDMDV_NFFT*32767.0);
-
-    for(i=0; i<FDMDV_NFFT; i++) {
-	mag_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag);
-	mag_dB[i] -= fullscale_dB;
+    for(i=0; i<FDMDV_NSPEC; i++) {
+	mag_spec_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag);
+	mag_spec_dB[i] -= full_scale_dB;
     }
 }
 

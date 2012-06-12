@@ -76,8 +76,9 @@ int main(int argc, char *argv[])
     int           sync_bit_log[MAX_FRAMES];
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*MAX_FRAMES];
     float         snr_est_log[MAX_FRAMES];
-    float        *fft_log;
- 
+    float        *rx_spec_log;
+    int           max_frames_reached;
+
     if (argc < 3) {
 	printf("usage: %s InputModemRawFile OutputBitFile [OctaveDumpFile]\n", argv[0]);
 	printf("e.g    %s hts1a_fdmdv.raw hts1a.c2\n", argv[0]);
@@ -102,14 +103,15 @@ int main(int argc, char *argv[])
 
     rx_fdm_log = (float*)malloc(sizeof(float)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
-    fft_log = (float*)malloc(sizeof(float)*FDMDV_NFFT*MAX_FRAMES);
-    assert(fft_log != NULL);
+    rx_spec_log = (float*)malloc(sizeof(float)*FDMDV_NSPEC*MAX_FRAMES);
+    assert(rx_spec_log != NULL);
 
     fdmdv = fdmdv_create();
     f = 0;
     state = 0;
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;
     rx_fdm_log_col_index = 0;
+    max_frames_reached = 0;
 
     while(fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin)
     {
@@ -137,12 +139,15 @@ int main(int argc, char *argv[])
 	    memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
 	    snr_est_log[f] = stats.snr_est;
 
-	    fdmdv_get_fft(fdmdv, &fft_log[f*FDMDV_NFFT], rx_fdm, nin_prev);
+	    fdmdv_get_rx_spectrum(fdmdv, &rx_spec_log[f*FDMDV_NSPEC], rx_fdm, nin_prev);
 
 	    f++;
 	}
-	else
+	
+	if ((f == MAX_FRAMES) && !max_frames_reached) {
 	    fprintf(stderr,"MAX_FRAMES exceed in Octave log, log truncated\n");
+	    max_frames_reached = 1;
+	}
 
 	/* state machine to output codec bits only if we have a 0,1
 	   sync bit sequence */
@@ -209,7 +214,7 @@ int main(int argc, char *argv[])
 	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*f);
 	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
 	    octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
-	    //octave_save_float(foct, "fft_log_c", fft_log, f, FDMDV_NFFT, FDMDV_NFFT);  
+	    octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, FDMDV_NSPEC, FDMDV_NSPEC);  
 	    fclose(foct);
 	}
     }
@@ -217,7 +222,7 @@ int main(int argc, char *argv[])
     fclose(fin);
     fclose(fout);
     free(rx_fdm_log);
-    free(fft_log);
+    free(rx_spec_log);
     fdmdv_destroy(fdmdv);
 
     return 0;
