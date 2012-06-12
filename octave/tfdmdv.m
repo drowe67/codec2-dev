@@ -196,7 +196,7 @@ stem_sig_and_error(1, 212, real(tx_symbols_log_c(1:n/2)), real(tx_symbols_log(1:
 % tx_filter()
 
 diff = tx_baseband_log - tx_baseband_log_c;
-c=3;
+c=15;
 plot_sig_and_error(2, 211, real(tx_baseband_log_c(c,:)), real(sum(diff)), 'tx baseband real')
 plot_sig_and_error(2, 212, imag(tx_baseband_log_c(c,:)), imag(sum(diff)), 'tx baseband imag')
 

@@ -89,7 +89,7 @@ struct FDMDV {
 
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
-    COMP tx_filter_memory[NC+1][NFILTER];
+    COMP tx_filter_memory[NC+1][NSYM];
     COMP phase_tx[NC+1];
     COMP freq[NC+1];
  
@@ -148,7 +148,7 @@ struct FDMDV {
 \*---------------------------------------------------------------------------*/
 
 void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit);
-void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NFILTER]);
+void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
 void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[]);
 void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_mem, COMP *phase, COMP *freq);
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);

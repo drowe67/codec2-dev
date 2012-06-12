@@ -102,6 +102,8 @@ int main(int argc, char *argv[])
     rx_baseband_log_col_index = 0;
     rx_filt_log_col_index = 0;
 
+    printf("sizeof FDMDV states: %d bytes\n", sizeof(struct FDMDV));
+
     for(f=0; f<FRAMES; f++) {
 
 	/* --------------------------------------------------------*\
