@@ -1,10 +1,10 @@
-% tfft_log.m
+% tget-spec.m
 %
-% Used in conjunction swith src/fdmdv_demod to test the
+% Used in conjunction with src/fdmdv_demod to test the
 % fdmdv_get_rx_spectrum() function.
 %
 % codec2-dev/src$ ./fdmdv_demod fdmdv_mod.raw tmp.c2 dump.txt
-% octave:3> tfft_log("../src/dump.txt")
+% octave:3> tget_spec("../src/dump.txt")
 %
 % Copyright David Rowe 2012
 % This program is distributed under the terms of the GNU General Public License 

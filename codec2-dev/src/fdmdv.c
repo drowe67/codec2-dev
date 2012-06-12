@@ -1377,7 +1377,7 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
   FDMDV_NSPEC.  Note that a 2*FDMDV_NSPEC size FFT is reqd to get
   FDMDV_NSPEC output points. FDMDV_NSPEC must be a power of 2.
 
-  See octave/tfft_log.m for a demo real time spectral display using
+  See octave/tget_spec.m for a demo real time spectral display using
   Octave. This demo averages the output over time to get a smoother
   display:
 
