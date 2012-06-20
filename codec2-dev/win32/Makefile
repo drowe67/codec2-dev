@@ -7,8 +7,6 @@
 # the machine-generated codebook source files.  It is designed to be cross compiled on
 # Linux.  
 # 
-# TODO - get this integarted into Automake system, such that if i586-mingw32msvc exists
-# the Win32 code gets automatically built.
 
 # uncomment under Windows
 #CC_PREFIX = 

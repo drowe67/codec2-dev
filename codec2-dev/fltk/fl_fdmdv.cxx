@@ -18,20 +18,29 @@
 
 #include "fdmdv.h"
 
-#define MIN_DB -40.0
-#define MAX_DB   0.0
-#define BETA     0.1
-#define MIN_HZ     0
-#define MAX_HZ  4000
+#define MIN_DB             -40.0
+#define MAX_DB               0.0
+#define BETA                 0.1
+#define MIN_HZ               0
+#define MAX_HZ            4000
+#define WATERFALL_SECS_Y     5    // number of seconds respresented by y axis of waterfall
+#define DT                   0.1  // time between samples 
+#define FS                8000
 
 class Spectrum;
+class Waterfall;
+
 char         *fin_name = NULL;
 FILE         *fin = NULL;
 struct FDMDV *fdmdv;
 Fl_Group     *agroup;
 Fl_Window    *window;
 Spectrum     *aSpectrum;
+Waterfall    *aWaterfall;
 
+float  av_mag[FDMDV_NSPEC]; // shared between a few classes
+
+float  Ts = 0.0;
 
 class Spectrum: public Fl_Box {
 protected:
@@ -100,29 +109,118 @@ protected:
     }
 
 public:
-    float  av_mag[FDMDV_NSPEC];
-
     Spectrum(int x, int y, int h, int w): Fl_Box(x,y,h,w, "Spectrum")
     {
-	int i;
-
-	for(i=0; i<FDMDV_NSPEC; i++)
-	    av_mag[i] = -40.0;
-
 	align(FL_ALIGN_TOP);
 	labelsize(10);
     };
 
-    // update average of each spectrum point
-    
-    void new_data(float mag_dB[]) {
-	int i;
+};
 
-	for(i=0; i<FDMDV_NSPEC; i++)
-	    av_mag[i] = (1.0 - BETA)*av_mag[i] + BETA*mag_dB[i];
+
+// question: how to map block sizes to pixels?
+// need to handle: FDMDV_NSPEC across x, even when FDMDV_NSPEC < w(),
+//                 could use axis as min of w(), FDMDV_NSPEC?
+// set height of blocks based on update rate, number of seconds to display?
+// do we take a snapshot every x mseconds of plot average?
+// maybe just take a first pass
+// draw graticule or axis
+
+/*
+
+  Notes:
+
+  The height h() pixels represents WATERFALL_SECS_Y of data.  Every DT
+  seconds we get a vector of FDMDV_NSPEC spectrum samples which we use
+  to update the last row.  The height of each row is dy pixels, which
+  maps to DT seconds.  We call each dy high rectangle of pixels a
+  block.
+
+*/
+
+class Waterfall: public Fl_Box {
+protected:
+
+    uchar *pixel_buf;
+
+    void draw() {
+	float  spec_index_per_px, intensity_per_dB;
+	int    px_per_sec;
+	int    index, dy, dy_blocks, bytes_in_row_of_blocks, b;
+	int    px, py, intensity;
+	uchar *last_row, *pdest, *psrc;
+
+	Fl_Box::draw();
+
+	// determine dy, the height of one "block"
+
+	px_per_sec = (float)h()/WATERFALL_SECS_Y;
+	dy = DT*px_per_sec;
+
+	// number of dy high blocks in spectrogram
+
+	dy_blocks = h()/dy;
+
+	// shift previous bit map
+					       
+	bytes_in_row_of_blocks = dy*w()*sizeof(uchar);
+
+	for(b=0; b<dy_blocks-1; b++) {
+	    pdest = pixel_buf + b*w()*dy;
+	    psrc  = pixel_buf + (b+1)*w()*dy;
+	    memcpy(pdest, psrc, bytes_in_row_of_blocks);
+	}
+
+	// create a new row of blocks at bottom
+
+	spec_index_per_px = (float)FDMDV_NSPEC/(float)w();
+	intensity_per_dB = (float)256/(MAX_DB - MIN_DB);
+	last_row = pixel_buf + dy*(dy_blocks - 1)*w()*sizeof(uchar);
+
+	for(px=0; px<w(); px++) {
+	    index = px*spec_index_per_px;
+	    intensity = intensity_per_dB * (av_mag[index] - MIN_DB);
+	    if (intensity > 255) intensity = 255;
+	    if (intensity < 0) intensity = 0;
+
+	    for(py=0; py<dy; py++)
+		last_row[px+py*w()] = intensity;
+	}
+
+	// update bit map
+
+	fl_draw_image_mono(pixel_buf, x(), y(), w(), h(), 1, w());
     }
 
+public:
+
+    Waterfall(int x, int y, int h, int w): Fl_Box(x,y,h,w, "Waterfall")
+    {
+	int buf_sz, i;
+
+	align(FL_ALIGN_TOP);
+	labelsize(10);
+
+	buf_sz = h*w;
+	pixel_buf = new uchar[buf_sz];
+	for(i=0; i<buf_sz; i++)
+	    pixel_buf[i] = 0;
+    };
+
+    ~Waterfall() {
+	delete pixel_buf;
+    }
 };
+
+
+// update average of each spectrum point
+    
+void new_data(float mag_dB[]) {
+    int i;
+
+    for(i=0; i<FDMDV_NSPEC; i++)
+	av_mag[i] = (1.0 - BETA)*av_mag[i] + BETA*mag_dB[i];
+}
 
 void idle(void*) {
     int   nin = FDMDV_NOM_SAMPLES_PER_FRAME;
@@ -132,13 +230,19 @@ void idle(void*) {
     int   i;
 
     if (fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin) {
+	Ts += (float)nin/FS;
+	//printf("Ts %f\n", Ts);
 	for(i=0; i<nin; i++)
 	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
 	fdmdv_get_rx_spectrum(fdmdv, rx_spec, rx_fdm, nin);
-	aSpectrum->new_data(rx_spec);
-	aSpectrum->redraw();
-	usleep(20000);
+	new_data(rx_spec);
+	if (Ts >= DT) {
+	    Ts -= DT;
+	    aSpectrum->redraw();
+	    aWaterfall->redraw();
+	}
     }
+    usleep(20000);
 }
 
 int arg_callback(int argc, char **argv, int &i) {
@@ -154,8 +258,9 @@ int arg_callback(int argc, char **argv, int &i) {
 
 int main(int argc, char **argv) {
     int ret;
-    int i = 1;
+    int i;
 
+    i = 1;
     Fl::args(argc,argv,i,arg_callback);
     
     if (argc != 3) {
@@ -169,9 +274,18 @@ int main(int argc, char **argv) {
 	exit(1);
     }
     
-    window = new Fl_Window(800, 600, "fl_fmdv");
+    for(i=0; i<FDMDV_NSPEC; i++)
+	av_mag[i] = -40.0;
+
+    // reccommended to prevent dithering and stopped display being
+    // covered by black flickering squares
+
+    Fl::visual(FL_RGB);
+
+    window = new Fl_Window(800, 20+300+20+20+300+20, "fl_fmdv");
     window->size_range(400,200);
     aSpectrum = new Spectrum(20, 20, 800-40, 300);
+    aWaterfall = new Waterfall(20, 20+300+20+20, 800-40, 300);
     window->add_resizable(*aSpectrum);
     fdmdv = fdmdv_create();
 
