@@ -176,9 +176,7 @@ This introduces a simulated 1000ppm error:
 TODO
 ----
 
-[ ] 48 kHz to and from 8 kHz routines to drive 48 kHz sound card audio
-[ ] implement SNR and ppm measurements in fdmdv_get_demod_stats()
-[ ] implement fdmdv_get_waterfall_line()
+[ ] implement ppm measurements in fdmdv_get_demod_stats()
 [ ] try interfering sine wave
     + maybe swept
     + does modem fall over?

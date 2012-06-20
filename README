@@ -64,10 +64,11 @@ Debugging
 Directories
 -----------
 
-  script   - shell scripts for playing and converting raw files
-  src      - C source code
+  fltk     - FLTK GUI programs(s)
   octave   - Octave scripts used for visualising internal signals 
              during development
+  script   - shell scripts for playing and converting raw files
+  src      - C source code
   raw      - speech files in raw format (16 bits signed linear 8 kHz)
   unittest - unit test source code
   voicing  - hand-estimated voicing files, used for development
@@ -77,6 +78,5 @@ Directories
 TODO
 ----
 
-[ ] Make sure we have separate state variables for enc and dec on
-    modes that use difference in time coding and have statesthat are
-    presevred from frame to frame.
+[ ] Get win32/Makefile integarted into Automake system, such that if
+    i586-mingw32msvc exists the Win32 code gets automatically built.
