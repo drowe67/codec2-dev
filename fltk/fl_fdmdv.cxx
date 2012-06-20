@@ -109,7 +109,7 @@ protected:
     }
 
 public:
-    Spectrum(int x, int y, int h, int w): Fl_Box(x,y,h,w, "Spectrum")
+    Spectrum(int x, int y, int w, int h): Fl_Box(x, y, w, h, "Spectrum")
     {
 	align(FL_ALIGN_TOP);
 	labelsize(10);
@@ -117,14 +117,6 @@ public:
 
 };
 
-
-// question: how to map block sizes to pixels?
-// need to handle: FDMDV_NSPEC across x, even when FDMDV_NSPEC < w(),
-//                 could use axis as min of w(), FDMDV_NSPEC?
-// set height of blocks based on update rate, number of seconds to display?
-// do we take a snapshot every x mseconds of plot average?
-// maybe just take a first pass
-// draw graticule or axis
 
 /*
 
@@ -141,14 +133,31 @@ public:
 class Waterfall: public Fl_Box {
 protected:
 
-    uchar *pixel_buf;
+    int       prev_w, prev_h;
+    unsigned *pixel_buf;
+
+    void new_pixel_buf(int w, int h) {
+	int buf_sz, i;
+
+	prev_w = w; prev_h = h;
+	buf_sz = h*w;
+	pixel_buf = new unsigned[buf_sz];
+	for(i=0; i<buf_sz; i++)
+	    pixel_buf[i] = 0;
+    }
 
     void draw() {
 	float  spec_index_per_px, intensity_per_dB;
 	int    px_per_sec;
 	int    index, dy, dy_blocks, bytes_in_row_of_blocks, b;
 	int    px, py, intensity;
-	uchar *last_row, *pdest, *psrc;
+	unsigned *last_row, *pdest, *psrc;
+
+	if ((h() != prev_h) || (w() != prev_w)) {
+	    printf("box has changed..... %d %d -> %d %d\n", w(), h(), prev_w, prev_h);
+	    delete pixel_buf;
+	    new_pixel_buf(w(), h());
+	}
 
 	Fl_Box::draw();
 
@@ -163,7 +172,7 @@ protected:
 
 	// shift previous bit map
 					       
-	bytes_in_row_of_blocks = dy*w()*sizeof(uchar);
+	bytes_in_row_of_blocks = dy*w()*sizeof(unsigned);
 
 	for(b=0; b<dy_blocks-1; b++) {
 	    pdest = pixel_buf + b*w()*dy;
@@ -175,7 +184,7 @@ protected:
 
 	spec_index_per_px = (float)FDMDV_NSPEC/(float)w();
 	intensity_per_dB = (float)256/(MAX_DB - MIN_DB);
-	last_row = pixel_buf + dy*(dy_blocks - 1)*w()*sizeof(uchar);
+	last_row = pixel_buf + dy*(dy_blocks - 1)*w();
 
 	for(px=0; px<w(); px++) {
 	    index = px*spec_index_per_px;
@@ -184,27 +193,22 @@ protected:
 	    if (intensity < 0) intensity = 0;
 
 	    for(py=0; py<dy; py++)
-		last_row[px+py*w()] = intensity;
+		last_row[px+py*w()] = intensity<<8;
 	}
 
 	// update bit map
 
-	fl_draw_image_mono(pixel_buf, x(), y(), w(), h(), 1, w());
+	fl_draw_image((uchar*)pixel_buf, x(), y(), w(), h(), 4, 0);
+
     }
 
 public:
 
-    Waterfall(int x, int y, int h, int w): Fl_Box(x,y,h,w, "Waterfall")
+    Waterfall(int x, int y, int w, int h): Fl_Box(x, y, w, h, "Waterfall")
     {
-	int buf_sz, i;
-
 	align(FL_ALIGN_TOP);
 	labelsize(10);
-
-	buf_sz = h*w;
-	pixel_buf = new uchar[buf_sz];
-	for(i=0; i<buf_sz; i++)
-	    pixel_buf[i] = 0;
+	new_pixel_buf(w,h);
     };
 
     ~Waterfall() {
