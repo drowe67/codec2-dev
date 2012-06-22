@@ -3,7 +3,7 @@
   Created 14 June 2012
   David Rowe
 
-  Fltk based GUI program to prototype spectrum, waterfall, and other
+  Fltk 1.3 based GUI program to prototype spectrum, waterfall, and other
   FDMDV GUI displays.
 */
 
@@ -26,6 +26,13 @@
 #define WATERFALL_SECS_Y     5    // number of seconds respresented by y axis of waterfall
 #define DT                   0.1  // time between samples 
 #define FS                8000
+
+#define W                  800
+#define W2                 (W/2)
+#define H                  600
+#define H2                 (H/2)
+#define SP                  20
+
 
 class Spectrum;
 class Waterfall;
@@ -271,6 +278,8 @@ void new_data(float mag_dB[]) {
 	av_mag[i] = (1.0 - BETA)*av_mag[i] + BETA*mag_dB[i];
 }
 
+// simulates real time operation by reading a raw file then pausing
+
 void idle(void*) {
     int   nin = FDMDV_NOM_SAMPLES_PER_FRAME;
     short rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
@@ -331,11 +340,11 @@ int main(int argc, char **argv) {
 
     Fl::visual(FL_RGB);
 
-    window = new Fl_Window(800, 20+300+20+20+300+20, "fl_fmdv");
-    window->size_range(100,100);
+    window = new Fl_Window(W, SP+H2+SP+SP+H2+SP, "fl_fmdv");
+    window->size_range(100, 100);
     window->resizable();
-    aSpectrum = new Spectrum(20, 20, 800-40, 300);
-    aWaterfall = new Waterfall(20, 20+300+20+20, 800-40, 300);
+    aSpectrum = new Spectrum(SP, SP, W-2*SP, H2);
+    aWaterfall = new Waterfall(SP, SP+H2+SP+SP, W-2*SP, H2);
     fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
