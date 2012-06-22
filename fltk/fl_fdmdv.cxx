@@ -135,6 +135,8 @@ protected:
 
     int       prev_w, prev_h;
     unsigned *pixel_buf;
+    unsigned  heatmap_lut[256];
+    int       greyscale;
 
     void new_pixel_buf(int w, int h) {
 	int buf_sz, i;
@@ -145,6 +147,34 @@ protected:
 	for(i=0; i<buf_sz; i++)
 	    pixel_buf[i] = 0;
     }
+    
+    // map val to a rgb colour
+    // from http://eddiema.ca/2011/01/21/c-sharp-heatmaps/
+
+    unsigned heatmap(float val, float min, float max) {
+	unsigned r = 0;
+	unsigned g = 0;
+	unsigned b = 0;
+
+	val = (val - min) / (max - min);
+	if(val <= 0.2) {
+	    b = (unsigned)((val / 0.2) * 255);
+	} else if(val >  0.2 &&  val <= 0.7) {
+	    b = (unsigned)((1.0 - ((val - 0.2) / 0.5)) * 255);
+	}
+	if(val >= 0.2 &&  val <= 0.6) {
+	    g = (unsigned)(((val - 0.2) / 0.4) * 255);
+	} else if(val >  0.6 &&  val <= 0.9) {
+	    g = (unsigned)((1.0 - ((val - 0.6) / 0.3)) * 255);
+	}
+	if(val >= 0.5) {
+	    r = (unsigned)(((val - 0.5) / 0.5) * 255);
+	}
+    
+	//printf("%f %x %x %x\n", val, r, g, b);
+
+	return  (b << 16) + (g << 8) + r;
+    }
 
     void draw() {
 	float  spec_index_per_px, intensity_per_dB;
@@ -153,8 +183,9 @@ protected:
 	int    px, py, intensity;
 	unsigned *last_row, *pdest, *psrc;
 
+	/* detect resizing of window */
+
 	if ((h() != prev_h) || (w() != prev_w)) {
-	    printf("box has changed..... %d %d -> %d %d\n", w(), h(), prev_w, prev_h);
 	    delete pixel_buf;
 	    new_pixel_buf(w(), h());
 	}
@@ -192,8 +223,14 @@ protected:
 	    if (intensity > 255) intensity = 255;
 	    if (intensity < 0) intensity = 0;
 
-	    for(py=0; py<dy; py++)
-		last_row[px+py*w()] = intensity<<8;
+	    if (greyscale) {
+		for(py=0; py<dy; py++)
+		    last_row[px+py*w()] = intensity<<8;
+	    }
+	    else {
+		for(py=0; py<dy; py++)
+		    last_row[px+py*w()] = heatmap_lut[intensity];
+	    }
 	}
 
 	// update bit map
@@ -206,6 +243,14 @@ public:
 
     Waterfall(int x, int y, int w, int h): Fl_Box(x, y, w, h, "Waterfall")
     {
+	float f;
+	int   i;
+
+	for(i=0; i<255; i++) {
+	    heatmap_lut[i] = heatmap((float)i, 0.0, 255.0);
+	}
+	greyscale = 0;
+
 	align(FL_ALIGN_TOP);
 	labelsize(10);
 	new_pixel_buf(w,h);
@@ -287,10 +332,10 @@ int main(int argc, char **argv) {
     Fl::visual(FL_RGB);
 
     window = new Fl_Window(800, 20+300+20+20+300+20, "fl_fmdv");
-    window->size_range(400,200);
+    window->size_range(100,100);
+    window->resizable();
     aSpectrum = new Spectrum(20, 20, 800-40, 300);
     aWaterfall = new Waterfall(20, 20+300+20+20, 800-40, 300);
-    window->add_resizable(*aSpectrum);
     fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
