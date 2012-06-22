@@ -1,3 +1,5 @@
+# Requires FLTK 1.3
+
 FLTK_CFLAGS += $(shell fltk-config --ldstaticflags)
 CFLAGS = -O3 -g
 
