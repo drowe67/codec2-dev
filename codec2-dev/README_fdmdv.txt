@@ -94,6 +94,9 @@ unittest/tfdmdv.c - Used to conjunction with unittest/tfdmdv.m to
 Octave Scripts
 --------------
 
+(Note these require some Octave packages to be installed, see
+octave/README.txt).
+
 fdmdv.m - Functions and variables that implement the Octave version of
           the FDMDV modem.
 
