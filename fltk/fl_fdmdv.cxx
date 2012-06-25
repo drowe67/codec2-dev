@@ -41,6 +41,7 @@
 class Spectrum;
 class Waterfall;
 class Scatter;
+class Scalar;
 
 char         *fin_name = NULL;
 FILE         *fin = NULL;
@@ -50,6 +51,9 @@ Fl_Window    *window;
 Spectrum     *aSpectrum;
 Waterfall    *aWaterfall;
 Scatter      *aScatter;
+Scalar       *aTimingEst;
+Scalar       *aFreqEst;
+Scalar       *aSNR;
 
 float  av_mag[FDMDV_NSPEC]; // shared between a few classes
 
@@ -277,7 +281,6 @@ public:
 
 class Scatter: public Fl_Box {
 protected:
-    int  first;
     COMP mem[SCATTER_MEM];
     COMP new_samples[FDMDV_NSYM];
     int  prev_w, prev_h;
@@ -355,6 +358,88 @@ public:
 
 };
 
+
+// general purpose way of plotting scalar values that are 
+// updated once per frame
+
+class Scalar: public Fl_Box {
+protected:
+    int    x_max, y_max;
+    float *mem;              /* array of x_max samples */
+    float  new_sample;
+    int    index;
+    int    prev_w, prev_h;
+
+    void draw() {
+	float x_scale;
+	float y_scale;
+	int   i, j, x1, y1;
+
+	Fl_Box::draw();
+
+	/* detect resizing of window */
+
+	if ((h() != prev_h) || (w() != prev_w)) {
+	    fl_color(FL_BLACK);
+	    fl_rectf(x(),y(),w(),h());
+	    prev_h = h(); prev_w = w();
+	}
+
+	fl_push_clip(x(),y(),w(),h());
+
+	x_scale = (float)w()/x_max;
+	y_scale = (float)h()/(2.0*y_max);
+
+	// erase last sample
+
+	fl_color(FL_BLACK);
+	x1 = x_scale * index + x();
+	y1 = -y_scale * mem[index] + y() + h()/2;
+	fl_point(x1, y1);
+
+	// draw new sample
+
+	fl_color(FL_GREEN);
+	x1 = x_scale * index + x();
+	y1 = -y_scale * new_sample + y() + h()/2;
+	fl_point(x1, y1);
+	mem[index] = new_sample;
+	fl_pop_clip();
+
+	index++;
+	if (index >=  x_max)
+	    index = 0;
+    }
+
+public:
+    Scalar(int x, int y, int w, int h, int x_max_, int y_max_, char name[]): Fl_Box(x, y, w, h, name)
+    {
+	int i;
+
+	align(FL_ALIGN_TOP);
+	labelsize(10);
+
+	x_max = x_max_; y_max = y_max_;
+	mem = new float[x_max];
+	for(i=0; i<x_max; i++) {
+	    mem[i] = 0.0;
+	}
+
+	prev_w = 0; prev_h = 0;
+	index = 0;
+    };
+
+    ~Scalar() {
+	delete mem;
+    }
+
+    void add_new_sample(float sample) {
+	new_sample = sample;
+    }
+
+};
+
+
 // update average of each spectrum point
     
 void new_data(float mag_dB[]) {
@@ -394,6 +479,9 @@ void idle(void*) {
 	fdmdv_get_rx_spectrum(fdmdv, rx_spec, rx_fdm, nin_prev);
 	new_data(rx_spec);
 	aScatter->add_new_samples(stats.rx_symbols);
+	aTimingEst->add_new_sample(stats.rx_timing);
+	aFreqEst->add_new_sample(stats.foff);
+	aSNR->add_new_sample(stats.snr_est);
 
 	// update plots every DT
 
@@ -402,6 +490,9 @@ void idle(void*) {
 	    aSpectrum->redraw();
 	    aWaterfall->redraw();
 	    aScatter->redraw();
+	    aTimingEst->redraw();
+	    aFreqEst->redraw();
+	    aSNR->redraw();
 	}
     }
     usleep(20000);
@@ -447,9 +538,12 @@ int main(int argc, char **argv) {
     window = new Fl_Window(W, SP+H2+SP+SP+H2+SP, "fl_fmdv");
     window->size_range(100, 100);
     window->resizable();
-    aSpectrum = new Spectrum(SP, SP, 2*W3-2*SP, H2);
-    aWaterfall = new Waterfall(SP, SP+H2+SP+SP, 2*W3-2*SP, H2);
-    aScatter = new Scatter(2*W3, SP, W3, H2);
+    aSpectrum = new Spectrum(SP, SP, W3-2*SP, H2);
+    aWaterfall = new Waterfall(SP, SP+H2+SP+SP, W3-2*SP, H2);
+    aScatter = new Scatter(W3+SP, SP, W3-2*SP, H2);
+    aTimingEst = new Scalar(W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 80, "Timing Est");
+    aFreqEst = new Scalar(2*W3+SP, SP, W3-2*SP, H2, 100, 100, "Frequency Est");
+    aSNR = new Scalar(2*W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 40, "SNR");
     fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
