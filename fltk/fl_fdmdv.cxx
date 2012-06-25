@@ -24,11 +24,15 @@
 #define MIN_HZ               0
 #define MAX_HZ            4000
 #define WATERFALL_SECS_Y     5    // number of seconds respresented by y axis of waterfall
-#define DT                   0.1  // time between samples 
+#define DT                   0.02  // time between samples 
 #define FS                8000
 
-#define W                  800
-#define W2                 (W/2)
+#define SCATTER_MEM       (FDMDV_NSYM)*50
+#define SCATTER_X_MAX        3.0
+#define SCATTER_Y_MAX        3.0
+
+#define W                  1200
+#define W3                 (W/3)
 #define H                  600
 #define H2                 (H/2)
 #define SP                  20
@@ -36,6 +40,7 @@
 
 class Spectrum;
 class Waterfall;
+class Scatter;
 
 char         *fin_name = NULL;
 FILE         *fin = NULL;
@@ -44,6 +49,7 @@ Fl_Group     *agroup;
 Fl_Window    *window;
 Spectrum     *aSpectrum;
 Waterfall    *aWaterfall;
+Scatter      *aScatter;
 
 float  av_mag[FDMDV_NSPEC]; // shared between a few classes
 
@@ -269,6 +275,86 @@ public:
 };
 
 
+class Scatter: public Fl_Box {
+protected:
+    int  first;
+    COMP mem[SCATTER_MEM];
+    COMP new_samples[FDMDV_NSYM];
+    int  prev_w, prev_h;
+
+    void draw() {
+	float x_scale;
+	float y_scale;
+	int   i, j, x1, y1;
+
+	Fl_Box::draw();
+
+	/* detect resizing of window */
+
+	if ((h() != prev_h) || (w() != prev_w)) {
+	    fl_color(FL_BLACK);
+	    fl_rectf(x(),y(),w(),h());
+	    prev_h = h(); prev_w = w();
+	}
+
+	fl_push_clip(x(),y(),w(),h());
+
+	x_scale = w()/SCATTER_X_MAX;
+	y_scale = h()/SCATTER_Y_MAX;
+
+	// erase last samples
+
+	fl_color(FL_BLACK);
+	for(i=0; i<FDMDV_NSYM; i++) {
+	    x1 = x_scale * mem[i].real + x() + w()/2;
+	    y1 = y_scale * mem[i].imag + y() + h()/2;
+	    fl_point(x1, y1);
+	    mem[i] = mem[i+FDMDV_NSYM];
+	}
+
+	// shift memory
+
+	for(i=FDMDV_NSYM; i<SCATTER_MEM-FDMDV_NSYM; i++) {
+	    mem[i] = mem[i+FDMDV_NSYM];
+	}
+
+	// draw new samples
+
+	fl_color(FL_GREEN);
+	for(i=SCATTER_MEM-FDMDV_NSYM, j=0; i<SCATTER_MEM; i++,j++) {
+	    x1 = x_scale * new_samples[j].real + x() + w()/2;
+	    y1 = y_scale * new_samples[j].imag + y() + h()/2;
+	    fl_point(x1, y1);
+	    mem[i] = new_samples[j];
+	}
+	fl_pop_clip();
+    }
+
+public:
+    Scatter(int x, int y, int w, int h): Fl_Box(x, y, w, h, "Scatter")
+    {
+	int i;
+
+	align(FL_ALIGN_TOP);
+	labelsize(10);
+
+	for(i=0; i<SCATTER_MEM; i++) {
+	    mem[i].real = 0.0;
+	    mem[i].imag = 0.0;
+	}
+
+	prev_w = 0; prev_h = 0;
+    };
+
+    void add_new_samples(COMP samples[]) {
+	int i;
+
+	for(i=0; i<FDMDV_NSYM; i++)
+	    new_samples[i] = samples[i];
+    }
+
+};
+
 // update average of each spectrum point
     
 void new_data(float mag_dB[]) {
@@ -281,23 +367,41 @@ void new_data(float mag_dB[]) {
 // simulates real time operation by reading a raw file then pausing
 
 void idle(void*) {
-    int   nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+    struct FDMDV_STATS stats;
+    int   rx_bits[FDMDV_BITS_PER_FRAME];
+    int   sync_bit;
+    int   nin, nin_prev;
     short rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     float rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     float rx_spec[FDMDV_NSPEC];
     int   i;
 
+    nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+
     if (fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin) {
 	Ts += (float)nin/FS;
-	//printf("Ts %f\n", Ts);
+	
+	// demod per frame processing
+
 	for(i=0; i<nin; i++)
 	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
-	fdmdv_get_rx_spectrum(fdmdv, rx_spec, rx_fdm, nin);
+	nin_prev = nin;
+	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
+
+	// get stats and spectrum and update
+
+	fdmdv_get_demod_stats(fdmdv, &stats);
+	fdmdv_get_rx_spectrum(fdmdv, rx_spec, rx_fdm, nin_prev);
 	new_data(rx_spec);
+	aScatter->add_new_samples(stats.rx_symbols);
+
+	// update plots every DT
+
 	if (Ts >= DT) {
 	    Ts -= DT;
 	    aSpectrum->redraw();
 	    aWaterfall->redraw();
+	    aScatter->redraw();
 	}
     }
     usleep(20000);
@@ -343,8 +447,9 @@ int main(int argc, char **argv) {
     window = new Fl_Window(W, SP+H2+SP+SP+H2+SP, "fl_fmdv");
     window->size_range(100, 100);
     window->resizable();
-    aSpectrum = new Spectrum(SP, SP, W-2*SP, H2);
-    aWaterfall = new Waterfall(SP, SP+H2+SP+SP, W-2*SP, H2);
+    aSpectrum = new Spectrum(SP, SP, 2*W3-2*SP, H2);
+    aWaterfall = new Waterfall(SP, SP+H2+SP+SP, 2*W3-2*SP, H2);
+    aScatter = new Scatter(2*W3, SP, W3, H2);
     fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
