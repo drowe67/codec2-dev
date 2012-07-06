@@ -69,6 +69,6 @@ tlspsens_LDADD = $(lib_LTLIBRARIES)
 tlspsens_LDFLAGS = $(LIBS)
 
 pa_rec_SOURCES = pa_rec.c
-pa_rec_LDADD = $(lib_LTLIBRARIES) 
+pa_rec_LDADD = $(lib_LTLIBRARIES) -lportaudio
 pa_rec_LDFLAGS = $(LIBS)
 

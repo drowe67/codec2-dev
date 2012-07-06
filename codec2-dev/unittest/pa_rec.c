@@ -39,6 +39,7 @@
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "portaudio.h"
@@ -51,13 +52,11 @@
 
 typedef short SAMPLE;
 
-typedef struct
-{
-    int          frameIndex;       /* Index into sample array. */
-    int          maxFrameIndex;
-    SAMPLE      *recordedSamples;
-}
-paTestData;
+typedef struct {
+    FILE               *fout;
+    int                 framesLeft;
+} paTestData;
+
 
 /* This routine will be called by the PortAudio engine when audio is available.
 ** It may be called at interrupt level on some machines so don't do anything
@@ -70,47 +69,40 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
                            void *userData )
 {
     paTestData *data = (paTestData*)userData;
-    const SAMPLE *rptr = (const SAMPLE*)inputBuffer;
-    SAMPLE *wptr = &data->recordedSamples[data->frameIndex /** NUM_CHANNELS*/];
-    long framesToCalc;
-    long i;
-    int finished;
-    unsigned long framesLeft = data->maxFrameIndex - data->frameIndex;
+    FILE       *fout = data->fout;
+    int         framesToCopy;
+    int         i;
+    int         finished;
+    short       buf[FRAMES_PER_BUFFER];
+    short      *rptr = (short*)inputBuffer;
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
     (void) statusFlags;
     (void) userData;
 
-    if( framesLeft < framesPerBuffer )
-    {
-        framesToCalc = framesLeft;
+    if (data->framesLeft < framesPerBuffer) {
+        framesToCopy = data->framesLeft;
         finished = paComplete;
-    }
-    else
-    {
-        framesToCalc = framesPerBuffer;
+    } 
+    else {
+        framesToCopy = framesPerBuffer;
         finished = paContinue;
     }
+    data->framesLeft -= framesToCopy;
 
-    if( inputBuffer == NULL )
-    {
-        for( i=0; i<framesToCalc; i++ )
-        {
-            *wptr++ = SAMPLE_SILENCE;  /* left */
-            //if( NUM_CHANNELS == 2 ) *wptr++ = SAMPLE_SILENCE;  /* right */
-        }
-    }
-    else
-    {
-        for( i=0; i<framesToCalc; i++ )
-        {
-            *wptr++ = *rptr;  /* left */
-	    rptr += 2;
-            //if( NUM_CHANNELS == 2 ) *wptr++ = *rptr++;  /* right */
-        }
-    }
-    data->frameIndex += framesToCalc;
+    assert(inputBuffer != NULL);
+
+    /* just use left channel */
+
+    for(i=0; i<framesToCopy; i++,rptr+=2)
+	buf[i] = *rptr; 
+
+    /* note Portaudio doc doesn't rec making systems calls in this
+       callback but seems to work OK */
+
+    fwrite(buf, sizeof(short), framesToCopy, fout);
+    
     return finished;
 }
 
@@ -128,33 +120,20 @@ int main(int argc, char *argv[])
     SAMPLE              max, val;
     double              average;
     int                 numSecs;
-    FILE               *fout;
 
     if (argc != 3) {
 	printf("usage: %s rawFile time(s)\n", argv[0]);
 	exit(0);
     }
 
-    fout = fopen(argv[1], "wt");
-    if (fout == NULL) {
+    data.fout = fopen(argv[1], "wt");
+    if (data.fout == NULL) {
 	printf("Error opening output raw file %s\n", argv[1]);
 	exit(1);
     }
 
     numSecs = atoi(argv[2]);
-    printf("patest_record.c\n"); fflush(stdout);
-
-    data.maxFrameIndex = totalFrames = numSecs * SAMPLE_RATE; /* Record for a few seconds. */
-    data.frameIndex = 0;
-    numSamples = totalFrames/* * NUM_CHANNELS*/;
-    numBytes = numSamples * sizeof(SAMPLE);
-    data.recordedSamples = (SAMPLE *) malloc( numBytes ); /* From now on, recordedSamples is initialised. */
-    if( data.recordedSamples == NULL )
-    {
-        printf("Could not allocate record array.\n");
-        goto done;
-    }
-    for( i=0; i<numSamples; i++ ) data.recordedSamples[i] = 0;
+    data.framesLeft = numSecs * SAMPLE_RATE;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
@@ -184,28 +163,21 @@ int main(int argc, char *argv[])
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto done;
-    printf("\n=== Now recording!! Please speak into the microphone. ===\n"); fflush(stdout);
 
     while( ( err = Pa_IsStreamActive( stream ) ) == 1 )
     {
-        Pa_Sleep(1000);
-        printf("index = %d\n", data.frameIndex ); fflush(stdout);
+        Pa_Sleep(100);
     }
     if( err < 0 ) goto done;
 
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto done;
 
-    /* Write recorded data to a file. */
-
-    fwrite( data.recordedSamples, /*NUM_CHANNELS * */sizeof(SAMPLE), totalFrames, fout );
-    fclose( fout );
+    fclose(data.fout);
 
 
 done:
     Pa_Terminate();
-    if( data.recordedSamples )       /* Sure it is NULL or valid. */
-        free( data.recordedSamples );
     if( err != paNoError )
     {
         fprintf( stderr, "An error occured while using the portaudio stream\n" );
