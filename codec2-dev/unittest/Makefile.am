@@ -68,7 +68,7 @@ tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src
 tlspsens_LDADD = $(lib_LTLIBRARIES) 
 tlspsens_LDFLAGS = $(LIBS)
 
-pa_rec_SOURCES = pa_rec.c
+pa_rec_SOURCES = pa_rec.c ../src/fdmdv.c ../src/kiss_fft.c
 pa_rec_LDADD = $(lib_LTLIBRARIES) -lportaudio
 pa_rec_LDFLAGS = $(LIBS)
 

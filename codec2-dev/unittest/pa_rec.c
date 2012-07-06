@@ -3,9 +3,10 @@
    David Rowe
    July 6 2012
 
-   Modified from paex_record.c Portaudio example 
+   Records at 48000 Hz from default sound device to a file.
 
-   Original author author Phil Burk  http://www.softsynth.com
+   Modified from paex_record.c Portaudio example. Original author
+   author Phil Burk http://www.softsynth.com
 
    To Build:
 
@@ -43,18 +44,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "portaudio.h"
+#include "fdmdv.h"
 
 #define SAMPLE_RATE       48000
-#define FRAMES_PER_BUFFER 512
-#define NUM_CHANNELS      2       /* I think most sound cards like stereo, we will
-				     convert to mono as we sample */
+#define N8                160           /* processing buffer size at 8 kHz */
+#define N48               (N8*FDMDV_OS) /* processing buffer size at 48 kHz */
+#define NUM_CHANNELS      2             /* I think most sound cards like stereo, we will
+				           convert to mono as we sample */
 #define SAMPLE_SILENCE    0
-
-typedef short SAMPLE;
 
 typedef struct {
     FILE               *fout;
     int                 framesLeft;
+    float               in48k[FDMDV_OS_TAPS + N48];
 } paTestData;
 
 
@@ -71,10 +73,11 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     paTestData *data = (paTestData*)userData;
     FILE       *fout = data->fout;
     int         framesToCopy;
-    int         i;
+    int         i, n8;
     int         finished;
-    short       buf[FRAMES_PER_BUFFER];
     short      *rptr = (short*)inputBuffer;
+    float       out8k[N8];
+    short       out8k_short[N8];
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
@@ -96,13 +99,24 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     /* just use left channel */
 
     for(i=0; i<framesToCopy; i++,rptr+=2)
-	buf[i] = *rptr; 
+	data->in48k[i+FDMDV_OS_TAPS] = *rptr; 
 
-    /* note Portaudio doc doesn't rec making systems calls in this
-       callback but seems to work OK */
+    /* downsample and update filter memory */
 
-    fwrite(buf, sizeof(short), framesToCopy, fout);
+    fdmdv_48_to_8(out8k, &data->in48k[FDMDV_OS_TAPS], N8);
+    for(i=0; i<FDMDV_OS_TAPS; i++)
+	data->in48k[i] = data->in48k[i+framesToCopy];
+
+    /* save 8k to disk  */
+
+    for(i=0; i<N8; i++)
+	out8k_short[i] = (short)out8k[i];
+
+    /* note Portaudio docs reccomends against making systems calls like
+       fwrite() in this callback but seems to work OK */
     
+    fwrite(out8k_short, sizeof(short), N8, fout);
+
     return finished;
 }
 
@@ -114,11 +128,6 @@ int main(int argc, char *argv[])
     PaError             err = paNoError;
     paTestData          data;
     int                 i;
-    int                 totalFrames;
-    int                 numSamples;
-    int                 numBytes;
-    SAMPLE              max, val;
-    double              average;
     int                 numSecs;
 
     if (argc != 3) {
@@ -134,6 +143,9 @@ int main(int argc, char *argv[])
 
     numSecs = atoi(argv[2]);
     data.framesLeft = numSecs * SAMPLE_RATE;
+
+    for(i=0; i<FDMDV_OS_TAPS; i++)
+	data.in48k[i] = 0.0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
@@ -155,7 +167,7 @@ int main(int argc, char *argv[])
               &inputParameters,
               NULL,                  /* &outputParameters, */
               SAMPLE_RATE,
-              FRAMES_PER_BUFFER,
+              N48,
               paClipOff,      /* we won't output out of range samples so don't bother clipping them */
               recordCallback,
               &data );
