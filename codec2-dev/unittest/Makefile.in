@@ -41,7 +41,7 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	tinterp$(EXEEXT) tquant$(EXEEXT) vq_train_jvm$(EXEEXT) \
 	scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) t48_8$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
-	pa_rec$(EXEEXT)
+	pa_rec$(EXEEXT) pa_play$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -74,6 +74,10 @@ am_lspsync_OBJECTS = lspsync.$(OBJEXT) quantise.$(OBJEXT) \
 	pack.$(OBJEXT) $(am__objects_1)
 lspsync_OBJECTS = $(am_lspsync_OBJECTS)
 lspsync_DEPENDENCIES =
+am_pa_play_OBJECTS = pa_play.$(OBJEXT) fdmdv.$(OBJEXT) \
+	kiss_fft.$(OBJEXT)
+pa_play_OBJECTS = $(am_pa_play_OBJECTS)
+pa_play_DEPENDENCIES =
 am_pa_rec_OBJECTS = pa_rec.$(OBJEXT) fdmdv.$(OBJEXT) \
 	kiss_fft.$(OBJEXT)
 pa_rec_OBJECTS = $(am_pa_rec_OBJECTS)
@@ -134,16 +138,18 @@ LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
 	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(pa_rec_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
-	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tlspsens_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(pa_play_SOURCES) $(pa_rec_SOURCES) $(scalarlsptest_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tquant_SOURCES) \
+	$(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
 	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(pa_rec_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
-	$(tfdmdv_SOURCES) $(tinterp_SOURCES) $(tlspsens_SOURCES) \
-	$(tnlp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES)
+	$(pa_play_SOURCES) $(pa_rec_SOURCES) $(scalarlsptest_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tquant_SOURCES) \
+	$(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -251,7 +257,7 @@ sbindir = @sbindir@
 sharedstatedir = @sharedstatedir@
 sysconfdir = @sysconfdir@
 target_alias = @target_alias@
-AM_CFLAGS = -I../src -fPIC -g  -DFLOATING_POINT -DVAR_ARRAYS -O2
+AM_CFLAGS = -I../src -fPIC -g  -DFLOATING_POINT -DVAR_ARRAYS -O2 -Wall
 AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
@@ -306,6 +312,9 @@ tlspsens_LDFLAGS = $(LIBS)
 pa_rec_SOURCES = pa_rec.c ../src/fdmdv.c ../src/kiss_fft.c
 pa_rec_LDADD = $(lib_LTLIBRARIES) -lportaudio
 pa_rec_LDFLAGS = $(LIBS)
+pa_play_SOURCES = pa_play.c ../src/fdmdv.c ../src/kiss_fft.c
+pa_play_LDADD = $(lib_LTLIBRARIES) -lportaudio
+pa_play_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -361,6 +370,9 @@ genres$(EXEEXT): $(genres_OBJECTS) $(genres_DEPENDENCIES)
 lspsync$(EXEEXT): $(lspsync_OBJECTS) $(lspsync_DEPENDENCIES) 
 	@rm -f lspsync$(EXEEXT)
 	$(LINK) $(lspsync_LDFLAGS) $(lspsync_OBJECTS) $(lspsync_LDADD) $(LIBS)
+pa_play$(EXEEXT): $(pa_play_OBJECTS) $(pa_play_DEPENDENCIES) 
+	@rm -f pa_play$(EXEEXT)
+	$(LINK) $(pa_play_LDFLAGS) $(pa_play_OBJECTS) $(pa_play_LDADD) $(LIBS)
 pa_rec$(EXEEXT): $(pa_rec_OBJECTS) $(pa_rec_DEPENDENCIES) 
 	@rm -f pa_rec$(EXEEXT)
 	$(LINK) $(pa_rec_LDFLAGS) $(pa_rec_OBJECTS) $(pa_rec_LDADD) $(LIBS)
@@ -422,6 +434,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lspsync.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/nlp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pa_play.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pa_rec.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phase.Po@am__quote@
