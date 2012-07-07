@@ -44,7 +44,15 @@
 #define H2                 (H/2)
 #define SP                  20
 
-#define SOUND_CARD_FS      48000
+// sound card
+
+#define SAMPLE_RATE  48000                        /* 48 kHz sampling rate rec. as we
+				                     can trust accuracy of sound
+				                     card                                    */
+#define N8           FDMDV_NOM_SAMPLES_PER_FRAME  /* processing buffer size at 8 kHz         */
+#define N48          (N8*FDMDV_OS)                /* processing buffer size at 48 kHz        */
+#define NUM_CHANNELS 2                            /* I think most sound cards prefer stereo,
+				                     we will convert to mono                 */
 
 // forward class declarations
 
@@ -81,7 +89,7 @@ int          zoom_spectrum = 0;
 
 float  Ts = 0.0;
 int    nbuf = 0;
-short  rx_fdm_scaled[7*FDMDV_NOM_SAMPLES_PER_FRAME];
+short  rx_fdm_scaled[2*FDMDV_NOM_SAMPLES_PER_FRAME];
 int    nin = FDMDV_NOM_SAMPLES_PER_FRAME;
 
 // Portaudio states -----------------------------
@@ -89,6 +97,10 @@ int    nin = FDMDV_NOM_SAMPLES_PER_FRAME;
 PaStreamParameters inputParameters;
 PaStream *stream = NULL;
 PaError err;
+
+typedef struct {
+    float               in48k[FDMDV_OS_TAPS + N48];
+} paCallBackData;
 
 // Class for each window type  ------------------
 
@@ -560,6 +572,7 @@ void new_data(float mag_dB[]) {
 	av_mag[i] = (1.0 - BETA)*av_mag[i] + BETA*mag_dB[i];
 }
 
+
 /*
   The sample source could be a sound card or file.  The sample source
   supplies a fixed number of samples with each call.  However
@@ -588,56 +601,32 @@ void new_data(float mag_dB[]) {
   are effectively clocked at the remote modulator sound card D/A clock
   rate.  We slip/gain buffers supplied to sound card 2 to compensate.
 
-  idle() is the FLTK function that gets continusouly called when FLTK
-  is not doing GUI work.  In a non-GUI program this could just be a
-  while(1) loop.
 */
 
-void idle(void*) {
+void per_frame_rx_processing(short rx_fdm_scaled[], int *nbuf, int *nin) {
     struct FDMDV_STATS stats;
-    int   rx_bits[FDMDV_BITS_PER_FRAME];
-    int   sync_bit;
-    float rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
-    float rx_spec[FDMDV_NSPEC];
-    int   i, j, nin_prev, ret;
+    int    rx_bits[FDMDV_BITS_PER_FRAME];
+    int    sync_bit;
+    float  rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    float  rx_spec[FDMDV_NSPEC];
+    int    i, j, nin_prev, ret;
 
-    if (fin_name != NULL) {
-	ret = fread(&rx_fdm_scaled[nbuf], 
-		    sizeof(short), 
-		    FDMDV_NOM_SAMPLES_PER_FRAME, 
-		    fin);
-
-	// simulate time delay from real world A/D input
-
-	usleep(20000);
-    }
-
-    if (sound_dev_name != NULL) {    
-	err = Pa_ReadStream(stream, 
-			   &rx_fdm_scaled[nbuf], 
-			   FDMDV_NOM_SAMPLES_PER_FRAME);
-	if (err & paInputOverflow) { 
-	    fprintf( stderr, "Input Overflow.\n" );
-	}
-    }
-
-    nbuf += FDMDV_NOM_SAMPLES_PER_FRAME;
-    assert(nbuf <= (2*FDMDV_NOM_SAMPLES_PER_FRAME));
+    *nbuf += FDMDV_NOM_SAMPLES_PER_FRAME;
+    assert(*nbuf <= (2*FDMDV_NOM_SAMPLES_PER_FRAME));
 
     // this will run the demod 0, 1 (nominal) or 2 time
 
-    while(nbuf >= nin) {
+    //printf("nbuf %d nin: %d\n", *nbuf, *nin);
+    while(*nbuf >= *nin) {
 
-	Ts += (float)nin/FS;
-	
 	// demod per frame processing
 
-	for(i=0; i<nin; i++)
+	for(i=0; i<*nin; i++)
 	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
-	nin_prev = nin;
-	//fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
-	nbuf -= nin_prev;
-	assert(nbuf >= 0);
+	nin_prev = *nin;
+	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, nin);
+	*nbuf -= nin_prev;
+	assert(*nbuf >= 0);
 
 	// get spectrum, stats and update windows
 
@@ -649,31 +638,116 @@ void idle(void*) {
 	aFreqEst->add_new_sample(stats.foff);
 	aSNR->add_new_sample(stats.snr_est);
 
-	// update plots every DT
-
-	if (Ts >= DT) {
-	    Ts -= DT;
-	    if (!zoomSpectrumWindow->shown() && !zoomWaterfallWindow->shown()) {
-		aSpectrum->redraw();
-		aWaterfall->redraw();
-		aScatter->redraw();
-		aTimingEst->redraw();
-		aFreqEst->redraw();
-		aSNR->redraw();
-	    }
-	    if (zoomSpectrumWindow->shown())		
-		aZoomedSpectrum->redraw();		
-	    if (zoomWaterfallWindow->shown())		
-		aZoomedWaterfall->redraw();		
-	}
-
 	// shift buffer
 
-	for(i=0; i<nbuf; i++)
+	for(i=0; i<*nbuf; i++)
 	    rx_fdm_scaled[i] = rx_fdm_scaled[i+nin_prev];
-
     }
 }
+
+
+/* 
+   Redraw windows every DT seconds.
+*/
+
+void update_gui(int nin, float *Ts) {
+
+    //Fl::lock();
+    *Ts += (float)nin/FS;
+	
+    *Ts += (float)nin/FS;
+    if (*Ts >= DT) {
+	*Ts -= DT;
+	if (!zoomSpectrumWindow->shown() && !zoomWaterfallWindow->shown()) {
+	    aSpectrum->redraw();
+	    aWaterfall->redraw();
+	    aScatter->redraw();
+	    aTimingEst->redraw();
+	    aFreqEst->redraw();
+	    aSNR->redraw();
+	}
+	if (zoomSpectrumWindow->shown())		
+	    aZoomedSpectrum->redraw();		
+	if (zoomWaterfallWindow->shown())		
+	    aZoomedWaterfall->redraw();		
+    }
+    //Fl::unlock();
+}
+
+
+/*
+  idle() is the FLTK function that gets continusouly called when FLTK
+  is not doing GUI work.  We use this function for providing file
+  input to update the GUI simulating real time operation.
+*/
+
+void idle(void*) {
+    int ret;
+
+    if (fin_name != NULL) {
+	ret = fread(&rx_fdm_scaled[nbuf], 
+		    sizeof(short), 
+		    FDMDV_NOM_SAMPLES_PER_FRAME, 
+		    fin);
+	per_frame_rx_processing(rx_fdm_scaled, &nbuf, &nin);
+    }
+
+    update_gui(nin, &Ts);
+
+    // simulate time delay from real world A/D input, and pause betwen
+    // screen updates
+
+    usleep(20000);
+}
+
+
+/* 
+   This routine will be called by the PortAudio engine when audio is
+   available.
+*/
+
+static int recordCallback( const void *inputBuffer, void *outputBuffer,
+                           unsigned long framesPerBuffer,
+                           const PaStreamCallbackTimeInfo* timeInfo,
+                           PaStreamCallbackFlags statusFlags,
+                           void *userData )
+{
+    paCallBackData *cbData = (paCallBackData*)userData;
+    float      *in48k = cbData->in48k;
+    int         i, n8;
+    int         finished;
+    short      *rptr = (short*)inputBuffer;
+    float       out8k[N8];
+    short       out8k_short[N8];
+
+    (void) outputBuffer; /* Prevent unused variable warnings. */
+    (void) timeInfo;
+    (void) statusFlags;
+    (void) userData;
+
+    assert(inputBuffer != NULL);
+
+    /* just use left channel */
+
+    for(i=0; i<framesPerBuffer; i++,rptr+=2)
+	in48k[i+FDMDV_OS_TAPS] = *rptr; 
+
+    /* downsample and update filter memory */
+
+    fdmdv_48_to_8(out8k, &in48k[FDMDV_OS_TAPS], N8);
+    for(i=0; i<FDMDV_OS_TAPS; i++)
+	in48k[i] = in48k[i+framesPerBuffer];
+
+    for(i=0; i<N8; i++)
+	rx_fdm_scaled[nbuf+i] = (short)out8k[i];
+
+    /* run demon and update GUI */
+
+    per_frame_rx_processing(rx_fdm_scaled, &nbuf, &nin);
+
+    return paContinue;
+}
+
 
 int arg_callback(int argc, char **argv, int &i) {
     if (argv[i][1] == 'i') {
@@ -694,8 +768,9 @@ int arg_callback(int argc, char **argv, int &i) {
 }
 
 int main(int argc, char **argv) {
-    int ret;
-    int i;
+    int             ret;
+    int             i;
+    paCallBackData  cbData;
 
     i = 1;
     Fl::args(argc,argv,i,arg_callback);
@@ -714,30 +789,35 @@ int main(int argc, char **argv) {
     }
 
     if (sound_dev_name != NULL) {
+	for(i=0; i<FDMDV_OS_TAPS; i++)
+	    cbData.in48k[i] = 0.0;
+
 	err = Pa_Initialize();
 	if( err != paNoError ) goto pa_error;
 	inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
-	printf( "Input device # %d.\n", inputParameters.device );
-	printf( "Input LL: %g s\n", Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency );
-	printf( "Input HL: %g s\n", Pa_GetDeviceInfo( inputParameters.device )->defaultHighInputLatency );
-	inputParameters.channelCount = 1;
+	if (inputParameters.device == paNoDevice) {
+	    fprintf(stderr,"Error: No default input device.\n");
+	    goto pa_error;
+	}
+	inputParameters.channelCount =  NUM_CHANNELS;        /* stereo input */
 	inputParameters.sampleFormat = paInt16;
-	inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultHighInputLatency ;
+	inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
 	inputParameters.hostApiSpecificStreamInfo = NULL;
 
+	/* Record some audio --------------------------------------------- */
+
 	err = Pa_OpenStream(
-              &stream,
-              &inputParameters,
-              NULL,                         // no output
-              /*SOUND_CARD_FS*/8000,                
-              FDMDV_NOM_SAMPLES_PER_FRAME,
-              paClipOff,      
-              NULL,                         // no callback, use blocking API
-              NULL );                       // no callback, so no callback userData
-	if( err != paNoError ) goto pa_error;
-	err = Pa_StartStream( stream );
+			    &stream,
+			    &inputParameters,
+			    NULL,                  /* &outputParameters, */
+			    SAMPLE_RATE,
+			    N48,
+			    paClipOff,      
+			    recordCallback,
+			    &cbData );
 	if( err != paNoError ) goto pa_error;
     }
+
     for(i=0; i<FDMDV_NSPEC; i++)
 	av_mag[i] = -40.0;
 
@@ -756,7 +836,8 @@ int main(int argc, char **argv) {
     aScatter = new Scatter(W3+SP, SP, W3-2*SP, H2);
     aTimingEst = new Scalar(W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 80, "Timing Est");
     aFreqEst = new Scalar(2*W3+SP, SP, W3-2*SP, H2, 100, 100, "Frequency Est");
-    aSNR = new Scalar(2*W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 10, "SNR");
+    aSNR = new Scalar(2*W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 20, "SNR");
+
     fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
@@ -774,6 +855,11 @@ int main(int argc, char **argv) {
     zoomWaterfallWindow = new Fl_Window(W, H, "Waterfall");
     aZoomedWaterfall = new Waterfall(SP, SP, W-2*SP, H-2*SP);
     zoomWaterfallWindow->end();
+
+    if (sound_dev_name != NULL) {
+	err = Pa_StartStream( stream );
+	if( err != paNoError ) goto pa_error;
+    }
 
     // show the main window and start running
 
