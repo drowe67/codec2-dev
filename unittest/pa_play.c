@@ -1,17 +1,14 @@
 /* 
-   pa_rec.c
+   pa_play.c
    David Rowe
-   July 6 2012
+   July 8 2012
 
-   Records at 48000 Hz from default sound device, convertes to 8 kHz,
-   and saves to raw file.  Used to get experience with Portaudio.
+   Converts samples from a 16 bit short 8000 Hz rawfile to 480000Hz
+   sample rate and plays them using the default sound device.  Used as
+   an intermediate step in Portaudio integration.
 
    Modified from paex_record.c Portaudio example. Original author
    author Phil Burk http://www.softsynth.com
-
-   To Build:
-
-     gcc paex_rec.c -o paex_rec -lm -lrt -lportaudio -pthread
 */
 
 /*
@@ -52,6 +49,7 @@
 				      card */
 #define N8           160           /* processing buffer size at 8 kHz */
 #define N48          (N8*FDMDV_OS) /* processing buffer size at 48 kHz */
+#define MEM8 (FDMDV_OS_TAPS/FDMDV_OS)
 #define NUM_CHANNELS 2             /* I think most sound cards prefer
 				      stereo, we will convert to mono
 				      as we sample */
@@ -59,125 +57,116 @@
 /* state information passed to call back */
 
 typedef struct {
-    FILE               *fout;
-    int                 framesLeft;
-    float               in48k[FDMDV_OS_TAPS + N48];
+    FILE               *fin;
+    float               in8k[MEM8 + N8];
 } paTestData;
 
 
 /* 
    This routine will be called by the PortAudio engine when audio is
-   available.  It may be called at interrupt level on some machines so
+   required.  It may be called at interrupt level on some machines so
    don't do anything that could mess up the system like calling
    malloc() or free().
 */
 
-static int recordCallback( const void *inputBuffer, void *outputBuffer,
+static int playCallback( const void *inputBuffer, void *outputBuffer,
                            unsigned long framesPerBuffer,
                            const PaStreamCallbackTimeInfo* timeInfo,
                            PaStreamCallbackFlags statusFlags,
                            void *userData )
 {
     paTestData *data = (paTestData*)userData;
-    FILE       *fout = data->fout;
-    int         framesToCopy;
-    int         i, n8;
+    FILE       *fin = data->fin;
+    int         i, nread;
     int         finished;
-    short      *rptr = (short*)inputBuffer;
-    float       out8k[N8];
-    short       out8k_short[N8];
+    short      *wptr = (short*)outputBuffer;
+    float      *in8k = data->in8k;
+    float       out48k[N48];
+    short       out48k_short[N48];
+    short       in8k_short[N8];
 
     (void) outputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
     (void) statusFlags;
     (void) userData;
 
-    if (data->framesLeft < framesPerBuffer) {
-        framesToCopy = data->framesLeft;
-        finished = paComplete;
-    } 
-    else {
-        framesToCopy = framesPerBuffer;
-        finished = paContinue;
-    }
-    data->framesLeft -= framesToCopy;
-
-    assert(inputBuffer != NULL);
-
-    /* just use left channel */
-
-    for(i=0; i<framesToCopy; i++,rptr+=2)
-	data->in48k[i+FDMDV_OS_TAPS] = *rptr; 
-
-    /* downsample and update filter memory */
-
-    fdmdv_48_to_8(out8k, &data->in48k[FDMDV_OS_TAPS], N8);
-    for(i=0; i<FDMDV_OS_TAPS; i++)
-	data->in48k[i] = data->in48k[i+framesToCopy];
-
-    /* save 8k to disk  */
-
-    for(i=0; i<N8; i++)
-	out8k_short[i] = (short)out8k[i];
-
     /* note Portaudio docs recs. against making systems calls like
        fwrite() in this callback but seems to work OK */
     
-    fwrite(out8k_short, sizeof(short), N8, fout);
+    nread = fread(in8k_short, sizeof(short), N8, fin);
+    if (nread == N8)
+	finished = paContinue;
+    else
+	finished = paComplete;
+
+    for(i=0; i<N8; i++)
+	in8k[MEM8+i] = in8k_short[i];
+
+    /* upsample and update filter memory */
+
+    fdmdv_8_to_48(out48k, &in8k[MEM8], N8);
+    for(i=0; i<MEM8; i++)
+	in8k[i] = in8k[i+N8];
+
+    assert(outputBuffer != NULL);
+
+    /* write signal to both channels */
+
+    for(i=0; i<N48; i++)
+	out48k_short[i] = (short)out48k[i];
+    for(i=0; i<framesPerBuffer; i++,wptr+=2) {
+	wptr[0] = out48k_short[i]; 
+	wptr[1] = out48k_short[i]; 
+    }
 
     return finished;
 }
 
 int main(int argc, char *argv[])
 {
-    PaStreamParameters  inputParameters,
-                        outputParameters;
+    PaStreamParameters  outputParameters;
     PaStream*           stream;
     PaError             err = paNoError;
     paTestData          data;
     int                 i;
-    int                 numSecs;
 
-    if (argc != 3) {
-	printf("usage: %s rawFile time(s)\n", argv[0]);
+    if (argc != 2) {
+	printf("usage: %s rawFile\n", argv[0]);
 	exit(0);
     }
 
-    data.fout = fopen(argv[1], "wt");
-    if (data.fout == NULL) {
-	printf("Error opening output raw file %s\n", argv[1]);
+    data.fin = fopen(argv[1], "rt");
+    if (data.fin == NULL) {
+	printf("Error opening input raw file %s\n", argv[1]);
 	exit(1);
     }
 
-    numSecs = atoi(argv[2]);
-    data.framesLeft = numSecs * SAMPLE_RATE;
-
-    for(i=0; i<FDMDV_OS_TAPS; i++)
-	data.in48k[i] = 0.0;
+    for(i=0; i<MEM8; i++)
+	data.in8k[i] = 0.0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
 
-    inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
-    if (inputParameters.device == paNoDevice) {
-        fprintf(stderr,"Error: No default input device.\n");
+    outputParameters.device = Pa_GetDefaultOutputDevice(); /* default input device */
+    if (outputParameters.device == paNoDevice) {
+        fprintf(stderr,"Error: No default output device.\n");
         goto done;
     }
-    inputParameters.channelCount = NUM_CHANNELS;         /* stereo input */
-    inputParameters.sampleFormat = paInt16;
-    inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
-    inputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.channelCount = NUM_CHANNELS;         /* stereo input */
+    outputParameters.sampleFormat = paInt16;
+    outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
 
-    /* Record some audio --------------------------------------------- */
+    /* Play some audio --------------------------------------------- */
 
     err = Pa_OpenStream(
               &stream,
-              &inputParameters,
-              NULL,                  /* &outputParameters, */
+	      NULL,
+              &outputParameters,
               SAMPLE_RATE,
               N48,
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
-              recordCallback,
+              paClipOff,      
+              playCallback,
               &data );
     if( err != paNoError ) goto done;
 
@@ -193,7 +182,7 @@ int main(int argc, char *argv[])
     err = Pa_CloseStream( stream );
     if( err != paNoError ) goto done;
 
-    fclose(data.fout);
+    fclose(data.fin);
 
 
 done:

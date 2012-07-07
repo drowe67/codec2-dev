@@ -1,9 +1,9 @@
-AM_CFLAGS = -I../src -fPIC -g  -DFLOATING_POINT -DVAR_ARRAYS -O2
+AM_CFLAGS = -I../src -fPIC -g  -DFLOATING_POINT -DVAR_ARRAYS -O2 -Wall
 AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens pa_rec
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens pa_rec pa_play
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -71,4 +71,8 @@ tlspsens_LDFLAGS = $(LIBS)
 pa_rec_SOURCES = pa_rec.c ../src/fdmdv.c ../src/kiss_fft.c
 pa_rec_LDADD = $(lib_LTLIBRARIES) -lportaudio
 pa_rec_LDFLAGS = $(LIBS)
+
+pa_play_SOURCES = pa_play.c ../src/fdmdv.c ../src/kiss_fft.c
+pa_play_LDADD = $(lib_LTLIBRARIES) -lportaudio
+pa_play_LDFLAGS = $(LIBS)
 
