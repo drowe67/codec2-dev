@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens pa_rec pa_play
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens pa_rec pa_play pa_recplay
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -75,4 +75,8 @@ pa_rec_LDFLAGS = $(LIBS)
 pa_play_SOURCES = pa_play.c ../src/fdmdv.c ../src/kiss_fft.c
 pa_play_LDADD = $(lib_LTLIBRARIES) -lportaudio
 pa_play_LDFLAGS = $(LIBS)
+
+pa_recplay_SOURCES = pa_recplay.c ../src/fdmdv.c ../src/kiss_fft.c
+pa_recplay_LDADD = $(lib_LTLIBRARIES) -lportaudio
+pa_recplay_LDFLAGS = $(LIBS)
 
