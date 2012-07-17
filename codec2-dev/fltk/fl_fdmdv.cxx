@@ -641,10 +641,10 @@ void new_data(float mag_dB[]) {
 \*------------------------------------------------------------------*/
 
 void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speech samples          */
-			     int   *n_output_buf, /* how many samples currently in rx_fdm_scaled[] */
+			     int   *n_output_buf, /* how many samples currently in output_buf[]    */
                              int    codec_bits[], /* current frame of bits for decoder             */
 			     short  input_buf[],  /* input buf of modem samples input to demod     */ 
-			     int   *n_input_buf,  /* how many samples currently in rx_fdm_scaled[] */
+			     int   *n_input_buf,  /* how many samples currently in input_buf[]     */
 			     int   *nin,          /* amount of samples demod needs for next call   */
 			     int   *state,        /* used to collect codec_bits[] halves           */
 			     struct CODEC2 *c2    /* Codec 2 states                                */
@@ -662,11 +662,20 @@ void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speec
     assert(*n_input_buf <= (2*FDMDV_NOM_SAMPLES_PER_FRAME));    
    
     /*
-      This will run the demod 0, 1 (nominal) or 2 times
-      0: run speech decoder again on previous frame of bits, 
-         this effectvely interpolates
-      1: normal, run decoder once, output speech samples to D/A
-      2: run decoder twice, discard miidle frame of speech samples
+      This while loop will run the demod 0, 1 (nominal) or 2 times:
+
+      0: when tx sample clock runs faster than rx, occasionally we
+         will run out of samples
+
+      1: normal, run decoder once, every 2nd frame output a frame of
+         speech samples to D/A
+
+      2: when tx sample clock runs slower than rx, occasionally we will
+         have enough samples to run demod twice.
+
+      With a +/- 10 Hz sample clock difference at FS=8000Hz (+/- 1250
+      ppm), case 0 or 1 occured about once every 30 seconds.  This is
+      no problem for the decoded audio.
     */
 
     while(*n_input_buf >= *nin) {
@@ -699,7 +708,8 @@ void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speec
 	   State machine to:
 
 	   + Mute decoded audio when out of sync.  The demod is synced
-	     when we are using the fine freq estimate.
+	     when we are using the fine freq estimate and SNR is above
+	     a thresh.
 
 	   + Decode codec bits only if we have a 0,1 sync bit
 	     sequence.  Collects two frames of demod bits to decode
@@ -914,7 +924,7 @@ static int callback( const void *inputBuffer, void *outputBuffer,
     }
     assert(n_output_buf >= 0);
 
-    /* shift speech sample output buffer */
+    /* shift speech samples in output buffer */
 
     for(i=0; i<(uint)n_output_buf; i++)
 	output_buf[i] = output_buf[i+N8];
