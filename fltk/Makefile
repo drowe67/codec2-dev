@@ -1,7 +1,7 @@
 # Requires FLTK 1.3 & Portaudio V19
 
 FLTK_CFLAGS += $(shell fltk-config --ldstaticflags)
-CFLAGS = -O3 -g
+CFLAGS = -O3 -g -Wall
 LIBS = ../src/.libs/libcodec2.a -lm -lrt -lportaudio -pthread
 LC2POC_C = fl_fdmdv.cxx
 

@@ -3,8 +3,12 @@
   Created 14 June 2012
   David Rowe
 
-  Fltk 1.3 based GUI program to prototype spectrum, waterfall, and other
-  FDMDV GUI displays.
+  Fltk 1.3 based GUI program to prototype FDMDV & Codec 2 integration
+  issues such as:
+
+    + spectrum, waterfall, and other FDMDV GUI displays
+    + integration with real time audio I/O using portaudio
+    + what we do with audio when out of sync
 */
 
 #include <assert.h>
@@ -22,6 +26,7 @@
 #include "portaudio.h"
 
 #include "fdmdv.h"
+#include "codec2.h"
 
 #define MIN_DB             -40.0 
 #define MAX_DB               0.0
@@ -50,9 +55,13 @@
 				                     can trust accuracy of sound
 				                     card                                    */
 #define N8           FDMDV_NOM_SAMPLES_PER_FRAME  /* processing buffer size at 8 kHz         */
+#define MEM8 (FDMDV_OS_TAPS/FDMDV_OS)
 #define N48          (N8*FDMDV_OS)                /* processing buffer size at 48 kHz        */
 #define NUM_CHANNELS 2                            /* I think most sound cards prefer stereo,
 				                     we will convert to mono                 */
+
+#define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
+#define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
 
 // forward class declarations
 
@@ -64,9 +73,12 @@ class Scalar;
 // Globals --------------------------------------
 
 char         *fin_name = NULL;
+char         *fout_name = NULL;
 char         *sound_dev_name = NULL;
 FILE         *fin = NULL;
+FILE         *fout = NULL;
 struct FDMDV *fdmdv;
+struct CODEC2 *codec2;
 float         av_mag[FDMDV_NSPEC]; // shared between a few classes
 
 // GUI variables --------------------------------
@@ -88,18 +100,22 @@ int          zoom_spectrum = 0;
 // Main processing loop states ------------------
 
 float  Ts = 0.0;
-int    nbuf = 0;
-short  rx_fdm_scaled[2*FDMDV_NOM_SAMPLES_PER_FRAME];
+short  input_buf[2*FDMDV_NOM_SAMPLES_PER_FRAME];
+int    n_input_buf = 0;
 int    nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+short *output_buf;
+int    n_output_buf = 0;
+int    codec_bits[2*FDMDV_BITS_PER_FRAME];
+int    state = 0;
 
 // Portaudio states -----------------------------
 
-PaStreamParameters inputParameters;
 PaStream *stream = NULL;
 PaError err;
 
 typedef struct {
     float               in48k[FDMDV_OS_TAPS + N48];
+    float               in8k[MEM8 + N8];
 } paCallBackData;
 
 // Class for each window type  ------------------
@@ -126,7 +142,7 @@ protected:
     void draw() {
 	float x_px_per_point = 0.0;
 	float y_px_per_dB = 0.0;
-	int   i, x1, y1, x2, y2, len;
+	int   i, x1, y1, x2, y2;
 	float mag1, mag2;
 	char  label[20];
 	float px_per_hz;
@@ -339,7 +355,6 @@ public:
 
     Waterfall(int x, int y, int w, int h): Fl_Box(x, y, w, h, "Waterfall")
     {
-	float f;
 	int   i;
 
 	for(i=0; i<255; i++) {
@@ -460,7 +475,7 @@ protected:
     void draw() {
 	float x_scale;
 	float y_scale;
-	int   i, j, x1, y1, x2, y2;
+	int   i, x1, y1, x2, y2;
 	char  label[100];
 
 	Fl_Box::draw();
@@ -530,7 +545,6 @@ protected:
 	    sprintf(label, "%d", i);
 	    fl_draw(label, x1, y1);
 	}
-
 	fl_pop_clip();
     }
 
@@ -573,7 +587,15 @@ void new_data(float mag_dB[]) {
 }
 
 
-/*
+/*------------------------------------------------------------------*\
+
+  FUNCTION: per_frame_rx_processing()
+  AUTHOR..: David Rowe
+  DATE....: July 2012
+  
+  Called every rx frame to take a buffer of input modem samples and
+  convert them to a buffer of output speech samples.
+
   The sample source could be a sound card or file.  The sample source
   supplies a fixed number of samples with each call.  However
   fdmdv_demod requires a variable number of samples for each call.
@@ -601,34 +623,69 @@ void new_data(float mag_dB[]) {
   are effectively clocked at the remote modulator sound card D/A clock
   rate.  We slip/gain buffers supplied to sound card 2 to compensate.
 
-*/
+  The current demod handles varying clock rates by having a variable
+  number of input samples, e.g. 120 160 (nominal) or 200.  However the
+  A/D always delivers a fixed number of samples.
 
-void per_frame_rx_processing(short rx_fdm_scaled[], int *nbuf, int *nin) {
+  So we currently need some logic between the A/D and the demod:
+    + A/D delivers fixed number of samples
+    + demod processes a variable number of samples
+    + this means we run demod 0,1 or 2 times, depending 
+      on number of buffered A/D samples
+    + demod always outputs 1 frame of bits
+    + so run demod and speech decoder 0, 1 or 2 times
+  
+  The ouput of the demod is codec voice data so it's OK if we miss or
+  repeat a frame every now and again.
+
+\*------------------------------------------------------------------*/
+
+void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speech samples          */
+			     int   *n_output_buf, /* how many samples currently in rx_fdm_scaled[] */
+                             int    codec_bits[], /* current frame of bits for decoder             */
+			     short  input_buf[],  /* input buf of modem samples input to demod     */ 
+			     int   *n_input_buf,  /* how many samples currently in rx_fdm_scaled[] */
+			     int   *nin,          /* amount of samples demod needs for next call   */
+			     int   *state,        /* used to collect codec_bits[] halves           */
+			     struct CODEC2 *c2    /* Codec 2 states                                */
+			     )
+{
     struct FDMDV_STATS stats;
-    int    rx_bits[FDMDV_BITS_PER_FRAME];
     int    sync_bit;
     float  rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    int    rx_bits[FDMDV_BITS_PER_FRAME];
+    uchar  packed_bits[BYTES_PER_CODEC_FRAME];
     float  rx_spec[FDMDV_NSPEC];
-    int    i, j, nin_prev, ret;
+    int    i, nin_prev, bit, byte;
+    int    next_state;
 
-    *nbuf += FDMDV_NOM_SAMPLES_PER_FRAME;
-    assert(*nbuf <= (2*FDMDV_NOM_SAMPLES_PER_FRAME));
+    assert(*n_input_buf <= (2*FDMDV_NOM_SAMPLES_PER_FRAME));    
+   
+    /*
+      This will run the demod 0, 1 (nominal) or 2 times
+      0: run speech decoder again on previous frame of bits, 
+         this effectvely interpolates
+      1: normal, run decoder once, output speech samples to D/A
+      2: run decoder twice, discard miidle frame of speech samples
+    */
 
-    // this will run the demod 0, 1 (nominal) or 2 time
-
-    //printf("nbuf %d nin: %d\n", *nbuf, *nin);
-    while(*nbuf >= *nin) {
+    while(*n_input_buf >= *nin) {
 
 	// demod per frame processing
 
 	for(i=0; i<*nin; i++)
-	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
+	    rx_fdm[i] = (float)input_buf[i]/FDMDV_SCALE;
 	nin_prev = *nin;
 	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, nin);
-	*nbuf -= nin_prev;
-	assert(*nbuf >= 0);
+	*n_input_buf -= nin_prev;
+	assert(*n_input_buf >= 0);
 
-	// get spectrum, stats and update windows
+	// shift input buffer
+
+	for(i=0; i<*n_input_buf; i++)
+	    input_buf[i] = input_buf[i+nin_prev];
+
+	// compute rx spectrum & get demod stats, and update GUI plot data
 
 	fdmdv_get_rx_spectrum(fdmdv, rx_spec, rx_fdm, nin_prev);
 	fdmdv_get_demod_stats(fdmdv, &stats);
@@ -638,10 +695,58 @@ void per_frame_rx_processing(short rx_fdm_scaled[], int *nbuf, int *nin) {
 	aFreqEst->add_new_sample(stats.foff);
 	aSNR->add_new_sample(stats.snr_est);
 
-	// shift buffer
+	/* 
+	   State machine to decode codec bits only if we have a 0,1 sync bit
+	   sequence.  Collects two frames of demod bits to decode one frame of
+	   codec bits.  
+	*/
 
-	for(i=0; i<*nbuf; i++)
-	    rx_fdm_scaled[i] = rx_fdm_scaled[i+nin_prev];
+	next_state = *state;
+	switch (*state) {
+	case 0:
+	    if (sync_bit == 0) {
+		next_state = 1;
+
+		/* first half of frame of codec bits */
+
+		memcpy(codec_bits, rx_bits, FDMDV_BITS_PER_FRAME*sizeof(int));
+	    }
+	    else
+		next_state = 0;
+	    break;
+	case 1:
+	    if (sync_bit == 1) {
+		/* second half of frame of codec bits */
+
+		memcpy(&codec_bits[FDMDV_BITS_PER_FRAME], rx_bits, FDMDV_BITS_PER_FRAME*sizeof(int));
+
+		/* pack bits, MSB received first  */
+
+		bit = 7; byte = 0;
+		memset(packed_bits, 0, BYTES_PER_CODEC_FRAME);
+		for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
+		    packed_bits[byte] |= (codec_bits[i] << bit);
+		    bit--;
+		    if (bit < 0) {
+			bit = 7;
+			byte++;
+		    }
+		}
+		assert(byte == BYTES_PER_CODEC_FRAME);
+
+		/* add decoded speech to end of output buffer */
+
+		if (*n_output_buf <= codec2_samples_per_frame(c2)) {
+		    codec2_decode(c2, &output_buf[*n_output_buf], packed_bits);
+		    *n_output_buf += codec2_samples_per_frame(c2);
+		}
+		assert(*n_output_buf <= (2*codec2_samples_per_frame(c2)));  
+		
+	    }
+	    next_state = 0;
+	    break;
+	}	
+	*state = next_state;
     }
 }
 
@@ -652,7 +757,6 @@ void per_frame_rx_processing(short rx_fdm_scaled[], int *nbuf, int *nin) {
 
 void update_gui(int nin, float *Ts) {
 
-    //Fl::lock();
     *Ts += (float)nin/FS;
 	
     *Ts += (float)nin/FS;
@@ -671,25 +775,42 @@ void update_gui(int nin, float *Ts) {
 	if (zoomWaterfallWindow->shown())		
 	    aZoomedWaterfall->redraw();		
     }
-    //Fl::unlock();
 }
 
 
 /*
   idle() is the FLTK function that gets continusouly called when FLTK
   is not doing GUI work.  We use this function for providing file
-  input to update the GUI simulating real time operation.
+  input to update the GUI when simulating real time operation.
 */
 
 void idle(void*) {
-    int ret;
+    int ret, i;
 
     if (fin_name != NULL) {
-	ret = fread(&rx_fdm_scaled[nbuf], 
+	ret = fread(&input_buf[n_input_buf], 
 		    sizeof(short), 
 		    FDMDV_NOM_SAMPLES_PER_FRAME, 
 		    fin);
-	per_frame_rx_processing(rx_fdm_scaled, &nbuf, &nin);
+	n_input_buf += FDMDV_NOM_SAMPLES_PER_FRAME;             
+
+	per_frame_rx_processing(output_buf, &n_output_buf,
+				codec_bits,
+				input_buf, &n_input_buf, 
+				&nin, &state, codec2);
+
+	if (fout_name != NULL) {
+	    if (n_output_buf >= N8) {
+		ret = fwrite(output_buf, sizeof(short), N8, fout);
+		n_output_buf -= N8;
+		assert(n_output_buf >= 0);
+		
+		/* shift speech sample output buffer */
+
+		for(i=0; i<n_output_buf; i++)
+		    output_buf[i] = output_buf[i+N8];
+	    }
+	}
     }
 
     update_gui(nin, &Ts);
@@ -706,26 +827,28 @@ void idle(void*) {
    available.
 */
 
-static int recordCallback( const void *inputBuffer, void *outputBuffer,
-                           unsigned long framesPerBuffer,
-                           const PaStreamCallbackTimeInfo* timeInfo,
-                           PaStreamCallbackFlags statusFlags,
-                           void *userData )
+static int callback( const void *inputBuffer, void *outputBuffer,
+		     unsigned long framesPerBuffer,
+		     const PaStreamCallbackTimeInfo* timeInfo,
+		     PaStreamCallbackFlags statusFlags,
+		     void *userData )
 {
     paCallBackData *cbData = (paCallBackData*)userData;
-    float      *in48k = cbData->in48k;
-    int         i, n8;
-    int         finished;
+    uint        i;
     short      *rptr = (short*)inputBuffer;
+    short      *wptr = (short*)outputBuffer;
+    float      *in8k = cbData->in8k;
+    float      *in48k = cbData->in48k;
     float       out8k[N8];
-    short       out8k_short[N8];
+    float       out48k[N48];
+    short       out48k_short[N48];
 
-    (void) outputBuffer; /* Prevent unused variable warnings. */
     (void) timeInfo;
     (void) statusFlags;
-    (void) userData;
 
     assert(inputBuffer != NULL);
+
+    /* Convert input model samples from 48 to 8 kHz ------------ */
 
     /* just use left channel */
 
@@ -738,12 +861,47 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     for(i=0; i<FDMDV_OS_TAPS; i++)
 	in48k[i] = in48k[i+framesPerBuffer];
 
+    /* run demod, decoder and update GUI info ------------------ */
+
     for(i=0; i<N8; i++)
-	rx_fdm_scaled[nbuf+i] = (short)out8k[i];
+	input_buf[n_input_buf+i] = (short)out8k[i];
+    n_input_buf += FDMDV_NOM_SAMPLES_PER_FRAME;             
 
-    /* run demon and update GUI */
+    per_frame_rx_processing(output_buf, &n_output_buf,
+			    codec_bits,
+			    input_buf, &n_input_buf, 
+			    &nin, &state, codec2);
 
-    per_frame_rx_processing(rx_fdm_scaled, &nbuf, &nin);
+    if (n_output_buf >= N8) {
+	for(i=0; i<N8; i++)
+	    in8k[MEM8+i] = output_buf[i];
+	n_output_buf -= N8;
+    }
+    assert(n_output_buf >= 0);
+
+    /* shift speech sample output buffer */
+
+    for(i=0; i<(uint)n_output_buf; i++)
+	output_buf[i] = output_buf[i+N8];
+
+    /* Convert output speech to 48 kHz sample rate ------------- */
+
+    /* upsample and update filter memory */
+
+    fdmdv_8_to_48(out48k, &in8k[MEM8], N8);
+    for(i=0; i<MEM8; i++)
+	in8k[i] = in8k[i+N8];
+
+    assert(outputBuffer != NULL);
+
+    /* write signal to both channels */
+
+    for(i=0; i<N48; i++)
+	out48k_short[i] = (short)out48k[i];
+    for(i=0; i<framesPerBuffer; i++,wptr+=2) {
+	wptr[0] = out48k_short[i]; 
+	wptr[1] = out48k_short[i]; 
+    }
 
     return paContinue;
 }
@@ -757,6 +915,13 @@ int arg_callback(int argc, char **argv, int &i) {
 	i += 2;
 	return 2;
     }
+    if (argv[i][1] == 'o') {
+	if ((i+1) >= argc) 
+	    return 0;
+	fout_name = argv[i+1];
+	i += 2;
+	return 2;
+    }
     if (argv[i][1] == 's') {
 	if ((i+1) >= argc) 
 	    return 0;
@@ -767,16 +932,23 @@ int arg_callback(int argc, char **argv, int &i) {
     return 0;
 }
 
+/*------------------------------------------------------------*\
+
+                                 MAIN
+
+\*------------------------------------------------------------*/
+
 int main(int argc, char **argv) {
-    int             ret;
-    int             i;
-    paCallBackData  cbData;
+    int                ret;
+    int                i;
+    PaStreamParameters inputParameters, outputParameters;
+    paCallBackData     cbData;
 
     i = 1;
     Fl::args(argc,argv,i,arg_callback);
 
     if (argc == 1) {
-	printf("usage: %s [-i inputFdmdvRawFile] [-s inputSoundDevice]\n", argv[0]);
+	printf("usage: %s [-i inputFdmdvRawFile] [-o outputRawSoundFile] [-s inputSoundDevice]\n", argv[0]);
 	exit(0);
     }
 
@@ -787,8 +959,31 @@ int main(int argc, char **argv) {
 	    exit(1);
 	}
     }
+    
+    if (fout_name != NULL) {
+	fout = fopen(fout_name,"wb");
+	if (fout == NULL) {
+	    fprintf(stderr, "Error opening output speech raw file %s\n", fout_name);
+	    exit(1);
+	}
+    }
+    
+    for(i=0; i<FDMDV_NSPEC; i++)
+	av_mag[i] = -40.0;
+
+    fdmdv = fdmdv_create();
+    codec2 = codec2_create(CODEC2_MODE_1400);
+    output_buf = (short*)malloc(2*sizeof(short)*codec2_samples_per_frame(codec2));
+
+    /*------------------------------------------------------------------------*\
+
+                           Init Sound Card I/O
+
+    \*------------------------------------------------------------------------*/
 
     if (sound_dev_name != NULL) {
+	for(i=0; i<MEM8; i++)
+	    cbData.in8k[i] = 0.0;
 	for(i=0; i<FDMDV_OS_TAPS; i++)
 	    cbData.in48k[i] = 0.0;
 
@@ -804,22 +999,34 @@ int main(int argc, char **argv) {
 	inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
 	inputParameters.hostApiSpecificStreamInfo = NULL;
 
-	/* Record some audio --------------------------------------------- */
+	outputParameters.device = Pa_GetDefaultOutputDevice(); /* default output device */
+	if (outputParameters.device == paNoDevice) {
+	    fprintf(stderr,"Error: No default output device.\n");
+	    goto pa_error;
+	}
+	outputParameters.channelCount = NUM_CHANNELS;         /* stereo output */
+	outputParameters.sampleFormat = paInt16;
+	outputParameters.suggestedLatency = Pa_GetDeviceInfo( outputParameters.device )->defaultLowOutputLatency;
+	outputParameters.hostApiSpecificStreamInfo = NULL;
 
 	err = Pa_OpenStream(
 			    &stream,
 			    &inputParameters,
-			    NULL,                  /* &outputParameters, */
+			    &outputParameters,                  
 			    SAMPLE_RATE,
 			    N48,
 			    paClipOff,      
-			    recordCallback,
-			    &cbData );
+			    callback,
+			    &cbData);
+
 	if( err != paNoError ) goto pa_error;
     }
 
-    for(i=0; i<FDMDV_NSPEC; i++)
-	av_mag[i] = -40.0;
+    /*------------------------------------------------------------------------*\
+
+                                 Init GUI
+
+    \*------------------------------------------------------------------------*/
 
     // recommended to prevent dithering and stopped display being
     // covered by black flickering squares
@@ -837,8 +1044,6 @@ int main(int argc, char **argv) {
     aTimingEst = new Scalar(W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 80, "Timing Est");
     aFreqEst = new Scalar(2*W3+SP, SP, W3-2*SP, H2, 100, 100, "Frequency Est");
     aSNR = new Scalar(2*W3+SP, SP+H2+SP+SP, W3-2*SP, H2, 100, 20, "SNR");
-
-    fdmdv = fdmdv_create();
 
     Fl::add_idle(idle);
 
@@ -874,8 +1079,13 @@ int main(int argc, char **argv) {
     }
 
     fdmdv_destroy(fdmdv);
+    codec2_destroy(codec2);
+    free(output_buf);
+
     if (fin_name != NULL)
 	fclose(fin);
+    if (fout_name != NULL)
+	fclose(fout);
 
     return ret;
 
