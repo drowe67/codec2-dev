@@ -696,25 +696,53 @@ void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speec
 	aSNR->add_new_sample(stats.snr_est);
 
 	/* 
-	   State machine to decode codec bits only if we have a 0,1 sync bit
-	   sequence.  Collects two frames of demod bits to decode one frame of
-	   codec bits.  
+	   State machine to:
+
+	   + Mute decoded audio when out of sync.  The demod is synced
+	     when we are using the fine freq estimate.
+
+	   + Decode codec bits only if we have a 0,1 sync bit
+	     sequence.  Collects two frames of demod bits to decode
+	     one frame of codec bits.
 	*/
 
 	next_state = *state;
 	switch (*state) {
 	case 0:
-	    if (sync_bit == 0) {
+	    /* mute output audio when out of sync */
+
+	    if (*n_output_buf < 2*codec2_samples_per_frame(c2) - N8) {
+		for(i=0; i<N8; i++)
+		    output_buf[*n_output_buf + i] = 0;
+		*n_output_buf += N8;
+	    }
+	    assert(*n_output_buf <= (2*codec2_samples_per_frame(c2)));  
+
+	    if ((stats.fest_coarse_fine == 1) && (stats.snr_est > 3.0))
 		next_state = 1;
+
+	    break;
+	case 1:
+	    if (sync_bit == 0) {
+		next_state = 2;
 
 		/* first half of frame of codec bits */
 
 		memcpy(codec_bits, rx_bits, FDMDV_BITS_PER_FRAME*sizeof(int));
 	    }
 	    else
+		next_state = 1;
+	    
+	    if (stats.fest_coarse_fine == 0)
 		next_state = 0;
+
 	    break;
-	case 1:
+	case 2:
+	    next_state = 1;
+
+	    if (stats.fest_coarse_fine == 0)
+		next_state = 0;
+
 	    if (sync_bit == 1) {
 		/* second half of frame of codec bits */
 
@@ -743,7 +771,6 @@ void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speec
 		assert(*n_output_buf <= (2*codec2_samples_per_frame(c2)));  
 		
 	    }
-	    next_state = 0;
 	    break;
 	}	
 	*state = next_state;
@@ -872,10 +899,18 @@ static int callback( const void *inputBuffer, void *outputBuffer,
 			    input_buf, &n_input_buf, 
 			    &nin, &state, codec2);
 
+    /* if demod out of sync copy input audio from A/D to aid in tuning */
+
     if (n_output_buf >= N8) {
-	for(i=0; i<N8; i++)
-	    in8k[MEM8+i] = output_buf[i];
-	n_output_buf -= N8;
+       if (state == 0) {
+	   for(i=0; i<N8; i++)
+	       in8k[MEM8+i] = out8k[i];       /* A/D signal */
+       }
+       else {
+	   for(i=0; i<N8; i++)
+	       in8k[MEM8+i] = output_buf[i];  /* decoded spech */
+       }
+       n_output_buf -= N8;
     }
     assert(n_output_buf >= 0);
 
