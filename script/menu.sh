@@ -59,6 +59,7 @@ while true ; do
   stty -cbreak
   if [ -n "$readchar" ] ; then
     if [ x$readchar == 'xq' -o x$readchar == 'xQ' ] ; then
+      echo
       exit 0
     fi
     if [ -z ${file[$readchar]} ] ; then
