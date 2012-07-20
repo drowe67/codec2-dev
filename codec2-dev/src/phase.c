@@ -263,3 +263,285 @@ void phase_synth_zero_order(
   }
 
 }
+
+/* states for phase experiments */
+
+struct PEXP {
+    float phi_prev[MAX_AMP];
+    float Wo_prev;
+};
+
+
+/*---------------------------------------------------------------------------* \
+
+  phase_experiment_create()
+
+  Inits states for phase quantisation experiments.
+
+\*---------------------------------------------------------------------------*/
+
+struct PEXP * phase_experiment_create() {
+    struct PEXP *pexp;
+    int i;
+
+    pexp = (struct PEXP *)malloc(sizeof(struct PEXP));
+    assert (pexp != NULL);
+
+    for(i=0; i<MAX_AMP; i++)
+	pexp->phi_prev[i] = 0.0;
+    pexp->Wo_prev = 0.0;
+
+    return pexp;
+}
+
+
+/*---------------------------------------------------------------------------* \
+
+  phase_experiment_destroy()
+
+\*---------------------------------------------------------------------------*/
+
+void phase_experiment_destroy(struct PEXP *pexp) {
+    assert(pexp != NULL);
+    free(pexp);
+}
+
+
+struct AMPINDEX {
+    float amp;
+    int   index;
+};
+
+static void bubbleSort(struct AMPINDEX numbers[], int array_size)
+{
+    int i, j;
+    struct AMPINDEX temp;
+ 
+  for (i = (array_size - 1); i > 0; i--)
+  {
+    for (j = 1; j <= i; j++)
+    {
+      if (numbers[j-1].amp < numbers[j].amp)
+      {
+        temp = numbers[j-1];
+        numbers[j-1] = numbers[j];
+        numbers[j] = temp;
+      }
+    }
+  }
+}
+
+/*---------------------------------------------------------------------------* \
+
+  phase_experiment()
+
+  Phase quantisation experiments.
+
+\*---------------------------------------------------------------------------*/
+
+void phase_experiment(struct PEXP *pexp, MODEL *model) {
+    int i;
+
+    assert(pexp != NULL);
+
+    //#define AMP
+    #ifdef AMP
+    {
+	int r = 0;
+	float max = 0;
+	for(i=1; i<model.L/4; i++)
+	    if (model.A[i] > max) max = model.A[i];
+	for(i=1; i<model.L/4; i++) {
+	    if (model.A[i] < 0.25*max) {
+		model.phi[i] += (PI/2)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+		r++;
+	    }
+	}
+	printf("r %d L/4 %d\n", r, model.L/4);
+    }
+    #endif
+
+    //#define AMP1
+    #ifdef AMP1
+    {
+	int r = 0, nr = 0, st, dim;
+	int top, j, max_harm, n_harm;
+	struct AMPINDEX sorted[MAX_AMP];
+	int ind[MAX_AMP];
+
+	st = 1;
+	dim = model.L/4;
+
+	for(i=st,j=1; i<=st+dim; i++,j++) {
+	    sorted[j].amp = model.A[i];
+	    sorted[j].index = i;
+	}
+	bubbleSort(&sorted[1], dim);
+	n_harm = max_harm = 0;
+	if (max_harm > dim)
+	    n_harm = dim;
+
+	for(i=st; i<=st+dim; i++) {		
+	    top = 0;
+	    for(j=1; j<=n_harm; j++)
+		if (model.A[i] == sorted[j].amp)
+		    top = 1;
+		
+	    if (!top) {
+		model.phi[i] = 0.0; /* make sure */
+		//model.phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX);
+		model.phi[i] = phi_prev[i] + i*N*model.Wo;
+		r++;
+	    }
+	    else
+		nr++;
+	}
+	printf("r %d nr %d dim %d\n", r, nr, dim);
+	    
+	for(i=0; i<n_harm; i++)
+	    ind[i] = sorted[i+1].index;
+	for(i=n_harm; i<max_harm; i++)
+	    ind[i] = 0;
+	dump_hephase(ind, max_harm);
+    }
+
+    #ifdef UPPER
+    for(i=3*model.L/4; i<=model.L; i++) {
+	//model.phi[i] = phi_prev[i] + i*N*model.Wo;
+	model.phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX);
+    }
+    #endif
+    for(i=1; i<=model.L; i++)
+	phi_prev[i] = model.phi[i];	    
+    #endif
+
+    //#define HF
+    #ifdef HF
+    for(i=1; i<model.L/4; i++)
+	model.phi[i] += (PI/8)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+	
+    for(i=model.L/4; i<3*model.L/4; i++)
+	model.phi[i] += (PI/4)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+	
+    for(i=3*model.L/4; i<=model.L; i++)
+	model.phi[i] += (PI/2)*(1.0 - 2.0*(float)rand()/RAND_MAX);	
+    #endif
+
+    //#define QUANT
+    #ifdef QUANT
+    for(i=1; i<=MAX_AMP; i++)
+	model.phi[i] += (PI/4)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+    #endif
+
+    //#define PRED
+    #ifdef PRED
+    for(i=1; i<=MAX_AMP; i++) {
+	if ((frames % 2) != 0) {
+	    /* predict on even frames */
+	    model.phi[i] = phi_prev[i] + N*i*(model.Wo);
+	}
+	else {		
+	    /* 2 bit quantise on odd */
+	    model.phi[i] += (PI/8)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+	}
+	phi_prev[i] = model.phi[i];	    
+	Wo_prev = model.Wo;
+    }	
+    //if ((frames % 2) != 0)
+    //    printf("frame: %d\n", frames);
+    #endif
+
+    #define PRED_ERR
+    #ifdef PRED_ERR
+    for(i=model->L/4+1; i<=model->L/2; i++) {
+	float pred = pexp->phi_prev[i] + N*i*(model->Wo);
+	float err = pred - model->phi[i];
+	err = atan2(sin(err),cos(err));
+	printf("%f\n",err);
+    }
+    #endif
+
+    //#define PRED2
+    #ifdef PRED2
+    /*
+      if (fabs(model.Wo - Wo_prev) > 0.1*model.Wo) {
+      for(i=1; i<=model.L/2; i++)
+      phi_prev[i] = (PI/8)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+      }
+      else
+      printf("%d\n", frames);
+    */
+	    
+    for(i=1; i<=model.L/4; i++) {
+	model.phi[i] = phi_prev[i] + N*i*(model.Wo);
+    }
+    #ifdef OLD
+    if ((frames % 2) != 0) {
+	/* predict on even frames */
+	for(i=model.L/4+1; i<=model.L; i++)
+	    model.phi[i] = phi_prev[i] + N*i*(model.Wo);
+    }
+    else {		
+	/* 3 bit quantise on odd */
+	for(i=model.L/4+1; i<=model.L; i++) {
+	    float pred = phi_prev[i] + N*i*(model.Wo);
+	    if (pred > model.phi[i]) 
+		model.phi[i] = pred - PI/8;
+	    else
+		model.phi[i] = pred + PI/8;
+		    
+	    //model.phi[i] += (PI/8)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+	}
+    }
+    #endif
+
+   #ifdef QUANT
+   for(i=model.L/4+1; i<=model.L/2; i++) {
+	float pred = phi_prev[i] + N*i*(model.Wo);
+	float err = pred - model.phi[i];
+	err = atan2(sin(err),cos(err));
+	float interval = 0.25;
+	int ind = floor(err/(interval*PI)+0.5);
+	float qerr = ind*interval*PI;
+	//printf("%f %d %f\n", err, ind, ind*0.25*PI);
+	if (pred > model.phi[i]) 
+	    model.phi[i] = pred - qerr;
+	else
+	    model.phi[i] = pred + qerr;
+		    
+    }
+
+    for(i=model.L/2+1; i<=7*model.L/8; i++) {
+	float pred = phi_prev[i] + N*i*(model.Wo);
+	float err = pred - model.phi[i];
+	err = atan2(sin(err),cos(err));
+	float interval = 0.5;
+	int ind = floor(err/(interval*PI)+0.5);
+	float qerr = ind*interval*PI;
+	//printf("%f %d %f\n", err, ind, ind*0.25*PI);
+	if (pred > model.phi[i]) 
+	    model.phi[i] = pred - qerr;
+	else
+	    model.phi[i] = pred + qerr;
+		    
+    }
+    #endif
+
+    /*
+      for(i=1; i<=model.L/4; i++) {
+      model.A[i] = 0.0;
+      }
+      for(i=model.L/2+1; i<=model.L; i++) {
+      model.A[i] = 0.0;
+      }
+    */
+	    
+    #endif
+
+    for(i=1; i<model->L; i++)
+	pexp->phi_prev[i] = model->phi[i];	    
+    pexp->Wo_prev = model->Wo;
+
+
+}
+

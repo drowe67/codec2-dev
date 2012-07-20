@@ -55,6 +55,7 @@ static FILE *fak = NULL;
 static FILE *fbg = NULL;
 static FILE *fE = NULL;
 static FILE *frk = NULL;
+static FILE *fhephase = NULL;
 
 static char  prefix[MAX_STR];
 
@@ -104,6 +105,8 @@ void dump_off(){
 	fclose(fE);
     if (frk != NULL)
 	fclose(frk);
+    if (fhephase != NULL)
+	fclose(fhephase);
 }
 
 void dump_Sn(float Sn[]) {
@@ -261,6 +264,25 @@ void dump_phase_(float phase_[], int L) {
 	fprintf(fphase_,"%f\t",0.0);
     fprintf(fphase_,"\n");    
 }
+
+
+void dump_hephase(int ind[], int dim) {
+    int m;
+    char s[MAX_STR];
+
+    if (!dumpon) return;
+
+    if (fhephase == NULL) {
+	sprintf(s,"%s_hephase.txt", prefix);
+	fhephase = fopen(s, "wt");
+	assert(fhephase != NULL);
+    }
+
+    for(m=0; m<dim; m++)
+	fprintf(fhephase,"%d\t",ind[m]);
+    fprintf(fhephase,"\n");    
+}
+
 
 void dump_snr(float snr) {
     char s[MAX_STR];
