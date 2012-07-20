@@ -33,4 +33,10 @@
 void phase_synth_zero_order(kiss_fft_cfg fft_dec_cfg, MODEL *model, float aks[], 
                             float *ex_phase, int order);
 
+struct PEXP;
+
+struct PEXP * phase_experiment_create();
+void phase_experiment_destroy(struct PEXP *pexp);
+void phase_experiment(struct PEXP *pexp, MODEL *model);
+
 #endif

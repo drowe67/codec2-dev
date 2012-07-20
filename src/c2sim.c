@@ -50,6 +50,7 @@
 void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
+
 /*---------------------------------------------------------------------------*\
                                                                           
 				MAIN                                        
@@ -94,7 +95,7 @@ int main(int argc, char *argv[])
     int   postfilt;
     float bg_est;
 
-    int   hand_voicing = 0, phasetest = 0;
+    int   hand_voicing = 0, phaseexp = 0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -118,6 +119,7 @@ int main(int argc, char *argv[])
     #ifdef DUMP
     int   dump;
     #endif
+    struct PEXP *pexp = NULL;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -131,7 +133,7 @@ int main(int argc, char *argv[])
         { "lspdt_mode", required_argument, NULL, 0 },
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
-        { "phasetest", no_argument, &phasetest, 1 },
+        { "phaseexp", no_argument, &phaseexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
@@ -314,6 +316,8 @@ int main(int argc, char *argv[])
     make_analysis_window(fft_fwd_cfg, w, W);
     make_synthesis_window(Pn);
     quantise_init();
+    if (phaseexp)
+	pexp = phase_experiment_create();
 
     /*----------------------------------------------------------------*\
 
@@ -351,6 +355,9 @@ int main(int argc, char *argv[])
         #ifdef DUMP 
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
         #endif
+
+	if (phaseexp)
+	    phase_experiment(pexp, &model);
 
 	/*------------------------------------------------------------*\
 
@@ -724,6 +731,8 @@ int main(int argc, char *argv[])
     if (lpc_model)
 	printf("SNR av = %5.2f dB\n", sum_snr/frames);
 
+    if (phaseexp)
+	phase_experiment_destroy(pexp);
     #ifdef DUMP
     if (dump)
 	dump_off();

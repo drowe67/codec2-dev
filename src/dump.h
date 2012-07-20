@@ -51,6 +51,7 @@ void dump_lpc_snr(float snr);
 void dump_snr(float snr);
 void dump_phase(float phase[], int L);
 void dump_phase_(float phase[], int L);
+void dump_hephase(int ind[], int dim);
 
 /* NLP states */
 
