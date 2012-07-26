@@ -269,6 +269,7 @@ void phase_synth_zero_order(
 struct PEXP {
     float phi_prev[MAX_AMP];
     float Wo_prev;
+    int   frames;
 };
 
 
@@ -290,6 +291,7 @@ struct PEXP * phase_experiment_create() {
     for(i=0; i<MAX_AMP; i++)
 	pexp->phi_prev[i] = 0.0;
     pexp->Wo_prev = 0.0;
+    pexp->frames = 0;
 
     return pexp;
 }
@@ -306,6 +308,14 @@ void phase_experiment_destroy(struct PEXP *pexp) {
     free(pexp);
 }
 
+
+/*---------------------------------------------------------------------------* \
+
+  Various test and experimental functions ................
+
+\*---------------------------------------------------------------------------*/
+
+/* Bubblesort to find highest amplitude harmonics */
 
 struct AMPINDEX {
     float amp;
@@ -331,20 +341,24 @@ static void bubbleSort(struct AMPINDEX numbers[], int array_size)
   }
 }
 
-/*---------------------------------------------------------------------------* \
-
-  phase_experiment()
-
-  Phase quantisation experiments.
-
-\*---------------------------------------------------------------------------*/
-
-void phase_experiment(struct PEXP *pexp, MODEL *model) {
-    int i;
-
-    assert(pexp != NULL);
-
     //#define AMP
+    #ifdef AMP
+    {
+	int r = 0;
+	float max = 0;
+	for(i=1; i<model.L/4; i++)
+	    if (model.A[i] > max) max = model.A[i];
+	for(i=1; i<model.L/4; i++) {
+	    if (model.A[i] < 0.25*max) {
+		model.phi[i] += (PI/2)*(1.0 - 2.0*(float)rand()/RAND_MAX);
+		r++;
+	    }
+	}
+	printf("r %d L/4 %d\n", r, model.L/4);
+    }
+    #endif
+
+   //#define AMP
     #ifdef AMP
     {
 	int r = 0;
@@ -451,7 +465,7 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
     //    printf("frame: %d\n", frames);
     #endif
 
-    #define PRED_ERR
+    //#define PRED_ERR
     #ifdef PRED_ERR
     for(i=model->L/4+1; i<=model->L/2; i++) {
 	float pred = pexp->phi_prev[i] + N*i*(model->Wo);
@@ -471,10 +485,8 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
       else
       printf("%d\n", frames);
     */
-	    
-    for(i=1; i<=model.L/4; i++) {
-	model.phi[i] = phi_prev[i] + N*i*(model.Wo);
-    }
+    #endif   
+
     #ifdef OLD
     if ((frames % 2) != 0) {
 	/* predict on even frames */
@@ -495,7 +507,7 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
     }
     #endif
 
-   #ifdef QUANT
+   #ifdef QUANT_SIM
    for(i=model.L/4+1; i<=model.L/2; i++) {
 	float pred = phi_prev[i] + N*i*(model.Wo);
 	float err = pred - model.phi[i];
@@ -536,12 +548,326 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
       }
     */
 	    
+
+static void print_pred_error(struct PEXP *pexp, MODEL *model, int start, int end) {
+    int i;
+    for(i=start; i<=end; i++) {
+	float pred = pexp->phi_prev[i] + N*i*(model->Wo);
+	float err = pred - model->phi[i];
+	err = atan2(sin(err),cos(err));
+	printf("%f\n",err);
+    }
+}
+
+
+static void predict_phases(struct PEXP *pexp, MODEL *model, int start, int end) {
+    int i;
+
+    for(i=start; i<=end; i++) {
+	model->phi[i] = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
+	//model->phi[i] = pexp->phi_prev[i] + N*i*model->Wo;
+    }
+}
+
+static void struct_phases(struct PEXP *pexp, MODEL *model, int start, int end) {
+    int i;
+
+    model->phi[1] = pexp->phi_prev[1] + N*model->Wo;
+
+    for(i=start; i<=end; i++)
+	model->phi[i] = model->phi[1]*i;
+   
+}
+
+static void skip_phases(struct PEXP *pexp, MODEL *model, int start, int end) {
+    int i;
+
+    for(i=start; i<=end; i+=2)
+	model->phi[i] = model->phi[i-1] - model->phi[i-2];
+   
+}
+
+static void rand_phases(MODEL *model, int start, int end) {
+    int i;
+
+    for(i=start; i<=end; i++)
+	model->phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX);
+   
+}
+
+static void quant_phase(float *phase, float min, float max, int bits) {
+    int   levels = 1 << bits; 
+    int   index;
+    float norm, step;
+
+    norm = (*phase - min)/(max - min);
+    index = floor(levels*norm);
+
+    //printf("phase %f norm %f index %d ", *phase, norm, index);
+    if (index < 0 ) index = 0;
+    if (index > (levels-1)) index = levels-1;
+    //printf("index %d ", index);
+    step = (max - min)/levels;
+    *phase = min + step*index + 0.5*step;
+    //printf("step %f phase %f\n", step, *phase);
+}
+
+static void quant_phases(MODEL *model, int start, int end, int bits) {
+    int i;
+
+    for(i=start; i<=end; i++) {
+	quant_phase(&model->phi[i], -PI, PI, bits);
+    }
+}
+
+static void fixed_bits_per_frame(struct PEXP *pexp, MODEL *model, int m, int budget) {
+    int res, finished;
+
+    res = 3;
+    finished = 0;
+
+    while(!finished) {
+	if (m > model->L/2)
+	    res = 2;
+	if (((budget - res) < 0) || (m > model->L))
+	    finished = 1;
+	else {
+	    quant_phase(&model->phi[m], -PI, PI, res);	    
+	    budget -= res;
+	    m++;
+	}
+    }
+    printf("m: %d L: %d budget: %d\n", m, model->L, budget);
+    predict_phases(pexp, model, m, model->L);
+    //rand_phases(model, m, model->L);
+}
+
+/* used to plot histogram of quantisation error, for 3 bits, 8 levels,
+   should be uniform between +/- PI/8 */
+
+static void check_phase_quant(MODEL *model, float tol)
+{
+    int m;
+    float phi_before[MAX_AMP];
+
+    for(m=1; m<=model->L; m++)
+	phi_before[m] = model->phi[m];
+
+    quant_phases(model, 1, model->L, 3);
+
+    for(m=1; m<=model->L; m++) {
+	float err = phi_before[m] - model->phi[m];
+	printf("%f\n", err);
+	if (fabs(err) > tol)
+	    exit(0);
+    }
+}
+
+
+static void repeat_phases(MODEL *model, int period)
+{
+    int m,i;
+
+    for(m=period+1,i=1; m<=model->L; m++,i++) {
+	model->phi[m] = model->phi[m-1] + model->phi[i+1] - model->phi[i];
+    }
+
+}
+
+
+static float est_phi1(MODEL *model, int start, int end)
+{
+    int m;
+    float delta, s, c, phi1_est;
+
+    if (end > model->L) 
+	end = model->L;
+
+    s = c = 0.0;
+    for(m=start; m<end; m++) {
+	delta = model->phi[m+1] - model->phi[m];
+	s += model->A[m]*sin(delta);
+	c += model->A[m]*cos(delta);
+    }
+
+    phi1_est = atan2(s,c);
+    
+    return phi1_est;
+}
+
+static void print_phi1_pred_error(MODEL *model, int start, int end)
+{
+    int m;
+    float phi1_est;
+
+    phi1_est = est_phi1(model, start, end);
+
+    for(m=start; m<end; m++) {
+	float err = model->phi[m+1] - model->phi[m] - phi1_est;
+	//float err = model->phi[m] - phi1_est*m;
+	err = atan2(sin(err),cos(err));
+	printf("%f\n", err);
+    }
+}
+
+
+static void first_order_band(MODEL *model, int start, int end, float phi1_est)
+{
+    int   m;
+    float pred_err, av_pred_err;
+    float c,s;
+
+    s = c = 0.0;
+    for(m=start; m<end; m++) {
+	pred_err = model->phi[m] - phi1_est*m;
+	s += model->A[m]*sin(pred_err);
+	c += model->A[m]*cos(pred_err);
+    }
+
+    av_pred_err = atan2(s,c);
+    for(m=start; m<end; m++) {
+	model->phi[m] = av_pred_err + phi1_est*m;
+	model->phi[m] = atan2(sin(model->phi[m]), cos(model->phi[m]));
+    }
+
+}
+
+
+static void sub_linear(MODEL *model, int start, int end, float phi1_est)
+{
+    int   m;
+
+    for(m=start; m<end; m++) {
+	model->phi[m] = m*phi1_est;
+    }
+}
+
+
+static void top_amp(struct PEXP *pexp, MODEL *model, int start, int end, int n_harm, int pred)
+{
+    int removed = 0, not_removed = 0;
+    int top, i, j;
+    struct AMPINDEX sorted[MAX_AMP];
+
+    /* sort into acending order of amplitude */
+
+    for(i=start,j=0; i<end; i++,j++) {
+	sorted[j].amp = model->A[i];
+	sorted[j].index = i;
+    }
+    bubbleSort(&sorted[1], end-start);
+
+    /* keep phase of top n_harm, predict others */
+
+    for(i=start; i<end; i++) {		
+	top = 0;
+	for(j=0; j<n_harm; j++)
+	    if (model->A[i] == sorted[j].amp)
+		top = 1;
+		
+	if (!top) {
+	    model->phi[i] = 0.0; /* make sure */
+	    if (pred)
+		model->phi[i] = pexp->phi_prev[i] + i*N*(model->Wo + pexp->Wo_prev)/2.0;
+	    else
+		model->phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX); // note: try rand for higher harms
+	    removed++;
+	}
+	else {
+	    /* need to make this work thru budget of bits */
+	    //quant_phase(&model->phi[i], -PI, PI, 3);	    
+	    not_removed++;
+	}
+    }
+    //printf("dim: %d rem %d not_rem %d\n", end-start, removed, not_removed);
+	    
+}
+
+
+/*---------------------------------------------------------------------------* \
+
+  phase_experiment()
+
+  Phase quantisation experiments.
+
+\*---------------------------------------------------------------------------*/
+
+void phase_experiment(struct PEXP *pexp, MODEL *model) {
+    int m;
+    float phi1_est;
+
+    assert(pexp != NULL);
+
+    //fixed_bits_per_frame(pexp, model, 40);
+    //quant_phases(model, 1, model->L, 3);
+    //print_pred_error(pexp, model, 1, model->L/2);
+    //struct_phases(pexp, model, 1, model->L/4);
+    //rand_phases(model, 10, model->L);
+    //for(m=1; m<=model->L; m++)
+    //	model->A[m] = 0.0;
+    //model->A[model->L/2] = 1000;
+    //repeat_phases(model, 20);
+    //predict_phases(pexp, model, 1, model->L/4);
+    //quant_phases(model, 1, 10, 3);
+    //quant_phases(model, 10, 20, 2);
+    //repeat_phases(model, 20);
+    //rand_phases(model, 3*model->L/4, model->L);
+    // print_phi1_pred_error(model, 1, model->L);
+    //predict_phases(pexp, model, 1, model->L/4);
+    //first_order_band(model, model->L/4, model->L/2);
+    //first_order_band(model, model->L/2, 3*model->L/4);
+    //if (fabs(model->Wo - pexp->Wo_prev)< 0.1*model->Wo)
+    
+
+    //phi1_est = est_phi1(model, 1, model->L/2);
+    //first_order_band(model, 1, model->L/4, phi1_est);	
+    //sub_linear(model, 1, model->L/4, phi1_est);
+
+    //top_amp(pexp, model, 1, model->L/4, 4);
+    //top_amp(pexp, model, model->L/4, model->L/2, 4);
+
+    //first_order_band(model, 1, model->L/4, phi1_est);	
+    //first_order_band(model, model->L/4, model->L/2, phi1_est);	
+
+    //if (fabs(model->Wo - pexp->Wo_prev) > 0.2*model->Wo)
+    //	rand_phases(model, model->L/2, model->L);
+	
+    //top_amp(pexp, model, 1, model->L/4, 4);
+    //top_amp(pexp, model, model->L/4, model->L/2, 8);
+    //top_amp(pexp, model, model->L/4+1, model->L/2, 10, 1);
+    //top_amp(pexp, model, 1, model->L/4, 10, 1);
+    //top_amp(pexp, model, model->L/4+1, 3*model->L/4, 10, 1);
+    //top_amp(pexp, model, 1, 3*model->L/4, 20, 1);
+
+    #ifdef REAS_CAND1
+    predict_phases(pexp, model, 1, model->L/4);
+    top_amp(pexp, model, model->L/4+1, 3*model->L/4, 10, 1);
+    rand_phases(model, 3*model->L/4+1, model->L);
     #endif
 
-    for(i=1; i<model->L; i++)
-	pexp->phi_prev[i] = model->phi[i];	    
+    #ifdef REAS_CAND2
+    if ((pexp->frames % 2) == 0) {
+	//printf("quant\n");
+	predict_phases(pexp, model, 1, model->L/4);	
+	//top_amp(pexp, model, model->L/4+1, 3*model->L/4, 20, 1);
+	top_amp(pexp, model,  model->L/4+1, 7*model->L/8, 20, 1);
+	rand_phases(model, 7*model->L/8+1, model->L);
+     }
+    else {
+	//printf("predict\n");
+	predict_phases(pexp, model, 1, model->L);
+    }
+    #endif
+
+
+    for(m=1; m<=model->L; m++)
+    	model->phi[m] = atan2(sin(model->phi[m]),cos(model->phi[m]));
+
+    /* update states */
+
+    for(m=1; m<model->L; m++)
+	pexp->phi_prev[m] = model->phi[m];	    
     pexp->Wo_prev = model->Wo;
-
-
+    pexp->frames++;
 }
 
