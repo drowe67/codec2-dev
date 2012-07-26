@@ -346,7 +346,7 @@ int main(int argc, char *argv[])
 
 	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
-	
+
 	dft_speech(fft_fwd_cfg, Sw, Sn, w); 
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
@@ -356,8 +356,15 @@ int main(int argc, char *argv[])
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
-	if (phaseexp)
+	if (phaseexp) {
+            #ifdef DUMP
+	    dump_phase(&model.phi[0], model.L);
+            #endif
 	    phase_experiment(pexp, &model);
+            #ifdef DUMP
+	    dump_phase_(&model.phi[0], model.L);
+            #endif
+	}
 
 	/*------------------------------------------------------------*\
 
