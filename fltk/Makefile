@@ -1,5 +1,10 @@
 # Requires FLTK 1.3 & Portaudio V19
 
+FLTK_VER = $(shell fltk-config --api-version)
+ifneq ($(FLTK_VER),1.3)
+$(error Must use FLTK version 1.3, you have $(FLTK_VER))
+endif
+
 FLTK_CFLAGS += $(shell fltk-config --ldstaticflags)
 CFLAGS = -O3 -g -Wall
 LIBS = ../src/.libs/libcodec2.a -lm -lrt -lportaudio -pthread
