@@ -41,7 +41,8 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	tinterp$(EXEEXT) tquant$(EXEEXT) vq_train_jvm$(EXEEXT) \
 	scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) t48_8$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
-	tphinterp$(EXEEXT) vqtrainph$(EXEEXT)
+	tphinterp$(EXEEXT) vqtrainph$(EXEEXT) genphdata$(EXEEXT) \
+	polar2rect$(EXEEXT)
 subdir = unittest
 DIST_COMMON = $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -60,6 +61,9 @@ extract_DEPENDENCIES =
 am_genlsp_OBJECTS = genlsp.$(OBJEXT) lpc.$(OBJEXT) lsp.$(OBJEXT)
 genlsp_OBJECTS = $(am_genlsp_OBJECTS)
 genlsp_DEPENDENCIES =
+am_genphdata_OBJECTS = genphdata.$(OBJEXT)
+genphdata_OBJECTS = $(am_genphdata_OBJECTS)
+genphdata_DEPENDENCIES =
 am_genres_OBJECTS = genres.$(OBJEXT) lpc.$(OBJEXT)
 genres_OBJECTS = $(am_genres_OBJECTS)
 genres_DEPENDENCIES =
@@ -74,6 +78,9 @@ am_lspsync_OBJECTS = lspsync.$(OBJEXT) quantise.$(OBJEXT) \
 	pack.$(OBJEXT) $(am__objects_1)
 lspsync_OBJECTS = $(am_lspsync_OBJECTS)
 lspsync_DEPENDENCIES =
+am_polar2rect_OBJECTS = polar2rect.$(OBJEXT)
+polar2rect_OBJECTS = $(am_polar2rect_OBJECTS)
+polar2rect_DEPENDENCIES =
 am_scalarlsptest_OBJECTS = scalarlsptest.$(OBJEXT) quantise.$(OBJEXT) \
 	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
 	$(am__objects_1)
@@ -136,13 +143,15 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
+	$(lspsync_SOURCES) $(polar2rect_SOURCES) \
 	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
 	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
 	$(tphinterp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
 	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES)
 DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genlsp_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
+	$(lspsync_SOURCES) $(polar2rect_SOURCES) \
 	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
 	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
 	$(tphinterp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
@@ -276,6 +285,12 @@ vqtrainjnd_LDFLAGS = $(LIBS)
 vqtrainph_SOURCES = vqtrainph.c
 vqtrainph_LDADD = $(lib_LTLIBRARIES) 
 vqtrainph_LDFLAGS = $(LIBS)
+genphdata_SOURCES = genphdata.c
+genphdata_LDADD = $(lib_LTLIBRARIES) 
+genphdata_LDFLAGS = $(LIBS)
+polar2rect_SOURCES = polar2rect.c
+polar2rect_LDADD = $(lib_LTLIBRARIES) 
+polar2rect_LDFLAGS = $(LIBS)
 vq_train_jvm_SOURCES = vq_train_jvm.c
 vq_train_jvm_LDADD = $(lib_LTLIBRARIES) 
 vq_train_jvm_LDFLAGS = $(LIBS)
@@ -361,12 +376,18 @@ extract$(EXEEXT): $(extract_OBJECTS) $(extract_DEPENDENCIES)
 genlsp$(EXEEXT): $(genlsp_OBJECTS) $(genlsp_DEPENDENCIES) 
 	@rm -f genlsp$(EXEEXT)
 	$(LINK) $(genlsp_LDFLAGS) $(genlsp_OBJECTS) $(genlsp_LDADD) $(LIBS)
+genphdata$(EXEEXT): $(genphdata_OBJECTS) $(genphdata_DEPENDENCIES) 
+	@rm -f genphdata$(EXEEXT)
+	$(LINK) $(genphdata_LDFLAGS) $(genphdata_OBJECTS) $(genphdata_LDADD) $(LIBS)
 genres$(EXEEXT): $(genres_OBJECTS) $(genres_DEPENDENCIES) 
 	@rm -f genres$(EXEEXT)
 	$(LINK) $(genres_LDFLAGS) $(genres_OBJECTS) $(genres_LDADD) $(LIBS)
 lspsync$(EXEEXT): $(lspsync_OBJECTS) $(lspsync_DEPENDENCIES) 
 	@rm -f lspsync$(EXEEXT)
 	$(LINK) $(lspsync_LDFLAGS) $(lspsync_OBJECTS) $(lspsync_LDADD) $(LIBS)
+polar2rect$(EXEEXT): $(polar2rect_OBJECTS) $(polar2rect_DEPENDENCIES) 
+	@rm -f polar2rect$(EXEEXT)
+	$(LINK) $(polar2rect_LDFLAGS) $(polar2rect_OBJECTS) $(polar2rect_LDADD) $(LIBS)
 scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES) 
 	@rm -f scalarlsptest$(EXEEXT)
 	$(LINK) $(scalarlsptest_LDFLAGS) $(scalarlsptest_OBJECTS) $(scalarlsptest_LDADD) $(LIBS)
@@ -423,6 +444,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlsp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genphdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genres.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/interp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
@@ -433,6 +455,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pack.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phase.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/polar2rect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postfilter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quantise.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@

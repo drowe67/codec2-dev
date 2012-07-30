@@ -28,10 +28,11 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#define	MAX_STR	256		/* maximum string length		*/
+#define	MAX_STR	2048		/* maximum string length		*/
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <ctype.h>
 #include <assert.h>
 
@@ -110,9 +111,11 @@ void scan_line(FILE *fp, float f[], int n)
     char   s[MAX_STR];
     char   *ps,*pe;
     int	   i;
-
+    
+    memset(s, 0, MAX_STR);
     ps = pe = fgets(s,MAX_STR,fp); 
-    assert(ps);
+    if (ps == NULL)
+	return;
     for(i=0; i<n; i++) {
 	while( isspace(*pe)) pe++;
 	while( !isspace(*pe)) pe++;
