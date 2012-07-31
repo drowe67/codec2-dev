@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 	scan_line(ftext, buf, en);
 	if (!feof(ftext)) {
 	    fwrite(&buf[st-1], sizeof(float), en-st+1, ffloat);
-	    printf("\r%ld lines",lines++);
+	    printf("\r%ld lines",++lines);
 	}
     }
     printf("\n");
