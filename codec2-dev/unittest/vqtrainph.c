@@ -91,6 +91,7 @@ int main(int argc, char *argv[]) {
     float   b;          /* equivalent number of bits                    */
     float   improvement;
     float   sd_vec, sd_element, sd_theory, bits_theory;
+    int     var_n;
 
     /* Interpret command line arguments */
 
@@ -111,6 +112,7 @@ int main(int argc, char *argv[]) {
 
     d = atoi(argv[2]);
     e = atoi(argv[3]);
+    printf("\n");
     printf("dimension D=%d  number of entries E=%d\n", d, e);
     vec = (COMP*)malloc(sizeof(COMP)*d);
     cb = (COMP*)malloc(sizeof(COMP)*d*e);
@@ -124,19 +126,36 @@ int main(int argc, char *argv[]) {
     /* determine size of training set */
 
     J = 0;
-    while(fread(vec, sizeof(COMP), d, ftrain) == (size_t)d)
+    var_n = 0;
+    while(fread(vec, sizeof(COMP), d, ftrain) == (size_t)d) {
+	for(j=0; j<d; j++)
+	    if ((vec[j].real != 0.0) && (vec[j].imag != 0.0))
+		var_n++;
 	J++;
-    printf("J=%d entries in training set\n", J);
+    }
+    printf("J=%d sparse vectors in training set, %d non-zero phases\n", J, var_n);
 
     /* set up initial codebook state from samples of training set */
 
     rewind(ftrain);
     ret = fread(cb, sizeof(COMP), d*e, ftrain);
 
+    /* codebook can't have any zero phase angle entries, these need to be set to
+       zero angle so cmult used to find phase angle differences works */
+
+    for(i=0; i<d*e; i++)
+	if ((cb[i].real == 0.0) && (cb[i].imag == 0.0)) {
+	    cb[i].real = 1.0;
+	    cb[i].imag = 0.0;
+	}
+	    
+    //print_vec(cb, d, 1);
+
     /* main loop */
 
-    printf("Iteration  delta  std dev    std dev       std dev (theory)  improvement\n");
-    printf("                  (per vec)  (per element) (per element)     (bits)\n");
+    printf("\n");
+    printf("Iteration  delta  var    std dev\n");
+    printf("--------------------------------\n");
 
     b = log10((float)e)/log10(2.0);
     sd_theory = (PI/sqrt(3.0))*pow(2.0, -b/(float)d);
@@ -161,17 +180,23 @@ int main(int argc, char *argv[]) {
 	for(i=0; i<J; i++) {
 	    ret = fread(vec, sizeof(COMP), d, ftrain);
 	    ind = quantise(cb, vec, d, e, &se);
+	    //printf("ind %d\n", ind);
 	    n[ind]++;
 	    acc(&cent[ind*d], vec, d);
 	}
 	
 	/* work out stats */
 
-	var = se/J;	
+	var = se/var_n;	
 	sd_vec = sqrt(var);
-	sd_element = sqrt(var/d);
-	bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
-	improvement = bits_theory - b;
+
+	/* we need to know dimension of cb (which varies from vector to vector) 
+           to calc bits_theory.  Maybe measure and use average dimension....
+	*/
+	//bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
+	//improvement = bits_theory - b;
+
+	//print_vec(cent, d, 1);
 
 	/* determine new codebook from centroids */
 
@@ -180,20 +205,24 @@ int main(int argc, char *argv[]) {
 	    memcpy(&cb[i*d], &cent[i*d], d*sizeof(COMP));
 	}
 
+	//print_vec(cb, d, 1);
+
 	iterations++;
 	if (iterations > 1) {
-	    delta = (var_1 - var)/var;
+	    if (var > 0.0) {
+		delta = (var_1 - var)/var;
+	    }
+	    else
+		delta = 0;
 	    if (delta < DELTAQ)
 		finished = 1;
 	}      
 		     
-	printf("%2d         %4.3f  %4.3f      %4.3f         %4.3f             % 4.3f\n",iterations, delta, sd_vec, sd_element, sd_theory, improvement);
+	printf("%2d         %4.3f  %4.3f  %4.3f \n",iterations, delta, var, sd_vec);
 
 	var_1 = var;
-
     } while (!finished);
 
-    /* TODO: measure variance per element to ensure sd's about the same */
 
     /* save codebook to disk */
 
@@ -206,7 +235,7 @@ int main(int argc, char *argv[]) {
     fprintf(fvq,"%d %d\n",d,e);
     for(j=0; j<e; j++) {
 	for(i=0; i<d; i++)
-	    fprintf(fvq,"%f %f ", cb[j*d+i].real, cb[j*d+i].imag);
+	    fprintf(fvq,"% 4.3f ", atan2(cb[j*d+i].imag, cb[j*d+i].real));
 	fprintf(fvq,"\n");
     }
     fclose(fvq);
@@ -325,7 +354,13 @@ void norm(COMP v[], int d)
 
     for(i=0; i<d; i++) {
 	mag = sqrt(v[i].real*v[i].real + v[i].imag*v[i].imag);
-	if (mag != 0.0) {
+	if (mag == 0.0) {
+	    /* can't have zero cb entries as cmult will break in quantise().
+	       We effectively set sparese phases to an angle of 0. */
+	    v[i].real = 1.0;
+	    v[i].imag = 0.0;
+	}
+	else {
 	    v[i].real /= mag;
 	    v[i].imag /= mag;
 	}
