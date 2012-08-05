@@ -704,7 +704,11 @@ void aks_to_M2(
 
   /* Determine magnitudes by linear interpolation of P(w) -------------------*/
 
-  signal = noise = 0.0;
+  /* when used just by decoded {A} might be all zeroes so init signal
+     to prevent log(0) errors */
+
+  signal = 1E-30; noise = 1E-32;
+
   for(m=1; m<=model->L; m++) {
     am = floor((m - 0.5)*model->Wo/r + 0.5);
     bm = floor((m + 0.5)*model->Wo/r + 0.5);
