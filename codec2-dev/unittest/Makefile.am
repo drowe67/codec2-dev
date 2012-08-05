@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens tphinterp vqtrainph genphdata polar2rect
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata polar2rect
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -79,8 +79,3 @@ create_interleaver_LDFLAGS = $(LIBS)
 tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
 tlspsens_LDADD = $(lib_LTLIBRARIES) 
 tlspsens_LDFLAGS = $(LIBS)
-
-tphinterp_SOURCES = tphinterp.c ../src/nlp.c ../src/sine.c ../src/kiss_fft.c ../src/dump.c
-tphinterp_LDADD = $(lib_LTLIBRARIES) 
-tphinterp_LDFLAGS = $(LIBS)
-
