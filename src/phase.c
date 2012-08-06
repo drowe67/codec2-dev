@@ -909,19 +909,19 @@ static float refine_Wo(struct PEXP     *pexp,
 }
 
 
-static void split_vq(struct PEXP *pexp, struct codebook *vq, float weights[], COMP sparse_pe[])
+static void split_vq(COMP sparse_pe_out[], struct PEXP *pexp, struct codebook *vq, float weights[], COMP sparse_pe_in[])
 {
     int i, j, non_zero, vq_ind;
     
     printf("\n offset %d k %d m %d  j: ", vq->offset, vq->k, vq->m);
-    vq_ind = vq_phase(vq->cb, &sparse_pe[vq->offset], &weights[vq->offset], vq->k, vq->m, &pexp->vq_var);
+    vq_ind = vq_phase(vq->cb, &sparse_pe_in[vq->offset], &weights[vq->offset], vq->k, vq->m, &pexp->vq_var);
   
     non_zero = 0;
     for(i=0, j=vq->offset; i<vq->k; i++,j++) {
 	//printf("%f ", atan2(sparse_pe[i].imag, sparse_pe[i].real));
-	if ((sparse_pe[i].real != 0.0) && (sparse_pe[i].imag != 0.0)) {
+	if ((sparse_pe_in[j].real != 0.0) && (sparse_pe_in[j].imag != 0.0)) {
 	    printf("%d ", j);
-	    sparse_pe[j] = vq->cb[vq->k * vq_ind + i];
+	    sparse_pe_out[j] = vq->cb[vq->k * vq_ind + i];
 	    non_zero++;
 	}
     }
@@ -934,7 +934,7 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 {
     int              i, index;
     float            pred, error, error_q_angle, best_Wo;
-    COMP             sparse_pe[MAX_AMP];
+    COMP             sparse_pe_in[MAX_AMP], sparse_pe_out[MAX_AMP];
     float            weights[MAX_AMP];
     COMP             error_q_rect;
 
@@ -944,27 +944,32 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
      /* transform to sparse pred error vector */
 
     for(i=0; i<MAX_AMP; i++) {
-	sparse_pe[i].real = 0.0;
-	sparse_pe[i].imag = 0.0;
+	sparse_pe_in[i].real = 0.0;
+	sparse_pe_in[i].imag = 0.0;
+	sparse_pe_out[i].real = 0.0;
+	sparse_pe_out[i].imag = 0.0;
     }
 
+    printf("\n");
     for(i=1; i<=model->L; i++) {
 	pred = pexp->phi_prev[i] + N*i*best_Wo;
 	error = pred - model->phi[i];
 
 	index = MAX_AMP*i*model->Wo/PI;
 	assert(index < MAX_AMP);
-	sparse_pe[index].real = cos(error);
-	sparse_pe[index].imag = sin(error);
+	sparse_pe_in[index].real = cos(error);
+	sparse_pe_in[index].imag = sin(error);
+	//sparse_pe_out[index] = sparse_pe_in[index];
 	weights[index] = model->A[i];
+	printf("%d ", index);
     }
     
     /* vector quantise */
-    
-    split_vq(pexp, pexp->vq1, weights, sparse_pe);
-    split_vq(pexp, pexp->vq2, weights, sparse_pe);
-    split_vq(pexp, pexp->vq3, weights, sparse_pe);
-    split_vq(pexp, pexp->vq4, weights, sparse_pe);
+        
+    split_vq(sparse_pe_out, pexp, pexp->vq1, weights, sparse_pe_in);
+    split_vq(sparse_pe_out, pexp, pexp->vq2, weights, sparse_pe_in);
+    split_vq(sparse_pe_out, pexp, pexp->vq3, weights, sparse_pe_in);
+    split_vq(sparse_pe_out, pexp, pexp->vq4, weights, sparse_pe_in);
 
     /* transform quantised phases back */
 
@@ -973,7 +978,7 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 
 	index = MAX_AMP*i*model->Wo/PI;
 	assert(index < MAX_AMP);
-	error_q_rect  = sparse_pe[index];
+	error_q_rect  = sparse_pe_out[index];
 	error_q_angle = atan2(error_q_rect.imag, error_q_rect.real);
 	model->phi[i] = pred - error_q_angle;
 	model->phi[i] = atan2(sin(model->phi[i]), cos(model->phi[i]));
