@@ -32,3 +32,12 @@ Training (experimental) sparse phase VQs:
   $ ./vqtrainph train_phtrainr.flt 20 1024 vq.txt
 
   Ouput is vq.txt
+
+Tests
+-----
+
++ build up insmallest possible stesp
++ impl errors v alg errors
++ use actual phase data as codebook
++ test vq with rand phases first or known data
+

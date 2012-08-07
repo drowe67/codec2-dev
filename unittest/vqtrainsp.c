@@ -1,11 +1,11 @@
 /*--------------------------------------------------------------------------*\
 
-	FILE........: vqtrainph.c
+	FILE........: vqtrainsp.c
 	AUTHOR......: David Rowe
-	DATE CREATED: 27 July 2012
+	DATE CREATED: 7 August 2012
 
-	This program trains phase vector quantisers.  Modified from
-	vqtrain.c
+	This program trains sparse amplitude vector quantisers.
+	Modified from vqtrainph.c
 
 \*--------------------------------------------------------------------------*/
 
@@ -52,7 +52,6 @@ typedef struct {
 
 #define	DELTAQ 	0.01		/* quiting distortion			*/
 #define	MAX_STR	80		/* maximum string length		*/
-#define PI      3.141592654
 
 /*-----------------------------------------------------------------------*\
 
@@ -60,11 +59,11 @@ typedef struct {
 
 \*-----------------------------------------------------------------------*/
 
-void zero(COMP v[], int d);
-void acc(COMP v1[], COMP v2[], int d);
-void norm(COMP v[], int k);
-int quantise(COMP cb[], COMP vec[], int d, int e, float *se);
-void print_vec(COMP cb[], int d, int e);
+void zero(float v[], int d);
+void acc(float v1[], float v2[], int d);
+void norm(float v[], int k, int n[]);
+int quantise(float cb[], float vec[], int d, int e, float *se);
+void print_vec(float cb[], int d, int e);
 
 /*-----------------------------------------------------------------------* \
 
@@ -74,9 +73,9 @@ void print_vec(COMP cb[], int d, int e);
 
 int main(int argc, char *argv[]) {
     int    d,e;		/* dimension and codebook size			*/
-    COMP   *vec;	/* current vector 				*/
-    COMP   *cb;		/* vector codebook				*/
-    COMP   *cent;	/* centroids for each codebook entry		*/
+    float  *vec;	/* current vector 				*/
+    float  *cb;		/* vector codebook				*/
+    float  *cent;	/* centroids for each codebook entry		*/
     int    *n;		/* number of vectors in this interval		*/
     int     J;		/* number of vectors in training set		*/
     int     ind;	/* index of current vector			*/
@@ -88,9 +87,7 @@ int main(int argc, char *argv[]) {
     FILE   *fvq;	/* file containing vector quantiser		*/
     int     ret;
     int     i,j, finished, iterations;
-    float   b;          /* equivalent number of bits                    */
-    float   improvement;
-    float   sd_vec, sd_element, sd_theory, bits_theory;
+    float   sd;
     int     var_n;
 
     /* Interpret command line arguments */
@@ -114,10 +111,10 @@ int main(int argc, char *argv[]) {
     e = atoi(argv[3]);
     printf("\n");
     printf("dimension D=%d  number of entries E=%d\n", d, e);
-    vec = (COMP*)malloc(sizeof(COMP)*d);
-    cb = (COMP*)malloc(sizeof(COMP)*d*e);
-    cent = (COMP*)malloc(sizeof(COMP)*d*e);
-    n = (int*)malloc(sizeof(int)*e);
+    vec = (float*)malloc(sizeof(float)*d);
+    cb = (float*)malloc(sizeof(float)*d*e);
+    cent = (float*)malloc(sizeof(float)*d*e);
+    n = (int*)malloc(sizeof(int)*d*e);
     if (cb == NULL || cb == NULL || cent == NULL || vec == NULL) {
 	printf("Error in malloc.\n");
 	exit(1);
@@ -127,38 +124,34 @@ int main(int argc, char *argv[]) {
 
     J = 0;
     var_n = 0;
-    while(fread(vec, sizeof(COMP), d, ftrain) == (size_t)d) {
+    while(fread(vec, sizeof(float), d, ftrain) == (size_t)d) {
 	for(j=0; j<d; j++)
-	    if ((vec[j].real != 0.0) && (vec[j].imag != 0.0))
+	    if (vec[j] != 0.0)
 		var_n++;
 	J++;
     }
-    printf("J=%d sparse vectors in training set, %d non-zero phases\n", J, var_n);
+    printf("J=%d sparse vectors in training set, %d non-zero values\n", J, var_n);
 
     /* set up initial codebook state from samples of training set */
 
+    #define INIT1
+    #ifdef INIT1
     rewind(ftrain);
-    ret = fread(cb, sizeof(COMP), d*e, ftrain);
+    ret = fread(cb, sizeof(float), d*e, ftrain);
+    #endif
 
-    /* codebook can't have any zero phase angle entries, these need to be set to
-       zero angle so cmult used to find phase angle differences works */
-
+    #ifdef INIT2
     for(i=0; i<d*e; i++)
-	if ((cb[i].real == 0.0) && (cb[i].imag == 0.0)) {
-	    cb[i].real = 1.0;
-	    cb[i].imag = 0.0;
-	}
-	    
-    //print_vec(cb, d, 1);
+	cb[i] = 1.0 - 2.0*rand()/RAND_MAX;
+    #endif
+
+    //print_vec(cb, d, 2);
 
     /* main loop */
 
     printf("\n");
     printf("Iteration  delta  var    std dev\n");
     printf("--------------------------------\n");
-
-    b = log10((float)e)/log10(2.0);
-    sd_theory = (PI/sqrt(3.0))*pow(2.0, -b/(float)d);
 
     iterations = 0;
     finished = 0;
@@ -170,35 +163,44 @@ int main(int argc, char *argv[]) {
 
 	for(i=0; i<e; i++) {
 	    zero(&cent[i*d], d);
-	    n[i] = 0;
+	    for(j=0; j<d; j++)
+		n[i*d+j] = 0;
 	}
+
+	//#define DBG
+	#ifdef DBG
+	printf("cb...\n");
+	print_vec(cb, d, e);
+	printf("\n\nquantise...\n");
+	#endif
 
 	/* quantise training set */
 
 	se = 0.0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(COMP), d, ftrain);
+	    ret = fread(vec, sizeof(float), d, ftrain);
 	    ind = quantise(cb, vec, d, e, &se);
-	    //printf("%d ", ind);
-	    n[ind]++;
+	    #ifdef DBG
+	    print_vec(vec, d, 1);
+	    printf("      ind %d\n", ind);
+	    #endif
 	    acc(&cent[ind*d], vec, d);
+	    for(j=0; j<d; j++)
+		if (vec[j] != 0.0)
+		    n[ind*d+j]++;
 	}
 	
+	#ifdef DBG
+	printf("cent...\n");
+	print_vec(cent, d, e);
+	printf("\n");
+	#endif
+
 	/* work out stats */
 
 	var = se/var_n;	
-	sd_vec = sqrt(var);
-
-	/* we need to know dimension of cb (which varies from vector to vector) 
-           to calc bits_theory.  Maybe measure and use average dimension....
-	*/
-	//bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
-	//improvement = bits_theory - b;
-
-	//print_vec(cent, d, 1);
-
-	//print_vec(cb, d, 1);
+	sd = sqrt(var);
 
 	iterations++;
 	if (iterations > 1) {
@@ -211,16 +213,20 @@ int main(int argc, char *argv[]) {
 		finished = 1;
 	}      
 		     
-	if (!finished) {
-	    /* determine new codebook from centroids */
+	/* determine new codebook from centroids */
 
-	    for(i=0; i<e; i++) {
-		norm(&cent[i*d], d);
-		memcpy(&cb[i*d], &cent[i*d], d*sizeof(COMP));
-	    }
+	for(i=0; i<e; i++) {
+	    norm(&cent[i*d], d, &n[i*d]);
+	    memcpy(&cb[i*d], &cent[i*d], d*sizeof(float));
 	}
+	
+	#ifdef DBG
+	printf("new cb ...\n");
+	print_vec(cent, d, e);
+	printf("\n");
+	#endif
 
-	printf("%2d         %4.3f  %4.3f  %4.3f \n",iterations, delta, var, sd_vec);
+	printf("%2d         %4.3f  %4.3f  %4.3f \n",iterations, delta, var, sd);
 	
 	var_1 = var;
     } while (!finished);
@@ -239,7 +245,7 @@ int main(int argc, char *argv[]) {
     fprintf(fvq,"%d %d\n",d,e);
     for(j=0; j<e; j++) {
 	for(i=0; i<d; i++)
-	    fprintf(fvq,"% 4.3f ", atan2(cb[j*d+i].imag, cb[j*d+i].real));
+	    fprintf(fvq,"% 4.3f ", cb[j*d+i]);
 	fprintf(fvq,"\n");
     }
     fclose(fvq);
@@ -253,47 +259,18 @@ int main(int argc, char *argv[]) {
 
 \*-----------------------------------------------------------------------*/
 
-void print_vec(COMP cb[], int d, int e)
+void print_vec(float cb[], int d, int e)
 {
     int i,j;
 
     for(j=0; j<e; j++) {
+	printf("    ");
 	for(i=0; i<d; i++) 
-	    printf("%f %f ", cb[j*d+i].real, cb[j*d+i].imag);
+	    printf("% 4.3f ", cb[j*d+i]);
 	printf("\n");
     }
 }
 
-
-static COMP cconj(COMP a)
-{
-    COMP res;
-
-    res.real = a.real;
-    res.imag = -a.imag;
-
-    return res;
-}
-
-static COMP cmult(COMP a, COMP b)
-{
-    COMP res;
-
-    res.real = a.real*b.real - a.imag*b.imag;
-    res.imag = a.real*b.imag + a.imag*b.real;
-
-    return res;
-}
-
-static COMP cadd(COMP a, COMP b)
-{
-    COMP res;
-
-    res.real = a.real + b.real;
-    res.imag = a.imag + b.imag;
-
-    return res;
-}
 
 /*---------------------------------------------------------------------------*\
 
@@ -306,13 +283,12 @@ static COMP cadd(COMP a, COMP b)
 
 \*---------------------------------------------------------------------------*/
 
-void zero(COMP v[], int d)
+void zero(float v[], int d)
 {
     int	i;
 
     for(i=0; i<d; i++) {
-	v[i].real = 0.0;
-	v[i].imag = 0.0;
+	v[i] = 0.0;
     }
 }
 
@@ -324,20 +300,19 @@ void zero(COMP v[], int d)
 	DATE CREATED: 23/2/95
 
 	Adds d dimensional vectors v1 to v2 and stores the result back
-	in v1.  We add them like vectors on the complex plane, summing
-	the real and imag terms.  
+	in v1.  
 
-	An unused entry in a sparse vector has both the real and imag
-	parts set to zero so won't affect the accumulation process.
+	An unused entry in a sparse vector is set to zero so won't
+	affect the accumulation process.
 
 \*---------------------------------------------------------------------------*/
 
-void acc(COMP v1[], COMP v2[], int d)
+void acc(float v1[], float v2[], int d)
 {
     int	   i;
 
     for(i=0; i<d; i++)
-	v1[i] = cadd(v1[i], v2[i]);
+	v1[i] += v2[i];
 }
 
 /*---------------------------------------------------------------------------*\
@@ -351,23 +326,13 @@ void acc(COMP v1[], COMP v2[], int d)
 
 \*---------------------------------------------------------------------------*/
 
-void norm(COMP v[], int d)
+void norm(float v[], int d, int n[])
 {
     int	   i;
-    float  mag;
 
     for(i=0; i<d; i++) {
-	mag = sqrt(v[i].real*v[i].real + v[i].imag*v[i].imag);
-	if (mag == 0.0) {
-	    /* can't have zero cb entries as cmult will break in quantise().
-	       We effectively set sparese phases to an angle of 0. */
-	    v[i].real = 1.0;
-	    v[i].imag = 0.0;
-	}
-	else {
-	    v[i].real /= mag;
-	    v[i].imag /= mag;
-	}
+	if (n[i] != 0)
+	    v[i] /= n[i];
     }
 }
 
@@ -386,30 +351,30 @@ void norm(COMP v[], int d)
 
 \*---------------------------------------------------------------------------*/
 
-int quantise(COMP cb[], COMP vec[], int d, int e, float *se)
+int quantise(float cb[], float vec[], int d, int e, float *se)
 {
    float   error;	/* current error		*/
    int     besti;	/* best index so far		*/
    float   best_error;	/* best error so far		*/
-   int	   i,j;
-   int     ignore;
-   COMP    diff;
+   int	   i,j,n;
+   float   diff;
 
    besti = 0;
    best_error = 1E32;
    for(j=0; j<e; j++) {
-	error = 0.0;
-	for(i=0; i<d; i++) {
-	    ignore = (vec[i].real == 0.0) && (vec[i].imag == 0.0);
-	    if (!ignore) {
-		diff = cmult(cb[j*d+i], cconj(vec[i]));
-		error += pow(atan2(diff.imag, diff.real), 2.0);
-	    }
-	}
-	if (error < best_error) {
-	    best_error = error;
-	    besti = j;
-	}
+       error = 0.0; n = 0;
+       for(i=0; i<d; i++) {
+	   if ((vec[i] != 0.0)&& (cb[j*d+i] != 0.0)) {
+	       diff = cb[j*d+i] - vec[i];
+	       error += diff*diff;
+	       n++;
+	   }
+       }
+       error /= n;
+       if (error < best_error) {
+	   best_error = error;
+	   besti = j;
+       }
    }
 
    *se += best_error;

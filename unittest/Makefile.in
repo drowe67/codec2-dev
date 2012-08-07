@@ -41,7 +41,8 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	tinterp$(EXEEXT) tquant$(EXEEXT) vq_train_jvm$(EXEEXT) \
 	scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) t48_8$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
-	vqtrainph$(EXEEXT) genphdata$(EXEEXT) polar2rect$(EXEEXT)
+	tphinterp$(EXEEXT) vqtrainph$(EXEEXT) genphdata$(EXEEXT) \
+	genampdata$(EXEEXT) polar2rect$(EXEEXT) vqtrainsp$(EXEEXT)
 subdir = unittest
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -57,6 +58,9 @@ create_interleaver_DEPENDENCIES =
 am_extract_OBJECTS = extract.$(OBJEXT)
 extract_OBJECTS = $(am_extract_OBJECTS)
 extract_DEPENDENCIES =
+am_genampdata_OBJECTS = genampdata.$(OBJEXT)
+genampdata_OBJECTS = $(am_genampdata_OBJECTS)
+genampdata_DEPENDENCIES =
 am_genlsp_OBJECTS = genlsp.$(OBJEXT) lpc.$(OBJEXT) lsp.$(OBJEXT)
 genlsp_OBJECTS = $(am_genlsp_OBJECTS)
 genlsp_DEPENDENCIES =
@@ -126,6 +130,9 @@ vqtrainjnd_DEPENDENCIES =
 am_vqtrainph_OBJECTS = vqtrainph.$(OBJEXT)
 vqtrainph_OBJECTS = $(am_vqtrainph_OBJECTS)
 vqtrainph_DEPENDENCIES =
+am_vqtrainsp_OBJECTS = vqtrainsp.$(OBJEXT)
+vqtrainsp_OBJECTS = $(am_vqtrainsp_OBJECTS)
+vqtrainsp_DEPENDENCIES =
 DEFAULT_INCLUDES = -I. -I$(srcdir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -138,19 +145,21 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
-	$(lspsync_SOURCES) $(polar2rect_SOURCES) \
+	$(genampdata_SOURCES) $(genlsp_SOURCES) $(genphdata_SOURCES) \
+	$(genres_SOURCES) $(lspsync_SOURCES) $(polar2rect_SOURCES) \
 	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
 	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
-	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
-	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES)
+	$(tphinterp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+	$(vqtrainsp_SOURCES)
 DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
-	$(lspsync_SOURCES) $(polar2rect_SOURCES) \
+	$(genampdata_SOURCES) $(genlsp_SOURCES) $(genphdata_SOURCES) \
+	$(genres_SOURCES) $(lspsync_SOURCES) $(polar2rect_SOURCES) \
 	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
 	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
-	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
-	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES)
+	$(tphinterp_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+	$(vqtrainsp_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -280,9 +289,15 @@ vqtrainjnd_LDFLAGS = $(LIBS)
 vqtrainph_SOURCES = vqtrainph.c
 vqtrainph_LDADD = $(lib_LTLIBRARIES) 
 vqtrainph_LDFLAGS = $(LIBS)
+vqtrainsp_SOURCES = vqtrainsp.c
+vqtrainsp_LDADD = $(lib_LTLIBRARIES) 
+vqtrainsp_LDFLAGS = $(LIBS)
 genphdata_SOURCES = genphdata.c
 genphdata_LDADD = $(lib_LTLIBRARIES) 
 genphdata_LDFLAGS = $(LIBS)
+genampdata_SOURCES = genampdata.c
+genampdata_LDADD = $(lib_LTLIBRARIES) 
+genampdata_LDFLAGS = $(LIBS)
 polar2rect_SOURCES = polar2rect.c
 polar2rect_LDADD = $(lib_LTLIBRARIES) 
 polar2rect_LDFLAGS = $(LIBS)
@@ -365,6 +380,9 @@ create_interleaver$(EXEEXT): $(create_interleaver_OBJECTS) $(create_interleaver_
 extract$(EXEEXT): $(extract_OBJECTS) $(extract_DEPENDENCIES) 
 	@rm -f extract$(EXEEXT)
 	$(LINK) $(extract_LDFLAGS) $(extract_OBJECTS) $(extract_LDADD) $(LIBS)
+genampdata$(EXEEXT): $(genampdata_OBJECTS) $(genampdata_DEPENDENCIES) 
+	@rm -f genampdata$(EXEEXT)
+	$(LINK) $(genampdata_LDFLAGS) $(genampdata_OBJECTS) $(genampdata_LDADD) $(LIBS)
 genlsp$(EXEEXT): $(genlsp_OBJECTS) $(genlsp_DEPENDENCIES) 
 	@rm -f genlsp$(EXEEXT)
 	$(LINK) $(genlsp_LDFLAGS) $(genlsp_OBJECTS) $(genlsp_LDADD) $(LIBS)
@@ -413,6 +431,9 @@ vqtrainjnd$(EXEEXT): $(vqtrainjnd_OBJECTS) $(vqtrainjnd_DEPENDENCIES)
 vqtrainph$(EXEEXT): $(vqtrainph_OBJECTS) $(vqtrainph_DEPENDENCIES) 
 	@rm -f vqtrainph$(EXEEXT)
 	$(LINK) $(vqtrainph_LDFLAGS) $(vqtrainph_OBJECTS) $(vqtrainph_LDADD) $(LIBS)
+vqtrainsp$(EXEEXT): $(vqtrainsp_OBJECTS) $(vqtrainsp_DEPENDENCIES) 
+	@rm -f vqtrainsp$(EXEEXT)
+	$(LINK) $(vqtrainsp_LDFLAGS) $(vqtrainsp_OBJECTS) $(vqtrainsp_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -432,6 +453,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genampdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genphdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genres.Po@am__quote@
@@ -459,6 +481,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrain.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrainjnd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrainph.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrainsp.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \

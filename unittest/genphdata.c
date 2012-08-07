@@ -1,7 +1,7 @@
 /*
   genphdata.c
 
-  Generates test phase data for trainvqph testing.
+  Generates test phase data for vqtrainph testing.
 */
 
 #include <stdio.h>

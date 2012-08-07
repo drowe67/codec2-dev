@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata polar2rect
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata genampdata polar2rect vqtrainsp
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -29,9 +29,17 @@ vqtrainph_SOURCES = vqtrainph.c
 vqtrainph_LDADD = $(lib_LTLIBRARIES) 
 vqtrainph_LDFLAGS = $(LIBS)
 
+vqtrainsp_SOURCES = vqtrainsp.c
+vqtrainsp_LDADD = $(lib_LTLIBRARIES) 
+vqtrainsp_LDFLAGS = $(LIBS)
+
 genphdata_SOURCES = genphdata.c
 genphdata_LDADD = $(lib_LTLIBRARIES) 
 genphdata_LDFLAGS = $(LIBS)
+
+genampdata_SOURCES = genampdata.c
+genampdata_LDADD = $(lib_LTLIBRARIES) 
+genampdata_LDFLAGS = $(LIBS)
 
 polar2rect_SOURCES = polar2rect.c
 polar2rect_LDADD = $(lib_LTLIBRARIES) 
