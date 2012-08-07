@@ -183,7 +183,7 @@ int main(int argc, char *argv[]) {
 	    ind = quantise(cb, vec, d, e, &se);
 	    #ifdef DBG
 	    print_vec(vec, d, 1);
-	    printf("      ind %d\n", ind);
+	    printf("      ind %d se: %f\n", ind, se);
 	    #endif
 	    acc(&cent[ind*d], vec, d);
 	    for(j=0; j<d; j++)
@@ -364,7 +364,7 @@ int quantise(float cb[], float vec[], int d, int e, float *se)
    for(j=0; j<e; j++) {
        error = 0.0; n = 0;
        for(i=0; i<d; i++) {
-	   if ((vec[i] != 0.0)&& (cb[j*d+i] != 0.0)) {
+	   if ((vec[i] != 0.0) && (cb[j*d+i] != 0.0)) {
 	       diff = cb[j*d+i] - vec[i];
 	       error += diff*diff;
 	       n++;
