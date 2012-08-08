@@ -769,7 +769,7 @@ static void print_sparse_pred_error(struct PEXP *pexp, MODEL *model, int start, 
 }
 
 
-void update_snr_calc(struct PEXP *pexp, MODEL *model, float before[])
+static void update_snr_calc(struct PEXP *pexp, MODEL *model, float before[])
 {
     int m;
     float signal, noise, diff;
@@ -788,7 +788,7 @@ void update_snr_calc(struct PEXP *pexp, MODEL *model, float before[])
 }
 
 
-void update_variance_calc(struct PEXP *pexp, MODEL *model, float before[])
+static void update_variance_calc(struct PEXP *pexp, MODEL *model, float before[])
 {
     int m;
     float diff;
@@ -927,6 +927,7 @@ static void split_vq(COMP sparse_pe_out[], struct PEXP *pexp, struct codebook *v
     }
     pexp->vq_var_n += non_zero;
 }
+
 
 static void sparse_vq_pred_error(struct PEXP     *pexp, 
 				 MODEL           *model 
@@ -1151,7 +1152,7 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
 
     /* update states */
 
-    for(m=1; m<model->L; m++)
+    for(m=1; m<=model->L; m++)
 	pexp->phi_prev[m] = model->phi[m];	    
     pexp->Wo_prev = model->Wo;
     pexp->frames++;

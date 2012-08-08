@@ -46,6 +46,7 @@
 #include "phase.h"
 #include "postfilter.h"
 #include "interp.h"
+#include "ampexp.h"
 
 void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
     int   postfilt;
     float bg_est;
 
-    int   hand_voicing = 0, phaseexp = 0;
+    int   hand_voicing = 0, phaseexp = 0, ampexp = 0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -120,6 +121,7 @@ int main(int argc, char *argv[])
     int   dump;
     #endif
     struct PEXP *pexp = NULL;
+    struct AEXP *aexp = NULL;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -134,6 +136,7 @@ int main(int argc, char *argv[])
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "phaseexp", no_argument, &phaseexp, 1 },
+        { "ampexp", no_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
@@ -318,6 +321,8 @@ int main(int argc, char *argv[])
     quantise_init();
     if (phaseexp)
 	pexp = phase_experiment_create();
+    if (ampexp)
+	aexp = amp_experiment_create();
 
     /*----------------------------------------------------------------*\
 
@@ -365,6 +370,10 @@ int main(int argc, char *argv[])
 	    dump_phase_(&model.phi[0], model.L);
             #endif
 	}
+
+	if (ampexp)
+	    amp_experiment(aexp, &model);
+	    
 
 	/*------------------------------------------------------------*\
 
@@ -740,6 +749,8 @@ int main(int argc, char *argv[])
 
     if (phaseexp)
 	phase_experiment_destroy(pexp);
+    if (ampexp)
+	amp_experiment_destroy(aexp);
     #ifdef DUMP
     if (dump)
 	dump_off();

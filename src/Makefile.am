@@ -106,6 +106,7 @@ interp.c \
 lsp.c \
 phase.c \
 quantise.c \
+ampexp.c \
 pack.c \
 codebook.c \
 codebookd.c \
@@ -113,7 +114,7 @@ codebookvq.c \
 codebookjnd.c \
 codebookjvm.c \
 codebookdt.c \
-codebookge.c
+codebookge.c 
 
 
 libcodec2_la_CFLAGS = $(AM_CFLAGS)
