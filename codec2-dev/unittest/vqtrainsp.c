@@ -64,6 +64,7 @@ void acc(float v1[], float v2[], int d);
 void norm(float v[], int k, int n[]);
 int quantise(float cb[], float vec[], int d, int e, float *se);
 void print_vec(float cb[], int d, int e);
+void split(float cb[], int d, int b);
 
 /*-----------------------------------------------------------------------* \
 
@@ -88,12 +89,12 @@ int main(int argc, char *argv[]) {
     int     ret;
     int     i,j, finished, iterations;
     float   sd;
-    int     var_n;
+    int     var_n, bits, b, levels;
 
     /* Interpret command line arguments */
 
     if (argc != 5)	{
-	printf("usage: %s TrainFile D(dimension) E(number of entries) VQFile\n", argv[0]);
+	printf("usage: %s TrainFile D(dimension) B(number of bits) VQFile\n", argv[0]);
 	exit(1);
     }
 
@@ -108,9 +109,10 @@ int main(int argc, char *argv[]) {
     /* determine k and m, and allocate arrays */
 
     d = atoi(argv[2]);
-    e = atoi(argv[3]);
+    bits = atoi(argv[3]);
+    e = 1<<bits;
     printf("\n");
-    printf("dimension D=%d  number of entries E=%d\n", d, e);
+    printf("dimension D=%d  number of bits B=%d entries E=%d\n", d, bits, e);
     vec = (float*)malloc(sizeof(float)*d);
     cb = (float*)malloc(sizeof(float)*d*e);
     cent = (float*)malloc(sizeof(float)*d*e);
@@ -132,105 +134,126 @@ int main(int argc, char *argv[]) {
     }
     printf("J=%d sparse vectors in training set, %d non-zero values\n", J, var_n);
 
-    /* set up initial codebook state from samples of training set */
+    /* set up initial codebook from centroid of training set */
 
-    #define INIT1
-    #ifdef INIT1
+    //#define DBG
+
+    zero(cent, d);
+    for(j=0; j<d; j++)
+	n[j] = 0;
     rewind(ftrain);
-    ret = fread(cb, sizeof(float), d*e, ftrain);
+    #ifdef DBG
+    printf("initial codebook...\n");
     #endif
-
-    #ifdef INIT2
-    for(i=0; i<d*e; i++)
-	cb[i] = 1.0 - 2.0*rand()/RAND_MAX;
+    for(i=0; i<J; i++) {
+	ret = fread(vec, sizeof(float), d, ftrain);
+        #ifdef DBG
+	print_vec(vec, d, 1);
+	#endif
+	acc(cent, vec, d);
+	for(j=0; j<d; j++)
+	    if (vec[j] != 0.0)
+		n[j]++;
+    }
+    norm(cent, d, n);
+    memcpy(cb, cent, d*sizeof(float));
+    #ifdef DBG
+    printf("\n");
+    print_vec(cb, d, 1);
     #endif
-
-    //print_vec(cb, d, 2);
 
     /* main loop */
 
     printf("\n");
-    printf("Iteration  delta  var    std dev\n");
-    printf("--------------------------------\n");
+    printf("bits  Iteration  delta  var    std dev\n");
+    printf("--------------------------------------\n");
 
-    iterations = 0;
-    finished = 0;
-    delta = 0;
-    var_1 = 0.0;
+    for(b=1; b<=bits; b++) {
+	levels = 1<<b;
+	iterations = 0;
+	finished = 0;
+	delta = 0;
+	var_1 = 0.0;
 
-    do {
-	/* zero centroids */
+	split(cb, d, levels/2);
+	//print_vec(cb, d, levels);
 
-	for(i=0; i<e; i++) {
-	    zero(&cent[i*d], d);
-	    for(j=0; j<d; j++)
-		n[i*d+j] = 0;
-	}
+	do {
+	    /* zero centroids */
 
-	//#define DBG
-	#ifdef DBG
-	printf("cb...\n");
-	print_vec(cb, d, e);
-	printf("\n\nquantise...\n");
-	#endif
-
-	/* quantise training set */
-
-	se = 0.0;
-	rewind(ftrain);
-	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(float), d, ftrain);
-	    ind = quantise(cb, vec, d, e, &se);
-	    #ifdef DBG
-	    print_vec(vec, d, 1);
-	    printf("      ind %d se: %f\n", ind, se);
-	    #endif
-	    acc(&cent[ind*d], vec, d);
-	    for(j=0; j<d; j++)
-		if (vec[j] != 0.0)
-		    n[ind*d+j]++;
-	}
-	
-	#ifdef DBG
-	printf("cent...\n");
-	print_vec(cent, d, e);
-	printf("\n");
-	#endif
-
-	/* work out stats */
-
-	var = se/var_n;	
-	sd = sqrt(var);
-
-	iterations++;
-	if (iterations > 1) {
-	    if (var > 0.0) {
-		delta = (var_1 - var)/var;
+	    for(i=0; i<levels; i++) {
+		zero(&cent[i*d], d);
+		for(j=0; j<d; j++)
+		    n[i*d+j] = 0;
 	    }
-	    else
-		delta = 0;
-	    if (delta < DELTAQ)
-		finished = 1;
-	}      
+
+	    //#define DBG
+            #ifdef DBG
+	    printf("cb...\n");
+	    print_vec(cb, d, levels);
+	    printf("\n\nquantise...\n");
+            #endif
+
+	    /* quantise training set */
+
+	    se = 0.0;
+	    rewind(ftrain);
+	    for(i=0; i<J; i++) {
+		ret = fread(vec, sizeof(float), d, ftrain);
+		ind = quantise(cb, vec, d, levels, &se);
+                #ifdef DBG
+		print_vec(vec, d, 1);
+		printf("      ind %d se: %f\n", ind, se);
+                #endif
+		acc(&cent[ind*d], vec, d);
+		for(j=0; j<d; j++)
+		    if (vec[j] != 0.0)
+			n[ind*d+j]++;
+	    }
+	
+            #ifdef DBG
+	    printf("cent...\n");
+	    print_vec(cent, d, e);
+	    printf("\n");
+            #endif
+
+	    /* work out stats */
+
+	    var = se/var_n;	
+	    sd = sqrt(var);
+
+	    iterations++;
+	    if (iterations > 1) {
+		if (var > 0.0) {
+		    delta = (var_1 - var)/var;
+		}
+		else
+		    delta = 0;
+		if (delta < DELTAQ)
+		    finished = 1;
+	    }      
 		     
-	/* determine new codebook from centroids */
+	    /* determine new codebook from centroids */
 
-	for(i=0; i<e; i++) {
-	    norm(&cent[i*d], d, &n[i*d]);
-	    memcpy(&cb[i*d], &cent[i*d], d*sizeof(float));
-	}
+	    for(i=0; i<levels; i++) {
+		norm(&cent[i*d], d, &n[i*d]);
+		memcpy(&cb[i*d], &cent[i*d], d*sizeof(float));
+	    }
 	
-	#ifdef DBG
-	printf("new cb ...\n");
-	print_vec(cent, d, e);
+            #ifdef DBG
+	    printf("new cb ...\n");
+	    print_vec(cent, d, e);
+	    printf("\n");
+            #endif
+
+	    printf("%2d    %2d         %4.3f  %6.3f  %4.3f\r",b,iterations, delta, var, sd);
+	    fflush(stdout);
+
+	    var_1 = var;
+	} while (!finished);
 	printf("\n");
-	#endif
-
-	printf("%2d         %4.3f  %4.3f  %4.3f \n",iterations, delta, var, sd);
-	
-	var_1 = var;
-    } while (!finished);
-
+    }
+    
 
     //print_vec(cb, d, 1);
     
@@ -245,7 +268,7 @@ int main(int argc, char *argv[]) {
     fprintf(fvq,"%d %d\n",d,e);
     for(j=0; j<e; j++) {
 	for(i=0; i<d; i++)
-	    fprintf(fvq,"% 4.3f ", cb[j*d+i]);
+	    fprintf(fvq,"% 7.3f ", cb[j*d+i]);
 	fprintf(fvq,"\n");
     }
     fclose(fvq);
@@ -266,7 +289,7 @@ void print_vec(float cb[], int d, int e)
     for(j=0; j<e; j++) {
 	printf("    ");
 	for(i=0; i<d; i++) 
-	    printf("% 4.3f ", cb[j*d+i]);
+	    printf("% 7.3f ", cb[j*d+i]);
 	printf("\n");
     }
 }
@@ -356,21 +379,19 @@ int quantise(float cb[], float vec[], int d, int e, float *se)
    float   error;	/* current error		*/
    int     besti;	/* best index so far		*/
    float   best_error;	/* best error so far		*/
-   int	   i,j,n;
+   int	   i,j;
    float   diff;
 
    besti = 0;
    best_error = 1E32;
    for(j=0; j<e; j++) {
-       error = 0.0; n = 0;
+       error = 0.0;
        for(i=0; i<d; i++) {
-	   if ((vec[i] != 0.0) && (cb[j*d+i] != 0.0)) {
+	   if (vec[i] != 0.0) {
 	       diff = cb[j*d+i] - vec[i];
 	       error += diff*diff;
-	       n++;
 	   }
        }
-       error /= n;
        if (error < best_error) {
 	   best_error = error;
 	   besti = j;
@@ -380,5 +401,18 @@ int quantise(float cb[], float vec[], int d, int e, float *se)
    *se += best_error;
 
    return(besti);
+}
+
+void split(float cb[], int d, int levels)
+{
+    int i,j;
+
+    for (i=0;i<levels;i++) {
+	for (j=0;j<d;j++) {
+	    float delta = .01*(rand()/(float)RAND_MAX-.5);
+	    cb[i*d+j] += delta;
+	    cb[(i+levels)*d+j] = cb[i*d+j] - delta;
+	}
+    }
 }
 
