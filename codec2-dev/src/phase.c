@@ -960,7 +960,7 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 	assert(index < MAX_AMP);
 	sparse_pe_in[index].real = cos(error);
 	sparse_pe_in[index].imag = sin(error);
-	//sparse_pe_out[index] = sparse_pe_in[index];
+	sparse_pe_out[index] = sparse_pe_in[index];
 	weights[index] = model->A[i];
 	printf("%d ", index);
     }
@@ -969,9 +969,9 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
         
     split_vq(sparse_pe_out, pexp, pexp->vq1, weights, sparse_pe_in);
     split_vq(sparse_pe_out, pexp, pexp->vq2, weights, sparse_pe_in);
-    split_vq(sparse_pe_out, pexp, pexp->vq3, weights, sparse_pe_in);
-    split_vq(sparse_pe_out, pexp, pexp->vq4, weights, sparse_pe_in);
-
+    //split_vq(sparse_pe_out, pexp, pexp->vq3, weights, sparse_pe_in);
+    //split_vq(sparse_pe_out, pexp, pexp->vq4, weights, sparse_pe_in);
+    
     /* transform quantised phases back */
 
     for(i=1; i<=model->L; i++) {
@@ -1130,11 +1130,8 @@ void phase_experiment(struct PEXP *pexp, MODEL *model) {
     //print_sparse_pred_error(pexp, model, 1, model->L, 40.0);
 
     sparse_vq_pred_error(pexp, model);
+ 
     //quant_phases(model, model->L/4+1, model->L, 3);
-
-    //sparse_vq_pred_error(pexp, model,  model->L/4+1,   model->L/2, pexp->vq2);
-    //sparse_vq_pred_error(pexp, model, model->L/2+1, 3*model->L/4, pexp->vq3);
-    //sparse_vq_pred_error(pexp, model, 3*model->L/4+21, model->L  , pexp->vq4);
 
     //predict_phases1(pexp, model, 1, model->L/4);
     //quant_phases(model, model->L/4+1, model->L, 3);
