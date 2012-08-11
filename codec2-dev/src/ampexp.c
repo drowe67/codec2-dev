@@ -59,7 +59,7 @@ struct AEXP {
     int              vq_var_n;
     struct codebook *vq1,*vq2,*vq3,*vq4,*vq5;
 
-    int              indexes[3];
+    int              indexes[5][3];
     MODEL            model[3];
     float            mag[3];
     MODEL            model_uq[3];
@@ -147,7 +147,7 @@ static struct codebook *load(const char * name)
 
 struct AEXP *amp_experiment_create() {
     struct AEXP *aexp;
-    int i,m;
+    int i,j,m;
 
     aexp = (struct AEXP *)malloc(sizeof(struct AEXP));
     assert (aexp != NULL);
@@ -162,8 +162,15 @@ struct AEXP *amp_experiment_create() {
     aexp->vq_var = 0.0;
     aexp->vq_var_n = 0;
 
-    aexp->vq1 = load("../unittest/amp1_20_1024.txt");
+    aexp->vq1 = load("amp_1_20_1024.txt");
     aexp->vq1->offset = 0;
+    aexp->vq2 = load("amp_21_40_1024.txt");
+    aexp->vq2->offset = 20;
+    aexp->vq3 = load("amp_41_60_1024.txt");
+    aexp->vq3->offset = 40;
+    aexp->vq4 = load("amp_61_80_128.txt");
+    aexp->vq4->offset = 60;
+
     #ifdef CAND2_GS
     //aexp->vq1 = load("../unittest/t1_amp1_20_1024.txt");
     //aexp->vq1 = load("../unittest/t2_amp1_20_1024.txt");
@@ -204,7 +211,8 @@ struct AEXP *amp_experiment_create() {
     #endif
 
     for(i=0; i<3; i++) {
-	aexp->indexes[i] = 0;
+	for(j=0; j<5; j++)
+	    aexp->indexes[j][i] = 0;
 	aexp->mag[i] = 1.0;
 	aexp->model[i].Wo = TWO_PI*100.0/8000.0;
 	aexp->model[i].L = floor(PI/aexp->model[i].Wo);	
@@ -322,7 +330,7 @@ static void print_sparse_pred_error(struct AEXP *aexp, MODEL *model, float mag_t
 static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_thresh)
 {
     int    m, index;
-    float  e, edB, enormdB, error, level;
+    float  e, edB, enormdB, error, dWo;
     float  sparse_pe[MAX_AMP];
 
     e = 0.0;
@@ -330,8 +338,9 @@ static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_th
 	e += model->A[m]*model->A[m];
     edB = 10*log10(e);
     enormdB = 10*log10(e/model->L); /* make high and low pitches have similar amps */
-
-    if (edB > edB_thresh) {
+    dWo = fabs((aexp->model_uq[2].Wo - aexp->model_uq[1].Wo)/aexp->model_uq[2].Wo);
+    
+    if ((edB > edB_thresh) && (dWo < 0.1)) {
 	for(m=0; m<MAX_AMP; m++) {
 	    sparse_pe[m] = 0.0;
 	}
@@ -346,10 +355,10 @@ static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_th
 	}
 
 	/* dump sparse amp vector */
-
+	
 	for(m=0; m<MAX_AMP; m++)
 	    printf("%f ", sparse_pe[m]);
-	printf("\n");
+	    printf("\n");
     }
 }
 
@@ -392,12 +401,12 @@ static int split_vq(float sparse_pe_out[], struct AEXP *aexp, struct codebook *v
     float se;
 
     vq_ind = vq_amp(vq->cb, &sparse_pe_in[vq->offset], &weights[vq->offset], vq->k, vq->m, &se);
-    printf("\n offset %d k %d m %d vq_ind %d j: ", vq->offset, vq->k, vq->m, vq_ind);
+    //printf("\n offset %d k %d m %d vq_ind %d j: ", vq->offset, vq->k, vq->m, vq_ind);
     
     non_zero = 0;
     for(i=0, j=vq->offset; i<vq->k; i++,j++) {
 	if (sparse_pe_in[j] != 0.0) {
-	    printf("%d ", j);
+	    //printf("%d ", j);
 	    sparse_pe_out[j] = vq->cb[vq->k * vq_ind + i];
 	    non_zero++;
 	}
@@ -512,11 +521,10 @@ static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 
     //#define SIM_VQ
     #ifndef SIM_VQ
-    printf("hello %d\n", aexp->frames);
-    aexp->indexes[2] = split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in);
-    //split_vq(sparse_pe_out, aexp, aexp->vq2, weights, sparse_pe_in);
-    //split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in);
-    //split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in);
+    aexp->indexes[0][2] = split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in);
+    aexp->indexes[1][2] = split_vq(sparse_pe_out, aexp, aexp->vq2, weights, sparse_pe_in);
+    aexp->indexes[2][2] = split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in);
+    aexp->indexes[3][2] = split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in);
     //split_vq(sparse_pe_out, aexp, aexp->vq5, weights, sparse_pe_in);
     #else
     for(m=aexp->vq->offset; m<aexp->vq->offset+aexp->vq->k; m++) {
@@ -624,12 +632,12 @@ static void gain_shape_split_vq(float sparse_pe_out[], struct AEXP *aexp, struct
     float se;
 
     vq_ind = gain_shape_vq_amp(vq->cb, &sparse_pe_in[vq->offset], &weights[vq->offset], vq->k, vq->m, &se, best_gain);
-    printf("\n offset %d k %d m %d vq_ind %d gain: %4.2f j: ", vq->offset, vq->k, vq->m, vq_ind, *best_gain);
+    //printf("\n offset %d k %d m %d vq_ind %d gain: %4.2f j: ", vq->offset, vq->k, vq->m, vq_ind, *best_gain);
   
     non_zero = 0;
     for(i=0, j=vq->offset; i<vq->k; i++,j++) {
 	if (sparse_pe_in[j] != 0.0) {
-	    printf("%d ", j);
+	    //printf("%d ", j);
 	    sparse_pe_out[j] = vq->cb[vq->k * vq_ind + i] + *best_gain;
 	    non_zero++;
 	}
@@ -641,7 +649,7 @@ static void gain_shape_split_vq(float sparse_pe_out[], struct AEXP *aexp, struct
 static void gain_shape_sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 {
     int    m, index;
-    float  error, amp_dB, best_gain;
+    float  amp_dB, best_gain;
     float  sparse_pe_in[MAX_AMP];
     float  sparse_pe_out[MAX_AMP];
     float  weights[MAX_AMP];
@@ -662,14 +670,14 @@ static void gain_shape_sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 
     /* vector quantise */
         
-    for(m=0; m<MAX_AMP; m++) {
+    for(m=0; m<=MAX_AMP; m++) {
 	sparse_pe_out[m] = sparse_pe_in[m];
     }
 
-    //gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in, &best_gain);
+    gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in, &best_gain);
     gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq2, weights, sparse_pe_in, &best_gain);
-    //gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in, &best_gain);
-    //gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in, &best_gain);
+    gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in, &best_gain);
+    gain_shape_split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in, &best_gain);
 
     for(m=0; m<MAX_AMP; m++) {
 	if (sparse_pe_in[m] != 0.0)
@@ -688,16 +696,33 @@ static void gain_shape_sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 }
 
 
+static void interp_split_vq(float sparse_pe_out[], struct AEXP *aexp, struct codebook *vq, float sparse_pe_in[], int ind)
+{
+    int   i, j;
+    float amp_dB;
+  
+    for(i=0, j=vq->offset; i<vq->k; i++,j++) {
+	if (sparse_pe_in[j] != 0.0) {
+	    amp_dB  = 0.5*(aexp->mag[0] + vq->cb[vq->k * aexp->indexes[ind][0] + i]);
+	    amp_dB += 0.5*(aexp->mag[2] + vq->cb[vq->k * aexp->indexes[ind][2] + i]);
+	    sparse_pe_out[j] = amp_dB;
+	}
+    }
+}
+
+
 static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 {
-    int              i, m, index;
+    int              i, j, m, index;
     float            amp_dB;
-    struct codebook *vq = aexp->vq1;
+    //struct codebook *vq = aexp->vq1;
+    float  sparse_pe_in[MAX_AMP];
+    float  sparse_pe_out[MAX_AMP];
  
     /* replace odd frames with interp */
     /* once we get an even input frame we can interpolate and output odd */
-    /* use VQ to interpolate.  This assumes some correlation in adjacent VQ
-       samples */
+    /* using VQ to interpolate.  This assumes some correlation in
+       adjacent VQ samples */
 
     memcpy(&aexp->model[2], model, sizeof(MODEL));
 
@@ -709,10 +734,42 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 	/* copy Wo, L, and phases */
 
 	memcpy(model, &aexp->model[1], sizeof(MODEL));
-	printf("mags: %4.2f %4.2f %4.2f Am: \n", aexp->mag[0], aexp->mag[1], aexp->mag[2]);
+	//printf("mags: %4.2f %4.2f %4.2f Am: \n", aexp->mag[0], aexp->mag[1], aexp->mag[2]);
 
-	/* now replace Am by interpolation */
+	/* now replace Am by interpolation, use similar design to VQ
+	   to handle different bands  */
 
+	for(m=1; m<=model->L; m++) {
+	    assert(model->A[m] > 0.0);
+
+	    index = MAX_AMP*m*model->Wo/PI;
+	    assert(index < MAX_AMP);
+	    sparse_pe_in[index] = 20.0*log10(model->A[m]);
+	}
+
+	/* this can be used for when just testing partial interpolation */
+
+	for(m=0; m<MAX_AMP; m++) {
+	    //sparse_pe_out[m] = sparse_pe_in[m];
+	    sparse_pe_out[m] = 0;
+	}
+	
+	interp_split_vq(sparse_pe_out, aexp, aexp->vq1, sparse_pe_in, 0);
+	interp_split_vq(sparse_pe_out, aexp, aexp->vq2, sparse_pe_in, 1);
+	interp_split_vq(sparse_pe_out, aexp, aexp->vq3, sparse_pe_in, 2);
+	interp_split_vq(sparse_pe_out, aexp, aexp->vq4, sparse_pe_in, 3);
+
+	for(m=1; m<=model->L; m++) {
+	    index = MAX_AMP*m*model->Wo/PI;
+	    assert(index < MAX_AMP);
+	    amp_dB = sparse_pe_out[index];
+	    //printf("  %4.2f", 10.0*log10(model->A[m]));
+	    model->A[m] = pow(10.0, amp_dB/20.0);
+	    //printf("  %4.2f\n", 10.0*log10(model->A[m]));
+	}
+ 
+        #ifdef INITIAL_VER
+        
 	for(m=1; m<=model->L; m++) {
 	    index = MAX_AMP*m*model->Wo/PI;
 	    assert(index < MAX_AMP);
@@ -720,13 +777,14 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 	    if (index < vq->k) {
 		amp_dB  = 0.5*(aexp->mag[0] + vq->cb[vq->k * aexp->indexes[0] + index]);
 		amp_dB += 0.5*(aexp->mag[2] + vq->cb[vq->k * aexp->indexes[2] + index]);
-		printf("  %4.2f", 10.0*log10(model->A[m]));
+		//printf("  %4.2f", 10.0*log10(model->A[m]));
 		//amp_dB = 10;
 		model->A[m] = pow(10.0, amp_dB/20.0);
 		printf("  %4.2f\n", 10.0*log10(model->A[m]));
 	    }
 	}
 	
+	#endif
     }
     else
 	memcpy(model, &aexp->model[1], sizeof(MODEL));
@@ -735,7 +793,8 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 
     for(i=0; i<2; i++) {
 	memcpy(&aexp->model[i], &aexp->model[i+1], sizeof(MODEL));
-	aexp->indexes[i] = aexp->indexes[i+1];
+	for(j=0; j<5; j++)
+	    aexp->indexes[j][i] = aexp->indexes[j][i+1];
 	aexp->mag[i] = aexp->mag[i+1];
     }
 }
@@ -748,25 +807,43 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 
 \*---------------------------------------------------------------------------*/
 
-void amp_experiment(struct AEXP *aexp, MODEL *model) {
+void amp_experiment(struct AEXP *aexp, MODEL *model, char *arg) {
     int m,i;
 
     memcpy(&aexp->model_uq[2], model, sizeof(MODEL));
 
-    //for(m=1; m<=aexp->model[1].L; m++)
-    //	before[m] = aexp->model[1].A[m];
-
     //add_quant_noise(aexp, model, model->L/2, model->L, 3);
     //sparse_vq_pred_error(aexp, model);
 
-    //print_sparse_amp_error(aexp, model, 1);
-    sparse_vq_amp(aexp, model);
-    vq_interp(aexp, model, 1);
+    /* print training samplesthat can be > train.txt for training VQ */
 
-    //gain_shape_sparse_vq_amp(aexp, model);
+    if (strcmp(arg, "train") == 0) 
+	print_sparse_amp_error(aexp, model, 50.0);
 
-    printf("%d %d %f %f %f %f\n", model->L, aexp->model[0].L, model->Wo, aexp->model[0].Wo, model->A[1], aexp->model[0].A[1]);
-    update_snr_calc(aexp, &aexp->model_uq[1], model);
+    /* VQ of amplitudes, no interpolation (ie 10ms rate) */
+
+    if (strcmp(arg, "vq") == 0) {
+	sparse_vq_amp(aexp, model);
+	vq_interp(aexp, model, 0);
+	update_snr_calc(aexp, &aexp->model_uq[1], model);
+    }
+
+    /* VQ of amplitudes, interpolation (ie 20ms rate) */
+
+    if (strcmp(arg, "vqi") == 0) {
+	sparse_vq_amp(aexp, model);
+	vq_interp(aexp, model, 1);
+	update_snr_calc(aexp, &aexp->model_uq[1], model);
+    }
+
+    /* gain/shape VQ of amplitudes, 10ms rate (doesn't work that well) */
+
+   if (strcmp(arg, "gsvq") == 0) {
+	gain_shape_sparse_vq_amp(aexp, model);
+	vq_interp(aexp, model, 0);
+	update_snr_calc(aexp, &aexp->model_uq[1], model);
+    }
+
 
     /* update states */
 
