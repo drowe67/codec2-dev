@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
     float pitch;
     int   voiced1 = 0;
     char  out_file[MAX_STR];
+    char  ampexp_arg[MAX_STR];
     float snr;
     float sum_snr;
 
@@ -136,7 +137,7 @@ int main(int argc, char *argv[])
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "phaseexp", no_argument, &phaseexp, 1 },
-        { "ampexp", no_argument, &ampexp, 1 },
+        { "ampexp", required_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
@@ -229,13 +230,15 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
-             } else if(strcmp(long_options[option_index].name, "dump_pitch_e") == 0) {
+	    } else if(strcmp(long_options[option_index].name, "dump_pitch_e") == 0) {
 	        if ((fjvm = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening pitch & energy dump file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
-           } else if(strcmp(long_options[option_index].name, "rate") == 0) {
+	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
+		strcpy(ampexp_arg, optarg);
+	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"2400") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
@@ -372,7 +375,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (ampexp)
-	    amp_experiment(aexp, &model);
+	    amp_experiment(aexp, &model, ampexp_arg);
 	    
 
 	/*------------------------------------------------------------*\

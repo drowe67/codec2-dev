@@ -1,4 +1,4 @@
-AM_CFLAGS = -I../src -fPIC -Wall -O3
+AM_CFLAGS = -I../src -fPIC -Wall -O3 -g
 AUTOMAKE_OPTS = gnu
 NAME = codec2
 AM_CPPFLAGS = $(AM_CFLAGS)

@@ -34,6 +34,6 @@ struct AEXP;
 
 struct AEXP *amp_experiment_create();
 void amp_experiment_destroy(struct AEXP *aexp);
-void amp_experiment(struct AEXP *aexp, MODEL *model);
+void amp_experiment(struct AEXP *aexp, MODEL *model, char *arg);
 
 #endif
