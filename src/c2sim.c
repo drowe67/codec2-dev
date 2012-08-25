@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
     int   voiced1 = 0;
     char  out_file[MAX_STR];
     char  ampexp_arg[MAX_STR];
+    char  phaseexp_arg[MAX_STR];
     float snr;
     float sum_snr;
 
@@ -97,7 +98,7 @@ int main(int argc, char *argv[])
     int   postfilt;
     float bg_est;
 
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0;
+    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi =0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -136,12 +137,13 @@ int main(int argc, char *argv[])
         { "lspdt_mode", required_argument, NULL, 0 },
         { "lspjvm", no_argument, &lspjvm, 1 },
         { "phase0", no_argument, &phase0, 1 },
-        { "phaseexp", no_argument, &phaseexp, 1 },
+        { "phaseexp", required_argument, &phaseexp, 1 },
         { "ampexp", required_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
         { "dec", no_argument, &decimate, 1 },
         { "dt", no_argument, &dt, 1 },
+        { "hi", no_argument, &hi, 1 },
         { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
@@ -236,6 +238,8 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }
+	    } else if(strcmp(long_options[option_index].name, "phaseexp") == 0) {
+		strcpy(phaseexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
 		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
@@ -364,19 +368,26 @@ int main(int argc, char *argv[])
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
+	if (ampexp)
+	    amp_experiment(aexp, &model, ampexp_arg);
+
 	if (phaseexp) {
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
             #endif
-	    phase_experiment(pexp, &model);
+	    phase_experiment(pexp, &model, phaseexp_arg);
             #ifdef DUMP
 	    dump_phase_(&model.phi[0], model.L);
             #endif
 	}
 
-	if (ampexp)
-	    amp_experiment(aexp, &model, ampexp_arg);
-	    
+	if (hi) {
+	    int m;
+	    for(m=1; m<model.L/2; m++)
+		model.A[m] = 0.0;
+	    for(m=3*model.L/4; m<=model.L; m++)
+		model.A[m] = 0.0;
+	}
 
 	/*------------------------------------------------------------*\
 

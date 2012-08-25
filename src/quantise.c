@@ -720,6 +720,14 @@ void aks_to_M2(
 
     signal += pow(model->A[m],2.0);
     noise  += pow(model->A[m] - Am,2.0);
+
+    /* this code improves perf of LPC model, in particular with phase0 */
+
+    if (Am > model->A[m])
+	Am *= 0.7;
+    if (Am < model->A[m])
+	Am *= 1.4;
+    
     model->A[m] = Am;
   }
   *snr = 10.0*log10(signal/noise);

@@ -162,14 +162,21 @@ struct AEXP *amp_experiment_create() {
     aexp->vq_var = 0.0;
     aexp->vq_var_n = 0;
 
-    aexp->vq1 = load("amp_1_20_1024.txt");
+    //aexp->vq1 = load("amp_1_80_1024a.txt");
+    //aexp->vq1 = load("../unittest/st1_10_1024.txt");
+    //aexp->vq1 = load("../unittest/amp41_80_1024.txt");
+    //aexp->vq1->offset = 40;
+    aexp->vq1 = load("../unittest/amp1_10_1024.txt");
     aexp->vq1->offset = 0;
-    aexp->vq2 = load("amp_21_40_1024.txt");
-    aexp->vq2->offset = 20;
-    aexp->vq3 = load("amp_41_60_1024.txt");
-    aexp->vq3->offset = 40;
-    aexp->vq4 = load("amp_61_80_128.txt");
-    aexp->vq4->offset = 60;
+    aexp->vq2 = load("../unittest/amp11_20_1024.txt");
+    aexp->vq2->offset = 10;
+
+    aexp->vq3 = load("../unittest/amp21_40_1024.txt");
+    aexp->vq3->offset = 20;
+    aexp->vq4 = load("../unittest/amp41_60_1024.txt");
+    aexp->vq4->offset = 40;
+    aexp->vq5 = load("../unittest/amp61_80_256.txt");
+    aexp->vq5->offset = 60;
 
     #ifdef CAND2_GS
     //aexp->vq1 = load("../unittest/t1_amp1_20_1024.txt");
@@ -327,17 +334,47 @@ static void print_sparse_pred_error(struct AEXP *aexp, MODEL *model, float mag_t
 }
 
 
-static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_thresh)
-{
-    int    m, index;
-    float  e, edB, enormdB, error, dWo;
-    float  sparse_pe[MAX_AMP];
+static float frame_energy(MODEL *model, float *enormdB) {
+    int   m;
+    float e, edB;
 
     e = 0.0;
     for(m=1; m<=model->L; m++)
 	e += model->A[m]*model->A[m];
     edB = 10*log10(e);
-    enormdB = 10*log10(e/model->L); /* make high and low pitches have similar amps */
+
+    #define VER_E0
+
+    #ifdef VER_E0
+    *enormdB = 10*log10(e/model->L); /* make high and low pitches have similar amps */
+    #endif
+
+    #ifdef VER_E1
+    e = 0.0;
+    for(m=1; m<=model->L; m++)
+	e += 10*log10(model->A[m]*model->A[m]);
+    *enormdB = e;
+    #endif
+
+    #ifdef VER_E2
+    e = 0.0;
+    for(m=1; m<=model->L; m++)
+	e += 10*log10(model->A[m]*model->A[m]);
+    *enormdB = e/model->L;
+    #endif
+    //printf("%f\n", enormdB);
+
+    return edB;
+}
+
+static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_thresh)
+{
+    int    m, index;
+    float  edB, enormdB, error, dWo, Am;
+    float  sparse_pe[MAX_AMP];
+
+    edB = frame_energy(model, &enormdB);
+    //printf("%f\n", enormdB);
     dWo = fabs((aexp->model_uq[2].Wo - aexp->model_uq[1].Wo)/aexp->model_uq[2].Wo);
     
     if ((edB > edB_thresh) && (dWo < 0.1)) {
@@ -358,7 +395,7 @@ static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_th
 	
 	for(m=0; m<MAX_AMP; m++)
 	    printf("%f ", sparse_pe[m]);
-	    printf("\n");
+	printf("\n");
     }
 }
 
@@ -401,13 +438,14 @@ static int split_vq(float sparse_pe_out[], struct AEXP *aexp, struct codebook *v
     float se;
 
     vq_ind = vq_amp(vq->cb, &sparse_pe_in[vq->offset], &weights[vq->offset], vq->k, vq->m, &se);
-    //printf("\n offset %d k %d m %d vq_ind %d j: ", vq->offset, vq->k, vq->m, vq_ind);
+    printf("\n offset %d k %d m %d vq_ind %d j: ", vq->offset, vq->k, vq->m, vq_ind);
     
     non_zero = 0;
     for(i=0, j=vq->offset; i<vq->k; i++,j++) {
 	if (sparse_pe_in[j] != 0.0) {
-	    //printf("%d ", j);
-	    sparse_pe_out[j] = vq->cb[vq->k * vq_ind + i];
+	    printf("%d ", j);
+	    sparse_pe_in[j]  -= vq->cb[vq->k * vq_ind + i];
+	    sparse_pe_out[j] += vq->cb[vq->k * vq_ind + i];
 	    non_zero++;
 	}
     }
@@ -421,19 +459,19 @@ static void sparse_vq_pred_error(struct AEXP *aexp,
 )
 {
     int    m, index;
-    float  error, amp_dB, mag;
+    float  error, amp_dB, edB, enormdB;
     float  sparse_pe_in[MAX_AMP];
     float  sparse_pe_out[MAX_AMP];
     float  weights[MAX_AMP];
+
+    edB = frame_energy(model, &enormdB);
 
     for(m=0; m<MAX_AMP; m++) {
 	sparse_pe_in[m] = 0.0;
 	sparse_pe_out[m] = 0.0;
     }
 
-    mag = 0.0;
     for(m=1; m<=model->L; m++) {
-	mag += model->A[m]*model->A[m];
  	assert(model->A[m] > 0.0);
 	error = PRED_COEFF*20.0*log10(aexp->A_prev[m]) - 20.0*log10(model->A[m]);
 
@@ -442,7 +480,6 @@ static void sparse_vq_pred_error(struct AEXP *aexp,
 	sparse_pe_in[index] = error;
 	weights[index] = model->A[m];
     }
-    mag = 10.0*log10(mag/model->L);
 
     /* vector quantise */
         
@@ -464,7 +501,7 @@ static void sparse_vq_pred_error(struct AEXP *aexp,
     }
     #endif
 
-    if (mag > -100.0)
+    if (edB > -100.0)
 	for(m=0; m<MAX_AMP; m++) {
 	    if (sparse_pe_in[m] != 0.0)
 		aexp->vq_var += pow(sparse_pe_out[m] - sparse_pe_in[m], 2.0);
@@ -484,19 +521,29 @@ static void sparse_vq_pred_error(struct AEXP *aexp,
 }
 
 
+static void split_error(struct AEXP *aexp, struct codebook *vq, float sparse_pe_in[], int ind)
+{
+    int i, j;
+
+    for(i=0, j=vq->offset; i<vq->k; i++,j++) {
+	if (sparse_pe_in[j] != 0.0) {
+	    sparse_pe_in[j] -= vq->cb[vq->k * ind + i];
+	}
+    }
+}
+
+
 static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 {
     int    m, index;
-    float  error, amp_dB, mag;
+    float  error, amp_dB, edB, enormdB;
     float  sparse_pe_in[MAX_AMP];
     float  sparse_pe_out[MAX_AMP];
     float  weights[MAX_AMP];
 
-    mag = 0.0;
-    for(m=1; m<=model->L; m++)
-	mag += model->A[m]*model->A[m];
-    mag = 10*log10(mag/model->L);
-    aexp->mag[2] = mag;
+    edB = frame_energy(model, &enormdB);
+
+    aexp->mag[2] = enormdB;
    
     for(m=0; m<MAX_AMP; m++) {
 	sparse_pe_in[m] = 0.0;
@@ -505,12 +552,12 @@ static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 
     for(m=1; m<=model->L; m++) {
  	assert(model->A[m] > 0.0);
-	error = 20.0*log10(model->A[m]) - mag;
+	error = 20.0*log10(model->A[m]) - enormdB;
 
 	index = MAX_AMP*m*model->Wo/PI;
 	assert(index < MAX_AMP);
 	sparse_pe_in[index] = error;
-	weights[index] = model->A[m];
+	weights[index] = pow(model->A[m],0.8);
     }
 
     /* vector quantise */
@@ -518,23 +565,25 @@ static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
     for(m=0; m<MAX_AMP; m++) {
 	sparse_pe_out[m] = sparse_pe_in[m];
     }
-
-    //#define SIM_VQ
-    #ifndef SIM_VQ
+    
+    for(m=0; m<80; m++)
+	sparse_pe_out[m] = 0;
+    
+    #define SPLIT
+    #ifdef SPLIT
     aexp->indexes[0][2] = split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in);
+    
     aexp->indexes[1][2] = split_vq(sparse_pe_out, aexp, aexp->vq2, weights, sparse_pe_in);
     aexp->indexes[2][2] = split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in);
     aexp->indexes[3][2] = split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in);
-    //split_vq(sparse_pe_out, aexp, aexp->vq5, weights, sparse_pe_in);
-    #else
-    for(m=aexp->vq->offset; m<aexp->vq->offset+aexp->vq->k; m++) {
-	if (sparse_pe_in[m] != 0.0) {
-	    float error = 0*(1.0 - 2.0*rand()/RAND_MAX);
-	    aexp->vq_var += error*error;
-	    aexp->vq_var_n++;
-	    sparse_pe_out[m] = sparse_pe_in[m] + error;
-	}
-    }
+    aexp->indexes[4][2] = split_vq(sparse_pe_out, aexp, aexp->vq5, weights, sparse_pe_in);
+    #endif
+    //#define MULTISTAGE
+    #ifdef MULTISTAGE
+    aexp->indexes[0][2] = split_vq(sparse_pe_out, aexp, aexp->vq1, weights, sparse_pe_in);
+    aexp->indexes[1][2] = split_vq(sparse_pe_out, aexp, aexp->vq2, weights, sparse_pe_in);
+    aexp->indexes[2][2] = split_vq(sparse_pe_out, aexp, aexp->vq3, weights, sparse_pe_in);
+    //aexp->indexes[3][2] = split_vq(sparse_pe_out, aexp, aexp->vq4, weights, sparse_pe_in);
     #endif
 
     for(m=0; m<MAX_AMP; m++) {
@@ -547,7 +596,7 @@ static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
     for(m=1; m<=model->L; m++) {
 	index = MAX_AMP*m*model->Wo/PI;
 	assert(index < MAX_AMP);
-	amp_dB = sparse_pe_out[index] + mag;
+	amp_dB = sparse_pe_out[index] + enormdB;
 	model->A[m] = pow(10.0, amp_dB/20.0);
     }
     //exit(0);
@@ -758,6 +807,7 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 	interp_split_vq(sparse_pe_out, aexp, aexp->vq2, sparse_pe_in, 1);
 	interp_split_vq(sparse_pe_out, aexp, aexp->vq3, sparse_pe_in, 2);
 	interp_split_vq(sparse_pe_out, aexp, aexp->vq4, sparse_pe_in, 3);
+	interp_split_vq(sparse_pe_out, aexp, aexp->vq5, sparse_pe_in, 4);
 
 	for(m=1; m<=model->L; m++) {
 	    index = MAX_AMP*m*model->Wo/PI;
@@ -797,6 +847,172 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 	    aexp->indexes[j][i] = aexp->indexes[j][i+1];
 	aexp->mag[i] = aexp->mag[i+1];
     }
+
+}
+
+
+/*
+  This functions tests theory that some bands can be combined together
+  due to less frequency resolution at higher frequencies.  This will
+  reduce the amount of information we need to encode.
+*/
+
+void smooth_samples(struct AEXP *aexp, MODEL *model, int mode)
+{
+    int    m, i, j, index, step, nav, v, en;
+    float  sparse_pe_in[MAX_AMP], av, amp_dB;
+    float  sparse_pe_out[MAX_AMP];
+    float  smoothed[MAX_AMP], smoothed_out[MAX_AMP];
+    float  weights[MAX_AMP];
+    float  edB, enormdB;
+
+    edB = frame_energy(model, &enormdB);
+    
+    for(m=0; m<MAX_AMP; m++) {
+	sparse_pe_in[m] = 0.0;
+	sparse_pe_out[m] = 0.0;
+    }
+
+    /* set up sparse array */
+
+    for(m=1; m<=model->L; m++) {
+ 	assert(model->A[m] > 0.0);
+
+	index = MAX_AMP*m*model->Wo/PI;
+	assert(index < MAX_AMP);
+	sparse_pe_out[index] = sparse_pe_in[index] = 20.0*log10(model->A[m]) - enormdB;
+    }
+
+    /* now combine samples at high frequencies to reduce dimension */
+
+    step=4;
+    for(i=MAX_AMP/2,v=0; i<MAX_AMP; i+=step,v++) {
+
+	/* average over one band */
+
+	av = 0.0; nav = 0;
+	en = i+step;
+	if (en > (MAX_AMP-1))
+	    en = MAX_AMP-1;
+	for(j=i; j<en; j++) {
+	    if (sparse_pe_in[j] != 0.0) {
+		av += sparse_pe_in[j];
+		nav++;
+	    }
+	}
+	if (nav) {
+	    av /= nav;
+	    smoothed[v] = av;
+	    weights[v] = pow(10.0,av/20.0);
+	    //weights[v] = 1.0;
+	}
+	else
+	    smoothed[v] = 0.0;
+
+    }
+
+    if (mode == 1) {
+	for(i=0; i<v; i++)
+	    printf("%5.2f ", smoothed[i]);
+	printf("\n");
+    }
+
+    if (mode == 2) {
+	for(i=0; i<v; i++)
+	    smoothed_out[i] = 0;
+	split_vq(smoothed_out, aexp, aexp->vq1, weights, smoothed);
+	for(i=0; i<v; i++)
+	    smoothed[i] = smoothed_out[i];
+    }
+	
+    /* set all samples to smoothed average */
+
+    step = 4;
+    for(i=MAX_AMP/2,v=0; i<MAX_AMP; i+=step,v++) {
+	en = i+step;
+	if (en > (MAX_AMP-1))
+	    en = MAX_AMP-1;
+	for(j=i; j<en; j++)
+	    sparse_pe_out[j] = smoothed[v];
+    }
+	  
+    /* convert back to Am */
+    
+    for(m=1; m<=model->L; m++) {
+	index = MAX_AMP*m*model->Wo/PI;
+	assert(index < MAX_AMP);
+	amp_dB = sparse_pe_out[index] + enormdB;
+	//printf("%d %4.2f %4.2f\n", m, 10.0*log10(model->A[m]), amp_dB);
+	model->A[m] = pow(10.0, amp_dB/20.0);
+    }
+    
+}
+
+#define MAX_BINS 40
+static float bins[] = {
+    /*1000.0, 1200.0, 1400.0, 1600.0, 1800,*/
+    2000.0, 2400.0, 2800.0,
+    3000.0, 3400.0, 3600.0, 4000.0};
+
+void smooth_amp(struct AEXP *aexp, MODEL *model) {
+    int    m, i;
+    int    nbins;
+    int    b;
+    float  f;
+    float  av[MAX_BINS];
+    int    nav[MAX_BINS];
+
+    nbins = sizeof(bins)/sizeof(float);
+
+    /* clear all bins */
+
+    for(i=0; i<MAX_BINS; i++) {
+	av[i] = 0.0;
+	nav[i] = 0;
+    }
+
+    /* add amps into each bin */
+
+    for(m=1; m<=model->L; m++) {
+	f = m*model->Wo*FS/TWO_PI;
+	if (f > bins[0]) {
+
+	    /* find bin  */
+
+	    for(i=0; i<nbins; i++)
+		if ((f > bins[i]) && (f <= bins[i+1]))
+		    b = i;
+	    assert(b < MAX_BINS);
+
+	    av[b] += model->A[m]*model->A[m];
+	    nav[b]++;
+	}
+	    
+    }
+
+    /* use averages to est amps */
+
+    for(m=1; m<=model->L; m++) {
+	f = m*model->Wo*FS/TWO_PI;
+	if (f > bins[0]) {
+
+	    /* find bin */
+
+	    for(i=0; i<nbins; i++)
+		if ((f > bins[i]) && (f <= bins[i+1]))
+		    b = i;
+	    assert(b < MAX_BINS);
+
+	    /* add predicted phase error to this bin */
+
+	    printf("L %d m %d f %4.f b %d\n", model->L, m, f, b);
+
+	    printf(" %d: %4.3f -> ", m, 20*log10(model->A[m])); 
+	    model->A[m] = sqrt(av[b]/nav[b]);
+	    printf("%4.3f\n", 20*log10(model->A[m])); 
+	}
+    }
+    printf("\n");
 }
 
 /*---------------------------------------------------------------------------*	\
@@ -809,16 +1025,18 @@ static void vq_interp(struct AEXP *aexp, MODEL *model, int on)
 
 void amp_experiment(struct AEXP *aexp, MODEL *model, char *arg) {
     int m,i;
-
+    
     memcpy(&aexp->model_uq[2], model, sizeof(MODEL));
 
-    //add_quant_noise(aexp, model, model->L/2, model->L, 3);
-    //sparse_vq_pred_error(aexp, model);
+    if (strcmp(arg, "qn") == 0) {
+	add_quant_noise(aexp, model, 1, model->L, 1);
+ 	update_snr_calc(aexp, &aexp->model_uq[2], model);
+   }
 
-    /* print training samplesthat can be > train.txt for training VQ */
+    /* print training samples that can be > train.txt for training VQ */
 
     if (strcmp(arg, "train") == 0) 
-	print_sparse_amp_error(aexp, model, 50.0);
+	print_sparse_amp_error(aexp, model, 00.0);
 
     /* VQ of amplitudes, no interpolation (ie 10ms rate) */
 
@@ -838,12 +1056,31 @@ void amp_experiment(struct AEXP *aexp, MODEL *model, char *arg) {
 
     /* gain/shape VQ of amplitudes, 10ms rate (doesn't work that well) */
 
-   if (strcmp(arg, "gsvq") == 0) {
+    if (strcmp(arg, "gsvq") == 0) {
 	gain_shape_sparse_vq_amp(aexp, model);
 	vq_interp(aexp, model, 0);
 	update_snr_calc(aexp, &aexp->model_uq[1], model);
     }
 
+    if (strcmp(arg, "smooth") == 0) {
+	smooth_samples(aexp, model, 0);
+	update_snr_calc(aexp, &aexp->model_uq[2], model);
+    }
+
+    if (strcmp(arg, "smoothtrain") == 0) {
+	smooth_samples(aexp, model, 1);
+	//update_snr_calc(aexp, &aexp->model_uq[2], model);
+    }
+
+    if (strcmp(arg, "smoothvq") == 0) {
+	smooth_samples(aexp, model, 2);
+	update_snr_calc(aexp, &aexp->model_uq[2], model);
+    }
+
+    if (strcmp(arg, "smoothamp") == 0) {
+	smooth_amp(aexp, model);
+	update_snr_calc(aexp, &aexp->model_uq[2], model);
+    }
 
     /* update states */
 
