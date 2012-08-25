@@ -5,8 +5,8 @@
   DATE CREATED: 20/8/2010
 
   Codec2 simulation.  Combines encoder and decoder and allows
-  switching in and out various algorithms and quantisation
-  steps. Used for algorithm development.
+  switching in and out various algorithms and quantisation steps. Used
+  for algorithm development.
 
 \*---------------------------------------------------------------------------*/
 
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
     int   postfilt;
     float bg_est;
 
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi =0;
+    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -144,6 +144,7 @@ int main(int argc, char *argv[])
         { "dec", no_argument, &decimate, 1 },
         { "dt", no_argument, &dt, 1 },
         { "hi", no_argument, &hi, 1 },
+        { "simlpcpf", no_argument, &simlpcpf, 1 },
         { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
@@ -611,7 +612,7 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1); 
+	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf); 
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps

@@ -645,7 +645,7 @@ float lpc_model_amplitudes(
   }
   #endif
 
-  aks_to_M2(ak,order,model,E,&snr, 1);   /* {ak} -> {Am} LPC decode */
+  aks_to_M2(ak,order,model,E,&snr, 1, 0);   /* {ak} -> {Am} LPC decode */
 
   return snr;
 }
@@ -668,7 +668,8 @@ void aks_to_M2(
   MODEL        *model,	     /* sinusoidal model parameters for this frame */
   float         E,	     /* energy term */
   float        *snr,	     /* signal to noise ratio for this frame in dB */
-  int           dump         /* true to dump sample to dump file */
+  int           dump,        /* true to dump sample to dump file */
+  int           sim_pf       /* true to simulate a post filter */
 )
 {
   COMP pw[FFT_ENC];	/* input to FFT for power spectrum */
@@ -721,13 +722,21 @@ void aks_to_M2(
     signal += pow(model->A[m],2.0);
     noise  += pow(model->A[m] - Am,2.0);
 
-    /* this code improves perf of LPC model, in particular with phase0 */
+    /* This code significantly improves perf of LPC model, in
+       particular when combined with phase0.  The LPC spectrum tends
+       to track just under the peaks of the spectral envelope, and
+       just above nulls.  This algorithm does the reverse to
+       compensate - raising the amplitudes of spectral peaks, while
+       attenuating the null.  This enhances the formants, and
+       supresses the energy between formants. */
 
-    if (Am > model->A[m])
-	Am *= 0.7;
-    if (Am < model->A[m])
-	Am *= 1.4;
-    
+    if (sim_pf) {
+	if (Am > model->A[m])
+	    Am *= 0.7;
+	if (Am < model->A[m])
+	    Am *= 1.4;
+    }
+
     model->A[m] = Am;
   }
   *snr = 10.0*log10(signal/noise);
@@ -1447,7 +1456,7 @@ float decode_amplitudes(kiss_fft_cfg  fft_fwd_cfg,
     bw_expand_lsps(lsps, LPC_ORD);
     lsp_to_lpc(lsps, ak, LPC_ORD);
     *e = decode_energy(energy_index);
-    aks_to_M2(ak, LPC_ORD, model, *e, &snr, 1); 
+    aks_to_M2(ak, LPC_ORD, model, *e, &snr, 1, 0); 
     apply_lpc_correction(model);
 
     return snr;

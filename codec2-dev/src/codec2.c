@@ -356,7 +356,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -383,7 +383,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
   Encodes 320 speech samples (40ms of speech) into 56 bits.
 
   The codec2 algorithm actually operates internally on 10ms (80
-  sample) frames, so we run the encoding algorithm for times:
+  sample) frames, so we run the encoding algorithm 4 times:
 
   frame 0: voicing bit
   frame 1: voicing bit, joint VQ of Wo and E
@@ -528,7 +528,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -705,7 +705,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
 	apply_lpc_correction(&model[i]);
     }
 
