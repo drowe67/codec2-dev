@@ -52,7 +52,7 @@ void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
 void aks_to_M2(kiss_fft_cfg fft_fwd_cfg, float ak[], int order, MODEL *model, 
-	       float E, float *snr, int dump);
+	       float E, float *snr, int dump, int sim_pf);
 
 int   encode_Wo(float Wo);
 float decode_Wo(int index);
