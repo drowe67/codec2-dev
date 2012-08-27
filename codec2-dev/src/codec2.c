@@ -356,7 +356,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0, 1); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -528,7 +528,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0, 1); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -705,7 +705,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 1, 0, 1); 
 	apply_lpc_correction(&model[i]);
     }
 

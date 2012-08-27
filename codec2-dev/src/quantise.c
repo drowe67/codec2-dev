@@ -645,11 +645,120 @@ float lpc_model_amplitudes(
   }
   #endif
 
-  aks_to_M2(ak,order,model,E,&snr, 1, 0);   /* {ak} -> {Am} LPC decode */
+  aks_to_M2(ak,order,model,E,&snr, 1, 0, 1);   /* {ak} -> {Am} LPC decode */
 
   return snr;
 }
 #endif
+
+/*---------------------------------------------------------------------------*\
+                                                                         
+   lpc_post_filter()
+   
+   Applies a post filter to the LPC synthesis filter power spectrum
+   Pw, which supresses the inter-formant energy.
+
+   The algorithm is from p267 (Section 8.6) of "Digital Speech",
+   edited by A.M. Kondoz, 1994 published by Wiley and Sons.  Chapter 8
+   of this text is on the MBE vocoder, and this is a freq domain
+   adaptation of post filtering commonly used in CELP.
+
+   I used the Octave simulation lpcpf.m to get an understaing of the
+   algorithm.
+
+   Requires two more FFTs which is significantly more MIPs.  However
+   it should be possible to implement this more efficiently in the
+   time domain.  Just not sure how to handle relative time delays
+   between the synthesis stage and updating these coeffs.  A smaller
+   FFT size might also be accetable to save CPU.  
+
+   TODO:
+   [ ] sync var names between Octave and C version
+   [ ] doc gain normalisation
+   [ ] I think the first FFT is not rqd as we do the same
+       thing in aks_to_M2().
+
+\*---------------------------------------------------------------------------*/
+
+#define LPCPF_GAMMA 0.5
+#define LPCPF_BETA  0.2
+
+void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[], int order)
+{
+    int   i;
+    COMP  x[FFT_ENC];   /* input to FFTs                */
+    COMP  Aw[FFT_ENC];  /* LPC analysis filter spectrum */	
+    COMP  Ww[FFT_ENC];  /* weighting spectrum           */
+    float Rw[FFT_ENC];  /* R = WA                       */
+    float e_before, e_after, gain;
+    float Pfw[FFT_ENC]; /* Post filter mag spectrum     */
+  
+    /* Determine LPC inverse filter spectrum 1/A(exp(jw)) -----------*/
+
+    /* we actually want the synthesis filter A(exp(jw) but the inverse
+       (analysis) filter is easier to find as it's FIR, we just use
+       the inverse of 1/A to get the synthesis filter A(exp(jw)) */
+
+    for(i=0; i<FFT_ENC; i++) {
+	x[i].real = 0.0;
+	x[i].imag = 0.0; 
+    }
+    
+    for(i=0; i<=order; i++)
+	x[i].real = ak[i];
+    kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Aw);
+
+    for(i=0; i<FFT_ENC/2; i++) {
+	Aw[i].real = 1.0/sqrt(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
+    }
+
+    /* Determine weighting filter spectrum W(exp(jw)) ---------------*/
+
+    for(i=0; i<FFT_ENC; i++) {
+	x[i].real = 0.0;
+	x[i].imag = 0.0; 
+    }
+    
+    for(i=0; i<=order; i++)
+	x[i].real = ak[i] * pow(LPCPF_GAMMA, (float)i);
+    kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Ww);
+
+    for(i=0; i<FFT_ENC/2; i++) {
+	Ww[i].real = sqrt(Ww[i].real*Ww[i].real + Ww[i].imag*Ww[i].imag);
+    }
+
+    /* Determined combined filter R = WA ---------------------------*/
+
+    for(i=0; i<FFT_ENC/2; i++) {
+	Rw[i] = Ww[i].real * Aw[i].real;
+    }
+ 
+    /* create post filter mag spectrum and apply ------------------*/
+    
+    /* measure energy before post filtering */
+
+    e_before = 0.0;
+    for(i=0; i<FFT_ENC/2; i++)
+	e_before += Pw[i].real;
+
+    /* apply post filter and measure energy  */
+
+    e_after = 0.0;
+    for(i=0; i<FFT_ENC/2; i++) {
+	Pfw[i] = pow(Rw[i], LPCPF_BETA);
+	Pw[i].real *= Pfw[i] * Pfw[i];
+	e_after += Pw[i].real;
+    }
+    gain = e_before/e_after;
+
+    /* apply gain factor to normalise energy */
+
+    for(i=0; i<FFT_ENC/2; i++) {
+	Pw[i].real *= gain;
+    }
+
+}
+
 
 /*---------------------------------------------------------------------------*\
                                                                          
@@ -669,7 +778,8 @@ void aks_to_M2(
   float         E,	     /* energy term */
   float        *snr,	     /* signal to noise ratio for this frame in dB */
   int           dump,        /* true to dump sample to dump file */
-  int           sim_pf       /* true to simulate a post filter */
+  int           sim_pf,      /* true to simulate a post filter */
+  int           pf           /* true to post filter */
 )
 {
   COMP pw[FFT_ENC];	/* input to FFT for power spectrum */
@@ -698,12 +808,16 @@ void aks_to_M2(
 
   for(i=0; i<FFT_ENC/2; i++)
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
+
   #ifdef DUMP
   if (dump) 
       dump_Pw(Pw);
   #endif
 
-  /* Determine magnitudes by linear interpolation of P(w) -------------------*/
+  if (pf)
+      lpc_post_filter(fft_fwd_cfg, Pw, ak, order);
+
+  /* Determine magnitudes from P(w) ----------------------------------------*/
 
   /* when used just by decoded {A} might be all zeroes so init signal
      to prevent log(0) errors */
@@ -903,7 +1017,7 @@ float speech_to_uq_lsps(float lsp[],
  
     /* 15 Hz BW expansion as I can't hear the difference and it may help
        help occasional fails in the LSP root finding.  Important to do this
-       after energy caluclation to avoid -ve energy values.
+       after energy calculation to avoid -ve energy values.
     */
 
     for(i=0; i<=order; i++)
@@ -911,7 +1025,7 @@ float speech_to_uq_lsps(float lsp[],
 
     roots = lpc_to_lsp(ak, order, lsp, 5, LSP_DELTA1);
     if (roots != order) {
-	/* use some benign LSP values we can use instead */
+	/* if root finding fails use some benign LSP values instead */
 	for(i=0; i<order; i++)
 	    lsp[i] = (PI/order)*(float)i;
     }
@@ -1456,7 +1570,7 @@ float decode_amplitudes(kiss_fft_cfg  fft_fwd_cfg,
     bw_expand_lsps(lsps, LPC_ORD);
     lsp_to_lpc(lsps, ak, LPC_ORD);
     *e = decode_energy(energy_index);
-    aks_to_M2(ak, LPC_ORD, model, *e, &snr, 1, 0); 
+    aks_to_M2(ak, LPC_ORD, model, *e, &snr, 1, 0, 0, 1); 
     apply_lpc_correction(model);
 
     return snr;

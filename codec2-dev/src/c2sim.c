@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     float bg_est;
 
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
+    int   lpcpf;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -145,6 +146,7 @@ int main(int argc, char *argv[])
         { "dt", no_argument, &dt, 1 },
         { "hi", no_argument, &hi, 1 },
         { "simlpcpf", no_argument, &simlpcpf, 1 },
+        { "lpcpf", no_argument, &lpcpf, 1 },
         { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
@@ -412,10 +414,6 @@ int main(int argc, char *argv[])
 	    autocorrelate(Wn,Rk,M,order);
 	    levinson_durbin(Rk,ak,order);
 
-            #ifdef DUMP
-	    dump_ak(ak, LPC_ORD);
-            #endif
-	
 	    /* determine voicing */
 
 	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_uq_Wo);
@@ -612,7 +610,11 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf); 
+            #ifdef DUMP
+	    dump_ak(ak, LPC_ORD);
+            #endif
+	
+	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf); 
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps
