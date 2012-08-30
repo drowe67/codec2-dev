@@ -4,8 +4,16 @@
 %
 % Plot ampltiude modelling information from dump files.
 
-function plamp(samname, f)
+function plamp(samname, f, samname2)
   
+  % switch some stuff off to unclutter display
+
+  plot_lsp = 0;
+  plot_snr = 0;
+  plot_vsnr = 0;
+  plot_sw = 0;
+  plot_pw = 0;
+
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
 
@@ -60,6 +68,16 @@ function plamp(samname, f)
     snr = load(snr_name);
   endif
 
+  % optional second file, for exploring post filter
+
+  model2q_name = " ";
+  if nargin == 3
+    model2q_name = strcat(samname2,"_qmodel.txt");
+    if file_in_path(".",modelq_name)
+      model2q = load(model2q_name);
+    end
+  end
+
   Ew_on = 1;
   k = ' ';
   do 
@@ -67,7 +85,7 @@ function plamp(samname, f)
     clf;
 %    s = [ Sn(2*(f-2)-1,:) Sn(2*(f-2),:) ];
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    size(s)
+    size(s);
     plot(s);
     axis([1 length(s) -20000 20000]);
 
@@ -78,20 +96,14 @@ function plamp(samname, f)
     plot((1:L)*Wo*4000/pi, 20*log10(Am),";Am;r");
     axis([1 4000 -10 80]);
     hold on;
-%    plot((0:255)*4000/256, Sw(f-2,:),";Sw;");
-    plot((0:255)*4000/256, Sw(f,:),";Sw;");
-    
-    if (file_in_path(".",sw__name))
-       plot((0:255)*4000/256, Sw_(f,:),";Sw_;g");
-       if (Ew_on == 1)
-          plot((0:255)*4000/256, Ew(f,:),";Ew_;r");
-       endif
-    endif
+    if plot_sw
+      plot((0:255)*4000/256, Sw(f,:),";Sw;");
+    end
  
     if (file_in_path(".",modelq_name))
       Amq = modelq(f,3:(L+2));
       plot((1:L)*Wo*4000/pi, 20*log10(Amq),";Amq;g" );
-      if (file_in_path(".",pw_name))
+      if (file_in_path(".",pw_name) && plot_pw)
         plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;c");
       endif	
       signal = Am * Am';
@@ -101,7 +113,12 @@ function plamp(samname, f)
       plot((1:L)*Wo*4000/pi, 20*log10(Amq) - 20*log10(Am), Am_err_label);
     endif
 
-    if (file_in_path(".",snr_name))
+    if file_in_path(".",model2q_name)
+      Amq2 = model2q(f,3:(L+2));
+      plot((1:L)*Wo*4000/pi, 20*log10(Amq2),";Amq2;m" );
+    end
+
+    if (file_in_path(".",snr_name) && plot_vsnr)
       snr_label = sprintf(";Voicing SNR %4.2f dB;",snr(f));
       plot(1,1,snr_label);
     endif
@@ -119,7 +136,7 @@ function plamp(samname, f)
       %plot((1:L)*Wo*4000/pi, 20*log10(orig-synth), phase_err_label);
     endif
 
-    if (file_in_path(".",lsp_name))
+    if (file_in_path(".",lsp_name) && plot_lsp)
       for l=1:10
         plot([lsp(f,l)*4000/pi lsp(f,l)*4000/pi], [60 80], 'r');
       endfor
@@ -138,18 +155,6 @@ function plamp(samname, f)
       %endif
       %figure(2);
     %endif
-
-    % autocorrelation function to research voicing est
-    
-    if (file_in_path(".",rk_name))
-      figure(3);
-      plot(Rk(f,:) / Rk(f,1), ";Rk;");
-      hold on;
-      p = floor(2*pi/Wo);
-      plot([p p ], [0 1], 'r');
-      hold off;
-      %figure(2);
-    endif
 
     % interactive menu
 
