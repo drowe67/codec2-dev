@@ -229,7 +229,8 @@ void phase_synth_zero_order(
     /* generate excitation */
 	    
     if (model->voiced) {
-	float offs;
+	//float rnd;
+
         b = floor(m*model->Wo/r + 0.5);
 	if (b > ((GLOTTAL_FFT_SIZE/2)-1)) {
 		b = (GLOTTAL_FFT_SIZE/2)-1;
@@ -239,10 +240,12 @@ void phase_synth_zero_order(
 	   males like hts1a. This moves the onset of each harmonic
 	   over +/- 0.25 of a sample.
 	*/
-	jitter = 0.25*(1.0 - 2.0*rand()/RAND_MAX);
+	//jitter = 0.25*(1.0 - 2.0*rand()/RAND_MAX);
+	jitter = 0;
 
-	Ex[m].real = cos(ex_phase[0]*m - jitter*model->Wo*m + glottal[b]);
-	Ex[m].imag = sin(ex_phase[0]*m - jitter*model->Wo*m + glottal[b]);
+	//rnd = (PI/8)*(1.0 - 2.0*rand()/RAND_MAX);
+	Ex[m].real = cos(ex_phase[0]*m/* - jitter*model->Wo*m + glottal[b]*/);
+	Ex[m].imag = sin(ex_phase[0]*m/* - jitter*model->Wo*m + glottal[b]*/);
     }
     else {
 
@@ -1672,6 +1675,22 @@ void phase_experiment(struct PEXP *pexp, MODEL *model, char *arg) {
     if (strcmp(arg,"struct23") == 0) {
 	struct_phases(pexp, model, model->L/2, 3*model->L/4 );
 	update_snr_calc(pexp, model, before);
+    }
+
+    if (strcmp(arg,"addnoise") == 0) {
+	int m;
+	float max;
+
+	max = 0;
+	for(m=1; m<=model->L; m++)
+	    if (model->A[m] > max)
+		max = model->A[m];
+	max = 20.0*log10(max);
+	for(m=1; m<=model->L; m++)
+	    if (20.0*log10(model->A[m]) < (max-20)) {
+		model->phi[m] += (PI/4)*(1.0 -2.0*rand()/RAND_MAX);
+		//printf("m %d\n", m);
+	    }
     }
 
     /* normalise phases */

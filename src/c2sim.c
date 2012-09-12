@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
     int lspdt = 0, lspdt_mode = LSPDT_ALL;
-    int dt = 0, lspjvm = 0, lspjnd = 0;
+    int dt = 0, lspjvm = 0, lspjnd = 0, lspmel = 0;
     float ak[LPC_MAX];
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
     struct option long_options[] = {
         { "lpc", required_argument, &lpc_model, 1 },
         { "lspjnd", no_argument, &lspjnd, 1 },
+        { "lspmel", no_argument, &lspmel, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
@@ -246,21 +247,22 @@ int main(int argc, char *argv[])
 	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
 		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
-                if(strcmp(optarg,"2400") == 0) {
+                if(strcmp(optarg,"4800") == 0) {
+	            lpc_model = 1; order = 10;
+		    vector_quant_Wo_e = 1;
+	            lsp = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 0;
+		    lpcpf = 1;
+               } else if(strcmp(optarg,"2400") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
 	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
 	            decimate = 1;
-               } else if(strcmp(optarg,"1500") == 0) {
-	            lpc_model = 1; order = 10;
-		    scalar_quant_Wo_e = 1;
-	            lsp = 1; lspdt = 1;
-	            phase0 = 1;
-	            postfilt = 1;
-	            decimate = 1;
-	            dt = 1;
+		    lpcpf = 1;
                } else if(strcmp(optarg,"1400") == 0) {
 	            lpc_model = 1; order = 10;
 		    vector_quant_Wo_e = 1;
@@ -269,6 +271,7 @@ int main(int argc, char *argv[])
 	            postfilt = 1;
 	            decimate = 1;
 	            dt = 1;
+ 		    lpcpf = 1;
                 } else if(strcmp(optarg,"1200") == 0) {
 	            lpc_model = 1; order = 10;
 		    scalar_quant_Wo_e = 1;
@@ -277,6 +280,7 @@ int main(int argc, char *argv[])
 	            postfilt = 1;
 	            decimate = 1;
 	            dt = 1;
+ 		    lpcpf = 1;
                 } else {
                     fprintf(stderr, "Error: invalid output rate %s\n", optarg);
                     exit(1);
@@ -383,7 +387,7 @@ int main(int argc, char *argv[])
 	    dump_phase_(&model.phi[0], model.L);
             #endif
 	}
-
+	
 	if (hi) {
 	    int m;
 	    for(m=1; m<model.L/2; m++)
@@ -449,6 +453,10 @@ int main(int argc, char *argv[])
 
 	    e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
+            #ifdef DUMP
+	    dump_ak(ak, LPC_ORD);
+            #endif
+	
 	    /* tracking down -ve energy values with BW expansion */
 	    /*
 	    if (e < 0.0) {
@@ -486,7 +494,7 @@ int main(int argc, char *argv[])
 
 	    if (lspd) {
 		lspd_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);
+		//bw_expand_lsps(lsps_, LPC_ORD);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
@@ -507,20 +515,59 @@ int main(int argc, char *argv[])
 		}
 	    }
 
-	    /* we need lsp__prev[] for lspdt and decimate.  If no
-	       other LSP quantisation is used we use original LSPs as
-	       there is no quantised version available. */
-
-	    if (!lsp && !lspd && !lspvq && !lspres && !lspjvm)
-		for(i=0; i<LPC_ORD; i++)
-		    lsps_[i] = lsps[i];
+	    /* experimenting with non-linear LSP spacing to see if
+	       it's just noticable */
 
 	    if (lspjnd) {
-		//locate_lsps_jnd_steps(lsps, LPC_ORD);
-		lspjnd_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);
+		for(i=0; i<LPC_ORD; i++)
+		    lsps_[i] = lsps[i];
+		locate_lsps_jnd_steps(lsps_, LPC_ORD);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
+
+	    /* Another experiment with non-linear LSP spacing, this
+	       time using a scaled version of mel frequency axis
+	       warping.  The scaling is such that the integer output
+	       can be directly sent over the channel.
+	    */
+
+	    if (lspmel) {
+		float f, f_;
+		int mel[LPC_ORD];
+
+		for(i=0; i<LPC_ORD; i++) {
+		    f = (4000.0/PI)*lsps[i];
+		    mel[i] = floor(70.0*log10(1.0 + f/700.0) + 0.5);
+		}
+
+		for(i=1; i<LPC_ORD; i++) {
+		    if (mel[i] == mel[i-1])
+			mel[i]++;
+		}
+
+		for(i=0; i<LPC_ORD; i++) {
+		    f_ = 700.0*( pow(10.0, (float)mel[i]/70.0) - 1.0);
+		    lsps_[i] = f_*(PI/4000.0);
+		}
+		for(i=5; i<10; i++) {
+		    lsps_[i] = lsps[i];
+		}
+
+		lsp_to_lpc(lsps_, ak, LPC_ORD);
+	    }
+
+	    /* we need lsp__prev[] for lspdt and decimate.  If no
+	       other LSP quantisation is used we use original LSPs as
+	       there is no quantised version available. TODO: this is
+	       mess, we should have structures and standard
+	       nomenclature for previous frames values, lsp_[]
+	       shouldnet be overwritten as we may want to dump it for
+	       analysis.  Re-design some time.
+	    */
+
+	    if (!lsp && !lspd && !lspvq && !lspres && !lspjvm && !lspjnd && !lspmel)
+		for(i=0; i<LPC_ORD; i++)
+		    lsps_[i] = lsps[i];
 
 	    /* Odd frames are generated by quantising the difference
 	       between the previous frames LSPs and this frames */
@@ -572,7 +619,7 @@ int main(int argc, char *argv[])
 	    /* if using decimated (20ms) frames we dump interp
 	       LSPs below */
 	    if (!decimate)
-		dump_lsp(lsps_);
+		dump_lsp_(lsps_);
             #endif
 	
 	    if (scalar_quant_Wo_e) {
@@ -610,11 +657,12 @@ int main(int argc, char *argv[])
 
 	    }
 
-            #ifdef DUMP
-	    dump_ak(ak, LPC_ORD);
-            #endif
-	
 	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf); 
+	    apply_lpc_correction(&model);
+
+            #ifdef DUMP
+	    dump_ak_(ak, LPC_ORD);
+            #endif
 
 	    /* note SNR on interpolated frames can't be measured properly
 	       by comparing Am as L has changed.  We can dump interp lsps
@@ -734,8 +782,11 @@ int main(int argc, char *argv[])
 	else {
 	    /* no decimation - sythesise each 10ms frame immediately */
 
+	    
 	    if (phase0)
 	    	phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
+	    
+
 	    if (postfilt)
 		postfilter(&model, &bg_est);
 	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn);
@@ -762,7 +813,7 @@ int main(int argc, char *argv[])
 	fclose(fout);
 
     if (lpc_model)
-	printf("SNR av = %5.2f dB\n", sum_snr/frames);
+    	printf("SNR av = %5.2f dB\n", sum_snr/frames);
 
     if (phaseexp)
 	phase_experiment_destroy(pexp);
@@ -820,7 +871,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
 			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
-			option_parameters = " <2400|1400|1200>";
+			option_parameters = " <4800|2400|1400|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " <DumpFilePrefix>";
 		} else {

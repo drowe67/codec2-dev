@@ -46,9 +46,11 @@
 #define CODEC2_WIN32SUPPORT
 #endif
 
-#define CODEC2_MODE_2400 0
-#define CODEC2_MODE_1400 1
-#define CODEC2_MODE_1200 2
+#define CODEC2_MODE_4800 0
+#define CODEC2_MODE_3600 1
+#define CODEC2_MODE_2400 2
+#define CODEC2_MODE_1400 3
+#define CODEC2_MODE_1200 4
 
 struct CODEC2;
 
