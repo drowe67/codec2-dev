@@ -62,15 +62,14 @@ void  encode_lsps_scalar(int indexes[], float lsp[], int order);
 void  decode_lsps_scalar(float lsp[], int indexes[], int order);
 void  encode_lsps_diff_freq_vq(int indexes[], float lsp[], int order);
 void  decode_lsps_diff_freq_vq(float lsp_[], int indexes[], int order);
-void encode_lsps_diff_time_vq(int indexes[], 
-			      float lsp[], 
-			      float lsp__prev[], 
-			      int order);
-void decode_lsps_diff_time_vq(
-			      float lsp_[], 
-			      int indexes[], 
-			      float lsp__prev[],
-			      int order);
+void  encode_lsps_diff_time(int indexes[], 
+			    float lsp[], 
+			    float lsp__prev[], 
+			    int order);
+void decode_lsps_diff_time(float lsp_[], 
+			   int indexes[], 
+			   float lsp__prev[],
+			   int order);
 
 void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim);
 void decode_lsps_vq(int *indexes, float *xq, int ndim);
@@ -81,6 +80,7 @@ void lspvq_quantise(float lsp[], float lsp_[], int order);
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
+void lspvqexp_quantise(float lsps[], float lsps_[], int order);
 
 void quantise_WoE(MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);
@@ -94,6 +94,7 @@ int  unpack(const unsigned char * bits, unsigned int *nbit, unsigned int index_b
 
 int lsp_bits(int i);
 int lspd_bits(int i);
+int lspdt_bits(int i);
 int lsp_pred_vq_bits(int i);
 
 void apply_lpc_correction(MODEL *model);

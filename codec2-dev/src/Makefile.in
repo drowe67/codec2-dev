@@ -72,8 +72,8 @@ am_libcodec2_la_OBJECTS = libcodec2_la-dump.lo libcodec2_la-lpc.lo \
 	libcodec2_la-ampexp.lo libcodec2_la-pack.lo \
 	libcodec2_la-codebook.lo libcodec2_la-codebookd.lo \
 	libcodec2_la-codebookvq.lo libcodec2_la-codebookjnd.lo \
-	libcodec2_la-codebookjvm.lo libcodec2_la-codebookdt.lo \
-	libcodec2_la-codebookge.lo
+	libcodec2_la-codebookjvm.lo libcodec2_la-codebookvqexp.lo \
+	libcodec2_la-codebookdt.lo libcodec2_la-codebookge.lo
 libcodec2_la_OBJECTS = $(am_libcodec2_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
@@ -272,7 +272,12 @@ CODEBOOKSD = \
   $D/dlsp2.txt \
   $D/dlsp3.txt \
   $D/dlsp4.txt \
-  $(top_srcdir)/unittest/lsp45678910.txt
+  $D/dlsp5.txt \
+  $D/dlsp6.txt \
+  $D/dlsp7.txt \
+  $D/dlsp8.txt \
+  $D/dlsp9.txt \
+  $D/dlsp10.txt 
 
 
 # lspd VQ quantisers
@@ -291,12 +296,26 @@ CODEBOOKSJND = \
   $(top_srcdir)/unittest/lspjnd5-10.txt
 
 CODEBOOKSDT = \
-  $D/lspdt.txt
+  $D/lspdt1.txt \
+  $D/lspdt2.txt \
+  $D/lspdt3.txt \
+  $D/lspdt4.txt \
+  $D/lspdt5.txt \
+  $D/lspdt6.txt \
+  $D/lspdt7.txt \
+  $D/lspdt8.txt \
+  $D/lspdt9.txt \
+  $D/lspdt10.txt
 
 CODEBOOKSJVM = \
   $D/lspjvm1.txt \
   $D/lspjvm2.txt \
   $D/lspjvm3.txt
+
+CODEBOOKSVQEXP = \
+  $D/lspvqexp1.txt \
+  $D/lspvqexp2.txt \
+  $D/lspvqexp3.txt
 
 CODEBOOKSGE = \
   $D/gecb.txt 
@@ -321,6 +340,7 @@ codebookd.c \
 codebookvq.c \
 codebookjnd.c \
 codebookjvm.c \
+codebookvqexp.c \
 codebookdt.c \
 codebookge.c 
 
@@ -508,6 +528,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookjnd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookjvm.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookvq.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookvqexp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codec2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-dump.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-fdmdv.Plo@am__quote@
@@ -676,6 +697,13 @@ libcodec2_la-codebookjvm.lo: codebookjvm.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='codebookjvm.c' object='libcodec2_la-codebookjvm.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-codebookjvm.lo `test -f 'codebookjvm.c' || echo '$(srcdir)/'`codebookjvm.c
+
+libcodec2_la-codebookvqexp.lo: codebookvqexp.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-codebookvqexp.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-codebookvqexp.Tpo" -c -o libcodec2_la-codebookvqexp.lo `test -f 'codebookvqexp.c' || echo '$(srcdir)/'`codebookvqexp.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libcodec2_la-codebookvqexp.Tpo" "$(DEPDIR)/libcodec2_la-codebookvqexp.Plo"; else rm -f "$(DEPDIR)/libcodec2_la-codebookvqexp.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='codebookvqexp.c' object='libcodec2_la-codebookvqexp.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-codebookvqexp.lo `test -f 'codebookvqexp.c' || echo '$(srcdir)/'`codebookvqexp.c
 
 libcodec2_la-codebookdt.lo: codebookdt.c
 @am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-codebookdt.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-codebookdt.Tpo" -c -o libcodec2_la-codebookdt.lo `test -f 'codebookdt.c' || echo '$(srcdir)/'`codebookdt.c; \
@@ -896,13 +924,12 @@ uninstall-am: uninstall-binPROGRAMS uninstall-info-am \
 
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
+codebookdt.$(OBJEXT): codebookdt.c
 codebookvq.$(OBJEXT): codebookvq.c
 codebookjnd.$(OBJEXT): codebookjnd.c
 codebookjvm.$(OBJEXT): codebookjvm.c
+codebookvqexp.$(OBJEXT): codebookvqexp.c
 codebookge.$(OBJEXT): codebookge.c
-
-$(CODEBOOKSDT): genlspdtcb
-	./genlspdtcb
 
 codebook.lo: codebook.c
 
@@ -911,6 +938,9 @@ codebook.c: generate_codebook $(CODEBOOKS)
 
 codebookd.c: generate_codebook $(CODEBOOKSD)
 	./generate_codebook lsp_cbd $(CODEBOOKSD) > codebookd.c
+
+codebookdt.c: generate_codebook $(CODEBOOKSDT)
+	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
 
 codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 	./generate_codebook lsp_cbvq $(CODEBOOKSVQ) > codebookvq.c
@@ -924,11 +954,14 @@ codebookdt.c: generate_codebook $(CODEBOOKSDT)
 codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
 	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
 
+codebookvqexp.c: generate_codebook $(CODEBOOKSVQEXP)
+	./generate_codebook lsp_cbvqexp $(CODEBOOKSVQEXP) > codebookvqexp.c
+
 codebookge.c: generate_codebook $(CODEBOOKSGE)
 	./generate_codebook ge_cb $(CODEBOOKSGE) > codebookge.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c codebookvqexp.c
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:

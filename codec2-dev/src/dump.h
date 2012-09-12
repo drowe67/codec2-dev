@@ -40,9 +40,14 @@ void dump_Ew(COMP Ew[]);
 
 void dump_model(MODEL *m);
 void dump_quantised_model(MODEL *m);
+void dump_Pwn(COMP Pw[]);
 void dump_Pw(COMP Pw[]);
+void dump_Rw(float Rw[]);
 void dump_lsp(float lsp[]);
+void dump_weights(float w[], int ndim);
+void dump_lsp_(float lsp_[]);
 void dump_ak(float ak[], int order);
+void dump_ak_(float ak[], int order);
 void dump_E(float E);
 void dump_lpc_snr(float snr);
 

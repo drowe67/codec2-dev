@@ -26,7 +26,12 @@ CODEBOOKSD= \
   $D/dlsp2.txt \
   $D/dlsp3.txt \
   $D/dlsp4.txt \
-  $(top_srcdir)/unittest/lsp45678910.txt
+  $D/dlsp5.txt \
+  $D/dlsp6.txt \
+  $D/dlsp7.txt \
+  $D/dlsp8.txt \
+  $D/dlsp9.txt \
+  $D/dlsp10.txt 
 
 # lspd VQ quantisers
 
@@ -45,12 +50,26 @@ CODEBOOKSJND= \
   $(top_srcdir)/unittest/lspjnd5-10.txt
 
 CODEBOOKSDT= \
-  $D/lspdt.txt
+  $D/lspdt1.txt \
+  $D/lspdt2.txt \
+  $D/lspdt3.txt \
+  $D/lspdt4.txt \
+  $D/lspdt5.txt \
+  $D/lspdt6.txt \
+  $D/lspdt7.txt \
+  $D/lspdt8.txt \
+  $D/lspdt9.txt \
+  $D/lspdt10.txt
 
 CODEBOOKSJVM= \
   $D/lspjvm1.txt \
   $D/lspjvm2.txt \
   $D/lspjvm3.txt
+
+CODEBOOKSVQEXP= \
+  $D/lspvqexp1.txt \
+  $D/lspvqexp2.txt \
+  $D/lspvqexp3.txt
 
 CODEBOOKSGE= \
   $D/gecb.txt 
@@ -59,13 +78,12 @@ noinst_PROGRAMS = generate_codebook genlspdtcb
 
 codebook.$(OBJEXT): codebook.c
 codebookd.$(OBJEXT): codebookd.c
+codebookdt.$(OBJEXT): codebookdt.c
 codebookvq.$(OBJEXT): codebookvq.c
 codebookjnd.$(OBJEXT): codebookjnd.c
 codebookjvm.$(OBJEXT): codebookjvm.c
+codebookvqexp.$(OBJEXT): codebookvqexp.c
 codebookge.$(OBJEXT): codebookge.c
-
-$(CODEBOOKSDT): genlspdtcb
-	./genlspdtcb
 
 codebook.lo: codebook.c
 
@@ -74,6 +92,9 @@ codebook.c: generate_codebook $(CODEBOOKS)
 
 codebookd.c: generate_codebook $(CODEBOOKSD)
 	./generate_codebook lsp_cbd $(CODEBOOKSD) > codebookd.c
+
+codebookdt.c: generate_codebook $(CODEBOOKSDT)
+	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
 
 codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 	./generate_codebook lsp_cbvq $(CODEBOOKSVQ) > codebookvq.c
@@ -87,11 +108,14 @@ codebookdt.c: generate_codebook $(CODEBOOKSDT)
 codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
 	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
 
+codebookvqexp.c: generate_codebook $(CODEBOOKSVQEXP)
+	./generate_codebook lsp_cbvqexp $(CODEBOOKSVQEXP) > codebookvqexp.c
+
 codebookge.c: generate_codebook $(CODEBOOKSGE)
 	./generate_codebook ge_cb $(CODEBOOKSGE) > codebookge.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c codebookvqexp.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -113,6 +137,7 @@ codebookd.c \
 codebookvq.c \
 codebookjnd.c \
 codebookjvm.c \
+codebookvqexp.c \
 codebookdt.c \
 codebookge.c 
 
