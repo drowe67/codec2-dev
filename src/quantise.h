@@ -38,6 +38,7 @@
 #define E_MAX_DB    40.0
 
 #define LSP_SCALAR_INDEXES    10
+#define LSPD_SCALAR_INDEXES    10
 #define LSP_PRED_VQ_INDEXES    3
 #define LSP_DIFF_FREQ_INDEXES  5
 #define LSP_DIFF_TIME_BITS     7
@@ -60,6 +61,8 @@ int   encode_Wo_dt(float Wo, float prev_Wo);
 float decode_Wo_dt(int index, float prev_Wo);
 void  encode_lsps_scalar(int indexes[], float lsp[], int order);
 void  decode_lsps_scalar(float lsp[], int indexes[], int order);
+void  encode_lspds_scalar(int indexes[], float lsp[], int order);
+void  decode_lspds_scalar(float lsp[], int indexes[], int order);
 void  encode_lsps_diff_freq_vq(int indexes[], float lsp[], int order);
 void  decode_lsps_diff_freq_vq(float lsp_[], int indexes[], int order);
 void  encode_lsps_diff_time(int indexes[], 
@@ -75,7 +78,6 @@ void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim);
 void decode_lsps_vq(int *indexes, float *xq, int ndim);
 
 long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
-void lspd_quantise(float lsp[], float lsp_[], int order);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);

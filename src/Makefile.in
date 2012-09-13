@@ -948,9 +948,6 @@ codebookvq.c: generate_codebook $(CODEBOOKSVQ)
 codebookjnd.c: generate_codebook $(CODEBOOKSJND)
 	./generate_codebook lsp_cbjnd $(CODEBOOKSJND) > codebookjnd.c
 
-codebookdt.c: generate_codebook $(CODEBOOKSDT)
-	./generate_codebook lsp_cbdt $(CODEBOOKSDT) > codebookdt.c
-
 codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
 	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
 

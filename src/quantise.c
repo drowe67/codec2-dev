@@ -130,16 +130,16 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
 
 /*---------------------------------------------------------------------------*\
 									      
-  lspd_quantise
+  encode_lspds_scalar()
 
   Scalar/VQ LSP difference quantiser.
 
 \*---------------------------------------------------------------------------*/
 
-void lspd_quantise(
-  float lsp[], 
-  float lsp_[],
-  int   order
+void encode_lspds_scalar(
+		 int   indexes[],
+		 float lsp[], 
+		 int   order
 ) 
 {
     int   i,k,m,index;
@@ -150,7 +150,6 @@ void lspd_quantise(
     float wt[LPC_MAX];
     const float *cb;
     float se;
-    int   indexes[LPC_MAX];
 
     assert(order == LPC_ORD);
 
@@ -180,7 +179,35 @@ void lspd_quantise(
 	indexes[i] = quantise(cb, &dlsp[i], wt, k, m, &se);
  	dlsp_[i] = cb[indexes[i]*k];
 
-	printf("%d dlsp %3.2f dlsp_ %3.2f\n", i, dlsp[i], dlsp_[i]);
+	//printf("%d dlsp %3.2f dlsp_ %3.2f\n", i, dlsp[i], dlsp_[i]);
+
+	if (i) 
+	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
+	else
+	    lsp__hz[0] = dlsp_[0];
+    }
+
+}
+
+void decode_lspds_scalar(
+		 float lsp_[], 
+		 int   indexes[],
+		 int   order
+) 
+{
+    int   i,k,index;
+    float lsp__hz[LPC_MAX];
+    float dlsp_[LPC_MAX];
+    const float *cb;
+    float se;
+
+    assert(order == LPC_ORD);
+
+     for(i=0; i<order; i++) {
+
+	k = lsp_cbd[i].k;
+	cb = lsp_cbd[i].cb;
+ 	dlsp_[i] = cb[indexes[i]*k];
 
 	if (i) 
 	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
@@ -191,6 +218,7 @@ void lspd_quantise(
     }
 
 }
+
 
 /*---------------------------------------------------------------------------*\
 									      

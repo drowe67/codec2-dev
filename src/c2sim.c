@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     float bg_est;
 
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
-    int   lpcpf;
+    int   lpcpf = 0;
     FILE *fvoicing = 0;
 
     MODEL prev_model, interp_model;
@@ -247,17 +247,17 @@ int main(int argc, char *argv[])
 	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
 		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
-                if(strcmp(optarg,"4800") == 0) {
+                if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1; order = 10;
-		    vector_quant_Wo_e = 1;
-	            lsp = 1;
+		    scalar_quant_Wo_e = 1;
+	            lspd = 1;
 	            phase0 = 1;
 	            postfilt = 1;
-	            decimate = 0;
+	            decimate = 1;
 		    lpcpf = 1;
                } else if(strcmp(optarg,"2400") == 0) {
 	            lpc_model = 1; order = 10;
-		    scalar_quant_Wo_e = 1;
+		    vector_quant_Wo_e = 1;
 	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
@@ -493,8 +493,8 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (lspd) {
-		lspd_quantise(lsps, lsps_, LPC_ORD);
-		//bw_expand_lsps(lsps_, LPC_ORD);
+		encode_lspds_scalar(lsp_indexes, lsps, LPC_ORD);
+		decode_lspds_scalar(lsps_, lsp_indexes, LPC_ORD);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
@@ -537,7 +537,7 @@ int main(int argc, char *argv[])
 
 		for(i=0; i<LPC_ORD; i++) {
 		    f = (4000.0/PI)*lsps[i];
-		    mel[i] = floor(70.0*log10(1.0 + f/700.0) + 0.5);
+		    mel[i] = floor(100.0*log10(1.0 + f/700.0) + 0.5);
 		}
 
 		for(i=1; i<LPC_ORD; i++) {
@@ -546,7 +546,7 @@ int main(int argc, char *argv[])
 		}
 
 		for(i=0; i<LPC_ORD; i++) {
-		    f_ = 700.0*( pow(10.0, (float)mel[i]/70.0) - 1.0);
+		    f_ = 700.0*( pow(10.0, (float)mel[i]/100.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}
 		for(i=5; i<10; i++) {
@@ -561,7 +561,7 @@ int main(int argc, char *argv[])
 	       there is no quantised version available. TODO: this is
 	       mess, we should have structures and standard
 	       nomenclature for previous frames values, lsp_[]
-	       shouldnet be overwritten as we may want to dump it for
+	       shouldn't be overwritten as we may want to dump it for
 	       analysis.  Re-design some time.
 	    */
 
@@ -781,11 +781,9 @@ int main(int argc, char *argv[])
 	}
 	else {
 	    /* no decimation - sythesise each 10ms frame immediately */
-
 	    
 	    if (phase0)
-	    	phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
-	    
+	    	phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	    
 
 	    if (postfilt)
 		postfilter(&model, &bg_est);

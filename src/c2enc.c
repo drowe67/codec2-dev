@@ -44,15 +44,13 @@ int main(int argc, char *argv[])
     int            nsam, nbit, nbyte;
  
     if (argc != 4) {
-	printf("usage: c2enc 4800|3600|2400|1400|1200 InputRawspeechFile OutputBitFile\n");
+	printf("usage: c2enc 3200|2400|1400|1200 InputRawspeechFile OutputBitFile\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	exit(1);
     }
  
-    if (strcmp(argv[1],"4800") == 0)
-	mode = CODEC2_MODE_4800;
-    else if (strcmp(argv[1],"3600") == 0)
-	mode = CODEC2_MODE_3600;
+    if (strcmp(argv[1],"3200") == 0)
+	mode = CODEC2_MODE_3200;
     else if (strcmp(argv[1],"2400") == 0)
 	mode = CODEC2_MODE_2400;
     else if (strcmp(argv[1],"1400") == 0)
@@ -60,7 +58,7 @@ int main(int argc, char *argv[])
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 4800, 3600, 2400, 1400 or 1200\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1400 or 1200\n", argv[1]);
 	exit(1);
     }
 

@@ -4,6 +4,6 @@
 #
 # Listen to files processed with sim.sh
 
-../script/menu.sh $1_lpc10.raw $1_lsp.raw $1_jnd.raw $1_mel.raw 
+../script/menu.sh $1_lpcpf.raw $1_3200.raw $1_2400.raw $2 $3
 
 
