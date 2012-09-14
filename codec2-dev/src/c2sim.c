@@ -87,7 +87,7 @@ int main(int argc, char *argv[])
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
     int lspdt = 0, lspdt_mode = LSPDT_ALL;
-    int dt = 0, lspjvm = 0, lspjnd = 0, lspmel = 0;
+    int dt = 0, lspjvm = 0, lspanssi = 0, lspjnd = 0, lspmel = 0;
     float ak[LPC_MAX];
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
@@ -138,6 +138,7 @@ int main(int argc, char *argv[])
         { "lspdt", no_argument, &lspdt, 1 },
         { "lspdt_mode", required_argument, NULL, 0 },
         { "lspjvm", no_argument, &lspjvm, 1 },
+        { "lspanssi", no_argument, &lspanssi, 1 },
         { "phase0", no_argument, &phase0, 1 },
         { "phaseexp", required_argument, &phaseexp, 1 },
         { "ampexp", required_argument, &ampexp, 1 },
@@ -505,7 +506,7 @@ int main(int argc, char *argv[])
 	    }
 
 	    if (lspjvm) {
-		/* Jean-Marc's multi-stage VQ */
+		/* Jean-Marc's multi-stage, split VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
 		{ 
 		    float lsps_bw[LPC_ORD];
@@ -513,6 +514,13 @@ int main(int argc, char *argv[])
 		    bw_expand_lsps(lsps_bw, LPC_ORD);			    
 		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
 		}
+	    }
+
+	    if (lspanssi) {
+		/*  multi-stage VQ from Anssi Ramo OH3GDD */
+
+		lspanssi_quantise(lsps, lsps_, LPC_ORD);
+		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
 	    /* experimenting with non-linear LSP spacing to see if
@@ -565,7 +573,7 @@ int main(int argc, char *argv[])
 	       analysis.  Re-design some time.
 	    */
 
-	    if (!lsp && !lspd && !lspvq && !lspres && !lspjvm && !lspjnd && !lspmel)
+	    if (!lsp && !lspd && !lspvq && !lspres && !lspjvm && !lspanssi && !lspjnd && !lspmel)
 		for(i=0; i<LPC_ORD; i++)
 		    lsps_[i] = lsps[i];
 
