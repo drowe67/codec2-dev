@@ -142,7 +142,7 @@ void encode_lspds_scalar(
 		 int   order
 ) 
 {
-    int   i,k,m,index;
+    int   i,k,m;
     float lsp_hz[LPC_MAX];
     float lsp__hz[LPC_MAX];
     float dlsp[LPC_MAX];
@@ -195,11 +195,10 @@ void decode_lspds_scalar(
 		 int   order
 ) 
 {
-    int   i,k,index;
+    int   i,k;
     float lsp__hz[LPC_MAX];
     float dlsp_[LPC_MAX];
     const float *cb;
-    float se;
 
     assert(order == LPC_ORD);
 
@@ -407,6 +406,38 @@ void compute_weights(const float *x, float *w, int ndim)
   //w[1]*=2;
 }
 
+/* LSP weight calculation function kindly submitted by Anssi, OH3GDD */
+
+void compute_weights_anssi(const float *x, float *w, int ndim)
+{
+  int i;
+  float d[LPC_ORD];
+
+  assert(ndim == LPC_ORD);
+
+  for(i=0; i<LPC_ORD; i++)
+      d[i] = 1.0;
+
+  d[0] = x[1];
+  for (i=1; i<LPC_ORD-1; i++)
+      d[i] = x[i+1] - x[i-1];
+  d[LPC_ORD-1] = PI - x[8];
+  for (i=0; i<LPC_ORD; i++) {
+        if (x[i]<((400.0/4000.0)*PI))
+            w[i]=5.0/(0.01+d[i]);
+        else if (x[i]<((700.0/4000.0)*PI))
+            w[i]=4.0/(0.01+d[i]);
+        else if (x[i]<((1200.0/4000.0)*PI))
+            w[i]=3.0/(0.01+d[i]);
+        else if (x[i]<((2000.0/4000.0)*PI))
+            w[i]=2.0/(0.01+d[i]);
+        else
+            w[i]=1.0/(0.01+d[i]);
+        
+        w[i]=sqrt(w[i]+0.3);
+  }
+}
+
 int find_nearest(const float *codebook, int nb_entries, float *x, int ndim)
 {
   int i, j;
@@ -487,47 +518,54 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
   }
 }
 
-void lspvqexp_quantise(float *x, float *xq, int ndim)
+/* 3 stage VQ LSP quantsier kindly submitted by Anssi, OH3GDD */
+
+void lspanssi_quantise(float *x, float *xq, int ndim)
 {
   int i, n1, n2, n3;
-  float err[LPC_ORD], err2[LPC_ORD], err3[LPC_ORD];
-  float w[LPC_ORD], w2[LPC_ORD], w3[LPC_ORD];
-  const float *codebook1 = lsp_cbvqexp[0].cb;
-  const float *codebook2 = lsp_cbvqexp[1].cb;
-  const float *codebook3 = lsp_cbvqexp[2].cb;
+  float e, err1[LPC_ORD], err2[LPC_ORD], err3[LPC_ORD];
+  float w[LPC_ORD];
+  const float *codebook1 = lsp_cbvqanssi[0].cb;
+  const float *codebook2 = lsp_cbvqanssi[1].cb;
+  const float *codebook3 = lsp_cbvqanssi[2].cb;
 
-  w[0] = MIN(x[0], x[1]-x[0]);
-  for (i=1;i<ndim-1;i++)
-    w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
-  w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], PI-x[ndim-1]);
-  
-  compute_weights(x, w, ndim);
+  compute_weights_anssi(x, w, ndim);
   #ifdef DUMP
   dump_weights(w, ndim);
   #endif
 
-  n1 = find_nearest(codebook1, lsp_cbvqexp[0].m, x, ndim);
+  n1 = find_nearest_weighted(codebook1, lsp_cbvqanssi[0].m, x, w, ndim);
   
+  e = 0.0;
   for (i=0;i<ndim;i++)
   {
-    xq[i] = codebook1[ndim*n1+i];
-    err[i] = x[i] - xq[i];
+      xq[i] = codebook1[ndim*n1+i];
+      err1[i] = x[i] - xq[i];
+      e += err1[i]*err1[i];
   }
-  for (i=0;i<ndim/2;i++)
+  //printf("error1: %f\n", e);
+
+  n2 = find_nearest_weighted(codebook2, lsp_cbvqanssi[1].m, err1, w, ndim);
+
+  e = 0.0;
+  for (i=0;i<ndim;i++)
   {
-    err2[i] = err[2*i];  
-    err3[i] = err[2*i+1];
-    w2[i] = w[2*i];  
-    w3[i] = w[2*i+1];
+      xq[i] += codebook2[ndim*n2+i];
+      err2[i] = x[i] - xq[i];
+      e += err2[i]*err2[i];
   }
-  n2 = find_nearest_weighted(codebook2, lsp_cbvqexp[1].m, err2, w2, ndim/2);
-  n3 = find_nearest_weighted(codebook3, lsp_cbvqexp[2].m, err3, w3, ndim/2);
+  //printf("error2: %f\n", e);
+
+  n3 = find_nearest_weighted(codebook3, lsp_cbvqanssi[2].m, err2, w, ndim);
   
-  for (i=0;i<ndim/2;i++)
+  e = 0.0;
+  for (i=0;i<ndim;i++)
   {
-      xq[2*i] += codebook2[ndim*n2/2+i];
-      xq[2*i+1] += codebook3[ndim*n3/2+i];
+      xq[i] += codebook3[ndim*n3+i];
+      err3[i] = x[i] - xq[i];
+      e += err3[i]*err3[i];
   }
+  //printf("error3: %f\n", e);
 }
 
 int check_lsp_order(float lsp[], int lpc_order)

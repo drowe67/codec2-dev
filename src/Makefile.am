@@ -66,10 +66,10 @@ CODEBOOKSJVM= \
   $D/lspjvm2.txt \
   $D/lspjvm3.txt
 
-CODEBOOKSVQEXP= \
-  $D/lspvqexp1.txt \
-  $D/lspvqexp2.txt \
-  $D/lspvqexp3.txt
+CODEBOOKSVQANSSI= \
+  $D/lspvqanssi1.txt \
+  $D/lspvqanssi2.txt \
+  $D/lspvqanssi3.txt
 
 CODEBOOKSGE= \
   $D/gecb.txt 
@@ -82,7 +82,7 @@ codebookdt.$(OBJEXT): codebookdt.c
 codebookvq.$(OBJEXT): codebookvq.c
 codebookjnd.$(OBJEXT): codebookjnd.c
 codebookjvm.$(OBJEXT): codebookjvm.c
-codebookvqexp.$(OBJEXT): codebookvqexp.c
+codebookvqanssi.$(OBJEXT): codebookvqanssi.c
 codebookge.$(OBJEXT): codebookge.c
 
 codebook.lo: codebook.c
@@ -105,14 +105,14 @@ codebookjnd.c: generate_codebook $(CODEBOOKSJND)
 codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
 	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
 
-codebookvqexp.c: generate_codebook $(CODEBOOKSVQEXP)
-	./generate_codebook lsp_cbvqexp $(CODEBOOKSVQEXP) > codebookvqexp.c
+codebookvqanssi.c: generate_codebook $(CODEBOOKSVQEXP)
+	./generate_codebook lsp_cbvqanssi $(CODEBOOKSVQANSSI) > codebookvqanssi.c
 
 codebookge.c: generate_codebook $(CODEBOOKSGE)
 	./generate_codebook ge_cb $(CODEBOOKSGE) > codebookge.c
 
 clean-local:
-	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c codebookvqexp.c
+	-rm -f codebook.c codebookd.c codebookdvq.c codebookjnd.c codebookdt.c codebookjvm.c codebookge.c codebookvqanssi.c
 
 lib_LTLIBRARIES	= libcodec2.la
 libcodec2_la_SOURCES = dump.c \
@@ -134,7 +134,7 @@ codebookd.c \
 codebookvq.c \
 codebookjnd.c \
 codebookjvm.c \
-codebookvqexp.c \
+codebookvqanssi.c \
 codebookdt.c \
 codebookge.c 
 
