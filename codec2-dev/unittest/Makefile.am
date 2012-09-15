@@ -49,7 +49,7 @@ vq_train_jvm_SOURCES = vq_train_jvm.c
 vq_train_jvm_LDADD = $(lib_LTLIBRARIES) 
 vq_train_jvm_LDFLAGS = $(LIBS)
 
-CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c ../src/codebookvqexp.c ../src/codebookge.c
+CODEBOOKS = ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c ../src/codebookvqanssi.c ../src/codebookge.c
 
 tnlp_SOURCES = tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c
 tnlp_LDADD = $(lib_LTLIBRARIES) 
