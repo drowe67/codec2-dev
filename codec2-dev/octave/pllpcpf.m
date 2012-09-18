@@ -9,10 +9,13 @@ function pllpcpf(samname, f)
   
   % switch some stuff off to unclutter display
 
+  plot_Am = 0;
+  plot_Amq = 0;
+  plot_err = 0;
   plot_lsp = 0;
   plot_snr = 0;
   plot_vsnr = 0;
-  plot_sw = 1;
+  plot_sw = 0;
   plot_pw = 1;
   plot_pwb = 1;
   plot_rw = 1;
@@ -69,10 +72,13 @@ function pllpcpf(samname, f)
     axis([1 length(s) -20000 20000]);
 
     figure(2);
+    clf;
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
-    plot((1:L)*Wo*4000/pi, 20*log10(Am),";Am;r");
+    if plot_Am
+      plot((1:L)*Wo*4000/pi, 20*log10(Am),";Am;r");
+    end
     axis([1 4000 -10 80]);
     hold on;
     if plot_sw
@@ -82,25 +88,29 @@ function pllpcpf(samname, f)
     if (file_in_path(".",modelq_name))
 
       Amq = modelq(f,3:(L+2));
-      plot((1:L)*Wo*4000/pi, 20*log10(Amq),";Amq;g" );
+      if plot_Amq
+        plot((1:L)*Wo*4000/pi, 20*log10(Amq),";Amq;g" );
+      end
 
       if (file_in_path(".",pwb_name) && plot_pwb)
-        plot((0:255)*4000/256, 10*log10(Pwb(f,:)),";Pwb;c");
+        plot((0:255)*4000/256, 10*log10(Pwb(f,:)),";Pwb;r");
       endif	
 
       if (file_in_path(".",rw_name) && plot_rw)
-        plot((0:255)*4000/256, 10*log10(Rw(f,:)),";Rw;c");
+        plot((0:255)*4000/256, 10*log10(Rw(f,:)),";Rw;b");
       endif	
 
       if (file_in_path(".",pw_name) && plot_pw)
-        plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;c.");
+        plot((0:255)*4000/256, 10*log10(Pw(f,:)),";Pw;g.");
       endif	
 
       signal = Am * Am';
       noise = (Am-Amq) * (Am-Amq)'; 
       snr1 = 10*log10(signal/noise);
       Am_err_label = sprintf(";Am error SNR %4.2f dB;m",snr1);
-      plot((1:L)*Wo*4000/pi, 20*log10(Amq) - 20*log10(Am), Am_err_label);
+      if plot_err
+        plot((1:L)*Wo*4000/pi, 20*log10(Amq) - 20*log10(Am), Am_err_label);
+      end
     endif
 
 

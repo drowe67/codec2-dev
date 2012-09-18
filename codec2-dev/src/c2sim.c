@@ -47,6 +47,7 @@
 #include "postfilter.h"
 #include "interp.h"
 #include "ampexp.h"
+#include "phaseexp.h"
 
 void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -436,7 +437,7 @@ int main(int argc, char *argv[])
 
 	    /* just to make sure we are not cheating - kill all phases */
 
-	    for(i=0; i<MAX_AMP; i++)
+	    for(i=0; i<=MAX_AMP; i++)
 	    	model.phi[i] = 0;
 	
 	    if (hand_voicing) {
@@ -519,7 +520,7 @@ int main(int argc, char *argv[])
 	    if (lspanssi) {
 		/*  multi-stage VQ from Anssi Ramo OH3GDD */
 
-		lspanssi_quantise(lsps, lsps_, LPC_ORD);
+		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 

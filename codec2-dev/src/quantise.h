@@ -82,7 +82,7 @@ void lspvq_quantise(float lsp[], float lsp_[], int order);
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
-void lspanssi_quantise(float lsps[], float lsps_[], int order);
+void lspanssi_quantise(float lsps[], float lsps_[], int order, int mbest_entries);
 
 void quantise_WoE(MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);

@@ -65,6 +65,7 @@ void norm(float v[], int k, int n[]);
 int quantise(float cb[], float vec[], int d, int e, float *se);
 void print_vec(float cb[], int d, int e);
 void split(float cb[], int d, int b);
+int gain_shape_quantise(float cb[], float vec[], int d, int e, float *se, float *best_gain);
 
 /*-----------------------------------------------------------------------* \
 
@@ -93,8 +94,8 @@ int main(int argc, char *argv[]) {
 
     /* Interpret command line arguments */
 
-    if (argc != 5)	{
-	printf("usage: %s TrainFile D(dimension) B(number of bits) VQFile\n", argv[0]);
+    if (argc < 5)	{
+	printf("usage: %s TrainFile D(dimension) B(number of bits) VQFile [error.txt file]\n", argv[0]);
 	exit(1);
     }
 
@@ -165,8 +166,8 @@ int main(int argc, char *argv[]) {
     /* main loop */
 
     printf("\n");
-    printf("bits  Iteration  delta  var    std dev\n");
-    printf("--------------------------------------\n");
+    printf("bits  Iteration  delta  var     std dev\n");
+    printf("---------------------------------------\n");
 
     for(b=1; b<=bits; b++) {
 	levels = 1<<b;
@@ -201,6 +202,10 @@ int main(int argc, char *argv[]) {
 	    for(i=0; i<J; i++) {
 		ret = fread(vec, sizeof(float), d, ftrain);
 		ind = quantise(cb, vec, d, levels, &se);
+		//ind = gain_shape_quantise(cb, vec, d, levels, &se, &best_gain);
+ 		//for(j=0; j<d; j++)
+		//	    if (vec[j] != 0.0)
+		//	vec[j] += best_gain;
                 #ifdef DBG
 		print_vec(vec, d, 1);
 		printf("      ind %d se: %f\n", ind, se);
@@ -233,13 +238,15 @@ int main(int argc, char *argv[]) {
 		    finished = 1;
 	    }      
 		     
-	    /* determine new codebook from centroids */
+	    if (!finished) {
+		/* determine new codebook from centroids */
 
-	    for(i=0; i<levels; i++) {
-		norm(&cent[i*d], d, &n[i*d]);
-		memcpy(&cb[i*d], &cent[i*d], d*sizeof(float));
+		for(i=0; i<levels; i++) {
+		    norm(&cent[i*d], d, &n[i*d]);
+		    memcpy(&cb[i*d], &cent[i*d], d*sizeof(float));
+		}
 	    }
-	
+
             #ifdef DBG
 	    printf("new cb ...\n");
 	    print_vec(cent, d, e);
@@ -272,6 +279,24 @@ int main(int argc, char *argv[]) {
 	fprintf(fvq,"\n");
     }
     fclose(fvq);
+
+    /* optionally dump error file for multi-stage work */
+
+    if (argc == 6) {	
+	FILE *ferr = fopen(argv[5],"wt");
+	assert(ferr != NULL);	
+	rewind(ftrain);
+	for(i=0; i<J; i++) {
+	    ret = fread(vec, sizeof(float), d, ftrain);
+	    ind = quantise(cb, vec, d, levels, &se);
+	    for(j=0; j<d; j++) {
+		if (vec[j] != 0.0)
+		    vec[j] -= cb[ind*d+j];
+		fprintf(ferr, "%f ", vec[j]);
+	    }
+	    fprintf(ferr, "\n");
+	}
+    }
 
     return 0;
 }
@@ -394,6 +419,54 @@ int quantise(float cb[], float vec[], int d, int e, float *se)
        }
        if (error < best_error) {
 	   best_error = error;
+	   besti = j;
+       }
+   }
+
+   *se += best_error;
+
+   return(besti);
+}
+
+int gain_shape_quantise(float cb[], float vec[], int d, int e, float *se, float *best_gain)
+{
+   float   error;	/* current error		*/
+   int     besti;	/* best index so far		*/
+   float   best_error;	/* best error so far		*/
+   int	   i,j,m;
+   float   diff, metric, best_metric, gain, sumAm, sumCb;
+
+   besti = 0;
+   best_metric = best_error = 1E32;
+   for(j=0; j<e; j++) {
+
+       /* compute optimum gain */
+
+       sumAm = sumCb = 0.0;
+       m = 0;
+       for(i=0; i<d; i++) {
+	   if (vec[i] != 0.0) {
+	       m++;
+	       sumAm += vec[i];
+	       sumCb += cb[j*d+i];
+	   }
+       }
+       gain = (sumAm - sumCb)/m;
+       
+       /* compute error */
+
+       metric = error = 0.0;
+       for(i=0; i<d; i++) {
+	   if (vec[i] != 0.0) {
+	       diff = vec[i] - cb[j*d+i] - gain;
+	       error += diff*diff;
+	       metric += diff*diff;
+	   }
+       }
+       if (metric < best_metric) {
+	   best_error = error;
+	   best_metric = metric;
+	   *best_gain = gain;
 	   besti = j;
        }
    }
