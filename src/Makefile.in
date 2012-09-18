@@ -69,11 +69,11 @@ am_libcodec2_la_OBJECTS = libcodec2_la-dump.lo libcodec2_la-lpc.lo \
 	libcodec2_la-fdmdv.lo libcodec2_la-kiss_fft.lo \
 	libcodec2_la-interp.lo libcodec2_la-lsp.lo \
 	libcodec2_la-phase.lo libcodec2_la-quantise.lo \
-	libcodec2_la-ampexp.lo libcodec2_la-pack.lo \
-	libcodec2_la-codebook.lo libcodec2_la-codebookd.lo \
-	libcodec2_la-codebookvq.lo libcodec2_la-codebookjnd.lo \
-	libcodec2_la-codebookjvm.lo libcodec2_la-codebookvqanssi.lo \
-	libcodec2_la-codebookdt.lo libcodec2_la-codebookge.lo
+	libcodec2_la-pack.lo libcodec2_la-codebook.lo \
+	libcodec2_la-codebookd.lo libcodec2_la-codebookvq.lo \
+	libcodec2_la-codebookjnd.lo libcodec2_la-codebookjvm.lo \
+	libcodec2_la-codebookvqanssi.lo libcodec2_la-codebookdt.lo \
+	libcodec2_la-codebookge.lo
 libcodec2_la_OBJECTS = $(am_libcodec2_la_OBJECTS)
 binPROGRAMS_INSTALL = $(INSTALL_PROGRAM)
 PROGRAMS = $(bin_PROGRAMS) $(noinst_PROGRAMS)
@@ -87,7 +87,7 @@ c2demo_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_c2enc_OBJECTS = c2enc.$(OBJEXT)
 c2enc_OBJECTS = $(am_c2enc_OBJECTS)
 c2enc_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_c2sim_OBJECTS = c2sim.$(OBJEXT)
+am_c2sim_OBJECTS = c2sim.$(OBJEXT) ampexp.$(OBJEXT) phaseexp.$(OBJEXT)
 c2sim_OBJECTS = $(am_c2sim_OBJECTS)
 c2sim_DEPENDENCIES = $(am__DEPENDENCIES_1)
 am_fdmdv_demod_OBJECTS = fdmdv_demod.$(OBJEXT) fdmdv.$(OBJEXT) \
@@ -333,7 +333,6 @@ interp.c \
 lsp.c \
 phase.c \
 quantise.c \
-ampexp.c \
 pack.c \
 codebook.c \
 codebookd.c \
@@ -357,7 +356,7 @@ c2enc_LDFLAGS = $(LIBS)
 c2dec_SOURCES = c2dec.c
 c2dec_LDADD = $(lib_LTLIBRARIES) 
 c2dec_LDFLAGS = $(LIBS)
-c2sim_SOURCES = c2sim.c
+c2sim_SOURCES = c2sim.c ampexp.c phaseexp.c
 c2sim_LDADD = $(lib_LTLIBRARIES) 
 c2sim_LDFLAGS = $(LIBS)
 fdmdv_get_test_bits_SOURCES = fdmdv_get_test_bits.c fdmdv.c kiss_fft.c
@@ -507,6 +506,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ampexp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2dec.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2demo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2enc.Po@am__quote@
@@ -520,7 +520,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-ampexp.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebook.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookd.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookdt.Plo@am__quote@
@@ -543,6 +542,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-quantise.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-sine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phaseexp.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -648,13 +648,6 @@ libcodec2_la-quantise.lo: quantise.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='quantise.c' object='libcodec2_la-quantise.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-quantise.lo `test -f 'quantise.c' || echo '$(srcdir)/'`quantise.c
-
-libcodec2_la-ampexp.lo: ampexp.c
-@am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-ampexp.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-ampexp.Tpo" -c -o libcodec2_la-ampexp.lo `test -f 'ampexp.c' || echo '$(srcdir)/'`ampexp.c; \
-@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/libcodec2_la-ampexp.Tpo" "$(DEPDIR)/libcodec2_la-ampexp.Plo"; else rm -f "$(DEPDIR)/libcodec2_la-ampexp.Tpo"; exit 1; fi
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='ampexp.c' object='libcodec2_la-ampexp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -c -o libcodec2_la-ampexp.lo `test -f 'ampexp.c' || echo '$(srcdir)/'`ampexp.c
 
 libcodec2_la-pack.lo: pack.c
 @am__fastdepCC_TRUE@	if $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcodec2_la_CFLAGS) $(CFLAGS) -MT libcodec2_la-pack.lo -MD -MP -MF "$(DEPDIR)/libcodec2_la-pack.Tpo" -c -o libcodec2_la-pack.lo `test -f 'pack.c' || echo '$(srcdir)/'`pack.c; \

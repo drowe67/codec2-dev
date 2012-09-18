@@ -113,7 +113,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
     c2->bg_est = 0.0;
     c2->ex_phase = 0.0;
 
-    for(l=1; l<MAX_AMP; l++)
+    for(l=1; l<=MAX_AMP; l++)
 	c2->prev_model_dec.A[l] = 0.0;
     c2->prev_model_dec.Wo = TWO_PI/P_MAX;
     c2->prev_model_dec.L = PI/c2->prev_model_dec.Wo;

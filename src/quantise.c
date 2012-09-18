@@ -518,54 +518,183 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
   }
 }
 
-/* 3 stage VQ LSP quantsier kindly submitted by Anssi, OH3GDD */
+#define MBEST_STAGES 3
 
-void lspanssi_quantise(float *x, float *xq, int ndim)
+struct MBEST_LIST {
+    int   index[MBEST_STAGES];    /* index of each stage that lead us to this error */
+    float error;
+};
+
+struct MBEST {
+    int                entries;   /* number of entries in mbest list   */
+    struct MBEST_LIST *list;
+};
+
+
+static struct MBEST *mbest_create(int entries) {
+    int           i,j;
+    struct MBEST *mbest;
+
+    assert(entries > 0);
+    mbest = (struct MBEST *)malloc(sizeof(struct MBEST));
+    assert(mbest != NULL);
+
+    mbest->entries = entries;
+    mbest->list = (struct MBEST_LIST *)malloc(entries*sizeof(struct MBEST_LIST));
+    assert(mbest->list != NULL);
+
+    for(i=0; i<mbest->entries; i++) {
+	for(j=0; j<MBEST_STAGES; j++)
+	    mbest->list[i].index[j] = 0;
+	mbest->list[i].error = 1E32;
+    }
+
+    return mbest;
+}
+
+
+static void mbest_destroy(struct MBEST *mbest) {
+    assert(mbest != NULL);
+    free(mbest->list);
+    free(mbest);
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  mbest_insert
+
+  Insert the results of a vector to codebook entry comparison.  the
+  list is in order of ascending error, so those codebook entries with the
+  smallest error will be first on the list.
+
+\*---------------------------------------------------------------------------*/
+
+static void mbest_insert(struct MBEST *mbest, int index[], float error) {
+    int                i, j, found;
+    struct MBEST_LIST *list    = mbest->list;
+    int                entries = mbest->entries;
+
+    found = 0;
+    for(i=0; i<entries && !found; i++)
+	if (error < list[i].error) {
+	    found = 1;
+	    for(j=entries-1; j>i; j--)
+		list[j] = list[j-1];
+	    for(j=0; j<MBEST_STAGES; j++)
+		list[i].index[j] = index[j];
+	    list[i].error = error;
+	}
+}
+
+
+static void mbest_print(char title[], struct MBEST *mbest) {
+    int i,j;
+    
+    printf("%s\n", title);
+    for(i=0; i<mbest->entries; i++) {
+	for(j=0; j<MBEST_STAGES; j++)
+	    printf("  %4d ", mbest->list[i].index[j]);
+	printf(" %f\n", mbest->list[i].error);
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  mbest_search
+
+  Searches vec[] to a codebbook of vectors, and maintains a list of the mbest
+  closest matches.
+
+\*---------------------------------------------------------------------------*/
+
+static void mbest_search(
+		  const float  *cb,     /* VQ codebook to search         */
+		  float         vec[],  /* target vector                 */
+		  float         w[],    /* weighting vector              */
+		  int           k,      /* dimension of vector           */ 
+		  int           m,      /* number on entries in codebook */
+		  struct MBEST *mbest,  /* list of closest matches       */
+		  int           index[] /* indexes that lead us here     */
+) 
 {
-  int i, n1, n2, n3;
-  float e, err1[LPC_ORD], err2[LPC_ORD], err3[LPC_ORD];
+   float   e;
+   int     i,j;
+   float   diff;
+
+   for(j=0; j<m; j++) {
+	e = 0.0;
+	for(i=0; i<k; i++) {
+	    diff = cb[j*k+i]-vec[i];
+	    e += pow(diff*w[i],2.0);
+	}
+	index[0] = j;
+	mbest_insert(mbest, index, e);
+   }
+}
+
+
+/* 3 stage VQ LSP quantiser.  Design and guidance kindly submitted by Anssi, OH3GDD */
+
+void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
+{
+    int i, j, n1, n2, n3;
   float w[LPC_ORD];
   const float *codebook1 = lsp_cbvqanssi[0].cb;
   const float *codebook2 = lsp_cbvqanssi[1].cb;
   const float *codebook3 = lsp_cbvqanssi[2].cb;
+  struct MBEST *mbest_stage1, *mbest_stage2, *mbest_stage3;
+  float target[LPC_ORD];
+  int   index[MBEST_STAGES];
 
+  mbest_stage1 = mbest_create(mbest_entries);
+  mbest_stage2 = mbest_create(mbest_entries);
+  mbest_stage3 = mbest_create(mbest_entries);
+  for(i=0; i<MBEST_STAGES; i++)
+      index[i] = 0;
+  
   compute_weights_anssi(x, w, ndim);
+
   #ifdef DUMP
   dump_weights(w, ndim);
   #endif
 
-  n1 = find_nearest_weighted(codebook1, lsp_cbvqanssi[0].m, x, w, ndim);
-  
-  e = 0.0;
-  for (i=0;i<ndim;i++)
-  {
-      xq[i] = codebook1[ndim*n1+i];
-      err1[i] = x[i] - xq[i];
-      e += err1[i]*err1[i];
-  }
-  //printf("error1: %f\n", e);
+  /* Stage 1 */
 
-  n2 = find_nearest_weighted(codebook2, lsp_cbvqanssi[1].m, err1, w, ndim);
+  mbest_search(codebook1, x, w, ndim, lsp_cbvqanssi[0].m, mbest_stage1, index);
+  mbest_print("Stage 1:", mbest_stage1);
 
-  e = 0.0;
-  for (i=0;i<ndim;i++)
-  {
-      xq[i] += codebook2[ndim*n2+i];
-      err2[i] = x[i] - xq[i];
-      e += err2[i]*err2[i];
-  }
-  //printf("error2: %f\n", e);
+  /* Stage 2 */
 
-  n3 = find_nearest_weighted(codebook3, lsp_cbvqanssi[2].m, err2, w, ndim);
-  
-  e = 0.0;
-  for (i=0;i<ndim;i++)
-  {
-      xq[i] += codebook3[ndim*n3+i];
-      err3[i] = x[i] - xq[i];
-      e += err3[i]*err3[i];
+  for (j=0; j<mbest_entries; j++) {
+      index[1] = n1 = mbest_stage1->list[j].index[0];
+      for(i=0; i<ndim; i++)
+	  target[i] = x[i] - codebook1[ndim*n1+i];
+      mbest_search(codebook2, target, w, ndim, lsp_cbvqanssi[1].m, mbest_stage2, index);      
   }
-  //printf("error3: %f\n", e);
+  mbest_print("Stage 2:", mbest_stage2);
+
+  /* Stage 3 */
+
+  for (j=0; j<mbest_entries; j++) {
+      index[2] = n1 = mbest_stage2->list[j].index[1];
+      index[1] = n2 = mbest_stage2->list[j].index[0];
+      for(i=0; i<ndim; i++)
+	  target[i] = x[i] - codebook1[ndim*n1+i] - codebook2[ndim*n2+i];
+      mbest_search(codebook3, target, w, ndim, lsp_cbvqanssi[2].m, mbest_stage3, index);      
+  }
+  mbest_print("Stage 3:", mbest_stage3);
+
+  n1 = mbest_stage3->list[0].index[2];
+  n2 = mbest_stage3->list[0].index[1];
+  n3 = mbest_stage3->list[0].index[0];
+  for (i=0;i<ndim;i++)
+      xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i];
+
+  mbest_destroy(mbest_stage1);
+  mbest_destroy(mbest_stage2);
+  mbest_destroy(mbest_stage3);
 }
 
 int check_lsp_order(float lsp[], int lpc_order)

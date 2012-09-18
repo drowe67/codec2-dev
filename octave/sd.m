@@ -26,6 +26,7 @@ function sd(raw_filename, dump_file_prefix, f)
     A2(i,:) = -20*log10(abs(fft(ak2(i,:),Ndft)));
     sd(i) = sum((A1(i,:) - A2(i,:)).^2)/Ndft;
   end
+  printf("sd av %3.2f dB*dB\n", sum(sd)/frames);
 
   figure(1);
   clf;
@@ -46,6 +47,11 @@ function sd(raw_filename, dump_file_prefix, f)
   lsp1 = load(lsp1_filename);
   lsp2 = load(lsp2_filename);
 
+  weights_filename = sprintf("%s_weights.txt", dump_file_prefix); 
+  if file_in_path(".",weights_filename)
+    weights = load(weights_filename);
+  end
+
   k = ' ';
   do 
     figure(2);
@@ -61,7 +67,10 @@ function sd(raw_filename, dump_file_prefix, f)
     axis([1 4000 -20 40]);
     hold on;
     plot((1:Ndft/2)*4000/(Ndft/2), A2(f,1:(Ndft/2)),";A2;");
- 
+    if file_in_path(".",weights_filename)
+      plot(lsp1(f,:)*4000/pi, weights(f,:),";weights;g+");
+    end
+
     for l=1:10
         plot([lsp1(f,l)*4000/pi lsp1(f,l)*4000/pi], [0  -10], 'r');
         plot([lsp2(f,l)*4000/pi lsp2(f,l)*4000/pi], [-10 -20], 'b');

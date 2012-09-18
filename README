@@ -64,19 +64,21 @@ Debugging
 Directories
 -----------
 
-  fltk     - FLTK GUI programs(s)
-  octave   - Octave scripts used for visualising internal signals 
-             during development
-  script   - shell scripts for playing and converting raw files
-  src      - C source code
-  raw      - speech files in raw format (16 bits signed linear 8 kHz)
-  unittest - unit test source code
-  voicing  - hand-estimated voicing files, used for development
-  wav      - speech files in wave file format
-  win32    - Support for building Windows DLL version of Codec 2 and FDMDV libraries
+  fltk      - FLTK GUI programs(s)
+  octave    - Octave scripts used for visualising internal signals 
+              during development
+  portaudio - Portaudio test programs
+  script    - shell scripts for playing and converting raw files
+  src       - C source code
+  raw       - speech files in raw format (16 bits signed linear 8 kHz)
+  unittest  - unit test source code
+  voicing   - hand-estimated voicing files, used for development
+  wav       - speech files in wave file format
+  win32     - Support for building Windows DLL version of Codec 2 and FDMDV libraries
 
 TODO
 ----
 
-[ ] Get win32/Makefile integarted into Automake system, such that if
+[ ] Get win32/Makefile integrated into Automake system, such that if
     i586-mingw32msvc exists the Win32 code gets automatically built.
+[ ] Same for fltk & portaudio, build these conditionally if libs exist

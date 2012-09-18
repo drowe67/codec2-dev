@@ -1,15 +1,15 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: phase.h                                          
+  FILE........: phaseexp.h                                          
   AUTHOR......: David Rowe                                             
-  DATE CREATED: 1/2/09                                                 
+  DATE CREATED: June 2012                                                
                                                                              
-  Functions for modelling phase.
+  Experimental functions for quantising, modelling and synthesising phase.
                                                                              
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2009 David Rowe
+  Copyright (C) 2012 David Rowe
 
   All rights reserved.
 
@@ -25,15 +25,15 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __PHASE__
-#define __PHASE__
+#ifndef __PHASEEXP__
+#define __PHASEEXP__
 
 #include "kiss_fft.h"
 
-void phase_synth_zero_order(kiss_fft_cfg fft_dec_cfg, 
-			    MODEL *model, 
-			    float aks[], 
-                            float *ex_phase, 
-			    int order);
+struct PEXP;
+
+struct PEXP * phase_experiment_create();
+void phase_experiment_destroy(struct PEXP *pexp);
+void phase_experiment(struct PEXP *pexp, MODEL *model, char *arg);
 
 #endif

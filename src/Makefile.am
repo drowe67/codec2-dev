@@ -127,7 +127,6 @@ interp.c \
 lsp.c \
 phase.c \
 quantise.c \
-ampexp.c \
 pack.c \
 codebook.c \
 codebookd.c \
@@ -159,7 +158,7 @@ c2dec_SOURCES = c2dec.c
 c2dec_LDADD = $(lib_LTLIBRARIES) 
 c2dec_LDFLAGS = $(LIBS)
 
-c2sim_SOURCES = c2sim.c
+c2sim_SOURCES = c2sim.c ampexp.c phaseexp.c
 c2sim_LDADD = $(lib_LTLIBRARIES) 
 c2sim_LDFLAGS = $(LIBS)
 

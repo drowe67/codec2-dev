@@ -638,6 +638,15 @@ void new_data(float mag_dB[]) {
   The ouput of the demod is codec voice data so it's OK if we miss or
   repeat a frame every now and again.
 
+  TODOs:
+
+    + this might work with arbitrary input and output buffer lengths,
+    0,1, or 2 only apply if we are inputting the nominal number of
+    samples on every call.
+
+    + so the I/O buffer sizes might not matter, as long as they of
+    reasonable size (say twice the nominal size).
+
 \*------------------------------------------------------------------*/
 
 void per_frame_rx_processing(short  output_buf[], /* output buf of decoded speech samples          */
