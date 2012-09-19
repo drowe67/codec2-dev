@@ -37,10 +37,10 @@ static const float codes0[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp2.txt */
 static const float codes1[] = {
@@ -72,10 +72,10 @@ static const float codes1[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp3.txt */
 static const float codes2[] = {
@@ -107,10 +107,10 @@ static const float codes2[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp4.txt */
 static const float codes3[] = {
@@ -122,30 +122,30 @@ static const float codes3[] = {
   150,
   175,
   200,
-  225,
   250,
-  275,
   300,
-  325,
   350,
-  375,
   400,
-  425,
   450,
-  475,
   500,
-  525,
   550,
-  575,
   600,
-  625,
   650,
-  675,
   700,
-  825,
+  750,
+  800,
   850,
-  875,
-  900
+  900,
+  950,
+  1000,
+  1050,
+  1100,
+  1150,
+  1200,
+  1250,
+  1300,
+  1350,
+  1400
 };
   /* codebook/dlsp5.txt */
 static const float codes4[] = {
@@ -157,30 +157,30 @@ static const float codes4[] = {
   150,
   175,
   200,
-  225,
   250,
-  275,
   300,
-  325,
   350,
-  375,
   400,
-  425,
   450,
-  475,
   500,
-  525,
   550,
-  575,
   600,
-  625,
   650,
-  675,
   700,
-  825,
+  750,
+  800,
   850,
-  875,
-  900
+  900,
+  950,
+  1000,
+  1050,
+  1100,
+  1150,
+  1200,
+  1250,
+  1300,
+  1350,
+  1400
 };
   /* codebook/dlsp6.txt */
 static const float codes5[] = {
@@ -192,30 +192,30 @@ static const float codes5[] = {
   150,
   175,
   200,
-  225,
   250,
-  275,
   300,
-  325,
   350,
-  375,
   400,
-  425,
   450,
-  475,
   500,
-  525,
   550,
-  575,
   600,
-  625,
   650,
-  675,
   700,
-  825,
+  750,
+  800,
   850,
-  875,
-  900
+  900,
+  950,
+  1000,
+  1050,
+  1100,
+  1150,
+  1200,
+  1250,
+  1300,
+  1350,
+  1400
 };
   /* codebook/dlsp7.txt */
 static const float codes6[] = {
@@ -247,10 +247,10 @@ static const float codes6[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp8.txt */
 static const float codes7[] = {
@@ -282,10 +282,10 @@ static const float codes7[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp9.txt */
 static const float codes8[] = {
@@ -317,10 +317,10 @@ static const float codes8[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
   /* codebook/dlsp10.txt */
 static const float codes9[] = {
@@ -352,10 +352,10 @@ static const float codes9[] = {
   650,
   675,
   700,
-  825,
-  850,
-  875,
-  900
+  725,
+  750,
+  775,
+  800
 };
 
 const struct lsp_codebook lsp_cbd[] = {
