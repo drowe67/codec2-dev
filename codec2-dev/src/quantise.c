@@ -163,6 +163,8 @@ void encode_lspds_scalar(
     for(i=0; i<order; i++)
 	lsp_hz[i] = (4000.0/PI)*lsp[i];
 
+    //printf("\n");
+
     wt[0] = 1.0;
     for(i=0; i<order; i++) {
 
@@ -179,12 +181,13 @@ void encode_lspds_scalar(
 	indexes[i] = quantise(cb, &dlsp[i], wt, k, m, &se);
  	dlsp_[i] = cb[indexes[i]*k];
 
-	//printf("%d dlsp %3.2f dlsp_ %3.2f\n", i, dlsp[i], dlsp_[i]);
 
 	if (i) 
 	    lsp__hz[i] = lsp__hz[i-1] + dlsp_[i];
 	else
 	    lsp__hz[0] = dlsp_[0];
+	
+	//printf("%d lsp %3.2f dlsp %3.2f dlsp_ %3.2f lsp_ %3.2f\n", i, lsp_hz[i], dlsp[i], dlsp_[i], lsp__hz[i]);
     }
 
 }
@@ -214,6 +217,8 @@ void decode_lspds_scalar(
 	    lsp__hz[0] = dlsp_[0];
 
 	lsp_[i] = (PI/4000.0)*lsp__hz[i];
+
+	//printf("%d dlsp_ %3.2f lsp_ %3.2f\n", i, dlsp_[i], lsp__hz[i]);
     }
 
 }
