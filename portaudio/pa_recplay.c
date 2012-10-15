@@ -44,6 +44,7 @@
 #include <stdlib.h>
 #include "portaudio.h"
 #include "fdmdv.h"
+#include "fifo.h"
 
 #define SAMPLE_RATE  48000         /* 48 kHz sampling rate rec. as we
 				      can trust accuracy of sound
@@ -54,12 +55,15 @@
 #define NUM_CHANNELS 2             /* I think most sound cards prefer
 				      stereo, we will convert to mono
 				      as we sample */
+#define MAX_FPB      2048          /* maximum value of framesPerBuffer */
 
 /* state information passed to call back */
 
 typedef struct {
     float               in48k[FDMDV_OS_TAPS + N48];
     float               in8k[MEM8 + N8];
+    struct FIFO        *infifo;
+    struct FIFO        *outfifo;
 } paTestData;
 
 
@@ -85,43 +89,95 @@ static int callback( const void *inputBuffer, void *outputBuffer,
     float       out8k[N8];
     float       out48k[N48];
     short       out48k_short[N48];
+    short       in48k_short[N48];
+    short       indata[MAX_FPB];
+    short       outdata[MAX_FPB];
 
     (void) timeInfo;
     (void) statusFlags;
 
     assert(inputBuffer != NULL);
-
-    /* just use left channel */
-
-    for(i=0; i<framesPerBuffer; i++,rptr+=2)
-	data->in48k[i+FDMDV_OS_TAPS] = *rptr; 
-
-    /* downsample and update filter memory */
-
-    fdmdv_48_to_8(out8k, &in48k[FDMDV_OS_TAPS], N8);
-    for(i=0; i<FDMDV_OS_TAPS; i++)
-	in48k[i] = in48k[i+framesPerBuffer];
-
-    /* play side, back up to 8k */
-
-    for(i=0; i<N8; i++)
-	in8k[MEM8+i] = out8k[i];
-
-    /* upsample and update filter memory */
-
-    fdmdv_8_to_48(out48k, &in8k[MEM8], N8);
-    for(i=0; i<MEM8; i++)
-	in8k[i] = in8k[i+N8];
-
     assert(outputBuffer != NULL);
 
-    /* write signal to both channels */
+    /* 
+       framesPerBuffer is portaudio-speak for number of samples we
+       actually get from the record side and need to provide to the
+       play side. On Linux (at least) it was found that
+       framesPerBuffer may not always be what we ask for in the
+       framesPerBuffer field of Pa_OpenStream.  For example a request
+       for 960 sample buffers lead to framesPerBuffer = 1024.
 
-    for(i=0; i<N48; i++)
-	out48k_short[i] = (short)out48k[i];
-    for(i=0; i<framesPerBuffer; i++,wptr+=2) {
-	wptr[0] = out48k_short[i]; 
-	wptr[1] = out48k_short[i]; 
+       To perform the 48 to 8 kHz conversion we need an integer
+       multiple of FDMDV_OS samples to support the interpolation and
+       decimation.  As we can't guarantee the size of framesPerBuffer
+       we do a little FIFO buffering.
+    */
+
+    //printf("framesPerBuffer: %d N48 %d\n", framesPerBuffer, N48);
+
+    /* assemble a mono buffer (just use left channel) and write to FIFO */
+
+    assert(framesPerBuffer < MAX_FPB);
+    for(i=0; i<framesPerBuffer; i++,rptr+=2)
+	indata[i] = *rptr;
+    fifo_write(data->infifo, indata, framesPerBuffer);
+
+    /* while we have enough samples available ... */
+
+    //printf("infifo before: %d\n", fifo_n(data->infifo));
+    while (fifo_read(data->infifo, in48k_short, N48) == 0) {
+
+	/* convert to float */
+
+	for(i=0; i<N48; i++)
+	    in48k[FDMDV_OS_TAPS + i] = in48k_short[i];
+
+	/* downsample and update filter memory */
+
+	fdmdv_48_to_8(out8k, &in48k[FDMDV_OS_TAPS], N8);
+	for(i=0; i<FDMDV_OS_TAPS; i++)
+	    in48k[i] = in48k[i+N48];
+
+	/* play side, back up to 8k */
+
+	for(i=0; i<N8; i++)
+	    in8k[MEM8+i] = out8k[i];
+
+	/* upsample and update filter memory */
+
+	fdmdv_8_to_48(out48k, &in8k[MEM8], N8);
+	for(i=0; i<MEM8; i++)
+	    in8k[i] = in8k[i+N8];
+
+	/* write signal to both channels */
+
+	for(i=0; i<N48; i++)
+	    out48k_short[i] = (short)out48k[i];
+
+	fifo_write(data->outfifo, out48k_short, N48);
+    }
+    //printf("infifo after: %d\n", fifo_n(data->infifo));
+    //printf("outfifo     : %d\n", fifo_n(data->outfifo));
+
+
+    /* OK now set up output samples */
+
+    if (fifo_read(data->outfifo, outdata, framesPerBuffer) == 0) {
+
+	/* write signal to both channels */
+
+	for(i=0; i<framesPerBuffer; i++,wptr+=2) {
+	    wptr[0] = outdata[i]; 
+	    wptr[1] = outdata[i]; 
+	}
+    }
+    else {
+	//printf("no data\n");
+	/* zero output if no data available */
+	for(i=0; i<framesPerBuffer; i++,wptr+=2) {
+	    wptr[0] = 0; 
+	    wptr[1] = 0; 
+	}
     }
 
     return paContinue;
@@ -135,10 +191,17 @@ int main(int argc, char *argv[])
     paTestData          data;
     int                 i;
 
+    /* init callback data */
+
     for(i=0; i<MEM8; i++)
 	data.in8k[i] = 0.0;
     for(i=0; i<FDMDV_OS_TAPS; i++)
 	data.in48k[i] = 0.0;
+
+    data.infifo = fifo_create(2*N48);
+    data.outfifo = fifo_create(2*N48);
+
+    /* init port audio */
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
@@ -170,7 +233,7 @@ int main(int argc, char *argv[])
 	      &inputParameters,
               &outputParameters,
               SAMPLE_RATE,
-              N48,
+              512,
               paClipOff,      
               callback,
               &data );
@@ -198,6 +261,10 @@ done:
         fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
         err = 1;          /* Always return 0 or 1, but no other return codes. */
     }
+
+    fifo_destroy(data.infifo);
+    fifo_destroy(data.outfifo);
+
     return err;
 }
 

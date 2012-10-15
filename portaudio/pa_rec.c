@@ -81,7 +81,7 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     paTestData *data = (paTestData*)userData;
     FILE       *fout = data->fout;
     int         framesToCopy;
-    int         i, n8;
+    int         i;
     int         finished;
     short      *rptr = (short*)inputBuffer;
     float       out8k[N8];
@@ -130,8 +130,7 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
 
 int main(int argc, char *argv[])
 {
-    PaStreamParameters  inputParameters,
-                        outputParameters;
+    PaStreamParameters  inputParameters;
     PaStream*           stream;
     PaError             err = paNoError;
     paTestData          data;
@@ -157,6 +156,9 @@ int main(int argc, char *argv[])
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
+
+    printf( "PortAudio version number = %d\nPortAudio version text = '%s'\n",
+            Pa_GetVersion(), Pa_GetVersionText() );
 
     inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
     if (inputParameters.device == paNoDevice) {
