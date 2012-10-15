@@ -9,7 +9,7 @@
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2009 David Rowe
+  Copyright (C) 2009-2012 David Rowe
 
   All rights reserved.
 
@@ -30,6 +30,8 @@
 
 #define LPC_MAX_ORDER 20
 
+void pre_emp(float Sn_pre[], float Sn[], float *mem, int Nsam);
+void de_emp(float Sn_se[], float Sn[], float *mem, int Nsam);
 void hanning_window(float Sn[],	float Wn[], int Nsam);
 void autocorrelate(float Sn[], float Rn[], int Nsam, int order);
 void levinson_durbin(float R[],	float lpcs[], int order);
