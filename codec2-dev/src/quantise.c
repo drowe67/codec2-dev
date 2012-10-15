@@ -411,9 +411,10 @@ void compute_weights(const float *x, float *w, int ndim)
   //w[1]*=2;
 }
 
-/* LSP weight calculation function kindly submitted by Anssi, OH3GDD */
+/* LSP weight calculation ported from m-file function kindly submitted
+   by Anssi, OH3GDD */
 
-void compute_weights_anssi(const float *x, float *w, int ndim)
+void compute_weights_anssi_mode2(const float *x, float *w, int ndim)
 {
   int i;
   float d[LPC_ORD];
@@ -439,7 +440,7 @@ void compute_weights_anssi(const float *x, float *w, int ndim)
         else
             w[i]=1.0/(0.01+d[i]);
         
-        w[i]=sqrt(w[i]+0.3);
+        w[i]=pow(w[i]+0.3, 0.66);
   }
 }
 
@@ -523,7 +524,7 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
   }
 }
 
-#define MBEST_STAGES 3
+#define MBEST_STAGES 4
 
 struct MBEST_LIST {
     int   index[MBEST_STAGES];    /* index of each stage that lead us to this error */
@@ -569,8 +570,8 @@ static void mbest_destroy(struct MBEST *mbest) {
 
   mbest_insert
 
-  Insert the results of a vector to codebook entry comparison.  the
-  list is in order of ascending error, so those codebook entries with the
+  Insert the results of a vector to codebook entry comparison. The
+  list is ordered in order or error, so those entries with the
   smallest error will be first on the list.
 
 \*---------------------------------------------------------------------------*/
@@ -644,22 +645,24 @@ static void mbest_search(
 
 void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
 {
-    int i, j, n1, n2, n3;
+  int i, j, n1, n2, n3, n4;
   float w[LPC_ORD];
   const float *codebook1 = lsp_cbvqanssi[0].cb;
   const float *codebook2 = lsp_cbvqanssi[1].cb;
   const float *codebook3 = lsp_cbvqanssi[2].cb;
-  struct MBEST *mbest_stage1, *mbest_stage2, *mbest_stage3;
+  const float *codebook4 = lsp_cbvqanssi[3].cb;
+  struct MBEST *mbest_stage1, *mbest_stage2, *mbest_stage3, *mbest_stage4;
   float target[LPC_ORD];
   int   index[MBEST_STAGES];
 
   mbest_stage1 = mbest_create(mbest_entries);
   mbest_stage2 = mbest_create(mbest_entries);
   mbest_stage3 = mbest_create(mbest_entries);
+  mbest_stage4 = mbest_create(mbest_entries);
   for(i=0; i<MBEST_STAGES; i++)
       index[i] = 0;
   
-  compute_weights_anssi(x, w, ndim);
+  compute_weights_anssi_mode2(x, w, ndim);
 
   #ifdef DUMP
   dump_weights(w, ndim);
@@ -691,15 +694,29 @@ void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
   }
   mbest_print("Stage 3:", mbest_stage3);
 
-  n1 = mbest_stage3->list[0].index[2];
-  n2 = mbest_stage3->list[0].index[1];
-  n3 = mbest_stage3->list[0].index[0];
+  /* Stage 4 */
+
+  for (j=0; j<mbest_entries; j++) {
+      index[3] = n1 = mbest_stage3->list[j].index[2];
+      index[2] = n2 = mbest_stage3->list[j].index[1];
+      index[1] = n3 = mbest_stage3->list[j].index[0];
+      for(i=0; i<ndim; i++)
+	  target[i] = x[i] - codebook1[ndim*n1+i] - codebook2[ndim*n2+i] - codebook3[ndim*n3+i];
+      mbest_search(codebook4, target, w, ndim, lsp_cbvqanssi[3].m, mbest_stage4, index);      
+  }
+  mbest_print("Stage 4:", mbest_stage4);
+
+  n1 = mbest_stage4->list[0].index[3];
+  n2 = mbest_stage4->list[0].index[2];
+  n3 = mbest_stage4->list[0].index[1];
+  n4 = mbest_stage4->list[0].index[0];
   for (i=0;i<ndim;i++)
-      xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i];
+      xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i] + codebook4[ndim*n4+i];
 
   mbest_destroy(mbest_stage1);
   mbest_destroy(mbest_stage2);
   mbest_destroy(mbest_stage3);
+  mbest_destroy(mbest_stage4);
 }
 
 int check_lsp_order(float lsp[], int lpc_order)
@@ -986,32 +1003,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	Pw[i].real *= 1.4*1.4;
     }
     
-    //#define IDEA1
-#ifdef IDEA1
-    /* add random component to phases in interformant regions */
 
-    /* determine threshold */
-
-    max_Rw = 20.0*log10(max_Rw);
-    min_Rw = 20.0*log10(min_Rw);
-    range = max_Rw - min_Rw;
-    thresh = min_Rw + 0.2*range;
-    r = FFT_ENC/TWO_PI;
-    printf("min %f max %f\n", min_Rw, max_Rw);
-    printf("range %4.2f thresh %4.2f\n", range, thresh);
-
-    for(m=1; m<=model->L; m++) {
-	/* determine freq of harmonic */
-	w = model->Wo*m;
-        bin = floor(w*r + 0.5);
-	printf("bin %d %4.2f ", bin, 20.0*log10(Rw[bin]));
-	if (20.0*log10(Rw[bin]) < thresh) {
-	    model->phi[m] += (PI/4)*(1.0 - 2.0*rand()/RAND_MAX);
-	    printf("m %d %4.2f ", m, 20.0*log10(Rw[bin]));
-	}
-    }
-    printf("\n");
-#endif
 }
 
 
