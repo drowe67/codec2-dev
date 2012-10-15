@@ -3,7 +3,7 @@
 
 CFLAGS =  -g -Wall -I../src
 LIBS = -lm -lportaudio -pthread
-SRC  = ../src/fdmdv.c ../src/kiss_fft.c
+SRC  = ../src/fdmdv.c ../src/kiss_fft.c ../src/fifo.c
 
 all: pa_rec pa_play pa_recplay pa_impresp
 
