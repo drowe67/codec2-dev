@@ -944,7 +944,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 
     /* Estimate pitch */
 
-    nlp(c2->nlp,c2->Sn,N,M,P_MIN,P_MAX,&pitch,Sw, &c2->prev_Wo_enc);
+    nlp(c2->nlp,c2->Sn,N,M,P_MIN,P_MAX,&pitch,Sw, c2->W, &c2->prev_Wo_enc);
     model->Wo = TWO_PI/pitch;
     model->L = PI/model->Wo;
 
