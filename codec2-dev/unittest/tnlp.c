@@ -142,7 +142,7 @@ char *argv[];
       dump_Sn(Sn); dump_Sw(Sw); 
 #endif
 
-      nlp(nlp_states,Sn,N,M,PITCH_MIN,PITCH_MAX,&pitch,Sw,&prev_Wo);
+      nlp(nlp_states,Sn,N,M,PITCH_MIN,PITCH_MAX,&pitch,Sw,W, &prev_Wo);
       prev_Wo = TWO_PI/pitch;
 
       fprintf(fout,"%f\n",pitch);

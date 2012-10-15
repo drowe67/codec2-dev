@@ -42,7 +42,8 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	scalarlsptest$(EXEEXT) tfdmdv$(EXEEXT) t48_8$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
 	vqtrainph$(EXEEXT) genphdata$(EXEEXT) genampdata$(EXEEXT) \
-	polar2rect$(EXEEXT) vqtrainsp$(EXEEXT)
+	polar2rect$(EXEEXT) vqtrainsp$(EXEEXT) tprede$(EXEEXT) \
+	pre$(EXEEXT) de$(EXEEXT)
 subdir = unittest
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -55,6 +56,9 @@ PROGRAMS = $(noinst_PROGRAMS)
 am_create_interleaver_OBJECTS = create_interleaver.$(OBJEXT)
 create_interleaver_OBJECTS = $(am_create_interleaver_OBJECTS)
 create_interleaver_DEPENDENCIES =
+am_de_OBJECTS = de.$(OBJEXT) lpc.$(OBJEXT)
+de_OBJECTS = $(am_de_OBJECTS)
+de_DEPENDENCIES =
 am_extract_OBJECTS = extract.$(OBJEXT)
 extract_OBJECTS = $(am_extract_OBJECTS)
 extract_DEPENDENCIES =
@@ -84,6 +88,9 @@ lspsync_DEPENDENCIES =
 am_polar2rect_OBJECTS = polar2rect.$(OBJEXT)
 polar2rect_OBJECTS = $(am_polar2rect_OBJECTS)
 polar2rect_DEPENDENCIES =
+am_pre_OBJECTS = pre.$(OBJEXT) lpc.$(OBJEXT)
+pre_OBJECTS = $(am_pre_OBJECTS)
+pre_DEPENDENCIES =
 am_scalarlsptest_OBJECTS = scalarlsptest.$(OBJEXT) quantise.$(OBJEXT) \
 	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
 	$(am__objects_1)
@@ -113,6 +120,9 @@ am_tnlp_OBJECTS = tnlp.$(OBJEXT) sine.$(OBJEXT) nlp.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) dump.$(OBJEXT)
 tnlp_OBJECTS = $(am_tnlp_OBJECTS)
 tnlp_DEPENDENCIES =
+am_tprede_OBJECTS = tprede.$(OBJEXT) lpc.$(OBJEXT)
+tprede_OBJECTS = $(am_tprede_OBJECTS)
+tprede_DEPENDENCIES =
 am_tquant_OBJECTS = tquant.$(OBJEXT) quantise.$(OBJEXT) lpc.$(OBJEXT) \
 	lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
 	$(am__objects_1)
@@ -144,19 +154,21 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genampdata_SOURCES) $(genlsp_SOURCES) $(genphdata_SOURCES) \
-	$(genres_SOURCES) $(lspsync_SOURCES) $(polar2rect_SOURCES) \
-	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
-	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
+	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
+	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
 	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
 	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
-DIST_SOURCES = $(create_interleaver_SOURCES) $(extract_SOURCES) \
-	$(genampdata_SOURCES) $(genlsp_SOURCES) $(genphdata_SOURCES) \
-	$(genres_SOURCES) $(lspsync_SOURCES) $(polar2rect_SOURCES) \
-	$(scalarlsptest_SOURCES) $(t48_8_SOURCES) $(tfdmdv_SOURCES) \
-	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+DIST_SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
+	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
+	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
+	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
 	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
 	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
@@ -334,6 +346,15 @@ create_interleaver_LDFLAGS = $(LIBS)
 tlspsens_SOURCES = tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c $(CODEBOOKS)
 tlspsens_LDADD = $(lib_LTLIBRARIES) 
 tlspsens_LDFLAGS = $(LIBS)
+tprede_SOURCES = tprede.c ../src/lpc.c 
+tprede_LDADD = $(lib_LTLIBRARIES) 
+tprede_LDFLAGS = $(LIBS)
+pre_SOURCES = pre.c ../src/lpc.c 
+pre_LDADD = $(lib_LTLIBRARIES) 
+pre_LDFLAGS = $(LIBS)
+de_SOURCES = de.c ../src/lpc.c 
+de_LDADD = $(lib_LTLIBRARIES) 
+de_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -377,6 +398,9 @@ clean-noinstPROGRAMS:
 create_interleaver$(EXEEXT): $(create_interleaver_OBJECTS) $(create_interleaver_DEPENDENCIES) 
 	@rm -f create_interleaver$(EXEEXT)
 	$(LINK) $(create_interleaver_LDFLAGS) $(create_interleaver_OBJECTS) $(create_interleaver_LDADD) $(LIBS)
+de$(EXEEXT): $(de_OBJECTS) $(de_DEPENDENCIES) 
+	@rm -f de$(EXEEXT)
+	$(LINK) $(de_LDFLAGS) $(de_OBJECTS) $(de_LDADD) $(LIBS)
 extract$(EXEEXT): $(extract_OBJECTS) $(extract_DEPENDENCIES) 
 	@rm -f extract$(EXEEXT)
 	$(LINK) $(extract_LDFLAGS) $(extract_OBJECTS) $(extract_LDADD) $(LIBS)
@@ -398,6 +422,9 @@ lspsync$(EXEEXT): $(lspsync_OBJECTS) $(lspsync_DEPENDENCIES)
 polar2rect$(EXEEXT): $(polar2rect_OBJECTS) $(polar2rect_DEPENDENCIES) 
 	@rm -f polar2rect$(EXEEXT)
 	$(LINK) $(polar2rect_LDFLAGS) $(polar2rect_OBJECTS) $(polar2rect_LDADD) $(LIBS)
+pre$(EXEEXT): $(pre_OBJECTS) $(pre_DEPENDENCIES) 
+	@rm -f pre$(EXEEXT)
+	$(LINK) $(pre_LDFLAGS) $(pre_OBJECTS) $(pre_LDADD) $(LIBS)
 scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES) 
 	@rm -f scalarlsptest$(EXEEXT)
 	$(LINK) $(scalarlsptest_LDFLAGS) $(scalarlsptest_OBJECTS) $(scalarlsptest_LDADD) $(LIBS)
@@ -416,6 +443,9 @@ tlspsens$(EXEEXT): $(tlspsens_OBJECTS) $(tlspsens_DEPENDENCIES)
 tnlp$(EXEEXT): $(tnlp_OBJECTS) $(tnlp_DEPENDENCIES) 
 	@rm -f tnlp$(EXEEXT)
 	$(LINK) $(tnlp_LDFLAGS) $(tnlp_OBJECTS) $(tnlp_LDADD) $(LIBS)
+tprede$(EXEEXT): $(tprede_OBJECTS) $(tprede_DEPENDENCIES) 
+	@rm -f tprede$(EXEEXT)
+	$(LINK) $(tprede_LDFLAGS) $(tprede_OBJECTS) $(tprede_LDADD) $(LIBS)
 tquant$(EXEEXT): $(tquant_OBJECTS) $(tquant_DEPENDENCIES) 
 	@rm -f tquant$(EXEEXT)
 	$(LINK) $(tquant_LDFLAGS) $(tquant_OBJECTS) $(tquant_LDADD) $(LIBS)
@@ -451,6 +481,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookvqanssi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codec2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/create_interleaver.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/de.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
@@ -469,6 +500,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phase.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/polar2rect.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postfilter.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quantise.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
@@ -477,6 +509,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tinterp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tlspsens.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tnlp.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tprede.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tquant.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vq_train_jvm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vqtrain.Po@am__quote@
