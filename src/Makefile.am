@@ -69,7 +69,8 @@ CODEBOOKSJVM= \
 CODEBOOKSVQANSSI= \
   $D/lspvqanssi1.txt \
   $D/lspvqanssi2.txt \
-  $D/lspvqanssi3.txt
+  $D/lspvqanssi3.txt \
+  $D/lspvqanssi4.txt
 
 CODEBOOKSGE= \
   $D/gecb.txt 
@@ -105,7 +106,7 @@ codebookjnd.c: generate_codebook $(CODEBOOKSJND)
 codebookjvm.c: generate_codebook $(CODEBOOKSJVM)
 	./generate_codebook lsp_cbjvm $(CODEBOOKSJVM) > codebookjvm.c
 
-codebookvqanssi.c: generate_codebook $(CODEBOOKSVQEXP)
+codebookvqanssi.c: generate_codebook $(CODEBOOKSVQANSSI)
 	./generate_codebook lsp_cbvqanssi $(CODEBOOKSVQANSSI) > codebookvqanssi.c
 
 codebookge.c: generate_codebook $(CODEBOOKSGE)
@@ -121,6 +122,7 @@ nlp.c \
 postfilter.c \
 sine.c \
 codec2.c \
+fifo.c \
 fdmdv.c \
 kiss_fft.c \
 interp.c \
