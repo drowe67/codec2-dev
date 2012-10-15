@@ -29,7 +29,6 @@
 #include "phase.h"
 #include "kiss_fft.h"
 #include "comp.h"
-#include "glottal.c"
 
 #include <assert.h>
 #include <ctype.h>
