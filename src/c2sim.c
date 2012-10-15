@@ -49,7 +49,7 @@
 #include "ampexp.h"
 #include "phaseexp.h"
 
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[]);
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 
@@ -65,6 +65,7 @@ int main(int argc, char *argv[])
     FILE *fin;		/* input speech file                     */
     short buf[N];	/* input/output buffer                   */
     float Sn[M];	/* float input speech samples            */
+    float Sn_pre[M];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     kiss_fft_cfg  fft_fwd_cfg;
     kiss_fft_cfg  fft_inv_cfg;
@@ -89,6 +90,8 @@ int main(int argc, char *argv[])
     int lspres = 0;
     int lspdt = 0, lspdt_mode = LSPDT_ALL;
     int dt = 0, lspjvm = 0, lspanssi = 0, lspjnd = 0, lspmel = 0;
+    int prede = 0;
+    float pre_mem = 0.0, de_mem = 0.0;
     float ak[LPC_MAX];
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
@@ -150,6 +153,7 @@ int main(int argc, char *argv[])
         { "hi", no_argument, &hi, 1 },
         { "simlpcpf", no_argument, &simlpcpf, 1 },
         { "lpcpf", no_argument, &lpcpf, 1 },
+        { "prede", no_argument, &prede, 1 },
         { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
@@ -162,8 +166,10 @@ int main(int argc, char *argv[])
     };
     int num_opts=sizeof(long_options)/sizeof(struct option);
     
-    for(i=0; i<M; i++)
+    for(i=0; i<M; i++) {
 	Sn[i] = 1.0;
+	Sn_pre[i] = 1.0;
+    }
     for(i=0; i<2*N; i++)
 	Sn_[i] = 0;
 
@@ -354,21 +360,26 @@ int main(int argc, char *argv[])
 
 	/* Read input speech */
 
-	for(i=0; i<M-N; i++)
+	for(i=0; i<M-N; i++) {
 	    Sn[i] = Sn[i+N];
+	    Sn_pre[i] = Sn_pre[i+N];
+	}
 	for(i=0; i<N; i++)
 	    Sn[i+M-N] = buf[i];
- 
+
+	pre_emp(&Sn_pre[M-N], &Sn[M-N], &pre_mem, N);
+	
+
 	/*------------------------------------------------------------*\
 
                       Estimate Sinusoidal Model Parameters
 
 	\*------------------------------------------------------------*/
 
-	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,&prev_uq_Wo);
+	nlp(nlp_states,Sn,N,M,P_MIN,P_MAX,&pitch,Sw,W,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 
-	dft_speech(fft_fwd_cfg, Sw, Sn, w); 
+	dft_speech(fft_fwd_cfg, Sw, Sn, w);
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W);
 	uq_Wo = model.Wo;
@@ -415,8 +426,15 @@ int main(int argc, char *argv[])
 
 	    /* find aks here, these are overwritten if LPC modelling is enabled */
 
-	    for(i=0; i<M; i++)
-		Wn[i] = Sn[i]*w[i];
+	    if (prede) {
+		for(i=0; i<M; i++)
+		    Wn[i] = Sn_pre[i]*w[i];
+	    }
+	    else {
+	    
+		for(i=0; i<M; i++)
+		    Wn[i] = Sn[i]*w[i];
+	    }
 	    autocorrelate(Wn,Rk,M,order);
 	    levinson_durbin(Rk,ak,order);
 
@@ -452,8 +470,11 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (lpc_model) {
-
-	    e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
+	    
+	    if (prede)
+		e = speech_to_uq_lsps(lsps, ak, Sn_pre, w, order);
+	    else
+		e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
             #ifdef DUMP
 	    dump_ak(ak, LPC_ORD);
@@ -521,6 +542,7 @@ int main(int argc, char *argv[])
 		/*  multi-stage VQ from Anssi Ramo OH3GDD */
 
 		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
+		bw_expand_lsps(lsps_, LPC_ORD);			    
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
@@ -761,7 +783,7 @@ int main(int argc, char *argv[])
 					   order);	
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn);
+		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn, prede, &de_mem);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -772,7 +794,7 @@ int main(int argc, char *argv[])
 		    phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn);
+		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -796,7 +818,7 @@ int main(int argc, char *argv[])
 
 	    if (postfilt)
 		postfilter(&model, &bg_est);
-	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn);
+	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem);
 	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
 	}
 
@@ -839,11 +861,13 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[])
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem)
 {
     int     i;
 
     synthesise(fft_inv_cfg, Sn_, model, Pn, 1);
+    if (prede)
+        de_emp(Sn_, Sn_, de_mem, N);	
 
     for(i=0; i<N; i++) {
 	if (Sn_[i] > 32767.0)
