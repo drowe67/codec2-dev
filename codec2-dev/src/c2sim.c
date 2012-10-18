@@ -49,7 +49,7 @@
 #include "ampexp.h"
 #include "phaseexp.h"
 
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem);
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 
@@ -129,6 +129,7 @@ int main(int argc, char *argv[])
     #endif
     struct PEXP *pexp = NULL;
     struct AEXP *aexp = NULL;
+    float gain = 1.0;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -158,6 +159,7 @@ int main(int argc, char *argv[])
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
+        { "gain", required_argument, NULL, 0 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -254,6 +256,8 @@ int main(int argc, char *argv[])
 		strcpy(phaseexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "ampexp") == 0) {
 		strcpy(ampexp_arg, optarg);
+	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
+		gain = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1; order = 10;
@@ -783,7 +787,7 @@ int main(int argc, char *argv[])
 					   order);	
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn, prede, &de_mem);
+		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn, prede, &de_mem, gain);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -794,7 +798,7 @@ int main(int argc, char *argv[])
 		    phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem);
+		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem, gain);
 		//printf("  buf[0] %d\n", buf[0]);
 		if (fout != NULL) 
 		    fwrite(buf,sizeof(short),N,fout);
@@ -818,7 +822,7 @@ int main(int argc, char *argv[])
 
 	    if (postfilt)
 		postfilter(&model, &bg_est);
-	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem);
+	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem, gain);
 	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
 	}
 
@@ -861,7 +865,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem)
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain)
 {
     int     i;
 
@@ -870,6 +874,7 @@ void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float 
         de_emp(Sn_, Sn_, de_mem, N);	
 
     for(i=0; i<N; i++) {
+	Sn_[i] *= gain;
 	if (Sn_[i] > 32767.0)
 	    buf[i] = 32767;
 	else if (Sn_[i] < -32767.0)
