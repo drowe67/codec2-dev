@@ -69,11 +69,13 @@ int main() {
 	    in8k[MEM8+i] = 16000.0*cos(TWO_PI*t*freq/FS);
 #endif
 
-	/* upsample and update filter memory */
+	/* upsample  */
 
 	fdmdv_8_to_48(out48k, &in8k[MEM8], N8);
+	/*
 	for(i=0; i<MEM8; i++)
 	    in8k[i] = in8k[i+N8];
+	*/
 
 	/* save 48k to disk for plotting and check out */
 
@@ -87,11 +89,13 @@ int main() {
 	for(i=0; i<N48; i++,t1++)
 	    in48k[i+FDMDV_OS_TAPS] = out48k[i] + 16000.0*cos(TWO_PI*t1*1E4/FS);
 
-	/* downsample and update filter memory */
+	/* downsample */
 
 	fdmdv_48_to_8(out8k, &in48k[FDMDV_OS_TAPS], N8);
+	/*
 	for(i=0; i<FDMDV_OS_TAPS; i++)
 	    in48k[i] = in48k[i+N48];
+	*/
 
 	/* save 8k to disk for plotting and check out */
 
