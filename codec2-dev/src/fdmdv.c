@@ -1093,7 +1093,7 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync,
   makes mistakes when used continuously.  So we use it until we have
   acquired the BPSK pilot, then switch to a more robust "fine"
   tracking algorithm.  If we lose sync we switch back to coarse mode
-  for fast-requisition of large frequency offsets.
+  for fast re-acquisition of large frequency offsets.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1337,6 +1337,12 @@ void CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 	    
 	}
     }	
+
+    /* update filter memory */
+
+    for(i=-(FDMDV_OS_TAPS/FDMDV_OS); i<0; i++)
+	in8k[i] = in8k[i + n];
+
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1365,6 +1371,11 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 	for(j=0; j<FDMDV_OS_TAPS; j++)
 	    out8k[i] += fdmdv_os_filter[j]*in48k[i*FDMDV_OS-j];
     }
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS; i<0; i++)
+	in48k[i] = in48k[i + n*FDMDV_OS];
 }
 
 /*---------------------------------------------------------------------------*\
