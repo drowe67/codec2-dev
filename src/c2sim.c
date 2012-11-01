@@ -363,7 +363,7 @@ int main(int argc, char *argv[])
 	//printf("frame: %d ", frames);
 
 	/* Read input speech */
-
+	
 	for(i=0; i<M-N; i++) {
 	    Sn[i] = Sn[i+N];
 	    Sn_pre[i] = Sn_pre[i+N];

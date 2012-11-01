@@ -612,7 +612,7 @@ void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[])
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	pack(bits, &nbit, lsp_indexes[i], lsp_bits(i));
     }
- 
+
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
 

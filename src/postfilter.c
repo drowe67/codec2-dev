@@ -27,6 +27,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -110,6 +111,7 @@ void postfilter(
   for(m=1; m<=model->L; m++)
       e += model->A[m]*model->A[m];
 
+  assert(e > 0.0);
   e = 10.0*log10(e/model->L);
 
   /* If beneath threhold, update bg estimate.  The idea

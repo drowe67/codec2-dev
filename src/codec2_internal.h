@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: fdmdv_internal.h
+  FILE........: codec2_internal.h
   AUTHOR......: David Rowe                                                          
   DATE CREATED: April 16 2012
                                                                              

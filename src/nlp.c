@@ -224,11 +224,12 @@ float nlp(
     float best_f0;
 
     assert(nlp_state != NULL);
+    assert(m <= PMAX_M);
     nlp = (NLP*)nlp_state;
 
     /* Square, notch filter at DC, and LP filter vector */
 
-    for(i=m-n; i<M; i++) 	    /* square latest speech samples */
+    for(i=m-n; i<m; i++) 	    /* square latest speech samples */
 	nlp->sq[i] = Sn[i]*Sn[i];
 
     for(i=m-n; i<m; i++) {	/* notch filter at DC */
@@ -236,7 +237,14 @@ float nlp(
 	notch += COEFF*nlp->mem_y;
 	nlp->mem_x = nlp->sq[i];
 	nlp->mem_y = notch;
-	nlp->sq[i] = notch;
+	nlp->sq[i] = notch + 1.0;  /* With 0 input vectors to codec,
+				      kiss_fft() would take a long
+				      time to execute when running in
+				      real time.  Problem was traced
+				      to kiss_fft function call in
+				      this function. Adding this small
+				      constant fixed problem.  Not
+				      exactly sure why. */
     }
 
     for(i=m-n; i<m; i++) {	/* FIR filter vector */
@@ -282,7 +290,7 @@ float nlp(
 	    gmax_bin = i;
 	}
     }
-
+    
     //#define POST_PROCESS_MBE
     #ifdef POST_PROCESS_MBE
     best_f0 = post_process_mbe(Fw, pmin, pmax, gmax, Sw, W, prev_Wo);
@@ -336,10 +344,10 @@ float post_process_sub_multiples(COMP Fw[],
     /* post process estimate by searching submultiples */
 
     mult = 2;
-    min_bin = PE_FFT_SIZE*DEC/pmax;
+    min_bin = PE_FFT_SIZE*DEC/pmax; 
     cmax_bin = gmax_bin;
     prev_f0_bin = *prev_Wo*(4000.0/PI)*(PE_FFT_SIZE*DEC)/SAMPLE_RATE;
-
+    
     while(gmax_bin/mult >= min_bin) {
 
 	b = gmax_bin/mult;			/* determine search interval */
