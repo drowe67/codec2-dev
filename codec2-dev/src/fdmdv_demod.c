@@ -219,6 +219,8 @@ int main(int argc, char *argv[])
 	}
     }
 
+    //fdmdv_dump_osc_mags(fdmdv);
+
     fclose(fin);
     fclose(fout);
     free(rx_fdm_log);

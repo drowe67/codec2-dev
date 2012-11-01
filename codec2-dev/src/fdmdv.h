@@ -98,6 +98,8 @@ void           CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_sta
 void           CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n);
 void           CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n);
 
+void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f);
+ 
 #ifdef __cplusplus
 }
 #endif

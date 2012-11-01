@@ -448,6 +448,12 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
     for (i=0; i<M; i++) 
 	tx_fdm[i] = cmult(two, tx_fdm[i]);
 
+    /* normalise digital oscilators as the magnitude can drfift over time */
+
+    for (c=0; c<NC+1; c++) {
+	phase_tx[c].real /= cabsolute(phase_tx[c]);	
+	phase_tx[c].imag /= cabsolute(phase_tx[c]);	
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -706,7 +712,7 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 
 void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect, COMP *foff_phase_rect, int nin)
 {
-    int i;
+    int   i;
 
     foff_rect->real = cos(2.0*PI*foff/FS);
     foff_rect->imag = sin(2.0*PI*foff/FS);
@@ -714,7 +720,11 @@ void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect
 	*foff_phase_rect = cmult(*foff_phase_rect, cconj(*foff_rect));
 	rx_fdm_fcorr[i] = fcmult(rx_fdm[i], *foff_phase_rect);
     }
-  
+
+    /* normalise digital oscilator as the magnitude can drfift over time */
+
+    foff_phase_rect->real /= cabsolute(*foff_phase_rect);	 
+    foff_phase_rect->imag /= cabsolute(*foff_phase_rect);	 
 }
 
 /*---------------------------------------------------------------------------*\
@@ -759,6 +769,12 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 	rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
     }
 
+    /* normalise digital oscilators as the magnitude can drfift over time */
+
+    for (c=0; c<NC+1; c++) {
+	phase_rx[c].real /= cabsolute(phase_rx[c]);	  
+	phase_rx[c].imag /= cabsolute(phase_rx[c]);	  
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1440,3 +1456,26 @@ void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_d
     }
 }
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  Function used during development to test if magnitude of digital
+  oscillators was drifting.  It was!
+
+\*---------------------------------------------------------------------------*/
+
+void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f) 
+{
+    int   i;
+
+    fprintf(stderr, "phase_tx[]:\n");
+    for(i=0; i<=NC; i++)
+	fprintf(stderr,"  %1.3f", cabsolute(f->phase_tx[i]));
+    fprintf(stderr,"\nfreq[]:\n");
+    for(i=0; i<=NC; i++)
+	fprintf(stderr,"  %1.3f", cabsolute(f->freq[i]));
+    fprintf(stderr,"\nfoff_rect %1.3f  foff_phase_rect: %1.3f", cabsolute(f->foff_rect), cabsolute(f->foff_phase_rect));
+    fprintf(stderr,"\nphase_rx[]:\n");
+    for(i=0; i<=NC; i++)
+	fprintf(stderr,"  %1.3f", cabsolute(f->phase_rx[i]));
+    fprintf(stderr, "\n\n");
+}
