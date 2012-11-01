@@ -400,7 +400,7 @@ float est_voicing_mbe(
     float elow, ehigh, eratio;
     float dF0, sixty;
 
-    sig = 0.0;
+    sig = 1E-4;
     for(l=1; l<=model->L/4; l++) {
 	sig += model->A[l]*model->A[l];
     }
@@ -412,7 +412,7 @@ float est_voicing_mbe(
     }
 
     Wo = model->Wo;
-    error = 0.0;
+    error = 1E-4;
 
     /* Just test across the harmonics in the first 1000 Hz (L/4) */
 
@@ -463,7 +463,7 @@ float est_voicing_mbe(
        determine if we have made any gross errors.
     */
 
-    elow = ehigh = 0.0;
+    elow = ehigh = 1E-4;
     for(l=1; l<=model->L/2; l++) {
 	elow += model->A[l]*model->A[l];
     }

@@ -972,7 +972,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
     
     /* measure energy before post filtering */
 
-    e_before = 0.0;
+    e_before = 1E-4;
     for(i=0; i<FFT_ENC/2; i++)
 	e_before += Pw[i].real;
 
@@ -983,7 +983,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	dump_Pwb(Pw);
     #endif
 
-    e_after = 0.0;
+    e_after = 1E-4;
     for(i=0; i<FFT_ENC/2; i++) {
 	Pfw[i] = pow(Rw[i], LPCPF_BETA);
 	Pw[i].real *= Pfw[i] * Pfw[i];
@@ -1251,17 +1251,29 @@ float speech_to_uq_lsps(float lsp[],
     int   i, roots;
     float Wn[M];
     float R[LPC_MAX+1];
-    float E;
+    float e, E;
 
-    for(i=0; i<M; i++)
+    e = 0.0;
+    for(i=0; i<M; i++) {
 	Wn[i] = Sn[i]*w[i];
+	e += Wn[i]*Wn[i];
+    }
+
+    /* trap 0 energy case as LPC analysis will fail */
+    
+    if (e == 0.0) {
+	for(i=0; i<order; i++)
+	    lsp[i] = (PI/order)*(float)i;
+	return 0.0;
+    }
+    
     autocorrelate(Wn, R, M, order);
     levinson_durbin(R, ak, order);
   
     E = 0.0;
     for(i=0; i<=order; i++)
 	E += ak[i]*R[i];
- 
+    
     /* 15 Hz BW expansion as I can't hear the difference and it may help
        help occasional fails in the LSP root finding.  Important to do this
        after energy calculation to avoid -ve energy values.
@@ -1955,6 +1967,7 @@ int encode_WoE(MODEL *model, float e, float xq[])
   int          ndim = ge_cb[0].k;
 
   assert((1<<WO_E_BITS) == nb_entries);
+  assert(e >= 0.0);
 
   x[0] = log10((model->Wo/PI)*4000.0/50.0)/log10(2);
   x[1] = 10.0*log10(1e-4 + e);
@@ -1970,6 +1983,7 @@ int encode_WoE(MODEL *model, float e, float xq[])
     err[i] -= codebook1[ndim*n1+i];
   }
 
+  //printf("enc: %f %f (%f)(%f) \n", xq[0], xq[1], e, 10.0*log10(1e-4 + e));
   return n1;
 }
 
@@ -2001,6 +2015,7 @@ void decode_WoE(MODEL *model, float *e, float xq[], int n1)
     err[i] -= codebook1[ndim*n1+i];
   }
 
+  //printf("dec: %f %f\n", xq[0], xq[1]);
   model->Wo = pow(2.0, xq[0])*(PI*50.0)/4000.0;
 
   /* bit errors can make us go out of range leading to all sorts of
