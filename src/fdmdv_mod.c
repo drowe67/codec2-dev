@@ -114,6 +114,8 @@ int main(int argc, char *argv[])
         if (fin == stdin) fflush(stdin);         
     }
 
+    //fdmdv_dump_osc_mags(fdmdv);
+
     fclose(fin);
     fclose(fout);
     fdmdv_destroy(fdmdv);
