@@ -1224,15 +1224,19 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
     fdmdv->rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
     
-    /* adjust number of input samples to keep timing within bounds */
+    /* if we have qcquired pilot adjust number of input samples to
+       keep timing within bounds.  Avoid adjusting number of samples
+       before acquisition as it will jump about based on noise.*/
 
     *nin = M;
 
-    if (fdmdv->rx_timing > 2*M/P)
-       *nin += M/P;
+    if (fdmdv->coarse_fine == FINE) {
+	if (fdmdv->rx_timing > 2*M/P)
+	    *nin += M/P;
     
-    if (fdmdv->rx_timing < 0)
-       *nin -= M/P;
+	if (fdmdv->rx_timing < 0)
+	    *nin -= M/P;
+    }
     
     foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
@@ -1343,6 +1347,11 @@ void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv,
 void CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 {
     int i,j,k,l;
+
+    /* make sure n is an integer multiple of the oversampling rate, ow
+       this function breaks */
+
+    assert((n % FDMDV_OS) == 0);
 
     for(i=0; i<n; i++) {
 	for(j=0; j<FDMDV_OS; j++) {

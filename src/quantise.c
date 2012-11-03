@@ -1967,7 +1967,8 @@ int encode_WoE(MODEL *model, float e, float xq[])
   int          ndim = ge_cb[0].k;
 
   assert((1<<WO_E_BITS) == nb_entries);
-  assert(e >= 0.0);
+
+  if (e < 0.0) e = 0;  /* occasional small negative energies due LPC round off I guess */
 
   x[0] = log10((model->Wo/PI)*4000.0/50.0)/log10(2);
   x[1] = 10.0*log10(1e-4 + e);
