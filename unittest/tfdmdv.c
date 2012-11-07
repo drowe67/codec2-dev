@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
     COMP          tx_fdm[M];
     float         channel[CHANNEL_BUF_SIZE];
     int           channel_count;
-    float         rx_fdm[M+M/P];
+    COMP          rx_fdm[M+M/P];
     float         foff_coarse;
     int           nin, next_nin;
     COMP          rx_fdm_fcorr[M+M/P];
@@ -138,8 +138,10 @@ int main(int argc, char *argv[])
 
 	/* take nin samples from start of buffer */
 
-	for(i=0; i<nin; i++)
-	    rx_fdm[i] = channel[i];
+	for(i=0; i<nin; i++) {
+	    rx_fdm[i].real = channel[i];
+            rx_fdm[i].imag = 0;
+        }
 
 	/* shift buffer back */
 
@@ -156,7 +158,7 @@ int main(int argc, char *argv[])
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
 	if (fdmdv->coarse_fine == COARSE)
 	    fdmdv->foff = foff_coarse;
-	freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
+	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
 	
 	/* baseband processing */
 
