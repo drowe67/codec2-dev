@@ -993,7 +993,7 @@ void ear_protection(float in_out[], int n) {
 
     if (over > 1.0) {
         gain = 1.0/(over*over);
-        fprintf(stderr, "gain: %f\n", gain);
+        //fprintf(stderr, "gain: %f\n", gain);
         for(i=0; i<n; i++)
             in_out[i] *= gain;
     }
