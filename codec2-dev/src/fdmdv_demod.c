@@ -57,13 +57,12 @@ int main(int argc, char *argv[])
     char          packed_bits[BYTES_PER_CODEC_FRAME];
     int           rx_bits[FDMDV_BITS_PER_FRAME];
     int           codec_bits[2*FDMDV_BITS_PER_FRAME];
-    float         rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    COMP          rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
     int           nin, nin_prev;
     int           sync_bit;
     int           state, next_state;
-
     int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;
@@ -115,8 +114,10 @@ int main(int argc, char *argv[])
 
     while(fread(rx_fdm_scaled, sizeof(short), nin, fin) == nin)
     {
-	for(i=0; i<nin; i++)
-	    rx_fdm[i] = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
+	for(i=0; i<nin; i++) {
+	    rx_fdm[i].real = (float)rx_fdm_scaled[i]/FDMDV_SCALE;
+            rx_fdm[i].imag = 0;
+        }
 	nin_prev = nin;
 	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
 

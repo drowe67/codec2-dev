@@ -647,7 +647,7 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
 \*---------------------------------------------------------------------------*/
 
-float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
+float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
 {
     int  i,j;
     COMP pilot[M+M/P];
@@ -685,8 +685,8 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
     }
 
     for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
-       	f->pilot_baseband1[j] = fcmult(rx_fdm[i], cconj(pilot[i]));
-	f->pilot_baseband2[j] = fcmult(rx_fdm[i], cconj(prev_pilot[i]));
+       	f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
+	f->pilot_baseband2[j] = cmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
     lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->fft_pilot_cfg, f->S1, nin);
@@ -702,15 +702,17 @@ float rx_est_freq_offset(struct FDMDV *f, float rx_fdm[], int nin)
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: freq_shift()	     
+  FUNCTION....: fdmdv_freq_shift()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: 26/4/2012
 
-  Frequency shift modem signal.
+  Frequency shift modem signal.  The use of complex input and output allows
+  single sided frequency shifting (no images).
 
 \*---------------------------------------------------------------------------*/
 
-void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect, COMP *foff_phase_rect, int nin)
+void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
+                                          COMP *foff_rect, COMP *foff_phase_rect, int nin)
 {
     int   i;
 
@@ -718,7 +720,7 @@ void freq_shift(COMP rx_fdm_fcorr[], float rx_fdm[], float foff, COMP *foff_rect
     foff_rect->imag = sin(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, cconj(*foff_rect));
-	rx_fdm_fcorr[i] = fcmult(rx_fdm[i], *foff_phase_rect);
+	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
     }
 
     /* normalise digital oscilator as the magnitude can drfift over time */
@@ -1190,7 +1192,7 @@ int freq_state(int sync_bit, int *state)
   DATE CREATED: 26/4/2012
 
   FDMDV demodulator, take an array of FDMDV_SAMPLES_PER_FRAME
-  modulated symbols, returns an array of FDMDV_BITS_PER_FRAME bits,
+  modulated samples, returns an array of FDMDV_BITS_PER_FRAME bits,
   plus the sync bit.  
 
   The number of input samples nin will normally be M ==
@@ -1201,7 +1203,7 @@ int freq_state(int sync_bit, int *state)
 \*---------------------------------------------------------------------------*/
 
 void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], 
-				     int *sync_bit, float rx_fdm[], int *nin)
+				     int *sync_bit, COMP rx_fdm[], int *nin)
 {
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
@@ -1216,7 +1218,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     
     if (fdmdv->coarse_fine == COARSE)
 	fdmdv->foff = foff_coarse;
-    freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
+    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
 	
     /* baseband processing */
 
@@ -1224,19 +1226,15 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
     fdmdv->rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
     
-    /* if we have qcquired pilot adjust number of input samples to
-       keep timing within bounds.  Avoid adjusting number of samples
-       before acquisition as it will jump about based on noise.*/
+    /* Adjust number of input samples to keep timing within bounds */
 
     *nin = M;
 
-    if (fdmdv->coarse_fine == FINE) {
-	if (fdmdv->rx_timing > 2*M/P)
-	    *nin += M/P;
+    if (fdmdv->rx_timing > 2*M/P)
+	*nin += M/P;
     
-	if (fdmdv->rx_timing < 0)
-	    *nin -= M/P;
-    }
+    if (fdmdv->rx_timing < 0)
+	*nin -= M/P;
     
     foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
