@@ -62,6 +62,7 @@ void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[])
 void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+void ear_protection(float in_out[], int n);
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -902,6 +903,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, float
     phase_synth_zero_order(c2->fft_fwd_cfg, model, ak, &c2->ex_phase, LPC_ORD);
     postfilter(model, &c2->bg_est);
     synthesise(c2->fft_inv_cfg, c2->Sn_, model, c2->Pn, 1);
+    ear_protection(c2->Sn_, N);
 
     for(i=0; i<N; i++) {
 	if (c2->Sn_[i] > 32767.0)
@@ -956,4 +958,43 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     //fprintf(stderr,"snr %3.2f  v: %d  Wo: %f prev_Wo: %f\n", 
     //	   snr, model->voiced, model->Wo, c2->prev_Wo_enc);
     c2->prev_Wo_enc = model->Wo;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: ear_protection()   
+  AUTHOR......: David Rowe			      
+  DATE CREATED: Nov 7 2012
+
+  Limits output level to protect ears when there are bit errors or the input
+  is overdriven.  This doesn't correct or mask bit erros, just reduces the
+  worst of their damage.
+
+\*---------------------------------------------------------------------------*/
+
+void ear_protection(float in_out[], int n) {
+    float max_sample, over, gain;
+    int   i;
+
+    /* find maximum sample in frame */
+
+    max_sample = 0.0;
+    for(i=0; i<n; i++)
+        if (in_out[i] > max_sample)
+            max_sample = in_out[i];
+
+    /* determine how far above set point */
+
+    over = max_sample/30000.0;
+
+    /* If we are x dB over set point we reduce level by 2x dB, this
+       attenuates major excursions in amplitude (likely to be caused
+       by bit errors) more than smaller ones */
+
+    if (over > 1.0) {
+        gain = 1.0/(over*over);
+        fprintf(stderr, "gain: %f\n", gain);
+        for(i=0; i<n; i++)
+            in_out[i] *= gain;
+    }
 }

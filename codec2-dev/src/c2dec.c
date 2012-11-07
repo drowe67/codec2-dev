@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
     float          ber, r;
 
     if (argc < 4) {
-	printf("usage: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile\n");
+	printf("usage: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile [ber]\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
 	exit(1);
     }
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     }
 
     if (ber != 0.0)
-	printf("actual BER: %1.3f\n", (float)bit_errors/(frames*nbit));
+	fprintf(stderr, "actual BER: %1.3f\n", (float)bit_errors/(frames*nbit));
 
     codec2_destroy(codec2);
 
