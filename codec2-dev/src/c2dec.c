@@ -32,6 +32,10 @@
 #include <string.h>
 #include <errno.h>
 
+#define NONE      0  /* no bit errors         */
+#define UNIFORM   1  /* random bit errors     */
+#define TWO_STATE 2  /* Two state error model */
+
 int main(int argc, char *argv[])
 {
     int            mode;
@@ -40,12 +44,17 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit, nbyte, i, byte, frames, bit_errors;
-    float          ber, r;
+    int            nsam, nbit, nbyte, i, byte, frames, bit_errors, error_mode;
+    int            state, next_state;
+    float          ber, r, pstate0, pstate1;
 
     if (argc < 4) {
-	printf("usage: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile [ber]\n");
+	printf("basic usage...............: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile\n");
+	printf("uniform errors usage.......: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
+	printf("two state fading usage....: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile probGood probBad\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
+	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.9\n");
+	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.99 0.9\n");
 	exit(1);
     }
 
@@ -76,10 +85,21 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    if (argc == 5)
+    error_mode = NONE;
+    ber = 0.0;
+    pstate0 = pstate1 = 0.0;
+
+    if (argc == 5) {
+        error_mode = UNIFORM;
 	ber = atof(argv[4]);
-    else
-	ber = 0.0;
+    }
+
+    if (argc == 6) {
+        error_mode = TWO_STATE;
+	pstate0 = atof(argv[4]);
+	pstate1 = atof(argv[5]);
+        state = 0;
+    }
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -91,7 +111,7 @@ int main(int argc, char *argv[])
 
     while(fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte) {
 	frames++;
-	if (ber != 0.0) {
+	if (error_mode == UNIFORM) {
 	    for(i=0; i<nbit; i++) {
 		r = (float)rand()/RAND_MAX;
 		if (r < ber) {
@@ -102,6 +122,42 @@ int main(int argc, char *argv[])
 		}
 	    }
 	}
+
+	if (error_mode == TWO_STATE) {
+            next_state = state;
+            switch(state) {
+            case 0:
+
+                /* clear channel state - no bit errors */
+
+  		r = (float)rand()/RAND_MAX;
+                if (r > pstate0)
+                    next_state = 1;
+                break;
+
+            case 1:
+                
+                /* burst error state - 50% bit error rate */
+
+                for(i=0; i<nbit; i++) {
+                    r = (float)rand()/RAND_MAX;
+                    if (r < 0.5) {
+                        byte = i/8;
+                        bits[byte] ^= 1 << (i - byte*8);
+                        bit_errors++;
+                    }
+		}
+
+  		r = (float)rand()/RAND_MAX;
+                if (r > pstate1)
+                    next_state = 0;
+                break;
+
+	    }
+               
+            state = next_state;
+        }
+
 	codec2_decode(codec2, buf, bits);
  	fwrite(buf, sizeof(short), nsam, fout);
 	//if this is in a pipeline, we probably don't want the usual
