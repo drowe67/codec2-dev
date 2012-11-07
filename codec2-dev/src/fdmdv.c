@@ -464,8 +464,13 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
   FDMDV modulator, take a frame of FDMDV_BITS_PER_FRAME bits and
   generates a frame of FDMDV_SAMPLES_PER_FRAME modulated symbols.
-  Sync bit is returned to aid alignment of your next frame.  The
-  sync_bit value returned will be used for the _next_ frame.
+  Sync bit is returned to aid alignment of your next frame.  
+
+  The sync_bit value returned will be used for the _next_ frame.
+
+  The output signal is complex to support single sided frequency
+  shifting, for example when testing frequency offsets in channel
+  simulation.
 
 \*---------------------------------------------------------------------------*/
 
@@ -1195,6 +1200,9 @@ int freq_state(int sync_bit, int *state)
   modulated samples, returns an array of FDMDV_BITS_PER_FRAME bits,
   plus the sync bit.  
 
+  The input signal is complex to support single sided frequcny shifting
+  before the demod input (e.g. fdmdv2 click to tune feature).
+
   The number of input samples nin will normally be M ==
   FDMDV_SAMPLES_PER_FRAME.  However to adjust for differences in
   transmit and receive sample clocks nin will occasionally be M-M/P,
@@ -1411,6 +1419,10 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
   dB. The spectral samples are scaled so that 0dB is the peak, a good
   range for plotting is 0 to -40dB.
 
+  Note only the real part of the complex input signal is used at
+  present.  A complex variable is used for input for compatability
+  with the other rx signal procesing.
+
   Successive calls can be used to build up a waterfall or spectrogram
   plot, by mapping the received levels to colours.
 
@@ -1427,7 +1439,7 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 \*---------------------------------------------------------------------------*/
 
 void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[], 
-					       float rx_fdm[], int nin) 
+					       COMP rx_fdm[], int nin) 
 {
     int   i,j;
     COMP  fft_in[2*FDMDV_NSPEC];
@@ -1439,7 +1451,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_d
     for(i=0; i<2*FDMDV_NSPEC-nin; i++)
 	f->fft_buf[i] = f->fft_buf[i+nin];
     for(j=0; j<nin; j++,i++)
-	f->fft_buf[i] = rx_fdm[j];
+	f->fft_buf[i] = rx_fdm[j].real;
     assert(i == 2*FDMDV_NSPEC);
 
     /* window and FFT */
