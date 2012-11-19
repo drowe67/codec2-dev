@@ -15,7 +15,7 @@
 #define WRITE_SZ 10
 #define READ_SZ  8  
 #define N_MAX    100
-#define LOOPS    10000
+#define LOOPS    1000000
 
 int run_thread = 1;
 struct FIFO *f;
@@ -25,7 +25,7 @@ void *writer_thread(void *data);
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 #define USE_THREADS
-#define USE_MUTEX
+//#define USE_MUTEX
 
 int main() {
     pthread_t awriter_thread;
@@ -79,7 +79,7 @@ void writer(void) {
     short  write_buf[WRITE_SZ];
     int    i;
 
-    if ((FIFO_SZ - fifo_n(f)) > WRITE_SZ) {
+    if ((FIFO_SZ - fifo_used(f)) > WRITE_SZ) {
         for(i=0; i<WRITE_SZ; i++) {
             write_buf[i] = n_in++;
             if (n_in == N_MAX)
