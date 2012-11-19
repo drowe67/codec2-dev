@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata genampdata polar2rect vqtrainsp tprede pre de 
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata genampdata polar2rect vqtrainsp tprede pre de tfifo
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -100,6 +100,6 @@ de_SOURCES = de.c ../src/lpc.c
 de_LDADD = $(lib_LTLIBRARIES) 
 de_LDFLAGS = $(LIBS)
 
-#tsrc_SOURCES = tsrc.c 
-#tsrc_LDADD = $(lib_LTLIBRARIES) /usr/lib/libsamplerate.so.0
-#tsrc_LDFLAGS = $(LIBS)
+tfifo_SOURCES = tfifo.c ../src/fifo.c
+tfifo_LDADD = $(lib_LTLIBRARIES) -lpthread
+tfifo_LDFLAGS = $(LIBS)

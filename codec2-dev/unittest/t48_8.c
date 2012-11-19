@@ -43,7 +43,7 @@ int main() {
     FILE *f8;
 
     int i,f,t,t1;
-    float freq = 505.0;
+    float freq = 800.0;
 
     f48 = fopen("out48.raw", "wb");
     assert(f48 != NULL);
