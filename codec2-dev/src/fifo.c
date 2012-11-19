@@ -5,7 +5,10 @@
   DATE CREATED: Oct 15 2012
                                                                              
   A FIFO design useful in gluing the FDMDV modem and codec together in
-  integrated applications.
+  integrated applications.  The unittest/tfifo indicates these
+  routines are thread safe without the need for syncronisisation
+  object, e.g. a different thread can read and write to a fifo at the
+  same time.
 
 \*---------------------------------------------------------------------------*/
 
@@ -36,7 +39,6 @@ struct FIFO {
     short *pin;
     short *pout;
     int    nshort;
-    int    n;
 };
 
 struct FIFO *fifo_create(int nshort) {
@@ -50,7 +52,6 @@ struct FIFO *fifo_create(int nshort) {
     fifo->pin = fifo->buf;
     fifo->pout = fifo->buf;
     fifo->nshort = nshort;
-    fifo->n = 0;
 
     return fifo;
 }
@@ -67,11 +68,13 @@ int fifo_write(struct FIFO *fifo, short data[], int n) {
     short         *pdata;
     short         *pin = fifo->pin;
 
-    //printf("  write %d in: %d\n", n, pin-fifo->pin);
     assert(fifo != NULL);
     assert(data != NULL);
 
-    fifo_free = fifo->nshort - fifo->n;
+    // available storage is one less than nshort as prd == pwr
+    // is reserved for empty rather than full
+
+    fifo_free = fifo->nshort - fifo_used(fifo) - 1;
 
     if (n > fifo_free) {
 	return -1;
@@ -87,7 +90,6 @@ int fifo_write(struct FIFO *fifo, short data[], int n) {
 	    if (pin == (fifo->buf + fifo->nshort))
 		pin = fifo->buf;
 	}
-	fifo->n += n;
 	fifo->pin = pin;
     }
 
@@ -98,13 +100,13 @@ int fifo_read(struct FIFO *fifo, short data[], int n)
 {
     int            i;
     short         *pdata;
+    short         *pin = fifo->pin;
     short         *pout = fifo->pout;
 
-    //printf("  read %d pout: %d\n", n, pout-fifo->buf);
     assert(fifo != NULL);
     assert(data != NULL);
  
-    if (n > fifo->n) {
+    if (n > fifo_used(fifo)) {
 	return -1;
     }
     else {
@@ -118,16 +120,24 @@ int fifo_read(struct FIFO *fifo, short data[], int n)
 	    if (pout == (fifo->buf + fifo->nshort))
 		pout = fifo->buf;
 	}
-	fifo->n -= n;
 	fifo->pout = pout;
     }
 
     return 0;
 }
 
-int fifo_n(struct FIFO *fifo)
+int fifo_used(struct FIFO *fifo)
 {
-   assert(fifo != NULL);
-   return fifo->n;
+    short         *pin = fifo->pin;
+    short         *pout = fifo->pout;
+    unsigned int   used;
+
+    assert(fifo != NULL);
+    if (pin >= pout)
+        used = pin - pout;
+    else
+        used = fifo->nshort + (unsigned int)(pin - pout);
+
+    return used;
 }
 
