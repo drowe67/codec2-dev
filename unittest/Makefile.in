@@ -43,7 +43,7 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
 	vqtrainph$(EXEEXT) genphdata$(EXEEXT) genampdata$(EXEEXT) \
 	polar2rect$(EXEEXT) vqtrainsp$(EXEEXT) tprede$(EXEEXT) \
-	pre$(EXEEXT) de$(EXEEXT)
+	pre$(EXEEXT) de$(EXEEXT) tfifo$(EXEEXT)
 subdir = unittest
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -103,6 +103,9 @@ am_tfdmdv_OBJECTS = tfdmdv.$(OBJEXT) fdmdv.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) octave.$(OBJEXT)
 tfdmdv_OBJECTS = $(am_tfdmdv_OBJECTS)
 tfdmdv_DEPENDENCIES =
+am_tfifo_OBJECTS = tfifo.$(OBJEXT) fifo.$(OBJEXT)
+tfifo_OBJECTS = $(am_tfifo_OBJECTS)
+tfifo_DEPENDENCIES =
 am_tinterp_OBJECTS = tinterp.$(OBJEXT) sine.$(OBJEXT) \
 	kiss_fft.$(OBJEXT) interp.$(OBJEXT) lpc.$(OBJEXT) \
 	lsp.$(OBJEXT) quantise.$(OBJEXT) $(am__objects_1) \
@@ -158,19 +161,19 @@ SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
 	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
 	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
 	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
-	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
-	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
-	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
-	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tfifo_SOURCES) \
+	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+	$(tprede_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
 DIST_SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
 	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
 	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
 	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
-	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tinterp_SOURCES) \
-	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
-	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
-	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tfifo_SOURCES) \
+	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
+	$(tprede_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
+	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
 ETAGS = etags
 CTAGS = ctags
@@ -355,6 +358,9 @@ pre_LDFLAGS = $(LIBS)
 de_SOURCES = de.c ../src/lpc.c 
 de_LDADD = $(lib_LTLIBRARIES) 
 de_LDFLAGS = $(LIBS)
+tfifo_SOURCES = tfifo.c ../src/fifo.c
+tfifo_LDADD = $(lib_LTLIBRARIES) -lpthread
+tfifo_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -434,6 +440,9 @@ t48_8$(EXEEXT): $(t48_8_OBJECTS) $(t48_8_DEPENDENCIES)
 tfdmdv$(EXEEXT): $(tfdmdv_OBJECTS) $(tfdmdv_DEPENDENCIES) 
 	@rm -f tfdmdv$(EXEEXT)
 	$(LINK) $(tfdmdv_LDFLAGS) $(tfdmdv_OBJECTS) $(tfdmdv_LDADD) $(LIBS)
+tfifo$(EXEEXT): $(tfifo_OBJECTS) $(tfifo_DEPENDENCIES) 
+	@rm -f tfifo$(EXEEXT)
+	$(LINK) $(tfifo_LDFLAGS) $(tfifo_OBJECTS) $(tfifo_LDADD) $(LIBS)
 tinterp$(EXEEXT): $(tinterp_OBJECTS) $(tinterp_DEPENDENCIES) 
 	@rm -f tinterp$(EXEEXT)
 	$(LINK) $(tinterp_LDFLAGS) $(tinterp_OBJECTS) $(tinterp_LDADD) $(LIBS)
@@ -485,6 +494,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dump.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/extract.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fifo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genampdata.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlsp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genphdata.Po@am__quote@
@@ -506,6 +516,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t48_8.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tfdmdv.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tfifo.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tinterp.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tlspsens.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tnlp.Po@am__quote@
@@ -846,6 +857,20 @@ octave.obj: ../src/octave.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o octave.obj `if test -f '../src/octave.c'; then $(CYGPATH_W) '../src/octave.c'; else $(CYGPATH_W) '$(srcdir)/../src/octave.c'; fi`
 
+fifo.o: ../src/fifo.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fifo.o -MD -MP -MF "$(DEPDIR)/fifo.Tpo" -c -o fifo.o `test -f '../src/fifo.c' || echo '$(srcdir)/'`../src/fifo.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fifo.Tpo" "$(DEPDIR)/fifo.Po"; else rm -f "$(DEPDIR)/fifo.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fifo.c' object='fifo.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fifo.o `test -f '../src/fifo.c' || echo '$(srcdir)/'`../src/fifo.c
+
+fifo.obj: ../src/fifo.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT fifo.obj -MD -MP -MF "$(DEPDIR)/fifo.Tpo" -c -o fifo.obj `if test -f '../src/fifo.c'; then $(CYGPATH_W) '../src/fifo.c'; else $(CYGPATH_W) '$(srcdir)/../src/fifo.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/fifo.Tpo" "$(DEPDIR)/fifo.Po"; else rm -f "$(DEPDIR)/fifo.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='../src/fifo.c' object='fifo.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o fifo.obj `if test -f '../src/fifo.c'; then $(CYGPATH_W) '../src/fifo.c'; else $(CYGPATH_W) '$(srcdir)/../src/fifo.c'; fi`
+
 mostlyclean-libtool:
 	-rm -f *.lo
 
@@ -1022,10 +1047,6 @@ uninstall-am: uninstall-info-am
 	pdf pdf-am ps ps-am tags uninstall uninstall-am \
 	uninstall-info-am
 
-
-#tsrc_SOURCES = tsrc.c 
-#tsrc_LDADD = $(lib_LTLIBRARIES) /usr/lib/libsamplerate.so.0
-#tsrc_LDFLAGS = $(LIBS)
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.
 .NOEXPORT:
