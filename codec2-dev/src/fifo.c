@@ -6,7 +6,7 @@
                                                                              
   A FIFO design useful in gluing the FDMDV modem and codec together in
   integrated applications.  The unittest/tfifo indicates these
-  routines are thread safe without the need for syncronisisation
+  routines are thread safe without the need for syncronisation
   object, e.g. a different thread can read and write to a fifo at the
   same time.
 
