@@ -178,19 +178,19 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
     /* Set up frequency of each carrier */
 
     for(c=0; c<NC/2; c++) {
-	carrier_freq = (-NC/2 + c)*FSEP + FCENTRE;
+	carrier_freq = (-NC/2 + c)*FSEP + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
     }
 
     for(c=NC/2; c<NC; c++) {
-	carrier_freq = (-NC/2 + c + 1)*FSEP + FCENTRE;
+	carrier_freq = (-NC/2 + c + 1)*FSEP + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
     }
 	
-    f->freq[NC].real = cos(2.0*PI*FCENTRE/FS);
-    f->freq[NC].imag = sin(2.0*PI*FCENTRE/FS);
+    f->freq[NC].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq[NC].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
 
     /* Generate DBPSK pilot Look Up Table (LUT) */
 
@@ -724,7 +724,7 @@ void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], fl
     foff_rect->real = cos(2.0*PI*foff/FS);
     foff_rect->imag = sin(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
-	*foff_phase_rect = cmult(*foff_phase_rect, cconj(*foff_rect));
+	*foff_phase_rect = cmult(*foff_phase_rect, *foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
     }
 
@@ -1226,7 +1226,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     
     if (fdmdv->coarse_fine == COARSE)
 	fdmdv->foff = foff_coarse;
-    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
+    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
 	
     /* baseband processing */
 

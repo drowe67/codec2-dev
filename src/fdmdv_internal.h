@@ -43,7 +43,7 @@
 #define FS                    8000  /* sample rate in Hz                                                    */
 #define T                 (1.0/FS)  /* sample period in seconds                                             */
 #define RS                      50  /* symbol rate in Hz                                                    */
-#define NC                      14  /* number of carriers                                                   */
+#define NC                      14  /* number of data carriers (plus one pilot in the centre)               */
 #define NB                       2  /* Bits/symbol for QPSK modulation                                      */
 #define RB              (NC*RS*NB)  /* bit rate                                                             */
 #define M                  (FS/RS)  /* oversampling factor                                                  */
@@ -51,7 +51,6 @@
 #define NFILTER            (NSYM*M) /* size of tx/rx filters at sample rate M                               */
 
 #define FSEP                    75  /* Separation between carriers (Hz)                                     */
-#define FCENTRE               1200  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
 
 #define NT                       5  /* number of symbols we estimate timing over                            */
 #define P                        4  /* oversample factor used for initial rx symbol filtering               */
@@ -69,8 +68,10 @@
 
 #define COARSE                   0
 #define FINE                     1
-#define TRACK_COEFF              0.5
 
+/* averaging filter coeffs */
+
+#define TRACK_COEFF              0.5
 #define SNR_COEFF                0.9        /* SNR est averaging filter coeff */
 
 /*---------------------------------------------------------------------------*\
