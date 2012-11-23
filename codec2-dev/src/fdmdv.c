@@ -1470,7 +1470,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_d
     /* scale and convert to dB */
 
     for(i=0; i<FDMDV_NSPEC; i++) {
-	mag_spec_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag);
+	mag_spec_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag + 1E-12);
 	mag_spec_dB[i] -= full_scale_dB;
     }
 }
