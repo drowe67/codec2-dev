@@ -72,7 +72,7 @@
 /* averaging filter coeffs */
 
 #define TRACK_COEFF              0.5
-#define SNR_COEFF                0.9        /* SNR est averaging filter coeff */
+#define SNR_COEFF                0.9       /* SNR est averaging filter coeff */
 
 /*---------------------------------------------------------------------------*\
                                                                              
