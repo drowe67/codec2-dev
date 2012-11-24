@@ -60,7 +60,7 @@ extern "C" {
 #define FDMDV_MAX_SAMPLES_PER_FRAME  200  /* max demod samples/frame, use this to allocate storage          */
 #define FDMDV_SCALE                 1000  /* suggested scaling for 16 bit shorts                            */
 #define FDMDV_NSYM                    15
-#define FDMDV_FCENTRE               1200  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
+#define FDMDV_FCENTRE               1500  /* Centre frequency, Nc/2 carriers below this, Nc/2 carriers above (Hz) */
 
 /* 8 to 48 kHz sample rate conversion */
 
