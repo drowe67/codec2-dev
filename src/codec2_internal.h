@@ -47,6 +47,11 @@ struct CODEC2 {
     MODEL         prev_model_dec;          /* previous frame's model parameters         */
     float         prev_lsps_dec[LPC_ORD];  /* previous frame's LSPs                     */
     float         prev_e_dec;              /* previous frame's LPC energy               */
+    
+    int           lpc_pf;                  /* LPC post filter on                        */
+    int           bass_boost;              /* LPC post filter bass boost                */
+    float         beta;                    /* LPC post filter parameters                */
+    float         gamma;
 
     float         xq_enc[2];               /* joint pitch and energy VQ states          */
     float         xq_dec[2];

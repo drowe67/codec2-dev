@@ -692,7 +692,7 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf); 
+	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA); 
 	    apply_lpc_correction(&model);
 
             #ifdef DUMP
