@@ -901,10 +901,8 @@ float lpc_model_amplitudes(
 
 \*---------------------------------------------------------------------------*/
 
-#define LPCPF_GAMMA 0.5
-#define LPCPF_BETA  0.2
-
-void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak[], int order, int dump)
+void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak[], 
+                     int order, int dump, float beta, float gamma, int bass_boost)
 {
     int   i;
     COMP  x[FFT_ENC];   /* input to FFTs                */
@@ -945,7 +943,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
     }
     
     for(i=0; i<=order; i++)
-	x[i].real = ak[i] * pow(LPCPF_GAMMA, (float)i);
+	x[i].real = ak[i] * pow(gamma, (float)i);
     kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Ww);
 
     for(i=0; i<FFT_ENC/2; i++) {
@@ -985,7 +983,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 
     e_after = 1E-4;
     for(i=0; i<FFT_ENC/2; i++) {
-	Pfw[i] = pow(Rw[i], LPCPF_BETA);
+	Pfw[i] = pow(Rw[i], beta);
 	Pw[i].real *= Pfw[i] * Pfw[i];
 	e_after += Pw[i].real;
     }
@@ -997,13 +995,13 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	Pw[i].real *= gain;
     }
 
-    /* add 3dB to first 1 kHz to account for LP effect of PF */
+    if (bass_boost) {
+        /* add 3dB to first 1 kHz to account for LP effect of PF */
 
-    for(i=0; i<FFT_ENC/8; i++) {
-	Pw[i].real *= 1.4*1.4;
+        for(i=0; i<FFT_ENC/8; i++) {
+            Pw[i].real *= 1.4*1.4;
+        }    
     }
-    
-
 }
 
 
@@ -1026,7 +1024,10 @@ void aks_to_M2(
   float        *snr,	     /* signal to noise ratio for this frame in dB */
   int           dump,        /* true to dump sample to dump file */
   int           sim_pf,      /* true to simulate a post filter */
-  int           pf           /* true to post filter */
+  int           pf,          /* true to LPC post filter */
+  int           bass_boost,  /* enable LPC filter 0-1khz 3dB boost */
+  float         beta,
+  float         gamma        /* LPC post filter parameters */
 )
 {
   COMP pw[FFT_ENC];	/* input to FFT for power spectrum */
@@ -1057,7 +1058,7 @@ void aks_to_M2(
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
 
   if (pf)
-      lpc_post_filter(fft_fwd_cfg, model, Pw, ak, order, dump);
+      lpc_post_filter(fft_fwd_cfg, model, Pw, ak, order, dump, beta, gamma, bass_boost);
 
   #ifdef DUMP
   if (dump) 

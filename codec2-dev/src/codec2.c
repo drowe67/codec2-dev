@@ -131,6 +131,8 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 	return NULL;
     }
 
+    c2->lpc_pf = 1; c2->bass_boost = 1; c2->beta = LPCPF_BETA; c2->gamma = LPCPF_GAMMA;
+
     c2->xq_enc[0] = c2->xq_enc[1] = 0.0;
     c2->xq_dec[0] = c2->xq_dec[1] = 0.0;
 
@@ -374,7 +376,8 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 
+                  c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -519,7 +522,8 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 
+                  c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -691,7 +695,8 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
+                  c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -868,7 +873,8 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     for(i=0; i<4; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
-	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 1); 
+	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
+                  c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma); 
 	apply_lpc_correction(&model[i]);
     }
 
@@ -998,3 +1004,14 @@ void ear_protection(float in_out[], int n) {
             in_out[i] *= gain;
     }
 }
+
+int CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
+{
+    assert((beta >= 0.0) && (beta <= 1.0));
+    assert((gamma >= 0.0) && (gamma <= 1.0));
+    c2->lpc_pf = enable;
+    c2->bass_boost = bass_boost;
+    c2->beta = beta;
+    c2->gamma = gamma;
+}
+
