@@ -659,7 +659,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
        frames */
 
     model[0].voiced = unpack(bits, &nbit, 1);
-
+    
     model[1].voiced = unpack(bits, &nbit, 1);
     WoE_index = unpack(bits, &nbit, WO_E_BITS);
     decode_WoE(&model[1], &e[1], c2->xq_dec, WoE_index);
@@ -1005,7 +1005,7 @@ void ear_protection(float in_out[], int n) {
     }
 }
 
-int CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
+void CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
 {
     assert((beta >= 0.0) && (beta <= 1.0));
     assert((gamma >= 0.0) && (gamma <= 1.0));
@@ -1014,4 +1014,46 @@ int CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable
     c2->beta = beta;
     c2->gamma = gamma;
 }
+
+/* 
+   Allows optional stealing of one of the voicing bits for use as a
+   spare bit, only 1400 bit/s supported for now.  Experimental method
+   of sending voice/data frames for FreeDV.
+*/
+
+int CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *c2)
+{
+    assert(c2 != NULL);
+
+    if (c2->mode != CODEC2_MODE_1400)
+        return -1;
+    
+    return 10; // bit 10 (11th bit) is v2 (third voicing bit)
+}
+
+/*
+   Reconstructs the spare voicing bit.  Note works on unpacked bits
+   for convenience.
+*/
+
+int CODEC2_WIN32SUPPORT codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked_bits[])
+{
+    int v0,v1,v3;
+
+    assert(c2 != NULL);
+
+    if (c2->mode != CODEC2_MODE_1400)
+        return -1;
+
+    v0 = unpacked_bits[0];
+    v1 = unpacked_bits[1];
+    v3 = unpacked_bits[11];
+
+    /* if either adjacent frame is voiced, make this one voiced */
+
+    unpacked_bits[10] = (v1 || v3);  
+
+    return 0;
+}
+
 

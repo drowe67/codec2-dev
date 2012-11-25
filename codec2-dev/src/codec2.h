@@ -59,7 +59,10 @@ void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *codec2_state, unsigned cha
 void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
 int  CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *codec2_state);
 int  CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *codec2_state);
-int  CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *codec2_state, int enable, int bass_boost, float beta, float gamma);
+
+void CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *codec2_state, int enable, int bass_boost, float beta, float gamma);
+int  CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *codec2_state);
+int  CODEC2_WIN32SUPPORT codec2_rebuild_spare_bit(struct CODEC2 *codec2_state, int unpacked_bits[]);
 
 #endif
 
