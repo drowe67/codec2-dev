@@ -69,7 +69,8 @@ extern "C" {
 
 /* FFT points */
 
-#define FDMDV_NSPEC            2048
+#define FDMDV_NSPEC             512
+#define FDMDV_MAX_F_HZ          4000
 
 /* FDMDV states and stats structures */
 
