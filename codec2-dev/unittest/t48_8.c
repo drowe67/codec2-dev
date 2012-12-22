@@ -20,7 +20,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 
 #define N8                        160 /* procssing buffer size at 8 kHz */
 #define N48             (N8*FDMDV_OS)

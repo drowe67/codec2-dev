@@ -36,7 +36,7 @@
 #include <math.h>
 
 #include "fdmdv_internal.h"
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 #include "octave.h"
 
 #define FRAMES 25

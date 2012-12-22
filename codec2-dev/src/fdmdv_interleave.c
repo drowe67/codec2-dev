@@ -34,7 +34,7 @@
 #include <math.h>
 #include <errno.h>
 
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 
 #define MAX_INTERLEAVER 1024
 

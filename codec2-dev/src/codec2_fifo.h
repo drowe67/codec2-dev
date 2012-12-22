@@ -1,11 +1,14 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: fifo.h
+  FILE........: codec2_fifo.h
   AUTHOR......: David Rowe
   DATE CREATED: Oct 15 2012
                                                                              
   A FIFO design useful in gluing the FDMDV modem and codec together in
   integrated applications.
+  
+  The name codec2_fifo.h is used to make it unique when "make
+  installed".                   
 
 \*---------------------------------------------------------------------------*/
 

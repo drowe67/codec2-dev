@@ -36,7 +36,7 @@
 #include <math.h>
 #include <errno.h>
 
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 
 #define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
 #define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)

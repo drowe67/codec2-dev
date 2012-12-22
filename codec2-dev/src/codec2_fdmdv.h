@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: fdmdv.h
+  FILE........: codec2_fdmdv.h
   AUTHOR......: David Rowe
   DATE CREATED: April 14 2012
                                                                              
@@ -8,7 +8,10 @@
   modem.  Used for digital audio over HF SSB. See README_fdmdv.txt for
   more information, and fdmdv_mod.c and fdmdv_demod.c for example
   usage.
-                     
+  
+  The name codec2_fdmdv.h is used to make it unique when "make
+  installed".
+                   
   References:
  
     [1] http://n1su.com/fdmdv/FDMDV_Docs_Rel_1_4b.pdf

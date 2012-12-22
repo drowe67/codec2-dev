@@ -40,7 +40,7 @@
 #include <math.h>
 #include <errno.h>
 
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 #include "octave.h"
 
 #define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
