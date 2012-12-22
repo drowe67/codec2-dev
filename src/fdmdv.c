@@ -38,7 +38,7 @@
 #include <math.h>
 
 #include "fdmdv_internal.h"
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 #include "rn.h"
 #include "test_bits.h"
 #include "pilot_coeff.h"

@@ -144,7 +144,7 @@ libcodec2_la_CFLAGS = $(AM_CFLAGS)
 libcodec2_la_LDFLAGS = $(LIBS)
 
 library_includedir = $(prefix)/include
-library_include_HEADERS	= codec2.h
+library_include_HEADERS	= codec2.h codec2_fdmdv.h codec2_fifo.h
 
 bin_PROGRAMS = c2demo c2enc c2dec c2sim fdmdv_get_test_bits fdmdv_mod fdmdv_demod fdmdv_put_test_bits fdmdv_interleave
 

@@ -30,7 +30,7 @@
 #define __FDMDV_INTERNAL__
 
 #include "comp.h"
-#include "fdmdv.h"
+#include "codec2_fdmdv.h"
 #include "kiss_fft.h"
 
 /*---------------------------------------------------------------------------*\

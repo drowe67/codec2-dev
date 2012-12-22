@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <pthread.h>
-#include "fifo.h"
+#include "codec2_fifo.h"
 
 #define FIFO_SZ  1024
 #define WRITE_SZ 10
