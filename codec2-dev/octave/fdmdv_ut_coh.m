@@ -19,9 +19,9 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
-EbNo_dB = 73;
-Foff_hz = 0;
+frames = 200;
+EbNo_dB = 7;
+Foff_hz = -100;
 hpa_clip = 150;
 
 % ------------------------------------------------------------
@@ -104,37 +104,10 @@ track_log = [];
 
 snr_log = [];
 
-% PSK demod ----
-
-% Set up matrix of tx symbols, one row for each carrier.  
-
-% The differential PSK encoder is driven by a sequence of test bits.
-% This test sequence is 4 frames (122 bits long), which means it
-% repeats every 4 frames.  However the DPSK encoder also has 4 states,
-% so it turns out that the transmitted sequence of PSK symbols repeats
-% itself every 16 frames.  Depending on the test data some carriers
-% repeat more often than that, but the sequence as a whole repeats
-% every 16 frames.
-
-% Each row in the matrix is the sequence of symbols for one carrier.
-% This repeats itself every 16 symbols.  We would like to demodulate
-% and measure the BER of this block of 16 symbols.  To do this we need
-% to correct any phase offset.
-
-prev_psk_test_symbols = ones(Nc+1,1);
-tx_symbols_mem = [];
-for i=1:6
-  psk_test_symbols = generate_psk_test_symbols(prev_psk_test_symbols);
-  prev_psk_test_symbols = psk_test_symbols(:,4);
-  tx_symbols_mem = [tx_symbols_mem psk_test_symbols .* exp(j*pi/4)];
-end
-
-% PSK BER counters
-
-psk_total_bits = 0;
-psk_total_bit_errors = 0;
-
 rx_symbols_ph_log = [];
+prev_rx_symbols_ph = ones(Nc+1,1);
+rx_phase_offsets_log = [];
+phase_amb_log = [];
 
 % ---------------------------------------------------------------------
 % Main loop 
@@ -206,7 +179,7 @@ for f=1:frames
     foff = foff_course;
   end
 
-  foff = 0; % disable for now
+  %foff = 0; % disable for now
 
   foff_log = [ foff_log foff ];
   foff_rect = exp(j*2*pi*foff/Fs);
@@ -223,13 +196,28 @@ for f=1:frames
   rx_filt = rx_filter(rx_baseband, M);
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, M);
+  rx_symbols_log = [rx_symbols_log rx_symbols.*(conj(prev_rx_symbols)./abs(prev_rx_symbols))*exp(j*pi/4)];
   rx_timing_log = [rx_timing_log rx_timing];
 
-  [rx_bits sync foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
-  rx_symbols_log = [rx_symbols_log rx_symbols .* exp(j*pi/4)];
+  % coherent phase offset estimation ------------------------------------
+
+  [rx_phase_offsets ferr] = rx_est_phase(rx_symbols);
+  rx_phase_offsets_log = [rx_phase_offsets_log rx_phase_offsets];
+  phase_amb_log = [phase_amb_log phase_amb];
+  rx_symbols_ph = rx_symbols_mem(:,floor(Nph/2)+1) .* exp(-j*(rx_phase_offsets + phase_amb));
+  rx_symbols_ph_log = [rx_symbols_ph_log rx_symbols_ph .* exp(j*pi/4)];
+  rx_symbols_ph = -1 + 2*(real(rx_symbols_ph .* exp(j*pi/4)) > 0) + j*(-1 + 2*(imag(rx_symbols_ph .* exp(j*pi/4)) > 0));
+
+  % Std differential (used for freq offset est and BPSK sync) and psuedo coherent detection -----------------------
+
+  [rx_bits_unused sync        ferr        pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits        sync_unused ferr_unused pd] = qpsk_to_bits(prev_rx_symbols_ph, rx_symbols_ph, 'dqpsk');
+
+  %----------------------------------------------------------------------
 
   foff -= 0.5*ferr;
   prev_rx_symbols = rx_symbols;
+  prev_rx_symbols_ph = rx_symbols_ph;
   sync_log = [sync_log sync];
   
   % freq est state machine
@@ -242,48 +230,11 @@ for f=1:frames
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
   snr_log = [snr_log calc_snr(sig_est, noise_est)];
 
-  % coherent PSK demod --------------------------------------
-
-  % update memory of the last Nph rx symbols
-
-  rx_symbols_mem(:,1:Npom-1) = rx_symbols_mem(:,2:Npom);
-  rx_symbols_mem(:,Npom) = rx_symbols .* exp(j*pi/4);
-
-  % estimate and correct phase of each received symbol in 16 symbol frame
-
-  for c=1:Nc                  
-    for s=Nph2+1:Nph2+Nstates  % symbols in middle of matrix that we correct 
-      st = s - Nph2; en = s + Nph2;
-      corr = rx_symbols_mem(c,st:en) * tx_symbols_mem(c,st:en)';
-      rx_symbols_mem_ph(c,s) = rx_symbols_mem(c,s) .* exp(-j*angle(corr));
-    end
-  end
-  
-  % count bit errors in centre of window
-
-  psk_bit_errors = 0;
-  psk_bits = Nc*Nstates;
-  st = Nph2+1; en = Nph2+Nstates;
-  for c=1:Nc
-    psk_bit_errors += sum(real(rx_symbols_mem_ph(c,st:en)) .* real(tx_symbols_mem(c,st:en)) < 0);
-    psk_bit_errors += sum(imag(rx_symbols_mem_ph(c,st:en)) .* imag(tx_symbols_mem(c,st:en)) < 0);
-  end
-  printf("psk_bit_errors: %d corr: %f\n", psk_bit_errors, angle(corr));
-  ber = psk_bit_errors/psk_bits;
-  if ber < 0.1
-    psk_total_bit_errors += psk_bit_errors;
-    psk_total_bits += psk_bits;
-    % phase correction only valid when we are in sync
-    rx_symbols_ph_log = [rx_symbols_ph_log rx_symbols_mem_ph(:,st:en)];
-  end
-
-  % ---------------------------------------------------------
-
   % count bit errors if we find a test frame
 
   [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
 
-  if test_frame_sync == 1
+  if (test_frame_sync == 1) && (f > 15)
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
     bit_errors_log = [bit_errors_log bit_errors];
@@ -334,10 +285,6 @@ printf("\nDPSK\n");
 printf("  bits......: %d\n", total_bits);
 printf("  errors....: %d\n", total_bit_errors);
 printf("  BER.......: %1.4f\n",  ber);
-printf("PSK\n");
-printf("  bits......: %d\n", psk_total_bits);
-printf("  errors....: %d\n", psk_total_bit_errors);
-printf("  BER.......: %1.4f\n",  psk_total_bit_errors/psk_total_bits);
 
 % ---------------------------------------------------------------------
 % Plots
@@ -365,18 +312,6 @@ title('Freq offset (Hz)');
 
 figure(3)
 clf;
-subplot(211)
-plot(real(tx_fdm_log));
-title('FDM Tx Signal');
-subplot(212)
-Nfft=Fs;
-S=fft(rx_fdm_log,Nfft);
-SdB=20*log10(abs(S));
-plot(SdB(1:Fs/4))
-title('FDM Rx Spectrum');
-
-figure(4)
-clf;
 subplot(311)
 stem(sync_log)
 axis([0 frames 0 1.5]);
@@ -389,24 +324,18 @@ plot(test_frame_sync_log);
 axis([0 frames 0 1.5]);
 title('Test Frame Sync')
 
-figure(5)
-clf;
-subplot(211)
-stem(real(rx_symbols_mem(2,:)))
-subplot(212)
-stem(imag(rx_symbols_mem(2,:)))
-
-figure(6)
-clf;
-subplot(211)
-stem(real(tx_symbols_mem(2,:)))
-subplot(212)
-stem(imag(tx_symbols_mem(2,:)))
-
-figure(7)
+figure(4)
 clf;
 [n m] = size(rx_symbols_ph_log);
 plot(real(rx_symbols_ph_log(1:Nc+1,15:m)),imag(rx_symbols_ph_log(1:Nc+1,15:m)),'+')
 %plot(real(rx_symbols_ph_log(2,15:m)),imag(rx_symbols_ph_log(2,15:m)),'+')
 axis([-3 3 -3 3]);
 title('Scatter Diagram - after phase correction');
+
+figure(5)
+clf;
+subplot(211)
+plot(rx_phase_offsets_log(1,:))
+subplot(212)
+plot(phase_amb_log(1,:))
+title('Rx Phase Offset Est')
