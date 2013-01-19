@@ -30,7 +30,11 @@ global P = 4;          % oversample factor used for rx symbol filtering
 global Nfilter = Nsym*M;
 global Nfiltertiming = M+Nfilter+M;
 alpha = 0.5;
-global snr_coeff = 0.9 % SNR est averaging filter coeff
+global snr_coeff;
+snr_coeff = 0.9;       % SNR est averaging filter coeff
+global Nph;
+Nph = 9;               % number of symbols to estimate phase over
+                       % must be odd number as we take centre symbol
 
 % root raised cosine (Root Nyquist) filter 
 
@@ -382,19 +386,56 @@ function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
 endfunction
 
 
-% Phase estimation function - probably won't work over a HF channel
-% Tries to operate over a single symbol but uses phase information from
-% all Nc carriers which should increase the SNR of phase estimate.
-% Maybe phase is coherent over a couple of symbols in HF channel,not
-% sure but it's worth 3dB so worth experimenting or using coherent as
-% an option.
+% Experimental "feed forward" phase estimation function - estimates
+% phase over a windows of Nph (e.g. Nph = 9) symbols.  May not work
+% well on HF channels but lets see.  Has a phase ambiguity of m(pi/4)
+% where m=0,1,2 which needs to be corrected outside of this function
 
-function rx_phase = rx_est_phase(prev_rx_symbols, rx_symbols)
+function [phase_offsets ferr] = rx_est_phase(rx_symbols)
+  global rx_symbols_mem;
+  global prev_phase_offsets;
+  global phase_amb;
+  global Nph;
+  global Nc;
 
-  % modulation strip
+  % keep record of Nph symbols
 
-  rx_phase = angle(sum(rx_symbols .^ 4))/4;
+  rx_symbols_mem(:,1:Nph-1) = rx_symbols_mem(:,2:Nph);
+  rx_symbols_mem(:,Nph) = rx_symbols;
  
+  % estimate and correct phase offset based of modulation stripped samples
+
+  phase_offsets = zeros(Nc+1,1);
+  for c=1:Nc+1
+
+    % rotate QPSK constellation to a single point
+    mod_stripped = abs(rx_symbols_mem(c,:)) .* exp(j*4*angle(rx_symbols_mem(c,:)));
+    
+    % find average phase offset, which will be on -pi/4 .. pi/4
+    sum_real = sum(real(mod_stripped));
+    sum_imag = sum(imag(mod_stripped));
+    phase_offsets(c) = atan2(sum_imag, sum_real)/4;
+
+    % determine if phase has jumped from - -> +    
+    if (prev_phase_offsets(c) < -pi/8) && (phase_offsets(c) > pi/8)
+      phase_amb(c) -= pi/2;
+      if (phase_amb(c) < -pi)
+        phase_amb(c) += 2*pi;
+      end
+    end
+    
+    % determine if phase has jumped from + -> -    
+    if (prev_phase_offsets(c) > pi/8) && (phase_offsets(c) < -pi/8)
+      phase_amb(c) += pi/2;
+      if (phase_amb(c) > pi)
+        phase_amb(c) -= 2*pi;
+      end
+    end
+  end
+
+  ferr = mean(phase_offsets - prev_phase_offsets);
+  prev_phase_offsets = phase_offsets;
+
 endfunction
 
 
@@ -415,6 +456,7 @@ function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbol
     % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
 
     for c=1:Nc
+      msb = lsb = 0;
       d = phase_difference(c);
       if ((real(d) >= 0) && (imag(d) >= 0))
          msb = 0; lsb = 0;
@@ -467,12 +509,14 @@ function [sig_est noise_est] = snr_update(sig_est, noise_est, phase_difference)
     % vector of mags, one for each carrier.
 
     s = abs(phase_difference);
-
+    
     % signal mag estimate for each carrier is a smoothed version
     % of instantaneous magntitude, this gives us a vector of smoothed
     % mag estimates, one for each carrier.
-
+    
     sig_est = snr_coeff*sig_est + (1 - snr_coeff)*s;
+
+    %printf("s: %f sig_est: %f snr_coeff: %f\n", s(1), sig_est(1), snr_coeff);
 
     % noise mag estimate is distance of current symbol from average
     % location of that symbol.  We reflect all symbols into the first
@@ -486,6 +530,7 @@ function [sig_est noise_est] = snr_update(sig_est, noise_est, phase_difference)
     % noise power estimates, one for each carrier.
 
     noise_est = snr_coeff*noise_est + (1 - snr_coeff)*n;
+
 endfunction
 
 
@@ -525,6 +570,12 @@ function bits = get_test_bits(nbits)
  
   for i=1:nbits
     bits(i) = test_bits(current_test_bit++);
+    %if (mod(i,2) == 0)
+    %  bits(i) = 1;
+    %else
+    %  bits(i) = 0;
+    %end
+    
     if (current_test_bit > Ntest_bits)
       current_test_bit = 1;
     endif
@@ -536,9 +587,8 @@ endfunction
 % Accepts nbits from rx and attempts to sync with test_bits sequence.
 % if sync OK measures bit errors
 
-function [sync bit_errors] = put_test_bits(rx_bits)
+function [sync bit_errors] = put_test_bits(test_bits, rx_bits)
   global Ntest_bits;       % length of test sequence
-  global test_bits;
   global rx_test_bits_mem;
 
   % Append to our memory
@@ -933,3 +983,11 @@ current_test_bit = 1;
 global rx_test_bits_mem;
 rx_test_bits_mem = zeros(1,Ntest_bits);
 
+% Experimental phase estimator states ----------------------
+
+global rx_symbols_mem;
+rx_symbols_mem = zeros(Nc+1, Nph);
+global prev_phase_offsets;
+prev_phase_offsets = zeros(Nc+1, 1);
+global phase_amb;
+phase_amb = zeros(Nc+1, 1);

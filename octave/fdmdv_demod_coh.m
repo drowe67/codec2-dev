@@ -1,14 +1,15 @@
-% fdmdv_demod.m
+% fdmdv_demod_coh.m
 %
 % Demodulator function for FDMDV modem (Octave version).  Requires
-% 8kHz sample rate raw files as input
+% 8kHz sample rate raw files as input.  This version uses experimental
+% psuedo coherent demodulation.
 %
-% Copyright David Rowe 2012
+% Copyright David Rowe 2013
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits, pngname)
+function fdmdv_demod_coh(rawfilename, nbits, pngname)
 
   fdmdv; % include modem code
 
@@ -51,6 +52,13 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   track = 0;
   fest_state = 0;
 
+  % psuedo coherent demod states
+
+  rx_symbols_ph_log = [];
+  prev_rx_symbols_ph = ones(Nc+1,1);
+  rx_phase_offsets_log = [];
+  phase_amb_log = [];
+
   % Main loop ----------------------------------------------------
 
   for f=1:frames
@@ -84,9 +92,9 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     rx_baseband = fdm_downconvert(rx_fdm, nin);
     rx_filt = rx_filter(rx_baseband, nin);
 
-    [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);
-    
+    [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);    
     rx_timing_log = [rx_timing_log rx_timing];
+
     nin = M;
     if rx_timing > 2*M/P
        nin += M/P;
@@ -95,18 +103,30 @@ function fdmdv_demod(rawfilename, nbits, pngname)
        nin -= M/P;
     end
 
-    if strcmp(modulation,'dqpsk')
-      rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
-    else
-      rx_symbols_log = [rx_symbols_log rx_symbols];
-    endif
-    [rx_bits sync f_err pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    rx_symbols_log = [rx_symbols_log rx_symbols.*(conj(prev_rx_symbols)./abs(prev_rx_symbols))*exp(j*pi/4)];
+
+    % coherent phase offset estimation ------------------------------------
+
+    [rx_phase_offsets ferr] = rx_est_phase(rx_symbols);
+    rx_phase_offsets_log = [rx_phase_offsets_log rx_phase_offsets];
+    phase_amb_log = [phase_amb_log phase_amb];
+    rx_symbols_ph = rx_symbols_mem(:,floor(Nph/2)+1) .* exp(-j*(rx_phase_offsets + phase_amb));
+    rx_symbols_ph_log = [rx_symbols_ph_log rx_symbols_ph .* exp(j*pi/4)];
+    rx_symbols_ph = -1 + 2*(real(rx_symbols_ph .* exp(j*pi/4)) > 0) + j*(-1 + 2*(imag(rx_symbols_ph .* exp(j*pi/4)) > 0));
+
+    % Std differential (used for freq offset est and BPSK sync) and psuedo coherent detection -----------------------
+
+    [rx_bits_unused sync        f_err       pd       ] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits        sync_unused ferr_unused pd_unused] = qpsk_to_bits(prev_rx_symbols_ph, rx_symbols_ph, 'dqpsk');
+ 
+    foff -= 0.5*f_err;
+    prev_rx_symbols = rx_symbols;
+    prev_rx_symbols_ph = rx_symbols_ph;
+    sync_log = [sync_log sync];
+
     [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
     snr_est = calc_snr(sig_est, noise_est);
     snr_est_log = [snr_est_log snr_est];
-    foff -= 0.5*f_err;
-    prev_rx_symbols = rx_symbols;
-    sync_log = [sync_log sync];
 
     % freq est state machine
 
@@ -214,4 +234,20 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   plot(xt, snr_est_log);
   title('SNR Estimates')
  
+  figure(6)
+  clf;
+  [n m] = size(rx_symbols_ph_log);
+  plot(real(rx_symbols_ph_log(1:Nc+1,15:m)),imag(rx_symbols_ph_log(1:Nc+1,15:m)),'+')
+  %plot(real(rx_symbols_ph_log(2,15:m)),imag(rx_symbols_ph_log(2,15:m)),'+')
+  axis([-2 2 -2 2]);
+  title('Scatter Diagram - after phase correction');
+
+  figure(7)
+  clf;
+  subplot(211)
+  plot(rx_phase_offsets_log(1,:))
+  subplot(212)
+  plot(phase_amb_log(1,:))
+  title('Rx Phase Offset Est')
+
 endfunction

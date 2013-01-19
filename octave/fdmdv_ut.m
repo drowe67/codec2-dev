@@ -12,7 +12,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 25;
+frames = 100;
 EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
@@ -96,6 +96,7 @@ fest_state = 0;
 track = 0;
 track_log = [];
 
+snr_log = [];
 
 % ---------------------------------------------------------------------
 % Main loop 
@@ -206,6 +207,7 @@ for f=1:frames
   % Update SNR est
 
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
+  snr_log = [snr_log calc_snr(sig_est, noise_est)];
 
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
@@ -316,3 +318,6 @@ plot(test_frame_sync_log);
 axis([0 frames 0 1.5]);
 title('Test Frame Sync')
 
+figure(5)
+clf
+plot(snr_log)
