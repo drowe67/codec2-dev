@@ -62,7 +62,7 @@ void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[])
 void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void ear_protection(float in_out[], int n);
+static void ear_protection(float in_out[], int n);
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -978,7 +978,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 
 \*---------------------------------------------------------------------------*/
 
-void ear_protection(float in_out[], int n) {
+static void ear_protection(float in_out[], int n) {
     float max_sample, over, gain;
     int   i;
 
