@@ -956,7 +956,7 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
     COMP  pi_on_4;
     COMP  d;
     int   msb=0, lsb=0;
-    float ferr;
+    float ferr, norm;
 
     pi_on_4.real = cos(PI/4.0);
     pi_on_4.imag = sin(PI/4.0);
@@ -964,8 +964,10 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
     /* Extra 45 degree clockwise lets us use real and imag axis as
        decision boundaries */
 
-    for(c=0; c<NC; c++)
-	phase_difference[c] = cmult(cmult(rx_symbols[c], cconj(prev_rx_symbols[c])), pi_on_4);
+    for(c=0; c<NC; c++) {
+        norm = 1.0/(cabsolute(prev_rx_symbols[c])+1E-6);
+	phase_difference[c] = cmult(cmult(rx_symbols[c], fcmult(norm,cconj(prev_rx_symbols[c]))), pi_on_4);
+    }
 				    
     /* map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits */
 
@@ -989,7 +991,8 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
  
     /* Extract DBPSK encoded Sync bit and fine freq offset estimate */
 
-    phase_difference[NC] = cmult(rx_symbols[NC], cconj(prev_rx_symbols[NC]));
+    norm = 1.0/(cabsolute(prev_rx_symbols[NC])+1E-6);
+    phase_difference[NC] = cmult(rx_symbols[NC], fcmult(norm, cconj(prev_rx_symbols[NC])));
     if (phase_difference[NC].real < 0) {
       *sync_bit = 1;
       ferr = phase_difference[NC].imag;
