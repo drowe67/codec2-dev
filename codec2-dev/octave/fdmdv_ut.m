@@ -12,8 +12,8 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
-EbNo_dB = 7.3;
+frames = 50*10;
+EbNo_dB = 10.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -98,6 +98,10 @@ track_log = [];
 
 snr_log = [];
 
+Nspec=1024;
+spec_mem=zeros(1,Nspec);
+SdB = zeros(1,Nspec);
+
 % ---------------------------------------------------------------------
 % Main loop 
 % ---------------------------------------------------------------------
@@ -149,6 +153,14 @@ for f=1:frames
   rx_fdm += noise;
   rx_fdm_log = [rx_fdm_log rx_fdm];
 
+  % update spectrum
+
+  l=length(rx_fdm);
+  spec_mem(1:Nspec-l) = spec_mem(l+1:Nspec);
+  spec_mem(Nspec-l+1:Nspec) = rx_fdm;
+  S=fft(spec_mem.*hanning(Nspec)',Nspec);
+  SdB = 0.9*SdB + 0.1*20*log10(abs(S));
+
   % Delay
 
   rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
@@ -190,7 +202,6 @@ for f=1:frames
 
   [rx_bits sync foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   if strcmp(modulation,'dqpsk')
-    %rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
     rx_symbols_log = [rx_symbols_log pd];
   else
     rx_symbols_log = [rx_symbols_log rx_symbols];
@@ -212,7 +223,8 @@ for f=1:frames
   % count bit errors if we find a test frame
   % Allow 15 frames for filter memories to fill and time est to settle
 
-  [test_frame_sync bit_errors] = put_test_bits(rx_bits);
+  [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
+  
   if test_frame_sync == 1
     total_bit_errors = total_bit_errors + bit_errors;
     total_bits = total_bits + Ntest_bits;
@@ -295,13 +307,12 @@ title('Freq offset (Hz)');
 figure(3)
 clf;
 subplot(211)
-plot(real(tx_fdm_log));
-title('FDM Tx Signal');
+plot(real(rx_fdm_log));
+title('FDM Rx Signal');
 subplot(212)
-Nfft=Fs;
-S=fft(rx_fdm_log,Nfft);
-SdB=20*log10(abs(S));
-plot(SdB(1:Fs/4))
+plot((0:Nspec/2-1)*Fs/Nspec, SdB(1:Nspec/2) - 20*log10(Nspec/2))
+axis([0 Fs/2 -40 0])
+grid
 title('FDM Rx Spectrum');
 
 figure(4)
@@ -320,4 +331,11 @@ title('Test Frame Sync')
 
 figure(5)
 clf
+subplot(211)
 plot(snr_log)
+subplot(212)
+%plot(20*log10(sig_est(1:Nc))-20*log10(sig_est(Nc+1))+6)
+%axis([1 Nc -6 6]);
+sdB_pc = 20*log10(sig_est(1:Nc+1));
+bar(sdB_pc(1:Nc) - mean(sdB_pc(1:Nc)))
+axis([0 Nc+1 -3 3]);

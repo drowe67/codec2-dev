@@ -29,6 +29,7 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   sync_log = [];
   test_frame_sync_log = [];
   test_frame_sync_state = 0;
+  error_pattern_log = [];
 
   % SNR states
 
@@ -51,6 +52,12 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   track = 0;
   fest_state = 0;
 
+  % spectrum states
+
+  Nspec=1024;
+  spec_mem=zeros(1,Nspec);
+  SdB = zeros(1,Nspec);
+
   % Main loop ----------------------------------------------------
 
   for f=1:frames
@@ -62,6 +69,14 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     end
     
     rx_fdm_log = [rx_fdm_log rx_fdm(1:nin)];
+
+    % update spectrum
+
+    l=length(rx_fdm);
+    spec_mem(1:Nspec-l) = spec_mem(l+1:Nspec);
+    spec_mem(Nspec-l+1:Nspec) = rx_fdm;
+    S=fft(spec_mem.*hanning(Nspec)',Nspec);
+    SdB = 0.9*SdB + 0.1*20*log10(abs(S));
 
     % frequency offset estimation and correction
 
@@ -96,7 +111,7 @@ function fdmdv_demod(rawfilename, nbits, pngname)
     end
 
     if strcmp(modulation,'dqpsk')
-      rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols)*exp(j*pi/4)];
+      rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols./abs(prev_rx_symbols))*exp(j*pi/4)];
     else
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
@@ -115,7 +130,7 @@ function fdmdv_demod(rawfilename, nbits, pngname)
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
+    [test_frame_sync bit_errors error_pattern] = put_test_bits(test_bits, rx_bits);
     if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + Ntest_bits;
@@ -141,20 +156,21 @@ function fdmdv_demod(rawfilename, nbits, pngname)
         test_frame_count = 0;
         if ((test_frame_sync == 0))      
           next_test_frame_sync_state = 0;
+        else
+          error_pattern_log = [error_pattern_log error_pattern];
         end
       end
     end
     test_frame_sync_state = next_test_frame_sync_state;
     test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
-
   end
-  
+ 
   % ---------------------------------------------------------------------
   % Print Stats
   % ---------------------------------------------------------------------
 
   ber = total_bit_errors / total_bits;
-
+  Fcentre
   printf("%d bits  %d errors  BER: %1.4f\n",total_bits, total_bit_errors, ber);
 
   % ---------------------------------------------------------------------
@@ -186,14 +202,7 @@ function fdmdv_demod(rawfilename, nbits, pngname)
 
   figure(3)
   clf;
-  subplot(211)
-  [a b] = size(rx_fdm_log);
-  xt1 = (1:b)/Fs;
-  plot(xt1, rx_fdm_log);
-  title('Rx FDM Signal');
-  subplot(212)
   spec(rx_fdm_log,8000);
-  title('FDM Rx Spectrogram');
 
   figure(4)
   clf;
@@ -211,7 +220,36 @@ function fdmdv_demod(rawfilename, nbits, pngname)
 
   figure(5)
   clf;
+  subplot(211);
   plot(xt, snr_est_log);
   title('SNR Estimates')
- 
+  subplot(212)
+  snrdB_pc = 20*log10(sig_est(1:Nc+1)) - 20*log10(noise_est(1:Nc+1));
+  bar(snrdB_pc(1:Nc) - mean(snrdB_pc(1:Nc)))
+  axis([0 Nc+1 -3 3]);
+
+  figure(6)
+  clf;
+  hold on;
+  lep = length(error_pattern_log);
+  for p=1:Nc
+    plot(p + 0.25*error_pattern_log((p-1)*2+1:Nc*Nb:lep));
+    plot(0.30 + p + 0.25*error_pattern_log(p*2:Nc*Nb:lep),'r')
+  end
+  hold off;
+  axis([1 lep/(Nc*Nb) 0 15])
+
+  figure(7)
+  clf;
+  subplot(211)
+  [a b] = size(rx_fdm_log);
+  xt1 = (1:b)/Fs;
+  plot(xt1, rx_fdm_log);
+  title('Rx FDM Signal');
+  subplot(212)
+  plot((0:Nspec/2-1)*Fs/Nspec, SdB(1:Nspec/2) - 20*log10(Nspec/2))
+  axis([0 Fs/2 -40 0])
+  grid
+  title('FDM Rx Spectrum');
+
 endfunction
