@@ -305,9 +305,9 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
 	if ((msb == 0) && (lsb == 1))
 	    tx_symbols[c] = cmult(j, prev_tx_symbols[c]);
 	if ((msb == 1) && (lsb == 0))
-	    tx_symbols[c] = cneg(prev_tx_symbols[c]);
-	if ((msb == 1) && (lsb == 1))
 	    tx_symbols[c] = cmult(cneg(j),prev_tx_symbols[c]);
+	if ((msb == 1) && (lsb == 1))
+	    tx_symbols[c] = cneg(prev_tx_symbols[c]);
     }
 
     /* +1 -1 +1 -1 BPSK sync carrier, once filtered becomes (roughly)
@@ -962,7 +962,9 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
     pi_on_4.imag = sin(PI/4.0);
 
     /* Extra 45 degree clockwise lets us use real and imag axis as
-       decision boundaries */
+       decision boundaries. "norm" makes sure the phase subtraction
+       from the previous symbol doesn't affect the amplitude, which
+       leads to sensible scatter plots */
 
     for(c=0; c<NC; c++) {
         norm = 1.0/(cabsolute(prev_rx_symbols[c])+1E-6);
@@ -980,10 +982,10 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
          msb = 0; lsb = 1;
       }
       if ((d.real < 0) && (d.imag < 0)) {
-         msb = 1; lsb = 0;
+         msb = 1; lsb = 1;
       }
       if ((d.real >= 0) && (d.imag < 0)) {
-         msb = 1; lsb = 1;
+         msb = 1; lsb = 0;
       }
       rx_bits[2*c] = msb;
       rx_bits[2*c+1] = lsb;
