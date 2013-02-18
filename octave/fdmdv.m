@@ -24,7 +24,7 @@ global Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
 global Nsym  = 6;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
-global Fcentre = 1200; % Centre frequency, Nc/2 carriers below this, N/c carriers above (Hz)
+global Fcentre = 1500; % Centre frequency, Nc/2 carriers below this, N/c carriers above (Hz)
 global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
 global Nfilter = Nsym*M;
@@ -73,10 +73,10 @@ function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
          tx_symbols(c) = j*prev_tx_symbols(c);
       endif  
       if ((msb == 1) && (lsb == 0))
-         tx_symbols(c) = -prev_tx_symbols(c);
+         tx_symbols(c) = -j*prev_tx_symbols(c);
       endif  
       if ((msb == 1) && (lsb == 1))
-         tx_symbols(c) = -j*prev_tx_symbols(c);
+         tx_symbols(c) = -prev_tx_symbols(c);
       endif 
     end
   else
@@ -451,7 +451,7 @@ function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbol
     % decision boundaries
 
     phase_difference = zeros(Nc+1,1);
-    phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)) * exp(j*pi/4);
+    phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)./(1E-6+abs(prev_rx_symbols(1:Nc)))) * exp(j*pi/4);
   
     % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
 
@@ -465,10 +465,10 @@ function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbol
          msb = 0; lsb = 1;
       endif  
       if ((real(d) < 0) && (imag(d) < 0))
-         msb = 1; lsb = 0;
+         msb = 1; lsb = 1;
       endif
       if ((real(d) >= 0) && (imag(d) < 0))
-         msb = 1; lsb = 1;
+         msb = 1; lsb = 0;
       endif
       rx_bits(2*(c-1)+1) = msb;
       rx_bits(2*(c-1)+2) = lsb;
@@ -476,7 +476,7 @@ function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbol
  
     % Extract DBPSK encoded Sync bit
 
-    phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1));
+    phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1)./(1E-6+abs(prev_rx_symbols(Nc+1))));
     if (real(phase_difference(Nc+1)) < 0)
       sync_bit = 1;
       f_err = imag(phase_difference(Nc+1));
@@ -534,7 +534,7 @@ function [sig_est noise_est] = snr_update(sig_est, noise_est, phase_difference)
 endfunction
 
 
-% calculate current SNR estimate (3000Hz noise BW)
+% calculate current sig estimate for eeach carrier
 
 function snr_dB = calc_snr(sig_est, noise_est)
   global Rs;
@@ -560,6 +560,7 @@ function snr_dB = calc_snr(sig_est, noise_est)
   snr_dB = SdB - N3000dB;
 
 endfunction
+
 
 % returns nbits from a repeating sequence of random data
 
@@ -587,7 +588,7 @@ endfunction
 % Accepts nbits from rx and attempts to sync with test_bits sequence.
 % if sync OK measures bit errors
 
-function [sync bit_errors] = put_test_bits(test_bits, rx_bits)
+function [sync bit_errors error_pattern] = put_test_bits(test_bits, rx_bits)
   global Ntest_bits;       % length of test sequence
   global rx_test_bits_mem;
 
@@ -599,7 +600,8 @@ function [sync bit_errors] = put_test_bits(test_bits, rx_bits)
 
   % see how many bit errors we get when checked against test sequence
 
-  bit_errors = sum(xor(test_bits,rx_test_bits_mem));
+  error_pattern = xor(test_bits,rx_test_bits_mem);
+  bit_errors = sum(error_pattern);
 
   % if less than a thresh we are aligned and in sync with test sequence
 
@@ -935,6 +937,7 @@ freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 global phase_tx;
 %phase_tx = ones(Nc+1,1);
 phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
+%phase_tx(1) *= 10 .^ (-6/20);
 global phase_rx;
 phase_rx = ones(Nc+1,1);
 
