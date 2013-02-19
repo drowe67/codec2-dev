@@ -1123,11 +1123,21 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync,
   tracking algorithm.  If we lose sync we switch back to coarse mode
   for fast re-acquisition of large frequency offsets.
 
+  The sync state is also useful for higher layers to determine when
+  there is valid FDMDV data for decoding.  We want to reliably and
+  quickly get into sync, stay in sync even on fading channels, and
+  fall out of sync quickly if tx stops or it's a false sync.
+
+  In multipath fading channels the BPSK sync carrier may be pushed
+  down in the noise, despite other carriers being at full strength.
+  We want to avoid loss of sync in these cases.
+
 \*---------------------------------------------------------------------------*/
 
 int freq_state(int sync_bit, int *state)
 {
     int next_state, coarse_fine;
+    int bad_sync = 0;
 
     /* acquire state, look for 6 symbol 010101 sequence from sync bit */
 
@@ -1162,27 +1172,40 @@ int freq_state(int sync_bit, int *state)
 	    next_state = 0;
 	break;
     case 5:
-	if (sync_bit == 1)
+	if (sync_bit == 1) {
 	    next_state = 6;
+            bad_sync = 0;
+        }
 	else 
 	    next_state = 0;
 	break;
 	
 	/* states 6 and above are track mode, make sure we keep
-	   getting 0101 sync bit sequence */
+	   getting 0101 sync bit sequence. bad_sync allows us to track
+	   through a few bad symbols when BPSK pilot is temporarilly
+	   faded out, avoiding a costly re-sync when valid data still
+	   exists on other carriers */
 
     case 6:
+        next_state = 7;
 	if (sync_bit == 0)
-	    next_state = 7;
-	else 
-	    next_state = 0;
+            bad_sync = 0;
+	else {
+            bad_sync++;
+            if (bad_sync > 2)
+                next_state = 0;
+        }
 
 	break;
     case 7:
+        next_state = 6;
 	if (sync_bit == 1)
-	    next_state = 6;
-	else 
-	    next_state = 0;
+	    bad_sync = 0;
+        else {
+            bad_sync++;
+            if (bad_sync > 2)
+                next_state = 0;
+        }
 	break;
     }
 
