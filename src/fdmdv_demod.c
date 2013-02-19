@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
     int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;
-    float        *rx_fdm_log;
+    COMP         *rx_fdm_log;
     int           rx_fdm_log_col_index;
     COMP          rx_symbols_log[FDMDV_NSYM][MAX_FRAMES];
     int           coarse_fine_log[MAX_FRAMES];
@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 
     /* malloc some of the bigger variables to prevent out of stack problems */
 
-    rx_fdm_log = (float*)malloc(sizeof(float)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
+    rx_fdm_log = (COMP*)malloc(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
     rx_spec_log = (float*)malloc(sizeof(float)*FDMDV_NSPEC*MAX_FRAMES);
     assert(rx_spec_log != NULL);
@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 
 	    /* log modem states for later dumping to Octave log file */
 
-	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(float)*nin_prev);
+	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(COMP)*nin_prev);
 	    rx_fdm_log_col_index += nin_prev;
 
 	    for(c=0; c<FDMDV_NSYM; c++)
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 			argv[3], strerror(errno));
 		exit(1);
 	    }
-	    octave_save_float(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
+	    octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
 	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, f, MAX_FRAMES);  
 	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
