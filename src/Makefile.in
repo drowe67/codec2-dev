@@ -42,7 +42,7 @@ noinst_PROGRAMS = generate_codebook$(EXEEXT) genlspdtcb$(EXEEXT)
 bin_PROGRAMS = c2demo$(EXEEXT) c2enc$(EXEEXT) c2dec$(EXEEXT) \
 	c2sim$(EXEEXT) fdmdv_get_test_bits$(EXEEXT) fdmdv_mod$(EXEEXT) \
 	fdmdv_demod$(EXEEXT) fdmdv_put_test_bits$(EXEEXT) \
-	fdmdv_interleave$(EXEEXT) sim_multipath_errors$(EXEEXT)
+	fdmdv_interleave$(EXEEXT) insert_errors$(EXEEXT)
 subdir = src
 DIST_COMMON = $(library_include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -115,9 +115,9 @@ generate_codebook_LDADD = $(LDADD)
 genlspdtcb_SOURCES = genlspdtcb.c
 genlspdtcb_OBJECTS = genlspdtcb.$(OBJEXT)
 genlspdtcb_LDADD = $(LDADD)
-am_sim_multipath_errors_OBJECTS = sim_multipath_errors.$(OBJEXT)
-sim_multipath_errors_OBJECTS = $(am_sim_multipath_errors_OBJECTS)
-sim_multipath_errors_LDADD = $(LDADD)
+am_insert_errors_OBJECTS = insert_errors.$(OBJEXT)
+insert_errors_OBJECTS = $(am_insert_errors_OBJECTS)
+insert_errors_LDADD = $(LDADD)
 DEFAULT_INCLUDES = -I. -I$(srcdir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -133,14 +133,13 @@ SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) $(c2demo_SOURCES) \
 	$(c2enc_SOURCES) $(c2sim_SOURCES) $(fdmdv_demod_SOURCES) \
 	$(fdmdv_get_test_bits_SOURCES) $(fdmdv_interleave_SOURCES) \
 	$(fdmdv_mod_SOURCES) $(fdmdv_put_test_bits_SOURCES) \
-	generate_codebook.c genlspdtcb.c \
-	$(sim_multipath_errors_SOURCES)
+	generate_codebook.c genlspdtcb.c $(insert_errors_SOURCES)
 DIST_SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) \
 	$(c2demo_SOURCES) $(c2enc_SOURCES) $(c2sim_SOURCES) \
 	$(fdmdv_demod_SOURCES) $(fdmdv_get_test_bits_SOURCES) \
 	$(fdmdv_interleave_SOURCES) $(fdmdv_mod_SOURCES) \
 	$(fdmdv_put_test_bits_SOURCES) generate_codebook.c \
-	genlspdtcb.c $(sim_multipath_errors_SOURCES)
+	genlspdtcb.c $(insert_errors_SOURCES)
 library_includeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(library_include_HEADERS)
 ETAGS = etags
@@ -375,8 +374,8 @@ fdmdv_put_test_bits_SOURCES = fdmdv_put_test_bits.c fdmdv.c kiss_fft.c
 fdmdv_put_test_bits_LDFLAGS = $(LIBS)
 fdmdv_interleave_SOURCES = fdmdv_interleave.c
 fdmdv_interleave_LDFLAGS = $(LIBS)
-sim_multipath_errors_SOURCES = sim_multipath_errors.c
-sim_multipath_errors_LDFLAGS = $(LIBS)
+insert_errors_SOURCES = insert_errors.c
+insert_errors_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -507,9 +506,9 @@ generate_codebook$(EXEEXT): $(generate_codebook_OBJECTS) $(generate_codebook_DEP
 genlspdtcb$(EXEEXT): $(genlspdtcb_OBJECTS) $(genlspdtcb_DEPENDENCIES) 
 	@rm -f genlspdtcb$(EXEEXT)
 	$(LINK) $(genlspdtcb_LDFLAGS) $(genlspdtcb_OBJECTS) $(genlspdtcb_LDADD) $(LIBS)
-sim_multipath_errors$(EXEEXT): $(sim_multipath_errors_OBJECTS) $(sim_multipath_errors_DEPENDENCIES) 
-	@rm -f sim_multipath_errors$(EXEEXT)
-	$(LINK) $(sim_multipath_errors_LDFLAGS) $(sim_multipath_errors_OBJECTS) $(sim_multipath_errors_LDADD) $(LIBS)
+insert_errors$(EXEEXT): $(insert_errors_OBJECTS) $(insert_errors_DEPENDENCIES) 
+	@rm -f insert_errors$(EXEEXT)
+	$(LINK) $(insert_errors_LDFLAGS) $(insert_errors_OBJECTS) $(insert_errors_LDADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -530,6 +529,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_put_test_bits.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insert_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebook.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebookd.Plo@am__quote@
@@ -555,7 +555,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-sine.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/octave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/phaseexp.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sim_multipath_errors.Po@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
