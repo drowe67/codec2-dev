@@ -758,7 +758,7 @@ endfunction
 % then switch to a more robust tracking algorithm.  If we lose sync we switch
 % back to acquire mode for fast-requisition.
 
-function [track state] = freq_state(sync_bit, state)
+function [track state bad_sync] = freq_state(sync_bit, state, bad_sync)
 
   % acquire state, look for 6 symbol 010101 sequence from sync bit
 
@@ -799,6 +799,7 @@ function [track state] = freq_state(sync_bit, state)
   if state == 5
     if sync_bit == 1
       next_state = 6;
+      bad_sync = 0;
     else 
       next_state = 0;
     end        
@@ -807,19 +808,32 @@ function [track state] = freq_state(sync_bit, state)
   % states 6 and above are track mode, make sure we keep getting 0101 sync bit sequence
 
   if state == 6
+    next_state = 7;
     if sync_bit == 0
-      next_state = 7;
-    else 
-      next_state = 0;
+      bad_sync = 0;
+    else
+      printf("inc ");
+      bad_sync++;
+      if bad_sync > 2
+        next_state = 0;
+      end
     end        
   end
+
   if state == 7
+    next_state = 6;
     if sync_bit == 1
-      next_state = 6;
-    else 
-      next_state = 0;
+      bad_sync = 0;
+    else
+      printf("inc ");
+      bad_sync++;
+      if bad_sync > 2
+        next_state = 0;
+      end
     end        
   end
+
+  %printf("state: %d  next_state: %d  sync_bit: %d bad_sync: %d\n", state, next_state, sync_bit, bad_sync);
 
   state = next_state;
   if state >= 6

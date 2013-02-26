@@ -51,6 +51,7 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
   track_log = [];
   track = 0;
   fest_state = 0;
+  bad_sync = 0;
 
   % spectrum states
 
@@ -125,7 +126,7 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
 
     % freq est state machine
 
-    [track fest_state] = freq_state(sync, fest_state);
+    [track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
     track_log = [track_log track];
 
     % count bit errors if we find a test frame
