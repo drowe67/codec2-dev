@@ -54,12 +54,12 @@ if nargin < 3 || isempty(framesize)
    framesize = 2048;
 endif
 
-offset = framesize/4;
+offset = framesize/8;
 
 X = 20*log10(abs(specgram(x, framesize, 48000, blackmanharris(framesize)', framesize-offset)));
 
 XM=max(max(X));
-X = max(XM-120,X);
+X = max(XM-30,X);
 %size(X)
 F = -[framesize/2-1:-1:0]/framesize*Fs;
 %F = [0:127]/128*24000;
