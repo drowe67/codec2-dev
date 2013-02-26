@@ -8,7 +8,7 @@
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits, pngname)
+function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
 
   fdmdv; % include modem code
 
@@ -170,7 +170,6 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   % ---------------------------------------------------------------------
 
   ber = total_bit_errors / total_bits;
-  Fcentre
   printf("%d bits  %d errors  BER: %1.4f\n",total_bits, total_bit_errors, ber);
 
   % ---------------------------------------------------------------------
@@ -251,5 +250,37 @@ function fdmdv_demod(rawfilename, nbits, pngname)
   axis([0 Fs/2 -40 0])
   grid
   title('FDM Rx Spectrum');
+
+  % interleaving tests
+
+  load ../unittest/inter560.txt
+  lep = length(error_pattern_log);
+  lep = floor(lep/560)*560;
+  error_pattern_log_inter = zeros(1,lep);
+  for i=1:560:lep
+    for j=1:560
+      %printf("i: %4d j: %4d inter560(j): %4d\n", i,j,inter560(j));
+      index = inter560(j);
+      error_pattern_log_inter(i-1+index+1) = error_pattern_log(i-1+j);
+    end
+  end
+
+  figure(8)
+  clf;
+  hold on;
+  for p=1:Nc
+    plot(p + 0.25*error_pattern_log_inter((p-1)*2+1:Nc*Nb:lep));
+    plot(0.30 + p + 0.25*error_pattern_log_inter(p*2:Nc*Nb:lep),'r')
+  end
+  hold off;
+  axis([1 lep/(Nc*Nb) 0 15])
+
+  % save error pattern file
+
+  if nargin == 3
+    fout = fopen(errorpatternfilename, "wb");
+    fwrite(fout, error_pattern_log_inter, "short");
+    fclose(fout);
+  end
 
 endfunction
