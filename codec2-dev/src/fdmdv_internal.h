@@ -130,6 +130,7 @@ struct FDMDV {
 
     int  fest_state;
     int  coarse_fine;
+    int  bad_sync;
 
     /* SNR estimation states */
 
@@ -167,7 +168,7 @@ float rx_est_timing(COMP  rx_symbols[],
 		   int   nin);	 
 float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[]);
 void snr_update(float sig_est[], float noise_est[], COMP phase_difference[]);
-int freq_state(int sync_bit, int *state);
+int freq_state(int sync_bit, int *state, int *bad_sync);
 float calc_snr(float sig_est[], float noise_est[]);
 
 #endif
