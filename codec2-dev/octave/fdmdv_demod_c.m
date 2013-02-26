@@ -36,7 +36,7 @@ function fdmdv_demod_c(dumpfilename, bits)
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors] = put_test_bits(rx_bits);
+    [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
     if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + Ntest_bits;
@@ -79,6 +79,7 @@ function fdmdv_demod_c(dumpfilename, bits)
   figure(1)
   clf;
   plot(real(rx_symbols_log_c(1:Nc+1,15:frames)),imag(rx_symbols_log_c(1:Nc+1,15:frames)),'+')
+  %plot(real(rx_symbols_log_c(Nc+1,15:frames)),imag(rx_symbols_log_c(Nc+1,15:frames)),'+')
   axis([-2 2 -2 2]);
   title('Scatter Diagram');
 
