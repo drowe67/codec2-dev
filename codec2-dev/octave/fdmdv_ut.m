@@ -12,8 +12,8 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 50*10;
-EbNo_dB = 10.3;
+frames = 100;
+EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -93,6 +93,7 @@ foff_phase = 1;
 t = 0;
 foff = 0;
 fest_state = 0;
+bad_sync = 0;
 track = 0;
 track_log = [];
 
@@ -212,7 +213,7 @@ for f=1:frames
   
   % freq est state machine
 
-  [track fest_state] = freq_state(sync, fest_state);
+  [track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
   track_log = [track_log track];
 
   % Update SNR est
