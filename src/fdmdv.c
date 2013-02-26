@@ -221,7 +221,8 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
 
     f->fest_state = 0;
     f->coarse_fine = COARSE;
- 
+    f->bad_sync = 0;
+
     for(c=0; c<NC+1; c++) {
 	f->sig_est[c] = 0.0;
 	f->noise_est[c] = 0.0;
@@ -1134,10 +1135,9 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync,
 
 \*---------------------------------------------------------------------------*/
 
-int freq_state(int sync_bit, int *state)
+int freq_state(int sync_bit, int *state, int *bad_sync)
 {
     int next_state, coarse_fine;
-    int bad_sync = 0;
 
     /* acquire state, look for 6 symbol 010101 sequence from sync bit */
 
@@ -1174,7 +1174,7 @@ int freq_state(int sync_bit, int *state)
     case 5:
 	if (sync_bit == 1) {
 	    next_state = 6;
-            bad_sync = 0;
+            *bad_sync = 0;
         }
 	else 
 	    next_state = 0;
@@ -1189,10 +1189,10 @@ int freq_state(int sync_bit, int *state)
     case 6:
         next_state = 7;
 	if (sync_bit == 0)
-            bad_sync = 0;
+            *bad_sync = 0;
 	else {
-            bad_sync++;
-            if (bad_sync > 2)
+            (*bad_sync)++;
+            if (*bad_sync > 2)
                 next_state = 0;
         }
 
@@ -1200,10 +1200,10 @@ int freq_state(int sync_bit, int *state)
     case 7:
         next_state = 6;
 	if (sync_bit == 1)
-	    bad_sync = 0;
+	    *bad_sync = 0;
         else {
-            bad_sync++;
-            if (bad_sync > 2)
+            (*bad_sync)++;
+            if (*bad_sync > 2)
                 next_state = 0;
         }
 	break;
@@ -1278,7 +1278,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
     /* freq offset estimation state machine */
 
-    fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state);
+    fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state, &fdmdv->bad_sync);
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 
