@@ -12,7 +12,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
+frames = 50;
 EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
@@ -114,7 +114,7 @@ for f=1:frames
   % -------------------
 
   tx_bits = get_test_bits(Nc*Nb);
-  tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation);
+  tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, modulation);
   prev_tx_symbols = tx_symbols;
   tx_baseband = tx_filter(tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
@@ -201,7 +201,7 @@ for f=1:frames
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
-  [rx_bits sync foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   if strcmp(modulation,'dqpsk')
     rx_symbols_log = [rx_symbols_log pd];
   else
