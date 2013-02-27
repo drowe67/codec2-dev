@@ -18,9 +18,12 @@ randn('state',1);
 global Fs = 8000;      % sample rate in Hz
 global T  = 1/Fs;      % sample period in seconds
 global Rs = 50;        % symbol rate in Hz
-global Nc = 14;        % number of carriers
-global Nb = 2;         % Bits/symbol for QPSK modulation
-global Rb = Nc*Rs*Nb;  % bit rate
+global Nc;             % number of carriers
+       Nc = 14;
+global Nb;
+       Nb = 2;         % Bits/symbol for PSK modulation
+global Rb;
+       Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
 global Nsym  = 6;      % number of symbols to filter over
 global Fsep  = 75;     % Separation between carriers (Hz)
@@ -31,9 +34,9 @@ global Nfilter = Nsym*M;
 global Nfiltertiming = M+Nfilter+M;
 alpha = 0.5;
 global snr_coeff;
-snr_coeff = 0.9;       % SNR est averaging filter coeff
+       snr_coeff = 0.9;% SNR est averaging filter coeff
 global Nph;
-Nph = 9;               % number of symbols to estimate phase over
+       Nph = 9;        % number of symbols to estimate phase over
                        % must be odd number as we take centre symbol
 
 % root raised cosine (Root Nyquist) filter 
@@ -41,48 +44,82 @@ Nph = 9;               % number of symbols to estimate phase over
 global gt_alpha5_root;
 gt_alpha5_root = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
 
+% Converts gray code to natural binary
+
+global m4_gray_to_binary = [
+                             bin2dec("00") 
+                             bin2dec("01")
+                             bin2dec("11")
+                             bin2dec("10")
+                           ];
+global m8_gray_to_binary = [
+                             bin2dec("000")
+                             bin2dec("001")
+                             bin2dec("011")
+                             bin2dec("010")
+                             bin2dec("111")
+                             bin2dec("110")
+                             bin2dec("100")
+                             bin2dec("101")
+                           ];
+
+% Convert natural binary to gray code
+
+global m4_binary_to_gray = [
+                             bin2dec("00") 
+                             bin2dec("01")
+                             bin2dec("11")
+                             bin2dec("10")
+                           ];
+
+global m8_binary_to_gray = [
+                             bin2dec("000")
+                             bin2dec("001")
+                             bin2dec("011")
+                             bin2dec("010")
+                             bin2dec("110")
+                             bin2dec("111")
+                             bin2dec("101")
+                             bin2dec("100")
+                           ];
 
 % Functions ----------------------------------------------------
 
 
-% generate Nc+1 QPSK symbols from vector of (1,Nc*Nb) input bits.  The
+% generate Nc+1 PSK symbols from vector of (1,Nc*Nb) input bits.  The
 % Nc+1 symbol is the +1 -1 +1 .... BPSK sync carrier
 
-function tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, modulation)
+function tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits)
   global Nc;
   global Nb;
   global pilot_bit;
+  global m4_gray_to_binary;
+  global m8_gray_to_binary;
 
-  % re-arrange as (Nc,Nb) matrix
+  assert(length(tx_bits) == Nc*Nb, "Incorrect number of bits");
 
-  tx_bits_matrix = zeros(Nc,Nb);
-  tx_bits_matrix(1:Nc,1) = tx_bits(1:Nb:Nb*Nc);
-  tx_bits_matrix(1:Nc,2) = tx_bits(2:Nb:Nb*Nc);
+  m = 2 .^ Nb;
+  assert((m == 4) || (m == 8));
 
-  if (strcmp(modulation,'dqpsk')) 
- 
-    % map to (Nc,1) DQPSK symbols
+  for c=1:Nc
 
-    for c=1:Nc
-      msb = tx_bits_matrix(c,1); lsb = tx_bits_matrix(c,2);
+    % extract bits for this symbol
 
-      if ((msb == 0) && (lsb == 0))
-	  tx_symbols(c) = prev_tx_symbols(c);
-      endif  
-      if ((msb == 0) && (lsb == 1))
-         tx_symbols(c) = j*prev_tx_symbols(c);
-      endif  
-      if ((msb == 1) && (lsb == 0))
-         tx_symbols(c) = -j*prev_tx_symbols(c);
-      endif  
-      if ((msb == 1) && (lsb == 1))
-         tx_symbols(c) = -prev_tx_symbols(c);
-      endif 
+    bits_binary = tx_bits((c-1)*Nb+1:c*Nb); 
+    bits_decimal = sum(bits_binary .* 2.^(Nb-1:-1:0)); 
+
+    % determine phase shift using gray code mapping    
+
+    if m == 4
+       phase_shift = (2*pi/m)*m4_gray_to_binary(bits_decimal+1);
+    else
+       phase_shift = (2*pi/m)*m8_gray_to_binary(bits_decimal+1);
     end
-  else
-    % QPSK mapping
-    tx_symbols = -1 + 2*tx_bits_matrix(:,1) - j + 2j*tx_bits_matrix(:,2);
-  endif
+
+    % apply phase shift from previous symbol
+
+    tx_symbols(c) = exp(j*phase_shift) * prev_tx_symbols(c);
+  end
 
   % +1 -1 +1 -1 BPSK sync carrier, once filtered becomes two spectral
   % lines at +/- Rs/2
@@ -441,60 +478,64 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function [rx_bits sync_bit f_err phase_difference] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation)
+function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation)
   global Nc;
   global Nb;
-  global Nb;
+  global m4_binary_to_gray;
+  global m8_binary_to_gray;
 
-  if (strcmp(modulation,'dqpsk')) 
-    % extra 45 degree clockwise lets us use real and imag axis as
-    % decision boundaries
+  m = 2 .^ Nb;
+  assert((m == 4) || (m == 8));
 
-    phase_difference = zeros(Nc+1,1);
-    phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)./(1E-6+abs(prev_rx_symbols(1:Nc)))) * exp(j*pi/4);
+  phase_difference = zeros(Nc+1,1);
+  phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)./(1E-6+abs(prev_rx_symbols(1:Nc))));
   
-    % map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits
+  for c=1:Nc
 
-    for c=1:Nc
-      msb = lsb = 0;
-      d = phase_difference(c);
-      if ((real(d) >= 0) && (imag(d) >= 0))
-         msb = 0; lsb = 0;
-      endif  
-      if ((real(d) < 0) && (imag(d) >= 0))
-         msb = 0; lsb = 1;
-      endif  
-      if ((real(d) < 0) && (imag(d) < 0))
-         msb = 1; lsb = 1;
-      endif
-      if ((real(d) >= 0) && (imag(d) < 0))
-         msb = 1; lsb = 0;
-      endif
-      rx_bits(2*(c-1)+1) = msb;
-      rx_bits(2*(c-1)+2) = lsb;
+    % determine index of constellation point received 0,1,...,m-1
+
+    index = floor(angle(phase_difference(c))*m/(2*pi) + 0.5);
+
+    if index < 0
+      index += m;
     end
- 
-    % Extract DBPSK encoded Sync bit
 
-    phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1)./(1E-6+abs(prev_rx_symbols(Nc+1))));
-    if (real(phase_difference(Nc+1)) < 0)
-      sync_bit = 1;
-      f_err = imag(phase_difference(Nc+1));
+    % map to decimal version of bits encoded in symbol
+
+    if m == 4
+      bits_decimal = m4_binary_to_gray(index+1);
     else
-      sync_bit = 0;
-      f_err = -imag(phase_difference(Nc+1));
+      bits_decimal = m8_binary_to_gray(index+1);
+    end
+    
+    % convert back to an array of received bits
+
+    for i=1:Nb
+      if bitand(bits_decimal, 2.^(Nb-i))
+        rx_bits((c-1)*Nb+i) = 1;
+      else
+        rx_bits((c-1)*Nb+i) = 0;
+      end
     end
 
-    % pilot carrier gets an extra pi/4 rotation to make it consistent with
-    % other carriers, as we need it for snr_update and scatter diagram
+  end
 
-    phase_difference(Nc+1) *= exp(j*pi/4);
+  assert(length(rx_bits) == Nc*Nb);
+
+  % Extract DBPSK encoded Sync bit
+
+  phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1)./(1E-6+abs(prev_rx_symbols(Nc+1))));
+  if (real(phase_difference(Nc+1)) < 0)
+    sync_bit = 1;
+    f_err = imag(phase_difference(Nc+1));
   else
-    % map (Nc,1) QPSK symbols back into an (1,Nc*Nb) array of bits
+    sync_bit = 0;
+    f_err = -imag(phase_difference(Nc+1));
+  end
 
-    rx_bits(1:Nb:Nc*Nb) = real(rx_symbols) > 0;
-    rx_bits(2:Nb:Nc*Nb) = imag(rx_symbols) > 0;
-  endif
+  % extra pi/4 rotation as we need for snr_update and scatter diagram
+
+  phase_difference *= exp(j*pi/4);
 
 endfunction
 
