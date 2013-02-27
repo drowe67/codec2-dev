@@ -1031,8 +1031,10 @@ rx_baseband_mem_timing = zeros(Nc+1, Nfiltertiming);
 
 % Test bit stream constants
 
-global Ntest_bits = Nc*Nb*4;     % length of test sequence
-global test_bits = rand(1,Ntest_bits) > 0.5;
+global Ntest_bits;
+       Ntest_bits  = Nc*Nb*4;     % length of test sequence
+global test_bits;
+       test_bits = rand(1,Ntest_bits) > 0.5;
 
 % Test bit stream state variables
 
