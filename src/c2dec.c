@@ -52,10 +52,10 @@ int main(int argc, char *argv[])
     float          ber, r, burst_length, burst_period, burst_timer;
 
     if (argc < 4) {
-	printf("basic usage.................: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile\n");
-	printf("uniform errors usage........: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit\n");
-	printf("uniform error on range usage: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
-	printf("two state fading usage......: c2dec 3200|2400|1400|1200 InputBitFile OutputRawSpeechFile burstLength burstPeriod\n");
+	printf("basic usage.................: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile\n");
+	printf("uniform errors usage........: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit\n");
+	printf("uniform error on range usage: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
+	printf("two state fading usage......: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile burstLength burstPeriod\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.9\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.99 0.9\n");
@@ -66,12 +66,14 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_3200;
     else if (strcmp(argv[1],"2400") == 0)
 	mode = CODEC2_MODE_2400;
+    else if (strcmp(argv[1],"1600") == 0)
+	mode = CODEC2_MODE_1600;
     else if (strcmp(argv[1],"1400") == 0)
 	mode = CODEC2_MODE_1400;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 4800, 3200, 2400, 1400 or 1200\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400 or 1200\n", argv[1]);
 	exit(1);
     }
     bit_rate = atoi(argv[1]);

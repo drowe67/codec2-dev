@@ -102,7 +102,7 @@ int main(int argc, char *argv[])
     Nc = FDMDV_NC;
     fdmdv = fdmdv_create(Nc);
 
-    /* malloc some of the bigger variables to prevent out of stack problems */
+    /* malloc some of the larger variables to prevent out of stack problems */
 
     rx_fdm_log = (COMP*)malloc(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
