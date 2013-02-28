@@ -116,7 +116,7 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
     else
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
-    [rx_bits sync f_err pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits sync f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
     [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
     snr_est = calc_snr(sig_est, noise_est);
     snr_est_log = [snr_est_log snr_est];
@@ -170,8 +170,13 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
   % Print Stats
   % ---------------------------------------------------------------------
 
+  % Peak to Average Power Ratio calcs from http://www.dsplog.com
+
+  papr = max(rx_fdm_log.*conj(rx_fdm_log)) / mean(rx_fdm_log.*conj(rx_fdm_log));
+  papr_dB = 10*log10(papr);
+
   ber = total_bit_errors / total_bits;
-  printf("%d bits  %d errors  BER: %1.4f\n",total_bits, total_bit_errors, ber);
+  printf("%d bits  %d errors  BER: %1.4f PAPR(rx): %1.2f dB\n",total_bits, total_bit_errors, ber, papr_dB);
 
   % ---------------------------------------------------------------------
   % Plots
@@ -232,12 +237,14 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
   clf;
   hold on;
   lep = length(error_pattern_log);
-  for p=1:Nc
-    plot(p + 0.25*error_pattern_log((p-1)*2+1:Nc*Nb:lep));
-    plot(0.30 + p + 0.25*error_pattern_log(p*2:Nc*Nb:lep),'r')
+  if lep != 0 
+    for p=1:Nc
+      plot(p + 0.25*error_pattern_log((p-1)*2+1:Nc*Nb:lep));
+      plot(0.30 + p + 0.25*error_pattern_log(p*2:Nc*Nb:lep),'r')
+    end
+    hold off;
+    axis([1 lep/(Nc*Nb) 0 15])
   end
-  hold off;
-  axis([1 lep/(Nc*Nb) 0 15])
 
   figure(7)
   clf;
@@ -252,6 +259,7 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
   grid
   title('FDM Rx Spectrum');
 
+if 0
   % interleaving tests
 
   load ../unittest/inter560.txt
@@ -275,12 +283,13 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
   end
   hold off;
   axis([1 lep/(Nc*Nb) 0 15])
+end
 
   % save error pattern file
 
   if nargin == 3
     fout = fopen(errorpatternfilename, "wb");
-    fwrite(fout, error_pattern_log_inter, "short");
+    fwrite(fout, error_pattern_log, "short");
     fclose(fout);
   end
 

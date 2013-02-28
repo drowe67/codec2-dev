@@ -17,7 +17,8 @@ randn('state',1);
 
 global Fs = 8000;      % sample rate in Hz
 global T  = 1/Fs;      % sample period in seconds
-global Rs = 50;        % symbol rate in Hz
+global Rs;
+       Rs = 50;        % symbol rate in Hz
 global Nc;             % number of carriers
        Nc = 14;
 global Nb;
@@ -26,7 +27,8 @@ global Rb;
        Rb = Nc*Rs*Nb;  % bit rate
 global M  = Fs/Rs;     % oversampling factor
 global Nsym  = 6;      % number of symbols to filter over
-global Fsep  = 75;     % Separation between carriers (Hz)
+global Fsep;
+       Fsep = 75;      % Separation between carriers (Hz)
 global Fcentre = 1500; % Centre frequency, Nc/2 carriers below this, N/c carriers above (Hz)
 global Nt = 5;         % number of symbols we estimate timing over
 global P = 4;          % oversample factor used for rx symbol filtering
@@ -990,9 +992,10 @@ freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
 % takes care of that.
 
 global phase_tx;
-%phase_tx = ones(Nc+1,1);
+phase_tx = ones(Nc+1,1);
 phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
-%phase_tx(1) *= 10 .^ (-6/20);
+%phase_tx = exp(j*2*pi*(0:Nc)/4);
+%phase_tx(Nc+1) = -1;
 global phase_rx;
 phase_rx = ones(Nc+1,1);
 

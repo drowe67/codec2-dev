@@ -12,7 +12,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 50;
+frames = 100;
 EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
@@ -65,8 +65,8 @@ C = 1; % power of each FDM carrier (energy/sample).  Total Carrier power should 
 N = 1; % total noise power (energy/sample) of noise source across entire bandwidth
 
 % Eb  = Carrier power * symbol time / (bits/symbol)
-%     = C *(1/Rs) / 2
-Eb_dB = 10*log10(C) - 10*log10(Rs) - 10*log10(2);
+%     = C *(1/Rs) / Nb
+Eb_dB = 10*log10(C) - 10*log10(Rs) - 10*log10(Nb);
 
 No_dBHz = Eb_dB - EbNo_dB;
 
@@ -182,7 +182,7 @@ for f=1:frames
   end
   foff_log = [ foff_log foff ];
   foff_rect = exp(j*2*pi*foff/Fs);
-
+  
   for i=1:M
     foff_phase *= foff_rect';
     rx_fdm_delay(i) = rx_fdm_delay(i)*foff_phase;
@@ -269,12 +269,16 @@ ber = total_bit_errors / total_bits;
 papr = max(tx_fdm_log.*conj(tx_fdm_log)) / mean(tx_fdm_log.*conj(tx_fdm_log));
 papr_dB = 10*log10(papr);
 
-% Note Eb/No set point is for Nc data carriers only, exclduing pilot.
-% This is convenient for testing BER versus Eb/No.  Measured Eb/No
-% includes power of pilot.  Similar for SNR, first number is SNR excluding
-% pilot pwr for Eb/No set point, 2nd value is measured SNR which will be a little
-% higher as pilot power is included.
+% Note Eb/No set point is for Nc data carriers only, excluding pilot.
+% This is convenient for testing BER versus Eb/No.  Measured SNR &
+% Eb/No includes power of pilot.  Similar for SNR, first number is SNR
+% excluding pilot pwr for Eb/No set point, 2nd value is measured SNR
+% which will be a little higher as pilot power is included. Note current SNR
+% est algorithm only works for QPSK, gives silly values for 8PSK.
 
+printf("Bits/symbol.: %d\n", Nb);
+printf("Num carriers: %d\n", Nc);
+printf("Bit Rate....: %d bits/s\n", Rb);
 printf("Eb/No (meas): %2.2f (%2.2f) dB\n", EbNo_dB, 10*log10(0.25*tx_pwr*Fs/(Rs*Nc*noise_pwr)));
 printf("bits........: %d\n", total_bits);
 printf("errors......: %d\n", total_bit_errors);
@@ -308,8 +312,8 @@ title('Freq offset (Hz)');
 figure(3)
 clf;
 subplot(211)
-plot(real(rx_fdm_log));
-title('FDM Rx Signal');
+plot(real(tx_fdm_log));
+title('FDM Tx Signal');
 subplot(212)
 plot((0:Nspec/2-1)*Fs/Nspec, SdB(1:Nspec/2) - 20*log10(Nspec/2))
 axis([0 Fs/2 -40 0])
