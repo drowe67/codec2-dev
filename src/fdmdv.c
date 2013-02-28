@@ -125,9 +125,9 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     int           c, i, k;
     float         carrier_freq;
 
-    assert(NC == FDMDV_NC);  /* check public and private #defines match */
+    //assert(NC == FDMDV_NC);  /* check public and private #defines match */
     assert(Nc <= NC);
-    assert(FDMDV_BITS_PER_FRAME == NC*NB);
+    //assert(FDMDV_BITS_PER_FRAME == NC*NB);
     assert(FDMDV_NOM_SAMPLES_PER_FRAME == M);
     assert(FDMDV_MAX_SAMPLES_PER_FRAME == (M+M/P));
 
@@ -137,9 +137,13 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     
     f->Nc = Nc;
 
+    f->ntest_bits = Nc*NB*4;
     f->current_test_bit = 0;
-    for(i=0; i<NTEST_BITS; i++)
+    f->rx_test_bits_mem = (int*)malloc(sizeof(int)*f->ntest_bits);
+    assert(f->rx_test_bits_mem != NULL);
+    for(i=0; i<f->ntest_bits; i++)
 	f->rx_test_bits_mem[i] = 0;
+    assert((sizeof(test_bits)/sizeof(int)) >= f->ntest_bits);
 
     f->tx_pilot_bit = 0;
 
@@ -256,6 +260,7 @@ void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
     assert(fdmdv != NULL);
     KISS_FFT_FREE(fdmdv->fft_pilot_cfg);
     KISS_FFT_FREE(fdmdv->fft_cfg);
+    free(fdmdv->rx_test_bits_mem);
     free(fdmdv);
 }
 
@@ -279,11 +284,12 @@ int CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv)
 void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 {
     int i;
+    int bits_per_frame = fdmdv_bits_per_frame(f);
 
-    for(i=0; i<FDMDV_BITS_PER_FRAME; i++) {
+    for(i=0; i<bits_per_frame; i++) {
 	tx_bits[i] = test_bits[f->current_test_bit];
 	f->current_test_bit++;
-	if (f->current_test_bit > (NTEST_BITS-1))
+	if (f->current_test_bit > (f->ntest_bits-1))
 	    f->current_test_bit = 0;
     }
  }
@@ -1087,31 +1093,32 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync,
 {
     int   i,j;
     float ber;
+    int   bits_per_frame = fdmdv_bits_per_frame(f);
 
     /* Append to our memory */
 
-    for(i=0,j=FDMDV_BITS_PER_FRAME; i<NTEST_BITS-FDMDV_BITS_PER_FRAME; i++,j++)
+    for(i=0,j=bits_per_frame; i<f->ntest_bits-bits_per_frame; i++,j++)
 	f->rx_test_bits_mem[i] = f->rx_test_bits_mem[j];
-    for(i=NTEST_BITS-FDMDV_BITS_PER_FRAME,j=0; i<NTEST_BITS; i++,j++)
+    for(i=f->ntest_bits-bits_per_frame,j=0; i<f->ntest_bits; i++,j++)
 	f->rx_test_bits_mem[i] = rx_bits[j];
     
     /* see how many bit errors we get when checked against test sequence */
        
     *bit_errors = 0;
-    for(i=0; i<NTEST_BITS; i++) {
+    for(i=0; i<f->ntest_bits; i++) {
 	*bit_errors += test_bits[i] ^ f->rx_test_bits_mem[i];
 	//printf("%d %d %d %d\n", i, test_bits[i], f->rx_test_bits_mem[i], test_bits[i] ^ f->rx_test_bits_mem[i]);
     }
 
     /* if less than a thresh we are aligned and in sync with test sequence */
 
-    ber = (float)*bit_errors/NTEST_BITS;
+    ber = (float)*bit_errors/f->ntest_bits;
   
     *sync = 0;
     if (ber < 0.2)
 	*sync = 1;
    
-    *ntest_bits = NTEST_BITS;
+    *ntest_bits = f->ntest_bits;
     
 }
 
