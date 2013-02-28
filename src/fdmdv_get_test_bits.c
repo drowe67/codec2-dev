@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     numBits = atoi(argv[2]);
     nCodecFrames = numBits/BITS_PER_CODEC_FRAME;
 
-    fdmdv = fdmdv_create();
+    fdmdv = fdmdv_create(FDMDV_NC);
 
     for(n=0; n<nCodecFrames; n++) {
 

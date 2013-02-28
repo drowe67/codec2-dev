@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    fdmdv = fdmdv_create();
+    fdmdv = fdmdv_create(FDMDV_NC);
     frames = 0;
 
     while(fread(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fin) == BYTES_PER_CODEC_FRAME) {

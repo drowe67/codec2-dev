@@ -119,12 +119,14 @@ static float cabsolute(COMP a)
 
 \*---------------------------------------------------------------------------*/
 
-struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
+struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 {
     struct FDMDV *f;
     int           c, i, k;
     float         carrier_freq;
 
+    assert(NC == FDMDV_NC);  /* check public and private #defines match */
+    assert(Nc <= NC);
     assert(FDMDV_BITS_PER_FRAME == NC*NB);
     assert(FDMDV_NOM_SAMPLES_PER_FRAME == M);
     assert(FDMDV_MAX_SAMPLES_PER_FRAME == (M+M/P));
@@ -133,13 +135,15 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
     if (f == NULL)
 	return NULL;
     
+    f->Nc = Nc;
+
     f->current_test_bit = 0;
     for(i=0; i<NTEST_BITS; i++)
 	f->rx_test_bits_mem[i] = 0;
 
     f->tx_pilot_bit = 0;
 
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<Nc+1; c++) {
 	f->prev_tx_symbols[c].real = 1.0;
 	f->prev_tx_symbols[c].imag = 0.0;
 	f->prev_rx_symbols[c].real = 1.0;
@@ -159,8 +163,8 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
            This helped PAPR for a few dB.  We don't need to adjust rx
            phase as DQPSK takes care of that. */
 	
-	f->phase_tx[c].real = cos(2.0*PI*c/(NC+1));
- 	f->phase_tx[c].imag = sin(2.0*PI*c/(NC+1));
+	f->phase_tx[c].real = cos(2.0*PI*c/(Nc+1));
+ 	f->phase_tx[c].imag = sin(2.0*PI*c/(Nc+1));
 
 	f->phase_rx[c].real = 1.0;
  	f->phase_rx[c].imag = 0.0;
@@ -177,24 +181,24 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
     
     /* Set up frequency of each carrier */
 
-    for(c=0; c<NC/2; c++) {
-	carrier_freq = (-NC/2 + c)*FSEP + FDMDV_FCENTRE;
+    for(c=0; c<Nc/2; c++) {
+	carrier_freq = (-Nc/2 + c)*FSEP + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
     }
 
-    for(c=NC/2; c<NC; c++) {
-	carrier_freq = (-NC/2 + c + 1)*FSEP + FDMDV_FCENTRE;
+    for(c=Nc/2; c<Nc; c++) {
+	carrier_freq = (-Nc/2 + c + 1)*FSEP + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
     }
 	
-    f->freq[NC].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
-    f->freq[NC].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq[Nc].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq[Nc].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
 
     /* Generate DBPSK pilot Look Up Table (LUT) */
 
-    generate_pilot_lut(f->pilot_lut, &f->freq[NC]);
+    generate_pilot_lut(f->pilot_lut, &f->freq[Nc]);
 
     /* freq Offset estimation states */
 
@@ -223,7 +227,7 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void)
     f->coarse_fine = COARSE;
     f->bad_sync = 0;
 
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<Nc+1; c++) {
 	f->sig_est[c] = 0.0;
 	f->noise_est[c] = 0.0;
     }

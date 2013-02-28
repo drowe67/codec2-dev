@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    fdmdv = fdmdv_create();
+    fdmdv = fdmdv_create(FDMDV_NC);
     total_bit_errors = 0;
     total_bits = 0;
 
