@@ -81,6 +81,9 @@
 \*---------------------------------------------------------------------------*/
 
 struct FDMDV {
+
+    int Nc;           
+
     /* test data (test frame) states */
 
     int  current_test_bit;

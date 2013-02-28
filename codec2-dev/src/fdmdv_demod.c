@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     rx_spec_log = (float*)malloc(sizeof(float)*FDMDV_NSPEC*MAX_FRAMES);
     assert(rx_spec_log != NULL);
 
-    fdmdv = fdmdv_create();
+    fdmdv = fdmdv_create(FDMDV_NC);
     f = 0;
     state = 0;
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;

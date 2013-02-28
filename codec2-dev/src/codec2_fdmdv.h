@@ -57,6 +57,7 @@ extern "C" {
 
 #include "comp.h"
 
+#define FDMDV_NC                      14  /* default number of data carriers                                */                               
 #define FDMDV_BITS_PER_FRAME          28  /* 20ms frames, 1400 bit/s                                        */
 #define FDMDV_NOM_SAMPLES_PER_FRAME  160  /* modulator output samples/frame and nominal demod samples/frame */
                                           /* at 8000 Hz sample rate                                         */
@@ -88,7 +89,7 @@ struct FDMDV_STATS {
     float  clock_offset;           /* Estimated tx/rx sample clock offset in ppm         */
 };
 
-struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(void);
+struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc);
 void           CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
     
 void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
