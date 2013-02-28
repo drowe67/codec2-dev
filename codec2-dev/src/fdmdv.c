@@ -125,9 +125,8 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     int           c, i, k;
     float         carrier_freq;
 
-    //assert(NC == FDMDV_NC);  /* check public and private #defines match */
+    assert(NC == FDMDV_NC_MAX);  /* check public and private #defines match */
     assert(Nc <= NC);
-    //assert(FDMDV_BITS_PER_FRAME == NC*NB);
     assert(FDMDV_NOM_SAMPLES_PER_FRAME == M);
     assert(FDMDV_MAX_SAMPLES_PER_FRAME == (M+M/P));
 
@@ -346,7 +345,7 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], in
   AUTHOR......: David Rowe			      
   DATE CREATED: 17/4/2012
 
-  Given NC*NB bits construct M samples (1 symbol) of NC+1 filtered
+  Given Nc*NB bits construct M samples (1 symbol) of Nc+1 filtered
   symbols streams.
 
 \*---------------------------------------------------------------------------*/
@@ -492,7 +491,7 @@ void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[],
     COMP          tx_baseband[NC+1][M];
 
     bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
-    memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
+    memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
     tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
     fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
 
@@ -755,7 +754,7 @@ void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], fl
 
 \*---------------------------------------------------------------------------*/
 
-void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
+void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
 {
     int  i,c;
 
@@ -765,7 +764,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 
     /* Nc/2 tones below centre freq */
   
-    for (c=0; c<NC/2; c++) 
+    for (c=0; c<Nc/2; c++) 
 	for (i=0; i<nin; i++) {
 	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
 	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
@@ -773,7 +772,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 
     /* Nc/2 tones above centre freq */
 
-    for (c=NC/2; c<NC; c++) 
+    for (c=Nc/2; c<Nc; c++) 
 	for (i=0; i<nin; i++) {
 	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
 	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
@@ -781,15 +780,15 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 
     /* centre pilot tone  */
 
-    c = NC;
+    c = Nc;
     for (i=0; i<nin; i++) {
 	phase_rx[c] = cmult(phase_rx[c],  freq[c]);
 	rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
     }
 
-    /* normalise digital oscilators as the magnitude can drfift over time */
+    /* normalise digital oscilators as the magnitude can drift over time */
 
-    for (c=0; c<NC+1; c++) {
+    for (c=0; c<Nc+1; c++) {
 	phase_rx[c].real /= cabsolute(phase_rx[c]);	  
 	phase_rx[c].imag /= cabsolute(phase_rx[c]);	  
     }
@@ -811,7 +810,7 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], COMP rx_fdm[], COMP phase_rx
 
 \*---------------------------------------------------------------------------*/
 
-void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin)
+void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin)
 {
     int c, i,j,k,l;
     int n=M/P;
@@ -824,13 +823,13 @@ void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_f
 
 	/* latest input sample */
 	
-	for(c=0; c<NC+1; c++)
+	for(c=0; c<Nc+1; c++)
 	    for(k=NFILTER-n,l=i; k<NFILTER; k++,l++)	
 		rx_filter_memory[c][k] = rx_baseband[c][l];
 	
 	/* convolution (filtering) */
 
-	for(c=0; c<NC+1; c++) {
+	for(c=0; c<Nc+1; c++) {
 	    rx_filt[c][j].real = 0.0; rx_filt[c][j].imag = 0.0;
 	    for(k=0; k<NFILTER; k++) 
 		rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root[k], rx_filter_memory[c][k]));
@@ -838,7 +837,7 @@ void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_f
 
 	/* make room for next input sample */
 	
-	for(c=0; c<NC+1; c++)
+	for(c=0; c<Nc+1; c++)
 	    for(k=0,l=n; k<NFILTER-n; k++,l++)	
 		rx_filter_memory[c][k] = rx_filter_memory[c][l];
     }
@@ -858,6 +857,7 @@ void rx_filter(COMP rx_filt[NC+1][P+1], COMP rx_baseband[NC+1][M+M/P], COMP rx_f
 \*---------------------------------------------------------------------------*/
 
 float rx_est_timing(COMP rx_symbols[], 
+                    int  Nc,
 		    COMP rx_filt[NC+1][P+1], 
 		    COMP rx_baseband[NC+1][M+M/P], 
 		    COMP rx_filter_mem_timing[NC+1][NT*P], 
@@ -882,10 +882,10 @@ float rx_est_timing(COMP rx_symbols[],
     
     /* update buffer of NT rate P filtered symbols */
     
-    for(c=0; c<NC+1; c++) 
+    for(c=0; c<Nc+1; c++) 
 	for(i=0,j=P-adjust; i<(NT-1)*P+adjust; i++,j++)
 	    rx_filter_mem_timing[c][i] = rx_filter_mem_timing[c][j];
-    for(c=0; c<NC+1; c++) 
+    for(c=0; c<Nc+1; c++) 
 	for(i=(NT-1)*P+adjust,j=0; i<NT*P; i++,j++)
 	    rx_filter_mem_timing[c][i] = rx_filt[c][j];
 	    
@@ -893,7 +893,7 @@ float rx_est_timing(COMP rx_symbols[],
 
     for(i=0; i<NT*P; i++) {
 	env[i] = 0.0;
-	for(c=0; c<NC+1; c++)
+	for(c=0; c<Nc+1; c++)
 	    env[i] += cabsolute(rx_filter_mem_timing[c][i]);
     }
 
@@ -927,10 +927,10 @@ float rx_est_timing(COMP rx_symbols[],
        filtered rx symbol with M sample precision once we have
        rx_timing */
 
-    for(c=0; c<NC+1; c++) 
+    for(c=0; c<Nc+1; c++) 
 	for(i=0,j=nin; i<NFILTERTIMING-nin; i++,j++)
 	    rx_baseband_mem_timing[c][i] = rx_baseband_mem_timing[c][j];
-    for(c=0; c<NC+1; c++) 
+    for(c=0; c<Nc+1; c++) 
 	for(i=NFILTERTIMING-nin,j=0; i<NFILTERTIMING; i++,j++)
 	    rx_baseband_mem_timing[c][i] = rx_baseband[c][j];
     
@@ -939,7 +939,7 @@ float rx_est_timing(COMP rx_symbols[],
        resolution. */
 
     s = round(rx_timing) + M;
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<Nc+1; c++) {
 	rx_symbols[c].real = 0.0;
 	rx_symbols[c].imag = 0.0;
 	for(k=s,j=0; k<s+NFILTER; k++,j++)
@@ -961,7 +961,7 @@ float rx_est_timing(COMP rx_symbols[],
 
 \*---------------------------------------------------------------------------*/
 
-float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[])
+float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[])
 {
     int   c;
     COMP  pi_on_4;
@@ -977,14 +977,14 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
        from the previous symbol doesn't affect the amplitude, which
        leads to sensible scatter plots */
 
-    for(c=0; c<NC; c++) {
+    for(c=0; c<Nc; c++) {
         norm = 1.0/(cabsolute(prev_rx_symbols[c])+1E-6);
 	phase_difference[c] = cmult(cmult(rx_symbols[c], fcmult(norm,cconj(prev_rx_symbols[c]))), pi_on_4);
     }
 				    
     /* map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits */
 
-    for (c=0; c<NC; c++) {
+    for (c=0; c<Nc; c++) {
       d = phase_difference[c];
       if ((d.real >= 0) && (d.imag >= 0)) {
          msb = 0; lsb = 0;
@@ -1004,22 +1004,22 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
  
     /* Extract DBPSK encoded Sync bit and fine freq offset estimate */
 
-    norm = 1.0/(cabsolute(prev_rx_symbols[NC])+1E-6);
-    phase_difference[NC] = cmult(rx_symbols[NC], fcmult(norm, cconj(prev_rx_symbols[NC])));
-    if (phase_difference[NC].real < 0) {
+    norm = 1.0/(cabsolute(prev_rx_symbols[Nc])+1E-6);
+    phase_difference[Nc] = cmult(rx_symbols[Nc], fcmult(norm, cconj(prev_rx_symbols[Nc])));
+    if (phase_difference[Nc].real < 0) {
       *sync_bit = 1;
-      ferr = phase_difference[NC].imag;
+      ferr = phase_difference[Nc].imag;
     }
     else {
       *sync_bit = 0;
-      ferr = -phase_difference[NC].imag;
+      ferr = -phase_difference[Nc].imag;
     }
     
     /* pilot carrier gets an extra pi/4 rotation to make it consistent
        with other carriers, as we need it for snr_update and scatter
        diagram */
 
-    phase_difference[NC] = cmult(phase_difference[NC], pi_on_4);
+    phase_difference[Nc] = cmult(phase_difference[Nc], pi_on_4);
 
     return ferr;
 }
@@ -1034,7 +1034,7 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, COMP phase_difference[], COMP p
 
 \*---------------------------------------------------------------------------*/
 
-void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
+void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_difference[])
 {
     float s[NC+1];
     COMP  refl_symbols[NC+1];
@@ -1048,21 +1048,21 @@ void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
     /* mag of each symbol is distance from origin, this gives us a
        vector of mags, one for each carrier. */
 
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	s[c] = cabsolute(phase_difference[c]);
 
     /* signal mag estimate for each carrier is a smoothed version of
        instantaneous magntitude, this gives us a vector of smoothed
        mag estimates, one for each carrier. */
 
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	sig_est[c] = SNR_COEFF*sig_est[c] + (1.0 - SNR_COEFF)*s[c];
 
     /* noise mag estimate is distance of current symbol from average
        location of that symbol.  We reflect all symbols into the first
        quadrant for convenience. */
     
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<Nc+1; c++) {
 	refl_symbols[c].real = fabs(phase_difference[c].real);
 	refl_symbols[c].imag = fabs(phase_difference[c].imag);    
 	n[c] = cabsolute(cadd(fcmult(sig_est[c], pi_on_4), cneg(refl_symbols[c])));
@@ -1072,7 +1072,7 @@ void snr_update(float sig_est[], float noise_est[], COMP phase_difference[])
        instantaneous noise mag, this gives us a vector of smoothed
        noise power estimates, one for each carrier. */
 
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	noise_est[c] = SNR_COEFF*noise_est[c] + (1 - SNR_COEFF)*n[c];
 }
 
@@ -1239,7 +1239,7 @@ int freq_state(int sync_bit, int *state, int *bad_sync)
   modulated samples, returns an array of FDMDV_BITS_PER_FRAME bits,
   plus the sync bit.  
 
-  The input signal is complex to support single sided frequcny shifting
+  The input signal is complex to support single sided frequency shifting
   before the demod input (e.g. fdmdv2 click to tune feature).
 
   The number of input samples nin will normally be M ==
@@ -1269,9 +1269,9 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 	
     /* baseband processing */
 
-    fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
-    rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, *nin);
-    fdmdv->rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    fdm_downconvert(rx_baseband, fdmdv->Nc, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
+    rx_filter(rx_filt, fdmdv->Nc, rx_baseband, fdmdv->rx_filter_memory, *nin);
+    fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
     
     /* Adjust number of input samples to keep timing within bounds */
 
@@ -1283,9 +1283,9 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     if (fdmdv->rx_timing < 0)
 	*nin -= M/P;
     
-    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
-    memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
-    snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->phase_difference);
+    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+    memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
+    snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->Nc, fdmdv->phase_difference);
 
     /* freq offset estimation state machine */
 
@@ -1303,7 +1303,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
 \*---------------------------------------------------------------------------*/
 
-float calc_snr(float sig_est[], float noise_est[])
+float calc_snr(int Nc, float sig_est[], float noise_est[])
 {
     float S, SdB;
     float mean, N50, N50dB, N3000dB;
@@ -1311,7 +1311,7 @@ float calc_snr(float sig_est[], float noise_est[])
     int   c;
    
     S = 0.0;
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	S += pow(sig_est[c], 2.0);
     SdB = 10.0*log10(S+1E-12);
     
@@ -1321,9 +1321,9 @@ float calc_snr(float sig_est[], float noise_est[])
        noise BW of the filter) */
 
     mean = 0.0;
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	mean += noise_est[c];
-    mean /= (NC+1);
+    mean /= (Nc+1);
     N50 = pow(mean, 2.0);
     N50dB = 10.0*log10(N50+1E-12);
 
@@ -1353,15 +1353,13 @@ void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv,
     int   c;
 
     fdmdv_stats->Nc = fdmdv->Nc;
-    fdmdv_stats->snr_est = calc_snr(fdmdv->sig_est, fdmdv->noise_est);
+    fdmdv_stats->snr_est = calc_snr(fdmdv->Nc, fdmdv->sig_est, fdmdv->noise_est);
     fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
     fdmdv_stats->foff = fdmdv->foff;
     fdmdv_stats->rx_timing = fdmdv->rx_timing;
     fdmdv_stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
-    assert((NC+1) == FDMDV_NSYM);
-
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<fdmdv->Nc+1; c++) {
 	fdmdv_stats->rx_symbols[c] = fdmdv->phase_difference[c];
     }
 }
@@ -1527,14 +1525,14 @@ void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f)
     int   i;
 
     fprintf(stderr, "phase_tx[]:\n");
-    for(i=0; i<=NC; i++)
+    for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->phase_tx[i]));
     fprintf(stderr,"\nfreq[]:\n");
-    for(i=0; i<=NC; i++)
+    for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->freq[i]));
     fprintf(stderr,"\nfoff_rect %1.3f  foff_phase_rect: %1.3f", cabsolute(f->foff_rect), cabsolute(f->foff_phase_rect));
     fprintf(stderr,"\nphase_rx[]:\n");
-    for(i=0; i<=NC; i++)
+    for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->phase_rx[i]));
     fprintf(stderr, "\n\n");
 }

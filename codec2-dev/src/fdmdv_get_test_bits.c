@@ -46,9 +46,10 @@ int main(int argc, char *argv[])
     int           bits_per_fdmdv_frame;
     int           bits_per_codec_frame;
     int           bytes_per_codec_frame;
+    int           Nc;
 
     if (argc < 3) {
-	printf("usage: %s OutputBitFile numBits\n", argv[0]);
+	printf("usage: %s OutputBitFile numBits [Nc]\n", argv[0]);
 	printf("e.g    %s test.c2 1400\n", argv[0]);
 	exit(1);
     }
@@ -62,7 +63,21 @@ int main(int argc, char *argv[])
 
     numBits = atoi(argv[2]);
 
-    fdmdv = fdmdv_create(FDMDV_NC);
+    if (argc == 4) {
+        Nc = atoi(argv[3]);
+        if ((Nc % 2) != 0) {
+            fprintf(stderr, "Error number of carriers must be a multiple of 2\n");
+            exit(1);
+        }
+        if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
+            fprintf(stderr, "Error number of carriers must be btween 2 and %d\n",  FDMDV_NC_MAX);
+            exit(1);
+        }
+    }
+    else
+        Nc = FDMDV_NC;
+
+    fdmdv = fdmdv_create(Nc);
 
     bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
     bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
