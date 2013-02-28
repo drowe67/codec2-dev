@@ -295,14 +295,14 @@ void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 
 \*---------------------------------------------------------------------------*/
 
-void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit)
+void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit)
 {
     int c, msb, lsb;
     COMP j = {0.0,1.0};
 
     /* map tx_bits to to Nc DQPSK symbols */
 
-    for(c=0; c<NC; c++) {
+    for(c=0; c<Nc; c++) {
 	msb = tx_bits[2*c]; 
 	lsb = tx_bits[2*c+1];
 	if ((msb == 0) && (lsb == 0))
@@ -319,9 +319,9 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
        two spectral lines at +/- Rs/2 */
  
     if (*pilot_bit)
-	tx_symbols[NC] = cneg(prev_tx_symbols[NC]);
+	tx_symbols[Nc] = cneg(prev_tx_symbols[Nc]);
     else
-	tx_symbols[NC] = prev_tx_symbols[NC];
+	tx_symbols[Nc] = prev_tx_symbols[Nc];
 
     if (*pilot_bit) 
 	*pilot_bit = 0;
@@ -340,7 +340,7 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], COMP prev_tx_symbols[], int tx_bit
 
 \*---------------------------------------------------------------------------*/
 
-void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM])
+void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM])
 {
     int     c;
     int     i,j,k;
@@ -350,21 +350,16 @@ void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memo
     gain.real = sqrt(2.0)/2.0;
     gain.imag = 0.0;
     
-    /*
-    for(c=0; c<NC+1; c++)
-	tx_filter_memory[c][NFILTER-1] = cmult(tx_symbols[c], gain);
-    */
-    for(c=0; c<NC+1; c++)
+    for(c=0; c<Nc+1; c++)
 	tx_filter_memory[c][NSYM-1] = cmult(tx_symbols[c], gain);
     
-
     /* 
        tx filter each symbol, generate M filtered output samples for each symbol.
        Efficient polyphase filter techniques used as tx_filter_memory is sparse
     */
 
     for(i=0; i<M; i++) {
-	for(c=0; c<NC+1; c++) {
+	for(c=0; c<Nc+1; c++) {
 
 	    /* filter real sample of symbol for carrier c */
 
@@ -386,10 +381,10 @@ void tx_filter(COMP tx_baseband[NC+1][M], COMP tx_symbols[], COMP tx_filter_memo
     /* shift memory, inserting zeros at end */
 
     for(i=0; i<NSYM-1; i++)
-	for(c=0; c<NC+1; c++)
+	for(c=0; c<Nc+1; c++)
 	    tx_filter_memory[c][i] = tx_filter_memory[c][i+1];
 
-    for(c=0; c<NC+1; c++) {
+    for(c=0; c<Nc+1; c++) {
 	tx_filter_memory[c][NSYM-1].real = 0.0;
 	tx_filter_memory[c][NSYM-1].imag = 0.0;
     }
@@ -485,9 +480,9 @@ void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[],
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
 
-    bits_to_dqpsk_symbols(tx_symbols, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
+    bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
-    tx_filter(tx_baseband, tx_symbols, fdmdv->tx_filter_memory);
+    tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
     fdm_upconvert(tx_fdm, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
 
     *sync_bit = fdmdv->tx_pilot_bit;
