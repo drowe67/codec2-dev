@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     struct FDMDV_STATS stats;
     COMP         *rx_fdm_log;
     int           rx_fdm_log_col_index;
-    COMP          rx_symbols_log[FDMDV_NSYM][MAX_FRAMES];
+    COMP         *rx_symbols_log;
     int           coarse_fine_log[MAX_FRAMES];
     float         rx_timing_log[MAX_FRAMES];
     float         foff_log[MAX_FRAMES];
@@ -77,6 +77,7 @@ int main(int argc, char *argv[])
     float         snr_est_log[MAX_FRAMES];
     float        *rx_spec_log;
     int           max_frames_reached;
+    int           Nc;
 
     if (argc < 3) {
 	printf("usage: %s InputModemRawFile OutputBitFile [OctaveDumpFile]\n", argv[0]);
@@ -98,14 +99,18 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    Nc = FDMDV_NC;
+    fdmdv = fdmdv_create(Nc);
+
     /* malloc some of the bigger variables to prevent out of stack problems */
 
     rx_fdm_log = (COMP*)malloc(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
     rx_spec_log = (float*)malloc(sizeof(float)*FDMDV_NSPEC*MAX_FRAMES);
     assert(rx_spec_log != NULL);
+    rx_symbols_log = (COMP*)malloc(sizeof(COMP)*(Nc+1)*MAX_FRAMES);
+    assert(rx_fdm_log != NULL);
 
-    fdmdv = fdmdv_create(FDMDV_NC);
     f = 0;
     state = 0;
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;
@@ -131,8 +136,8 @@ int main(int argc, char *argv[])
 	    memcpy(&rx_fdm_log[rx_fdm_log_col_index], rx_fdm, sizeof(COMP)*nin_prev);
 	    rx_fdm_log_col_index += nin_prev;
 
-	    for(c=0; c<FDMDV_NSYM; c++)
-		rx_symbols_log[c][f] = stats.rx_symbols[c];
+	    for(c=0; c<Nc+1; c++)
+		rx_symbols_log[f*(Nc+1)+c] = stats.rx_symbols[c];
 	    foff_log[f] = stats.foff;
 	    rx_timing_log[f] = stats.rx_timing;
 	    coarse_fine_log[f] = stats.fest_coarse_fine;
@@ -208,7 +213,7 @@ int main(int argc, char *argv[])
 		exit(1);
 	    }
 	    octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
-	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, FDMDV_NSYM, f, MAX_FRAMES);  
+	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
 	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, f);  
