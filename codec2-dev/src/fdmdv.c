@@ -259,6 +259,11 @@ void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
     free(fdmdv);
 }
 
+int CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv)
+{
+    return (fdmdv->Nc * NB);
+}
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdmdv_get_test_bits()	     
@@ -402,7 +407,7 @@ void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_fil
 
 \*---------------------------------------------------------------------------*/
 
-void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq[])
+void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq[])
 {
     int  i,c;
     COMP two = {2.0, 0.0};
@@ -415,7 +420,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
     /* Nc/2 tones below centre freq */
   
-    for (c=0; c<NC/2; c++) 
+    for (c=0; c<Nc/2; c++) 
 	for (i=0; i<M; i++) {
 	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
 	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
@@ -423,7 +428,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
     /* Nc/2 tones above centre freq */
 
-    for (c=NC/2; c<NC; c++) 
+    for (c=Nc/2; c<Nc; c++) 
 	for (i=0; i<M; i++) {
 	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
 	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
@@ -431,7 +436,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
     /* add centre pilot tone  */
 
-    c = NC;
+    c = Nc;
     for (i=0; i<M; i++) {
 	phase_tx[c] = cmult(phase_tx[c],  freq[c]);
 	pilot = cmult(cmult(two, tx_baseband[c][i]), phase_tx[c]);
@@ -450,7 +455,7 @@ void fdm_upconvert(COMP tx_fdm[], COMP tx_baseband[NC+1][M], COMP phase_tx[], CO
 
     /* normalise digital oscilators as the magnitude can drfift over time */
 
-    for (c=0; c<NC+1; c++) {
+    for (c=0; c<Nc+1; c++) {
 	phase_tx[c].real /= cabsolute(phase_tx[c]);	
 	phase_tx[c].imag /= cabsolute(phase_tx[c]);	
     }
@@ -483,7 +488,7 @@ void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[],
     bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
     tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
-    fdm_upconvert(tx_fdm, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
+    fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
 
     *sync_bit = fdmdv->tx_pilot_bit;
 }
@@ -1340,6 +1345,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv,
 {
     int   c;
 
+    fdmdv_stats->Nc = fdmdv->Nc;
     fdmdv_stats->snr_est = calc_snr(fdmdv->sig_est, fdmdv->noise_est);
     fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
     fdmdv_stats->foff = fdmdv->foff;

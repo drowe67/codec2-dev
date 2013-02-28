@@ -35,17 +35,17 @@
 
 #include "codec2_fdmdv.h"
 
-#define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
-#define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
-
 int main(int argc, char *argv[])
 {
     FILE         *fout;
     struct FDMDV *fdmdv;
-    char          packed_bits[BYTES_PER_CODEC_FRAME];
-    int           tx_bits[2*FDMDV_BITS_PER_FRAME];
+    char          *packed_bits;
+    int           *tx_bits;
     int           n, i, bit, byte;
     int           numBits, nCodecFrames;
+    int           bits_per_fdmdv_frame;
+    int           bits_per_codec_frame;
+    int           bytes_per_codec_frame;
 
     if (argc < 3) {
 	printf("usage: %s OutputBitFile numBits\n", argv[0]);
@@ -61,20 +61,31 @@ int main(int argc, char *argv[])
     }
 
     numBits = atoi(argv[2]);
-    nCodecFrames = numBits/BITS_PER_CODEC_FRAME;
 
     fdmdv = fdmdv_create(FDMDV_NC);
+
+    bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
+    bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
+    assert((bits_per_codec_frame % 8) == 0); /* make sure integer number of bytes per frame */
+    bytes_per_codec_frame = bits_per_codec_frame/8;
+
+    packed_bits = (char*)malloc(bytes_per_codec_frame);
+    assert(packed_bits != NULL);
+    tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
+    assert(tx_bits != NULL);
+
+    nCodecFrames = numBits/bytes_per_codec_frame;
 
     for(n=0; n<nCodecFrames; n++) {
 
 	fdmdv_get_test_bits(fdmdv, tx_bits);
-	fdmdv_get_test_bits(fdmdv, &tx_bits[FDMDV_BITS_PER_FRAME]);
+	fdmdv_get_test_bits(fdmdv, &tx_bits[bits_per_fdmdv_frame]);
 	
 	/* pack bits, MSB received first  */
 
 	bit = 7; byte = 0;
-	memset(packed_bits, 0, BYTES_PER_CODEC_FRAME);
-	for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
+	memset(packed_bits, 0, bytes_per_codec_frame);
+	for(i=0; i<bits_per_codec_frame; i++) {
 	    packed_bits[byte] |= (tx_bits[i] << bit);
 	    bit--;
 	    if (bit < 0) {
@@ -82,9 +93,9 @@ int main(int argc, char *argv[])
 		byte++;
 	    }
 	}
-	assert(byte == BYTES_PER_CODEC_FRAME);
+	assert(byte == bytes_per_codec_frame);
 
-	fwrite(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fout);
+	fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
  
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
@@ -92,6 +103,8 @@ int main(int argc, char *argv[])
         if (fout == stdout) fflush(stdout);
     }
 
+    free(tx_bits);
+    free(packed_bits);
     fclose(fout);
     fdmdv_destroy(fdmdv);
 

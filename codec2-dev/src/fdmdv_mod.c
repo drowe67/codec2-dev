@@ -38,20 +38,20 @@
 
 #include "codec2_fdmdv.h"
 
-#define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
-#define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
-
 int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
     struct FDMDV *fdmdv;
-    char          packed_bits[BYTES_PER_CODEC_FRAME];
-    int           tx_bits[2*FDMDV_BITS_PER_FRAME];
+    char          *packed_bits;
+    int           *tx_bits;
     COMP          tx_fdm[2*FDMDV_NOM_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[2*FDMDV_NOM_SAMPLES_PER_FRAME];
     int           frames;
     int           i, bit, byte;
     int           sync_bit;
+    int           bits_per_fdmdv_frame;
+    int           bits_per_codec_frame;
+    int           bytes_per_codec_frame;
 
     if (argc < 3) {
 	printf("usage: %s InputBitFile OutputModemRawFile\n", argv[0]);
@@ -74,15 +74,26 @@ int main(int argc, char *argv[])
     }
 
     fdmdv = fdmdv_create(FDMDV_NC);
+
+    bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
+    bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
+    assert((bits_per_codec_frame % 8) == 0); /* make sure integer number of bytes per frame */
+    bytes_per_codec_frame = bits_per_codec_frame/8;
+
+    packed_bits = (char*)malloc(bytes_per_codec_frame);
+    assert(packed_bits != NULL);
+    tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
+    assert(tx_bits != NULL);
+
     frames = 0;
 
-    while(fread(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fin) == BYTES_PER_CODEC_FRAME) {
+    while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
 	frames++;
 	
 	/* unpack bits, MSB first */
 
 	bit = 7; byte = 0;
-	for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
+	for(i=0; i<bits_per_codec_frame; i++) {
 	    tx_bits[i] = (packed_bits[byte] >> bit) & 0x1;
 	    bit--;
 	    if (bit < 0) {
@@ -90,14 +101,14 @@ int main(int argc, char *argv[])
 		byte++;
 	    }
 	}
-	assert(byte == BYTES_PER_CODEC_FRAME);
+	assert(byte == bytes_per_codec_frame);
 
 	/* modulate even and odd frames */
 
 	fdmdv_mod(fdmdv, tx_fdm, tx_bits, &sync_bit);
 	assert(sync_bit == 1);
 
-	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[FDMDV_BITS_PER_FRAME], &sync_bit);
+	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[bits_per_fdmdv_frame], &sync_bit);
 	assert(sync_bit == 0);
 
 	/* scale and save to disk as shorts */
@@ -116,6 +127,8 @@ int main(int argc, char *argv[])
 
     //fdmdv_dump_osc_mags(fdmdv);
 
+    free(tx_bits);
+    free(packed_bits);
     fclose(fin);
     fclose(fout);
     fdmdv_destroy(fdmdv);
