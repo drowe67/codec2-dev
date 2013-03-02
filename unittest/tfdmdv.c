@@ -64,6 +64,7 @@ int main(int argc, char *argv[])
     float         foff_fine;
     int           sync_bit;
     int           fest_state;
+    int           bad_sync;
 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
@@ -95,7 +96,7 @@ int main(int argc, char *argv[])
     FILE         *fout;
     int           f,c,i,j;
 
-    fdmdv = fdmdv_create();
+    fdmdv = fdmdv_create(FDMDV_NC);
     next_nin = M;
     channel_count = 0;
 
@@ -111,10 +112,10 @@ int main(int argc, char *argv[])
 	\*---------------------------------------------------------*/
 
 	fdmdv_get_test_bits(fdmdv, tx_bits);
-	bits_to_dqpsk_symbols(tx_symbols, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
+	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
 	memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
-	tx_filter(tx_baseband, tx_symbols, fdmdv->tx_filter_memory);
-	fdm_upconvert(tx_fdm, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
+	tx_filter(tx_baseband, FDMDV_NC, tx_symbols, fdmdv->tx_filter_memory);
+	fdm_upconvert(tx_fdm, FDMDV_NC, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
 
 	/* --------------------------------------------------------*\
 	                          Channel
@@ -162,11 +163,11 @@ int main(int argc, char *argv[])
 	
 	/* baseband processing */
 
-	fdm_downconvert(rx_baseband, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
-	rx_filter(rx_filt, rx_baseband, fdmdv->rx_filter_memory, nin);
-	rx_timing = rx_est_timing(rx_symbols, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
-	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
-	snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->phase_difference);
+	fdm_downconvert(rx_baseband, FDMDV_NC, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
+	rx_filter(rx_filt, FDMDV_NC, rx_baseband, fdmdv->rx_filter_memory, nin);
+	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
+	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+	snr_update(fdmdv->sig_est, fdmdv->noise_est, FDMDV_NC, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	
 	next_nin = M;
@@ -177,7 +178,7 @@ int main(int argc, char *argv[])
 	if (rx_timing < 0)
 	    next_nin -= M/P;
 	
-	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state);
+	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state, &bad_sync);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
 	/* --------------------------------------------------------*\
