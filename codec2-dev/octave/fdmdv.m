@@ -20,7 +20,11 @@ global T  = 1/Fs;      % sample period in seconds
 global Rs;
        Rs = 50;        % symbol rate in Hz
 global Nc;             % number of carriers
+if isempty(NumCarriers)
        Nc = 14;
+else
+       Nc = NumCarriers;
+end
 global Nb;
        Nb = 2;         % Bits/symbol for PSK modulation
 global Rb;
@@ -855,7 +859,6 @@ function [track state bad_sync] = freq_state(sync_bit, state, bad_sync)
     if sync_bit == 0
       bad_sync = 0;
     else
-      printf("inc ");
       bad_sync++;
       if bad_sync > 2
         next_state = 0;
@@ -868,7 +871,6 @@ function [track state bad_sync] = freq_state(sync_bit, state, bad_sync)
     if sync_bit == 1
       bad_sync = 0;
     else
-      printf("inc ");
       bad_sync++;
       if bad_sync > 2
         next_state = 0;

@@ -8,10 +8,10 @@
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
+function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename)
 
   fdmdv; % include modem code
-
+  
   modulation = 'dqpsk';
 
   fin = fopen(rawfilename, "rb");
@@ -243,7 +243,7 @@ function fdmdv_demod(rawfilename, nbits, errorpatternfilename)
       plot(0.30 + p + 0.25*error_pattern_log(p*2:Nc*Nb:lep),'r')
     end
     hold off;
-    axis([1 lep/(Nc*Nb) 0 15])
+    axis([1 lep/(Nc*Nb) 0 Nc])
   end
 
   figure(7)
@@ -282,12 +282,12 @@ if 0
     plot(0.30 + p + 0.25*error_pattern_log_inter(p*2:Nc*Nb:lep),'r')
   end
   hold off;
-  axis([1 lep/(Nc*Nb) 0 15])
+  axis([1 lep/(Nc*Nb) 0 Nc])
 end
 
   % save error pattern file
 
-  if nargin == 3
+  if nargin == 4
     fout = fopen(errorpatternfilename, "wb");
     fwrite(fout, error_pattern_log, "short");
     fclose(fout);
