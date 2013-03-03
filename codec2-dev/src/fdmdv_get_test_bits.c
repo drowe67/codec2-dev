@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
     tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
     assert(tx_bits != NULL);
 
-    nCodecFrames = numBits/bytes_per_codec_frame;
+    nCodecFrames = numBits/bits_per_codec_frame;
 
     for(n=0; n<nCodecFrames; n++) {
 
