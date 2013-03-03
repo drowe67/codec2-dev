@@ -6,8 +6,8 @@ Created March 2012
 Introduction
 ------------
 
-A 1400 bit/s Frequency Division Multiplexed Digital Voice (FDMDV) modem
-based on [1].  Used for digital audio over HF SSB.
+A 1400 bit/s (nominal) Frequency Division Multiplexed Digital Voice
+(FDMDV) modem based on [1].  Used for digital audio over HF SSB.
                      
 The FDMDV modem was first implemented in GNU Octave, then ported to C.
 Algorithm development is generally easier in Octave, but for real time
@@ -57,6 +57,10 @@ $ cd src
 
    For real time applications, the fdmdv.[ch] library includes functions to
    convert between 48 and 8 kHz sample rates.
+
+6. Send 20 seconds at 2000 bit/s (20 carriers) to demod and count errors:
+
+   $ ./fdmdv_get_test_bits - 20000 20 | ./fdmdv_mod - - 20 | ./fdmdv_demod - - 20 | ./fdmdv_put_test_bits - 20
 
 References
 ----------
