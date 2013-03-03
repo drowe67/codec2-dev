@@ -1,3 +1,16 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: golay23.c
+  AUTHOR......: Robert Morelos-Zaragoza & David Rowe
+  DATE CREATED: 3 March 2013
+
+  To test:
+  
+     src$ gcc golay23.c -o golay23 -Wall -DGOLAY23_UNITTEST
+     src$ ./golay23
+
+\*---------------------------------------------------------------------------*/
+
 /* File:    golay23.c
  * Title:   Encoder/decoder for a binary (23,12,7) Golay code
  * Author:  Robert Morelos-Zaragoza (robert@spectra.eng.hawaii.edu)
@@ -46,6 +59,9 @@
  * ==   Copyright (c) 1994  Robert Morelos-Zaragoza. All rights reserved.   ==
  */
 
+#include "golay23.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #define X22             0x00400000   /* vector representation of X^{22} */
@@ -74,7 +90,7 @@ static int position[23] = { 0x00000001, 0x00000002, 0x00000004, 0x00000008,
                             0x00001000, 0x00002000, 0x00004000, 0x00008000,
                             0x00010000, 0x00020000, 0x00040000, 0x00080000,
                             0x00100000, 0x00200000, 0x00400000 };
-static long arr2int(a,r)
+static int arr2int(a,r)
 /*
  * Convert a binary vector of Hamming weight r, and nonzero positions in
  * array a[1]...a[r], to a long integer \sum_{i=1}^r 2^{a[i]-1}.
@@ -115,7 +131,7 @@ int  *a;
   return;
 }
 
-long get_syndrome(pattern)
+int get_syndrome(pattern)
 /*
  * Compute the syndrome corresponding to the given pattern, i.e., the
  * remainder after dividing the pattern (when considering it as the vector
@@ -125,9 +141,9 @@ long get_syndrome(pattern)
  * when constructing the decoding table; and (3) pattern = received vector, to
  * obtain its syndrome in decoding.
  */
-long pattern;
+int pattern;
 {
-    long aux = X22;
+    int aux = X22;
  
     if (pattern >= X11)
        while (pattern & MASK12) {
@@ -137,6 +153,116 @@ long pattern;
            }
     return(pattern);
 }
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: golay23_init()   
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 3 March 2013
+
+  Call this once when you start your program to init the Golay tables.
+
+\*---------------------------------------------------------------------------*/
+
+void golay23_init(void ) {
+   int  i;
+   long temp;
+   int  a[4];
+   int  pattern;
+
+   /*
+    * ---------------------------------------------------------------------
+    *                  Generate ENCODING TABLE
+    *
+    * An entry to the table is an information vector, a 32-bit integer,
+    * whose 12 least significant positions are the information bits. The
+    * resulting value is a codeword in the (23,12,7) Golay code: A 32-bit
+    * integer whose 23 least significant bits are coded bits: Of these, the
+    * 12 most significant bits are information bits and the 11 least
+    * significant bits are redundant bits (systematic encoding).
+    * --------------------------------------------------------------------- 
+    */
+    for (pattern = 0; pattern < 4096; pattern++) {
+        temp = pattern << 11;          /* multiply information by X^{11} */
+        encoding_table[pattern] = temp + get_syndrome(temp);/* add redundancy */
+        }
+
+   /*
+    * ---------------------------------------------------------------------
+    *                  Generate DECODING TABLE
+    *
+    * An entry to the decoding table is a syndrome and the resulting value
+    * is the most likely error pattern. First an error pattern is generated.
+    * Then its syndrome is calculated and used as a pointer to the table
+    * where the error pattern value is stored.
+    * --------------------------------------------------------------------- 
+    *            
+    * (1) Error patterns of WEIGHT 1 (SINGLE ERRORS)
+    */
+    decoding_table[0] = 0;
+    decoding_table[1] = 1;
+    temp = 1; 
+    for (i=2; i<= 23; i++) {
+        temp *= 2;
+        decoding_table[get_syndrome(temp)] = temp;
+        }
+   /*            
+    * (2) Error patterns of WEIGHT 2 (DOUBLE ERRORS)
+    */
+    a[1] = 1; a[2] = 2;
+    temp = arr2int(a,2);
+    decoding_table[get_syndrome(temp)] = temp;
+    for (i=1; i<253; i++) {
+        nextcomb(23,2,a);
+        temp = arr2int(a,2);
+        decoding_table[get_syndrome(temp)] = temp;
+        }
+   /*            
+    * (3) Error patterns of WEIGHT 3 (TRIPLE ERRORS)
+    */
+    a[1] = 1; a[2] = 2; a[3] = 3;
+    temp = arr2int(a,3);
+    decoding_table[get_syndrome(temp)] = temp;
+    for (i=1; i<1771; i++) {
+        nextcomb(23,3,a);
+        temp = arr2int(a,3);
+        decoding_table[get_syndrome(temp)] = temp;
+    }
+
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: golay23_encode()   
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 3 March 2013
+
+  Given 12 bits of data retiurns a 23 bit codeword for transmission
+  over the channel.
+
+\*---------------------------------------------------------------------------*/
+
+int golay23_encode(int data) {
+    //printf("data: 0x%x\n", data);
+    assert(data <= 0xfff);
+    return encoding_table[data];
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: golay23_decode()   
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 3 March 2013
+
+  Given a 23 bit received codeword, returns the 12 bit corrected data.
+
+\*---------------------------------------------------------------------------*/
+
+int golay23_decode(int received_codeword) {
+    return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
+}
+
+#ifdef GOLAY23_UNITTEST
 
 static int golay23_test(int error_pattern) {
     int data;
@@ -151,9 +277,9 @@ static int golay23_test(int error_pattern) {
 
     for (data = 0; data<(1<<12); data++) {
 
-        codeword = encoding_table[data];
+        codeword = golay23_encode(data);
         recd = codeword ^ error_pattern;
-        recd ^= decoding_table[get_syndrome(recd)];
+        recd = golay23_decode(recd);
         pattern = (recd ^ codeword) >> 11;
         for (i=0; i<12; i++)
             if (pattern & position[i])
@@ -177,7 +303,6 @@ int main(void)
    int  tests;
    int a[4];
    int error_pattern;
-
 
    /*
     * ---------------------------------------------------------------------
@@ -280,3 +405,4 @@ int main(void)
 
     return 0;
 }
+#endif
