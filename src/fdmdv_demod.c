@@ -43,9 +43,6 @@
 #include "codec2_fdmdv.h"
 #include "octave.h"
 
-#define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
-#define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
-
 /* lof of information we want to dump to Octave */
 
 #define MAX_FRAMES 50*60 /* 1 minute at 50 symbols/s */
@@ -54,9 +51,9 @@ int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
     struct FDMDV *fdmdv;
-    char          packed_bits[BYTES_PER_CODEC_FRAME];
-    int           rx_bits[FDMDV_BITS_PER_FRAME];
-    int           codec_bits[2*FDMDV_BITS_PER_FRAME];
+    char         *packed_bits;
+    int          *rx_bits;
+    int          *codec_bits;
     COMP          rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
@@ -77,10 +74,13 @@ int main(int argc, char *argv[])
     float         snr_est_log[MAX_FRAMES];
     float        *rx_spec_log;
     int           max_frames_reached;
+    int           bits_per_fdmdv_frame;
+    int           bits_per_codec_frame;
+    int           bytes_per_codec_frame;
     int           Nc;
 
     if (argc < 3) {
-	printf("usage: %s InputModemRawFile OutputBitFile [OctaveDumpFile]\n", argv[0]);
+	printf("usage: %s InputModemRawFile OutputBitFile [Nc] [OctaveDumpFile]\n", argv[0]);
 	printf("e.g    %s hts1a_fdmdv.raw hts1a.c2\n", argv[0]);
 	exit(1);
     }
@@ -99,8 +99,32 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    Nc = FDMDV_NC;
+    if (argc >= 4) {
+        Nc = atoi(argv[3]);
+        if ((Nc % 2) != 0) {
+            fprintf(stderr, "Error number of carriers must be a multiple of 2\n");
+            exit(1);
+        }
+        if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
+            fprintf(stderr, "Error number of carriers must be btween 2 and %d\n",  FDMDV_NC_MAX);
+            exit(1);
+        }
+    }
+    else
+        Nc = FDMDV_NC;
+    
     fdmdv = fdmdv_create(Nc);
+
+    bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
+    bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
+    assert((bits_per_codec_frame % 8) == 0); /* make sure integer number of bytes per frame */
+    bytes_per_codec_frame = bits_per_codec_frame/8;
+
+    /* malloc some buffers that are dependant on Nc */
+
+    packed_bits = (char*)malloc(bytes_per_codec_frame); assert(packed_bits != NULL);
+    rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame); assert(rx_bits != NULL);
+    codec_bits = (int*)malloc(2*sizeof(int)*bits_per_fdmdv_frame); assert(codec_bits != NULL);
 
     /* malloc some of the larger variables to prevent out of stack problems */
 
@@ -142,7 +166,7 @@ int main(int argc, char *argv[])
 	    rx_timing_log[f] = stats.rx_timing;
 	    coarse_fine_log[f] = stats.fest_coarse_fine;
 	    sync_bit_log[f] = sync_bit;
-	    memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
+	    memcpy(&rx_bits_log[bits_per_fdmdv_frame*f], rx_bits, sizeof(int)*bits_per_fdmdv_frame);
 	    snr_est_log[f] = stats.snr_est;
 
 	    fdmdv_get_rx_spectrum(fdmdv, &rx_spec_log[f*FDMDV_NSPEC], rx_fdm, nin_prev);
@@ -163,20 +187,20 @@ int main(int argc, char *argv[])
 	case 0:
 	    if (sync_bit == 0) {
 		next_state = 1;
-		memcpy(codec_bits, rx_bits, FDMDV_BITS_PER_FRAME*sizeof(int));
+		memcpy(codec_bits, rx_bits, bits_per_fdmdv_frame*sizeof(int));
 	    }
 	    else
 		next_state = 0;
 	    break;
 	case 1:
 	    if (sync_bit == 1) {
-		memcpy(&codec_bits[FDMDV_BITS_PER_FRAME], rx_bits, FDMDV_BITS_PER_FRAME*sizeof(int));
+		memcpy(&codec_bits[bits_per_fdmdv_frame], rx_bits, bits_per_fdmdv_frame*sizeof(int));
 
 		/* pack bits, MSB received first  */
 
 		bit = 7; byte = 0;
-		memset(packed_bits, 0, BYTES_PER_CODEC_FRAME);
-		for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
+		memset(packed_bits, 0, bytes_per_codec_frame);
+		for(i=0; i<bits_per_codec_frame; i++) {
 		    packed_bits[byte] |= (codec_bits[i] << bit);
 		    bit--;
 		    if (bit < 0) {
@@ -184,9 +208,9 @@ int main(int argc, char *argv[])
 			byte++;
 		    }
 		}
-		assert(byte == BYTES_PER_CODEC_FRAME);
+		assert(byte == bytes_per_codec_frame);
 
-		fwrite(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fout);
+		fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
 	    }
 	    next_state = 0;
 	    break;
@@ -202,7 +226,7 @@ int main(int argc, char *argv[])
 
     /* Optional dump to Octave log file */
 
-    if (argc == 4) {
+    if (argc == 5) {
 
 	/* make sure 3rd arg is not just the pipe command */
 
@@ -217,7 +241,7 @@ int main(int argc, char *argv[])
 	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
 	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, f);  
-	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*f);
+	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
 	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
 	    octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, FDMDV_NSPEC, FDMDV_NSPEC);  

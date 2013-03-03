@@ -36,20 +36,21 @@
 
 #include "codec2_fdmdv.h"
 
-#define BITS_PER_CODEC_FRAME (2*FDMDV_BITS_PER_FRAME)
-#define BYTES_PER_CODEC_FRAME (BITS_PER_CODEC_FRAME/8)
-
 int main(int argc, char *argv[])
 {
     FILE         *fin;
     struct FDMDV *fdmdv;
-    char          packed_bits[BYTES_PER_CODEC_FRAME];
-    int           rx_bits[2*FDMDV_BITS_PER_FRAME];
+    char         *packed_bits;
+    int          *rx_bits;
     int           i, bit, byte;
     int           test_frame_sync, bit_errors, total_bit_errors, total_bits, ntest_bits;
+    int           bits_per_fdmdv_frame;
+    int           bits_per_codec_frame;
+    int           bytes_per_codec_frame;
+    int           Nc;
 
     if (argc < 2) {
-	printf("usage: %s InputBitFile\n", argv[0]);
+	printf("usage: %s InputBitFile [Nc]\n", argv[0]);
 	printf("e.g    %s test.c2\n", argv[0]);
 	exit(1);
     }
@@ -61,15 +62,42 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    fdmdv = fdmdv_create(FDMDV_NC);
+    if (argc == 3) {
+        Nc = atoi(argv[2]);
+        if ((Nc % 2) != 0) {
+            fprintf(stderr, "Error number of carriers must be a multiple of 2\n");
+            exit(1);
+        }
+        if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
+            fprintf(stderr, "Error number of carriers must be between 2 and %d\n",  FDMDV_NC_MAX);
+            exit(1);
+        }
+    }
+    else
+        Nc = FDMDV_NC;
+
+    fdmdv = fdmdv_create(Nc);
+
+    bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
+    bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
+    assert((bits_per_codec_frame % 8) == 0); /* make sure integer number of bytes per frame */
+    bytes_per_codec_frame = bits_per_codec_frame/8;
+    fprintf(stderr, "bits_per_fdmdv_frame: %d bits_per_codec_frame: %d bytes_per_codec_frame: %d\n",
+            bits_per_fdmdv_frame, bits_per_codec_frame, bytes_per_codec_frame);
+
+    packed_bits = (char*)malloc(bytes_per_codec_frame);
+    assert(packed_bits != NULL);
+    rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
+    assert(rx_bits != NULL);
+
     total_bit_errors = 0;
     total_bits = 0;
 
-    while(fread(packed_bits, sizeof(char), BYTES_PER_CODEC_FRAME, fin) == BYTES_PER_CODEC_FRAME) {
+    while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
 	/* unpack bits, MSB first */
 
 	bit = 7; byte = 0;
-	for(i=0; i<BITS_PER_CODEC_FRAME; i++) {
+	for(i=0; i<bits_per_codec_frame; i++) {
 	    rx_bits[i] = (packed_bits[byte] >> bit) & 0x1;
 	    //printf("%d 0x%x %d\n", i, packed_bits[byte], rx_bits[i]);
 	    bit--;
@@ -78,7 +106,7 @@ int main(int argc, char *argv[])
 		byte++;
 	    }
 	}
-	assert(byte == BYTES_PER_CODEC_FRAME);
+	assert(byte == bytes_per_codec_frame);
 
 	fdmdv_put_test_bits(fdmdv, &test_frame_sync, &bit_errors, &ntest_bits, rx_bits);
 	if (test_frame_sync == 1) {
@@ -88,7 +116,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	    printf("-");
-  	fdmdv_put_test_bits(fdmdv, &test_frame_sync, &bit_errors, &ntest_bits, &rx_bits[FDMDV_BITS_PER_FRAME]);
+  	fdmdv_put_test_bits(fdmdv, &test_frame_sync, &bit_errors, &ntest_bits, &rx_bits[bits_per_fdmdv_frame]);
 	if (test_frame_sync == 1) {
 	    total_bit_errors += bit_errors;
 	    total_bits = total_bits + ntest_bits;
