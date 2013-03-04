@@ -42,7 +42,8 @@ noinst_PROGRAMS = generate_codebook$(EXEEXT) genlspdtcb$(EXEEXT)
 bin_PROGRAMS = c2demo$(EXEEXT) c2enc$(EXEEXT) c2dec$(EXEEXT) \
 	c2sim$(EXEEXT) fdmdv_get_test_bits$(EXEEXT) fdmdv_mod$(EXEEXT) \
 	fdmdv_demod$(EXEEXT) fdmdv_put_test_bits$(EXEEXT) \
-	fdmdv_interleave$(EXEEXT) insert_errors$(EXEEXT)
+	fdmdv_interleave$(EXEEXT) insert_errors$(EXEEXT) \
+	fec_enc$(EXEEXT) fec_dec$(EXEEXT)
 subdir = src
 DIST_COMMON = $(library_include_HEADERS) $(srcdir)/Makefile.am \
 	$(srcdir)/Makefile.in
@@ -109,6 +110,12 @@ am_fdmdv_put_test_bits_OBJECTS = fdmdv_put_test_bits.$(OBJEXT) \
 	fdmdv.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_put_test_bits_OBJECTS = $(am_fdmdv_put_test_bits_OBJECTS)
 fdmdv_put_test_bits_LDADD = $(LDADD)
+am_fec_dec_OBJECTS = fec_dec.$(OBJEXT)
+fec_dec_OBJECTS = $(am_fec_dec_OBJECTS)
+fec_dec_DEPENDENCIES = $(am__DEPENDENCIES_1)
+am_fec_enc_OBJECTS = fec_enc.$(OBJEXT)
+fec_enc_OBJECTS = $(am_fec_enc_OBJECTS)
+fec_enc_DEPENDENCIES = $(am__DEPENDENCIES_1)
 generate_codebook_SOURCES = generate_codebook.c
 generate_codebook_OBJECTS = generate_codebook.$(OBJEXT)
 generate_codebook_LDADD = $(LDADD)
@@ -133,13 +140,15 @@ SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) $(c2demo_SOURCES) \
 	$(c2enc_SOURCES) $(c2sim_SOURCES) $(fdmdv_demod_SOURCES) \
 	$(fdmdv_get_test_bits_SOURCES) $(fdmdv_interleave_SOURCES) \
 	$(fdmdv_mod_SOURCES) $(fdmdv_put_test_bits_SOURCES) \
-	generate_codebook.c genlspdtcb.c $(insert_errors_SOURCES)
+	$(fec_dec_SOURCES) $(fec_enc_SOURCES) generate_codebook.c \
+	genlspdtcb.c $(insert_errors_SOURCES)
 DIST_SOURCES = $(libcodec2_la_SOURCES) $(c2dec_SOURCES) \
 	$(c2demo_SOURCES) $(c2enc_SOURCES) $(c2sim_SOURCES) \
 	$(fdmdv_demod_SOURCES) $(fdmdv_get_test_bits_SOURCES) \
 	$(fdmdv_interleave_SOURCES) $(fdmdv_mod_SOURCES) \
-	$(fdmdv_put_test_bits_SOURCES) generate_codebook.c \
-	genlspdtcb.c $(insert_errors_SOURCES)
+	$(fdmdv_put_test_bits_SOURCES) $(fec_dec_SOURCES) \
+	$(fec_enc_SOURCES) generate_codebook.c genlspdtcb.c \
+	$(insert_errors_SOURCES)
 library_includeHEADERS_INSTALL = $(INSTALL_HEADER)
 HEADERS = $(library_include_HEADERS)
 ETAGS = etags
@@ -376,6 +385,12 @@ fdmdv_interleave_SOURCES = fdmdv_interleave.c
 fdmdv_interleave_LDFLAGS = $(LIBS)
 insert_errors_SOURCES = insert_errors.c
 insert_errors_LDFLAGS = $(LIBS)
+fec_enc_SOURCES = fec_enc.c
+fec_enc_LDADD = $(lib_LTLIBRARIES) 
+fec_enc_LDFLAGS = $(LIBS)
+fec_dec_SOURCES = fec_dec.c
+fec_dec_LDADD = $(lib_LTLIBRARIES) 
+fec_dec_LDFLAGS = $(LIBS)
 all: all-am
 
 .SUFFIXES:
@@ -500,6 +515,12 @@ fdmdv_mod$(EXEEXT): $(fdmdv_mod_OBJECTS) $(fdmdv_mod_DEPENDENCIES)
 fdmdv_put_test_bits$(EXEEXT): $(fdmdv_put_test_bits_OBJECTS) $(fdmdv_put_test_bits_DEPENDENCIES) 
 	@rm -f fdmdv_put_test_bits$(EXEEXT)
 	$(LINK) $(fdmdv_put_test_bits_LDFLAGS) $(fdmdv_put_test_bits_OBJECTS) $(fdmdv_put_test_bits_LDADD) $(LIBS)
+fec_dec$(EXEEXT): $(fec_dec_OBJECTS) $(fec_dec_DEPENDENCIES) 
+	@rm -f fec_dec$(EXEEXT)
+	$(LINK) $(fec_dec_LDFLAGS) $(fec_dec_OBJECTS) $(fec_dec_LDADD) $(LIBS)
+fec_enc$(EXEEXT): $(fec_enc_OBJECTS) $(fec_enc_DEPENDENCIES) 
+	@rm -f fec_enc$(EXEEXT)
+	$(LINK) $(fec_enc_LDFLAGS) $(fec_enc_OBJECTS) $(fec_enc_LDADD) $(LIBS)
 generate_codebook$(EXEEXT): $(generate_codebook_OBJECTS) $(generate_codebook_DEPENDENCIES) 
 	@rm -f generate_codebook$(EXEEXT)
 	$(LINK) $(generate_codebook_LDFLAGS) $(generate_codebook_OBJECTS) $(generate_codebook_LDADD) $(LIBS)
@@ -527,6 +548,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_interleave.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_mod.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdmdv_put_test_bits.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fec_dec.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fec_enc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insert_errors.Po@am__quote@
