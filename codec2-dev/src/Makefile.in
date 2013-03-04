@@ -110,10 +110,10 @@ am_fdmdv_put_test_bits_OBJECTS = fdmdv_put_test_bits.$(OBJEXT) \
 	fdmdv.$(OBJEXT) kiss_fft.$(OBJEXT)
 fdmdv_put_test_bits_OBJECTS = $(am_fdmdv_put_test_bits_OBJECTS)
 fdmdv_put_test_bits_LDADD = $(LDADD)
-am_fec_dec_OBJECTS = fec_dec.$(OBJEXT)
+am_fec_dec_OBJECTS = fec_dec.$(OBJEXT) golay23.$(OBJEXT)
 fec_dec_OBJECTS = $(am_fec_dec_OBJECTS)
 fec_dec_DEPENDENCIES = $(am__DEPENDENCIES_1)
-am_fec_enc_OBJECTS = fec_enc.$(OBJEXT)
+am_fec_enc_OBJECTS = fec_enc.$(OBJEXT) golay23.$(OBJEXT)
 fec_enc_OBJECTS = $(am_fec_enc_OBJECTS)
 fec_enc_DEPENDENCIES = $(am__DEPENDENCIES_1)
 generate_codebook_SOURCES = generate_codebook.c
@@ -385,10 +385,10 @@ fdmdv_interleave_SOURCES = fdmdv_interleave.c
 fdmdv_interleave_LDFLAGS = $(LIBS)
 insert_errors_SOURCES = insert_errors.c
 insert_errors_LDFLAGS = $(LIBS)
-fec_enc_SOURCES = fec_enc.c
+fec_enc_SOURCES = fec_enc.c golay23.c
 fec_enc_LDADD = $(lib_LTLIBRARIES) 
 fec_enc_LDFLAGS = $(LIBS)
-fec_dec_SOURCES = fec_dec.c
+fec_dec_SOURCES = fec_dec.c  golay23.c
 fec_dec_LDADD = $(lib_LTLIBRARIES) 
 fec_dec_LDFLAGS = $(LIBS)
 all: all-am
@@ -552,6 +552,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fec_enc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/generate_codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/genlspdtcb.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/golay23.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/insert_errors.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/kiss_fft.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libcodec2_la-codebook.Plo@am__quote@

@@ -30,6 +30,7 @@
 
 #include "codec2.h"
 #include "codec2_fdmdv.h"
+#include "golay23.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -49,7 +50,8 @@ int main(int argc, char *argv[])
     unsigned char *packed_output_bits;
     int           *unpacked_output_bits;
     int            mode, Nc, bit, byte;
-    int            i;
+    int            i,j;
+    int            data, codeword1, codeword2;
 
     if (argc < 3) {
 	printf("%s InputFromCodecFile OutputToModemWithFECFile\n", argv[0]);
@@ -102,10 +104,12 @@ int main(int argc, char *argv[])
     unpacked_output_bits = (int*)malloc(bits_per_output_frame*sizeof(int));
     assert(unpacked_output_bits != NULL);
     
-    fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
-            bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
+    //fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
+    //        bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
 
     /* main loop */
+
+    golay23_init();
 
     while(fread(packed_input_bits, sizeof(char), bytes_per_input_frame, fin) == (size_t)bytes_per_input_frame) {
 
@@ -122,10 +126,46 @@ int main(int argc, char *argv[])
 	}
 	assert(byte == bytes_per_input_frame);
 
+        /* add FEC  ----------------------------------*/
+
+        /* Protect first 24 bits with (23,12) Golay Code.  The first
+           24 bits are the most sensitive, as they contain the
+           pitch/energy VQ and voicing bits. This uses 56 + 11 + 11 =
+           78 bits, so we have two spare in 80 bit frame sent to
+           modem. */
+
+        /* first codeword */
+
+        data = 0;
+        for(i=0; i<12; i++) {
+            data <<= 1;
+            data |= unpacked_input_bits[i];
+        }
+        codeword1 = golay23_encode(data);
+        //fprintf(stderr, "data1: 0x%x codeword1: 0x%x\n", data, codeword1);
+
+        /* second codeword */
+
+        data = 0;
+        for(i=12; i<24; i++) {
+            data <<= 1;
+            data |= unpacked_input_bits[i];
+        }
+        codeword2 = golay23_encode(data);
+        //fprintf(stderr, "data: 0x%x codeword2: 0x%x\n", data, codeword2);
+
+        /* now pack output frame with parity bits at end to make them
+           as far apart as possible from the data the protect.  Parity
+           bits are LSB of the Golay codeword */
+
         for(i=0; i<bits_per_input_frame; i++)
             unpacked_output_bits[i] = unpacked_input_bits[i];
-        for(i=bits_per_input_frame; i<bits_per_output_frame; i++)
-            unpacked_output_bits[i] = 1;
+        for(j=0; i<bits_per_input_frame+11; i++,j++) {
+            unpacked_output_bits[i] = (codeword1 >> (10-j)) & 0x1;
+        }
+        for(j=0; i<bits_per_input_frame+11+11; i++,j++) {
+            unpacked_output_bits[i] = (codeword2 >> (10-j)) & 0x1;
+        }
 
         /* pack bits, MSB first  */
 

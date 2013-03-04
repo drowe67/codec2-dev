@@ -183,10 +183,10 @@ fdmdv_interleave_LDFLAGS = $(LIBS)
 insert_errors_SOURCES =  insert_errors.c
 insert_errors_LDFLAGS = $(LIBS)
 
-fec_enc_SOURCES =  fec_enc.c
+fec_enc_SOURCES =  fec_enc.c golay23.c
 fec_enc_LDADD = $(lib_LTLIBRARIES) 
 fec_enc_LDFLAGS = $(LIBS)
 
-fec_dec_SOURCES =  fec_dec.c
+fec_dec_SOURCES =  fec_dec.c  golay23.c
 fec_dec_LDADD = $(lib_LTLIBRARIES) 
 fec_dec_LDFLAGS = $(LIBS)
