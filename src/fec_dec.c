@@ -28,6 +28,7 @@
 
 #include "codec2.h"
 #include "codec2_fdmdv.h"
+#include "golay23.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -48,6 +49,7 @@ int main(int argc, char *argv[])
     int           *unpacked_output_bits;
     int            mode, Nc, bit, byte;
     int            i;
+    int            recd_codeword, codeword1, codeword2;
 
     if (argc < 3) {
 	printf("%s InputFromModemWithFECFile OutputToCodec2File\n", argv[0]);
@@ -99,10 +101,12 @@ int main(int argc, char *argv[])
     unpacked_output_bits = (int*)malloc(bits_per_output_frame*sizeof(int));
     assert(unpacked_output_bits != NULL);
     
-    fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
-            bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
+    // fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
+    //        bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
 
     /* main loop */
+
+    golay23_init();
 
     while(fread(packed_input_bits, sizeof(char), bytes_per_input_frame, fin) == (size_t)bytes_per_input_frame) {
 
@@ -119,7 +123,51 @@ int main(int argc, char *argv[])
 	}
 	assert(byte == bytes_per_input_frame);
 
-        for(i=0; i<bits_per_output_frame; i++)
+        #ifdef TEST
+        /* Some test bit errors (not comprehesnive) */
+        unpacked_input_bits[0] = (unpacked_input_bits[0] ^ 1) & 0x1;
+        unpacked_input_bits[23] = (unpacked_input_bits[23] ^ 1) & 0x1;
+        #endif
+
+        /* decode first codeword */
+
+        recd_codeword = 0;
+        for(i=0; i<12; i++) {
+            recd_codeword <<= 1;
+            recd_codeword |= unpacked_input_bits[i];
+        }
+        for(i=bits_per_output_frame; i<bits_per_output_frame+11; i++) {
+            recd_codeword <<= 1;
+            recd_codeword |= unpacked_input_bits[i];
+        }
+        codeword1 = golay23_decode(recd_codeword);
+        //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
+
+        for(i=0; i<12; i++) {
+            unpacked_output_bits[i] = codeword1 >> (22-i);
+        }
+
+        /* decode second codeword */
+
+        recd_codeword = 0;
+        for(i=12; i<24; i++) {
+            recd_codeword <<= 1;
+            recd_codeword |= unpacked_input_bits[i];
+        }
+        for(i=bits_per_output_frame+11; i<bits_per_output_frame+11+11; i++) {
+            recd_codeword <<= 1;
+            recd_codeword |= unpacked_input_bits[i];
+        }
+        codeword2 = golay23_decode(recd_codeword);
+        //fprintf(stderr, "received codeword2: 0x%x  decoded codeword2: 0x%x\n", recd_codeword, codeword2);
+
+        for(i=0; i<12; i++) {
+            unpacked_output_bits[12+i] = codeword2 >> (22-i);
+        }
+
+        /* unprotected bits */
+
+        for(i=24; i<bits_per_output_frame; i++)
             unpacked_output_bits[i] = unpacked_input_bits[i];
 
         /* pack bits, MSB first  */

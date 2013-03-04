@@ -83,6 +83,8 @@
  * a[] = auxiliary array to generate correctable error patterns
  */
 
+static int inited =  0;
+
 static int encoding_table[4096], decoding_table[2048];
 static int position[23] = { 0x00000001, 0x00000002, 0x00000004, 0x00000008,
                             0x00000010, 0x00000020, 0x00000040, 0x00000080,
@@ -229,6 +231,7 @@ void golay23_init(void ) {
         decoding_table[get_syndrome(temp)] = temp;
     }
 
+    inited = 1;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -243,6 +246,8 @@ void golay23_init(void ) {
 \*---------------------------------------------------------------------------*/
 
 int golay23_encode(int data) {
+    assert(inited);
+
     //printf("data: 0x%x\n", data);
     assert(data <= 0xfff);
     return encoding_table[data];
@@ -259,6 +264,8 @@ int golay23_encode(int data) {
 \*---------------------------------------------------------------------------*/
 
 int golay23_decode(int received_codeword) {
+    assert(inited);
+
     return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
 }
 
