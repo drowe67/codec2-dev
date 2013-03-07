@@ -1217,18 +1217,24 @@ void CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enabl
 
 /* 
    Allows optional stealing of one of the voicing bits for use as a
-   spare bit, only 1400 bit/s supported for now.  Experimental method
-   of sending voice/data frames for FreeDV.
+   spare bit, only 1400 & 1600 bit/s supported for now.  Experimental
+   method of sending voice/data frames for FreeDV.
 */
 
 int CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
 
-    if (c2->mode != CODEC2_MODE_1400)
-        return -1;
+    switch(c2->mode) {
+    case CODEC2_MODE_1400:
+        return 10; // bit 10 (11th bit) is v2 (third voicing bit)
+        break;
+    case CODEC2_MODE_1600:
+        return 15; // bit 15 (16th bit) is v2 (third voicing bit)
+        break;
+    }
     
-    return 10; // bit 10 (11th bit) is v2 (third voicing bit)
+    return -1;
 }
 
 /*
