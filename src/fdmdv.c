@@ -144,6 +144,8 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 	f->rx_test_bits_mem[i] = 0;
     assert((sizeof(test_bits)/sizeof(int)) >= f->ntest_bits);
 
+    f->old_qpsk_mapping = 0;
+
     f->tx_pilot_bit = 0;
 
     for(c=0; c<Nc+1; c++) {
@@ -263,6 +265,12 @@ void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
     free(fdmdv);
 }
 
+
+void CODEC2_WIN32SUPPORT fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv) {
+    fdmdv->old_qpsk_mapping = 1;  
+}
+
+
 int CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv)
 {
     return (fdmdv->Nc * NB);
@@ -305,12 +313,13 @@ void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 
 \*---------------------------------------------------------------------------*/
 
-void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit)
+void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit, int old_qpsk_mapping)
 {
     int c, msb, lsb;
     COMP j = {0.0,1.0};
 
-    /* map tx_bits to to Nc DQPSK symbols */
+    /* Map tx_bits to to Nc DQPSK symbols.  Note legacy support for
+       old (suboptimal) V0.91 FreeDV mapping */
 
     for(c=0; c<Nc; c++) {
 	msb = tx_bits[2*c]; 
@@ -318,11 +327,19 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], in
 	if ((msb == 0) && (lsb == 0))
 	    tx_symbols[c] = prev_tx_symbols[c];
 	if ((msb == 0) && (lsb == 1))
-	    tx_symbols[c] = cmult(j, prev_tx_symbols[c]);
-	if ((msb == 1) && (lsb == 0))
-	    tx_symbols[c] = cmult(cneg(j),prev_tx_symbols[c]);
-	if ((msb == 1) && (lsb == 1))
-	    tx_symbols[c] = cneg(prev_tx_symbols[c]);
+            tx_symbols[c] = cmult(j, prev_tx_symbols[c]);
+	if ((msb == 1) && (lsb == 0)) {
+	    if (old_qpsk_mapping)
+                tx_symbols[c] = cneg(prev_tx_symbols[c]);           
+            else
+                tx_symbols[c] = cmult(cneg(j),prev_tx_symbols[c]);
+        }
+	if ((msb == 1) && (lsb == 1)) {
+	    if (old_qpsk_mapping)
+                tx_symbols[c] = cmult(cneg(j),prev_tx_symbols[c]);  
+            else
+                tx_symbols[c] = cneg(prev_tx_symbols[c]);
+        }
     }
 
     /* +1 -1 +1 -1 BPSK sync carrier, once filtered becomes (roughly)
@@ -490,7 +507,7 @@ void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[],
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
 
-    bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
+    bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
     tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
     fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
@@ -961,7 +978,8 @@ float rx_est_timing(COMP rx_symbols[],
 
 \*---------------------------------------------------------------------------*/
 
-float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[])
+float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], 
+                   COMP rx_symbols[], int old_qpsk_mapping)
 {
     int   c;
     COMP  pi_on_4;
@@ -987,16 +1005,24 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
     for (c=0; c<Nc; c++) {
       d = phase_difference[c];
       if ((d.real >= 0) && (d.imag >= 0)) {
-         msb = 0; lsb = 0;
+          msb = 0; lsb = 0;
       }
       if ((d.real < 0) && (d.imag >= 0)) {
-         msb = 0; lsb = 1;
+          msb = 0; lsb = 1;
       }
       if ((d.real < 0) && (d.imag < 0)) {
-         msb = 1; lsb = 1;
+          if (old_qpsk_mapping) {
+              msb = 1; lsb = 0;
+          } else {
+              msb = 1; lsb = 1;
+          }
       }
       if ((d.real >= 0) && (d.imag < 0)) {
-         msb = 1; lsb = 0;
+          if (old_qpsk_mapping) {
+              msb = 1; lsb = 1;
+          } else {
+              msb = 1; lsb = 0;
+          }
       }
       rx_bits[2*c] = msb;
       rx_bits[2*c+1] = lsb;
@@ -1283,7 +1309,8 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     if (fdmdv->rx_timing < 0)
 	*nin -= M/P;
     
-    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 
+                             fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
     snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->Nc, fdmdv->phase_difference);
 

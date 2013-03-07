@@ -90,6 +90,7 @@ struct FDMDV {
 
     /* Modulator */
 
+    int  old_qpsk_mapping;
     int  tx_pilot_bit;
     COMP prev_tx_symbols[NC+1];
     COMP tx_filter_memory[NC+1][NSYM];
@@ -151,7 +152,7 @@ struct FDMDV {
 
 \*---------------------------------------------------------------------------*/
 
-void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit);
+void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit, int old_qpsk_mapping);
 void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
 void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[]);
 void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_mem, COMP *phase, COMP *freq);
@@ -168,7 +169,7 @@ float rx_est_timing(COMP  rx_symbols[], int Nc,
 		   float env[],
 		   COMP  rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
 		   int   nin);	 
-float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[]);
+float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[], int old_qpsk_mapping);
 void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_difference[]);
 int freq_state(int sync_bit, int *state, int *bad_sync);
 float calc_snr(int Nc, float sig_est[], float noise_est[]);

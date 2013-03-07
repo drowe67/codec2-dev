@@ -92,6 +92,7 @@ struct FDMDV_STATS {
 
 struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc);
 void           CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
+void           CODEC2_WIN32SUPPORT fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv_state);
 int            CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv_state);
     
 void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
