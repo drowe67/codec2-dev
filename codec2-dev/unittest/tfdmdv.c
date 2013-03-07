@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 	\*---------------------------------------------------------*/
 
 	fdmdv_get_test_bits(fdmdv, tx_bits);
-	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit);
+	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, 0);
 	memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(NC+1));
 	tx_filter(tx_baseband, FDMDV_NC, tx_symbols, fdmdv->tx_filter_memory);
 	fdm_upconvert(tx_fdm, FDMDV_NC, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
 	fdm_downconvert(rx_baseband, FDMDV_NC, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, FDMDV_NC, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
-	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols);
+	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
 	snr_update(fdmdv->sig_est, fdmdv->noise_est, FDMDV_NC, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(NC+1));
 	
