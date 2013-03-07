@@ -28,8 +28,16 @@
 #ifndef __GOLAY23__
 #define __GOLAY23__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void golay23_init(void);
 int  golay23_encode(int data);
 int  golay23_decode(int received_codeword);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

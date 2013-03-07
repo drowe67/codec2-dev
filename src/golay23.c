@@ -86,19 +86,19 @@
 static int inited =  0;
 
 static int encoding_table[4096], decoding_table[2048];
+#ifdef GOLAY23_UNITTEST
 static int position[23] = { 0x00000001, 0x00000002, 0x00000004, 0x00000008,
                             0x00000010, 0x00000020, 0x00000040, 0x00000080,
                             0x00000100, 0x00000200, 0x00000400, 0x00000800,
                             0x00001000, 0x00002000, 0x00004000, 0x00008000,
                             0x00010000, 0x00020000, 0x00040000, 0x00080000,
                             0x00100000, 0x00200000, 0x00400000 };
-static int arr2int(a,r)
+#endif
+static int arr2int(int a[], int r)
 /*
  * Convert a binary vector of Hamming weight r, and nonzero positions in
  * array a[1]...a[r], to a long integer \sum_{i=1}^r 2^{a[i]-1}.
  */
-int r;
-int *a;
 {
    int i;
    long mul, result = 0, temp;
@@ -113,12 +113,10 @@ int *a;
    return(result);
 }
 
-void nextcomb(n, r, a)
+void nextcomb(int n, int r, int a[])
 /*
  * Calculate next r-combination of an n-set.
  */
-int  n, r;
-int  *a;
 {
   int  i, j;
  
@@ -133,7 +131,7 @@ int  *a;
   return;
 }
 
-int get_syndrome(pattern)
+int get_syndrome(int pattern)
 /*
  * Compute the syndrome corresponding to the given pattern, i.e., the
  * remainder after dividing the pattern (when considering it as the vector
@@ -143,7 +141,6 @@ int get_syndrome(pattern)
  * when constructing the decoding table; and (3) pattern = received vector, to
  * obtain its syndrome in decoding.
  */
-int pattern;
 {
     int aux = X22;
  
