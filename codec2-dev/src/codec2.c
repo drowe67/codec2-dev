@@ -1244,22 +1244,38 @@ int CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *c2)
 
 int CODEC2_WIN32SUPPORT codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked_bits[])
 {
-    int v0,v1,v3;
+    int v1,v3;
 
     assert(c2 != NULL);
 
-    if (c2->mode != CODEC2_MODE_1400)
-        return -1;
-
-    v0 = unpacked_bits[0];
     v1 = unpacked_bits[1];
-    v3 = unpacked_bits[11];
 
-    /* if either adjacent frame is voiced, make this one voiced */
+    switch(c2->mode) {
+    case CODEC2_MODE_1400:
 
-    unpacked_bits[10] = (v1 || v3);  
+        v3 = unpacked_bits[1+1+8+1];
 
-    return 0;
+        /* if either adjacent frame is voiced, make this one voiced */
+
+        unpacked_bits[10] = (v1 || v3);  
+
+        return 0;
+
+        break;
+
+    case CODEC2_MODE_1600:
+        v3 = unpacked_bits[1+1+8+5+1];
+
+        /* if either adjacent frame is voiced, make this one voiced */
+
+        unpacked_bits[15] = (v1 || v3);  
+
+        return 0;
+
+        break;
+    }
+
+    return -1;
 }
 
 
