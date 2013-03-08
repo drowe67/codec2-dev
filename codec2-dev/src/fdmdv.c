@@ -1102,6 +1102,12 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
 	noise_est[c] = SNR_COEFF*noise_est[c] + (1 - SNR_COEFF)*n[c];
 }
 
+// returns number of shorts in error_pattern[], one short per error
+
+int CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *f) {
+    return f->ntest_bits;
+}
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdmdv_put_test_bits()	     
@@ -1113,7 +1119,7 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, 
+void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[],
 					     int *bit_errors, int *ntest_bits, 
 					     int rx_bits[])
 {
@@ -1132,7 +1138,8 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync,
        
     *bit_errors = 0;
     for(i=0; i<f->ntest_bits; i++) {
-	*bit_errors += test_bits[i] ^ f->rx_test_bits_mem[i];
+        error_pattern[i] = test_bits[i] ^ f->rx_test_bits_mem[i];
+	*bit_errors += error_pattern[i];
 	//printf("%d %d %d %d\n", i, test_bits[i], f->rx_test_bits_mem[i], test_bits[i] ^ f->rx_test_bits_mem[i]);
     }
 

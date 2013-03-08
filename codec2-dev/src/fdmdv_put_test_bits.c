@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
     int           bits_per_codec_frame;
     int           bytes_per_codec_frame;
     int           Nc;
+    int          *error_pattern;
 
     if (argc < 2) {
 	printf("usage: %s InputBitFile [Nc]\n", argv[0]);
@@ -90,6 +91,9 @@ int main(int argc, char *argv[])
     rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
     assert(rx_bits != NULL);
 
+    error_pattern = (int*)malloc(fdmdv_error_pattern_size(fdmdv)*sizeof(int));
+    assert(error_pattern != NULL);
+
     total_bit_errors = 0;
     total_bits = 0;
 
@@ -108,7 +112,7 @@ int main(int argc, char *argv[])
 	}
 	assert(byte == bytes_per_codec_frame);
 
-	fdmdv_put_test_bits(fdmdv, &test_frame_sync, &bit_errors, &ntest_bits, rx_bits);
+	fdmdv_put_test_bits(fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, rx_bits);
 	if (test_frame_sync == 1) {
 	    total_bit_errors += bit_errors;
 	    total_bits = total_bits + ntest_bits;
@@ -116,7 +120,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	    printf("-");
-  	fdmdv_put_test_bits(fdmdv, &test_frame_sync, &bit_errors, &ntest_bits, &rx_bits[bits_per_fdmdv_frame]);
+  	fdmdv_put_test_bits(fdmdv, &test_frame_sync,  error_pattern, &bit_errors, &ntest_bits, &rx_bits[bits_per_fdmdv_frame]);
 	if (test_frame_sync == 1) {
 	    total_bit_errors += bit_errors;
 	    total_bits = total_bits + ntest_bits;
@@ -132,6 +136,7 @@ int main(int argc, char *argv[])
     }
 
     fclose(fin);
+    free(error_pattern);
     fdmdv_destroy(fdmdv);
 
     printf("\nbits %d  errors %d  BER %1.4f\n", total_bits, total_bit_errors, (float)total_bit_errors/(1E-6+total_bits) );
