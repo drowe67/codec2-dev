@@ -59,7 +59,7 @@ extern "C" {
 
 #define FDMDV_NC                      14  /* default number of data carriers                                */                               
 #define FDMDV_NC_MAX                  20  /* maximum number of data carriers                                */                               
-#define FDMDV_BITS_PER_FRAME          28  /* 20ms frames, 1400 bit/s                                        */
+#define FDMDV_BITS_PER_FRAME          28  /* 20ms frames, for nominal 1400 bit/s                            */
 #define FDMDV_NOM_SAMPLES_PER_FRAME  160  /* modulator output samples/frame and nominal demod samples/frame */
                                           /* at 8000 Hz sample rate                                         */
 #define FDMDV_MAX_SAMPLES_PER_FRAME  200  /* max demod samples/frame, use this to allocate storage          */
@@ -99,7 +99,8 @@ void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_
 void           CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, COMP rx_fdm[], int *nin);
     
 void           CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
-void           CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, int *bit_errors, int *ntest_bits, int rx_bits[]);
+int            CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *fdmdv_state);
+void           CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[], int *bit_errors, int *ntest_bits, int rx_bits[]);
     
 void           CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void           CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
