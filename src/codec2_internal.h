@@ -55,6 +55,8 @@ struct CODEC2 {
 
     float         xq_enc[2];               /* joint pitch and energy VQ states          */
     float         xq_dec[2];
+
+    int           smoothing;               /* enable smoothing for channels with errors */
 };
 
 #endif

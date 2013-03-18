@@ -727,11 +727,12 @@ int check_lsp_order(float lsp[], int lpc_order)
 
     for(i=1; i<lpc_order; i++)
 	if (lsp[i] < lsp[i-1]) {
-	    //printf("swap %d\n",i);
+	    //fprintf(stderr, "swap %d\n",i);
 	    swaps++;
 	    tmp = lsp[i-1];
-	    lsp[i-1] = lsp[i]-0.05;
-	    lsp[i] = tmp+0.05;
+	    lsp[i-1] = lsp[i]-0.1;
+	    lsp[i] = tmp+0.1;
+            i = 1; /* start check again, as swap may have caused out of order */
 	}
 
     return swaps;
@@ -1644,7 +1645,7 @@ void bw_expand_lsps(float lsp[],
 
     for(i=1; i<4; i++) {
 	
-	if ((lsp[i] - lsp[i-1]) < 50*(PI/4000.0))
+	if ((lsp[i] - lsp[i-1]) < 50.0*(PI/4000.0))
 	    lsp[i] = lsp[i-1] + 50.0*(PI/4000.0);
 	
     }
@@ -1655,8 +1656,32 @@ void bw_expand_lsps(float lsp[],
     */
 
     for(i=4; i<order; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(100.0/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(100.0/4000.0);
+	if (lsp[i] - lsp[i-1] < 100.0*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + 100.0*(PI/4000.0);
+    }
+}
+
+void bw_expand_lsps2(float lsp[],
+		    int   order
+)
+{
+    int i;
+
+    for(i=1; i<4; i++) {
+	
+	if ((lsp[i] - lsp[i-1]) < 100.0*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + 100.0*(PI/4000.0);
+	
+    }
+
+    /* As quantiser gaps increased, larger BW expansion was required
+       to prevent twinkly noises.  This may need more experiment for
+       different quanstisers.
+    */
+
+    for(i=4; i<order; i++) {
+	if (lsp[i] - lsp[i-1] < 200.0*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + 200.0*(PI/4000.0);
     }
 }
 
