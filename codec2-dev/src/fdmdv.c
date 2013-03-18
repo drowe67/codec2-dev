@@ -1192,11 +1192,11 @@ int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
     unique_word = 0;
     for(i=0; i<NSYNC_MEM-1; i++)
         sync_mem[i] = sync_mem[i+1];
-    sync_mem[i] = sync_bit;
+    sync_mem[i] = 1 - 2*sync_bit;
     corr = 0;
     for(i=0; i<NSYNC_MEM; i++)
         corr += sync_mem[i]*sync_uw[i];
-    if (corr == NSYNC_MEM)
+    if (abs(corr) == NSYNC_MEM)
         unique_word = 1;
 
     /* iterate state machine */
@@ -1235,6 +1235,7 @@ int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
 	break;
     }
 
+    printf("state: %d next_state: %d uw: %d timer: %d\n", *state, next_state, unique_word, *timer);
     *state = next_state;
     if (*state)
 	sync = 1;
