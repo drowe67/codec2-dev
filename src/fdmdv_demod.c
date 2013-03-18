@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
     COMP         *rx_fdm_log;
     int           rx_fdm_log_col_index;
     COMP         *rx_symbols_log;
-    int           coarse_fine_log[MAX_FRAMES];
+    int           sync_log[MAX_FRAMES];
     float         rx_timing_log[MAX_FRAMES];
     float         foff_log[MAX_FRAMES];
     int           sync_bit_log[MAX_FRAMES];
@@ -164,7 +164,7 @@ int main(int argc, char *argv[])
 		rx_symbols_log[f*(Nc+1)+c] = stats.rx_symbols[c];
 	    foff_log[f] = stats.foff;
 	    rx_timing_log[f] = stats.rx_timing;
-	    coarse_fine_log[f] = stats.fest_coarse_fine;
+	    sync_log[f] = stats.sync;
 	    sync_bit_log[f] = sync_bit;
 	    memcpy(&rx_bits_log[bits_per_fdmdv_frame*f], rx_bits, sizeof(int)*bits_per_fdmdv_frame);
 	    snr_est_log[f] = stats.snr_est;
@@ -240,7 +240,7 @@ int main(int argc, char *argv[])
 	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
 	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
-	    octave_save_int(foct, "coarse_fine_log_c", coarse_fine_log, 1, f);  
+	    octave_save_int(foct, "sync_log_c", sync_log, 1, f);  
 	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
 	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
 	    octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  

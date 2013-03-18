@@ -62,10 +62,7 @@
 #define NPILOTLPF                  (4*M)    /* number of samples we DFT pilot over, pilot est window */
 #define MPILOTFFT                    256
 
-/* freq offset sestimation states */
-
-#define COARSE                   0
-#define FINE                     1
+#define NSYNC_MEM                6
 
 /* averaging filter coeffs */
 
@@ -129,11 +126,12 @@ struct FDMDV {
     COMP  phase_difference[NC+1];
     COMP  prev_rx_symbols[NC+1];
     
-    /* freq est state machine */
+    /* sync state machine */
 
+    int  sync_mem[NSYNC_MEM];
     int  fest_state;
-    int  coarse_fine;
-    int  bad_sync;
+    int  sync;
+    int  timer;
 
     /* SNR estimation states */
 
@@ -171,7 +169,7 @@ float rx_est_timing(COMP  rx_symbols[], int Nc,
 		   int   nin);	 
 float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[], int old_qpsk_mapping);
 void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_difference[]);
-int freq_state(int sync_bit, int *state, int *bad_sync);
+int freq_state(int sync_bit, int *state, int *timer, int *sync_mem);
 float calc_snr(int Nc, float sig_est[], float noise_est[]);
 
 #endif

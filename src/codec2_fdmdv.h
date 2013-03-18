@@ -84,7 +84,7 @@ struct FDMDV_STATS {
     int    Nc;
     float  snr_est;                    /* estimated SNR of rx signal in dB (3 kHz noise BW)  */
     COMP   rx_symbols[FDMDV_NC_MAX+1]; /* latest received symbols, for scatter plot          */ 
-    int    fest_coarse_fine;           /* freq est state, 0-coarse 1-fine                    */ 
+    int    sync;                       /* demod sync state                                   */ 
     float  foff;                       /* estimated freq offset in Hz                        */       
     float  rx_timing;                  /* estimated optimum timing offset in samples         */
     float  clock_offset;               /* Estimated tx/rx sample clock offset in ppm         */
