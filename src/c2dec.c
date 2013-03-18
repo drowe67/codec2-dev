@@ -46,16 +46,17 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit, nbyte, i, byte, frames, bit_errors, error_mode;
+    int            nsam, nbit, nbyte, i, byte, frames, bits_proc, bit_errors, error_mode;
     int            nstart_bit, nend_bit, bit_rate;
     int            state, next_state;
     float          ber, r, burst_length, burst_period, burst_timer;
+    unsigned char  mask;
 
-    if (argc < 4) {
-	printf("basic usage.................: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile\n");
-	printf("uniform errors usage........: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit\n");
-	printf("uniform error on range usage: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
-	printf("two state fading usage......: c2dec 3200|2400|1600|1400|1200 InputBitFile OutputRawSpeechFile burstLength burstPeriod\n");
+    if ((argc != 4) && (argc != 5) && (argc != 6) && (argc != 7)) {
+	printf("basic usage.................: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile\n");
+	printf("uniform errors usage........: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit smoothingFlag\n");
+	printf("uniform error on range usage: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
+	printf("two state fading usage......: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile burstLength burstPeriod\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.9\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.99 0.9\n");
@@ -70,10 +71,12 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_1600;
     else if (strcmp(argv[1],"1400") == 0)
 	mode = CODEC2_MODE_1400;
+    else if (strcmp(argv[1],"1300") == 0)
+	mode = CODEC2_MODE_1300;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400 or 1200\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300 or 1200\n", argv[1]);
 	exit(1);
     }
     bit_rate = atoi(argv[1]);
@@ -103,7 +106,7 @@ int main(int argc, char *argv[])
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
-    frames = bit_errors = 0;
+    frames = bit_errors = bits_proc = 0;
     nstart_bit = 0;
     nend_bit = nbit-1;
 
@@ -120,7 +123,7 @@ int main(int argc, char *argv[])
 	nend_bit = 2;
         state = 0;
     }
-
+    
     if (argc == 7) {
         error_mode = UNIFORM_RANGE;
 	ber = atof(argv[4]);
@@ -142,10 +145,13 @@ int main(int argc, char *argv[])
 		r = (float)rand()/RAND_MAX;
 		if (r < ber) {
 		    byte = i/8;
-		    //printf("nbyte %d nbit %d i %d byte %d\n", nbyte, nbit, i, byte);
-		    bits[byte] ^= 1 << (7 - i - byte*8);
+		    //printf("nbyte %d nbit %d i %d byte %d bits[%d] 0x%0x ", nbyte, nbit, i, byte, byte, bits[byte]);
+		    mask = 1 << (7 - i + byte*8);
+                    bits[byte] ^= mask;
+		    //printf("shift: %d mask: 0x%0x bits[%d] 0x%0x\n", 7 - i + byte*8, mask, byte, bits[byte] );
 		    bit_errors++;
-		}
+ 		}
+                bits_proc++;
 	    }
 	}
 
@@ -171,9 +177,10 @@ int main(int argc, char *argv[])
                     r = (float)rand()/RAND_MAX;
                     if (r < 0.5) {
                         byte = i/8;
-                        bits[byte] ^= 1 << (7 - i - byte*8);
+                        bits[byte] ^= 1 << (7 - i + byte*8);
                         bit_errors++;
                     }
+                    bits_proc++;
 		}
 
                 if (burst_timer > burst_period) {
@@ -196,7 +203,7 @@ int main(int argc, char *argv[])
     }
 
     if (error_mode)
-	fprintf(stderr, "actual BER: %1.3f\n", (float)bit_errors/(frames*nbit));
+	fprintf(stderr, "actual BER: %1.3f\n", (float)bit_errors/bits_proc);
 
     codec2_destroy(codec2);
 
