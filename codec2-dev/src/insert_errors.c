@@ -36,11 +36,6 @@
 #include <string.h>
 #include <errno.h>
 
-// This just assumes 1400 bit/s mode for now
-
-#define BITS_PER_FRAME  56
-#define BYTES_PER_FRAME  7
-   
 int main(int argc, char *argv[])
 {
     FILE          *fin;
@@ -50,9 +45,11 @@ int main(int argc, char *argv[])
     unsigned char  byte;
     short          error;
     int            errors, bits;
+    int            bits_per_frame, bytes_per_frame;
 
-    if (argc < 3) {
-	printf("%s InputBitFile OutputBitFile ErrorFile [startBit endBit]\n", argv[0]);
+    if (argc < 4) {
+	printf("%s InputBitFile OutputBitFile ErrorFile bitsPerFrame [startBit endBit]\n", argv[0]);
+	printf("%s InputBitFile OutputBitFile BER\n", argv[0]);
 	exit(1);
     }
 
@@ -76,10 +73,14 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    start_bit = 0; end_bit = BITS_PER_FRAME;
-    if (argc == 6) {
- 	start_bit = atoi(argv[4]);
-	end_bit = atoi(argv[5]);   
+    bits_per_frame = atoi(argv[4]);
+    assert((bits_per_frame % 8) == 0);
+    bytes_per_frame = bits_per_frame/8;
+
+    start_bit = 0; end_bit = bits_per_frame;
+    if (argc == 7) {
+ 	start_bit = atoi(argv[5]);
+	end_bit = atoi(argv[6]);   
     }
         
     bit = 0;
@@ -102,10 +103,13 @@ int main(int argc, char *argv[])
                 exit(0);
             }
             bit++;
-            if (bit == BITS_PER_FRAME)
+            if (bit == bits_per_frame)
                 bit = 0;
         }
         fwrite(&byte, sizeof(char), 1, fout);
+        if (fout == stdout) fflush(stdout);
+        if (fin == stdin) fflush(stdin);         
+ 
     }
 
     fclose(fin);

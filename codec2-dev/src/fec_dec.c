@@ -36,6 +36,10 @@
 #include <string.h>
 #include <errno.h>
 
+#define MODE_1600 0
+#define MODE_1850 1
+#define MODE_2000 2
+
 int main(int argc, char *argv[])
 {
     void          *codec2, *fdmdv;
@@ -47,12 +51,12 @@ int main(int argc, char *argv[])
     int            bits_per_output_frame, bytes_per_output_frame;
     unsigned char *packed_output_bits;
     int           *unpacked_output_bits;
-    int            mode, Nc, bit, byte;
-    int            i;
+    int            codec2_mode, mode, Nc, bit, byte;
+    int            i,j;
     int            recd_codeword, codeword1, codeword2;
 
     if (argc < 3) {
-	printf("%s InputFromModemWithFECFile OutputToCodec2File\n", argv[0]);
+	printf("%s InputFromModemWithFECFile OutputToCodec2File [2000|1600]\n", argv[0]);
 	exit(1);
     }
 
@@ -73,7 +77,28 @@ int main(int argc, char *argv[])
     /* input parameters and buffers. Note data is split into two 20ms
        frames for transmission over modem. */
 
-    Nc = 20;
+    if ((argc != 4) || (strcmp(argv[3],"2000") == 0)) {
+        /* 2000 bit/s with FEC */
+        mode = MODE_2000;
+	codec2_mode = CODEC2_MODE_1400;
+        Nc = 20;
+    } else if ((strcmp(argv[3],"1850") == 0)) {
+        /* 1850 bit/s with FEC */
+        mode = MODE_1850;
+	codec2_mode = CODEC2_MODE_1300;
+        Nc = 20;
+    }
+    else if (strcmp(argv[3],"1600") == 0) {
+        /* 1600 bit/s with FEC (actually 1575 with one spare) */
+        mode = MODE_1600;
+	codec2_mode = CODEC2_MODE_1300;
+        Nc = 16;
+    }
+    else {
+	fprintf(stderr, "Error in mode: %s.  Must be 2000 or 1600\n", argv[3]);
+	exit(1);
+    }
+
     fdmdv = fdmdv_create(Nc);
 
     bits_per_input_frame = 2*fdmdv_bits_per_frame(fdmdv);
@@ -89,20 +114,18 @@ int main(int argc, char *argv[])
        Output parameters and buffers.
     */
 
-    mode = CODEC2_MODE_1400;
-    codec2 = codec2_create(mode);
+    codec2 = codec2_create(codec2_mode);
 
     bits_per_output_frame = codec2_bits_per_frame(codec2);
-    bytes_per_output_frame = bits_per_output_frame/8;
-    assert((bits_per_output_frame % 8) == 0); /* make sure integer number of bytes per frame */
+    bytes_per_output_frame = (bits_per_output_frame+7)/8;
 
     packed_output_bits = (unsigned char*)malloc(bytes_per_output_frame*sizeof(char));
     assert(packed_output_bits != NULL);
     unpacked_output_bits = (int*)malloc(bits_per_output_frame*sizeof(int));
     assert(unpacked_output_bits != NULL);
     
-    // fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
-    //        bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
+    fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
+            bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
 
     /* main loop */
 
@@ -121,7 +144,6 @@ int main(int argc, char *argv[])
 		byte++;
 	    }
 	}
-	assert(byte == bytes_per_input_frame);
 
         #ifdef TEST
         /* Some test bit errors (not comprehesnive) */
@@ -129,46 +151,124 @@ int main(int argc, char *argv[])
         unpacked_input_bits[23] = (unpacked_input_bits[23] ^ 1) & 0x1;
         #endif
 
-        /* decode first codeword */
+        if (mode == MODE_2000) {
+            /* decode first codeword */
 
-        recd_codeword = 0;
-        for(i=0; i<12; i++) {
-            recd_codeword <<= 1;
-            recd_codeword |= unpacked_input_bits[i];
+            recd_codeword = 0;
+            for(i=0; i<12; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=bits_per_output_frame; i<bits_per_output_frame+11; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            codeword1 = golay23_decode(recd_codeword);
+            //codeword1 = recd_codeword;
+            //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
+
+            for(i=0; i<12; i++) {
+                unpacked_output_bits[i] = (codeword1 >> (22-i)) & 0x1;
+            }
+
+            /* decode second codeword */
+
+            recd_codeword = 0;
+            for(i=12; i<24; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=bits_per_output_frame+11; i<bits_per_output_frame+11+11; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            codeword2 = golay23_decode(recd_codeword);
+            //codeword2 = recd_codeword;
+            //fprintf(stderr, "received codeword2: 0x%x  decoded codeword2: 0x%x\n", recd_codeword, codeword2);
+
+            for(i=0; i<12; i++) {
+                unpacked_output_bits[12+i] = (codeword2 >> (22-i)) & 0x1;
+            }
+
+            /* unprotected bits */
+
+            for(i=24; i<bits_per_output_frame; i++)
+                unpacked_output_bits[i] = unpacked_input_bits[i];
         }
-        for(i=bits_per_output_frame; i<bits_per_output_frame+11; i++) {
-            recd_codeword <<= 1;
-            recd_codeword |= unpacked_input_bits[i];
+ 
+        if (mode == MODE_1600) {
+            recd_codeword = 0;
+            for(i=0; i<8; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=11; i<15; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=bits_per_output_frame; i<bits_per_output_frame+11; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            codeword1 = golay23_decode(recd_codeword);
+            //codeword1 = recd_codeword;
+            //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
+           
+            for(i=0; i<bits_per_output_frame; i++)
+                unpacked_output_bits[i] = unpacked_input_bits[i];
+
+            for(i=0; i<8; i++) {
+                unpacked_output_bits[i] = (codeword1 >> (22-i)) & 0x1;
+            }
+            for(i=8,j=11; i<12; i++,j++) {
+                unpacked_output_bits[j] = (codeword1 >> (22-i)) & 0x1;
+            }
         }
-        codeword1 = golay23_decode(recd_codeword);
-        //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
 
-        for(i=0; i<12; i++) {
-            unpacked_output_bits[i] = codeword1 >> (22-i);
+        if (mode == MODE_1850) {
+            recd_codeword = 0;
+            for(i=0; i<8; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=11; i<15; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=bits_per_output_frame; i<bits_per_output_frame+11; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            codeword1 = golay23_decode(recd_codeword);
+            //codeword1 = recd_codeword;
+            //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
+           
+            recd_codeword = 0;
+            for(i=16; i<28; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            for(i=bits_per_output_frame+11; i<bits_per_output_frame+11+11; i++) {
+                recd_codeword <<= 1;
+                recd_codeword |= unpacked_input_bits[i];
+            }
+            codeword2 = golay23_decode(recd_codeword);
+            fprintf(stderr, "received codeword2: 0x%x  decoded codeword2: 0x%x\n", recd_codeword, codeword2);
+          
+            for(i=0; i<bits_per_output_frame; i++)
+                unpacked_output_bits[i] = unpacked_input_bits[i];
+            
+            for(i=0; i<8; i++) {
+                unpacked_output_bits[i] = (codeword1 >> (22-i)) & 0x1;
+            }
+            for(i=8,j=11; i<12; i++,j++) {
+                unpacked_output_bits[j] = (codeword1 >> (22-i)) & 0x1;
+            }
+            for(i=0,j=16; i<12; i++,j++) {
+                unpacked_output_bits[j] = (codeword2 >> (22-i)) & 0x1;
+            }
+            
         }
-
-        /* decode second codeword */
-
-        recd_codeword = 0;
-        for(i=12; i<24; i++) {
-            recd_codeword <<= 1;
-            recd_codeword |= unpacked_input_bits[i];
-        }
-        for(i=bits_per_output_frame+11; i<bits_per_output_frame+11+11; i++) {
-            recd_codeword <<= 1;
-            recd_codeword |= unpacked_input_bits[i];
-        }
-        codeword2 = golay23_decode(recd_codeword);
-        //fprintf(stderr, "received codeword2: 0x%x  decoded codeword2: 0x%x\n", recd_codeword, codeword2);
-
-        for(i=0; i<12; i++) {
-            unpacked_output_bits[12+i] = codeword2 >> (22-i);
-        }
-
-        /* unprotected bits */
-
-        for(i=24; i<bits_per_output_frame; i++)
-            unpacked_output_bits[i] = unpacked_input_bits[i];
 
         /* pack bits, MSB first  */
 
@@ -182,7 +282,6 @@ int main(int argc, char *argv[])
                 byte++;
             }
         }
-        assert(byte == bytes_per_output_frame);
         
  	fwrite(packed_output_bits, sizeof(char), bytes_per_output_frame, fout);
 

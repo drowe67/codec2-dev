@@ -36,7 +36,7 @@
 
 #include "codec2_fdmdv.h"
 
-#define MAX_INTERLEAVER 1024
+#define MAX_INTERLEAVER 10000
 
 int main(int argc, char *argv[])
 {
@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
 
     m = src_bit;
     fprintf(stderr, "Interleaver size m = %d  interleave = %d\n", m, interleave);
+    assert((m%8) == 0);
     mpacked = m/8;
 
     packed_bits = (char*)malloc(mpacked*sizeof(char));

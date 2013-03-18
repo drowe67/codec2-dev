@@ -263,6 +263,7 @@ int golay23_encode(int data) {
 int golay23_decode(int received_codeword) {
     assert(inited);
 
+    //printf("syndrome: 0x%x\n", get_syndrome(received_codeword));
     return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
 }
 
