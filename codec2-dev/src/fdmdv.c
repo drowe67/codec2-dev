@@ -46,7 +46,9 @@
 #include "hanning.h"
 #include "os.h"
 
-/*---------------------------------------------------------------------------*\
+static int sync_uw[] = {1,-1,1,-1,1,-1};
+
+/*---------------------------------------------------------------------------* \
                                                                              
                                FUNCTIONS
 
@@ -229,8 +231,10 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     f->foff_phase_rect.imag = 0.0;
 
     f->fest_state = 0;
-    f->coarse_fine = COARSE;
-    f->bad_sync = 0;
+    f->sync = 0;
+    f->timer = 0;
+    for(i=0; i<NSYNC_MEM; i++)
+        f->sync_mem[i] = 0;
 
     for(c=0; c<Nc+1; c++) {
 	f->sig_est[c] = 0.0;
@@ -1179,87 +1183,65 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short e
 
 \*---------------------------------------------------------------------------*/
 
-int freq_state(int sync_bit, int *state, int *bad_sync)
+int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
 {
-    int next_state, coarse_fine;
+    int next_state, sync, unique_word, i, corr;
 
-    /* acquire state, look for 6 symbol 010101 sequence from sync bit */
+    /* look for 6 symbols (120ms) 010101 of sync sequence */
+
+    unique_word = 0;
+    for(i=0; i<NSYNC_MEM-1; i++)
+        sync_mem[i] = sync_mem[i+1];
+    sync_mem[i] = sync_bit;
+    corr = 0;
+    for(i=0; i<NSYNC_MEM; i++)
+        corr += sync_mem[i]*sync_uw[i];
+    if (corr == NSYNC_MEM)
+        unique_word = 1;
+
+    /* iterate state machine */
 
     next_state = *state;
     switch(*state) {
     case 0:
-	if (sync_bit == 0)
+	if (unique_word) {
 	    next_state = 1;
+            *timer = 0;
+        }
 	break;
-    case 1:
-	if (sync_bit == 1)
-	    next_state = 2;
+    case 1:                  /* tentative sync state         */
+	if (unique_word) {
+            (*timer)++;
+            if (*timer == 25) /* sync has been good for 500ms */
+                next_state = 2;
+        }
 	else 
-	    next_state = 0;
+	    next_state = 0;  /* quickly fall out of sync     */
 	break;
-    case 2:
-	if (sync_bit == 0)
+    case 2:                  /* good sync state */
+	if (unique_word == 0) {
+            *timer = 0;
 	    next_state = 3;
-	else 
-	    next_state = 0;
-	break;
-    case 3:
-	if (sync_bit == 1)
-	    next_state = 4;
-	else 
-	    next_state = 0;
-	break;
-    case 4:
-	if (sync_bit == 0)
-	    next_state = 5;
-	else 
-	    next_state = 0;
-	break;
-    case 5:
-	if (sync_bit == 1) {
-	    next_state = 6;
-            *bad_sync = 0;
         }
-	else 
-	    next_state = 0;
 	break;
-	
-	/* states 6 and above are track mode, make sure we keep
-	   getting 0101 sync bit sequence. bad_sync allows us to track
-	   through a few bad symbols when BPSK pilot is temporarilly
-	   faded out, avoiding a costly re-sync when valid data still
-	   exists on other carriers */
-
-    case 6:
-        next_state = 7;
-	if (sync_bit == 0)
-            *bad_sync = 0;
-	else {
-            (*bad_sync)++;
-            if (*bad_sync > 2)
-                next_state = 0;
-        }
-
-	break;
-    case 7:
-        next_state = 6;
-	if (sync_bit == 1)
-	    *bad_sync = 0;
-        else {
-            (*bad_sync)++;
-            if (*bad_sync > 2)
+    case 3:                  /* tentative bad state, but could be a fade */
+	if (unique_word)
+	    next_state = 2;
+	else  {
+            (*timer)++;
+            if (*timer == 50) /* wait for 1000ms in case sync comes back  */
                 next_state = 0;
         }
 	break;
     }
 
     *state = next_state;
-    if (*state >= 6)
-	coarse_fine = FINE;
+    if (*state)
+	sync = 1;
     else
-	coarse_fine = COARSE;
+	sync = 0;
  
-    return coarse_fine;
+    return sync;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1296,7 +1278,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
    
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
     
-    if (fdmdv->coarse_fine == COARSE)
+    if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
     fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
 	
@@ -1323,7 +1305,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
     /* freq offset estimation state machine */
 
-    fdmdv->coarse_fine = freq_state(*sync_bit, &fdmdv->fest_state, &fdmdv->bad_sync);
+    fdmdv->sync = freq_state(*sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 
@@ -1388,7 +1370,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv,
 
     fdmdv_stats->Nc = fdmdv->Nc;
     fdmdv_stats->snr_est = calc_snr(fdmdv->Nc, fdmdv->sig_est, fdmdv->noise_est);
-    fdmdv_stats->fest_coarse_fine = fdmdv->coarse_fine;
+    fdmdv_stats->sync = fdmdv->sync;
     fdmdv_stats->foff = fdmdv->foff;
     fdmdv_stats->rx_timing = fdmdv->rx_timing;
     fdmdv_stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
