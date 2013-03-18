@@ -1235,7 +1235,7 @@ int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
 	break;
     }
 
-    printf("state: %d next_state: %d uw: %d timer: %d\n", *state, next_state, unique_word, *timer);
+    //printf("state: %d next_state: %d uw: %d timer: %d\n", *state, next_state, unique_word, *timer);
     *state = next_state;
     if (*state)
 	sync = 1;
