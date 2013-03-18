@@ -224,6 +224,26 @@ void interp_Wo(
   MODEL *next       /* next frames model params                      */
 	       )
 {
+    interp_Wo2(interp, prev, next, 0.5);
+}
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_Wo2()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22 May 2012
+        
+  Weighted interpolation of two Wo samples.
+  
+\*---------------------------------------------------------------------------*/
+
+void interp_Wo2(
+  MODEL *interp,    /* interpolated model params                     */
+  MODEL *prev,      /* previous frames model params                  */
+  MODEL *next,      /* next frames model params                      */
+  float  weight
+)
+{
     /* trap corner case where voicing est is probably wrong */
 
     if (interp->voiced && !prev->voiced && !next->voiced) {
@@ -234,7 +254,7 @@ void interp_Wo(
 
     if (interp->voiced) {
 	if (prev->voiced && next->voiced)
-	    interp->Wo = (prev->Wo + next->Wo)/2.0;
+	    interp->Wo = (1.0 - weight)*prev->Wo + weight*next->Wo;
 	if (!prev->voiced && next->voiced)
 	    interp->Wo = next->Wo;
 	if (prev->voiced && !next->voiced)
@@ -261,6 +281,24 @@ void interp_Wo(
 float interp_energy(float prev_e, float next_e)
 {
     return pow(10.0, (log10(prev_e) + log10(next_e))/2.0);
+ 
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_energy2()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22 May 2012
+        
+  Interpolates centre 10ms sample of energy given two samples 20ms
+  apart.
+  
+\*---------------------------------------------------------------------------*/
+
+float interp_energy2(float prev_e, float next_e, float weight)
+{
+    return pow(10.0, (1.0 - weight)*log10(prev_e) + weight*log10(next_e));
  
 }
 
