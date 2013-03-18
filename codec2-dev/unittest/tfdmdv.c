@@ -63,8 +63,6 @@ int main(int argc, char *argv[])
     int           rx_bits[FDMDV_BITS_PER_FRAME];
     float         foff_fine;
     int           sync_bit;
-    int           fest_state;
-    int           bad_sync;
 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
@@ -90,7 +88,7 @@ int main(int argc, char *argv[])
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     float         foff_fine_log[FRAMES];
     int           sync_bit_log[FRAMES];
-    int           coarse_fine_log[FRAMES];
+    int           sync_log[FRAMES];
     int           nin_log[FRAMES];
 
     FILE         *fout;
@@ -157,7 +155,7 @@ int main(int argc, char *argv[])
 	/* freq offset estimation and correction */
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
-	if (fdmdv->coarse_fine == COARSE)
+	if (fdmdv->sync == 0)
 	    fdmdv->foff = foff_coarse;
 	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, nin);
 	
@@ -178,7 +176,7 @@ int main(int argc, char *argv[])
 	if (rx_timing < 0)
 	    next_nin -= M/P;
 	
-	fdmdv->coarse_fine = freq_state(sync_bit, &fdmdv->fest_state, &bad_sync);
+	fdmdv->sync = freq_state(sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
 	/* --------------------------------------------------------*\
@@ -237,7 +235,7 @@ int main(int argc, char *argv[])
 	foff_fine_log[f] = foff_fine;
 	sync_bit_log[f] = sync_bit;
 
-	coarse_fine_log[f] = fdmdv->coarse_fine;
+	sync_log[f] = fdmdv->sync;
     }
 
 
@@ -272,7 +270,7 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
     octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES, FRAMES);  
     octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
-    octave_save_int(fout, "coarse_fine_log_c", coarse_fine_log, 1, FRAMES);  
+    octave_save_int(fout, "sync_log_c", sync_log, 1, FRAMES);  
     octave_save_int(fout, "nin_log_c", nin_log, 1, FRAMES);  
     fclose(fout);
 
