@@ -58,8 +58,8 @@ int main(int argc, char *argv[])
     short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
     int           nin, nin_prev;
-    int           sync_bit;
-    int           state, next_state;
+    int           sync_bit, reliable_sync_bit;
+    int           sync;
     int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;
@@ -136,7 +136,6 @@ int main(int argc, char *argv[])
     assert(rx_fdm_log != NULL);
 
     f = 0;
-    state = 0;
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;
     rx_fdm_log_col_index = 0;
     max_frames_reached = 0;
@@ -148,7 +147,7 @@ int main(int argc, char *argv[])
             rx_fdm[i].imag = 0;
         }
 	nin_prev = nin;
-	fdmdv_demod(fdmdv, rx_bits, &sync_bit, rx_fdm, &nin);
+	fdmdv_demod(fdmdv, rx_bits, &reliable_sync_bit, rx_fdm, &nin);
 
 	/* log data for optional Octave dump */
 
@@ -179,43 +178,35 @@ int main(int argc, char *argv[])
 	    max_frames_reached = 1;
 	}
 
-	/* state machine to output codec bits only if we have a 0,1
-	   sync bit sequence */
+        if (reliable_sync_bit)
+            sync = 1;
+        //printf("sync_bit: %d reliable_sync_bit: %d sync: %d\n", sync_bit, reliable_sync_bit, sync);
 
-	next_state = state;
-	switch (state) {
-	case 0:
-	    if (sync_bit == 0) {
-		next_state = 1;
-		memcpy(codec_bits, rx_bits, bits_per_fdmdv_frame*sizeof(int));
-	    }
-	    else
-		next_state = 0;
-	    break;
-	case 1:
-	    if (sync_bit == 1) {
-		memcpy(&codec_bits[bits_per_fdmdv_frame], rx_bits, bits_per_fdmdv_frame*sizeof(int));
+        if (sync == 0) {
+            memcpy(codec_bits, rx_bits, bits_per_fdmdv_frame*sizeof(int));
+            sync = 1;
+        }
+        else {
+            memcpy(&codec_bits[bits_per_fdmdv_frame], rx_bits, bits_per_fdmdv_frame*sizeof(int));
 
-		/* pack bits, MSB received first  */
+            /* pack bits, MSB received first  */
 
-		bit = 7; byte = 0;
-		memset(packed_bits, 0, bytes_per_codec_frame);
-		for(i=0; i<bits_per_codec_frame; i++) {
-		    packed_bits[byte] |= (codec_bits[i] << bit);
-		    bit--;
-		    if (bit < 0) {
-			bit = 7;
-			byte++;
-		    }
-		}
-		assert(byte == bytes_per_codec_frame);
+            bit = 7; byte = 0;
+            memset(packed_bits, 0, bytes_per_codec_frame);
+            for(i=0; i<bits_per_codec_frame; i++) {
+                packed_bits[byte] |= (codec_bits[i] << bit);
+                bit--;
+                if (bit < 0) {
+                    bit = 7;
+                    byte++;
+                }
+            }
+            assert(byte == bytes_per_codec_frame);
 
-		fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
-	    }
-	    next_state = 0;
-	    break;
-	}	
-	state = next_state;
+            fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
+            sync = 0;
+        }
+           
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
