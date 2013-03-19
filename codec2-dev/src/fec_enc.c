@@ -246,7 +246,6 @@ int main(int argc, char *argv[])
 
             */
 
-
             data = 0;
             for(i=0; i<8; i++) {
                 data <<= 1;
@@ -267,6 +266,7 @@ int main(int argc, char *argv[])
             for(j=0; i<bits_per_input_frame+11; i++,j++) {
                 unpacked_output_bits[i] = (codeword1 >> (10-j)) & 0x1;
             }
+            bits[i] = 0; /* spare bit */
         }
 
         /* pack bits, MSB first  */
@@ -274,6 +274,7 @@ int main(int argc, char *argv[])
         bit = 7; byte = 0;
         memset(packed_output_bits, 0, bytes_per_output_frame);
         for(i=0; i<bits_per_output_frame; i++) {
+            assert((unpacked_output_bits[i] == 0) || (unpacked_output_bits[i] == 1));
             packed_output_bits[byte] |= (unpacked_output_bits[i] << bit);
             bit--;
             if (bit < 0) {
