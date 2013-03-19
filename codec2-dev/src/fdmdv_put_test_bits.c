@@ -44,11 +44,12 @@ int main(int argc, char *argv[])
     int          *rx_bits;
     int           i, bit, byte;
     int           test_frame_sync, bit_errors, total_bit_errors, total_bits, ntest_bits;
+    int           test_frame_sync_state, test_frame_count;
     int           bits_per_fdmdv_frame;
     int           bits_per_codec_frame;
     int           bytes_per_codec_frame;
     int           Nc;
-    int          *error_pattern;
+    short        *error_pattern;
 
     if (argc < 2) {
 	printf("usage: %s InputBitFile [Nc]\n", argv[0]);
@@ -96,6 +97,8 @@ int main(int argc, char *argv[])
 
     total_bit_errors = 0;
     total_bits = 0;
+    test_frame_sync_state = 0;
+    test_frame_count = 0;
 
     while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
 	/* unpack bits, MSB first */
@@ -113,18 +116,45 @@ int main(int argc, char *argv[])
 	assert(byte == bytes_per_codec_frame);
 
 	fdmdv_put_test_bits(fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, rx_bits);
+
 	if (test_frame_sync == 1) {
-	    total_bit_errors += bit_errors;
-	    total_bits = total_bits + ntest_bits;
-	    printf("+");
+	    test_frame_sync_state = 1;
+            test_frame_count = 0;
+        }
+
+        if (test_frame_sync_state) {
+            if (test_frame_count == 0) {
+                total_bit_errors += bit_errors;
+                total_bits = total_bits + ntest_bits;
+                printf("+");
+            }
+            else
+                printf("-");
+            test_frame_count++;
+            if (test_frame_count == 4)
+                test_frame_count = 0;
 	}
-	else
-	    printf("-");
+        else
+            printf("-");
+
   	fdmdv_put_test_bits(fdmdv, &test_frame_sync,  error_pattern, &bit_errors, &ntest_bits, &rx_bits[bits_per_fdmdv_frame]);
+
 	if (test_frame_sync == 1) {
-	    total_bit_errors += bit_errors;
-	    total_bits = total_bits + ntest_bits;
-	    printf("+");
+	    test_frame_sync_state = 1;
+            test_frame_count = 0;
+        }
+
+        if (test_frame_sync_state) {
+            if (test_frame_count == 0) {
+                total_bit_errors += bit_errors;
+                total_bits = total_bits + ntest_bits;
+                printf("+");
+            }
+            else
+                printf("-");
+            test_frame_count++;
+            if (test_frame_count == 4)
+                test_frame_count = 0;
 	}
 	else
 	    printf("-");
