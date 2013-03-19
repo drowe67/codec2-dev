@@ -1183,11 +1183,11 @@ void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short e
 
 \*---------------------------------------------------------------------------*/
 
-int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
+int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int *sync_mem)
 {
     int next_state, sync, unique_word, i, corr;
 
-    /* look for 6 symbols (120ms) 010101 of sync sequence */
+    /* look for 6 symbols (120ms) 101010 of sync sequence */
 
     unique_word = 0;
     for(i=0; i<NSYNC_MEM-1; i++)
@@ -1198,6 +1198,7 @@ int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
         corr += sync_mem[i]*sync_uw[i];
     if (abs(corr) == NSYNC_MEM)
         unique_word = 1;
+    *reliable_sync_bit = (corr == NSYNC_MEM);
 
     /* iterate state machine */
 
@@ -1266,7 +1267,7 @@ int freq_state(int sync_bit, int *state, int *timer, int *sync_mem)
 \*---------------------------------------------------------------------------*/
 
 void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], 
-				     int *sync_bit, COMP rx_fdm[], int *nin)
+				     int *reliable_sync_bit, COMP rx_fdm[], int *nin)
 {
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
@@ -1274,7 +1275,8 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     COMP          rx_filt[NC+1][P+1];
     COMP          rx_symbols[NC+1];
     float         env[NT*P];
- 
+    int           sync_bit;
+
     /* freq offset estimation and correction */
    
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
@@ -1299,14 +1301,14 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     if (fdmdv->rx_timing < 0)
 	*nin -= M/P;
     
-    foff_fine = qpsk_to_bits(rx_bits, sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 
+    foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 
                              fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
     snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->Nc, fdmdv->phase_difference);
 
     /* freq offset estimation state machine */
 
-    fdmdv->sync = freq_state(*sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
+    fdmdv->sync = freq_state(reliable_sync_bit, sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 

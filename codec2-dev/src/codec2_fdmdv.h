@@ -96,7 +96,7 @@ void           CODEC2_WIN32SUPPORT fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmd
 int            CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv_state);
     
 void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
-void           CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *sync_bit, COMP rx_fdm[], int *nin);
+void           CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin);
     
 void           CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
 int            CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *fdmdv_state);
