@@ -62,7 +62,7 @@ int main(int argc, char *argv[])
     COMP          rx_symbols[NC+1];
     int           rx_bits[FDMDV_BITS_PER_FRAME];
     float         foff_fine;
-    int           sync_bit;
+    int           sync_bit, reliable_sync_bit;
 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(NC+1)*FRAMES];
@@ -176,7 +176,7 @@ int main(int argc, char *argv[])
 	if (rx_timing < 0)
 	    next_nin -= M/P;
 	
-	fdmdv->sync = freq_state(sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
+	fdmdv->sync = freq_state(&reliable_sync_bit, sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
 	/* --------------------------------------------------------*\
