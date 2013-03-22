@@ -267,6 +267,21 @@ int golay23_decode(int received_codeword) {
     return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
 }
 
+int golay23_count_errors(int recd_codeword, int corrected_codeword)
+{
+    int errors = 0;
+    int diff, i;
+
+    diff = recd_codeword ^ corrected_codeword;
+    for(i=0; i<23; i++) {
+        if (diff & 0x1)
+            errors++;
+        diff >>= 1;
+    }
+
+    return errors;
+}
+
 #ifdef GOLAY23_UNITTEST
 
 static int golay23_test(int error_pattern) {
