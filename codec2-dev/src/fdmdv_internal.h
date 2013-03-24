@@ -50,7 +50,7 @@
 #define NSYM                     6  /* number of symbols to filter over                                     */
 #define NFILTER            (NSYM*M) /* size of tx/rx filters at sample rate M                               */
 
-#define FSEP                    75  /* Separation between carriers (Hz)                                     */
+#define FSEP                    75  /* Default separation between carriers (Hz)                             */
 
 #define NT                       5  /* number of symbols we estimate timing over                            */
 #define P                        4  /* oversample factor used for initial rx symbol filtering               */
@@ -77,7 +77,8 @@
 
 struct FDMDV {
 
-    int Nc;           
+    int   Nc;           
+    float fsep;
 
     /* test data (test frame) states */
 
