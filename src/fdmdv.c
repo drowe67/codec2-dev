@@ -125,7 +125,6 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 {
     struct FDMDV *f;
     int           c, i, k;
-    float         carrier_freq;
 
     assert(NC == FDMDV_NC_MAX);  /* check public and private #defines match */
     assert(Nc <= NC);
@@ -184,22 +183,9 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 	    f->rx_baseband_mem_timing[c][k].real = 0.0;
 	    f->rx_baseband_mem_timing[c][k].imag = 0.0;
 	}
-  }
+    }
     
-    /* Set up frequency of each carrier */
-
-    for(c=0; c<Nc/2; c++) {
-	carrier_freq = (-Nc/2 + c)*FSEP + FDMDV_FCENTRE;
-	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
-    }
-
-    for(c=Nc/2; c<Nc; c++) {
-	carrier_freq = (-Nc/2 + c + 1)*FSEP + FDMDV_FCENTRE;
-	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
-    }
-	
+    fdmdv_set_fsep(f, FSEP);
     f->freq[Nc].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
     f->freq[Nc].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
 
@@ -304,6 +290,32 @@ void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 	    f->current_test_bit = 0;
     }
  }
+
+float CODEC2_WIN32SUPPORT fdmdv_get_fsep(struct FDMDV *f)
+{
+    return f->fsep;
+}
+
+void CODEC2_WIN32SUPPORT fdmdv_set_fsep(struct FDMDV *f, float fsep) {
+    int   c;
+    float carrier_freq;
+
+    f->fsep = fsep;
+    /* Set up frequency of each carrier */
+
+    for(c=0; c<f->Nc/2; c++) {
+	carrier_freq = (-f->Nc/2 + c)*f->fsep + FDMDV_FCENTRE;
+	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+    }
+
+    for(c=f->Nc/2; c<f->Nc; c++) {
+	carrier_freq = (-f->Nc/2 + c + 1)*f->fsep + FDMDV_FCENTRE;
+	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+    }
+}
+
 
 /*---------------------------------------------------------------------------*\
                                                        
