@@ -1,6 +1,16 @@
+#
+# Codec2 - Next-Generation Digital Voice for Two-Way Radio
+#
+# CMake configuration contributed by Richard Shaw (KF5OIM)
+# Please report questions, comments, problems, or patches to the freetel
+# mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
+#
+
 cmake_minimum_required(VERSION 2.8)
 
 # Prevent in-source builds
+# If an in-source build is attempted, you will still need to clean up a few
+# files manually.
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
@@ -11,18 +21,21 @@ project(codec2)
 # Set project version information. This should probably be done via external
 # file at some point.
 #
-set(PROJECT_VERSION_MAJOR 0)
-set(PROJECT_VERSION_MINOR 2)
+set(CODEC2_VERSION_MAJOR 0)
+set(CODEC2_VERSION_MINOR 2)
 # Set to patch level is needed, otherwise leave FALSE.
-set(PROJECT_VERSION_PATCH FALSE)
-set(PROJECT_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+set(CODEC2_VERSION_PATCH FALSE)
+set(CODEC2_VERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
-set(SOVERSION ${PROJECT_VERSION})
-if(PROJECT_VERSION_PATCH)
-	set(PROJECT_VERSION "${PROJECT_VERSION}.${PROJECT_VERSION_PATCH}")
+set(SOVERSION "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}")
+if(CODEC2_VERSION_PATCH)
+    set(PROJECT_VERSION "${CODEC2_VERSION}.${PROJECT_VERSION_PATCH}")
 endif()
 
-message(STATUS "codec2 version: ${PROJECT_VERSION}")
+# Set default build type
+set(CMAKE_BUILD_TYPE "Release")
+
+message(STATUS "codec2 version: ${CODEC2_VERSION}")
 
 #
 # Find the svn revision if this is a working copy.
@@ -31,17 +44,27 @@ message(STATUS "codec2 version: ${PROJECT_VERSION}")
 #
 #find_package(Subversion)
 #if(Subversion_FOUND)
-#	Subversion_WC_INFO(${CMAKE_CURRENT_SOURCE_DIR} CODEC2)
-#	message(STATUS "codec2 svn revision: ${CODEC2_WC_REVISION}")
+#   Subversion_WC_INFO(${CMAKE_CURRENT_SOURCE_DIR} CODEC2)
+#   message(STATUS "codec2 svn revision: ${CODEC2_WC_REVISION}")
 #else(SUBVERSION_FOUND)
-#	message(WARNING "Subversion not found. Can not determine svn revision.")
+#   message(WARNING "Subversion not found. Can not determine svn revision.")
 #endif(SUBVERSION_FOUND)
 
 # Set default C++ flags.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -O3 -g")
 
+
+#
+# Default options
+#
 # Build shared libraries by default
 set(BUILD_SHARED_LIBS TRUE CACHE BOOL "Build shared library. Set to FALSE for static library.")
+# Do not install example code by default.
+option(INSTALL_EXAMPLES "Install example code." OFF)
+if(INSTALL_EXAMPLES)
+    install(DIRECTORY octave raw script voicing wav
+        DESTINATION share/codec2)
+endif()
 
 
 #
@@ -51,8 +74,8 @@ set(BUILD_SHARED_LIBS TRUE CACHE BOOL "Build shared library. Set to FALSE for st
 
 # Math library is automatic on MSVC
 if(UNIX)
-        set(CMAKE_REQUIRED_INCLUDES math.h)
-        set(CMAKE_REQUIRED_LIBRARIES m)
+    set(CMAKE_REQUIRED_INCLUDES math.h)
+    set(CMAKE_REQUIRED_LIBRARIES m)
 endif(UNIX)
 
 include(CheckIncludeFiles)
@@ -80,34 +103,32 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 add_subdirectory(src)
 
-#
-# Install example code? Defaults to no.
-#
-option(INSTALL_EXAMPLES "Install example code." OFF)
-if(INSTALL_EXAMPLES)
-	install(DIRECTORY octave raw script voicing wav
-		DESTINATION share/codec2)
-endif()
 
 #
-# Cpack NSIS configuration for Windows. EXPERIMENTAL!!!
+# Cpack NSIS installer configuration for Windows. EXPERIMENTAL!!!
+# See: http://nsis.sourceforge.net/Download
+#
+# *nix systems should use "make install" and/or appropriate
+# distribution packaging tools.
 #
 if(WIN32)
-	include(InstallRequiredSystemLibraries)
-	set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
-	set(CPACK_PACKAGE_VENDOR "CMake")
-	set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
-	set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
-	set(CPACK_PACKAGE_VERSION_MAJOR ${PACKAGE_VERSION_MAJOR})
-	set(CPACK_PACKAGE_VERSION_MINOR ${PACKAGE_VERSION_MINOR})
-	set(CPACK_PACKAGE_VERSION_PATCH ${PACKAGE_VERSION_PATCH})
-	set(CPACK_PACKAGE_INSTALL_DIRECTORY "CMake ${CMake_VERSION_MAJOR}.${CMake_VERSION_MINOR}")
-	# There is a bug in NSI that does not handle full unix paths properly. Make
-	# sure there is at least one set of four (4) backlasshes.
-	#set(CPACK_PACKAGE_ICON "${CMake_SOURCE_DIR}/Utilities/Release\\\\InstallIcon.bmp")
-	set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\MyExecutable.exe")
-	set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY} Codec2")
-	set(CPACK_NSIS_URL_INFO_ABOUT "http:\\\\\\\\codec2.org")
-	set(CPACK_NSIS_MODIFY_PATH ON)
-	include(CPack)
+    include(InstallRequiredSystemLibraries)
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
+    set(CPACK_PACKAGE_VENDOR "CMake")
+    set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
+    set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+    set(CPACK_PACKAGE_VERSION_MAJOR ${CODEC2_VERSION_MAJOR})
+    set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
+        if(PROJECT_VERSION_PATCH)
+        set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
+    endif(PROJECT_VERSION_PATCH)
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "Codec2")
+    # There is a bug in NSI that does not handle full unix paths properly. Make
+    # sure there is at least one set of four (4) backlasshes.
+    #set(CPACK_PACKAGE_ICON "${CMake_SOURCE_DIR}/Utilities/Release\\\\InstallIcon.bmp")
+    #set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\MyExecutable.exe")
+    set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
+    set(CPACK_NSIS_URL_INFO_ABOUT "http:\\\\\\\\codec2.org")
+    set(CPACK_NSIS_MODIFY_PATH ON)
+    include(CPack)
 endif(WIN32)
