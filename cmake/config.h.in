@@ -18,4 +18,6 @@
 #cmakedefine HAVE_COS      @HAVE_COS@
 #cmakedefine HAVE_ATAN2    @HAVE_ATAN2@
 #cmakedefine HAVE_LOG10    @HAVE_LOG10@
+#cmakedefine HAVE_ROUND    @HAVE_ROUND@
+#cmakedefine HAVE_GETOPT   @HAVE_GETOPT@
 #endif
