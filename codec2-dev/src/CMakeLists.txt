@@ -94,6 +94,9 @@ if(NOT CMAKE_CROSSCOMPILING)
     # genlspdtcb
     add_executable(genlspdtcb genlspdtcb.c)
     target_link_libraries(genlspdtcb ${CMAKE_REQUIRED_LIBRARIES})
+    # Make native builds available for cross-compiling.
+    export(TARGETS generate_codebook genlspdtcb
+        FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
 endif(NOT CMAKE_CROSSCOMPILING)
 
 # codebook.c
@@ -151,10 +154,6 @@ add_custom_command(
     COMMAND generate_codebook ge_cb ${CODEBOOKSGE} > ${CMAKE_CURRENT_BINARY_DIR}/codebookge.c
     DEPENDS generate_codebook ${CODEBOOKSGE}
 )
-
-# Make native builds available for cross-compiling.
-export(TARGETS generate_codebook genlspdtcb
-    FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
 
 #
 # codec2 library sources
