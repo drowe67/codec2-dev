@@ -29,6 +29,8 @@
 #include "nlp.h"
 #include "dump.h"
 #include "kiss_fft.h"
+#undef TIMER
+#include "machdep.h"
 
 #include <assert.h>
 #include <math.h>
@@ -50,6 +52,8 @@
 #define F0_MAX      500
 #define CNLP        0.3	        /* post processor constant              */
 #define NLP_NTAP 48	        /* Decimation LPF order */
+
+#undef DUMP
 
 /*---------------------------------------------------------------------------*\
                                                                             
@@ -111,6 +115,8 @@ const float nlp_fir[] = {
 };
 
 typedef struct {
+    int           m;
+    float         w[PMAX_M/DEC];     /* DFT window                   */ 
     float         sq[PMAX_M];	     /* squared speech samples       */
     float         mem_x,mem_y;       /* memory for notch filter      */
     float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
@@ -131,14 +137,23 @@ float post_process_sub_multiples(COMP Fw[],
 
 \*---------------------------------------------------------------------------*/
 
-void *nlp_create()
+void *nlp_create(
+int    m			/* analysis window size */
+)
 {
     NLP *nlp;
     int  i;
 
+    assert(m <= PMAX_M);
+
     nlp = (NLP*)malloc(sizeof(NLP));
     if (nlp == NULL)
 	return NULL;
+
+    nlp->m = m;
+    for(i=0; i<m/DEC; i++) {
+	nlp->w[i] = 0.5 - 0.5*cos(2*PI*i/(m/DEC-1));
+    }
 
     for(i=0; i<PMAX_M; i++)
 	nlp->sq[i] = 0.0;
@@ -205,7 +220,6 @@ float nlp(
   void *nlp_state, 
   float  Sn[],			/* input speech vector */
   int    n,			/* frames shift (no. new samples in Sn[]) */
-  int    m,			/* analysis window size */
   int    pmin,                  /* minimum pitch value */
   int    pmax,			/* maximum pitch value */
   float *pitch,			/* estimated pitch period in samples */
@@ -220,12 +234,15 @@ float nlp(
     COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal (output) */
     float  gmax;
     int    gmax_bin;
-    int   i,j;
-    float best_f0;
-
+    int    m, i,j;
+    float  best_f0;
+    TIMER_VAR(start, tnotch, filter, peakpick, window, fft, magsq, shiftmem);
+    
     assert(nlp_state != NULL);
-    assert(m <= PMAX_M);
     nlp = (NLP*)nlp_state;
+    m = nlp->m;
+
+    TIMER_SAMPLE(start);
 
     /* Square, notch filter at DC, and LP filter vector */
 
@@ -247,6 +264,8 @@ float nlp(
 				      exactly sure why. */
     }
 
+    TIMER_SAMPLE_AND_LOG(tnotch, start, "      square and notch");
+
     for(i=m-n; i<m; i++) {	/* FIR filter vector */
 
 	for(j=0; j<NLP_NTAP-1; j++)
@@ -258,6 +277,8 @@ float nlp(
 	    nlp->sq[i] += nlp->mem_fir[j]*nlp_fir[j];
     }
 
+    TIMER_SAMPLE_AND_LOG(filter, tnotch, "      filter");
+ 
     /* Decimate and DFT */
 
     for(i=0; i<PE_FFT_SIZE; i++) {
@@ -265,16 +286,20 @@ float nlp(
 	fw[i].imag = 0.0;
     }
     for(i=0; i<m/DEC; i++) {
-	fw[i].real = nlp->sq[i*DEC]*(0.5 - 0.5*cos(2*PI*i/(m/DEC-1)));
+	fw[i].real = nlp->sq[i*DEC]*nlp->w[i];
     }
+    TIMER_SAMPLE_AND_LOG(window, filter, "      window");
     #ifdef DUMP
     dump_dec(Fw);
     #endif
 
     kiss_fft(nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
+    TIMER_SAMPLE_AND_LOG(fft, window, "      fft");
+
     for(i=0; i<PE_FFT_SIZE; i++)
 	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
 
+    TIMER_SAMPLE_AND_LOG(magsq, fft, "      mag sq");
     #ifdef DUMP
     dump_sq(nlp->sq);
     dump_Fw(Fw);
@@ -291,12 +316,16 @@ float nlp(
 	}
     }
     
+    TIMER_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
+
     //#define POST_PROCESS_MBE
     #ifdef POST_PROCESS_MBE
     best_f0 = post_process_mbe(Fw, pmin, pmax, gmax, Sw, W, prev_Wo);
     #else
     best_f0 = post_process_sub_multiples(Fw, pmin, pmax, gmax, gmax_bin, prev_Wo);
     #endif
+
+    TIMER_SAMPLE_AND_LOG(shiftmem, peakpick,  "      post process");
 
     /* Shift samples in buffer to make room for new samples */
 
@@ -306,6 +335,11 @@ float nlp(
     /* return pitch and F0 estimate */
 
     *pitch = (float)SAMPLE_RATE/best_f0;
+
+    TIMER_SAMPLE_AND_LOG2(shiftmem,  "      shift mem");
+
+    TIMER_SAMPLE_AND_LOG2(start,  "      nlp int");
+
     return(best_f0);  
 }
 
@@ -338,7 +372,7 @@ float post_process_sub_multiples(COMP Fw[],
     int   mult;
     float thresh, best_f0;
     int   b, bmin, bmax, lmax_bin;
-    float lmax, cmax;
+    float lmax;
     int   prev_f0_bin;
 
     /* post process estimate by searching submultiples */
@@ -374,7 +408,6 @@ float post_process_sub_multiples(COMP Fw[],
 
 	if (lmax > thresh)
 	    if ((lmax > Fw[lmax_bin-1].real) && (lmax > Fw[lmax_bin+1].real)) {
-		cmax = lmax;
 		cmax_bin = lmax_bin;
 	    }
 
@@ -404,7 +437,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
   float f0,best_f0;		/* fundamental frequency */
   float e,e_min;                /* MBE cost function */
   int   i;
+  #ifdef DUMP
   float e_hz[F0_MAX];
+  #endif
   int   bin;
   float f0_min, f0_max;
   float f0_start, f0_end;
@@ -415,8 +450,10 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
   /* Now look for local maxima.  Each local maxima is a candidate
      that we test using the MBE pitch estimation algotithm */
 
+  #ifdef DUMP
   for(i=0; i<F0_MAX; i++)
       e_hz[i] = -1;
+  #endif
   e_min = 1E32;
   best_f0 = 50;
   for(i=PE_FFT_SIZE*DEC/pmax; i<=PE_FFT_SIZE*DEC/pmin; i++) {
@@ -437,7 +474,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 	    for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
 		e = test_candidate_mbe(Sw, W, f0);
 		bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
-		e_hz[bin] = e;
+		#ifdef DUMP
+                e_hz[bin] = e;
+                #endif
 		if (e < e_min) {
 		    e_min = e;
 		    best_f0 = f0;
@@ -460,7 +499,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
   for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
       e = test_candidate_mbe(Sw, W, f0);
       bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
+      #ifdef DUMP
       e_hz[bin] = e;
+      #endif
       if (e < e_min) {
 	  e_min = e;
 	  best_f0 = f0;
@@ -539,5 +580,4 @@ float test_candidate_mbe(
 
     return error;
 }
-
 

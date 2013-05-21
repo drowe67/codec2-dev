@@ -35,6 +35,7 @@
 #include "defines.h"
 #include "comp.h"
 #include "dump.h"
+#include "sine.h"
 #include "postfilter.h"
 
 /*---------------------------------------------------------------------------*\
@@ -103,16 +104,16 @@ void postfilter(
 )	
 {
   int   m, uv;
-  float e;
+  float e, thresh;
 
   /* determine average energy across spectrum */
 
-  e = 0.0;
+  e = 1E-12;
   for(m=1; m<=model->L; m++)
       e += model->A[m]*model->A[m];
 
   assert(e > 0.0);
-  e = 10.0*log10(e/model->L);
+  e = 10.0*log10f(e/model->L);
 
   /* If beneath threhold, update bg estimate.  The idea
      of the threshold is to prevent updating during high level
@@ -126,10 +127,11 @@ void postfilter(
   */
 
   uv = 0;
+  thresh = powf(10.0, (*bg_est + BG_MARGIN)/20.0);
   if (model->voiced)
       for(m=1; m<=model->L; m++)
-	  if (20.0*log10(model->A[m]) < (*bg_est + BG_MARGIN)) {
-	      model->phi[m] = TWO_PI*(float)rand()/RAND_MAX;
+	  if (model->A[m] < thresh) {
+	      model->phi[m] = TWO_PI*(float)codec2_rand()/CODEC2_RAND_MAX;
 	      uv++;
 	  }
 

@@ -26,7 +26,10 @@
 #ifndef __DUMP__
 #define __DUMP__
 
+#include "defines.h"
 #include "comp.h"
+#include "kiss_fft.h"
+#include "codec2_internal.h"
 
 void dump_on(char filename_prefix[]);
 void dump_off();
@@ -69,5 +72,6 @@ void dump_Rk(float Rk[]);
 /* post filter */
 
 void dump_bg(float e, float bg_est, float percent_uv);
+void dump_Pwb(COMP Pwb[]);
 
 #endif

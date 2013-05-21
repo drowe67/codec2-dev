@@ -32,6 +32,13 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef __EMBEDDED__
+#include "gdb_stdio.h"
+#define fprintf gdb_stdio_fprintf
+#define fopen gdb_stdio_fopen
+#define fclose gdb_stdio_fclose
+#endif
+
 #ifdef DUMP
 static int dumpon = 0;
 
@@ -204,6 +211,7 @@ void dump_Ew(COMP Ew[]) {
 void dump_model(MODEL *model) {
     int l;
     char s[MAX_STR];
+    char line[2048];
 
     if (!dumpon) return;
 
@@ -213,18 +221,25 @@ void dump_model(MODEL *model) {
 	assert(fmodel != NULL);
     }
 
-    fprintf(fmodel,"%f\t%d\t", model->Wo, model->L);    
-    for(l=1; l<=model->L; l++)
-	fprintf(fmodel,"%f\t",model->A[l]);
-    for(l=model->L+1; l<MAX_AMP; l++)
-	fprintf(fmodel,"0.0\t");
-    fprintf(fmodel,"%d\t",model->voiced);
-    fprintf(fmodel,"\n");    
+    sprintf(line,"%12f %12d ", model->Wo, model->L);    
+    for(l=1; l<=model->L; l++) {
+	sprintf(s,"%12f ",model->A[l]);
+        strcat(line, s);
+    }
+    for(l=model->L+1; l<=MAX_AMP; l++) {
+	sprintf(s,"%12f ", 0.0);
+        strcat(line,s);
+    }
+        
+    sprintf(s,"%d\n",model->voiced);
+    strcat(line,s);
+    fprintf(fmodel,"%s",line);    
 }
 
 void dump_quantised_model(MODEL *model) {
     int l;
     char s[MAX_STR];
+    char line[2048];
 
     if (!dumpon) return;
 
@@ -234,12 +249,19 @@ void dump_quantised_model(MODEL *model) {
 	assert(fqmodel != NULL);
     }
 
-    fprintf(fqmodel,"%f\t%d\t", model->Wo, model->L);    
-    for(l=1; l<=model->L; l++)
-	fprintf(fqmodel,"%f\t",model->A[l]);
-    for(l=model->L+1; l<MAX_AMP; l++)
-	fprintf(fqmodel,"0.0\t");
-    fprintf(fqmodel,"\n");    
+    sprintf(line,"%12f %12d ", model->Wo, model->L);    
+    for(l=1; l<=model->L; l++) {
+	sprintf(s,"%12f ",model->A[l]);
+        strcat(line, s);
+    }
+    for(l=model->L+1; l<=MAX_AMP; l++) {
+	sprintf(s,"%12f ", 0.0);
+        strcat(line, s);
+    }
+        
+    sprintf(s,"%d\n",model->voiced);
+    strcat(line, s);
+    fprintf(fqmodel, "%s", line);    
 }
 
 void dump_phase(float phase[], int L) {
@@ -256,7 +278,7 @@ void dump_phase(float phase[], int L) {
 
     for(l=1; l<=L; l++)
 	fprintf(fphase,"%f\t",phase[l]);
-    for(l=L+1; l<MAX_AMP; l++)
+    for(l=L+1; l<=MAX_AMP; l++)
 	fprintf(fphase,"%f\t",0.0);
     fprintf(fphase,"\n");    
 }

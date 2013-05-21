@@ -32,13 +32,12 @@
 */
 
 #include "codec2.h"
+#include "sine.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-
-#define BITS_SIZE	((CODEC2_BITS_PER_FRAME + 7) / 8)
 
 int main(int argc, char *argv[])
 {
@@ -47,7 +46,12 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit;
+    int            nsam, nbit, i, r;
+
+    for(i=0; i<10; i++) {
+        r = codec2_rand();
+        printf("[%d] r = %d\n", i, r);
+    }
 
     if (argc != 3) {
 	printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);
@@ -66,10 +70,14 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    #ifdef DUMP
+    dump_on("c2demo");
+    #endif
+
     /* Note only one set of Codec 2 states is required for an encoder
        and decoder pair. */
 
-    codec2 = codec2_create(CODEC2_MODE_1400);
+    codec2 = codec2_create(CODEC2_MODE_1300);
     nsam = codec2_samples_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
     nbit = codec2_bits_per_frame(codec2);
