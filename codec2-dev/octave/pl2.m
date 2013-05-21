@@ -29,6 +29,10 @@ function pl2(samname1, samname2, start_sam, end_sam, pngname)
   plot(s2(st:en),l2);
   axis([1 en-st min(s1(st:en)) max(s1(st:en))]);
  
+  figure(2)
+  plot(s1(st:en)-s2(st:en));
+  max(s1(st:en)-s2(st:en))
+  
   if (nargin == 5)
 
     % small image
