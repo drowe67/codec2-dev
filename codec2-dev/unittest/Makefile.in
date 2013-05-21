@@ -43,7 +43,8 @@ noinst_PROGRAMS = genres$(EXEEXT) genlsp$(EXEEXT) extract$(EXEEXT) \
 	lspsync$(EXEEXT) create_interleaver$(EXEEXT) tlspsens$(EXEEXT) \
 	vqtrainph$(EXEEXT) genphdata$(EXEEXT) genampdata$(EXEEXT) \
 	polar2rect$(EXEEXT) vqtrainsp$(EXEEXT) tprede$(EXEEXT) \
-	pre$(EXEEXT) de$(EXEEXT) tfifo$(EXEEXT)
+	pre$(EXEEXT) de$(EXEEXT) tfifo$(EXEEXT) raw2h$(EXEEXT) \
+	c2validate$(EXEEXT)
 subdir = unittest
 DIST_COMMON = README $(srcdir)/Makefile.am $(srcdir)/Makefile.in
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
@@ -53,6 +54,9 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
 PROGRAMS = $(noinst_PROGRAMS)
+am_c2validate_OBJECTS = c2validate-c2validate.$(OBJEXT)
+c2validate_OBJECTS = $(am_c2validate_OBJECTS)
+c2validate_DEPENDENCIES = ../src/libcodec2.la
 am_create_interleaver_OBJECTS = create_interleaver.$(OBJEXT)
 create_interleaver_OBJECTS = $(am_create_interleaver_OBJECTS)
 create_interleaver_DEPENDENCIES =
@@ -91,6 +95,9 @@ polar2rect_DEPENDENCIES =
 am_pre_OBJECTS = pre.$(OBJEXT) lpc.$(OBJEXT)
 pre_OBJECTS = $(am_pre_OBJECTS)
 pre_DEPENDENCIES =
+am_raw2h_OBJECTS = raw2h.$(OBJEXT)
+raw2h_OBJECTS = $(am_raw2h_OBJECTS)
+raw2h_DEPENDENCIES =
 am_scalarlsptest_OBJECTS = scalarlsptest.$(OBJEXT) quantise.$(OBJEXT) \
 	lpc.$(OBJEXT) lsp.$(OBJEXT) dump.$(OBJEXT) kiss_fft.$(OBJEXT) \
 	$(am__objects_1)
@@ -157,23 +164,25 @@ LTCOMPILE = $(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --tag=CC --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
-	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
-	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
-	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tfifo_SOURCES) \
-	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
-	$(tprede_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+SOURCES = $(c2validate_SOURCES) $(create_interleaver_SOURCES) \
+	$(de_SOURCES) $(extract_SOURCES) $(genampdata_SOURCES) \
+	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
+	$(lspsync_SOURCES) $(polar2rect_SOURCES) $(pre_SOURCES) \
+	$(raw2h_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
+	$(tfdmdv_SOURCES) $(tfifo_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
-DIST_SOURCES = $(create_interleaver_SOURCES) $(de_SOURCES) \
-	$(extract_SOURCES) $(genampdata_SOURCES) $(genlsp_SOURCES) \
-	$(genphdata_SOURCES) $(genres_SOURCES) $(lspsync_SOURCES) \
-	$(polar2rect_SOURCES) $(pre_SOURCES) $(scalarlsptest_SOURCES) \
-	$(t48_8_SOURCES) $(tfdmdv_SOURCES) $(tfifo_SOURCES) \
-	$(tinterp_SOURCES) $(tlspsens_SOURCES) $(tnlp_SOURCES) \
-	$(tprede_SOURCES) $(tquant_SOURCES) $(vq_train_jvm_SOURCES) \
-	$(vqtrain_SOURCES) $(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
+DIST_SOURCES = $(c2validate_SOURCES) $(create_interleaver_SOURCES) \
+	$(de_SOURCES) $(extract_SOURCES) $(genampdata_SOURCES) \
+	$(genlsp_SOURCES) $(genphdata_SOURCES) $(genres_SOURCES) \
+	$(lspsync_SOURCES) $(polar2rect_SOURCES) $(pre_SOURCES) \
+	$(raw2h_SOURCES) $(scalarlsptest_SOURCES) $(t48_8_SOURCES) \
+	$(tfdmdv_SOURCES) $(tfifo_SOURCES) $(tinterp_SOURCES) \
+	$(tlspsens_SOURCES) $(tnlp_SOURCES) $(tprede_SOURCES) \
+	$(tquant_SOURCES) $(vq_train_jvm_SOURCES) $(vqtrain_SOURCES) \
+	$(vqtrainjnd_SOURCES) $(vqtrainph_SOURCES) \
 	$(vqtrainsp_SOURCES)
 ETAGS = etags
 CTAGS = ctags
@@ -294,7 +303,7 @@ genlsp_LDADD = $(lib_LTLIBRARIES)
 genlsp_LDFLAGS = $(LIBS)
 extract_SOURCES = extract.c
 extract_LDADD = $(lib_LTLIBRARIES) 
-extract_LDFLAGS = $(LIBS)
+extract_LDFLAGS = $(LIBS) 
 vqtrain_SOURCES = vqtrain.c
 vqtrain_LDADD = $(lib_LTLIBRARIES) 
 vqtrain_LDFLAGS = $(LIBS)
@@ -361,6 +370,13 @@ de_LDFLAGS = $(LIBS)
 tfifo_SOURCES = tfifo.c ../src/fifo.c
 tfifo_LDADD = $(lib_LTLIBRARIES) -lpthread
 tfifo_LDFLAGS = $(LIBS)
+raw2h_SOURCES = raw2h.c
+raw2h_LDADD = $(lib_LTLIBRARIES)
+raw2h_LDFLAGS = $(LIBS)
+c2validate_CFLAGS = -D__UNITTEST__
+c2validate_SOURCES = c2validate.c
+c2validate_LDADD = $(lib_LTLIBRARIES) ../src/libcodec2.la
+c2validate_LDFLAGS = $(LIBS) 
 all: all-am
 
 .SUFFIXES:
@@ -401,6 +417,9 @@ clean-noinstPROGRAMS:
 	  echo " rm -f $$p $$f"; \
 	  rm -f $$p $$f ; \
 	done
+c2validate$(EXEEXT): $(c2validate_OBJECTS) $(c2validate_DEPENDENCIES) 
+	@rm -f c2validate$(EXEEXT)
+	$(LINK) $(c2validate_LDFLAGS) $(c2validate_OBJECTS) $(c2validate_LDADD) $(LIBS)
 create_interleaver$(EXEEXT): $(create_interleaver_OBJECTS) $(create_interleaver_DEPENDENCIES) 
 	@rm -f create_interleaver$(EXEEXT)
 	$(LINK) $(create_interleaver_LDFLAGS) $(create_interleaver_OBJECTS) $(create_interleaver_LDADD) $(LIBS)
@@ -431,6 +450,9 @@ polar2rect$(EXEEXT): $(polar2rect_OBJECTS) $(polar2rect_DEPENDENCIES)
 pre$(EXEEXT): $(pre_OBJECTS) $(pre_DEPENDENCIES) 
 	@rm -f pre$(EXEEXT)
 	$(LINK) $(pre_LDFLAGS) $(pre_OBJECTS) $(pre_LDADD) $(LIBS)
+raw2h$(EXEEXT): $(raw2h_OBJECTS) $(raw2h_DEPENDENCIES) 
+	@rm -f raw2h$(EXEEXT)
+	$(LINK) $(raw2h_LDFLAGS) $(raw2h_OBJECTS) $(raw2h_LDADD) $(LIBS)
 scalarlsptest$(EXEEXT): $(scalarlsptest_OBJECTS) $(scalarlsptest_DEPENDENCIES) 
 	@rm -f scalarlsptest$(EXEEXT)
 	$(LINK) $(scalarlsptest_LDFLAGS) $(scalarlsptest_OBJECTS) $(scalarlsptest_LDADD) $(LIBS)
@@ -480,6 +502,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/c2validate-c2validate.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebook.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/codebookdt.Po@am__quote@
@@ -512,6 +535,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/postfilter.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pre.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/quantise.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/raw2h.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/scalarlsptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sine.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t48_8.Po@am__quote@
@@ -548,6 +572,20 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LTCOMPILE) -c -o $@ $<
+
+c2validate-c2validate.o: c2validate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(c2validate_CFLAGS) $(CFLAGS) -MT c2validate-c2validate.o -MD -MP -MF "$(DEPDIR)/c2validate-c2validate.Tpo" -c -o c2validate-c2validate.o `test -f 'c2validate.c' || echo '$(srcdir)/'`c2validate.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/c2validate-c2validate.Tpo" "$(DEPDIR)/c2validate-c2validate.Po"; else rm -f "$(DEPDIR)/c2validate-c2validate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='c2validate.c' object='c2validate-c2validate.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(c2validate_CFLAGS) $(CFLAGS) -c -o c2validate-c2validate.o `test -f 'c2validate.c' || echo '$(srcdir)/'`c2validate.c
+
+c2validate-c2validate.obj: c2validate.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(c2validate_CFLAGS) $(CFLAGS) -MT c2validate-c2validate.obj -MD -MP -MF "$(DEPDIR)/c2validate-c2validate.Tpo" -c -o c2validate-c2validate.obj `if test -f 'c2validate.c'; then $(CYGPATH_W) 'c2validate.c'; else $(CYGPATH_W) '$(srcdir)/c2validate.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/c2validate-c2validate.Tpo" "$(DEPDIR)/c2validate-c2validate.Po"; else rm -f "$(DEPDIR)/c2validate-c2validate.Tpo"; exit 1; fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='c2validate.c' object='c2validate-c2validate.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(c2validate_CFLAGS) $(CFLAGS) -c -o c2validate-c2validate.obj `if test -f 'c2validate.c'; then $(CYGPATH_W) 'c2validate.c'; else $(CYGPATH_W) '$(srcdir)/c2validate.c'; fi`
 
 lpc.o: ../src/lpc.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT lpc.o -MD -MP -MF "$(DEPDIR)/lpc.Tpo" -c -o lpc.o `test -f '../src/lpc.c' || echo '$(srcdir)/'`../src/lpc.c; \
