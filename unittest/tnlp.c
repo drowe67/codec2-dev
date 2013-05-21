@@ -122,7 +122,7 @@ char *argv[];
 /// #warning "Compile with -DDUMP if you expect to dump anything."
 #endif
 
-    nlp_states = nlp_create();
+    nlp_states = nlp_create(M);
     fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
     make_analysis_window(fft_fwd_cfg, w, W);
 
@@ -142,7 +142,7 @@ char *argv[];
       dump_Sn(Sn); dump_Sw(Sw); 
 #endif
 
-      nlp(nlp_states,Sn,N,M,PITCH_MIN,PITCH_MAX,&pitch,Sw,W, &prev_Wo);
+      nlp(nlp_states,Sn,N,PITCH_MIN,PITCH_MAX,&pitch,Sw,W, &prev_Wo);
       prev_Wo = TWO_PI/pitch;
 
       fprintf(fout,"%f\n",pitch);

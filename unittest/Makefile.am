@@ -3,7 +3,7 @@ AUTOMAKE_OPTS = gnu
 NAME = libcodec2
 AM_CPPFLAGS = $(AM_CFLAGS)
 
-noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata genampdata polar2rect vqtrainsp tprede pre de tfifo
+noinst_PROGRAMS = genres genlsp extract vqtrain vqtrainjnd tnlp tinterp tquant vq_train_jvm scalarlsptest tfdmdv t48_8 lspsync create_interleaver tlspsens vqtrainph genphdata genampdata polar2rect vqtrainsp tprede pre de tfifo raw2h c2validate
 
 genres_SOURCES = genres.c ../src/lpc.c
 genres_LDADD = $(lib_LTLIBRARIES) 
@@ -15,7 +15,7 @@ genlsp_LDFLAGS = $(LIBS)
 
 extract_SOURCES = extract.c
 extract_LDADD = $(lib_LTLIBRARIES) 
-extract_LDFLAGS = $(LIBS)
+extract_LDFLAGS = $(LIBS) 
 
 vqtrain_SOURCES = vqtrain.c
 vqtrain_LDADD = $(lib_LTLIBRARIES) 
@@ -103,3 +103,12 @@ de_LDFLAGS = $(LIBS)
 tfifo_SOURCES = tfifo.c ../src/fifo.c
 tfifo_LDADD = $(lib_LTLIBRARIES) -lpthread
 tfifo_LDFLAGS = $(LIBS)
+
+raw2h_SOURCES = raw2h.c
+raw2h_LDADD = $(lib_LTLIBRARIES)
+raw2h_LDFLAGS = $(LIBS)
+
+c2validate_CFLAGS = -D__UNITTEST__
+c2validate_SOURCES = c2validate.c
+c2validate_LDADD = $(lib_LTLIBRARIES) ../src/libcodec2.la
+c2validate_LDFLAGS = $(LIBS) 
