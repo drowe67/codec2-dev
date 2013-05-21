@@ -44,6 +44,7 @@
 #include "codec2.h"
 #include "lsp.h"
 #include "codec2_internal.h"
+#include "machdep.h"
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -131,7 +132,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
     }
     c2->prev_e_dec = 1;
 
-    c2->nlp = nlp_create();
+    c2->nlp = nlp_create(M);
     if (c2->nlp == NULL) {
 	free (c2);
 	return NULL;
@@ -335,7 +336,6 @@ void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, short speech[])
     for(i=0; i<LSPD_SCALAR_INDEXES; i++) {
 	pack(bits, &nbit, lspd_indexes[i], lspd_bits(i));
     }
-
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
 
@@ -967,7 +967,10 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     int     Wo_index, e_index;
     int     i;
     unsigned int nbit = 0;
-    
+    #ifdef TIMER
+    unsigned int quant_start;
+    #endif
+
     assert(c2 != NULL);
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
@@ -995,6 +998,9 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     Wo_index = encode_Wo(model.Wo);
     pack(bits, &nbit, Wo_index, WO_BITS);
 
+    #ifdef TIMER
+    quant_start = machdep_timer_sample();
+    #endif
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
     e_index = encode_energy(e);
     pack(bits, &nbit, e_index, E_BITS);
@@ -1003,6 +1009,9 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	pack(bits, &nbit, lsp_indexes[i], lsp_bits(i));
     }
+    #ifdef TIMER
+    machdep_timer_sample_and_log(quant_start, "    quant/packing"); 
+    #endif
 
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
@@ -1030,6 +1039,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     int     i,j;
     unsigned int nbit = 0;
     float   weight;
+    TIMER_VAR(recover_start);
     
     assert(c2 != NULL);
 
@@ -1068,6 +1078,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     /* Wo, energy, and LSPs are sampled every 40ms so we interpolate
        the 3 frames in between */
 
+    TIMER_SAMPLE(recover_start);
     for(i=0, weight=0.25; i<3; i++, weight += 0.25) {
 	interpolate_lsp_ver2(&lsps[i][0], c2->prev_lsps_dec, &lsps[3][0], weight);
         interp_Wo2(&model[i], &c2->prev_model_dec, &model[3], weight);
@@ -1082,6 +1093,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma); 
 	apply_lpc_correction(&model[i]);
     }
+    TIMER_SAMPLE_AND_LOG2(recover_start, "    recover"); 
 
     /* synthesise ------------------------------------------------*/
 
@@ -1288,10 +1300,26 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, float ak[])
 {
     int     i;
+    TIMER_VAR(phase_start, pf_start, synth_start);
+
+    #ifdef DUMP
+    dump_quantised_model(model);
+    #endif
+
+    TIMER_SAMPLE(phase_start);
 
     phase_synth_zero_order(c2->fft_fwd_cfg, model, ak, &c2->ex_phase, LPC_ORD);
+
+    TIMER_SAMPLE_AND_LOG(pf_start,phase_start, "    phase_synth"); 
+
     postfilter(model, &c2->bg_est);
+
+    TIMER_SAMPLE_AND_LOG(synth_start, pf_start, "    postfilter"); 
+
     synthesise(c2->fft_inv_cfg, c2->Sn_, model, c2->Pn, 1);
+
+    TIMER_SAMPLE_AND_LOG2(synth_start, "    synth"); 
+
     ear_protection(c2->Sn_, N);
 
     for(i=0; i<N; i++) {
@@ -1321,8 +1349,9 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     COMP    Sw[FFT_ENC];
     COMP    Sw_[FFT_ENC];
     COMP    Ew[FFT_ENC];
-    float   pitch, snr;
+    float   pitch;
     int     i;
+    TIMER_VAR(dft_start, nlp_start, model_start, two_stage, estamps);
 
     /* Read input speech */
 
@@ -1331,22 +1360,30 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     for(i=0; i<N; i++)
       c2->Sn[i+M-N] = speech[i];
 
+    TIMER_SAMPLE(dft_start);
     dft_speech(c2->fft_fwd_cfg, Sw, c2->Sn, c2->w);
+    TIMER_SAMPLE_AND_LOG(nlp_start, dft_start, "    dft_speech");
 
     /* Estimate pitch */
 
-    nlp(c2->nlp,c2->Sn,N,M,P_MIN,P_MAX,&pitch,Sw, c2->W, &c2->prev_Wo_enc);
+    nlp(c2->nlp,c2->Sn,N,P_MIN,P_MAX,&pitch,Sw, c2->W, &c2->prev_Wo_enc);
+    TIMER_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp"); 
+
     model->Wo = TWO_PI/pitch;
     model->L = PI/model->Wo;
 
     /* estimate model parameters */
 
     two_stage_pitch_refinement(model, Sw);
-    estimate_amplitudes(model, Sw, c2->W);
-    snr = est_voicing_mbe(model, Sw, c2->W, Sw_, Ew, c2->prev_Wo_enc);
-    //fprintf(stderr,"snr %3.2f  v: %d  Wo: %f prev_Wo: %f\n", 
-    //	   snr, model->voiced, model->Wo, c2->prev_Wo_enc);
+    TIMER_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage"); 
+    estimate_amplitudes(model, Sw, c2->W, 0);
+    TIMER_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps"); 
+    est_voicing_mbe(model, Sw, c2->W, Sw_, Ew, c2->prev_Wo_enc);
     c2->prev_Wo_enc = model->Wo;
+    TIMER_SAMPLE_AND_LOG2(estamps, "    est_voicing"); 
+    #ifdef DUMP
+    dump_model(model);
+    #endif
 }
 
 /*---------------------------------------------------------------------------*\

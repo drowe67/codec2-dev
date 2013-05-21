@@ -37,6 +37,8 @@
 #include "lpc.h"
 #include "lsp.h"
 #include "kiss_fft.h"
+#undef TIMER
+#include "machdep.h"
 
 #define LSP_DELTA1 0.01         /* grid spacing for LSP root searches */
 
@@ -63,9 +65,11 @@ int lspd_bits(int i) {
     return lsp_cbd[i].log2m;
 }
 
+#ifdef __EXPERIMENTAL__
 int lspdt_bits(int i) {
     return lsp_cbdt[i].log2m;
 }
+#endif
 
 int lsp_pred_vq_bits(int i) {
     return lsp_cbjvm[i].log2m;
@@ -223,7 +227,7 @@ void decode_lspds_scalar(
 
 }
 
-
+#ifdef __EXPERIMENTAL__
 /*---------------------------------------------------------------------------*\
 									      
   lspvq_quantise
@@ -393,6 +397,7 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode)
 #endif
 
 }
+#endif
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX_ENTRIES 16384
@@ -523,6 +528,8 @@ void lspjvm_quantise(float *x, float *xq, int ndim)
     xq[2*i+1] += codebook3[ndim*n3/2+i];
   }
 }
+
+#ifdef __EXPERIMENTAL__
 
 #define MBEST_STAGES 4
 
@@ -718,6 +725,7 @@ void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
   mbest_destroy(mbest_stage3);
   mbest_destroy(mbest_stage4);
 }
+#endif
 
 int check_lsp_order(float lsp[], int lpc_order)
 {
@@ -748,130 +756,6 @@ void force_min_lsp_dist(float lsp[], int lpc_order)
 	}
 }
 
-#ifdef NOT_USED
-/*---------------------------------------------------------------------------*\
-									      
-  lpc_model_amplitudes
-
-  Derive a LPC model for amplitude samples then estimate amplitude samples
-  from this model with optional LSP quantisation.
-
-  Returns the spectral distortion for this frame.
-
-\*---------------------------------------------------------------------------*/
-
-float lpc_model_amplitudes(
-  float  Sn[],			/* Input frame of speech samples */
-  float  w[],			
-  MODEL *model,			/* sinusoidal model parameters */
-  int    order,                 /* LPC model order */
-  int    lsp_quant,             /* optional LSP quantisation if non-zero */
-  float  ak[]                   /* output aks */
-)
-{
-  float Wn[M];
-  float R[LPC_MAX+1];
-  float E;
-  int   i,j;
-  float snr;	
-  float lsp[LPC_MAX];
-  float lsp_hz[LPC_MAX];
-  float lsp_[LPC_MAX];
-  int   roots;                  /* number of LSP roots found */
-  float wt[LPC_MAX];
-
-  for(i=0; i<M; i++)
-    Wn[i] = Sn[i]*w[i];
-  autocorrelate(Wn,R,M,order);
-  levinson_durbin(R,ak,order);
-  
-  E = 0.0;
-  for(i=0; i<=order; i++)
-      E += ak[i]*R[i];
- 
-  for(i=0; i<order; i++)
-      wt[i] = 1.0;
-
-  if (lsp_quant) {
-    roots = lpc_to_lsp(ak, order, lsp, 5, LSP_DELTA1);
-    if (roots != order)
-	printf("LSP roots not found\n");
-
-    /* convert from radians to Hz to make quantisers more
-       human readable */
-
-    for(i=0; i<order; i++)
-	lsp_hz[i] = (4000.0/PI)*lsp[i];
-    
-#ifdef NOT_NOW
-    /* simple uniform scalar quantisers */
-
-    for(i=0; i<10; i++) {
-	k = lsp_cb[i].k;
-	m = lsp_cb[i].m;
-	cb = lsp_cb[i].cb;
-	index = quantise(cb, &lsp_hz[i], wt, k, m, &se);
-	lsp_hz[i] = cb[index*k];
-    }
-#endif
-    
-    /* experiment: simulating uniform quantisation error
-    for(i=0; i<order; i++)
-	lsp[i] += PI*(12.5/4000.0)*(1.0 - 2.0*(float)rand()/RAND_MAX);
-    */
-
-    for(i=0; i<order; i++)
-	lsp[i] = (PI/4000.0)*lsp_hz[i];
-
-    /* Bandwidth Expansion (BW).  Prevents any two LSPs getting too
-       close together after quantisation.  We know from experiment
-       that LSP quantisation errors < 12.5Hz (25Hz step size) are
-       inaudible so we use that as the minimum LSP separation.
-    */
-
-    for(i=1; i<5; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(12.5/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(12.5/4000.0);
-    }
-
-    /* as quantiser gaps increased, larger BW expansion was required
-       to prevent twinkly noises */
-
-    for(i=5; i<8; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(25.0/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(25.0/4000.0);
-    }
-    for(i=8; i<order; i++) {
-	if (lsp[i] - lsp[i-1] < PI*(75.0/4000.0))
-	    lsp[i] = lsp[i-1] + PI*(75.0/4000.0);
-    }
-
-    for(j=0; j<order; j++) 
-	lsp_[j] = lsp[j];
-
-    lsp_to_lpc(lsp_, ak, order);
-#ifdef DUMP
-    dump_lsp(lsp);
-#endif
-  }
-
-#ifdef DUMP
-  dump_E(E);
-#endif
-  #ifdef SIM_QUANT
-  /* simulated LPC energy quantisation */
-  {
-      float e = 10.0*log10(E);
-      e += 2.0*(1.0 - 2.0*(float)rand()/RAND_MAX);
-      E = pow(10.0,e/10.0);
-  }
-  #endif
-
-  aks_to_M2(ak,order,model,E,&snr, 1, 0, 1);   /* {ak} -> {Am} LPC decode */
-
-  return snr;
-}
-#endif
 
 /*---------------------------------------------------------------------------*\
                                                                          
@@ -913,8 +797,10 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
     float e_before, e_after, gain;
     float Pfw[FFT_ENC]; /* Post filter mag spectrum     */
     float max_Rw, min_Rw;
-    float range, thresh, r, w;
-    int   m, bin;
+    float coeff;
+    TIMER_VAR(tstart, tfft1, taw, tfft2, tww, tr);
+
+    TIMER_SAMPLE(tstart);
 
     /* Determine LPC inverse filter spectrum 1/A(exp(jw)) -----------*/
 
@@ -932,9 +818,13 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	x[i].real = ak[i];
     kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Aw);
 
+    TIMER_SAMPLE_AND_LOG(tfft1, tstart, "        fft1"); 
+
     for(i=0; i<FFT_ENC/2; i++) {
-	Aw[i].real = 1.0/sqrt(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
+	Aw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
     }
+
+    TIMER_SAMPLE_AND_LOG(taw, tfft1, "        Aw"); 
 
     /* Determine weighting filter spectrum W(exp(jw)) ---------------*/
 
@@ -943,25 +833,36 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	x[i].imag = 0.0; 
     }
     
-    for(i=0; i<=order; i++)
-	x[i].real = ak[i] * pow(gamma, (float)i);
+    x[0].real = ak[0];
+    coeff = gamma;
+    for(i=1; i<=order; i++) {
+	x[i].real = ak[i] * coeff;
+        coeff *= gamma;
+    }
     kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Ww);
 
+    TIMER_SAMPLE_AND_LOG(tfft2, taw, "        fft2"); 
+
     for(i=0; i<FFT_ENC/2; i++) {
-	Ww[i].real = sqrt(Ww[i].real*Ww[i].real + Ww[i].imag*Ww[i].imag);
+	Ww[i].real = Ww[i].real*Ww[i].real + Ww[i].imag*Ww[i].imag;
     }
+
+    TIMER_SAMPLE_AND_LOG(tww, tfft2, "        Ww"); 
 
     /* Determined combined filter R = WA ---------------------------*/
 
     max_Rw = 0.0; min_Rw = 1E32;
     for(i=0; i<FFT_ENC/2; i++) {
-	Rw[i] = Ww[i].real * Aw[i].real;
+	Rw[i] = sqrtf(Ww[i].real * Aw[i].real);
 	if (Rw[i] > max_Rw)
 	    max_Rw = Rw[i];
 	if (Rw[i] < min_Rw)
 	    min_Rw = Rw[i];
 
     }
+
+    TIMER_SAMPLE_AND_LOG(tr, tww, "        R"); 
+
     #ifdef DUMP
     if (dump)
       dump_Rw(Rw);
@@ -984,7 +885,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 
     e_after = 1E-4;
     for(i=0; i<FFT_ENC/2; i++) {
-	Pfw[i] = pow(Rw[i], beta);
+	Pfw[i] = powf(Rw[i], beta);
 	Pw[i].real *= Pfw[i] * Pfw[i];
 	e_after += Pw[i].real;
     }
@@ -1003,6 +904,8 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
             Pw[i].real *= 1.4*1.4;
         }    
     }
+
+    TIMER_SAMPLE_AND_LOG2(tr, "        filt"); 
 }
 
 
@@ -1039,6 +942,9 @@ void aks_to_M2(
   float Em;		/* energy in band */
   float Am;		/* spectral amplitude sample */
   float signal, noise;
+  TIMER_VAR(tstart, tfft, tpw, tpf);
+
+  TIMER_SAMPLE(tstart);
 
   r = TWO_PI/(FFT_ENC);
 
@@ -1052,14 +958,20 @@ void aks_to_M2(
   for(i=0; i<=order; i++)
     pw[i].real = ak[i];
   kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
+  
+  TIMER_SAMPLE_AND_LOG(tfft, tstart, "      fft"); 
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
   for(i=0; i<FFT_ENC/2; i++)
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
 
+  TIMER_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
+
   if (pf)
       lpc_post_filter(fft_fwd_cfg, model, Pw, ak, order, dump, beta, gamma, bass_boost);
+
+  TIMER_SAMPLE_AND_LOG(tpf, tpw, "      LPC post filter"); 
 
   #ifdef DUMP
   if (dump) 
@@ -1074,35 +986,37 @@ void aks_to_M2(
   signal = 1E-30; noise = 1E-32;
 
   for(m=1; m<=model->L; m++) {
-    am = floor((m - 0.5)*model->Wo/r + 0.5);
-    bm = floor((m + 0.5)*model->Wo/r + 0.5);
-    Em = 0.0;
+      am = (int)((m - 0.5)*model->Wo/r + 0.5);
+      bm = (int)((m + 0.5)*model->Wo/r + 0.5);
+      Em = 0.0;
 
-    for(i=am; i<bm; i++)
-      Em += Pw[i].real;
-    Am = sqrt(Em);
+      for(i=am; i<bm; i++)
+          Em += Pw[i].real;
+      Am = sqrtf(Em);
 
-    signal += pow(model->A[m],2.0);
-    noise  += pow(model->A[m] - Am,2.0);
+      signal += model->A[m]*model->A[m];
+      noise  += (model->A[m] - Am)*(model->A[m] - Am);
 
-    /* This code significantly improves perf of LPC model, in
-       particular when combined with phase0.  The LPC spectrum tends
-       to track just under the peaks of the spectral envelope, and
-       just above nulls.  This algorithm does the reverse to
-       compensate - raising the amplitudes of spectral peaks, while
-       attenuating the null.  This enhances the formants, and
-       supresses the energy between formants. */
+      /* This code significantly improves perf of LPC model, in
+         particular when combined with phase0.  The LPC spectrum tends
+         to track just under the peaks of the spectral envelope, and
+         just above nulls.  This algorithm does the reverse to
+         compensate - raising the amplitudes of spectral peaks, while
+         attenuating the null.  This enhances the formants, and
+         supresses the energy between formants. */
 
-    if (sim_pf) {
-	if (Am > model->A[m])
-	    Am *= 0.7;
-	if (Am < model->A[m])
-	    Am *= 1.4;
-    }
+      if (sim_pf) {
+          if (Am > model->A[m])
+              Am *= 0.7;
+          if (Am < model->A[m])
+              Am *= 1.4;
+      }
 
-    model->A[m] = Am;
+      model->A[m] = Am;
   }
   *snr = 10.0*log10(signal/noise);
+
+  TIMER_SAMPLE_AND_LOG2(tpf, "      rec"); 
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1360,6 +1274,8 @@ void decode_lsps_scalar(float lsp[], int indexes[], int order)
 }
 
 
+#ifdef __EXPERIMENTAL__
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: encode_lsps_diff_freq_vq()	     
@@ -1540,7 +1456,7 @@ void decode_lsps_diff_time(
     }
 
 }
-
+#endif
 
 /*---------------------------------------------------------------------------*\
                                                        

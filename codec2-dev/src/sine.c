@@ -289,7 +289,7 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax, float 
   float Wo;		/* current "test" fundamental freq. */
   float Wom;		/* Wo that maximises E */
   float Em;		/* mamimum energy */
-  float r;		/* number of rads/bin */
+  float r, one_on_r;	/* number of rads/bin */
   float p;		/* current pitch */
   
   /* Initialisation */
@@ -298,7 +298,8 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax, float 
   Wom = model->Wo;
   Em = 0.0;
   r = TWO_PI/FFT_ENC;
-  
+  one_on_r = 1.0/r;
+
   /* Determine harmonic sum for a range of Wo values */
 
   for(p=pmin; p<=pmax; p+=pstep) {
@@ -306,12 +307,10 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax, float 
     Wo = TWO_PI/p;
 
     /* Sum harmonic magnitudes */
-
     for(m=1; m<=model->L; m++) {
-      b = floor(m*Wo/r + 0.5);
-      E += Sw[b].real*Sw[b].real + Sw[b].imag*Sw[b].imag;
+        b = (int)(m*Wo*one_on_r + 0.5);
+        E += Sw[b].real*Sw[b].real + Sw[b].imag*Sw[b].imag;
     }  
-
     /* Compare to see if this is a maximum */
     
     if (E > Em) {
@@ -333,40 +332,45 @@ void hs_pitch_refinement(MODEL *model, COMP Sw[], float pmin, float pmax, float 
 									      
 \*---------------------------------------------------------------------------*/
 
-void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[])
+void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[], int est_phase)
 {
   int   i,m;		/* loop variables */
   int   am,bm;		/* bounds of current harmonic */
   int   b;		/* DFT bin of centre of current harmonic */
   float den;		/* denominator of amplitude expression */
-  float r;		/* number of rads/bin */
+  float r, one_on_r;	/* number of rads/bin */
   int   offset;
   COMP  Am;
 
   r = TWO_PI/FFT_ENC;
+  one_on_r = 1.0/r;
 
   for(m=1; m<=model->L; m++) {
     den = 0.0;
-    am = floor((m - 0.5)*model->Wo/r + 0.5);
-    bm = floor((m + 0.5)*model->Wo/r + 0.5);
-    b = floor(m*model->Wo/r + 0.5);
+    am = (int)((m - 0.5)*model->Wo*one_on_r + 0.5);
+    bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
+    b = (int)(m*model->Wo/r + 0.5);
 
     /* Estimate ampltude of harmonic */
 
     den = 0.0;
     Am.real = Am.imag = 0.0;
+    offset = FFT_ENC/2 - (int)(m*model->Wo*one_on_r + 0.5);
     for(i=am; i<bm; i++) {
       den += Sw[i].real*Sw[i].real + Sw[i].imag*Sw[i].imag;
-      offset = i + FFT_ENC/2 - floor(m*model->Wo/r + 0.5);
-      Am.real += Sw[i].real*W[offset].real;
-      Am.imag += Sw[i].imag*W[offset].real;
+      Am.real += Sw[i].real*W[i + offset].real;
+      Am.imag += Sw[i].imag*W[i + offset].real;
     }
 
-    model->A[m] = sqrt(den);
+    model->A[m] = sqrtf(den);
 
-    /* Estimate phase of harmonic */
+    if (est_phase) {
 
-    model->phi[m] = atan2(Sw[b].imag,Sw[b].real);
+        /* Estimate phase of harmonic, this is expensive in CPU for
+           embedded devicesso we make it an option */
+
+        model->phi[m] = atan2(Sw[b].imag,Sw[b].real);
+    }
   }
 }
 
@@ -398,7 +402,7 @@ float est_voicing_mbe(
     float Wo;            
     float sig, snr;
     float elow, ehigh, eratio;
-    float dF0, sixty;
+    float sixty;
 
     sig = 1E-4;
     for(l=1; l<=model->L/4; l++) {
@@ -425,11 +429,11 @@ float est_voicing_mbe(
 
 	/* Estimate amplitude of harmonic assuming harmonic is totally voiced */
 
+        offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
 	for(m=al; m<bl; m++) {
-	    offset = FFT_ENC/2 + m - l*Wo*FFT_ENC/TWO_PI + 0.5;
-	    Am.real += Sw[m].real*W[offset].real + Sw[m].imag*W[offset].imag;
-	    Am.imag += Sw[m].imag*W[offset].real - Sw[m].real*W[offset].imag;
-	    den += W[offset].real*W[offset].real + W[offset].imag*W[offset].imag;
+	    Am.real += Sw[m].real*W[offset+m].real;
+	    Am.imag += Sw[m].imag*W[offset+m].real;
+	    den += W[offset+m].real*W[offset+m].real;
         }
 
         Am.real = Am.real/den;
@@ -437,10 +441,10 @@ float est_voicing_mbe(
 
         /* Determine error between estimated harmonic and original */
 
+        offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
         for(m=al; m<bl; m++) {
-	    offset = FFT_ENC/2 + m - l*Wo*FFT_ENC/TWO_PI + 0.5;
-	    Sw_[m].real = Am.real*W[offset].real - Am.imag*W[offset].imag;
-	    Sw_[m].imag = Am.real*W[offset].imag + Am.imag*W[offset].real;
+	    Sw_[m].real = Am.real*W[offset+m].real;
+	    Sw_[m].imag = Am.imag*W[offset+m].real;
 	    Ew[m].real = Sw[m].real - Sw_[m].real;
 	    Ew[m].imag = Sw[m].imag - Sw_[m].imag;
 	    error += Ew[m].real*Ew[m].real;
@@ -471,7 +475,6 @@ float est_voicing_mbe(
 	ehigh += model->A[l]*model->A[l];
     }
     eratio = 10.0*log10(elow/ehigh);
-    dF0 = 0.0;
 
     /* Look for Type 1 errors, strongly V speech that has been
        accidentally declared UV */
@@ -486,16 +489,6 @@ float est_voicing_mbe(
     if (model->voiced == 1) {
 	if (eratio < -10.0)
 	    model->voiced = 0;
-
-	/* If pitch is jumping about it's likely this is UV */
-	
-	/* 13 Feb 2012 - this seems to add some V errors so comment out for now.  Maybe
-	   double check on bg noise files
-
-	   dF0 = (model->Wo - prev_Wo)*FS/TWO_PI;
-	   if (fabs(dF0) > 15.0) 
-	   model->voiced = 0;
-	*/
 
 	/* A common source of Type 2 errors is the pitch estimator
 	   gives a low (50Hz) estimate for UV speech, which gives a
@@ -570,7 +563,6 @@ void synthesise(
 
     if (shift) {
 	/* Update memories */
-
 	for(i=0; i<N-1; i++) {
 	    Sn_[i] = Sn_[i+N];
 	}
@@ -602,12 +594,12 @@ void synthesise(
     for(l=1; l<=model->L; l++) {
     //for(l=model->L/2; l<=model->L; l++) {
     //for(l=1; l<=model->L/4; l++) {
-	b = floor(l*model->Wo*FFT_DEC/TWO_PI + 0.5);
+	b = (int)(l*model->Wo*FFT_DEC/TWO_PI + 0.5);
 	if (b > ((FFT_DEC/2)-1)) {
 		b = (FFT_DEC/2)-1;
 	}
-	Sw_[b].real = model->A[l]*cos(model->phi[l]);
-	Sw_[b].imag = model->A[l]*sin(model->phi[l]);
+	Sw_[b].real = model->A[l]*cosf(model->phi[l]);
+	Sw_[b].imag = model->A[l]*sinf(model->phi[l]);
 	Sw_[FFT_DEC-b].real = Sw_[b].real;
 	Sw_[FFT_DEC-b].imag = -Sw_[b].imag;
     }
@@ -644,5 +636,13 @@ void synthesise(
     else
 	for(i=N-1,j=0; i<2*N; i++,j++)
 	    Sn_[i] += sw_[j].real*Pn[i];
+}
+
+
+static unsigned long next = 1;
+
+int codec2_rand(void) {
+    next = next * 1103515245 + 12345;
+    return((unsigned)(next/65536) % 32768);
 }
 

@@ -29,15 +29,13 @@
 #include "phase.h"
 #include "kiss_fft.h"
 #include "comp.h"
-#include "glottal.c"
+#include "sine.h"
 
 #include <assert.h>
 #include <ctype.h>
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
-
-#define GLOTTAL_FFT_SIZE 512
 
 /*---------------------------------------------------------------------------*\
 
@@ -84,18 +82,18 @@ void aks_to_H(
   /* Sample magnitude and phase at harmonics */
 
   for(m=1; m<=model->L; m++) {
-    am = floor((m - 0.5)*model->Wo/r + 0.5);
-    bm = floor((m + 0.5)*model->Wo/r + 0.5);
-    b = floor(m*model->Wo/r + 0.5);
+      am = (int)((m - 0.5)*model->Wo/r + 0.5);
+      bm = (int)((m + 0.5)*model->Wo/r + 0.5);
+      b = (int)(m*model->Wo/r + 0.5);
+      
+      Em = 0.0;
+      for(i=am; i<bm; i++)
+          Em += G/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
+      Am = sqrtf(fabsf(Em/(bm-am)));
 
-    Em = 0.0;
-    for(i=am; i<bm; i++)
-      Em += G/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
-    Am = sqrt(fabs(Em/(bm-am)));
-
-    phi_ = -atan2(Pw[b].imag,Pw[b].real);
-    H[m].real = Am*cos(phi_);
-    H[m].imag = Am*sin(phi_);
+      phi_ = -atan2f(Pw[b].imag,Pw[b].real);
+      H[m].real = Am*cosf(phi_);
+      H[m].imag = Am*sinf(phi_);
   }
 }
 
@@ -204,9 +202,6 @@ void phase_synth_zero_order(
   COMP  A_[MAX_AMP+1];		/* synthesised harmonic samples */
   COMP  H[MAX_AMP+1];           /* LPC freq domain samples */
   float G;
-  float jitter = 0.0;
-  float r;
-  int   b;
 
   G = 1.0;
   aks_to_H(fft_fwd_cfg, model, aks, G, H, order);
@@ -222,30 +217,15 @@ void phase_synth_zero_order(
   
   ex_phase[0] += (model->Wo)*N;
   ex_phase[0] -= TWO_PI*floor(ex_phase[0]/TWO_PI + 0.5);
-  r = TWO_PI/GLOTTAL_FFT_SIZE;
 
   for(m=1; m<=model->L; m++) {
       
     /* generate excitation */
 	    
-    if (model->voiced) {
-	//float rnd;
+      if (model->voiced) {
 
-        b = floor(m*model->Wo/r + 0.5);
-	if (b > ((GLOTTAL_FFT_SIZE/2)-1)) {
-		b = (GLOTTAL_FFT_SIZE/2)-1;
-	}
-
-	/* I think adding a little jitter helps improve low pitch
-	   males like hts1a. This moves the onset of each harmonic
-	   over +/- 0.25 of a sample.
-	*/
-	//jitter = 0.25*(1.0 - 2.0*rand()/RAND_MAX);
-	jitter = 0;
-
-	//rnd = (PI/8)*(1.0 - 2.0*rand()/RAND_MAX);
-	Ex[m].real = cos(ex_phase[0]*m/* - jitter*model->Wo*m + glottal[b]*/);
-	Ex[m].imag = sin(ex_phase[0]*m/* - jitter*model->Wo*m + glottal[b]*/);
+	Ex[m].real = cosf(ex_phase[0]*m);
+	Ex[m].imag = sinf(ex_phase[0]*m);
     }
     else {
 
@@ -253,9 +233,9 @@ void phase_synth_zero_order(
 	   phase is not needed in the unvoiced case, but no harm in
 	   keeping it.
         */
-	float phi = TWO_PI*(float)rand()/RAND_MAX;
-        Ex[m].real = cos(phi);
-	Ex[m].imag = sin(phi);
+	float phi = TWO_PI*(float)codec2_rand()/CODEC2_RAND_MAX;
+        Ex[m].real = cosf(phi);
+	Ex[m].imag = sinf(phi);
     }
 
     /* filter using LPC filter */
@@ -265,7 +245,7 @@ void phase_synth_zero_order(
 
     /* modify sinusoidal phase */
    
-    new_phi = atan2(A_[m].imag, A_[m].real+1E-12);
+    new_phi = atan2f(A_[m].imag, A_[m].real+1E-12);
     model->phi[m] = new_phi;
   }
 
