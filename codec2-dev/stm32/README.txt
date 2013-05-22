@@ -4,7 +4,7 @@ David Rowe May 2013
 
 TODO
  + Describe what gdb_stdio does, describe what UT does.
- +  Where raw files end up.  
+ + Where raw files end up.  
  + Dump files and how to use them.
 
 Getting Started
@@ -12,26 +12,33 @@ Getting Started
 
 . Install arm toolchain binary
 
-  wget https://launchpadlibrarian.net/126639661/gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
-  untar, I placed it in ~/sat
+   $ cd ~
+   $ wget https://launchpadlibrarian.net/126639661/gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
+   $ tar xjf gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
 
 . Build codec2 unit test:
 
-  cd codec2_dec/stm
-  edit BINPATH for your toolchain locations
-  make
+   $ cd codec2_dec/stm
+   In the Makefile edit the BINPATH variable for your toolchain location
+   $ make
 
 . Patching and build stlink:
 
-   TBC
+   $ cd ~
+   $ git clone https://github.com/texane/stlink.git
+   $ cd stlink
+   ~/stlink$ git checkout bbecbc1e81b15b85829149424d048d96bd844939
+   ~/stlink$ patch -p0 < ~/codec2-dev/stlink.patch
+   ~/stlink$ make 
 
-. start st-util:
+. Place a copy of hts1a.raw in the stlink directory and start st-util:
 
+   ~/stlink$ cp ~/codec2-dev/raw/hts1a .
    ~/stlink$ sudo ./st-util -f /home/david/codec2-dev/stm32/stm32f4_codec2.elf
 
 . Start gdb:
 
-   ~/codec2-dev/stm32$ ~/sat/bin/arm-none-eabi-gdb stm32f4_codec2.elf
+   $ ~/codec2-dev/stm32$ ~/sat/bin/arm-none-eabi-gdb stm32f4_codec2.elf
 
    (gdb) tar ext :4242
 
@@ -45,7 +52,7 @@ Getting Started
  
 . Power cycle Discovery.
 
-. ctrl-C to stop st-util, then restart st-util
+. Stop st-util using ctrl-C, then restart st-util
 
 . Back to gdb:
 
@@ -60,6 +67,10 @@ Getting Started
    (gdb) c
    Continuing.
 
+. gdb will prints various debug messages, and the codec output file
+  will be written to ~/stlink.
+  
+  ~/stlink$ play -r 8000 -s -2 hts1a_out.raw
 
 Process
 -------
