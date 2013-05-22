@@ -2,28 +2,34 @@ README.txt
 codec2-dev stm32f4 
 David Rowe May 2013
 
+TODO
+ + Describe what gdb_stdio does, describe what UT does.
+ +  Where raw files end up.  
+ + Dump files and how to use them.
+
 Getting Started
 -------------------------
 
-Describe what gdb_stdio does, describe what UT does. Where raw files
-end up.  Dump files and how to use them.
+. Install arm toolchain binary
 
-Install arm toolchain binary
+  wget https://launchpadlibrarian.net/126639661/gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
+  untar, I placed it in ~/sat
 
-Download and untar STM32F4xx_DSP_StdPeriph_Lib_V1.1.0
+. Build codec2 unit test:
 
-build codec2 unit test, describe what it does
-make
+  cd codec2_dec/stm
+  edit BINPATH for your toolchain locations
+  make
 
-1. Patching and build stlink:
+. Patching and build stlink:
 
    TBC
 
-2. start st-util:
+. start st-util:
 
    ~/stlink$ sudo ./st-util -f /home/david/codec2-dev/stm32/stm32f4_codec2.elf
 
-3. Start gdb:
+. Start gdb:
 
    ~/codec2-dev/stm32$ ~/sat/bin/arm-none-eabi-gdb stm32f4_codec2.elf
 
@@ -37,11 +43,11 @@ make
     Start address 0x800a885, load size 118572
     Transfer rate: 13 KB/sec, 10779 bytes/write.
  
-4. Power cycle Discovery.
+. Power cycle Discovery.
 
-5. ctrl-C to stop st-util, then restart st-util
+. ctrl-C to stop st-util, then restart st-util
 
-6. Back to gdb:
+. Back to gdb:
 
     (gdb) tar ext :4242
     A program is being debugged already.  Kill it? (y or n) y

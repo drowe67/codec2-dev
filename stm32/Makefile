@@ -29,6 +29,8 @@ endif
 
 # Definitions for the STM32F4 Standard Peripheral Library
 
+PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
+PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
 PERIPHLIBVER	= V1.1.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)_$(PERIPHLIBVER)
@@ -69,7 +71,10 @@ $(CODEC2_SRC)/codebookge.c \
 $(CODEC2_SRC)/dump.c 
 
 CFLAGS += -D__EMBEDDED__ -DTIMER
+
+#enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
+
 CFLAGS += -I/home/david/codec2-dev/src
 CFLAGS += -I/home/david/codec2-dev/unittest
 CFLAGS += -Iinc
@@ -107,7 +112,15 @@ OBJS = $(SRCS:.c=.o)
 
 all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf
 
-libstm32f4.a:
+dl/$(PERIPHLIBZIP):
+	mkdir -p dl
+	cd dl; wget $(PERIPHLIBURL)/$(PERIPHLIBZIP)
+	
+$(PERIPHLIBDIR): dl/$(PERIPHLIBZIP)
+	cd dl; unzip $(PERIPHLIBZIP)
+	mv dl/$(PERIPHLIBDIR) $(PERIPHLIBDIR)
+
+libstm32f4.a: $(PERIPHLIBDIR)
 	$(MAKE) $(STM32F4TEMPLATE)/system_stm32f4xx.o
 	for F in $(STM32F4LIB)/src/*.c ; do $(MAKE) $${F%.c}.o ; done
 	for F in $(CMSIS)/DSP_Lib/Source/*/*.c ; do $(MAKE) $${F%.c}.o ; done
