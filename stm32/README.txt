@@ -30,14 +30,14 @@ Getting Started
    $ cd stlink
    ~/stlink$ git checkout bbecbc1e81b15b85829149424d048d96bd844939
    ~/stlink$ patch -p0 < ~/codec2-dev/stm32/stlink/stlink.patch
-   ~/stlink$ cp ~/codec2-dev/stm32/stlink/elfsym.* .
+   ~/stlink$ cp ~/codec2-dev/stm32/stlink/elfsym.* gdbserver
    ~/stlink$ ./autogen.sh
    ~/stlink$ ./configure
    ~/stlink$ make 
 
 . Place a copy of hts1a.raw in the stlink directory and start st-util:
 
-   ~/stlink$ cp ~/codec2-dev/raw/hts1a .
+   ~/stlink$ cp ~/codec2-dev/raw/hts1a.raw .
    ~/stlink$ sudo ./st-util -f /home/david/codec2-dev/stm32/stm32f4_codec2.elf
 
 . In _another_ console start gdb:
