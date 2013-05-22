@@ -18,7 +18,7 @@ LIBNAME = codec2.lib
 
 CFLAGS  = -O2 -Wall -D__CODEC2_WIN32__
 
-HDRS = ../src/codec2.h ../src/fdmdv.h
+HDRS = ../src/codec2.h ../src/codec2_fdmdv.h
 
 OBJS = dump.o lpc.o nlp.o postfilter.o sine.o codec2.o fdmdv.o kiss_fft.o interp.o lsp.o phase.o quantise.o pack.o codebook.o codebookd.o codebookvq.o codebookjnd.o codebookjvm.o codebookdt.o codebookge.o
 
@@ -30,7 +30,7 @@ $(DLLNAME): $(OBJS)
 %.o: ../src/%.c $(HDRS) Makefile
 	$(CC_PREFIX)gcc $(CFLAGS) -D__CODEC2_BUILDING_DLL__ -c $< -o $@
 
-c2demo.exe: ../src/c2demo.c $(DLLNAME) $(LIBNAME)
+c2demo.exe: ../src/c2demo.c  $(DLLNAME) $(LIBNAME)
 	$(CC_PREFIX)gcc $(CFLAGS) $< -o $@ $(LIBNAME)
 
 c2enc.exe: ../src/c2enc.c $(DLLNAME) $(LIBNAME)
