@@ -27,7 +27,7 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
     int            nsam, nbit;
     FILE          *fin, *fout;
     int            frame;
-    unsigned int   enc_start, dec_start;
+    TIMER_VAR(enc_start, dec_start);
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -54,11 +54,12 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
     frame = 0;
 
     while (fread(inbuf, sizeof(short), nsam, fin) == nsam) {
-        enc_start = machdep_timer_sample();
+        TIMER_SAMPLE(enc_start);
         codec2_encode(codec2, bits, inbuf);
-        dec_start = machdep_timer_sample_and_log(enc_start, "  enc");     
+        TIMER_SAMPLE_AND_LOG(dec_start, enc_start, "  enc");     
 	codec2_decode(codec2, outbuf, bits);
-        machdep_timer_sample_and_log(dec_start, "  dec");     
+        TIMER_SAMPLE_AND_LOG2(dec_start, "  dec");     
+        TIMER_SAMPLE_AND_LOG2(enc_start, "  enc & dec");     
         fwrite((char*)outbuf, sizeof(short), nsam, fout);
         printf("frame: %d\n", ++frame);
         machdep_timer_print_logged_samples();
