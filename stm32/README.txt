@@ -6,6 +6,7 @@ TODO
  + Describe what gdb_stdio does, describe what UT does.
  + Where raw files end up.  
  + Dump files and how to use them.
+ + check if "CFLAGS:  -mlittle-endian -mthumb -mthumb-interwork" needed
 
 Getting Started
 -------------------------
@@ -28,7 +29,10 @@ Getting Started
    $ git clone https://github.com/texane/stlink.git
    $ cd stlink
    ~/stlink$ git checkout bbecbc1e81b15b85829149424d048d96bd844939
-   ~/stlink$ patch -p0 < ~/codec2-dev/stlink.patch
+   ~/stlink$ patch -p0 < ~/codec2-dev/stm32/stlink/stlink.patch
+   ~/stlink$ cp ~/codec2-dev/stm32/stlink/elfsym.* .
+   ~/stlink$ ./autogen.sh
+   ~/stlink$ ./configure
    ~/stlink$ make 
 
 . Place a copy of hts1a.raw in the stlink directory and start st-util:
@@ -36,7 +40,7 @@ Getting Started
    ~/stlink$ cp ~/codec2-dev/raw/hts1a .
    ~/stlink$ sudo ./st-util -f /home/david/codec2-dev/stm32/stm32f4_codec2.elf
 
-. Start gdb:
+. In _another_ console start gdb:
 
    $ ~/codec2-dev/stm32$ ~/sat/bin/arm-none-eabi-gdb stm32f4_codec2.elf
 
@@ -77,8 +81,8 @@ Process
 
 1. Profiling macros.
 
-2. enable DUMP to dump files, note proofiling times will be corrupted
-by this due to latency in talking to Host
+2. enable DUMP variable in Makefile to dump files, note profiling
+times will be corrupted by this due to latency in talking to Host
 
 3. Compare outputs using octave/diff_codec.  Worked example:
 
@@ -88,5 +92,5 @@ diff_codec("~/stlink/ref/hts1a_out_1300.raw", "~/stlink/hts1a_out_1300.raw","~/s
 Gotcha
 ------
 
-using printf rather than gdb_stdio_printf, regular stdio functions are stubbed out so will link, just nothing will happen.
+Using printf rather than gdb_stdio_printf, regular stdio functions are stubbed out so will link, just nothing will happen.
 
