@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dactest.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -131,6 +131,18 @@ $(PROJ_NAME).elf: $(SRCS)
 
 fft_test.elf: $(FFT_TEST_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+DAC_TEST=$(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Examples/DAC/DAC_SignalsGeneration
+DAC_TEST_SRCS=\
+$(DAC_TEST)/main.c \
+$(DAC_TEST)/stm32f4xx_it.c \
+$(DAC_TEST)/system_stm32f4xx.c \
+$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+dactest.elf: $(DAC_TEST_SRCS)
+	$(CC) $(CFLAGS) -DUSE_STM324xG_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/Common $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o
