@@ -7,7 +7,7 @@ FLOAT_TYPE=hard
 
 ###################################################
 
-BINPATH=~/sat/bin
+BINPATH=~/gcc-arm-none-eabi-4_7-2013q1/bin
 CC=$(BINPATH)/arm-none-eabi-gcc
 OBJCOPY=$(BINPATH)/arm-none-eabi-objcopy
 SIZE=$(BINPATH)/arm-none-eabi-size
@@ -75,8 +75,8 @@ CFLAGS += -D__EMBEDDED__ -DTIMER
 #enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
 
-CFLAGS += -I/home/david/codec2-dev/src
-CFLAGS += -I/home/david/codec2-dev/unittest
+CFLAGS += -I../src
+CFLAGS += -I../unittest
 CFLAGS += -Iinc
 
 FFT_TEST_SRCS = \
@@ -104,7 +104,7 @@ LIBS = libstm32f4.a -lg -lnosys -lm
 
 # startup file
 
-SRCS += src/startup_stm32f4xx.s
+SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
@@ -115,7 +115,7 @@ all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dactest.elf
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
 	cd dl; wget $(PERIPHLIBURL)/$(PERIPHLIBZIP)
-	
+
 $(PERIPHLIBDIR): dl/$(PERIPHLIBZIP)
 	cd dl; unzip $(PERIPHLIBZIP)
 	mv dl/$(PERIPHLIBDIR) $(PERIPHLIBDIR)

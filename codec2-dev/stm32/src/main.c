@@ -154,11 +154,3 @@ int main(void) {
     return 0;
 }
 
-
-/*
- * Dummy function to avoid compiler error
- */
-void _init() {
-
-}
-
