@@ -1,26 +1,41 @@
 README.txt
-codec2-dev stm32f4 
+codec2 support for the stm32f4
 David Rowe May 2013
 
-TODO
- + Describe what gdb_stdio does, describe what UT does.
- + Where raw files end up.  
- + Dump files and how to use them.
- + check if "CFLAGS:  -mlittle-endian -mthumb -mthumb-interwork" needed
+Introduction
+------------
+
+The Makefile generates several unit tests, stm32f4_codec2.elf is the
+most important.  It's is equivalent to c2demo.c and runs the encoder
+and decoder on raw speech files.  It also gathers and prints profiling
+information and can dump the codec states to compare changes.
+
+gdb_stdio system
+----------------
+
+stutil contains a gdb server that talks to the target firmware.
+stutil has been patched to allow "semihosting": stdio requests on the
+target are re-directed to the host PC.  So if you call printf on the
+target, it appears on the host PC console.  With printf/fread/fwrite
+and gdb it makes developing on bare metal just like developing on any
+command line gcc system.
+
+The root path for files accessed by the target is the path st-util is
+run from.
 
 Getting Started
--------------------------
+---------------
 
 . Install arm toolchain binary
 
    $ cd ~
-   $ wget https://launchpadlibrarian.net/126639661/gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
+   $ wget https://launchpad.net/gcc-arm-embedded/4.7/4.7-2013-q1-update/+download/gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2
    $ tar xjf gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
 
 . Build codec2 unit test:
 
-   $ cd codec2_dec/stm
-   In the Makefile edit the BINPATH variable for your toolchain location
+   $ cd codec2_dev/stm32
+   If necessary, edit the BINPATH variable in Makefile for your toolchain location
    $ make
 
 . Patching and build stlink:
@@ -31,6 +46,7 @@ Getting Started
    ~/stlink$ git checkout bbecbc1e81b15b85829149424d048d96bd844939
    ~/stlink$ patch -p0 < ~/codec2-dev/stm32/stlink/stlink.patch
    ~/stlink$ cp ~/codec2-dev/stm32/stlink/elfsym.* gdbserver
+   ~/stlink$ sudo apt-get install libusb-1.0-0-dev libelf-dev automake 
    ~/stlink$ ./autogen.sh
    ~/stlink$ ./configure
    ~/stlink$ make 
@@ -42,7 +58,7 @@ Getting Started
 
 . In _another_ console start gdb:
 
-   $ ~/codec2-dev/stm32$ ~/sat/bin/arm-none-eabi-gdb stm32f4_codec2.elf
+   $ ~/codec2-dev/stm32$ ~/gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2 stm32f4_codec2.elf
 
    (gdb) tar ext :4242
 
@@ -79,18 +95,23 @@ Getting Started
 Process
 -------
 
-1. Profiling macros.
+1. Profiling macros, grep on TIMER_xxxx
 
-2. enable DUMP variable in Makefile to dump files, note profiling
-times will be corrupted by this due to latency in talking to Host
+2. Enable DUMP variable in Makefile to dump files, note profiling
+   times will be corrupted by this due to latency in talking to Host
 
-3. Compare outputs using octave/diff_codec.  Worked example:
+3. Compare outputs using octave/diff_codec.  Example:
 
-diff_codec("~/stlink/ref/hts1a_out_1300.raw", "~/stlink/hts1a_out_1300.raw","~/stlink/stm32f4", "~/stlink/ref/stm32f4")
-
+   octave:> diff_codec("~/stlink/ref/hts1a_out_1300.raw", "~/stlink/hts1a_out_1300.raw","~/stlink/stm32f4", "~/stlink/ref/stm32f4")
 
 Gotcha
 ------
 
-Using printf rather than gdb_stdio_printf, regular stdio functions are stubbed out so will link, just nothing will happen.
+Using printf rather than gdb_stdio_printf, regular stdio functions are
+stubbed out so will link, just nothing will happen.
 
+TODO
+----
+
+ + check if "CFLAGS:  -mlittle-endian -mthumb -mthumb-interwork" needed
+ + double check if _fini hack is OK (src/init.c)
