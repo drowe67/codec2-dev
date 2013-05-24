@@ -152,7 +152,7 @@ int    m			/* analysis window size */
 
     nlp->m = m;
     for(i=0; i<m/DEC; i++) {
-	nlp->w[i] = 0.5 - 0.5*cos(2*PI*i/(m/DEC-1));
+	nlp->w[i] = 0.5 - 0.5*cosf(2*PI*i/(m/DEC-1));
     }
 
     for(i=0; i<PMAX_M; i++)
