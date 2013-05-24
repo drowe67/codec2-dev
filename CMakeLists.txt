@@ -33,7 +33,10 @@ if(CODEC2_VERSION_PATCH)
 endif()
 
 # Set default build type
-set(CMAKE_BUILD_TYPE "Release")
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release")
+endif(NOT CMAKE_BUILD_TYPE)
+message(STATUS "Build type is: ${CMAKE_BUILD_TYPE}")
 
 message(STATUS "codec2 version: ${CODEC2_VERSION}")
 
@@ -51,14 +54,15 @@ message(STATUS "codec2 version: ${CODEC2_VERSION}")
 #endif(SUBVERSION_FOUND)
 
 # Set default C++ flags.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -O3 -g")
-
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
 
 #
 # Default options
 #
 # Build shared libraries by default
 set(BUILD_SHARED_LIBS TRUE CACHE BOOL "Build shared library. Set to FALSE for static library.")
+option(UNITTEST "Build unittest binaries." OFF)
 # Do not install example code by default.
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
@@ -103,6 +107,12 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 add_subdirectory(src)
 
+if(UNITTEST)
+    # Pthread Library
+    find_package(Threads REQUIRED)
+    message(STATUS "Threads library flags: ${CMAKE_THREAD_LIBS_INIT}")
+    add_subdirectory(unittest)
+endif(UNITTEST)
 
 #
 # Cpack NSIS installer configuration for Windows. EXPERIMENTAL!!!
