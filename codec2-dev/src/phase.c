@@ -216,7 +216,7 @@ void phase_synth_zero_order(
   */
   
   ex_phase[0] += (model->Wo)*N;
-  ex_phase[0] -= TWO_PI*floor(ex_phase[0]/TWO_PI + 0.5);
+  ex_phase[0] -= TWO_PI*floorf(ex_phase[0]/TWO_PI + 0.5);
 
   for(m=1; m<=model->L; m++) {
       

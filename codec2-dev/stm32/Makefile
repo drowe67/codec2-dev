@@ -18,8 +18,8 @@ CFLAGS  = -std=gnu99 -g -O2 -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
-#CFLAGS += -fsingle-precision-constant -Wdouble-promotion
-CFLAGS += -fsingle-precision-constant
+CFLAGS += -fsingle-precision-constant -Wdouble-promotion
+#CFLAGS += -fsingle-precision-constant
 CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1
 else
 CFLAGS += -msoft-float
@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dactest.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf ut_dac.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -134,14 +134,14 @@ fft_test.elf: $(FFT_TEST_SRCS)
 
 DAC_TEST=$(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Examples/DAC/DAC_SignalsGeneration
 DAC_TEST_SRCS=\
-$(DAC_TEST)/main.c \
+src/ut_dac.c \
 $(DAC_TEST)/stm32f4xx_it.c \
 $(DAC_TEST)/system_stm32f4xx.c \
 $(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-dactest.elf: $(DAC_TEST_SRCS)
+ut_dac.elf: $(DAC_TEST_SRCS)
 	$(CC) $(CFLAGS) -DUSE_STM324xG_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/Common $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:

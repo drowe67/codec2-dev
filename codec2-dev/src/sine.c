@@ -88,7 +88,7 @@ void make_analysis_window(kiss_fft_cfg fft_fwd_cfg, float w[], COMP W[])
   for(i=0; i<M/2-NW/2; i++)
     w[i] = 0.0;
   for(i=M/2-NW/2,j=0; i<M/2+NW/2; i++,j++) {
-    w[i] = 0.5 - 0.5*cos(TWO_PI*j/(NW-1));
+    w[i] = 0.5 - 0.5*cosf(TWO_PI*j/(NW-1));
     m += w[i]*w[i];
   }
   for(i=M/2+NW/2; i<M; i++)
@@ -97,7 +97,7 @@ void make_analysis_window(kiss_fft_cfg fft_fwd_cfg, float w[], COMP W[])
   /* Normalise - makes freq domain amplitude estimation straight
      forward */
 
-  m = 1.0/sqrt(m*FFT_ENC);
+  m = 1.0/sqrtf(m*FFT_ENC);
   for(i=0; i<M; i++) {
     w[i] *= m;
   }
@@ -452,7 +452,7 @@ float est_voicing_mbe(
 	}
     }
     
-    snr = 10.0*log10(sig/error);
+    snr = 10.0*log10f(sig/error);
     if (snr > V_THRESH)
 	model->voiced = 1;
     else
@@ -474,7 +474,7 @@ float est_voicing_mbe(
     for(l=model->L/2; l<=model->L; l++) {
 	ehigh += model->A[l]*model->A[l];
     }
-    eratio = 10.0*log10(elow/ehigh);
+    eratio = 10.0*log10f(elow/ehigh);
 
     /* Look for Type 1 errors, strongly V speech that has been
        accidentally declared UV */
