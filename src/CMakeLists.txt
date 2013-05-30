@@ -182,7 +182,7 @@ set(CODEC2_SRCS
     codebookvqanssi.c
     codebookdt.c
     codebookge.c
-    #golay23.c
+    golay23.c
 )
 
 add_library(codec2 ${CODEC2_SRCS})
