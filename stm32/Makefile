@@ -14,7 +14,7 @@ SIZE=$(BINPATH)/arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -g -O2 -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -O2 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -132,19 +132,15 @@ $(PROJ_NAME).elf: $(SRCS)
 fft_test.elf: $(FFT_TEST_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
-DAC_TEST=$(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Examples/DAC/DAC_SignalsGeneration
 DAC_TEST_SRCS=\
 src/dac_ut.c \
+src/dac_it.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-#$(DAC_TEST)/stm32f4xx_it.c \
-#$(DAC_TEST)/system_stm32f4xx.c \
-#(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
-
 dac_ut.elf: $(DAC_TEST_SRCS)
-	$(CC) $(CFLAGS) -DUSE_STM324xG_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/Common $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o

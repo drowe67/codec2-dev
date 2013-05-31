@@ -156,6 +156,7 @@ static void TIM6_Config(void)
 static void DAC_Ch2_SineWaveConfig(void)
 {
   DMA_InitTypeDef DMA_InitStructure;
+  NVIC_InitTypeDef NVIC_InitStructure;
   
   /* DAC channel2 Configuration */
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
@@ -181,6 +182,17 @@ static void DAC_Ch2_SineWaveConfig(void)
   DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
   DMA_Init(DMA1_Stream6, &DMA_InitStructure);
+
+  /* Enable DMA Half 7 Complete interrupts */
+  DMA_ITConfig(DMA1_Stream6, DMA_IT_TC | DMA_IT_HT, ENABLE);
+
+  /* Enable the DMA Stream IRQ Channel */
+
+  NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream6_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);     
 
   /* Enable DMA1_Stream6 */
   DMA_Cmd(DMA1_Stream6, ENABLE);
