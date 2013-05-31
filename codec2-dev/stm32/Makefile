@@ -138,6 +138,7 @@ src/ut_dac.c \
 $(DAC_TEST)/stm32f4xx_it.c \
 $(DAC_TEST)/system_stm32f4xx.c \
 $(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
+gdb_stdio.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
