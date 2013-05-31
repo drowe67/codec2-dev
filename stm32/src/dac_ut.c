@@ -1,3 +1,33 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: dac_ut.c
+  AUTHOR......: David Rowe
+  DATE CREATED: May 31 2013
+
+  Plays a 500 Hz sine wave sampled at 16 kHz out of PF5 on a Discovery board.
+
+\*---------------------------------------------------------------------------*/
+
+/*
+  Copyright (C) 2013 David Rowe
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2.1, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
+
+
+/* Modfied version of the following: */
+
 /**
   ******************************************************************************
   * @file    DAC/DAC_SignalsGeneration/main.c 
@@ -25,55 +55,25 @@
   ******************************************************************************
   */
 
-/* Includes ------------------------------------------------------------------*/
-#include "ut_dac.h"
-#include "gdb_stdio.h"
+#include "stm32f4xx.h"
 
-#ifdef __EMBEDDED__
-#define printf gdb_stdio_printf
-#define fopen gdb_stdio_fopen
-#define fclose gdb_stdio_fclose
-#define fread gdb_stdio_fread
-#define fwrite gdb_stdio_fwrite
-#endif
+#define DAC_DHR12R2_ADDRESS    0x40007414
 
-/** @addtogroup STM32F4xx_StdPeriph_Examples
-  * @{
-  */
-
-/** @addtogroup DAC_SignalsGeneration
-  * @{
-  */ 
-
-/* Private typedef -----------------------------------------------------------*/
-/* Private define ------------------------------------------------------------*/
-/* Private macro -------------------------------------------------------------*/
-/* Private variables ---------------------------------------------------------*/
 DAC_InitTypeDef  DAC_InitStructure;
 
+/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
+   are unsigned */
 
 const uint16_t aSine12bit[32] = {
                       2047, 2447, 2831, 3185, 3498, 3750, 3939, 4056, 4095, 4056,
                       3939, 3750, 3495, 3185, 2831, 2447, 2047, 1647, 1263, 909, 
                       599, 344, 155, 38, 0, 38, 155, 344, 599, 909, 1263, 1647};
 
-const uint8_t aEscalator8bit[6] = {0x0, 0x33, 0x66, 0x99, 0xCC, 0xFF};
-
-__IO uint8_t ubSelectedWavesForm = 1;
-__IO uint8_t ubKeyPressed = SET; 
-
-/* Private function prototypes -----------------------------------------------*/
 static void TIM6_Config(void);
-
 static void DAC_Ch2_SineWaveConfig(void);
 
 /* Private functions ---------------------------------------------------------*/
 
-/**
-  * @brief   Main program
-  * @param  None
-  * @retval None
-  */
 int main(void)
 {
   /*!< At this stage the microcontroller clock setting is already configured, 
@@ -123,23 +123,19 @@ static void TIM6_Config(void)
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
   
   /* --------------------------------------------------------
-  TIM3 input clock (TIM6CLK) is set to 2 * APB1 clock (PCLK1), 
-  since APB1 prescaler is different from 1.   
-    TIM6CLK = 2 * PCLK1  
-    TIM6CLK = HCLK / 2 = SystemCoreClock /2 
-          
-  TIM6 Update event occurs each TIM6CLK/256 
+  
+  TIM3 input clock (TIM6CLK) is set to 2 * APB1 clock (PCLK1), since
+  APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
+  13 clock tree figure in DM0031020.pdf).
 
-  Note: 
-   SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
-   Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
-   function to update SystemCoreClock variable value. Otherwise, any configuration
-   based on this variable will be incorrect.    
+     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
+                    = (HCLK/2)/TIM_ClockDivision
+                    
+   ----------------------------------------------------------- */
 
-  ----------------------------------------------------------- */
   /* Time base configuration */
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 1679;          
+  TIM_TimeBaseStructure.TIM_Period = 5250;          
   TIM_TimeBaseStructure.TIM_Prescaler = 0;       
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
