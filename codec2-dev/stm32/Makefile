@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf ut_dac.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -134,15 +134,16 @@ fft_test.elf: $(FFT_TEST_SRCS)
 
 DAC_TEST=$(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Examples/DAC/DAC_SignalsGeneration
 DAC_TEST_SRCS=\
-src/ut_dac.c \
-$(DAC_TEST)/stm32f4xx_it.c \
-$(DAC_TEST)/system_stm32f4xx.c \
-$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
-gdb_stdio.c \
+src/dac_ut.c \
+src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-ut_dac.elf: $(DAC_TEST_SRCS)
+#$(DAC_TEST)/stm32f4xx_it.c \
+#$(DAC_TEST)/system_stm32f4xx.c \
+#(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL/stm324xg_eval.c \
+
+dac_ut.elf: $(DAC_TEST_SRCS)
 	$(CC) $(CFLAGS) -DUSE_STM324xG_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/STM3240_41_G_EVAL -I$(PERIPHLIBDIR)/Utilities/STM32_EVAL/Common $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
