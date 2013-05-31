@@ -53,7 +53,7 @@ Getting Started
 
 . Place a copy of hts1a.raw in the stlink directory and start st-util:
 
-   ~/stlink$ cp ~/codec2-dev/raw/hts1a.raw .
+   ~/stlink$ cp ~/codec2-dev/raw/hts1a.raw stm_in.raw
    ~/stlink$ sudo ./st-util -f /home/david/codec2-dev/stm32/stm32f4_codec2.elf
 
 . In _another_ console start gdb:
@@ -90,7 +90,7 @@ Getting Started
 . gdb will prints various debug messages, and the codec output file
   will be written to ~/stlink.
   
-  ~/stlink$ play -r 8000 -s -2 hts1a_out.raw
+  ~/stlink$ play -r 8000 -s -2 stm_out.raw
 
 Process
 -------

@@ -38,13 +38,13 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
 
     fin = fopen(inputfile, "rb");
     if (fin == NULL) {
-        printf("Error opening input file: %s\n",inputfile);
+        printf("Error opening input file: %s\n\nTerminating....\n",inputfile);
         exit(1);
     }
 
     fout = fopen(outputfile, "wb");
     if (fout == NULL) {
-        printf("Error opening output file: %s\n",outputfile);
+        printf("Error opening output file: %s\n\nTerminating....\n",outputfile);
         exit(1);
     }
 
@@ -98,7 +98,7 @@ static void c2speedtest(int mode, char inputfile[])
 
     fin = fopen(inputfile, "rb");
     if (fin == NULL) {
-        printf("Error opening input file: %s\n",inputfile);
+        printf("Error opening input file: %s\nTerminating....\n",inputfile);
         exit(1);
     }
 
@@ -130,7 +130,7 @@ void gpio_init() {
                                          // purpose output
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     SystemInit();
     gpio_init();
     machdep_timer_init ();
@@ -140,14 +140,14 @@ int main(void) {
     /* File I/O test for profiling or (with #define DUMP)
        dumping states for optimisation and tiuning */
 
-    c2demo(CODEC2_MODE_1600, "hts1a.raw", "hts1a_out.raw");
+    c2demo(CODEC2_MODE_1600, "stm_in.raw", "stm_out.raw");
 
     printf("Starting c2 speed test\n");
     
     /* Another test of execution speed. Look at PD13 with a
        oscilliscope.  On time is enc, off is dec */
 
-    c2speedtest(CODEC2_MODE_1600, "hts1a.raw");
+    c2speedtest(CODEC2_MODE_1600, "stm_in.raw");
 
     printf("Finished\n");
 
