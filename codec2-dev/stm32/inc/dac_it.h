@@ -1,10 +1,10 @@
 /**
   ******************************************************************************
-  * @file    DAC/DAC_SignalsGeneration/main.h 
+  * @file    DMA/DMA_FLASHToRAM/stm32f4xx_it.h 
   * @author  MCD Application Team
   * @version V1.1.0
   * @date    18-January-2013
-  * @brief   Header for main.c module
+  * @brief   This file contains the headers of the interrupt handlers.
   ******************************************************************************
   * @attention
   *
@@ -24,40 +24,38 @@
   *
   ******************************************************************************
   */
-  
+
 /* Define to prevent recursive inclusion -------------------------------------*/
-#ifndef __MAIN_H
-#define __MAIN_H
+#ifndef __STM32F4xx_IT_H
+#define __STM32F4xx_IT_H
+
+#ifdef __cplusplus
+ extern "C" {
+#endif 
 
 /* Includes ------------------------------------------------------------------*/
-#include "stm32f4xx.h"
-
-#if defined (USE_STM324xG_EVAL)
-  #include "stm324xg_eval.h"
-
-#elif defined (USE_STM324x7I_EVAL) 
-  #include "stm324x7i_eval.h"
-
-#else
- #error "Please select first the Evaluation board used in your application (in Project Options)"
-#endif
+#include "stm32f4xx_dma.h"
 
 /* Exported types ------------------------------------------------------------*/
 /* Exported constants --------------------------------------------------------*/
 /* Exported macro ------------------------------------------------------------*/
-#if defined (USE_STM324xG_EVAL)
-
-  #define DAC_DHR12R2_ADDRESS    0x40007414
-  #define DAC_DHR8R1_ADDRESS     0x40007410
-
-#else /* defined (USE_STM324x7I_EVAL)*/ 
-
-  #define DAC_DHR12R2_ADDRESS    0x40007414
-  #define DAC_DHR8R1_ADDRESS     0x40007410
-
-#endif
 /* Exported functions ------------------------------------------------------- */
 
-#endif /* __MAIN_H */
+void NMI_Handler(void);
+void HardFault_Handler(void);
+void MemManage_Handler(void);
+void BusFault_Handler(void);
+void UsageFault_Handler(void);
+void SVC_Handler(void);
+void DebugMon_Handler(void);
+void PendSV_Handler(void);
+void SysTick_Handler(void);
+void DMA_STREAM_IRQHANDLER(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __STM32F4xx_IT_H */
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/
