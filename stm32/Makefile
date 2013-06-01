@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -132,14 +132,27 @@ $(PROJ_NAME).elf: $(SRCS)
 fft_test.elf: $(FFT_TEST_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
-DAC_TEST_SRCS=\
+DAC_UT_SRCS=\
 src/dac_ut.c \
-src/dac_it.c \
+../src/fifo.c \
+src/stm32f4_dac.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-dac_ut.elf: $(DAC_TEST_SRCS)
+dac_ut.elf: $(DAC_UT_SRCS)
+	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+
+DAC_PLAY_SRCS=\
+src/dac_play.c \
+../src/fifo.c \
+gdb_stdio.c \
+src/stm32f4_dac.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+dac_play.elf: $(DAC_PLAY_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:

@@ -152,7 +152,7 @@ void SysTick_Handler(void)
 /*                 STM32F4xx Peripherals Interrupt Handlers                   */
 /*  Add here the Interrupt Handler for the used peripheral(s) (PPP), for the  */
 /*  available peripheral interrupt handler's name please refer to the startup */
-/*  file (startup_stm32f40xx.s/startup_stm32f427x.s).                                               */
+/*  file (startup_stm32f40xx.s/startup_stm32f427x.s).                         */
 /******************************************************************************/
 
 /**
@@ -162,18 +162,35 @@ void SysTick_Handler(void)
   */
 void DMA1_Stream6_IRQHandler(void)
 {
-  /* Test on DMA Stream Transfer Complete interrupt */
-  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6))
+
+  /* Transfer half empty interrupt */
+
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET))
   {
-    /* Clear DMA Stream Transfer Complete interrupt pending bit */
-    DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);  
-    interrupts++;
+      /* fill first half from fifo */
+
+      fifo_read(DMA1_Stream6_fifo, dac_buf, DAC_BUF_SZ/2);
+
+      /* Clear DMA Stream Transfer Complete interrupt pending bit */
+
+      DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);  
+
+      interrupts++;
   }
-  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6))
+
+  /* Transfer complete interrupt */
+
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET))
   {
-    /* Clear DMA Stream Transfer Complete interrupt pending bit */
-    DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);  
-    interrupts++;
+      /* fill second half from fifo */
+
+      fifo_read(DMA1_Stream6_fifo, &dac_buf[DAC_BUF_SZ/2], DAC_BUF_SZ/2);
+
+      /* Clear DMA Stream Transfer Complete interrupt pending bit */
+
+      DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);  
+
+      interrupts++;
   }
 }
 
