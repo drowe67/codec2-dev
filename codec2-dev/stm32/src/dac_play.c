@@ -1,10 +1,10 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: dac_ut.c
+  FILE........: dac_play.c
   AUTHOR......: David Rowe
-  DATE CREATED: May 31 2013
+  DATE CREATED: 1 June 2013
 
-  Plays a 500 Hz sine wave sampled at 16 kHz out of PF5 on a Discovery board.
+  Plays a 16 kHz sample rate raw file to the Discovery DAC.
 
 \*---------------------------------------------------------------------------*/
 
@@ -25,33 +25,44 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <assert.h>
+#include <stdlib.h>
 #include "stm32f4_dac.h"
+#include "gdb_stdio.h"
 
-#define SINE_SAMPLES   32
+#define printf gdb_stdio_printf
+#define fopen gdb_stdio_fopen
+#define fclose gdb_stdio_fclose
+#define fread gdb_stdio_fread
+#define fwrite gdb_stdio_fwrite
 
-
-/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Not sampels
-   are 16 bit 2's complement, the DAC driver convertsto 12 bit
-   unsigned. */
-
-const short aSine[] = {
-    -16,    6384,   12528,  18192,   23200,   27232,   30256,   32128,   32752,   32128,
-    30256,   27232,   23152,   18192,   12528,    6384,     -16,   -6416,  -12560,  -18224,
-    -23184,  -27264,  -30288,  -32160,  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,
-    -12560,   -6416
-};
+#define N1 24000
+#define N2   320
 
 int main(void) {
+    short *buf, *pbuf;
+    FILE  *fin;
+    int    i, nframes;
 
+    buf = (short*)malloc(N1*sizeof(short));
     dac_open();
 
-    while (1) {
-
-        /* keep DAC FIFO topped up */
-
-        dac_write((short*)aSine, SINE_SAMPLES);
+    fin = fopen("stm_in.raw", "rb");
+    if (fin == NULL) {
+        printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
+        exit(1);
     }
-   
+    fread(buf, sizeof(short), N1, fin);
+    fclose(fin);
+
+    nframes = N1/N2;
+    while(1) {
+        printf("Starting!\n");
+        pbuf = buf;
+        for(i=0; i<nframes; i++) {
+            while(dac_write(pbuf, N2) == -1);
+            pbuf += N2;
+        } 
+        printf("Finished!\n");
+    }
 }
 
