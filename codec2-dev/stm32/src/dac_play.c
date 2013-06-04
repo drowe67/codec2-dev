@@ -29,12 +29,6 @@
 #include "stm32f4_dac.h"
 #include "gdb_stdio.h"
 
-#define printf gdb_stdio_printf
-#define fopen gdb_stdio_fopen
-#define fclose gdb_stdio_fclose
-#define fread gdb_stdio_fread
-#define fwrite gdb_stdio_fwrite
-
 #define N   2000
 
 int main(void) {
