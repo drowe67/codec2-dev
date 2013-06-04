@@ -100,7 +100,6 @@ int fifo_read(struct FIFO *fifo, short data[], int n)
 {
     int            i;
     short         *pdata;
-    short         *pin = fifo->pin;
     short         *pout = fifo->pout;
 
     assert(fifo != NULL);

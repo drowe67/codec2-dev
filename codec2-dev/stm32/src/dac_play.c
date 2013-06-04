@@ -35,34 +35,33 @@
 #define fread gdb_stdio_fread
 #define fwrite gdb_stdio_fwrite
 
-#define N1 24000
-#define N2   320
+#define N   2000
 
 int main(void) {
-    short *buf, *pbuf;
+    short  buf[N];
     FILE  *fin;
-    int    i, nframes;
 
-    buf = (short*)malloc(N1*sizeof(short));
     dac_open();
 
-    fin = fopen("stm_in.raw", "rb");
-    if (fin == NULL) {
-        printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
-        exit(1);
-    }
-    fread(buf, sizeof(short), N1, fin);
-    fclose(fin);
-
-    nframes = N1/N2;
     while(1) {
+        fin = fopen("stm_in.raw", "rb");
+        if (fin == NULL) {
+            printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
+            exit(1);
+        }
+    
         printf("Starting!\n");
-        pbuf = buf;
-        for(i=0; i<nframes; i++) {
-            while(dac_write(pbuf, N2) == -1);
-            pbuf += N2;
-        } 
+
+        while(fread(buf, sizeof(short), N, fin) == N) {
+            while(dac_write(buf, N) == -1);
+        }  
+
         printf("Finished!\n");
+        fclose(fin);
     }
+
+    /* let FIFO empty */
+
+    while(1);
 }
 
