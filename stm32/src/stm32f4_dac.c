@@ -35,8 +35,8 @@
 #define DAC_DHR12R2_ADDRESS    0x40007414
 #define DAC_DHR12L2_ADDRESS    0x40007418
 
-#define DAC_BUF_SZ    320
-#define FIFO_SZ      2000
+#define DAC_BUF_SZ   320
+#define FIFO_SZ      8000
 #define DAC_MAX      4096
 
 DAC_InitTypeDef  DAC_InitStructure;
@@ -46,6 +46,8 @@ unsigned short dac_buf[DAC_BUF_SZ];
 
 static void TIM6_Config(void);
 static void DAC_Ch2_Config(void);
+
+int dac_underflow;
 
 void dac_open(void) {
 
@@ -209,8 +211,10 @@ void DMA1_Stream6_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET) {
         /* fill first half from fifo */
 
-        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1)
+        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
+            dac_underflow++;
+        }
 
         /* convert to unsigned */
 
@@ -229,8 +233,10 @@ void DMA1_Stream6_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET) {
         /* fill second half from fifo */
 
-        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1)
+        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
+            dac_underflow++;
+        }
 
         /* convert to unsigned */
 

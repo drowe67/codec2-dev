@@ -13,7 +13,7 @@
 
 #define TWO_PI     6.283185307
 #define FS         8000.0
-#define AMP        1000.0
+#define AMP        32767.0
 
 int main(int argc, char *argv[]) {
     FILE *f;
