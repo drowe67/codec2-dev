@@ -56,12 +56,25 @@
 TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 TIM_OCInitTypeDef  TIM_OCInitStructure;
 
+unsigned short uhADCxConvertedValue;
+
 static void ADC_Config(void);
 void Timer1Config();
 static void TIM_Config(void);
 
 int main(void) {
+    /* check ADC value changes with GND and VCC sampled */
+    /* look for 17kHz (ish) on timer pins */
+
     ADC_Config();
+
+    Timer1Config();
+
+    /* todo: that start up cmd here */
+
+    while(1) {
+        printf("ADC; %d\n", uhADCxConvertedValue);
+    }
 
 }
 
@@ -133,7 +146,7 @@ static void ADC_Config(void)
   /* ADC3 regular channel7 configuration *************************************/
   ADC_RegularChannelConfig(ADCx, ADC_CHANNEL, 1, ADC_SampleTime_3Cycles);
 
- /* Enable DMA request after last transfer (Single-ADC mode) */
+  /* Enable DMA request after last transfer (Single-ADC mode) */
   ADC_DMARequestAfterLastTransferCmd(ADCx, ENABLE);
 
   /* Enable ADC3 DMA */
