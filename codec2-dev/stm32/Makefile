@@ -163,7 +163,7 @@ src/startup_stm32f4xx.s \
 src/init.c
 
 adc_ut.elf: $(ADC_UT_SRCS)
-	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o
