@@ -43,7 +43,7 @@
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
  
-#define TRY3
+//#define TRY3
 #ifdef TRY3
 
 #define ADCx                     ADC1
@@ -118,15 +118,14 @@ static void ADC_Config(void)
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
   DMA_Init(DMA_STREAMx, &DMA_InitStructure);
 
-#define TMP
-#ifdef TMP
+  ADC_DeInit();
+
   /* ADC Common Init **********************************************************/
   ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
   ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
   ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
   ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
   ADC_CommonInit(&ADC_CommonInitStructure);
-#endif
 
   /* ADC1 Init ****************************************************************/
   ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
@@ -165,7 +164,7 @@ static void ADC_Config(void)
 }
 #endif
 
-//#define TRY2
+#define TRY2
 #ifdef TRY2
 
 int ConvertedValue = 0; //Converted value readed from ADC
