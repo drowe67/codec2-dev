@@ -129,6 +129,7 @@ static void TIM6_Config(void)
   TIM_TimeBaseInit(TIM6, &TIM_TimeBaseStructure);
 
   /* TIM6 TRGO selection */
+
   TIM_SelectOutputTrigger(TIM6, TIM_TRGOSource_Update);
   
   /* TIM6 enable counter */
@@ -170,7 +171,7 @@ static void DAC_Ch2_Config(void)
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
   DMA_Init(DMA1_Stream6, &DMA_InitStructure);
 
-  /* Enable DMA Half 7 Complete interrupts */
+  /* Enable DMA Half & Complete interrupts */
   DMA_ITConfig(DMA1_Stream6, DMA_IT_TC | DMA_IT_HT, ENABLE);
 
   /* Enable the DMA Stream IRQ Channel */

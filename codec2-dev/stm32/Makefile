@@ -156,6 +156,7 @@ dac_play.elf: $(DAC_PLAY_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 ADC_UT_SRCS=\
+../src/fifo.c \
 gdb_stdio.c \
 src/stm32f4_adc.c \
 src/system_stm32f4xx.c \
