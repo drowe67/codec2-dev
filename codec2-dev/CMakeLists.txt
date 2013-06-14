@@ -8,9 +8,11 @@
 
 cmake_minimum_required(VERSION 2.8)
 
+#
 # Prevent in-source builds
 # If an in-source build is attempted, you will still need to clean up a few
 # files manually.
+#
 set(CMAKE_DISABLE_SOURCE_CHANGES ON)
 set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
 
@@ -30,7 +32,8 @@ set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 if(CODEC2_VERSION_PATCH)
     set(PROJECT_VERSION "${CODEC2_VERSION}.${CODEC2_VERSION_PATCH}")
-endif()
+endif(CODEC2_VERSION_PATCH)
+message(STATUS "codec2 version: ${CODEC2_VERSION}")
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -38,7 +41,21 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 message(STATUS "Build type is: ${CMAKE_BUILD_TYPE}")
 
-message(STATUS "codec2 version: ${CODEC2_VERSION}")
+#
+# Setup Windows/MinGW specifics here.
+#
+if(MINGW)
+    message(STATUS "System is MinGW.")
+    foreach(RUNTIME
+        libgcc_s_sjlj-1.dll
+        libstdc++-6.dll)
+        message(STATUS "Checking for ${RUNTIME}")
+        find_library(${RUNTIME}_LIB ${RUNTIME})
+        message(STATUS "runtime found: ${${RUNTIME}_LIB}")
+        list(APPEND CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS ${${RUNTIME}_LIB})
+    endforeach()
+endif(MINGW)
+
 
 #
 # Find the svn revision if this is a working copy.
@@ -54,16 +71,15 @@ message(STATUS "codec2 version: ${CODEC2_VERSION}")
 #endif(SUBVERSION_FOUND)
 
 # Set default C++ flags.
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
 
 #
 # Default options
-#
-# Build shared libraries by default
-set(BUILD_SHARED_LIBS TRUE CACHE BOOL "Build shared library. Set to FALSE for static library.")
+#a
+option(BUILD_SHARED_LIBS
+    "Build shared library. Set to OFF for static library." ON)
 option(UNITTEST "Build unittest binaries." OFF)
-# Do not install example code by default.
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script voicing wav
@@ -71,12 +87,7 @@ if(INSTALL_EXAMPLES)
 endif()
 
 
-#
-# Find some standard headers and functions.
-# Should we error out if one is not available?
-#
-
-# Math library is automatic on MSVC
+# Math library is automatic on windows
 if(UNIX)
     set(CMAKE_REQUIRED_INCLUDES math.h)
     set(CMAKE_REQUIRED_LIBRARIES m)
@@ -115,7 +126,7 @@ if(UNITTEST)
 endif(UNITTEST)
 
 #
-# Cpack NSIS installer configuration for Windows. EXPERIMENTAL!!!
+# Cpack NSIS installer configuration for Windows.
 # See: http://nsis.sourceforge.net/Download
 #
 # *nix systems should use "make install" and/or appropriate
