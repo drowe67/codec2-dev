@@ -164,6 +164,7 @@ void Timer1Config() {
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 
     /* Time Base configuration */
+    TIM_DeInit(TIM1);
     TIM_TimeBaseStructure.TIM_Prescaler = 0;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_Period = uhTimerPeriod;
@@ -222,6 +223,7 @@ void adc_configure(){
     ADC_init_structure.ADC_DataAlign = ADC_DataAlign_Right;
     ADC_init_structure.ADC_Resolution = ADC_Resolution_12b;
 
+#define TMR1_SAMPLING
 #ifdef TMR1_SAMPLING
     ADC_init_structure.ADC_ContinuousConvMode = DISABLE; 
 #else
@@ -229,7 +231,7 @@ void adc_configure(){
 #endif
 
 #ifdef TMR1_SAMPLING
-    ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
+    ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC3;
     ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
 #else
     ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
