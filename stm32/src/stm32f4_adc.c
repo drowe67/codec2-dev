@@ -15,7 +15,9 @@
   + fifos
   + work out a way to unit test
   [ ] ADC working at same time as DAC
- 
+  [ ] remove (or make optional) the TIM_Config() code that sends PWM output to pins
+  [ ] check comments still valid
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -69,7 +71,14 @@ uint16_t aSRC_Buffer[3] = {0, 0, 0};
 void Timer1Config();
 void adc_configure();
 
+#define REC_TIME_SECS 30
+#define N   2000
+#define FS  16000
+
 int main(void){
+    short  buf[N];
+    FILE  *frec;
+    int    i, bufs;
 
     DMA2_Stream0_fifo = fifo_create(FIFO_SZ);
     assert(DMA2_Stream0_fifo != NULL);
@@ -77,17 +86,30 @@ int main(void){
     Timer1Config();
     adc_configure();
     ADC_SoftwareStartConv(ADC1);
-    while(1){
+
+    frec = fopen("stm_out.raw", "wb");
+    if (frec == NULL) {
+        printf("Error opening input file: stm_out.raw\n\nTerminating....\n");
+        exit(1);
+    }
+    bufs = FS*REC_TIME_SECS/N;
+
+    for(i=0; i<bufs; i++) {
         //ConvertedValue = adc_convert();
         //printf("ConvertedValue = %d\n", ConvertedValue); 
-        printf("adc_buf: %d %d  half: %d full: %d\n", 
+        printf("adc_buf: %d %d  half: %d full: %d adc_overflow: %d\n", 
                adc_buf[0],adc_buf[ADC_BUF_SZ-1],
-               half, full); 
+               half, full, adc_overflow);
+        while(fifo_read(DMA2_Stream0_fifo, buf, N) != -1);
+        fwrite(buf, sizeof(short), N, frec);      
     }
+    fclose(frec);
+    printf("Finished!\n");
 }
 
-/* DR: note I dont think any of this is needed, except perhaps to check
-   timer frequency */
+/* DR: TIM_Config configures a couple of I/O pins for PWM output from
+   Timer1 Channel 3.  Note I dont think any of this is needed, except
+   perhaps to check timer frequency.  Can be removed down the track. */
 
 /**
   * @brief  Configure the TIM1 Pins.
@@ -102,6 +124,7 @@ static void TIM_Config(void)
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
 
   /* GPIOA Configuration: Channel 3 as alternate function push-pull */
+
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 ;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
@@ -111,6 +134,7 @@ static void TIM_Config(void)
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
 
   /* GPIOB Configuration: Channel 3N as alternate function push-pull */
+
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
@@ -122,7 +146,7 @@ void Timer1Config() {
 
     TIM_Config();
 
-    /* TIM1 DMA Transfer example -------------------------------------------------
+    /* TIM1 example -------------------------------------------------
   
        TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2 
        prescaler is different from 1.   
@@ -134,10 +158,8 @@ void Timer1Config() {
        SystemCoreClock is set to 168 MHz for STM32F4xx devices.
 
        The objective is to configure TIM1 channel 3 to generate complementary PWM
-       signal with a frequency equal to 17.57 KHz:
-       - TIM1_Period = (SystemCoreClock / 17570) - 1
-       and a variable duty cycle that is changed by the DMA after a specific number of
-       Update DMA request.
+       signal with a frequency equal to F KHz:
+       - TIM1_Period = (SystemCoreClock / F) - 1
 
        The number of this repetitive requests is defined by the TIM1 Repetion counter,
        each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
@@ -164,16 +186,21 @@ void Timer1Config() {
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 
     /* Time Base configuration */
+
     TIM_DeInit(TIM1);
     TIM_TimeBaseStructure.TIM_Prescaler = 0;
     TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseStructure.TIM_Period = uhTimerPeriod;
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 3;
+    TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 
     TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 
     /* Channel 3 Configuration in PWM mode */
+
+    /* I think we just ned to enable channel 3 somehow, but without
+       (or optionally with) actual ouput to a GPIO pin.  */
+
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
     TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
     TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
@@ -191,9 +218,6 @@ void Timer1Config() {
     /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
   
-    /* TIM1 Update DMA Request enable */
-    //TIM_DMACmd(TIM1, TIM_DMA_CC3, ENABLE);
-
     /* Main Output Enable */
     TIM_CtrlPWMOutputs(TIM1, ENABLE);
 }
@@ -220,24 +244,11 @@ void adc_configure(){
     // ADC structure configuration
 
     ADC_DeInit();
-    ADC_init_structure.ADC_DataAlign = ADC_DataAlign_Right;
+    ADC_init_structure.ADC_DataAlign = ADC_DataAlign_Left;
     ADC_init_structure.ADC_Resolution = ADC_Resolution_12b;
-
-#define TMR1_SAMPLING
-#ifdef TMR1_SAMPLING
     ADC_init_structure.ADC_ContinuousConvMode = DISABLE; 
-#else
-    ADC_init_structure.ADC_ContinuousConvMode = ENABLE; 
-#endif
-
-#ifdef TMR1_SAMPLING
     ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC3;
     ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-#else
-    ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-    ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-#endif
-
     ADC_init_structure.ADC_NbrOfConversion = 1;
     ADC_init_structure.ADC_ScanConvMode = DISABLE;
     ADC_Init(ADCx,&ADC_init_structure);
@@ -312,6 +323,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         for(i=0; i<ADC_BUF_SZ/2; i++) {
             sam = (int)adc_buf[i] - 32768;
+            //sam = (int)adc_buf[i];
             signed_buf[i] = sam;
         }
 
@@ -335,6 +347,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         for(i=0; i<ADC_BUF_SZ/2; i++) {
             sam = (int)adc_buf[ADC_BUF_SZ/2 + i] - 32768;
+            //sam = (int)adc_buf[ADC_BUF_SZ/2 + i];
             signed_buf[i] = sam;
         }
 
@@ -350,346 +363,3 @@ void DMA2_Stream0_IRQHandler(void) {
     }
 }
 
-#ifdef TRY1
-
-#define ADCx                     ADC1
-#define ADC_CHANNEL              ADC_Channel_7
-#define ADCx_CLK                 RCC_APB2Periph_ADC1
-#define ADCx_CHANNEL_GPIO_CLK    RCC_AHB1Periph_GPIOA
-#define GPIO_PIN                 GPIO_Pin_7
-#define GPIO_PORT                GPIOA
-#define DMA_CHANNELx             DMA_Channel_0
-#define DMA_STREAMx              DMA2_Stream0
-#define ADCx_DR_ADDRESS          ((uint32_t)0x4001204C)
-
-#define TIM1_CCR3_ADDRESS    0x4001223C
-
-TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-TIM_OCInitTypeDef  TIM_OCInitStructure;
-
-uint16_t uhTimerPeriod;
-uint16_t aSRC_Buffer[3] = {0, 0, 0};
-
-unsigned short uhADCxConvertedValue;
-
-static void ADC_Config(void);
-void Timer1Config();
-static void TIM_Config(void);
-
-int main(void) {
-    /* check ADC value changes with GND and VCC sampled */
-    /* look for 17kHz (ish) on timer pins */
-
-    ADC_Config();
-    ADC_SoftwareStartConv(ADCx);
-
-    Timer1Config();
-
-    /* todo: that start up cmd here */
-
-    while(1) {
-        printf("ADC: %d\n", uhADCxConvertedValue);
-    }
-
-}
-
-
-void Timer1Config() {
-
-    /* TIM Configuration */
-
-    TIM_Config();
-
-    /* TIM1 DMA Transfer example -------------------------------------------------
-  
-       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2 
-       prescaler is different from 1.   
-       TIM1CLK = 2 * PCLK2  
-       PCLK2 = HCLK / 2 
-       => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
-  
-       TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
-       SystemCoreClock is set to 168 MHz for STM32F4xx devices.
-
-       The objective is to configure TIM1 channel 3 to generate complementary PWM
-       signal with a frequency equal to 17.57 KHz:
-       - TIM1_Period = (SystemCoreClock / 17570) - 1
-       and a variable duty cycle that is changed by the DMA after a specific number of
-       Update DMA request.
-
-       The number of this repetitive requests is defined by the TIM1 Repetion counter,
-       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
-       value defined by the aSRC_Buffer.
-  
-       Note: 
-       SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
-       Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
-       function to update SystemCoreClock variable value. Otherwise, any configuration
-       based on this variable will be incorrect.  
-       -----------------------------------------------------------------------------*/
-  
-    /* Compute the value to be set in ARR regiter to generate signal frequency at 17.57 Khz */
-    uhTimerPeriod = (SystemCoreClock / 17570 ) - 1;
-    /* Compute CCR1 value to generate a duty cycle at 50% */
-    aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
-    /* Compute CCR1 value to generate a duty cycle at 37.5% */
-    aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
-    /* Compute CCR1 value to generate a duty cycle at 25% */
-    aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
-
-    /* TIM1 Peripheral Configuration -------------------------------------------*/
-    /* TIM1 clock enable */
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
-
-    /* Time Base configuration */
-    TIM_TimeBaseStructure.TIM_Prescaler = 0;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_Period = uhTimerPeriod;
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 3;
-
-    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-
-    /* Channel 3 Configuration in PWM mode */
-    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = aSRC_Buffer[0];
-    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
-    TIM_OCInitStructure.TIM_OCNPolarity = TIM_OCNPolarity_Low;
-    TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
-    TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCIdleState_Reset;
-
-    TIM_OC3Init(TIM1, &TIM_OCInitStructure);
-
-    /* Enable preload feature */
-    TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-  
-    /* TIM1 counter enable */
-    TIM_Cmd(TIM1, ENABLE);
-  
-    /* DMA enable*/
-    DMA_Cmd(DMA2_Stream6, ENABLE);
-  
-    /* TIM1 Update DMA Request enable */
-    TIM_DMACmd(TIM1, TIM_DMA_CC3, ENABLE);
-
-    /* Main Output Enable */
-    TIM_CtrlPWMOutputs(TIM1, ENABLE);
-}
-
-/**
-  * @brief  ADC3 channel07 with DMA configuration
-  * @note   This function Configure the ADC peripheral  
-            1) Enable peripheral clocks
-            2) DMA2_Stream0 channel2 configuration
-            3) Configure ADC Channel7 pin as analog input
-            4) Configure ADC3 Channel7 
-  * @param  None
-  * @retval None
-  */
-static void ADC_Config(void)
-{
-  ADC_InitTypeDef       ADC_InitStructure;
-  ADC_CommonInitTypeDef ADC_CommonInitStructure;
-  DMA_InitTypeDef       DMA_InitStructure;
-  GPIO_InitTypeDef      GPIO_InitStructure;
-
-  /* Enable ADCx, DMA and GPIO clocks ****************************************/ 
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
-  RCC_AHB1PeriphClockCmd(ADCx_CHANNEL_GPIO_CLK, ENABLE);  
-  RCC_APB2PeriphClockCmd(ADCx_CLK, ENABLE);
-  
-
-  /* DMA2 Stream0 channel2 configuration **************************************/
-  DMA_InitStructure.DMA_Channel = DMA_CHANNELx;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADCx_DR_ADDRESS;
-  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)&uhADCxConvertedValue;
-  DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
-  DMA_InitStructure.DMA_BufferSize = 1;
-  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Disable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
-  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;         
-  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
-  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-  DMA_Init(DMA_STREAMx, &DMA_InitStructure);
-  DMA_Cmd(DMA_STREAMx, ENABLE);
-
-  /* Configure ADC3 Channel7 pin as analog input ******************************/
-  GPIO_InitStructure.GPIO_Pin = GPIO_PIN;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL ;
-  GPIO_Init(GPIO_PORT, &GPIO_InitStructure);
-
-  /* ADC Common Init **********************************************************/
-  ADC_CommonInitStructure.ADC_Mode = ADC_Mode_Independent;
-  ADC_CommonInitStructure.ADC_Prescaler = ADC_Prescaler_Div2;
-  ADC_CommonInitStructure.ADC_DMAAccessMode = ADC_DMAAccessMode_Disabled;
-  ADC_CommonInitStructure.ADC_TwoSamplingDelay = ADC_TwoSamplingDelay_5Cycles;
-  ADC_CommonInit(&ADC_CommonInitStructure);
-
-  /* ADC3 Init ****************************************************************/
-  ADC_InitStructure.ADC_Resolution = ADC_Resolution_12b;
-  ADC_InitStructure.ADC_ScanConvMode = DISABLE;
-  ADC_InitStructure.ADC_ContinuousConvMode = ENABLE;
-  ADC_InitStructure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_None;
-  ADC_InitStructure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC1;
-  ADC_InitStructure.ADC_DataAlign = ADC_DataAlign_Right;
-  ADC_InitStructure.ADC_NbrOfConversion = 1;
-  ADC_Init(ADCx, &ADC_InitStructure);
-
-  /* ADC3 regular channel7 configuration *************************************/
-  ADC_RegularChannelConfig(ADCx, ADC_CHANNEL, 1, ADC_SampleTime_3Cycles);
-
-  /* Enable DMA request after last transfer (Single-ADC mode) */
-  ADC_DMARequestAfterLastTransferCmd(ADCx, ENABLE);
-
-  /* Enable ADC3 DMA */
-  ADC_DMACmd(ADCx, ENABLE);
-
-  /* Enable ADC3 */
-  ADC_Cmd(ADCx, ENABLE);
-}
-
-void Timer1Config() {
-
-    /* TIM Configuration */
-
-    TIM_Config();
-
-    /* TIM1 DMA Transfer example -------------------------------------------------
-  
-       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2 
-       prescaler is different from 1.   
-       TIM1CLK = 2 * PCLK2  
-       PCLK2 = HCLK / 2 
-       => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
-  
-       TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
-       SystemCoreClock is set to 168 MHz for STM32F4xx devices.
-
-       The objective is to configure TIM1 channel 3 to generate complementary PWM
-       signal with a frequency equal to 17.57 KHz:
-       - TIM1_Period = (SystemCoreClock / 17570) - 1
-       and a variable duty cycle that is changed by the DMA after a specific number of
-       Update DMA request.
-
-       The number of this repetitive requests is defined by the TIM1 Repetion counter,
-       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
-       value defined by the aSRC_Buffer.
-  
-       Note: 
-       SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
-       Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
-       function to update SystemCoreClock variable value. Otherwise, any configuration
-       based on this variable will be incorrect.  
-       -----------------------------------------------------------------------------*/
-  
-    /* Compute the value to be set in ARR regiter to generate signal frequency at 17.57 Khz */
-    uhTimerPeriod = (SystemCoreClock / 17570 ) - 1;
-    /* Compute CCR1 value to generate a duty cycle at 50% */
-    aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
-    /* Compute CCR1 value to generate a duty cycle at 37.5% */
-    aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
-    /* Compute CCR1 value to generate a duty cycle at 25% */
-    aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
-
-    /* TIM1 Peripheral Configuration -------------------------------------------*/
-    /* TIM1 clock enable */
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
-
-    /* Time Base configuration */
-    TIM_TimeBaseStructure.TIM_Prescaler = 0;
-    TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
-    TIM_TimeBaseStructure.TIM_Period = uhTimerPeriod;
-    TIM_TimeBaseStructure.TIM_ClockDivision = 0;
-    TIM_TimeBaseStructure.TIM_RepetitionCounter = 3;
-
-    TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
-
-    /* Channel 3 Configuration in PWM mode */
-    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
-    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
-    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
-    TIM_OCInitStructure.TIM_Pulse = aSRC_Buffer[0];
-    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
-    TIM_OCInitStructure.TIM_OCNPolarity = TIM_OCNPolarity_Low;
-    TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
-    TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCIdleState_Reset;
-
-    TIM_OC3Init(TIM1, &TIM_OCInitStructure);
-
-    /* Enable preload feature */
-    TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-  
-    /* TIM1 counter enable */
-    TIM_Cmd(TIM1, ENABLE);
-  
-    /* DMA enable*/
-    DMA_Cmd(DMA2_Stream6, ENABLE);
-  
-    /* TIM1 Update DMA Request enable */
-    TIM_DMACmd(TIM1, TIM_DMA_CC3, ENABLE);
-
-    /* Main Output Enable */
-    TIM_CtrlPWMOutputs(TIM1, ENABLE);
-}
-
-/* DR: note I dont think any of this is needed, except perhaps to check
-   timer frequency */
-
-/**
-  * @brief  Configure the TIM1 Pins.
-  * @param  None
-  * @retval None
-  */
-static void TIM_Config(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  DMA_InitTypeDef DMA_InitStructure;
-  
-  /* GPIOA and GPIOB clock enable */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
-
-  /* GPIOA Configuration: Channel 3 as alternate function push-pull */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 ;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
-  GPIO_Init(GPIOA, &GPIO_InitStructure); 
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
-
-  /* GPIOB Configuration: Channel 3N as alternate function push-pull */
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
-
-  /* DMA clock enable */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 , ENABLE);
-
-  DMA_DeInit(DMA2_Stream6);
-  DMA_InitStructure.DMA_Channel = DMA_Channel_6;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(TIM1_CCR3_ADDRESS) ;
-  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)aSRC_Buffer;
-  DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-  DMA_InitStructure.DMA_BufferSize = 3;
-  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_MemoryDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
-  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
-  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-
-  DMA_Init(DMA2_Stream6, &DMA_InitStructure);
-}
-#endif
