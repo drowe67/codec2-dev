@@ -33,25 +33,25 @@
 
 int main(void) {
     short  buf[N];
-    FILE  *fin;
+    FILE  *fplay;
 
     dac_open();
 
     while(1) {
-        fin = fopen("stm_in.raw", "rb");
-        if (fin == NULL) {
+        fplay = fopen("stm_in.raw", "rb");
+        if (fplay == NULL) {
             printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
             exit(1);
         }
     
         printf("Starting!\n");
 
-        while(fread(buf, sizeof(short), N, fin) == N) {
+        while(fread(buf, sizeof(short), N, fplay) == N) {
             while(dac_write(buf, N) == -1);
         }  
 
         printf("Finished!\n");
-        fclose(fin);
+        fclose(fplay);
     }
 
     /* let FIFO empty */
