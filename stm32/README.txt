@@ -38,14 +38,11 @@ Getting Started
    If necessary, edit the BINPATH variable in Makefile for your toolchain location
    $ make
 
-. Patching and build stlink:
+. Build stlink:
 
    $ cd ~
-   $ git clone https://github.com/texane/stlink.git
+   $ git clone https://github.com/shenki/stlink.git
    $ cd stlink
-   ~/stlink$ git checkout bbecbc1e81b15b85829149424d048d96bd844939
-   ~/stlink$ patch -p0 < ~/codec2-dev/stm32/stlink/stlink.patch
-   ~/stlink$ cp ~/codec2-dev/stm32/stlink/elfsym.* gdbserver
    ~/stlink$ sudo apt-get install libusb-1.0-0-dev libelf-dev automake 
    ~/stlink$ ./autogen.sh
    ~/stlink$ ./configure
