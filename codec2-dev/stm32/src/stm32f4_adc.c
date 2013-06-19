@@ -94,13 +94,14 @@ int main(void){
     }
     bufs = FS*REC_TIME_SECS/N;
 
+    printf("Starting!\n");
     for(i=0; i<bufs; i++) {
         //ConvertedValue = adc_convert();
         //printf("ConvertedValue = %d\n", ConvertedValue); 
         printf("adc_buf: %d %d  half: %d full: %d adc_overflow: %d\n", 
                adc_buf[0],adc_buf[ADC_BUF_SZ-1],
                half, full, adc_overflow);
-        while(fifo_read(DMA2_Stream0_fifo, buf, N) != -1);
+        while(fifo_read(DMA2_Stream0_fifo, buf, N) == -1);
         fwrite(buf, sizeof(short), N, frec);      
     }
     fclose(frec);
