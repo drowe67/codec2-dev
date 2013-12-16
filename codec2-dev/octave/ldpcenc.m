@@ -41,9 +41,10 @@ sim_in.Ntrials =  1000;
 if exist('deb')~=1, deb = 0; end
 sim_in.deb =    deb;
 
-sim_out = ldpc_proc(sim_in, 'test.mat');
+% init enc and dec
+% generate bits
+% encode
+% decode
+% measure BER
+ldpc_proc(sim_in, 'test.mat');
 
-figure(100); 
-semilogy(sim_out.Ebvec,  sim_out.BERvec)
-xlabel('Eb/N0')
-ylabel('BER')
