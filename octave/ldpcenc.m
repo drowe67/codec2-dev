@@ -15,11 +15,11 @@ cd(currentdir)
 ldpc;
 
 %
-sim_in.Eprob = 0.1; 
-disp([' test with erasure probability of ' num2str(sim_in.Eprob)]); 
+%sim_in.Eprob = 0.1; 
+%disp([' test with erasure probability of ' num2str(sim_in.Eprob)]); 
 
-sim_in.comment = 'test ldpc';
-sim_in.Esvec = 8:1/2:11; 
+%sim_in.comment = 'test ldpc';
+%sim_in.Esvec = 8:1/2:11; 
 
 %sim_in.rate = 3/4;
 %sim_in.framesize = 16200
