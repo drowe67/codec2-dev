@@ -20,6 +20,23 @@ function code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping)
     code_param.bits_per_symbol = log2(mod_order);
 endfunction
 
+% inserts a unique word into a frame of bits
+
+function frameout = insert_uw(framein, uw)
+
+    luw = length(uw);
+    lframein = length(framein);
+    spacing = lframein/luw;
+
+    frameout = [];
+
+    for i=1:luw
+        frameout(1+(i-1)*spacing+i-1:i*spacing+i-1) = framein(1+(i-1)*spacing:i*spacing);
+        frameout(i*spacing+i) = uw(i);
+    end
+
+endfunction
+
 function [codeword s] = ldpc_enc(data, code_param)
         codeword = LdpcEncode( data, code_param.H_rows, code_param.P_matrix );
         s = Modulate( codeword, code_param.S_matrix );
@@ -39,53 +56,18 @@ function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decode
     detected_data = x_hat(max_iterations,:);
 endfunction
 
-function sim_out = ldpc_proc(sim_in, resfile)
+% Packs a binary array into an array of 8 bit bytes, MSB first
 
-    rate = 3/4; 
-    framesize = 576;  
-
-    mod_order = 4; 
-    modulation = 'QPSK';
-    mapping = 'gray';
-
-    demod_type = 0;
-    decoder_type = 0;
-    max_iterations = 100;
-
-    code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping);
-
-    Ntrials = 84;
-    EsNo=10;
-
-    Tbits = Terrs = Ferrs = 0;
-    
-    data = [];
-    r = []; 
-    for nn = 1: Ntrials        
-        d = round( rand( 1, code_param.data_bits_per_frame ) );
-        data = [data d];
-        [codeword, s] = ldpc_enc(d, code_param);
-        code_param.code_bits_per_frame = length(codeword);
-        code_param.symbols_per_frame = length(s);
-        r = [r s];
+function packed = packmsb(unpacked)
+    packed = zeros(1,floor(length(unpacked)+7)/8);
+    bit = 7; byte = 1;
+    for i=1:length(unpacked)
+        packed(byte) = bitor(packed(byte), bitshift(unpacked(i),bit));
+        bit--;
+        if (bit < 0)
+            bit = 7;
+            byte++;
+        end 
     end
-
-    for nn = 1: Ntrials        
-        st = (nn-1)*code_param.symbols_per_frame + 1;
-        en = (nn)*code_param.symbols_per_frame;
-        detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r(st:en), EsNo);
-        st = (nn-1)*code_param.data_bits_per_frame + 1;
-        en = (nn)*code_param.data_bits_per_frame;
-        error_positions = xor( detected_data(1:code_param.data_bits_per_frame), data(st:en) );
-        Nerrs = sum( error_positions);
-        
-        if Nerrs>0, fprintf(1,'x'),  else fprintf(1,'.'),  end
-        if (rem(nn, 50)==0),  fprintf(1,'\n'),  end    
-        if Nerrs>0,  Ferrs = Ferrs +1;  end
-        Terrs = Terrs + Nerrs;
-        Tbits = Tbits + code_param.data_bits_per_frame;        
-    end
-
 endfunction
-
 

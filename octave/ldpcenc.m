@@ -1,50 +1,64 @@
-%test batch file   for the FSO-OOK simulations
+% ldpcenc.m
+% David Rowe 20 Dec 2013
 % 
-% this version uses WiMax eIRA codes and includes erasures 
+% LDPC encoder test program. Encodes and modulates a random data stream 
+
+% Start CML library
 
 currentdir = pwd;
-thiscomp = computer;
-
 addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
 cd /home/david/tmp/cml
-CmlStartup              % note that this is not in the cml path!
-disp('added cluster path and run CmlStartup')
-
+CmlStartup                           % note that this is not in the cml path!
 cd(currentdir)
+
+% Our LDPC library
 
 ldpc;
 
-%
-%sim_in.Eprob = 0.1; 
-%disp([' test with erasure probability of ' num2str(sim_in.Eprob)]); 
+% Start simulation
 
-%sim_in.comment = 'test ldpc';
-%sim_in.Esvec = 8:1/2:11; 
+rate = 3/4; 
+framesize = 576;  
 
-%sim_in.rate = 3/4;
-%sim_in.framesize = 16200
+mod_order = 4; 
+modulation = 'QPSK';
+mapping = 'gray';
 
-% sim_in.rate = 0.5;
-% sim_in.framesize = 204;
+demod_type = 0;
+decoder_type = 0;
+max_iterations = 100;
 
-sim_in.rate = 3/4; 
-sim_in.framesize = 576;  
+vocoderframesize = 52;
+nvocoderframes = 8;
 
-sim_in.mod_order = 4; 
-sim_in.modulation = 'QPSK';
-sim_in.mapping = 'gray';
+code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping);
 
-sim_in.Lim_Ferrs= 30;
-sim_in.Ntrials =  1000;
+data = [];
+r = []; 
+
+% Encode a bunch of frames
+
+Nframes = 100;
+
+% repeat same codeword frame for now to ease testing
+
+vd = round( rand( 1, vocoderframesize*nvocoderframes) );
+d = insert_uw(vd, [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0]);
+
+data = [data d];
+[codeword, s] = ldpc_enc(d, code_param);
+code_param.code_bits_per_frame = length(codeword);
+code_param.symbols_per_frame = length(s);
+packedcodeword = packmsb(codeword);
+
+fc=fopen("codeword.bin","wb");
+for nn = 1: Nframes        
+    fwrite(fc,packedcodeword,"char");
+end
+fclose(fc);
+
+printf("framesize: %d data_bits_per_frame: %d code_bits_per_frame: %d\n", ...
+        framesize, code_param.data_bits_per_frame,  code_param.code_bits_per_frame);
 
 
-if exist('deb')~=1, deb = 0; end
-sim_in.deb =    deb;
-
-% init enc and dec
-% generate bits
-% encode
-% decode
-% measure BER
-ldpc_proc(sim_in, 'test.mat');
-
+ 
