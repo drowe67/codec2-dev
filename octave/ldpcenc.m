@@ -39,11 +39,12 @@ r = [];
 % Encode a bunch of frames
 
 Nframes = 100;
+uw = [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0];
 
 % repeat same codeword frame for now to ease testing
 
 vd = round( rand( 1, vocoderframesize*nvocoderframes) );
-d = insert_uw(vd, [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0]);
+d  = insert_uw(vd, uw);
 
 data = [data d];
 [codeword, s] = ldpc_enc(d, code_param);
@@ -53,12 +54,43 @@ packedcodeword = packmsb(codeword);
 
 fc=fopen("codeword.bin","wb");
 for nn = 1: Nframes        
-    fwrite(fc,packedcodeword,"char");
+    fwrite(fc,packedcodeword,"uchar");
 end
 fclose(fc);
 
 printf("framesize: %d data_bits_per_frame: %d code_bits_per_frame: %d\n", ...
         framesize, code_param.data_bits_per_frame,  code_param.code_bits_per_frame);
 
+% rx simulation (separate later)
 
- 
+mod_uw = build_mod_uw(uw, 2*length(vd)/length(uw));
+
+lpackedcodeword=length(packedcodeword);
+fc=fopen("codeword.bin","rb");
+lpackedmodem = 72/8;
+mod_codeword = zeros(1, code_param.code_bits_per_frame/2);
+lmod_codeword = code_param.code_bits_per_frame/2;
+
+for m=1:16
+
+    % read in one modem frame at a time
+
+    packedmodem = fread(fc,lpackedmodem,"uchar");
+    unpackedmodem = unpackmsb(packedmodem);
+
+    j = 1;
+    for i=1:2:length(unpackedmodem)
+        mod_unpackedmodem(j) = qpsk_mod(unpackedmodem(i:i+1));
+        j += 1;
+    end
+
+    % keep buffer of one entire codeword
+
+    mod_codeword(1:lmod_codeword-length(mod_unpackedmodem)) = mod_codeword(length(mod_unpackedmodem)+1:lmod_codeword);
+    mod_codeword(lmod_codeword-length(mod_unpackedmodem)+1:lmod_codeword) = mod_unpackedmodem;
+
+    look_for_uw(10*mod_codeword(1:length(mod_uw)), mod_uw)
+end
+
+fclose(fc);
+
