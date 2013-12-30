@@ -102,15 +102,16 @@ endfunction
 
 % Uses the UW to determine when we have a full codeword ready for decoding
 
-function found_uw = look_for_uw(mem_rx_symbols, mod_uw)
+function [found_uw corr] = look_for_uw(mem_rx_symbols, mod_uw)
     sparse_mem_rx_symbols = mem_rx_symbols(find(mod_uw));
 
     % correlate with ref UW
 
     num = (mem_rx_symbols * mod_uw') .^ 2;
     den = (sparse_mem_rx_symbols * sparse_mem_rx_symbols') * (mod_uw * mod_uw');
-
-    found_uw = abs(num/(den+1E-6)) > 0.8;
+    
+    corr = abs(num/(den+1E-6));
+    found_uw = corr > 0.8;
 endfunction
 
 
