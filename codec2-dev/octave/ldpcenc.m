@@ -27,6 +27,7 @@ mapping = 'gray';
 demod_type = 0;
 decoder_type = 0;
 max_iterations = 100;
+EsNo = 10;
 
 vocoderframesize = 52;
 nvocoderframes = 8;
@@ -58,8 +59,8 @@ for nn = 1: Nframes
 end
 fclose(fc);
 
-printf("framesize: %d data_bits_per_frame: %d code_bits_per_frame: %d\n", ...
-        framesize, code_param.data_bits_per_frame,  code_param.code_bits_per_frame);
+%printf("framesize: %d data_bits_per_frame: %d code_bits_per_frame: %d\n", ...
+%        framesize, code_param.data_bits_per_frame,  code_param.code_bits_per_frame);
 
 % rx simulation (separate later)
 
@@ -71,7 +72,7 @@ lpackedmodem = 72/8;
 mod_codeword = zeros(1, code_param.code_bits_per_frame/2);
 lmod_codeword = code_param.code_bits_per_frame/2;
 
-for m=1:16
+for m=1:8
 
     % read in one modem frame at a time
 
@@ -89,8 +90,28 @@ for m=1:16
     mod_codeword(1:lmod_codeword-length(mod_unpackedmodem)) = mod_codeword(length(mod_unpackedmodem)+1:lmod_codeword);
     mod_codeword(lmod_codeword-length(mod_unpackedmodem)+1:lmod_codeword) = mod_unpackedmodem;
 
-    look_for_uw(10*mod_codeword(1:length(mod_uw)), mod_uw)
+    uw_sync = look_for_uw(mod_codeword(1:length(mod_uw)), mod_uw);
+    if (uw_sync)
+        % force UW symbols as they are known (is this needed?)
+
+        % LDPC decode
+
+        detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, mod_codeword, EsNo);
+
+        % unpack payload data, removing UW
+
+        vd_rx = remove_uw(detected_data(1:code_param.data_bits_per_frame), length(vd), length(uw));
+
+        % measure BER
+
+        error_positions = xor(vd, vd_rx);
+        Nerrs = sum(error_positions);
+        if Nerrs>0, fprintf(1,'x'),  else fprintf(1,'.'),  end
+
+        % save packed payload data to disk
+    end
 end
 
+fprintf(1,'\n')
 fclose(fc);
 

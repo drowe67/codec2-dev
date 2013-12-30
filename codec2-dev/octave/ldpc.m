@@ -23,12 +23,12 @@ endfunction
 % Gray coded QPSK modulation function
 
 function symbol = qpsk_mod(two_bits)
-    two_bits_decimal = sum(two_bits .* [1 2]); 
+    two_bits_decimal = sum(two_bits .* [2 1]); 
     switch(two_bits_decimal)
-        case (0) symbol =  1+j;
-        case (1) symbol = -1+j;
-        case (2) symbol =  1-j;
-        case (3) symbol = -1-j;
+        case (0) symbol =  1;
+        case (1) symbol =  j;
+        case (2) symbol = -j;
+        case (3) symbol = -1;
     endswitch
 endfunction
 
@@ -56,8 +56,29 @@ function frameout = insert_uw(framein, uw)
         pout += 2;
         luw -= 2;
     end
+endfunction
+
+% removes a unique word from a frame of bits.  The UW bits are spread
+% throughout the input frame 2 bits at a time.
+
+function frameout = remove_uw(framein, lvd, luw)
+
+    spacing = 2*lvd/luw;
+
+    frameout = [];
+
+    pin = 1; pout = 1;
+    while (luw)
+        %printf("pin %d pout %d luw %d  ", pin, pout, luw);
+        %printf("pin+spacing-1 %d lvd %d lframein: %d\n", pin+spacing-1, lvd, length(framein));
+        frameout(pout:pout+spacing-1) = framein(pin:pin+spacing-1);
+        pin  += spacing + 2; 
+        pout += spacing;
+        luw  -= 2;
+    end
 
 endfunction
+
 
 % builds up a sparse QPSK modulated version version of the UW for use
 % in UW sync at the rx
