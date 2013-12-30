@@ -17,6 +17,8 @@ ldpc;
 
 % Start simulation
 
+rand('state',1);
+
 rate = 3/4; 
 framesize = 576;  
 
@@ -28,6 +30,7 @@ demod_type = 0;
 decoder_type = 0;
 max_iterations = 100;
 EsNo = 10;
+Eprob = 0.18;
 
 vocoderframesize = 52;
 nvocoderframes = 8;
@@ -72,11 +75,13 @@ lpackedmodem = 72/8;
 mod_codeword = zeros(1, code_param.code_bits_per_frame/2);
 lmod_codeword = code_param.code_bits_per_frame/2;
 
-for m=1:8
+Terrs = 0; Ferrs = 0; Tbits = 0; Tframes = 0; nerr = [];
+corr = []; n = 0;
+sync_state = 0; sync_count = 0;
 
-    % read in one modem frame at a time
-
-    packedmodem = fread(fc,lpackedmodem,"uchar");
+[packedmodem, count] = fread(fc,lpackedmodem,"uchar");
+while (count == lpackedmodem)
+    n++;
     unpackedmodem = unpackmsb(packedmodem);
 
     j = 1;
@@ -85,13 +90,22 @@ for m=1:8
         j += 1;
     end
 
+    erasures = rand(1,length(mod_unpackedmodem))<Eprob; 
+    mod_unpackedmodem(erasures) = 0;
+
     % keep buffer of one entire codeword
 
     mod_codeword(1:lmod_codeword-length(mod_unpackedmodem)) = mod_codeword(length(mod_unpackedmodem)+1:lmod_codeword);
     mod_codeword(lmod_codeword-length(mod_unpackedmodem)+1:lmod_codeword) = mod_unpackedmodem;
 
-    uw_sync = look_for_uw(mod_codeword(1:length(mod_uw)), mod_uw);
+    [uw_sync corr(n)] = look_for_uw(mod_codeword(1:length(mod_uw)), mod_uw);
     if (uw_sync)
+      sync_state = 1;
+    end
+
+    if (sync_state && (sync_count == 0))
+        Tframes++;
+
         % force UW symbols as they are known (is this needed?)
 
         % LDPC decode
@@ -106,12 +120,29 @@ for m=1:8
 
         error_positions = xor(vd, vd_rx);
         Nerrs = sum(error_positions);
-        if Nerrs>0, fprintf(1,'x'),  else fprintf(1,'.'),  end
+        if Nerrs>0, fprintf(1,'x'); Ferrs++; ,  else fprintf(1,'.'),  end
+        Tbits += length(vd);
+        Terrs += Nerrs;
+        nerr(Tframes) = Nerrs;
 
         % save packed payload data to disk
     end
-end
 
-fprintf(1,'\n')
+    if (sync_state)
+        sync_count++;
+        if (sync_count == 8)
+            sync_count = 0;
+        end
+    end
+
+    % read in one modem frame at a time
+
+    [packedmodem, count] = fread(fc, lpackedmodem, "uchar");
+end
 fclose(fc);
 
+fprintf(1,"\nFrames: %d bits: %d errors: %d BER = %f FER = %f\n", Tframes, Tbits, Terrs, Terrs/Tbits, Ferrs/Tframes);
+subplot(211)
+plot(corr);
+subplot(212)
+plot(nerr);
