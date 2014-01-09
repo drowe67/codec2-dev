@@ -31,7 +31,7 @@ demod_type = 0;
 decoder_type = 0;
 max_iterations = 100;
 EsNo = 10;
-Eprob = 0.15;
+Eprob = 0.0;
 
 vocoderframesize = 52;
 nvocoderframes = 8;
@@ -42,8 +42,6 @@ code_param.code_bits_per_frame = 576;
 
 data = [];
 r = []; 
-
-% Encoder: Generate simulated vocoder data, insert UW, and LPDC encode ---------------
 
 Nframes = 100;
 uw = [1 0 1 0 1 0 1 0 1 0 1 0 1 0 1 0];
@@ -64,12 +62,14 @@ lmod_codeword = code_param.code_bits_per_frame/2;
 Terrs = 0; Ferrs = 0; Tbits = 0; Tframes = 0; nerr = [];
 corr = []; n = 0;
 sync_state = 0; sync_count = 0;
+mod_unpackedmodem_log = [];
 
 [mod_unpackedmodem_float32, count] = fread(fm,nbitspermodemframe, "float32");
 while (count == nbitspermodemframe)
     n++;
 
     mod_unpackedmodem = mod_unpackedmodem_float32(1:2:nbitspermodemframe) + j*mod_unpackedmodem_float32(2:2:nbitspermodemframe);
+    mod_unpackedmodem_log = [mod_unpackedmodem_log mod_unpackedmodem];
     erasures = rand(1,length(mod_unpackedmodem)) < Eprob; 
     mod_unpackedmodem(erasures) = 0;
 
@@ -121,7 +121,13 @@ while (count == nbitspermodemframe)
 end
 
 fprintf(1,"\nFrames: %d bits: %d errors: %d BER = %f FER = %f\n", Tframes, Tbits, Terrs, Terrs/Tbits, Ferrs/Tframes);
-subplot(211)
-plot(corr);
-subplot(212)
-plot(nerr);
+%subplot(211)
+%plot(corr);
+%subplot(212)
+%plot(nerr);
+figure(1)
+clf;
+[n m] = size(mod_unpackedmodem_log);
+plot( real(mod_unpackedmodem_log), imag(mod_unpackedmodem_log), '+')
+axis([-2 2 -2 2]);
+title('Scatter Diagram');
