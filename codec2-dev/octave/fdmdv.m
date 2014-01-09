@@ -964,6 +964,32 @@ function png_file(fig, pngfilename)
   print(pngname, '-dpng', "-S800,600")
 endfunction
 
+
+% dump rx_bits in hex
+
+function dump_bits(rx_bits)
+
+    % pack into bytes, MSB first
+
+    packed = zeros(1,floor(length(rx_bits)+7)/8);
+    bit = 7; byte = 1;
+    for i=1:length(rx_bits)
+        packed(byte) = bitor(packed(byte), bitshift(rx_bits(i),bit));
+        bit--;
+        if (bit < 0)
+            bit = 7;
+            byte++;
+        end 
+    end
+
+    for i=1:length(packed)
+        printf("0x%02x ", packed(i)); 
+    end
+    printf("\n");
+
+endfunction
+
+
 % Initialise ----------------------------------------------------
 
 global pilot_bit;

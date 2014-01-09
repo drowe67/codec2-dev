@@ -8,7 +8,7 @@
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename)
+function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symbolfilename)
 
   fdmdv; % include modem code
   
@@ -46,7 +46,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename)
 
   % misc states
 
-  nin = M; % timing correction for sample rate differences
+  nin = M;                 % timing correction for sample rate differences
   foff = 0;
   track_log = [];
   track = 0;
@@ -58,6 +58,14 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename)
   Nspec=1024;
   spec_mem=zeros(1,Nspec);
   SdB = zeros(1,Nspec);
+
+  % optionally save output symbols 
+
+  if nargin == 5
+    fm = fopen(symbolfilename,"wb");
+    dual_rx_symbols = zeros(1, 2*Nc);
+    dual_rx_bits = zeros(1,2*Nc*Nb);
+  end
 
   % Main loop ----------------------------------------------------
 
@@ -117,6 +125,28 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename)
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
     [rx_bits sync f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+
+    % optionally save output symbols 
+
+    if (nargin == 5) && (track == 1)
+      if sync == 1 
+          dual_rx_symbols(Nc+1:2*Nc) = rx_symbols(1:Nc).*conj(prev_rx_symbols(1:Nc)./abs(prev_rx_symbols(1:Nc)));
+          dual_rx_symbols_float32 = []; k = 1;
+          for i=1:2*Nc
+              dual_rx_symbols_float32(k++) = real(dual_rx_symbols(i));
+              dual_rx_symbols_float32(k++) = imag(dual_rx_symbols(i));
+          end
+          fwrite(fm, dual_rx_symbols_float32, "float32");
+          dual_rx_bits(Nc*Nb+1:2*Nc*Nb) = rx_bits;
+          dump_bits(dual_rx_bits);
+      else
+          dual_rx_symbols(1:Nc) = rx_symbols(1:Nc).*conj(prev_rx_symbols(1:Nc)./abs(prev_rx_symbols(1:Nc)));
+          dual_rx_bits(1:Nc*Nb) = rx_bits;
+      end
+    end
+
+    % update some states
+
     [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
     snr_est = calc_snr(sig_est, noise_est);
     snr_est_log = [snr_est_log snr_est];
@@ -285,12 +315,13 @@ if 0
   axis([1 lep/(Nc*Nb) 0 Nc])
 end
 
-  % save error pattern file
+  % optionally save error pattern file
 
   if nargin == 4
     fout = fopen(errorpatternfilename, "wb");
     fwrite(fout, error_pattern_log, "short");
     fclose(fout);
   end
+
 
 endfunction
