@@ -52,6 +52,8 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
   track = 0;
   fest_state = 0;
   bad_sync = 0;
+  sync_track = 0;
+  entered_track_log = [];
 
   % spectrum states
 
@@ -93,7 +95,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
     
     if track == 0
-      foff  = foff_coarse;
+      foff  = foff_coarse = 0;
     end
     foff_log = [ foff_log foff ];
     foff_rect = exp(j*2*pi*foff/Fs);
@@ -128,8 +130,17 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
     % optionally save output symbols 
 
-    if (nargin == 5) && (track == 1)
-      if sync == 1 
+    if (nargin == 5)
+
+      % this free runs, and is reset by an "entered sync" state
+
+      if (sync_track == 0)
+         sync_track = 1;
+      else
+         sync_track = 0; 
+      end
+
+      if (track == 1) && (sync_track == 1)
           dual_rx_symbols(Nc+1:2*Nc) = rx_symbols(1:Nc).*conj(prev_rx_symbols(1:Nc)./abs(prev_rx_symbols(1:Nc)));
           dual_rx_symbols_float32 = []; k = 1;
           for i=1:2*Nc
@@ -138,7 +149,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
           end
           fwrite(fm, dual_rx_symbols_float32, "float32");
           dual_rx_bits(Nc*Nb+1:2*Nc*Nb) = rx_bits;
-          dump_bits(dual_rx_bits);
+          %dump_bits(dual_rx_bits);
       else
           dual_rx_symbols(1:Nc) = rx_symbols(1:Nc).*conj(prev_rx_symbols(1:Nc)./abs(prev_rx_symbols(1:Nc)));
           dual_rx_bits(1:Nc*Nb) = rx_bits;
@@ -156,8 +167,12 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
     % freq est state machine
 
-    [track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
+    [entered_track track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
     track_log = [track_log track];
+    if (entered_track == 1)
+        sync_track = 1;
+    end
+    entered_track_log = [entered_track_log entered_track];
 
     % count bit errors if we find a test frame
 
@@ -196,6 +211,14 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
   end
  
+  if nargin == 5
+    fclose(fm);
+    etfilename = strcat(strtok(symbolfilename,"."),"_et.bin");
+    fet = fopen(etfilename, "wb");
+    fwrite(fet, entered_track_log, "short");
+    fclose(fet);
+  end
+
   % ---------------------------------------------------------------------
   % Print Stats
   % ---------------------------------------------------------------------

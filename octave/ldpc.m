@@ -1,15 +1,5 @@
 % ldpc.m
-% ldpc functions
-
-% LDPC demo;   Bill Cowley 
-% Call the CML routines and simulate one set of SNRs.   See test_ldpc1.m
-%
-% sim_in the input parameter structure
-% sim_out contains BERs and other stats for each value of SNR
-% resfile is the result file
-%
-% 4/oct/2013:   edited to use the WiMax eIRA codes 
-%               see 'help InitializeWiMaxLDPC' for parameter values 
+% LDPC functions
 
 1;
 
@@ -42,7 +32,6 @@ function frameout = insert_uw(framein, uw)
     spacing = 2*lframein/luw;
 
     frameout = [];
-    mod_uw = [];
 
     pin = 1; pout = 1; puw = 1;
     while (luw)
@@ -51,7 +40,6 @@ function frameout = insert_uw(framein, uw)
         pin += spacing; 
         pout += spacing;
         frameout(pout:pout+1) = uw(puw:puw+1);
-        mod_uw(pout:pout+1) = qpsk_mod(uw(puw:puw+1));
         puw += 2;
         pout += 2;
         luw -= 2;
@@ -78,6 +66,29 @@ function frameout = remove_uw(framein, lvd, luw)
     end
 
 endfunction
+
+
+% removes a unique word from a frame of symbols.  The UW symbols are spread
+% throughout the input frame 1 symbol at a time.
+
+function framesymbolsout = remove_uw_symbols(framesymbolsin, ldatasymbols, luwsymbols)
+
+    spacing = ldatasymbols/luwsymbols;
+
+    framesymbolsout = [];
+
+    pin = 1; pout = 1;
+    while (luwsymbols)
+        %printf("pin %d pout %d luw %d  ", pin, pout, luwsymbols);
+        %printf("pin+spacing-1 %d ldatasymbols %d lframein: %d\n", pin+spacing-1, ldatasymbols, length(framesymbolsin));
+        framesymbolsout(pout:pout+spacing-1) = framesymbolsin(pin:pin+spacing-1);
+        pin  += spacing + 1; 
+        pout += spacing;
+        luwsymbols--;
+    end
+
+endfunction
+
 
 
 % builds up a sparse QPSK modulated version version of the UW for use
@@ -166,3 +177,21 @@ function unpacked = unpackmsb(packed)
     end
 endfunction
 
+
+% symbol interleaver that acts on bits 2 at a time
+
+function y = interleave_bits(interleaver, x)
+    y =  zeros(1,length(x));
+    for i = 1:length(interleaver)
+        dst = interleaver(i);
+        y(2*(dst-1)+1:2*dst) = x(2*(i-1)+1:2*(i));
+    end
+endfunction
+
+% symbol de-interleaver
+
+function x = deinterleave_symbols(interleaver, y)
+    for i = 1:length(interleaver)
+        x(i) = y(interleaver(i));
+    end
+endfunction

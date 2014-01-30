@@ -805,7 +805,9 @@ endfunction
 % then switch to a more robust tracking algorithm.  If we lose sync we switch
 % back to acquire mode for fast-requisition.
 
-function [track state bad_sync] = freq_state(sync_bit, state, bad_sync)
+function [entered_track track state bad_sync] = freq_state(sync_bit, state, bad_sync)
+
+  entered_track = 0;
 
   % acquire state, look for 6 symbol 010101 sequence from sync bit
 
@@ -845,6 +847,7 @@ function [track state bad_sync] = freq_state(sync_bit, state, bad_sync)
   end
   if state == 5
     if sync_bit == 1
+      entered_track = 1;
       next_state = 6;
       bad_sync = 0;
     else 
