@@ -1946,7 +1946,6 @@ int encode_WoE(MODEL *model, float e, float xq[])
 void decode_WoE(MODEL *model, float *e, float xq[], int n1)
 {
   int          i;
-  float        err[2];
   const float *codebook1 = ge_cb[0].cb;
   int          ndim = ge_cb[0].k;
   float Wo_min = TWO_PI/P_MAX;
@@ -1955,7 +1954,6 @@ void decode_WoE(MODEL *model, float *e, float xq[], int n1)
   for (i=0;i<ndim;i++)
   {
     xq[i] = ge_coeff[i]*xq[i] + codebook1[ndim*n1+i];
-    err[i] -= codebook1[ndim*n1+i];
   }
 
   //printf("dec: %f %f\n", xq[0], xq[1]);
