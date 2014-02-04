@@ -719,7 +719,7 @@ static void gain_shape_sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 
     /* vector quantise */
         
-    for(m=0; m<=MAX_AMP; m++) {
+    for(m=0; m<MAX_AMP; m++) {
 	sparse_pe_out[m] = sparse_pe_in[m];
     }
 
