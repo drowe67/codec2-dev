@@ -59,18 +59,18 @@ function sim_out = ber_test(sim_in, modulation)
 
     % design root nyquist (root raised cosine) filter and init tx and rx filter states
 
-    alpha = 0.5; T=1/Fs; Nsym=7; M=Fs/Rs;
+    alpha = 0.5; T=1/Fs; Nfiltsym=7; M=Fs/Rs;
     if floor(Fs/Rs) != Fs/Rs
         printf("oversampling ratio must be an integer\n");
         exit;
     end
-    hrn = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
+    hrn = gen_rn_coeffs(alpha, T, Rs, Nfiltsym, M);
     Nfilter = length(hrn);
     tx_filter_memory = zeros(1, Nfilter);
-    tx_baseband_log = [];
     rx_filter_memory = zeros(1, Nfilter);
-    rx_baseband_log = [];
-    s_delay_line_filt = zeros(1,Nsym);
+    s_delay_line_filt = zeros(1,Nfiltsym);
+ 
+    wc = 2*pi*1500/Fs;
 
     for ne = 1:length(Esvec)
         Es = Esvec(ne);
@@ -78,6 +78,15 @@ function sim_out = ber_test(sim_in, modulation)
     
         variance = Fs/(2*Rs*EsNo);
         Terrs = 0;  Tbits = 0;  Ferrs = 0;
+        printf("EsNo (dB): %f EsNo: %f variance: %f\n", Es, EsNo, variance);
+
+        tx_filt_log = [];
+        rx_filt_log = [];
+        rx_baseband_log = [];
+        tx_baseband_log = [];
+        noise_log = [];
+
+        tx_phase = rx_phase = 0;
 
         for nn = 1: Ntrials
                   
@@ -101,11 +110,11 @@ function sim_out = ber_test(sim_in, modulation)
 
             % root nyquist filter symbols
 
-            for k=1:Nsym
+            for k=1:Nsymb
 
                % tx filter symbols
 
-               tx_baseband = zeros(1,M);
+               tx_filt = zeros(1,M);
 
                % tx filter each symbol, generate M filtered output samples for each symbol.
                % Efficient polyphase filter techniques used as tx_filter_memory is sparse
@@ -113,32 +122,39 @@ function sim_out = ber_test(sim_in, modulation)
                tx_filter_memory(Nfilter) = s_ch(k);
 
                for i=1:M
-                   tx_baseband(i) = M*tx_filter_memory(M:M:Nfilter) * hrn(M-i+1:M:Nfilter)';
+                   tx_filt(i) = M*tx_filter_memory(M:M:Nfilter) * hrn(M-i+1:M:Nfilter)';
                end
                tx_filter_memory(1:Nfilter-M) = tx_filter_memory(M+1:Nfilter);
                tx_filter_memory(Nfilter-M+1:Nfilter) = zeros(1,M);
-               tx_baseband_log = [tx_baseband_log tx_baseband];
+               tx_filt_log = [tx_filt_log tx_filt];
+               
+               % AWGN noise and phase/freq offset channel simulation
 
                noise = sqrt(variance)*( randn(1,M) + j*randn(1,M) );
-               rx_baseband = tx_baseband.*exp(j*phase_offset) + noise;
+               noise_log = [noise_log noise];
+               rx_baseband = tx_filt.*exp(j*phase_offset) + noise;
                phase_offset += w_offset;
-
+               
                % rx filter symbol
 
                rx_filter_memory(Nfilter-M+1:Nfilter) = rx_baseband;
                rx_filt = rx_filter_memory * hrn';
                rx_filter_memory(1:Nfilter-M) = rx_filter_memory(1+M:Nfilter);
-               rx_baseband_log = [rx_baseband_log rx_filt];
+               rx_filt_log = [rx_filt_log rx_filt];
 
                % delay in tx data to compensate for filtering
 
-               s_delay_line_filt(1:Nsym-1) = s_delay_line_filt(2:Nsym);
-               s_delay_line_filt(Nsym) = s(k);
+               s_delay_line_filt(1:Nfiltsym-1) = s_delay_line_filt(2:Nfiltsym);
+               s_delay_line_filt(Nfiltsym) = s(k);
                tx_bits(2*(k-1)+1:2*k) = qpsk_demod(s_delay_line_filt(1));
                s(k) = s_delay_line_filt(1);   % input to phase est later
 
-               s_ch(k) = rx_filt;
+               s_ch(k) = rx_filt;               
             end
+
+            %noise = sqrt(variance)*( randn(1,Nsymb) + j*randn(1,Nsymb) );
+            %s_ch = s_ch.*exp(j*phase_offset) + noise;
+            %phase_offset += w_offset;
 
             % Channel simulation
 
@@ -190,51 +206,40 @@ function sim_out = ber_test(sim_in, modulation)
 
             % Measure BER
 
-            % discard bits from first 2*Nsym symbols as tx and rx filter memories not full
+            % discard bits from first 2*Nfiltsym symbols as tx and rx filter memories not full
 
             if nn == 1
-                tx_bits = tx_bits(2*bps*Nsym+1:length(tx_bits));
-                rx_bits = rx_bits(2*bps*Nsym+1:length(rx_bits));
+                tx_bits = tx_bits(2*bps*Nfiltsym+1:length(tx_bits));
+                rx_bits = rx_bits(2*bps*Nfiltsym+1:length(rx_bits));
             end
 
             error_positions = xor( rx_bits, tx_bits );
             Nerrs = sum(error_positions);
             Terrs += Nerrs;
-            nerr(nn) = Nerrs;
-       
-            if Nerrs>0,  Ferrs = Ferrs +1;  end
-            Terrs = Terrs + Nerrs;
-            Tbits = Tbits + framesize;
+            Tbits = Tbits + length(tx_bits);
 
         end
     
         TERvec(ne) = Terrs;
         FERvec(ne) = Ferrs;
         BERvec(ne) = Terrs/Tbits;
+        printf("  Terrs: %d BER %f BER theory %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
+               Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), var(tx_filt_log), var(noise_log),
+               var(tx_filt_log)/Rs, var(noise_log)/Fs, (var(tx_filt_log)/Rs)/(var(noise_log)/Fs));
     end
     
     Ebvec = Esvec - 10*log10(bps);
     sim_out.BERvec = BERvec;
+    sim_out.BER_theoryvec = 0.5*erfc(sqrt(10.^(Ebvec/10)));
     sim_out.Ebvec = Ebvec;
     sim_out.FERvec = FERvec;
     sim_out.TERvec  = TERvec;
 
     if plot_scatter
         figure(2);
-        scat = rx_symb_log(2*Nsym:length(rx_symb_log)) .* exp(j*pi/4);
-
+        clf;
+        scat = rx_symb_log(2*Nfiltsym:length(rx_symb_log)) .* exp(j*pi/4);
         plot(real(scat), imag(scat),'+');
-        figure(3);
-        clf
-        plot(real(spread(1:100)));
-        hold on
-        plot(imag(spread(1:100)),'r')
-        hold off;
-        figure(4)
-        subplot(211)
-        plot(imag(tx_baseband_log(1:30*M)));
-        subplot(212)
-        plot(imag(rx_symb_log(2*Nsym:length(rx_symb_log))));
     end
 endfunction
 
@@ -261,8 +266,8 @@ endfunction
 % Start simulation ---------------------------------------
 
 sim_in.Esvec            = 1:10; 
-sim_in.Ntrials          = 10;
-sim_in.framesize        = 100;
+sim_in.Ntrials          = 100;
+sim_in.framesize        = 30;
 sim_in.phase_offset     = 0;
 sim_in.phase_est        = 0;
 sim_in.w_offset         = 0;
@@ -280,10 +285,10 @@ sim_in.w_offset         = 0;
 %sim_qpsk_coh            = ber_test(sim_in, 'qpsk');
 
 sim_in.phase_offset     = 0;
-sim_in.phase_est        = 1;
+sim_in.phase_est        = 0;
 sim_in.w_offset         = 0;  
 sim_in.plot_scatter     = 1;
-sim_in.Esvec            = 10;
+sim_in.Esvec            = 7;
 sim_in.hf_sim           = 0;
 sim_qpsk_scatter        = ber_test(sim_in, 'qpsk');
 
@@ -291,6 +296,7 @@ figure(1);
 clf;
 semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec)
 hold on;
+semilogy(sim_qpsk.Ebvec, sim_qpsk.BER_theoryvec,'r;coherent;')
 %semilogy(sim_qpsk_coh.Ebvec, sim_qpsk_coh.BERvec,'r;coherent;')
 hold off;
 xlabel('Eb/N0')
