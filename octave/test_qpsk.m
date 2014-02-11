@@ -1,17 +1,20 @@
 % test_qpsk.m
 % David Rowe Feb 2014
 %
-% Single sample per symbol QPSK modem simulation, based on code by Bill Cowley
-% Generates curves BER versus E/No curves for different modems.  Design to
-% test perform initial tests on coherent demodulation for HF channels without
-% building a full blown modem.  Lacks filtering, timing estimation, frame sync.
-% 
+% QPSK modem simulation, initially based on code by Bill Cowley
+% Generates curves BER versus E/No curves for different modems.
+% Design to test coherent demodulation ideas on HF channels without
+% building a full blown modem.  Lacks timing estimation, frame sync.
+
+% TODO
+%   [ ] put spreading sample files sonewhere useful
 
 1;
 
 % main test function 
 
 function sim_out = ber_test(sim_in, modulation)
+    Fs = 8000;
 
     framesize        = sim_in.framesize;
     Ntrials          = sim_in.Ntrials;
@@ -22,8 +25,7 @@ function sim_out = ber_test(sim_in, modulation)
     plot_scatter     = sim_in.plot_scatter;
     Rs               = sim_in.Rs;
     hf_sim           = sim_in.hf_sim;
-    hf_spread_hz     = sim_in.hf_spread_hz;
-    hf_delay_samples = sim_in.hf_delay_samples;
+    Nhfdelay         = floor(sim_in.hf_delay_ms*1000/Fs);
 
     bps              = 2;
     Nsymb            = framesize/bps;
@@ -34,26 +36,32 @@ function sim_out = ber_test(sim_in, modulation)
     Np               = 5;
     r_delay_line     = zeros(1,Np);
     s_delay_line     = zeros(1,Np);
-    hf_delay_line    = zeros(1,Nsymb+hf_delay_samples);
     spread_main_phi  = 0;
     spread_delay_phi = 0;
     spread_main_phi_log = [];
 
-    % convert "spreading" samples from 1kHz carrier at Fs to complex baseband at Rs
+    % convert "spreading" samples from 1kHz carrier at Fs to complex baseband
 
-    Fs = 8000; Fc = 1000;
+    Fc = 1000;
     fspread = fopen("../unittest/sine1k_2Hz_spread.raw","rb");
     spread1k = fread(fspread, "int16")/10000;
+    fclose(fspread);
+    fspread = fopen("../unittest/sine1k_2ms_delay_2Hz_spread.raw","rb");
+    spread1k_2ms = fread(fspread, "int16")/10000;
+    fclose(fspread);
 
     % down convert to complex baseband
     spreadbb = spread1k.*exp(-j*(2*pi*Fc/Fs)*(1:length(spread1k))');
+    spreadbb_2ms = spread1k_2ms.*exp(-j*(2*pi*Fc/Fs)*(1:length(spread1k_2ms))');
 
     % remove -2000 Hz image
     b = fir1(50, 5/Fs);
-    spreadlpf = filter(b,1,spreadbb);
+    spread = filter(b,1,spreadbb);
+    spread_2ms = filter(b,1,spreadbb_2ms);
 
-    % decimate to symbol rate
-    spread = spreadlpf(1:floor(Fs/Rs):length(spreadlpf));
+    % Determine "gain" of HF channel model, so we can normalise later
+
+    hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
 
     sc = 1;
 
@@ -69,8 +77,7 @@ function sim_out = ber_test(sim_in, modulation)
     tx_filter_memory = zeros(1, Nfilter);
     rx_filter_memory = zeros(1, Nfilter);
     s_delay_line_filt = zeros(1,Nfiltsym);
- 
-    wc = 2*pi*1500/Fs;
+    hf_sim_delay_line = zeros(1,M+Nhfdelay);
 
     for ne = 1:length(Esvec)
         Es = Esvec(ne);
@@ -97,14 +104,16 @@ function sim_out = ber_test(sim_in, modulation)
         rx_baseband_log = [];
         tx_baseband_log = [];
         noise_log = [];
+        c_est_log = [];
+        c_est = 0;
 
         tx_phase = rx_phase = 0;
 
         for nn = 1: Ntrials
                   
-           tx_bits = round( rand( 1, framesize ) );
+            tx_bits = round( rand( 1, framesize ) );
 
-           % modulate
+            % modulate
 
             s = zeros(1, Nsymb);
             for i=1:Nsymb
@@ -138,10 +147,27 @@ function sim_out = ber_test(sim_in, modulation)
                end
                tx_filter_memory(1:Nfilter-M) = tx_filter_memory(M+1:Nfilter);
                tx_filter_memory(Nfilter-M+1:Nfilter) = zeros(1,M);
-               tx_filt_log = [tx_filt_log tx_filt];
                
+               % HF channel simulation
+
+               if hf_sim
+                   hf_sim_delay_line(1:Nhfdelay) = hf_sim_delay_line(M+1:M+Nhfdelay);
+                   hf_sim_delay_line(Nhfdelay+1:M+Nhfdelay) = tx_filt;
+
+                   if (sc > (length(spread)-M))
+                       sc =1 ;
+                   end
+                   tx_filt = tx_filt.*spread(sc:sc+M-1)' + hf_sim_delay_line(1:M).*spread_2ms(sc+sc+M-1);
+                   sc += M;
+
+                   % normalise so average HF power C=1
+
+                   tx_filt *= hf_gain;
+               end
+               tx_filt_log = [tx_filt_log tx_filt];
+
                % AWGN noise and phase/freq offset channel simulation
-               % 0.5 factor ensures var(noise) == variance , i.e. splits power betwen Re & Im
+               % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
 
                noise = sqrt(variance*0.5)*( randn(1,M) + j*randn(1,M) );
                noise_log = [noise_log noise];
@@ -163,13 +189,6 @@ function sim_out = ber_test(sim_in, modulation)
                s(k) = s_delay_line_filt(1);   % input to phase est later
 
                s_ch(k) = rx_filt;               
-            end
-
-            % Channel simulation
-
-            if hf_sim
-                s_ch = s_ch.*spread(sc:sc+Nsymb-1)';
-                sc += Nsymb;
             end
 
             % coherent demod phase estimation and correction
@@ -249,6 +268,8 @@ function sim_out = ber_test(sim_in, modulation)
         clf;
         scat = rx_symb_log(2*Nfiltsym:length(rx_symb_log)) .* exp(j*pi/4);
         plot(real(scat), imag(scat),'+');
+        figure(3);
+        plot(c_est_log);
     end
 endfunction
 
@@ -278,28 +299,22 @@ sim_in.Esvec            = 1:10;
 sim_in.Ntrials          = 100;
 sim_in.framesize        = 30;
 sim_in.phase_offset     = 0;
-sim_in.phase_est        = 0;
+sim_in.phase_est        = 1;
 sim_in.w_offset         = 0;
 sim_in.plot_scatter     = 0;
 sim_in.Rs               = 100;
-sim_in.hf_sim           = 0;
-sim_in.hf_spread_hz     = 2;
-sim_in.hf_delay_samples = 5;
+sim_in.hf_sim           = 1;
+sim_in.hf_delay_ms      = 2;
 
 sim_qpsk                = ber_test(sim_in, 'qpsk');
 
 sim_in.phase_offset     = 0;
 sim_in.phase_est        = 0;
 sim_in.w_offset         = 0;  
-%sim_qpsk_coh            = ber_test(sim_in, 'qpsk');
-
-sim_in.phase_offset     = 0;
-sim_in.phase_est        = 1;
-sim_in.w_offset         = 0;  
 sim_in.plot_scatter     = 1;
-sim_in.Esvec            = 7;
+sim_in.Esvec            = 70;
 sim_in.hf_sim           = 0;
-sim_qpsk_scatter        = ber_test(sim_in, 'qpsk');
+sim_qpsk_scatter        = ber_test(sim_in, 'dqpsk');
 
 figure(1); 
 clf;
