@@ -76,7 +76,19 @@ function sim_out = ber_test(sim_in, modulation)
         Es = Esvec(ne);
         EsNo = 10^(Es/10);
     
-        variance = Fs/(2*Rs*EsNo);
+        % Given Es/No, determine the variance of a normal noise source:
+        %
+        %   Es = C/Rs where C is carrier power (energy per unit time) and Rs is the symbole rate
+        %   N  = NoB where N is the total noise power, No is the Noise spectral density is W/Hz
+        %        and B is the bandwidth of the noise which is Fs
+        %   No = N/Fs
+        %
+        % equating Es/No we get:
+        %
+        %   Es/No = (C/Rs)/(No/Fs)
+        %   No    = CFs/(Rs(Es/No))
+
+        variance = Fs/(Rs*EsNo);
         Terrs = 0;  Tbits = 0;  Ferrs = 0;
         printf("EsNo (dB): %f EsNo: %f variance: %f\n", Es, EsNo, variance);
 
@@ -129,8 +141,9 @@ function sim_out = ber_test(sim_in, modulation)
                tx_filt_log = [tx_filt_log tx_filt];
                
                % AWGN noise and phase/freq offset channel simulation
+               % 0.5 factor ensures var(noise) == variance , i.e. splits power betwen Re & Im
 
-               noise = sqrt(variance)*( randn(1,M) + j*randn(1,M) );
+               noise = sqrt(variance*0.5)*( randn(1,M) + j*randn(1,M) );
                noise_log = [noise_log noise];
                rx_baseband = tx_filt.*exp(j*phase_offset) + noise;
                phase_offset += w_offset;
@@ -151,10 +164,6 @@ function sim_out = ber_test(sim_in, modulation)
 
                s_ch(k) = rx_filt;               
             end
-
-            %noise = sqrt(variance)*( randn(1,Nsymb) + j*randn(1,Nsymb) );
-            %s_ch = s_ch.*exp(j*phase_offset) + noise;
-            %phase_offset += w_offset;
 
             % Channel simulation
 
@@ -263,7 +272,7 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
-% Start simulation ---------------------------------------
+% Start simulations ---------------------------------------
 
 sim_in.Esvec            = 1:10; 
 sim_in.Ntrials          = 100;
@@ -285,7 +294,7 @@ sim_in.w_offset         = 0;
 %sim_qpsk_coh            = ber_test(sim_in, 'qpsk');
 
 sim_in.phase_offset     = 0;
-sim_in.phase_est        = 0;
+sim_in.phase_est        = 1;
 sim_in.w_offset         = 0;  
 sim_in.plot_scatter     = 1;
 sim_in.Esvec            = 7;
@@ -296,7 +305,7 @@ figure(1);
 clf;
 semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec)
 hold on;
-semilogy(sim_qpsk.Ebvec, sim_qpsk.BER_theoryvec,'r;coherent;')
+semilogy(sim_qpsk.Ebvec, sim_qpsk.BER_theoryvec,'r;theory;')
 %semilogy(sim_qpsk_coh.Ebvec, sim_qpsk_coh.BERvec,'r;coherent;')
 hold off;
 xlabel('Eb/N0')
