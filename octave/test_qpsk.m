@@ -77,6 +77,7 @@ function sim_out = ber_test(sim_in, modulation)
     tx_filter_memory = zeros(1, Nfilter);
     rx_filter_memory = zeros(1, Nfilter);
     s_delay_line_filt = zeros(1,Nfiltsym);
+    tx_bits_delay_line_filt = zeros(1,Nfiltsym*bps);
     hf_sim_delay_line = zeros(1,M+Nhfdelay);
 
     for ne = 1:length(Esvec)
@@ -154,10 +155,10 @@ function sim_out = ber_test(sim_in, modulation)
                    hf_sim_delay_line(1:Nhfdelay) = hf_sim_delay_line(M+1:M+Nhfdelay);
                    hf_sim_delay_line(Nhfdelay+1:M+Nhfdelay) = tx_filt;
 
-                   if (sc > (length(spread)-M))
+                   if ((sc+M) > length(spread)) || ((sc+M) > length(spread_2ms))
                        sc =1 ;
                    end
-                   tx_filt = tx_filt.*spread(sc:sc+M-1)' + hf_sim_delay_line(1:M).*spread_2ms(sc+sc+M-1);
+                   tx_filt = tx_filt.*spread(sc:sc+M-1)' + hf_sim_delay_line(1:M).*spread_2ms(sc:sc+M-1)';
                    sc += M;
 
                    % normalise so average HF power C=1
@@ -181,12 +182,19 @@ function sim_out = ber_test(sim_in, modulation)
                rx_filter_memory(1:Nfilter-M) = rx_filter_memory(1+M:Nfilter);
                rx_filt_log = [rx_filt_log rx_filt];
 
-               % delay in tx data to compensate for filtering
+               % delay in tx symbols to compensate for filtering
+               % delay, as tx symbols are used as pilot symbols input
+               % to phase est
 
                s_delay_line_filt(1:Nfiltsym-1) = s_delay_line_filt(2:Nfiltsym);
                s_delay_line_filt(Nfiltsym) = s(k);
-               tx_bits(2*(k-1)+1:2*k) = qpsk_demod(s_delay_line_filt(1));
-               s(k) = s_delay_line_filt(1);   % input to phase est later
+               s(k) = s_delay_line_filt(1);  
+
+               % delay in tx bits to compensate for filtering delay
+
+               tx_bits_delay_line_filt(1:(Nfiltsym-1)*bps) = tx_bits_delay_line_filt(bps+1:Nfiltsym*bps);
+               tx_bits_delay_line_filt((Nfiltsym-1)*bps+1:Nfiltsym*bps) = tx_bits((k-1)*bps+1:k*bps);
+               tx_bits((k-1)*bps+1:k*bps) = tx_bits_delay_line_filt(1:bps);
 
                s_ch(k) = rx_filt;               
             end
@@ -251,9 +259,9 @@ function sim_out = ber_test(sim_in, modulation)
         TERvec(ne) = Terrs;
         FERvec(ne) = Ferrs;
         BERvec(ne) = Terrs/Tbits;
-        printf("  Terrs: %d BER %f BER theory %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
-               Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), var(tx_filt_log), var(noise_log),
-               var(tx_filt_log)/Rs, var(noise_log)/Fs, (var(tx_filt_log)/Rs)/(var(noise_log)/Fs));
+        %printf("  Terrs: %d BER %f BER theory %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
+        %       Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), var(tx_filt_log), var(noise_log),
+        %       var(tx_filt_log)/Rs, var(noise_log)/Fs, (var(tx_filt_log)/Rs)/(var(noise_log)/Fs));
     end
     
     Ebvec = Esvec - 10*log10(bps);
@@ -295,35 +303,37 @@ endfunction
 
 % Start simulations ---------------------------------------
 
-sim_in.Esvec            = 1:10; 
+sim_in.Esvec            = 1:12; 
 sim_in.Ntrials          = 100;
-sim_in.framesize        = 30;
-sim_in.phase_offset     = 0;
-sim_in.phase_est        = 1;
-sim_in.w_offset         = 0;
-sim_in.plot_scatter     = 0;
+sim_in.framesize        = 100;
 sim_in.Rs               = 100;
-sim_in.hf_sim           = 1;
-sim_in.hf_delay_ms      = 2;
-
-sim_qpsk                = ber_test(sim_in, 'qpsk');
-
 sim_in.phase_offset     = 0;
 sim_in.phase_est        = 0;
-sim_in.w_offset         = 0;  
-sim_in.plot_scatter     = 1;
-sim_in.Esvec            = 70;
+sim_in.w_offset         = 0;
+sim_in.plot_scatter     = 0;
 sim_in.hf_sim           = 0;
-sim_qpsk_scatter        = ber_test(sim_in, 'dqpsk');
+
+sim_qpsk                = ber_test(sim_in, 'qpsk');
+sim_dqpsk               = ber_test(sim_in, 'dqpsk');
+sim_in.phase_est        = 1;
+sim_qpsk_coh            = ber_test(sim_in, 'qpsk');
+sim_in.hf_delay_ms      = 2;
+sim_in.hf_sim           = 1;
+sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+sim_in.phase_est        = 0;
+sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
 
 figure(1); 
 clf;
-semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec)
+semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'b;qpsk;')
 hold on;
-semilogy(sim_qpsk.Ebvec, sim_qpsk.BER_theoryvec,'r;theory;')
-%semilogy(sim_qpsk_coh.Ebvec, sim_qpsk_coh.BERvec,'r;coherent;')
+semilogy(sim_qpsk.Ebvec, sim_qpsk.BER_theoryvec,'r;qpsk theory;')
+semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'g;dqpsk;')
+semilogy(sim_qpsk_coh.Ebvec, sim_qpsk_coh.BERvec,'k;qpsk coh;')
+semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'c;qpsk hf;')
+semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'m;dqpsk hf;')
 hold off;
 xlabel('Eb/N0')
 ylabel('BER')
-grid
+grid("minor")
 

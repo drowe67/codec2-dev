@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf adc_ut.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf adc_ut.elf timer_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -164,6 +164,16 @@ src/startup_stm32f4xx.s \
 src/init.c
 
 adc_ut.elf: $(ADC_UT_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+TIMER_UT_SRCS=\
+gdb_stdio.c \
+src/timer_ut.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+timer_ut.elf: $(TIMER_UT_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
