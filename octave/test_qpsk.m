@@ -43,10 +43,10 @@ function sim_out = ber_test(sim_in, modulation)
     % convert "spreading" samples from 1kHz carrier at Fs to complex baseband
 
     Fc = 1000;
-    fspread = fopen("../unittest/sine1k_2Hz_spread.raw","rb");
+    fspread = fopen("../raw/sine1k_2Hz_spread.raw","rb");
     spread1k = fread(fspread, "int16")/10000;
     fclose(fspread);
-    fspread = fopen("../unittest/sine1k_2ms_delay_2Hz_spread.raw","rb");
+    fspread = fopen("../raw/sine1k_2ms_delay_2Hz_spread.raw","rb");
     spread1k_2ms = fread(fspread, "int16")/10000;
     fclose(fspread);
 
