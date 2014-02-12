@@ -55,7 +55,7 @@ Getting Started
 
 . In _another_ console start gdb:
 
-   $ ~/codec2-dev/stm32$ ~/gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2 stm32f4_codec2.elf
+   $ ~/codec2-dev/stm32$ ~/gcc-arm-none-eabi-4_7-2013q1/bin/arm-none-eabi-gdb stm32f4_codec2.elf
 
    (gdb) tar ext :4242
 

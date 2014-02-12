@@ -111,7 +111,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     rx_filt = rx_filter(rx_baseband, nin);
 
     [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);
-    
+
     rx_timing_log = [rx_timing_log rx_timing];
     nin = M;
     if rx_timing > 2*M/P
@@ -139,7 +139,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
       else
          sync_track = 0; 
       end
-
+      
       if (track == 1) && (sync_track == 1)
           dual_rx_symbols(Nc+1:2*Nc) = rx_symbols(1:Nc).*conj(prev_rx_symbols(1:Nc)./abs(prev_rx_symbols(1:Nc)));
           dual_rx_symbols_float32 = []; k = 1;

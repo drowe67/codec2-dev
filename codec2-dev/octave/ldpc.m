@@ -3,12 +3,14 @@
 
 1;
 
+
 function code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping)
     [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
     code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix );
     code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
     code_param.bits_per_symbol = log2(mod_order);
 endfunction
+
 
 % Gray coded QPSK modulation function
 
@@ -21,6 +23,16 @@ function symbol = qpsk_mod(two_bits)
         case (3) symbol = -1;
     endswitch
 endfunction
+
+
+% Gray coded QPSK demodulation function
+
+function two_bits = qpsk_demod(symbol)
+    bit0 = real(symbol*exp(j*pi/4)) < 0;
+    bit1 = imag(symbol*exp(j*pi/4)) < 0;
+    two_bits = [bit1 bit0];
+endfunction
+
 
 % inserts a unique word into a frame of bits.  The UW bits are spread
 % throughout the input frame 2 bits at a time.
