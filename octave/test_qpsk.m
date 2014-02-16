@@ -58,7 +58,7 @@ function sim_out = ber_test(sim_in, modulation)
 
         ldpc;
 
-        rate = 1/2; 
+        rate = 3/4; 
         mod_order = 4; 
         modulation = 'QPSK';
         mapping = 'gray';
@@ -157,11 +157,12 @@ function sim_out = ber_test(sim_in, modulation)
         tx_phase = rx_phase = 0;
         tx_data_buffer = zeros(1,2*framesize);
         s_data_buffer = zeros(1,2*Nsymb);
+        C_log = [];
 
         for nn = 1: Ntrials
                   
-            %tx_bits = round( rand( 1, framesize*rate ) );
-            tx_bits = [1 0 zeros(1,framesize*rate-2)];
+            tx_bits = round( rand( 1, framesize*rate ) );
+            %tx_bits = [1 0 zeros(1,framesize*rate-2)];
 
             % modulate
 
@@ -215,8 +216,8 @@ function sim_out = ber_test(sim_in, modulation)
                    %if ((sc+M) > length(spread)) || ((sc+M) > length(spread_2ms))
                    %    sc =1 ;
                    %end
+                   comb = conj(spread(sc:sc+M-1))' + conj(spread_2ms(sc:sc+M-1))';
                    if hf_phase_only
-                        comb = conj(spread(sc:sc+M-1))' + conj(spread_2ms(sc:sc+M-1))';
                         tx_filt = tx_filt.*exp(j*angle(comb));
                         hf_angle_log = [hf_angle_log angle(comb)];
                    else
@@ -235,6 +236,7 @@ function sim_out = ber_test(sim_in, modulation)
                    if hf_phase_only == 0   % C already 1 if we are just tweaking phase
                        tx_filt *= hf_gain;
                    end
+                   C_log = [C_log abs(comb)*hf_gain];
                end
                tx_filt_log = [tx_filt_log tx_filt];
 
@@ -323,7 +325,10 @@ function sim_out = ber_test(sim_in, modulation)
             if nn == 1
                 tx_bits_tmp = tx_bits(skip:length(tx_bits));
                 rx_bits_tmp = rx_bits(skip:length(rx_bits));
-            end
+            else
+                tx_bits_tmp = tx_bits;
+                rx_bits_tmp = rx_bits;
+           end
 
             error_positions = xor( rx_bits_tmp, tx_bits_tmp );
             Nerrs = sum(error_positions);
@@ -340,8 +345,12 @@ function sim_out = ber_test(sim_in, modulation)
                 tx_data_buffer(framesize+1:2*framesize) = tx_bits;
                 s_data_buffer(Nsymb+1:2*Nsymb) = s_ch;
 
-                st_tx = (Nfiltsym-1)*bps+1;
-                st_s = (Nfiltsym-1);
+                offset = Nfiltsym-1;
+                if (phase_est)
+                    offset += floor(Nps/2);
+                end
+                st_tx = offset*bps+1;
+                st_s = offset;
 
                 detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, ...
                                 s_data_buffer(st_s+1:st_s+Nsymb), min(100,EsNo));
@@ -373,7 +382,8 @@ function sim_out = ber_test(sim_in, modulation)
             printf("EsNo (dB): %f  Terrs: %d BER %f BER theory %f", Es, Terrs,
                    Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)));
             if ldpc_code
-                printf(" LDPC: Terrs: %d BER: %f", Terrsldpc, Terrsldpc/Tbitsldpc);
+                printf(" LDPC: Terrs: %d BER: %f Ferrs: %d FER: %f", 
+                       Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/(Ntrials-1));
             end
             printf("\n");
         end
@@ -385,9 +395,9 @@ function sim_out = ber_test(sim_in, modulation)
     end
     
     Ebvec = Esvec - 10*log10(bps);
-    sim_out.BERvec      = BERvec;
-    sim_out.Ebvec       = Ebvec;
-    sim_out.TERvec      = TERvec;
+    sim_out.BERvec          = BERvec;
+    sim_out.Ebvec           = Ebvec;
+    sim_out.TERvec          = TERvec;
     if ldpc_code
         sim_out.BERldpcvec  = BERldpcvec;
         sim_out.TERldpcvec  = TERldpcvec;
@@ -400,20 +410,15 @@ function sim_out = ber_test(sim_in, modulation)
         scat = rx_symb_log(2*Nfiltsym:length(rx_symb_log)) .* exp(j*pi/4);
         plot(real(scat), imag(scat),'+');
 
-        if hf_sim
-          figure(3);
+        figure(3);
+        clf;
 
-          if hf_phase_only
-              plot(hf_angle_log);
-              axis([1 10000 min(hf_angle_log) max(hf_angle_log)])
-          else
-            plot(abs(spread));
-            hold on;
-            plot(abs(spread_2ms),'g');
-            hold off;
-            axis([1 10000 0 1.4])
-          end
-       end
+        if hf_phase_only
+            plot(hf_angle_log);
+            axis([1 10000 min(hf_angle_log) max(hf_angle_log)])
+        else
+            plot(C_log);
+        end
     end
 endfunction
 
@@ -444,23 +449,23 @@ endfunction
 % Start simulations ---------------------------------------
 
 more off;
-sim_in.verbose = 1;
+sim_in.verbose = 2;
 
-sim_in.Esvec            = 1:5; 
-sim_in.Ntrials          = 3;
-sim_in.framesize        = 576;
+sim_in.Esvec            = 5; 
+sim_in.Ntrials          = 100;
+sim_in.framesize        = 100;
 sim_in.Rs               = 400;
 sim_in.phase_offset     = 0;
 sim_in.phase_est        = 0;
 sim_in.w_offset         = 0;
-sim_in.plot_scatter     = 0;
+sim_in.plot_scatter     = 1;
 sim_in.hf_delay_ms      = 2;
-sim_in.hf_sim           = 0;
+sim_in.hf_sim           = 1;
 sim_in.Np               = 6;
 sim_in.Ns               = 5;
 sim_in.hf_phase_only    = 0;
-sim_in.hf_mag_only      = 0;
-sim_in.ldpc_code        = 1;
+sim_in.hf_mag_only      = 1;
+sim_in.ldpc_code        = 0;
 
 Ebvec = sim_in.Esvec - 10*log10(2);
 BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
