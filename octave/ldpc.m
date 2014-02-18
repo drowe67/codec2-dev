@@ -144,8 +144,8 @@ function [codeword s] = ldpc_enc(data, code_param)
 endfunction
 
 
-function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo)
-    symbol_likelihood = Demod2D( r, code_param.S_matrix, EsNo);
+function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fading)
+    symbol_likelihood = Demod2D( r, code_param.S_matrix, EsNo, fading);
          
     % initialize the extrinsic decoder input
     input_somap_c = zeros(1, code_param.code_bits_per_frame );
