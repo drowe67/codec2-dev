@@ -35,11 +35,29 @@ function sim_out = ber_test(sim_in, modulation)
     prev_sym_tx      = qpsk_mod([0 0]);
     prev_sym_rx      = qpsk_mod([0 0]);
 
-    Np               = sim_in.Np;  % number of pilot symbols to use in phase est
-    Ns               = sim_in.Ns;  % spacing of pilot symbols, so (Nps-1) data symbols between every pilot
-    Nps              = Np*Ns;
+    phase_est_method = sim_in.phase_est_method;
+    if phase_est_method == 1
+      Nps            = sim_in.Np; 
+    else
+      Np             = sim_in.Np;
+      Ns             = sim_in.Ns;
+      if Np/2 == floor(Np/2)
+        printf("Np must be odd\n");
+        return;
+      end
+      Nps            = (Np-1)*Ns+1; 
+    end
+    r_delay_line     = zeros(Nc, Nps);
+    s_delay_line     = zeros(Nc, Nps);
+    ph_est_log       = [];
+
+    phase_noise_amp  = sim_in.phase_noise_amp;
 
     ldpc_code = sim_in.ldpc_code;
+
+    tx_bits_buf = zeros(1,2*framesize);
+    rx_bits_buf = zeros(1,2*framesize);
+    rx_symb_buf = zeros(1,2*Nsymb);
 
     % Init LDPC --------------------------------------------------------------------
 
@@ -129,6 +147,7 @@ function sim_out = ber_test(sim_in, modulation)
         tx_symb_log      = [];
         rx_symb_log      = [];
         noise_log        = [];
+        mod_strip_log    = [];
 
         % init HF channel
 
@@ -140,7 +159,7 @@ function sim_out = ber_test(sim_in, modulation)
         for nn = 1: Ntrials
                   
             tx_bits = round( rand( 1, framesize*rate ) );
-
+ 
             % modulate --------------------------------------------
 
             if ldpc_code
@@ -156,6 +175,8 @@ function sim_out = ber_test(sim_in, modulation)
                     s(i) = tx_symb;
                 end
             end
+            tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
+            tx_bits_buf(framesize+1:2*framesize) = tx_bits;
             s_ch = s;
 
             % HF channel simulation  ------------------------------------
@@ -200,9 +221,72 @@ function sim_out = ber_test(sim_in, modulation)
 
             noise = sqrt(variance*0.5)*(randn(1,Nsymb) + j*randn(1,Nsymb));
             noise_log = [noise_log noise];
-            s_ch = s_ch.*exp(j*phase_offset) + noise;
-            phase_offset += w_offset;
+            phase_noise = phase_noise_amp*(2.0*rand(1,Nsymb)-1.0);
+ 
+            % organise into carriers to apply frequency and phase offset
+
+            for i=1:Nc:Nsymb
+              for k=1:Nc
+                 s_ch(i+k-1) = s_ch(i+k-1)*exp(j*(phase_offset+phase_noise(i+k-1))) + noise(i+k-1);
+              end 
+              phase_offset += w_offset;
+            end
                
+            % phase estimation
+            
+            ph_est = zeros(Nc,1);
+
+            if phase_est
+
+                % organise into carriers
+
+                for i=1:Nc:Nsymb
+
+                  for k=1:Nc
+                      centre = floor(Nps/2)+1;
+
+                      % delay line for phase est window
+
+                      r_delay_line(k,1:Nps-1) = r_delay_line(k,2:Nps);
+                      r_delay_line(k,Nps) = s_ch(i+k-1);
+
+                      % delay in tx data to compensate data for phase est window
+
+                      s_delay_line(k,1:Nps-1) = s_delay_line(k,2:Nps);
+                      s_delay_line(k,Nps) = s(i+k-1);
+                      %tx_bits(2*(i+k-1-1)+1:2*(i+k-1)) = qpsk_demod(s_delay_line(k,centre));
+ 
+                      if phase_est_method == 1
+                        % QPSK modulation strip and phase est
+
+                        mod_strip_pol  = angle(r_delay_line(k,:)) * 4;
+                        mod_strip_rect = exp(j*mod_strip_pol);
+
+                        ph_est_pol = atan2(sum(imag(mod_strip_rect)),sum(real(mod_strip_rect)))/4;
+                        ph_est(k)  = exp(j*ph_est_pol);
+
+                        s_ch(i+k-1) = r_delay_line(k,centre).*exp(-j*ph_est_pol);
+                      else
+
+                        % estimate phase from surrounding known pilot symbols and correct
+
+                        corr = 0;
+                        for m=1:Ns:Nps
+                          if (m != centre)
+                            corr += s_delay_line(k,m) * r_delay_line(k,m)';
+                          end
+                        end
+                        ph_est(k)  = conj(corr/(1E-6+abs(corr)));
+                        s_ch(i+k-1) = r_delay_line(k,centre).*exp(j*angle(corr));
+                      end
+
+                  end
+                  
+                  ph_est_log = [ph_est_log ph_est];
+               end    
+               %printf("corr: %f angle: %f\n", corr, angle(corr));
+            end
+
             % de-modulate
 
             rx_bits = zeros(1, framesize);
@@ -217,24 +301,50 @@ function sim_out = ber_test(sim_in, modulation)
                 rx_symb_log = [rx_symb_log rx_symb];
             end
 
-            % Measure BER
+            rx_bits_buf(1:framesize) = rx_bits_buf(framesize+1:2*framesize);
+            rx_bits_buf(framesize+1:2*framesize) = rx_bits;
+            rx_symb_buf(1:Nsymb) = rx_symb_buf(Nsymb+1:2*Nsymb);
+            rx_symb_buf(Nsymb+1:2*Nsymb) = s_ch;
 
-            error_positions = xor(rx_bits, tx_bits);
-            Nerrs = sum(error_positions);
-            Terrs += Nerrs;
-            Tbits += length(tx_bits);
+            % determine location of start and end of frame depending on processing delays
 
-            % Optionally LDPC decode
+            if phase_est
+              st_rx_bits = 1+(floor(Nps/2)+1-1)*Nc*2;
+              st_rx_symb = 1+(floor(Nps/2)+1-1)*Nc;
+           else
+              st_rx_bits = 1;
+              st_rx_symb = 1;
+            end
+            en_rx_bits = st_rx_bits+framesize-1;
+            en_rx_symb = st_rx_symb+Nsymb-1;
+
+            if nn > 1
+              % Measure BER
+
+              %printf("nn: %d centre: %d\n", nn, floor(Nps/2)+1);
+              %tx_bits_buf(1:20)
+              %rx_bits_buf(st_rx_bits:st_rx_bits+20-1)
+              error_positions = xor(rx_bits_buf(st_rx_bits:en_rx_bits), tx_bits_buf(1:framesize));
+              Nerrs = sum(error_positions);
+              Terrs += Nerrs;
+              Tbits += length(tx_bits);
+
+              % Optionally LDPC decode
             
-            if ldpc_code
-                detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, s_ch, min(100,EsNo), hf_fading);
-                error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
+              if ldpc_code
+                detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_symb_buf(st_rx_symb:en_rx_symb), min(100,EsNo), hf_fading);
+                %for m=1:20
+                %  printf("%f ", qpsk_demod(rx_symb_buf(m)));
+                %end
+                %detected_data(1:19)
+                error_positions = xor( detected_data(1:framesize*rate), tx_bits_buf(1:framesize*rate) );
                 Nerrs = sum(error_positions);
                 if Nerrs
                     Ferrsldpc++;
                 end
                 Terrsldpc += Nerrs;
                 Tbitsldpc += framesize*rate;
+              end
             end
         end
     
@@ -276,7 +386,8 @@ function sim_out = ber_test(sim_in, modulation)
         figure(2);
         clf;
         scat = rx_symb_log .* exp(j*pi/4);
-        plot(real(scat), imag(scat),'+');
+        plot(real(scat(Nps*Nc:length(scat))), imag(scat(Nps*Nc:length(scat))),'+');
+        title('Scatter plot');
 
         figure(3);
         clf;
@@ -287,11 +398,32 @@ function sim_out = ber_test(sim_in, modulation)
         mesh(x,y,EsNodBSurface);
         grid
         %axis([1 Nc 1 Rs*2 -10 10])
+        title('HF Channel Es/No');
 
         figure(4);
         clf;
-        mesh(x,y,unwrap(angle(hf_model(y,:))));
+        %mesh(x,y,unwrap(angle(hf_model(y,:))));
+        subplot(211)
+        plot(y,abs(hf_model(y,1)))
+        title('HF Channel Carrier 1 Mag');
+        subplot(212)
+        plot(y,angle(hf_model(y,1)))
+        title('HF Channel Carrier 1 Phase');
 
+        if phase_est
+          scat = ph_est_log(1,floor(Nps/2):Rs*2+floor(Nps/2)-1);
+          hold on;
+          plot(angle(scat),'r');
+          hold off;
+
+          figure(5)
+          clf;
+          scat = ph_est_log(1,y);
+          plot(real(scat), imag(scat),'+');
+          title('Carrier 1 Phase Est');
+          axis([-1 1 -1 1])
+        end
+if 0        
         figure(5);
         clf;
         subplot(211)
@@ -311,6 +443,7 @@ function sim_out = ber_test(sim_in, modulation)
             tmp = [tmp abs(hf_model(i,:))];
         end
         hist(tmp);
+end
      end
 
 endfunction
@@ -339,70 +472,168 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
+function sim_in = standard_init
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 0;
+
+  sim_in.Esvec            = 5; 
+  sim_in.Ntrials          = 30;
+  sim_in.framesize        = 576;
+  sim_in.Rs               = 100;
+  sim_in.Nc               = 8;
+
+  sim_in.phase_offset     = 0;
+  sim_in.w_offset         = 0;
+  sim_in.phase_noise_amp  = 0;
+
+  sim_in.hf_delay_ms      = 2;
+  sim_in.hf_sim           = 0;
+  sim_in.hf_phase_only    = 0;
+  sim_in.hf_mag_only      = 1;
+
+  sim_in.phase_est        = 0;
+  sim_in.phase_est_method = 1;
+  sim_in.Np               = 5;
+  sim_in.Ns               = 5;
+
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 1;
+endfunction
+
+function ideal
+
+  sim_in = standard_init();
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.Esvec            = 5; 
+  sim_in.hf_sim           = 1;
+  sim_in.Ntrials          = 30;
+
+  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+
+  sim_in.hf_sim           = 0;
+  sim_in.plot_scatter     = 0;
+  sim_in.Esvec            = 2:15; 
+  sim_in.ldpc_code        = 0;
+  Ebvec = sim_in.Esvec - 10*log10(2);
+  BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+  sim_qpsk                = ber_test(sim_in, 'qpsk');
+  sim_dqpsk               = ber_test(sim_in, 'dqpsk');
+
+  sim_in.hf_sim           = 1;
+  sim_in.Esvec            = 2:15; 
+  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+  sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
+  sim_in.ldpc_code        = 1;
+  sim_qpsk_hf_ldpc1       = ber_test(sim_in, 'qpsk');
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_qpsk_hf_ldpc2       = ber_test(sim_in, 'qpsk');
+  sim_in.ldpc_code_rate   = 3/4;
+  sim_in.hf_sim           = 0;
+  sim_qpsk_awgn_ldpc      = ber_test(sim_in, 'qpsk');
+
+  figure(1); 
+  clf;
+  semilogy(Ebvec, BER_theory,'r;QPSK theory;')
+  hold on;
+  semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'g;QPSK AWGN;')
+  semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF;')
+  semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
+  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'m;DQPSK HF;')
+  semilogy(sim_qpsk_hf_ldpc1.Ebvec, sim_qpsk_hf_ldpc1.BERldpcvec,'k;QPSK HF LDPC 3/4;')
+  semilogy(sim_qpsk_hf_ldpc2.Ebvec, sim_qpsk_hf_ldpc2.BERldpcvec,'b;QPSK HF LDPC 1/2;')
+  semilogy(sim_qpsk_awgn_ldpc.Ebvec, sim_qpsk_awgn_ldpc.BERldpcvec,'k;QPSK AWGN LDPC 3/4;')
+
+  hold off;
+  xlabel('Eb/N0')
+  ylabel('BER')
+  grid("minor")
+  axis([min(Ebvec) max(Ebvec) 1E-3 1])
+endfunction
+
+function phase_noise
+  sim_in = standard_init();
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.Esvec            = 100; 
+  sim_in.Ntrials          = 30;
+
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.phase_noise_amp  = pi/16;
+  tmp                     = ber_test(sim_in, 'qpsk');
+
+  sim_in.plot_scatter     = 0;
+  sim_in.Esvec            = 2:8; 
+  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+
+  Ebvec = sim_in.Esvec - 10*log10(2);
+  BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+
+  sim_in.phase_noise_amp = 0;
+  sim_qpsk               = ber_test(sim_in, 'qpsk');
+  sim_in.phase_noise_amp = pi/8;
+  sim_qpsk_pn8           = ber_test(sim_in, 'qpsk');
+  sim_in.phase_noise_amp = pi/16;
+  sim_qpsk_pn16          = ber_test(sim_in, 'qpsk');
+  sim_in.phase_noise_amp = pi/32;
+  sim_qpsk_pn32          = ber_test(sim_in, 'qpsk');
+
+  figure(1); 
+  clf;
+  semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'g;QPSK phase noise 0;')
+  hold on;
+  semilogy(sim_qpsk_pn8.Ebvec, sim_qpsk_pn8.BERvec,'c;QPSK phase noise +/- pi/8;')
+  semilogy(sim_qpsk_pn16.Ebvec, sim_qpsk_pn16.BERvec,'b;QPSK phase noise +/- pi/16;')
+  semilogy(sim_qpsk_pn32.Ebvec, sim_qpsk_pn32.BERvec,'k;QPSK phase noise +/- pi/32;')
+
+  semilogy(sim_qpsk.Ebvec, sim_qpsk.BERldpcvec,'g;QPSK phase noise 0 ldpc;')
+  semilogy(sim_qpsk_pn8.Ebvec, sim_qpsk_pn8.BERldpcvec,'c;QPSK phase noise +/- pi/8 ldpc;')
+  semilogy(sim_qpsk_pn16.Ebvec, sim_qpsk_pn16.BERldpcvec,'b;QPSK phase noise +/- pi/16 ldpc;')
+  semilogy(sim_qpsk_pn32.Ebvec, sim_qpsk_pn32.BERldpcvec,'k;QPSK phase noise +/- pi/32 ldpc;')
+
+  hold off;
+  xlabel('Eb/N0')
+  ylabel('BER')
+  grid("minor")
+  axis([min(Ebvec) max(Ebvec) 1E-2 1])
+endfunction
+
+function test_phase_est
+  sim_in = standard_init();
+
+  sim_in.Rs               = 100;
+  sim_in.Nc               = 8;
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.Esvec            = 5; 
+  sim_in.Ntrials          = 30;
+
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.phase_est        = 1;
+  sim_in.phase_est_method = 2;
+  sim_in.Np               = 3;
+  sim_in.phase_offset     = 0;
+  sim_in.w_offset         = 0;
+
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 0;
+
+  tmp                     = ber_test(sim_in, 'qpsk');
+
+endfunction
+
 % Start simulations ---------------------------------------
 
 more off;
-sim_in.verbose          = 2;
-sim_in.plot_scatter     = 1;
 
-sim_in.Esvec            = 5; 
-sim_in.Ntrials          = 30;
-sim_in.framesize        = 576;
-sim_in.Rs               = 100;
-sim_in.Nc               = 8;
-
-sim_in.phase_offset     = 0;
-sim_in.w_offset         = 0;
-
-sim_in.hf_delay_ms      = 2;
-sim_in.hf_sim           = 1;
-sim_in.hf_phase_only    = 0;
-sim_in.hf_mag_only      = 1;
-
-sim_in.phase_est        = 0;
-sim_in.Np               = 6;
-sim_in.Ns               = 5;
-
-sim_in.ldpc_code_rate   = 3/4;
-sim_in.ldpc_code        = 1;
-
-sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
-
-sim_in.hf_sim           = 0;
-sim_in.plot_scatter     = 0;
-sim_in.Esvec            = 2:15; 
-sim_in.ldpc_code        = 0;
-Ebvec = sim_in.Esvec - 10*log10(2);
-BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
-sim_qpsk                = ber_test(sim_in, 'qpsk');
-sim_dqpsk               = ber_test(sim_in, 'dqpsk');
-sim_in.hf_sim           = 1;
-sim_in.Esvec            = 2:15; 
-sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
-sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-sim_in.ldpc_code        = 1;
-sim_qpsk_hf_ldpc1       = ber_test(sim_in, 'qpsk');
-sim_in.ldpc_code_rate   = 1/2;
-sim_qpsk_hf_ldpc2       = ber_test(sim_in, 'qpsk');
-sim_in.ldpc_code_rate   = 3/4;
-sim_in.hf_sim           = 0;
-sim_qpsk_awgn_ldpc      = ber_test(sim_in, 'qpsk');
-
-figure(1); 
-clf;
-semilogy(Ebvec, BER_theory,'r;QPSK theory;')
-hold on;
-semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'g;QPSK AWGN;')
-semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF;')
-semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
-semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'m;DQPSK HF;')
-semilogy(sim_qpsk_hf_ldpc1.Ebvec, sim_qpsk_hf_ldpc1.BERldpcvec,'k;QPSK HF LDPC 3/4;')
-semilogy(sim_qpsk_hf_ldpc2.Ebvec, sim_qpsk_hf_ldpc2.BERldpcvec,'b;QPSK HF LDPC 1/2;')
-semilogy(sim_qpsk_awgn_ldpc.Ebvec, sim_qpsk_awgn_ldpc.BERldpcvec,'k;QPSK AWGN LDPC 3/4;')
-
-semilogy([min(Ebvec) max(Ebvec)], [3E-2 3E-2], 'r;Codec 2 target BER;')
-hold off;
-xlabel('Eb/N0')
-ylabel('BER')
-grid("minor")
-axis([min(Ebvec) max(Ebvec) 1E-2 1])
+test_phase_est();
