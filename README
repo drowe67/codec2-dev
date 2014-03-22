@@ -12,7 +12,7 @@ Quickstart
 ----------
 
 1/ Listen to Codec 2:
-
+ *** FIRST STEP OBSOLETE: See README.cmake for building ***
    $ ./configure && make
    $ cd src
    $ ./c2demo ../raw/hts1a.raw hts1a_c2.raw
