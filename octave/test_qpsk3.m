@@ -1,12 +1,15 @@
-% test_qps2k.m
-% David Rowe Feb 2014
+% test_qps3k.m
+% David Rowe March 2014
 %
 % QPSK modem simulation, version 2.  Simplifed version of
-% test_qpsk. initially based on code by Bill Cowley Generates curves
+% test_qpsk. Initially based on code by Bill Cowley Generates curves
 % BER versus E/No curves for different modems.  Design to test
 % coherent demodulation ideas on HF channels without building a full
 % blown modem.  Uses 'genie provided' estimates for timing estimation,
 % frame sync.
+%
+% Compared to test_qsk2.m this version supports phase estimation
+% (coherent demod)
 
 1;
 
@@ -30,11 +33,14 @@ function sim_out = ber_test(sim_in, modulation)
     hf_phase_only    = sim_in.hf_phase_only;
     hf_mag_only      = sim_in.hf_mag_only;
     Nc               = sim_in.Nc;
+    sim_coh_dpsk     = sim_in.sim_coh_dpsk;
 
     bps              = 2;
     Nsymb            = framesize/bps;
-    prev_sym_tx      = qpsk_mod([0 0]);
-    prev_sym_rx      = qpsk_mod([0 0]);
+    for k=1:Nc
+      prev_sym_tx(k) = qpsk_mod([0 0]);
+      prev_sym_rx(k) = qpsk_mod([0 0]);
+    end
 
     phase_est_method = sim_in.phase_est_method;
     if phase_est_method == 2
@@ -78,14 +84,14 @@ function sim_out = ber_test(sim_in, modulation)
 
         rate = sim_in.ldpc_code_rate; 
         mod_order = 4; 
-        modulation = 'QPSK';
+        modulation2 = 'QPSK';
         mapping = 'gray';
 
         demod_type = 0;
         decoder_type = 0;
         max_iterations = 100;
 
-        code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping);
+        code_param = ldpc_init(rate, framesize, modulation2, mod_order, mapping);
         code_param.code_bits_per_frame = framesize;
         code_param.symbols_per_frame = framesize/bps;
     else
@@ -150,13 +156,16 @@ function sim_out = ber_test(sim_in, modulation)
         rx_symb_log      = [];
         noise_log        = [];
         mod_strip_log    = [];
-
+        
         % init HF channel
 
         hf_n = 1;
         hf_angle_log = [];
         hf_fading = ones(1,Nsymb);             % default input for ldpc dec
         hf_model = ones(Ntrials*Nsymb/Nc, Nc); % defaults for plotting surface
+
+        sim_out.errors_log = [];
+        sim_out.ldpc_errors_log = [];
 
         for nn = 1: Ntrials
                   
@@ -166,16 +175,17 @@ function sim_out = ber_test(sim_in, modulation)
 
             if ldpc_code
                 [tx_bits, s] = ldpc_enc(tx_bits, code_param);
-            else
-                s = zeros(1, Nsymb);
-                for i=1:Nsymb
-                    tx_symb = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
-                    if strcmp(modulation,'dqpsk')
-                        tx_symb *= prev_sym_tx;
-                        prev_sym_tx = tx_symb;
-                    end 
-                    s(i) = tx_symb;
-                end
+            end
+            s = zeros(1, Nsymb);
+            for i=1:Nc:Nsymb
+              for k=1:Nc
+                tx_symb = qpsk_mod(tx_bits(2*(i-1+k-1)+1:2*(i+k-1)));
+                if strcmp(modulation,'dqpsk')
+                    tx_symb *= prev_sym_tx(k);
+                    prev_sym_tx(k) = tx_symb;
+                end 
+                s(i+k-1) = tx_symb;
+              end
             end
             tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
             tx_bits_buf(framesize+1:2*framesize) = tx_bits;
@@ -270,7 +280,7 @@ function sim_out = ber_test(sim_in, modulation)
                         % s_ch(i+k-1) = r_delay_line(k,centre);
                      end
 
-                      if phase_est_method == 3
+                     if phase_est_method == 3
                         % QPSK modulation strip and phase est with original symbol mags
 
                         mod_strip_pol  = angle(r_delay_line(k,:)) * 4;
@@ -308,15 +318,22 @@ function sim_out = ber_test(sim_in, modulation)
             % de-modulate
 
             rx_bits = zeros(1, framesize);
-            for i=1:Nsymb
-                rx_symb = s_ch(i);
+            for i=1:Nc:Nsymb
+              for k=1:Nc
+                rx_symb = s_ch(i+k-1);
                 if strcmp(modulation,'dqpsk')
                     tmp = rx_symb;
-                    rx_symb *= conj(prev_sym_rx/abs(prev_sym_rx));
-                    prev_sym_rx = tmp;
+                    rx_symb *= conj(prev_sym_rx(k)/abs(prev_sym_rx(k)));
+                    if sim_coh_dpsk
+                      prev_sym_rx(k) = qpsk_mod(qpsk_demod(tmp));
+                    else
+                      prev_sym_rx(k) = tmp;
+                    end
+                    s_ch(i+k-1) = rx_symb;
                 end
-                rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb);
+                rx_bits((2*(i-1+k-1)+1):(2*(i+k-1))) = qpsk_demod(rx_symb);
                 rx_symb_log = [rx_symb_log rx_symb];
+              end
             end
 
 if newldpc
@@ -347,6 +364,7 @@ if newldpc
               %rx_bits_buf(st_rx_bits:st_rx_bits+20-1)
               error_positions = xor(rx_bits_buf(st_rx_bits:en_rx_bits), tx_bits_buf(1:framesize));
               Nerrs = sum(error_positions);
+              sim_out.errors_log = [sim_out.errors_log error_positions];
               Terrs += Nerrs;
               Tbits += length(tx_bits);
 
@@ -359,6 +377,7 @@ if newldpc
                 %detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, s_ch, min(100,EsNo), hf_fading);
                 %error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
                 Nerrs = sum(error_positions);
+                sim_out.ldpc_errors_log = [sim_out.ldpc_errors_log error_positions];
                 if Nerrs
                     Ferrsldpc++;
                 end
@@ -384,6 +403,7 @@ else
                 end
                 Terrsldpc += Nerrs;
                 Tbitsldpc += framesize*rate;
+
             end
         end
 end
@@ -413,6 +433,13 @@ end
     end
     
     Ebvec = Esvec - 10*log10(bps);
+
+    % account for extra power rqd for pilot symbols
+
+    if (phase_est_method == 2) && (phase_est)
+      Ebvec += 10*log10(Ns/(Ns-1));
+    end
+
     sim_out.BERvec          = BERvec;
     sim_out.Ebvec           = Ebvec;
     sim_out.TERvec          = TERvec;
@@ -485,6 +512,8 @@ if 0
         hist(tmp);
 end
      end
+
+size(sim_out.errors_log)
 
 endfunction
 
@@ -648,20 +677,21 @@ endfunction
 function phase_est_hf
   sim_in = standard_init();
 
-  sim_in.Rs               = 200;
-  sim_in.Nc               = 4;
+  sim_in.Rs               = 100;
+  sim_in.Nc               = 8;
 
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 0;
 
-  sim_in.Esvec            = 2:8; 
-  sim_in.Ntrials          = 30;
+  sim_in.Esvec            = 5:15; 
+  sim_in.Ntrials          = 100;
 
   sim_in.newldpc          = 1;
   sim_in.ldpc_code_rate   = 1/2;
   sim_in.ldpc_code        = 1;
 
   sim_in.phase_est        = 0;
+  sim_in.sim_coh_dpsk     = 0;
   sim_in.phase_est_method = 2;
   sim_in.Np               = 3;
   sim_in.phase_offset     = 0;
@@ -674,47 +704,40 @@ function phase_est_hf
 
   baseline                = ber_test(sim_in, 'qpsk');
 
-  sim_in.hf_mag_only      = 1;
+  sim_in.hf_mag_only      = 0;
   sim_in.phase_est_method = 2;
   sim_in.phase_est        = 1;
+  sim_in.Np               = 3;
+  pilot_3                 = ber_test(sim_in, 'qpsk');
+  sim_in.Np               = 5;
+  pilot_5                 = ber_test(sim_in, 'qpsk');
   sim_in.Np               = 7;
   pilot_7                 = ber_test(sim_in, 'qpsk');
 
-  sim_in.hf_mag_only      = 0;
-  pilot_7b                = ber_test(sim_in, 'qpsk');
-
-if 0
+if 1
   sim_in.phase_est        = 0;
   dqpsk                   = ber_test(sim_in, 'dqpsk');
 
-  sim_in.phase_est        = 1;
-  sim_in.phase_est_method = 3;
-  sim_in.Np               = 41;
-  dqpsk_strip_41          = ber_test(sim_in, 'dqpsk');
-end
-  
   figure(1); 
   clf;
   semilogy(baseline.Ebvec, baseline.BERvec,'r;QPSK CCIR poor;')
   hold on;
   semilogy(baseline.Ebvec, baseline.BERldpcvec,'r;QPSK CCIR poor ldpc;')
-  semilogy(pilot_7.Ebvec, pilot_7.BERvec,'b;QPSK CCIR poor ldpc pilot 7;')
-  semilogy(pilot_7.Ebvec, pilot_7.BERldpcvec,'b;QPSK CCIR poor ldpc pilot 7;')
-  semilogy(pilot_7b.Ebvec, pilot_7b.BERvec,'g;QPSK CCIR poor ldpc pilot 7b;')
-  semilogy(pilot_7b.Ebvec, pilot_7b.BERldpcvec,'g;QPSK CCIR poor ldpc pilot 7b;')
-if 0
-  semilogy(dqpsk.Ebvec, dqpsk.BERvec,'c;DQPSK CCIR poor ldpc;')
-  semilogy(dqpsk.Ebvec, dqpsk.BERldpcvec,'c;DQPSK CCIR poor ldpc;')
-  semilogy(dqpsk_strip_41.Ebvec, dqpsk_strip_41.BERvec,'m;DQPSK CCIR poor ldpc strip 41;')
-  semilogy(dqpsk_strip_41.Ebvec, dqpsk_strip_41.BERldpcvec,'m;DQPSK CCIR poor ldpc strip 41;')
-end
+  semilogy(pilot_3.Ebvec, pilot_3.BERvec,'b;QPSK CCIR poor ldpc pilot 3;')
+  semilogy(pilot_3.Ebvec, pilot_3.BERldpcvec,'b;QPSK CCIR poor ldpc pilot 3;')
+  semilogy(pilot_5.Ebvec, pilot_5.BERvec,'g;QPSK CCIR poor ldpc pilot 5;')
+  semilogy(pilot_5.Ebvec, pilot_5.BERldpcvec,'g;QPSK CCIR poor ldpc pilot 5;')
+  semilogy(pilot_7.Ebvec, pilot_7.BERvec,'m;QPSK CCIR poor ldpc pilot 7;')
+  semilogy(pilot_7.Ebvec, pilot_7.BERldpcvec,'m;QPSK CCIR poor ldpc pilot 7;')
+  semilogy(dqpsk.Ebvec, dqpsk.BERvec,'k;DQPSK CCIR poor ldpc;')
+  semilogy(dqpsk.Ebvec, dqpsk.BERldpcvec,'k;DQPSK CCIR poor ldpc;')
 
   hold off;
   xlabel('Eb/N0')
   ylabel('BER')
   grid("minor")
   axis([min(Ebvec) max(Ebvec) 1E-2 1])
-
+end
 endfunction
 
 function phase_est_awgn
@@ -788,10 +811,145 @@ function phase_est_awgn
   axis([min(Ebvec) max(Ebvec) 1E-2 1])
 endfunction
 
+function test_dpsk
+  sim_in = standard_init();
+
+  sim_in.Rs               = 100;
+  sim_in.Nc               = 8;
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 0;
+
+  sim_in.Esvec            = 5; 
+  sim_in.Ntrials          = 30;
+
+  sim_in.newldpc          = 1;
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.phase_est        = 0;
+  sim_in.phase_est_method = 3;
+  sim_in.Np               = 41;
+  sim_in.phase_offset     = 0;
+  sim_in.w_offset         = 0;
+  sim_in.sim_coh_dpsk     = 0;
+
+  sim_in.hf_sim           = 0;
+  sim_in.hf_mag_only      = 1;
+
+  Ebvec = sim_in.Esvec - 10*log10(2);
+
+  baseline                = ber_test(sim_in, 'qpsk');
+  sim_in.phase_est        = 0;
+  dqpsk                   = ber_test(sim_in, 'dqpsk');
+
+  sim_in.phase_est        = 1;
+  sim_in.phase_est_method = 3;
+  sim_in.sim_coh_dpsk     = 1;
+  sim_in.Np               = 41;
+  dqpsk_strip_41          = ber_test(sim_in, 'dqpsk');
+  
+  figure(1); 
+  clf;
+  semilogy(baseline.Ebvec, baseline.BERvec,'r;QPSK CCIR poor;')
+  hold on;
+  semilogy(baseline.Ebvec, baseline.BERldpcvec,'r;QPSK CCIR poor ldpc;')
+  semilogy(dqpsk.Ebvec, dqpsk.BERvec,'c;DQPSK CCIR poor ldpc;')
+  semilogy(dqpsk.Ebvec, dqpsk.BERldpcvec,'c;DQPSK CCIR poor ldpc;')
+  semilogy(dqpsk_strip_41.Ebvec, dqpsk_strip_41.BERvec,'m;DQPSK CCIR poor ldpc strip 41;')
+  semilogy(dqpsk_strip_41.Ebvec, dqpsk_strip_41.BERldpcvec,'m;DQPSK CCIR poor ldpc strip 41;')
+
+  hold off;
+  xlabel('Eb/N0')
+  ylabel('BER')
+  grid("minor")
+  axis([min(Ebvec) max(Ebvec) 1E-2 1])
+
+endfunction
+
+function gen_error_pattern_qpsk()
+  sim_in = standard_init();
+
+  % model codec and uncoded streams as 1000 bit/s each
+
+  sim_in.Rs               = 100;
+  sim_in.Nc               = 4;
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 0;
+
+  sim_in.Esvec            = 10; % Eb/No=2dB
+  sim_in.Ntrials          = 30;
+
+  sim_in.newldpc          = 1;
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.phase_est        = 1;
+  sim_in.phase_est_method = 2;
+  sim_in.Np               = 5;
+  sim_in.phase_offset     = 0;
+  sim_in.w_offset         = 0;
+  sim_in.sim_coh_dpsk     = 0;
+
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 0;
+
+  qpsk                    = ber_test(sim_in, 'qpsk');
+ 
+  length(qpsk.errors_log) 
+  length(qpsk.ldpc_errors_log)
+  % multiplex errors into prot and unprot halves of 52 bit codec frames
+
+  error_pattern = [];
+  for i=1:26:length(qpsk.ldpc_errors_log)-52
+    error_pattern = [error_pattern qpsk.ldpc_errors_log(i:i+25) qpsk.errors_log(i:i+25)  zeros(1,4)];
+    %error_pattern = [error_pattern qpsk.ldpc_errors_log(i:i+25) zeros(1,26)  zeros(1,4)];
+    %error_pattern = [error_pattern zeros(1,26) qpsk.errors_log(i:i+25)  zeros(1,4)];
+  end
+
+  fep=fopen("qpsk_errors_2dB.bin","wb"); fwrite(fep, error_pattern, "short"); fclose(fep);
+
+endfunction
+
+function gen_error_pattern_dpsk()
+  sim_in = standard_init();
+
+  sim_in.Rs               = 50;
+  sim_in.Nc               = 16;
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.Esvec            = 10; % Eb/No=Es/No-3
+  sim_in.Ntrials          = 30;
+
+  sim_in.newldpc          = 1;
+  sim_in.ldpc_code_rate   = 1/2;
+  sim_in.ldpc_code        = 0;
+
+  sim_in.phase_est        = 0;
+  sim_in.phase_est_method = 3;
+  sim_in.Np               = 41;
+  sim_in.phase_offset     = 0;
+  sim_in.w_offset         = 0;
+  sim_in.sim_coh_dpsk     = 0;
+
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 1;
+
+  dqpsk                    = ber_test(sim_in, 'dqpsk');
+ 
+  fep=fopen("dqpsk_errors_12dB.bin","wb"); fwrite(fep, dqpsk.errors_log, "short"); fclose(fep);
+
+endfunction
+
 % Start simulations ---------------------------------------
 
 more off;
 
 %ideal();
-phase_est_hf();
+%phase_est_hf();
 %phase_est_awgn();
+%test_dpsk();
+gen_error_pattern_qpsk
