@@ -370,7 +370,7 @@ static float frame_energy(MODEL *model, float *enormdB) {
 static void print_sparse_amp_error(struct AEXP *aexp, MODEL *model, float edB_thresh)
 {
     int    m, index;
-    float  edB, enormdB, error, dWo, Am;
+    float  edB, enormdB, error, dWo;
     float  sparse_pe[MAX_AMP];
 
     edB = frame_energy(model, &enormdB);
@@ -536,12 +536,12 @@ static void split_error(struct AEXP *aexp, struct codebook *vq, float sparse_pe_
 static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 {
     int    m, index;
-    float  error, amp_dB, edB, enormdB;
+    float  error, amp_dB, enormdB;
     float  sparse_pe_in[MAX_AMP];
     float  sparse_pe_out[MAX_AMP];
     float  weights[MAX_AMP];
 
-    edB = frame_energy(model, &enormdB);
+    frame_energy(model, &enormdB);
 
     aexp->mag[2] = enormdB;
    
@@ -864,9 +864,9 @@ void smooth_samples(struct AEXP *aexp, MODEL *model, int mode)
     float  sparse_pe_out[MAX_AMP];
     float  smoothed[MAX_AMP], smoothed_out[MAX_AMP];
     float  weights[MAX_AMP];
-    float  edB, enormdB;
+    float  enormdB;
 
-    edB = frame_energy(model, &enormdB);
+    frame_energy(model, &enormdB);
     
     for(m=0; m<MAX_AMP; m++) {
 	sparse_pe_in[m] = 0.0;

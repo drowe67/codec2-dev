@@ -58,8 +58,8 @@ int main(int argc, char *argv[])
     short         rx_fdm_scaled[FDMDV_MAX_SAMPLES_PER_FRAME];
     int           i, bit, byte, c;
     int           nin, nin_prev;
-    int           sync_bit, reliable_sync_bit;
-    int           sync;
+    int           sync_bit = 0, reliable_sync_bit;
+    int           sync = 0;
     int           f;
     FILE         *foct = NULL;
     struct FDMDV_STATS stats;

@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
     assert(rx_bits != NULL);
 
-    error_pattern = (int*)malloc(fdmdv_error_pattern_size(fdmdv)*sizeof(int));
+    error_pattern = (short*)malloc(fdmdv_error_pattern_size(fdmdv)*sizeof(int));
     assert(error_pattern != NULL);
 
     total_bit_errors = 0;

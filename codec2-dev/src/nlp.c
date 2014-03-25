@@ -440,7 +440,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
   #ifdef DUMP
   float e_hz[F0_MAX];
   #endif
+  #if !defined(NDEBUG) || defined(DUMP)
   int   bin;
+  #endif
   float f0_min, f0_max;
   float f0_start, f0_end;
 
@@ -473,7 +475,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 
 	    for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
 		e = test_candidate_mbe(Sw, W, f0);
+		#if !defined(NDEBUG) || defined(DUMP)
 		bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
+		#endif
 		#ifdef DUMP
                 e_hz[bin] = e;
                 #endif
@@ -498,7 +502,9 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 
   for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
       e = test_candidate_mbe(Sw, W, f0);
+      #if !defined(NDEBUG) || defined(DUMP)
       bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
+      #endif
       #ifdef DUMP
       e_hz[bin] = e;
       #endif
