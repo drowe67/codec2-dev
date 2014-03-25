@@ -426,7 +426,6 @@ int main(int argc, char *argv[])
 	if (phase0) {
 	    float Wn[M];		        /* windowed speech samples */
 	    float Rk[LPC_MAX+1];	        /* autocorrelation coeffs  */
-	    int ret;
 
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
@@ -467,7 +466,7 @@ int main(int argc, char *argv[])
 	    	model.phi[i] = 0;
 	
 	    if (hand_voicing) {
-		ret = fscanf(fvoicing,"%d\n",&model.voiced);
+		fscanf(fvoicing,"%d\n",&model.voiced);
 	    }
 	}
 

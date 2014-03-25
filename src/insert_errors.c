@@ -45,7 +45,7 @@ int main(int argc, char *argv[])
     unsigned char  byte;
     short          error;
     int            errors, bits;
-    int            bits_per_frame, bytes_per_frame;
+    int            bits_per_frame;
 
     if (argc < 4) {
 	printf("%s InputBitFile OutputBitFile ErrorFile bitsPerFrame [startBit endBit]\n", argv[0]);
@@ -75,7 +75,6 @@ int main(int argc, char *argv[])
 
     bits_per_frame = atoi(argv[4]);
     assert((bits_per_frame % 8) == 0);
-    bytes_per_frame = bits_per_frame/8;
 
     start_bit = 0; end_bit = bits_per_frame;
     if (argc == 7) {

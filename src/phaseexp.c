@@ -343,14 +343,6 @@ static void predict_phases2(struct PEXP *pexp, MODEL *model, int start, int end)
    
 }
 
-static void skip_phases(struct PEXP *pexp, MODEL *model, int start, int end) {
-    int i;
-
-    for(i=start; i<=end; i+=2)
-	model->phi[i] = model->phi[i-1] - model->phi[i-2];
-   
-}
-
 static void rand_phases(MODEL *model, int start, int end) {
     int i;
 
@@ -859,117 +851,6 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 }
 
 
-/*
-  est delta (in Wo)
-  see if this gives us a better (smaller variance) prediction error
-*/
-
-static void print_pred_error_sparse_wo_correction(struct PEXP *pexp, 
-						  MODEL *model, 
-						  int start, int end, 
-						  float mag_thresh)
-{
-    int   i, index;
-    float mag, pred, error[MAX_AMP], diff, c, s, delta, err;
-    float sparse_pe[MAX_AMP];
-
-    mag = 0.0;
-    for(i=start; i<=end; i++)
-	mag += model->A[i]*model->A[i];
-    mag = 10*log10(mag/(end-start));
-    
-    if (mag > mag_thresh) {
-	for(i=0; i<MAX_AMP; i++) {
-	    sparse_pe[i] = 0.0;
-	}
-
-	/* predict phase and sum differences between harmonics */
-
-	for(i=start; i<=end; i++) {
-	    //model->phi[i] = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0 + 0.01*N*i;
-	    pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
-	    error[i] = pred - model->phi[i];
-	}
-
-	/* estimate delta Wo */
-
-	c = s = 0.0;
-	for(i=start+1; i<=end; i++) {
-	    diff = error[i] - error[i-1];
-	    c += log(model->A[i])*cos(diff);
-	    s += log(model->A[i])*sin(diff);
-	}
-	delta = atan2(s,c)/N;
-	//printf("delta %f\n",delta);
-	delta = 0;
-	/* now predict phases using corrected Wo */
- 
-	for(i=start; i<=end; i++) {
-	    pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0 - N*i*delta;
-	    err = pred - model->phi[i];
-	    err = atan2(sin(err),cos(err));
-
-	    index = MAX_AMP*i*model->Wo/PI;
-	    assert(index < MAX_AMP);
-	    sparse_pe[index] = err;
-	}
-
-	/* dump spare phase vector in polar format */
-	
-	for(i=0; i<MAX_AMP; i++)
-	    printf("%f ", sparse_pe[i]);
-	printf("\n");
-	
-    }
-  
-}
-
-
-static void print_pred_error_sparse_wo_correction1(struct PEXP *pexp, 
-						  MODEL *model, 
-						  int start, int end, 
-						  float mag_thresh)
-{
-    int   i, index;
-    float mag, pred, best_Wo, err;
-    float sparse_pe[MAX_AMP];
-
-    mag = 0.0;
-    for(i=start; i<=end; i++)
-	mag += model->A[i]*model->A[i];
-    mag = 10*log10(mag/(end-start));
-    
-    if (mag > mag_thresh) {
-
-	best_Wo = refine_Wo(pexp, model, start, end);
-
-	/* now predict phases using corrected Wo */
- 
-	for(i=0; i<MAX_AMP; i++) {
-	    sparse_pe[i] = 0.0;
-	}
-
-	for(i=start; i<=end; i++) {
-	    pred = pexp->phi_prev[i] + N*i*best_Wo;
-	    err = pred - model->phi[i];
-	    err = atan2(sin(err),cos(err));
-
-	    index = MAX_AMP*i*model->Wo/PI;
-	    assert(index < MAX_AMP);
-	    sparse_pe[index] = err;
-	}
-
-	/* dump spare phase vector in polar format */
-	
-	for(i=0; i<MAX_AMP; i++)
-	    printf("%f ", sparse_pe[i]);
-	printf("\n");
-	
-    }
-  
-}
-
-
 static void predict_phases1(struct PEXP *pexp, MODEL *model, int start, int end) {
     int i;
     float best_Wo;
@@ -1356,7 +1237,7 @@ static void repeat_phases(struct PEXP *pexp, MODEL *model) {
 
 void phase_experiment(struct PEXP *pexp, MODEL *model, char *arg) {
     int              m;
-    float            before[MAX_AMP], best_Wo;
+    float            before[MAX_AMP];
 
     assert(pexp != NULL);
     memcpy(before, &model->phi[0], sizeof(float)*MAX_AMP);
