@@ -24,6 +24,7 @@ function sim_out = ber_test(sim_in)
     hf_phase_only    = sim_in.hf_phase_only;
     hf_mag_only      = sim_in.hf_mag_only;
     Nc               = sim_in.Nc;
+    symbol_amp       = sim_in.symbol_amp;
 
     bps              = 2;
     Nsymb            = framesize/bps;
@@ -88,10 +89,11 @@ function sim_out = ber_test(sim_in)
         
         Terrs = 0;  Tbits = 0;
 
-        tx_symb_log      = [];
-        rx_symb_log      = [];
-        noise_log        = [];
-        
+        tx_symb_log        = [];
+        rx_symb_log        = [];
+        noise_log          = [];
+        sim_out.errors_log = [];
+
         % init HF channel
 
         hf_n = 1;
@@ -100,7 +102,11 @@ function sim_out = ber_test(sim_in)
         hf_model = ones(Ntrials*Nsymb/Nc, Nc); % defaults for plotting surface
 
         sim_out.errors_log = [];
-        sim_out.ldpc_errors_log = [];
+        sim_out.Nerrs = [];
+        sim_out.snr_log = [];
+        sim_out.hf_model_pwr = [];
+
+        symbol_amp_index = 1;
 
         for nn = 1: Ntrials
                   
@@ -114,10 +120,11 @@ function sim_out = ber_test(sim_in)
                 tx_symb = qpsk_mod(tx_bits(2*(i-1+k-1)+1:2*(i+k-1)));
                 tx_symb *= prev_sym_tx(k);
                 prev_sym_tx(k) = tx_symb;
-                s(i+k-1) = tx_symb;
+                s(i+k-1) = symbol_amp(symbol_amp_index)*tx_symb;
               end
             end
             s_ch = s;
+            symbol_amp_index++;
 
             % HF channel simulation  ------------------------------------
             
@@ -156,6 +163,12 @@ function sim_out = ber_test(sim_in)
             
             tx_symb_log = [tx_symb_log s_ch];
 
+            % "genie" SNR estimate 
+            
+            snr = (s_ch*s_ch')/(Nsymb*variance);
+            sim_out.snr_log = [sim_out.snr_log snr];
+            sim_out.hf_model_pwr = [sim_out.hf_model_pwr mean(hf_fading.^2)];
+
             % AWGN noise and phase/freq offset channel simulation
             % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
 
@@ -186,9 +199,12 @@ function sim_out = ber_test(sim_in)
             end
 
             error_positions = xor(rx_bits, tx_bits);
+            sim_out.errors_log = [sim_out.errors_log error_positions];
             Nerrs = sum(error_positions);
+            sim_out.Nerrs = [sim_out.Nerrs Nerrs];
             Terrs += Nerrs;
             Tbits += length(tx_bits);
+
         end
 
         TERvec(ne) = Terrs;
@@ -228,6 +244,7 @@ function sim_out = ber_test(sim_in)
         grid
         title('HF Channel Es/No');
 
+        if 0 
         figure(4);
         clf;
         subplot(211)
@@ -236,6 +253,7 @@ function sim_out = ber_test(sim_in)
         subplot(212)
         plot(y,angle(hf_model(y,1)))
         title('HF Channel Carrier 1 Phase');
+        end
     end
 
 endfunction
@@ -284,23 +302,87 @@ function sim_in = standard_init
   sim_in.hf_mag_only      = 0;
 endfunction
 
+function awgn_hf_ber_curves()
+  sim_in = standard_init();
+
+  Ebvec = sim_in.Esvec - 10*log10(2);
+  BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+
+  dpsk_awgn = ber_test(sim_in);
+  sim_in.hf_sim           = 1;
+  dpsk_hf   = ber_test(sim_in);
+
+  figure(1); 
+  clf;
+  semilogy(Ebvec, BER_theory,'r;QPSK theory;')
+  hold on;
+  semilogy(dpsk_awgn.Ebvec, dpsk_awgn.BERvec,'g;DQPSK;')
+  semilogy(dpsk_hf.Ebvec, dpsk_hf.BERvec,'g;DQPSK HF;')
+  hold off;
+  xlabel('Eb/N0')
+  ylabel('BER')
+  grid("minor")
+  axis([min(Ebvec) max(Ebvec) 1E-3 1])
+end
+
 sim_in = standard_init();
 
-Ebvec = sim_in.Esvec - 10*log10(2);
-BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+% energy file sampled every 10ms
 
-dpsk_awgn = ber_test(sim_in);
-sim_in.hf_sim           = 1;
-dpsk_hf   = ber_test(sim_in);
+load ../src/ve9qrp.txt
+pdB=10*log10(ve9qrp);
+for i=1:length(pdB)
+  if pdB(i) < 0
+    pdB(i) = 0;
+  end
+end
 
-figure(1); 
+% Down sample to 40ms rate used for 1300 bit/s codec, every 4th sample is transmitted
+
+pdB = pdB(4:4:length(pdB));
+
+% Use linear mapping function in dB domain to map to symbol power
+
+power_map_x  = [ 0 20 24 40 50 ];
+power_map_y  = [-3 -3  0 6  6];
+mapped_pdB = interp1(power_map_x, power_map_y, pdB);
+
+sim_in.symbol_amp = 10 .^ (mapped_pdB/20);
+%sim_in.symbol_amp = ones(1,length(pdB));
+sim_in.plot_scatter = 1;
+sim_in.verbose      = 2;
+sim_in.hf_sim       = 1;
+sim_in.Esvec        = 10;
+
+dqpsk_pwr_hf = ber_test(sim_in);
+
+% note: need way to test that power is aligned with speech
+
+figure(4)
 clf;
-semilogy(Ebvec, BER_theory,'r;QPSK theory;')
+plot((1:sim_in.Ntrials)*80*4, pdB(1:sim_in.Ntrials));
 hold on;
-semilogy(dpsk_awgn.Ebvec, dpsk_awgn.BERvec,'g;DQPSK;')
-semilogy(dpsk_hf.Ebvec, dpsk_hf.BERvec,'g;DQPSK HF;')
+plot((1:sim_in.Ntrials)*80*4, mapped_pdB(1:sim_in.Ntrials),'r');
 hold off;
-xlabel('Eb/N0')
-ylabel('BER')
-grid("minor")
-axis([min(Ebvec) max(Ebvec) 1E-3 1])
+
+figure(5)
+clf;
+
+s = load_raw("../raw/ve9qrp.raw");
+M=320; M_on_2 = M/2; % processing delay between input speech and centre of analysis window
+plot(M_on_2:(M_on_2-1+sim_in.Ntrials*M),s(1:sim_in.Ntrials*M))
+hold on;
+plot((1:sim_in.Ntrials)*M, 5000*sim_in.symbol_amp(1:sim_in.Ntrials),'r');
+hold off;
+axis([1 sim_in.Ntrials*M -3E4 3E4]);
+
+figure(6)
+clf;
+plot((1:sim_in.Ntrials)*M, 20*log10(sim_in.symbol_amp(1:sim_in.Ntrials)),'b;Es (dB);');
+hold on;
+plot((1:sim_in.Ntrials)*M, 10*log10(dqpsk_pwr_hf.hf_model_pwr),'g;Fading (dB);');
+plot((1:sim_in.Ntrials)*M, 10*log10(dqpsk_pwr_hf.snr_log),'r;Es/No (dB);');
+hold off;
+
+fep=fopen("dqpsk_errors_pwr.bin","wb"); fwrite(fep, dqpsk_pwr_hf.errors_log, "short"); fclose(fep);
+fmute=fopen("dqpsk_mute.bin","wb"); fwrite(fmute, mute, "short"); fclose(fmute);
