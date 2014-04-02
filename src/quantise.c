@@ -1553,16 +1553,14 @@ void decode_lsps_vq(int *indexes, float *xq, int ndim)
 
 \*---------------------------------------------------------------------------*/
 
-void bw_expand_lsps(float lsp[],
-		    int   order
-)
+void bw_expand_lsps(float lsp[], int order, float min_sep_low, float min_sep_high)
 {
     int i;
 
     for(i=1; i<4; i++) {
 	
-	if ((lsp[i] - lsp[i-1]) < 50.0*(PI/4000.0))
-	    lsp[i] = lsp[i-1] + 50.0*(PI/4000.0);
+	if ((lsp[i] - lsp[i-1]) < min_sep_low*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + min_sep_low*(PI/4000.0);
 	
     }
 
@@ -1572,8 +1570,8 @@ void bw_expand_lsps(float lsp[],
     */
 
     for(i=4; i<order; i++) {
-	if (lsp[i] - lsp[i-1] < 100.0*(PI/4000.0))
-	    lsp[i] = lsp[i-1] + 100.0*(PI/4000.0);
+	if (lsp[i] - lsp[i-1] < min_sep_high*(PI/4000.0))
+	    lsp[i] = lsp[i-1] + min_sep_high*(PI/4000.0);
     }
 }
 

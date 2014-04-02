@@ -44,18 +44,20 @@ int main(int argc, char *argv[])
     void          *codec2;
     FILE          *fin;
     FILE          *fout;
+    FILE          *fber = NULL;
     short         *buf;
-    unsigned char *bits;
+    unsigned char *bits, *prev_bits;
     int            nsam, nbit, nbyte, i, byte, frames, bits_proc, bit_errors, error_mode;
     int            nstart_bit, nend_bit, bit_rate;
     int            state, next_state;
-    float          ber, r, burst_length, burst_period, burst_timer;
+    float          ber, r, burst_length, burst_period, burst_timer, ber_est;
     unsigned char  mask;
 
     if ((argc != 4) && (argc != 5) && (argc != 6) && (argc != 7)) {
 	printf("basic usage.................: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile\n");
-	printf("uniform errors usage........: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit smoothingFlag\n");
+	printf("uniform errors usage........: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile uniformBER startBit endBit\n");
 	printf("uniform error on range usage: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile uniformBER\n");
+	printf("demod BER estimate..........: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile BERfile\n");
 	printf("two state fading usage......: c2dec 3200|2400|1600|1400|1300|1200 InputBitFile OutputRawSpeechFile burstLength burstPeriod\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw\n");
 	printf("e.g    c2dec 1400 hts1a.c2 hts1a_1400.raw 0.9\n");
@@ -106,13 +108,18 @@ int main(int argc, char *argv[])
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
+    prev_bits = (unsigned char*)malloc(nbyte*sizeof(char));
     frames = bit_errors = bits_proc = 0;
     nstart_bit = 0;
     nend_bit = nbit-1;
 
     if (argc == 5) {
-        error_mode = UNIFORM;
-	ber = atof(argv[4]);
+        /* see if 4th argument is a valid file name */
+        if ( (fber = fopen(argv[4],"rb")) == NULL ) {
+            /* otherwise it must be BER value for uniform errors */
+            ber = atof(argv[4]);
+	    error_mode = UNIFORM;
+        }
     }
 
     if (argc == 6) {
@@ -194,12 +201,30 @@ int main(int argc, char *argv[])
             state = next_state;
         }
 
-	codec2_decode(codec2, buf, bits);
+        if (fber != NULL) {
+            if (fread(&ber_est, sizeof(float), 1, fber) != 1) {
+                fprintf(stderr, "ran out of BER estimates!\n");
+                exit(1);
+            }
+            //fprintf(stderr, "ber_est: %f\n", ber_est);
+        }
+        else
+            ber_est = 0.0;
+
+        /* frame repeat logic */
+        if (ber_est > 0.15) {
+            //memcpy(bits, prev_bits, nbyte);
+            // fprintf(stderr, "repeat\n");
+        }
+            
+	codec2_decode(codec2, buf, bits, ber_est);
  	fwrite(buf, sizeof(short), nsam, fout);
 	//if this is in a pipeline, we probably don't want the usual
         //buffering to occur
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);         
+
+        memcpy(prev_bits, bits, nbyte);
     }
 
     if (error_mode)

@@ -64,7 +64,7 @@ void codec2_decode_1600(struct CODEC2 *c2, short speech[], const unsigned char *
 void codec2_encode_1400(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[]);
-void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
 void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
@@ -248,7 +248,7 @@ void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, s
 	codec2_encode_1200(c2, bits, speech);
 }
 
-void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
+void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)
 {
     assert(c2 != NULL);
     assert(
@@ -269,7 +269,7 @@ void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const 
     if (c2->mode == CODEC2_MODE_1400)
  	codec2_decode_1400(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_1300)
- 	codec2_decode_1300(c2, speech, bits);
+ 	codec2_decode_1300(c2, speech, bits, ber_est);
     if (c2->mode == CODEC2_MODE_1200)
  	codec2_decode_1200(c2, speech, bits);
 }
@@ -534,7 +534,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     decode_lsps_scalar(&lsps[1][0], lsp_indexes, LPC_ORD);
     check_lsp_order(&lsps[1][0], LPC_ORD);
-    bw_expand_lsps(&lsps[1][0], LPC_ORD);
+    bw_expand_lsps(&lsps[1][0], LPC_ORD, 50.0, 100.0);
  
     /* interpolate ------------------------------------------------*/
 
@@ -717,7 +717,7 @@ void codec2_decode_1600(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     decode_lsps_scalar(&lsps[3][0], lsp_indexes, LPC_ORD);
     check_lsp_order(&lsps[3][0], LPC_ORD);
-    bw_expand_lsps(&lsps[3][0], LPC_ORD);
+    bw_expand_lsps(&lsps[3][0], LPC_ORD, 50.0, 100.0);
  
     /* interpolate ------------------------------------------------*/
 
@@ -890,7 +890,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     decode_lsps_scalar(&lsps[3][0], lsp_indexes, LPC_ORD);
     check_lsp_order(&lsps[3][0], LPC_ORD);
-    bw_expand_lsps(&lsps[3][0], LPC_ORD);
+    bw_expand_lsps(&lsps[3][0], LPC_ORD, 50.0, 100.0);
  
     /* interpolate ------------------------------------------------*/
 
@@ -1027,7 +1027,7 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits)
+void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est)
 {
     MODEL   model[4];
     int     lsp_indexes[LPC_ORD];
@@ -1071,8 +1071,15 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     decode_lsps_scalar(&lsps[3][0], lsp_indexes, LPC_ORD);
     check_lsp_order(&lsps[3][0], LPC_ORD);
-    bw_expand_lsps(&lsps[3][0], LPC_ORD);
+    bw_expand_lsps(&lsps[3][0], LPC_ORD, 50.0, 100.0);
  
+    if (ber_est > 0.15) {
+        model[0].voiced =  model[1].voiced = model[2].voiced = model[3].voiced = 0;
+        e[3] = decode_energy(10);
+        bw_expand_lsps(&lsps[3][0], LPC_ORD, 200.0, 200.0);
+        fprintf(stderr, "soft mute\n");
+    }
+
     /* interpolate ------------------------------------------------*/
 
     /* Wo, energy, and LSPs are sampled every 40ms so we interpolate
@@ -1248,7 +1255,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     }
     decode_lsps_vq(lsp_indexes, &lsps[3][0], LPC_ORD);
     check_lsp_order(&lsps[3][0], LPC_ORD);
-    bw_expand_lsps(&lsps[3][0], LPC_ORD);
+    bw_expand_lsps(&lsps[3][0], LPC_ORD, 50.0, 100.0);
  
     /* interpolate ------------------------------------------------*/
 

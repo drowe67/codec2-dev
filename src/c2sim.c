@@ -518,7 +518,7 @@ int main(int argc, char *argv[])
 	    if (lsp) {
 		encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
 		decode_lsps_scalar(lsps_, lsp_indexes, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);
+		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 
@@ -531,7 +531,7 @@ int main(int argc, char *argv[])
 #ifdef __EXPERIMENTAL__
 	    if (lspvq) {
 		lspvq_quantise(lsps, lsps_, LPC_ORD);
-		bw_expand_lsps(lsps_, LPC_ORD);
+		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 #endif
@@ -542,7 +542,7 @@ int main(int argc, char *argv[])
 		{ 
 		    float lsps_bw[LPC_ORD];
 		    memcpy(lsps_bw, lsps_, sizeof(float)*LPC_ORD);
-		    bw_expand_lsps(lsps_bw, LPC_ORD);			    
+		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);			    
 		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
 		}
 	    }
@@ -552,7 +552,7 @@ int main(int argc, char *argv[])
 		/*  multi-stage VQ from Anssi Ramo OH3GDD */
 
 		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
-		bw_expand_lsps(lsps_, LPC_ORD);			    
+		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);			    
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 #endif
@@ -618,7 +618,7 @@ int main(int argc, char *argv[])
 	    if (lspdt && !decimate) {
 		if (frames%2) {
 		    lspdt_quantise(lsps, lsps_, lsps__prev, lspdt_mode);
-		    bw_expand_lsps(lsps_, LPC_ORD);
+		    bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
 		    lsp_to_lpc(lsps_, ak, LPC_ORD);
 		}
 		for(i=0; i<LPC_ORD; i++)
@@ -650,7 +650,7 @@ int main(int argc, char *argv[])
 		    for(i=0; i<LPC_ORD; i++)
 			lsps_[i] = lsps__prev2[i];		  
                     #endif		    
-		    bw_expand_lsps(lsps_, LPC_ORD);
+		    bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
 		    lsp_to_lpc(lsps_, ak, LPC_ORD);
 		}
 		
