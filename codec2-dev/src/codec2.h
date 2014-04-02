@@ -58,7 +58,7 @@ struct CODEC2;
 struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode);
 void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *codec2_state);
 void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *codec2_state, unsigned char * bits, short speech_in[]);
-void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits);
+      void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *codec2_state, short speech_out[], const unsigned char *bits, float ber_est);
 int  CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *codec2_state);
 int  CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *codec2_state);
 

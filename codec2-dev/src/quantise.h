@@ -111,7 +111,7 @@ float speech_to_uq_lsps(float lsp[],
 		        int   order
 			);
 int check_lsp_order(float lsp[], int lpc_order);
-void bw_expand_lsps(float lsp[], int order);
+void bw_expand_lsps(float lsp[], int order, float min_sep_low, float min_sep_high);
 void bw_expand_lsps2(float lsp[], int order);
 void locate_lsps_jnd_steps(float lsp[], int order);
 float decode_amplitudes(MODEL *model, 
