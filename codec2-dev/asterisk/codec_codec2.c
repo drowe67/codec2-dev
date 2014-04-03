@@ -32,7 +32,7 @@
 
 #define BUFFER_SAMPLES	  8000
 #define CODEC2_SAMPLES    160
-#define	CODEC2_FRAME_LEN  7
+#define	CODEC2_FRAME_LEN  6
 
 /* Sample frame data */
 
@@ -41,7 +41,7 @@
 
 struct codec2_translator_pvt {	        /* both codec2tolin and codec2togsm */
     struct CODEC2 *codec2;
-    short  buf[BUFFER_SAMPLES];	/* lintocodec2, temporary storage */
+    int16_t  buf[BUFFER_SAMPLES];	/* lintocodec2, temporary storage */
 };
 
 static int codec2_new(struct ast_trans_pvt *pvt)
@@ -49,6 +49,8 @@ static int codec2_new(struct ast_trans_pvt *pvt)
     struct codec2_translator_pvt *tmp = pvt->pvt;
 
     tmp->codec2 = codec2_create(CODEC2_MODE_2400);
+    if (!tmp->codec2)
+        return -1;
 	
     return 0;
 }
