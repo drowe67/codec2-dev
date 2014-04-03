@@ -1,0 +1,384 @@
+diff -urN asterisk-11.8.1-orig/build_tools/menuselect-deps.in asterisk-11.8.1-codec2/build_tools/menuselect-deps.in
+--- asterisk-11.8.1-orig/build_tools/menuselect-deps.in	2013-04-11 21:59:35.000000000 +0200
++++ asterisk-11.8.1-codec2/build_tools/menuselect-deps.in	2014-04-01 10:24:29.368859813 +0200
+@@ -4,6 +4,7 @@
+ CRYPTO=@PBX_CRYPTO@
+ BFD=@PBX_BFD@
+ BISON=@PBX_BISON@
++CODEC2=@PBX_CODEC2@
+ CURL=@PBX_CURL@
+ DAHDI=@PBX_DAHDI@
+ DLADDR=@PBX_DLADDR@
+diff -urN asterisk-11.8.1-orig/codecs/codec_codec2.c asterisk-11.8.1-codec2/codecs/codec_codec2.c
+--- asterisk-11.8.1-orig/codecs/codec_codec2.c	1970-01-01 01:00:00.000000000 +0100
++++ asterisk-11.8.1-codec2/codecs/codec_codec2.c	2014-04-01 01:28:47.000000000 +0200
+@@ -0,0 +1,190 @@
++/*
++ * Codec 2 module for Asterisk.
++ *
++ * Credit: codec_gsm.c used as a starting point.
++ *
++ * Copyright (C) 2012 Ed W and David Rowe
++ *
++ * This program is free software, distributed under the terms of
++ * the GNU General Public License Version 2. See the LICENSE file
++ * at the top of the source tree.
++ */
++
++/*! \file
++ *
++ * \brief Translate between signed linear and Codec 2
++ *
++ * \ingroup codecs
++ */
++
++/*** MODULEINFO
++	<depend>codec2</depend>
++	<support_level>core</support_level>
++ ***/
++
++#include "asterisk.h"
++
++#include "asterisk/translate.h"
++#include "asterisk/config.h"
++#include "asterisk/module.h"
++#include "asterisk/utils.h"
++
++#include <codec2/codec2.h>
++
++#define BUFFER_SAMPLES	  8000
++#define CODEC2_SAMPLES    160
++#define	CODEC2_FRAME_LEN  6
++
++/* Sample frame data */
++
++#include "asterisk/slin.h"
++#include "ex_codec2.h"
++
++struct codec2_translator_pvt {	        /* both codec2tolin and codec2togsm */
++    struct CODEC2 *codec2;
++    int16_t  buf[BUFFER_SAMPLES];	/* lintocodec2, temporary storage */
++};
++
++static int codec2_new(struct ast_trans_pvt *pvt)
++{
++    struct codec2_translator_pvt *tmp = pvt->pvt;
++
++    tmp->codec2 = codec2_create(CODEC2_MODE_2400);
++    if (!tmp)
++        return -1;
++	
++    return 0;
++}
++
++/*! \brief decode and store in outbuf. */
++static int codec2tolin_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
++{
++    struct codec2_translator_pvt *tmp = pvt->pvt;
++    int x;
++    int16_t *dst = pvt->outbuf.i16;
++    int flen = CODEC2_FRAME_LEN;
++
++    for (x=0; x < f->datalen; x += flen) {
++	unsigned char *src;
++	int len;
++	len = CODEC2_SAMPLES;
++	src = f->data.ptr + x;
++
++	codec2_decode(tmp->codec2, dst + pvt->samples, src);
++
++	pvt->samples += CODEC2_SAMPLES;
++	pvt->datalen += 2 * CODEC2_SAMPLES;
++    }
++    return 0;
++}
++
++/*! \brief store samples into working buffer for later decode */
++static int lintocodec2_framein(struct ast_trans_pvt *pvt, struct ast_frame *f)
++{
++	struct codec2_translator_pvt *tmp = pvt->pvt;
++
++	if (pvt->samples + f->samples > BUFFER_SAMPLES) {
++		ast_log(LOG_WARNING, "Out of buffer space\n");
++		return -1;
++	}
++	memcpy(tmp->buf + pvt->samples, f->data.ptr, f->datalen);
++	pvt->samples += f->samples;
++	return 0;
++}
++
++/*! \brief encode and produce a frame */
++static struct ast_frame *lintocodec2_frameout(struct ast_trans_pvt *pvt)
++{
++	struct codec2_translator_pvt *tmp = pvt->pvt;
++	int datalen = 0;
++	int samples = 0;
++
++	/* We can't work on anything less than a frame in size */
++	if (pvt->samples < CODEC2_SAMPLES)
++		return NULL;
++	while (pvt->samples >= CODEC2_SAMPLES) {
++	    /* Encode a frame of data */
++	    codec2_encode(tmp->codec2, (unsigned char*)(pvt->outbuf.c + datalen), tmp->buf + samples);
++	    datalen += CODEC2_FRAME_LEN;
++	    samples += CODEC2_SAMPLES;
++	    pvt->samples -= CODEC2_SAMPLES;
++	}
++
++	/* Move the data at the end of the buffer to the front */
++	if (pvt->samples)
++		memmove(tmp->buf, tmp->buf + samples, pvt->samples * 2);
++
++	return ast_trans_frameout(pvt, datalen, samples);
++}
++
++static void codec2_destroy_stuff(struct ast_trans_pvt *pvt)
++{
++	struct codec2_translator_pvt *tmp = pvt->pvt;
++	if (tmp->codec2)
++		codec2_destroy(tmp->codec2);
++}
++
++static struct ast_translator codec2tolin = {
++	.name = "codec2tolin", 
++	.newpvt = codec2_new,
++	.framein = codec2tolin_framein,
++	.destroy = codec2_destroy_stuff,
++	.sample = codec2_sample,
++	.buffer_samples = BUFFER_SAMPLES,
++	.buf_size = BUFFER_SAMPLES * 2,
++	.desc_size = sizeof (struct codec2_translator_pvt ),
++};
++
++static struct ast_translator lintocodec2 = {
++	.name = "lintocodec2", 
++	.newpvt = codec2_new,
++	.framein = lintocodec2_framein,
++	.frameout = lintocodec2_frameout,
++	.destroy = codec2_destroy_stuff,
++	.sample = slin8_sample,
++	.desc_size = sizeof (struct codec2_translator_pvt ),
++	.buf_size = (BUFFER_SAMPLES * CODEC2_FRAME_LEN + CODEC2_SAMPLES - 1)/CODEC2_SAMPLES,
++};
++
++/*! \brief standard module glue */
++static int reload(void)
++{
++	return AST_MODULE_LOAD_SUCCESS;
++}
++
++static int unload_module(void)
++{
++	int res;
++
++	res = ast_unregister_translator(&lintocodec2);
++	if (!res)
++		res = ast_unregister_translator(&codec2tolin);
++
++	return res;
++}
++
++static int load_module(void)
++{
++	int res;
++	
++	ast_format_set(&codec2tolin.src_format, AST_FORMAT_CODEC2, 0);
++	ast_format_set(&codec2tolin.dst_format, AST_FORMAT_SLINEAR, 0);
++	
++	ast_format_set(&lintocodec2.src_format, AST_FORMAT_SLINEAR, 0);
++	ast_format_set(&lintocodec2.dst_format, AST_FORMAT_CODEC2, 0);
++
++	res = ast_register_translator(&codec2tolin);
++	if (!res) 
++		res=ast_register_translator(&lintocodec2);
++	else
++		ast_unregister_translator(&codec2tolin);
++	if (res) 
++		return AST_MODULE_LOAD_FAILURE;
++	return AST_MODULE_LOAD_SUCCESS;
++}
++
++AST_MODULE_INFO(ASTERISK_GPL_KEY, AST_MODFLAG_DEFAULT, "Codec 2 Coder/Decoder",
++		.load = load_module,
++		.unload = unload_module,
++		.reload = reload,
++	       );
+diff -urN asterisk-11.8.1-orig/codecs/ex_codec2.h asterisk-11.8.1-codec2/codecs/ex_codec2.h
+--- asterisk-11.8.1-orig/codecs/ex_codec2.h	1970-01-01 01:00:00.000000000 +0100
++++ asterisk-11.8.1-codec2/codecs/ex_codec2.h	2014-04-01 01:30:29.000000000 +0200
+@@ -0,0 +1,29 @@
++/*! \file
++ * \brief 8-bit raw data
++ *
++ * Copyright (C) 2012, 2012 Ed W and David Rowe
++ *
++ * Distributed under the terms of the GNU General Public License
++ *
++ */
++
++static uint8_t ex_codec2[] = {
++    0xea,0xca,0x14,0x85,0x91,0x78
++};
++
++static struct ast_frame *codec2_sample(void)
++{
++	static struct ast_frame f = {
++		.frametype = AST_FRAME_VOICE,
++		.datalen = sizeof(ex_codec2),
++		.samples = CODEC2_SAMPLES,
++		.mallocd = 0,
++		.offset = 0,
++		.src = __PRETTY_FUNCTION__,
++		.data.ptr = ex_codec2,
++	};
++	
++	ast_format_set(&f.subclass.format, AST_FORMAT_CODEC2, 0);
++
++	return &f;
++}
+diff -urN asterisk-11.8.1-orig/configure.ac asterisk-11.8.1-codec2/configure.ac
+--- asterisk-11.8.1-orig/configure.ac	2014-01-08 17:17:32.000000000 +0100
++++ asterisk-11.8.1-codec2/configure.ac	2014-04-01 10:27:08.503390997 +0200
+@@ -384,6 +384,7 @@
+ AST_EXT_LIB_SETUP([BKTR], [Stack Backtrace], [execinfo])
+ AST_EXT_LIB_SETUP([BLUETOOTH], [Bluetooth], [bluetooth])
+ AST_EXT_LIB_SETUP([CAP], [POSIX 1.e capabilities], [cap])
++AST_EXT_LIB_SETUP([CODEC2], [Codec 2], [codec2])
+ AST_EXT_LIB_SETUP([COROSYNC], [Corosync], [cpg])
+ AST_EXT_LIB_SETUP_OPTIONAL([COROSYNC_CFG_STATE_TRACK], [A callback only in corosync 1.x], [COROSYNC], [cfg])
+ AST_EXT_LIB_SETUP([CURSES], [curses], [curses])
+@@ -2116,6 +2117,8 @@
+ 
+ AST_EXT_LIB_CHECK([RADIUS], [radiusclient-ng], [rc_read_config], [radiusclient-ng.h])
+ 
++AST_EXT_LIB_CHECK([CODEC2], [codec2], [codec2_create], [codec2/codec2.h])
++
+ AST_EXT_LIB_CHECK([COROSYNC], [cpg], [cpg_join], [corosync/cpg.h], [-lcfg])
+ AST_EXT_LIB_CHECK([COROSYNC_CFG_STATE_TRACK], [cfg], [corosync_cfg_state_track], [corosync/cfg.h], [-lcfg])
+ 
+diff -urN asterisk-11.8.1-orig/include/asterisk/format.h asterisk-11.8.1-codec2/include/asterisk/format.h
+--- asterisk-11.8.1-orig/include/asterisk/format.h	2012-07-13 20:41:07.000000000 +0200
++++ asterisk-11.8.1-codec2/include/asterisk/format.h	2014-04-01 10:03:16.120355835 +0200
+@@ -101,6 +101,7 @@
+ 	AST_FORMAT_SLINEAR192       = 27 + AST_FORMAT_TYPE_AUDIO,
+ 	AST_FORMAT_SPEEX32          = 28 + AST_FORMAT_TYPE_AUDIO,
+ 	AST_FORMAT_CELT             = 29 + AST_FORMAT_TYPE_AUDIO,
++	AST_FORMAT_CODEC2           = 31 + AST_FORMAT_TYPE_AUDIO,
+ 
+ 	/*! H.261 Video */
+ 	AST_FORMAT_H261             = 1 + AST_FORMAT_TYPE_VIDEO,
+diff -urN asterisk-11.8.1-orig/main/channel.c asterisk-11.8.1-codec2/main/channel.c
+--- asterisk-11.8.1-orig/main/channel.c	2013-12-31 00:16:04.000000000 +0100
++++ asterisk-11.8.1-codec2/main/channel.c	2014-04-01 10:06:55.659929991 +0200
+@@ -918,6 +918,8 @@
+ 		AST_FORMAT_SILK,
+ 		/*! CELT supports crazy high sample rates */
+ 		AST_FORMAT_CELT,
++		/* Codec 2 */
++		AST_FORMAT_CODEC2,
+ 		/*! Ick, LPC10 sounds terrible, but at least we have code for it, if you're tacky enough
+ 		    to use it */
+ 		AST_FORMAT_LPC10,
+diff -urN asterisk-11.8.1-orig/main/format.c asterisk-11.8.1-codec2/main/format.c
+--- asterisk-11.8.1-orig/main/format.c	2013-06-12 04:25:23.000000000 +0200
++++ asterisk-11.8.1-codec2/main/format.c	2014-04-01 10:11:05.319972320 +0200
+@@ -430,6 +430,9 @@
+ 	/*! SpeeX Wideband (16kHz) Free Compression */
+ 	case AST_FORMAT_SPEEX16:
+ 		return (1ULL << 33);
++	/*! Codec 2 (8KHz) */
++	case AST_FORMAT_CODEC2:
++		return (1ULL << 35);
+ 	/*! Raw mu-law data (G.711) */
+ 	case AST_FORMAT_TESTLAW:
+ 		return (1ULL << 47);
+@@ -532,6 +535,9 @@
+ 	/*! SpeeX Wideband (16kHz) Free Compression */
+ 	case (1ULL << 33):
+ 		return ast_format_set(dst, AST_FORMAT_SPEEX16, 0);
++	/*! Codec 2 (8KHz) */
++	case (1ULL << 35):
++		return ast_format_set(dst, AST_FORMAT_CODEC2, 0);
+ 	/*! Raw mu-law data (G.711) */
+ 	case (1ULL << 47):
+ 		return ast_format_set(dst, AST_FORMAT_TESTLAW, 0);
+@@ -1071,6 +1077,8 @@
+ 	format_list_add_static(ast_format_set(&tmpfmt, AST_FORMAT_SLINEAR48, 0), "slin48", 48000, "16 bit Signed Linear PCM (48kHz)", 960, 10, 70, 10, 20, AST_SMOOTHER_FLAG_BE, 0);/*!< Signed linear (48kHz) */
+ 	format_list_add_static(ast_format_set(&tmpfmt, AST_FORMAT_SLINEAR96, 0), "slin96", 96000, "16 bit Signed Linear PCM (96kHz)", 1920, 10, 70, 10, 20, AST_SMOOTHER_FLAG_BE, 0);/*!< Signed linear (96kHz) */
+ 	format_list_add_static(ast_format_set(&tmpfmt, AST_FORMAT_SLINEAR192, 0), "slin192", 192000, "16 bit Signed Linear PCM (192kHz)", 3840, 10, 70, 10, 20, AST_SMOOTHER_FLAG_BE, 0);/*!< Signed linear (192kHz) */
++	/* Codec 2 */
++	format_list_add_static(ast_format_set(&tmpfmt, AST_FORMAT_CODEC2, 0), "codec2", 8000, "Codec 2", 6, 20, 20, 20, 20, 0, 0);  /*!< codec_codec2.c */
+ 
+ 	return 0;
+ }
+diff -urN asterisk-11.8.1-orig/main/frame.c asterisk-11.8.1-codec2/main/frame.c
+--- asterisk-11.8.1-orig/main/frame.c	2012-07-24 18:54:26.000000000 +0200
++++ asterisk-11.8.1-codec2/main/frame.c	2014-04-01 10:13:35.626395684 +0200
+@@ -1083,6 +1083,10 @@
+ 		/* TODO The assumes 20ms delivery right now, which is incorrect */
+ 		samples = ast_format_rate(&f->subclass.format) / 50;
+ 		break;
++        /* Codec 2 */
++        case AST_FORMAT_CODEC2:
++        	samples = 160 * (f->datalen / 6);
++        	break;
+ 	default:
+ 		ast_log(LOG_WARNING, "Unable to calculate samples for format %s\n", ast_getformatname(&f->subclass.format));
+ 	}
+@@ -1134,6 +1138,10 @@
+ 		/* 48,000 samples per second at 64kbps is 8,000 bytes per second */
+ 		len = (int) samples / ((float) 48000 / 8000);
+ 		break;
++        /* Codec 2 */
++        case AST_FORMAT_CODEC2:
++        	len = (samples / 160) * 6;
++        	break;
+ 	default:
+ 		ast_log(LOG_WARNING, "Unable to calculate sample length for format %s\n", ast_getformatname(format));
+ 	}
+diff -urN asterisk-11.8.1-orig/main/rtp_engine.c asterisk-11.8.1-codec2/main/rtp_engine.c
+--- asterisk-11.8.1-orig/main/rtp_engine.c	2013-12-18 00:35:07.000000000 +0100
++++ asterisk-11.8.1-codec2/main/rtp_engine.c	2014-04-01 10:17:00.121681465 +0200
+@@ -2289,6 +2289,8 @@
+ 	set_next_mime_type(ast_format_set(&tmpfmt, AST_FORMAT_SIREN7, 0), 0, "audio", "G7221", 16000);
+ 	set_next_mime_type(ast_format_set(&tmpfmt, AST_FORMAT_SIREN14, 0), 0, "audio", "G7221", 32000);
+ 	set_next_mime_type(ast_format_set(&tmpfmt, AST_FORMAT_G719, 0), 0, "audio", "G719", 48000);
++	/* Codec 2 */
++	set_next_mime_type(ast_format_set(&tmpfmt, AST_FORMAT_CODEC2, 0), 0, "audio", "CODEC2", 8000);
+ 
+ 	/* Define the static rtp payload mappings */
+ 	add_static_payload(0, ast_format_set(&tmpfmt, AST_FORMAT_ULAW, 0), 0);
+@@ -2330,6 +2332,8 @@
+ 	add_static_payload(118, ast_format_set(&tmpfmt, AST_FORMAT_SLINEAR16, 0), 0); /* 16 Khz signed linear */
+ 	add_static_payload(119, ast_format_set(&tmpfmt, AST_FORMAT_SPEEX32, 0), 0);
+ 	add_static_payload(121, NULL, AST_RTP_CISCO_DTMF);   /* Must be type 121 */
++	/* Codec 2 */
++	add_static_payload(121, ast_format_set(&tmpfmt, AST_FORMAT_CODEC2, 0), 0);
+ 
+ 	return 0;
+ }
+diff -urN asterisk-11.8.1-orig/makeopts.in asterisk-11.8.1-codec2/makeopts.in
+--- asterisk-11.8.1-orig/makeopts.in	2013-04-11 21:59:35.000000000 +0200
++++ asterisk-11.8.1-codec2/makeopts.in	2014-04-01 10:28:49.424993462 +0200
+@@ -120,6 +120,9 @@
+ BLUETOOTH_INCLUDE=@BLUETOOTH_INCLUDE@
+ BLUETOOTH_LIB=@BLUETOOTH_LIB@
+ 
++CODEC2_INCLUDE=@CODEC2_INCLUDE@
++CODEC2_LIB=@CODEC2_LIB@
++
+ CURL_INCLUDE=@CURL_INCLUDE@
+ CURL_LIB=@CURL_LIB@
+ 
+diff -urN asterisk-11.8.1-orig/res/res_rtp_asterisk.c asterisk-11.8.1-codec2/res/res_rtp_asterisk.c
+--- asterisk-11.8.1-orig/res/res_rtp_asterisk.c	2014-02-27 22:39:30.000000000 +0100
++++ asterisk-11.8.1-codec2/res/res_rtp_asterisk.c	2014-04-01 10:19:18.727901747 +0200
+@@ -2738,6 +2738,8 @@
+ 		case AST_FORMAT_SIREN7:
+ 		case AST_FORMAT_SIREN14:
+ 		case AST_FORMAT_G719:
++		/* Codec 2 */
++		case AST_FORMAT_CODEC2:
+ 			/* these are all frame-based codecs and cannot be safely run through
+ 			   a smoother */
+ 			break;
