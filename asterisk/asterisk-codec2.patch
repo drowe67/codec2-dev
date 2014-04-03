@@ -14,7 +14,7 @@
  	{ AST_FORMAT_ADPCM, "adpcm" , 8000, "ADPCM", 40, 10, 300, 10, 20 },                                    /*!< codec_adpcm.c */
  	{ AST_FORMAT_SLINEAR, "slin", 8000, "16 bit Signed Linear PCM", 160, 10, 70, 10, 20, AST_SMOOTHER_FLAG_BE }, /*!< Signed linear */
  	{ AST_FORMAT_LPC10, "lpc10", 8000, "LPC10", 7, 20, 20, 20, 20 },                                       /*!< codec_lpc10.c */ 
-+	{ AST_FORMAT_CODEC2, "codec2", 8000, "Codec 2", 7, 20, 20, 20, 20 },                                       /*!< codec_codec2.c */ 
++	{ AST_FORMAT_CODEC2, "codec2", 8000, "Codec 2", 6, 20, 20, 20, 20 },                                       /*!< codec_codec2.c */ 
  	{ AST_FORMAT_G729A, "g729", 8000, "G.729A", 10, 10, 230, 10, 20, AST_SMOOTHER_FLAG_G729 },             /*!< Binary commercial distribution */
  	{ AST_FORMAT_SPEEX, "speex", 8000, "SpeeX", 10, 10, 60, 10, 20 },                                      /*!< codec_speex.c */
  	{ AST_FORMAT_SPEEX16, "speex16", 16000, "SpeeX 16khz", 10, 10, 60, 10, 20 },                          /*!< codec_speex.c */
@@ -23,7 +23,7 @@
  		samples += (((char *)(f->data.ptr))[7] & 0x1) * 8;
  		break;
 +	case AST_FORMAT_CODEC2:
-+		samples = 160 * (f->datalen / 7);
++		samples = 160 * (f->datalen / 6);
 +		break;
  	case AST_FORMAT_ULAW:
  	case AST_FORMAT_ALAW:
@@ -33,7 +33,7 @@
  		len = (samples / 160) * 33;
  		break;
 +	case AST_FORMAT_CODEC2:
-+		len = (samples / 160) * 7;
++		len = (samples / 160) * 6;
 +		break;
  	case AST_FORMAT_G729A:
  		len = samples / 8;
