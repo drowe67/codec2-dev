@@ -112,9 +112,9 @@ function sim_out = ber_test(sim_in)
 
         sc = 1; hf_n = 1;
         hf_sim_delay_line = zeros(1,M+Nhfdelay);
-        freq_sample = Fcentre + ((Fsep*(-Nc/2)):50:(Fsep*(Nc/2)));
-        freq_sample = (2*pi/Fs)*freq_sample;
-        hf_model = ones(Ntrials*Nsymb/Nc, length(freq_sample));   % defaults for plotting surface
+        freq_sample_hz = Fcentre + ((Fsep*(-Nc/2)):50:(Fsep*(Nc/2)));
+        freq_sample_rads = (2*pi/Fs)*freq_sample_hz;
+        hf_model = ones(Ntrials*Nsymb/Nc, length(freq_sample_rads));   % defaults for plotting surface
 
         % bunch of outputs we log for graphing
 
@@ -146,6 +146,7 @@ function sim_out = ber_test(sim_in)
 
             % Now we start processing frame Nc symbols at a time to model parallel carriers
 
+            tx_fdm_sym_log = [];
             for i=1:Nc:Nsymb
 
                 % Delay tx symbols to match delay due to filters. qpsk
@@ -200,11 +201,13 @@ function sim_out = ber_test(sim_in)
 
                    % sample HF channel spectrum in middle of this symbol for plotting
 
-                   hf_model(hf_n,:) = hf_gain*(spread(sc+M/2) + exp(-j*freq_sample*Nhfdelay)*spread_2ms(sc+M/2));
+                   hf_model(hf_n,:) = hf_gain*(spread(sc+M/2) + exp(-j*freq_sample_rads*Nhfdelay)*spread_2ms(sc+M/2));
 
                    sc += M;
                    hf_n++;
                 end
+
+                tx_fdm_sym_log = [tx_fdm_sym_log tx_fdm ];
 
                 % AWGN noise and phase/freq offset channel simulation
                 % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
@@ -242,7 +245,7 @@ function sim_out = ber_test(sim_in)
             % est HF model power for entire code frame (which could be several symbols)
 
             if hf_sim
-              frame_hf_model = reshape(hf_model(hf_n-Nsymb/Nc:hf_n-1,:),1,(Nsymb/Nc)*length(freq_sample));                       
+              frame_hf_model = reshape(hf_model(hf_n-Nsymb/Nc:hf_n-1,:),1,(Nsymb/Nc)*length(freq_sample_hz));                       
               sim_out.hf_model_pwr = [sim_out.hf_model_pwr mean(abs(frame_hf_model).^2)];
             else 
               sim_out.hf_model_pwr = [sim_out.hf_model_pwr 1];
@@ -250,7 +253,7 @@ function sim_out = ber_test(sim_in)
 
             % "genie" SNR estimate 
             
-            snr = (tx_fdm*tx_fdm')/(M*variance);
+            snr = (tx_fdm_sym_log*tx_fdm_sym_log')/(M*variance);
             sim_out.snr_log = [sim_out.snr_log snr];
   
             % de-modulate
@@ -311,10 +314,8 @@ function sim_out = ber_test(sim_in)
         figure(3);
         clf;        
         y = 1:Rs*2;
-        [rr,cc] = size(hf_model);
-        x = 1:cc;
         EsNodBSurface = 20*log10(abs(hf_model(y,:))) + EsNodB;
-        mesh(x,y,EsNodBSurface);
+        mesh(1:length(freq_sample_hz),y,EsNodBSurface);
         grid
         title('HF Channel Es/No');
     end
@@ -417,7 +418,7 @@ sim_in.verbose      = 2;
 sim_in.hf_delay_ms  = 2;
 sim_in.hf_sim       = 1;
 sim_in.Esvec        = 10;
-sim_in.Ntrials      = 100;
+sim_in.Ntrials      = 400;
 
 dqpsk_pwr_hf = ber_test(sim_in);
 
