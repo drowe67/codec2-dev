@@ -199,25 +199,24 @@ function sim_out = ber_test(sim_in)
             end
 
             error_positions = xor(rx_bits, tx_bits);
-            sim_out.errors_log = [sim_out.errors_log error_positions];
             Nerrs = sum(error_positions);
             sim_out.Nerrs = [sim_out.Nerrs Nerrs];
             Terrs += Nerrs;
             Tbits += length(tx_bits);
-
+            
+            sim_out.errors_log = [sim_out.errors_log error_positions];
         end
 
         TERvec(ne) = Terrs;
         BERvec(ne) = Terrs/Tbits;
 
         if verbose 
-            printf("EsNo (dB): %f  Terrs: %d BER %f BER theory %f", EsNodB, Terrs,
-                   Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)));
+            printf("EsNo (dB): %f  Terrs: %d BER %f ", EsNodB, Terrs, Terrs/Tbits);
             printf("\n");
         end
         if verbose > 1
-            printf("Terrs: %d BER %f BER theory %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
-                   Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), var(tx_symb_log), var(noise_log),
+            printf("Terrs: %d BER %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
+                   Terrs/Tbits, var(tx_symb_log), var(noise_log),
                    var(tx_symb_log), var(noise_log), var(tx_symb_log)/var(noise_log));
         end
     end
@@ -344,15 +343,16 @@ pdB = pdB(4:4:length(pdB));
 % Use linear mapping function in dB domain to map to symbol power
 
 power_map_x  = [ 0 20 24 40 50 ];
-power_map_y  = [-3 -3  0 6  6];
+power_map_y  = [-6 -6  0 6  6];
 mapped_pdB = interp1(power_map_x, power_map_y, pdB);
 
-sim_in.symbol_amp = 10 .^ (mapped_pdB/20);
-%sim_in.symbol_amp = ones(1,length(pdB));
+%sim_in.symbol_amp = 10 .^ (mapped_pdB/20);
+sim_in.symbol_amp = ones(1,length(pdB));
 sim_in.plot_scatter = 1;
 sim_in.verbose      = 2;
 sim_in.hf_sim       = 1;
 sim_in.Esvec        = 10;
+sim_in.Ntrials      = 400;
 
 dqpsk_pwr_hf = ber_test(sim_in);
 
@@ -382,7 +382,13 @@ plot((1:sim_in.Ntrials)*M, 20*log10(sim_in.symbol_amp(1:sim_in.Ntrials)),'b;Es (
 hold on;
 plot((1:sim_in.Ntrials)*M, 10*log10(dqpsk_pwr_hf.hf_model_pwr),'g;Fading (dB);');
 plot((1:sim_in.Ntrials)*M, 10*log10(dqpsk_pwr_hf.snr_log),'r;Es/No (dB);');
+
+ber = dqpsk_pwr_hf.Nerrs/sim_in.framesize;
+ber_clip = ber;
+ber_clip(find(ber > 0.2)) = 0.2;
+plot((1:sim_in.Ntrials)*M, -20+100*ber_clip,'k;BER (0-20%);');
 hold off;
+axis([1 sim_in.Ntrials*M -20 20])
 
 fep=fopen("dqpsk_errors_pwr.bin","wb"); fwrite(fep, dqpsk_pwr_hf.errors_log, "short"); fclose(fep);
-fmute=fopen("dqpsk_mute.bin","wb"); fwrite(fmute, mute, "short"); fclose(fmute);
+fber=fopen("ber.bin","wb"); fwrite(fber, ber, "float"); fclose(fber);
