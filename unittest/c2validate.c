@@ -68,7 +68,7 @@ int c2validate(int mode, short input_samples[], short output_samples[], char out
 
     for(i=0; i<nframes; i++) {
 	codec2_encode(codec2, bits, pinput);
-	codec2_decode(codec2, outbuf, bits);
+	codec2_decode(codec2, outbuf, bits, 0.0);
         for(j=0; j<nsam; j++) {
             if (outbuf[j] != poutput[j])
                 result = 0;
