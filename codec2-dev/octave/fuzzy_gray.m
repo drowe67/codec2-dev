@@ -3,10 +3,14 @@
 % 10 April 2014
 %
 % Various experiments in fuzzy gray codes and quantising and
-% transmitting scalars.  Idea is that with one bit error in the
-% codeword only changes the encoded value by at most 1.
+% transmitting scalars. 
 
 1;
+
+% fuzzy gray coding idea: use an extra parity bit, if we get a single
+% bit error the value will be "close: to the original, so effect of
+% error will be soft.  Unlike data we don't need 0 bit errors. I
+% struggled to extend this to larger m.
 
 function three_bit_code
     m=4;
@@ -38,6 +42,8 @@ function three_bit_code
     end
 endfunction
 
+% regular natural binary quantiser
+
 function index = quantise_value(value, min_value, max_value, num_levels)
     norm = (value - min_value)/(max_value - min_value);
     index = floor(num_levels * norm + 0.5);
@@ -53,6 +59,8 @@ function value = unquantise_value(index, min_value, max_value, num_levels)
     step  = (max_value - min_value)/num_levels;
     value = min_value + step*(index);
 endfunction
+
+% converting natural binary to gray
 
 function gray = binary_to_gray(natural)
     gray = bitxor(bitshift(natural,-1),natural);
@@ -70,7 +78,7 @@ function natural = gray_to_binary(gray)
     end
 endfunction
 
-function sim_out = test_baseline_uncoded(Ebvec, Nbits, Ntrials, enable_error_log)
+function sim_out = test_baseline_uncoded(Ebvec, Nbits, Ntrials, enable_error_log, enable_gray)
     Nlevels = 2.^ Nbits; powersOfTwo = 2 .^ fliplr(0:(Nbits-1));
     Nsymb   = Nbits;
 
@@ -90,6 +98,9 @@ function sim_out = test_baseline_uncoded(Ebvec, Nbits, Ntrials, enable_error_log
                   
             tx_value = rand(1,1);
             tx_index = quantise_value(tx_value, 0, 1, Nlevels);
+            if enable_gray
+                tx_index = binary_to_gray(tx_index);
+            end
             tx_bits = dec2bin(tx_index, Nbits) - '0';
             tx_symbols = -1 + 2*tx_bits; 
 
@@ -110,6 +121,9 @@ function sim_out = test_baseline_uncoded(Ebvec, Nbits, Ntrials, enable_error_log
             end
 
             rx_index = (powersOfTwo  * rx_bits');
+            if enable_gray
+                rx_index = gray_to_binary(rx_index);
+            end
             rx_value = unquantise_value(rx_index, 0, 1, Nlevels);
 
             qsignal += tx_value*tx_value;
@@ -181,6 +195,9 @@ function sim_out = test_varpower(Ebvec, Nbits, Ntrials, amps, enable_error_log)
     end
 
 endfunction
+
+% gray codes with specified number of data an dparity bits.  Soft
+% decision decoding.  Didn't really work out.
 
 function valid_codewords = fuzzy_code_create(ndata,nparity)
     Nbits = ndata + nparity;
@@ -345,12 +362,14 @@ function compare_baseline_fuzzy
     hold off;
 endfunction
 
+% compare baseline and variable power schemes and make plots
+
 function compare_baseline_varpower_plot
     Ebvec   = -2:5;
     Ntrials = 5000;
     Nbits   = 5;
 
-    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0);
+    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0, 0);
     amps = [2 1.5 1.0 0.5 0.5];
     av_pwr = (amps*amps')/length(amps);
     amps_norm = amps/sqrt(av_pwr)
@@ -390,6 +409,10 @@ function compare_baseline_varpower_plot
     plot(varpower.qnoise_log(1,1:250),'r;varpower;')
 endfunction
 
+% Compare baseline and variable power schemes and make error pattern
+% files for inserting into codec bit stream so we can listen to
+% result.
+
 function compare_baseline_varpower_error_files
     Ebvec   = -2;
     Fs      = 25;         % number of samples per second
@@ -400,7 +423,7 @@ function compare_baseline_varpower_error_files
     bits_per_frame_rounded = ceil(bits_per_frame/8)*8; % c2enc uses integer number of bytes/frame
     start_bit = 12;                                    % first energy bit (after 4 voicing, 7 Wo bits)
 
-    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 1);
+    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 1, 0);
     amps = [2 1.5 1.0 0.5 0.5];
     av_pwr = (amps*amps')/length(amps);
     amps_norm = amps/sqrt(av_pwr);
@@ -428,6 +451,78 @@ function compare_baseline_varpower_error_files
     fep=fopen("energy_errors_varpower.bin","wb"); fwrite(fep, varpower_errors, "short"); fclose(fep);
 endfunction
 
+% compare natural and gray coding and make plots
+
+function compare_natural_gray_plot
+    Ebvec   = -2:10;
+    Ntrials = 5000;
+    Nbits   = 7;
+
+    natural = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0, 0);
+    gray    = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0, 1);
+
+    figure(1);
+    clf;
+    semilogy(Ebvec, natural.BERvec)
+    xlabel('Eb/No (dB)')
+    ylabel('BER')
+    grid("minor")
+    title('BER versus Eb/No')
+
+    figure(2);
+    clf;
+    plot(Ebvec, natural.QSNRvec,'b;natural;')
+    hold on;
+    plot(Ebvec, gray.QSNRvec,'r;gray;')
+    hold off;
+    xlabel('Eb/No (dB)')
+    ylabel('SNR (dB)')
+    grid("minor")
+    title('Quantiser SNR versus Eb/No')
+
+    figure(3);
+    subplot(211)
+    hist(natural.qnoise_log(1,:),50);
+    title('Natural and Gray coded Error Histograms')
+    subplot(212)
+    hist(gray.qnoise_log(1,:),50);
+
+    figure(4)
+    subplot(211)
+    plot(natural.qnoise_log(1,1:250),'b;natural;')
+    axis([0 250 -1 1])
+    title('Natural and Gray coded Error plots for Eb/No = -2dB')
+    subplot(212)
+    plot(gray.qnoise_log(1,1:250),'r;gray;')
+    axis([0 250 -1 1])
+endfunction
+
+% compare natural at different Eb/No and Nbitsmake plots
+
+function compare_natural_nbit_plot
+    Ebvec   = -2:10;
+    Ntrials = 5000;
+
+    figure(1);
+    clf;
+    for n = 2:7
+        natural = test_baseline_uncoded(Ebvec, n, Ntrials, 0, 0);
+        plot(Ebvec, natural.QSNRvec)
+        if n == 2
+            hold on;
+        end
+   end
+   hold off;
+
+   xlabel('Eb/No (dB)')
+   ylabel('SNR (dB)')
+   grid("minor")
+   title('Quantiser SNR versus Eb/No')
+endfunction
+
+more off;
+compare_natural_nbit_plot
+%compare_natural_gray_plot
 %compare_baseline_varpower_plot
 %compare_baseline_varpower_error_files
 
