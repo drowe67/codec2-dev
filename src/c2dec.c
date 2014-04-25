@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     unsigned char  mask;
     int            natural, dump;
 
-    char* opt_string = ":";
+    char* opt_string = "h:";
     struct option long_options[] = {
         { "ber", required_argument, NULL, 0 },
         { "range", required_argument, NULL, 0 },
@@ -72,6 +72,9 @@ int main(int argc, char *argv[])
     };
     int num_opts=sizeof(long_options)/sizeof(struct option);
  
+    if (argc < 4)
+        print_help(long_options, num_opts, argv);
+    
     if (strcmp(argv[1],"3200") == 0)
 	mode = CODEC2_MODE_3200;
     else if (strcmp(argv[1],"2400") == 0)
@@ -108,6 +111,7 @@ int main(int argc, char *argv[])
     ber = 0.0;
     burst_length = burst_period = 0.0;
     burst_timer = 0.0;
+    dump = natural = 0;
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -128,7 +132,7 @@ int main(int argc, char *argv[])
             break;
 
         switch (opt) {
-         case 0:
+        case 0:
             if(strcmp(long_options[option_index].name, "ber") == 0) {
                 ber = atof(optarg);
                 error_mode = UNIFORM;
@@ -140,28 +144,30 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "berfile") == 0) {
 	        if ((fber = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening BER file: %s %s.\n",
-		        optarg, strerror(errno));
+                            optarg, strerror(errno));
                     exit(1);
                 }
+            
+            } 
             #ifdef DUMP
-            } else if(strcmp(long_options[option_index].name, "dump") == 0) {
+            else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump) 
 	            dump_on(optarg);
+            }
             #endif
             break;
-            }
 
-         case 'h':
+        case 'h':
             print_help(long_options, num_opts, argv);
             break;
 
-         default:
+        default:
             /* This will never be reached */
             break;
         }
     }
-
     assert(nend_bit <= nbit);
+    codec2_set_natural_or_gray(codec2, !natural);
 
     while(fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte) {
 	frames++;
