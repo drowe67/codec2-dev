@@ -52,16 +52,16 @@ pack(
  unsigned int		fieldWidth/* Width of the field in BITS, not bytes. */
  )
 {
-    pack_natural_or_grey(bitArray, bitIndex, field, fieldWidth, 1);
+    pack_natural_or_gray(bitArray, bitIndex, field, fieldWidth, 1);
 }
 
 void
-pack_natural_or_grey(
+pack_natural_or_gray(
  unsigned char *	bitArray,  /* The output bit string. */
  unsigned int *		bitIndex,  /* Index into the string in BITS, not bytes.*/
  int			field,	   /* The bit field to be packed. */
  unsigned int		fieldWidth,/* Width of the field in BITS, not bytes. */
- int                    gray       /* non-zero for gray coding */
+ unsigned int           gray       /* non-zero for gray coding */
  )
 {
   if (gray) {
@@ -95,7 +95,7 @@ unpack(
  unsigned int		fieldWidth/* Width of the field in BITS, not bytes. */
  )
 {
-    unpack_natural_or_gray(bitArray, bitIndex, fieldWidth, 1);
+    return unpack_natural_or_gray(bitArray, bitIndex, fieldWidth, 1);
 }
 
 /** Unpack a field from a bit string, to binary, optionally using
