@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
             //printf("bit: %d start_bit: %d end_bit: %d\n", bit, start_bit, end_bit);
             if (fread(&error, sizeof(short), 1, ferror)) {
                 if ((bit >= start_bit) && (bit <= end_bit))
-                    byte ^= error << i;
+                    byte ^= error << (7-i);
                 if (error)
                     errors++;
             }
