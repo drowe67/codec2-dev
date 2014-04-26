@@ -520,8 +520,48 @@ function compare_natural_nbit_plot
    title('Quantiser SNR versus Eb/No')
 endfunction
 
+function generate_varpower_error_files(EbNo, start_bit, end_bit, amps, error_file_name)
+    Fs      = 25;         % number of samples per second
+    Nsec    = 15;         % seconds to simulate
+    Ntrials = Fs*Nsec;
+    Nbits   = end_bit - start_bit + 1;
+    bits_per_frame = 52;
+    bits_per_frame_rounded = ceil(bits_per_frame/8)*8; % c2enc uses integer number of bytes/frame
+                                                       % first energy bit (after 4 voicing, 7 Wo bits)
+
+    % normalise powers and run test
+
+    av_pwr = (amps*amps')/length(amps);
+    amps_norm = amps/sqrt(av_pwr);
+    av_pwr2 = (amps_norm*amps_norm')/length(amps_norm)
+    varpower = test_varpower(EbNo, Nbits, Ntrials, amps_norm, 1);
+
+    % construct error patterns to apply to c2enc bit stream
+
+    varpower_errors = [];
+    for i=1:Ntrials
+        error_positions = varpower.error_log(Nbits*(i-1)+1:Nbits*i);
+        num_errors(i) = sum(error_positions);
+        varpower_errors = [varpower_errors zeros(1,start_bit-1) error_positions ...
+                           zeros(1, bits_per_frame_rounded - Nbits - (start_bit-1))];
+    end
+ 
+    % save error pattern to file
+
+    fep=fopen(error_file_name,"wb"); fwrite(fep, varpower_errors, "short"); fclose(fep);
+
+    figure(1)
+    clf
+    hist(num_errors)
+endfunction
+
 more off;
-compare_natural_nbit_plot
+
+generate_varpower_error_files(0, 17, 52, ones(1,36), "lsp_baseline_errors_0dB.bin")
+amps = [8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 8 4 2 8 4];
+generate_varpower_error_files(0, 17, 52, amps, "lsp_varpower_errors_0dB.bin")
+
+%compare_natural_nbit_plot
 %compare_natural_gray_plot
 %compare_baseline_varpower_plot
 %compare_baseline_varpower_error_files

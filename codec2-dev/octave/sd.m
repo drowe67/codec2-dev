@@ -37,11 +37,6 @@ function sd(raw_filename, dump_file_prefix, f)
   subplot(212)
   plot(sd);
 
-  % now enter single step mode so we can analyse each frame
-
-  sn_name = strcat(dump_file_prefix,"_sn.txt");
-  Sn = load(sn_name);
-
   lsp1_filename = sprintf("%s_lsp.txt", dump_file_prefix);
   lsp2_filename = sprintf("%s_lsp_.txt", dump_file_prefix);
   lsp1 = load(lsp1_filename);
@@ -52,17 +47,19 @@ function sd(raw_filename, dump_file_prefix, f)
     weights = load(weights_filename);
   end
 
+  % now enter single step mode so we can analyse each frame
   k = ' ';
   do 
     figure(2);
     clf;
-    subplot(211)
-    s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    size(s);
-    plot(s);
-    axis([1 length(s) -20000 20000]);
+    plot((4000/pi)*lsp1((f-2:f+2),:));
+    hold on;
+    plot((4000/pi)*lsp2((f-2:f+2),:),'+-');
+    hold off;
 
-    subplot(212);
+    figure(3);
+    clf;
+
     plot((1:Ndft/2)*4000/(Ndft/2), A1(f,1:(Ndft/2)),";A1;r");
     axis([1 4000 -20 40]);
     hold on;
@@ -75,6 +72,7 @@ function sd(raw_filename, dump_file_prefix, f)
         plot([lsp1(f,l)*4000/pi lsp1(f,l)*4000/pi], [0  -10], 'r');
         plot([lsp2(f,l)*4000/pi lsp2(f,l)*4000/pi], [-10 -20], 'b');
     endfor
+    
     plot(0,0,';lsp1;r');
     plot(0,0,';lsp2;b');
     sd_str = sprintf(";sd %3.2f dB*dB;", sd(f));
