@@ -61,7 +61,8 @@ int main(int argc, char *argv[])
     char* opt_string = "h:";
     struct option long_options[] = {
         { "ber", required_argument, NULL, 0 },
-        { "range", required_argument, NULL, 0 },
+        { "startbit", required_argument, NULL, 0 },
+        { "endbit", required_argument, NULL, 0 },
         { "berfile", required_argument, NULL, 0 },
         { "natural", no_argument, &natural, 1 },
         #ifdef DUMP
@@ -136,12 +137,11 @@ int main(int argc, char *argv[])
             if(strcmp(long_options[option_index].name, "ber") == 0) {
                 ber = atof(optarg);
                 error_mode = UNIFORM;
-            } else if(strcmp(long_options[option_index].name, "range") == 0) {
-                ber = atof(optarg);
-	        nstart_bit = atoi(optarg+1);
-	        nend_bit = atoi(optarg+2);
-                error_mode = UNIFORM_RANGE;
-            } else if(strcmp(long_options[option_index].name, "berfile") == 0) {
+            } else if(strcmp(long_options[option_index].name, "startbit") == 0) {
+	        nstart_bit = atoi(optarg);
+            } else if(strcmp(long_options[option_index].name, "endbit") == 0) {
+	        nend_bit = atoi(optarg);
+             } else if(strcmp(long_options[option_index].name, "berfile") == 0) {
 	        if ((fber = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening BER file: %s %s.\n",
                             optarg, strerror(errno));
@@ -168,7 +168,8 @@ int main(int argc, char *argv[])
     }
     assert(nend_bit <= nbit);
     codec2_set_natural_or_gray(codec2, !natural);
-
+    //printf("%d %d\n", nstart_bit, nend_bit);
+ 
     while(fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte) {
 	frames++;
 
@@ -273,8 +274,10 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 			option_parameters="";
 		} else if (strcmp("ber", long_options[i].name) == 0) {
 			option_parameters = " BER";
-		} else if (strcmp("range", long_options[i].name) == 0) {
-			option_parameters = " BER startBit EndBit";
+		} else if (strcmp("startbit", long_options[i].name) == 0) {
+			option_parameters = " startBit";
+		} else if (strcmp("endbit", long_options[i].name) == 0) {
+			option_parameters = " endBit";
 		} else if (strcmp("berfile", long_options[i].name) == 0) {
 			option_parameters = " berFileName";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
