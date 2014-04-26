@@ -1108,6 +1108,10 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 	apply_lpc_correction(&model[i]);
     }
     TIMER_SAMPLE_AND_LOG2(recover_start, "    recover"); 
+    #ifdef DUMP
+    dump_lsp_(&lsps[3][0]);
+    dump_ak_(&ak[3][0], LPC_ORD);
+    #endif
 
     /* synthesise ------------------------------------------------*/
 
