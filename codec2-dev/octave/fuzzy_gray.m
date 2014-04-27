@@ -161,7 +161,7 @@ function sim_out = test_varpower(Ebvec, Nbits, Ntrials, amps, enable_error_log)
             tx_value = rand(1,1);
             tx_index = quantise_value(tx_value, 0, 1, Nlevels);
             tx_bits = dec2bin(tx_index, Nbits) - '0';
-            tx_symbols = (-1 + 2*tx_bits) .* amps; 
+            tx_symbols = (-1 + 2*tx_bits) .* amps;
 
             % AWGN noise and phase/freq offset channel simulation
             % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
@@ -196,7 +196,7 @@ function sim_out = test_varpower(Ebvec, Nbits, Ntrials, amps, enable_error_log)
 
 endfunction
 
-% gray codes with specified number of data an dparity bits.  Soft
+% gray codes with specified number of data and parity bits.  Soft
 % decision decoding.  Didn't really work out.
 
 function valid_codewords = fuzzy_code_create(ndata,nparity)
@@ -210,7 +210,7 @@ function valid_codewords = fuzzy_code_create(ndata,nparity)
     bad_distance = 0;
     for i=1:Nvalid
         for k=i+1:Nvalid
-            distance = sum(bitxor(valid_codewords(i,:), valid_codewords(k,:)))
+            distance = sum(bitxor(valid_codewords(i,:), valid_codewords(k,:)));
             if distance < 2
                 bad_distance++;
             end
@@ -227,7 +227,7 @@ function tx_codeword = fuzzy_code_encode(codewords, value)
     tx_codeword = codewords(value+1,:);
 endfunction
 
-function value = fuzzy_code_decode(codewords, rx_symbols)
+function [value, best_codeword] = fuzzy_code_decode(codewords, rx_symbols)
     max_corr = 0;
     value = 0;
     [rows,cols] = size(codewords);
@@ -236,47 +236,9 @@ function value = fuzzy_code_decode(codewords, rx_symbols)
         if (corr > max_corr)
             max_corr = corr;
             value = i-1;
+            best_codeword = codewords(i,:);
         end 
     end
-endfunction
-
-function set_codewords = fuzzy_code_create(ndata, nparity)
-    Nbits = ndata + nparity;
-    Nvalid = 2 .^ ndata;
-    M = 2 .^ Nbits;
-
-    codewords = dec2bin(0:(M-1), Nbits) - '0';
-
-    set_codewords(1,:) = codewords(1,:);
-
-    for i=1:Nvalid-1
-
-        % measure distance from current set to all codewords
-
-        for m=1:i
-            printf("%d: ", m);
-            for k=1:length(codewords);
-                d(m,k) = sum(bitxor(set_codewords(m,:), codewords(k,:)));
-                printf("%d ", d(m,k));
-            end
-            printf("\n");
-        end
-
-        % choose new codeword for set that has maximum distance from current set
-
-        dmax = 0; best_cw = 1;
-        for k=1:length(codewords);
-            dmin = min(d(:,k));
-            if dmin > dmax
-                dmax = dmin;
-                best_cw = k;
-            end
-        end
-
-        printf("[%d %d]\n", dmax, best_cw);
-        set_codewords(i+1,:) = codewords(best_cw,:)
-    end
-    
 endfunction
 
 
@@ -295,7 +257,8 @@ function sim_out = test_fuzzy_code(Ebvec, Ndata, Nparity, Ntrials)
     
         variance = 1/EbNo;
         
-        Terrs = 0;  Tbits = 0;
+        Terrs = 0; Terrs_coded = 0; Tbits = 0;
+        Nsingle = Nsingle_corrected = 0;
         qsignal = qnoise = 0;
  
         for nn = 1:Ntrials
@@ -311,25 +274,54 @@ function sim_out = test_fuzzy_code(Ebvec, Ndata, Nparity, Ntrials)
             noise = sqrt(variance*0.5)*(randn(1,Nsymb) + j*randn(1,Nsymb));
             rx_symbols = tx_symbols + noise;
 
-            rx_index = fuzzy_code_decode(codewords, rx_symbols);     
-            rx_value = unquantise_value(rx_index, 0, 1, Nlevels);
+            % uncoded BER
 
+            rx_bits = rx_symbols > 0;
+            error_positions = xor(rx_bits(1:Ndata), tx_codeword(1:Ndata));
+            Nerrs = sum(error_positions);
+            Terrs += Nerrs;
+            Tbits += Ndata;
+            
+            % decode and determine QSNR
+ 
+            [rx_index, rx_codeword] = fuzzy_code_decode(codewords, rx_symbols);     
+            rx_value = unquantise_value(rx_index, 0, 1, Nlevels);
             qsignal += tx_value*tx_value;
             qnoise  += (tx_value - rx_value) .^ 2;
             sim_out.qnoise_log(ne,nn) = tx_value - rx_value;
+
+            % coded BER
+
+            error_positions = xor(rx_codeword(1:Ndata), tx_codeword(1:Ndata));
+            Nerrs_coded = sum(error_positions);
+            if Nerrs == 1
+                Nsingle++;
+                if Nerrs_coded == 0
+                    Nsingle_corrected++;
+                end
+            end
+            Terrs_coded += Nerrs_coded;
+ 
         end
 
+        sim_out.BERvec(ne) = Terrs/Tbits;
+        sim_out.BERvec_coded(ne) = Terrs_coded/Tbits;
+        sim_out.Nsingle(ne) = Nsingle;
+        sim_out.Nsingle_corrected(ne) = Nsingle_corrected;
+
         sim_out.QSNRvec(ne) = 10*log10(qsignal/qnoise);
-        printf("EbNo (dB): %3.2f  QSNR (dB): %3.2f\n", EbNodB, sim_out.QSNRvec(ne));
+        printf("EbNo (dB): %3.2f  Terrs: %6d BER %1.4f Terrs_coded: %6d BER_coded %1.4f QSNR (dB): %3.2f", 
+        EbNodB, Terrs, Terrs/Tbits, Terrs_coded, Terrs_coded/Tbits, sim_out.QSNRvec(ne));
+        printf(" Nsingle: %d Nsingle_corrected: %d corrected: %3.1f\n", Nsingle,  Nsingle_corrected, Nsingle_corrected*100/Nsingle);
     end
 endfunction
 
 function compare_baseline_fuzzy
-    Ebvec   = 0:7;
-    Ntrials = 1000;
-    Nbits   = 3; Nparity = 1;
+    Ebvec   = 0:3;
+    Ntrials = 5000;
+    Nbits   = 4; Nparity = 1;
 
-    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials);
+    baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0, 0);
     fuzzy = test_fuzzy_code(Ebvec, Nbits, Nparity, Ntrials);
 
     figure(1);
@@ -356,10 +348,10 @@ function compare_baseline_fuzzy
     hist(fuzzy.qnoise_log(4,:),50);
 
     figure(4)
-    plot(baseline.qnoise_log(1,1:250),'b;baseline;')
-    hold on;
-    plot(fuzzy.qnoise_log(1,1:250),'r;fuzzy;')
-    hold off;
+    subplot(211)
+    plot(baseline.qnoise_log(4,1:250),'b;baseline;')
+    subplot(212)
+    plot(fuzzy.qnoise_log(4,1:250),'r;fuzzy;')
 endfunction
 
 % compare baseline and variable power schemes and make plots
@@ -372,7 +364,7 @@ function compare_baseline_varpower_plot
     baseline = test_baseline_uncoded(Ebvec, Nbits, Ntrials, 0, 0);
     amps = [2 1.5 1.0 0.5 0.5];
     av_pwr = (amps*amps')/length(amps);
-    amps_norm = amps/sqrt(av_pwr)
+    amps_norm = amps/sqrt(av_pwr);
     varpower = test_varpower(Ebvec, Nbits, Ntrials,  amps_norm, 0);
 
     figure(1);
@@ -522,7 +514,7 @@ endfunction
 
 function generate_varpower_error_files(EbNo, start_bit, end_bit, amps, error_file_name)
     Fs      = 25;         % number of samples per second
-    Nsec    = 15;         % seconds to simulate
+    Nsec    = 3;         % seconds to simulate
     Ntrials = Fs*Nsec;
     Nbits   = end_bit - start_bit + 1;
     bits_per_frame = 52;
@@ -541,6 +533,30 @@ function generate_varpower_error_files(EbNo, start_bit, end_bit, amps, error_fil
     varpower_errors = [];
     for i=1:Ntrials
         error_positions = varpower.error_log(Nbits*(i-1)+1:Nbits*i);
+
+        if 0
+        % reset single errors to tes effect of ideal single bit error correcting code
+        for i=1:7
+          st = 4*(i-1)+1
+          en = 4*i
+          if sum(error_positions(st:en)) == 1
+            error_positions(st:en) = 0;
+          end
+        end
+        for i=1:2
+          st = 7*4+3*(i-1)+1 
+          en = 7*4+3*i
+          if sum(error_positions(st:en)) == 1
+            error_positions(st:en) = 0;
+          end
+        end
+        st = 7*4+3*2+1 
+        en = 7*4+3*2+2
+          if sum(error_positions(st:en)) == 1
+            error_positions(st:en) = 0;
+          end
+        end
+
         num_errors(i) = sum(error_positions);
         varpower_errors = [varpower_errors zeros(1,start_bit-1) error_positions ...
                            zeros(1, bits_per_frame_rounded - Nbits - (start_bit-1))];
@@ -557,14 +573,14 @@ endfunction
 
 more off;
 
-generate_varpower_error_files(0, 17, 52, ones(1,36), "lsp_baseline_errors_0dB.bin")
-amps = [8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 1 8 4 2 8 4 2 8 4];
-generate_varpower_error_files(0, 17, 52, amps, "lsp_varpower_errors_0dB.bin")
+%generate_varpower_error_files(0, 17, 52, ones(1,36), "lsp_baseline_errors_0dB.bin")
+%amps = [1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 0 1 1 1 1 1 1 1 1 ];
+%generate_varpower_error_files(0, 17, 52, amps, "lsp_varpower_errors_0dB.bin")
 
 %compare_natural_nbit_plot
 %compare_natural_gray_plot
 %compare_baseline_varpower_plot
 %compare_baseline_varpower_error_files
 
-%compare_baseline_fuzzy
+compare_baseline_fuzzy
 %fuzzy_code_create(3,1)
