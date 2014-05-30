@@ -110,7 +110,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf adc_ut.elf timer_ut.elf
+all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -155,7 +155,8 @@ src/init.c
 dac_play.elf: $(DAC_PLAY_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 
-ADC_UT_SRCS=\
+ADC_REC_SRCS=\
+src/adc_rec.c \
 ../src/fifo.c \
 gdb_stdio.c \
 src/stm32f4_adc.c \
@@ -163,17 +164,48 @@ src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-adc_ut.elf: $(ADC_UT_SRCS)
+adc_rec.elf: $(ADC_REC_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
-TIMER_UT_SRCS=\
-gdb_stdio.c \
-src/timer_ut.c \
+PWM_UT_SRCS=\
+src/stm32f4_pwm.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-timer_ut.elf: $(TIMER_UT_SRCS)
+pwm_ut.elf: $(PWM_UT_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+POWER_UT_SRCS=\
+src/power_ut.c \
+gdb_stdio.c \
+../src/fifo.c \
+src/stm32f4_adc.c \
+src/stm32f4_dac.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+src/stm32f4_timer.c \
+
+POWER_UT_SRCS += \
+$(CODEC2_SRC)/lpc.c \
+$(CODEC2_SRC)/nlp.c \
+$(CODEC2_SRC)/postfilter.c \
+$(CODEC2_SRC)/sine.c \
+$(CODEC2_SRC)/codec2.c \
+$(CODEC2_SRC)/kiss_fft.c \
+$(CODEC2_SRC)/interp.c \
+$(CODEC2_SRC)/lsp.c \
+$(CODEC2_SRC)/phase.c \
+$(CODEC2_SRC)/quantise.c \
+$(CODEC2_SRC)/pack.c \
+$(CODEC2_SRC)/codebook.c \
+$(CODEC2_SRC)/codebookd.c \
+$(CODEC2_SRC)/codebookjvm.c \
+$(CODEC2_SRC)/codebookge.c \
+$(CODEC2_SRC)/dump.c 
+
+power_ut.elf: $(POWER_UT_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:

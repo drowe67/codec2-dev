@@ -36,7 +36,7 @@
 #define DAC_DHR12L2_ADDRESS    0x40007418
 
 #define DAC_BUF_SZ   320
-#define FIFO_SZ      8000
+#define FIFO_SZ      1000
 #define DAC_MAX      4096
 
 DAC_InitTypeDef  DAC_InitStructure;
@@ -149,7 +149,7 @@ static void DAC_Ch2_Config(void)
   /* DAC channel2 Configuration */
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
   DAC_Init(DAC_Channel_2, &DAC_InitStructure);
 
   /* DMA1_Stream6 channel7 configuration **************************************/

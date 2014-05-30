@@ -10,13 +10,19 @@
   [X] just get ADC to run at all, prove its sampling something....
   [X] as above with DMA
   [X] half and finished interrupts, ISR
-  [ ] timer config to drive ADC conversion, measure sample rate and confirm 16kHz
-  + larger ADC DMA buffer
-  + fifos
-  + work out a way to unit test
+  [X] timer config to drive ADC conversion, measure sample rate and confirm 16kHz
+      + larger ADC DMA buffer
+      + fifos
+      + work out a way to unit test
   [ ] ADC working at same time as DAC
-  [ ] remove (or make optional) the TIM_Config() code that sends PWM output to pins
+  [X] remove (or make optional) the TIM_Config() code that sends PWM output to pins
   [ ] check comments still valid
+  [X] convert to driver
+  [ ] way to determine which timers are used so they don't get re-sued
+  [ ] way to select different pins/ADCs for multiple channels, multiple channel support
+  [ ] access functions for halff/full/overflow to trap any issues
+  [ ] should FIFOs be in this drivr or in UTs connected to stdio?  SmartMic will just need
+      40ms of buffering
 
 \*---------------------------------------------------------------------------*/
 
@@ -47,9 +53,10 @@
  
 #include "codec2_fifo.h"
 #include "gdb_stdio.h"
+#include "stm32f4_adc.h"
 
 #define ADC_BUF_SZ   320
-#define FIFO_SZ      8000
+#define FIFO_SZ      1000
 
 struct FIFO *DMA2_Stream0_fifo;
 unsigned short adc_buf[ADC_BUF_SZ];
@@ -71,81 +78,22 @@ uint16_t aSRC_Buffer[3] = {0, 0, 0};
 void Timer1Config();
 void adc_configure();
 
-#define REC_TIME_SECS 30
-#define N   2000
-#define FS  16000
-
-int main(void){
-    short  buf[N];
-    FILE  *frec;
-    int    i, bufs;
-
+void adc_open(void) {
     DMA2_Stream0_fifo = fifo_create(FIFO_SZ);
     assert(DMA2_Stream0_fifo != NULL);
 
     Timer1Config();
     adc_configure();
     ADC_SoftwareStartConv(ADC1);
-
-    frec = fopen("stm_out.raw", "wb");
-    if (frec == NULL) {
-        printf("Error opening input file: stm_out.raw\n\nTerminating....\n");
-        exit(1);
-    }
-    bufs = FS*REC_TIME_SECS/N;
-
-    printf("Starting!\n");
-    for(i=0; i<bufs; i++) {
-        //ConvertedValue = adc_convert();
-        //printf("ConvertedValue = %d\n", ConvertedValue); 
-        printf("adc_buf: %d %d  half: %d full: %d adc_overflow: %d\n", 
-               adc_buf[0],adc_buf[ADC_BUF_SZ-1],
-               half, full, adc_overflow);
-        while(fifo_read(DMA2_Stream0_fifo, buf, N) == -1);
-        fwrite(buf, sizeof(short), N, frec);      
-    }
-    fclose(frec);
-    printf("Finished!\n");
 }
 
-/* DR: TIM_Config configures a couple of I/O pins for PWM output from
-   Timer1 Channel 3.  Note I dont think any of this is needed, except
-   perhaps to check timer frequency.  Can be removed down the track. */
+/* n signed 16 bit samples in buf[] if return != -1 */
 
-/**
-  * @brief  Configure the TIM1 Pins.
-  * @param  None
-  * @retval None
-  */
-static void TIM_Config(void)
-{
-  GPIO_InitTypeDef GPIO_InitStructure;
-  
-  /* GPIOA and GPIOB clock enable */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
-
-  /* GPIOA Configuration: Channel 3 as alternate function push-pull */
-
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 ;
-  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
-  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
-  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
-  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
-  GPIO_Init(GPIOA, &GPIO_InitStructure); 
-  GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
-
-  /* GPIOB Configuration: Channel 3N as alternate function push-pull */
-
-  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
-  GPIO_Init(GPIOB, &GPIO_InitStructure);
-  GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
+int adc_read(short buf[], int n) {   
+    return fifo_read(DMA2_Stream0_fifo, buf, n);
 }
 
 void Timer1Config() {
-
-    /* TIM Configuration */
-
-    TIM_Config();
 
     /* TIM1 example -------------------------------------------------
   

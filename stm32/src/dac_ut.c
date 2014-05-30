@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 31 2013
 
-  Plays a 500 Hz sine wave sampled at 16 kHz out of PF5 on a Discovery board.
+  Plays a 500 Hz sine wave sampled at 16 kHz out of PA5 on a Discovery board.
 
 \*---------------------------------------------------------------------------*/
 
@@ -35,7 +35,7 @@
    are 16 bit 2's complement, the DAC driver convertsto 12 bit
    unsigned. */
 
-const short aSine[] = {
+short aSine[] = {
     -16,    6384,   12528,  18192,   23200,   27232,   30256,   32128,   32752,   32128,
     30256,   27232,   23152,   18192,   12528,    6384,     -16,   -6416,  -12560,  -18224,
     -23184,  -27264,  -30288,  -32160,  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,
@@ -43,6 +43,10 @@ const short aSine[] = {
 };
 
 int main(void) {
+    int i;
+
+    //for(i=0; i<32; i++)
+    //    aSine[i] /= 2;
 
     dac_open();
 
