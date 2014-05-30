@@ -1,15 +1,15 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: dac_play.c
+  FILE........: adc_rec.c
   AUTHOR......: David Rowe
-  DATE CREATED: 1 June 2013
+  DATE CREATED: 30 May 2014
 
-  Plays a 16 kHz sample rate raw file to the STM32F4 DAC.
+  Recordss a 16 kHz sample rate raw file from the STM32F4 ADC.
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2013 David Rowe
+  Copyright (C) 2014 David Rowe
 
   All rights reserved.
 
@@ -26,36 +26,33 @@
 */
 
 #include <stdlib.h>
-#include "stm32f4_dac.h"
+#include "stm32f4_adc.h"
 #include "gdb_stdio.h"
 
+#define REC_TIME_SECS 10
 #define N   2000
+#define FS  16000
 
-int main(void) {
+int main(void){
     short  buf[N];
-    FILE  *fplay;
+    FILE  *frec;
+    int    i, bufs;
 
-    dac_open();
+    adc_open();
 
-    while(1) {
-        fplay = fopen("stm_in.raw", "rb");
-        if (fplay == NULL) {
-            printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
-            exit(1);
-        }
-    
-        printf("Starting!\n");
-
-        while(fread(buf, sizeof(short), N, fplay) == N) {
-            while(dac_write(buf, N) == -1);
-        }  
-
-        printf("Finished!\n");
-        fclose(fplay);
+    frec = fopen("stm_out.raw", "wb");
+    if (frec == NULL) {
+        printf("Error opening input file: stm_out.raw\n\nTerminating....\n");
+        exit(1);
     }
+    bufs = FS*REC_TIME_SECS/N;
 
-    /* let FIFO empty */
-
-    while(1);
+    printf("Starting!\n");
+    for(i=0; i<bufs; i++) {
+        while(adc_read(buf, N) == -1);
+        fwrite(buf, sizeof(short), N, frec);  
+        printf(".");
+    }
+    fclose(frec);
+    printf("Finished!\n");
 }
-
