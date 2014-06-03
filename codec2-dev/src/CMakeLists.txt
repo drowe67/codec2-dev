@@ -194,6 +194,7 @@ set(CODEC2_PUBLIC_HEADERS
     codec2.h
     codec2_fdmdv.h
     codec2_fifo.h
+    comp.h
     golay23.h
 )
 
