@@ -119,6 +119,22 @@ configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
 include_directories(${PROJECT_BINARY_DIR})
 
 #
+# Find speex library
+#
+message(STATUS "Looking for Speex DSP library.")
+find_path(SPEEXDSP_INCLUDE_DIR speex/speex.h)
+find_library(SPEEXDSP_LIBRARY speexdsp)
+message(STATUS "  Speex DSP headers: ${SPEEXDSP_INCLUDE_DIR}")
+message(STATUS "  Speex DSP library: ${SPEEXDSP_LIBRARY}")
+if(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
+    include_directories(${SPEEXDSP_INCLUDE_DIR})
+    list(APPEND CMAKE_REQUIRED_LIBRARIES ${SPEEXDSP_LIBRARY})
+else(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
+    message(FATAL_ERROR "Speex DSP library not found!")
+endif(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
+
+
+#
 # codec2 library
 #
 add_subdirectory(src)
