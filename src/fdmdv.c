@@ -445,9 +445,10 @@ void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_fil
 
 void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq[])
 {
-    int  i,c;
-    COMP two = {2.0, 0.0};
-    COMP pilot;
+    int   i,c;
+    COMP  two = {2.0, 0.0};
+    COMP  pilot;
+    float mag;
 
     for(i=0; i<M; i++) {
 	tx_fdm[i].real = 0.0;
@@ -492,8 +493,9 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
     /* normalise digital oscilators as the magnitude can drfift over time */
 
     for (c=0; c<Nc+1; c++) {
-	phase_tx[c].real /= cabsolute(phase_tx[c]);	
-	phase_tx[c].imag /= cabsolute(phase_tx[c]);	
+        mag = cabsolute(phase_tx[c]);
+	phase_tx[c].real /= mag;	
+	phase_tx[c].imag /= mag;	
     }
 }
 
@@ -760,7 +762,8 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
 void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
                                           COMP *foff_phase_rect, int nin)
 {
-    COMP foff_rect;
+    COMP  foff_rect;
+    float mag;
     int   i;
 
     foff_rect.real = cos(2.0*PI*foff/FS);
@@ -772,8 +775,9 @@ void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], fl
 
     /* normalise digital oscilator as the magnitude can drfift over time */
 
-    foff_phase_rect->real /= cabsolute(*foff_phase_rect);	 
-    foff_phase_rect->imag /= cabsolute(*foff_phase_rect);	 
+    mag = cabsolute(*foff_phase_rect);
+    foff_phase_rect->real /= mag;	 
+    foff_phase_rect->imag /= mag;	 
 }
 
 /*---------------------------------------------------------------------------*\
@@ -788,7 +792,8 @@ void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], fl
 
 void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin)
 {
-    int  i,c;
+    int   i,c;
+    float mag;
 
     /* maximum number of input samples to demod */
 
@@ -821,8 +826,9 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP 
     /* normalise digital oscilators as the magnitude can drift over time */
 
     for (c=0; c<Nc+1; c++) {
-	phase_rx[c].real /= cabsolute(phase_rx[c]);	  
-	phase_rx[c].imag /= cabsolute(phase_rx[c]);	  
+        mag = cabsolute(phase_rx[c]);
+	phase_rx[c].real /= mag;	  
+	phase_rx[c].imag /= mag;	  
     }
 }
 
