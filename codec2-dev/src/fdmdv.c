@@ -211,8 +211,6 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     }
 
     f->foff = 0.0;
-    f->foff_rect.real = 1.0;
-    f->foff_rect.imag = 0.0;
     f->foff_phase_rect.real = 1.0;
     f->foff_phase_rect.imag = 0.0;
 
@@ -760,14 +758,15 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
 \*---------------------------------------------------------------------------*/
 
 void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
-                                          COMP *foff_rect, COMP *foff_phase_rect, int nin)
+                                          COMP *foff_phase_rect, int nin)
 {
+    COMP foff_rect;
     int   i;
 
-    foff_rect->real = cos(2.0*PI*foff/FS);
-    foff_rect->imag = sin(2.0*PI*foff/FS);
+    foff_rect.real = cos(2.0*PI*foff/FS);
+    foff_rect.imag = sin(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
-	*foff_phase_rect = cmult(*foff_phase_rect, *foff_rect);
+	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
     }
 
@@ -1295,7 +1294,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
-    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_rect, &fdmdv->foff_phase_rect, *nin);
+    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
 	
     /* baseband processing */
 
@@ -1561,7 +1560,7 @@ void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f)
     fprintf(stderr,"\nfreq[]:\n");
     for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->freq[i]));
-    fprintf(stderr,"\nfoff_rect %1.3f  foff_phase_rect: %1.3f", cabsolute(f->foff_rect), cabsolute(f->foff_phase_rect));
+    fprintf(stderr,"\nfoff_phase_rect: %1.3f", cabsolute(f->foff_phase_rect));
     fprintf(stderr,"\nphase_rx[]:\n");
     for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->phase_rx[i]));
