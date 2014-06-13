@@ -20,7 +20,7 @@ global T  = 1/Fs;      % sample period in seconds
 global Rs;
        Rs = 50;        % symbol rate in Hz
 global Nc;             % number of carriers
-if isempty(NumCarriers)
+if exist("NumCarriers") == 0
        Nc = 14;
 else
        Nc = NumCarriers;

@@ -9,6 +9,7 @@
 % Version 2
 %
 
+NumCarriers = 20;
 fdmdv; % load modem code
  
 % Generate reference vectors using Octave implementation of FDMDV modem
@@ -22,7 +23,7 @@ prev_rx_symbols = ones(Nc+1,1);
 foff_phase_rect = 1;
 coarse_fine = 0;
 fest_state = 0;
-channel = [];
+channel = zeros(1,10*M);
 channel_count = 0;
 next_nin = M;
 sig_est = zeros(Nc+1,1);
@@ -61,7 +62,7 @@ for f=1:frames
 
   tx_bits = get_test_bits(Nc*Nb);
   tx_bits_log = [tx_bits_log tx_bits];
-  tx_symbols = bits_to_qpsk(prev_tx_symbols, tx_bits, 'dqpsk');
+  tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, 'dqpsk');
   prev_tx_symbols = tx_symbols;
   tx_symbols_log = [tx_symbols_log tx_symbols];
   tx_baseband = tx_filter(tx_symbols);
@@ -132,7 +133,7 @@ for f=1:frames
   end
   nin_log = [nin_log nin];
 
-  [rx_bits sync_bit foff_fine pd] = qpsk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
 
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
   sig_est_log = [sig_est_log sig_est];
