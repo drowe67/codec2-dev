@@ -644,13 +644,15 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
     for(i=0; i<NPILOTLPF-nin; i++)
 	pilot_lpf[i] = pilot_lpf[nin+i];
-    for(i=NPILOTLPF-nin, j=0; i<NPILOTLPF; i++,j++) {
+    for(i=NPILOTLPF-nin, j=NPILOTCOEFF; i<NPILOTLPF; i++,j++) {
 	pilot_lpf[i].real = 0.0; pilot_lpf[i].imag = 0.0;
-	for(k=0; k<NPILOTCOEFF; k++)
-	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j+k]));
+	for(k=0; k<NPILOTCOEFF; k++) {
+	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j-k]));
+	    //pilot_lpf[i] = pilot_baseband[j-NPILOTCOEFF+1];
+        }
     }
 
-    /* decimate to improve DFT resolution, window and DFT */
+   /* decimate to improve DFT resolution, window and DFT */
 
     mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
     for(i=0; i<MPILOTFFT; i++) {
@@ -722,9 +724,9 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
     /*
       Down convert latest M samples of pilot by multiplying by ideal
       BPSK pilot signal we have generated locally.  The peak of the
-      resulting signal is sensitive to the time shift between the
-      received and local version of the pilot, so we do it twice at
-      different time shifts and choose the maximum.
+      DFT of the resulting signal is sensitive to the time shift
+      between the received and local version of the pilot, so we do it
+      twice at different time shifts and choose the maximum.
     */
 
     for(i=0; i<NPILOTBASEBAND-nin; i++) {
@@ -733,7 +735,7 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
     }
 
     for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
-       	f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
+        f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
 	f->pilot_baseband2[j] = cmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
