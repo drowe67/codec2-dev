@@ -217,6 +217,14 @@ function tx_fdm = fdm_upconvert(tx_filt)
   % shifting for the purpose of testing easier
 
   tx_fdm = 2*tx_fdm;
+
+  % normalise digital oscilators as the magnitude can drift over time
+
+  for c=1:Nc+1
+    mag = abs(phase_tx(c));
+    phase_tx(c) /= mag;
+  end
+
 endfunction
 
 
@@ -290,9 +298,10 @@ endfunction
 
 % LPF and peak pick part of freq est, put in a function as we call it twice
 
-function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
+function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
   global M;
   global Npilotlpf;
+  global Npilotbaseband;
   global Npilotcoeff;
   global Fs;
   global Mpilotfft;
@@ -301,9 +310,10 @@ function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
   % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
   pilot_lpf(1:Npilotlpf-nin) = pilot_lpf(nin+1:Npilotlpf);
-  j = 1;
+  j = Npilotcoeff+1;
   for i = Npilotlpf-nin+1:Npilotlpf
-    pilot_lpf(i) = pilot_baseband(j:j+Npilotcoeff-1) * pilot_coeff';
+    pilot_lpf(i) = pilot_baseband(j-Npilotcoeff+1:j) * pilot_coeff';
+    %pilot_lpf(i) = pilot_baseband(j-Npilotcoeff+1);
     j++;
   end
 
@@ -326,6 +336,8 @@ function [foff imax pilot_lpf S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
     foff = (ix - 1)*r;
   endif
 
+  pilot_lpf_out = pilot_lpf;
+
 endfunction
 
 
@@ -340,10 +352,10 @@ function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
   global pilot_lpf1;
   global pilot_lpf2;
 
-  % down convert latest nin samples of pilot by multiplying by
-  % ideal BPSK pilot signal we have generated locally.  This
-  % peak of the resulting signal is sensitive to the time shift between 
-  % the received and local version of the pilot, so we do it twice at
+  % down convert latest nin samples of pilot by multiplying by ideal
+  % BPSK pilot signal we have generated locally.  The peak of the DFT
+  % of the resulting signal is sensitive to the time shift between the
+  % received and local version of the pilot, so we do it twice at
   % different time shifts and choose the maximum.
  
   pilot_baseband1(1:Npilotbaseband-nin) = pilot_baseband1(nin+1:Npilotbaseband);

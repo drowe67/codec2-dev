@@ -9,7 +9,7 @@
 % Version 2
 %
 
-NumCarriers = 20;
+NumCarriers = 14;
 fdmdv; % load modem code
  
 % Generate reference vectors using Octave implementation of FDMDV modem
@@ -23,7 +23,7 @@ prev_rx_symbols = ones(Nc+1,1);
 foff_phase_rect = 1;
 coarse_fine = 0;
 fest_state = 0;
-channel = zeros(1,10*M);
+channel = [];
 channel_count = 0;
 next_nin = M;
 sig_est = zeros(Nc+1,1);
@@ -82,6 +82,7 @@ for f=1:frames
   %else
   %  nin = M;
   %end
+  nin = M;
   channel = [channel real(tx_fdm)];
   channel_count += M;
   rx_fdm = channel(1:nin);
@@ -93,7 +94,9 @@ for f=1:frames
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
 
   [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
-  if coarse_fine == 0
+  foff_coarse = 0;
+  sync = 0;
+  if sync == 0
     foff = foff_coarse;
   end
   foff_coarse_log = [foff_coarse_log foff_coarse];
@@ -148,8 +151,8 @@ for f=1:frames
 
   % freq est state machine
 
-  [coarse_fine fest_state] = freq_state(sync_bit, fest_state);
-  coarse_fine_log = [coarse_fine_log coarse_fine];
+  [sync fest_state] = freq_state(sync_bit, fest_state);
+  sync_log = [coarse_fine_log sync];
 end
 
 % Compare to the output from the C version
@@ -161,9 +164,9 @@ load ../unittest/tfdmdv_out.txt
 function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   figure(plotnum)
   subplot(subplotnum)
-  stem(sig);
+  stem(sig,'g;C version;');
   hold on;
-  stem(error,'g');
+  stem(error,'r;Error between C and Octave;');
   hold off;
   if nargin == 6
     axis(axisvec);
@@ -174,9 +177,9 @@ endfunction
 function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   figure(plotnum)
   subplot(subplotnum)
-  plot(sig);
+  plot(sig,'g;C version;');
   hold on;
-  plot(error,'g');
+  plot(error,'r;Error between C and Octave;');
   hold off;
   if nargin == 6
     axis(axisvec);
@@ -197,9 +200,9 @@ stem_sig_and_error(1, 212, real(tx_symbols_log_c(1:n/2)), real(tx_symbols_log(1:
 % tx_filter()
 
 diff = tx_baseband_log - tx_baseband_log_c;
-c=15;
-plot_sig_and_error(2, 211, real(tx_baseband_log_c(c,:)), real(sum(diff)), 'tx baseband real')
-plot_sig_and_error(2, 212, imag(tx_baseband_log_c(c,:)), imag(sum(diff)), 'tx baseband imag')
+c=1;
+plot_sig_and_error(2, 211, real(tx_baseband_log_c(c,:)), real(tx_baseband_log(c,:) - tx_baseband_log_c(c,:)), 'tx baseband real')
+plot_sig_and_error(2, 212, imag(tx_baseband_log_c(c,:)), imag(tx_baseband_log(c,:) - tx_baseband_log_c(c,:)), 'tx baseband imag')
 
 % fdm_upconvert()
 
@@ -213,11 +216,11 @@ plot_sig_and_error(4, 212, imag(pilot_lut_c), imag(pilot_lut - pilot_lut_c), 'pi
 
 % rx_est_freq_offset()
 
-st=1;  en = 3*Npilotbaseband;
+st=1;  en = 5*Npilotbaseband;
 plot_sig_and_error(5, 211, real(pilot_baseband1_log(st:en)), real(pilot_baseband1_log(st:en) - pilot_baseband1_log_c(st:en)), 'pilot baseband1 real' )
 plot_sig_and_error(5, 212, real(pilot_baseband2_log(st:en)), real(pilot_baseband2_log(st:en) - pilot_baseband2_log_c(st:en)), 'pilot baseband2 real' )
 
-st=1;  en = 3*Npilotlpf;
+st=1;  en = 5*Npilotlpf;
 plot_sig_and_error(6, 211, real(pilot_lpf1_log(st:en)), real(pilot_lpf1_log(st:en) - pilot_lpf1_log_c(st:en)), 'pilot lpf1 real' )
 plot_sig_and_error(6, 212, real(pilot_lpf2_log(st:en)), real(pilot_lpf2_log(st:en) - pilot_lpf2_log_c(st:en)), 'pilot lpf2 real' )
 
@@ -231,7 +234,7 @@ plot_sig_and_error(9, 211, foff_coarse_log, foff_coarse_log - foff_coarse_log_c,
 plot_sig_and_error(9, 212, foff_fine_log, foff_fine_log - foff_fine_log_c, 'Fine Freq Offset' )
 
 plot_sig_and_error(10, 211, foff_log, foff_log - foff_log_c, 'Freq Offset' )
-plot_sig_and_error(10, 212, coarse_fine_log, coarse_fine_log - coarse_fine_log_c, 'Freq Est Coarse(0) Fine(1)', [1 frames -0.5 1.5] )
+plot_sig_and_error(10, 212, sync_log, sync_log - sync_log_c, 'Freq Est Coarse(0) Fine(1)', [1 frames -0.5 1.5] )
 
 c=15;
 plot_sig_and_error(11, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
@@ -271,7 +274,8 @@ function check(a, b, test_name)
   end
   printf(": ");  
   
-  if sum(abs(a - b))/n < 1E-3
+  e = sum(abs(a - b))/n;
+  if e < 1E-3
     printf("OK\n");
     passes++;
   else
@@ -299,9 +303,8 @@ check(rx_timing_log, rx_timing_log_c, 'rx_timing');
 check(rx_symbols_log, rx_symbols_log_c, 'rx_symbols');
 check(rx_bits_log, rx_bits_log_c, 'rx bits');
 check(sync_bit_log, sync_bit_log_c, 'sync bit');
-check(coarse_fine_log, coarse_fine_log_c, 'coarse_fine');
+check(sync_log, sync_log_c, 'sync');
 check(nin_log, nin_log_c, 'nin');
 check(sig_est_log, sig_est_log_c, 'sig_est');
 check(noise_est_log, noise_est_log_c, 'noise_est');
-
 printf("\npasses: %d fails: %d\n", passes, fails);
