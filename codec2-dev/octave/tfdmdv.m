@@ -289,6 +289,7 @@ check(tx_symbols_log,  tx_symbols_log_c, 'tx_symbols');
 check(tx_baseband_log, tx_baseband_log_c, 'tx_baseband');
 check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
 check(pilot_lut, pilot_lut_c, 'pilot_lut');
+check(pilot_coeff, pilot_coeff_c, 'pilot_coeff');
 check(pilot_baseband1_log, pilot_baseband1_log_c, 'pilot lpf1');
 check(pilot_baseband2_log, pilot_baseband2_log_c, 'pilot lpf2');
 check(S1_log, S1_log_c, 'S1');
