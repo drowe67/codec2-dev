@@ -106,7 +106,7 @@ static COMP cadd(COMP a, COMP b)
 
 static float cabsolute(COMP a)
 {
-    return sqrt(pow(a.real, 2.0) + pow(a.imag, 2.0));
+    return sqrt(a.real*a.real + a.imag*a.imag);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1019,8 +1019,10 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
        leads to sensible scatter plots */
 
     for(c=0; c<Nc; c++) {
-        norm = 1.0/(cabsolute(prev_rx_symbols[c])+1E-6);
-	phase_difference[c] = cmult(cmult(rx_symbols[c], fcmult(norm,cconj(prev_rx_symbols[c]))), pi_on_4);
+        norm = 1.0/(1E-6 + cabsolute(prev_rx_symbols[c]));
+	prev_rx_symbols[c] = fcmult(norm, prev_rx_symbols[c]);
+        phase_difference[c] = cmult(prev_rx_symbols[c], cconj(prev_rx_symbols[c]));
+	phase_difference[c] = cmult(phase_difference[c],pi_on_4);        
     }
 				    
     /* map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits */

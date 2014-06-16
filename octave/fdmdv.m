@@ -506,8 +506,11 @@ function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols
   assert((m == 4) || (m == 8));
 
   phase_difference = zeros(Nc+1,1);
-  phase_difference(1:Nc) = rx_symbols(1:Nc) .* conj(prev_rx_symbols(1:Nc)./(1E-6+abs(prev_rx_symbols(1:Nc))));
-  
+  for c=1:Nc 
+    norm = 1/(1E-6+abs(prev_rx_symbols(c)));  
+    phase_difference(c) = prev_rx_symbols(c) .* conj(prev_rx_symbols(c)) * norm;
+  end
+
   for c=1:Nc
 
     % determine index of constellation point received 0,1,...,m-1
@@ -542,7 +545,8 @@ function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols
 
   % Extract DBPSK encoded Sync bit
 
-  phase_difference(Nc+1,1) = rx_symbols(Nc+1) .* conj(prev_rx_symbols(Nc+1)./(1E-6+abs(prev_rx_symbols(Nc+1))));
+  norm = 1/(1E-6+abs(prev_rx_symbols(Nc+1)));
+  phase_difference(Nc+1) = rx_symbols(Nc+1) * conj(prev_rx_symbols(Nc+1)) * norm;
   if (real(phase_difference(Nc+1)) < 0)
     sync_bit = 1;
     f_err = imag(phase_difference(Nc+1));
@@ -552,9 +556,9 @@ function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols
   end
 
   % extra pi/4 rotation as we need for snr_update and scatter diagram
-
+  
   phase_difference *= exp(j*pi/4);
-
+  
 endfunction
 
 

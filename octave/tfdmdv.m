@@ -48,6 +48,7 @@ rx_baseband_log = [];
 rx_filt_log = [];
 env_log = [];
 rx_timing_log = [];
+phase_difference_log = [];
 rx_symbols_log = [];
 rx_bits_log = []; 
 sync_bit_log = [];  
@@ -55,6 +56,11 @@ coarse_fine_log = [];
 nin_log = [];
 sig_est_log = [];
 noise_est_log = [];
+
+% adjust this if the screen is getting a bit cluttered
+
+global no_plot_list;
+no_plot_list = [1 2 3 4 5 6 7 8 12];
 
 for f=1:frames
 
@@ -137,6 +143,7 @@ for f=1:frames
   nin_log = [nin_log nin];
 
   [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  phase_difference_log = [phase_difference_log pd];
 
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
   sig_est_log = [sig_est_log sig_est];
@@ -162,6 +169,11 @@ load ../unittest/tfdmdv_out.txt
 % Helper functions to plot output of C verson and difference between Octave and C versions
 
 function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
+  global no_plot_list;
+
+  if find(no_plot_list == plotnum)
+    return;
+  end
   figure(plotnum)
   subplot(subplotnum)
   stem(sig,'g;C version;');
@@ -175,6 +187,12 @@ function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
 endfunction
 
 function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
+  global no_plot_list;
+
+  if find(no_plot_list == plotnum)
+    return;
+  end
+
   figure(plotnum)
   subplot(subplotnum)
   plot(sig,'g;C version;');
@@ -243,21 +261,25 @@ plot_sig_and_error(11, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:
 plot_sig_and_error(12, 211, real(rx_filt_log(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt real' )
 plot_sig_and_error(12, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt imag' )
 
-st=1; en=3*Nt*P;
-plot_sig_and_error(13, 211, env_log(st:en), env_log(st:en) - env_log_c(st:en), 'env' )
-stem_sig_and_error(13, 212, real(rx_symbols_log(c,:)), real(rx_symbols_log(c,:) - rx_symbols_log_c(c,:)), 'rx symbols' )
-
-st=10*28;
-en = 12*28;
+st=1*28;
+en = 3*28;
 plot_sig_and_error(14, 211, rx_timing_log, rx_timing_log - rx_timing_log_c, 'Rx Timing' )
 stem_sig_and_error(14, 212, sync_bit_log_c, sync_bit_log - sync_bit_log_c, 'Sync bit', [1 n -1.5 1.5])
 
 stem_sig_and_error(15, 211, rx_bits_log_c(st:en), rx_bits_log(st:en) - rx_bits_log_c(st:en), 'RX bits', [1 en-st -1.5 1.5])
 stem_sig_and_error(15, 212, nin_log_c, nin_log - nin_log_c, 'nin')
 
-c = 1;
+c = 12;
 plot_sig_and_error(16, 211, sig_est_log(c,:), sig_est_log(c,:) - sig_est_log_c(c,:), 'sig est for SNR' )
 plot_sig_and_error(16, 212, noise_est_log(c,:), noise_est_log(c,:) - noise_est_log_c(c,:), 'noise est for SNR' )
+
+f=2;
+
+stem_sig_and_error(13, 211, real(rx_symbols_log(:,f)), real(rx_symbols_log(:,f) - rx_symbols_log_c(:,f)), 'rx symbols real' )
+stem_sig_and_error(13, 212, imag(rx_symbols_log(:,f)), imag(rx_symbols_log(:,f) - rx_symbols_log_c(:,f)), 'rx symbols imag' )
+
+stem_sig_and_error(17, 211, real(phase_difference_log(:,f)), real(phase_difference_log(:,f) - phase_difference_log_c(:,f)), 'phase difference real' )
+stem_sig_and_error(17, 212, imag(phase_difference_log(:,f)), imag(phase_difference_log(:,f) - phase_difference_log_c(:,f)), 'phase difference imag' )
 
 % ---------------------------------------------------------------------------------------
 % AUTOMATED CHECKS ------------------------------------------
