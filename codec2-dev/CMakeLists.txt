@@ -29,7 +29,7 @@ project(codec2)
 # file at some point.
 #
 set(CODEC2_VERSION_MAJOR 0)
-set(CODEC2_VERSION_MINOR 2)
+set(CODEC2_VERSION_MINOR 3)
 # Set to patch level is needed, otherwise leave FALSE.
 set(CODEC2_VERSION_PATCH FALSE)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
