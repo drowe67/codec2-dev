@@ -85,6 +85,7 @@ int main(int argc, char *argv[])
     float         env_log[NT*P*FRAMES];
     float         rx_timing_log[FRAMES];
     COMP          rx_symbols_log[FDMDV_NC+1][FRAMES];
+    COMP          phase_difference_log[FDMDV_NC+1][FRAMES];
     float         sig_est_log[FDMDV_NC+1][FRAMES];
     float         noise_est_log[FDMDV_NC+1][FRAMES];
     int           rx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
@@ -106,7 +107,7 @@ int main(int argc, char *argv[])
     printf("sizeof FDMDV states: %d bytes\n", sizeof(struct FDMDV));
 
     for(f=0; f<FRAMES; f++) {
-
+        
 	/* --------------------------------------------------------*\
 	                          Modulator
 	\*---------------------------------------------------------*/
@@ -170,6 +171,11 @@ int main(int argc, char *argv[])
 	rx_filter(rx_filt, FDMDV_NC, rx_baseband, fdmdv->rx_filter_memory, nin);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
+        //for(i=0; i<FDMDV_NC;i++)
+        //    printf("rx_symbols: %f %f prev_rx_symbols: %f %f phase_difference: %f %f\n", rx_symbols[i].real, rx_symbols[i].imag,
+        //          fdmdv->prev_rx_symbols[i].real, fdmdv->prev_rx_symbols[i].imag, fdmdv->phase_difference[i].real, fdmdv->phase_difference[i].imag);
+        //if (f==1)
+        //   exit(0);
 	snr_update(fdmdv->sig_est, fdmdv->noise_est, FDMDV_NC, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(FDMDV_NC+1));
 	
@@ -194,8 +200,6 @@ int main(int argc, char *argv[])
 	    for(i=0; i<M; i++)
 		tx_baseband_log[c][f*M+i] = tx_baseband[c][i]; 
 	memcpy(&tx_fdm_log[M*f], tx_fdm, sizeof(COMP)*M);
-
-	/* freq offset estimation */
 
 	memcpy(&pilot_baseband1_log[f*NPILOTBASEBAND], fdmdv->pilot_baseband1, sizeof(COMP)*NPILOTBASEBAND);
 	memcpy(&pilot_baseband2_log[f*NPILOTBASEBAND], fdmdv->pilot_baseband2, sizeof(COMP)*NPILOTBASEBAND);
@@ -227,8 +231,10 @@ int main(int argc, char *argv[])
 	memcpy(&env_log[NT*P*f], env, sizeof(float)*NT*P);
 	rx_timing_log[f] = rx_timing;
 	nin_log[f] = nin;
-	for(c=0; c<FDMDV_NC+1; c++)
+	for(c=0; c<FDMDV_NC+1; c++) {
 	    rx_symbols_log[c][f] = rx_symbols[c];
+	    phase_difference_log[c][f] = fdmdv->phase_difference[c];
+        }
 	
 	/* qpsk_to_bits() */
 
@@ -271,6 +277,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES, NT*P*FRAMES);  
     octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES, FRAMES);  
     octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (FDMDV_NC+1), FRAMES, FRAMES);  
+    octave_save_complex(fout, "phase_difference_log_c", (COMP*)phase_difference_log, (FDMDV_NC+1), FRAMES, FRAMES);  
     octave_save_float(fout, "sig_est_log_c", (float*)sig_est_log, (FDMDV_NC+1), FRAMES, FRAMES);  
     octave_save_float(fout, "noise_est_log_c", (float*)noise_est_log, (FDMDV_NC+1), FRAMES, FRAMES);  
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
