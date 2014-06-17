@@ -10,7 +10,7 @@
 %
 
 function fdmdv_demod_c(dumpfilename, bits)
-
+  NumCarriers = 16;
   fdmdv; % include modem code
 
   frames = bits/(Nc*Nb);

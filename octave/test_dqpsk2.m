@@ -407,8 +407,10 @@ pdB = pdB(4:4:length(pdB));
 
 % Use linear mapping function in dB domain to map to symbol power
 
-power_map_x  = [ 0 20 24 40 50 ];
-power_map_y  = [-6 -6  0 6  6];
+%power_map_x  = [ 0 20 24 40 50 ];
+%power_map_y  = [--6 -6  0  6  6];
+power_map_x  = [ 0 50 ];
+power_map_y  = [ -15 12];
 mapped_pdB = interp1(power_map_x, power_map_y, pdB);
 
 sim_in.symbol_amp = 10 .^ (mapped_pdB/20);

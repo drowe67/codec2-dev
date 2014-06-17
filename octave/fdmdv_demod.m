@@ -207,6 +207,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
         end
       end
     end
+
     test_frame_sync_state = next_test_frame_sync_state;
     test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
   end

@@ -6,6 +6,7 @@
 % Design to test coherent demodulation ideas on HF channels without
 % building a full blown modem.  Uses 'genie provided' estimates for
 % timing estimation, frame sync.
+%
 
 1;
 
@@ -219,7 +220,6 @@ function sim_out = ber_test(sim_in, modulation)
                    comb = conj(spread(sc:sc+M-1))' + conj(spread_2ms(sc:sc+M-1))';
                    if hf_phase_only
                         tx_filt = tx_filt.*exp(j*angle(comb));
-                        hf_angle_log = [hf_angle_log angle(comb)];
                    else
                        if hf_mag_only
                            comb = conj(spread(sc:sc+M-1))' + conj(spread_2ms(sc:sc+M-1))';
@@ -239,6 +239,7 @@ function sim_out = ber_test(sim_in, modulation)
                    C_log = [C_log abs(comb)*hf_gain];
                end
                tx_filt_log = [tx_filt_log tx_filt];
+               hf_angle_log = [hf_angle_log angle(comb)];
 
                % AWGN noise and phase/freq offset channel simulation
                % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
@@ -413,12 +414,11 @@ function sim_out = ber_test(sim_in, modulation)
         figure(3);
         clf;
 
-        if hf_phase_only
-            plot(hf_angle_log);
-            axis([1 10000 min(hf_angle_log) max(hf_angle_log)])
-        else
-            plot(C_log);
-        end
+        subplot(211)
+        plot(C_log);
+        subplot(212)
+        plot(hf_angle_log);
+        axis([1 10000 min(hf_angle_log) max(hf_angle_log)])
     end
 endfunction
 
