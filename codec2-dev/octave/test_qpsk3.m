@@ -573,12 +573,14 @@ function ideal
 
   sim_in = standard_init();
 
-  sim_in.verbose          = 1;
+  sim_in.sim_coh_dpsk     = 0;
+  sim_in.newldpc          = 1;
+  sim_in.verbose          = 2;
   sim_in.plot_scatter     = 1;
 
   sim_in.Esvec            = 5; 
   sim_in.hf_sim           = 1;
-  sim_in.Ntrials          = 100;
+  sim_in.Ntrials          = 30;
 
   sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
 
@@ -948,8 +950,8 @@ endfunction
 
 more off;
 
-%ideal();
+ideal();
 %phase_est_hf();
 %phase_est_awgn();
 %test_dpsk();
-gen_error_pattern_qpsk
+%gen_error_pattern_qpsk
