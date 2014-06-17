@@ -34,7 +34,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-/* Only 10 gets used, so far. */
 #define LSP_MAX_ORDER	20
 
 /*---------------------------------------------------------------------------*\
