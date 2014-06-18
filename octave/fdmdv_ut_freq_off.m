@@ -15,10 +15,12 @@
 %      + histogram of freq ests?
 
 fdmdv;  % load modem code
- 
+hf_sim; % load hf sim code
+
 % ---------------------------------------------------------------------
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
-% Total power is sum of power in all FDM carriers
+% Total power is sum of power in all FDM carriers.  These calcs set the
+% Eb/No of the data carriers.
 % ---------------------------------------------------------------------
 
 function [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB)
@@ -44,12 +46,13 @@ function [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB)
 
   % C/No = Carrier Power/noise spectral density
   %      = power per carrier*number of carriers / noise spectral density
-  CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
+  CNo_dB = 10*log10(C) + 10*log10(Nc) - No_dBHz;
 
-  % SNR in equivalent 3000 Hz SSB channel
+  % SNR in equivalent 3000 Hz SSB channel, adding extra power for pilot to get
+  % true SNR.
 
   B = 3000;
-  SNR = CNo_dB - 10*log10(B);
+  SNR = CNo_dB - 10*log10(B) + 10*log10((Nc+4)/Nc);
 end
 
 % ------------------------------------------------------------
@@ -63,39 +66,50 @@ function sim_out = freq_off_est_test(sim_in)
   global prev_pilot_lut_index;
   global pilot_lpf1;
   global Npilotlpf;
+  global spread;
+  global spread_2ms;
+  global hf_gain;
 
-  EbNovec = sim_in.EbNovec;
-  Ndelay = sim_in.delay;
-  frames = sim_in.frames;
+  EbNovec  = sim_in.EbNovec;
+  Ndelay   = sim_in.delay;
+  frames   = sim_in.frames;
   startup_delay = sim_in.startup_delay;
   allowable_error = sim_in.allowable_error;
-  foff_hz = sim_in.foff_hz;
+  foff_hz  = sim_in.foff_hz;
+  hf_sim   = sim_in.hf_sim;
+  hf_delay = floor(sim_in.hf_delay_ms*Fs);
 
   % ---------------------------------------------------------------------
   % Main loop 
   % ---------------------------------------------------------------------
 
   for ne = 1:length(EbNovec)
-     EbNo_dB = EbNovec(ne);
-     [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB);
-     hits = 0;
+    EbNo_dB = EbNovec(ne);
+    [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB);
+    hits = 0;
 
-     tx_filt = zeros(Nc,M);
-     prev_tx_symbols = ones(Nc+1,1);
+    tx_filt = zeros(Nc,M);
+    prev_tx_symbols = ones(Nc+1,1);
 
-     tx_fdm_log = [];
-     rx_fdm_log = [];
-     pilot_lpf1_log = [];
-     S1_log = [];
-     rx_fdm_delay = zeros(M+Ndelay,1);
+    tx_fdm_log = [];
+    rx_fdm_log = [];
+    pilot_lpf1_log = [];
+    S1_log = [];
+    rx_fdm_delay = zeros(M+Ndelay,1);
 
-     % freq offset simulation states
+    % freq offset simulation states
 
-     phase_offset = 1;
-     freq_offset = exp(j*2*pi*foff_hz/Fs);
-     foff_phase = 1;
+    phase_offset = 1;
+    freq_offset = exp(j*2*pi*foff_hz/Fs);
+    foff_phase = 1;
 
-     for f=1:frames
+    % hf sim states
+    
+    path2 = zeros(1,hf_delay+M);
+    sum_sig   = 0;
+    sum_noise = 0;
+
+    for f=1:frames
 
       % ------------------- Modulator -------------------
 
@@ -117,15 +131,26 @@ function sim_out = freq_off_est_test(sim_in)
         tx_fdm(i) = phase_offset*tx_fdm(i); 
       end
 
+      % optional HF channel sim
+
+      if hf_sim
+        path1 = tx_fdm .* conj(spread(f*M+1:f*M+M)');
+        path2(hf_delay+1:hf_delay+M) = tx_fdm .* conj(spread_2ms(f*M+1:f*M+M)');
+
+        tx_fdm = hf_gain*(path1 + path2(1:M));
+      end
+      sum_sig += tx_fdm * tx_fdm';
+
       rx_fdm = real(tx_fdm);
 
       % AWGN noise
 
       noise = Nsd*randn(1,M); 
+      sum_noise += noise * noise';
       rx_fdm += noise; 
       rx_fdm_log = [rx_fdm_log rx_fdm];
 
-      % Delay
+      % Fixed Delay
 
       rx_fdm_delay(1:Ndelay) = rx_fdm_delay(M+1:M+Ndelay);
       rx_fdm_delay(Ndelay+1:M+Ndelay) = rx_fdm; 
@@ -143,7 +168,7 @@ function sim_out = freq_off_est_test(sim_in)
 
       foff_log(ne,f) = foff_coarse;
 
-      if (f > startup_delay) && (abs(foff_coarse < foff_hz) < allowable_error)
+      if (f > startup_delay) && (abs(foff_coarse - foff_hz) < allowable_error)
         hits++;
       end
     end
@@ -153,26 +178,35 @@ function sim_out = freq_off_est_test(sim_in)
     sim_out.foff_sd(ne) = std(foff_log(ne,startup_delay:frames));
     sim_out.hits = hits;
     sim_out.hits_percent = 100*sim_out.hits/(frames-startup_delay);
+    sim_out.SNRvec(ne) = SNR;
 
-    printf("EbNo (dB): %3.2f  SNR (3kHz dB): %3.2f  std dev (Hz): %3.2f  Hits: %d (%3.2f%%)\n", ...
-           EbNo_dB, SNR, sim_out.foff_sd(ne), sim_out.hits, sim_out.hits_percent);
+    % noise we have measures is 4000 Hz wide, we want noise in 3000 Hz BW
+
+    snr_meas = 10*log10(sum_sig/(sum_noise*4000/3000));
+
+    printf("EbNo (dB): %5.2f  SNR: % -4.2f % -4.2f std dev (Hz): %3.2f  Hits: %d (%3.2f%%)\n", ...
+           EbNo_dB, SNR, snr_meas, sim_out.foff_sd(ne), sim_out.hits, sim_out.hits_percent);
 
     % plots if single dimension vector
 
     if length(EbNovec) == 1
-      figure(2)
+      figure(1)
       clf;
       plot(foff_log(ne,:))
       xlabel("Frames")
       ylabel("Freq offset estimate")
 
-      figure(3)
+      figure(2)
       clf;
       hist(foff_log(ne,:));
 
-      figure(4)
+      figure(3)
       [n m] = size(S1_log);
       mesh(-200+400*(0:m-1)/256,1:n,abs(S1_log(:,:)))
+
+      figure(4)
+      clf;
+      spec(rx_fdm_log,8000);
     end
   end
 end
@@ -180,6 +214,35 @@ end
 % ---------------------------------------------------------------------
 % Run Automated Tests
 % ---------------------------------------------------------------------
+
+more off;
+
+% Test 2 - range of Eb/No (SNRs) in multipath channel
+
+sim_in.EbNovec = 0:10;
+sim_in.delay = 0;
+sim_in.hf_sim = 1;
+sim_in.hf_delay_ms = 2;
+sim_in.frames = Rs*10;
+sim_in.foff_hz = 0;
+sim_in.startup_delay = 10;
+sim_in.allowable_error = 5;
+
+sim_out = freq_off_est_test(sim_in);
+
+figure(5)
+clf
+subplot(211)
+plot(sim_in.EbNovec,sim_out.foff_sd)
+hold on;
+plot(sim_in.EbNovec,sim_out.foff_sd,'+')
+hold off;
+xlabel("Eb/No (dB)")
+ylabel("Std Dev")
+axis([(min(sim_in.EbNovec)-1) (max(sim_in.EbNovec)+1) -1 10]);
+
+if 0
+ Test 1 - range of Eb/No (SNRs) in AWGN channel
 
 sim_in.EbNovec = 0:10;
 sim_in.delay = M/2;
@@ -190,9 +253,25 @@ sim_in.allowable_error = 5;
 
 sim_out = freq_off_est_test(sim_in);
 
-figure(1)
+figure(4)
 clf
+subplot(211)
 plot(sim_in.EbNovec,sim_out.foff_sd)
+hold on;
+plot(sim_in.EbNovec,sim_out.foff_sd,'+')
+hold off;
 xlabel("Eb/No (dB)")
 ylabel("Std Dev")
+axis([(min(sim_in.EbNovec)-1) (max(sim_in.EbNovec)+1) -1 10]);
 
+subplot(212)
+plot(sim_out.SNRvec,sim_out.foff_sd)
+hold on;
+plot(sim_out.SNRvec,sim_out.foff_sd,'+')
+hold off;
+xlabel("SNR (dB)")
+ylabel("Std Dev")
+axis([(min(sim_out.SNRvec)-1)  (max(sim_out.SNRvec)+1) -1 10]);
+
+% Test 2 - range of Eb/No (SNRs) in AWGN channel
+end
