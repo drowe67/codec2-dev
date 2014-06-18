@@ -16,20 +16,15 @@
 
 fdmdv;  % load modem code
  
-% Simulation Parameters --------------------------------------
-
-frames = 100;
-EbNovec = 10;
-Foff_hz = 0;
-
 % ---------------------------------------------------------------------
 % Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
 % Total power is sum of power in all FDM carriers
 % ---------------------------------------------------------------------
 
-function Nsd = calc_Nsd_from_EbNo(EbNo_dB)
+function [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB)
   global Rs;
   global Nb;
+  global Nc;
   global Fs;
 
   C = 1; % power of each FDM carrier (energy/sample).  Total Carrier power should = Nc*C = Nc
@@ -46,112 +41,158 @@ function Nsd = calc_Nsd_from_EbNo(EbNo_dB)
   N_dB = No_dBHz + 10*log10(Fs/2);
   Ngain_dB = N_dB - 10*log10(N);
   Nsd = 10^(Ngain_dB/20);
+
+  % C/No = Carrier Power/noise spectral density
+  %      = power per carrier*number of carriers / noise spectral density
+  CNo_dB = 10*log10(C)  + 10*log10(Nc) - No_dBHz;
+
+  % SNR in equivalent 3000 Hz SSB channel
+
+  B = 3000;
+  SNR = CNo_dB - 10*log10(B);
 end
 
 % ------------------------------------------------------------
 
-modulation = 'dqpsk';
-tx_filt = zeros(Nc,M);
-tx_fdm_log = [];
-rx_fdm_log = [];
-prev_tx_symbols = ones(Nc+1,1);
-ferr = 0;
-foff = 0;
-foff_log = [];
+function sim_out = freq_off_est_test(sim_in)
+  global Nc;
+  global Nb;
+  global M;
+  global Fs;
+  global pilot_lut_index;
+  global prev_pilot_lut_index;
+  global pilot_lpf1;
+  global Npilotlpf;
 
-% fixed delay simuation
+  EbNovec = sim_in.EbNovec;
+  Ndelay = sim_in.delay;
+  frames = sim_in.frames;
+  startup_delay = sim_in.startup_delay;
+  allowable_error = sim_in.allowable_error;
+  foff_hz = sim_in.foff_hz;
 
-Ndelay = M+20;
-rx_fdm_delay = zeros(Ndelay,1);
+  % ---------------------------------------------------------------------
+  % Main loop 
+  % ---------------------------------------------------------------------
 
-% ---------------------------------------------------------------------
-% Eb/No calculations.  We need to work out Eb/No for each FDM carrier.
-% Total power is sum of power in all FDM carriers
-% ---------------------------------------------------------------------
+  for ne = 1:length(EbNovec)
+     EbNo_dB = EbNovec(ne);
+     [Nsd SNR] = calc_Nsd_from_EbNo(EbNo_dB);
+     hits = 0;
 
-% freq offset simulation states
+     tx_filt = zeros(Nc,M);
+     prev_tx_symbols = ones(Nc+1,1);
 
-phase_offset = 1;
-freq_offset = exp(j*2*pi*Foff_hz/Fs);
-foff_phase = 1;
-t = 0;
-foff = 0;
+     tx_fdm_log = [];
+     rx_fdm_log = [];
+     pilot_lpf1_log = [];
+     S1_log = [];
+     rx_fdm_delay = zeros(M+Ndelay,1);
 
-% ---------------------------------------------------------------------
-% Main loop 
-% ---------------------------------------------------------------------
+     % freq offset simulation states
 
-for ne = 1:length(EbNovec)
-   EbNo_dB = EbNovec(ne);
-   Nsd = calc_Nsd_from_EbNo(EbNo_dB);
+     phase_offset = 1;
+     freq_offset = exp(j*2*pi*foff_hz/Fs);
+     foff_phase = 1;
 
-  for f=1:frames
+     for f=1:frames
 
-    % ------------------- Modulator -------------------
+      % ------------------- Modulator -------------------
 
-    tx_bits = get_test_bits(Nc*Nb); 
-    tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, modulation); 
-    prev_tx_symbols = tx_symbols; 
-    tx_baseband = tx_filter(tx_symbols); 
-    tx_fdm = fdm_upconvert(tx_baseband);
-    tx_fdm_log = [tx_fdm_log real(tx_fdm)];
+      tx_bits = get_test_bits(Nc*Nb); 
+      tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, 'dqpsk'); 
+      prev_tx_symbols = tx_symbols; 
+      tx_baseband = tx_filter(tx_symbols); 
+      tx_fdm = fdm_upconvert(tx_baseband);
+      tx_fdm_log = [tx_fdm_log real(tx_fdm)];
 
-    % ------------------- Channel simulation -------------------
+      % ------------------- Channel simulation -------------------
 
-    % frequency offset
+      % frequency offset
 
-    Foff = Foff_hz; for i=1:M freq_offset = exp(j*2*pi*Foff/Fs);
-    phase_offset *= freq_offset; tx_fdm(i) = phase_offset*tx_fdm(i); end
+      foff = foff_hz; 
+      for i=1:M 
+        freq_offset = exp(j*2*pi*foff/Fs);
+        phase_offset *= freq_offset; 
+        tx_fdm(i) = phase_offset*tx_fdm(i); 
+      end
 
-     rx_fdm = real(tx_fdm);
+      rx_fdm = real(tx_fdm);
 
-    % AWGN noise
+      % AWGN noise
 
-    noise = Nsd*randn(1,M); 
-    rx_fdm += noise; 
-    rx_fdm_log = [rx_fdm_log rx_fdm];
+      noise = Nsd*randn(1,M); 
+      rx_fdm += noise; 
+      rx_fdm_log = [rx_fdm_log rx_fdm];
 
-    % Delay
+      % Delay
 
-    rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
-    rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm; 
-    %rx_fdm_delay = rx_fdm;
-  
-    % ------------------- Freq Offset Est -------------------
+      rx_fdm_delay(1:Ndelay) = rx_fdm_delay(M+1:M+Ndelay);
+      rx_fdm_delay(Ndelay+1:M+Ndelay) = rx_fdm; 
 
-    % frequency offset estimation and correction, need to call
-    % rx_est_freq_offset even in track mode to keep states updated
+      % ------------------- Freq Offset Est -------------------
 
-    [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = ...
-    get_pilot(pilot_lut_index, prev_pilot_lut_index, M); 
-    [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
-    foff_log(ne,f) = foff_coarse;
+      % frequency offset estimation and correction, need to call
+      % rx_est_freq_offset even in track mode to keep states updated
+
+      [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = ...
+          get_pilot(pilot_lut_index, prev_pilot_lut_index, M); 
+      [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
+      pilot_lpf1_log = [pilot_lpf1_log pilot_lpf1(Npilotlpf-M+1:Npilotlpf)];
+      S1_log(f,:) = fftshift(S1);
+
+      foff_log(ne,f) = foff_coarse;
+
+      if (f > startup_delay) && (abs(foff_coarse < foff_hz) < allowable_error)
+        hits++;
+      end
+    end
+
+    % results for this EbNo value
+
+    sim_out.foff_sd(ne) = std(foff_log(ne,startup_delay:frames));
+    sim_out.hits = hits;
+    sim_out.hits_percent = 100*sim_out.hits/(frames-startup_delay);
+
+    printf("EbNo (dB): %3.2f  SNR (3kHz dB): %3.2f  std dev (Hz): %3.2f  Hits: %d (%3.2f%%)\n", ...
+           EbNo_dB, SNR, sim_out.foff_sd(ne), sim_out.hits, sim_out.hits_percent);
+
+    % plots if single dimension vector
+
+    if length(EbNovec) == 1
+      figure(2)
+      clf;
+      plot(foff_log(ne,:))
+      xlabel("Frames")
+      ylabel("Freq offset estimate")
+
+      figure(3)
+      clf;
+      hist(foff_log(ne,:));
+
+      figure(4)
+      [n m] = size(S1_log);
+      mesh(-200+400*(0:m-1)/256,1:n,abs(S1_log(:,:)))
+    end
   end
 end
 
 % ---------------------------------------------------------------------
-% Print Stats
+% Run Automated Tests
 % ---------------------------------------------------------------------
 
-% ---------------------------------------------------------------------
-% Plots
-% ---------------------------------------------------------------------
+sim_in.EbNovec = 0:10;
+sim_in.delay = M/2;
+sim_in.frames = 20;
+sim_in.foff_hz = 0;
+sim_in.startup_delay = 10;
+sim_in.allowable_error = 5;
+
+sim_out = freq_off_est_test(sim_in);
 
 figure(1)
 clf
-for ne = 1:length(EbNovec)
-  foff_std(ne) = std(foff_log(ne,:));
-end
-plot(EbNovec,foff_std)
+plot(sim_in.EbNovec,sim_out.foff_sd)
 xlabel("Eb/No (dB)")
 ylabel("Std Dev")
 
-figure(2)
-clf;
-plot(foff_log(1,:))
-xlabel("Frames")
-ylabel("Freq offset estimate")
-
-figure(3)
-clf;
-hist(foff_log(1,:))
