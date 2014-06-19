@@ -795,7 +795,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
     COMP  Ww[FFT_ENC];  /* weighting spectrum           */
     float Rw[FFT_ENC];  /* R = WA                       */
     float e_before, e_after, gain;
-    float Pfw[FFT_ENC]; /* Post filter mag spectrum     */
+    float Pfw;
     float max_Rw, min_Rw;
     float coeff;
     TIMER_VAR(tstart, tfft1, taw, tfft2, tww, tr);
@@ -883,14 +883,14 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, MODEL *model, COMP Pw[], float ak
 	dump_Pwb(Pw);
     #endif
 
+
     e_after = 1E-4;
     for(i=0; i<FFT_ENC/2; i++) {
-	Pfw[i] = powf(Rw[i], beta);
-	Pw[i].real *= Pfw[i] * Pfw[i];
-	e_after += Pw[i].real;
+        Pfw = powf(Rw[i], beta);
+        Pw[i].real *= Pfw * Pfw;
+        e_after += Pw[i].real;
     }
     gain = e_before/e_after;
-
     /* apply gain factor to normalise energy */
 
     for(i=0; i<FFT_ENC/2; i++) {
