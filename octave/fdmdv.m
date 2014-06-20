@@ -89,6 +89,8 @@ global m8_binary_to_gray = [
                              bin2dec("100")
                            ];
 
+% temp logging stuff
+
 % Functions ----------------------------------------------------
 
 
@@ -208,7 +210,7 @@ function tx_fdm = fdm_upconvert(tx_filt)
   for i=1:M
     phase_tx(c) = phase_tx(c) * freq(c);
     pilot(i) = 2*tx_filt(c,i)*phase_tx(c);
-    tx_fdm(i) = tx_fdm(i) + pilot(i);
+    tx_fdm(i) = tx_fdm(i) + pilot(i);  
   end
  
   % Scale such that total Carrier power C of real(tx_fdm) = Nc.  This
@@ -313,10 +315,9 @@ function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, 
   j = Npilotcoeff+1;
   for i = Npilotlpf-nin+1:Npilotlpf
     pilot_lpf(i) = pilot_baseband(j-Npilotcoeff+1:j) * pilot_coeff';
-    %pilot_lpf(i) = pilot_baseband(j-Npilotcoeff+1);
     j++;
   end
-
+  
   % decimate to improve DFT resolution, window and DFT
 
   Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
@@ -327,7 +328,7 @@ function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, 
 
   % peak pick and convert to Hz
 
-  [imax ix] = max(S);
+  [imax ix] = max(abs(S));
   r = 2*200/Mpilotfft;     % maps FFT bin to frequency in Hz
   
   if ix > Mpilotfft/2
@@ -373,6 +374,7 @@ function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
   else
     foff = foff2;
   end  
+  foff = foff1;
 endfunction
 
 
@@ -675,8 +677,6 @@ function [sync bit_errors error_pattern] = put_test_bits(test_bits, rx_bits)
     sync = 1;
   endif
 endfunction
-
-
 
 % Generate M samples of DBPSK pilot signal for Freq offset estimation
 
@@ -1049,17 +1049,22 @@ phase_rx = ones(Nc+1,1);
 % Freq offset estimator constants
 
 global Mpilotfft      = 256;
-global Npilotcoeff    = 30;                             % number of pilot LPF coeffs
-global pilot_coeff    = fir1(Npilotcoeff-1, 200/(Fs/2))'; % 200Hz LPF
-global Npilotbaseband = Npilotcoeff + M + M/P;          % number of pilot baseband samples reqd for pilot LPF
-global Npilotlpf      = 4*M;                            % number of samples we DFT pilot over, pilot est window
+global Npilotcoeff;                                      % number of pilot LPF coeffs
+       Npilotcoeff    = 300;                             % number of pilot LPF coeffs
+global pilot_coeff;
+       pilot_coeff    = fir1(Npilotcoeff-1, 200/(Fs/2))';% 200Hz LPF
+global Npilotbaseband = Npilotcoeff + M + M/P;           % number of pilot baseband samples reqd for pilot LPF
+global Npilotlpf;                                        % number of samples we DFT pilot over, pilot est window
+       Npilotlpf      = 16*M;
 
 % pilot LUT, used for copy of pilot at rx
   
 global pilot_lut;
 pilot_lut = generate_pilot_lut();
-pilot_lut_index = 1;
-prev_pilot_lut_index = 3*M+1;
+global pilot_lut_index;
+       pilot_lut_index = 1;
+global prev_pilot_lut_index;
+       prev_pilot_lut_index = 3*M+1;
 
 % Freq offset estimator states 
 
