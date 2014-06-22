@@ -79,8 +79,8 @@ int main(int argc, char *argv[])
     int           bytes_per_codec_frame;
     int           Nc;
 
-    if (argc < 3) {
-	printf("usage: %s InputModemRawFile OutputBitFile [Nc] [OctaveDumpFile]\n", argv[0]);
+    if (argc < 2) {
+	printf("usage: %s InputModemRawFile OutputBitFile [Nc [OctaveDumpFile]]\n", argv[0]);
 	printf("e.g    %s hts1a_fdmdv.raw hts1a.c2\n", argv[0]);
 	exit(1);
     }
@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
             exit(1);
         }
         if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
-            fprintf(stderr, "Error number of carriers must be btween 2 and %d\n",  FDMDV_NC_MAX);
+            fprintf(stderr, "Error number of carriers must be between 2 and %d\n",  FDMDV_NC_MAX);
             exit(1);
         }
     }
@@ -219,25 +219,21 @@ int main(int argc, char *argv[])
 
     if (argc == 5) {
 
-	/* make sure 3rd arg is not just the pipe command */
-
-	if (strcmp(argv[3],"|")) {
-	    if ((foct = fopen(argv[3],"wt")) == NULL ) {
-		fprintf(stderr, "Error opening Octave dump file: %s: %s.\n",
-			argv[3], strerror(errno));
-		exit(1);
-	    }
-	    octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
-	    octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);  
-	    octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
-	    octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
-	    octave_save_int(foct, "sync_log_c", sync_log, 1, f);  
-	    octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
-	    octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
-	    octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
-	    octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, FDMDV_NSPEC, FDMDV_NSPEC);  
-	    fclose(foct);
+	if ((foct = fopen(argv[4],"wt")) == NULL ) {
+	    fprintf(stderr, "Error opening Octave dump file: %s: %s.\n",
+		argv[4], strerror(errno));
+	    exit(1);
 	}
+	octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
+	octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);  
+	octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
+	octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
+	octave_save_int(foct, "sync_log_c", sync_log, 1, f);  
+	octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
+	octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
+	octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
+	octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, FDMDV_NSPEC, FDMDV_NSPEC);  
+	fclose(foct);
     }
 
     //fdmdv_dump_osc_mags(fdmdv);
