@@ -75,8 +75,8 @@ target_link_libraries(de codec2)
 add_executable(tfifo tfifo.c ../src/fifo.c)
 target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})
 
-add_executable(raw2h raw2h.c)
-target_link_libraries(raw2h codec2)
+add_executable(speexnoisesup speexnoisesup.c)
+target_link_libraries(speexnoisesup speexdsp)
 
 add_definitions(-D__UNITTEST__)
 add_executable(c2validate c2validate.c)
