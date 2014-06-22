@@ -106,7 +106,7 @@ static COMP cadd(COMP a, COMP b)
 
 static float cabsolute(COMP a)
 {
-    return sqrt(a.real*a.real + a.imag*a.imag);
+    return sqrt(pow(a.real, 2.0) + pow(a.imag, 2.0));
 }
 
 /*---------------------------------------------------------------------------*\
@@ -644,15 +644,13 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
     for(i=0; i<NPILOTLPF-nin; i++)
 	pilot_lpf[i] = pilot_lpf[nin+i];
-    for(i=NPILOTLPF-nin, j=NPILOTCOEFF; i<NPILOTLPF; i++,j++) {
+    for(i=NPILOTLPF-nin, j=0; i<NPILOTLPF; i++,j++) {
 	pilot_lpf[i].real = 0.0; pilot_lpf[i].imag = 0.0;
-	for(k=0; k<NPILOTCOEFF; k++) {
-	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j-k]));
-	    //pilot_lpf[i] = pilot_baseband[j-NPILOTCOEFF+1];
-        }
+	for(k=0; k<NPILOTCOEFF; k++)
+	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j+k]));
     }
 
-   /* decimate to improve DFT resolution, window and DFT */
+    /* decimate to improve DFT resolution, window and DFT */
 
     mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
     for(i=0; i<MPILOTFFT; i++) {
@@ -724,9 +722,9 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
     /*
       Down convert latest M samples of pilot by multiplying by ideal
       BPSK pilot signal we have generated locally.  The peak of the
-      DFT of the resulting signal is sensitive to the time shift
-      between the received and local version of the pilot, so we do it
-      twice at different time shifts and choose the maximum.
+      resulting signal is sensitive to the time shift between the
+      received and local version of the pilot, so we do it twice at
+      different time shifts and choose the maximum.
     */
 
     for(i=0; i<NPILOTBASEBAND-nin; i++) {
@@ -735,7 +733,7 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
     }
 
     for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
-        f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
+       	f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
 	f->pilot_baseband2[j] = cmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
@@ -1019,10 +1017,8 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
        leads to sensible scatter plots */
 
     for(c=0; c<Nc; c++) {
-        norm = 1.0/(1E-6 + cabsolute(prev_rx_symbols[c]));
-	prev_rx_symbols[c] = fcmult(norm, prev_rx_symbols[c]);
-        phase_difference[c] = cmult(prev_rx_symbols[c], cconj(prev_rx_symbols[c]));
-	phase_difference[c] = cmult(phase_difference[c],pi_on_4);        
+        norm = 1.0/(cabsolute(prev_rx_symbols[c])+1E-6);
+	phase_difference[c] = cmult(cmult(rx_symbols[c], fcmult(norm,cconj(prev_rx_symbols[c]))), pi_on_4);
     }
 				    
     /* map (Nc,1) DQPSK symbols back into an (1,Nc*Nb) array of bits */
