@@ -94,14 +94,15 @@ function sim_out = freq_off_est_test(sim_in)
   global spread_2ms;
   global hf_gain;
 
-  EbNovec  = sim_in.EbNovec;
-  Ndelay   = sim_in.delay;
-  frames   = sim_in.frames;
+  EbNovec   = sim_in.EbNovec;
+  Ndelay    = sim_in.delay;
+  frames    = sim_in.frames;
   startup_delay = sim_in.startup_delay;
   allowable_error = sim_in.allowable_error;
-  foff_hz  = sim_in.foff_hz;
-  hf_sim   = sim_in.hf_sim;
-  hf_delay = floor(sim_in.hf_delay_ms*Fs/1000);
+  foff_hz   = sim_in.foff_hz;
+  hf_sim    = sim_in.hf_sim;
+  hf_delay  = floor(sim_in.hf_delay_ms*Fs/1000);
+  plot_type = sim_in.plot_type;
 
   % work out gain for HF model
   % e = sum((g*s)^2) = g*g*sum(s^2) = N, g = sqrt(N/sum(s^2))
@@ -115,13 +116,22 @@ function sim_out = freq_off_est_test(sim_in)
   hf_gain = sqrt(frames*M/p);
   p2 = (hf_gain*(s1+s2))'*(hf_gain*(s1+s2));
 
+  if hf_sim
+    channel_model = "HF";
+  else
+    channel_model = "AWGN";
+  end
+
   % spectrogram states
 
-  spec_states.m             = 4*M;
+  spec_states.m             = 16*M;
   spec_states.nfft2         = 2 ^ ceil(log2(spec_states.m/2));
-  spec_states.dec           = 4;
+  spec_states.dec           = 2;
   spec_states.sample_memory = zeros(1, spec_states.m);
   spec_states.lower_clip_dB = -30;
+
+  printf("\n%s\n", sim_in.test_name);
+  printf("  Channel EbNo SNR(calc) SNR(meas) SD(Hz) Hits Hits(%%) Result\n");
 
   % ---------------------------------------------------------------------
   % Main loop 
@@ -144,9 +154,7 @@ function sim_out = freq_off_est_test(sim_in)
     % freq offset simulation states
 
     phase_offset = 1;
-    freq_offset = exp(j*2*pi*foff_hz/Fs);
-    foff_phase = 1;
-    Nmedian = 25;
+    Nmedian = 20;
     foff_median=zeros(1,Nmedian);
 
     % hf sim states
@@ -160,6 +168,7 @@ function sim_out = freq_off_est_test(sim_in)
     fest_current = 0;
     fdelta = 5;
     candidate_thresh = 10;
+    foff_est_thresh_prev = 0;
 
     for f=1:frames
 
@@ -167,6 +176,10 @@ function sim_out = freq_off_est_test(sim_in)
 
       tx_bits = get_test_bits(Nc*Nb); 
       tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, 'dqpsk'); 
+
+      % simulate BPF filtering of +/- 200 Hz
+      % tx_symbols(1:6) = 0; tx_symbols(9:Nc) = 0;
+
       prev_tx_symbols = tx_symbols; 
       tx_baseband = tx_filter(tx_symbols); 
       tx_fdm = fdm_upconvert(tx_baseband);
@@ -176,9 +189,8 @@ function sim_out = freq_off_est_test(sim_in)
 
       % frequency offset
 
-      foff = foff_hz; 
       for i=1:M 
-        freq_offset = exp(j*2*pi*foff/Fs);
+        freq_offset = exp(j*2*pi*foff_hz(f)/Fs);
         phase_offset *= freq_offset; 
         tx_fdm(i) = phase_offset*tx_fdm(i); 
       end
@@ -219,11 +231,13 @@ function sim_out = freq_off_est_test(sim_in)
       [foff_est S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
       pilot_lpf1_log = [pilot_lpf1_log pilot_lpf1(Npilotlpf-M+1:Npilotlpf)];
       S1_log(f,:) = fftshift(S1);
+      S2_log(f,:) = fftshift(S2);
      
       % raw estimate
       
       foff_log(ne,f) = foff_est;
-      maxcf_log(ne,f) = max(abs(S1));
+      maxS1_log(ne,f) = max(S1.*conj(S1)/(S1*S1'));
+      maxS2_log(ne,f) = max(S2.*conj(S2)/(S2*S2'));
 
       % median filter post-processed
 
@@ -245,16 +259,28 @@ function sim_out = freq_off_est_test(sim_in)
          if abs(foff_est - fest_candidate) > fdelta
            next_state = 0;
          end
-         candidate_count++; 
+        candidate_count++; 
          if candidate_count > candidate_thresh
            fest_current = fest_candidate;
-           next_state = 1;
+           next_state = 0;
         end
       end
       state = next_state;
       foff_statemach_log(ne,f) = fest_current;
 
-      if (f > startup_delay) && (abs(foff_est - foff_hz) < allowable_error)
+      % threshold post processed
+
+      if (maxS1_log(ne,f) > 0.06) || (maxS2_log(ne,f) > 0.06)
+      %if (maxS1_log(ne,f) > 0.08)
+         foff_thresh_log(ne,f) = foff_est;
+      else   
+         foff_thresh_log(ne,f) = foff_est_thresh_prev;
+      end
+      foff_est_thresh_prev = foff_thresh_log(ne,f);
+
+      % hit/miss stats
+      fest_current = foff_statemach_log(ne,f);
+      if (f > startup_delay) && (abs(fest_current - foff_hz(f)) < allowable_error)
         hits++;
       end
 
@@ -276,48 +302,78 @@ function sim_out = freq_off_est_test(sim_in)
 
     snr_meas = 10*log10(sum_sig/(sum_noise*4000/3000));
 
-    printf("EbNo (dB): %5.2f  SNR: % -4.2f % -4.2f std dev (Hz): %3.2f  Hits: %d (%3.2f%%)\n", ...
-           EbNo_dB, SNR, snr_meas, sim_out.foff_sd(ne), sim_out.hits, sim_out.hits_percent);
+    printf("  %6s %5.2f % -5.2f     % -5.2f     %3.2f   %d  %3.2f  ", ...
+           channel_model, EbNo_dB, SNR, snr_meas, sim_out.foff_sd(ne), sim_out.hits, sim_out.hits_percent);
+ 
+    if sim_out.hits_percent == 100
+      printf("PASS\n");
+    else
+      printf("FAIL\n");
+      figure(5)
+      clf
+      plot(abs(foff_statemach_log(ne,:) - foff_hz < allowable_error));
+    end
 
     % plots if single dimension vector
 
     if length(EbNovec) == 1
+      fmin = -200; fmax = 200;
       figure(1)
       clf;
-      subplot(311)
+      subplot(411)
       plot(foff_log(ne,:))
-      axis([1 frames -200 200]);
-      ylabel("Freq offset estimate")
-      subplot(312)
+      axis([1 frames fmin fmax]);
+      ylabel("Foff raw")
+      subplot(412)
       plot(foff_median_log(ne,:))
-      axis([1 frames -200 200]);
-      ylabel("Freq offset estimate")
-      subplot(313)
-      plot(foff_statemach_log(ne,:))
-      axis([1 frames -200 200]);
+      axis([1 frames fmin fmax]);
+      ylabel("Foff median")
+      subplot(413)
+      plot(foff_statemach_log(ne,:),'g')
+      ylabel("Foff state")
+      axis([1 frames fmin fmax]);
+      subplot(414)
+      plot(foff_thresh_log(ne,:))
+      ylabel("Foff thresh")
+      axis([1 frames fmin fmax]);
       xlabel("Frames")
-      ylabel("Freq offset estimate")
       grid;
 
       figure(2)
       clf;
-      plot(maxcf_log(ne,:))
-      axis([1 frames -0 300]);
+      plot(maxS1_log(ne,:));
+      axis([1 frames 0 0.2]);
       xlabel("Frames")
-      ylabel("max(abs(S1))")
+      ylabel("max(abs(S1/S2))")
       grid;
+      hold on;
+      plot(maxS2_log(ne,:),'g');
+      hold off;
 
       figure(3)
       [n m] = size(S1_log);
-      mesh(-200+400*(0:m-1)/256,1:n,abs(S1_log(:,:)));
-      xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel("max(abs(S1))")
+      if strcmp(plot_type,"mesh")
+        mesh(-200+400*(0:m-1)/256,1:n,abs(S1_log(:,:)));
+        xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel("max(abs(S1))")
+      else
+        imagesc(1:n,-200+400*(1:(m-1))/m,abs(S1_log(:,:))');
+        set(gca,'YDir','normal')
+        ylabel('Freq (Hz)'); xlabel('Frame num');
+        axis([1 n -200 200])
+      end  
 
       figure(4)
       clf
       [n m] = size(spectrogram);
-      lower = floor(500*m/4000); upper = floor(2500*m/4000);
-      mesh(lower:upper,1:n,spectrogram(:,lower:upper));
-      xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel('Amplitude (dB)');
+      if strcmp(plot_type,"mesh")
+        mesh(1:m,1:n,spectrogram);
+        xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel('Amplitude (dB)');
+      else
+        imagesc(1:n,(4000/m)*(1:m),spectrogram')
+        set(gca,'YDir','normal')
+        ylabel('Freq (Hz)'); xlabel('Frame num');
+        axis([1 n 500 2500])
+      end
 
       sim_out.spec = spectrogram;
       sim_out.tx_fdm_log = spectrogram;
@@ -329,42 +385,35 @@ end
 % Run Automated Tests
 % ---------------------------------------------------------------------
 
-figure(5); h=freqz(pilot_coeff,1,4000); plot(20*log10(abs(h(1:1000)))); grid
-
 more off;
 
-sim_in.EbNovec = 3;
-sim_in.hf_sim = 1;
-sim_in.hf_delay_ms = 2;
-sim_in.delay = M/2;
-sim_in.frames = Rs*10;
-sim_in.foff_hz = 50;
-sim_in.startup_delay = 10;
-sim_in.allowable_error = 5;
-
-sim_out = freq_off_est_test(sim_in);
-
-% Test 1 - range of Eb/No (SNRs) in AWGN channel
-
 function test1
-  sim_in.EbNovec = 0:10;
+  global M;
+  global Rs;
+
+  sim_in.test_name = "Test 1: range of Eb/No (SNRs) in AWGN channel";
+  sim_in.EbNovec = [3:10 99];
   sim_in.delay = M/2;
-  sim_in.frames = 20;
-  sim_in.foff_hz = 50;
-  sim_in.startup_delay = 10;
+  sim_in.frames = Rs*3;
+  sim_in.foff_hz(1:sim_in.frames) = 50;
+  sim_in.startup_delay = 0.5*Rs;
   sim_in.allowable_error = 5;
+  sim_in.hf_sim = 0;
+  sim_in.hf_delay_ms = 2;
+  sim_in.delay = M/2;
+  sim_in.plot_type = "waterfall";
 
   sim_out = freq_off_est_test(sim_in);
 
-  figure(4)
+  figure(5)
   clf
   subplot(211)
-  plot(sim_in.EbNovec,sim_out.foff_sd)
+  plot(sim_in.EbNovec, sim_out.foff_sd)
   hold on;
-  plot(sim_in.EbNovec,sim_out.foff_sd,'+')
+  plot(sim_in.EbNovec, sim_out.foff_sd,'+')
   hold off;
   xlabel("Eb/No (dB)")
-  ylabel("Std Dev")
+  ylabel("Std Dev (Hz)")
   axis([(min(sim_in.EbNovec)-1) (max(sim_in.EbNovec)+1) -1 10]);
 
   subplot(212)
@@ -373,20 +422,20 @@ function test1
   plot(sim_out.SNRvec,sim_out.foff_sd,'+')
   hold off;
   xlabel("SNR (dB)")
-  ylabel("Std Dev")
+  ylabel("Std Dev (Hz)")
   axis([(min(sim_out.SNRvec)-1)  (max(sim_out.SNRvec)+1) -1 10]);
 end
 
-% Test 2 - range of Eb/No (SNRs) in multipath channel
 
 function test2
+  sim_in.test_name = "Test 2: range of Eb/No (SNRs) in HF multipath channel"
   sim_in.EbNovec = 0:10;
   sim_in.delay = 2;
-  sim_in.hf_sim = 0;
+  sim_in.hf_sim = 1;
   sim_in.hf_delay_ms = 2;
-  sim_in.frames = Rs*10;
+  sim_in.frames = Rs*2;
   sim_in.foff_hz = 0;
-  sim_in.startup_delay = 10;
+  sim_in.startup_delay = Rs/2;
   sim_in.allowable_error = 5;
 
   sim_out = freq_off_est_test(sim_in);
@@ -402,4 +451,23 @@ function test2
   ylabel("Std Dev")
   axis([(min(sim_in.EbNovec)-1) (max(sim_in.EbNovec)+1) -1 10]);
 end
+
+function test3
+  global M;
+  global Rs;
+
+  sim_in.test_name = "Test 3: 30 Seconds in HF multipath channel at 0dB-ish SNR";
+  sim_in.EbNovec = 3;
+  sim_in.hf_sim = 0;
+  sim_in.hf_delay_ms = 2;
+  sim_in.delay = M/2;
+  sim_in.frames = Rs*5;
+  sim_in.foff_hz(1:sim_in.frames) = -50;
+  sim_in.startup_delay = Rs; % allow 1 second in heavily faded channels      
+  sim_in.allowable_error = 5;
+  sim_in.plot_type = "waterfall";
+  sim_out = freq_off_est_test(sim_in);
+endfunction
+
+test3;
 
