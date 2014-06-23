@@ -1396,7 +1396,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     TIMER_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage"); 
     estimate_amplitudes(model, Sw, c2->W, 0);
     TIMER_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps"); 
-    est_voicing_mbe(model, Sw, c2->W, Sw_, Ew, c2->prev_Wo_enc);
+    est_voicing_mbe(model, Sw, c2->W, Sw_, Ew);
     c2->prev_Wo_enc = model->Wo;
     TIMER_SAMPLE_AND_LOG2(estamps, "    est_voicing"); 
     #ifdef DUMP

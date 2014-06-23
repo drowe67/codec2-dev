@@ -391,8 +391,7 @@ float est_voicing_mbe(
     COMP   W[],
     COMP   Sw_[],         /* DFT of all voiced synthesised signal  */
                           /* useful for debugging/dump file        */
-    COMP   Ew[],          /* DFT of error                          */
-    float prev_Wo)
+    COMP   Ew[])          /* DFT of error                          */
 {
     int   i,l,al,bl,m;    /* loop variables */
     COMP  Am;             /* amplitude sample for this band */

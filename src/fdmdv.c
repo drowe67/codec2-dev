@@ -644,10 +644,10 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
     for(i=0; i<NPILOTLPF-nin; i++)
 	pilot_lpf[i] = pilot_lpf[nin+i];
-    for(i=NPILOTLPF-nin, j=0; i<NPILOTLPF; i++,j++) {
+    for(i=NPILOTLPF-nin, j=NPILOTBASEBAND-nin; i<NPILOTLPF; i++,j++) {
 	pilot_lpf[i].real = 0.0; pilot_lpf[i].imag = 0.0;
 	for(k=0; k<NPILOTCOEFF; k++)
-	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j+k]));
+	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j-NPILOTCOEFF+1+k]));
     }
 
     /* decimate to improve DFT resolution, window and DFT */
