@@ -84,7 +84,7 @@ int main(int argc, char *argv[])
     char  phaseexp_arg[MAX_STR];
     float snr;
     float sum_snr;
-
+    int orderi;
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
     int dt = 0, lspjvm = 0, lspanssi = 0, lspjnd = 0, lspmel = 0;
     int prede = 0;
     float pre_mem = 0.0, de_mem = 0.0;
-    float ak[LPC_MAX];
+    float ak[order];
     COMP  Sw_[FFT_ENC];
     COMP  Ew[FFT_ENC]; 
  
@@ -108,14 +108,14 @@ int main(int argc, char *argv[])
 
     MODEL prev_model, interp_model;
     int decimate = 0;
-    float lsps[LPC_MAX];
-    float prev_lsps[LPC_MAX], prev_lsps_[LPC_MAX];
-    float lsps__prev[LPC_MAX];
-    float lsps__prev2[LPC_MAX];
+    float lsps[order];
+    float prev_lsps[order], prev_lsps_[order];
+    float lsps__prev[order];
+    float lsps__prev2[order];
     float e, prev_e;
-    float ak_interp[LPC_MAX];
-    int   lsp_indexes[LPC_MAX];
-    float lsps_[LPC_MAX];
+    float ak_interp[order];
+    int   lsp_indexes[order];
+    float lsps_[order];
     float Woe_[2];
 
     void *nlp_states;
@@ -191,9 +191,9 @@ int main(int argc, char *argv[])
 	//ex_phase[i] = (PI/3)*(float)rand()/RAND_MAX;
 	ex_phase[i] = 0.0;
     }
-    for(i=0; i<LPC_ORD; i++) {
-	lsps_[i] = prev_lsps[i] = prev_lsps_[i] = i*PI/(LPC_ORD+1);
-	lsps__prev[i] = lsps__prev2[i] = i*PI/(LPC_ORD+1);
+    for(i=0; i<order; i++) {
+	lsps_[i] = prev_lsps[i] = prev_lsps_[i] = i*PI/(order+1);
+	lsps__prev[i] = lsps__prev2[i] = i*PI/(order+1);
     }
     e = prev_e = 1;
     hpf_states[0] = hpf_states[1] = 0.0;
@@ -219,11 +219,12 @@ int main(int argc, char *argv[])
         switch (opt) {
          case 0:
             if(strcmp(long_options[option_index].name, "lpc") == 0) {
-                order = atoi(optarg);
-                if((order < 4) || (order > 20)) {
-                    fprintf(stderr, "Error in LPC order: %s\n", optarg);
+                orderi = atoi(optarg);
+                if((orderi < 4) || (orderi > order)) {
+                    fprintf(stderr, "Error in LPC order (4 to %d): %s\n", order, optarg);
                     exit(1);
                 }
+                order = orderi;
             #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump) 
@@ -264,7 +265,7 @@ int main(int argc, char *argv[])
 		gain = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
-	            lpc_model = 1; order = 10;
+	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
 	            lspd = 1;
 	            phase0 = 1;
@@ -272,7 +273,7 @@ int main(int argc, char *argv[])
 	            decimate = 1;
 		    lpcpf = 1;
                } else if(strcmp(optarg,"2400") == 0) {
-	            lpc_model = 1; order = 10;
+	            lpc_model = 1;
 		    vector_quant_Wo_e = 1;
 	            lsp = 1;
 	            phase0 = 1;
@@ -280,7 +281,7 @@ int main(int argc, char *argv[])
 	            decimate = 1;
 		    lpcpf = 1;
                } else if(strcmp(optarg,"1400") == 0) {
-	            lpc_model = 1; order = 10;
+	            lpc_model = 1;
 		    vector_quant_Wo_e = 1;
 	            lsp = 1; lspdt = 1;
 	            phase0 = 1;
@@ -289,7 +290,7 @@ int main(int argc, char *argv[])
 	            dt = 1;
  		    lpcpf = 1;
                 } else if(strcmp(optarg,"1200") == 0) {
-	            lpc_model = 1; order = 10;
+	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
 	            lspjvm = 1; lspdt = 1;
 	            phase0 = 1;
@@ -298,7 +299,7 @@ int main(int argc, char *argv[])
 	            dt = 1;
  		    lpcpf = 1;
                 } else {
-                    fprintf(stderr, "Error: invalid output rate %s\n", optarg);
+                    fprintf(stderr, "Error: invalid output rate (3200|2400|1400|1200) %s\n", optarg);
                     exit(1);
                 }
             }
@@ -425,7 +426,7 @@ int main(int argc, char *argv[])
 
 	if (phase0) {
 	    float Wn[M];		        /* windowed speech samples */
-	    float Rk[LPC_MAX+1];	        /* autocorrelation coeffs  */
+	    float Rk[order+1];                  /* autocorrelation coeffs  */
 
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
@@ -447,7 +448,7 @@ int main(int argc, char *argv[])
 
 	    /* determine voicing */
 
-	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew, prev_uq_Wo);
+	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew);
 
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
@@ -484,7 +485,7 @@ int main(int argc, char *argv[])
 		e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
             #ifdef DUMP
-	    dump_ak(ak, LPC_ORD);
+	    dump_ak(ak, order);
             #endif
 	
 	    /* tracking down -ve energy values with BW expansion */
@@ -509,7 +510,7 @@ int main(int argc, char *argv[])
 	    /* dump order is different if we are decimating */
 	    if (!decimate)
 		dump_lsp(lsps);
-	    for(i=0; i<LPC_ORD; i++)
+	    for(i=0; i<order; i++)
 		prev_lsps[i] = lsps[i];
             #endif
 
@@ -711,7 +712,7 @@ int main(int argc, char *argv[])
 	    apply_lpc_correction(&model);
 
             #ifdef DUMP
-	    dump_ak_(ak, LPC_ORD);
+	    dump_ak_(ak, order);
             #endif
 
 	    /* note SNR on interpolated frames can't be measured properly
@@ -734,14 +735,14 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (decimate) {
-	    float lsps_interp[LPC_ORD];
+	    float lsps_interp[order];
 
 	    if (!phase0) {
 		printf("needs --phase0 to resample phase for interpolated Wo\n");
 		exit(0);
 	    }
 	    if (!lpc_model) {
-		printf("needs --lpc 10 to resample amplitudes\n");
+		printf("needs --lpc [order] to resample amplitudes\n");
 		exit(0);
 	    }
 
@@ -772,19 +773,19 @@ int main(int argc, char *argv[])
 		printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
 		       interp_model.Wo, interp_model.L, interp_model.voiced, prev_e);
 		printf("  lsps_interp: ");
-		for(i=0; i<LPC_ORD; i++)
+		for(i=0; i<order; i++)
 		    printf("%5.3f  ", lsps_interp[i]);
 		printf("\n  A..........: ");
-		for(i=0; i<10; i++)
+		for(i=0; i<order; i++)
 		    printf("%5.3f  ",interp_model.A[i]);
 
 		printf("\n  Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
 		       model.Wo, model.L, e, model.voiced);
 		printf("  lsps_......: ");
-		for(i=0; i<LPC_ORD; i++)
+		for(i=0; i<order; i++)
 		    printf("%5.3f  ", lsps_[i]);
 		printf("\n  A..........: ");
-		for(i=0; i<10; i++)
+		for(i=0; i<order; i++)
 		    printf("%5.3f  ",model.A[i]);
 		printf("\n");
 		*/
@@ -821,7 +822,7 @@ int main(int argc, char *argv[])
 		/* update states for next time */
 
 		prev_model = model;
-		for(i=0; i<LPC_ORD; i++)
+		for(i=0; i<order; i++)
 		    prev_lsps_[i] = lsps_[i];
 		prev_e = e;
 	    }
@@ -922,7 +923,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
 			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
-			option_parameters = " <4800|2400|1400|1200>";
+			option_parameters = " <3200|2400|1400|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " <DumpFilePrefix>";
 		} else {

@@ -34,8 +34,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define LSP_MAX_ORDER	20
-
 /*---------------------------------------------------------------------------*\
 
   Introduction to Line Spectrum Pairs (LSPs)
@@ -88,14 +86,14 @@
 
 
 static float
-cheb_poly_eva(float *coef,float x,int m)
+cheb_poly_eva(float *coef,float x,int order)
 /*  float coef[]  	coefficients of the polynomial to be evaluated 	*/
 /*  float x   		the point where polynomial is to be evaluated 	*/
-/*  int m 		order of the polynomial 			*/
+/*  int order 		order of the polynomial 			*/
 {
     int i;
     float *t,*u,*v,sum;
-    float T[(LSP_MAX_ORDER / 2) + 1];
+    float T[(order / 2) + 1];
 
     /* Initialise pointers */
 
@@ -107,7 +105,7 @@ cheb_poly_eva(float *coef,float x,int m)
 
     /* Evaluate chebyshev series formulation using iterative approach 	*/
 
-    for(i=2;i<=m/2;i++)
+    for(i=2;i<=order/2;i++)
 	*v++ = (2*x)*(*u++) - *t++;  	/* T[i] = 2*x*T[i-1] - T[i-2]	*/
 
     sum=0.0;                        	/* initialise sum to zero 	*/
@@ -115,8 +113,8 @@ cheb_poly_eva(float *coef,float x,int m)
 
     /* Evaluate polynomial and return value also free memory space */
 
-    for(i=0;i<=m/2;i++)
-	sum+=coef[(m/2)-i]**t++;
+    for(i=0;i<=order/2;i++)
+	sum+=coef[(order/2)-i]**t++;
 
     return sum;
 }
@@ -132,9 +130,9 @@ cheb_poly_eva(float *coef,float x,int m)
 
 \*---------------------------------------------------------------------------*/
 
-int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
+int lpc_to_lsp (float *a, int order, float *freq, int nb, float delta)
 /*  float *a 		     	lpc coefficients			*/
-/*  int lpcrdr			order of LPC coefficients (10) 		*/
+/*  int order			order of LPC coefficients (10) 		*/
 /*  float *freq 	      	LSP frequencies in radians      	*/
 /*  int nb			number of sub-intervals (4) 		*/
 /*  float delta			grid spacing interval (0.02) 		*/
@@ -149,11 +147,11 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
     float *pt;                	/* ptr used for cheb_poly_eval()
 				   whether P' or Q' 			*/
     int roots=0;              	/* number of roots found 	        */
-    float Q[LSP_MAX_ORDER + 1];
-    float P[LSP_MAX_ORDER + 1];
+    float Q[order + 1];
+    float P[order + 1];
 
     flag = 1;                	
-    m = lpcrdr/2;            	/* order of P'(z) & Q'(z) polynimials 	*/
+    m = order/2;            	/* order of P'(z) & Q'(z) polynimials 	*/
 
     /* Allocate memory space for polynomials */
 
@@ -167,8 +165,8 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
     *px++ = 1.0;
     *qx++ = 1.0;
     for(i=1;i<=m;i++){
-	*px++ = a[i]+a[lpcrdr+1-i]-*p++;
-	*qx++ = a[i]-a[lpcrdr+1-i]+*q++;
+	*px++ = a[i]+a[order+1-i]-*p++;
+	*qx++ = a[i]-a[order+1-i]+*q++;
     }
     px = P;
     qx = Q;
@@ -188,17 +186,17 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
     xl = 1.0;               	/* start at point xl = 1 		*/
 
 
-    for(j=0;j<lpcrdr;j++){
+    for(j=0;j<order;j++){
 	if(j%2)            	/* determines whether P' or Q' is eval. */
 	    pt = qx;
 	else
 	    pt = px;
 
-	psuml = cheb_poly_eva(pt,xl,lpcrdr);	/* evals poly. at xl 	*/
+	psuml = cheb_poly_eva(pt,xl,order);	/* evals poly. at xl 	*/
 	flag = 1;
 	while(flag && (xr >= -1.0)){
 	    xr = xl - delta ;                  	/* interval spacing 	*/
-	    psumr = cheb_poly_eva(pt,xr,lpcrdr);/* poly(xl-delta_x) 	*/
+	    psumr = cheb_poly_eva(pt,xr,order);/* poly(xl-delta_x) 	*/
 	    temp_psumr = psumr;
 	    temp_xr = xr;
 
@@ -217,7 +215,7 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
 		psumm=psuml;
 		for(k=0;k<=nb;k++){
 		    xm = (xl+xr)/2;        	/* bisect the interval 	*/
-		    psumm=cheb_poly_eva(pt,xm,lpcrdr);
+		    psumm=cheb_poly_eva(pt,xm,order);
 		    if(psumm*psuml>0.){
 			psuml=psumm;
 			xl=xm;
@@ -242,7 +240,7 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
 
     /* convert from x domain to radians */
 
-    for(i=0; i<lpcrdr; i++) {
+    for(i=0; i<order; i++) {
 	freq[i] = acos(freq[i]);
     }
 
@@ -260,30 +258,29 @@ int lpc_to_lsp (float *a, int lpcrdr, float *freq, int nb, float delta)
 
 \*---------------------------------------------------------------------------*/
 
-void lsp_to_lpc(float *lsp, float *ak, int lpcrdr)
+void lsp_to_lpc(float *lsp, float *ak, int order)
 /*  float *freq         array of LSP frequencies in radians     	*/
 /*  float *ak 		array of LPC coefficients 			*/
-/*  int lpcrdr  	order of LPC coefficients 			*/
+/*  int order     	order of LPC coefficients 			*/
 
 
 {
     int i,j;
     float xout1,xout2,xin1,xin2;
     float *pw,*n1,*n2,*n3,*n4 = 0;
-    int m = lpcrdr/2;
-    float freq[LSP_MAX_ORDER];
-    float Wp[(LSP_MAX_ORDER * 4) + 2];
+    float freq[order];
+    float Wp[(order * 4) + 2];
     
     /* convert from radians to the x=cos(w) domain */
 
-    for(i=0; i<lpcrdr; i++)
+    for(i=0; i<order; i++)
 	freq[i] = cos(lsp[i]);
 
     pw = Wp;
 
     /* initialise contents of array */
 
-    for(i=0;i<=4*m+1;i++){       	/* set contents of buffer to 0 */
+    for(i=0;i<=4*(order/2)+1;i++){       	/* set contents of buffer to 0 */
 	*pw++ = 0.0;
     }
 
@@ -296,8 +293,8 @@ void lsp_to_lpc(float *lsp, float *ak, int lpcrdr)
     /* reconstruct P(z) and Q(z) by cascading second order polynomials
       in form 1 - 2xz(-1) +z(-2), where x is the LSP coefficient */
 
-    for(j=0;j<=lpcrdr;j++){
-	for(i=0;i<m;i++){
+    for(j=0;j<=order;j++){
+	for(i=0;i<(order/2);i++){
 	    n1 = pw+(i*4);
 	    n2 = n1 + 1;
 	    n3 = n2 + 1;

@@ -78,8 +78,8 @@ void decode_lsps_diff_time(float lsp_[],
 			   float lsp__prev[],
 			   int order);
 
-void encode_lsps_vq(int *indexes, float *x, float *xq, int ndim);
-void decode_lsps_vq(int *indexes, float *xq, int ndim);
+void encode_lsps_vq(int *indexes, float *x, float *xq, int order);
+void decode_lsps_vq(int *indexes, float *xq, int order);
 
 long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 

@@ -48,7 +48,6 @@
 #define FFT_DEC    512	    	/* size of FFT used in decoder          */
 #define TW         40		/* Trapezoidal synthesis window overlap */
 #define V_THRESH   6.0          /* voicing threshold in dB              */
-#define LPC_MAX    20		/* maximum LPC order                    */
 #define LPC_ORD    10		/* phase modelling LPC order            */
 
 /* Pitch estimation defines */
