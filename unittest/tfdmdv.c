@@ -11,7 +11,6 @@
                                                                              
 \*---------------------------------------------------------------------------*/
 
-
 /*
   Copyright (C) 2012 David Rowe
 
@@ -159,11 +158,9 @@ int main(int argc, char *argv[])
 	/* freq offset estimation and correction */
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
-        foff_coarse = 0;
-        fdmdv->sync = 0;
 	if (fdmdv->sync == 0)
 	    fdmdv->foff = foff_coarse;
-	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, foff_coarse, &fdmdv->foff_phase_rect, nin);
+	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, nin);
 	
 	/* baseband processing */
 

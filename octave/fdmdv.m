@@ -44,6 +44,8 @@ global snr_coeff;
 global Nph;
        Nph = 9;        % number of symbols to estimate phase over
                        % must be odd number as we take centre symbol
+global Nsync_mem = 6
+global sync_uw = [1 -1 1 -1 1 -1];
 
 % root raised cosine (Root Nyquist) filter 
 
@@ -312,7 +314,7 @@ function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, 
   % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
   pilot_lpf(1:Npilotlpf-nin) = pilot_lpf(nin+1:Npilotlpf);
-  k = Npilotcoeff+1;
+  k = Npilotbaseband-nin+1;;
   for i = Npilotlpf-nin+1:Npilotlpf
     pilot_lpf(i) = pilot_baseband(k-Npilotcoeff+1:k) * pilot_coeff';
     k++;
@@ -524,38 +526,60 @@ function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols
 
   phase_difference = zeros(Nc+1,1);
   for c=1:Nc 
-    norm = 1/(1E-6+abs(prev_rx_symbols(c)));  
-    phase_difference(c) = prev_rx_symbols(c) .* conj(prev_rx_symbols(c)) * norm;
+     norm = 1/(1E-6+abs(prev_rx_symbols(c)));  
+     phase_difference(c) = rx_symbols(c) .* conj(prev_rx_symbols(c)) * norm;
   end
 
   for c=1:Nc
-
-    % determine index of constellation point received 0,1,...,m-1
-
-    index = floor(angle(phase_difference(c))*m/(2*pi) + 0.5);
-
-    if index < 0
-      index += m;
-    end
-
-    % map to decimal version of bits encoded in symbol
+    phase_difference(c) *= exp(j*pi/4);
 
     if m == 4
-      bits_decimal = m4_binary_to_gray(index+1);
-    else
-      bits_decimal = m8_binary_to_gray(index+1);
-    end
-    
-    % convert back to an array of received bits
 
-    for i=1:Nb
-      if bitand(bits_decimal, 2.^(Nb-i))
-        rx_bits((c-1)*Nb+i) = 1;
+        % to get a good match between C and Octave during start up use same as C code
+
+        d = phase_difference(c);
+        if (real(d) >= 0) && (imag(d) >= 0)
+          msb = 0; lsb = 0;
+        end
+        if (real(d) < 0) && (imag(d) >= 0)
+          msb = 0; lsb = 1;
+        end
+        if (real(d) < 0) && (imag(d) < 0)
+          msb = 1; lsb = 1;
+        end
+        if (real(d) >= 0) && (imag(d) < 0)
+          msb = 1; lsb = 0;
+        end
+          
+        rx_bits(2*(c-1)+1) = msb;
+        rx_bits(2*c) = lsb;
+    else
+      % determine index of constellation point received 0,1,...,m-1
+
+      index = floor(angle(phase_difference(c))*m/(2*pi) + 0.5);
+
+      if index < 0
+        index += m;
+      end
+
+      % map to decimal version of bits encoded in symbol
+
+      if m == 4
+        bits_decimal = m4_binary_to_gray(index+1);
       else
-        rx_bits((c-1)*Nb+i) = 0;
+        bits_decimal = m8_binary_to_gray(index+1);
+      end
+    
+      % convert back to an array of received bits
+
+      for i=1:Nb
+        if bitand(bits_decimal, 2.^(Nb-i))
+          rx_bits((c-1)*Nb+i) = 1;
+        else
+          rx_bits((c-1)*Nb+i) = 0;
+        end
       end
     end
-
   end
 
   assert(length(rx_bits) == Nc*Nb);
@@ -574,7 +598,7 @@ function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols
 
   % extra pi/4 rotation as we need for snr_update and scatter diagram
   
-  phase_difference *= exp(j*pi/4);
+  phase_difference(Nc+1) *= exp(j*pi/4);
   
 endfunction
 
@@ -836,89 +860,69 @@ endfunction
 % then switch to a more robust tracking algorithm.  If we lose sync we switch
 % back to acquire mode for fast-requisition.
 
-function [entered_track track state bad_sync] = freq_state(sync_bit, state, bad_sync)
+function [sync reliable_sync_bit state timer sync_mem] = freq_state(sync_bit, state, timer, sync_mem)
+  global Nsync_mem;
+  global sync_uw;
 
-  entered_track = 0;
+  % look for 6 symbol (120ms) 010101 of sync sequence
 
-  % acquire state, look for 6 symbol 010101 sequence from sync bit
+  unique_word = 0;
+  for i=1:Nsync_mem-1
+    sync_mem(i) = sync_mem(i+1);
+  end
+  sync_mem(Nsync_mem) = 1 - 2*sync_bit;
+  corr = 0;
+  for i=1:Nsync_mem
+    corr += sync_mem(i)*sync_uw(i);
+  end
+  if abs(corr) == Nsync_mem
+    unique_word = 1;
+  end
+  reliable_sync_bit = (abs(corr) == Nsync_mem);
+  
+  % iterate state machine
 
   next_state = state;
   if state == 0
-    if sync_bit == 0
+    if unique_word
       next_state = 1;
+      timer = 0;
     end        
   end
   if state == 1
-    if sync_bit == 1
+    if unique_word
+      timer++;
+      if timer == 25       % sync has been good for 500ms
+        next_state = 2;
+      end
+    else 
+      next_state = 0;
+    end        
+  end
+  if state == 2            % good sync state
+    if unique_word == 0
+      timer = 0;
+      next_state = 3;
+    end
+  end
+  if state == 3            % tenative bad  state, but could be a fade
+    if unique_word
       next_state = 2;
     else 
-      next_state = 0;
-    end        
-  end
-  if state == 2
-    if sync_bit == 0
-      next_state = 3;
-    else 
-      next_state = 0;
-    end        
-  end
-  if state == 3
-    if sync_bit == 1
-      next_state = 4;
-    else 
-      next_state = 0;
-    end        
-  end
-  if state == 4
-    if sync_bit == 0
-      next_state = 5;
-    else 
-      next_state = 0;
-    end        
-  end
-  if state == 5
-    if sync_bit == 1
-      entered_track = 1;
-      next_state = 6;
-      bad_sync = 0;
-    else 
-      next_state = 0;
-    end        
-  end
-
-  % states 6 and above are track mode, make sure we keep getting 0101 sync bit sequence
-
-  if state == 6
-    next_state = 7;
-    if sync_bit == 0
-      bad_sync = 0;
-    else
-      bad_sync++;
-      if bad_sync > 2
+      timer++;
+      if timer == 50       % wait for 1000ms in case sync comes back  
         next_state = 0;
       end
     end        
   end
 
-  if state == 7
-    next_state = 6;
-    if sync_bit == 1
-      bad_sync = 0;
-    else
-      bad_sync++;
-      if bad_sync > 2
-        next_state = 0;
-      end
-    end        
-  end
-
-  %printf("state: %d  next_state: %d  sync_bit: %d bad_sync: %d\n", state, next_state, sync_bit, bad_sync);
-
+  %printf("corr: % -d state: %d next_state: %d uw: %d timer: %d\n", corr, state, next_state, unique_word, timer);
   state = next_state;
-  if state >= 6
-    track = 1;
+
+  if state
+    sync = 1;
   else
-    track = 0;
+    sync = 0;
   end
 endfunction
 
@@ -1077,10 +1081,10 @@ global Mpilotfft      = 256;
 global Npilotcoeff;                                      % number of pilot LPF coeffs
        Npilotcoeff    = 30;                              
 global pilot_coeff;
-       pilot_coeff    = fir1(Npilotcoeff-1, 100/(Fs/2))';% 200Hz LPF
+       pilot_coeff    = fir1(Npilotcoeff-1, 200/(Fs/2))';% 200Hz LPF
 global Npilotbaseband = Npilotcoeff + M + M/P;           % number of pilot baseband samples reqd for pilot LPF
 global Npilotlpf;                                        % number of symbols we DFT pilot over, pilot est window
-       Npilotlpf      = 8*M;
+       Npilotlpf      = 4*M;
 
 % pilot LUT, used for copy of pilot at rx
   
@@ -1093,8 +1097,10 @@ global prev_pilot_lut_index;
 
 % Freq offset estimator states 
 
+if 0
 global bpf;
        bpf = zeros(1, Nbpf);                            % BPF pilot input samples
+end
 global pilot_baseband1;
 global pilot_baseband2;
 pilot_baseband1 = zeros(1, Npilotbaseband);             % pilot baseband samples
