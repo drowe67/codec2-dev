@@ -9,6 +9,7 @@
 % Version 2
 %
 
+more off
 NumCarriers = 14;
 fdmdv; % load modem code
  
@@ -21,13 +22,16 @@ frames = 25;
 prev_tx_symbols = ones(Nc+1,1);
 prev_rx_symbols = ones(Nc+1,1);
 foff_phase_rect = 1;
-coarse_fine = 0;
-fest_state = 0;
 channel = [];
 channel_count = 0;
 next_nin = M;
 sig_est = zeros(Nc+1,1);
 noise_est = zeros(Nc+1,1);
+
+sync = 0;
+fest_state = 0;
+fest_timer = 0;
+sync_mem = zeros(1,Nsync_mem);
 
 % Octave outputs we want to collect for comparison to C version
 
@@ -52,7 +56,7 @@ phase_difference_log = [];
 rx_symbols_log = [];
 rx_bits_log = []; 
 sync_bit_log = [];  
-coarse_fine_log = [];
+sync_log = [];  
 nin_log = [];
 sig_est_log = [];
 noise_est_log = [];
@@ -60,7 +64,7 @@ noise_est_log = [];
 % adjust this if the screen is getting a bit cluttered
 
 global no_plot_list;
-no_plot_list = [1 2 3 4 5 6 7 8 12];
+no_plot_list = [1 2 3 4 5 6 7 8 11 12 16];
 
 for f=1:frames
 
@@ -78,16 +82,7 @@ for f=1:frames
 
   % channel
 
-  nin = next_nin;
-  %nin = 120;
-  %nin = M;
-  %if (f == 3)
-  %  nin = 120;
-  %elseif (f == 4)
-  %  nin = 200;
-  %else
-  %  nin = M;
-  %end
+  %nin = next_nin;
   nin = M;
   channel = [channel real(tx_fdm)];
   channel_count += M;
@@ -100,8 +95,6 @@ for f=1:frames
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
 
   [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
-  foff_coarse = 0;
-  sync = 0;
   if sync == 0
     foff = foff_coarse;
   end
@@ -158,8 +151,8 @@ for f=1:frames
 
   % freq est state machine
 
-  [sync fest_state] = freq_state(sync_bit, fest_state);
-  sync_log = [coarse_fine_log sync];
+  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+  sync_log = [sync_log sync];
 end
 
 % Compare to the output from the C version
@@ -176,9 +169,9 @@ function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
   end
   figure(plotnum)
   subplot(subplotnum)
-  stem(sig,'g;C version;');
+  stem(sig,'g;Octave version;');
   hold on;
-  stem(error,'r;Error between C and Octave;');
+  stem(error,'r;Octave - C version (hopefully 0);');
   hold off;
   if nargin == 6
     axis(axisvec);
@@ -195,9 +188,9 @@ function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
 
   figure(plotnum)
   subplot(subplotnum)
-  plot(sig,'g;C version;');
+  plot(sig,'g;Octave version;');
   hold on;
-  plot(error,'r;Error between C and Octave;');
+  plot(error,'r;Octave - C version (hopefully 0);');
   hold off;
   if nargin == 6
     axis(axisvec);
@@ -252,7 +245,7 @@ plot_sig_and_error(9, 211, foff_coarse_log, foff_coarse_log - foff_coarse_log_c,
 plot_sig_and_error(9, 212, foff_fine_log, foff_fine_log - foff_fine_log_c, 'Fine Freq Offset' )
 
 plot_sig_and_error(10, 211, foff_log, foff_log - foff_log_c, 'Freq Offset' )
-plot_sig_and_error(10, 212, sync_log, sync_log - sync_log_c, 'Freq Est Coarse(0) Fine(1)', [1 frames -0.5 1.5] )
+plot_sig_and_error(10, 212, sync_log, sync_log - sync_log_c, 'Sync & Freq Est Coarse(0) Fine(1)', [1 frames -1.5 1.5] )
 
 c=15;
 plot_sig_and_error(11, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
@@ -273,7 +266,7 @@ c = 12;
 plot_sig_and_error(16, 211, sig_est_log(c,:), sig_est_log(c,:) - sig_est_log_c(c,:), 'sig est for SNR' )
 plot_sig_and_error(16, 212, noise_est_log(c,:), noise_est_log(c,:) - noise_est_log_c(c,:), 'noise est for SNR' )
 
-f=2;
+f=12;
 
 stem_sig_and_error(13, 211, real(rx_symbols_log(:,f)), real(rx_symbols_log(:,f) - rx_symbols_log_c(:,f)), 'rx symbols real' )
 stem_sig_and_error(13, 212, imag(rx_symbols_log(:,f)), imag(rx_symbols_log(:,f) - rx_symbols_log_c(:,f)), 'rx symbols imag' )

@@ -1215,7 +1215,7 @@ int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int
         corr += sync_mem[i]*sync_uw[i];
     if (abs(corr) == NSYNC_MEM)
         unique_word = 1;
-    *reliable_sync_bit = (corr == NSYNC_MEM);
+    *reliable_sync_bit = (abs(corr) == NSYNC_MEM);
 
     /* iterate state machine */
 
@@ -1227,7 +1227,7 @@ int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int
             *timer = 0;
         }
 	break;
-    case 1:                  /* tentative sync state         */
+    case 1:                   /* tentative sync state         */
 	if (unique_word) {
             (*timer)++;
             if (*timer == 25) /* sync has been good for 500ms */
