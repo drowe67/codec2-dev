@@ -124,9 +124,9 @@ function sim_out = freq_off_est_test(sim_in)
 
   % spectrogram states
 
-  spec_states.m             = 16*M;
+  spec_states.m             = 8*M;
   spec_states.nfft2         = 2 ^ ceil(log2(spec_states.m/2));
-  spec_states.dec           = 2;
+  spec_states.dec           = 4;
   spec_states.sample_memory = zeros(1, spec_states.m);
   spec_states.lower_clip_dB = -30;
 
@@ -356,7 +356,7 @@ function sim_out = freq_off_est_test(sim_in)
         mesh(-200+400*(0:m-1)/256,1:n,abs(S1_log(:,:)));
         xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel("max(abs(S1))")
       else
-        imagesc(1:n,-200+400*(1:(m-1))/m,abs(S1_log(:,:))');
+        imagesc(1:n,-200+400*(0:(m-1))/m,abs(S1_log(:,:))');
         set(gca,'YDir','normal')
         ylabel('Freq (Hz)'); xlabel('Frame num');
         axis([1 n -200 200])
@@ -366,7 +366,7 @@ function sim_out = freq_off_est_test(sim_in)
       clf
       [n m] = size(spectrogram);
       if strcmp(plot_type,"mesh")
-        mesh(1:m,1:n,spectrogram);
+        mesh((4000/m)*(1:m),1:n,spectrogram);
         xlabel('Freq (Hz)'); ylabel('Frame num'); zlabel('Amplitude (dB)');
       else
         imagesc(1:n,(4000/m)*(1:m),spectrogram')
@@ -457,16 +457,32 @@ function test3
   global Rs;
 
   sim_in.test_name = "Test 3: 30 Seconds in HF multipath channel at 0dB-ish SNR";
-  sim_in.EbNovec = 3;
+  sim_in.EbNovec = 13;
   sim_in.hf_sim = 0;
   sim_in.hf_delay_ms = 2;
   sim_in.delay = M/2;
-  sim_in.frames = Rs*5;
+  sim_in.frames = Rs;
   sim_in.foff_hz(1:sim_in.frames) = -50;
   sim_in.startup_delay = Rs; % allow 1 second in heavily faded channels      
   sim_in.allowable_error = 5;
-  sim_in.plot_type = "waterfall";
+  sim_in.plot_type = "mesh";
   sim_out = freq_off_est_test(sim_in);
+endfunction
+
+function animated_gif
+  figure(4)
+  for i=5:5:360
+    view(i,45)
+    filename=sprintf('fdmdv_fig%05d.png',i);
+    print(filename);
+  end
+  if 0
+  for i=90:-5:-270
+    view(45,i)
+    filename=sprintf('fdmdv_fig%05d.png',i);
+    print(filename);
+  end
+  end
 endfunction
 
 test3;
