@@ -183,7 +183,7 @@ void make_analysis_window(kiss_fft_cfg fft_fwd_cfg, float w[], COMP W[])
 
 float hpf(float x, float states[])
 {
-    states[0] += -HPF_BETA*states[0] + x - states[1];
+    states[0] = -HPF_BETA*states[0] + x - states[1];
     states[1] = x;
 
     return states[0];
