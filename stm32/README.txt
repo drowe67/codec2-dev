@@ -30,12 +30,21 @@ Getting Started
 
    $ cd ~
    $ wget https://launchpad.net/gcc-arm-embedded/4.7/4.7-2013-q1-update/+download/gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2
-   $ tar xjf gcc-arm-none-eabi-4_7-2012q4-20121208-linux.tar.bz2
+   $ tar xjf gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2
 
 . Build codec2 unit test:
 
    $ cd codec2_dev/stm32
-   If necessary, edit the BINPATH variable in Makefile for your toolchain location
+   In Makefile: edit the BINPATH variable for your toolchain location
+                edit PERIPHLIBVER for the current version of the peripheral
+                 library, currently V1.3.0
+                delete power_ut.elf target from the all: target
+   $ make
+   after make downloads the peripheral library, you will get a compile error:
+   #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
+   edit STM32F4xx_DSP_StdPeriph_Lib_V1.3.0/Libraries/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h
+   and at the top of that file, uncomment the appropriate line for your target
+   processor.
    $ make
 
 . Build stlink:
