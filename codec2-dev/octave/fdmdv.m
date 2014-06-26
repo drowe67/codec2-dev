@@ -878,7 +878,7 @@ function [sync reliable_sync_bit state timer sync_mem] = freq_state(sync_bit, st
   if abs(corr) == Nsync_mem
     unique_word = 1;
   end
-  reliable_sync_bit = (abs(corr) == Nsync_mem);
+  reliable_sync_bit = (corr == Nsync_mem);
   
   % iterate state machine
 
