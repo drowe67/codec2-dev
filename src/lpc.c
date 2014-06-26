@@ -156,28 +156,26 @@ void levinson_durbin(
   int order		/* order of the LPC analysis */
 )
 {
-  float E[order+1];
-  float k[order+1];
   float a[order+1][order+1];
-  float sum;
+  float sum, e, k;
   int i,j;				/* loop variables */
 
-  E[0] = R[0];				/* Equation 38a, Makhoul */
+  e = R[0];				/* Equation 38a, Makhoul */
 
   for(i=1; i<=order; i++) {
     sum = 0.0;
     for(j=1; j<=i-1; j++)
       sum += a[i-1][j]*R[i-j];
-    k[i] = -1.0*(R[i] + sum)/E[i-1];	/* Equation 38b, Makhoul */
-    if (fabsf(k[i]) > 1.0)
-      k[i] = 0.0;
+    k = -1.0*(R[i] + sum)/e;		/* Equation 38b, Makhoul */
+    if (fabsf(k) > 1.0)
+      k = 0.0;
 
-    a[i][i] = k[i];
+    a[i][i] = k;
 
     for(j=1; j<=i-1; j++)
-      a[i][j] = a[i-1][j] + k[i]*a[i-1][i-j];	/* Equation 38c, Makhoul */
+      a[i][j] = a[i-1][j] + k*a[i-1][i-j];	/* Equation 38c, Makhoul */
 
-    E[i] = (1-k[i]*k[i])*E[i-1];		/* Equation 38d, Makhoul */
+    e *= (1-k*k);				/* Equation 38d, Makhoul */
   }
 
   for(i=1; i<=order; i++)
