@@ -13,13 +13,14 @@ fdmdv;               % load modem code
 % Simulation Parameters --------------------------------------
 
 frames = 100;
-EbNo_dB = 7.3;
+EbNo_dB = 51.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
 hpa_clip = 150;
 
 % ------------------------------------------------------------
 
+more off;
 tx_filt = zeros(Nc,M);
 rx_symbols_log = [];
 rx_phase_log = 0;

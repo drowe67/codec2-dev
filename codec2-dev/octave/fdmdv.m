@@ -433,6 +433,32 @@ function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
 
   x = env * exp(-j*2*pi*(0:m-1)/P)';
   
+linear_interp = 1;
+
+if linear_interp
+
+  rx_timing = angle(x)*P/(2*pi) + P/4;
+  if (rx_timing > P)
+     rx_timing -= P;
+  end
+  if (rx_timing < -P)
+     rx_timing += P;
+  end
+
+  % rx_filter_mem_timing contains Nt*P samples (Nt symbols at rate P),
+  % where Nt is odd.  Lets use linear interpolation to resample in the
+  % centre of the timing estimation window
+
+  rx_timing += floor(Nt/2)*P;
+  low_sample = floor(rx_timing);
+  fract = rx_timing - low_sample;
+  high_sample = ceil(rx_timing);
+  % printf("rx_timing: %f low_sample: %f high_sample: %f fract: %f\n", rx_timing, low_sample, high_sample, fract);
+
+  rx_symbols = rx_filter_mem_timing(:,low_sample)*(1-fract) + rx_filter_mem_timing(:,high_sample)*fract;
+
+else
+
   % map phase to estimated optimum timing instant at rate M
   % the M/4 part was adjusted by experiment, I know not why....
 
@@ -456,6 +482,7 @@ function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
 
   s = round(rx_timing) + M;
   rx_symbols = rx_baseband_mem_timing(:,s+1:s+Nfilter) * gt_alpha5_root';
+end
 
 endfunction
 
