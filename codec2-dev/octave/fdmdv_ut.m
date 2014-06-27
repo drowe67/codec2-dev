@@ -42,7 +42,7 @@ tx_fdm_log = [];
 total_bit_errors = 0;
 total_bits = 0;
 bit_errors_log = [];
-sync_log = [];
+sync_bit_log = [];
 test_frame_sync_log = [];
 test_frame_sync_state = 0;
 
@@ -93,9 +93,10 @@ foff_phase = 1;
 t = 0;
 foff = 0;
 fest_state = 0;
-bad_sync = 0;
-track = 0;
-track_log = [];
+fest_timer = 0;
+sync_mem = zeros(1,Nsync_mem);
+sync = 0;
+sync_log = [];
 
 snr_log = [];
 
@@ -172,12 +173,12 @@ for f=1:frames
   % Demodulator
   % -------------------
 
-  % frequency offset estimation and correction, need to call rx_est_freq_offset even in track
+  % frequency offset estimation and correction, need to call rx_est_freq_offset even in sync
   % mode to keep states updated
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
   [foff_course S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
-  if track == 0
+  if sync == 0
     foff = foff_course;
   end
   foff_log = [ foff_log foff ];
@@ -201,7 +202,7 @@ for f=1:frames
   %rx_phase_log = [rx_phase_log rx_phase];
   %rx_symbols = rx_symbols*exp(j*rx_phase);
 
-  [rx_bits sync foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
   if strcmp(modulation,'dqpsk')
     rx_symbols_log = [rx_symbols_log pd];
   else
@@ -209,12 +210,12 @@ for f=1:frames
   endif
   foff -= 0.5*ferr;
   prev_rx_symbols = rx_symbols;
-  sync_log = [sync_log sync];
+  sync_bit_log = [sync_bit_log sync_bit];
   
   % freq est state machine
 
-  [track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
-  track_log = [track_log track];
+  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+  sync_log = [sync_log sync];
 
   % Update SNR est
 
@@ -305,7 +306,7 @@ title('timing offset (samples)');
 subplot(212)
 plot(foff_log, '-;freq offset;')
 hold on;
-plot(track_log*75, 'r;course-fine;');
+plot(sync_log*75, 'r;Sync State & course(0) fine(1) freq tracking;');
 hold off;
 title('Freq offset (Hz)');
 
@@ -323,7 +324,7 @@ title('FDM Rx Spectrum');
 figure(4)
 clf;
 subplot(311)
-stem(sync_log)
+stem(sync_bit_log)
 axis([0 frames 0 1.5]);
 title('BPSK Sync')
 subplot(312)
