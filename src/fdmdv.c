@@ -179,10 +179,6 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 	    f->rx_filter_mem_timing[c][k].real = 0.0;
 	    f->rx_filter_mem_timing[c][k].imag = 0.0;
 	}
- 	for(k=0; k<NFILTERTIMING; k++) {
-	    f->rx_baseband_mem_timing[c][k].real = 0.0;
-	    f->rx_baseband_mem_timing[c][k].imag = 0.0;
-	}
     }
     
     fdmdv_set_fsep(f, FSEP);
@@ -897,16 +893,15 @@ void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], C
 float rx_est_timing(COMP rx_symbols[], 
                     int  Nc,
 		    COMP rx_filt[NC+1][P+1], 
-		    COMP rx_baseband[NC+1][M+M/P], 
 		    COMP rx_filter_mem_timing[NC+1][NT*P], 
 		    float env[],
-		    COMP rx_baseband_mem_timing[NC+1][NFILTERTIMING], 
 		    int nin)	 
 {
-    int   c,i,j,k;
-    int   adjust, s;
+    int   c,i,j;
+    int   adjust;
     COMP  x, phase, freq;
-    float rx_timing;
+    float rx_timing, fract, norm_rx_timing;
+    int   low_sample, high_sample;
 
     /*
       nin  adjust 
@@ -950,41 +945,34 @@ float rx_est_timing(COMP rx_symbols[],
 	phase = cmult(phase, freq);
     }
 
-    /* Map phase to estimated optimum timing instant at rate M.  The
-       M/4 part was adjusted by experiment, I know not why.... */
+    /* Map phase to estimated optimum timing instant at rate P.  The
+       P/4 part was adjusted by experiment, I know not why.... */
     
-    rx_timing = atan2(x.imag, x.real)*M/(2*PI) + M/4;
+    norm_rx_timing = atan2(x.imag, x.real)/(2*PI);
+    rx_timing      = norm_rx_timing*P + P/4;
     
-    if (rx_timing > M)
-	rx_timing -= M;
-    if (rx_timing < -M)
-	rx_timing += M;
-   
-    /* rx_filt_mem_timing contains M + Nfilter + M samples of the
-       baseband signal at rate M this enables us to resample the
-       filtered rx symbol with M sample precision once we have
-       rx_timing */
+    if (rx_timing > P)
+	rx_timing -= P;
+    if (rx_timing < -P)
+	rx_timing += P;
 
-    for(c=0; c<Nc+1; c++) 
-	for(i=0,j=nin; i<NFILTERTIMING-nin; i++,j++)
-	    rx_baseband_mem_timing[c][i] = rx_baseband_mem_timing[c][j];
-    for(c=0; c<Nc+1; c++) 
-	for(i=NFILTERTIMING-nin,j=0; i<NFILTERTIMING; i++,j++)
-	    rx_baseband_mem_timing[c][i] = rx_baseband[c][j];
-    
-    /* rx filter to get symbol for each carrier at estimated optimum
-       timing instant.  We use rate M filter memory to get fine timing
-       resolution. */
+    /* rx_filter_mem_timing contains Nt*P samples (Nt symbols at rate
+       P), where Nt is odd.  Lets use linear interpolation to resample
+       in the centre of the timing estimation window .*/
 
-    s = round(rx_timing) + M;
+    rx_timing  += floorf(NT/2.0)*P;
+    low_sample = floorf(rx_timing);
+    fract = rx_timing - low_sample;
+    high_sample = ceilf(rx_timing);
+
+    //printf("rx_timing: %f low_sample: %d high_sample: %d fract: %f\n", rx_timing, low_sample, high_sample, fract);
+    
     for(c=0; c<Nc+1; c++) {
-	rx_symbols[c].real = 0.0;
-	rx_symbols[c].imag = 0.0;
-	for(k=s,j=0; k<s+NFILTER; k++,j++)
-	    rx_symbols[c] = cadd(rx_symbols[c], fcmult(gt_alpha5_root[j], rx_baseband_mem_timing[c][k]));
+        rx_symbols[c] = cadd(fcmult(1.0-fract, rx_filter_mem_timing[c][low_sample-1]), fcmult(fract, rx_filter_mem_timing[c][high_sample-1]));
+        //rx_symbols[c] = rx_filter_mem_timing[c][high_sample];
     }
-	
-    return rx_timing;
+  	
+    return norm_rx_timing*M;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1306,7 +1294,7 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
     fdm_downconvert(rx_baseband, fdmdv->Nc, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
     rx_filter(rx_filt, fdmdv->Nc, rx_baseband, fdmdv->rx_filter_memory, *nin);
-    fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, *nin);	 
+    fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
     
     /* Adjust number of input samples to keep timing within bounds */
 

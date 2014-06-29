@@ -64,7 +64,7 @@ noise_est_log = [];
 % adjust this if the screen is getting a bit cluttered
 
 global no_plot_list;
-no_plot_list = [1 2 3 4 5 6 7 8 11 12 16];
+no_plot_list = [1 2 3 4 5 6 7 8 16];
 
 for f=1:frames
 
@@ -82,8 +82,10 @@ for f=1:frames
 
   % channel
 
-  %nin = next_nin;
-  nin = M;
+  nin = next_nin;
+
+  % nin = M;  % when debugging good idea to uncomment this to "open loop"
+
   channel = [channel real(tx_fdm)];
   channel_count += M;
   rx_fdm = channel(1:nin);
@@ -95,6 +97,9 @@ for f=1:frames
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
 
   [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
+
+  %sync = 0; % when debugging good idea to uncomment this to "open loop"
+
   if sync == 0
     foff = foff_coarse;
   end
@@ -120,9 +125,8 @@ for f=1:frames
   rx_filt = rx_filter(rx_baseband, nin);
   rx_filt_log = [rx_filt_log rx_filt];
 
-  [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin);
+  [rx_symbols rx_timing env] = rx_est_timing(rx_filt, nin);
   env_log = [env_log env];
-
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
 
@@ -247,7 +251,7 @@ plot_sig_and_error(9, 212, foff_fine_log, foff_fine_log - foff_fine_log_c, 'Fine
 plot_sig_and_error(10, 211, foff_log, foff_log - foff_log_c, 'Freq Offset' )
 plot_sig_and_error(10, 212, sync_log, sync_log - sync_log_c, 'Sync & Freq Est Coarse(0) Fine(1)', [1 frames -1.5 1.5] )
 
-c=15;
+c=1;
 plot_sig_and_error(11, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
 plot_sig_and_error(11, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
 
