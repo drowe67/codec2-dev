@@ -354,22 +354,6 @@ function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
   global pilot_baseband2;
   global pilot_lpf1;
   global pilot_lpf2;
-  global Nbpf;
-  global Nbpfcoeff;
-  global bpf_coeff;
-  global bpf;
-
-if 0
-  % Band Pass filter input so we have (mainly) just the pilots
-  
-  bpf(1:Nbpf-nin) = bpf(nin+1:Nbpf);
-  bpf(Nbpf-nin+1:Nbpf) = rx_fdm(1:nin);
-  k = 1;
-  for i = Nbpf-nin+1:Nbpf
-    rx_fdm_bpf(k) = bpf(i-(Nbpfcoeff-1):i) *  bpf_coeff';
-    k++;
-  end
-end
 
   % down convert latest nin samples of pilot by multiplying by ideal
   % BPSK pilot signal we have generated locally.  The peak of the DFT
@@ -397,12 +381,11 @@ endfunction
 
 % Estimate optimum timing offset, re-filter receive symbols
 
-function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
+function [rx_symbols rx_timing_M env] = rx_est_timing(rx_filt, nin)
   global M;
   global Nt;
   global Nc;
   global rx_filter_mem_timing;
-  global rx_baseband_mem_timing;
   global P;
   global Nfilter;
   global Nfiltertiming;
@@ -433,11 +416,8 @@ function [rx_symbols rx_timing env] = rx_est_timing(rx_filt, rx_baseband, nin)
 
   x = env * exp(-j*2*pi*(0:m-1)/P)';
   
-linear_interp = 1;
-
-if linear_interp
-
-  rx_timing = angle(x)*P/(2*pi) + P/4;
+  norm_rx_timing = angle(x)/(2*pi);
+  rx_timing = norm_rx_timing*P + P/4;
   if (rx_timing > P)
      rx_timing -= P;
   end
@@ -453,37 +433,12 @@ if linear_interp
   low_sample = floor(rx_timing);
   fract = rx_timing - low_sample;
   high_sample = ceil(rx_timing);
-  % printf("rx_timing: %f low_sample: %f high_sample: %f fract: %f\n", rx_timing, low_sample, high_sample, fract);
-
+  %printf("rx_timing: %f low_sample: %f high_sample: %f fract: %f\n", rx_timing, low_sample, high_sample, fract);
+  
   rx_symbols = rx_filter_mem_timing(:,low_sample)*(1-fract) + rx_filter_mem_timing(:,high_sample)*fract;
+  % rx_symbols = rx_filter_mem_timing(:,high_sample+1);
 
-else
-
-  % map phase to estimated optimum timing instant at rate M
-  % the M/4 part was adjusted by experiment, I know not why....
-
-  rx_timing = angle(x)*M/(2*pi) + M/4;
-  if (rx_timing > M)
-     rx_timing -= M;
-  end
-  if (rx_timing < -M)
-     rx_timing += M;
-  end
-
-  % rx_baseband_mem_timing contains M + Nfilter + M samples of the
-  % baseband signal at rate M this enables us to resample the filtered
-  % rx symbol with M sample precision once we have rx_timing
-
-  rx_baseband_mem_timing(:,1:Nfiltertiming-nin) = rx_baseband_mem_timing(:,nin+1:Nfiltertiming);
-  rx_baseband_mem_timing(:,Nfiltertiming-nin+1:Nfiltertiming) = rx_baseband;
-
-  % sample right in the middle of the timing estimator window, by filtering
-  % at rate M
-
-  s = round(rx_timing) + M;
-  rx_symbols = rx_baseband_mem_timing(:,s+1:s+Nfilter) * gt_alpha5_root';
-end
-
+  rx_timing_M = norm_rx_timing*M;
 endfunction
 
 
@@ -1094,15 +1049,6 @@ phase_rx = ones(Nc+1,1);
 
 % Freq offset estimator constants
 
-if 0
-global Nbpfcoeff;                                        % number of input BPF coeffs
-       Nbpfcoeff      = 100;                              
-global bpf_coeff;
-       bpf_coeff      = fir1(Nbpfcoeff-1, [Fcentre-100 Fcentre+100]/(Fs/2),'pass')';
-global Nbpf;
-       Nbpf           = Nbpfcoeff + M + M/P;             % number of pilot baseband samples reqd for pilot LPF
-end
-
 global Mpilotfft      = 256;
 
 global Npilotcoeff;                                      % number of pilot LPF coeffs
@@ -1124,10 +1070,6 @@ global prev_pilot_lut_index;
 
 % Freq offset estimator states 
 
-if 0
-global bpf;
-       bpf = zeros(1, Nbpf);                            % BPF pilot input samples
-end
 global pilot_baseband1;
 global pilot_baseband2;
 pilot_baseband1 = zeros(1, Npilotbaseband);             % pilot baseband samples

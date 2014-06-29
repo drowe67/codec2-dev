@@ -122,15 +122,9 @@ int main(int argc, char *argv[])
 	\*---------------------------------------------------------*/
 
 	nin = next_nin;
-	/*
-	if (f == 2)
-	    nin = 120;
-	if (f == 3)
-	    nin = 200;
-	if ((f !=2) && (f != 3))
-            nin = M;
-	*/
-        nin = M;
+
+        //nin = M;  // when debugging good idea to uncomment this to "open loop"
+
 	/* add M tx samples to end of buffer */
 
 	assert((channel_count + M) < CHANNEL_BUF_SIZE);
@@ -158,6 +152,9 @@ int main(int argc, char *argv[])
 	/* freq offset estimation and correction */
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
+
+        //fdmdv->sync = 0; // when debugging good idea to uncomment this to "open loop"
+
 	if (fdmdv->sync == 0)
 	    fdmdv->foff = foff_coarse;
 	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, nin);
@@ -166,7 +163,7 @@ int main(int argc, char *argv[])
 
 	fdm_downconvert(rx_baseband, FDMDV_NC, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
 	rx_filter(rx_filt, FDMDV_NC, rx_baseband, fdmdv->rx_filter_memory, nin);
-	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, rx_baseband, fdmdv->rx_filter_mem_timing, env, fdmdv->rx_baseband_mem_timing, nin);	 
+	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
         //for(i=0; i<FDMDV_NC;i++)
         //    printf("rx_symbols: %f %f prev_rx_symbols: %f %f phase_difference: %f %f\n", rx_symbols[i].real, rx_symbols[i].imag,
