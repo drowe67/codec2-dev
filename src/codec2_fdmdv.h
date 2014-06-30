@@ -90,31 +90,31 @@ struct FDMDV_STATS {
     float  clock_offset;               /* Estimated tx/rx sample clock offset in ppm         */
 };
 
-struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc);
-void           CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv_state);
-void           CODEC2_WIN32SUPPORT fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv_state);
-int            CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv_state);
-float          CODEC2_WIN32SUPPORT fdmdv_get_fsep(struct FDMDV *fdmdv_state);
-void           CODEC2_WIN32SUPPORT fdmdv_set_fsep(struct FDMDV *fdmdv_state, float fsep);
+struct FDMDV * fdmdv_create(int Nc);
+void           fdmdv_destroy(struct FDMDV *fdmdv_state);
+void           fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv_state);
+int            fdmdv_bits_per_frame(struct FDMDV *fdmdv_state);
+float          fdmdv_get_fsep(struct FDMDV *fdmdv_state);
+void           fdmdv_set_fsep(struct FDMDV *fdmdv_state, float fsep);
 
-void           CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
-void           CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin);
+void           fdmdv_mod(struct FDMDV *fdmdv_state, COMP tx_fdm[], int tx_bits[], int *sync_bit);
+void           fdmdv_demod(struct FDMDV *fdmdv_state, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin);
     
-void           CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
-int            CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *fdmdv_state);
-void           CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[], int *bit_errors, int *ntest_bits, int rx_bits[]);
+void           fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
+int            fdmdv_error_pattern_size(struct FDMDV *fdmdv_state);
+void           fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[], int *bit_errors, int *ntest_bits, int rx_bits[]);
     
-void           CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
-void           CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
+void           fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
+void           fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
 
-void           CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n);
-void           CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n);
+void           fdmdv_8_to_48(float out48k[], float in8k[], int n);
+void           fdmdv_48_to_8(float out8k[], float in48k[], int n);
 
-void           CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
+void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
 
 /* debug/development function(s) */
 
-void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f);
+void fdmdv_dump_osc_mags(struct FDMDV *f);
  
 #ifdef __cplusplus
 }

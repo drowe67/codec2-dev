@@ -84,7 +84,7 @@ for f=1:frames
 
   nin = next_nin;
 
-  % nin = M;  % when debugging good idea to uncomment this to "open loop"
+  %nin = M;  % when debugging good idea to uncomment this to "open loop"
 
   channel = [channel real(tx_fdm)];
   channel_count += M;
@@ -119,10 +119,15 @@ for f=1:frames
     rx_fdm_fcorr(i) = rx_fdm(i)*foff_phase_rect;
   end
 
-  rx_baseband = fdm_downconvert(rx_fdm_fcorr, nin);
+if 1
+  % more memory efficient but more complex
+  rx_filt = down_convert_and_rx_filter(rx_fdm_fcorr, nin);
+else
+  rx_baseband = fdm_downconvert(rx_fdm_corr,nin);
   rx_baseband_log = [rx_baseband_log rx_baseband];
-
   rx_filt = rx_filter(rx_baseband, nin);
+end
+
   rx_filt_log = [rx_filt_log rx_filt];
 
   [rx_symbols rx_timing env] = rx_est_timing(rx_filt, nin);
@@ -252,8 +257,10 @@ plot_sig_and_error(10, 211, foff_log, foff_log - foff_log_c, 'Freq Offset' )
 plot_sig_and_error(10, 212, sync_log, sync_log - sync_log_c, 'Sync & Freq Est Coarse(0) Fine(1)', [1 frames -1.5 1.5] )
 
 c=1;
+if 0
 plot_sig_and_error(11, 211, real(rx_baseband_log(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband real' )
 plot_sig_and_error(11, 212, imag(rx_baseband_log(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'Rx baseband imag' )
+end
 
 plot_sig_and_error(12, 211, real(rx_filt_log(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt real' )
 plot_sig_and_error(12, 212, imag(rx_filt_log(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'Rx filt imag' )
@@ -316,7 +323,7 @@ check(S2_log, S2_log_c, 'S2');
 check(foff_coarse_log, foff_coarse_log_c, 'foff_coarse');
 check(foff_fine_log, foff_fine_log_c, 'foff_fine');
 check(foff_log, foff_log_c, 'foff');
-check(rx_baseband_log, rx_baseband_log_c, 'rx baseband');
+%check(rx_baseband_log, rx_baseband_log_c, 'rx baseband');
 check(rx_filt_log, rx_filt_log_c, 'rx filt');
 check(env_log, env_log_c, 'env');
 check(rx_timing_log, rx_timing_log_c, 'rx_timing');
