@@ -299,7 +299,7 @@ function rx_filt = rx_filter(rx_baseband, nin)
 endfunction
 
 
-% Combined down convert and rx filter, more memort efficentut less intuitive design
+% Combined down convert and rx filter, more memory efficient but less intuitive design
 
 function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
   global Nc;
@@ -330,7 +330,7 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
      % This means winding phase(c) back from this point
      % to ensure phase continuity
 
-      wind_back_phase = -freq_pol(c)*Nfilter;
+     wind_back_phase = -freq_pol(c)*Nfilter;
      phase_rx(c)     =  phase_rx(c)*exp(j*wind_back_phase);
     
      % down convert all samples in buffer
@@ -339,7 +339,7 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
      st  = Nfilter+M;      % end of buffer
      st -= nin-1;          % first new sample
      st -= Nfilter;        % first sample used in filtering
- 
+     
      for i=st:Nfilter+M
         phase_rx(c) = phase_rx(c) * freq(c);
 	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
@@ -347,8 +347,7 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
  
      % now we can filter this carrier's P symbols
 
-     N=M/P;
-     k=1;
+     N=M/P; k = 1;
      for i=1:N:nin
        rx_filt(c,k) = rx_baseband(st+i-1:st+i-1+Nfilter-1) * gt_alpha5_root';
        k+=1;

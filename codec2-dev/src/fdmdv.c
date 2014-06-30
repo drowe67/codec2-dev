@@ -121,7 +121,7 @@ static float cabsolute(COMP a)
 
 \*---------------------------------------------------------------------------*/
 
-struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
+struct FDMDV * fdmdv_create(int Nc)
 {
     struct FDMDV *f;
     int           c, i, k;
@@ -160,11 +160,6 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 	    f->tx_filter_memory[c][k].imag = 0.0;
 	}
 
-	for(k=0; k<NFILTER; k++) {
-	    f->rx_filter_memory[c][k].real = 0.0;
-	    f->rx_filter_memory[c][k].imag = 0.0;
-	}
-
 	/* Spread initial FDM carrier phase out as far as possible.
            This helped PAPR for a few dB.  We don't need to adjust rx
            phase as DQPSK takes care of that. */
@@ -184,6 +179,7 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     fdmdv_set_fsep(f, FSEP);
     f->freq[Nc].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
     f->freq[Nc].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq_pol[Nc]  = 2.0*PI*FDMDV_FCENTRE/FS;
 
     /* Generate DBPSK pilot Look Up Table (LUT) */
 
@@ -209,6 +205,11 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
     f->foff = 0.0;
     f->foff_phase_rect.real = 1.0;
     f->foff_phase_rect.imag = 0.0;
+
+    for(i=0; i<NFILTER+M; i++) {
+        f->rx_fdm_mem[i].real = 0.0; 
+        f->rx_fdm_mem[i].imag = 0.0; 
+    }
 
     f->fest_state = 0;
     f->sync = 0;
@@ -240,7 +241,7 @@ struct FDMDV * CODEC2_WIN32SUPPORT fdmdv_create(int Nc)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
+void fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
     KISS_FFT_FREE(fdmdv->fft_pilot_cfg);
@@ -250,12 +251,12 @@ void CODEC2_WIN32SUPPORT fdmdv_destroy(struct FDMDV *fdmdv)
 }
 
 
-void CODEC2_WIN32SUPPORT fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv) {
+void fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv) {
     fdmdv->old_qpsk_mapping = 1;  
 }
 
 
-int CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv)
+int fdmdv_bits_per_frame(struct FDMDV *fdmdv)
 {
     return (fdmdv->Nc * NB);
 }
@@ -272,7 +273,7 @@ int CODEC2_WIN32SUPPORT fdmdv_bits_per_frame(struct FDMDV *fdmdv)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
+void fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 {
     int i;
     int bits_per_frame = fdmdv_bits_per_frame(f);
@@ -285,12 +286,12 @@ void CODEC2_WIN32SUPPORT fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
     }
  }
 
-float CODEC2_WIN32SUPPORT fdmdv_get_fsep(struct FDMDV *f)
+float fdmdv_get_fsep(struct FDMDV *f)
 {
     return f->fsep;
 }
 
-void CODEC2_WIN32SUPPORT fdmdv_set_fsep(struct FDMDV *f, float fsep) {
+void fdmdv_set_fsep(struct FDMDV *f, float fsep) {
     int   c;
     float carrier_freq;
 
@@ -301,12 +302,14 @@ void CODEC2_WIN32SUPPORT fdmdv_set_fsep(struct FDMDV *f, float fsep) {
 	carrier_freq = (-f->Nc/2 + c)*f->fsep + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+ 	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 
     for(c=f->Nc/2; c<f->Nc; c++) {
 	carrier_freq = (-f->Nc/2 + c + 1)*f->fsep + FDMDV_FCENTRE;
 	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
  	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+ 	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 }
 
@@ -513,8 +516,7 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], 
-				   int tx_bits[], int *sync_bit)
+void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
@@ -755,8 +757,8 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
-                                          COMP *foff_phase_rect, int nin)
+void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
+                      COMP *foff_phase_rect, int nin)
 {
     COMP  foff_rect;
     float mag;
@@ -877,6 +879,95 @@ void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], C
     }
 
     assert(j <= (P+1)); /* check for any over runs */
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: down_convert_and_rx_filter()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 30/6/2014
+
+  Combined down convert and rx filter, more memory efficient but less
+  intuitive design.  
+
+  Depending on the number of input samples to the demod nin, we
+  produce P-1, P (usually), or P+1 filtered samples at rate P.  nin is
+  occasionally adjusted to compensate for timing slips due to
+  different tx and rx sample clocks.
+
+\*---------------------------------------------------------------------------*/
+
+/*
+TODO:
+  [ ] windback phase at init time, incl cconj
+*/
+
+void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[], 
+                                COMP rx_fdm_mem[], COMP phase_rx[], COMP freq[], 
+                                float freq_pol[], int nin)
+{
+    int i,k,m,c,st,N;
+    float windback_phase, mag;
+    COMP  windback_phase_rect;
+    COMP  rx_baseband[NFILTER+M];
+
+    /* update memory of rx_fdm */
+
+    for(i=0; i<NFILTER+M-nin; i++)
+        rx_fdm_mem[i] = rx_fdm_mem[i+nin];
+    for(i=NFILTER+M-nin, k=0; i<NFILTER+M; i++, k++)
+        rx_fdm_mem[i] = rx_fdm[k];
+
+    for(c=0; c<Nc+1; c++) {
+
+        /*
+          now downconvert using current freq offset to get Nfilter+nin
+          baseband samples.
+     
+                     Nfilter             nin
+          |--------------------------|---------|
+                                      | 
+                                  phase_rx(c)
+     
+          This means winding phase(c) back from this point to ensure
+          phase continuity.
+        */
+
+        windback_phase           = -freq_pol[c]*NFILTER;
+        windback_phase_rect.real = cos(windback_phase);
+        windback_phase_rect.imag = sin(windback_phase);
+        phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
+    
+        /* down convert all samples in buffer */
+
+        st  = NFILTER+M-1;    /* end of buffer                  */
+        st -= nin-1;          /* first new sample               */
+        st -= NFILTER;        /* first sample used in filtering */
+        
+        for(i=st; i<NFILTER+M; i++) {
+            phase_rx[c]    = cmult(phase_rx[c], freq[c]);
+            rx_baseband[i] = cmult(rx_fdm_mem[i],cconj(phase_rx[c]));
+        }
+ 
+        /* now we can filter this carrier's P symbols */
+
+        N=M/P;
+        for(i=0, k=0; i<nin; i+=N, k++) {
+ 
+           rx_filt[c][k].real = 0.0; rx_filt[c][k].imag = 0.0;
+            
+            for(m=0; m<NFILTER; m++) 
+                rx_filt[c][k] = cadd(rx_filt[c][k], fcmult(gt_alpha5_root[m], rx_baseband[st+i+m]));
+        }
+
+        /* normalise digital oscilators as the magnitude can drift over time */
+
+        mag = cabsolute(phase_rx[c]);
+	phase_rx[c].real /= mag;	  
+	phase_rx[c].imag /= mag;
+	  
+       //printf("phase_rx[%d] = %f %f\n", c, phase_rx[c].real, phase_rx[c].imag);
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1113,7 +1204,7 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
 
 // returns number of shorts in error_pattern[], one short per error
 
-int CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *f) {
+int fdmdv_error_pattern_size(struct FDMDV *f) {
     return f->ntest_bits;
 }
 
@@ -1128,9 +1219,8 @@ int CODEC2_WIN32SUPPORT fdmdv_error_pattern_size(struct FDMDV *f) {
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[],
-					     int *bit_errors, int *ntest_bits, 
-					     int rx_bits[])
+void fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[],
+			 int *bit_errors, int *ntest_bits, int rx_bits[])
 {
     int   i,j;
     float ber;
@@ -1271,12 +1361,11 @@ int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], 
-				     int *reliable_sync_bit, COMP rx_fdm[], int *nin)
+void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[], 
+		 int *reliable_sync_bit, COMP rx_fdm[], int *nin)
 {
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
-    COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
     COMP          rx_symbols[NC+1];
     float         env[NT*P];
@@ -1292,8 +1381,8 @@ void CODEC2_WIN32SUPPORT fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 	
     /* baseband processing */
 
-    fdm_downconvert(rx_baseband, fdmdv->Nc, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, *nin);
-    rx_filter(rx_filt, fdmdv->Nc, rx_baseband, fdmdv->rx_filter_memory, *nin);
+    down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
+                               fdmdv->freq_pol, *nin);
     fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
     
     /* Adjust number of input samples to keep timing within bounds */
@@ -1371,8 +1460,7 @@ float calc_snr(int Nc, float sig_est[], float noise_est[])
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv, 
-					       struct FDMDV_STATS *fdmdv_stats)
+void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 {
     int   c;
 
@@ -1412,7 +1500,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_demod_stats(struct FDMDV *fdmdv,
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
+void fdmdv_8_to_48(float out48k[], float in8k[], int n)
 {
     int i,j,k,l;
 
@@ -1455,7 +1543,7 @@ void CODEC2_WIN32SUPPORT fdmdv_8_to_48(float out48k[], float in8k[], int n)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
+void fdmdv_48_to_8(float out8k[], float in48k[], int n)
 {
     int i,j;
 
@@ -1500,7 +1588,7 @@ void CODEC2_WIN32SUPPORT fdmdv_48_to_8(float out8k[], float in48k[], int n)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[], 
+void fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[], 
 					       COMP rx_fdm[], int nin) 
 {
     int   i,j;
@@ -1544,7 +1632,7 @@ void CODEC2_WIN32SUPPORT fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_d
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT fdmdv_dump_osc_mags(struct FDMDV *f) 
+void fdmdv_dump_osc_mags(struct FDMDV *f) 
 {
     int   i;
 
