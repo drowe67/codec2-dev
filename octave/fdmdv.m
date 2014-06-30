@@ -282,7 +282,6 @@ function rx_filt = rx_filter(rx_baseband, nin)
   global rx_filter_memory;
   global Nfilter;
   global gt_alpha5_root;
-  global Fsep;
 
   rx_filt = zeros(Nc+1,nin*P/M);
 
@@ -296,6 +295,64 @@ function rx_filt = rx_filter(rx_baseband, nin)
     rx_filt(:,j) = rx_filter_memory * gt_alpha5_root';
     rx_filter_memory(:,1:Nfilter-N) = rx_filter_memory(:,1+N:Nfilter);
     j+=1;
+  end
+endfunction
+
+
+% Combined down convert and rx filter, more memort efficentut less intuitive design
+
+function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
+  global Nc;
+  global M;
+  global P;
+  global rx_fdm_mem;
+  global phase_rx;
+  global freq;
+  global freq_pol;
+  global Nfilter;
+  global gt_alpha5_root;
+
+  % update memory of rx_fdm
+
+  rx_fdm_mem(1:Nfilter+M-nin) = rx_fdm_mem(nin+1:Nfilter+M);
+  rx_fdm_mem(Nfilter+M-nin+1:Nfilter+M) = rx_fdm(1:nin);
+
+  for c=1:Nc+1
+
+     % now downconvert using current freq offset to get Nfilter+nin
+     % baseband samples.
+     % 
+     %           Nfilter              nin
+     % |--------------------------|---------|
+     %                             |
+     %                         phase_rx(c)
+     %
+     % This means winding phase(c) back from this point
+     % to ensure phase continuity
+
+      wind_back_phase = -freq_pol(c)*Nfilter;
+     phase_rx(c)     =  phase_rx(c)*exp(j*wind_back_phase);
+    
+     % down convert all samples in buffer
+
+     rx_baseband = zeros(1,Nfilter+M);
+     st  = Nfilter+M;      % end of buffer
+     st -= nin-1;          % first new sample
+     st -= Nfilter;        % first sample used in filtering
+ 
+     for i=st:Nfilter+M
+        phase_rx(c) = phase_rx(c) * freq(c);
+	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
+     end
+ 
+     % now we can filter this carrier's P symbols
+
+     N=M/P;
+     k=1;
+     for i=1:N:nin
+       rx_filt(c,k) = rx_baseband(st+i-1:st+i-1+Nfilter-1) * gt_alpha5_root';
+       k+=1;
+     end
   end
 endfunction
 
@@ -1020,20 +1077,28 @@ tx_filter_memory = zeros(Nc+1, Nfilter);
 global rx_filter_memory;
 rx_filter_memory = zeros(Nc+1, Nfilter);
 
+global rx_fdm_mem;
+       rx_fdm_mem = zeros(1,Nfilter+M);
+
 % phasors used for up and down converters
 
 global freq;
-freq = zeros(Nc+1,1);
+       freq = zeros(Nc+1,1);
+global freq_pol;
+       freq_pol = zeros(Nc+1,1);
 for c=1:Nc/2
   carrier_freq = (-Nc/2 - 1 + c)*Fsep + Fcentre;
-  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+  freq_pol(c)  = 2*pi*carrier_freq/Fs;
+  freq(c)      = exp(j*freq_pol(c));
 end
 for c=Nc/2+1:Nc
   carrier_freq = (-Nc/2 + c)*Fsep + Fcentre;
-  freq(c) = exp(j*2*pi*carrier_freq/Fs);
+  freq_pol(c)  = 2*pi*carrier_freq/Fs;
+  freq(c)      = exp(j*freq_pol(c));
 end
 
-freq(Nc+1) = exp(j*2*pi*Fcentre/Fs);
+freq_pol(c)  = 2*pi*Fcentre/Fs;
+freq(Nc+1) = exp(j*freq_pol(c));
 
 % Spread initial FDM carrier phase out as far as possible.  This
 % helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
