@@ -13,7 +13,7 @@ fdmdv;               % load modem code
 % Simulation Parameters --------------------------------------
 
 frames = 100;
-EbNo_dB = 51.3;
+EbNo_dB = 7.3;
 Foff_hz = 0;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -27,6 +27,7 @@ rx_phase_log = 0;
 rx_timing_log = 0;
 tx_pwr = 0;
 noise_pwr = 0;
+rx_fdm_mem = zeros(1,Nfilter+M);
 rx_fdm_log = [];
 rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
@@ -166,9 +167,9 @@ for f=1:frames
 
   % Delay
 
-  rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
-  rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
-  %rx_fdm_delay = rx_fdm;
+  %rx_fdm_delay(1:Ndelay-M) = rx_fdm_delay(M+1:Ndelay);
+  %rx_fdm_delay(Ndelay-M+1:Ndelay) = rx_fdm;
+  rx_fdm_delay = rx_fdm;
 
   % -------------------
   % Demodulator
@@ -176,9 +177,7 @@ for f=1:frames
 
   % frequency offset estimation and correction, need to call rx_est_freq_offset even in sync
   % mode to keep states updated
-
-  [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
-  [foff_course S1 S2] = rx_est_freq_offset(rx_fdm_delay, pilot, prev_pilot, M);
+  
   if sync == 0
     foff = foff_course;
   end
@@ -190,13 +189,64 @@ for f=1:frames
     rx_fdm_delay(i) = rx_fdm_delay(i)*foff_phase;
   end
 
+if 1
+
+  nin = M;
+
+  % update memory of rx_fdm
+
+  rx_fdm_mem(1:Nfilter+M-nin) = rx_fdm_mem(nin+1:Nfilter+M);
+  rx_fdm_mem(Nfilter+M-nin+1:Nfilter+M) = rx_fdm_delay(1:nin);
+
+  for c=1:Nc+1
+
+     % now downconvert using current freq offset to get Nfilter+nin
+     % baseband samples.
+     % 
+     %           Nfilter              nin
+     % |--------------------------|---------|
+     %                             |
+     %                         phase_rx(c)
+     %
+     % This means winding phase(c) back and fwd from this point
+     % to ensure phase continuity
+
+     freq_pol        =  atan2(imag(freq(c)), real(freq(c)));
+     wind_back_phase = -freq_pol*Nfilter;
+     phase_rx(c)     =  phase_rx(c)*exp(j*wind_back_phase);
+    
+     % down convert all samples in buffer
+
+     rx_baseband = zeros(1,Nfilter+M);
+     st  = Nfilter+M;      % end of buffer
+     st -= nin-1;          % first new sample
+     st -= Nfilter;        % first sample involved in filtering
+ 
+     for i=st:Nfilter+M
+        phase_rx(c) = phase_rx(c) * freq(c);
+	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
+     end
+ 
+     % now we can filter this carrier's P symbols
+
+     N=M/P;
+     k=1;
+     for i=1:N:nin
+       rx_filt(c,k) = rx_baseband(st+i-1:st+i-1+Nfilter-1) * gt_alpha5_root';
+       k+=1;
+     end
+  end
+
+else
+
   % baseband processing
 
   rx_baseband = fdm_downconvert(rx_fdm_delay(1:M), M);
   rx_baseband_log = [rx_baseband_log rx_baseband];
   rx_filt = rx_filter(rx_baseband, M);
+end
 
-  [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, M);
+  [rx_symbols rx_timing] = rx_est_timing(rx_filt, M);
   rx_timing_log = [rx_timing_log rx_timing];
 
   %rx_phase = rx_est_phase(rx_symbols);
@@ -303,7 +353,7 @@ figure(2)
 clf;
 subplot(211)
 plot(rx_timing_log)
-title('timing offset (samples)');
+title('timing offset');
 subplot(212)
 plot(foff_log, '-;freq offset;')
 hold on;
