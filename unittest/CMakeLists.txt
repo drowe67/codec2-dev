@@ -78,6 +78,8 @@ target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})
 add_executable(speexnoisesup speexnoisesup.c)
 target_link_libraries(speexnoisesup speexdsp)
 
+add_executable(fdmdv_mem fdmdv_mem.c)
+
 add_definitions(-D__UNITTEST__)
 add_executable(c2validate c2validate.c)
 target_link_libraries(c2validate codec2)
