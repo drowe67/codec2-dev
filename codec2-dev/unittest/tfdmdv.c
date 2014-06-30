@@ -161,15 +161,17 @@ int main(int argc, char *argv[])
 	
 	/* baseband processing */
 
-	fdm_downconvert(rx_baseband, FDMDV_NC, rx_fdm_fcorr, fdmdv->phase_rx, fdmdv->freq, nin);
-	rx_filter(rx_filt, FDMDV_NC, rx_baseband, fdmdv->rx_filter_memory, nin);
+        down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_fcorr, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
+                                   fdmdv->freq_pol, nin);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
+
         //for(i=0; i<FDMDV_NC;i++)
         //    printf("rx_symbols: %f %f prev_rx_symbols: %f %f phase_difference: %f %f\n", rx_symbols[i].real, rx_symbols[i].imag,
         //          fdmdv->prev_rx_symbols[i].real, fdmdv->prev_rx_symbols[i].imag, fdmdv->phase_difference[i].real, fdmdv->phase_difference[i].imag);
         //if (f==1)
         //   exit(0);
+
 	snr_update(fdmdv->sig_est, fdmdv->noise_est, FDMDV_NC, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(FDMDV_NC+1));
 	
@@ -225,6 +227,7 @@ int main(int argc, char *argv[])
 	memcpy(&env_log[NT*P*f], env, sizeof(float)*NT*P);
 	rx_timing_log[f] = rx_timing;
 	nin_log[f] = nin;
+        
 	for(c=0; c<FDMDV_NC+1; c++) {
 	    rx_symbols_log[c][f] = rx_symbols[c];
 	    phase_difference_log[c][f] = fdmdv->phase_difference[c];
