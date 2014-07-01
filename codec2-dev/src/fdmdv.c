@@ -106,7 +106,7 @@ static COMP cadd(COMP a, COMP b)
 
 static float cabsolute(COMP a)
 {
-    return sqrt(pow(a.real, 2.0) + pow(a.imag, 2.0));
+    return sqrtf(pow(a.real, 2.0) + pow(a.imag, 2.0));
 }
 
 /*---------------------------------------------------------------------------*\
@@ -164,8 +164,8 @@ struct FDMDV * fdmdv_create(int Nc)
            This helped PAPR for a few dB.  We don't need to adjust rx
            phase as DQPSK takes care of that. */
 	
-	f->phase_tx[c].real = cos(2.0*PI*c/(Nc+1));
- 	f->phase_tx[c].imag = sin(2.0*PI*c/(Nc+1));
+	f->phase_tx[c].real = cosf(2.0*PI*c/(Nc+1));
+ 	f->phase_tx[c].imag = sinf(2.0*PI*c/(Nc+1));
 
 	f->phase_rx[c].real = 1.0;
  	f->phase_rx[c].imag = 0.0;
@@ -177,8 +177,8 @@ struct FDMDV * fdmdv_create(int Nc)
     }
     
     fdmdv_set_fsep(f, FSEP);
-    f->freq[Nc].real = cos(2.0*PI*FDMDV_FCENTRE/FS);
-    f->freq[Nc].imag = sin(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq[Nc].real = cosf(2.0*PI*FDMDV_FCENTRE/FS);
+    f->freq[Nc].imag = sinf(2.0*PI*FDMDV_FCENTRE/FS);
     f->freq_pol[Nc]  = 2.0*PI*FDMDV_FCENTRE/FS;
 
     /* Generate DBPSK pilot Look Up Table (LUT) */
@@ -300,15 +300,15 @@ void fdmdv_set_fsep(struct FDMDV *f, float fsep) {
 
     for(c=0; c<f->Nc/2; c++) {
 	carrier_freq = (-f->Nc/2 + c)*f->fsep + FDMDV_FCENTRE;
-	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 
     for(c=f->Nc/2; c<f->Nc; c++) {
 	carrier_freq = (-f->Nc/2 + c + 1)*f->fsep + FDMDV_FCENTRE;
-	f->freq[c].real = cos(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sin(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 }
@@ -387,7 +387,7 @@ void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_fil
     float   acc;
     COMP    gain;
 
-    gain.real = sqrt(2.0)/2.0;
+    gain.real = sqrtf(2.0)/2.0;
     gain.imag = 0.0;
     
     for(c=0; c<Nc+1; c++)
@@ -559,7 +559,7 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol,
 
     /* filter DPSK symbol to create M baseband samples */
 
-    filter_mem[NFILTER-1] = (sqrt(2)/2) * *symbol;
+    filter_mem[NFILTER-1] = (sqrtf(2)/2) * *symbol;
     for(i=0; i<M; i++) {
 	tx_baseband[i] = 0.0; 
 	for(j=M-1,k=M-i-1; j<NFILTER; j+=M,k+=M)
@@ -578,8 +578,8 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol,
 
     for(i=0; i<M; i++) {
 	*phase = cmult(*phase, *freq);
-	pilot_fdm[i].real = sqrt(2)*2*tx_baseband[i] * phase->real;
-	pilot_fdm[i].imag = sqrt(2)*2*tx_baseband[i] * phase->imag;
+	pilot_fdm[i].real = sqrtf(2)*2*tx_baseband[i] * phase->real;
+	pilot_fdm[i].imag = sqrtf(2)*2*tx_baseband[i] * phase->imag;
     }
 }
 
@@ -598,7 +598,7 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol,
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 {
     int   pilot_rx_bit = 0;
-    float pilot_symbol = sqrt(2.0);
+    float pilot_symbol = sqrtf(2.0);
     COMP  pilot_phase  = {1.0, 0.0};
     float pilot_filter_mem[NFILTER];
     COMP  pilot[M];
@@ -764,8 +764,8 @@ void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
     float mag;
     int   i;
 
-    foff_rect.real = cos(2.0*PI*foff/FS);
-    foff_rect.imag = sin(2.0*PI*foff/FS);
+    foff_rect.real = cosf(2.0*PI*foff/FS);
+    foff_rect.imag = sinf(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
@@ -933,8 +933,8 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
         */
 
         windback_phase           = -freq_pol[c]*NFILTER;
-        windback_phase_rect.real = cos(windback_phase);
-        windback_phase_rect.imag = sin(windback_phase);
+        windback_phase_rect.real = cosf(windback_phase);
+        windback_phase_rect.imag = sinf(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
     
         /* down convert all samples in buffer */
@@ -1025,8 +1025,8 @@ float rx_est_timing(COMP rx_symbols[],
        out single DFT at frequency 2*pi/P */
 
     x.real = 0.0; x.imag = 0.0;
-    freq.real = cos(2*PI/P);
-    freq.imag = sin(2*PI/P);
+    freq.real = cosf(2*PI/P);
+    freq.imag = sinf(2*PI/P);
     phase.real = 1.0;
     phase.imag = 0.0;
 
@@ -1038,7 +1038,7 @@ float rx_est_timing(COMP rx_symbols[],
     /* Map phase to estimated optimum timing instant at rate P.  The
        P/4 part was adjusted by experiment, I know not why.... */
     
-    norm_rx_timing = atan2(x.imag, x.real)/(2*PI);
+    norm_rx_timing = atan2f(x.imag, x.real)/(2*PI);
     rx_timing      = norm_rx_timing*P + P/4;
     
     if (rx_timing > P)
@@ -1086,8 +1086,8 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
     int   msb=0, lsb=0;
     float ferr, norm;
 
-    pi_on_4.real = cos(PI/4.0);
-    pi_on_4.imag = sin(PI/4.0);
+    pi_on_4.real = cosf(PI/4.0);
+    pi_on_4.imag = sinf(PI/4.0);
 
     /* Extra 45 degree clockwise lets us use real and imag axis as
        decision boundaries. "norm" makes sure the phase subtraction
@@ -1167,8 +1167,8 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
     COMP  pi_on_4;
     int   c;
 
-    pi_on_4.real = cos(PI/4.0);
-    pi_on_4.imag = sin(PI/4.0);
+    pi_on_4.real = cosf(PI/4.0);
+    pi_on_4.imag = sinf(PI/4.0);
 
     /* mag of each symbol is distance from origin, this gives us a
        vector of mags, one for each carrier. */
@@ -1188,8 +1188,8 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
        quadrant for convenience. */
     
     for(c=0; c<Nc+1; c++) {
-	refl_symbols[c].real = fabs(phase_difference[c].real);
-	refl_symbols[c].imag = fabs(phase_difference[c].imag);    
+	refl_symbols[c].real = fabsf(phase_difference[c].real);
+	refl_symbols[c].imag = fabsf(phase_difference[c].imag);    
 	n[c] = cabsolute(cadd(fcmult(sig_est[c], pi_on_4), cneg(refl_symbols[c])));
     }
      
@@ -1606,7 +1606,7 @@ void fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[],
     /* window and FFT */
 
     for(i=0; i<2*FDMDV_NSPEC; i++) {
-	fft_in[i].real = f->fft_buf[i] * (0.5 - 0.5*cos((float)i*2.0*PI/(2*FDMDV_NSPEC)));
+	fft_in[i].real = f->fft_buf[i] * (0.5 - 0.5*cosf((float)i*2.0*PI/(2*FDMDV_NSPEC)));
 	fft_in[i].imag = 0.0;
     }
 
