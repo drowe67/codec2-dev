@@ -84,7 +84,7 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
 #a
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
-option(UNITTEST "Build unittest binaries." OFF)
+option(UNITTEST "Build unittest binaries." ON)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script voicing wav
