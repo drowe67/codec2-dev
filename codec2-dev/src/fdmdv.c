@@ -898,8 +898,7 @@ void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], C
 \*---------------------------------------------------------------------------*/
 
 /*
-TODO:
-  [ ] windback phase at init time, incl cconj
+   TODO: [ ] windback phase calculated once at init time
 */
 
 void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[], 
@@ -1134,11 +1133,11 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
     phase_difference[Nc] = cmult(rx_symbols[Nc], fcmult(norm, cconj(prev_rx_symbols[Nc])));
     if (phase_difference[Nc].real < 0) {
       *sync_bit = 1;
-      ferr = phase_difference[Nc].imag;
+      ferr = phase_difference[Nc].imag*norm;    /* make f_err magnitude insensitive */
     }
     else {
       *sync_bit = 0;
-      ferr = -phase_difference[Nc].imag;
+      ferr = -phase_difference[Nc].imag*norm;
     }
     
     /* pilot carrier gets an extra pi/4 rotation to make it consistent
