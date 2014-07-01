@@ -33,7 +33,7 @@ $ cd src
  
 3. Send 14000 modulated bits (10 seconds) to the demod and count errors:
 
-    $  ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | ./fdmdv_demod - - demod_dump.txt | ./fdmdv_put_test_bits -
+    $  ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | ./fdmdv_demod - - 14 demod_dump.txt | ./fdmdv_put_test_bits -
 
     Use Octave to look at plots of 1 second (1400 bits) of modem operation:
 
