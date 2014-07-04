@@ -168,6 +168,7 @@ adc_rec.elf: $(ADC_REC_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 PWM_UT_SRCS=\
+gdb_stdio.c \
 src/stm32f4_pwm.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \

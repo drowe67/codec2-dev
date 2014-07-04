@@ -1,17 +1,15 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: stm32f4_pwm.c
+  FILE........: timer_ut.c
   AUTHOR......: David Rowe
-  DATE CREATED: 26 June 2013
+  DATE CREATED: 3 Jan 2014
 
-  PWM  driver module for STM32F4.
-
-  TODO:
+  Unit test STM32F4 timer hardware.
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2013 David Rowe
+  Copyright (C) 2014 David Rowe
 
   All rights reserved.
 
@@ -27,43 +25,29 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
-#include "gdb_stdio.h"
 
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
  
-#define TIM1_CCR3_ADDRESS    0x4001003C
-//#define TIM1_CCR3_ADDRESS    0x4001223C
-#define SINE_SAMPLES         32
+#include "gdb_stdio.h"
+
+#define TIM1_CCR3_ADDRESS    0x4001223C
 
 TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 TIM_OCInitTypeDef  TIM_OCInitStructure;
+TIM_BDTRInitTypeDef TIM_BDTRInitStructure;
 uint16_t uhTimerPeriod;
-uint16_t aSRC_Buffer[SINE_SAMPLES] = {0, 0, 0};
-
-/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Not sampels
-   are 16 bit 2's complement, the DAC driver convertsto 12 bit
-   unsigned. */
-
-short aSine[SINE_SAMPLES] = {
-    -16,    6384,   12528,  18192,   23200,   27232,   30256,   32128,   32752,   32128,
-    30256,   27232,   23152,   18192,   12528,    6384,     -16,   -6416,  -12560,  -18224,
-    -23184,  -27264,  -30288,  -32160,  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,
-    -12560,   -6416
-};
+uint16_t aSRC_Buffer[3] = {0, 0, 0};
 
 void Timer1Config();
-
-#define FS  16000
+#define FS  3500000
 
 int main(void){
     Timer1Config();
-    while(1);
-}
+ }
 
 /* DR: TIM_Config configures a couple of I/O pins for PWM output from
    Timer1 Channel 3.  Note I dont think any of this is needed, except
@@ -77,12 +61,12 @@ int main(void){
 static void TIM_Config(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
-  DMA_InitTypeDef DMA_InitStructure;
   
   /* GPIOA and GPIOB clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
 
   /* GPIOA Configuration: Channel 3 as alternate function push-pull */
+  /* Discovery board pin PA10 */
 
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 ;
   GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
@@ -93,36 +77,14 @@ static void TIM_Config(void)
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
 
   /* GPIOB Configuration: Channel 3N as alternate function push-pull */
+  /* Discovery board pin PB15 */
 
   GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
   GPIO_Init(GPIOB, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
-
-  /* DMA clock enable */
-  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 , ENABLE);
-
-  DMA_DeInit(DMA2_Stream6);
-  DMA_InitStructure.DMA_Channel = DMA_Channel_6;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(TIM1_CCR3_ADDRESS) ;
-  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)aSRC_Buffer;
-  DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
-  DMA_InitStructure.DMA_BufferSize = SINE_SAMPLES;
-  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
-  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
-  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_MemoryDataSize = DMA_PeripheralDataSize_HalfWord;
-  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
-  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_Full;
-  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
-  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-
-  DMA_Init(DMA2_Stream6, &DMA_InitStructure);
 }
 
 void Timer1Config() {
-    int i;
 
     /* TIM Configuration */
 
@@ -154,38 +116,17 @@ void Timer1Config() {
        based on this variable will be incorrect.  
        -----------------------------------------------------------------------------*/
   
-    /* Compute the value to be set in ARR regiter to generate signal frequency at FS */
-
-#ifdef TMP
+    /* Compute the value to be set in ARR regiter to generate signal frequency at FS Hz */
     uhTimerPeriod = (SystemCoreClock / FS ) - 1;
-    gdb_stdio_printf("uhTimerPeriod = %d\n", uhTimerPeriod);
-
-    /* Compute CCR1 values to generate a duty cycle at 50% */
-
-    for(i=0; i<SINE_SAMPLES; i++) {
-        aSRC_Buffer[i] = uhTimerPeriod *((int)aSine[i] + 32768)/(32768*2);
-    }
-#else
-    uhTimerPeriod = (SystemCoreClock / 42000000 ) - 1;
-    gdb_stdio_printf("uhTimerPeriod = %d\n", uhTimerPeriod);
-
-    /* Compute CCR1 values to generate a duty cycle at 50% */
-
-    aSRC_Buffer[0] = 2;
-#endif
-
-#ifdef OLD
-  /* Compute CCR1 value to generate a duty cycle at 50% */
-  aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
-  /* Compute CCR1 value to generate a duty cycle at 37.5% */
-  aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
-  /* Compute CCR1 value to generate a duty cycle at 25% */
-  aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
-#endif
+    /* Compute CCR1 value to generate a duty cycle at 50% */
+    aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
+    /* Compute CCR1 value to generate a duty cycle at 37.5% */
+    aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
+    /* Compute CCR1 value to generate a duty cycle at 25% */
+    aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
 
     /* TIM1 Peripheral Configuration -------------------------------------------*/
     /* TIM1 clock enable */
-
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 
     /* Time Base configuration */
@@ -201,6 +142,9 @@ void Timer1Config() {
 
     /* Channel 3 Configuration in PWM mode */
 
+    /* I think we just ned to enable channel 3 somehow, but without
+       (or optionally with) actual ouput to a GPIO pin.  */
+
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
     TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
     TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
@@ -215,15 +159,21 @@ void Timer1Config() {
     /* Enable preload feature */
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
   
+    /* Automatic Output enable, Break, dead time and lock configuration*/
+    TIM_BDTRInitStructure.TIM_OSSRState = TIM_OSSRState_Enable;
+    TIM_BDTRInitStructure.TIM_OSSIState = TIM_OSSIState_Enable;
+    //TIM_BDTRInitStructure.TIM_LOCKLevel = TIM_LOCKLevel_1;
+    TIM_BDTRInitStructure.TIM_DeadTime = 11;
+    //TIM_BDTRInitStructure.TIM_Break = TIM_Break_Enable;
+    //TIM_BDTRInitStructure.TIM_BreakPolarity = TIM_BreakPolarity_High;
+    TIM_BDTRInitStructure.TIM_AutomaticOutput = TIM_AutomaticOutput_Enable;
+
+    TIM_BDTRConfig(TIM1, &TIM_BDTRInitStructure);
+
     /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
   
-    /* DMA enable*/
-    //DMA_Cmd(DMA2_Stream6, ENABLE);
-  
-    /* TIM1 Update DMA Request enable */
-    //TIM_DMACmd(TIM1, TIM_DMA_CC3, ENABLE);
-
     /* Main Output Enable */
     TIM_CtrlPWMOutputs(TIM1, ENABLE);
 }
+
