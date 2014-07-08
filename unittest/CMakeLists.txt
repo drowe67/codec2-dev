@@ -76,7 +76,7 @@ add_executable(tfifo tfifo.c ../src/fifo.c)
 target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(speexnoisesup speexnoisesup.c)
-target_link_libraries(speexnoisesup speexdsp)
+target_link_libraries(speexnoisesup ${SPEEXDSP_LIBRARY})
 
 add_executable(fdmdv_mem fdmdv_mem.c)
 
