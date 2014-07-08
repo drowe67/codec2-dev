@@ -25,3 +25,17 @@ $ cmake ../ (defaults to /usr/local, use CMAKE_INSTALL_PREFIX to override)
 $ make
 (as root)
 $ make install
+
+=====================
+Win32
+=====================
+
+Install MinGW & the mysys shell
+   + pwd -W prints true Win32 directory
+   + I also installed emacs, "tortise svn", and "cmake"
+
+$ cd codec2-dev
+$ mkdir build_win32
+$ cd build_win32
+$ cmake -DSPEEXDSP_INCLUDE_DIR=/usr/local/include/ -G "MSYS Makefiles" ..
+$ make
