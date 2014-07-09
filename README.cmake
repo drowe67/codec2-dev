@@ -32,7 +32,7 @@ Win32
 
 Install MinGW & the mysys shell
    + pwd -W prints true Win32 directory
-   + I also installed emacs, "tortise svn", and "cmake"
+   + I also installed emacs, "tortise svn", and "cmake", and built and installed speex
 
 $ cd codec2-dev
 $ mkdir build_win32
