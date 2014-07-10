@@ -91,7 +91,7 @@ function fdmdv_demod_c(dumpfilename, bits)
   subplot(212)
   plot(xt, foff_log_c(1:frames), '-;freq offset;')
   hold on;
-  plot(xt, coarse_fine_log_c(1:frames)*75, 'r;course-fine;');
+  plot(xt, sync_log_c(1:frames)*75, 'r;course-fine;');
   hold off;
   title('Freq offset (Hz)');
   grid

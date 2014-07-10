@@ -14,7 +14,7 @@ fdmdv;               % load modem code
 
 frames = 100;
 EbNo_dB = 7.3;
-Foff_hz = 10;
+Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;
 

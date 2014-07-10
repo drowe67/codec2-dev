@@ -48,12 +48,12 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
   nin = M;                 % timing correction for sample rate differences
   foff = 0;
-  track_log = [];
-  track = 0;
+
   fest_state = 0;
-  bad_sync = 0;
-  sync_track = 0;
-  entered_track_log = [];
+  fest_timer = 0;
+  sync_mem = zeros(1,Nsync_mem);
+  sync = 0;
+  sync_log = [];
 
   % spectrum states
 
@@ -94,8 +94,8 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
     [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
     
-    if track == 0
-      foff  = foff_coarse = 0;
+    if sync == 0
+      foff  = foff_coarse;
     end
     foff_log = [ foff_log foff ];
     foff_rect = exp(j*2*pi*foff/Fs);
@@ -110,7 +110,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     rx_baseband = fdm_downconvert(rx_fdm, nin);
     rx_filt = rx_filter(rx_baseband, nin);
 
-    [rx_symbols rx_timing] = rx_est_timing(rx_filt, rx_baseband, nin);
+    [rx_symbols rx_timing] = rx_est_timing(rx_filt, nin);
 
     rx_timing_log = [rx_timing_log rx_timing];
     nin = M;
@@ -126,7 +126,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     else
       rx_symbols_log = [rx_symbols_log rx_symbols];
     endif
-    [rx_bits sync f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits sync_bit f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
 
     % optionally save output symbols 
 
@@ -163,16 +163,11 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     snr_est_log = [snr_est_log snr_est];
     foff -= 0.5*f_err;
     prev_rx_symbols = rx_symbols;
-    sync_log = [sync_log sync];
 
     % freq est state machine
 
-    [entered_track track fest_state bad_sync] = freq_state(sync, fest_state, bad_sync);
-    track_log = [track_log track];
-    if (entered_track == 1)
-        sync_track = 1;
-    end
-    entered_track_log = [entered_track_log entered_track];
+    [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+    sync_log = [sync_log sync];
 
     % count bit errors if we find a test frame
 
@@ -254,7 +249,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
   subplot(212)
   plot(xt, foff_log, '-;freq offset;')
   hold on;
-  plot(xt, track_log*75, 'r;course-fine;');
+  plot(xt, sync_log*75, 'r;course-fine;');
   hold off;
   title('Freq offset (Hz)');
   grid
