@@ -226,7 +226,8 @@ struct FDMDV * fdmdv_create(int Nc)
 	f->fft_buf[i] = 0.0;
     f->fft_cfg = kiss_fft_alloc (2*FDMDV_NSPEC, 0, NULL, NULL);
     assert(f->fft_cfg != NULL);
-
+    
+    f->sig_pwr_av = 0.0;
 
     return f;
 }
@@ -1646,4 +1647,51 @@ void fdmdv_dump_osc_mags(struct FDMDV *f)
     for(i=0; i<=f->Nc; i++)
 	fprintf(stderr,"  %1.3f", cabsolute(f->phase_rx[i]));
     fprintf(stderr, "\n\n");
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fdmdv_simulate_channel()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 10 July 2014
+
+  Simple channel simulation function to aid in testing.  Target SNR
+  uses noise measured in a 3 kHz bandwidth.  
+
+  TODO: Measured SNR is coming out a few dB higher than target_snr, this
+  needs to be fixed.
+
+\*---------------------------------------------------------------------------*/
+
+void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float target_snr) 
+{
+    float sig_pwr, target_snr_linear, noise_pwr, noise_pwr_4k, var_uniform, noise_gain;
+    int   i;
+
+    /* estimate signal power */
+
+    sig_pwr = 0.0;
+    for(i=0; i<nin; i++)
+        sig_pwr += samples[i].real*samples[i].real + samples[i].imag*samples[i].imag;
+    
+    f->sig_pwr_av = 0.9*f->sig_pwr_av + 0.1*(sig_pwr/nin);
+
+    /* det noise to meet target SNR */
+
+    target_snr_linear = powf(10.0, target_snr/10.0);
+    noise_pwr = f->sig_pwr_av/target_snr_linear;
+    noise_pwr_4k = 0.75*noise_pwr;                     /* this is the equivalent power scaled to a 4000 Hz BW */
+
+    /* for convenience we are using a uniform random number generator */
+
+    var_uniform = 1.0/12.0;
+    noise_gain = sqrtf(0.5*noise_pwr_4k/var_uniform);
+
+    for(i=0; i<nin; i++) {
+        samples[i].real += noise_gain*(((float)rand()/RAND_MAX) - 0.5);
+        samples[i].imag += noise_gain*(((float)rand()/RAND_MAX) - 0.5);
+    }
+
+    //printf("f->sig_pwr_av: %f target_snr_linear: %f noise_pwr_4k: %f noise_gain: %f\n", 
+    //       f->sig_pwr_av, target_snr_linear, noise_pwr_4k, noise_gain);
 }
