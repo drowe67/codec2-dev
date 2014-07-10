@@ -1380,7 +1380,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 	
     /* baseband processing */
 
-    down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
+    down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_fcorr, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
                                fdmdv->freq_pol, *nin);
     fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
     

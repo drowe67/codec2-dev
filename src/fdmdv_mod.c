@@ -53,6 +53,8 @@ int main(int argc, char *argv[])
     int           bits_per_codec_frame;
     int           bytes_per_codec_frame;
     int           Nc;
+    COMP          foff_phase_rect;
+    float         foff;
 
     if (argc < 3) {
 	printf("usage: %s InputBitFile OutputModemRawFile [Nc]\n", argv[0]);
@@ -100,6 +102,9 @@ int main(int argc, char *argv[])
     tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
     assert(tx_bits != NULL);
 
+    foff = -100;
+    foff_phase_rect.real = 1.0; foff_phase_rect.imag = 0.0; 
+
     frames = 0;
 
     while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
@@ -125,6 +130,10 @@ int main(int argc, char *argv[])
 
 	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[bits_per_fdmdv_frame], &sync_bit);
 	assert(sync_bit == 0);
+
+        /* optional frequency offset */
+
+        fdmdv_freq_shift(tx_fdm, tx_fdm, foff, &foff_phase_rect, 2*FDMDV_NOM_SAMPLES_PER_FRAME);
 
 	/* scale and save to disk as shorts */
 
