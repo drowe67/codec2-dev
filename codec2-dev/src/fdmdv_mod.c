@@ -131,9 +131,12 @@ int main(int argc, char *argv[])
 	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[bits_per_fdmdv_frame], &sync_bit);
 	assert(sync_bit == 0);
 
-        /* optional frequency offset */
+        #ifdef CHANNEL_SIM
+        /* optional freq shift and channel simulation */
 
         fdmdv_freq_shift(tx_fdm, tx_fdm, foff, &foff_phase_rect, 2*FDMDV_NOM_SAMPLES_PER_FRAME);
+        fdmdv_simulate_channel(fdmdv, tx_fdm, 2*FDMDV_NOM_SAMPLES_PER_FRAME, 10.0);
+        #endif
 
 	/* scale and save to disk as shorts */
 
