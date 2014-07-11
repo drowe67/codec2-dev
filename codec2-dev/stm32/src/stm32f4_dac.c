@@ -37,38 +37,34 @@
 
 #define DAC_BUF_SZ   320
 #define FIFO_SZ      4*DAC_BUF_SZ
-#define DAC_MAX      4096
+#define DAC_MAX      4096            /* maximum amplitude */
 
 DAC_InitTypeDef  DAC_InitStructure;
-struct FIFO *DMA1_Stream6_fifo;
+struct FIFO *dac1_fifo;
+struct FIFO *dac2_fifo;
 
-unsigned short dac_buf[DAC_BUF_SZ];
+unsigned short dac1_buf[DAC_BUF_SZ];
+unsigned short dac2_buf[DAC_BUF_SZ];
 
-static void TIM6_Config(void);
-static void DAC_Ch2_Config(void);
+static void tim6_config(void);
+static void dac1_config(void);
+static void dac2_config(void);
 
 int dac_underflow;
 
 void dac_open(void) {
 
-    memset(dac_buf, 32768, sizeof(short)*DAC_BUF_SZ);
+    memset(dac1_buf, 32768, sizeof(short)*DAC_BUF_SZ);
+    memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
 
-    /* Create fifo */
+    /* Create fifos */
 
-    DMA1_Stream6_fifo = fifo_create(FIFO_SZ);
-    assert(DMA1_Stream6_fifo != NULL);
+    dac1_fifo = fifo_create(FIFO_SZ);
+    dac2_fifo = fifo_create(FIFO_SZ);
+    assert(dac1_fifo != NULL);
+    assert(dac2_fifo != NULL);
 
-    /*!< At this stage the microcontroller clock setting is already configured, 
-      this is done through SystemInit() function which is called from startup
-      files (startup_stm32f40xx.s/startup_stm32f427x.s) before to branch to 
-      application main. 
-      To reconfigure the default setting of SystemInit() function, refer to
-      system_stm32f4xx.c file
-    */    
-
-    /* Preconfiguration before using DAC----------------------------------------*/
-
-    GPIO_InitTypeDef GPIO_InitStructure;
+    /* Turn on the clocks we need -----------------------------------------------*/
 
     /* DMA1 clock enable */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
@@ -77,35 +73,36 @@ void dac_open(void) {
     /* DAC Periph clock enable */
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
 
-    /* DAC channel 1 & 2 (DAC_OUT1 = PA.4)(DAC_OUT2 = PA.5) configuration */
+    /* GPIO Pin configuration DAC1->PA.4, DAC2->PA.5 configuration --------------*/
+
+    GPIO_InitTypeDef GPIO_InitStructure;
     GPIO_InitStructure.GPIO_Pin = GPIO_Pin_4 | GPIO_Pin_5;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AN;
     GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_NOPULL;
     GPIO_Init(GPIOA, &GPIO_InitStructure);
 
-    /* TIM6 Configuration ------------------------------------------------------*/
+    /* Timer and DAC 1 & 2 Configuration ----------------------------------------*/
 
-    TIM6_Config();  
-    DAC_Ch2_Config();
-    
+    tim6_config();  
+    dac1_config();
+    dac2_config();
 }
 
-/* Accepts signed 16 bit samples */
+/* Call these puppies to send samples to the DACs.  For your
+   convenience they accept signed 16 bit samples. */
 
-int dac_write(short buf[], int n) {   
-    return fifo_write(DMA1_Stream6_fifo, buf, n);
+int dac1_write(short buf[], int n) {   
+    return fifo_write(dac1_fifo, buf, n);
 }
 
-/**             
-  * @brief  TIM6 Configuration
-  * @note   TIM6 configuration is based on APB1 frequency
-  * @note   TIM6 Update event occurs each TIM6CLK/256   
-  * @param  None
-  * @retval None
-  */
-static void TIM6_Config(void)
+int dac2_write(short buf[], int n) {   
+    return fifo_write(dac2_fifo, buf, n);
+}
+
+static void tim6_config(void)
 {
   TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
+
   /* TIM6 Periph clock enable */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
   
@@ -121,6 +118,7 @@ static void TIM6_Config(void)
   ----------------------------------------------------------- */
 
   /* Time base configuration */
+
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
   TIM_TimeBaseStructure.TIM_Period = 5250;          
   TIM_TimeBaseStructure.TIM_Prescaler = 0;       
@@ -133,30 +131,29 @@ static void TIM6_Config(void)
   TIM_SelectOutputTrigger(TIM6, TIM_TRGOSource_Update);
   
   /* TIM6 enable counter */
+
   TIM_Cmd(TIM6, ENABLE);
 }
 
-/**
-  * @brief  DAC  Channel2 SineWave Configuration
-  * @param  None
-  * @retval None
-  */
-static void DAC_Ch2_Config(void)
+static void dac1_config(void)
 {
   DMA_InitTypeDef DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
   
-  /* DAC channel2 Configuration */
+  /* DAC channel11Configuration */
+
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
   DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
-  DAC_Init(DAC_Channel_2, &DAC_InitStructure);
+  DAC_Init(DAC_Channel_1, &DAC_InitStructure);
 
-  /* DMA1_Stream6 channel7 configuration **************************************/
-  DMA_DeInit(DMA1_Stream6);
+  /* DMA1_Stream5 channel7 configuration **************************************/
+  /* Table 35 page 219 of the monster data sheet */
+
+  DMA_DeInit(DMA1_Stream5);
   DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12L2_ADDRESS;
-  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac_buf;
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R2_ADDRESS;
+  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac1_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
   DMA_InitStructure.DMA_BufferSize = DAC_BUF_SZ;
   DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
@@ -172,6 +169,64 @@ static void DAC_Ch2_Config(void)
   DMA_Init(DMA1_Stream6, &DMA_InitStructure);
 
   /* Enable DMA Half & Complete interrupts */
+
+  DMA_ITConfig(DMA1_Stream5, DMA_IT_TC | DMA_IT_HT, ENABLE);
+
+  /* Enable the DMA Stream IRQ Channel */
+
+  NVIC_InitStructure.NVIC_IRQChannel = DMA1_Stream5_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);     
+
+  /* Enable DMA1_Stream5 */
+
+  DMA_Cmd(DMA1_Stream5, ENABLE);
+
+  /* Enable DAC Channel 1 */
+
+  DAC_Cmd(DAC_Channel_1, ENABLE);
+
+  /* Enable DMA for DAC Channel 1 */
+
+  DAC_DMACmd(DAC_Channel_1, ENABLE);
+}
+
+static void dac2_config(void)
+{
+  DMA_InitTypeDef DMA_InitStructure;
+  NVIC_InitTypeDef NVIC_InitStructure;
+  
+  /* DAC channel2 Configuration */
+
+  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
+  DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
+  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
+  DAC_Init(DAC_Channel_2, &DAC_InitStructure);
+
+  /* DMA1_Stream6 channel7 configuration **************************************/
+
+  DMA_DeInit(DMA1_Stream6);
+  DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12L2_ADDRESS;
+  DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac2_buf;
+  DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
+  DMA_InitStructure.DMA_BufferSize = DAC_BUF_SZ;
+  DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
+  DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
+  DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_HalfWord;
+  DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
+  DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
+  DMA_InitStructure.DMA_Priority = DMA_Priority_High;
+  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;         
+  DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
+  DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
+  DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
+  DMA_Init(DMA1_Stream6, &DMA_InitStructure);
+
+  /* Enable DMA Half & Complete interrupts */
+
   DMA_ITConfig(DMA1_Stream6, DMA_IT_TC | DMA_IT_HT, ENABLE);
 
   /* Enable the DMA Stream IRQ Channel */
@@ -183,12 +238,15 @@ static void DAC_Ch2_Config(void)
   NVIC_Init(&NVIC_InitStructure);     
 
   /* Enable DMA1_Stream6 */
+
   DMA_Cmd(DMA1_Stream6, ENABLE);
 
-  /* Enable DAC Channel2 */
+  /* Enable DAC Channel 2 */
+
   DAC_Cmd(DAC_Channel_2, ENABLE);
 
-  /* Enable DMA for DAC Channel2 */
+  /* Enable DMA for DAC Channel 2 */
+
   DAC_DMACmd(DAC_Channel_2, ENABLE);
 }
 
@@ -200,19 +258,19 @@ static void DAC_Ch2_Config(void)
 /******************************************************************************/
 
 /*
-  This function handles DMA Stream interrupt request.
+  This function handles DMA1 Stream 5 interrupt request for DAC1.
 */
 
-void DMA1_Stream6_IRQHandler(void) {
+void DMA1_Stream5_IRQHandler(void) {
     int i, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
-    /* Transfer half empty interrupt */
+    /* Transfer half empty interrupt - refill first half */
 
-    if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET) {
+    if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_HTIF5) != RESET) {
         /* fill first half from fifo */
 
-        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -221,7 +279,60 @@ void DMA1_Stream6_IRQHandler(void) {
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac_buf[i] = (unsigned short)(sam);
+            dac1_buf[i] = (unsigned short)(sam);
+        }
+
+        /* Clear DMA Stream Transfer Complete interrupt pending bit */
+
+        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_HTIF5);  
+    }
+
+    /* Transfer complete interrupt - refill 2nd half */
+
+    if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_TCIF5) != RESET) {
+        /* fill second half from fifo */
+
+        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+            memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
+            dac_underflow++;
+        }
+
+        /* convert to unsigned */
+
+        for(i=0; i<DAC_BUF_SZ/2; i++) {
+            sam = (int)signed_buf[i] + 32768;
+            dac1_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam);
+        }
+
+        /* Clear DMA Stream Transfer Complete interrupt pending bit */
+
+        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);  
+    }
+}
+
+/*
+  This function handles DMA1 Stream 6 interrupt request for DAC2.
+*/
+
+void DMA1_Stream6_IRQHandler(void) {
+    int i, sam;
+    short signed_buf[DAC_BUF_SZ/2];
+
+    /* Transfer half empty interrupt - refill first half */
+
+    if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET) {
+        /* fill first half from fifo */
+
+        if (fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+            memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
+            dac_underflow++;
+        }
+
+        /* convert to unsigned */
+
+        for(i=0; i<DAC_BUF_SZ/2; i++) {
+            sam = (int)signed_buf[i] + 32768;
+            dac2_buf[i] = (unsigned short)(sam);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -229,12 +340,12 @@ void DMA1_Stream6_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);  
     }
 
-    /* Transfer complete interrupt */
+    /* Transfer complete interrupt - refill 2nd half */
 
     if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET) {
         /* fill second half from fifo */
 
-        if (fifo_read(DMA1_Stream6_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -243,7 +354,7 @@ void DMA1_Stream6_IRQHandler(void) {
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam);
+            dac2_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -251,3 +362,4 @@ void DMA1_Stream6_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);  
     }
 }
+
