@@ -51,8 +51,8 @@ target_link_libraries(scalarlsptest codec2)
 add_executable(tfdmdv tfdmdv.c ../src/fdmdv.c ../src/kiss_fft.c ../src/octave.c)
 target_link_libraries(tfdmdv codec2)
 
-add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
-target_link_libraries(t48_8 codec2)
+add_executable(t16_8 t16_8.c ../src/fdmdv.c ../src/kiss_fft.c)
+target_link_libraries(t16_8 codec2)
 
 add_executable(lspsync lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c ${CODEBOOKS})
 target_link_libraries(lspsync codec2)
