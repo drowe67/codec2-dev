@@ -68,7 +68,7 @@ extern "C" {
 
 /* 8 to 48 kHz sample rate conversion */
 
-#define FDMDV_OS                 6         /* oversampling rate           */
+#define FDMDV_OS                 2         /* oversampling rate           */
 #define FDMDV_OS_TAPS           48         /* number of OS filter taps    */
 
 /* FFT points */
@@ -107,8 +107,8 @@ void           fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_patte
 void           fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
 void           fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
 
-void           fdmdv_8_to_48(float out48k[], float in8k[], int n);
-void           fdmdv_48_to_8(float out8k[], float in48k[], int n);
+void           fdmdv_8_to_16(float out16k[], float in8k[], int n);
+void           fdmdv_16_to_8(float out8k[], float in16k[], int n);
 
 void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
 
