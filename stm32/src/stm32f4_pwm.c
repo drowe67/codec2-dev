@@ -98,6 +98,7 @@ static void TIM_Config(void)
   GPIO_Init(GPIOB, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
 
+#ifdef DR_OFF
   /* DMA clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 , ENABLE);
 
@@ -119,6 +120,7 @@ static void TIM_Config(void)
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
 
   DMA_Init(DMA2_Stream6, &DMA_InitStructure);
+#endif
 }
 
 void Timer1Config() {
@@ -158,7 +160,7 @@ void Timer1Config() {
 
 #ifdef TMP
     uhTimerPeriod = (SystemCoreClock / FS ) - 1;
-    gdb_stdio_printf("uhTimerPeriod = %d\n", uhTimerPeriod);
+    //gdb_stdio_printf("uhTimerPeriod = %d\n", uhTimerPeriod);
 
     /* Compute CCR1 values to generate a duty cycle at 50% */
 
@@ -166,24 +168,11 @@ void Timer1Config() {
         aSRC_Buffer[i] = uhTimerPeriod *((int)aSine[i] + 32768)/(32768*2);
     }
 #else
-    uhTimerPeriod = (SystemCoreClock / 42000000 ) - 1;
-    gdb_stdio_printf("uhTimerPeriod = %d\n", uhTimerPeriod);
-
-    /* Compute CCR1 values to generate a duty cycle at 50% */
-
-    aSRC_Buffer[0] = 2;
+    uhTimerPeriod = (SystemCoreClock / 28000000) - 1;
+    aSRC_Buffer[0] =   uhTimerPeriod/2 + 1;
+    
 #endif
 
-#ifdef OLD
-  /* Compute CCR1 value to generate a duty cycle at 50% */
-  aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
-  /* Compute CCR1 value to generate a duty cycle at 37.5% */
-  aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
-  /* Compute CCR1 value to generate a duty cycle at 25% */
-  aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
-#endif
-
-    /* TIM1 Peripheral Configuration -------------------------------------------*/
     /* TIM1 clock enable */
 
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
@@ -199,6 +188,9 @@ void Timer1Config() {
 
     TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 
+
+    #define TMP2
+#ifdef TMP2
     /* Channel 3 Configuration in PWM mode */
 
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
@@ -214,7 +206,25 @@ void Timer1Config() {
 
     /* Enable preload feature */
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-  
+#else
+    /* Channel 3 Configuration in PWM mode */
+
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_Toggle;
+    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
+    //TIM_OCInitStructure.TIM_Pulse = aSRC_Buffer[0];
+
+    //TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
+    //TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
+
+    //TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    //TIM_OCInitStructure.TIM_OCNPolarity = TIM_OCNPolarity_Low;
+    //TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCIdleState_Reset;
+
+    TIM_OC3Init(TIM1, &TIM_OCInitStructure);
+
+    //TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
+#endif
+ 
     /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
   
