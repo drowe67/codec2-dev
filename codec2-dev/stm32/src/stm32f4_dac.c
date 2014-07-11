@@ -36,7 +36,7 @@
 #define DAC_DHR12L2_ADDRESS    0x40007418
 
 #define DAC_BUF_SZ   320
-#define FIFO_SZ      1000
+#define FIFO_SZ      4*DAC_BUF_SZ
 #define DAC_MAX      4096
 
 DAC_InitTypeDef  DAC_InitStructure;
