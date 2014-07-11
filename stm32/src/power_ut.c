@@ -5,7 +5,7 @@
   DATE CREATED: 30 May 2014
 
   Runs Codec 2, ADC, and DAC, to fully exercise STM32C so we can a feel for
-  run-time power consumption for SmartMic and hence dimension regulators.
+  run-time power consumption for SM1000 and hence dimension regulators.
 
 \*---------------------------------------------------------------------------*/
 
@@ -51,7 +51,7 @@
 
 #define SPEED_TEST_SAMPLES 24000
 
-/* modifiaction of test used to measure codec2 execuation speed.  We read/write ADC/DAC
+/* modification of test used to measure codec2 execuation speed.  We read/write ADC/DAC
    but dont do anything with the samples, as they are at 16 kHz and codec needs 8 kHz.  Just
    trying to exercise everything to get a feel for power consumption */
 
@@ -101,7 +101,7 @@ static void c2speedtest(int mode, char inputfile[])
 	codec2_decode(codec2, outbuf, bits);
         
         //printf("write to DAC\n");
-        while(dac_write(dummy_buf, nsam*2) == -1); /* runs at Fs = 16kHz */
+        while(dac1_write(dummy_buf, nsam*2) == -1); /* runs at Fs = 16kHz */
         //printf(".");
     }
 

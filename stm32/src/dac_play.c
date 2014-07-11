@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 1 June 2013
 
-  Plays a 16 kHz sample rate raw file to the STM32F4 DAC.
+  Plays a 16 kHz sample rate raw file to the STM32F4 pin PA5.
 
 \*---------------------------------------------------------------------------*/
 
@@ -47,7 +47,7 @@ int main(void) {
         printf("Starting!\n");
 
         while(fread(buf, sizeof(short), N, fplay) == N) {
-            while(dac_write(buf, N) == -1);
+            while(dac2_write(buf, N) == -1);
         }  
 
         printf("Finished!\n");

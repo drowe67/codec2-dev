@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: May 31 2013
 
-  Plays a 500 Hz sine wave sampled at 16 kHz out of PA5 on a Discovery board.
+  Plays a 500 Hz sine wave sampled at 16 kHz out of PA5 on a Discovery board,
+  or the speaker output of the SM1000.
 
 \*---------------------------------------------------------------------------*/
 
@@ -43,18 +44,13 @@ short aSine[] = {
 };
 
 int main(void) {
-    int i;
-
-    //for(i=0; i<32; i++)
-    //    aSine[i] /= 2;
-
     dac_open();
 
     while (1) {
 
         /* keep DAC FIFO topped up */
 
-        dac_write((short*)aSine, SINE_SAMPLES);
+        dac1_write((short*)aSine, SINE_SAMPLES);
     }
    
 }
