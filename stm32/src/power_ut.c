@@ -90,7 +90,7 @@ static void c2speedtest(int mode, char inputfile[])
     pinbuf = inbuf;
     for(f=0; f<nframes; f++) {
         //printf("read ADC\n");
-        while(adc_read(dummy_buf, nsam*2) == -1);  /* runs at Fs = 16kHz */
+        while(adc1_read(dummy_buf, nsam*2) == -1);  /* runs at Fs = 16kHz */
 
         //printf("Codec 2 enc\n");
 	GPIOD->ODR = (1 << 13);

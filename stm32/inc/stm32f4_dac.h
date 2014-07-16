@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 1 June 2013
 
-  DAC driver module for STM32F4.
+  Two channel FIFO buffered DAC driver module for STM32F4.
 
 \*---------------------------------------------------------------------------*/
 
@@ -29,6 +29,7 @@
 #define __STM32F4_DAC__
 
 void dac_open(void);
-int dac_write(short buf[], int n); 
+int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
+int dac2_write(short buf[], int n); /* DAC2 pin PA5 */
 
 #endif

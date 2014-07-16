@@ -39,12 +39,11 @@
 #define FIFO_SZ      4*DAC_BUF_SZ
 #define DAC_MAX      4096            /* maximum amplitude */
 
-DAC_InitTypeDef  DAC_InitStructure;
-struct FIFO *dac1_fifo;
-struct FIFO *dac2_fifo;
+static struct FIFO *dac1_fifo;
+static struct FIFO *dac2_fifo;
 
-unsigned short dac1_buf[DAC_BUF_SZ];
-unsigned short dac2_buf[DAC_BUF_SZ];
+static unsigned short dac1_buf[DAC_BUF_SZ];
+static unsigned short dac2_buf[DAC_BUF_SZ];
 
 static void tim6_config(void);
 static void dac1_config(void);
@@ -137,7 +136,8 @@ static void tim6_config(void)
 
 static void dac1_config(void)
 {
-  DMA_InitTypeDef DMA_InitStructure;
+  DAC_InitTypeDef  DAC_InitStructure;
+  DMA_InitTypeDef  DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
   
   /* DAC channel11Configuration */
@@ -195,6 +195,7 @@ static void dac1_config(void)
 
 static void dac2_config(void)
 {
+  DAC_InitTypeDef  DAC_InitStructure;
   DMA_InitTypeDef DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
   
