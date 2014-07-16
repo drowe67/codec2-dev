@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 30 May 2014
 
-  ADC driver module for STM32F4.
+  Two channel FIFO buffered ADC driver module for STM32F4.
 
 \*---------------------------------------------------------------------------*/
 
@@ -29,6 +29,7 @@
 #define __STM32F4_ADC__
 
 void adc_open(void);
-int adc_read(short buf[], int n); 
+int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
+int adc2_read(short buf[], int n); /* ADC2 Pin PA2 */
 
 #endif

@@ -50,7 +50,7 @@ int main(void) {
 
         /* keep DAC FIFO topped up */
 
-        dac1_write((short*)aSine, SINE_SAMPLES);
+        dac2_write((short*)aSine, SINE_SAMPLES);
     }
    
 }

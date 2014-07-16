@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 30 May 2014
 
-  Recordss a 16 kHz sample rate raw file from the STM32F4 ADC.
+  Records a 16 kHz sample rate raw file from the STM32F4 ADC Pin PA1.
 
 \*---------------------------------------------------------------------------*/
 
@@ -49,7 +49,7 @@ int main(void){
 
     printf("Starting!\n");
     for(i=0; i<bufs; i++) {
-        while(adc_read(buf, N) == -1);
+        while(adc1_read(buf, N) == -1);
         fwrite(buf, sizeof(short), N, frec);  
         printf(".");
     }
