@@ -66,10 +66,12 @@ unsigned int machdep_timer_sample(void) {
 
 unsigned int machdep_timer_sample_and_log(unsigned int start, char s[])
 {
-    char tmp[80];
+    char  tmp[80];
+    float msec;
 
     unsigned int dwt = *DWT_CYCCNT - start;
-    sprintf(tmp, "%s %5.2f msecs\n",s,1000.0*(float)dwt/CORE_CLOCK);
+    msec = 1000.0*(float)dwt/CORE_CLOCK;
+    sprintf(tmp, "%s %5.2f msecs\n",s,(double)msec);
     if ((strlen(buf) + strlen(tmp)) < BUF_SZ)
         strcat(buf, tmp);
     return *DWT_CYCCNT;
@@ -80,3 +82,4 @@ void machdep_timer_print_logged_samples(void)
     gdb_stdio_printf("%s", buf);
     *buf = 0;
 }
+ 

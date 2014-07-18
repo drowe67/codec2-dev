@@ -1,3 +1,30 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: codec2_profile.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 30 May 2013
+
+  Profiling Codec 2 operation on the STM32F4.
+
+\*---------------------------------------------------------------------------*/
+
+/*
+  Copyright (C) 2014 David Rowe
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2.1, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -131,7 +158,6 @@ void gpio_init() {
 }
 
 int main(int argc, char *argv[]) {
-    SystemInit();
     gpio_init();
     machdep_timer_init ();
  

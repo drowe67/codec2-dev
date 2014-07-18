@@ -2,7 +2,6 @@
 
 ###################################################
 
-PROJ_NAME=stm32f4_codec2
 FLOAT_TYPE=hard
 
 ###################################################
@@ -45,14 +44,10 @@ CFLAGS		+= -DARM_MATH_CM4
 
 ###################################################
 
-# Sources
-
-SRCS = main.c gdb_stdio.c stm32f4_timer.c system_stm32f4xx.c
-
 # Codec 2
 
 CODEC2_SRC=../src
-SRCS += \
+CODEC2_SRCS=\
 $(CODEC2_SRC)/lpc.c \
 $(CODEC2_SRC)/nlp.c \
 $(CODEC2_SRC)/postfilter.c \
@@ -68,7 +63,8 @@ $(CODEC2_SRC)/codebook.c \
 $(CODEC2_SRC)/codebookd.c \
 $(CODEC2_SRC)/codebookjvm.c \
 $(CODEC2_SRC)/codebookge.c \
-$(CODEC2_SRC)/dump.c 
+$(CODEC2_SRC)/dump.c \
+$(CODEC2_SRC)/fdmdv.c
 
 CFLAGS += -D__EMBEDDED__ -DTIMER
 
@@ -110,7 +106,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a $(PROJ_NAME).elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf fdmdv_profile.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -126,7 +122,18 @@ libstm32f4.a: $(PERIPHLIBDIR)
 	for F in $(CMSIS)/DSP_Lib/Source/*/*.c ; do $(MAKE) $${F%.c}.o ; done
 	find $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"	
 
-$(PROJ_NAME).elf: $(SRCS) 
+####################################################
+
+CODEC2_PROFILE_SRCS=\
+src/codec2_profile.c \
+src/gdb_stdio.c \
+src/stm32f4_timer.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+src/system_stm32f4xx.c
+CODEC2_PROFILE_SRCS += $(CODEC2_SRCS)
+
+codec2_profile.elf: $(CODEC2_PROFILE_SRCS) 
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 fft_test.elf: $(FFT_TEST_SRCS)
@@ -188,25 +195,22 @@ src/startup_stm32f4xx.s \
 src/init.c \
 src/stm32f4_timer.c \
 
-POWER_UT_SRCS += \
-$(CODEC2_SRC)/lpc.c \
-$(CODEC2_SRC)/nlp.c \
-$(CODEC2_SRC)/postfilter.c \
-$(CODEC2_SRC)/sine.c \
-$(CODEC2_SRC)/codec2.c \
-$(CODEC2_SRC)/kiss_fft.c \
-$(CODEC2_SRC)/interp.c \
-$(CODEC2_SRC)/lsp.c \
-$(CODEC2_SRC)/phase.c \
-$(CODEC2_SRC)/quantise.c \
-$(CODEC2_SRC)/pack.c \
-$(CODEC2_SRC)/codebook.c \
-$(CODEC2_SRC)/codebookd.c \
-$(CODEC2_SRC)/codebookjvm.c \
-$(CODEC2_SRC)/codebookge.c \
-$(CODEC2_SRC)/dump.c 
+POWER_UT_SRCS += $(CODEC2_SRCS)
 
 power_ut.elf: $(POWER_UT_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+FDMDV_PROFILE_SRCS=\
+src/fdmdv_profile.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+src/stm32f4_timer.c
+
+FDMDV_PROFILE_SRCS += $(CODEC2_SRCS)
+
+fdmdv_profile.elf: $(FDMDV_PROFILE_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
