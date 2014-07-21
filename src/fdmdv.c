@@ -45,10 +45,15 @@
 #include "kiss_fft.h"
 #include "hanning.h"
 #include "os.h"
+#include "machdep.h"
 
 static int sync_uw[] = {1,-1,1,-1,1,-1};
 
-/*---------------------------------------------------------------------------* \
+#ifdef __EMBEDDED__
+#define printf gdb_stdio_printf
+#endif
+
+/*---------------------------------------------------------------------------*\
                                                                              
                                FUNCTIONS
 
@@ -521,11 +526,16 @@ void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
+    TIMER_VAR(mod_start, tx_filter_start, fdm_upconvert_start);
 
+    TIMER_SAMPLE(mod_start);
     bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
+    TIMER_SAMPLE_AND_LOG(tx_filter_start, mod_start, "    bits_to_dqpsk_symbols"); 
     tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
+    TIMER_SAMPLE_AND_LOG(fdm_upconvert_start, tx_filter_start, "    tx_filter"); 
     fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
+    TIMER_SAMPLE_AND_LOG2(fdm_upconvert_start, "    fdm_upconvert"); 
 
     *sync_bit = fdmdv->tx_pilot_bit;
 }
@@ -910,6 +920,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
     float windback_phase, mag;
     COMP  windback_phase_rect;
     COMP  rx_baseband[NFILTER+M];
+    TIMER_VAR(windback_start,  downconvert_start, filter_start);
 
     /* update memory of rx_fdm */
 
@@ -933,10 +944,12 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
           phase continuity.
         */
 
+        TIMER_SAMPLE(windback_start);
         windback_phase           = -freq_pol[c]*NFILTER;
         windback_phase_rect.real = cosf(windback_phase);
         windback_phase_rect.imag = sinf(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
+        TIMER_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback"); 
     
         /* down convert all samples in buffer */
 
@@ -948,6 +961,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
             phase_rx[c]    = cmult(phase_rx[c], freq[c]);
             rx_baseband[i] = cmult(rx_fdm_mem[i],cconj(phase_rx[c]));
         }
+        TIMER_SAMPLE_AND_LOG(filter_start, downconvert_start, "        downconvert"); 
  
         /* now we can filter this carrier's P symbols */
 
@@ -959,6 +973,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
             for(m=0; m<NFILTER; m++) 
                 rx_filt[c][k] = cadd(rx_filt[c][k], fcmult(gt_alpha5_root[m], rx_baseband[st+i+m]));
         }
+        TIMER_SAMPLE_AND_LOG2(filter_start, "        filter"); 
 
         /* normalise digital oscilators as the magnitude can drift over time */
 
@@ -1370,20 +1385,27 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     COMP          rx_symbols[NC+1];
     float         env[NT*P];
     int           sync_bit;
+    TIMER_VAR(demod_start, fdmdv_freq_shift_start, down_convert_and_rx_filter_start);
+    TIMER_VAR(rx_est_timing_start, qpsk_to_bits_start, snr_update_start, freq_state_start);
 
     /* freq offset estimation and correction */
    
+    TIMER_SAMPLE(demod_start);
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
+    TIMER_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset"); 
     
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
     fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
-	
+    TIMER_SAMPLE_AND_LOG(down_convert_and_rx_filter_start, fdmdv_freq_shift_start, "    fdmdv_freq_shift"); 
+ 	
     /* baseband processing */
 
     down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_fcorr, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
                                fdmdv->freq_pol, *nin);
+    TIMER_SAMPLE_AND_LOG(rx_est_timing_start, down_convert_and_rx_filter_start, "    down_convert_and_rx_filter"); 
     fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
+    TIMER_SAMPLE_AND_LOG(qpsk_to_bits_start, rx_est_timing_start, "    rx_est_timing"); 
     
     /* Adjust number of input samples to keep timing within bounds */
 
@@ -1398,11 +1420,14 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 
                              fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
+    TIMER_SAMPLE_AND_LOG(snr_update_start, qpsk_to_bits_start, "    qpsk_to_bits"); 
     snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->Nc, fdmdv->phase_difference);
+    TIMER_SAMPLE_AND_LOG(freq_state_start, snr_update_start, "    snr_update"); 
 
     /* freq offset estimation state machine */
 
     fdmdv->sync = freq_state(reliable_sync_bit, sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
+    TIMER_SAMPLE_AND_LOG2(freq_state_start, "    freq_state"); 
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 
@@ -1425,8 +1450,8 @@ float calc_snr(int Nc, float sig_est[], float noise_est[])
    
     S = 0.0;
     for(c=0; c<Nc+1; c++)
-	S += pow(sig_est[c], 2.0);
-    SdB = 10.0*log10(S+1E-12);
+	S += powf(sig_est[c], 2.0);
+    SdB = 10.0*log10f(S+1E-12);
     
     /* Average noise mag across all carriers and square to get an
        average noise power.  This is an estimate of the noise power in
@@ -1437,13 +1462,13 @@ float calc_snr(int Nc, float sig_est[], float noise_est[])
     for(c=0; c<Nc+1; c++)
 	mean += noise_est[c];
     mean /= (Nc+1);
-    N50 = pow(mean, 2.0);
-    N50dB = 10.0*log10(N50+1E-12);
+    N50 = powf(mean, 2.0);
+    N50dB = 10.0*log10f(N50+1E-12);
 
     /* Now multiply by (3000 Hz)/(50 Hz) to find the total noise power
        in 3000 Hz */
 
-    N3000dB = N50dB + 10.0*log10(3000.0/RS);
+    N3000dB = N50dB + 10.0*log10f(3000.0/RS);
 
     snr_dB = SdB - N3000dB;
 
@@ -1607,7 +1632,7 @@ void fdmdv_get_rx_spectrum(struct FDMDV *f, float mag_spec_dB[],
     /* scale and convert to dB */
 
     for(i=0; i<FDMDV_NSPEC; i++) {
-	mag_spec_dB[i]  = 10.0*log10(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag + 1E-12);
+	mag_spec_dB[i]  = 10.0*log10f(fft_out[i].real*fft_out[i].real + fft_out[i].imag*fft_out[i].imag + 1E-12);
 	mag_spec_dB[i] -= full_scale_dB;
     }
 }
@@ -1625,14 +1650,14 @@ void fdmdv_dump_osc_mags(struct FDMDV *f)
 
     fprintf(stderr, "phase_tx[]:\n");
     for(i=0; i<=f->Nc; i++)
-	fprintf(stderr,"  %1.3f", cabsolute(f->phase_tx[i]));
+	fprintf(stderr,"  %1.3f", (double)cabsolute(f->phase_tx[i]));
     fprintf(stderr,"\nfreq[]:\n");
     for(i=0; i<=f->Nc; i++)
-	fprintf(stderr,"  %1.3f", cabsolute(f->freq[i]));
-    fprintf(stderr,"\nfoff_phase_rect: %1.3f", cabsolute(f->foff_phase_rect));
+	fprintf(stderr,"  %1.3f", (double)cabsolute(f->freq[i]));
+    fprintf(stderr,"\nfoff_phase_rect: %1.3f", (double)cabsolute(f->foff_phase_rect));
     fprintf(stderr,"\nphase_rx[]:\n");
     for(i=0; i<=f->Nc; i++)
-	fprintf(stderr,"  %1.3f", cabsolute(f->phase_rx[i]));
+	fprintf(stderr,"  %1.3f", (double)cabsolute(f->phase_rx[i]));
     fprintf(stderr, "\n\n");
 }
 
