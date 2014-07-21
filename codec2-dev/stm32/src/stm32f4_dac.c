@@ -32,7 +32,10 @@
 #include "codec2_fifo.h"
 #include "stm32f4_dac.h"
 
-#define DAC_DHR12R2_ADDRESS    0x40007414
+/* write to these registers for 12 bit left aligned data, as per data sheet 
+   make sure 4 least sig bits set to 0 */
+
+#define DAC_DHR12L1_ADDRESS    0x4000740c
 #define DAC_DHR12L2_ADDRESS    0x40007418
 
 #define DAC_BUF_SZ   320
@@ -144,7 +147,7 @@ static void dac1_config(void)
 
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
+  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
   DAC_Init(DAC_Channel_1, &DAC_InitStructure);
 
   /* DMA1_Stream5 channel7 configuration **************************************/
@@ -152,7 +155,7 @@ static void dac1_config(void)
 
   DMA_DeInit(DMA1_Stream5);
   DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R2_ADDRESS;
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12L1_ADDRESS;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac1_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
   DMA_InitStructure.DMA_BufferSize = DAC_BUF_SZ;
@@ -166,7 +169,7 @@ static void dac1_config(void)
   DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
   DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-  DMA_Init(DMA1_Stream6, &DMA_InitStructure);
+  DMA_Init(DMA1_Stream5, &DMA_InitStructure);
 
   /* Enable DMA Half & Complete interrupts */
 
@@ -203,7 +206,7 @@ static void dac2_config(void)
 
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
+  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
   DAC_Init(DAC_Channel_2, &DAC_InitStructure);
 
   /* DMA1_Stream6 channel7 configuration **************************************/
@@ -280,7 +283,7 @@ void DMA1_Stream5_IRQHandler(void) {
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac1_buf[i] = (unsigned short)(sam);
+            dac1_buf[i] = (unsigned short)(sam & 0xfff000);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -302,7 +305,7 @@ void DMA1_Stream5_IRQHandler(void) {
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac1_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam);
+            dac1_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam & 0xfff000);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -333,7 +336,7 @@ void DMA1_Stream6_IRQHandler(void) {
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac2_buf[i] = (unsigned short)(sam);
+            dac2_buf[i] = (unsigned short)(sam & 0xfff000);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -351,11 +354,11 @@ void DMA1_Stream6_IRQHandler(void) {
             dac_underflow++;
         }
 
-        /* convert to unsigned */
+        /* convert to unsigned  */
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
             sam = (int)signed_buf[i] + 32768;
-            dac2_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam);
+            dac2_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam & 0xfff000);
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */

@@ -32,15 +32,15 @@
 #define SINE_SAMPLES   32
 
 
-/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Not sampels
+/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
    are 16 bit 2's complement, the DAC driver convertsto 12 bit
    unsigned. */
 
 short aSine[] = {
-    -16,    6384,   12528,  18192,   23200,   27232,   30256,   32128,   32752,   32128,
-    30256,   27232,   23152,   18192,   12528,    6384,     -16,   -6416,  -12560,  -18224,
-    -23184,  -27264,  -30288,  -32160,  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,
-    -12560,   -6416
+     -16,    6384,   12528,   18192,   23200,   27232,   30256,   32128,
+   32752,   32128,   30256,   27232,   23152,   18192,   12528,    6384,
+     -16,   -6416,  -12560,  -18224,  -23184,  -27264,  -30288,  -32160,
+  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,  -12560,   -6416
 };
 
 int main(void) {
@@ -48,8 +48,9 @@ int main(void) {
 
     while (1) {
 
-        /* keep DAC FIFO topped up */
+        /* keep DAC FIFOs topped up */
 
+        dac1_write((short*)aSine, SINE_SAMPLES);
         dac2_write((short*)aSine, SINE_SAMPLES);
     }
    
