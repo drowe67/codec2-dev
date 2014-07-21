@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 18 July 2014
 
-  Profiling Codec 2 operation on the STM32F4.
+  Profiling FDMDV modem operation on the STM32F4.
 
 \*---------------------------------------------------------------------------*/
 
@@ -55,16 +55,19 @@ int main(int argc, char *argv[]) {
     int                *tx_bits;
     int                *rx_bits;
     COMP                tx_fdm[2*FDMDV_NOM_SAMPLES_PER_FRAME];
-    int                 i, nin, reliable_sync_bit, sync_bit;
+    int                 i, nin, reliable_sync_bit, sync_bit, bit_errors, ntest_bits, test_frame_sync;
+    short              *error_pattern;
     struct FDMDV_STATS  stats;
     TIMER_VAR(mod_start, demod_start);
 
+    machdep_timer_init ();
     fdmdv = fdmdv_create(FDMDV_NC);
 
     bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
     bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
     tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame); assert(tx_bits != NULL);
     rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame); assert(rx_bits != NULL);
+    error_pattern = (short*)malloc(fdmdv_error_pattern_size(fdmdv)*sizeof(int)); assert(error_pattern != NULL);
 
     nin = FDMDV_NOM_SAMPLES_PER_FRAME;
 
@@ -79,15 +82,18 @@ int main(int argc, char *argv[]) {
 	fdmdv_mod(fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &tx_bits[bits_per_fdmdv_frame], &sync_bit);
 	assert(sync_bit == 0);
 
-        TIMER_SAMPLE_AND_LOG(demod_start, mod_start, "  enc");     
+        TIMER_SAMPLE_AND_LOG(demod_start, mod_start, "  mod");     
 
         fdmdv_demod(fdmdv, rx_bits, &reliable_sync_bit, tx_fdm, &nin);
-        fdmdv_demod(fdmdv, rx_bits, &reliable_sync_bit, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &nin);
-        TIMER_SAMPLE_AND_LOG2(demod_start, "  dec");     
-        TIMER_SAMPLE_AND_LOG2(mod_start, "  enc & dec");     
+        fdmdv_demod(fdmdv, &rx_bits[bits_per_fdmdv_frame], &reliable_sync_bit, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &nin);
+        TIMER_SAMPLE_AND_LOG2(demod_start, "  demod");     
+        TIMER_SAMPLE_AND_LOG2(mod_start, "  mod & demod");     
 
         fdmdv_get_demod_stats(fdmdv, &stats);
-        printf("frame: %d sync: %d reliable_sync_bit: %d SNR: %3.2f\n", i, stats.sync, reliable_sync_bit, (double)stats.snr_est);
+        fdmdv_put_test_bits(fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, rx_bits);
+
+        printf("frame: %d sync: %d reliable_sync_bit: %d SNR: %3.2f test_frame_sync: %d\n", 
+               i, stats.sync, reliable_sync_bit, (double)stats.snr_est, test_frame_sync);
         machdep_timer_print_logged_samples();
     }
 
