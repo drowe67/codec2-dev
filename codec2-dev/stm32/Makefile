@@ -13,7 +13,7 @@ SIZE=$(BINPATH)/arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -O2 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
