@@ -57,7 +57,7 @@ gt_alpha5_root = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
 global Nrxdec;
        Nrxdec=31;
 global rxec;
-       rxdec = fir1(Nrxdec, 0.25);
+       rxdec = fir1(Nrxdec-1, 0.25);
 if 0
   % tmp code to plot freq resp.  20dB attn of any aliases should be fine
   % not real sensitive to in-band attn, e.g. outer tones a dB down should be OK
@@ -337,6 +337,7 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
   global freq_pol;
   global Nfilter;
   global gt_alpha5_root;
+  global Q;
 
   % update memory of rx_fdm
 
@@ -375,7 +376,7 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
 
      N=M/P; k = 1;
      for i=1:N:nin
-       rx_filt(c,k) = rx_baseband(st+i-1:st+i-1+Nfilter-1) * gt_alpha5_root';
+       rx_filt(c,k) = (M/Q)*rx_baseband(st+i-1:M/Q:st+i-1+Nfilter-1) * gt_alpha5_root(1:M/Q:length(gt_alpha5_root))';
        k+=1;
      end
   end
@@ -1151,6 +1152,9 @@ global fbb_phase_tx;
        fbb_phase_tx = 1;
 global fbb_phase_rx;
        fbb_phase_rx = 1;
+global rxdec_lpf_mem;
+       rxdec_lpf_mem = zeros(1,Nrxdec-1+M);
+global Q=M/4;
 
 % Spread initial FDM carrier phase out as far as possible.  This
 % helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
