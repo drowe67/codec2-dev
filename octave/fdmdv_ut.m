@@ -12,8 +12,8 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 100;
-EbNo_dB = 7.3;
+frames = 20;
+EbNo_dB = 73;
 Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -169,6 +169,13 @@ for f=1:frames
   % Demodulator
   % -------------------
 
+  % shift down to complex baseband
+
+  for i=1:M
+    fbb_phase_rx = fbb_phase_rx*fbb_rect';
+    rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+  end
+
   % frequency offset estimation and correction, need to call rx_est_freq_offset even in sync
   % mode to keep states updated
   
@@ -187,14 +194,10 @@ for f=1:frames
     rx_fdm(i) = rx_fdm(i)*foff_phase;
   end
 
-if 1
-  % more memory efficient but more complex
+  % LP filter
+  % Decimate to rate M/4
+
   rx_filt = down_convert_and_rx_filter(rx_fdm, M);
-else
-  rx_baseband = fdm_downconvert(rx_fdm, M);
-  rx_baseband_log = [rx_baseband_log rx_baseband];
-  rx_filt = rx_filter(rx_baseband, M);
-end
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, M);
   rx_timing_log = [rx_timing_log rx_timing];
