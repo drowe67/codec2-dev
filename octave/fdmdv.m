@@ -56,8 +56,8 @@ gt_alpha5_root = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
 
 global Nrxdec;
        Nrxdec=31;
-global rxec;
-       rxdec = fir1(Nrxdec-1, 0.25);
+global rxdec_coeff;
+       rxdec_coeff = fir1(Nrxdec-1, 0.25);
 if 0
   % tmp code to plot freq resp.  20dB attn of any aliases should be fine
   % not real sensitive to in-band attn, e.g. outer tones a dB down should be OK
@@ -325,9 +325,27 @@ function rx_filt = rx_filter(rx_baseband, nin)
 endfunction
 
 
+% LP filter +/- 1000 Hz, allows us to perfrom rx filtering at a lower rate saving CPU
+
+function rx_fdm_filter = rxdec_filter(rx_fdm, nin)
+  global M;
+  global Nrxdec;
+  global rxdec_coeff;
+  global rxdec_lpf_mem;
+ 
+  rxdec_lpf_mem(1:Nrxdec-1+M-nin) = rxdec_lpf_mem(nin+1:Nrxdec-1+M);
+  rxdec_lpf_mem(Nrxdec-1+M-nin+1:Nrxdec-1+M) = rx_fdm(1:nin);
+
+  rx_fdm_filter = zeros(1,nin);
+  for i=1:nin
+    rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec_coeff;
+  end
+end
+
+
 % Combined down convert and rx filter, more memory efficient but less intuitive design
 
-function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
+function rx_filt = down_convert_and_rx_filter(rx_fdm, nin, dec_rate)
   global Nc;
   global M;
   global P;
@@ -372,11 +390,11 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin)
 	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
      end
  
-     % now we can filter this carrier's P symbols
+     % now we can filter this carrier's P symbols.  Due to filtering of rx_fdm we can filter at rate at rate M/Q
 
      N=M/P; k = 1;
      for i=1:N:nin
-       rx_filt(c,k) = (M/Q)*rx_baseband(st+i-1:M/Q:st+i-1+Nfilter-1) * gt_alpha5_root(1:M/Q:length(gt_alpha5_root))';
+       rx_filt(c,k) = (M/Q)*rx_baseband(st+i-1:dec_rate:st+i-1+Nfilter-1) * gt_alpha5_root(1:dec_rate:length(gt_alpha5_root))';
        k+=1;
      end
   end
