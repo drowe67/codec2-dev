@@ -12,8 +12,8 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 20;
-EbNo_dB = 73;
+frames = 100;
+EbNo_dB = 6.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;
@@ -194,10 +194,19 @@ for f=1:frames
     rx_fdm(i) = rx_fdm(i)*foff_phase;
   end
 
-  % LP filter
-  % Decimate to rate M/4
+  % LP filter +/- 1000 Hz
 
-  rx_filt = down_convert_and_rx_filter(rx_fdm, M);
+  rxdec_lpf_mem(1:Nrxdec-1) = rxdec_lpf_mem(M+1:Nrxdec-1+M);
+  rxdec_lpf_mem(Nrxdec:Nrxdec-1+M) = rx_fdm;
+
+  rx_fdm_filter = zeros(1,M);
+  for i=1:M
+    rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec;
+  end
+
+  % Decimate to rate Q to reduce CPU load of rx filtering
+
+  rx_filt = down_convert_and_rx_filter(rx_fdm_filter, M);
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, M);
   rx_timing_log = [rx_timing_log rx_timing];
