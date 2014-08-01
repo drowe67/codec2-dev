@@ -53,7 +53,9 @@
 #define FSEP                    75  /* Default separation between carriers (Hz)                             */
 
 #define NT                       5  /* number of symbols we estimate timing over                            */
-#define P                        4  /* oversample factor used for initial rx symbol filtering               */
+#define P                        4  /* oversample factor used for initial rx symbol filtering output        */
+#define Q                     (M/4) /* oversample factor used for initial rx symbol filtering input         */
+#define NRXDEC                  31  /* number of taps in the rx decimation filter                           */
 
 #define NPILOT_LUT                 (4*M)    /* number of pilot look up table samples                 */
 #define NPILOTCOEFF                   30    /* number of FIR filter coeffs in LP filter              */
@@ -111,6 +113,13 @@ struct FDMDV {
     COMP S1[MPILOTFFT];
     COMP S2[MPILOTFFT];
 
+    /* baseband to low IF carrier states */
+
+    COMP  fbb_rect;
+    float fbb_pol;
+    COMP  fbb_phase_tx;
+    COMP  fbb_phase_rx;
+
     /* freq offset correction states */
 
     float foff;
@@ -118,6 +127,7 @@ struct FDMDV {
     
     /* Demodulator */
 
+    COMP  rxdec_lpf_mem[NRXDEC-1+M]; 
     COMP  rx_fdm_mem[NFILTER+M]; 
     COMP  phase_rx[NC+1];
     COMP  rx_filter_mem_timing[NC+1][NT*P];
@@ -155,16 +165,18 @@ struct FDMDV {
 
 void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit, int old_qpsk_mapping);
 void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
-void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[]);
+void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[],
+                   COMP *fbb_phase, COMP fbb_rect);
 void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_mem, COMP *phase, COMP *freq);
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);
 float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin);
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin);
 void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
+void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int nin);
 void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
 void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[], 
                                 COMP rx_fdm_mem[], COMP phase_rx[], COMP freq[], 
-                                float freq_pol[], int nin);
+                                float freq_pol[], int nin, int dec_rate);
 float rx_est_timing(COMP  rx_symbols[], int Nc, 
 		    COMP  rx_filt[NC+1][P+1], 
 		    COMP  rx_filter_mem_timing[NC+1][NT*P], 

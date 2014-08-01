@@ -89,6 +89,15 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     S=fft(spec_mem.*hanning(Nspec)',Nspec);
     SdB = 0.9*SdB + 0.1*20*log10(abs(S));
 
+    % shift down to complex baseband
+
+    for i=1:nin
+      fbb_phase_rx = fbb_phase_rx*fbb_rect';
+      rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+    end
+    mag = abs(fbb_phase_rx);
+    fbb_phase_rx /= mag;
+
     % frequency offset estimation and correction
 
     [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);

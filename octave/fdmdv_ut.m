@@ -175,6 +175,8 @@ for f=1:frames
     fbb_phase_rx = fbb_phase_rx*fbb_rect';
     rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
   end
+  mag = abs(fbb_phase_rx);
+  fbb_phase_rx /= mag;
 
   % frequency offset estimation and correction, need to call rx_est_freq_offset even in sync
   % mode to keep states updated
@@ -195,10 +197,6 @@ for f=1:frames
   end
 
   rx_fdm_filter = rxdec_filter(rx_fdm, M);
-
-  % TODO: Decimate to rate Q at this point, this will save some more CPU
-  %       in down_convert_and_rx_filter
-
   rx_filt = down_convert_and_rx_filter(rx_fdm_filter, M, M/Q);
 
   [rx_symbols rx_timing] = rx_est_timing(rx_filt, M);

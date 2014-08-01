@@ -64,7 +64,7 @@ noise_est_log = [];
 % adjust this if the screen is getting a bit cluttered
 
 global no_plot_list;
-no_plot_list = [1 2 3 4 5 6 7 8 16];
+no_plot_list = [];
 
 for f=1:frames
 
@@ -92,7 +92,16 @@ for f=1:frames
   channel = channel(nin+1:channel_count);
   channel_count -= nin;
 
-  % demodulator
+  % demodulator --------------------------------------------
+
+  % shift down to complex baseband
+
+  for i=1:nin
+    fbb_phase_rx = fbb_phase_rx*fbb_rect';
+    rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+  end
+  mag = abs(fbb_phase_rx);
+  fbb_phase_rx /= mag;
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
 
@@ -119,14 +128,8 @@ for f=1:frames
     rx_fdm_fcorr(i) = rx_fdm(i)*foff_phase_rect;
   end
 
-if 1
-  % more memory efficient but more complex
-  rx_filt = down_convert_and_rx_filter(rx_fdm_fcorr, nin);
-else
-  rx_baseband = fdm_downconvert(rx_fdm_corr,nin);
-  rx_baseband_log = [rx_baseband_log rx_baseband];
-  rx_filt = rx_filter(rx_baseband, nin);
-end
+  rx_fdm_filter = rxdec_filter(rx_fdm_fcorr, nin);
+  rx_filt = down_convert_and_rx_filter(rx_fdm_filter, nin, M/Q);
 
   rx_filt_log = [rx_filt_log rx_filt];
 
