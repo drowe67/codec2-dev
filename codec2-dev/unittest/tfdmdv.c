@@ -56,6 +56,7 @@ int main(int argc, char *argv[])
     float         foff_coarse;
     int           nin, next_nin;
     COMP          rx_fdm_fcorr[M+M/P];
+    COMP          rx_fdm_filter[M+M/P];
     COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
     float         rx_timing;
@@ -115,7 +116,7 @@ int main(int argc, char *argv[])
 	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, 0);
 	memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(FDMDV_NC+1));
 	tx_filter(tx_baseband, FDMDV_NC, tx_symbols, fdmdv->tx_filter_memory);
-	fdm_upconvert(tx_fdm, FDMDV_NC, tx_baseband, fdmdv->phase_tx, fdmdv->freq);
+	fdm_upconvert(tx_fdm, FDMDV_NC, tx_baseband, fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
 
 	/* --------------------------------------------------------*\
 	                          Channel
@@ -149,6 +150,10 @@ int main(int argc, char *argv[])
 	                        Demodulator
 	\*---------------------------------------------------------*/
 
+        /* shift down to complex baseband */
+
+        fdmdv_freq_shift(rx_fdm, rx_fdm, -FDMDV_FCENTRE, &fdmdv->fbb_phase_rx, nin);
+
 	/* freq offset estimation and correction */
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
@@ -161,8 +166,9 @@ int main(int argc, char *argv[])
 	
 	/* baseband processing */
 
-        down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_fcorr, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
-                                   fdmdv->freq_pol, nin);
+        rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, nin);
+        down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
+                                   fdmdv->freq_pol, nin, M/Q);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);	 
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
 
