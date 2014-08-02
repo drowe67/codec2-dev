@@ -9,8 +9,8 @@
 % Version 2
 %
 
-function fdmdv_demod_c(dumpfilename, bits)
-  NumCarriers = 16;
+function fdmdv_demod_c(dumpfilename, bits, NumCarriers)
+ 
   fdmdv; % include modem code
 
   frames = bits/(Nc*Nb);
@@ -68,6 +68,9 @@ function fdmdv_demod_c(dumpfilename, bits)
     test_frame_sync_state = next_test_frame_sync_state;
     test_frame_sync_log = [test_frame_sync_log test_frame_sync_state];
   end
+
+  ber = total_bit_errors / total_bits;
+  printf("%d bits  %d errors  BER: %1.4f\n",total_bits, total_bit_errors, ber);
 
   % ---------------------------------------------------------------------
   % Plots

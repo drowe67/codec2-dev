@@ -104,7 +104,6 @@ for f=1:frames
   fbb_phase_rx /= mag;
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
-
   [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
 
   %sync = 0; % when debugging good idea to uncomment this to "open loop"
@@ -147,7 +146,7 @@ for f=1:frames
   end
   nin_log = [nin_log nin];
 
-  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
   phase_difference_log = [phase_difference_log pd];
 
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
@@ -158,7 +157,7 @@ for f=1:frames
   rx_bits_log = [rx_bits_log rx_bits]; 
   foff_fine_log = [foff_fine_log foff_fine];
   sync_bit_log = [sync_bit_log sync_bit];  
-  foff -= 0.5*foff_fine;
+  foff -= 0.5*f_err;
   foff_log = [foff_log foff];
 
   % freq est state machine
