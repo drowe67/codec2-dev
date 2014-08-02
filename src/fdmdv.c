@@ -1750,6 +1750,37 @@ void fdmdv_dump_osc_mags(struct FDMDV *f)
     fprintf(stderr, "\n\n");
 }
 
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: randn()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 2 August 2014
+
+  Simple approximation to normal (gaussian) random number generator
+  with 0 mean and unit variance.
+
+\*---------------------------------------------------------------------------*/
+
+#define RANDN_IT 12  /* This magic number of iterations gives us a
+                        unit variance.  I think beacuse var =
+                        (b-a)^2/12 for one uniform random variable, so
+                        for a sum of n random variables it's
+                        n(b-a)^2/12, or for b=1, a = 0, n=12, we get
+                        var = 12(1-0)^2/12 = 1 */ 
+
+static float randn() {
+    int   i;
+    float rn = 0.0;
+
+    for(i=0; i<RANDN_IT; i++)
+        rn += (float)rand()/RAND_MAX;
+
+    rn -= (float)RANDN_IT/2.0;
+    return rn;
+}
+
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdmdv_simulate_channel()	     
@@ -1766,7 +1797,7 @@ void fdmdv_dump_osc_mags(struct FDMDV *f)
 
 void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float target_snr) 
 {
-    float sig_pwr, target_snr_linear, noise_pwr, noise_pwr_4k, var_uniform, noise_gain;
+    float sig_pwr, target_snr_linear, noise_pwr, noise_pwr_1Hz, noise_pwr_4000Hz, noise_gain;
     int   i;
 
     /* estimate signal power */
@@ -1775,24 +1806,26 @@ void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float targ
     for(i=0; i<nin; i++)
         sig_pwr += samples[i].real*samples[i].real + samples[i].imag*samples[i].imag;
     
-    f->sig_pwr_av = 0.9*f->sig_pwr_av + 0.1*(sig_pwr/nin);
+    sig_pwr /= nin;
+
+    f->sig_pwr_av = 0.9*f->sig_pwr_av + 0.1*sig_pwr;
 
     /* det noise to meet target SNR */
 
     target_snr_linear = powf(10.0, target_snr/10.0);
-    noise_pwr = f->sig_pwr_av/target_snr_linear;
-    noise_pwr_4k = 0.75*noise_pwr;                     /* this is the equivalent power scaled to a 4000 Hz BW */
+    noise_pwr = f->sig_pwr_av/target_snr_linear;       /* noise pwr in a 3000 Hz BW     */
+    noise_pwr_1Hz = noise_pwr/3000.0;                  /* noise pwr in a 1 Hz bandwidth */
+    noise_pwr_4000Hz = noise_pwr_1Hz*4000.0;           /* noise pwr in a 4000 Hz BW, which 
+                                                          due to fs=8000 Hz in our simulation noise BW */
 
-    /* for convenience we are using a uniform random number generator */
-
-    var_uniform = 1.0/12.0;
-    noise_gain = sqrtf(0.5*noise_pwr_4k/var_uniform);
-
+    noise_gain = sqrtf(0.5*noise_pwr_4000Hz);          /* split noise pwr between real and imag sides  */
+    
     for(i=0; i<nin; i++) {
-        samples[i].real += noise_gain*(((float)rand()/RAND_MAX) - 0.5);
-        samples[i].imag += noise_gain*(((float)rand()/RAND_MAX) - 0.5);
+        samples[i].real += noise_gain*randn();
+        samples[i].imag += noise_gain*randn();
     }
-
-    //printf("f->sig_pwr_av: %f target_snr_linear: %f noise_pwr_4k: %f noise_gain: %f\n", 
-    //       f->sig_pwr_av, target_snr_linear, noise_pwr_4k, noise_gain);
+    /*    
+    fprintf(stderr, "sig_pwr: %f f->sig_pwr_av: %e target_snr_linear: %f noise_pwr_4000Hz: %e noise_gain: %e\n", 
+            sig_pwr, f->sig_pwr_av, target_snr_linear, noise_pwr_4000Hz, noise_gain);
+    */
 }

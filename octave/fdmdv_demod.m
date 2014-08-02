@@ -19,7 +19,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
   frames = nbits/(Nc*Nb);
 
   prev_rx_symbols = ones(Nc+1,1);
-  foff_phase = 1;
+  foff_phase_rect = 1;
 
   % BER stats
 
@@ -40,6 +40,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
   rx_symbols_log = [];
   rx_timing_log = [];
+  foff_coarse_log = [];
   foff_log = [];
   rx_fdm_log = [];
   snr_est_log = [];
@@ -106,22 +107,22 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     if sync == 0
       foff  = foff_coarse;
     end
-    foff_log = [ foff_log foff ];
+    foff_coarse_log = [foff_coarse_log foff_coarse];
+
     foff_rect = exp(j*2*pi*foff/Fs);
 
     for i=1:nin
-      foff_phase *= foff_rect';
-      rx_fdm(i) = rx_fdm(i)*foff_phase;
+      foff_phase_rect *= foff_rect';
+      rx_fdm_fcorr(i) = rx_fdm(i)*foff_phase_rect;
     end
 
     % baseband processing
 
-    rx_baseband = fdm_downconvert(rx_fdm, nin);
-    rx_filt = rx_filter(rx_baseband, nin);
-
+    rx_fdm_filter = rxdec_filter(rx_fdm_fcorr, nin);
+    rx_filt = down_convert_and_rx_filter(rx_fdm_filter, nin, M/Q);
     [rx_symbols rx_timing] = rx_est_timing(rx_filt, nin);
-
     rx_timing_log = [rx_timing_log rx_timing];
+
     nin = M;
     if rx_timing > 2*M/P
        nin += M/P;
@@ -130,11 +131,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
        nin -= M/P;
     end
 
-    if strcmp(modulation,'dqpsk')
-      rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols./abs(prev_rx_symbols))*exp(j*pi/4)];
-    else
-      rx_symbols_log = [rx_symbols_log rx_symbols];
-    endif
+    rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols./abs(prev_rx_symbols))*exp(j*pi/4)];
     [rx_bits sync_bit f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
 
     % optionally save output symbols 
@@ -167,11 +164,12 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
     % update some states
 
+    prev_rx_symbols = rx_symbols;
     [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
     snr_est = calc_snr(sig_est, noise_est);
     snr_est_log = [snr_est_log snr_est];
     foff -= 0.5*f_err;
-    prev_rx_symbols = rx_symbols;
+    foff_log = [foff_log foff];
 
     % freq est state machine
 
