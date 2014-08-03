@@ -38,7 +38,7 @@
 #include "codec2_fdmdv.h"
 #include "octave.h"
 
-#define FRAMES 25
+#define FRAMES 35
 #define CHANNEL_BUF_SIZE (10*M)
 
 extern float pilot_coeff[];

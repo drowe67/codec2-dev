@@ -18,7 +18,7 @@ fdmdv; % load modem code
 global passes;
 global fails;
 passes = fails = 0;
-frames = 25;
+frames = 35;
 prev_tx_symbols = ones(Nc+1,1);
 prev_rx_symbols = ones(Nc+1,1);
 foff_phase_rect = 1;
@@ -64,7 +64,7 @@ noise_est_log = [];
 % adjust this if the screen is getting a bit cluttered
 
 global no_plot_list;
-no_plot_list = [];
+no_plot_list = [1 2 3 4 5 6 7 8 11 12 13 14 15 16];
 
 for f=1:frames
 
@@ -146,8 +146,12 @@ for f=1:frames
   end
   nin_log = [nin_log nin];
 
-  [rx_bits sync_bit f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
   phase_difference_log = [phase_difference_log pd];
+
+  foff_fine_log = [foff_fine_log foff_fine];
+  foff -= 0.5*foff_fine;
+  foff_log = [foff_log foff];
 
   [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
   sig_est_log = [sig_est_log sig_est];
@@ -155,10 +159,7 @@ for f=1:frames
 
   prev_rx_symbols = rx_symbols;
   rx_bits_log = [rx_bits_log rx_bits]; 
-  foff_fine_log = [foff_fine_log foff_fine];
   sync_bit_log = [sync_bit_log sync_bit];  
-  foff -= 0.5*f_err;
-  foff_log = [foff_log foff];
 
   % freq est state machine
 

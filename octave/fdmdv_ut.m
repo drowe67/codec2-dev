@@ -12,8 +12,8 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 20;
-EbNo_dB = 63;
+frames = 200;
+EbNo_dB = 6.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
 hpa_clip = 150;
