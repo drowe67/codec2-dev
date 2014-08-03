@@ -818,7 +818,7 @@ void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: fdm_downconvert()	     
+  FUNCTION....: fdm_downconvert     
   AUTHOR......: David Rowe			      
   DATE CREATED: 22/4/2012
 
@@ -999,7 +999,9 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
     float windback_phase, mag;
     COMP  windback_phase_rect;
     COMP  rx_baseband[NFILTER+M];
-    TIMER_VAR(windback_start,  downconvert_start, filter_start);
+    COMP  f_rect;
+
+    //TIMER_VAR(windback_start,  downconvert_start, filter_start);
 
     /* update memory of rx_fdm */
 
@@ -1023,12 +1025,12 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
           phase continuity.
         */
 
-        TIMER_SAMPLE(windback_start);
+        //TIMER_SAMPLE(windback_start);
         windback_phase           = -freq_pol[c]*NFILTER;
         windback_phase_rect.real = cosf(windback_phase);
         windback_phase_rect.imag = sinf(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
-        TIMER_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback"); 
+        //TIMER_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback"); 
     
         /* down convert all samples in buffer */
 
@@ -1036,11 +1038,17 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
         st -= nin-1;          /* first new sample               */
         st -= NFILTER;        /* first sample used in filtering */
         
-        for(i=st; i<NFILTER+M; i++) {
-            phase_rx[c]    = cmult(phase_rx[c], freq[c]);
+        /* freq shift per dec_rate step is dec_rate times original shift */
+
+        f_rect = freq[c];
+        for(i=0; i<dec_rate-1; i++)
+            f_rect = cmult(f_rect,freq[c]);
+
+        for(i=st; i<NFILTER+M; i+=dec_rate) {
+            phase_rx[c]    = cmult(phase_rx[c], f_rect);
             rx_baseband[i] = cmult(rx_fdm_mem[i],cconj(phase_rx[c]));
         }
-        TIMER_SAMPLE_AND_LOG(filter_start, downconvert_start, "        downconvert"); 
+        //TIMER_SAMPLE_AND_LOG(filter_start, downconvert_start, "        downconvert"); 
  
         /* now we can filter this carrier's P symbols */
 
@@ -1056,7 +1064,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
            rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
            #endif
         }
-        TIMER_SAMPLE_AND_LOG2(filter_start, "        filter"); 
+        //TIMER_SAMPLE_AND_LOG2(filter_start, "        filter"); 
 
         /* normalise digital oscilators as the magnitude can drift over time */
 
@@ -1465,6 +1473,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     float         foff_coarse, foff_fine;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_fdm_filter[M+M/P];
+    COMP          rx_fdm_bb[M+M/P];
     COMP          rx_filt[NC+1][P+1];
     COMP          rx_symbols[NC+1];
     float         env[NT*P];
@@ -1474,17 +1483,17 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
     /* shift down to complex baseband */
 
-    fdmdv_freq_shift(rx_fdm, rx_fdm, -FDMDV_FCENTRE, &fdmdv->fbb_phase_rx, *nin);
+    fdmdv_freq_shift(rx_fdm_bb, rx_fdm, -FDMDV_FCENTRE, &fdmdv->fbb_phase_rx, *nin);
 
     /* freq offset estimation and correction */
    
     TIMER_SAMPLE(demod_start);
-    foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, *nin);
+    foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin);
     TIMER_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset"); 
     
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
-    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
+    fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm_bb, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
     TIMER_SAMPLE_AND_LOG(down_convert_and_rx_filter_start, fdmdv_freq_shift_start, "    fdmdv_freq_shift"); 
  	
     /* baseband processing */

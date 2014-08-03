@@ -389,8 +389,10 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin, dec_rate)
      st -= nin-1;          % first new sample
      st -= Nfilter;        % first sample used in filtering
      
-     for i=st:Nfilter+M
-        phase_rx(c) = phase_rx(c) * freq(c);
+     f_rect = freq(c) .^ dec_rate;
+
+     for i=st:dec_rate:Nfilter+M
+        phase_rx(c) = phase_rx(c) * f_rect;
 	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
      end
  
