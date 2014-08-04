@@ -35,6 +35,10 @@
 
 #include "freedv_api.h"
 
+void my_put_next_rx_char(void *callback_state, char c) {
+    fprintf(stderr, "%c", c);
+}
+
 int main(int argc, char *argv[]) {
     FILE          *fin, *fout;
     short          speech_out[FREEDV_NSAMPLES];
@@ -65,6 +69,8 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(FREEDV_MODE_1600);
     assert(freedv != NULL);
 
+    freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
+
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx
        sample clock frequencies.  Note also the number of output
@@ -75,6 +81,12 @@ int main(int argc, char *argv[]) {
         nout = freedv_rx(freedv, speech_out, demod_in);
         fwrite(speech_out, sizeof(short), nout, fout);
         nin = freedv_nin(freedv);
+
+	/* if this is in a pipeline, we probably don't want the usual
+           buffering to occur */
+
+        if (fout == stdout) fflush(stdout);
+        if (fin == stdin) fflush(stdin);         
     }
 
     freedv_close(freedv);

@@ -184,6 +184,7 @@ set(CODEC2_SRCS
     codebookge.c
     golay23.c
     freedv_api.c
+    varicode.c
 )
 
 add_library(codec2 ${CODEC2_SRCS})
