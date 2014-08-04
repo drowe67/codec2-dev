@@ -6,31 +6,41 @@ and below.  For more information please see:
 
     http://rowetel.com/codec2.html
 
-Also included is a FDMDV modem, see README_fdmdv.txt
+Also included is a FDMDV modem (README_fdmdv.txt), and an API for
+embeddeding FreeDV in other programs (see example below).  For more
+information on building Codec 2 see READE.cmake
 
 Quickstart
 ----------
 
 1/ Listen to Codec 2:
- *** FIRST STEP OBSOLETE: See README.cmake for building ***
-   $ ./configure && make
-   $ cd src
-   $ ./c2demo ../raw/hts1a.raw hts1a_c2.raw
-   $ ../script/menu.sh ../raw/hts1a.raw hts1a_c2.raw
-
-   NOTE: For playback testing, menu.sh requires either the 'play',
-   'aplay' or 'ossplay' programs to be installed (see
-   http://sox.sourceforge.net/, http://www.alsa-project.org/, or
-   http://www.opensound.com/ respectively).
+   $ cd codec2
+   $ mkdir build_linux
+   $ cmake ..
+   $ make
+   $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
+   $ play ../raw/hts1a.raw hts1a_c2.raw
 
 2/ Compress and Decompress a file:
 
-   $ ./c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
-   $ ./c2dec 2400 hts1a_c2.bit hts1a_c2.raw 
+   $ ./src/c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
+   $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2.raw 
 
 3/ Same thing with pipes:
 
-   $ ./c2enc 1400 ../raw/hts1a.raw - | ./c2dec 1400 - - | play -t raw -r 8000 -s -2 -
+   $ ./src/c2enc 1400 ../raw/hts1a.raw - | ./src/c2dec 1400 - - | play -t raw -r 8000 -s -2 -
+
+Embedded FreeDV API
+-------------------
+
+See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
+freedv_rx.  Quickstart:
+
+  $ ./freedv_tx ../../raw/hts1.raw - | ./freedv_rx - - | play -t raw -r 8000 -s -2 -
+
+Or with a simulated 2 dB SNR channel:
+
+  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - | play -t raw -r 8000 -s -2 
 
 Programs
 --------
@@ -64,21 +74,12 @@ Debugging
 Directories
 -----------
 
-  fltk      - FLTK GUI programs(s)
   octave    - Octave scripts used for visualising internal signals 
               during development
-  portaudio - Portaudio test programs
   script    - shell scripts for playing and converting raw files
   src       - C source code
   raw       - speech files in raw format (16 bits signed linear 8 kHz)
   unittest  - unit test source code
-  voicing   - hand-estimated voicing files, used for development
   wav       - speech files in wave file format
-  win32     - Support for building Windows DLL version of Codec 2 and FDMDV libraries
+  stm32     - Support for the STM32F4 microcntroller
 
-TODO
-----
-
-[ ] Get win32/Makefile integrated into Automake system, such that if
-    i586-mingw32msvc exists the Win32 code gets automatically built.
-[ ] Same for fltk & portaudio, build these conditionally if libs exist
