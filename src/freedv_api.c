@@ -8,7 +8,7 @@
   embedding FreeDV in other programs.
       
   TODO:
-    [ ] speex tx/rx works
+    [X] speex tx/rx works
     [ ] txt messages
     [ ] optional test tx framemode
                                                                        
@@ -39,6 +39,7 @@
 #include "codec2.h"
 #include "codec2_fdmdv.h"
 #include "golay23.h"
+#include "varicode.h"
 #include "freedv_api.h"
 
 /*---------------------------------------------------------------------------*\
@@ -96,6 +97,12 @@ struct freedv *freedv_open(int mode) {
         || (f->tx_bits == NULL) || (f->rx_bits == NULL) || (f->fdmdv_bits == NULL))
         return NULL;
 
+    varicode_decode_init(&f->varicode_dec_states, 0);
+    f->nvaricode_bits = 0;
+    f->varicode_bit_index = 0;
+    f->freedv_get_next_tx_char = NULL;
+    f->freedv_put_next_rx_char = NULL;
+
     golay23_init();
 
     return f;
@@ -129,14 +136,15 @@ void freedv_close(struct freedv *freedv) {
   Takes a frame of input speech samples, encodes and modulates them to produce
   a frame of modem samples that can be sent to the transmitter.
 
-  Both speech_in[] and mod_out[] are FREEDV_NSAMPLES long.
+  speech_in[] and mod_out[] are sampled at 8 kHz, 16 bit shorts,
+  and FREEDV_NSAMPLES long.
 
 \*---------------------------------------------------------------------------*/
 
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     int    bit, byte, i, j;
     int    bits_per_codec_frame, bits_per_fdmdv_frame;
-    int    data, codeword1;
+    int    data, codeword1, data_flag_index;
     COMP   tx_fdm[2*FDMDV_NOM_SAMPLES_PER_FRAME];
      
     bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
@@ -156,6 +164,27 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
         }
     }
     
+    // spare bit in frame that codec defines.  Use this 1
+    // bit/frame to send txt messages
+
+    data_flag_index = codec2_get_spare_bit_index(f->codec2);
+    assert(data_flag_index != -1); // not supported for all rates
+   
+    if (f->nvaricode_bits) {
+        f->codec_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
+        f->nvaricode_bits--;
+    } 
+    
+    if (f->nvaricode_bits == 0) {
+        /* get new char and encode */
+        char s[2];
+        if (f->freedv_get_next_tx_char != NULL) {
+            s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
+            f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 0);
+            f->varicode_bit_index = 0;
+        }
+    }
+
     if (f->mode == FREEDV_MODE_1600) {
             
         /* Protect first 12 out of first 16 excitation bits with (23,12) Golay Code:
@@ -219,6 +248,8 @@ int freedv_nin(struct freedv *f) {
   Takes a frame of samples from the radio receiver, demodulates them,
   then decodes them, producing a frame of decoded speech samples.  
 
+  Both demod_in[] and speech_out[] are 16 bit shorts sampled at 8 kHz.
+
   To account for difference in the transmit and receive sample clock
   frequencies, the number of demod_in[] samples is time varying.  It
   is the responsibility of the caller to pass the correct number of
@@ -235,8 +266,10 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     COMP                rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
     int                 reliable_sync_bit, i, j, bit, byte, nin_prev, nout;
-    int                 recd_codeword, codeword1;
+    int                 recd_codeword, codeword1, data_flag_index, n_ascii, valid;
     struct FDMDV_STATS  fdmdv_stats;
+    short               abit[1];
+    char                ascii_out;
 
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
@@ -288,6 +321,24 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
                 }
             }
 
+            // extract txt msg data bit ------------------------------------------------------------
+
+            data_flag_index = codec2_get_spare_bit_index(f->codec2);
+            assert(data_flag_index != -1); // not supported for all rates
+
+            abit[0] = f->codec_bits[data_flag_index];
+
+            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, abit, 1, 1);
+            assert((n_ascii == 0) || (n_asacii == 1));
+            if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+            }
+
+            // reconstruct missing bit we steal for data bit and decode speech
+
+            valid = codec2_rebuild_spare_bit(f->codec2, f->codec_bits);
+            assert(valid != -1);
+
             // pack bits, MSB received first
 
             bit  = 7;
@@ -323,36 +374,5 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     }
 
     return nout;
-}
-
-/*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: freedv_tx_text
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 3 August 2014
-
-  Attempt to transmit an ASCII character.  Will return non-zero if
-  character was accepted, zero if the (single character) buffer is
-  full.
-
-\*---------------------------------------------------------------------------*/
-
-int freedv_tx_text(struct freedv *mode, char c) {
-    return 0;
-}
-
-/*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: freedv_tx_text
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 3 August 2014
-
-  Attempt to receive an ASCII character.  Will return non-zero if a new
-  character is available, zero otherwise.
-
-\*---------------------------------------------------------------------------*/
-
-int freedv_rx_text(struct freedv *mode, char *c) {
-    return 0;
 }
 

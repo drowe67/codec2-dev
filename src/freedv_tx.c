@@ -33,11 +33,28 @@
 
 #include "freedv_api.h"
 
+struct my_callback_state {
+    char  tx_str[80];
+    char *ptx_str;
+};
+
+char my_get_next_tx_char(void *callback_state) {
+    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+    char  c = *pstate->ptx_str++;
+    
+    if (*pstate->ptx_str == 0) {
+        pstate->ptx_str = pstate->tx_str;
+    }
+    
+    return c;
+}
+
 int main(int argc, char *argv[]) {
-    FILE          *fin, *fout;
-    short          speech_in[FREEDV_NSAMPLES];
-    short          mod_out[FREEDV_NSAMPLES];
-    struct freedv *freedv;
+    FILE                     *fin, *fout;
+    short                     speech_in[FREEDV_NSAMPLES];
+    short                     mod_out[FREEDV_NSAMPLES];
+    struct freedv            *freedv;
+    struct my_callback_state  my_cb_state;
 
     if (argc < 3) {
 	printf("usage: %s InputRawSpeechFile OutputModemRawFile\n", argv[0]);
@@ -62,9 +79,24 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(FREEDV_MODE_1600);
     assert(freedv != NULL);
 
+    /* set up callback for txt msg chars */
+
+    sprintf(my_cb_state.tx_str, "cq cq cq hello world\n");
+    my_cb_state.ptx_str = my_cb_state.tx_str;
+    freedv->callback_state = (void*)&my_cb_state;
+    freedv->freedv_get_next_tx_char = &my_get_next_tx_char;
+
+    /* OK main loop */
+
     while(fread(speech_in, sizeof(short), FREEDV_NSAMPLES, fin) == FREEDV_NSAMPLES) {
         freedv_tx(freedv, mod_out, speech_in);
         fwrite(mod_out, sizeof(short), FREEDV_NSAMPLES, fout);
+
+	/* if this is in a pipeline, we probably don't want the usual
+           buffering to occur */
+
+        if (fout == stdout) fflush(stdout);
+        if (fin == stdin) fflush(stdin);         
     }
 
     freedv_close(freedv);
