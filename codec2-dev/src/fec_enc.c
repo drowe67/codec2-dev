@@ -267,6 +267,10 @@ int main(int argc, char *argv[])
                 unpacked_output_bits[i] = (codeword1 >> (10-j)) & 0x1;
             }
             unpacked_output_bits[i] = 0; /* spare bit */
+
+            //for(i=0; i<bits_per_input_frame+12; i++)
+            //    printf("%d\n", unpacked_output_bits[i]);
+
         }
 
         /* pack bits, MSB first  */

@@ -183,6 +183,7 @@ set(CODEC2_SRCS
     codebookdt.c
     codebookge.c
     golay23.c
+    freedv_api.c
 )
 
 add_library(codec2 ${CODEC2_SRCS})
@@ -226,8 +227,8 @@ target_link_libraries(fdmdv_demod ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c)
 target_link_libraries(fdmdv_put_test_bits ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(fdmdv_channel fdmdv_channel.c fdmdv.c kiss_fft.c)
-target_link_libraries(fdmdv_channel ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(fdmdv_channel fdmdv_channel.c)
+target_link_libraries(fdmdv_channel ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fdmdv_interleave fdmdv_interleave.c)
 target_link_libraries(fdmdv_interleave ${CMAKE_REQUIRED_LIBRARIES})
@@ -240,6 +241,13 @@ target_link_libraries(fec_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fec_dec fec_dec.c golay23.c)
 target_link_libraries(fec_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_tx freedv_tx.c)
+target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(freedv_rx freedv_rx.c)
+target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 
 install(TARGETS
     codec2
