@@ -7,11 +7,14 @@ and below.  For more information please see:
     http://rowetel.com/codec2.html
 
 Also included is a FDMDV modem (README_fdmdv.txt), and an API for
-embeddeding FreeDV in other programs (see example below).  For more
+embedding FreeDV in other programs (see example below).  For more
 information on building Codec 2 see READE.cmake
 
 Quickstart
 ----------
+
+NOTE: Use the "codec2" or "codec2-dev" depending on which repository
+      you are working with
 
 1/ Listen to Codec 2:
    $ cd codec2
@@ -36,11 +39,16 @@ Embedded FreeDV API
 See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
 freedv_rx.  Quickstart:
 
-  $ ./freedv_tx ../../raw/hts1.raw - | ./freedv_rx - - | play -t raw -r 8000 -s -2 -
+  $ ./freedv_tx ../../raw/hts1.raw - | ./freedv_rx - - | play -t raw -r 8000 -s -2 -q -
 
 Or with a simulated 2 dB SNR channel:
 
-  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - | play -t raw -r 8000 -s -2 
+  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - | play -t raw -r 8000 -s -2 -q -
+
+To log the demod state information and received text msg characters to a text file:
+
+  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - log.txt | play -t raw -r 8000 -s -2 -q -
+  $ cat log.txt
 
 Programs
 --------
@@ -61,25 +69,34 @@ switching phase modelling or LSP quantisation on and off.
 Debugging
 ---------
 
-1/ For dump file support:
+1/ To compile with debug symbols for using gdb:
 
-  $ cd codec2
-  $ CFLAGS=-DDUMP ./configure
-  $ make clean && make
+  $ cd ~/codec2
+  $ rm -Rf build_linux && mkdir build_linux
+  $ cd build_linux
+  $ CFLAGS=-g cmake ..
+  $ make
 
-2/ To use gdb:
+2/ For dump file support:
 
-  $ libtool --mode=execute gdb c2sim
+  $ cd ~/codec2
+  $ rm -Rf build_linux && mkdir build_linux
+  $ CFLAGS=-DDUMP cmake ..
+  $ cd build_linux
+  $ make
 
 Directories
 -----------
 
-  octave    - Octave scripts used for visualising internal signals 
-              during development
-  script    - shell scripts for playing and converting raw files
-  src       - C source code
-  raw       - speech files in raw format (16 bits signed linear 8 kHz)
-  unittest  - unit test source code
-  wav       - speech files in wave file format
-  stm32     - Support for the STM32F4 microcntroller
+  asterisk &  - unmaintained Asterisk support
+  asterisk-11 
+  cmake       - cmake support files
+  octave      - Octave scripts used for visualising internal signals 
+                during development
+  script      - shell scripts for playing and converting raw files
+  src         - C source code for Codec 2, FDMDV modem, FreeDV API
+  raw         - speech files in raw format (16 bits signed linear 8 kHz)
+  stm32       - Support for the STM32F4 microcontroller and SM1000 FreeDV speaker-mic
+  unittest    - unit test source code
+  wav         - speech files in wave file format
 

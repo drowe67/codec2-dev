@@ -9,7 +9,7 @@
       
   TODO:
     [X] speex tx/rx works
-    [ ] txt messages
+    [X] txt messages
     [ ] optional test tx framemode
                                                                        
 \*---------------------------------------------------------------------------*/
@@ -104,6 +104,7 @@ struct freedv *freedv_open(int mode) {
     f->freedv_put_next_rx_char = NULL;
 
     golay23_init();
+    f->total_bit_errors = 0;
 
     return f;
 }
@@ -168,7 +169,6 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     // bit/frame to send txt messages
 
     data_flag_index = codec2_get_spare_bit_index(f->codec2);
-    assert(data_flag_index != -1); // not supported for all rates
    
     if (f->nvaricode_bits) {
         f->codec_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
@@ -266,8 +266,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     COMP                rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
     int                 reliable_sync_bit, i, j, bit, byte, nin_prev, nout;
-    int                 recd_codeword, codeword1, data_flag_index, n_ascii, valid;
-    struct FDMDV_STATS  fdmdv_stats;
+    int                 recd_codeword, codeword1, data_flag_index, n_ascii;
     short               abit[1];
     char                ascii_out;
 
@@ -282,9 +281,9 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
     nin_prev = f->nin;
     fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, rx_fdm, &f->nin);
-    fdmdv_get_demod_stats(f->fdmdv, &fdmdv_stats);
+    fdmdv_get_demod_stats(f->fdmdv, &f->fdmdv_stats);
     
-    if (fdmdv_stats.sync) {
+    if (f->fdmdv_stats.sync) {
         if (reliable_sync_bit == 0) {
             memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
             nout = 0;
@@ -307,6 +306,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
                     recd_codeword |= f->rx_bits[i];
                 }
                 codeword1 = golay23_decode(recd_codeword);
+                f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
+
                 //codeword1 = recd_codeword;
                 //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
            
@@ -324,20 +325,16 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
             // extract txt msg data bit ------------------------------------------------------------
 
             data_flag_index = codec2_get_spare_bit_index(f->codec2);
-            assert(data_flag_index != -1); // not supported for all rates
-
             abit[0] = f->codec_bits[data_flag_index];
 
             n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, abit, 1, 1);
-            assert((n_ascii == 0) || (n_asacii == 1));
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }
 
             // reconstruct missing bit we steal for data bit and decode speech
 
-            valid = codec2_rebuild_spare_bit(f->codec2, f->codec_bits);
-            assert(valid != -1);
+            codec2_rebuild_spare_bit(f->codec2, f->codec_bits);
 
             // pack bits, MSB received first
 
@@ -357,7 +354,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
             /* squelch if beneath SNR threshold */
 
-            if (fdmdv_stats.snr_est < f->snr_thresh) {
+            if (f->fdmdv_stats.snr_est < f->snr_thresh) {
                 for(i=0; i<FREEDV_NSAMPLES; i++)
                     speech_out[i] = 0;
             }
