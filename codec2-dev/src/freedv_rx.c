@@ -35,20 +35,28 @@
 
 #include "freedv_api.h"
 
+struct my_callback_state {
+    FILE *ftxt;
+};
+
 void my_put_next_rx_char(void *callback_state, char c) {
-    fprintf(stderr, "%c", c);
+    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+    if (pstate->ftxt != NULL) {
+        fprintf(pstate->ftxt, "text char received callback: %c\n", c);
+    }
 }
 
 int main(int argc, char *argv[]) {
-    FILE          *fin, *fout;
-    short          speech_out[FREEDV_NSAMPLES];
-    short          demod_in[FREEDV_NSAMPLES];
-    struct freedv *freedv;
-    int            nin, nout;
+    FILE                      *fin, *fout, *ftxt;
+    short                      speech_out[FREEDV_NSAMPLES];
+    short                      demod_in[FREEDV_NSAMPLES];
+    struct freedv             *freedv;
+    int                        nin, nout, frame;
+    struct my_callback_state   my_cb_state;
 
     if (argc < 3) {
-	printf("usage: %s InputModemSpeechFile OutputSpeechawFile\n", argv[0]);
-	printf("e.g    %s hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
+	printf("usage: %s InputModemSpeechFile OutputSpeechawFile txtLogFile\n", argv[0]);
+	printf("e.g    %s hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
 
@@ -66,9 +74,20 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
     
+    ftxt = NULL;
+    if ( (argc > 3) && (strcmp(argv[3],"|") != 0) ) {
+        if ((ftxt = fopen(argv[3],"wt")) == NULL ) {
+            fprintf(stderr, "Error opening txt Log File: %s: %s.\n",
+                    argv[3], strerror(errno));
+            exit(1);
+        }
+    }
+    
     freedv = freedv_open(FREEDV_MODE_1600);
     assert(freedv != NULL);
 
+    my_cb_state.ftxt = ftxt;
+    freedv->callback_state = (void*)&my_cb_state;
     freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
 
     /* Note we need to work out how many samples demod needs on each
@@ -81,6 +100,14 @@ int main(int argc, char *argv[]) {
         nout = freedv_rx(freedv, speech_out, demod_in);
         fwrite(speech_out, sizeof(short), nout, fout);
         nin = freedv_nin(freedv);
+
+        /* log some side info to the txt file */
+        
+        frame++;
+        if (ftxt != NULL) {
+            fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
+                    freedv->fdmdv_stats.sync, freedv->fdmdv_stats.snr_est, freedv->total_bit_errors);
+        }
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */

@@ -28,24 +28,30 @@
 
 #ifndef __FREEDV__
 
-
-#define FREEDV_MODE_1600    0
-#define FREEDV_NSAMPLES   320
+#define FREEDV_MODE_1600        0
+#define FREEDV_NSAMPLES       320
 
 #include "varicode.h"
+#include "codec2_fdmdv.h"
 
 struct freedv {
     int                  mode;
+
     void                *codec2;
     struct FDMDV        *fdmdv;
+    struct FDMDV_STATS   fdmdv_stats;
+
     unsigned char       *packed_codec_bits;
     int                 *codec_bits;
     int                 *tx_bits;
     int                 *fdmdv_bits;
     int                 *rx_bits;
     int                  tx_sync_bit;
+    int                  total_bit_errors;
+
     float                snr_thresh;
     int                  nin;
+
     struct VARICODE_DEC  varicode_dec_states;
     short                tx_varicode_bits[VARICODE_MAX_BITS];
     int                  nvaricode_bits;

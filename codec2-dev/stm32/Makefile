@@ -64,9 +64,12 @@ $(CODEC2_SRC)/codebookd.c \
 $(CODEC2_SRC)/codebookjvm.c \
 $(CODEC2_SRC)/codebookge.c \
 $(CODEC2_SRC)/dump.c \
-$(CODEC2_SRC)/fdmdv.c
+$(CODEC2_SRC)/fdmdv.c \
+$(CODEC2_SRC)/freedv_api.c \
+$(CODEC2_SRC)/varicode.c \
+$(CODEC2_SRC)/golay23.c
 
-CFLAGS += -D__EMBEDDED__ -DTIMER
+CFLAGS += -D__EMBEDDED__ 
 
 #enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
@@ -106,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf fdmdv_profile.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -134,7 +137,7 @@ src/system_stm32f4xx.c
 CODEC2_PROFILE_SRCS += $(CODEC2_SRCS)
 
 codec2_profile.elf: $(CODEC2_PROFILE_SRCS) 
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -DTIMER $^ -o $@ $(LIBPATHS) $(LIBS)
 
 fft_test.elf: $(FFT_TEST_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
@@ -211,6 +214,31 @@ src/stm32f4_timer.c
 FDMDV_PROFILE_SRCS += $(CODEC2_SRCS)
 
 fdmdv_profile.elf: $(FDMDV_PROFILE_SRCS)
+	$(CC) $(CFLAGS) -DTIMER $^ -o $@ $(LIBPATHS) $(LIBS)
+
+SM1000_LEDS_SWITCHES_UT_SRCS=\
+src/sm1000_leds_switches_ut.c \
+src/sm1000_leds_switches.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+sm1000_leds_switches_ut.elf: $(SM1000_LEDS_SWITCHES_UT_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+SM1000_SRCS=\
+src/sm1000_main.c \
+src/sm1000_leds_switches.c \
+../src/fifo.c \
+src/stm32f4_adc.c \
+src/stm32f4_dac.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+SM1000_SRCS += $(CODEC2_SRCS)
+
+sm1000.elf: $(SM1000_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:

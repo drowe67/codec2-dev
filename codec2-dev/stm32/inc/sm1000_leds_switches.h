@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: leds_switches.h
+  FILE........: sm1000_leds_switches.h
   AUTHOR......: David Rowe
   DATE CREATED: 18 July 2014
 
@@ -28,10 +28,15 @@
 #ifndef __LEDS_SWITCHES__
 #define __LEDS_SWITCHES__
 
-void leds_switches_init(void);
+void sm1000_leds_switches_init(void);
+
 void led_pwr(int state);
 void led_ptt(int state);
 void led_rt(int state);
 void led_err(int state);
+
+int switch_ptt(void);
+int switch_select(void);
+int switch_back(void);
 
 #endif
