@@ -44,7 +44,7 @@ short aSine[] = {
 };
 
 int main(void) {
-    dac_open();
+    dac_open(4*DAC_BUF_SZ);
 
     while (1) {
 

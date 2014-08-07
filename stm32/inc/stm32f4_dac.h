@@ -28,7 +28,9 @@
 #ifndef __STM32F4_DAC__
 #define __STM32F4_DAC__
 
-void dac_open(void);
+#define DAC_BUF_SZ   320
+
+void dac_open(int fifo_sz);
 int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
 int dac2_write(short buf[], int n); /* DAC2 pin PA5 */
 

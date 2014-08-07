@@ -38,7 +38,7 @@ int main(void) {
     /* init all the drivers for various peripherals */
 
     sm1000_leds_switches_init();
-    dac_open();
+    dac_open(4*DAC_BUF_SZ);
     adc_open();
     f = freedv_open(FREEDV_MODE_1600);
 
