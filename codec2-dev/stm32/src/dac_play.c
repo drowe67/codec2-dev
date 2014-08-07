@@ -29,13 +29,13 @@
 #include "stm32f4_dac.h"
 #include "gdb_stdio.h"
 
-#define N   2000
+#define N    (5*DAC_BUF_SZ)
 
 int main(void) {
     short  buf[N];
     FILE  *fplay;
 
-    dac_open();
+    dac_open(2*N);
 
     while(1) {
         fplay = fopen("stm_in.raw", "rb");

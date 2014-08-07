@@ -35,12 +35,18 @@
 /* write to these registers for 12 bit left aligned data, as per data sheet 
    make sure 4 least sig bits set to 0 */
 
-#define DAC_DHR12L1_ADDRESS    0x4000740c
-#define DAC_DHR12L2_ADDRESS    0x40007418
+#define DAC_DHR12R1_ADDRESS    0x40007408
+#define DAC_DHR12R2_ADDRESS    0x40007414
 
-#define DAC_BUF_SZ   320
-#define FIFO_SZ      4*DAC_BUF_SZ
 #define DAC_MAX      4096            /* maximum amplitude */
+
+/* y=mx+c mapping of samples16 bit shorts to DAC samples.  Table: 74
+   of data sheet indicates With DAC buffer on, DAC range is limited to
+   0x0E0 to 0xF1C at VREF+ = 3.6 V, we have Vref=3.3V which is close.
+ */
+
+#define M ((3868.0-224.0)/65536.0)
+#define C 2047.0
 
 static struct FIFO *dac1_fifo;
 static struct FIFO *dac2_fifo;
@@ -54,15 +60,15 @@ static void dac2_config(void);
 
 int dac_underflow;
 
-void dac_open(void) {
+void dac_open(int fifo_size) {
 
     memset(dac1_buf, 32768, sizeof(short)*DAC_BUF_SZ);
     memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
 
     /* Create fifos */
 
-    dac1_fifo = fifo_create(FIFO_SZ);
-    dac2_fifo = fifo_create(FIFO_SZ);
+    dac1_fifo = fifo_create(fifo_size);
+    dac2_fifo = fifo_create(fifo_size);
     assert(dac1_fifo != NULL);
     assert(dac2_fifo != NULL);
 
@@ -155,7 +161,7 @@ static void dac1_config(void)
 
   DMA_DeInit(DMA1_Stream5);
   DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12L1_ADDRESS;
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R1_ADDRESS;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac1_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
   DMA_InitStructure.DMA_BufferSize = DAC_BUF_SZ;
@@ -213,7 +219,7 @@ static void dac2_config(void)
 
   DMA_DeInit(DMA1_Stream6);
   DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
-  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12L2_ADDRESS;
+  DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R2_ADDRESS;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac2_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
   DMA_InitStructure.DMA_BufferSize = DAC_BUF_SZ;
@@ -266,7 +272,7 @@ static void dac2_config(void)
 */
 
 void DMA1_Stream5_IRQHandler(void) {
-    int i, sam;
+    int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
     /* Transfer half empty interrupt - refill first half */
@@ -282,8 +288,8 @@ void DMA1_Stream5_IRQHandler(void) {
         /* convert to unsigned */
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
-            sam = (int)signed_buf[i] + 32768;
-            dac1_buf[i] = (unsigned short)(sam & 0xfff000);
+            sam = (int)(M*(float)signed_buf[i] + C);
+            dac1_buf[i] = (unsigned short)sam;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -303,9 +309,9 @@ void DMA1_Stream5_IRQHandler(void) {
 
         /* convert to unsigned */
 
-        for(i=0; i<DAC_BUF_SZ/2; i++) {
-            sam = (int)signed_buf[i] + 32768;
-            dac1_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam & 0xfff000);
+        for(i=0, j=DAC_BUF_SZ/2; i<DAC_BUF_SZ/2; i++,j++) {
+            sam = (int)(M*(float)signed_buf[i] + C);
+            dac1_buf[j] = (unsigned short)sam;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -319,7 +325,7 @@ void DMA1_Stream5_IRQHandler(void) {
 */
 
 void DMA1_Stream6_IRQHandler(void) {
-    int i, sam;
+    int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
     /* Transfer half empty interrupt - refill first half */
@@ -335,8 +341,8 @@ void DMA1_Stream6_IRQHandler(void) {
         /* convert to unsigned */
 
         for(i=0; i<DAC_BUF_SZ/2; i++) {
-            sam = (int)signed_buf[i] + 32768;
-            dac2_buf[i] = (unsigned short)(sam & 0xfff000);
+            sam = (int)(M*(float)signed_buf[i] + C);
+            dac2_buf[i] = (unsigned short)sam;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -356,9 +362,9 @@ void DMA1_Stream6_IRQHandler(void) {
 
         /* convert to unsigned  */
 
-        for(i=0; i<DAC_BUF_SZ/2; i++) {
-            sam = (int)signed_buf[i] + 32768;
-            dac2_buf[i+DAC_BUF_SZ/2] = (unsigned short)(sam & 0xfff000);
+        for(i=0, j=DAC_BUF_SZ/2; i<DAC_BUF_SZ/2; i++,j++) {
+            sam = (int)(M*(float)signed_buf[i] + C);
+            dac2_buf[j] = (unsigned short)sam;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */

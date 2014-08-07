@@ -122,7 +122,7 @@ int main(int argc, char *argv[]) {
     gpio_init();
     machdep_timer_init ();
     adc_open();
-    dac_open();
+    dac_open(4*DAC_BUF_SZ);
 
     printf("Starting power_ut\n");
 
