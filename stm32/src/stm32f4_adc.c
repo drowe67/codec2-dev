@@ -6,6 +6,18 @@
 
   ADC driver module for STM32F4.
 
+  TODO:
+  [X] just get ADC to run at all, prove its sampling something....
+  [X] as above with DMA
+  [X] half and finished interrupts, ISR
+  [ ] timer config to drive ADC conversion, measure sample rate and confirm 16kHz
+  + larger ADC DMA buffer
+  + fifos
+  + work out a way to unit test
+  [ ] ADC working at same time as DAC
+  [ ] remove (or make optional) the TIM_Config() code that sends PWM output to pins
+  [ ] check comments still valid
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -35,50 +47,144 @@
  
 #include "codec2_fifo.h"
 #include "gdb_stdio.h"
-#include "stm32f4_adc.h"
 
 #define ADC_BUF_SZ   320
-#define FIFO_SZ      4*ADC_BUF_SZ
+#define FIFO_SZ      8000
 
-static struct FIFO *adc1_fifo;
-static struct FIFO *adc2_fifo;
-static unsigned short adc_buf[ADC_BUF_SZ];
-static int adc_overflow;
-static int half,full;
+struct FIFO *DMA2_Stream0_fifo;
+unsigned short adc_buf[ADC_BUF_SZ];
+int adc_overflow;
+int half,full;
 
 #define ADCx_DR_ADDRESS          ((uint32_t)0x4001204C)
 #define DMA_CHANNELx             DMA_Channel_0
 #define DMA_STREAMx              DMA2_Stream0
+#define ADCx                     ADC1
 
 #define TIM1_CCR3_ADDRESS    0x4001223C
 
-static void Timer1Config();
-static void adc_configure();
+TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+TIM_OCInitTypeDef  TIM_OCInitStructure;
+uint16_t uhTimerPeriod;
+uint16_t aSRC_Buffer[3] = {0, 0, 0};
 
-void adc_open(void) {
-    adc1_fifo = fifo_create(FIFO_SZ);
-    adc2_fifo = fifo_create(FIFO_SZ);
-    assert(adc1_fifo != NULL);
-    assert(adc2_fifo != NULL);
+void Timer1Config();
+void adc_configure();
 
-    Timer1Config();
+#define REC_TIME_SECS 5
+#define N   2000
+#define FS  16000
+
+static void tim2_config(void);
+
+int main(void){
+    short  buf[N];
+    FILE  *frec;
+    int    i, bufs;
+
+    DMA2_Stream0_fifo = fifo_create(FIFO_SZ);
+    assert(DMA2_Stream0_fifo != NULL);
+
+    //Timer1Config();
+    tim2_config();
     adc_configure();
     ADC_SoftwareStartConv(ADC1);
+
+    frec = fopen("stm_out.raw", "wb");
+    if (frec == NULL) {
+        printf("Error opening input file: stm_out.raw\n\nTerminating....\n");
+        exit(1);
+    }
+    bufs = FS*REC_TIME_SECS/N;
+
+    printf("Starting!\n");
+    for(i=0; i<bufs; i++) {
+        //ConvertedValue = adc_convert();
+        //printf("ConvertedValue = %d\n", ConvertedValue); 
+        printf("adc_buf: %d %d  half: %d full: %d adc_overflow: %d\n", 
+               adc_buf[0],adc_buf[ADC_BUF_SZ-1],
+               half, full, adc_overflow);
+        while(fifo_read(DMA2_Stream0_fifo, buf, N) == -1);
+        fwrite(buf, sizeof(short), N, frec);      
+    }
+    fclose(frec);
+    printf("Finished!\n");
 }
 
-/* n signed 16 bit samples in buf[] if return != -1 */
+/* DR: TIM_Config configures a couple of I/O pins for PWM output from
+   Timer1 Channel 3.  Note I dont think any of this is needed, except
+   perhaps to check timer frequency.  Can be removed down the track. */
 
-int adc1_read(short buf[], int n) {   
-    return fifo_read(adc1_fifo, buf, n);
+/**
+  * @brief  Configure the TIM1 Pins.
+  * @param  None
+  * @retval None
+  */
+static void TIM_Config(void)
+{
+  GPIO_InitTypeDef GPIO_InitStructure;
+  
+  /* GPIOA and GPIOB clock enable */
+  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
+
+  /* GPIOA Configuration: Channel 3 as alternate function push-pull */
+
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10 ;
+  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
+  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
+  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
+  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
+  GPIO_Init(GPIOA, &GPIO_InitStructure); 
+  GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
+
+  /* GPIOB Configuration: Channel 3N as alternate function push-pull */
+
+  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_15;
+  GPIO_Init(GPIOB, &GPIO_InitStructure);
+  GPIO_PinAFConfig(GPIOB, GPIO_PinSource15, GPIO_AF_TIM1);
 }
 
-int adc2_read(short buf[], int n) {   
-    return fifo_read(adc2_fifo, buf, n);
+static void tim2_config(void)
+{
+  TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
+
+  /* TIM2 Periph clock enable */
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
+  
+  /* --------------------------------------------------------
+  
+  TIM2 input clock (TIM2CLK) is set to 2 * APB1 clock (PCLK1), since
+  APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
+  13 clock tree figure in DM0031020.pdf).
+
+     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
+                    = (HCLK/2)/TIM_ClockDivision
+                    
+  ----------------------------------------------------------- */
+
+  /* Time base configuration */
+
+  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
+  TIM_TimeBaseStructure.TIM_Period = 5250;          
+  TIM_TimeBaseStructure.TIM_Prescaler = 0;       
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
+  TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
+
+  /* TIM6 TRGO selection */
+
+  TIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);
+  
+  /* TIM2 enable counter */
+
+  TIM_Cmd(TIM2, ENABLE);
 }
 
 void Timer1Config() {
-    TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
-    uint16_t                 uhTimerPeriod;
+
+    /* TIM Configuration */
+
+    TIM_Config();
 
     /* TIM1 example -------------------------------------------------
   
@@ -91,21 +197,32 @@ void Timer1Config() {
        TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
        SystemCoreClock is set to 168 MHz for STM32F4xx devices.
 
-       The objective is to configure TIM1 channel 3 to generate a
-       clock with a frequency equal to F KHz:
-       
-         TIM1_Period = (SystemCoreClock / F) - 1
+       The objective is to configure TIM1 channel 3 to generate complementary PWM
+       signal with a frequency equal to F KHz:
+       - TIM1_Period = (SystemCoreClock / F) - 1
 
+       The number of this repetitive requests is defined by the TIM1 Repetion counter,
+       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
+       value defined by the aSRC_Buffer.
+  
+       Note: 
+       SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
+       Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
+       function to update SystemCoreClock variable value. Otherwise, any configuration
+       based on this variable will be incorrect.  
        -----------------------------------------------------------------------------*/
   
-    /* Compute the value to be set in ARR regiter to generate signal frequency at 16.00 KHz */
-
+    /* Compute the value to be set in ARR regiter to generate signal frequency at 16.00 Khz */
     uhTimerPeriod = (SystemCoreClock / 16000 ) - 1;
+    /* Compute CCR1 value to generate a duty cycle at 50% */
+    aSRC_Buffer[0] = (uint16_t) (((uint32_t) 5 * (uhTimerPeriod - 1)) / 10);
+    /* Compute CCR1 value to generate a duty cycle at 37.5% */
+    aSRC_Buffer[1] = (uint16_t) (((uint32_t) 375 * (uhTimerPeriod - 1)) / 1000);
+    /* Compute CCR1 value to generate a duty cycle at 25% */
+    aSRC_Buffer[2] = (uint16_t) (((uint32_t) 25 * (uhTimerPeriod - 1)) / 100);
 
     /* TIM1 Peripheral Configuration -------------------------------------------*/
-
     /* TIM1 clock enable */
-
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_TIM1, ENABLE);
 
     /* Time Base configuration */
@@ -119,12 +236,33 @@ void Timer1Config() {
 
     TIM_TimeBaseInit(TIM1, &TIM_TimeBaseStructure);
 
-    /* TIM1 counter enable */
+    /* Channel 3 Configuration in PWM mode */
 
+    /* I think we just ned to enable channel 3 somehow, but without
+       (or optionally with) actual ouput to a GPIO pin.  */
+
+    TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM2;
+    TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;
+    TIM_OCInitStructure.TIM_OutputNState = TIM_OutputNState_Enable;
+    TIM_OCInitStructure.TIM_Pulse = aSRC_Buffer[0];
+    TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_Low;
+    TIM_OCInitStructure.TIM_OCNPolarity = TIM_OCNPolarity_Low;
+    TIM_OCInitStructure.TIM_OCIdleState = TIM_OCIdleState_Set;
+    TIM_OCInitStructure.TIM_OCNIdleState = TIM_OCIdleState_Reset;
+
+    TIM_OC3Init(TIM1, &TIM_OCInitStructure);
+
+    /* Enable preload feature */
+    TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
+  
+    /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
+  
+    /* Main Output Enable */
+    TIM_CtrlPWMOutputs(TIM1, ENABLE);
 }
 
-void adc_configure() {
+void adc_configure(){
     ADC_InitTypeDef  ADC_init_structure; 
     GPIO_InitTypeDef GPIO_initStructre; 
     DMA_InitTypeDef  DMA_InitStructure;
@@ -132,39 +270,42 @@ void adc_configure() {
 
     // Clock configuration
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1,  ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2,  ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_ADC1,ENABLE);
+    //RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOCEN,ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN,ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
 
-    // Analog pin configuration ADC1->PA1, ADC2->PA2 
+    // Analog pin configuration
 
-    GPIO_initStructre.GPIO_Pin = GPIO_Pin_1 | GPIO_Pin_2;        
+    //GPIO_initStructre.GPIO_Pin = GPIO_Pin_1;        // ADC Channel 10 is connected to PC0
+    GPIO_initStructre.GPIO_Pin = GPIO_Pin_2;        // ADC Channel 10 is connected to PC0
     GPIO_initStructre.GPIO_Mode = GPIO_Mode_AN;     
     GPIO_initStructre.GPIO_PuPd = GPIO_PuPd_NOPULL; 
+    //GPIO_Init(GPIOC,&GPIO_initStructre);            
     GPIO_Init(GPIOA,&GPIO_initStructre);            
 
-    // ADC structure configuration.  Note we are just using one ADC, which samples
-    // two analog channels when triggered by the timer.
+    // ADC structure configuration
 
     ADC_DeInit();
     ADC_init_structure.ADC_DataAlign = ADC_DataAlign_Left;
     ADC_init_structure.ADC_Resolution = ADC_Resolution_12b;
     ADC_init_structure.ADC_ContinuousConvMode = DISABLE; 
-    ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC3;
+    //ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T1_CC3;
+    ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
     ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-    ADC_init_structure.ADC_NbrOfConversion = 2;
-    ADC_init_structure.ADC_ScanConvMode = ENABLE;
-    ADC_Init(ADC1,&ADC_init_structure);
+    ADC_init_structure.ADC_NbrOfConversion = 1;
+    ADC_init_structure.ADC_ScanConvMode = DISABLE;
+    ADC_Init(ADCx,&ADC_init_structure);
 
-    // Select the channels to be read from
+    // Select the channel to be read from
 
-    ADC_RegularChannelConfig(ADC1,ADC_Channel_1,1,ADC_SampleTime_144Cycles);
-    ADC_RegularChannelConfig(ADC1,ADC_Channel_2,2,ADC_SampleTime_144Cycles);
+    //ADC_RegularChannelConfig(ADCx,ADC_Channel_10,1,ADC_SampleTime_144Cycles);
+    ADC_RegularChannelConfig(ADCx,ADC_Channel_2,1,ADC_SampleTime_144Cycles);
 
     /* DMA  configuration **************************************/
 
-    DMA_DeInit(DMA2_Stream0);
-    DMA_InitStructure.DMA_Channel = DMA_Channel_0;  
+    DMA_DeInit(DMA_STREAMx);
+    DMA_InitStructure.DMA_Channel = DMA_CHANNELx;  
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADCx_DR_ADDRESS;
     DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)adc_buf;
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
@@ -179,19 +320,19 @@ void adc_configure() {
     DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
     DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
     DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
-    DMA_Init(DMA2_Stream0, &DMA_InitStructure);
+    DMA_Init(DMA_STREAMx, &DMA_InitStructure);
 
     /* Enable DMA request after last transfer (Single-ADC mode) */
 
-    ADC_DMARequestAfterLastTransferCmd(ADC1, ENABLE);
+    ADC_DMARequestAfterLastTransferCmd(ADCx, ENABLE);
 
     /* Enable ADC1 DMA */
 
-    ADC_DMACmd(ADC1, ENABLE);
+    ADC_DMACmd(ADCx, ENABLE);
 
     /* DMA2_Stream0 enable */
 
-    DMA_Cmd(DMA2_Stream0, ENABLE);
+    DMA_Cmd(DMA_STREAMx, ENABLE);
 
     /* Enable DMA Half & Complete interrupts */
 
@@ -215,9 +356,8 @@ void adc_configure() {
 */
 
 void DMA2_Stream0_IRQHandler(void) {
-    int i, j, sam1, sam2;
-    short signed_buf1[ADC_BUF_SZ/4];
-    short signed_buf2[ADC_BUF_SZ/4];
+    int i, sam;
+    short signed_buf[ADC_BUF_SZ/2];
 
     /* Half transfer interrupt */
 
@@ -226,19 +366,15 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* convert to signed */
 
-        for(i=0,j=0; i<ADC_BUF_SZ/4; i++,j+=2) {
-            sam1 = (int)adc_buf[j]   - 32768;
-            sam2 = (int)adc_buf[j+1] - 32768;
-            signed_buf1[i] = sam1;
-            signed_buf2[i] = sam2;
+        for(i=0; i<ADC_BUF_SZ/2; i++) {
+            sam = (int)adc_buf[i] - 32768;
+            //sam = (int)adc_buf[i];
+            signed_buf[i] = sam;
         }
 
-        /* write first half to fifo */
+       /* write first half to fifo */
 
-        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
-            adc_overflow++;
-        }
-        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+        if (fifo_write(DMA2_Stream0_fifo, signed_buf, ADC_BUF_SZ/2) == -1) {
             adc_overflow++;
         }
 
@@ -254,19 +390,15 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* convert to signed */
 
-        for(i=0,j=ADC_BUF_SZ/2; i<ADC_BUF_SZ/4; i++,j+=2) {
-            sam1 = (int)adc_buf[j]   - 32768;
-            sam2 = (int)adc_buf[j+1] - 32768;
-            signed_buf1[i] = sam1;
-            signed_buf2[i] = sam2;
+        for(i=0; i<ADC_BUF_SZ/2; i++) {
+            sam = (int)adc_buf[ADC_BUF_SZ/2 + i] - 32768;
+            //sam = (int)adc_buf[ADC_BUF_SZ/2 + i];
+            signed_buf[i] = sam;
         }
 
         /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
-            adc_overflow++;
-        }
-        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+        if (fifo_write(DMA2_Stream0_fifo, signed_buf, ADC_BUF_SZ/2) == -1) {
             adc_overflow++;
         }
 
