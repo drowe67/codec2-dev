@@ -56,7 +56,7 @@
 struct freedv *freedv_open(int mode) {
     struct freedv *f;
     int            Nc, codec2_mode, nbit, nbyte;
-
+    
     if (mode != FREEDV_MODE_1600)
         return NULL;
 
@@ -97,7 +97,7 @@ struct freedv *freedv_open(int mode) {
         || (f->tx_bits == NULL) || (f->rx_bits == NULL) || (f->fdmdv_bits == NULL))
         return NULL;
 
-    varicode_decode_init(&f->varicode_dec_states, 0);
+    varicode_decode_init(&f->varicode_dec_states, 1);
     f->nvaricode_bits = 0;
     f->varicode_bit_index = 0;
     f->freedv_get_next_tx_char = NULL;
@@ -180,7 +180,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
         char s[2];
         if (f->freedv_get_next_tx_char != NULL) {
             s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
-            f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 0);
+            f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
             f->varicode_bit_index = 0;
         }
     }
