@@ -24,7 +24,6 @@
 
 #define N8                        160 /* procssing buffer size at 8 kHz */
 #define N16             (N8*FDMDV_OS)
-#define MEM8 (FDMDV_OS_TAPS/FDMDV_OS)
 #define FRAMES                     50
 #define TWO_PI            6.283185307
 #define FS                       8000
@@ -32,12 +31,12 @@
 #define SINE
 
 int main() {
-    float in8k[MEM8 + N8];
+    float in8k[FDMDV_OS_TAPS_8K + N8];
     float out16k[N16];
     short out16k_short[N16];
     FILE *f16;
 
-    float in16k[FDMDV_OS_TAPS + N16];
+    float in16k[FDMDV_OS_TAPS_16K + N16];
     float out8k[N16];
     short out8k_short[N8];
     FILE *f8;
@@ -52,9 +51,9 @@ int main() {
     
     /* clear filter memories */
 
-    for(i=0; i<MEM8; i++)
+    for(i=0; i<FDMDV_OS_TAPS_8K; i++)
 	in8k[i] = 0.0;
-    for(i=0; i<FDMDV_OS_TAPS; i++)
+    for(i=0; i<FDMDV_OS_TAPS_16K; i++)
 	in16k[i] = 0.0;
 
     t = t1 = 0;
@@ -62,16 +61,16 @@ int main() {
 
 #ifdef DC
 	for(i=0; i<N8; i++)
-	    in8k[MEM8+i] = 16000.0;
+	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0;
 #endif
 #ifdef SINE
 	for(i=0; i<N8; i++,t++)
-	    in8k[MEM8+i] = 16000.0*cos(TWO_PI*t*freq/FS);
+	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0*cos(TWO_PI*t*freq/FS);
 #endif
 
 	/* upsample  */
 
-	fdmdv_8_to_16(out16k, &in8k[MEM8], N8);
+	fdmdv_8_to_16(out16k, &in8k[FDMDV_OS_TAPS_8K], N8);
 	/*
 	for(i=0; i<MEM8; i++)
 	    in8k[i] = in8k[i+N8];
@@ -87,13 +86,13 @@ int main() {
 	   knock this out */
 
 	for(i=0; i<N16; i++,t1++)
-	    in16k[i+FDMDV_OS_TAPS] = out16k[i] + 16000.0*cos(TWO_PI*t1*1E4/FS);
+	    in16k[i+FDMDV_OS_TAPS_16K] = out16k[i] + 16000.0*cos(TWO_PI*t1*1E4/FS);
 
 	/* downsample */
 
-	fdmdv_16_to_8(out8k, &in16k[FDMDV_OS_TAPS], N8);
+	fdmdv_16_to_8(out8k, &in16k[FDMDV_OS_TAPS_16K], N8);
 	/*
-	for(i=0; i<FDMDV_OS_TAPS; i++)
+	for(i=0; i<FDMDV_OS_TAPS_16K; i++)
 	    in16k[i] = in16k[i+N16];
 	*/
 

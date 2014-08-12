@@ -68,8 +68,9 @@ extern "C" {
 
 /* 8 to 48 kHz sample rate conversion */
 
-#define FDMDV_OS                 2         /* oversampling rate           */
-#define FDMDV_OS_TAPS           48         /* number of OS filter taps    */
+#define FDMDV_OS                 2                            /* oversampling rate                   */
+#define FDMDV_OS_TAPS_16K       48                            /* number of OS filter taps at 16kHz   */
+#define FDMDV_OS_TAPS_8K        (FDMDV_OS_TAPS_16K/FDMDV_OS)  /* number of OS filter taps at 8kHz    */
 
 /* FFT points */
 

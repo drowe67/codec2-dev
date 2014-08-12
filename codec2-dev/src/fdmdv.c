@@ -1622,7 +1622,7 @@ void fdmdv_8_to_16(float out16k[], float in8k[], int n)
     for(i=0; i<n; i++) {
 	for(j=0; j<FDMDV_OS; j++) {
 	    out16k[i*FDMDV_OS+j] = 0.0;
-	    for(k=0,l=0; k<FDMDV_OS_TAPS; k+=FDMDV_OS,l++)
+	    for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
 		out16k[i*FDMDV_OS+j] += fdmdv_os_filter[k+j]*in8k[i-l];
 	    out16k[i*FDMDV_OS+j] *= FDMDV_OS;
 	    
@@ -1631,7 +1631,7 @@ void fdmdv_8_to_16(float out16k[], float in8k[], int n)
 
     /* update filter memory */
 
-    for(i=-(FDMDV_OS_TAPS/FDMDV_OS); i<0; i++)
+    for(i=-(FDMDV_OS_TAPS_8K); i<0; i++)
 	in8k[i] = in8k[i + n];
 
 }
@@ -1659,13 +1659,13 @@ void fdmdv_16_to_8(float out8k[], float in16k[], int n)
 
     for(i=0; i<n; i++) {
 	out8k[i] = 0.0;
-	for(j=0; j<FDMDV_OS_TAPS; j++)
+	for(j=0; j<FDMDV_OS_TAPS_16K; j++)
 	    out8k[i] += fdmdv_os_filter[j]*in16k[i*FDMDV_OS-j];
     }
 
     /* update filter memory */
 
-    for(i=-FDMDV_OS_TAPS; i<0; i++)
+    for(i=-FDMDV_OS_TAPS_16K; i<0; i++)
 	in16k[i] = in16k[i + n*FDMDV_OS];
 }
 
