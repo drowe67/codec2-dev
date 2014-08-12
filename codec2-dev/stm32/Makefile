@@ -13,7 +13,7 @@ SIZE=$(BINPATH)/arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -O3 --param max-unroll-times=200 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf power_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -146,6 +146,7 @@ DAC_UT_SRCS=\
 src/dac_ut.c \
 ../src/fifo.c \
 src/stm32f4_dac.c \
+src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
@@ -153,11 +154,25 @@ src/init.c
 dac_ut.elf: $(DAC_UT_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 
+ADCDAC_UT_SRCS=\
+src/adcdac_ut.c \
+../src/fifo.c \
+src/stm32f4_dac.c \
+src/stm32f4_adc.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+adcdac_ut.elf: $(ADCDAC_UT_SRCS)
+	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+
 DAC_PLAY_SRCS=\
 src/dac_play.c \
 ../src/fifo.c \
 gdb_stdio.c \
 src/stm32f4_dac.c \
+src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
@@ -170,6 +185,7 @@ src/adc_rec.c \
 ../src/fifo.c \
 gdb_stdio.c \
 src/stm32f4_adc.c \
+src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
@@ -193,6 +209,7 @@ gdb_stdio.c \
 ../src/fifo.c \
 src/stm32f4_adc.c \
 src/stm32f4_dac.c \
+src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c \
@@ -230,16 +247,21 @@ SM1000_SRCS=\
 src/sm1000_main.c \
 src/sm1000_leds_switches.c \
 ../src/fifo.c \
-src/stm32f4_adc.c \
-src/stm32f4_dac.c \
+src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
 
 SM1000_SRCS += $(CODEC2_SRCS)
 
-sm1000.elf: $(SM1000_SRCS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+src/stm32f4_dac.o: src/stm32f4_dac.c
+	$(CC) $(CFLAGS)  $^ -c -o $@ 
+
+src/stm32f4_adc.o: src/stm32f4_adc.c
+	$(CC) $(CFLAGS)  $^ -c -o $@ 
+
+sm1000.elf: $(SM1000_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o

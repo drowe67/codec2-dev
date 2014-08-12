@@ -31,6 +31,7 @@
 #include "stm32f4xx.h"
 #include "codec2_fifo.h"
 #include "stm32f4_dac.h"
+#include "debugblinky.h"
 
 /* write to these registers for 12 bit left aligned data, as per data sheet 
    make sure 4 least sig bits set to 0 */
@@ -94,6 +95,8 @@ void dac_open(int fifo_size) {
     tim6_config();  
     dac1_config();
     dac2_config();
+
+    init_debug_blinky();
 }
 
 /* Call these puppies to send samples to the DACs.  For your
@@ -116,7 +119,7 @@ static void tim6_config(void)
   
   /* --------------------------------------------------------
   
-  TIM3 input clock (TIM6CLK) is set to 2 * APB1 clock (PCLK1), since
+  TIM6 input clock (TIM6CLK) is set to 2 * APB1 clock (PCLK1), since
   APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
   13 clock tree figure in DM0031020.pdf).
 
@@ -275,6 +278,8 @@ void DMA1_Stream5_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
+    GPIOE->ODR = (1 << 1);
+
     /* Transfer half empty interrupt - refill first half */
 
     if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_HTIF5) != RESET) {
@@ -318,6 +323,8 @@ void DMA1_Stream5_IRQHandler(void) {
 
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);  
     }
+
+    GPIOE->ODR &= ~(1 << 1);
 }
 
 /*
@@ -327,6 +334,8 @@ void DMA1_Stream5_IRQHandler(void) {
 void DMA1_Stream6_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
+
+    GPIOE->ODR = (1 << 2);
 
     /* Transfer half empty interrupt - refill first half */
 
@@ -371,5 +380,7 @@ void DMA1_Stream6_IRQHandler(void) {
 
         DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);  
     }
+
+    GPIOE->ODR &= ~(1 << 2);
 }
 

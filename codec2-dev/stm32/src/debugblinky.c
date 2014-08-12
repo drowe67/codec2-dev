@@ -1,15 +1,15 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: dac_play.c
+  FILE........: debugblinky.c
   AUTHOR......: David Rowe
-  DATE CREATED: 1 June 2013
+  DATE CREATED: 12 August 2014
 
-  Plays a 16 kHz sample rate raw file to the STM32F4 DACs.
+  Configures GPIO pins used for debug blinkies
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2013 David Rowe
+  Copyright (C) 2014 David Rowe
 
   All rights reserved.
 
@@ -25,38 +25,21 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdlib.h>
-#include "stm32f4_dac.h"
-#include "gdb_stdio.h"
+#include "stm32f4xx.h"
 
-#define N    (5*DAC_BUF_SZ)
+void init_debug_blinky(void) {
+    GPIO_InitTypeDef GPIO_InitStruct;
 
-int main(void) {
-    short  buf[N];
-    FILE  *fplay;
+    /* PE0-3 used to indicate activity */
 
-    dac_open(2*N);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
 
-    while(1) {
-        fplay = fopen("stm_in.raw", "rb");
-        if (fplay == NULL) {
-            printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
-            exit(1);
-        }
-    
-        printf("Starting!\n");
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_0 | GPIO_Pin_1 | GPIO_Pin_2 | GPIO_Pin_3;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT; 		
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 	
+    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; 	 
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL; 	
+    GPIO_Init(GPIOE, &GPIO_InitStruct); 		
 
-        while(fread(buf, sizeof(short), N, fplay) == N) {
-            while(dac1_write(buf, N) == -1);
-            while(dac2_write(buf, N) == -1);
-        }  
-
-        printf("Finished!\n");
-        fclose(fplay);
-    }
-
-    /* let FIFO empty */
-
-    while(1);
 }
 

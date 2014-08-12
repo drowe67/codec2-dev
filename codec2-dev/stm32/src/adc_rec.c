@@ -30,7 +30,7 @@
 #include "gdb_stdio.h"
 
 #define REC_TIME_SECS 10
-#define N   2000
+#define  N  (ADC_BUF_SZ*6)
 #define FS  16000
 
 int main(void){
@@ -38,7 +38,7 @@ int main(void){
     FILE  *frec;
     int    i, bufs;
 
-    adc_open();
+    adc_open(2*N);
 
     frec = fopen("stm_out.raw", "wb");
     if (frec == NULL) {
@@ -51,7 +51,7 @@ int main(void){
     for(i=0; i<bufs; i++) {
         while(adc1_read(buf, N) == -1);
         fwrite(buf, sizeof(short), N, frec);  
-        printf(".");
+        printf(".\n");
     }
     fclose(frec);
     printf("Finished!\n");

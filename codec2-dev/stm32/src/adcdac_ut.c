@@ -1,11 +1,10 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: dac_ut.c
+  FILE........: adcdac_ut.c
   AUTHOR......: David Rowe
-  DATE CREATED: May 31 2013
+  DATE CREATED: May 31 201310 Aug 2014
 
-  Plays a 500 Hz sine wave sampled at 16 kHz out of PA5 on a Discovery board,
-  or the speaker output of the SM1000.
+  Echoes ADC2 input (mic) to DAC2 output (speaker) on SM1000.
 
 \*---------------------------------------------------------------------------*/
 
@@ -28,6 +27,7 @@
 
 #include <assert.h>
 #include "stm32f4_dac.h"
+#include "stm32f4_adc.h"
 
 #define SINE_SAMPLES   32
 
@@ -44,15 +44,17 @@ short aSine[] = {
 };
 
 int main(void) {
+    short buf[SINE_SAMPLES];
 
     dac_open(4*DAC_BUF_SZ);
+    adc_open(4*ADC_BUF_SZ);
 
     while (1) {
 
         /* keep DAC FIFOs topped up */
 
-        dac1_write((short*)aSine, SINE_SAMPLES);
-        dac2_write((short*)aSine, SINE_SAMPLES);
+        while(adc1_read(buf, SINE_SAMPLES) == -1);
+        dac2_write(buf, SINE_SAMPLES);
     }
    
 }

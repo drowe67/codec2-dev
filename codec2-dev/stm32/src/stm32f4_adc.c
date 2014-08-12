@@ -35,6 +35,7 @@
  
 #include "codec2_fifo.h"
 #include "stm32f4_adc.h"
+#include "debugblinky.h"
 
 struct FIFO *adc1_fifo;
 unsigned short adc_buf[ADC_BUF_SZ];
@@ -56,6 +57,7 @@ void adc_open(int fifo_sz) {
 
     tim2_config();
     adc_configure();
+    init_debug_blinky();
 }
 
 /* n signed 16 bit samples in buf[] if return != -1 */
@@ -135,7 +137,8 @@ void adc_configure(){
 
     // Select the channel to be read from
 
-    ADC_RegularChannelConfig(ADCx,ADC_Channel_3,1,ADC_SampleTime_144Cycles);
+    ADC_RegularChannelConfig(ADCx,ADC_Channel_2,1,ADC_SampleTime_144Cycles);
+    //ADC_VBATCmd(ENABLE); 
 
     /* DMA  configuration **************************************/
 
@@ -195,6 +198,8 @@ void DMA2_Stream0_IRQHandler(void) {
     int i, sam;
     short signed_buf[ADC_BUF_SZ/2];
 
+    GPIOE->ODR = (1 << 0);
+
     /* Half transfer interrupt */
 
     if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_HTIF0) != RESET) {
@@ -240,5 +245,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);  
     }
+
+    GPIOE->ODR &= ~(1 << 0);
 }
 
