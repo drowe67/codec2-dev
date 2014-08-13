@@ -19,7 +19,7 @@ global passes;
 global fails;
 passes = fails = 0;
 frames = 35;
-prev_tx_symbols = ones(Nc+1,1);
+prev_tx_symbols = ones(Nc+1,1); prev_tx_symbols(Nc+1) = 2;
 prev_rx_symbols = ones(Nc+1,1);
 foff_phase_rect = 1;
 channel = [];
