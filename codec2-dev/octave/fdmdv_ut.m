@@ -12,7 +12,7 @@ fdmdv;               % load modem code
  
 % Simulation Parameters --------------------------------------
 
-frames = 200;
+frames = 100;
 EbNo_dB = 6.3;
 Foff_hz = -100;
 modulation = 'dqpsk';
@@ -30,7 +30,7 @@ noise_pwr = 0;
 rx_fdm_log = [];
 rx_baseband_log = [];
 rx_bits_offset = zeros(Nc*Nb*2);
-prev_tx_symbols = ones(Nc+1,1);
+prev_tx_symbols = ones(Nc+1,1); prev_tx_symbols(Nc+1) = 2;
 prev_rx_symbols = ones(Nc+1,1);
 ferr = 0;
 foff = 0;

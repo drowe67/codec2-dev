@@ -209,29 +209,11 @@ function tx_fdm = fdm_upconvert(tx_filt)
 
   % Nc/2 tones below zero
   
-  for c=1:Nc/2
+  for c=1:Nc+1
       for i=1:M
         phase_tx(c) = phase_tx(c) * freq(c);
 	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*phase_tx(c);
       end
-  end
-  
-  % Nc/2 tones above zero
-
-  for c=Nc/2+1:Nc
-      for i=1:M
-        phase_tx(c) = phase_tx(c) * freq(c);
-	tx_fdm(i) = tx_fdm(i) + tx_filt(c,i)*phase_tx(c);
-      end
-  end
-
-  % add centre pilot tone 
-
-  c = Nc+1;
-  for i=1:M
-    phase_tx(c) = phase_tx(c) * freq(c);
-    pilot(i) = 2*tx_filt(c,i)*phase_tx(c);
-    tx_fdm(i) = tx_fdm(i) + pilot(i);  
   end
  
   % shift up to carrier freq

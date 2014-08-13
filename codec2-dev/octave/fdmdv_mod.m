@@ -15,7 +15,7 @@ function tx_fdm = fdmdv_mod(rawfilename, nbits)
   frames = floor(nbits/(Nc*Nb))
   tx_fdm = [];
   gain = 1000; % Scale up to 16 bit shorts
-  prev_tx_symbols = ones(Nc+1,1);
+  prev_tx_symbols = ones(Nc+1,1); prev_tx_symbols(Nc+1) = 2;
 
   for i=1:frames
     tx_bits = get_test_bits(Nc*Nb);

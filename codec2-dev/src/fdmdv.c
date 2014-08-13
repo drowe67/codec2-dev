@@ -181,7 +181,8 @@ struct FDMDV * fdmdv_create(int Nc)
 	    f->rx_filter_mem_timing[c][k].imag = 0.0;
 	}
     }
-    
+    f->prev_tx_symbols[Nc].real = 2.0;
+
     fdmdv_set_fsep(f, FSEP);
     f->freq[Nc].real = cosf(2.0*PI*0.0/FS);
     f->freq[Nc].imag = sinf(2.0*PI*0.0/FS);
@@ -468,7 +469,6 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
 {
     int   i,c;
     COMP  two = {2.0, 0.0};
-    COMP  pilot;
     float mag;
 
     for(i=0; i<M; i++) {
@@ -476,30 +476,11 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
 	tx_fdm[i].imag = 0.0;
     }
 
-    /* Nc/2 tones below centre freq */
-  
-    for (c=0; c<Nc/2; c++) 
+    for (c=0; c<=Nc; c++) 
 	for (i=0; i<M; i++) {
 	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
 	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
 	}
-
-    /* Nc/2 tones above centre freq */
-
-    for (c=Nc/2; c<Nc; c++) 
-	for (i=0; i<M; i++) {
-	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
-	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband[c][i], phase_tx[c]));
-	}
-
-    /* add centre pilot tone  */
-
-    c = Nc;
-    for (i=0; i<M; i++) {
-	phase_tx[c] = cmult(phase_tx[c],  freq[c]);
-	pilot = cmult(cmult(two, tx_baseband[c][i]), phase_tx[c]);
-	tx_fdm[i] = cadd(tx_fdm[i], pilot);
-    }
 
     /* shift whole thing up to carrier freq */
 
