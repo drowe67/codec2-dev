@@ -1,11 +1,12 @@
 
 /*---------------------------------------------------------------------------*\
 
-  FILE........: stm32f4_timer.c
+  FILE........: stm32f4_machdep.c
   AUTHOR......: David Rowe
   DATE CREATED: May 2 2013
 
-  STM32F4 implementation of the machine dependant timer functions.
+  STM32F4 implementation of the machine dependant timer functions,
+  e.g. profiling using a clock cycle counter..
 
 \*---------------------------------------------------------------------------*/
 
@@ -39,7 +40,7 @@ volatile unsigned int *SCB_DEMCR    = (volatile unsigned int *)0xE000EDFC;
 
 static char buf[BUF_SZ];
 
-void machdep_timer_init(void)
+void machdep_profile_init(void)
 {
     static int enabled = 0;
  
@@ -53,18 +54,18 @@ void machdep_timer_init(void)
     *buf = 0;
 }
 
-void machdep_timer_reset(void)
+void machdep_profile_reset(void)
 {
     *DWT_CYCCNT = 0; // reset the counter
 }
 
-unsigned int machdep_timer_sample(void) {
+unsigned int machdep_profile_sample(void) {
     return *DWT_CYCCNT;
 }
 
 /* log to a buffer, we only call printf after timing finished as it is slow */
 
-unsigned int machdep_timer_sample_and_log(unsigned int start, char s[])
+unsigned int machdep_profile_sample_and_log(unsigned int start, char s[])
 {
     char  tmp[80];
     float msec;
@@ -77,7 +78,7 @@ unsigned int machdep_timer_sample_and_log(unsigned int start, char s[])
     return *DWT_CYCCNT;
 }
 
-void machdep_timer_print_logged_samples(void)
+void machdep_profile_print_logged_samples(void)
 {
     gdb_stdio_printf("%s", buf);
     *buf = 0;

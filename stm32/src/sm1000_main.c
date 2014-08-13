@@ -67,6 +67,7 @@ int main(void) {
        [ ] switch debouncing?
        [ ] light led with bit errors
        [ ] 16 to 8 kHz rate conversion
+       [ ] change freedv_api interface to float[]
     */
 
     /* clear filter memories */

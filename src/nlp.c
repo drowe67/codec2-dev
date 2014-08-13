@@ -29,7 +29,7 @@
 #include "nlp.h"
 #include "dump.h"
 #include "kiss_fft.h"
-#undef TIMER
+#undef PROFILE
 #include "machdep.h"
 
 #include <assert.h>
@@ -236,13 +236,13 @@ float nlp(
     int    gmax_bin;
     int    m, i,j;
     float  best_f0;
-    TIMER_VAR(start, tnotch, filter, peakpick, window, fft, magsq, shiftmem);
+    PROFILE_VAR(start, tnotch, filter, peakpick, window, fft, magsq, shiftmem);
     
     assert(nlp_state != NULL);
     nlp = (NLP*)nlp_state;
     m = nlp->m;
 
-    TIMER_SAMPLE(start);
+    PROFILE_SAMPLE(start);
 
     /* Square, notch filter at DC, and LP filter vector */
 
@@ -264,7 +264,7 @@ float nlp(
 				      exactly sure why. */
     }
 
-    TIMER_SAMPLE_AND_LOG(tnotch, start, "      square and notch");
+    PROFILE_SAMPLE_AND_LOG(tnotch, start, "      square and notch");
 
     for(i=m-n; i<m; i++) {	/* FIR filter vector */
 
@@ -277,7 +277,7 @@ float nlp(
 	    nlp->sq[i] += nlp->mem_fir[j]*nlp_fir[j];
     }
 
-    TIMER_SAMPLE_AND_LOG(filter, tnotch, "      filter");
+    PROFILE_SAMPLE_AND_LOG(filter, tnotch, "      filter");
  
     /* Decimate and DFT */
 
@@ -288,18 +288,18 @@ float nlp(
     for(i=0; i<m/DEC; i++) {
 	fw[i].real = nlp->sq[i*DEC]*nlp->w[i];
     }
-    TIMER_SAMPLE_AND_LOG(window, filter, "      window");
+    PROFILE_SAMPLE_AND_LOG(window, filter, "      window");
     #ifdef DUMP
     dump_dec(Fw);
     #endif
 
     kiss_fft(nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
-    TIMER_SAMPLE_AND_LOG(fft, window, "      fft");
+    PROFILE_SAMPLE_AND_LOG(fft, window, "      fft");
 
     for(i=0; i<PE_FFT_SIZE; i++)
 	Fw[i].real = Fw[i].real*Fw[i].real + Fw[i].imag*Fw[i].imag;
 
-    TIMER_SAMPLE_AND_LOG(magsq, fft, "      mag sq");
+    PROFILE_SAMPLE_AND_LOG(magsq, fft, "      mag sq");
     #ifdef DUMP
     dump_sq(nlp->sq);
     dump_Fw(Fw);
@@ -316,7 +316,7 @@ float nlp(
 	}
     }
     
-    TIMER_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
+    PROFILE_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
 
     //#define POST_PROCESS_MBE
     #ifdef POST_PROCESS_MBE
@@ -325,7 +325,7 @@ float nlp(
     best_f0 = post_process_sub_multiples(Fw, pmin, pmax, gmax, gmax_bin, prev_Wo);
     #endif
 
-    TIMER_SAMPLE_AND_LOG(shiftmem, peakpick,  "      post process");
+    PROFILE_SAMPLE_AND_LOG(shiftmem, peakpick,  "      post process");
 
     /* Shift samples in buffer to make room for new samples */
 
@@ -336,9 +336,9 @@ float nlp(
 
     *pitch = (float)SAMPLE_RATE/best_f0;
 
-    TIMER_SAMPLE_AND_LOG2(shiftmem,  "      shift mem");
+    PROFILE_SAMPLE_AND_LOG2(shiftmem,  "      shift mem");
 
-    TIMER_SAMPLE_AND_LOG2(start,  "      nlp int");
+    PROFILE_SAMPLE_AND_LOG2(start,  "      nlp int");
 
     return(best_f0);  
 }

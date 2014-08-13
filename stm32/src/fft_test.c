@@ -119,12 +119,12 @@ int main(void)
         kiss_fft_cfg fft_fwd_cfg;
 
         SystemInit();
-        machdep_timer_init();
+        machdep_profile_init();
         fft_fwd_cfg = kiss_fft_alloc(fftSize, 0, NULL, NULL);
-        kiss_fft_start = machdep_timer_sample();	
+        kiss_fft_start = machdep_profile_sample();	
         kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)testInput_f32_10khz, 
                  (kiss_fft_cpx *)kiss_complex_out);
-        machdep_timer_sample_and_log(kiss_fft_start, "  kiss_fft");     
+        machdep_profile_sample_and_log(kiss_fft_start, "  kiss_fft");     
  
 	status = ARM_MATH_SUCCESS; 
 	 
@@ -132,10 +132,10 @@ int main(void)
 	status = arm_cfft_radix2_init_f32(&S, fftSize, ifftFlag, doBitReverse); 	 
 
 	/* Process the data through the CFFT/CIFFT module */ 
-        fft_start = machdep_timer_sample();	
+        fft_start = machdep_profile_sample();	
         arm_cfft_radix2_f32(&S, testInput_f32_10khz); 
-        machdep_timer_sample_and_log(fft_start, "  fft");     
-        machdep_timer_print_logged_samples();
+        machdep_profile_sample_and_log(fft_start, "  fft");     
+        machdep_profile_print_logged_samples();
 
 	/* Process the data through the Complex Magnitude Module for  
 	calculating the magnitude at each bin */ 

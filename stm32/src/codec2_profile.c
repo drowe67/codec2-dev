@@ -54,7 +54,7 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
     int            nsam, nbit;
     FILE          *fin, *fout;
     int            frame;
-    TIMER_VAR(enc_start, dec_start);
+    PROFILE_VAR(enc_start, dec_start);
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -81,15 +81,15 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
     frame = 0;
 
     while (fread(inbuf, sizeof(short), nsam, fin) == nsam) {
-        TIMER_SAMPLE(enc_start);
+        PROFILE_SAMPLE(enc_start);
         codec2_encode(codec2, bits, inbuf);
-        TIMER_SAMPLE_AND_LOG(dec_start, enc_start, "  enc");     
+        PROFILE_SAMPLE_AND_LOG(dec_start, enc_start, "  enc");     
 	codec2_decode(codec2, outbuf, bits);
-        TIMER_SAMPLE_AND_LOG2(dec_start, "  dec");     
-        TIMER_SAMPLE_AND_LOG2(enc_start, "  enc & dec");     
+        PROFILE_SAMPLE_AND_LOG2(dec_start, "  dec");     
+        PROFILE_SAMPLE_AND_LOG2(enc_start, "  enc & dec");     
         fwrite((char*)outbuf, sizeof(short), nsam, fout);
         printf("frame: %d\n", ++frame);
-        machdep_timer_print_logged_samples();
+        machdep_profile_print_logged_samples();
     }
 
     #ifdef DUMP
@@ -159,7 +159,7 @@ void gpio_init() {
 
 int main(int argc, char *argv[]) {
     gpio_init();
-    machdep_timer_init ();
+    machdep_profile_init ();
  
     printf("Starting c2demo\n");
 
