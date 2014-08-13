@@ -220,13 +220,6 @@ n = 28;
 stem_sig_and_error(1, 211, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
 stem_sig_and_error(1, 212, real(tx_symbols_log_c(1:n/2)), real(tx_symbols_log(1:n/2) - tx_symbols_log_c(1:n/2)), 'tx symbols real', [1 n/2 -1.5 1.5])
 
-% tx_filter()
-
-diff = tx_baseband_log - tx_baseband_log_c;
-c=1;
-plot_sig_and_error(2, 211, real(tx_baseband_log_c(c,:)), real(tx_baseband_log(c,:) - tx_baseband_log_c(c,:)), 'tx baseband real')
-plot_sig_and_error(2, 212, imag(tx_baseband_log_c(c,:)), imag(tx_baseband_log(c,:) - tx_baseband_log_c(c,:)), 'tx baseband imag')
-
 % fdm_upconvert()
 
 plot_sig_and_error(3, 211, real(tx_fdm_log_c), real(tx_fdm_log - tx_fdm_log_c), 'tx fdm real')
@@ -315,7 +308,6 @@ endfunction
 
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symbols_log,  tx_symbols_log_c, 'tx_symbols');
-check(tx_baseband_log, tx_baseband_log_c, 'tx_baseband');
 check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
 check(pilot_lut, pilot_lut_c, 'pilot_lut');
 check(pilot_coeff, pilot_coeff_c, 'pilot_coeff');

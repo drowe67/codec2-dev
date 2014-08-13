@@ -112,7 +112,7 @@ static COMP cadd(COMP a, COMP b)
 
 static float cabsolute(COMP a)
 {
-    return sqrtf(pow(a.real, 2.0) + pow(a.imag, 2.0));
+    return sqrtf(powf(a.real, 2.0) + powf(a.imag, 2.0));
 }
 
 /*---------------------------------------------------------------------------*\
@@ -391,6 +391,7 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], in
 	*pilot_bit = 1;
 }
 
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: tx_filter()	     
@@ -452,6 +453,115 @@ void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_fil
     }
 }
 
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: tx_filter_and_upconvert()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 13 August 2014
+
+  Given Nc*NB bits construct M samples (1 symbol) of Nc+1 filtered
+  symbols streams.
+
+\*---------------------------------------------------------------------------*/
+
+void tx_filter_and_upconvert(COMP tx_fdm[], int Nc, COMP tx_symbols[], 
+                             COMP tx_filter_memory[NC+1][NSYM],
+                             COMP phase_tx[], COMP freq[], 
+                             COMP *fbb_phase, COMP fbb_rect)
+{
+    int     c;
+    int     i,j,k;
+    float   acc;
+    COMP    gain;
+    COMP    tx_baseband;
+    COMP  two = {2.0, 0.0};
+    float mag;
+
+    gain.real = sqrtf(2.0)/2.0;
+    gain.imag = 0.0;
+    
+    for(i=0; i<M; i++) {
+	tx_fdm[i].real = 0.0;
+	tx_fdm[i].imag = 0.0;
+    }
+
+    for(c=0; c<Nc+1; c++)
+	tx_filter_memory[c][NSYM-1] = cmult(tx_symbols[c], gain);
+    
+    /* 
+       tx filter each symbol, generate M filtered output samples for
+       each symbol, which we then freq shift and sum with other
+       carriers.  Efficient polyphase filter techniques used as
+       tx_filter_memory is sparse
+    */
+
+    for(c=0; c<Nc+1; c++) {
+        for(i=0; i<M; i++) {
+
+	    /* filter real sample of symbol for carrier c */
+
+	    acc = 0.0;
+	    for(j=0,k=M-i-1; j<NSYM; j++,k+=M)
+		acc += M * tx_filter_memory[c][j].real * gt_alpha5_root[k];
+	    tx_baseband.real = acc;	
+
+	    /* filter imag sample of symbol for carrier c */
+
+	    acc = 0.0;
+	    for(j=0,k=M-i-1; j<NSYM; j++,k+=M)
+		acc += M * tx_filter_memory[c][j].imag * gt_alpha5_root[k];
+	    tx_baseband.imag = acc;
+
+            /* freq shift and sum */
+
+	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
+	    tx_fdm[i] = cadd(tx_fdm[i], cmult(tx_baseband, phase_tx[c]));
+	}
+    }
+
+    /* shift whole thing up to carrier freq */
+
+    for (i=0; i<M; i++) {
+	*fbb_phase = cmult(*fbb_phase, fbb_rect);
+	tx_fdm[i] = cmult(tx_fdm[i], *fbb_phase);
+    }
+
+    /*
+      Scale such that total Carrier power C of real(tx_fdm) = Nc.  This
+      excludes the power of the pilot tone.
+      We return the complex (single sided) signal to make frequency
+      shifting for the purpose of testing easier
+    */
+
+    for (i=0; i<M; i++) 
+	tx_fdm[i] = cmult(two, tx_fdm[i]);
+
+    /* normalise digital oscillators as the magnitude can drift over time */
+
+    for (c=0; c<Nc+1; c++) {
+        mag = cabsolute(phase_tx[c]);
+	phase_tx[c].real /= mag;	
+	phase_tx[c].imag /= mag;	
+    }
+
+    mag = cabsolute(*fbb_phase);
+    fbb_phase->real /= mag;	
+    fbb_phase->imag /= mag;	
+
+    /* shift memory, inserting zeros at end */
+
+    for(i=0; i<NSYM-1; i++)
+	for(c=0; c<Nc+1; c++)
+	    tx_filter_memory[c][i] = tx_filter_memory[c][i+1];
+
+    for(c=0; c<Nc+1; c++) {
+	tx_filter_memory[c][NSYM-1].real = 0.0;
+	tx_filter_memory[c][NSYM-1].imag = 0.0;
+    }
+}
+
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdm_upconvert()	     
@@ -499,7 +609,7 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
     for (i=0; i<M; i++) 
 	tx_fdm[i] = cmult(two, tx_fdm[i]);
 
-    /* normalise digital oscilators as the magnitude can drfift over time */
+    /* normalise digital oscilators as the magnitude can drift over time */
 
     for (c=0; c<Nc+1; c++) {
         mag = cabsolute(phase_tx[c]);
@@ -533,17 +643,14 @@ void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_
 void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
-    COMP          tx_baseband[NC+1][M];
-    PROFILE_VAR(mod_start, tx_filter_start, fdm_upconvert_start);
+    PROFILE_VAR(mod_start, tx_filter_and_upconvert_start);
 
     PROFILE_SAMPLE(mod_start);
     bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
-    PROFILE_SAMPLE_AND_LOG(tx_filter_start, mod_start, "    bits_to_dqpsk_symbols"); 
-    tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
-    PROFILE_SAMPLE_AND_LOG(fdm_upconvert_start, tx_filter_start, "    tx_filter"); 
-    fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
-    PROFILE_SAMPLE_AND_LOG2(fdm_upconvert_start, "    fdm_upconvert"); 
+    PROFILE_SAMPLE_AND_LOG(tx_filter_and_upconvert_start, mod_start, "    bits_to_dqpsk_symbols"); 
+    tx_filter_and_upconvert(tx_fdm, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory, 
+                            fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
 
     *sync_bit = fdmdv->tx_pilot_bit;
 }
