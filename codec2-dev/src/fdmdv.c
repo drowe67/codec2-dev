@@ -553,16 +553,16 @@ void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
 {
     COMP          tx_symbols[NC+1];
     COMP          tx_baseband[NC+1][M];
-    TIMER_VAR(mod_start, tx_filter_start, fdm_upconvert_start);
+    PROFILE_VAR(mod_start, tx_filter_start, fdm_upconvert_start);
 
-    TIMER_SAMPLE(mod_start);
+    PROFILE_SAMPLE(mod_start);
     bits_to_dqpsk_symbols(tx_symbols, fdmdv->Nc, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
-    TIMER_SAMPLE_AND_LOG(tx_filter_start, mod_start, "    bits_to_dqpsk_symbols"); 
+    PROFILE_SAMPLE_AND_LOG(tx_filter_start, mod_start, "    bits_to_dqpsk_symbols"); 
     tx_filter(tx_baseband, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory);
-    TIMER_SAMPLE_AND_LOG(fdm_upconvert_start, tx_filter_start, "    tx_filter"); 
+    PROFILE_SAMPLE_AND_LOG(fdm_upconvert_start, tx_filter_start, "    tx_filter"); 
     fdm_upconvert(tx_fdm, fdmdv->Nc, tx_baseband, fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
-    TIMER_SAMPLE_AND_LOG2(fdm_upconvert_start, "    fdm_upconvert"); 
+    PROFILE_SAMPLE_AND_LOG2(fdm_upconvert_start, "    fdm_upconvert"); 
 
     *sync_bit = fdmdv->tx_pilot_bit;
 }
@@ -1001,7 +1001,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
     COMP  rx_baseband[NFILTER+M];
     COMP  f_rect;
 
-    //TIMER_VAR(windback_start,  downconvert_start, filter_start);
+    //PROFILE_VAR(windback_start,  downconvert_start, filter_start);
 
     /* update memory of rx_fdm */
 
@@ -1025,12 +1025,12 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
           phase continuity.
         */
 
-        //TIMER_SAMPLE(windback_start);
+        //PROFILE_SAMPLE(windback_start);
         windback_phase           = -freq_pol[c]*NFILTER;
         windback_phase_rect.real = cosf(windback_phase);
         windback_phase_rect.imag = sinf(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
-        //TIMER_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback"); 
+        //PROFILE_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback"); 
     
         /* down convert all samples in buffer */
 
@@ -1048,7 +1048,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
             phase_rx[c]    = cmult(phase_rx[c], f_rect);
             rx_baseband[i] = cmult(rx_fdm_mem[i],cconj(phase_rx[c]));
         }
-        //TIMER_SAMPLE_AND_LOG(filter_start, downconvert_start, "        downconvert"); 
+        //PROFILE_SAMPLE_AND_LOG(filter_start, downconvert_start, "        downconvert"); 
  
         /* now we can filter this carrier's P symbols */
 
@@ -1064,7 +1064,7 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
            rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
            #endif
         }
-        //TIMER_SAMPLE_AND_LOG2(filter_start, "        filter"); 
+        //PROFILE_SAMPLE_AND_LOG2(filter_start, "        filter"); 
 
         /* normalise digital oscilators as the magnitude can drift over time */
 
@@ -1478,8 +1478,8 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     COMP          rx_symbols[NC+1];
     float         env[NT*P];
     int           sync_bit;
-    TIMER_VAR(demod_start, fdmdv_freq_shift_start, down_convert_and_rx_filter_start);
-    TIMER_VAR(rx_est_timing_start, qpsk_to_bits_start, snr_update_start, freq_state_start);
+    PROFILE_VAR(demod_start, fdmdv_freq_shift_start, down_convert_and_rx_filter_start);
+    PROFILE_VAR(rx_est_timing_start, qpsk_to_bits_start, snr_update_start, freq_state_start);
 
     /* shift down to complex baseband */
 
@@ -1487,23 +1487,23 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 
     /* freq offset estimation and correction */
    
-    TIMER_SAMPLE(demod_start);
+    PROFILE_SAMPLE(demod_start);
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin);
-    TIMER_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset"); 
+    PROFILE_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset"); 
     
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
     fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm_bb, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
-    TIMER_SAMPLE_AND_LOG(down_convert_and_rx_filter_start, fdmdv_freq_shift_start, "    fdmdv_freq_shift"); 
+    PROFILE_SAMPLE_AND_LOG(down_convert_and_rx_filter_start, fdmdv_freq_shift_start, "    fdmdv_freq_shift"); 
  	
     /* baseband processing */
 
     rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, *nin);
     down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
                                fdmdv->freq_pol, *nin, M/Q);
-    TIMER_SAMPLE_AND_LOG(rx_est_timing_start, down_convert_and_rx_filter_start, "    down_convert_and_rx_filter"); 
+    PROFILE_SAMPLE_AND_LOG(rx_est_timing_start, down_convert_and_rx_filter_start, "    down_convert_and_rx_filter"); 
     fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
-    TIMER_SAMPLE_AND_LOG(qpsk_to_bits_start, rx_est_timing_start, "    rx_est_timing"); 
+    PROFILE_SAMPLE_AND_LOG(qpsk_to_bits_start, rx_est_timing_start, "    rx_est_timing"); 
     
     /* Adjust number of input samples to keep timing within bounds */
 
@@ -1518,14 +1518,14 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     foff_fine = qpsk_to_bits(rx_bits, &sync_bit, fdmdv->Nc, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 
                              fdmdv->old_qpsk_mapping);
     memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(fdmdv->Nc+1));
-    TIMER_SAMPLE_AND_LOG(snr_update_start, qpsk_to_bits_start, "    qpsk_to_bits"); 
+    PROFILE_SAMPLE_AND_LOG(snr_update_start, qpsk_to_bits_start, "    qpsk_to_bits"); 
     snr_update(fdmdv->sig_est, fdmdv->noise_est, fdmdv->Nc, fdmdv->phase_difference);
-    TIMER_SAMPLE_AND_LOG(freq_state_start, snr_update_start, "    snr_update"); 
+    PROFILE_SAMPLE_AND_LOG(freq_state_start, snr_update_start, "    snr_update"); 
 
     /* freq offset estimation state machine */
 
     fdmdv->sync = freq_state(reliable_sync_bit, sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
-    TIMER_SAMPLE_AND_LOG2(freq_state_start, "    freq_state"); 
+    PROFILE_SAMPLE_AND_LOG2(freq_state_start, "    freq_state"); 
     fdmdv->foff  -= TRACK_COEFF*foff_fine;
 }
 

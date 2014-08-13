@@ -91,9 +91,9 @@ int main(int argc, char *argv[]) {
     int                 i, j, nin, reliable_sync_bit[2], sync_bit, bit_errors, ntest_bits, test_frame_sync;
     short              *error_pattern;
     struct FDMDV_STATS  stats;
-    TIMER_VAR(mod_start, demod_start);
+    PROFILE_VAR(mod_start, demod_start);
 
-    machdep_timer_init ();
+    machdep_profile_init ();
     fdmdv = fdmdv_create(FDMDV_NC);
 
     bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
@@ -110,7 +110,7 @@ int main(int argc, char *argv[]) {
 	fdmdv_get_test_bits(fdmdv, tx_bits);
 	fdmdv_get_test_bits(fdmdv, &tx_bits[bits_per_fdmdv_frame]);
 
-        TIMER_SAMPLE(mod_start);
+        PROFILE_SAMPLE(mod_start);
 
 	fdmdv_mod(fdmdv, tx_fdm, tx_bits, &sync_bit);
 	assert(sync_bit == 1);
@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
 	assert(sync_bit == 0);
         channel_in(tx_fdm, 2*FDMDV_NOM_SAMPLES_PER_FRAME);
 
-        TIMER_SAMPLE_AND_LOG(demod_start, mod_start, "  mod");     
+        PROFILE_SAMPLE_AND_LOG(demod_start, mod_start, "  mod");     
 
         for(j=0; j<2; j++) {
             channel_out(rx_fdm, nin);
@@ -131,15 +131,15 @@ int main(int argc, char *argv[]) {
                 fdmdv_put_test_bits(fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, &codec_bits[bits_per_fdmdv_frame]);
             }
         }
-        TIMER_SAMPLE_AND_LOG2(demod_start, "  demod");     
-        TIMER_SAMPLE_AND_LOG2(mod_start, "  mod & demod");     
+        PROFILE_SAMPLE_AND_LOG2(demod_start, "  demod");     
+        PROFILE_SAMPLE_AND_LOG2(mod_start, "  mod & demod");     
 
         fdmdv_get_demod_stats(fdmdv, &stats);
 
         printf("frame: %d sync: %d reliable_sync_bit: %d %d SNR: %3.2f test_frame_sync: %d\n", 
                i, stats.sync, reliable_sync_bit[0], reliable_sync_bit[1], (double)stats.snr_est, 
                test_frame_sync);
-        machdep_timer_print_logged_samples();
+        machdep_profile_print_logged_samples();
     }
 
     fdmdv_destroy(fdmdv);

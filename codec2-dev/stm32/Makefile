@@ -82,7 +82,7 @@ FFT_TEST_SRCS = \
 $(DSPLIB)/Examples/arm_fft_bin_example/arm_fft_bin_data.c \
 fft_test.c \
 src/startup_stm32f4xx.s \
-stm32f4_timer.c \
+stm32f4_machdep.c \
 gdb_stdio.c \
 ../src/kiss_fft.c
 
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_profile.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -130,14 +130,14 @@ libstm32f4.a: $(PERIPHLIBDIR)
 CODEC2_PROFILE_SRCS=\
 src/codec2_profile.c \
 src/gdb_stdio.c \
-src/stm32f4_timer.c \
+src/stm32f4_machdep.c \
 src/startup_stm32f4xx.s \
 src/init.c \
 src/system_stm32f4xx.c
 CODEC2_PROFILE_SRCS += $(CODEC2_SRCS)
 
 codec2_profile.elf: $(CODEC2_PROFILE_SRCS) 
-	$(CC) $(CFLAGS) -DTIMER $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 fft_test.elf: $(FFT_TEST_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
@@ -213,7 +213,7 @@ src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c \
-src/stm32f4_timer.c \
+src/stm32f4_machdep.c \
 
 POWER_UT_SRCS += $(CODEC2_SRCS)
 
@@ -226,12 +226,12 @@ gdb_stdio.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c \
-src/stm32f4_timer.c
+src/stm32f4_machdep.c
 
 FDMDV_PROFILE_SRCS += $(CODEC2_SRCS)
 
 fdmdv_profile.elf: $(FDMDV_PROFILE_SRCS)
-	$(CC) $(CFLAGS) -DTIMER $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 SM1000_LEDS_SWITCHES_UT_SRCS=\
 src/sm1000_leds_switches_ut.c \
@@ -262,6 +262,19 @@ src/stm32f4_adc.o: src/stm32f4_adc.c
 
 sm1000.elf: $(SM1000_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+
+FREEDV_PROFILE_SRCS=\
+src/freedv_profile.c \
+src/stm32f4_machdep.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+FREEDV_PROFILE_SRCS += $(CODEC2_SRCS)
+
+freedv_profile.elf: $(FREEDV_PROFILE_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o

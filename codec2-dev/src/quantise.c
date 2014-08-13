@@ -37,7 +37,7 @@
 #include "lpc.h"
 #include "lsp.h"
 #include "kiss_fft.h"
-#undef TIMER
+#undef PROFILE
 #include "machdep.h"
 
 #define LSP_DELTA1 0.01         /* grid spacing for LSP root searches */
@@ -796,9 +796,9 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
     float Pfw;
     float max_Rw, min_Rw;
     float coeff;
-    TIMER_VAR(tstart, tfft1, taw, tfft2, tww, tr);
+    PROFILE_VAR(tstart, tfft1, taw, tfft2, tww, tr);
 
-    TIMER_SAMPLE(tstart);
+    PROFILE_SAMPLE(tstart);
 
     /* Determine LPC inverse filter spectrum 1/A(exp(jw)) -----------*/
 
@@ -816,13 +816,13 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 	x[i].real = ak[i];
     kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Aw);
 
-    TIMER_SAMPLE_AND_LOG(tfft1, tstart, "        fft1"); 
+    PROFILE_SAMPLE_AND_LOG(tfft1, tstart, "        fft1"); 
 
     for(i=0; i<FFT_ENC/2; i++) {
 	Aw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
     }
 
-    TIMER_SAMPLE_AND_LOG(taw, tfft1, "        Aw"); 
+    PROFILE_SAMPLE_AND_LOG(taw, tfft1, "        Aw"); 
 
     /* Determine weighting filter spectrum W(exp(jw)) ---------------*/
 
@@ -839,13 +839,13 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
     }
     kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Ww);
 
-    TIMER_SAMPLE_AND_LOG(tfft2, taw, "        fft2"); 
+    PROFILE_SAMPLE_AND_LOG(tfft2, taw, "        fft2"); 
 
     for(i=0; i<FFT_ENC/2; i++) {
 	Ww[i].real = Ww[i].real*Ww[i].real + Ww[i].imag*Ww[i].imag;
     }
 
-    TIMER_SAMPLE_AND_LOG(tww, tfft2, "        Ww"); 
+    PROFILE_SAMPLE_AND_LOG(tww, tfft2, "        Ww"); 
 
     /* Determined combined filter R = WA ---------------------------*/
 
@@ -859,7 +859,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 
     }
 
-    TIMER_SAMPLE_AND_LOG(tr, tww, "        R"); 
+    PROFILE_SAMPLE_AND_LOG(tr, tww, "        R"); 
 
     #ifdef DUMP
     if (dump)
@@ -903,7 +903,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
         }    
     }
 
-    TIMER_SAMPLE_AND_LOG2(tr, "        filt"); 
+    PROFILE_SAMPLE_AND_LOG2(tr, "        filt"); 
 }
 
 
@@ -940,9 +940,9 @@ void aks_to_M2(
   float Em;		/* energy in band */
   float Am;		/* spectral amplitude sample */
   float signal, noise;
-  TIMER_VAR(tstart, tfft, tpw, tpf);
+  PROFILE_VAR(tstart, tfft, tpw, tpf);
 
-  TIMER_SAMPLE(tstart);
+  PROFILE_SAMPLE(tstart);
 
   r = TWO_PI/(FFT_ENC);
 
@@ -957,19 +957,19 @@ void aks_to_M2(
     pw[i].real = ak[i];
   kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
   
-  TIMER_SAMPLE_AND_LOG(tfft, tstart, "      fft"); 
+  PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft"); 
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
   for(i=0; i<FFT_ENC/2; i++)
     Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
 
-  TIMER_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
+  PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
 
   if (pf)
       lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost);
 
-  TIMER_SAMPLE_AND_LOG(tpf, tpw, "      LPC post filter"); 
+  PROFILE_SAMPLE_AND_LOG(tpf, tpw, "      LPC post filter"); 
 
   #ifdef DUMP
   if (dump) 
@@ -1014,7 +1014,7 @@ void aks_to_M2(
   }
   *snr = 10.0*log10f(signal/noise);
 
-  TIMER_SAMPLE_AND_LOG2(tpf, "      rec"); 
+  PROFILE_SAMPLE_AND_LOG2(tpf, "      rec"); 
 }
 
 /*---------------------------------------------------------------------------*\

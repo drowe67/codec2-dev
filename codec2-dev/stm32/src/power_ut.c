@@ -120,7 +120,7 @@ void gpio_init() {
 int main(int argc, char *argv[]) {
     SystemInit();
     gpio_init();
-    machdep_timer_init ();
+    machdep_profile_init ();
     adc_open(4*DAC_BUF_SZ);
     dac_open(4*DAC_BUF_SZ);
 
