@@ -167,6 +167,9 @@ void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], in
 void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
 void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[],
                    COMP *fbb_phase, COMP fbb_rect);
+void tx_filter_and_upconvert(COMP tx_fdm[], int Nc, COMP tx_symbols[], 
+                             COMP tx_filter_memory[NC+1][NSYM],
+                             COMP phase_tx[], COMP freq[], COMP *fbb_phase, COMP fbb_rect);
 void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_mem, COMP *phase, COMP *freq);
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);
 float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin);

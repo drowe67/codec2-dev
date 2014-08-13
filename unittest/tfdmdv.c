@@ -48,7 +48,6 @@ int main(int argc, char *argv[])
     struct FDMDV *fdmdv;
     int           tx_bits[FDMDV_BITS_PER_FRAME];
     COMP          tx_symbols[FDMDV_NC+1];
-    COMP          tx_baseband[NC+1][M];
     COMP          tx_fdm[M];
     float         channel[CHANNEL_BUF_SIZE];
     int           channel_count;
@@ -68,7 +67,6 @@ int main(int argc, char *argv[])
 
     int           tx_bits_log[FDMDV_BITS_PER_FRAME*FRAMES];
     COMP          tx_symbols_log[(FDMDV_NC+1)*FRAMES];
-    COMP          tx_baseband_log[(NC+1)][M*FRAMES];
     COMP          tx_fdm_log[M*FRAMES];
     COMP          pilot_baseband1_log[NPILOTBASEBAND*FRAMES];
     COMP          pilot_baseband2_log[NPILOTBASEBAND*FRAMES];
@@ -115,8 +113,8 @@ int main(int argc, char *argv[])
 	fdmdv_get_test_bits(fdmdv, tx_bits);
 	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, 0);
 	memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(FDMDV_NC+1));
-	tx_filter(tx_baseband, FDMDV_NC, tx_symbols, fdmdv->tx_filter_memory);
-	fdm_upconvert(tx_fdm, FDMDV_NC, tx_baseband, fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
+        tx_filter_and_upconvert(tx_fdm, FDMDV_NC , tx_symbols, fdmdv->tx_filter_memory, 
+                                fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
 
 	/* --------------------------------------------------------*\
 	                          Channel
@@ -198,9 +196,6 @@ int main(int argc, char *argv[])
 
 	memcpy(&tx_bits_log[FDMDV_BITS_PER_FRAME*f], tx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
 	memcpy(&tx_symbols_log[(FDMDV_NC+1)*f], tx_symbols, sizeof(COMP)*(FDMDV_NC+1));
-	for(c=0; c<FDMDV_NC+1; c++)
-	    for(i=0; i<M; i++)
-		tx_baseband_log[c][f*M+i] = tx_baseband[c][i]; 
 	memcpy(&tx_fdm_log[M*f], tx_fdm, sizeof(COMP)*M);
 
 	memcpy(&pilot_baseband1_log[f*NPILOTBASEBAND], fdmdv->pilot_baseband1, sizeof(COMP)*NPILOTBASEBAND);
@@ -263,8 +258,7 @@ int main(int argc, char *argv[])
     fprintf(fout, "# Created by tfdmdv.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symbols_log_c", tx_symbols_log, 1, (FDMDV_NC+1)*FRAMES, (FDMDV_NC+1)*FRAMES);  
-    octave_save_complex(fout, "tx_baseband_log_c", (COMP*)tx_baseband_log, (FDMDV_NC+1), M*FRAMES, M*FRAMES);  
-    octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);  
+octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);  
     octave_save_complex(fout, "pilot_lut_c", (COMP*)fdmdv->pilot_lut, 1, NPILOT_LUT, NPILOT_LUT);  
     octave_save_complex(fout, "pilot_baseband1_log_c", pilot_baseband1_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
     octave_save_complex(fout, "pilot_baseband2_log_c", pilot_baseband2_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
