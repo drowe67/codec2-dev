@@ -122,6 +122,7 @@ int main(void) {
                 nout = freedv_rx(f, buf, buf);
                 dac2_write(buf, nout);
                 led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
+                nin = freedv_nin(f);
             }
 
         }

@@ -13,7 +13,7 @@ SIZE=$(BINPATH)/arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -O3 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_profile.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf 
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -263,18 +263,31 @@ src/stm32f4_adc.o: src/stm32f4_adc.c
 sm1000.elf: $(SM1000_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
-FREEDV_PROFILE_SRCS=\
-src/freedv_profile.c \
+FREEDV_TX_PROFILE_SRCS=\
+src/freedv_tx_profile.c \
 src/stm32f4_machdep.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
 
-FREEDV_PROFILE_SRCS += $(CODEC2_SRCS)
+FREEDV_TX_PROFILE_SRCS += $(CODEC2_SRCS)
 
-freedv_profile.elf: $(FREEDV_PROFILE_SRCS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+freedv_tx_profile.elf: $(FREEDV_TX_PROFILE_SRCS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+FREEDV_RX_PROFILE_SRCS=\
+src/freedv_rx_profile.c \
+src/stm32f4_machdep.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
+
+freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o
