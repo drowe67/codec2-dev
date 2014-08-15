@@ -106,6 +106,8 @@ struct freedv *freedv_open(int mode) {
     golay23_init();
     f->total_bit_errors = 0;
 
+    f->nin = FDMDV_NOM_SAMPLES_PER_FRAME;
+
     return f;
 }
 
@@ -282,7 +284,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     nin_prev = f->nin;
     fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, rx_fdm, &f->nin);
     fdmdv_get_demod_stats(f->fdmdv, &f->fdmdv_stats);
-    
+
     if (f->fdmdv_stats.sync) {
         if (reliable_sync_bit == 0) {
             memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));

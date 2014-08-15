@@ -651,6 +651,7 @@ void fdmdv_mod(struct FDMDV *fdmdv, COMP tx_fdm[], int tx_bits[], int *sync_bit)
     PROFILE_SAMPLE_AND_LOG(tx_filter_and_upconvert_start, mod_start, "    bits_to_dqpsk_symbols"); 
     tx_filter_and_upconvert(tx_fdm, fdmdv->Nc, tx_symbols, fdmdv->tx_filter_memory, 
                             fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
+    PROFILE_SAMPLE_AND_LOG2(tx_filter_and_upconvert_start, "    tx_filter_and_upconvert"); 
 
     *sync_bit = fdmdv->tx_pilot_bit;
 }
