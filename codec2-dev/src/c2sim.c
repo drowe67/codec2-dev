@@ -171,7 +171,8 @@ int main(int argc, char *argv[])
         { NULL, no_argument, NULL, 0 }
     };
     int num_opts=sizeof(long_options)/sizeof(struct option);
-    
+    COMP Aw[FFT_ENC];
+
     for(i=0; i<M; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
@@ -708,7 +709,7 @@ int main(int argc, char *argv[])
 
 	    }
 
-	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA); 
+	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw); 
 	    apply_lpc_correction(&model);
 
             #ifdef DUMP
@@ -764,8 +765,13 @@ int main(int argc, char *argv[])
 
 		interp_model.voiced = voiced1;
 		
+                #ifdef FIX_ME
+                /* NOTE: need to get this woking again */
+                interpolate_lsp_ver2(lsps_interp, prev_lsps_,  lsps_, 0.5)
+                    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw); 
 		interpolate_lsp(fft_fwd_cfg, &interp_model, &prev_model, &model,
 				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
+                #endif
 		apply_lpc_correction(&interp_model);
 
 		/* used to compare with c2enc/c2dec version 
@@ -799,8 +805,7 @@ int main(int argc, char *argv[])
                 #endif
 
 		if (phase0)
-		    phase_synth_zero_order(fft_fwd_cfg, &interp_model, ak_interp, ex_phase,
-					   order);	
+		    phase_synth_zero_order(fft_fwd_cfg, &interp_model, ex_phase, Aw);
 		if (postfilt)
 		    postfilter(&interp_model, &bg_est);
 		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn, prede, &de_mem, gain);
@@ -811,7 +816,7 @@ int main(int argc, char *argv[])
 		/* decode this frame */
 
 		if (phase0)
-		    phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	
+		    phase_synth_zero_order(fft_fwd_cfg, &model, ex_phase, Aw);	
 		if (postfilt)
 		    postfilter(&model, &bg_est);
 		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem, gain);
@@ -834,7 +839,7 @@ int main(int argc, char *argv[])
 	    /* no decimation - sythesise each 10ms frame immediately */
 	    
 	    if (phase0)
-	    	phase_synth_zero_order(fft_fwd_cfg, &model, ak, ex_phase, order);	    
+	    	phase_synth_zero_order(fft_fwd_cfg, &model, ex_phase, Aw);	    
 
 	    if (postfilt)
 		postfilter(&model, &bg_est);

@@ -391,7 +391,7 @@ endfunction
 
 % LPF and peak pick part of freq est, put in a function as we call it twice
 
-function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin)
+function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin, do_fft)
   global M;
   global Npilotlpf;
   global Npilotbaseband;
@@ -409,24 +409,30 @@ function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, 
     k++;
   end
   
-  % decimate to improve DFT resolution, window and DFT
+  imax = 0;
+  foff = 0;
+  S = zeros(1, Mpilotfft);
 
-  Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
-  h = hanning(Npilotlpf);
-  s = pilot_lpf(1:Mpilot:Npilotlpf) .* h(1:Mpilot:Npilotlpf)';
-  s = [s zeros(1,Mpilotfft-Npilotlpf/Mpilot)];
-  S = fft(s, Mpilotfft);
+  if do_fft
+    % decimate to improve DFT resolution, window and DFT
 
-  % peak pick and convert to Hz
+    Mpilot = Fs/(2*200);  % calc decimation rate given new sample rate is twice LPF freq
+    h = hanning(Npilotlpf);
+    s = pilot_lpf(1:Mpilot:Npilotlpf) .* h(1:Mpilot:Npilotlpf)';
+    s = [s zeros(1,Mpilotfft-Npilotlpf/Mpilot)];
+    S = fft(s, Mpilotfft);
 
-  [imax ix] = max(abs(S));
-  r = 2*200/Mpilotfft;     % maps FFT bin to frequency in Hz
+    % peak pick and convert to Hz
+
+    [imax ix] = max(abs(S));
+    r = 2*200/Mpilotfft;     % maps FFT bin to frequency in Hz
   
-  if ix > Mpilotfft/2
-    foff = (ix - Mpilotfft - 1)*r;
-  else
-    foff = (ix - 1)*r;
-  endif
+    if ix > Mpilotfft/2
+      foff = (ix - Mpilotfft - 1)*r;
+    else
+      foff = (ix - 1)*r;
+    endif
+  end
 
   pilot_lpf_out = pilot_lpf;
 
@@ -436,7 +442,7 @@ endfunction
 % Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
 % sensitive to pilot tone level wrt other carriers
 
-function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
+function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin, do_fft)
   global M;
   global Npilotbaseband;
   global pilot_baseband1;
@@ -457,8 +463,8 @@ function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin)
     pilot_baseband2(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot_prev(i)); 
   end
 
-  [foff1 max1 pilot_lpf1 S1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin);
-  [foff2 max2 pilot_lpf2 S2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin);
+  [foff1 max1 pilot_lpf1 S1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin, do_fft);
+  [foff2 max2 pilot_lpf2 S2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin, do_fft);
 
   if max1 > max2
     foff = foff1;

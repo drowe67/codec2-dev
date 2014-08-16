@@ -37,5 +37,8 @@ function pl2(samname1, samname2, start_sam, end_sam, offset)
   figure(2)
   plot(s1(st1:en1)-s2(st2:en2));
   
+  f=fopen("diff.raw","wb");
+  d = s1(st1:en1)-s2(st2:en2);
+  fwrite(f,d,"short");
 
 endfunction

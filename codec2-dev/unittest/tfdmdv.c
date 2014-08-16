@@ -154,9 +154,9 @@ int main(int argc, char *argv[])
 
 	/* freq offset estimation and correction */
 
-	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin);
-
         //fdmdv->sync = 0; // when debugging good idea to uncomment this to "open loop"
+
+	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin, !fdmdv->sync);
 
 	if (fdmdv->sync == 0)
 	    fdmdv->foff = foff_coarse;

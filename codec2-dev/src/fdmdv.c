@@ -756,7 +756,8 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 \*---------------------------------------------------------------------------*/
 
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], 
-		   COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin)
+		   COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin,
+                   int do_fft)
 {
     int   i,j,k;
     int   mpilot;
@@ -775,35 +776,49 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 	    pilot_lpf[i] = cadd(pilot_lpf[i], fcmult(pilot_coeff[k], pilot_baseband[j-NPILOTCOEFF+1+k]));
     }
 
-    /* decimate to improve DFT resolution, window and DFT */
-
-    mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
-    for(i=0; i<MPILOTFFT; i++) {
-	s[i].real = 0.0; s[i].imag = 0.0;
-    }
-    for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
-	s[j] = fcmult(hanning[i], pilot_lpf[i]); 
-    }
-
-    kiss_fft(fft_pilot_cfg, (kiss_fft_cpx *)s, (kiss_fft_cpx *)S);
-
-    /* peak pick and convert to Hz */
+    /* We only need to do FFTs if we are out of sync.  Making them optional saves CPU in sync, which is when
+       we need to run the codec */
 
     imax = 0.0;
-    ix = 0;
+    *foff = 0.0;
     for(i=0; i<MPILOTFFT; i++) {
-	mag = S[i].real*S[i].real + S[i].imag*S[i].imag;
-	if (mag > imax) {
-	    imax = mag;
-	    ix = i;
-	}
+        S[i].real = 0.0;
+        S[i].imag = 0.0;
     }
-    r = 2.0*200.0/MPILOTFFT;     /* maps FFT bin to frequency in Hz */
+
+    if (do_fft) {
+        
+        /* decimate to improve DFT resolution, window and DFT */
+
+        mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
+        for(i=0; i<MPILOTFFT; i++) {
+            s[i].real = 0.0; s[i].imag = 0.0;
+        }
+        for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
+            s[j] = fcmult(hanning[i], pilot_lpf[i]); 
+        }
+
+        kiss_fft(fft_pilot_cfg, (kiss_fft_cpx *)s, (kiss_fft_cpx *)S);
+
+        /* peak pick and convert to Hz */
+
+        imax = 0.0;
+        ix = 0;
+        for(i=0; i<MPILOTFFT; i++) {
+            mag = S[i].real*S[i].real + S[i].imag*S[i].imag;
+            if (mag > imax) {
+                imax = mag;
+                ix = i;
+            }
+        }
+        r = 2.0*200.0/MPILOTFFT;     /* maps FFT bin to frequency in Hz */
   
-    if (ix >= MPILOTFFT/2)
-	*foff = (ix - MPILOTFFT)*r;
-    else
-	*foff = (ix)*r;
+        if (ix >= MPILOTFFT/2)
+            *foff = (ix - MPILOTFFT)*r;
+        else
+            *foff = (ix)*r;
+    }
+
     *max = imax;
 
 }
@@ -820,7 +835,7 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
 \*---------------------------------------------------------------------------*/
 
-float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
+float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 {
     int  i,j;
     COMP pilot[M+M/P];
@@ -862,8 +877,8 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin)
 	f->pilot_baseband2[j] = cmult(rx_fdm[i], cconj(prev_pilot[i]));
     }
 
-    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->fft_pilot_cfg, f->S1, nin);
-    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->fft_pilot_cfg, f->S2, nin);
+    lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->fft_pilot_cfg, f->S1, nin, do_fft);
+    lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->fft_pilot_cfg, f->S2, nin, do_fft);
 
     if (max1 > max2)
 	foff = foff1;
@@ -1577,7 +1592,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     /* freq offset estimation and correction */
    
     PROFILE_SAMPLE(demod_start);
-    foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin);
+    foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin, !fdmdv->sync);
     PROFILE_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset"); 
     
     if (fdmdv->sync == 0)

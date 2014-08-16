@@ -104,7 +104,7 @@ for f=1:frames
   fbb_phase_rx /= mag;
 
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
-  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin);
+  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin, !sync);
 
   %sync = 0; % when debugging good idea to uncomment this to "open loop"
 

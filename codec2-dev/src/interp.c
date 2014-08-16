@@ -129,6 +129,8 @@ float sample_log_amp(MODEL *model, float w)
     return log_amp;
 }
 
+#ifdef NOT_NEEDED
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: interp_lsp()	     
@@ -204,7 +206,7 @@ void interpolate_lsp(
     aks_to_M2(fft_fwd_cfg, ak_interp, LPC_ORD, interp, e, &snr, 0, 0, 1, 1, LPCPF_BETA, LPCPF_GAMMA); 
     //printf("  interp: ak[1]: %f A[1] %f\n", ak_interp[1], interp->A[1]);
 }
-
+#endif
 
 /*---------------------------------------------------------------------------*\
 
