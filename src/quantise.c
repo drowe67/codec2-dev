@@ -789,7 +789,6 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 {
     int   i;
     COMP  x[FFT_ENC];   /* input to FFTs                */
-    COMP  Aw[FFT_ENC];  /* LPC analysis filter spectrum */	
     COMP  Ww[FFT_ENC];  /* weighting spectrum           */
     float Rw[FFT_ENC];  /* R = WA                       */
     float e_before, e_after, gain;
@@ -907,10 +906,11 @@ void aks_to_M2(
   int           pf,          /* true to LPC post filter */
   int           bass_boost,  /* enable LPC filter 0-1khz 3dB boost */
   float         beta,
-  float         gamma        /* LPC post filter parameters */
+  float         gamma,       /* LPC post filter parameters */
+  COMP          Aw[]         /* output power spectrum */
 )
 {
-  COMP pw[FFT_ENC];	/* input to FFT for power spectrum */
+  COMP a[FFT_ENC];	/* input to FFT for power spectrum */
   COMP Pw[FFT_ENC];	/* output power spectrum */
   int i,m;		/* loop variables */
   int am,bm;		/* limits of current band */
@@ -927,20 +927,22 @@ void aks_to_M2(
   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
 
   for(i=0; i<FFT_ENC; i++) {
-    pw[i].real = 0.0;
-    pw[i].imag = 0.0; 
+    a[i].real = 0.0;
+    a[i].imag = 0.0; 
+    Pw[i].real = 0.0;
+    Pw[i].imag = 0.0;
   }
 
   for(i=0; i<=order; i++)
-    pw[i].real = ak[i];
-  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)pw, (kiss_fft_cpx *)Pw);
-  
+    a[i].real = ak[i];
+  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)a, (kiss_fft_cpx *)Aw);
+
   PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft"); 
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
   for(i=0; i<FFT_ENC/2; i++)
-    Pw[i].real = 1.0/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
+    Pw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
 
   PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
 

@@ -27,6 +27,7 @@
 #define __QUANTISE__
 
 #include "kiss_fft.h"
+#include "comp.h"
 
 #define WO_BITS     7
 #define WO_LEVELS   (1<<WO_BITS)
@@ -57,7 +58,7 @@ float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
 void aks_to_M2(kiss_fft_cfg fft_fwd_cfg, float ak[], int order, MODEL *model, 
 	       float E, float *snr, int dump, int sim_pf, 
-               int pf, int bass_boost, float beta, float gamma);
+               int pf, int bass_boost, float beta, float gamma, COMP Aw[]);
 
 int   encode_Wo(float Wo);
 float decode_Wo(int index);
