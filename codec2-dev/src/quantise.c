@@ -767,7 +767,7 @@ void force_min_lsp_dist(float lsp[], int order)
    of this text is on the MBE vocoder, and this is a freq domain
    adaptation of post filtering commonly used in CELP.
 
-   I used the Octave simulation lpcpf.m to get an understaing of the
+   I used the Octave simulation lpcpf.m to get an understanding of the
    algorithm.
 
    Requires two more FFTs which is significantly more MIPs.  However
@@ -785,7 +785,7 @@ void force_min_lsp_dist(float lsp[], int order)
 \*---------------------------------------------------------------------------*/
 
 void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[], 
-                     int order, int dump, float beta, float gamma, int bass_boost)
+                     int order, int dump, float beta, float gamma, int bass_boost, float E)
 {
     int   i;
     COMP  x[FFT_ENC];   /* input to FFTs                */
@@ -799,30 +799,6 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
     PROFILE_VAR(tstart, tfft1, taw, tfft2, tww, tr);
 
     PROFILE_SAMPLE(tstart);
-
-    /* Determine LPC inverse filter spectrum 1/A(exp(jw)) -----------*/
-
-    /* we actually want the synthesis filter A(exp(jw)) but the
-       inverse (analysis) filter is easier to find as it's FIR, we
-       just use the inverse of 1/A to get the synthesis filter
-       A(exp(jw)) */
-
-    for(i=0; i<FFT_ENC; i++) {
-	x[i].real = 0.0;
-	x[i].imag = 0.0; 
-    }
-    
-    for(i=0; i<=order; i++)
-	x[i].real = ak[i];
-    kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Aw);
-
-    PROFILE_SAMPLE_AND_LOG(tfft1, tstart, "        fft1"); 
-
-    for(i=0; i<FFT_ENC/2; i++) {
-	Aw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
-    }
-
-    PROFILE_SAMPLE_AND_LOG(taw, tfft1, "        Aw"); 
 
     /* Determine weighting filter spectrum W(exp(jw)) ---------------*/
 
@@ -851,7 +827,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 
     max_Rw = 0.0; min_Rw = 1E32;
     for(i=0; i<FFT_ENC/2; i++) {
-	Rw[i] = sqrtf(Ww[i].real * Aw[i].real);
+	Rw[i] = sqrtf(Ww[i].real * Pw[i].real);
 	if (Rw[i] > max_Rw)
 	    max_Rw = Rw[i];
 	if (Rw[i] < min_Rw)
@@ -889,8 +865,10 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
         e_after += Pw[i].real;
     }
     gain = e_before/e_after;
-    /* apply gain factor to normalise energy */
 
+    /* apply gain factor to normalise energy, and LPC Energy */
+
+    gain *= E;
     for(i=0; i<FFT_ENC/2; i++) {
 	Pw[i].real *= gain;
     }
@@ -962,12 +940,12 @@ void aks_to_M2(
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
   for(i=0; i<FFT_ENC/2; i++)
-    Pw[i].real = E/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
+    Pw[i].real = 1.0/(Pw[i].real*Pw[i].real + Pw[i].imag*Pw[i].imag);
 
   PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
 
   if (pf)
-      lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost);
+      lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost, E);
 
   PROFILE_SAMPLE_AND_LOG(tpf, tpw, "      LPC post filter"); 
 

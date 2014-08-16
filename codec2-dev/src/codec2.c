@@ -1328,7 +1328,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, float
 
     phase_synth_zero_order(c2->fft_fwd_cfg, model, ak, &c2->ex_phase, LPC_ORD);
 
-    PROFILE_SAMPLE_AND_LOG(pf_start,phase_start, "    phase_synth"); 
+    PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth"); 
 
     postfilter(model, &c2->bg_est);
 
@@ -1411,7 +1411,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
   DATE CREATED: Nov 7 2012
 
   Limits output level to protect ears when there are bit errors or the input
-  is overdriven.  This doesn't correct or mask bit erros, just reduces the
+  is overdriven.  This doesn't correct or mask bit errors, just reduces the
   worst of their damage.
 
 \*---------------------------------------------------------------------------*/
