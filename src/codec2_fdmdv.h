@@ -109,9 +109,9 @@ void           fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STA
 void           fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
 
 void           fdmdv_8_to_16(float out16k[], float in8k[], int n);
-void           fdmdv_8_to_16_short(short out16k[], float in8k[], int n);
+void           fdmdv_8_to_16_short(short out16k[], short in8k[], int n);
 void           fdmdv_16_to_8(float out8k[], float in16k[], int n);
-void           fdmdv_16_short_to_8(float out8k[], short in16k[], int n);
+void           fdmdv_16_to_8_short(short out8k[], short in16k[], int n);
 
 void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin);
 
