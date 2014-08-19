@@ -1,17 +1,17 @@
 /* 
-   t16_8.c
+   t16__short_8.c
    David Rowe
-   May 10 2012
+   19 August 2014
 
    Unit test for 16 to 8 kHz sample rate conversion functions.  I
    evaluated output by plotting using Octave and looking for jaggies:
 
-     pl("../unittest/out16.raw",1,3000)
+     pl("../unittest/out16_short.raw",1,3000)
      pl("../unittest/out8.raw",1,3000)
 
    Listening to it also shows up anything nasty:
 
-     $ play -s -2 -r 16000 out16.raw
+     $ play -s -2 -r 16000 out16_short.raw
      $ play -s -2 -r 8000 out8.raw
 
   */
@@ -24,7 +24,7 @@
 
 #define N8                        160 /* procssing buffer size at 8 kHz */
 #define N16             (N8*FDMDV_OS)
-#define FRAMES                     50
+#define FRAMES                     100
 #define TWO_PI            6.283185307
 #define FS                      16000
 
@@ -32,11 +32,10 @@
 
 int main() {
     float in8k[FDMDV_OS_TAPS_8K + N8];
-    float out16k[N16];
     short out16k_short[N16];
     FILE *f16;
 
-    float in16k[FDMDV_OS_TAPS_16K + N16];
+    short in16k_short[FDMDV_OS_TAPS_16K + N16];
     float out8k[N16];
     short out8k_short[N8];
     FILE *f8;
@@ -44,7 +43,7 @@ int main() {
     int i,f,t,t1;
     float freq = 800.0;
 
-    f16 = fopen("out16.raw", "wb");
+    f16 = fopen("out16_short.raw", "wb");
     assert(f16 != NULL);
     f8 = fopen("out8.raw", "wb");
     assert(f8 != NULL);
@@ -54,7 +53,7 @@ int main() {
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
 	in8k[i] = 0.0;
     for(i=0; i<FDMDV_OS_TAPS_16K; i++)
-	in16k[i] = 0.0;
+	in16k_short[i] = 0;
 
     t = t1 = 0;
     for(f=0; f<FRAMES; f++) {
@@ -65,36 +64,24 @@ int main() {
 #endif
 #ifdef SINE
 	for(i=0; i<N8; i++,t++)
-	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0*cos(TWO_PI*t*freq/FS);
+	    in8k[FDMDV_OS_TAPS_8K+i] = 8000.0*cos(TWO_PI*t*freq/FS);
 #endif
 
 	/* upsample  */
 
-	fdmdv_8_to_16(out16k, &in8k[FDMDV_OS_TAPS_8K], N8);
-	/*
-	for(i=0; i<MEM8; i++)
-	    in8k[i] = in8k[i+N8];
-	*/
+	fdmdv_8_to_16_short(out16k_short, &in8k[FDMDV_OS_TAPS_8K], N8);
 
-	/* save 16k to disk for plotting and check out */
-
-	for(i=0; i<N16; i++)
-	    out16k_short[i] = (short)out16k[i];
 	fwrite(out16k_short, sizeof(short), N16, f16);
 	
-	/* add a 6 kHz spurious signal, down sampler should
+	/* add a 6 kHz spurious signal for fun, we want down sampler to
 	   knock this out */
 
 	for(i=0; i<N16; i++,t1++)
-	    in16k[i+FDMDV_OS_TAPS_16K] = out16k[i] + 16000.0*cos(TWO_PI*t1*6000.0/FS);
+	    in16k_short[i+FDMDV_OS_TAPS_16K] = out16k_short[i] + 8000.0*cos(TWO_PI*t1*6000.0/FS);
 
 	/* downsample */
 
-	fdmdv_16_to_8(out8k, &in16k[FDMDV_OS_TAPS_16K], N8);
-	/*
-	for(i=0; i<FDMDV_OS_TAPS_16K; i++)
-	    in16k[i] = in16k[i+N16];
-	*/
+	fdmdv_16_short_to_8(out8k, &in16k_short[FDMDV_OS_TAPS_16K], N8);
 
 	/* save 8k to disk for plotting and check out */
 
