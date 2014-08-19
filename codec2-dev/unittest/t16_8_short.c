@@ -1,5 +1,5 @@
 /* 
-   t16__short_8.c
+   t16_8_short.c
    David Rowe
    19 August 2014
 
@@ -31,13 +31,12 @@
 #define SINE
 
 int main() {
-    float in8k[FDMDV_OS_TAPS_8K + N8];
+    short in8k_short[FDMDV_OS_TAPS_8K + N8];
     short out16k_short[N16];
     FILE *f16;
 
     short in16k_short[FDMDV_OS_TAPS_16K + N16];
-    float out8k[N16];
-    short out8k_short[N8];
+    short out8k_short[N16];
     FILE *f8;
 
     int i,f,t,t1;
@@ -51,7 +50,7 @@ int main() {
     /* clear filter memories */
 
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
-	in8k[i] = 0.0;
+	in8k_short[i] = 0;
     for(i=0; i<FDMDV_OS_TAPS_16K; i++)
 	in16k_short[i] = 0;
 
@@ -60,16 +59,16 @@ int main() {
 
 #ifdef DC
 	for(i=0; i<N8; i++)
-	    in8k[FDMDV_OS_TAPS_8K+i] = 16000.0;
+	    in8k_short[FDMDV_OS_TAPS_8K+i] = 16000.0;
 #endif
 #ifdef SINE
 	for(i=0; i<N8; i++,t++)
-	    in8k[FDMDV_OS_TAPS_8K+i] = 8000.0*cos(TWO_PI*t*freq/FS);
+	    in8k_short[FDMDV_OS_TAPS_8K+i] = 8000.0*cos(TWO_PI*t*freq/FS);
 #endif
 
 	/* upsample  */
 
-	fdmdv_8_to_16_short(out16k_short, &in8k[FDMDV_OS_TAPS_8K], N8);
+	fdmdv_8_to_16_short(out16k_short, &in8k_short[FDMDV_OS_TAPS_8K], N8);
 
 	fwrite(out16k_short, sizeof(short), N16, f16);
 	
@@ -81,12 +80,10 @@ int main() {
 
 	/* downsample */
 
-	fdmdv_16_short_to_8(out8k, &in16k_short[FDMDV_OS_TAPS_16K], N8);
+	fdmdv_16_to_8_short(out8k_short, &in16k_short[FDMDV_OS_TAPS_16K], N8);
 
 	/* save 8k to disk for plotting and check out */
 
-	for(i=0; i<N8; i++)
-	    out8k_short[i] = (short)out8k[i];
 	fwrite(out8k_short, sizeof(short), N8, f8);
 	
     }
