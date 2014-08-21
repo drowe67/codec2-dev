@@ -137,7 +137,7 @@ void adc_configure(){
 
     // Select the channel to be read from
 
-    ADC_RegularChannelConfig(ADCx,ADC_Channel_2,1,ADC_SampleTime_144Cycles);
+    ADC_RegularChannelConfig(ADCx,ADC_Channel_1,1,ADC_SampleTime_144Cycles);
     //ADC_VBATCmd(ENABLE); 
 
     /* DMA  configuration **************************************/

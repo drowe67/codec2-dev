@@ -287,7 +287,7 @@ src/init.c
 FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
 
 freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o
