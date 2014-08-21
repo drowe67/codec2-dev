@@ -36,12 +36,11 @@
 
 int main(void) {
     struct freedv *f;
-    float  adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
-    float  adc8k[FREEDV_NSAMPLES];
-    float  dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
-    float  dac16k[FREEDV_NSAMPLES_16K];
-    short  buf[FREEDV_NSAMPLES_16K];
-
+    short          adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
+    short          dac16k[FREEDV_NSAMPLES_16K];
+    short          adc8k[FREEDV_NSAMPLES];
+    short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
+ 
     int    nin, nout, i;
 
     /* init all the drivers for various peripherals */
@@ -49,7 +48,7 @@ int main(void) {
     //sm1000_leds_switches_init();
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
-    //f = freedv_open(FREEDV_MODE_1600);
+    f = freedv_open(FREEDV_MODE_1600);
 
     /* LEDs into a known state */
 
@@ -78,34 +77,29 @@ int main(void) {
 	dac8k[i] = 0.0;
     
     while(1) {
-        if(1) {
+
+
+        if (0) {
 
             /* Transmit -------------------------------------------------------------------------*/
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
-            if (adc1_read(buf, FREEDV_NSAMPLES_16K) == 0) {
-
+            if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
                 GPIOE->ODR = (1 << 3);
-                for(i=0; i<FREEDV_NSAMPLES_16K; i++)
-                    adc16k[FDMDV_OS_TAPS_16K+i] = buf[i];
 
-                fdmdv_16_to_8(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
+                fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
 
-                for(i=0; i<FREEDV_NSAMPLES; i++)
-                    buf[i] = adc8k[i];
-                //freedv_tx(f, buf, buf);
-                for(i=0; i<FREEDV_NSAMPLES; i++)
-                    dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+                freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                //for(i=0; i<FREEDV_NSAMPLES; i++)
+                //    dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
 
-                fdmdv_8_to_16(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
+                fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
 
-                for(i=0; i<FREEDV_NSAMPLES_16K; i++)
-                    buf[i] = dac16k[i];          
-                dac2_write(buf, FREEDV_NSAMPLES_16K);
-                GPIOE->ODR &= ~(1 << 3);
+                dac2_write(dac16k, FREEDV_NSAMPLES_16K);
 
                 //led_ptt(1); led_rt(0); led_err(0);
+                GPIOE->ODR &= ~(1 << 3);
             }
 
         }
@@ -115,18 +109,24 @@ int main(void) {
 
             /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
-            nin = freedv_nin(f);
+            nin = freedv_nin(f);   
+            nout = nin;
             f->total_bit_errors = 0;
-            
-            if (adc1_read(buf, nin) == 0) {
-                nout = freedv_rx(f, buf, buf);
-                dac2_write(buf, nout);
-                led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
-                nin = freedv_nin(f);
+
+            if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
+                GPIOE->ODR = (1 << 3);
+                fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
+                nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                //for(i=0; i<FREEDV_NSAMPLES; i++)
+                //   dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+                fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
+                dac2_write(dac16k, 2*nout);
+                //led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
+                GPIOE->ODR &= ~(1 << 3);
             }
 
         }
-        
+       
     } /* while(1) ... */
 }
 

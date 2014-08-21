@@ -25,6 +25,9 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define PROFILE
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -35,6 +38,7 @@
 #include "gdb_stdio.h"
 #include "freedv_api.h"
 #include "machdep.h"
+#include "codec2_fdmdv.h"
 
 #ifdef __EMBEDDED__
 #define printf gdb_stdio_printf
@@ -42,49 +46,85 @@
 #define fclose gdb_stdio_fclose
 #define fread gdb_stdio_fread
 #define fwrite gdb_stdio_fwrite
+#define fprintf gdb_stdio_fprintf
 #endif
+
+#define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
 int main(int argc, char *argv[]) {
     struct freedv *f;
-    short          inbuf[FREEDV_NSAMPLES], outbuf[FREEDV_NSAMPLES];
-    FILE          *fin, *fout;
-    int            frame, nin, nout = 0;
-    PROFILE_VAR(freedv_start);
+    short          adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
+    short          dac16k[FREEDV_NSAMPLES_16K];
+    short          adc8k[FREEDV_NSAMPLES];
+    short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
+    FILE          *fin, *fout, *ftotal;
+    int            frame, nin_16k, nin, i, nout = 0;
+    struct FDMDV_STATS  stats;
+    PROFILE_VAR(fdmdv_16_to_8_start, freedv_rx_start, fdmdv_8_to_16_start);
 
     machdep_profile_init();
 
     f = freedv_open(FREEDV_MODE_1600);
 
-    // Transmit ---------------------------------------------------------------------
+    // Receive ---------------------------------------------------------------------
 
     frame = 0;
 
-    fin = fopen("mod.raw", "rb");
+    fin = fopen("mod_16k.raw", "rb");
     if (fin == NULL) {
         printf("Error opening input file\n");
         exit(1);
     }
 
-    fout = fopen("stm_out.raw", "wb");
+    fout = fopen("speechout_16k.raw", "wb");
     if (fout == NULL) {
         printf("Error opening output file\n");
         exit(1);
     }
 
-    nin = freedv_nin(f);
-    while (fread(inbuf, sizeof(short), nin, fin) == nin) {
-        PROFILE_SAMPLE(freedv_start);
-        nout = freedv_rx(f, outbuf, inbuf);
-        nin = freedv_nin(f);
-        PROFILE_SAMPLE_AND_LOG2(freedv_start, "  demod");     
+    ftotal = fopen("total.txt", "wt");
+    assert(ftotal != NULL);
 
+    /* clear filter memories */
+
+    for(i=0; i<FDMDV_OS_TAPS_16K; i++)
+	adc16k[i] = 0.0;
+    for(i=0; i<FDMDV_OS_TAPS_8K; i++)
+	dac8k[i] = 0.0;
+    
+    nin = freedv_nin(f);
+    nin_16k = 2*nin;
+    nout = nin;
+    while (fread(&adc16k[FDMDV_OS_TAPS_16K], sizeof(short), nin_16k, fin) == nin_16k) {
+
+        PROFILE_SAMPLE(fdmdv_16_to_8_start);
+
+        fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
+
+        PROFILE_SAMPLE_AND_LOG(freedv_rx_start, fdmdv_16_to_8_start, "  fdmdv_16_to_8");
+
+        nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+        nin = freedv_nin(f); nin_16k = 2*nin;
+        fdmdv_get_demod_stats(f->fdmdv, &stats);
+
+        PROFILE_SAMPLE_AND_LOG(fdmdv_8_to_16_start, freedv_rx_start, "  freedv_rx");     
+
+        fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
+
+        PROFILE_SAMPLE_AND_LOG2(fdmdv_8_to_16_start, "  fdmdv_8_to_16");
+
+        fprintf(ftotal, "%d\n", machdep_profile_sample() - fdmdv_16_to_8_start);
         machdep_profile_print_logged_samples();
-        fwrite(outbuf, sizeof(short), nout, fout);
-        printf("frame: %d\n", ++frame);
+
+        fwrite(dac16k, sizeof(short), 2*nout, fout);
+        fdmdv_get_demod_stats(f->fdmdv, &stats);
+        printf("frame: %d nin_16k: %d sync: %d SNR: %3.2f \n", 
+               ++frame, nin_16k, stats.sync, (double)stats.snr_est);
     }
 
     fclose(fin);
     fclose(fout);
+    fclose(ftotal);
 
     return 0;
 }
