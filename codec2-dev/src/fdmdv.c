@@ -1716,21 +1716,28 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct FDMDV_STATS *fdmdv_stats)
 
 void fdmdv_8_to_16(float out16k[], float in8k[], int n)
 {
-    int i,j,k,l;
+    int i,k,l;
+    float acc;
 
     /* make sure n is an integer multiple of the oversampling rate, ow
        this function breaks */
 
     assert((n % FDMDV_OS) == 0);
 
+    /* this version unrolled for specific FDMDV_OS */
+
+    assert(FDMDV_OS == 2);
+    
     for(i=0; i<n; i++) {
-	for(j=0; j<FDMDV_OS; j++) {
-	    out16k[i*FDMDV_OS+j] = 0.0;
-	    for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
-		out16k[i*FDMDV_OS+j] += fdmdv_os_filter[k+j]*in8k[i-l];
-	    out16k[i*FDMDV_OS+j] *= FDMDV_OS;
-	    
-	}
+        acc = 0.0;
+        for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
+            acc += fdmdv_os_filter[k]*in8k[i-l];
+        out16k[i*FDMDV_OS] = FDMDV_OS*acc;
+
+        acc = 0.0;
+        for(k=1,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
+            acc += fdmdv_os_filter[k]*in8k[i-l];
+        out16k[i*FDMDV_OS+1] = FDMDV_OS*acc;
     }	
 
     /* update filter memory */
@@ -1742,7 +1749,7 @@ void fdmdv_8_to_16(float out16k[], float in8k[], int n)
 
 void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
 {
-    int i,j,k,l;
+    int i,k,l;
     float acc;
 
     /* make sure n is an integer multiple of the oversampling rate, ow
@@ -1750,14 +1757,20 @@ void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
 
     assert((n % FDMDV_OS) == 0);
 
+    /* this version unrolled for specific FDMDV_OS */
+
+    assert(FDMDV_OS == 2);
+
     for(i=0; i<n; i++) {
-	for(j=0; j<FDMDV_OS; j++) {
-	    acc = 0.0;
-	    for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
-		acc += fdmdv_os_filter[k+j]*(float)in8k[i-l];
-	    out16k[i*FDMDV_OS+j] = acc*FDMDV_OS;
-	    
-	}
+        acc = 0.0;
+        for(k=0,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
+            acc += fdmdv_os_filter[k]*(float)in8k[i-l];
+        out16k[i*FDMDV_OS] = FDMDV_OS*acc;
+
+        acc = 0.0;
+        for(k=1,l=0; k<FDMDV_OS_TAPS_16K; k+=FDMDV_OS,l++)
+            acc += fdmdv_os_filter[k]*(float)in8k[i-l];
+        out16k[i*FDMDV_OS+1] = FDMDV_OS*acc;
     }	
 
     /* update filter memory */
@@ -1789,11 +1802,10 @@ void fdmdv_16_to_8(float out8k[], float in16k[], int n)
     float acc;
     int   i,j,k;
     
-    for(i=0, k=0; k<n; i+=FDMDV_OS, k++) {
-        
+    for(i=0, k=0; k<n; i+=FDMDV_OS, k++) {       
 	acc = 0.0;
 	for(j=0; j<FDMDV_OS_TAPS_16K; j++)
-	    acc += fdmdv_os_filter[j]*(float)in16k[i-j]; 
+	    acc += fdmdv_os_filter[j]*in16k[i-j]; 
         out8k[k] = acc;       
     }
 
@@ -1805,12 +1817,14 @@ void fdmdv_16_to_8(float out8k[], float in16k[], int n)
 
 void fdmdv_16_to_8_short(short out8k[], short in16k[], int n)
 {
-    int i,j;
+    float acc;
+    int i,j,k;
 
-    for(i=0; i<n; i++) {
-	out8k[i] = 0.0;
+    for(i=0, k=0; k<n; i+=FDMDV_OS, k++) {
+	acc = 0.0;
 	for(j=0; j<FDMDV_OS_TAPS_16K; j++)
-	    out8k[i] += fdmdv_os_filter[j]*(float)in16k[i*FDMDV_OS-j];
+	    acc += fdmdv_os_filter[j]*(float)in16k[i-j];
+        out8k[k] = acc;
     }
 
     /* update filter memory */
