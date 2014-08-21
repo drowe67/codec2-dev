@@ -139,8 +139,17 @@ void freedv_close(struct freedv *freedv) {
   Takes a frame of input speech samples, encodes and modulates them to produce
   a frame of modem samples that can be sent to the transmitter.
 
-  speech_in[] and mod_out[] are sampled at 8 kHz, 16 bit shorts,
-  and FREEDV_NSAMPLES long.
+  speech_in[] and mod_out[] are sampled at 8 kHz, 16 bit shorts, and
+  FREEDV_NSAMPLES long.  The speech_in[] level should be such that the
+  peak speech level is between +/16384 and +/- 32767.  mod_out[] will
+  be scaled such that the peak level is just less than +/-32767.
+
+  The FDM modem signal mod_out[] has a high crest factor (around
+  12dB), however the energy and duration of the peaks is small.
+  FreeDV is generally operated at a "backoff" of 6-8dB.  Adjust the
+  power amplifier drive so that the average power is 6-8dB less than
+  the peak power of the PA.  For example, on a radio rated at 100W PEP
+  for SSB, the average FreeDV power is typically 20-25W.
 
 \*---------------------------------------------------------------------------*/
 
@@ -251,16 +260,26 @@ int freedv_nin(struct freedv *f) {
   then decodes them, producing a frame of decoded speech samples.  
 
   Both demod_in[] and speech_out[] are 16 bit shorts sampled at 8 kHz.
+  The peak level of demod_in[] is not critical, as the demod works
+  well over a wide range of amplitude scaling.  However it is best to
+  avoid clipping (overload, or samples pinned to +/- 32767).  Suggest
+  scaling so the peak (modem signal plus noise) is between +/-16384
+  and +/-32767.  speech_out[] will peak at just less than +/-32767.
 
   To account for difference in the transmit and receive sample clock
   frequencies, the number of demod_in[] samples is time varying.  It
-  is the responsibility of the caller to pass the correct number of
+  is the responsibility of the caller to supply the correct number of
   samples.  Call freedv_nin() before each call to freedv_rx() to
   determine how many samples to pass to this function (see example).
 
   Returns the number of output speech samples available in
   speech_out[]. When in sync this will typically alternate between 0
-  and FREEDV_NSAMPLES.  When out of sync, this will be f->nin.
+  and FREEDV_NSAMPLES.  When out of sync, this will be f->nin.  
+
+  When out of sync, this function echoes the demod_in[] samples to
+  speech_out[].  This allows the user to listen to the channel, which
+  is useful for tuning FreeDV signals or reception of non-FreeDV
+  signals.
 
 \*---------------------------------------------------------------------------*/
 
