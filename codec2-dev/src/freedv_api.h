@@ -5,7 +5,9 @@
   DATE CREATED: August 2014
                                                                              
   Library of API functions that implement FreeDV "modes", useful for
-  embedding FreeDV in other programs.
+  embedding FreeDV in other programs.  Please see the documentation
+  for each function in freedv_api.c, and the sample freedv_tx.c and
+  freedv_rx.c programs.
                                                                              
 \*---------------------------------------------------------------------------*/
 
