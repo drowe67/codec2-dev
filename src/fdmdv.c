@@ -677,8 +677,7 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol,
  
     if (*bit)
 	*symbol = -*symbol;
-    else
-	*symbol = *symbol;
+
     if (*bit) 
 	*bit = 0;
     else
