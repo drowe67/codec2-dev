@@ -38,8 +38,9 @@
 #include "debugblinky.h"
 
 struct FIFO *adc1_fifo;
+struct FIFO *adc2_fifo;
 unsigned short adc_buf[ADC_BUF_SZ];
-int adc_overflow;
+int adc_overflow1, adc_overflow2;
 int half,full;
 
 #define ADCx_DR_ADDRESS          ((uint32_t)0x4001204C)
@@ -54,6 +55,8 @@ static void tim2_config(void);
 void adc_open(int fifo_sz) {
     adc1_fifo = fifo_create(fifo_sz);
     assert(adc1_fifo != NULL);
+    adc2_fifo = fifo_create(fifo_sz);
+    assert(adc2_fifo != NULL);
 
     tim2_config();
     adc_configure();
@@ -64,6 +67,12 @@ void adc_open(int fifo_sz) {
 
 int adc1_read(short buf[], int n) {   
     return fifo_read(adc1_fifo, buf, n);
+}
+
+/* n signed 16 bit samples in buf[] if return != -1 */
+
+int adc2_read(short buf[], int n) {   
+    return fifo_read(adc2_fifo, buf, n);
 }
 
 
@@ -131,13 +140,14 @@ void adc_configure(){
     ADC_init_structure.ADC_ContinuousConvMode = DISABLE; 
     ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
     ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
-    ADC_init_structure.ADC_NbrOfConversion = 1;
-    ADC_init_structure.ADC_ScanConvMode = DISABLE;
+    ADC_init_structure.ADC_NbrOfConversion = 2;
+    ADC_init_structure.ADC_ScanConvMode = ENABLE;
     ADC_Init(ADCx,&ADC_init_structure);
 
     // Select the channel to be read from
 
     ADC_RegularChannelConfig(ADCx,ADC_Channel_1,1,ADC_SampleTime_144Cycles);
+    ADC_RegularChannelConfig(ADCx,ADC_Channel_2,2,ADC_SampleTime_144Cycles);
     //ADC_VBATCmd(ENABLE); 
 
     /* DMA  configuration **************************************/
@@ -195,8 +205,9 @@ void adc_configure(){
 */
 
 void DMA2_Stream0_IRQHandler(void) {
-    int i, sam;
-    short signed_buf[ADC_BUF_SZ/2];
+    int i, j, sam;
+    short signed_buf1[ADC_BUF_SZ/2];
+    short signed_buf2[ADC_BUF_SZ/2];
 
     GPIOE->ODR = (1 << 0);
 
@@ -207,15 +218,19 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* convert to signed */
 
-        for(i=0; i<ADC_BUF_SZ/2; i++) {
+        for(i=0, j=0; i<ADC_BUF_SZ/2; i+=2,j++) {
             sam = (int)adc_buf[i] - 32768;
-            signed_buf[i] = sam;
+            signed_buf1[j] = sam;
+            sam = (int)adc_buf[i+1] - 32768;
+            signed_buf2[j] = sam;
         }
+        /* write first half to fifo */
 
-       /* write first half to fifo */
-
-        if (fifo_write(adc1_fifo, signed_buf, ADC_BUF_SZ/2) == -1) {
-            adc_overflow++;
+        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
+            adc_overflow1++;
+        }
+        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+            adc_overflow2++;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
@@ -230,15 +245,20 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* convert to signed */
 
-        for(i=0; i<ADC_BUF_SZ/2; i++) {
+        for(i=0, j=0; i<ADC_BUF_SZ/2; i+=2,j++) {
             sam = (int)adc_buf[ADC_BUF_SZ/2 + i] - 32768;
-            signed_buf[i] = sam;
+            signed_buf1[j] = sam;
+            sam = (int)adc_buf[ADC_BUF_SZ/2 + i+1] - 32768;
+            signed_buf2[j] = sam;
         }
 
         /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, signed_buf, ADC_BUF_SZ/2) == -1) {
-            adc_overflow++;
+        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
+            adc_overflow1++;
+        }
+        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+            adc_overflow2++;
         }
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
