@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf 
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -191,6 +191,20 @@ src/startup_stm32f4xx.s \
 src/init.c
 
 adc_rec.elf: $(ADC_REC_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+ADC_SD_SRCS=\
+src/adc_sd.c \
+../src/fifo.c \
+gdb_stdio.c \
+src/stm32f4_adc.c \
+src/stm32f4_dac.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+adc_sd.elf: $(ADC_SD_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 PWM_UT_SRCS=\
