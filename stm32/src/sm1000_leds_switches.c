@@ -25,13 +25,13 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#define LED_PWR       12
-#define LED_PTT       13
-#define LED_RT        14
-#define LED_ERR       15
-#define SWITCH_PTT     7
-#define SWITCH_SELECT  0
-#define SWITCH_BACK    1
+#define LED_PWR        GPIO_Pin_12
+#define LED_PTT        GPIO_Pin_13
+#define LED_RT         GPIO_Pin_14
+#define LED_ERR        GPIO_Pin_15
+#define SWITCH_PTT     GPIO_Pin_7
+#define SWITCH_SELECT  GPIO_Pin_0
+#define SWITCH_BACK    GPIO_Pin_1
 
 #include <stm32f4xx.h>
 #include <stm32f4xx_gpio.h>
@@ -62,40 +62,40 @@ void sm1000_leds_switches_init(void) {
 
 void led_pwr(int state) {
     if (state)
-        GPIOD->ODR = (1 << LED_PWR);
+        GPIOD->ODR |= (1 << 12);
     else
-        GPIOD->ODR &= ~(1 << LED_PWR);
+        GPIOD->ODR &= ~(1 << 12);
 }
 
 void led_ptt(int state) {
     if (state)
-        GPIOD->ODR = (1 << LED_PTT);
+        GPIOD->ODR |= (1 << 13);
     else
-        GPIOD->ODR &= ~(1 << LED_PTT);
+        GPIOD->ODR &= ~(1 << 13);
 }
 
 void led_rt(int state) {
     if (state)
-        GPIOD->ODR = (1 << LED_RT);
+        GPIOD->ODR |= (1 << 14);
     else
-        GPIOD->ODR &= ~(1 << LED_RT);
+        GPIOD->ODR &= ~(1 << 14);
 }
 
 void led_err(int state) {
     if (state)
-        GPIOD->ODR = (1 << LED_ERR);
+        GPIOD->ODR |= (1 << 15);
     else
-        GPIOD->ODR &= ~(1 << LED_ERR);
+        GPIOD->ODR &= ~(1 << 15);
 }
 
 int switch_ptt(void) {
-    return GPIOA->IDR & SWITCH_PTT;
+    return GPIOD->IDR & (1 << 7);
 }
 
 int switch_select(void) {
-    return GPIOA->IDR & SWITCH_SELECT;
+    return GPIOD->IDR & (1 << 0);
 }
 
 int switch_back(void) {
-    return GPIOA->IDR & SWITCH_BACK;
+    return GPIOD->IDR & (1 << 1);
 }

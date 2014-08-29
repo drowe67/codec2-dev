@@ -53,7 +53,7 @@ int main(void) {
 
         /* keep DAC FIFOs topped up */
 
-        while(adc1_read(buf, SINE_SAMPLES) == -1);
+        while(adc2_read(buf, SINE_SAMPLES) == -1);
         dac2_write(buf, SINE_SAMPLES);
     }
    
