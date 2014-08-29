@@ -30,6 +30,7 @@
 
 int main(void) {
     sm1000_leds_switches_init();
+
     while(1) {
         led_pwr(switch_select());
         led_ptt(switch_ptt());
