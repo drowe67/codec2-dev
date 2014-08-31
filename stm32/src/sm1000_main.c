@@ -45,7 +45,7 @@ int main(void) {
 
     /* init all the drivers for various peripherals */
 
-    //sm1000_leds_switches_init();
+    sm1000_leds_switches_init();
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
     f = freedv_open(FREEDV_MODE_1600);
@@ -58,15 +58,10 @@ int main(void) {
        TODO:
        [ ] UT analog interfaces from file IO
        [ ] UTs for simultaneous tx & rx on analog interfaces
-       [ ] measure CPU load of various parts with a blinky
-           [ ] ADC and DAC drivers
-           [ ] rate conversion
        [ ] detect program assert type errors with a blinky
        [ ] timer tick function to measure 10ms-ish type times
        [ ] switch debouncing?
        [ ] light led with bit errors
-       [ ] 16 to 8 kHz rate conversion
-       [ ] change freedv_api interface to float[]
     */
 
     /* clear filter memories */
@@ -78,13 +73,13 @@ int main(void) {
     
     while(1) {
 
-        if (0) {
+        if (switch_ptt()) {
 
             /* Transmit -------------------------------------------------------------------------*/
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
-            if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
+            if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
                 GPIOE->ODR = (1 << 3);
 
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
@@ -95,9 +90,9 @@ int main(void) {
 
                 fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
 
-                dac2_write(dac16k, FREEDV_NSAMPLES_16K);
+                dac1_write(dac16k, FREEDV_NSAMPLES_16K);
 
-                //led_ptt(1); led_rt(0); led_err(0);
+                led_ptt(1); led_rt(0); led_err(0);
                 GPIOE->ODR &= ~(1 << 3);
             }
 
@@ -120,7 +115,7 @@ int main(void) {
                 //   dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                 fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
                 dac2_write(dac16k, 2*nout);
-                //led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
+                led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
                 GPIOE->ODR &= ~(1 << 3);
             }
 
