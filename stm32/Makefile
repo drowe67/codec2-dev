@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -301,6 +301,28 @@ src/init.c
 FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
 
 freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+USB_VCP_UT=\
+src/usb_vcp_ut.c \
+usb_conf/usb_bsp.c \
+usb_conf/usbd_desc.c \
+usb_conf/usbd_usr.c \
+usb_lib/cdc/usbd_cdc_core.c \
+usb_lib/cdc/usbd_cdc_vcp.c \
+usb_lib/core/usbd_core.c \
+usb_lib/core/usbd_ioreq.c \
+usb_lib/core/usbd_req.c \
+usb_lib/otg/usb_core.c \
+usb_lib/otg/usb_dcd.c \
+usb_lib/otg/usb_dcd_int.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+CFLAGS += -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
+
+usb_vcp_ut.elf: $(USB_VCP_UT)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
