@@ -305,6 +305,8 @@ freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
 
 USB_VCP_UT=\
 src/usb_vcp_ut.c \
+src/stm32f4_usb_vcp.c \
+src/sm1000_leds_switches.c \
 usb_conf/usb_bsp.c \
 usb_conf/usbd_desc.c \
 usb_conf/usbd_usr.c \
