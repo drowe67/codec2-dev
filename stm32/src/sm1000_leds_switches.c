@@ -99,3 +99,34 @@ int switch_select(void) {
 int switch_back(void) {
     return GPIOD->IDR & (1 << 1);
 }
+
+/*
+  FUNCTION: ColorfulRingOfDeath()
+  AUTHOR..: xenovacivus
+
+  Colourful ring of death, blink LEDs like crazy forever if something
+  really nasty happens.  Adapted from USB Virtual COM Port (VCP)
+  module adapted from code I found here:
+
+    https://github.com/xenovacivus/STM32DiscoveryVCP
+
+  Call this to indicate a failure.  Blinks the STM32F4 discovery LEDs
+  in sequence.  At 168Mhz, the blinking will be very fast - about 5
+  Hz.  Keep that in mind when debugging, knowing the clock speed
+  might help with debugging.
+*/
+
+void ColorfulRingOfDeath(void) {
+    uint16_t ring = 1;
+    while (1) {
+        uint32_t count = 0;
+        while (count++ < 500000);
+
+        GPIOD->BSRRH = (ring << 12);
+        ring = ring << 1;
+        if (ring >= 1<<4) {
+            ring = 1;
+        }
+        GPIOD->BSRRL = (ring << 12);
+    }
+}
