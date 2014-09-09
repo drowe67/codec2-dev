@@ -116,11 +116,14 @@ int switch_back(void) {
   might help with debugging.
 */
 
-void ColorfulRingOfDeath(void) {
+int mycode; /* examine this with debugger if it dies */
+
+void ColorfulRingOfDeath(int code) {
+    mycode = code;
     uint16_t ring = 1;
     while (1) {
         uint32_t count = 0;
-        while (count++ < 500000);
+        while (count++ < 5000000);
 
         GPIOD->BSRRH = (ring << 12);
         ring = ring << 1;
@@ -130,3 +133,7 @@ void ColorfulRingOfDeath(void) {
         GPIOD->BSRRL = (ring << 12);
     }
 }
+void HardFault_Handler(void) { ColorfulRingOfDeath(1); }
+void MemManage_Handler(void) { ColorfulRingOfDeath(2); }
+void BusFault_Handler(void)  { ColorfulRingOfDeath(3); }
+void UsageFault_Handler(void){ ColorfulRingOfDeath(4); }
