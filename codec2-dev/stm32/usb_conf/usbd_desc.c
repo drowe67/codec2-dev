@@ -20,6 +20,7 @@
   */ 
 
 /* Includes ------------------------------------------------------------------*/
+#include <assert.h>
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_req.h"
@@ -212,7 +213,6 @@ uint8_t *  USBD_USR_LangIDStrDescriptor( uint8_t speed , uint16_t *length)
 */
 uint8_t *  USBD_USR_ProductStrDescriptor( uint8_t speed , uint16_t *length)
 {
- 
   
   if(speed == 0)
   {   
@@ -222,6 +222,9 @@ uint8_t *  USBD_USR_ProductStrDescriptor( uint8_t speed , uint16_t *length)
   {
     USBD_GetString ((uint8_t*)USBD_PRODUCT_FS_STRING, USBD_StrDesc, length);
   }
+  
+  assert(*length < USB_MAX_STR_DESC_SIZ);
+
   return USBD_StrDesc;
 }
 
@@ -235,6 +238,7 @@ uint8_t *  USBD_USR_ProductStrDescriptor( uint8_t speed , uint16_t *length)
 uint8_t *  USBD_USR_ManufacturerStrDescriptor( uint8_t speed , uint16_t *length)
 {
   USBD_GetString ((uint8_t*)USBD_MANUFACTURER_STRING, USBD_StrDesc, length);
+  assert(*length < USB_MAX_STR_DESC_SIZ);
   return USBD_StrDesc;
 }
 
@@ -255,6 +259,7 @@ uint8_t *  USBD_USR_SerialStrDescriptor( uint8_t speed , uint16_t *length)
   {
     USBD_GetString ((uint8_t*)USBD_SERIALNUMBER_FS_STRING, USBD_StrDesc, length);
   }
+  assert(*length < USB_MAX_STR_DESC_SIZ);
   return USBD_StrDesc;
 }
 
@@ -275,6 +280,7 @@ uint8_t *  USBD_USR_ConfigStrDescriptor( uint8_t speed , uint16_t *length)
   {
     USBD_GetString ((uint8_t*)USBD_CONFIGURATION_FS_STRING, USBD_StrDesc, length);
   }
+  assert(*length < USB_MAX_STR_DESC_SIZ);
   return USBD_StrDesc;  
 }
 
@@ -296,6 +302,7 @@ uint8_t *  USBD_USR_InterfaceStrDescriptor( uint8_t speed , uint16_t *length)
   {
     USBD_GetString ((uint8_t*)USBD_INTERFACE_FS_STRING, USBD_StrDesc, length);
   }
+  assert(*length < USB_MAX_STR_DESC_SIZ);
   return USBD_StrDesc;  
 }
 
