@@ -39,6 +39,6 @@ int switch_ptt(void);
 int switch_select(void);
 int switch_back(void);
 
-void ColorfulRingOfDeath(void);
+void ColorfulRingOfDeath(int code);
 
 #endif
