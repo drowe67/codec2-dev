@@ -69,10 +69,6 @@ void usb_vcp_init() {
  */
 
 void NMI_Handler(void)       {}
-void HardFault_Handler(void) { ColorfulRingOfDeath(); }
-void MemManage_Handler(void) { ColorfulRingOfDeath(); }
-void BusFault_Handler(void)  { ColorfulRingOfDeath(); }
-void UsageFault_Handler(void){ ColorfulRingOfDeath(); }
 void SVC_Handler(void)       {}
 void DebugMon_Handler(void)  {}
 void PendSV_Handler(void)    {}

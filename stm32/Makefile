@@ -13,7 +13,7 @@ SIZE=$(BINPATH)/arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -O3 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -234,6 +234,34 @@ POWER_UT_SRCS += $(CODEC2_SRCS)
 power_ut.elf: $(POWER_UT_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
+USB_VCP=\
+usb_conf/usb_bsp.c \
+usb_conf/usbd_desc.c \
+usb_conf/usbd_usr.c \
+usb_lib/cdc/usbd_cdc_core.c \
+usb_lib/cdc/usbd_cdc_vcp.c \
+usb_lib/core/usbd_core.c \
+usb_lib/core/usbd_ioreq.c \
+usb_lib/core/usbd_req.c \
+usb_lib/otg/usb_core.c \
+usb_lib/otg/usb_dcd.c \
+usb_lib/otg/usb_dcd_int.c
+
+USB_VCP_UT=\
+src/usb_vcp_ut.c \
+src/stm32f4_usb_vcp.c \
+src/sm1000_leds_switches.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+USB_VCP_UT+=$(USB_VCP)
+
+CFLAGS += -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
+
+usb_vcp_ut.elf: $(USB_VCP_UT)
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
 FDMDV_PROFILE_SRCS=\
 src/fdmdv_profile.c \
 gdb_stdio.c \
@@ -301,30 +329,6 @@ src/init.c
 FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
 
 freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
-
-USB_VCP_UT=\
-src/usb_vcp_ut.c \
-src/stm32f4_usb_vcp.c \
-src/sm1000_leds_switches.c \
-usb_conf/usb_bsp.c \
-usb_conf/usbd_desc.c \
-usb_conf/usbd_usr.c \
-usb_lib/cdc/usbd_cdc_core.c \
-usb_lib/cdc/usbd_cdc_vcp.c \
-usb_lib/core/usbd_core.c \
-usb_lib/core/usbd_ioreq.c \
-usb_lib/core/usbd_req.c \
-usb_lib/otg/usb_core.c \
-usb_lib/otg/usb_dcd.c \
-usb_lib/otg/usb_dcd_int.c \
-src/system_stm32f4xx.c \
-src/startup_stm32f4xx.s \
-src/init.c 
-
-CFLAGS += -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
-
-usb_vcp_ut.elf: $(USB_VCP_UT)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
