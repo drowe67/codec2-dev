@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -330,6 +330,21 @@ FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
 
 freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS)
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+FDMDV_DUMP_RT_SRCS=\
+src/fdmdv_dump_rt.c \
+src/sm1000_leds_switches.c \
+../src/fifo.c \
+src/debugblinky.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+FDMDV_DUMP_RT_SRCS += $(CODEC2_SRCS)
+
+fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 clean:
 	rm -f *.o
