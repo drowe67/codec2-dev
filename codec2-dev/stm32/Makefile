@@ -153,6 +153,7 @@ src/init.c
 
 dac_ut.elf: $(DAC_UT_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary dac_ut.elf dac_ut.bin
 
 ADCDAC_UT_SRCS=\
 src/adcdac_ut.c \
@@ -304,6 +305,7 @@ src/stm32f4_adc.o: src/stm32f4_adc.c
 
 sm1000.elf: $(SM1000_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary sm1000.elf sm1000.bin
 
 FREEDV_TX_PROFILE_SRCS=\
 src/freedv_tx_profile.c \
