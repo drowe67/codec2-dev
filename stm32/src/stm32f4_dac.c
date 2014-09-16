@@ -152,9 +152,18 @@ static void dac1_config(void)
   DMA_InitTypeDef  DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
   
-  /* DAC channel11Configuration */
+  /* DAC channel 1 Configuration */
 
-  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
+  /* 
+     This line fixed a bug that cost me 5 days, bad wave amplitude
+     value, and some STM32F4 periph library bugs caused triangle wave
+     geneartion to be enable resulting in a low level tone on the
+     SM1000, that we thought was caused by analog issues like layour
+     or power supply biasing
+  */
+  DAC_StructInit(&DAC_InitStructure); 
+
+  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO; 
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
   DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
   DAC_Init(DAC_Channel_1, &DAC_InitStructure);
@@ -211,8 +220,9 @@ static void dac2_config(void)
   DMA_InitTypeDef DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
   
-  /* DAC channel2 Configuration */
+  /* DAC channel 2 Configuration (see notes in dac1_config() above) */
 
+  DAC_StructInit(&DAC_InitStructure);
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T6_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
   DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
@@ -261,6 +271,7 @@ static void dac2_config(void)
   /* Enable DMA for DAC Channel 2 */
 
   DAC_DMACmd(DAC_Channel_2, ENABLE);
+
 }
 
 /******************************************************************************/

@@ -54,15 +54,6 @@ int main(void) {
 
     //led_pwr(1); led_ptt(0); led_rt(0); led_err(0);
 
-    /* 
-       TODO:
-       [ ] UT analog interfaces from file IO
-       [ ] UTs for simultaneous tx & rx on analog interfaces
-       [ ] detect program assert type errors with a blinky
-       [ ] timer tick function to measure 10ms-ish type times
-       [ ] switch debouncing?
-       [ ] light led with bit errors
-    */
 
     /* clear filter memories */
 
@@ -112,7 +103,7 @@ int main(void) {
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
                 nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                 //for(i=0; i<FREEDV_NSAMPLES; i++)
-                //   dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+                //   dac8k[FDMDV_OS_TAPS_8K+i] = 0;
                 fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
                 dac2_write(dac16k, 2*nout);
                 led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
@@ -120,7 +111,6 @@ int main(void) {
             }
 
         }
-       
     } /* while(1) ... */
 }
 
