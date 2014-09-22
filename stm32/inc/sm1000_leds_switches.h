@@ -34,6 +34,7 @@ void led_pwr(int state);
 void led_ptt(int state);
 void led_rt(int state);
 void led_err(int state);
+void not_cptt(int state);
 
 int switch_ptt(void);
 int switch_select(void);
