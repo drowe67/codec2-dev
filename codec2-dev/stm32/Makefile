@@ -167,6 +167,7 @@ src/init.c
 
 adcdac_ut.elf: $(ADCDAC_UT_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary adcdac_ut.elf adcdac_ut.bin
 
 DAC_PLAY_SRCS=\
 src/dac_play.c \

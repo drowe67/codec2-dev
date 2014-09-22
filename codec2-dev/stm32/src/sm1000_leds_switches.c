@@ -25,6 +25,7 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define _CPTT          GPIO_Pin_10
 #define LED_PWR        GPIO_Pin_12
 #define LED_PTT        GPIO_Pin_13
 #define LED_RT         GPIO_Pin_14
@@ -44,7 +45,7 @@ void sm1000_leds_switches_init(void) {
 
     /* output pins */
 
-    GPIO_InitStruct.GPIO_Pin = LED_PWR | LED_PTT | LED_RT | LED_ERR;
+    GPIO_InitStruct.GPIO_Pin = LED_PWR | LED_PTT | LED_RT | LED_ERR | _CPTT;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT; 		
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 	
     GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; 	 
@@ -58,7 +59,7 @@ void sm1000_leds_switches_init(void) {
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 
     GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL; /* we have our own external pull ups */	
     GPIO_Init(GPIOD, &GPIO_InitStruct); 		
- }
+}
 
 void led_pwr(int state) {
     if (state)
@@ -86,6 +87,13 @@ void led_err(int state) {
         GPIOD->ODR |= (1 << 15);
     else
         GPIOD->ODR &= ~(1 << 15);
+}
+
+void not_cptt(int state) {
+    if (state)
+        GPIOD->ODR |= (1 << 10);
+    else
+        GPIOD->ODR &= ~(1 << 10);
 }
 
 int switch_ptt(void) {
