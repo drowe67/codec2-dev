@@ -34,17 +34,52 @@
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
+#define FIFTY_MS  50
+#define MAX_MODES  3
+#define ANALOG     0
+#define DV         1
+#define TONE       2
+
+#define SS_IDLE           0
+#define SS_DEBOUNCE_DOWN  1
+#define SS_WAIT_BUTTON_UP 2
+#define SS_DEBOUNCE_UP    3
+
+typedef struct {
+    int state;
+    int mode;
+} SWITCH_STATE;
+
+unsigned int downTicker;
+
+void SysTick_Handler(void);
+void iterate_select_state_machine(SWITCH_STATE *ss);
+
+#define SINE_SAMPLES   32
+
+/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
+   are 16 bit 2's complement, the DAC driver convertsto 12 bit
+   unsigned. */
+
+short aSine[] = {
+     -16,    6384,   12528,   18192,   23200,   27232,   30256,   32128,
+   32752,   32128,   30256,   27232,   23152,   18192,   12528,    6384,
+     -16,   -6416,  -12560,  -18224,  -23184,  -27264,  -30288,  -32160,
+  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,  -12560,   -6416
+};
+
 int main(void) {
     struct freedv *f;
     short          adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
     short          dac16k[FREEDV_NSAMPLES_16K];
     short          adc8k[FREEDV_NSAMPLES];
     short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
- 
-    int    nin, nout, i, analog_mode;
+    SWITCH_STATE   ss;
+    int            nin, nout, i;
 
     /* init all the drivers for various peripherals */
 
+    SysTick_Config(SystemCoreClock/168000); /* 1 kHz SysTick */
     sm1000_leds_switches_init();
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
@@ -61,16 +96,12 @@ int main(void) {
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
 	dac8k[i] = 0.0;
 
-    analog_mode = 1;
+    ss.state = SS_IDLE;
+    ss.mode  = ANALOG;
 
     while(1) {
-
-        if (switch_select()) {
-            if (analog_mode)
-                analog_mode = 0;
-            else
-                analog_mode = 1;
-        }
+        
+        iterate_select_state_machine(&ss);
 
         if (switch_ptt()) {
 
@@ -83,18 +114,21 @@ int main(void) {
 
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
 
-                freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
-                
-                /* force analog bypass when select down */
-                
-                if (analog_mode) {
+                if (ss.mode == ANALOG) {
                     for(i=0; i<FREEDV_NSAMPLES; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
+                    dac1_write(dac16k, FREEDV_NSAMPLES_16K);
+                }
+                if (ss.mode == DV) {
+                    freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
+                    dac1_write(dac16k, FREEDV_NSAMPLES_16K);
                 }
 
-                fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
-
-                dac1_write(dac16k, FREEDV_NSAMPLES_16K);
+                if (ss.mode == TONE) {
+                    while(dac1_write((short*)aSine, SINE_SAMPLES) == 0);
+                }
 
                 led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
                 GPIOE->ODR &= ~(1 << 3);
@@ -109,7 +143,7 @@ int main(void) {
 
             /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
-            if (analog_mode) {
+            if (ss.mode == ANALOG) {
 
                 /* force analog bypass when select down */
 
@@ -130,7 +164,6 @@ int main(void) {
                 nout = nin;
                 f->total_bit_errors = 0;
 
-
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                     GPIOE->ODR = (1 << 3);
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
@@ -146,3 +179,51 @@ int main(void) {
     } /* while(1) ... */
 }
 
+/*
+ * SysTick Interrupt Handler
+ */
+
+void SysTick_Handler(void)
+{
+    if (downTicker > 0) {
+        downTicker--;
+    }
+}
+
+/* Select button state machine.  Debounces switches and enables cycling
+   through ANALOG-DV-TONE modes */
+
+void iterate_select_state_machine(SWITCH_STATE *ss) {
+    int next_state;
+
+    next_state = ss->state;
+    switch(ss->state) {
+        case SS_IDLE:
+            if (switch_select()) {
+                downTicker = FIFTY_MS;
+                next_state = SS_DEBOUNCE_DOWN;
+            }
+            break;
+        case SS_DEBOUNCE_DOWN:
+            if (downTicker == 0) {
+                ss->mode++;
+                if (ss->mode >= MAX_MODES)
+                    ss->mode = 0;
+                next_state = SS_WAIT_BUTTON_UP;
+            }
+            break;
+        case SS_WAIT_BUTTON_UP:
+            if (switch_select() == 0) {
+                downTicker = FIFTY_MS;
+                next_state = SS_DEBOUNCE_UP;
+            }
+            break;
+        case SS_DEBOUNCE_UP:
+            if (downTicker == 0) {
+                next_state = SS_IDLE;
+            }
+            break;
+   }
+    ss->state = next_state;
+}
+            

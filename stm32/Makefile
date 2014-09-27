@@ -160,6 +160,7 @@ src/adcdac_ut.c \
 ../src/fifo.c \
 src/stm32f4_dac.c \
 src/stm32f4_adc.c \
+src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \

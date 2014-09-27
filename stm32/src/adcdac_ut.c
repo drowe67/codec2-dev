@@ -28,6 +28,7 @@
 #include <assert.h>
 #include "stm32f4_dac.h"
 #include "stm32f4_adc.h"
+#include "sm1000_leds_switches.h"
 
 #define SINE_SAMPLES   32
 
@@ -45,16 +46,24 @@ short aSine[] = {
 
 int main(void) {
     short buf[SINE_SAMPLES];
+    int   i;
 
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
+    sm1000_leds_switches_init();
 
     while (1) {
 
         /* keep DAC FIFOs topped up */
 
-        while(adc1_read(buf, SINE_SAMPLES) == -1);
-        dac2_write(buf, SINE_SAMPLES);
+        while(adc2_read(buf, SINE_SAMPLES) == -1);
+        
+        if (switch_select()) {
+            for(i=0; i<SINE_SAMPLES; i++)
+                buf[i] = 0;
+        }
+            
+        dac1_write(buf, SINE_SAMPLES);
     }
    
 }
