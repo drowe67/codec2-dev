@@ -1007,17 +1007,17 @@ void aks_to_M2(
 
 \*---------------------------------------------------------------------------*/
 
-int encode_Wo(float Wo)
+int encode_Wo(float Wo, int bits)
 {
-    int   index;
+    int   index, Wo_levels = 1<<bits;
     float Wo_min = TWO_PI/P_MAX;
     float Wo_max = TWO_PI/P_MIN;
     float norm;
 
     norm = (Wo - Wo_min)/(Wo_max - Wo_min);
-    index = floorf(WO_LEVELS * norm + 0.5);
+    index = floorf(Wo_levels * norm + 0.5);
     if (index < 0 ) index = 0;
-    if (index > (WO_LEVELS-1)) index = WO_LEVELS-1;
+    if (index > (Wo_levels-1)) index = Wo_levels-1;
 
     return index;
 }
@@ -1032,17 +1032,67 @@ int encode_Wo(float Wo)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_Wo(int index)
+float decode_Wo(int index, int bits)
 {
     float Wo_min = TWO_PI/P_MAX;
     float Wo_max = TWO_PI/P_MIN;
     float step;
     float Wo;
+    int   Wo_levels = 1<<bits;
 
-    step = (Wo_max - Wo_min)/WO_LEVELS;
+    step = (Wo_max - Wo_min)/Wo_levels;
     Wo   = Wo_min + step*(index);
 
     return Wo;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_log_Wo()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22/8/2010 
+
+  Encodes Wo in the log domain using a WO_LEVELS quantiser.
+
+\*---------------------------------------------------------------------------*/
+
+int encode_log_Wo(float Wo, int bits)
+{
+    int   index, Wo_levels = 1<<bits;
+    float Wo_min = TWO_PI/P_MAX;
+    float Wo_max = TWO_PI/P_MIN;
+    float norm;
+
+    norm = (log10f(Wo) - log10f(Wo_min))/(log10f(Wo_max) - log10f(Wo_min));
+    index = floorf(Wo_levels * norm + 0.5);
+    if (index < 0 ) index = 0;
+    if (index > (Wo_levels-1)) index = Wo_levels-1;
+
+    return index;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_log_Wo()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 22/8/2010 
+
+  Decodes Wo using a WO_LEVELS quantiser in the log domain.
+
+\*---------------------------------------------------------------------------*/
+
+float decode_log_Wo(int index, int bits)
+{
+    float Wo_min = TWO_PI/P_MAX;
+    float Wo_max = TWO_PI/P_MIN;
+    float step;
+    float Wo;
+    int   Wo_levels = 1<<bits;
+
+    step = (log10f(Wo_max) - log10f(Wo_min))/Wo_levels;
+    Wo   = log10f(Wo_min) + step*(index);
+
+    return powf(10,Wo);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1493,7 +1543,7 @@ void encode_lsps_vq(int *indexes, float *x, float *xq, int order)
 
 \*---------------------------------------------------------------------------*/
 
-void decode_lsps_vq(int *indexes, float *xq, int order)
+void decode_lsps_vq(int *indexes, float *xq, int order, int stages)
 {
   int i, n1, n2, n3;
   const float *codebook1 = lsp_cbjvm[0].cb;
@@ -1504,15 +1554,17 @@ void decode_lsps_vq(int *indexes, float *xq, int order)
   n2 = indexes[1];
   n3 = indexes[2];
 
-  for (i=0;i<order;i++)
-  {
-    xq[i] = codebook1[order*n1+i];
+  for (i=0;i<order;i++) {
+      xq[i] = codebook1[order*n1+i];
   }
-  for (i=0;i<order/2;i++)
-  {
-    xq[2*i] += codebook2[order*n2/2+i];
-    xq[2*i+1] += codebook3[order*n3/2+i];
+  
+  if (stages != 1) {
+      for (i=0;i<order/2;i++) {
+          xq[2*i] += codebook2[order*n2/2+i];
+          xq[2*i+1] += codebook3[order*n3/2+i];
+      }
   }
+  
 }
 
 
@@ -1675,18 +1727,18 @@ void apply_lpc_correction(MODEL *model)
 
 \*---------------------------------------------------------------------------*/
 
-int encode_energy(float e)
+int encode_energy(float e, int bits)
 {
-    int   index;
+    int   index, e_levels = 1<<bits;
     float e_min = E_MIN_DB;
     float e_max = E_MAX_DB;
     float norm;
 
     e = 10.0*log10f(e);
     norm = (e - e_min)/(e_max - e_min);
-    index = floorf(E_LEVELS * norm + 0.5);
+    index = floorf(e_levels * norm + 0.5);
     if (index < 0 ) index = 0;
-    if (index > (E_LEVELS-1)) index = E_LEVELS-1;
+    if (index > (e_levels-1)) index = e_levels-1;
 
     return index;
 }
@@ -1701,14 +1753,15 @@ int encode_energy(float e)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_energy(int index)
+float decode_energy(int index, int bits)
 {
     float e_min = E_MIN_DB;
     float e_max = E_MAX_DB;
     float step;
     float e;
+    int   e_levels = 1<<bits;
 
-    step = (e_max - e_min)/E_LEVELS;
+    step = (e_max - e_min)/e_levels;
     e    = e_min + step*(index);
     e    = powf(10.0,e/10.0);
 

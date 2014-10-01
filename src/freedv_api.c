@@ -140,9 +140,10 @@ void freedv_close(struct freedv *freedv) {
   a frame of modem samples that can be sent to the transmitter.
 
   speech_in[] and mod_out[] are sampled at 8 kHz, 16 bit shorts, and
-  FREEDV_NSAMPLES long.  The speech_in[] level should be such that the
-  peak speech level is between +/16384 and +/- 32767.  mod_out[] will
-  be scaled such that the peak level is just less than +/-32767.
+  are always FREEDV_NSAMPLES long.  The speech_in[] level should be
+  such that the peak speech level is between +/16384 and +/- 32767.
+  mod_out[] will be scaled such that the peak level is just less than
+  +/-32767.
 
   The FDM modem signal mod_out[] has a high crest factor (around
   12dB), however the energy and duration of the peaks is small.
