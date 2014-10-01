@@ -60,8 +60,10 @@ void aks_to_M2(kiss_fft_cfg fft_fwd_cfg, float ak[], int order, MODEL *model,
 	       float E, float *snr, int dump, int sim_pf, 
                int pf, int bass_boost, float beta, float gamma, COMP Aw[]);
 
-int   encode_Wo(float Wo);
-float decode_Wo(int index);
+int   encode_Wo(float Wo, int bits);
+float decode_Wo(int index, int bits);
+int   encode_log_Wo(float Wo, int bits);
+float decode_log_Wo(int index, int bits);
 int   encode_Wo_dt(float Wo, float prev_Wo);
 float decode_Wo_dt(int index, float prev_Wo);
 void  encode_lsps_scalar(int indexes[], float lsp[], int order);
@@ -80,7 +82,7 @@ void decode_lsps_diff_time(float lsp_[],
 			   int order);
 
 void encode_lsps_vq(int *indexes, float *x, float *xq, int order);
-void decode_lsps_vq(int *indexes, float *xq, int order);
+void decode_lsps_vq(int *indexes, float *xq, int order, int stages);
 
 long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
 void lspvq_quantise(float lsp[], float lsp_[], int order); 
@@ -93,8 +95,8 @@ void quantise_WoE(MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);
 void decode_WoE(MODEL *model, float *e, float xq[], int n1);
 
-int encode_energy(float e);
-float decode_energy(int index);
+int encode_energy(float e, int bits);
+float decode_energy(int index, int bits);
 
 void pack(unsigned char * bits, unsigned int *nbit, int index, unsigned int index_bits);
 void pack_natural_or_gray(unsigned char * bits, unsigned int *nbit, int index, unsigned int index_bits, unsigned int gray);

@@ -676,14 +676,14 @@ int main(int argc, char *argv[])
 	
 	    if (scalar_quant_Wo_e) {
 
-		e = decode_energy(encode_energy(e));
+		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
 
 		if (!decimate) {
 		    /* we send params every 10ms, delta-time every 20ms */
 		    if (dt && (frames % 2)) 
 			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
 		    else
-			model.Wo = decode_Wo(encode_Wo(model.Wo));
+			model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
 		}
 
 		if (decimate) {
@@ -693,7 +693,7 @@ int main(int argc, char *argv[])
 			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
 		    }
 		    else
-			model.Wo = decode_Wo(encode_Wo(model.Wo));		    
+			model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);		    
 		}
 
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */

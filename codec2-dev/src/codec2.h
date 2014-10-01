@@ -52,6 +52,7 @@
 #define CODEC2_MODE_1400 3
 #define CODEC2_MODE_1300 4
 #define CODEC2_MODE_1200 5
+#define CODEC2_MODE_450  6
 
 struct CODEC2;
 
