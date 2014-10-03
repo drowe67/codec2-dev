@@ -103,8 +103,8 @@ int main(void) {
         
         iterate_select_state_machine(&ss);
 
-        if (switch_ptt()) {
-
+        if (switch_ptt() || (ext_ptt() == 0)) {
+            
             /* Transmit -------------------------------------------------------------------------*/
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
@@ -125,7 +125,6 @@ int main(void) {
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
                     dac1_write(dac16k, FREEDV_NSAMPLES_16K);
                 }
-
                 if (ss.mode == TONE) {
                     while(dac1_write((short*)aSine, SINE_SAMPLES) == 0);
                 }

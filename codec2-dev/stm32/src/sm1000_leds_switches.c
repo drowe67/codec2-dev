@@ -33,6 +33,7 @@
 #define SWITCH_PTT     GPIO_Pin_7
 #define SWITCH_SELECT  GPIO_Pin_0
 #define SWITCH_BACK    GPIO_Pin_1
+#define EXT_PTT        GPIO_Pin_8
 
 #include <stm32f4xx.h>
 #include <stm32f4xx_gpio.h>
@@ -47,7 +48,7 @@ void sm1000_leds_switches_init(void) {
 
     GPIO_InitStruct.GPIO_Pin = LED_PWR | LED_PTT | LED_RT | LED_ERR | _CPTT;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_OUT; 		
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 	
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz; 	
     GPIO_InitStruct.GPIO_OType = GPIO_OType_PP; 	 
     GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL; 	
     GPIO_Init(GPIOD, &GPIO_InitStruct); 		
@@ -56,9 +57,17 @@ void sm1000_leds_switches_init(void) {
 
     GPIO_InitStruct.GPIO_Pin = SWITCH_PTT | SWITCH_SELECT | SWITCH_BACK;
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN; 		
-    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz; 
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz; 
     GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL; /* we have our own external pull ups */	
-    GPIO_Init(GPIOD, &GPIO_InitStruct); 		
+    GPIO_Init(GPIOD, &GPIO_InitStruct); 	
+
+    GPIO_InitStruct.GPIO_Pin = EXT_PTT;
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN; 		
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_2MHz; 
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_UP;     /* use internal pull up */	
+    GPIO_Init(GPIOD, &GPIO_InitStruct); 	
+
+	
 }
 
 void led_pwr(int state) {
@@ -106,6 +115,10 @@ int switch_select(void) {
 
 int switch_back(void) {
     return GPIOD->IDR & (1 << 1);
+}
+
+int ext_ptt(void) {
+    return GPIOD->IDR & (1 << 8);
 }
 
 /*
