@@ -78,10 +78,7 @@ int main(int argc, char *argv[])
 
     if (argc == 4) {
         Nc = atoi(argv[3]);
-         if ((Nc % 2) != 0) {
-            fprintf(stderr, "Error number of carriers must be a multiple of 2\n");
-            exit(1);
-        }
+
         if ((Nc < 2) || (Nc > FDMDV_NC_MAX) ) {
             fprintf(stderr, "Error number of carriers must be btween 2 and %d\n",  FDMDV_NC_MAX);
             exit(1);
@@ -94,8 +91,7 @@ int main(int argc, char *argv[])
 
     bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
     bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
-    assert((bits_per_codec_frame % 8) == 0); /* make sure integer number of bytes per frame */
-    bytes_per_codec_frame = bits_per_codec_frame/8;
+    bytes_per_codec_frame = (bits_per_codec_frame+7)/8;
 
     packed_bits = (char*)malloc(bytes_per_codec_frame);
     assert(packed_bits != NULL);
@@ -121,7 +117,6 @@ int main(int argc, char *argv[])
 		byte++;
 	    }
 	}
-	assert(byte == bytes_per_codec_frame);
 
 	/* modulate even and odd frames */
 
