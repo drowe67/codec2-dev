@@ -39,6 +39,7 @@ void not_cptt(int state);
 int switch_ptt(void);
 int switch_select(void);
 int switch_back(void);
+int ext_ptt(void);
 
 void ColorfulRingOfDeath(int code);
 
