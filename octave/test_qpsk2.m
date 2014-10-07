@@ -515,7 +515,7 @@ function ideal
 
   sim_in.hf_sim           = 0;
   sim_in.plot_scatter     = 0;
-  sim_in.Esvec            = 2:15; 
+  sim_in.Esvec            = 2:10; 
   sim_in.ldpc_code        = 0;
   Ebvec = sim_in.Esvec - 10*log10(2);
   BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
@@ -523,16 +523,13 @@ function ideal
   sim_dqpsk               = ber_test(sim_in, 'dqpsk');
 
   sim_in.hf_sim           = 1;
-  sim_in.Esvec            = 2:15; 
   sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-  sim_in.ldpc_code        = 1;
-  sim_qpsk_hf_ldpc1       = ber_test(sim_in, 'qpsk');
   sim_in.ldpc_code_rate   = 1/2;
-  sim_qpsk_hf_ldpc2       = ber_test(sim_in, 'qpsk');
-  sim_in.ldpc_code_rate   = 3/4;
-  sim_in.hf_sim           = 0;
-  sim_qpsk_awgn_ldpc      = ber_test(sim_in, 'qpsk');
+  sim_in.ldpc_code        = 1;
+  sim_qpsk_hf_ldpc        = ber_test(sim_in, 'qpsk');
+  sim_in.hf_mag_only      = 0;
+  sim_dqpsk_hf_ldpc       = ber_test(sim_in, 'dqpsk');
 
   figure(1); 
   clf;
@@ -540,11 +537,10 @@ function ideal
   hold on;
   semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'g;QPSK AWGN;')
   semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF;')
-  semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
-  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'m;DQPSK HF;')
-  semilogy(sim_qpsk_hf_ldpc1.Ebvec, sim_qpsk_hf_ldpc1.BERldpcvec,'k;QPSK HF LDPC 3/4;')
-  semilogy(sim_qpsk_hf_ldpc2.Ebvec, sim_qpsk_hf_ldpc2.BERldpcvec,'b;QPSK HF LDPC 1/2;')
-  semilogy(sim_qpsk_awgn_ldpc.Ebvec, sim_qpsk_awgn_ldpc.BERldpcvec,'k;QPSK AWGN LDPC 3/4;')
+  semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'g;DQPSK AWGN;')
+  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'r;DQPSK HF;')
+  semilogy(sim_qpsk_hf_ldpc.Ebvec, sim_qpsk_hf_ldpc.BERldpcvec,'b;QPSK HF LDPC 1/2;')
+  semilogy(sim_dqpsk_hf_ldpc.Ebvec, sim_dqpsk_hf_ldpc.BERldpcvec,'b;DQPSK HF LDPC 1/2;')
 
   hold off;
   xlabel('Eb/N0')
@@ -636,4 +632,4 @@ endfunction
 
 more off;
 
-test_phase_est();
+ideal();

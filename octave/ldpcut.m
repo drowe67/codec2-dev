@@ -53,7 +53,7 @@ end
 for nn = 1: Ntrials        
     st = (nn-1)*code_param.symbols_per_frame + 1;
     en = (nn)*code_param.symbols_per_frame;
-    detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r(st:en), EsNo);
+    detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r(st:en), EsNo, ones(1,code_param.symbols_per_frame));
     st = (nn-1)*code_param.data_bits_per_frame + 1;
     en = (nn)*code_param.data_bits_per_frame;
     error_positions = xor( detected_data(1:code_param.data_bits_per_frame), data(st:en) );
