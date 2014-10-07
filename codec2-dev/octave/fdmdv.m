@@ -1147,7 +1147,7 @@ for c=1:Nc/2
   freq_pol(c)  = 2*pi*carrier_freq/Fs;
   freq(c)      = exp(j*freq_pol(c));
 end
-for c=Nc/2+1:Nc
+for c=floor(Nc/2)+1:Nc
   %carrier_freq = (-Nc/2 + c)*Fsep + Fcentre;
   carrier_freq = (-Nc/2 + c)*Fsep;
   freq_pol(c)  = 2*pi*carrier_freq/Fs;
