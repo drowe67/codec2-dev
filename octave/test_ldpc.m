@@ -41,6 +41,7 @@ function sim_out = ber_test(sim_in, modulation)
     Nchip            = sim_in.Nchip;  % spread spectrum factor
     Np               = sim_in.Np;     % number of pilots to use
     Ns               = sim_in.Ns;     % step size between pilots
+    ldpc_code        = sim_in.ldpc_code;
 
     bps              = 2;
     Nsymb            = framesize/bps;
@@ -50,6 +51,39 @@ function sim_out = ber_test(sim_in, modulation)
     prev_sym_rx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
 
     s_ch_mem    = zeros(Np*Ns+1, Nc*Nchip);
+
+    % Init LDPC --------------------------------------------------------------------
+
+    if ldpc_code
+        % Start CML library
+
+        currentdir = pwd;
+        addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
+        cd /home/david/tmp/cml
+        CmlStartup                           % note that this is not in the cml path!
+        cd(currentdir)
+  
+        % Our LDPC library
+
+        ldpc;
+
+        rate = sim_in.ldpc_code_rate; 
+        mod_order = 4; 
+        modulation2 = 'QPSK';
+        mapping = 'gray';
+
+        demod_type = 0;
+        decoder_type = 0;
+        max_iterations = 100;
+
+        code_param = ldpc_init(rate, framesize, modulation2, mod_order, mapping);
+        code_param.code_bits_per_frame = framesize;
+        code_param.symbols_per_frame = framesize/bps;
+
+        ldpc_errors_log = []; ldpc_Nerrs_log = [];
+    else
+        rate = 1;
+    end
 
     % Init HF channel model from stored sample files of spreading signal ----------------------------------
 
@@ -90,7 +124,7 @@ function sim_out = ber_test(sim_in, modulation)
     % different implementations of ccir-poor would do this in
     % different ways, leading to different BER results.  Oh Well!
 
-    hf_gain = 1.0/sqrt(var(spread(1:Ntrials))+var(spread_2ms(1:Ntrials)));
+    hf_gain = 1.0/sqrt(var(spread(1:Nsymbrow*Ntrials))+var(spread_2ms(1:Nsymbrow*Ntrials)));
 
     % Start Simulation ----------------------------------------------------------------
 
@@ -110,6 +144,8 @@ function sim_out = ber_test(sim_in, modulation)
         noise_log        = [];
         errors_log       = [];
         Nerrs_log        = [];
+        
+        Terrsldpc = Tbitsldpc = Ferrsldpc = 0;
 
         % init HF channel
 
@@ -125,7 +161,10 @@ function sim_out = ber_test(sim_in, modulation)
 
         for nn = 1:Ntrials+Np*Ns
                   
-            tx_bits = round(rand(1,framesize));                       
+            tx_bits = round(rand(1,framesize*rate));                       
+            if ldpc_code
+                [tx_bits, tmp] = ldpc_enc(tx_bits, code_param);
+            end
 
             % modulate --------------------------------------------
 
@@ -164,6 +203,7 @@ function sim_out = ber_test(sim_in, modulation)
 
             % HF channel simulation  ------------------------------------
             
+            hf_fading = ones(1,Nsymb);
             if hf_sim
 
                 % separation between carriers.  Note this effectively
@@ -174,10 +214,10 @@ function sim_out = ber_test(sim_in, modulation)
                 wsep = 2*pi*(1+0.5);  % e.g. 75Hz spacing at Rs=50Hz, alpha=0.5 filters
 
                 hf_model(hf_n, :) = zeros(1,Nc*Nchip);
-
+                
                 for r=1:Nsymbrow
                   for c=1:Nchip*Nc
-                    time_shift = floor(c*Rs/4);
+                    time_shift = floor((c-1)*Nsymbrow);
                     ahf_model = hf_gain*(spread(hf_n+time_shift) + exp(-j*c*wsep*nhfdelay)*spread_2ms(hf_n+time_shift));
                     if hf_mag_only
                       s_ch(r,c) *= abs(ahf_model);
@@ -185,6 +225,7 @@ function sim_out = ber_test(sim_in, modulation)
                       s_ch(r,c) *= ahf_model;
                     end
                     hf_model(hf_n, c) = ahf_model;
+                    hf_fading((c-1)*Nsymbrow+r) = abs(ahf_model);
                   end
                   hf_n++;
                 end
@@ -230,10 +271,12 @@ function sim_out = ber_test(sim_in, modulation)
             % demodulate stage 2
 
             rx_bits = zeros(1, framesize);
+            rx_symb_linear = zeros(1,Nsymb);
             for c=1:Nc
               for r=1:Nsymbrow
                 i = (c-1)*Nsymbrow + r;
                 rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
+                rx_symb_linear(i) = rx_symb(r,c);
                 rx_symb_log = [rx_symb_log rx_symb(r,c)];
               end
             end
@@ -246,6 +289,22 @@ function sim_out = ber_test(sim_in, modulation)
             Tbits += length(tx_bits);
             errors_log = [errors_log error_positions];
             Nerrs_log = [Nerrs_log Nerrs];
+
+            % Optionally LDPC decode
+            
+            if ldpc_code
+                detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, ...
+                                         rx_symb_linear, min(100,EsNo), hf_fading);
+                error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
+                Nerrs = sum(error_positions);
+                ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
+                ldpc_errors_log = [ldpc_errors_log error_positions];
+                if Nerrs
+                    Ferrsldpc++;
+                end
+                Terrsldpc += Nerrs;
+                Tbitsldpc += framesize*rate;
+            end
         end
     
         TERvec(ne) = Terrs;
@@ -255,12 +314,11 @@ function sim_out = ber_test(sim_in, modulation)
 
             printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
                    Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
+            if ldpc_code
+                printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
+                       Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
+            end
             printf("\n");
-        end
-        if verbose > 1
-            printf("Terrs: %d BER %f BER theory %f C %f N %f Es %f No %f Es/No %f\n\n", Terrs,
-                   Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), var(tx_symb_log), var(noise_log),
-                   var(tx_symb_log), var(noise_log), var(tx_symb_log)/var(noise_log));
         end
     end
     
@@ -313,7 +371,12 @@ function sim_out = ber_test(sim_in, modulation)
 
         figure(4)
         clf
+        subplot(211)
         stem(Nerrs_log)
+        subplot(212)
+        if ldpc_code
+          stem(ldpc_Nerrs_log)
+        end
    end
 
 endfunction
@@ -346,7 +409,7 @@ function sim_in = standard_init
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 0;
 
-  sim_in.Esvec            = 5; 
+  sim_in.Esvec            = 50; 
   sim_in.Ntrials          = 30;
   sim_in.framesize        = 2;
   sim_in.Rs               = 50;
@@ -423,17 +486,19 @@ function test_single
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.framesize        = 588;
+  sim_in.framesize        = 576;
   sim_in.Nc               = 2;
   sim_in.Rs               = 200;
   sim_in.Ns               = 8;
   sim_in.Np               = 0;
   sim_in.Nchip            = 1;
+  sim_in.ldpc_code_rate   = 0.5;
+  sim_in.ldpc_code        = 1;
 
-  sim_in.Ntrials          = 10;
-  sim_in.Esvec            = 5; 
+  sim_in.Ntrials          = 20;
+  sim_in.Esvec            = 2; 
   sim_in.hf_sim           = 0;
-  sim_in.hf_mag_only      = 0;
+  sim_in.hf_mag_only      = 1;
   
   sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
 endfunction
