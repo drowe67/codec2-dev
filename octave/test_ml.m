@@ -2,10 +2,15 @@
 % David Rowe Oct 2014
 %
 
-% Simulation to test FDM QPSK with maximum likelihood decoding on
-% fading channels.
+% Simulation to test FDM DQPSK with maximum likelihood detection on
+% fading channels.  Based on JPL publication 89-38 "Multiple Symbol
+% Differential Detection of Uncoded and Trellis Coded MPSK" by
+% Divsalar, Simon, Shahshahani.  Thanks Johhn Gibbs NN7F for advice.
   
-1;
+% reqd to make sure we can repeat tests exactly
+
+rand('state',1); 
+randn('state',1);
 
 % main test function 
 
@@ -147,17 +152,15 @@ function sim_out = ber_test(sim_in, modulation)
             rx_bits = zeros(1, framesize);
             for c=1:Nc
 
-                r(c,1:3) = r(c, 2:4);
-                r(c,4) = s_ch(c);
-
+                r(c,2:4) = r(c, 1:3);
+                r(c,1) = s_ch(c);
+  
                 rx_symb(c) = s_ch(c);
                 if strcmp(modulation,'dqpsk')
                   tmp = rx_symb(c);
                   rx_symb(c) *= conj(prev_sym_rx(c)/abs(prev_sym_rx(c)));
                   prev_sym_rx(c) = tmp;
                 end
-
-                % r(c,:)
 
                 if ml == 0
                   rx_bits((2*(c-1)+1):(2*c)) = qpsk_demod(rx_symb(c));
@@ -167,8 +170,12 @@ function sim_out = ber_test(sim_in, modulation)
                   for k=1:4
                     for k_1=1:4
                       for k_2=1:4
-                        %eta = abs(r(c,1) + r(c,3)*tx(k)'*tx(k_1)' + r(c,2)*tx(k_1)')^2;
-                        eta = abs(r(c,1) + r(c,4)*tx(k)'*tx(k_1)'*tx(k_2)' + r(c,3)*tx(k_1)'*tx(k_2)' + r(c,2)*tx(k_2)')^2;
+                        if ml == 3
+                          eta = abs(r(c,3) + r(c,1)*tx(k)'*tx(k_1)' + r(c,2)*tx(k_1)')^2;
+                        end
+                        if ml == 4
+                          eta = abs(r(c,4) + r(c,1)*tx(k)'*tx(k_1)'*tx(k_2)' + r(c,2)*tx(k_1)'*tx(k_2)' + r(c,3)*tx(k_2)')^2;
+                        end
                         %printf("  %d %d %f \n", k_1, k, eta);
                         if eta > max_eta
                           max_eta = eta;
@@ -197,7 +204,7 @@ function sim_out = ber_test(sim_in, modulation)
         BERvec(ne) = Terrs/Tbits;
 
         if verbose 
-            av_tx_pwr = (tx_symb_log * tx_symb_log')/length(tx_symb_log)
+            av_tx_pwr = (tx_symb_log * tx_symb_log')/length(tx_symb_log);
 
             printf("EsNo (dB): %3.1f  Terrs: %d BER %4.3f QPSK BER theory %4.3f av_tx_pwr: %3.2f", EsNodB, Terrs,
                    Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
@@ -297,23 +304,30 @@ function test_curves
   Ebvec = sim_in.Esvec - 10*log10(2);
   BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
   sim_in.ml               = 0;
-  sim_dqpsk               = ber_test(sim_in, 'dqpsk');
-  sim_in.ml               = 1;  
-  sim_dqpsk_ml            = ber_test(sim_in, 'dqpsk');
+  %sim_dqpsk               = ber_test(sim_in, 'dqpsk');
+  sim_in.ml               = 3;  
+  %sim_dqpsk_ml3            = ber_test(sim_in, 'dqpsk');
+  sim_in.ml               = 4;  
+  %sim_dqpsk_ml4            = ber_test(sim_in, 'dqpsk');
   sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 1;
   sim_in.ml               = 0;
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-  sim_in.ml               = 1;  
-  sim_dqpsk_ml_hf         = ber_test(sim_in, 'dqpsk');
+  sim_in.ml               = 4;  
+  sim_dqpsk_ml_hf3        = ber_test(sim_in, 'dqpsk');
+  sim_in.ml               = 4;  
+  sim_dqpsk_ml_hf4        = ber_test(sim_in, 'dqpsk');
 
   figure(1); 
   clf;
   semilogy(Ebvec, BER_theory,'r;QPSK theory;')
   hold on;
-  semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
-  semilogy(sim_dqpsk_ml.Ebvec, sim_dqpsk_ml.BERvec,'k;DQPSK ML AWGN;')
+  %semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
+  %semilogy(sim_dqpsk_ml3.Ebvec, sim_dqpsk_ml3.BERvec,'k;DQPSK ML N=3 AWGN;')
+  %semilogy(sim_dqpsk_ml4.Ebvec, sim_dqpsk_ml4.BERvec,'g;DQPSK ML N=4 AWGN;')
   semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'c;DQPSK HF;')
-  semilogy(sim_dqpsk_ml_hf.Ebvec, sim_dqpsk_ml_hf.BERvec,'k;DQPSK ML HF;')
+  semilogy(sim_dqpsk_ml_hf3.Ebvec, sim_dqpsk_ml_hf3.BERvec,'k;DQPSK ML N=3 HF;')
+  semilogy(sim_dqpsk_ml_hf4.Ebvec, sim_dqpsk_ml_hf4.BERvec,'g;DQPSK ML N=4 HF;')
   hold off;
 
   xlabel('Eb/N0')
@@ -331,7 +345,7 @@ function test_single
   sim_in.Ntrials          = 500;
 
   sim_in.hf_mag_only      = 0;
-  sim_in.hf_sim           = 1;
+  sim_in.hf_sim           = 0;
   sim_in.ml               = 0;
   sim_in.Esvec            = 10;
 
