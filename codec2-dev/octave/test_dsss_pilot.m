@@ -1,20 +1,15 @@
-% test_dsss.m
+% test_dsss_pilot.m
 % David Rowe Oct 2014
 %
 
-% Simulation to test FDM QPSK combined with DSSS.  A low rate Codec
-% (e.g. 450 bit/s) is transmitted on Nc=4 FDM carriers.  This same
-% information is repeated Nchip=4 times on bocks of carriers that are
-% delayed by up to Rs symbols.  It's like spread spectrum with a
-% spreading code of 1111.  Turns out this goes a long way to
-% converting a fading channel into an AWGN one.  Good scatter diagram
-% and BER curve results.  Disadvantage is more bandwidth is required.
-
-% When output error files used to simulate codec provided a few dB
-% drop to 1dB SNR for intelligable speech for 450 codec combined with
-% DSSS compared with legacy 1600 bit/s mode that has FEC.  Improvement
-% not as great as hoped as 1600 codec can cope with higher BER.
+% Simulation to test FDM QPSK with pilot based coherent detection
+% combined with DSSS.
   
+% reqd to make sure we can repeat tests exactly
+
+rand('state',1); 
+randn('state',1);
+
 1;
 
 % main test function 
@@ -34,15 +29,18 @@ function sim_out = ber_test(sim_in, modulation)
     nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
     hf_mag_only      = sim_in.hf_mag_only;
     Nchip            = sim_in.Nchip;
+    Np               = sim_in.Np;
+    Ns               = sim_in.Ns;
 
     bps              = 2;
     Nc = Nsymb       = framesize/bps;
+
     prev_sym_tx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
     prev_sym_rx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
 
-    tx_bits_buf = zeros(1,2*framesize);
-    rx_bits_buf = zeros(1,2*framesize);
-    rx_symb_buf = zeros(1,2*Nsymb);
+    tx_bits_mem = zeros(Np*Ns+1, framesize);
+    tx_symb_mem = zeros(Np*Ns+1, Nc*Nchip);
+    s_ch_mem    = zeros(Np*Ns+1, Nc*Nchip);
 
     % Init HF channel model from stored sample files of spreading signal ----------------------------------
 
@@ -83,7 +81,7 @@ function sim_out = ber_test(sim_in, modulation)
     % different implementations of ccir-poor would do this in
     % different ways, leading to different BER results.  Oh Well!
 
-    hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
+    hf_gain = 1.0/sqrt(var(spread(1:Ntrials))+var(spread_2ms(1:Ntrials)));
 
     % Start Simulation ----------------------------------------------------------------
 
@@ -98,7 +96,7 @@ function sim_out = ber_test(sim_in, modulation)
         
         Terrs = 0;  Tbits = 0;
 
-        tx_symb_log      = [];
+        s_ch_tx_log      = [];
         rx_symb_log      = [];
         noise_log        = [];
         errors_log       = [];
@@ -107,16 +105,24 @@ function sim_out = ber_test(sim_in, modulation)
         % init HF channel
 
         hf_n = 1;
+        phi_ = zeros(Ntrials+Np*Ns, Nc*Nchip);
+
+        phase_offset = 0;
+        w_offset     = 0;
 
         % simulation starts here-----------------------------------
  
-        for nn = 1: Ntrials
+        for nn = 1:Ntrials+Np*Ns
                   
             tx_bits = round( rand( 1, framesize) );                       
+            tx_bits_mem(1:Np*Ns,:) = tx_bits_mem(2:Np*Ns+1,:);
+            for b=1:framesize
+              tx_bits_mem(Np*Ns+1,b) = tx_bits(b);
+            end
 
             % modulate --------------------------------------------
 
-            tx_symb=zeros(1,Nc*Nchip);
+            tx_symb = zeros(1,Nc*Nchip);
 
             for i=1:Nc
                 tx_symb(i) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
@@ -131,10 +137,15 @@ function sim_out = ber_test(sim_in, modulation)
             % Optionally DQPSK encode
  
             if strcmp(modulation,'dqpsk')
-              for i=1:Nc*Nchip
-                tx_symb(i) *= prev_sym_tx(i);
-                prev_sym_tx(i) = tx_symb(i);
-              end 
+              for c=1:Nc*Nchip
+                tx_symb(c) *= prev_sym_tx(c);
+                prev_sym_tx(c) = tx_symb(c);
+              end               
+            end
+
+            tx_symb_mem(1:Np*Ns,:) = tx_symb_mem(2:Np*Ns+1,:);
+            for c=1:Nc*Nchip
+              tx_symb_mem(Np*Ns+1,c) = tx_symb(c);
             end
 
             s_ch = tx_symb/sqrt(Nchip);
@@ -150,7 +161,7 @@ function sim_out = ber_test(sim_in, modulation)
 
                 wsep = 2*pi*(1+0.5);  % e.g. 75Hz spacing at Rs=50Hz, alpha=0.5 filters
 
-                hf_model(hf_n, :) = zeros(1,Nc);
+                hf_model(hf_n, :) = zeros(1,Nc*Nchip);
 
                 for i=1:Nchip
                     time_shift = floor(i*Rs/4);
@@ -161,13 +172,13 @@ function sim_out = ber_test(sim_in, modulation)
                         else
                              s_ch((i-1)*Nc+k) *= ahf_model;
                         end
-                        hf_model(hf_n, k) += ahf_model/Nchip;
+                        hf_model(hf_n, (i-1)*Nc+k) = ahf_model;
                     end
                 end
                 hf_n++;
             end
            
-            tx_symb_log = [tx_symb_log s_ch];
+            s_ch_tx_log = [s_ch_tx_log s_ch];
 
             % AWGN noise and phase/freq offset channel simulation
             % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
@@ -175,16 +186,32 @@ function sim_out = ber_test(sim_in, modulation)
             noise = sqrt(variance*0.5)*(randn(1,Nsymb*Nchip) + j*randn(1,Nsymb*Nchip));
             noise_log = [noise_log noise];
 
-            s_ch = s_ch + noise;
+            s_ch = s_ch.*exp(j*phase_offset) + noise;
+            phase_offset += w_offset;
 
-            % de-modulate
+            s_ch_mem(1:Np*Ns,:) = s_ch_mem(2:Np*Ns+1,:);
+            for c=1:Nc*Nchip
+              s_ch_mem(Np*Ns+1,c) = s_ch(c);
+            end
+            
+            % pilot based phase estimation and correction
+            
+            if Np
+               for c=1:Nc*Nchip
+                 pilots = tx_symb_mem(:,c);
+                 pilots(floor(Np*Ns/2)+1) = 0;
+                 phi_(nn,c) = angle(pilots(1:Ns:Np*Ns+1)'*s_ch_mem(1:Ns:Np*Ns+1,c));
+                end
+            end
 
-            for i=1:Nc*Nchip
-                rx_symb(i) = s_ch(i);
+            % demodulate stage 1
+
+            for c=1:Nc*Nchip
+                rx_symb(c) = s_ch_mem(floor(Np*Ns/2)+1,c) *exp(-j*phi_(nn,c));
                 if strcmp(modulation,'dqpsk')
-                    tmp = rx_symb(i);
-                    rx_symb(i) *= conj(prev_sym_rx(i)/abs(prev_sym_rx(i)));
-                    prev_sym_rx(i) = tmp;
+                    tmp = rx_symb(c);
+                    rx_symb(c) *= conj(prev_sym_rx(c)/abs(prev_sym_rx(c)));
+                    prev_sym_rx(c) = tmp;
                 end
             end
 
@@ -194,31 +221,33 @@ function sim_out = ber_test(sim_in, modulation)
               rx_symb(1:Nc) = rx_symb(1:Nc) + rx_symb(i:i+Nc-1);
             end
 
-            % demodulate
+            % demodulate stage 2 (start when we have Np*Ns symbols in memories)
 
-            rx_bits = zeros(1, framesize);
-            for i=1:Nc
-              rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(i));
+            if nn > Np*Ns
+              rx_bits = zeros(1, framesize);
+              for c=1:Nc
+                rx_bits((2*(c-1)+1):(2*c)) = qpsk_demod(rx_symb(c));
+                tx_bits((2*(c-1)+1):(2*c)) = tx_bits_mem(floor(Np*Ns/2)+1,(2*(c-1)+1):(2*c));
+              end
+              rx_symb_log = [rx_symb_log rx_symb(1:Nc)];
+
+              % Measure BER
+
+              error_positions = xor(rx_bits, tx_bits);
+              Nerrs = sum(error_positions);
+              Terrs += Nerrs;
+              Tbits += length(tx_bits);
+              errors_log = [errors_log error_positions];
+              Nerrs_log = [Nerrs_log Nerrs];
             end
-            rx_symb_log = [rx_symb_log rx_symb(1:Nc)];
-
-            % Measure BER
-
-            error_positions = xor(rx_bits, tx_bits);
-            Nerrs = sum(error_positions);
-            Terrs += Nerrs;
-            Tbits += length(tx_bits);
-            errors_log = [errors_log error_positions];
-            Nerrs_log = [Nerrs_log Nerrs];
         end
     
         TERvec(ne) = Terrs;
         BERvec(ne) = Terrs/Tbits;
-
         if verbose 
-            av_tx_pwr = (tx_symb_log * tx_symb_log')/length(tx_symb_log);
+            av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
 
-            printf("EsNo (dB): %f  Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+            printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
                    Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
             printf("\n");
         end
@@ -247,18 +276,33 @@ function sim_out = ber_test(sim_in, modulation)
           clf;
         
           y = 1:(hf_n-1);
-          x = 1:Nc;
+          x = 1:Nc*Nchip;
           EsNodBSurface = 20*log10(abs(hf_model(y,:))) - 10*log10(variance);
           EsNodBSurface(find(EsNodBSurface < -5)) = -5;
           mesh(x,y,EsNodBSurface);
           grid
-          axis([1 Nc 1 Rs*5 -5 15])
+          axis([1 (Nc+1)*Nchip 1 Rs*5 -5 15])
           title('HF Channel Es/No');
 
           if verbose 
-            av_hf_pwr = sum(abs(hf_model(y)).^2)/(hf_n-1);
-            printf("average HF power: %3.2f over %d symbols\n", av_hf_pwr, hf_n-1);
+            [m n] = size(hf_model);
+            av_hf_pwr = sum(sum(abs(hf_model(:,:)).^2))/(m*n);
+            printf("average HF power: %3.2f over %d symbols\n", av_hf_pwr, m*n);
           end
+
+          figure(5);
+          clf
+          subplot(211)
+          [m n] = size(hf_model);
+          plot(angle(hf_model(1:m,1)),'g;HF channel phase;')
+          hold on;
+          lphi_ = length(phi_);
+          plot(phi_(1+floor(Ns*Np/2):lphi_),'r+;Estimated HF channel phase;')
+          ylabel('Phase (rads)');
+          subplot(212)
+          plot(abs(hf_model(1:m,1)))
+          ylabel('Amplitude');
+          xlabel('Time (symbols)');
         end
 
         figure(4)
@@ -298,9 +342,8 @@ function sim_in = standard_init
 
   sim_in.Esvec            = 5; 
   sim_in.Ntrials          = 30;
-  sim_in.framesize        = 8;
+  sim_in.framesize        = 2;
   sim_in.Rs               = 50;
-  sim_in.Nc               = 4;
 
   sim_in.phase_offset     = 0;
   sim_in.w_offset         = 0;
@@ -320,36 +363,45 @@ function test_curves
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.Esvec            = 50; 
-  sim_in.hf_sim           = 0;
+  sim_in.Esvec            = 10; 
+  sim_in.hf_sim           = 1;
   sim_in.Ntrials          = 1000;
+  sim_in.Rs               = 200;
+  sim_in.Np               = 4;
+  sim_in.Ns               = 8;
+  sim_in.Nchip            = 1;
 
-  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+  sim_qpsk                = ber_test(sim_in, 'qpsk');
 
   sim_in.hf_sim           = 0;
   sim_in.plot_scatter     = 0;
-  sim_in.Esvec            = 5:15; 
+  sim_in.Esvec            = 10:20; 
   Ebvec = sim_in.Esvec - 10*log10(2);
   BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+
+  sim_in.Np               = 0;
+  sim_in.Nchip            = 1;
+
   sim_dqpsk               = ber_test(sim_in, 'dqpsk');
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 1;
-  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+  sim_qpsk_hf_ideal       = ber_test(sim_in, 'qpsk');
+  sim_in.hf_mag_only      = 0;
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-  sim_in.Nchip            = 4;
-  sim_dqpsk_hf_dsss       = ber_test(sim_in, 'dqpsk');
-  sim_in.hf_mag_only      = 1;
-  sim_qpsk_hf_dsss        = ber_test(sim_in, 'qpsk');
+  sim_in.Np               = 6;
+  sim_qpsk_hf_pilot       = ber_test(sim_in, 'qpsk');
+  sim_in.Nchip            = 2;
+  sim_qpsk_hf_pilot_dsss  = ber_test(sim_in, 'qpsk');
 
   figure(1); 
   clf;
   semilogy(Ebvec, BER_theory,'r;QPSK theory;')
   hold on;
   semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
-  semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'b;QPSK HF;')
+  semilogy(sim_qpsk_hf_ideal.Ebvec, sim_qpsk_hf_ideal.BERvec,'b;QPSK HF ideal;')
   semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'k;DQPSK HF;')
-  semilogy(sim_dqpsk_hf_dsss.Ebvec, sim_dqpsk_hf_dsss.BERvec,'g;DQPSK DSSS HF;')
-  semilogy(sim_qpsk_hf_dsss.Ebvec, sim_qpsk_hf_dsss.BERvec,'r;QPSK DSSS HF;')
+  semilogy(sim_qpsk_hf_pilot.Ebvec, sim_qpsk_hf_pilot.BERvec,'r;QPSK Np=6 HF;')
+  semilogy(sim_qpsk_hf_pilot_dsss.Ebvec, sim_qpsk_hf_pilot_dsss.BERvec,'g;QPSK Np=6 Nchip=2 HF;')
   hold off;
 
   xlabel('Eb/N0')
@@ -365,46 +417,21 @@ function test_single
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.Esvec            = 10; 
-  sim_in.hf_sim           = 1;
-  sim_in.Nchip            = 4;
-  sim_in.Ntrials          = 500;
+  sim_in.Ntrials          = 1000;
+  sim_in.Esvec            = 2; 
+  sim_in.hf_sim           = 0;
+  sim_in.hf_mag_only      = 0;
+  sim_in.Nchip            = 2;
+  sim_in.Np               = 6;
+  sim_in.Ns               = 8;
+  sim_in.Rs               = 200;
   
-  sim_qpsk_hf             = ber_test(sim_in, 'dqpsk');
-endfunction
-
-function test_1600_v_450
-
-  sim_in = standard_init();
-
-  sim_in.verbose          = 1;
-  sim_in.plot_scatter     = 1;
-  sim_in.Ntrials          = 500;
-  sim_in.hf_sim           = 1;
-
-  sim_in.framesize        = 32;
-  sim_in.Nc               = 16;
-  sim_in.Esvec            = 7; 
-  sim_in.Nchip            = 1;
-  
-  sim_dqpsk_hf_1600        = ber_test(sim_in, 'dqpsk');
-
-  sim_in.framesize        = 8;
-  sim_in.Nc               = 4;
-  sim_in.Esvec            = sim_in.Esvec + 10*log10(1600/450); 
-  sim_in.Nchip            = 4;
-  
-  sim_dqpsk_hf_450         = ber_test(sim_in, 'dqpsk');
-  
-  fep=fopen("errors_1600.bin","wb"); fwrite(fep, sim_dqpsk_hf_1600.errors_log, "short"); fclose(fep);
-  fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_dqpsk_hf_450.errors_log, "short"); fclose(fep);
-
+  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
 endfunction
 
 
 % Start simulations ---------------------------------------
 
 more off;
-
-%test_1600_v_450();
 test_curves();
+%test_single();
