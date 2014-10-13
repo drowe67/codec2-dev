@@ -6,10 +6,13 @@
 % DSSS, and rate 1/2 LDPC
 %
 % TODO
-%   [ ] Nc carriers, 588 bit frames
-%   [ ] FEC
+%   [X] Nc carriers, 588 bit frames
+%   [X] FEC
+%   [X] pilot insertion and removal
 %   [ ] delay on parity and DSSS carriers
-%   [ ] pilot insertion and removal
+%   [ ] pilot based phase est
+%   [ ] uncoded and coded frame sync
+%   [ ] timing estimation, RN filtering, carrier FDM
  
 % reqd to make sure we can repeat tests exactly
 
@@ -46,11 +49,24 @@ function sim_out = ber_test(sim_in, modulation)
     bps              = 2;
     Nsymb            = framesize/bps;
     Nsymbrow         = Nsymb/Nc;
+    Npilotsframe     = Nsymbrow/Ns;
+    Nsymbrowpilot    = Nsymbrow + Npilotsframe;
+
+    printf("Each frame is %d bits or %d symbols, transmitted as %d symbols by %d carriers.",
+           framesize, Nsymb, Nsymbrow, Nc);
+    printf("  There are %d pilot symbols in each carrier, seperated by %d data/parity symbols.",
+           Npilotsframe, Ns);
+    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", 
+           Nsymbrowpilot, Nc);
+
+    assert(Npilotsframe == floor(Nsymbrow/Ns), "Npilotsframe must be an integer");
 
     prev_sym_tx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
     prev_sym_rx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
 
-    s_ch_mem    = zeros(Np*Ns+1, Nc*Nchip);
+    rx_symb_buf  = zeros(3*Nsymbrow, Nc);
+    rx_pilot_buf = zeros(3*Npilotsframe,Nc);
+    tx_bits_buf  = zeros(1,2*framesize);
 
     % Init LDPC --------------------------------------------------------------------
 
@@ -115,7 +131,7 @@ function sim_out = ber_test(sim_in, modulation)
     spread_2ms = spread_2ms(1000:length(spread_2ms));
 
     % decimate down to Rs
-
+    
     spread = spread(1:M:length(spread));
     spread_2ms = spread_2ms(1:M:length(spread_2ms));
 
@@ -144,34 +160,36 @@ function sim_out = ber_test(sim_in, modulation)
         noise_log        = [];
         errors_log       = [];
         Nerrs_log        = [];
-        
+        phi_log          = [];
+
         Terrsldpc = Tbitsldpc = Ferrsldpc = 0;
 
         % init HF channel
 
         hf_n = 1;
-        phi_ = zeros(Ntrials+Np*Ns, Nc*Nchip);
 
         phase_offset = 0;
-        w_offset     = 0;
+        w_offset     = pi/16;
 
         % simulation starts here-----------------------------------
  
-        tx_bits = round(rand(1,framesize));                       
-
-        for nn = 1:Ntrials+Np*Ns
+        for nn = 1:Ntrials+2
                   
-            tx_bits = round(rand(1,framesize*rate));                       
             if ldpc_code
+                tx_bits = round(rand(1,framesize*rate));                       
                 [tx_bits, tmp] = ldpc_enc(tx_bits, code_param);
+            else
+                tx_bits = round(rand(1,framesize));                       
             end
+            tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
+            tx_bits_buf(framesize+1:2*framesize) = tx_bits;
 
             % modulate --------------------------------------------
 
-            tx_symb = zeros(Nsymbrow,Nc*Nchip);
-
             % organise symbols into a Nsymbrow rows by Nc cols
             % data and parity bits are on separate carriers
+
+            tx_symb = zeros(Nsymbrow,Nc*Nchip);
 
             for c=1:Nc
               for r=1:Nsymbrow
@@ -179,6 +197,18 @@ function sim_out = ber_test(sim_in, modulation)
                 tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
               end
             end
+
+            % Optionally insert pilots, one every Ns data symbols
+
+            pilot = ones(Npilotsframe,Nc);
+            tx_symb_pilot = zeros(Nsymbrowpilot, Nc);
+            
+            for p=1:Npilotsframe
+              tx_symb_pilot((p-1)*(Ns+1)+1,:)          = pilot(p,:);                 % row of pilots
+              %printf("%d %d %d %d\n", (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*Ns+1, p*Ns);
+              tx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:) = tx_symb((p-1)*Ns+1:p*Ns,:); % payload symbols
+            end
+            tx_symb = tx_symb_pilot;
 
             % Optionally copy to other carriers (spreading)
 
@@ -190,7 +220,7 @@ function sim_out = ber_test(sim_in, modulation)
  
             if strcmp(modulation,'dqpsk')
               for c=1:Nc*Nchip
-                for r=1:Nsymbrow
+                for r=1:Nsymbrowpilot
                   tx_symb(r,c) *= prev_sym_tx(c);
                   prev_sym_tx(c) = tx_symb(r,c);
                 end
@@ -215,9 +245,9 @@ function sim_out = ber_test(sim_in, modulation)
 
                 hf_model(hf_n, :) = zeros(1,Nc*Nchip);
                 
-                for r=1:Nsymbrow
+                for r=1:Nsymbrowpilot
                   for c=1:Nchip*Nc
-                    time_shift = floor((c-1)*Nsymbrow);
+                    time_shift = floor((c-1)*Nsymbrowpilot);
                     ahf_model = hf_gain*(spread(hf_n+time_shift) + exp(-j*c*wsep*nhfdelay)*spread_2ms(hf_n+time_shift));
                     if hf_mag_only
                       s_ch(r,c) *= abs(ahf_model);
@@ -225,7 +255,6 @@ function sim_out = ber_test(sim_in, modulation)
                       s_ch(r,c) *= ahf_model;
                     end
                     hf_model(hf_n, c) = ahf_model;
-                    hf_fading((c-1)*Nsymbrow+r) = abs(ahf_model);
                   end
                   hf_n++;
                 end
@@ -242,14 +271,14 @@ function sim_out = ber_test(sim_in, modulation)
             % AWGN noise and phase/freq offset channel simulation
             % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
 
-            noise = sqrt(variance*0.5)*(randn(Nsymbrow,Nc*Nchip) + j*randn(Nsymbrow,Nc*Nchip));
+            noise = sqrt(variance*0.5)*(randn(Nsymbrowpilot,Nc*Nchip) + j*randn(Nsymbrowpilot,Nc*Nchip));
             noise_log = [noise_log noise];
 
             s_ch = s_ch + noise;
             
             % demodulate stage 1
 
-            for r=1:Nsymbrow
+            for r=1:Nsymbrowpilot
               for c=1:Nc*Nchip
                 rx_symb(r,c) = s_ch(r, c);
                 if strcmp(modulation,'dqpsk')
@@ -260,9 +289,67 @@ function sim_out = ber_test(sim_in, modulation)
               end
             end
 
+            % strip out pilots
+
+            rx_symb_pilot = rx_symb;
+            rx_symb = zeros(Nsymbrow, Nc);
+            rx_pilot = zeros(Npilotsframe, Nc);
+
+            for p=1:Npilotsframe
+              % printf("%d %d %d %d %d\n", (p-1)*Ns+1, p*Ns, (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*(Ns+1)+1);
+              rx_symb((p-1)*Ns+1:p*Ns,:) = rx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:);
+              rx_pilot(p,:) = rx_symb_pilot((p-1)*(Ns+1)+1,:);
+            end
+
+            % buffer three frames of symbols (and pilots) for phase recovery
+
+            rx_symb_buf(1:2*Nsymbrow,:) = rx_symb_buf(Nsymbrow+1:3*Nsymbrow,:);
+            rx_symb_buf(2*Nsymbrow+1:3*Nsymbrow,:) = rx_symb;
+            rx_pilot_buf(1:2*Npilotsframe,:) = rx_pilot_buf(Npilotsframe+1:3*Npilotsframe,:);
+            rx_pilot_buf(2*Npilotsframe+1:3*Npilotsframe,:) = rx_pilot;
+
+            % pilot assisted phase estimation and correction of middle frame in rx symb buffer
+
+            rx_symb = rx_symb_buf(Nsymbrow+1:2*Nsymbrow,:);
+            if nn > 2
+              phi_ = zeros(Nsymbrow, Nc);
+              for c=1:Nc
+                if verbose > 2
+                  printf("phi_   : ");
+                end
+                for r=1:Nsymbrow
+                  st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
+                  en = st + Np - 1;
+                  phi_(r,c) = angle(sum(rx_pilot_buf(st:en,c)));
+                  if verbose > 2
+                    printf("% 4.3f ", phi_(r,c))
+                  end
+                  rx_symb(r,c) *= exp(-j*phi_(r,c));
+                end
+                if verbose > 2
+                  printf("\nrx_symb: ");
+                  for r=1:Nsymbrow
+                    printf("% 4.3f ", angle(rx_symb(r,c)))
+                  end
+                  printf("\nindexes: ");
+                  for r=1:Nsymbrow
+                    st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
+                    en = st + Np - 1;
+                    printf("%2d,%2d  ", st,en)
+                  end
+                  printf("\npilots : ");
+                  for p=1:3*Npilotsframe
+                    printf("% 4.3f ", angle(rx_pilot_buf(p,c)));
+                  end 
+                  printf("\n\n");
+                end
+              end 
+              phi_log = [phi_log ; phi_];
+            end
+
             % de-spread
 
-            for r=1:Nsymbrow
+            for r=1:Nsymbrowpilot
               for c=Nc+1:Nc:Nchip*Nc
                 rx_symb(r,1:Nc) = rx_symb(r,1:Nc) + rx_symb(r,c:c+Nc-1);
               end
@@ -270,32 +357,36 @@ function sim_out = ber_test(sim_in, modulation)
 
             % demodulate stage 2
 
-            rx_bits = zeros(1, framesize);
             rx_symb_linear = zeros(1,Nsymb);
+            rx_bits = zeros(1, framesize);
             for c=1:Nc
               for r=1:Nsymbrow
                 i = (c-1)*Nsymbrow + r;
-                rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
                 rx_symb_linear(i) = rx_symb(r,c);
-                rx_symb_log = [rx_symb_log rx_symb(r,c)];
+                rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
               end
             end
-            
-            % Measure BER
 
-            error_positions = xor(rx_bits, tx_bits);
-            Nerrs = sum(error_positions);
-            Terrs += Nerrs;
-            Tbits += length(tx_bits);
-            errors_log = [errors_log error_positions];
-            Nerrs_log = [Nerrs_log Nerrs];
+            % Wait until we have 3 frames to do pilot assisted phase estimation
 
-            % Optionally LDPC decode
+            if nn > 2 
+              rx_symb_log = [rx_symb_log rx_symb_linear];
+
+              % Measure BER
+
+              error_positions = xor(rx_bits, tx_bits_buf(1:framesize));
+              Nerrs = sum(error_positions);
+              Terrs += Nerrs;
+              Tbits += length(tx_bits);
+              errors_log = [errors_log error_positions];
+              Nerrs_log = [Nerrs_log Nerrs];
+
+              % Optionally LDPC decode
             
-            if ldpc_code
+              if ldpc_code
                 detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, ...
                                          rx_symb_linear, min(100,EsNo), hf_fading);
-                error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
+                error_positions = xor( detected_data(1:framesize*rate), tx_bits_buf(1:framesize*rate) );
                 Nerrs = sum(error_positions);
                 ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
                 ldpc_errors_log = [ldpc_errors_log error_positions];
@@ -304,22 +395,24 @@ function sim_out = ber_test(sim_in, modulation)
                 end
                 Terrsldpc += Nerrs;
                 Tbitsldpc += framesize*rate;
+              end
             end
-        end
-    
-        TERvec(ne) = Terrs;
-        BERvec(ne) = Terrs/Tbits;
-        if verbose 
-            av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
+          end
+           
+          TERvec(ne) = Terrs;
+            BERvec(ne) = Terrs/Tbits;
 
-            printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
-                   Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
-            if ldpc_code
-                printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
-                       Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
+            if verbose 
+              av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
+
+              printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+                       Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
+              if ldpc_code
+                  printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
+                         Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
+              end
+              printf("\n");
             end
-            printf("\n");
-        end
     end
     
     Ebvec = Esvec - 10*log10(bps);
@@ -357,11 +450,11 @@ function sim_out = ber_test(sim_in, modulation)
           figure(5);
           clf
           subplot(211)
-          [m n] = size(hf_model);
+          [m n] = size(hf_model)
           plot(angle(hf_model(1:m,1)),'g;HF channel phase;')
           hold on;
-          lphi_ = length(phi_);
-          plot(phi_(1+floor(Ns*Np/2):lphi_),'r+;Estimated HF channel phase;')
+          lphi_log = length(phi_log)
+          plot(phi_log(1+floor(Ns*Np/2):lphi_log),'r+;Estimated HF channel phase;')
           ylabel('Phase (rads)');
           subplot(212)
           plot(abs(hf_model(1:m,1)))
@@ -488,17 +581,17 @@ function test_single
 
   sim_in.framesize        = 576;
   sim_in.Nc               = 2;
-  sim_in.Rs               = 200;
+  sim_in.Rs               = 250;
   sim_in.Ns               = 8;
-  sim_in.Np               = 0;
+  sim_in.Np               = 4;
   sim_in.Nchip            = 1;
   sim_in.ldpc_code_rate   = 0.5;
   sim_in.ldpc_code        = 1;
 
   sim_in.Ntrials          = 20;
-  sim_in.Esvec            = 2; 
+  sim_in.Esvec            = 3; 
   sim_in.hf_sim           = 0;
-  sim_in.hf_mag_only      = 1;
+  sim_in.hf_mag_only      = 0;
   
   sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
 endfunction
