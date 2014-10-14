@@ -68,6 +68,14 @@ function sim_out = ber_test(sim_in, modulation)
     rx_pilot_buf = zeros(3*Npilotsframe,Nc*Nchip);
     tx_bits_buf  = zeros(1,2*framesize);
 
+    % pilot sequence is used for phase and amplitude estimation, and frame sync
+
+    pilot = zeros(Npilotsframe,Nc);
+    for c=1:Nc
+      pilot(:,c) = [ones(1,floor(Npilotsframe/2)) -ones(1,ceil(Npilotsframe/2))]';
+    end
+    tx_pilot_buf = [pilot; pilot; pilot];
+   
     % Init LDPC --------------------------------------------------------------------
 
     if ldpc_code
@@ -190,7 +198,7 @@ function sim_out = ber_test(sim_in, modulation)
             % organise symbols into a Nsymbrow rows by Nc cols
             % data and parity bits are on separate carriers
 
-            tx_symb = zeros(Nsymbrow,Nc*Nchip);
+            tx_symb = zeros(Nsymbrow,Nc);
 
             for c=1:Nc
               for r=1:Nsymbrow
@@ -201,8 +209,7 @@ function sim_out = ber_test(sim_in, modulation)
 
             % Optionally insert pilots, one every Ns data symbols
 
-            pilot = ones(Npilotsframe,Nc*Nchip);
-            tx_symb_pilot = zeros(Nsymbrowpilot, Nc*Nchip);
+            tx_symb_pilot = zeros(Nsymbrowpilot, Nc);
             
             for p=1:Npilotsframe
               tx_symb_pilot((p-1)*(Ns+1)+1,:)          = pilot(p,:);                 % row of pilots
@@ -250,6 +257,7 @@ function sim_out = ber_test(sim_in, modulation)
                   for c=1:Nchip*Nc
                     time_shift = floor((c-1)*Nsymbrowpilot);
                     ahf_model = hf_gain*(spread(hf_n+time_shift) + exp(-j*c*wsep*nhfdelay)*spread_2ms(hf_n+time_shift));
+                    
                     if hf_mag_only
                       s_ch(r,c) *= abs(ahf_model);
                     else
@@ -323,8 +331,8 @@ function sim_out = ber_test(sim_in, modulation)
                 for r=1:Nsymbrow
                   st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
                   en = st + Np - 1;
-                  phi_(r,c) = angle(sum(rx_pilot_buf(st:en,c)));
-                  amp_(r,c) = mean(abs(rx_pilot_buf(st:en,c)));
+                  phi_(r,c) = angle(sum(tx_pilot_buf(st:en,1)'*rx_pilot_buf(st:en,c)));
+                  amp_(r,c) = abs(tx_pilot_buf(st:en,1)'*rx_pilot_buf(st:en,c))/Np;
                   %amp_(r,c) = abs(rx_symb(r,c));
                   if verbose > 2
                     printf("% 4.3f ", phi_(r,c))
@@ -350,7 +358,6 @@ function sim_out = ber_test(sim_in, modulation)
                 end
               end 
               phi_log = [phi_log; phi_];
-              amp_log = [amp_log; amp_];
             end
 
             % de-spread
@@ -358,7 +365,12 @@ function sim_out = ber_test(sim_in, modulation)
             for r=1:Nsymbrow
               for c=Nc+1:Nc:Nchip*Nc
                 rx_symb(r,1:Nc) = rx_symb(r,1:Nc) + rx_symb(r,c:c+Nc-1);
+                amp_(r,1:Nc)    = amp_(r,1:Nc) + amp_(r,c:c+Nc-1);
               end
+            end
+           
+            if nn > 2
+              amp_log = [amp_log; amp_];
             end
 
             % demodulate stage 2
@@ -607,17 +619,17 @@ function test_single
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.framesize        = 576*4;
+  sim_in.framesize        = 576;
   sim_in.Nc               = 2;
   sim_in.Rs               = 250;
   sim_in.Ns               = 6;
   sim_in.Np               = 4;
-  sim_in.Nchip            = 2;
+  sim_in.Nchip            = 1;
   sim_in.ldpc_code_rate   = 0.5;
   sim_in.ldpc_code        = 1;
 
-  sim_in.Ntrials          = 5;
-  sim_in.Esvec            = 5; 
+  sim_in.Ntrials          = 20;
+  sim_in.Esvec            = 7; 
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
   
