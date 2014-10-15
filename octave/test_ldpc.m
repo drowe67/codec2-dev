@@ -298,7 +298,7 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in
         if verbose > 2
           printf("% 4.3f ", phi_(r,c))
         end
-        %rx_symb(r,c) *= exp(-j*phi_(r,c));
+        rx_symb(r,c) *= exp(-j*phi_(r,c));
       end
 
       if verbose > 2
@@ -861,6 +861,8 @@ function rate_Fs_rx(rx_filename)
   Fs                      = sim_in.Fs;
   Nc                      = sim_in.Nc;
   Nsymbrowpilot           = sim_in.Nsymbrowpilot;
+  pilot                   = sim_in.pilot;
+  Ns                      = sim_in.Ns;
 
   M = Fs/Rs;
 
@@ -884,11 +886,6 @@ function rate_Fs_rx(rx_filename)
 
   rx_fdm=rx_fdm(1:46000);
 
-  figure(1)
-  clf;
-  subplot(211)
-  plot(rx_fdm(1:100))
-
   printf("downconverting\n");
 
   [m n] = size(rx_fdm);
@@ -911,32 +908,49 @@ function rate_Fs_rx(rx_filename)
     rx_filt(:,c) = filter(rn_coeff, 1, rx_bb(:,c));
   end
 
+  % fine timing and decimation
 
   [m n] = size(rx_filt);
   rx_symb_buf = rx_filt(1:M:m,:);
-  Ntrials = m/M/Nsymbrowpilot;
 
-  subplot(212)
-  stem(imag(rx_symb_buf(1:50,1)))
-
-  printf("here Ntrials = %d\n", Ntrials);
+  % use pilots to estimate coarse timing (frame sync)
   
+  max_corr = 0;
+  max_s    = 1;
+  corr = zeros(1,Nsymbrowpilot);
+  for s=1:Nsymbrowpilot
+    corr(s) = rx_symb_buf(s:Ns+1:s+Nsymbrowpilot-1,1)' * pilot(:,1);
+    if corr(s) > max_corr
+      max_corr = corr;
+      max_s    = s
+    end
+  end
+  figure(1)
+  clf;
+  subplot(211)
+  plot(real(corr))
+  subplot(212)
+  stem(real(rx_symb_buf(max_s:Ns+1:max_s+Nsymbrowpilot-1,1)))
+  hold on;
+  stem(imag(rx_symb_buf(max_s:Ns+1:max_s+Nsymbrowpilot-1,1)),'g')
+  hold off;
+  
+  Ntrials = m/M/Nsymbrowpilot;
   for nn=1:Ntrials
-    printf("%d %d %d\n", nn, (nn-1)*Nsymbrowpilot+1, nn*Nsymbrowpilot)
-    s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+1:nn*Nsymbrowpilot,:);
+    s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+max_s:nn*Nsymbrowpilot+max_s,:);
     [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
     
     % wait 2 frames so phi_ and amp_ are valid
     
     rx_symb_log = [rx_symb_log rx_symb_linear];
 
-    if 0
+    if 1
       % Measure BER
 
-      error_positions = xor(rx_bits, tx_bits_buf(1:framesize));
+      error_positions = xor(rx_bits(1:framesize*rate), tx_bits(1:framesize*rate));
       Nerrs = sum(error_positions);
       Terrs += Nerrs;
-      Tbits += length(tx_bits);
+      Tbits += framesize*rate;
       errors_log = [errors_log error_positions];
       Nerrs_log = [Nerrs_log Nerrs];
 
@@ -944,7 +958,7 @@ function rate_Fs_rx(rx_filename)
             
       detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
                                rx_symb_linear, min(100,EsNo), amp_linear);
-      error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
+      error_positions = xor(detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
       Nerrs = sum(error_positions);
       ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
       ldpc_errors_log = [ldpc_errors_log error_positions];
