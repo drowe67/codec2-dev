@@ -88,7 +88,7 @@ void interpolate(
     for(l=1; l<=interp->L; l++) {
 	w = l*interp->Wo;
 	log_amp = (sample_log_amp(prev, w) + sample_log_amp(next, w))/2.0;
-	interp->A[l] = pow(10.0, log_amp);
+	interp->A[l] = powf(10.0, log_amp);
     }
 }
 
