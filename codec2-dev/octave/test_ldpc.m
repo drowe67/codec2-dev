@@ -21,95 +21,76 @@ randn('state',1);
 
 1;
 
-% main test function 
+% Symbol rate processing for tx side (modulator)
 
-function sim_out = ber_test(sim_in, modulation)
-    Fs = 8000;
-
-    verbose          = sim_in.verbose;
-    framesize        = sim_in.framesize;
-    Ntrials          = sim_in.Ntrials;
-    Esvec            = sim_in.Esvec;
-    phase_offset     = sim_in.phase_offset;
-    w_offset         = sim_in.w_offset;
-    plot_scatter     = sim_in.plot_scatter;
-
-    Rs               = sim_in.Rs;
-    Nc               = sim_in.Nc;
-
-    hf_sim           = sim_in.hf_sim;
-    nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
-    hf_mag_only      = sim_in.hf_mag_only;
-
-    Nchip            = sim_in.Nchip;  % spread spectrum factor
-    Np               = sim_in.Np;     % number of pilots to use
-    Ns               = sim_in.Ns;     % step size between pilots
-    ldpc_code        = sim_in.ldpc_code;
-
-    bps              = 2;
-    Nsymb            = framesize/bps;
-    Nsymbrow         = Nsymb/Nc;
-    Npilotsframe     = Nsymbrow/Ns;
-    Nsymbrowpilot    = Nsymbrow + Npilotsframe;
-
-    printf("Each frame is %d bits or %d symbols, transmitted as %d symbols by %d carriers.",
-           framesize, Nsymb, Nsymbrow, Nc);
-    printf("  There are %d pilot symbols in each carrier, seperated by %d data/parity symbols.",
-           Npilotsframe, Ns);
-    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", 
-           Nsymbrowpilot, Nc);
-
-    assert(Npilotsframe == floor(Nsymbrow/Ns), "Npilotsframe must be an integer");
-
-    prev_sym_tx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
-    prev_sym_rx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
-
-    rx_symb_buf  = zeros(3*Nsymbrow, Nc*Nchip);
-    rx_pilot_buf = zeros(3*Npilotsframe,Nc*Nchip);
-    tx_bits_buf  = zeros(1,2*framesize);
-
-    % pilot sequence is used for phase and amplitude estimation, and frame sync
-
-    pilot = zeros(Npilotsframe,Nc);
-    for c=1:Nc
-      pilot(:,c) = [ones(1,floor(Npilotsframe/2)) -ones(1,ceil(Npilotsframe/2))]';
-    end
-    tx_pilot_buf = [pilot; pilot; pilot];
-   
-    % Init LDPC --------------------------------------------------------------------
+function [tx_symb tx_bits prev_sym_tx] = tx_symbol_rate(sim_in, tx_bits, code_param, prev_sym_tx)
+    ldpc_code     = sim_in.ldpc_code;
+    framesize     = sim_in.framesize;
+    rate          = sim_in.rate;
+    Nsymbrow      = sim_in.Nsymbrow;
+    Nsymbrowpilot = sim_in.Nsymbrowpilot;
+    Nc            = sim_in.Nc;
+    Npilotsframe  = sim_in.Npilotsframe;
+    Ns            = sim_in.Ns;
+    Nchip         = sim_in.Nchip;
+    modulation    = sim_in.modulation;
+    pilot         = sim_in.pilot;
 
     if ldpc_code
-        % Start CML library
-
-        currentdir = pwd;
-        addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
-        cd /home/david/tmp/cml
-        CmlStartup                           % note that this is not in the cml path!
-        cd(currentdir)
-  
-        % Our LDPC library
-
-        ldpc;
-
-        rate = sim_in.ldpc_code_rate; 
-        mod_order = 4; 
-        modulation2 = 'QPSK';
-        mapping = 'gray';
-
-        demod_type = 0;
-        decoder_type = 0;
-        max_iterations = 100;
-
-        code_param = ldpc_init(rate, framesize, modulation2, mod_order, mapping);
-        code_param.code_bits_per_frame = framesize;
-        code_param.symbols_per_frame = framesize/bps;
-
-        ldpc_errors_log = []; ldpc_Nerrs_log = [];
-    else
-        rate = 1;
+        [tx_bits, tmp] = ldpc_enc(tx_bits, code_param);
     end
 
-    % Init HF channel model from stored sample files of spreading signal ----------------------------------
+    % modulate --------------------------------------------
+
+    % organise symbols into a Nsymbrow rows by Nc cols
+    % data and parity bits are on separate carriers
+
+    tx_symb = zeros(Nsymbrow,Nc);
+
+    for c=1:Nc
+      for r=1:Nsymbrow
+        i = (c-1)*Nsymbrow + r;
+        tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
+      end
+    end
+
+    % Optionally insert pilots, one every Ns data symbols
+
+    tx_symb_pilot = zeros(Nsymbrowpilot, Nc);
+            
+    for p=1:Npilotsframe
+      tx_symb_pilot((p-1)*(Ns+1)+1,:)          = pilot(p,:);                 % row of pilots
+      %printf("%d %d %d %d\n", (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*Ns+1, p*Ns);
+      tx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:) = tx_symb((p-1)*Ns+1:p*Ns,:); % payload symbols
+    end
+    tx_symb = tx_symb_pilot;
+
+    % Optionally copy to other carriers (spreading)
+
+    for c=Nc+1:Nc:Nc*Nchip
+      tx_symb(:,c:c+Nc-1) = tx_symb(:,1:Nc);
+    end
+            
+    % Optionally DQPSK encode
+ 
+    if strcmp(modulation,'dqpsk')
+      for c=1:Nc*Nchip
+        for r=1:Nsymbrowpilot
+          tx_symb(r,c) *= prev_sym_tx(c);
+          prev_sym_tx(c) = tx_symb(r,c);
+        end
+      end               
+    end
+
+    % ensures energy/symbol is normalised when spreading
+
+    tx_symb = tx_symb/sqrt(Nchip);
+end
+
+
+% Init HF channel model from stored sample files of spreading signal ----------------------------------
+
+function [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, nsam)
 
     % convert "spreading" samples from 1kHz carrier at Fs to complex
     % baseband, generated by passing a 1kHz sine wave through PathSim
@@ -148,7 +129,102 @@ function sim_out = ber_test(sim_in, modulation)
     % different implementations of ccir-poor would do this in
     % different ways, leading to different BER results.  Oh Well!
 
-    hf_gain = 1.0/sqrt(var(spread(1:Nsymbrow*Ntrials))+var(spread_2ms(1:Nsymbrow*Ntrials)));
+    hf_gain = 1.0/sqrt(var(spread(1:nsam))+var(spread_2ms(1:nsam)));
+endfunction
+
+
+% main test function 
+
+function sim_out = ber_test(sim_in)
+    Fs = 8000;
+
+    modulation       = sim_in.modulation;
+    verbose          = sim_in.verbose;
+    framesize        = sim_in.framesize;
+    Ntrials          = sim_in.Ntrials;
+    Esvec            = sim_in.Esvec;
+    phase_offset     = sim_in.phase_offset;
+    w_offset         = sim_in.w_offset;
+    plot_scatter     = sim_in.plot_scatter;
+
+    Rs               = sim_in.Rs;
+    Nc               = sim_in.Nc;
+
+    hf_sim           = sim_in.hf_sim;
+    nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
+    hf_mag_only      = sim_in.hf_mag_only;
+
+    Nchip            = sim_in.Nchip;  % spread spectrum factor
+    Np               = sim_in.Np;     % number of pilots to use
+    Ns               = sim_in.Ns;     % step size between pilots
+    ldpc_code        = sim_in.ldpc_code;
+    sim_in.rate = rate = sim_in.ldpc_code_rate; 
+
+    bps              = 2;
+
+    sim_in.Nsymb         = Nsymb            = framesize/bps;
+    sim_in.Nsymbrow      = Nsymbrow         = Nsymb/Nc;
+    sim_in.Npilotsframe  = Npilotsframe     = Nsymbrow/Ns;
+    sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe;
+
+    printf("Each frame is %d bits or %d symbols, transmitted as %d symbols by %d carriers.",
+           framesize, Nsymb, Nsymbrow, Nc);
+    printf("  There are %d pilot symbols in each carrier, seperated by %d data/parity symbols.",
+           Npilotsframe, Ns);
+    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", 
+           Nsymbrowpilot, Nc);
+
+    assert(Npilotsframe == floor(Nsymbrow/Ns), "Npilotsframe must be an integer");
+
+    prev_sym_tx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
+    prev_sym_rx      = qpsk_mod([0 0])*ones(1,Nc*Nchip);
+
+    rx_symb_buf  = zeros(3*Nsymbrow, Nc*Nchip);
+    rx_pilot_buf = zeros(3*Npilotsframe,Nc*Nchip);
+    tx_bits_buf  = zeros(1,2*framesize);
+
+    % pilot sequence is used for phase and amplitude estimation, and frame sync
+
+    pilot = zeros(Npilotsframe,Nc);
+    for c=1:Nc
+      pilot(:,c) = [ones(1,floor(Npilotsframe/2)) -ones(1,ceil(Npilotsframe/2))]';
+    end
+    sim_in.pilot = pilot;
+    tx_pilot_buf = [pilot; pilot; pilot];
+   
+    % Init LDPC --------------------------------------------------------------------
+
+    if ldpc_code
+        % Start CML library
+
+        currentdir = pwd;
+        addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
+        cd /home/david/tmp/cml
+        CmlStartup                           % note that this is not in the cml path!
+        cd(currentdir)
+  
+        % Our LDPC library
+
+        ldpc;
+
+        mod_order = 4; 
+        modulation2 = 'QPSK';
+        mapping = 'gray';
+
+        demod_type = 0;
+        decoder_type = 0;
+        max_iterations = 100;
+
+        code_param = ldpc_init(rate, framesize, modulation2, mod_order, mapping);
+        code_param.code_bits_per_frame = framesize;
+        code_param.symbols_per_frame = framesize/bps;
+
+        ldpc_errors_log = []; ldpc_Nerrs_log = [];
+    else
+        rate = 1;
+    end
+
+    [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, Nsymbrowpilot*Ntrials);
 
     % Start Simulation ----------------------------------------------------------------
 
@@ -157,7 +233,7 @@ function sim_out = ber_test(sim_in, modulation)
         EsNo = 10^(EsNodB/10);
     
         variance = 1/EsNo;
-         if verbose > 1
+        if verbose > 1
             printf("EsNo (dB): %f EsNo: %f variance: %f\n", EsNodB, EsNo, variance);
         end
         
@@ -185,59 +261,15 @@ function sim_out = ber_test(sim_in, modulation)
         for nn = 1:Ntrials+2
                   
             if ldpc_code
-                tx_bits = round(rand(1,framesize*rate));                       
-                [tx_bits, tmp] = ldpc_enc(tx_bits, code_param);
+              tx_bits = round(rand(1,framesize*rate));                       
             else
-                tx_bits = round(rand(1,framesize));                       
+              tx_bits = round(rand(1,framesize));                       
             end
+
+            [s_ch tx_bits prev_sym_tx] = tx_symbol_rate(sim_in, tx_bits, code_param, prev_sym_tx);
+   
             tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
             tx_bits_buf(framesize+1:2*framesize) = tx_bits;
-
-            % modulate --------------------------------------------
-
-            % organise symbols into a Nsymbrow rows by Nc cols
-            % data and parity bits are on separate carriers
-
-            tx_symb = zeros(Nsymbrow,Nc);
-
-            for c=1:Nc
-              for r=1:Nsymbrow
-                i = (c-1)*Nsymbrow + r;
-                tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
-              end
-            end
-
-            % Optionally insert pilots, one every Ns data symbols
-
-            tx_symb_pilot = zeros(Nsymbrowpilot, Nc);
-            
-            for p=1:Npilotsframe
-              tx_symb_pilot((p-1)*(Ns+1)+1,:)          = pilot(p,:);                 % row of pilots
-              %printf("%d %d %d %d\n", (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*Ns+1, p*Ns);
-              tx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:) = tx_symb((p-1)*Ns+1:p*Ns,:); % payload symbols
-            end
-            tx_symb = tx_symb_pilot;
-
-            % Optionally copy to other carriers (spreading)
-
-            for c=Nc+1:Nc:Nc*Nchip
-              tx_symb(:,c:c+Nc-1) = tx_symb(:,1:Nc);
-            end
-            
-            % Optionally DQPSK encode
- 
-            if strcmp(modulation,'dqpsk')
-              for c=1:Nc*Nchip
-                for r=1:Nsymbrowpilot
-                  tx_symb(r,c) *= prev_sym_tx(c);
-                  prev_sym_tx(c) = tx_symb(r,c);
-                end
-              end               
-            end
-
-            % ensures energy/symbol is normalised when spreading
-
-            s_ch = tx_symb/sqrt(Nchip);
 
             % HF channel simulation  ------------------------------------
             
@@ -628,12 +660,13 @@ function test_single
   sim_in.ldpc_code_rate   = 0.5;
   sim_in.ldpc_code        = 1;
 
-  sim_in.Ntrials          = 20;
+  sim_in.Ntrials          = 10;
   sim_in.Esvec            = 7; 
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
-  
-  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+  sim_in.modulation       = 'qpsk';
+
+  sim_qpsk_hf             = ber_test(sim_in);
 
   fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
 endfunction
