@@ -442,7 +442,7 @@ void compute_weights_anssi_mode2(const float *x, float *w, int ndim)
         else
             w[i]=1.0/(0.01+d[i]);
         
-        w[i]=pow(w[i]+0.3, 0.66);
+        w[i]=powf(w[i]+0.3, 0.66);
   }
 }
 #endif
@@ -638,7 +638,7 @@ static void mbest_search(
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
-	    e += pow(diff*w[i],2.0);
+	    e += powf(diff*w[i],2.0);
 	}
 	index[0] = j;
 	mbest_insert(mbest, index, e);
@@ -1113,7 +1113,7 @@ int encode_Wo_dt(float Wo, float prev_Wo)
     float norm;
 
     norm = (Wo - prev_Wo)/(Wo_max - Wo_min);
-    index = floor(WO_LEVELS * norm + 0.5);
+    index = floorf(WO_LEVELS * norm + 0.5);
     //printf("ENC index: %d ", index);
 
     /* hard limit */
