@@ -310,7 +310,7 @@ void kf_factor(int n,int * facbuf)
 {
     int p=4;
     double floor_sqrt;
-    floor_sqrt = floor( sqrt((double)n) );
+    floor_sqrt = floorf( sqrtf((double)n) );
 
     /*factor out powers of 4, powers of 2, then any remaining primes */
     do {

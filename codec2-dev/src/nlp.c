@@ -476,7 +476,7 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 	    for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
 		e = test_candidate_mbe(Sw, W, f0);
 		#if !defined(NDEBUG) || defined(DUMP)
-		bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
+		bin = floorf(f0); assert((bin > 0) && (bin < F0_MAX));
 		#endif
 		#ifdef DUMP
                 e_hz[bin] = e;
@@ -503,7 +503,7 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
   for(f0=f0_start; f0<=f0_end; f0+= 2.5) {
       e = test_candidate_mbe(Sw, W, f0);
       #if !defined(NDEBUG) || defined(DUMP)
-      bin = floor(f0); assert((bin > 0) && (bin < F0_MAX));
+      bin = floorf(f0); assert((bin > 0) && (bin < F0_MAX));
       #endif
       #ifdef DUMP
       e_hz[bin] = e;
@@ -547,7 +547,7 @@ float test_candidate_mbe(
     float Wo;             /* current "test" fundamental freq. */
     int   L;
     
-    L = floor((SAMPLE_RATE/2.0)/f0);
+    L = floorf((SAMPLE_RATE/2.0)/f0);
     Wo = f0*(2*PI/SAMPLE_RATE);
 
     error = 0.0;
@@ -558,8 +558,8 @@ float test_candidate_mbe(
 	Am.real = 0.0;
 	Am.imag = 0.0;
 	den = 0.0;
-	al = ceil((l - 0.5)*Wo*FFT_ENC/TWO_PI);
-	bl = ceil((l + 0.5)*Wo*FFT_ENC/TWO_PI);
+	al = ceilf((l - 0.5)*Wo*FFT_ENC/TWO_PI);
+	bl = ceilf((l + 0.5)*Wo*FFT_ENC/TWO_PI);
 
 	/* Estimate amplitude of harmonic assuming harmonic is totally voiced */
 
