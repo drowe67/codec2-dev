@@ -733,9 +733,145 @@ function test_single
   fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
 endfunction
 
+% Rate Fs test
+
+function test_rate_Fs(tx_filename)
+  sim_in = standard_init();
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.framesize        = 576;
+  sim_in.Nc               = 2;
+  sim_in.Rs               = 250;
+  sim_in.Ns               = 6;
+  sim_in.Np               = 4;
+  sim_in.Nchip            = 1;
+  sim_in.ldpc_code_rate   = 0.5;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.Ntrials          = 10;
+  sim_in.Esvec            = 7; 
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 0;
+  sim_in.modulation       = 'qpsk';
+
+  sim_in = symbol_rate_init(sim_in);
+
+  prev_sym_tx             = sim_in.prev_sym_tx;
+  prev_sym_rx             = sim_in.prev_sym_rx;
+  code_param              = sim_in.code_param;
+  tx_bits_buf             = sim_in.tx_bits_buf;
+  framesize               = sim_in.framesize;
+  rate                    = sim_in.ldpc_code_rate;
+  Ntrials                 = sim_in.Ntrials;
+  Rs                      = sim_in.Rs;
+  Fs                      = sim_in.Fs;
+  Nc                      = sim_in.Nc;
+
+  M = Fs/Rs;
+
+  EsNodB = sim_in.Esvec(1);
+  EsNo = 10^(EsNodB/10);
+ 
+  rx_symb_log = []; av_tx_pwr = [];
+  Terrs = Tbits = 0;
+  errors_log = []; Nerrs_log = []; 
+  ldpc_Nerrs_log = []; ldpc_errors_log = [];
+  Ferrsldpc = Terrsldpc = Tbitsldpc = 0;
+
+  rn_coeff = gen_rn_coeffs(0.5, 1/Fs, Rs, 6, M);
+  tx_symb_buf = [];
+
+  for nn=1:Ntrials+2
+
+    % modulator ---------------------------------------------------------------------
+
+    tx_bits = round(rand(1,framesize*rate));                       
+    [tx_symb tx_bits prev_sym_tx] = symbol_rate_tx(sim_in, tx_bits, code_param, prev_sym_tx);
+    tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
+    tx_bits_buf(framesize+1:2*framesize) = tx_bits;
+    tx_symb_buf = [tx_symb_buf; tx_symb];
+
+    s_ch = tx_symb;
+    [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
+
+    % wait 2 frames so phi_ and amp_ are valid
+
+    if nn > 2 
+      rx_symb_log = [rx_symb_log rx_symb_linear];
+
+      % Measure BER
+
+      error_positions = xor(rx_bits, tx_bits_buf(1:framesize));
+      Nerrs = sum(error_positions);
+      Terrs += Nerrs;
+      Tbits += length(tx_bits);
+      errors_log = [errors_log error_positions];
+      Nerrs_log = [Nerrs_log Nerrs];
+
+      % LDPC decode
+            
+      detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
+                               rx_symb_linear, min(100,EsNo), amp_linear);
+      error_positions = xor( detected_data(1:framesize*rate), tx_bits_buf(1:framesize*rate) );
+      Nerrs = sum(error_positions);
+      ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
+      ldpc_errors_log = [ldpc_errors_log error_positions];
+      if Nerrs
+        Ferrsldpc++;
+      end
+      Terrsldpc += Nerrs;
+      Tbitsldpc += framesize*rate;
+    end
+  end
+
+  printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+         Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
+  printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
+         Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
+ 
+  % zero pad and tx filter
+
+  [m n] = size(tx_symb_buf);
+  zp = [];
+  for i=1:m
+    zrow = M*tx_symb_buf(i,:);
+    zp = [zp; zrow; zeros(M-1,Nc)];
+  end
+
+  for c=1:Nc
+    tx_filt(:,c) = filter(rn_coeff, 1, zp(:,c));
+  end
+
+  % upconvert to real IF and save to disk
+
+  [m n] = size(tx_filt);
+  tx_fdm = zeros(1,m);
+  Fc = 1500;
+  freq(1) = exp(j*2*pi*(Fc - Rs*0.75)/Fs);
+  freq(2) = exp(j*2*pi*(Fc + Rs*0.75)/Fs);
+  phase_tx = ones(1,Nc);
+
+  for c=1:Nc
+    for i=1:m
+      phase_tx(c) = phase_tx(c) * freq(c);
+      tx_fdm(i) = tx_fdm(i) + tx_filt(i,c)*phase_tx(c);
+    end
+  end
+
+  Ascale = 10000;
+  figure(1);
+  clf;
+  plot(Ascale*real(tx_fdm))
+
+  ftx=fopen(tx_filename,"wb"); fwrite(ftx, Ascale*real(tx_fdm), "short"); fclose(ftx);
+
+endfunction
 
 % Start simulations ---------------------------------------
 
 more off;
 %test_curves();
-test_single();
+%test_single();
+test_rate_Fs("tx.raw");
