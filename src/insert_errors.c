@@ -74,7 +74,6 @@ int main(int argc, char *argv[])
     }
 
     bits_per_frame = atoi(argv[4]);
-    assert((bits_per_frame % 8) == 0);
 
     start_bit = 0; end_bit = bits_per_frame;
     if (argc == 7) {
@@ -87,25 +86,25 @@ int main(int argc, char *argv[])
 
     while(fread(&byte, sizeof(char), 1, fin) == 1) {
 
-        for(i=0; i<8; i++) {
-            bits++;
-            //printf("bit: %d start_bit: %d end_bit: %d\n", bit, start_bit, end_bit);
-            if (fread(&error, sizeof(short), 1, ferror)) {
-                if ((bit >= start_bit) && (bit <= end_bit))
-                    byte ^= error << (7-i);
-                if (error)
-                    errors++;
+        for(i=0; i<8; i++, bits++) {
+            if (bits != bits_per_frame) {
+                if (fread(&error, sizeof(short), 1, ferror)) {
+                    if ((bit >= start_bit) && (bit <= end_bit))
+                        byte ^= error << (7-i);
+                    if (error)
+                        errors++;
+                }
+                else {
+                    fprintf(stderr,"bits: %d ber: %4.3f\n", bits, (float)errors/bits);
+                    fclose (fin); fclose(fout); fclose(ferror);
+                    exit(0);
+                }
             }
-            else {
-                fprintf(stderr,"bits: %d ber: %4.3f\n", bits, (float)errors/bits);
-                fclose (fin); fclose(fout); fclose(ferror);
-                exit(0);
-            }
-            bit++;
-            if (bit == bits_per_frame)
-                bit = 0;
         }
+
         fwrite(&byte, sizeof(char), 1, fout);
+        if (bits == bits_per_frame)
+            bits = 0;
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);         
  
