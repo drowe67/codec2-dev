@@ -298,7 +298,7 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in
         if verbose > 2
           printf("% 4.3f ", phi_(r,c))
         end
-        rx_symb(r,c) *= exp(-j*phi_(r,c));
+        %rx_symb(r,c) *= exp(-j*phi_(r,c));
       end
 
       if verbose > 2
@@ -733,9 +733,9 @@ function test_single
   fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
 endfunction
 
-% Rate Fs test
+% Rate Fs test funcs -----------------------------------------------------------
 
-function test_rate_Fs(tx_filename)
+function rate_Fs_tx(tx_filename)
   sim_in = standard_init();
 
   sim_in.verbose          = 1;
@@ -759,7 +759,6 @@ function test_rate_Fs(tx_filename)
   sim_in = symbol_rate_init(sim_in);
 
   prev_sym_tx             = sim_in.prev_sym_tx;
-  prev_sym_rx             = sim_in.prev_sym_rx;
   code_param              = sim_in.code_param;
   tx_bits_buf             = sim_in.tx_bits_buf;
   framesize               = sim_in.framesize;
@@ -775,61 +774,19 @@ function test_rate_Fs(tx_filename)
   EsNo = 10^(EsNodB/10);
  
   rx_symb_log = []; av_tx_pwr = [];
-  Terrs = Tbits = 0;
-  errors_log = []; Nerrs_log = []; 
-  ldpc_Nerrs_log = []; ldpc_errors_log = [];
-  Ferrsldpc = Terrsldpc = Tbitsldpc = 0;
 
   rn_coeff = gen_rn_coeffs(0.5, 1/Fs, Rs, 6, M);
   tx_symb_buf = [];
 
+  tx_bits = round(rand(1,framesize*rate));                       
+
   for nn=1:Ntrials+2
 
-    % modulator ---------------------------------------------------------------------
-
-    tx_bits = round(rand(1,framesize*rate));                       
-    [tx_symb tx_bits prev_sym_tx] = symbol_rate_tx(sim_in, tx_bits, code_param, prev_sym_tx);
+    [tx_symb tx_bits_out prev_sym_tx] = symbol_rate_tx(sim_in, tx_bits, code_param, prev_sym_tx);
     tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
-    tx_bits_buf(framesize+1:2*framesize) = tx_bits;
+    tx_bits_buf(framesize+1:2*framesize) = tx_bits_out;
     tx_symb_buf = [tx_symb_buf; tx_symb];
-
-    s_ch = tx_symb;
-    [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
-
-    % wait 2 frames so phi_ and amp_ are valid
-
-    if nn > 2 
-      rx_symb_log = [rx_symb_log rx_symb_linear];
-
-      % Measure BER
-
-      error_positions = xor(rx_bits, tx_bits_buf(1:framesize));
-      Nerrs = sum(error_positions);
-      Terrs += Nerrs;
-      Tbits += length(tx_bits);
-      errors_log = [errors_log error_positions];
-      Nerrs_log = [Nerrs_log Nerrs];
-
-      % LDPC decode
-            
-      detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
-                               rx_symb_linear, min(100,EsNo), amp_linear);
-      error_positions = xor( detected_data(1:framesize*rate), tx_bits_buf(1:framesize*rate) );
-      Nerrs = sum(error_positions);
-      ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
-      ldpc_errors_log = [ldpc_errors_log error_positions];
-      if Nerrs
-        Ferrsldpc++;
-      end
-      Terrsldpc += Nerrs;
-      Tbitsldpc += framesize*rate;
-    end
   end
-
-  printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
-         Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
-  printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
-         Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
  
   % zero pad and tx filter
 
@@ -869,9 +826,155 @@ function test_rate_Fs(tx_filename)
 
 endfunction
 
+
+function rate_Fs_rx(rx_filename)
+  sim_in = standard_init();
+
+  sim_in.verbose          = 1;
+  sim_in.plot_scatter     = 1;
+
+  sim_in.framesize        = 576;
+  sim_in.Nc               = 2;
+  sim_in.Rs               = 250;
+  sim_in.Ns               = 6;
+  sim_in.Np               = 4;
+  sim_in.Nchip            = 1;
+  sim_in.ldpc_code_rate   = 0.5;
+  sim_in.ldpc_code        = 1;
+
+  sim_in.Ntrials          = 10;
+  sim_in.Esvec            = 7; 
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 0;
+  sim_in.modulation       = 'qpsk';
+
+  sim_in = symbol_rate_init(sim_in);
+
+  prev_sym_tx             = sim_in.prev_sym_tx;
+  prev_sym_rx             = sim_in.prev_sym_rx;
+  code_param              = sim_in.code_param;
+  tx_bits_buf             = sim_in.tx_bits_buf;
+  framesize               = sim_in.framesize;
+  rate                    = sim_in.ldpc_code_rate;
+  Ntrials                 = sim_in.Ntrials;
+  Rs                      = sim_in.Rs;
+  Fs                      = sim_in.Fs;
+  Nc                      = sim_in.Nc;
+  Nsymbrowpilot           = sim_in.Nsymbrowpilot;
+
+  M = Fs/Rs;
+
+  EsNodB = sim_in.Esvec(1);
+  EsNo = 10^(EsNodB/10);
+ 
+  rx_symb_log = []; av_tx_pwr = [];
+  Terrs = Tbits = 0;
+  errors_log = []; Nerrs_log = []; 
+  ldpc_Nerrs_log = []; ldpc_errors_log = [];
+  Ferrsldpc = Terrsldpc = Tbitsldpc = 0;
+
+  rn_coeff = gen_rn_coeffs(0.5, 1/Fs, Rs, 6, M);
+
+  tx_bits = round(rand(1,framesize*rate));                       
+
+  % read from disk, downconvert, filter, decimate to rate Rs
+
+  Ascale = 10000;
+  frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short")/Ascale; fclose(frx);
+
+  rx_fdm=rx_fdm(1:46000);
+
+  figure(1)
+  clf;
+  subplot(211)
+  plot(rx_fdm(1:100))
+
+  printf("downconverting\n");
+
+  [m n] = size(rx_fdm);
+  rx_symb = zeros(m,Nc);
+  Fc = 1500;
+  freq(1) = exp(-j*2*pi*(Fc - Rs*0.75)/Fs);
+  freq(2) = exp(-j*2*pi*(Fc + Rs*0.75)/Fs);
+  phase_rx = ones(1,Nc);
+  rx_bb = zeros(m,Nc);
+
+  for c=1:Nc
+    for i=1:m
+      phase_rx(c) = phase_rx(c) * freq(c);
+      rx_bb(i,c) = rx_fdm(i)*phase_rx(c);
+    end
+  end
+
+  printf("filtering\n");
+  for c=1:Nc
+    rx_filt(:,c) = filter(rn_coeff, 1, rx_bb(:,c));
+  end
+
+
+  [m n] = size(rx_filt);
+  rx_symb_buf = rx_filt(1:M:m,:);
+  Ntrials = m/M/Nsymbrowpilot;
+
+  subplot(212)
+  stem(imag(rx_symb_buf(1:50,1)))
+
+  printf("here Ntrials = %d\n", Ntrials);
+  
+  for nn=1:Ntrials
+    printf("%d %d %d\n", nn, (nn-1)*Nsymbrowpilot+1, nn*Nsymbrowpilot)
+    s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+1:nn*Nsymbrowpilot,:);
+    [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
+    
+    % wait 2 frames so phi_ and amp_ are valid
+    
+    rx_symb_log = [rx_symb_log rx_symb_linear];
+
+    if 0
+      % Measure BER
+
+      error_positions = xor(rx_bits, tx_bits_buf(1:framesize));
+      Nerrs = sum(error_positions);
+      Terrs += Nerrs;
+      Tbits += length(tx_bits);
+      errors_log = [errors_log error_positions];
+      Nerrs_log = [Nerrs_log Nerrs];
+
+      % LDPC decode
+            
+      detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
+                               rx_symb_linear, min(100,EsNo), amp_linear);
+      error_positions = xor( detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
+      Nerrs = sum(error_positions);
+      ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
+      ldpc_errors_log = [ldpc_errors_log error_positions];
+      if Nerrs
+        Ferrsldpc++;
+      end
+      Terrsldpc += Nerrs;
+      Tbitsldpc += framesize*rate;
+    end
+  end
+
+  printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+         Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
+  printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
+         Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
+ 
+  figure(2);
+  clf;
+  scat = rx_symb_log .* exp(j*pi/4);
+  plot(real(scat), imag(scat),'+');
+  title('Scatter plot');
+
+endfunction
+
+
+
 % Start simulations ---------------------------------------
 
 more off;
 %test_curves();
 %test_single();
-test_rate_Fs("tx.raw");
+%rate_Fs_tx("tx.raw");
+rate_Fs_rx("tx.raw");
