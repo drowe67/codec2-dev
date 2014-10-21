@@ -74,5 +74,6 @@ void freedv_close(struct freedv *freedv);
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]);
 int freedv_nin(struct freedv *f);
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]);
+int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
 
 #endif

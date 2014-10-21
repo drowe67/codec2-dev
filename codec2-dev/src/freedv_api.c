@@ -284,7 +284,23 @@ int freedv_nin(struct freedv *f) {
 
 \*---------------------------------------------------------------------------*/
 
+// short version
+
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
+
+float rxdata[FDMDV_MAX_SAMPLES_PER_FRAME];
+int i;
+
+    for(i=0; i<f->nin; i++)  rxdata[i] = (float)demod_in[i]/FDMDV_SCALE;
+
+    return freedv_floatrx(f, speech_out, rxdata);
+    
+}
+
+
+// float version
+
+int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     COMP                rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
     int                 reliable_sync_bit, i, j, bit, byte, nin_prev, nout;
@@ -297,7 +313,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
     for(i=0; i<f->nin; i++) {
-        rx_fdm[i].real = (float)demod_in[i]/FDMDV_SCALE;
+        rx_fdm[i].real = demod_in[i];
         rx_fdm[i].imag = 0;
     }
 
