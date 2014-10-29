@@ -9,10 +9,13 @@
 %   [X] Nc carriers, 588 bit frames
 %   [X] FEC
 %   [X] pilot insertion and removal
-%   [ ] delay on parity and DSSS carriers
+%   [ ] delay on parity carriers
 %   [X] pilot based phase est
 %   [ ] uncoded and coded frame sync
-%   [ ] timing estimation, RN filtering, carrier FDM
+%   [X] timing estimation, RN filtering, carrier FDM
+%   [ ] this file getting too big - refactor
+%   [ ] robust coarse timing
+%   [ ] Np knob on GUI
  
 % reqd to make sure we can repeat tests exactly
 
@@ -185,11 +188,7 @@ function sim_in = symbol_rate_init(sim_in)
 
     % pilot sequence is used for phase and amplitude estimation, and frame sync
 
-    p = 1 - 2*(rand(1,Npilotsframe) > 0.5);
-    for c=1:Nc
-      %pilot(:,c) = [ones(1,floor(Npilotsframe/2)) -ones(1,ceil(Npilotsframe/2))]';
-      pilot(:,c) = p;
-    end
+    pilot = 1 - 2*(rand(Npilotsframe,Nc) > 0.5);
     sim_in.pilot = pilot;
     sim_in.tx_pilot_buf = [pilot; pilot; pilot];
    
@@ -293,8 +292,8 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in
       for r=1:Nsymbrow
         st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
         en = st + Np - 1;
-        phi_(r,c) = angle(sum(tx_pilot_buf(st:en,1)'*rx_pilot_buf(st:en,c)));
-        amp_(r,c) = abs(tx_pilot_buf(st:en,1)'*rx_pilot_buf(st:en,c))/Np;
+        phi_(r,c) = angle(sum(tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c)));
+        amp_(r,c) = abs(tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c))/Np;
         %amp_(r,c) = abs(rx_symb(r,c));
         if verbose > 2
           printf("% 4.3f ", phi_(r,c))
@@ -715,15 +714,15 @@ function test_single
   sim_in.plot_scatter     = 1;
 
   sim_in.framesize        = 576;
-  sim_in.Nc               = 2;
-  sim_in.Rs               = 250;
-  sim_in.Ns               = 6;
-  sim_in.Np               = 4;
+  sim_in.Nc               = 9;
+  sim_in.Rs               = 50;
+  sim_in.Ns               = 4;
+  sim_in.Np               = 2;
   sim_in.Nchip            = 1;
   sim_in.ldpc_code_rate   = 0.5;
   sim_in.ldpc_code        = 1;
 
-  sim_in.Ntrials          = 10;
+  sim_in.Ntrials          = 20;
   sim_in.Esvec            = 7; 
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
@@ -743,10 +742,10 @@ function rate_Fs_tx(tx_filename)
   sim_in.plot_scatter     = 1;
 
   sim_in.framesize        = 576;
-  sim_in.Nc               = 2;
-  sim_in.Rs               = 250;
-  sim_in.Ns               = 6;
-  sim_in.Np               = 4;
+  sim_in.Nc               = 9;
+  sim_in.Rs               = 50;
+  sim_in.Ns               = 4;
+  sim_in.Np               = 2;
   sim_in.Nchip            = 1;
   sim_in.ldpc_code_rate   = 0.5;
   sim_in.ldpc_code        = 1;
@@ -807,8 +806,9 @@ function rate_Fs_tx(tx_filename)
   [m n] = size(tx_filt);
   tx_fdm = zeros(1,m);
   Fc = 1500;
-  freq(1) = exp(j*2*pi*(Fc - Rs*0.75)/Fs);
-  freq(2) = exp(j*2*pi*(Fc + Rs*0.75)/Fs);
+  for c=1:Nc
+    freq(c) = exp(j*2*pi*(Fc - c*Rs*1.5)/Fs);
+  end
   phase_tx = ones(1,Nc);
 
   for c=1:Nc
@@ -818,7 +818,7 @@ function rate_Fs_tx(tx_filename)
     end
   end
 
-  Ascale = 10000;
+  Ascale = 2000;
   figure(1);
   clf;
   plot(Ascale*real(tx_fdm))
@@ -835,9 +835,9 @@ function rate_Fs_rx(rx_filename)
   sim_in.plot_scatter     = 1;
 
   sim_in.framesize        = 576;
-  sim_in.Nc               = 2;
-  sim_in.Rs               = 250;
-  sim_in.Ns               = 6;
+  sim_in.Nc               = 9;
+  sim_in.Rs               = 50;
+  sim_in.Ns               = 4;
   sim_in.Np               = 4;
   sim_in.Nchip            = 1;
   sim_in.ldpc_code_rate   = 0.5;
@@ -871,6 +871,7 @@ function rate_Fs_rx(rx_filename)
   EsNodB = sim_in.Esvec(1);
   EsNo = 10^(EsNodB/10);
  
+  phi_log = []; amp_log = [];
   rx_symb_log = []; av_tx_pwr = [];
   Terrs = Tbits = 0;
   errors_log = []; Nerrs_log = []; 
@@ -881,20 +882,27 @@ function rate_Fs_rx(rx_filename)
 
   tx_bits = round(rand(1,framesize*rate));                       
 
-  % read from disk, downconvert, filter, decimate to rate Rs
+  % read from disk
 
-  Ascale = 10000;
+  Ascale = 2000;
   frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short")/Ascale; fclose(frx);
 
-  rx_fdm=sqrt(2)*rx_fdm;
+  rx_fdm=sqrt(2)*rx_fdm(1:48000);
+  figure(2)
+  plot(rx_fdm);
 
-  printf("downconverting\n");
+  % freq offset estimation
+
+  f_max = test_freq_off_est(rx_filename, 16000);
+  f_max = 0;
+  printf("Downconverting...\n");
 
   [m n] = size(rx_fdm);
   rx_symb = zeros(m,Nc);
   Fc = 1500;
-  freq(1) = exp(-j*2*pi*(Fc - Rs*0.75)/Fs);
-  freq(2) = exp(-j*2*pi*(Fc + Rs*0.75)/Fs);
+  for c=1:Nc
+    freq(c) = exp(-j*2*pi*(-f_max + Fc - c*Rs*1.5)/Fs);
+  end
   phase_rx = ones(1,Nc);
   rx_bb = zeros(m,Nc);
 
@@ -905,7 +913,7 @@ function rate_Fs_rx(rx_filename)
     end
   end
 
-  sim_ch = 1;
+  sim_ch = 0;
   if sim_ch
 
     % freq offset
@@ -931,7 +939,7 @@ function rate_Fs_rx(rx_filename)
     rx_bb = rx_bb + noise;
   end
 
-  printf("filtering\n");
+  printf("Filtering...\n");
   for c=1:Nc
     rx_filt(:,c) = filter(rn_coeff, 1, rx_bb(:,c));
   end
@@ -941,11 +949,11 @@ function rate_Fs_rx(rx_filename)
   % that's one more/less sample over Ft samples at Fs=8000 Hz.
 
   printf("Fine timing estimation....\n");
-  ft = 800;
+  ft = 1600;
   [nsam m] = size(rx_filt);
   rx_symb_buf = []; rx_timing_log = [];
-
-  for st=1:ft:floor(nsam/ft)*ft
+  
+  for st=1:ft:floor(nsam/ft - 1)*ft
     % fine timing and decimation
 
     env = zeros(ft,1);
@@ -960,9 +968,11 @@ function rate_Fs_rx(rx_filename)
     x = exp(-j*2*pi*(0:ft-1)/M) * env;
   
     norm_rx_timing = angle(x)/(2*pi);
-    rx_timing = floor(norm_rx_timing*M+0.5) + M;
+    %norm_rx_timing = -0.4;
+    rx_timing = -floor(norm_rx_timing*M+0.5) + M;
     rx_timing_log = [rx_timing_log norm_rx_timing];
 
+    % printf("%d %d\n", st+rx_timing, st+rx_timing+ft-1);
     rx_symb_buf = [rx_symb_buf; rx_filt(st+rx_timing:M:st+rx_timing+ft-1,:)];
   end
   
@@ -973,47 +983,52 @@ function rate_Fs_rx(rx_filename)
   title('fine timing')
   
   % Coarse timing estimation (frame sync). Use pilots to estimate
-  % coarse timing (frame sync) from just first two frames ovr a grid
-  % of possible postions and frequency offsets..  This is a "one shot"
-  % algorithm and doesn't try to resync if it's lost.  Hopefully OK
-  % for initial tests.
+  % coarse timing (frame sync) from just first two frames over a grid
+  % of possible postions.  This is a "one shot" algorithm and doesn't
+  % try to resync if it's lost.  Hopefully OK for initial tests.
   
   printf("Coarse timing...\n");
-  max_corr = 0;
-  max_s    = 1;
-  corr = zeros(1,Nsymbrowpilot);
-  for f=-50:0.25:50
-    w = exp(j*((2*pi*f/Rs)*(Ns+1))*(0:Npilotsframe-1));
-    for s=1:Nsymbrowpilot
-      corr = (rx_symb_buf(s:Ns+1:s+Nsymbrowpilot-1,1)' .* w) * pilot(:,1);
-      if abs(corr) > max_corr
-        max_corr = abs(corr);
-        max_s    = s;
-        max_f    = f;
-      end
-    end
-  end
-  printf("max_s: %d max_f: %f\n", max_s, max_f);
-
+  
   printf("Symbol rate demodulation....\n");
-  foff_rect = exp(j*2*pi*max_f/Rs); phase_off = 1;
-  Ntrials = floor((nsam/M - max_s)/Nsymbrowpilot) - 1;
+  phase_off = 1;
+  Ntrials = floor((nsam/M)/Nsymbrowpilot) - 2;
+  max_s = 6;
   for nn=1:Ntrials
-    phase_off_vec = zeros(1,Nsymbrowpilot);
-    for i=1:Nsymbrowpilot
-      phase_off_vec(i) = phase_off;
-      phase_off *= foff_rect;
+
+    if nn == 1
+      max_corr = 0;
+      max_s    = 1;
+      for s=1:Nsymbrowpilot
+        st = s+(nn-1)*Nsymbrowpilot;
+        e = 0;
+        for i=1:Nc
+          e += rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c)' * rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c);
+        end
+        corr = 0;
+        for i=1:Nc
+          corr += rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c)' * pilot(:,c);
+        end
+        corr_log(s) = abs(corr)/abs(e);
+        if abs(corr)/abs(e) > max_corr
+          max_corr = abs(corr)/abs(e);
+          max_s    = s;
+        end
+      end
+
+      printf("max_s: %d\n", max_s);
+      figure(6);
+      plot(corr_log)
     end
-    
+
     s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+max_s:nn*Nsymbrowpilot+max_s-1,:);
-    for c=1:Nc
-      s_ch(:,c) = s_ch(:,c) .* phase_off_vec';
-    end
     [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
         
     rx_symb_log = [rx_symb_log rx_symb_linear];
+    phi_log = [phi_log; phi_];
+    amp_log = [amp_log; amp_];
 
     if nn > 1
+
       % Measure BER
 
       error_positions = xor(rx_bits(1:framesize*rate), tx_bits(1:framesize*rate));
@@ -1026,7 +1041,7 @@ function rate_Fs_rx(rx_filename)
       % LDPC decode
             
       detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
-                               rx_symb_linear, min(100,EsNo), amp_linear);
+                               rx_symb_linear, min(100,12), amp_linear);
       error_positions = xor(detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
       Nerrs = sum(error_positions);
       ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
@@ -1054,15 +1069,110 @@ function rate_Fs_rx(rx_filename)
   clf
   subplot(211)
   stem(Nerrs_log)
-  axis([-1 Ntrials+1 0 max(Nerrs_log)+1])
+  axis([0 Ntrials+1 0 max(Nerrs_log)+1])
   title('Uncoded Errors/Frame');
   subplot(212)
   stem(ldpc_Nerrs_log)
-  axis([-1 Ntrials+1 0 max(ldpc_Nerrs_log)+1])
+  axis([0 Ntrials+1 0 max(ldpc_Nerrs_log)+1])
   title('Coded Errors/Frame');
+
+  figure(5)
+  clf
+  [m1 n1] = size(phi_log);
+  phi_x = [];
+  phi_x_counter = 1;
+  p = Ns;
+  for r=1:m1
+    if p == Ns
+      phi_x_counter++;
+      p = 0;
+    end
+    p++;
+    phi_x = [phi_x phi_x_counter++];        
+  end
+          
+  subplot(211)
+  plot(phi_x, phi_log(:,1),'r+;Estimated HF channel phase;')
+  ylabel('Phase (rads)');
+
+  subplot(212)
+  plot(phi_x, amp_log(:,1),'r+;Estimated HF channel amp;')
+  ylabel('Amplitude');
+  xlabel('Time (symbols)');
+
+  fep=fopen("errors_450.bin","wb"); fwrite(fep, ldpc_errors_log, "short"); fclose(fep);
 
 endfunction
 
+% ideas: cld estimate timing with freq offset and decimate to save cpu load
+%        fft to do cross correlation
+
+function f_max = test_freq_off_est(rx_filename, offset, n)
+  fpilot = fopen("tx_zero.raw","rb"); tx_pilot = fread(fpilot, "short"); fclose(fpilot);
+  frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short"); fclose(frx);
+
+  Fs = 8000;
+  nc = 1800;  % portion we wish to correlate over (first 2 rows on pilots)
+ 
+  rx_fdm = rx_fdm(offset:length(rx_fdm));
+
+  % downconvert to complex baseband to remove images
+
+  f = 1000;
+  foff_rect    = exp(j*2*pi*f*(1:2*n)/Fs);
+  tx_pilot_bb  = tx_pilot(1:n) .* foff_rect(1:n)';
+  rx_fdm_bb    = rx_fdm(offset:offset+2*n-1) .* foff_rect';
+
+  % remove -2000 Hz image
+
+  b = fir1(50, 1000/Fs);
+  tx_pilot_bb_lpf = filter(b,1,tx_pilot_bb);
+  rx_fdm_bb_lpf   = filter(b,1,rx_fdm_bb);
+
+  % decimate by M
+
+  M = 4;
+  tx_pilot_bb_lpf = tx_pilot_bb_lpf(1:M:length(tx_pilot_bb_lpf));
+  rx_fdm_bb_lpf   = rx_fdm_bb_lpf(1:M:length(rx_fdm_bb_lpf));
+  n /= M;
+  nc /= M;
+
+  figure(1)
+  subplot(211)
+  plot(real(tx_pilot_bb_lpf(1:nc)))
+  subplot(212)
+  plot(imag(tx_pilot_bb_lpf(1:nc)))
+
+  % correlate over a range of frequency offsets and delays
+
+  c_max = 0;
+  f_n = 1;
+  f_range = -75:2.5:75;
+  c_log=zeros(n, length(f_range));
+
+  for f=f_range
+    foff_rect = exp(j*2*pi*(f*M)*(1:nc)/Fs);
+    for s=1:n
+      
+      c = abs(tx_pilot_bb_lpf(1:nc)' * (rx_fdm_bb_lpf(s:s+nc-1) .* foff_rect'));
+      c_log(s,f_n) = c;
+      if c > c_max
+        c_max = c;
+        f_max = f;
+        s_max = s;
+      end
+    end
+    f_n++;
+    printf("f: %f c_max: %f f_max: %f s_max: %d\n", f, c_max, f_max, s_max);
+  end
+
+  figure(2);
+  y = f_range;
+  x = s_max-25:min(s_max+25, n);
+  mesh(y,x, c_log(x,:));
+  grid
+  
+endfunction
 
 
 % Start simulations ---------------------------------------
@@ -1070,5 +1180,7 @@ endfunction
 more off;
 %test_curves();
 %test_single();
-%rate_Fs_tx("tx.raw");
-rate_Fs_rx("tx.raw")
+%rate_Fs_tx("tx_zero.raw");
+%rate_Fs_rx("tx.wav")
+%rate_Fs_rx("tx_ccir_poor_-3dB.wav")
+test_freq_off_est("tx_ccir_poor_0dB_-25Hz.wav",1,5*6400)
