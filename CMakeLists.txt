@@ -128,12 +128,12 @@ configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
 include_directories(${PROJECT_BINARY_DIR})
 
 # CMake Package setup
-include(CMakePackageConfigHelpers)
-configure_package_config_file(cmake/codec2-config.cmake.in
-    ${CMAKE_CURRENT_BINARY_DIR}/codec2-config.cmake
-    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
-    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
-)
+#include(CMakePackageConfigHelpers)
+#configure_package_config_file(cmake/codec2-config.cmake.in
+#    ${CMAKE_CURRENT_BINARY_DIR}/codec2-config.cmake
+#    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
+#    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+#)
 
 #
 # codec2 library
