@@ -57,6 +57,9 @@ target_link_libraries(t16_8 codec2)
 add_executable(t16_8_short t16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(t16_8_short codec2)
 
+#add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
+#target_link_libraries(t48_8 codec2)
+
 add_executable(lspsync lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c ${CODEBOOKS})
 target_link_libraries(lspsync codec2)
 
@@ -80,10 +83,15 @@ target_link_libraries(tfifo codec2 ${CMAKE_THREAD_LIBS_INIT})
 
 add_executable(speexnoisesup speexnoisesup.c)
 target_link_libraries(speexnoisesup ${SPEEXDSP_LIBRARY})
+set_target_properties(speexnoisesup
+    PROPERTIES INCLUDE_DIRECTORIES ${SPEEXDSP_INCLUDE_DIR}
+)
 
 add_executable(fdmdv_mem fdmdv_mem.c)
+
+add_executable(raw2h raw2h.c)
+target_link_libraries(raw2h codec2)
 
 add_definitions(-D__UNITTEST__)
 add_executable(c2validate c2validate.c)
 target_link_libraries(c2validate codec2)
-#c2validate_LDADD = $(lib_LTLIBRARIES) ../src/libcodec2.la

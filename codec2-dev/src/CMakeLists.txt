@@ -82,12 +82,10 @@ set(CODEBOOKSGE ${D}/gecb.txt)
 
 # when crosscompiling import the executable targets from a file
 if(CMAKE_CROSSCOMPILING)
-    SET(IMPORT_EXECUTABLES "IMPORTFILE-NOTFOUND" CACHE FILEPATH "Point it to the export file from a native build")
-    INCLUDE(${IMPORT_EXECUTABLES})
-endif(CMAKE_CROSSCOMPILING)
-
+    set(IMPORT_EXECUTABLES "IMPORTFILE-NOTFOUND" CACHE FILEPATH "Point to the export file from a native build")
+    include(${IMPORT_EXECUTABLES})
+else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
-if(NOT CMAKE_CROSSCOMPILING)
     # generate_codebook
     add_executable(generate_codebook generate_codebook.c)
     target_link_libraries(generate_codebook ${CMAKE_REQUIRED_LIBRARIES})
@@ -97,7 +95,8 @@ if(NOT CMAKE_CROSSCOMPILING)
     # Make native builds available for cross-compiling.
     export(TARGETS generate_codebook genlspdtcb
         FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
-endif(NOT CMAKE_CROSSCOMPILING)
+endif(CMAKE_CROSSCOMPILING)
+
 
 # codebook.c
 add_custom_command(
@@ -187,21 +186,23 @@ set(CODEC2_SRCS
     varicode.c
 )
 
-add_library(codec2 ${CODEC2_SRCS})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(codec2 ${CMAKE_REQUIRED_LIBRARIES})
-set_target_properties(codec2 PROPERTIES SOVERSION ${SOVERSION})
-
 set(CODEC2_PUBLIC_HEADERS
+    golay23.h
     codec2.h
     codec2_fdmdv.h
     codec2_fifo.h
     comp.h
-    golay23.h
 )
 
-install(FILES ${CODEC2_PUBLIC_HEADERS}
-    DESTINATION include/codec2
+#
+# Setup the codec2 library
+#
+add_library(codec2 ${CODEC2_SRCS})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(codec2 ${CMAKE_REQUIRED_LIBRARIES})
+set_target_properties(codec2 PROPERTIES
+    SOVERSION ${SOVERSION}
+    PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"
 )
 
 add_executable(c2demo c2demo.c)
@@ -249,9 +250,18 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+install(TARGETS codec2 EXPORT codec2-config
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    PUBLIC_HEADER DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/codec2
+)
+
+#install(EXPORT codec2-config
+#    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
+#)
 
 install(TARGETS
-    codec2
     c2demo
     c2demo
     c2enc
@@ -264,7 +274,5 @@ install(TARGETS
     insert_errors
     fec_enc
     fec_dec
-    LIBRARY DESTINATION lib${LIB_SUFFIX}
-    ARCHIVE DESTINATION lib${LIB_SUFFIX}
-    RUNTIME DESTINATION bin
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )

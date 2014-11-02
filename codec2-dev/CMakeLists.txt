@@ -5,8 +5,16 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+project(codec2)
 
 cmake_minimum_required(VERSION 2.8)
+
+include(GNUInstallDirs)
+mark_as_advanced(CLEAR
+    CMAKE_INSTALL_BINDIR
+    CMAKE_INSTALL_INCLUDEDIR
+    CMAKE_INSTALL_LIBDIR
+)
 
 #
 # Prevent in-source builds
@@ -21,8 +29,6 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
    "separate build directory and run cmake from there.")
 endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
-project(codec2)
-
 
 #
 # Set project version information. This should probably be done via external
@@ -30,35 +36,40 @@ project(codec2)
 #
 set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 3)
-# Set to patch level is needed, otherwise leave FALSE.
+# Set to patch level if needed, otherwise leave FALSE.
 set(CODEC2_VERSION_PATCH FALSE)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 if(CODEC2_VERSION_PATCH)
-    set(PROJECT_VERSION "${CODEC2_VERSION}.${CODEC2_VERSION_PATCH}")
-endif(CODEC2_VERSION_PATCH)
+    set(CODEC2_VERSION "${CODEC2_VERSION}.${CODEC2_VERSION_PATCH}")
+endif()
 message(STATUS "codec2 version: ${CODEC2_VERSION}")
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
-endif(NOT CMAKE_BUILD_TYPE)
-message(STATUS "Build type is: ${CMAKE_BUILD_TYPE}")
+endif()
+
+# Set default C++ flags.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+
+# -fPIC is implied on MinGW...
+if(NOT WIN32)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
+endif()
+
+
+message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
+message(STATUS "Compiler Flags: " ${CMAKE_CXX_FLAGS})
 
 #
 # Setup Windows/MinGW specifics here.
 #
 if(MINGW)
     message(STATUS "System is MinGW.")
-    foreach(RUNTIME
-        libgcc_s_sjlj-1.dll
-        libstdc++-6.dll)
-        message(STATUS "Checking for ${RUNTIME}")
-        find_library(${RUNTIME}_LIB ${RUNTIME})
-        message(STATUS "runtime found: ${${RUNTIME}_LIB}")
-        list(APPEND CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS ${${RUNTIME}_LIB})
-    endforeach()
 endif(MINGW)
 
 
@@ -75,20 +86,18 @@ endif(MINGW)
 #   message(WARNING "Subversion not found. Can not determine svn revision.")
 #endif(SUBVERSION_FOUND)
 
-# Set default C++ flags.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -Wall")
 
 #
 # Default options
-#a
+#
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 option(UNITTEST "Build unittest binaries." ON)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script voicing wav
-        DESTINATION share/codec2)
+        USE_SOURCE_PERMISSIONS
+        DESTINATION ${CMAKE_INSTALL_DATADIR}/codec2)
 endif()
 
 
@@ -118,21 +127,13 @@ configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
                 "${PROJECT_BINARY_DIR}/config.h" )
 include_directories(${PROJECT_BINARY_DIR})
 
-#
-# Find speex library
-#
-message(STATUS "Looking for Speex DSP library.")
-find_path(SPEEXDSP_INCLUDE_DIR speex/speex.h)
-find_library(SPEEXDSP_LIBRARY speexdsp)
-message(STATUS "  Speex DSP headers: ${SPEEXDSP_INCLUDE_DIR}")
-message(STATUS "  Speex DSP library: ${SPEEXDSP_LIBRARY}")
-if(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
-    include_directories(${SPEEXDSP_INCLUDE_DIR})
-    list(APPEND CMAKE_REQUIRED_LIBRARIES ${SPEEXDSP_LIBRARY})
-else(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
-    message(FATAL_ERROR "Speex DSP library not found!")
-endif(SPEEXDSP_INCLUDE_DIR AND SPEEXDSP_LIBRARY)
-
+# CMake Package setup
+include(CMakePackageConfigHelpers)
+configure_package_config_file(cmake/codec2-config.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/codec2-config.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+)
 
 #
 # codec2 library
@@ -143,6 +144,19 @@ if(UNITTEST)
     # Pthread Library
     find_package(Threads REQUIRED)
     message(STATUS "Threads library flags: ${CMAKE_THREAD_LIBS_INIT}")
+
+    #
+    # Find speex library
+    #
+    message(STATUS "Looking for Speex DSP library.")
+    find_path(SPEEXDSP_INCLUDE_DIR speex/speex.h)
+    find_library(SPEEXDSP_LIBRARY speexdsp)
+    message(STATUS "  Speex DSP headers: ${SPEEXDSP_INCLUDE_DIR}")
+    message(STATUS "  Speex DSP library: ${SPEEXDSP_LIBRARY}")
+    if(NOT SPEEXDSP_INCLUDE_DIR AND NOT SPEEXDSP_LIBRARY)
+        message(FATAL_ERROR "Speex DSP library not found!")
+    endif()
+
     add_subdirectory(unittest)
 endif(UNITTEST)
 
@@ -154,7 +168,15 @@ endif(UNITTEST)
 # distribution packaging tools.
 #
 if(WIN32)
-    include(InstallRequiredSystemLibraries)
+    # Detect if we're doing a 32-bit or 64-bit windows build.
+    if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+        set(CMAKE_CL_64 TRUE)
+    endif()
+
+    configure_file(cmake/GetDependencies.cmake.in cmake/GetDependencies.cmake
+        @ONLY
+    )
+    install(SCRIPT ${CMAKE_BINARY_DIR}/cmake/GetDependencies.cmake)
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Next-Generation Digital Voice for Two-Way Radio")
     set(CPACK_PACKAGE_VENDOR "CMake")
     set(CPACK_PACKAGE_DESCRIPTION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/README")
@@ -163,14 +185,13 @@ if(WIN32)
     set(CPACK_PACKAGE_VERSION_MINOR ${CODEC2_VERSION_MINOR})
     if(CODEC2_VERSION_PATCH)
         set(CPACK_PACKAGE_VERSION_PATCH ${CODEC2_VERSION_PATCH})
-    endif(CODEC2_VERSION_PATCH)
+    else()
+        set(CPACK_PACKAGE_VERSION_PATCH 0)
+    endif()
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "Codec2")
-    # There is a bug in NSI that does not handle full unix paths properly. Make
-    # sure there is at least one set of four (4) backlasshes.
-    #set(CPACK_PACKAGE_ICON "${CMake_SOURCE_DIR}/Utilities/Release\\\\InstallIcon.bmp")
-    #set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\MyExecutable.exe")
+    set(CPACK_CREATE_DESKTOP_LINKS "")
     set(CPACK_NSIS_DISPLAY_NAME "${CPACK_PACKAGE_INSTALL_DIRECTORY}")
-    set(CPACK_NSIS_URL_INFO_ABOUT "http:\\\\\\\\codec2.org")
+    set(CPACK_NSIS_URL_INFO_ABOUT "http://codec2.org")
     set(CPACK_NSIS_MODIFY_PATH ON)
     include(CPack)
 endif(WIN32)
