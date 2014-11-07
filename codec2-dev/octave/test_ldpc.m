@@ -893,15 +893,15 @@ function rate_Fs_rx(rx_filename)
 
   % freq offset estimation
 
-  f_max = test_freq_off_est(rx_filename, 16000);
-  f_max = 0;
+  [f_max max_s_Fs] = test_freq_off_est(rx_filename, 1,5*6400);
+  max_s = floor(max_s_Fs/M + 6);
   printf("Downconverting...\n");
 
   [m n] = size(rx_fdm);
   rx_symb = zeros(m,Nc);
   Fc = 1500;
   for c=1:Nc
-    freq(c) = exp(-j*2*pi*(-f_max + Fc - c*Rs*1.5)/Fs);
+    freq(c) = exp(-j*2*pi*(f_max + Fc - c*Rs*1.5)/Fs);
   end
   phase_rx = ones(1,Nc);
   rx_bb = zeros(m,Nc);
@@ -911,32 +911,6 @@ function rate_Fs_rx(rx_filename)
       phase_rx(c) = phase_rx(c) * freq(c);
       rx_bb(i,c) = rx_fdm(i)*phase_rx(c);
     end
-  end
-
-  sim_ch = 0;
-  if sim_ch
-
-    % freq offset
-
-    foff = 0;
-    woff = exp(j*2*pi*foff/Fs);
-    phase_off = pi/2;
-    for i=1:m
-      for c=1:Nc
-        rx_bb(i,c) = rx_bb(i,c)*phase_off;
-      end
-      phase_off = phase_off*woff;
-    end
-     
-    % AWGN noise and phase/freq offset channel simulation
-    % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
-
-    EsNodB = sim_in.Esvec;
-    EsNo = 10^(EsNodB/10);
-    variance = M/EsNo;
-    [m n] = size(rx_bb);
-    noise = sqrt(variance*0.5)*(randn(m,n) + j*randn(m,n));
-    rx_bb = rx_bb + noise;
   end
 
   printf("Filtering...\n");
@@ -981,44 +955,13 @@ function rate_Fs_rx(rx_filename)
   plot(rx_timing_log)
   axis([1 length(rx_timing_log) -0.5 0.5 ])
   title('fine timing')
-  
-  % Coarse timing estimation (frame sync). Use pilots to estimate
-  % coarse timing (frame sync) from just first two frames over a grid
-  % of possible postions.  This is a "one shot" algorithm and doesn't
-  % try to resync if it's lost.  Hopefully OK for initial tests.
-  
-  printf("Coarse timing...\n");
-  
+    
   printf("Symbol rate demodulation....\n");
   phase_off = 1;
   Ntrials = floor((nsam/M)/Nsymbrowpilot) - 2;
-  max_s = 6;
+  %max_s = 6;
+
   for nn=1:Ntrials
-
-    if nn == 1
-      max_corr = 0;
-      max_s    = 1;
-      for s=1:Nsymbrowpilot
-        st = s+(nn-1)*Nsymbrowpilot;
-        e = 0;
-        for i=1:Nc
-          e += rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c)' * rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c);
-        end
-        corr = 0;
-        for i=1:Nc
-          corr += rx_symb_buf(st:Ns+1:st+Nsymbrowpilot-1,c)' * pilot(:,c);
-        end
-        corr_log(s) = abs(corr)/abs(e);
-        if abs(corr)/abs(e) > max_corr
-          max_corr = abs(corr)/abs(e);
-          max_s    = s;
-        end
-      end
-
-      printf("max_s: %d\n", max_s);
-      figure(6);
-      plot(corr_log)
-    end
 
     s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+max_s:nn*Nsymbrowpilot+max_s-1,:);
     [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
@@ -1107,15 +1050,13 @@ endfunction
 % ideas: cld estimate timing with freq offset and decimate to save cpu load
 %        fft to do cross correlation
 
-function f_max = test_freq_off_est(rx_filename, offset, n)
+function [f_max s_max] = test_freq_off_est(rx_filename, offset, n)
   fpilot = fopen("tx_zero.raw","rb"); tx_pilot = fread(fpilot, "short"); fclose(fpilot);
   frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short"); fclose(frx);
 
   Fs = 8000;
   nc = 1800;  % portion we wish to correlate over (first 2 rows on pilots)
  
-  rx_fdm = rx_fdm(offset:length(rx_fdm));
-
   % downconvert to complex baseband to remove images
 
   f = 1000;
@@ -1168,10 +1109,16 @@ function f_max = test_freq_off_est(rx_filename, offset, n)
 
   figure(2);
   y = f_range;
-  x = s_max-25:min(s_max+25, n);
+  x = max(s_max-25,1):min(s_max+25, n);
   mesh(y,x, c_log(x,:));
   grid
   
+  s_max *= M;
+  s_max -= floor(s_max/6400)*6400
+
+  % decimated position at sample rate.  need to relate this to symbol
+  % rate position.
+
 endfunction
 
 
@@ -1182,5 +1129,5 @@ more off;
 %test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_rx("tx.wav")
-%rate_Fs_rx("tx_ccir_poor_-3dB.wav")
-test_freq_off_est("tx_ccir_poor_0dB_-25Hz.wav",1,5*6400)
+rate_Fs_rx("tx_ccir_poor_-3dB_-48Hz.wav")
+%test_freq_off_est("tx.raw",40,6400)
