@@ -16,6 +16,7 @@
 %   [ ] this file getting too big - refactor
 %   [ ] robust coarse timing
 %   [ ] Np knob on GUI
+%   [ ] experimental tuning on EnNo_, fading[], to optimise LDPC dec perf
  
 % reqd to make sure we can repeat tests exactly
 
@@ -89,6 +90,39 @@ function [tx_symb tx_bits prev_sym_tx] = symbol_rate_tx(sim_in, tx_bits, code_pa
 
     tx_symb = tx_symb/sqrt(Nchip);
 end
+
+
+% compression, John Gibbs pointed out it's best to perform
+% non-linear operations on an oversampled signals as they
+% tend to generate broadband noise that will be aliased into
+% passband if bandwidth is too low
+
+function y = compress(x, power)
+
+  % oversample by a factor of M
+
+  M = 4;
+  Ntap = 47;
+  n = length(x);  
+
+  b = fir1(Ntap,1/M);
+  xM = zeros(1,M*n);
+  for i=1:n
+    xM(i*M) = M*x(i);
+  end
+  
+  xM = filter(b,1,xM);
+
+  % non linearity
+
+  yM = sign(xM).*(abs(xM) .^ power);
+
+  % decimate by a factor of M
+
+  yM = filter(b,1,yM);
+  y  = yM(1:M:n*M);
+    
+endfunction
 
 
 % Init HF channel model from stored sample files of spreading signal ----------------------------------
@@ -225,7 +259,7 @@ function sim_in = symbol_rate_init(sim_in)
 endfunction
 
 
-function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx)
+function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx)
     framesize     = sim_in.framesize;
     Nsymb         = sim_in.Nsymb;
     Nsymbrow      = sim_in.Nsymbrow;
@@ -292,8 +326,9 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in
       for r=1:Nsymbrow
         st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
         en = st + Np - 1;
-        phi_(r,c) = angle(sum(tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c)));
-        amp_(r,c) = abs(tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c))/Np;
+        ch_est = tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c)/Np;
+        phi_(r,c) = angle(ch_est);
+        amp_(r,c) = abs(ch_est);
         %amp_(r,c) = abs(rx_symb(r,c));
         if verbose > 2
           printf("% 4.3f ", phi_(r,c))
@@ -342,6 +377,48 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in
         rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
       end
     end
+
+    % Estimate noise power from demodulated symbols.  One method is to
+    % calculate the distance of each symbol from the average symbol
+    % position. However this is complicated by fading, which means the
+    % amplitude of the symbols is constantly changing.
+    
+    % Now the scatter diagram in a fading channel is a X shape.  The
+    % noise can be resolved into two components at right angles to
+    % each other.  The component along the the "thickness" of the arms
+    % is proportional to the noise power and not affected by fading.
+        
+    v = zeros(1,Nsymb);
+    for i=1:Nsymb
+      s = rx_symb_linear(i);
+      if abs(real(s)) > abs(imag(s))
+        v(i) = imag(s);
+      else
+        v(i) = real(s);
+      end
+      %printf("s: %f %f  v: %f\n", real(s), imag(s), v(i));
+    end
+
+    % Note we are only measuring variance in one axis, as other axis is obscured by fading.  We assume
+    % that total noise power is shared between both axis so multiply by sqrt(2) to get an estimate of
+    % total noise pwr.  Small constant prevents divide by zero errors on start up.
+
+    No_ = var(v)*sqrt(2) + 1E-6;
+
+    % Estimate signal power
+    
+    Es_ = mean(amp_linear .^ 2);
+ 
+    EsNo_ = Es_/No_;
+    printf("Es_: %f No_: %f  Es/No: %f  Es/No dB: %f\n", Es_, No_, Es_/No_, 10*log10(EsNo_));
+  
+    % LDPC decoder requires some amplitude normalisation
+    % (AGC), was found to break ow.  So we adjust the symbol
+    % amplitudes so that they are an averge of 1
+
+    rx_symb_linear /= mean(amp_linear);
+    amp_linear /= mean(amp_linear);
+    
 endfunction
 
 
@@ -403,6 +480,7 @@ function sim_out = ber_test(sim_in)
         Nerrs_log        = [];
         phi_log          = [];
         amp_log          = [];
+        EsNo__log        = [];
 
         ldpc_errors_log = []; ldpc_Nerrs_log = [];
 
@@ -476,8 +554,8 @@ function sim_out = ber_test(sim_in)
 
             s_ch = s_ch + noise;
             
-            [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
-            
+            [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);                                 
+
             phi_log = [phi_log; phi_];
             amp_log = [amp_log; amp_];
 
@@ -485,6 +563,7 @@ function sim_out = ber_test(sim_in)
 
             if nn > 2 
               rx_symb_log = [rx_symb_log rx_symb_linear];
+              EsNo__log = [EsNo__log EsNo_];
 
               % Measure BER
 
@@ -499,7 +578,7 @@ function sim_out = ber_test(sim_in)
             
               if ldpc_code
                 detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
-                                         rx_symb_linear, min(100,EsNo), amp_linear);
+                                         rx_symb_linear, min(100,EsNo_), amp_linear);
                 error_positions = xor( detected_data(1:framesize*rate), tx_bits_buf(1:framesize*rate) );
                 Nerrs = sum(error_positions);
                 ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
@@ -519,7 +598,7 @@ function sim_out = ber_test(sim_in)
             if verbose 
               av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
 
-              printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+              printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", mean(10*log10(EsNo__log)), Terrs,
                        Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
               if ldpc_code
                   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
@@ -542,6 +621,8 @@ function sim_out = ber_test(sim_in)
         scat = rx_symb_log .* exp(j*pi/4);
         plot(real(scat), imag(scat),'+');
         title('Scatter plot');
+        a = 1.5*max(real(scat)); b = 1.5*max(imag(scat));
+        axis([-a a -b b]);
 
         if hf_sim
           figure(3);
@@ -562,39 +643,46 @@ function sim_out = ber_test(sim_in)
             printf("average HF power: %3.2f over %d symbols\n", av_hf_pwr, m*n);
           end
 
-          figure(5);
-          clf
-          subplot(211)
+       end
+
+        % set up time axis to include gaps for pilots
+
+        [m1 n1] = size(phi_log);
+        phi_x = [];
+        phi_x_counter = 1;
+        p = Ns;
+        for r=1:m1
+          if p == Ns
+            phi_x_counter++;
+            p = 0;
+          end
+          p++;
+          phi_x = [phi_x phi_x_counter++];        
+        end
+
+        phi_x -= Nsymbrowpilot; % account for delay in pilot buffer
+
+        figure(5);
+        clf
+        subplot(211)
+        plot(phi_x, phi_log(:,2),'r+;Estimated HF channel phase;')
+        if hf_sim
+          hold on;
           [m n] = size(hf_model);
           plot(angle(hf_model(1:m,2)),'g;HF channel phase;')
-          hold on;
-
-          % set up time axis to include gaps for pilots
-
-          [m1 n1] = size(phi_log);
-          phi_x = [];
-          phi_x_counter = 1;
-          p = Ns;
-          for r=1:m1
-            if p == Ns
-              phi_x_counter++;
-              p = 0;
-            end
-            p++;
-            phi_x = [phi_x phi_x_counter++];        
-          end
-          
-          plot(phi_x, phi_log(:,2),'r+;Estimated HF channel phase;')
-          ylabel('Phase (rads)');
-
-          subplot(212)
-          plot(abs(hf_model(1:m,2)))
-          hold on;
-          plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
           hold off;
-          ylabel('Amplitude');
-          xlabel('Time (symbols)');
         end
+        ylabel('Phase (rads)');
+
+        subplot(212)
+        plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
+        if hf_sim
+          hold on;
+          plot(abs(hf_model(1:m,2)))
+          hold off;
+        end
+        ylabel('Amplitude');
+        xlabel('Time (symbols)');
 
         figure(4)
         clf
@@ -604,6 +692,7 @@ function sim_out = ber_test(sim_in)
         if ldpc_code
           stem(ldpc_Nerrs_log)
         end
+
    end
 
 endfunction
@@ -723,7 +812,7 @@ function test_single
   sim_in.ldpc_code        = 1;
 
   sim_in.Ntrials          = 20;
-  sim_in.Esvec            = 7; 
+  sim_in.Esvec            = 10; 
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
   sim_in.modulation       = 'qpsk';
@@ -810,6 +899,7 @@ function rate_Fs_tx(tx_filename)
     freq(c) = exp(j*2*pi*(Fc - c*Rs*1.5)/Fs);
   end
   phase_tx = ones(1,Nc);
+  %phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
 
   for c=1:Nc
     for i=1:m
@@ -818,10 +908,21 @@ function rate_Fs_tx(tx_filename)
     end
   end
 
+  tx_fdm = real(tx_fdm);
+
+  tx_fdm = compress(tx_fdm, 0.4);
+  %tx_fdm = sign(tx_fdm) .* (abs(tx_fdm) .^ 0.4); 
+  %hpa_clip = max(abs(tx_fdm))*0.8
+  %tx_fdm(find(abs(tx_fdm) > hpa_clip)) = hpa_clip;
+
+  papr = max(tx_fdm.*conj(tx_fdm)) / mean(tx_fdm.*conj(tx_fdm));
+  papr_dB = 10*log10(papr);
+  printf("PAPR: %4.2f dB\n", papr_dB);
+
   Ascale = 2000;
   figure(1);
   clf;
-  plot(Ascale*real(tx_fdm))
+  plot(Ascale*tx_fdm(1:800))
 
   ftx=fopen(tx_filename,"wb"); fwrite(ftx, Ascale*real(tx_fdm), "short"); fclose(ftx);
 
@@ -871,7 +972,7 @@ function rate_Fs_rx(rx_filename)
   EsNodB = sim_in.Esvec(1);
   EsNo = 10^(EsNodB/10);
  
-  phi_log = []; amp_log = [];
+  phi_log = []; amp_log = []; EsNo__log = [];
   rx_symb_log = []; av_tx_pwr = [];
   Terrs = Tbits = 0;
   errors_log = []; Nerrs_log = []; 
@@ -887,13 +988,15 @@ function rate_Fs_rx(rx_filename)
   Ascale = 2000;
   frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short")/Ascale; fclose(frx);
 
-  rx_fdm=sqrt(2)*rx_fdm(1:48000);
+  rx_fdm=sqrt(2)*rx_fdm;
   figure(2)
   plot(rx_fdm);
 
   % freq offset estimation
 
+  printf("Freq offset and coarse timing est...\n");
   [f_max max_s_Fs] = test_freq_off_est(rx_filename, 1,5*6400);
+  
   max_s = floor(max_s_Fs/M + 6);
   printf("Downconverting...\n");
 
@@ -943,14 +1046,18 @@ function rate_Fs_rx(rx_filename)
   
     norm_rx_timing = angle(x)/(2*pi);
     %norm_rx_timing = -0.4;
-    rx_timing = -floor(norm_rx_timing*M+0.5) + M;
+    if norm_rx_timing < 0
+      rx_timing = -floor(norm_rx_timing*M+0.5) + M;
+    else
+      rx_timing = -floor(norm_rx_timing*M+0.5) + 2*M;
+    end
     rx_timing_log = [rx_timing_log norm_rx_timing];
 
     % printf("%d %d\n", st+rx_timing, st+rx_timing+ft-1);
     rx_symb_buf = [rx_symb_buf; rx_filt(st+rx_timing:M:st+rx_timing+ft-1,:)];
   end
   
-  figure(1)
+  figure(2)
   clf;
   plot(rx_timing_log)
   axis([1 length(rx_timing_log) -0.5 0.5 ])
@@ -964,13 +1071,14 @@ function rate_Fs_rx(rx_filename)
   for nn=1:Ntrials
 
     s_ch = rx_symb_buf((nn-1)*Nsymbrowpilot+max_s:nn*Nsymbrowpilot+max_s-1,:);
-    [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
+    [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);
         
     rx_symb_log = [rx_symb_log rx_symb_linear];
     phi_log = [phi_log; phi_];
     amp_log = [amp_log; amp_];
 
     if nn > 1
+      EsNo__log = [EsNo__log EsNo_];
 
       % Measure BER
 
@@ -984,7 +1092,7 @@ function rate_Fs_rx(rx_filename)
       % LDPC decode
             
       detected_data = ldpc_dec(code_param, sim_in.max_iterations, sim_in.demod_type, sim_in.decoder_type, ...
-                               rx_symb_linear, min(100,12), amp_linear);
+                               rx_symb_linear, min(100,EsNo_), amp_linear);
       error_positions = xor(detected_data(1:framesize*rate), tx_bits(1:framesize*rate) );
       Nerrs = sum(error_positions);
       ldpc_Nerrs_log = [ldpc_Nerrs_log Nerrs];
@@ -997,7 +1105,7 @@ function rate_Fs_rx(rx_filename)
     end
   end
 
-  printf("EsNo (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", EsNodB, Terrs,
+  printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", mean(10*log10(EsNo__log)), Terrs,
          Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
          Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
@@ -1005,6 +1113,7 @@ function rate_Fs_rx(rx_filename)
   figure(3);
   clf;
   scat = rx_symb_log .* exp(j*pi/4);
+  scat = scat((framesize):length(scat));
   plot(real(scat), imag(scat),'+');
   title('Scatter plot');
         
@@ -1043,6 +1152,10 @@ function rate_Fs_rx(rx_filename)
   ylabel('Amplitude');
   xlabel('Time (symbols)');
 
+  figure(6);
+  plot(10*log10(EsNo__log));
+  title('EsNo (dB)')
+
   fep=fopen("errors_450.bin","wb"); fwrite(fep, ldpc_errors_log, "short"); fclose(fep);
 
 endfunction
@@ -1078,12 +1191,6 @@ function [f_max s_max] = test_freq_off_est(rx_filename, offset, n)
   n /= M;
   nc /= M;
 
-  figure(1)
-  subplot(211)
-  plot(real(tx_pilot_bb_lpf(1:nc)))
-  subplot(212)
-  plot(imag(tx_pilot_bb_lpf(1:nc)))
-
   % correlate over a range of frequency offsets and delays
 
   c_max = 0;
@@ -1104,17 +1211,18 @@ function [f_max s_max] = test_freq_off_est(rx_filename, offset, n)
       end
     end
     f_n++;
-    printf("f: %f c_max: %f f_max: %f s_max: %d\n", f, c_max, f_max, s_max);
+    %printf("f: %f c_max: %f f_max: %f s_max: %d\n", f, c_max, f_max, s_max);
   end
 
-  figure(2);
+  figure(1);
   y = f_range;
   x = max(s_max-25,1):min(s_max+25, n);
   mesh(y,x, c_log(x,:));
   grid
   
   s_max *= M;
-  s_max -= floor(s_max/6400)*6400
+  s_max -= floor(s_max/6400)*6400;
+  printf("f_max: %f  s_max: %d\n", f_max, s_max);
 
   % decimated position at sample rate.  need to relate this to symbol
   % rate position.
@@ -1127,7 +1235,7 @@ endfunction
 more off;
 %test_curves();
 %test_single();
-%rate_Fs_tx("tx_zero.raw");
-%rate_Fs_rx("tx.wav")
-rate_Fs_rx("tx_ccir_poor_-3dB_-48Hz.wav")
+%rate_Fs_tx("tx_clip2.raw");
+rate_Fs_rx("tx_ccir_poor_-3dB.wav")
+%rate_Fs_rx("tx.raw")
 %test_freq_off_est("tx.raw",40,6400)
