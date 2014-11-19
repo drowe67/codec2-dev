@@ -598,7 +598,8 @@ function sim_out = ber_test(sim_in)
             if verbose 
               av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
 
-              printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", mean(10*log10(EsNo__log)), Terrs,
+              printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f",
+                       mean(10*log10(EsNo__log)), Terrs,
                        Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
               if ldpc_code
                   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
@@ -989,6 +990,17 @@ function rate_Fs_rx(rx_filename)
   frx=fopen(rx_filename,"rb"); rx_fdm = fread(frx, "short")/Ascale; fclose(frx);
 
   rx_fdm=sqrt(2)*rx_fdm;
+
+  if 0 
+    % optionally add AWGN noise for testing calibration of Es//No measurement
+
+    snr_3000Hz_dB = -9;
+    snr_4000Hz_lin = 10 ^ (snr_3000Hz_dB/10);
+    snr_4000Hz_lin *= (3000/4000);
+    variance = var(rx_fdm)/snr_4000Hz_lin;
+    rx_fdm += sqrt(variance)*randn(length(rx_fdm),1);
+  end
+
   figure(2)
   plot(rx_fdm);
 
@@ -1105,7 +1117,10 @@ function rate_Fs_rx(rx_filename)
     end
   end
 
-  printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", mean(10*log10(EsNo__log)), Terrs,
+  EsNo_av = mean(10*log10(EsNo__log));
+  printf("EsNo est (dB): %3.1f SNR est: %3.2f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", 
+         EsNo_av, mean(EsNo_to_SNR(EsNo__log)),
+         Terrs,
          Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
          Terrsldpc, Terrsldpc/Tbitsldpc, Ferrsldpc, Ferrsldpc/Ntrials);
@@ -1153,8 +1168,9 @@ function rate_Fs_rx(rx_filename)
   xlabel('Time (symbols)');
 
   figure(6);
-  plot(10*log10(EsNo__log));
-  title('EsNo (dB)')
+  clf
+  plot(EsNo_to_SNR(10*log10(EsNo__log)));
+  title('SNR est (dB)')
 
   fep=fopen("errors_450.bin","wb"); fwrite(fep, ldpc_errors_log, "short"); fclose(fep);
 
@@ -1229,6 +1245,9 @@ function [f_max s_max] = test_freq_off_est(rx_filename, offset, n)
 
 endfunction
 
+function snr = EsNo_to_SNR(EsNo)
+  snr = interp1([20 11.8 9.0 6.7 4.9 3.3 -10], [ 3 3 0 -3 -6 -9 -9], EsNo);
+endfunction
 
 % Start simulations ---------------------------------------
 
@@ -1236,6 +1255,6 @@ more off;
 %test_curves();
 %test_single();
 %rate_Fs_tx("tx_clip2.raw");
-rate_Fs_rx("tx_ccir_poor_-3dB.wav")
+rate_Fs_rx("tx_awgn_-3dB.wav")
 %rate_Fs_rx("tx.raw")
 %test_freq_off_est("tx.raw",40,6400)
