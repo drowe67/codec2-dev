@@ -182,7 +182,7 @@ for f=1:frames
   % mode to keep states updated
   
   [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, M);
-  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M);
+  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, M, !sync);
 
   if sync == 0
     foff = foff_coarse;
