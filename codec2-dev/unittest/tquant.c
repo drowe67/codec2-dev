@@ -73,8 +73,8 @@ int test_energy_quant(int levels, float max_error_dB) {
 
     for(i=0; i<levels; i++) {
 	index_in = i;
-	e = decode_energy(index_in);
-	index_out = encode_energy(e);
+	e = decode_energy(index_in, E_BITS);
+	index_out = encode_energy(e, E_BITS);
 	if (index_in != index_out) {
 	    printf("edB: %f index_in: %d index_out: %d\n", 
 		   10.0*log10(e), index_in, index_out);
@@ -84,13 +84,13 @@ int test_energy_quant(int levels, float max_error_dB) {
 
     /* check error over range of quantiser */
 
-    low_e = decode_energy(0);
-    high_e = decode_energy(levels-1);
+    low_e = decode_energy(0, E_BITS);
+    high_e = decode_energy(levels-1, E_BITS);
     fe = fopen("energy_err.txt", "wt");
 
     for(e=low_e; e<high_e; e +=(high_e-low_e)/1000.0) {
-	index = encode_energy(e);
-	e_dec = decode_energy(index);
+	index = encode_energy(e, E_BITS);
+	e_dec = decode_energy(index, E_BITS);
 	error = 10.0*log10(e) - 10.0*log10(e_dec);
 	fprintf(fe, "%f\n", error);
 	if (fabs(error) > max_error_dB) {
@@ -173,7 +173,7 @@ int test_Wo_quant() {
     f = fopen("quant_pitch.txt","wt");
 
     for(Wo=0.9*(TWO_PI/P_MAX); Wo<=1.1*(TWO_PI/P_MIN); Wo += 0.001) {
-	index = encode_Wo(Wo);
+	index = encode_Wo(Wo, WO_BITS);
 	fprintf(f, "%f %d\n", Wo, index);
     }
 
@@ -184,8 +184,8 @@ int test_Wo_quant() {
 
     for(c=0; c<WO_LEVELS; c++) {
 	index_in = c;
-	Wo = decode_Wo(index_in);
-        index_out = encode_Wo(Wo);
+	Wo = decode_Wo(index_in, WO_BITS);
+        index_out = encode_Wo(Wo, WO_BITS);
 	if (index_in != index_out)
 	    printf("  Wo %f index_in %d index_out %d\n", Wo, 
 		   index_in, index_out);
@@ -198,8 +198,8 @@ int test_Wo_quant() {
     step_size = ((TWO_PI/P_MIN) - (TWO_PI/P_MAX))/WO_LEVELS;
 
     for(Wo=TWO_PI/P_MAX; Wo<0.99*TWO_PI/P_MIN; Wo += 0.0001) {
-	index = encode_Wo(Wo);
-	Wo_dec = decode_Wo(index);
+	index = encode_Wo(Wo, WO_BITS);
+	Wo_dec = decode_Wo(index, WO_BITS);
 	error = Wo - Wo_dec;
 	if (fabs(error) > (step_size/2.0)) {
 	    printf("error: %f  step_size/2: %f\n", error, step_size/2.0);
