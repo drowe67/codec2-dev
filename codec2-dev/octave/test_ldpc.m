@@ -57,6 +57,7 @@ function [tx_symb tx_bits prev_sym_tx] = symbol_rate_tx(sim_in, tx_bits, code_pa
         tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
       end
     end
+    %tx_symb = zeros(Nsymbrow,Nc);
 
     % Optionally insert pilots, one every Ns data symbols
 
@@ -410,7 +411,7 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx 
     Es_ = mean(amp_linear .^ 2);
  
     EsNo_ = Es_/No_;
-    printf("Es_: %f No_: %f  Es/No: %f  Es/No dB: %f\n", Es_, No_, Es_/No_, 10*log10(EsNo_));
+    %printf("Es_: %f No_: %f  Es/No: %f  Es/No dB: %f\n", Es_, No_, Es_/No_, 10*log10(EsNo_));
   
     % LDPC decoder requires some amplitude normalisation
     % (AGC), was found to break ow.  So we adjust the symbol
@@ -752,12 +753,16 @@ function test_curves
   sim_in.Esvec            = 10; 
   sim_in.hf_sim           = 1;
   sim_in.Ntrials          = 1000;
-  sim_in.Rs               = 200;
+  sim_in.Rs               = 50;
+  sim_in.Nc               = 9;
   sim_in.Np               = 4;
   sim_in.Ns               = 8;
   sim_in.Nchip            = 1;
+  sim_in.modulation       = 'qpsk';
+  sim_in.ldpc_code_rate   = 0.5;
+  sim_in.ldpc_code        = 0;
 
-  sim_qpsk                = ber_test(sim_in, 'qpsk');
+  sim_qpsk                = ber_test(sim_in);
 
   sim_in.hf_sim           = 0;
   sim_in.plot_scatter     = 0;
@@ -768,16 +773,19 @@ function test_curves
   sim_in.Np               = 0;
   sim_in.Nchip            = 1;
 
+  sim_in.modulation       = 'dqpsk';
   sim_dqpsk               = ber_test(sim_in, 'dqpsk');
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 1;
+  sim_in.modulation       = 'qpsk';
   sim_qpsk_hf_ideal       = ber_test(sim_in, 'qpsk');
+  sim_in.modulation       = 'dqpsk';
   sim_in.hf_mag_only      = 0;
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-  sim_in.Np               = 6;
+  sim_in.modulation       = 'qpsk';
+  sim_in.Ns               = 4
+  sim_in.Np               = 2;
   sim_qpsk_hf_pilot       = ber_test(sim_in, 'qpsk');
-  sim_in.Nchip            = 2;
-  sim_qpsk_hf_pilot_dsss  = ber_test(sim_in, 'qpsk');
 
   figure(1); 
   clf;
@@ -786,8 +794,7 @@ function test_curves
   semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
   semilogy(sim_qpsk_hf_ideal.Ebvec, sim_qpsk_hf_ideal.BERvec,'b;QPSK HF ideal;')
   semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'k;DQPSK HF;')
-  semilogy(sim_qpsk_hf_pilot.Ebvec, sim_qpsk_hf_pilot.BERvec,'r;QPSK Np=6 HF;')
-  semilogy(sim_qpsk_hf_pilot_dsss.Ebvec, sim_qpsk_hf_pilot_dsss.BERvec,'g;QPSK Np=6 Nchip=2 HF;')
+  semilogy(sim_qpsk_hf_pilot.Ebvec, sim_qpsk_hf_pilot.BERvec,'r;QPSK Np=2 Ns=4 HF;')
   hold off;
 
   xlabel('Eb/N0')
@@ -911,7 +918,7 @@ function rate_Fs_tx(tx_filename)
 
   tx_fdm = real(tx_fdm);
 
-  tx_fdm = compress(tx_fdm, 0.4);
+  %tx_fdm = compress(tx_fdm, 0.4);
   %tx_fdm = sign(tx_fdm) .* (abs(tx_fdm) .^ 0.4); 
   %hpa_clip = max(abs(tx_fdm))*0.8
   %tx_fdm(find(abs(tx_fdm) > hpa_clip)) = hpa_clip;
@@ -1001,15 +1008,16 @@ function rate_Fs_rx(rx_filename)
     rx_fdm += sqrt(variance)*randn(length(rx_fdm),1);
   end
 
-  figure(2)
-  plot(rx_fdm);
+  figure(1)
+  plot(rx_fdm(800:1200));
 
   % freq offset estimation
 
   printf("Freq offset and coarse timing est...\n");
   [f_max max_s_Fs] = test_freq_off_est(rx_filename, 1,5*6400);
-  
+  %f_max = 0; max_s_Fs = 4;
   max_s = floor(max_s_Fs/M + 6);
+
   printf("Downconverting...\n");
 
   [m n] = size(rx_fdm);
@@ -1033,12 +1041,17 @@ function rate_Fs_rx(rx_filename)
     rx_filt(:,c) = filter(rn_coeff, 1, rx_bb(:,c));
   end
 
+  %subplot(211);
+  %plot(real(rx_filt(1:10*M,9)));
+  %subplot(212);
+  %plot(imag(rx_filt(1:10*M,9)));
+
   % Fine timing estimation and decimation to symbol rate Rs. Break rx
-  % signal into ft=800 sample blocks for.  If clock offset is 1000ppm,
+  % signal into ft sample blocks.  If clock offset is 1000ppm,
   % that's one more/less sample over Ft samples at Fs=8000 Hz.
 
   printf("Fine timing estimation....\n");
-  ft = 1600;
+  ft = M*10;
   [nsam m] = size(rx_filt);
   rx_symb_buf = []; rx_timing_log = [];
   
@@ -1119,7 +1132,7 @@ function rate_Fs_rx(rx_filename)
 
   EsNo_av = mean(10*log10(EsNo__log));
   printf("EsNo est (dB): %3.1f SNR est: %3.2f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f", 
-         EsNo_av, mean(EsNo_to_SNR(EsNo__log)),
+         EsNo_av, mean(EsNo_to_SNR(10*log10(EsNo__log))),
          Terrs,
          Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f\n", 
@@ -1254,7 +1267,8 @@ endfunction
 more off;
 %test_curves();
 %test_single();
-%rate_Fs_tx("tx_clip2.raw");
-rate_Fs_rx("tx_awgn_-3dB.wav")
-%rate_Fs_rx("tx.raw")
+%rate_Fs_tx("tx_zero.raw");
+%rate_Fs_tx("tx_950.raw");
+rate_Fs_rx("tx_-4dB.wav")
+%rate_Fs_rx("mel010.wav")
 %test_freq_off_est("tx.raw",40,6400)
