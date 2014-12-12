@@ -156,17 +156,23 @@ endfunction
 
 function sim_out = analog_fm_test(sim_in)
   Fs        = 96000; FsOn2 = Fs/2;
-  fm_max    = 3000;
   fm        = 1000; wm = 2*pi*fm/Fs;
   nsam      = Fs;
   CNdB      = sim_in.CNdB;
   verbose   = sim_in.verbose;
+  pre_emp   = sim_in.pre_emp;
+  de_emp    = sim_in.de_emp;
 
   % FM modulator constants
 
-  fc = 24E3; wc = 2*pi*fc/Fs;
-  fd = 3E3; wd = 2*pi*fd/Fs;
+  fm_max = 3000;                   % max modulation freq
+  fc = 24E3; wc = 2*pi*fc/Fs;      % carrier frequency
+  fd = 5E3; wd = 2*pi*fd/Fs;       % (max) deviation
+  m = fd/fm_max;                   % modulation index
   Bfm = 2*(fd+fm_max);             % Carson's rule for FM signal bandwidth
+  tc  = 50E-6;
+  prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
+
   %printf("Bfm: %f m: %f wc: %f wd: %f wm: %f\n", Bfm, fd/fm_max, wc, wd, wm);
   
   % input filter gets rid of excess noise before demodulator, as too much
@@ -180,7 +186,8 @@ function sim_out = analog_fm_test(sim_in)
 
   % demoduator output filter to limit us to 3 kHz
 
-  bout = firls(200,[0 2800 3200 FsOn2]/FsOn2, [1 1 0.01 0.01]);
+  fc = (fm_max)/(FsOn2);
+  bout = firls(200,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
 
   % start simulation
 
@@ -198,8 +205,14 @@ function sim_out = analog_fm_test(sim_in)
 
     t = 0:(nsam-1);
     tx_phase = 0;
+    mod = sin(wm*t);
+    if pre_emp
+      mod = filter(prede,1,mod);
+      mod = mod/max(mod);           % AGC to set deviation
+    end
+
     for i=0:nsam-1
-        w = wc + wd*sin(wm*i);
+        w = wc + wd*mod(i+1);
         tx_phase = tx_phase + w;
         tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
         tx(i+1) = exp(j*tx_phase);
@@ -219,6 +232,9 @@ function sim_out = analog_fm_test(sim_in)
     rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
     rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
     rx_out = filter(bout,1,rx_out);
+    if de_emp
+      rx_out = filter(1,prede,rx_out);
+    end
 
     % notch out test tone
 
@@ -236,8 +252,21 @@ function sim_out = analog_fm_test(sim_in)
     snr = (sinad-nad)/nad;
     sim_out.snr(ne) = snr;
    
+    if verbose > 1
+      printf("modn index: %2.1f Bfm: %.0f Hz\n", m, Bfm);
+    end
+
     if verbose > 0
-      printf("C/N: %f S+N+D: %f  N+D: %f SNR: %f dB\n", aCNdB, sinad, nad, 10*log10(snr));
+
+      % Theory from FMTutorial.pdf, Lawrence Der, Silicon labs paper
+
+      snr_theory_dB = aCNdB + 10*log10(3*m*m*(m+1));
+      fx = 1/(2*pi*tc); W = fm_max;
+      I = (W/fx)^3/(3*((W/fx) - atan(W/fx)));
+      I_dB = 10*log10(I);
+
+      printf("C/N: %4.1f SNR: %4.1f dB THEORY: %4.1f dB or with pre/de: %4.1f dB\n", 
+      aCNdB, 10*log10(snr), snr_theory_dB, snr_theory_dB+I_dB);
     end
 
     if verbose > 1
@@ -255,7 +284,7 @@ function sim_out = analog_fm_test(sim_in)
       figure(2)
       subplot(211)
       plot(rx_out(settle:nsam))
-      axis([1 4000 -0.3 0.3]) 
+      axis([1 4000 -1 1]) 
       subplot(212)
       Rx = 20*log10(abs(fft(rx_out(settle:nsam))));
       plot(Rx(1:10000))
@@ -292,6 +321,9 @@ end
 % illustration of harmonic dist, clean up, integration with AFSK, AFSK-FM, v FSK
 sim_in.nsam    = 96000;
 sim_in.verbose = 2;
+sim_in.pre_emp = 1;
+sim_in.de_emp  = 1;
+
 %sim_in.CNdB = [10 20 30 40 50 100];
 sim_in.CNdB   = 20;
 sim_out = analog_fm_test(sim_in);
