@@ -18,6 +18,7 @@
 
 rand('state',1); 
 randn('state',1);
+graphics_toolkit ("gnuplot");
 
 function sim_out = ber_test(sim_in)
   Fs        = 96000;
@@ -25,6 +26,7 @@ function sim_out = ber_test(sim_in)
   fspace    = 2200;
   Rs        = sim_in.Rs;
   Ts        = Fs/Rs;
+  emphasis  = 50E-6;
 
   framesize = sim_in.framesize;
   EbNodB    = sim_in.EbNodB;
@@ -156,122 +158,111 @@ function sim_out = analog_fm_test(sim_in)
   Fs        = 96000; FsOn2 = Fs/2;
   fm_max    = 3000;
   fm        = 1000; wm = 2*pi*fm/Fs;
-
   nsam      = Fs;
   CNdB      = sim_in.CNdB;
+  verbose   = sim_in.verbose;
 
   % FM modulator constants
 
   fc = 24E3; wc = 2*pi*fc/Fs;
   fd = 3E3; wd = 2*pi*fd/Fs;
-  Bfm = 2*(fd+fm_max);             % Carson's rule for FM demod input noise BW
-  printf("Bfm: %f m: %f wc: %f wd: %f wm: %f\n", Bfm, fd/fm_max, wc, wd, wm);
+  Bfm = 2*(fd+fm_max);             % Carson's rule for FM signal bandwidth
+  %printf("Bfm: %f m: %f wc: %f wd: %f wm: %f\n", Bfm, fd/fm_max, wc, wd, wm);
   
+  % input filter gets rid of excess noise before demodulator, as too much
+  % noise causes atan2() to jump around, e.g. -pi to pi.  However this
+  % filter can cause harmonic distortion at very high SNRs, as it knocks out
+  % some of the FM signal spectra.  This filter isn't really required for high
+  % SNRs > 20dB.
+
   fc = (Bfm/2)/(FsOn2);
   bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
-  %figure(5); clf; h=freqz(bin,1,FsOn2); plot(20*log10(abs(h(1:10000)))); 
-  %axis([ 1 10000 -40 0]); grid
+
+  % demoduator output filter to limit us to 3 kHz
+
   bout = firls(200,[0 2800 3200 FsOn2]/FsOn2, [1 1 0.01 0.01]);
-  %figure(5); clf; h=freqz(bout,1,FsOn2); plot(20*log10(abs(h(1:10000)))); 
-  %axis([ 1 10000 -40 0]); grid
-  % simulate over a range of C/N values
+
+  % start simulation
 
   for ne = 1:length(CNdB)
 
+    % work out the variance we need to obtain our C/N in the bandwidth
+    % of the FM demod.  The gaussian generator randn() generates noise
+    % with a bandwidth of Fs
+
     aCNdB = CNdB(ne);
-    CN = 10^(aCNdB/10)
+    CN = 10^(aCNdB/10);
     variance = Fs/(CN*Bfm);
-    printf("variance: %f\n", variance);
-    
+     
     % FM Modulator -------------------------------
 
     t = 0:(nsam-1);
     tx_phase = 0;
     for i=0:nsam-1
         w = wc + wd*sin(wm*i);
-        %w = wc + wd;
         tx_phase = tx_phase + w;
         tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
         tx(i+1) = exp(j*tx_phase);
     end       
-    %tx = exp(j*( wc*t + wd*sin(wm*t) ));
-    %tx = exp(j*( (wc+wm)*t) );
-    figure(5)
-    clf
-    plot(tx(1:100))
     
     % Channel ---------------------------------
 
-    noise = sqrt(variance/2)*(randn(1,length(tx)) + j*randn(1,length(tx)));
-    rx    = (1 + 0.0*cos(2*pi*1000*t/Fs)) .* tx + noise;
-    %printf("p rx: %f\n", var(rx))
-    figure(3)
-    subplot(211)
-    plot(20*log10(abs(fft(rx))))
-    title('FM Demod input Spectrum');
-    axis([1 length(tx) 0 100]);
-    
+    noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+    rx = tx + noise;
+
     % FM Demodulator
 
-    l = length(rx);
-    rx_bb = rx .* exp(-j*wc*t);               % down to complex baseband
-     %p1 = (rx_bb * rx_bb')/l;
-
-    figure(1)
-    subplot(211)
-    plot(rx_bb,'+');
-    title('FM demod input')
-    axis([-2 2 -2 2]);
-
-    %printf("rx_bb mean: %f var: %f snr dB: %f\n", mean(rx_bb), var(rx_bb), 10*log10(mean(rx_bb)/var(rx_bb)))
+    rx_bb = rx .* exp(-j*wc*t);      % down to complex baseband
     rx_bb = filter(bin,1,rx_bb);
-    %printf("rx_bb mean: %f var: %f snr dB: %f\n", mean(rx_bb(200:l)), var(rx_bb(200:l)), 
-    %10*log10(mean(rx_bb(200:l))/var(rx_bb(200:l))))
-    %rx_bb = rx_bb .* (1.0+0.2*randn(1,l));
-    p2 = (rx_bb * rx_bb')/l;
-    %printf("p rx_bb filter: %f C/N: %f\n C/N dB: %f", p2, 1/p2, 10*log10(1/p2))
-
-    subplot(212)
-    plot(rx_bb(200:l),'+');
-    axis([-2 2 -2 2]);
+    p2 = (rx_bb * rx_bb')/nsam;
  
-    figure(3)
-    subplot(212)
-    Rx_bb = 20*log10(abs(fft(rx_bb)));
-    plot(Rx_bb)
-    axis([1 length(tx) 0 100]);
-    title('FM Demod input Spectrum filter');
-
-    rx_bb_diff = [ 1 rx_bb(2:l) .* conj(rx_bb(1:l-1))];
-    rx = atan2(imag(rx_bb_diff),real(rx_bb_diff));
-    %rx = angle(rx_bb);
-    %rx = rx_bb;
-    rx = filter(bout,1,rx);
+    rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
+    rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
+    rx_out = filter(bout,1,rx_out);
 
     % notch out test tone
 
     w = 2*pi*fm/Fs; beta = 0.99;
-    rx = filter([1 -2 1],[1 -2*beta beta*beta], rx);
-    rx_notch = filter([1 -2*cos(w) 1],[1 -2*beta*cos(w) beta*beta], rx);
-    mean(rx_notch(1000:l))
-    var(rx_notch(1000:l))
-    figure(2)
-    subplot(211)
-    plot(rx(1000:5000))
-    %axis([1 800 -0.3 0.3]) 
-    subplot(212)
-    Rx = 20*log10(abs(fft(rx(1000:l))));
-    plot(Rx(1:10000))
-    %hist(rx_notch(1000:l),100)
-    p3 = (rx(1000:l) * rx(1000:l)')/(l-1000);
-    p4 = (rx_notch(1000:l) * rx_notch(1000:l)')/(l-1000);
+    rx_notch = filter([1 -2*cos(w) 1],[1 -2*beta*cos(w) beta*beta], rx_out);
 
-    %printf("%f %f\n", aCNdB, CN);
-    %sig = sqrt(2)*cos(2*pi*wm*t) + sqrt(1/CN)*randn(1,l);
-    %p3  = (sig * sig')/l;
-    snr = (p3-p4)/p4;
-    printf("C/N: %f S+N: %f  N: %f SNR: %f\n", aCNdB, p3, p4, 10*log10(snr));
-    sim_out.p3(ne) = p3;
+    % measure power with and without test tone to determine S+N and N
+
+    settle = 1000;             % filter settling time, to avoid transients
+    nsettle = nsam - settle;
+
+    sinad = (rx_out(settle:nsam) * rx_out(settle:nsam)')/nsettle;
+    nad = (rx_notch(settle:nsam) * rx_notch(settle:nsam)')/nsettle;
+
+    snr = (sinad-nad)/nad;
+    sim_out.snr(ne) = snr;
+   
+    if verbose > 0
+      printf("C/N: %f S+N+D: %f  N+D: %f SNR: %f dB\n", aCNdB, sinad, nad, 10*log10(snr));
+    end
+
+    if verbose > 1
+      figure(1)
+      subplot(211)
+      plot(20*log10(abs(fft(rx))))
+      title('FM Modulator Output Spectrum');
+      axis([1 length(tx) 0 100]);
+      subplot(212)
+      Rx_bb = 20*log10(abs(fft(rx_bb)));
+      plot(Rx_bb)
+      axis([1 length(tx) 0 100]);
+      title('FM Demodulator (baseband) Input Spectrum');
+
+      figure(2)
+      subplot(211)
+      plot(rx_out(settle:nsam))
+      axis([1 4000 -0.3 0.3]) 
+      subplot(212)
+      Rx = 20*log10(abs(fft(rx_out(settle:nsam))));
+      plot(Rx(1:10000))
+      axis([1 10000 0 100]);
+   end
+
+    %hist(rx_notch(1000:l),100)
   end
 
 endfunction
@@ -299,8 +290,9 @@ end
 
 % optional plots, prod det, different beta curves, pre/de emphasis, better det,
 % illustration of harmonic dist, clean up, integration with AFSK, AFSK-FM, v FSK
-sim_in.nsam = 96000;
+sim_in.nsam    = 96000;
+sim_in.verbose = 2;
 %sim_in.CNdB = [10 20 30 40 50 100];
-sim_in.CNdB   = 6;
+sim_in.CNdB   = 20;
 sim_out = analog_fm_test(sim_in);
 
