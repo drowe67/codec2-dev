@@ -15,6 +15,11 @@
 %       + filtering, varying modulation index
 %   [ ] GMSK
 %   [ ] refactor to plot analog FM demod curves
+%   [ ] SSB curves
+%   [ ] different modn index beta curves, 
+%   [ ]  illustration of harmonic dist, 
+%   [ ] integration with AFSK, AFSK-FM, v AFSK-SSB (ie FSK)
+
 
 rand('state',1); 
 randn('state',1);
@@ -210,14 +215,13 @@ function sim_out = analog_fm_test(sim_in)
       mod = filter(prede,1,mod);
       mod = mod/max(mod);           % AGC to set deviation
     end
-
     for i=0:nsam-1
         w = wc + wd*mod(i+1);
         tx_phase = tx_phase + w;
         tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
         tx(i+1) = exp(j*tx_phase);
     end       
-    
+
     % Channel ---------------------------------
 
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
@@ -250,21 +254,23 @@ function sim_out = analog_fm_test(sim_in)
     nad = (rx_notch(settle:nsam) * rx_notch(settle:nsam)')/nsettle;
 
     snr = (sinad-nad)/nad;
-    sim_out.snr(ne) = snr;
+    sim_out.snrdB(ne) = 10*log10(snr);
+   
+    % Theory from FMTutorial.pdf, Lawrence Der, Silicon labs paper
+
+    snr_theory_dB = aCNdB + 10*log10(3*m*m*(m+1));
+    fx = 1/(2*pi*tc); W = fm_max;
+    I = (W/fx)^3/(3*((W/fx) - atan(W/fx)));
+    I_dB = 10*log10(I);
+
+    sim_out.snr_theorydB(ne) = snr_theory_dB;
+    sim_out.snr_theory_pre_dedB(ne) = snr_theory_dB + I_dB;
    
     if verbose > 1
       printf("modn index: %2.1f Bfm: %.0f Hz\n", m, Bfm);
     end
 
     if verbose > 0
-
-      % Theory from FMTutorial.pdf, Lawrence Der, Silicon labs paper
-
-      snr_theory_dB = aCNdB + 10*log10(3*m*m*(m+1));
-      fx = 1/(2*pi*tc); W = fm_max;
-      I = (W/fx)^3/(3*((W/fx) - atan(W/fx)));
-      I_dB = 10*log10(I);
-
       printf("C/N: %4.1f SNR: %4.1f dB THEORY: %4.1f dB or with pre/de: %4.1f dB\n", 
       aCNdB, 10*log10(snr), snr_theory_dB, snr_theory_dB+I_dB);
     end
@@ -317,14 +323,36 @@ function run_fsk_sim
   grid("minor");
 end
 
-% optional plots, prod det, different beta curves, pre/de emphasis, better det,
-% illustration of harmonic dist, clean up, integration with AFSK, AFSK-FM, v FSK
-sim_in.nsam    = 96000;
-sim_in.verbose = 2;
-sim_in.pre_emp = 1;
-sim_in.de_emp  = 1;
+function run_fm_curves
+  sim_in.nsam    = 96000;
+  sim_in.verbose = 1;
+  sim_in.pre_emp = 0;
+  sim_in.de_emp  = 0;
+  sim_in.CNdB = -4:2:20;
 
-%sim_in.CNdB = [10 20 30 40 50 100];
-sim_in.CNdB   = 20;
-sim_out = analog_fm_test(sim_in);
+  sim_out = analog_fm_test(sim_in);
+  figure(1)
+  clf
+  plot(sim_in.CNdB, sim_out.snrdB,"r;FM Simulated;");
+  hold on;
+  plot(sim_in.CNdB, sim_out.snr_theorydB,"g;FM Theory;");
+  plot(sim_in.CNdB, sim_in.CNdB,"g; SSB Theory;");
+  hold off;
+  grid;
+  xlabel("FM demod input CNR (dB)");
+  ylabel("FM demod output SNR (dB)");
+endfunction
+
+function run_fm_single
+  sim_in.nsam    = 96000;
+  sim_in.verbose = 2;
+  sim_in.pre_emp = 0;
+  sim_in.de_emp  = 0;
+
+  sim_in.CNdB   = 0;
+  sim_out = analog_fm_test(sim_in);
+end
+
+%run_fm_curves
+run_fm_single
 
