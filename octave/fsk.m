@@ -41,7 +41,7 @@ function sim_out = ber_test(sim_in)
   fc = 24E3; wc = 2*pi*fc/Fs;
   f_max_deviation = 3E3; w_max_deviation = 2*pi*f_max_deviation/Fs
 
-  % simulate over a rnage of Eb/No values
+  % simulate over a range of Eb/No values
 
   for ne = 1:length(EbNodB)
     Nerrs = Terrs = Tbits = 0;
@@ -159,27 +159,19 @@ function sim_out = ber_test(sim_in)
 endfunction
 
 
-function sim_out = analog_fm_test(sim_in)
-  Fs        = 96000; FsOn2 = Fs/2;
-  fm        = 1000; wm = 2*pi*fm/Fs;
-  nsam      = Fs;
-  CNdB      = sim_in.CNdB;
-  verbose   = sim_in.verbose;
-  pre_emp   = sim_in.pre_emp;
-  de_emp    = sim_in.de_emp;
+function fm_states = analog_fm_init(fm_states)
 
   % FM modulator constants
 
-  fm_max = 3000;                   % max modulation freq
-  fc = 24E3; wc = 2*pi*fc/Fs;      % carrier frequency
-  fd = 5E3; wd = 2*pi*fd/Fs;       % (max) deviation
-  m = fd/fm_max;                   % modulation index
-  Bfm = 2*(fd+fm_max);             % Carson's rule for FM signal bandwidth
-  tc  = 50E-6;
-  prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
+  fm_states.Fs = Fs = 96000; FsOn2 = Fs/2;  
+  fm_states.fm_max = fm_max = 3000;          % max modulation freq
+  fm_states.fc = 24E3;                       % carrier frequency
+  fm_states.fd = fd = 5E3;                   % (max) deviation
+  fm_states.m = fd/fm_max;                   % modulation index
+  fm_states.Bfm = Bfm = 2*(fd+fm_max);       % Carson's rule for FM signal bandwidth
+  fm_states.tc = tc = 50E-6;
+  fm_states.prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
 
-  %printf("Bfm: %f m: %f wc: %f wd: %f wm: %f\n", Bfm, fd/fm_max, wc, wd, wm);
-  
   % input filter gets rid of excess noise before demodulator, as too much
   % noise causes atan2() to jump around, e.g. -pi to pi.  However this
   % filter can cause harmonic distortion at very high SNRs, as it knocks out
@@ -187,13 +179,72 @@ function sim_out = analog_fm_test(sim_in)
   % SNRs > 20dB.
 
   fc = (Bfm/2)/(FsOn2);
-  bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
+  fm_states.bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
 
-  % demoduator output filter to limit us to 3 kHz
+  % demoduator output filter to limit us to fm_max (e.g. 3kHz)
 
   fc = (fm_max)/(FsOn2);
-  bout = firls(200,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
+  fm_states.bout = firls(200,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
 
+endfunction
+
+
+function tx = analog_fm_mod(fm_states, mod)
+  Fs = fm_states.Fs;
+  fc = fm_states.fc; wc = 2*pi*fc/Fs;
+  fd = fm_states.fd; wd = 2*pi*fd/Fs;
+  nsam = length(mod);
+
+  if fm_states.pre_emp
+    mod = filter(fm_states.prede,1,mod);
+    mod = mod/max(mod);           % AGC to set deviation
+  end
+
+  tx_phase = 0;
+  tx = zeros(1,nsam);
+
+  for i=0:nsam-1
+    w = wc + wd*mod(i+1);
+    tx_phase = tx_phase + w;
+    tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
+    tx(i+1) = exp(j*tx_phase);
+  end       
+endfunction
+
+
+function [rx_out rx_bb] = analog_fm_demod(fm_states, rx)
+  Fs = fm_states.Fs;
+  fc = fm_states.fc; wc = 2*pi*fc/Fs;
+  nsam = length(rx);
+  t = 0:(nsam-1);
+
+  rx_bb = rx .* exp(-j*wc*t);      % down to complex baseband
+  rx_bb = filter(fm_states.bin,1,rx_bb);
+  rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
+  rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
+  rx_out = filter(fm_states.bout,1,rx_out);
+  if fm_states.de_emp
+    rx_out = filter(1,fm_states.prede,rx_out);
+  end
+endfunction
+
+
+function sim_out = analog_fm_test(sim_in)
+  nsam      = sim_in.nsam;
+  CNdB      = sim_in.CNdB;
+  verbose   = sim_in.verbose;
+
+  fm_states.pre_emp = pre_emp = sim_in.pre_emp;
+  fm_states.de_emp  = de_emp = sim_in.de_emp;
+  fm_states = analog_fm_init(fm_states);
+
+  Fs = fm_states.Fs;
+  Bfm = fm_states.Bfm;
+  m = fm_states.m; tc = fm_states.tc; fm_max = fm_states.fm_max;
+  t = 0:(nsam-1);
+
+  fm = 1000; wm = 2*pi*fm/fm_states.Fs;
+  
   % start simulation
 
   for ne = 1:length(CNdB)
@@ -208,19 +259,8 @@ function sim_out = analog_fm_test(sim_in)
      
     % FM Modulator -------------------------------
 
-    t = 0:(nsam-1);
-    tx_phase = 0;
     mod = sin(wm*t);
-    if pre_emp
-      mod = filter(prede,1,mod);
-      mod = mod/max(mod);           % AGC to set deviation
-    end
-    for i=0:nsam-1
-        w = wc + wd*mod(i+1);
-        tx_phase = tx_phase + w;
-        tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
-        tx(i+1) = exp(j*tx_phase);
-    end       
+    tx = analog_fm_mod(fm_states, mod);
 
     % Channel ---------------------------------
 
@@ -229,16 +269,7 @@ function sim_out = analog_fm_test(sim_in)
 
     % FM Demodulator
 
-    rx_bb = rx .* exp(-j*wc*t);      % down to complex baseband
-    rx_bb = filter(bin,1,rx_bb);
-    p2 = (rx_bb * rx_bb')/nsam;
- 
-    rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
-    rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
-    rx_out = filter(bout,1,rx_out);
-    if de_emp
-      rx_out = filter(1,prede,rx_out);
-    end
+    [rx_out rx_bb] = analog_fm_demod(fm_states, rx);
 
     % notch out test tone
 
@@ -297,7 +328,6 @@ function sim_out = analog_fm_test(sim_in)
       axis([1 10000 0 100]);
    end
 
-    %hist(rx_notch(1000:l),100)
   end
 
 endfunction
@@ -353,6 +383,6 @@ function run_fm_single
   sim_out = analog_fm_test(sim_in);
 end
 
-%run_fm_curves
-run_fm_single
+run_fm_curves
+%run_fm_single
 
