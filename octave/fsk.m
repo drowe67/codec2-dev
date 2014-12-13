@@ -6,58 +6,69 @@
 % TODO
 %   [X] Code up mod/non-coh demod/AWGN channel simulation
 %   [X] Eb/No verses BER curves
-%   [ ] test with pre/de-emphahsis impairments
+%   [X] test analog FM with pre/de-emphahsis 
 %       + this will introduce delay, use fir filter, group delay
-%   [ ] test with hard limiting      
-%       + it's FSK, so AM shouldn't matter?  
-%       + also make 8-bit fixed point impl easy
-%   [ ] channel simulation of HT/FM radio
+%   [X] channel simulation of HT/FM radio
 %       + filtering, varying modulation index
 %   [ ] GMSK
-%   [ ] refactor to plot analog FM demod curves
-%   [ ] SSB curves
-%   [ ] different modn index beta curves, 
-%   [ ]  illustration of harmonic dist, 
-%   [ ] integration with AFSK, AFSK-FM, v AFSK-SSB (ie FSK)
-
+%   [X] refactor to plot analog FM demod curves
+%   [X] SSB curves
+%   [-] different modn index beta curves, 
+%       + not really important for now
+%   [ ] plot to illustrate harmonic dist, 
+%   [X] integration with AFSK, AFSK-FM, v AFSK-SSB (ie FSK)
+%   [-] fine timing offset for pre/de filters?
+%       + do we need interpolation as well?
+%       + might leave this as pre/de not significant now
+%   [X] C/No curves?
+%   [ ] spectrum plots
 
 rand('state',1); 
 randn('state',1);
 graphics_toolkit ("gnuplot");
 
-function sim_out = ber_test(sim_in)
+function sim_out = fsk_ber_test(sim_in)
   Fs        = 96000;
-  fmark     = 1200;
-  fspace    = 2200;
+  fmark     = sim_in.fmark;
+  fspace    = sim_in.fspace;
   Rs        = sim_in.Rs;
   Ts        = Fs/Rs;
   emphasis  = 50E-6;
+  verbose   = sim_in.verbose;
 
-  framesize = sim_in.framesize;
+  nsym      = sim_in.nsym;
+  nsam      = nsym*Ts;
   EbNodB    = sim_in.EbNodB;
 
-  % FM modulator constants
+  fm        = sim_in.fm;
 
-  fc = 24E3; wc = 2*pi*fc/Fs;
-  f_max_deviation = 3E3; w_max_deviation = 2*pi*f_max_deviation/Fs
+  if fm
+    fm_states.pre_emp = 0;
+    fm_states.de_emp  = 0;
+    fm_states.Ts      = Ts;
+    fm_states = analog_fm_init(fm_states);
+  end
 
   % simulate over a range of Eb/No values
 
   for ne = 1:length(EbNodB)
     Nerrs = Terrs = Tbits = 0;
 
+    % randn() generates noise across the entire Fs bandwidth, we want to scale
+    % the noise power (i.e. the variance) so we get the Eb/No we want in the
+    % bandwidth of our FSK signal, which we assume is Rs.
+
     aEbNodB = EbNodB(ne);
     EbNo = 10^(aEbNodB/10);
-    variance = Fs/(Rs*EbNo)
+    variance = Fs/(Rs*EbNo);
 
     % Modulator -------------------------------
 
-    tx_bits = round(rand(1, framesize));
-    %tx_bits = zeros(1, framesize);
-    tx = zeros(1,framesize*Ts);
+    tx_bits = round(rand(1, nsym));
+    tx = zeros(1,nsam);
     tx_phase = 0;
 
-    for i=1:framesize
+    for i=1:nsym
       for k=1:Ts
         if tx_bits(i) == 1
           tx_phase += 2*pi*fmark/Fs;
@@ -65,71 +76,47 @@ function sim_out = ber_test(sim_in)
           tx_phase += 2*pi*fspace/Fs;
         end
         tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
-        tx((i-1)*Ts+k) = sqrt(2)*cos(tx_phase);
+        tx((i-1)*Ts+k) = exp(j*tx_phase);
       end
     end
 
-    figure(4)
-    subplot(211);
-    plot(tx(1:1000));
-
-    % Optional AFSK-FM modulator
+    % Optional AFSK over FM modulator
 
     if sim_in.fm
-      mod = tx/sqrt(2);
-      wt = wc*(0:(framesize*Ts-1)) + w_max_deviation*mod;
-      % wt = wc*(0:(framesize*Ts-1));
-      tx = exp(j*wt);
+      % FM mod takes real input; +/- 1 for correct deviation
+      tx = analog_fm_mod(fm_states, real(tx));
     end
   
     % Channel ---------------------------------
 
-    noise = sqrt(variance/2)*(randn(1,length(tx)) + j*randn(1,length(tx)));
+    % We use complex (single sided) channel simulation, as it's convenient
+    % for the FM simulation.
+
+    noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
     rx    = tx + noise;
-    printf("EbNo: %f Eb: %f var No: %f EbNo (meas): %f\n", 
-    EbNo, var(tx)*Ts/Fs, var(noise)/(Fs/2), (var(tx)*Ts/Fs)/(var(noise)/(Fs/2)));
+    if verbose > 1
+      printf("EbNo: %f Eb: %f var No: %f EbNo (meas): %f\n", 
+      EbNo, var(tx)*Ts/Fs, var(noise)/Fs, (var(tx)*Ts/Fs)/(var(noise)/Fs));
+    end
 
-    %rx = exp(j*angle(rx));
-    figure(4)
-    subplot(211)
-    plot(real(rx(1:1000)),'+');
-    title('FM demod input (real)')
-
-    % Optional AFSK-FM demodulator
+    % Optional AFSK over FM demodulator
 
     if sim_in.fm
-      figure(4)
-      subplot(211)
-      plot(real(rx(1:1000)),'+');
-      title('FM demod input (real)')
-
-      l = length(rx);
-      rx_bb = rx .* exp(-j*wc*(0:(l-1)));               % down to complex baseband
-      b=fir1(15,f_max_deviation/Fs);
-      rx_bb=filter(b,1,rx_bb);
-      rx_bb_diff = rx_bb(2:l) .* conj(rx_bb(1:l-1));    % difference in phase, which is freq 
-                                                        % also keeps us away from atan function 
-                                                        % discontinuities
-
-      rx = atan2(imag(rx_bb),real(rx_bb));
-      subplot(212);
-      plot(rx(1:1000));
-      title('FM demod output');
-
-      figure(5)
-      plot(rx_bb)
-      axis([-2 2 -2 2])   
+      % scaling factor for convenience to match pure FSK
+      rx_bb = 2*analog_fm_demod(fm_states, rx);
+    else
+      rx_bb = rx;
     end
 
     % Demodulator -----------------------------
 
     % non-coherent FSK demod
 
-    mark_dc  = rx .* exp(-j*(0:(framesize*Ts)-1)*2*pi*fmark/Fs);
-    space_dc = rx .* exp(-j*(0:(framesize*Ts)-1)*2*pi*fspace/Fs);
+    mark_dc  = rx_bb .* exp(-j*(0:nsam-1)*2*pi*fmark/Fs);
+    space_dc = rx_bb .* exp(-j*(0:nsam-1)*2*pi*fspace/Fs);
 
-    rx_bits = zeros(1, framesize);
-    for i=1:framesize
+    rx_bits = zeros(1, nsym);
+    for i=1:nsym
       st = (i-1)*Ts+1;
       en = st+Ts-1;
       mark_int(i)  = sum(mark_dc(st:en));
@@ -137,21 +124,49 @@ function sim_out = ber_test(sim_in)
       rx_bits(i) = abs(mark_int(i)) > abs(space_int(i));
     end
   
-    figure(2);
-    subplot(211)
-    stem(abs(mark_int(1:20)));
-    subplot(212)
-    stem(abs(space_int(1:20)));
-    
-    error_positions = xor(rx_bits, tx_bits);
+    if fm
+      d = fm_states.nsym_delay;
+      error_positions = xor(rx_bits(1+d:nsym), tx_bits(1:(nsym-d)));
+    else
+      error_positions = xor(rx_bits, tx_bits);
+    end
     Nerrs = sum(error_positions);
     Terrs += Nerrs;
-    Tbits += framesize-1;
+    Tbits += length(error_positions);
 
     TERvec(ne) = Terrs;
     BERvec(ne) = Terrs/Tbits;
 
-    printf("EbNo (db): %3.2f Terrs: %d BER: %3.2f \n", aEbNodB, Terrs, Terrs/Tbits);
+    if verbose > 1
+      figure(2)
+      clf
+      Rx = 10*log10(abs(fft(rx)));
+      plot(Rx(1:Fs/2));
+      axis([1 Fs/2 0 50]);
+
+      figure(3)
+      clf;
+      subplot(211)
+      plot(real(rx_bb(1:Ts*20)))
+      subplot(212)
+      Rx_bb = 10*log10(abs(fft(rx_bb)));
+      plot(Rx_bb(1:3000));
+      axis([1 3000 0 50]);
+
+      figure(4);
+      subplot(211)
+      stem(abs(mark_int(1:100)));
+      subplot(212)
+      stem(abs(space_int(1:100)));   
+      
+      figure(5)
+      clf
+      plot(error_positions);
+    end
+
+    if verbose
+      printf("EbNo (db): %3.2f Terrs: %d BER: %3.2f \n", aEbNodB, Terrs, Terrs/Tbits);
+    end
   end
 
   sim_out.TERvec = TERvec;
@@ -172,6 +187,20 @@ function fm_states = analog_fm_init(fm_states)
   fm_states.tc = tc = 50E-6;
   fm_states.prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
 
+  % Select length of filter to be an integer number of symbols to
+  % assist with "fine" timing offset estimation.  Set Ts to 1 for
+  % analog modulation.
+
+  Ts = fm_states.Ts;
+  desired_ncoeffs = 200;
+  ncoeffs = floor(desired_ncoeffs/Ts+1)*Ts;
+
+  % "coarse" timing offset is half filter length, we have two filters.
+  % This is the delay the two filters introduce, so we need to adjust
+  % for this when comparing tx to trx bits for BER calcs.
+
+  fm_states.nsym_delay = ncoeffs/Ts;
+
   % input filter gets rid of excess noise before demodulator, as too much
   % noise causes atan2() to jump around, e.g. -pi to pi.  However this
   % filter can cause harmonic distortion at very high SNRs, as it knocks out
@@ -179,12 +208,12 @@ function fm_states = analog_fm_init(fm_states)
   % SNRs > 20dB.
 
   fc = (Bfm/2)/(FsOn2);
-  fm_states.bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
+  fm_states.bin  = firls(ncoeffs,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
 
   % demoduator output filter to limit us to fm_max (e.g. 3kHz)
 
   fc = (fm_max)/(FsOn2);
-  fm_states.bout = firls(200,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
+  fm_states.bout = firls(ncoeffs,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
 
 endfunction
 
@@ -215,13 +244,14 @@ endfunction
 function [rx_out rx_bb] = analog_fm_demod(fm_states, rx)
   Fs = fm_states.Fs;
   fc = fm_states.fc; wc = 2*pi*fc/Fs;
+  fd = fm_states.fd; wd = 2*pi*fd/Fs;
   nsam = length(rx);
   t = 0:(nsam-1);
 
   rx_bb = rx .* exp(-j*wc*t);      % down to complex baseband
   rx_bb = filter(fm_states.bin,1,rx_bb);
   rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
-  rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
+  rx_out = (1/wd)*atan2(imag(rx_bb_diff),real(rx_bb_diff));
   rx_out = filter(fm_states.bout,1,rx_out);
   if fm_states.de_emp
     rx_out = filter(1,fm_states.prede,rx_out);
@@ -236,7 +266,9 @@ function sim_out = analog_fm_test(sim_in)
 
   fm_states.pre_emp = pre_emp = sim_in.pre_emp;
   fm_states.de_emp  = de_emp = sim_in.de_emp;
+  fm_states.Ts = 1;
   fm_states = analog_fm_init(fm_states);
+  sim_out.Bfm = fm_states.Bfm;
 
   Fs = fm_states.Fs;
   Bfm = fm_states.Bfm;
@@ -334,23 +366,54 @@ endfunction
 
 more off;
 
-function run_fsk_sim
+function run_fsk_curves
+  sim_in.fmark     = 1200;
+  sim_in.fspace    = 2200;
   sim_in.Rs        = 1200;
-  sim_in.framesize = 1200;
-  sim_in.EbNodB    = 30;
-  sim_in.fm        = 1;
+  sim_in.nsym      = 12000;
+  sim_in.EbNodB    = 0:2:20;
+  sim_in.fm        = 0;
+  sim_in.verbose   = 1;
 
   EbNo  = 10 .^ (sim_in.EbNodB/10);
-  non_coh_theory.BERvec = 0.5*exp(-EbNo/2);
-  non_coh_sim = ber_test(sim_in);
+  fsk_theory.BERvec = 0.5*exp(-EbNo/2); % non-coherent BFSK demod
+  fsk_sim = fsk_ber_test(sim_in);
+
+  sim_in.fm  = 1;
+  fsk_fm_sim = fsk_ber_test(sim_in);
+
+  % BER v Eb/No curves
 
   figure(1); 
   clf;
-  semilogy(sim_in.EbNodB, non_coh_theory.BERvec,'r;FSK non coherent AWGN theory;')
+  semilogy(sim_in.EbNodB, fsk_theory.BERvec,'r;FSK theory;')
   hold on;
-  semilogy(sim_in.EbNodB, non_coh_sim.BERvec,'g;FSK non coherent AWGN sim;')
+  semilogy(sim_in.EbNodB, fsk_sim.BERvec,'g;FSK sim;')
+  semilogy(sim_in.EbNodB, fsk_fm_sim.BERvec,'b;FSK over FM sim;')
   hold off;
   grid("minor");
+  axis([min(sim_in.EbNodB) max(sim_in.EbNodB) 1E-4 1])
+  legend("boxoff");
+  xlabel("Eb/No (dB)");
+  ylabel("Bit Error Rate (BER)")
+
+  % BER v SNR (3000 Hz noise BW and Eb=C/Rs=1/Rs)
+  % Eb/No = (C/Rs)/(1/(N/B))
+  % C/N   = (Eb/No)*(Rs/B)
+
+  RsOnB_dB = 10*log10(sim_in.Rs/3000);
+  figure(2); 
+  clf;
+  semilogy(sim_in.EbNodB+RsOnB_dB, fsk_theory.BERvec,'r;FSK theory;')
+  hold on;
+  semilogy(sim_in.EbNodB+RsOnB_dB, fsk_sim.BERvec,'g;FSK sim;')
+  semilogy(sim_in.EbNodB+RsOnB_dB, fsk_fm_sim.BERvec,'b;FSK over FM sim;')
+  hold off;
+  grid("minor");
+  axis([min(sim_in.EbNodB) max(sim_in.EbNodB) 1E-4 1])
+  legend("boxoff");
+  xlabel("S/N for RS=1200 bit/s and 3000 Hz noise bandwidth(dB)");
+  ylabel("Bit Error Rate (BER)")
 end
 
 function run_fm_curves
@@ -361,16 +424,36 @@ function run_fm_curves
   sim_in.CNdB = -4:2:20;
 
   sim_out = analog_fm_test(sim_in);
+
   figure(1)
   clf
   plot(sim_in.CNdB, sim_out.snrdB,"r;FM Simulated;");
   hold on;
   plot(sim_in.CNdB, sim_out.snr_theorydB,"g;FM Theory;");
-  plot(sim_in.CNdB, sim_in.CNdB,"g; SSB Theory;");
+  plot(sim_in.CNdB, sim_in.CNdB,"b; SSB Theory;");
   hold off;
-  grid;
-  xlabel("FM demod input CNR (dB)");
-  ylabel("FM demod output SNR (dB)");
+  grid("minor");
+  xlabel("FM demod input C/N (dB)");
+  ylabel("FM demod output S/N (dB)");
+  legend("boxoff");
+
+  % C/No curves
+
+  Bfm_dB = 10*log10(sim_out.Bfm);
+  Bssb_dB = 10*log10(3000);
+
+  figure(2)
+  clf
+  plot(sim_in.CNdB + Bfm_dB, sim_out.snrdB,"r;FM Simulated;");
+  hold on;
+  plot(sim_in.CNdB + Bfm_dB, sim_out.snr_theorydB,"g;FM Theory;");
+  plot(sim_in.CNdB + Bssb_dB, sim_in.CNdB,"b; SSB Theory;");
+  hold off;
+  grid("minor");
+  xlabel("FM demod input C/No (dB)");
+  ylabel("FM demod output S/N (dB)");
+  legend("boxoff");
+
 endfunction
 
 function run_fm_single
@@ -383,6 +466,7 @@ function run_fm_single
   sim_out = analog_fm_test(sim_in);
 end
 
-run_fm_curves
-%run_fm_single
+%run_fsk_curves
+%run_fm_curves
+run_fm_single
 
