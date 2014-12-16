@@ -11,13 +11,12 @@ function fm_states = analog_fm_init(fm_states)
 
   Fs = fm_states.Fs; FsOn2 = Fs/2;  
   fm_max = fm_states.fm_max;                 % max modulation freq
-  fm_states.fc = 24E3;                       % carrier frequency
   fd = fm_states.fd;                         % (max) deviation
   fm_states.m = fd/fm_max;                   % modulation index
   fm_states.Bfm = Bfm = 2*(fd+fm_max);       % Carson's rule for FM signal bandwidth
   fm_states.tc = tc = 50E-6;
   fm_states.prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
-
+  
   % Select length of filter to be an integer number of symbols to
   % assist with "fine" timing offset estimation.  Set Ts to 1 for
   % analog modulation.
@@ -43,9 +42,8 @@ function fm_states = analog_fm_init(fm_states)
 
   % demoduator output filter to limit us to fm_max (e.g. 3kHz)
 
-  fc = (fm_max)/(FsOn2);
+  fc = fm_max/(FsOn2);
   fm_states.bout = firls(ncoeffs,[0 0.95*fc 1.05*fc 1], [1 1 0.01 0.01]);
-
 endfunction
 
 
@@ -83,7 +81,9 @@ function [rx_out rx_bb] = analog_fm_demod(fm_states, rx)
   rx_bb = filter(fm_states.bin,1,rx_bb);
   rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
   rx_out = (1/wd)*atan2(imag(rx_bb_diff),real(rx_bb_diff));
-  rx_out = filter(fm_states.bout,1,rx_out);
+  if fm_states.output_filter
+    rx_out = filter(fm_states.bout,1,rx_out);
+  end
   if fm_states.de_emp
     rx_out = filter(1,fm_states.prede,rx_out);
   end
@@ -98,10 +98,12 @@ function sim_out = analog_fm_test(sim_in)
   Fs = fm_states.Fs = 96000;  
   fm_max = fm_states.fm_max = 3E3;
   fd = fm_states.fd = 5E3;
+  fm_states.fc = 24E3;
 
   fm_states.pre_emp = pre_emp = sim_in.pre_emp;
   fm_states.de_emp  = de_emp = sim_in.de_emp;
   fm_states.Ts = 1;
+  fm_states.output_filter = 1;
   fm_states = analog_fm_init(fm_states);
   sim_out.Bfm = fm_states.Bfm;
 
@@ -246,7 +248,7 @@ function run_fm_single
   sim_in.pre_emp = 0;
   sim_in.de_emp  = 0;
 
-  sim_in.CNdB   = 10;
+  sim_in.CNdB   = 20;
   sim_out = analog_fm_test(sim_in);
 end
 
