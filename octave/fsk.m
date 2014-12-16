@@ -50,8 +50,10 @@ function sim_out = fsk_ber_test(sim_in)
     fm_states.de_emp  = 0;
     fm_states.Ts      = Ts;
     fm_states.Fs      = Fs; 
+    fm_states.fc      = Fs/4; 
     fm_states.fm_max  = 3E3;
     fm_states.fd      = 5E3;
+    fm_states.output_filter = 1;
     fm_states = analog_fm_init(fm_states);
   end
 
@@ -168,10 +170,6 @@ function sim_out = fsk_ber_test(sim_in)
       stem(abs(mark_int(1:100)));
       subplot(212)
       stem(abs(space_int(1:100)));   
-      
-      figure(5)
-      clf
-      plot(error_positions);
     end
 
     if verbose
