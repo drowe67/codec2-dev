@@ -3,8 +3,8 @@
 %
 % GMSK modem simulation
 %
-% [ ] plot eye diagram
-% [ ] BER curves with theoretical results
+% [X] plot eye diagram
+% [ ] BER curves with reas match to theoretical
 % [ ] spectrum - will it pass thru a HT?
 
 % Filter coeffs From:
@@ -60,10 +60,10 @@ randn('state',1);
 graphics_toolkit ("gnuplot");
 fm;
 
-function gmsk_states = gmsk_init
+function gmsk_states = gmsk_init(gmsk_states)
   gmsk_states.Fs = 48000;
   gmsk_states.Rs = 4800;
-  gmsk_states.M = gmsk_states.Fs/gmsk_states.Rs;
+  M = gmsk_states.M = gmsk_states.Fs/gmsk_states.Rs;
   global gmsk_mod_coeff;
   global gmsk_demod_coeff;
 
@@ -78,11 +78,18 @@ function gmsk_states = gmsk_init
 
   [x i_mod] = max(gmsk_mod_coeff);
   [x i_demod] = max(gmsk_demod_coeff);
-  gmsk_states.filter_delay = i_mod + i_demod;
+  if strcmp(gmsk_states.rx_filter,"lowpass")
+    gmsk_states.filter_delay = i_mod + i_demod;
+  elseif strcmp(gmsk_states.rx_filter,"matched")
+    gmsk_states.filter_delay = i_mod + i_mod;
+  else
+    printf("filter type not known");
+  end
 
-  gmsk_states.Toff = -2;
-  gmsk_states.dsam = dsam = gmsk_states.filter_delay + gmsk_states.fm_states.nsym_delay*gmsk_states.M;
+  gmsk_states.Toff = 2;
+  gmsk_states.dsam = dsam = gmsk_states.filter_delay;
   gmsk_states.dsym = floor(dsam/gmsk_states.M);
+
 endfunction
 
 
@@ -92,11 +99,14 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
   nsam = nsym*M;
   global gmsk_mod_coeff;
 
+  % NRZ sequence of symbols
+
   tx_symbols = zeros(1,nsam);
-  tx_symbols(1:M:nsam) = -1 + 2*tx_bits;
+  for i=1:nsym
+    tx_symbols(1+(i-1)*M:i*M) = -1 + 2*tx_bits(i);
+  end
 
   tx_filt = filter(gmsk_mod_coeff, 1, tx_symbols);
-  tx_filt = tx_filt / max(tx_filt);
   tx = analog_fm_mod(gmsk_states.fm_states, tx_filt);
 
   % work out delays of filter to align bits
@@ -104,22 +114,28 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
 endfunction
 
 
-function [rx_bits rx_filt] = gmsk_demod(gmsk_states, rx)
+function [rx_bits rx_out] = gmsk_demod(gmsk_states, rx)
   M = gmsk_states.M;
   nsam = length(rx);
   nsym = floor(nsam/M);
   global gmsk_demod_coeff;
+  global gmsk_mod_coeff;
+  wd = 2*pi*gmsk_states.fm_states.fd/gmsk_states.Fs;
 
-  [rx_bb fm_bb] = analog_fm_demod(gmsk_states.fm_states, rx);
-  rx_filt = filter(gmsk_demod_coeff, 1, rx_bb);
+  if strcmp(gmsk_states.rx_filter,"lowpass")
+    rx_filt = filter(gmsk_demod_coeff, 1, rx);
+  elseif strcmp(gmsk_states.rx_filter,"matched")
+    rx_filt = filter(gmsk_mod_coeff, 1, rx);
+  else
+    printf("filter type not known");   
+  end
 
-  rx_bits = zeros(1,nsym);
+  rx_diff = [ 1 rx_filt(2:nsam) .* conj(rx_filt(1:nsam-1))];
+  rx_out = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
+
   Toff = gmsk_states.Toff;
-  dsam = gmsk_states.dsam;
-  rx_bits = rx_filt(dsam+1+Toff:M:length(rx_filt)) > 0;
-
-  figure(1)
-  plot(fm_bb)
+  dsam = gmsk_states.filter_delay;
+  rx_bits = rx_out(1+dsam+Toff:M:length(rx_out)) > 0;
 endfunction
 
 
@@ -128,12 +144,14 @@ function sim_out = gmsk_test(sim_in)
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
 
-  gmsk_states = gmsk_init;
+  gmsk_states.rx_filter = sim_in.filter;
+  gmsk_states = gmsk_init(gmsk_states);
   M = gmsk_states.M;
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
   Bfm = gmsk_states.fm_states.Bfm;
   dsam = gmsk_states.dsam;
+  Toff = gmsk_states.Toff;
  
   for ne = 1:length(EbNodB)
     aEbNodB = EbNodB(ne);
@@ -141,14 +159,18 @@ function sim_out = gmsk_test(sim_in)
     variance = Fs/(Rs*EbNo);
 
     tx_bits = round(rand(1, nsym));
+    %tx_bits = ones(1, nsym);
+    %tx_bits(2:2:nsym) = 0;
     [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
     nsam = length(tx);
-
+    
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
     rx    = tx + noise;
+    [rx_bits rx_out] = gmsk_demod(gmsk_states, rx);
+      
+    %tx_bits(1:10)
+    %rx_bits(1:10)
 
-    [rx_bits rx_filt] = gmsk_demod(gmsk_states, rx);
-  
     l = length(rx_bits);
     error_positions = xor(rx_bits(1:l), tx_bits(1:l));
     Nerrs = sum(error_positions);
@@ -161,26 +183,41 @@ function sim_out = gmsk_test(sim_in)
 
     if verbose > 1
 
+      figure(1)
+      eyesyms = 2;
+      plot(rx_out(dsam+1+Toff:dsam+eyesyms*M+Toff))
+      hold on;
+      for i=1:10
+        st = dsam+1+Toff+i*eyesyms*M;
+        en = st + eyesyms*M;
+        plot(rx_out(st:en))
+      end
+      hold off;
+      axis([0 eyesyms*M -2 2]);
+      title('Eye Diagram');
+
       figure(2);
       nplot = 16;
       clf;
       subplot(211)
       stem(tx_symbols(1:M:nplot*M))
       axis([1 nplot -1 1])
+      title('tx symbols');
       subplot(212)
-      Toff = gmsk_states.Toff;
-      stem(rx_filt(dsam+1+Toff:M:dsam+nplot*M+Toff))
+      stem(rx_out(dsam+1+Toff:M:dsam+nplot*M+Toff))
       axis([1 nplot -1 1])
+      title('rx symbols');
 
       figure(3);
       clf;
       subplot(211)
-      plot(tx_filt(21+1:21+nplot*M))
+      plot(tx_filt(21+1:21+1+nplot*M))
       axis([1 nplot*M -1 1]);
+      title('tx after guassian filter');
       subplot(212)
-      d = gmsk_states.filter_delay + gmsk_states.fm_states.nsym_delay*M;
-      plot(rx_filt(d+1:d+nplot*M))
+      plot(rx_out(dsam+1+Toff:dsam+nplot*M+Toff))
       axis([1 nplot*M -1 1]);
+      title('rx after before sampling');
 
       figure(4);
       clf
@@ -190,7 +227,7 @@ function sim_out = gmsk_test(sim_in)
       plot(Tx)
       grid;
       title('GMSK Demodulator Input Spectrum');
-      axis([1 Fs/2 0 80])
+      axis([1 10000 0 80])
 
       subplot(212)
       f = fft(tx);
@@ -207,21 +244,9 @@ function sim_out = gmsk_test(sim_in)
       hold off;  
       title("Cumulative Power");
       grid;
+      axis([1 10000 0 max(cs)])
 
       printf("Bfm: %4.0fHz %3.0f%% power bandwidth %4.0fHz = %3.2f*Rb\n", Bfm, x*100, bw, bw/Rs);
-
-      figure(5)
-      clf;
-      subplot(211)
-      Tx_filt = 20*log10(abs(fft(tx_filt)));
-      plot(Tx_filt)
-      axis([1 10000 0 80]);
-      grid;
-      subplot(212)
-      Rx_filt = 20*log10(abs(fft(rx_filt)));
-      plot(Rx_filt)
-      axis([1 10000 0 80]);
-      grid;
     end
   end
 
@@ -231,8 +256,9 @@ function sim_out = gmsk_test(sim_in)
 endfunction
 
 function run_gmsk_single
+  sim_in.filter = "lowpass";
   sim_in.nsym = 4800;
-  sim_in.EbNodB = 120;
+  sim_in.EbNodB = 10;
   sim_in.verbose = 2;
 
   sim_out = gmsk_test(sim_in);
@@ -282,7 +308,12 @@ function run_gmsk_curves
 
 endfunction
 
+function run_gmsk_init
+  gmsk_init;
+endfunction
+
 run_gmsk_single
 %run_gmsk_curves
+%run_gmsk_init
 
 

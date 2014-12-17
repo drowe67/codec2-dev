@@ -66,7 +66,7 @@ function tx = analog_fm_mod(fm_states, mod)
     tx_phase = tx_phase + w;
     tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
     tx(i+1) = exp(j*tx_phase);
-  end       
+  end
 endfunction
 
 
