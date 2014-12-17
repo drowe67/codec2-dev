@@ -79,9 +79,10 @@ function gmsk_states = gmsk_init(gmsk_states)
   [x i_mod] = max(gmsk_mod_coeff);
   [x i_demod] = max(gmsk_demod_coeff);
   if strcmp(gmsk_states.rx_filter,"lowpass")
-    gmsk_states.filter_delay = i_mod + i_demod;
-  elseif strcmp(gmsk_states.rx_filter,"matched")
-    gmsk_states.filter_delay = i_mod + i_mod;
+    %gmsk_states.filter_delay = i_mod + i_demod;
+    gmsk_states.filter_delay = i_mod + 100+21;
+  elseif strcmp(gmsk_states.rx_filter,"ml")
+    gmsk_states.filter_delay = i_mod + 100+35;
   else
     printf("filter type not known");
   end
@@ -90,6 +91,27 @@ function gmsk_states = gmsk_init(gmsk_states)
   gmsk_states.dsam = dsam = gmsk_states.filter_delay;
   gmsk_states.dsym = floor(dsam/gmsk_states.M);
 
+  % Max Likelihood 3 symbol filter
+  % Matched rx filter of all possible 3 bit sequences, an attempt to
+  % account for ISI.  Note filtering is in phase domain to model use
+  % of legacy FM radios where FM mod.demod is not in DSP.
+
+  ml_bits = [ 0 0 0; 0 0 1; 0 1 0; 0 1 1; 1 0 0; 1 0 1; 1 1 0; 1 1 1];
+  ml_symbols = zeros(8,7*M);
+  for r=1:8
+    for c=1:3
+      ml_symbols(r,1+(c-1)*M:c*M) = -1 + 2*ml_bits(r,c);
+    end
+    ml_filt(r,:) = filter(gmsk_mod_coeff,1,ml_symbols(r,:));
+  end
+  figure(5)
+  subplot(211)
+  plot(ml_symbols')  
+  subplot(212)
+  plot(ml_filt')
+
+  gmsk_states.ml_filt = ml_filt;
+  gmsk_states.ml_bits = ml_bits;
 endfunction
 
 
@@ -122,20 +144,60 @@ function [rx_bits rx_out] = gmsk_demod(gmsk_states, rx)
   global gmsk_mod_coeff;
   wd = 2*pi*gmsk_states.fm_states.fd/gmsk_states.Fs;
 
-  if strcmp(gmsk_states.rx_filter,"lowpass")
-    rx_filt = filter(gmsk_demod_coeff, 1, rx);
-  elseif strcmp(gmsk_states.rx_filter,"matched")
-    rx_filt = filter(gmsk_mod_coeff, 1, rx);
-  else
-    printf("filter type not known");   
-  end
+  % wide filter that introduces no ISI but limits noise
+  % at input to FM demod
+
+  %fc = (4800)/(gmsk_states.Fs/2);
+  %bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
+  %rx_filt = filter(bin, 1, rx);
+  g = raised_cosine_filter(0.5,M);
+  rx_filt = filter(bin, 1, rx);
+
+  % FM demod
 
   rx_diff = [ 1 rx_filt(2:nsam) .* conj(rx_filt(1:nsam-1))];
   rx_out = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
 
+  % ML detector, bank of 8 filters that we run in parallel
+  rx_ml_out = zeros(8,nsam);
+  for r=1:8
+    rx_ml_out(r,:) = filter(gmsk_states.ml_filt(r,:), 1, rx_out);
+  end
+
+  figure(6)
+  clf
+  nplot = 10;
+  dsam = gmsk_states.dsam;
+  Toff = gmsk_states.Toff;
+  %subplot(8,1,1)
+  st = 1+dsam+Toff;
+  en = st + nplot*M-1;
+  mesh(1:nplot*M, 1:8, rx_ml_out(:,st:en))
+  %hold on;
+  %for r=2:8
+  %  %subplot(8,1,r)
+  %  plot(rx_ml_out(r,1+dsam+Toff:+dsam+Toff+nplot*M))
+  %end
+  %hold off;
+
+  % choose maxima
+
+  Toff = 15;
+  for i=1:nsym - (1 + dsam + Toff)/M
+    s = 1 + dsam + Toff + (i-1)*M;
+    [m(i) r] = max(rx_ml_out(:,s));
+    rx_bits(i) = gmsk_states.ml_bits(r,2);
+  end
+  nplot = 200;
+  figure(7)
+  subplot(211)
+  stem(m(1:nplot))
+  subplot(212)
+  stem(rx_bits(1:nplot))
+
   Toff = gmsk_states.Toff;
   dsam = gmsk_states.filter_delay;
-  rx_bits = rx_out(1+dsam+Toff:M:length(rx_out)) > 0;
+  %rx_bits = rx_out(1+dsam+Toff:M:length(rx_out)) > 0;
 endfunction
 
 
@@ -158,9 +220,9 @@ function sim_out = gmsk_test(sim_in)
     EbNo = 10^(aEbNodB/10);
     variance = Fs/(Rs*EbNo);
 
-    tx_bits = round(rand(1, nsym));
-    %tx_bits = ones(1, nsym);
-    %tx_bits(2:2:nsym) = 0;
+    %tx_bits = round(rand(1, nsym));
+    tx_bits = ones(1, nsym);
+    tx_bits(2:2:nsym) = 0;
     [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
     nsam = length(tx);
     
@@ -255,6 +317,7 @@ function sim_out = gmsk_test(sim_in)
   sim_out.Rs = gmsk_states.Rs;
 endfunction
 
+
 function run_gmsk_single
   sim_in.filter = "lowpass";
   sim_in.nsym = 4800;
@@ -263,6 +326,7 @@ function run_gmsk_single
 
   sim_out = gmsk_test(sim_in);
 endfunction
+
 
 function run_gmsk_curves
   sim_in.nsym = 4800;
@@ -309,7 +373,8 @@ function run_gmsk_curves
 endfunction
 
 function run_gmsk_init
-  gmsk_init;
+  sim_in.rx_filter = "lowpass";
+  gmsk_init(sim_in);
 endfunction
 
 run_gmsk_single
