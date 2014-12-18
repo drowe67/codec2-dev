@@ -4,7 +4,7 @@
 % GMSK modem simulation
 %
 % [X] plot eye diagram
-% [ ] BER curves with reas match to theoretical
+% [X] BER curves with reas match to theoretical
 % [ ] spectrum - will it pass thru a HT?
 
 % Filter coeffs From:
@@ -88,11 +88,12 @@ function gmsk_states = gmsk_init(gmsk_states)
 
   if gmsk_states.coherent_demod
     gmsk_states.filter_delay = i_mod + i_mod;
+    gmsk_states.Toff = -2;
   else
     gmsk_states.filter_delay = i_mod + i_demod + 100;
-  end
+    gmsk_states.Toff = 2;
+ end
 
-  gmsk_states.Toff = 0;
   gmsk_states.dsam = dsam = gmsk_states.filter_delay;
 
 endfunction
@@ -147,18 +148,9 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
 
     % sample symbols at end of integration
 
-    Toff = -2;
     dsam = 41 + M;
     re_syms = re(1+dsam+Toff:2*M:nsam);
     im_syms = im(1+dsam+M+Toff:2*M:nsam);
-
-    if 0
-    figure(5)
-    subplot(211)
-    stem(re_syms(1:10)/(2*M));
-    subplot(212)
-    stem(im_syms(1:10)/(2*M))
-    end
 
     % XORs/adders on the RHS of Muroyta et al Fig 8 (a) and (b).  We
     % simulate digital logic bit stream at clock rate Rs, even though
@@ -185,14 +177,23 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
   else
     % non-coherent demod
 
+    % filter to get rid of most of noise before FM demod, but doesnt
+    % introduce any ISI
+
     fc = (4800)/(gmsk_states.Fs/2);
     bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
     rx_filt = filter(bin, 1, rx);
+
+    % FM demod
+
     rx_diff = [ 1 rx_filt(2:nsam) .* conj(rx_filt(1:nsam-1))];
     rx_out = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
-    rx_out = filter(gmsk_demod_coeff, 1, rx_out);
 
-    rx_bits = rx_out(1+dsam+Toff:M:length(rx_out)) > 0;
+    % low pass filter, trade off betwen ISI and removing noise
+
+    rx_out = filter(gmsk_demod_coeff, 1, rx_out);
+    
+    rx_bits = real(rx_out(1+dsam+Toff:M:length(rx_out)) > 0);
   end
 
 endfunction
@@ -240,8 +241,9 @@ function sim_out = gmsk_test(sim_in)
 
     if verbose > 1
 
-      if !gmsk_states.coherent_demod
+      if gmsk_states.coherent_demod == 0
         figure(1)
+        clf
         eyesyms = 2;
         plot(rx_out(dsam+1+Toff:dsam+eyesyms*M+Toff))
         hold on;
@@ -253,61 +255,38 @@ function sim_out = gmsk_test(sim_in)
         hold off;
         axis([0 eyesyms*M -2 2]);
         title('Eye Diagram');
-      end
+      else
+        figure(1);
+        nplot = 16;
+        clf;
+        subplot(211)
+        plot(real(rx_filt(1:nplot*M)))
+        axis([1 nplot*M -1 1])
+        title('Matched Filter');
+        subplot(212)
+        plot(imag(rx_filt(1:nplot*M)))
+        axis([1 nplot*M -1 1])
 
-      figure(1);
-      nplot = 16;
-      clf;
-      subplot(211)
-      plot(real(rx_filt(1:nplot*M))/(2*M))
-      axis([1 nplot*M -1 1])
-      title('Matched Filter');
-      subplot(212)
-      plot(imag(rx_filt(1:nplot*M))(2*M))
-      axis([1 nplot*M -1 1])
-
-      figure(2);
-      nplot = 16;
-      clf;
-      subplot(211)
-      plot(real(rx_out(1:nplot*M)))
-      title('Integrator');
-      axis([1 nplot*M -1 1])
-      subplot(212)
-      plot(imag(rx_out(1:nplot*M)))
-      axis([1 nplot*M -1 1])
+        figure(2);
+        nplot = 16;
+        clf;
+        subplot(211)
+        plot(real(rx_out(1:nplot*M))/(2*M))
+        title('Integrator');
+        axis([1 nplot*M -1 1])
+        subplot(212)
+        plot(imag(rx_out(1:nplot*M)/(2*M)))
+        axis([1 nplot*M -1 1])
+     end
 
       figure(3)
       clf
       subplot(211)
       stem(tx_bits(1:20))
+      title('Tx Bits')
       subplot(212)
       stem(rx_bits(1:20))
-      rx_bits(1:10)
-if 0 
-      figure(3);
-      nplot = 16;
-      clf;
-      subplot(211)
-      stem(tx_symbols(1:M:nplot*M))
-      axis([1 nplot -1 1])
-      title('tx symbols');
-      subplot(212)
-      stem(rx_out(dsam+1+Toff:M:dsam+nplot*M+Toff))
-      axis([1 nplot -1 1])
-      title('rx symbols');
-
-     figure(3);
-      clf;
-      subplot(211)
-      plot(tx_filt(21+1:21+1+nplot*M))
-      axis([1 nplot*M -1 1]);
-      title('tx after guassian filter');
-      subplot(212)
-      plot(rx_out(dsam+1+Toff:dsam+nplot*M+Toff))
-      axis([1 nplot*M -1 1]);
-      title('rx after before sampling');
-end
+      title('Rx Bits')
 
       figure(4);
       clf
@@ -317,7 +296,7 @@ end
       plot(Tx)
       grid;
       title('GMSK Demodulator Input Spectrum');
-      axis([1 10000 0 80])
+      axis([1 5000 0 80])
 
       subplot(212)
       f = fft(tx);
@@ -334,7 +313,7 @@ end
       hold off;  
       title("Cumulative Power");
       grid;
-      axis([1 10000 0 max(cs)])
+      axis([1 5000 0 max(cs)])
 
       printf("Bfm: %4.0fHz %3.0f%% power bandwidth %4.0fHz = %3.2f*Rb\n", Bfm, x*100, bw, bw/Rs);
     end
@@ -347,7 +326,7 @@ endfunction
 
 
 function run_gmsk_single
-  sim_in.coherent_demod = 0;
+  sim_in.coherent_demod = 1;
   sim_in.nsym = 4800;
   sim_in.EbNodB = 10;
   sim_in.verbose = 2;
@@ -358,8 +337,8 @@ endfunction
 
 function run_gmsk_curves
   sim_in.coherent_demod = 1;
-  sim_in.nsym = 4800;
-  sim_in.EbNodB = 2:8;
+  sim_in.nsym = 48000;
+  sim_in.EbNodB = 2:10;
   sim_in.verbose = 1;
 
   gmsk_coh = gmsk_test(sim_in);
@@ -369,7 +348,7 @@ function run_gmsk_curves
 
   Rs = gmsk_coh.Rs;
   EbNo  = 10 .^ (sim_in.EbNodB/10);
-  alpha = 0.75;
+  alpha = 0.75; % guess for BT=0.5 GMSK
   gmsk_theory.BERvec = 0.5*erfc(sqrt(alpha*EbNo));
 
   % BER v Eb/No curves
@@ -397,7 +376,7 @@ function run_gmsk_curves
   semilogy(sim_in.EbNodB+RsOnB_dB, gmsk_theory.BERvec,'r;GMSK theory;')
   hold on;
   semilogy(sim_in.EbNodB+RsOnB_dB, gmsk_coh.BERvec,'g;GMSK sim coherent;')
-  semilogy(sim_in.EbNodB, gmsk_noncoh.BERvec,'b;GMSK sim non-coherent;')
+  semilogy(sim_in.EbNodB+RsOnB_dB, gmsk_noncoh.BERvec,'b;GMSK sim non-coherent;')
   hold off;
   grid("minor");
   axis([min(sim_in.EbNodB+RsOnB_dB) max(sim_in.EbNodB+RsOnB_dB) 1E-4 1])
@@ -412,8 +391,8 @@ function run_gmsk_init
   gmsk_init(sim_in);
 endfunction
 
-run_gmsk_single
-%run_gmsk_curves
+%run_gmsk_single
+run_gmsk_curves
 %run_gmsk_init
 
 
