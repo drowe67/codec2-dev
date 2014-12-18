@@ -89,7 +89,7 @@ struct freedv *freedv_open(int mode) {
     nbit = 2*fdmdv_bits_per_frame(f->fdmdv);
     f->tx_bits = (int*)malloc(nbit*sizeof(int));
     f->rx_bits = (int*)malloc(nbit*sizeof(int));
- 
+    
     nbit = fdmdv_bits_per_frame(f->fdmdv);
     f->fdmdv_bits = (int*)malloc(nbit*sizeof(int));
 
@@ -333,15 +333,15 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
                 recd_codeword = 0;
                 for(i=0; i<8; i++) {
                     recd_codeword <<= 1;
-                    recd_codeword |= f->rx_bits[i];
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
                 }
                 for(i=11; i<15; i++) {
                     recd_codeword <<= 1;
-                    recd_codeword |= f->rx_bits[i];
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
                 }
                 for(i=bits_per_codec_frame; i<bits_per_codec_frame+11; i++) {
                     recd_codeword <<= 1;
-                    recd_codeword |= f->rx_bits[i];
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
                 }
                 codeword1 = golay23_decode(recd_codeword);
                 f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
