@@ -6,7 +6,7 @@
 
   To test:
   
-     src$ gcc golay23.c -o golay23 -Wall -DGOLAY23_UNITTEST
+     src$ gcc golay23.c -o golay23 -Wall -DGOLAY23_UNITTEST -DRUN_TIME_TABLES
      src$ ./golay23
 
   To generate tables:
@@ -257,9 +257,9 @@ void golay23_init(void) {
 
 int golay23_encode(int data) {
     assert(inited);
+    assert(data <= 0xfff);
 
     //printf("data: 0x%x\n", data);
-    assert(data <= 0xfff);
     return encoding_table[data];
 }
 
@@ -275,6 +275,7 @@ int golay23_encode(int data) {
 
 int golay23_decode(int received_codeword) {
     assert(inited);
+    assert((received_codeword < (1<<23)) && (received_codeword >= 0));
 
     //printf("syndrome: 0x%x\n", get_syndrome(received_codeword));
     return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
