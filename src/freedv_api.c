@@ -291,7 +291,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 float rxdata[FDMDV_MAX_SAMPLES_PER_FRAME];
 int i;
 
-    for(i=0; i<f->nin; i++)  rxdata[i] = (float)demod_in[i]/FDMDV_SCALE;
+    for(i=0; i<f->nin; i++)
+        rxdata[i] = (float)demod_in[i]/FDMDV_SCALE;
 
     return freedv_floatrx(f, speech_out, rxdata);
     
@@ -404,7 +405,7 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         /* if not in sync pass through analog samples */
         /* this lets us "hear" whats going on, e.g. during tuning */
         for(i=0; i<nin_prev; i++)
-            speech_out[i] = demod_in[i];
+            speech_out[i] = FDMDV_SCALE*demod_in[i];
         nout = nin_prev;
     }
 
