@@ -5,7 +5,10 @@
 %
 % [X] plot eye diagram
 % [X] BER curves with reas match to theoretical
-% [ ] spectrum - will it pass thru a HT?
+% [X] fine timing estimator 
+% [ ] phase/freq estimator
+% [ ] coarse timing estimator (sync up to known test frames)
+% [ ] file read/write interface
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -88,10 +91,10 @@ function gmsk_states = gmsk_init(gmsk_states)
 
   if gmsk_states.coherent_demod
     gmsk_states.filter_delay = i_mod + i_mod;
-    gmsk_states.Toff = -2;
+    gmsk_states.Toff = -4;
   else
     gmsk_states.filter_delay = i_mod + i_demod + 100;
-    gmsk_states.Toff = 2;
+    gmsk_states.Toff = 3;
  end
 
   gmsk_states.dsam = dsam = gmsk_states.filter_delay;
@@ -119,6 +122,8 @@ endfunction
 
 function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
   M = gmsk_states.M;
+  Rs = gmsk_states.Rs;
+  Fs = gmsk_states.Fs;
   nsam = length(rx);
   nsym = floor(nsam/M);
   global gmsk_demod_coeff;
@@ -146,9 +151,19 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     im = conv(imag(rx_filt),ones(1,2*M));
     rx_out = re + j*im;
 
+    dsam = 41 + M;
+
+    % timing estimate todo: clean up all these magic numbers
+
+    x = abs(re);
+    w = 2*pi*(Rs/2)/Fs;
+    X = x(dsam:nsam) * exp(j*w*(0:nsam-dsam))';
+    timing_adj = angle(X)*2*M/(2*pi);
+    printf("%f %f\n", angle(X), timing_adj);
+    dsam -= floor(timing_adj) - 2;
+
     % sample symbols at end of integration
 
-    dsam = 41 + M;
     re_syms = re(1+dsam+Toff:2*M:nsam);
     im_syms = im(1+dsam+M+Toff:2*M:nsam);
 
@@ -227,7 +242,8 @@ function sim_out = gmsk_test(sim_in)
     %tx_bits(1:10)
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
     rx    = tx + noise;
-    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
+
+    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(5:length(rx)));
       
     l = length(rx_bits);
     error_positions = xor(rx_bits(1:l), tx_bits(1:l));
@@ -316,6 +332,18 @@ function sim_out = gmsk_test(sim_in)
       axis([1 5000 0 max(cs)])
 
       printf("Bfm: %4.0fHz %3.0f%% power bandwidth %4.0fHz = %3.2f*Rb\n", Bfm, x*100, bw, bw/Rs);
+
+      % timing/phase info?
+
+      figure(5)
+      x = abs(real(rx_out));
+      subplot(211)
+      plot(x)
+      axis([1 M*160 min(x) max(x)])      
+      subplot(212)
+      X = 20*log10(abs(fft(x)));
+      plot(X)
+      axis([1 5000 min(X) max(X)])
     end
   end
 
@@ -328,7 +356,7 @@ endfunction
 function run_gmsk_single
   sim_in.coherent_demod = 1;
   sim_in.nsym = 4800;
-  sim_in.EbNodB = 10;
+  sim_in.EbNodB = 6;
   sim_in.verbose = 2;
 
   sim_out = gmsk_test(sim_in);
@@ -337,7 +365,7 @@ endfunction
 
 function run_gmsk_curves
   sim_in.coherent_demod = 1;
-  sim_in.nsym = 48000;
+  sim_in.nsym = 4800;
   sim_in.EbNodB = 2:10;
   sim_in.verbose = 1;
 
