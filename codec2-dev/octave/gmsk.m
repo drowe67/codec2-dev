@@ -7,6 +7,7 @@
 % [X] BER curves with reas match to theoretical
 % [X] fine timing estimator 
 % [ ] phase/freq estimator
+%     + need initial acquisition and tracking
 % [ ] coarse timing estimator (sync up to known test frames)
 % [ ] file read/write interface
 
@@ -159,8 +160,23 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     w = 2*pi*(Rs/2)/Fs;
     X = x(dsam:nsam) * exp(j*w*(0:nsam-dsam))';
     timing_adj = angle(X)*2*M/(2*pi);
-    printf("%f %f\n", angle(X), timing_adj);
+    %printf("%f %f\n", angle(X), timing_adj);
     dsam -= floor(timing_adj) - 2;
+
+    % prototype phase/fine freq tracking
+    % todo: freq acquisition, remove ampl info, closed loop tracking
+
+    a = sign(real(rx_filt)) .* sign(imag(rx_filt));
+    figure(6)
+    subplot(211)
+    plot(a(1:2000));        
+    subplot(212)
+    a_dec = a(dsam+Toff+M/2:2*M:length(a));
+    a_dec = filter(1,[1 -0.999],a_dec);
+    plot(a_dec)
+    mean(a)
+    mean(a_dec)
+    %axis([1 2000 -500 500])
 
     % sample symbols at end of integration
 
@@ -243,7 +259,7 @@ function sim_out = gmsk_test(sim_in)
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
     rx    = tx + noise;
 
-    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(5:length(rx)));
+    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, exp(-0*j*pi/4)*rx(1:length(rx)));
       
     l = length(rx_bits);
     error_positions = xor(rx_bits(1:l), tx_bits(1:l));
@@ -419,8 +435,8 @@ function run_gmsk_init
   gmsk_init(sim_in);
 endfunction
 
-%run_gmsk_single
-run_gmsk_curves
+run_gmsk_single
+%run_gmsk_curves
 %run_gmsk_init
 
 
