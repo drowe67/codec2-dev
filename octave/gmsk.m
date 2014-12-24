@@ -142,6 +142,29 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
 
     rx_filt = filter(gmsk_mod_coeff, 1, rx);
 
+    % TODO implement and test phase/fine freq tracking loop
+    if gmsk_states.phase_track
+      a = zeros(1,nsam);
+      phase_off_est = 0;
+      phase_gain = 0.01;
+      for i=1:nsam-1
+        rx_filt(i) *= exp(-j*phase_off_est);
+        a(i) = sign(real(rx_filt(i))) .* sign(imag(rx_filt(i)));
+        phase_off_est += phase_gain*a(i);       
+      end
+
+      figure(7)
+      subplot(211)
+      plot(a(1:2000));        
+      subplot(212)
+      a_dec = a(dsam+Toff+M/2:2*M:length(a));
+      a_dec = filter(1,[1 -0.999],a_dec);
+      plot(a_dec)
+      mean(a)
+      mean(a_dec)
+      %axis([1 2000 -500 500])
+    end
+
     % Property of MSK that re and im arms are sequences of 2T
     % long symbols, can be demodulated like QPSK with matched filter
     % and integrate and dump.
@@ -160,23 +183,8 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     w = 2*pi*(Rs/2)/Fs;
     X = x(dsam:nsam) * exp(j*w*(0:nsam-dsam))';
     timing_adj = angle(X)*2*M/(2*pi);
-    %printf("%f %f\n", angle(X), timing_adj);
+    printf("%f %f\n", angle(X), timing_adj);
     dsam -= floor(timing_adj) - 2;
-
-    % prototype phase/fine freq tracking
-    % todo: freq acquisition, remove ampl info, closed loop tracking
-
-    a = sign(real(rx_filt)) .* sign(imag(rx_filt));
-    figure(6)
-    subplot(211)
-    plot(a(1:2000));        
-    subplot(212)
-    a_dec = a(dsam+Toff+M/2:2*M:length(a));
-    a_dec = filter(1,[1 -0.999],a_dec);
-    plot(a_dec)
-    mean(a)
-    mean(a_dec)
-    %axis([1 2000 -500 500])
 
     % sample symbols at end of integration
 
@@ -230,12 +238,46 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
 endfunction
 
 
+function [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, rx, verbose)
+  Fs = gmsk_states.Fs;
+  Rs = gmsk_states.Rs;
+
+  % one frame should have preamble at start and end, enough to see in DFT 
+
+  f = fft(rx);
+  nsam = length(rx);
+
+  % Look for line at Rs/2.  Just look on +ve side for now, a more
+  % reliable method would be to check for mirror image of line at -ve,
+  % look for line in range +/- 100 Hz
+  
+  start_bin = floor((Rs/2 - 100)*nsam/Fs) + 1;
+  stop_bin = floor((Rs/2 + 100)*nsam/Fs) + 1;
+  [max_val max_bin] = max(abs(f(start_bin:stop_bin)));
+  printf("nsam: %d start_bin: %d start_bin: %d max_bin: %d\n", nsam, start_bin, stop_bin, max_bin);
+
+  % map max_bin to frequency offset
+
+  freq_offset_est = (max_bin - floor(100*nsam/Fs) - 1)*Fs/nsam;  
+  phase_offset_est = angle(f(max_bin)) - 0.935153; % magic number due to initial filter delay?
+
+  if verbose
+    printf("freq_offset_est: %f phase_offset_est: %f\n", freq_offset_est, phase_offset_est);
+    figure(6)
+    plot((1:nsam)*Fs/nsam, 20*log10(abs(f)));
+    axis([1 Rs 0 80]);
+  end
+
+endfunction
+
+
 function sim_out = gmsk_test(sim_in)
   nsym =  sim_in.nsym;
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
 
   gmsk_states.coherent_demod = sim_in.coherent_demod;
+  gmsk_states.phase_track = 0;
   gmsk_states = gmsk_init(gmsk_states);
   M = gmsk_states.M;
   Fs = gmsk_states.Fs;
@@ -250,16 +292,16 @@ function sim_out = gmsk_test(sim_in)
     variance = Fs/(Rs*EbNo);
 
     tx_bits = round(rand(1, nsym));
-    %tx_bits = ones(1, nsym);
+    tx_bits = ones(1, nsym);
     %tx_bits = zeros(1, nsym);
-    %tx_bits(2:2:nsym) = 0;
+    tx_bits(1:2:nsym) = 0;
     [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
     nsam = length(tx);
     %tx_bits(1:10)
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
-    rx    = tx + noise;
+    rx    = tx*exp(j*pi/2) + noise;
 
-    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, exp(-0*j*pi/4)*rx(1:length(rx)));
+    [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(1:length(rx)));
       
     l = length(rx_bits);
     error_positions = xor(rx_bits(1:l), tx_bits(1:l));
@@ -349,17 +391,6 @@ function sim_out = gmsk_test(sim_in)
 
       printf("Bfm: %4.0fHz %3.0f%% power bandwidth %4.0fHz = %3.2f*Rb\n", Bfm, x*100, bw, bw/Rs);
 
-      % timing/phase info?
-
-      figure(5)
-      x = abs(real(rx_out));
-      subplot(211)
-      plot(x)
-      axis([1 M*160 min(x) max(x)])      
-      subplot(212)
-      X = 20*log10(abs(fft(x)));
-      plot(X)
-      axis([1 5000 min(X) max(X)])
     end
   end
 
@@ -371,7 +402,7 @@ endfunction
 
 function run_gmsk_single
   sim_in.coherent_demod = 1;
-  sim_in.nsym = 4800;
+  sim_in.nsym = 480;
   sim_in.EbNodB = 6;
   sim_in.verbose = 2;
 
@@ -430,13 +461,64 @@ function run_gmsk_curves
 
 endfunction
 
-function run_gmsk_init
-  sim_in.rx_filter = "lowpass";
-  gmsk_init(sim_in);
-endfunction
+% TODO: [ ] test over range of freq, phase, coarse timing and Eb/No values
+%       [ ] Modify for Rs=1200, e.g. mod filter above
+%       [ ] extra stuff at begining/end for filter delays
+   
+function run_test_freq_offset
+  verbose = 1;
+  aEbNodB = 60;
+  phase_offset = 0;
+  freq_offset  = -5;
 
-run_gmsk_single
+  gmsk_states.coherent_demod = 1;
+  gmsk_states.phase_track    = 1;
+  gmsk_states = gmsk_init(gmsk_states);
+  Fs = gmsk_states.Fs;
+  Rs = gmsk_states.Rs;
+
+  % As a first pass frame consists of "np" preamble bits for freq/phase
+  % sync then "nd" data bits
+
+  np = 480;
+  nd = 480;
+
+  tx_bits = ones(1,np);
+  tx_bits(1:4:np) = 0;
+  tx_bits(2:4:np) = 0;
+  tx_bits = [tx_bits round(rand(1, nd))];
+
+  [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
+  nsam = length(tx);
+
+  EbNo = 10^(aEbNodB/10);
+  variance = Fs/(Rs*EbNo);
+  noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+  w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
+
+  rx = tx.*exp(j*w) + noise;
+
+  [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, rx, verbose);
+  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs + phase_offset_est;
+  %rx = rx.*exp(-j*w_est);
+
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
+  l = length(rx_bits);
+  error_positions = xor(rx_bits(1:l), tx_bits(1:l));
+  Nerrs = sum(error_positions);
+  ber = Nerrs/l;
+  printf("Eb/No: %3.1f freq_offset: %4.1f phase_offset: %4.3f Nerrs: %d BER: %f\n", 
+         aEbNodB, freq_offset, phase_offset, Nerrs, ber);
+  figure(1)
+  clf
+  subplot(211)
+  stem(real(rx_bits(1:100)))
+  subplot(212)
+  stem(real(error_positions))
+endfunction
+    
+%run_gmsk_single
 %run_gmsk_curves
 %run_gmsk_init
-
+run_test_freq_offset
 
