@@ -10,6 +10,8 @@
 %     + need initial acquisition and tracking
 % [ ] coarse timing estimator (sync up to known test frames)
 % [ ] file read/write interface
+% [ ] modify for 1200 bit/s (or any) operation, ie GMSK filter coeff generation
+%     or re-sampling
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -138,42 +140,28 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     % See IEEE Trans on Comms, Muroyta et al, 1981, "GSM Modulation
     % for Digital Radio Telephony" Fig 8:
 
+    freq_offset = 1; phase_offset = 0;
+    w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
+
     % matched filter
 
-    rx_filt = filter(gmsk_mod_coeff, 1, rx);
-
-    % TODO implement and test phase/fine freq tracking loop
-    if gmsk_states.phase_track
-      a = zeros(1,nsam);
-      phase_off_est = 0;
-      phase_gain = 0.01;
-      for i=1:nsam-1
-        rx_filt(i) *= exp(-j*phase_off_est);
-        a(i) = sign(real(rx_filt(i))) .* sign(imag(rx_filt(i)));
-        phase_off_est += phase_gain*a(i);       
-      end
-
-      figure(7)
-      subplot(211)
-      plot(a(1:2000));        
-      subplot(212)
-      a_dec = a(dsam+Toff+M/2:2*M:length(a));
-      a_dec = filter(1,[1 -0.999],a_dec);
-      plot(a_dec)
-      mean(a)
-      mean(a_dec)
-      %axis([1 2000 -500 500])
-    end
+    rx_filt = filter(gmsk_mod_coeff, 1, rx.*exp(j*w));
 
     % Property of MSK that re and im arms are sequences of 2T
     % long symbols, can be demodulated like QPSK with matched filter
     % and integrate and dump.
 
     % integrate energy in symbols 2T long in re and im arms
+    % note this could be combined with matched filter
 
     re = conv(real(rx_filt),ones(1,2*M));
     im = conv(imag(rx_filt),ones(1,2*M));
     rx_out = re + j*im;
+
+    rx_out = rx_out(1:length(w)).*exp(-j*w);
+    re = real(rx_out); im = imag(rx_out);
+
+    % TODO implement and test phase/fine freq tracking loop
 
     dsam = 41 + M;
 
@@ -183,13 +171,51 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     w = 2*pi*(Rs/2)/Fs;
     X = x(dsam:nsam) * exp(j*w*(0:nsam-dsam))';
     timing_adj = angle(X)*2*M/(2*pi);
-    printf("%f %f\n", angle(X), timing_adj);
+    printf("timing angle: %f adjustment: %f\n", angle(X), timing_adj);
     dsam -= floor(timing_adj) - 2;
 
-    % sample symbols at end of integration
+    if gmsk_states.phase_track
+
+      % sample 90 deg through the timing clock period
+
+      phase_off_est = 0;
+      phase_off_est_log = p_sample = zeros(1,nsym/2);
+      beta = 0.005;
+      for i=1:0
+         ind = dsam+Toff+i*2*M;
+         if ind + 2*M < nsam
+           p_sample(i) = sign(re(ind)*im(ind));
+           phase_off_est = (1-beta)*phase_off_est + (beta)*p_sample(i);
+           phase_off_est_log(i) = phase_off_est;
+
+           next_symbol  = re(ind+2*M:ind+4*M-1) + j*im(ind+2*M:ind+4*M-1);
+           %next_symbol *= exp(-j*10*phase_off_est);
+           re(ind+2*M:ind+4*M-1) = real(next_symbol);
+           im(ind+2*M:ind+4*M-1) = imag(next_symbol);
+        end
+      end
+
+     % sample symbols at end of integration
 
     re_syms = re(1+dsam+Toff:2*M:nsam);
     im_syms = im(1+dsam+M+Toff:2*M:nsam);
+
+     figure(7)
+      clf
+      subplot(211)
+      %stem(re(1+dsam+Toff:2*M:M*100));        
+      plot(re(1:M*100));        
+      subplot(212)
+      plot(im(1:M*100));        
+      %axis([1 nsym/2 -1 1])
+      %printf("mean(p_sample): %f\n", mean(p_sample));
+
+      figure(8)
+      clf
+      a = re_syms .* im_syms;
+      plot(a(1:100));
+      mean(a(1:100))
+    end
 
     % XORs/adders on the RHS of Muroyta et al Fig 8 (a) and (b).  We
     % simulate digital logic bit stream at clock rate Rs, even though
@@ -467,9 +493,10 @@ endfunction
    
 function run_test_freq_offset
   verbose = 1;
-  aEbNodB = 60;
+  aEbNodB = 6;
   phase_offset = 0;
-  freq_offset  = -5;
+  freq_offset  = 0;
+  nsym = 4800;
 
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
@@ -477,16 +504,10 @@ function run_test_freq_offset
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
 
-  % As a first pass frame consists of "np" preamble bits for freq/phase
-  % sync then "nd" data bits
+  % A frame consists of nsym random data bits.  Some experimentation
+  % has shown they need to be random for the sync algorithms to work
 
-  np = 480;
-  nd = 480;
-
-  tx_bits = ones(1,np);
-  tx_bits(1:4:np) = 0;
-  tx_bits(2:4:np) = 0;
-  tx_bits = [tx_bits round(rand(1, nd))];
+  tx_bits = round(rand(1, nsym));
 
   [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
   nsam = length(tx);
@@ -495,6 +516,8 @@ function run_test_freq_offset
   variance = Fs/(Rs*EbNo);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
+  figure(2)
+  plot(w/pi)
 
   rx = tx.*exp(j*w) + noise;
 
@@ -514,7 +537,7 @@ function run_test_freq_offset
   subplot(211)
   stem(real(rx_bits(1:100)))
   subplot(212)
-  stem(real(error_positions))
+  stem(real(error_positions(1:100)))
 endfunction
     
 %run_gmsk_single
