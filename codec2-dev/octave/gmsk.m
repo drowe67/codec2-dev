@@ -123,7 +123,7 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
 endfunction
 
 
-function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
+function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
   M = gmsk_states.M;
   Rs = gmsk_states.Rs;
   Fs = gmsk_states.Fs;
@@ -140,12 +140,9 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     % See IEEE Trans on Comms, Muroyta et al, 1981, "GSM Modulation
     % for Digital Radio Telephony" Fig 8:
 
-    freq_offset = 1; phase_offset = 0;
-    w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
-
     % matched filter
 
-    rx_filt = filter(gmsk_mod_coeff, 1, rx.*exp(j*w));
+    rx_filt = filter(gmsk_mod_coeff, 1, rx);
 
     % Property of MSK that re and im arms are sequences of 2T
     % long symbols, can be demodulated like QPSK with matched filter
@@ -154,12 +151,7 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
     % integrate energy in symbols 2T long in re and im arms
     % note this could be combined with matched filter
 
-    re = conv(real(rx_filt),ones(1,2*M));
-    im = conv(imag(rx_filt),ones(1,2*M));
-    rx_out = re + j*im;
-
-    rx_out = rx_out(1:length(w)).*exp(-j*w);
-    re = real(rx_out); im = imag(rx_out);
+    rx_int = conv(rx_filt,ones(1,2*M));
 
     % TODO implement and test phase/fine freq tracking loop
 
@@ -167,55 +159,64 @@ function [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx)
 
     % timing estimate todo: clean up all these magic numbers
 
-    x = abs(re);
+    x = abs(real(rx_int));
     w = 2*pi*(Rs/2)/Fs;
-    X = x(dsam:nsam) * exp(j*w*(0:nsam-dsam))';
-    timing_adj = angle(X)*2*M/(2*pi);
+    X = x(1:nsam) * exp(j*w*(0:nsam-1))';
+    timing_angle = angle(X);
+    timing_adj = timing_angle*2*M/(2*pi);
+
+    timing_adj = 1.4; % lock for now while we play with phase
+
     printf("timing angle: %f adjustment: %f\n", angle(X), timing_adj);
     dsam -= floor(timing_adj) - 2;
 
     if gmsk_states.phase_track
 
-      % sample 90 deg through the timing clock period
+      % DCO design from "Introduction To Phase-Lock Loop System Modeling", Wen Li
+      % http://www.ece.ualberta.ca/~ee401/parts/data/PLLIntro.pdf
 
-      phase_off_est = 0;
-      phase_off_est_log = p_sample = zeros(1,nsym/2);
-      beta = 0.005;
-      for i=1:0
-         ind = dsam+Toff+i*2*M;
-         if ind + 2*M < nsam
-           p_sample(i) = sign(re(ind)*im(ind));
-           phase_off_est = (1-beta)*phase_off_est + (beta)*p_sample(i);
-           phase_off_est_log(i) = phase_off_est;
+      eta = 0.707;
+      wn = 2*pi*20;
+      Ts = 1/Fs;
+      g1 = 1 - exp(-2*eta*wn*Ts);
+      g2 = 1 + exp(-2*eta*wn*Ts) - 2*exp(-eta*wn*Ts)*cos(wn*Ts*sqrt(1-eta*eta));
+      Gpd = 2/pi;
+      Gvco = 1;
+      G1 = g1/(Gpd*Gvco);  G2 = g2/(Gpd*Gvco);
+      printf("g1: %e g2: %e G1: %e G2: %e\n", g1, g2, G1, G2);
 
-           next_symbol  = re(ind+2*M:ind+4*M-1) + j*im(ind+2*M:ind+4*M-1);
-           %next_symbol *= exp(-j*10*phase_off_est);
-           re(ind+2*M:ind+4*M-1) = real(next_symbol);
-           im(ind+2*M:ind+4*M-1) = imag(next_symbol);
-        end
+      filt_prev = dco = lower = ph_err_filt = ph_err = 0;
+      dco_log = filt_log = zeros(1,nsam);
+
+      % we need a sine wave at the timing clock frequency
+
+      timing_clock_phase = timing_angle;
+ 
+      for i=1:nsam
+        timing_clock_phase += (2*pi)/(2*M);
+        rx_int(i) *= exp(-j*dco);
+        ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*sin(timing_clock_phase);
+        lower = ph_err*G2 + lower;
+        filt  = ph_err*G1 + lower;
+        dco   = dco + filt_prev;
+        filt_prev = filt;
+        filt_log(i) = filt;
+        dco_log(i) = dco;
       end
 
-     % sample symbols at end of integration
-
-    re_syms = re(1+dsam+Toff:2*M:nsam);
-    im_syms = im(1+dsam+M+Toff:2*M:nsam);
-
-     figure(7)
+      figure(6);
       clf
-      subplot(211)
-      %stem(re(1+dsam+Toff:2*M:M*100));        
-      plot(re(1:M*100));        
-      subplot(212)
-      plot(im(1:M*100));        
-      %axis([1 nsym/2 -1 1])
-      %printf("mean(p_sample): %f\n", mean(p_sample));
-
-      figure(8)
-      clf
-      a = re_syms .* im_syms;
-      plot(a(1:100));
-      mean(a(1:100))
+      subplot(211);
+      plot(filt_log);
+      subplot(212);
+      plot(dco_log/pi);
+      %axis([1 nsam -0.5 0.5])
     end
+
+    % sample symbols at end of integration
+
+    re_syms = real(rx_int(1+dsam+Toff:2*M:nsam));
+    im_syms = imag(rx_int(1+dsam+M+Toff:2*M:nsam));
 
     % XORs/adders on the RHS of Muroyta et al Fig 8 (a) and (b).  We
     % simulate digital logic bit stream at clock rate Rs, even though
@@ -495,7 +496,7 @@ function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
   phase_offset = 0;
-  freq_offset  = 0;
+  freq_offset  = 1;
   nsym = 4800;
 
   gmsk_states.coherent_demod = 1;
@@ -534,10 +535,12 @@ function run_test_freq_offset
          aEbNodB, freq_offset, phase_offset, Nerrs, ber);
   figure(1)
   clf
-  subplot(211)
-  stem(real(rx_bits(1:100)))
-  subplot(212)
-  stem(real(error_positions(1:100)))
+  subplot(311)
+  stem(real(tx_bits(500:520)))
+  subplot(312)
+  stem(real(rx_bits(500:520)))
+  subplot(313)
+  stem(real(cumsum(error_positions)))
 endfunction
     
 %run_gmsk_single
