@@ -160,30 +160,39 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
     % timing estimate todo: clean up all these magic numbers
 
     x = abs(real(rx_int));
-    w = 2*pi*(Rs/2)/Fs;
-    X = x(1:nsam) * exp(j*w*(0:nsam-1))';
+    w = exp(j*(0:100*M-1)*2*pi*(Rs/2)/Fs);
+    X = x(1:100*M) * w';
     timing_angle = angle(X);
     timing_adj = timing_angle*2*M/(2*pi);
 
-    timing_adj = 1.4; % lock for now while we play with phase
+    if 0
+     figure(8)
+     clf
+    subplot(211)
+    plot(x(1:M*20))
+    subplot(212)
+    plot(real(w(1:M*20)))
+    end
+
+    %timing_adj = 1.4; % lock for now while we play with phase
 
     printf("timing angle: %f adjustment: %f\n", angle(X), timing_adj);
-    dsam -= floor(timing_adj) - 2;
-
+    dsam -= floor(M+timing_adj) - 2;
+    
     if gmsk_states.phase_track
-
+ 
       % DCO design from "Introduction To Phase-Lock Loop System Modeling", Wen Li
       % http://www.ece.ualberta.ca/~ee401/parts/data/PLLIntro.pdf
 
       eta = 0.707;
-      wn = 2*pi*20;
+      wn = 2*pi*10;
       Ts = 1/Fs;
       g1 = 1 - exp(-2*eta*wn*Ts);
       g2 = 1 + exp(-2*eta*wn*Ts) - 2*exp(-eta*wn*Ts)*cos(wn*Ts*sqrt(1-eta*eta));
       Gpd = 2/pi;
       Gvco = 1;
       G1 = g1/(Gpd*Gvco);  G2 = g2/(Gpd*Gvco);
-      printf("g1: %e g2: %e G1: %e G2: %e\n", g1, g2, G1, G2);
+      %printf("g1: %e g2: %e G1: %e G2: %e\n", g1, g2, G1, G2);
 
       filt_prev = dco = lower = ph_err_filt = ph_err = 0;
       dco_log = filt_log = zeros(1,nsam);
@@ -195,15 +204,14 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       for i=1:nsam
         timing_clock_phase += (2*pi)/(2*M);
         rx_int(i) *= exp(-j*dco);
-        ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*sin(timing_clock_phase);
+        ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*cos(timing_clock_phase);
         lower = ph_err*G2 + lower;
         filt  = ph_err*G1 + lower;
-        dco   = dco + filt_prev;
-        filt_prev = filt;
+        dco   = dco + filt;
         filt_log(i) = filt;
         dco_log(i) = dco;
       end
-
+      
       figure(6);
       clf
       subplot(211);
@@ -281,7 +289,7 @@ function [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, r
   start_bin = floor((Rs/2 - 100)*nsam/Fs) + 1;
   stop_bin = floor((Rs/2 + 100)*nsam/Fs) + 1;
   [max_val max_bin] = max(abs(f(start_bin:stop_bin)));
-  printf("nsam: %d start_bin: %d start_bin: %d max_bin: %d\n", nsam, start_bin, stop_bin, max_bin);
+  % printf("nsam: %d start_bin: %d start_bin: %d max_bin: %d\n", nsam, start_bin, stop_bin, max_bin);
 
   % map max_bin to frequency offset
 
@@ -289,7 +297,7 @@ function [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, r
   phase_offset_est = angle(f(max_bin)) - 0.935153; % magic number due to initial filter delay?
 
   if verbose
-    printf("freq_offset_est: %f phase_offset_est: %f\n", freq_offset_est, phase_offset_est);
+    %printf("freq_offset_est: %f phase_offset_est: %f\n", freq_offset_est, phase_offset_est);
     figure(6)
     plot((1:nsam)*Fs/nsam, 20*log10(abs(f)));
     axis([1 Rs 0 80]);
@@ -495,9 +503,9 @@ endfunction
 function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
-  phase_offset = 0;
-  freq_offset  = 1;
-  nsym = 4800;
+  phase_offset = pi/10;
+  freq_offset  = -5;
+  nsym = 4800*2;
 
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
@@ -508,8 +516,12 @@ function run_test_freq_offset
   % A frame consists of nsym random data bits.  Some experimentation
   % has shown they need to be random for the sync algorithms to work
 
-  tx_bits = round(rand(1, nsym));
+  % note must be random-ish data (not say 11001100...) for timing estimator to work
 
+  tx_bits = round(rand(1, nsym));
+  %tx_bits = zeros(1,nsym);
+  %tx_bits(1:3:nsym) = 1;
+ 
   [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
   nsam = length(tx);
 
