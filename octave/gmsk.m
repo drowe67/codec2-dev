@@ -159,25 +159,14 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
 
     % timing estimate todo: clean up all these magic numbers
 
+    if 1
     x = abs(real(rx_int));
-    w = exp(j*(0:100*M-1)*2*pi*(Rs/2)/Fs);
-    X = x(1:100*M) * w';
+    w = exp(j*(0:nsam-1)*2*pi*(Rs/2)/Fs);
+    X = x(1:nsam) * w';
     timing_angle = angle(X);
     timing_adj = timing_angle*2*M/(2*pi);
-
-    if 0
-     figure(8)
-     clf
-    subplot(211)
-    plot(x(1:M*20))
-    subplot(212)
-    plot(real(w(1:M*20)))
+    timing_clock_phase = timing_angle;
     end
-
-    %timing_adj = 1.4; % lock for now while we play with phase
-
-    printf("timing angle: %f adjustment: %f\n", angle(X), timing_adj);
-    dsam -= floor(M+timing_adj) - 2;
     
     if gmsk_states.phase_track
  
@@ -197,11 +186,26 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       filt_prev = dco = lower = ph_err_filt = ph_err = 0;
       dco_log = filt_log = zeros(1,nsam);
 
-      % we need a sine wave at the timing clock frequency
-
-      timing_clock_phase = timing_angle;
- 
+      % we need a sine wave at the timing clsvn uock frequency
+      k = 1;
+      tw = 200;
+      xr_log = []; xi_log = [];
+      w_log = [];
       for i=1:nsam
+        if mod(i,tw) == 0
+          l = i - tw+1;
+          xr = abs(real(rx_int(l:l+tw-1)));
+          xi = abs(imag(rx_int(l:l+tw-1)));
+          w = exp(j*(l:l+tw-1)*2*pi*(Rs/2)/Fs);
+          X = xr * w';
+          timing_angle(k) = angle(X);
+          timing_adj = timing_angle(k)*2*M/(2*pi);
+          timing_clock_phase = timing_angle(k);
+          k++;
+          xr_log = [xr_log xr];
+          xi_log = [xi_log xi];
+          w_log = [w_log w];
+        end
         timing_clock_phase += (2*pi)/(2*M);
         rx_int(i) *= exp(-j*dco);
         ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*cos(timing_clock_phase);
@@ -219,8 +223,20 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       subplot(212);
       plot(dco_log/pi);
       %axis([1 nsam -0.5 0.5])
+
+      figure(7)
+      clf;
+      subplot(211)
+      plot(xr_log(1:1000));
+      subplot(212)
+      plot(xi_log(1:1000));
+      figure(8)
+      stem(timing_angle);
     end
 
+    %printf("timing angle: %f adjustment: %f\n", timing_angle, timing_adj);
+    dsam -= floor(M+timing_adj) - 2;
+    
     % sample symbols at end of integration
 
     re_syms = real(rx_int(1+dsam+Toff:2*M:nsam));
@@ -503,8 +519,8 @@ endfunction
 function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
-  phase_offset = pi/10;
-  freq_offset  = -5;
+  phase_offset = -pi/2;
+  freq_offset  = 50;
   nsym = 4800*2;
 
   gmsk_states.coherent_demod = 1;
@@ -518,10 +534,14 @@ function run_test_freq_offset
 
   % note must be random-ish data (not say 11001100...) for timing estimator to work
 
-  tx_bits = round(rand(1, nsym));
-  %tx_bits = zeros(1,nsym);
-  %tx_bits(1:3:nsym) = 1;
- 
+  framesize = 480;
+  nframes = floor(nsym/framesize);
+  tx_frame = round(rand(1, framesize));
+  tx_bits = 0;
+  for i=1:nframes
+    tx_bits = [tx_bits tx_frame];
+  end
+
   [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
   nsam = length(tx);
 
@@ -540,11 +560,25 @@ function run_test_freq_offset
 
   [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
   l = length(rx_bits);
-  error_positions = xor(rx_bits(1:l), tx_bits(1:l));
-  Nerrs = sum(error_positions);
-  ber = Nerrs/l;
-  printf("Eb/No: %3.1f freq_offset: %4.1f phase_offset: %4.3f Nerrs: %d BER: %f\n", 
-         aEbNodB, freq_offset, phase_offset, Nerrs, ber);
+
+  % attempt to perform "coarse sync" sync with the received frames 
+
+  Nerrs = zeros(1,framesize);
+  Nerrs_min = l;
+  for i=1:framesize
+    Nerrs(i) = sum(xor(rx_bits(i:l), tx_bits(1:l-i+1)));
+    if Nerrs(i) < Nerrs_min
+       Nerrs_min = Nerrs(i);
+       ber = Nerrs(i)/length(rx_bits(i:l));
+       coarse_sync = i;
+       error_positions = xor(rx_bits(i:l), tx_bits(1:l-i+1));
+   end
+  end
+  figure(9)
+  plot(Nerrs);
+
+  printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nerrs: %d BER: %f\n", 
+         aEbNodB, freq_offset, phase_offset, Nerrs(coarse_sync), ber);
   figure(1)
   clf
   subplot(311)
