@@ -5,13 +5,17 @@
 %
 % [X] plot eye diagram
 % [X] BER curves with reas match to theoretical
-% [X] fine timing estimator 
-% [ ] phase/freq estimator
+% [X] fine timing estimator
+%     [ ] test with sox based fine timing error 
+% [X] phase/freq estimator
 %     + need initial acquisition and tracking
+%     [ ] auto test with different freq offsets
 % [ ] coarse timing estimator (sync up to known test frames)
+%     [ ] auto test with different coarse timing offsets
 % [ ] file read/write interface
 % [ ] modify for 1200 bit/s (or any) operation, ie GMSK filter coeff generation
 %     or re-sampling
+
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -186,7 +190,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       filt_prev = dco = lower = ph_err_filt = ph_err = 0;
       dco_log = filt_log = zeros(1,nsam);
 
-      % we need a sine wave at the timing clsvn uock frequency
+      % we need a sine wave at the timing clock frequency
       k = 1;
       tw = 200;
       xr_log = []; xi_log = [];
@@ -216,7 +220,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
         dco_log(i) = dco;
       end
       
-      figure(6);
+      figure(4);
       clf
       subplot(211);
       plot(filt_log);
@@ -224,7 +228,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       plot(dco_log/pi);
       %axis([1 nsam -0.5 0.5])
 
-      figure(7)
+      figure(5)
       clf;
       subplot(211)
       plot(xr_log(1:1000));
@@ -289,34 +293,53 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
 endfunction
 
 
-function [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, rx, verbose)
+function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose)
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
 
-  % one frame should have preamble at start and end, enough to see in DFT 
-
-  f = fft(rx);
-  nsam = length(rx);
-
-  % Look for line at Rs/2.  Just look on +ve side for now, a more
-  % reliable method would be to check for mirror image of line at -ve,
-  % look for line in range +/- 100 Hz
+  % Suggest Rs/10 symbols of preamble (100ms), this works OK at
+  % Rs=4800 and Es/No = 6dB.  The large, Fs sample FFT size is used
+  % for convenience (the bin resolution is 1 Hz), for real time we
+  % would decimate and use smaller FFT to save CPU and memory.
   
-  start_bin = floor((Rs/2 - 100)*nsam/Fs) + 1;
-  stop_bin = floor((Rs/2 + 100)*nsam/Fs) + 1;
+  ndft = Fs;
+  f = fft(rx .* hanning(length(rx))', ndft);
+  f = fftshift(f);
+
+  % Look for line a centre frequency, which is the strongest component
+  % when 101010 .... is used to modulate the GMK signal.  Note just
+  % searching for a single line will get false lock on random sine
+  % waves but that's OK for a PoC.  It could be improved by checking
+  % for other lines, or demodulating the preamble and checking for bit
+  % errors.
+  
+  start_bin = 1+ Fs/2-Rs/2; 
+  stop_bin = start_bin + Rs;
   [max_val max_bin] = max(abs(f(start_bin:stop_bin)));
-  % printf("nsam: %d start_bin: %d start_bin: %d max_bin: %d\n", nsam, start_bin, stop_bin, max_bin);
+  max_bin -= Rs/2 + 1;
+  if verbose > 1
+    printf("ndft: %d start_bin: %d stop_bin: %d max_bin: %d\n", ndft, start_bin, stop_bin, max_bin);
+  end
+
+  % calc ratio of line energy to total energy.  For a valid preamble
+  % this was measured as about 0.20 to 0.25 depending on noise.
+
+  sum_sq = sum(abs(f(start_bin:stop_bin)) .^ 2);
+  ratio = sqrt(max_val*max_val/sum_sq);
 
   % map max_bin to frequency offset
 
-  freq_offset_est = (max_bin - floor(100*nsam/Fs) - 1)*Fs/nsam;  
-  phase_offset_est = angle(f(max_bin)) - 0.935153; % magic number due to initial filter delay?
+  freq_offset_est = max_bin;  
 
-  if verbose
-    %printf("freq_offset_est: %f phase_offset_est: %f\n", freq_offset_est, phase_offset_est);
-    figure(6)
-    plot((1:nsam)*Fs/nsam, 20*log10(abs(f)));
-    axis([1 Rs 0 80]);
+  if verbose > 1
+    printf("freq_offset_est: %f  pk/rms ratio: %f \n", freq_offset_est, ratio);
+    figure(1)
+    clf
+    subplot(211)
+    plot(rx,'+')
+    subplot(212)
+    plot(-Rs/2:Rs/2, 20*log10(abs(f(start_bin:stop_bin))));
+    axis([-Rs/2 Rs/2 0 80]);
   end
 
 endfunction
@@ -519,25 +542,29 @@ endfunction
 function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
-  phase_offset = -pi/2;
-  freq_offset  = 50;
+  phase_offset = 0;
+  freq_offset  = -1000;
   nsym = 4800*2;
+  npreamble = 480;
 
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
   gmsk_states = gmsk_init(gmsk_states);
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
+  M  = gmsk_states.M;
 
   % A frame consists of nsym random data bits.  Some experimentation
   % has shown they need to be random for the sync algorithms to work
 
-  % note must be random-ish data (not say 11001100...) for timing estimator to work
+  % note must be random-ish data (not say 11001100...) for timing estimator to work.
+  % However initial freq offset estimation is a lot easier with a 01010 type sequence
 
   framesize = 480;
   nframes = floor(nsym/framesize);
   tx_frame = round(rand(1, framesize));
-  tx_bits = 0;
+  tx_bits = zeros(1,npreamble);
+  tx_bits(1:2:npreamble) = 1;
   for i=1:nframes
     tx_bits = [tx_bits tx_frame];
   end
@@ -554,39 +581,73 @@ function run_test_freq_offset
 
   rx = tx.*exp(j*w) + noise;
 
-  [freq_offset_est phase_offset_est] = gmsk_est_freq_phase(gmsk_states, rx, verbose);
-  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs + phase_offset_est;
-  %rx = rx.*exp(-j*w_est);
+  % look through rx buffer and determine if there is a valid preamble.  Use steps of half the
+  % preamble size in samples to try to bracket the pre-amble.
+
+  preamble_step = npreamble*M/2;
+  ratio = 0; freq_offset_est = 0; preamble_location = 0;
+  for i=1:preamble_step:length(rx)
+    [afreq_offset_est aratio] = gmsk_est_freq_offset(gmsk_states, rx(i:i+preamble_step-1), verbose);
+    if aratio > ratio
+      preamble_location = i;
+      ratio = aratio;
+      freq_offset_est = afreq_offset_est;
+    end
+  end
+  if verbose
+    printf("preamble location: %d frequency offset: %f ratio: %f\n", 
+    preamble_location, freq_offset_est, ratio);   
+  end
+
+  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
+  rx = rx.*exp(-j*w_est);
 
   [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
-  l = length(rx_bits);
+  nframes_rx = length(rx_bits)/framesize;
 
-  % attempt to perform "coarse sync" sync with the received frames 
+  % attempt to perform "coarse sync" sync with the received frames, we check each frame for the 
+  % best coarse sync position.  Brute force approach, that would be changed for a real demod which
+  % has some sort of unique word.
 
-  Nerrs = zeros(1,framesize);
-  Nerrs_min = l;
-  for i=1:framesize
-    Nerrs(i) = sum(xor(rx_bits(i:l), tx_bits(1:l-i+1)));
-    if Nerrs(i) < Nerrs_min
-       Nerrs_min = Nerrs(i);
-       ber = Nerrs(i)/length(rx_bits(i:l));
-       coarse_sync = i;
-       error_positions = xor(rx_bits(i:l), tx_bits(1:l-i+1));
-   end
+  Nerrs_log = zeros(1,nframes_rx);
+  total_errors = 0;
+  total_bits   = 0;
+  
+  for f=1:nframes_rx-1
+    Nerrs_min = framesize;
+    for i=1:framesize;
+      st = (f-1)*framesize+i; en = st+framesize-1;
+      %printf("nframes: %d f: %f st: %d en: %d\n", nframes, f, st, en);
+      Nerrs = sum(xor(rx_bits(st:en), tx_frame));
+      if Nerrs < Nerrs_min
+        Nerrs_min = Nerrs;
+      end
+    end
+    if Nerrs_min/framesize < 0.2
+      Nerrs_log(f) = Nerrs_min;
+      total_errors += Nerrs_min;
+      total_bits   += framesize;
+    end
   end
-  figure(9)
-  plot(Nerrs);
+
+  ber = total_errors/total_bits;
 
   printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nerrs: %d BER: %f\n", 
-         aEbNodB, freq_offset, phase_offset, Nerrs(coarse_sync), ber);
-  figure(1)
+         aEbNodB, freq_offset, phase_offset, total_errors, ber);
+
+  figure(2)
   clf
   subplot(311)
   stem(real(tx_bits(500:520)))
   subplot(312)
   stem(real(rx_bits(500:520)))
   subplot(313)
-  stem(real(cumsum(error_positions)))
+  stem(real(cumsum(Nerrs_log)))
+
+  figure(3)
+  clf;
+  plot(Nerrs_log);
+
 endfunction
     
 %run_gmsk_single
