@@ -19,7 +19,7 @@
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
-% which is in turn from Jonathan G4KLX.  The demod coeffs LPF noise
+% which is in turn from Jonathan G4KLX.  The demod coeffs low pass filter noise
 
 global gmsk_mod_coeff = [...
  6.455906007234699e-014, 1.037067381285011e-012, 1.444835156335346e-011,...
@@ -157,21 +157,8 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
 
     rx_int = conv(rx_filt,ones(1,2*M));
 
-    % TODO implement and test phase/fine freq tracking loop
+    % phase and fine frequency tracking and correction ------------------------
 
-    dsam = 41 + M;
-
-    % timing estimate todo: clean up all these magic numbers
-
-    if 1
-    x = abs(real(rx_int));
-    w = exp(j*(0:nsam-1)*2*pi*(Rs/2)/Fs);
-    X = x(1:nsam) * w';
-    timing_angle = angle(X);
-    timing_adj = timing_angle*2*M/(2*pi);
-    timing_clock_phase = timing_angle;
-    end
-    
     if gmsk_states.phase_track
  
       % DCO design from "Introduction To Phase-Lock Loop System Modeling", Wen Li
@@ -190,27 +177,37 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       filt_prev = dco = lower = ph_err_filt = ph_err = 0;
       dco_log = filt_log = zeros(1,nsam);
 
-      % we need a sine wave at the timing clock frequency
+      % w is the ref sine wave at the timing clock frequency
+      % tw is the length of the window used to estimate timing
+
       k = 1;
-      tw = 200;
+      tw = 200*M;
       xr_log = []; xi_log = [];
       w_log = [];
+      timing_clock_phase = 0;
+      timing_angle = 0;
+      timing_angle_log = zeros(1,nsam);
+
       for i=1:nsam
+
+        % update sample timing estimate every tw samples
+
         if mod(i,tw) == 0
           l = i - tw+1;
           xr = abs(real(rx_int(l:l+tw-1)));
           xi = abs(imag(rx_int(l:l+tw-1)));
           w = exp(j*(l:l+tw-1)*2*pi*(Rs/2)/Fs);
           X = xr * w';
-          timing_angle(k) = angle(X);
-          timing_adj = timing_angle(k)*2*M/(2*pi);
-          timing_clock_phase = timing_angle(k);
+          timing_clock_phase = timing_angle = angle(X);
           k++;
           xr_log = [xr_log xr];
           xi_log = [xi_log xi];
           w_log = [w_log w];
+        else
+          timing_clock_phase += (2*pi)/(2*M);
         end
-        timing_clock_phase += (2*pi)/(2*M);
+        timing_angle_log(i) = timing_angle;
+
         rx_int(i) *= exp(-j*dco);
         ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*cos(timing_clock_phase);
         lower = ph_err*G2 + lower;
@@ -224,33 +221,44 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       clf
       subplot(211);
       plot(filt_log);
+      title('PLL filter')
       subplot(212);
       plot(dco_log/pi);
+      title('PLL DCO phase');
       %axis([1 nsam -0.5 0.5])
-
-      figure(5)
-      clf;
-      subplot(211)
-      plot(xr_log(1:1000));
-      subplot(212)
-      plot(xi_log(1:1000));
-      figure(8)
-      stem(timing_angle);
     end
 
-    %printf("timing angle: %f adjustment: %f\n", timing_angle, timing_adj);
-    dsam -= floor(M+timing_adj) - 2;
+    % sample integrator output at correct timing instant
     
-    % sample symbols at end of integration
+    timing_adj = timing_angle_log*2*M/(2*pi);
+    timing_adj_uw = unwrap(timing_angle_log)*2*M/(2*pi);
+    % Toff = floor(2*M+timing_adj);
+    Toff = floor(timing_adj_uw);
+    k = 1;
+    re_syms = im_syms = zeros(1,nsym/2);
+  
+    for i=140:2*M:nsam-140
+      re_syms(k) = real(rx_int(i+Toff(i)));
+      im_syms(k) = imag(rx_int(i+Toff(i)+M));
+      %re_syms(k) = real(rx_int(i-10));
+      %im_syms(k) = imag(rx_int(i+M-10));
+      k++;
+    end
 
-    re_syms = real(rx_int(1+dsam+Toff:2*M:nsam));
-    im_syms = imag(rx_int(1+dsam+M+Toff:2*M:nsam));
+    figure(8)
+    clf
+    subplot(211)
+    plot(timing_adj);
+    title('Timing est');
+    subplot(212)
+    plot(Toff);
+    title('Timing est unwrap');
 
     % XORs/adders on the RHS of Muroyta et al Fig 8 (a) and (b).  We
     % simulate digital logic bit stream at clock rate Rs, even though
     % we sample integrators at rate Rs/2.  I can't explain how and why
     % this logic works/is required.  I think it can be worked out from
-    % comparing MSK demods.
+    % comparing to MSK/OQPSK demod designs.
 
     l = length(re_syms);
     l2 = 2*l;
@@ -543,7 +551,7 @@ function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
   phase_offset = 0;
-  freq_offset  = -1000;
+  freq_offset  = -10.5;
   nsym = 4800*2;
   npreamble = 480;
 
@@ -576,8 +584,6 @@ function run_test_freq_offset
   variance = Fs/(Rs*EbNo);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
-  figure(2)
-  plot(w/pi)
 
   rx = tx.*exp(j*w) + noise;
 
@@ -586,8 +592,10 @@ function run_test_freq_offset
 
   preamble_step = npreamble*M/2;
   ratio = 0; freq_offset_est = 0; preamble_location = 0;
+  ratio_log = [];
   for i=1:preamble_step:length(rx)
     [afreq_offset_est aratio] = gmsk_est_freq_offset(gmsk_states, rx(i:i+preamble_step-1), verbose);
+    ratio_log = [ratio_log aratio];
     if aratio > ratio
       preamble_location = i;
       ratio = aratio;
@@ -597,13 +605,20 @@ function run_test_freq_offset
   if verbose
     printf("preamble location: %d frequency offset: %f ratio: %f\n", 
     preamble_location, freq_offset_est, ratio);   
+    figure(9)
+    plot(ratio_log);
+    title('Preamble ratio');
   end
 
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
   rx = rx.*exp(-j*w_est);
 
+  % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
+
   [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
   nframes_rx = length(rx_bits)/framesize;
+
+  % printf("ntx: %d nrx: %d ntx_bits: %d nrx_bits: %d\n", length(tx), length(rx), length(tx_bits), length(rx_bits));
 
   % attempt to perform "coarse sync" sync with the received frames, we check each frame for the 
   % best coarse sync position.  Brute force approach, that would be changed for a real demod which
@@ -617,14 +632,14 @@ function run_test_freq_offset
     Nerrs_min = framesize;
     for i=1:framesize;
       st = (f-1)*framesize+i; en = st+framesize-1;
-      %printf("nframes: %d f: %f st: %d en: %d\n", nframes, f, st, en);
       Nerrs = sum(xor(rx_bits(st:en), tx_frame));
+      %printf("nframes: %d f: %f st: %d en: %d Nerrs: %d\n", nframes, f, st, en, Nerrs);
       if Nerrs < Nerrs_min
         Nerrs_min = Nerrs;
       end
     end
+    Nerrs_log(f) = Nerrs_min;
     if Nerrs_min/framesize < 0.2
-      Nerrs_log(f) = Nerrs_min;
       total_errors += Nerrs_min;
       total_bits   += framesize;
     end
@@ -632,8 +647,8 @@ function run_test_freq_offset
 
   ber = total_errors/total_bits;
 
-  printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nerrs: %d BER: %f\n", 
-         aEbNodB, freq_offset, phase_offset, total_errors, ber);
+  printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
+         aEbNodB, freq_offset, phase_offset, nframes_rx, total_bits, total_errors, ber);
 
   figure(2)
   clf
@@ -647,6 +662,7 @@ function run_test_freq_offset
   figure(3)
   clf;
   plot(Nerrs_log);
+  title('Bit Errors');
 
 endfunction
     
