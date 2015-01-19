@@ -233,13 +233,15 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
     timing_adj = timing_angle_log*2*M/(2*pi);
     timing_adj_uw = unwrap(timing_angle_log)*2*M/(2*pi);
     % Toff = floor(2*M+timing_adj);
-    Toff = floor(timing_adj_uw);
+    Toff = floor(timing_adj_uw+0.5);
     k = 1;
     re_syms = im_syms = zeros(1,nsym/2);
   
-    for i=140:2*M:nsam-140
-      re_syms(k) = real(rx_int(i+Toff(i)));
-      im_syms(k) = imag(rx_int(i+Toff(i)+M));
+    for i=2*M:2*M:nsam
+      if (i-Toff(i)+M) < nsam
+        re_syms(k) = real(rx_int(i-Toff(i)));
+        im_syms(k) = imag(rx_int(i-Toff(i)+M));
+      end
       %re_syms(k) = real(rx_int(i-10));
       %im_syms(k) = imag(rx_int(i+M-10));
       k++;
@@ -552,6 +554,7 @@ function run_test_freq_offset
   aEbNodB = 6;
   phase_offset = 0;
   freq_offset  = -10.5;
+  timing_offset = 11128;
   nsym = 4800*2;
   npreamble = 480;
 
@@ -578,6 +581,7 @@ function run_test_freq_offset
   end
 
   [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
+  tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
 
   EbNo = 10^(aEbNodB/10);
@@ -593,7 +597,7 @@ function run_test_freq_offset
   preamble_step = npreamble*M/2;
   ratio = 0; freq_offset_est = 0; preamble_location = 0;
   ratio_log = [];
-  for i=1:preamble_step:length(rx)
+  for i=1:preamble_step:length(rx)-preamble_step
     [afreq_offset_est aratio] = gmsk_est_freq_offset(gmsk_states, rx(i:i+preamble_step-1), verbose);
     ratio_log = [ratio_log aratio];
     if aratio > ratio
@@ -615,20 +619,23 @@ function run_test_freq_offset
 
   % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
 
-  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx);
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(preamble_location+framesize:nsam));
   nframes_rx = length(rx_bits)/framesize;
 
   % printf("ntx: %d nrx: %d ntx_bits: %d nrx_bits: %d\n", length(tx), length(rx), length(tx_bits), length(rx_bits));
 
-  % attempt to perform "coarse sync" sync with the received frames, we check each frame for the 
-  % best coarse sync position.  Brute force approach, that would be changed for a real demod which
-  % has some sort of unique word.
+  % attempt to perform "coarse sync" sync with the received frames, we
+  % check each frame for the best coarse sync position.  Brute force
+  % approach, that would be changed for a real demod which has some
+  % sort of unique word.  Start looking for valid frames 1 frame
+  % after start of pre-amble to give PLL time to lock
 
   Nerrs_log = zeros(1,nframes_rx);
+  Nerrs_all_log = zeros(1,nframes_rx);
   total_errors = 0;
   total_bits   = 0;
   
-  for f=1:nframes_rx-1
+  for f=2:nframes_rx-1
     Nerrs_min = framesize;
     for i=1:framesize;
       st = (f-1)*framesize+i; en = st+framesize-1;
@@ -638,8 +645,9 @@ function run_test_freq_offset
         Nerrs_min = Nerrs;
       end
     end
-    Nerrs_log(f) = Nerrs_min;
-    if Nerrs_min/framesize < 0.2
+    Nerrs_all_log(f) = Nerrs_min;
+    if Nerrs_min/framesize < 0.1
+      Nerrs_log(f) = Nerrs_min;
       total_errors += Nerrs_min;
       total_bits   += framesize;
     end
@@ -652,17 +660,15 @@ function run_test_freq_offset
 
   figure(2)
   clf
-  subplot(311)
-  stem(real(tx_bits(500:520)))
-  subplot(312)
-  stem(real(rx_bits(500:520)))
-  subplot(313)
-  stem(real(cumsum(Nerrs_log)))
-
-  figure(3)
-  clf;
+  subplot(211)
   plot(Nerrs_log);
-  title('Bit Errors');
+  hold on;
+  plot(Nerrs_all_log,'g');
+  hold off;
+  title('Bit Errors')
+  subplot(212)
+  stem(real(cumsum(Nerrs_log)))
+  title('Cumulative Bit Errors')
 
 endfunction
     
