@@ -6,16 +6,16 @@
 % [X] plot eye diagram
 % [X] BER curves with reas match to theoretical
 % [X] fine timing estimator
-%     [ ] test with sox based fine timing error 
+%     [X] test with fine timing error by resampling
 % [X] phase/freq estimator
 %     + need initial acquisition and tracking
-%     [ ] auto test with different freq offsets
-% [ ] coarse timing estimator (sync up to known test frames)
-%     [ ] auto test with different coarse timing offsets
+%     [X] test with different freq offsets
+% [X] coarse timing estimator (sync up to known test frames)
+%     [X] test with different coarse timing offsets
 % [ ] file read/write interface
 % [ ] modify for 1200 bit/s (or any) operation, ie GMSK filter coeff generation
 %     or re-sampling
-
+% [ ] way to measure input SNR to demod
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -553,9 +553,10 @@ function run_test_freq_offset
   verbose = 1;
   aEbNodB = 6;
   phase_offset = 0;
-  freq_offset  = -10.5;
-  timing_offset = 11128;
-  nsym = 4800*2;
+  freq_offset  = 1025.3;
+  timing_offset = 1207;
+  sample_clock_offset_ppm = 500;
+  nsym = 4800*4;
   npreamble = 480;
 
   gmsk_states.coherent_demod = 1;
@@ -581,6 +582,8 @@ function run_test_freq_offset
   end
 
   [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
+
+  tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
 
