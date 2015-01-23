@@ -1,7 +1,8 @@
 % gmsk.m
 % David Rowe Dec 2014
 %
-% GMSK modem simulation
+% GMSK modem implementation and simulations to test
+
 %
 % [X] plot eye diagram
 % [X] BER curves with reas match to theoretical
@@ -13,9 +14,15 @@
 % [X] coarse timing estimator (sync up to known test frames)
 %     [X] test with different coarse timing offsets
 % [ ] file read/write interface
-% [ ] modify for 1200 bit/s (or any) operation, ie GMSK filter coeff generation
-%     or re-sampling
+%     [ ] refactor into tx/rx functions
+% [ ] modify for 1200 (or any) bit/s operation
+%     + ie GMSK filter coeff generation
+%     + or just re-sampling? e.g. ratio of Fs to Rs?
 % [ ] way to measure input SNR to demod
+%     + Maybe based on test tone/carrier from the other side?
+%     + think about process ... total signal plus noise power?  Increase power until S+N doubles?
+% [ ] generate curves for baseline modem and with sync algorithms
+%     + used coarse sync code to remove need for knowing delays
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -70,41 +77,36 @@ randn('state',1);
 graphics_toolkit ("gnuplot");
 fm;
 
-function gmsk_states = gmsk_init(gmsk_states)
+%
+% Functions that implement the GMSK modem ------------------------------------------------------
+%
+
+function gmsk_states = gmsk_init(gmsk_states, Rs)
 
   % general 
 
   gmsk_states.Fs = 48000;
-  gmsk_states.Rs = 4800;
+  gmsk_states.Rs = Rs;
   M = gmsk_states.M = gmsk_states.Fs/gmsk_states.Rs;
   global gmsk_mod_coeff;
   global gmsk_demod_coeff;
+  gmsk_states.mod_coeff = (Rs/4800)*resample(gmsk_mod_coeff, 4800, Rs);
+  figure(12)
+  plot(gmsk_mod_coeff)
+  hold on;
+  plot(gmsk_states.mod_coeff,'g')
+  hold off;
 
   % set up FM modulator
 
   fm_states.Fs = gmsk_states.Fs;  
   fm_states.fc = 0;  
-  fm_max = fm_states.fm_max = 2400;
-  fd = fm_states.fd = 1200;
+  fm_max = fm_states.fm_max = Rs/2;
+  fd = fm_states.fd = Rs/4;
   fm_states.Ts = gmsk_states.M;  
   fm_states.pre_emp = fm_states.de_emp = 0;
   fm_states.output_filter = 1;
   gmsk_states.fm_states = analog_fm_init(fm_states);
-
-  % configure delays for demod type
-
-  [x i_mod] = max(gmsk_mod_coeff);
-  [x i_demod] = max(gmsk_demod_coeff);
-
-  if gmsk_states.coherent_demod
-    gmsk_states.filter_delay = i_mod + i_mod;
-    gmsk_states.Toff = -4;
-  else
-    gmsk_states.filter_delay = i_mod + i_demod + 100;
-    gmsk_states.Toff = 3;
- end
-
-  gmsk_states.dsam = dsam = gmsk_states.filter_delay;
 
 endfunction
 
@@ -113,7 +115,6 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
   M = gmsk_states.M;
   nsym = length(tx_bits);
   nsam = nsym*M;
-  global gmsk_mod_coeff;
 
   % NRZ sequence of symbols
 
@@ -122,7 +123,10 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
     tx_symbols(1+(i-1)*M:i*M) = -1 + 2*tx_bits(i);
   end
 
-  tx_filt = filter(gmsk_mod_coeff, 1, tx_symbols);
+  tx_filt = filter(gmsk_states.mod_coeff, 1, tx_symbols);
+  figure(13)
+  clf
+  plot(tx_filt(1:M*10))
   tx = analog_fm_mod(gmsk_states.fm_states, tx_filt);
 endfunction
 
@@ -134,10 +138,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
   nsam = length(rx);
   nsym = floor(nsam/M);
   global gmsk_demod_coeff;
-  global gmsk_mod_coeff;
   wd = 2*pi*gmsk_states.fm_states.fd/gmsk_states.Fs;
-  Toff = gmsk_states.Toff;
-  dsam = gmsk_states.filter_delay;
 
   if gmsk_states.coherent_demod
 
@@ -146,7 +147,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
 
     % matched filter
 
-    rx_filt = filter(gmsk_mod_coeff, 1, rx);
+    rx_filt = filter(gmsk_states.mod_coeff, 1, rx);
 
     % Property of MSK that re and im arms are sequences of 2T
     % long symbols, can be demodulated like QPSK with matched filter
@@ -303,6 +304,13 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
 endfunction
 
 
+% Initial frequency offset estimation. Look for line a centre
+% frequency, which is the strongest component when ...101010... is
+% used to modulate the GMSK signal.  Note just searching for a single
+% line will get false lock on random sine waves but that's OK for a
+% PoC.  It could be improved by checking for other lines, or
+% demodulating the preamble and checking for bit errors.
+  
 function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose)
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
@@ -316,17 +324,11 @@ function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose
   f = fft(rx .* hanning(length(rx))', ndft);
   f = fftshift(f);
 
-  % Look for line a centre frequency, which is the strongest component
-  % when 101010 .... is used to modulate the GMK signal.  Note just
-  % searching for a single line will get false lock on random sine
-  % waves but that's OK for a PoC.  It could be improved by checking
-  % for other lines, or demodulating the preamble and checking for bit
-  % errors.
-  
-  start_bin = 1+ Fs/2-Rs/2; 
-  stop_bin = start_bin + Rs;
+  start_bin = 1+ Fs/2-Rs/4; 
+  stop_bin = start_bin + Rs/2;
   [max_val max_bin] = max(abs(f(start_bin:stop_bin)));
-  max_bin -= Rs/2 + 1;
+  
+  max_bin -= Rs/4 + 1;
   if verbose > 1
     printf("ndft: %d start_bin: %d stop_bin: %d max_bin: %d\n", ndft, start_bin, stop_bin, max_bin);
   end
@@ -348,12 +350,15 @@ function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose
     subplot(211)
     plot(rx,'+')
     subplot(212)
-    plot(-Rs/2:Rs/2, 20*log10(abs(f(start_bin:stop_bin))));
-    axis([-Rs/2 Rs/2 0 80]);
+    plot(-Rs/4:Rs/4, 20*log10(abs(f(start_bin:stop_bin))));
+    axis([-Rs/4 Rs/4 0 80]);
   end
 
 endfunction
 
+%
+%  Functions for Testing the GMSK modem --------------------------------------------------------
+%
 
 function sim_out = gmsk_test(sim_in)
   nsym =  sim_in.nsym;
@@ -381,7 +386,7 @@ function sim_out = gmsk_test(sim_in)
     tx_bits(1:2:nsym) = 0;
     [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
     nsam = length(tx);
-    %tx_bits(1:10)
+    
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
     rx    = tx*exp(j*pi/2) + noise;
 
@@ -496,7 +501,7 @@ endfunction
 
 function run_gmsk_curves
   sim_in.coherent_demod = 1;
-  sim_in.nsym = 4800;
+  sim_in.nsym = 2400;
   sim_in.EbNodB = 2:10;
   sim_in.verbose = 1;
 
@@ -550,18 +555,19 @@ endfunction
 %       [ ] extra stuff at begining/end for filter delays
    
 function run_test_freq_offset
+  Rs = 4800;
   verbose = 1;
   aEbNodB = 6;
   phase_offset = 0;
-  freq_offset  = 1025.3;
-  timing_offset = 1207;
-  sample_clock_offset_ppm = 500;
-  nsym = 4800*4;
+  freq_offset  = 0;
+  timing_offset = 0;
+  sample_clock_offset_ppm = 0;
+  nsym = 4800*2;
   npreamble = 480;
 
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
-  gmsk_states = gmsk_init(gmsk_states);
+  gmsk_states = gmsk_init(gmsk_states, Rs);
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
   M  = gmsk_states.M;
@@ -586,7 +592,12 @@ function run_test_freq_offset
   tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
-
+  figure(11);
+  subplot(211)
+  plot(real(tx(1:M*10)))
+  subplot(212)
+  plot(imag(tx(1:M*10)))
+  
   EbNo = 10^(aEbNodB/10);
   variance = Fs/(Rs*EbNo);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
