@@ -15,7 +15,7 @@
 %     [X] test with different coarse timing offsets
 % [ ] file read/write interface
 %     [ ] refactor into tx/rx functions
-% [ ] modify for 1200 (or any) bit/s operation
+% [X] modify for 1200 (or any) bit/s operation
 %     + ie GMSK filter coeff generation
 %     + or just re-sampling? e.g. ratio of Fs to Rs?
 % [ ] way to measure input SNR to demod
@@ -91,11 +91,13 @@ function gmsk_states = gmsk_init(gmsk_states, Rs)
   global gmsk_mod_coeff;
   global gmsk_demod_coeff;
   gmsk_states.mod_coeff = (Rs/4800)*resample(gmsk_mod_coeff, 4800, Rs);
+
   figure(12)
-  plot(gmsk_mod_coeff)
+  plot(gmsk_mod_coeff,'r;original 4800;')
   hold on;
-  plot(gmsk_states.mod_coeff,'g')
+  plot(gmsk_states.mod_coeff,'g;interpolated;')
   hold off;
+  title('GMSK pulse shaping filter')
 
   % set up FM modulator
 
@@ -124,9 +126,12 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
   end
 
   tx_filt = filter(gmsk_states.mod_coeff, 1, tx_symbols);
+  
   figure(13)
   clf
   plot(tx_filt(1:M*10))
+  title('tx signal after filtering, before FM mod')
+
   tx = analog_fm_mod(gmsk_states.fm_states, tx_filt);
 endfunction
 
@@ -166,7 +171,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       % http://www.ece.ualberta.ca/~ee401/parts/data/PLLIntro.pdf
 
       eta = 0.707;
-      wn = 2*pi*10;
+      wn = 2*pi*10*(Rs/4800);  % (Rs/4800) -> found reducing the BW benifical with falling Rs
       Ts = 1/Fs;
       g1 = 1 - exp(-2*eta*wn*Ts);
       g2 = 1 + exp(-2*eta*wn*Ts) - 2*exp(-eta*wn*Ts)*cos(wn*Ts*sqrt(1-eta*eta));
@@ -349,9 +354,11 @@ function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose
     clf
     subplot(211)
     plot(rx,'+')
+    title('rx signal on complex plane')
     subplot(212)
     plot(-Rs/4:Rs/4, 20*log10(abs(f(start_bin:stop_bin))));
     axis([-Rs/4 Rs/4 0 80]);
+    title('spectrum of rx signal');
   end
 
 endfunction
@@ -558,10 +565,10 @@ function run_test_freq_offset
   Rs = 4800;
   verbose = 1;
   aEbNodB = 6;
-  phase_offset = 0;
-  freq_offset  = 0;
-  timing_offset = 0;
-  sample_clock_offset_ppm = 0;
+  phase_offset = pi/2;
+  freq_offset  = -104;
+  timing_offset = 1234;
+  sample_clock_offset_ppm = -500;
   nsym = 4800*2;
   npreamble = 480;
 
@@ -592,12 +599,18 @@ function run_test_freq_offset
   tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
-  figure(11);
-  subplot(211)
-  plot(real(tx(1:M*10)))
-  subplot(212)
-  plot(imag(tx(1:M*10)))
-  
+
+  if verbose
+    figure(11);
+    subplot(211)
+    st = timing_offset; en = st+M*10;
+    plot(real(tx(st:en)))
+    title('Real part of tx');
+    subplot(212)
+    plot(imag(tx(st:en)))
+    title('Imag part of tx');
+  end
+
   EbNo = 10^(aEbNodB/10);
   variance = Fs/(Rs*EbNo);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
