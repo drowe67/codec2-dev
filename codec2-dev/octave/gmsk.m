@@ -22,7 +22,7 @@
 %     + Maybe based on test tone/carrier from the other side?
 %     + think about process ... total signal plus noise power?  Increase power until S+N doubles?
 % [ ] generate curves for baseline modem and with sync algorithms
-%     + used coarse sync code to remove need for knowing delays
+%     [ ] used coarse sync code to remove need for knowing delays
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -85,6 +85,7 @@ function gmsk_states = gmsk_init(gmsk_states, Rs)
 
   % general 
 
+  verbose = gmsk_states.verbose;
   gmsk_states.Fs = 48000;
   gmsk_states.Rs = Rs;
   M = gmsk_states.M = gmsk_states.Fs/gmsk_states.Rs;
@@ -92,12 +93,14 @@ function gmsk_states = gmsk_init(gmsk_states, Rs)
   global gmsk_demod_coeff;
   gmsk_states.mod_coeff = (Rs/4800)*resample(gmsk_mod_coeff, 4800, Rs);
 
-  figure(12)
-  plot(gmsk_mod_coeff,'r;original 4800;')
-  hold on;
-  plot(gmsk_states.mod_coeff,'g;interpolated;')
-  hold off;
-  title('GMSK pulse shaping filter')
+  if verbose
+    figure(12)
+    plot(gmsk_mod_coeff,'r;original 4800;')
+    hold on;
+    plot(gmsk_states.mod_coeff,'g;interpolated;')
+    hold off;
+    title('GMSK pulse shaping filter')
+  end
 
   % set up FM modulator
 
@@ -117,6 +120,7 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
   M = gmsk_states.M;
   nsym = length(tx_bits);
   nsam = nsym*M;
+  verbose = gmsk_states.verbose;
 
   % NRZ sequence of symbols
 
@@ -127,10 +131,12 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
 
   tx_filt = filter(gmsk_states.mod_coeff, 1, tx_symbols);
   
-  figure(13)
-  clf
-  plot(tx_filt(1:M*10))
-  title('tx signal after filtering, before FM mod')
+  if verbose
+    figure(13)
+    clf
+    plot(tx_filt(1:M*10))
+    title('tx signal after filtering, before FM mod')
+  end
 
   tx = analog_fm_mod(gmsk_states.fm_states, tx_filt);
 endfunction
@@ -506,6 +512,8 @@ function run_gmsk_single
 endfunction
 
 
+% Generate a bunch of BER versus Eb/No curves for various demods
+
 function run_gmsk_curves
   sim_in.coherent_demod = 1;
   sim_in.nsym = 2400;
@@ -557,66 +565,9 @@ function run_gmsk_curves
 
 endfunction
 
-% TODO: [ ] test over range of freq, phase, coarse timing and Eb/No values
-%       [ ] Modify for Rs=1200, e.g. mod filter above
-%       [ ] extra stuff at begining/end for filter delays
-   
-function run_test_freq_offset
-  Rs = 4800;
-  verbose = 1;
-  aEbNodB = 6;
-  phase_offset = pi/2;
-  freq_offset  = -104;
-  timing_offset = 1234;
-  sample_clock_offset_ppm = -500;
-  nsym = 4800*2;
-  npreamble = 480;
 
-  gmsk_states.coherent_demod = 1;
-  gmsk_states.phase_track    = 1;
-  gmsk_states = gmsk_init(gmsk_states, Rs);
-  Fs = gmsk_states.Fs;
-  Rs = gmsk_states.Rs;
-  M  = gmsk_states.M;
-
-  % A frame consists of nsym random data bits.  Some experimentation
-  % has shown they need to be random for the sync algorithms to work
-
-  % note must be random-ish data (not say 11001100...) for timing estimator to work.
-  % However initial freq offset estimation is a lot easier with a 01010 type sequence
-
-  framesize = 480;
-  nframes = floor(nsym/framesize);
-  tx_frame = round(rand(1, framesize));
-  tx_bits = zeros(1,npreamble);
-  tx_bits(1:2:npreamble) = 1;
-  for i=1:nframes
-    tx_bits = [tx_bits tx_frame];
-  end
-
-  [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
-
-  tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
-  tx = [zeros(1,timing_offset) tx];
-  nsam = length(tx);
-
-  if verbose
-    figure(11);
-    subplot(211)
-    st = timing_offset; en = st+M*10;
-    plot(real(tx(st:en)))
-    title('Real part of tx');
-    subplot(212)
-    plot(imag(tx(st:en)))
-    title('Imag part of tx');
-  end
-
-  EbNo = 10^(aEbNodB/10);
-  variance = Fs/(Rs*EbNo);
-  noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
-  w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
-
-  rx = tx.*exp(j*w) + noise;
+function [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx)
+  verbose = gmsk_states.verbose;
 
   % look through rx buffer and determine if there is a valid preamble.  Use steps of half the
   % preamble size in samples to try to bracket the pre-amble.
@@ -640,34 +591,28 @@ function run_test_freq_offset
     plot(ratio_log);
     title('Preamble ratio');
   end
+endfunction
 
-  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
-  rx = rx.*exp(-j*w_est);
 
-  % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
+% attempt to perform "coarse sync" sync with the received frames, we
+% check each frame for the best coarse sync position.  Brute force
+% approach, that would be changed for a real demod which has some
+% sort of unique word.  Start looking for valid frames 1 frame
+% after start of pre-amble to give PLL time to lock
 
-  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(preamble_location+framesize:nsam));
-  nframes_rx = length(rx_bits)/framesize;
+function [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits)
 
-  % printf("ntx: %d nrx: %d ntx_bits: %d nrx_bits: %d\n", length(tx), length(rx), length(tx_bits), length(rx_bits));
-
-  % attempt to perform "coarse sync" sync with the received frames, we
-  % check each frame for the best coarse sync position.  Brute force
-  % approach, that would be changed for a real demod which has some
-  % sort of unique word.  Start looking for valid frames 1 frame
-  % after start of pre-amble to give PLL time to lock
-
-  Nerrs_log = zeros(1,nframes_rx);
-  Nerrs_all_log = zeros(1,nframes_rx);
+  Nerrs_log = zeros(1, nframes_rx);
+  Nerrs_all_log = zeros(1, nframes_rx);
   total_errors = 0;
   total_bits   = 0;
-  
+  framesize = length(tx_frame);
+
   for f=2:nframes_rx-1
     Nerrs_min = framesize;
     for i=1:framesize;
       st = (f-1)*framesize+i; en = st+framesize-1;
       Nerrs = sum(xor(rx_bits(st:en), tx_frame));
-      %printf("nframes: %d f: %f st: %d en: %d Nerrs: %d\n", nframes, f, st, en, Nerrs);
       if Nerrs < Nerrs_min
         Nerrs_min = Nerrs;
       end
@@ -679,6 +624,93 @@ function run_test_freq_offset
       total_bits   += framesize;
     end
   end
+endfunction
+
+
+% Give the demod a hard time: frequency, phase, time offsets, sample clock difference
+   
+function run_test_channel_impairments
+  Rs = 1200;
+  verbose = 2;
+  aEbNodB = 6;
+  phase_offset = pi/2;
+  freq_offset  = -104;
+  timing_offset = 1234;
+  sample_clock_offset_ppm = -500;
+  nsym = 4800*2;
+  npreamble = 480;
+
+  gmsk_states.verbose = verbose;
+  gmsk_states.coherent_demod = 1;
+  gmsk_states.phase_track    = 1;
+  gmsk_states = gmsk_init(gmsk_states, Rs);
+  Fs = gmsk_states.Fs;
+  Rs = gmsk_states.Rs;
+  M  = gmsk_states.M;
+
+  % A frame consists of nsym random data bits.  Some experimentation
+  % has shown they must be random-ish data (not say 11001100...) for
+  % timing estimator to work.  However initial freq offset estimation
+  % is a lot easier with a 01010 type sequence, so we construct a 
+  % frame with a pre-amble followed by frames of random data.
+
+  framesize = 480;
+  nframes = floor(nsym/framesize);
+  tx_frame = round(rand(1, framesize));
+  tx_bits = zeros(1,npreamble);
+  tx_bits(1:2:npreamble) = 1;
+  for i=1:nframes
+    tx_bits = [tx_bits tx_frame];
+  end
+
+  [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
+
+  tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
+  tx = [zeros(1,timing_offset) tx];
+  nsam = length(tx);
+
+  fc = 1500; gain = 2;
+  wc = 2*pi*fc/Fs;
+  w1 = exp(j*wc*(1:nsam));
+  tx = gain*real(tx .* w1);
+
+  if verbose
+    figure(11);
+    subplot(211)
+    st = timing_offset; en = st+M*10;
+    plot(real(tx(st:en)))
+    title('Real part of tx');
+    subplot(212)
+    plot(imag(tx(st:en)))
+    title('Imag part of tx');
+  end
+
+  EbNo = 10^(aEbNodB/10);
+  variance = Fs/(Rs*EbNo);
+  noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+  w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
+
+  rx = tx.*exp(j*w) + noise;
+
+  rx = rx .* conj(w1);
+
+  figure(3)
+  clf
+  Rx=20*log10(abs(fft(rx)));
+  plot(Rx);
+
+  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
+  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
+  rx = rx.*exp(-j*w_est);
+
+  % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
+
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(preamble_location+framesize:nsam));
+  nframes_rx = length(rx_bits)/framesize;
+
+  % printf("ntx: %d nrx: %d ntx_bits: %d nrx_bits: %d\n", length(tx), length(rx), length(tx_bits), length(rx_bits));
+
+  [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
 
   ber = total_errors/total_bits;
 
@@ -699,8 +731,122 @@ function run_test_freq_offset
 
 endfunction
     
+
+% Generates a Fs=48kHz raw file of 16 bit samples centred on 1500Hz,
+% Suitable for transmitting with a SSB tx
+
+function gmsk_tx(tx_file_name)
+  Rs = 1200;
+  nsym =  Rs*10;
+  framesize = 480;
+  npreamble = 480;
+  gain      = 10000;
+  fc        = 1500;
+
+  gmsk_states.verbose = 0;
+  gmsk_states.coherent_demod = 1;
+  gmsk_states.phase_track    = 1;
+  gmsk_states = gmsk_init(gmsk_states, Rs);
+  Fs = gmsk_states.Fs;
+  Rs = gmsk_states.Rs;
+  M  = gmsk_states.M;
+
+  % generate frame with preamble
+
+  nframes = floor(nsym/framesize);
+  tx_frame = round(rand(1, framesize));
+  tx_bits = zeros(1,npreamble);
+  tx_bits(1:2:npreamble) = 1;
+  for i=1:nframes
+    tx_bits = [tx_bits tx_frame];
+  end
+  
+  [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
+  nsam = length(tx);
+
+  wc = 2*pi*fc/Fs;
+  w = exp(j*wc*(1:nsam));
+  tx = gain*real(tx .* w);
+  figure(1)
+  plot(tx(1:4000))
+  fout = fopen(tx_file_name,"wb");
+  fwrite(fout, tx, "short");
+  fclose(fout);
+
+endfunction
+
+
+% Reads a file of Fs=48kHz 16 bit samples centred on 1500Hz, and
+% measures the BER.
+
+function gmsk_rx(rx_file_name)
+  Rs = 1200;
+  framesize = 480;
+  npreamble = 480;
+  fc        = 1500;
+
+  gmsk_states.verbose = 2;
+  gmsk_states.coherent_demod = 1;
+  gmsk_states.phase_track    = 1;
+  gmsk_states = gmsk_init(gmsk_states, Rs);
+  Fs = gmsk_states.Fs;
+  Rs = gmsk_states.Rs;
+  M  = gmsk_states.M;
+
+  tx_frame = round(rand(1, framesize));
+
+  % get real signal at fc offset and convert to baseband complex
+  % signal
+  
+  fin = fopen(rx_file_name,"rb");
+  rx = fread(fin,"short")';
+  fclose(fin);
+  nsam = length(rx);
+  wc = 2*pi*fc/Fs;
+  w = exp(-j*wc*(1:nsam));
+  rx = rx .* w;
+
+  figure(3)
+  clf
+  Rx=20*log10(abs(fft(rx)));
+  plot(Rx);
+
+  % find preamble and demodulate
+
+  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
+  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
+  rx = rx.*exp(-j*w_est);
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(preamble_location+framesize:nsam));
+  nframes_rx = length(rx_bits)/framesize;
+
+  % count errors
+
+  [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
+
+  ber = total_errors/total_bits;
+
+  printf("f_off: %4.1f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
+         freq_offset_est, nframes_rx, total_bits, total_errors, ber);
+
+  figure(2)
+  clf
+  subplot(211)
+  plot(Nerrs_log);
+  hold on;
+  plot(Nerrs_all_log,'g');
+  hold off;
+  title('Bit Errors')
+  subplot(212)
+  stem(real(cumsum(Nerrs_log)))
+  title('Cumulative Bit Errors')
+
+endfunction
+
+
 %run_gmsk_single
 %run_gmsk_curves
 %run_gmsk_init
-run_test_freq_offset
+%run_test_channel_impairments
+%gmsk_tx("test_gmsk.raw")
+gmsk_rx("test_gmsk.raw")
 
