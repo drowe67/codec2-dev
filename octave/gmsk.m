@@ -150,6 +150,8 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
   nsym = floor(nsam/M);
   global gmsk_demod_coeff;
   wd = 2*pi*gmsk_states.fm_states.fd/gmsk_states.Fs;
+  timing_angle_log = zeros(1,length(rx));
+  rx_int = zeros(1,length(rx));
 
   if gmsk_states.coherent_demod
 
@@ -296,21 +298,23 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
     % filter to get rid of most of noise before FM demod, but doesnt
     % introduce any ISI
 
-    fc = (4800)/(gmsk_states.Fs/2);
+    fc = Rs/(Fs/2);
     bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
     rx_filt = filter(bin, 1, rx);
+    %rx_filt = rx;
 
     % FM demod
 
     rx_diff = [ 1 rx_filt(2:nsam) .* conj(rx_filt(1:nsam-1))];
-    rx_out = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
+    rx_filt = (1/wd)*atan2(imag(rx_diff),real(rx_diff));
 
     % low pass filter, trade off betwen ISI and removing noise
 
-    rx_out = filter(gmsk_demod_coeff, 1, rx_out);
-    
-    rx_bits = real(rx_out(1+dsam+Toff:M:length(rx_out)) > 0);
-  end
+    rx_filt = filter(gmsk_demod_coeff, 1, rx_filt);  
+    Toff = 7;
+    rx_bits = real(rx_filt(1+Toff:M:length(rx_filt)) > 0);
+
+   end
 
 endfunction
 
@@ -377,16 +381,16 @@ function sim_out = gmsk_test(sim_in)
   nsym =  sim_in.nsym;
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
+  Rs = 4800;
 
+  gmsk_states.verbose = verbose;
   gmsk_states.coherent_demod = sim_in.coherent_demod;
   gmsk_states.phase_track = 0;
-  gmsk_states = gmsk_init(gmsk_states);
+  gmsk_states = gmsk_init(gmsk_states, Rs);
   M = gmsk_states.M;
   Fs = gmsk_states.Fs;
   Rs = gmsk_states.Rs;
   Bfm = gmsk_states.fm_states.Bfm;
-  dsam = gmsk_states.dsam;
-  Toff = gmsk_states.Toff;
  
   for ne = 1:length(EbNodB)
     aEbNodB = EbNodB(ne);
@@ -394,9 +398,9 @@ function sim_out = gmsk_test(sim_in)
     variance = Fs/(Rs*EbNo);
 
     tx_bits = round(rand(1, nsym));
-    tx_bits = ones(1, nsym);
+    %tx_bits = ones(1, nsym);
     %tx_bits = zeros(1, nsym);
-    tx_bits(1:2:nsym) = 0;
+    %tx_bits(1:2:nsym) = 0;
     [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits);
     nsam = length(tx);
     
@@ -404,32 +408,41 @@ function sim_out = gmsk_test(sim_in)
     rx    = tx*exp(j*pi/2) + noise;
 
     [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(1:length(rx)));
-      
-    l = length(rx_bits);
-    error_positions = xor(rx_bits(1:l), tx_bits(1:l));
-    Nerrs = sum(error_positions);
-    TERvec(ne) = Nerrs;
-    BERvec(ne) = Nerrs/l;
+
+    % search for frame location over a range
+
+    Nerrs_min = nsym; Nbits_min = nsym; l = length(rx_bits);
+    for i=1:100;
+      Nerrs = sum(xor(rx_bits(i:l), tx_bits(1:l-i+1)));
+      if Nerrs < Nerrs_min
+        Nerrs_min = Nerrs;
+        Nbits_min = l;
+      end
+    end
+ 
+    TERvec(ne) = Nerrs_min;
+    BERvec(ne) = Nerrs_min/Nbits_min;
     
     if verbose > 0
-      printf("EbNo dB: %3.1f Nerrs: %d BER: %f BER Theory: %f\n", aEbNodB, Nerrs, BERvec(ne), 0.5*erfc(sqrt(0.75*EbNo)));
+      printf("EbNo dB: %3.1f Nerrs: %d BER: %f BER Theory: %f\n", aEbNodB, Nerrs_min, BERvec(ne), 0.5*erfc(sqrt(0.75*EbNo)));
     end
 
     if verbose > 1
 
       if gmsk_states.coherent_demod == 0
+        Toff = 0; dsam = M*30;
         figure(1)
         clf
         eyesyms = 2;
-        plot(rx_out(dsam+1+Toff:dsam+eyesyms*M+Toff))
+        plot(rx_filt(dsam+1+Toff:dsam+eyesyms*M+Toff))
         hold on;
         for i=1:10
           st = dsam+1+Toff+i*eyesyms*M;
           en = st + eyesyms*M;
-          plot(rx_out(st:en))
+          plot(rx_filt(st:en))
         end
         hold off;
-        axis([0 eyesyms*M -2 2]);
+        %axis([dsam dsam+eyesyms*M -2 2]);
         title('Eye Diagram');
       else
         figure(1);
@@ -503,9 +516,9 @@ endfunction
 
 
 function run_gmsk_single
-  sim_in.coherent_demod = 1;
-  sim_in.nsym = 480;
-  sim_in.EbNodB = 6;
+  sim_in.coherent_demod = 0;
+  sim_in.nsym = 4800;
+  sim_in.EbNodB = 10;
   sim_in.verbose = 2;
 
   sim_out = gmsk_test(sim_in);
@@ -516,7 +529,7 @@ endfunction
 
 function run_gmsk_curves
   sim_in.coherent_demod = 1;
-  sim_in.nsym = 2400;
+  sim_in.nsym = 48000;
   sim_in.EbNodB = 2:10;
   sim_in.verbose = 1;
 
@@ -669,11 +682,6 @@ function run_test_channel_impairments
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
 
-  fc = 1500; gain = 2;
-  wc = 2*pi*fc/Fs;
-  w1 = exp(j*wc*(1:nsam));
-  tx = gain*real(tx .* w1);
-
   if verbose
     figure(11);
     subplot(211)
@@ -692,12 +700,13 @@ function run_test_channel_impairments
 
   rx = tx.*exp(j*w) + noise;
 
-  rx = rx .* conj(w1);
-
-  figure(3)
-  clf
-  Rx=20*log10(abs(fft(rx)));
-  plot(Rx);
+  fc = 1500; gain = 10000;
+  wc = 2*pi*fc/Fs;
+  w1 = exp(j*wc*(1:nsam));
+  rx1 = gain*real(rx .* w1);
+  fout = fopen("rx_6dB.raw","wb");
+  fwrite(fout, rx1, "short");
+  fclose(fout);
 
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
@@ -798,13 +807,15 @@ function gmsk_rx(rx_file_name)
   % get real signal at fc offset and convert to baseband complex
   % signal
   
-  fin = fopen(rx_file_name,"rb");
-  rx = fread(fin,"short")';
-  fclose(fin);
-  nsam = length(rx);
-  wc = 2*pi*fc/Fs;
-  w = exp(-j*wc*(1:nsam));
-  rx = rx .* w;
+  if 0 
+    fin = fopen(rx_file_name,"rb");
+    rx = fread(fin,"short")';
+    fclose(fin);
+    nsam = length(rx);
+    wc = 2*pi*fc/Fs;
+    w = exp(-j*wc*(1:nsam));
+    r x = rx .* w;
+  end
 
   figure(3)
   clf
@@ -844,9 +855,9 @@ endfunction
 
 
 %run_gmsk_single
-%run_gmsk_curves
+run_gmsk_curves
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-gmsk_rx("test_gmsk.raw")
+%gmsk_rx("ssb.1.wav")
 
