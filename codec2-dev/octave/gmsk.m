@@ -25,8 +25,11 @@
 %     [X] used coarse sync code to remove need for knowing delays
 % [X] demod level indep
 %     + scaled OK +/- 20dB same BER
-% [ ] effect of DC signals from SDRs
-% [ ] effect of large interferers
+% [X] effect of DC signals from SDRs
+%     + simulated effect of general interferer at -1500Hz, at an amplitude of 4
+%       (12 dB above GMSK signal), it started to affect BER e.g. 0.007 to 0.009
+%       Line appeared about 30dB above top of GMSK signal.
+% [ ] effect of quantisation noise
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -306,7 +309,6 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
     fc = Rs/(Fs/2);
     bin  = firls(200,[0 fc*(1-0.05) fc*(1+0.05) 1],[1 1 0.01 0.01]);
     rx_filt = filter(bin, 1, rx);
-    %rx_filt = rx;
 
     % FM demod
 
@@ -603,8 +605,8 @@ function [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npr
     end
   end
   if verbose
-    printf("preamble location: %d frequency offset: %f ratio: %f\n", 
-    preamble_location, freq_offset_est, ratio);   
+    printf("preamble location: %5.1f ms est f_off: %5.1f Hz ratio: %3.2f\n", 
+    preamble_location/gmsk_states.Fs, freq_offset_est, ratio);   
     figure;
     plot(ratio_log);
     title('Preamble ratio');
@@ -644,6 +646,21 @@ function [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nfr
   end
 endfunction
 
+function plot_spectrum(gmsk_states, rx, preamble_location, title_str)
+  Fs = gmsk_states.Fs;
+  st = preamble_location + gmsk_states.npreamble*gmsk_states.M;
+  sig = rx(st:st+Fs*0.5);
+  h = hanning(length(sig))';
+  Rx=20*log10(abs(fftshift(fft(sig .* h, Fs))));
+  figure;
+  plot(-Fs/2:Fs/2-1,Rx);
+  grid("minor");
+  xlabel('Hz');
+  ylabel('dB');
+  topy = ceil(max(Rx)/10)*10;
+  axis([-4000 4000 topy-50 topy+10])
+  title(title_str);
+endfunction
 
 % Give the demod a hard time: frequency, phase, time offsets, sample clock difference
    
@@ -655,9 +672,12 @@ function run_test_channel_impairments
   freq_offset  = -104;
   timing_offset = 1234;
   sample_clock_offset_ppm = -500;
+  interferer_freq = -1500;
+  interferer_amp  = 0;
   nsym = 4800*2;
   npreamble = 480;
 
+  gmsk_states.npreamble = npreamble;
   gmsk_states.verbose = verbose;
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
@@ -702,9 +722,10 @@ function run_test_channel_impairments
   variance = Fs/(Rs*EbNo);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
+  interferer = interferer_amp*exp(j*interferer_freq*(2*pi/Fs)*(0:nsam-1));
 
-  rx = tx.*exp(j*w) + noise;
-
+  rx = tx.*exp(j*w) + noise + interferer;
+  
   % optional dump to file
 
   if 0
@@ -720,6 +741,8 @@ function run_test_channel_impairments
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
   rx = rx.*exp(-j*w_est);
+
+  plot_spectrum(gmsk_states, rx, preamble_location, "GMSK rx just after preamble");
 
   % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
 
@@ -738,9 +761,9 @@ function run_test_channel_impairments
   figure;
   clf
   subplot(211)
-  plot(Nerrs_log,'r;errors/frame counted for BER');
+  plot(Nerrs_log,'r;errors/frame counted for BER;');
   hold on;
-  plot(Nerrs_all_log,'g;all errors/frame');
+  plot(Nerrs_all_log,'g;all errors/frame;');
   hold off;
   legend("boxoff");
   title('Bit Errors')
@@ -804,6 +827,7 @@ function gmsk_rx(rx_file_name)
   npreamble = 480;
   fc        = 1500;
 
+  gmsk_states.npreamble = npreamble;
   gmsk_states.verbose = 1;
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
@@ -820,12 +844,32 @@ function gmsk_rx(rx_file_name)
   fin = fopen(rx_file_name,"rb");
   rx = fread(fin,"short")';
   fclose(fin);
-  rx = filter([1 -0.999],[1 -0.99],rx);
+  %rx = filter([1 -0.999],[1 -0.99],rx);
   nsam = length(rx);
   wc = 2*pi*fc/Fs;
   w = exp(-j*wc*(1:nsam));
   rxbb = rx .* w;
  
+  % power of signal, averaged over window
+  % TODO: remove wave file header, scale of actual level
+  %       filter so we measure only energy in our passband
+  %       work out noise BW of filter.  Use GMSK filter?
+
+  bpwr_lp  = fir1(200,3000/(Fs/2));
+  noise_bw = Fs*(var(filter(bpwr_lp,1,randn(1,1E6))));
+
+  rx_filt = filter(bpwr_lp, 1, rx(1000:length(rx)));
+  rx_filt = filter([1 -0.999], [1 -0.99], rx_filt);
+  rx_power = conv(rx_filt.^2,ones(1,100*M));
+  rx_power_dB = 10*log10(rx_power);
+  subplot(211)
+  plot(rx_filt);
+  subplot(212)
+  plot(10*log10(rx_power));
+  axis([1 length(rx_power) max(rx_power_dB)-9 max(rx_power_dB)+1])
+  grid("minor")
+  plot_spectrum(gmsk_states, rx_filt, 1, "after filtering for power est");
+
   % find preamble and demodulate
 
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rxbb);
@@ -840,20 +884,7 @@ function gmsk_rx(rx_file_name)
   % after preamble
 
   % spectrum of a chunk of signal just after preamble
-
-  figure;
-  st = preamble_location+npreamble*M;
-  sig = rx(st:st+Fs*0.5);
-
-  h = hanning(length(sig))';
-  Rx=20*log10(abs(fftshift(fft(sig .* h, Fs))));
-  plot(-Fs/2:Fs/2-1,Rx);
-  grid("minor");
-  xlabel('Hz');
-  ylabel('dB');
-  topy = ceil(max(Rx)/10)*10;
-  axis([-4000 4000 topy-50 topy+10])
-  title('rx spectrum just after preamble');
+  plot_spectrum(gmsk_states, rx, preamble_location, "GMSK rx just after preamble");
 
   % count errors
 
@@ -884,5 +915,5 @@ endfunction
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-gmsk_rx("ssb_audio_short.wav")
+gmsk_rx("ssb_short.wav")
 
