@@ -21,8 +21,12 @@
 % [ ] way to measure input SNR to demod
 %     + Maybe based on test tone/carrier from the other side?
 %     + think about process ... total signal plus noise power?  Increase power until S+N doubles?
-% [ ] generate curves for baseline modem and with sync algorithms
-%     [ ] used coarse sync code to remove need for knowing delays
+% [X] generate curves for baseline modem and with sync algorithms
+%     [X] used coarse sync code to remove need for knowing delays
+% [X] demod level indep
+%     + scaled OK +/- 20dB same BER
+% [ ] effect of DC signals from SDRs
+% [ ] effect of large interferers
 
 % Filter coeffs From:
 % https://github.com/on1arf/gmsk/blob/master/gmskmodem_codec2/API/a_dspstuff.h,
@@ -76,6 +80,7 @@ rand('state',1);
 randn('state',1);
 graphics_toolkit ("gnuplot");
 fm;
+close all;
 
 %
 % Functions that implement the GMSK modem ------------------------------------------------------
@@ -93,8 +98,8 @@ function gmsk_states = gmsk_init(gmsk_states, Rs)
   global gmsk_demod_coeff;
   gmsk_states.mod_coeff = (Rs/4800)*resample(gmsk_mod_coeff, 4800, Rs);
 
-  if verbose
-    figure(12)
+  if verbose > 1
+    figure;
     plot(gmsk_mod_coeff,'r;original 4800;')
     hold on;
     plot(gmsk_states.mod_coeff,'g;interpolated;')
@@ -131,8 +136,8 @@ function [tx tx_filt tx_symbols] = gmsk_mod(gmsk_states, tx_bits)
 
   tx_filt = filter(gmsk_states.mod_coeff, 1, tx_symbols);
   
-  if verbose
-    figure(13)
+  if verbose > 1
+    figure;
     clf
     plot(tx_filt(1:M*10))
     title('tx signal after filtering, before FM mod')
@@ -231,7 +236,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
         dco_log(i) = dco;
       end
       
-      figure(4);
+      figure;
       clf
       subplot(211);
       plot(filt_log);
@@ -261,7 +266,7 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       k++;
     end
 
-    figure(8)
+    figure;
     clf
     subplot(211)
     plot(timing_adj);
@@ -360,7 +365,7 @@ function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose
 
   if verbose > 1
     printf("freq_offset_est: %f  pk/rms ratio: %f \n", freq_offset_est, ratio);
-    figure(1)
+    figure;
     clf
     subplot(211)
     plot(rx,'+')
@@ -431,7 +436,7 @@ function sim_out = gmsk_test(sim_in)
 
       if gmsk_states.coherent_demod == 0
         Toff = 0; dsam = M*30;
-        figure(1)
+        figure;
         clf
         eyesyms = 2;
         plot(rx_filt(dsam+1+Toff:dsam+eyesyms*M+Toff))
@@ -445,7 +450,7 @@ function sim_out = gmsk_test(sim_in)
         %axis([dsam dsam+eyesyms*M -2 2]);
         title('Eye Diagram');
       else
-        figure(1);
+        figure;
         nplot = 16;
         clf;
         subplot(211)
@@ -456,7 +461,7 @@ function sim_out = gmsk_test(sim_in)
         plot(imag(rx_filt(1:nplot*M)))
         axis([1 nplot*M -1 1])
 
-        figure(2);
+        figure;
         nplot = 16;
         clf;
         subplot(211)
@@ -468,7 +473,7 @@ function sim_out = gmsk_test(sim_in)
         axis([1 nplot*M -1 1])
      end
 
-      figure(3)
+      figure;
       clf
       subplot(211)
       stem(tx_bits(1:20))
@@ -477,7 +482,7 @@ function sim_out = gmsk_test(sim_in)
       stem(rx_bits(1:20))
       title('Rx Bits')
 
-      figure(4);
+      figure;
       clf
       subplot(211);
       f = fft(rx);
@@ -545,7 +550,7 @@ function run_gmsk_curves
 
   % BER v Eb/No curves
 
-  figure(1); 
+  figure;
   clf;
   semilogy(sim_in.EbNodB, gmsk_theory.BERvec,'r;GMSK theory;')
   hold on;
@@ -563,7 +568,7 @@ function run_gmsk_curves
   % C/N   = (Eb/No)*(Rs/B)
 
   RsOnB_dB = 10*log10(Rs/1);
-  figure(2); 
+  figure;
   clf;
   semilogy(sim_in.EbNodB+RsOnB_dB, gmsk_theory.BERvec,'r;GMSK theory;')
   hold on;
@@ -600,7 +605,7 @@ function [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npr
   if verbose
     printf("preamble location: %d frequency offset: %f ratio: %f\n", 
     preamble_location, freq_offset_est, ratio);   
-    figure(9)
+    figure;
     plot(ratio_log);
     title('Preamble ratio');
   end
@@ -644,7 +649,7 @@ endfunction
    
 function run_test_channel_impairments
   Rs = 1200;
-  verbose = 2;
+  verbose = 1;
   aEbNodB = 6;
   phase_offset = pi/2;
   freq_offset  = -104;
@@ -682,8 +687,8 @@ function run_test_channel_impairments
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
 
-  if verbose
-    figure(11);
+  if verbose > 1
+    figure;
     subplot(211)
     st = timing_offset; en = st+M*10;
     plot(real(tx(st:en)))
@@ -700,13 +705,17 @@ function run_test_channel_impairments
 
   rx = tx.*exp(j*w) + noise;
 
-  fc = 1500; gain = 10000;
-  wc = 2*pi*fc/Fs;
-  w1 = exp(j*wc*(1:nsam));
-  rx1 = gain*real(rx .* w1);
-  fout = fopen("rx_6dB.raw","wb");
-  fwrite(fout, rx1, "short");
-  fclose(fout);
+  % optional dump to file
+
+  if 0
+    fc = 1500; gain = 10000;
+    wc = 2*pi*fc/Fs;
+    w1 = exp(j*wc*(1:nsam));
+    rx1 = gain*real(rx .* w1);
+    fout = fopen("rx_6dB.raw","wb");
+    fwrite(fout, rx1, "short");
+    fclose(fout);
+  end
 
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
@@ -726,13 +735,14 @@ function run_test_channel_impairments
   printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
          aEbNodB, freq_offset, phase_offset, nframes_rx, total_bits, total_errors, ber);
 
-  figure(2)
+  figure;
   clf
   subplot(211)
-  plot(Nerrs_log);
+  plot(Nerrs_log,'r;errors/frame counted for BER');
   hold on;
-  plot(Nerrs_all_log,'g');
+  plot(Nerrs_all_log,'g;all errors/frame');
   hold off;
+  legend("boxoff");
   title('Bit Errors')
   subplot(212)
   stem(real(cumsum(Nerrs_log)))
@@ -762,7 +772,7 @@ function gmsk_tx(tx_file_name)
 
   % generate frame with preamble
 
-  nframes = floor(nsym/framesize);
+  nframes = floor(nsym/framesize)
   tx_frame = round(rand(1, framesize));
   tx_bits = zeros(1,npreamble);
   tx_bits(1:2:npreamble) = 1;
@@ -776,7 +786,7 @@ function gmsk_tx(tx_file_name)
   wc = 2*pi*fc/Fs;
   w = exp(j*wc*(1:nsam));
   tx = gain*real(tx .* w);
-  figure(1)
+  figure;
   plot(tx(1:4000))
   fout = fopen(tx_file_name,"wb");
   fwrite(fout, tx, "short");
@@ -794,7 +804,7 @@ function gmsk_rx(rx_file_name)
   npreamble = 480;
   fc        = 1500;
 
-  gmsk_states.verbose = 2;
+  gmsk_states.verbose = 1;
   gmsk_states.coherent_demod = 1;
   gmsk_states.phase_track    = 1;
   gmsk_states = gmsk_init(gmsk_states, Rs);
@@ -807,28 +817,43 @@ function gmsk_rx(rx_file_name)
   % get real signal at fc offset and convert to baseband complex
   % signal
   
-  if 0 
-    fin = fopen(rx_file_name,"rb");
-    rx = fread(fin,"short")';
-    fclose(fin);
-    nsam = length(rx);
-    wc = 2*pi*fc/Fs;
-    w = exp(-j*wc*(1:nsam));
-    r x = rx .* w;
-  end
-
-  figure(3)
-  clf
-  Rx=20*log10(abs(fft(rx)));
-  plot(Rx);
-
+  fin = fopen(rx_file_name,"rb");
+  rx = fread(fin,"short")';
+  fclose(fin);
+  rx = filter([1 -0.999],[1 -0.99],rx);
+  nsam = length(rx);
+  wc = 2*pi*fc/Fs;
+  w = exp(-j*wc*(1:nsam));
+  rxbb = rx .* w;
+ 
   % find preamble and demodulate
 
-  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
+  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rxbb);
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
-  rx = rx.*exp(-j*w_est);
-  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rx(preamble_location+framesize:nsam));
+  rxbb = rxbb.*exp(-j*w_est);
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(preamble_location+framesize:nsam));
   nframes_rx = length(rx_bits)/framesize;
+
+  % spectrogram or mesh plot?
+  % noise est
+  % decimate down to lower Fs?
+  % after preamble
+
+  % spectrum of a chunk of signal just after preamble
+
+  figure;
+  st = preamble_location+npreamble*M;
+  sig = rx(st:st+Fs*0.5);
+
+  h = hanning(length(sig))';
+  Rx=20*log10(abs(fftshift(fft(sig .* h, Fs))));
+  plot(-Fs/2:Fs/2-1,Rx);
+  grid("minor");
+  xlabel('Hz');
+  ylabel('dB');
+  topy = ceil(max(Rx)/10)*10;
+  axis([-4000 4000 topy-50 topy+10])
+  title('rx spectrum just after preamble');
 
   % count errors
 
@@ -839,7 +864,7 @@ function gmsk_rx(rx_file_name)
   printf("f_off: %4.1f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
          freq_offset_est, nframes_rx, total_bits, total_errors, ber);
 
-  figure(2)
+  figure;
   clf
   subplot(211)
   plot(Nerrs_log);
@@ -855,9 +880,9 @@ endfunction
 
 
 %run_gmsk_single
-run_gmsk_curves
+%run_gmsk_curves
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-%gmsk_rx("ssb.1.wav")
+gmsk_rx("ssb_audio_short.wav")
 
