@@ -605,7 +605,7 @@ function [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npr
     end
   end
   if verbose
-    printf("preamble location: %5.1f ms est f_off: %5.1f Hz ratio: %3.2f\n", 
+    printf("preamble location: %2.1f seconds est f_off: %5.1f Hz ratio: %3.2f\n", 
     preamble_location/gmsk_states.Fs, freq_offset_est, ratio);   
     figure;
     plot(ratio_log);
@@ -850,6 +850,10 @@ function gmsk_rx(rx_file_name)
   w = exp(-j*wc*(1:nsam));
   rxbb = rx .* w;
  
+  % find preamble
+
+  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rxbb);
+
   % power of signal, averaged over window
   % TODO: remove wave file header, scale of actual level
   %       filter so we measure only energy in our passband
@@ -862,21 +866,44 @@ function gmsk_rx(rx_file_name)
   rx_filt = filter([1 -0.999], [1 -0.99], rx_filt);
   rx_power = conv(rx_filt.^2,ones(1,100*M));
   rx_power_dB = 10*log10(rx_power);
+  figure;
   subplot(211)
   plot(rx_filt);
   subplot(212)
-  plot(10*log10(rx_power));
+  plot(rx_power_dB);
   axis([1 length(rx_power) max(rx_power_dB)-9 max(rx_power_dB)+1])
   grid("minor")
+
+  % work out where to sample N, and S+N
+
+  noise_end = preamble_location - 2*npreamble*M;
+  noise_start = noise_end - Fs;
+  noise = mean(rx_power_dB(noise_start:noise_end));
+  signal_noise_start = preamble_location + 2*npreamble*M;
+  signal_noise_end = signal_noise_start + Fs;
+  signal_noise = mean(rx_power_dB(signal_noise_start:signal_noise_end));
+  hold on;
+  plot([noise_start noise_end],[noise noise],'color','r','linewidth',5);
+  plot([signal_noise_start signal_noise_end],[signal_noise signal_noise],'color','r','linewidth',5);
+
+  % determine SNR
+  
+  noise_lin = 10 ^ (noise/10);
+  signal_noise_lin = 10 ^ (signal_noise/10);
+  signal_lin = signal_noise_lin - noise_lin;
+  signal = 10*log10(signal_lin);
+  snr = signal - noise;
+  CNo = snr + 10*log10(noise_bw);
+  EbNo = CNo - 10*log10(Rs);
+
+  EbNo_lin  = 10 .^ (EbNo/10);
+  alpha = 0.75;                             % guess for BT=0.5 GMSK
+  ber_theory = 0.5*erfc(sqrt(alpha*EbNo_lin));
+
+  printf("Estimated S: %3.1f N: %3.1f Nbw: %4.0f Hz SNR: %3.1f CNo: %3.1f EbNo: %3.1f BER theory: %f\n",
+         signal, noise, noise_bw, snr, CNo, EbNo, ber_theory);
+
   plot_spectrum(gmsk_states, rx_filt, 1, "after filtering for power est");
-
-  % find preamble and demodulate
-
-  [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rxbb);
-  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
-  rxbb = rxbb.*exp(-j*w_est);
-  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(preamble_location+framesize:nsam));
-  nframes_rx = length(rx_bits)/framesize;
 
   % spectrogram or mesh plot?
   % noise est
@@ -885,6 +912,13 @@ function gmsk_rx(rx_file_name)
 
   % spectrum of a chunk of signal just after preamble
   plot_spectrum(gmsk_states, rx, preamble_location, "GMSK rx just after preamble");
+
+  % correct freq offset and demodulate
+
+  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
+  rxbb = rxbb.*exp(-j*w_est);
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(preamble_location+npreamble*M:nsam));
+  nframes_rx = length(rx_bits)/framesize;
 
   % count errors
 
@@ -898,11 +932,12 @@ function gmsk_rx(rx_file_name)
   figure;
   clf
   subplot(211)
-  plot(Nerrs_log);
+  plot(Nerrs_log,'r;errors/frame counted for BER;');
   hold on;
-  plot(Nerrs_all_log,'g');
-  hold off;
+  plot(Nerrs_all_log,'g;all errors/frame;');
+  hold on;
   title('Bit Errors')
+  legend("boxoff");
   subplot(212)
   stem(real(cumsum(Nerrs_log)))
   title('Cumulative Bit Errors')
