@@ -667,10 +667,10 @@ endfunction
 function run_test_channel_impairments
   Rs = 1200;
   verbose = 1;
-  aEbNodB = 6;
+  aEbNodB = 9;
   phase_offset = pi/2;
   freq_offset  = -104;
-  timing_offset = 1234;
+  timing_offset = 100E3;
   sample_clock_offset_ppm = -500;
   interferer_freq = -1500;
   interferer_amp  = 0;
@@ -728,7 +728,7 @@ function run_test_channel_impairments
   
   % optional dump to file
 
-  if 0
+  if 1
     fc = 1500; gain = 10000;
     wc = 2*pi*fc/Fs;
     w1 = exp(j*wc*(1:nsam));
@@ -878,30 +878,34 @@ function gmsk_rx(rx_file_name)
 
   noise_end = preamble_location - 2*npreamble*M;
   noise_start = noise_end - Fs;
-  noise = mean(rx_power_dB(noise_start:noise_end));
-  signal_noise_start = preamble_location + 2*npreamble*M;
-  signal_noise_end = signal_noise_start + Fs;
-  signal_noise = mean(rx_power_dB(signal_noise_start:signal_noise_end));
-  hold on;
-  plot([noise_start noise_end],[noise noise],'color','r','linewidth',5);
-  plot([signal_noise_start signal_noise_end],[signal_noise signal_noise],'color','r','linewidth',5);
+  if noise_start < 1
+    printf("Hmm, we really need >1 second of noise only before preamble to measure noise!\n");
+  else
+    noise = mean(rx_power_dB(noise_start:noise_end));
+    signal_noise_start = preamble_location + 2*npreamble*M;
+    signal_noise_end = signal_noise_start + Fs;
+    signal_noise = mean(rx_power_dB(signal_noise_start:signal_noise_end));
+    hold on;
+    plot([noise_start noise_end],[noise noise],'color','r','linewidth',5);
+    plot([signal_noise_start signal_noise_end],[signal_noise signal_noise],'color','r','linewidth',5);
 
-  % determine SNR
+    % determine SNR
   
-  noise_lin = 10 ^ (noise/10);
-  signal_noise_lin = 10 ^ (signal_noise/10);
-  signal_lin = signal_noise_lin - noise_lin;
-  signal = 10*log10(signal_lin);
-  snr = signal - noise;
-  CNo = snr + 10*log10(noise_bw);
-  EbNo = CNo - 10*log10(Rs);
+    noise_lin = 10 ^ (noise/10);
+    signal_noise_lin = 10 ^ (signal_noise/10);
+    signal_lin = signal_noise_lin - noise_lin;
+    signal = 10*log10(signal_lin);
+    snr = signal - noise;
+    CNo = snr + 10*log10(noise_bw);
+    EbNo = CNo - 10*log10(Rs);
 
-  EbNo_lin  = 10 .^ (EbNo/10);
-  alpha = 0.75;                             % guess for BT=0.5 GMSK
-  ber_theory = 0.5*erfc(sqrt(alpha*EbNo_lin));
+    EbNo_lin  = 10 .^ (EbNo/10);
+    alpha = 0.75;                             % guess for BT=0.5 GMSK
+    ber_theory = 0.5*erfc(sqrt(alpha*EbNo_lin));
 
-  printf("Estimated S: %3.1f N: %3.1f Nbw: %4.0f Hz SNR: %3.1f CNo: %3.1f EbNo: %3.1f BER theory: %f\n",
-         signal, noise, noise_bw, snr, CNo, EbNo, ber_theory);
+    printf("Estimated S: %3.1f N: %3.1f Nbw: %4.0f Hz SNR: %3.1f CNo: %3.1f EbNo: %3.1f BER theory: %f\n",
+           signal, noise, noise_bw, snr, CNo, EbNo, ber_theory);
+  end
 
   plot_spectrum(gmsk_states, rx_filt, 1, "after filtering for power est");
 
@@ -926,8 +930,8 @@ function gmsk_rx(rx_file_name)
 
   ber = total_errors/total_bits;
 
-  printf("f_off: %4.1f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
-         freq_offset_est, nframes_rx, total_bits, total_errors, ber);
+  printf("Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
+         nframes_rx, total_bits, total_errors, ber);
 
   figure;
   clf
@@ -950,5 +954,5 @@ endfunction
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-gmsk_rx("ssb_short.wav")
+gmsk_rx("rx_6dB.raw")
 
