@@ -667,7 +667,7 @@ endfunction
 function run_test_channel_impairments
   Rs = 1200;
   verbose = 1;
-  aEbNodB = 9;
+  aEbNodB = 6;
   phase_offset = pi/2;
   freq_offset  = -104;
   timing_offset = 100E3;
@@ -724,7 +724,7 @@ function run_test_channel_impairments
   w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
   interferer = interferer_amp*exp(j*interferer_freq*(2*pi/Fs)*(0:nsam-1));
 
-  rx = tx.*exp(j*w) + noise + interferer;
+  rx = sqrt(2)*tx.*exp(j*w) + noise + interferer;
   
   % optional dump to file
 
@@ -737,6 +737,8 @@ function run_test_channel_impairments
     fwrite(fout, rx1, "short");
     fclose(fout);
   end
+
+  rx = rx1 .* conj(w1);
 
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rx);
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
@@ -859,12 +861,13 @@ function gmsk_rx(rx_file_name)
   %       filter so we measure only energy in our passband
   %       work out noise BW of filter.  Use GMSK filter?
 
-  bpwr_lp  = fir1(200,3000/(Fs/2));
-  noise_bw = Fs*(var(filter(bpwr_lp,1,randn(1,1E6))));
+  [b a] = cheby2(6,40,[200 3000]*pi/Fs);
+  %bpwr_lp  = fir2([200,4000/(Fs/2));
+  noise_bw = var(filter(b,a,randn(1,1E6)));
 
-  rx_filt = filter(bpwr_lp, 1, rx(1000:length(rx)));
-  rx_filt = filter([1 -0.999], [1 -0.99], rx_filt);
-  rx_power = conv(rx_filt.^2,ones(1,100*M));
+  rx_filt = filter(b, a, rx(1000:length(rx)));
+  npower_window = 200*M;
+  rx_power = conv(rx_filt.^2,ones(1,npower_window))/(npower_window);
   rx_power_dB = 10*log10(rx_power);
   figure;
   subplot(211)
@@ -896,7 +899,8 @@ function gmsk_rx(rx_file_name)
     signal_lin = signal_noise_lin - noise_lin;
     signal = 10*log10(signal_lin);
     snr = signal - noise;
-    CNo = snr + 10*log10(noise_bw);
+    fudge_factor = 3; % 3dB for single/double sided noise adjustment?  Just a guess
+    CNo = snr + 10*log10(Fs*noise_bw) - fudge_factor;
     EbNo = CNo - 10*log10(Rs);
 
     EbNo_lin  = 10 .^ (EbNo/10);
@@ -904,7 +908,7 @@ function gmsk_rx(rx_file_name)
     ber_theory = 0.5*erfc(sqrt(alpha*EbNo_lin));
 
     printf("Estimated S: %3.1f N: %3.1f Nbw: %4.0f Hz SNR: %3.1f CNo: %3.1f EbNo: %3.1f BER theory: %f\n",
-           signal, noise, noise_bw, snr, CNo, EbNo, ber_theory);
+           signal, noise, Fs*noise_bw, snr, CNo, EbNo, ber_theory);
   end
 
   plot_spectrum(gmsk_states, rx_filt, 1, "after filtering for power est");
@@ -954,5 +958,5 @@ endfunction
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-gmsk_rx("rx_6dB.raw")
+gmsk_rx("ssb_short.wav")
 
