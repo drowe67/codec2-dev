@@ -79,8 +79,20 @@ function [rx_out rx_bb] = analog_fm_demod(fm_states, rx)
 
   rx_bb = rx .* exp(-j*wc*t);      % down to complex baseband
   rx_bb = filter(fm_states.bin,1,rx_bb);
+
+  % differentiate first, in rect domain, then find angle, this puts
+  % signal on the positive side of the real axis
+
   rx_bb_diff = [ 1 rx_bb(2:nsam) .* conj(rx_bb(1:nsam-1))];
-  rx_out = (1/wd)*atan2(imag(rx_bb_diff),real(rx_bb_diff));
+  rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
+
+  % limit maximum phase jumps, to remove staticc type noise at low SNRs
+
+  rx_out(find(rx_out > wd)) = wd;
+  rx_out(find(rx_out < -wd)) = -wd;
+
+  rx_out *= (1/wd);
+
   if fm_states.output_filter
     rx_out = filter(fm_states.bout,1,rx_out);
   end
@@ -248,12 +260,61 @@ function run_fm_single
   sim_in.pre_emp = 0;
   sim_in.de_emp  = 0;
 
-  sim_in.CNdB   = 20;
+  sim_in.CNdB   = 2;
   sim_out = analog_fm_test(sim_in);
 end
+
+
+function fm_demod_file(file_name_out, file_name_in)
+  fin = fopen(file_name_in,"rb");
+  rx = fread(fin,"short")'; 
+  rx = rx(1000:length(rx)); % strip of wave header
+  fclose(fin);
+
+  Fs = fm_states.Fs = 48000;  
+  fm_max = fm_states.fm_max = 3E3;
+  fd = fm_states.fd = 5E3;
+  fm_states.fc = 12E3;
+
+  fm_states.pre_emp = 1;
+  fm_states.de_emp  = 0;
+  fm_states.Ts = 1;
+  fm_states.output_filter = 1;
+  fm_states = analog_fm_init(fm_states);
+
+  [rx_out rx_bb] = analog_fm_demod(fm_states, rx);
+
+  rx_out *= 5000;
+  fout = fopen(file_name_out,"wb");
+  fwrite(fout, rx_out, "short");
+  fclose(fout);
+
+  figure(1)
+  subplot(211)
+  plot(rx)
+  subplot(212)
+  plot(20*log10(abs(fft(rx))))
+  title('FM Dmodulator Intput Spectrum');
+
+  figure(2)
+  subplot(211)
+  Rx_bb = 20*log10(abs(fft(rx_bb)));
+  plot(Rx_bb)
+  title('FM Demodulator (baseband) Input Spectrum');
+
+  subplot(212)
+  plot(20*log10(abs(fft(rx_out))))
+  title('FM Dmodulator Output Spectrum');
+
+  figure(3)
+  plot(rx_out)
+  title('FM Dmodulator Output');
+
+endfunction
 
 more off;
 
 %run_fm_curves
+fm_demod_file("ssb_fm_out.raw","~/Desktop/ssb_fm.wav")
 %run_fm_single
 
