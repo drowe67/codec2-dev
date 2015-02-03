@@ -346,7 +346,7 @@ function [freq_offset_est ratio] = gmsk_est_freq_offset(gmsk_states, rx, verbose
   f = fft(rx .* hanning(length(rx))', ndft);
   f = fftshift(f);
 
-  start_bin = 1+ Fs/2-Rs/4; 
+  start_bin = 1 + Fs/2-Rs/4; 
   stop_bin = start_bin + Rs/2;
   [max_val max_bin] = max(abs(f(start_bin:stop_bin)));
   
@@ -620,25 +620,29 @@ endfunction
 % sort of unique word.  Start looking for valid frames 1 frame
 % after start of pre-amble to give PLL time to lock
 
-function [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits)
+function [total_errors total_bits Nerrs_log Nerrs_all_log errors_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits)
 
   Nerrs_log = zeros(1, nframes_rx);
   Nerrs_all_log = zeros(1, nframes_rx);
   total_errors = 0;
   total_bits   = 0;
   framesize = length(tx_frame);
+  errors_log = [];
 
   for f=2:nframes_rx-1
     Nerrs_min = framesize;
     for i=1:framesize;
       st = (f-1)*framesize+i; en = st+framesize-1;
-      Nerrs = sum(xor(rx_bits(st:en), tx_frame));
+      errors = xor(rx_bits(st:en), tx_frame); 
+      Nerrs = sum(errors);
       if Nerrs < Nerrs_min
         Nerrs_min = Nerrs;
+        errors_min = errors;
       end
     end
     Nerrs_all_log(f) = Nerrs_min;
     if Nerrs_min/framesize < 0.1
+      errors_log = [errors_log errors_min];
       Nerrs_log(f) = Nerrs_min;
       total_errors += Nerrs_min;
       total_bits   += framesize;
@@ -823,7 +827,7 @@ endfunction
 % Reads a file of Fs=48kHz 16 bit samples centred on 1500Hz, and
 % measures the BER.
 
-function gmsk_rx(rx_file_name)
+function gmsk_rx(rx_file_name, err_file_name)
   Rs = 1200;
   framesize = 480;
   npreamble = 480;
@@ -846,7 +850,7 @@ function gmsk_rx(rx_file_name)
   fin = fopen(rx_file_name,"rb");
   rx = fread(fin,"short")';
   fclose(fin);
-  %rx = filter([1 -0.999],[1 -0.99],rx);
+  rx = filter([1 -0.999],[1 -0.99],rx);
   nsam = length(rx);
   wc = 2*pi*fc/Fs;
   w = exp(-j*wc*(1:nsam));
@@ -861,7 +865,7 @@ function gmsk_rx(rx_file_name)
   %       filter so we measure only energy in our passband
   %       work out noise BW of filter.  Use GMSK filter?
 
-  [b a] = cheby2(6,40,[200 3000]*pi/Fs);
+  [b a] = cheby2(6,40,[200 3000]/(Fs/2));
   %bpwr_lp  = fir2([200,4000/(Fs/2));
   noise_bw = var(filter(b,a,randn(1,1E6)));
 
@@ -872,12 +876,13 @@ function gmsk_rx(rx_file_name)
   figure;
   subplot(211)
   plot(rx_filt);
+  title('GMSK Power (narrow filter)');
   subplot(212)
   plot(rx_power_dB);
   axis([1 length(rx_power) max(rx_power_dB)-9 max(rx_power_dB)+1])
   grid("minor")
 
-  % work out where to sample N, and S+N
+  % Work out where to sample N, and S+N
 
   noise_end = preamble_location - 2*npreamble*M;
   noise_start = noise_end - Fs;
@@ -911,31 +916,57 @@ function gmsk_rx(rx_file_name)
            signal, noise, Fs*noise_bw, snr, CNo, EbNo, ber_theory);
   end
 
-  plot_spectrum(gmsk_states, rx_filt, 1, "after filtering for power est");
+  % FM signal is centred on 12 kHz and 16 kHz wide so lets also work out noise there
 
-  % spectrogram or mesh plot?
-  % noise est
-  % decimate down to lower Fs?
-  % after preamble
+  [b a] = cheby2(6,40,[12000-8000 12000+8000]/(Fs/2));
+  noise_bw_fm = var(filter(b,a,randn(1,1E6)));
 
-  % spectrum of a chunk of signal just after preamble
+  rx_filt_fm = filter(b, a, rx(1000:length(rx)));
+  rx_power_fm = conv(rx_filt_fm.^2,ones(1,npower_window))/(npower_window);
+  rx_power_dB_fm = 10*log10(rx_power_fm);
+
+  figure
+  subplot(211)
+  plot(rx_filt_fm);
+  title('Analog FM Power (wide filter)');
+  subplot(212)
+  plot(rx_power_dB_fm);
+  axis([1 length(rx_power_fm) max(rx_power_dB_fm)-19 max(rx_power_dB_fm)+1])
+  grid("minor")
+
+  % spectrum of a chunk of GMSK signal just after preamble
+
   plot_spectrum(gmsk_states, rx, preamble_location, "GMSK rx just after preamble");
 
   % correct freq offset and demodulate
 
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
   rxbb = rxbb.*exp(-j*w_est);
-  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(preamble_location+npreamble*M:nsam));
+  st = preamble_location+npreamble*M; 
+  en = min(nsam,st + 22*framesize*M);
+  [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(st:en));
   nframes_rx = length(rx_bits)/framesize;
 
   % count errors
 
-  [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
+  [total_errors total_bits Nerrs_log Nerrs_all_log errors_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
 
   ber = total_errors/total_bits;
 
   printf("Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
          nframes_rx, total_bits, total_errors, ber);
+
+  % Optionally save a file of bit errors so we can simulate the effect on Codec 2
+
+  if nargin == 2
+
+    % To simulate effects of these errors on Codec 2:
+    %   $  ~/codec2-dev/octave$ ../build_linux/src/c2enc 1300 ../raw/hts1raw - | ../build_linux/src/insert_errors - - ssb7dbSNR.err 52 | ../build_linux/src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
+    % Note in this example I'm using the 1300 bit/s codec, it's sig more robust that 1200 bit/s, 
+    % if we ran the GMSK modem at 1300 bit/s there would be a 10*log10(1300/1200) = 0.35dB SNR penalty 
+
+    fep=fopen(err_file_name,"wb"); fwrite(fep, errors_log, "short"); fclose(fep);
+  end
 
   figure;
   clf
@@ -949,7 +980,6 @@ function gmsk_rx(rx_file_name)
   subplot(212)
   stem(real(cumsum(Nerrs_log)))
   title('Cumulative Bit Errors')
-
 endfunction
 
 
@@ -958,5 +988,7 @@ endfunction
 %run_gmsk_init
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
-gmsk_rx("ssb_short.wav")
+%gmsk_rx("ssb-ber5.wav")
+gmsk_rx("~/Desktop/ssb9dbSNRnodecode.wav")
+%gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
 
