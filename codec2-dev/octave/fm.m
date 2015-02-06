@@ -260,7 +260,7 @@ function run_fm_single
   sim_in.pre_emp = 0;
   sim_in.de_emp  = 0;
 
-  sim_in.CNdB   = 2;
+  sim_in.CNdB   = 25;
   sim_out = analog_fm_test(sim_in);
 end
 
@@ -268,7 +268,7 @@ end
 function fm_demod_file(file_name_out, file_name_in)
   fin = fopen(file_name_in,"rb");
   rx = fread(fin,"short")'; 
-  rx = rx(1000:length(rx)); % strip of wave header
+  rx = rx(100000:length(rx)); % strip of wave header
   fclose(fin);
 
   Fs = fm_states.Fs = 48000;  
@@ -276,15 +276,15 @@ function fm_demod_file(file_name_out, file_name_in)
   fd = fm_states.fd = 5E3;
   fm_states.fc = 12E3;
 
-  fm_states.pre_emp = 1;
-  fm_states.de_emp  = 0;
+  fm_states.pre_emp = 0;
+  fm_states.de_emp  = 1;
   fm_states.Ts = 1;
   fm_states.output_filter = 1;
   fm_states = analog_fm_init(fm_states);
 
   [rx_out rx_bb] = analog_fm_demod(fm_states, rx);
 
-  rx_out *= 5000;
+  rx_out *= 20000;
   fout = fopen(file_name_out,"wb");
   fwrite(fout, rx_out, "short");
   fclose(fout);
@@ -310,11 +310,45 @@ function fm_demod_file(file_name_out, file_name_in)
   plot(rx_out)
   title('FM Dmodulator Output');
 
+  % estimate SNR, C/No etc
+
+  npower_window = 1024;
+  rx_power = conv(rx.^2,ones(1,npower_window))/(npower_window);
+  rx_power_dB = 10*log10(rx_power);
+  figure;
+  subplot(211)
+  plot(rx);
+  subplot(212)
+  plot(rx_power_dB);
+  axis([1 length(rx_power) max(rx_power_dB)-9 max(rx_power_dB)+1])
+  grid("minor")
+
+  % estimate FM demod output SNR if a 1000 Hz tone is present
+
+  w = 2*pi*1000/Fs; beta = 0.99;
+  rx_notch = filter([1 -2*cos(w) 1],[1 -2*beta*cos(w) beta*beta], rx_out);
+
+  rx_out_power = conv(rx_out.^2,ones(1,npower_window))/(npower_window);
+  rx_out_power_dB = 10*log10(rx_out_power);
+  rx_notch_power = conv(rx_notch.^2,ones(1,npower_window))/(npower_window);
+  rx_notch_power_dB = 10*log10(rx_notch_power);
+  figure;
+  plot(rx_out_power_dB,'r;FM demod output power;');
+  hold on;
+  plot(rx_notch_power_dB,'b;1000 Hz notch filter output power;');
+  plot(rx_out_power_dB-rx_notch_power_dB,'g;1000 Hz tone SNR;');
+  hold off;
+  legend("boxoff");
+  ylabel('dB');
+  xlabel('Time (samples)');
+  grid("minor")
+
 endfunction
 
 more off;
 
 %run_fm_curves
-fm_demod_file("ssb_fm_out.raw","~/Desktop/ssb_fm.wav")
+%fm_demod_file("ssb_fm_out.raw","~/Desktop/ssb_fm.wav")
+%fm_demod_file("ssb25_fm_de.raw", "~/Desktop/ssb25db.wav")
 %run_fm_single
 
