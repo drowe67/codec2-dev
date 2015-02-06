@@ -904,9 +904,9 @@ function gmsk_rx(rx_file_name, err_file_name)
     signal_lin = signal_noise_lin - noise_lin;
     signal = 10*log10(signal_lin);
     snr = signal - noise;
-    fudge_factor = 3; % 3dB for single/double sided noise adjustment?  Just a guess
+    fudge_factor = 3;                           % 3dB for single/double sided noise adjustment?  Just a guess
     CNo = snr + 10*log10(Fs*noise_bw) - fudge_factor;
-    EbNo = CNo - 10*log10(Rs);
+    EbNo = CNo - 10*log10(Rs);  
 
     EbNo_lin  = 10 .^ (EbNo/10);
     alpha = 0.75;                             % guess for BT=0.5 GMSK
@@ -924,15 +924,26 @@ function gmsk_rx(rx_file_name, err_file_name)
   rx_filt_fm = filter(b, a, rx(1000:length(rx)));
   rx_power_fm = conv(rx_filt_fm.^2,ones(1,npower_window))/(npower_window);
   rx_power_dB_fm = 10*log10(rx_power_fm);
+  
+  noise = mean(rx_power_dB_fm(noise_start:noise_end))*ones(1, length(rx_power_fm));
+  noise_lin = 10 .^ (noise/10);
+
+  signal_lin = rx_power_fm - noise_lin;
+  signal = 10*log10(abs(signal_lin) + 1E-6);
+  snr = signal - noise;
+
+  CNo = snr + 10*log10(Fs*noise_bw_fm) - fudge_factor;
 
   figure
-  subplot(211)
-  plot(rx_filt_fm);
-  title('Analog FM Power (wide filter)');
-  subplot(212)
-  plot(rx_power_dB_fm);
-  axis([1 length(rx_power_fm) max(rx_power_dB_fm)-19 max(rx_power_dB_fm)+1])
+  plot(rx_power_dB_fm,'r;signal plus noise;');
+  hold on;
+  plot(CNo,'g;C/No;');
+  hold off;
+  top_fm = ceil(max(CNo)/10)*10;
+  axis([1 length(rx_power_dB_fm) 20 top_fm])
   grid("minor")
+  legend("boxoff");
+  title('FM C/No');
 
   % spectrum of a chunk of GMSK signal just after preamble
 
@@ -989,6 +1000,6 @@ endfunction
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
 %gmsk_rx("ssb-ber5.wav")
-gmsk_rx("~/Desktop/ssb9dbSNRnodecode.wav")
+gmsk_rx("~/Desktop/ssb25db.wav")
 %gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
 
