@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 20 Feb 2015
 
-  Filter/decimator function, broken out to this filer so we can unit
+  Filter/decimator function, broken out to this file so we can unit
   test easily.  
 
   Unit testing:
@@ -72,7 +72,7 @@ void inline iir_tuner(float dec_buf[], unsigned short adc_buf[]) {
         }
 
         /* Equaliser FIR filter, notch at Fs/(4*ADC_TUNER_M) to smooth out 
-           IIR BF passband response */
+           IIR BPF passband response */
 
         z = y + BETA2*z_2;
         dec_buf[j] = z;

@@ -43,7 +43,6 @@
 
 struct FIFO *adc1_fifo;
 unsigned short adc_buf[ADC_TUNER_BUF_SZ];
-float y_2, y_1;
 int adc_overflow1;
 int half,full;
 
@@ -51,9 +50,6 @@ int half,full;
 #define DMA_CHANNELx             DMA_Channel_0
 #define DMA_STREAMx              DMA2_Stream0
 #define ADCx                     ADC1
-
-#define BETA1                    0.999
-#define BETA2                    0.955
 
 void adc_configure();
 
@@ -204,7 +200,7 @@ void adc_configure(){
 */
 
 void DMA2_Stream0_IRQHandler(void) {
-    short dec_buf[ADC_TUNER_N/2];
+    float dec_buf[ADC_TUNER_N/2];
 
     GPIOE->ODR = (1 << 0);
 
@@ -217,7 +213,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* write first half to fifo */
 
-        if (fifo_write(adc1_fifo, dec_buf, ADC_TUNER_N/2) == -1) {
+        if (fifo_write(adc1_fifo, (short)dec_buf, ADC_TUNER_N) == -1) {
             adc_overflow1++;
         }
 
@@ -235,7 +231,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, dec_buf, ADC_TUNER_N/2) == -1) {
+        if (fifo_write(adc1_fifo, (short)dec_buf, ADC_TUNER_N) == -1) {
             adc_overflow1++;
         }
 

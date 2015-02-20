@@ -30,7 +30,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.1.0
+PERIPHLIBVER	= V1.4.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)_$(PERIPHLIBVER)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf tuner_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -349,6 +349,21 @@ FDMDV_DUMP_RT_SRCS += $(CODEC2_SRCS)
 
 fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+
+TUNER_UT_SRCS=\
+src/tuner_ut.c \
+../src/fifo.c \
+src/stm32f4_dac.c \
+src/stm32f4_adc_tuner.c \
+src/sm1000_leds_switches.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+tuner_ut.elf: $(ADCDAC_UT_SRCS)
+	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary tuner_ut.elf tuner_ut.bin
 
 clean:
 	rm -f *.o
