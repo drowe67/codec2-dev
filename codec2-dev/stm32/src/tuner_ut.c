@@ -31,25 +31,16 @@
 #include "sm1000_leds_switches.h"
 
 int main(void) {
-    short buf[SINE_SAMPLES];
-    int   i;
+    float tuner_out[ADC_TUNER_N];
 
     dac_open(4*DAC_BUF_SZ);
-    adc_open(4*ADC_TUNER_N;
+    adc_open(4*ADC_TUNER_N);
     sm1000_leds_switches_init();
 
     while (1) {
 
-        while(adc1_read(buf, ADC_TUNER_N) == -1);
+        while(adc1_read((short *)tuner_out, ADC_TUNER_N) == -1);
         
-        /*
-        if (switch_select()) {
-            for(i=0; i<SINE_SAMPLES; i++)
-                buf[i] = 0;
-        }
-            
-        dac1_write(buf, SINE_SAMPLES);
-        */
     }
    
 }

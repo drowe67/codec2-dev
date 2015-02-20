@@ -40,6 +40,7 @@
 #endif
 
 #include "stm32f4_adc_tuner.h"
+#include "iir_tuner.h"
 
 /* Filter coefficients of IIR tuner (BETA1) and FIR equaliser (BETA2).
    Note neat trick to relate BETA2 to BETA1 by the decimation rate */
@@ -55,7 +56,7 @@ float y_2, y_1, z_2, z_1;
    ADC -> signed conversion - IIR BPF - Decimate - FIR Equaliser -> FIFO
 */
 
-void inline iir_tuner(float dec_buf[], unsigned short adc_buf[]) {
+void iir_tuner(float dec_buf[], unsigned short adc_buf[]) {
     int i, j, k;
     float x, y, z;
 

@@ -6,6 +6,10 @@
 
   Main program for SM1000.
 
+  TODO
+
+  [ ] make led blink 1-2-3 times for "mode"
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -31,6 +35,7 @@
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
 #include <stm32f4xx_gpio.h>
+#include <stdlib.h>
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
@@ -112,6 +117,14 @@ int main(void) {
             if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
                 GPIOE->ODR = (1 << 3);
 
+                /* clipping indicator */
+
+                led_err(0);
+                for (i=0; i<FREEDV_NSAMPLES_16K; i++) {
+                    if (abs(adc16k[FDMDV_OS_TAPS_16K+i]) > 28000)
+                        led_err(1);
+                }
+
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
 
                 if (ss.mode == ANALOG) {
@@ -122,11 +135,16 @@ int main(void) {
                 }
                 if (ss.mode == DV) {
                     freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                        dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
                     dac1_write(dac16k, FREEDV_NSAMPLES_16K);
                 }
                 if (ss.mode == TONE) {
-                    while(dac1_write((short*)aSine, SINE_SAMPLES) == 0);
+                    short buf[SINE_SAMPLES];
+                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                        buf[i] = aSine[i]*0.398; /* 8dB back off from peak */                   
+                    while(dac1_write(buf, SINE_SAMPLES) == 0);
                 }
 
                 led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
@@ -198,7 +216,7 @@ void iterate_select_state_machine(SWITCH_STATE *ss) {
     next_state = ss->state;
     switch(ss->state) {
         case SS_IDLE:
-            if (switch_select()) {
+            if (switch_select() == 0) {
                 downTicker = FIFTY_MS;
                 next_state = SS_DEBOUNCE_DOWN;
             }
@@ -212,7 +230,7 @@ void iterate_select_state_machine(SWITCH_STATE *ss) {
             }
             break;
         case SS_WAIT_BUTTON_UP:
-            if (switch_select() == 0) {
+            if (switch_select() == 1) {
                 downTicker = FIFTY_MS;
                 next_state = SS_DEBOUNCE_UP;
             }
