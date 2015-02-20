@@ -39,7 +39,7 @@
 #include "codec2_fifo.h"
 #include "stm32f4_adc_tuner.h"
 #include "debugblinky.h"
-#include "iir_tuner.c"
+#include "iir_tuner.h"
 
 struct FIFO *adc1_fifo;
 unsigned short adc_buf[ADC_TUNER_BUF_SZ];
@@ -202,6 +202,8 @@ void adc_configure(){
 void DMA2_Stream0_IRQHandler(void) {
     float dec_buf[ADC_TUNER_N/2];
 
+    /* PE0 is asserted high for the duration of this ISR
+
     GPIOE->ODR = (1 << 0);
 
     /* Half transfer interrupt */
@@ -213,7 +215,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* write first half to fifo */
 
-        if (fifo_write(adc1_fifo, (short)dec_buf, ADC_TUNER_N) == -1) {
+        if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
             adc_overflow1++;
         }
 
@@ -231,7 +233,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, (short)dec_buf, ADC_TUNER_N) == -1) {
+        if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
             adc_overflow1++;
         }
 

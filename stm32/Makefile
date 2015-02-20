@@ -30,7 +30,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.4.0
+PERIPHLIBVER	= V1.1.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)_$(PERIPHLIBVER)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -350,20 +350,30 @@ FDMDV_DUMP_RT_SRCS += $(CODEC2_SRCS)
 fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
+# ---------------------------------------------------------------------------
+
 TUNER_UT_SRCS=\
 src/tuner_ut.c \
 ../src/fifo.c \
 src/stm32f4_dac.c \
-src/stm32f4_adc_tuner.c \
+src/iir_tuner.c \
 src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c
 
-tuner_ut.elf: $(ADCDAC_UT_SRCS)
-	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+# this needs to be compiled without the optimiser or ugly things happen
+# would be nice to work out why as ISRs need to run fast
+
+src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
+	$(CC) $(CFLAGS) $^ -c -o $@ 
+
+tuner_ut.elf: $(TUNER_UT_SRCS) src/stm32f4_adc_tuner.o
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 	$(OBJCOPY) -O binary tuner_ut.elf tuner_ut.bin
+
+# ---------------------------------------------------------------------------------
 
 clean:
 	rm -f *.o
