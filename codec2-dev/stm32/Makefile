@@ -354,6 +354,7 @@ fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS) src/stm32f4_dac.o src/stm32f4_adc.o
 
 TUNER_UT_SRCS=\
 src/tuner_ut.c \
+gdb_stdio.c \
 ../src/fifo.c \
 src/stm32f4_dac.c \
 src/iir_tuner.c \
