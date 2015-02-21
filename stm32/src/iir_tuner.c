@@ -9,7 +9,7 @@
 
   Unit testing:
   
-    ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_tuner.c -o iir_tuner -lm -Wal
+    ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_tuner.c -o iir_tuner -lm -Wall
     ~/codec2-dev/stm32$ ./iir_tuner
 
 \*---------------------------------------------------------------------------*/
@@ -56,7 +56,7 @@ float y_2, y_1, z_2, z_1;
    ADC -> signed conversion - IIR BPF - Decimate - FIR Equaliser -> FIFO
 */
 
-void iir_tuner(float dec_buf[], unsigned short adc_buf[]) {
+void iir_tuner(float dec_50[], unsigned short adc_buf[]) {
     int i, j, k;
     float x, y, z;
 
@@ -76,10 +76,27 @@ void iir_tuner(float dec_buf[], unsigned short adc_buf[]) {
            IIR BPF passband response */
 
         z = y + BETA2*z_2;
-        dec_buf[j] = z;
+        dec_50[j] = z;
         z_2 = z_1;
         z_1 = y;
     }
+}
+
+
+/* BPF at 12.5 kHz +/- 2000 Hz, and decimate down to Fs = 10kHz */
+
+static float fir_50_to_10[];
+void iir_tuner_dec_50_to_10(float dec_10[], float dec_50[], int n) {
+    int   i,j,k;
+    float acc;
+
+    for(i=0,k=0; i<n; i+=5,k++) {
+        acc = 0.0;
+        for(j=0; j<IIR_TUNER_DEC_50_10_FILT_MEM; j++)
+            acc += dec_50[i-j]*fir_50_to_10[j];
+        dec_10[k] = acc;
+    }
+        
 }
 
 
@@ -108,9 +125,13 @@ void synth_line(unsigned short us[], float f, float amp, int n) {
 int main(void) {
     float          f1,f2,f3,f4;
     unsigned short s[NIN];
-    float          dec_s[NOUT];
+    float          dec_50[IIR_TUNER_DEC_50_10_FILT_MEM+NOUT];
+    float          dec_10[NOUT/5];
     FILE          *f;
-    int            i,j;
+    int            i,j,k;
+    short          dec_10_short;
+
+    /* test Fs=2E6 unsigned short to Fs=50E3 float tuner/resampler -----------------------*/
 
     f1 = 500E3;
     f2 = f1 + 8E3;       /* wanted */
@@ -123,7 +144,7 @@ int main(void) {
     synth_line(s, f3, 0.05, NIN);
     synth_line(s, f4, 0.1, NIN);
     for(i=0, j=0; i<NIN; i+=ADC_TUNER_BUF_SZ/2, j+=ADC_TUNER_N/2) {
-        iir_tuner(&dec_s[j], &s[i]);
+        iir_tuner(&dec_50[j], &s[i]);
     }
     
     f = fopen("iir_tuner_s.txt", "wt");  assert(f != NULL);
@@ -134,7 +155,29 @@ int main(void) {
 
     f = fopen("iir_tuner.txt", "wt");  assert(f != NULL);
     for(i=0; i<NOUT; i++)
-        fprintf(f, "%f\n", dec_s[i]);
+        fprintf(f, "%f\n", dec_50[i]);
+    fprintf(f, "\n");
+    fclose(f);
+
+    /* test FS=2E6 unsigned short -> Fs=10kHz short ---------------------------------------------*/
+
+    for(i=0; i<NIN; i++)
+        s[i] = 32767;
+    for(i=1; i<NIN; i+=4)
+        s[i] += 32767;
+    for(i=3; i<NIN; i+=4)
+        s[i] -= 32767;
+
+    for(i=0, j=0, k=0; i<NIN; i+=ADC_TUNER_BUF_SZ/2, j+=ADC_TUNER_N/2, k+=(ADC_TUNER_N/2)/5) {
+        iir_tuner(&dec_50[IIR_TUNER_DEC_50_10_FILT_MEM+j], &s[i]);
+        iir_tuner_dec_50_to_10(&dec_10[k], &dec_50[IIR_TUNER_DEC_50_10_FILT_MEM+j], ADC_TUNER_N/2);
+    }
+
+    f = fopen("iir_tuner2.txt", "wt");  assert(f != NULL);
+    for(i=0; i<NOUT/5; i++) {
+        dec_10_short = dec_10[i]/ADC_TUNER_M;
+        fprintf(f, "%d\n", dec_10_short);
+    }
     fprintf(f, "\n");
     fclose(f);
 
@@ -142,3 +185,110 @@ int main(void) {
 }
 
 #endif
+
+/* Band pass FIR filter coefficents centred on Fs/4, used before Fs=50kHz to Fs=10kHz */
+
+static float fir_50_to_10[] = {
+    -1.71502876e-07,
+    -3.93029078e-05,
+    -5.30743362e-04,
+    1.17938704e-04,
+    1.09727519e-03,
+    -1.90605585e-04,
+    -1.61350037e-03,
+    2.37746793e-04,
+    1.86947117e-03,
+    -2.28459776e-04,
+    -1.56457257e-03,
+    1.33627883e-04,
+    4.28669971e-04,
+    5.51555269e-05,
+    1.60217953e-03,
+    -3.09989338e-04,
+    -4.22595074e-03,
+    5.63604865e-04,
+    6.71504730e-03,
+    -7.23797964e-04,
+    -8.02135199e-03,
+    7.03165104e-04,
+    7.05924883e-03,
+    -4.54750532e-04,
+    -3.11212393e-03,
+    2.24463518e-08,
+    -3.75334414e-03,
+    5.63496992e-04,
+    1.24113249e-02,
+    -1.08145162e-03,
+    -2.06694342e-02,
+    1.38572694e-03,
+    2.55955103e-02,
+    -1.34897285e-03,
+    -2.41472078e-02,
+    9.32473244e-04,
+    1.39715800e-02,
+    -2.09763900e-04,
+    5.83111135e-03,
+    -6.44614872e-04,
+    -3.42028021e-02,
+    1.40049434e-03,
+    6.80569757e-02,
+    -1.83898122e-03,
+    -1.02710848e-01,
+    1.82014182e-03,
+    1.32754277e-01,
+    -1.32936318e-03,
+    -1.53163914e-01,
+    4.86473969e-04,
+    1.60393264e-01,
+    4.86473969e-04,
+    -1.53163914e-01,
+    -1.32936318e-03,
+    1.32754277e-01,
+    1.82014182e-03,
+    -1.02710848e-01,
+    -1.83898122e-03,
+    6.80569757e-02,
+    1.40049434e-03,
+    -3.42028021e-02,
+    -6.44614872e-04,
+    5.83111135e-03,
+    -2.09763900e-04,
+    1.39715800e-02,
+    9.32473244e-04,
+    -2.41472078e-02,
+    -1.34897285e-03,
+    2.55955103e-02,
+    1.38572694e-03,
+    -2.06694342e-02,
+    -1.08145162e-03,
+    1.24113249e-02,
+    5.63496992e-04,
+    -3.75334414e-03,
+    2.24463518e-08,
+    -3.11212393e-03,
+    -4.54750532e-04,
+    7.05924883e-03,
+    7.03165104e-04,
+    -8.02135199e-03,
+    -7.23797964e-04,
+    6.71504730e-03,
+    5.63604865e-04,
+    -4.22595074e-03,
+    -3.09989338e-04,
+    1.60217953e-03,
+    5.51555269e-05,
+    4.28669971e-04,
+    1.33627883e-04,
+    -1.56457257e-03,
+    -2.28459776e-04,
+    1.86947117e-03,
+    2.37746793e-04,
+    -1.61350037e-03,
+    -1.90605585e-04,
+    1.09727519e-03,
+    1.17938704e-04,
+    -5.30743362e-04,
+    -3.93029078e-05,
+    -1.71502876e-07
+};
+

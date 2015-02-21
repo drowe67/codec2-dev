@@ -197,14 +197,32 @@ void adc_configure(){
 
 /*
   This function handles DMA Stream interrupt request.
+
+  ADC_TUNER_BUF_SZ = 45 * 160 = 7200, so one interrupt every 7200/2 = 3600 samples
+  or interrupts at a rate of 2E6/3600 = 555.56 Hz.
 */
 
 void DMA2_Stream0_IRQHandler(void) {
     float dec_buf[ADC_TUNER_N/2];
+    int i;
 
-    /* PE0 is asserted high for the duration of this ISR
+    /* PE0 is asserted high for the duration of this ISR */
 
     GPIOE->ODR = (1 << 0);
+
+    //#define DUMMY_SIGNAL
+    #ifdef DUMMY_SIGNAL
+
+    /* Fs/4 sine wave, right in the middle of the pass band ! */
+
+    for(i=0; i<ADC_TUNER_BUF_SZ; i++)
+        adc_buf[i] = 32767;
+    for(i=1; i<ADC_TUNER_BUF_SZ; i+=4)
+        adc_buf[i] += 32767;
+    for(i=3; i<ADC_TUNER_BUF_SZ; i+=4)
+        adc_buf[i] -= 32767;
+
+    #endif
 
     /* Half transfer interrupt */
 
