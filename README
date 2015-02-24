@@ -81,8 +81,8 @@ Debugging
 
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
-  $ CFLAGS=-DDUMP cmake ..
   $ cd build_linux
+  $ CFLAGS=-DDUMP cmake ..
   $ make
 
 Directories

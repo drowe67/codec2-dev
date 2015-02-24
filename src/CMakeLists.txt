@@ -167,6 +167,7 @@ set(CODEC2_SRCS
     codec2.c
     fifo.c
     fdmdv.c
+    fm.c
     kiss_fft.c
     interp.c
     lsp.c
@@ -190,6 +191,7 @@ set(CODEC2_PUBLIC_HEADERS
     golay23.h
     codec2.h
     codec2_fdmdv.h
+    codec2_fm.h
     codec2_fifo.h
     comp.h
 )
@@ -250,6 +252,9 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(fm_demod fm_demod.c fm.c)
+target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
+
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -269,6 +274,7 @@ install(TARGETS
     c2sim
     fdmdv_get_test_bits
     fdmdv_mod fdmdv_demod
+    fm_demod
     fdmdv_put_test_bits
     fdmdv_interleave
     insert_errors

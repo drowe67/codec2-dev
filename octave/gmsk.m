@@ -269,6 +269,12 @@ function [rx_bits rx_int rx_filt] = gmsk_demod(gmsk_states, rx)
       k++;
     end
 
+    figure
+    subplot(211)
+    stem(re_syms)
+    subplot(211)
+    stem(im_syms)
+    
     figure;
     clf
     subplot(211)
@@ -831,7 +837,7 @@ function gmsk_rx(rx_file_name, err_file_name)
   Rs = 1200;
   framesize = 480;
   npreamble = 480;
-  fc        = 1500;
+  fc        = 1900;
 
   gmsk_states.npreamble = npreamble;
   gmsk_states.verbose = 1;
@@ -856,6 +862,9 @@ function gmsk_rx(rx_file_name, err_file_name)
   w = exp(-j*wc*(1:nsam));
   rxbb = rx .* w;
  
+  figure;
+  plot(rx);
+
   % find preamble
 
   [preamble_location freq_offset_est] = find_preamble(gmsk_states, M, npreamble, rxbb);
@@ -875,11 +884,11 @@ function gmsk_rx(rx_file_name, err_file_name)
   rx_power_dB = 10*log10(rx_power);
   figure;
   subplot(211)
-  plot(rx_filt);
+  plot(rx_filt(1000:5*Fs));
   title('GMSK Power (narrow filter)');
   subplot(212)
   plot(rx_power_dB);
-  axis([1 length(rx_power) max(rx_power_dB)-9 max(rx_power_dB)+1])
+  axis([1 length(rx_power) max(rx_power_dB)-29 max(rx_power_dB)+1])
   grid("minor")
 
   % Work out where to sample N, and S+N
@@ -954,7 +963,9 @@ function gmsk_rx(rx_file_name, err_file_name)
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
   rxbb = rxbb.*exp(-j*w_est);
   st = preamble_location+npreamble*M; 
-  en = min(nsam,st + 22*framesize*M);
+  en = min(nsam,st + 4*framesize*M); 
+  %en = nsam;
+  gmsk_statres.verbose = 2;
   [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(st:en));
   nframes_rx = length(rx_bits)/framesize;
 
@@ -1000,6 +1011,7 @@ endfunction
 %run_test_channel_impairments
 %gmsk_tx("test_gmsk.raw")
 %gmsk_rx("ssb-ber5.wav")
-gmsk_rx("~/Desktop/ssb25db.wav")
+%gmsk_rx("ssb25db.wav")
 %gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
+gmsk_rx("~/Desktop/test_gmsk_28BER.raw")
 
