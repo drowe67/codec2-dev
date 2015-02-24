@@ -52,5 +52,5 @@ title('After Decimation');
 subplot(212)
 plot(20*log10(abs(fft(s4)/fs)))
 grid
-title('After Flattening Filter');
+title('After Equaliser');
 axis([0 fs/2/M -10 50])
