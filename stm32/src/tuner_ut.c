@@ -83,5 +83,7 @@ int main(void) {
 
     printf("finished! %d\n", adc_overflow1);
     fclose(ftuner);
+
+    while(1); /* keep ISR running */
 }
 

@@ -86,15 +86,18 @@ static void tim2_config(void)
   APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
   13 clock tree figure in DM0031020.pdf).
 
-     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
-                    = (HCLK/2)/TIM_ClockDivision
+     Sample rate Fs = 2*PCLK1/)TIM_ClockDivision+1)
+                    = (HCLK/2)/(TIM_ClockDivision+1)
                     
+  Note from David: The +1 was discovered empirically, still not sure
+  if it's right.
+
   ----------------------------------------------------------- */
 
   /* Time base configuration */
 
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 42;          
+  TIM_TimeBaseStructure.TIM_Period = 41;          
   TIM_TimeBaseStructure.TIM_Prescaler = 0;       
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
@@ -110,7 +113,7 @@ static void tim2_config(void)
 }
 
 
-void adc_configure(){
+void adc_configure() {
     ADC_InitTypeDef  ADC_init_structure; 
     GPIO_InitTypeDef GPIO_initStructre; 
     DMA_InitTypeDef  DMA_InitStructure;
