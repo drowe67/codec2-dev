@@ -211,7 +211,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
     /* PE0 is asserted high for the duration of this ISR */
 
-    GPIOE->ODR = (1 << 0);
+    GPIOE->ODR |= (1 << 0);
 
     //#define DUMMY_SIGNAL
     #ifdef DUMMY_SIGNAL

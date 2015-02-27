@@ -209,7 +209,7 @@ void DMA2_Stream0_IRQHandler(void) {
     short signed_buf1[ADC_BUF_SZ/2];
     short signed_buf2[ADC_BUF_SZ/2];
 
-    GPIOE->ODR = (1 << 0);
+    GPIOE->ODR |= (1 << 0);
 
     /* Half transfer interrupt */
 

@@ -289,7 +289,7 @@ void DMA1_Stream5_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
-    GPIOE->ODR = (1 << 1);
+    GPIOE->ODR |= (1 << 1);
 
     /* Transfer half empty interrupt - refill first half */
 
@@ -346,7 +346,7 @@ void DMA1_Stream6_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
-    GPIOE->ODR = (1 << 2);
+    GPIOE->ODR |= (1 << 2);
 
     /* Transfer half empty interrupt - refill first half */
 
