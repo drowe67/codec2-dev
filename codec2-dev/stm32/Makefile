@@ -362,7 +362,8 @@ src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c
+src/init.c \
+../src/fm.c
 
 # this needs to be compiled without the optimiser or ugly things happen
 # would be nice to work out why as ISRs need to run fast
