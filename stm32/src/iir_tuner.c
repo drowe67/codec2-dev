@@ -1,4 +1,4 @@
-/*---------------------------------------------------------------------------*\
+ /*---------------------------------------------------------------------------*\
 
   FILE........: iir_tuner.c
   AUTHOR......: David Rowe
@@ -45,12 +45,23 @@
 /* Filter coefficients of IIR tuner (BETA1) and FIR equaliser (BETA2).
    Note neat trick to relate BETA2 to BETA1 by the decimation rate */
 
-#define BETA1                    0.999
-#define BETA2                    (1.0 - (1.0-BETA1)*ADC_TUNER_M)
+#define BETA1                    .9990234375			// B1MUL/(2**B1SHFT)
+#define B1MUL			 1023				
+#define B1SMUL			 1204
+#define B1SHFT			 10				// 10 bits gives us plenty of headroom between 31 bits of int and 14 bits of ADC
+#define B2MUL			 979				// This actually matches BETA2 exactly with the supplied BETA1
+#define B2SHFT			 10				// 10 is also the lowest we can go without beta1=1
+#define BETA2                    (1.0 - (1.0-BETA1)*ADC_TUNER_M)// B2MUL/(2**B2SHFT)
+
+#define FIXED_IIR                                               //Define this to compile a fixed point IIR filter
 
 /* filter states - we keep them global due to the need for speed */
 
+#ifdef FIXED_IIR
+int n_2, n_1, o_2, o_1;
+#else
 float y_2, y_1, z_2, z_1;
+#endif
 
 /*
    ADC -> signed conversion - IIR BPF - Decimate - FIR Equaliser -> FIFO
@@ -59,26 +70,40 @@ float y_2, y_1, z_2, z_1;
 void iir_tuner(float dec_50[], unsigned short adc_buf[]) {
     int i, j, k;
     float x, y, z;
+    int n, m, o;
 
     for(i=0, j=0; i<ADC_TUNER_BUF_SZ/2; j++) {
 
         /* IIR BPF centred at Fs/4.  All your MIPs are belong to this
            loop. */
-
         for(k=0; k<ADC_TUNER_M; k++,i++) {
-            x = (int)adc_buf[i] - 32768;
-            y = x - BETA1*y_2;
-            y_2 = y_1;
+            #ifdef FIXED_IIR
+            m = (int)adc_buf[i];
+            n = m - ((B1SMUL*n_1)>>B1SHFT) - ((B1MUL*n_2)>>B1SHFT);
+            n_2 = n_1;
+            n_1 = n;
+            #else
+	    x = (int)adc_buf[i] - 32768;
+	    y = x - (BETA1*y_2);
+	    y_2 = y_1;
             y_1 = y;
+            #endif
         }
 
         /* Equaliser FIR filter, notch at Fs/(4*ADC_TUNER_M) to smooth out 
            IIR BPF passband response */
-
-        z = y + BETA2*z_2;
-        dec_50[j] = z;
+        #ifdef FIXED_IIR
+	o = n + ((B2MUL*o_2)>>B2SHFT);
+	dec_50[j] = (float)o;
+	o_2 = o_1;
+	o_1 = n;
+        #else
+	z=y+BETA2*z_2;        
+	dec_50[j] = z;
         z_2 = z_1;
         z_1 = y;
+        #endif
+       
     }
 }
 
@@ -133,7 +158,7 @@ int main(void) {
 
     /* test Fs=2E6 unsigned short to Fs=50E3 float tuner/resampler -----------------------*/
 
-    f1 = 500E3;
+    f1 = 700E3;
     f2 = f1 + 8E3;       /* wanted */
     f3 = f1 - 7E3;       /* wanted */
     f4 = f1 - 207E3;     /* out of band, should be greatly attenuated */

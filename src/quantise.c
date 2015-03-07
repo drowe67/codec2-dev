@@ -941,9 +941,8 @@ void aks_to_M2(
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
-  for(i=0; i<FFT_ENC/2; i++) {
-    Pw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag + 1E-6);
-  }
+  for(i=0; i<FFT_ENC/2; i++)
+    Pw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag);
 
   PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw"); 
 

@@ -1,16 +1,16 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: stm32f4_adc_tuner.h
+  FILE........: stm32f4_dac.h
   AUTHOR......: David Rowe
-  DATE CREATED: 19 Feb 2015
+  DATE CREATED: 1 June 2013
 
-  Single channel ADC driver module for STM32F4 that samples pin PA1 at
-  2 MHz and down converts to 50 kHz, with "tuning" centred at 500 kHz.
+  Two channel FIFO buffered DAC driver module for STM32F4. DAC1 is fixed at
+  Fs=2Mhz
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2015 David Rowe
+  Copyright (C) 2013 David Rowe
 
   All rights reserved.
 
@@ -26,14 +26,16 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __STM32F4_ADC_TUNER__
-#define __STM32F4_ADC_TUNER__
+#ifndef __STM32F4_DAC__
+#define __STM32F4_DAC__
 
-#define ADC_TUNER_M  55   /* decimation rate */
-#define ADC_TUNER_N  160
-#define ADC_TUNER_BUF_SZ  (ADC_TUNER_M*ADC_TUNER_N)
+#define DUC_N 100
+#define DUC_M  25
+#define DAC_DUC_BUF_SZ DUC_M*DUC_N
+#define DAC_BUF_SZ 2048
 
-void adc_open(int fifo_sz);
-int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
+void dac_open(int fifo_sz);
+int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
+int dac2_write(short buf[], int n); /* DAC2 pin PA5 */
 
 #endif
