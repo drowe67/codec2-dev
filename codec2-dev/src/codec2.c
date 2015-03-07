@@ -418,12 +418,11 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char *
 
     interp_Wo(&model[0], &c2->prev_model_dec, &model[1]);
     e[0] = interp_energy(c2->prev_e_dec, e[1]);
-
+ 
     /* LSPs are sampled every 20ms so we interpolate the frame in
        between, then recover spectral amplitudes */
 
     interpolate_lsp_ver2(&lsps[0][0], c2->prev_lsps_dec, &lsps[1][0], 0.5);
-
     for(i=0; i<2; i++) {
 	lsp_to_lpc(&lsps[i][0], &ak[i][0], LPC_ORD);
 	aks_to_M2(c2->fft_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0, 

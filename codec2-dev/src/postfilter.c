@@ -111,7 +111,7 @@ void postfilter(
   e = 1E-12;
   for(m=1; m<=model->L; m++)
       e += model->A[m]*model->A[m];
-  
+
   assert(e > 0.0);
   e = 10.0*log10f(e/model->L);
 

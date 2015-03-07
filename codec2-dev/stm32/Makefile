@@ -6,7 +6,7 @@ FLOAT_TYPE=hard
 
 ###################################################
 
-BINPATH=~/gcc-arm-none-eabi-4_7-2013q1/bin
+BINPATH=/opt/gcc-arm-none-eabi-4_7-2013q1/bin
 CC=$(BINPATH)/arm-none-eabi-gcc
 OBJCOPY=$(BINPATH)/arm-none-eabi-objcopy
 SIZE=$(BINPATH)/arm-none-eabi-size
@@ -30,7 +30,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.1.0
+PERIPHLIBVER	= V1.4.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)_$(PERIPHLIBVER)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf tuner_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf tuner_ut.elf fast_dac_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -154,6 +154,19 @@ src/init.c
 dac_ut.elf: $(DAC_UT_SRCS)
 	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
 	$(OBJCOPY) -O binary dac_ut.elf dac_ut.bin
+
+FAST_DAC_UT_SRCS=\
+src/fast_dac_ut.c \
+../src/fifo.c \
+src/stm32f4_dacduc.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+fast_dac_ut.elf: $(FAST_DAC_UT_SRCS)
+	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary fast_dac_ut.elf fast_dac_ut.bin
 
 ADCDAC_UT_SRCS=\
 src/adcdac_ut.c \
