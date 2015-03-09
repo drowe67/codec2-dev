@@ -158,6 +158,8 @@ dac_ut.elf: $(DAC_UT_SRCS)
 FAST_DAC_UT_SRCS=\
 src/fast_dac_ut.c \
 ../src/fifo.c \
+src/iir_duc.c \
+src/gdb_stdio.c \
 src/stm32f4_dacduc.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
@@ -165,7 +167,7 @@ src/startup_stm32f4xx.s \
 src/init.c
 
 fast_dac_ut.elf: $(FAST_DAC_UT_SRCS)
-	$(CC) $(CFLAGS) -O0 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 	$(OBJCOPY) -O binary fast_dac_ut.elf fast_dac_ut.bin
 
 ADCDAC_UT_SRCS=\
