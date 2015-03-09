@@ -32,7 +32,7 @@
 #include "codec2_fifo.h"
 #include "stm32f4_dacduc.h"
 #include "debugblinky.h"
-
+ 
 /* write to these registers for 12 bit left aligned data, as per data sheet 
    make sure 4 least sig bits set to 0 */
 
@@ -63,15 +63,15 @@ static void dac2_config(void);
 
 int dac_underflow;
 
-void dac_open(int fifo_size) {
+void fast_dac_open(int dac1_fifo_size,int dac2_fifo_size) {
 
     memset(dac1_buf, 32768, sizeof(short)*DAC_DUC_BUF_SZ);
     memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
 
     /* Create fifos */
 
-    dac1_fifo = fifo_create(fifo_size);
-    dac2_fifo = fifo_create(fifo_size);
+    dac1_fifo = fifo_create(dac1_fifo_size);
+    dac2_fifo = fifo_create(dac2_fifo_size);
     assert(dac1_fifo != NULL);
     assert(dac2_fifo != NULL);
 
@@ -134,7 +134,7 @@ static void tim6_config(void)
   /* Time base configuration */
 
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 80;          
+  TIM_TimeBaseStructure.TIM_Period = 5250;          
   TIM_TimeBaseStructure.TIM_Prescaler = 0;       
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
@@ -209,7 +209,9 @@ static void dac1_config(void)
 
   DAC_InitStructure.DAC_Trigger = DAC_Trigger_T7_TRGO; 
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
-  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Enable;
+
+  /*External buffering is needed to get nice square samples at Fs=2Mhz. See DM00129215.pdf */
+  DAC_InitStructure.DAC_OutputBuffer = DAC_OutputBuffer_Disable;
   DAC_Init(DAC_Channel_1, &DAC_InitStructure);
 
   /* DMA1_Stream5 channel7 configuration **************************************/
@@ -336,14 +338,9 @@ void DMA1_Stream5_IRQHandler(void) {
 
     if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_HTIF5) != RESET) {
         /* fill first half from fifo */
-	
-        if (fifo_read(dac1_fifo, (short*)dac1_buf, DAC_DUC_BUF_SZ/2) == -1) {
-            memset(dac1_buf, 0, sizeof(short)*DAC_DUC_BUF_SZ/2);
-            dac_underflow++;
-        }
+	fifo_read(dac1_fifo, (short*)dac1_buf, DAC_DUC_BUF_SZ/2);
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
-
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_HTIF5);  
     }
 
@@ -351,12 +348,9 @@ void DMA1_Stream5_IRQHandler(void) {
 
     if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_TCIF5) != RESET) {
         /* fill second half from fifo */
+	fifo_read(dac1_fifo, (short*)(dac1_buf+DAC_DUC_BUF_SZ/2), DAC_DUC_BUF_SZ/2);
 
-        if (fifo_read(dac1_fifo, (short*)(dac1_buf+DAC_DUC_BUF_SZ/2), DAC_DUC_BUF_SZ/2) == -1) {
-            memset(dac1_buf, 0, sizeof(short)*DAC_DUC_BUF_SZ/2);
-            dac_underflow++;
-        }    /* Clear DMA Stream Transfer Complete interrupt pending bit */
-
+        /* Clear DMA Stream Transfer Complete interrupt pending bit */
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);  
     }
 

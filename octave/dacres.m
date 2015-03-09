@@ -17,7 +17,7 @@ t = (0:(fs-1));
 
 beta1 = 0.999;
 b1x = -2*sqrt(beta1)*cos(2*pi*fb/(fs*M))
-beta2 = 1 - (1-0.999)*M;
+beta2 = beta1 - (1-0.999)*M;
 
 s1 = [fs zeros(1,fs-1)];       % noise floor, continuous interferers 
 s2 = 100*4*cos(t*2*pi*f2/fs);  % wanted signal 40dB above interferers
