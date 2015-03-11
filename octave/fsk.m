@@ -110,6 +110,7 @@ function sim_out = fsk_ber_test(sim_in)
       printf("EbNo: %f Eb: %f var No: %f EbNo (meas): %f\n", 
       EbNo, var(tx)*Ts/Fs, var(noise)/Fs, (var(tx)*Ts/Fs)/(var(noise)/Fs));
     end
+    save fsk tx_bits rx
 
     % Optional AFSK over FM demodulator
 
@@ -233,12 +234,12 @@ function run_fsk_curves
 end
 
 function run_fsk_single
-  sim_in.fmark     = 1200;
-  sim_in.fspace    = 2200;
-  sim_in.Rs        = 1200;
-  sim_in.nsym      = 1200;
-  sim_in.EbNodB    = 16;
-  sim_in.fm        = 1;
+  sim_in.fmark     = 1000;
+  sim_in.fspace    = 2000;
+  sim_in.Rs        = 1000;
+  sim_in.nsym      = 2000;
+  sim_in.EbNodB    = 7;
+  sim_in.fm        = 0;
   sim_in.verbose   = 1;
 
   fsk_sim = fsk_ber_test(sim_in);

@@ -305,7 +305,7 @@ void fdmdv_get_test_bits(struct FDMDV *f, int tx_bits[])
 	if (f->current_test_bit > (f->ntest_bits-1))
 	    f->current_test_bit = 0;
     }
- }
+}
 
 float fdmdv_get_fsep(struct FDMDV *f)
 {

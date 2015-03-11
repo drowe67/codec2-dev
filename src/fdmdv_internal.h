@@ -1,7 +1,7 @@
 /*---------------------------------------------------------------------------*\
                                                                              
   FILE........: fdmdv_internal.h
-  AUTHOR......: David Rowe                                                          
+  AUTHOR......: David Rowe
   DATE CREATED: April 16 2012
                                                                              
   Header file for FDMDV internal functions, exposed via this header
