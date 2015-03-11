@@ -47,7 +47,7 @@
 
 //IIR and FIR filter states. Global for go fast.
 float f_1,f_2,f;
-int   n1_1,n1_2,n1,n2_1,n2_2,n2;
+int   n_1,n_2,n;
 
 /*
    Upconvert and bandpass filter a chunk of spectrum from Fs/M to Fs. We're going for 700khz here.
@@ -64,23 +64,17 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
         f_2 = f_1;
         f_1 = modin[i];                                             //Scale fir output and convert to fixed.
         m = (int)((f/(IN_SCALE))*DAC_SCALE_2);                      //Scale fir output and convert to fixed
-        n1 = m + ((B1SMUL*n1_1)>>B1SHFT) - ((B1MUL*n1_2)>>B1SHFT);   //Apply one cycle of IIR. This feeds the fir-ed sample into the output filter
-        n1_2 = n1_1;
-        n1_1 = n1;
-	n2 = n1 + ((B1SMUL*n2_1)>>B1SHFT) - ((B1MUL*n2_2)>>B1SHFT);
-	n2_2 = n2_1;
-	n2_1 = n2;
-        dac_out[k]=(unsigned short)(n2+DAC_SCALE_2);
+        n = m + ((B1SMUL*n_1)>>B1SHFT) - ((B1MUL*n_2)>>B1SHFT);   //Apply one cycle of IIR. This feeds the fir-ed sample into the output filter
+        n_2 = n_1;
+        n_1 = n;
+        dac_out[k]=(unsigned short)(n+DAC_SCALE_2);
         k++;
         //now do the rest of the filtering. Because we're zero-stuffing we can neglect the sample from the fir filter.
         for(j=1;j<DUC_M;j++,k++){
             n = ((B1SMUL*n_1)>>B1SHFT) - ((B1MUL*n_2)>>B1SHFT);
             n_2 = n_1;
             n_1 = n;
-	    n2 = n1 + ((B1SMUL*n2_1)>>B1SHFT) - ((B1MUL*n2_2)>>B1SHFT);
-	    n2_2 = n2_1;
-	    n2_1 = n2;
-            dac_out[k]=(unsigned short)((n2)+DAC_SCALE_2);
+            dac_out[k]=(unsigned short)((n)+DAC_SCALE_2);
         }
     }
 }

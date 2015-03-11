@@ -19,16 +19,14 @@ pcicfb = fir1(20,.5); %Interpolation LPF Fir
 s1fir = filter(ciccb,1,pcicfb); %Combine compensation and LPF
 
 t = (1:fs/2);
-scpin = .1*sin(t*pi*2*(3000/8000))*i;       % initial complex input
+scpin = e.^(i*(t*pi*2*(3000/8000)));       % initial complex input
 scpin(1) = 1+i;
 
 intstage1 = zeros(1,2*length(scpin));   %First stage of interpolation, 2x
 intstage1(1:2:2*length(scpin))=scpin;
-%scpin = filter(s1fir,1,scpin);
 
 scireal = int32(filter(s1fir,1,real(intstage1))*csf);       %separate input into real and imiginary and apply pre-distortion
 sciimag = int32(filter(s1fir,1,imag(intstage1))*csf);       % also convert to integer. CIC integrator needs integer to work properly
-
 
 %Apply 3 stage comb to real
 fdin = scireal;
@@ -74,6 +72,7 @@ end
 scoreal=single(fdnext/(2**20));
 
 fdin=sciimag;
+
 %Apply 3 stage comb to imag
 combout1=0;
 combout2=0;
@@ -133,6 +132,10 @@ sduceq = filter([1 0 beta2],1,sducin);  %pre interpolation notch filter to equal
 sducinterp = zeros(1,length(sduceq)*M);    %interpolate by zero-stuffing
 sducinterp(1:M:length(sduceq)*M) = sduceq;
 sdac = filter(1,[1 b1x beta1],sducinterp); %select wanted signal
+
+sdac = sdac + median(sdac);  %Center above zero
+sdac = sdac / max(sdac);     %normalize
+sdac = int32(sdac*2000);     %integerize
 
 figure(1)
 subplot(211)
