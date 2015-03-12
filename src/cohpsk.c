@@ -77,7 +77,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int framesiz
     short bits;
 
     assert(COHPSK_NC == PILOTS_NC);
-    assert((NSYMROW*PILOTS_NC)/2 == framesize);
+    assert((NSYMROW*PILOTS_NC)*2 == framesize);
  
     /*
       Organise QPSK symbols into a NSYMBROWS rows by PILOTS_NC cols matrix,
@@ -109,9 +109,11 @@ void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int framesiz
 
         /* NS rows of data symbols */
 
-        for(i=0; i<NS; data_r++,r++) {
-            for(c=0; c<PILOTS_NC; c++)
+        for(i=0; i<NS; data_r++,r++,i++) {
+            for(c=0; c<PILOTS_NC; c++) {
                 tx_symb[r][c] = tx_symb_data[data_r][c];
+                //printf("r: %d c: %d data_r: %d %r %r\n", r, c, data_r, tx_symb[r][c]);
+            }
         }
     }
 

@@ -12,7 +12,8 @@
 more off
 NumCarriers = 14;
 fdmdv; % load modem code
- 
+autotest;
+
 % Generate reference vectors using Octave implementation of FDMDV modem
 
 global passes;
@@ -171,44 +172,6 @@ end
 
 load ../unittest/tfdmdv_out.txt
 
-% Helper functions to plot output of C verson and difference between Octave and C versions
-
-function stem_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
-  global no_plot_list;
-
-  if find(no_plot_list == plotnum)
-    return;
-  end
-  figure(plotnum)
-  subplot(subplotnum)
-  stem(sig,'g;Octave version;');
-  hold on;
-  stem(error,'r;Octave - C version (hopefully 0);');
-  hold off;
-  if nargin == 6
-    axis(axisvec);
-  end
-  title(titlestr);
-endfunction
-
-function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
-  global no_plot_list;
-
-  if find(no_plot_list == plotnum)
-    return;
-  end
-
-  figure(plotnum)
-  subplot(subplotnum)
-  plot(sig,'g;Octave version;');
-  hold on;
-  plot(error,'r;Octave - C version (hopefully 0);');
-  hold off;
-  if nargin == 6
-    axis(axisvec);
-  end
-  title(titlestr);
-endfunction
 
 % ---------------------------------------------------------------------------------------
 % Plot output and test each C function
@@ -281,30 +244,6 @@ stem_sig_and_error(13, 212, imag(rx_symbols_log(:,f)), imag(rx_symbols_log(:,f) 
 stem_sig_and_error(17, 211, real(phase_difference_log(:,f)), real(phase_difference_log(:,f) - phase_difference_log_c(:,f)), 'phase difference real' )
 stem_sig_and_error(17, 212, imag(phase_difference_log(:,f)), imag(phase_difference_log(:,f) - phase_difference_log_c(:,f)), 'phase difference imag' )
 
-% ---------------------------------------------------------------------------------------
-% AUTOMATED CHECKS ------------------------------------------
-% ---------------------------------------------------------------------------------------
-
-function check(a, b, test_name)
-  global passes;
-  global fails;
-
-  [m n] = size(a);
-  printf("%s", test_name);
-  for i=1:(25-length(test_name))
-    printf(".");
-  end
-  printf(": ");  
-  
-  e = sum(abs(a - b))/n;
-  if e < 1E-3
-    printf("OK\n");
-    passes++;
-  else
-    printf("FAIL\n");
-    fails++;
-  end
-endfunction
 
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symbols_log,  tx_symbols_log_c, 'tx_symbols');
