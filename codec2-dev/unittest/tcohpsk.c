@@ -57,13 +57,15 @@ int main(int argc, char *argv[])
 
     rx_sym_log_r=0;
 
+    memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
+
     for(f=0; f<FRAMES; f++) {
         
 	/* --------------------------------------------------------*\
 	                          Modulator
 	\*---------------------------------------------------------*/
 
-	bits_to_qpsk_symbols(tx_symbols, (int*)test_bits_coh, sizeof(test_bits_coh));
+	bits_to_qpsk_symbols(tx_symbols, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
 
 	/* --------------------------------------------------------*\
 	                       Log each vector 
