@@ -15,13 +15,13 @@ fi = 2E6/M;                     %freq of first interpolation
 fb = 7E5;                       %Bandpass frequency
 fc1 = fi/4;                     %Frequency of initial upconversion
 ciccb=[-0.029626    0.252638   -2.304683   16.332166   -2.304683    0.252638   -0.029626]; %CIC Compensation FIR
-pcicfb = fir1(21,.5); %Interpolation LPF Fir
+pcicfb = fir1(39,.5); %Interpolation LPF Fir
 s1fir = filter(ciccb,1,pcicfb); %Combine compensation and LPF
-s1fir = [-0.00000215, -0.00008715, 0.00073915, -0.00674415, 0.05618415, 0.01629015, -0.19074815, -0.04231615, 0.53620515, 0.09933915, -1.32978715, -0.38797815, 3.97887715, 6.70888315, 3.97887715, -0.38797815, -1.32978715, 0.09933915, 0.53620515, -0.04231615, -0.19074815, ];
+%s1fir = [-0.00000215, -0.00008715, 0.00073915, -0.00674415, 0.05618415, 0.01629015, -0.19074815, -0.04231615, 0.53620515, 0.09933915, -1.32978715, -0.38797815, 3.97887715, 6.70888315, 3.97887715, -0.38797815, -1.32978715, 0.09933915, 0.53620515, -0.04231615, -0.19074815, ];
 
 t = (1:fs/2);
-%scpin = e.^(i*(t*pi*2*(3000/8000)));       % initial complex input
-scpin = zeros(1,length(t));
+scpin = e.^(i*(t*pi*2*(3000/8000)));       % initial complex input
+%scpin = zeros(1,length(t));
 scpin(1) = 1+i;
 
 intstage1 = zeros(1,2*length(scpin));   %First stage of interpolation, 2x
