@@ -79,7 +79,7 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
     }
 }
 
-#define F8C80R_LEN 21                                       //Number of taps in the 8C80R filters
+#define F8C80R_LEN 40                                     //Number of taps in the 8C80R filters
 #define F8C80R_MUL 1024
 static int int1r,int2r,int3r,int4r,cmb1r,cmb2r,cmb3r,cmb4r; //States for re combs and integrators
 static int int1i,int2i,int3i,int4i,cmb1i,cmb2i,cmb3i,cmb4i; //States for im combs and integrators
@@ -117,13 +117,13 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             fir_8c80r_im[ptr_8c80r+F8C80R_LEN]=f8c80r_temp_im[j];
             nr=0; ni=0;
             for(k=0;k<F8C80R_LEN;k++){
-                nr=nr+fir_8c80r_cic[k]*fir_8c80r_re[(ptr_8c80r+F8C80R_LEN)-k];
-                ni=ni+fir_8c80r_cic[k]*fir_8c80r_im[(ptr_8c80r+F8C80R_LEN)-k];
+                nr+=fir_8c80r_cic[k]*fir_8c80r_re[ptr_8c80r+k];
+                ni+=fir_8c80r_cic[k]*fir_8c80r_im[ptr_8c80r+k];
             }
             f8c80r_temp_re[j]=nr; //Can be optimized out. Will do later
             f8c80r_temp_im[j]=ni; //Ditto
             ptr_8c80r++;
-            if(ptr_8c80r>F8C80R_LEN)
+            if(ptr_8c80r>=F8C80R_LEN)
                 ptr_8c80r=0;
         }
         for(j=0;j<DUC_N/5;j++){   //Comb and Integrate
@@ -150,21 +150,19 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             int3i = int2i + int3i;                //Integrator stage 3 im
             int4i = int3i + int4i;                //Integrator stage 4 im
             //Convert this complex into real and cancel out the gain from CIC
-	    ret = (float) (((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i))>>0);
-            real_80[(i*DUC_N)+(j*5)] = ret/F8C80R_MUL;
+	    ret = (float) (((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
+            real_80[(i*DUC_N)+(j*5)] = ret/1052048;
             w8c80r = (w8c80r+1)&0x3;
-            for(k=1;k<5;k++){                     //Next 4 stages of integration
-                //int1r = 0 + int1r;            //Integrator stage 1 re
+            //Next 4 stages of integration. Stage 1 can be ignored because of zero stuffing.
+            for(k=1;k<5;k++){
                 int2r = int1r + int2r;            //Integrator stage 2 re
                 int3r = int2r + int3r;            //Integrator stage 3 re
                 int4r = int3r + int4r;            //Integrator stage 4 re
-                //int1i = 0 + int1i;            //Integrator stage 1 im
                 int2i = int1i + int2i;            //Integrator stage 2 im
                 int3i = int2i + int3i;            //Integrator stage 3 im
                 int4i = int3i + int4i;            //Integrator stage 4 im
-	        ret = (float)(((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i))>>0);
-               // printf("%f,",ret);
-                real_80[(i*DUC_N)+(j*5)+k] = ret/F8C80R_MUL;
+	        ret = (float)(((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
+                real_80[(i*DUC_N)+(j*5)+k] = ret/1052048;  //Cancel out gain from all that.
 		w8c80r = (w8c80r+1)&0x3;
             }
         }
@@ -181,7 +179,7 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
 #define FS     80000
 #define AMP_MAX 1
 
-#define NOUT_BUFS    1000
+#define NOUT_BUFS    500
 #define NIN          (NOUT_BUFS*DUC_N)
 #define NOUT         (NIN*DUC_M)
 
@@ -203,7 +201,7 @@ float      fout[NIN];
 unsigned short todac[NOUT];
 
 int main(void) {
-    float          f1,f2,f3;
+    float          f1,f2,f3,w;
     FILE          *f;
     int            i;
 
@@ -212,12 +210,15 @@ int main(void) {
     f3 = f1 + 7E3;        /* wanted */
 
     for(i=0;i<NIN/10;i++){
-        in[i].real=cos((float)i*(M_PI*.25));
-        printf("%f\n",in[i].real);
-        //in[i].real=0.70710678118;
-        in[i].imag=0;
+	w = 2.*M_PI*2000./(float)(FS/10);
+        in[i].real=.1*cos((float)i*w);
+        in[i].imag=.1*sin((float)i*w);
+        //in[i].real=0;
+        //in[i].real=1;
+        //in[i].imag=0;
     }
-    //in[0].real=1;
+    in[0].imag=0.70710678118;
+    in[0].real=0.70710678118;
     /*for(i=0; i<NIN; i++)
         s[i] = 0.01;*/
     /*synth_line(s, f2, 0.5, NIN);
@@ -225,8 +226,8 @@ int main(void) {
     printf("\n");
     upconv_8c_80r(in,s,NOUT_BUFS);
     printf("\n");
-    //for(i=0;i<NOUT_BUFS;i++)
-    //    iir_upconv(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
+    for(i=0;i<NOUT_BUFS;i++)
+        iir_upconv(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
     
     f = fopen("iir_duc_s.txt", "wt");  assert(f != NULL);
     for(i=0; i<NIN; i++)
@@ -252,27 +253,12 @@ int main(void) {
 
 // constants for a fir filter used to convert 8kc complex to 80kc real
 static float fir_8c80r_cic[] = {
--0.00000215,
--0.00008715,
-0.00073915,
--0.00674415,
-0.05618415,
-0.01629015,
--0.19074815,
--0.04231615,
-0.53620515,
-0.09933915,
--1.32978715,
--0.38797815,
-3.97887715,
-6.70888315,
-3.97887715,
--0.38797815,
--1.32978715,
-0.09933915,
-0.53620515,
--0.04231615,
--0.19074815,
+0.000029,-0.000218,0.001966,-0.013414,-0.016592,0.020464,0.029699,-0.037796,
+-0.056654,0.070474,0.101466,-0.122748,-0.170446,0.201349,0.275064,-0.319207,
+-0.440914,0.506617,0.740998,-0.855843,-1.501563,1.688391,5.983289,5.983289,
+1.688391,-1.501563,-0.855843,0.740998,0.506617,-0.440914,-0.319207,0.275064,
+0.201349,-0.170446,-0.122748,0.101466,0.070474,-0.056654,-0.037796,0.029699,
+
 };
 
 
