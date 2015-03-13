@@ -75,7 +75,7 @@ int main(void) {
 
     memset((void*)outbuf,0,sizeof(short)*DAC_DUC_BUF_SZ);
     setup_timer();
-    dac_open(2*DAC_DUC_BUF_SZ,2*DAC_BUF_SZ);
+    fast_dac_open(2*DAC_DUC_BUF_SZ,2*DAC_BUF_SZ);
 
     tstart=tend=0;
     while (1) {

@@ -34,7 +34,7 @@
 #define DAC_DUC_BUF_SZ DUC_M*DUC_N
 #define DAC_BUF_SZ 2048
 
-void fast_dac_open(int fifo_sz);
+void fast_dac_open(int dac1_fifo_size,int dac2_fifo_size);
 int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
 int dac2_write(short buf[], int n); /* DAC2 pin PA5 */
 
