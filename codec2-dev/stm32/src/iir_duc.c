@@ -86,12 +86,11 @@ static int int1i,int2i,int3i,int4i,cmb1i,cmb2i,cmb3i,cmb4i; //States for im comb
 static float fir_8c80r_cic[];                               //FIR Coeffs
 static float fir_8c80r_re[F8C80R_LEN*2];                    //FIR delay line for re
 static float fir_8c80r_im[F8C80R_LEN*2];                    //FIR delay line for im
-static float f8c80r_temp_re[DUC_N/5];
-static float f8c80r_temp_im[DUC_N/5];
 static int ptr_8c80r;                                       //circular buffer ptr fir_8c80r_re
 static int w8c80r = 0;                                      //Omega for upconversion
 static int cosf4[] = {1,0,-1,0};                            //Cosine table for fs/4. precomputed by meat computer
 static int sinf4[] = {0,1,0,-1};                            //Sine table for fs/4.
+
 /*
    Interpolate and shift from 8k complex to 80k real, centered on Fs/4.
     comp_8 - Input samples - 8Kc complex - must be (DUC_N/10)*count long
@@ -100,35 +99,34 @@ static int sinf4[] = {0,1,0,-1};                            //Sine table for fs/
 */
 
 void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
-    int i,j,k;
-    float nr,ni,ret;
-    int cmbr,cmbi,cmbrr,cmbii,rein,imin;
+    int i,j,k;                           //Loop indices
+    float nr,ni,ret;                     //Temporary variables
+    int cmbr,cmbi,cmbrr,cmbii,rein,imin; //More temporaries
     for(i=0;i<count;i++){                //Iterate through chunks of samples
-        for(j=0;j<DUC_N/10;j++){          //zero stuff
-            f8c80r_temp_re[ j*2   ] = comp_8[j + (i * (DUC_N/10)) ].real;
-            f8c80r_temp_re[(j*2)+1] = 0; //Stuff a zero in here
-            f8c80r_temp_im[ j*2   ] = comp_8[j + (i * (DUC_N/10)) ].imag;
-            f8c80r_temp_im[(j*2)+1] = 0; //Stuff a zero in here
-        }
-        for(j=0;j<DUC_N/5;j++){          //run samples through a fir
-            fir_8c80r_re[ptr_8c80r]=f8c80r_temp_re[j];
-            fir_8c80r_im[ptr_8c80r]=f8c80r_temp_im[j];
-            fir_8c80r_re[ptr_8c80r+F8C80R_LEN]=f8c80r_temp_re[j];
-            fir_8c80r_im[ptr_8c80r+F8C80R_LEN]=f8c80r_temp_im[j];
+        for(j=0;j<DUC_N/5;j++){
+            if(j&0x1){ //If j is odd, stuff a zero, otherwise get a sample
+                nr = 0;
+                ni = 0;
+            } else {
+                nr = comp_8[(j/2) + (i * (DUC_N/10)) ].real;
+                ni = comp_8[(j/2) + (i * (DUC_N/10)) ].imag;
+            }
+            // Put the sample in the delay line
+            fir_8c80r_re[ptr_8c80r]=nr;
+            fir_8c80r_im[ptr_8c80r]=ni;
+            fir_8c80r_re[ptr_8c80r+F8C80R_LEN]=nr;
+            fir_8c80r_im[ptr_8c80r+F8C80R_LEN]=ni;
             nr=0; ni=0;
             for(k=0;k<F8C80R_LEN;k++){
                 nr+=fir_8c80r_cic[k]*fir_8c80r_re[ptr_8c80r+k];
                 ni+=fir_8c80r_cic[k]*fir_8c80r_im[ptr_8c80r+k];
             }
-            f8c80r_temp_re[j]=nr; //Can be optimized out. Will do later
-            f8c80r_temp_im[j]=ni; //Ditto
-            ptr_8c80r++;
+            ptr_8c80r++;                          //Spin the dealy line index
             if(ptr_8c80r>=F8C80R_LEN)
                 ptr_8c80r=0;
-        }
-        for(j=0;j<DUC_N/5;j++){   //Comb and Integrate
-            rein = (int)(f8c80r_temp_re[j]*F8C80R_MUL); //Can be optimized out. Will do later
-            imin = (int)(f8c80r_temp_im[j]*F8C80R_MUL); //Ditto
+
+            rein = (int)(nr*F8C80R_MUL); //Convert to int
+            imin = (int)(ni*F8C80R_MUL); //CIC filters must be signed,fixed point to work
            
             cmbr =  rein - cmb1r; cmb1r = rein;   //Comb 1 real
             cmbrr = cmbr - cmb2r; cmb2r = cmbr;   //Comb 2 real
@@ -139,7 +137,7 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             cmbii = cmbi - cmb2i; cmb2i = cmbi;   //Comb 2 im
             cmbi = cmbii - cmb3i; cmb3i = cmbii;  //Comb 3 im
             cmbii = cmbi - cmb4i; cmb4i = cmbi;   //Comb 4 im
-            //Do one cycle of integration
+            //Do first cycle of integration
             int1r = cmbrr + int1r;                //Integrator stage 1 re
             int2r = int1r + int2r;                //Integrator stage 2 re
             int3r = int2r + int3r;                //Integrator stage 3 re
@@ -150,8 +148,9 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             int3i = int2i + int3i;                //Integrator stage 3 im
             int4i = int3i + int4i;                //Integrator stage 4 im
             //Convert this complex into real and cancel out the gain from CIC
+            //This should probably spit out integers instead of going back to float
 	    ret = (float) (((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
-            real_80[(i*DUC_N)+(j*5)] = ret/1052048;
+            real_80[(i*DUC_N)+(j*5)] = ret/526024;
             w8c80r = (w8c80r+1)&0x3;
             //Next 4 stages of integration. Stage 1 can be ignored because of zero stuffing.
             for(k=1;k<5;k++){
@@ -162,7 +161,7 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
                 int3i = int2i + int3i;            //Integrator stage 3 im
                 int4i = int3i + int4i;            //Integrator stage 4 im
 	        ret = (float)(((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
-                real_80[(i*DUC_N)+(j*5)+k] = ret/1052048;  //Cancel out gain from all that.
+                real_80[(i*DUC_N)+(j*5)+k] = ret/526024;  //Cancel out gain from all that.
 		w8c80r = (w8c80r+1)&0x3;
             }
         }
@@ -201,43 +200,32 @@ float      fout[NIN];
 unsigned short todac[NOUT];
 
 int main(void) {
-    float          f1,f2,f3,w;
+    float          w;
     FILE          *f;
     int            i;
 
-    f1 = 20E3;	          /* center of passband */
-    f2 = f1;	  /* wanted */
-    f3 = f1 + 7E3;        /* wanted */
-
     for(i=0;i<NIN/10;i++){
-	w = 2.*M_PI*2000./(float)(FS/10);
+        //Tone at Fs/4 +/- 3K
+	w = 2.*M_PI*2500./(float)(FS/10);
         in[i].real=.1*cos((float)i*w);
-        in[i].imag=.1*sin((float)i*w);
+        //in[i].imag=.1*sin((float)i*w);
         //in[i].real=0;
         //in[i].real=1;
-        //in[i].imag=0;
+        in[i].imag=0;
     }
+
+    //Impulse to give us an idea of our filter bands
     in[0].imag=0.70710678118;
     in[0].real=0.70710678118;
-    /*for(i=0; i<NIN; i++)
-        s[i] = 0.01;*/
-    /*synth_line(s, f2, 0.5, NIN);
-    synth_line(s, f3, 0.5, NIN);*/
-    printf("\n");
+    
+    //interpolate from 8k comp to 80k real
     upconv_8c_80r(in,s,NOUT_BUFS);
-    printf("\n");
     for(i=0;i<NOUT_BUFS;i++)
         iir_upconv(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
     
     f = fopen("iir_duc_s.txt", "wt");  assert(f != NULL);
     for(i=0; i<NIN; i++)
         fprintf(f, "%f\n", s[i]);
-    fprintf(f, "\n");
-    fclose(f);
-
-    f = fopen("iir_duc_f.txt", "wt");  assert(f != NULL);
-    for(i=0; i<NIN; i++)
-        fprintf(f, "%f\n", fout[i]);
     fprintf(f, "\n");
     fclose(f);
 
