@@ -79,17 +79,16 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
     }
 }
 
-#define F8C80R_LEN 40                                     //Number of taps in the 8C80R filters
-#define F8C80R_MUL 1024
+#define F8C80R_LEN 30                                     //Number of taps in the 8C80R filters
+#define F8C80R_MUL 4096
 static int int1r,int2r,int3r,int4r,cmb1r,cmb2r,cmb3r,cmb4r; //States for re combs and integrators
 static int int1i,int2i,int3i,int4i,cmb1i,cmb2i,cmb3i,cmb4i; //States for im combs and integrators
-static float fir_8c80r_cic[];                               //FIR Coeffs
-static float fir_8c80r_re[F8C80R_LEN*2];                    //FIR delay line for re
-static float fir_8c80r_im[F8C80R_LEN*2];                    //FIR delay line for im
 static int ptr_8c80r;                                       //circular buffer ptr fir_8c80r_re
 static int w8c80r = 0;                                      //Omega for upconversion
-static int cosf4[] = {1,0,-1,0};                            //Cosine table for fs/4. precomputed by meat computer
-static int sinf4[] = {0,1,0,-1};                            //Sine table for fs/4.
+
+static int fir_8c80r_cic_i[];                               //FIR Coeffs
+static int fir_8c80r_re[F8C80R_LEN*2];                      //FIR delay line for re
+static int fir_8c80r_im[F8C80R_LEN*2];                      //FIR delay line for im
 
 /*
    Interpolate and shift from 8k complex to 80k real, centered on Fs/4.
@@ -100,16 +99,20 @@ static int sinf4[] = {0,1,0,-1};                            //Sine table for fs/
 
 void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
     int i,j,k;                           //Loop indices
-    float nr,ni,ret;                     //Temporary variables
+    float ret;                     //Temporary variables
+    int nr,ni;
     int cmbr,cmbi,cmbrr,cmbii,rein,imin; //More temporaries
+    int inidx = 0;                       //Index of input
+    int outidx = 0;                      //Index of output
     for(i=0;i<count;i++){                //Iterate through chunks of samples
         for(j=0;j<DUC_N/5;j++){
             if(j&0x1){ //If j is odd, stuff a zero, otherwise get a sample
                 nr = 0;
                 ni = 0;
             } else {
-                nr = comp_8[(j/2) + (i * (DUC_N/10)) ].real;
-                ni = comp_8[(j/2) + (i * (DUC_N/10)) ].imag;
+                nr = (int)(comp_8[inidx].real*F8C80R_MUL);
+                ni = (int)(comp_8[inidx].imag*F8C80R_MUL);
+                inidx++;
             }
             // Put the sample in the delay line
             fir_8c80r_re[ptr_8c80r]=nr;
@@ -117,17 +120,17 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             fir_8c80r_re[ptr_8c80r+F8C80R_LEN]=nr;
             fir_8c80r_im[ptr_8c80r+F8C80R_LEN]=ni;
             nr=0; ni=0;
-            for(k=0;k<F8C80R_LEN;k++){
-                nr+=fir_8c80r_cic[k]*fir_8c80r_re[ptr_8c80r+k];
-                ni+=fir_8c80r_cic[k]*fir_8c80r_im[ptr_8c80r+k];
+            //Some special initilization voodoo is done here.
+            //We skip all of the zeros by setting up the loop this way
+            for(k=(j&0x1);k<F8C80R_LEN;k+=2){
+                nr+=(fir_8c80r_cic_i[k]*fir_8c80r_re[ptr_8c80r+k])>>14;
+                ni+=(fir_8c80r_cic_i[k]*fir_8c80r_im[ptr_8c80r+k])>>14;
             }
             ptr_8c80r++;                          //Spin the dealy line index
             if(ptr_8c80r>=F8C80R_LEN)
                 ptr_8c80r=0;
-
-            rein = (int)(nr*F8C80R_MUL); //Convert to int
-            imin = (int)(ni*F8C80R_MUL); //CIC filters must be signed,fixed point to work
-           
+            rein=nr;
+            imin=ni;
             cmbr =  rein - cmb1r; cmb1r = rein;   //Comb 1 real
             cmbrr = cmbr - cmb2r; cmb2r = cmbr;   //Comb 2 real
             cmbr = cmbrr - cmb3r; cmb3r = cmbrr;  //Comb 3 real
@@ -149,9 +152,15 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             int4i = int3i + int4i;                //Integrator stage 4 im
             //Convert this complex into real and cancel out the gain from CIC
             //This should probably spit out integers instead of going back to float
-	    ret = (float) (((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
-            real_80[(i*DUC_N)+(j*5)] = ret/526024;
-            w8c80r = (w8c80r+1)&0x3;
+            switch(w8c80r&0x3){                   //Do comp->real conversion by hand
+                case 0:ret=(float)(-int4r>>8);break;
+                case 1:ret=(float)(int4i>>8);break;
+                case 2:ret=(float)(int4r>>8);break;
+                case 3:ret=(float)(-int4i>>8);break;
+            }
+            real_80[outidx] = ret/8192;   //Divide by 4096 to cancel out gain
+            outidx++;
+            w8c80r++;     //spin omega
             //Next 4 stages of integration. Stage 1 can be ignored because of zero stuffing.
             for(k=1;k<5;k++){
                 int2r = int1r + int2r;            //Integrator stage 2 re
@@ -160,9 +169,15 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
                 int2i = int1i + int2i;            //Integrator stage 2 im
                 int3i = int2i + int3i;            //Integrator stage 3 im
                 int4i = int3i + int4i;            //Integrator stage 4 im
-	        ret = (float)(((-cosf4[w8c80r]*int4r)+(sinf4[w8c80r]*int4i)));
-                real_80[(i*DUC_N)+(j*5)+k] = ret/526024;  //Cancel out gain from all that.
-		w8c80r = (w8c80r+1)&0x3;
+                switch(w8c80r&0x3){               //Do comp->real conversion by hand
+                    case 0:ret=(float)(-int4r>>8);break;
+                    case 1:ret=(float)(int4i>>8);break;
+                    case 2:ret=(float)(int4r>>8);break;
+                    case 3:ret=(float)(-int4i>>8);break;
+                }
+                real_80[outidx] = ret/8192;  //Cancel out gain from all that.
+                outidx++;
+		w8c80r++;
             }
         }
     } 
@@ -207,10 +222,10 @@ int main(void) {
     for(i=0;i<NIN/10;i++){
         //Tone at Fs/4 +/- 3K
 	w = 2.*M_PI*2500./(float)(FS/10);
-        in[i].real=.1*cos((float)i*w);
+        //in[i].real=cos((float)i*w);
         //in[i].imag=.1*sin((float)i*w);
         //in[i].real=0;
-        //in[i].real=1;
+        in[i].real=1;
         in[i].imag=0;
     }
 
@@ -240,14 +255,19 @@ int main(void) {
 #endif
 
 // constants for a fir filter used to convert 8kc complex to 80kc real
-static float fir_8c80r_cic[] = {
+/*static float fir_8c80r_cic[] = {
 0.000029,-0.000218,0.001966,-0.013414,-0.016592,0.020464,0.029699,-0.037796,
 -0.056654,0.070474,0.101466,-0.122748,-0.170446,0.201349,0.275064,-0.319207,
 -0.440914,0.506617,0.740998,-0.855843,-1.501563,1.688391,5.983289,5.983289,
 1.688391,-1.501563,-0.855843,0.740998,0.506617,-0.440914,-0.319207,0.275064,
 0.201349,-0.170446,-0.122748,0.101466,0.070474,-0.056654,-0.037796,0.029699,
 
-};
+};*/
+
+//Coeffs for fixed point fir LPF and CIC precompensation
+static int fir_8c80r_cic_i[] = {
+1,-2,18,-128,135,309,-419,-926,1177,2284,-2790,
+-5691,6535,24425,24425,6535,-5691,-2790,2284,1177,-926,-419,};
 
 
 

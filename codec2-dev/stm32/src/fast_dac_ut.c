@@ -34,7 +34,8 @@
 #include <stm32f4xx_tim.h>
 #include <stm32f4xx_rcc.h>
 #include "gdb_stdio.h"
-
+#include "comp.h"
+#include "gmsk_test_dat_m4.h"
 #define SINE_SAMPLES  32
 
 
@@ -54,6 +55,12 @@ float f4sine[] = {1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0
 		  1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,
 		 -1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,};
 
+//Intermediate 80k real before tx
+float tx_imm[DUC_N];
+
+//Complex input to chain
+COMP comp_in[DUC_N/10];
+
 unsigned short outbuf[DAC_DUC_BUF_SZ];
 
 void setup_timer()
@@ -71,23 +78,37 @@ void setup_timer()
 }
 
 int main(void) {
-    int tstart,tend,cyc;
+    int tstart,tup,tend,cyc,i;
 
     memset((void*)outbuf,0,sizeof(short)*DAC_DUC_BUF_SZ);
     setup_timer();
     fast_dac_open(2*DAC_DUC_BUF_SZ,2*DAC_BUF_SZ);
-
-    tstart=tend=0;
+    tstart=tend=tup=cyc=0;
+    //Initalize complex input with signal at zero
+    for(i=0;i<DUC_N/10;i++){
+        comp_in[i].real=1;
+        comp_in[i].imag=0;
+    }
     while (1) {
-	cyc++;
-	if(cyc%100000==0){
-		printf("upconvert takes %d uSecs\n",tend-tstart);
-	}
-        /* keep DAC FIFOs topped up */
-	tstart = TIM_GetCounter(TIM2);
-	iir_upconv(f4sine,outbuf);
+	cyc+=16;
+        if(cyc>GMSK_TEST_LEN)
+            cyc=0;
+	/*if(cyc%10000==0){
+                printf("8c80r takes %d uSecs\n",tup-tstart);
+		printf("iir upconvert takes %d uSecs\n",tend-tup);
+	}*/
+        tstart = TIM_GetCounter(TIM2);
+
+        upconv_8c_80r(comp_in,tx_imm,1);
+
+	tup = TIM_GetCounter(TIM2);
+
+	iir_upconv(tx_imm,outbuf);
+
 	tend = TIM_GetCounter(TIM2);
-	dac1_write((short*)outbuf,DAC_DUC_BUF_SZ);
+
+        //Sit and spin until we can get more samples into the dac 
+	while(dac1_write((short*)outbuf,DAC_DUC_BUF_SZ)<0);
     }
    
 }
