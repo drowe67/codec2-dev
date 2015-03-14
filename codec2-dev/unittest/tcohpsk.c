@@ -38,6 +38,7 @@
 #include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
 #include "cohpsk_defs.h"
+#include "cohpsk_internal.h"
 #include "test_bits_coh.h"
 #include "octave.h"
 
@@ -46,39 +47,58 @@
 
 int main(int argc, char *argv[])
 {
-    int           tx_bits[COHPSK_BITS_PER_FRAME];
-    COMP          tx_symbols[NSYMROWPILOT][PILOTS_NC];
+    struct COHPSK *coh;
+    int            tx_bits[COHPSK_BITS_PER_FRAME];
+    COMP           tx_symb[NSYMROWPILOT][PILOTS_NC];
+    int            rx_bits[COHPSK_BITS_PER_FRAME];
     
-    int           tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
-    COMP          tx_symbols_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
-                                          
-    FILE         *fout;
-    int           f, r,c,rx_sym_log_r;
+    int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
+    COMP           tx_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
 
-    rx_sym_log_r=0;
+    float          rx_amp_log[NSYMROW*FRAMES][PILOTS_NC];
+    float          rx_phi_log[NSYMROW*FRAMES][PILOTS_NC];
+    int            rx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
+                                          
+    FILE          *fout;
+    int            f, r, c, log_r, log_data_r;
+
+    coh = cohpsk_create();
+    assert(coh != NULL);
+
+    log_r = log_data_r= 0;
 
     memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
     for(f=0; f<FRAMES; f++) {
         
 	/* --------------------------------------------------------*\
-	                          Modulator
+	                          Modem
 	\*---------------------------------------------------------*/
 
-	bits_to_qpsk_symbols(tx_symbols, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
+	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
+        qpsk_symbols_to_bits(coh, rx_bits, tx_symb);
 
 	/* --------------------------------------------------------*\
 	                       Log each vector 
 	\*---------------------------------------------------------*/
 
 	memcpy(&tx_bits_log[COHPSK_BITS_PER_FRAME*f], tx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
-	for(r=0; r<NSYMROWPILOT; r++, rx_sym_log_r++) {
+	for(r=0; r<NSYMROWPILOT; r++, log_r++) {
             for(c=0; c<PILOTS_NC; c++) 
-		tx_symbols_log[rx_sym_log_r][c] = tx_symbols[r][c]; 
+		tx_symb_log[log_r][c] = tx_symb[r][c]; 
         }
-	assert(rx_sym_log_r <= NSYMROWPILOT*FRAMES);
-    }
 
+	for(r=0; r<NSYMROW; r++, log_data_r++) {
+            for(c=0; c<PILOTS_NC; c++) {
+		rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
+		rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
+            }
+        }
+	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
+
+	assert(log_r <= NSYMROWPILOT*FRAMES);
+	assert(log_data_r <= NSYMROW*FRAMES);
+    }
 
     /*---------------------------------------------------------*\
                Dump logs to Octave file for evaluation 
@@ -89,8 +109,12 @@ int main(int argc, char *argv[])
     assert(fout != NULL);
     fprintf(fout, "# Created by tcohpsk.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
-    octave_save_complex(fout, "tx_symbols_log_c", (COMP*)tx_symbols_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "tx_symb_log_c", (COMP*)tx_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "rx_amp_log_c", (COMP*)rx_amp_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "rx_phi_log_c", (COMP*)rx_phi_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
     fclose(fout);
+
+    cohpsk_destroy(coh);
 
     return 0;
 }

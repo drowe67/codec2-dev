@@ -52,7 +52,7 @@ add_executable(tfdmdv tfdmdv.c ../src/fdmdv.c ../src/kiss_fft.c ../src/octave.c)
 target_link_libraries(tfdmdv codec2)
 
 add_executable(tcohpsk tcohpsk.c ../src/cohpsk.c ../src/octave.c)
-target_link_libraries(tcohpsk)
+target_link_libraries(tcohpsk codec2)
 
 add_executable(t16_8 t16_8.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(t16_8 codec2)

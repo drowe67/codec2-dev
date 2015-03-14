@@ -39,6 +39,7 @@
 
 #include "fdmdv_internal.h"
 #include "codec2_fdmdv.h"
+#include "comp_prim.h"
 #include "rn.h"
 #include "rxdec_coeff.h"
 #include "test_bits.h"
@@ -54,68 +55,7 @@ static int sync_uw[] = {1,-1,1,-1,1,-1};
 #define printf gdb_stdio_printf
 #endif
 
-/*---------------------------------------------------------------------------*\
-                                                                             
-                               FUNCTIONS
-
-\*---------------------------------------------------------------------------*/
-
-static COMP cneg(COMP a)
-{
-    COMP res;
-
-    res.real = -a.real;
-    res.imag = -a.imag;
-
-    return res;
-}
-
-static COMP cconj(COMP a)
-{
-    COMP res;
-
-    res.real = a.real;
-    res.imag = -a.imag;
-
-    return res;
-}
-
-static COMP cmult(COMP a, COMP b)
-{
-    COMP res;
-
-    res.real = a.real*b.real - a.imag*b.imag;
-    res.imag = a.real*b.imag + a.imag*b.real;
-
-    return res;
-}
-
-static COMP fcmult(float a, COMP b)
-{
-    COMP res;
-
-    res.real = a*b.real;
-    res.imag = a*b.imag;
-
-    return res;
-}
-
-static COMP cadd(COMP a, COMP b)
-{
-    COMP res;
-
-    res.real = a.real + b.real;
-    res.imag = a.imag + b.imag;
-
-    return res;
-}
-
-static float cabsolute(COMP a)
-{
-    return sqrtf(powf(a.real, 2.0) + powf(a.imag, 2.0));
-}
-
-/*---------------------------------------------------------------------------*\
+/*--------------------------------------------------------------------------* \
                                                        
   FUNCTION....: fdmdv_create	     
   AUTHOR......: David Rowe			      

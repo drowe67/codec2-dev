@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: cohpsk.h
+  FILE........: cohpsk_internal.h
   AUTHOR......: David Rowe
   DATE CREATED: March 2015
                                                                              
@@ -25,19 +25,15 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __CODEC2_COHPSK__
-#define __CODEC2_COHPSK__
+#ifndef __COHPSK_INTERNAL__
+#define __COHPSK_INTERNAL__
 
-#define COHPSK_BITS_PER_FRAME 160             /* hard coded for now */
-#define COHPSK_NC               4             /* hard coded for now */
-
-#include "comp.h"
-
-struct COHPSK;
-
-struct COHPSK *cohpsk_create(void);
-void cohpsk_destroy(struct COHPSK *coh);
-void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC], int tx_bits[], int nbits);
-void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHPSK_NC]);
+struct COHPSK {
+    float tx_pilot_buf[3*NPILOTSFRAME][PILOTS_NC];      /* 3 frames of tx pilot symbols                          */
+    COMP  rx_pilot_buf[3*NPILOTSFRAME][PILOTS_NC];      /* 3 frames of rx piloy symbols                          */
+    COMP  rx_symb_buf[3*NSYMROW][PILOTS_NC];            /* 3 frames of rx data symbols                           */
+    float phi_[NSYMROW][PILOTS_NC];                     /* phase estimates for this frame of rx data symbols     */
+    float amp_[NSYMROW][PILOTS_NC];                     /* amplitude estimates for this frame of rx data symbols */
+};
 
 #endif
