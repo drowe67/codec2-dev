@@ -57,6 +57,7 @@ int main(int argc, char *argv[])
 
     float          rx_amp_log[NSYMROW*FRAMES][PILOTS_NC];
     float          rx_phi_log[NSYMROW*FRAMES][PILOTS_NC];
+    COMP           rx_symb_log[NSYMROW*FRAMES][PILOTS_NC];
     int            rx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
                                           
     FILE          *fout;
@@ -77,7 +78,7 @@ int main(int argc, char *argv[])
 
 	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
         qpsk_symbols_to_bits(coh, rx_bits, tx_symb);
-
+ 
 	/* --------------------------------------------------------*\
 	                       Log each vector 
 	\*---------------------------------------------------------*/
@@ -92,6 +93,7 @@ int main(int argc, char *argv[])
             for(c=0; c<PILOTS_NC; c++) {
 		rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
 		rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
+		rx_symb_log[log_data_r][c] = coh->rx_symb_buf[r][c]; 
             }
         }
 	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
@@ -110,8 +112,10 @@ int main(int argc, char *argv[])
     fprintf(fout, "# Created by tcohpsk.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symb_log_c", (COMP*)tx_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_complex(fout, "rx_amp_log_c", (COMP*)rx_amp_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_complex(fout, "rx_phi_log_c", (COMP*)rx_phi_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
     fclose(fout);
 
     cohpsk_destroy(coh);
