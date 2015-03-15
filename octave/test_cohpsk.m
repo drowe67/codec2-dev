@@ -559,7 +559,7 @@ endfunction
 
 function gen_test_bits()
   sim_in = standard_init();
-  framesize = 160;
+  framesize = 160*10;
   tx_bits = round(rand(1,framesize));
   test_bits_coh_file(tx_bits);
 endfunction
