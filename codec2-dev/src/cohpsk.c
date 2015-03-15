@@ -5,12 +5,7 @@
   DATE CREATED: March 2015
                                                                              
   Functions that implement a coherent PSK FDM modem.
-        
-  TODO:
-    [ ] matching octave function bits_to_dqpsk_symbols()
-    [ ] framework for test program and octave UT
-    [ ] testframe used by both Octave and C
-                                                               
+                                                                       
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -77,6 +72,7 @@ static COMP qpsk_mod[] = {
 struct COHPSK *cohpsk_create(void)
 {
     struct COHPSK *coh;
+    int            r,c;
 
     coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
     if (coh == NULL)
@@ -87,6 +83,13 @@ struct COHPSK *cohpsk_create(void)
     memcpy(&coh->tx_pilot_buf[0][0], pilots_coh, sizeof(pilots_coh));
     memcpy(&coh->tx_pilot_buf[NPILOTSFRAME][0], pilots_coh, sizeof(pilots_coh));
     memcpy(&coh->tx_pilot_buf[2*NPILOTSFRAME][0], pilots_coh, sizeof(pilots_coh));
+
+    for(r=0; r<3*NSYMROW; r++) {
+        for(c=0; c<PILOTS_NC; c++) {
+            coh->rx_symb_buf[r][c].real = 0.0;
+            coh->rx_symb_buf[r][c].imag = 0.0;
+        }
+    }
 
     return coh;
 }
@@ -193,7 +196,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
 
     for (r=0, p_r=2*NPILOTSFRAME, data_r=2*NSYMROW; r<NSYMROWPILOT; p_r++) {
 
-        printf("r: %d data_r: %d\n", r, data_r);
+        // printf("r: %d data_r: %d\n", r, data_r);
         /* copy row of pilots onto end of pilot buffer */
 
         for(c=0; c<PILOTS_NC; c++) {
@@ -207,14 +210,17 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
         /* copy NS rows of data symbols onto end of data symbol buffer */
 
         for(i=0; i<NS; data_r++,r++,i++) {
-            for(c=0; c<PILOTS_NC; c++)
+            for(c=0; c<PILOTS_NC; c++) {
                 coh->rx_symb_buf[data_r][c] = rx_symb[r][c];
+                //printf("r: %d c: %d %f %f\n", r,c, rx_symb[r][c].real, rx_symb[r][c].imag);
+            }
         }
     }
 
+
     /* estimate channel amplitude and phase and correct data symbols in middle of buffer */
 
-    for (r=0, data_r=NSYMROW; r<NSYMROW; r++, data_r) {
+    for (r=0, data_r=NSYMROW; r<NSYMROW; r++, data_r++) {
 
         /* pilots to use for correcting data_r-th symbol */
 
@@ -223,7 +229,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
         assert(st >= 0);
         assert(en < 3*NPILOTSFRAME);
 
-        printf("r: %d data_r: %d st: %d en: %d\n", r, data_r, st, en);
+        //printf("r: %d data_r: %d st: %d en: %d\n", r, data_r, st, en);
 
         /* iterate over all of the carriers */
 
@@ -250,14 +256,27 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
             rx_bits[2*i]   = rot.real < 0;
             rx_bits[2*i+1] = rot.imag < 0;
 
-            printf("  c: %d ch_est: %f %f phi_: %f amp_: %f\n",c,  ch_est.real, ch_est.imag, coh->phi_[r][c], coh->amp_[r][c]);
+            //printf("  c: %d ch_est: %f %f phi_: %f amp_: %f\n",c,  ch_est.real, ch_est.imag, coh->phi_[r][c], coh->amp_[r][c]);
         }
         //exit(0);
     }
 
-    /* shift buffers */
+    r = NSYMROW+19; c = 0;
+    //printf("%d %d %f %f\n", r,c, coh->rx_symb_buf[r][c].real, coh->rx_symb_buf[r][c].imag);
 
-    memcpy(&coh->rx_pilot_buf[0][0], &coh->rx_pilot_buf[NPILOTSFRAME][0], sizeof(COMP)*2*NPILOTSFRAME*PILOTS_NC);
-    memcpy(&coh->rx_symb_buf[0][0], &coh->rx_symb_buf[NSYMROW][0], sizeof(COMP)*2*NSYMROW*PILOTS_NC);
+    /* shift buffers */
+    
+    for(r=0; r<2*NSYMROW; r++) {
+        for(c=0; c<PILOTS_NC; c++) {
+            coh->rx_symb_buf[r][c] = coh->rx_symb_buf[r+NSYMROW][c];
+        }
+    }
+    for(r=0; r<2*NPILOTSFRAME; r++) {
+        for(c=0; c<PILOTS_NC; c++) {
+            coh->rx_pilot_buf[r][c] = coh->rx_pilot_buf[r+NPILOTSFRAME][c];
+        }
+    }
+    r = 19; c = 0;
+    //printf("%d %d %f %f\n", r,c, coh->rx_symb_buf[r][c].real, coh->rx_symb_buf[r][c].imag);
 
 }

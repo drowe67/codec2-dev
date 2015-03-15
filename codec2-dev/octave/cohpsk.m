@@ -195,7 +195,7 @@ end
 
 % Symbol rate processing for rx side (demodulator) -------------------------------------------------------
 
-function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx)
+function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, s_ch, prev_sym_rx)
     framesize     = sim_in.framesize;
     Nsymb         = sim_in.Nsymb;
     Nsymbrow      = sim_in.Nsymbrow;
