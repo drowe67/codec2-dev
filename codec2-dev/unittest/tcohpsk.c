@@ -41,15 +41,18 @@
 #include "cohpsk_internal.h"
 #include "test_bits_coh.h"
 #include "octave.h"
+#include "comp_prim.h"
 
 #define FRAMES 35
-#define CHANNEL_BUF_SIZE (10*M)
+#define RS     50
+#define FOFF   1
 
 int main(int argc, char *argv[])
 {
     struct COHPSK *coh;
     int            tx_bits[COHPSK_BITS_PER_FRAME];
     COMP           tx_symb[NSYMROWPILOT][PILOTS_NC];
+    COMP           ch_symb[NSYMROWPILOT][PILOTS_NC];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
@@ -62,13 +65,20 @@ int main(int argc, char *argv[])
                                           
     FILE          *fout;
     int            f, r, c, log_r, log_data_r;
+    COMP           phase, freq;
+    int           *ptest_bits_coh, *ptest_bits_coh_end;
 
     coh = cohpsk_create();
     assert(coh != NULL);
 
     log_r = log_data_r= 0;
+    ptest_bits_coh = (int*)test_bits_coh;
+    ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
     memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
+
+    phase.real = 1.0; phase.imag = 0.0; 
+    freq.real = cos(2.0*M_PI*FOFF/RS); freq.imag = sin(2.0*M_PI*FOFF/RS);
 
     for(f=0; f<FRAMES; f++) {
         
@@ -76,8 +86,20 @@ int main(int argc, char *argv[])
 	                          Modem
 	\*---------------------------------------------------------*/
 
+        memcpy(tx_bits, ptest_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
+        ptest_bits_coh += COHPSK_BITS_PER_FRAME;
+        if (ptest_bits_coh >= ptest_bits_coh_end)
+            ptest_bits_coh = (int*)test_bits_coh;
 	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
-        qpsk_symbols_to_bits(coh, rx_bits, tx_symb);
+
+        for(r=0; r<NSYMROWPILOT; r++) {
+            phase = cmult(phase,freq);
+            for(c=0; c<PILOTS_NC; c++)
+                ch_symb[r][c] = cmult(tx_symb[r][c], phase);
+        }
+        phase = fcmult(1.0/cabsolute(phase), phase);
+
+        qpsk_symbols_to_bits(coh, rx_bits, ch_symb);
  
 	/* --------------------------------------------------------*\
 	                       Log each vector 

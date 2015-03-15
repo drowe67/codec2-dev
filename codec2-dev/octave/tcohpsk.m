@@ -13,9 +13,10 @@ graphics_toolkit ("gnuplot");
 cohpsk;
 autotest;
 
-n = 160;
-frames = 35;
+n = 2000;
+rames = 35;
 framesize = 160;
+foff = 1;
 
 load ../build_linux/unittest/tcohpsk_out.txt
 
@@ -33,22 +34,44 @@ sim_in.do_write_pilot_file = 0;
 sim_in = symbol_rate_init(sim_in);
 
 rand('state',1); 
-tx_bits = round(rand(1,framesize));
+tx_bits_coh = round(rand(1,framesize*10));
+ptx_bits_coh = 1;
+
 tx_bits_log = [];
 tx_symb_log = [];
 rx_amp_log = [];
 rx_phi_log = [];
 rx_symb_log = [];
 rx_bits_log = [];
+
+phase = 1;
+freq = exp(j*2*pi*foff/sim_in.Rs);
+
+ch_symb = zeros(sim_in.Nsymbrowpilot, sim_in.Nc);
+
 for i=1:frames
-    tx_bits_log = [tx_bits_log tx_bits];
+  tx_bits = tx_bits_coh(ptx_bits_coh:ptx_bits_coh+framesize-1);
+  ptx_bits_coh += framesize;
+  if ptx_bits_coh > length(tx_bits_coh)
+    ptx_bits_coh = 1;
+  end
+
+  tx_bits_log = [tx_bits_log tx_bits];
+
   [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
-    tx_symb_log = [tx_symb_log; tx_symb];
-  [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, tx_symb, []);
-    rx_symb_log = [rx_symb_log; rx_symb];
-    rx_amp_log = [rx_amp_log; amp_];
-    rx_phi_log = [rx_phi_log; phi_];
-    rx_bits_log = [rx_bits_log; rx_bits];
+  tx_symb_log = [tx_symb_log; tx_symb];
+
+  for r=1:sim_in.Nsymbrowpilot
+    phase = phase*freq;
+    ch_symb(r,:) = tx_symb(r,:)*phase;  
+  end
+  phase = phase/abs(phase);
+
+  [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, ch_symb, []);
+  rx_symb_log = [rx_symb_log; rx_symb];
+  rx_amp_log = [rx_amp_log; amp_];
+  rx_phi_log = [rx_phi_log; phi_];
+  rx_bits_log = [rx_bits_log; rx_bits];
 end
 
 stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])

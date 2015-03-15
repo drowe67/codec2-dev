@@ -269,7 +269,7 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx 
         if verbose > 2
           printf("% 4.3f ", phi_(r,c))
         end
-        % rx_symb(r,c) *= exp(-j*phi_(r,c));
+        rx_symb(r,c) *= exp(-j*phi_(r,c));
       end
 
       if verbose > 2
