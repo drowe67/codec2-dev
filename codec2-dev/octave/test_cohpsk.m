@@ -105,8 +105,8 @@ function test_single
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
 
-  sim_in.Ntrials          = 20;
-  sim_in.Esvec            = 100; 
+  sim_in.Ntrials          = 35;
+  sim_in.Esvec            = 8; 
   sim_in.hf_sim           = 0;
   sim_in.hf_mag_only      = 0;
   sim_in.modulation       = 'qpsk';
@@ -469,11 +469,13 @@ function rate_Fs_rx(rx_filename)
   subplot(211)
   plot(phi_x, phi_log(:,1),'r+;Estimated HF channel phase;')
   ylabel('Phase (rads)');
+  legend('boxoff');
 
   subplot(212)
   plot(phi_x, amp_log(:,1),'r+;Estimated HF channel amp;')
   ylabel('Amplitude');
   xlabel('Time (symbols)');
+  legend('boxoff');
 
   figure(6);
   clf

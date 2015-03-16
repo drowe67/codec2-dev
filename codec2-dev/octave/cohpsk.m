@@ -618,7 +618,7 @@ function sim_out = ber_test(sim_in)
 
             s_ch = s_ch + noise;
             
-            [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = symbol_rate_rx(sim_in, s_ch, prev_sym_rx);                                 
+            [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, s_ch, prev_sym_rx);                                 
 
             phi_log = [phi_log; phi_];
             amp_log = [amp_log; amp_];
@@ -662,8 +662,8 @@ function sim_out = ber_test(sim_in)
             if verbose 
               av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
 
-              printf("EsNo est (dB): %3.1f Terrs: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f",
-                       mean(10*log10(EsNo__log)), Terrs,
+              printf("EsNo est (dB): %3.1f Terrs: %d Tbits: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f",
+                       mean(10*log10(EsNo__log)), Terrs, Tbits,
                        Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
               if ldpc_code
                   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 
@@ -738,6 +738,7 @@ function sim_out = ber_test(sim_in)
           hold off;
         end
         ylabel('Phase (rads)');
+        legend('boxoff');
 
         subplot(212)
         plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
@@ -748,6 +749,7 @@ function sim_out = ber_test(sim_in)
         end
         ylabel('Amplitude');
         xlabel('Time (symbols)');
+        legend('boxoff');
 
         figure(4)
         clf

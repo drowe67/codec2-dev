@@ -252,17 +252,14 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
             /* demodulate */
 
             i = c*NSYMROW + r;
-            rot = cmult(rx_symb[data_r][c], pi_on_4);
-            rx_bits[2*i]   = rot.real < 0;
-            rx_bits[2*i+1] = rot.imag < 0;
+            rot = cmult(coh->rx_symb_buf[data_r][c], pi_on_4);
+            rx_bits[2*i+1] = rot.real < 0;
+            rx_bits[2*i]   = rot.imag < 0;
 
             //printf("  c: %d ch_est: %f %f phi_: %f amp_: %f\n",c,  ch_est.real, ch_est.imag, coh->phi_[r][c], coh->amp_[r][c]);
         }
         //exit(0);
     }
-
-    r = NSYMROW+19; c = 0;
-    //printf("%d %d %f %f\n", r,c, coh->rx_symb_buf[r][c].real, coh->rx_symb_buf[r][c].imag);
 
     /* shift buffers */
     
@@ -275,8 +272,5 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHP
         for(c=0; c<PILOTS_NC; c++) {
             coh->rx_pilot_buf[r][c] = coh->rx_pilot_buf[r+NPILOTSFRAME][c];
         }
-    }
-    r = 19; c = 0;
-    //printf("%d %d %f %f\n", r,c, coh->rx_symb_buf[r][c].real, coh->rx_symb_buf[r][c].imag);
-
+    } 
 }

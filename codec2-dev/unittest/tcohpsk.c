@@ -42,6 +42,7 @@
 #include "test_bits_coh.h"
 #include "octave.h"
 #include "comp_prim.h"
+#include "noise_samples.h"
 
 #define FRAMES 35
 #define RS     50
@@ -57,6 +58,7 @@ int main(int argc, char *argv[])
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
     COMP           tx_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
+    COMP           ch_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
 
     float          rx_amp_log[NSYMROW*FRAMES][PILOTS_NC];
     float          rx_phi_log[NSYMROW*FRAMES][PILOTS_NC];
@@ -64,14 +66,14 @@ int main(int argc, char *argv[])
     int            rx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
                                           
     FILE          *fout;
-    int            f, r, c, log_r, log_data_r;
+    int            f, r, c, log_r, log_data_r, noise_r;
     COMP           phase, freq;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
 
     coh = cohpsk_create();
     assert(coh != NULL);
 
-    log_r = log_data_r= 0;
+    log_r = log_data_r = noise_r = 0;
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
@@ -92,10 +94,13 @@ int main(int argc, char *argv[])
             ptest_bits_coh = (int*)test_bits_coh;
 	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
 
-        for(r=0; r<NSYMROWPILOT; r++) {
+        for(r=0; r<NSYMROWPILOT; r++,noise_r++) {
             phase = cmult(phase,freq);
-            for(c=0; c<PILOTS_NC; c++)
-                ch_symb[r][c] = cmult(tx_symb[r][c], phase);
+            for(c=0; c<PILOTS_NC; c++) {
+                ch_symb[r][c] = cadd(cmult(tx_symb[r][c], phase), noise[noise_r][c]);
+                //printf("%d %d %f %f \n",r,c,ch_symb[r][c].real, ch_symb[r][c].imag);
+                //ch_symb[r][c] = cmult(tx_symb[r][c], phase);
+             }
         }
         phase = fcmult(1.0/cabsolute(phase), phase);
 
@@ -107,8 +112,10 @@ int main(int argc, char *argv[])
 
 	memcpy(&tx_bits_log[COHPSK_BITS_PER_FRAME*f], tx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
 	for(r=0; r<NSYMROWPILOT; r++, log_r++) {
-            for(c=0; c<PILOTS_NC; c++) 
+            for(c=0; c<PILOTS_NC; c++) {
 		tx_symb_log[log_r][c] = tx_symb[r][c]; 
+		ch_symb_log[log_r][c] = ch_symb[r][c]; 
+            }
         }
 
 	for(r=0; r<NSYMROW; r++, log_data_r++) {
@@ -121,6 +128,7 @@ int main(int argc, char *argv[])
 	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
 	assert(log_r <= NSYMROWPILOT*FRAMES);
+	assert(noise_r <= NSYMROWPILOT*FRAMES);
 	assert(log_data_r <= NSYMROW*FRAMES);
     }
 
@@ -134,6 +142,7 @@ int main(int argc, char *argv[])
     fprintf(fout, "# Created by tcohpsk.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symb_log_c", (COMP*)tx_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "ch_symb_log_c", (COMP*)ch_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
     octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
     octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
