@@ -13,12 +13,14 @@
 %     [ ] feedback to correct out freq offset est
 %     [ ] fading channel
 
-rand('state',1); 
-randn('state',1);
 graphics_toolkit ("gnuplot");
 
 cohpsk;
+fdmdv;
 autotest;
+
+rand('state',1); 
+randn('state',1);
 
 n = 2000;
 frames = 35;
@@ -35,7 +37,7 @@ sim_in = standard_init();
 sim_in.framesize        = 160;
 sim_in.ldpc_code        = 0;
 sim_in.ldpc_code_rate   = 1;
-sim_in.Nc               = 4;
+sim_in.Nc = Nc          = 4;
 sim_in.Rs               = 50;
 sim_in.Ns               = 4;
 sim_in.Np               = 2;
@@ -57,6 +59,8 @@ rx_symb_log = [];
 rx_bits_log = [];
 noise_log = [];
 nerr_log = [];
+tx_baseband_log = [];
+tx_fdm_log = [];
 
 phase = 1;
 freq = exp(j*2*pi*foff/sim_in.Rs);
@@ -64,6 +68,20 @@ freq = exp(j*2*pi*foff/sim_in.Rs);
 ch_symb = zeros(sim_in.Nsymbrowpilot, sim_in.Nc);
 
 Nerrs = Tbits = 0;
+
+fdmdv.Fs = 8000;
+fdmdv.Nc = Nc-1;
+fdmdv.M = Fs/Rs;
+fdmdv.tx_filter_memory = zeros(fdmdv.Nc+1, Nfilter);
+fdmdv.Nfilter =  Nfilter;
+fdmdv.gt_alpha5_root = gt_alpha5_root;
+fdmdv.Fsep = 75;
+fdmdv.phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
+freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
+fdmdv.freq = exp(j*2*pi*freq_hz/Fs);
+Fcentre = 1500;
+fdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
+fdmdv.fbb_phase_tx = 1;
 
 for i=1:frames
   tx_bits = tx_bits_coh(ptx_bits_coh:ptx_bits_coh+framesize-1);
@@ -76,6 +94,13 @@ for i=1:frames
 
   [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
   tx_symb_log = [tx_symb_log; tx_symb];
+
+  for r=1:sim_in.Nsymbrowpilot
+    [tx_baseband fdmdv] = tx_filter(fdmdv, rot90(tx_symb(r,:),1));
+    tx_baseband_log = [tx_baseband_log tx_baseband];
+    [tx_fdm fdmdv] = fdm_upconvert(fdmdv, tx_baseband);
+    tx_fdm_log = [tx_fdm_log tx_fdm];
+  end
 
   noise = sqrt(variance*0.5)*(randn(sim_in.Nsymbrowpilot,sim_in.Nc) + j*randn(sim_in.Nsymbrowpilot,sim_in.Nc));
   noise_log = [noise_log; noise];

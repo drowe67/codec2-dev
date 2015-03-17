@@ -8,7 +8,7 @@
 % Version 2
 %
 
-% reqd to mak sure we get same random bits at mod and demod
+% reqd to make sure we get same random bits at mod and demod
 
 rand('state',1); 
 randn('state',1);
@@ -165,21 +165,21 @@ function tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits)
 endfunction
 
 
-% Given Nc*Nb bits construct M samples (1 symbol) of Nc filtered
+% Given Nc symbols construct M samples (1 symbol) of Nc filtered
 % symbols streams
 
-function tx_baseband = tx_filter(tx_symbols)
-  global Nc;
-  global M;
-  global tx_filter_memory;
-  global Nfilter;
-  global gt_alpha5_root;
+function [tx_baseband fdmdv] = tx_filter(fdmdv, tx_symbols)
+  Nc = fdmdv.Nc;
+  M = fdmdv.M;
+  tx_filter_memory = fdmdv.tx_filter_memory;
+  Nfilter = fdmdv.Nfilter;
+  gt_alpha5_root = fdmdv.gt_alpha5_root;
 
   tx_baseband = zeros(Nc+1,M);
 
   % tx filter each symbol, generate M filtered output samples for each symbol.
   % Efficient polyphase filter techniques used as tx_filter_memory is sparse
-
+  
   tx_filter_memory(:,Nfilter) = sqrt(2)/2*tx_symbols;
 
   for i=1:M
@@ -188,6 +188,7 @@ function tx_baseband = tx_filter(tx_symbols)
   tx_filter_memory(:,1:Nfilter-M) = tx_filter_memory(:,M+1:Nfilter);
   tx_filter_memory(:,Nfilter-M+1:Nfilter) = zeros(Nc+1,M);
 
+  fdmdv.tx_filter_memory = tx_filter_memory;
 endfunction
 
 
@@ -195,19 +196,19 @@ endfunction
 % stream.  Returns complex signal so we can apply frequency offsets
 % easily.
 
-function tx_fdm = fdm_upconvert(tx_filt)
-  global Fs;
-  global M;
-  global Nc;
-  global Fsep;
-  global phase_tx;
-  global freq;
-  global fbb_rect;
-  global fbb_phase_tx;
+function [tx_fdm fdmdv] = fdm_upconvert(fdmdv, tx_filt)
+  Fs = fdmdv.Fs;
+  M = fdmdv.M;
+  Nc = fdmdv.Nc;
+  Fsep = fdmdv.Fsep;
+  phase_tx = fdmdv.phase_tx;
+  freq = fdmdv.freq;
+  fbb_rect = fdmdv.fbb_rect;
+  fbb_phase_tx = fdmdv.fbb_phase_tx;
 
   tx_fdm = zeros(1,M);
 
-  % Nc/2 tones below zero
+  % Nc+1 tones
   
   for c=1:Nc+1
       for i=1:M
@@ -239,6 +240,8 @@ function tx_fdm = fdm_upconvert(tx_filt)
   mag = abs(fbb_phase_tx);
   fbb_phase_tx /= mag;
 
+  fdmdv.fbb_phase_tx = fbb_phase_tx;
+  fdmdv.phase_tx = phase_tx;
 endfunction
 
 
