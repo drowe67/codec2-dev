@@ -16,18 +16,41 @@ Quickstart
 NOTE: Use the "codec2" or "codec2-dev" depending on which repository
       you are working with
 
+NOTE: You may not have the necessary speex libraries installed. Some
+      distributions may have packages available 
+      i.e. sudo apt-get install speex-*
+      alternatively, visit http://www.speex.org and follow the instructions
+
 1/ Listen to Codec 2:
+
    $ cd codec2
    $ mkdir build_linux
+   $ cd build_linux
    $ cmake ..
    $ make
    $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
-   $ play ../raw/hts1a.raw hts1a_c2.raw
+   $ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
+   $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
 
-2/ Compress and Decompress a file:
+2/ Compress, Decompress and then play a file:
+
+   using 2400 bps bit rate encoding
 
    $ ./src/c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
-   $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2.raw 
+   $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw 
+
+   which can be played with
+
+   $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
+
+   using 450 bps bit rate encoding
+
+   $ ./src/c2enc 450 ../raw/hts1a.raw hts1a_c2.bit
+   $ ./src/c2dec 450 hts1a_c2.bit hts1a_c2_450.raw
+
+   which can be played with
+
+   $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_450.raw
 
 3/ Same thing with pipes:
 
