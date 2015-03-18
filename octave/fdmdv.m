@@ -247,54 +247,35 @@ endfunction
 
 % Frequency shift each modem carrier down to Nc+1 baseband signals
 
-function rx_baseband = fdm_downconvert(rx_fdm, nin)
-  global Fs;
-  global M;
-  global Nc;
-  global Fsep;
-  global phase_rx;
-  global freq;
+function [rx_baseband fdmdv] = fdm_downconvert(fdmdv, rx_fdm, nin)
+  Fs = fdmdv.Fs;
+  M = fdmdv.M;
+  Nc = fdmdv.Nc;
+  phase_rx = fdmdv.phase_rx;
+  freq = fdmdv.freq;
 
-  rx_baseband = zeros(1,nin);
-
-  % Nc/2 tones below centre freq
+  rx_baseband = zeros(Nc+1,nin);
   
-  for c=1:Nc/2
+  for c=1:Nc+1
       for i=1:nin
         phase_rx(c) = phase_rx(c) * freq(c);
 	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
       end
   end
 
-  % Nc/2 tones above centre freq  
-
-  for c=Nc/2+1:Nc
-      for i=1:nin
-        phase_rx(c) = phase_rx(c) * freq(c);
-	rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
-      end
-  end
-
-  % Pilot
-
-  c = Nc+1;
-  for i=1:nin
-    phase_rx(c) = phase_rx(c) * freq(c);
-    rx_baseband(c,i) = rx_fdm(i)*phase_rx(c)';
-  end
-
+  fdmdv.phase_rx = phase_rx;
 endfunction
 
 
 % Receive filter each baseband signal at oversample rate P
 
-function rx_filt = rx_filter(rx_baseband, nin)
-  global Nc;
-  global M;
-  global P;
-  global rx_filter_memory;
-  global Nfilter;
-  global gt_alpha5_root;
+function [rx_filt fdmdv] = rx_filter(fdmdv, rx_baseband, nin)
+  Nc = fdmdv.Nc;
+  M = fdmdv.M;
+  P = fdmdv.P;
+  rx_filter_memory = fdmdv.rx_filter_memory;
+  Nfilter = fdmdv.Nfilter;
+  gt_alpha5_root = fdmdv.gt_alpha5_root;
 
   rx_filt = zeros(Nc+1,nin*P/M);
 
@@ -309,16 +290,18 @@ function rx_filt = rx_filter(rx_baseband, nin)
     rx_filter_memory(:,1:Nfilter-N) = rx_filter_memory(:,1+N:Nfilter);
     j+=1;
   end
+
+  fdmdv.rx_filter_memory = rx_filter_memory;
 endfunction
 
 
 % LP filter +/- 1000 Hz, allows us to perfrom rx filtering at a lower rate saving CPU
 
-function rx_fdm_filter = rxdec_filter(rx_fdm, nin)
-  global M;
-  global Nrxdec;
-  global rxdec_coeff;
-  global rxdec_lpf_mem;
+function [rx_fdm_filter fdmdv] = rxdec_filter(fdmdv, rx_fdm, nin)
+  M = fdmdv.M;
+  Nrxdec = fdmdv.Nrxdec;
+  rxdec_coeff = fdmdv.rxdec_coeff;
+  rxdec_lpf_mem = fdmdv.rxdec_lpf_mem;
  
   rxdec_lpf_mem(1:Nrxdec-1+M-nin) = rxdec_lpf_mem(nin+1:Nrxdec-1+M);
   rxdec_lpf_mem(Nrxdec-1+M-nin+1:Nrxdec-1+M) = rx_fdm(1:nin);
@@ -327,6 +310,8 @@ function rx_fdm_filter = rxdec_filter(rx_fdm, nin)
   for i=1:nin
     rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec_coeff;
   end
+
+  fdmdv.rxdec_lpf_mem = rxdec_lpf_mem;
 end
 
 
@@ -334,17 +319,17 @@ end
 % TODO: Decimate mem update and downconversion, this will save some more CPU and memory
 %       note phase would have to advance 4 times as fast
 
-function rx_filt = down_convert_and_rx_filter(rx_fdm, nin, dec_rate)
-  global Nc;
-  global M;
-  global P;
-  global rx_fdm_mem;
-  global phase_rx;
-  global freq;
-  global freq_pol;
-  global Nfilter;
-  global gt_alpha5_root;
-  global Q;
+function [rx_filt fdmdv] = down_convert_and_rx_filter(fdmdv, rx_fdm, nin, dec_rate)
+  Nc = fdmdv.Nc;
+  M = fdmdv.M;
+  P = fdmdv.P;
+  rx_fdm_mem = fdmdv.rx_fdm_mem;
+  phase_rx = fdmdv.phase_rx;
+  freq = fdmdv.freq;
+  freq_pol = fdmdv.freq_pol;
+  Nfilter = fdmdv.Nfilter;
+  gt_alpha5_root = fdmdv.gt_alpha5_root;
+  Q = fdmdv.Q;
 
   % update memory of rx_fdm
 
@@ -389,6 +374,9 @@ function rx_filt = down_convert_and_rx_filter(rx_fdm, nin, dec_rate)
        k+=1;
      end
   end
+
+  fdmdv.phase_rx   = phase_rx;
+  fdmdv.rx_fdm_mem = rx_fdm_mem;
 endfunction
 
 
@@ -479,15 +467,14 @@ endfunction
 
 % Estimate optimum timing offset, re-filter receive symbols
 
-function [rx_symbols rx_timing_M env] = rx_est_timing(rx_filt, nin)
-  global M;
-  global Nt;
-  global Nc;
-  global rx_filter_mem_timing;
-  global P;
-  global Nfilter;
-  global Nfiltertiming;
-  global gt_alpha5_root;
+function [rx_symbols rx_timing_M env fdmdv] = rx_est_timing(fdmdv, rx_filt, nin)
+  M = fdmdv.M;
+  Nt = fdmdv.Nt;
+  Nc = fdmdv.Nc;
+  rx_filter_mem_timing = fdmdv.rx_filter_mem_timing;
+  P = fdmdv.P;
+  Nfilter = fdmdv.Nfilter;
+  Nfiltertiming = fdmdv.Nfiltertiming;
 
   % nin  adjust 
   % --------------------------------
@@ -537,6 +524,8 @@ function [rx_symbols rx_timing_M env] = rx_est_timing(rx_filt, nin)
   % rx_symbols = rx_filter_mem_timing(:,high_sample+1);
 
   rx_timing_M = norm_rx_timing*M;
+
+  fdmdv.rx_filter_mem_timing = rx_filter_mem_timing;
 endfunction
 
 
