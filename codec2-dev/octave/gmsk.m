@@ -837,7 +837,7 @@ function gmsk_rx(rx_file_name, err_file_name)
   Rs = 1200;
   framesize = 480;
   npreamble = 480;
-  fc        = 1900;
+  fc        = 1500;
 
   gmsk_states.npreamble = npreamble;
   gmsk_states.verbose = 1;
@@ -1013,5 +1013,6 @@ endfunction
 %gmsk_rx("ssb-ber5.wav")
 %gmsk_rx("ssb25db.wav")
 %gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
-gmsk_rx("~/Desktop/test_gmsk_28BER.raw")
+%gmsk_rx("~/Desktop/test_gmsk_28BER.raw")
+gmsk_rx("~/Desktop/gmsk_rec1.wav")
 
