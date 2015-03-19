@@ -64,7 +64,7 @@ function check(a, b, test_name, tol)
     printf("OK\n");
     passes++;
   else
-    printf("FAIL\n");
+    printf("FAIL (%f)\n",e);
     fails++;
   end
 endfunction
