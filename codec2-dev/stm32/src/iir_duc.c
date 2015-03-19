@@ -79,10 +79,10 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
     }
 }
 
-#define F8C80R_LEN 30                                     //Number of taps in the 8C80R filters
+#define F8C80R_LEN 42                                     //Number of taps in the 8C80R filters
 #define F8C80R_MUL 4096
-static int int1r,int2r,int3r,int4r,cmb1r,cmb2r,cmb3r,cmb4r; //States for re combs and integrators
-static int int1i,int2i,int3i,int4i,cmb1i,cmb2i,cmb3i,cmb4i; //States for im combs and integrators
+static int int1r,int2r,int3r,int4r,int5r,cmb1r,cmb2r,cmb3r,cmb4r,cmb5r; //States for re combs and integrators
+static int int1i,int2i,int3i,int4i,int5i,cmb1i,cmb2i,cmb3i,cmb4i,cmb5i; //States for im combs and integrators
 static int ptr_8c80r;                                       //circular buffer ptr fir_8c80r_re
 static int w8c80r = 0;                                      //Omega for upconversion
 
@@ -135,28 +135,32 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             cmbrr = cmbr - cmb2r; cmb2r = cmbr;   //Comb 2 real
             cmbr = cmbrr - cmb3r; cmb3r = cmbrr;  //Comb 3 real
             cmbrr = cmbr - cmb4r; cmb4r = cmbr;   //Comb 4 real
+	    cmbr = cmbrr - cmb5r; cmb5r = cmbrr;
 
             cmbi =  imin - cmb1i; cmb1i = imin;   //Comb 1 im
             cmbii = cmbi - cmb2i; cmb2i = cmbi;   //Comb 2 im
             cmbi = cmbii - cmb3i; cmb3i = cmbii;  //Comb 3 im
             cmbii = cmbi - cmb4i; cmb4i = cmbi;   //Comb 4 im
+            cmbi = cmbii - cmb5i; cmb5i = cmbii;   //Comb 4 im
             //Do first cycle of integration
-            int1r = cmbrr + int1r;                //Integrator stage 1 re
+            int1r = cmbr + int1r;                //Integrator stage 1 re
             int2r = int1r + int2r;                //Integrator stage 2 re
             int3r = int2r + int3r;                //Integrator stage 3 re
             int4r = int3r + int4r;                //Integrator stage 4 re
+            int5i = int4i + int5i; 
 
-            int1i = cmbii + int1i;                //Integrator stage 1 im
+            int1i = cmbi + int1i;                //Integrator stage 1 im
             int2i = int1i + int2i;                //Integrator stage 2 im
             int3i = int2i + int3i;                //Integrator stage 3 im
             int4i = int3i + int4i;                //Integrator stage 4 im
+            int5r = int4r + int5r; 
             //Convert this complex into real and cancel out the gain from CIC
             //This should probably spit out integers instead of going back to float
             switch(w8c80r&0x3){                   //Do comp->real conversion by hand
-                case 0:ret=(float)(-int4r>>8);break;
-                case 1:ret=(float)(int4i>>8);break;
-                case 2:ret=(float)(int4r>>8);break;
-                case 3:ret=(float)(-int4i>>8);break;
+                case 0:ret=(float)(-int5i>>7);break;
+                case 1:ret=(float)(int5r>>7);break;
+                case 2:ret=(float)(int5i>>7);break;
+                case 3:ret=(float)(-int5r>>7);break;
             }
             real_80[outidx] = ret/8192;   //Divide by 4096 to cancel out gain
             outidx++;
@@ -166,14 +170,16 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
                 int2r = int1r + int2r;            //Integrator stage 2 re
                 int3r = int2r + int3r;            //Integrator stage 3 re
                 int4r = int3r + int4r;            //Integrator stage 4 re
+		int5r = int4r + int5r; 
                 int2i = int1i + int2i;            //Integrator stage 2 im
                 int3i = int2i + int3i;            //Integrator stage 3 im
                 int4i = int3i + int4i;            //Integrator stage 4 im
+	        int5i = int4i + int5i; 
                 switch(w8c80r&0x3){               //Do comp->real conversion by hand
-                    case 0:ret=(float)(-int4r>>8);break;
-                    case 1:ret=(float)(int4i>>8);break;
-                    case 2:ret=(float)(int4r>>8);break;
-                    case 3:ret=(float)(-int4i>>8);break;
+                    case 0:ret=(float)(-int5i>>7);break;
+                    case 1:ret=(float)(int5r>>7);break;
+                    case 2:ret=(float)(int5i>>7);break;
+                    case 3:ret=(float)(-int5r>>7);break;
                 }
                 real_80[outidx] = ret/8192;  //Cancel out gain from all that.
                 outidx++;
@@ -221,11 +227,11 @@ int main(void) {
 
     for(i=0;i<NIN/10;i++){
         //Tone at Fs/4 +/- 3K
-	w = 2.*M_PI*2500./(float)(FS/10);
-        //in[i].real=cos((float)i*w);
+	w = 2.*M_PI*1000./(float)(FS/10);
+        in[i].real=cos((float)i*w);
         //in[i].imag=.1*sin((float)i*w);
         //in[i].real=0;
-        in[i].real=1;
+        //in[i].real=1;
         in[i].imag=0;
     }
 
@@ -266,8 +272,8 @@ int main(void) {
 
 //Coeffs for fixed point fir LPF and CIC precompensation
 static int fir_8c80r_cic_i[] = {
-1,-2,18,-128,135,309,-419,-926,1177,2284,-2790,
--5691,6535,24425,24425,6535,-5691,-2790,2284,1177,-926,-419,};
+0,0,-2,16,-16,-20,26,37,-47,-68,83,116,-139,-187,219,294,-339,-461,528,766,
+-882,-1540,1730,6117,6117,1730,-1540,-882,766,528,-461,-339,294,219,-187,-139,116,83,-68,-47,37,26};
 
 
 

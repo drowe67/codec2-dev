@@ -15,7 +15,7 @@ fi = 2E6/M;                     %freq of first interpolation
 fb = 7E5;                       %Bandpass frequency
 fc1 = fi/4;                     %Frequency of initial upconversion
 ciccb=[-0.029626    0.252638   -2.304683   16.332166   -2.304683    0.252638   -0.029626]; %CIC Compensation FIR
-pcicfb = fir1(21,.5); %Interpolation LPF Fir
+pcicfb = fir1(41,.5); %Interpolation LPF Fir
 s1fir = filter(ciccb,1,pcicfb); %Combine compensation and LPF
 %s1fir = [-0.00000215, -0.00008715, 0.00073915, -0.00674415, 0.05618415, 0.01629015, -0.19074815, -0.04231615, 0.53620515, 0.09933915, -1.32978715, -0.38797815, 3.97887715, 6.70888315, 3.97887715, -0.38797815, -1.32978715, 0.09933915, 0.53620515, -0.04231615, -0.19074815, ];
 
@@ -121,14 +121,14 @@ scoimag=single(fdnext/(2**20));
 ssout = scoreal.*cos(pi*.5*(1:length(scoreal))) + scoimag.*sin(pi*.5*(1:length(scoimag)));
 
 
-t = (0:(fs-1));
+t = (0:(fi-1));
 
 beta1 = 0.999;
 b1x = -2*sqrt(beta1)*cos(2*pi*(fb/fd))
 beta2 = beta1 - (1-beta1)*M;
 
 sducin = ssout;
-
+%sducin = cos(pi*.5*t);
 
 sduceq = filter([1 0 beta2],1,sducin);  %pre interpolation notch filter to equalize bandpass after interpolation
 sducinterp = zeros(1,length(sduceq)*M);    %interpolate by zero-stuffing
