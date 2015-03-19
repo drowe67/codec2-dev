@@ -245,15 +245,15 @@ check(rx_fdm_log, rx_fdm_log_c, 'rx_fdm');
 check(rx_baseband_log, rx_baseband_log_c, 'rx_baseband',0.01);
 check(rx_filt_log, rx_filt_log_c, 'rx_filt');
 check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
-check(rx_amp_log, rx_amp_log_c, 'rx_amp_log');
+check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
 check(rx_phi_log, rx_phi_log_c, 'rx_phi_log');
-check(rx_symb_log, rx_symb_log_c, 'rx_symb');
+check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
 
 % Determine bit error rate
 
 sz = length(tx_bits_log_c);
-Nerrs_c = sum(xor(tx_bits_log_c(framesize+1:sz-framesize), rx_bits_log_c(2*framesize+1:sz)));
+Nerrs_c = sum(xor(tx_bits_log_c(framesize+1:sz-2*framesize), rx_bits_log_c(3*framesize+1:sz)));
 Tbits_c = sz - 2*framesize;
 ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;

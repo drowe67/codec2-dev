@@ -48,6 +48,8 @@
 #define RS     50
 #define FOFF   1
 
+extern float pilots_coh[][PILOTS_NC];
+
 int main(int argc, char *argv[])
 {
     struct COHPSK *coh;
@@ -56,6 +58,7 @@ int main(int argc, char *argv[])
     COMP           tx_fdm[M*NSYMROWPILOT];
     COMP           rx_fdm[M*NSYMROWPILOT];
     COMP           ch_symb[NSYMROWPILOT][PILOTS_NC];
+    COMP           ct_symb_buf[2*NSYMROWPILOT][COHPSK_NC];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
@@ -88,6 +91,10 @@ int main(int argc, char *argv[])
     COMP           rx_onesym[PILOTS_NC];
     int            rx_baseband_log_col_index = 0;
     COMP           rx_baseband_log[PILOTS_NC][(M+M/P)*NSYMROWPILOT*FRAMES];
+    
+    int            t,ct,p;
+    float          max_corr;
+    COMP           corr;
 
     coh = cohpsk_create();
     assert(coh != NULL);
@@ -177,8 +184,6 @@ int main(int argc, char *argv[])
 	  }
 	  rx_baseband_log_col_index += nin;        
 
-         //if (f == 3)
-          //    exit(0);
  	  for(c=0; c<PILOTS_NC; c++) {       
             for(i=0; i<P; i++) {
               rx_filt_log[c][rx_filt_log_col_index + i] = rx_filt[c][i]; 
@@ -187,8 +192,36 @@ int main(int argc, char *argv[])
 	  rx_filt_log_col_index += P;        
 
         }
-        qpsk_symbols_to_bits(coh, rx_bits, ch_symb);
 
+        /* coarse frame sync */
+
+        for(r=0; r<NSYMROWPILOT; r++)
+            for(c=0; c<PILOTS_NC; c++) {
+                ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
+                ct_symb_buf[r+NSYMROWPILOT][c] = ch_symb[r][c];
+            }
+        
+        max_corr = 0;
+        for(t=0; t<NSYMROWPILOT; t++) {
+            
+            corr.real = corr.imag = 0.0;
+            for(p=0; p<NPILOTSFRAME; p++) {
+                for(c=0; c<PILOTS_NC; c++) {
+                    corr = cadd(corr,fcmult(pilots_coh[p][c], ct_symb_buf[t+p*(NS+1)][c]));
+                }
+            }
+        
+            if (cabsolute(corr) > max_corr) {
+                max_corr = cabsolute(corr);
+                ct = t;
+            }
+        }
+        //printf("max_corr: %f ct: %d\n", max_corr, ct);
+
+        /* Coherent phase estimation and correction */
+
+        qpsk_symbols_to_bits(coh, rx_bits, ct_symb_buf + ct);
+        
 	/* --------------------------------------------------------*\
 	                       Log each vector 
 	\*---------------------------------------------------------*/
