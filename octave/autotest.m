@@ -44,9 +44,13 @@ function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
 endfunction
 
 
-function check(a, b, test_name)
+function check(a, b, test_name, tol)
   global passes;
   global fails;
+
+  if nargin == 3
+    tol = 1E-3;
+  end
 
   [m n] = size(a);
   printf("%s", test_name);
@@ -55,8 +59,8 @@ function check(a, b, test_name)
   end
   printf(": ");  
   
-  e = sum(abs(a - b))/n;
-  if e < 1E-3
+  e = sum(sum(abs(a - b))/n);
+  if e < tol
     printf("OK\n");
     passes++;
   else

@@ -104,10 +104,11 @@ fdmdv.rx_filter_memory = zeros(fdmdv.Nc+1, fdmdv.Nfilter);
 rx_filt_log = [];
 rx_fdm_filter_log = [];
 rx_baseband_log = [];
+rx_fdm_log = [];
 
 fbb_phase_rx = 1;
 
-% frame of just pilots ofr coarse sync
+% frame of just pilots for coarse sync
 
 tx_bits = zeros(1,framesize);
 [tx_symb_pilot tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
@@ -117,6 +118,7 @@ end
 
 ct_symb_buf = zeros(2*sim_in.Nsymbrowpilot, sim_in.Nc);
 
+prev_tx_bits = [];
 % main loop --------------------------------------------------------------------
 
 for i=1:frames
@@ -142,6 +144,10 @@ for i=1:frames
   end
   tx_fdm_log = [tx_fdm_log tx_fdm_frame];
 
+  %
+  % Demod ----------------------------------------------------------------------
+  %
+
   nin = M;
 
   % shift frame down to complex baseband
@@ -153,6 +159,7 @@ for i=1:frames
   end
   mag = abs(fbb_phase_rx);
   fbb_phase_rx /= mag;
+  rx_fdm_log = [rx_fdm_log rx_fdm_frame_bb];
 
   ch_symb = zeros(sim_in.Nsymbrowpilot, Nc);
   for r=1:sim_in.Nsymbrowpilot
@@ -213,21 +220,31 @@ end
   end
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
+
 end
 
 stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
 stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
 stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
-stem_sig_and_error(3, 211, real(ch_symb_log_c(1:n)), real(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb re', [1 n -1.5 1.5])
-stem_sig_and_error(3, 212, imag(ch_symb_log_c(1:n)), imag(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb im', [1 n -1.5 1.5])
-stem_sig_and_error(4, 211, rx_amp_log_c(1:n), rx_amp_log(1:n) - rx_amp_log_c(1:n), 'Amp Est', [1 n -1.5 1.5])
-stem_sig_and_error(4, 212, rx_phi_log_c(1:n), rx_phi_log(1:n) - rx_phi_log_c(1:n), 'Phase Est', [1 n -4 4])
-stem_sig_and_error(5, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb re', [1 n -1.5 1.5])
-stem_sig_and_error(5, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
-stem_sig_and_error(6, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
+
+stem_sig_and_error(3, 211, real(tx_fdm_log_c(1:n)), real(tx_fdm_log(1:n) - tx_fdm_log_c(1:n)), 'tx fdm re', [1 n -10 10])
+stem_sig_and_error(3, 212, imag(tx_fdm_log_c(1:n)), imag(tx_fdm_log(1:n) - tx_fdm_log_c(1:n)), 'tx fdm im', [1 n -10 10])
+
+stem_sig_and_error(4, 211, real(ch_symb_log_c(1:n)), real(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb re', [1 n -2 2])
+stem_sig_and_error(4, 212, imag(ch_symb_log_c(1:n)), imag(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb im', [1 n -2 2])
+stem_sig_and_error(5, 211, rx_amp_log_c(1:n), rx_amp_log(1:n) - rx_amp_log_c(1:n), 'Amp Est', [1 n -1.5 1.5])
+stem_sig_and_error(5, 212, rx_phi_log_c(1:n), rx_phi_log(1:n) - rx_phi_log_c(1:n), 'Phase Est', [1 n -4 4])
+stem_sig_and_error(6, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb re', [1 n -1.5 1.5])
+stem_sig_and_error(6, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
+stem_sig_and_error(7, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
 
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symb_log, tx_symb_log_c, 'tx_symb');
+check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
+check(rx_fdm_log, rx_fdm_log_c, 'rx_fdm');
+check(rx_baseband_log, rx_baseband_log_c, 'rx_baseband',0.01);
+check(rx_filt_log, rx_filt_log_c, 'rx_filt');
+check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp_log');
 check(rx_phi_log, rx_phi_log_c, 'rx_phi_log');
 check(rx_symb_log, rx_symb_log_c, 'rx_symb');

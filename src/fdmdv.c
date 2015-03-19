@@ -400,8 +400,8 @@ void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_fil
   AUTHOR......: David Rowe			      
   DATE CREATED: 13 August 2014
 
-  Given Nc*NB bits construct M samples (1 symbol) of Nc+1 filtered
-  symbols streams.
+  Given Nc symbols construct M samples (1 symbol) of Nc+1 filtered
+  and upconverted symbols.
 
 \*---------------------------------------------------------------------------*/
 
@@ -878,29 +878,13 @@ void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP 
 
     assert(nin <= (M+M/P));
 
-    /* Nc/2 tones below centre freq */
+    /* downconvert */
   
-    for (c=0; c<Nc/2; c++) 
+    for (c=0; c<Nc+1; c++) 
 	for (i=0; i<nin; i++) {
 	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
 	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
 	}
-
-    /* Nc/2 tones above centre freq */
-
-    for (c=Nc/2; c<Nc; c++) 
-	for (i=0; i<nin; i++) {
-	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
-	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
-	}
-
-    /* centre pilot tone  */
-
-    c = Nc;
-    for (i=0; i<nin; i++) {
-	phase_rx[c] = cmult(phase_rx[c],  freq[c]);
-	rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
-    }
 
     /* normalise digital oscilators as the magnitude can drift over time */
 
