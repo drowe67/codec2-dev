@@ -884,7 +884,7 @@ function gmsk_rx(rx_file_name, err_file_name)
   rx_power_dB = 10*log10(rx_power);
   figure;
   subplot(211)
-  plot(rx_filt(1000:5*Fs));
+  plot(rx_filt(1000:length(rx_filt)));
   title('GMSK Power (narrow filter)');
   subplot(212)
   plot(rx_power_dB);
@@ -923,7 +923,6 @@ function gmsk_rx(rx_file_name, err_file_name)
 
     printf("Estimated S: %3.1f N: %3.1f Nbw: %4.0f Hz SNR: %3.1f CNo: %3.1f EbNo: %3.1f BER theory: %f\n",
            signal, noise, Fs*noise_bw, snr, CNo, EbNo, ber_theory);
-  end
 
   % FM signal is centred on 12 kHz and 16 kHz wide so lets also work out noise there
 
@@ -953,6 +952,7 @@ function gmsk_rx(rx_file_name, err_file_name)
   grid("minor")
   legend("boxoff");
   title('FM C/No');
+  end
 
   % spectrum of a chunk of GMSK signal just after preamble
 
@@ -1014,5 +1014,5 @@ endfunction
 %gmsk_rx("ssb25db.wav")
 %gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
 %gmsk_rx("~/Desktop/test_gmsk_28BER.raw")
-gmsk_rx("~/Desktop/gmsk_rec1.wav")
+gmsk_rx("~/Desktop/gmsk_rec_reverse.wav")
 

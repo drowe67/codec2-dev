@@ -263,6 +263,11 @@ function [rx_baseband fdmdv] = fdm_downconvert(fdmdv, rx_fdm, nin)
       end
   end
 
+  for c=1:Nc+1
+    mag = abs(phase_rx(c));
+    phase_rx(c) /= mag;
+  end
+
   fdmdv.phase_rx = phase_rx;
 endfunction
 

@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
     fprintf(fout, "# Created by tfdmdv.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symbols_log_c", tx_symbols_log, 1, (FDMDV_NC+1)*FRAMES, (FDMDV_NC+1)*FRAMES);  
-octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);  
+    octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);  
     octave_save_complex(fout, "pilot_lut_c", (COMP*)fdmdv->pilot_lut, 1, NPILOT_LUT, NPILOT_LUT);  
     octave_save_complex(fout, "pilot_baseband1_log_c", pilot_baseband1_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
     octave_save_complex(fout, "pilot_baseband2_log_c", pilot_baseband2_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
