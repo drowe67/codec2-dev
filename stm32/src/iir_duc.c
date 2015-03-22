@@ -8,7 +8,7 @@
 
   Unit testing:
   
-    ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_duc.c -o iir_duc -lm -Wall
+    ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_duc.c -o iir_duc -lm -Wall -I../src/
     ~/codec2-dev/stm32$ ./iir_duc
 
 \*---------------------------------------------------------------------------*/
@@ -75,6 +75,63 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
             n_2 = n_1;
             n_1 = n;
             dac_out[k]=(unsigned short)((n)+DAC_SCALE_2);
+        }
+    }
+}
+
+#define F48C80R_LEN 25
+#define F48C80R_MUL 4096
+static int js3 = 0;                           //Index for downsampling
+static int js5 = 0;                           //Index for upsampling
+static int w48c80r;                           //Phase for real to comp conversion
+static int ptr_48c80r;                        //Pointer in fir delay lines
+static int fir_48c80r[];                      //Fir filter coeffs
+static int fir_48c80r_re[F48C80R_LEN*2];      //Real delay line. Can probably be made much smaller.
+static int fir_48c80r_im[F48C80R_LEN*2];      //Imag delay line. Can probably be made much smaller.
+
+void upconv_48c_80r(COMP comp_48[],float real_80[],int count){
+    int i,j,k;         //Loop counters
+    float ret;         //Temp vars
+    int nr,ni;         //Temp vars
+    int inidx = 0;     //Input index
+    int outidx = 0;    //Output index
+    for(i=0;i<count;i++){ //Iterate through sample blocks
+        for(j=0;j<DUC_N*3;j++){ //Iterate through high rate intermediate 
+            if(js5==0){              //Upsample by 5
+                nr=(int)(comp_48[inidx].real*F48C80R_MUL);
+                ni=(int)(comp_48[inidx].imag*F48C80R_MUL);
+                fir_48c80r_re[ptr_48c80r] = nr;
+                fir_48c80r_im[ptr_48c80r] = ni;
+                fir_48c80r_re[ptr_48c80r+F48C80R_LEN] = nr;
+                fir_48c80r_im[ptr_48c80r+F48C80R_LEN] = ni;
+                inidx++;
+                js5=5;
+            }
+            if(js3==0){               //Downsample by 3
+                nr=0;ni=0;
+                if(w48c80r&0x1){      //Only compute FIR for the line we need
+                    for(k=js5;k<F48C80R_LEN;k+=5) //Skip zero-stuffed samples
+                        nr+=(fir_48c80r[k]*fir_48c80r_re[ptr_48c80r+k]);
+                }else{
+                    for(k=js5;k<F48C80R_LEN;k+=5)
+                        ni+=(fir_48c80r[k]*fir_48c80r_im[ptr_48c80r+k]); 
+                }      
+                switch(w48c80r&0x3){ //Do comp->real conversion by hand
+                    case 0:ret=(float)(-ni>>11);break;
+                    case 1:ret=(float)(nr>>11);break;
+                    case 2:ret=(float)(ni>>11);break;
+                    case 3:ret=(float)(-nr>>11);break;
+                }
+                real_80[outidx]=ret/8192; //Scale back result; should probably just return int
+                outidx++;
+                js3=3;
+            }
+            w48c80r++;
+            ptr_48c80r++;
+            if(ptr_48c80r>=F48C80R_LEN)
+                ptr_48c80r=0;
+            js3--;
+            js5--;
         }
     }
 }
@@ -215,7 +272,7 @@ void synth_line(float us[], float f, float amp, int n) {
     }
 }
 
-COMP       in[NIN/10];
+COMP       in[48000];
 float 	   s[NIN];
 float      fout[NIN];
 unsigned short todac[NOUT];
@@ -225,7 +282,7 @@ int main(void) {
     FILE          *f;
     int            i;
 
-    for(i=0;i<NIN/10;i++){
+    for(i=0;i<48000;i++){
         //Tone at Fs/4 +/- 3K
 	w = 2.*M_PI*1000./(float)(FS/10);
         in[i].real=cos((float)i*w);
@@ -240,7 +297,7 @@ int main(void) {
     in[0].real=0.70710678118;
     
     //interpolate from 8k comp to 80k real
-    upconv_8c_80r(in,s,NOUT_BUFS);
+    upconv_48c_80r(in,s,NOUT_BUFS);
     for(i=0;i<NOUT_BUFS;i++)
         iir_upconv(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
     
@@ -275,6 +332,7 @@ static int fir_8c80r_cic_i[] = {
 0,0,-2,16,-16,-20,26,37,-47,-68,83,116,-139,-187,219,294,-339,-461,528,766,
 -882,-1540,1730,6117,6117,1730,-1540,-882,766,528,-461,-339,294,219,-187,-139,116,83,-68,-47,37,26};
 
-
+static int fir_48c80r[] = {
+-21, -41, -74, -109, -115, -42, 153, 493, 958, 1483, 1970, 2316, 2441, 2316, 1970, 1483, 958, 493, 153, -42, -115, -109, -74, -41, -21,};
 
 
