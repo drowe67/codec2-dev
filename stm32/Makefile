@@ -30,9 +30,9 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.4.0
+PERIPHLIBVER	= V1.5.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
-PERIPHLIBDIR	= $(PERIPHLIBNAME)_$(PERIPHLIBVER)
+PERIPHLIBDIR	= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
 STM32F4LIB	= $(PERIPHLIBDIR)/Libraries/STM32F4xx_StdPeriph_Driver
 STM32F4TEMPLATE	= $(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Templates
@@ -79,7 +79,7 @@ CFLAGS += -I../unittest
 CFLAGS += -Iinc
 
 FFT_TEST_SRCS = \
-$(DSPLIB)/Examples/arm_fft_bin_example/arm_fft_bin_data.c \
+$(DSPLIB)/Examples/arm_fft_bin_example/ARM/arm_fft_bin_data.c \
 fft_test.c \
 src/startup_stm32f4xx.s \
 stm32f4_machdep.c \

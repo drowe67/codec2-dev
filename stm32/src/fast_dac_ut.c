@@ -35,7 +35,7 @@
 #include <stm32f4xx_rcc.h>
 #include "gdb_stdio.h"
 #include "comp.h"
-#include "gmsk_test_dat_m4.h"
+//#include "gmsk_test_dat_m4.h"
 #define SINE_SAMPLES  32
 
 
@@ -91,15 +91,15 @@ int main(void) {
     }
     while (1) {
 	cyc+=DUC_N/10;
-        if(cyc>GMSK_TEST_LEN)
-            cyc=0;
+        //if(cyc>GMSK_TEST_LEN)
+        //    cyc=0;
 	/*if(cyc%10000==0){
                 printf("8c80r takes %d uSecs\n",tup-tstart);
 		printf("iir upconvert takes %d uSecs\n",tend-tup);
 	}*/
         tstart = TIM_GetCounter(TIM2);
 
-        upconv_8c_80r(&gmsk_test_d[cyc],tx_imm,1);
+        //upconv_8c_80r(&gmsk_test_d[cyc],tx_imm,1);
 
 	tup = TIM_GetCounter(TIM2);
 

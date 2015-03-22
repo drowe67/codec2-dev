@@ -138,6 +138,7 @@ sdac = filter(1,[1 b1x beta1],sducinterp); %select wanted signal
 sdac = sdac + median(sdac);  %Center above zero
 sdac = sdac / max(sdac);     %normalize
 sdac = int32(sdac*2000);     %integerize
+sdac = sdac + sdac .^ 5;
 
 figure(1)
 subplot(211)
@@ -161,4 +162,4 @@ subplot(212)
 plot(20*log10(abs(fft(sdac)/fd)))
 grid
 title('After bandpass');
-axis([0 (fd/2) -20 80])
+%axis([0 (fd/2) -20 80])
