@@ -56,7 +56,7 @@ float f4sine[] = {1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0
 1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,};
 
 //Intermediate 80k real before tx
-float tx_imm[DUC_N];
+int tx_imm[DUC_N];
 
 //Complex input to chain
 COMP comp_in[DUC_N/10];
@@ -85,25 +85,25 @@ int main(void) {
     fast_dac_open(2*DAC_DUC_BUF_SZ,2*DAC_BUF_SZ);
     tstart=tend=tup=cyc=0;
     //Initalize complex input with signal at zero
-    for(i=0;i<DUC_N/10;i++){
+    for(i=0;i<DUC_48N;i++){
         comp_in[i].real=1;
         comp_in[i].imag=0;
     }
     while (1) {
-	cyc+=DUC_N/10;
+	cyc++;
         //if(cyc>GMSK_TEST_LEN)
         //    cyc=0;
-	/*if(cyc%10000==0){
-                printf("8c80r takes %d uSecs\n",tup-tstart);
+	if(cyc%10000==0){
+                printf("48c80r takes %d uSecs\n",tup-tstart);
 		printf("iir upconvert takes %d uSecs\n",tend-tup);
-	}*/
+	}
         tstart = TIM_GetCounter(TIM2);
 
-        //upconv_8c_80r(&gmsk_test_d[cyc],tx_imm,1);
+        upconv_48c_80r(comp_in,tx_imm,1);
 
 	tup = TIM_GetCounter(TIM2);
 
-	iir_upconv(tx_imm,outbuf);
+	iir_upconv_fixp(tx_imm,outbuf);
 
 	tend = TIM_GetCounter(TIM2);
 

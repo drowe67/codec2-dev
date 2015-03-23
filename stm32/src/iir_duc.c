@@ -37,7 +37,7 @@
 #define B1MUL			 32441	
 #define B1SMUL			 -38328
 #define B1SHFT			 15				// 10 bits gives us plenty of headroom between 31 bits of int and 14 bits of ADC
-#define B2MUL			 24593				// This actually matches BETA2 exactly with the supplied BETA1
+#define B2MUL			 24593  			// This actually matches BETA2 exactly with the supplied BETA1
 #define B2SHFT			 15				// 10 is also the lowest we can go without beta1=1
 #define BETA2                    (1.0 - (1.0-BETA1)*DUC_M)	// B2MUL/(2**B2SHFT)
 #define IN_SCALE                 2.0                            //Input scaling factor. Should be as large as the amplitude of the incoming samples
@@ -47,7 +47,7 @@
 
 //IIR and FIR filter states. Global for go fast.
 float f_1,f_2,f;
-int   n_1,n_2,n;
+int   n_1,n_2,n,m_1,m_2,m;
 
 /*
    Upconvert and bandpass filter a chunk of spectrum from Fs/M to Fs. We're going for 700khz here.
@@ -79,22 +79,62 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
     }
 }
 
+/*
+   Upconvert and bandpass filter a chunk of spectrum from Fs/M to Fs. We're going for 700khz here.
+   modin needs to be DUC_N long and dac_out needs to be DUC_N*DUC_M long. This 
+*/
+
+void iir_upconv_fixp(int modin[], unsigned short dac_out[]){
+    int i,j,k;
+    int l;
+    k=0;
+    //Iterate through input samples and apply pre-eq FIR, interpolate, and apply BPF IIR
+    for(i=0;i<DUC_N;i++){
+        l = modin[i];//(modin[i]*10)>>4;
+        m = l+((m_2*B2MUL)>>B2SHFT);
+        m_2 = m_1;
+        m_1 = l;                                             //Scale fir output and convert to fixed.
+        //m = (int)((f/(IN_SCALE))*DAC_SCALE_2);                      //Scale fir output and convert to fixed
+        n = m + ((B1SMUL*n_1)>>B1SHFT) - ((B1MUL*n_2)>>B1SHFT);   //Apply one cycle of IIR. This feeds the fir-ed sample into the output filter
+        n_2 = n_1;
+        n_1 = n;
+        dac_out[k]=(unsigned short)(n+DAC_SCALE_2);
+        k++;
+        //now do the rest of the filtering. Because we're zero-stuffing we can neglect the sample from the fir filter.
+        for(j=1;j<DUC_M;j++,k++){
+            n = ((B1SMUL*n_1)>>B1SHFT) - ((B1MUL*n_2)>>B1SHFT);
+            n_2 = n_1;
+            n_1 = n;
+            dac_out[k]=(unsigned short)((n)+DAC_SCALE_2);
+        }
+    }
+}
+
 #define F48C80R_LEN 25
 #define F48C80R_MUL 4096
 static int js3 = 0;                           //Index for downsampling
 static int js5 = 0;                           //Index for upsampling
-static int w48c80r;                           //Phase for real to comp conversion
+static unsigned int w48c80r;                  //Phase for real to comp conversion
 static int ptr_48c80r;                        //Pointer in fir delay lines
 static int fir_48c80r[];                      //Fir filter coeffs
 static int fir_48c80r_re[F48C80R_LEN*2];      //Real delay line. Can probably be made much smaller.
 static int fir_48c80r_im[F48C80R_LEN*2];      //Imag delay line. Can probably be made much smaller.
+static int * sel_48c80r[2] = {fir_48c80r_re,fir_48c80r_im};    //Selector used to optimize out branches in inner loops
 
-void upconv_48c_80r(COMP comp_48[],float real_80[],int count){
+/*
+   Interpolate and shift from 48k complex to 80k real, centered on Fs/4.
+    comp_8 - Input samples - 8Kc complex - must be DUC_48N*count long
+    upout - Output samples - must be DUC_N*count long
+    count - how many chunks of samples must be processed
+*/
+
+void upconv_48c_80r(COMP comp_48[],int real_80[],int count){
     int i,j,k;         //Loop counters
-    float ret;         //Temp vars
+    int ret;         //Temp vars
     int nr,ni;         //Temp vars
     int inidx = 0;     //Input index
-    int outidx = 0;    //Output index
+    int outidx = 0;
+    int ncs_48c80r[3];
     for(i=0;i<count;i++){ //Iterate through sample blocks
         for(j=0;j<DUC_N*3;j++){ //Iterate through high rate intermediate 
             if(js5==0){              //Upsample by 5
@@ -105,31 +145,25 @@ void upconv_48c_80r(COMP comp_48[],float real_80[],int count){
                 fir_48c80r_re[ptr_48c80r+F48C80R_LEN] = nr;
                 fir_48c80r_im[ptr_48c80r+F48C80R_LEN] = ni;
                 inidx++;
-                js5=5;
+                js5=5; 
+                if(ptr_48c80r>=F48C80R_LEN)
+                    ptr_48c80r-=F48C80R_LEN;
             }
             if(js3==0){               //Downsample by 3
-                nr=0;ni=0;
-                if(w48c80r&0x1){      //Only compute FIR for the line we need
-                    for(k=js5;k<F48C80R_LEN;k+=5) //Skip zero-stuffed samples
-                        nr+=(fir_48c80r[k]*fir_48c80r_re[ptr_48c80r+k]);
-                }else{
-                    for(k=js5;k<F48C80R_LEN;k+=5)
-                        ni+=(fir_48c80r[k]*fir_48c80r_im[ptr_48c80r+k]); 
-                }      
-                switch(w48c80r&0x3){ //Do comp->real conversion by hand
-                    case 0:ret=(float)(-ni>>11);break;
-                    case 1:ret=(float)(nr>>11);break;
-                    case 2:ret=(float)(ni>>11);break;
-                    case 3:ret=(float)(-nr>>11);break;
-                }
-                real_80[outidx]=ret/8192; //Scale back result; should probably just return int
+                ni=0;
+                /*This loop computes the FIR filter. It only computes from either the re or the im delay line,
+                    depending on comp->re phase It also skips all 'zeros' in the delay line */
+                for(k=js5;k<F48C80R_LEN;k+=5)
+                    ni+=(fir_48c80r[k]*sel_48c80r[w48c80r&0x1][ptr_48c80r+k]);   
+                ncs_48c80r[0]=ni;
+                ncs_48c80r[2]=-ni;
+                ret=(ncs_48c80r[w48c80r&0x2]);
+                real_80[outidx]=ret>>14; //Scale back result; should probably just return int
                 outidx++;
                 js3=3;
+                w48c80r+=3;
             }
-            w48c80r++;
             ptr_48c80r++;
-            if(ptr_48c80r>=F48C80R_LEN)
-                ptr_48c80r=0;
             js3--;
             js5--;
         }
@@ -273,7 +307,7 @@ void synth_line(float us[], float f, float amp, int n) {
 }
 
 COMP       in[48000];
-float 	   s[NIN];
+int 	   s[NIN];
 float      fout[NIN];
 unsigned short todac[NOUT];
 
@@ -299,11 +333,11 @@ int main(void) {
     //interpolate from 8k comp to 80k real
     upconv_48c_80r(in,s,NOUT_BUFS);
     for(i=0;i<NOUT_BUFS;i++)
-        iir_upconv(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
+        iir_upconv_fixp(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
     
     f = fopen("iir_duc_s.txt", "wt");  assert(f != NULL);
     for(i=0; i<NIN; i++)
-        fprintf(f, "%f\n", s[i]);
+        fprintf(f, "%d\n", s[i]);
     fprintf(f, "\n");
     fclose(f);
 
@@ -317,22 +351,21 @@ int main(void) {
 
 #endif
 
-// constants for a fir filter used to convert 8kc complex to 80kc real
-/*static float fir_8c80r_cic[] = {
-0.000029,-0.000218,0.001966,-0.013414,-0.016592,0.020464,0.029699,-0.037796,
--0.056654,0.070474,0.101466,-0.122748,-0.170446,0.201349,0.275064,-0.319207,
--0.440914,0.506617,0.740998,-0.855843,-1.501563,1.688391,5.983289,5.983289,
-1.688391,-1.501563,-0.855843,0.740998,0.506617,-0.440914,-0.319207,0.275064,
-0.201349,-0.170446,-0.122748,0.101466,0.070474,-0.056654,-0.037796,0.029699,
-
-};*/
 
 //Coeffs for fixed point fir LPF and CIC precompensation
 static int fir_8c80r_cic_i[] = {
-0,0,-2,16,-16,-20,26,37,-47,-68,83,116,-139,-187,219,294,-339,-461,528,766,
--882,-1540,1730,6117,6117,1730,-1540,-882,766,528,-461,-339,294,219,-187,-139,116,83,-68,-47,37,26};
+    0,    0,   -2,   16,  -16,  -20,   26,   37,  -47,  -68,
+   83,  116, -139, -187,  219,  294, -339, -461,  528,  766,
+ -882,-1540, 1730, 6117, 6117, 1730,-1540, -882,  766,  528,
+ -461, -339,  294,  219, -187, -139,  116,   83,  -68,  -47,
+   37,   26,
+};
 
+//Coeffs for fir filter used in 48k comp to 80k real conversion
 static int fir_48c80r[] = {
--21, -41, -74, -109, -115, -42, 153, 493, 958, 1483, 1970, 2316, 2441, 2316, 1970, 1483, 958, 493, 153, -42, -115, -109, -74, -41, -21,};
+  -21,  -41,  -74, -109, -115,  -42,  153,  493,  958, 1483,
+ 1970, 2316, 2441, 2316, 1970, 1483,  958,  493,  153,  -42, 
+ -115, -109,  -74,  -41,  -21,
+};
 
 
