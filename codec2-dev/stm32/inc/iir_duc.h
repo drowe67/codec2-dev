@@ -30,7 +30,8 @@
 #include "comp.h"
 
 void iir_upconv(float modin[],unsigned short dac_out[]);
-void upconv_48c_80r(COMP comp_8[],float real_80[],int count);
+void iir_upconv_fixp(int modin[], unsigned short dac_out[]);
+void upconv_48c_80r(COMP comp_8[],int real_80[],int count);
 void upconv_8c_80r(COMP comp_8[],float real_80[],int count);
 
 #endif

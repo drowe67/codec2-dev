@@ -31,6 +31,7 @@
 
 #define DUC_N 160
 #define DUC_M  25
+#define DUC_48N 96                     //This is 3/5th DUC_N
 #define DAC_DUC_BUF_SZ DUC_M*DUC_N
 #define DAC_BUF_SZ 2048
 
