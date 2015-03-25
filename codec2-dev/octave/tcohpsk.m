@@ -24,10 +24,10 @@ randn('state',1);
 
 n = 2000;
 frames = 35;
-framesize = 160;
-foff = 1;
+framesize = 160
+foff = 50;
 
-EsNodB = 8;
+EsNodB = 18;
 EsNo = 10^(EsNodB/10);
 variance = 1/EsNo;
 
@@ -81,8 +81,12 @@ freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
 fdmdv.freq_pol = 2*pi*freq_hz/Fs;
 fdmdv.freq = exp(j*fdmdv.freq_pol);
 Fcentre = 1500;
+
 fdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
 fdmdv.fbb_phase_tx = 1;
+
+fdmdv.fbb_rect_rx = exp(j*2*pi*(Fcentre)/Fs);
+fbb_phase_rx = 1;
 
 fdmdv.Nrxdec = 31;
 fdmdv.rxdec_coeff = fir1(fdmdv.Nrxdec-1, 0.25)';
@@ -105,9 +109,14 @@ rx_filt_log = [];
 rx_fdm_filter_log = [];
 rx_baseband_log = [];
 rx_fdm_log = [];
+f_err_log = [];
+f_err_fail = 0;
 
-fbb_phase_rx = 1;
+fbb_phase_ch = 1;
+sync = 0;
 
+% set up pilot signals for sync ------------------------------------------------
+ 
 % frame of just pilots for coarse sync
 
 tx_bits = zeros(1,framesize);
@@ -116,9 +125,24 @@ for r=1:(sim_in.Ns+1):sim_in.Nsymbrowpilot
   tx_symb_pilot(r+1:r+sim_in.Ns,:) = zeros(sim_in.Ns, sim_in.Nc);
 end
 
+% filtered frame of just pilots for freq offset and coarse timing
+
+tx_pilot_fdm_frame = [];
+fdmdvp = fdmdv;
+for r=1:sim_in.Nsymbrowpilot
+  tx_onesymb = tx_symb_pilot(r,:);
+  [tx_baseband fdmdvp] = tx_filter(fdmdvp, tx_onesymb);
+  tx_baseband_log = [tx_baseband_log tx_baseband];
+  [tx_fdm fdmdvp] = fdm_upconvert(fdmdvp, tx_baseband);
+  tx_pilot_fdm_frame = [tx_pilot_fdm_frame tx_fdm];
+end
+
+% ------------------------------------------------------------------------------
+
 ct_symb_buf = zeros(2*sim_in.Nsymbrowpilot, sim_in.Nc);
 
 prev_tx_bits = [];
+
 % main loop --------------------------------------------------------------------
 
 for i=1:frames
@@ -131,7 +155,6 @@ for i=1:frames
   tx_bits_log = [tx_bits_log tx_bits];
 
   [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
-  %tx_symb = tx_symb_pilot;
   tx_symb_log = [tx_symb_log; tx_symb];
 
   tx_fdm_frame = [];
@@ -145,8 +168,63 @@ for i=1:frames
   tx_fdm_log = [tx_fdm_log tx_fdm_frame];
 
   %
+  % Channel --------------------------------------------------------------------
+  %
+
+  % [X] calibrated noise for 1% errors
+  % [ ] req of x % probability of sync in y ms?
+  %      + take foff est, run filter for XXX symbols?
+  %      + look for a couple of rows of pilots, take metric
+  %      + try to decode frame, say between two pilots?, get corr metric?
+  %      + try again
+  % [ ] manually test at +/-75 Hz
+  % [ ] good BER with freq offset
+  % [ ] Integrate offset est into demod
+  %    + slow application or block based?
+  %    + just need to get a workable first pass for now
+  % [ ] module in cohpsk
+  % [ ] C port
+
+  fdmdv.fbb_rect_ch = exp(j*2*pi*foff/Fs);
+  ch_fdm_frame = zeros(1, sim_in.Nsymbrowpilot*M);
+  for r=1:sim_in.Nsymbrowpilot*M
+    fbb_phase_ch = fbb_phase_ch*fdmdv.fbb_rect_ch;
+    ch_fdm_frame(r) = tx_fdm_frame(r)*fbb_phase_ch;
+  end
+  mag = abs(fbb_phase_ch);
+  fbb_phase_ch /= mag;
+  
+  % each carrier has power = 2, total power 2Nc, total symbol rate NcRs, noise BW B=Fs
+  % Es/No = (C/Rs)/(N/B), N = var = 2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No)
+
+  variance = 2*Fs/(sim_in.Rs*EsNo);
+  noise = sqrt(variance*0.5)*(randn(1,sim_in.Nsymbrowpilot*M) + j*randn(1,sim_in.Nsymbrowpilot*M));
+  noise_log = [noise_log; noise];
+
+  ch_fdm_frame += noise;
+
+  %
   % Demod ----------------------------------------------------------------------
   %
+
+  % Coarse Freq offset estimation
+
+  if sync == 0
+    f_start = Fcentre - ((Nc/2)+2)*Fsep; f_stop = Fcentre + ((Nc/2)+2)*Fsep;
+    T = abs(fft(ch_fdm_frame(1:4*M).* hanning(4*M)',Fs)).^2;
+    T  = T(f_start:f_stop);
+    x = f_start:f_stop;
+    f_est = x*T'/sum(T);
+    f_off_est = f_est - Fcentre;
+    f_err = f_off_est - foff;
+    if abs(f_err) > 5
+      f_err_fail++;
+    end
+    f_err_log = [f_err_log f_err];
+    printf("coarse freq est: %f offset: %f  f_err: %f\n", f_est, f_off_est, f_err);
+    f_est +=1;
+    fdmdv.fbb_rect_rx = exp(j*2*pi*f_est/Fs);
+  end
 
   nin = M;
 
@@ -154,18 +232,15 @@ for i=1:frames
 
   rx_fdm_frame_bb = zeros(1, sim_in.Nsymbrowpilot*M);
   for r=1:sim_in.Nsymbrowpilot*M
-    fbb_phase_rx = fbb_phase_rx*fdmdv.fbb_rect';
-    rx_fdm_frame_bb(r) = tx_fdm_frame(r)*fbb_phase_rx;
+    fbb_phase_rx = fbb_phase_rx*fdmdv.fbb_rect_rx';
+    rx_fdm_frame_bb(r) = ch_fdm_frame(r)*fbb_phase_rx;
   end
   mag = abs(fbb_phase_rx);
   fbb_phase_rx /= mag;
   rx_fdm_log = [rx_fdm_log rx_fdm_frame_bb];
-
+  
   ch_symb = zeros(sim_in.Nsymbrowpilot, Nc);
   for r=1:sim_in.Nsymbrowpilot
-    %[rx_fdm_filter fdmdv] = rxdec_filter(fdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
-    %rx_fdm_filter_log = [rx_fdm_filter_log rx_fdm_filter];
-    %[rx_filt fdmdv] = down_convert_and_rx_filter(fdmdv, rx_fdm_filter, nin, M/Q);
 
     [rx_baseband fdmdv] = fdm_downconvert(fdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
     rx_baseband_log = [rx_baseband_log rx_baseband];
@@ -176,33 +251,46 @@ for i=1:frames
     [rx_onesym rx_timing env fdmdv] = rx_est_timing(fdmdv, rx_filt, nin);     
     ch_symb(r,:) = rx_onesym;
   end
-
-if 0
-  noise = sqrt(variance*0.5)*(randn(sim_in.Nsymbrowpilot,sim_in.Nc) + j*randn(sim_in.Nsymbrowpilot,sim_in.Nc));
-  noise_log = [noise_log; noise];
-
-  for r=1:sim_in.Nsymbrowpilot
-    phase = phase*freq;
-    ch_symb(r,:) = tx_symb(r,:)*phase + noise(r,:);  
-  end
-  phase = phase/abs(phase);
-end
+  
   ch_symb_log = [ch_symb_log; ch_symb];
 
-  % coarse timing 
+  % coarse timing and initial fine freq est
 
   ct_symb_buf(1:sim_in.Nsymbrowpilot,:) = ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:);
   ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:) = ch_symb;
 
-  max_corr = 0;
-  for t=0:sim_in.Nsymbrowpilot-1
-    corr =  sum(sum(rot90(ct_symb_buf(t+1:t+sim_in.Nsymbrowpilot,:),1) * tx_symb_pilot));
-    if corr > max_corr
-      max_corr = corr;
-      ct = t;
+  if sync == 0
+    max_corr = 0;
+    for f_fine=-5:1:5
+      f_fine_rect = exp(-j*f_fine*2*pi*(0:sim_in.Ns+1:sim_in.Nsymbrowpilot-1)/Rs)';
+      for t=0:sim_in.Nsymbrowpilot-1
+        corr = 0; mag = 0;
+        for c=1:Nc
+          f_corr_vec = f_fine_rect .* ct_symb_buf(t+1:sim_in.Ns+1:t+sim_in.Nsymbrowpilot,c);
+          for p=1:5
+            corr += sim_in.pilot(p,c) * f_corr_vec(p);
+            mag  += abs(f_corr_vec(p));
+          end
+        end
+        %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
+        if corr > max_corr
+          max_corr = corr;
+          max_mag = mag;
+          ct = t;
+          f_fine_est = f_fine;
+        end
+      end
+    end
+
+    printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", f_fine_est, abs(max_corr), max_mag, ct);
+    if max_corr/max_mag > 0.8
+      sync = 1;
     end
   end
-  %printf("max_corr: %f ct: %d\n", max_corr, ct);
+ 
+  if (i==500)
+    xx        
+  end
 
   [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(ct+1:ct+sim_in.Nsymbrowpilot,:), []);
   rx_symb_log = [rx_symb_log; rx_symb];
@@ -259,7 +347,10 @@ ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;
 printf("EsNodB: %4.1f ber..: %3.2f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
- 
+printf("f_err std: %f  fails: %d\n", std(f_err_log), f_err_fail);
+figure(8)
+hist(f_err_log)
+
 % C header file of noise samples so C version gives extacly the same results
 
 function write_noise_file(noise_log)
