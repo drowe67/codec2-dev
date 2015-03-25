@@ -484,6 +484,73 @@ function test_bits_coh_file(test_bits_coh)
 endfunction
 
 
+% Frequency offset estimation --------------------------------------------------
+
+function [f_max s_max] = freq_off_est(rx_fdm, tx_pilot, offset, n)
+
+  Fs = 8000;
+  nc = 1800;  % portion we wish to correlate over (first 2 rows on pilots)
+ 
+  % downconvert to complex baseband to remove images
+
+  f = 1500;
+  foff_rect    = exp(j*2*pi*f*(1:2*n)/Fs);
+  tx_pilot_bb  = tx_pilot(1:n) .* foff_rect(1:n)';
+  rx_fdm_bb    = rx_fdm(offset:offset+2*n-1) .* foff_rect';
+
+  % remove -2000 Hz image
+
+  b = fir1(50, 1000/Fs);
+  tx_pilot_bb_lpf = filter(b,1,tx_pilot_bb);
+  rx_fdm_bb_lpf   = filter(b,1,rx_fdm_bb);
+
+  % decimate by M
+
+  M = 4;
+  tx_pilot_bb_lpf = tx_pilot_bb_lpf(1:M:length(tx_pilot_bb_lpf));
+  rx_fdm_bb_lpf   = rx_fdm_bb_lpf(1:M:length(rx_fdm_bb_lpf));
+  n /= M;
+  nc /= M;
+
+  % correlate over a range of frequency offsets and delays
+
+  c_max = 0;
+  f_n = 1;
+  f_range = -75:2.5:75;
+  c_log=zeros(n, length(f_range));
+
+  for f=f_range
+    foff_rect = exp(j*2*pi*(f*M)*(1:nc)/Fs);
+    for s=1:n
+      
+      c = abs(tx_pilot_bb_lpf(1:nc)' * (rx_fdm_bb_lpf(s:s+nc-1) .* foff_rect'));
+      c_log(s,f_n) = c;
+      if c > c_max
+        c_max = c;
+        f_max = f;
+        s_max = s;
+      end
+    end
+    f_n++;
+    %printf("f: %f c_max: %f f_max: %f s_max: %d\n", f, c_max, f_max, s_max);
+  end
+
+  figure(1);
+  y = f_range;
+  x = max(s_max-25,1):min(s_max+25, n);
+  mesh(y,x, c_log(x,:));
+  grid
+  
+  s_max *= M;
+  s_max -= floor(s_max/6400)*6400;
+  printf("f_max: %f  s_max: %d\n", f_max, s_max);
+
+  % decimated position at sample rate.  need to relate this to symbol
+  % rate position.
+
+endfunction
+
+
 % Rate Rs BER tests ------------------------------------------------------------------------------
 
 function sim_out = ber_test(sim_in)
