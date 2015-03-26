@@ -211,7 +211,7 @@ for i=1:frames
 
   if sync == 0
     f_start = Fcentre - ((Nc/2)+2)*Fsep; f_stop = Fcentre + ((Nc/2)+2)*Fsep;
-    T = abs(fft(ch_fdm_frame(1:4*M).* hanning(4*M)',Fs)).^2;
+    T = abs(fft(ch_fdm_frame(1:8*M).* hanning(8*M)',Fs)).^2;
     T  = T(f_start:f_stop);
     x = f_start:f_stop;
     f_est = x*T'/sum(T);
@@ -222,8 +222,8 @@ for i=1:frames
     end
     f_err_log = [f_err_log f_err];
     printf("coarse freq est: %f offset: %f  f_err: %f\n", f_est, f_off_est, f_err);
-    f_est +=1;
-    fdmdv.fbb_rect_rx = exp(j*2*pi*f_est/Fs);
+    fdmdv.fbb_rect_rx = exp(j*2*pi*(f_est)/Fs);
+    sync = 1;
   end
 
   nin = M;
@@ -254,21 +254,24 @@ for i=1:frames
   
   ch_symb_log = [ch_symb_log; ch_symb];
 
-  % coarse timing and initial fine freq est
+  % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
 
   ct_symb_buf(1:sim_in.Nsymbrowpilot,:) = ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:);
   ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:) = ch_symb;
 
-  if sync == 0
+  sampling_points = [1 (2:sim_in.Ns+1:1+sim_in.Npilotsframe*sim_in.Ns+1)];
+  pilot2 = [ sim_in.pilot(1,:); sim_in.pilot];
+
+  if sync == 1
     max_corr = 0;
-    for f_fine=-5:1:5
-      f_fine_rect = exp(-j*f_fine*2*pi*(0:sim_in.Ns+1:sim_in.Nsymbrowpilot-1)/Rs)';
+    for f_fine=-15:1:15
+      f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
       for t=0:sim_in.Nsymbrowpilot-1
         corr = 0; mag = 0;
         for c=1:Nc
-          f_corr_vec = f_fine_rect .* ct_symb_buf(t+1:sim_in.Ns+1:t+sim_in.Nsymbrowpilot,c);
-          for p=1:5
-            corr += sim_in.pilot(p,c) * f_corr_vec(p);
+          f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c);
+          for p=1:sim_in.Npilotsframe+1
+            corr += pilot2(p,c) * f_corr_vec(p);
             mag  += abs(f_corr_vec(p));
           end
         end
@@ -284,12 +287,18 @@ for i=1:frames
 
     printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", f_fine_est, abs(max_corr), max_mag, ct);
     if max_corr/max_mag > 0.8
-      sync = 1;
+      sync = 2;
     end
   end
  
-  if (i==500)
-    xx        
+  if (i==50)
+    figure(8)
+    f_fine_rect = exp(-j*f_fine_est*2*pi*sampling_points/Rs)';
+    plot(f_fine_rect,'+');
+    hold on;
+    plot(ct_symb_buf(ct+sampling_points,1),'b+');
+    hold off; 
+    xx
   end
 
   [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(ct+1:ct+sim_in.Nsymbrowpilot,:), []);
