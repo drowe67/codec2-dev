@@ -64,7 +64,7 @@ function sim_in = symbol_rate_init(sim_in)
     sim_in.Nsymb         = Nsymb            = framesize/bps;
     sim_in.Nsymbrow      = Nsymbrow         = Nsymb/Nc;
     sim_in.Npilotsframe  = Npilotsframe     = Nsymbrow/Ns;
-    sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe;
+    sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe + 1;
 
     printf("Each frame is %d bits or %d symbols, transmitted as %d symbols by %d carriers.",
            framesize, Nsymb, Nsymbrow, Nc);
@@ -169,6 +169,10 @@ function [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, c
       tx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:) = tx_symb((p-1)*Ns+1:p*Ns,:); % payload symbols
     end
     tx_symb = tx_symb_pilot;
+
+    % Append extra col of pilots at the start
+
+    tx_symb = [ pilot(1,:);  tx_symb_pilot];
 
     % Optionally copy to other carriers (spreading)
 
