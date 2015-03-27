@@ -63,17 +63,14 @@ function sim_in = symbol_rate_init(sim_in)
 
     sim_in.Nsymb         = Nsymb            = framesize/bps;
     sim_in.Nsymbrow      = Nsymbrow         = Nsymb/Nc;
-    sim_in.Npilotsframe  = Npilotsframe     = Nsymbrow/Ns;
-    sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe + 1;
+    sim_in.Npilotsframe  = Npilotsframe     = Nsymbrow/Ns+1;
+    sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe;
 
-    printf("Each frame is %d bits or %d symbols, transmitted as %d symbols by %d carriers.",
-           framesize, Nsymb, Nsymbrow, Nc);
-    printf("  There are %d pilot symbols in each carrier, seperated by %d data/parity symbols.",
-           Npilotsframe, Ns);
-    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", 
-           Nsymbrowpilot, Nc);
+    printf("Each frame contains %d data bits or %d data symbols, transmitted as %d symbols by %d carriers.", framesize, Nsymb, Nsymbrow, Nc);
+    printf("  There are %d pilot symbols in each carrier together at the start of each frame, then %d data symbols.", Npilotsframe, Ns); 
+    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", Nsymbrowpilot, Nc);
 
-    assert(Npilotsframe == floor(Nsymbrow/Ns), "Npilotsframe must be an integer");
+    %assert(Npilotsframe == floor(Nsymbrow/Ns), "Npilotsframe must be an integer");
 
     sim_in.prev_sym_tx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
     sim_in.prev_sym_rx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
@@ -90,6 +87,11 @@ function sim_in = symbol_rate_init(sim_in)
     if sim_in.do_write_pilot_file
       write_pilot_file(pilot, Nsymbrowpilot, Ns, Np, Nsymbrow, Npilotsframe, Nc);
     end
+
+    % we use first 2 pilots of next frame to help with frame sync and fine freq
+
+    sim_in.Nct_sym_buf = 2*Nsymbrowpilot + 2;
+    sim_in.ct_symb_buf = zeros(sim_in.Nct_sym_buf, Nc);
 
     % Init LDPC --------------------------------------------------------------------
 
@@ -157,22 +159,10 @@ function [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, c
         tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));
       end
     end
-    %tx_symb = zeros(Nsymbrow,Nc);
-
-    % insert pilots, one every Ns data symbols
-
-    tx_symb_pilot = zeros(Nsymbrowpilot, Nc);
-            
-    for p=1:Npilotsframe
-      tx_symb_pilot((p-1)*(Ns+1)+1,:)          = pilot(p,:);                 % row of pilots
-      %printf("%d %d %d %d\n", (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*Ns+1, p*Ns);
-      tx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:) = tx_symb((p-1)*Ns+1:p*Ns,:); % payload symbols
-    end
-    tx_symb = tx_symb_pilot;
-
-    % Append extra col of pilots at the start
-
-    tx_symb = [ pilot(1,:);  tx_symb_pilot];
+    
+    % insert pilots at start of frame
+    
+    tx_symb = [pilot(1,:); pilot(2,:); tx_symb;];
 
     % Optionally copy to other carriers (spreading)
 
@@ -490,6 +480,8 @@ endfunction
 
 % Frequency offset estimation --------------------------------------------------
 
+% This function was used in initial Nov 2014 experiments
+
 function [f_max s_max] = freq_off_est(rx_fdm, tx_pilot, offset, n)
 
   Fs = 8000;
@@ -552,6 +544,100 @@ function [f_max s_max] = freq_off_est(rx_fdm, tx_pilot, offset, n)
   % decimated position at sample rate.  need to relate this to symbol
   % rate position.
 
+endfunction
+
+
+% Set of functions to implement latest and greatest freq offset
+% estimation, March 2015 ----------------------
+
+% returns an estimate of frequency offset, advances to next sync state
+
+function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame, sync, next_sync)
+  Fcentre = fdmdv.Fcentre;
+  Nc      = fdmdv.Nc;
+  Fsep    = fdmdv.Fsep;
+  M       = fdmdv.M;
+  Fs      = fdmdv.Fs;
+  Ndft    = cohpsk.Ndft;
+
+  if sync == 0
+    f_start = Fcentre - ((Nc/2)+2)*Fsep; 
+    f_stop = Fcentre + ((Nc/2)+2)*Fsep;
+    T = abs(fft(ch_fdm_frame(1:6*M).* hanning(6*M)', Ndft)).^2;
+    sc = Ndft/Fs;
+    bin_start = floor(f_start*sc+0.5)+1;
+    bin_stop = floor(f_stop*sc+0.5)+1;
+    x = bin_start-1:bin_stop-1;
+    bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
+    cohpsk.f_est = bin_est/sc;
+    printf("coarse freq est: %f\n", cohpsk.f_est);
+    next_sync = 1;
+  end
+
+endfunction
+
+
+% returns index of start of frame and fine freq offset
+
+function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, next_sync)
+  ct_symb_buf   = cohpsk.ct_symb_buf;
+  Nct_sym_buf   = cohpsk.Nct_sym_buf;
+  Rs            = cohpsk.Rs;
+  Nsymbrowpilot = cohpsk.Nsymbrowpilot;
+  Nc            = cohpsk.Nc;
+
+  % update memory in symbol buffer
+
+  for r=1:Nct_sym_buf-Nsymbrowpilot
+    ct_symb_buf(r,:) = ct_symb_buf(r+Nsymbrowpilot,:);
+  end
+  i = 1;
+  for r=Nct_sym_buf-Nsymbrowpilot+1:Nct_sym_buf
+    ct_symb_buf(r,:) = ch_symb(i,:);
+    i++;
+  end
+  cohpsk.ct_symb_buf = ct_symb_buf;
+
+  % sample pilots at start of this frame and start of next frame 
+
+  sampling_points = [1 2 7 8];
+  pilot2 = [ cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
+
+  if sync == 2
+
+    % sample correlation over 2D grid of time and fine freq points
+
+    max_corr = 0;
+    for f_fine=-20:1:20
+      f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
+      for t=0:cohpsk.Nsymbrowpilot-1
+        corr = 0; mag = 0;
+        for c=1:Nc
+          f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c);
+          for p=1:length(sampling_points)
+            corr += pilot2(p,c) * f_corr_vec(p);
+            mag  += abs(f_corr_vec(p));
+          end
+        end
+        %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
+        if corr > max_corr
+          max_corr = corr;
+          max_mag = mag;
+          cohpsk.ct = t;
+          cohpsk.f_fine_est = f_fine;
+        end
+      end
+    end
+
+    printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
+    if max_corr/max_mag > 0.9
+      printf("in sync!\n");
+      next_sync = 4;
+    else
+      next_sync = 0;
+      printf("  back to coarse freq offset ets...\n");
+    end
+  end
 endfunction
 
 

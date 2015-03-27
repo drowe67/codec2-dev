@@ -23,18 +23,18 @@ rand('state',1);
 randn('state',1);
 
 n = 2000;
-frames = 35;
-framesize = 160
-foff = 50;
+frames = 35*4;
+framesize = 32;
+foff = -80;
 
-EsNodB = 18;
+EsNodB = 8;
 EsNo = 10^(EsNodB/10);
 variance = 1/EsNo;
 
 load ../build_linux/unittest/tcohpsk_out.txt
 
 sim_in = standard_init();
-sim_in.framesize        = 160;
+sim_in.framesize        = framesize;
 sim_in.ldpc_code        = 0;
 sim_in.ldpc_code_rate   = 1;
 sim_in.Nc = Nc          = 4;
@@ -80,7 +80,10 @@ fdmdv.phase_tx = ones(fdmdv.Nc+1,1);
 freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
 fdmdv.freq_pol = 2*pi*freq_hz/Fs;
 fdmdv.freq = exp(j*fdmdv.freq_pol);
-Fcentre = 1500;
+fdmdv.Fcentre = 1500;
+
+cohpsk.Ndft = 1024;
+cohpsk.f_est = fdmdv.Fcentre;
 
 fdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
 fdmdv.fbb_phase_tx = 1;
@@ -209,27 +212,15 @@ for i=1:frames
 
   % Coarse Freq offset estimation
 
-  if sync == 0
-    f_start = Fcentre - ((Nc/2)+2)*Fsep; f_stop = Fcentre + ((Nc/2)+2)*Fsep;
-    T = abs(fft(ch_fdm_frame(1:8*M).* hanning(8*M)',Fs)).^2;
-    T  = T(f_start:f_stop);
-    x = f_start:f_stop;
-    f_est = x*T'/sum(T);
-    f_off_est = f_est - Fcentre;
-    f_err = f_off_est - foff;
-    if abs(f_err) > 5
-      f_err_fail++;
-    end
-    f_err_log = [f_err_log f_err];
-    printf("coarse freq est: %f offset: %f  f_err: %f\n", f_est, f_off_est, f_err);
-    fdmdv.fbb_rect_rx = exp(j*2*pi*(f_est)/Fs);
-    sync = 1;
-  end
+  next_sync = sync;
+  
+  [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame, sync, next_sync);
 
   nin = M;
 
   % shift frame down to complex baseband
-
+ 
+  fdmdv.fbb_rect_rx = exp(j*2*pi*cohpsk.f_est/fdmdv.Fs);
   rx_fdm_frame_bb = zeros(1, sim_in.Nsymbrowpilot*M);
   for r=1:sim_in.Nsymbrowpilot*M
     fbb_phase_rx = fbb_phase_rx*fdmdv.fbb_rect_rx';
@@ -239,6 +230,8 @@ for i=1:frames
   fbb_phase_rx /= mag;
   rx_fdm_log = [rx_fdm_log rx_fdm_frame_bb];
   
+  % sample rate demod processing
+
   ch_symb = zeros(sim_in.Nsymbrowpilot, Nc);
   for r=1:sim_in.Nsymbrowpilot
 
@@ -255,52 +248,21 @@ for i=1:frames
   ch_symb_log = [ch_symb_log; ch_symb];
 
   % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
-
-  ct_symb_buf(1:sim_in.Nsymbrowpilot,:) = ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:);
-  ct_symb_buf(sim_in.Nsymbrowpilot+1:2*sim_in.Nsymbrowpilot,:) = ch_symb;
-
-  sampling_points = [1 (2:sim_in.Ns+1:1+sim_in.Npilotsframe*sim_in.Ns+1)];
-  pilot2 = [ sim_in.pilot(1,:); sim_in.pilot];
+  
+  [next_sync sim_in] = frame_sync_fine_timing_est(sim_in, ch_symb, sync, next_sync);
 
   if sync == 1
-    max_corr = 0;
-    for f_fine=-15:1:15
-      f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
-      for t=0:sim_in.Nsymbrowpilot-1
-        corr = 0; mag = 0;
-        for c=1:Nc
-          f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c);
-          for p=1:sim_in.Npilotsframe+1
-            corr += pilot2(p,c) * f_corr_vec(p);
-            mag  += abs(f_corr_vec(p));
-          end
-        end
-        %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
-        if corr > max_corr
-          max_corr = corr;
-          max_mag = mag;
-          ct = t;
-          f_fine_est = f_fine;
-        end
-      end
-    end
-
-    printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", f_fine_est, abs(max_corr), max_mag, ct);
-    if max_corr/max_mag > 0.8
-      sync = 2;
-    end
+    next_sync = 2;
   end
- 
-  if (i==50)
-    figure(8)
-    f_fine_rect = exp(-j*f_fine_est*2*pi*sampling_points/Rs)';
-    plot(f_fine_rect,'+');
-    hold on;
-    plot(ct_symb_buf(ct+sampling_points,1),'b+');
-    hold off; 
+
+  printf("i: %d sync: %d next_sync: %d\n", i, sync, next_sync);
+  sync = next_sync;
+
+  if (i==10)
     xx
   end
 
+  if 0
   [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(ct+1:ct+sim_in.Nsymbrowpilot,:), []);
   rx_symb_log = [rx_symb_log; rx_symb];
   rx_amp_log = [rx_amp_log; amp_];
@@ -317,6 +279,7 @@ for i=1:frames
   end
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
+  end
 
 end
 
