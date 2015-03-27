@@ -31,20 +31,68 @@ EsNodB = 8;
 EsNo = 10^(EsNodB/10);
 variance = 1/EsNo;
 
+Rs = 50
+Nc = 4;
+
+% --------------------------------------------------------------------------
+
+afdmdv.Fs = 8000;
+afdmdv.Nc = Nc-1;
+afdmdv.Rs = Rs;
+afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
+afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, Nfilter);
+afdmdv.Nfilter =  Nfilter;
+afdmdv.gt_alpha5_root = gt_alpha5_root;
+afdmdv.Fsep = 75;
+afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
+freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
+afdmdv.freq_pol = 2*pi*freq_hz/Fs;
+afdmdv.freq = exp(j*afdmdv.freq_pol);
+afdmdv.Fcentre = 1500;
+
+afdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
+afdmdv.fbb_phase_tx = 1;
+
+afdmdv.fbb_rect_rx = exp(j*2*pi*(Fcentre)/Fs);
+fbb_phase_rx = 1;
+
+afdmdv.Nrxdec = 31;
+afdmdv.rxdec_coeff = fir1(afdmdv.Nrxdec-1, 0.25)';
+afdmdv.rxdec_lpf_mem = zeros(1,afdmdv.Nrxdec-1+M);
+
+P = afdmdv.P = 4;
+afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
+afdmdv.Nsym = 6;
+afdmdv.Nfilter = afdmdv.Nsym*afdmdv.M;
+afdmdv.rx_fdm_mem = zeros(1,afdmdv.Nfilter + afdmdv.M);
+Q = afdmdv.Q = afdmdv.M/4;
+
+afdmdv.Nt = 5;
+afdmdv.rx_filter_mem_timing = zeros(afdmdv.Nc+1, afdmdv.Nt*afdmdv.P);
+afdmdv.Nfiltertiming = afdmdv.M + afdmdv.Nfilter + afdmdv.M;
+
+afdmdv.rx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
+
+% ---------------------------------------------------------
+
 load ../build_linux/unittest/tcohpsk_out.txt
 
-sim_in = standard_init();
-sim_in.framesize        = framesize;
-sim_in.ldpc_code        = 0;
-sim_in.ldpc_code_rate   = 1;
-sim_in.Nc = Nc          = 4;
-sim_in.Rs               = 50;
-sim_in.Ns               = 4;
-sim_in.Np               = 2;
-sim_in.Nchip            = 1;
-sim_in.modulation       = 'qpsk';
-sim_in.do_write_pilot_file = 0;
-sim_in = symbol_rate_init(sim_in);
+acohpsk = standard_init();
+acohpsk.framesize        = framesize;
+acohpsk.ldpc_code        = 0;
+acohpsk.ldpc_code_rate   = 1;
+acohpsk.Nc               = Nc;
+acohpsk.Rs               = Rs;
+acohpsk.Ns               = 4;
+acohpsk.Np               = 2;
+acohpsk.Nchip            = 1;
+acohpsk.modulation       = 'qpsk';
+acohpsk.do_write_pilot_file = 0;
+acohpsk = symbol_rate_init(acohpsk);
+acohpsk.Ndft = 1024;
+acohpsk.f_est = afdmdv.Fcentre;
+
+% -----------------------------------------------------------
 
 rand('state',1); 
 tx_bits_coh = round(rand(1,framesize*10));
@@ -63,50 +111,11 @@ tx_baseband_log = [];
 tx_fdm_log = [];
 
 phase = 1;
-freq = exp(j*2*pi*foff/sim_in.Rs);
+freq = exp(j*2*pi*foff/acohpsk.Rs);
 
-ch_symb = zeros(sim_in.Nsymbrowpilot, sim_in.Nc);
+ch_symb = zeros(acohpsk.Nsymbrowpilot, acohpsk.Nc);
 
 Nerrs = Tbits = 0;
-
-fdmdv.Fs = 8000;
-fdmdv.Nc = Nc-1;
-M = fdmdv.M = Fs/Rs;
-fdmdv.tx_filter_memory = zeros(fdmdv.Nc+1, Nfilter);
-fdmdv.Nfilter =  Nfilter;
-fdmdv.gt_alpha5_root = gt_alpha5_root;
-fdmdv.Fsep = 75;
-fdmdv.phase_tx = ones(fdmdv.Nc+1,1);
-freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
-fdmdv.freq_pol = 2*pi*freq_hz/Fs;
-fdmdv.freq = exp(j*fdmdv.freq_pol);
-fdmdv.Fcentre = 1500;
-
-cohpsk.Ndft = 1024;
-cohpsk.f_est = fdmdv.Fcentre;
-
-fdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
-fdmdv.fbb_phase_tx = 1;
-
-fdmdv.fbb_rect_rx = exp(j*2*pi*(Fcentre)/Fs);
-fbb_phase_rx = 1;
-
-fdmdv.Nrxdec = 31;
-fdmdv.rxdec_coeff = fir1(fdmdv.Nrxdec-1, 0.25)';
-fdmdv.rxdec_lpf_mem = zeros(1,fdmdv.Nrxdec-1+M);
-
-P = fdmdv.P = 4;
-fdmdv.phase_rx = ones(fdmdv.Nc+1,1);
-fdmdv.Nsym = 6;
-fdmdv.Nfilter = fdmdv.Nsym*fdmdv.M;
-fdmdv.rx_fdm_mem = zeros(1,fdmdv.Nfilter + fdmdv.M);
-Q = fdmdv.Q = fdmdv.M/4;
-
-fdmdv.Nt = 5;
-fdmdv.rx_filter_mem_timing = zeros(fdmdv.Nc+1, fdmdv.Nt*fdmdv.P);
-fdmdv.Nfiltertiming = fdmdv.M + fdmdv.Nfilter + fdmdv.M;
-
-fdmdv.rx_filter_memory = zeros(fdmdv.Nc+1, fdmdv.Nfilter);
 
 rx_filt_log = [];
 rx_fdm_filter_log = [];
@@ -117,32 +126,6 @@ f_err_fail = 0;
 
 fbb_phase_ch = 1;
 sync = 0;
-
-% set up pilot signals for sync ------------------------------------------------
- 
-% frame of just pilots for coarse sync
-
-tx_bits = zeros(1,framesize);
-[tx_symb_pilot tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
-for r=1:(sim_in.Ns+1):sim_in.Nsymbrowpilot
-  tx_symb_pilot(r+1:r+sim_in.Ns,:) = zeros(sim_in.Ns, sim_in.Nc);
-end
-
-% filtered frame of just pilots for freq offset and coarse timing
-
-tx_pilot_fdm_frame = [];
-fdmdvp = fdmdv;
-for r=1:sim_in.Nsymbrowpilot
-  tx_onesymb = tx_symb_pilot(r,:);
-  [tx_baseband fdmdvp] = tx_filter(fdmdvp, tx_onesymb);
-  tx_baseband_log = [tx_baseband_log tx_baseband];
-  [tx_fdm fdmdvp] = fdm_upconvert(fdmdvp, tx_baseband);
-  tx_pilot_fdm_frame = [tx_pilot_fdm_frame tx_fdm];
-end
-
-% ------------------------------------------------------------------------------
-
-ct_symb_buf = zeros(2*sim_in.Nsymbrowpilot, sim_in.Nc);
 
 prev_tx_bits = [];
 
@@ -157,15 +140,15 @@ for i=1:frames
 
   tx_bits_log = [tx_bits_log tx_bits];
 
-  [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(sim_in, tx_bits, [], []);
+  [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(acohpsk, tx_bits, [], []);
   tx_symb_log = [tx_symb_log; tx_symb];
 
   tx_fdm_frame = [];
-  for r=1:sim_in.Nsymbrowpilot
+  for r=1:acohpsk.Nsymbrowpilot
     tx_onesymb = tx_symb(r,:);
-    [tx_baseband fdmdv] = tx_filter(fdmdv, tx_onesymb);
+    [tx_baseband afdmdv] = tx_filter(afdmdv, tx_onesymb);
     tx_baseband_log = [tx_baseband_log tx_baseband];
-    [tx_fdm fdmdv] = fdm_upconvert(fdmdv, tx_baseband);
+    [tx_fdm afdmdv] = fdm_upconvert(afdmdv, tx_baseband);
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
   tx_fdm_log = [tx_fdm_log tx_fdm_frame];
@@ -188,10 +171,10 @@ for i=1:frames
   % [ ] module in cohpsk
   % [ ] C port
 
-  fdmdv.fbb_rect_ch = exp(j*2*pi*foff/Fs);
-  ch_fdm_frame = zeros(1, sim_in.Nsymbrowpilot*M);
-  for r=1:sim_in.Nsymbrowpilot*M
-    fbb_phase_ch = fbb_phase_ch*fdmdv.fbb_rect_ch;
+  afdmdv.fbb_rect_ch = exp(j*2*pi*foff/Fs);
+  ch_fdm_frame = zeros(1, acohpsk.Nsymbrowpilot*M);
+  for r=1:acohpsk.Nsymbrowpilot*M
+    fbb_phase_ch = fbb_phase_ch*afdmdv.fbb_rect_ch;
     ch_fdm_frame(r) = tx_fdm_frame(r)*fbb_phase_ch;
   end
   mag = abs(fbb_phase_ch);
@@ -200,8 +183,8 @@ for i=1:frames
   % each carrier has power = 2, total power 2Nc, total symbol rate NcRs, noise BW B=Fs
   % Es/No = (C/Rs)/(N/B), N = var = 2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No)
 
-  variance = 2*Fs/(sim_in.Rs*EsNo);
-  noise = sqrt(variance*0.5)*(randn(1,sim_in.Nsymbrowpilot*M) + j*randn(1,sim_in.Nsymbrowpilot*M));
+  variance = 2*Fs/(acohpsk.Rs*EsNo);
+  noise = sqrt(variance*0.5)*(randn(1,acohpsk.Nsymbrowpilot*M) + j*randn(1,acohpsk.Nsymbrowpilot*M));
   noise_log = [noise_log; noise];
 
   ch_fdm_frame += noise;
@@ -214,16 +197,16 @@ for i=1:frames
 
   next_sync = sync;
   
-  [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame, sync, next_sync);
+  [next_sync acohpsk] = coarse_freq_offset_est(acohpsk, afdmdv, ch_fdm_frame, sync, next_sync);
 
   nin = M;
 
   % shift frame down to complex baseband
  
-  fdmdv.fbb_rect_rx = exp(j*2*pi*cohpsk.f_est/fdmdv.Fs);
-  rx_fdm_frame_bb = zeros(1, sim_in.Nsymbrowpilot*M);
-  for r=1:sim_in.Nsymbrowpilot*M
-    fbb_phase_rx = fbb_phase_rx*fdmdv.fbb_rect_rx';
+  afdmdv.fbb_rect_rx = exp(j*2*pi*acohpsk.f_est/afdmdv.Fs);
+  rx_fdm_frame_bb = zeros(1, acohpsk.Nsymbrowpilot*M);
+  for r=1:acohpsk.Nsymbrowpilot*M
+    fbb_phase_rx = fbb_phase_rx*afdmdv.fbb_rect_rx';
     rx_fdm_frame_bb(r) = ch_fdm_frame(r)*fbb_phase_rx;
   end
   mag = abs(fbb_phase_rx);
@@ -232,16 +215,16 @@ for i=1:frames
   
   % sample rate demod processing
 
-  ch_symb = zeros(sim_in.Nsymbrowpilot, Nc);
-  for r=1:sim_in.Nsymbrowpilot
+  ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc);
+  for r=1:acohpsk.Nsymbrowpilot
 
-    [rx_baseband fdmdv] = fdm_downconvert(fdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
+    [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
     rx_baseband_log = [rx_baseband_log rx_baseband];
-    [rx_filt fdmdv] = rx_filter(fdmdv, rx_baseband, nin);
+    [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
 
     rx_filt_log = [rx_filt_log rx_filt];
 
-    [rx_onesym rx_timing env fdmdv] = rx_est_timing(fdmdv, rx_filt, nin);     
+    [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
     ch_symb(r,:) = rx_onesym;
   end
   
@@ -249,7 +232,7 @@ for i=1:frames
 
   % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
-  [next_sync sim_in] = frame_sync_fine_timing_est(sim_in, ch_symb, sync, next_sync);
+  [next_sync acohpsk] = frame_sync_fine_timing_est(acohpsk, ch_symb, sync, next_sync);
 
   if sync == 1
     next_sync = 2;
@@ -263,7 +246,7 @@ for i=1:frames
   end
 
   if 0
-  [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(ct+1:ct+sim_in.Nsymbrowpilot,:), []);
+  [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx acohpsk] = qpsk_symbols_to_bits(acohpsk, ct_symb_buf(ct+1:ct+acohpsk.Nsymbrowpilot,:), []);
   rx_symb_log = [rx_symb_log; rx_symb];
   rx_amp_log = [rx_amp_log; amp_];
   rx_phi_log = [rx_phi_log; phi_];
