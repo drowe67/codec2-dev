@@ -93,6 +93,8 @@ function sim_in = symbol_rate_init(sim_in)
     sim_in.Nct_sym_buf = 2*Nsymbrowpilot + 2;
     sim_in.ct_symb_buf = zeros(sim_in.Nct_sym_buf, Nc);
 
+    sim_in.ff_phase = 1;
+
     % Init LDPC --------------------------------------------------------------------
 
     if ldpc_code
@@ -189,121 +191,42 @@ end
 
 % Symbol rate processing for rx side (demodulator) -------------------------------------------------------
 
-function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx sim_in] = qpsk_symbols_to_bits(sim_in, s_ch, prev_sym_rx)
-    framesize     = sim_in.framesize;
-    Nsymb         = sim_in.Nsymb;
-    Nsymbrow      = sim_in.Nsymbrow;
-    Nsymbrowpilot = sim_in.Nsymbrowpilot;
-    Nc            = sim_in.Nc;
-    Npilotsframe  = sim_in.Npilotsframe;
-    Ns            = sim_in.Ns;
-    Np            = sim_in.Np;
-    Nchip         = sim_in.Nchip;
-    modulation    = sim_in.modulation;
-    pilot         = sim_in.pilot;
-    rx_symb_buf   = sim_in.rx_symb_buf;
-    rx_pilot_buf  = sim_in.rx_pilot_buf;
-    tx_pilot_buf  = sim_in.tx_pilot_buf;
-    verbose       = sim_in.verbose;
+function [rx_symb rx_bits amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk, ct_symb_buf)
+    framesize     = cohpsk.framesize;
+    Nsymb         = cohpsk.Nsymb;
+    Nsymbrow      = cohpsk.Nsymbrow;
+    Nsymbrowpilot = cohpsk.Nsymbrowpilot;
+    Nc            = cohpsk.Nc;
+    Npilotsframe  = cohpsk.Npilotsframe;
+    pilot         = cohpsk.pilot;
+    verbose       = cohpsk.verbose;
 
-    % demodulate stage 1
+    % average pilots to get phase and amplitude estimates
+    % we assume there are two samples at the start of each frame and two at the end
 
-    for r=1:Nsymbrowpilot
-      for c=1:Nc*Nchip
-        rx_symb(r,c) = s_ch(r, c);
-        if strcmp(modulation,'dqpsk')
-          tmp = rx_symb(r,c);
-          rx_symb(r,c) *= conj(prev_sym_rx(c)/abs(prev_sym_rx(c)));
-          prev_sym_rx(c) = tmp;
-        end
-      end
-    end
-           
-    % strip out pilots
+    sampling_points = [1 2 7 8];
+    pilot2 = [cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
+    phi_ = zeros(Nsymbrow, Nc);
+    amp_ = zeros(Nsymbrow, Nc);
+   
+    for c=1:Nc
+      corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);
+      mag  = sum(abs(ct_symb_buf(sampling_points,c)));
 
-    rx_symb_pilot = rx_symb;
-    rx_symb = zeros(Nsymbrow, Nc*Nchip);
-    rx_pilot = zeros(Npilotsframe, Nc*Nchip);
-
-    for p=1:Npilotsframe
-      % printf("%d %d %d %d %d\n", (p-1)*Ns+1, p*Ns, (p-1)*(Ns+1)+2, p*(Ns+1), (p-1)*(Ns+1)+1);
-      rx_symb((p-1)*Ns+1:p*Ns,:) = rx_symb_pilot((p-1)*(Ns+1)+2:p*(Ns+1),:);
-      rx_pilot(p,:) = rx_symb_pilot((p-1)*(Ns+1)+1,:);
+      phi_(:, c) = angle(corr);
+      amp_(:, c) = mag/length(sampling_points);
     end
 
-    % buffer three frames of symbols (and pilots) for phase recovery
+    % now correct phase of data symbols and make decn on bits
 
-    rx_symb_buf(1:2*Nsymbrow,:) = rx_symb_buf(Nsymbrow+1:3*Nsymbrow,:);
-    rx_symb_buf(2*Nsymbrow+1:3*Nsymbrow,:) = rx_symb;
-    rx_pilot_buf(1:2*Npilotsframe,:) = rx_pilot_buf(Npilotsframe+1:3*Npilotsframe,:);
-    rx_pilot_buf(2*Npilotsframe+1:3*Npilotsframe,:) = rx_pilot;
-    sim_in.rx_symb_buf = rx_symb_buf;
-    sim_in.rx_pilot_buf = rx_pilot_buf;
-
-    % pilot assisted phase estimation and correction of middle frame in rx symb buffer
-
-    rx_symb = rx_symb_buf(Nsymbrow+1:2*Nsymbrow,:);
-            
-    phi_ = zeros(Nsymbrow, Nc*Nchip);
-    amp_ = ones(Nsymbrow, Nc*Nchip);
-
-    for c=1:Nc*Nchip
-
-      if verbose > 2
-        printf("phi_   : ");
-      end
-
-      for r=1:Nsymbrow
-        st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
-        en = st + Np - 1;
-        ch_est = tx_pilot_buf(st:en,c)'*rx_pilot_buf(st:en,c)/Np;
-        phi_(r,c) = angle(ch_est);
-        amp_(r,c) = abs(ch_est);
-        %amp_(r,c) = abs(rx_symb(r,c));
-        if verbose > 2
-          printf("% 4.3f ", phi_(r,c))
-        end
-        rx_symb(r,c) *= exp(-j*phi_(r,c));
-      end
-
-      if verbose > 2
-        printf("\nrx_symb: ");
-        for r=1:Nsymbrow
-          printf("% 4.3f ", angle(rx_symb(r,c)))
-        end
-        printf("\nindexes: ");
-        for r=1:Nsymbrow
-          st = Npilotsframe+1+floor((r-1)/Ns) - floor(Np/2) + 1;
-          en = st + Np - 1;
-          printf("%2d,%2d  ", st,en)
-        end
-        printf("\npilots : ");
-        for p=1:3*Npilotsframe
-          printf("% 4.3f ", angle(rx_pilot_buf(p,c)));
-        end 
-        printf("\n\n");
-      end
-    end 
-    
-    % de-spread
-            
-    for r=1:Nsymbrow
-      for c=Nc+1:Nc:Nchip*Nc
-        rx_symb(r,1:Nc) = rx_symb(r,1:Nc) + rx_symb(r,c:c+Nc-1);
-        amp_(r,1:Nc)    = amp_(r,1:Nc) + amp_(r,c:c+Nc-1);
-      end
-    end
-           
-    % demodulate stage 2
-
-    rx_symb_linear = zeros(1,Nsymb);
-    amp_linear = zeros(1,Nsymb);
+    rx_symb = zeros(Nsymbrow, Nc);
+    rx_symb_linear = zeros(1, Nsymbrow*Nc);
     rx_bits = zeros(1, framesize);
     for c=1:Nc
       for r=1:Nsymbrow
         i = (c-1)*Nsymbrow + r;
-        rx_symb_linear(i) = rx_symb(r,c);
-        amp_linear(i) = amp_(r,c);
+        rx_symb(i) = ct_symb_buf(2+r,c)*exp(-j*phi_(c));
+        rx_symb_linear(i) = rx_symb(i);
         rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
       end
     end
@@ -337,18 +260,11 @@ function [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx 
 
     % Estimate signal power
     
-    Es_ = mean(amp_linear .^ 2);
+    Es_ = mean(amp_ .^ 2);
  
     EsNo_ = Es_/No_;
     %printf("Es_: %f No_: %f  Es/No: %f  Es/No dB: %f\n", Es_, No_, Es_/No_, 10*log10(EsNo_));
-  
-    % LDPC decoder requires some amplitude normalisation
-    % (AGC), was found to break ow.  So we adjust the symbol
-    % amplitudes so that they are an averge of 1
-
-    rx_symb_linear /= mean(amp_linear);
-    amp_linear /= mean(amp_linear);
-    
+      
 endfunction
 
 
@@ -625,6 +541,7 @@ function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, 
           max_mag = mag;
           cohpsk.ct = t;
           cohpsk.f_fine_est = f_fine;
+          cohpsk.ff_rect = exp(-j*f_fine*2*pi/Rs);
         end
       end
     end

@@ -25,7 +25,7 @@ randn('state',1);
 n = 2000;
 frames = 35*4;
 framesize = 32;
-foff = -80;
+foff = 0;
 
 EsNodB = 8;
 EsNo = 10^(EsNodB/10);
@@ -233,36 +233,71 @@ for i=1:frames
   % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
   [next_sync acohpsk] = frame_sync_fine_timing_est(acohpsk, ch_symb, sync, next_sync);
+  %acohpsk.ff_rect = exp(j*2*pi*(-1.0)/Rs);
 
   if sync == 1
     next_sync = 2;
   end
 
-  printf("i: %d sync: %d next_sync: %d\n", i, sync, next_sync);
+  %printf("i: %d sync: %d next_sync: %d\n", i, sync, next_sync);
   sync = next_sync;
 
-  if (i==10)
+  if (i==1000)
     xx
   end
 
-  if 0
-  [rx_symb rx_bits rx_symb_linear amp_linear amp_ phi_ EsNo_ prev_sym_rx acohpsk] = qpsk_symbols_to_bits(acohpsk, ct_symb_buf(ct+1:ct+acohpsk.Nsymbrowpilot,:), []);
-  rx_symb_log = [rx_symb_log; rx_symb];
-  rx_amp_log = [rx_amp_log; amp_];
-  rx_phi_log = [rx_phi_log; phi_];
-  rx_bits_log = [rx_bits_log rx_bits];
+  % We can decode first that we get sync on.  Need to fine freq correct all of it's symbols, 
+  % including pilots.  From then on, just correct new symbols into frame.
+  % make copy, so if we lose sync we havent fine freq corrected ct_symb_buf
+  % if next_sync == 4 correct all 8
+  % if sync == 2 correct latest 6
 
-  % BER stats
+  if (next_sync == 4) || (sync == 4)
 
-  if i > 3
-    error_positions = xor(prev_tx_bits2, rx_bits);
-    Nerrs  += sum(error_positions);
-    nerr_log = [nerr_log sum(error_positions)];
-    Tbits += length(error_positions);
+    if next_sync == 4
+
+      % first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples
+
+      ct_symb_ff_buf = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      for r=1:acohpsk.Nsymbrowpilot+2
+        acohpsk.ff_phase *= acohpsk.ff_rect';
+        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
+      end
+
+    else
+      
+      % second and subsequent frames, just fine freq correct the latest Nsymbrowpilot
+
+      ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(Nsymbrowpilot+1:Nsymbrowpilot+2,:);
+      ct_symb_ff_buf(3:Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      for r=3:acohpsk.Nsymbrowpilot+2
+        afdmdv.ff_phase *= afdmdv.ff_rect';
+        ct_symb_ff_buf(r,:) *= afdmdv.ff_phase;
+      end
+
+    end
+
+    mag = abs(acohpsk.ff_phase);
+    acohpsk.ff_phase /= mag;
+      
+    [rx_symb rx_bits amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, ct_symb_ff_buf);
+    rx_symb_log = [rx_symb_log; rx_symb];
+    rx_amp_log = [rx_amp_log; amp_];
+    rx_phi_log = [rx_phi_log; phi_];
+    rx_bits_log = [rx_bits_log rx_bits];
+
+    % BER stats
+
+    if i > 2
+      error_positions = xor(prev_tx_bits2, rx_bits);
+      Nerrs  += sum(error_positions);
+      nerr_log = [nerr_log sum(error_positions)];
+     Tbits += length(error_positions);
+    end 
   end
+
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
-  end
 
 end
 
@@ -281,6 +316,7 @@ stem_sig_and_error(6, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_
 stem_sig_and_error(6, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
 stem_sig_and_error(7, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
 
+if 0
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symb_log, tx_symb_log_c, 'tx_symb');
 check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
@@ -292,6 +328,7 @@ check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
 check(rx_phi_log, rx_phi_log_c, 'rx_phi_log');
 check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
+end
 
 % Determine bit error rate
 
