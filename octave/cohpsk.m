@@ -95,6 +95,8 @@ function sim_in = symbol_rate_init(sim_in)
 
     sim_in.ff_phase = 1;
 
+    sim_in.ct_symb_ff_buf = zeros(Nsymbrowpilot + 2, Nc);
+
     % Init LDPC --------------------------------------------------------------------
 
     if ldpc_code
@@ -555,6 +557,60 @@ function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, 
       printf("  back to coarse freq offset ets...\n");
     end
   end
+endfunction
+
+
+% fine freq correction
+
+function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
+  ct_symb_ff_buf = acohpsk.ct_symb_ff_buf;
+
+  % We can decode first frame that we achieve sync.  Need to fine freq
+  % correct all of it's symbols, including pilots.  From then on, just
+  % correct new symbols into frame.  make copy, so if we lose sync we
+  % havent fine freq corrected ct_symb_buf if next_sync == 4 correct
+  % all 8 if sync == 2 correct latest 6
+
+  if (next_sync == 4) || (sync == 4)
+
+    if next_sync == 4
+
+      % first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples
+
+      ct_symb_ff_buf = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      for r=1:acohpsk.Nsymbrowpilot+2
+        acohpsk.ff_phase *= acohpsk.ff_rect';
+        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
+      end
+
+    else
+      
+      % second and subsequent frames, just fine freq correct the latest Nsymbrowpilot
+
+      ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(Nsymbrowpilot+1:Nsymbrowpilot+2,:);
+      ct_symb_ff_buf(3:Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      for r=3:acohpsk.Nsymbrowpilot+2
+        afdmdv.ff_phase *= afdmdv.ff_rect';
+        ct_symb_ff_buf(r,:) *= afdmdv.ff_phase;
+      end
+
+    end
+
+    mag = abs(acohpsk.ff_phase);
+    acohpsk.ff_phase /= mag;
+
+    acohpsk.ct_symb_ff_buf = ct_symb_ff_buf;
+  end
+endfunction
+
+
+% misc sync state machine code, just wanted it in a function
+
+function sync = sync_state_machine(sync, next_sync)
+  if sync == 1
+    next_sync = 2;
+  end
+  sync = next_sync;
 endfunction
 
 
