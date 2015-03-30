@@ -44,7 +44,7 @@
 #include "comp_prim.h"
 //#include "noise_samples.h"
 
-#define FRAMES 35
+#define FRAMES (35*4)
 #define RS     50
 #define FOFF   1
 
@@ -137,8 +137,10 @@ int main(int argc, char *argv[])
 
         memcpy(tx_bits, ptest_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
         ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-        if (ptest_bits_coh >= ptest_bits_coh_end)
+        if (ptest_bits_coh >= ptest_bits_coh_end) {
             ptest_bits_coh = (int*)test_bits_coh;
+        }
+
 	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
 
         for(r=0; r<NSYMROWPILOT; r++) {
@@ -241,7 +243,7 @@ int main(int argc, char *argv[])
             for(c=0; c<PILOTS_NC; c++) {
 		rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
 		rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
-		rx_symb_log[log_data_r][c] = coh->rx_symb_buf[r][c]; 
+		rx_symb_log[log_data_r][c] = coh->rx_symb[r][c]; 
             }
         }
 	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);

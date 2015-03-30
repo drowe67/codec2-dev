@@ -84,7 +84,6 @@ acohpsk.ldpc_code_rate   = 1;
 acohpsk.Nc               = Nc;
 acohpsk.Rs               = Rs;
 acohpsk.Ns               = 4;
-acohpsk.Np               = 2;
 acohpsk.Nchip            = 1;
 acohpsk.modulation       = 'qpsk';
 acohpsk.do_write_pilot_file = 0;
@@ -280,11 +279,11 @@ stem_sig_and_error(6, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_
 stem_sig_and_error(6, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
 stem_sig_and_error(7, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
 
-if 0
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symb_log, tx_symb_log_c, 'tx_symb');
 check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
 check(rx_fdm_log, rx_fdm_log_c, 'rx_fdm');
+if 0
 check(rx_baseband_log, rx_baseband_log_c, 'rx_baseband',0.01);
 check(rx_filt_log, rx_filt_log_c, 'rx_filt');
 check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
@@ -304,8 +303,6 @@ ber = Nerrs/Tbits;
 printf("EsNodB: %4.1f ber..: %3.2f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
 printf("f_err std: %f  fails: %d\n", std(f_err_log), f_err_fail);
-figure(8)
-hist(f_err_log)
 
 % C header file of noise samples so C version gives extacly the same results
 
