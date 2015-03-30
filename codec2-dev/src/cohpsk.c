@@ -72,22 +72,19 @@ static COMP qpsk_mod[] = {
 struct COHPSK *cohpsk_create(void)
 {
     struct COHPSK *coh;
-    int            r,c;
+    int            r,c,p;
 
     coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
     if (coh == NULL)
         return NULL;
 
-    /* set up buffer of 3 frames of tx pilot symbols */
+    /* set up buffer of tx pilot symbols for rx */
 
-    memcpy(&coh->tx_pilot_buf[0][0], pilots_coh, sizeof(pilots_coh));
-    memcpy(&coh->tx_pilot_buf[NPILOTSFRAME][0], pilots_coh, sizeof(pilots_coh));
-    memcpy(&coh->tx_pilot_buf[2*NPILOTSFRAME][0], pilots_coh, sizeof(pilots_coh));
-
-    for(r=0; r<3*NSYMROW; r++) {
-        for(c=0; c<PILOTS_NC; c++) {
-            coh->rx_symb_buf[r][c].real = 0.0;
-            coh->rx_symb_buf[r][c].imag = 0.0;
+    for(r=0; r<2*NPILOTSFRAME; ) {
+        for(p=0; p<NPILOTSFRAME; r++, p++) {
+            for(c=0; c<PILOTS_NC; c++) {
+                coh->pilot2[r][c] = pilots_coh[p][c];
+            }
         }
     }
 
@@ -124,7 +121,6 @@ void cohpsk_destroy(struct COHPSK *coh)
 
 void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int nbits)
 {
-    COMP tx_symb_data[NSYMROW][PILOTS_NC];
     int   i, r, c, p_r, data_r;
     short bits;
 
@@ -132,145 +128,90 @@ void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int nbits)
     assert((NSYMROW*PILOTS_NC)*2 == nbits);
  
     /*
+      Insert two rows of Nc pilots at beginning of data frame.
+
       Organise QPSK symbols into a NSYMBROWS rows by PILOTS_NC cols matrix,
-      each column is a carrier, time flows down the rows......
+      each column is a carrier, time flows down the cols......
 
       Note: the "& 0x1" prevents and non binary tx_bits[] screwing up
       our lives.  Call me defensive.
     */
 
-    for(c=0; c<PILOTS_NC; c++) {
-        for(r=0; r<NSYMROW; r++) {
-            i = c*NSYMROW + r;
-            bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);          
-            tx_symb_data[r][c] = qpsk_mod[bits];
-        }
-    }
-
-    /* "push" in rows of Nc pilots, one row every NS data symbols */
-            
-    for (r=0, p_r=0, data_r=0; p_r<NPILOTSFRAME; p_r++) {
-
-        /* row of pilots */
-
+    r = 0;
+    for(p_r=0; p_r<2; p_r++) {
         for(c=0; c<PILOTS_NC; c++) {
             tx_symb[r][c].real = pilots_coh[p_r][c];
             tx_symb[r][c].imag = 0.0;
         }
         r++;
-
-        /* NS rows of data symbols */
-
-        for(i=0; i<NS; data_r++,r++,i++) {
-            for(c=0; c<PILOTS_NC; c++) {
-                tx_symb[r][c] = tx_symb_data[data_r][c];
-            }
+    }
+    for(data_r=0; data_r<NSYMROW; data_r++, r++) {
+        for(c=0; c<PILOTS_NC; c++) {
+            i = c*NSYMROW + data_r;
+            bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);          
+            tx_symb[r][c] = qpsk_mod[bits];
         }
     }
-
+    
     assert(p_r == NPILOTSFRAME);
-    assert(data_r == NSYMROW);
     assert(r == NSYMROWPILOT);
 }
 
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: bits_to_qpsk_symbols()	     
+  FUNCTION....: qpsk_symbols_to_bits()	     
   AUTHOR......: David Rowe			      
   DATE CREATED: March 2015
 
   Rate Rs demodulator. Extract pilot symbols and estimate amplitude and phase
   of each carrier.  Correct phase of data symbols and convert to bits.
 
+  Further improvement.  In channels with rapidly changing phase by
+  moderate Eb/No, we could perhaps do better by interpolating the
+  phase across symbols rather than using the same phi_ for all symbols.
+
 \*---------------------------------------------------------------------------*/
 
-void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP rx_symb[][COHPSK_NC])
+void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][COHPSK_NC])
 {
-    int   st, en, r, c, i, p_r, data_r;
-    COMP  ch_est, rot, pi_on_4;
+    int   r, c, i;
+    COMP  corr, rot, pi_on_4;
+    float mag, phi_, amp_;
+    short sampling_points[] = {1, 2, 7, 8};
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
+   
+    /* Average pilots to get phase and amplitude estimates we assume
+       there are two pilots at the start of each frame and two at the
+       end */
 
-    /* extract pilot and data symbols into 3 frame buffers */
-
-    for (r=0, p_r=2*NPILOTSFRAME, data_r=2*NSYMROW; r<NSYMROWPILOT; p_r++) {
-
-        // printf("r: %d data_r: %d\n", r, data_r);
-        /* copy row of pilots onto end of pilot buffer */
-
-        for(c=0; c<PILOTS_NC; c++) {
-            coh->rx_pilot_buf[p_r][c] = rx_symb[r][c];
-            //printf("  %d %d %f %f", p_r, c, coh->rx_pilot_buf[p_r][c].real, coh->rx_pilot_buf[p_r][c].imag);
+    for(c=0; c<PILOTS_NC; c++) {
+        corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
+        for(r=0; r<2*NPILOTSFRAME; r++) {
+            corr = cadd(corr, fcmult(coh->pilot2[r][c], ct_symb_buf[sampling_points[r]][c]));
+            mag  += cabsolute(ct_symb_buf[sampling_points[r]][c]);
         }
-        //printf("\n");
-        r++;
-
-        //printf("r: %d data_r: %d\n", r, data_r);
-        /* copy NS rows of data symbols onto end of data symbol buffer */
-
-        for(i=0; i<NS; data_r++,r++,i++) {
-            for(c=0; c<PILOTS_NC; c++) {
-                coh->rx_symb_buf[data_r][c] = rx_symb[r][c];
-                //printf("r: %d c: %d %f %f\n", r,c, rx_symb[r][c].real, rx_symb[r][c].imag);
-            }
+      
+        phi_ = atan2f(corr.imag, corr.real);
+        amp_ =  mag/2*NPILOTSFRAME;
+        for(r=0; r<2*NPILOTSFRAME; r++) {
+            coh->phi_[r][c] = phi_;
+            coh->amp_[r][c] = amp_;
         }
     }
 
+    /* now correct phase of data symbols and make decn on bits */
 
-    /* estimate channel amplitude and phase and correct data symbols in middle of buffer */
-
-    for (r=0, data_r=NSYMROW; r<NSYMROW; r++, data_r++) {
-
-        /* pilots to use for correcting data_r-th symbol */
-
-        st = NPILOTSFRAME + floor(r/NS) - floor(NP/2) + 1;
-        en = st + NP - 1;
-        assert(st >= 0);
-        assert(en < 3*NPILOTSFRAME);
-
-        //printf("r: %d data_r: %d st: %d en: %d\n", r, data_r, st, en);
-
-        /* iterate over all of the carriers */
-
-        for (c=0; c<PILOTS_NC; c++) {
-
-            /* estimate channel */
-
-            ch_est.real = 0.0; ch_est.imag = 0.0;
-            for (i=st; i<=en; i++)
-                ch_est = cadd(ch_est, fcmult(coh->tx_pilot_buf[i][c], coh->rx_pilot_buf[i][c]));
-            ch_est = fcmult(1.0/NP, ch_est);
-            coh->phi_[r][c] = atan2(ch_est.imag,ch_est.real);
-            coh->amp_[r][c] = cabsolute(ch_est);
-
-            /* correct phase */
-
-            rot.real = cosf(coh->phi_[r][c]); rot.imag = -sinf(coh->phi_[r][c]);
-            coh->rx_symb_buf[data_r][c] = cmult(coh->rx_symb_buf[data_r][c], rot);
-
-            /* demodulate */
-
+    for(c=0; c<PILOTS_NC; c++) {
+        rot.real = cosf(coh->phi_[0][c]); rot.imag = -sinf(coh->phi_[0][c]);
+        for (r=0; r<NSYMROW; r++) {
             i = c*NSYMROW + r;
-            rot = cmult(coh->rx_symb_buf[data_r][c], pi_on_4);
+            coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], rot);
+            rot = cmult(coh->rx_symb[r][c], pi_on_4);
             rx_bits[2*i+1] = rot.real < 0;
             rx_bits[2*i]   = rot.imag < 0;
-
-            //printf("  c: %d ch_est: %f %f phi_: %f amp_: %f\n",c,  ch_est.real, ch_est.imag, coh->phi_[r][c], coh->amp_[r][c]);
-        }
-        //exit(0);
-    }
-
-    /* shift buffers */
-    
-    for(r=0; r<2*NSYMROW; r++) {
-        for(c=0; c<PILOTS_NC; c++) {
-            coh->rx_symb_buf[r][c] = coh->rx_symb_buf[r+NSYMROW][c];
         }
     }
-    for(r=0; r<2*NPILOTSFRAME; r++) {
-        for(c=0; c<PILOTS_NC; c++) {
-            coh->rx_pilot_buf[r][c] = coh->rx_pilot_buf[r+NPILOTSFRAME][c];
-        }
-    } 
+
 }

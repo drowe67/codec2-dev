@@ -94,7 +94,7 @@ function test_single
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.framesize        = 160;
+  sim_in.framesize        = 32;
   sim_in.Nc               = 4;
   sim_in.Rs               = 50;
   sim_in.Ns               = 4;
@@ -561,7 +561,7 @@ endfunction
 
 function gen_test_bits()
   sim_in = standard_init();
-  framesize = 160*10;
+  framesize = 32*10;
   tx_bits = round(rand(1,framesize));
   test_bits_coh_file(tx_bits);
 endfunction
@@ -570,11 +570,11 @@ endfunction
 
 more off;
 %test_curves();
-test_single();
+%test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_tx("tx.raw");
 %rate_Fs_rx("tx_-4dB.wav")
 %rate_Fs_rx("tx.raw")
 %test_freq_off_est("tx.raw",40,6400)
-%gen_test_bits();
+gen_test_bits();
 
