@@ -22,8 +22,8 @@ autotest;
 rand('state',1); 
 randn('state',1);
 
-n = 2000;
-frames = 35*4;
+n = 840;
+frames = 35;
 framesize = 32;
 foff = 0;
 
@@ -31,7 +31,7 @@ EsNodB = 8;
 EsNo = 10^(EsNodB/10);
 variance = 1/EsNo;
 
-Rs = 50
+Rs = 50;
 Nc = 4;
 
 % --------------------------------------------------------------------------
@@ -107,7 +107,8 @@ rx_bits_log = [];
 noise_log = [];
 nerr_log = [];
 tx_baseband_log = [];
-tx_fdm_log = [];
+tx_fdm_frame_log = [];
+ch_fdm_frame_log = [];
 
 phase = 1;
 freq = exp(j*2*pi*foff/acohpsk.Rs);
@@ -119,11 +120,11 @@ Nerrs = Tbits = 0;
 rx_filt_log = [];
 rx_fdm_filter_log = [];
 rx_baseband_log = [];
-rx_fdm_log = [];
+rx_fdm_frame_log = [];
 f_err_log = [];
 f_err_fail = 0;
 
-fbb_phase_ch = 1;
+phase_ch = 1;
 sync = 0;
 
 prev_tx_bits = [];
@@ -150,7 +151,7 @@ for i=1:frames
     [tx_fdm afdmdv] = fdm_upconvert(afdmdv, tx_baseband);
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
-  tx_fdm_log = [tx_fdm_log tx_fdm_frame];
+  tx_fdm_frame_log = [tx_fdm_frame_log tx_fdm_frame];
 
   %
   % Channel --------------------------------------------------------------------
@@ -169,24 +170,21 @@ for i=1:frames
   %    + just need to get a workable first pass for now
   % [ ] module in cohpsk
   % [ ] C port
+  % [ ] smaller block size to min ram req
+  % [ ] Feeback loop 
 
-  afdmdv.fbb_rect_ch = exp(j*2*pi*foff/Fs);
-  ch_fdm_frame = zeros(1, acohpsk.Nsymbrowpilot*M);
-  for r=1:acohpsk.Nsymbrowpilot*M
-    fbb_phase_ch = fbb_phase_ch*afdmdv.fbb_rect_ch;
-    ch_fdm_frame(r) = tx_fdm_frame(r)*fbb_phase_ch;
-  end
-  mag = abs(fbb_phase_ch);
-  fbb_phase_ch /= mag;
+  [ch_fdm_frame phase_ch] = freq_shift(tx_fdm_frame, foff, Fs, phase_ch);
   
   % each carrier has power = 2, total power 2Nc, total symbol rate NcRs, noise BW B=Fs
   % Es/No = (C/Rs)/(N/B), N = var = 2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No)
 
   variance = 2*Fs/(acohpsk.Rs*EsNo);
   noise = sqrt(variance*0.5)*(randn(1,acohpsk.Nsymbrowpilot*M) + j*randn(1,acohpsk.Nsymbrowpilot*M));
-  noise_log = [noise_log; noise];
+  noise_log = [noise_log noise];
 
   ch_fdm_frame += noise;
+
+  ch_fdm_frame_log = [ch_fdm_frame_log ch_fdm_frame];
 
   %
   % Demod ----------------------------------------------------------------------
@@ -200,7 +198,7 @@ for i=1:frames
 
   nin = M;
 
-  % shift frame down to complex baseband
+  % shift entire FDM signal to 0 Hz
  
   afdmdv.fbb_rect_rx = exp(j*2*pi*acohpsk.f_est/afdmdv.Fs);
   rx_fdm_frame_bb = zeros(1, acohpsk.Nsymbrowpilot*M);
@@ -210,15 +208,18 @@ for i=1:frames
   end
   mag = abs(fbb_phase_rx);
   fbb_phase_rx /= mag;
-  rx_fdm_log = [rx_fdm_log rx_fdm_frame_bb];
+  rx_fdm_frame_bb_log = [rx_fdm_log rx_fdm_frame_bb];
   
   % sample rate demod processing
 
   ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc);
   for r=1:acohpsk.Nsymbrowpilot
 
+    % donwconvert each FDM carrier to Nc separate baseband signals
+
     [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
     rx_baseband_log = [rx_baseband_log rx_baseband];
+
     [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
 
     rx_filt_log = [rx_filt_log rx_filt];
@@ -232,7 +233,6 @@ for i=1:frames
   % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
   [next_sync acohpsk] = frame_sync_fine_timing_est(acohpsk, ch_symb, sync, next_sync);
-  %acohpsk.ff_rect = exp(j*2*pi*(-1.0)/Rs);
 
   if (i==1000)
     xx
@@ -268,9 +268,12 @@ stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(
 stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
 stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
 
-stem_sig_and_error(3, 211, real(tx_fdm_log_c(1:n)), real(tx_fdm_log(1:n) - tx_fdm_log_c(1:n)), 'tx fdm re', [1 n -10 10])
-stem_sig_and_error(3, 212, imag(tx_fdm_log_c(1:n)), imag(tx_fdm_log(1:n) - tx_fdm_log_c(1:n)), 'tx fdm im', [1 n -10 10])
+stem_sig_and_error(3, 211, real(tx_fdm_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
+stem_sig_and_error(3, 212, imag(tx_fdm_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
+stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
+stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
 
+if 0
 stem_sig_and_error(4, 211, real(ch_symb_log_c(1:n)), real(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb re', [1 n -2 2])
 stem_sig_and_error(4, 212, imag(ch_symb_log_c(1:n)), imag(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb im', [1 n -2 2])
 stem_sig_and_error(5, 211, rx_amp_log_c(1:n), rx_amp_log(1:n) - rx_amp_log_c(1:n), 'Amp Est', [1 n -1.5 1.5])
@@ -278,12 +281,15 @@ stem_sig_and_error(5, 212, rx_phi_log_c(1:n), rx_phi_log(1:n) - rx_phi_log_c(1:n
 stem_sig_and_error(6, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb re', [1 n -1.5 1.5])
 stem_sig_and_error(6, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
 stem_sig_and_error(7, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
+end
 
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symb_log, tx_symb_log_c, 'tx_symb');
-check(tx_fdm_log, tx_fdm_log_c, 'tx_fdm');
-check(rx_fdm_log, rx_fdm_log_c, 'rx_fdm');
+check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
+check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
+
 if 0
+
 check(rx_baseband_log, rx_baseband_log_c, 'rx_baseband',0.01);
 check(rx_filt_log, rx_filt_log_c, 'rx_filt');
 check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
@@ -308,21 +314,17 @@ printf("f_err std: %f  fails: %d\n", std(f_err_log), f_err_fail);
 
 function write_noise_file(noise_log)
 
-  [m n] = size(noise_log);
+  m = length(noise_log);
 
   filename = sprintf("../unittest/noise_samples.h");
   f=fopen(filename,"wt");
   fprintf(f,"/* Generated by write_noise_file() Octave function */\n\n");
-  fprintf(f,"COMP noise[][PILOTS_NC]={\n");
+  fprintf(f,"COMP noise[]={\n");
   for r=1:m
-    fprintf(f, "  {");
-    for c=1:n-1
-      fprintf(f, "  {%f,%f},", real(noise_log(r, c)), imag(noise_log(r, c)));
-    end
     if r < m
-      fprintf(f, "  {%f,%f}},\n", real(noise_log(r, n)), imag(noise_log(r, n)));
+      fprintf(f, "  {%f,%f},\n", real(noise_log(r)), imag(noise_log(r)));
     else
-      fprintf(f, "  {%f,%f}}\n};", real(noise_log(r, n)), imag(noise_log(r, n)));
+      fprintf(f, "  {%f,%f}\n};", real(noise_log(r)), imag(noise_log(r)));
     end
   end
 
