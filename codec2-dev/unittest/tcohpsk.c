@@ -42,11 +42,11 @@
 #include "test_bits_coh.h"
 #include "octave.h"
 #include "comp_prim.h"
-//#include "noise_samples.h"
+#include "noise_samples.h"
 
-#define FRAMES (35*4)
+#define FRAMES 35
 #define RS     50
-#define FOFF   1
+#define FOFF   0
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -55,16 +55,18 @@ int main(int argc, char *argv[])
     struct COHPSK *coh;
     int            tx_bits[COHPSK_BITS_PER_FRAME];
     COMP           tx_symb[NSYMROWPILOT][PILOTS_NC];
-    COMP           tx_fdm[M*NSYMROWPILOT];
-    COMP           rx_fdm[M*NSYMROWPILOT];
+    COMP           tx_fdm_frame[M*NSYMROWPILOT];
+    COMP           ch_fdm_frame[M*NSYMROWPILOT];
+    COMP           rx_fdm_frame_bb[M*NSYMROWPILOT];
     COMP           ch_symb[NSYMROWPILOT][PILOTS_NC];
     COMP           ct_symb_buf[2*NSYMROWPILOT][COHPSK_NC];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
     COMP           tx_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
-    COMP           tx_fdm_log[M*NSYMROWPILOT*FRAMES];
-    COMP           rx_fdm_log[M*NSYMROWPILOT*FRAMES];
+    COMP           tx_fdm_frame_log[M*NSYMROWPILOT*FRAMES];
+    COMP           ch_fdm_frame_log[M*NSYMROWPILOT*FRAMES];
+    COMP           rx_fdm_frame_bb_log[M*NSYMROWPILOT*FRAMES];
     COMP           ch_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
 
     float          rx_amp_log[NSYMROW*FRAMES][PILOTS_NC];
@@ -74,9 +76,9 @@ int main(int argc, char *argv[])
                                           
     FILE          *fout;
     int            f, r, c, log_r, log_data_r, noise_r, i;
-    COMP           phase, freq;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
-    float           freq_hz;
+    float          freq_hz;
+    COMP           phase_ch;
 
     struct FDMDV  *fdmdv;
     COMP           rx_baseband[PILOTS_NC][M+M/P];
@@ -91,10 +93,9 @@ int main(int argc, char *argv[])
     COMP           rx_onesym[PILOTS_NC];
     int            rx_baseband_log_col_index = 0;
     COMP           rx_baseband_log[PILOTS_NC][(M+M/P)*NSYMROWPILOT*FRAMES];
-    
-    int            t,ct,p;
-    float          max_corr;
-    COMP           corr;
+
+    int            ct;
+    int            sync, next_sync;
 
     coh = cohpsk_create();
     assert(coh != NULL);
@@ -105,9 +106,9 @@ int main(int argc, char *argv[])
 
     memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
-    phase.real = 1.0; phase.imag = 0.0; 
-    freq.real = cos(2.0*M_PI*FOFF/RS); freq.imag = sin(2.0*M_PI*FOFF/RS);
-
+    phase_ch.real = 1.0; phase_ch.imag = 0.0; 
+    sync = 0;
+    
     /* set up fdmdv states so we can use those modem functions */
 
     fdmdv = fdmdv_create(PILOTS_NC - 1);
@@ -146,32 +147,30 @@ int main(int argc, char *argv[])
         for(r=0; r<NSYMROWPILOT; r++) {
            for(c=0; c<PILOTS_NC; c++) 
               tx_onesym[c] = tx_symb[r][c];         
-          tx_filter_and_upconvert(&tx_fdm[r*M], fdmdv->Nc , tx_onesym, fdmdv->tx_filter_memory, 
-                                  fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
+           tx_filter_and_upconvert(&tx_fdm_frame[r*M], fdmdv->Nc , tx_onesym, fdmdv->tx_filter_memory, 
+                                   fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
         }
 
-        #ifdef TMP
-        for(r=0; r<NSYMROWPILOT; r++,noise_r++) {
-            phase = cmult(phase,freq);
-            for(c=0; c<PILOTS_NC; c++) {
-                ch_symb[r][c] = cadd(cmult(tx_symb[r][c], phase), noise[noise_r][c]);
-                //printf("%d %d %f %f \n",r,c,ch_symb[r][c].real, ch_symb[r][c].imag);
-                //ch_symb[r][c] = cmult(tx_symb[r][c], phase);
-             }
-        }
-        phase = fcmult(1.0/cabsolute(phase), phase);
-        #endif
+        fdmdv_freq_shift(ch_fdm_frame, tx_fdm_frame, FOFF, &phase_ch, NSYMROWPILOT*M);
 
-        memcpy(rx_fdm, tx_fdm, sizeof(COMP)*M*NSYMROWPILOT);
+        for(r=0; r<NSYMROWPILOT*M; r++,noise_r++) {
+            ch_fdm_frame[r] = cadd(ch_fdm_frame[r], noise[noise_r]);
+        }
 
 	/* --------------------------------------------------------*\
 	                          Demod
 	\*---------------------------------------------------------*/
 
+        next_sync = sync;
+
+        coarse_freq_offset_est(coh, fdmdv, ch_fdm_frame, sync, &next_sync);
+
+        /* sample rate demod processing */
+
         nin = M;
         for (r=0; r<NSYMROWPILOT; r++) {
-          fdmdv_freq_shift(&rx_fdm[r*M], &rx_fdm[r*M], -FDMDV_FCENTRE, &fdmdv->fbb_phase_rx, nin);
-          fdm_downconvert(rx_baseband, fdmdv->Nc, &rx_fdm[r*M], fdmdv->phase_rx, fdmdv->freq, nin);
+          fdmdv_freq_shift(&rx_fdm_frame_bb[r*M], &ch_fdm_frame[r*M], -coh->f_est, &fdmdv->fbb_phase_rx, nin);
+          fdm_downconvert(rx_baseband, fdmdv->Nc, &rx_fdm_frame_bb[r*M], fdmdv->phase_rx, fdmdv->freq, nin);
           rx_filter(rx_filt, fdmdv->Nc, rx_baseband, rx_filter_memory, nin);
 	  rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);
           
@@ -195,42 +194,24 @@ int main(int argc, char *argv[])
 
         }
 
-        /* coarse frame sync */
-
-        for(r=0; r<NSYMROWPILOT; r++)
-            for(c=0; c<PILOTS_NC; c++) {
-                ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
-                ct_symb_buf[r+NSYMROWPILOT][c] = ch_symb[r][c];
-            }
-        
-        max_corr = 0;
-        for(t=0; t<NSYMROWPILOT; t++) {
-            
-            corr.real = corr.imag = 0.0;
-            for(p=0; p<NPILOTSFRAME; p++) {
-                for(c=0; c<PILOTS_NC; c++) {
-                    corr = cadd(corr,fcmult(pilots_coh[p][c], ct_symb_buf[t+p*(NS+1)][c]));
-                }
-            }
-        
-            if (cabsolute(corr) > max_corr) {
-                max_corr = cabsolute(corr);
-                ct = t;
-            }
-        }
-        //printf("max_corr: %f ct: %d\n", max_corr, ct);
+        /* coarse timing (frame sync) and initial fine freq est */
+  
+        frame_sync_fine_timing_est(coh, ch_symb, sync, &next_sync);
 
         /* Coherent phase estimation and correction */
 
         qpsk_symbols_to_bits(coh, rx_bits, ct_symb_buf + ct);
         
+        sync = sync_state_machine(sync, next_sync);
+
 	/* --------------------------------------------------------*\
 	                       Log each vector 
 	\*---------------------------------------------------------*/
 
 	memcpy(&tx_bits_log[COHPSK_BITS_PER_FRAME*f], tx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
-	memcpy(&tx_fdm_log[M*NSYMROWPILOT*f], tx_fdm, sizeof(COMP)*M*NSYMROWPILOT);
-       	memcpy(&rx_fdm_log[M*NSYMROWPILOT*f], rx_fdm, sizeof(COMP)*M*NSYMROWPILOT);
+	memcpy(&tx_fdm_frame_log[M*NSYMROWPILOT*f], tx_fdm_frame, sizeof(COMP)*M*NSYMROWPILOT);
+	memcpy(&ch_fdm_frame_log[M*NSYMROWPILOT*f], ch_fdm_frame, sizeof(COMP)*M*NSYMROWPILOT);
+       	memcpy(&rx_fdm_frame_bb_log[M*NSYMROWPILOT*f], rx_fdm_frame_bb, sizeof(COMP)*M*NSYMROWPILOT);
 
 	for(r=0; r<NSYMROWPILOT; r++, log_r++) {
             for(c=0; c<PILOTS_NC; c++) {
@@ -249,7 +230,7 @@ int main(int argc, char *argv[])
 	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
 	assert(log_r <= NSYMROWPILOT*FRAMES);
-	assert(noise_r <= NSYMROWPILOT*FRAMES);
+	assert(noise_r <= NSYMROWPILOT*M*FRAMES);
 	assert(log_data_r <= NSYMROW*FRAMES);
     }
 
@@ -264,8 +245,9 @@ int main(int argc, char *argv[])
     fprintf(fout, "# Created by tcohpsk.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symb_log_c", (COMP*)tx_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
-    octave_save_complex(fout, "rx_fdm_log_c", (COMP*)rx_fdm_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
+    octave_save_complex(fout, "tx_fdm_frame_log_c", (COMP*)tx_fdm_frame_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
+    octave_save_complex(fout, "ch_fdm_frame_log_c", (COMP*)ch_fdm_frame_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
+    octave_save_complex(fout, "rx_fdm_frame_bb_log_c", (COMP*)rx_fdm_frame_bb_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, PILOTS_NC, rx_baseband_log_col_index, (M+M/P)*FRAMES*NSYMROWPILOT);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, PILOTS_NC, rx_filt_log_col_index, (P+1)*FRAMES*NSYMROWPILOT);  
     octave_save_complex(fout, "ch_symb_log_c", (COMP*)ch_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  

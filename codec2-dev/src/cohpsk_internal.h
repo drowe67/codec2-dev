@@ -28,11 +28,23 @@
 #ifndef __COHPSK_INTERNAL__
 #define __COHPSK_INTERNAL__
 
+#define COARSE_FEST_NDFT 1024
+#define NCT_SYMB_BUF     (2*NSYMROWPILOT+2)
+
+#include "kiss_fft.h"
+
 struct COHPSK {
-    float pilot2[2*NPILOTSFRAME][PILOTS_NC];    
-    float phi_[NSYMROW][PILOTS_NC];                     /* phase estimates for this frame of rx data symbols     */
-    float amp_[NSYMROW][PILOTS_NC];                     /* amplitude estimates for this frame of rx data symbols */
-    COMP  rx_symb[NSYMROW][PILOTS_NC];                  /* demodulated symbols                                   */
+    float        pilot2[2*NPILOTSFRAME][PILOTS_NC];    
+    float        phi_[NSYMROW][PILOTS_NC];           /* phase estimates for this frame of rx data symbols     */
+    float        amp_[NSYMROW][PILOTS_NC];           /* amplitude estimates for this frame of rx data symbols */
+    COMP         rx_symb[NSYMROW][PILOTS_NC];        /* demodulated symbols                                   */
+    kiss_fft_cfg fft_coarse_fest;
+    float        f_est;
+    COMP         ct_symb_buf[NCT_SYMB_BUF][PILOTS_NC];
+    float        f_fine_est;
+    int          ct;
+    COMP         ff_rect;
 };
+
 
 #endif

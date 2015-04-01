@@ -1001,6 +1001,22 @@ function [sync reliable_sync_bit state timer sync_mem] = freq_state(sync_bit, st
 endfunction
 
 
+% complex freq shifting helper function
+
+function [out phase] = freq_shift(in, freqHz, Fs, phase)
+  freq_rect = exp(j*2*pi*freqHz/Fs);
+
+  out = zeros(1, length(in));
+  for r=1:length(in)
+    phase *= freq_rect;
+    out(r) = in(r)*phase;
+  end
+
+  mag = abs(phase);
+  phase /= mag;
+endfunction
+
+
 % Save test bits to a text file in the form of a C array
 
 function test_bits_file(filename)

@@ -477,14 +477,16 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
   if sync == 0
     f_start = Fcentre - ((Nc/2)+2)*Fsep; 
     f_stop = Fcentre + ((Nc/2)+2)*Fsep;
-    T = abs(fft(ch_fdm_frame(1:6*M).* hanning(6*M)', Ndft)).^2;
+    ll = length(ch_fdm_frame);
+    h = 0.5 - 0.5*cos(2*pi*(0:ll-1)/(ll-1));
+    T = abs(fft(ch_fdm_frame .* h, Ndft)).^2;
     sc = Ndft/Fs;
     bin_start = floor(f_start*sc+0.5)+1;
     bin_stop = floor(f_stop*sc+0.5)+1;
     x = bin_start-1:bin_stop-1;
     bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
     cohpsk.f_est = bin_est/sc;
-    printf("coarse freq est: %f\n", cohpsk.f_est);
+    printf("bin_est: %f coarse freq est: %f\n", bin_est, cohpsk.f_est);
     next_sync = 1;
   end
 
@@ -511,7 +513,7 @@ function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, 
     i++;
   end
   cohpsk.ct_symb_buf = ct_symb_buf;
-
+  
   % sample pilots at start of this frame and start of next frame 
 
   sampling_points = [1 2 7 8];
