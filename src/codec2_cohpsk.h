@@ -41,7 +41,8 @@ void cohpsk_destroy(struct COHPSK *coh);
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC], int tx_bits[], int nbits);
 void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][COHPSK_NC]);
 void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm_frame[], int sync, int *next_sync);
-void frame_sync_fine_timing_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC], int sync, int *next_sync);
-int sync_state_machine(sync, next_sync);
+void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC], int sync, int *next_sync);
+void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync);
+int sync_state_machine(int sync, int next_sync);
 
 #endif

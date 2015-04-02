@@ -105,6 +105,8 @@ struct COHPSK *cohpsk_create(void)
         }
     }
 
+    coh->ff_phase.real = 1.0; coh->ff_phase.imag = 0.0;
+
     return coh;
 }
 
@@ -193,10 +195,10 @@ void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int nbits)
 
 void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][COHPSK_NC])
 {
-    int   r, c, i;
-    COMP  corr, rot, pi_on_4;
+    int   p, r, c, i;
+    COMP  corr, rot, pi_on_4, phi_rect;
     float mag, phi_, amp_;
-    short sampling_points[] = {1, 2, 7, 8};
+    short sampling_points[] = {0, 1, 6, 7};
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
    
@@ -206,14 +208,14 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
 
     for(c=0; c<PILOTS_NC; c++) {
         corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
-        for(r=0; r<2*NPILOTSFRAME; r++) {
-            corr = cadd(corr, fcmult(coh->pilot2[r][c], ct_symb_buf[sampling_points[r]][c]));
-            mag  += cabsolute(ct_symb_buf[sampling_points[r]][c]);
+        for(p=0; p<NPILOTSFRAME+2; p++) {
+            corr = cadd(corr, fcmult(coh->pilot2[p][c], ct_symb_buf[sampling_points[p]][c]));
+            mag  += cabsolute(ct_symb_buf[sampling_points[p]][c]);
         }
       
         phi_ = atan2f(corr.imag, corr.real);
-        amp_ =  mag/2*NPILOTSFRAME;
-        for(r=0; r<2*NPILOTSFRAME; r++) {
+        amp_ =  mag/(NPILOTSFRAME+2);
+        for(r=0; r<NSYMROW; r++) {
             coh->phi_[r][c] = phi_;
             coh->amp_[r][c] = amp_;
         }
@@ -222,16 +224,19 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
     /* now correct phase of data symbols and make decn on bits */
 
     for(c=0; c<PILOTS_NC; c++) {
-        rot.real = cosf(coh->phi_[0][c]); rot.imag = -sinf(coh->phi_[0][c]);
+        phi_rect.real = cosf(coh->phi_[0][c]); phi_rect.imag = -sinf(coh->phi_[0][c]);
+        //rot.real = 1.0; rot.imag = 0.0;
         for (r=0; r<NSYMROW; r++) {
             i = c*NSYMROW + r;
-            coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], rot);
+            coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], phi_rect);
+            //printf("%d %d %f %f\n", r,c, coh->rx_symb[r][c].real, coh->rx_symb[r][c].imag);
+            //printf("phi_ %d %d %f %f\n", r,c, ct_symb_buf[NPILOTSFRAME + r][c].real, ct_symb_buf[NPILOTSFRAME + r][c].imag);
             rot = cmult(coh->rx_symb[r][c], pi_on_4);
             rx_bits[2*i+1] = rot.real < 0;
             rx_bits[2*i]   = rot.imag < 0;
         }
     }
-
+    
 }
 
 
@@ -260,13 +265,14 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
         sc = (float)COARSE_FEST_NDFT/FS;
         bin_start = floorf(f_start*sc+0.5);
         bin_stop = floorf(f_stop*sc+0.5);
-        // printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n",
-        //       f_start, f_stop, sc, bin_start, bin_stop);
+        //printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n",
+        //        f_start, f_stop, sc, bin_start, bin_stop);
 
         for(i=0; i<NSYMROWPILOT*M; i++) {
             h = 0.5 - 0.5*cosf(2*M_PI*i/(NSYMROWPILOT*M-1));
             s[i] = fcmult(h, ch_fdm_frame[i]); 
         }
+        
         for (; i<COARSE_FEST_NDFT; i++) {
             s[i].real = 0.0;
             s[i].imag = 0.0;
@@ -277,16 +283,16 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
         /* find centroid of signal energy inside search window */
 
         num = den = 0.0;
-        for(i=bin_start; i<bin_stop; i++) {
+        for(i=bin_start; i<=bin_stop; i++) {
             magsq = S[i].real*S[i].real + S[i].imag*S[i].imag;
-            num += (float)(i+1)*magsq;
+            num += (float)(i)*magsq;
             den += magsq;
         }
         bin_est = num/den;
-        coh->f_est = bin_est/sc;
+        coh->f_est = floor(bin_est/sc+0.5);
 
-        printf("bin_est: %f coarse freq est: %f\n", bin_est, coh->f_est);
-     
+        printf("coarse freq est: %f\n", coh->f_est);
+        
         *next_sync = 1;
     }
 }
@@ -298,14 +304,16 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
   AUTHOR......: David Rowe			      
   DATE CREATED: April 2015
 
-  Returns an estimate of frequency offset, advances to next sync state.
+  Returns an estimate of frame sync (coarse timing) offset and fine
+  frequency offset, advances to next sync state if we have a reliable
+  match for frame sync.
 
   TODO: This is very stack heavy for an embedded uC.  Tweak algorthim to use
         a smaller DFT and test.
 
 \*---------------------------------------------------------------------------*/
 
-void frame_sync_fine_timing_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int sync, int *next_sync)
+void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int sync, int *next_sync)
 {
     int   sampling_points[] = {0, 1, 6, 7};
     int   r,c,i,p,t;
@@ -339,14 +347,14 @@ void frame_sync_fine_timing_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], i
                 corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
                 for (c=0; c<PILOTS_NC; c++) {
                     for (p=0; p<NPILOTSFRAME+2; p++) {
-                        f_fine_rect.real = cosf(-f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
-                        f_fine_rect.imag = sinf(-f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
+                        f_fine_rect.real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
+                        f_fine_rect.imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
                         f_corr = cmult(f_fine_rect, coh->ct_symb_buf[t+sampling_points[p]][c]);
                         corr = cadd(corr, fcmult(coh->pilot2[p][c], f_corr));
                         mag  += cabsolute(f_corr);
                     }
                 }
-                //printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
+                //printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, corr.real, corr.imag);
                 if (cabsolute(corr) > max_corr) {
                     max_corr = cabsolute(corr);
                     max_mag = mag;
@@ -357,8 +365,8 @@ void frame_sync_fine_timing_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], i
         }
 
 
-        coh->ff_rect.real = cosf(-coh->f_fine_est*2.0*M_PI/RS);
-        coh->ff_rect.imag = sinf(-coh->f_fine_est*2.0*M_PI/RS);
+        coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/RS);
+        coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/RS);
         printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
  
         if (max_corr/max_mag > 0.9) {
@@ -367,18 +375,83 @@ void frame_sync_fine_timing_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], i
         }
         else {
             *next_sync = 0;
-            printf("  back to coarse freq offset ets...\n");
+            printf("  back to coarse freq offset est...\n");
         }
-        //exit(0);
+        
     }
 }
 
 
-int sync_state_machine(sync, next_sync)
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fine_freq_correct()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: April 2015
+
+  Fine frequency correction of symbols at rate Rs.
+
+\*---------------------------------------------------------------------------*/
+
+void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync) {
+    int   r,c;
+    float mag;
+
+  /*
+    We can decode first frame that we achieve sync.  Need to fine freq
+    correct all of it's symbols, including pilots.  From then on, just
+    correct new symbols into frame.  make copy, so if we lose sync we
+    havent fine freq corrected ct_symb_buf if next_sync == 4 correct
+    all 8 if sync == 2 correct latest 6.
+  */
+
+  if ((next_sync == 4) || (sync == 4)) {
+
+      if ((next_sync == 4) && (sync == 2)) {
+          
+          /* first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples */
+
+          for(r=0; r<NSYMROWPILOT+2; r++) {
+              coh->ff_phase = cmult(coh->ff_phase, cconj(coh->ff_rect));
+              for(c=0; c<PILOTS_NC; c++) {
+                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
+                  coh->ct_symb_ff_buf[r][c] = cmult(coh->ct_symb_ff_buf[r][c], coh->ff_phase);
+              }
+          }
+      }
+      else {
+          
+          /* second and subsequent frames, just fine freq correct the latest Nsymbrowpilot */
+
+          for(r=0; r<2; r++) {
+              for(c=0; c<PILOTS_NC; c++) {
+                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_ff_buf[r+NSYMROWPILOT][c];
+              }
+          }
+          
+          for(; r<NSYMROWPILOT+2; r++) {
+              coh->ff_phase = cmult(coh->ff_phase, cconj(coh->ff_rect));
+              for(c=0; c<PILOTS_NC; c++) {
+                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
+                  //printf("%d %d %f %f\n", r,c,coh->ct_symb_ff_buf[r][c].real, coh->ct_symb_ff_buf[r][c].imag);
+                  coh->ct_symb_ff_buf[r][c] = cmult(coh->ct_symb_ff_buf[r][c], coh->ff_phase);
+              }
+          }
+      }
+
+      mag = cabsolute(coh->ff_phase);
+      coh->ff_phase.real /= mag;
+      coh->ff_phase.imag /= mag;
+  }
+}
+
+
+int sync_state_machine(int sync, int next_sync)
 {
     if (sync == 1)
         next_sync = 2;
     sync = next_sync;
+
+    return sync;
 }
 
 
