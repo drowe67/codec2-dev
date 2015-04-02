@@ -53,13 +53,19 @@ function check(a, b, test_name, tol)
   end
 
   [m n] = size(a);
+  if m > n
+    ll = m;
+  else
+    ll = n;
+  end
+
   printf("%s", test_name);
   for i=1:(25-length(test_name))
     printf(".");
   end
   printf(": ");  
   
-  e = sum(sum(abs(a - b))/n);
+  e = sum(sum(abs(a - b))/ll);
   if e < tol
     printf("OK\n");
     passes++;

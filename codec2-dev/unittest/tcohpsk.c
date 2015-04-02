@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     COMP           ch_fdm_frame_log[M*NSYMROWPILOT*FRAMES];
     COMP           rx_fdm_frame_bb_log[M*NSYMROWPILOT*FRAMES];
     COMP           ch_symb_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
-
+    COMP           ct_symb_ff_log[NSYMROWPILOT*FRAMES][PILOTS_NC];
     float          rx_amp_log[NSYMROW*FRAMES][PILOTS_NC];
     float          rx_phi_log[NSYMROW*FRAMES][PILOTS_NC];
     COMP           rx_symb_log[NSYMROW*FRAMES][PILOTS_NC];
@@ -94,13 +94,12 @@ int main(int argc, char *argv[])
     int            rx_baseband_log_col_index = 0;
     COMP           rx_baseband_log[PILOTS_NC][(M+M/P)*NSYMROWPILOT*FRAMES];
 
-    int            ct;
-    int            sync, next_sync;
+    int            sync, next_sync, log_bits;
 
     coh = cohpsk_create();
     assert(coh != NULL);
 
-    log_r = log_data_r = noise_r = 0;
+    log_r = log_data_r = noise_r = log_bits = 0;
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
@@ -196,14 +195,16 @@ int main(int argc, char *argv[])
 
         /* coarse timing (frame sync) and initial fine freq est */
   
-        frame_sync_fine_timing_est(coh, ch_symb, sync, &next_sync);
-
-        /* Coherent phase estimation and correction */
-
-        qpsk_symbols_to_bits(coh, rx_bits, ct_symb_buf + ct);
+        frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
+        fine_freq_correct(coh, sync, next_sync);
         
-        sync = sync_state_machine(sync, next_sync);
+        if ((sync == 4) || (next_sync == 4)) {
+           qpsk_symbols_to_bits(coh, rx_bits, coh->ct_symb_ff_buf);
+        }
 
+        //printf("f: %d sync: %d next_sync: %d\n", f, sync, next_sync);
+        sync = sync_state_machine(sync, next_sync);
+        
 	/* --------------------------------------------------------*\
 	                       Log each vector 
 	\*---------------------------------------------------------*/
@@ -217,23 +218,27 @@ int main(int argc, char *argv[])
             for(c=0; c<PILOTS_NC; c++) {
 		tx_symb_log[log_r][c] = tx_symb[r][c]; 
 		ch_symb_log[log_r][c] = ch_symb[r][c]; 
+		ct_symb_ff_log[log_r][c] = coh->ct_symb_ff_buf[r][c]; 
             }
         }
 
-	for(r=0; r<NSYMROW; r++, log_data_r++) {
-            for(c=0; c<PILOTS_NC; c++) {
-		rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
-		rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
-		rx_symb_log[log_data_r][c] = coh->rx_symb[r][c]; 
+        if ((sync == 4) || (next_sync == 4)) {
+
+           for(r=0; r<NSYMROW; r++, log_data_r++) {
+                for(c=0; c<PILOTS_NC; c++) {
+                    rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
+                    rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
+                    rx_symb_log[log_data_r][c] = coh->rx_symb[r][c]; 
+                }
             }
+            memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*log_bits], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
+            log_bits++;
         }
-	memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*f], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
 	assert(log_r <= NSYMROWPILOT*FRAMES);
 	assert(noise_r <= NSYMROWPILOT*M*FRAMES);
 	assert(log_data_r <= NSYMROW*FRAMES);
     }
-
 
     /*---------------------------------------------------------*\
                Dump logs to Octave file for evaluation 
@@ -251,10 +256,11 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, PILOTS_NC, rx_baseband_log_col_index, (M+M/P)*FRAMES*NSYMROWPILOT);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, PILOTS_NC, rx_filt_log_col_index, (P+1)*FRAMES*NSYMROWPILOT);  
     octave_save_complex(fout, "ch_symb_log_c", (COMP*)ch_symb_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, NSYMROW*FRAMES, PILOTS_NC, PILOTS_NC);  
-    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
+    octave_save_complex(fout, "ct_symb_ff_log_c", (COMP*)ct_symb_ff_log, NSYMROWPILOT*FRAMES, PILOTS_NC, PILOTS_NC);  
+    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, PILOTS_NC, PILOTS_NC);  
+    octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, PILOTS_NC, PILOTS_NC);  
+    octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, PILOTS_NC, PILOTS_NC);  
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*log_bits);
     fclose(fout);
 
     fdmdv_destroy(fdmdv);

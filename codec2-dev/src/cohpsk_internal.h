@@ -41,9 +41,11 @@ struct COHPSK {
     kiss_fft_cfg fft_coarse_fest;
     float        f_est;
     COMP         ct_symb_buf[NCT_SYMB_BUF][PILOTS_NC];
+    int          ct;                                 /* coarse timing offset in symbols                       */
     float        f_fine_est;
-    int          ct;
     COMP         ff_rect;
+    COMP         ff_phase;
+    COMP         ct_symb_ff_buf[NSYMROWPILOT+2][PILOTS_NC];
 };
 
 

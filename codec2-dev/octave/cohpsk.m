@@ -224,9 +224,11 @@ function [rx_symb rx_bits amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk,
     for c=1:Nc
       for r=1:Nsymbrow
         i = (c-1)*Nsymbrow + r;
-        rx_symb(i) = ct_symb_buf(2+r,c)*exp(-j*phi_(c));
+        rx_symb(r,c) = ct_symb_buf(2+r,c)*exp(-j*phi_(r,c));
+        %rx_symb(r,c) = ct_symb_buf(2+r,c);
         rx_symb_linear(i) = rx_symb(i);
         rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
+        %printf("phi_ %d %d %f %f\n", r,c,real(exp(-j*phi_(r,c))), imag(exp(-j*phi_(r,c))));
       end
     end
 
@@ -483,11 +485,15 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
     sc = Ndft/Fs;
     bin_start = floor(f_start*sc+0.5)+1;
     bin_stop = floor(f_stop*sc+0.5)+1;
+
+    %printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n", f_start, f_stop, sc, bin_start, bin_stop);
+
     x = bin_start-1:bin_stop-1;
     bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
-    cohpsk.f_est = bin_est/sc;
-    printf("bin_est: %f coarse freq est: %f\n", bin_est, cohpsk.f_est);
+    cohpsk.f_est = floor(bin_est/sc+0.5);
+    printf("coarse freq est: %f\n", cohpsk.f_est);
     next_sync = 1;
+    
   end
 
 endfunction
@@ -495,7 +501,7 @@ endfunction
 
 % returns index of start of frame and fine freq offset
 
-function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, next_sync)
+function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, next_sync)
   ct_symb_buf   = cohpsk.ct_symb_buf;
   Nct_sym_buf   = cohpsk.Nct_sym_buf;
   Rs            = cohpsk.Rs;
@@ -552,7 +558,7 @@ function [next_sync cohpsk] = frame_sync_fine_timing_est(cohpsk, ch_symb, sync, 
       next_sync = 4;
     else
       next_sync = 0;
-      printf("  back to coarse freq offset ets...\n");
+      printf("  back to coarse freq offset est...\n");
     end
   end
 endfunction
@@ -571,8 +577,8 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
 
   if (next_sync == 4) || (sync == 4)
 
-    if next_sync == 4
-
+    if (next_sync == 4) && (sync == 2)
+      
       % first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples
 
       ct_symb_ff_buf = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
@@ -582,14 +588,14 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
       end
 
     else
-      
+
       % second and subsequent frames, just fine freq correct the latest Nsymbrowpilot
 
-      ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(Nsymbrowpilot+1:Nsymbrowpilot+2,:);
-      ct_symb_ff_buf(3:Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
+      ct_symb_ff_buf(3:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
       for r=3:acohpsk.Nsymbrowpilot+2
-        afdmdv.ff_phase *= afdmdv.ff_rect';
-        ct_symb_ff_buf(r,:) *= afdmdv.ff_phase;
+        acohpsk.ff_phase *= acohpsk.ff_rect';
+       ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
       end
 
     end

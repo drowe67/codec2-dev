@@ -104,11 +104,13 @@ rx_phi_log = [];
 ch_symb_log = [];
 rx_symb_log = [];
 rx_bits_log = [];
+tx_bits_prev_log = [];
 noise_log = [];
 nerr_log = [];
 tx_baseband_log = [];
 tx_fdm_frame_log = [];
 ch_fdm_frame_log = [];
+rx_fdm_frame_bb_log = [];
 
 phase = 1;
 freq = exp(j*2*pi*foff/acohpsk.Rs);
@@ -123,6 +125,7 @@ rx_baseband_log = [];
 rx_fdm_frame_log = [];
 f_err_log = [];
 f_err_fail = 0;
+ct_symb_ff_log = [];
 
 phase_ch = 1;
 sync = 0;
@@ -208,7 +211,7 @@ for i=1:frames
   end
   mag = abs(fbb_phase_rx);
   fbb_phase_rx /= mag;
-  rx_fdm_frame_bb_log = [rx_fdm_log rx_fdm_frame_bb];
+  rx_fdm_frame_bb_log = [rx_fdm_frame_bb_log rx_fdm_frame_bb];
   
   % sample rate demod processing
 
@@ -232,13 +235,9 @@ for i=1:frames
 
   % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
-  [next_sync acohpsk] = frame_sync_fine_timing_est(acohpsk, ch_symb, sync, next_sync);
-
-  if (i==1000)
-    xx
-  end
-
+  [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
   acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
+  ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
 
   if (sync == 4) || (next_sync == 4)  
     [rx_symb rx_bits amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
@@ -246,17 +245,17 @@ for i=1:frames
     rx_amp_log = [rx_amp_log; amp_];
     rx_phi_log = [rx_phi_log; phi_];
     rx_bits_log = [rx_bits_log rx_bits];
+    tx_bits_prev_log = [tx_bits_prev_log prev_tx_bits2];
 
     % BER stats
 
-    if i > 2
-      error_positions = xor(prev_tx_bits2, rx_bits);
-      Nerrs  += sum(error_positions);
-      nerr_log = [nerr_log sum(error_positions)];
-     Tbits += length(error_positions);
-    end 
+    error_positions = xor(prev_tx_bits2, rx_bits);
+    Nerrs  += sum(error_positions);
+    nerr_log = [nerr_log sum(error_positions)];
+    Tbits += length(error_positions);
   end
 
+  %printf("f: %d sync: %d next_sync: %d\n", i, sync, next_sync);
   sync = sync_state_machine(sync, next_sync);
 
   prev_tx_bits2 = prev_tx_bits;
@@ -272,43 +271,42 @@ stem_sig_and_error(3, 211, real(tx_fdm_log_c(1:n)), real(tx_fdm_frame_log(1:n) -
 stem_sig_and_error(3, 212, imag(tx_fdm_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
 stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
 stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
+stem_sig_and_error(5, 211, real(rx_fdm_frame_bb_log_c(1:n)), real(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb re', [1 n -10 10])
+stem_sig_and_error(5, 212, imag(rx_fdm_frame_bb_log_c(1:n)), imag(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb im', [1 n -10 10])
 
-if 0
-stem_sig_and_error(4, 211, real(ch_symb_log_c(1:n)), real(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb re', [1 n -2 2])
-stem_sig_and_error(4, 212, imag(ch_symb_log_c(1:n)), imag(ch_symb_log(1:n) - ch_symb_log_c(1:n)), 'ch symb im', [1 n -2 2])
-stem_sig_and_error(5, 211, rx_amp_log_c(1:n), rx_amp_log(1:n) - rx_amp_log_c(1:n), 'Amp Est', [1 n -1.5 1.5])
-stem_sig_and_error(5, 212, rx_phi_log_c(1:n), rx_phi_log(1:n) - rx_phi_log_c(1:n), 'Phase Est', [1 n -4 4])
-stem_sig_and_error(6, 211, real(rx_symb_log_c(1:n)), real(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb re', [1 n -1.5 1.5])
-stem_sig_and_error(6, 212, imag(rx_symb_log_c(1:n)), imag(rx_symb_log(1:n) - rx_symb_log_c(1:n)), 'rx symb im', [1 n -1.5 1.5])
-stem_sig_and_error(7, 111, rx_bits_log_c(1:n), rx_bits_log(1:n) - rx_bits_log_c(1:n), 'rx bits', [1 n -1.5 1.5])
-end
+[n m] = size(ch_symb_log);
+stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
+stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
+stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
+stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
+
+stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
+stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
+stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
+stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
+stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 n -1.5 1.5])
 
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_symb_log, tx_symb_log_c, 'tx_symb');
 check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
 check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
-
-if 0
-
-check(rx_baseband_log, rx_baseband_log_c, 'rx_baseband',0.01);
-check(rx_filt_log, rx_filt_log_c, 'rx_filt');
+check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
 check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
+check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
-check(rx_phi_log, rx_phi_log_c, 'rx_phi_log');
+check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.01);
 check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
-end
 
 % Determine bit error rate
 
 sz = length(tx_bits_log_c);
-Nerrs_c = sum(xor(tx_bits_log_c(framesize+1:sz-2*framesize), rx_bits_log_c(3*framesize+1:sz)));
-Tbits_c = sz - 2*framesize;
+Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c));
+Tbits_c = length(tx_bits_prev_log);
 ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;
 printf("EsNodB: %4.1f ber..: %3.2f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
-printf("f_err std: %f  fails: %d\n", std(f_err_log), f_err_fail);
 
 % C header file of noise samples so C version gives extacly the same results
 
