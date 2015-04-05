@@ -28,8 +28,9 @@
 #ifndef __CODEC2_COHPSK__
 #define __CODEC2_COHPSK__
 
-#define COHPSK_BITS_PER_FRAME  32             /* hard coded for now */
-#define COHPSK_NC               4             /* hard coded for now */
+#define COHPSK_BITS_PER_FRAME    32               /* hard coded for now */
+#define COHPSK_NC                 4               /* hard coded for now */
+#define COHPSK_SAMPLES_PER_FRAME (NSYMROWPILOT*M)
 
 #include "comp.h"
 #include "codec2_fdmdv.h"
@@ -44,5 +45,8 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC], int sync, int *next_sync);
 void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync);
 int sync_state_machine(int sync, int next_sync);
+
+void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[]);
+void cohpsk_demod(struct COHPSK *cohpsk, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[]);
 
 #endif
