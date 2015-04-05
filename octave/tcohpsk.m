@@ -8,10 +8,25 @@
 %
 % Ideas:
 % [ ] EB/No v BER curves changing Np, freq offset etc
-%     + can do these pretty fast in C, if we jave the channel models
+%     + can do these pretty fast in C, if we have the channel models
 %     [ ] better interpolation between two signals
 %     [ ] feedback to correct out freq offset est
 %     [ ] fading channel
+%     [ ] freq drift
+%     [ ] timing drift
+% [ ] one version to compare Octave to C
+%     [ ] just compare C at some spot points
+%         + drive C simul from command line?
+%         + drive from octave?
+% [ ] one version to unit test against various impairments  
+% [ ] measure/plot BER against impairments and ideal and tune
+%     + 100 errors
+%     [ ] freq offset
+%         + feeback fine freq?  This will cause IL
+%     [ ] fading ch, compared to ideal
+% [ ] smaller freq est block size to min ram req
+% [ ] freq tracking eeback loop 
+
 
 graphics_toolkit ("gnuplot");
 
@@ -22,17 +37,21 @@ autotest;
 rand('state',1); 
 randn('state',1);
 
+% test parameters ----------------------------------------------------------
+
 n = 840;
 frames = 35;
-framesize = 32;
-foff = 0;
-
+foff = 10.5;
 EsNodB = 8;
+
 EsNo = 10^(EsNodB/10);
 variance = 1/EsNo;
 
+% modem constants ----------------------------------------------------------
+
 Rs = 50;
 Nc = 4;
+framesize = 32;
 
 % --------------------------------------------------------------------------
 
@@ -52,9 +71,7 @@ afdmdv.Fcentre = 1500;
 
 afdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
 afdmdv.fbb_phase_tx = 1;
-
-afdmdv.fbb_rect_rx = exp(j*2*pi*(Fcentre)/Fs);
-fbb_phase_rx = 1;
+afdmdv.fbb_phase_rx = 1;
 
 afdmdv.Nrxdec = 31;
 afdmdv.rxdec_coeff = fir1(afdmdv.Nrxdec-1, 0.25)';
@@ -160,22 +177,6 @@ for i=1:frames
   % Channel --------------------------------------------------------------------
   %
 
-  % [X] calibrated noise for 1% errors
-  % [ ] req of x % probability of sync in y ms?
-  %      + take foff est, run filter for XXX symbols?
-  %      + look for a couple of rows of pilots, take metric
-  %      + try to decode frame, say between two pilots?, get corr metric?
-  %      + try again
-  % [ ] manually test at +/-75 Hz
-  % [ ] good BER with freq offset
-  % [ ] Integrate offset est into demod
-  %    + slow application or block based?
-  %    + just need to get a workable first pass for now
-  % [ ] module in cohpsk
-  % [ ] C port
-  % [ ] smaller block size to min ram req
-  % [ ] Feeback loop 
-
   [ch_fdm_frame phase_ch] = freq_shift(tx_fdm_frame, foff, Fs, phase_ch);
   
   % each carrier has power = 2, total power 2Nc, total symbol rate NcRs, noise BW B=Fs
@@ -203,16 +204,9 @@ for i=1:frames
 
   % shift entire FDM signal to 0 Hz
  
-  afdmdv.fbb_rect_rx = exp(j*2*pi*acohpsk.f_est/afdmdv.Fs);
-  rx_fdm_frame_bb = zeros(1, acohpsk.Nsymbrowpilot*M);
-  for r=1:acohpsk.Nsymbrowpilot*M
-    fbb_phase_rx = fbb_phase_rx*afdmdv.fbb_rect_rx';
-    rx_fdm_frame_bb(r) = ch_fdm_frame(r)*fbb_phase_rx;
-  end
-  mag = abs(fbb_phase_rx);
-  fbb_phase_rx /= mag;
+  [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
   rx_fdm_frame_bb_log = [rx_fdm_frame_bb_log rx_fdm_frame_bb];
-  
+
   % sample rate demod processing
 
   ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc);
@@ -267,8 +261,8 @@ stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(
 stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
 stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
 
-stem_sig_and_error(3, 211, real(tx_fdm_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
-stem_sig_and_error(3, 212, imag(tx_fdm_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
+stem_sig_and_error(3, 211, real(tx_fdm_frame_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
+stem_sig_and_error(3, 212, imag(tx_fdm_frame_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
 stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
 stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
 stem_sig_and_error(5, 211, real(rx_fdm_frame_bb_log_c(1:n)), real(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb re', [1 n -10 10])
@@ -307,6 +301,15 @@ ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;
 printf("EsNodB: %4.1f ber..: %3.2f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
+
+% some other useful plots
+
+if 0
+figure
+plot(rx_symb_log,'+')
+figure
+plot(xor(tx_bits_prev_log, rx_bits_log_c),'+')
+end
 
 % C header file of noise samples so C version gives extacly the same results
 
