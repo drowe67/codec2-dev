@@ -97,6 +97,7 @@ int main(int argc, char *argv[])
     int            sync, next_sync, log_bits;
 
     coh = cohpsk_create();
+    fdmdv = coh->fdmdv;
     assert(coh != NULL);
 
     log_r = log_data_r = noise_r = log_bits = 0;
@@ -108,25 +109,6 @@ int main(int argc, char *argv[])
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     sync = 0;
     
-    /* set up fdmdv states so we can use those modem functions */
-
-    fdmdv = fdmdv_create(PILOTS_NC - 1);
-    for(c=0; c<PILOTS_NC; c++) {
-	fdmdv->phase_tx[c].real = 1.0;
- 	fdmdv->phase_tx[c].imag = 0.0;
-
-        freq_hz = fdmdv->fsep*( -PILOTS_NC/2 - 0.5 + c + 1.0 );
-	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/FS);
- 	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/FS);
- 	fdmdv->freq_pol[c]  = 2.0*M_PI*freq_hz/FS;
-
-        //printf("c: %d %f %f\n",c,freq_hz,fdmdv->freq_pol[c]);
-        for(i=0; i<NFILTER; i++) {
-            rx_filter_memory[c][i].real = 0.0;
-            rx_filter_memory[c][i].imag = 0.0;
-        }
-    }
-
     /* Main Loop ---------------------------------------------------------------------*/
 
     for(f=0; f<FRAMES; f++) {
@@ -150,6 +132,10 @@ int main(int argc, char *argv[])
                                    fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
         }
 
+	/* --------------------------------------------------------*\
+	                          Channel
+	\*---------------------------------------------------------*/
+
         fdmdv_freq_shift(ch_fdm_frame, tx_fdm_frame, FOFF, &phase_ch, NSYMROWPILOT*M);
 
         for(r=0; r<NSYMROWPILOT*M; r++,noise_r++) {
@@ -170,7 +156,7 @@ int main(int argc, char *argv[])
         for (r=0; r<NSYMROWPILOT; r++) {
           fdmdv_freq_shift(&rx_fdm_frame_bb[r*M], &ch_fdm_frame[r*M], -coh->f_est, &fdmdv->fbb_phase_rx, nin);
           fdm_downconvert(rx_baseband, fdmdv->Nc, &rx_fdm_frame_bb[r*M], fdmdv->phase_rx, fdmdv->freq, nin);
-          rx_filter(rx_filt, fdmdv->Nc, rx_baseband, rx_filter_memory, nin);
+          rx_filter(rx_filt, fdmdv->Nc, rx_baseband, coh->rx_filter_memory, nin);
 	  rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);
           
           for(c=0; c<PILOTS_NC; c++) {
@@ -263,7 +249,6 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*log_bits);
     fclose(fout);
 
-    fdmdv_destroy(fdmdv);
     cohpsk_destroy(coh);
 
     return 0;

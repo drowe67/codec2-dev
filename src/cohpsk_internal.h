@@ -31,6 +31,7 @@
 #define COARSE_FEST_NDFT 1024
 #define NCT_SYMB_BUF     (2*NSYMROWPILOT+2)
 
+#include "fdmdv_internal.h"
 #include "kiss_fft.h"
 
 struct COHPSK {
@@ -40,12 +41,16 @@ struct COHPSK {
     COMP         rx_symb[NSYMROW][PILOTS_NC];        /* demodulated symbols                                   */
     kiss_fft_cfg fft_coarse_fest;
     float        f_est;
+    COMP         rx_filter_memory[PILOTS_NC][NFILTER];
     COMP         ct_symb_buf[NCT_SYMB_BUF][PILOTS_NC];
     int          ct;                                 /* coarse timing offset in symbols                       */
     float        f_fine_est;
     COMP         ff_rect;
     COMP         ff_phase;
     COMP         ct_symb_ff_buf[NSYMROWPILOT+2][PILOTS_NC];
+    int          sync;
+    
+    struct FDMDV *fdmdv;
 };
 
 

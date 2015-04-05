@@ -75,7 +75,9 @@ static COMP qpsk_mod[] = {
 struct COHPSK *cohpsk_create(void)
 {
     struct COHPSK *coh;
-    int            r,c,p;
+    struct FDMDV  *fdmdv;
+    int            r,c,p,i;
+    float          freq_hz;
 
     coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
     if (coh == NULL)
@@ -106,6 +108,27 @@ struct COHPSK *cohpsk_create(void)
     }
 
     coh->ff_phase.real = 1.0; coh->ff_phase.imag = 0.0;
+    coh->sync = 0;
+
+    /* set up fdmdv states so we can use those modem functions */
+
+    fdmdv = fdmdv_create(PILOTS_NC - 1);
+    for(c=0; c<PILOTS_NC; c++) {
+	fdmdv->phase_tx[c].real = 1.0;
+ 	fdmdv->phase_tx[c].imag = 0.0;
+
+        freq_hz = fdmdv->fsep*( -PILOTS_NC/2 - 0.5 + c + 1.0 );
+	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/FS);
+ 	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/FS);
+ 	fdmdv->freq_pol[c]  = 2.0*M_PI*freq_hz/FS;
+
+        //printf("c: %d %f %f\n",c,freq_hz,fdmdv->freq_pol[c]);
+        for(i=0; i<NFILTER; i++) {
+            coh->rx_filter_memory[c][i].real = 0.0;
+            coh->rx_filter_memory[c][i].imag = 0.0;
+        }
+    }
+    coh->fdmdv = fdmdv;
 
     return coh;
 }
@@ -123,6 +146,7 @@ struct COHPSK *cohpsk_create(void)
 
 void cohpsk_destroy(struct COHPSK *coh)
 {
+    fdmdv_destroy(coh->fdmdv);
     KISS_FFT_FREE(coh->fft_coarse_fest);    
     assert(coh != NULL);
     free(coh);
@@ -455,4 +479,101 @@ int sync_state_machine(int sync, int next_sync)
 }
 
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_mod()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 5/4/2015
 
+  COHPSK modulator, take a frame of COHPSK_BITS_PER_FRAME bits and
+  generates a frame of COHPSK_SAMPLES_PER_FRAME modulated symbols.
+
+  The output signal is complex to support single sided frequency
+  shifting, for example when testing frequency offsets in channel
+  simulation.
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
+{
+    struct FDMDV *fdmdv = coh->fdmdv;
+    COMP tx_symb[NSYMROWPILOT][PILOTS_NC];
+    COMP tx_onesym[PILOTS_NC];
+    int  r,c;
+
+    bits_to_qpsk_symbols(tx_symb, tx_bits, COHPSK_BITS_PER_FRAME);
+
+    for(r=0; r<NSYMROWPILOT; r++) {
+        for(c=0; c<PILOTS_NC; c++) 
+            tx_onesym[c] = tx_symb[r][c];         
+        tx_filter_and_upconvert(&tx_fdm[r*M], fdmdv->Nc , tx_onesym, fdmdv->tx_filter_memory, 
+                                fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_demod()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 5/4/2015
+
+  COHPSK demodulator, takes an array of COHPSK_SAMPLES_PER_FRAME
+  modulated samples, returns an array of COHPSK_BITS_PER_FRAME bits.
+
+  The input signal is complex to support single sided frequency shifting
+  before the demod input (e.g. click to tune feature).
+
+  The number of input samples is fixed, and unlike the FDMDV modem
+  doesn't change to adjust for differences in transmit and receive
+  sample clocks.  This means frame sync will occasionally be lost,
+  however this is hardly noticable for digital voice applications.
+
+  TODO: logic to check if we are still in sync, ride thru bad frames
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[])
+{
+    struct FDMDV *fdmdv = coh->fdmdv;
+    COMP  rx_fdm_frame_bb[M*NSYMROWPILOT];
+    COMP  rx_baseband[PILOTS_NC][M+M/P];
+    COMP  rx_filt[PILOTS_NC][P+1];
+    float env[NT*P], rx_timing;
+    COMP  ch_symb[NSYMROWPILOT][PILOTS_NC];
+    COMP  rx_onesym[PILOTS_NC];
+    int   sync, next_sync, nin, r, c;
+
+    next_sync = sync = coh->sync;
+
+    coarse_freq_offset_est(coh, fdmdv, rx_fdm, sync, &next_sync);
+
+    /* sample rate demod processing */
+
+    nin = M;
+    for (r=0; r<NSYMROWPILOT; r++) {
+        fdmdv_freq_shift(&rx_fdm_frame_bb[r*M], &rx_fdm[r*M], -coh->f_est, &fdmdv->fbb_phase_rx, nin);
+        fdm_downconvert(rx_baseband, fdmdv->Nc, &rx_fdm_frame_bb[r*M], fdmdv->phase_rx, fdmdv->freq, nin);
+        rx_filter(rx_filt, fdmdv->Nc, rx_baseband, coh->rx_filter_memory, nin);
+        rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);
+          
+        for(c=0; c<PILOTS_NC; c++) {
+            ch_symb[r][c] = rx_onesym[c];
+        }
+    }
+     
+    /* coarse timing (frame sync) and initial fine freq est */
+  
+    frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
+    fine_freq_correct(coh, sync, next_sync);
+        
+    *reliable_sync_bit = 0;
+    if ((sync == 4) || (next_sync == 4)) {
+        qpsk_symbols_to_bits(coh, rx_bits, coh->ct_symb_ff_buf);
+        *reliable_sync_bit = 1;
+    }
+
+    sync = sync_state_machine(sync, next_sync);        
+
+    coh->sync = sync;
+}

@@ -53,7 +53,7 @@ Rs = 50;
 Nc = 4;
 framesize = 32;
 
-% --------------------------------------------------------------------------
+% FDMDV init ---------------------------------------------------------------
 
 afdmdv.Fs = 8000;
 afdmdv.Nc = Nc-1;
@@ -90,9 +90,7 @@ afdmdv.Nfiltertiming = afdmdv.M + afdmdv.Nfilter + afdmdv.M;
 
 afdmdv.rx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
 
-% ---------------------------------------------------------
-
-load ../build_linux/unittest/tcohpsk_out.txt
+% COHPSK Init --------------------------------------------------------
 
 acohpsk = standard_init();
 acohpsk.framesize        = framesize;
@@ -110,10 +108,6 @@ acohpsk.f_est = afdmdv.Fcentre;
 
 % -----------------------------------------------------------
 
-rand('state',1); 
-tx_bits_coh = round(rand(1,framesize*10));
-ptx_bits_coh = 1;
-
 tx_bits_log = [];
 tx_symb_log = [];
 rx_amp_log = [];
@@ -128,26 +122,27 @@ tx_baseband_log = [];
 tx_fdm_frame_log = [];
 ch_fdm_frame_log = [];
 rx_fdm_frame_bb_log = [];
-
-phase = 1;
-freq = exp(j*2*pi*foff/acohpsk.Rs);
-
-ch_symb = zeros(acohpsk.Nsymbrowpilot, acohpsk.Nc);
-
-Nerrs = Tbits = 0;
-
 rx_filt_log = [];
 rx_fdm_filter_log = [];
 rx_baseband_log = [];
 rx_fdm_frame_log = [];
-f_err_log = [];
-f_err_fail = 0;
 ct_symb_ff_log = [];
+
+% BER measurement -------------------------------------------------------------
+
+rand('state',1); 
+tx_bits_coh = round(rand(1,framesize*10));
+ptx_bits_coh = 1;
+
+Nerrs = Tbits = 0;
+prev_tx_bits = [];
 
 phase_ch = 1;
 sync = 0;
 
-prev_tx_bits = [];
+% Output vectors from C port ---------------------------------------------------
+
+load ../build_linux/unittest/tcohpsk_out.txt
 
 % main loop --------------------------------------------------------------------
 
@@ -212,7 +207,7 @@ for i=1:frames
   ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc);
   for r=1:acohpsk.Nsymbrowpilot
 
-    % donwconvert each FDM carrier to Nc separate baseband signals
+    % downconvert each FDM carrier to Nc separate baseband signals
 
     [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
     rx_baseband_log = [rx_baseband_log rx_baseband];
