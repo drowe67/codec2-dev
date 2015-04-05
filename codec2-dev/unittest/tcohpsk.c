@@ -46,7 +46,7 @@
 
 #define FRAMES 35
 #define RS     50
-#define FOFF   0
+#define FOFF   10.5
 
 extern float pilots_coh[][PILOTS_NC];
 
