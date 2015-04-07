@@ -316,7 +316,7 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
         bin_est = num/den;
         coh->f_est = floor(bin_est/sc+0.5);
 
-        printf("coarse freq est: %f\n", coh->f_est);
+        fprintf(stderr, "coarse freq est: %f\n", coh->f_est);
         
         *next_sync = 1;
     }
@@ -392,15 +392,15 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int
 
         coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/RS);
         coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/RS);
-        printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
+        fprintf(stderr, "  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
  
         if (max_corr/max_mag > 0.9) {
-            printf("in sync!\n");
+            fprintf(stderr, "in sync!\n");
             *next_sync = 4;
         }
         else {
             *next_sync = 0;
-            printf("  back to coarse freq offset est...\n");
+            fprintf(stderr, "  back to coarse freq offset est...\n");
         }
         
     }

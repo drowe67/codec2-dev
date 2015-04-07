@@ -266,6 +266,9 @@ target_link_libraries(cohpsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(cohpsk_get_test_bits cohpsk_get_test_bits.c)
 target_link_libraries(cohpsk_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(cohpsk_put_test_bits cohpsk_put_test_bits.c)
+target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
