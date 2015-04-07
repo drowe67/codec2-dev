@@ -38,7 +38,6 @@
 #include <math.h>
 
 #include "codec2_cohpsk.h"
-#include "test_bits.h"
 #include "cohpsk_defs.h"
 #include "cohpsk_internal.h"
 #include "fdmdv_internal.h"
@@ -78,6 +77,8 @@ struct COHPSK *cohpsk_create(void)
     struct FDMDV  *fdmdv;
     int            r,c,p,i;
     float          freq_hz;
+
+    assert(COHPSK_SAMPLES_PER_FRAME == M*NSYMROWPILOT);
 
     coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
     if (coh == NULL)
