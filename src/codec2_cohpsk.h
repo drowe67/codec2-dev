@@ -28,9 +28,9 @@
 #ifndef __CODEC2_COHPSK__
 #define __CODEC2_COHPSK__
 
-#define COHPSK_BITS_PER_FRAME    32               /* hard coded for now */
-#define COHPSK_NC                 4               /* hard coded for now */
-#define COHPSK_SAMPLES_PER_FRAME (NSYMROWPILOT*M)
+#define COHPSK_BITS_PER_FRAME     32              /* hard coded for now */
+#define COHPSK_NC                  4              /* hard coded for now */
+#define COHPSK_SAMPLES_PER_FRAME 960
 
 #include "comp.h"
 #include "codec2_fdmdv.h"
