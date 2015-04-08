@@ -47,6 +47,7 @@
 #define FRAMES 35
 #define RS     50
 #define FOFF   10.5
+#define ESNODB 8.0
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -85,13 +86,15 @@ int main(int argc, char *argv[])
     COMP           rx_filt_log[PILOTS_NC][(P+1)*NSYMROWPILOT*FRAMES];
     int            rx_filt_log_col_index = 0;
     float          env[NT*P];
-    float          rx_timing;
+    float           __attribute__((unused)) rx_timing;
     COMP           tx_onesym[PILOTS_NC];
     COMP           rx_onesym[PILOTS_NC];
     int            rx_baseband_log_col_index = 0;
     COMP           rx_baseband_log[PILOTS_NC][(M+M/P)*NSYMROWPILOT*FRAMES];
 
     int            sync, next_sync, log_bits;
+    float          EsNo, variance;
+    COMP           scaled_noise;
 
     coh = cohpsk_create();
     fdmdv = coh->fdmdv;
@@ -106,6 +109,13 @@ int main(int argc, char *argv[])
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     sync = 0;
     
+    /*  each carrier has power = 2, total power 2Nc, total symbol rate
+        NcRs, noise BW B=Fs Es/No = (C/Rs)/(N/B), N = var =
+        2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No) */
+
+    EsNo = pow(10.0, ESNODB/10.0);
+    variance = 2.0*FS/(RS*EsNo);
+
     /* Main Loop ---------------------------------------------------------------------*/
 
     for(f=0; f<FRAMES; f++) {
@@ -136,7 +146,8 @@ int main(int argc, char *argv[])
         fdmdv_freq_shift(ch_fdm_frame, tx_fdm_frame, FOFF, &phase_ch, NSYMROWPILOT*M);
 
         for(r=0; r<NSYMROWPILOT*M; r++,noise_r++) {
-            ch_fdm_frame[r] = cadd(ch_fdm_frame[r], noise[noise_r]);
+            scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
+            ch_fdm_frame[r] = cadd(ch_fdm_frame[r], scaled_noise);
         }
 
 	/* --------------------------------------------------------*\
