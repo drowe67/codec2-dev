@@ -65,7 +65,9 @@ static COMP qpsk_mod[] = {
     {-1.0, 0.0}
 };
     
-void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int sampling_points[], int t, float f_fine);
+static int sampling_points[] = {0, 1, 6, 7};
+
+void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine);
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -238,7 +240,6 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
     int   p, r, c, i;
     COMP  corr, rot, pi_on_4, phi_rect;
     float mag, phi_, amp_;
-    short sampling_points[] = {0, 1, 6, 7};
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
    
@@ -338,7 +339,7 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
 }
 
 
-void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int sampling_points[], int t, float f_fine) 
+void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine) 
 {
     COMP  corr, f_fine_rect, f_corr;
     float mag;
@@ -377,7 +378,6 @@ void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int sa
 
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int sync, int *next_sync)
 {
-    int   sampling_points[] = {0, 1, 6, 7};
     int   r,c,i,t;
     float f_fine, mag, max_corr, max_mag;
     COMP  corr;
@@ -406,7 +406,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int
         max_corr = 0;
         for (f_fine=-20; f_fine<=20; f_fine+=1.0) {
             for (t=0; t<NSYMROWPILOT; t++) {
-                corr_with_pilots(&corr, &mag, coh, sampling_points, t, f_fine);
+                corr_with_pilots(&corr, &mag, coh, t, f_fine);
                 //printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, corr.real, corr.imag);
                 if (cabsolute(corr) > max_corr) {
                     max_corr = cabsolute(corr);
@@ -425,6 +425,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int
         if (max_corr/max_mag > 0.9) {
             fprintf(stderr, "in sync!\n");
             *next_sync = 4;
+            coh->sync_timer = 0;
         }
         else {
             *next_sync = 0;
@@ -489,6 +490,7 @@ void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync) {
                   coh->ct_symb_ff_buf[r][c] = cmult(coh->ct_symb_ff_buf[r][c], coh->ff_phase);
               }
           }
+
       }
 
       mag = cabsolute(coh->ff_phase);
@@ -498,10 +500,29 @@ void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync) {
 }
 
 
-int sync_state_machine(int sync, int next_sync)
+int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 {
+    COMP  corr;
+    float mag;
+
     if (sync == 1)
         next_sync = 2;
+
+    if (sync == 4) {
+
+        /* check that sync is still good */
+
+        corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
+
+        if (cabsolute(corr)/mag < 0.9) 
+            coh->sync_timer++;
+
+        if (coh->sync_timer == 3) {
+            fprintf(stderr,"  lost sync ....\n");
+            next_sync = 0;
+        }
+    }
+              
     sync = next_sync;
 
     return sync;
@@ -602,7 +623,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
         *reliable_sync_bit = 1;
     }
 
-    sync = sync_state_machine(sync, next_sync);        
+    sync = sync_state_machine(coh, sync, next_sync);        
 
     coh->sync = sync;
 }

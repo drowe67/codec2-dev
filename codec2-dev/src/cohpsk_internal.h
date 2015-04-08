@@ -49,7 +49,8 @@ struct COHPSK {
     COMP         ff_phase;
     COMP         ct_symb_ff_buf[NSYMROWPILOT+2][PILOTS_NC];
     int          sync;
-    
+    int          sync_timer;
+
     struct FDMDV *fdmdv;
 };
 

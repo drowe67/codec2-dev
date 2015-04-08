@@ -59,7 +59,6 @@ int main(int argc, char *argv[])
     COMP           ch_fdm_frame[M*NSYMROWPILOT];
     COMP           rx_fdm_frame_bb[M*NSYMROWPILOT];
     COMP           ch_symb[NSYMROWPILOT][PILOTS_NC];
-    COMP           ct_symb_buf[2*NSYMROWPILOT][COHPSK_NC];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
@@ -77,7 +76,6 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f, r, c, log_r, log_data_r, noise_r, i;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
-    float          freq_hz;
     COMP           phase_ch;
 
     struct FDMDV  *fdmdv;
@@ -87,7 +85,6 @@ int main(int argc, char *argv[])
     COMP           rx_filt_log[PILOTS_NC][(P+1)*NSYMROWPILOT*FRAMES];
     int            rx_filt_log_col_index = 0;
     float          env[NT*P];
-    COMP           rx_filter_memory[PILOTS_NC][NFILTER];
     float          rx_timing;
     COMP           tx_onesym[PILOTS_NC];
     COMP           rx_onesym[PILOTS_NC];
@@ -189,7 +186,7 @@ int main(int argc, char *argv[])
         }
 
         //printf("f: %d sync: %d next_sync: %d\n", f, sync, next_sync);
-        sync = sync_state_machine(sync, next_sync);
+        sync = sync_state_machine(coh, sync, next_sync);
         
 	/* --------------------------------------------------------*\
 	                       Log each vector 
