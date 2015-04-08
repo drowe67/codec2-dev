@@ -6,26 +6,6 @@
 % output of the reference versions of the same functions written in
 % Octave.
 %
-% Ideas:
-% [ ] EB/No v BER curves changing Np, freq offset etc
-%     + can do these pretty fast in C, if we have the channel models
-%     [ ] better interpolation between two signals
-%     [ ] feedback to correct out freq offset est
-%     [ ] fading channel
-%     [ ] freq drift
-%     [ ] timing drift
-% [ ] one version to compare Octave to C
-%     [ ] just compare C at some spot points
-%         + drive C simul from command line?
-%         + drive from octave?
-% [ ] one version to unit test against various impairments  
-% [ ] measure/plot BER against impairments and ideal and tune
-%     + 100 errors
-%     [ ] freq offset
-%         + feeback fine freq?  This will cause IL
-%     [ ] fading ch, compared to ideal
-% [ ] smaller freq est block size to min ram req
-% [ ] freq tracking eeback loop 
 
 
 graphics_toolkit ("gnuplot");
