@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: ttest_cohpsk_ch.c
+  FILE........: test_cohpsk_ch.c
   AUTHOR......: David Rowe  
   DATE CREATED: April 2015
                                                                              
@@ -38,7 +38,7 @@
 #include "comp_prim.h"
 #include "noise_samples.h"
 
-#define FRAMES 35
+#define FRAMES 350
 #define FOFFHZ 10.5
 
 int main(int argc, char *argv[])
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     noise_r = 0; 
-    noise_end = sizeof(noise)/sizeof(int);
+    noise_end = sizeof(noise)/sizeof(COMP);
     
     /* Main Loop ---------------------------------------------------------------------*/
 

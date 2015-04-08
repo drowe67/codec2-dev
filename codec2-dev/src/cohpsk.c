@@ -5,7 +5,20 @@
   DATE CREATED: March 2015
                                                                              
   Functions that implement a coherent PSK FDM modem.
-                                                                       
+                 
+  TODO:
+
+  [ ] Code to plot EB/No v BER curves for
+      [ ] AWGN channel
+      [ ] freq offset
+      [ ] fading channel
+      [ ] freq drift
+      [ ] timing drift
+  [ ] tune and meas impl loss perf for above
+  [ ] out of sync state
+  [ ] freq offset/drift feedback loop 
+  [ ] smaller freq est block size to min ram req
+                                                      
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -52,6 +65,8 @@ static COMP qpsk_mod[] = {
     {-1.0, 0.0}
 };
     
+void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int sampling_points[], int t, float f_fine);
+
 /*---------------------------------------------------------------------------*\
                                                                              
                                FUNCTIONS
@@ -323,6 +338,28 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
 }
 
 
+void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int sampling_points[], int t, float f_fine) 
+{
+    COMP  corr, f_fine_rect, f_corr;
+    float mag;
+    int   c, p;
+    
+    corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
+    for (c=0; c<PILOTS_NC; c++) {
+        for (p=0; p<NPILOTSFRAME+2; p++) {
+            f_fine_rect.real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
+            f_fine_rect.imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
+            f_corr = cmult(f_fine_rect, coh->ct_symb_buf[t+sampling_points[p]][c]);
+            corr = cadd(corr, fcmult(coh->pilot2[p][c], f_corr));
+            mag  += cabsolute(f_corr);
+        }
+    }
+
+    *corr_out = corr;
+    *mag_out  = mag;
+}
+
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: frame_sync_fine_timing_est()	     
@@ -341,9 +378,9 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int sync, int *next_sync)
 {
     int   sampling_points[] = {0, 1, 6, 7};
-    int   r,c,i,p,t;
+    int   r,c,i,t;
     float f_fine, mag, max_corr, max_mag;
-    COMP  f_fine_rect, f_corr, corr;
+    COMP  corr;
 
     /* update memory in symbol buffer */
 
@@ -369,16 +406,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int
         max_corr = 0;
         for (f_fine=-20; f_fine<=20; f_fine+=1.0) {
             for (t=0; t<NSYMROWPILOT; t++) {
-                corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
-                for (c=0; c<PILOTS_NC; c++) {
-                    for (p=0; p<NPILOTSFRAME+2; p++) {
-                        f_fine_rect.real = cosf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
-                        f_fine_rect.imag = sinf(f_fine*2.0*M_PI*(sampling_points[p]+1.0)/RS);
-                        f_corr = cmult(f_fine_rect, coh->ct_symb_buf[t+sampling_points[p]][c]);
-                        corr = cadd(corr, fcmult(coh->pilot2[p][c], f_corr));
-                        mag  += cabsolute(f_corr);
-                    }
-                }
+                corr_with_pilots(&corr, &mag, coh, sampling_points, t, f_fine);
                 //printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, corr.real, corr.imag);
                 if (cabsolute(corr) > max_corr) {
                     max_corr = cabsolute(corr);
@@ -540,7 +568,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
     COMP  rx_fdm_frame_bb[M*NSYMROWPILOT];
     COMP  rx_baseband[PILOTS_NC][M+M/P];
     COMP  rx_filt[PILOTS_NC][P+1];
-    float env[NT*P], rx_timing;
+    float env[NT*P], __attribute__((unused)) rx_timing;
     COMP  ch_symb[NSYMROWPILOT][PILOTS_NC];
     COMP  rx_onesym[PILOTS_NC];
     int   sync, next_sync, nin, r, c;

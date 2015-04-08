@@ -34,7 +34,7 @@
 
 \*---------------------------------------------------------------------------*/
 
-static COMP cneg(COMP a)
+inline static COMP cneg(COMP a)
 {
     COMP res;
 
@@ -44,7 +44,7 @@ static COMP cneg(COMP a)
     return res;
 }
 
-static COMP cconj(COMP a)
+inline static COMP cconj(COMP a)
 {
     COMP res;
 
@@ -54,7 +54,7 @@ static COMP cconj(COMP a)
     return res;
 }
 
-static COMP cmult(COMP a, COMP b)
+inline static COMP cmult(COMP a, COMP b)
 {
     COMP res;
 
@@ -64,7 +64,7 @@ static COMP cmult(COMP a, COMP b)
     return res;
 }
 
-static COMP fcmult(float a, COMP b)
+inline static COMP fcmult(float a, COMP b)
 {
     COMP res;
 
@@ -74,7 +74,7 @@ static COMP fcmult(float a, COMP b)
     return res;
 }
 
-static COMP cadd(COMP a, COMP b)
+inline static COMP cadd(COMP a, COMP b)
 {
     COMP res;
 
@@ -84,7 +84,7 @@ static COMP cadd(COMP a, COMP b)
     return res;
 }
 
-static float cabsolute(COMP a)
+inline static float cabsolute(COMP a)
 {
     return sqrtf(powf(a.real, 2.0) + powf(a.imag, 2.0));
 }
