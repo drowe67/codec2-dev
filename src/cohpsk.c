@@ -15,7 +15,6 @@
       [ ] freq drift
       [ ] timing drift
   [ ] tune and meas impl loss perf for above
-  [ ] out of sync state
   [ ] freq offset/drift feedback loop 
   [ ] smaller freq est block size to min ram req
                                                       
@@ -510,12 +509,14 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 
     if (sync == 4) {
 
-        /* check that sync is still good */
+        /* check that sync is still good, fall out of sync on 3 consecutive bad frames */
 
         corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
 
         if (cabsolute(corr)/mag < 0.9) 
             coh->sync_timer++;
+        else
+            coh->sync_timer = 0;            
 
         if (coh->sync_timer == 3) {
             fprintf(stderr,"  lost sync ....\n");
