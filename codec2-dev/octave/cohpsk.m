@@ -190,7 +190,7 @@ end
 
 % Symbol rate processing for rx side (demodulator) -------------------------------------------------------
 
-function [rx_symb rx_bits amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk, ct_symb_buf)
+function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk, ct_symb_buf)
     framesize     = cohpsk.framesize;
     Nsymb         = cohpsk.Nsymb;
     Nsymbrow      = cohpsk.Nsymbrow;
@@ -211,7 +211,7 @@ function [rx_symb rx_bits amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk,
     for c=1:Nc
       corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);
       mag  = sum(abs(ct_symb_buf(sampling_points,c)));
-
+      
       phi_(:, c) = angle(corr);
       amp_(:, c) = mag/length(sampling_points);
     end
@@ -691,6 +691,8 @@ function sim_out = ber_test(sim_in)
         phase_offset = 0;
         w_offset     = pi/16;
 
+        ct_symb_buf = zeros(2*Nsymbrowpilot, Nc);
+
         % simulation starts here-----------------------------------
  
         for nn = 1:Ntrials+2
@@ -701,10 +703,12 @@ function sim_out = ber_test(sim_in)
               tx_bits = round(rand(1,framesize));                       
             end
 
-            [s_ch tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param, prev_sym_tx);
+            [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param, prev_sym_tx);
    
             tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
             tx_bits_buf(framesize+1:2*framesize) = tx_bits;
+
+            s_ch = tx_symb;
 
             % HF channel simulation  ------------------------------------
             
@@ -752,14 +756,17 @@ function sim_out = ber_test(sim_in)
 
             s_ch = s_ch + noise;
             
-            [rx_symb rx_bits amp_ phi_ EsNo_ sim_in] = qpsk_symbols_to_bits(sim_in, s_ch);                                 
+            ct_symb_buf(1:Nsymbrowpilot,:) = ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:);
+            ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:) = s_ch;
+
+            [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(1:Nsymbrowpilot+Npilotsframe,:));                                 
 
             phi_log = [phi_log; phi_];
             amp_log = [amp_log; amp_];
 
-            % Wait until we have 3 frames to do pilot assisted phase estimation
+            % Wait until we have enough frames to do pilot assisted phase estimation
 
-            if nn > 2 
+            if nn > 1
               rx_symb_log = [rx_symb_log rx_symb_linear];
               EsNo__log = [EsNo__log EsNo_];
 
@@ -796,8 +803,8 @@ function sim_out = ber_test(sim_in)
             if verbose 
               av_tx_pwr = (s_ch_tx_log * s_ch_tx_log')/length(s_ch_tx_log);
 
-              printf("EsNo est (dB): %3.1f Terrs: %d Tbits: %d BER %4.2f QPSK BER theory %4.2f av_tx_pwr: %3.2f",
-                       mean(10*log10(EsNo__log)), Terrs, Tbits,
+              printf("EsNo (dB): %3.1f Terrs: %d Tbits: %d BER %5.3f QPSK BER theory %5.3f av_tx_pwr: %3.2f",
+                     EsNodB, Terrs, Tbits,
                        Terrs/Tbits, 0.5*erfc(sqrt(EsNo/2)), av_tx_pwr);
               if ldpc_code
                   printf("\n LDPC: Terrs: %d BER: %4.2f Ferrs: %d FER: %4.2f", 

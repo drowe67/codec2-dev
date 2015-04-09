@@ -14,7 +14,7 @@
       [ ] fading channel
       [ ] freq drift
       [ ] timing drift
-  [ ] tune and meas impl loss perf for above
+  [ ] tune perf/impl loss to get closer to ideal
   [ ] freq offset/drift feedback loop 
   [ ] smaller freq est block size to min ram req
                                                       
@@ -95,6 +95,8 @@ struct COHPSK *cohpsk_create(void)
     float          freq_hz;
 
     assert(COHPSK_SAMPLES_PER_FRAME == M*NSYMROWPILOT);
+    assert(COHPSK_RS == RS);
+    assert(COHPSK_FS == FS);
 
     coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
     if (coh == NULL)
@@ -331,7 +333,7 @@ void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm
         bin_est = num/den;
         coh->f_est = floor(bin_est/sc+0.5);
 
-        fprintf(stderr, "coarse freq est: %f\n", coh->f_est);
+        fprintf(stderr, "  coarse freq est: %f\n", coh->f_est);
         
         *next_sync = 1;
     }
@@ -422,7 +424,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][PILOTS_NC], int
         fprintf(stderr, "  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
  
         if (max_corr/max_mag > 0.9) {
-            fprintf(stderr, "in sync!\n");
+            fprintf(stderr, "  in sync!\n");
             *next_sync = 4;
             coh->sync_timer = 0;
         }

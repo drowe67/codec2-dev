@@ -209,7 +209,7 @@ for i=1:frames
   ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
 
   if (sync == 4) || (next_sync == 4)  
-    [rx_symb rx_bits amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
+    [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
     rx_symb_log = [rx_symb_log; rx_symb];
     rx_amp_log = [rx_amp_log; amp_];
     rx_phi_log = [rx_phi_log; phi_];
