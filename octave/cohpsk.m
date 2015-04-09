@@ -130,7 +130,45 @@ endfunction
 
 % Symbol rate processing for tx side (modulator) -------------------------------------------------------
 
-function [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param, prev_sym_tx)
+function [tx_symb prev_tx_symb] = bits_to_dqpsk_symbols(sim_in, tx_bits, prev_tx_symb)
+    Nc         = sim_in.Nc;
+    Nsymbrow   = sim_in.Nsymbrow;
+
+    tx_symb = zeros(Nsymbrow,Nc);
+
+    for c=1:Nc
+      for r=1:Nsymbrow
+        i = (c-1)*Nsymbrow + r;
+        tx_symb(r,c) = qpsk_mod(tx_bits(2*(i-1)+1:2*i));  
+        tx_symb(r,c) *= prev_tx_symb(c);
+        prev_tx_symb(c) = tx_symb(r,c);
+      end
+    end
+              
+endfunction
+
+
+function [rx_symb rx_bits rx_symb_linear prev_rx_symb] = dqpsk_symbols_to_bits(sim_in, rx_symb, prev_rx_symb)
+    Nc         = sim_in.Nc;
+    Nsymbrow   = sim_in.Nsymbrow;
+
+    tx_symb = zeros(Nsymbrow,Nc);
+
+    for c=1:Nc
+      for r=1:Nsymbrow
+        tmp = rx_symb(r,c);
+        rx_symb(r,c) *= conj(prev_rx_symb(c))/abs(prev_rx_symb(c));
+        prev_rx_symb(c) = tmp;
+        i = (c-1)*Nsymbrow + r;
+        rx_symb_linear(i) = rx_symb(r,c);
+        rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
+      end
+    end 
+              
+endfunction
+
+
+function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     ldpc_code     = sim_in.ldpc_code;
     rate          = sim_in.ldpc_code_rate;
     framesize     = sim_in.framesize;
@@ -169,17 +207,6 @@ function [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, c
 
     for c=Nc+1:Nc:Nc*Nchip
       tx_symb(:,c:c+Nc-1) = tx_symb(:,1:Nc);
-    end
-            
-    % Optionally DQPSK encode
- 
-    if strcmp(modulation,'dqpsk')
-      for c=1:Nc*Nchip
-        for r=1:Nsymbrowpilot
-          tx_symb(r,c) *= prev_sym_tx(c);
-          prev_sym_tx(c) = tx_symb(r,c);
-        end
-      end               
     end
 
     % ensures energy/symbol is normalised when spreading
@@ -658,6 +685,10 @@ function sim_out = ber_test(sim_in)
 
     [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, Nsymbrowpilot*Ntrials);
 
+    if strcmp(modulation,'dqpsk')
+      Nsymbrowpilot = Nsymbrow;
+    end
+
     % Start Simulation ----------------------------------------------------------------
 
     for ne = 1:length(Esvec)
@@ -692,6 +723,7 @@ function sim_out = ber_test(sim_in)
         w_offset     = pi/16;
 
         ct_symb_buf = zeros(2*Nsymbrowpilot, Nc);
+        prev_tx_symb = prev_rx_symb = ones(1,Nc);
 
         % simulation starts here-----------------------------------
  
@@ -703,10 +735,21 @@ function sim_out = ber_test(sim_in)
               tx_bits = round(rand(1,framesize));                       
             end
 
-            [tx_symb tx_bits prev_sym_tx] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param, prev_sym_tx);
-   
-            tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
-            tx_bits_buf(framesize+1:2*framesize) = tx_bits;
+            if strcmp(modulation,'qpsk')
+
+              [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param);
+
+              % one frame delay on bits for qpsk
+
+              tx_bits_buf(1:framesize) = tx_bits_buf(framesize+1:2*framesize);
+              tx_bits_buf(framesize+1:2*framesize) = tx_bits;
+
+            end
+            if strcmp(modulation, 'dqpsk')
+              [tx_symb prev_tx_symb] = bits_to_dqpsk_symbols(sim_in, tx_bits, prev_tx_symb);
+              tx_bits_buf(1:framesize) = tx_bits;
+            end
+
 
             s_ch = tx_symb;
 
@@ -759,16 +802,20 @@ function sim_out = ber_test(sim_in)
             ct_symb_buf(1:Nsymbrowpilot,:) = ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:);
             ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:) = s_ch;
 
-            [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(1:Nsymbrowpilot+Npilotsframe,:));                                 
-
-            phi_log = [phi_log; phi_];
-            amp_log = [amp_log; amp_];
-
+            if strcmp(modulation,'qpsk')
+              [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(1:Nsymbrowpilot+Npilotsframe,:));                                 
+              phi_log = [phi_log; phi_];
+              amp_log = [amp_log; amp_];
+            end
+            if strcmp(modulation,'dqpsk')
+              [rx_symb rx_bits rx_symb_linear prev_rx_symb] = dqpsk_symbols_to_bits(sim_in, s_ch, prev_rx_symb);                                 
+            end
+                        
             % Wait until we have enough frames to do pilot assisted phase estimation
 
             if nn > 1
               rx_symb_log = [rx_symb_log rx_symb_linear];
-              EsNo__log = [EsNo__log EsNo_];
+              %EsNo__log = [EsNo__log EsNo_];
 
               % Measure BER
 
@@ -851,55 +898,57 @@ function sim_out = ber_test(sim_in)
 
        end
 
-        % set up time axis to include gaps for pilots
+       if strcmp(modulation,'qpsk')
+          % set up time axis to include gaps for pilots
 
-        [m1 n1] = size(phi_log);
-        phi_x = [];
-        phi_x_counter = 1;
-        p = Ns;
-        for r=1:m1
-          if p == Ns
-            phi_x_counter++;
-            p = 0;
-          end
-          p++;
-          phi_x = [phi_x phi_x_counter++];        
-        end
+         [m1 n1] = size(phi_log);
+         phi_x = [];
+         phi_x_counter = 1;
+         p = Ns;
+         for r=1:m1
+           if p == Ns
+             phi_x_counter++;
+             p = 0;
+           end
+           p++;
+           phi_x = [phi_x phi_x_counter++];        
+         end
 
-        phi_x -= Nsymbrowpilot; % account for delay in pilot buffer
+         phi_x -= Nsymbrowpilot; % account for delay in pilot buffer
 
-        figure(5);
-        clf
-        subplot(211)
-        plot(phi_x, phi_log(:,2),'r+;Estimated HF channel phase;')
-        if hf_sim
-          hold on;
-          [m n] = size(hf_model);
-          plot(angle(hf_model(1:m,2)),'g;HF channel phase;')
-          hold off;
-        end
-        ylabel('Phase (rads)');
-        legend('boxoff');
+         figure(5);
+         clf
+         subplot(211)
+         plot(phi_x, phi_log(:,2),'r+;Estimated HF channel phase;')
+         if hf_sim
+           hold on;
+           [m n] = size(hf_model);
+           plot(angle(hf_model(1:m,2)),'g;HF channel phase;')
+           hold off;
+         end
+         ylabel('Phase (rads)');
+         legend('boxoff');
 
-        subplot(212)
-        plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
-        if hf_sim
-          hold on;
-          plot(abs(hf_model(1:m,2)))
-          hold off;
-        end
-        ylabel('Amplitude');
-        xlabel('Time (symbols)');
-        legend('boxoff');
+         subplot(212)
+         plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
+         if hf_sim
+           hold on;
+           plot(abs(hf_model(1:m,2)))
+           hold off;
+         end
+         ylabel('Amplitude');
+         xlabel('Time (symbols)');
+         legend('boxoff');
+       end
 
-        figure(4)
-        clf
-        subplot(211)
-        stem(Nerrs_log)
-        subplot(212)
-        if ldpc_code
-          stem(ldpc_Nerrs_log)
-        end
+       figure(4)
+       clf
+       subplot(211)
+       stem(Nerrs_log)
+       subplot(212)
+       if ldpc_code
+         stem(ldpc_Nerrs_log)
+       end
 
    end
 
