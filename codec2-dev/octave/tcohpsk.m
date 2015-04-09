@@ -134,7 +134,7 @@ for i=1:frames
 
   tx_bits_log = [tx_bits_log tx_bits];
 
-  [tx_symb tx_bits prev_tx_sym] = bits_to_qpsk_symbols(acohpsk, tx_bits, [], []);
+  [tx_symb tx_bits] = bits_to_qpsk_symbols(acohpsk, tx_bits, [], []);
   tx_symb_log = [tx_symb_log; tx_symb];
 
   tx_fdm_frame = [];

@@ -27,63 +27,87 @@ graphics_toolkit ("gnuplot");
 cohpsk;
 
 function test_curves
-
+     
   sim_in = standard_init();
+  sim_in.do_write_pilot_file = 0;
+
+  % single test point ---------------------------------------
 
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
   sim_in.Esvec            = 10; 
+  sim_in.framesize        = 32;
   sim_in.hf_sim           = 1;
-  sim_in.Ntrials          = 1000;
+  sim_in.Ntrials          = 100;
   sim_in.Rs               = 50;
-  sim_in.Nc               = 9;
-  sim_in.Np               = 4;
-  sim_in.Ns               = 8;
+  sim_in.Nc               = 4;
+  sim_in.Np               = 2;
+  sim_in.Ns               = 4;
   sim_in.Nchip            = 1;
   sim_in.modulation       = 'qpsk';
-  sim_in.ldpc_code_rate   = 0.5;
+  sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
 
   sim_qpsk                = ber_test(sim_in);
 
+  % AWGN curves ----------------------------------------------------
+
+  sim_in.Ntrials          = 500;
   sim_in.hf_sim           = 0;
   sim_in.plot_scatter     = 0;
-  sim_in.Esvec            = 10:20; 
+  sim_in.Esvec            = 5:10; 
+
   Ebvec = sim_in.Esvec - 10*log10(2);
   BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
-
-  sim_in.Np               = 0;
-  sim_in.Nchip            = 1;
-
+  
   sim_in.modulation       = 'dqpsk';
   sim_dqpsk               = ber_test(sim_in, 'dqpsk');
-  sim_in.hf_sim           = 1;
-  sim_in.hf_mag_only      = 1;
+
   sim_in.modulation       = 'qpsk';
-  sim_qpsk_hf_ideal       = ber_test(sim_in, 'qpsk');
-  sim_in.modulation       = 'dqpsk';
-  sim_in.hf_mag_only      = 0;
-  sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
-  sim_in.modulation       = 'qpsk';
-  sim_in.Ns               = 4
+  sim_in.Ns               = 4;
   sim_in.Np               = 2;
-  sim_qpsk_hf_pilot       = ber_test(sim_in, 'qpsk');
+  sim_qpsk_pilot          = ber_test(sim_in, 'qpsk');
+
+  % HF curves ----------------------------------------------------
+
+  sim_in.Ntrials          = 200;
+  sim_in.hf_sim           = 1;
+  sim_in.plot_scatter     = 0;
+  sim_in.Esvec            = 5:20; 
+
+  Ebvec = sim_in.Esvec - 10*log10(2);
+  BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
+  
+  sim_in.modulation       = 'dqpsk';
+  sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
+
+  sim_in.modulation       = 'qpsk';
+  sim_in.Ns               = 4;
+  sim_in.Np               = 2;
+  sim_qpsk_pilot_hf       = ber_test(sim_in, 'qpsk');
+
+  % plot results ---------------------------------------------------
 
   figure(1); 
   clf;
   semilogy(Ebvec, BER_theory,'r;QPSK theory;')
   hold on;
+
   semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
-  semilogy(sim_qpsk_hf_ideal.Ebvec, sim_qpsk_hf_ideal.BERvec,'b;QPSK HF ideal;')
-  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'k;DQPSK HF;')
-  semilogy(sim_qpsk_hf_pilot.Ebvec, sim_qpsk_hf_pilot.BERvec,'r;QPSK Np=2 Ns=4 HF;')
+  semilogy(sim_qpsk_pilot.Ebvec, sim_qpsk_pilot.BERvec,'b;QPSK pilot AWGN;')
+
+  %semilogy(sim_qpsk_hf_ideal.Ebvec, sim_qpsk_hf_ideal.BERvec,'b;QPSK HF ideal;')
+  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'c;DQPSK HF;')
+  semilogy(sim_qpsk_pilot_hf.Ebvec, sim_qpsk_pilot_hf.BERvec,'b;QPSK pilot HF;')
+
   hold off;
 
   xlabel('Eb/N0')
   ylabel('BER')
   grid("minor")
   axis([min(Ebvec) max(Ebvec) 1E-3 1])
+  legend("boxoff");
 endfunction
 
 
@@ -100,22 +124,22 @@ function test_single
   sim_in.Ns               = 4;
   sim_in.Np               = 2;
   sim_in.Nchip            = 1;
-% sim_in.ldpc_code_rate   = 0.5;
-% sim_in.ldpc_code        = 1;
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
 
-  sim_in.Ntrials          = 500;
-  sim_in.Esvec            = 8; 
+  sim_in.Ntrials          = 100;
+  sim_in.Esvec            = 10; 
   sim_in.hf_sim           = 0;
   sim_in.hf_mag_only      = 0;
   sim_in.modulation       = 'qpsk';
 
-  sim_in.do_write_pilot_file = 1;
+  sim_in.modulation       = 'dqpsk';
+
+  sim_in.do_write_pilot_file = 0;
 
   sim_qpsk_hf             = ber_test(sim_in);
 
-  fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
+  %fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
 endfunction
 
 
@@ -569,8 +593,8 @@ endfunction
 % Start simulations ---------------------------------------
 
 more off;
-%test_curves();
-test_single();
+test_curves();
+%test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_tx("tx.raw");
 %rate_Fs_rx("tx_-4dB.wav")
