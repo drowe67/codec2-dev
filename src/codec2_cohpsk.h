@@ -31,6 +31,8 @@
 #define COHPSK_BITS_PER_FRAME     32              /* hard coded for now */
 #define COHPSK_NC                  4              /* hard coded for now */
 #define COHPSK_SAMPLES_PER_FRAME 960
+#define COHPSK_RS                 50
+#define COHPSK_FS               8000
 
 #include "comp.h"
 #include "codec2_fdmdv.h"

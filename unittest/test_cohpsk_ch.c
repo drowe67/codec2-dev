@@ -38,8 +38,9 @@
 #include "comp_prim.h"
 #include "noise_samples.h"
 
-#define FRAMES 350
-#define FOFFHZ 10.5
+#define FRAMES   350
+#define FOFF_HZ  10.5
+#define ES_NO_DB  12.0
 
 int main(int argc, char *argv[])
 {
@@ -55,6 +56,17 @@ int main(int argc, char *argv[])
     int            noise_r, noise_end;
     float          corr;
     int            state, next_state, nerrors, nbits, reliable_sync_bit;
+    float          EsNo, variance;
+    COMP           scaled_noise;
+    float          EsNodB, foff_hz;
+
+    EsNodB = ES_NO_DB;
+    foff_hz =  FOFF_HZ;
+    if (argc == 3) {
+        EsNodB = atof(argv[1]);
+        foff_hz = atof(argv[2]);
+    }
+    fprintf(stderr, "EsNodB: %4.2f foff: %4.2f Hz\n", EsNodB, foff_hz);
 
     coh = cohpsk_create();
     assert(coh != NULL);
@@ -65,6 +77,13 @@ int main(int argc, char *argv[])
     noise_r = 0; 
     noise_end = sizeof(noise)/sizeof(COMP);
     
+    /*  each carrier has power = 2, total power 2Nc, total symbol rate
+        NcRs, noise BW B=Fs Es/No = (C/Rs)/(N/B), N = var =
+        2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No) */
+
+    EsNo = pow(10.0, EsNodB/10.0);
+    variance = 2.0*COHPSK_FS/(COHPSK_RS*EsNo);
+
     /* Main Loop ---------------------------------------------------------------------*/
 
     for(f=0; f<FRAMES; f++) {
@@ -85,14 +104,15 @@ int main(int argc, char *argv[])
 	                          Channel
 	\*---------------------------------------------------------*/
 
-        fdmdv_freq_shift(ch_fdm, tx_fdm, FOFFHZ, &phase_ch, COHPSK_SAMPLES_PER_FRAME);
+        fdmdv_freq_shift(ch_fdm, tx_fdm, foff_hz, &phase_ch, COHPSK_SAMPLES_PER_FRAME);
 
         for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
-           ch_fdm[r] = cadd(ch_fdm[r], noise[noise_r]);
-           noise_r++;
-           if (noise_r > noise_end)
-               noise_r = 0;
-         }
+            scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
+            ch_fdm[r] = cadd(ch_fdm[r], scaled_noise);
+            noise_r++;
+            if (noise_r > noise_end)
+                noise_r = 0;
+        }
 
 	/* --------------------------------------------------------*\
 	                          Demod
@@ -105,17 +125,18 @@ int main(int argc, char *argv[])
             corr += (1.0 - 2.0*(rx_bits[i] & 0x1)) * (1.0 - 2.0*ptest_bits_coh_rx[i]);
         }
 
-        /* state logic to sybc up to test data */
+        /* state logic to sync up to test data */
 
         next_state = state;
 
         if (state == 0) {
-            fprintf(stderr, "corr %f\n", corr);            
             if (reliable_sync_bit && (corr == COHPSK_BITS_PER_FRAME)) {
                 next_state = 1;
                 ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
                 nerrors = COHPSK_BITS_PER_FRAME - corr;
                 nbits = COHPSK_BITS_PER_FRAME;
+                fprintf(stderr, "  test data sync\n");            
+
             }
         }
 
@@ -131,7 +152,7 @@ int main(int argc, char *argv[])
         state = next_state;
     }
     
-    printf("BER: %3.2f Nbits: %d Nerrors: %d\n", (float)nerrors/nbits, nbits, nerrors);
+    printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
 
     cohpsk_destroy(coh);
 

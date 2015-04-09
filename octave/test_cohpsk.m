@@ -105,7 +105,7 @@ function test_single
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
 
-  sim_in.Ntrials          = 35;
+  sim_in.Ntrials          = 500;
   sim_in.Esvec            = 8; 
   sim_in.hf_sim           = 0;
   sim_in.hf_mag_only      = 0;
@@ -570,11 +570,11 @@ endfunction
 
 more off;
 %test_curves();
-%test_single();
+test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_tx("tx.raw");
 %rate_Fs_rx("tx_-4dB.wav")
 %rate_Fs_rx("tx.raw")
 %test_freq_off_est("tx.raw",40,6400)
-gen_test_bits();
+%gen_test_bits();
 
