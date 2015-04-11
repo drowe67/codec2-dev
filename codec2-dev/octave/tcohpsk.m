@@ -78,6 +78,7 @@ acohpsk.ldpc_code_rate   = 1;
 acohpsk.Nc               = Nc;
 acohpsk.Rs               = Rs;
 acohpsk.Ns               = 4;
+acohpsk.coh_en           = 1;
 acohpsk.Nchip            = 1;
 acohpsk.modulation       = 'qpsk';
 acohpsk.do_write_pilot_file = 0;
