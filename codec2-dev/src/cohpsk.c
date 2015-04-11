@@ -56,6 +56,7 @@
 #include "pilots_coh.h"
 #include "comp_prim.h"
 #include "kiss_fft.h"
+#include "linreg.h"
 
 static COMP qpsk_mod[] = {
     { 1.0, 0.0},
@@ -239,6 +240,9 @@ void bits_to_qpsk_symbols(COMP tx_symb[][PILOTS_NC], int tx_bits[], int nbits)
 void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][COHPSK_NC])
 {
     int   p, r, c, i;
+    float x[NPILOTSFRAME+2], x1;
+    COMP  y[NPILOTSFRAME+2], yfit;
+    COMP  m, b;
     COMP  corr, rot, pi_on_4, phi_rect;
     float mag, phi_, amp_;
 
@@ -249,6 +253,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
        end */
 
     for(c=0; c<PILOTS_NC; c++) {
+#ifdef OLD
         corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
         for(p=0; p<NPILOTSFRAME+2; p++) {
             corr = cadd(corr, fcmult(coh->pilot2[p][c], ct_symb_buf[sampling_points[p]][c]));
@@ -261,14 +266,39 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
             coh->phi_[r][c] = phi_;
             coh->amp_[r][c] = amp_;
         }
+#endif
+
+        /* set up lin reg model and interpolate phase */
+
+        for(p=0; p<NPILOTSFRAME+2; p++) {
+            x[p] = sampling_points[p];
+            y[p] = fcmult(coh->pilot2[p][c], ct_symb_buf[sampling_points[p]][c]);
+        }
+        linreg(&m, &b, x, y, NPILOTSFRAME+2);
+        for(r=0; r<NSYMROW; r++) {
+            x1 = (float)(r+NPILOTSFRAME);
+            yfit = cadd(fcmult(x1,m),b);
+            coh->phi_[r][c] = atan2(yfit.imag, yfit.real);
+        }
+
+        /* amplitude estimation */
+
+        mag = 0.0;
+        for(p=0; p<NPILOTSFRAME+2; p++) {
+            mag  += cabsolute(ct_symb_buf[sampling_points[p]][c]);
+        }
+        amp_ =  mag/(NPILOTSFRAME+2);
+        for(r=0; r<NSYMROW; r++) {
+             coh->amp_[r][c] = amp_;
+        }
     }
 
     /* now correct phase of data symbols and make decn on bits */
 
     for(c=0; c<PILOTS_NC; c++) {
-        phi_rect.real = cosf(coh->phi_[0][c]); phi_rect.imag = -sinf(coh->phi_[0][c]);
         //rot.real = 1.0; rot.imag = 0.0;
         for (r=0; r<NSYMROW; r++) {
+            phi_rect.real = cosf(coh->phi_[r][c]); phi_rect.imag = -sinf(coh->phi_[r][c]);
             i = c*NSYMROW + r;
             coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], phi_rect);
             //printf("%d %d %f %f\n", r,c, coh->rx_symb[r][c].real, coh->rx_symb[r][c].imag);

@@ -170,6 +170,7 @@ set(CODEC2_SRCS
     fdmdv.c
     fm.c
     kiss_fft.c
+    linreg.c
     interp.c
     lsp.c
     phase.c
