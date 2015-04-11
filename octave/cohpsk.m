@@ -65,9 +65,11 @@ function sim_in = symbol_rate_init(sim_in)
     sim_in.Npilotsframe  = Npilotsframe     = 2;
     sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe;
 
-    printf("Each frame contains %d data bits or %d data symbols, transmitted as %d symbols by %d carriers.", framesize, Nsymb, Nsymbrow, Nc);
-    printf("  There are %d pilot symbols in each carrier together at the start of each frame, then %d data symbols.", Npilotsframe, Ns); 
-    printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", Nsymbrowpilot, Nc);
+    if verbose == 2
+      printf("Each frame contains %d data bits or %d data symbols, transmitted as %d symbols by %d carriers.", framesize, Nsymb, Nsymbrow, Nc);
+      printf("  There are %d pilot symbols in each carrier together at the start of each frame, then %d data symbols.", Npilotsframe, Ns); 
+      printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", Nsymbrowpilot, Nc);
+    end
 
     sim_in.prev_sym_tx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
     sim_in.prev_sym_rx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
@@ -226,6 +228,7 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     Npilotsframe  = cohpsk.Npilotsframe;
     pilot         = cohpsk.pilot;
     verbose       = cohpsk.verbose;
+    coh_en        = cohpsk.coh_en;
 
     % average pilots to get phase and amplitude estimates
     % we assume there are two samples at the start of each frame and two at the end
@@ -234,12 +237,20 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     pilot2 = [cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
     phi_ = zeros(Nsymbrow, Nc);
     amp_ = zeros(Nsymbrow, Nc);
-   
+    
+    % corr method was used initially, but was poor at tracking fast phase 
+    % changes.  Linear regression works better.
+
     for c=1:Nc
-      corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);
-      mag  = sum(abs(ct_symb_buf(sampling_points,c)));
+      %corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);      
+      %phi_(:, c) = angle(corr);
+     
+      y = ct_symb_buf(sampling_points,c) .* pilot2(:,c);
+      [m b] = linreg(sampling_points, y, length(sampling_points));
+      yfit = m*[3 4 5 6] + b;
+      phi_(:, c) = angle(yfit);
       
-      phi_(:, c) = angle(corr);
+      mag  = sum(abs(ct_symb_buf(sampling_points,c)));
       amp_(:, c) = mag/length(sampling_points);
     end
 
@@ -251,8 +262,11 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     for c=1:Nc
       for r=1:Nsymbrow
         i = (c-1)*Nsymbrow + r;
-        rx_symb(r,c) = ct_symb_buf(2+r,c)*exp(-j*phi_(r,c));
-        %rx_symb(r,c) = ct_symb_buf(2+r,c);
+        if coh_en == 1
+          rx_symb(r,c) = ct_symb_buf(2+r,c)*exp(-j*phi_(r,c));
+        else
+          rx_symb(r,c) = ct_symb_buf(2+r,c);
+        end
         rx_symb_linear(i) = rx_symb(i);
         rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
         %printf("phi_ %d %d %f %f\n", r,c,real(exp(-j*phi_(r,c))), imag(exp(-j*phi_(r,c))));
@@ -682,6 +696,7 @@ function sim_out = ber_test(sim_in)
     hf_sim           = sim_in.hf_sim;
     nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
     hf_mag_only      = sim_in.hf_mag_only;
+    f_off            = sim_in.f_off;
 
     [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, Nsymbrowpilot*Ntrials);
 
@@ -719,8 +734,9 @@ function sim_out = ber_test(sim_in)
 
         hf_n = 1;
 
-        phase_offset = 0;
-        w_offset     = pi/16;
+        phase_offset_rect = 1;
+        w_offset      = 2*pi*f_off/Rs;
+        w_offset_rect = exp(j*w_offset);
 
         ct_symb_buf = zeros(2*Nsymbrowpilot, Nc);
         prev_tx_symb = prev_rx_symb = ones(1,Nc);
@@ -749,7 +765,6 @@ function sim_out = ber_test(sim_in)
               [tx_symb prev_tx_symb] = bits_to_dqpsk_symbols(sim_in, tx_bits, prev_tx_symb);
               tx_bits_buf(1:framesize) = tx_bits;
             end
-
 
             s_ch = tx_symb;
 
@@ -797,8 +812,12 @@ function sim_out = ber_test(sim_in)
             noise = sqrt(variance*0.5)*(randn(Nsymbrowpilot,Nc*Nchip) + j*randn(Nsymbrowpilot,Nc*Nchip));
             noise_log = [noise_log noise];
 
-            s_ch = s_ch + noise;
-            
+            for r=1:Nsymbrowpilot
+              s_ch(r,:) *= phase_offset_rect;
+              phase_offset_rect *= w_offset_rect;
+            end
+            s_ch += noise;
+
             ct_symb_buf(1:Nsymbrowpilot,:) = ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:);
             ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:) = s_ch;
 
@@ -887,7 +906,7 @@ function sim_out = ber_test(sim_in)
           EsNodBSurface(find(EsNodBSurface < -5)) = -5;
           mesh(x,y,EsNodBSurface);
           grid
-          axis([1 (Nc+1)*Nchip 1 Rs*5 -5 15])
+          axis([1 (Nc+1)*Nchip 1 Rs*5 -5 25])
           title('HF Channel Es/No');
 
           if verbose 
@@ -907,7 +926,7 @@ function sim_out = ber_test(sim_in)
          p = Ns;
          for r=1:m1
            if p == Ns
-             phi_x_counter++;
+             phi_x_counter += Npilotsframe;
              p = 0;
            end
            p++;
@@ -919,6 +938,7 @@ function sim_out = ber_test(sim_in)
          figure(5);
          clf
          subplot(211)
+         [m n] = size(phi_log);
          plot(phi_x, phi_log(:,2),'r+;Estimated HF channel phase;')
          if hf_sim
            hold on;
@@ -928,6 +948,7 @@ function sim_out = ber_test(sim_in)
          end
          ylabel('Phase (rads)');
          legend('boxoff');
+         axis([1 m -1.1*pi 1.1*pi])
 
          subplot(212)
          plot(phi_x, amp_log(:,2),'r+;Estimated HF channel amp;')
@@ -939,17 +960,13 @@ function sim_out = ber_test(sim_in)
          ylabel('Amplitude');
          xlabel('Time (symbols)');
          legend('boxoff');
+         axis([1 m 0 3])
        end
 
        figure(4)
        clf
-       subplot(211)
        stem(Nerrs_log)
-       subplot(212)
-       if ldpc_code
-         stem(ldpc_Nerrs_log)
-       end
-
+       axis([1 length(Nerrs_log) 0 max(Nerrs_log)+1])
    end
 
 endfunction
@@ -958,6 +975,7 @@ endfunction
 
 function sim_in = standard_init
   sim_in.verbose          = 1;
+  sim_in.do_write_pilot_file = 0;
   sim_in.plot_scatter     = 0;
 
   sim_in.Esvec            = 50; 

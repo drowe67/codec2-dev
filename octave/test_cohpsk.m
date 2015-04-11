@@ -36,9 +36,8 @@ function test_curves
   sim_in.verbose          = 1;
   sim_in.plot_scatter     = 1;
 
-  sim_in.Esvec            = 10; 
+  sim_in.Esvec            = 20; 
   sim_in.framesize        = 32;
-  sim_in.hf_sim           = 1;
   sim_in.Ntrials          = 100;
   sim_in.Rs               = 50;
   sim_in.Nc               = 4;
@@ -48,12 +47,17 @@ function test_curves
   sim_in.modulation       = 'qpsk';
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
+  sim_in.coh_en           = 1;
+
+  sim_in.hf_sim           = 1;
+  sim_in.hf_mag_only      = 0;
+  sim_in.f_off            = 0;
 
   sim_qpsk                = ber_test(sim_in);
 
   % AWGN curves ----------------------------------------------------
 
-  sim_in.Ntrials          = 500;
+  sim_in.Ntrials          = 400;
   sim_in.hf_sim           = 0;
   sim_in.plot_scatter     = 0;
   sim_in.Esvec            = 5:10; 
@@ -65,26 +69,24 @@ function test_curves
   sim_dqpsk               = ber_test(sim_in, 'dqpsk');
 
   sim_in.modulation       = 'qpsk';
-  sim_in.Ns               = 4;
-  sim_in.Np               = 2;
   sim_qpsk_pilot          = ber_test(sim_in, 'qpsk');
 
   % HF curves ----------------------------------------------------
 
-  sim_in.Ntrials          = 200;
+  sim_in.Ntrials          = 400;
   sim_in.hf_sim           = 1;
   sim_in.plot_scatter     = 0;
   sim_in.Esvec            = 5:20; 
-
-  Ebvec = sim_in.Esvec - 10*log10(2);
-  BER_theory = 0.5*erfc(sqrt(10.^(Ebvec/10)));
-  
   sim_in.modulation       = 'dqpsk';
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
 
   sim_in.modulation       = 'qpsk';
-  sim_in.Ns               = 4;
-  sim_in.Np               = 2;
+  sim_in.coh_en           = 0;
+  sim_in.hf_mag_only      = 1;
+  sim_qpsk_hf             = ber_test(sim_in, 'qpsk');
+
+  sim_in.coh_en           = 1;
+  sim_in.hf_mag_only      = 0;
   sim_qpsk_pilot_hf       = ber_test(sim_in, 'qpsk');
 
   % plot results ---------------------------------------------------
@@ -97,16 +99,16 @@ function test_curves
   semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'c;DQPSK AWGN;')
   semilogy(sim_qpsk_pilot.Ebvec, sim_qpsk_pilot.BERvec,'b;QPSK pilot AWGN;')
 
-  %semilogy(sim_qpsk_hf_ideal.Ebvec, sim_qpsk_hf_ideal.BERvec,'b;QPSK HF ideal;')
-  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'c;DQPSK HF;')
+  semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF ideal;')
   semilogy(sim_qpsk_pilot_hf.Ebvec, sim_qpsk_pilot_hf.BERvec,'b;QPSK pilot HF;')
+  semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'c;DQPSK HF;')
 
   hold off;
 
   xlabel('Eb/N0')
   ylabel('BER')
   grid("minor")
-  axis([min(Ebvec) max(Ebvec) 1E-3 1])
+  axis([min(sim_qpsk_hf.Ebvec) max(sim_qpsk_hf.Ebvec) 1E-3 1])
   legend("boxoff");
 endfunction
 
@@ -129,13 +131,13 @@ function test_single
 
   sim_in.Ntrials          = 100;
   sim_in.Esvec            = 10; 
-  sim_in.hf_sim           = 0;
+  sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
   sim_in.modulation       = 'qpsk';
+  sim_in.coh_en           = 1;
+  sim_in.f_off            = 0;
 
-  sim_in.modulation       = 'dqpsk';
-
-  sim_in.do_write_pilot_file = 0;
+  %sim_in.modulation      = 'dqpsk';
 
   sim_qpsk_hf             = ber_test(sim_in);
 
@@ -593,6 +595,7 @@ endfunction
 % Start simulations ---------------------------------------
 
 more off;
+%close all;
 test_curves();
 %test_single();
 %rate_Fs_tx("tx_zero.raw");
