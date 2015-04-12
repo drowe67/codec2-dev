@@ -8,13 +8,14 @@
                  
   TODO:
 
-  [ ] Code to plot EB/No v BER curves for
+  [ ] Code to plot EB/No v BER curves to char perf for
       [ ] AWGN channel
       [ ] freq offset
       [ ] fading channel
       [ ] freq drift
       [ ] timing drift
   [ ] tune perf/impl loss to get closer to ideal
+      [X] linear interp of phase for better fading perf
   [ ] freq offset/drift feedback loop 
   [ ] smaller freq est block size to min ram req
                                                       
@@ -253,7 +254,8 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
        end */
 
     for(c=0; c<PILOTS_NC; c++) {
-#ifdef OLD
+//#define AVERAGE
+#ifdef AVERAGE
         corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
         for(p=0; p<NPILOTSFRAME+2; p++) {
             corr = cadd(corr, fcmult(coh->pilot2[p][c], ct_symb_buf[sampling_points[p]][c]));
@@ -266,7 +268,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
             coh->phi_[r][c] = phi_;
             coh->amp_[r][c] = amp_;
         }
-#endif
+#else
 
         /* set up lin reg model and interpolate phase */
 
@@ -291,6 +293,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
         for(r=0; r<NSYMROW; r++) {
              coh->amp_[r][c] = amp_;
         }
+#endif
     }
 
     /* now correct phase of data symbols and make decn on bits */
