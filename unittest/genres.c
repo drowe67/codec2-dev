@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <lpc.h>
 
 #define N 160
@@ -74,6 +75,8 @@ int main(int argc, char *argv[])
 
   while( (fread(buf,sizeof(short),N,fin)) == N) {
     frames++;
+    for(i=0; i<P; i++)
+      Sn[i] = Sn[i+N];
     for(i=0; i<N; i++)
       Sn[P+i] = (float)buf[i];
 
@@ -85,10 +88,8 @@ int main(int argc, char *argv[])
       buf[i] = (short)res[i];
     fwrite(buf,sizeof(short),N,fres);
 
-    /* update filter memory */
-
-    for(i=0; i<P; i++)
-        Sn[i] = Sn[i+N]; 
+    if (fres == stdout) fflush(stdout);
+    if (fin == stdin) fflush(stdin);
   }
 
   fclose(fin);

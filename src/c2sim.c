@@ -333,7 +333,8 @@ int main(int argc, char *argv[])
 
     /* Input file */
 
-     if ((fin = fopen(argv[optind],"rb")) == NULL) {
+    if (strcmp(argv[optind], "-")  == 0) fin = stdin;
+    else if ((fin = fopen(argv[optind],"rb")) == NULL) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
 		argv[optind], strerror(errno));
 	exit(1);
