@@ -48,6 +48,7 @@
 #include "interp.h"
 #include "ampexp.h"
 #include "phaseexp.h"
+#include "bpf.h"
 
 void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -64,8 +65,9 @@ int main(int argc, char *argv[])
     FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
     short buf[N];	/* input/output buffer                   */
+    float buf_float[N];
     float Sn[M];	/* float input speech samples            */
-    float Sn_pre[M];	/* pre-emphasised input speech samples   */
+    float Sn_pre[N];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     kiss_fft_cfg  fft_fwd_cfg;
     kiss_fft_cfg  fft_inv_cfg;
@@ -130,6 +132,8 @@ int main(int argc, char *argv[])
     struct PEXP *pexp = NULL;
     struct AEXP *aexp = NULL;
     float gain = 1.0;
+    int   bpf_en = 0;
+    float bpf_buf[BPF_N+N];
 
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -164,6 +168,7 @@ int main(int argc, char *argv[])
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
         { "gain", required_argument, NULL, 0 },
+        { "bpf", no_argument, &bpf_en, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -356,6 +361,11 @@ int main(int argc, char *argv[])
     if (ampexp)
 	aexp = amp_experiment_create();
 
+    if (bpf_en) {
+        for(i=0; i<BPF_N; i++)
+            bpf_buf[i] = 0.0;
+    }
+
     /*----------------------------------------------------------------*\
 
                             Main Loop
@@ -366,19 +376,33 @@ int main(int argc, char *argv[])
     sum_snr = 0;
     while(fread(buf,sizeof(short),N,fin)) {
 	frames++;
-	//printf("frame: %d ", frames);
 
-	/* Read input speech */
+	for(i=0; i<N; i++)
+	    buf_float[i] = buf[i];
+
+	/* optionally filter input speech */
 	
+        if (prede) {
+           pre_emp(Sn_pre, buf_float, &pre_mem, N);
+           for(i=0; i<N; i++)
+                buf_float[i] = Sn_pre[i];
+        }
+         
+        if (bpf_en) {
+            for(i=0; i<BPF_N; i++)
+                bpf_buf[i] =  bpf_buf[N+i];
+            for(i=0; i<N; i++)
+                bpf_buf[BPF_N+i] = buf_float[i];
+            inverse_filter(&bpf_buf[BPF_N], bpf, N, buf_float, BPF_N);
+       }
+
+        /* shift buffer of input samples, and insert new samples */
+
 	for(i=0; i<M-N; i++) {
 	    Sn[i] = Sn[i+N];
-	    Sn_pre[i] = Sn_pre[i+N];
 	}
 	for(i=0; i<N; i++)
-	    Sn[i+M-N] = buf[i];
-
-	pre_emp(&Sn_pre[M-N], &Sn[M-N], &pre_mem, N);
-	
+	    Sn[i+M-N] = buf_float[i];
 
 	/*------------------------------------------------------------*\
 
@@ -435,15 +459,8 @@ int main(int argc, char *argv[])
 
 	    /* find aks here, these are overwritten if LPC modelling is enabled */
 
-	    if (prede) {
-		for(i=0; i<M; i++)
-		    Wn[i] = Sn_pre[i]*w[i];
-	    }
-	    else {
-	    
-		for(i=0; i<M; i++)
-		    Wn[i] = Sn[i]*w[i];
-	    }
+            for(i=0; i<M; i++)
+                Wn[i] = Sn[i]*w[i];
 	    autocorrelate(Wn,Rk,M,order);
 	    levinson_durbin(Rk,ak,order);
 
@@ -480,10 +497,7 @@ int main(int argc, char *argv[])
 
 	if (lpc_model) {
 	    
-	    if (prede)
-		e = speech_to_uq_lsps(lsps, ak, Sn_pre, w, order);
-	    else
-		e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
+            e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
 
             #ifdef DUMP
 	    dump_ak(ak, order);
