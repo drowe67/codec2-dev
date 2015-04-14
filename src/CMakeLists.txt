@@ -78,6 +78,15 @@ set(CODEBOOKSVQANSSI
     ${D}/lspvqanssi4.txt
 )
 
+set(CODEBOOKSMEL
+    ${D}/mel1.txt
+    ${D}/mel2.txt
+    ${D}/mel3.txt
+    ${D}/mel4.txt
+    ${D}/mel5.txt
+    ${D}/mel6.txt
+)
+
 set(CODEBOOKSGE ${D}/gecb.txt)
 
 # when crosscompiling import the executable targets from a file
@@ -147,6 +156,13 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSVQANSSI}
 )
 
+# codebookmel.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
+    COMMAND generate_codebook mel_cb ${CODEBOOKSMEL} > ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
+    DEPENDS generate_codebook ${CODEBOOKSMEL}
+)
+
 # codebookge.c
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookge.c
@@ -183,6 +199,7 @@ set(CODEC2_SRCS
     codebookjvm.c
     codebookvqanssi.c
     codebookdt.c
+    codebookmel.c
     codebookge.c
     golay23.c
     freedv_api.c

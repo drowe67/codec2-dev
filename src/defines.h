@@ -88,6 +88,7 @@ extern const struct lsp_codebook lsp_cbjnd[];
 extern const struct lsp_codebook lsp_cbdt[];
 extern const struct lsp_codebook lsp_cbjvm[];
 extern const struct lsp_codebook lsp_cbvqanssi[];
+extern const struct lsp_codebook mel_cb[];
 extern const struct lsp_codebook ge_cb[];
 
 #endif
