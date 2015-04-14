@@ -91,6 +91,9 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
 void lspanssi_quantise(float lsps[], float lsps_[], int order, int mbest_entries);
 
+void encode_mels_scalar(int mel_indexes[], float mels[], int order);
+void decode_mels_scalar(float mels[], int mel_indexes[], int order);
+
 void quantise_WoE(MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);
 void decode_WoE(MODEL *model, float *e, float xq[], int n1);

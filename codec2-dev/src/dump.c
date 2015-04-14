@@ -456,7 +456,7 @@ void dump_lsp_(float lsp_[]) {
     fprintf(flsp_,"\n");    
 }
 
-void dump_mel(int mel[]) {
+void dump_mel(float mel[], int order) {
     int i;
     char s[MAX_STR];
 
@@ -468,8 +468,8 @@ void dump_mel(int mel[]) {
 	assert(fmel != NULL);
     }
 
-    for(i=0; i<10; i++)
-	fprintf(fmel,"%d\t",mel[i]);
+    for(i=0; i<order; i++)
+	fprintf(fmel,"%f\t",mel[i]);
     fprintf(fmel,"\n");    
 }
 

@@ -591,34 +591,33 @@ int main(int argc, char *argv[])
 	    */
 
 	    if (lspmel) {
-		float f, f_;
-		int mel[LPC_ORD];
+		float f, f_, dmel;
+		float mel[LPC_ORD];
+		int   mel_indexes[LPC_ORD];
 
-		for(i=0; i<LPC_ORD; i++) {
+		for(i=0; i<order; i++) {
 		    f = (4000.0/PI)*lsps[i];
-		    mel[i] = floor(100.0*log10(1.0 + f/700.0) + 0.5);
+		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
 
-		for(i=1; i<LPC_ORD; i++) {
+		for(i=1; i<order; i++) {
 		    if (mel[i] == mel[i-1])
 			mel[i]++;
 		}
 
+ 		encode_mels_scalar(mel_indexes, mel, 6);
+		decode_mels_scalar(mel, mel_indexes, 6);
+                
                 #ifdef DUMP
-                dump_mel(mel);
+                dump_mel(mel, order);
                 #endif
 
 		for(i=0; i<LPC_ORD; i++) {
-		    f_ = 700.0*( pow(10.0, (float)mel[i]/100.0) - 1.0);
+		    f_ = 700.0*( pow(10.0, (float)mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}
-                /*
-                for(i=5; i<10; i++) {
-		    lsps_[i] = lsps[i];
-		}
-                */
-
-		lsp_to_lpc(lsps_, ak, LPC_ORD);
+ 
+		lsp_to_lpc(lsps_, ak, order);
 	    }
 
 	    /* we need lsp__prev[] for lspdt and decimate.  If no

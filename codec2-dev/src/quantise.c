@@ -1303,6 +1303,74 @@ void decode_lsps_scalar(float lsp[], int indexes[], int order)
 }
 
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: encode_mels_scalar()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: April 2015 
+
+  Low bit rate mel coeff encoder.
+
+\*---------------------------------------------------------------------------*/
+
+void encode_mels_scalar(int indexes[], float mels[], int order)
+{
+    int    i,m;
+    float  wt[1];
+    const float * cb;
+    float se, mel_, dmel;
+    
+    /* scalar quantisers */
+
+    wt[0] = 1.0;
+    for(i=0; i<order; i++) {
+	m = mel_cb[i].m;
+	cb = mel_cb[i].cb;
+        if (i%2) {
+            /* on odd mels quantise difference */
+            mel_ = mel_cb[i-1].cb[indexes[i-1]];
+            dmel = mels[i] - mel_;
+            indexes[i] = quantise(cb, &dmel, wt, 1, m, &se);
+            //printf("%d mel: %f mel_: %f dmel: %f index: %d\n", i, mels[i], mel_, dmel, indexes[i]);
+        }
+        else {
+            indexes[i] = quantise(cb, &mels[i], wt, 1, m, &se);
+            //printf("%d mel: %f dmel: %f index: %d\n", i, mels[i], 0.0, indexes[i]);
+        }
+
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: decode_mels_scalar()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: April 2015 
+
+  From a vector of quantised mel indexes, returns the quantised
+  (floating point) mels.
+
+\*---------------------------------------------------------------------------*/
+
+void decode_mels_scalar(float mels[], int indexes[], int order)
+{
+    int    i;
+    const float * cb;
+
+    for(i=0; i<order; i++) {
+	cb = mel_cb[i].cb;
+        if (i%2) {
+            /* on odd mels quantise difference */
+            mels[i] = mels[i-1] + cb[indexes[i]];
+        }
+        else
+            mels[i] = cb[indexes[i]];
+    }
+
+}
+
+
 #ifdef __EXPERIMENTAL__
 
 /*---------------------------------------------------------------------------*\

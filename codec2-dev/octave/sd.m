@@ -36,6 +36,7 @@ function sd(raw_filename, dump_file_prefix, f)
   plot(s);
   subplot(212)
   plot(sd);
+  axis([1 frames 0 10])
 
   lsp1_filename = sprintf("%s_lsp.txt", dump_file_prefix);
   lsp2_filename = sprintf("%s_lsp_.txt", dump_file_prefix);
