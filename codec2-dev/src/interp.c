@@ -315,11 +315,11 @@ float interp_energy2(float prev_e, float next_e, float weight)
   
 \*---------------------------------------------------------------------------*/
 
-void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight)
+void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight, int order)
 {
     int i;
 
-    for(i=0; i<LPC_ORD; i++)
+    for(i=0; i<order; i++)
 	interp[i] = (1.0 - weight)*prev[i] + weight*next[i];
 }
 

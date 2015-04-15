@@ -110,6 +110,7 @@ int lsp_bits(int i);
 int lspd_bits(int i);
 int lspdt_bits(int i);
 int lsp_pred_vq_bits(int i);
+int mel_bits(int i);
 
 void apply_lpc_correction(MODEL *model);
 float speech_to_uq_lsps(float lsp[],

@@ -76,11 +76,10 @@ int main(int argc, char *argv[])
     MODEL model;
     float Pn[2*N];	/* trapezoidal synthesis window          */
     float Sn_[2*N];	/* synthesised speech */
-    int   i;		/* loop variable                         */
+    int   i,m;		/* loop variable                         */
     int   frames;
-    float prev_Wo, prev__Wo, uq_Wo, prev_uq_Wo;
+    float prev_Wo, prev__Wo, prev_uq_Wo;
     float pitch;
-    int   voiced1 = 0;
     char  out_file[MAX_STR];
     char  ampexp_arg[MAX_STR];
     char  phaseexp_arg[MAX_STR];
@@ -90,8 +89,10 @@ int main(int argc, char *argv[])
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
-    int lspdt = 0, lspdt_mode = LSPDT_ALL;
-    int dt = 0, lspjvm = 0, lspanssi = 0, lspjnd = 0, lspmel = 0;
+    int lspjvm = 0, lspjnd = 0, lspmel = 0;
+    #ifdef __EXPERIMENTAL__
+    int lspanssi = 0, 
+    #endif
     int prede = 0;
     float pre_mem = 0.0, de_mem = 0.0;
     float ak[order];
@@ -102,23 +103,23 @@ int main(int argc, char *argv[])
     float ex_phase[MAX_AMP+1];
 
     int   postfilt;
-    float bg_est;
 
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
 
-    MODEL prev_model, interp_model;
-    int decimate = 0;
+    MODEL prev_model;
+    int dec;
+    int decimate = 1;
     float lsps[order];
-    float prev_lsps[order], prev_lsps_[order];
-    float lsps__prev[order];
-    float lsps__prev2[order];
     float e, prev_e;
-    float ak_interp[order];
     int   lsp_indexes[order];
     float lsps_[order];
     float Woe_[2];
+
+    float lsps_dec[4][LPC_ORD], e_dec[4], weight, weight_inc, ak_dec[4][LPC_ORD];
+    MODEL model_dec[4], prev_model_dec;
+    float prev_lsps_dec[order], prev_e_dec;
 
     void *nlp_states;
     float hpf_states[2];
@@ -144,10 +145,6 @@ int main(int argc, char *argv[])
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
         { "lspres", no_argument, &lspres, 1 },
-        #ifdef __EXPERIMENTAL__
-        { "lspdt", no_argument, &lspdt, 1 },
-        { "lspdt_mode", required_argument, NULL, 0 },
-        #endif
         { "lspjvm", no_argument, &lspjvm, 1 },
         #ifdef __EXPERIMENTAL__
         { "lspanssi", no_argument, &lspanssi, 1 },
@@ -157,8 +154,7 @@ int main(int argc, char *argv[])
         { "ampexp", required_argument, &ampexp, 1 },
         { "postfilter", no_argument, &postfilt, 1 },
         { "hand_voicing", required_argument, &hand_voicing, 1 },
-        { "dec", no_argument, &decimate, 1 },
-        { "dt", no_argument, &dt, 1 },
+        { "dec", required_argument, &dec, 1 },
         { "hi", no_argument, &hi, 1 },
         { "simlpcpf", no_argument, &simlpcpf, 1 },
         { "lpcpf", no_argument, &lpcpf, 1 },
@@ -196,10 +192,6 @@ int main(int argc, char *argv[])
     for(i=1; i<=MAX_AMP; i++) {
 	//ex_phase[i] = (PI/3)*(float)rand()/RAND_MAX;
 	ex_phase[i] = 0.0;
-    }
-    for(i=0; i<order; i++) {
-	lsps_[i] = prev_lsps[i] = prev_lsps_[i] = i*PI/(order+1);
-	lsps__prev[i] = lsps__prev2[i] = i*PI/(order+1);
     }
     e = prev_e = 1;
     hpf_states[0] = hpf_states[1] = 0.0;
@@ -240,17 +232,23 @@ int main(int argc, char *argv[])
                   || strcmp(long_options[option_index].name, "lspd") == 0
                   || strcmp(long_options[option_index].name, "lspvq") == 0) {
 	        assert(order == LPC_ORD);
-            } else if(strcmp(long_options[option_index].name, "lspdt_mode") == 0) {
-	        if (strcmp(optarg,"all") == 0)
-	            lspdt_mode = LSPDT_ALL;
-	        else if (strcmp(optarg,"low") == 0)
-	            lspdt_mode = LSPDT_LOW;
-	        else if (strcmp(optarg,"high") == 0)
-	            lspdt_mode = LSPDT_HIGH;
-	        else {
-	            fprintf(stderr, "Error in lspdt_mode: %s\n", optarg);
+            } else if(strcmp(long_options[option_index].name, "dec") == 0) {
+               
+                decimate = atoi(optarg);
+	        if ((decimate != 2) && (decimate != 4)) {
+	            fprintf(stderr, "Error in --dec, must be 2 or 4\n");
 	            exit(1);
 	        }
+
+                if (!phase0) {
+                    printf("needs --phase0 to resample phase when using --dec\n");
+                    exit(1);
+                }
+                if (!lpc_model) {
+                    printf("needs --lpc [order] to resample amplitudes when using --dec\n");
+                    exit(1);
+                }
+ 
             } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
 	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
 	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
@@ -284,25 +282,31 @@ int main(int argc, char *argv[])
 	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
-	            decimate = 1;
+	            decimate = 2;
 		    lpcpf = 1;
                } else if(strcmp(optarg,"1400") == 0) {
 	            lpc_model = 1;
 		    vector_quant_Wo_e = 1;
-	            lsp = 1; lspdt = 1;
+	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
-	            decimate = 1;
-	            dt = 1;
+	            decimate = 4;
  		    lpcpf = 1;
-                } else if(strcmp(optarg,"1200") == 0) {
+               } else if(strcmp(optarg,"1300") == 0) {
 	            lpc_model = 1;
 		    scalar_quant_Wo_e = 1;
-	            lspjvm = 1; lspdt = 1;
+	            lsp = 1;
 	            phase0 = 1;
 	            postfilt = 1;
-	            decimate = 1;
-	            dt = 1;
+	            decimate = 4;
+ 		    lpcpf = 1;
+               } else if(strcmp(optarg,"1200") == 0) {
+	            lpc_model = 1;
+		    scalar_quant_Wo_e = 1;
+	            lspjvm = 1;
+	            phase0 = 1;
+	            postfilt = 1;
+	            decimate = 4;
  		    lpcpf = 1;
                 } else {
                     fprintf(stderr, "Error: invalid output rate (3200|2400|1400|1200) %s\n", optarg);
@@ -341,7 +345,6 @@ int main(int argc, char *argv[])
     }
 
     ex_phase[0] = 0;
-    bg_est = 0.0;
     Woe_[0] = Woe_[1] = 1.0;
 
     /*
@@ -367,7 +370,17 @@ int main(int argc, char *argv[])
             bpf_buf[i] = 0.0;
     }
 
-    /*----------------------------------------------------------------*\
+    for(i=0; i<LPC_ORD; i++) {
+        prev_lsps_dec[i] = i*PI/(LPC_ORD+1);
+    }
+    prev_e_dec = 1;
+    for(m=1; m<=MAX_AMP; m++)
+	prev_model_dec.A[m] = 0.0;
+    prev_model_dec.Wo = TWO_PI/P_MAX;
+    prev_model_dec.L = PI/prev_model_dec.Wo;
+    prev_model_dec.voiced = 0;
+
+    /*----------------------------------------------------------------* \
 
                             Main Loop
 
@@ -417,7 +430,6 @@ int main(int argc, char *argv[])
 	dft_speech(fft_fwd_cfg, Sw, Sn, w);
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
-	uq_Wo = model.Wo;
  
         #ifdef DUMP 
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
@@ -453,6 +465,7 @@ int main(int argc, char *argv[])
 	if (phase0) {
 	    float Wn[M];		        /* windowed speech samples */
 	    float Rk[order+1];                  /* autocorrelation coeffs  */
+            COMP a[FFT_ENC];	                
 
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
@@ -485,6 +498,18 @@ int main(int argc, char *argv[])
 	    for(i=0; i<=MAX_AMP; i++)
 	    	model.phi[i] = 0;
 	
+            /* Determine DFT of A(exp(jw)), which is needed for phase0 model when
+               LPC is not used, e.g. indecimate=1 (10ms) frames with no LPC */
+
+            for(i=0; i<FFT_ENC; i++) {
+                a[i].real = 0.0;
+                a[i].imag = 0.0; 
+            }
+
+            for(i=0; i<=order; i++)
+                a[i].real = ak[i];
+            kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)a, (kiss_fft_cpx *)Aw);
+
 	    if (hand_voicing) {
 		fscanf(fvoicing,"%d\n",&model.voiced);
 	    }
@@ -499,6 +524,8 @@ int main(int argc, char *argv[])
 	if (lpc_model) {
 	    
             e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
+            for(i=0; i<LPC_ORD; i++)
+                lsps_[i] = lsps[i];
 
             #ifdef DUMP
 	    dump_ak(ak, order);
@@ -523,11 +550,7 @@ int main(int argc, char *argv[])
 		fprintf(fjvm, "%f\n", e);
 
             #ifdef DUMP
-	    /* dump order is different if we are decimating */
-	    if (!decimate)
-		dump_lsp(lsps);
-	    for(i=0; i<order; i++)
-		prev_lsps[i] = lsps[i];
+            dump_lsp(lsps);
             #endif
 
 	    /* various LSP quantisation schemes */
@@ -591,7 +614,7 @@ int main(int argc, char *argv[])
 	    */
 
 	    if (lspmel) {
-		float f, f_, dmel;
+		float f, f_;
 		float mel[LPC_ORD];
 		int   mel_indexes[LPC_ORD];
 
@@ -619,97 +642,11 @@ int main(int argc, char *argv[])
  
 		lsp_to_lpc(lsps_, ak, order);
 	    }
-
-	    /* we need lsp__prev[] for lspdt and decimate.  If no
-	       other LSP quantisation is used we use original LSPs as
-	       there is no quantised version available. TODO: this is
-	       mess, we should have structures and standard
-	       nomenclature for previous frames values, lsp_[]
-	       shouldn't be overwritten as we may want to dump it for
-	       analysis.  Re-design some time.
-	    */
-
-	    if (!lsp && !lspd && !lspvq && !lspres && !lspjvm && !lspanssi && !lspjnd && !lspmel)
-		for(i=0; i<LPC_ORD; i++)
-		    lsps_[i] = lsps[i];
-
-	    /* Odd frames are generated by quantising the difference
-	       between the previous frames LSPs and this frames */
-	
-#ifdef __EXPERIMENTAL__
-	    if (lspdt && !decimate) {
-		if (frames%2) {
-		    lspdt_quantise(lsps, lsps_, lsps__prev, lspdt_mode);
-		    bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		    lsp_to_lpc(lsps_, ak, LPC_ORD);
-		}
-		for(i=0; i<LPC_ORD; i++)
-		    lsps__prev[i] = lsps_[i];		
-	    }
-#endif
-
-	    /* 
-	       When decimation is enabled we only send LSPs to the
-	       decoder on odd frames.  In the Delta-time LSPs case we
-	       encode every second odd frame (i.e. every 3rd frame out
-	       of 4) by quantising the difference between the 1st
-	       frames LSPs and the 3rd frames:
-
-	       10ms, frame 1: discard (interpolate at decoder)
-	       20ms, frame 2: send "full" LSP frame
-	       30ms, frame 3: discard (interpolate at decoder)
-	       40ms, frame 4: send LSPs differences between frame 4 and frame 2
-	    */
-   
-	    if (lspdt && decimate) {
-		/* print previous LSPs to make sure we are using the right set */
-		if ((frames%4) == 0) {
-		    //printf("  lspdt ");  
-                    //#define LSPDT		    
-                    #ifdef LSPDT		    
-		    lspdt_quantise(lsps, lsps_, lsps__prev2, lspdt_mode);
-                    #else
-		    for(i=0; i<LPC_ORD; i++)
-			lsps_[i] = lsps__prev2[i];		  
-                    #endif		    
-		    bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
-		    lsp_to_lpc(lsps_, ak, LPC_ORD);
-		}
-		
-		for(i=0; i<LPC_ORD; i++) {
-		    lsps__prev2[i] = lsps__prev[i];
-		    lsps__prev[i] = lsps_[i];
-		}
-	    }
-            #ifdef DUMP
-	    /* if using decimated (20ms) frames we dump interp
-	       LSPs below */
-	    if (!decimate)
-		dump_lsp_(lsps_);
-            #endif
 	
 	    if (scalar_quant_Wo_e) {
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
-
-		if (!decimate) {
-		    /* we send params every 10ms, delta-time every 20ms */
-		    if (dt && (frames % 2)) 
-			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev_Wo),prev_Wo);
-		    else
-			model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
-		}
-
-		if (decimate) {
-		    /* we send params every 20ms */
-		    if (dt && ((frames % 4) == 0)) {
-			/* delta-time every 40ms */
-			model.Wo = decode_Wo_dt(encode_Wo_dt(model.Wo, prev__Wo),prev__Wo);
-		    }
-		    else
-			model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);		    
-		}
-
+                model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
 
@@ -717,156 +654,83 @@ int main(int argc, char *argv[])
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
 
-		//printf("\nWo %f e %f\n", model.Wo, e);
 		quantise_WoE(&model, &e, Woe_);
-		//printf("Wo %f e %f\n", model.Wo, e);
-
 	    }
             
-	    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw); 
-	    apply_lpc_correction(&model);
-
-            #ifdef DUMP
-	    dump_ak_(ak, order);
-            #endif
-
-	    /* note SNR on interpolated frames can't be measured properly
-	       by comparing Am as L has changed.  We can dump interp lsps
-	       and compare them,
-	    */
-            #ifdef DUMP
-	    dump_lpc_snr(snr);
-            #endif
-	    sum_snr += snr;
-            #ifdef DUMP
-	    dump_quantised_model(&model);
-            #endif
 	}
 
 	/*------------------------------------------------------------*\
 
-                         Decimation to 20ms frame rate
+          Synthesise and optional decimation to 20 or 40ms frame rate
 
 	\*------------------------------------------------------------*/
 
-	if (decimate) {
-	    float lsps_interp[order];
+        /* 
+           if decimate == 2, we interpolate frame n from frame n-1 and n+1
+           if decimate == 4, we interpolate frames n, n+1, n+2, from frames n-1 and n+3
 
-	    if (!phase0) {
-		printf("needs --phase0 to resample phase for interpolated Wo\n");
-		exit(0);
-	    }
-	    if (!lpc_model) {
-		printf("needs --lpc [order] to resample amplitudes\n");
-		exit(0);
-	    }
+           This is meant to give identical results to the implementations of various modes
+           in codec2.c
+        */
 
-	    /* 
-	       Each 20ms we synthesise two 10ms frames:
+        /* delay line to keep frame by frame voicing decisions */
 
-	       frame 1: discard except for voicing bit
-	       frame 2: interpolate frame 1 LSPs from frame 2 and frame 0
-	                synthesise frame 1 and frame 2 speech
-	       frame 3: discard except for voicing bit
-	       frame 4: interpolate frame 3 LSPs from frame 4 and frame 2
-	                synthesise frame 3 and frame 4 speech
-	    */
+        for(i=0; i<decimate-1; i++)
+            model_dec[i] = model_dec[i+1];
+        model_dec[decimate-1] = model;
 
-	    if ((frames%2) == 0) {
-		//printf("frame: %d\n", frames);
+        if ((frames % decimate) == 0) {
+            for(i=0; i<order; i++)
+                lsps_dec[decimate-1][i] = lsps_[i];
+            e_dec[decimate-1] = e;
+            model_dec[decimate-1] = model;
 
-		/* decode interpolated frame */
+            /* interpolate the model parameters */
 
-		interp_model.voiced = voiced1;
-		
-                #ifdef FIX_ME
-                /* NOTE: need to get this woking again */
-                interpolate_lsp_ver2(lsps_interp, prev_lsps_,  lsps_, 0.5)
-                    aks_to_M2(fft_fwd_cfg, ak, order, &model, e, &snr, 1, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw); 
-		interpolate_lsp(fft_fwd_cfg, &interp_model, &prev_model, &model,
-				prev_lsps_, prev_e, lsps_, e, ak_interp, lsps_interp);		
-                #endif
-		apply_lpc_correction(&interp_model);
+            weight_inc = 1.0/decimate;
+            for(i=0, weight=weight_inc; i<decimate-1; i++, weight += weight_inc) {
+                //model_dec[i].voiced = model_dec[decimate-1].voiced;
+                interpolate_lsp_ver2(&lsps_dec[i][0], prev_lsps_dec, &lsps_dec[decimate-1][0], weight, order);
+                interp_Wo2(&model_dec[i], &prev_model_dec, &model_dec[decimate-1], weight);
+                e_dec[i] = interp_energy2(prev_e_dec, e_dec[decimate-1],weight);
+            }
 
-		/* used to compare with c2enc/c2dec version 
+            /* then recover spectral amplitudes and synthesise */    
 
-		printf("  Wo: %1.5f  L: %d v1: %d prev_e: %f\n", 
-		       interp_model.Wo, interp_model.L, interp_model.voiced, prev_e);
-		printf("  lsps_interp: ");
-		for(i=0; i<order; i++)
-		    printf("%5.3f  ", lsps_interp[i]);
-		printf("\n  A..........: ");
-		for(i=0; i<order; i++)
-		    printf("%5.3f  ",interp_model.A[i]);
+            for(i=0; i<decimate; i++) {
+                if (lpc_model) {
+                    lsp_to_lpc(&lsps_dec[i][0], &ak_dec[i][0], order);                
+                    aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i], 
+                              &snr, 0, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
+                    apply_lpc_correction(&model_dec[i]);
+                    #ifdef DUMP
+                    dump_lsp_(&lsps_dec[i][0]);
+                    dump_ak_(&ak_dec[i][0], order);
+                    sum_snr += snr;
+                    dump_quantised_model(&model_dec[i]);
+                    #endif
+                }
 
-		printf("\n  Wo: %1.5f  L: %d e: %3.2f v2: %d\n", 
-		       model.Wo, model.L, e, model.voiced);
-		printf("  lsps_......: ");
-		for(i=0; i<order; i++)
-		    printf("%5.3f  ", lsps_[i]);
-		printf("\n  A..........: ");
-		for(i=0; i<order; i++)
-		    printf("%5.3f  ",model.A[i]);
-		printf("\n");
-		*/
-			
-                #ifdef DUMP
-		/* do dumping here so we get lsp dump file in correct order */
-		dump_lsp(prev_lsps);
-		dump_lsp(lsps_interp);
-		dump_lsp(lsps);
-		dump_lsp(lsps_);
-                #endif
+                if (phase0)
+                    phase_synth_zero_order(fft_fwd_cfg, &model_dec[i], ex_phase, Aw);	
+                synth_one_frame(fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
+                if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
+            }
+                    /*
+            for(i=0; i<decimate; i++) {
+                    printf("%d Wo: %f L: %d v: %d\n", frames, model_dec[i].Wo, model_dec[i].L, model_dec[i].voiced);
+            }
+            if (frames == 4*50)
+                exit(0);
+                    */
+            /* update memories for next frame ----------------------------*/
 
-		if (phase0)
-		    phase_synth_zero_order(fft_fwd_cfg, &interp_model, ex_phase, Aw);
-		if (postfilt)
-		    postfilter(&interp_model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &interp_model, Sn_, Pn, prede, &de_mem, gain);
-		//printf("  buf[0] %d\n", buf[0]);
-		if (fout != NULL) 
-		    fwrite(buf,sizeof(short),N,fout);
+            prev_model_dec = model_dec[decimate-1];
+            prev_e_dec = e_dec[decimate-1];
+            for(i=0; i<LPC_ORD; i++)
+                prev_lsps_dec[i] = lsps_dec[decimate-1][i];        
+       }
 
-		/* decode this frame */
-
-		if (phase0)
-		    phase_synth_zero_order(fft_fwd_cfg, &model, ex_phase, Aw);	
-		if (postfilt)
-		    postfilter(&model, &bg_est);
-		synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem, gain);
-		//printf("  buf[0] %d\n", buf[0]);
-		if (fout != NULL) 
-		    fwrite(buf,sizeof(short),N,fout);
-
-		/* update states for next time */
-
-		prev_model = model;
-		for(i=0; i<order; i++)
-		    prev_lsps_[i] = lsps_[i];
-		prev_e = e;
-	    }
-	    else {
-		voiced1 = model.voiced;
-	    }
-	}
-	else {
-	    /* no decimation - sythesise each 10ms frame immediately */
-	    
-	    if (phase0)
-	    	phase_synth_zero_order(fft_fwd_cfg, &model, ex_phase, Aw);	    
-
-	    if (postfilt)
-		postfilter(&model, &bg_est);
-	    synth_one_frame(fft_inv_cfg, buf, &model, Sn_, Pn, prede, &de_mem, gain);
-	    if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
-	}
-
-	prev__Wo = prev_Wo;
-	prev_Wo = model.Wo;
-	prev_uq_Wo = uq_Wo;
-	//if (frames == 8) {
-	//    exit(0);
-	//}
     }
 
     /*----------------------------------------------------------------*\
@@ -935,14 +799,14 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 			option_parameters="";
 		} else if (strcmp("lpc", long_options[i].name) == 0) {
 			option_parameters = " <Order>";
-		} else if (strcmp("lspdt_mode", long_options[i].name) == 0) {
-			option_parameters = " <all|high|low>";
+		} else if (strcmp("dec", long_options[i].name) == 0) {
+			option_parameters = " <2|4>";
 		} else if (strcmp("hand_voicing", long_options[i].name) == 0) {
 			option_parameters = " <VoicingFile>";
 		} else if (strcmp("dump_pitch_e", long_options[i].name) == 0) {
 			option_parameters = " <Dump File>";
 		} else if (strcmp("rate", long_options[i].name) == 0) {
-			option_parameters = " <3200|2400|1400|1200>";
+			option_parameters = " <3200|2400|1400|1300|1200>";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " <DumpFilePrefix>";
 		} else {
@@ -952,3 +816,4 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 	}
 	exit(1);
 }
+
