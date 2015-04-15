@@ -40,6 +40,6 @@ void interp_Wo(MODEL *interp, MODEL *prev, MODEL *next);
 void interp_Wo2(MODEL *interp, MODEL *prev, MODEL *next, float weight);
 float interp_energy(float prev, float next);
 float interp_energy2(float prev, float next, float weight);
-void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight);
+void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight, int order);
 
 #endif

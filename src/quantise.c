@@ -65,6 +65,10 @@ int lspd_bits(int i) {
     return lsp_cbd[i].log2m;
 }
 
+int mel_bits(int i) {
+    return mel_cb[i].log2m;
+}
+
 #ifdef __EXPERIMENTAL__
 int lspdt_bits(int i) {
     return lsp_cbdt[i].log2m;
@@ -903,8 +907,8 @@ void aks_to_M2(
   float        *snr,	     /* signal to noise ratio for this frame in dB */
   int           dump,        /* true to dump sample to dump file */
   int           sim_pf,      /* true to simulate a post filter */
-  int           pf,          /* true to LPC post filter */
-  int           bass_boost,  /* enable LPC filter 0-1khz 3dB boost */
+  int           pf,          /* true to enable actual LPC post filter */
+  int           bass_boost,  /* enable LPC filter 0-1kHz 3dB boost */
   float         beta,
   float         gamma,       /* LPC post filter parameters */
   COMP          Aw[]         /* output power spectrum */
@@ -949,6 +953,11 @@ void aks_to_M2(
 
   if (pf)
       lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost, E);
+  else {
+      for(i=0; i<FFT_ENC; i++) {
+          Pw[i].real *= E;
+      }
+  }
 
   PROFILE_SAMPLE_AND_LOG(tpf, tpw, "      LPC post filter"); 
 
