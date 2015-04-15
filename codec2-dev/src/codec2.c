@@ -45,6 +45,7 @@
 #include "lsp.h"
 #include "codec2_internal.h"
 #include "machdep.h"
+#include "bpf.h"
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -150,6 +151,11 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 
     c2->smoothing = 0;
 
+    c2->bpf_buf = (float*)malloc(sizeof(float)*(BPF_N+4*N));
+    assert(c2->bpf_buf != NULL);
+    for(i=0; i<BPF_N+4*N; i++)
+        c2->bpf_buf[i] = 0.0;
+
     return c2;
 }
 
@@ -166,6 +172,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
+    free(c2->bpf_buf);
     nlp_destroy(c2->nlp);
     KISS_FFT_FREE(c2->fft_fwd_cfg);
     KISS_FFT_FREE(c2->fft_inv_cfg);
@@ -1346,26 +1353,38 @@ void codec2_encode_650(struct CODEC2 *c2, unsigned char * bits, short speech[])
     int     indexes[LPC_ORD_LOW];
     int     Wo_index, e_index, i;
     unsigned int nbit = 0;
+    float   bpf_out[4*N];
+    short   bpf_speech[4*N];
 
     assert(c2 != NULL);
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
 
+    /* band pass filter */
+
+    for(i=0; i<BPF_N; i++)
+        c2->bpf_buf[i] = c2->bpf_buf[4*N+i];
+    for(i=0; i<4*N; i++)
+        c2->bpf_buf[BPF_N+i] = speech[i];
+    inverse_filter(&c2->bpf_buf[BPF_N], bpf, 4*N, bpf_out, BPF_N);
+    for(i=0; i<4*N; i++)
+        bpf_speech[i] = bpf_out[i];
+
     /* frame 1 --------------------------------------------------------*/
 
-    analyse_one_frame(c2, &model, speech);
+    analyse_one_frame(c2, &model, bpf_speech);
  
     /* frame 2 --------------------------------------------------------*/
 
-    analyse_one_frame(c2, &model, &speech[N]);
+    analyse_one_frame(c2, &model, &bpf_speech[N]);
  
     /* frame 3 --------------------------------------------------------*/
 
-    analyse_one_frame(c2, &model, &speech[2*N]);
+    analyse_one_frame(c2, &model, &bpf_speech[2*N]);
 
     /* frame 4: - voicing, scalar Wo & E, scalar LSPs -----------------*/
 
-    analyse_one_frame(c2, &model, &speech[3*N]);
+    analyse_one_frame(c2, &model, &bpf_speech[3*N]);
     pack(bits, &nbit, model.voiced, 1);
     Wo_index = encode_log_Wo(model.Wo, 5);
     pack_natural_or_gray(bits, &nbit, Wo_index, 5, c2->gray);
