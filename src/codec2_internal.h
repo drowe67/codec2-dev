@@ -35,6 +35,7 @@ struct CODEC2 {
     float         w[M];	                   /* time domain hamming window                */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
     float         Pn[2*N];	           /* trapezoidal synthesis window              */
+    float        *bpf_buf;                /* buffer for band pass filter               */
     float         Sn[M];                   /* input speech                              */
     float         hpf_states[2];           /* high pass filter states                   */
     void         *nlp;                     /* pitch predictor states                    */
