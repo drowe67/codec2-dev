@@ -132,6 +132,8 @@ endfunction
 
 % Symbol rate processing for tx side (modulator) -------------------------------------------------------
 
+% legacy DQPSK mod for comparative testing
+
 function [tx_symb prev_tx_symb] = bits_to_dqpsk_symbols(sim_in, tx_bits, prev_tx_symb)
     Nc         = sim_in.Nc;
     Nsymbrow   = sim_in.Nsymbrow;
@@ -149,6 +151,8 @@ function [tx_symb prev_tx_symb] = bits_to_dqpsk_symbols(sim_in, tx_bits, prev_tx
               
 endfunction
 
+
+% legacy DQPSK demod for comparative testing
 
 function [rx_symb rx_bits rx_symb_linear prev_rx_symb] = dqpsk_symbols_to_bits(sim_in, rx_symb, prev_rx_symb)
     Nc         = sim_in.Nc;
@@ -205,7 +209,7 @@ function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     
     tx_symb = [pilot(1,:); pilot(2,:); tx_symb;];
 
-    % Optionally copy to other carriers (diversity)
+    % copy to other carriers (diversity)
 
     tmp = tx_symb;
     for d=1:Nd-1
@@ -243,8 +247,8 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
 
     sampling_points = [1 2 7 8];
     pilot2 = [cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
-    phi_ = zeros(Nsymbrow, Nc);
-    amp_ = zeros(Nsymbrow, Nc);
+    phi_ = zeros(Nsymbrow, Nc*Nd);
+    amp_ = zeros(Nsymbrow, Nc*Nd);
     
     for c=1:Nc*Nd
       %corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);      
@@ -254,7 +258,10 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
       [m b] = linreg(sampling_points, y, length(sampling_points));
       yfit = m*[3 4 5 6] + b;
       phi_(:, c) = angle(yfit);
-      
+      %for r=1:Nsymbrow
+      %  printf("  %f", phi_(r,c));
+      %end
+      %printf("\n");
       mag  = sum(abs(ct_symb_buf(sampling_points,c)));
       amp_(:, c) = mag/length(sampling_points);
     end
@@ -535,7 +542,7 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
   Ndft    = cohpsk.Ndft;
 
   if sync == 0
-    f_start = Fcentre - ((Nc/2)+2)*Fsep; 
+    f_start = Fcentre - ((Nc/2)+2)*Fsep;
     f_stop = Fcentre + ((Nc/2)+2)*Fsep;
     ll = length(ch_fdm_frame);
     h = 0.5 - 0.5*cos(2*pi*(0:ll-1)/(ll-1));
@@ -549,7 +556,7 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
     x = bin_start-1:bin_stop-1;
     bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
     cohpsk.f_est = floor(bin_est/sc+0.5);
-    printf("coarse freq est: %f\n", cohpsk.f_est);
+    printf("  coarse freq est: %f\n", cohpsk.f_est);
     next_sync = 1;
     
   end
@@ -565,6 +572,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
   Rs            = cohpsk.Rs;
   Nsymbrowpilot = cohpsk.Nsymbrowpilot;
   Nc            = cohpsk.Nc;
+  Nd            = cohpsk.Nd;
 
   % update memory in symbol buffer
 
@@ -592,10 +600,10 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
       f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
       for t=0:cohpsk.Nsymbrowpilot-1
         corr = 0; mag = 0;
-        for c=1:Nc
+        for c=1:Nc*Nd
           f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c);
           for p=1:length(sampling_points)
-            corr += pilot2(p,c) * f_corr_vec(p);
+            corr += pilot2(p,c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
             mag  += abs(f_corr_vec(p));
           end
         end
@@ -612,7 +620,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
 
     printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
     if max_corr/max_mag > 0.9
-      printf("in sync!\n");
+      printf("  in sync!\n");
       next_sync = 4;
     else
       next_sync = 0;
