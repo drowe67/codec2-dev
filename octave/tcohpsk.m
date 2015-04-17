@@ -30,12 +30,13 @@ EsNo = 10^(EsNodB/10);
 
 Rs = 50;
 Nc = 4;
+Nd = 2;
 framesize = 32;
 
 % FDMDV init ---------------------------------------------------------------
 
 afdmdv.Fs = 8000;
-afdmdv.Nc = Nc-1;
+afdmdv.Nc = Nd*Nc-1;
 afdmdv.Rs = Rs;
 afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
 afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, Nfilter);
@@ -43,7 +44,7 @@ afdmdv.Nfilter =  Nfilter;
 afdmdv.gt_alpha5_root = gt_alpha5_root;
 afdmdv.Fsep = 75;
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = Fsep*( -Nc/2 - 0.5 + (1:Nc) );
+freq_hz = Fsep*( -afdmdv.Nc/2 - 0.5 + (1:afdmdv.Nc+1) );
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -79,7 +80,7 @@ acohpsk.Nc               = Nc;
 acohpsk.Rs               = Rs;
 acohpsk.Ns               = 4;
 acohpsk.coh_en           = 1;
-acohpsk.Nchip            = 1;
+acohpsk.Nd               = Nd;
 acohpsk.modulation       = 'qpsk';
 acohpsk.do_write_pilot_file = 0;
 acohpsk = symbol_rate_init(acohpsk);
@@ -185,7 +186,7 @@ for i=1:frames
 
   % sample rate demod processing
 
-  ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc);
+  ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc*Nd);
   for r=1:acohpsk.Nsymbrowpilot
 
     % downconvert each FDM carrier to Nc separate baseband signals
@@ -233,6 +234,7 @@ for i=1:frames
 
 end
 
+if 0
 stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
 stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
 stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
@@ -275,7 +277,8 @@ Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c));
 Tbits_c = length(tx_bits_prev_log);
 ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;
-printf("EsNodB: %4.1f ber..: %3.2f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
+end
+
 printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
 
 % some other useful plots

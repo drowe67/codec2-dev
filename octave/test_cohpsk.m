@@ -38,12 +38,12 @@ function test_curves
 
   sim_in.Esvec            = 20; 
   sim_in.framesize        = 32;
-  sim_in.Ntrials          = 100;
+  sim_in.Ntrials          = 400;
   sim_in.Rs               = 50;
   sim_in.Nc               = 4;
   sim_in.Np               = 2;
   sim_in.Ns               = 4;
-  sim_in.Nchip            = 1;
+  sim_in.Nd               = 1;
   sim_in.modulation       = 'qpsk';
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
@@ -52,6 +52,7 @@ function test_curves
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
   sim_in.f_off            = 0;
+  sim_in.div_timeshift    = 1;
 
   sim_qpsk                = ber_test(sim_in);
 
@@ -89,6 +90,19 @@ function test_curves
   sim_in.hf_mag_only      = 0;
   sim_qpsk_pilot_hf       = ber_test(sim_in, 'qpsk');
 
+  sim_in.Nd               = 2;
+  sim_in.div_timeshift    = 1;
+  sim_qpsk_pilot_hf_div   = ber_test(sim_in, 'qpsk');
+
+  sim_in.div_timeshift    = sim_in.Rs;
+  sim_qpsk_pilot_hf_div2  = ber_test(sim_in, 'qpsk');
+
+  sim_in.modulation       = 'qpsk';
+  sim_in.coh_en           = 0;
+  sim_in.hf_mag_only      = 1;
+  sim_in.div_timeshift    = 1;
+  sim_qpsk_hf_div         = ber_test(sim_in, 'qpsk');
+
   % plot results ---------------------------------------------------
 
   figure(1); 
@@ -100,7 +114,10 @@ function test_curves
   semilogy(sim_qpsk_pilot.Ebvec, sim_qpsk_pilot.BERvec,'b;QPSK pilot AWGN;')
 
   semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF ideal;')
+  semilogy(sim_qpsk_hf_div.Ebvec, sim_qpsk_hf_div.BERvec,'r;QPSK HF ideal div;')
   semilogy(sim_qpsk_pilot_hf.Ebvec, sim_qpsk_pilot_hf.BERvec,'b;QPSK pilot HF;')
+  semilogy(sim_qpsk_pilot_hf_div.Ebvec, sim_qpsk_pilot_hf_div.BERvec,'g;QPSK pilot Nd=2 HF;')
+  semilogy(sim_qpsk_pilot_hf_div2.Ebvec, sim_qpsk_pilot_hf_div2.BERvec,'g;QPSK pilot Nd=2 Rs HF;')
   semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'c;DQPSK HF;')
 
   hold off;
@@ -125,17 +142,19 @@ function test_single
   sim_in.Rs               = 50;
   sim_in.Ns               = 4;
   sim_in.Np               = 2;
-  sim_in.Nchip            = 1;
+  sim_in.Nd               = 2;
   sim_in.ldpc_code_rate   = 1;
   sim_in.ldpc_code        = 0;
 
-  sim_in.Ntrials          = 100;
-  sim_in.Esvec            = 10; 
+  sim_in.Ntrials          = 400;
+  sim_in.Esvec            = 13; 
   sim_in.hf_sim           = 1;
   sim_in.hf_mag_only      = 0;
   sim_in.modulation       = 'qpsk';
   sim_in.coh_en           = 1;
   sim_in.f_off            = 0;
+
+  sim_in.div_timeshift    = 1;
 
   %sim_in.modulation      = 'dqpsk';
 
@@ -596,8 +615,8 @@ endfunction
 
 more off;
 %close all;
-test_curves();
-%test_single();
+%test_curves();
+test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_tx("tx.raw");
 %rate_Fs_rx("tx_-4dB.wav")

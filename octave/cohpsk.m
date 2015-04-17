@@ -53,7 +53,7 @@ function sim_in = symbol_rate_init(sim_in)
     nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
     hf_mag_only      = sim_in.hf_mag_only;
 
-    Nchip            = sim_in.Nchip;  % spread spectrum factor
+    Nd               = sim_in.Nd;     % diveristy
     Ns               = sim_in.Ns;     % step size between pilots
     ldpc_code        = sim_in.ldpc_code;
     rate             = sim_in.ldpc_code_rate; 
@@ -71,11 +71,11 @@ function sim_in = symbol_rate_init(sim_in)
       printf("  Including pilots, the frame is %d symbols long by %d carriers.\n\n", Nsymbrowpilot, Nc);
     end
 
-    sim_in.prev_sym_tx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
-    sim_in.prev_sym_rx = qpsk_mod([0 0])*ones(1,Nc*Nchip);
+    sim_in.prev_sym_tx = qpsk_mod([0 0])*ones(1,Nc*Nd);
+    sim_in.prev_sym_rx = qpsk_mod([0 0])*ones(1,Nc*Nd);
 
-    sim_in.rx_symb_buf  = zeros(3*Nsymbrow, Nc*Nchip);
-    sim_in.rx_pilot_buf = zeros(3*Npilotsframe,Nc*Nchip);
+    sim_in.rx_symb_buf  = zeros(3*Nsymbrow, Nc*Nd);
+    sim_in.rx_pilot_buf = zeros(3*Npilotsframe,Nc*Nd);
     sim_in.tx_bits_buf  = zeros(1,2*framesize);
 
     % pilot sequence is used for phase and amplitude estimation, and frame sync
@@ -90,11 +90,11 @@ function sim_in = symbol_rate_init(sim_in)
     % we use first 2 pilots of next frame to help with frame sync and fine freq
 
     sim_in.Nct_sym_buf = 2*Nsymbrowpilot + 2;
-    sim_in.ct_symb_buf = zeros(sim_in.Nct_sym_buf, Nc);
+    sim_in.ct_symb_buf = zeros(sim_in.Nct_sym_buf, Nc*Nd);
 
     sim_in.ff_phase = 1;
 
-    sim_in.ct_symb_ff_buf = zeros(Nsymbrowpilot + 2, Nc);
+    sim_in.ct_symb_ff_buf = zeros(Nsymbrowpilot + 2, Nc*Nd);
 
     % Init LDPC --------------------------------------------------------------------
 
@@ -179,9 +179,9 @@ function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     Nc            = sim_in.Nc;
     Npilotsframe  = sim_in.Npilotsframe;
     Ns            = sim_in.Ns;
-    Nchip         = sim_in.Nchip;
     modulation    = sim_in.modulation;
     pilot         = sim_in.pilot;
+    Nd            = sim_in.Nd;
 
     if ldpc_code
         [tx_bits, tmp] = ldpc_enc(tx_bits, code_param);
@@ -205,15 +205,17 @@ function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     
     tx_symb = [pilot(1,:); pilot(2,:); tx_symb;];
 
-    % Optionally copy to other carriers (spreading)
+    % Optionally copy to other carriers (diversity)
 
-    for c=Nc+1:Nc:Nc*Nchip
-      tx_symb(:,c:c+Nc-1) = tx_symb(:,1:Nc);
+    tmp = tx_symb;
+    for d=1:Nd-1
+      tmp = [tmp tx_symb];
     end
+    tx_symb = tmp;
 
-    % ensures energy/symbol is normalised when spreading
+    % ensures energy/symbol is normalised with diveristy
 
-    tx_symb = tx_symb/sqrt(Nchip);
+    tx_symb = tx_symb/sqrt(Nd);
 end
 
 
@@ -225,27 +227,30 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     Nsymbrow      = cohpsk.Nsymbrow;
     Nsymbrowpilot = cohpsk.Nsymbrowpilot;
     Nc            = cohpsk.Nc;
+    Nd            = cohpsk.Nd;
     Npilotsframe  = cohpsk.Npilotsframe;
     pilot         = cohpsk.pilot;
     verbose       = cohpsk.verbose;
     coh_en        = cohpsk.coh_en;
 
-    % average pilots to get phase and amplitude estimates
-    % we assume there are two samples at the start of each frame and two at the end
+    % Use pilots to get phase and amplitude estimates We assume there
+    % are two samples at the start of each frame and two at the end
+    % Note: correlation (averging) method was used initially, but was
+    % poor at tracking fast phase changes that we experience on fading
+    % channels.  Linear regression (fitting a straight line) works
+    % better on fading channels, but increases BER slighlty for AWGN
+    % channels.
 
     sampling_points = [1 2 7 8];
     pilot2 = [cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
     phi_ = zeros(Nsymbrow, Nc);
     amp_ = zeros(Nsymbrow, Nc);
     
-    % corr method was used initially, but was poor at tracking fast phase 
-    % changes.  Linear regression works better.
-
-    for c=1:Nc
+    for c=1:Nc*Nd
       %corr = pilot2(:,c)' * ct_symb_buf(sampling_points,c);      
       %phi_(:, c) = angle(corr);
      
-      y = ct_symb_buf(sampling_points,c) .* pilot2(:,c);
+      y = ct_symb_buf(sampling_points,c) .* pilot2(:,c-Nc*floor((c-1)/Nc));
       [m b] = linreg(sampling_points, y, length(sampling_points));
       yfit = m*[3 4 5 6] + b;
       phi_(:, c) = angle(yfit);
@@ -254,22 +259,34 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
       amp_(:, c) = mag/length(sampling_points);
     end
 
-    % now correct phase of data symbols and make decn on bits
+    % now correct phase of data symbols
 
     rx_symb = zeros(Nsymbrow, Nc);
     rx_symb_linear = zeros(1, Nsymbrow*Nc);
     rx_bits = zeros(1, framesize);
-    for c=1:Nc
+    for c=1:Nc*Nd
       for r=1:Nsymbrow
-        i = (c-1)*Nsymbrow + r;
         if coh_en == 1
           rx_symb(r,c) = ct_symb_buf(2+r,c)*exp(-j*phi_(r,c));
         else
           rx_symb(r,c) = ct_symb_buf(2+r,c);
         end
-        rx_symb_linear(i) = rx_symb(i);
-        rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(rx_symb(r,c));
+        i = (c-1)*Nsymbrow + r;
         %printf("phi_ %d %d %f %f\n", r,c,real(exp(-j*phi_(r,c))), imag(exp(-j*phi_(r,c))));
+      end
+    end
+
+    % and finally optional diversity combination and make decn on bits
+
+    for c=1:Nc
+      for r=1:Nsymbrow
+        i = (c-1)*Nsymbrow + r;
+        div_symb = rx_symb(r,c);
+        for d=1:Nd-1
+          div_symb += rx_symb(r,c + Nc*d);
+        end
+        rx_symb_linear(i) = div_symb;
+        rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(div_symb);
       end
     end
 
@@ -684,7 +701,7 @@ function sim_out = ber_test(sim_in)
     Npilotsframe     = sim_in.Npilotsframe;
     Ns               = sim_in.Ns;
     Np               = sim_in.Np;
-    Nchip            = sim_in.Nchip;
+    Nd               = sim_in.Nd;
     modulation       = sim_in.modulation;
     pilot            = sim_in.pilot;
     prev_sym_tx      = sim_in.prev_sym_tx;
@@ -697,8 +714,9 @@ function sim_out = ber_test(sim_in)
     nhfdelay         = sim_in.hf_delay_ms*Rs/1000;
     hf_mag_only      = sim_in.hf_mag_only;
     f_off            = sim_in.f_off;
+    div_time_shift   = sim_in.div_timeshift;
 
-    [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, Nsymbrowpilot*Ntrials);
+    [spread spread_2ms hf_gain] = init_hf_model(Fs, Rs, Nsymbrowpilot*(Ntrials+2));
 
     if strcmp(modulation,'dqpsk')
       Nsymbrowpilot = Nsymbrow;
@@ -738,8 +756,8 @@ function sim_out = ber_test(sim_in)
         w_offset      = 2*pi*f_off/Rs;
         w_offset_rect = exp(j*w_offset);
 
-        ct_symb_buf = zeros(2*Nsymbrowpilot, Nc);
-        prev_tx_symb = prev_rx_symb = ones(1,Nc);
+        ct_symb_buf = zeros(2*Nsymbrowpilot, Nc*Nd);
+        prev_tx_symb = prev_rx_symb = ones(1, Nc*Nd);
 
         % simulation starts here-----------------------------------
  
@@ -780,11 +798,15 @@ function sim_out = ber_test(sim_in)
 
                 wsep = 2*pi*(1+0.5);  % e.g. 75Hz spacing at Rs=50Hz, alpha=0.5 filters
 
-                hf_model(hf_n, :) = zeros(1,Nc*Nchip);
+                hf_model(hf_n, :) = zeros(1,Nc*Nd);
                 
                 for r=1:Nsymbrowpilot
-                  for c=1:Nchip*Nc
-                    time_shift = floor((c-1)*Nsymbrowpilot);
+                  for c=1:Nd*Nc
+                    if c > Nc 
+                      time_shift = sim_in.div_timeshift;
+                    else
+                      time_shift = 1;
+                    end
                     ahf_model = hf_gain*(spread(hf_n+time_shift) + exp(-j*c*wsep*nhfdelay)*spread_2ms(hf_n+time_shift));
                     
                     if hf_mag_only
@@ -801,7 +823,7 @@ function sim_out = ber_test(sim_in)
             % keep a record of each tx symbol so we can check average power
 
             for r=1:Nsymbrow
-              for c=1:Nchip*Nc
+              for c=1:Nd*Nc
                  s_ch_tx_log = [s_ch_tx_log s_ch(r,c)];
               end
             end
@@ -809,7 +831,7 @@ function sim_out = ber_test(sim_in)
             % AWGN noise and phase/freq offset channel simulation
             % 0.5 factor ensures var(noise) == variance , i.e. splits power between Re & Im
 
-            noise = sqrt(variance*0.5)*(randn(Nsymbrowpilot,Nc*Nchip) + j*randn(Nsymbrowpilot,Nc*Nchip));
+            noise = sqrt(variance*0.5)*(randn(Nsymbrowpilot,Nc*Nd) + j*randn(Nsymbrowpilot,Nc*Nd));
             noise_log = [noise_log noise];
 
             for r=1:Nsymbrowpilot
@@ -901,12 +923,13 @@ function sim_out = ber_test(sim_in)
           clf;
         
           y = 1:(hf_n-1);
-          x = 1:Nc*Nchip;
+          x = 1:Nc*Nd;
           EsNodBSurface = 20*log10(abs(hf_model(y,:))) - 10*log10(variance);
           EsNodBSurface(find(EsNodBSurface < -5)) = -5;
+          EsNodBSurface(find(EsNodBSurface > 25)) = 25;
           mesh(x,y,EsNodBSurface);
           grid
-          axis([1 (Nc+1)*Nchip 1 Rs*5 -5 25])
+          axis([1 Nc*Nd 1 Rs*5 -5 25])
           title('HF Channel Es/No');
 
           if verbose 
@@ -991,5 +1014,5 @@ function sim_in = standard_init
   sim_in.hf_sim           = 0;
   sim_in.hf_mag_only      = 0;
 
-  sim_in.Nchip            = 1;
+  sim_in.Nd            = 1;
 endfunction
