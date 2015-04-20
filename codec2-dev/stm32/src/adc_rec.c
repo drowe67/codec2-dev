@@ -4,7 +4,9 @@
   AUTHOR......: David Rowe
   DATE CREATED: 30 May 2014
 
-  Records a 16 kHz sample rate raw file from one of the ADC channels.
+  Records a 16 kHz sample rate raw file from one of the ADC channels,
+  which are connected to pins PA1 (ADC1) and PA2 (ADC2).
+
   Note the semi-hosting system isn't fast enough to transfer 2 16 kHz
   streams at once.
   
