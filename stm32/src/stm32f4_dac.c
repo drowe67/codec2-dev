@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: 1 June 2013
 
-  DAC driver module for STM32F4.
+  DAC driver module for STM32F4. DAC1 is connected to pin PA4, DAC2
+  is connected to pin PA5.
 
 \*---------------------------------------------------------------------------*/
 

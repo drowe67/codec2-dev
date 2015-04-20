@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: 1 June 2013
 
-  Plays a 16 kHz sample rate raw file to the STM32F4 DACs.
+  Plays a 16 kHz sample rate raw file to the STM32F4 DACs. DAC1 is
+  connected to pin PA4, DAC2 is connected to pin PA5.
 
 \*---------------------------------------------------------------------------*/
 

@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: 4 June 2013
 
-  Two channel ADC driver module for STM32F4.
+  Two channel ADC driver module for STM32F4.  Pin PA1 connects to ADC1, pin
+  PA2 connects to ADC2.
 
 \*---------------------------------------------------------------------------*/
 
