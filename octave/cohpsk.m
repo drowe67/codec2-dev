@@ -534,33 +534,58 @@ endfunction
 % returns an estimate of frequency offset, advances to next sync state
 
 function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame, sync, next_sync)
-  Fcentre = fdmdv.Fcentre;
-  Nc      = fdmdv.Nc;
-  Fsep    = fdmdv.Fsep;
-  M       = fdmdv.M;
-  Fs      = fdmdv.Fs;
-  Ndft    = cohpsk.Ndft;
+  Fcentre    = fdmdv.Fcentre;
+  Nc         = fdmdv.Nc;
+  Fsep       = fdmdv.Fsep;
+  M          = fdmdv.M;
+  Fs         = fdmdv.Fs;
+  Ndft       = cohpsk.Ndft;
+  coarse_mem = cohpsk.coarse_mem;
+  Ncm        = cohpsk.Ncm;
+
+  %            ll
+  % |--------|-----|
+
+  ll = length(ch_fdm_frame);
+  sz_mem = Ncm-ll;
+  for i=1:sz_mem
+    coarse_mem(i) = coarse_mem(i+ll);
+  end
+  coarse_mem(Ncm-ll+1:Ncm) = ch_fdm_frame;
 
   if sync == 0
-    f_start = Fcentre - ((Nc/2)+2)*Fsep;
-    f_stop = Fcentre + ((Nc/2)+2)*Fsep;
-    ll = length(ch_fdm_frame);
-    h = 0.5 - 0.5*cos(2*pi*(0:ll-1)/(ll-1));
-    T = abs(fft(ch_fdm_frame .* h, Ndft)).^2;
+    h = 0.5 - 0.5*cos(2*pi*(0:Ncm-1)/(Ncm-1));
+    T = abs(fft(coarse_mem .* h, Ndft)).^2;
     sc = Ndft/Fs;
-    bin_start = floor(f_start*sc+0.5)+1;
-    bin_stop = floor(f_stop*sc+0.5)+1;
 
+    for i=1:5
+      f_start = Fcentre - ((Nc/2)+2)*Fsep;
+      f_stop = Fcentre + ((Nc/2)+2)*Fsep;
+      bin_start = floor(f_start*sc+0.5)+1;
+      bin_stop = floor(f_stop*sc+0.5)+1;
+      x = bin_start-1:bin_stop-1;
+      bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
+      f_est = floor(bin_est/sc+0.5);
+      Fcentre = f_est;
+    end 
     %printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n", f_start, f_stop, sc, bin_start, bin_stop);
 
-    x = bin_start-1:bin_stop-1;
-    bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
-    cohpsk.f_est = floor(bin_est/sc+0.5);
+    cohpsk.f_est = f_est;
+    
     printf("  coarse freq est: %f\n", cohpsk.f_est);
     next_sync = 1;
-    
+    figure(5)
+    clf
+    subplot(211)
+    plot(T)
+    hold on
+    plot([bin_est bin_est],[0 max(T)],'g')
+    hold off    
+    axis([bin_start bin_stop 0 max(T)])
+   
   end
 
+  cohpsk.coarse_mem = coarse_mem;
 endfunction
 
 
@@ -596,7 +621,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     % sample correlation over 2D grid of time and fine freq points
 
     max_corr = 0;
-    for f_fine=-20:1:20
+    for f_fine=-20:0.25:20
       f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
       for t=0:cohpsk.Nsymbrowpilot-1
         corr = 0; mag = 0;
@@ -619,14 +644,52 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     end
 
     printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
-    if max_corr/max_mag > 0.9
-      printf("  in sync!\n");
+    if abs(max_corr/max_mag) > 0.7
+      printf("  [%d] in sync!\n", cohpsk.frame);
+      cohpsk.sync_timer = 0;
+      %cohpsk.f_est -= cohpsk.f_fine_est;
+      %cohpsk.f_fine_est = 0;
+      %cohpsk.ff_rect = 1;
+      printf("  .... adjusting to %f\n", cohpsk.f_est);
       next_sync = 4;
     else
       next_sync = 0;
       printf("  back to coarse freq offset est...\n");
     end
+    cohpsk.ratio = abs(max_corr/max_mag);
   end
+
+
+  if sync == 4
+
+    % we are in sync so just sample correlation over 1D grid of fine freq points
+
+    max_corr = 0;
+    st = cohpsk.f_fine_est - 1;
+    en = cohpsk.f_fine_est + 1;
+    for f_fine = st:0.25*en
+        f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
+        corr = 0; mag = 0;
+        for c=1:Nc*Nd
+          f_corr_vec = f_fine_rect .* ct_symb_buf(cohpsk.ct+sampling_points,c);
+          for p=1:length(sampling_points)
+            corr += pilot2(p,c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
+            mag  += abs(f_corr_vec(p));
+          end
+        end
+        if corr > max_corr
+          max_corr = corr;
+          max_mag = mag;
+          f_fine_est = f_fine;
+        end
+    end
+
+    %cohpsk.f_est -= 0.5*f_fine_est;
+    %printf("  coarse: %f  fine: %f\n", cohpsk.f_est, f_fine_est);
+    cohpsk.ratio = abs(max_corr/max_mag);
+  end
+  
+
 endfunction
 
 
@@ -641,9 +704,8 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
   % havent fine freq corrected ct_symb_buf if next_sync == 4 correct
   % all 8 if sync == 2 correct latest 6
 
-  if (next_sync == 4) || (sync == 4)
 
-    if (next_sync == 4) && (sync == 2)
+  if (next_sync == 4) && (sync == 2)
       
       % first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples
 
@@ -652,9 +714,9 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
         acohpsk.ff_phase *= acohpsk.ff_rect';
         ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
       end
+  end
 
-    else
-
+  if sync == 4
       % second and subsequent frames, just fine freq correct the latest Nsymbrowpilot
 
       ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
@@ -663,23 +725,44 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
         acohpsk.ff_phase *= acohpsk.ff_rect';
        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
       end
-
-    end
-
-    mag = abs(acohpsk.ff_phase);
-    acohpsk.ff_phase /= mag;
-
-    acohpsk.ct_symb_ff_buf = ct_symb_ff_buf;
   end
+
+  mag = abs(acohpsk.ff_phase);
+  acohpsk.ff_phase /= mag;
+
+  acohpsk.ct_symb_ff_buf = ct_symb_ff_buf;
+
 endfunction
 
 
 % misc sync state machine code, just wanted it in a function
 
-function sync = sync_state_machine(sync, next_sync)
+function [sync cohpsk] = sync_state_machine(cohpsk, sync, next_sync)
+
   if sync == 1
     next_sync = 2;
   end
+  if sync == 5
+    next_sync = 4;
+  end
+
+  if sync == 4
+
+    % check that sync is still good, fall out of sync on consecutive bad frames */
+
+    if cohpsk.ratio < 0.5
+      cohpsk.sync_timer++;
+    else
+      cohpsk.sync_timer = 0;            
+    end
+    %printf("  ratio: %f  sync timer: %d\n", cohpsk.ratio, cohpsk.sync_timer);
+
+    if cohpsk.sync_timer == 5
+      printf("  lost sync ....\n");
+      next_sync = 0;
+    end
+  end
+
   sync = next_sync;
 endfunction
 

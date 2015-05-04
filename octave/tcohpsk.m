@@ -1,14 +1,17 @@
 % tcohpsk.m
 % David Rowe Oct 2014
 %
-% Octave script that tests the C port of the coherent PSK modem.  This
-% script loads the output of unittest/tcohpsk.c and compares it to the
-% output of the reference versions of the same functions written in
-% Octave.
+% Octave script that:
 %
-
+% i) tests the C port of the coherent PSK modem.  This script loads
+%    the output of unittest/tcohpsk.c and compares it to the output of
+%    the reference versions of the same functions written in Octave.
+%
+% or (ii) can optionally be used to run an Octave version of the cohpsk
+%    modem to tune and develop it.
 
 graphics_toolkit ("gnuplot");
+more off;
 
 cohpsk;
 fdmdv;
@@ -19,10 +22,13 @@ randn('state',1);
 
 % test parameters ----------------------------------------------------------
 
-n = 840;
-frames = 35;
-foff = 10.5;
-EsNodB = 8;
+frames = 100;
+foff = 100;
+dfoff = 0;
+EsNodB = 10;
+fading_en = 0;
+hf_delay_ms = 2;
+compare_with_c = 0;
 
 EsNo = 10^(EsNodB/10);
 
@@ -108,8 +114,10 @@ rx_fdm_filter_log = [];
 rx_baseband_log = [];
 rx_fdm_frame_log = [];
 ct_symb_ff_log = [];
+rx_timing_log = [];
+ratio_log = [];
 
-% BER measurement -------------------------------------------------------------
+% Channel modeling and BER measurement ----------------------------------------
 
 rand('state',1); 
 tx_bits_coh = round(rand(1,framesize*10));
@@ -121,13 +129,15 @@ prev_tx_bits = [];
 phase_ch = 1;
 sync = 0;
 
-% Output vectors from C port ---------------------------------------------------
-
-load ../build_linux/unittest/tcohpsk_out.txt
+[spread spread_2ms hf_gain] = init_hf_model(Fs, Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
+hf_n = 1;
+nhfdelay = floor(hf_delay_ms*Fs/1000);
+ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
 
 % main loop --------------------------------------------------------------------
 
 for i=1:frames
+  acohpsk.frame = i;
   tx_bits = tx_bits_coh(ptx_bits_coh:ptx_bits_coh+framesize-1);
   ptx_bits_coh += framesize;
   if ptx_bits_coh > length(tx_bits_coh)
@@ -153,8 +163,29 @@ for i=1:frames
   % Channel --------------------------------------------------------------------
   %
 
-  [ch_fdm_frame phase_ch] = freq_shift(tx_fdm_frame, foff, Fs, phase_ch);
-  
+  %[ch_fdm_frame phase_ch] = freq_shift(tx_fdm_frame, foff, Fs, phase_ch);
+  %foff += dfoff*acohpsk.Nsymbrowpilot*M;
+
+  ch_fdm_frame = zeros(1,acohpsk.Nsymbrowpilot*M);
+  for i=1:acohpsk.Nsymbrowpilot*M
+    foff_rect = exp(j*2*pi*foff/Fs);
+    foff += dfoff;
+    phase_ch *= foff_rect;
+    ch_fdm_frame(i) = tx_fdm_frame(i) * phase_ch;
+  end
+  phase_ch /= abs(phase_ch);
+
+  if fading_en
+    ch_fdm_delay(1:nhfdelay) = ch_fdm_delay(acohpsk.Nsymbrowpilot*M+1:nhfdelay+acohpsk.Nsymbrowpilot*M);
+    ch_fdm_delay(nhfdelay+1:nhfdelay+acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
+
+    for i=1:acohpsk.Nsymbrowpilot*M
+      ahf_model = hf_gain*(spread(hf_n)*ch_fdm_frame(i) + spread_2ms(hf_n)*ch_fdm_delay(i));
+      ch_fdm_frame(i) = ahf_model;
+      hf_n++;
+    end
+  end
+
   % each carrier has power = 2, total power 2Nc, total symbol rate NcRs, noise BW B=Fs
   % Es/No = (C/Rs)/(N/B), N = var = 2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No)
 
@@ -176,7 +207,6 @@ for i=1:frames
   next_sync = sync;
   
   [next_sync acohpsk] = coarse_freq_offset_est(acohpsk, afdmdv, ch_fdm_frame, sync, next_sync);
-
   nin = M;
 
   % shift entire FDM signal to 0 Hz
@@ -199,6 +229,8 @@ for i=1:frames
     rx_filt_log = [rx_filt_log rx_filt];
 
     [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
+    rx_timing_log = [rx_timing_log rx_timing];
+
     ch_symb(r,:) = rx_onesym;
   end
   
@@ -217,6 +249,7 @@ for i=1:frames
     rx_phi_log = [rx_phi_log; phi_];
     rx_bits_log = [rx_bits_log rx_bits];
     tx_bits_prev_log = [tx_bits_prev_log prev_tx_bits2];
+    ratio_log = [ratio_log acohpsk.ratio];
 
     % BER stats
 
@@ -226,68 +259,90 @@ for i=1:frames
     Tbits += length(error_positions);
   end
 
-  %printf("f: %d sync: %d next_sync: %d\n", i, sync, next_sync);
-  sync = sync_state_machine(sync, next_sync);
+  if sync == 0
+    Nerrs = 0;
+    Tbits = 0;
+    nerr_log = [];
+  end
+
+  % printf("f: %d sync: %d next_sync: %d\n", i, sync, next_sync);
+  [sync acohpsk] = sync_state_machine(acohpsk, sync, next_sync);
 
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
 
 end
 
-stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
-stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
-stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
-
-stem_sig_and_error(3, 211, real(tx_fdm_frame_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
-stem_sig_and_error(3, 212, imag(tx_fdm_frame_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
-stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
-stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
-stem_sig_and_error(5, 211, real(rx_fdm_frame_bb_log_c(1:n)), real(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb re', [1 n -10 10])
-stem_sig_and_error(5, 212, imag(rx_fdm_frame_bb_log_c(1:n)), imag(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb im', [1 n -10 10])
-
-[n m] = size(ch_symb_log);
-stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
-stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
-stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
-stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
-stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
-stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
-stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
-stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
-stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 n -1.5 1.5])
-
-check(tx_bits_log, tx_bits_log_c, 'tx_bits');
-check(tx_symb_log, tx_symb_log_c, 'tx_symb');
-check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
-check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
-check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
-check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
-check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
-check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
-check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.01);
-check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
-check(rx_bits_log, rx_bits_log_c, 'rx_bits');
-
-% Determine bit error rate
-
-sz = length(tx_bits_log_c);
-Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c));
-Tbits_c = length(tx_bits_prev_log);
-ber_c = Nerrs_c/Tbits_c;
 ber = Nerrs/Tbits;
+printf("EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 
-printf("EsNodB: %4.1f ber_c: %3.2f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
+if compare_with_c
 
-% some other useful plots
+  % Output vectors from C port ---------------------------------------------------
 
-if 0
-figure
-plot(rx_symb_log,'+')
-figure
-plot(xor(tx_bits_prev_log, rx_bits_log_c),'+')
+  load ../build_linux/unittest/tcohpsk_out.txt
+
+  stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
+  stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
+  stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
+
+  stem_sig_and_error(3, 211, real(tx_fdm_frame_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
+  stem_sig_and_error(3, 212, imag(tx_fdm_frame_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
+  stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
+  stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
+  stem_sig_and_error(5, 211, real(rx_fdm_frame_bb_log_c(1:n)), real(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb re', [1 n -10 10])
+  stem_sig_and_error(5, 212, imag(rx_fdm_frame_bb_log_c(1:n)), imag(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb im', [1 n -10 10])
+
+  [n m] = size(ch_symb_log);
+  stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
+  stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
+  stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
+  stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
+  stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
+  stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
+  stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
+  stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
+  stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 n -1.5 1.5])
+
+  check(tx_bits_log, tx_bits_log_c, 'tx_bits');
+  check(tx_symb_log, tx_symb_log_c, 'tx_symb');
+  check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
+  check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
+  check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
+
+  check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
+  check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
+  check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
+  check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.01);
+  check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
+  check(rx_bits_log, rx_bits_log_c, 'rx_bits');
+
+  % Determine bit error rate
+
+  sz = length(tx_bits_log_c);
+  Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c));
+  Tbits_c = length(tx_bits_prev_log);
+  ber_c = Nerrs_c/Tbits_c;
+  printf("EsNodB: %4.1f ber_c: %4.3f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
+
+else
+
+  % some other useful plots
+
+  figure(1)
+  plot(rx_symb_log*exp(j*pi/4),'+')
+  figure(2)
+  plot(rx_timing_log)
+  figure(3)
+  stem(nerr_log)
+  figure(4)
+  stem(ratio_log)
+
 end
 
-% C header file of noise samples so C version gives extacly the same results
+
+% function to write C header file of noise samples so C version gives
+% extactly the same results
 
 function write_noise_file(uvnoise_log)
 
