@@ -13,6 +13,20 @@ autotest;
 rand('state',1); 
 randn('state',1);
 
+function [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, nsymb, nin)
+    M = afdmdv.M;
+
+    for r=1:nsymb
+      % downconvert each FDM carrier to Nc separate baseband signals
+
+      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
+      [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
+      [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
+
+      ch_symb(r,:) = rx_onesym;
+    end
+endfunction
+ 
 % Core function for testing frequency offset estimator.  Performs one test
 
 function sim_out = freq_off_est_test(sim_in)
@@ -71,6 +85,8 @@ function sim_out = freq_off_est_test(sim_in)
   acohpsk.coarse_mem  = zeros(1,acohpsk.Ncm);
   acohpsk.Ndft = 2^(ceil(log2(acohpsk.Ncm)));
  
+  ch_fdm_frame_buf = zeros(1, 2*acohpsk.Nsymbrowpilot*M);
+
   frames    = sim_in.frames;
   EsNodB    = sim_in.EsNodB;
   foff      = sim_in.foff;
@@ -161,37 +177,47 @@ function sim_out = freq_off_est_test(sim_in)
     % Try to achieve sync --------------------------------------------------------------------
     %
 
-    next_sync = sync;
+    % store two frames so we can rewind if we get a good candidate
 
+    ch_fdm_frame_buf(1:acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M);
+    ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
+
+    next_sync = sync;
+    sync = 0;
     if sync == 0
-      next_sync = 2;
       acohpsk.f_est = Fcentre;
     end
 
-    [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-
-    for r=1:acohpsk.Nsymbrowpilot
-
-      % downconvert each FDM carrier to Nc separate baseband signals
-
-      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
-      [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
-      [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
-
-      ch_symb(r,:) = rx_onesym;
-    end
-    ch_symb_log = [ch_symb_log; ch_symb];
+    [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
+    ch_symb_log = [ch_symb_log; ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:)];
 
     % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
-    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
+    acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
-    % if we've acheived sync gather stats
+    % we've found a sync candidate
 
-    if (next_sync == 4) 
-       freq_offset_log = [freq_offset_log acohpsk.f_fine_est+foff];
-       sync_time_log = [sync_time_log f-sync_start];
-       sync = 0; next_sync = 2; sync_start = f;
+    if (next_sync == 1)
+
+       % rewind and re-process last few frames with f_est
+
+       acohpsk.f_est -= acohpsk.f_fine_est;
+       printf("  [%d] trying sync cand f_est: %f\n", f, acohpsk.f_est);
+       [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
+       [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
+       acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+       [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+
+       % candidate checks out so log stats
+
+       if (next_sync == 1)
+         printf("  [%d] in sync!\n", f);
+         freq_offset_log = [freq_offset_log Fcentre+foff-acohpsk.f_est,];
+         sync_time_log = [sync_time_log f-sync_start];
+         next_sync = 0; sync_start = f;
+       end
     end
 
     %printf("f: %d sync: %d next_sync: %d\n", f, sync, next_sync);
@@ -211,8 +237,8 @@ endfunction
 
 function freq_off_est_test_single
   sim_in.frames    = 100;
-  sim_in.EsNodB    = 20;
-  sim_in.foff      = -15;
+  sim_in.EsNodB    = 12;
+  sim_in.foff      = 20;
   sim_in.dfoff     = 0;
   sim_in.fading_en = 1;
 
@@ -234,17 +260,17 @@ function freq_off_est_test_single
   subplot(211)
   plot(real(sim_out.tx_fdm_frame_log(1:2*960)))
   subplot(212)
-  plot(real(sim_out.ch_symb_log(1:24,:)),'+')
+  plot(real(sim_out.ch_symb_log),'+')
 endfunction
 
 
 function [freq_off_log EsNodBSet] = freq_off_est_test_curves
   EsNodBSet = [20 12 8];
 
-  sim_in.frames    = 100;
+  sim_in.frames    = 10;
   sim_in.foff      = -20;
   sim_in.dfoff     = 0;
-  sim_in.fading_en = 1;
+  sim_in.fading_en = 0;
   freq_off_log = 1E6*ones(sim_in.frames, length(EsNodBSet) );
   sync_time_log = 1E6*ones(sim_in.frames, length(EsNodBSet) );
 
