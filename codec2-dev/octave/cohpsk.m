@@ -589,15 +589,7 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
 endfunction
 
 
-% returns index of start of frame and fine freq offset
-
-function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, next_sync)
-  ct_symb_buf   = cohpsk.ct_symb_buf;
-  Nct_sym_buf   = cohpsk.Nct_sym_buf;
-  Rs            = cohpsk.Rs;
-  Nsymbrowpilot = cohpsk.Nsymbrowpilot;
-  Nc            = cohpsk.Nc;
-  Nd            = cohpsk.Nd;
+function ct_symb_buf = update_ct_symb_buf(ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
 
   % update memory in symbol buffer
 
@@ -609,14 +601,28 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     ct_symb_buf(r,:) = ch_symb(i,:);
     i++;
   end
+endfunction
+
+
+% returns index of start of frame and fine freq offset
+
+function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, next_sync)
+  ct_symb_buf   = cohpsk.ct_symb_buf;
+  Nct_sym_buf   = cohpsk.Nct_sym_buf;
+  Rs            = cohpsk.Rs;
+  Nsymbrowpilot = cohpsk.Nsymbrowpilot;
+  Nc            = cohpsk.Nc;
+  Nd            = cohpsk.Nd;
+
+  ct_symb_buf = update_ct_symb_buf(ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot);
   cohpsk.ct_symb_buf = ct_symb_buf;
-  
+ 
   % sample pilots at start of this frame and start of next frame 
 
   sampling_points = [1 2 7 8];
   pilot2 = [ cohpsk.pilot(1,:); cohpsk.pilot(2,:); cohpsk.pilot(1,:); cohpsk.pilot(2,:);];
 
-  if sync == 2
+  if sync == 0
 
     % sample correlation over 2D grid of time and fine freq points
 
@@ -633,7 +639,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
           end
         end
         %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
-        if corr > max_corr
+        if corr >= max_corr
           max_corr = corr;
           max_mag = mag;
           cohpsk.ct = t;
@@ -643,24 +649,19 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
       end
     end
 
-    printf("  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
+    printf("  [%d] fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.frame, cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
     if abs(max_corr/max_mag) > 0.7
-      printf("  [%d] in sync!\n", cohpsk.frame);
+      printf("  [%d] encouraging sync word!\n", cohpsk.frame);
       cohpsk.sync_timer = 0;
-      %cohpsk.f_est -= cohpsk.f_fine_est;
-      %cohpsk.f_fine_est = 0;
-      %cohpsk.ff_rect = 1;
-      printf("  .... adjusting to %f\n", cohpsk.f_est);
-      next_sync = 4;
+      next_sync = 1;
     else
       next_sync = 0;
-      printf("  back to coarse freq offset est...\n");
+      printf("  [%d] back to coarse freq offset est...\n", cohpsk.frame) ;
     end
     cohpsk.ratio = abs(max_corr/max_mag);
   end
 
-
-  if sync == 4
+  if sync == 1
 
     % we are in sync so just sample correlation over 1D grid of fine freq points
 
@@ -740,13 +741,6 @@ endfunction
 function [sync cohpsk] = sync_state_machine(cohpsk, sync, next_sync)
 
   if sync == 1
-    next_sync = 2;
-  end
-  if sync == 5
-    next_sync = 4;
-  end
-
-  if sync == 4
 
     % check that sync is still good, fall out of sync on consecutive bad frames */
 
