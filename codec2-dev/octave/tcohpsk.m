@@ -22,10 +22,10 @@ randn('state',1);
 
 % test parameters ----------------------------------------------------------
 
-frames = 100;
-foff = 100;
+frames = 10;
+foff = 0;
 dfoff = 0;
-EsNodB = 10;
+EsNodB = 8;
 fading_en = 0;
 hf_delay_ms = 2;
 compare_with_c = 0;
@@ -39,6 +39,9 @@ Nc = 4;
 Nd = 2;
 framesize = 32;
 
+afdmdv.Nsym = 2;
+afdmdv.Nt = 3;
+
 % FDMDV init ---------------------------------------------------------------
 
 afdmdv.Fs = 8000;
@@ -47,7 +50,7 @@ afdmdv.Rs = Rs;
 afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
 afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, Nfilter);
 afdmdv.Nfilter =  Nfilter;
-afdmdv.gt_alpha5_root = gt_alpha5_root;
+afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
 afdmdv.Fsep = 75;
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
 freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd) );
@@ -65,12 +68,10 @@ afdmdv.rxdec_lpf_mem = zeros(1,afdmdv.Nrxdec-1+M);
 
 P = afdmdv.P = 4;
 afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
-afdmdv.Nsym = 6;
 afdmdv.Nfilter = afdmdv.Nsym*afdmdv.M;
 afdmdv.rx_fdm_mem = zeros(1,afdmdv.Nfilter + afdmdv.M);
 Q = afdmdv.Q = afdmdv.M/4;
 
-afdmdv.Nt = 5;
 afdmdv.rx_filter_mem_timing = zeros(afdmdv.Nc+1, afdmdv.Nt*afdmdv.P);
 afdmdv.Nfiltertiming = afdmdv.M + afdmdv.Nfilter + afdmdv.M;
 
@@ -92,6 +93,8 @@ acohpsk.do_write_pilot_file = 0;
 acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
+
+ch_fdm_frame_buf = zeros(1, 2*acohpsk.Nsymbrowpilot*M);
 
 % -----------------------------------------------------------
 
@@ -136,8 +139,8 @@ ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
 
 % main loop --------------------------------------------------------------------
 
-for i=1:frames
-  acohpsk.frame = i;
+for f=1:frames
+  acohpsk.frame = f;
   tx_bits = tx_bits_coh(ptx_bits_coh:ptx_bits_coh+framesize-1);
   ptx_bits_coh += framesize;
   if ptx_bits_coh > length(tx_bits_coh)
@@ -202,47 +205,64 @@ for i=1:frames
   % Demod ----------------------------------------------------------------------
   %
 
-  % Coarse Freq offset estimation
+  % store two frames of received samples so we can rewind if we get a good candidate
+
+  ch_fdm_frame_buf(1:acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M);
+  ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
 
   next_sync = sync;
-  
-  [next_sync acohpsk] = coarse_freq_offset_est(acohpsk, afdmdv, ch_fdm_frame, sync, next_sync);
   nin = M;
 
-  % shift entire FDM signal to 0 Hz
- 
-  [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-  rx_fdm_frame_bb_log = [rx_fdm_frame_bb_log rx_fdm_frame_bb];
+  % if out of sync do Initial Freq offset estimation over last two frames
 
-  % sample rate demod processing
+  if (sync == 0) & (f>1)
 
-  ch_symb = zeros(acohpsk.Nsymbrowpilot, Nc*Nd);
-  for r=1:acohpsk.Nsymbrowpilot
+    % we are out of sync so reset f_est and process two frames to clean out memories
 
-    % downconvert each FDM carrier to Nc separate baseband signals
+    acohpsk.f_est = Fcentre;
+    [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
+    acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
 
-    [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
-    rx_baseband_log = [rx_baseband_log rx_baseband];
+    if next_sync == 1
 
-    [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
+      % we've found a sync candidate!
+      % re-process last two frames with adjusted f_est then check again
 
-    rx_filt_log = [rx_filt_log rx_filt];
+      acohpsk.f_est -= acohpsk.f_fine_est;
 
-    [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
-    rx_timing_log = [rx_timing_log rx_timing];
+      printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
 
-    ch_symb(r,:) = rx_onesym;
+      [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
+      [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
+      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+      [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+
+      if next_sync == 1
+        % OK we are in sync!
+        % demodulate first frame (demod completed below)
+
+        printf("  [%d] in sync!\n", f);
+        acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+      end
+    end  
   end
-  
-  ch_symb_log = [ch_symb_log; ch_symb];
 
-  % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
-  
-  [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
-  acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
-  ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
+  % If in sync just do sample rate processing on latest frame
 
-  if (sync == 4) || (next_sync == 4)  
+  if sync == 1
+    [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, acohpsk.Nsymbrowpilot, nin);
+    acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+
+    acohpsk.ct_symb_ff_buf(1:2,:) = acohpsk.ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
+    acohpsk.ct_symb_ff_buf(3:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
+  end
+
+  % if we are in sync complete demodulation with symbol rate processing
+
+  if (next_sync == 1) || (sync == 1)
     [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
     rx_symb_log = [rx_symb_log; rx_symb];
     rx_amp_log = [rx_amp_log; amp_];
@@ -252,12 +272,24 @@ for i=1:frames
     ratio_log = [ratio_log acohpsk.ratio];
 
     % BER stats
-
-    error_positions = xor(prev_tx_bits2, rx_bits);
+    %size(rx_bits)
+    %size(prev_tx_bits2)
+    %error_positions = xor(prev_tx_bits2, rx_bits);
+    error_positions = xor(prev_tx_bits, rx_bits);
     Nerrs  += sum(error_positions);
     nerr_log = [nerr_log sum(error_positions)];
     Tbits += length(error_positions);
+    printf("\r  [%d]", f);
   end
+
+   
+  %rx_fdm_frame_bb_log = [rx_fdm_frame_bb_log rx_fdm_frame_bb];
+  %rx_baseband_log = [rx_baseband_log rx_baseband];
+  %rx_filt_log = [rx_filt_log rx_filt];
+  %rx_timing_log = [rx_timing_log rx_timing];
+  %ch_symb_log = [ch_symb_log; ch_symb];
+  % TODO ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
+
 
   if sync == 0
     Nerrs = 0;
@@ -265,7 +297,7 @@ for i=1:frames
     nerr_log = [];
   end
 
-  % printf("f: %d sync: %d next_sync: %d\n", i, sync, next_sync);
+  % printf("f: %d sync: %d next_sync: %d\n", f, sync, next_sync);
   [sync acohpsk] = sync_state_machine(acohpsk, sync, next_sync);
 
   prev_tx_bits2 = prev_tx_bits;
@@ -274,7 +306,7 @@ for i=1:frames
 end
 
 ber = Nerrs/Tbits;
-printf("EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
+printf("\nEsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 
 if compare_with_c
 
