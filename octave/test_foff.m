@@ -13,19 +13,6 @@ autotest;
 rand('state',1); 
 randn('state',1);
 
-function [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, nsymb, nin)
-    M = afdmdv.M;
-
-    for r=1:nsymb
-      % downconvert each FDM carrier to Nc separate baseband signals
-
-      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
-      [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
-      [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
-
-      ch_symb(r,:) = rx_onesym;
-    end
-endfunction
  
 % Core function for testing frequency offset estimator.  Performs one test
 
@@ -204,7 +191,7 @@ function sim_out = freq_off_est_test(sim_in)
        % rewind and re-process last few frames with f_est
 
        acohpsk.f_est -= acohpsk.f_fine_est;
-       printf("  [%d] trying sync cand f_est: %f\n", f, acohpsk.f_est);
+       printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
        [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
        [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
        acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
@@ -214,7 +201,7 @@ function sim_out = freq_off_est_test(sim_in)
 
        if (next_sync == 1)
          printf("  [%d] in sync!\n", f);
-         freq_offset_log = [freq_offset_log Fcentre+foff-acohpsk.f_est,];
+         freq_offset_log = [freq_offset_log Fcentre+foff-acohpsk.f_est];
          sync_time_log = [sync_time_log f-sync_start];
          next_sync = 0; sync_start = f;
        end
@@ -236,11 +223,11 @@ endfunction
 
 
 function freq_off_est_test_single
-  sim_in.frames    = 100;
-  sim_in.EsNodB    = 12;
-  sim_in.foff      = 20;
+  sim_in.frames    = 10;
+  sim_in.EsNodB    = 100;
+  sim_in.foff      = 10;
   sim_in.dfoff     = 0;
-  sim_in.fading_en = 1;
+  sim_in.fading_en = 0;
 
   sim_out = freq_off_est_test(sim_in);
 
@@ -267,10 +254,10 @@ endfunction
 function [freq_off_log EsNodBSet] = freq_off_est_test_curves
   EsNodBSet = [20 12 8];
 
-  sim_in.frames    = 10;
+  sim_in.frames    = 100;
   sim_in.foff      = -20;
   sim_in.dfoff     = 0;
-  sim_in.fading_en = 0;
+  sim_in.fading_en = 1;
   freq_off_log = 1E6*ones(sim_in.frames, length(EsNodBSet) );
   sync_time_log = 1E6*ones(sim_in.frames, length(EsNodBSet) );
 

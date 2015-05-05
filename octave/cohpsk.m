@@ -589,6 +589,21 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
 endfunction
 
 
+function [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, nsymb, nin)
+    M = afdmdv.M;
+
+    for r=1:nsymb
+      % downconvert each FDM carrier to Nc separate baseband signals
+
+      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
+      [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
+      [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
+
+      ch_symb(r,:) = rx_onesym;
+    end
+endfunction
+
+
 function ct_symb_buf = update_ct_symb_buf(ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
 
   % update memory in symbol buffer
@@ -724,7 +739,7 @@ function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
       ct_symb_ff_buf(3:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
       for r=3:acohpsk.Nsymbrowpilot+2
         acohpsk.ff_phase *= acohpsk.ff_rect';
-       ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
+        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
       end
   end
 
