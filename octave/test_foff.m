@@ -26,9 +26,12 @@ function sim_out = freq_off_est_test(sim_in)
   framesize = 32;
   Fs = 8000;
   Fcentre = 1500;
+  
+  Nsw = 3; % numbers of sync window frames we process over.  Set based
+           % on Nsym to flush filter memory by final frame in windw
 
-  afdmdv.Nsym = 2;
-  afdmdv.Nt = 3;
+  afdmdv.Nsym = 5;
+  afdmdv.Nt = 5;
 
   afdmdv.Fs = 8000;
   afdmdv.Nc = Nd*Nc-1;
@@ -72,7 +75,7 @@ function sim_out = freq_off_est_test(sim_in)
   acohpsk.coarse_mem  = zeros(1,acohpsk.Ncm);
   acohpsk.Ndft = 2^(ceil(log2(acohpsk.Ncm)));
  
-  ch_fdm_frame_buf = zeros(1, 2*acohpsk.Nsymbrowpilot*M);
+  ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*M);
 
   frames    = sim_in.frames;
   EsNodB    = sim_in.EsNodB;
@@ -164,10 +167,10 @@ function sim_out = freq_off_est_test(sim_in)
     % Try to achieve sync --------------------------------------------------------------------
     %
 
-    % store two frames so we can rewind if we get a good candidate
+    % store Nsw frames so we can rewind if we get a good candidate
 
-    ch_fdm_frame_buf(1:acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M);
-    ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
+    ch_fdm_frame_buf(1:(Nsw-1)*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M);
+    ch_fdm_frame_buf((Nsw-1)*acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
 
     next_sync = sync;
     sync = 0;
@@ -176,13 +179,15 @@ function sim_out = freq_off_est_test(sim_in)
     end
 
     [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
-    ch_symb_log = [ch_symb_log; ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:)];
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
+    ch_symb_log = [ch_symb_log; ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:)];
 
     % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
-    acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
-    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+    for i=1:Nsw-1
+      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+    end
+    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
     % we've found a sync candidate
 
@@ -193,9 +198,15 @@ function sim_out = freq_off_est_test(sim_in)
        acohpsk.f_est -= acohpsk.f_fine_est;
        printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
        [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-       [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
-       acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
-       [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+       [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
+       for i=1:Nsw-1
+         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+       end
+       [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+       if abs(acohpsk.f_fine_est) > 2
+         printf("  [%d] Hmm %f is a bit big so back to coarse est ...\n", f, acohpsk.f_fine_est);
+         next_sync = 0;
+       end
 
        % candidate checks out so log stats
 
@@ -223,11 +234,11 @@ endfunction
 
 
 function freq_off_est_test_single
-  sim_in.frames    = 10;
-  sim_in.EsNodB    = 100;
-  sim_in.foff      = 10;
+  sim_in.frames    = 100;
+  sim_in.EsNodB    = 12;
+  sim_in.foff      = -20;
   sim_in.dfoff     = 0;
-  sim_in.fading_en = 0;
+  sim_in.fading_en = 1;
 
   sim_out = freq_off_est_test(sim_in);
 
@@ -246,8 +257,10 @@ function freq_off_est_test_single
   figure(3)
   subplot(211)
   plot(real(sim_out.tx_fdm_frame_log(1:2*960)))
+  grid;
   subplot(212)
   plot(real(sim_out.ch_symb_log),'+')
+  grid;
 endfunction
 
 
@@ -341,8 +354,8 @@ function [freq_off_log EsNodBSet] = freq_off_est_test_curves
 endfunction
 
 
-freq_off_est_test_single;
-%freq_off_est_test_curves;
+%freq_off_est_test_single;
+freq_off_est_test_curves;
 
 % 1. start with +/- 20Hz offset
 % 2. Measure frames to sync.  How to define sync?  Foff to withn 1 Hz. Sync state
