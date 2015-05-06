@@ -22,11 +22,11 @@ randn('state',1);
 
 % test parameters ----------------------------------------------------------
 
-frames = 10;
+frames = 100;
 foff = 0;
 dfoff = 0;
-EsNodB = 8;
-fading_en = 0;
+EsNodB = 12;
+fading_en = 1;
 hf_delay_ms = 2;
 compare_with_c = 0;
 
@@ -39,8 +39,9 @@ Nc = 4;
 Nd = 2;
 framesize = 32;
 
-afdmdv.Nsym = 2;
-afdmdv.Nt = 3;
+Nsw = 3;
+afdmdv.Nsym = 5;
+afdmdv.Nt = 5;
 
 % FDMDV init ---------------------------------------------------------------
 
@@ -94,7 +95,7 @@ acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
 
-ch_fdm_frame_buf = zeros(1, 2*acohpsk.Nsymbrowpilot*M);
+ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*M);
 
 % -----------------------------------------------------------
 
@@ -207,23 +208,25 @@ for f=1:frames
 
   % store two frames of received samples so we can rewind if we get a good candidate
 
-  ch_fdm_frame_buf(1:acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M);
-  ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:2*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
+  ch_fdm_frame_buf(1:(Nsw-1)*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M);
+  ch_fdm_frame_buf((Nsw-1)*acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
 
   next_sync = sync;
   nin = M;
 
   % if out of sync do Initial Freq offset estimation over last two frames
 
-  if (sync == 0) & (f>1)
+  if (sync == 0) && (f>1)
 
     % we are out of sync so reset f_est and process two frames to clean out memories
 
     acohpsk.f_est = Fcentre;
     [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
-    acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
-    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
+    for i=1:Nsw-1
+      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+    end
+    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
     if next_sync == 1
 
@@ -235,9 +238,15 @@ for f=1:frames
       printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
 
       [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-      [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, 2*acohpsk.Nsymbrowpilot, nin);
-      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb, acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
-      [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb(acohpsk.Nsymbrowpilot+1:2*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+      [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
+      for i=1:Nsw-1
+        acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+      end
+      [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+      if abs(acohpsk.f_fine_est) > 2
+        printf("  [%d] Hmm %f is a bit big so back to coarse est ...\n", f, acohpsk.f_fine_est);
+        next_sync = 0;
+      end
 
       if next_sync == 1
         % OK we are in sync!
@@ -272,13 +281,14 @@ for f=1:frames
     ratio_log = [ratio_log acohpsk.ratio];
 
     % BER stats
-    %size(rx_bits)
-    %size(prev_tx_bits2)
-    %error_positions = xor(prev_tx_bits2, rx_bits);
-    error_positions = xor(prev_tx_bits, rx_bits);
-    Nerrs  += sum(error_positions);
-    nerr_log = [nerr_log sum(error_positions)];
-    Tbits += length(error_positions);
+
+    if f > 2
+      error_positions = xor(prev_tx_bits2, rx_bits);
+      %error_positions = xor(prev_tx_bits, rx_bits);
+      Nerrs  += sum(error_positions);
+      nerr_log = [nerr_log sum(error_positions)];
+      Tbits += length(error_positions);
+    end
     printf("\r  [%d]", f);
   end
 
