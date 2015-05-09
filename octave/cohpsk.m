@@ -589,17 +589,56 @@ function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame
 endfunction
 
 
-function [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, nsymb, nin)
+function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, f_est, nsymb, nin, freq_track)
     M = afdmdv.M;
 
+    % figure(10); clf; hold on;
     for r=1:nsymb
+      % downconvert entire signal to nominal baseband 
+
+      [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame(1+(r-1)*M:r*M), -f_est, afdmdv.Fs, afdmdv.fbb_phase_rx);
+
       % downconvert each FDM carrier to Nc separate baseband signals
 
-      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb(1+(r-1)*M:r*M), nin);
+      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb, nin);
       [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
       [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
 
       ch_symb(r,:) = rx_onesym;
+
+      % freq tracking, see test_ftrack.m for unit test.  Placed in
+      % this function as it needs to work on a symbol by symbol basis
+      % rather than frame by frame.  This means the control loop
+      % operates at a sample rate of Rs = 50Hz for say 1 Hz/s drift.
+
+      if freq_track
+        beta = 0.005;
+        g = 0.2;
+
+        % combine difference on phase from last symbol over Nc carriers
+
+        mod_strip = 0;
+        for c=1:afdmdv.Nc+1
+          adiff = rx_onesym(c) .* conj(afdmdv.prev_rx_symb(c));
+          afdmdv.prev_rx_symb(c) = rx_onesym(c);
+          amod_strip = adiff.^4;
+          amod_strip = abs(real(amod_strip)) + j*imag(amod_strip);
+          mod_strip += amod_strip;
+        end
+        %plot(mod_strip)
+
+        % 4th power strips QPSK modulation, by multiplying phase by 4
+        % Using the abs value of the real coord was found to help 
+        % non-linear issues when noise power was large
+
+        
+        % loop filter made up of 1st order IIR plus integrator.  Integerator
+        % was found to be reqd 
+        
+        afdmdv.filt = ((1-beta)*afdmdv.filt + beta*angle(mod_strip));
+        f_est += g*afdmdv.filt;
+
+      end
     end
 endfunction
 
@@ -683,7 +722,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     max_corr = 0;
     st = cohpsk.f_fine_est - 1;
     en = cohpsk.f_fine_est + 1;
-    for f_fine = st:0.25*en
+    for f_fine = st:0.25:en
         f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
         corr = 0; mag = 0;
         for c=1:Nc*Nd
@@ -764,10 +803,10 @@ function [sync cohpsk] = sync_state_machine(cohpsk, sync, next_sync)
     else
       cohpsk.sync_timer = 0;            
     end
-    %printf("  ratio: %f  sync timer: %d\n", cohpsk.ratio, cohpsk.sync_timer);
+    % printf("  ratio: %f  sync timer: %d\n", cohpsk.ratio, cohpsk.sync_timer);
 
-    if cohpsk.sync_timer == 5
-      printf("  lost sync ....\n");
+    if cohpsk.sync_timer == 10
+      printf("  [%d] lost sync ....\n", cohpsk.frame);
       next_sync = 0;
     end
   end
