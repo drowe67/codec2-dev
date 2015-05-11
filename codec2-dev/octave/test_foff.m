@@ -174,20 +174,35 @@ function sim_out = freq_off_est_test(sim_in)
 
     next_sync = sync;
     sync = 0;
+
     if sync == 0
-      acohpsk.f_est = Fcentre;
-    end
 
-    [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
-    ch_symb_log = [ch_symb_log; ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:)];
+      % we can test +/- 20Hz, so we break this up into 3 tests to cover +/- 60Hz
 
-    % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
+      max_ratio = 0;
+      for acohpsk.f_est = Fcentre-40:40:Fcentre+40
+        
+        printf("  [%d] acohpsk.f_est: %f +/- 20\n", f, acohpsk.f_est);
+        [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est ] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
+        ch_symb_log = [ch_symb_log; ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:)];
+
+        % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
-    for i=1:Nsw-1
-      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+        for i=1:Nsw-1
+          acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+        end
+        [anext_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+
+        if anext_sync == 1
+          %printf("  [%d] acohpsk.ratio: %f\n", f, acohpsk.ratio);
+          if acohpsk.ratio > max_ratio
+            max_ratio   = acohpsk.ratio;
+            f_est       = acohpsk.f_est - acohpsk.f_fine_est;
+            next_sync   = anext_sync;
+          end
+        end
+      end
     end
-    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
     % we've found a sync candidate
 
@@ -195,10 +210,9 @@ function sim_out = freq_off_est_test(sim_in)
 
        % rewind and re-process last few frames with f_est
 
-       acohpsk.f_est -= acohpsk.f_fine_est;
+       acohpsk.f_est = f_est;
        printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
-       [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-       [ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, Nsw*acohpsk.Nsymbrowpilot, nin);
+       [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
        for i=1:Nsw-1
          acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
        end
@@ -236,7 +250,7 @@ endfunction
 function freq_off_est_test_single
   sim_in.frames    = 100;
   sim_in.EsNodB    = 12;
-  sim_in.foff      = -20;
+  sim_in.foff      = -59;
   sim_in.dfoff     = 0;
   sim_in.fading_en = 1;
 
@@ -268,7 +282,7 @@ function [freq_off_log EsNodBSet] = freq_off_est_test_curves
   EsNodBSet = [20 12 8];
 
   sim_in.frames    = 100;
-  sim_in.foff      = -20;
+  sim_in.foff      = -40;
   sim_in.dfoff     = 0;
   sim_in.fading_en = 1;
   freq_off_log = 1E6*ones(sim_in.frames, length(EsNodBSet) );
@@ -354,8 +368,8 @@ function [freq_off_log EsNodBSet] = freq_off_est_test_curves
 endfunction
 
 
-%freq_off_est_test_single;
-freq_off_est_test_curves;
+freq_off_est_test_single;
+%freq_off_est_test_curves;
 
 % 1. start with +/- 20Hz offset
 % 2. Measure frames to sync.  How to define sync?  Foff to withn 1 Hz. Sync state

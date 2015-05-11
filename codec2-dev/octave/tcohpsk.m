@@ -22,9 +22,13 @@ randn('state',1);
 
 % test parameters ----------------------------------------------------------
 
-frames = 200;
-foff = -20;
-dfoff = 0/Fs;
+% TODO 
+% [ ] set up various tests we use to characterise modem for easy 
+%     repeating when we change modem
+
+frames = 100;
+foff = -40;
+dfoff = -0.5/Fs;
 EsNodB = 12;
 fading_en = 1;
 hf_delay_ms = 2;
@@ -225,26 +229,40 @@ for f=1:frames
 
   if (sync == 0) && (f>1)
 
-    % we are out of sync so reset f_est and process two frames to clean out memories
+    % we can test +/- 20Hz, so we break this up into 3 tests to cover +/- 60Hz
 
-    acohpsk.f_est = Fcentre;
-    %[rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
-    for i=1:Nsw-1
-      acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+    max_ratio = 0;
+    for acohpsk.f_est = Fcentre-40:40:Fcentre+40
+        
+      printf("  [%d] acohpsk.f_est: %f +/- 20\n", f, acohpsk.f_est);
+
+      % we are out of sync so reset f_est and process two frames to clean out memories
+
+      [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
+      for i=1:Nsw-1
+        acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
+      end
+      [anext_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
+
+      if anext_sync == 1
+        %printf("  [%d] acohpsk.ratio: %f\n", f, acohpsk.ratio);
+        if acohpsk.ratio > max_ratio
+          max_ratio   = acohpsk.ratio;
+          f_est       = acohpsk.f_est - acohpsk.f_fine_est;
+          next_sync   = anext_sync;
+        end
+      end
     end
-    [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
     if next_sync == 1
 
       % we've found a sync candidate!
       % re-process last two frames with adjusted f_est then check again
 
-      acohpsk.f_est -= acohpsk.f_fine_est;
+      acohpsk.f_est = f_est;
 
       printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
 
-      %[rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame_buf, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
       [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
       for i=1:Nsw-1
         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
@@ -384,29 +402,34 @@ else
   % some other useful plots
 
   figure(1)
+  clf;
   plot(rx_symb_log*exp(j*pi/4),'+')
   title('Scatter');
 
   figure(2)
+  clf;
   plot(rx_timing_log)
   title('rx timing');
 
   figure(3)
+  clf;
   stem(nerr_log)
   title('Bit Errors');
 
   figure(4)
+  clf;
   stem(ratio_log)
   title('Sync ratio');
 
   figure(5);
+  clf;
   subplot(211)
-  plot(foff_log);
+  plot(foff_log,';freq offset;');
   hold on;
-  plot(fest_log - Fcentre,'g');
+  plot(fest_log - Fcentre,'g;freq offset est;');
   hold off;
-  
-  title('freq offset error');
+  title('freq offset');
+  legend("boxoff");  
 
   subplot(212)
   plot(foff_log(1:length(fest_log)) - fest_log + Fcentre)
