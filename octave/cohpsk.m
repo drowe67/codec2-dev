@@ -710,7 +710,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
       next_sync = 1;
     else
       next_sync = 0;
-      printf("  [%d] back to coarse freq offset est...\n", cohpsk.frame) ;
+      %printf("  [%d] back to coarse freq offset est...\n", cohpsk.frame) ;
     end
     cohpsk.ratio = abs(max_corr/max_mag);
   end
