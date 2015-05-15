@@ -594,7 +594,7 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
 
     % figure(10); clf; hold on;
     for r=1:nsymb
-      % downconvert entire signal to nominal baseband 
+      % shift signal to nominal baseband, this will put Nc/2 carriers either side of 0 Hz
 
       [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame(1+(r-1)*M:r*M), -f_est, afdmdv.Fs, afdmdv.fbb_phase_rx);
 
@@ -621,21 +621,21 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
         for c=1:afdmdv.Nc+1
           adiff = rx_onesym(c) .* conj(afdmdv.prev_rx_symb(c));
           afdmdv.prev_rx_symb(c) = rx_onesym(c);
+
+          % 4th power strips QPSK modulation, by multiplying phase by 4
+          % Using the abs value of the real coord was found to help 
+          % non-linear issues when noise power was large
+
           amod_strip = adiff.^4;
           amod_strip = abs(real(amod_strip)) + j*imag(amod_strip);
           mod_strip += amod_strip;
         end
         %plot(mod_strip)
-
-        % 4th power strips QPSK modulation, by multiplying phase by 4
-        % Using the abs value of the real coord was found to help 
-        % non-linear issues when noise power was large
-
         
         % loop filter made up of 1st order IIR plus integrator.  Integerator
         % was found to be reqd 
         
-        afdmdv.filt = ((1-beta)*afdmdv.filt + beta*angle(mod_strip));
+        afdmdv.filt = (1-beta)*afdmdv.filt + beta*angle(mod_strip);
         f_est += g*afdmdv.filt;
 
       end
@@ -643,7 +643,7 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
 endfunction
 
 
-function ct_symb_buf = update_ct_symb_buf(ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
+void update_ct_symb_buf(COMP ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
 
   % update memory in symbol buffer
 
@@ -714,78 +714,19 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     end
     cohpsk.ratio = abs(max_corr/max_mag);
   end
+  
+  % single point correlation just to see if we are still in sync
 
   if sync == 1
-
-    % we are in sync so just sample correlation over 1D grid of fine freq points
-
-    max_corr = 0;
-    st = cohpsk.f_fine_est - 1;
-    en = cohpsk.f_fine_est + 1;
-    for f_fine = st:0.25:en
-        f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
-        corr = 0; mag = 0;
-        for c=1:Nc*Nd
-          f_corr_vec = f_fine_rect .* ct_symb_buf(cohpsk.ct+sampling_points,c);
-          for p=1:length(sampling_points)
-            corr += pilot2(p,c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
-            mag  += abs(f_corr_vec(p));
-          end
-        end
-        if corr > max_corr
-          max_corr = corr;
-          max_mag = mag;
-          f_fine_est = f_fine;
-        end
+    corr = 0; mag = 0;
+    for c=1:Nc*Nd
+      for p=1:length(sampling_points)
+        corr += pilot2(p, c-Nc*floor((c-1)/Nc)) * ct_symb_buf(cohpsk.ct + sampling_points,c);
+        mag  += abs(f_corr_vec(p));
+      end
     end
-
-    %cohpsk.f_est -= 0.5*f_fine_est;
-    %printf("  coarse: %f  fine: %f\n", cohpsk.f_est, f_fine_est);
-    cohpsk.ratio = abs(max_corr/max_mag);
+    cohpsk.ratio = abs(corr)/mag;
   end
-  
-
-endfunction
-
-
-% fine freq correction
-
-function acohpsk = fine_freq_correct(acohpsk, sync, next_sync);
-  ct_symb_ff_buf = acohpsk.ct_symb_ff_buf;
-
-  % We can decode first frame that we achieve sync.  Need to fine freq
-  % correct all of it's symbols, including pilots.  From then on, just
-  % correct new symbols into frame.  make copy, so if we lose sync we
-  % havent fine freq corrected ct_symb_buf if next_sync == 4 correct
-  % all 8 if sync == 2 correct latest 6
-
-
-  if (next_sync == 4) && (sync == 2)
-      
-      % first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples
-
-      ct_symb_ff_buf = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
-      for r=1:acohpsk.Nsymbrowpilot+2
-        acohpsk.ff_phase *= acohpsk.ff_rect';
-        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
-      end
-  end
-
-  if sync == 4
-      % second and subsequent frames, just fine freq correct the latest Nsymbrowpilot
-
-      ct_symb_ff_buf(1:2,:) = ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
-      ct_symb_ff_buf(3:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
-      for r=3:acohpsk.Nsymbrowpilot+2
-        acohpsk.ff_phase *= acohpsk.ff_rect';
-        ct_symb_ff_buf(r,:) *= acohpsk.ff_phase;
-      end
-  end
-
-  mag = abs(acohpsk.ff_phase);
-  acohpsk.ff_phase /= mag;
-
-  acohpsk.ct_symb_ff_buf = ct_symb_ff_buf;
 
 endfunction
 

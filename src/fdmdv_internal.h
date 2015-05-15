@@ -124,7 +124,8 @@ struct FDMDV {
 
     float foff;
     COMP foff_phase_rect;
-    
+    float filt;
+
     /* Demodulator */
 
     COMP  rxdec_lpf_mem[NRXDEC-1+M]; 
