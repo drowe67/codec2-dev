@@ -69,6 +69,7 @@ static COMP qpsk_mod[] = {
 static int sampling_points[] = {0, 1, 6, 7};
 
 void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine);
+void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_NC*ND]);
 
 /*---------------------------------------------------------------------------*\
                                                                              
@@ -131,7 +132,16 @@ struct COHPSK *cohpsk_create(void)
     }
 
     coh->ff_phase.real = 1.0; coh->ff_phase.imag = 0.0;
-    coh->sync = 0;
+    coh->sync  = 0;
+    coh->frame = 0;
+    coh->ratio = 0.0;
+
+    /* clear sync window buffer */
+
+    for (i=0; i<NSW*NSYMROWPILOT*M; i++) {
+        coh->ch_fdm_frame_buf[i].real = 0.0;
+        coh->ch_fdm_frame_buf[i].imag = 0.0;
+    }
 
     /* set up fdmdv states so we can use those modem functions */
 
@@ -152,6 +162,15 @@ struct COHPSK *cohpsk_create(void)
         }
     }
     coh->fdmdv = fdmdv;
+
+    /* disable optional logging by default */
+
+    coh->rx_baseband_log = NULL;
+    coh->rx_baseband_log_col_index = 0;
+    coh->rx_filt_log = NULL;
+    coh->rx_filt_log_col_index = 0;
+    coh->ch_symb_log = NULL;
+    coh->ch_symb_log_r = 0;
 
     return coh;
 }
@@ -260,8 +279,8 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
     float x[NPILOTSFRAME+2], x1;
     COMP  y[NPILOTSFRAME+2], yfit;
     COMP  m, b;
-    COMP  corr, rot, pi_on_4, phi_rect, div_symb;
-    float mag, phi_, amp_;
+    COMP   __attribute__((unused)) corr, rot, pi_on_4, phi_rect, div_symb;
+    float mag,  __attribute__((unused)) phi_,  __attribute__((unused)) amp_;
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
    
@@ -345,63 +364,6 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
 }
 
 
-/*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: coarse_freq_offset_est()	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: March 2015
-
-  Determines an estimate of frequency offset, advances to next sync state.
-
-  TODO: This is currently very stack heavy for an embedded uC.  Tweak
-        algorithm in Octave and C to use a smaller DFT and test.
-
-\*---------------------------------------------------------------------------*/
-
-void coarse_freq_offset_est(struct COHPSK *coh, struct FDMDV *fdmdv, COMP ch_fdm_frame[], int sync, int *next_sync)
-{
-    float f_start, f_stop, sc, h, magsq, num, den, bin_est;
-    COMP  s[COARSE_FEST_NDFT], S[COARSE_FEST_NDFT];
-    int   bin_start, bin_stop, i;
-
-    if (sync == 0) {
-        f_start = FDMDV_FCENTRE - (((float)(COHPSK_NC*ND-1)/2)+2)*FSEP; 
-        f_stop = FDMDV_FCENTRE + (((float)(COHPSK_NC*ND-1)/2)+2)*FSEP;
-        sc = (float)COARSE_FEST_NDFT/FS;
-        bin_start = floorf(f_start*sc+0.5);
-        bin_stop = floorf(f_stop*sc+0.5);
-        //printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n",
-        //        f_start, f_stop, sc, bin_start, bin_stop);
-
-        for(i=0; i<NSYMROWPILOT*M; i++) {
-            h = 0.5 - 0.5*cosf(2*M_PI*i/(NSYMROWPILOT*M-1));
-            s[i] = fcmult(h, ch_fdm_frame[i]); 
-        }
-        
-        for (; i<COARSE_FEST_NDFT; i++) {
-            s[i].real = 0.0;
-            s[i].imag = 0.0;
-        }
-
-        kiss_fft(coh->fft_coarse_fest, (kiss_fft_cpx *)s, (kiss_fft_cpx *)S);
-        
-        /* find centroid of signal energy inside search window */
-
-        num = den = 0.0;
-        for(i=bin_start; i<=bin_stop; i++) {
-            magsq = S[i].real*S[i].real + S[i].imag*S[i].imag;
-            num += (float)(i)*magsq;
-            den += magsq;
-        }
-        bin_est = num/den;
-        coh->f_est = floor(bin_est/sc+0.5);
-
-        fprintf(stderr, "  coarse freq est: %f\n", coh->f_est);
-        
-        *next_sync = 1;
-    }
-}
-
 
 void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine) 
 {
@@ -436,40 +398,24 @@ void corr_with_pilots(COMP *corr_out, float *mag_out, struct COHPSK *coh, int t,
   frequency offset, advances to next sync state if we have a reliable
   match for frame sync.
 
-  TODO: This is very stack heavy for an embedded uC.  Tweak algorthim to use
-        a smaller DFT and test.
-
 \*---------------------------------------------------------------------------*/
 
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], int sync, int *next_sync)
 {
-    int   r,c,i,t;
+    int   t;
     float f_fine, mag, max_corr, max_mag;
     COMP  corr;
 
-    /* update memory in symbol buffer */
-
-    for (r=0; r<NCT_SYMB_BUF-NSYMROWPILOT; r++) {
-        for(c=0; c<COHPSK_NC*ND; c++) {
-            coh->ct_symb_buf[r][c] = coh->ct_symb_buf[r+NSYMROWPILOT][c];
-        }
-    }
-
-    for (r=NCT_SYMB_BUF-NSYMROWPILOT,i=0; r<NCT_SYMB_BUF; r++,i++) {
-       for(c=0; c<COHPSK_NC*ND; c++) {
-           coh->ct_symb_buf[r][c] = ch_symb[i][c];
-           //printf("%d %d %f %f\n", i,c,ch_symb[i][c].real, ch_symb[i][c].imag);
-       }
-    }
+    update_ct_symb_buf(coh->ct_symb_buf, ch_symb);
 
     /* sample pilots at start of this frame and start of next frame */
 
-    if (sync == 2) {
+    if (sync == 0) {
 
         /* sample correlation over 2D grid of time and fine freq points */
 
         max_corr = 0;
-        for (f_fine=-20; f_fine<=20; f_fine+=1.0) {
+        for (f_fine=-20; f_fine<=20; f_fine+=0.25) {
             for (t=0; t<NSYMROWPILOT; t++) {
                 corr_with_pilots(&corr, &mag, coh, t, f_fine);
                 //printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, corr.real, corr.imag);
@@ -487,81 +433,35 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/RS);
         fprintf(stderr, "  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
  
-        if (max_corr/max_mag > 0.9) {
-            fprintf(stderr, "  in sync!\n");
-            *next_sync = 4;
+        if (max_corr/max_mag > 0.7) {
+            fprintf(stderr, "  [%d] encouraging sync word!\n", coh->frame);
             coh->sync_timer = 0;
+            *next_sync = 1;
         }
         else {
             *next_sync = 0;
-            fprintf(stderr, "  back to coarse freq offset est...\n");
+            fprintf(stderr, "  [%d]  back to coarse freq offset est...\n", coh->frame);
         }
-        
+        coh->ratio = max_corr/max_mag;        
     }
 }
 
 
-/*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: fine_freq_correct()	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: April 2015
+void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_NC*ND])
+{
+    int r, c, i;
 
-  Fine frequency correction of symbols at rate Rs.
+    /* update memory in symbol buffer */
 
-\*---------------------------------------------------------------------------*/
-
-void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync) {
-    int   r,c;
-    float mag;
-
-  /*
-    We can decode first frame that we achieve sync.  Need to fine freq
-    correct all of it's symbols, including pilots.  From then on, just
-    correct new symbols into frame.  make copy, so if we lose sync we
-    havent fine freq corrected ct_symb_buf if next_sync == 4 correct
-    all 8 if sync == 2 correct latest 6.
-  */
-
-  if ((next_sync == 4) || (sync == 4)) {
-
-      if ((next_sync == 4) && (sync == 2)) {
-          
-          /* first frame, we've just gotten sync so fine freq correct all Nsymbrowpilot+2 samples */
-
-          for(r=0; r<NSYMROWPILOT+2; r++) {
-              coh->ff_phase = cmult(coh->ff_phase, cconj(coh->ff_rect));
-              for(c=0; c<COHPSK_NC*ND; c++) {
-                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
-                  coh->ct_symb_ff_buf[r][c] = cmult(coh->ct_symb_ff_buf[r][c], coh->ff_phase);
-              }
-          }
-      }
-      else {
-          
-          /* second and subsequent frames, just fine freq correct the latest Nsymbrowpilot */
-
-          for(r=0; r<2; r++) {
-              for(c=0; c<COHPSK_NC*ND; c++) {
-                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_ff_buf[r+NSYMROWPILOT][c];
-              }
-          }
-          
-          for(; r<NSYMROWPILOT+2; r++) {
-              coh->ff_phase = cmult(coh->ff_phase, cconj(coh->ff_rect));
-              for(c=0; c<COHPSK_NC*ND; c++) {
-                  coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
-                  //printf("%d %d %f %f\n", r,c,coh->ct_symb_ff_buf[r][c].real, coh->ct_symb_ff_buf[r][c].imag);
-                  coh->ct_symb_ff_buf[r][c] = cmult(coh->ct_symb_ff_buf[r][c], coh->ff_phase);
-              }
-          }
-
-      }
-
-      mag = cabsolute(coh->ff_phase);
-      coh->ff_phase.real /= mag;
-      coh->ff_phase.imag /= mag;
-  }
+    for(r=0; r<NCT_SYMB_BUF-NSYMROWPILOT; r++) {
+        for(c=0; c<COHPSK_NC*ND; c++)
+            ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
+    }
+  
+    for(r=NCT_SYMB_BUF-NSYMROWPILOT, i=0; r<NSYMROWPILOT; r++, i++) {
+        for(c=0; c<COHPSK_NC*ND; c++)
+            ct_symb_buf[r][c] = ch_symb[i][c];
+    }
 }
 
 
@@ -570,14 +470,11 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
     COMP  corr;
     float mag;
 
-    if (sync == 1)
-        next_sync = 2;
+    if (sync == 1) {
 
-    if (sync == 4) {
+        /* check that sync is still good, fall out of sync on consecutive bad frames */
 
-        /* check that sync is still good, fall out of sync on 3 consecutive bad frames */
-
-        corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
+        corr_with_pilots(&corr, &mag, coh, coh->ct, 0.0);
         // printf("%f\n", cabsolute(corr)/mag);
 
         if (cabsolute(corr)/mag < 0.5) 
@@ -585,8 +482,8 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
         else
             coh->sync_timer = 0;            
 
-        if (coh->sync_timer == 3) {
-            fprintf(stderr,"  lost sync ....\n");
+        if (coh->sync_timer == 10) {
+            fprintf(stderr,"  [%d] lost sync ....\n", coh->frame);
             next_sync = 0;
         }
     }
@@ -630,6 +527,94 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 }
 
 
+void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK_NC*ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
+{
+    struct FDMDV *fdmdv = coh->fdmdv;
+    int   r, c, i;
+    COMP  rx_fdm_frame_bb[M];
+    COMP  rx_baseband[COHPSK_NC*ND][M+M/P];
+    COMP  rx_filt[COHPSK_NC*ND][P+1];
+    float env[NT*P], __attribute__((unused)) rx_timing;
+    COMP  rx_onesym[COHPSK_NC*ND];
+    float beta, g;
+    COMP  adiff, amod_strip, mod_strip;
+
+    assert(nin < M*NSYMROWPILOT);
+
+    for (r=0; r<nsymb; r++) {
+        fdmdv_freq_shift(rx_fdm_frame_bb, &ch_fdm_frame[r*M], -(*f_est), &fdmdv->fbb_phase_rx, nin);
+        fdm_downconvert(rx_baseband, fdmdv->Nc, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
+        rx_filter(rx_filt, fdmdv->Nc, rx_baseband, coh->rx_filter_memory, nin);
+        rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);
+          
+        for(c=0; c<COHPSK_NC*ND; c++) {
+            ch_symb[r][c] = rx_onesym[c];
+        }
+
+        /* freq tracking, see test_ftrack.m for unit test.  Placed in
+           this function as it needs to work on a symbol by symbol
+           abasis rather than frame by frame.  This means the control
+           loop operates at a sample rate of Rs = 50Hz for say 1 Hz/s
+           drift. */
+
+        if (freq_track) {
+            beta = 0.005;
+            g = 0.2;
+
+            /* combine difference on phase from last symbol over Nc carriers */
+
+            mod_strip.real = 0.0; mod_strip.imag = 0.0;
+            for(c=0; c<fdmdv->Nc+1; c++) {
+                adiff = cmult(rx_onesym[c], cconj(fdmdv->prev_rx_symbols[c]));
+                fdmdv->prev_rx_symbols[c] = rx_onesym[c];
+
+                /* 4th power strips QPSK modulation, by multiplying phase by 4
+                   Using the abs value of the real coord was found to help 
+                   non-linear issues when noise power was large. */
+
+                amod_strip = cmult(adiff, adiff);
+                amod_strip = cmult(amod_strip, amod_strip);
+                amod_strip.real = cabsolute(amod_strip);
+                mod_strip = cadd(mod_strip, amod_strip);
+            }
+        
+            /* loop filter made up of 1st order IIR plus integrator.  Integerator
+               was found to be reqd  */
+        
+            fdmdv->filt = (1.0-beta)*fdmdv->filt + beta*atan2(mod_strip.imag, mod_strip.real);
+            *f_est += g*fdmdv->filt;
+        }    
+
+        /* Optional logging used for testing against Octave version */
+
+        if (coh->rx_baseband_log) {
+            for(c=0; c<COHPSK_NC*ND; c++) {       
+            for(i=0; i<nin; i++) {
+              coh->rx_baseband_log[c*(M+M/P)*LOG_FRAMES*NSYMROWPILOT + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+            }
+          }
+          coh->rx_baseband_log_col_index += nin;        
+        }
+
+        if (coh->rx_filt_log) {
+ 	  for(c=0; c<COHPSK_NC*ND; c++) {       
+            for(i=0; i<P; i++) {
+              coh->rx_filt_log[c*(P+1)*LOG_FRAMES*NSYMROWPILOT + coh->rx_filt_log_col_index + i] = rx_filt[c][i]; 
+            }
+	  }
+	  coh->rx_filt_log_col_index += P;        
+        }
+    }
+
+    if (coh->ch_symb_log) {
+	for(r=0; r<NSYMROWPILOT; r++, coh->ch_symb_log_r++) {
+            for(c=0; c<COHPSK_NC*ND; c++) {
+		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND* + c] = ch_symb[r][c]; 
+            }
+        }
+    }
+}
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: cohpsk_demod()	     
@@ -653,45 +638,103 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 
 void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[])
 {
-    struct FDMDV *fdmdv = coh->fdmdv;
-    COMP  rx_fdm_frame_bb[M*NSYMROWPILOT];
-    COMP  rx_baseband[COHPSK_NC*ND][M+M/P];
-    COMP  rx_filt[COHPSK_NC*ND][P+1];
-    float env[NT*P], __attribute__((unused)) rx_timing;
-    COMP  ch_symb[NSYMROWPILOT][COHPSK_NC*ND];
-    COMP  rx_onesym[COHPSK_NC*ND];
-    int   sync, next_sync, nin, r, c;
+    COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
+    int   i, j, sync, anext_sync, next_sync, nin, r, c;
+    float max_ratio, f_est;
+
+    /* store two frames of received samples so we can rewind if we get a good candidate */
+
+    for (i=0; i<(NSW-1)*NSYMROWPILOT*M; i++)
+        coh->ch_fdm_frame_buf[i] = coh->ch_fdm_frame_buf[i+NSYMROWPILOT*M];
+    for (j=0; i<NSYMROWPILOT*M; i++,j++)
+        coh->ch_fdm_frame_buf[i] = rx_fdm[j];
 
     next_sync = sync = coh->sync;
-
-    coarse_freq_offset_est(coh, fdmdv, rx_fdm, sync, &next_sync);
-
-    /* sample rate demod processing */
-
     nin = M;
-    for (r=0; r<NSYMROWPILOT; r++) {
-        fdmdv_freq_shift(&rx_fdm_frame_bb[r*M], &rx_fdm[r*M], -coh->f_est, &fdmdv->fbb_phase_rx, nin);
-        fdm_downconvert(rx_baseband, fdmdv->Nc, &rx_fdm_frame_bb[r*M], fdmdv->phase_rx, fdmdv->freq, nin);
-        rx_filter(rx_filt, fdmdv->Nc, rx_baseband, coh->rx_filter_memory, nin);
-        rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin);
-          
-        for(c=0; c<COHPSK_NC*ND; c++) {
-            ch_symb[r][c] = rx_onesym[c];
-        }
-    }
-     
-    /* coarse timing (frame sync) and initial fine freq est */
-  
-    frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
-    fine_freq_correct(coh, sync, next_sync);
+
+    /* if out of sync do Initial Freq offset estimation using NSW frames to flush out filter memories */
+
+    if (sync == 0) {
+
+        /* we can test +/- 20Hz, so we break this up into 3 tests to cover +/- 60Hz */
+
+        max_ratio = 0.0;
+        for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
         
+            printf("  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
+
+            /* we are out of sync so reset f_est and process two frames to clean out memories */
+
+            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, nin, 0);
+            for (i=0; i<NSW-1; i++) {
+                update_ct_symb_buf(coh->ct_symb_buf, &ch_symb[i*NSYMROWPILOT]);
+            }
+            frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &anext_sync);
+
+            if (anext_sync == 1) {
+                //printf("  [%d] acohpsk.ratio: %f\n", f, coh->ratio);
+                if (coh->ratio > max_ratio) {
+                    max_ratio   = coh->ratio;
+                    f_est       = coh->f_est - coh->f_fine_est;
+                    next_sync   = anext_sync;
+                }
+            }
+        }
+
+        if (next_sync == 1) {
+
+            /* we've found a sync candidate!
+               re-process last NSW frames with adjusted f_est then check again */
+
+            coh->f_est = f_est;
+
+            fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
+
+            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, nin, 0);
+            for (i=0; i<NSW-1; i++) {
+                update_ct_symb_buf(coh->ct_symb_buf, &ch_symb[i*NSYMROWPILOT]);
+            }
+            frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
+
+            if (fabs(coh->f_fine_est) > 2.0) {
+                fprintf(stderr, "  [%d] Hmm %f is a bit big so back to coarse est ...\n", coh->frame, coh->f_fine_est);
+                next_sync = 0;
+            }
+        }
+
+        if (next_sync == 1) {
+            /* OK we are in sync!
+               demodulate first frame (demod completed below) */
+
+            fprintf(stderr, "  [%d] in sync!\n", coh->frame);
+            for(r=0; r<NSYMROWPILOT+2; r++)
+                for(c=0; c<COHPSK_NC*ND; c++)
+                    coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
+        }
+    }  
+
+    /* If in sync just do sample rate processing on latest frame */
+
+    if (sync == 1) {
+        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 1);
+        frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
+ 
+        for(r=0; r<2; r++)
+            for(c=0; c<COHPSK_NC*ND; c++)
+                coh->ct_symb_ff_buf[r][c] = coh->ct_symb_ff_buf[r+NSYMROWPILOT][c];
+        for(; r<NSYMROWPILOT+2; r++)
+            for(c=0; c<COHPSK_NC*ND; c++)
+                coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
+    }
+
+    /* if we are in sync complete demodulation with symbol rate processing */
+  
     *reliable_sync_bit = 0;
-    if ((sync == 4) || (next_sync == 4)) {
+    if ((next_sync == 1) || (sync == 1)) {
         qpsk_symbols_to_bits(coh, rx_bits, coh->ct_symb_ff_buf);
         *reliable_sync_bit = 1;
     }
 
     sync = sync_state_machine(coh, sync, next_sync);        
-
     coh->sync = sync;
 }

@@ -38,9 +38,14 @@
 #include "comp_prim.h"
 #include "noise_samples.h"
 
-#define FRAMES   350
-#define FOFF_HZ  10.5
-#define ES_NO_DB  12.0
+#define FS          8000
+#define FRAMES      100
+#define FOFF_HZ     10.5
+#define ES_NO_DB     8.0
+#define HF_DELAY_MS  2.0
+#define HF_GAIN      1.423599
+
+#define FADING_FILE_NAME "../../raw/fading_samples.float"
 
 int main(int argc, char *argv[])
 {
@@ -54,19 +59,23 @@ int main(int argc, char *argv[])
     int           *ptest_bits_coh, *ptest_bits_coh_end, *ptest_bits_coh_rx;
     COMP           phase_ch;
     int            noise_r, noise_end;
-    float          corr;
+    int            errors;
     int            state, next_state, nerrors, nbits, reliable_sync_bit;
     float          EsNo, variance;
     COMP           scaled_noise;
     float          EsNodB, foff_hz;
+    int            fading_en, nhfdelay, ret;
+    COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
+    FILE          *ffading;
 
     EsNodB = ES_NO_DB;
     foff_hz =  FOFF_HZ;
-    if (argc == 3) {
+    if (argc == 4) {
         EsNodB = atof(argv[1]);
         foff_hz = atof(argv[2]);
+        fading_en = atoi(argv[3]);
     }
-    fprintf(stderr, "EsNodB: %4.2f foff: %4.2f Hz\n", EsNodB, foff_hz);
+    fprintf(stderr, "EsNodB: %4.2f foff: %4.2f Hz fading: %d\n", EsNodB, foff_hz, fading_en);
 
     coh = cohpsk_create();
     assert(coh != NULL);
@@ -83,6 +92,23 @@ int main(int argc, char *argv[])
 
     EsNo = pow(10.0, EsNodB/10.0);
     variance = 2.0*COHPSK_FS/(COHPSK_RS*EsNo);
+
+    /* init HF fading model */
+
+    if (fading_en) {
+        ffading = fopen(FADING_FILE_NAME, "rb");
+        if (ffading == NULL) {
+            printf("Can't find fading file: %s\n", FADING_FILE_NAME);
+            exit(1);
+        }
+        nhfdelay = floor(HF_DELAY_MS*FS/1000);
+        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_SAMPLES_PER_FRAME)*sizeof(COMP));
+        assert(ch_fdm_delay != NULL);
+        for(i=0; i<nhfdelay+COHPSK_SAMPLES_PER_FRAME; i++) {
+            ch_fdm_delay[i].real = 0.0;
+            ch_fdm_delay[i].imag = 0.0;
+        }
+    }
 
     /* Main Loop ---------------------------------------------------------------------*/
 
@@ -106,6 +132,35 @@ int main(int argc, char *argv[])
 
         fdmdv_freq_shift(ch_fdm, tx_fdm, foff_hz, &phase_ch, COHPSK_SAMPLES_PER_FRAME);
 
+        /* optional HF fading -------------------------------------*/
+
+        if (fading_en) {
+
+            /* update delayed signal buffer */
+
+            for(i=0; i<nhfdelay; i++)
+                ch_fdm_delay[i] = ch_fdm_delay[i+COHPSK_SAMPLES_PER_FRAME];
+            for(; i<COHPSK_SAMPLES_PER_FRAME; i++)
+                ch_fdm_delay[i] = ch_fdm[i];
+
+            /* combine direct and delayed paths, both multiplied by
+               "spreading" (doppler) functions */
+
+            for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+                ret = fread(&aspread, sizeof(COMP), 1, ffading);
+                assert(ret == 1);
+                ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
+                assert(ret == 1);
+                //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
+                
+                direct    = cmult(aspread, ch_fdm[i]);
+                delayed   = cmult(aspread_2ms, ch_fdm_delay[i]);
+                ch_fdm[i] = fcmult(HF_GAIN, cadd(direct, delayed));
+            }
+        }
+
+        /* AWGN noise ------------------------------------------*/
+
         for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm[r] = cadd(ch_fdm[r], scaled_noise);
@@ -120,9 +175,9 @@ int main(int argc, char *argv[])
 
  	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_fdm);
 
-        corr = 0.0;
+        errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-            corr += (1.0 - 2.0*(rx_bits[i] & 0x1)) * (1.0 - 2.0*ptest_bits_coh_rx[i]);
+            errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i];
         }
 
         /* state logic to sync up to test data */
@@ -130,10 +185,10 @@ int main(int argc, char *argv[])
         next_state = state;
 
         if (state == 0) {
-            if (reliable_sync_bit && (corr == COHPSK_BITS_PER_FRAME)) {
+            if (reliable_sync_bit && (errors == 0)) {
                 next_state = 1;
                 ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
-                nerrors = COHPSK_BITS_PER_FRAME - corr;
+                nerrors = errors;
                 nbits = COHPSK_BITS_PER_FRAME;
                 fprintf(stderr, "  test data sync\n");            
 
@@ -141,7 +196,7 @@ int main(int argc, char *argv[])
         }
 
         if (state == 1) {
-            nerrors += COHPSK_BITS_PER_FRAME - corr;
+            nerrors += errors;
             nbits   += COHPSK_BITS_PER_FRAME;
             ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
             if (ptest_bits_coh_rx >= ptest_bits_coh_end) {
@@ -154,6 +209,10 @@ int main(int argc, char *argv[])
     
     printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
 
+    if (fading_en) {
+        free(ch_fdm_delay);
+        fclose(ffading);
+    }
     cohpsk_destroy(coh);
 
     return 0;

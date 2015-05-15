@@ -225,7 +225,7 @@ for f=1:frames
   next_sync = sync;
   nin = M;
 
-  % if out of sync do Initial Freq offset estimation over last two frames
+  % if out of sync do Initial Freq offset estimation over NSW frames to flush out memories
 
   if (sync == 0) && (f>1)
 

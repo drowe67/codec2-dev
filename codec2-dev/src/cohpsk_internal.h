@@ -32,11 +32,15 @@
 #define NCT_SYMB_BUF     (2*NSYMROWPILOT+2)
 #define ND               2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus 
                                                         one copy */
+#define NSW              3                           /* number of sync window frames */
+
+#define LOG_FRAMES       35
 
 #include "fdmdv_internal.h"
 #include "kiss_fft.h"
 
 struct COHPSK {
+    COMP         ch_fdm_frame_buf[NSW*NSYMROWPILOT*M];  /* buffer of several frames of symbols from channel      */
     float        pilot2[2*NPILOTSFRAME][COHPSK_NC];    
     float        phi_[NSYMROW][COHPSK_NC*ND];           /* phase estimates for this frame of rx data symbols     */
     float        amp_[NSYMROW][COHPSK_NC*ND];           /* amplitude estimates for this frame of rx data symbols */
@@ -53,7 +57,19 @@ struct COHPSK {
     int          sync;
     int          sync_timer;
 
+    int          frame;
+    float        ratio;
+
     struct FDMDV *fdmdv;
+    
+    /* optional log variables used for tetsing Octave to C port */
+
+    COMP           *rx_baseband_log;
+    int            rx_baseband_log_col_index;
+    COMP           *rx_filt_log;
+    int            rx_filt_log_col_index;
+    COMP           *ch_symb_log;
+    int            ch_symb_log_r;
 };
 
 
