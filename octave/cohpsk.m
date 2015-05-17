@@ -643,7 +643,7 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
 endfunction
 
 
-void update_ct_symb_buf(COMP ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
+function ct_symb_buf = update_ct_symb_buf(ct_symb_buf, ch_symb, Nct_sym_buf, Nsymbrowpilot)
 
   % update memory in symbol buffer
 
@@ -719,13 +719,16 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
 
   if sync == 1
     corr = 0; mag = 0;
+    f_fine_rect = exp(-j*cohpsk.f_fine_est*2*pi*sampling_points/Rs)';
     for c=1:Nc*Nd
+      f_corr_vec = f_fine_rect .* ct_symb_buf(cohpsk.ct+sampling_points,c);
       for p=1:length(sampling_points)
-        corr += pilot2(p, c-Nc*floor((c-1)/Nc)) * ct_symb_buf(cohpsk.ct + sampling_points,c);
+        corr += pilot2(p, c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
         mag  += abs(f_corr_vec(p));
       end
     end
     cohpsk.ratio = abs(corr)/mag;
+    %printf("f_fine_est: %f ratio: %f\n", cohpsk.f_fine_est, cohpsk.ratio);
   end
 
 endfunction

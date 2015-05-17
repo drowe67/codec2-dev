@@ -34,7 +34,7 @@
                                                         one copy */
 #define NSW              3                           /* number of sync window frames */
 
-#define LOG_FRAMES       35
+#define LOG_FRAMES       2                           /* todo: re-arrange logging and tcohpsk.c so this can be moved */
 
 #include "fdmdv_internal.h"
 #include "kiss_fft.h"
@@ -66,6 +66,7 @@ struct COHPSK {
 
     COMP           *rx_baseband_log;
     int            rx_baseband_log_col_index;
+    int            rx_baseband_log_col_sz;
     COMP           *rx_filt_log;
     int            rx_filt_log_col_index;
     COMP           *ch_symb_log;
