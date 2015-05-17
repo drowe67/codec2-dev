@@ -431,16 +431,15 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
 
         coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/RS);
         coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/RS);
-        fprintf(stderr, "  fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", coh->f_fine_est, max_corr, max_mag, coh->ct);
+        fprintf(stderr, "  [%d]   fine freq f: %6.2f max_coff: %f max_mag: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr, max_mag, coh->ct);
  
         if (max_corr/max_mag > 0.7) {
-            fprintf(stderr, "  [%d] encouraging sync word!\n", coh->frame);
+            fprintf(stderr, "  [%d]   encouraging sync word!\n", coh->frame);
             coh->sync_timer = 0;
             *next_sync = 1;
         }
         else {
             *next_sync = 0;
-            fprintf(stderr, "  [%d]  back to coarse freq offset est...\n", coh->frame);
         }
         coh->ratio = max_corr/max_mag;        
     }
@@ -458,7 +457,7 @@ void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_
             ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
     }
   
-    for(r=NCT_SYMB_BUF-NSYMROWPILOT, i=0; r<NSYMROWPILOT; r++, i++) {
+    for(r=NCT_SYMB_BUF-NSYMROWPILOT, i=0; r<NCT_SYMB_BUF; r++, i++) {
         for(c=0; c<COHPSK_NC*ND; c++)
             ct_symb_buf[r][c] = ch_symb[i][c];
     }
@@ -474,7 +473,7 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 
         /* check that sync is still good, fall out of sync on consecutive bad frames */
 
-        corr_with_pilots(&corr, &mag, coh, coh->ct, 0.0);
+        corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
         // printf("%f\n", cabsolute(corr)/mag);
 
         if (cabsolute(corr)/mag < 0.5) 
@@ -589,11 +588,12 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK
 
         if (coh->rx_baseband_log) {
             for(c=0; c<COHPSK_NC*ND; c++) {       
-            for(i=0; i<nin; i++) {
-              coh->rx_baseband_log[c*(M+M/P)*LOG_FRAMES*NSYMROWPILOT + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+                for(i=0; i<nin; i++) {
+                    coh->rx_baseband_log[c*(M+M/P)*LOG_FRAMES*NSYMROWPILOT + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+                }
             }
-          }
-          coh->rx_baseband_log_col_index += nin;        
+            coh->rx_baseband_log_col_index += nin;
+            assert(coh->rx_baseband_log_col_index <= coh->rx_baseband_log_col_sz);
         }
 
         if (coh->rx_filt_log) {
@@ -609,11 +609,12 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK
     if (coh->ch_symb_log) {
 	for(r=0; r<NSYMROWPILOT; r++, coh->ch_symb_log_r++) {
             for(c=0; c<COHPSK_NC*ND; c++) {
-		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND* + c] = ch_symb[r][c]; 
+		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND + c] = ch_symb[r][c]; 
             }
         }
     }
 }
+
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -646,8 +647,9 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
 
     for (i=0; i<(NSW-1)*NSYMROWPILOT*M; i++)
         coh->ch_fdm_frame_buf[i] = coh->ch_fdm_frame_buf[i+NSYMROWPILOT*M];
-    for (j=0; i<NSYMROWPILOT*M; i++,j++)
+    for (j=0; i<NSW*NSYMROWPILOT*M; i++,j++)
         coh->ch_fdm_frame_buf[i] = rx_fdm[j];
+    //printf("i: %d j: %d rx_fdm[0]: %f %f\n", i,j, rx_fdm[0].real, rx_fdm[0].imag);
 
     next_sync = sync = coh->sync;
     nin = M;
@@ -697,7 +699,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
             frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
 
             if (fabs(coh->f_fine_est) > 2.0) {
-                fprintf(stderr, "  [%d] Hmm %f is a bit big so back to coarse est ...\n", coh->frame, coh->f_fine_est);
+                fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
                 next_sync = 0;
             }
         }

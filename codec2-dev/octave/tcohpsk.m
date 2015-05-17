@@ -26,13 +26,41 @@ randn('state',1);
 % [ ] set up various tests we use to characterise modem for easy 
 %     repeating when we change modem
 
-frames = 100;
-foff = -40;
-dfoff = -0.5/Fs;
-EsNodB = 12;
-fading_en = 1;
-hf_delay_ms = 2;
-compare_with_c = 0;
+test = 'compare to c';
+
+if strcmp(test, 'compare to c')
+  frames = 10;
+  foff =  0;
+  dfoff = 0;
+  EsNodB = 12;
+  fading_en = 0;
+  hf_delay_ms = 2;
+  compare_with_c = 1;
+end
+
+% should be BER around 0.015 to 0.02
+
+if strcmp(test, 'awgn')
+  frames = 100;
+  foff =  0;
+  dfoff = 0;
+  EsNodB = 8;
+  fading_en = 0;
+  hf_delay_ms = 2;
+  compare_with_c = 0;
+end
+
+% Similar to AWGN - should be BER around 0.015 to 0.02
+
+if strcmp(test, 'fading');
+  frames = 100;
+  foff = -40;
+  dfoff = -0.5/Fs;
+  EsNodB = 12;
+  fading_en = 1;
+  hf_delay_ms = 2;
+  compare_with_c = 0;
+end
 
 EsNo = 10^(EsNodB/10);
 
