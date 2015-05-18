@@ -29,10 +29,10 @@ randn('state',1);
 test = 'compare to c';
 
 if strcmp(test, 'compare to c')
-  frames = 10;
+  frames = 2;
   foff =  0;
   dfoff = 0;
-  EsNodB = 12;
+  EsNodB = 0;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
@@ -72,7 +72,7 @@ Nd = 2;
 framesize = 32;
 
 Nsw = 3;
-afdmdv.Nsym = 5;
+afdmdv.Nsym = 6;
 afdmdv.Nt = 5;
 
 % FDMDV init ---------------------------------------------------------------
@@ -255,7 +255,7 @@ for f=1:frames
 
   % if out of sync do Initial Freq offset estimation over NSW frames to flush out memories
 
-  if (sync == 0) && (f>1)
+  if (sync == 0)
 
     % we can test +/- 20Hz, so we break this up into 3 tests to cover +/- 60Hz
 
@@ -267,6 +267,11 @@ for f=1:frames
       % we are out of sync so reset f_est and process two frames to clean out memories
 
       [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
+      rx_baseband_log = [rx_baseband_log rx_baseband];
+ 
+      rx_filt_log = [rx_filt_log rx_filt];
+      ch_symb_log = [ch_symb_log; ch_symb];
+
       for i=1:Nsw-1
         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
       end
@@ -292,6 +297,10 @@ for f=1:frames
       printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
 
       [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
+      rx_baseband_log = [rx_baseband_log rx_baseband];
+      rx_filt_log = [rx_filt_log rx_filt];
+      ch_symb_log = [ch_symb_log; ch_symb];
+ 
       for i=1:Nsw-1
         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
       end
@@ -314,9 +323,10 @@ for f=1:frames
   % If in sync just do sample rate processing on latest frame
 
   if sync == 1
-    %[rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame, -acohpsk.f_est, Fs, afdmdv.fbb_phase_rx);
-    %[ch_symb rx_timing rx_filt rx_baseband afdmdv] = rate_Fs_rx_processing(afdmdv, rx_fdm_frame_bb, acohpsk.Nsymbrowpilot, nin);
     [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 1);
+    rx_baseband_log = [rx_baseband_log rx_baseband];
+    rx_filt_log = [rx_filt_log rx_filt];
+    ch_symb_log = [ch_symb_log; ch_symb];
     [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
 
     acohpsk.ct_symb_ff_buf(1:2,:) = acohpsk.ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
@@ -382,22 +392,23 @@ if compare_with_c
 
   load ../build_linux/unittest/tcohpsk_out.txt
 
-  stem_sig_and_error(1, 111, tx_bits_log_c(1:n), tx_bits_log(1:n) - tx_bits_log_c(1:n), 'tx bits', [1 n -1.5 1.5])
-  stem_sig_and_error(2, 211, real(tx_symb_log_c(1:n)), real(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb re', [1 n -1.5 1.5])
-  stem_sig_and_error(2, 212, imag(tx_symb_log_c(1:n)), imag(tx_symb_log(1:n) - tx_symb_log_c(1:n)), 'tx symb im', [1 n -1.5 1.5])
+  stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits) -1.5 1.5])
+  stem_sig_and_error(2, 211, real(tx_symb_log_c), real(tx_symb_log - tx_symb_log_c), 'tx symb re', [1 length(tx_symb_log_c) -1.5 1.5])
+  stem_sig_and_error(2, 212, imag(tx_symb_log_c), imag(tx_symb_log - tx_symb_log_c), 'tx symb im', [1 length(tx_symb_log_c) -1.5 1.5])
 
-  stem_sig_and_error(3, 211, real(tx_fdm_frame_log_c(1:n)), real(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame re', [1 n -10 10])
-  stem_sig_and_error(3, 212, imag(tx_fdm_frame_log_c(1:n)), imag(tx_fdm_frame_log(1:n) - tx_fdm_frame_log_c(1:n)), 'tx fdm frame im', [1 n -10 10])
-  stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c(1:n)), real(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame re', [1 n -10 10])
-  stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c(1:n)), imag(ch_fdm_frame_log(1:n) - ch_fdm_frame_log_c(1:n)), 'ch fdm frame im', [1 n -10 10])
-  stem_sig_and_error(5, 211, real(rx_fdm_frame_bb_log_c(1:n)), real(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb re', [1 n -10 10])
-  stem_sig_and_error(5, 212, imag(rx_fdm_frame_bb_log_c(1:n)), imag(rx_fdm_frame_bb_log(1:n) - rx_fdm_frame_bb_log_c(1:n)), 'rx fdm frame bb im', [1 n -10 10])
+  stem_sig_and_error(3, 211, real(tx_fdm_frame_log_c), real(tx_fdm_frame_log - tx_fdm_frame_log_c), 'tx fdm frame re', [1 length(tx_fdm_frame_log) -10 10])
+  stem_sig_and_error(3, 212, imag(tx_fdm_frame_log_c), imag(tx_fdm_frame_log - tx_fdm_frame_log_c), 'tx fdm frame im', [1 length(tx_fdm_frame_log) -10 10])
+  stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c), real(ch_fdm_frame_log - ch_fdm_frame_log_c), 'ch fdm frame re', [1 length(ch_fdm_frame_log) -10 10])
+  stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c), imag(ch_fdm_frame_log - ch_fdm_frame_log_c), 'ch fdm frame im', [1 length(ch_fdm_frame_log) -10 10])
 
-  [n m] = size(ch_symb_log);
+  stem_sig_and_error(5, 211, real(rx_baseband_log_c(1,:)), real(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband re', [1 length(rx_baseband_log) -10 10])
+  stem_sig_and_error(5, 212, imag(rx_baseband_log_c(1,:)), imag(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband im', [1 length(rx_baseband_log) -10 10])
+
+  [n m] = size(ch_symb_log); n = 40;
   stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
   stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
-  stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
-  stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
+  %stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
+  %stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
   stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
   stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
   stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
@@ -408,10 +419,10 @@ if compare_with_c
   check(tx_symb_log, tx_symb_log_c, 'tx_symb');
   check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
   check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
-  check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
+  %check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
 
   check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
-  check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
+  %check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
   check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.01);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
