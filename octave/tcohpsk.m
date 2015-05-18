@@ -10,6 +10,19 @@
 % or (ii) can optionally be used to run an Octave version of the cohpsk
 %    modem to tune and develop it.
 
+%  TODO:
+%
+%  [ ] Test
+%      [X] AWGN channel
+%      [X] freq offset
+%      [X] fading channel
+%      [X] freq drift
+%      [ ] timing drift
+%  [X] tune perf/impl loss to get closer to ideal
+%      [X] linear interp of phase for better fading perf
+%  [X] freq offset/drift feedback loop 
+%  [ ] PAPR measurement and reduction
+
 graphics_toolkit ("gnuplot");
 more off;
 
@@ -30,8 +43,8 @@ test = 'compare to c';
 
 if strcmp(test, 'compare to c')
   frames = 35;
-  foff =  0;
-  dfoff = 0;
+  foff =  55.5;
+  dfoff = -0.5/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
@@ -111,7 +124,7 @@ afdmdv.Nfiltertiming = afdmdv.M + afdmdv.Nfilter + afdmdv.M;
 afdmdv.rx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
 
 afdmdv.filt = 0;
-afdmdv.prev_rx_symb = zeros(1,afdmdv.Nc+1);
+afdmdv.prev_rx_symb = ones(1,afdmdv.Nc+1);
 
 % COHPSK Init --------------------------------------------------------
 
@@ -156,7 +169,7 @@ ct_symb_ff_log = [];
 rx_timing_log = [];
 ratio_log = [];
 foff_log = [];
-fest_log = [];
+f_est_log = [];
 
 % Channel modeling and BER measurement ----------------------------------------
 
@@ -323,7 +336,7 @@ for f=1:frames
   % If in sync just do sample rate processing on latest frame
 
   if sync == 1
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 0);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 1);
     [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
 
     acohpsk.ct_symb_ff_buf(1:2,:) = acohpsk.ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
@@ -333,7 +346,8 @@ for f=1:frames
     rx_filt_log = [rx_filt_log rx_filt];
     ch_symb_log = [ch_symb_log; ch_symb];
     rx_timing_log = [rx_timing_log rx_timing];
-    fest_log = [fest_log acohpsk.f_est];
+    f_est_log = [f_est_log acohpsk.f_est];
+    %printf("%f\n", acohpsk.f_est);
   end
 
   % if we are in sync complete demodulation with symbol rate processing
@@ -388,6 +402,10 @@ printf("\nOctave EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, 
 
 if compare_with_c
 
+  % Output vectors from C port ---------------------------------------------------
+
+  load ../build_linux/unittest/tcohpsk_out.txt
+
   % Determine bit error rate
 
   sz = length(tx_bits_log_c);
@@ -395,10 +413,6 @@ if compare_with_c
   Tbits_c = length(tx_bits_prev_log);
   ber_c = Nerrs_c/Tbits_c;
   printf("C EsNodB.....: %4.1f ber_c: %4.3f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
-
-  % Output vectors from C port ---------------------------------------------------
-
-  load ../build_linux/unittest/tcohpsk_out.txt
 
   stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits) -1.5 1.5])
   stem_sig_and_error(2, 211, real(tx_symb_log_c), real(tx_symb_log - tx_symb_log_c), 'tx symb re', [1 length(tx_symb_log_c) -1.5 1.5])
@@ -415,13 +429,15 @@ if compare_with_c
   [n m] = size(ch_symb_log);
   stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
   stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
-  %stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
-  %stem_sig_and_error(7, 212, imag(ct_symb_ff_log_c), imag(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff im', [1 n -1.5 1.5])
+
+  [n m] = size(rx_symb_log);
   stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
   stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
   stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
   stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
-  stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 n -1.5 1.5])
+
+  stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
+  stem_sig_and_error(11, 111, f_est_log_c - Fcentre, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) foff-5 foff+5])
 
   check(tx_bits_log, tx_bits_log_c, 'tx_bits');
   check(tx_symb_log, tx_symb_log_c, 'tx_symb');
@@ -429,12 +445,13 @@ if compare_with_c
   check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
   %check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
 
-  check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.01);
+  check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.05);
   %check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
-  check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.01);
+  check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.05);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
+  check(f_est_log, f_est_log_c, 'f_est');
 
 
 else
@@ -466,13 +483,13 @@ else
   subplot(211)
   plot(foff_log,';freq offset;');
   hold on;
-  plot(fest_log - Fcentre,'g;freq offset est;');
+  plot(f_est_log - Fcentre,'g;freq offset est;');
   hold off;
   title('freq offset');
   legend("boxoff");  
 
   subplot(212)
-  plot(foff_log(1:length(fest_log)) - fest_log + Fcentre)
+  plot(foff_log(1:length(f_est_log)) - fest_log + Fcentre)
   title('freq offset estimation error');
 
 end

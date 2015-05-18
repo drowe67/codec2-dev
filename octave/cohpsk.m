@@ -638,12 +638,14 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
           mod_strip += amod_strip;
         end
         %plot(mod_strip)
-        
+        %printf("modstrip: %f %f\n", real(mod_strip), imag(mod_strip));
+
         % loop filter made up of 1st order IIR plus integrator.  Integerator
         % was found to be reqd 
         
         afdmdv.filt = (1-beta)*afdmdv.filt + beta*angle(mod_strip);
         f_est += g*afdmdv.filt;
+        %printf("filt: %f angle: %f\n", afdmdv.filt, angle(mod_strip));
 
       end
     end

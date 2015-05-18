@@ -49,7 +49,8 @@
 #define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
 
 #define RS          50
-#define FOFF        0
+#define FOFF        55.5
+#define DFOFF       (-0.5/(float)FS)
 #define ESNODB      8
 
 extern float pilots_coh[][PILOTS_NC];
@@ -80,7 +81,8 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f, r, c, log_r, log_data_r, noise_r, ff_log_r;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
-    COMP           phase_ch;
+    double         foff;
+    COMP           foff_rect, phase_ch;
 
     struct FDMDV  *fdmdv;
     //COMP           rx_filt[COHPSK_NC*ND][P+1];
@@ -91,6 +93,8 @@ int main(int argc, char *argv[])
     //COMP           rx_onesym[COHPSK_NC*ND];
     //int            rx_baseband_log_col_index = 0;
     //COMP           rx_baseband_log[COHPSK_NC*ND][(M+M/P)*NSYMROWPILOT*FRAMES];
+    float            f_est_log[FRAMES];
+    int              f_est_samples;
 
     int            log_bits;
     float          EsNo, variance;
@@ -114,12 +118,13 @@ int main(int argc, char *argv[])
     
     /* init stuff */
 
-    log_r = log_data_r = noise_r = log_bits = ff_log_r = 0;
+    log_r = log_data_r = noise_r = log_bits = ff_log_r = f_est_samples = 0;
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
     memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
 
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
+    foff = FOFF;
      
     /*  each carrier has power = 2, total power 2Nc, total symbol rate
         NcRs, noise BW B=Fs Es/No = (C/Rs)/(N/B), N = var =
@@ -127,6 +132,7 @@ int main(int argc, char *argv[])
 
     EsNo = pow(10.0, ESNODB/10.0);
     variance = 2.0*FS/(RS*EsNo);
+    //fprintf(stderr, "doff: %e\n", DFOFF);
 
     /* Main Loop ---------------------------------------------------------------------*/
 
@@ -156,8 +162,17 @@ int main(int argc, char *argv[])
 	                          Channel
 	\*---------------------------------------------------------*/
 
-        fdmdv_freq_shift(ch_fdm_frame, tx_fdm_frame, FOFF, &phase_ch, NSYMROWPILOT*M);
+        //fdmdv_freq_shift(ch_fdm_frame, tx_fdm_frame, FOFF, &phase_ch, NSYMROWPILOT*M);
 
+        for(r=0; r<NSYMROWPILOT*M; r++) {
+            foff_rect.real = cos(2.0*M_PI*foff/FS); foff_rect.imag = sin(2.0*M_PI*foff/FS);
+            foff += DFOFF;
+            phase_ch = cmult(phase_ch, foff_rect);
+            ch_fdm_frame[r] = cmult(tx_fdm_frame[r], phase_ch);
+        }
+        phase_ch.real /= cabsolute(phase_ch);
+        phase_ch.imag /= cabsolute(phase_ch);
+        //fprintf(stderr, "%f\n", foff);
         for(r=0; r<NSYMROWPILOT*M; r++,noise_r++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm_frame[r] = cadd(ch_fdm_frame[r], scaled_noise);
@@ -201,13 +216,14 @@ int main(int argc, char *argv[])
             }
             memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*log_bits], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
             log_bits++;
+            f_est_log[f_est_samples++] = coh->f_est;
         }
 
 	assert(log_r <= NSYMROWPILOT*FRAMES);
 	assert(noise_r <= NSYMROWPILOT*M*FRAMES);
 	assert(log_data_r <= NSYMROW*FRAMES);
 
-        printf("\r[%d]", f+1);
+        printf("\r  [%d]", f+1);
     }
     printf("\n");
 
@@ -232,6 +248,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*log_bits);
+    octave_save_float(fout, "f_est_log_c", &f_est_log[1], 1, f_est_samples-1, f_est_samples-1);  
     fclose(fout);
 
     cohpsk_destroy(coh);
