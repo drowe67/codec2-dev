@@ -5,20 +5,7 @@
   DATE CREATED: March 2015
                                                                              
   Functions that implement a coherent PSK FDM modem.
-                 
-  TODO:
-
-  [ ] Code to plot EB/No v BER curves to char perf for
-      [ ] AWGN channel
-      [ ] freq offset
-      [ ] fading channel
-      [ ] freq drift
-      [ ] timing drift
-  [ ] tune perf/impl loss to get closer to ideal
-      [X] linear interp of phase for better fading perf
-  [ ] freq offset/drift feedback loop 
-  [ ] smaller freq est block size to min ram req
-                                                      
+                                                                       
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -564,6 +551,8 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
             mod_strip.real = 0.0; mod_strip.imag = 0.0;
             for(c=0; c<fdmdv->Nc+1; c++) {
+                //printf("rx_onesym[%d] %f %f prev_rx_symbols[%d] %f %f\n", c, rx_onesym[c].real, rx_onesym[c].imag,
+                //       fdmdv->prev_rx_symbols[c].real, fdmdv->prev_rx_symbols[c].imag);
                 adiff = cmult(rx_onesym[c], cconj(fdmdv->prev_rx_symbols[c]));
                 fdmdv->prev_rx_symbols[c] = rx_onesym[c];
 
@@ -573,14 +562,16 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
                 amod_strip = cmult(adiff, adiff);
                 amod_strip = cmult(amod_strip, amod_strip);
-                amod_strip.real = cabsolute(amod_strip);
+                amod_strip.real = fabsf(amod_strip.real);
                 mod_strip = cadd(mod_strip, amod_strip);
             }
-        
+            //printf("modstrip: %f %f\n", mod_strip.real, mod_strip.imag);
+
             /* loop filter made up of 1st order IIR plus integrator.  Integerator
                was found to be reqd  */
         
             fdmdv->filt = (1.0-beta)*fdmdv->filt + beta*atan2(mod_strip.imag, mod_strip.real);
+            //printf("filt: %f angle: %f\n", fdmdv->filt, atan2(mod_strip.imag, mod_strip.real));
             *f_est += g*fdmdv->filt;
         }    
 
@@ -663,7 +654,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
         max_ratio = 0.0;
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
         
-            printf("  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
+            fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
 
             /* we are out of sync so reset f_est and process two frames to clean out memories */
 
@@ -728,7 +719,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
     /* If in sync just do sample rate processing on latest frame */
 
     if (sync == 1) {
-        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 0);
+        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 1);
         frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
  
         for(r=0; r<2; r++)
