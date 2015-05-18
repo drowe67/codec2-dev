@@ -34,8 +34,6 @@
                                                         one copy */
 #define NSW              3                           /* number of sync window frames */
 
-#define LOG_FRAMES       2                           /* todo: re-arrange logging and tcohpsk.c so this can be moved */
-
 #include "fdmdv_internal.h"
 #include "kiss_fft.h"
 

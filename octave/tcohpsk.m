@@ -29,10 +29,10 @@ randn('state',1);
 test = 'compare to c';
 
 if strcmp(test, 'compare to c')
-  frames = 2;
+  frames = 35;
   foff =  0;
   dfoff = 0;
-  EsNodB = 0;
+  EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
@@ -323,15 +323,14 @@ for f=1:frames
   % If in sync just do sample rate processing on latest frame
 
   if sync == 1
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 1);
-    rx_baseband_log = [rx_baseband_log rx_baseband];
-    rx_filt_log = [rx_filt_log rx_filt];
-    ch_symb_log = [ch_symb_log; ch_symb];
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 0);
     [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
 
     acohpsk.ct_symb_ff_buf(1:2,:) = acohpsk.ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
     acohpsk.ct_symb_ff_buf(3:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+3:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
 
+    rx_baseband_log = [rx_baseband_log rx_baseband];
+    rx_filt_log = [rx_filt_log rx_filt];
     ch_symb_log = [ch_symb_log; ch_symb];
     rx_timing_log = [rx_timing_log rx_timing];
     fest_log = [fest_log acohpsk.f_est];
@@ -347,6 +346,7 @@ for f=1:frames
     rx_bits_log = [rx_bits_log rx_bits];
     tx_bits_prev_log = [tx_bits_prev_log prev_tx_bits2];
     ratio_log = [ratio_log acohpsk.ratio];
+    ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
 
     % BER stats
 
@@ -366,7 +366,7 @@ for f=1:frames
   %rx_filt_log = [rx_filt_log rx_filt];
   %rx_timing_log = [rx_timing_log rx_timing];
   %ch_symb_log = [ch_symb_log; ch_symb];
-  % TODO ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
+  % ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
 
 
   if sync == 0
@@ -384,9 +384,17 @@ for f=1:frames
 end
 
 ber = Nerrs/Tbits;
-printf("\nEsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
+printf("\nOctave EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 
 if compare_with_c
+
+  % Determine bit error rate
+
+  sz = length(tx_bits_log_c);
+  Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c(framesize+1:length(rx_bits_log_c))));
+  Tbits_c = length(tx_bits_prev_log);
+  ber_c = Nerrs_c/Tbits_c;
+  printf("C EsNodB.....: %4.1f ber_c: %4.3f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
 
   % Output vectors from C port ---------------------------------------------------
 
@@ -404,7 +412,7 @@ if compare_with_c
   stem_sig_and_error(5, 211, real(rx_baseband_log_c(1,:)), real(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband re', [1 length(rx_baseband_log) -10 10])
   stem_sig_and_error(5, 212, imag(rx_baseband_log_c(1,:)), imag(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband im', [1 length(rx_baseband_log) -10 10])
 
-  [n m] = size(ch_symb_log); n = 40;
+  [n m] = size(ch_symb_log);
   stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
   stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
   %stem_sig_and_error(7, 211, real(ct_symb_ff_log_c), real(ct_symb_ff_log - ct_symb_ff_log_c), 'ct symb ff re', [1 n -1.5 1.5])
@@ -428,13 +436,6 @@ if compare_with_c
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
 
-  % Determine bit error rate
-
-  sz = length(tx_bits_log_c);
-  Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c));
-  Tbits_c = length(tx_bits_prev_log);
-  ber_c = Nerrs_c/Tbits_c;
-  printf("EsNodB: %4.1f ber_c: %4.3f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
 
 else
 

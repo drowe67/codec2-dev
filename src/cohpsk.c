@@ -526,7 +526,7 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 }
 
 
-void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK_NC*ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
+void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
 {
     struct FDMDV *fdmdv = coh->fdmdv;
     int   r, c, i;
@@ -696,7 +696,17 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
             for (i=0; i<NSW-1; i++) {
                 update_ct_symb_buf(coh->ct_symb_buf, &ch_symb[i*NSYMROWPILOT]);
             }
-            frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
+            /*
+              for(i=0; i<NSW*NSYMROWPILOT; i++) {
+                printf("%f %f\n", ch_symb[i][0].real, ch_symb[i][0].imag);
+            }
+            */
+            /*
+            for(i=0; i<NCT_SYMB_BUF; i++) {
+                printf("%f %f\n", coh->ct_symb_buf[i][0].real, coh->ct_symb_buf[i][0].imag);
+            }
+            */
+             frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
 
             if (fabs(coh->f_fine_est) > 2.0) {
                 fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
@@ -718,8 +728,8 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
     /* If in sync just do sample rate processing on latest frame */
 
     if (sync == 1) {
-        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 1);
-        frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
+        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 0);
+        frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
  
         for(r=0; r<2; r++)
             for(c=0; c<COHPSK_NC*ND; c++)
