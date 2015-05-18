@@ -49,8 +49,8 @@
 #define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
 
 #define RS          50
-#define FOFF        10.5
-#define ESNODB      8.0
+#define FOFF        0
+#define ESNODB      0
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -101,11 +101,19 @@ int main(int argc, char *argv[])
     fdmdv = coh->fdmdv;
     assert(coh != NULL);
 
-    coh->rx_filt_log = (COMP *)malloc(sizeof(COMP)*COHPSK_NC*ND*(P+1)*NSYMROWPILOT*FRAMESL);
-    coh->rx_baseband_log_col_sz = M*NSYMROWPILOT*FRAMESL;
-    coh->rx_baseband_log = (COMP *)malloc(sizeof(COMP)*COHPSK_NC*ND*(M+M/P)*NSYMROWPILOT*FRAMESL);
-    coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*FRAMESL*COHPSK_NC*ND);
+    /* these puppies are used for logging data in the bowels on the modem */
+
+    coh->rx_baseband_log_col_sz = (M+M/P)*NSYMROWPILOT*FRAMESL;
+    coh->rx_baseband_log = (COMP *)malloc(sizeof(COMP)*COHPSK_NC*ND*coh->rx_baseband_log_col_sz);
+
+    coh->rx_filt_log_col_sz = (P+1)*NSYMROWPILOT*FRAMESL;
+    coh->rx_filt_log = (COMP *)malloc(sizeof(COMP)*COHPSK_NC*ND*coh->rx_filt_log_col_sz);
+
+    coh->ch_symb_log_col_sz = COHPSK_NC*ND;
+    coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*FRAMESL*coh->ch_symb_log_col_sz);
     
+    /* init stuff */
+
     log_r = log_data_r = noise_r = log_bits = 0;
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
@@ -208,8 +216,8 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "tx_fdm_frame_log_c", (COMP*)tx_fdm_frame_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
     octave_save_complex(fout, "ch_fdm_frame_log_c", (COMP*)ch_fdm_frame_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
     //octave_save_complex(fout, "rx_fdm_frame_bb_log_c", (COMP*)rx_fdm_frame_bb_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
-    octave_save_complex(fout, "rx_baseband_log_c", (COMP*)coh->rx_baseband_log, COHPSK_NC*ND, coh->rx_baseband_log_col_index, (M+M/P)*FRAMES*NSYMROWPILOT);  
-    octave_save_complex(fout, "rx_filt_log_c", (COMP*)coh->rx_filt_log, COHPSK_NC*ND, coh->rx_filt_log_col_index, (P+1)*FRAMES*NSYMROWPILOT);  
+    octave_save_complex(fout, "rx_baseband_log_c", (COMP*)coh->rx_baseband_log, COHPSK_NC*ND, coh->rx_baseband_log_col_index, coh->rx_baseband_log_col_sz);  
+    octave_save_complex(fout, "rx_filt_log_c", (COMP*)coh->rx_filt_log, COHPSK_NC*ND, coh->rx_filt_log_col_index, coh->rx_filt_log_col_sz);  
     octave_save_complex(fout, "ch_symb_log_c", (COMP*)coh->ch_symb_log, coh->ch_symb_log_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_complex(fout, "ct_symb_ff_log_c", (COMP*)ct_symb_ff_log, NSYMROWPILOT*FRAMES, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  

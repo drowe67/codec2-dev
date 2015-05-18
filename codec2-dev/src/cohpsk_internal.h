@@ -67,10 +67,14 @@ struct COHPSK {
     COMP           *rx_baseband_log;
     int            rx_baseband_log_col_index;
     int            rx_baseband_log_col_sz;
+
     COMP           *rx_filt_log;
     int            rx_filt_log_col_index;
+    int            rx_filt_log_col_sz;
+
     COMP           *ch_symb_log;
     int            ch_symb_log_r;
+    int            ch_symb_log_col_sz;
 };
 
 

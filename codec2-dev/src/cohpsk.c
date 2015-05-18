@@ -589,7 +589,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK
         if (coh->rx_baseband_log) {
             for(c=0; c<COHPSK_NC*ND; c++) {       
                 for(i=0; i<nin; i++) {
-                    coh->rx_baseband_log[c*(M+M/P)*LOG_FRAMES*NSYMROWPILOT + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+                    coh->rx_baseband_log[c*coh->rx_baseband_log_col_sz + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
                 }
             }
             coh->rx_baseband_log_col_index += nin;
@@ -599,20 +599,20 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[NSYMROWPILOT][COHPSK
         if (coh->rx_filt_log) {
  	  for(c=0; c<COHPSK_NC*ND; c++) {       
             for(i=0; i<P; i++) {
-              coh->rx_filt_log[c*(P+1)*LOG_FRAMES*NSYMROWPILOT + coh->rx_filt_log_col_index + i] = rx_filt[c][i]; 
+              coh->rx_filt_log[c*coh->rx_filt_log_col_sz + coh->rx_filt_log_col_index + i] = rx_filt[c][i]; 
             }
 	  }
 	  coh->rx_filt_log_col_index += P;        
         }
-    }
 
-    if (coh->ch_symb_log) {
-	for(r=0; r<NSYMROWPILOT; r++, coh->ch_symb_log_r++) {
+        if (coh->ch_symb_log) {
             for(c=0; c<COHPSK_NC*ND; c++) {
 		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND + c] = ch_symb[r][c]; 
             }
+            coh->ch_symb_log_r++;
         }
     }
+
 }
 
 

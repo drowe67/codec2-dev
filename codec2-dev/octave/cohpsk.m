@@ -592,7 +592,10 @@ endfunction
 function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, f_est, nsymb, nin, freq_track)
     M = afdmdv.M;
 
-    % figure(10); clf; hold on;
+    rx_baseband = [];
+    rx_filt = [];
+    rx_timing = [];
+
     for r=1:nsymb
       % shift signal to nominal baseband, this will put Nc/2 carriers either side of 0 Hz
 
@@ -600,9 +603,13 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
 
       % downconvert each FDM carrier to Nc separate baseband signals
 
-      [rx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb, nin);
-      [rx_filt afdmdv] = rx_filter(afdmdv, rx_baseband, nin);
-      [rx_onesym rx_timing env afdmdv] = rx_est_timing(afdmdv, rx_filt, nin);     
+      [arx_baseband afdmdv] = fdm_downconvert(afdmdv, rx_fdm_frame_bb, nin);
+      [arx_filt afdmdv] = rx_filter(afdmdv, arx_baseband, nin);
+      [rx_onesym arx_timing env afdmdv] = rx_est_timing(afdmdv, arx_filt, nin);     
+
+      rx_baseband = [rx_baseband arx_baseband];
+      rx_filt     = [rx_filt arx_filt];
+      rx_timng    = [rx_timing arx_timing];
 
       ch_symb(r,:) = rx_onesym;
 
