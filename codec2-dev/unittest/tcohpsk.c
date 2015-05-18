@@ -44,13 +44,13 @@
 #include "comp_prim.h"
 #include "noise_samples.h"
 
-#define FRAMES      LOG_FRAMES            /* LOG_FRAMES is #defined in cohpsk_internal.h                        */
+#define FRAMES      35                    /* LOG_FRAMES is #defined in cohpsk_internal.h                        */
 #define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 #define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
 
 #define RS          50
 #define FOFF        0
-#define ESNODB      0
+#define ESNODB      8
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
     int            rx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
                                           
     FILE          *fout;
-    int            f, r, c, log_r, log_data_r, noise_r;
+    int            f, r, c, log_r, log_data_r, noise_r, ff_log_r;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
     COMP           phase_ch;
 
@@ -114,7 +114,7 @@ int main(int argc, char *argv[])
     
     /* init stuff */
 
-    log_r = log_data_r = noise_r = log_bits = 0;
+    log_r = log_data_r = noise_r = log_bits = ff_log_r = 0;
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
     memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
@@ -181,13 +181,18 @@ int main(int argc, char *argv[])
 	for(r=0; r<NSYMROWPILOT; r++, log_r++) {
             for(c=0; c<COHPSK_NC*ND; c++) {
 		tx_symb_log[log_r][c] = tx_symb[r][c]; 
-		ct_symb_ff_log[log_r][c] = coh->ct_symb_ff_buf[r][c]; 
             }
         }
 
         if (coh->sync == 1) {
 
-           for(r=0; r<NSYMROW; r++, log_data_r++) {
+            for(r=0; r<NSYMROWPILOT; r++, ff_log_r++) {
+                for(c=0; c<COHPSK_NC*ND; c++) {
+                    ct_symb_ff_log[ff_log_r][c] = coh->ct_symb_ff_buf[r][c]; 
+                }
+            }
+
+            for(r=0; r<NSYMROW; r++, log_data_r++) {
                 for(c=0; c<COHPSK_NC*ND; c++) {
                     rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
                     rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
@@ -201,7 +206,10 @@ int main(int argc, char *argv[])
 	assert(log_r <= NSYMROWPILOT*FRAMES);
 	assert(noise_r <= NSYMROWPILOT*M*FRAMES);
 	assert(log_data_r <= NSYMROW*FRAMES);
+
+        printf("\r[%d]", f+1);
     }
+    printf("\n");
 
     /*---------------------------------------------------------*\
                Dump logs to Octave file for evaluation 
