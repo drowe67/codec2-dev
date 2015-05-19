@@ -22,6 +22,8 @@
 %      [X] linear interp of phase for better fading perf
 %  [X] freq offset/drift feedback loop 
 %  [ ] PAPR measurement and reduction
+%  [ ] check it doesn't sync on noise
+%  [ ] check "unsync"
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -35,11 +37,10 @@ randn('state',1);
 
 % test parameters ----------------------------------------------------------
 
-% TODO 
-% [ ] set up various tests we use to characterise modem for easy 
-%     repeating when we change modem
 
-test = 'compare to c';
+%test = 'compare to c';
+%test = 'awgn';
+test = 'fading';
 
 if strcmp(test, 'compare to c')
   frames = 35;
@@ -68,7 +69,7 @@ end
 if strcmp(test, 'fading');
   frames = 100;
   foff = -40;
-  dfoff = -0.5/Fs;
+  dfoff = 0.5/Fs;
   EsNodB = 12;
   fading_en = 1;
   hf_delay_ms = 2;
@@ -99,7 +100,7 @@ afdmdv.Nfilter =  Nfilter;
 afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
 afdmdv.Fsep = 75;
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd) );
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd) )
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -211,6 +212,11 @@ for f=1:frames
     [tx_fdm afdmdv] = fdm_upconvert(afdmdv, tx_baseband);
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
+
+  %clip = 50;
+  %ind = find(abs(tx_fdm_frame) > clip);
+  %tx_fdm_frame(ind) = clip*exp(j*angle(tx_fdm_frame(ind)));
+
   tx_fdm_frame_log = [tx_fdm_frame_log tx_fdm_frame];
 
   %
@@ -323,11 +329,14 @@ for f=1:frames
         next_sync = 0;
       end
 
+      if acohpsk.ratio < 0.9
+        next_sync = 0
+      end
       if next_sync == 1
         % OK we are in sync!
         % demodulate first frame (demod completed below)
 
-        printf("  [%d] in sync!\n", f);
+        printf("  [%d] in sync! f_est: %f ratio: %f \n", f, f_est, acohpsk.ratio);
         acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot+2,:) = acohpsk.ct_symb_buf(acohpsk.ct+1:acohpsk.ct+acohpsk.Nsymbrowpilot+2,:);
       end
     end  
@@ -344,7 +353,7 @@ for f=1:frames
 
     rx_baseband_log = [rx_baseband_log rx_baseband];
     rx_filt_log = [rx_filt_log rx_filt];
-    ch_symb_log = [ch_symb_log; ch_symb];
+    ch_symb_log = [ch_symb_log; ch_symb];     
     rx_timing_log = [rx_timing_log rx_timing];
     f_est_log = [f_est_log acohpsk.f_est];
     %printf("%f\n", acohpsk.f_est);
@@ -455,30 +464,42 @@ if compare_with_c
 
 
 else
+  
+  papr = max(tx_fdm_frame_log.*conj(tx_fdm_frame_log)) / mean(tx_fdm_frame_log.*conj(tx_fdm_frame_log));
+  papr_dB = 10*log10(papr);
+  printf("PAPR: %4.2f dB\n", papr_dB);
 
   % some other useful plots
 
   figure(1)
+  clf
+  subplot(211)
+  plot(real(tx_fdm_frame_log))
+  subplot(212)
+  plot(imag(tx_fdm_frame_log))
+  title('tx fdm');
+
+  figure(2)
   clf;
   plot(rx_symb_log*exp(j*pi/4),'+')
   title('Scatter');
 
-  figure(2)
+  figure(3)
   clf;
   plot(rx_timing_log)
   title('rx timing');
 
-  figure(3)
+  figure(4)
   clf;
   stem(nerr_log)
   title('Bit Errors');
 
-  figure(4)
+  figure(5)
   clf;
   stem(ratio_log)
   title('Sync ratio');
 
-  figure(5);
+  figure(6);
   clf;
   subplot(211)
   plot(foff_log,';freq offset;');
@@ -487,11 +508,13 @@ else
   hold off;
   title('freq offset');
   legend("boxoff");  
-
   subplot(212)
-  plot(foff_log(1:length(f_est_log)) - fest_log + Fcentre)
+  plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
 
+  figure(7)
+  clf
+  plot(tx_fdm_frame_log)
 end
 
 

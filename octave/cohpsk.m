@@ -217,7 +217,7 @@ function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     end
     tx_symb = tmp;
 
-    % ensures energy/symbol is normalised with diveristy
+    % ensures energy/symbol is normalised with diversity
 
     tx_symb = tx_symb/sqrt(Nd);
 end
@@ -609,7 +609,7 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
 
       rx_baseband = [rx_baseband arx_baseband];
       rx_filt     = [rx_filt arx_filt];
-      rx_timng    = [rx_timing arx_timing];
+      rx_timing    = [rx_timing arx_timing];
 
       ch_symb(r,:) = rx_onesym;
 
@@ -691,15 +691,17 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
 
     max_corr = 0;
     for f_fine=-20:0.25:20
-      f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)';
+      f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)'; % note: this could be pre-computed at init or compile time
       for t=0:cohpsk.Nsymbrowpilot-1
         corr = 0; mag = 0;
         for c=1:Nc*Nd
-          f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c);
+          f_corr_vec = f_fine_rect .* ct_symb_buf(t+sampling_points,c); % note: this could be pre-computed at init or compile time
+          acorr = 0.0;
           for p=1:length(sampling_points)
-            corr += pilot2(p,c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
-            mag  += abs(f_corr_vec(p));
+            acorr += pilot2(p,c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
+            mag   += abs(f_corr_vec(p));
           end
+          corr += abs(acorr);
         end
         %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
         if corr >= max_corr
@@ -712,9 +714,9 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
       end
     end
 
-    printf("  [%d] fine freq f: %f max_corr: %f max_mag: %f ct: %d\n", cohpsk.frame, cohpsk.f_fine_est, abs(max_corr), max_mag, cohpsk.ct);
+    printf("  [%d]   fine freq f: %f max_ratio: %f ct: %d\n", cohpsk.frame, cohpsk.f_fine_est, abs(max_corr)/max_mag, cohpsk.ct);
     if abs(max_corr/max_mag) > 0.7
-      printf("  [%d] encouraging sync word!\n", cohpsk.frame);
+      printf("  [%d]   encouraging sync word! ratio: %f\n", cohpsk.frame, abs(max_corr/max_mag));
       cohpsk.sync_timer = 0;
       next_sync = 1;
     else
@@ -731,10 +733,12 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     f_fine_rect = exp(-j*cohpsk.f_fine_est*2*pi*sampling_points/Rs)';
     for c=1:Nc*Nd
       f_corr_vec = f_fine_rect .* ct_symb_buf(cohpsk.ct+sampling_points,c);
+      acorr = 0;
       for p=1:length(sampling_points)
-        corr += pilot2(p, c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
+        acorr += pilot2(p, c-Nc*floor((c-1)/Nc)) * f_corr_vec(p);
         mag  += abs(f_corr_vec(p));
       end
+      corr += abs(acorr);
     end
     cohpsk.ratio = abs(corr)/mag;
     %printf("f_fine_est: %f ratio: %f\n", cohpsk.f_fine_est, cohpsk.ratio);
