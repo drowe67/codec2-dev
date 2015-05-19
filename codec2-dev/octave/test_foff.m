@@ -42,7 +42,7 @@ function sim_out = freq_off_est_test(sim_in)
   afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
   afdmdv.Fsep = 75;
   afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-  freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd) );
+  freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^1.1 );
   afdmdv.freq_pol = 2*pi*freq_hz/Fs;
   afdmdv.freq = exp(j*afdmdv.freq_pol);
   afdmdv.Fcentre = 1500;
@@ -50,8 +50,8 @@ function sim_out = freq_off_est_test(sim_in)
   afdmdv.fbb_rect = exp(j*2*pi*Fcentre/Fs);
   afdmdv.fbb_phase_tx = 1;
   afdmdv.fbb_phase_rx = 1;
-  afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
-
+  %afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
+  afdmdv.phase_rx = 1 - 2*(mod(1:Nc*Nd,2));
   nin = M;
 
   P = afdmdv.P = 4;
@@ -103,6 +103,7 @@ function sim_out = freq_off_est_test(sim_in)
   ch_fdm_frame_log = [];
   ch_symb_log = [];
   tx_fdm_frame_log = [];
+  ratio_log = [];
 
   for f=1:frames
 
@@ -181,10 +182,10 @@ function sim_out = freq_off_est_test(sim_in)
 
       max_ratio = 0;
       for acohpsk.f_est = Fcentre-40:40:Fcentre+40
+      %for acohpsk.f_est = Fcentre
         
         printf("  [%d] acohpsk.f_est: %f +/- 20\n", f, acohpsk.f_est);
         [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est ] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
-        ch_symb_log = [ch_symb_log; ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:)];
 
         % coarse timing (frame sync) and initial fine freq est ---------------------------------------------
   
@@ -194,7 +195,7 @@ function sim_out = freq_off_est_test(sim_in)
         [anext_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb((Nsw-1)*acohpsk.Nsymbrowpilot+1:Nsw*acohpsk.Nsymbrowpilot,:), sync, next_sync);
 
         if anext_sync == 1
-          %printf("  [%d] acohpsk.ratio: %f\n", f, acohpsk.ratio);
+          printf("  [%d] acohpsk.ratio: %f\n", f, acohpsk.ratio);
           if acohpsk.ratio > max_ratio
             max_ratio   = acohpsk.ratio;
             f_est       = acohpsk.f_est - acohpsk.f_fine_est;
@@ -213,6 +214,7 @@ function sim_out = freq_off_est_test(sim_in)
        acohpsk.f_est = f_est;
        printf("  [%d] trying sync and f_est: %f\n", f, acohpsk.f_est);
        [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
+       ch_symb_log = ch_symb;
        for i=1:Nsw-1
          acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
        end
@@ -228,6 +230,7 @@ function sim_out = freq_off_est_test(sim_in)
          printf("  [%d] in sync!\n", f);
          freq_offset_log = [freq_offset_log Fcentre+foff-acohpsk.f_est];
          sync_time_log = [sync_time_log f-sync_start];
+         ratio_log = [ratio_log max_ratio];
          next_sync = 0; sync_start = f;
        end
     end
@@ -244,13 +247,14 @@ function sim_out = freq_off_est_test(sim_in)
   sim_out.ch_fdm_frame_log = ch_fdm_frame_log;
   sim_out.ch_symb_log = ch_symb_log;
   sim_out.tx_fdm_frame_log = tx_fdm_frame_log;
+  sim_out.ratio_log = ratio_log;
 endfunction
 
 
 function freq_off_est_test_single
-  sim_in.frames    = 100;
+  sim_in.frames    = 35;
   sim_in.EsNodB    = 12;
-  sim_in.foff      = -59;
+  sim_in.foff      = -55.5;
   sim_in.dfoff     = 0;
   sim_in.fading_en = 1;
 
@@ -259,14 +263,26 @@ function freq_off_est_test_single
   figure(1)
   subplot(211)
   plot(sim_out.freq_offset_log)
+  ylabel('f est error')
+  xlabel('time')
+
   subplot(212)
-  hist(sim_out.freq_offset_log)
+  if length(sim_out.freq_offset_log) > 0
+    hist(sim_out.freq_offset_log)
+    xlabel('f est error')
+    ylabel('histogram');
+  end
 
   figure(2)
   subplot(211)
   plot(sim_out.sync_time_log)
+  ylabel('time to sync (frames)')
   subplot(212)
-  hist(sim_out.sync_time_log)
+  if length(sim_out.sync_time_log) > 0
+    hist(sim_out.sync_time_log)
+    xlabel('time to sync (frames)')
+    ylabel('histogram')
+  end
 
   figure(3)
   subplot(211)
@@ -275,6 +291,16 @@ function freq_off_est_test_single
   subplot(212)
   plot(real(sim_out.ch_symb_log),'+')
   grid;
+
+  figure(4)
+  clf;
+  plot(sim_out.ch_symb_log,'+')
+
+  figure(5)
+  clf;
+  plot(sim_out.ratio_log)
+  xlabel('time')
+  ylabel('ratio for sync')
 endfunction
 
 
