@@ -755,7 +755,7 @@ function [sync cohpsk] = sync_state_machine(cohpsk, sync, next_sync)
 
     % check that sync is still good, fall out of sync on consecutive bad frames */
 
-    if cohpsk.ratio < 0.5
+    if cohpsk.ratio < 0.8
       cohpsk.sync_timer++;
     else
       cohpsk.sync_timer = 0;            

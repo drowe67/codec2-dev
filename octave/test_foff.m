@@ -394,8 +394,8 @@ function [freq_off_log EsNodBSet] = freq_off_est_test_curves
 endfunction
 
 
-freq_off_est_test_single;
-%freq_off_est_test_curves;
+%freq_off_est_test_single;
+freq_off_est_test_curves;
 
 % 1. start with +/- 20Hz offset
 % 2. Measure frames to sync.  How to define sync?  Foff to withn 1 Hz. Sync state
