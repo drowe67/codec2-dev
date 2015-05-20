@@ -21,13 +21,17 @@
 %  [X] tune perf/impl loss to get closer to ideal
 %      [X] linear interp of phase for better fading perf
 %  [X] freq offset/drift feedback loop 
-%  [ ] PAPR measurement and reduction
-%  [ ] false sync
-%      [ ] noise
-%      [ ] similar but invalid signal like huge f off
-%  [ ] check "unsync"
+%  [X] PAPR measurement and reduction
+%  [X] false sync
+%      [X] doesn't sync up on noise (used EsNo = -12)
+%      [X] similar but invalid signal like huge f off
+%  [X] ability to "unsync" when signal dissapears
 %  [ ] some calibrated tests against FreeDV 1600
 %      + compare sound quality at various Es/Nos
+%  [ ] way to handle eom w/o nasties
+%      + like mute ouput when signal has gone or v low snr
+%      + instantaneous snr
+%  [ ] nasty rig filter passband
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -479,9 +483,10 @@ else
   clf
   subplot(211)
   plot(real(tx_fdm_frame_log))
+  title('tx fdm real');
   subplot(212)
   plot(imag(tx_fdm_frame_log))
-  title('tx fdm');
+  title('tx fdm imag');
 
   figure(2)
   clf;
@@ -518,7 +523,13 @@ else
 
   figure(7)
   clf
-  plot(tx_fdm_frame_log)
+  spec = 20*log10(abs(fft(tx_fdm_frame_log)));
+  l = length(spec);
+  plot((Fs/l)*(1:l), spec)
+  axis([1 Fs/2 0 max(spec)]);
+  title('tx spectrum');
+  ylabel('Amplitude (dB)')
+  xlabel('Frequency (Hz)')
 
 end
 
