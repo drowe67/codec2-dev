@@ -22,8 +22,12 @@
 %      [X] linear interp of phase for better fading perf
 %  [X] freq offset/drift feedback loop 
 %  [ ] PAPR measurement and reduction
-%  [ ] check it doesn't sync on noise
+%  [ ] false sync
+%      [ ] noise
+%      [ ] similar but invalid signal like huge f off
 %  [ ] check "unsync"
+%  [ ] some calibrated tests against FreeDV 1600
+%      + compare sound quality at various Es/Nos
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -68,7 +72,7 @@ end
 
 if strcmp(test, 'fading');
   frames = 100;
-  foff = -40;
+  foff = -52.3;
   dfoff = 0.5/Fs;
   EsNodB = 12;
   fading_en = 1;
@@ -100,7 +104,7 @@ afdmdv.Nfilter =  Nfilter;
 afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
 afdmdv.Fsep = 75;
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd) )
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -213,9 +217,9 @@ for f=1:frames
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
 
-  %clip = 50;
-  %ind = find(abs(tx_fdm_frame) > clip);
-  %tx_fdm_frame(ind) = clip*exp(j*angle(tx_fdm_frame(ind)));
+  clip = 5;
+  ind = find(abs(tx_fdm_frame) > clip);
+  tx_fdm_frame(ind) = clip*exp(j*angle(tx_fdm_frame(ind)));
 
   tx_fdm_frame_log = [tx_fdm_frame_log tx_fdm_frame];
 
@@ -330,7 +334,7 @@ for f=1:frames
       end
 
       if acohpsk.ratio < 0.9
-        next_sync = 0
+        next_sync = 0;
       end
       if next_sync == 1
         % OK we are in sync!
@@ -467,7 +471,7 @@ else
   
   papr = max(tx_fdm_frame_log.*conj(tx_fdm_frame_log)) / mean(tx_fdm_frame_log.*conj(tx_fdm_frame_log));
   papr_dB = 10*log10(papr);
-  printf("PAPR: %4.2f dB\n", papr_dB);
+  printf("av tx pwr: %f PAPR: %4.2f dB av rx pwr: %f\n", var(tx_fdm_frame_log), papr_dB, var(ch_fdm_frame_log));
 
   % some other useful plots
 
@@ -515,6 +519,7 @@ else
   figure(7)
   clf
   plot(tx_fdm_frame_log)
+
 end
 
 

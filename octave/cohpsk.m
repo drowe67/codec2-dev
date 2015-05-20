@@ -715,7 +715,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
     end
 
     printf("  [%d]   fine freq f: %f max_ratio: %f ct: %d\n", cohpsk.frame, cohpsk.f_fine_est, abs(max_corr)/max_mag, cohpsk.ct);
-    if abs(max_corr/max_mag) > 0.7
+    if abs(max_corr/max_mag) > 0.9
       printf("  [%d]   encouraging sync word! ratio: %f\n", cohpsk.frame, abs(max_corr/max_mag));
       cohpsk.sync_timer = 0;
       next_sync = 1;
