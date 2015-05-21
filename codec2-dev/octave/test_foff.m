@@ -91,7 +91,7 @@ function sim_out = freq_off_est_test(sim_in)
   rand('state',1); 
   tx_bits_coh = round(rand(1,framesize*10));
   ptx_bits_coh = 1;
-  [spread spread_2ms hf_gain] = init_hf_model(Fs, Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
+  [spread spread_2ms hf_gain] = init_hf_model(Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
 
   hf_n = 1;
   nhfdelay = floor(hf_delay_ms*Fs/1000);

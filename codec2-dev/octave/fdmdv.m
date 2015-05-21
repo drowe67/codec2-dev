@@ -890,7 +890,8 @@ function [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pil
   end
 endfunction
 
-
+if 0
+% want to use Octave resample function!
 
 % Change the sample rate by a small amount, for example 1000ppm (ratio
 % = 1.001).  Always returns nout samples in buf_out, but uses a
@@ -928,7 +929,7 @@ function [buf_out t nin] = resample(buf_in, t, ratio, nout)
   t -= delta;
 
 endfunction
-
+end
 
 % freq offset state machine.  Moves between acquire and track states based
 % on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
