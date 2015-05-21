@@ -46,8 +46,8 @@ randn('state',1);
 % select which test  ----------------------------------------------------------
 
 %test = 'compare to c';
-test = 'awgn';
-%test = 'fading';
+%test = 'awgn';
+test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
@@ -69,10 +69,10 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 10;
+  frames = 100;
   foff =  0;
   dfoff = 0;
-  EsNodB = 80;
+  EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -82,7 +82,7 @@ end
 
 if strcmp(test, 'fading');
   frames = 100;
-  foff = -52.3;
+  foff = -53.1;
   dfoff = 0.5/Fs;
   EsNodB = 12;
   fading_en = 1;
@@ -95,19 +95,29 @@ EsNo = 10^(EsNodB/10);
 % modem constants ----------------------------------------------------------
 
 Rs = 75;               % symbol rate in Hz
-Nc = 4;                % number of carriers
+Nc = 7;                % number of carriers
 Nd = 2;                % diveristy factor
-framesize = 32;        % number of payoad data bits in the frame
+framesize = 56;        % number of payload data bits in the frame
 
 Nsw = 3;               % frames we demod for initial sync window
 afdmdv.Nsym = 6;       % size of tx/tx root nyquist filter in symbols
 afdmdv.Nt = 5;         % number of symbols we estimate timing over
+
+clip = 6.5;            % Clipping of tx signal to reduce PAPR. Adjust by 
+                       % experiment as Nc and Nd change.  Check out no noise 
+                       % scatter diagram and AWGN/fading BER perf
+                       % at operating points
 
 % FDMDV init ---------------------------------------------------------------
 
 Fs = afdmdv.Fs = 7500;
 afdmdv.Nc = Nd*Nc-1;
 afdmdv.Rs = Rs;
+if Fs/afdmdv.Rs != floor(Fs/afdmdv.Rs)
+  printf("\n  Oops, Fs/Rs must be an integer!\n\n");
+  return
+end
+
 M = afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
 afdmdv.Nfilter = afdmdv.Nsym*M;
 afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
@@ -135,6 +145,9 @@ afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
 afdmdv.Nfilter = afdmdv.Nsym*afdmdv.M;
 afdmdv.rx_fdm_mem = zeros(1,afdmdv.Nfilter + afdmdv.M);
 Q = afdmdv.Q = afdmdv.M/4;
+if Q != floor(Q)
+  printf("\n  Yeah .... if (Fs/Rs)/4 = M/4 isn't an integer we will just go and break things.\n\n");
+end
 
 afdmdv.rx_filter_mem_timing = zeros(afdmdv.Nc+1, afdmdv.Nt*afdmdv.P);
 afdmdv.Nfiltertiming = afdmdv.M + afdmdv.Nfilter + afdmdv.M;
@@ -196,7 +209,7 @@ tx_bits_coh = round(rand(1,framesize*10));
 ptx_bits_coh = 1;
 
 Nerrs = Tbits = 0;
-prev_tx_bits = [];
+prev_tx_bits = prev_tx_bits2 = [];
 
 phase_ch = 1;
 sync = initial_sync;
@@ -205,7 +218,7 @@ acohpsk.f_fine_est = 0;
 acohpsk.ct = 4;
 acohpsk.ftrack_en = ftrack_en;
 
-[spread spread_2ms hf_gain] = init_hf_model(Fs, Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
+[spread spread_2ms hf_gain] = init_hf_model(Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
 hf_n = 1;
 nhfdelay = floor(hf_delay_ms*Fs/1000);
 ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
@@ -234,7 +247,6 @@ for f=1:frames
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
 
-  clip = 5;
   ind = find(abs(tx_fdm_frame) > clip);
   tx_fdm_frame(ind) = clip*exp(j*angle(tx_fdm_frame(ind)));
 
@@ -488,7 +500,7 @@ else
   
   papr = max(tx_fdm_frame_log.*conj(tx_fdm_frame_log)) / mean(tx_fdm_frame_log.*conj(tx_fdm_frame_log));
   papr_dB = 10*log10(papr);
-  printf("av tx pwr: %f PAPR: %4.2f dB av rx pwr: %f\n", var(tx_fdm_frame_log), papr_dB, var(ch_fdm_frame_log));
+  printf("av tx pwr: %4.2f PAPR: %4.2f av rx pwr: %4.2f\n", var(tx_fdm_frame_log), papr_dB, var(ch_fdm_frame_log));
 
   % some other useful plots
 
@@ -502,26 +514,43 @@ else
   title('tx fdm imag');
 
   figure(2)
+  clf
+  spec = 20*log10(abs(fft(tx_fdm_frame_log)));
+  l = length(spec);
+  plot((Fs/l)*(1:l), spec)
+  axis([1 Fs/2 0 max(spec)]);
+  title('tx spectrum');
+  ylabel('Amplitude (dB)')
+  xlabel('Frequency (Hz)')
+  grid;
+
+  figure(3)
   clf;
   plot(rx_symb_log*exp(j*pi/4),'+')
   title('Scatter');
 
-  figure(3)
+  figure(4)
   clf;
+  subplot(211)
+  plot(rx_phi_log)
+  subplot(212)
+  plot(rx_amp_log)
+
+  figure(5)
+  clf;
+  subplot(211)
   plot(rx_timing_log)
   title('rx timing');
+  subplot(212)
+  stem(ratio_log)
+  title('Sync ratio');
 
-  figure(4)
+  figure(6)
   clf;
   stem(nerr_log)
   title('Bit Errors');
 
-  figure(5)
-  clf;
-  stem(ratio_log)
-  title('Sync ratio');
-
-  figure(6);
+  figure(7);
   clf;
   subplot(211)
   plot(foff_log,';freq offset;');
@@ -534,15 +563,6 @@ else
   plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
 
-  figure(7)
-  clf
-  spec = 20*log10(abs(fft(tx_fdm_frame_log)));
-  l = length(spec);
-  plot((Fs/l)*(1:l), spec)
-  axis([1 Fs/2 0 max(spec)]);
-  title('tx spectrum');
-  ylabel('Amplitude (dB)')
-  xlabel('Frequency (Hz)')
 
 end
 

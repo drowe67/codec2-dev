@@ -554,7 +554,7 @@ endfunction
 more off;
 %close all;
 %test_curves();
-%test_single();
+test_single();
 %rate_Fs_tx("tx_zero.raw");
 %rate_Fs_tx("tx.raw");
 %rate_Fs_rx("tx_-4dB.wav")
