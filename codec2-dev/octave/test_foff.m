@@ -20,7 +20,7 @@ function sim_out = freq_off_est_test(sim_in)
   global Nfilter;
   global M;
 
-  Rs = 50;
+  Rs = 100;
   Nc = 4;
   Nd = 2;
   framesize = 32;
@@ -36,11 +36,12 @@ function sim_out = freq_off_est_test(sim_in)
   afdmdv.Fs = 8000;
   afdmdv.Nc = Nd*Nc-1;
   afdmdv.Rs = Rs;
-  afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
-  afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, Nfilter);
-  afdmdv.Nfilter =  Nfilter;
-  afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
-  afdmdv.Fsep = 75;
+  M = afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
+  afdmdv.Nfilter = afdmdv.Nsym*M;
+  afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
+  excess_bw = 0.5;
+  afdmdv.gt_alpha5_root = gen_rn_coeffs(excess_bw, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
+  afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
   afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
   freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^1.1 );
   afdmdv.freq_pol = 2*pi*freq_hz/Fs;
@@ -252,11 +253,11 @@ endfunction
 
 
 function freq_off_est_test_single
-  sim_in.frames    = 35;
-  sim_in.EsNodB    = 12;
-  sim_in.foff      = -55.5;
+  sim_in.frames    = 5;
+  sim_in.EsNodB    = 120;
+  sim_in.foff      = 0;
   sim_in.dfoff     = 0;
-  sim_in.fading_en = 1;
+  sim_in.fading_en = 0;
 
   sim_out = freq_off_est_test(sim_in);
 
@@ -394,11 +395,8 @@ function [freq_off_log EsNodBSet] = freq_off_est_test_curves
 endfunction
 
 
-%freq_off_est_test_single;
-freq_off_est_test_curves;
+% select on of these to run:
 
-% 1. start with +/- 20Hz offset
-% 2. Measure frames to sync.  How to define sync?  Foff to withn 1 Hz. Sync state
-%    Need to see if we get false sync
-% 3. Try shortened filter
-% 4. Extend to parallel demods at +/- 
+freq_off_est_test_single;
+%freq_off_est_test_curves;
+

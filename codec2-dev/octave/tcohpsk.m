@@ -43,12 +43,18 @@ autotest;
 rand('state',1); 
 randn('state',1);
 
-% test parameters ----------------------------------------------------------
-
+% select which test  ----------------------------------------------------------
 
 %test = 'compare to c';
-%test = 'awgn';
-test = 'fading';
+test = 'awgn';
+%test = 'fading';
+
+% some parameters that can be over ridden, e.g. to disable parts of modem
+
+initial_sync = 0;  % setting this to 1 put us straight into sync w/o freq offset est
+ftrack_en    = 1;  % set to 0 to disable freq tracking
+
+% predefined tests ....
 
 if strcmp(test, 'compare to c')
   frames = 35;
@@ -63,10 +69,10 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 100;
+  frames = 10;
   foff =  0;
   dfoff = 0;
-  EsNodB = 8;
+  EsNodB = 80;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -88,27 +94,30 @@ EsNo = 10^(EsNodB/10);
 
 % modem constants ----------------------------------------------------------
 
-Rs = 50;
-Nc = 4;
-Nd = 2;
-framesize = 32;
+Rs = 75;               % symbol rate in Hz
+Nc = 4;                % number of carriers
+Nd = 2;                % diveristy factor
+framesize = 32;        % number of payoad data bits in the frame
 
-Nsw = 3;
-afdmdv.Nsym = 6;
-afdmdv.Nt = 5;
+Nsw = 3;               % frames we demod for initial sync window
+afdmdv.Nsym = 6;       % size of tx/tx root nyquist filter in symbols
+afdmdv.Nt = 5;         % number of symbols we estimate timing over
 
 % FDMDV init ---------------------------------------------------------------
 
-afdmdv.Fs = 8000;
+Fs = afdmdv.Fs = 7500;
 afdmdv.Nc = Nd*Nc-1;
 afdmdv.Rs = Rs;
-afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
-afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, Nfilter);
-afdmdv.Nfilter =  Nfilter;
-afdmdv.gt_alpha5_root = gen_rn_coeffs(0.5, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
-afdmdv.Fsep = 75;
+M = afdmdv.M  = afdmdv.Fs/afdmdv.Rs;
+afdmdv.Nfilter = afdmdv.Nsym*M;
+afdmdv.tx_filter_memory = zeros(afdmdv.Nc+1, afdmdv.Nfilter);
+excess_bw = 0.5;
+afdmdv.gt_alpha5_root = gen_rn_coeffs(excess_bw, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M);
+
+Fcentre = afdmdv.Fcentre = 1500;
+afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 );
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -119,7 +128,7 @@ afdmdv.fbb_phase_rx = 1;
 
 afdmdv.Nrxdec = 31;
 afdmdv.rxdec_coeff = fir1(afdmdv.Nrxdec-1, 0.25)';
-afdmdv.rxdec_lpf_mem = zeros(1,afdmdv.Nrxdec-1+M);
+afdmdv.rxdec_lpf_mem = zeros(1,afdmdv.Nrxdec-1+afdmdv.M);
 
 P = afdmdv.P = 4;
 afdmdv.phase_rx = ones(afdmdv.Nc+1,1);
@@ -152,7 +161,7 @@ acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
 
-ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*M);
+ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*afdmdv.M);
 
 % -----------------------------------------------------------
 
@@ -190,7 +199,11 @@ Nerrs = Tbits = 0;
 prev_tx_bits = [];
 
 phase_ch = 1;
-sync = 0;
+sync = initial_sync;
+acohpsk.f_est = Fcentre;
+acohpsk.f_fine_est = 0;
+acohpsk.ct = 4;
+acohpsk.ftrack_en = ftrack_en;
 
 [spread spread_2ms hf_gain] = init_hf_model(Fs, Fs, frames*acohpsk.Nsymbrowpilot*afdmdv.M);
 hf_n = 1;
@@ -353,7 +366,7 @@ for f=1:frames
   % If in sync just do sample rate processing on latest frame
 
   if sync == 1
-    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, 1);
+    [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, acohpsk.f_est, acohpsk.Nsymbrowpilot, nin, acohpsk.ftrack_en);
     [next_sync acohpsk] = frame_sync_fine_freq_est(acohpsk, ch_symb, sync, next_sync);
 
     acohpsk.ct_symb_ff_buf(1:2,:) = acohpsk.ct_symb_ff_buf(acohpsk.Nsymbrowpilot+1:acohpsk.Nsymbrowpilot+2,:);
