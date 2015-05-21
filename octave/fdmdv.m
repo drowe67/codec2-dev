@@ -15,6 +15,7 @@ randn('state',1);
 
 % Constants
 
+if 0
 global Fs = 8000;      % sample rate in Hz
 global T  = 1/Fs;      % sample period in seconds
 global Rs;
@@ -58,6 +59,7 @@ global Nrxdec;
        Nrxdec=31;
 global rxdec_coeff;
        rxdec_coeff = fir1(Nrxdec-1, 0.25);
+end
 if 0
   % tmp code to plot freq resp.  20dB attn of any aliases should be fine
   % not real sensitive to in-band attn, e.g. outer tones a dB down should be OK
@@ -1134,7 +1136,7 @@ function dump_bits(rx_bits)
 
 endfunction
 
-
+if 0
 % Initialise ----------------------------------------------------
 
 global pilot_bit;
@@ -1254,3 +1256,4 @@ global prev_phase_offsets;
 prev_phase_offsets = zeros(Nc+1, 1);
 global phase_amb;
 phase_amb = zeros(Nc+1, 1);
+end
