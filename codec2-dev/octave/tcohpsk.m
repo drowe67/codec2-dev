@@ -1,23 +1,26 @@
 % tcohpsk.m
 % David Rowe Oct 2014
 %
-% Octave script that:
+% Octave coherent PSK modem script that hs two modes:
 %
 % i) tests the C port of the coherent PSK modem.  This script loads
 %    the output of unittest/tcohpsk.c and compares it to the output of
-%    the reference versions of the same functions written in Octave.
+%    the reference versions of the same modem written in Octave.
 %
-% or (ii) can optionally be used to run an Octave version of the cohpsk
-%    modem to tune and develop it.
+
+% (ii) Runs the Octave version of the cohpsk modem to tune and develop
+%      it, including extensive channel simulations such as AWGN noise,
+%      fading/HF, frequency offset, frequency drift, and tx/rx sample
+%      rate differences.
 
 %  TODO:
 %
-%  [ ] Test
+%  [X] Test
 %      [X] AWGN channel
 %      [X] freq offset
 %      [X] fading channel
 %      [X] freq drift
-%      [ ] timing drift
+%      [X] timing drift
 %  [X] tune perf/impl loss to get closer to ideal
 %      [X] linear interp of phase for better fading perf
 %  [X] freq offset/drift feedback loop 
@@ -28,10 +31,13 @@
 %  [X] ability to "unsync" when signal dissapears
 %  [ ] some calibrated tests against FreeDV 1600
 %      + compare sound quality at various Es/Nos
+%  [ ] sync
+%      + set some req & implement
 %  [ ] way to handle eom w/o nasties
 %      + like mute ouput when signal has gone or v low snr
 %      + instantaneous snr
 %  [ ] nasty rig filter passband
+%  [ ] pilot based EsNo estimation
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -64,18 +70,20 @@ if strcmp(test, 'compare to c')
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
+  sample_rate_ppm = 0;
 end
 
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
   frames = 100;
-  foff =  0;
-  dfoff = 0;
+  foff =  58.8;
+  dfoff = -0.5/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
+  sample_rate_ppm = 1000;
 end
 
 % Similar to AWGN - should be BER around 0.015 to 0.02
@@ -83,11 +91,12 @@ end
 if strcmp(test, 'fading');
   frames = 100;
   foff = -53.1;
-  dfoff = 0.5/Fs;
+  dfoff = 0.0/Fs;
   EsNodB = 12;
   fading_en = 1;
   hf_delay_ms = 2;
   compare_with_c = 0;
+  sample_rate_ppm = -100;
 end
 
 EsNo = 10^(EsNodB/10);
@@ -225,8 +234,9 @@ ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
 
 % main loop --------------------------------------------------------------------
 
+% run mod and channel as aseparate loop so we can resample to simulate sample rate differences
+
 for f=1:frames
-  acohpsk.frame = f;
   tx_bits = tx_bits_coh(ptx_bits_coh:ptx_bits_coh+framesize-1);
   ptx_bits_coh += framesize;
   if ptx_bits_coh > length(tx_bits_coh)
@@ -255,9 +265,6 @@ for f=1:frames
   %
   % Channel --------------------------------------------------------------------
   %
-
-  %[ch_fdm_frame phase_ch] = freq_shift(tx_fdm_frame, foff, Fs, phase_ch);
-  %foff += dfoff*acohpsk.Nsymbrowpilot*M;
 
   ch_fdm_frame = zeros(1,acohpsk.Nsymbrowpilot*M);
   for i=1:acohpsk.Nsymbrowpilot*M
@@ -292,6 +299,35 @@ for f=1:frames
   ch_fdm_frame += noise;
 
   ch_fdm_frame_log = [ch_fdm_frame_log ch_fdm_frame];
+end
+
+% simulate difference in sample clocks
+
+ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
+
+% Now run demod ----------------------------------------------------------------
+
+ch_fdm_frame_log_index = 1;
+f = 0;
+
+while (ch_fdm_frame_log_index + acohpsk.Nsymbrowpilot*M+M/P) < length(ch_fdm_frame_log)
+  acohpsk.frame = f++;
+
+  if sync == 0  
+    nin = M;
+  else
+    nin = M;
+    if rx_timing(1) > M/P
+      nin = M + M/P;
+    end
+    if rx_timing(1) < -M/P
+      nin = M - M/P;
+    end
+  end
+
+  nin_frame = (acohpsk.Nsymbrowpilot-1)*M + nin;
+  ch_fdm_frame = ch_fdm_frame_log(ch_fdm_frame_log_index:ch_fdm_frame_log_index + nin_frame - 1);
+  ch_fdm_frame_log_index += nin_frame;
 
   %
   % Demod ----------------------------------------------------------------------
@@ -299,11 +335,10 @@ for f=1:frames
 
   % store two frames of received samples so we can rewind if we get a good candidate
 
-  ch_fdm_frame_buf(1:(Nsw-1)*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame_buf(acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M);
-  ch_fdm_frame_buf((Nsw-1)*acohpsk.Nsymbrowpilot*M+1:Nsw*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
+  ch_fdm_frame_buf(1:Nsw*acohpsk.Nsymbrowpilot*M-nin_frame) = ch_fdm_frame_buf(nin_frame+1:Nsw*acohpsk.Nsymbrowpilot*M);
+  ch_fdm_frame_buf(Nsw*acohpsk.Nsymbrowpilot*M-nin_frame+1:Nsw*acohpsk.Nsymbrowpilot*M) = ch_fdm_frame;
 
   next_sync = sync;
-  nin = M;
 
   % if out of sync do Initial Freq offset estimation over NSW frames to flush out memories
 
@@ -407,8 +442,7 @@ for f=1:frames
     % BER stats
 
     if f > 2
-      error_positions = xor(prev_tx_bits2, rx_bits);
-      %error_positions = xor(prev_tx_bits, rx_bits);
+      error_positions = xor(tx_bits_log((f-3)*framesize+1:(f-2)*framesize), rx_bits);
       Nerrs  += sum(error_positions);
       nerr_log = [nerr_log sum(error_positions)];
       Tbits += length(error_positions);
@@ -416,22 +450,14 @@ for f=1:frames
     printf("\r  [%d]", f);
   end
 
-   
-  %rx_fdm_frame_bb_log = [rx_fdm_frame_bb_log rx_fdm_frame_bb];
-  %rx_baseband_log = [rx_baseband_log rx_baseband];
-  %rx_filt_log = [rx_filt_log rx_filt];
-  %rx_timing_log = [rx_timing_log rx_timing];
-  %ch_symb_log = [ch_symb_log; ch_symb];
-  % ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
+  % reset BER stats if we lose sync
 
-
-  if sync == 0
-    Nerrs = 0;
-    Tbits = 0;
-    nerr_log = [];
+  if sync == 1
+    %Nerrs = 0;
+    %Tbits = 0;
+    %nerr_log = [];
   end
 
-  % printf("f: %d sync: %d next_sync: %d\n", f, sync, next_sync);
   [sync acohpsk] = sync_state_machine(acohpsk, sync, next_sync);
 
   prev_tx_bits2 = prev_tx_bits;
@@ -563,6 +589,12 @@ else
   plot(foff_log(1:length(f_est_log)) - f_est_log + Fcentre)
   title('freq offset estimation error');
 
+  figure(8)
+  clf
+  subplot(211)
+  stem(real(rx_filt_log(1,52:4:200)))
+  subplot(212)
+  stem(imag(rx_filt_log(1,52:4:200)))
 
 end
 
