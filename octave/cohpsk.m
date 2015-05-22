@@ -64,7 +64,7 @@ function sim_in = symbol_rate_init(sim_in)
     sim_in.Nsymbrow      = Nsymbrow         = Nsymb/Nc;
     sim_in.Npilotsframe  = Npilotsframe     = 2;
     sim_in.Nsymbrowpilot = Nsymbrowpilot    = Nsymbrow + Npilotsframe;
-
+    
     if verbose == 2
       printf("Each frame contains %d data bits or %d data symbols, transmitted as %d symbols by %d carriers.", framesize, Nsymb, Nsymbrow, Nc);
       printf("  There are %d pilot symbols in each carrier together at the start of each frame, then %d data symbols.", Npilotsframe, Ns); 
@@ -459,147 +459,20 @@ function test_bits_coh_file(test_bits_coh)
 endfunction
 
 
-% Frequency offset estimation --------------------------------------------------
-
-% This function was used in initial Nov 2014 experiments
-
-function [f_max s_max] = freq_off_est(rx_fdm, tx_pilot, offset, n)
-
-  Fs = 8000;
-  nc = 1800;  % portion we wish to correlate over (first 2 rows on pilots)
- 
-  % downconvert to complex baseband to remove images
-
-  f = 1500;
-  foff_rect    = exp(j*2*pi*f*(1:2*n)/Fs);
-  tx_pilot_bb  = tx_pilot(1:n) .* foff_rect(1:n)';
-  rx_fdm_bb    = rx_fdm(offset:offset+2*n-1) .* foff_rect';
-
-  % remove -2000 Hz image
-
-  b = fir1(50, 1000/Fs);
-  tx_pilot_bb_lpf = filter(b,1,tx_pilot_bb);
-  rx_fdm_bb_lpf   = filter(b,1,rx_fdm_bb);
-
-  % decimate by M
-
-  M = 4;
-  tx_pilot_bb_lpf = tx_pilot_bb_lpf(1:M:length(tx_pilot_bb_lpf));
-  rx_fdm_bb_lpf   = rx_fdm_bb_lpf(1:M:length(rx_fdm_bb_lpf));
-  n /= M;
-  nc /= M;
-
-  % correlate over a range of frequency offsets and delays
-
-  c_max = 0;
-  f_n = 1;
-  f_range = -75:2.5:75;
-  c_log=zeros(n, length(f_range));
-
-  for f=f_range
-    foff_rect = exp(j*2*pi*(f*M)*(1:nc)/Fs);
-    for s=1:n
-      
-      c = abs(tx_pilot_bb_lpf(1:nc)' * (rx_fdm_bb_lpf(s:s+nc-1) .* foff_rect'));
-      c_log(s,f_n) = c;
-      if c > c_max
-        c_max = c;
-        f_max = f;
-        s_max = s;
-      end
-    end
-    f_n++;
-    %printf("f: %f c_max: %f f_max: %f s_max: %d\n", f, c_max, f_max, s_max);
-  end
-
-  figure(1);
-  y = f_range;
-  x = max(s_max-25,1):min(s_max+25, n);
-  mesh(y,x, c_log(x,:));
-  grid
-  
-  s_max *= M;
-  s_max -= floor(s_max/6400)*6400;
-  printf("f_max: %f  s_max: %d\n", f_max, s_max);
-
-  % decimated position at sample rate.  need to relate this to symbol
-  % rate position.
-
-endfunction
-
-
-% Set of functions to implement latest and greatest freq offset
-% estimation, March 2015 ----------------------
-
-% returns an estimate of frequency offset, advances to next sync state
-
-function [next_sync cohpsk] = coarse_freq_offset_est(cohpsk, fdmdv, ch_fdm_frame, sync, next_sync)
-  Fcentre    = fdmdv.Fcentre;
-  Nc         = fdmdv.Nc;
-  Fsep       = fdmdv.Fsep;
-  M          = fdmdv.M;
-  Fs         = fdmdv.Fs;
-  Ndft       = cohpsk.Ndft;
-  coarse_mem = cohpsk.coarse_mem;
-  Ncm        = cohpsk.Ncm;
-
-  %            ll
-  % |--------|-----|
-
-  ll = length(ch_fdm_frame);
-  sz_mem = Ncm-ll;
-  for i=1:sz_mem
-    coarse_mem(i) = coarse_mem(i+ll);
-  end
-  coarse_mem(Ncm-ll+1:Ncm) = ch_fdm_frame;
-
-  if sync == 0
-    h = 0.5 - 0.5*cos(2*pi*(0:Ncm-1)/(Ncm-1));
-    T = abs(fft(coarse_mem .* h, Ndft)).^2;
-    sc = Ndft/Fs;
-
-    for i=1:5
-      f_start = Fcentre - ((Nc/2)+2)*Fsep;
-      f_stop = Fcentre + ((Nc/2)+2)*Fsep;
-      bin_start = floor(f_start*sc+0.5)+1;
-      bin_stop = floor(f_stop*sc+0.5)+1;
-      x = bin_start-1:bin_stop-1;
-      bin_est = x*T(bin_start:bin_stop)'/sum(T(bin_start:bin_stop));
-      f_est = floor(bin_est/sc+0.5);
-      Fcentre = f_est;
-    end 
-    %printf("f_start: %f f_stop: %f sc: %f bin_start: %d bin_stop: %d\n", f_start, f_stop, sc, bin_start, bin_stop);
-
-    cohpsk.f_est = f_est;
-    
-    printf("  coarse freq est: %f\n", cohpsk.f_est);
-    next_sync = 1;
-    figure(5)
-    clf
-    subplot(211)
-    plot(T)
-    hold on
-    plot([bin_est bin_est],[0 max(T)],'g')
-    hold off    
-    axis([bin_start bin_stop 0 max(T)])
-   
-  end
-
-  cohpsk.coarse_mem = coarse_mem;
-endfunction
-
-
 function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame, f_est, nsymb, nin, freq_track)
     M = afdmdv.M;
-
+    
     rx_baseband = [];
     rx_filt = [];
     rx_timing = [];
 
+    ch_fdm_frame_index = 1;
+
     for r=1:nsymb
       % shift signal to nominal baseband, this will put Nc/2 carriers either side of 0 Hz
 
-      [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame(1+(r-1)*M:r*M), -f_est, afdmdv.Fs, afdmdv.fbb_phase_rx);
+      [rx_fdm_frame_bb afdmdv.fbb_phase_rx] = freq_shift(ch_fdm_frame(ch_fdm_frame_index:ch_fdm_frame_index + nin - 1), -f_est, afdmdv.Fs, afdmdv.fbb_phase_rx);
+      ch_fdm_frame_index += nin;
 
       % downconvert each FDM carrier to Nc separate baseband signals
 
@@ -612,6 +485,12 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
       rx_timing    = [rx_timing arx_timing];
 
       ch_symb(r,:) = rx_onesym;
+
+      % we only allow a timing shift on one symbol per frame
+
+      if nin != M
+        nin = M;
+      end
 
       % freq tracking, see test_ftrack.m for unit test.  Placed in
       % this function as it needs to work on a symbol by symbol basis
