@@ -33,11 +33,16 @@
 %      + compare sound quality at various Es/Nos
 %  [ ] sync
 %      + set some req & implement
-%  [ ] way to handle eom w/o nasties
-%      + like mute ouput when signal has gone or v low snr
-%      + instantaneous snr
-%  [ ] nasty rig filter passband
+%      [ ] way to handle eom w/o nasties
+%          + like mute ouput when signal has gone or v low snr
+%          + instantaneous snr
+%  [X] ssb tx filter with 3dB passband ripple
+%      + diverisity helped for AWGN BER 0.024 down to 0.016
+%      + Only a small change in fading perf with filter on/off
+%      + however other filters may have other effects, should test this, 
+%        e.g. scatter plots, some sort of BER metric?
 %  [ ] pilot based EsNo estimation
+%  [ ] different diversity combination
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -51,39 +56,42 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-%test = 'compare to c';
+test = 'compare to c';
 %test = 'awgn';
-test = 'fading';
+%test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
 initial_sync = 0;  % setting this to 1 put us straight into sync w/o freq offset est
-ftrack_en    = 1;  % set to 0 to disable freq tracking
+ftrack_en    = 1;  % set to 1 to enable freq tracking
+ssb_tx_filt  = 1;  % set to 1 to to simulate SSB tx filter with passband ripple
+Fs           = 7500;
 
 % predefined tests ....
 
 if strcmp(test, 'compare to c')
   frames = 35;
-  foff =  55.5;
-  dfoff = -0.5/Fs;
+  foff =  0;
+  dfoff = 0;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
   sample_rate_ppm = 0;
+  ssb_tx_filt  = 0;
 end
 
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
   frames = 100;
-  foff =  58.8;
-  dfoff = -0.5/Fs;
+  foff =  0;
+  dfoff = -0/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
-  sample_rate_ppm = 1000;
+  sample_rate_ppm = 0;
 end
 
 % Similar to AWGN - should be BER around 0.015 to 0.02
@@ -112,14 +120,14 @@ Nsw = 3;               % frames we demod for initial sync window
 afdmdv.Nsym = 6;       % size of tx/tx root nyquist filter in symbols
 afdmdv.Nt = 5;         % number of symbols we estimate timing over
 
-clip = 6.5;            % Clipping of tx signal to reduce PAPR. Adjust by 
+clip = 65;            % Clipping of tx signal to reduce PAPR. Adjust by 
                        % experiment as Nc and Nd change.  Check out no noise 
                        % scatter diagram and AWGN/fading BER perf
                        % at operating points
 
 % FDMDV init ---------------------------------------------------------------
 
-Fs = afdmdv.Fs = 7500;
+afdmdv.Fs = Fs;
 afdmdv.Nc = Nd*Nc-1;
 afdmdv.Rs = Rs;
 if Fs/afdmdv.Rs != floor(Fs/afdmdv.Rs)
@@ -136,7 +144,7 @@ afdmdv.gt_alpha5_root = gen_rn_coeffs(excess_bw, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M
 Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 );
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^1 );
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -178,7 +186,7 @@ acohpsk.Ns               = 4;
 acohpsk.coh_en           = 1;
 acohpsk.Nd               = Nd;
 acohpsk.modulation       = 'qpsk';
-acohpsk.do_write_pilot_file = 0;
+acohpsk.do_write_pilot_file = 1;      % enable this to dump pilot symbols to C .h file, e.g. if frame params change
 acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
@@ -232,6 +240,13 @@ hf_n = 1;
 nhfdelay = floor(hf_delay_ms*Fs/1000);
 ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
 
+% simulated SSB tx filter
+
+[b, a] = cheby1(4, 3, [600, 2600]/(Fs/2));
+[y filt_states] = filter(b,a,0);
+h = freqz(b,a,(600:2600)/(Fs/(2*pi)));
+filt_gain = (2600-600)/sum(abs(h) .^ 2);   % ensures power after filter == before filter
+
 % main loop --------------------------------------------------------------------
 
 % run mod and channel as aseparate loop so we can resample to simulate sample rate differences
@@ -247,7 +262,7 @@ for f=1:frames
 
   [tx_symb tx_bits] = bits_to_qpsk_symbols(acohpsk, tx_bits, [], []);
   tx_symb_log = [tx_symb_log; tx_symb];
-
+  
   tx_fdm_frame = [];
   for r=1:acohpsk.Nsymbrowpilot
     tx_onesymb = tx_symb(r,:);
@@ -257,6 +272,10 @@ for f=1:frames
     tx_fdm_frame = [tx_fdm_frame tx_fdm];
   end
 
+  % clipping, which along with non-linear carrier spacing, improves PAPR
+  % The value of clip is a function of Nc and is adjusted experimentally
+  % such that the BER hit over no clipping at Es/No=8dB is small.
+
   ind = find(abs(tx_fdm_frame) > clip);
   tx_fdm_frame(ind) = clip*exp(j*angle(tx_fdm_frame(ind)));
 
@@ -265,6 +284,14 @@ for f=1:frames
   %
   % Channel --------------------------------------------------------------------
   %
+
+  % simulate tx SSB filter with ripple
+
+  if ssb_tx_filt
+    [tx_fdm_frame filt_states] = filter(b,a,sqrt(filt_gain)*tx_fdm_frame, filt_states);
+  end
+
+  % frequency offset and frequency drift
 
   ch_fdm_frame = zeros(1,acohpsk.Nsymbrowpilot*M);
   for i=1:acohpsk.Nsymbrowpilot*M
@@ -276,6 +303,8 @@ for f=1:frames
   foff_log = [foff_log foff];
   phase_ch /= abs(phase_ch);
   % printf("foff: %f  ", foff);
+
+  % optional fading
 
   if fading_en
     ch_fdm_delay(1:nhfdelay) = ch_fdm_delay(acohpsk.Nsymbrowpilot*M+1:nhfdelay+acohpsk.Nsymbrowpilot*M);
@@ -310,18 +339,21 @@ ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
 ch_fdm_frame_log_index = 1;
 f = 0;
 
-while (ch_fdm_frame_log_index + acohpsk.Nsymbrowpilot*M+M/P) < length(ch_fdm_frame_log)
-  acohpsk.frame = f++;
+%while (ch_fdm_frame_log_index + acohpsk.Nsymbrowpilot*M+M/P) < length(ch_fdm_frame_log)
+for f=1:frames;
+  acohpsk.frame = f;
 
   if sync == 0  
     nin = M;
   else
     nin = M;
+    if 0
     if rx_timing(1) > M/P
       nin = M + M/P;
     end
     if rx_timing(1) < -M/P
       nin = M - M/P;
+    end
     end
   end
 
@@ -355,7 +387,7 @@ while (ch_fdm_frame_log_index + acohpsk.Nsymbrowpilot*M+M/P) < length(ch_fdm_fra
 
       [ch_symb rx_timing rx_filt rx_baseband afdmdv acohpsk.f_est] = rate_Fs_rx_processing(afdmdv, ch_fdm_frame_buf, acohpsk.f_est, Nsw*acohpsk.Nsymbrowpilot, nin, 0);
       rx_baseband_log = [rx_baseband_log rx_baseband];
- 
+      
       rx_filt_log = [rx_filt_log rx_filt];
       ch_symb_log = [ch_symb_log; ch_symb];
 
@@ -476,13 +508,15 @@ if compare_with_c
 
   % Determine bit error rate
 
-  sz = length(tx_bits_log_c);
-  Nerrs_c = sum(xor(tx_bits_prev_log, rx_bits_log_c(framesize+1:length(rx_bits_log_c))));
+  
+  sz = length(rx_bits_log_c);
+  Nerrs_c = sum(xor(tx_bits_log(1:sz-framesize), rx_bits_log_c(framesize+1:sz)));
   Tbits_c = length(tx_bits_prev_log);
   ber_c = Nerrs_c/Tbits_c;
   printf("C EsNodB.....: %4.1f ber_c: %4.3f Nerrs_c: %d Tbits_c: %d\n", EsNodB, ber_c, Nerrs_c, Tbits_c);
-
-  stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits) -1.5 1.5])
+  
+  stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
+  
   stem_sig_and_error(2, 211, real(tx_symb_log_c), real(tx_symb_log - tx_symb_log_c), 'tx symb re', [1 length(tx_symb_log_c) -1.5 1.5])
   stem_sig_and_error(2, 212, imag(tx_symb_log_c), imag(tx_symb_log - tx_symb_log_c), 'tx symb im', [1 length(tx_symb_log_c) -1.5 1.5])
 
@@ -491,16 +525,21 @@ if compare_with_c
   stem_sig_and_error(4, 211, real(ch_fdm_frame_log_c), real(ch_fdm_frame_log - ch_fdm_frame_log_c), 'ch fdm frame re', [1 length(ch_fdm_frame_log) -10 10])
   stem_sig_and_error(4, 212, imag(ch_fdm_frame_log_c), imag(ch_fdm_frame_log - ch_fdm_frame_log_c), 'ch fdm frame im', [1 length(ch_fdm_frame_log) -10 10])
 
-  stem_sig_and_error(5, 211, real(rx_baseband_log_c(1,:)), real(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband re', [1 length(rx_baseband_log) -10 10])
-  stem_sig_and_error(5, 212, imag(rx_baseband_log_c(1,:)), imag(rx_baseband_log(1,:) - rx_baseband_log_c(1,:)), 'rx baseband im', [1 length(rx_baseband_log) -10 10])
+  c = 1;
+  stem_sig_and_error(5, 211, real(rx_baseband_log_c(c,:)), real(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'rx baseband re', [1 length(rx_baseband_log) -10 10])
+  stem_sig_and_error(5, 212, imag(rx_baseband_log_c(c,:)), imag(rx_baseband_log(c,:) - rx_baseband_log_c(c,:)), 'rx baseband im', [1 length(rx_baseband_log) -10 10])
+  stem_sig_and_error(6, 211, real(rx_filt_log_c(c,:)), real(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'rx filt re', [1 length(rx_filt_log) -1 1])
+  stem_sig_and_error(6, 212, imag(rx_filt_log_c(c,:)), imag(rx_filt_log(c,:) - rx_filt_log_c(c,:)), 'rx filt im', [1 length(rx_filt_log) -1 1])
 
   [n m] = size(ch_symb_log);
-  stem_sig_and_error(6, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
-  stem_sig_and_error(6, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
+  stem_sig_and_error(7, 211, real(ch_symb_log_c), real(ch_symb_log - ch_symb_log_c), 'ch symb re', [1 n -1.5 1.5])
+  stem_sig_and_error(7, 212, imag(ch_symb_log_c), imag(ch_symb_log - ch_symb_log_c), 'ch symb im', [1 n -1.5 1.5])
 
   [n m] = size(rx_symb_log);
   stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
-  stem_sig_and_error(8, 212, rx_phi_log_c, rx_phi_log - rx_phi_log_c, 'Phase Est', [1 n -4 4])
+  phi_log_diff = rx_phi_log - rx_phi_log_c;
+  phi_log_diff(find(phi_log_diff > pi)) -= 2*pi;
+  stem_sig_and_error(8, 212, rx_phi_log_c, phi_log_diff, 'Phase Est', [1 n -4 4])
   stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
   stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
 
@@ -509,18 +548,18 @@ if compare_with_c
 
   check(tx_bits_log, tx_bits_log_c, 'tx_bits');
   check(tx_symb_log, tx_symb_log_c, 'tx_symb');
-  check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame');
-  check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame');
+  check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame',0.01);
+  check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame',0.01);
   %check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
 
   check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.05);
   %check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
-  check(rx_phi_log, rx_phi_log_c, 'rx_phi_log',0.05);
+  check(phi_log_diff, zeros(length(phi_log_diff), Nc*Nd), 'rx_phi_log',0.05);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
   check(f_est_log, f_est_log_c, 'f_est');
-
+  
 
 else
   
@@ -552,8 +591,14 @@ else
 
   figure(3)
   clf;
-  plot(rx_symb_log*exp(j*pi/4),'+')
+  % plot combined signals to show diversity gains
+  combined = rx_symb_log(:,1:Nc);
+  for d=2:Nd
+    combined += rx_symb_log(:, (d-1)*Nc+1:d*Nc);
+  end
+  plot(combined*exp(j*pi/4)/sqrt(Nd),'+')
   title('Scatter');
+  axis([-2 2 -2 2])
 
   figure(4)
   clf;
@@ -591,11 +636,10 @@ else
 
   figure(8)
   clf
-  subplot(211)
-  stem(real(rx_filt_log(1,52:4:200)))
-  subplot(212)
-  stem(imag(rx_filt_log(1,52:4:200)))
-
+  h = freqz(b,a,Fs/2);
+  plot(20*log10(abs(h)))
+  axis([1 Fs/2 -50 0])
+  grid
 end
 
 

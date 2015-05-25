@@ -1119,7 +1119,8 @@ float rx_est_timing(COMP rx_symbols[],
 		    COMP rx_filt[NC+1][P+1], 
 		    COMP rx_filter_mem_timing[NC+1][NT*P], 
 		    float env[],
-		    int nin)	 
+		    int nin,
+                    int m)	 
 {
     int   c,i,j;
     int   adjust;
@@ -1135,7 +1136,7 @@ float rx_est_timing(COMP rx_symbols[],
       200   1 (one more rate P sample)
     */
 
-    adjust = P - nin*P/M;
+    adjust = P - nin*P/m;
     
     /* update buffer of NT rate P filtered symbols */
     
@@ -1196,7 +1197,7 @@ float rx_est_timing(COMP rx_symbols[],
         //rx_symbols[c] = rx_filter_mem_timing[c][high_sample];
     }
   	
-    return norm_rx_timing*M;
+    return norm_rx_timing*m;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1529,7 +1530,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
                                fdmdv->freq_pol, *nin, M/Q);
     PROFILE_SAMPLE_AND_LOG(rx_est_timing_start, down_convert_and_rx_filter_start, "    down_convert_and_rx_filter"); 
-    fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin);	 
+    fdmdv->rx_timing = rx_est_timing(rx_symbols, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, *nin, M);	 
     PROFILE_SAMPLE_AND_LOG(qpsk_to_bits_start, rx_est_timing_start, "    rx_est_timing"); 
     
     /* Adjust number of input samples to keep timing within bounds */

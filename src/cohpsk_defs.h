@@ -3,7 +3,7 @@
 #define NSYMROW      4   /* number of data symbols on each row (i.e. each carrier) */
 #define NS           4   /* number of data symbols between pilots                   */
 #define NPILOTSFRAME 2   /* number of pilot symbols on each row                     */
-#define PILOTS_NC    4   /* number of carriers                                      */
+#define PILOTS_NC    7   /* number of carriers                                      */
 
 #define NSYMROWPILOT 6   /* length of row after pilots inserted                     */
 
