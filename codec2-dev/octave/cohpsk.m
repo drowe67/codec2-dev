@@ -483,7 +483,7 @@ function [ch_symb rx_timing rx_filt rx_baseband afdmdv f_est] = rate_Fs_rx_proce
       rx_baseband = [rx_baseband arx_baseband];
       rx_filt     = [rx_filt arx_filt];
       rx_timing    = [rx_timing arx_timing];
-
+      
       ch_symb(r,:) = rx_onesym;
 
       % we only allow a timing shift on one symbol per frame
@@ -582,7 +582,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
           end
           corr += abs(acorr);
         end
-        %printf("  f: %f  t: %d corr: %f %f\n", f_fine, t, real(corr), imag(corr));
+        %printf("  f: %f  t: %d corr: %f mag: %f\n", f_fine, t, corr, mag);
         if corr >= max_corr
           max_corr = corr;
           max_mag = mag;
@@ -592,7 +592,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
         end
       end
     end
-
+    
     printf("  [%d]   fine freq f: %f max_ratio: %f ct: %d\n", cohpsk.frame, cohpsk.f_fine_est, abs(max_corr)/max_mag, cohpsk.ct);
     if abs(max_corr/max_mag) > 0.9
       printf("  [%d]   encouraging sync word! ratio: %f\n", cohpsk.frame, abs(max_corr/max_mag));

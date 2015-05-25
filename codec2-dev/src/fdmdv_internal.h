@@ -185,7 +185,8 @@ float rx_est_timing(COMP  rx_symbols[], int Nc,
 		    COMP  rx_filt[NC+1][P+1], 
 		    COMP  rx_filter_mem_timing[NC+1][NT*P], 
 		    float env[],
-		    int   nin);	 
+		    int   nin,
+                    int   m);	 
 float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[], COMP prev_rx_symbols[], COMP rx_symbols[], int old_qpsk_mapping);
 void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_difference[]);
 int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int *sync_mem);
