@@ -120,7 +120,7 @@ Nsw = 3;               % frames we demod for initial sync window
 afdmdv.Nsym = 6;       % size of tx/tx root nyquist filter in symbols
 afdmdv.Nt = 5;         % number of symbols we estimate timing over
 
-clip = 65;            % Clipping of tx signal to reduce PAPR. Adjust by 
+clip = 6.5;            % Clipping of tx signal to reduce PAPR. Adjust by 
                        % experiment as Nc and Nd change.  Check out no noise 
                        % scatter diagram and AWGN/fading BER perf
                        % at operating points
@@ -144,7 +144,8 @@ afdmdv.gt_alpha5_root = gen_rn_coeffs(excess_bw, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M
 Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^1 );
+% non linear carrier spacing, combined with clip, helps PAPR a lot!
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 ); 
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
