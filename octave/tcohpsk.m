@@ -77,7 +77,7 @@ if strcmp(test, 'compare to c')
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
-  sample_rate_ppm = -1000;
+  sample_rate_ppm = -1500;
   ssb_tx_filt  = 0;
 end
 
@@ -91,7 +91,7 @@ if strcmp(test, 'awgn')
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
-  sample_rate_ppm = -1000;
+  sample_rate_ppm = -1500;
 end
 
 % Similar to AWGN - should be BER around 0.015 to 0.02
@@ -335,9 +335,9 @@ end
 
 %ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
 
-ch_fdm_frame_log_out = zeros(1, length(ch_fdm_frame_log));
 tin=1;
 tout=1;
+ch_fdm_frame_log_out = zeros(1,length(ch_fdm_frame_log));
 while tin < length(ch_fdm_frame_log)
       t1 = floor(tin);
       t2 = ceil(tin);
@@ -347,7 +347,7 @@ while tin < length(ch_fdm_frame_log)
       tin  += 1+sample_rate_ppm/1E6;
       %printf("tin: %f tout: %f f: %f\n", tin, tout, f);
 end
-ch_fdm_frame_log = ch_fdm_frame_log_out;
+ch_fdm_frame_log = ch_fdm_frame_log_out(1:tout-1);
 
 % Now run demod ----------------------------------------------------------------
 
@@ -563,7 +563,7 @@ if compare_with_c
   stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
 
   stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
-  stem_sig_and_error(11, 111, f_est_log_c, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) min(f_est_log) max(f_est_log)])
+  stem_sig_and_error(11, 111, f_est_log_c - Fcentre - foff, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) -5 5])
   stem_sig_and_error(12, 111, rx_timing_log_c, rx_timing_log_c - rx_timing_log, 'rx timing', [1 length(rx_timing_log) -M M])
 
   check(tx_bits_log, tx_bits_log_c, 'tx_bits');

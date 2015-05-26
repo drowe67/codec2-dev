@@ -51,7 +51,7 @@
 #define FOFF        58.7
 #define DFOFF       (-0.5/(float)COHPSK_FS)
 #define ESNODB      8
-#define PPM         -1000
+#define PPM         -1500
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -202,14 +202,14 @@ int main(int argc, char *argv[])
     nin_frame = COHPSK_SAMPLES_PER_FRAME;
     ch_fdm_frame_log_index = 0;
 
+    /* --------------------------------------------------------*\
+	                        Demod
+    \*---------------------------------------------------------*/
+
     for(f=0; f<FRAMES; f++) {
         coh->frame = f;
 
         //printf("nin_frame: %d\n", nin_frame);
-
-	/* --------------------------------------------------------*\
-	                          Demod
-	\*---------------------------------------------------------*/
 
         assert(ch_fdm_frame_log_index < COHPSK_M*NSYMROWPILOT*FRAMES);
         tmp = nin_frame;

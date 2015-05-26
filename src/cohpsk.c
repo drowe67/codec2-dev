@@ -784,7 +784,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 {
     struct FDMDV *fdmdv = coh->fdmdv;
     int   r, c, i, ch_fdm_frame_index;
-    COMP  rx_fdm_frame_bb[COHPSK_M];
+    COMP  rx_fdm_frame_bb[COHPSK_M+COHPSK_M/P];
     COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
     COMP  rx_filt[COHPSK_NC*ND][P+1];
     float env[NT*P], __attribute__((unused)) rx_timing;
@@ -846,6 +846,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         /* Optional logging used for testing against Octave version */
 
         if (coh->rx_baseband_log) {
+            assert(nin <= (COHPSK_M+COHPSK_M/P));
             for(c=0; c<COHPSK_NC*ND; c++) {       
                 for(i=0; i<nin; i++) {
                     coh->rx_baseband_log[c*coh->rx_baseband_log_col_sz + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
