@@ -135,13 +135,15 @@ struct COHPSK *cohpsk_create(void)
 	fdmdv->phase_tx[c].real = 1.0;
  	fdmdv->phase_tx[c].imag = 0.0;
 
-        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + c + 1.0 );
+        /* note non-linear carrier spacing to help PAPR, works v well in conjunction with CLIP */
+
+        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + pow(c + 1.0, 0.98) );
         
 	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/COHPSK_FS);
  	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/COHPSK_FS);
  	fdmdv->freq_pol[c]  = 2.0*M_PI*freq_hz/COHPSK_FS;
 
-        printf("c: %d %f %f\n",c,freq_hz,fdmdv->freq_pol[c]);
+        //printf("c: %d %f %f\n",c,freq_hz,fdmdv->freq_pol[c]);
         for(i=0; i<COHPSK_NFILTER; i++) {
             coh->rx_filter_memory[c][i].real = 0.0;
             coh->rx_filter_memory[c][i].imag = 0.0;
@@ -616,8 +618,8 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 {
     struct FDMDV *fdmdv = coh->fdmdv;
-    COMP tx_symb[NSYMROWPILOT][COHPSK_NC*ND];
-    COMP tx_onesym[COHPSK_NC*ND];
+    COMP  tx_symb[NSYMROWPILOT][COHPSK_NC*ND];
+    COMP  tx_onesym[COHPSK_NC*ND];
     int  r,c;
 
     bits_to_qpsk_symbols(tx_symb, tx_bits, COHPSK_BITS_PER_FRAME);
@@ -631,6 +633,33 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 }
 
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_clip()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: May 2015
+
+  Hard clips a cohpsk modulator signal to improve PAPR, CLIP threshold
+  hard coded and will need to be changed if NC*ND does.
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_clip(COMP tx_fdm[])
+{
+    COMP  sam;
+    float mag;
+    int   i;
+
+    for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+        sam = tx_fdm[i];
+        mag = cabsolute(sam);            
+        if (mag >  COHPSK_CLIP)  {
+            sam = fcmult( COHPSK_CLIP/mag, sam);
+        }
+        tx_fdm[i] = sam;
+    }
+ }
+ 
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: fdm_downconvert_coh   
