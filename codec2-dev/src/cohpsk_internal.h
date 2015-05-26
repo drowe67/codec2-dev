@@ -51,7 +51,9 @@ struct COHPSK {
     float        f_est;
     COMP         rx_filter_memory[COHPSK_NC*ND][COHPSK_NFILTER];
     COMP         ct_symb_buf[NCT_SYMB_BUF][COHPSK_NC*ND];
-    int          ct;                                 /* coarse timing offset in symbols                       */
+    int          ct;                                    /* coarse timing offset in symbols                       */
+    float        rx_timing;                             /* fine timing for last symbol in frame                  */
+    int          nin;                                   /* number of samples to input for next symbol            */
     float        f_fine_est;
     COMP         ff_rect;
     COMP         ff_phase;
@@ -64,19 +66,22 @@ struct COHPSK {
 
     struct FDMDV *fdmdv;
     
-    /* optional log variables used for tetsing Octave to C port */
+    /* optional log variables used for testing Octave to C port */
 
-    COMP           *rx_baseband_log;
+    COMP          *rx_baseband_log;
     int            rx_baseband_log_col_index;
     int            rx_baseband_log_col_sz;
 
-    COMP           *rx_filt_log;
+    COMP          *rx_filt_log;
     int            rx_filt_log_col_index;
     int            rx_filt_log_col_sz;
 
-    COMP           *ch_symb_log;
+    COMP          *ch_symb_log;
     int            ch_symb_log_r;
     int            ch_symb_log_col_sz;
+
+    float         *rx_timing_log;
+    int            rx_timing_log_index;
 };
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);

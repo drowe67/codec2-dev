@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     float          EsNo, variance;
     COMP           scaled_noise;
     float          EsNodB, foff_hz;
-    int            fading_en, nhfdelay, ret;
+    int            fading_en, nhfdelay, ret, nin;
     COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
     FILE          *ffading;
 
@@ -111,6 +111,8 @@ int main(int argc, char *argv[])
     }
 
     /* Main Loop ---------------------------------------------------------------------*/
+
+    nin = COHPSK_SAMPLES_PER_FRAME;
 
     for(f=0; f<FRAMES; f++) {
         
@@ -173,7 +175,7 @@ int main(int argc, char *argv[])
 	                          Demod
 	\*---------------------------------------------------------*/
 
- 	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_fdm);
+ 	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_fdm, &nin);
 
         errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {

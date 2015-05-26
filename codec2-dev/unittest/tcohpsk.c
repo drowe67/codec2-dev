@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
     float          EsNo, variance;
     COMP           scaled_noise;
     int            reliable_sync_bit;
+    int            ch_fdm_frame_log_index, nin_frame, tmp;
 
     coh = cohpsk_create();
     fdmdv = coh->fdmdv;
@@ -114,6 +115,8 @@ int main(int argc, char *argv[])
 
     coh->ch_symb_log_col_sz = COHPSK_NC*ND;
     coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*FRAMESL*coh->ch_symb_log_col_sz);
+
+    coh->rx_timing_log = (float*)malloc(sizeof(float)*NSYMROWPILOT*FRAMESL);
     
     /* init stuff */
 
@@ -136,7 +139,6 @@ int main(int argc, char *argv[])
     /* Main Loop ---------------------------------------------------------------------*/
 
     for(f=0; f<FRAMES; f++) {
-        coh->frame = f;
 
 	/* --------------------------------------------------------*\
 	                          Mod
@@ -176,27 +178,39 @@ int main(int argc, char *argv[])
             ch_fdm_frame[r] = cadd(ch_fdm_frame[r], scaled_noise);
         }
 
-
-	/* --------------------------------------------------------*\
-	                          Demod
-	\*---------------------------------------------------------*/
-
-        cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_fdm_frame);
-
- 	/* --------------------------------------------------------*\
-	                       Log each vector 
-	\*---------------------------------------------------------*/
+        /* tx vector logging */
 
 	memcpy(&tx_bits_log[COHPSK_BITS_PER_FRAME*f], tx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
 	memcpy(&tx_fdm_frame_log[COHPSK_M*NSYMROWPILOT*f], tx_fdm_frame, sizeof(COMP)*COHPSK_M*NSYMROWPILOT);
 	memcpy(&ch_fdm_frame_log[COHPSK_M*NSYMROWPILOT*f], ch_fdm_frame, sizeof(COMP)*COHPSK_M*NSYMROWPILOT);
-       	//memcpy(&rx_fdm_frame_bb_log[M*NSYMROWPILOT*f], rx_fdm_frame_bb, sizeof(COMP)*M*NSYMROWPILOT);
-
+  
 	for(r=0; r<NSYMROWPILOT; r++, log_r++) {
             for(c=0; c<COHPSK_NC*ND; c++) {
 		tx_symb_log[log_r][c] = tx_symb[r][c]; 
             }
         }
+    }
+
+    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    ch_fdm_frame_log_index = 0;
+
+    for(f=0; f<FRAMES; f++) {
+        coh->frame = f;
+
+        //printf("nin_frame: %d\n", nin_frame);
+
+	/* --------------------------------------------------------*\
+	                          Demod
+	\*---------------------------------------------------------*/
+
+        assert(ch_fdm_frame_log_index < COHPSK_M*NSYMROWPILOT*FRAMES);
+        tmp = nin_frame;
+        cohpsk_demod(coh, rx_bits, &reliable_sync_bit, &ch_fdm_frame_log[ch_fdm_frame_log_index], &nin_frame);
+        ch_fdm_frame_log_index += tmp;
+
+ 	/* --------------------------------------------------------*\
+	                       Log each vector 
+	\*---------------------------------------------------------*/
 
         if (coh->sync == 1) {
 
@@ -242,6 +256,7 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)coh->rx_baseband_log, COHPSK_NC*ND, coh->rx_baseband_log_col_index, coh->rx_baseband_log_col_sz);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)coh->rx_filt_log, COHPSK_NC*ND, coh->rx_filt_log_col_index, coh->rx_filt_log_col_sz);  
     octave_save_complex(fout, "ch_symb_log_c", (COMP*)coh->ch_symb_log, coh->ch_symb_log_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+    octave_save_float(fout, "rx_timing_log_c", (float*)coh->rx_timing_log, 1, coh->rx_timing_log_index, coh->rx_timing_log_index);  
     octave_save_complex(fout, "ct_symb_ff_log_c", (COMP*)ct_symb_ff_log, NSYMROWPILOT*FRAMES, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
