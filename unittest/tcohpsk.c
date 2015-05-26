@@ -48,9 +48,10 @@
 #define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 #define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
 
-#define FOFF        0 //55.5
-#define DFOFF       0 //(-0.5/(float)COHPSK_FS)
+#define FOFF        58.7
+#define DFOFF       (-0.5/(float)COHPSK_FS)
 #define ESNODB      8
+#define PPM         -1000
 
 extern float pilots_coh[][PILOTS_NC];
 
@@ -69,6 +70,7 @@ int main(int argc, char *argv[])
     COMP           tx_symb_log[NSYMROWPILOT*FRAMES][COHPSK_NC*ND];
     COMP           tx_fdm_frame_log[COHPSK_M*NSYMROWPILOT*FRAMES];
     COMP           ch_fdm_frame_log[COHPSK_M*NSYMROWPILOT*FRAMES];
+    COMP           ch_fdm_frame_log_out[(COHPSK_M*NSYMROWPILOT+1)*FRAMES];
     //COMP           rx_fdm_frame_bb_log[M*NSYMROWPILOT*FRAMES];
     //COMP           ch_symb_log[NSYMROWPILOT*FRAMES][COHPSK_NC*ND];
     COMP           ct_symb_ff_log[NSYMROWPILOT*FRAMES][COHPSK_NC*ND];
@@ -99,7 +101,7 @@ int main(int argc, char *argv[])
     float          EsNo, variance;
     COMP           scaled_noise;
     int            reliable_sync_bit;
-    int            ch_fdm_frame_log_index, nin_frame, tmp;
+    int            ch_fdm_frame_log_index, nin_frame, tmp, nout;
 
     coh = cohpsk_create();
     fdmdv = coh->fdmdv;
@@ -192,6 +194,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    /* Fs offset simulation */
+
+    nout = cohpsk_fs_offset(ch_fdm_frame_log_out, ch_fdm_frame_log, COHPSK_M*NSYMROWPILOT*FRAMES, PPM);
+    assert(nout < (COHPSK_M*NSYMROWPILOT+1)*FRAMES);
+
     nin_frame = COHPSK_SAMPLES_PER_FRAME;
     ch_fdm_frame_log_index = 0;
 
@@ -206,7 +213,7 @@ int main(int argc, char *argv[])
 
         assert(ch_fdm_frame_log_index < COHPSK_M*NSYMROWPILOT*FRAMES);
         tmp = nin_frame;
-        cohpsk_demod(coh, rx_bits, &reliable_sync_bit, &ch_fdm_frame_log[ch_fdm_frame_log_index], &nin_frame);
+        cohpsk_demod(coh, rx_bits, &reliable_sync_bit, &ch_fdm_frame_log_out[ch_fdm_frame_log_index], &nin_frame);
         ch_fdm_frame_log_index += tmp;
 
  	/* --------------------------------------------------------*\
@@ -252,7 +259,7 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
     octave_save_complex(fout, "tx_symb_log_c", (COMP*)tx_symb_log, NSYMROWPILOT*FRAMES, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_complex(fout, "tx_fdm_frame_log_c", (COMP*)tx_fdm_frame_log, 1, COHPSK_M*NSYMROWPILOT*FRAMES, COHPSK_M*NSYMROWPILOT*FRAMES);  
-    octave_save_complex(fout, "ch_fdm_frame_log_c", (COMP*)ch_fdm_frame_log, 1, COHPSK_M*NSYMROWPILOT*FRAMES, COHPSK_M*NSYMROWPILOT*FRAMES);  
+    octave_save_complex(fout, "ch_fdm_frame_log_c", (COMP*)ch_fdm_frame_log_out, 1, nout-1, nout-1);  
     //octave_save_complex(fout, "rx_fdm_frame_bb_log_c", (COMP*)rx_fdm_frame_bb_log, 1, M*NSYMROWPILOT*FRAMES, M*NSYMROWPILOT*FRAMES);  
     octave_save_complex(fout, "rx_baseband_log_c", (COMP*)coh->rx_baseband_log, COHPSK_NC*ND, coh->rx_baseband_log_col_index, coh->rx_baseband_log_col_sz);  
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)coh->rx_filt_log, COHPSK_NC*ND, coh->rx_filt_log_col_index, coh->rx_filt_log_col_sz);  

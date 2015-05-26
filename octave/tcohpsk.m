@@ -71,13 +71,13 @@ Fs           = 7500;
 
 if strcmp(test, 'compare to c')
   frames = 35;
-  foff =  0;
-  dfoff = 0;
+  foff =  58.7;
+  dfoff = -0.5/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 1;
-  sample_rate_ppm = 0;
+  sample_rate_ppm = -1000;
   ssb_tx_filt  = 0;
 end
 
@@ -91,7 +91,7 @@ if strcmp(test, 'awgn')
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
-  sample_rate_ppm = 0;
+  sample_rate_ppm = -1000;
 end
 
 % Similar to AWGN - should be BER around 0.015 to 0.02
@@ -333,7 +333,21 @@ end
 
 % simulate difference in sample clocks
 
-ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
+%ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
+
+ch_fdm_frame_log_out = zeros(1, length(ch_fdm_frame_log));
+tin=1;
+tout=1;
+while tin < length(ch_fdm_frame_log)
+      t1 = floor(tin);
+      t2 = ceil(tin);
+      f = tin - t1;
+      ch_fdm_frame_log_out(tout) = (1-f)*ch_fdm_frame_log(t1) + f*ch_fdm_frame_log(t2);
+      tout += 1;
+      tin  += 1+sample_rate_ppm/1E6;
+      %printf("tin: %f tout: %f f: %f\n", tin, tout, f);
+end
+ch_fdm_frame_log = ch_fdm_frame_log_out;
 
 % Now run demod ----------------------------------------------------------------
 
@@ -543,12 +557,13 @@ if compare_with_c
   stem_sig_and_error(8, 211, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'Amp Est', [1 n -1.5 1.5])
   phi_log_diff = rx_phi_log - rx_phi_log_c;
   phi_log_diff(find(phi_log_diff > pi)) -= 2*pi;
+  phi_log_diff(find(phi_log_diff < -pi)) += 2*pi;
   stem_sig_and_error(8, 212, rx_phi_log_c, phi_log_diff, 'Phase Est', [1 n -4 4])
   stem_sig_and_error(9, 211, real(rx_symb_log_c), real(rx_symb_log - rx_symb_log_c), 'rx symb re', [1 n -1.5 1.5])
   stem_sig_and_error(9, 212, imag(rx_symb_log_c), imag(rx_symb_log - rx_symb_log_c), 'rx symb im', [1 n -1.5 1.5])
 
   stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
-  stem_sig_and_error(11, 111, f_est_log_c - Fcentre, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) foff-5 foff+5])
+  stem_sig_and_error(11, 111, f_est_log_c, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) min(f_est_log) max(f_est_log)])
   stem_sig_and_error(12, 111, rx_timing_log_c, rx_timing_log_c - rx_timing_log, 'rx timing', [1 length(rx_timing_log) -M M])
 
   check(tx_bits_log, tx_bits_log_c, 'tx_bits');

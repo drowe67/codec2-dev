@@ -1027,3 +1027,35 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
     *nin_frame = (NSYMROWPILOT-1)*COHPSK_M + nin;
     //printf("%f %d %d\n", coh->rx_timing, nin, *nin_frame);
 }
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_fs_offset()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: May 2015
+
+  Simulates small Fs offset between mod and demod.
+
+\*---------------------------------------------------------------------------*/
+
+int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
+{
+    double tin, f;
+    int   tout, t1, t2;
+
+    tin = 0.0; tout = 0; 
+    while (tin < n) {
+      t1 = floor(tin);
+      t2 = ceil(tin);
+      f = tin - t1;
+      out[tout].real = (1.0-f)*in[t1].real + f*in[t2].real;
+      out[tout].imag = (1.0-f)*in[t1].imag + f*in[t2].imag;
+      tout += 1;
+      tin  += 1.0 + sample_rate_ppm/1E6;
+      //printf("tin: %f tout: %d f: %f\n", tin, tout, f);
+    }
+
+    return tout;
+}
+
