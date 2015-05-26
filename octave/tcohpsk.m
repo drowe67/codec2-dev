@@ -337,27 +337,14 @@ ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
 % Now run demod ----------------------------------------------------------------
 
 ch_fdm_frame_log_index = 1;
+nin = M;
 f = 0;
+nin_frame = acohpsk.Nsymbrowpilot*M;
 
 %while (ch_fdm_frame_log_index + acohpsk.Nsymbrowpilot*M+M/P) < length(ch_fdm_frame_log)
 for f=1:frames;
   acohpsk.frame = f;
 
-  if sync == 0  
-    nin = M;
-  else
-    nin = M;
-    if 0
-    if rx_timing(1) > M/P
-      nin = M + M/P;
-    end
-    if rx_timing(1) < -M/P
-      nin = M - M/P;
-    end
-    end
-  end
-
-  nin_frame = (acohpsk.Nsymbrowpilot-1)*M + nin;
   ch_fdm_frame = ch_fdm_frame_log(ch_fdm_frame_log_index:ch_fdm_frame_log_index + nin_frame - 1);
   ch_fdm_frame_log_index += nin_frame;
 
@@ -390,6 +377,7 @@ for f=1:frames;
       
       rx_filt_log = [rx_filt_log rx_filt];
       ch_symb_log = [ch_symb_log; ch_symb];
+      rx_timing_log = [rx_timing_log rx_timing];
 
       for i=1:Nsw-1
         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
@@ -419,7 +407,8 @@ for f=1:frames;
       rx_baseband_log = [rx_baseband_log rx_baseband];
       rx_filt_log = [rx_filt_log rx_filt];
       ch_symb_log = [ch_symb_log; ch_symb];
- 
+      rx_timing_log = [rx_timing_log rx_timing];
+
       for i=1:Nsw-1
         acohpsk.ct_symb_buf = update_ct_symb_buf(acohpsk.ct_symb_buf, ch_symb((i-1)*acohpsk.Nsymbrowpilot+1:i*acohpsk.Nsymbrowpilot,:), acohpsk.Nct_sym_buf, acohpsk.Nsymbrowpilot);
       end
@@ -492,6 +481,20 @@ for f=1:frames;
 
   [sync acohpsk] = sync_state_machine(acohpsk, sync, next_sync);
 
+  % work out how many samples we need for next time
+
+  nin = M;
+  if sync == 1
+    if rx_timing(length(rx_timing)) > M/P
+      nin = M + M/P;
+    end
+    if rx_timing(length(rx_timing)) < -M/P
+      nin = M - M/P;
+    end
+  end
+  nin_frame = (acohpsk.Nsymbrowpilot-1)*M + nin;
+  %printf("%f %d %d\n", rx_timing(length(rx_timing)), nin, nin_frame);
+
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
 
@@ -545,6 +548,7 @@ if compare_with_c
 
   stem_sig_and_error(10, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
   stem_sig_and_error(11, 111, f_est_log_c - Fcentre, f_est_log - f_est_log_c, 'f est', [1 length(f_est_log) foff-5 foff+5])
+  stem_sig_and_error(12, 111, rx_timing_log_c, rx_timing_log_c - rx_timing_log, 'rx timing', [1 length(rx_timing_log) -M M])
 
   check(tx_bits_log, tx_bits_log_c, 'tx_bits');
   check(tx_symb_log, tx_symb_log_c, 'tx_symb');
@@ -557,6 +561,7 @@ if compare_with_c
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
   check(phi_log_diff, zeros(length(phi_log_diff), Nc*Nd), 'rx_phi_log',0.05);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
+  check(rx_timing_log, rx_timing_log_c, 'rx_timing',0.001);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
   check(f_est_log, f_est_log_c, 'f_est');
   

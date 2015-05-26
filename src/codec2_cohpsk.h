@@ -32,7 +32,7 @@
 #define COHPSK_NC                  7              /* hard coded for now */
 #define COHPSK_SAMPLES_PER_FRAME 600
 #define COHPSK_RS                 75
-#define COHPSK_FS               7500
+#define COHPSK_FS               7500              /* note this is a wierd value to get an integer oversampling rate */
 
 #include "comp.h"
 #include "codec2_fdmdv.h"
@@ -42,6 +42,6 @@ struct COHPSK;
 struct COHPSK *cohpsk_create(void);
 void cohpsk_destroy(struct COHPSK *coh);
 void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[]);
-void cohpsk_demod(struct COHPSK *cohpsk, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[]);
+void cohpsk_demod(struct COHPSK *cohpsk, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame);
 
 #endif

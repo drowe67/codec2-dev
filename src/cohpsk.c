@@ -118,6 +118,7 @@ struct COHPSK *cohpsk_create(void)
     coh->sync  = 0;
     coh->frame = 0;
     coh->ratio = 0.0;
+    coh->nin = COHPSK_M;
 
     /* clear sync window buffer */
 
@@ -160,6 +161,8 @@ struct COHPSK *cohpsk_create(void)
     coh->rx_filt_log_col_index = 0;
     coh->ch_symb_log = NULL;
     coh->ch_symb_log_r = 0;
+    coh->rx_timing_log = NULL;
+    coh->rx_timing_log_index = 0;
 
     return coh;
 }
@@ -751,7 +754,7 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
 void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COMP ch_fdm_frame[], float *f_est, int nsymb, int nin, int freq_track)
 {
     struct FDMDV *fdmdv = coh->fdmdv;
-    int   r, c, i;
+    int   r, c, i, ch_fdm_frame_index;
     COMP  rx_fdm_frame_bb[COHPSK_M];
     COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
     COMP  rx_filt[COHPSK_NC*ND][P+1];
@@ -760,10 +763,11 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     float beta, g;
     COMP  adiff, amod_strip, mod_strip;
 
-    assert(nin < COHPSK_M*NSYMROWPILOT);
+    ch_fdm_frame_index = 0;
 
     for (r=0; r<nsymb; r++) {
-        fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[r*COHPSK_M], -(*f_est), &fdmdv->fbb_phase_rx, nin);
+        fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[ch_fdm_frame_index], -(*f_est), &fdmdv->fbb_phase_rx, nin);
+        ch_fdm_frame_index += nin;
         fdm_downconvert_coh(rx_baseband, COHPSK_NC*ND, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
         rx_filter_coh(rx_filt, COHPSK_NC*ND, rx_baseband, coh->rx_filter_memory, nin);
         rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, COHPSK_M);
@@ -823,12 +827,12 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         }
 
         if (coh->rx_filt_log) {
- 	  for(c=0; c<COHPSK_NC*ND; c++) {       
-            for(i=0; i<P; i++) {
+ 	  for(c=0; c<COHPSK_NC*ND; c++) {     
+            for(i=0; i<nin/(COHPSK_M/P); i++) {
               coh->rx_filt_log[c*coh->rx_filt_log_col_sz + coh->rx_filt_log_col_index + i] = rx_filt[c][i]; 
             }
 	  }
-	  coh->rx_filt_log_col_index += P;        
+	  coh->rx_filt_log_col_index += nin/(COHPSK_M/P);        
         }
 
         if (coh->ch_symb_log) {
@@ -837,8 +841,20 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
             }
             coh->ch_symb_log_r++;
         }
+
+        if (coh->rx_timing_log) {
+            coh->rx_timing_log[coh->rx_timing_log_index] = rx_timing;
+            coh->rx_timing_log_index++;
+            //printf("rx_timing_log_index: %d\n", coh->rx_timing_log_index);
+        }
+
+        /* we only allow a timing shift on one symbol per frame */
+
+        if (nin != COHPSK_M)
+            nin = COHPSK_M;
     }
 
+    coh->rx_timing = rx_timing;
 }
 
 
@@ -848,39 +864,31 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
   AUTHOR......: David Rowe			      
   DATE CREATED: 5/4/2015
 
-  COHPSK demodulator, takes an array of COHPSK_SAMPLES_PER_FRAME
-  modulated samples, returns an array of COHPSK_BITS_PER_FRAME bits.
+  COHPSK demodulator, takes an array of (nominally) nin_frame =
+  COHPSK_SAMPLES_PER_FRAME modulated samples, returns an array of
+  COHPSK_BITS_PER_FRAME bits.
 
   The input signal is complex to support single sided frequency shifting
   before the demod input (e.g. click to tune feature).
 
-  The number of input samples is fixed, and unlike the FDMDV modem
-  doesn't change to adjust for differences in transmit and receive
-  sample clocks.  This means frame sync will occasionally be lost,
-  however this is hardly noticable for digital voice applications.
-
-  TODO: logic to check if we are still in sync, ride thru bad frames
-
 \*---------------------------------------------------------------------------*/
 
-void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[])
+void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame)
 {
     COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
     int   i, j, sync, anext_sync, next_sync, nin, r, c;
     float max_ratio, f_est;
 
-    /* store two frames of received samples so we can rewind if we get a good candidate */
+    next_sync = sync = coh->sync;
 
-    for (i=0; i<(NSW-1)*NSYMROWPILOT*COHPSK_M; i++)
-        coh->ch_fdm_frame_buf[i] = coh->ch_fdm_frame_buf[i+NSYMROWPILOT*COHPSK_M];
+    for (i=0; i<NSW*NSYMROWPILOT*COHPSK_M-*nin_frame; i++)
+        coh->ch_fdm_frame_buf[i] = coh->ch_fdm_frame_buf[i+*nin_frame];
+    //printf("nin_frame: %d i: %d i+nin_frame: %d\n", *nin_frame, i, i+*nin_frame);
     for (j=0; i<NSW*NSYMROWPILOT*COHPSK_M; i++,j++)
         coh->ch_fdm_frame_buf[i] = rx_fdm[j];
     //printf("i: %d j: %d rx_fdm[0]: %f %f\n", i,j, rx_fdm[0].real, rx_fdm[0].imag);
 
-    next_sync = sync = coh->sync;
-    nin = COHPSK_M;
-
-    /* if out of sync do Initial Freq offset estimation using NSW frames to flush out filter memories */
+   /* if out of sync do Initial Freq offset estimation using NSW frames to flush out filter memories */
 
     if (sync == 0) {
 
@@ -893,7 +901,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
 
             /* we are out of sync so reset f_est and process two frames to clean out memories */
 
-            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, nin, 0);
+            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, COHPSK_M, 0);
             for (i=0; i<NSW-1; i++) {
                 update_ct_symb_buf(coh->ct_symb_buf, &ch_symb[i*NSYMROWPILOT]);
             }
@@ -918,7 +926,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
 
             fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
 
-            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, nin, 0);
+            rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, COHPSK_M, 0);
             for (i=0; i<NSW-1; i++) {
                 update_ct_symb_buf(coh->ct_symb_buf, &ch_symb[i*NSYMROWPILOT]);
             }
@@ -954,7 +962,7 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
     /* If in sync just do sample rate processing on latest frame */
 
     if (sync == 1) {
-        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, nin, 1);
+        rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, coh->nin, 1);
         frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
  
         for(r=0; r<2; r++)
@@ -975,4 +983,18 @@ void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COM
 
     sync = sync_state_machine(coh, sync, next_sync);        
     coh->sync = sync;
+
+    /* work out how many samples we need for the next call to account
+       for differences in tx and rx sample clocks */
+
+    nin = COHPSK_M;   
+    if (sync == 1) {
+        if (coh->rx_timing > COHPSK_M/P)
+            nin = COHPSK_M + COHPSK_M/P;
+        if (coh->rx_timing < -COHPSK_M/P)
+            nin = COHPSK_M - COHPSK_M/P;
+    }
+    coh->nin = nin;
+    *nin_frame = (NSYMROWPILOT-1)*COHPSK_M + nin;
+    //printf("%f %d %d\n", coh->rx_timing, nin, *nin_frame);
 }
