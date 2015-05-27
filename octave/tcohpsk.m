@@ -57,8 +57,8 @@ randn('state',1);
 % select which test  ----------------------------------------------------------
 
 %test = 'compare to c';
-%test = 'awgn';
-test = 'fading';
+test = 'awgn';
+%test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
@@ -70,7 +70,7 @@ Fs           = 7500;
 % predefined tests ....
 
 if strcmp(test, 'compare to c')
-  frames = 35;
+  frames = 100;
   foff =  58.7;
   dfoff = -0.5/Fs;
   EsNodB = 8;
@@ -84,7 +84,7 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 10;
+  frames = 100;
   foff =  0;
   dfoff = -0/Fs;
   EsNodB = 8;
@@ -98,7 +98,7 @@ end
 
 if strcmp(test, 'fading');
   frames = 100;
-  foff = 55;
+  foff = -10.5;
   dfoff = 0.0/Fs;
   EsNodB = 12;
   fading_en = 1;
