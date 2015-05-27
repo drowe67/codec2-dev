@@ -57,8 +57,8 @@ randn('state',1);
 % select which test  ----------------------------------------------------------
 
 %test = 'compare to c';
-test = 'awgn';
-%test = 'fading';
+%test = 'awgn';
+test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
@@ -97,7 +97,7 @@ end
 % Similar to AWGN - should be BER around 0.015 to 0.02
 
 if strcmp(test, 'fading');
-  frames = 100;
+  frames = 200;
   foff = -10.5;
   dfoff = 0.0/Fs;
   EsNodB = 12;
