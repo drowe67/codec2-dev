@@ -627,8 +627,8 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
     for(r=0; r<NSYMROWPILOT; r++) {
         for(c=0; c<COHPSK_NC*ND; c++) 
             tx_onesym[c] = tx_symb[r][c];         
-        tx_filter_and_upconvert(&tx_fdm[r*COHPSK_M], fdmdv->Nc , tx_onesym, fdmdv->tx_filter_memory, 
-                                fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
+        tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory, 
+                                    fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
     }
 }
 
