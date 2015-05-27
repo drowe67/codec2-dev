@@ -37,13 +37,18 @@
 #include "octave.h"
 #include "comp_prim.h"
 #include "noise_samples.h"
+#include "cohpsk_defs.h"
+#include "cohpsk_internal.h"
 
-#define FS          8000
 #define FRAMES      100
-#define FOFF_HZ     10.5
-#define ES_NO_DB     8.0
+#define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
+#define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
+
+#define FOFF_HZ      0.0
+#define ES_NO_DB     80.0
 #define HF_DELAY_MS  2.0
-#define HF_GAIN      1.423599
+
+#define CH_BUF_SZ (4*COHPSK_SAMPLES_PER_FRAME)
 
 #define FADING_FILE_NAME "../../raw/fading_samples.float"
 
@@ -53,7 +58,11 @@ int main(int argc, char *argv[])
     int            tx_bits[COHPSK_BITS_PER_FRAME];
     COMP           tx_fdm[COHPSK_SAMPLES_PER_FRAME];
     COMP           ch_fdm[COHPSK_SAMPLES_PER_FRAME];
+    COMP           ch_buf[CH_BUF_SZ];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
+    float          rx_amp_log[NSYMROW*FRAMES][COHPSK_NC*ND];
+    float          rx_phi_log[NSYMROW*FRAMES][COHPSK_NC*ND];
+    COMP           rx_symb_log[NSYMROW*FRAMES][COHPSK_NC*ND];
                                             
     int            f, r, i;
     int           *ptest_bits_coh, *ptest_bits_coh_end, *ptest_bits_coh_rx;
@@ -64,12 +73,21 @@ int main(int argc, char *argv[])
     float          EsNo, variance;
     COMP           scaled_noise;
     float          EsNodB, foff_hz;
-    int            fading_en, nhfdelay, ret, nin;
+    int            fading_en, nhfdelay, ret, nin_frame;
+    float          hf_gain;
     COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
-    FILE          *ffading;
+    FILE          *ffading, *fout;
+    int            ch_buf_n;
+    float          tx_pwr, rx_pwr, noise_pwr;
+    int            error_positions_hist[COHPSK_BITS_PER_FRAME];
+    int            log_data_r, c, j, tmp;
+
+    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+        error_positions_hist[i] = 0;
 
     EsNodB = ES_NO_DB;
     foff_hz =  FOFF_HZ;
+    fading_en = 0;
     if (argc == 4) {
         EsNodB = atof(argv[1]);
         foff_hz = atof(argv[2]);
@@ -80,18 +98,27 @@ int main(int argc, char *argv[])
     coh = cohpsk_create();
     assert(coh != NULL);
 
+    coh->ch_symb_log_col_sz = COHPSK_NC*ND;
+    coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*FRAMESL*coh->ch_symb_log_col_sz);
+
     ptest_bits_coh = ptest_bits_coh_rx = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
+    
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     noise_r = 0; 
     noise_end = sizeof(noise)/sizeof(COMP);
-    
+    ch_buf_n = 0;
+
+    log_data_r = 0;
+
     /*  each carrier has power = 2, total power 2Nc, total symbol rate
         NcRs, noise BW B=Fs Es/No = (C/Rs)/(N/B), N = var =
         2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No) */
 
     EsNo = pow(10.0, EsNodB/10.0);
     variance = 2.0*COHPSK_FS/(COHPSK_RS*EsNo);
+    
+    tx_pwr = rx_pwr = noise_pwr = 0.0;
 
     /* init HF fading model */
 
@@ -101,18 +128,22 @@ int main(int argc, char *argv[])
             printf("Can't find fading file: %s\n", FADING_FILE_NAME);
             exit(1);
         }
-        nhfdelay = floor(HF_DELAY_MS*FS/1000);
+        nhfdelay = floor(HF_DELAY_MS*COHPSK_FS/1000);
         ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_SAMPLES_PER_FRAME)*sizeof(COMP));
         assert(ch_fdm_delay != NULL);
         for(i=0; i<nhfdelay+COHPSK_SAMPLES_PER_FRAME; i++) {
             ch_fdm_delay[i].real = 0.0;
             ch_fdm_delay[i].imag = 0.0;
         }
+
+        /* first values are HF gains */
+
+        for (i=0; i<4; i++)
+            ret = fread(&hf_gain, sizeof(float), 1, ffading);
+        printf("hf_gain: %f\n", hf_gain);
     }
 
     /* Main Loop ---------------------------------------------------------------------*/
-
-    nin = COHPSK_SAMPLES_PER_FRAME;
 
     for(f=0; f<FRAMES; f++) {
         
@@ -124,9 +155,15 @@ int main(int argc, char *argv[])
         ptest_bits_coh += COHPSK_BITS_PER_FRAME;
         if (ptest_bits_coh >= ptest_bits_coh_end) {
             ptest_bits_coh = (int*)test_bits_coh;
+            //fprintf(stderr, "  [%d] tx test bits wrap\n", f);            
         }
 
 	cohpsk_mod(coh, tx_fdm, tx_bits);
+        cohpsk_clip(tx_fdm);
+        
+        for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
+            tx_pwr += pow(tx_fdm[r].real, 2.0) + pow(tx_fdm[r].imag, 2.0);
+        }
 
 	/* --------------------------------------------------------*\
 	                          Channel
@@ -142,8 +179,8 @@ int main(int argc, char *argv[])
 
             for(i=0; i<nhfdelay; i++)
                 ch_fdm_delay[i] = ch_fdm_delay[i+COHPSK_SAMPLES_PER_FRAME];
-            for(; i<COHPSK_SAMPLES_PER_FRAME; i++)
-                ch_fdm_delay[i] = ch_fdm[i];
+            for(j=0; j<COHPSK_SAMPLES_PER_FRAME; i++, j++)
+                ch_fdm_delay[i] = ch_fdm[j];
 
             /* combine direct and delayed paths, both multiplied by
                "spreading" (doppler) functions */
@@ -157,8 +194,12 @@ int main(int argc, char *argv[])
                 
                 direct    = cmult(aspread, ch_fdm[i]);
                 delayed   = cmult(aspread_2ms, ch_fdm_delay[i]);
-                ch_fdm[i] = fcmult(HF_GAIN, cadd(direct, delayed));
+                ch_fdm[i] = fcmult(hf_gain, cadd(direct, delayed));
             }
+        }
+
+        for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
+            rx_pwr += pow(ch_fdm[r].real, 2.0) + pow(ch_fdm[r].imag, 2.0);
         }
 
         /* AWGN noise ------------------------------------------*/
@@ -166,56 +207,105 @@ int main(int argc, char *argv[])
         for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm[r] = cadd(ch_fdm[r], scaled_noise);
+            noise_pwr += pow(noise[noise_r].real, 2.0) + pow(noise[noise_r].imag, 2.0);
             noise_r++;
-            if (noise_r > noise_end)
+            if (noise_r > noise_end) {
                 noise_r = 0;
+                //fprintf(stderr, "  [%d] noise wrap\n", f);            
+            }
+               
         }
 
+        /* buffer so we can let demod Fs offset code do it's thing */
+        
+        memcpy(&ch_buf[ch_buf_n], ch_fdm, sizeof(COMP)*COHPSK_SAMPLES_PER_FRAME);
+        ch_buf_n += COHPSK_SAMPLES_PER_FRAME;
+        assert(ch_buf_n < CH_BUF_SZ);
+
+        // add SAMPLES to end
+        // subtract nin from beginning
 	/* --------------------------------------------------------*\
 	                          Demod
 	\*---------------------------------------------------------*/
 
- 	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_fdm, &nin);
+        /* locks timing to avoid complications when we know there is
+           no Fs offset */
 
+        tmp = nin_frame;
+ 	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_buf, &tmp);
+        ch_buf_n -= nin_frame;
+        assert(ch_buf_n >= 0);
+        if (ch_buf_n)
+            memcpy(ch_buf, &ch_buf[nin_frame], sizeof(COMP)*ch_buf_n);
+        nin_frame = tmp;
+
+        //fprintf(stderr, "  [%d] nin_frame: %d\n", f, nin_frame);            
         errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
             errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i];
+            if (state == 1) {
+                if ((rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i])
+                    error_positions_hist[i]++;
+            }
         }
-
+        
         /* state logic to sync up to test data */
 
         next_state = state;
-
+        
         if (state == 0) {
-            if (reliable_sync_bit && (errors == 0)) {
+            if (reliable_sync_bit && (errors < 4)) {
                 next_state = 1;
                 ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
                 nerrors = errors;
                 nbits = COHPSK_BITS_PER_FRAME;
-                fprintf(stderr, "  test data sync\n");            
-
+                //fprintf(stderr, "  [%d] test data sync nerrors: %d\n", f, nerrors);            
             }
         }
 
         if (state == 1) {
             nerrors += errors;
             nbits   += COHPSK_BITS_PER_FRAME;
+            //fprintf(stderr, "  [%d] test data sync errors: %d\n", f, errors);            
             ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
             if (ptest_bits_coh_rx >= ptest_bits_coh_end) {
                 ptest_bits_coh_rx = (int*)test_bits_coh;
+                //fprintf(stderr, "  [%d] rx test bits wrap\n", f);                         
+            }
+
+            for(r=0; r<NSYMROW; r++, log_data_r++) {
+                for(c=0; c<COHPSK_NC*ND; c++) {
+                    rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
+                    rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
+                    rx_symb_log[log_data_r][c] = coh->rx_symb[r][c]; 
+                }
             }
         }
-
+        
         state = next_state;
     }
-    
+            
     printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
-
+    printf("tx var: %f noise var: %f rx var: %f\n", 
+           tx_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME), 
+           noise_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME),
+           rx_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME) 
+           );
     if (fading_en) {
         free(ch_fdm_delay);
         fclose(ffading);
     }
     cohpsk_destroy(coh);
+        
+    //for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+    //        printf("%d %d\n", i, error_positions_hist[i]);
+
+    fout = fopen("test_cohpsk_ch_out.txt","wt");
+    octave_save_complex(fout, "ch_symb_log_c", (COMP*)coh->ch_symb_log, coh->ch_symb_log_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+    octave_save_float(fout, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+    octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+    fclose(fout);
 
     return 0;
 }

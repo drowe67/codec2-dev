@@ -56,9 +56,9 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-test = 'compare to c';
+%test = 'compare to c';
 %test = 'awgn';
-%test = 'fading';
+test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
@@ -84,27 +84,27 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 100;
+  frames = 10;
   foff =  0;
   dfoff = -0/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
-  sample_rate_ppm = -1500;
+  sample_rate_ppm = 0;
 end
 
 % Similar to AWGN - should be BER around 0.015 to 0.02
 
 if strcmp(test, 'fading');
   frames = 100;
-  foff = -53.1;
+  foff = 55;
   dfoff = 0.0/Fs;
   EsNodB = 12;
   fading_en = 1;
   hf_delay_ms = 2;
   compare_with_c = 0;
-  sample_rate_ppm = -100;
+  sample_rate_ppm = 0;
 end
 
 EsNo = 10^(EsNodB/10);
@@ -228,6 +228,7 @@ ptx_bits_coh = 1;
 
 Nerrs = Tbits = 0;
 prev_tx_bits = prev_tx_bits2 = [];
+error_positions_hist = zeros(1,framesize);
 
 phase_ch = 1;
 sync = initial_sync;
@@ -482,6 +483,7 @@ for f=1:frames;
       Nerrs  += sum(error_positions);
       nerr_log = [nerr_log sum(error_positions)];
       Tbits += length(error_positions);
+      error_positions_hist += error_positions;
     end
     printf("\r  [%d]", f);
   end
@@ -659,8 +661,15 @@ else
   clf
   h = freqz(b,a,Fs/2);
   plot(20*log10(abs(h)))
-  axis([1 Fs/2 -50 0])
+  axis([1 Fs/2 -20 0])
   grid
+  title('SSB tx filter')
+
+  figure(9)
+  clf
+  plot(error_positions_hist)    
+  title('histogram of bit errors')                               
+
 end
 
 
@@ -684,5 +693,26 @@ function write_noise_file(uvnoise_log)
     end
   end
 
+  fclose(f);
+endfunction
+
+
+% function to write float fading samples for use by C programs
+
+function write_noise_file(raw_file_name, Fs, len_samples)
+  [spread spread_2ms hf_gain] = init_hf_model(Fs, len_samples);
+ hf_gain
+  % interleave real imag samples
+
+  inter = zeros(1,len_samples*4);
+  inter(1:4) = hf_gain;
+  for i=1:len_samples
+    inter(i*4+1) = real(spread(i));
+    inter(i*4+2) = imag(spread(i));
+    inter(i*4+3) = real(spread_2ms(i));
+    inter(i*4+4) = imag(spread_2ms(i));
+  end
+  f = fopen(raw_file_name,"wb");
+  fwrite(f, inter, "float32");
   fclose(f);
 endfunction
