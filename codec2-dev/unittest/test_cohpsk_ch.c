@@ -41,14 +41,22 @@
 #include "cohpsk_internal.h"
 
 #define FRAMES      100
-#define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
-#define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
+#define SYNC_FRAMES 12     /* sync state uses up extra log storage as we reprocess several times */
+
+/* defaults with no arguments */
 
 #define FOFF_HZ      0.0
-#define ES_NO_DB     80.0
+#define ES_NO_DB     8.0
 #define HF_DELAY_MS  2.0
 
 #define CH_BUF_SZ (4*COHPSK_SAMPLES_PER_FRAME)
+
+/* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
+   tcohpsk first (any variant) to load the function into Octave, e.g.:
+
+  octave:17> tcohpsk
+  octave:18> write_noise_file("../raw/fading_samples.float", 7500, 7500*60)
+*/
 
 #define FADING_FILE_NAME "../../raw/fading_samples.float"
 
@@ -60,9 +68,9 @@ int main(int argc, char *argv[])
     COMP           ch_fdm[COHPSK_SAMPLES_PER_FRAME];
     COMP           ch_buf[CH_BUF_SZ];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
-    float          rx_amp_log[NSYMROW*FRAMES][COHPSK_NC*ND];
-    float          rx_phi_log[NSYMROW*FRAMES][COHPSK_NC*ND];
-    COMP           rx_symb_log[NSYMROW*FRAMES][COHPSK_NC*ND];
+    float         *rx_amp_log;
+    float         *rx_phi_log;
+    COMP          *rx_symb_log;
                                             
     int            f, r, i;
     int           *ptest_bits_coh, *ptest_bits_coh_end, *ptest_bits_coh_rx;
@@ -73,7 +81,7 @@ int main(int argc, char *argv[])
     float          EsNo, variance;
     COMP           scaled_noise;
     float          EsNodB, foff_hz;
-    int            fading_en, nhfdelay, ret, nin_frame;
+    int            fading_en, nhfdelay, ret, nin_frame, frames, framesl;
     float          hf_gain;
     COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
     FILE          *ffading, *fout;
@@ -88,18 +96,29 @@ int main(int argc, char *argv[])
     EsNodB = ES_NO_DB;
     foff_hz =  FOFF_HZ;
     fading_en = 0;
-    if (argc == 4) {
+    frames = FRAMES;
+    if (argc == 5) {
         EsNodB = atof(argv[1]);
         foff_hz = atof(argv[2]);
         fading_en = atoi(argv[3]);
+        frames = atoi(argv[4]);
     }
     fprintf(stderr, "EsNodB: %4.2f foff: %4.2f Hz fading: %d\n", EsNodB, foff_hz, fading_en);
 
     coh = cohpsk_create();
     assert(coh != NULL);
 
+    framesl = SYNC_FRAMES*frames;
     coh->ch_symb_log_col_sz = COHPSK_NC*ND;
-    coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*FRAMESL*coh->ch_symb_log_col_sz);
+    coh->ch_symb_log = (COMP *)malloc(sizeof(COMP)*NSYMROWPILOT*framesl*coh->ch_symb_log_col_sz);
+    assert(coh->ch_symb_log != NULL);
+
+    rx_amp_log = (float *)malloc(sizeof(float)*frames*NSYMROW*COHPSK_NC*ND);
+    assert(rx_amp_log != NULL);
+    rx_phi_log = (float *)malloc(sizeof(float)*frames*NSYMROW*COHPSK_NC*ND);
+    assert(rx_phi_log != NULL);
+    rx_symb_log = (COMP *)malloc(sizeof(COMP)*frames*NSYMROW*COHPSK_NC*ND);
+    assert(rx_symb_log != NULL);
 
     ptest_bits_coh = ptest_bits_coh_rx = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
@@ -136,7 +155,7 @@ int main(int argc, char *argv[])
             ch_fdm_delay[i].imag = 0.0;
         }
 
-        /* first values are HF gains */
+        /* first values in file are HF gains */
 
         for (i=0; i<4; i++)
             ret = fread(&hf_gain, sizeof(float), 1, ffading);
@@ -145,7 +164,8 @@ int main(int argc, char *argv[])
 
     /* Main Loop ---------------------------------------------------------------------*/
 
-    for(f=0; f<FRAMES; f++) {
+    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    for(f=0; f<frames; f++) {
         
 	/* --------------------------------------------------------*\
 	                          Mod
@@ -222,18 +242,15 @@ int main(int argc, char *argv[])
         ch_buf_n += COHPSK_SAMPLES_PER_FRAME;
         assert(ch_buf_n < CH_BUF_SZ);
 
-        // add SAMPLES to end
-        // subtract nin from beginning
-	/* --------------------------------------------------------*\
+ 	/* --------------------------------------------------------*\
 	                          Demod
 	\*---------------------------------------------------------*/
 
-        /* locks timing to avoid complications when we know there is
-           no Fs offset */
-
+        coh->frame = f;
         tmp = nin_frame;
  	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_buf, &tmp);
         ch_buf_n -= nin_frame;
+        //printf("nin_frame: %d tmp: %d ch_buf_n: %d\n", nin_frame, tmp, ch_buf_n);
         assert(ch_buf_n >= 0);
         if (ch_buf_n)
             memcpy(ch_buf, &ch_buf[nin_frame], sizeof(COMP)*ch_buf_n);
@@ -275,9 +292,9 @@ int main(int argc, char *argv[])
 
             for(r=0; r<NSYMROW; r++, log_data_r++) {
                 for(c=0; c<COHPSK_NC*ND; c++) {
-                    rx_amp_log[log_data_r][c] = coh->amp_[r][c]; 
-                    rx_phi_log[log_data_r][c] = coh->phi_[r][c]; 
-                    rx_symb_log[log_data_r][c] = coh->rx_symb[r][c]; 
+                    rx_amp_log[log_data_r*COHPSK_NC*ND+c] = coh->amp_[r][c]; 
+                    rx_phi_log[log_data_r*COHPSK_NC*ND+c] = coh->phi_[r][c]; 
+                    rx_symb_log[log_data_r*COHPSK_NC*ND+c] = coh->rx_symb[r][c]; 
                 }
             }
         }
@@ -287,9 +304,9 @@ int main(int argc, char *argv[])
             
     printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
     printf("tx var: %f noise var: %f rx var: %f\n", 
-           tx_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME), 
-           noise_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME),
-           rx_pwr/(FRAMES*COHPSK_SAMPLES_PER_FRAME) 
+           tx_pwr/(frames*COHPSK_SAMPLES_PER_FRAME), 
+           noise_pwr/(frames*COHPSK_SAMPLES_PER_FRAME),
+           rx_pwr/(frames*COHPSK_SAMPLES_PER_FRAME) 
            );
     if (fading_en) {
         free(ch_fdm_delay);
