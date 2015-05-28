@@ -35,7 +35,6 @@
 #define COHPSK_FS               7500              /* note this is a wierd value to get an integer oversampling rate */
 
 #include "comp.h"
-#include "codec2_fdmdv.h"
 
 struct COHPSK;
 
