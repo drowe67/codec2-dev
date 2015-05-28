@@ -42,8 +42,11 @@ int main(int argc, char *argv[])
     FILE         *fin;
     int           rx_bits[COHPSK_BITS_PER_FRAME];
     int           *ptest_bits_coh, *ptest_bits_coh_end;
-    int           state, next_state, i, nbits, nerrors;
-    float         corr;
+    int           state, next_state, i, nbits, errors, nerrors;
+    int           error_positions_hist[COHPSK_BITS_PER_FRAME];
+
+    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+        error_positions_hist[i] = 0;
 
     if (argc < 2) {
 	printf("usage: %s InputOneBitPerIntFile\n", argv[0]);
@@ -62,9 +65,13 @@ int main(int argc, char *argv[])
 
     while (fread(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
 
-        corr = 0.0;
+        errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-            corr += (1.0 - 2.0*(rx_bits[i] & 0x1)) * (1.0 - 2.0*ptest_bits_coh[i]);
+            errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh[i];
+            if (state == 1) {
+                if ((rx_bits[i] & 0x1) ^ ptest_bits_coh[i])
+                    error_positions_hist[i]++;
+            }
         }
 
         /* state logic */
@@ -72,17 +79,16 @@ int main(int argc, char *argv[])
         next_state = state;
 
         if (state == 0) {
-            fprintf(stderr, "corr %f\n", corr);            
-            if (corr == COHPSK_BITS_PER_FRAME) {
+            if (errors < 4) {
                 next_state = 1;
                 ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-                nerrors = COHPSK_BITS_PER_FRAME - corr;
+                nerrors = errors;
                 nbits = COHPSK_BITS_PER_FRAME;
             }
         }
 
         if (state == 1) {
-            nerrors += COHPSK_BITS_PER_FRAME - corr;
+            nerrors += errors;
             nbits   += COHPSK_BITS_PER_FRAME;
             ptest_bits_coh += COHPSK_BITS_PER_FRAME;
             if (ptest_bits_coh >= ptest_bits_coh_end) {
@@ -96,7 +102,7 @@ int main(int argc, char *argv[])
     }
 
     fclose(fin);
-    printf("BER: %3.2f Nbits: %d Nerrors: %d\n", (float)nerrors/nbits, nbits, nerrors);
+    printf("BER: %4.3f Nbits: %d Nerrors: %d\n", (float)nerrors/nbits, nbits, nerrors);
 
     return 0;
 }

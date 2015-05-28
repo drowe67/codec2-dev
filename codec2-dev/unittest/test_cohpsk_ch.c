@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     int            ch_buf_n;
     float          tx_pwr, rx_pwr, noise_pwr;
     int            error_positions_hist[COHPSK_BITS_PER_FRAME];
-    int            log_data_r, c, j, tmp;
+    int            log_data_r, c, j, tmp, ret;
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
         error_positions_hist[i] = 0;
@@ -218,8 +218,8 @@ int main(int argc, char *argv[])
             }
         }
 
-        for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
-            rx_pwr += pow(ch_fdm[r].real, 2.0) + pow(ch_fdm[r].imag, 2.0);
+        for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+            rx_pwr += pow(ch_fdm[i].real, 2.0) + pow(ch_fdm[i].imag, 2.0);
         }
 
         /* AWGN noise ------------------------------------------*/

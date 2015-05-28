@@ -42,7 +42,14 @@
 %      + however other filters may have other effects, should test this, 
 %        e.g. scatter plots, some sort of BER metric?
 %  [ ] pilot based EsNo estimation
+%  [ ] filter reqd with compression?
+%      + make sure not too much noise passed into noise floor
 %  [ ] different diversity combination
+%  [ ] histogram of bit errors
+%      + lot of data
+%      + ssb filter
+%      + compression
+%      + make sure it's flat with many errors
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -57,14 +64,14 @@ randn('state',1);
 % select which test  ----------------------------------------------------------
 
 %test = 'compare to c';
-%test = 'awgn';
-test = 'fading';
+test = 'awgn';
+%test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
 
 initial_sync = 0;  % setting this to 1 put us straight into sync w/o freq offset est
 ftrack_en    = 1;  % set to 1 to enable freq tracking
-ssb_tx_filt  = 1;  % set to 1 to to simulate SSB tx filter with passband ripple
+ssb_tx_filt  = 0;  % set to 1 to to simulate SSB tx filter with passband ripple
 Fs           = 7500;
 
 % predefined tests ....
@@ -84,10 +91,10 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 100;
+  frames = 10;
   foff =  0;
   dfoff = -0/Fs;
-  EsNodB = 8;
+  EsNodB = 80;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -349,6 +356,8 @@ while tin < length(ch_fdm_frame_log)
       %printf("tin: %f tout: %f f: %f\n", tin, tout, f);
 end
 ch_fdm_frame_log = ch_fdm_frame_log_out(1:tout-1);
+
+%ch_fdm_frame_log = real(ch_fdm_frame_log);
 
 % Now run demod ----------------------------------------------------------------
 

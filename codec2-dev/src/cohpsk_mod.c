@@ -35,6 +35,7 @@
 #include <errno.h>
 
 #include "codec2_cohpsk.h"
+#include "codec2_fdmdv.h"
 
 int main(int argc, char *argv[])
 {
@@ -73,6 +74,7 @@ int main(int argc, char *argv[])
 	frames++;
 
 	cohpsk_mod(cohpsk, tx_fdm, tx_bits);
+        cohpsk_clip(tx_fdm);
 
 	/* scale and save to disk as shorts */
 

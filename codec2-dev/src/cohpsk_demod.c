@@ -34,6 +34,7 @@
 #include <errno.h>
 
 #include "codec2_cohpsk.h"
+#include "codec2_fdmdv.h"
 
 int main(int argc, char *argv[])
 {
@@ -42,7 +43,7 @@ int main(int argc, char *argv[])
     int           rx_bits[COHPSK_BITS_PER_FRAME];
     COMP          rx_fdm[COHPSK_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_SAMPLES_PER_FRAME];
-    int           frames, reliable_sync_bit;
+    int           frames, reliable_sync_bit, nin_frame;
     int           i;
 
     if (argc < 3) {
@@ -68,19 +69,21 @@ int main(int argc, char *argv[])
 
     frames = 0;
 
-    while(fread(rx_fdm_scaled, sizeof(short), COHPSK_SAMPLES_PER_FRAME, fin) == COHPSK_SAMPLES_PER_FRAME) {
+    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    while(fread(rx_fdm_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
 	frames++;
 
 	/* scale and demod */
 
-	for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+	for(i=0; i<nin_frame; i++) {
 	    rx_fdm[i].real = rx_fdm_scaled[i]/FDMDV_SCALE;
             rx_fdm[i].imag = 0.0;
         }
 
-	cohpsk_demod(cohpsk, rx_bits, &reliable_sync_bit, rx_fdm);
+	cohpsk_demod(cohpsk, rx_bits, &reliable_sync_bit, rx_fdm, &nin_frame);
 
- 	fwrite(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fout);
+ 	if (reliable_sync_bit)
+            fwrite(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
