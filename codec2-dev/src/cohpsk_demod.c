@@ -34,20 +34,28 @@
 #include <errno.h>
 
 #include "codec2_cohpsk.h"
+#include "cohpsk_defs.h"
+#include "cohpsk_internal.h"
 #include "codec2_fdmdv.h"
+#include "octave.h"
+
+#define LOG_FRAMES 100
 
 int main(int argc, char *argv[])
 {
-    FILE          *fin, *fout;
+    FILE          *fin, *fout, *foct;
     struct COHPSK *cohpsk;
     int           rx_bits[COHPSK_BITS_PER_FRAME];
     COMP          rx_fdm[COHPSK_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_SAMPLES_PER_FRAME];
     int           frames, reliable_sync_bit, nin_frame;
-    int           i;
+    float        *rx_amp_log;
+    float        *rx_phi_log;
+    COMP         *rx_symb_log;
+    int           i, r, c, log_data_r, oct, logframes;
 
     if (argc < 3) {
-	printf("usage: %s InputModemRawFile OutputOneBitPerIntFile\n", argv[0]);
+	printf("usage: %s InputModemRawFile OutputOneBitPerIntFile [OctaveLogFile]\n", argv[0]);
 	exit(1);
     }
 
@@ -65,8 +73,30 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    foct = NULL;
+    oct = 0;
+    if (argc == 4) {
+        if ( (foct = fopen(argv[3],"wt")) == NULL ) {
+            fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
+                    argv[3], strerror(errno));            
+	exit(1);
+        }
+        oct = 1;
+    }
+
     cohpsk = cohpsk_create();
 
+    if (oct) {
+        logframes = LOG_FRAMES;
+        rx_amp_log = (float *)malloc(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        assert(rx_amp_log != NULL);
+        rx_phi_log = (float *)malloc(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        assert(rx_phi_log != NULL);
+        rx_symb_log = (COMP *)malloc(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*ND);
+        assert(rx_symb_log != NULL);
+    }
+
+    log_data_r = 0;
     frames = 0;
 
     nin_frame = COHPSK_SAMPLES_PER_FRAME;
@@ -82,8 +112,22 @@ int main(int argc, char *argv[])
 
 	cohpsk_demod(cohpsk, rx_bits, &reliable_sync_bit, rx_fdm, &nin_frame);
 
- 	if (reliable_sync_bit)
+ 	if (reliable_sync_bit) {
             fwrite(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fout);
+
+            if (oct) {
+                for(r=0; r<NSYMROW; r++, log_data_r++) {
+                    for(c=0; c<COHPSK_NC*ND; c++) {
+                        rx_amp_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->amp_[r][c]; 
+                        rx_phi_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->phi_[r][c]; 
+                        rx_symb_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->rx_symb[r][c]; 
+                    }
+                }
+                //printf("frames: %d log_data_r: %d\n", frames, log_data_r);
+                if (frames == logframes)
+                    oct = 0;
+            }
+        }
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
@@ -94,7 +138,18 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
+
+    /* optionally dump Octave files */
+
+    if (foct != NULL) {
+        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+        octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+        octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+        fclose(foct);
+    }
+
     cohpsk_destroy(cohpsk);
 
+ 
     return 0;
 }

@@ -68,8 +68,8 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
 void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
 void codec2_encode_1200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
-void codec2_encode_650(struct CODEC2 *c2, unsigned char * bits, short speech[]);
-void codec2_decode_650(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
 
 /*---------------------------------------------------------------------------*\
@@ -108,7 +108,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 	   (mode == CODEC2_MODE_1400) || 
 	   (mode == CODEC2_MODE_1300) || 
 	   (mode == CODEC2_MODE_1200) ||
-	   (mode == CODEC2_MODE_650) 
+	   (mode == CODEC2_MODE_700) 
 	   );
     c2->mode = mode;
     for(i=0; i<M; i++)
@@ -202,8 +202,8 @@ int CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
 	return 52;
     if  (c2->mode == CODEC2_MODE_1200)
 	return 48;
-    if  (c2->mode == CODEC2_MODE_650)
-	return 26;
+    if  (c2->mode == CODEC2_MODE_700)
+	return 28;
 
     return 0; /* shouldn't get here */
 }
@@ -232,7 +232,7 @@ int CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 320;
     if  (c2->mode == CODEC2_MODE_1200)
 	return 320;
-    if  (c2->mode == CODEC2_MODE_650)
+    if  (c2->mode == CODEC2_MODE_700)
 	return 320;
 
     return 0; /* shouldnt get here */
@@ -248,7 +248,7 @@ void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, s
 	   (c2->mode == CODEC2_MODE_1400) || 
 	   (c2->mode == CODEC2_MODE_1300) || 
 	   (c2->mode == CODEC2_MODE_1200) ||
-	   (c2->mode == CODEC2_MODE_650)
+	   (c2->mode == CODEC2_MODE_700)
 	   );
 
     if (c2->mode == CODEC2_MODE_3200)
@@ -263,8 +263,8 @@ void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, s
 	codec2_encode_1300(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_1200)
 	codec2_encode_1200(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_650)
-	codec2_encode_650(c2, bits, speech);
+    if (c2->mode == CODEC2_MODE_700)
+	codec2_encode_700(c2, bits, speech);
 }
 
 void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
@@ -282,7 +282,7 @@ void CODEC2_WIN32SUPPORT codec2_decode_ber(struct CODEC2 *c2, short speech[], co
 	   (c2->mode == CODEC2_MODE_1400) || 
 	   (c2->mode == CODEC2_MODE_1300) || 
 	   (c2->mode == CODEC2_MODE_1200) ||
-	   (c2->mode == CODEC2_MODE_650)
+	   (c2->mode == CODEC2_MODE_700)
 	   );
 
     if (c2->mode == CODEC2_MODE_3200)
@@ -297,8 +297,8 @@ void CODEC2_WIN32SUPPORT codec2_decode_ber(struct CODEC2 *c2, short speech[], co
  	codec2_decode_1300(c2, speech, bits, ber_est);
     if (c2->mode == CODEC2_MODE_1200)
  	codec2_decode_1200(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_650)
- 	codec2_decode_650(c2, speech, bits);
+    if (c2->mode == CODEC2_MODE_700)
+ 	codec2_decode_700(c2, speech, bits);
 }
 
 
@@ -1317,11 +1317,11 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: codec2_encode_650	     
+  FUNCTION....: codec2_encode_700	     
   AUTHOR......: David Rowe			      
   DATE CREATED: April 2015
 
-  Encodes 320 speech samples (40ms of speech) into 26 bits.  
+  Encodes 320 speech samples (40ms of speech) into 28 bits.  
 
   The codec2 algorithm actually operates internally on 10ms (80
   sample) frames, so we run the encoding algorithm four times:
@@ -1329,7 +1329,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
   frame 0: nothing
   frame 1: nothing
   frame 2: nothing
-  frame 3: voicing bit, scalar Wo and E, 17 bit LSP MEL scalar
+  frame 3: voicing bit, scalar Wo and E, 17 bit LSP MEL scalar, 2 spare
 
   The bit allocation is:
 
@@ -1339,11 +1339,12 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
     Energy                              0          3         3
     log Wo                              0          5         5
     Voicing                             0          1         1
-    TOTAL                               0         26        26
+    spare                               0          2         2
+    TOTAL                               0         28        28
  
 \*---------------------------------------------------------------------------*/
 
-void codec2_encode_650(struct CODEC2 *c2, unsigned char * bits, short speech[])
+void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[])
 {
     MODEL   model;
     float   lsps[LPC_ORD_LOW];
@@ -1355,6 +1356,7 @@ void codec2_encode_650(struct CODEC2 *c2, unsigned char * bits, short speech[])
     unsigned int nbit = 0;
     float   bpf_out[4*N];
     short   bpf_speech[4*N];
+    int     spare = 0;
 
     assert(c2 != NULL);
 
@@ -1403,21 +1405,23 @@ void codec2_encode_650(struct CODEC2 *c2, unsigned char * bits, short speech[])
         pack(bits, &nbit, indexes[i], mel_bits(i));
     }
 
+    pack_natural_or_gray(bits, &nbit, spare, 2, c2->gray);
+
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
 
 
 /*---------------------------------------------------------------------------*\
                                                        
-  FUNCTION....: codec2_decode_650	     
+  FUNCTION....: codec2_decode_700	     
   AUTHOR......: David Rowe			      
   DATE CREATED: April 2015
 
-  Decodes frames of 26 bits into 320 samples (40ms) of speech.
+  Decodes frames of 28 bits into 320 samples (40ms) of speech.
 
 \*---------------------------------------------------------------------------*/
 
-void codec2_decode_650(struct CODEC2 *c2, short speech[], const unsigned char * bits)
+void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * bits)
 {
     MODEL   model[4];
     int     indexes[LPC_ORD_LOW];

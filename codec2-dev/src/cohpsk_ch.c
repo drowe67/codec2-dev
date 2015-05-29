@@ -47,10 +47,12 @@
 #include "comp_prim.h"
 #include "../unittest/noise_samples.h"
 #include "ht_coeff.h"
+#include "ssbfilt_coeff.h"
 #include "codec2_fdmdv.h"
 
 #define BUF_N        160
 #define HF_DELAY_MS  2.0
+#define PAPR_TARGET  7.0
 
 /* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
    tcohpsk first (any variant) to load the function into Octave, e.g.:
@@ -64,25 +66,27 @@
 int main(int argc, char *argv[])
 {
     FILE          *fin, *ffading, *fout;
-    float          EsNodB, foff_hz;
+    float          NodB, foff_hz;
     int            fading_en, nhfdelay;
 
     short          buf[BUF_N];
     float          htbuf[HT_N+BUF_N];
     COMP           ch_in[BUF_N];
     COMP           ch_fdm[BUF_N];
+    float          ssbfiltbuf[SSBFILT_N+BUF_N];
+    float          ssbfiltout[BUF_N];
                                            
     COMP           phase_ch;
     int            noise_r, noise_end;
-    float          EsNo, variance;
+    float          No, variance;
     COMP           scaled_noise;
     float          hf_gain;
     COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
-    float          tx_pwr, rx_pwr, noise_pwr;
-    int            frames, i, j, k, ret;
-    float          sam;
+    float          tx_pwr, tx_pwr_fade, noise_pwr;
+    int            frames, i, j, k, ret, clipped;
+    float          sam, peak, inclip, papr, CNo, snr3k, EbNo700;
 
-    if (argc == 6) {
+    if (argc == 7) {
         if (strcmp(argv[1], "-")  == 0) fin = stdin;
         else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
             fprintf(stderr, "Error opening input modem raw file: %s: %s.\n",
@@ -97,28 +101,29 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        EsNodB = atof(argv[3]);
+        NodB = atof(argv[3]);
         foff_hz = atof(argv[4]);
         fading_en = atoi(argv[5]);
+        inclip = atof(argv[6]);
     }
     else {
-        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz SNR3000Hz FoffHz FadingEn\n", argv[0]);
+        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz SNR3000Hz FoffHz FadingEn InputClip0to1\n", argv[0]);
         exit(1);
     }
-    fprintf(stderr, "EsNodB: %4.2f foff: %4.2f Hz fading: %d\n", EsNodB, foff_hz, fading_en);
+    fprintf(stderr, "NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f\n", NodB, foff_hz, fading_en, inclip);
     
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     noise_r = 0; 
     noise_end = sizeof(noise)/sizeof(COMP);
 
-    /*  each carrier has power = 2, total power 2Nc, total symbol rate
-        NcRs, noise BW B=Fs Es/No = (C/Rs)/(N/B), N = var =
-        2NcFs/NcRs(Es/No) = 2Fs/Rs(Es/No) */
+    /*  N = var = NoFs */
 
-    EsNo = pow(10.0, EsNodB/10.0);
-    variance = 2.0*COHPSK_FS/(COHPSK_RS*EsNo);
+    No = pow(10.0, NodB/10.0);
+    variance = COHPSK_FS*No;
     
-    tx_pwr = rx_pwr = noise_pwr = 0.0;
+    tx_pwr = tx_pwr_fade = noise_pwr = 0.0;
+    clipped = 0;
+    peak = 0.0;
 
     /* init HF fading model */
 
@@ -166,7 +171,19 @@ int main(int argc, char *argv[])
                freqencies.
             */
 
-            htbuf[j] = (float)buf[i]/FDMDV_SCALE;
+            sam = (float)buf[i];
+            //printf("sam: %f ", sam);
+            if (sam > inclip*32767.0)
+                sam = inclip*32767.0;
+            if (sam < -inclip*32767.0)
+                sam = -inclip*32767.0;
+            //printf("sam: %f\n", sam);
+            htbuf[j] = sam/FDMDV_SCALE;
+            
+            if (fabs(htbuf[j]) > peak) {
+                peak = fabs(htbuf[j]);
+            }
+            tx_pwr += pow(htbuf[j], 2.0);
 
             /* FIR filter with HT to get imag, just delay to get real */
 
@@ -184,19 +201,6 @@ int main(int argc, char *argv[])
 
         for(i=0; i<HT_N; i++)
            htbuf[i] = htbuf[i+BUF_N];
-
-        for(i=0; i<BUF_N; i++) {
-            //printf("%d %f %f\n", i, ch_in[i].real, ch_in[i].imag);
-            tx_pwr += pow(ch_in[i].real, 2.0) + pow(ch_in[i].imag, 2.0);
-        }
-
-        /* +3dB factor is beacuse we ouput a real signal, this has half
-           the power of the complex version but as the noise reflects
-           across from the -ve side the same noise power. */
-
-        for(i=0; i<BUF_N; i++) {
-            ch_in[i] = fcmult(sqrt(2.0), ch_in[i]);
-        }
 
 	/* --------------------------------------------------------*\
 	                          Channel
@@ -231,10 +235,12 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* we only output the real signal, which is half the power. */
+        /* Measure power after fading model to make sure aaverage pwr
+           is the same as AWGN channels. We only output the real
+           signal, which is half the power. */
 
         for(i=0; i<BUF_N; i++) {
-            rx_pwr += pow(ch_fdm[i].real, 2.0);
+            tx_pwr_fade += pow(ch_fdm[i].real, 2.0);
         }
 
         /* AWGN noise ------------------------------------------*/
@@ -242,21 +248,44 @@ int main(int argc, char *argv[])
         for(i=0; i<BUF_N; i++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm[i] = cadd(ch_fdm[i], scaled_noise);
-            noise_pwr += pow(noise[noise_r].real, 2.0) + pow(noise[noise_r].imag, 2.0);
+            noise_pwr += pow(scaled_noise.real, 2.0);
             noise_r++;
             if (noise_r > noise_end) {
                 noise_r = 0;
                 //fprintf(stderr, "  [%d] noise wrap\n", f);            
-            }
-               
+            }              
         }
+
+        /* FIR filter to simulate (a rather flat) SSB filter.  Might
+           be useful to have an option for a filter with a few dB
+           ripple too, to screw up the modem. This is mainly so analog
+           SSB sounds realistic. */
+
+        for(i=0, j=SSBFILT_N; i<BUF_N; i++,j++) {
+            ssbfiltbuf[j] = ch_fdm[i].real;
+            ssbfiltout[i] = 0.0;
+            for(k=0; k<SSBFILT_N; k++) {
+                ssbfiltout[i] += ssbfiltbuf[j-k]*ssbfilt_coeff[k];
+            }
+        }
+
+        /* update SSB filter memory */
+
+        for(i=0; i<SSBFILT_N; i++)
+           ssbfiltbuf[i] = ssbfiltbuf[i+BUF_N];
 
 	/* scale and save to disk as shorts */
 
 	for(i=0; i<BUF_N; i++) {
-            sam = FDMDV_SCALE * ch_fdm[i].real;
-            if (fabs(sam) > 32767.0)
-                fprintf(stderr,"clipping: %f\n", sam);
+            sam = FDMDV_SCALE * ssbfiltout[i];
+            if (sam > 32767.0) {
+                clipped++;
+                sam = 32767.0;
+            }
+            if (sam < -32767.0) {
+                clipped++;
+                sam = -32767.0;
+            }
 	    buf[i] = sam;
         }
 
@@ -271,13 +300,26 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
-
-    fprintf(stderr, "tx var: %f noise var: %f rx var: %f\n", 
-           tx_pwr/(frames*BUF_N), 
-           noise_pwr/(frames*BUF_N),
-           rx_pwr/(frames*BUF_N) 
+    
+    fprintf(stderr, "peak pwr.....: %7.2f\nav input pwr.: %7.2f\nav pwr fading: %7.2f\nnoise pwr....: %7.2f\nclipping.....: %7.2f %%\n", 
+            peak*peak,
+            tx_pwr/(frames*BUF_N), 
+            tx_pwr_fade/(frames*BUF_N),
+            noise_pwr/(frames*BUF_N),
+            100.0*clipped/frames
            );
-
+    papr = 10*log10(peak*peak/(tx_pwr/(frames*BUF_N)));
+    CNo = 10*log10(tx_pwr/(noise_pwr/(COHPSK_FS/2))); // single sided spctrum magic IDFK!
+    snr3k = CNo - 10*log10(3000);
+    EbNo700 = CNo - 10*log10(700) - 10*log10(6.0/4.0); // divide by bit rate and pilot overhead
+    fprintf(stderr, "PAPR (dB)....: %7.2f (target %3.2f)\nC/No (dB)....: %7.2f\nSNR3k........: %7.2f\nEb/No(Rb=700): %7.2f\n",
+            papr,
+            PAPR_TARGET,
+            CNo,
+            snr3k,
+            EbNo700
+            );
+ 
     return 0;
 }
 
