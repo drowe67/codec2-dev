@@ -278,7 +278,7 @@ target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(cohpsk_mod cohpsk_mod.c)
 target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(cohpsk_demod cohpsk_demod.c)
+add_executable(cohpsk_demod cohpsk_demod.c octave.c)
 target_link_libraries(cohpsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(cohpsk_get_test_bits cohpsk_get_test_bits.c)

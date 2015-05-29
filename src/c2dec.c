@@ -51,12 +51,13 @@ int main(int argc, char *argv[])
     FILE          *fber = NULL;
     short         *buf;
     unsigned char *bits, *prev_bits;
+    int           *unpacked_bits;
     int            nsam, nbit, nbyte, i, byte, frames, bits_proc, bit_errors, error_mode;
     int            nstart_bit, nend_bit, bit_rate;
     int            state, next_state;
     float          ber, r, burst_length, burst_period, burst_timer, ber_est;
     unsigned char  mask;
-    int            natural, dump;
+    int            natural, dump, unpacked, bit, ret;
 
     char* opt_string = "h:";
     struct option long_options[] = {
@@ -65,6 +66,7 @@ int main(int argc, char *argv[])
         { "endbit", required_argument, NULL, 0 },
         { "berfile", required_argument, NULL, 0 },
         { "natural", no_argument, &natural, 1 },
+        { "unpacked", no_argument, &unpacked, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -88,10 +90,10 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_1300;
     else if (strcmp(argv[1],"1200") == 0)
 	mode = CODEC2_MODE_1200;
-    else if (strcmp(argv[1],"650") == 0)
-	mode = CODEC2_MODE_650;
+    else if (strcmp(argv[1],"700") == 0)
+	mode = CODEC2_MODE_700;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, or 650\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, or 700\n", argv[1]);
 	exit(1);
     }
     bit_rate = atoi(argv[1]);
@@ -122,6 +124,7 @@ int main(int argc, char *argv[])
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
+    unpacked_bits = (int*)malloc(nbit*sizeof(int));
     prev_bits = (unsigned char*)malloc(nbyte*sizeof(char));
     frames = bit_errors = bits_proc = 0;
     nstart_bit = 0;
@@ -172,12 +175,18 @@ int main(int argc, char *argv[])
     codec2_set_natural_or_gray(codec2, !natural);
     //printf("%d %d\n", nstart_bit, nend_bit);
  
-    while(fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte) {
+    if (unpacked)
+        ret = (fread(unpacked_bits, sizeof(int), nbit, fin) == (size_t)nbit);
+    else
+        ret = (fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte);
+      
+    while(ret) {
 	frames++;
 
-        // apply bit errors, MSB of byte 0 is bit 0 in frame */
+        // apply bit errors, MSB of byte 0 is bit 0 in frame, only works in packed mode
         
 	if ((error_mode == UNIFORM) || (error_mode == UNIFORM_RANGE)) {
+            assert(unpacked == 0);
 	    for(i=nstart_bit; i<nend_bit+1; i++) {
 		r = (float)rand()/RAND_MAX;
 		if (r < ber) {
@@ -193,6 +202,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (error_mode == TWO_STATE) {
+            assert(unpacked == 0);
             burst_timer += (float)nbit/bit_rate;
             fprintf(stderr, "burst_timer: %f  state: %d\n", burst_timer, state);
 
@@ -241,14 +251,36 @@ int main(int argc, char *argv[])
         else
             ber_est = 0.0;
             
+        if (unpacked) {
+            /* pack bits, MSB received first  */
+
+            bit = 7; byte = 0;
+            memset(bits, 0, nbyte);
+            for(i=0; i<nbit; i++) {
+                bits[byte] |= (unpacked_bits[i] << bit);
+                bit--;
+                if (bit < 0) {
+                    bit = 7;
+                    byte++;
+                }
+            }
+       }
+
 	codec2_decode_ber(codec2, buf, bits, ber_est);
  	fwrite(buf, sizeof(short), nsam, fout);
+
 	//if this is in a pipeline, we probably don't want the usual
         //buffering to occur
+
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);         
 
         memcpy(prev_bits, bits, nbyte);
+
+        if (unpacked)
+            ret = (fread(unpacked_bits, sizeof(int), nbit, fin) == (size_t)nbit);
+        else
+            ret = (fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte);
     }
 
     if (error_mode)
@@ -258,6 +290,7 @@ int main(int argc, char *argv[])
 
     free(buf);
     free(bits);
+    free(unpacked_bits);
     fclose(fin);
     fclose(fout);
 

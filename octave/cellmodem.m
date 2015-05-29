@@ -6,12 +6,18 @@
 % Ideas:
 %   + insert low rate codec
 %   + generate bunch of symbols, run through codec, measure MSE, choose best set
+%   + measure probablility of error, "distance" from other symbols
+%   + can we use VQ training algorithm for this?  Start with 2 symbols,
+%     pass through channel, measure MSE, split again?
 %   + start with cmd line version of codec, frame synchronous
 %   + add symbol timing estimator later
 %   + try different frame rates
 %   + simulate impairments like HP/LP filtering.  Can we correct for this?
 %   + pilots symbols so we can use energy as well?
 %   + set of F0 as well
+%   + LSP quantisers preferrentially preserve peaks, so three peaks is a
+%     reasonable signal set.  Modulate position and bandwidth to creat 
+%     symbol set.  Maybe 50 or 100 Hz grid for LSPs, evaluate that some how.
 
 graphics_toolkit ("gnuplot");
 lsp;
@@ -35,6 +41,8 @@ for m=1:l
     ex += cos(wo*m*(1:N));
 end
 s = filter(1, a, ex);
+
+% insert codec here (e.g. write to file, run codec, read file)
 
 % extract received symbol from channel
 

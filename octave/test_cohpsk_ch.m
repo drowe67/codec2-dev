@@ -5,7 +5,7 @@
 
 Nc=7; Nd=2;
 
-load ../build_linux/unittest/test_cohpsk_ch_out.txt
+load ../build_linux/src/test_cohpsk_ch_out.txt
   
 figure(3)
 clf;
