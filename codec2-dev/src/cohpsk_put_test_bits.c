@@ -36,20 +36,24 @@
 
 #include "codec2_cohpsk.h"
 #include "test_bits_coh.h"
+#include "octave.h"
+
+#define LOG_FRAMES 100
 
 int main(int argc, char *argv[])
 {
-    FILE         *fin;
+    FILE         *fin, *foct;
     int           rx_bits[COHPSK_BITS_PER_FRAME];
-    int           *ptest_bits_coh, *ptest_bits_coh_end;
+    int          *ptest_bits_coh, *ptest_bits_coh_end;
     int           state, next_state, i, nbits, errors, nerrors;
-    int           error_positions_hist[COHPSK_BITS_PER_FRAME];
+    int           error_positions_hist[COHPSK_BITS_PER_FRAME], logframes;
+    int           nerr_log[LOG_FRAMES];
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
         error_positions_hist[i] = 0;
 
     if (argc < 2) {
-	printf("usage: %s InputOneBitPerIntFile\n", argv[0]);
+	fprintf(stderr, "usage: %s InputOneBitPerIntFile [OctaveLogFile]\n", argv[0]);
 	exit(1);
     }
 
@@ -60,19 +64,34 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    foct = NULL;
+    logframes = 0;
+    if (argc == 3) {
+        if ( (foct = fopen(argv[2],"wt")) == NULL ) {
+            fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
+                    argv[2], strerror(errno));            
+	exit(1);
+        }
+    }
+
+    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+        error_positions_hist[i] = 0;
+
     ptest_bits_coh = (int*)test_bits_coh;
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
+    state = 0; nbits = 0; nerrors = 0;
     while (fread(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
 
         errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
             errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh[i];
             if (state == 1) {
-                if ((rx_bits[i] & 0x1) ^ ptest_bits_coh[i])
+                if ((state == 1 ) && (rx_bits[i] & 0x1) ^ ptest_bits_coh[i])
                     error_positions_hist[i]++;
             }
         }
+        //printf("state: %d errors: %d nerrors: %d\n", state, errors, nerrors);
 
         /* state logic */
 
@@ -84,6 +103,8 @@ int main(int argc, char *argv[])
                 ptest_bits_coh += COHPSK_BITS_PER_FRAME;
                 nerrors = errors;
                 nbits = COHPSK_BITS_PER_FRAME;
+                if (logframes < LOG_FRAMES)
+                    nerr_log[logframes++] = errors;
             }
         }
 
@@ -94,6 +115,8 @@ int main(int argc, char *argv[])
             if (ptest_bits_coh >= ptest_bits_coh_end) {
                 ptest_bits_coh = (int*)test_bits_coh;
             }
+            if (logframes < LOG_FRAMES)
+                nerr_log[logframes++] = errors;
         }
 
         state = next_state;
@@ -101,8 +124,14 @@ int main(int argc, char *argv[])
         if (fin == stdin) fflush(stdin);
     }
 
+    if (foct != NULL) {
+        octave_save_int(foct, "nerr_log_c", nerr_log, 1, logframes);  
+        octave_save_int(foct, "error_positions_hist_c", error_positions_hist, 1, logframes);  
+        fclose(foct);
+    }
+
     fclose(fin);
-    printf("BER: %4.3f Nbits: %d Nerrors: %d\n", (float)nerrors/nbits, nbits, nerrors);
+    fprintf(stderr, "BER: %4.3f Nbits: %d Nerrors: %d\n", (float)nerrors/nbits, nbits, nerrors);
 
     return 0;
 }
