@@ -40,6 +40,7 @@
 #include "octave.h"
 
 #define LOG_FRAMES 100
+#define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 
 int main(int argc, char *argv[])
 {
@@ -52,6 +53,7 @@ int main(int argc, char *argv[])
     float        *rx_amp_log;
     float        *rx_phi_log;
     COMP         *rx_symb_log;
+    float         f_est_log[LOG_FRAMES], ratio_log[LOG_FRAMES];
     int           i, r, c, log_data_r, oct, logframes;
 
     if (argc < 3) {
@@ -94,6 +96,8 @@ int main(int argc, char *argv[])
         assert(rx_phi_log != NULL);
         rx_symb_log = (COMP *)malloc(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*ND);
         assert(rx_symb_log != NULL);
+        cohpsk->rx_timing_log = (float*)malloc(sizeof(float)*SYNC_FRAMES*logframes*NSYMROWPILOT);
+        assert(cohpsk->rx_timing_log != NULL);
     }
 
     log_data_r = 0;
@@ -123,6 +127,10 @@ int main(int argc, char *argv[])
                         rx_symb_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->rx_symb[r][c]; 
                     }
                 }
+
+                f_est_log[frames-1] = cohpsk->f_est;
+                ratio_log[frames-1] = cohpsk->ratio;
+
                 //printf("frames: %d log_data_r: %d\n", frames, log_data_r);
                 if (frames == logframes)
                     oct = 0;
@@ -145,6 +153,9 @@ int main(int argc, char *argv[])
         octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
         octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
         octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
+        octave_save_float(foct, "rx_timing_log_c", (float*)cohpsk->rx_timing_log, 1, cohpsk->rx_timing_log_index, cohpsk->rx_timing_log_index);  
+        octave_save_float(foct, "f_est_log_c", f_est_log, 1, logframes, logframes);  
+        octave_save_float(foct, "ratio_log_c", ratio_log, 1, logframes, logframes);  
         fclose(foct);
     }
 

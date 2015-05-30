@@ -90,6 +90,8 @@ int main(int argc, char *argv[]) {
     freedv->callback_state = (void*)&my_cb_state;
     freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
 
+    freedv->snr_thresh = -100.0;
+
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx
        sample clock frequencies.  Note also the number of output
