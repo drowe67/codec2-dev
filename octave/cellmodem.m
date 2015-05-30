@@ -22,37 +22,65 @@
 graphics_toolkit ("gnuplot");
 lsp;
 
+codec_cmd = "speexenc --bitrate 4000 in.raw - | speexdec - out.raw"
+
 lpc_order = 4;
 Fs = 8000;
-fo = 100;             % pitch frequency of voice 
+fo = 200;             % pitch frequency of voice 
 wo = 2*pi*fo/Fs;      % pitch in rads
 N  = Fs*0.04;         % frame length
+frames = Fs/N;        % frames to play through codec
+gain = 100;
 
-% construct LSP symbol
+s = [];
+w_log = [];
+w__log = [];
 
-w = [0.1 0.4  0.5 0.8]*pi
+for f=1:frames
 
-% synthesise speech signal
+  % construct LSP symbol
 
-a=lsptoa(w)
-l=pi/wo;
-ex = zeros(1,N);
-for m=1:l
+  w = [0.1 0.4  0.5 0.8]*pi;
+
+  % synthesise speech signal
+
+  a=lsptoa(w);
+  w_log = [w_log; w];
+  l=pi/wo;
+  ex = zeros(1,N);
+  for m=1:l
     ex += cos(wo*m*(1:N));
+  end
+  s = [s filter(1, a, ex)];
 end
-s = filter(1, a, ex);
 
-% insert codec here (e.g. write to file, run codec, read file)
+% play through codec
 
-% extract received symbol from channel
+s *= gain;
+f=fopen("in.raw","wb");
+fwrite(f,s,"short");
+fclose(f);
+system(codec_cmd);
+f=fopen("out.raw","rb");
+s_ = fread(f,Inf,"short");
+fclose(f);
 
-a_ = lpcauto(s, lpc_order)
-w_ = atolsp(a_)
+% extract received symbols from channel and evaluate
+
+for f=1:frames
+  a_ = lpcauto(s_((f-1)*N+1:f*N), lpc_order);
+  w_ = atolsp(a_);
+  w__log = [w__log; w_];
+end
 
 figure(1);
 clf;
 subplot(211)
 plot(s)
+axis([1 Fs/10 -4000 4000]);
 subplot(212)
-plot(w,'g+',w_','r+');
-axis([0 lpc_order+1 0 pi])
+plot(s_);
+axis([1 Fs/10 -4000 4000]);
+
+figure(2)
+plot(w_log, 'g', w__log, 'r+')
