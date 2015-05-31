@@ -581,6 +581,8 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
         /* check that sync is still good, fall out of sync on consecutive bad frames */
 
         corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
+        coh->ratio = fabsf(corr)/mag;        
+
         // printf("%f\n", cabsolute(corr)/mag);
 
         if (fabsf(corr)/mag < 0.8) 

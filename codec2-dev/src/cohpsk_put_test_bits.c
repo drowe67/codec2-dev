@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
 
     if (foct != NULL) {
         octave_save_int(foct, "nerr_log_c", nerr_log, 1, logframes);  
-        octave_save_int(foct, "error_positions_hist_c", error_positions_hist, 1, logframes);  
+        octave_save_int(foct, "error_positions_hist_c", error_positions_hist, 1, COHPSK_BITS_PER_FRAME);  
         fclose(foct);
     }
 
