@@ -130,6 +130,7 @@ int main(int argc, char *argv[])
 
                 f_est_log[frames-1] = cohpsk->f_est;
                 ratio_log[frames-1] = cohpsk->ratio;
+                //fprintf(stderr,"ratio: %f\n", cohpsk->ratio);
 
                 //printf("frames: %d log_data_r: %d\n", frames, log_data_r);
                 if (frames == logframes)

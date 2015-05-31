@@ -20,67 +20,118 @@
 %     symbol set.  Maybe 50 or 100 Hz grid for LSPs, evaluate that some how.
 
 graphics_toolkit ("gnuplot");
+rand('state',1);
 lsp;
 
-codec_cmd = "speexenc --bitrate 4000 in.raw - | speexdec - out.raw"
+% given a vector of LSP symbols, constructs a synthesised speech signals
+% anfd runs it through a codec
 
-lpc_order = 4;
-Fs = 8000;
-fo = 200;             % pitch frequency of voice 
-wo = 2*pi*fo/Fs;      % pitch in rads
-N  = Fs*0.04;         % frame length
-frames = Fs/N;        % frames to play through codec
-gain = 100;
+function [w__log mse] = run_sim(sim_in, w_log)
+  N         = sim_in.N;
+  Wo        = sim_in.Wo;
+  frames    = sim_in.frames;
+  lpc_order = sim_in.lpc_order;
 
-s = [];
-w_log = [];
-w__log = [];
+  s      = [];
+  w__log = [];
+  L      = floor(pi/Wo);
+  phi    = zeros(1,L);
 
-for f=1:frames
+  for f=1:frames
 
-  % construct LSP symbol
+    % synthesise speech signal
 
-  w = [0.1 0.4  0.5 0.8]*pi;
+    a=lsptoa(w_log(f,:));
 
-  % synthesise speech signal
+    ex = zeros(1,N);
+    for m=1:L
+      phi(m) += Wo*m*N;
+      ex += cos(phi(m) + Wo*m*(0:N-1));
+    end
 
-  a=lsptoa(w);
-  w_log = [w_log; w];
-  l=pi/wo;
-  ex = zeros(1,N);
-  for m=1:l
-    ex += cos(wo*m*(1:N));
+    s = [s filter(1, a, ex)];
   end
-  s = [s filter(1, a, ex)];
+
+  % play through codec
+
+  s *= sim_in.gain;
+  f=fopen("in.raw","wb");
+  fwrite(f,s,"short");
+  fclose(f);
+  system(sim_in.codec_cmd);
+  f=fopen("out.raw","rb");
+  s_ = fread(f,Inf,"short");
+  fclose(f);
+
+  % extract received symbols from channel and evaluate
+
+  mse = zeros(1,frames);
+  for f=1:frames
+    a_ = lpcauto(s_((f-1)*sim_in.N+1:f*N), lpc_order);
+    w_ = atolsp(a_);
+    w__log = [w__log; w_];
+    error = w__log(f,:) - w_log(f,:);
+    mse(f) = error*error';
+  end
+endfunction
+
+% constants -----------------------------------------------------
+
+sim_in.codec_cmd = "speexenc --bitrate 4000 in.raw - | speexdec - out.raw";
+
+lpc_order   = sim_in.lpc_order = 6;
+Fs          = sim_in.Fs = 8000;
+              sim_in.Fo = 100;             % pitch frequency of voice 
+              sim_in.Wo = 2*pi*Fo/Fs;      % pitch in rads
+N           = sim_in.N  = Fs*0.04;         % frame length
+frames      = sim_in.frames = 1000;        % frames to play through codec
+              sim_in.gain = 100;
+Nsym        = 8;                           % number of symbols to find
+
+% start with some LSP random vectors
+% for stable filter most be monotonically increasing on 0..pi
+
+w_log = [];
+for f=1:frames;
+  w = sort(rand(1,lpc_order)*pi);
+  w_log = [w_log; w];
+end
+[w__log mse] = run_sim(sim_in, w_log);
+
+% sort by MSE to get the best symbols
+
+[sort_mse sort_ind] = sort(mse);
+symbols = w_log(sort_ind(1:Nsym),:)
+
+% Play these symbols through the codec in random order
+
+w_log = [];
+symb_ind = [];
+for f=1:frames
+  symb_ind(f) = floor(1 + rand(1,1)*Nsym);
+  w_log = [w_log; symbols(symb_ind,:)];
 end
 
-% play through codec
+[w__log mse] = run_sim(sim_in, w_log);
 
-s *= gain;
-f=fopen("in.raw","wb");
-fwrite(f,s,"short");
-fclose(f);
-system(codec_cmd);
-f=fopen("out.raw","rb");
-s_ = fread(f,Inf,"short");
-fclose(f);
-
-% extract received symbols from channel and evaluate
+% now see if we can "detect" them
 
 for f=1:frames
-  a_ = lpcauto(s_((f-1)*N+1:f*N), lpc_order);
-  w_ = atolsp(a_);
-  w__log = [w__log; w_];
+
+  % check received symbol against codebook of symbols
+
+  min_e = 1E6;
+  for i=1:Nsym
+    e = w__log(f,:)*symbols(i,:)';
+    if e < min_e
+      min_e = e;
+      min_ind = i;
+    end
+  end
+
+  symb_ind_out(f) = min_ind;
 end
 
-figure(1);
-clf;
-subplot(211)
-plot(s)
-axis([1 Fs/10 -4000 4000]);
-subplot(212)
-plot(s_);
-axis([1 Fs/10 -4000 4000]);
-
-figure(2)
-plot(w_log, 'g', w__log, 'r+')
+figure(1)
+clf
+plot(symb_ind,'g',symb_ind_out,'r');

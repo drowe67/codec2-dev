@@ -47,3 +47,10 @@ figure(5);
 clf;
 plot(error_positions_hist_c);
 title('Error Position Histogram');
+
+figure(6)
+y = 1:length(rx_amp_log_c);
+x = 1:Nc*Nd;
+mesh(x,y,20*log10(rx_amp_log_c));
+grid
+title('Channel Amplitude dB');

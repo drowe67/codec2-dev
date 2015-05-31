@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
         inclip = atof(argv[6]);
     }
     else {
-        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz SNR3000Hz FoffHz FadingEn InputClip0to1\n", argv[0]);
+        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz No(dB/Hz) FoffHz FadingEn InputClip0to1\n", argv[0]);
         exit(1);
     }
     fprintf(stderr, "NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f\n", NodB, foff_hz, fading_en, inclip);

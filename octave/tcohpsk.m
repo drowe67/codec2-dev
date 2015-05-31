@@ -44,8 +44,9 @@
 %  [ ] pilot based EsNo estimation
 %  [ ] filter reqd with compression?
 %      + make sure not too much noise passed into noise floor
-%  [ ] different diversity combination
-%  [ ] histogram of bit errors
+%  [X] different diversity combination
+%      + taking largest symbol didn't help
+%  [X] histogram of bit errors
 %      + lot of data
 %      + ssb filter
 %      + compression
