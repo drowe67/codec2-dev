@@ -42,6 +42,6 @@ struct COHPSK *cohpsk_create(void);
 void cohpsk_destroy(struct COHPSK *coh);
 void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[]);
 void cohpsk_clip(COMP tx_fdm[]);
-void cohpsk_demod(struct COHPSK *cohpsk, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame);
+void cohpsk_demod(struct COHPSK *cohpsk, float rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame);
 
 #endif

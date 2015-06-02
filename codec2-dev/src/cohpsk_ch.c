@@ -50,9 +50,10 @@
 #include "ssbfilt_coeff.h"
 #include "codec2_fdmdv.h"
 
-#define BUF_N        160
-#define HF_DELAY_MS  2.0
-#define PAPR_TARGET  7.0
+#define BUF_N                 160
+#define FAST_FADING_DELAY_MS  2.0
+#define SLOW_FADING_DELAY_MS  0.5
+#define PAPR_TARGET           7.0
 
 /* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
    tcohpsk first (any variant) to load the function into Octave, e.g.:
@@ -61,7 +62,8 @@
   octave:18> write_noise_file("../raw/fading_samples.float", 7500, 7500*60)
 */
 
-#define FADING_FILE_NAME "../../raw/fading_samples.float"
+#define FAST_FADING_FILE_NAME "../../raw/fast_fading_samples.float"
+#define SLOW_FADING_FILE_NAME "../../raw/slow_fading_samples.float"
 
 int main(int argc, char *argv[])
 {
@@ -107,7 +109,7 @@ int main(int argc, char *argv[])
         inclip = atof(argv[6]);
     }
     else {
-        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz No(dB/Hz) FoffHz FadingEn InputClip0to1\n", argv[0]);
+        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz No(dB/Hz) FoffHz Fading[0-none 1-fast 2-slow] InputClip0to1\n", argv[0]);
         exit(1);
     }
     fprintf(stderr, "NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f\n", NodB, foff_hz, fading_en, inclip);
@@ -128,12 +130,24 @@ int main(int argc, char *argv[])
     /* init HF fading model */
 
     if (fading_en) {
-        ffading = fopen(FADING_FILE_NAME, "rb");
-        if (ffading == NULL) {
-            printf("Can't find fading file: %s\n", FADING_FILE_NAME);
-            exit(1);
+        if (fading_en == 1) {
+            ffading = fopen(FAST_FADING_FILE_NAME, "rb");
+            if (ffading == NULL) {
+                printf("Can't find fast fading file: %s\n", FAST_FADING_FILE_NAME);
+                exit(1);
+            }
+            nhfdelay = floor(FAST_FADING_DELAY_MS*COHPSK_FS/1000);
         }
-        nhfdelay = floor(HF_DELAY_MS*COHPSK_FS/1000);
+
+        if (fading_en == 2) {
+            ffading = fopen(SLOW_FADING_FILE_NAME, "rb");
+            if (ffading == NULL) {
+                printf("Can't find slow fading file: %s\n", SLOW_FADING_FILE_NAME);
+                exit(1);
+            }
+            nhfdelay = floor(SLOW_FADING_DELAY_MS*COHPSK_FS/1000);
+        }
+
         ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_SAMPLES_PER_FRAME)*sizeof(COMP));
         assert(ch_fdm_delay != NULL);
         for(i=0; i<nhfdelay+COHPSK_SAMPLES_PER_FRAME; i++) {

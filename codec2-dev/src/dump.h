@@ -38,6 +38,7 @@ void dump_Sn(float Sn[]);
 void dump_Sw(COMP Sw[]);
 void dump_Sw_(COMP Sw_[]);
 void dump_Ew(COMP Ew[]);
+void dump_softdec(float *softdec, int n);
 
 /* amplitude modelling */
 

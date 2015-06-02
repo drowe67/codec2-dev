@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
     COMP           ch_fdm[COHPSK_SAMPLES_PER_FRAME];
     COMP           ch_buf[CH_BUF_SZ];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
+    float          rx_bits_sd[COHPSK_BITS_PER_FRAME];
     float         *rx_amp_log;
     float         *rx_phi_log;
     COMP          *rx_symb_log;
@@ -248,7 +249,10 @@ int main(int argc, char *argv[])
 
         coh->frame = f;
         tmp = nin_frame;
- 	cohpsk_demod(coh, rx_bits, &reliable_sync_bit, ch_buf, &tmp);
+ 	cohpsk_demod(coh, rx_bits_sd, &reliable_sync_bit, ch_buf, &tmp);
+        for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+            rx_bits[i] = rx_bits_sd[i] > 0.0;
+        
         ch_buf_n -= nin_frame;
         //printf("nin_frame: %d tmp: %d ch_buf_n: %d\n", nin_frame, tmp, ch_buf_n);
         assert(ch_buf_n >= 0);

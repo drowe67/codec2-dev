@@ -51,6 +51,8 @@
 %      + ssb filter
 %      + compression
 %      + make sure it's flat with many errors
+%  [ ] linear tracking of ampl ests
+%      + seem to only change every 
 
 graphics_toolkit ("gnuplot");
 more off;
