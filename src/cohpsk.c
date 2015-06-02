@@ -266,7 +266,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
 \*---------------------------------------------------------------------------*/
 
-void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][COHPSK_NC*ND])
+void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*ND])
 {
     int   p, r, c, i, pc, d;
     float x[NPILOTSFRAME+2], x1;
@@ -350,8 +350,8 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, int rx_bits[], COMP ct_symb_buf[][
             }
             rot = cmult(div_symb, pi_on_4);
             i = c*NSYMROW + r;
-            rx_bits[2*i+1] = rot.real < 0;
-            rx_bits[2*i]   = rot.imag < 0;
+            rx_bits[2*i+1] = rot.real;
+            rx_bits[2*i]   = rot.imag;
         }
     }
 }
@@ -905,7 +905,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
 \*---------------------------------------------------------------------------*/
 
-void cohpsk_demod(struct COHPSK *coh, int rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame)
+void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame)
 {
     COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
     int   i, j, sync, anext_sync, next_sync, nin, r, c;

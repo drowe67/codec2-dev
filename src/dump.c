@@ -46,6 +46,7 @@ static FILE *fsn = NULL;
 static FILE *fsw = NULL;
 static FILE *few = NULL;
 static FILE *fsw_ = NULL;
+static FILE *fsoftdec = NULL;
 static FILE *fmodel = NULL;
 static FILE *fqmodel = NULL;
 static FILE *fpwb = NULL;
@@ -88,6 +89,8 @@ void dump_off(){
 	fclose(few);
     if (fmodel != NULL)
 	fclose(fmodel);
+    if (fsoftdec != NULL)
+	fclose(fsoftdec);
     if (fqmodel != NULL)
 	fclose(fqmodel);
     if (fpwb != NULL)
@@ -209,6 +212,24 @@ void dump_Ew(COMP Ew[]) {
 	fprintf(few,"%f\t",
 		10.0*log10(Ew[i].real*Ew[i].real + Ew[i].imag*Ew[i].imag));
     fprintf(few,"\n");    
+}
+
+void dump_softdec(float *softdec, int n)
+{
+    int i;
+    char s[MAX_STR];
+
+    if (!dumpon) return;
+
+    if (fsoftdec == NULL) {
+	sprintf(s,"%s_softdec.txt", prefix);
+	fsoftdec = fopen(s, "wt");
+	assert(fsoftdec != NULL);
+    }
+
+    for(i=0; i<n; i++)
+	fprintf(fsoftdec,"%f\t", softdec[i]);
+    fprintf(fsoftdec,"\n");
 }
 
 void dump_model(MODEL *model) {

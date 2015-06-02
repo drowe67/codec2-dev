@@ -64,6 +64,7 @@ int main(int argc, char *argv[])
     COMP           ch_fdm_frame[COHPSK_M*NSYMROWPILOT];
     //COMP           rx_fdm_frame_bb[M*NSYMROWPILOT];
     //COMP           ch_symb[NSYMROWPILOT][COHPSK_NC*ND];
+    float          rx_bits_sd[COHPSK_BITS_PER_FRAME];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     
     int            tx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
@@ -213,7 +214,10 @@ int main(int argc, char *argv[])
 
         assert(ch_fdm_frame_log_index < COHPSK_M*NSYMROWPILOT*FRAMES);
         tmp = nin_frame;
-        cohpsk_demod(coh, rx_bits, &reliable_sync_bit, &ch_fdm_frame_log_out[ch_fdm_frame_log_index], &nin_frame);
+        cohpsk_demod(coh, rx_bits_sd, &reliable_sync_bit, &ch_fdm_frame_log_out[ch_fdm_frame_log_index], &nin_frame);
+        for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+            rx_bits[i] = rx_bits_sd[i] > 0.0;
+
         ch_fdm_frame_log_index += tmp;
 
  	/* --------------------------------------------------------*\

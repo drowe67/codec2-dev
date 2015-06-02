@@ -155,6 +155,8 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
     assert(c2->bpf_buf != NULL);
     for(i=0; i<BPF_N+4*N; i++)
         c2->bpf_buf[i] = 0.0;
+    
+    c2->softdec = NULL;
 
     return c2;
 }
@@ -1486,6 +1488,14 @@ void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * 
 	apply_lpc_correction(&model[i]);
 	synthesise_one_frame(c2, &speech[N*i], &model[i], Aw);
     }
+
+    #ifdef DUMP
+    dump_lsp_(&lsps[3][0]);
+    dump_ak_(&ak[3][0], LPC_ORD_LOW);
+    dump_model(&model[3]);
+    if (c2->softdec)
+        dump_softdec(c2->softdec, nbit);
+    #endif
 
     /* update memories for next frame ----------------------------*/
 

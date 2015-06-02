@@ -43,6 +43,7 @@
 int main(int argc, char *argv[])
 {
     FILE         *fin, *foct;
+    float         rx_bits_sd[COHPSK_BITS_PER_FRAME];
     int           rx_bits[COHPSK_BITS_PER_FRAME];
     int          *ptest_bits_coh, *ptest_bits_coh_end;
     int           state, next_state, i, nbits, errors, nerrors;
@@ -81,7 +82,11 @@ int main(int argc, char *argv[])
     ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
     state = 0; nbits = 0; nerrors = 0;
-    while (fread(rx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
+    while (fread(rx_bits_sd, sizeof(float), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
+        for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
+            rx_bits[i] = rx_bits_sd[i] < 0.0;
+            //fprintf(stderr,"%f %d\n", rx_bits_sd[i], rx_bits[i]);
+        }
 
         errors = 0;
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
