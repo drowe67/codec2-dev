@@ -92,7 +92,7 @@ static void ear_protection(float in_out[], int n);
 
 \*---------------------------------------------------------------------------*/
 
-struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
+struct CODEC2 * codec2_create(int mode)
 {
     struct CODEC2 *c2;
     int            i,l;
@@ -171,7 +171,7 @@ struct CODEC2 * CODEC2_WIN32SUPPORT codec2_create(int mode)
 
 \*---------------------------------------------------------------------------*/
 
-void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
+void codec2_destroy(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
     free(c2->bpf_buf);
@@ -191,7 +191,7 @@ void CODEC2_WIN32SUPPORT codec2_destroy(struct CODEC2 *c2)
 
 \*---------------------------------------------------------------------------*/
 
-int CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
+int codec2_bits_per_frame(struct CODEC2 *c2) {
     if (c2->mode == CODEC2_MODE_3200)
 	return 64;
     if (c2->mode == CODEC2_MODE_2400)
@@ -221,7 +221,7 @@ int CODEC2_WIN32SUPPORT codec2_bits_per_frame(struct CODEC2 *c2) {
 
 \*---------------------------------------------------------------------------*/
 
-int CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
+int codec2_samples_per_frame(struct CODEC2 *c2) {
     if (c2->mode == CODEC2_MODE_3200)
 	return 160;
     if (c2->mode == CODEC2_MODE_2400)
@@ -240,7 +240,7 @@ int CODEC2_WIN32SUPPORT codec2_samples_per_frame(struct CODEC2 *c2) {
     return 0; /* shouldnt get here */
 }
 
-void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
+void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 {
     assert(c2 != NULL);
     assert(
@@ -269,12 +269,12 @@ void CODEC2_WIN32SUPPORT codec2_encode(struct CODEC2 *c2, unsigned char *bits, s
 	codec2_encode_700(c2, bits, speech);
 }
 
-void CODEC2_WIN32SUPPORT codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
+void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
 {
     codec2_decode_ber(c2, speech, bits, 0.0);
 }
 
-void CODEC2_WIN32SUPPORT codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)
+void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)
 {
     assert(c2 != NULL);
     assert(
@@ -1404,9 +1404,9 @@ void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[])
     encode_mels_scalar(indexes, mel, LPC_ORD_LOW);
 
     for(i=0; i<LPC_ORD_LOW; i++) {
-        pack(bits, &nbit, indexes[i], mel_bits(i));
+        pack_natural_or_gray(bits, &nbit, indexes[i], mel_bits(i), c2->gray);
     }
-
+    
     pack_natural_or_gray(bits, &nbit, spare, 2, c2->gray);
 
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
@@ -1459,8 +1459,9 @@ void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * 
     e[3] = decode_energy(e_index, 3);
  
     for(i=0; i<LPC_ORD_LOW; i++) {
-        indexes[i] = unpack(bits, &nbit, mel_bits(i));
+        indexes[i] = unpack_natural_or_gray(bits, &nbit, mel_bits(i), c2->gray);
     }
+    
     decode_mels_scalar(mel, indexes, LPC_ORD_LOW);
     for(i=0; i<LPC_ORD_LOW; i++) {
         f_ = 700.0*( pow(10.0, (float)mel[i]/2595.0) - 1.0);
@@ -1470,7 +1471,22 @@ void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * 
 
     check_lsp_order(&lsps[3][0], LPC_ORD_LOW);
     bw_expand_lsps(&lsps[3][0], LPC_ORD_LOW, 50.0, 100.0);
- 
+    
+    #ifdef MASK_NOT_FOR_NOW
+    /* first pass at soft decn error masking, needs further work      */
+    /* If soft dec info available expand further for low power frames */
+
+    if (c2->softdec) {
+        float e = 0.0;
+        for(i=9; i<9+17; i++)
+            e += c2->softdec[i]*c2->softdec[i];
+        e /= 6.0;
+        //fprintf(stderr, "e: %f\n", e);
+        //if (e < 0.3)
+        //      bw_expand_lsps(&lsps[3][0], LPC_ORD_LOW, 150.0, 300.0);
+    }
+    #endif
+
     /* interpolate ------------------------------------------------*/
  
     /* LSPs, Wo, and energy are sampled every 40ms so we interpolate
@@ -1644,7 +1660,7 @@ static void ear_protection(float in_out[], int n) {
     }
 }
 
-void CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
+void codec2_set_lpc_post_filter(struct CODEC2 *c2, int enable, int bass_boost, float beta, float gamma)
 {
     assert((beta >= 0.0) && (beta <= 1.0));
     assert((gamma >= 0.0) && (gamma <= 1.0));
@@ -1660,7 +1676,7 @@ void CODEC2_WIN32SUPPORT codec2_set_lpc_post_filter(struct CODEC2 *c2, int enabl
    Experimental method of sending voice/data frames for FreeDV.
 */
 
-int CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *c2)
+int codec2_get_spare_bit_index(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
 
@@ -1684,7 +1700,7 @@ int CODEC2_WIN32SUPPORT codec2_get_spare_bit_index(struct CODEC2 *c2)
    for convenience.
 */
 
-int CODEC2_WIN32SUPPORT codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked_bits[])
+int codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked_bits[])
 {
     int v1,v3;
 
@@ -1732,9 +1748,15 @@ int CODEC2_WIN32SUPPORT codec2_rebuild_spare_bit(struct CODEC2 *c2, int unpacked
     return -1;
 }
 
-void CODEC2_WIN32SUPPORT codec2_set_natural_or_gray(struct CODEC2 *c2, int gray)
+void codec2_set_natural_or_gray(struct CODEC2 *c2, int gray)
 {
     assert(c2 != NULL);
     c2->gray = gray;
+}
+
+void codec2_set_softdec(struct CODEC2 *c2, float *softdec)
+{
+    assert(c2 != NULL);
+    c2->softdec = softdec;
 }
 

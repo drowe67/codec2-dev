@@ -225,7 +225,7 @@ end
 
 % Symbol rate processing for rx side (demodulator) -------------------------------------------------------
 
-function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_to_bits(cohpsk, ct_symb_buf)
+function [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms cohpsk] = qpsk_symbols_to_bits(cohpsk, ct_symb_buf)
     framesize     = cohpsk.framesize;
     Nsymb         = cohpsk.Nsymb;
     Nsymbrow      = cohpsk.Nsymbrow;
@@ -269,7 +269,7 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     % now correct phase of data symbols
 
     rx_symb = zeros(Nsymbrow, Nc);
-    rx_symb_linear = zeros(1, Nsymbrow*Nc);
+    rx_symb_linear = zeros(1, Nsymbrow*Nc*Nd);
     rx_bits = zeros(1, framesize);
     for c=1:Nc*Nd
       for r=1:Nsymbrow
@@ -279,6 +279,7 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
           rx_symb(r,c) = ct_symb_buf(2+r,c);
         end
         i = (c-1)*Nsymbrow + r;
+        rx_symb_linear(i) = rx_symb(r,c);
         %printf("phi_ %d %d %f %f\n", r,c,real(exp(-j*phi_(r,c))), imag(exp(-j*phi_(r,c))));
       end
     end
@@ -292,7 +293,6 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
         for d=1:Nd-1
           div_symb += rx_symb(r,c + Nc*d);
         end
-        rx_symb_linear(i) = div_symb;
         rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(div_symb);
       end
     end
@@ -302,34 +302,32 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ cohpsk] = qpsk_symbols_
     % position. However this is complicated by fading, which means the
     % amplitude of the symbols is constantly changing.
     
-    % Now the scatter diagram in a fading channel is a X shape.  The
-    % noise can be resolved into two components at right angles to
-    % each other.  The component along the the "thickness" of the arms
-    % is proportional to the noise power and not affected by fading.
+    % Now the scatter diagram in a fading channel is a X or cross
+    % shape.  The noise can be resolved into two components at right
+    % angles to each other.  The component along the the "thickness"
+    % of the arms is proportional to the noise power and not affected
+    % by fading.  We only use points further along the real axis than
+    % the mean amplitude so we keep out of the central nosiey blob
         
-    v = zeros(1,Nsymb);
-    for i=1:Nsymb
+    sig_rms = mean(abs(rx_symb_linear));
+   
+    sum_x = 0;
+    sum_xx = 0;
+    n = 0;
+    for i=1:Nsymb*Nd
       s = rx_symb_linear(i);
-      if abs(real(s)) > abs(imag(s))
-        v(i) = imag(s);
-      else
-        v(i) = real(s);
+      if abs(real(s)) > sig_rms
+        sum_x  += imag(s);
+        sum_xx += imag(s)*imag(s);
+        n++;
       end
-      %printf("s: %f %f  v: %f\n", real(s), imag(s), v(i));
     end
-
-    % Note we are only measuring variance in one axis, as other axis is obscured by fading.  We assume
-    % that total noise power is shared between both axis so multiply by sqrt(2) to get an estimate of
-    % total noise pwr.  Small constant prevents divide by zero errors on start up.
-
-    No_ = var(v)*sqrt(2) + 1E-6;
-
-    % Estimate signal power
-    
-    Es_ = mean(amp_ .^ 2);
- 
-    EsNo_ = Es_/No_;
-    %printf("Es_: %f No_: %f  Es/No: %f  Es/No dB: %f\n", Es_, No_, Es_/No_, 10*log10(EsNo_));
+   
+    noise_var = 0;
+    if n > 1
+      noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+    end
+    noise_rms = sqrt(noise_var);
       
 endfunction
 

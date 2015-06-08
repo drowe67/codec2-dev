@@ -65,7 +65,11 @@ struct COHPSK {
     int          frame;
     float        ratio;
 
+    float        sig_rms;
+    float        noise_rms;
+
     struct FDMDV *fdmdv;
+    
     
     /* optional log variables used for testing Octave to C port */
 

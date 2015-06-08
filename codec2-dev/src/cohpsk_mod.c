@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe  
   DATE CREATED: April 5 2015
                                                                              
-  Given an input file of bits (note one bit per int, not compressed),
+  Given an input file of bits (note one bit per float, soft decision format),
   outputs a raw file (8kHz, 16 bit shorts) of COHPSK modem samples
   ready to send over a HF radio channel.
                                                                              
@@ -41,6 +41,7 @@ int main(int argc, char *argv[])
 {
     FILE          *fin, *fout;
     struct COHPSK *cohpsk;
+    float         tx_bits_sd[COHPSK_BITS_PER_FRAME];
     int           tx_bits[COHPSK_BITS_PER_FRAME];
     COMP          tx_fdm[COHPSK_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[COHPSK_SAMPLES_PER_FRAME];
@@ -70,9 +71,11 @@ int main(int argc, char *argv[])
 
     frames = 0;
 
-    while(fread(tx_bits, sizeof(int), COHPSK_BITS_PER_FRAME, fin) == COHPSK_BITS_PER_FRAME) {
+    while(fread(tx_bits_sd, sizeof(float), COHPSK_BITS_PER_FRAME, fin) == COHPSK_BITS_PER_FRAME) {
 	frames++;
 
+        for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+            tx_bits[i] = tx_bits_sd[i] < 0.0;
 	cohpsk_mod(cohpsk, tx_fdm, tx_bits);
         cohpsk_clip(tx_fdm);
 

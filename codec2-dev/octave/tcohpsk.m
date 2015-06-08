@@ -41,7 +41,7 @@
 %      + Only a small change in fading perf with filter on/off
 %      + however other filters may have other effects, should test this, 
 %        e.g. scatter plots, some sort of BER metric?
-%  [ ] pilot based EsNo estimation
+%  [X] EsNo estimation
 %  [ ] filter reqd with compression?
 %      + make sure not too much noise passed into noise floor
 %  [X] different diversity combination
@@ -51,8 +51,6 @@
 %      + ssb filter
 %      + compression
 %      + make sure it's flat with many errors
-%  [ ] linear tracking of ampl ests
-%      + seem to only change every 
 
 graphics_toolkit ("gnuplot");
 more off;
@@ -66,8 +64,8 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-%test = 'compare to c';
-test = 'awgn';
+test = 'compare to c';
+%test = 'awgn';
 %test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
@@ -94,10 +92,10 @@ end
 % should be BER around 0.015 to 0.02
 
 if strcmp(test, 'awgn')
-  frames = 10;
+  frames = 100;
   foff =  0;
   dfoff = -0/Fs;
-  EsNodB = 80;
+  EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -107,10 +105,10 @@ end
 % Similar to AWGN - should be BER around 0.015 to 0.02
 
 if strcmp(test, 'fading');
-  frames = 200;
+  frames = 100;
   foff = -10.5;
   dfoff = 0.0/Fs;
-  EsNodB = 12;
+  EsNodB = 9;
   fading_en = 1;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -229,6 +227,9 @@ rx_timing_log = [];
 ratio_log = [];
 foff_log = [];
 f_est_log = [];
+sig_rms_log = [];
+noise_rms_log = [];           
+noise_rms_filt_log = [];
 
 % Channel modeling and BER measurement ----------------------------------------
 
@@ -258,6 +259,8 @@ ch_fdm_delay = zeros(1, acohpsk.Nsymbrowpilot*M + nhfdelay);
 [y filt_states] = filter(b,a,0);
 h = freqz(b,a,(600:2600)/(Fs/(2*pi)));
 filt_gain = (2600-600)/sum(abs(h) .^ 2);   % ensures power after filter == before filter
+
+noise_rms_filt = 0;
 
 % main loop --------------------------------------------------------------------
 
@@ -479,7 +482,7 @@ for f=1:frames;
   % if we are in sync complete demodulation with symbol rate processing
 
   if (next_sync == 1) || (sync == 1)
-    [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
+    [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
     rx_symb_log = [rx_symb_log; rx_symb];
     rx_amp_log = [rx_amp_log; amp_];
     rx_phi_log = [rx_phi_log; phi_];
@@ -487,6 +490,10 @@ for f=1:frames;
     tx_bits_prev_log = [tx_bits_prev_log prev_tx_bits2];
     ratio_log = [ratio_log acohpsk.ratio];
     ct_symb_ff_log = [ct_symb_ff_log; acohpsk.ct_symb_ff_buf(1:acohpsk.Nsymbrowpilot,:)];
+    sig_rms_log = [sig_rms_log sig_rms];
+    noise_rms_log = [noise_rms_log noise_rms];
+    noise_rms_filt = 0.9*noise_rms_filt + 0.1*noise_rms;
+    noise_rms_filt_log = [noise_rms_filt_log noise_rms_filt];
 
     % BER stats
 
@@ -594,6 +601,8 @@ if compare_with_c
   check(rx_timing_log, rx_timing_log_c, 'rx_timing',0.001);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
   check(f_est_log, f_est_log_c, 'f_est');
+  check(sig_rms_log, sig_rms_log_c, 'sig_rms');
+  check(noise_rms_log, noise_rms_log_c, 'noise_rms');
   
 
 else
@@ -653,8 +662,12 @@ else
 
   figure(6)
   clf;
+  subplot(211)
   stem(nerr_log)
   title('Bit Errors');
+  subplot(212)
+  plot(noise_rms_filt_log,'r', sig_rms_log,'g');
+  title('Est rms signal and noise')
 
   figure(7);
   clf;
@@ -682,6 +695,7 @@ else
   plot(error_positions_hist)    
   title('histogram of bit errors')                               
 
+  
 end
 
 

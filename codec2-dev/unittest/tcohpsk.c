@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
     int            rx_bits_log[COHPSK_BITS_PER_FRAME*FRAMES];
                                           
     FILE          *fout;
-    int            f, r, c, log_r, log_data_r, noise_r, ff_log_r;
+    int            f, r, c, log_r, log_data_r, noise_r, ff_log_r, i;
     int           *ptest_bits_coh, *ptest_bits_coh_end;
     double         foff;
     COMP           foff_rect, phase_ch;
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
     //COMP           rx_onesym[COHPSK_NC*ND];
     //int            rx_baseband_log_col_index = 0;
     //COMP           rx_baseband_log[COHPSK_NC*ND][(M+M/P)*NSYMROWPILOT*FRAMES];
-    float            f_est_log[FRAMES];
+    float            f_est_log[FRAMES], sig_rms_log[FRAMES], noise_rms_log[FRAMES];
     int              f_est_samples;
 
     int            log_bits;
@@ -216,7 +216,7 @@ int main(int argc, char *argv[])
         tmp = nin_frame;
         cohpsk_demod(coh, rx_bits_sd, &reliable_sync_bit, &ch_fdm_frame_log_out[ch_fdm_frame_log_index], &nin_frame);
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-            rx_bits[i] = rx_bits_sd[i] > 0.0;
+            rx_bits[i] = rx_bits_sd[i] < 0.0;
 
         ch_fdm_frame_log_index += tmp;
 
@@ -241,7 +241,10 @@ int main(int argc, char *argv[])
             }
             memcpy(&rx_bits_log[COHPSK_BITS_PER_FRAME*log_bits], rx_bits, sizeof(int)*COHPSK_BITS_PER_FRAME);
             log_bits++;
-            f_est_log[f_est_samples++] = coh->f_est;
+            f_est_log[f_est_samples] = coh->f_est;
+            sig_rms_log[f_est_samples] = coh->sig_rms;
+            noise_rms_log[f_est_samples] = coh->noise_rms;
+            f_est_samples++;;
         }
 
 	assert(log_r <= NSYMROWPILOT*FRAMES);
@@ -275,6 +278,8 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, COHPSK_BITS_PER_FRAME*log_bits);
     octave_save_float(fout, "f_est_log_c", &f_est_log[1], 1, f_est_samples-1, f_est_samples-1);  
+    octave_save_float(fout, "sig_rms_log_c", sig_rms_log, 1, f_est_samples, f_est_samples-1);  
+    octave_save_float(fout, "noise_rms_log_c", noise_rms_log, 1, f_est_samples, f_est_samples);  
 #ifdef XX
 #endif
     fclose(fout);
