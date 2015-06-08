@@ -55,7 +55,8 @@
    tcohpsk first (any variant) to load the function into Octave, e.g.:
 
   octave:17> tcohpsk
-  octave:18> write_noise_file("../raw/fading_samples.float", 7500, 7500*60)
+  octave:18> write_noise_file("../raw/fast_fading_samples.float", 7500, 7500*60)
+  octave:19> write_noise_file("../raw/slow_fading_samples.float", 75000, 7500*60)
 */
 
 #define FADING_FILE_NAME "../../raw/fading_samples.float"
@@ -89,7 +90,7 @@ int main(int argc, char *argv[])
     int            ch_buf_n;
     float          tx_pwr, rx_pwr, noise_pwr;
     int            error_positions_hist[COHPSK_BITS_PER_FRAME];
-    int            log_data_r, c, j, tmp, ret;
+    int            log_data_r, c, j, tmp;
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
         error_positions_hist[i] = 0;

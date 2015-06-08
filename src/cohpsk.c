@@ -155,6 +155,8 @@ struct COHPSK *cohpsk_create(void)
 
     coh->fdmdv = fdmdv;
 
+    coh->sig_rms = coh->noise_rms = 0.0;
+
     /* disable optional logging by default */
 
     coh->rx_baseband_log = NULL;
@@ -268,34 +270,19 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
 void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*ND])
 {
-    int   p, r, c, i, pc, d;
+    int   p, r, c, i, pc, d, n;
     float x[NPILOTSFRAME+2], x1;
     COMP  y[NPILOTSFRAME+2], yfit;
+    COMP  rx_symb_linear[NSYMROW*COHPSK_NC*ND];
     COMP  m, b;
     COMP   __attribute__((unused)) corr, rot, pi_on_4, phi_rect, div_symb;
     float mag,  __attribute__((unused)) phi_,  __attribute__((unused)) amp_;
+    float sum_x, sum_xx, noise_var;
+    COMP  s;
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
    
     for(c=0; c<COHPSK_NC*ND; c++) {
-//#define AVERAGE
-#ifdef AVERAGE
-        /* Average pilots to get phase and amplitude estimates using
-           two pilots at the start of each frame and two at the end */
-
-        corr.real = 0.0; corr.imag = 0.0; mag = 0.0;
-        for(p=0; p<NPILOTSFRAME+2; p++) {
-            corr = cadd(corr, fcmult(coh->pilot2[p][c], ct_symb_buf[sampling_points[p]][c]));
-            mag  += cabsolute(ct_symb_buf[sampling_points[p]][c]);
-        }
-      
-        phi_ = atan2f(corr.imag, corr.real);
-        amp_ =  mag/(NPILOTSFRAME+2);
-        for(r=0; r<NSYMROW; r++) {
-            coh->phi_[r][c] = phi_;
-            coh->amp_[r][c] = amp_;
-        }
-#else
 
         /* Set up lin reg model and interpolate phase.  Works better than average for channels with
            quickly changing phase, like HF. */
@@ -304,17 +291,15 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
             x[p] = sampling_points[p];
             pc = c % COHPSK_NC;
             y[p] = fcmult(coh->pilot2[p][pc], ct_symb_buf[sampling_points[p]][c]);
-            //printf("%f %f\n", y[p].real, y[p].imag);
         }
-        //printf("\n");
+        
         linreg(&m, &b, x, y, NPILOTSFRAME+2);
         for(r=0; r<NSYMROW; r++) {
             x1 = (float)(r+NPILOTSFRAME);
             yfit = cadd(fcmult(x1,m),b);
             coh->phi_[r][c] = atan2(yfit.imag, yfit.real);
-            //printf("  %f", coh->phi_[r][c]);
         }
-        //printf("\n");
+ 
         /* amplitude estimation */
 
         mag = 0.0;
@@ -325,22 +310,20 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
         for(r=0; r<NSYMROW; r++) {
              coh->amp_[r][c] = amp_;
         }
-#endif
     }
-    //exit(0);
+    
     /* now correct phase of data symbols */
 
     for(c=0; c<COHPSK_NC*ND; c++) {
-        //rot.real = 1.0; rot.imag = 0.0;
         for (r=0; r<NSYMROW; r++) {
             phi_rect.real = cosf(coh->phi_[r][c]); phi_rect.imag = -sinf(coh->phi_[r][c]);
             coh->rx_symb[r][c] = cmult(ct_symb_buf[NPILOTSFRAME + r][c], phi_rect);
-            //printf("%d %d %f %f\n", r,c, coh->rx_symb[r][c].real, coh->rx_symb[r][c].imag);
-            //printf("phi_ %d %d %f %f\n", r,c, ct_symb_buf[NPILOTSFRAME + r][c].real, ct_symb_buf[NPILOTSFRAME + r][c].imag);
+            i = c*NSYMROW + r;
+            rx_symb_linear[i] = coh->rx_symb[r][c];
         }
     }
     
-    /* and finally optional diversity combination and make decn on bits */
+    /* and finally optional diversity combination, note output is soft decm a "1" is < 0 */
 
     for(c=0; c<COHPSK_NC; c++) {
         for(r=0; r<NSYMROW; r++) {
@@ -354,6 +337,33 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
             rx_bits[2*i]   = rot.imag;
         }
     }
+
+    
+    /* estimate RMS signal and noise */
+
+    mag = 0.0;
+    for(i=0; i<NSYMROW*COHPSK_NC*ND; i++)
+        mag += cabsolute(rx_symb_linear[i]);
+    coh->sig_rms = mag/(NSYMROW*COHPSK_NC*ND);
+
+    sum_x = 0;
+    sum_xx = 0;
+    n = 0;
+    for (i=0; i<NSYMROW*COHPSK_NC*ND; i++) {
+      s = rx_symb_linear[i];
+      if (fabsf(s.real) > coh->sig_rms) {
+        sum_x  += s.imag;
+        sum_xx += s.imag*s.imag;
+        n++;
+      }
+    }
+   
+    noise_var = 0;
+    if (n > 1) {
+      noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+    }
+    coh->noise_rms = sqrtf(noise_var);
+
 }
 
 

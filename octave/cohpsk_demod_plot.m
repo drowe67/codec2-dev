@@ -4,9 +4,9 @@
 % Plot Octave outputs from cohpsk_demod, c2dec, to visualise whats going on
 % when errors hit the system
 
-% $ ./c2enc 700 ../../raw/ve9qrp_10s.raw - | ./cohpsk_mod - - | ./cohpsk_ch - - -60 50 1 1 | ./cohpsk_demod - - | ./c2dec 700 - - --dump ve9qrp | play -t raw -r 8000 -s -2 - -q
+% $ ./c2enc 700 ../../raw/ve9qrp_10s.raw - | ./cohpsk_mod - - | ./cohpsk_ch - - -60 50 1 1 | ./cohpsk_demod - - cohpsk_demod.txt | ./c2dec 700 - - --dump ve9qrp | play -t raw -r 8000 -s -2 - -q
 
-% ./c2enc 700 ../../raw/ve9qrp_10s.raw - | ./cohpsk_mod - - | ./cohpsk_ch - - -30 50 1 1 | ./cohpsk_demod - - | ./c2dec 700 - - --dump ve9qrp_snr3 | play -t raw -r 8000 -s -2 - -q
+% ./c2enc 700 ../../raw/ve9qrp_10s.raw - | ./cohpsk_mod - - | ./cohpsk_ch - - -30 50 1 1 | ./cohpsk_demod - - cohpsk_demod.txt | ./c2dec 700 - - --dump ve9qrp_snr3 | play -t raw -r 8000 -s -2 - -q
 
 graphics_toolkit ("gnuplot");
 
@@ -110,9 +110,10 @@ hold off
 
 figure(8)
 clf;
-f1=fft(ve9qrp_ak_(st:en,:)',128);
-f2=fft(ve9qrp_snr3_ak_(1:en-st+1,:)',128);
-d = (20*log10(abs(f1)) - 20*log10(abs(f2)));
+f1=1./fft(ve9qrp_ak_(st:en,:)',128);
+f2=1./fft(ve9qrp_snr3_ak_(1:en-st+1,:)',128);
+%d = (20*log10(abs(f1)) - 20*log10(abs(f2)));
+d = 20*log10(abs(f2));
 sdsq = mean(d.^2);
 plot(sdsq)
 title('spectral distortion clean and channel SNR=3dB')
@@ -122,9 +123,37 @@ clf;
 y = 1:en-st+1;
 x = 1:40;
 %mesh(y,x,-20*log10(abs(f2(1:40,:))));
-mesh(y,x,d(1:40,:));
+mesh(y,x,d(x,:));
 grid
 title('Synthesis filter difference between clean and channel SNR=3dB');
 xlabel('Time (codec frames)')
 ylabel('Frequency 0 to 2500Hz');
 zlabel('Difference (dB)');
+
+% map soft decn information to LSPs
+
+mel1 = ve9qrp_snr3_softdec(:,10:12);
+mel2 = ve9qrp_snr3_softdec(:,13:14);
+mel3 = ve9qrp_snr3_softdec(:,15:18);
+mel4 = ve9qrp_snr3_softdec(:,19:21);
+mel5 = ve9qrp_snr3_softdec(:,22:24);
+mel6 = ve9qrp_snr3_softdec(:,25:26);
+softdec_mel = [sum(mel1'.^2); sum(mel2'.^2); sum(mel3'.^2); sum(mel4'.^2); sum(mel5'.^2); sum(mel6'.^2)];
+
+figure(10)
+clf;
+y = 1:en-st+1;
+x = 1:6;
+%mesh(y,x,-20*log10(abs(f2(1:40,:))));
+mesh(y, x, softdec_mel(:,y));
+grid
+xlabel('Codec frame')
+ylabel('LSP')
+zlabel('Power')
+%axis([1 (en-st+1) 1 6 -10 5])
+
+% plot symbol energy against SD
+
+figure(11)
+semilogx(mean(softdec_mel(:,1:en-st+1)), sdsq,'+')
+grid

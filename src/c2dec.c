@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
     ber = 0.0;
     burst_length = burst_period = 0.0;
     burst_timer = 0.0;
-    dump = natural = 0;
+    dump = natural = softdec = 0;
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
-    softdec_bits = (int*)malloc(nbit*sizeof(float));
+    softdec_bits = (float*)malloc(nbit*sizeof(float));
     frames = bit_errors = bits_proc = 0;
     nstart_bit = 0;
     nend_bit = nbit-1;
@@ -174,6 +174,7 @@ int main(int argc, char *argv[])
     codec2_set_natural_or_gray(codec2, !natural);
     //printf("%d %d\n", nstart_bit, nend_bit);
  
+    //fprintf(stderr, "softdec: %d natural: %d\n", softdec, natural);
     if (softdec)
         ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);
     else
@@ -263,7 +264,8 @@ int main(int argc, char *argv[])
                     byte++;
                 }
             }
-       }
+            codec2_set_softdec(codec2, softdec_bits);
+        }
 
 	codec2_decode_ber(codec2, buf, bits, ber_est);
  	fwrite(buf, sizeof(short), nsam, fout);
