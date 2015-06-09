@@ -529,6 +529,7 @@ int main(int argc, char *argv[])
 
             #ifdef DUMP
 	    dump_ak(ak, order);
+            dump_E(e);
             #endif
 	
 	    /* tracking down -ve energy values with BW expansion */

@@ -596,9 +596,9 @@ if compare_with_c
   check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.05);
   %check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
-  check(phi_log_diff, zeros(length(phi_log_diff), Nc*Nd), 'rx_phi_log',0.05);
+  check(phi_log_diff, zeros(length(phi_log_diff), Nc*Nd), 'rx_phi_log',0.1);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);
-  check(rx_timing_log, rx_timing_log_c, 'rx_timing',0.001);
+  check(rx_timing_log, rx_timing_log_c, 'rx_timing',0.005);
   check(rx_bits_log, rx_bits_log_c, 'rx_bits');
   check(f_est_log, f_est_log_c, 'f_est');
   check(sig_rms_log, sig_rms_log_c, 'sig_rms');
