@@ -28,9 +28,14 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifdef __cplusplus
+  extern "C" {
+#endif
+
 #ifndef __FREEDV__
 
 #define FREEDV_MODE_1600        0
+#define FREEDV_MODE_700         1
 #define FREEDV_NSAMPLES       320
 
 #include "varicode.h"
@@ -39,7 +44,7 @@
 struct freedv {
     int                  mode;
 
-    void                *codec2;
+    struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
     struct FDMDV_STATS   fdmdv_stats;
 
@@ -75,5 +80,10 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]);
 int freedv_nin(struct freedv *f);
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]);
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
+int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]);
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

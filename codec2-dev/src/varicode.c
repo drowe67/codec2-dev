@@ -168,6 +168,13 @@ void varicode_decode_init(struct VARICODE_DEC *dec_states, int code_num)
 }
 
 
+void varicode_set_code_num(struct VARICODE_DEC *dec_states, int code_num)
+{
+    assert((code_num == 1) || (code_num == 2));
+    dec_states->code_num = code_num;
+}
+
+
 /* Code 1 decode function, accepts one bit at a time */
 
 static int decode_one_bit(struct VARICODE_DEC *s, char *single_ascii, short varicode_in, int long_code)
