@@ -288,8 +288,8 @@ int freedv_nin(struct freedv *f) {
 
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
-float rxdata[FDMDV_MAX_SAMPLES_PER_FRAME];
-int i;
+    float rxdata[FDMDV_MAX_SAMPLES_PER_FRAME];
+    int i;
 
     for(i=0; i<f->nin; i++)
         rxdata[i] = (float)demod_in[i]/FDMDV_SCALE;
@@ -299,10 +299,23 @@ int i;
 }
 
 
-// float version
+// float input samples version
 
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
-    COMP                rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    COMP rx_fdm[FDMDV_MAX_SAMPLES_PER_FRAME];
+    int  i;
+
+    for(i=0; i<f->nin; i++) {
+        rx_fdm[i].real = demod_in[i];
+        rx_fdm[i].imag = 0;
+    }
+
+    return freedv_comprx(f, speech_out, rx_fdm);
+}
+
+// complex input samples version
+
+int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
     int                 reliable_sync_bit, i, j, bit, byte, nin_prev, nout;
     int                 recd_codeword, codeword1, data_flag_index, n_ascii;
@@ -313,13 +326,8 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
-    for(i=0; i<f->nin; i++) {
-        rx_fdm[i].real = demod_in[i];
-        rx_fdm[i].imag = 0;
-    }
-
     nin_prev = f->nin;
-    fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, rx_fdm, &f->nin);
+    fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
     fdmdv_get_demod_stats(f->fdmdv, &f->fdmdv_stats);
 
     if (f->fdmdv_stats.sync) {
@@ -405,10 +413,61 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         /* if not in sync pass through analog samples */
         /* this lets us "hear" whats going on, e.g. during tuning */
         for(i=0; i<nin_prev; i++)
-            speech_out[i] = FDMDV_SCALE*demod_in[i];
+            speech_out[i] = FDMDV_SCALE*demod_in[i].real;
         nout = nin_prev;
     }
 
     return nout;
 }
 
+
+#ifdef TODO
+                if (g_testFrames) {
+                    int bit_errors, ntest_bits, test_frame_sync;
+
+                    // test frame processing, g_test_frame_sync will be asserted when we detect a
+                    // valid test frame.
+
+                    fdmdv_put_test_bits(g_pFDMDV, &test_frame_sync, g_error_pattern, &bit_errors, &ntest_bits, codec_bits);
+
+                    if (test_frame_sync == 1) {
+                        g_test_frame_sync_state = 1;
+                        g_test_frame_count = 0;
+                    }
+
+                    if (g_test_frame_sync_state) {
+                        if (g_test_frame_count == 0) {
+                            //printf("bit_errors: %d ntest_bits: %d\n", bit_errors, ntest_bits);
+                            g_total_bit_errors += bit_errors;
+                            g_total_bits       += ntest_bits;
+                            fifo_write(g_errorFifo, g_error_pattern, g_sz_error_pattern);
+                        }
+                        g_test_frame_count++;
+                        if (g_test_frame_count == 4)
+                            g_test_frame_count = 0;
+                    }
+
+                    fdmdv_put_test_bits(g_pFDMDV, &test_frame_sync, g_error_pattern, &bit_errors, &ntest_bits, &codec_bits[bits_per_fdmdv_frame]);
+
+                    if (test_frame_sync == 1) {
+                        g_test_frame_sync_state = 1;
+                        g_test_frame_count = 0;
+                    }
+
+                    if (g_test_frame_sync_state) {
+                        if (g_test_frame_count == 0) {
+                            //printf("bit_errors: %d ntest_bits: %d\n", bit_errors, ntest_bits);
+                            g_total_bit_errors += bit_errors;
+                            g_total_bits       += ntest_bits;
+                            fifo_write(g_errorFifo, g_error_pattern, g_sz_error_pattern);
+                        }
+                        g_test_frame_count++;
+                        if (g_test_frame_count == 4)
+                            g_test_frame_count = 0;
+                    }
+
+                    // silent audio
+
+                    for(i=0; i<2*N8; i++)
+                        output_buf[i] = 0;
+#endif
