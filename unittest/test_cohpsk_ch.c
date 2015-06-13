@@ -49,7 +49,7 @@
 #define ES_NO_DB     8.0
 #define HF_DELAY_MS  2.0
 
-#define CH_BUF_SZ (4*COHPSK_SAMPLES_PER_FRAME)
+#define CH_BUF_SZ (4*COHPSK_NOM_SAMPLES_PER_FRAME)
 
 /* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
    tcohpsk first (any variant) to load the function into Octave, e.g.:
@@ -65,8 +65,8 @@ int main(int argc, char *argv[])
 {
     struct COHPSK *coh;
     int            tx_bits[COHPSK_BITS_PER_FRAME];
-    COMP           tx_fdm[COHPSK_SAMPLES_PER_FRAME];
-    COMP           ch_fdm[COHPSK_SAMPLES_PER_FRAME];
+    COMP           tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
+    COMP           ch_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     COMP           ch_buf[CH_BUF_SZ];
     int            rx_bits[COHPSK_BITS_PER_FRAME];
     float          rx_bits_sd[COHPSK_BITS_PER_FRAME];
@@ -150,9 +150,9 @@ int main(int argc, char *argv[])
             exit(1);
         }
         nhfdelay = floor(HF_DELAY_MS*COHPSK_FS/1000);
-        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_SAMPLES_PER_FRAME)*sizeof(COMP));
+        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
         assert(ch_fdm_delay != NULL);
-        for(i=0; i<nhfdelay+COHPSK_SAMPLES_PER_FRAME; i++) {
+        for(i=0; i<nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
             ch_fdm_delay[i].real = 0.0;
             ch_fdm_delay[i].imag = 0.0;
         }
@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
 
     /* Main Loop ---------------------------------------------------------------------*/
 
-    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    nin_frame = COHPSK_NOM_SAMPLES_PER_FRAME;
     for(f=0; f<frames; f++) {
         
 	/* --------------------------------------------------------*\
@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
 	cohpsk_mod(coh, tx_fdm, tx_bits);
         cohpsk_clip(tx_fdm);
         
-        for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
+        for(r=0; r<COHPSK_NOM_SAMPLES_PER_FRAME; r++) {
             tx_pwr += pow(tx_fdm[r].real, 2.0) + pow(tx_fdm[r].imag, 2.0);
         }
 
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
 	                          Channel
 	\*---------------------------------------------------------*/
 
-        fdmdv_freq_shift(ch_fdm, tx_fdm, foff_hz, &phase_ch, COHPSK_SAMPLES_PER_FRAME);
+        fdmdv_freq_shift(ch_fdm, tx_fdm, foff_hz, &phase_ch, COHPSK_NOM_SAMPLES_PER_FRAME);
 
         /* optional HF fading -------------------------------------*/
 
@@ -200,14 +200,14 @@ int main(int argc, char *argv[])
             /* update delayed signal buffer */
 
             for(i=0; i<nhfdelay; i++)
-                ch_fdm_delay[i] = ch_fdm_delay[i+COHPSK_SAMPLES_PER_FRAME];
-            for(j=0; j<COHPSK_SAMPLES_PER_FRAME; i++, j++)
+                ch_fdm_delay[i] = ch_fdm_delay[i+COHPSK_NOM_SAMPLES_PER_FRAME];
+            for(j=0; j<COHPSK_NOM_SAMPLES_PER_FRAME; i++, j++)
                 ch_fdm_delay[i] = ch_fdm[j];
 
             /* combine direct and delayed paths, both multiplied by
                "spreading" (doppler) functions */
 
-            for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+            for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
                 assert(ret == 1);
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
@@ -220,13 +220,13 @@ int main(int argc, char *argv[])
             }
         }
 
-        for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+        for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
             rx_pwr += pow(ch_fdm[i].real, 2.0) + pow(ch_fdm[i].imag, 2.0);
         }
 
         /* AWGN noise ------------------------------------------*/
 
-        for(r=0; r<COHPSK_SAMPLES_PER_FRAME; r++) {
+        for(r=0; r<COHPSK_NOM_SAMPLES_PER_FRAME; r++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm[r] = cadd(ch_fdm[r], scaled_noise);
             noise_pwr += pow(noise[noise_r].real, 2.0) + pow(noise[noise_r].imag, 2.0);
@@ -240,8 +240,8 @@ int main(int argc, char *argv[])
 
         /* buffer so we can let demod Fs offset code do it's thing */
         
-        memcpy(&ch_buf[ch_buf_n], ch_fdm, sizeof(COMP)*COHPSK_SAMPLES_PER_FRAME);
-        ch_buf_n += COHPSK_SAMPLES_PER_FRAME;
+        memcpy(&ch_buf[ch_buf_n], ch_fdm, sizeof(COMP)*COHPSK_NOM_SAMPLES_PER_FRAME);
+        ch_buf_n += COHPSK_NOM_SAMPLES_PER_FRAME;
         assert(ch_buf_n < CH_BUF_SZ);
 
  	/* --------------------------------------------------------*\
@@ -309,9 +309,9 @@ int main(int argc, char *argv[])
             
     printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
     printf("tx var: %f noise var: %f rx var: %f\n", 
-           tx_pwr/(frames*COHPSK_SAMPLES_PER_FRAME), 
-           noise_pwr/(frames*COHPSK_SAMPLES_PER_FRAME),
-           rx_pwr/(frames*COHPSK_SAMPLES_PER_FRAME) 
+           tx_pwr/(frames*COHPSK_NOM_SAMPLES_PER_FRAME), 
+           noise_pwr/(frames*COHPSK_NOM_SAMPLES_PER_FRAME),
+           rx_pwr/(frames*COHPSK_NOM_SAMPLES_PER_FRAME) 
            );
     if (fading_en) {
         free(ch_fdm_delay);
