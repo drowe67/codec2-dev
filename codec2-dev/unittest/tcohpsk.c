@@ -200,7 +200,7 @@ int main(int argc, char *argv[])
     nout = cohpsk_fs_offset(ch_fdm_frame_log_out, ch_fdm_frame_log, COHPSK_M*NSYMROWPILOT*FRAMES, PPM);
     assert(nout < (COHPSK_M*NSYMROWPILOT+1)*FRAMES);
 
-    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    nin_frame = COHPSK_NOM_SAMPLES_PER_FRAME;
     ch_fdm_frame_log_index = 0;
 
     /* --------------------------------------------------------*\
