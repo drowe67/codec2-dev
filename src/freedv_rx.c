@@ -42,49 +42,62 @@ struct my_callback_state {
 void my_put_next_rx_char(void *callback_state, char c) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     if (pstate->ftxt != NULL) {
-        fprintf(pstate->ftxt, "text char received callback: %c\n", c);
+        fprintf(stderr, "%c", c);
     }
 }
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt;
-    short                      speech_out[FREEDV_NSAMPLES];
-    short                      demod_in[FREEDV_NSAMPLES];
+    short                     *speech_out;
+    short                     *demod_in;
     struct freedv             *freedv;
     int                        nin, nout, frame;
     struct my_callback_state   my_cb_state;
+    int                        mode;
 
-    if (argc < 3) {
-	printf("usage: %s InputModemSpeechFile OutputSpeechawFile txtLogFile\n", argv[0]);
-	printf("e.g    %s hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
+    if (argc < 4) {
+	printf("usage: %s 1600|700 InputModemSpeechFile OutputSpeechawFile txtLogFile\n", argv[0]);
+	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
 
-    if (strcmp(argv[1], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
+    mode = -1;
+    if (!strcmp(argv[1],"1600"))
+        mode = FREEDV_MODE_1600;
+    if (!strcmp(argv[1],"700"))
+        mode = FREEDV_MODE_700;
+    assert(mode != -1);
+
+    if (strcmp(argv[2], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input raw modem sample file: %s: %s.\n",
-         argv[1], strerror(errno));
+         argv[2], strerror(errno));
 	exit(1);
     }
 
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
+    if (strcmp(argv[3], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output speech sample file: %s: %s.\n",
-         argv[2], strerror(errno));
+         argv[3], strerror(errno));
 	exit(1);
     }
     
     ftxt = NULL;
-    if ( (argc > 3) && (strcmp(argv[3],"|") != 0) ) {
-        if ((ftxt = fopen(argv[3],"wt")) == NULL ) {
+    if ( (argc > 4) && (strcmp(argv[4],"|") != 0) ) {
+        if ((ftxt = fopen(argv[4],"wt")) == NULL ) {
             fprintf(stderr, "Error opening txt Log File: %s: %s.\n",
-                    argv[3], strerror(errno));
+                    argv[4], strerror(errno));
             exit(1);
         }
     }
     
-    freedv = freedv_open(FREEDV_MODE_1600);
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
+
+    speech_out = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
+    assert(speech_out != NULL);
+    demod_in = (short*)malloc(sizeof(short)*freedv->n_max_modem_samples);
+    assert(demod_in != NULL);
 
     my_cb_state.ftxt = ftxt;
     freedv->callback_state = (void*)&my_cb_state;
@@ -118,6 +131,8 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);         
     }
 
+    free(speech_out);
+    free(demod_in);
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);

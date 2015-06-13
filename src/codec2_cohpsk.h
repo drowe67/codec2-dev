@@ -28,11 +28,14 @@
 #ifndef __CODEC2_COHPSK__
 #define __CODEC2_COHPSK__
 
-#define COHPSK_BITS_PER_FRAME     56              /* hard coded for now */
-#define COHPSK_NC                  7              /* hard coded for now */
-#define COHPSK_SAMPLES_PER_FRAME 600
-#define COHPSK_RS                 75
-#define COHPSK_FS               7500              /* note this is a wierd value to get an integer oversampling rate */
+#define COHPSK_BITS_PER_FRAME         56              /* hard coded for now */
+#define COHPSK_NC                      7              /* hard coded for now */
+#define COHPSK_NOM_SAMPLES_PER_FRAME 600
+#define COHPSK_MAX_SAMPLES_PER_FRAME 625
+#define COHPSK_RS                     75
+#define COHPSK_FS                   7500              /* note this is a wierd 
+                                                         value to get an integer 
+                                                         oversampling rate */
 
 #include "comp.h"
 

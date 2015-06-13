@@ -51,33 +51,46 @@ char my_get_next_tx_char(void *callback_state) {
 
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
-    short                     speech_in[FREEDV_NSAMPLES];
-    short                     mod_out[FREEDV_NSAMPLES];
+    short                    *speech_in;
+    short                    *mod_out;
     struct freedv            *freedv;
     struct my_callback_state  my_cb_state;
+    int                       mode;
 
-    if (argc < 3) {
-	printf("usage: %s InputRawSpeechFile OutputModemRawFile\n", argv[0]);
-	printf("e.g    %s hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
+    if (argc < 4) {
+	printf("usage: %s 1600|700 InputRawSpeechFile OutputModemRawFile\n", argv[0]);
+	printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
 	exit(1);
     }
 
-    if (strcmp(argv[1], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
+    mode = -1;
+    if (!strcmp(argv[1],"1600"))
+        mode = FREEDV_MODE_1600;
+    if (!strcmp(argv[1],"700"))
+        mode = FREEDV_MODE_700;
+    assert(mode != -1);
+
+    if (strcmp(argv[2], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n",
-         argv[1], strerror(errno));
-	exit(1);
-    }
-
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
     }
+
+    if (strcmp(argv[3], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
+	fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
+         argv[3], strerror(errno));
+	exit(1);
+    }
     
-    freedv = freedv_open(FREEDV_MODE_1600);
+    freedv = freedv_open(mode);
     assert(freedv != NULL);
+
+    speech_in = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
+    assert(speech_in != NULL);
+    mod_out = (short*)malloc(sizeof(short)*freedv->n_nom_modem_samples);
+    assert(mod_out != NULL);
 
     /* set up callback for txt msg chars */
 
@@ -88,9 +101,9 @@ int main(int argc, char *argv[]) {
 
     /* OK main loop */
 
-    while(fread(speech_in, sizeof(short), FREEDV_NSAMPLES, fin) == FREEDV_NSAMPLES) {
+    while(fread(speech_in, sizeof(short), freedv->n_speech_samples, fin) == freedv->n_speech_samples) {
         freedv_tx(freedv, mod_out, speech_in);
-        fwrite(mod_out, sizeof(short), FREEDV_NSAMPLES, fout);
+        fwrite(mod_out, sizeof(short), freedv->n_nom_modem_samples, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
@@ -99,6 +112,8 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);         
     }
 
+    free(speech_in);
+    free(mod_out);
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);

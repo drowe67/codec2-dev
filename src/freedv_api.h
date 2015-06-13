@@ -36,10 +36,10 @@
 
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_700         1
-#define FREEDV_NSAMPLES       320
 
 #include "varicode.h"
 #include "codec2_fdmdv.h"
+#include "codec2_cohpsk.h"
 
 struct freedv {
     int                  mode;
@@ -47,6 +47,14 @@ struct freedv {
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
     struct FDMDV_STATS   fdmdv_stats;
+    struct COHPSK       *cohpsk;
+
+    int                  n_speech_samples;
+    int                  n_nom_modem_samples;    // size of tx and most rx modenm sample buffers
+    int                  n_max_modem_samples;    // make your rx modem sample buffers this big
+
+    int                  modem_sample_rate;      // caller is responsible for meeting this
+    int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;
     int                 *codec_bits;
@@ -76,7 +84,10 @@ struct freedv {
 
 struct freedv *freedv_open(int mode);
 void freedv_close(struct freedv *freedv);
+
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]);
+void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]);
+
 int freedv_nin(struct freedv *f);
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]);
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
