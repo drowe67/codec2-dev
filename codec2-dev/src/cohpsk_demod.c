@@ -47,8 +47,8 @@ int main(int argc, char *argv[])
     FILE          *fin, *fout, *foct;
     struct COHPSK *cohpsk;
     float         rx_bits[COHPSK_BITS_PER_FRAME];
-    COMP          rx_fdm[COHPSK_SAMPLES_PER_FRAME];
-    short         rx_fdm_scaled[COHPSK_SAMPLES_PER_FRAME];
+    COMP          rx_fdm[COHPSK_MAX_SAMPLES_PER_FRAME];
+    short         rx_fdm_scaled[COHPSK_MAX_SAMPLES_PER_FRAME];
     int           frames, reliable_sync_bit, nin_frame;
     float        *rx_amp_log;
     float        *rx_phi_log;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
     log_data_r = 0;
     frames = 0;
 
-    nin_frame = COHPSK_SAMPLES_PER_FRAME;
+    nin_frame = COHPSK_NOM_SAMPLES_PER_FRAME;
     while(fread(rx_fdm_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
 	frames++;
 

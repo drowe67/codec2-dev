@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
     struct COHPSK *cohpsk;
     float         tx_bits_sd[COHPSK_BITS_PER_FRAME];
     int           tx_bits[COHPSK_BITS_PER_FRAME];
-    COMP          tx_fdm[COHPSK_SAMPLES_PER_FRAME];
-    short         tx_fdm_scaled[COHPSK_SAMPLES_PER_FRAME];
+    COMP          tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
+    short         tx_fdm_scaled[COHPSK_NOM_SAMPLES_PER_FRAME];
     int           frames;
     int           i;
 
@@ -81,10 +81,10 @@ int main(int argc, char *argv[])
 
 	/* scale and save to disk as shorts */
 
-	for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++)
+	for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++)
 	    tx_fdm_scaled[i] = FDMDV_SCALE * tx_fdm[i].real;
 
- 	fwrite(tx_fdm_scaled, sizeof(short), COHPSK_SAMPLES_PER_FRAME, fout);
+ 	fwrite(tx_fdm_scaled, sizeof(short), COHPSK_NOM_SAMPLES_PER_FRAME, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */

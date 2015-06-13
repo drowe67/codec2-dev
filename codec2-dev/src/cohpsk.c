@@ -86,7 +86,8 @@ struct COHPSK *cohpsk_create(void)
     float          freq_hz;
 
     assert(COHPSK_NC == PILOTS_NC);
-    assert(COHPSK_SAMPLES_PER_FRAME == COHPSK_M*NSYMROWPILOT);
+    assert(COHPSK_NOM_SAMPLES_PER_FRAME == (COHPSK_M*NSYMROWPILOT));
+    assert(COHPSK_MAX_SAMPLES_PER_FRAME == (COHPSK_M*NSYMROWPILOT+COHPSK_M/P));
     assert(COHPSK_ND == ND);
     assert(COHPSK_NSYM == NSYM);  /* as we want to use the tx sym mem on fdmdv */
     assert(COHPSK_NT == NT);
@@ -619,7 +620,7 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
   DATE CREATED: 5/4/2015
 
   COHPSK modulator, take a frame of COHPSK_BITS_PER_FRAME bits and
-  generates a frame of COHPSK_SAMPLES_PER_FRAME modulated symbols.
+  generates a frame of COHPSK_NOM_SAMPLES_PER_FRAME modulated symbols.
 
   The output signal is complex to support single sided frequency
   shifting, for example when testing frequency offsets in channel
@@ -662,7 +663,7 @@ void cohpsk_clip(COMP tx_fdm[])
     float mag;
     int   i;
 
-    for(i=0; i<COHPSK_SAMPLES_PER_FRAME; i++) {
+    for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
         sam = tx_fdm[i];
         mag = cabsolute(sam);            
         if (mag >  COHPSK_CLIP)  {
@@ -907,7 +908,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
   DATE CREATED: 5/4/2015
 
   COHPSK demodulator, takes an array of (nominally) nin_frame =
-  COHPSK_SAMPLES_PER_FRAME modulated samples, returns an array of
+  COHPSK_NOM_SAMPLES_PER_FRAME modulated samples, returns an array of
   COHPSK_BITS_PER_FRAME bits.
 
   The input signal is complex to support single sided frequency shifting
@@ -920,6 +921,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
     COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
     int   i, j, sync, anext_sync, next_sync, nin, r, c;
     float max_ratio, f_est;
+
+    assert(*nin_frame <= COHPSK_MAX_SAMPLES_PER_FRAME);
 
     next_sync = sync = coh->sync;
 

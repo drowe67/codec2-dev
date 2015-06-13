@@ -148,9 +148,9 @@ int main(int argc, char *argv[])
             nhfdelay = floor(SLOW_FADING_DELAY_MS*COHPSK_FS/1000);
         }
 
-        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_SAMPLES_PER_FRAME)*sizeof(COMP));
+        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
         assert(ch_fdm_delay != NULL);
-        for(i=0; i<nhfdelay+COHPSK_SAMPLES_PER_FRAME; i++) {
+        for(i=0; i<nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
             ch_fdm_delay[i].real = 0.0;
             ch_fdm_delay[i].imag = 0.0;
         }
