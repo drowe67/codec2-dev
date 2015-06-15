@@ -70,7 +70,8 @@ struct COHPSK {
 
     struct FDMDV *fdmdv;
     
-    
+    int           verbose;
+
     /* optional log variables used for testing Octave to C port */
 
     COMP          *rx_baseband_log;

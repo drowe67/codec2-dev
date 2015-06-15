@@ -158,6 +158,15 @@ struct COHPSK *cohpsk_create(void)
 
     coh->sig_rms = coh->noise_rms = 0.0;
 
+    for(c=0; c<COHPSK_NC*ND; c++) {
+        for (r=0; r<NSYMROW; r++) {
+            coh->rx_symb[r][c].real = 0.0;
+            coh->rx_symb[r][c].imag = 0.0;
+        }
+    }
+
+    coh->verbose = 0;
+
     /* disable optional logging by default */
 
     coh->rx_baseband_log = NULL;
@@ -550,10 +559,12 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         
         coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
         coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
-        fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
+        if (coh->verbose)
+            fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
  
         if (max_corr/max_mag > 0.9) {
-            fprintf(stderr, "  [%d]   encouraging sync word!\n", coh->frame);
+            if (coh->verbose)
+                fprintf(stderr, "  [%d]   encouraging sync word!\n", coh->frame);
             coh->sync_timer = 0;
             *next_sync = 1;
         }
@@ -602,7 +613,8 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
             coh->sync_timer = 0;            
 
         if (coh->sync_timer == 10) {
-            fprintf(stderr,"  [%d] lost sync ....\n", coh->frame);
+            if (coh->verbose)
+                fprintf(stderr,"  [%d] lost sync ....\n", coh->frame);
             next_sync = 0;
         }
     }
@@ -942,7 +954,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
         max_ratio = 0.0;
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
         
-            fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
+            if (coh->verbose)
+                fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
 
             /* we are out of sync so reset f_est and process two frames to clean out memories */
 
@@ -969,7 +982,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
 
             coh->f_est = f_est;
 
-            fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
+            if (coh->verbose)
+                fprintf(stderr, "  [%d] trying sync and f_est: %f\n", coh->frame, coh->f_est);
 
             rate_Fs_rx_processing(coh, ch_symb, coh->ch_fdm_frame_buf, &coh->f_est, NSW*NSYMROWPILOT, COHPSK_M, 0);
             for (i=0; i<NSW-1; i++) {
@@ -988,7 +1002,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
              frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
 
             if (fabs(coh->f_fine_est) > 2.0) {
-                fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
+                if (coh->verbose)
+                    fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, coh->f_fine_est);
                 next_sync = 0;
             }
         }
@@ -997,7 +1012,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
             /* OK we are in sync!
                demodulate first frame (demod completed below) */
 
-            fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, coh->f_est, coh->ratio);
+            if (coh->verbose)
+                fprintf(stderr, "  [%d] in sync! f_est: %f ratio: %f \n", coh->frame, coh->f_est, coh->ratio);
             for(r=0; r<NSYMROWPILOT+2; r++)
                 for(c=0; c<COHPSK_NC*ND; c++)
                     coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
@@ -1092,7 +1108,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
-    stats->snr_est = 20*log10(coh->sig_rms/coh->noise_rms);
+    stats->snr_est = 20*log10(coh->sig_rms/(coh->noise_rms+1E-6));
     stats->sync = coh->sync;
     stats->foff = coh->f_est;
     stats->rx_timing = coh->rx_timing;
