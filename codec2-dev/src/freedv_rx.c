@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
         frame++;
         if (ftxt != NULL) {
             fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
-                    freedv->fdmdv_stats.sync, freedv->fdmdv_stats.snr_est, freedv->total_bit_errors);
+                    freedv->stats.sync, freedv->stats.snr_est, freedv->total_bit_errors);
         }
 
 	/* if this is in a pipeline, we probably don't want the usual

@@ -40,25 +40,23 @@ int main(int argc, char *argv[])
 {
     struct FDMDV *fdmdv;
 
-    printf("struct FDMDV..........: %d\n", sizeof(struct FDMDV));
-    printf("prev_tx_symbols.......: %d\n", sizeof(fdmdv->prev_tx_symbols));
-    printf("tx_filter_memory......: %d\n", sizeof(fdmdv->tx_filter_memory));
-    printf("phase_tx..............: %d\n", sizeof(fdmdv->phase_tx));
-    printf("freq..................: %d\n", sizeof(fdmdv->freq));
-    printf("pilot_lut.............: %d\n", sizeof(fdmdv->pilot_lut));
-    printf("pilot_baseband1.......: %d\n", sizeof(fdmdv->pilot_baseband1));
-    printf("pilot_baseband2.......: %d\n", sizeof(fdmdv->pilot_baseband2));
-    printf("pilot_lpf1............: %d\n", sizeof(fdmdv->pilot_lpf1));
-    printf("pilot_lpf2............: %d\n", sizeof(fdmdv->pilot_lpf2));
-    printf("S1....................: %d\n", sizeof(fdmdv->S1));
-    printf("S2....................: %d\n", sizeof(fdmdv->S2));
-    printf("phase_rx..............: %d\n", sizeof(fdmdv->phase_rx));
-    printf("rx_fdm_mem............: %d\n", sizeof(fdmdv->rx_fdm_mem));
-    printf("rx_filter_mem_timing..: %d\n", sizeof(fdmdv->rx_filter_mem_timing));
-    printf("phase_difference......: %d\n", sizeof(fdmdv->phase_difference));
-    printf("prev_rx_symbols.......: %d\n", sizeof(fdmdv->prev_rx_symbols));
-    printf("fft_buf...............: %d\n", sizeof(fdmdv->fft_buf));
-    printf("kiss_fft_cfg..........: %d\n", sizeof(fdmdv->fft_cfg));
+    printf("struct FDMDV..........: %ld\n", sizeof(struct FDMDV));
+    printf("prev_tx_symbols.......: %ld\n", sizeof(fdmdv->prev_tx_symbols));
+    printf("tx_filter_memory......: %ld\n", sizeof(fdmdv->tx_filter_memory));
+    printf("phase_tx..............: %ld\n", sizeof(fdmdv->phase_tx));
+    printf("freq..................: %ld\n", sizeof(fdmdv->freq));
+    printf("pilot_lut.............: %ld\n", sizeof(fdmdv->pilot_lut));
+    printf("pilot_baseband1.......: %ld\n", sizeof(fdmdv->pilot_baseband1));
+    printf("pilot_baseband2.......: %ld\n", sizeof(fdmdv->pilot_baseband2));
+    printf("pilot_lpf1............: %ld\n", sizeof(fdmdv->pilot_lpf1));
+    printf("pilot_lpf2............: %ld\n", sizeof(fdmdv->pilot_lpf2));
+    printf("S1....................: %ld\n", sizeof(fdmdv->S1));
+    printf("S2....................: %ld\n", sizeof(fdmdv->S2));
+    printf("phase_rx..............: %ld\n", sizeof(fdmdv->phase_rx));
+    printf("rx_fdm_mem............: %ld\n", sizeof(fdmdv->rx_fdm_mem));
+    printf("rx_filter_mem_timing..: %ld\n", sizeof(fdmdv->rx_filter_mem_timing));
+    printf("phase_difference......: %ld\n", sizeof(fdmdv->phase_difference));
+    printf("prev_rx_symbols.......: %ld\n", sizeof(fdmdv->prev_rx_symbols));
 
     return 0;
 }

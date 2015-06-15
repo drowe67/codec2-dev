@@ -324,7 +324,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
         }
     }
     
-    /* and finally optional diversity combination, note output is soft decm a "1" is < 0 */
+    /* and finally optional diversity combination, note output is soft decn a "1" is < 0 */
 
     for(c=0; c<COHPSK_NC; c++) {
         for(r=0; r<NSYMROW; r++) {
@@ -1075,3 +1075,34 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
     return tout;
 }
 
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_get_demod_stats()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: 14 June 2015
+
+  Fills stats structure with a bunch of demod information.
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
+{
+    int   c,r;
+
+    stats->Nc = COHPSK_NC*ND;
+    assert(stats->Nc <= MODEM_STATS_NC_MAX);
+    stats->snr_est = 20*log10(coh->sig_rms/coh->noise_rms);
+    stats->sync = coh->sync;
+    stats->foff = coh->f_est;
+    stats->rx_timing = coh->rx_timing;
+    stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
+
+    assert(stats->nr <= MODEM_STATS_NR_MAX);
+    stats->nr = NSYMROW;
+    for(c=0; c<COHPSK_NC*ND; c++) {
+        for (r=0; r<NSYMROW; r++) {
+            stats->rx_symbols[r][c] = coh->rx_symb[r][c];
+        }
+    }
+}

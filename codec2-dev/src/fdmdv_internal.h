@@ -148,11 +148,6 @@ struct FDMDV {
     float sig_est[NC+1];
     float noise_est[NC+1];
 
-    /* Buf for FFT/waterfall */
-
-    float fft_buf[2*FDMDV_NSPEC];
-    kiss_fft_cfg fft_cfg;  
-
     /* channel simulation */
 
     float sig_pwr_av;
