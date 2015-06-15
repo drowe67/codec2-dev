@@ -928,7 +928,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
 \*---------------------------------------------------------------------------*/
 
-void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, COMP rx_fdm[], int *nin_frame)
+void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_fdm[], int *nin_frame)
 {
     COMP  ch_symb[NSW*NSYMROWPILOT][COHPSK_NC*ND];
     int   i, j, sync, anext_sync, next_sync, nin, r, c;
@@ -1036,10 +1036,10 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *reliable_sync_bit, C
 
     /* if we are in sync complete demodulation with symbol rate processing */
   
-    *reliable_sync_bit = 0;
+    *sync_good = 0;
     if ((next_sync == 1) || (sync == 1)) {
         qpsk_symbols_to_bits(coh, rx_bits, coh->ct_symb_ff_buf);
-        *reliable_sync_bit = 1;
+        *sync_good = 1;
     }
 
     sync = sync_state_machine(coh, sync, next_sync);        

@@ -64,7 +64,7 @@ struct freedv {
     int                  tx_sync_bit;
     int                  total_bit_errors;
 
-    int                  reliable_sync_bit;
+    int                  sync;
     float                snr_est;
     float                snr_thresh;
     int                  nin;

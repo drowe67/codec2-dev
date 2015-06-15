@@ -435,7 +435,7 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
-    int                 reliable_sync_bit, i, j, bit, byte, nin_prev, nout, k;
+    int                 sync, i, j, bit, byte, nin_prev, nout, k;
     int                 recd_codeword, codeword1, data_flag_index, n_ascii;
     short               abit[1];
     char                ascii_out;
@@ -449,12 +449,14 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (f->mode == FREEDV_MODE_1600) {
+        int reliable_sync_bit;
+
         bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
         nin_prev = f->nin;
         fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
-        f->reliable_sync_bit = reliable_sync_bit;
+        f->sync = f->fdmdv->sync;
         f->snr_est = f->stats.snr_est;
 
         if (f->stats.sync) {
@@ -548,15 +550,14 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
     if (f->mode == FREEDV_MODE_700) {
         float rx_bits[COHPSK_BITS_PER_FRAME];
-        int   reliable_sync_bit;
+        int   sync;
 
         nin_prev = f->nin;
-	cohpsk_demod(f->cohpsk, rx_bits, &reliable_sync_bit, demod_in, &f->nin);
-        f->reliable_sync_bit = reliable_sync_bit;
+	cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
+        f->sync = sync;
         f->snr_est = 2.0;
-        fprintf(stderr, "%d\n", reliable_sync_bit);
 
- 	if (reliable_sync_bit) {
+ 	if (sync) {
 
             data_flag_index = codec2_get_spare_bit_index(f->codec2);
 
