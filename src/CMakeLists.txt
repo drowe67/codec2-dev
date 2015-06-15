@@ -204,6 +204,7 @@ set(CODEC2_SRCS
     golay23.c
     freedv_api.c
     varicode.c
+    modem_stats.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
@@ -245,7 +246,7 @@ target_link_libraries(fdmdv_get_test_bits ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(fdmdv_mod fdmdv_mod.c fdmdv.c kiss_fft.c)
 target_link_libraries(fdmdv_mod ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c)
+add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c modem_stats.c)
 target_link_libraries(fdmdv_demod ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c)

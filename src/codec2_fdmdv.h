@@ -56,6 +56,7 @@ extern "C" {
 #endif
 
 #include "comp.h"
+#include "modem_stats.h"
 
 #define FDMDV_NC                      14  /* default number of data carriers                                */                               
 #define FDMDV_NC_MAX                  20  /* maximum number of data carriers                                */                               
@@ -72,25 +73,10 @@ extern "C" {
 #define FDMDV_OS_TAPS_16K       48                            /* number of OS filter taps at 16kHz   */
 #define FDMDV_OS_TAPS_8K        (FDMDV_OS_TAPS_16K/FDMDV_OS)  /* number of OS filter taps at 8kHz    */
 
-/* FFT points */
-
-#define FDMDV_NSPEC             512
-#define FDMDV_MAX_F_HZ          4000
-
 /* FDMDV states and stats structures */
 
 struct FDMDV;
     
-struct FDMDV_STATS {
-    int    Nc;
-    float  snr_est;                    /* estimated SNR of rx signal in dB (3 kHz noise BW)  */
-    COMP   rx_symbols[FDMDV_NC_MAX+1]; /* latest received symbols, for scatter plot          */ 
-    int    sync;                       /* demod sync state                                   */ 
-    float  foff;                       /* estimated freq offset in Hz                        */       
-    float  rx_timing;                  /* estimated optimum timing offset in samples         */
-    float  clock_offset;               /* Estimated tx/rx sample clock offset in ppm         */
-};
-
 struct FDMDV * fdmdv_create(int Nc);
 void           fdmdv_destroy(struct FDMDV *fdmdv_state);
 void           fdmdv_use_old_qpsk_mapping(struct FDMDV *fdmdv_state);
@@ -105,8 +91,7 @@ void           fdmdv_get_test_bits(struct FDMDV *fdmdv_state, int tx_bits[]);
 int            fdmdv_error_pattern_size(struct FDMDV *fdmdv_state);
 void           fdmdv_put_test_bits(struct FDMDV *f, int *sync, short error_pattern[], int *bit_errors, int *ntest_bits, int rx_bits[]);
     
-void           fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct FDMDV_STATS *fdmdv_stats);
-void           fdmdv_get_rx_spectrum(struct FDMDV *fdmdv_state, float mag_dB[], COMP rx_fdm[], int nin);
+void           fdmdv_get_demod_stats(struct FDMDV *fdmdv_state, struct MODEM_STATS *stats);
 
 void           fdmdv_8_to_16(float out16k[], float in8k[], int n);
 void           fdmdv_8_to_16_short(short out16k[], short in8k[], int n);

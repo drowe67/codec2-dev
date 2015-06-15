@@ -46,14 +46,14 @@ struct freedv {
 
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
-    struct FDMDV_STATS   fdmdv_stats;
+    struct MODEM_STATS   stats;
     struct COHPSK       *cohpsk;
 
     int                  n_speech_samples;
     int                  n_nom_modem_samples;    // size of tx and most rx modenm sample buffers
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
 
-    int                  modem_sample_rate;      // caller is responsible for meeting this
+    int                  modem_sample_rate;      // ATM caller is responsible for meeting this (TBC)
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;
@@ -64,6 +64,8 @@ struct freedv {
     int                  tx_sync_bit;
     int                  total_bit_errors;
 
+    int                  reliable_sync_bit;
+    float                snr_est;
     float                snr_thresh;
     int                  nin;
 

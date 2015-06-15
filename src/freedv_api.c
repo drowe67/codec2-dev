@@ -58,7 +58,7 @@
 
 struct freedv *freedv_open(int mode) {
     struct freedv *f;
-    int            Nc, codec2_mode, nbit, nbyte;
+    int            Nc, codec2_mode, nbit, nbyte, i;
     
     if ((mode != FREEDV_MODE_1600) && (mode != FREEDV_MODE_700))
         return NULL;
@@ -133,7 +133,7 @@ struct freedv *freedv_open(int mode) {
     f->freedv_put_next_rx_char = NULL;
 
     f->total_bit_errors = 0;
-
+    
     return f;
 }
 
@@ -453,9 +453,11 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
         nin_prev = f->nin;
         fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
-        fdmdv_get_demod_stats(f->fdmdv, &f->fdmdv_stats);
+        fdmdv_get_demod_stats(f->fdmdv, &f->stats);
+        f->reliable_sync_bit = reliable_sync_bit;
+        f->snr_est = f->stats.snr_est;
 
-        if (f->fdmdv_stats.sync) {
+        if (f->stats.sync) {
             if (reliable_sync_bit == 0) {
                 memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
                 nout = 0;
@@ -526,7 +528,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
                 /* squelch if beneath SNR threshold */
 
-                if (f->fdmdv_stats.snr_est < f->snr_thresh) {
+                if (f->stats.snr_est < f->snr_thresh) {
                     for(i=0; i<f->n_speech_samples; i++)
                         speech_out[i] = 0;
                 }
@@ -550,6 +552,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
         nin_prev = f->nin;
 	cohpsk_demod(f->cohpsk, rx_bits, &reliable_sync_bit, demod_in, &f->nin);
+        f->reliable_sync_bit = reliable_sync_bit;
+        f->snr_est = 2.0;
+        fprintf(stderr, "%d\n", reliable_sync_bit);
 
  	if (reliable_sync_bit) {
 
@@ -587,11 +592,21 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             nout = f->n_speech_samples;
         }
         else {
+            float t,a,b,s;
+            int   t1,t2;
+
             /* if not in sync pass through analog samples */
             /* this lets us "hear" whats going on, e.g. during tuning */
-            for(i=0; i<nin_prev; i++)
-                speech_out[i] = FDMDV_SCALE*demod_in[i].real;
-            nout = nin_prev;
+            /* need to linearly interp as Fs in and out slightly different */
+
+            for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=f->modem_sample_rate/FS) {
+                t1 = floor(t); t2 = ceil(t);
+                a = t - t1;
+                b = t2 - t1;
+                s = b*demod_in[t1].real + a*demod_in[t2].real;
+                speech_out[i] = FDMDV_SCALE*s;
+            }
+            nout = f->n_speech_samples;
         }
      }
 

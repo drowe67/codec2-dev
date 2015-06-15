@@ -42,6 +42,7 @@
 
 #include "codec2_fdmdv.h"
 #include "octave.h"
+#include "freedv_api.h"
 
 /* lof of information we want to dump to Octave */
 
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     int           sync = 0;
     int           f;
     FILE         *foct = NULL;
-    struct FDMDV_STATS stats;
+    struct MODEM_STATS stats;
     COMP         *rx_fdm_log;
     int           rx_fdm_log_col_index;
     COMP         *rx_symbols_log;
@@ -111,6 +112,7 @@ int main(int argc, char *argv[])
         Nc = FDMDV_NC;
     
     fdmdv = fdmdv_create(Nc);
+    modem_stats_open(&stats);
 
     bits_per_fdmdv_frame = fdmdv_bits_per_frame(fdmdv);
     bits_per_codec_frame = 2*fdmdv_bits_per_frame(fdmdv);
@@ -126,7 +128,7 @@ int main(int argc, char *argv[])
 
     rx_fdm_log = (COMP*)malloc(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
-    rx_spec_log = (float*)malloc(sizeof(float)*FDMDV_NSPEC*MAX_FRAMES);
+    rx_spec_log = (float*)malloc(sizeof(float)*MODEM_STATS_NSPEC*MAX_FRAMES);
     assert(rx_spec_log != NULL);
     rx_symbols_log = (COMP*)malloc(sizeof(COMP)*(Nc+1)*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
@@ -156,7 +158,7 @@ int main(int argc, char *argv[])
 	    rx_fdm_log_col_index += nin_prev;
 
 	    for(c=0; c<Nc+1; c++)
-		rx_symbols_log[f*(Nc+1)+c] = stats.rx_symbols[c];
+		rx_symbols_log[f*(Nc+1)+c] = stats.rx_symbols[0][c];
 	    foff_log[f] = stats.foff;
 	    rx_timing_log[f] = stats.rx_timing;
 	    sync_log[f] = stats.sync;
@@ -164,7 +166,7 @@ int main(int argc, char *argv[])
 	    memcpy(&rx_bits_log[bits_per_fdmdv_frame*f], rx_bits, sizeof(int)*bits_per_fdmdv_frame);
 	    snr_est_log[f] = stats.snr_est;
 
-	    fdmdv_get_rx_spectrum(fdmdv, &rx_spec_log[f*FDMDV_NSPEC], rx_fdm, nin_prev);
+	    modem_stats_get_rx_spectrum(&stats, &rx_spec_log[f*MODEM_STATS_NSPEC], rx_fdm, nin_prev);
 
 	    f++;
 	}
@@ -227,7 +229,7 @@ int main(int argc, char *argv[])
 	octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
 	octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
 	octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
-	octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, FDMDV_NSPEC, FDMDV_NSPEC);  
+	octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, MODEM_STATS_NSPEC, MODEM_STATS_NSPEC);  
 	fclose(foct);
     }
 
