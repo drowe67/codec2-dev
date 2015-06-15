@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     float         rx_bits[COHPSK_BITS_PER_FRAME];
     COMP          rx_fdm[COHPSK_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_MAX_SAMPLES_PER_FRAME];
-    int           frames, reliable_sync_bit, nin_frame;
+    int           frames, sync, nin_frame;
     float        *rx_amp_log;
     float        *rx_phi_log;
     COMP         *rx_symb_log;
@@ -114,9 +114,9 @@ int main(int argc, char *argv[])
             rx_fdm[i].imag = 0.0;
         }
 
-	cohpsk_demod(cohpsk, rx_bits, &reliable_sync_bit, rx_fdm, &nin_frame);
+	cohpsk_demod(cohpsk, rx_bits, &sync, rx_fdm, &nin_frame);
 
- 	if (reliable_sync_bit) {
+ 	if (sync) {
             fwrite(rx_bits, sizeof(float), COHPSK_BITS_PER_FRAME, fout);
 
             if (oct) {
