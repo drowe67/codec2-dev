@@ -1108,7 +1108,8 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
-    stats->snr_est = 20*log10(coh->sig_rms/(coh->noise_rms+1E-6));
+    stats->snr_est = 20*log10((coh->sig_rms+1E-6)/(coh->noise_rms+1E-6)) - 10*log10(3000.0/700.0);
+    //fprintf(stderr, "sig_rms: %f noise_rms: %f snr_est: %f\n", coh->sig_rms, coh->noise_rms, stats->snr_est);
     stats->sync = coh->sync;
     stats->foff = coh->f_est;
     stats->rx_timing = coh->rx_timing;
