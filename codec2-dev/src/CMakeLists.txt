@@ -91,8 +91,10 @@ set(CODEBOOKSGE ${D}/gecb.txt)
 
 # when crosscompiling import the executable targets from a file
 if(CMAKE_CROSSCOMPILING)
-    set(IMPORT_EXECUTABLES "IMPORTFILE-NOTFOUND" CACHE FILEPATH "Point to the export file from a native build")
-    include(${IMPORT_EXECUTABLES})
+    #set(IMPORT_EXECUTABLES "IMPORTFILE-NOTFOUND" CACHE FILEPATH "Point to the export file from a native build")
+    #include(${IMPORT_EXECUTABLES})
+    add_executable(generate_codebook IMPORTED)
+    set_property(TARGET generate_codebook PROPERTY IMPORTED_LOCATION ${GENERATE_CODEBOOK})
 else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
