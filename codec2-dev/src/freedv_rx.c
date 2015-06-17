@@ -92,6 +92,7 @@ int main(int argc, char *argv[]) {
     }
     
     freedv = freedv_open(mode);
+    cohpsk_set_verbose(freedv->cohpsk, 1);
     assert(freedv != NULL);
 
     speech_out = (short*)malloc(sizeof(short)*freedv->n_speech_samples);

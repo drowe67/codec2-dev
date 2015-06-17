@@ -541,8 +541,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         else {
             /* if not in sync pass through analog samples */
             /* this lets us "hear" whats going on, e.g. during tuning */
+            
             for(i=0; i<nin_prev; i++)
                 speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+            //fprintf(stderr, "%d %d %d\n", nin_prev, speech_out[0], speech_out[nin_prev-1]);
             nout = nin_prev;
         }
     }
@@ -600,7 +602,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             /* this lets us "hear" whats going on, e.g. during tuning */
             /* need to linearly interp as Fs in and out slightly different */
 
-            for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=f->modem_sample_rate/FS) {
+            for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=(float)f->modem_sample_rate/FS) {
                 t1 = floor(t); t2 = ceil(t);
                 a = t - t1;
                 b = t2 - t1;
@@ -608,6 +610,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 speech_out[i] = FDMDV_SCALE*s;
             }
             nout = f->n_speech_samples;
+            //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
         }
      }
 

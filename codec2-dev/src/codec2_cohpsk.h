@@ -48,5 +48,6 @@ void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[]);
 void cohpsk_clip(COMP tx_fdm[]);
 void cohpsk_demod(struct COHPSK *cohpsk, float rx_bits[], int *sync, COMP rx_fdm[], int *nin_frame);
 void cohpsk_get_demod_stats(struct COHPSK *cohpsk, struct MODEM_STATS *stats);
+void cohpsk_set_verbose(struct COHPSK *coh, int verbose);
 
 #endif
