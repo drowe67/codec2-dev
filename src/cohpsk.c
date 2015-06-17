@@ -1123,3 +1123,12 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
         }
     }
 }
+
+
+void cohpsk_set_verbose(struct COHPSK *coh, int verbose)
+{
+    assert(coh != NULL);
+    coh->verbose = verbose;
+}
+
+
