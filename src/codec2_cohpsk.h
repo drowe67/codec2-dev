@@ -42,6 +42,8 @@
 
 struct COHPSK;
 
+extern const int test_bits_coh[];
+
 struct COHPSK *cohpsk_create(void);
 void cohpsk_destroy(struct COHPSK *coh);
 void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[]);
@@ -49,5 +51,8 @@ void cohpsk_clip(COMP tx_fdm[]);
 void cohpsk_demod(struct COHPSK *cohpsk, float rx_bits[], int *sync, COMP rx_fdm[], int *nin_frame);
 void cohpsk_get_demod_stats(struct COHPSK *cohpsk, struct MODEM_STATS *stats);
 void cohpsk_set_verbose(struct COHPSK *coh, int verbose);
+void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[]);
+void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
+                          int *bit_errors, float rx_bits_sd[]);
 
 #endif

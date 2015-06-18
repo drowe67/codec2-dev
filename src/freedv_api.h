@@ -62,6 +62,14 @@ struct freedv {
     int                 *fdmdv_bits;
     int                 *rx_bits;
     int                  tx_sync_bit;
+
+    int                 *ptest_bits_coh;
+    int                 *ptest_bits_coh_end;
+
+    int                  test_frames;            // set this baby for 1 to tx/rx test frames to look at bit error stats
+    int                  test_frame_sync_state;
+    int                  test_frame_count;
+    int                  total_bits;
     int                  total_bit_errors;
 
     int                  sync;

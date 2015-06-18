@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     int           i;
 
     if (argc < 3) {
-	printf("usage: %s InputOneBitPerIntFile OutputModemRawFile\n", argv[0]);
+	printf("usage: %s InputOneFloatPerBitFile OutputModemRawFile\n", argv[0]);
 	exit(1);
     }
 

@@ -46,6 +46,7 @@
 #include "kiss_fft.h"
 #include "linreg.h"
 #include "rn_coh.h"
+#include "test_bits_coh.h"
 
 static COMP qpsk_mod[] = {
     { 1.0, 0.0},
@@ -178,6 +179,11 @@ struct COHPSK *cohpsk_create(void)
     coh->rx_timing_log = NULL;
     coh->rx_timing_log_index = 0;
 
+    /* test frames */
+
+    coh->ptest_bits_coh_tx = coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+    coh->ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
+    
     return coh;
 }
 
@@ -1133,6 +1139,76 @@ void cohpsk_set_verbose(struct COHPSK *coh, int verbose)
 {
     assert(coh != NULL);
     coh->verbose = verbose;
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_get_test_bits()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: June 2015
+
+  Returns a frame of known test bits.
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[])
+{
+    memcpy(rx_bits, coh->ptest_bits_coh_tx, sizeof(int)*COHPSK_BITS_PER_FRAME);
+    coh->ptest_bits_coh_tx += COHPSK_BITS_PER_FRAME;
+    if (coh->ptest_bits_coh_tx >=coh->ptest_bits_coh_end) {
+        coh->ptest_bits_coh_tx = (int*)test_bits_coh;
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: cohpsk_put_test_bits()	     
+  AUTHOR......: David Rowe			      
+  DATE CREATED: June 2015
+
+  Accepts bits from demod and attempts to sync with the known
+  test_bits sequence.  When synced measures bit errors.
+
+\*---------------------------------------------------------------------------*/
+
+void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
+			 int *bit_errors, float rx_bits_sd[])
+{
+    int i, next_state, anerror;
+    int rx_bits[COHPSK_BITS_PER_FRAME];
+
+    for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
+        rx_bits[i] = rx_bits_sd[i] < 0.0;
+    }
+
+    *bit_errors = 0;
+    for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
+        anerror = (rx_bits[i] & 0x1) ^ coh->ptest_bits_coh_rx[i];
+        *bit_errors += anerror;
+        error_pattern[i] = anerror;
+    }
+
+    /* state logic */
+
+    next_state = *state;
+
+    if (*state == 0) {
+        if (*bit_errors < 4) {
+            next_state = 1;
+            coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
+        }
+    }
+
+    if (*state == 1) {
+        coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
+        if (coh->ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
+            coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+        }
+    }
+
+    *state = next_state;
 }
 
 

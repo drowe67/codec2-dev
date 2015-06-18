@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     int                       mode;
 
     if (argc < 4) {
-	printf("usage: %s 1600|700 InputRawSpeechFile OutputModemRawFile\n", argv[0]);
+	printf("usage: %s 1600|700 InputRawSpeechFile OutputModemRawFile [--testframes]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
 	exit(1);
     }
@@ -86,6 +86,10 @@ int main(int argc, char *argv[]) {
     
     freedv = freedv_open(mode);
     assert(freedv != NULL);
+
+    if ((argc > 4) && (strcmp(argv[4], "--testframes") == 0)) {
+        freedv->test_frames = 1;
+    }
 
     speech_in = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
     assert(speech_in != NULL);
