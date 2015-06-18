@@ -35,7 +35,6 @@
 #include <errno.h>
 
 #include "codec2_cohpsk.h"
-#include "test_bits_coh.h"
 #include "octave.h"
 
 #define LOG_FRAMES 100
@@ -44,17 +43,17 @@ int main(int argc, char *argv[])
 {
     FILE         *fin, *foct;
     float         rx_bits_sd[COHPSK_BITS_PER_FRAME];
-    int           rx_bits[COHPSK_BITS_PER_FRAME];
-    int          *ptest_bits_coh, *ptest_bits_coh_end;
-    int           state, next_state, i, nbits, errors, nerrors;
+    int           state, i, nbits, bit_errors, nerrors;
+    short         error_pattern[COHPSK_BITS_PER_FRAME];
     int           error_positions_hist[COHPSK_BITS_PER_FRAME], logframes;
     int           nerr_log[LOG_FRAMES];
+    struct COHPSK *coh;
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
         error_positions_hist[i] = 0;
 
     if (argc < 2) {
-	fprintf(stderr, "usage: %s InputOneBitPerIntFile [OctaveLogFile]\n", argv[0]);
+	fprintf(stderr, "usage: %s InputOneFloatPerBitFile [OctaveLogFile]\n", argv[0]);
 	exit(1);
     }
 
@@ -64,6 +63,8 @@ int main(int argc, char *argv[])
          argv[1], strerror(errno));
 	exit(1);
     }
+
+    coh = cohpsk_create();
 
     foct = NULL;
     logframes = 0;
@@ -78,53 +79,18 @@ int main(int argc, char *argv[])
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
         error_positions_hist[i] = 0;
 
-    ptest_bits_coh = (int*)test_bits_coh;
-    ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
-
     state = 0; nbits = 0; nerrors = 0;
     while (fread(rx_bits_sd, sizeof(float), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
-        for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-            rx_bits[i] = rx_bits_sd[i] < 0.0;
-            //fprintf(stderr,"%f %d\n", rx_bits_sd[i], rx_bits[i]);
-        }
 
-        errors = 0;
-        for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-            errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh[i];
-            if (state == 1) {
-                if ((state == 1 ) && (rx_bits[i] & 0x1) ^ ptest_bits_coh[i])
-                    error_positions_hist[i]++;
-            }
-        }
-        //printf("state: %d errors: %d nerrors: %d\n", state, errors, nerrors);
-
-        /* state logic */
-
-        next_state = state;
-
-        if (state == 0) {
-            if (errors < 4) {
-                next_state = 1;
-                ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-                nerrors = errors;
-                nbits = COHPSK_BITS_PER_FRAME;
-                if (logframes < LOG_FRAMES)
-                    nerr_log[logframes++] = errors;
-            }
-        }
-
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_sd);
         if (state == 1) {
-            nerrors += errors;
+            for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                error_positions_hist[i] += error_pattern[i];
+           if (logframes < LOG_FRAMES)
+                nerr_log[logframes++] = bit_errors;
+            nerrors += bit_errors;
             nbits   += COHPSK_BITS_PER_FRAME;
-            ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-            if (ptest_bits_coh >= ptest_bits_coh_end) {
-                ptest_bits_coh = (int*)test_bits_coh;
-            }
-            if (logframes < LOG_FRAMES)
-                nerr_log[logframes++] = errors;
         }
-
-        state = next_state;
 
         if (fin == stdin) fflush(stdin);
     }

@@ -72,6 +72,10 @@ struct COHPSK {
     
     int           verbose;
 
+    int          *ptest_bits_coh_tx;
+    int          *ptest_bits_coh_rx;
+    int          *ptest_bits_coh_end;
+
     /* optional log variables used for testing Octave to C port */
 
     COMP          *rx_baseband_log;
