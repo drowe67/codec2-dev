@@ -1105,13 +1105,17 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
 void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 {
     int   c,r;
+    COMP  pi_4;
+
+    pi_4.real = cosf(M_PI/4.0);
+    pi_4.imag = sinf(M_PI/4.0);
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
     stats->snr_est = 20*log10((coh->sig_rms+1E-6)/(coh->noise_rms+1E-6)) - 10*log10(3000.0/700.0);
     //fprintf(stderr, "sig_rms: %f noise_rms: %f snr_est: %f\n", coh->sig_rms, coh->noise_rms, stats->snr_est);
     stats->sync = coh->sync;
-    stats->foff = coh->f_est;
+    stats->foff = coh->f_est - FDMDV_FCENTRE;
     stats->rx_timing = coh->rx_timing;
     stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
@@ -1119,7 +1123,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
     stats->nr = NSYMROW;
     for(c=0; c<COHPSK_NC*ND; c++) {
         for (r=0; r<NSYMROW; r++) {
-            stats->rx_symbols[r][c] = coh->rx_symb[r][c];
+            stats->rx_symbols[r][c] = cmult(coh->rx_symb[r][c], pi_4);
         }
     }
 }
