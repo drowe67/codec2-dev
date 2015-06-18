@@ -118,7 +118,7 @@ int main(int argc, char *argv[]) {
     cb = (float*)malloc(sizeof(float)*d*e);
     cent = (float*)malloc(sizeof(float)*d*e);
     n = (int*)malloc(sizeof(int)*d*e);
-    if (cb == NULL || cb == NULL || cent == NULL || vec == NULL) {
+    if (vec == NULL || cb == NULL || cent == NULL || n == NULL) {
 	printf("Error in malloc.\n");
 	exit(1);
     }
