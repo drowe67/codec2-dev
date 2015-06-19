@@ -33,7 +33,6 @@
 #include <math.h>
 
 #include "codec2_cohpsk.h"
-#include "test_bits_coh.h"
 #include "octave.h"
 #include "comp_prim.h"
 #include "noise_samples.h"
@@ -68,18 +67,16 @@ int main(int argc, char *argv[])
     COMP           tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     COMP           ch_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     COMP           ch_buf[CH_BUF_SZ];
-    int            rx_bits[COHPSK_BITS_PER_FRAME];
     float          rx_bits_sd[COHPSK_BITS_PER_FRAME];
     float         *rx_amp_log;
     float         *rx_phi_log;
     COMP          *rx_symb_log;
                                             
     int            f, r, i;
-    int           *ptest_bits_coh, *ptest_bits_coh_end, *ptest_bits_coh_rx;
     COMP           phase_ch;
     int            noise_r, noise_end;
-    int            errors;
-    int            state, next_state, nerrors, nbits, reliable_sync_bit;
+    int            bit_errors;
+    int            state, nerrors, nbits, reliable_sync_bit;
     float          EsNo, variance;
     COMP           scaled_noise;
     float          EsNodB, foff_hz;
@@ -89,12 +86,9 @@ int main(int argc, char *argv[])
     FILE          *ffading, *fout;
     int            ch_buf_n;
     float          tx_pwr, rx_pwr, noise_pwr;
-    int            error_positions_hist[COHPSK_BITS_PER_FRAME];
+    short          error_pattern[COHPSK_BITS_PER_FRAME];
     int            log_data_r, c, j, tmp;
-
-    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-        error_positions_hist[i] = 0;
-
+             
     EsNodB = ES_NO_DB;
     foff_hz =  FOFF_HZ;
     fading_en = 0;
@@ -122,9 +116,6 @@ int main(int argc, char *argv[])
     rx_symb_log = (COMP *)malloc(sizeof(COMP)*frames*NSYMROW*COHPSK_NC*ND);
     assert(rx_symb_log != NULL);
 
-    ptest_bits_coh = ptest_bits_coh_rx = (int*)test_bits_coh;
-    ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
-    
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     noise_r = 0; 
     noise_end = sizeof(noise)/sizeof(COMP);
@@ -173,13 +164,7 @@ int main(int argc, char *argv[])
 	                          Mod
 	\*---------------------------------------------------------*/
 
-        memcpy(tx_bits, ptest_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
-        ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-        if (ptest_bits_coh >= ptest_bits_coh_end) {
-            ptest_bits_coh = (int*)test_bits_coh;
-            //fprintf(stderr, "  [%d] tx test bits wrap\n", f);            
-        }
-
+        cohpsk_get_test_bits(coh, tx_bits);
 	cohpsk_mod(coh, tx_fdm, tx_bits);
         cohpsk_clip(tx_fdm);
         
@@ -251,9 +236,7 @@ int main(int argc, char *argv[])
         coh->frame = f;
         tmp = nin_frame;
  	cohpsk_demod(coh, rx_bits_sd, &reliable_sync_bit, ch_buf, &tmp);
-        for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-            rx_bits[i] = rx_bits_sd[i] > 0.0;
-        
+
         ch_buf_n -= nin_frame;
         //printf("nin_frame: %d tmp: %d ch_buf_n: %d\n", nin_frame, tmp, ch_buf_n);
         assert(ch_buf_n >= 0);
@@ -261,40 +244,11 @@ int main(int argc, char *argv[])
             memcpy(ch_buf, &ch_buf[nin_frame], sizeof(COMP)*ch_buf_n);
         nin_frame = tmp;
 
-        //fprintf(stderr, "  [%d] nin_frame: %d\n", f, nin_frame);            
-        errors = 0;
-        for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-            errors += (rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i];
-            if (state == 1) {
-                if ((rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i])
-                    error_positions_hist[i]++;
-            }
-        }
-        
-        /* state logic to sync up to test data */
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_sd);
+        nerrors += bit_errors;
+        nbits   += COHPSK_BITS_PER_FRAME;
 
-        next_state = state;
-        
-        if (state == 0) {
-            if (reliable_sync_bit && (errors < 4)) {
-                next_state = 1;
-                ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
-                nerrors = errors;
-                nbits = COHPSK_BITS_PER_FRAME;
-                //fprintf(stderr, "  [%d] test data sync nerrors: %d\n", f, nerrors);            
-            }
-        }
-
-        if (state == 1) {
-            nerrors += errors;
-            nbits   += COHPSK_BITS_PER_FRAME;
-            //fprintf(stderr, "  [%d] test data sync errors: %d\n", f, errors);            
-            ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
-            if (ptest_bits_coh_rx >= ptest_bits_coh_end) {
-                ptest_bits_coh_rx = (int*)test_bits_coh;
-                //fprintf(stderr, "  [%d] rx test bits wrap\n", f);                         
-            }
-
+        if (state) {
             for(r=0; r<NSYMROW; r++, log_data_r++) {
                 for(c=0; c<COHPSK_NC*ND; c++) {
                     rx_amp_log[log_data_r*COHPSK_NC*ND+c] = coh->amp_[r][c]; 
@@ -304,7 +258,6 @@ int main(int argc, char *argv[])
             }
         }
         
-        state = next_state;
     }
             
     printf("%4.3f %d %d\n", (float)nerrors/nbits, nbits, nerrors);
@@ -319,9 +272,6 @@ int main(int argc, char *argv[])
     }
     cohpsk_destroy(coh);
         
-    //for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-    //        printf("%d %d\n", i, error_positions_hist[i]);
-
     fout = fopen("test_cohpsk_ch_out.txt","wt");
     octave_save_complex(fout, "ch_symb_log_c", (COMP*)coh->ch_symb_log, coh->ch_symb_log_r, COHPSK_NC*ND, COHPSK_NC*ND);  
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  

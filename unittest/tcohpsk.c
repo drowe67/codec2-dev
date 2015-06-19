@@ -39,7 +39,6 @@
 #include "codec2_cohpsk.h"
 #include "cohpsk_defs.h"
 #include "cohpsk_internal.h"
-#include "test_bits_coh.h"
 #include "octave.h"
 #include "comp_prim.h"
 #include "noise_samples.h"
@@ -82,7 +81,6 @@ int main(int argc, char *argv[])
                                           
     FILE          *fout;
     int            f, r, c, log_r, log_data_r, noise_r, ff_log_r, i;
-    int           *ptest_bits_coh, *ptest_bits_coh_end;
     double         foff;
     COMP           foff_rect, phase_ch;
 
@@ -124,10 +122,6 @@ int main(int argc, char *argv[])
     /* init stuff */
 
     log_r = log_data_r = noise_r = log_bits = ff_log_r = f_est_samples = 0;
-    ptest_bits_coh = (int*)test_bits_coh;
-    ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
-    memcpy(tx_bits, test_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
-
     phase_ch.real = 1.0; phase_ch.imag = 0.0; 
     foff = FOFF;
      
@@ -147,12 +141,7 @@ int main(int argc, char *argv[])
 	                          Mod
 	\*---------------------------------------------------------*/
 
-        memcpy(tx_bits, ptest_bits_coh, sizeof(int)*COHPSK_BITS_PER_FRAME);
-        ptest_bits_coh += COHPSK_BITS_PER_FRAME;
-        if (ptest_bits_coh >= ptest_bits_coh_end) {
-            ptest_bits_coh = (int*)test_bits_coh;
-        }
-
+        cohpsk_get_test_bits(coh, tx_bits);
 	bits_to_qpsk_symbols(tx_symb, (int*)tx_bits, COHPSK_BITS_PER_FRAME);
 
         for(r=0; r<NSYMROWPILOT; r++) {
