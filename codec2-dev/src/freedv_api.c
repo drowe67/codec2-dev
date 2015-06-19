@@ -502,6 +502,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     }
                     codeword1 = golay23_decode(recd_codeword);
                     f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
+                    f->total_bits       += 23;
 
                     //codeword1 = recd_codeword;
                     //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
@@ -549,7 +550,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 else {
                     int   test_frame_sync, bit_errors, ntest_bits, k;
                     short error_pattern[fdmdv_error_pattern_size(f->fdmdv)];
-
+                    
                     for(k=0; k<2; k++) {
                         /* test frames, so lets sync up to the test frames and count any errors */
                         fdmdv_put_test_bits(f->fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, &f->rx_bits[k*bits_per_fdmdv_frame]);
@@ -655,11 +656,15 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     f->total_bit_errors += bit_errors;
                     f->total_bits       += COHPSK_BITS_PER_FRAME;
                 }
+
+                for(i=0; i<f->n_speech_samples; i++)
+                    speech_out[i] = 0; 
+                nout = f->n_speech_samples;  
             }
             
         }
 
-        if ((sync == 0) || f->test_frames) {
+        if (sync == 0) {
             float t,a,b,s;
             int   t1,t2;
 
