@@ -10,7 +10,7 @@
   TODO:
     [X] speex tx/rx works
     [X] txt messages
-    [ ] optional test tx framemode
+    [X] optional test tx framemode
                                                                        
 \*---------------------------------------------------------------------------*/
 
@@ -44,6 +44,9 @@
 #include "varicode.h"
 #include "freedv_api.h"
 #include "comp_prim.h"
+
+#define NORM_PWR  1.74   /* experimentally derived fudge factor so 1600 and 
+                            700 mode have the same tx power */
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -369,7 +372,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         if (f->clip)
             cohpsk_clip(tx_fdm);
         for(i=0; i<f->n_nom_modem_samples; i++)
-            mod_out[i] = fcmult(FDMDV_SCALE, tx_fdm[i]);
+            mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
     }
 }
 
