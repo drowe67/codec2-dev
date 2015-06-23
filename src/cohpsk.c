@@ -951,7 +951,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         coh->ch_fdm_frame_buf[i] = rx_fdm[j];
     //printf("i: %d j: %d rx_fdm[0]: %f %f\n", i,j, rx_fdm[0].real, rx_fdm[0].imag);
 
-   /* if out of sync do Initial Freq offset estimation using NSW frames to flush out filter memories */
+    /* if out of sync do Initial Freq offset estimation using NSW frames to flush out filter memories */
 
     if (sync == 0) {
 
@@ -1063,7 +1063,8 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
     }
     coh->nin = nin;
     *nin_frame = (NSYMROWPILOT-1)*COHPSK_M + nin;
-    //printf("%f %d %d\n", coh->rx_timing, nin, *nin_frame);
+    //if (coh->verbose)
+    //    fprintf(stderr, "%f %d %d\n", coh->rx_timing, nin, *nin_frame);
 }
 
 
@@ -1139,6 +1140,13 @@ void cohpsk_set_verbose(struct COHPSK *coh, int verbose)
 {
     assert(coh != NULL);
     coh->verbose = verbose;
+}
+
+
+void cohpsk_set_frame(struct COHPSK *coh, int frame)
+{
+    assert(coh != NULL);
+    coh->frame = frame;
 }
 
 

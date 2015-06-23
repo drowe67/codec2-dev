@@ -31,7 +31,7 @@
 #define NCT_SYMB_BUF      (2*NSYMROWPILOT+2)
 #define ND                2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus 
                                                          one copy */
-#define NSW               3                           /* number of sync window frames */
+#define NSW               4                           /* number of sync window frames */
 #define COHPSK_ND         2                           /* diversity factor   */
 #define COHPSK_M          100                         /* oversampling rate */
 #define COHPSK_NSYM       6
