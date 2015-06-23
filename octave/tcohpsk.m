@@ -64,8 +64,8 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-test = 'compare to c';
-%test = 'awgn';
+%test = 'compare to c';
+test = 'awgn';
 %test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
