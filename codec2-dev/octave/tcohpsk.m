@@ -93,8 +93,8 @@ end
 
 if strcmp(test, 'awgn')
   frames = 100;
-  foff =  0;
-  dfoff = -0/Fs;
+  foff =  58.7;
+  dfoff = -0.5/Fs;
   EsNodB = 8;
   fading_en = 0;
   hf_delay_ms = 2;
@@ -106,9 +106,9 @@ end
 
 if strcmp(test, 'fading');
   frames = 100;
-  foff = -10.5;
-  dfoff = 0.0/Fs;
-  EsNodB = 9;
+  foff = -25;
+  dfoff = 0.5/Fs;
+  EsNodB = 12;
   fading_en = 1;
   hf_delay_ms = 2;
   compare_with_c = 0;
@@ -124,7 +124,7 @@ Nc = 7;                % number of carriers
 Nd = 2;                % diveristy factor
 framesize = 56;        % number of payload data bits in the frame
 
-Nsw = 3;               % frames we demod for initial sync window
+Nsw = 4;               % frames we demod for initial sync window
 afdmdv.Nsym = 6;       % size of tx/tx root nyquist filter in symbols
 afdmdv.Nt = 5;         % number of symbols we estimate timing over
 
@@ -362,10 +362,17 @@ while tin < length(ch_fdm_frame_log)
       %printf("tin: %f tout: %f f: %f\n", tin, tout, f);
 end
 ch_fdm_frame_log = ch_fdm_frame_log_out(1:tout-1);
+%ch_fdm_frame_log *= 5000;
 
 %ch_fdm_frame_log = real(ch_fdm_frame_log);
 
 % Now run demod ----------------------------------------------------------------
+
+%ch_fdm_frame_log = load_raw("~/fdmdv2-dev/build_linux/tmp.raw");
+%ch_fdm_frame_log = ch_fdm_frame_log(M:length(ch_fdm_frame_log));
+%ch_fdm_frame_log /= 5000;
+
+%frames = floor(acohpsk.Nsymbrowpilot*M);
 
 ch_fdm_frame_log_index = 1;
 nin = M;
@@ -398,6 +405,7 @@ for f=1:frames;
 
     max_ratio = 0;
     for acohpsk.f_est = Fcentre-40:40:Fcentre+40
+%    for acohpsk.f_est = Fcentre
         
       printf("  [%d] acohpsk.f_est: %f +/- 20\n", f, acohpsk.f_est);
 
@@ -642,7 +650,8 @@ else
   end
   plot(combined*exp(j*pi/4)/sqrt(Nd),'+')
   title('Scatter');
-  axis([-2 2 -2 2])
+  ymax = abs(max(max(combined)));
+  axis([-ymax ymax -ymax ymax])
 
   figure(4)
   clf;

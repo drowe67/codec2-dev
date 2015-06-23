@@ -83,9 +83,9 @@ int main(int argc, char *argv[]) {
     }
     
     freedv = freedv_open(mode);
-    if (mode == FREEDV_MODE_700)
-        cohpsk_set_verbose(freedv->cohpsk, 1);
     assert(freedv != NULL);
+    if (mode == FREEDV_MODE_700)
+        cohpsk_set_verbose(freedv->cohpsk, 0);
 
     if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
         freedv->test_frames = 1;
@@ -110,19 +110,20 @@ int main(int argc, char *argv[]) {
 
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
+        frame++;
+        cohpsk_set_frame(freedv->cohpsk, frame);
+
         nout = freedv_rx(freedv, speech_out, demod_in);
-        fwrite(speech_out, sizeof(short), nout, fout);
         nin = freedv_nin(freedv);
 
+        fwrite(speech_out, sizeof(short), nout, fout);
         if (freedv->mode == FREEDV_MODE_1600)
             fdmdv_get_demod_stats(freedv->fdmdv, &freedv->stats);
         if (freedv->mode == FREEDV_MODE_700)
             cohpsk_get_demod_stats(freedv->cohpsk, &freedv->stats);
-
-        /* log some side info to the txt file */
         
-        frame++;
-        /*
+        /* log some side info to the txt file */
+        /*       
         if (ftxt != NULL) {
             fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
                     freedv->stats.sync, freedv->stats.snr_est, freedv->total_bit_errors);

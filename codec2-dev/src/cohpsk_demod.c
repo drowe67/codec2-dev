@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
     }
 
     cohpsk = cohpsk_create();
+    cohpsk_set_verbose(cohpsk, 1);
 
     if (oct) {
         logframes = LOG_FRAMES;
@@ -106,6 +107,7 @@ int main(int argc, char *argv[])
     nin_frame = COHPSK_NOM_SAMPLES_PER_FRAME;
     while(fread(rx_fdm_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
 	frames++;
+        cohpsk_set_frame(cohpsk, frames);
 
 	/* scale and demod */
 

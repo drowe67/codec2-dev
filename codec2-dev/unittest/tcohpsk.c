@@ -105,6 +105,7 @@ int main(int argc, char *argv[])
     coh = cohpsk_create();
     fdmdv = coh->fdmdv;
     assert(coh != NULL);
+    cohpsk_set_verbose(coh, 1);
 
     /* these puppies are used for logging data in the bowels on the modem */
 
@@ -156,7 +157,6 @@ int main(int argc, char *argv[])
 	                          Channel
 	\*---------------------------------------------------------*/
 
-
         for(r=0; r<NSYMROWPILOT*COHPSK_M; r++) {
             foff_rect.real = cos(2.0*M_PI*foff/COHPSK_FS); foff_rect.imag = sin(2.0*M_PI*foff/COHPSK_FS);
             foff += DFOFF;
@@ -169,6 +169,12 @@ int main(int argc, char *argv[])
         for(r=0; r<NSYMROWPILOT*COHPSK_M; r++,noise_r++) {
             scaled_noise = fcmult(sqrt(variance), noise[noise_r]);
             ch_fdm_frame[r] = cadd(ch_fdm_frame[r], scaled_noise);
+        }
+
+        /* optional gain to test level sensitivity */
+
+        for(r=0; r<NSYMROWPILOT*COHPSK_M; r++) {
+            ch_fdm_frame[r] = fcmult(1.0, ch_fdm_frame[r]);
         }
 
         /* tx vector logging */

@@ -568,6 +568,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
 
     max_corr = 0;
     for f_fine=-20:0.25:20
+%    for f_fine=-1:0.25:1
       f_fine_rect = exp(-j*f_fine*2*pi*sampling_points/Rs)'; % note: this could be pre-computed at init or compile time
       for t=0:cohpsk.Nsymbrowpilot-1
         corr = 0; mag = 0;
@@ -580,7 +581,7 @@ function [next_sync cohpsk] = frame_sync_fine_freq_est(cohpsk, ch_symb, sync, ne
           end
           corr += abs(acorr);
         end
-        %printf("  f: %f  t: %d corr: %f mag: %f\n", f_fine, t, corr, mag);
+        %printf("  f: %f  t: %d corr: %f mag: %f ratio: %f\n", f_fine, t, corr, mag, corr/mag);
         if corr >= max_corr
           max_corr = corr;
           max_mag = mag;

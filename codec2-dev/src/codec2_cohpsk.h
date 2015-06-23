@@ -54,5 +54,6 @@ void cohpsk_set_verbose(struct COHPSK *coh, int verbose);
 void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[]);
 void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
                           int *bit_errors, float rx_bits_sd[]);
+void cohpsk_set_frame(struct COHPSK *coh, int frame);
 
 #endif

@@ -682,8 +682,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             nout = f->n_speech_samples;
             //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
         }
+
     }
-    
+     
     return nout;
 }
 
