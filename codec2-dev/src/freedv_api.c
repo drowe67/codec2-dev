@@ -72,7 +72,8 @@ struct freedv *freedv_open(int mode) {
     
     f->mode = mode;
     f->test_frames = 0;
-    
+    f->snr_squelch_thresh = 2.0;
+   
     if (mode == FREEDV_MODE_1600) {
         Nc = 16;
         f->tx_sync_bit = 0;
@@ -80,7 +81,6 @@ struct freedv *freedv_open(int mode) {
         f->fdmdv = fdmdv_create(Nc);
         if (f->fdmdv == NULL)
             return NULL;
-        f->snr_thresh = 2.0;
         golay23_init();
         f->nin = FDMDV_NOM_SAMPLES_PER_FRAME;
         f->n_nom_modem_samples = 2*FDMDV_NOM_SAMPLES_PER_FRAME;
@@ -469,6 +469,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+    nout = f->n_speech_samples;
 
     if (f->mode == FREEDV_MODE_1600) {
         int reliable_sync_bit;
@@ -581,7 +582,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
                 /* squelch if beneath SNR threshold or test frames enabled */
 
-                if ((f->stats.snr_est < f->snr_thresh) || f->test_frames) {
+                if ((f->stats.snr_est < f->snr_squelch_thresh) || f->test_frames) {
                     for(i=0; i<f->n_speech_samples; i++)
                         speech_out[i] = 0;
                 }
@@ -608,7 +609,8 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         nin_prev = f->nin;
 	cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
         f->sync = sync;
-        f->snr_est = 2.0;
+        cohpsk_get_demod_stats(f->cohpsk, &f->stats);
+        f->snr_est = f->stats.snr_est;
 
  	if (sync) {
 
@@ -642,6 +644,11 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     }
 
                     codec2_decode(f->codec2, speech_out, f->packed_codec_bits);
+
+                    if (f->stats.snr_est < f->snr_squelch_thresh) {
+                        for(i=0; i<f->n_speech_samples; i++)
+                            speech_out[i] = 0; 
+                    }
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
                 nout = f->n_speech_samples;

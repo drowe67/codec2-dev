@@ -1126,7 +1126,7 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
     stats->rx_timing = coh->rx_timing;
     stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
-    assert(stats->nr <= MODEM_STATS_NR_MAX);
+    assert(NSYMROW <= MODEM_STATS_NR_MAX);
     stats->nr = NSYMROW;
     for(c=0; c<COHPSK_NC*ND; c++) {
         for (r=0; r<NSYMROW; r++) {
