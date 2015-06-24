@@ -74,7 +74,7 @@ struct freedv {
 
     int                  sync;
     float                snr_est;
-    float                snr_thresh;
+    float                snr_squelch_thresh;
     int                  nin;
 
     struct VARICODE_DEC  varicode_dec_states;

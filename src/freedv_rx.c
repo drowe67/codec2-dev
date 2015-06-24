@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     freedv->callback_state = (void*)&my_cb_state;
     freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
 
-    freedv->snr_thresh = -100.0;
+    freedv->snr_squelch_thresh = -100.0;
 
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx
@@ -111,7 +111,8 @@ int main(int argc, char *argv[]) {
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
-        cohpsk_set_frame(freedv->cohpsk, frame);
+        if (mode == FREEDV_MODE_700)
+            cohpsk_set_frame(freedv->cohpsk, frame);
 
         nout = freedv_rx(freedv, speech_out, demod_in);
         nin = freedv_nin(freedv);
