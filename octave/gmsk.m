@@ -790,8 +790,9 @@ endfunction
 % Suitable for transmitting with a SSB tx
 
 function gmsk_tx(tx_file_name)
+  rand('state',1); 
   Rs = 1200;
-  nsym =  Rs*10;
+  nsym =  Rs*4;
   framesize = 480;
   npreamble = 480;
   gain      = 10000;
@@ -834,6 +835,8 @@ endfunction
 % measures the BER.
 
 function gmsk_rx(rx_file_name, err_file_name)
+  rand('state',1); 
+
   Rs = 1200;
   framesize = 480;
   npreamble = 480;
@@ -963,8 +966,8 @@ function gmsk_rx(rx_file_name, err_file_name)
   w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
   rxbb = rxbb.*exp(-j*w_est);
   st = preamble_location+npreamble*M; 
-  en = min(nsam,st + 4*framesize*M); 
-  %en = nsam;
+  %en = min(nsam,st + 4*framesize*M); 
+  en = nsam;
   gmsk_statres.verbose = 2;
   [rx_bits rx_out rx_filt] = gmsk_demod(gmsk_states, rxbb(st:en));
   nframes_rx = length(rx_bits)/framesize;
@@ -1009,10 +1012,10 @@ endfunction
 %run_gmsk_curves
 %run_gmsk_init
 %run_test_channel_impairments
-%gmsk_tx("test_gmsk.raw")
-%gmsk_rx("ssb-ber5.wav")
+gmsk_tx("test_gmsk.raw")
+gmsk_rx("test_gmsk.raw")
 %gmsk_rx("ssb25db.wav")
 %gmsk_rx("~/Desktop/ssb_fm_gmsk_high.wav")
 %gmsk_rx("~/Desktop/test_gmsk_28BER.raw")
-gmsk_rx("~/Desktop/gmsk_rec_reverse.wav")
+%gmsk_rx("~/Desktop/gmsk_rec_reverse.wav")
 
