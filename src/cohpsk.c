@@ -1113,13 +1113,16 @@ void cohpsk_get_demod_stats(struct COHPSK *coh, struct MODEM_STATS *stats)
 {
     int   c,r;
     COMP  pi_4;
+    float new_snr_est;
 
     pi_4.real = cosf(M_PI/4.0);
     pi_4.imag = sinf(M_PI/4.0);
 
     stats->Nc = COHPSK_NC*ND;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
-    stats->snr_est = 20*log10((coh->sig_rms+1E-6)/(coh->noise_rms+1E-6)) - 10*log10(3000.0/700.0);
+    new_snr_est = 20*log10((coh->sig_rms+1E-6)/(coh->noise_rms+1E-6)) - 10*log10(3000.0/700.0);
+    stats->snr_est = 0.9*stats->snr_est + 0.1*new_snr_est;
+
     //fprintf(stderr, "sig_rms: %f noise_rms: %f snr_est: %f\n", coh->sig_rms, coh->noise_rms, stats->snr_est);
     stats->sync = coh->sync;
     stats->foff = coh->f_est - FDMDV_FCENTRE;

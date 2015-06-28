@@ -90,6 +90,9 @@ int main(int argc, char *argv[]) {
     if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
         freedv->test_frames = 1;
     }
+    if ( (argc > 4) && (strcmp(argv[4], "--smooth") == 0) ) {
+        freedv->smooth_symbols = 1;
+    }
     
     speech_out = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
     assert(speech_out != NULL);

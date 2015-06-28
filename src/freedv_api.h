@@ -62,6 +62,8 @@ struct freedv {
     int                 *fdmdv_bits;
     int                 *rx_bits;
     int                  tx_sync_bit;
+    int                  smooth_symbols;
+    float               *prev_rx_bits;
 
     int                 *ptest_bits_coh;
     int                 *ptest_bits_coh_end;
@@ -75,6 +77,7 @@ struct freedv {
     int                  sync;
     float                snr_est;
     float                snr_squelch_thresh;
+    float                squelch_en;
     int                  nin;
 
     struct VARICODE_DEC  varicode_dec_states;
