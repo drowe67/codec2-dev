@@ -590,7 +590,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
                     for(i=0; i<f->n_speech_samples; i++)
                         speech_out[i] = 0;
-                    fprintf(stderr, "sq! ");
                 }
 
                 nout = f->n_speech_samples;
@@ -632,7 +631,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 /* optional smoothing of codec symbols */
 
                 if (f->smooth_symbols) {
-                    float tmp;
 
                     for(i=0; i<bits_per_codec_frame; i++) {
                         rx_bits[i] += rx_bits[i+bits_per_codec_frame];
@@ -671,7 +669,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                     if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
                         for(i=0; i<f->n_speech_samples; i++)
                             speech_out[i] = 0; 
-                        fprintf(stderr, "sq! ");
                     }
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
