@@ -71,8 +71,9 @@ struct freedv *freedv_open(int mode) {
         return NULL;
     
     f->mode = mode;
-    f->test_frames = 0;
+    f->test_frames = f->smooth_symbols = 0;
     f->snr_squelch_thresh = 2.0;
+    f->squelch_en = 1;
    
     if (mode == FREEDV_MODE_1600) {
         Nc = 16;
@@ -122,6 +123,9 @@ struct freedv *freedv_open(int mode) {
         f->n_speech_samples = codec2_samples_per_frame(f->codec2);
     if (mode == FREEDV_MODE_700)
         f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+    f->prev_rx_bits = (float*)malloc(sizeof(float)*2*codec2_bits_per_frame(f->codec2));
+    if (f->prev_rx_bits == NULL)
+        return NULL;
 
     nbit = codec2_bits_per_frame(f->codec2);
     nbyte = (nbit + 7) / 8;
@@ -158,6 +162,7 @@ struct freedv *freedv_open(int mode) {
 void freedv_close(struct freedv *freedv) {
     assert(freedv != NULL);
 
+    free(freedv->prev_rx_bits);
     free(freedv->packed_codec_bits);
     free(freedv->codec_bits);
     free(freedv->tx_bits);
@@ -582,9 +587,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
                 /* squelch if beneath SNR threshold or test frames enabled */
 
-                if ((f->stats.snr_est < f->snr_squelch_thresh) || f->test_frames) {
+                if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
                     for(i=0; i<f->n_speech_samples; i++)
                         speech_out[i] = 0;
+                    fprintf(stderr, "sq! ");
                 }
 
                 nout = f->n_speech_samples;
@@ -594,8 +600,14 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             /* if not in sync pass through analog samples */
             /* this lets us "hear" whats going on, e.g. during tuning */
             
-            for(i=0; i<nin_prev; i++)
-                speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+            if (f->squelch_en == 0) {
+                for(i=0; i<nin_prev; i++)
+                    speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+            }
+            else {
+                for(i=0; i<nin_prev; i++)
+                    speech_out[i] = 0;
+             }
             //fprintf(stderr, "%d %d %d\n", nin_prev, speech_out[0], speech_out[nin_prev-1]);
             nout = nin_prev;
         }
@@ -616,6 +628,17 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
             if (f->test_frames == 0) {
                 data_flag_index = codec2_get_spare_bit_index(f->codec2);
+
+                /* optional smoothing of codec symbols */
+
+                if (f->smooth_symbols) {
+                    float tmp;
+
+                    for(i=0; i<bits_per_codec_frame; i++) {
+                        rx_bits[i] += rx_bits[i+bits_per_codec_frame];
+                        rx_bits[i+bits_per_codec_frame] = rx_bits[i];
+                    }
+                }
 
                 for (j=0; j<COHPSK_BITS_PER_FRAME; j+=bits_per_codec_frame) {
                 
@@ -645,9 +668,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
                     codec2_decode(f->codec2, speech_out, f->packed_codec_bits);
 
-                    if (f->stats.snr_est < f->snr_squelch_thresh) {
+                    if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
                         for(i=0; i<f->n_speech_samples; i++)
                             speech_out[i] = 0; 
+                        fprintf(stderr, "sq! ");
                     }
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
@@ -675,23 +699,31 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         }
 
         if (sync == 0) {
-            float t,a,b,s;
-            int   t1,t2;
-
-            /* if not in sync pass through analog samples */
-            /* this lets us "hear" whats going on, e.g. during tuning */
-            /* need to linearly interp as Fs in and out slightly different */
-
-            for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=(float)f->modem_sample_rate/FS) {
-                t1 = floor(t); t2 = ceil(t);
-                a = t - t1;
-                b = t2 - t1;
-                s = b*demod_in[t1].real + a*demod_in[t2].real;
-                speech_out[i] = FDMDV_SCALE*s;
+            if (f->squelch_en) {
+                for(i=0; i<f->n_speech_samples; i++)
+                    speech_out[i] = 0; 
+                nout = f->n_speech_samples;                 
             }
-            nout = f->n_speech_samples;
-            //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
+            else {
+                float t,a,b,s;
+                int   t1,t2;
+
+                /* if not in sync pass through analog samples */
+                /* this lets us "hear" whats going on, e.g. during tuning */
+                /* need to linearly interp as Fs in and out slightly different */
+
+                for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=(float)f->modem_sample_rate/FS) {
+                    t1 = floor(t); t2 = ceil(t);
+                    a = t - t1;
+                    b = t2 - t1;
+                    s = b*demod_in[t1].real + a*demod_in[t2].real;               
+                    speech_out[i] = FDMDV_SCALE*s;
+                }
+                nout = f->n_speech_samples;
+                //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
+            }
         }
+            
 
     }
      
