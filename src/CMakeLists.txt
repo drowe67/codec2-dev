@@ -89,12 +89,17 @@ set(CODEBOOKSMEL
 
 set(CODEBOOKSGE ${D}/gecb.txt)
 
-# when crosscompiling import the executable targets from a file
+# when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
-    set(IMPORT_EXECUTABLES "IMPORTFILE-NOTFOUND" CACHE FILEPATH "Point to the export file from a native build")
-    include(${IMPORT_EXECUTABLES})
-    #add_executable(generate_codebook IMPORTED)
-    set_property(TARGET generate_codebook PROPERTY IMPORTED_LOCATION ${GENERATE_CODEBOOK})
+    include(ExternalProject)
+    ExternalProject_Add(codec2_native
+       SOURCE_DIR ${CMAKE_SOURCE_DIR}
+       BUILD_COMMAND $(MAKE) generate_codebook
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    add_executable(generate_codebook IMPORTED)
+    set_property(TARGET generate_codebook PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
+
 else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
