@@ -54,6 +54,10 @@ endif()
 # Set default C++ flags.
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O2")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS}")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS}")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS}")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS}")
 
 # -fPIC is implied on MinGW...
 if(NOT WIN32)
@@ -61,9 +65,12 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
-
 message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
-message(STATUS "Compiler Flags: " ${CMAKE_CXX_FLAGS})
+string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
+if(NOT "_FLAGS" STREQUAL "NONE")
+    set(BUILD_FLAGS "${CMAKE_C_FLAGS_${_FLAGS}}")
+endif()
+message(STATUS "Compiler Flags: " ${BUILD_FLAGS})
 
 #
 # Setup Windows/MinGW specifics here.
