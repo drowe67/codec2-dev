@@ -75,6 +75,7 @@ struct freedv {
     int                  total_bit_errors;
 
     int                  sync;
+    int                  evenframe;
     float                snr_est;
     float                snr_squelch_thresh;
     float                squelch_en;
