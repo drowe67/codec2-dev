@@ -98,8 +98,9 @@ if(CMAKE_CROSSCOMPILING)
        INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_codebook ${CMAKE_CURRENT_BINARY_DIR}
     )
     add_executable(generate_codebook IMPORTED)
-    set_property(TARGET generate_codebook PROPERTY IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
-
+    set_target_properties(generate_codebook PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_codebook)
+    add_dependencies(generate_codebook codec2_native)
 else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
