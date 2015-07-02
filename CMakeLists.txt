@@ -102,7 +102,7 @@ option(BUILD_SHARED_LIBS
 option(UNITTEST "Build unittest binaries." ON)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
-    install(DIRECTORY octave raw script voicing wav
+    install(DIRECTORY octave raw script wav
         USE_SOURCE_PERMISSIONS
         DESTINATION ${CMAKE_INSTALL_DATADIR}/codec2)
 endif()
