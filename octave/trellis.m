@@ -6,17 +6,35 @@
 % and left over redundancy to correct errors on codec parameter
 % reception.
 %
-% [ ]  Add probability of transition
-% [ ]  Will this mess up a perfectly received signal, i.e. all
+% [X]  Add probability of transition
+% [X]  Will this mess up a perfectly received signal, i.e. all
 %      codewords perfectly received.  This should dominate prob
 %      calc (with small No)
+% [ ] can we measure erroneous decodes?  Whn it makes it worse?
+%     + like all FEC, at some point, it will get a poorer BER
+%     + can we drawa curve of coded versus uncoded errors?
+% [ ] test with actual data, add errors, see if it corrects any
+% [ ] can we draw a trellis with actual values?
+%
+% Note we need SD bits and natural binary order encoding, for example
+%   ./c2enc 700 ../../raw/ve9qrp_10s.raw ../../octave/ve9qrp_10s.bit --softdec --natural
 
 graphics_toolkit ("gnuplot");
 more off;
+randn('state',1);
+
+% Before I couldn't even sp3ll functional programmer.  Now I are one ;)
+
+function [bits_per_frame bit_fields] = codec2_700_bit_fields
+  bits_per_frame = 28;                % number of bits/frame for "700" mode
+  bit_fields = [1 5 3 3 2 4 3 3 2 2]; % number of bits in each field for "700" mode
+  % voiced, Wo, energy, LSP 1..6, 2 spare
+endfunction
+
+% builds a metric of trasnition probablilities for each codec field (model parameter)
 
 function [tp codewords] = build_tp(bitstream_filename)
-  bits_per_frame = 28; 
-  bit_fields = [1 5 3 3 2 4 3 3 2 2];
+  [bits_per_frame bit_fields] = codec2_700_bit_fields;
   nfields = length(bit_fields);
 
   % load encoded speech file (one float per bit)
@@ -27,7 +45,7 @@ function [tp codewords] = build_tp(bitstream_filename)
   nframes = floor(length(bitstream)/bits_per_frame);
   bitstream = bitstream < 0;
   
-  % extract LSPs codewords
+  % extract each field (model parameter) for bit stream
 
   codewords = zeros(nframes,nfields);
   for f=1:nframes
@@ -64,6 +82,25 @@ function [tp codewords] = build_tp(bitstream_filename)
 endfunction
 
 
+% converts a decimal vlaue to a soft dec binary value
+
+function c = dec2sd(dec, nbits)
+    
+    % convert to binary
+
+    c = zeros(1,nbits);
+    for j=0:nbits-1
+      mask = 2.^j;
+      if bitand(dec,mask)
+        c(nbits-j) = 1;
+      end
+    end
+
+    % map to +/- 1
+
+    c = 1 - 2*c;
+endfunction
+
 % y is vector of +/- 1 soft decision values for 0,1 transmitted bits
 
 function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
@@ -76,20 +113,8 @@ function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
   lnp = zeros(1,np);
   for i=0:np-1
 
-    % convert to binary
+    c = dec2sd(i,nbits);
 
-    c = zeros(1,nbits);
-    for j=0:nbits-1
-      mask = 2.^j;
-      if bitand(i,mask)
-        c(j+1) = 1;
-      end
-    end
-
-    % map to +/- 1
-
-    c = 1 - 2*c;
-    
     % probability calculation for this i
 
     lnp(i+1) = sum(y .* c);
@@ -102,50 +127,236 @@ endfunction
 % tp is the transition probabilities, each row is the start state
 % returns the most likely transitted codeword c
 
-function c = find_most_likely_codeword(y, tp)
-    [nstates nbits] = size(y);
-    tp
+function c = find_most_likely_codeword(y, tp, verbose)
+    [ncodewords nbits] = size(y);
+    nstates = 2^nbits;
     y_n   = y(1,:);  % codeword received at time n
     y_n_1 = y(2,:);  % codeword received at time n+1
+    y_n_2 = y(3,:);  % codeword received at time n+1
 
     lnp_n   = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n);
     lnp_n_1 = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n_1);
+    lnp_n_2 = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n_2);
 
-    % determine probability of a path
+    if verbose
+      % printf received codewords
+
+      printf("rx_codewords\n");
+      for r=1:ncodewords
+        for c=1:nbits
+          printf("%7.2f", y(r,c));
+        end
+        printf("\n");
+      end
+
+      % print probability of each rx codeword table
+
+      printf("\nProbability of each tx codeword:\n");
+      printf("tx_codeword   lnp(n)  lnp(n+1)  lnp(n+2)  \n");
+      printf("bin dec\n");
+      for i=1:nstates
+        printf("%3s  %2d      %7.2f   %7.2f   %7.2f\n", dec2bin(i-1,nbits), i-1, lnp_n(i), lnp_n_1(i), lnp_n_2(i));
+      end
+      printf("\n");
+
+      printf("\nTransition Probability table:\n");
+      printf("state/next_state\n");
+      for r=1:nstates
+        for c=1:nstates
+          printf("%7.2f", tp(r,c));
+        end
+        printf("\n");
+      end
+      printf("\n");
+    end
+
+    % determine probability of each path
     % (prob of start state)(prob of transition)(prob of next state)
     % cycle through all possibilities of states
     % state variable for possible state
     % step through them exhaustively
 
-    max_prob = 0;
+    if verbose
+      printf("Evaulation of all possible paths\n");
+      printf("tx codeword\n");
+      printf(" n  n+1  n+2    lnp(n) lnp(n+1) lnp(n+2)  tp(n,n+1)  tp(n+1,n+2)      total\n");
+    end
+    max_prob = -100;
     for n=1:nstates
       for n_1=1:nstates
-        prob = lnp_n(n);
-        prob += tp(n, n_1);
-        prob += lnp_n_1(n_1);
-        printf("state: %d %d %f\n", n, n_1, prob);
-        if (prob > max_prob)
-          max_prob = prob;
-          max_n = n; max_n_1 = n;
+        for n_2=1:nstates
+          prob = lnp_n(n);
+          prob += lnp_n_1(n_1);
+          prob += lnp_n_2(n_2);
+          prob += tp(n, n_1);
+          prob += tp(n_1, n_2);
+          if verbose
+            printf("%2d %4d %4d  %7.2f  %7.2f  %7.2f     %6.2f       %6.2f   %8.2f\n", n-1, n_1-1, n_2-1, lnp_n(n), lnp_n_1(n_1), lnp_n_2(n_2), tp(n, n_1), tp(n_1, n_2), prob);
+          end
+          if (prob > max_prob)
+            max_prob = prob;
+            max_n = n; max_n_1 = n_1; max_n_2 = n_2;
+          end 
         end
       end
     end
     
+    if verbose
+      printf("And the winner is.....\n");
+      printf("%2d %4d %4d  %7.2f  %7.2f  %7.2f     %6.2f       %6.2f   %8.2f\n", max_n-1, max_n_1-1, max_n_2-1, lnp_n(n), lnp_n_1(max_n_1), lnp_n_2(max_n_2), tp(max_n, max_n_1), tp(max_n_1, max_n_2), max_prob);
+    end
+
+    c = max_n_1 - 1;
+
 endfunction
 
-% for a given parameter
-% weight for No
-% given received symbols y(n) and y(n+1)
-% calculate all possible paths
-% select most likely
+% Simulations ---------------------------
+
+function [dec_hat dec_simple_hat] = run_test(tx_codewords, transition_probabilities, var, verbose)
+  [frames nbits]    = size(tx_codewords);
+  nerrors           = 0;
+  nerrors_simple    = 0;
+  tbits             = 0;
+  nstates           = 2.^nbits;
+
+  rx_codewords = tx_codewords + sqrt(var)*randn(frames, nbits);
+  dec_hat = dec_simple_hat = zeros(1,frames);
+  
+  for f=2:frames-1
+    tx_bits        = tx_codewords(f,:) < 0;
+    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-1:f+1,:)/(2*var),log(transition_probabilities+0.001), verbose);
+    rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
+    rx_bits_simple = rx_codewords(f,:) < 0;
+    dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
+
+    nerrors        += sum(xor(tx_bits, rx_bits));
+    nerrors_simple += sum(xor(tx_bits, rx_bits_simple));
+    if verbose
+      printf("[%d] %d %d\n", f, nerrors, nerrors_simple);
+    end
+    tbits += nbits;
+  end
+
+  EbNodB = 10*log10(1/(2*var));
+  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f\n", 
+         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits);
+  
+endfunction
 
 
-printf("loading training database and generating tp .... ");
-[tp codewords] = build_tp("hts.bit");
-printf("done\n");
+% Single point test, print out tables
 
-y = [-1 -1; -1 -1];
-find_most_likely_codeword(y,tp(1:4,1:4,5))
+function test_single
+  tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
+  var     = 0.001;
+  verbose = 1;
 
-% TODO: normalise tp (is this rqd? Just a const?), ln(tp), add No to calculation
-%       then test!  Try to insert in channel and correct errors
+  tx_codewords = [-1 1; 1 -1; -1 1];
+  run_test(tx_codewords, tp, var, verbose)
+endfunction
+
+
+% plot a trajectory of codewords, to help test "distance" is better using trellis than simple decoding
+
+function test_traj(tx_codewords, tp, var, verbose)
+  [frames nbits] = size(tx_codewords);
+  nstates = 2.^nbits;
+
+  tp = tp ./ sum(tp+0.001,2);
+
+  [dec_hat dec_simple_hat] = run_test(tx_codewords, tp, var, verbose);
+
+  dec_tx_codewords = zeros(1,frames);
+  for f=2:frames-1
+    tx_bits = tx_codewords(f,:) < 0;
+    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
+  end
+
+  figure(1);
+  subplot(211)
+  stem(dec_tx_codewords - dec_hat)
+  axis([1 frames -nstates/2 nstates/2]);
+  title('Trellis Decoding');
+  subplot(212)
+  stem(dec_tx_codewords - dec_simple_hat);
+  axis([1 frames -nstates/2 nstates/2]);
+  title('Simple Decoding');
+
+  figure(2)
+  tp
+  length(1:nstates)
+  mesh(1:nstates,1:nstates,tp)
+  ylabel('current state');
+  xlabel('next state');
+endfunction
+
+
+% A contrived trajectories to check out the idea
+
+function simple_traj
+  %tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
+  tp      = [0.5 0.25 0 0; 0.25 0.5 0.25 0; 0 0.25 0.5 0.25; 0 0 0.25 0.5];
+  var     = 0.5;
+  verbose = 0;
+  nbits   = 2;
+  frames  = 100;
+
+  tx_codewords = ones(frames, nbits);
+  test_traj(tx_codewords, tp, var, verbose)
+endfunction
+
+
+% Run through a trajectory, say from a different file to what we
+% trained with.  Plot trajectory before and after passing through
+% our decoder.  Try first with no noise, then with noise.
+
+function test_codec_model_parameter(bitstream_filename, model_param)
+  [bits_per_frame bit_fields] = codec2_700_bit_fields;
+
+  % load training data
+
+  printf("loading training database and generating tp .... ");
+  [tp codewords_train] = build_tp("hts.bit");
+  printf("done\n");
+
+  % load test data
+
+  printf("loading test database .... ");
+  [tp_test codewords_test] = build_tp(bitstream_filename);
+  printf("done\n");
+
+  % run test data through
+
+  nbits    = bit_fields(model_param);
+  nstates  = 2.^nbits;
+  var      = 0.5;
+  verbose  = 0;
+  frames   = length(codewords_test);
+  frames   = 100;
+
+  tx_codewords = zeros(frames, nbits);
+  for f=1:frames
+    dec = codewords_test(f, model_param);
+    tx_codewords(f,:) = dec2sd(dec, nbits);
+  end
+
+  test_traj(tx_codewords, tp(1:nstates,1:nstates,model_param), var, verbose);
+
+  figure(3)
+  plot(codewords_test(1:frames, model_param))
+
+  figure(4);
+  fs=fopen("../raw/ve9qrp_10s.raw","rb");
+  s = fread(fs,Inf,"short");
+  plot(s(1:320*frames))
+  axis([1 320*frames -3E4 3E4 ])
+endfunction
+
+
+% uncomment one of the below to run a simulation
+
+%test_single
+%simple_traj;
+test_codec_model_parameter("ve9qrp_10s.bit", 6);
+
+
