@@ -109,7 +109,7 @@ function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
 
   % work through all possible received codeworks and determine probability
   % given a number of bits
-
+  
   lnp = zeros(1,np);
   for i=0:np-1
 
@@ -119,7 +119,7 @@ function lnp = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y)
 
     lnp(i+1) = sum(y .* c);
   end
-
+  
 endfunction
 
 
@@ -127,21 +127,20 @@ endfunction
 % tp is the transition probabilities, each row is the start state
 % returns the most likely transitted codeword c
 
-function c = find_most_likely_codeword(y, tp, verbose)
+function c = find_most_likely_codeword(y, tp, nstages, verbose)
     [ncodewords nbits] = size(y);
     nstates = 2^nbits;
-    y_n   = y(1,:);  % codeword received at time n
-    y_n_1 = y(2,:);  % codeword received at time n+1
-    y_n_2 = y(3,:);  % codeword received at time n+1
-
-    lnp_n   = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n);
-    lnp_n_1 = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n_1);
-    lnp_n_2 = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y_n_2);
+    n = ones(1,nstages);
+    
+    lnp = zeros(nstages, nstates);
+    for s=1:nstages
+      lnp(s,:) = ln_prob_of_tx_codeword_c_given_rx_codeword_y(y(s,:));
+    end
 
     if verbose
       % printf received codewords
 
-      printf("rx_codewords\n");
+      printf("rx_codewords:\n");
       for r=1:ncodewords
         for c=1:nbits
           printf("%7.2f", y(r,c));
@@ -152,10 +151,19 @@ function c = find_most_likely_codeword(y, tp, verbose)
       % print probability of each rx codeword table
 
       printf("\nProbability of each tx codeword:\n");
-      printf("tx_codeword   lnp(n)  lnp(n+1)  lnp(n+2)  \n");
-      printf("bin dec\n");
+      printf("tx_codeword      stage\n");
+      printf("bin dec  ");
+      for s=1:nstages
+        printf("    %9d", s);
+      end
+      printf("\n");
+
       for i=1:nstates
-        printf("%3s  %2d      %7.2f   %7.2f   %7.2f\n", dec2bin(i-1,nbits), i-1, lnp_n(i), lnp_n_1(i), lnp_n_2(i));
+        printf("%3s  %2d  ", dec2bin(i-1,nbits), i-1);
+        for s=1:nstages
+          printf("    %9.2f", lnp(s, i));
+        end
+        printf("\n");
       end
       printf("\n");
 
@@ -177,42 +185,85 @@ function c = find_most_likely_codeword(y, tp, verbose)
     % step through them exhaustively
 
     if verbose
-      printf("Evaulation of all possible paths\n");
-      printf("tx codeword\n");
-      printf(" n  n+1  n+2    lnp(n) lnp(n+1) lnp(n+2)  tp(n,n+1)  tp(n+1,n+2)      total\n");
-    end
-    max_prob = -100;
-    for n=1:nstates
-      for n_1=1:nstates
-        for n_2=1:nstates
-          prob = lnp_n(n);
-          prob += lnp_n_1(n_1);
-          prob += lnp_n_2(n_2);
-          prob += tp(n, n_1);
-          prob += tp(n_1, n_2);
-          if verbose
-            printf("%2d %4d %4d  %7.2f  %7.2f  %7.2f     %6.2f       %6.2f   %8.2f\n", n-1, n_1-1, n_2-1, lnp_n(n), lnp_n_1(n_1), lnp_n_2(n_2), tp(n, n_1), tp(n_1, n_2), prob);
-          end
-          if (prob > max_prob)
-            max_prob = prob;
-            max_n = n; max_n_1 = n_1; max_n_2 = n_2;
-          end 
+      printf("Evaulation of all possible paths:\n");
+      printf("tx codewords\n");
+      printf("   n");
+      for s=1:nstages-1
+        printf(" n+%d", s);
+      end
+      printf("  ");
+      for s=1:nstages
+        printf("  lnp(%d) ", s-1);
+        if s < nstages
+          printf(" tp(%d,%d) ", s-1,s);
         end
       end
+      printf("     prob  max_prob\n");
     end
+
+    max_prob = -100;
+
+    do
+
+      % add up probabilities for this path
+   
+      if verbose
+        for s=1:nstages
+          printf("%4d", n(s)-1);
+        end
+        printf("  ");
+      end
+
+      prob = 0;
+      for s=1:nstages
+         prob += lnp(s, n(s));
+         if verbose
+           printf("%8.2f ", lnp(s, n(s)));
+         end
+         if s < nstages
+           prob += tp(n(s),n(s+1));
+           if verbose
+             printf("%8.2f ", tp(n(s),n(s+1)));
+           end
+         end
+      end
+
+      if (prob > max_prob)
+        max_prob = prob;
+        max_n = n; 
+      end    
     
+      if verbose
+        printf("%9.2f %9.2f\n", prob, max_prob);
+      end
+
+      % next path
+
+      s = nstages;
+      n(s)++;
+      while (s && (n(s) == (nstates+1))) 
+        n(s) = 1;
+        s--;
+        if s > 0
+          n(s)++;
+        end
+      end
+    until (sum(n) == nstages)
+
+    c = max_n((nstages+1)/2) - 1;
     if verbose
-      printf("And the winner is.....\n");
-      printf("%2d %4d %4d  %7.2f  %7.2f  %7.2f     %6.2f       %6.2f   %8.2f\n", max_n-1, max_n_1-1, max_n_2-1, lnp_n(n), lnp_n_1(max_n_1), lnp_n_2(max_n_2), tp(max_n, max_n_1), tp(max_n_1, max_n_2), max_prob);
+      printf("\nMost likely path....: ");
+      for s=1:nstages
+        printf("%4d", max_n(s)-1);
+      end
+      printf("\nMost likely codeword: %4d\n", c);
     end
-
-    c = max_n_1 - 1;
-
 endfunction
+
 
 % Simulations ---------------------------
 
-function [dec_hat dec_simple_hat] = run_test(tx_codewords, transition_probabilities, var, verbose)
+function [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, transition_probabilities, nstages, var, verbose)
   [frames nbits]    = size(tx_codewords);
   nerrors           = 0;
   nerrors_simple    = 0;
@@ -220,11 +271,13 @@ function [dec_hat dec_simple_hat] = run_test(tx_codewords, transition_probabilit
   nstates           = 2.^nbits;
 
   rx_codewords = tx_codewords + sqrt(var)*randn(frames, nbits);
-  dec_hat = dec_simple_hat = zeros(1,frames);
+  dec_hat = dec_simple_hat = dec_tx_codewords = zeros(1,frames);
   
-  for f=2:frames-1
+  ns2 = floor(nstages/2);
+  for f=ns2+1:frames-ns2
     tx_bits        = tx_codewords(f,:) < 0;
-    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-1:f+1,:)/(2*var),log(transition_probabilities+0.001), verbose);
+    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
+    dec_hat(f)     = find_most_likely_codeword(rx_codewords(f-ns2:f+ns2,:)/(2*var),log(transition_probabilities+0.001), nstages, verbose);
     rx_bits        = dec2sd(dec_hat(f), nbits) < 0;
     rx_bits_simple = rx_codewords(f,:) < 0;
     dec_simple_hat(f) = sum(rx_bits_simple .* 2.^(nbits-1:-1:0));
@@ -238,8 +291,9 @@ function [dec_hat dec_simple_hat] = run_test(tx_codewords, transition_probabilit
   end
 
   EbNodB = 10*log10(1/(2*var));
-  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f\n", 
-         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits);
+  printf("Eb/No: %3.2f dB nerrors %d %d BER: %3.2f %3.2f std dev: %3.2f %3.2f\n", 
+         EbNodB, nerrors, nerrors_simple, nerrors/tbits, nerrors_simple/tbits,
+         std(dec_tx_codewords - dec_hat), std(dec_tx_codewords - dec_simple_hat));
   
 endfunction
 
@@ -247,30 +301,29 @@ endfunction
 % Single point test, print out tables
 
 function test_single
-  tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
-  var     = 0.001;
-  verbose = 1;
+  tp       = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
+  nstages  = 3;
+  var      = 0.5;
+  verbose  = 1;
 
-  tx_codewords = [-1 1; 1 -1; -1 1];
-  run_test(tx_codewords, tp, var, verbose)
+  tx_codewords = [1 1; 1 1; 1 1];
+  run_test(tx_codewords, tp, nstages, var, verbose);
 endfunction
 
 
 % plot a trajectory of codewords, to help test "distance" is better using trellis than simple decoding
 
-function test_traj(tx_codewords, tp, var, verbose)
+function test_traj(tx_codewords, tp, nstages, var, verbose)
   [frames nbits] = size(tx_codewords);
   nstates = 2.^nbits;
 
-  tp = tp ./ sum(tp+0.001,2);
-
-  [dec_hat dec_simple_hat] = run_test(tx_codewords, tp, var, verbose);
-
-  dec_tx_codewords = zeros(1,frames);
-  for f=2:frames-1
-    tx_bits = tx_codewords(f,:) < 0;
-    dec_tx_codewords(f) = sum(tx_bits .* 2.^(nbits-1:-1:0));
+  s = sum(tp+0.001,2);
+  [r c] = size(tp);
+  for i=1:r
+    tp(i,:) /= s(i);
   end
+
+  [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, tp, nstages, var, verbose);
 
   figure(1);
   subplot(211)
@@ -296,13 +349,14 @@ endfunction
 function simple_traj
   %tp      = [1 0 0 0; 1 0 0 0; 1 0 0 0; 1 0 0 0];
   tp      = [0.5 0.25 0 0; 0.25 0.5 0.25 0; 0 0.25 0.5 0.25; 0 0 0.25 0.5];
+  nstages = 3;
   var     = 0.5;
   verbose = 0;
   nbits   = 2;
-  frames  = 100;
+  frames  = 25;
 
   tx_codewords = ones(frames, nbits);
-  test_traj(tx_codewords, tp, var, verbose)
+  test_traj(tx_codewords, tp, nstages, var, verbose)
 endfunction
 
 
@@ -329,10 +383,11 @@ function test_codec_model_parameter(bitstream_filename, model_param)
 
   nbits    = bit_fields(model_param);
   nstates  = 2.^nbits;
-  var      = 0.5;
+  nstages  = 3;
+  var      = 0.25;
   verbose  = 0;
   frames   = length(codewords_test);
-  frames   = 100;
+  %frames   = 100;
 
   tx_codewords = zeros(frames, nbits);
   for f=1:frames
@@ -340,23 +395,129 @@ function test_codec_model_parameter(bitstream_filename, model_param)
     tx_codewords(f,:) = dec2sd(dec, nbits);
   end
 
-  test_traj(tx_codewords, tp(1:nstates,1:nstates,model_param), var, verbose);
+  test_traj(tx_codewords, tp(1:nstates,1:nstates,model_param), nstages, var, verbose);
 
   figure(3)
   plot(codewords_test(1:frames, model_param))
 
+if 0
   figure(4);
   fs=fopen("../raw/ve9qrp_10s.raw","rb");
   s = fread(fs,Inf,"short");
   plot(s(1:320*frames))
   axis([1 320*frames -3E4 3E4 ])
+end
 endfunction
 
+
+% writes an output bitsream file with errors corrected
+% replay with something like:
+%   $ ./c2dec 700 ../../octave/ve9qrp_10s_trellis.bit - --softdec --natural | play -t raw -r 8000 -s -2 -
+
+function process_test_file(bitstream_filename)
+  [bits_per_frame bit_fields] = codec2_700_bit_fields;
+
+  % load training data
+
+  printf("loading training database and generating tp .... ");
+  [tp codewords_train] = build_tp("hts.bit");
+  printf("done\n");
+
+  % load test data
+
+  printf("loading test database .... ");
+  [tp_test codewords_test] = build_tp(bitstream_filename);
+  printf("done\n");
+
+  nstages  = 3;
+  var      = 0.5;
+  verbose  = 0;
+  frames   = length(codewords_test);
+  %frames   = 150;
+
+  % set up output frames
+
+  frames_out = zeros(1,frames*bits_per_frame);
+  frames_out_simple = zeros(1,frames*bits_per_frame);
+ 
+  % run test data through model and trellis decoder
+
+  % just pass these fields straight through
+
+  %for mp=1:10
+  for mp=[1 2 3 10]
+    nbits = bit_fields(mp);
+
+    % pack parameters in SD format into output frame
+
+    for i=1:frames      
+      en = (i-1)*bits_per_frame + sum(bit_fields(1:mp));
+      st = en - (nbits-1);
+      %printf("fr st: %d offset: %d st: %d en: %d\n", (i-1)*bits_per_frame, sum(bit_fields(1:mp)), st, en);
+      frames_out(st:en) = dec2sd(codewords_test(i, mp), nbits);
+      frames_out_simple(st:en) = dec2sd(codewords_test(i, mp), nbits);
+      %p += bit_fields(i);
+    end
+  end
+
+  
+  % trellis decode these fields
+
+  for mp=4:9
+    nbits    = bit_fields(mp);
+    nstates  = 2.^nbits;
+
+    printf("processing parameter: %d nbits: %d\n", mp, nbits);
+
+    % normalise transition probability rows
+
+    tpmp = tp(1:nstates,1:nstates, mp);
+    s = sum(tpmp+0.001,2);
+    [r c] = size(tpmp);
+    for i=1:r
+      tpmp(i,:) /= s(i);
+    end
+
+    tx_codewords = zeros(frames, nbits);
+    for f=1:frames
+      dec = codewords_test(f, mp);
+      tx_codewords(f,:) = dec2sd(dec, nbits);
+    end
+
+    [dec_hat dec_simple_hat dec_tx_codewords] = run_test(tx_codewords, tpmp, nstages, var, verbose);
+
+    % pack decoded parameter in SD format into output frame
+
+    for i=1:frames      
+      en = (i-1)*bits_per_frame + sum(bit_fields(1:mp));
+      st = en - (nbits-1);
+      frames_out(st:en) = dec2sd(dec_hat(i), nbits);
+      frames_out_simple(st:en) = dec2sd(dec_simple_hat(i), nbits);
+    end
+
+  end
+
+  % save frames out
+
+  [tok rem] = strtok(bitstream_filename,".");
+  fn_trellis = sprintf("%s_%3.2f_trellis%s",tok,var,rem);
+  fn_simple = sprintf("%s_%3.2f_simple%s",tok,var,rem);
+  printf("writing output files: %s %s for your listening pleasure!\n", fn_trellis, fn_simple);
+
+  fbitstream = fopen(fn_trellis,"wb");
+  fwrite(fbitstream, frames_out,"float32");
+  fclose(fbitstream);
+
+  fbitstream = fopen(fn_simple,"wb");
+  fwrite(fbitstream, frames_out_simple,"float32");
+  fclose(fbitstream);
+
+endfunction
 
 % uncomment one of the below to run a simulation
 
 %test_single
 %simple_traj;
 test_codec_model_parameter("ve9qrp_10s.bit", 6);
-
+%process_test_file("ve9qrp_10s.bit")
 
