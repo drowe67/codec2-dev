@@ -72,6 +72,8 @@ struct freedv *freedv_open(int mode) {
     
     f->mode = mode;
     f->test_frames = f->smooth_symbols = 0;
+    f->freedv_put_error_pattern = NULL;
+    f->error_pattern_callback_state = NULL;
     f->snr_squelch_thresh = 2.0;
     f->squelch_en = 1;
    
@@ -97,6 +99,7 @@ struct freedv *freedv_open(int mode) {
         if ((f->tx_bits == NULL) || (f->rx_bits == NULL))
             return NULL;
         f->evenframe = 0;
+        f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
     }
 
     if (mode == FREEDV_MODE_700) {
@@ -111,6 +114,7 @@ struct freedv *freedv_open(int mode) {
         f->tx_bits = (int*)malloc(nbit*sizeof(int));
         if (f->tx_bits == NULL)
             return NULL;
+        f->sz_error_pattern = cohpsk_error_pattern_size();
     }
 
     f->test_frame_sync_state = 0;
@@ -578,7 +582,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                             if (f->test_frame_count == 0) {
                                 f->total_bit_errors += bit_errors;
                                 f->total_bits += ntest_bits;
-                            }
+                                if (f->freedv_put_error_pattern != NULL) {
+                                    (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, fdmdv_error_pattern_size(f->fdmdv));
+                                }
+                           }
                             f->test_frame_count++;
                             if (f->test_frame_count == 4)
                                 f->test_frame_count = 0;
@@ -699,11 +706,12 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 /* test data, lets see if we can sync to the test data sequence */
 
                 cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors, rx_bits);
-                if (f->test_frame_sync_state == 1) {
-                    //for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                    //    error_positions_hist[i] += error_pattern[i];
+                if (f->test_frame_sync_state) {
                     f->total_bit_errors += bit_errors;
                     f->total_bits       += COHPSK_BITS_PER_FRAME;
+                    if (f->freedv_put_error_pattern != NULL) {
+                        (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
+                    }
                 }
 
                 for(i=0; i<f->n_speech_samples; i++)

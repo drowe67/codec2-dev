@@ -73,6 +73,12 @@ struct freedv {
     int                  test_frame_count;
     int                  total_bits;
     int                  total_bit_errors;
+    int                  sz_error_pattern;
+
+    /* optional user defined function to pass error pattern when a test frame is received */
+
+    void                *error_pattern_callback_state;
+    void (*freedv_put_error_pattern)(void *error_pattern_callback_state, short error_pattern[], int sz_error_pattern);
 
     int                  sync;
     int                  evenframe;

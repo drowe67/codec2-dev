@@ -1396,7 +1396,7 @@ void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[])
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD_LOW);
     e_index = encode_energy(e, 3);
     pack_natural_or_gray(bits, &nbit, e_index, 3, c2->gray);
- 
+
     for(i=0; i<LPC_ORD_LOW; i++) {
         f = (4000.0/PI)*lsps[i];
         mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);

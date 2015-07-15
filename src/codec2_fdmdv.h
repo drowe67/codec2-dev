@@ -103,7 +103,7 @@ void           fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
 /* debug/development function(s) */
 
 void fdmdv_dump_osc_mags(struct FDMDV *f);
-void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float target_snr);
+void fdmdv_simulate_channel(float *sig_pwr_av, COMP samples[], int nin, float target_snr);
  
 #ifdef __cplusplus
 }
