@@ -548,7 +548,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
 
         /* sample correlation over 2D grid of time and fine freq points */
 
-        max_corr = 0;
+        max_corr = max_mag = 0;
         for (f_fine=-20; f_fine<=20; f_fine+=0.25) {
             for (t=0; t<NSYMROWPILOT; t++) {
                 corr_with_pilots(&corr, &mag, coh, t, f_fine);
@@ -818,12 +818,13 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     COMP  rx_fdm_frame_bb[COHPSK_M+COHPSK_M/P];
     COMP  rx_baseband[COHPSK_NC*ND][COHPSK_M+COHPSK_M/P];
     COMP  rx_filt[COHPSK_NC*ND][P+1];
-    float env[NT*P], __attribute__((unused)) rx_timing;
+    float env[NT*P], rx_timing;
     COMP  rx_onesym[COHPSK_NC*ND];
     float beta, g;
     COMP  adiff, amod_strip, mod_strip;
 
     ch_fdm_frame_index = 0;
+    rx_timing = 0;
 
     for (r=0; r<nsymb; r++) {
         fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[ch_fdm_frame_index], -(*f_est), &fdmdv->fbb_phase_rx, nin);
@@ -958,6 +959,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         /* we can test +/- 20Hz, so we break this up into 3 tests to cover +/- 60Hz */
 
         max_ratio = 0.0;
+        f_est = 0.0;
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
         
             if (coh->verbose)
@@ -1212,14 +1214,33 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
         }
     }
 
-    if (*state == 1) {
+    /* if 5 frames with large BER reset test frame sync */
+
+    if (*state > 0) {
+        if (*bit_errors > 8) {
+            if (*state == 6)
+                next_state = 0;
+            else
+                next_state = *state+1;
+        }
+        else
+            next_state = 1;
+    }
+
+    if (*state > 0) {
         coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
         if (coh->ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
             coh->ptest_bits_coh_rx = (int*)test_bits_coh;
         }
     }
+   
+    //fprintf(stderr, "state: %d next_state: %d bit_errors: %d\n", *state, next_state, *bit_errors);
 
     *state = next_state;
+}
+
+int cohpsk_error_pattern_size(void) { 
+    return COHPSK_BITS_PER_FRAME;
 }
 
 

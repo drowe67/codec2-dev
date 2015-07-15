@@ -1819,12 +1819,15 @@ static float randn() {
   Simple channel simulation function to aid in testing.  Target SNR
   uses noise measured in a 3 kHz bandwidth.  
 
+  Doesn't use fdmdv states so can be called from anywhere, e.g. non
+  fdmdv applications.
+
   TODO: Measured SNR is coming out a few dB higher than target_snr, this
   needs to be fixed.
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float target_snr) 
+void fdmdv_simulate_channel(float *sig_pwr_av, COMP samples[], int nin, float target_snr) 
 {
     float sig_pwr, target_snr_linear, noise_pwr, noise_pwr_1Hz, noise_pwr_4000Hz, noise_gain;
     int   i;
@@ -1837,12 +1840,12 @@ void fdmdv_simulate_channel(struct FDMDV *f, COMP samples[], int nin, float targ
     
     sig_pwr /= nin;
 
-    f->sig_pwr_av = 0.9*f->sig_pwr_av + 0.1*sig_pwr;
+    *sig_pwr_av = 0.9**sig_pwr_av + 0.1*sig_pwr;
 
     /* det noise to meet target SNR */
 
     target_snr_linear = powf(10.0, target_snr/10.0);
-    noise_pwr = f->sig_pwr_av/target_snr_linear;       /* noise pwr in a 3000 Hz BW     */
+    noise_pwr = *sig_pwr_av/target_snr_linear;       /* noise pwr in a 3000 Hz BW     */
     noise_pwr_1Hz = noise_pwr/3000.0;                  /* noise pwr in a 1 Hz bandwidth */
     noise_pwr_4000Hz = noise_pwr_1Hz*4000.0;           /* noise pwr in a 4000 Hz BW, which 
                                                           due to fs=8000 Hz in our simulation noise BW */
