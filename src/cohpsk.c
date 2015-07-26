@@ -247,10 +247,21 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
         r++;
     }
     for(data_r=0; data_r<NSYMROW; data_r++, r++) {
+        
         for(c=0; c<COHPSK_NC; c++) {
             i = c*NSYMROW + data_r;
             bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);          
             tx_symb[r][c] = fcmult(1.0/sqrtf(ND),qpsk_mod[bits]);
+
+            /* test code to see what happens when we attenuate one
+               carrier, this may happen in practice with tx SSB filter
+               ripple.  
+
+               if (c==5) { 
+                 COMP attn = {0.5,0.0};
+                 tx_symb[r][c] = cmult(tx_symb[r][c], attn);
+               }
+            */
         }
     }
     
@@ -789,15 +800,15 @@ void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHP
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
+void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs, 
                           COMP *foff_phase_rect, int nin)
 {
     COMP  foff_rect;
     float mag;
     int   i;
 
-    foff_rect.real = cosf(2.0*PI*foff/COHPSK_FS);
-    foff_rect.imag = sinf(2.0*PI*foff/COHPSK_FS);
+    foff_rect.real = cosf(2.0*PI*foff/Fs);
+    foff_rect.imag = sinf(2.0*PI*foff/Fs);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
@@ -827,7 +838,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
     rx_timing = 0;
 
     for (r=0; r<nsymb; r++) {
-        fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[ch_fdm_frame_index], -(*f_est), &fdmdv->fbb_phase_rx, nin);
+        fdmdv_freq_shift_coh(rx_fdm_frame_bb, &ch_fdm_frame[ch_fdm_frame_index], -(*f_est), COHPSK_FS, &fdmdv->fbb_phase_rx, nin);
         ch_fdm_frame_index += nin;
         fdm_downconvert_coh(rx_baseband, COHPSK_NC*ND, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
         rx_filter_coh(rx_filt, COHPSK_NC*ND, rx_baseband, coh->rx_filter_memory, nin);

@@ -56,5 +56,6 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
                           int *bit_errors, float rx_bits_sd[]);
 int cohpsk_error_pattern_size(void);
 void cohpsk_set_frame(struct COHPSK *coh, int frame);
-
+void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs, 
+                          COMP *foff_phase_rect, int nin);
 #endif

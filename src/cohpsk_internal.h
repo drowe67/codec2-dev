@@ -105,8 +105,6 @@ void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHP
 void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*COHPSK_ND], int sync, int *next_sync);
 void fine_freq_correct(struct COHPSK *coh, int sync, int next_sync);
 int sync_state_machine(struct COHPSK *coh, int sync, int next_sync);
-void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, 
-                          COMP *foff_phase_rect, int nin);
 int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm);
 
 #endif
