@@ -704,10 +704,10 @@ int main(int argc, char *argv[])
                     aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i], 
                               &snr, 0, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
                     apply_lpc_correction(&model_dec[i]);
+                    sum_snr += snr;
                     #ifdef DUMP
                     dump_lsp_(&lsps_dec[i][0]);
                     dump_ak_(&ak_dec[i][0], order);
-                    sum_snr += snr;
                     dump_quantised_model(&model_dec[i]);
                     #endif
                 }
@@ -746,7 +746,7 @@ int main(int argc, char *argv[])
 	fclose(fout);
 
     if (lpc_model)
-    	printf("SNR av = %5.2f dB\n", sum_snr/frames);
+    	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
 
     if (phaseexp)
 	phase_experiment_destroy(pexp);
