@@ -50,7 +50,7 @@ struct freedv {
     struct COHPSK       *cohpsk;
 
     int                  n_speech_samples;
-    int                  n_nom_modem_samples;    // size of tx and most rx modenm sample buffers
+    int                  n_nom_modem_samples;    // size of tx and most rx modem sample buffers
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
 
     int                  modem_sample_rate;      // ATM caller is responsible for meeting this (TBC)

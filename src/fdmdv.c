@@ -422,7 +422,7 @@ void tx_filter_and_upconvert(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 
     for(c=0; c<Nc+1; c++)
 	tx_filter_memory[c][NSYM-1] = cmult(tx_symbols[c], gain);
-    
+
     /* 
        tx filter each symbol, generate M filtered output samples for
        each symbol, which we then freq shift and sum with other
