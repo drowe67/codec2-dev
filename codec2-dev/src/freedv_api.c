@@ -74,10 +74,10 @@ struct freedv *freedv_open(int mode) {
     f->test_frames = f->smooth_symbols = 0;
     f->freedv_put_error_pattern = NULL;
     f->error_pattern_callback_state = NULL;
-    f->snr_squelch_thresh = 2.0;
-    f->squelch_en = 1;
    
     if (mode == FREEDV_MODE_1600) {
+        f->snr_squelch_thresh = 2.0;
+        f->squelch_en = 1;
         Nc = 16;
         f->tx_sync_bit = 0;
         codec2_mode = CODEC2_MODE_1300;
@@ -103,6 +103,8 @@ struct freedv *freedv_open(int mode) {
     }
 
     if (mode == FREEDV_MODE_700) {
+        f->snr_squelch_thresh = 0.0;
+        f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700;
         f->cohpsk = cohpsk_create();
         f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
@@ -729,18 +731,33 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             }
             else {
                 float t,a,b,s;
-                int   t1,t2;
+                int   t1;
 
                 /* if not in sync pass through analog samples */
                 /* this lets us "hear" whats going on, e.g. during tuning */
                 /* need to linearly interp as Fs in and out slightly different */
+                /* this is a bit crude (compared to analog FreeDV mode)
+                   but it's probably OK for a tuning aid off air signals */
 
                 for(i=0, t=0.0; i<f->n_speech_samples; i++, t+=(float)f->modem_sample_rate/FS) {
-                    t1 = floor(t); t2 = ceil(t);
+                    t1 = floor(t);
                     a = t - t1;
-                    b = t2 - t1;
-                    s = b*demod_in[t1].real + a*demod_in[t2].real;               
+                    b = 1.0 - a;
+
+                    /* avoid running past end of input array */
+                    
+                    if (t1 < (f->nin-1)) 
+                        s = b*demod_in[t1].real + a*demod_in[t1+1].real;       
+                    else
+                        s = b*demod_in[t1].real;
+                    
                     speech_out[i] = FDMDV_SCALE*s;
+                    /*
+                    if ((i < 10) || (i > 590)) {
+                        printf("i: %d t: %f t1: %d a: %f b: %f s[t1]: %f s[t2]: %f s: %f\n",
+                               i,t,t1,a,b,demod_in[t1].real, demod_in[t1+1].real, s);
+                    }
+                    */
                 }
                 nout = f->n_speech_samples;
                 //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
