@@ -1210,6 +1210,9 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
     *bit_errors = 0;
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
         anerror = (rx_bits[i] & 0x1) ^ coh->ptest_bits_coh_rx[i];
+        if ((anerror < 0) || (anerror > 1)) {
+            fprintf(stderr, "i: %d rx_bits: %d ptest_bits_coh_rx: %d\n", i, rx_bits[i], coh->ptest_bits_coh_rx[i]);
+        }
         *bit_errors += anerror;
         error_pattern[i] = anerror;
     }
@@ -1222,6 +1225,9 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
         if (*bit_errors < 4) {
             next_state = 1;
             coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
+            if (coh->ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
+                coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+            }
         }
     }
 
