@@ -124,7 +124,7 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
   float  mag;
   int    i,k;
 
-  wc_rect.real = cos(wc); wc_rect.imag = -sin(wc);
+  wc_rect.real = cosf(wc); wc_rect.imag = -sinf(wc);
 
   for(i=0; i<nsam; i++) {
 
@@ -136,10 +136,13 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
       /* input FIR filter */
 
       rx_bb_filt.real = 0.0; rx_bb_filt.imag = 0.0;
-      for(k=0; k<FILT_MEM; k++) {
-          rx_bb_filt.real += rx_bb[i-k].real * bin[k];
-          rx_bb_filt.imag += rx_bb[i-k].imag * bin[k];
+      
+      for(k=0; k<FILT_MEM/2; k++) {
+          rx_bb_filt.real += rx_bb[i-k].real * bin[k+FILT_MEM/4];
+          rx_bb_filt.imag += rx_bb[i-k].imag * bin[k+FILT_MEM/4];
       }
+      
+      //rx_bb_filt = rx_bb[i];
       //printf("%f %f %f\n", rx[i], wc_rect.real, wc_rect.imag);
       //printf("%f %f %f\n", rx[i], fm_states->lo_phase.real, fm_states->lo_phase.imag);
       //printf("%f %f %f\n", rx[i], rx_bb[i].real, rx_bb[i].imag);
@@ -153,7 +156,7 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
       rx_bb_diff = cmult(rx_bb_filt, cconj(fm_states->rx_bb_filt_prev));
       fm_states->rx_bb_filt_prev = rx_bb_filt;
   
-      rx_dem = atan2(rx_bb_diff.imag, rx_bb_diff.real);
+      rx_dem = atan2f(rx_bb_diff.imag, rx_bb_diff.real);
 
       /* limit maximum phase jumps, to remove static type noise at low SNRs */
 
@@ -166,10 +169,12 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
       //printf("%f %f\n", rx_bb_diff.real, rx_bb_diff.imag);
       rx_dem_mem[i] = rx_dem;
       acc = 0;
-      for(k=0; k<FILT_MEM; k++) {
+      /*
+        for(k=0; k<FILT_MEM; k++) {
           acc += rx_dem_mem[i-k] * bout[k];
       }
-      rx_out[i] = acc;
+      */
+      rx_out[i] = rx_dem;
   }
 
   /* update filter memories */
