@@ -4,8 +4,14 @@
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
                                                                              
-  Demo receive program for FreeDV API functions.
-                                                                     
+  Demo receive program for FreeDV API functions, some side information
+  written to freedv_rx_log.txt
+ 
+  Example usage (all one line):
+
+     codec2-dev/build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | 
+                                 ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -
+                                                             
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -84,14 +90,9 @@ int main(int argc, char *argv[]) {
     
     freedv = freedv_open(mode);
     assert(freedv != NULL);
-    if (mode == FREEDV_MODE_700)
-        cohpsk_set_verbose(freedv->cohpsk, 0);
 
     if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
         freedv->test_frames = 1;
-    }
-    if ( (argc > 4) && (strcmp(argv[4], "--smooth") == 0) ) {
-        freedv->smooth_symbols = 1;
     }
     
     speech_out = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
@@ -99,7 +100,8 @@ int main(int argc, char *argv[]) {
     demod_in = (short*)malloc(sizeof(short)*freedv->n_max_modem_samples);
     assert(demod_in != NULL);
 
-    ftxt = stderr;
+    ftxt = fopen("freedv_rx_log.txt","wt");
+    assert(ftxt != NULL);
     my_cb_state.ftxt = ftxt;
     freedv->callback_state = (void*)&my_cb_state;
     freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
@@ -114,25 +116,18 @@ int main(int argc, char *argv[]) {
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
-        if (mode == FREEDV_MODE_700)
-            cohpsk_set_frame(freedv->cohpsk, frame);
 
         nout = freedv_rx(freedv, speech_out, demod_in);
         nin = freedv_nin(freedv);
 
         fwrite(speech_out, sizeof(short), nout, fout);
-        if (freedv->mode == FREEDV_MODE_1600)
-            fdmdv_get_demod_stats(freedv->fdmdv, &freedv->stats);
-        if (freedv->mode == FREEDV_MODE_700)
-            cohpsk_get_demod_stats(freedv->cohpsk, &freedv->stats);
         
         /* log some side info to the txt file */
-        /*       
+               
         if (ftxt != NULL) {
             fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
-                    freedv->stats.sync, freedv->stats.snr_est, freedv->total_bit_errors);
+                    freedv->sync, freedv->snr_est, freedv->total_bit_errors);
         }
-        */
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
