@@ -43,7 +43,17 @@
 #include "golay23.h"
 #include "varicode.h"
 #include "freedv_api.h"
+#include "freedv_api_internal.h"
 #include "comp_prim.h"
+
+#define VERSION     10	/* The API version number.  The first version is 10.  Increment if the API changes
+                           in a way that would require changes by the API user. */
+/*
+ * Version 10   Initial version August 2, 2015.
+ * Version 11   September
+ *              Changes go here.
+ *
+ */
 
 #define NORM_PWR  1.74   /* experimentally derived fudge factor so 1600 and 
                             700 mode have the same tx power */
@@ -770,4 +780,103 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     //fprintf(stderr,"f->stats.sync: %d reliable_sync_bit: %d evenframe: %d nout: %d\n", f->stats.sync, reliable_sync_bit, f->evenframe, nout);
     return nout;
 }
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: freedv_get_version
+  AUTHOR......: Jim Ahlstrom      
+  DATE CREATED: 28 July 2015
+
+  Return the version of the FreeDV API.  This is meant to help API users determine when
+  incompatible changes have occurred.
+
+\*---------------------------------------------------------------------------*/
+
+int freedv_get_version(void)
+{
+    return VERSION;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: freedv_set_callback_txt
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 28 July 2015
+
+  Set the callback functions and the callback state pointer that will be used
+  for the aux txt channel.  The freedv_callback_rx is a function pointer that
+  will be called to return received characters.  The freedv_callback_tx is a
+  function pointer that will be called to send transmitted characters.  The callback
+  state is a user-defined void pointer that will be passed to the callback functions.
+  Any or all can be NULL, and the default is all NULL.
+  The function signatures are:
+    void receive_char(void *callback_state, char c);
+    char transmit_char(void *callback_state);
+
+\*---------------------------------------------------------------------------*/
+
+void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_callback_tx tx, void *state)
+{
+    f->freedv_put_next_rx_char = rx;
+    f->freedv_get_next_tx_char = tx;
+    f->callback_state = state;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: freedv_get_modem_stats
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 28 July 2015
+
+  Return data from the modem.  The arguments are pointers to the data items.  The
+  pointers can be NULL if the data item is not wanted.
+
+\*---------------------------------------------------------------------------*/
+
+void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
+{
+    if (f->mode == FREEDV_MODE_1600)
+        fdmdv_get_demod_stats(f->fdmdv, &f->stats);
+    if (f->mode == FREEDV_MODE_700)
+        cohpsk_get_demod_stats(f->cohpsk, &f->stats);
+    if (sync) *sync = f->stats.sync;
+    if (snr_est) *snr_est = f->stats.snr_est;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTIONS...: freedv_set_*
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 28 July 2015
+
+  Set some parameters used by FreeDV.  It is possible to write a macro using ## for
+  this, but I wasn't sure it would be 100% portable.
+
+\*---------------------------------------------------------------------------*/
+
+// Set integers
+void freedv_set_test_frames				(struct freedv *f, int val) {f->smooth_symbols = val;}
+void freedv_set_squelch_en				(struct freedv *f, int val) {f->squelch_en = val;}
+// Set floats
+void freedv_set_snr_squelch_thresh		(struct freedv *f, float val) {f->snr_squelch_thresh = val;}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTIONS...: freedv_get_*
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 28 July 2015
+
+  Get some parameters from FreeDV.  It is possible to write a macro using ## for
+  this, but I wasn't sure it would be 100% portable.
+
+\*---------------------------------------------------------------------------*/
+
+// Get integers
+int freedv_get_test_frames				(struct freedv *f) {return f->test_frames;}
+int freedv_get_n_speech_samples			(struct freedv *f) {return f->n_speech_samples;}
+int freedv_get_n_max_modem_samples		(struct freedv *f) {return f->n_max_modem_samples;}
+int freedv_get_n_nom_modem_samples		(struct freedv *f) {return f->n_nom_modem_samples;}
+int freedv_get_total_bits				(struct freedv *f) {return f->total_bits;}
+int freedv_get_total_bit_errors			(struct freedv *f) {return f->total_bit_errors;}
+// Get floats
 
