@@ -6,9 +6,9 @@ and below.  For more information please see:
 
     http://rowetel.com/codec2.html
 
-Also included is a FDMDV modem (README_fdmdv.txt), and an API for
-embedding FreeDV in other programs (see example below).  For more
-information on building Codec 2 see READE.cmake
+Also included is a FDMDV modem (README_fdmdv.txt), a coherent PSK
+modem and an API for embedding FreeDV in other programs (see example
+below).  For more information on building Codec 2 see READE.cmake
 
 Quickstart
 ----------
@@ -43,18 +43,18 @@ NOTE: You may not have the necessary speex libraries installed. Some
 
    $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
 
-   using 450 bps bit rate encoding
+   using 700 bps bit rate encoding
 
-   $ ./src/c2enc 450 ../raw/hts1a.raw hts1a_c2.bit
-   $ ./src/c2dec 450 hts1a_c2.bit hts1a_c2_450.raw
+   $ ./src/c2enc 700 ../raw/hts1a.raw hts1a_c2.bit
+   $ ./src/c2dec 700 hts1a_c2.bit hts1a_c2_700.raw
 
    which can be played with
 
-   $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_450.raw
+   $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
 
 3/ Same thing with pipes:
 
-   $ ./src/c2enc 1400 ../raw/hts1a.raw - | ./src/c2dec 1400 - - | play -t raw -r 8000 -s -2 -
+   $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
 
 Embedded FreeDV API
 -------------------
@@ -62,16 +62,8 @@ Embedded FreeDV API
 See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
 freedv_rx.  Quickstart:
 
-  $ ./freedv_tx ../../raw/hts1.raw - | ./freedv_rx - - | play -t raw -r 8000 -s -2 -q -
-
-Or with a simulated 2 dB SNR channel:
-
-  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - | play -t raw -r 8000 -s -2 -q -
-
-To log the demod state information and received text msg characters to a text file:
-
-  $ ./freedv_tx ../../raw/hts1.raw - | ./fdmdv_channel - - 2 | ./freedv_rx - - log.txt | play -t raw -r 8000 -s -2 -q -
-  $ cat log.txt
+  $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
+  $ cat freedv_rx_log.txt
 
 Programs
 --------
