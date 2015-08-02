@@ -60,6 +60,12 @@ int main(int argc, char *argv[]) {
     int                        nin, nout, frame = 0;
     struct my_callback_state   my_cb_state;
     int                        mode;
+    int                        sync;
+    int                        total_bits;
+    int                        total_bit_errors;
+    float                      snr_est;
+    int                        n_speech_samples;
+    int                        n_max_modem_samples;
 
     if (argc < 4) {
 	printf("usage: %s 1600|700 InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
@@ -92,21 +98,22 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
-        freedv->test_frames = 1;
+		freedv_set_test_frames(freedv, 1);
     }
+    freedv_set_snr_squelch_thresh(freedv, -100.0);
+    freedv_set_squelch_en(freedv, 1);
     
-    speech_out = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
+    n_speech_samples = freedv_get_n_speech_samples(freedv);
+    n_max_modem_samples = freedv_get_n_max_modem_samples(freedv);
+    speech_out = (short*)malloc(sizeof(short)*n_speech_samples);
     assert(speech_out != NULL);
-    demod_in = (short*)malloc(sizeof(short)*freedv->n_max_modem_samples);
+    demod_in = (short*)malloc(sizeof(short)*n_max_modem_samples);
     assert(demod_in != NULL);
 
     ftxt = fopen("freedv_rx_log.txt","wt");
     assert(ftxt != NULL);
     my_cb_state.ftxt = ftxt;
-    freedv->callback_state = (void*)&my_cb_state;
-    freedv->freedv_put_next_rx_char = &my_put_next_rx_char;
-
-    freedv->snr_squelch_thresh = -100.0;
+    freedv_set_callback_txt(freedv, &my_put_next_rx_char, NULL, &my_cb_state);
 
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx
@@ -121,12 +128,14 @@ int main(int argc, char *argv[]) {
         nin = freedv_nin(freedv);
 
         fwrite(speech_out, sizeof(short), nout, fout);
+        freedv_get_modem_stats(freedv, &sync, &snr_est);
+        total_bit_errors = freedv_get_total_bit_errors(freedv);
         
         /* log some side info to the txt file */
                
         if (ftxt != NULL) {
             fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
-                    freedv->sync, freedv->snr_est, freedv->total_bit_errors);
+                    sync, snr_est, total_bit_errors);
         }
 
 	/* if this is in a pipeline, we probably don't want the usual
@@ -136,8 +145,10 @@ int main(int argc, char *argv[]) {
         if (fin == stdin) fflush(stdin);         
     }
 
-    if (freedv->test_frames) {
-        fprintf(stderr, "bits: %d errors: %d BER: %3.2f\n", freedv->total_bits, freedv->total_bit_errors, (float)freedv->total_bit_errors/freedv->total_bits);
+    if (freedv_get_test_frames(freedv)) {
+        total_bits = freedv_get_total_bits(freedv);
+        total_bit_errors = freedv_get_total_bit_errors(freedv);
+        fprintf(stderr, "bits: %d errors: %d BER: %3.2f\n", total_bits, total_bit_errors, (float)total_bit_errors/total_bits);
     }
 
     free(speech_out);

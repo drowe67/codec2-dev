@@ -56,6 +56,8 @@ int main(int argc, char *argv[]) {
     struct freedv            *freedv;
     struct my_callback_state  my_cb_state;
     int                       mode;
+    int                       n_speech_samples;
+    int                       n_nom_modem_samples;
 
     if (argc < 4) {
 	printf("usage: %s 1600|700 InputRawSpeechFile OutputModemRawFile [--testframes]\n", argv[0]);
@@ -88,26 +90,29 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     if ((argc > 4) && (strcmp(argv[4], "--testframes") == 0)) {
-        freedv->test_frames = 1;
+		freedv_set_test_frames(freedv, 1);
     }
+    freedv_set_snr_squelch_thresh(freedv, -100.0);
+    freedv_set_squelch_en(freedv, 1);
 
-    speech_in = (short*)malloc(sizeof(short)*freedv->n_speech_samples);
+    n_speech_samples = freedv_get_n_speech_samples(freedv);
+    n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
+    speech_in = (short*)malloc(sizeof(short)*n_speech_samples);
     assert(speech_in != NULL);
-    mod_out = (short*)malloc(sizeof(short)*freedv->n_nom_modem_samples);
+    mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
 
     /* set up callback for txt msg chars */
 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\n");
     my_cb_state.ptx_str = my_cb_state.tx_str;
-    freedv->callback_state = (void*)&my_cb_state;
-    freedv->freedv_get_next_tx_char = &my_get_next_tx_char;
+    freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
 
     /* OK main loop */
 
-    while(fread(speech_in, sizeof(short), freedv->n_speech_samples, fin) == freedv->n_speech_samples) {
+    while(fread(speech_in, sizeof(short), n_speech_samples, fin) == n_speech_samples) {
         freedv_tx(freedv, mod_out, speech_in);
-        fwrite(mod_out, sizeof(short), freedv->n_nom_modem_samples, fout);
+        fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */

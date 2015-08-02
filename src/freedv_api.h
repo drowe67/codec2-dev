@@ -34,85 +34,44 @@
 
 #ifndef __FREEDV__
 
+// This declares a single-precision (float) complex number
+#include "comp.h"
+
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_700         1
 
-#include "varicode.h"
-#include "codec2_fdmdv.h"
-#include "codec2_cohpsk.h"
+struct freedv;
 
-struct freedv {
-    int                  mode;
+typedef void (*freedv_callback_rx)(void *, char);
+typedef char (*freedv_callback_tx)(void *);
 
-    struct CODEC2       *codec2;
-    struct FDMDV        *fdmdv;
-    struct MODEM_STATS   stats;
-    struct COHPSK       *cohpsk;
-
-    int                  n_speech_samples;
-    int                  n_nom_modem_samples;    // size of tx and most rx modem sample buffers
-    int                  n_max_modem_samples;    // make your rx modem sample buffers this big
-
-    int                  modem_sample_rate;      // ATM caller is responsible for meeting this (TBC)
-    int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
-
-    unsigned char       *packed_codec_bits;
-    int                 *codec_bits;
-    int                 *tx_bits;
-    int                 *fdmdv_bits;
-    int                 *rx_bits;
-    int                  tx_sync_bit;
-    int                  smooth_symbols;
-    float               *prev_rx_bits;
-
-    int                 *ptest_bits_coh;
-    int                 *ptest_bits_coh_end;
-
-    int                  test_frames;            // set this baby for 1 to tx/rx test frames to look at bit error stats
-    int                  test_frame_sync_state;
-    int                  test_frame_count;
-    int                  total_bits;
-    int                  total_bit_errors;
-    int                  sz_error_pattern;
-
-    /* optional user defined function to pass error pattern when a test frame is received */
-
-    void                *error_pattern_callback_state;
-    void (*freedv_put_error_pattern)(void *error_pattern_callback_state, short error_pattern[], int sz_error_pattern);
-
-    int                  sync;
-    int                  evenframe;
-    float                snr_est;
-    float                snr_squelch_thresh;
-    float                squelch_en;
-    int                  nin;
-
-    struct VARICODE_DEC  varicode_dec_states;
-    short                tx_varicode_bits[VARICODE_MAX_BITS];
-    int                  nvaricode_bits;
-    int                  varicode_bit_index;
-    
-    /* user defined function ptrs to produce and consume ASCII
-      characters using aux txt channel */
-
-    char (*freedv_get_next_tx_char)(void *callback_state);
-    void (*freedv_put_next_rx_char)(void *callback_state, char c);
-
-    void                *callback_state;
-
-};
-
+// FreeDV API functions:
+// open, close
 struct freedv *freedv_open(int mode);
 void freedv_close(struct freedv *freedv);
-
-void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]);
-void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]);
-
-int freedv_nin(struct freedv *f);
-int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]);
-int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]);
-int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]);
-
+// Transmit
+void freedv_tx(struct freedv *freedv, short mod_out[], short speech_in[]);
+void freedv_comptx(struct freedv *freedv, COMP mod_out[], short speech_in[]);
+// Receive
+int freedv_nin(struct freedv *freedv);
+int freedv_rx(struct freedv *freedv, short speech_out[], short demod_in[]);
+int freedv_floatrx(struct freedv *freedv, short speech_out[], float demod_in[]);
+int freedv_comprx(struct freedv *freedv, short speech_out[], COMP demod_in[]);
+// Set parameters
+void freedv_set_callback_txt(struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
+void freedv_set_test_frames			(struct freedv *freedv, int test_frames);
+void freedv_set_smooth_symbols		(struct freedv *freedv, int smooth_symbols);
+void freedv_set_squelch_en			(struct freedv *freedv, int squelch_en);
+void freedv_set_snr_squelch_thresh	(struct freedv *freedv, float snr_squelch_thresh);
+// Get parameters
+int freedv_get_version(void);
+void freedv_get_modem_stats(struct freedv *freedv, int *sync, float *snr_est);
+int freedv_get_test_frames			(struct freedv *freedv);
+int freedv_get_n_speech_samples		(struct freedv *freedv);
+int freedv_get_n_max_modem_samples	(struct freedv *freedv);
+int freedv_get_n_nom_modem_samples	(struct freedv *freedv);
+int freedv_get_total_bits			(struct freedv *freedv);
+int freedv_get_total_bit_errors		(struct freedv *freedv);
 #endif
 
 #ifdef __cplusplus
