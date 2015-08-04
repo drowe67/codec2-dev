@@ -8,7 +8,7 @@ and below.  For more information please see:
 
 Also included is a FDMDV modem (README_fdmdv.txt), a coherent PSK
 modem and an API for embedding FreeDV in other programs (see example
-below).  For more information on building Codec 2 see READE.cmake
+below).  For more information on building Codec 2 see README.cmake
 
 Quickstart
 ----------
@@ -106,12 +106,11 @@ Directories
   asterisk &  - unmaintained Asterisk support
   asterisk-11 
   cmake       - cmake support files
-  octave      - Octave scripts used for visualising internal signals 
-                during development
+  octave      - Octave scripts used to support development
   script      - shell scripts for playing and converting raw files
-  src         - C source code for Codec 2, FDMDV modem, FreeDV API
+  src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
   raw         - speech files in raw format (16 bits signed linear 8 kHz)
-  stm32       - Support for the STM32F4 microcontroller and SM1000 FreeDV speaker-mic
+  stm32       - Support for the STM32F4 microcontroller and SM1000 FreeDV Adaptor
   unittest    - unit test source code
   wav         - speech files in wave file format
 
