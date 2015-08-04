@@ -17,9 +17,7 @@ operation of the Octave and C versions are identical.
 Quickstart
 ----------
 
-$ cd codec2-dev
-$ ./configure && make
-$ cd src
+Built as part of codec2-dev, see README for build instructions.
 
 1. Generate some test bits and modulate them:
 
