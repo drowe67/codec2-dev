@@ -51,6 +51,7 @@ void dump_lsp(float lsp[]);
 void dump_weights(float w[], int ndim);
 void dump_lsp_(float lsp_[]);
 void dump_mel(float mel[], int order);
+void dump_mel_indexes(int mel_indexes[], int order);
 void dump_ak(float ak[], int order);
 void dump_ak_(float ak[], int order);
 void dump_E(float E);

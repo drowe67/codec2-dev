@@ -1,7 +1,7 @@
 Codec 2 README
 --------------
 
-Codec 2 is an open source (LGPL licensed) speech codec for 2400 bit/s
+Codec 2 is an open source (LGPL licensed) speech codec for 3200 bit/s
 and below.  For more information please see:
 
     http://rowetel.com/codec2.html
@@ -9,6 +9,25 @@ and below.  For more information please see:
 Also included is a FDMDV modem (README_fdmdv.txt), a coherent PSK
 modem and an API for embedding FreeDV in other programs (see example
 below).  For more information on building Codec 2 see README.cmake
+
+SVN Repository
+--------------
+
+Check out the latest (development branch) code using:
+
+  $ svn co https://svn.code.sf.net/p/freetel/code/codec2-dev codec2-dev
+
+There are 3rd party GIT mirrors of Codec2 and FreeDV. Use Git at your
+own risk.
+
+  GIT IS NOT SUPPORTED!!!
+
+All patches, support questions etc, need to be against the SVN
+repository above.
+
+Please do not email me (David), or the codec2-dev mailing list
+suggesting we change to Git.  I get these emails every week.  Really,
+I understand the arguments, but am content with SVN for now.
 
 Quickstart
 ----------
