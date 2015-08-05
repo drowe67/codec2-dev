@@ -235,8 +235,8 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
                
                 decimate = atoi(optarg);
-	        if ((decimate != 2) && (decimate != 4)) {
-	            fprintf(stderr, "Error in --dec, must be 2 or 4\n");
+	        if ((decimate != 2) && (decimate != 3) && (decimate != 4)) {
+	            fprintf(stderr, "Error in --dec, must be 2, 3, or 4\n");
 	            exit(1);
 	        }
 
@@ -624,20 +624,42 @@ int main(int argc, char *argv[])
 		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
 
+                /* round to the nearest x hz */
+                #define MEL_ROUND 50
+		for(i=0; i<order; i++) {
+                    float x = floor(mel[i]/MEL_ROUND+0.5)*MEL_ROUND;
+                    mel[i] = x;
+                    //printf("mel[%d] = %f x: %f\n", i, mel[i], x);
+                }
+
 		for(i=1; i<order; i++) {
-		    if (mel[i] == mel[i-1])
-			mel[i]++;
+		    if (mel[i] == mel[i-1]) {
+			mel[i]+=MEL_ROUND/2;
+			mel[i-1]-=MEL_ROUND/2;
+                        i = 1;
+                    }
 		}
 
  		encode_mels_scalar(mel_indexes, mel, 6);
+                #ifdef DUMP
+                dump_mel_indexes(mel_indexes, 6);
+                #endif
 		decode_mels_scalar(mel, mel_indexes, 6);
                 
+		for(i=1; i<order; i++) {
+		    if (mel[i] == mel[i-1]) {
+			mel[i]+=MEL_ROUND/2;
+			mel[i-1]-=MEL_ROUND/2;
+                        i = 1;
+                    }
+		}
+
                 #ifdef DUMP
                 dump_mel(mel, order);
                 #endif
 
 		for(i=0; i<LPC_ORD; i++) {
-		    f_ = 700.0*( pow(10.0, (float)mel[i]/2595.0) - 1.0);
+		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}
  

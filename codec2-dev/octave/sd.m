@@ -52,7 +52,7 @@ function sd(raw_filename, dump_file_prefix, f)
   axis([1 length(s) -20E3 20E3])
   subplot(212)
   [a b c] = plotyy(1:frames, sd, 1:frames, e);
-  axis(a, [1 frames 0 10])
+  %axis(a, [1 frames 0 10])
 
   lsp1_filename = sprintf("%s_lsp.txt", dump_file_prefix);
   lsp2_filename = sprintf("%s_lsp_.txt", dump_file_prefix);
@@ -77,9 +77,25 @@ function sd(raw_filename, dump_file_prefix, f)
   subplot(211)
   ind = find(e > 0);
   hist(sd(ind))
+  title('Histogram of SD');
   subplot(212)
   plot((1:Ndft)*8000/Ndft, spec_err)
   axis([300 3000 0 max(spec_err)])
+  title('Average error across spectrum')
+
+  mel_indexes_filename = sprintf("%s_mel_indexes.txt", dump_file_prefix);
+  if file_in_path(".", mel_indexes_filename)
+    mel_indexes = load(mel_indexes_filename);
+    figure(6)
+    bins = [15, 7, 15, 7, 7, 7];
+    ind = find(e > 5); % ignore silence frames
+    for i=1:6
+      subplot(3,2,i)
+      hist(mel_indexes(ind,i),0:bins(i))
+      ylab = sprintf("index %d", i);
+      ylabel(ylab);
+    end
+  end
 
   % now enter single step mode so we can analyse each frame
   k = ' ';
@@ -101,10 +117,10 @@ function sd(raw_filename, dump_file_prefix, f)
     figure(3);
     clf;
 
-    plot((1:Ndft/2)*4000/(Ndft/2), A1(fr,1:(Ndft/2)),";A1;r");
+    plot((1:Ndft/2)*4000/(Ndft/2), A1(fr,1:(Ndft/2)),";A enc;r");
     axis([1 4000 -20 40]);
     hold on;
-    plot((1:Ndft/2)*4000/(Ndft/2), A2(fr,1:(Ndft/2)),";A2;");
+    plot((1:Ndft/2)*4000/(Ndft/2), A2(fr,1:(Ndft/2)),";A dec;");
     if file_in_path(".",weights_filename)
       plot(lsp1(fr,:)*4000/pi, weights(fr,:),";weights;g+");
     end
@@ -118,9 +134,10 @@ function sd(raw_filename, dump_file_prefix, f)
     endfor
     printf("\n");
     
-    plot(0,0,';lsp1;r');
-    plot(0,0,';lsp2;b');
-    sd_str = sprintf(";sd %3.2f dB*dB;", sd(fr));
+    plot(0,0,';lsp enc;r');
+    plot(0,0,';lsp dec;b');
+    plot(0,0,';mel dec;g');
+    sd_str = sprintf(";sd %3.2f dB*dB;", sd(f));
     plot(0,0,sd_str);
    
     hold off;

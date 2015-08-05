@@ -1372,7 +1372,7 @@ void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[])
         c2->bpf_buf[BPF_N+i] = speech[i];
     inverse_filter(&c2->bpf_buf[BPF_N], bpf, 4*N, bpf_out, BPF_N);
     for(i=0; i<4*N; i++)
-        bpf_speech[i] = bpf_out[i];
+        bpf_speech[i] = speech[i];
 
     /* frame 1 --------------------------------------------------------*/
 

@@ -56,6 +56,7 @@ static FILE *flsp = NULL;
 static FILE *fweights = NULL;
 static FILE *flsp_ = NULL;
 static FILE *fmel = NULL;
+static FILE *fmel_indexes = NULL;
 static FILE *fphase = NULL;
 static FILE *fphase_ = NULL;
 static FILE *ffw = NULL;
@@ -107,6 +108,8 @@ void dump_off(){
 	fclose(flsp_);
     if (fmel != NULL)
 	fclose(fmel);
+    if (fmel_indexes != NULL)
+	fclose(fmel_indexes);
     if (fphase != NULL)
 	fclose(fphase);
     if (fphase_ != NULL)
@@ -492,6 +495,23 @@ void dump_mel(float mel[], int order) {
     for(i=0; i<order; i++)
 	fprintf(fmel,"%f\t",mel[i]);
     fprintf(fmel,"\n");    
+}
+
+void dump_mel_indexes(int mel_indexes[], int order) {
+    int i;
+    char s[MAX_STR];
+
+    if (!dumpon) return;
+
+    if (fmel_indexes == NULL) {
+	sprintf(s,"%s_mel_indexes.txt", prefix);
+	fmel_indexes = fopen(s, "wt");
+	assert(fmel_indexes != NULL);
+    }
+
+    for(i=0; i<order; i++)
+	fprintf(fmel_indexes,"%d\t",mel_indexes[i]);
+    fprintf(fmel_indexes,"\n");    
 }
 
 void dump_ak(float ak[], int order) {
