@@ -104,9 +104,10 @@ int main(int argc, char *argv[])
 
     int   postfilt;
 
-    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0;
+    int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
+    FILE *flspmel = 0;
 
     MODEL prev_model;
     int dec;
@@ -141,6 +142,7 @@ int main(int argc, char *argv[])
         { "lpc", required_argument, &lpc_model, 1 },
         { "lspjnd", no_argument, &lspjnd, 1 },
         { "lspmel", no_argument, &lspmel, 1 },
+        { "lspmelread", required_argument, &lspmelread, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
@@ -252,6 +254,12 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
 	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
 	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "lspmelread") == 0) {
+	        if ((flspmel = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float lspmel file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -624,41 +632,35 @@ int main(int argc, char *argv[])
 		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
 
-                /* round to the nearest x hz */
-                #define MEL_ROUND 50
-		for(i=0; i<order; i++) {
-                    float x = floor(mel[i]/MEL_ROUND+0.5)*MEL_ROUND;
-                    mel[i] = x;
-                    //printf("mel[%d] = %f x: %f\n", i, mel[i], x);
-                }
-
-		for(i=1; i<order; i++) {
-		    if (mel[i] == mel[i-1]) {
-			mel[i]+=MEL_ROUND/2;
-			mel[i-1]-=MEL_ROUND/2;
-                        i = 1;
-                    }
-		}
+                #ifdef DUMP
+                dump_mel(mel, order);
+                #endif
 
  		encode_mels_scalar(mel_indexes, mel, 6);
                 #ifdef DUMP
                 dump_mel_indexes(mel_indexes, 6);
                 #endif
-		decode_mels_scalar(mel, mel_indexes, 6);
+		//decode_mels_scalar(mel, mel_indexes, 6);
                 
+                /* read in VQed lsp-mels from octave/melvq.m */
+
+                if (lspmelread) {
+                    int ret = fread(mel, sizeof(float), order, flspmel);
+                    assert(ret == order);
+                }
+                                
+                /* ensure no unstable filters after quantisation */
+
+                #define MEL_ROUND 50
 		for(i=1; i<order; i++) {
-		    if (mel[i] == mel[i-1]) {
+		    if (mel[i] <= mel[i-1]) {
 			mel[i]+=MEL_ROUND/2;
 			mel[i-1]-=MEL_ROUND/2;
                         i = 1;
                     }
 		}
-
-                #ifdef DUMP
-                dump_mel(mel, order);
-                #endif
-
-		for(i=0; i<LPC_ORD; i++) {
+                
+		for(i=0; i<order; i++) {
 		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}

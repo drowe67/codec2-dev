@@ -12,6 +12,11 @@
 1;
 
 % train up multi-stage VQ
+% ~/codec2-dev/build_linux/src$ sox -r 8000 -s -2 ../../wav/all.wav -t raw -r 8000 -s -2 - sinc 300 sinc -2600 | ./c2sim - --lpc 6 --lpcpf --lspmel --dump all  -o - | play -t raw -r 8000 -s -2 - vol 3
+%
+% octave:> load ../build_linux/src/all_mel.txt
+% octave:> melvq; vq = trainvq(all_mel, 64, 3);
+% octave:> save vq
 
 function vq = trainvq(training_data, Nvec, stages)
 
@@ -51,14 +56,15 @@ endfunction
 
 % Search multi-stage VQ, retaining m best candidates at each stage
 
-function [res ind] = mbest(vqset, input_vecs, m)
+function [res output_vecs ind] = mbest(vqset, input_vecs, m)
 
   [Nvec order stages] = size(vqset);
   [Ninput tmp] = size(input_vecs);
 
-  res = [];   % residual error after VQ
-  ind = [];   % index of vqs
-
+  res = [];         % residual error after VQ
+  output_vecs = []; % quantised ouput vectors
+  ind = [];         % index of vqs
+  
   for i=1:Ninput
   
     % first stage, find mbest candidates
@@ -105,26 +111,54 @@ function [res ind] = mbest(vqset, input_vecs, m)
 
     % final residual
     target(1,:) = input_vecs(i,:);
-    for v=1:s
+    out = zeros(1,order);
+    for v=1:stages
       target(1,:) -= vqset(cand_list(1,v+1),:,v);
+      out += vqset(cand_list(1,v+1),:,v);
     end
-    res = [res; target(1,:)];
-    ind = [ind; cand_list(1,2:1+stages)];
+    res  = [res; target(1,:)];
+    output_vecs  = [output_vecs; out];
+    ind  = [ind; cand_list(1,2:1+stages)];
   end
 
 endfunction
 
-more off;
-load "../build_linux/src/all_mel.txt"
-load vq;
-[res1 ind] = mbest(vq, all_mel(1,:),3);
-mean(std(res1))
 
-% save text file of "vq quantised mels"
-% load back into c2sim at run time
-% train on continuous mels
-% sorting/stability
-% see how it sounds
-% Goal is to get VQ sounding OK, similar to UQ at 20 or 40ms dec,
-% sig better than current 700
-% analysis of data, outliers, different training
+% Quantises a set of msl-lsps and saves back to disk so they can be read in by c2sim
+% assumes we have a vq saved to disk called vq
+%
+% ~/codec2-dev/build_linux/src$ sox -r 8000 -s -2 ../../wav/vk5qi.wav -t raw -r 8000 -s -2 - sinc 300 sinc -2600 | ./c2sim - --lpc 6 --lpcpf --lspmel --dump vk5qi  -o - | play -t raw -r 8000 -s -2 - vol 3
+%
+% octave:> test_run("vk5qi")
+%
+% ~/codec2-dev/build_linux/src$ sox -r 8000 -s -2 ../../wav/vk5qi.wav -t raw -r 8000 -s -2 - sinc 300 sinc -2600 | ./c2sim - --lpc 6 --lpcpf --phase0 --dec 4 --postfilter --lspmel --lspmelread ../../octave/vk5qi_mel_.out -o - | play -t raw -r 8000 -s -2 - vol 3
+
+function ind = test_run(samplename)
+
+  more off;
+  input_vecs_name = sprintf("../build_linux/src/%s_mel.txt", samplename);
+  input_vecs_name
+  mel = load(input_vecs_name);
+  load vq;
+  [res mel_ ind] = mbest(vq, mel, 5);
+  mean(std(res))
+
+  output_vecs_name = sprintf("%s_mel_.out", samplename);
+  fmel_ = fopen(output_vecs_name,"wb"); 
+  [r c] = size(mel_);
+  for i=1:r
+    fwrite(fmel_, mel_(i,:), "float32"); 
+  end
+  fclose(fmel_);
+end
+
+ind = test_run("all")
+
+% [X] save text file of "vq quantised mels"
+% [X] load back into c2sim at run time
+% [X] train on continuous mels
+% [X] sorting/stability
+% [X] see how it sounds
+% [X] Goal is to get VQ sounding OK, similar to UQ at 20 or 40ms dec,
+% [X] sig better than current 700
+% [X] check all indexes used with hist
