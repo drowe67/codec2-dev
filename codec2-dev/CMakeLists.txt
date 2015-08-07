@@ -99,6 +99,7 @@ endif(MINGW)
 #
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
+# Unittest should be on for dev builds and off for releases.
 option(UNITTEST "Build unittest binaries." ON)
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)

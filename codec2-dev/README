@@ -32,8 +32,7 @@ I understand the arguments, but am content with SVN for now.
 Quickstart
 ----------
 
-NOTE: Use the "codec2" or "codec2-dev" depending on which repository
-      you are working with
+Refer to INSTALL for more general building and installing instructions.
 
 NOTE: You may not have the necessary speex libraries installed. Some
       distributions may have packages available 
@@ -42,7 +41,7 @@ NOTE: You may not have the necessary speex libraries installed. Some
 
 1/ Listen to Codec 2:
 
-   $ cd codec2
+   $ cd codec2-dev
    $ mkdir build_linux
    $ cd build_linux
    $ cmake ..
