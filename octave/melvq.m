@@ -152,7 +152,11 @@ function ind = test_run(samplename)
   fclose(fmel_);
 end
 
-ind = test_run("all")
+ind = test_run("cq_ref");
+
+%load "../build_linux/src/all_mel.txt"
+%vq = trainvq(all_mel, 64, 3);
+%save vq;
 
 % [X] save text file of "vq quantised mels"
 % [X] load back into c2sim at run time

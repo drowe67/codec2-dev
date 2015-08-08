@@ -23,9 +23,9 @@ function write_c_array(filename, arrayname, vec)
   fclose(f);
 endfunction
 
-b=firls(100,[0 400 500 2400 2600 4000]/4000,[0.01 0.01 1 1 0.01 0.01]);
+b=firls(100,[0 250 300 2600 2700 4000]/4000,[0.01 0.01 1 1 0.01 0.01]);
 freqz(b)
-write_c_array("../src/bpf.h", "bpf", b)
+write_c_array("../src/bpfb.h", "bpfb", b)
 
 % C header file of noise samples so C version gives extacly the same results
 

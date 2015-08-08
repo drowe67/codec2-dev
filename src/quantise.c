@@ -136,6 +136,8 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
    return(besti);
 }
 
+
+
 /*---------------------------------------------------------------------------*\
 									      
   encode_lspds_scalar()
@@ -197,6 +199,7 @@ void encode_lspds_scalar(
     }
 
 }
+
 
 void decode_lspds_scalar(
 		 float lsp_[], 
@@ -528,6 +531,46 @@ void lspjvm_quantise(float *x, float *xq, int order)
   {
     xq[2*i] += codebook2[order*n2/2+i];
     xq[2*i+1] += codebook3[order*n3/2+i];
+  }
+}
+
+
+/* simple (non mbest) 6th order LSP MEL VQ quantiser */
+
+void lspmelvq_quantise(float *x, float *xq, int order)
+{
+  int i, n1, n2, n3;
+  float err[order], err2[order], err3[order];
+  float w[order], w2[order], w3[order];
+  const float *codebook1 = lspmelvq_cb[0].cb;
+  const float *codebook2 = lspmelvq_cb[1].cb;
+  const float *codebook3 = lspmelvq_cb[2].cb;
+  float tmp[order];
+
+  assert(order == lspmelvq_cb[0].k);
+
+  n1 = find_nearest(codebook1, lspmelvq_cb[0].m, x, order);
+  
+  for (i=0; i<order; i++) {
+    tmp[i] = codebook1[order*n1+i];
+    err[i] = x[i] - tmp[i];
+  }
+  
+  n2 = find_nearest(codebook2, lspmelvq_cb[1].m, err, order);
+
+  for (i=0; i<order; i++) {
+    tmp[i] += codebook2[order*n2+i];
+    err[i] = x[i] - tmp[i];
+  }
+
+  n3 = find_nearest(codebook3, lspmelvq_cb[2].m, err, order);
+
+  for (i=0; i<order; i++) {
+    tmp[i] += codebook3[order*n3+i];
+  }
+  
+  for (i=0; i<order; i++) {
+      xq[i] = tmp[i];
   }
 }
 

@@ -49,6 +49,7 @@
 #include "ampexp.h"
 #include "phaseexp.h"
 #include "bpf.h"
+#include "bpfb.h"
 
 void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -66,6 +67,7 @@ int main(int argc, char *argv[])
     FILE *fin;		/* input speech file                     */
     short buf[N];	/* input/output buffer                   */
     float buf_float[N];
+    float buf_float_bpf[N];
     float Sn[M];	/* float input speech samples            */
     float Sn_pre[N];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
@@ -89,7 +91,7 @@ int main(int argc, char *argv[])
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
-    int lspjvm = 0, lspjnd = 0, lspmel = 0;
+    int lspjvm = 0, lspjnd = 0, lspmel = 0, lspmelvq = 0;
     #ifdef __EXPERIMENTAL__
     int lspanssi = 0, 
     #endif
@@ -103,6 +105,7 @@ int main(int argc, char *argv[])
     float ex_phase[MAX_AMP+1];
 
     int   postfilt;
+    float bg_est = 0.0;
 
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
     int   lpcpf = 0;
@@ -135,6 +138,7 @@ int main(int argc, char *argv[])
     struct AEXP *aexp = NULL;
     float gain = 1.0;
     int   bpf_en = 0;
+    int   bpfb_en = 0;
     float bpf_buf[BPF_N+N];
 
     char* opt_string = "ho:";
@@ -143,6 +147,7 @@ int main(int argc, char *argv[])
         { "lspjnd", no_argument, &lspjnd, 1 },
         { "lspmel", no_argument, &lspmel, 1 },
         { "lspmelread", required_argument, &lspmelread, 1 },
+        { "lspmelvq", required_argument, &lspmelvq, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
@@ -167,6 +172,7 @@ int main(int argc, char *argv[])
         { "rate", required_argument, NULL, 0 },
         { "gain", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
+        { "bpfb", no_argument, &bpfb_en, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -373,6 +379,8 @@ int main(int argc, char *argv[])
     if (ampexp)
 	aexp = amp_experiment_create();
 
+    if (bpfb_en)
+        bpf_en = 1;
     if (bpf_en) {
         for(i=0; i<BPF_N; i++)
             bpf_buf[i] = 0.0;
@@ -411,20 +419,30 @@ int main(int argc, char *argv[])
         }
          
         if (bpf_en) {
+            /* filter input speech to create buf_float_bpf[], this is fed to the 
+               LPC modelling.  Unfiltered speech in in buf_float[], which is
+               delayed to match that of the BPF */
+
+            /* BPF speech */
+
             for(i=0; i<BPF_N; i++)
                 bpf_buf[i] =  bpf_buf[N+i];
             for(i=0; i<N; i++)
                 bpf_buf[BPF_N+i] = buf_float[i];
-            inverse_filter(&bpf_buf[BPF_N], bpf, N, buf_float, BPF_N);
-       }
+            if (bpfb_en)
+                inverse_filter(&bpf_buf[BPF_N], bpfb, N, buf_float, BPF_N);
+            else
+                inverse_filter(&bpf_buf[BPF_N], bpf, N, buf_float, BPF_N);
+        }
 
         /* shift buffer of input samples, and insert new samples */
 
 	for(i=0; i<M-N; i++) {
 	    Sn[i] = Sn[i+N];
 	}
-	for(i=0; i<N; i++)
+	for(i=0; i<N; i++) {
 	    Sn[i+M-N] = buf_float[i];
+        }
 
 	/*------------------------------------------------------------*\
 
@@ -505,7 +523,7 @@ int main(int argc, char *argv[])
 
 	    for(i=0; i<=MAX_AMP; i++)
 	    	model.phi[i] = 0;
-	
+	    
             /* Determine DFT of A(exp(jw)), which is needed for phase0 model when
                LPC is not used, e.g. indecimate=1 (10ms) frames with no LPC */
 
@@ -649,11 +667,15 @@ int main(int argc, char *argv[])
                     assert(ret == order);
                 }
                                 
+                if (lspmelvq) {
+                    lspmelvq_quantise(mel, mel, 6);
+                }
+
                 /* ensure no unstable filters after quantisation */
 
-                #define MEL_ROUND 50
+                #define MEL_ROUND 10
 		for(i=1; i<order; i++) {
-		    if (mel[i] <= mel[i-1]) {
+		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
 			mel[i]+=MEL_ROUND/2;
 			mel[i-1]-=MEL_ROUND/2;
                         i = 1;
@@ -738,6 +760,8 @@ int main(int argc, char *argv[])
 
                 if (phase0)
                     phase_synth_zero_order(fft_fwd_cfg, &model_dec[i], ex_phase, Aw);	
+                if (postfilt)
+                    postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
             }
@@ -785,11 +809,12 @@ int main(int argc, char *argv[])
 	fclose(fvoicing);
 
     nlp_destroy(nlp_states);
-
+    
     return 0;
 }
-
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain)
+                
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], 
+                     float Pn[], int prede, float *de_mem, float gain)
 {
     int     i;
 

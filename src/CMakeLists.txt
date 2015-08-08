@@ -34,48 +34,10 @@ set(CODEBOOKSD
     ${D}/dlsp10.txt
 )
 
-# lspd VQ quantisers
-
-set(CODEBOOKSVQ
-    ${D}/lsp1.txt
-    ${D}/lsp2.txt
-    ${D}/lsp3.txt
-    ${D}/lsp4.txt
-    ${CMAKE_SOURCE_DIR}/unittest/lsp45678910.txt
-)
-
-set(CODEBOOKSJND
-    ${D}/lsp1.txt
-    ${D}/lsp2.txt
-    ${D}/lsp3.txt
-    ${D}/lsp4.txt
-    ${CMAKE_SOURCE_DIR}/unittest/lspjnd5-10.txt
-)
-
-set(CODEBOOKSDT
-    ${D}/lspdt1.txt
-    ${D}/lspdt2.txt
-    ${D}/lspdt3.txt
-    ${D}/lspdt4.txt
-    ${D}/lspdt5.txt
-    ${D}/lspdt6.txt
-    ${D}/lspdt7.txt
-    ${D}/lspdt8.txt
-    ${D}/lspdt9.txt
-    ${D}/lspdt10.txt
-)
-
 set(CODEBOOKSJVM
     ${D}/lspjvm1.txt
     ${D}/lspjvm2.txt
     ${D}/lspjvm3.txt
-)
-
-set(CODEBOOKSVQANSSI
-    ${D}/lspvqanssi1.txt
-    ${D}/lspvqanssi2.txt
-    ${D}/lspvqanssi3.txt
-    ${D}/lspvqanssi4.txt
 )
 
 set(CODEBOOKSMEL
@@ -85,6 +47,12 @@ set(CODEBOOKSMEL
     ${D}/mel4.txt
     ${D}/mel5.txt
     ${D}/mel6.txt
+)
+
+set(CODEBOOKSLSPMELVQ
+    ${D}/lspmelvq1.txt
+    ${D}/lspmelvq2.txt
+    ${D}/lspmelvq3.txt
 )
 
 set(CODEBOOKSGE ${D}/gecb.txt)
@@ -129,27 +97,6 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSD}
 )
 
-# codebookdt.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookdt.c
-    COMMAND generate_codebook lsp_cbdt ${CODEBOOKSDT} > ${CMAKE_CURRENT_BINARY_DIR}/codebookdt.c
-    DEPENDS generate_codebook ${CODEBOOKSDT}
-)
-
-# codebookvq.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookvq.c
-    COMMAND generate_codebook lsp_cbvq ${CODEBOOKSVQ} > ${CMAKE_CURRENT_BINARY_DIR}/codebookvq.c
-    DEPENDS generate_codebook ${CODEBOOKSVQ}
-)
-
-# codebookjnd.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjnd.c
-    COMMAND generate_codebook lsp_cbjnd ${CODEBOOKSJND} > ${CMAKE_CURRENT_BINARY_DIR}/codebookjnd.c
-    DEPENDS generate_codebook ${CODEBOOKSJND}
-)
-
 # codebookjvm.c
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookjvm.c
@@ -157,18 +104,19 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSJVM}
 )
 
-# codebookvqanssi.c
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookvqanssi.c
-    COMMAND generate_codebook lsp_cbvqanssi ${CODEBOOKSVQANSSI} > ${CMAKE_CURRENT_BINARY_DIR}/codebookvqanssi.c
-    DEPENDS generate_codebook ${CODEBOOKSVQANSSI}
-)
 
 # codebookmel.c
 add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
     COMMAND generate_codebook mel_cb ${CODEBOOKSMEL} > ${CMAKE_CURRENT_BINARY_DIR}/codebookmel.c
     DEPENDS generate_codebook ${CODEBOOKSMEL}
+)
+
+# codebooklspmelvq.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
+    COMMAND generate_codebook lspmelvq_cb ${CODEBOOKSLSPMELVQ} > ${CMAKE_CURRENT_BINARY_DIR}/codebooklspmelvq.c
+    DEPENDS generate_codebook ${CODEBOOKSLSPMELVQ}
 )
 
 # codebookge.c
@@ -202,12 +150,9 @@ set(CODEC2_SRCS
     pack.c
     codebook.c
     codebookd.c
-    codebookvq.c
-    codebookjnd.c
     codebookjvm.c
-    codebookvqanssi.c
-    codebookdt.c
     codebookmel.c
+    codebooklspmelvq.c
     codebookge.c
     golay23.c
     freedv_api.c
