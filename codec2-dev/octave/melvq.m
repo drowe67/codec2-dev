@@ -152,7 +152,7 @@ function ind = test_run(samplename)
   fclose(fmel_);
 end
 
-ind = test_run("cq_ref");
+ind = test_run("vk5qi");
 
 %load "../build_linux/src/all_mel.txt"
 %vq = trainvq(all_mel, 64, 3);
