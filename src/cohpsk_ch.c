@@ -45,7 +45,7 @@
 
 #include "codec2_cohpsk.h"
 #include "comp_prim.h"
-#include "../unittest/noise_samples.h"
+#include "noise_samples.h"
 #include "ht_coeff.h"
 #include "ssbfilt_coeff.h"
 #include "codec2_fdmdv.h"
