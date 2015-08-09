@@ -535,22 +535,22 @@ void lspjvm_quantise(float *x, float *xq, int order)
 }
 
 
-/* simple (non mbest) 6th order LSP MEL VQ quantiser */
+/* simple (non mbest) 6th order LSP MEL VQ quantiser.  Returns MSE of result */
 
-void lspmelvq_quantise(float *x, float *xq, int order)
+float lspmelvq_quantise(float *x, float *xq, int order)
 {
   int i, n1, n2, n3;
-  float err[order], err2[order], err3[order];
-  float w[order], w2[order], w3[order];
+  float err[order];
   const float *codebook1 = lspmelvq_cb[0].cb;
   const float *codebook2 = lspmelvq_cb[1].cb;
   const float *codebook3 = lspmelvq_cb[2].cb;
   float tmp[order];
+  float mse;
 
   assert(order == lspmelvq_cb[0].k);
 
   n1 = find_nearest(codebook1, lspmelvq_cb[0].m, x, order);
-  
+
   for (i=0; i<order; i++) {
     tmp[i] = codebook1[order*n1+i];
     err[i] = x[i] - tmp[i];
@@ -565,16 +565,19 @@ void lspmelvq_quantise(float *x, float *xq, int order)
 
   n3 = find_nearest(codebook3, lspmelvq_cb[2].m, err, order);
 
+  mse = 0.0;
   for (i=0; i<order; i++) {
     tmp[i] += codebook3[order*n3+i];
+    err[i] = x[i] - tmp[i];
+    mse += err[i]*err[i];
   }
   
   for (i=0; i<order; i++) {
       xq[i] = tmp[i];
   }
+ 
+  return mse;
 }
-
-#ifdef __EXPERIMENTAL__
 
 #define MBEST_STAGES 4
 
@@ -649,11 +652,11 @@ static void mbest_insert(struct MBEST *mbest, int index[], float error) {
 static void mbest_print(char title[], struct MBEST *mbest) {
     int i,j;
     
-    printf("%s\n", title);
+    fprintf(stderr, "%s\n", title);
     for(i=0; i<mbest->entries; i++) {
 	for(j=0; j<MBEST_STAGES; j++)
-	    printf("  %4d ", mbest->list[i].index[j]);
-	printf(" %f\n", mbest->list[i].error);
+	    fprintf(stderr, "  %4d ", mbest->list[i].index[j]);
+	fprintf(stderr, " %f\n", mbest->list[i].error);
     }
 }
 
@@ -693,37 +696,32 @@ static void mbest_search(
 }
 
 
-/* 3 stage VQ LSP quantiser.  Design and guidance kindly submitted by Anssi, OH3GDD */
+/* 3 stage VQ LSP quantiser useing mbest search.  Design and guidance kindly submitted by Anssi, OH3GDD */
 
-void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
+float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries)
 {
-  int i, j, n1, n2, n3, n4;
-  float w[LPC_ORD];
-  const float *codebook1 = lsp_cbvqanssi[0].cb;
-  const float *codebook2 = lsp_cbvqanssi[1].cb;
-  const float *codebook3 = lsp_cbvqanssi[2].cb;
-  const float *codebook4 = lsp_cbvqanssi[3].cb;
-  struct MBEST *mbest_stage1, *mbest_stage2, *mbest_stage3, *mbest_stage4;
-  float target[LPC_ORD];
+  int i, j, n1, n2, n3;
+  const float *codebook1 = lspmelvq_cb[0].cb;
+  const float *codebook2 = lspmelvq_cb[1].cb;
+  const float *codebook3 = lspmelvq_cb[2].cb;
+  struct MBEST *mbest_stage1, *mbest_stage2, *mbest_stage3;
+  float target[ndim];
+  float w[ndim];
   int   index[MBEST_STAGES];
+  float mse, tmp;
 
+  for(i=0; i<ndim; i++)
+      w[i] = 1.0;
   mbest_stage1 = mbest_create(mbest_entries);
   mbest_stage2 = mbest_create(mbest_entries);
   mbest_stage3 = mbest_create(mbest_entries);
-  mbest_stage4 = mbest_create(mbest_entries);
   for(i=0; i<MBEST_STAGES; i++)
       index[i] = 0;
   
-  compute_weights_anssi_mode2(x, w, ndim);
-
-  #ifdef DUMP
-  dump_weights(w, ndim);
-  #endif
-
   /* Stage 1 */
 
-  mbest_search(codebook1, x, w, ndim, lsp_cbvqanssi[0].m, mbest_stage1, index);
-  mbest_print("Stage 1:", mbest_stage1);
+  mbest_search(codebook1, x, w, ndim, lspmelvq_cb[0].m, mbest_stage1, index);
+  //mbest_print("Stage 1:", mbest_stage1);
 
   /* Stage 2 */
 
@@ -731,9 +729,9 @@ void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
       index[1] = n1 = mbest_stage1->list[j].index[0];
       for(i=0; i<ndim; i++)
 	  target[i] = x[i] - codebook1[ndim*n1+i];
-      mbest_search(codebook2, target, w, ndim, lsp_cbvqanssi[1].m, mbest_stage2, index);      
+      mbest_search(codebook2, target, w, ndim, lspmelvq_cb[1].m, mbest_stage2, index);      
   }
-  mbest_print("Stage 2:", mbest_stage2);
+  //mbest_print("Stage 2:", mbest_stage2);
 
   /* Stage 3 */
 
@@ -742,35 +740,27 @@ void lspanssi_quantise(float *x, float *xq, int ndim, int mbest_entries)
       index[1] = n2 = mbest_stage2->list[j].index[0];
       for(i=0; i<ndim; i++)
 	  target[i] = x[i] - codebook1[ndim*n1+i] - codebook2[ndim*n2+i];
-      mbest_search(codebook3, target, w, ndim, lsp_cbvqanssi[2].m, mbest_stage3, index);      
+      mbest_search(codebook3, target, w, ndim, lspmelvq_cb[2].m, mbest_stage3, index);      
   }
-  mbest_print("Stage 3:", mbest_stage3);
+  //mbest_print("Stage 3:", mbest_stage3);
 
-  /* Stage 4 */
-
-  for (j=0; j<mbest_entries; j++) {
-      index[3] = n1 = mbest_stage3->list[j].index[2];
-      index[2] = n2 = mbest_stage3->list[j].index[1];
-      index[1] = n3 = mbest_stage3->list[j].index[0];
-      for(i=0; i<ndim; i++)
-	  target[i] = x[i] - codebook1[ndim*n1+i] - codebook2[ndim*n2+i] - codebook3[ndim*n3+i];
-      mbest_search(codebook4, target, w, ndim, lsp_cbvqanssi[3].m, mbest_stage4, index);      
+  n1 = mbest_stage3->list[0].index[2];
+  n2 = mbest_stage3->list[0].index[1];
+  n3 = mbest_stage3->list[0].index[0];
+  mse = 0.0;
+  for (i=0;i<ndim;i++) {
+      tmp = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i];
+      mse += (x[i]-tmp)*(x[i]-tmp);
+      xq[i] = tmp;
   }
-  mbest_print("Stage 4:", mbest_stage4);
-
-  n1 = mbest_stage4->list[0].index[3];
-  n2 = mbest_stage4->list[0].index[2];
-  n3 = mbest_stage4->list[0].index[1];
-  n4 = mbest_stage4->list[0].index[0];
-  for (i=0;i<ndim;i++)
-      xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i] + codebook4[ndim*n4+i];
 
   mbest_destroy(mbest_stage1);
   mbest_destroy(mbest_stage2);
   mbest_destroy(mbest_stage3);
-  mbest_destroy(mbest_stage4);
+  
+  return mse;
 }
-#endif
+
 
 int check_lsp_order(float lsp[], int order)
 {

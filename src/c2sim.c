@@ -140,14 +140,15 @@ int main(int argc, char *argv[])
     int   bpf_en = 0;
     int   bpfb_en = 0;
     float bpf_buf[BPF_N+N];
-
+    float lspmelvq_mse = 0.0;
+    
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "lpc", required_argument, &lpc_model, 1 },
         { "lspjnd", no_argument, &lspjnd, 1 },
         { "lspmel", no_argument, &lspmel, 1 },
         { "lspmelread", required_argument, &lspmelread, 1 },
-        { "lspmelvq", required_argument, &lspmelvq, 1 },
+        { "lspmelvq", no_argument, &lspmelvq, 1 },
         { "lsp", no_argument, &lsp, 1 },
         { "lspd", no_argument, &lspd, 1 },
         { "lspvq", no_argument, &lspvq, 1 },
@@ -649,11 +650,11 @@ int main(int argc, char *argv[])
 		    f = (4000.0/PI)*lsps[i];
 		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
-
+                
                 #ifdef DUMP
                 dump_mel(mel, order);
                 #endif
-
+                
  		encode_mels_scalar(mel_indexes, mel, 6);
                 #ifdef DUMP
                 dump_mel_indexes(mel_indexes, 6);
@@ -661,18 +662,24 @@ int main(int argc, char *argv[])
 		//decode_mels_scalar(mel, mel_indexes, 6);
                 
                 /* read in VQed lsp-mels from octave/melvq.m */
-
+           
                 if (lspmelread) {
-                    int ret = fread(mel, sizeof(float), order, flspmel);
+                    float mel_[order];
+                    int ret = fread(mel_, sizeof(float), order, flspmel);
                     assert(ret == order);
+                    for(i=0; i<order; i++) {
+                        lspmelvq_mse += pow(mel[i] - mel_[i], 2.0);
+                        mel[i] = mel_[i];
+                    }
                 }
-                                
+                
                 if (lspmelvq) {
-                    lspmelvq_quantise(mel, mel, 6);
+                    //lspmelvq_mse += lspmelvq_quantise(mel, mel, order);
+                    lspmelvq_mse += lspmelvq_mbest_quantise(mel, mel, order, 5);
                 }
-
+        
                 /* ensure no unstable filters after quantisation */
-
+        
                 #define MEL_ROUND 10
 		for(i=1; i<order; i++) {
 		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
@@ -681,22 +688,23 @@ int main(int argc, char *argv[])
                         i = 1;
                     }
 		}
-                
+        
 		for(i=0; i<order; i++) {
 		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}
- 
+                
 		lsp_to_lpc(lsps_, ak, order);
+                
 	    }
-	
+                
 	    if (scalar_quant_Wo_e) {
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
                 model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
-
+                
 	    if (vector_quant_Wo_e) {
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
@@ -725,7 +733,7 @@ int main(int argc, char *argv[])
         for(i=0; i<decimate-1; i++)
             model_dec[i] = model_dec[i+1];
         model_dec[decimate-1] = model;
-
+                
         if ((frames % decimate) == 0) {
             for(i=0; i<order; i++)
                 lsps_dec[decimate-1][i] = lsps_[i];
@@ -765,13 +773,7 @@ int main(int argc, char *argv[])
                 synth_one_frame(fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
             }
-                    /*
-            for(i=0; i<decimate; i++) {
-                    printf("%d Wo: %f L: %d v: %d\n", frames, model_dec[i].Wo, model_dec[i].L, model_dec[i].voiced);
-            }
-            if (frames == 4*50)
-                exit(0);
-                    */
+
             /* update memories for next frame ----------------------------*/
 
             prev_model_dec = model_dec[decimate-1];
@@ -781,7 +783,7 @@ int main(int argc, char *argv[])
        }
 
     }
-
+                
     /*----------------------------------------------------------------*\
 
                             End Main Loop
@@ -789,12 +791,15 @@ int main(int argc, char *argv[])
     \*----------------------------------------------------------------*/
 
     fclose(fin);
-
+                
     if (fout != NULL)
 	fclose(fout);
 
-    if (lpc_model)
+    if (lpc_model) {
     	fprintf(stderr, "SNR av = %5.2f dB\n", sum_snr/frames);
+        if (lspmelvq || lspmelread)
+            fprintf(stderr, "lspmelvq std = %3.1f Hz\n", sqrt(lspmelvq_mse/frames));
+    }
 
     if (phaseexp)
 	phase_experiment_destroy(pexp);

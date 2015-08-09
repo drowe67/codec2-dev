@@ -90,7 +90,8 @@ void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
 void lspanssi_quantise(float lsps[], float lsps_[], int order, int mbest_entries);
-void lspmelvq_quantise(float *x, float *xq, int order);
+float lspmelvq_quantise(float *x, float *xq, int order);
+float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries);
 
 void encode_mels_scalar(int mel_indexes[], float mels[], int order);
 void decode_mels_scalar(float mels[], int mel_indexes[], int order);
