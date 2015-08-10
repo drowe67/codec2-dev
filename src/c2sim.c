@@ -128,6 +128,7 @@ int main(int argc, char *argv[])
     void *nlp_states;
     float hpf_states[2];
     int   scalar_quant_Wo_e = 0;
+    int   scalar_quant_Wo_e_low = 0;
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
     FILE *fjvm = NULL;
@@ -169,6 +170,7 @@ int main(int argc, char *argv[])
         { "prede", no_argument, &prede, 1 },
         { "dump_pitch_e", required_argument, &dump_pitch_e, 1 },
         { "sq_pitch_e", no_argument, &scalar_quant_Wo_e, 1 },
+        { "sq_pitch_e_low", no_argument, &scalar_quant_Wo_e_low, 1 },
         { "vq_pitch_e", no_argument, &vector_quant_Wo_e, 1 },
         { "rate", required_argument, NULL, 0 },
         { "gain", required_argument, NULL, 0 },
@@ -674,8 +676,9 @@ int main(int argc, char *argv[])
                 }
                 
                 if (lspmelvq) {
+                    int indexes[3];
                     //lspmelvq_mse += lspmelvq_quantise(mel, mel, order);
-                    lspmelvq_mse += lspmelvq_mbest_quantise(mel, mel, order, 5);
+                    lspmelvq_mse += lspmelvq_mbest_encode(indexes, mel, mel, order, 5);
                 }
         
                 /* ensure no unstable filters after quantisation */
@@ -702,6 +705,13 @@ int main(int argc, char *argv[])
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
                 model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
+		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
+	    }
+                
+	    if (scalar_quant_Wo_e_low) {
+                int ind;
+		e = decode_energy(ind = encode_energy(e, 3), 3);
+                model.Wo = decode_log_Wo(encode_log_Wo(model.Wo, 5), 5);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
                 
@@ -869,6 +879,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 		}
 		fprintf(stderr, "\t--%s%s\n", long_options[i].name, option_parameters);
 	}
+
 	exit(1);
 }
 

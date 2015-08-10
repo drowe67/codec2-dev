@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     int            bit, byte,i;
 
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700 InputRawspeechFile OutputBitFile [--natural] [--softdec]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B InputRawspeechFile OutputBitFile [--natural] [--softdec]\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
@@ -66,8 +66,10 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_1200;
     else if (strcmp(argv[1],"700") == 0)
 	mode = CODEC2_MODE_700;
+    else if (strcmp(argv[1],"700B") == 0)
+	mode = CODEC2_MODE_700B;
     else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200 or 700\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700 or 700B\n", argv[1]);
 	exit(1);
     }
 
