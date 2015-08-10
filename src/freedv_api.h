@@ -39,6 +39,7 @@
 
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_700         1
+#define FREEDV_MODE_700B        2
 
 struct freedv;
 
