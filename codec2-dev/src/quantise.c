@@ -69,6 +69,10 @@ int mel_bits(int i) {
     return mel_cb[i].log2m;
 }
 
+int lspmelvq_cb_bits(int i) {
+    return lspmelvq_cb[i].log2m;
+}
+
 #ifdef __EXPERIMENTAL__
 int lspdt_bits(int i) {
     return lsp_cbdt[i].log2m;
@@ -698,7 +702,7 @@ static void mbest_search(
 
 /* 3 stage VQ LSP quantiser useing mbest search.  Design and guidance kindly submitted by Anssi, OH3GDD */
 
-float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries)
+float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest_entries)
 {
   int i, j, n1, n2, n3;
   const float *codebook1 = lspmelvq_cb[0].cb;
@@ -712,6 +716,7 @@ float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries)
 
   for(i=0; i<ndim; i++)
       w[i] = 1.0;
+  
   mbest_stage1 = mbest_create(mbest_entries);
   mbest_stage2 = mbest_create(mbest_entries);
   mbest_stage3 = mbest_create(mbest_entries);
@@ -757,8 +762,24 @@ float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries)
   mbest_destroy(mbest_stage1);
   mbest_destroy(mbest_stage2);
   mbest_destroy(mbest_stage3);
-  
+
+  indexes[0] = n1; indexes[1] = n2; indexes[2] = n3;
+
   return mse;
+}
+
+
+void lspmelvq_decode(int *indexes, float *xq, int ndim)
+{
+  int i, n1, n2, n3;
+  const float *codebook1 = lspmelvq_cb[0].cb;
+  const float *codebook2 = lspmelvq_cb[1].cb;
+  const float *codebook3 = lspmelvq_cb[2].cb;
+
+  n1 = indexes[0]; n2 = indexes[1]; n3 = indexes[2];
+  for (i=0;i<ndim;i++) {
+      xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i];
+  }
 }
 
 

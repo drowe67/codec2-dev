@@ -91,7 +91,9 @@ void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
 void lspanssi_quantise(float lsps[], float lsps_[], int order, int mbest_entries);
 float lspmelvq_quantise(float *x, float *xq, int order);
-float lspmelvq_mbest_quantise(float *x, float *xq, int ndim, int mbest_entries);
+
+float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest_entries);
+void lspmelvq_decode(int *indexes, float *xq, int ndim);
 
 void encode_mels_scalar(int mel_indexes[], float mels[], int order);
 void decode_mels_scalar(float mels[], int mel_indexes[], int order);
@@ -113,6 +115,7 @@ int lspd_bits(int i);
 int lspdt_bits(int i);
 int lsp_pred_vq_bits(int i);
 int mel_bits(int i);
+int lspmelvq_cb_bits(int i);
 
 void apply_lpc_correction(MODEL *model);
 float speech_to_uq_lsps(float lsp[],
