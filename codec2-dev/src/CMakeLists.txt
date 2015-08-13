@@ -172,7 +172,7 @@ set(CODEC2_PUBLIC_HEADERS
     kiss_fft.h
     freedv_api.h
     varicode.h
-
+    freedv_api_internal.h
 )
 
 #
