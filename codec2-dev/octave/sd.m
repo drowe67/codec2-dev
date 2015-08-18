@@ -13,9 +13,9 @@ function sd(raw_filename, dump_file_prefix, f)
   ak2_filename = sprintf("%s_ak_.txt", dump_file_prefix);
   ak1 = load(ak1_filename);
   ak2 = load(ak2_filename);
-
-  [ak1_r, ak1_c] = size(ak1);
-  [ak2_r, ak2_c] = size(ak1);
+  
+  [ak1_r, ak1_c] = size(ak1)
+  [ak2_r, ak2_c] = size(ak2)
 
   frames = max([ak1_r ak2_r]); printf("%d frames\n", frames);
   sd = zeros(1,frames);
@@ -84,7 +84,7 @@ function sd(raw_filename, dump_file_prefix, f)
   title('Average error across spectrum')
 
   mel_indexes_filename = sprintf("%s_mel_indexes.txt", dump_file_prefix);
-  if file_in_path(".", mel_indexes_filename)
+  if 0 %file_in_path(".", mel_indexes_filename)
     mel_indexes = load(mel_indexes_filename);
     figure(6)
     bins = [15, 7, 15, 7, 7, 7];
@@ -126,7 +126,7 @@ function sd(raw_filename, dump_file_prefix, f)
     end
 
     printf("\n");
-    for l=1:6
+    for l=1:10
         plot([lsp1(fr,l)*4000/pi lsp1(fr,l)*4000/pi], [0  -10], 'r');
         plot([lsp2(fr,l)*4000/pi lsp2(fr,l)*4000/pi], [-10 -20], 'b');
         plot([mel(fr,l) mel(fr,l)], [0 10], 'g');

@@ -124,7 +124,7 @@ function [res output_vecs ind] = mbest(vqset, input_vecs, m)
 endfunction
 
 
-% Quantises a set of msl-lsps and saves back to disk so they can be read in by c2sim
+% Quantises a set of mel-lsps and saves back to disk so they can be read in by c2sim
 % assumes we have a vq saved to disk called vq
 %
 % ~/codec2-dev/build_linux/src$ sox -r 8000 -s -2 ../../wav/vk5qi.wav -t raw -r 8000 -s -2 - sinc 300 sinc -2600 | ./c2sim - --lpc 6 --lpcpf --lspmel --dump vk5qi  -o - | play -t raw -r 8000 -s -2 - vol 3
@@ -152,7 +152,7 @@ function ind = test_run(samplename)
   fclose(fmel_);
 end
 
-ind = test_run("vk5qi");
+ind = test_run("hts1a");
 
 %load "../build_linux/src/all_mel.txt"
 %vq = trainvq(all_mel, 64, 3);
