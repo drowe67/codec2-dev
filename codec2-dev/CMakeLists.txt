@@ -5,7 +5,7 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
-project(codec2)
+project(codec2 C)
 
 cmake_minimum_required(VERSION 2.8)
 
