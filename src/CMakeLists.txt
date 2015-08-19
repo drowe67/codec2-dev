@@ -168,6 +168,7 @@ set(CODEC2_PUBLIC_HEADERS
     codec2_fm.h
     codec2_fifo.h
     comp.h
+    comp_prim.h
     modem_stats.h
     kiss_fft.h
     freedv_api.h
