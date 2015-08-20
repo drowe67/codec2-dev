@@ -142,7 +142,9 @@ int main(int argc, char *argv[])
     int   bpfb_en = 0;
     float bpf_buf[BPF_N+N];
     float lspmelvq_mse = 0.0;
-    
+    int   amread;
+    FILE *fam;
+
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "lpc", required_argument, &lpc_model, 1 },
@@ -176,6 +178,7 @@ int main(int argc, char *argv[])
         { "gain", required_argument, NULL, 0 },
         { "bpf", no_argument, &bpf_en, 1 },
         { "bpfb", no_argument, &bpfb_en, 1 },
+        { "amread", required_argument, &amread, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -269,6 +272,12 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "lspmelread") == 0) {
 	        if ((flspmel = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening float lspmel file: %s: %s.\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "amread") == 0) {
+	        if ((fam = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float Am file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -645,14 +654,23 @@ int main(int argc, char *argv[])
 
 	    if (lspmel) {
 		float f, f_;
-		float mel[LPC_ORD];
-		int   mel_indexes[LPC_ORD];
+		float mel[order];
+		int   mel_indexes[order];
 
 		for(i=0; i<order; i++) {
 		    f = (4000.0/PI)*lsps[i];
 		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
                 
+                #define MEL_ROUND 25
+		for(i=1; i<order; i++) {
+		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
+			mel[i]+=MEL_ROUND/2;
+			mel[i-1]-=MEL_ROUND/2;
+                        i = 1;
+                    }
+		}
+
                 #ifdef DUMP
                 dump_mel(mel, order);
                 #endif
@@ -682,8 +700,8 @@ int main(int argc, char *argv[])
                 }
         
                 /* ensure no unstable filters after quantisation */
-        
-                #define MEL_ROUND 10
+                       
+                #define MEL_ROUND 25
 		for(i=1; i<order; i++) {
 		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
 			mel[i]+=MEL_ROUND/2;
@@ -691,7 +709,7 @@ int main(int argc, char *argv[])
                         i = 1;
                     }
 		}
-        
+                
 		for(i=0; i<order; i++) {
 		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
@@ -723,6 +741,11 @@ int main(int argc, char *argv[])
 	    }
             
 	}
+
+        if (amread) {
+            int ret = fread(model.A, sizeof(float), MAX_AMP, fam);
+            assert(ret == MAX_AMP);
+        }
 
 	/*------------------------------------------------------------*\
 

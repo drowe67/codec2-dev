@@ -11,9 +11,18 @@
 %  + harmonics beneath the masking curve
 % we do care about:
 %  + clearly defined formant formation
+%  + some relative amplitude info, like dominance of HF for UV sounds
+%
+% TODO:
+%   [ ] waterfall sounds
+%       [ ] tweak CB bandwidths at LF to be wider
+%   [ ] way to output at various processing steps, like PF initial mask, pre PF
+%   [ ] BPF at all?
+%   [ ] phase model?  Fit LPC, just swing phase at peaks? Try no phase tweaks
 
 1;
 
+% 
 % frame by frame analysis
 
 function newamp_frame(samname, f)
@@ -26,9 +35,8 @@ function newamp_frame(samname, f)
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
-
-
-  Ew_on = 1;
+ 
+  plot_all_masks = 0;
   k = ' ';
   do 
     figure(1);
@@ -51,16 +59,32 @@ function newamp_frame(samname, f)
     hold on;
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
 
-    [maskdB mask_sample_freqs_kHz] = determine_mask(AmdB, Wo, L);
-    non_masked_m = find(maskdB < AmdB);
-    plot(mask_sample_freqs_kHz*1000, maskdB, 'g');
-    plot(non_masked_m*Wo*4000/pi, AmdB(non_masked_m),'b+');
+    [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
+    plot(Am_freqs_kHz*1000, maskdB, 'g');
+
+    % Analysis by synthesis ---------------------------------------
+
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+
+    plot(local_maxima(:,2)*Wo*4000/pi, 70*ones(1,length(local_maxima)), 'r+');
+    plot(mask_sample_freqs_kHz*1000, newmaskdB, 'm');
+
+    % optionally plot all masking curves
+
+    if plot_all_masks
+      mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+      for m=1:L
+        maskdB = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        plot(mask_sample_freqs_kHz*1000, maskdB, "k--");
+      end
+    end
 
     hold off;
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit m-all", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -69,24 +93,75 @@ function newamp_frame(samname, f)
     if (k == 'b')
       f = f - 1;
     endif
-
+    if k == 'm'
+      if plot_all_masks == 0
+         plot_all_masks = 1;
+      else
+         plot_all_masks = 0;
+      end
+    end
   until (k == 'q')
   printf("\n");
 
 endfunction
 
 
-function [maskdB mask_sample_freqs_kHz] = determine_mask(AmdB, Wo, L)
+% model mask using just a few samples of critical band filters
+
+function [newmaskdB local_maxima_sort] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+    local_maxima = [];
+    if maskdB(1) > maskdB(2)
+      local_maxima = [local_maxima; AmdB(1) 1];
+    end
+    for m=2:L-1
+      if (maskdB(m-1) < maskdB(m)) && (maskdB(m) > maskdB(m+1))
+        local_maxima = [local_maxima; AmdB(m) m];
+      end
+    end
+    [nlm tmp] = size(local_maxima);
+    if nlm == 0
+      local_maxima = [AmdB(1) 1];
+      nlm = 1;
+    end
+    local_maxima_sort = flipud(sortrows(local_maxima,1));
+
+    % construct new mask from sorted local maxima
+
+    masker_amps_dB = local_maxima_sort(1:min(4,nlm),1);
+    % masker_amps_dB = mean(masker_amps_dB)*ones(1,min(4,nlm));
+    masker_freqs_kHz = local_maxima_sort(1:min(4,nlm),2)*Wo*4/pi;
+    newmaskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz);
+endfunction
+
+
+% determine cumulative mask, using amplitude of each harmonic.  Mask is
+% sampled across L points in the linear domain
+
+function maskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz)
 
     % calculate and plot masking curve
 
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    maskdB = zeros(1,L);
-    for m=1:L
-      fmasker_kHz = m*Wo*4/pi;
-      maskdB = max(maskdB, schroeder(fmasker_kHz, mask_sample_freqs_kHz) + AmdB(m)); 
+    maskdB = zeros(1,length(mask_sample_freqs_kHz));
+    for m=1:length(masker_freqs_kHz)
+      maskdB = max(maskdB, schroeder(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
     end
 end
+
+
+% Sample mask as model for Am, tweaked a bit to enhance
+% the formants:antiformant radtio, like the LPC postfilter
+
+function [maskdB_pf Am_freqs_kHz peaks_kHz] = mask_model(AmdB, Wo, L)
+
+    Am_freqs_kHz = (1:L)*Wo*4/pi;
+    maskdB = determine_mask(AmdB, Am_freqs_kHz, Am_freqs_kHz);
+    non_masked_m = find(maskdB < AmdB);
+    peaks_kHz = non_masked_m*Wo*4/pi;
+    maskdB_pf = maskdB;
+    %maskdB_pf = zeros(1,L);
+    %maskdB_pf(non_masked_m) = maskdB(non_masked_m) + 6;
+
+endfunction
 
 
 % process a whole file and write results
@@ -94,26 +169,30 @@ end
 function newamp_batch(samname)
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
-  [frames nc] = size(model)
+  [frames nc] = size(model);
   max_amp = 80;
 
   Am_out_name = sprintf("%s_am.out", samname);
   fam = fopen(Am_out_name,"wb"); 
 
   for f=1:frames
-
+    
     L = min([model(f,2) max_amp-1]);
     Wo = model(f,1);
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
-    
-    % zero out any harmonics beneath mask
 
-    [maskdB mask_sample_freqs_kHz] = determine_mask(AmdB, Wo, L);
-    non_masked_m = find(maskdB < AmdB);
+    maskdB = mask_model(AmdB, Wo, L);
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+
+    [nlm tmp] = size(local_maxima);
+    non_masked_m = local_maxima(1:min(4,nlm),2);
+    maskdB_pf = newmaskdB;
+    maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
+    
     Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (maskdB(1:L-1)/20);
-    Am_(non_masked_m+1) *=2;
+    Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);
     
     % save to file
     fwrite(fam, Am_, "float32");
@@ -149,6 +228,18 @@ function b=bark(f)
 endfunction
 
 
+% return a sampling grid of frequencies in Hz given B equally spaced
+% points on the bark scale
+
+function f_Hz = bark_freq_samples(B)
+   Fs2 = 4000;
+   bark_lut = bark(1:Fs2);
+   bark_grid_step = 1/B;
+   bark_grid = (bark_grid_step:bark_grid_step:1)*bark(Fs2);
+   f_Hz = interp1(bark_lut, 1:Fs2, bark_grid);
+endfunction
+
+
 % plot some masking curves
 
 function plot_masking
@@ -162,6 +253,6 @@ endfunction
 % Choose one of these to run
 
 more off;
-newamp_frame("../build_linux/src/hts2a", 100);
-%newamp_batch("../build_linux/src/kristoff");
+%newamp_frame("../build_linux/src/hts1a", 121);
+newamp_batch("../build_linux/src/hts1a");
 %plot_masking
