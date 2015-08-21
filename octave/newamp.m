@@ -1,11 +1,15 @@
+% newamp.m
+%
 % Copyright David Rowe 2015
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Octave script to explore new ideas in amplitude modelling.
+% Library of Octave functions to explore new ideas in amplitude
+% (spectral envelope) modelling.  See newamp_fby (frame by frame
+% analysis) and newamp_batch (batch processing for listening tests)
 %
 % we don't care about
-%  + spectral tilt, in can vary on input and our quantiser shouldnt care.
+%  + spectral tilt, in can vary on input and our model shouldnt care.
 %    We can vary it on output and the listener won't care 
 %  + absolute energy of entire signal
 %  + harmonics beneath the masking curve
@@ -15,100 +19,19 @@
 %
 % TODO:
 %   [ ] waterfall sounds
-%       [ ] tweak CB bandwidths at LF to be wider
+%       [X] tweak CB bandwidths at LF to be wider
 %   [ ] way to output at various processing steps, like PF initial mask, pre PF
 %   [ ] BPF at all?
 %   [ ] phase model?  Fit LPC, just swing phase at peaks? Try no phase tweaks
 
 1;
 
-% 
-% frame by frame analysis
-
-function newamp_frame(samname, f)
-  
-  sn_name = strcat(samname,"_sn.txt");
-  Sn = load(sn_name);
-
-  sw_name = strcat(samname,"_sw.txt");
-  Sw = load(sw_name);
-
-  model_name = strcat(samname,"_model.txt");
-  model = load(model_name);
- 
-  plot_all_masks = 0;
-  k = ' ';
-  do 
-    figure(1);
-    clf;
-    s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    size(s);
-    plot(s);
-    axis([1 length(s) -20000 20000]);
-
-    figure(2);
-    Wo = model(f,1);
-    L = model(f,2);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
-
-    % plotting
-
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
-    axis([1 4000 0 80]);
-    hold on;
-    plot((0:255)*4000/256, Sw(f,:),";Sw;");
-
-    [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    plot(Am_freqs_kHz*1000, maskdB, 'g');
-
-    % Analysis by synthesis ---------------------------------------
-
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
-
-    plot(local_maxima(:,2)*Wo*4000/pi, 70*ones(1,length(local_maxima)), 'r+');
-    plot(mask_sample_freqs_kHz*1000, newmaskdB, 'm');
-
-    % optionally plot all masking curves
-
-    if plot_all_masks
-      mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-      for m=1:L
-        maskdB = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
-        plot(mask_sample_freqs_kHz*1000, maskdB, "k--");
-      end
-    end
-
-    hold off;
-
-    % interactive menu
-
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit m-all", f);
-    fflush(stdout);
-    k = kbhit();
-    if (k == 'n')
-      f = f + 1;
-    endif
-    if (k == 'b')
-      f = f - 1;
-    endif
-    if k == 'm'
-      if plot_all_masks == 0
-         plot_all_masks = 1;
-      else
-         plot_all_masks = 0;
-      end
-    end
-  until (k == 'q')
-  printf("\n");
-
-endfunction
-
-
-% model mask using just a few samples of critical band filters
+% model mask using just a few samples of critical band filter centre frequencies
 
 function [newmaskdB local_maxima_sort] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+
+    % find local maxima and sort in descending order of magnitude
+
     local_maxima = [];
     if maskdB(1) > maskdB(2)
       local_maxima = [local_maxima; AmdB(1) 1];
@@ -125,10 +48,11 @@ function [newmaskdB local_maxima_sort] = make_newmask(maskdB, AmdB, Wo, L, mask_
     end
     local_maxima_sort = flipud(sortrows(local_maxima,1));
 
-    % construct new mask from sorted local maxima
+    % construct new mask from a small subset of sorted local maxima,
+    % this is the highly compressed model of the amplitude envelope
+    % that we send to the decoder
 
     masker_amps_dB = local_maxima_sort(1:min(4,nlm),1);
-    % masker_amps_dB = mean(masker_amps_dB)*ones(1,min(4,nlm));
     masker_freqs_kHz = local_maxima_sort(1:min(4,nlm),2)*Wo*4/pi;
     newmaskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz);
 endfunction
@@ -164,44 +88,6 @@ function [maskdB_pf Am_freqs_kHz peaks_kHz] = mask_model(AmdB, Wo, L)
 endfunction
 
 
-% process a whole file and write results
-
-function newamp_batch(samname)
-  model_name = strcat(samname,"_model.txt");
-  model = load(model_name);
-  [frames nc] = size(model);
-  max_amp = 80;
-
-  Am_out_name = sprintf("%s_am.out", samname);
-  fam = fopen(Am_out_name,"wb"); 
-
-  for f=1:frames
-    
-    L = min([model(f,2) max_amp-1]);
-    Wo = model(f,1);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
-
-    maskdB = mask_model(AmdB, Wo, L);
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
-
-    [nlm tmp] = size(local_maxima);
-    non_masked_m = local_maxima(1:min(4,nlm),2);
-    maskdB_pf = newmaskdB;
-    maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
-    
-    Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);
-    
-    % save to file
-    fwrite(fam, Am_, "float32");
-  end
-
-  fclose(fam);
-
-endfunction
-
 %
 % Masking functions from http://www.perceptualentropy.com/coder.html#C
 % Thanks Jon Boley!
@@ -209,13 +95,32 @@ endfunction
 
 % Calculate the Schroeder masking spectrum for a given frequency and SPL
 
-function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz)
+function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, modified_bark_en=1)
   f_kHz = mask_sample_freqs_kHz;
-  A = 3.64*(f_kHz).^(-0.8) - 6.5*exp(-0.6*(f_kHz - 3.3).^2) + (10^(-3))*(f_kHz).^4;
   f_Hz = f_kHz*1000;
 
   % Schroeder Spreading Function
-  dz = bark(freq_tone_kHz*1000)-bark(f_Hz);
+
+  if modified_bark_en == 1
+
+    % Modification by DR: Piecewise linear model that makes bands
+    % beneath 1.5kHz wider to match the width of F1 and
+    % "fill in" the spectra better for UV sounds.
+
+    if freq_tone_kHz <= 0.5
+      y = 0.5;
+    end
+    if (freq_tone_kHz > 0.5) && (freq_tone_kHz < 1.5)
+      y = 0.5*freq_tone_kHz + 0.25;
+    end
+    if freq_tone_kHz >= 1.5
+      y = 1;
+    end
+    dz = y*(bark(freq_tone_kHz*1000) - bark(f_Hz));
+  else
+    dz = bark(freq_tone_kHz*1000)-bark(f_Hz);
+  end
+
   maskdB = 15.81 + 7.5*(dz+0.474) - 17.5*sqrt(1 + (dz+0.474).^2);
 endfunction
 
@@ -228,31 +133,33 @@ function b=bark(f)
 endfunction
 
 
-% return a sampling grid of frequencies in Hz given B equally spaced
-% points on the bark scale
-
-function f_Hz = bark_freq_samples(B)
-   Fs2 = 4000;
-   bark_lut = bark(1:Fs2);
-   bark_grid_step = 1/B;
-   bark_grid = (bark_grid_step:bark_grid_step:1)*bark(Fs2);
-   f_Hz = interp1(bark_lut, 1:Fs2, bark_grid);
-endfunction
-
-
-% plot some masking curves
+% plot some masking curves, used for working on masking filter changes
 
 function plot_masking
   Fs = 8000;
-  mask_sample_freqs_kHz = 0.1:0.1:(Fs/1000)/2;
-  maskdB = schroeder(1, mask_sample_freqs_kHz)
+
   figure(1)
+  mask_sample_freqs_kHz = 0.1:0.1:(Fs/1000)/2;
+  maskdB = schroeder(0.5, mask_sample_freqs_kHz, 0);
   plot(mask_sample_freqs_kHz, maskdB);
+  hold on;
+  maskdB = schroeder(0.5, mask_sample_freqs_kHz, 1);
+  plot(mask_sample_freqs_kHz, maskdB,'g');
+
+  for f=1:0.5:3
+    maskdB = schroeder(f, mask_sample_freqs_kHz, 0);
+    plot(mask_sample_freqs_kHz, maskdB);
+    maskdB = schroeder(f, mask_sample_freqs_kHz, 1);
+    plot(mask_sample_freqs_kHz, maskdB,'g');
+  end
+  hold off;
+  axis([0.1 4 -30 0])
+
+  figure(2)
+  plot(mask_sample_freqs_kHz, bark(mask_sample_freqs_kHz*1000))
+  hold on;
+  plot(mask_sample_freqs_kHz, modified_bark(mask_sample_freqs_kHz*1000),'g')
+  hold off;
+  grid
 endfunction
 
-% Choose one of these to run
-
-more off;
-%newamp_frame("../build_linux/src/hts1a", 121);
-newamp_batch("../build_linux/src/hts1a");
-%plot_masking
