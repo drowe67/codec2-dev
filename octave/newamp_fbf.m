@@ -36,6 +36,7 @@ function newamp_fbf(samname, f)
     axis([1 length(s) -20000 20000]);
 
     figure(2);
+    clf;
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
@@ -46,18 +47,45 @@ function newamp_fbf(samname, f)
     plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
     axis([1 4000 0 80]);
     hold on;
+    plot((1:L)*Wo*4000/pi, AmdB,";Am;r+");
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    plot(Am_freqs_kHz*1000, maskdB, 'g');
+    %plot(Am_freqs_kHz*1000, maskdB, 'g');
 
-    % Analysis by synthesis ---------------------------------------
+    % optionally show harmonics that are not masked
+
+    not_masked_m = find(maskdB < AmdB);
+    if 0
+      plot(not_masked_m*Wo*4000/pi, 70*ones(1,length(not_masked_m)), 'bk+');
+    end
+
+    % optionally plot synthesised spectrum (early simple model)
+
+    if 0
+      AmdB_ = maskdB;
+      AmdB_(not_masked_m) += 6;
+      plot(Am_freqs_kHz*1000, AmdB_, 'g');
+      plot(Am_freqs_kHz*1000, AmdB_, 'g+');
+    end
+
+    % estimate low rate samples
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB local_maxima] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    
+    [nlm tmp] = size(local_maxima(:,2));
+    nlm = min(nlm,4);
+    tonef_kHz = local_maxima(1:nlm,2)*Wo*4/pi;
+    toneamp_dB = local_maxima(1:nlm,1);
+    plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
+    plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
 
-    plot(local_maxima(:,2)*Wo*4000/pi, 70*ones(1,length(local_maxima)), 'r+');
-    plot(mask_sample_freqs_kHz*1000, newmaskdB, 'm');
+    % fit a line to amplitudes
+
+    %[m b] = linreg(tonef_kHz, toneamp_dB, nlm);
+    %plot(tonef_kHz*1000, tonef_kHz*m + b, "bk");
+    %plot(tonef_kHz*1000, 60 + toneamp_dB - (tonef_kHz*m + b), "r+");
 
     % optionally plot all masking curves
 

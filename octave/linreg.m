@@ -3,6 +3,8 @@
 %
 % Based on:
 %    http://stackoverflow.com/questions/5083465/fast-efficient-least-squares-fit-algorithm-in-c
+%
+% finds y = mx + b to best fit n points x and y
 
 function [m b] = linreg(x,y,n)
   sumx = 0.0;   % sum of x

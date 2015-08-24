@@ -17,7 +17,8 @@
 
 function newamp_batch(samname)
   newamp;
-  
+  more off;
+
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
@@ -35,13 +36,28 @@ function newamp_batch(samname)
 
     maskdB = mask_model(AmdB, Wo, L);
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [newmaskdB local_maxima] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
 
     [nlm tmp] = size(local_maxima);
     non_masked_m = local_maxima(1:min(4,nlm),2);
-    maskdB_pf = newmaskdB;
+
+    % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
+
+    maskdB_pf = newmaskdB - 6;
     maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
-    
+
+    if 0 
+      % Early work as per blog post part 1
+      % Attempt 1
+      maskdB_pf = zeros(1,L);
+      maskdB_pf(non_masked_m) = maskdB(non_masked_m);
+      % Attempt 2
+      %maskdB_pf = maskdB;
+      % Attempt 3
+      %maskdB_pf = maskdB;
+      %maskdB_pf(non_masked_m) += 6;
+    end
+
     Am_ = zeros(1,max_amp);
     Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);
     
