@@ -20,41 +20,100 @@
 % TODO:
 %   [ ] waterfall sounds
 %       [X] tweak CB bandwidths at LF to be wider
+%       [ ] consider a floor in mask to interpolate missing bits
+%       [ ] some sort of filter on min amp/diff from previous peak, e.g. vk5qi:161, 172
+%           + min spacing in bark?  Make larger at higher freq?
+%           + or some other measure, like making sure choice minimises MSE
 %   [ ] way to output at various processing steps, like PF initial mask, pre PF
 %   [ ] BPF at all?
 %   [ ] phase model?  Fit LPC, just swing phase at peaks? Try no phase tweaks
 
 1;
 
-% model mask using just a few samples of critical band filter centre frequencies
+% Create a "decimated mask" model using just a few samples of
+% critical band filter centre frequencies.  For voiced speech,
+% we fit the amplitude of these samples to a straight line.
+% TODO: 
+%  [ ] track down bg noises on vk5qi and kristoff
+%  [ ] return data for plotting, like slope m
+%  [ ] quantise m
 
-function [newmaskdB local_maxima_sort] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+function [decmaskdB local_maxima_sort] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
 
-    % find local maxima and sort in descending order of magnitude
+    % band pass filter: limit search to 250 to 3800 Hz
+
+    m_st = max(1,floor((pi*250/4000)/Wo));
+    m_en = floor((pi*3800/4000)/Wo);
+
+    % We start off by assuming that the local maxima in the masking
+    % curve are the centres of the samples we want to keep.
 
     local_maxima = [];
-    if maskdB(1) > maskdB(2)
-      local_maxima = [local_maxima; AmdB(1) 1];
+    if maskdB(m_st) > maskdB(m_st+1)
+      local_maxima = [local_maxima; AmdB(m_st) m_st];
     end
-    for m=2:L-1
+    for m=m_st+1:m_en-1
       if (maskdB(m-1) < maskdB(m)) && (maskdB(m) > maskdB(m+1))
         local_maxima = [local_maxima; AmdB(m) m];
       end
     end
     [nlm tmp] = size(local_maxima);
+
+    % Occasionally there are no local maxima so pop one in
+
     if nlm == 0
-      local_maxima = [AmdB(1) 1];
+      local_maxima = [AmdB(m_st) m_st];
       nlm = 1;
     end
-    local_maxima_sort = flipud(sortrows(local_maxima,1));
+    
+    % fit a straight line to the amplitudes of our candidate samples,
+    % this will help us later when we code and transmit the amplitude 
+    % of each sample
 
-    % construct new mask from a small subset of sorted local maxima,
-    % this is the highly compressed model of the amplitude envelope
-    % that we send to the decoder
+    if nlm > 1
+      [m b] = linreg(local_maxima(:,2), local_maxima(:,1), nlm);
+      local_maxima_fit = local_maxima(:,2)*m + b;
+    else
+      local_maxima_fit = local_maxima(1,1);
+    end
 
-    masker_amps_dB = local_maxima_sort(1:min(4,nlm),1);
-    masker_freqs_kHz = local_maxima_sort(1:min(4,nlm),2)*Wo*4/pi;
-    newmaskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz);
+    % Remove any outliers to the straight line fit: Sometimes local
+    % maxima appear in an antiformant regions, say if F1 and F2 are a
+    % long way apart.  After a straight line fit the anti-format
+    % amplitide sample will be way off the straight line, which will
+    % cause a spike of spectral energy right where we don't want it -
+    % in the middle of an antiformat.  So lets test the fit of each
+    % sample, and only include those that work well with the straight
+    % line fit.  For voiced frames, m < 0.  For UV frames, we don't
+    % care about the straight line fit as unvoiced speech is all over
+    % the place in amplitude anyway.
+    
+    local_maxima2 = [];
+    for i=1:nlm
+      if (local_maxima_fit(i) - local_maxima(i,1) < 6) || (m > 0)
+        local_maxima2 = [local_maxima2; local_maxima(i,1) local_maxima(i,2)];
+      end
+    end
+
+    % now sort and keep the top 4 samples
+    
+    local_maxima_sort = flipud(sortrows(local_maxima2,1));
+    [nlm tmp] = size(local_maxima_sort);
+    nlm = min(nlm,4);
+    local_maxima_sort = local_maxima_sort(1:nlm,:);
+
+    % fit straight line again, this time with outliers removed
+
+    [m b] = linreg(local_maxima_sort(:,2), local_maxima_sort(:,1), nlm);
+    masker_amps_dB = local_maxima_sort(:,2)*m + b;
+    masker_freqs_kHz = local_maxima_sort(:,2)*Wo*4/pi;
+    %masker_amps_dB = local_maxima_sort(:,1);
+    %masker_freqs_kHz = local_maxima_sort(:,2)*Wo*4/pi;
+
+    % and construct new, decimated mask using our small set of
+    % samples, with amplitudes fitted to a linear line
+
+    decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
 endfunction
 
 
@@ -163,3 +222,44 @@ function plot_masking
   grid
 endfunction
 
+
+% produce a scatter diagram of amplitudes
+
+function amp_scatter(samname)
+  
+  model_name = strcat(samname,"_model.txt");
+  model = load(model_name);
+  [frames nc] = size(model);
+  max_amp = 80;
+
+  Am_out_name = sprintf("%s_am.out", samname);
+  freqs = [];
+  ampsdB = [];
+
+  for f=1:frames
+    
+    L = min([model(f,2) max_amp-1]);
+    Wo = model(f,1);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+
+    maskdB = mask_model(AmdB, Wo, L);
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    [newmaskdB local_maxima] = make_newmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+
+    [nlm tmp] = size(local_maxima);
+    freqs = [freqs (local_maxima(1:min(4,nlm),2)*Wo*4000/pi)'];
+    an_ampsdB = local_maxima(1:min(4,nlm),1)';
+    ampsdB = [ampsdB an_ampsdB-mean(an_ampsdB)];
+  end
+
+  figure(1)
+  plot(freqs, ampsdB,'+');
+  figure(2)
+  subplot(211)
+  hist(freqs,20)
+  subplot(212)
+  hist(ampsdB,20)
+endfunction
+
+%amp_scatter("../build_linux/src/all")
