@@ -36,7 +36,7 @@ function newamp_batch(samname)
 
     maskdB = mask_model(AmdB, Wo, L);
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [newmaskdB local_maxima] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
 
     [nlm tmp] = size(local_maxima);
     non_masked_m = local_maxima(1:min(4,nlm),2);
