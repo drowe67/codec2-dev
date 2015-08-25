@@ -117,6 +117,49 @@ function [decmaskdB local_maxima_sort] = make_decmask(maskdB, AmdB, Wo, L, mask_
 endfunction
 
 
+% Alternative way to come up with a decimated mask model, using
+% analysis by synthesis to determine the best place to put samples.
+% Ahh, takes me back to when I was a slip of a speech coder, playing
+% with my first CELP codec!
+
+function [decmaskdB dec_samples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+
+    % band pass filter: limit search to 250 to 3800 Hz
+
+    m_st = max(1,floor((pi*250/4000)/Wo));
+    m_en = floor((pi*3800/4000)/Wo);
+
+    target = maskdB;
+    decmaskdB = zeros(1,L);
+    dec_samples = [];
+
+
+    for sample=1:4
+
+      % find best position for sample to minimise distance to target
+
+      min_mse = 1E32;
+      for m=m_st:m_en
+        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        candidate = max(decmaskdB, single_mask_m);
+        candidate = max(zeros(1,L), candidate);
+        error = target - candidate;
+        mse = sum(error .^ 2);
+        %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
+        if (mse < min_mse)
+          min_mse = mse;
+          min_mse_m = m;
+          min_candidate = candidate;
+        end
+      end
+
+      decmaskdB = min_candidate;
+      dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
+    end
+
+endfunction
+
+
 % determine cumulative mask, using amplitude of each harmonic.  Mask is
 % sampled across L points in the linear domain
 
@@ -131,19 +174,12 @@ function maskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_f
 end
 
 
-% Sample mask as model for Am, tweaked a bit to enhance
-% the formants:antiformant radtio, like the LPC postfilter
+% Sample mask as model for Am
 
-function [maskdB_pf Am_freqs_kHz peaks_kHz] = mask_model(AmdB, Wo, L)
+function [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L)
 
     Am_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB = determine_mask(AmdB, Am_freqs_kHz, Am_freqs_kHz);
-    non_masked_m = find(maskdB < AmdB);
-    peaks_kHz = non_masked_m*Wo*4/pi;
-    maskdB_pf = maskdB;
-    %maskdB_pf = zeros(1,L);
-    %maskdB_pf(non_masked_m) = maskdB(non_masked_m) + 6;
-
 endfunction
 
 

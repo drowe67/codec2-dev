@@ -14,6 +14,7 @@
 
 function newamp_fbf(samname, f)
   
+  more off;
   newamp;
 
   sn_name = strcat(samname,"_sn.txt");
@@ -51,7 +52,7 @@ function newamp_fbf(samname, f)
     plot((0:255)*4000/256, Sw(f,:),";Sw;");
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    %plot(Am_freqs_kHz*1000, maskdB, 'g');
+    plot(Am_freqs_kHz*1000, maskdB, 'g');
 
     % optionally show harmonics that are not masked
 
@@ -72,7 +73,7 @@ function newamp_fbf(samname, f)
     % estimate low rate samples
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB local_maxima] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB local_maxima] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
     
     [nlm tmp] = size(local_maxima(:,2));
     nlm = min(nlm,4);
@@ -99,6 +100,8 @@ function newamp_fbf(samname, f)
 
     hold off;
 
+    figure(3)
+    plot(decmaskdB)
     % interactive menu
 
     printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit m-all", f);
