@@ -6,14 +6,14 @@ FLOAT_TYPE=hard
 
 ###################################################
 
-BINPATH=/opt/gcc-arm-none-eabi-4_7-2013q1/bin
-CC=$(BINPATH)/arm-none-eabi-gcc
-OBJCOPY=$(BINPATH)/arm-none-eabi-objcopy
-SIZE=$(BINPATH)/arm-none-eabi-size
+BINPATH=
+CC=$(BINPATH)arm-none-eabi-gcc
+OBJCOPY=$(BINPATH)arm-none-eabi-objcopy
+SIZE=$(BINPATH)arm-none-eabi-size
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F4XX -DCORTEX_M4
+CFLAGS  = -std=gnu99 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F40_41xxx -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -30,7 +30,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.5.0
+PERIPHLIBVER	= V1.4.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -79,7 +79,7 @@ CFLAGS += -I../unittest
 CFLAGS += -Iinc
 
 FFT_TEST_SRCS = \
-$(DSPLIB)/Examples/arm_fft_bin_example/ARM/arm_fft_bin_data.c \
+$(DSPLIB)/Examples/arm_fft_bin_example/arm_fft_bin_data.c \
 fft_test.c \
 src/startup_stm32f4xx.s \
 stm32f4_machdep.c \
@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf fdmdv_dump_rt.elf tuner_ut.elf fast_dac_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf tuner_ut.elf fast_dac_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -117,7 +117,7 @@ dl/$(PERIPHLIBZIP):
 
 $(PERIPHLIBDIR): dl/$(PERIPHLIBZIP)
 	cd dl; unzip $(PERIPHLIBZIP)
-	mv dl/$(PERIPHLIBDIR) $(PERIPHLIBDIR)
+	mv dl/$(PERIPHLIBDIR)_$(PERIPHLIBVER) $(PERIPHLIBDIR)
 
 libstm32f4.a: $(PERIPHLIBDIR)
 	$(MAKE) $(STM32F4TEMPLATE)/system_stm32f4xx.o

@@ -75,12 +75,9 @@ short aSine[] = {
 
 int main(void) {
     struct freedv *f;
-    short          adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
-    short          dac16k[FREEDV_NSAMPLES_16K];
-    short          adc8k[FREEDV_NSAMPLES];
-    short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
     SWITCH_STATE   ss;
     int            nin, nout, i;
+    int            n_samples, n_samples_16k;
 
     /* init all the drivers for various peripherals */
 
@@ -89,6 +86,13 @@ int main(void) {
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
     f = freedv_open(FREEDV_MODE_1600);
+    n_samples = freedv_get_n_speech_samples(f);
+    n_samples_16k = 2*n_samples;
+
+    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
+    short          dac16k[n_samples_16k];
+    short          adc8k[n_samples];
+    short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
     /* put outputs into a known state */
 
@@ -114,35 +118,35 @@ int main(void) {
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
-            if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
+            if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                 GPIOE->ODR = (1 << 3);
 
                 /* clipping indicator */
 
                 led_err(0);
-                for (i=0; i<FREEDV_NSAMPLES_16K; i++) {
+                for (i=0; i<n_samples_16k; i++) {
                     if (abs(adc16k[FDMDV_OS_TAPS_16K+i]) > 28000)
                         led_err(1);
                 }
 
-                fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
+                fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
 
                 if (ss.mode == ANALOG) {
-                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                    for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
-                    dac1_write(dac16k, FREEDV_NSAMPLES_16K);
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    dac1_write(dac16k, n_samples_16k);
                 }
                 if (ss.mode == DV) {
                     freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
-                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                    for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
-                    dac1_write(dac16k, FREEDV_NSAMPLES_16K);
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    dac1_write(dac16k, n_samples_16k);
                 }
                 if (ss.mode == TONE) {
                     short buf[SINE_SAMPLES];
-                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                    for(i=0; i<n_samples; i++)
                         buf[i] = aSine[i]*0.398; /* 8dB back off from peak */                   
                     while(dac1_write(buf, SINE_SAMPLES) == 0);
                 }
@@ -162,14 +166,12 @@ int main(void) {
 
             if (ss.mode == ANALOG) {
 
-                /* force analog bypass when select down */
-
-                if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES_16K) == 0) {
-                    fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], FREEDV_NSAMPLES);
-                    for(i=0; i<FREEDV_NSAMPLES; i++)
+                if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
+                    fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
+                    for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], FREEDV_NSAMPLES);              
-                    dac2_write(dac16k, FREEDV_NSAMPLES_16K);
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    dac2_write(dac16k, n_samples_16k);
                     led_rt(0); led_err(0);
                }
             }
@@ -179,7 +181,7 @@ int main(void) {
 
                 nin = freedv_nin(f);   
                 nout = nin;
-                f->total_bit_errors = 0;
+                freedv_zero_total_bit_errors(f);
 
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                     GPIOE->ODR = (1 << 3);
@@ -187,7 +189,7 @@ int main(void) {
                     nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
                     dac2_write(dac16k, 2*nout);
-                    led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
+                    led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
                     GPIOE->ODR &= ~(1 << 3);
                 }
             }

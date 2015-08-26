@@ -46,14 +46,15 @@
 
 int main(int argc, char *argv[]) {
     struct freedv *f;
-    short          inbuf[FREEDV_NSAMPLES], outbuf[FREEDV_NSAMPLES];
     FILE          *fin, *fout;
-    int            frame;
+    int            frame, n_samples;
     PROFILE_VAR(freedv_start);
 
     machdep_profile_init();
 
     f = freedv_open(FREEDV_MODE_1600);
+    n_samples = freedv_get_n_speech_samples(f);
+    short inbuf[n_samples], outbuf[n_samples];
 
     // Transmit ---------------------------------------------------------------------
 
@@ -71,12 +72,12 @@ int main(int argc, char *argv[]) {
 
     frame = 0;
 
-    while (fread(inbuf, sizeof(short), FREEDV_NSAMPLES, fin) == FREEDV_NSAMPLES) {
+    while (fread(inbuf, sizeof(short), n_samples, fin) == n_samples) {
         PROFILE_SAMPLE(freedv_start);
         freedv_tx(f, outbuf, inbuf);
         PROFILE_SAMPLE_AND_LOG2(freedv_start, "  freedv_tx");     
        
-        fwrite(outbuf, sizeof(short), FREEDV_NSAMPLES, fout);
+        fwrite(outbuf, sizeof(short), n_samples, fout);
         printf("frame: %d\n", ++frame);
         machdep_profile_print_logged_samples();
    }

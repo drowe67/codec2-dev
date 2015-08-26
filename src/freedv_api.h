@@ -73,6 +73,8 @@ int freedv_get_n_max_modem_samples	(struct freedv *freedv);
 int freedv_get_n_nom_modem_samples	(struct freedv *freedv);
 int freedv_get_total_bits			(struct freedv *freedv);
 int freedv_get_total_bit_errors		(struct freedv *freedv);
+void freedv_zero_total_bit_errors	(struct freedv *freedv);
+int freedv_get_sync		        (struct freedv *freedv);
 #endif
 
 #ifdef __cplusplus
