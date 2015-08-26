@@ -8,6 +8,11 @@ NOTES:
     rely on 'make install' as the packages (RPM & DEB) created by CPack are
     questionable.
 
+To compile codec2, the packages build-essential and cmake are required.
+If they are not installed, at a command prompt, type
+
+$ sudo apt-get install build-essential cmake 
+
 To test the cmake build make a directory anywhere underneath (or outside of)
 the source directory.
 
