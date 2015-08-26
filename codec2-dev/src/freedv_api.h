@@ -69,6 +69,7 @@ int freedv_get_version(void);
 void freedv_get_modem_stats(struct freedv *freedv, int *sync, float *snr_est);
 int freedv_get_test_frames			(struct freedv *freedv);
 int freedv_get_n_speech_samples		(struct freedv *freedv);
+int freedv_get_modem_sample_rate	(struct freedv *freedv);
 int freedv_get_n_max_modem_samples	(struct freedv *freedv);
 int freedv_get_n_nom_modem_samples	(struct freedv *freedv);
 int freedv_get_total_bits			(struct freedv *freedv);
