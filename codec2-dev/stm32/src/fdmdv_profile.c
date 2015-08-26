@@ -90,7 +90,7 @@ int main(int argc, char *argv[]) {
     COMP                rx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME];
     int                 i, j, nin, reliable_sync_bit[2], sync_bit, bit_errors, ntest_bits, test_frame_sync;
     short              *error_pattern;
-    struct FDMDV_STATS  stats;
+    struct MODEM_STATS  stats;
     PROFILE_VAR(mod_start, demod_start);
 
     machdep_profile_init ();

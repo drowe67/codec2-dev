@@ -277,10 +277,12 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 	codec2_encode_1300(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_1200)
 	codec2_encode_1200(c2, bits, speech);
+#ifndef CORTEX_M4
     if (c2->mode == CODEC2_MODE_700)
 	codec2_encode_700(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_700B)
 	codec2_encode_700b(c2, bits, speech);
+#endif
 }
 
 void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
@@ -314,10 +316,12 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
  	codec2_decode_1300(c2, speech, bits, ber_est);
     if (c2->mode == CODEC2_MODE_1200)
  	codec2_decode_1200(c2, speech, bits);
+#ifndef CORTEX_M4
     if (c2->mode == CODEC2_MODE_700)
  	codec2_decode_700(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_700B)
  	codec2_decode_700b(c2, speech, bits);
+#endif
 }
 
 
@@ -1334,6 +1338,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 }
 
 
+#ifndef CORTEX_M4
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: codec2_encode_700	     
@@ -1741,7 +1746,7 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<LPC_ORD_LOW; i++)
 	c2->prev_lsps_dec[i] = lsps[3][i];
 }
-
+#endif
 
 /*---------------------------------------------------------------------------*\
                                                        

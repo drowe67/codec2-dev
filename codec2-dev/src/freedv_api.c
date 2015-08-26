@@ -107,6 +107,7 @@ struct freedv *freedv_open(int mode) {
         f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
     }
 
+#ifndef CORTEX_M4
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B)) {
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
@@ -126,6 +127,7 @@ struct freedv *freedv_open(int mode) {
             return NULL;
         f->sz_error_pattern = cohpsk_error_pattern_size();
     }
+#endif
 
     f->test_frame_sync_state = 0;
     f->total_bits = 0;
@@ -183,8 +185,10 @@ void freedv_close(struct freedv *freedv) {
     free(freedv->tx_bits);
     if (freedv->mode == FREEDV_MODE_1600)
         fdmdv_destroy(freedv->fdmdv);
+#ifndef CORTEX_M4
     if (freedv->mode == FREEDV_MODE_700)
         cohpsk_destroy(freedv->cohpsk);
+#endif
     codec2_destroy(freedv->codec2);
     free(freedv);
 }
@@ -335,6 +339,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     }
 
 
+#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
         bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
         bits_per_modem_frame = COHPSK_BITS_PER_FRAME;
@@ -399,6 +404,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         for(i=0; i<f->n_nom_modem_samples; i++)
             mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
     }
+#endif
 }
 
 int freedv_nin(struct freedv *f) {
@@ -653,6 +659,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
 
+#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
         float rx_bits[COHPSK_BITS_PER_FRAME];
         int   sync;
@@ -781,9 +788,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 //fprintf(stderr, "%d %d %d\n", f->n_speech_samples, speech_out[0], speech_out[nin_prev-1]);
             }
         }
-            
 
     }
+#endif            
      
     //fprintf(stderr,"f->stats.sync: %d reliable_sync_bit: %d evenframe: %d nout: %d\n", f->stats.sync, reliable_sync_bit, f->evenframe, nout);
     return nout;
@@ -845,8 +852,10 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
+#ifndef CORTEX_M4
     if (f->mode == FREEDV_MODE_700)
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
+#endif
     if (sync) *sync = f->stats.sync;
     if (snr_est) *snr_est = f->stats.snr_est;
 }
@@ -865,6 +874,7 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 // Set integers
 void freedv_set_test_frames				(struct freedv *f, int val) {f->smooth_symbols = val;}
 void freedv_set_squelch_en				(struct freedv *f, int val) {f->squelch_en = val;}
+void freedv_zero_total_bit_errors			(struct freedv *f) {f->total_bit_errors = 0;}
 // Set floats
 void freedv_set_snr_squelch_thresh		(struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 
@@ -886,5 +896,6 @@ int freedv_get_n_max_modem_samples		(struct freedv *f) {return f->n_max_modem_sa
 int freedv_get_n_nom_modem_samples		(struct freedv *f) {return f->n_nom_modem_samples;}
 int freedv_get_total_bits				(struct freedv *f) {return f->total_bits;}
 int freedv_get_total_bit_errors			(struct freedv *f) {return f->total_bit_errors;}
+int freedv_get_sync           			(struct freedv *f) {return  f->stats.sync;}
 // Get floats
 

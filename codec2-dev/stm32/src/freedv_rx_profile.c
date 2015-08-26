@@ -53,18 +53,24 @@
 
 int main(int argc, char *argv[]) {
     struct freedv *f;
-    short          adc16k[FDMDV_OS_TAPS_16K+FREEDV_NSAMPLES_16K];
-    short          dac16k[FREEDV_NSAMPLES_16K];
-    short          adc8k[FREEDV_NSAMPLES];
-    short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
     FILE          *fin, *fout, *ftotal;
     int            frame, nin_16k, nin, i, nout = 0;
-    struct FDMDV_STATS  stats;
+    int            n_samples, n_samples_16k;
+    int            sync;
+    float          snr_est;
+
     PROFILE_VAR(fdmdv_16_to_8_start, freedv_rx_start, fdmdv_8_to_16_start);
 
     machdep_profile_init();
 
     f = freedv_open(FREEDV_MODE_1600);
+    n_samples = freedv_get_n_speech_samples(f);
+    n_samples_16k = 2*n_samples;
+
+    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
+    short          dac16k[n_samples_16k];
+    short          adc8k[n_samples];
+    short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
     // Receive ---------------------------------------------------------------------
 
@@ -105,7 +111,6 @@ int main(int argc, char *argv[]) {
 
         nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
         nin = freedv_nin(f); nin_16k = 2*nin;
-        fdmdv_get_demod_stats(f->fdmdv, &stats);
 
         PROFILE_SAMPLE_AND_LOG(fdmdv_8_to_16_start, freedv_rx_start, "  freedv_rx");     
 
@@ -117,9 +122,9 @@ int main(int argc, char *argv[]) {
         machdep_profile_print_logged_samples();
 
         fwrite(dac16k, sizeof(short), 2*nout, fout);
-        fdmdv_get_demod_stats(f->fdmdv, &stats);
+        freedv_get_modem_stats(f, &sync, &snr_est);
         printf("frame: %d nin_16k: %d sync: %d SNR: %3.2f \n", 
-               ++frame, nin_16k, stats.sync, (double)stats.snr_est);
+               ++frame, nin_16k, sync, (double)snr_est);
     }
 
     fclose(fin);

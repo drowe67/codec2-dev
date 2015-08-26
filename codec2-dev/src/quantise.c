@@ -65,6 +65,7 @@ int lspd_bits(int i) {
     return lsp_cbd[i].log2m;
 }
 
+#ifndef CORTEX_M4
 int mel_bits(int i) {
     return mel_cb[i].log2m;
 }
@@ -72,6 +73,7 @@ int mel_bits(int i) {
 int lspmelvq_cb_bits(int i) {
     return lspmelvq_cb[i].log2m;
 }
+#endif
 
 #ifdef __EXPERIMENTAL__
 int lspdt_bits(int i) {
@@ -539,6 +541,7 @@ void lspjvm_quantise(float *x, float *xq, int order)
 }
 
 
+#ifndef CORTEX_M4
 /* simple (non mbest) 6th order LSP MEL VQ quantiser.  Returns MSE of result */
 
 float lspmelvq_quantise(float *x, float *xq, int order)
@@ -781,6 +784,7 @@ void lspmelvq_decode(int *indexes, float *xq, int ndim)
       xq[i] = codebook1[ndim*n1+i] + codebook2[ndim*n2+i] + codebook3[ndim*n3+i];
   }
 }
+#endif
 
 
 int check_lsp_order(float lsp[], int order)
@@ -1366,6 +1370,8 @@ void decode_lsps_scalar(float lsp[], int indexes[], int order)
 }
 
 
+#ifndef CORTEX_M4
+
 /*---------------------------------------------------------------------------*\
                                                        
   FUNCTION....: encode_mels_scalar()	     
@@ -1433,6 +1439,7 @@ void decode_mels_scalar(float mels[], int indexes[], int order)
 
 }
 
+#endif
 
 #ifdef __EXPERIMENTAL__
 
