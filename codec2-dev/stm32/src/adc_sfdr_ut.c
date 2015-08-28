@@ -41,33 +41,41 @@
 #include "../src/codec2_fm.h"
 #include "stm32f4xx.h"
 
-#define REC_TIME_SECS 1
+#define BUFS          10
 #define FS            2E6
-#define N             (ADC_TUNER_BUF_SZ/2)
+#define N             1024
 
 extern int adc_overflow1;
 
 int main(void) {
-    short  buf[N];
-    int    bufs, i;
-    FILE  *fadc;
+    unsigned short unsigned_buf[N];
+    short          buf[N];
+    int            sam;
+    int            i, j, fifo_sz;
+    FILE          *fadc;
 
-    ftuner = fopen("adc.raw", "wb");
-    if (ftuner == NULL) {
+    fadc = fopen("adc.raw", "wb");
+    if (fadc == NULL) {
         printf("Error opening output file: adc.raw\n\nTerminating....\n");
         exit(1);
     }
-    bufs = FS*REC_TIME_SECS/N;
-    fifo_sz = ADC_TUNER_N;
-    printf("Starting! bufs: %d %d\n", bufs, fifo_sz);
+    fifo_sz = ADC_TUNER_BUF_SZ;
+    printf("Starting! bufs: %d %d\n", BUFS, fifo_sz);
  
     adc_open(fifo_sz);
     adc_set_tuner_en(0); /* dump raw samples, no tuner */
 
     sm1000_leds_switches_init();
 
-    for (i=0; i<bufs; i++) {
-        while(adc1_read(buf, N) == -1);
+    for (i=0; i<BUFS; i++) {
+        while(adc1_read((short*)unsigned_buf, N) == -1);
+
+        /* convert to signed */
+
+        for(j=0; j<N; j++) {
+            sam = (int)unsigned_buf[j] - 32768;
+            buf[j] = sam;
+        }
 
         /* most of the time will be spent here */
 
@@ -77,6 +85,6 @@ int main(void) {
     }
     fclose(fadc);
 
-    printf("Finsihed!\n");
+    printf("Finished!\n");
 }
 

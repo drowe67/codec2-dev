@@ -396,6 +396,7 @@ ADC_SFDR_UT_SRCS=\
 src/adc_sfdr_ut.c \
 gdb_stdio.c \
 ../src/fifo.c \
+src/iir_tuner.c \
 src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
@@ -408,7 +409,7 @@ src/init.c \
 src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
 	$(CC) $(CFLAGS) $^ -c -o $@ 
 
-adc_sfdr_ut.elf: $(TUNER_UT_SRCS) src/stm32f4_adc_tuner.o
+adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS) src/stm32f4_adc_tuner.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 	$(OBJCOPY) -O binary adc_sfdr_ut.elf adc_sfdr_ut.bin
 
