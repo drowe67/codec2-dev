@@ -109,7 +109,7 @@ OBJS = $(SRCS:.c=.o)
 
 ###################################################
 
-all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf tuner_ut.elf fast_dac_ut.elf
+all: libstm32f4.a codec2_profile.elf fft_test.elf dac_ut.elf dac_play.elf adc_rec.elf pwm_ut.elf fdmdv_profile.elf sm1000_leds_switches_ut.elf sm1000.elf adcdac_ut.elf freedv_tx_profile.elf freedv_rx_profile.elf adc_sd.elf usb_vcp_ut.elf tuner_ut.elf fast_dac_ut.elf adc_sfdr_ut.elf
 
 dl/$(PERIPHLIBZIP):
 	mkdir -p dl
@@ -389,6 +389,28 @@ src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
 tuner_ut.elf: $(TUNER_UT_SRCS) src/stm32f4_adc_tuner.o
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 	$(OBJCOPY) -O binary tuner_ut.elf tuner_ut.bin
+
+# ---------------------------------------------------------------------------
+
+ADC_SFDR_UT_SRCS=\
+src/adc_sfdr_ut.c \
+gdb_stdio.c \
+../src/fifo.c \
+src/sm1000_leds_switches.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+
+# this needs to be compiled without the optimiser or ugly things happen
+# would be nice to work out why as ISRs need to run fast
+
+src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
+	$(CC) $(CFLAGS) $^ -c -o $@ 
+
+adc_sfdr_ut.elf: $(TUNER_UT_SRCS) src/stm32f4_adc_tuner.o
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(OBJCOPY) -O binary adc_sfdr_ut.elf adc_sfdr_ut.bin
 
 # ---------------------------------------------------------------------------------
 

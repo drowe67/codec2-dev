@@ -1,14 +1,31 @@
 README.txt
 codec2 support for the stm32f4
-David Rowe May 2013
+David Rowe August 2015
 
-Introduction
-------------
+Quickstart
+==========
 
-The Makefile generates several unit tests, stm32f4_codec2.elf is the
-most important.  It's is equivalent to c2demo.c and runs the encoder
-and decoder on raw speech files.  It also gathers and prints profiling
-information and can dump the codec states to compare changes.
+The Makefile generates several programs used in Codec 2 development on
+the STM32F4, including sm1000.bin, the firmware for the SM1000.
+
+1. Find stm32f4_dsp_stdperiph_lib.zip on the InterWebs and place in in
+   dl.  (st.com was down when I last looked for it)
+
+2. Install the toolchain, on Ubuntu 14 this is:
+
+   $ sudo apt-get install gcc-arm-none-eabi
+
+3. $ make (and cross your fingers)
+
+You may need to mess about with the Makefile to get it to work,
+e.g. BINPATH, PERIPHLIBURL.  A better build system is hopefully on
+it's way.  Contact me if you can help.
+
+Not quite so Quickstart
+=======================
+
+Note: This section needs some editing.  It deals with the running the
+semi-hosting used for development system.
 
 gdb_stdio system
 ----------------
