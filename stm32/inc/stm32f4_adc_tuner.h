@@ -35,5 +35,6 @@
 
 void adc_open(int fifo_sz);
 int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
+void adc_set_tuner_en(short flag); /* disable tuner to get raw ADC samples written to fifo */
 
 #endif

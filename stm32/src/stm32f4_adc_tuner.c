@@ -45,6 +45,7 @@ struct FIFO *adc1_fifo;
 unsigned short adc_buf[ADC_TUNER_BUF_SZ];
 int adc_overflow1;
 int half,full;
+static short tuner_en = 1;
 
 #define ADCx_DR_ADDRESS          ((uint32_t)0x4001204C)
 #define DMA_CHANNELx             DMA_Channel_0
@@ -72,6 +73,11 @@ int adc1_read(short buf[], int n) {
     return fifo_read(adc1_fifo, buf, n);
 }
 
+
+void adc_set_tuner_en(short flag)
+{
+    tuner_en = flag;
+}
 
 static void tim2_config(void)
 {
@@ -232,14 +238,18 @@ void DMA2_Stream0_IRQHandler(void) {
     if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_HTIF0) != RESET) {
         half++;
 
-        iir_tuner(dec_buf, adc_buf);
+        if (tuner_en) {
+            iir_tuner(dec_buf, adc_buf);
 
-        /* write first half to fifo */
+            /* write first half to fifo */
 
-        if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
-            adc_overflow1++;
+            if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
+                adc_overflow1++;
+            }
         }
-
+        else
+            fifo_write(adc1_fifo, (short*)adc_buf, ADC_TUNER_BUF_SZ/2);
+          
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_HTIF0);  
@@ -250,14 +260,18 @@ void DMA2_Stream0_IRQHandler(void) {
     if(DMA_GetITStatus(DMA2_Stream0, DMA_IT_TCIF0) != RESET) {
         full++;
 
-        iir_tuner(dec_buf, &adc_buf[ADC_TUNER_BUF_SZ/2]);
+        if (tuner_en) {
+            iir_tuner(dec_buf, &adc_buf[ADC_TUNER_BUF_SZ/2]);
 
-        /* write second half to fifo */
+            /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
-            adc_overflow1++;
+            if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
+              adc_overflow1++;
+            }
         }
-
+        else
+            fifo_write(adc1_fifo, (short*)&adc_buf[ADC_TUNER_BUF_SZ/2], ADC_TUNER_BUF_SZ/2);
+            
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);  
