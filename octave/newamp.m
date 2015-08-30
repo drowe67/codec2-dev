@@ -38,6 +38,19 @@
 %  [ ] return data for plotting, like slope m
 %  [ ] quantise m
 
+% dealing with UV, BG noise. Prob is flat spectra.  When we fit a low
+% freq masking model it's formant shaped rather than flat.  So we get
+% these gaps in spectra that come and go - waterfall noises.  In
+% particular at low frequencies.  Good news is they don't need to be
+% quantised too finely.  This model has the disadvantage of not having
+% variable bandwidths.
+% when do waterfall noises appear?
+% idea: we could add the ability to have wider bands
+%        Add some sort of slope or floor
+%        increase spacing of samples?  Like min spacing in bark dimension
+
+% can we fit a different shape?
+
 function [decmaskdB local_maxima_sort] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
 
     % band pass filter: limit search to 250 to 3800 Hz
@@ -122,19 +135,24 @@ endfunction
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB dec_samples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+function [decmaskdB dec_samples error_log candidate_log target_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
 
     % band pass filter: limit search to 250 to 3800 Hz
 
-    m_st = max(1,floor((pi*250/4000)/Wo));
-    m_en = floor((pi*3800/4000)/Wo);
+    %m_st = max(1,floor((pi*250/4000)/Wo));
+    %m_en = floor((pi*3800/4000)/Wo);
+    m_st = 1;
+    m_en = L;
 
     target = maskdB;
     decmaskdB = zeros(1,L);
     dec_samples = [];
-
+    error_log = [];
+    candidate_log = [];
 
     for sample=1:4
+
+      target_log = target;
 
       % find best position for sample to minimise distance to target
 
@@ -142,9 +160,11 @@ function [decmaskdB dec_samples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_s
       for m=m_st:m_en
         single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
-        candidate = max(zeros(1,L), candidate);
+        candidate = max(min(maskdB), candidate);
         error = target - candidate;
-        mse = sum(error .^ 2);
+        error_log = [error_log; error];
+        candidate_log = [candidate_log; candidate];
+        mse = sum(abs(error)); % MSE in log domain
         %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
         if (mse < min_mse)
           min_mse = mse;
@@ -155,8 +175,62 @@ function [decmaskdB dec_samples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_s
 
       decmaskdB = min_candidate;
       dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
+      %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
     end
 
+    % simulate quantisation of amplitudes by adding some noise
+
+    if 0
+      masker_amps_dB = dec_samples(:,1);
+      masker_amps_dB += 3*(1 - 2*rand(4,1));
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+    
+    % quantisation of amplitudes.  Determine and subtract mean.  Quantise difference
+    % from mean to 4 levels (2 bits), at 6dB/level:
+    %
+    %           Level
+    %    0       -9            
+    %    1       -3
+    %    2       +3
+    %    3       +9
+
+    if 0
+      masker_amps_dB = dec_samples(:,1);
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+
+      energy_dB = mean(masker_amps_dB);
+      masker_amps_dB -= energy_dB;
+      for i=1:4
+        masker_amps_dB(i) = quantise([-9 -3 3 9], masker_amps_dB(i));
+      end
+      masker_amps_dB += energy_dB;
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+
+    % fit straight line to amplitudes (sounds bad, still a bug somewhere)
+
+    if 0
+      [gradient intercept] = linreg(dec_samples(:,2), dec_samples(:,1), 4);
+      masker_amps_dB = dec_samples(:,2)*gradient + intercept;
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+endfunction
+
+
+% quantise input sample to nearest value in table 
+
+function quant_out = quantise(levels, quant_in)
+  best_se = 1E32;
+  for i=1:length(levels)
+    se = (levels(i) - quant_in)^2;
+    if se < best_se
+      quant_out = levels(i);
+      best_se = se;
+    end
+  end
 endfunction
 
 
@@ -202,14 +276,19 @@ function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, modified_bark_
     % beneath 1.5kHz wider to match the width of F1 and
     % "fill in" the spectra better for UV sounds.
 
-    if freq_tone_kHz <= 0.5
-      y = 0.5;
+    x1 = 0.5; x2 = 1.5;
+    y1 = 0.5; y2 = 1;
+    grad  = (y2 - y1)/(x2 - x1);
+    y_int = y1 - grad*x1;
+
+    if freq_tone_kHz <= x1
+      y = y1;
     end
     if (freq_tone_kHz > 0.5) && (freq_tone_kHz < 1.5)
-      y = 0.5*freq_tone_kHz + 0.25;
+      y = grad*freq_tone_kHz + y_int;
     end
-    if freq_tone_kHz >= 1.5
-      y = 1;
+    if freq_tone_kHz >= x2
+      y = y2;
     end
     dz = y*(bark(freq_tone_kHz*1000) - bark(f_Hz));
   else
@@ -228,6 +307,16 @@ function b=bark(f)
 endfunction
 
 
+% -12dB/octave mask to model speech articulation
+
+function maskdB = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
+  maskdB = zeros(1, length(mask_sample_freqs_kHz));
+  for m=1:length(mask_sample_freqs_kHz)
+    maskdB(m) = -12*abs(log2(freq_tone_kHz/mask_sample_freqs_kHz(m)));
+    printf("m: %d ft: %f fm: %f ft/fm: %f maskdB: %f\n", m, freq_tone_kHz, mask_sample_freqs_kHz(m), freq_tone_kHz/mask_sample_freqs_kHz(m), maskdB(m));
+  end
+endfunction
+
 % plot some masking curves, used for working on masking filter changes
 
 function plot_masking
@@ -235,26 +324,27 @@ function plot_masking
 
   figure(1)
   mask_sample_freqs_kHz = 0.1:0.1:(Fs/1000)/2;
-  maskdB = schroeder(0.5, mask_sample_freqs_kHz, 0);
-  plot(mask_sample_freqs_kHz, maskdB);
+  maskdB_cb = schroeder(0.5, mask_sample_freqs_kHz, 1);
+  plot(mask_sample_freqs_kHz, maskdB_cb);
   hold on;
-  maskdB = schroeder(0.5, mask_sample_freqs_kHz, 1);
-  plot(mask_sample_freqs_kHz, maskdB,'g');
+  maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_res,'g');
 
-  for f=1:0.5:3
-    maskdB = schroeder(f, mask_sample_freqs_kHz, 0);
-    plot(mask_sample_freqs_kHz, maskdB);
-    maskdB = schroeder(f, mask_sample_freqs_kHz, 1);
-    plot(mask_sample_freqs_kHz, maskdB,'g');
+  for f=0.5:0.5:3
+    maskdB_cb = schroeder(f, mask_sample_freqs_kHz, 1);
+    plot(mask_sample_freqs_kHz, maskdB_cb);
+    maskdB_res = resonator(f, mask_sample_freqs_kHz);
+    plot(mask_sample_freqs_kHz, maskdB_res,'g');
   end
   hold off;
   axis([0.1 4 -30 0])
+  grid
 
   figure(2)
-  plot(mask_sample_freqs_kHz, bark(mask_sample_freqs_kHz*1000))
-  hold on;
-  plot(mask_sample_freqs_kHz, modified_bark(mask_sample_freqs_kHz*1000),'g')
-  hold off;
+  clf;
+  w = pi/4; beta = 0.9;
+  X = freqz(1,[1 -2*beta*cos(w) beta*beta],4000);
+  plot(10*log10(abs(X)))
   grid
 endfunction
 

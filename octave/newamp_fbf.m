@@ -73,7 +73,7 @@ function newamp_fbf(samname, f)
     % estimate low rate samples
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB local_maxima] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB local_maxima error_log candidate_log target_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
     
     [nlm tmp] = size(local_maxima(:,2));
     nlm = min(nlm,4);
@@ -101,7 +101,14 @@ function newamp_fbf(samname, f)
     hold off;
 
     figure(3)
-    plot(decmaskdB)
+    plot(target_log,'g')
+    hold on;
+    plot(candidate_log(3,:),'b');
+    plot(candidate_log(5,:),'b');
+    plot(error_log(3,:),'r');
+    plot(error_log(5,:),'r');
+    hold off;
+
     % interactive menu
 
     printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit m-all", f);
