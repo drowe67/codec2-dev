@@ -15,7 +15,7 @@
 
 % process a whole file and write results
 
-function newamp_batch(samname)
+function newamp_batch(samname, optional_Am_out_name)
   newamp;
   more off;
 
@@ -24,7 +24,13 @@ function newamp_batch(samname)
   [frames nc] = size(model);
   max_amp = 80;
 
-  Am_out_name = sprintf("%s_am.out", samname);
+  if nargin == 1
+    Am_out_name = sprintf("%s_am.out", samname);
+  end
+  if nargin == 2
+    Am_out_name = optional_Am_out_name;
+  end
+    
   fam = fopen(Am_out_name,"wb"); 
 
   for f=1:frames
