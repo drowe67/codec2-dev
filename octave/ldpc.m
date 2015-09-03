@@ -1,5 +1,18 @@
 % ldpc.m
-% LDPC functions
+%
+% David Rowe 2013
+% Octave functions to help us use the CML LDPC code.
+%
+% Installing CML library
+% ----------------------
+%
+% $ sudo apt-get install liboctave-dev
+% $ wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
+% $ unzip cml.1.10.zip
+% $ patch < ~/codec2-dev/octave/cml.patch
+% $ cd source
+% $ octave
+% octave:> make
 
 1;
 

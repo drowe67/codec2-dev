@@ -1,13 +1,16 @@
-% LDPC unit test script
+% ldpcut.m
+%
 % David Rowe 18 Dec 2013
-% Based on siulation by Bill Cowley
+%
+% Octave LDPC unit test script, based on simulation by Bill Cowley VK5DSP
+%
 
-% Start CML library
+% Start CML library (see CML set up instructions in ldpc.m)
 
 currentdir = pwd;
 addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
 cd /home/david/tmp/cml
-CmlStartup                            % note that this is not in the cml path!
+CmlStartup                           % note that this is not in the cml path!
 cd(currentdir)
 
 % Our LDPC library
@@ -30,7 +33,7 @@ max_iterations = 100;
 code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping);
 
 Ntrials = 84;
-EsNo=10;
+EsNo = 10;
 
 Tbits = Terrs = Ferrs = 0;
     
@@ -59,11 +62,13 @@ for nn = 1: Ntrials
     error_positions = xor( detected_data(1:code_param.data_bits_per_frame), data(st:en) );
     Nerrs = sum( error_positions);
         
-    if Nerrs>0, fprintf(1,'x'),  else fprintf(1,'.'),  end
-    if (rem(nn, 50)==0),  fprintf(1,'\n'),  end    
+    % print "." if frame decoded without errors, 'x' if we can't decode
+
+    if Nerrs>0, fprintf(1,'x'),  else printf('.'),  end
+    if (rem(nn, 50)==0),  printf('\n'),  end    
     if Nerrs>0,  Ferrs = Ferrs +1;  end
     Terrs = Terrs + Nerrs;
     Tbits = Tbits + code_param.data_bits_per_frame;        
 end
-fprintf(1,'\n')
+printf("\nTbits: %d Terrs: %d Ferrs: %d\n", Tbits, Terrs,  Ferrs)
 
