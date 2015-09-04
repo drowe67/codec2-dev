@@ -19,10 +19,14 @@ function newamp_batch(samname, optional_Am_out_name)
   newamp;
   more off;
 
+  max_amp = 80;
+  use_decmask = 1;
+  postfilter_en = 1;
+  decimate = 1;
+
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
-  max_amp = 80;
 
   if nargin == 1
     Am_out_name = sprintf("%s_am.out", samname);
@@ -34,23 +38,35 @@ function newamp_batch(samname, optional_Am_out_name)
   fam = fopen(Am_out_name,"wb"); 
 
   for f=1:frames
-    
+    printf("\rframe: %d", f);
     L = min([model(f,2) max_amp-1]);
     Wo = model(f,1);
     Am = model(f,3:(L+2));
+
     AmdB = 20*log10(Am);
 
-    maskdB = mask_model(AmdB, Wo, L);
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [newmaskdB local_maxima] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    % find mask and decimated mask
 
-    [nlm tmp] = size(local_maxima);
-    non_masked_m = local_maxima(1:min(4,nlm),2);
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    maskdB = mask_model(AmdB, Wo, L);
+    [decmaskdB decmasksamples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+
+    if use_decmask
+      non_masked_m = decmasksamples(:,2);
+      maskdB_ = decmaskdB;
+    else
+      maskdB_ = maskdB;
+      non_masked_m = find(AmdB > maskdB);
+    end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
-    maskdB_pf = newmaskdB - 6;
-    maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
+    if postfilter_en
+      maskdB_pf = maskdB_ - 6;
+      maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
+    else
+      maskdB_pf = maskdB_;
+    end
 
     if 0 
       % Early work as per blog post part 1
@@ -65,13 +81,13 @@ function newamp_batch(samname, optional_Am_out_name)
     end
 
     Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);
-    
-    % save to file
+    Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);  % C array doesnt use A[0]
     fwrite(fam, Am_, "float32");
   end
 
   fclose(fam);
+
+  printf("\n");
 
 endfunction
 

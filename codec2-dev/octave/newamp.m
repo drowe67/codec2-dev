@@ -160,13 +160,20 @@ function [decmaskdB dec_samples error_log candidate_log target_log] = make_decma
       for m=m_st:m_en
         single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
-        candidate = max(min(maskdB), candidate);
         error = target - candidate;
+        mse = sum(abs(error)); % MSE in log domain
         error_log = [error_log; error];
         candidate_log = [candidate_log; candidate];
-        mse = sum(abs(error)); % MSE in log domain
         %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
-        if (mse < min_mse)
+
+        too_close = 0;
+        for x=1:sample-1
+          if abs(dec_samples(x,2) - m) < 2
+            too_close = 1;
+          end
+        end
+
+        if (mse < min_mse) && (too_close == 0)
           min_mse = mse;
           min_mse_m = m;
           min_candidate = candidate;
@@ -176,6 +183,12 @@ function [decmaskdB dec_samples error_log candidate_log target_log] = make_decma
       decmaskdB = min_candidate;
       dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
       %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
+    end
+
+    if 0
+      % add floor to mask - unsuccessful attempt at fixing tinkle noises
+      min_AmdB = max(dec_samples(:,1));
+      decmaskdB = max(decmaskdB, min_AmdB - 20);
     end
 
     % simulate quantisation of amplitudes by adding some noise
@@ -284,7 +297,7 @@ function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, modified_bark_
     if freq_tone_kHz <= x1
       y = y1;
     end
-    if (freq_tone_kHz > 0.5) && (freq_tone_kHz < 1.5)
+    if (freq_tone_kHz > x1) && (freq_tone_kHz < x2)
       y = grad*freq_tone_kHz + y_int;
     end
     if freq_tone_kHz >= x2
@@ -312,8 +325,8 @@ endfunction
 function maskdB = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   maskdB = zeros(1, length(mask_sample_freqs_kHz));
   for m=1:length(mask_sample_freqs_kHz)
-    maskdB(m) = -12*abs(log2(freq_tone_kHz/mask_sample_freqs_kHz(m)));
-    printf("m: %d ft: %f fm: %f ft/fm: %f maskdB: %f\n", m, freq_tone_kHz, mask_sample_freqs_kHz(m), freq_tone_kHz/mask_sample_freqs_kHz(m), maskdB(m));
+    maskdB(m) = -24*abs(log2(freq_tone_kHz/mask_sample_freqs_kHz(m)));
+    %printf("m: %d ft: %f fm: %f ft/fm: %f maskdB: %f\n", m, freq_tone_kHz, mask_sample_freqs_kHz(m), freq_tone_kHz/mask_sample_freqs_kHz(m), maskdB(m));
   end
 endfunction
 
