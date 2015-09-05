@@ -8,8 +8,15 @@ Quickstart
 The Makefile generates several programs used in Codec 2 development on
 the STM32F4, including sm1000.bin, the firmware for the SM1000.
 
-1. Find stm32f4_dsp_stdperiph_lib.zip on the InterWebs and place in in
-   dl.  (st.com was down when I last looked for it)
+1. Find stm32f4_dsp_stdperiph_lib.zip on the InterWebs and place it in
+   codec2-dev/stm32/dl.  The latest version is available from st.com,
+   however this may not compile cleanly.  Here is how to obtain
+   version 1.4:
+
+   $ cd codec-dev/stm32
+   $ mkdir dl
+   $ cd dl
+   $ wget http://rowetel.com/downloads/codec2/smartmic/stm32f4_dsp_stdperiph_lib.zip
 
 2. Install the toolchain, on Ubuntu 14 this is:
 
