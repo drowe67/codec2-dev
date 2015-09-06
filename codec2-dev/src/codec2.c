@@ -1920,7 +1920,7 @@ int codec2_get_spare_bit_index(struct CODEC2 *c2)
         return 26; // bits 26 and 27 are spare
         break;
     case CODEC2_MODE_700B:
-        return 26; // bits 26 and 27 are spare
+        return 27; // bit 27 is spare
         break;
     }
     
