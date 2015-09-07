@@ -41,15 +41,15 @@
 #include "freedv_api_internal.h"
 #include "comp_prim.h"
 
-#define VERSION     10	/* The API version number.  The first version
+#define VERSION     11    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
                            user. */
 /*
  * Version 10   Initial version August 2, 2015.
- * Version 11   September
- *              Changes go here.
- *
+ * Version 11   September 2015
+ *              Added: freedv_zero_total_bit_errors(), freedv_get_sync()
+ *              Changed all input and output sample rates to 8000 sps.  Rates for FREEDV_MODE_700 and 700B were 7500.
  */
 
 #define NORM_PWR  1.74   /* experimentally derived fudge factor so 1600 and 
@@ -94,6 +94,7 @@ struct freedv *freedv_open(int mode) {
         golay23_init();
         f->nin = FDMDV_NOM_SAMPLES_PER_FRAME;
         f->n_nom_modem_samples = 2*FDMDV_NOM_SAMPLES_PER_FRAME;
+        f->n_nat_modem_samples = f->n_nom_modem_samples;
         f->n_max_modem_samples = FDMDV_NOM_SAMPLES_PER_FRAME+FDMDV_MAX_SAMPLES_PER_FRAME;
         f->modem_sample_rate = FS;
         nbit = fdmdv_bits_per_frame(f->fdmdv);
@@ -119,8 +120,9 @@ struct freedv *freedv_open(int mode) {
             codec2_mode = CODEC2_MODE_700B;            
         f->cohpsk = cohpsk_create();
         f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
-        f->n_nom_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;
-        f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME;
+        f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;          // native modem samples as used by the modem
+        f->n_nom_modem_samples = f->n_nat_modem_samples * 8000 / 7500;  // number of samples after native samples are interpolated to 8000 sps
+        f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * 8000 / 7500 + 1;
         f->modem_sample_rate = COHPSK_FS;                /* note wierd sample rate */
         f->clip = 1;
         nbit = COHPSK_BITS_PER_FRAME;
@@ -157,6 +159,17 @@ struct freedv *freedv_open(int mode) {
     if ((f->packed_codec_bits == NULL) || (f->codec_bits == NULL))
         return NULL;
 
+    if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B)) {        // change modem rates to 8000 sps
+        f->ptFilter7500to8000 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
+        f->ptFilter8000to7500 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
+        quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
+        quisk_filt_cfInit(f->ptFilter7500to8000, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
+    }
+    else {
+        f->ptFilter7500to8000 = NULL;
+        f->ptFilter8000to7500 = NULL;
+    }
+
     varicode_decode_init(&f->varicode_dec_states, 1);
     f->nvaricode_bits = 0;
     f->varicode_bit_index = 0;
@@ -192,6 +205,16 @@ void freedv_close(struct freedv *freedv) {
         cohpsk_destroy(freedv->cohpsk);
 #endif
     codec2_destroy(freedv->codec2);
+    if (freedv->ptFilter8000to7500) {
+        quisk_filt_destroy(freedv->ptFilter8000to7500);
+        free(freedv->ptFilter8000to7500);
+        freedv->ptFilter8000to7500 = NULL;
+    }
+    if (freedv->ptFilter7500to8000) {
+        quisk_filt_destroy(freedv->ptFilter7500to8000);
+        free(freedv->ptFilter7500to8000);
+        freedv->ptFilter7500to8000 = NULL;
+    }
     free(freedv);
 }
 
@@ -210,14 +233,9 @@ void freedv_close(struct freedv *freedv) {
   should be such that the peak speech level is between +/- 16384 and
   +/- 32767.
 
-  The FDM modem signal mod_out[] is sampled at
-  freedv_get_modem_sample_rate() Hz and is
+  The FDM modem signal mod_out[] is sampled at 8000 Hz and is
   freedv_get_n_nom_modem_samples() long.  mod_out[] will be scaled
   such that the peak level is just less than +/-32767.
-
-  Note that freedv_get_modem_sample_rate() is 8000 Hz for 1600 mode
-  but 7500 Hz for 700 and 700B mode. You must convert sample rates as
-  required.
 
   The complex-valued output can directly drive an I/Q modulator to
   produce a single sideband signal.  To generate the other sideband,
@@ -258,7 +276,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     int    bit, byte, i, j, k;
     int    bits_per_codec_frame, bits_per_modem_frame;
     int    data, codeword1, data_flag_index, nspare;
-    COMP   tx_fdm[f->n_nom_modem_samples];
+    COMP   tx_fdm[f->n_nat_modem_samples];
      
     assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B));
 
@@ -415,14 +433,22 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits);
         if (f->clip)
             cohpsk_clip(tx_fdm);
-        for(i=0; i<f->n_nom_modem_samples; i++)
+        for(i=0; i<f->n_nat_modem_samples; i++)
             mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
+        i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
+        //assert(i == f->n_nom_modem_samples);
+        // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
     }
 #endif
 }
 
 int freedv_nin(struct freedv *f) {
-    return f->nin;
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B))
+        // For mode 700, the input rate is 8000 sps, but the modem rate is 7500 sps
+        // For mode 700, we request a larger number of Rx samples that will be decimated to f->nin samples
+        return (16 * f->nin + f->ptFilter8000to7500->decim_index) / 15;
+    else
+        return f->nin;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -435,9 +461,8 @@ int freedv_nin(struct freedv *f) {
   decodes them, producing a frame of decoded speech samples.  See
   freedv_rx.c for an example.
 
-  demod_in[] is a variable length block of received samples at the
-  modem sample rate given by freedv_get_n_max_modem_samples().  To
-  account for difference in the transmit and receive sample clock
+  demod_in[] is a block of received samples sampled at 8000 Hz.
+  To account for difference in the transmit and receive sample clock
   frequencies, the number of demod_in[] samples is time varying. You
   MUST call freedv_nin() BEFORE each call to freedv_rx() and pass
   exactly that many samples to this function.
@@ -456,7 +481,7 @@ int freedv_nin(struct freedv *f) {
   freedv_get_n_speech_samples() and 0.
 
   700 and 700B mode: The number of output speech samples returned will
-  is always be freedv_get_n_speech_samples(), regardless of sync.
+  always be freedv_get_n_speech_samples(), regardless of sync.
 
   The peak level of demod_in[] is not critical, as the demod works
   well over a wide range of amplitude scaling.  However avoid clipping
@@ -478,10 +503,11 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
     int i;
+    int nin = freedv_nin(f);
 
-    assert(f->nin <= f->n_max_modem_samples);
+    assert(nin <= f->n_max_modem_samples);
 
-    for(i=0; i<f->nin; i++) {
+    for(i=0; i<nin; i++) {
         rx_fdm[i].real = (float)demod_in[i];
         rx_fdm[i].imag = 0.0;
     }
@@ -496,10 +522,11 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
     int  i;
+    int nin = freedv_nin(f);
 
-    assert(f->nin <= f->n_max_modem_samples);
+    assert(nin <= f->n_max_modem_samples);
 
-    for(i=0; i<f->nin; i++) {
+    for(i=0; i<nin; i++) {
         rx_fdm[i].real = demod_in[i];
         rx_fdm[i].imag = 0;
     }
@@ -520,14 +547,14 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
     assert(f->nin <= f->n_max_modem_samples);
 
-    for(i=0; i<f->nin; i++)
-        demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
-
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     nout = f->n_speech_samples;
 
     if (f->mode == FREEDV_MODE_1600) {
+
+        for(i=0; i<f->nin; i++)
+            demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
         bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
@@ -688,13 +715,20 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         float rx_bits[COHPSK_BITS_PER_FRAME];
         int   sync;
 
+        i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
+        //if (i != f->nin)
+        //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
+
+        for(i=0; i<f->nin; i++)
+            demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+
         nin_prev = f->nin;
-	cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
+        cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
         f->sync = sync;
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
         f->snr_est = f->stats.snr_est;
 
- 	if (sync) {
+        if (sync) {
 
             if (f->test_frames == 0) {
                 data_flag_index = codec2_get_spare_bit_index(f->codec2);
@@ -896,11 +930,11 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 \*---------------------------------------------------------------------------*/
 
 // Set integers
-void freedv_set_test_frames				(struct freedv *f, int val) {f->smooth_symbols = val;}
-void freedv_set_squelch_en				(struct freedv *f, int val) {f->squelch_en = val;}
-void freedv_zero_total_bit_errors			(struct freedv *f) {f->total_bit_errors = 0;}
+void freedv_set_test_frames               (struct freedv *f, int val) {f->test_frames = val;}
+void freedv_set_squelch_en                (struct freedv *f, int val) {f->squelch_en = val;}
+void freedv_zero_total_bit_errors         (struct freedv *f) {f->total_bit_errors = 0;}
 // Set floats
-void freedv_set_snr_squelch_thresh		(struct freedv *f, float val) {f->snr_squelch_thresh = val;}
+void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -914,13 +948,115 @@ void freedv_set_snr_squelch_thresh		(struct freedv *f, float val) {f->snr_squelc
 \*---------------------------------------------------------------------------*/
 
 // Get integers
-int freedv_get_test_frames				(struct freedv *f) {return f->test_frames;}
-int freedv_get_n_speech_samples			(struct freedv *f) {return f->n_speech_samples;}
-int freedv_get_modem_sample_rate		(struct freedv *f) {return f->modem_sample_rate;}
-int freedv_get_n_max_modem_samples		(struct freedv *f) {return f->n_max_modem_samples;}
-int freedv_get_n_nom_modem_samples		(struct freedv *f) {return f->n_nom_modem_samples;}
-int freedv_get_total_bits				(struct freedv *f) {return f->total_bits;}
-int freedv_get_total_bit_errors			(struct freedv *f) {return f->total_bit_errors;}
-int freedv_get_sync           			(struct freedv *f) {return  f->stats.sync;}
+int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
+int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
+//int freedv_get_modem_sample_rate        (struct freedv *f) {return f->modem_sample_rate;}
+int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
+int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
+int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
+int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bit_errors;}
+int freedv_get_sync                       (struct freedv *f) {return  f->stats.sync;}
 // Get floats
+
+
+/*--  Functions below this line are private, and not meant for public use  --*/
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTIONS...: quisk_filt_cfInit
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 27 August 2015
+
+  Initialize a FIR filter that will be used to change sample rates.  These rate
+  changing filters were copied from Quisk and modified for float samples.
+
+\*---------------------------------------------------------------------------*/
+
+static void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps)
+{    // Prepare a new filter using coefs and taps.  Samples are complex.
+    filter->dCoefs = coefs;
+    filter->cSamples = (COMP *)malloc(taps * sizeof(COMP));
+    memset(filter->cSamples, 0, taps * sizeof(COMP));
+    filter->ptcSamp = filter->cSamples;
+    filter->nTaps = taps;
+    filter->cBuf = NULL;
+    filter->nBuf = 0;
+    filter->decim_index = 0;
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTIONS...: quisk_filt_destroy
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 27 August 2015
+
+  Destroy the FIR filter and free all resources.
+
+\*---------------------------------------------------------------------------*/
+
+static void quisk_filt_destroy(struct quisk_cfFilter * filter)
+{
+    if (filter->cSamples) {
+        free(filter->cSamples);
+        filter->cSamples = NULL;
+    }
+    if (filter->cBuf) {
+        free(filter->cBuf);
+        filter->cBuf = NULL;
+    }
+}
+
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTIONS...: quisk_cfInterpDecim
+  AUTHOR......: Jim Ahlstrom
+  DATE CREATED: 27 August 2015
+
+  Take an array of samples cSamples of length count, multiply the sample rate
+  by interp, and then divide the sample rate by decim.  Return the new number
+  of samples.  Each specific interp and decim will require its own custom
+  FIR filter.
+
+\*---------------------------------------------------------------------------*/
+
+static int quisk_cfInterpDecim(COMP * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim)
+{   // Interpolate by interp, and then decimate by decim.
+    // This uses the float coefficients of filter (not the complex).  Samples are complex.
+    int i, k, nOut;
+    float * ptCoef;
+    COMP * ptSample;
+    COMP csample;
+
+    if (count > filter->nBuf) {    // increase size of sample buffer
+        filter->nBuf = count * 2;
+        if (filter->cBuf)
+            free(filter->cBuf);
+        filter->cBuf = (COMP *)malloc(filter->nBuf * sizeof(COMP));
+    }
+    memcpy(filter->cBuf, cSamples, count * sizeof(COMP));
+    nOut = 0;
+    for (i = 0; i < count; i++) {
+        // Put samples into buffer left to right.  Use samples right to left.
+        *filter->ptcSamp = filter->cBuf[i];
+        while (filter->decim_index < interp) {
+            ptSample = filter->ptcSamp;
+            ptCoef = filter->dCoefs + filter->decim_index;
+            csample.real = 0;
+            csample.imag = 0;
+            for (k = 0; k < filter->nTaps / interp; k++, ptCoef += interp) {
+                csample.real += (*ptSample).real * *ptCoef;
+                csample.imag += (*ptSample).imag * *ptCoef;
+                if (--ptSample < filter->cSamples)
+                    ptSample = filter->cSamples + filter->nTaps - 1;
+            }
+            cSamples[nOut].real = csample.real * interp;
+            cSamples[nOut].imag = csample.imag * interp;
+            nOut++;
+            filter->decim_index += decim;
+        }
+        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
+            filter->ptcSamp = filter->cSamples;
+        filter->decim_index = filter->decim_index - interp;
+    }
+    return nOut;
+}
 

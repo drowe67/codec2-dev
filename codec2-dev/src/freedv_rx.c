@@ -48,7 +48,7 @@ struct my_callback_state {
 void my_put_next_rx_char(void *callback_state, char c) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     if (pstate->ftxt != NULL) {
-        fprintf(pstate->ftxt, "%c\n", c);
+        //fprintf(pstate->ftxt, "%c\n", c);
     }
 }
 
@@ -99,8 +99,8 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(mode);
     assert(freedv != NULL);
 
-    if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
-		freedv_set_test_frames(freedv, 1);
+    if ( (argc > 3) && (strcmp(argv[4], "--testframes") == 0) ) {
+      freedv_set_test_frames(freedv, 1);
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
@@ -136,8 +136,8 @@ int main(int argc, char *argv[]) {
         /* log some side info to the txt file */
                
         if (ftxt != NULL) {
-            fprintf(ftxt, "frame: %d  demod sync: %d  demod snr: %3.2f dB  bit errors: %d\n", frame, 
-                    sync, snr_est, total_bit_errors);
+            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d\n", 
+                    frame, sync, nin, snr_est, total_bit_errors);
         }
 
 	/* if this is in a pipeline, we probably don't want the usual
