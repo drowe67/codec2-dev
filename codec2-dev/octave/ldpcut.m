@@ -16,6 +16,7 @@ cd(currentdir)
 % Our LDPC library
 
 ldpc;
+qpsk_;
 
 function sim_out = run_simulation(sim_in)
 
@@ -150,8 +151,9 @@ figure(1)
 clf
 semilogy(EbNodB, uncoded_BER_theory,'r;uncoded QPSK theory;')
 hold on;
-semilogy(EbNodB-10*log10(sim_in.rate), sim_out.BER,'g;LDPC coded QPSK simulation;');
+semilogy(EbNodB-10*log10(sim_in.rate), sim_out.BER+1E-10,'g;LDPC coded QPSK simulation;');
 hold off;
 grid('minor')
 xlabel('Eb/No (dB)')
 ylabel('BER')
+axis([min(EbNodB) max(EbNodB) min(uncoded_BER_theory) 1])
