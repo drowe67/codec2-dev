@@ -291,7 +291,7 @@ end
 
 
 function fm_mod_file(file_name_out)
-  fm_states.Fs = 44400;  
+  fm_states.Fs = 48000;  
   fm_states.fm_max = 3E3;
   fm_states.fd = 5E3;
   fm_states.fc = fm_states.Fs/4;
@@ -412,6 +412,46 @@ function make_coeff_file
   fm_fir_coeff_file(fm_states, "fm_fir_coeff.h")
 endfunction
 
+function test_fm_modulator
+  fm_states.Fs = 48000;  
+  fm_states.fm_max = 3E3;
+  fm_states.fd = 5E3;
+  fm_states.fc = fm_states.Fs/4;
+
+  fm_states.pre_emp = 0;
+  fm_states.de_emp  = 0;
+  fm_states.Ts = 1;
+  fm_states.output_filter = 1;
+  fm_states = analog_fm_init(fm_states);
+  
+  test_t = [1:(fm_states.Fs*10)];
+  test_freq1 = 2*pi*3000/fm_states.Fs;
+  test_freq2 = 2*pi*1000/fm_states.Fs;
+
+  test_sig = .5*sin(test_t*test_freq1) + .5*sin(test_t*test_freq2);
+  %test_sig = zeros(1,length(test_t));
+  %test_sig = ones(1,length(test_t));
+
+  ftsig = fopen("fm_test_sig.raw","wb");
+  fwrite(ftsig,test_sig*16384,"short");
+  fclose(ftsig);
+  
+  system("../fm_test fm_test_sig.raw fm_test_out.raw");
+  ftmod = fopen("fm_test_out.raw","r");
+  test_mod = fread(ftmod,"short")/16384;
+  fclose(ftmod);
+  
+  comp_mod = analog_fm_mod(fm_states,test_sig);
+  
+  figure(1)
+  comp_mod_real = real(comp_mod);
+  size(comp_mod_real)
+  size(test_mod)
+  mod_diff = zeros(1,length(test_mod));
+  mod_diff = rot90(test_mod) .- comp_mod_real;
+  plot(mod_diff);
+  
+endfunction
 
 more off;
 
@@ -420,4 +460,5 @@ more off;
 %fm_demod_file("ssb25_fm_de.raw", "~/Desktop/ssb25db.wav")
 %run_fm_single
 %make_coeff_file
-fm_mod_file("fm_1000.raw");
+%fm_mod_file("fm_1000.raw");
+test_fm_modulator

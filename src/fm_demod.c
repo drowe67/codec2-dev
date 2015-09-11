@@ -38,6 +38,8 @@
 
 #define N 160
 
+#define TEST_MOD
+
 int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
@@ -68,16 +70,20 @@ int main(int argc, char *argv[])
     }
 
     fm         = fm_create(N);
-    fm->Fs     = 44400.0;
+    fm->Fs     = 48000.0;
     fm->fm_max = 3000.0;
     fm->fd     = 5000.0;
     fm->fc     = fm->Fs/4;
 
     while(fread(buf, sizeof(short), N, fin) == N) {
 	for(i=0; i<N; i++) {
-	    rx[i] = buf[i];
+	    rx[i] = ((float)buf[i])/16384;
         }
+#ifdef TEST_MOD
+	fm_mod(fm, rx, rx_out);
+#else
         fm_demod(fm, rx_out, rx);
+#endif
 	for(i=0; i<N; i++) {
 	    buf[i] = 16384*rx_out[i];
         }

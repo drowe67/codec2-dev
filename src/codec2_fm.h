@@ -37,7 +37,8 @@ struct FM {
     float  fc;               /* setme: carrier frequency            */ 
     COMP  *rx_bb;
     COMP   rx_bb_filt_prev;
-    float *rx_dem_mem;      
+    float *rx_dem_mem;
+    float  tx_phase;
     int    nsam;
     COMP   lo_phase;
 };
@@ -45,6 +46,7 @@ struct FM {
 struct FM *fm_create(int nsam);
 void fm_destroy(struct FM *fm_states);
 void fm_demod(struct FM *fm, float rx_out[], float rx[]);
+void fm_mod(struct FM *fm, float tx_in[], float tx_out[]);
 
 #endif
 
