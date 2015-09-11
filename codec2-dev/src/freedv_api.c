@@ -932,9 +932,19 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 // Set integers
 void freedv_set_test_frames               (struct freedv *f, int val) {f->test_frames = val;}
 void freedv_set_squelch_en                (struct freedv *f, int val) {f->squelch_en = val;}
-void freedv_zero_total_bit_errors         (struct freedv *f) {f->total_bit_errors = 0;}
+void freedv_set_total_bit_errors          (struct freedv *f, int val) {f->total_bit_errors = val;}
+void freedv_set_total_bits                (struct freedv *f, int val) {f->total_bits = val;}
+void freedv_set_clip                       (struct freedv *f, int val) {f->clip = val;}
+void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
+
 // Set floats
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
+
+void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_error_pattern cb, void *state)
+{
+    f->freedv_put_error_pattern = cb;
+    f->error_pattern_callback_state = state;
+}
 
 /*---------------------------------------------------------------------------*\
                                                        
@@ -948,16 +958,22 @@ void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_
 \*---------------------------------------------------------------------------*/
 
 // Get integers
+int freedv_get_mode                       (struct freedv *f) {return f->mode;}
 int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
 int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
-//int freedv_get_modem_sample_rate        (struct freedv *f) {return f->modem_sample_rate;}
+int freedv_get_modem_sample_rate          (struct freedv *f) {return FS;}
 int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
 int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bit_errors;}
 int freedv_get_sync                       (struct freedv *f) {return  f->stats.sync;}
+int freedv_get_sz_error_pattern           (struct freedv *f) {return  f->sz_error_pattern;}
 // Get floats
 
+struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}
+
+void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats) 
+  { memcpy(stats, &f->stats, sizeof(struct MODEM_STATS)); }
 
 /*--  Functions below this line are private, and not meant for public use  --*/
 /*---------------------------------------------------------------------------*\

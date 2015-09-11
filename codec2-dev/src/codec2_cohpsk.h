@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
                                                                              
-  FILE........: cohpsk.h
+  FILE........: codec2_cohpsk.h
   AUTHOR......: David Rowe
   DATE CREATED: March 2015
                                                                              
