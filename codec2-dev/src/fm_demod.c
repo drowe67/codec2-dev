@@ -74,7 +74,7 @@ int main(int argc, char *argv[])
     fm->Fs     = 48000.0;
     fm->fm_max = 3000.0;
     fm->fd     = 5000.0;
-    fm->fc     = fm->Fs/4;
+    fm->fc     = 0;
 
     while(fread(buf, sizeof(short), N, fin) == N) {
 	for(i=0; i<N; i++) {
