@@ -37,7 +37,7 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 4)
 # Set to patch level if needed, otherwise leave FALSE.
-set(CODEC2_VERSION_PATCH FALSE)
+set(CODEC2_VERSION_PATCH 1)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -48,7 +48,7 @@ message(STATUS "codec2 version: ${CODEC2_VERSION}")
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Debug")
+    set(CMAKE_BUILD_TYPE "Release")
 endif()
 
 # Set default C++ flags.
@@ -100,7 +100,9 @@ endif(MINGW)
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 # Unittest should be on for dev builds and off for releases.
-if(IS_DIRECTORY ${CMAKE_SOURCE_DIR}/unittest)
+if(CMAKE_BUILD_TYPE MATCHES "Release")
+    option(UNITTEST "Build unittest binaries." OFF)
+else()
     option(UNITTEST "Build unittest binaries." ON)
 endif()
 option(INSTALL_EXAMPLES "Install example code." OFF)
