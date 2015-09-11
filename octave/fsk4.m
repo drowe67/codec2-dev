@@ -7,9 +7,7 @@ fm;
 
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
-function r = fsk4_rcf_resp(f)
-    r = 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
-endfunction
+fsk4_rcf_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
 
 %Maximum positive deviation of amy 4FSK symbol
 global fsk4_max_deviation = 1944;
@@ -42,4 +40,29 @@ function fsk4_states = fsk4_init(fsk4_states,Rs)
     fsk4_states.fm_states = analog_fm_init(fm_states);
 
 endfunction 
+
+function [tx, tx_filt] = fsk4_mod(fsk4_states, tx_symbols)
+  M = fsk4_states.M;
+  nsym = length(tx_symbols);
+  nsam = nsym*M;
+
+  tx_stream = zeros(1,nsam);
+  for i=1:nsym
+    tx_stream(1+(i-1)*M:i*M) = fsk4_states.symmap(tx_symbols(i));
+  end
+  tx_filt = filter(fsk4_states.tx_filter, 1, tx_stream);
+  tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
+endfunction
+
+
+
+
+
+
+
+
+
+
+
+
     
