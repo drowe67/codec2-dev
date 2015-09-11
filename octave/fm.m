@@ -438,7 +438,10 @@ function test_fm_modulator
   
   system("../fm_test fm_test_sig.raw fm_test_out.raw");
   ftmod = fopen("fm_test_out.raw","r");
-  test_mod = fread(ftmod,"short")/16384;
+  test_mod_p = rot90(fread(ftmod,"short"))/16384;
+  test_mod_r = test_mod_p(1:2:length(test_mod_p));
+  test_mod_i = test_mod_p(2:2:length(test_mod_p));
+  test_mod = test_mod_r .+ i*test_mod_i;
   fclose(ftmod);
   
   comp_mod = analog_fm_mod(fm_states,test_sig);
@@ -448,8 +451,8 @@ function test_fm_modulator
   size(comp_mod_real)
   size(test_mod)
   mod_diff = zeros(1,length(test_mod));
-  mod_diff = rot90(test_mod) .- comp_mod_real;
-  plot(mod_diff);
+  mod_diff = test_mod .- comp_mod;
+  plot(real(mod_diff),test_t,imag(mod_diff),test_t);
   
 endfunction
 

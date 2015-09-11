@@ -240,18 +240,48 @@ void fm_mod(struct FM *fm_states, float tx_in[], float tx_out[]){
   fm_states->tx_phase = tx_phase;
 }
 
+/*---------------------------------------------------------------------------*\
+                                                       
+  FUNCTION....: fm_mod	     
+  AUTHOR......: Brady O'Brien			      
+  DATE CREATED: Sept. 10 2015
 
+  Modulate an FM signal from a baseband modulating signal
 
+  struct FM *fm - FM state structure. Can be reused from fm_demod.
+  float tx_in[] - nsam baseband samples to be modulated
+  float tx_out[] - nsam samples in which to place the modulated FM
 
+\*---------------------------------------------------------------------------*/
 
+void fm_mod_comp(struct FM *fm_states, float tx_in[], COMP tx_out[]){
+  float  Fs = fm_states->Fs;    //Sampling freq
+  float  fc = fm_states->fc;    //Center freq
+  float  wc = 2*M_PI*fc/Fs;     //Center freq in rads/samp
+  float  fd = fm_states->fd;    //Max deviation in cycles/samp
+  float  wd = 2*M_PI*fd/Fs;     //Max deviation in rads/samp
+  int  nsam = fm_states->nsam;  //Samples per batch of modulation
+  float tx_phase = fm_states->tx_phase; //Transmit phase in rads
+  float w;			//Temp variable for phase of VFO during loop
+  int i;
+ 
+  //Go through the samples, spin the oscillator, and generate some FM
+  for(i=0; i<nsam; i++){
+      w = wc + wd*tx_in[i];   //Calculate phase of VFO
+      tx_phase += w;          //Spin TX oscillator
 
+      //TODO: Add pre-emphasis and pre-emph AGC for voice    
 
+      //Make sure tx_phase stays from 0 to 2PI.
+      //If tx_phase goes above 4PI, It's because fc+fd*tx_in[i] is way too large for the sample
+      // rate.
+      if(tx_phase > 2*M_PI)
+          tx_phase -= 2*M_PI;
 
-
-
-
-
-
-
-
+      tx_out[i].real = cosf(tx_phase);
+      tx_out[i].imag = sinf(tx_phase);
+  }
+  //Save phase back into state struct
+  fm_states->tx_phase = tx_phase;
+}
 

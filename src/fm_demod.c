@@ -38,15 +38,16 @@
 
 #define N 160
 
-#define TEST_MOD
+#define TEST_MOD_COMP
 
 int main(int argc, char *argv[])
 {
     FILE         *fin, *fout;
     struct FM    *fm;
-    short         buf[N];
+    short         buf[N*2];
     float         rx[N];
     float         rx_out[N];
+    COMP          out_comp[N];
     int           i;
 
     if (argc < 2) {
@@ -82,12 +83,26 @@ int main(int argc, char *argv[])
 #ifdef TEST_MOD
 	fm_mod(fm, rx, rx_out);
 #else
+#ifdef  TEST_MOD_COMP
+	fm_mod_comp(fm, rx, out_comp);
+#else
         fm_demod(fm, rx_out, rx);
 #endif
+#endif
+
+
+#ifdef TEST_MOD_COMP
+	for(i=0; i<N; i++) {
+	    buf[i*2    ] = 16384*out_comp[i].real;
+            buf[1+(i*2)] = 16384*out_comp[i].imag;
+        }
+	fwrite(buf, sizeof(short), N*2, fout);
+#else
 	for(i=0; i<N; i++) {
 	    buf[i] = 16384*rx_out[i];
         }
         fwrite(buf, sizeof(short), N, fout);
+#endif
     }
 
     fm_destroy(fm);
