@@ -416,7 +416,8 @@ function test_fm_modulator
   fm_states.Fs = 48000;  
   fm_states.fm_max = 3E3;
   fm_states.fd = 5E3;
-  fm_states.fc = fm_states.Fs/4;
+  %fm_states.fc = fm_states.Fs/4;
+  fm_states.fc = 0;   
 
   fm_states.pre_emp = 0;
   fm_states.de_emp  = 0;
@@ -452,8 +453,8 @@ function test_fm_modulator
   size(test_mod)
   mod_diff = zeros(1,length(test_mod));
   mod_diff = test_mod .- comp_mod;
-  plot(real(mod_diff),test_t,imag(mod_diff),test_t);
-  
+  plot(test_t,real(test_mod .- comp_mod),test_t,imag(test_mod .- comp_mod));
+
 endfunction
 
 more off;
@@ -464,4 +465,4 @@ more off;
 %run_fm_single
 %make_coeff_file
 %fm_mod_file("fm_1000.raw");
-test_fm_modulator
+%test_fm_modulator
