@@ -246,11 +246,12 @@ void fm_mod(struct FM *fm_states, float tx_in[], float tx_out[]){
   AUTHOR......: Brady O'Brien			      
   DATE CREATED: Sept. 10 2015
 
-  Modulate an FM signal from a baseband modulating signal
+  Modulate an FM signal from a baseband modulating signal. Output signal is
+   in complex domain
 
   struct FM *fm - FM state structure. Can be reused from fm_demod.
   float tx_in[] - nsam baseband samples to be modulated
-  float tx_out[] - nsam samples in which to place the modulated FM
+  COMP tx_out[] - nsam samples in which to place the modulated FM
 
 \*---------------------------------------------------------------------------*/
 
