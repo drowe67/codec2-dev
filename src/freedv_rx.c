@@ -99,7 +99,7 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(mode);
     assert(freedv != NULL);
 
-    if ( (argc > 3) && (strcmp(argv[4], "--testframes") == 0) ) {
+    if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
       freedv_set_test_frames(freedv, 1);
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
