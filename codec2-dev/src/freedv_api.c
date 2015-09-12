@@ -911,7 +911,7 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
 #ifndef CORTEX_M4
-    if (f->mode == FREEDV_MODE_700)
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
 #endif
     if (sync) *sync = f->stats.sync;
@@ -973,7 +973,14 @@ int freedv_get_sz_error_pattern           (struct freedv *f) {return  f->sz_erro
 struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}
 
 void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats) 
-  { memcpy(stats, &f->stats, sizeof(struct MODEM_STATS)); }
+{ 
+    if (f->mode == FREEDV_MODE_1600)
+        fdmdv_get_demod_stats(f->fdmdv, stats);
+#ifndef CORTEX_M4
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B))
+        cohpsk_get_demod_stats(f->cohpsk, stats);
+#endif
+}
 
 /*--  Functions below this line are private, and not meant for public use  --*/
 /*---------------------------------------------------------------------------*\
