@@ -124,7 +124,7 @@ struct FDMDV {
 
     float foff;
     COMP foff_phase_rect;
-    float filt;
+    float foff_filt;
 
     /* Demodulator */
 
