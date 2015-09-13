@@ -57,7 +57,6 @@ function [tx, tx_filt] = fsk4_mod(fsk4_states, tx_bits)
     lbits = [lbits 0]
   end
   tx_symbols = lbits + hbits*2 + 1;
-  hist(tx_symbols);
   M = fsk4_states.M;
   nsym = length(tx_symbols);
   nsam = nsym*M;
@@ -100,10 +99,29 @@ endfunction
 function sym = fsk4_demod_fmrid(fsk4_states, rx)
   afmd = analog_fm_demod(fsk4_states.fm_states,rx);
   sym = afsym = idmp(afmd,10);
-  for i=(1:length(afsym))
-    
+  
+  %Even and odd symbol error.
+  erreven = 0;
+  errodd  = 0;
+  % Demod symbol map. I should probably figure a better way to do this.
+  % After integrating, the high symbol tends to be about 7.5
+  dmsyms = rot90(fsk4_states.symmap * 7.5);
+
+  oddsyms  = afsym(1:2:length(afsym));
+  evensyms = afsym(2:2:length(afsym));
+  [errseven,deceven] = min(abs(evensyms - dmsyms));
+  [errsodd ,decodd ] = min(abs(oddsyms  - dmsyms));
+
+  erreven = mean(errseven)
+  errodd  = mean(errsodd )
+
+  if erreven < errodd
+    sym = deceven;
+  else
+    sym = decodd;
   end
-  eyediagram(afsym,4);
+  eyediagram(decodd ,4);
+  eyediagram(deceven,4);
   %todo: write the thing that finds the symbols in the even/odd integrator output.
 endfunction
 
