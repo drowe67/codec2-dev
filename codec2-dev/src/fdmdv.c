@@ -183,6 +183,7 @@ struct FDMDV * fdmdv_create(int Nc)
     }
 
     f->sig_pwr_av = 0.0;
+    f->foff_filt = 0.0;
 
     return f;
 }
@@ -1168,6 +1169,8 @@ float rx_est_timing(COMP rx_symbols[],
        P/4 part was adjusted by experiment, I know not why.... */
     
     norm_rx_timing = atan2f(x.imag, x.real)/(2*PI);
+    assert(fabsf(norm_rx_timing) < 1.0);
+    //fprintf(stderr,"%f %f norm_rx_timing: %f\n", x.real, x.imag, norm_rx_timing);
     rx_timing      = norm_rx_timing*P + P/4;
     
     if (rx_timing > P)

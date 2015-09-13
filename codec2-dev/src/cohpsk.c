@@ -881,9 +881,9 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
             /* loop filter made up of 1st order IIR plus integrator.  Integerator
                was found to be reqd  */
         
-            fdmdv->filt = (1.0-beta)*fdmdv->filt + beta*atan2(mod_strip.imag, mod_strip.real);
-            //printf("filt: %f angle: %f\n", fdmdv->filt, atan2(mod_strip.imag, mod_strip.real));
-            *f_est += g*fdmdv->filt;
+            fdmdv->foff_filt = (1.0-beta)*fdmdv->foff_filt + beta*atan2(mod_strip.imag, mod_strip.real);
+            //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2(mod_strip.imag, mod_strip.real));
+            *f_est += g*fdmdv->foff_filt;
         }    
 
         /* Optional logging used for testing against Octave version */
