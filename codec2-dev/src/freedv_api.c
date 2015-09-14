@@ -712,19 +712,23 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
-        COMP  demod_in_scale[f->n_max_modem_samples];
         float rx_bits[COHPSK_BITS_PER_FRAME];
         int   sync;
+
+        // echo samples back out as default (say if sync not found)
+
+        for(i=0; i<freedv_nin(f); i++)
+            speech_out[i] = demod_in[i].real; 
 
         i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
         //if (i != f->nin)
         //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
 
         for(i=0; i<f->nin; i++)
-            demod_in_scale[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+            demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
         nin_prev = f->nin;
-        cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in_scale, &f->nin);
+        cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
         f->sync = sync;
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
         f->snr_est = f->stats.snr_est;
@@ -808,8 +812,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         }
 
 
-        /* no valid FreeDV signal - either squelch output of echo
-           input samples to output as a tuning aid. */
+        /* no valid FreeDV signal - squelch output */
 
         if (sync == 0) {
             nout = freedv_nin(f);                 
@@ -817,16 +820,12 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
                 for(i=0; i<nout; i++)
                     speech_out[i] = 0; 
             }
-            else {
-                for(i=0; i<nout; i++)
-                    speech_out[i] = demod_in[i].real; 
-            }
         }
 
     }
 #endif            
      
-    //fprintf(stderr,"f->stats.sync: %d reliable_sync_bit: %d evenframe: %d nout: %d\n", f->stats.sync, reliable_sync_bit, f->evenframe, nout);
+    //fprintf(stderr,"freedv_nin(f): %d nout: %d\n", freedv_nin(f), nout);
     return nout;
 }
 
