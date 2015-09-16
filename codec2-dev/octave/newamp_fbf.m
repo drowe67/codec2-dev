@@ -25,7 +25,8 @@ function newamp_fbf(samname, f)
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
- 
+  [frames tmp] = size(model);
+
   plot_all_masks = 0;
   k = ' ';
   do 
@@ -41,6 +42,8 @@ function newamp_fbf(samname, f)
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
+    %[h w] = freqz([1 -1],1,(1:L)*Wo); % pre-emphasise to reduce dynamic range
+    %Am = Am .* abs(h);
     AmdB = 20*log10(Am);
 
     % plotting
@@ -70,7 +73,7 @@ function newamp_fbf(samname, f)
       plot(Am_freqs_kHz*1000, AmdB_, 'g+');
     end
 
-    % estimate low rate samples
+    % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     [decmaskdB local_maxima error_log candidate_log target_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
@@ -79,14 +82,19 @@ function newamp_fbf(samname, f)
     nlm = min(nlm,4);
     tonef_kHz = local_maxima(1:nlm,2)*Wo*4/pi;
     toneamp_dB = local_maxima(1:nlm,1);
-    plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
-    plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
+    %plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
+    %plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
 
     % fit a line to amplitudes
 
     %[m b] = linreg(tonef_kHz, toneamp_dB, nlm);
     %plot(tonef_kHz*1000, tonef_kHz*m + b, "bk");
     %plot(tonef_kHz*1000, 60 + toneamp_dB - (tonef_kHz*m + b), "r+");
+
+    % decimated in time
+
+    maskdB = decimate_frame_rate(maskdB, model, 4, f, frames, mask_sample_freqs_kHz);
+    plot(mask_sample_freqs_kHz*1000, maskdB, 'k');
 
     % optionally plot all masking curves
 

@@ -13,6 +13,7 @@
 %   octave:14> newamp_batch("../build_linux/src/hts1a")
 %   ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --amread hts1a_am.out -o - | play -t raw -r 8000 -s -2 -
 
+
 % process a whole file and write results
 
 function newamp_batch(samname, optional_Am_out_name)
@@ -20,7 +21,7 @@ function newamp_batch(samname, optional_Am_out_name)
   more off;
 
   max_amp = 80;
-  use_decmask = 1;
+  use_decmask = 0;
   postfilter_en = 1;
   decimate = 1;
 
@@ -38,14 +39,14 @@ function newamp_batch(samname, optional_Am_out_name)
   fam = fopen(Am_out_name,"wb"); 
 
   for f=1:frames
-    printf("\rframe: %d", f);
+    printf("frame: %d", f);
     L = min([model(f,2) max_amp-1]);
     Wo = model(f,1);
     Am = model(f,3:(L+2));
 
     AmdB = 20*log10(Am);
 
-    % find mask and decimated mask
+    % find mask and decimate mask samples
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB = mask_model(AmdB, Wo, L);
@@ -59,6 +60,8 @@ function newamp_batch(samname, optional_Am_out_name)
       non_masked_m = find(AmdB > maskdB);
     end
 
+    maskdB_ = decimate_frame_rate(maskdB_, model, decimate, f, frames, mask_sample_freqs_kHz);
+
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
     if postfilter_en
@@ -67,6 +70,7 @@ function newamp_batch(samname, optional_Am_out_name)
     else
       maskdB_pf = maskdB_;
     end
+
 
     if 0 
       % Early work as per blog post part 1
@@ -90,4 +94,5 @@ function newamp_batch(samname, optional_Am_out_name)
   printf("\n");
 
 endfunction
+
 
