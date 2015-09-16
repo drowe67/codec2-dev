@@ -112,8 +112,8 @@ function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   [errseven,deceven] = min(abs(evensyms - dmsyms));
   [errsodd ,decodd ] = min(abs(oddsyms  - dmsyms));
 
-  terreven = mean(errseven)
-  terrodd  = mean(errsodd )
+  terreven = mean(errseven);
+  terrodd  = mean(errsodd );
 
   if terreven < terrodd
     sym = deceven;
@@ -129,22 +129,38 @@ function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   end
 endfunction
 
-function ber = nfbert(rxoffset)
+% Bit error rate test
+% for a noise-free channel
+% now supports noisy channels
+function ber = nfbert(aEbNodB)
   bitcnt = 48000;
   offset = 29;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,2400);
-  txrf = fsk4_mod(fsk4_states,test_bits);
-   
-  txrf = [txrf(offset:length(txrf)) zeros(1,offset)];
-  %add noise here
+  Fs = fsk4_states.Fs;
+  Rs = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
+
+  tx = fsk4_mod(fsk4_states,test_bits);
   
-  [rx_bits,rx_err] = fsk4_demod_fmrid(fsk4_states,txrf);
- % for offset = (25:31)
- %  offset
-   ber = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)))/(bitcnt-offset);
- % end
+  %add noise here
+  %shamelessly copied from gmsk.m
+
+  EbNo = 10^(aEbNodB/10);
+  variance = Fs/(Rs*EbNo);
+  nsam = length(tx);
+  noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+  rx    = tx*exp(j*pi/2) + noise;
+
+  [rx_bits,rx_err] = fsk4_demod_fmrid(fsk4_states,rx);
+  ber = 1;
+  
+  %thing to account for offset from input data to output data
+  %No preamble detection yet
+  for offset = (25:31)
+    bern = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)))/(bitcnt-offset);
+    ber = min([ber bern]);
+  end
   plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
 endfunction
 
