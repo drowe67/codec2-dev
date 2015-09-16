@@ -96,13 +96,13 @@ endfunction
 
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
-function sym = fsk4_demod_fmrid(fsk4_states, rx)
-  afmd = analog_fm_demod(fsk4_states.fm_states,rx);
-  sym = afsym = idmp(afmd,10);
+function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
+  rxd = analog_fm_demod(fsk4_states.fm_states,rx);
   
-  %Even and odd symbol error.
-  erreven = 0;
-  errodd  = 0;
+  %rx_filt = filter(fsk4_states.tx_filter, 1, rxd); 
+  rx_filt=rxd;
+  sym = afsym = idmp(rx_filt,fsk4_states.M/2);
+
   % Demod symbol map. I should probably figure a better way to do this.
   % After integrating, the high symbol tends to be about 7.5
   dmsyms = rot90(fsk4_states.symmap * 7.5);
@@ -112,21 +112,39 @@ function sym = fsk4_demod_fmrid(fsk4_states, rx)
   [errseven,deceven] = min(abs(evensyms - dmsyms));
   [errsodd ,decodd ] = min(abs(oddsyms  - dmsyms));
 
-  erreven = mean(errseven)
-  errodd  = mean(errsodd )
+  terreven = mean(errseven)
+  terrodd  = mean(errsodd )
 
-  if erreven < errodd
+  if terreven < terrodd
     sym = deceven;
+    err = errseven;
   else
     sym = decodd;
+    err = errsodd;
   end
-  eyediagram(decodd ,4);
-  eyediagram(deceven,4);
-  %todo: write the thing that finds the symbols in the even/odd integrator output.
+  bits = zeros(1,length(sym)*2);
+  %Translate symbols back into bits
+  for i=1:length(sym)
+    bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](sym(i),(1:2));
+  end
 endfunction
 
-
-
-
-
+function ber = nfbert(rxoffset)
+  bitcnt = 48000;
+  offset = 29;
+  test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
+  fsk4_states.M = 1;
+  fsk4_states = fsk4_init(fsk4_states,2400);
+  txrf = fsk4_mod(fsk4_states,test_bits);
+   
+  txrf = [txrf(offset:length(txrf)) zeros(1,offset)];
+  %add noise here
+  
+  [rx_bits,rx_err] = fsk4_demod_fmrid(fsk4_states,txrf);
+ % for offset = (25:31)
+ %  offset
+   ber = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)))/(bitcnt-offset);
+ % end
+  plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
+endfunction
 
