@@ -330,6 +330,54 @@ function maskdB = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   end
 endfunction
 
+function maskdB = resample_mask(model, f, mask_sample_freqs_kHz)
+  max_amp = 80;
+
+  Wo = model(f,1);
+  L = min([model(f,2) max_amp-1]);
+  Am = model(f,3:(L+2));
+  AmdB = 20*log10(Am);
+  masker_freqs_kHz = (1:L)*Wo*4/pi;
+  maskdB = determine_mask(AmdB, masker_freqs_kHz, mask_sample_freqs_kHz);
+endfunction
+
+
+% decimate frame rate of mask, use interpolation in the log domain 
+
+function maskdB_ = decimate_frame_rate(maskdB, model, decimate, f, frames, mask_sample_freqs_kHz)
+    max_amp = 80;
+
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp-1]);
+
+    if (mod(f-1,decimate) && (f < (frames-decimate)))
+
+      % determine frames that bracket the one we need to interp
+
+      left_f = decimate*floor(f/decimate)+1; 
+      right_f = decimate*ceil(f/decimate)+1;
+
+      % determine fraction of each frame to use
+
+      right_fraction  = mod(f-1,decimate)/decimate;
+      left_fraction = 1 - right_fraction;
+
+      printf("\nf: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n",f,left_f,right_f,left_fraction,right_fraction)
+
+      % determine mask for left and right frames, sampling at Wo for this frame
+
+      mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+      maskdB_left = resample_mask(model, left_f, mask_sample_freqs_kHz);
+      maskdB_right = resample_mask(model, right_f, mask_sample_freqs_kHz);
+
+      maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
+    else
+      maskdB_ = maskdB;
+      printf("\n");
+    end
+endfunction
+
+
 % plot some masking curves, used for working on masking filter changes
 
 function plot_masking
