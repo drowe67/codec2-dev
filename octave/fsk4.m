@@ -24,7 +24,10 @@ function fsk4_states = fsk4_init(fsk4_states,Rs)
     Rs = fsk4_states.Rs = Rs;     %Symbol rate
     M = fsk4_states.M = fsk4_states.Fs/fsk4_states.Rs; %Samples per symbol
     
-    %Set up 4FSK raised cosine filter
+    % Set up 4FSK raised cosine filter. This probably screws up perf if we were using
+    % optimal mod and dmeods but helps performance when using nasty old analog FM mods
+    % and demods
+
     rf = (0:(Fs/2));
     tx_filter = fir2(100 ,rf/(Fs/2),fsk4_rcf_resp(rf));
     fsk4_states.tx_filter = tx_filter;
@@ -42,7 +45,7 @@ function fsk4_states = fsk4_init(fsk4_states,Rs)
 
 endfunction 
 
-function d = idmp(data, M, offset)
+function d = idmp(data, M)
     d = zeros(1,length(data)/M);
     for i = 1:length(d)
       d(i) = sum(data(1+(i-1)*M:i*M));
@@ -69,50 +72,49 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
   %tx_filt = tx_filt / max(tx_filt);
   tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
   figure(10);
-  plot(tx_filt(1:M*10));
-  title('Input to FM modulator')
+  plot(20*log10(abs(fft(tx))))
 
 endfunction
 
-%non-coherent demod based on a paper I found on IEEE xplore. Paper claims it is ~1db under coherent.
-% I don't think it works
-% Paper is titled "ALL- DIGITAL PSEUDO- COHERENT (PC) FSK MODEMS"
+% Integrate and Dump 4FSK demod
+
 function bits = fsk4_demod_thing(fsk4_states, rx)
   global fsk4_symbols;
+
+  M = fsk4_states.M;
   Fs = fsk4_states.Fs;
+  t = (0:length(rx)-1);
+  symup = fsk4_symbols;
+  
+  % Integrator is like an FIR filter with rectangular window coeffs.
+  % This has some nasty side lobes so lets limit the overall amount
+  % of noise getting in.  tx filter just happens to work, but I imagine
+  % other LPF would as well.
 
-  t = (1:length(rx));
-  %shiftup = exp(j*2*pi*(1/4)*t);
- 
-  ffilt = 4800;
-  rx_filter = fir1(300,ffilt/fsk4_states.Fs);
-  %rx_filter = [1];
-  tx_filter = fsk4_states.tx_filter;
-  %rx_up = filter(rx_filter,1,rx);
-  rx_filter = tx_filter;
-  rx_up = rx;%real(rx.*shiftup);
-  symup = fsk4_symbols;% + Fs/4;
-  sym1m = filter(rx_filter,1,exp(-j*2*pi*(symup(1)/Fs)*t).*rx_up);
-  sym2m = filter(rx_filter,1,exp(-j*2*pi*(symup(2)/Fs)*t).*rx_up);
-  sym3m = filter(rx_filter,1,exp(-j*2*pi*(symup(3)/Fs)*t).*rx_up);
-  sym4m = filter(rx_filter,1,exp(-j*2*pi*(symup(4)/Fs)*t).*rx_up);
+  rx = filter(fsk4_states.tx_filter, 1, rx);
 
-  figure(11);
-  clf
-  np = fsk4_states.M*10;
-  subplot(411); plot(abs(sym1m(1:np)))
-  title('Output of each demod filter')
-  subplot(412); plot(abs(sym2m(1:np)))
-  subplot(413); plot(abs(sym3m(1:np)))
-  subplot(414); plot(abs(sym4m(1:np)))
+  sym1m = exp(j*2*pi*(symup(1)/Fs)*t).*rx;
+  sym2m = exp(j*2*pi*(symup(2)/Fs)*t).*rx;
+  sym3m = exp(j*2*pi*(symup(3)/Fs)*t).*rx;
+  sym4m = exp(j*2*pi*(symup(4)/Fs)*t).*rx;
 
-  sym1m = idmp(sym1m,20); sym1m = (real(sym1m).^2+imag(sym1m).^2);
-  sym2m = idmp(sym2m,20); sym2m = (real(sym2m).^2+imag(sym2m).^2);
-  sym3m = idmp(sym3m,20); sym3m = (real(sym3m).^2+imag(sym3m).^2);
-  sym4m = idmp(sym4m,20); sym4m = (real(sym4m).^2+imag(sym4m).^2);
-  sym = sym1m*-3 + sym2m*-1 + sym3m*1 + sym4m*3;
+  % this puppy found by experiment between 1 and M. Will vary with different
+  % filter impulse responses, as delay will vary.  f you add M to it coarse
+  % timing will adjust by 1.
+
+  fine_timing = M+1;
+
+  sym1m = idmp(sym1m(fine_timing:length(sym1m)),M); sym1m = (real(sym1m).^2+imag(sym1m).^2);
+  sym2m = idmp(sym2m(fine_timing:length(sym2m)),M); sym2m = (real(sym2m).^2+imag(sym2m).^2);
+  sym3m = idmp(sym3m(fine_timing:length(sym3m)),M); sym3m = (real(sym3m).^2+imag(sym3m).^2);
+  sym4m = idmp(sym4m(fine_timing:length(sym4m)),M); sym4m = (real(sym4m).^2+imag(sym4m).^2);
+
   figure(2);
-  plot((1:2000),sym1m(1:2000),(1:2000),sym2m(1:2000),(1:2000),sym3m(1:2000),(1:2000),sym4m(1:2000));
+  nsym = 100;
+  subplot(411); plot(sym1m(1:nsym))
+  subplot(412); plot(sym2m(1:nsym))
+  subplot(413); plot(sym3m(1:nsym))
+  subplot(414); plot(sym4m(1:nsym))
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
@@ -223,7 +225,10 @@ endfunction
 % for a noise-free channel
 % now supports noisy channels
 function ber = nfbert(aEsNodB)
-  bitcnt = 4800;
+  rand('state',1); 
+  randn('state',1);
+
+  bitcnt = 48000;
   offset = 29;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
@@ -254,10 +259,12 @@ function ber = nfbert(aEsNodB)
     bern = nerr/(bitcnt-offset);
     if(bern < ber)
       ox = offset;
+      best_nerr = nerr;
     end
     ber = min([ber bern]);
   end
   offset = ox;
+  printf("coarse timing: %d nerr: %d\n", offset, best_nerr);
   %plot(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
   %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
 endfunction
