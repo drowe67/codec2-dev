@@ -527,6 +527,11 @@ function ideal
   sim_dqpsk_hf            = ber_test(sim_in, 'dqpsk');
   sim_in.ldpc_code_rate   = 1/2;
   sim_in.ldpc_code        = 1;
+
+  sim_in.hf_sim           = 0;
+  sim_qpsk_ldpc           = ber_test(sim_in, 'qpsk');
+
+  sim_in.hf_sim           = 1;
   sim_qpsk_hf_ldpc        = ber_test(sim_in, 'qpsk');
   sim_in.hf_mag_only      = 0;
   sim_dqpsk_hf_ldpc       = ber_test(sim_in, 'dqpsk');
@@ -537,6 +542,7 @@ function ideal
   hold on;
   semilogy(sim_qpsk.Ebvec, sim_qpsk.BERvec,'g;QPSK AWGN;')
   semilogy(sim_qpsk_hf.Ebvec, sim_qpsk_hf.BERvec,'r;QPSK HF;')
+  semilogy(sim_qpsk_ldpc.Ebvec, sim_qpsk_ldpc.BERldpcvec,'bk;QPSK HF;')
   semilogy(sim_dqpsk.Ebvec, sim_dqpsk.BERvec,'g;DQPSK AWGN;')
   semilogy(sim_dqpsk_hf.Ebvec, sim_dqpsk_hf.BERvec,'r;DQPSK HF;')
   semilogy(sim_qpsk_hf_ldpc.Ebvec, sim_qpsk_hf_ldpc.BERldpcvec,'b;QPSK HF LDPC 1/2;')

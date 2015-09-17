@@ -62,7 +62,6 @@ function sim_out = run_simulation(sim_in)
   demod_type = 0;
   decoder_type = 0;
   max_iterations = 100;
-  EsNo = 10;               % decoder needs an estimated channel EsNo (linear ratio, not dB)
 
   code_param = ldpc_init(aqpsk.code_rate, aqpsk.framesize, modulation, mod_order, mapping);
   assert(code_param.data_bits_per_frame == aqpsk.Ndatabits);
@@ -151,19 +150,17 @@ figure(1)
 clf
 semilogy(EbNodB, uncoded_BER_theory,'r;uncoded QPSK theory;')
 hold on;
-semilogy(EbNodB, sim_out.BER_uc,'r+;uncoded QPSK actual;')
-semilogy(EbNodB-10*log10(sim_out.code_rate), sim_out.BER+1E-10,'g;LDPC coded QPSK simulation;');
+semilogy(EbNodB, sim_out.BER_uc,'r+;uncoded QPSK simulated;')
+semilogy(EbNodB-10*log10(sim_out.code_rate), sim_out.BER+1E-10,'g;LDPC coded QPSK simulated;');
 hold off;
 grid('minor')
 xlabel('Eb/No (dB)')
 ylabel('BER')
 axis([min(EbNodB) max(EbNodB) min(uncoded_BER_theory) 1])
 
-% add noise
 % correct freq offset
 % output "demodulated" tx frame to a file of bits for 3rd party modulator
-% actually estimate Es/No
-% meas impl loss for pilot symbols
-% put in Es/No loop, measure coded and uncoded errors
-% separate into end and dec
-
+% actually estimate Es/No for LDPC
+% improve phase est impl loss
+% separate into enc and demod functions
+% generate filter coeffs, save to C header file
