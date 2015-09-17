@@ -79,23 +79,23 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
 
   t = (1:length(rx));
   %shiftup = exp(j*2*pi*(1/4)*t);
-  
-  ffilt = 5000
+ 
+  ffilt = 4800;
   rx_filter = fir1(300,ffilt/fsk4_states.Fs);
   %rx_filter = [1];
   tx_filter = fsk4_states.tx_filter;
   %rx_up = filter(rx_filter,1,rx);
-
+  rx_filter = tx_filter;
   rx_up = rx;%real(rx.*shiftup);
   symup = fsk4_symbols;% + Fs/4;
   sym1m = filter(rx_filter,1,exp(j*2*pi*(symup(1)/Fs)*t).*rx_up);
   sym2m = filter(rx_filter,1,exp(j*2*pi*(symup(2)/Fs)*t).*rx_up);
   sym3m = filter(rx_filter,1,exp(j*2*pi*(symup(3)/Fs)*t).*rx_up);
   sym4m = filter(rx_filter,1,exp(j*2*pi*(symup(4)/Fs)*t).*rx_up);
-  sym1m = idmp(sym1m,20); sym1m = abs(sym1m);%(real(sym1m).^2+imag(sym1m).^2);
-  sym2m = idmp(sym2m,20); sym2m = abs(sym2m);%(real(sym2m).^2+imag(sym2m).^2);
-  sym3m = idmp(sym3m,20); sym3m = abs(sym3m);%(real(sym3m).^2+imag(sym3m).^2);
-  sym4m = idmp(sym4m,20); sym4m = abs(sym4m);%(real(sym4m).^2+imag(sym4m).^2);
+  sym1m = idmp(sym1m,20); sym1m = (real(sym1m).^2+imag(sym1m).^2);
+  sym2m = idmp(sym2m,20); sym2m = (real(sym2m).^2+imag(sym2m).^2);
+  sym3m = idmp(sym3m,20); sym3m = (real(sym3m).^2+imag(sym3m).^2);
+  sym4m = idmp(sym4m,20); sym4m = (real(sym4m).^2+imag(sym4m).^2);
   sym = sym1m*-3 + sym2m*-1 + sym3m*1 + sym4m*3;
   %figure(1);
   %plot((1:2000),abs(sym1m)(1:2:4000),(1:2000),abs(sym2m)(1:2:4000),(1:2000),abs(sym3m)(1:2:4000),(1:2000),abs(sym4m)(1:2:4000));
@@ -104,11 +104,16 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
+  iveven = iv(2:2:length(iv));
+  ivodd = iv(1:2:length(iv));
+  figure(3);
+  hist(iveven);
+  figure(4);
+  hist(ivodd);
+  %iv = iveven;
   for i=1:length(iv)
     bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](iv(i),(1:2));
   end
-  figure(3);
-  hist(iv(1:2:length(iv)),30);
 endfunction
 
 function bits = fsk4_demod_two(fsk4_states,rx)
@@ -224,7 +229,7 @@ function ber = nfbert(aEsNodB)
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-
+  rx = rx(20:length(rx));
   rx_bits = fsk4_demod_thing(fsk4_states,rx);
   ber = 1;
   
