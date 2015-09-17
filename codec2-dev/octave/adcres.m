@@ -1,7 +1,7 @@
 % adcres.m
 % David Rowe 18 Feb 2015
 %
-% ADC resamping simulation
+% ADC resamping simulation, IIR tuner development.
 
 % [ ] quantisation of ADC
 % [ ] SNR at ADC input, SNR at resampler output
@@ -19,7 +19,7 @@ f4 = f1 - 207E3;
 t = (0:(fs-1));
 M = 45;
 beta1 = 0.999;
-beta2 = 1 - (1-0.999)*M;
+beta2 = 1 - (1-beta1)*M;
 
 s1 = [fs zeros(1,fs-1)];       % noise floor, continuous interferers 
 s2 = 100*4*cos(t*2*pi*f2/fs);  % wanted signal 40dB above interferers

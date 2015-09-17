@@ -17,12 +17,18 @@ for i=1:num_frames
 end
 
 XdB /= num_frames;
-XdB -= max(XdB);
+XdB -= max(20*log10(N));
 
 figure(1)
+clf
 plot((0:N/2-1)*Fs/(1000*N), XdB)
 grid
 ylabel('Amplitude dB')
 xlabel('Frequency (kHz)');
-axis([0 Fs/(2*1000) -80 0])
+axis([0 Fs/(2*1000) -30 80])
+
+figure(2)
+clf
+plot(s)
+
 
