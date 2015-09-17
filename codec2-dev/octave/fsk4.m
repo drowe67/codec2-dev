@@ -68,6 +68,10 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
   tx_filt = filter(fsk4_states.tx_filter, 1, tx_stream);
   %tx_filt = tx_filt / max(tx_filt);
   tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
+  figure(10);
+  plot(tx_filt(1:M*10));
+  title('Input to FM modulator')
+
 endfunction
 
 %non-coherent demod based on a paper I found on IEEE xplore. Paper claims it is ~1db under coherent.
@@ -88,17 +92,25 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   rx_filter = tx_filter;
   rx_up = rx;%real(rx.*shiftup);
   symup = fsk4_symbols;% + Fs/4;
-  sym1m = filter(rx_filter,1,exp(j*2*pi*(symup(1)/Fs)*t).*rx_up);
-  sym2m = filter(rx_filter,1,exp(j*2*pi*(symup(2)/Fs)*t).*rx_up);
-  sym3m = filter(rx_filter,1,exp(j*2*pi*(symup(3)/Fs)*t).*rx_up);
-  sym4m = filter(rx_filter,1,exp(j*2*pi*(symup(4)/Fs)*t).*rx_up);
+  sym1m = filter(rx_filter,1,exp(-j*2*pi*(symup(1)/Fs)*t).*rx_up);
+  sym2m = filter(rx_filter,1,exp(-j*2*pi*(symup(2)/Fs)*t).*rx_up);
+  sym3m = filter(rx_filter,1,exp(-j*2*pi*(symup(3)/Fs)*t).*rx_up);
+  sym4m = filter(rx_filter,1,exp(-j*2*pi*(symup(4)/Fs)*t).*rx_up);
+
+  figure(11);
+  clf
+  np = fsk4_states.M*10;
+  subplot(411); plot(abs(sym1m(1:np)))
+  title('Output of each demod filter')
+  subplot(412); plot(abs(sym2m(1:np)))
+  subplot(413); plot(abs(sym3m(1:np)))
+  subplot(414); plot(abs(sym4m(1:np)))
+
   sym1m = idmp(sym1m,20); sym1m = (real(sym1m).^2+imag(sym1m).^2);
   sym2m = idmp(sym2m,20); sym2m = (real(sym2m).^2+imag(sym2m).^2);
   sym3m = idmp(sym3m,20); sym3m = (real(sym3m).^2+imag(sym3m).^2);
   sym4m = idmp(sym4m,20); sym4m = (real(sym4m).^2+imag(sym4m).^2);
   sym = sym1m*-3 + sym2m*-1 + sym3m*1 + sym4m*3;
-  %figure(1);
-  %plot((1:2000),abs(sym1m)(1:2:4000),(1:2000),abs(sym2m)(1:2:4000),(1:2000),abs(sym3m)(1:2:4000),(1:2000),abs(sym4m)(1:2:4000));
   figure(2);
   plot((1:2000),sym1m(1:2000),(1:2000),sym2m(1:2000),(1:2000),sym3m(1:2000),(1:2000),sym4m(1:2000));
   
@@ -211,16 +223,17 @@ endfunction
 % for a noise-free channel
 % now supports noisy channels
 function ber = nfbert(aEsNodB)
-  bitcnt = 48000;
+  bitcnt = 4800;
   offset = 29;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,2400);
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
-
-  tx = fsk4_mod(fsk4_states,test_bits);
   
+  tx = fsk4_mod(fsk4_states,test_bits);
+  printf("M: %d\n", fsk4_states.M);
+
   %add noise here
   %shamelessly copied from gmsk.m
   EsNo = 10^(aEsNodB/10);
@@ -237,7 +250,8 @@ function ber = nfbert(aEsNodB)
   %No preamble detection yet
   ox = 1;
   for offset = (1:100)
-    bern = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)))/(bitcnt-offset);
+    nerr = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
     if(bern < ber)
       ox = offset;
     end
