@@ -330,6 +330,9 @@ function maskdB = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   end
 endfunction
 
+
+% sampling the mask in one frame using an arbitrary set of samplng frequencies
+
 function maskdB = resample_mask(model, f, mask_sample_freqs_kHz)
   max_amp = 80;
 
@@ -342,7 +345,7 @@ function maskdB = resample_mask(model, f, mask_sample_freqs_kHz)
 endfunction
 
 
-% decimate frame rate of mask, use interpolation in the log domain 
+% decimate frame rate of mask, use linear interpolation in the log domain 
 
 function maskdB_ = decimate_frame_rate(maskdB, model, decimate, f, frames, mask_sample_freqs_kHz)
     max_amp = 80;
@@ -449,4 +452,63 @@ function amp_scatter(samname)
   hist(ampsdB,20)
 endfunction
 
-%amp_scatter("../build_linux/src/all")
+
+% Determine a phase spectra from a magnitude spectra
+% from http://www.dsprelated.com/showcode/20.php
+% Haven't _quite_ figured out how this works but have to start somewhere ....
+%
+% TODO: we may be able to sample at a lower rate, like mWo
+%       but start with something that works
+
+function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
+  Nfft    = 512;  % FFT size to use 
+  Fs      = 8000;
+  max_amp = 80;
+  L       = min([model(f,2) max_amp-1]);
+  Wo      = model(f,1);
+
+  mask_sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
+  Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
+
+  % optional input of aks for testing
+
+  if nargin == 3
+    Aw = 1 ./ fft(ak,Nfft);
+    Gdbfk = 20*log10(abs(Aw(1:Nfft/2+1)));
+  end
+
+  Ns = length(Gdbfk); if Ns~=Nfft/2+1, error("confusion"); end
+  Sdb = [Gdbfk,Gdbfk(Ns-1:-1:2)]; % install negative-frequencies
+
+  S = 10 .^ (Sdb/20); % convert to linear magnitude
+  s = ifft(S); % desired impulse response
+  s = real(s); % any imaginary part is quantization noise
+  tlerr = 100*norm(s(round(0.9*Ns:1.1*Ns)))/norm(s);
+  disp(sprintf(['  Time-limitedness check: Outer 20%% of impulse ' ...
+               'response is %0.2f %% of total rms'],tlerr));
+  % = 0.02 percent
+
+  if tlerr>1.0 % arbitrarily set 1% as the upper limit allowed
+    disp('  Increase Nfft and/or smooth Sdb\n');
+  end
+
+  c = ifft(Sdb); % compute real cepstrum from log magnitude spectrum
+
+  % Check aliasing of cepstrum (in theory there is always some):
+
+  caliaserr = 100*norm(c(round(Ns*0.9:Ns*1.1)))/norm(c);
+  disp(sprintf(['  Cepstral time-aliasing check: Outer 20%% of ' ...
+               'cepstrum holds %0.2f %% of total rms\n'],caliaserr));
+
+  if caliaserr>1.0 % arbitrary limit
+    disp('  Increase Nfft and/or smooth Sdb to shorten cepstrum\n');
+  end
+
+  % Fold cepstrum to reflect non-min-phase zeros inside unit circle:
+
+  cf = [c(1), c(2:Ns-1)+c(Nfft:-1:Ns+1), c(Ns), zeros(1,Nfft-Ns)];
+  Cf = fft(cf); % = dB_magnitude + j * minimum_phase
+
+  phase = imag(Cf)/(20/log(10));
+endfunction
+
