@@ -16,7 +16,7 @@
 
 % process a whole file and write results
 
-function newamp_batch(samname, optional_Am_out_name)
+function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
@@ -31,12 +31,17 @@ function newamp_batch(samname, optional_Am_out_name)
 
   if nargin == 1
     Am_out_name = sprintf("%s_am.out", samname);
+    Aw_out_name = sprintf("%s_aw.out", samname);
   end
-  if nargin == 2
+  if nargin >= 2
     Am_out_name = optional_Am_out_name;
   end
-    
-  fam = fopen(Am_out_name,"wb"); 
+  if nargin >= 3
+    Aw_out_name = optional_Aw_out_name;
+  end
+   
+  fam  = fopen(Am_out_name,"wb"); 
+  faw = fopen(Aw_out_name,"wb"); 
 
   for f=1:frames
     printf("frame: %d", f);
@@ -87,9 +92,19 @@ function newamp_batch(samname, optional_Am_out_name)
     Am_ = zeros(1,max_amp);
     Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);  % C array doesnt use A[0]
     fwrite(fam, Am_, "float32");
+
+    fft_enc = 512;
+    phase = determine_phase(model, f);
+    assert(length(phase) == fft_enc);
+    Aw = zeros(1, fft_enc*2); 
+    Aw(1:2:fft_enc*2) = cos(phase);
+    Aw(2:2:fft_enc*2) = -sin(phase);
+ 
+    fwrite(faw, Aw, "float32");    
   end
 
   fclose(fam);
+  fclose(faw);
 
   printf("\n");
 

@@ -93,8 +93,8 @@ function newamp_fbf(samname, f)
 
     % decimated in time
 
-    maskdB = decimate_frame_rate(maskdB, model, 4, f, frames, mask_sample_freqs_kHz);
-    plot(mask_sample_freqs_kHz*1000, maskdB, 'k');
+    %maskdB = decimate_frame_rate(maskdB, model, 4, f, frames, mask_sample_freqs_kHz);
+    %plot(mask_sample_freqs_kHz*1000, maskdB, 'k');
 
     % optionally plot all masking curves
 
@@ -108,14 +108,23 @@ function newamp_fbf(samname, f)
 
     hold off;
 
+    ak_name = strcat(samname,"_ak.txt");
+    ak = load(ak_name);
+
+    [phase Sdb s Aw] = determine_phase(model, f, ak(f,:));
     figure(3)
-    plot(target_log,'g')
+    subplot(211)
+    plot(Sdb)
     hold on;
-    plot(candidate_log(3,:),'b');
-    plot(candidate_log(5,:),'b');
-    plot(error_log(3,:),'r');
-    plot(error_log(5,:),'r');
+    plot(20*log10(abs(Aw(1:256))),'g')
     hold off;
+    subplot(212)
+    plot(phase(1:256))
+    hold on;
+    plot(angle(Aw(1:256)),'g')
+    hold off;
+    figure(4)
+    plot(s)
 
     % interactive menu
 
