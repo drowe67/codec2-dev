@@ -111,6 +111,14 @@ int dac2_write(short buf[], int n) {
     return fifo_write(dac2_fifo, buf, n);
 }
 
+int dac1_free() {
+    return fifo_free(dac1_fifo);
+}
+
+int dac2_free() {
+    return fifo_free(dac2_fifo);
+}
+
 static void tim6_config(void)
 {
   TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
