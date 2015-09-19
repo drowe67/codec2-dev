@@ -118,13 +118,8 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
-  iveven = iv(2:2:length(iv));
-  ivodd = iv(1:2:length(iv));
   figure(3);
-  hist(iveven);
-  figure(4);
-  hist(ivodd);
-  %iv = iveven;
+  hist(iv);
   for i=1:length(iv)
     bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](iv(i),(1:2));
   end
@@ -143,10 +138,10 @@ function bits = fsk4_demod_two(fsk4_states,rx)
   t = (1:length(rx));
   fsk4_symbols
   rx = filter(rx_filter, 1, rx);
-  sym1dc = exp(-j*2*pi*(fsk4_symbols(1)/Fs)*t) .* rx;
-  sym2dc = exp(-j*2*pi*(fsk4_symbols(2)/Fs)*t) .* rx;
-  sym3dc = exp(-j*2*pi*(fsk4_symbols(3)/Fs)*t) .* rx;
-  sym4dc = exp(-j*2*pi*(fsk4_symbols(4)/Fs)*t) .* rx;
+  sym1dc = exp(j*2*pi*(fsk4_symbols(1)/Fs)*t) .* rx;
+  sym2dc = exp(j*2*pi*(fsk4_symbols(2)/Fs)*t) .* rx;
+  sym3dc = exp(j*2*pi*(fsk4_symbols(3)/Fs)*t) .* rx;
+  sym4dc = exp(j*2*pi*(fsk4_symbols(4)/Fs)*t) .* rx;
  
   figure(1);
   %plot(t(1:20:length(t)),abs(idmp(sym1dc,20)),t(1:20:length(t)),abs(idmp(sym2dc,20)));
@@ -184,38 +179,39 @@ function bits = fsk4_demod_two(fsk4_states,rx)
   hist(syms);
   
 endfunction
+ 
+%My fourth attempt at a 4fsk demodulator. Based on the same paper as the previous.
+function bits = fsk4_demod_four(fsk4_states,rx)
+
+endfunction
 
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
 function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
   
-  % rx_filt = filter(fsk4_states.tx_filter, 1, rxd); 
-  rx_filt=rxd;
-  sym = afsym = idmp(rx_filt,fsk4_states.M/2);
-
+  rx_filt = filter(fsk4_states.tx_filter, 1, rxd); 
+  %rx_filt=rxd;
+  figure(1)
+  eyediagram(rxd,40);
+  sym = afsym = idmp(rx_filt,fsk4_states.M);
+  figure(4)
+  eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
   % After integrating, the high symbol tends to be about 7.5
-  dmsyms = rot90(fsk4_states.symmap * 10);
+  dmsyms = rot90(fsk4_states.symmap * 20);
 
   oddsyms  = afsym(1:2:length(afsym));
   evensyms = afsym(2:2:length(afsym));
-  hist(evensyms);
-  [errseven,deceven] = min(abs(evensyms - dmsyms));
-  [errsodd ,decodd ] = min(abs(oddsyms  - dmsyms));
-  
-  terreven = mean(errseven);
-  terrodd  = mean(errsodd );
+  figure(2)
+  hist(evensyms,30);
 
-  if terreven < terrodd
-    sym = deceven;
-    err = errseven;
-  else
-    sym = decodd;
-    err = errsodd;
-  end
+  [err, sym] = min(abs(afsym-dmsyms));
+
   bits = zeros(1,length(sym)*2);
   %Translate symbols back into bits
+  figure(3)
+  hist(sym);
   for i=1:length(sym)
     bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](sym(i),(1:2));
   end
@@ -247,8 +243,8 @@ function ber = nfbert(aEsNodB)
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-  rx = rx(20:length(rx));
-  rx_bits = fsk4_demod_thing(fsk4_states,rx);
+  rx = rx(10:length(rx));
+  rx_bits = fsk4_demod_fmrid(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
