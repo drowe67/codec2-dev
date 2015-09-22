@@ -115,14 +115,13 @@ function newamp_fbf(samname, f)
     figure(3)
     subplot(211)
     plot(Sdb)
-    hold on;
-    plot(20*log10(abs(Aw(1:256))),'g')
-    hold off;
+    title('Mag (dB)');
     subplot(212)
     plot(phase(1:256))
     hold on;
-    plot(angle(Aw(1:256)),'g')
+    plot(angle(Aw(1:256))+0.5,'g')
     hold off;
+    title('Phase (rads)');
     figure(4)
     plot(s)
 
