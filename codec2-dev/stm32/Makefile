@@ -769,7 +769,7 @@ adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.o) src/stm32f4_adc_tuner.O3.o \
 clean:
 	rm -f *.elf *.bin
 	rm -f libstm32f4.a
-	find $(PERIPHLIBDIR) -type f -name '*.o' | xargs rm -f
+	find . ../src -type f -name '*.o' | xargs rm -f
 
 # ---------------------------------------------------------------------------------
 
