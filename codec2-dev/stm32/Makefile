@@ -410,6 +410,7 @@ FFT_TEST_SRCS = \
 $(DSPLIB)/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c \
 fft_test.c \
 src/startup_stm32f4xx.s \
+src/system_stm32f4xx.c \
 stm32f4_machdep.c \
 gdb_stdio.c \
 ../src/kiss_fft.c
@@ -495,7 +496,7 @@ CODEC2_PROFILE_SRCS += $(CODEC2_SRCS)
 codec2_profile.elf: $(CODEC2_PROFILE_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
-fft_test.elf: $(FFT_TEST_SRCS:.c=.o)
+fft_test.elf: $(FFT_TEST_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 DAC_UT_SRCS=\
