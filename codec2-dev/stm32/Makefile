@@ -769,7 +769,7 @@ src/init.c \
 src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
 	$(CC) $(CFLAGS) $^ -c -o $@
 
-adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.o) src/stm32f4_adc_tuner.O3.o \
+adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.O3.o) src/stm32f4_adc_tuner.O3.o \
 		libstm32f4.a
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
