@@ -63,24 +63,12 @@ typedef struct {
 unsigned int downTicker = 0;
 unsigned int announceTicker = 0;
 
+struct tone_gen_t tone_gen;
 struct sfx_player_t sfx_player;
 struct morse_player_t morse_player;
 
 void SysTick_Handler(void);
 void iterate_select_state_machine(SWITCH_STATE *ss);
-
-#define SINE_SAMPLES   32
-
-/* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
-   are 16 bit 2's complement, the DAC driver convertsto 12 bit
-   unsigned. */
-
-short aSine[] = {
-     -16,    6384,   12528,   18192,   23200,   27232,   30256,   32128,
-   32752,   32128,   30256,   27232,   23152,   18192,   12528,    6384,
-     -16,   -6416,  -12560,  -18224,  -23184,  -27264,  -30288,  -32160,
-  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,  -12560,   -6416
-};
 
 int main(void) {
     struct freedv *f;
@@ -117,6 +105,8 @@ int main(void) {
     morse_player.freq = 800;
     morse_player.dit_time = 60;    /* 20 WPM */
     morse_player.msg = NULL;
+
+    tone_reset(&tone_gen, 0, 0);
 
     /* play a start-up tune. */
     sfx_play(&sfx_player, sound_startup);
@@ -194,10 +184,19 @@ int main(void) {
                     dac1_write(dac16k, n_samples_16k);
                 }
                 if (ss.mode == TONE) {
-                    short buf[SINE_SAMPLES];
-                    for(i=0; i<n_samples; i++)
-                        buf[i] = aSine[i]*0.398; /* 8dB back off from peak */
-                    while(dac1_write(buf, SINE_SAMPLES) == 0);
+                    if (!tone_gen.remain)
+                        /*
+                         * Somewhat ugly, but UINT16_MAX is effectively
+                         * infinite.
+                         */
+                        tone_reset(&tone_gen, 500, UINT16_MAX);
+                    int len = dac1_free();
+                    if (len > n_samples_16k)
+                        len = n_samples_16k;
+                    for(i=0; i<len; i++)
+                        /* 8dB back off from peak */
+                        dac16k[i] = tone_next(&tone_gen)*0.398;
+                    dac1_write(dac16k, len);
                 }
 
                 led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
