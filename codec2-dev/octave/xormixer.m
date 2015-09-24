@@ -17,8 +17,8 @@ for i=1:Tm:n
   modulation(i:(i+Tm/2-1)) = 1;
 end
 
-carrier = carrier .* hanning(n)';
-modulation = modulation .* hanning(n)';
+%carrier = carrier .* hanning(n)';
+%modulation = modulation .* hanning(n)';
 mixer = xor(carrier,modulation) .* hanning(n)';
 
 figure(1);
