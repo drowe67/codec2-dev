@@ -47,7 +47,7 @@ int switch_select(void);
 int switch_back(void);
 int ext_ptt(void);
 
-#define DEBOUNCE_DELAY 500 /*!< Delay to wait while switch bounces */
+#define DEBOUNCE_DELAY 50 /*!< Delay to wait while switch bounces */
 
 #define SW_STEADY   0   /*!< Switch is in steady-state */
 #define SW_DEBOUNCE 1   /*!< Switch is being debounced */
