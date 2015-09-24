@@ -7,19 +7,14 @@ fm;
 
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
-global fsk4_rcf_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
+dmr.tx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
+dmr.rx_filt_resp = dmr_tx_filt_resp;
+dmr.max_dev = 1944;
+dmr.syms = [-1944 -648 648 1944];
 
-%Maximum positive deviation of amy 4FSK symbol
-global fsk4_max_deviation = 1944;
+global dmr_info = dmr;
 
-%Deviation of the FSK symbols
-global fsk4_symbols = [-1944 -648 648 1944];
-
-function fsk4_states = fsk4_init(fsk4_states,Rs)
-    global fsk4_max_deviation;
-    global fsk4_symbols;
-    global fsk4_rcf_resp;
-
+function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     Fs = fsk4_states.Fs = 48000;  %Sample rate
     Rs = fsk4_states.Rs = Rs;     %Symbol rate
     M = fsk4_states.M = fsk4_states.Fs/fsk4_states.Rs; %Samples per symbol
@@ -29,16 +24,16 @@ function fsk4_states = fsk4_init(fsk4_states,Rs)
     % and demods
 
     rf = (0:(Fs/2));
-    tx_filter = fir2(100 ,rf/(Fs/2),fsk4_rcf_resp(rf));
-    fsk4_states.tx_filter = tx_filter;
+    fsk4_states.tx_filter = fir2(100 ,rf/(Fs/2),fsk4_info.tx_filt_resp(rf));
+    fsk4_states.rx_filter = fir2(100 ,rf/(Fs/2),fsk4_info.rx_filt_resp(rf));
     %Set up the 4FSK symbols
-    fsk4_states.symmap = fsk4_symbols / fsk4_max_deviation;
+    fsk4_states.symmap = fsk4_info.syms / fsk4_info.max_dev;
     
     fm_states.Ts = M;
     fm_states.Fs = Fs;
     fm_states.fc = 0;
-    fm_states.fm_max = fsk4_max_deviation*2;
-    fm_states.fd = fsk4_max_deviation;
+    fm_states.fm_max = fsk4_info.max_dev*2;
+    fm_states.fd = fsk4_info.max_dev;
     fm_states.pre_emp = fm_states.de_emp = 0;
     fm_states.output_filter = 1;
     fsk4_states.fm_states = analog_fm_init(fm_states);
@@ -91,7 +86,7 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   % of noise getting in.  tx filter just happens to work, but I imagine
   % other LPF would as well.
 
-  rx = filter(fsk4_states.tx_filter, 1, rx);
+  rx = filter(fsk4_states.rx_filter, 1, rx);
 
   sym1m = exp(j*2*pi*(symup(1)/Fs)*t).*rx;
   sym2m = exp(j*2*pi*(symup(2)/Fs)*t).*rx;
@@ -221,6 +216,7 @@ endfunction
 % for a noise-free channel
 % now supports noisy channels
 function ber = nfbert(aEsNodB)
+  global dmr_info;
   rand('state',1); 
   randn('state',1);
 
@@ -228,7 +224,7 @@ function ber = nfbert(aEsNodB)
   offset = 29;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
-  fsk4_states = fsk4_init(fsk4_states,2400);
+  fsk4_states = fsk4_init(fsk4_states,2400,dmr_info);
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
   
