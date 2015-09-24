@@ -43,36 +43,73 @@
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
-#define FIFTY_MS  50
+#define DEBOUNCE_DELAY     500
 #define ANNOUNCE_DELAY  300000  /* Supposed to be msec, seems not */
+
 #define MAX_MODES  3
 #define ANALOG     0
 #define DV         1
 #define TONE       2
 
-#define SS_IDLE           0
-#define SS_DEBOUNCE_DOWN  1
-#define SS_WAIT_BUTTON_UP 2
-#define SS_DEBOUNCE_UP    3
+#define SW_STEADY   0   /*!< Switch is in steady-state */
+#define SW_DEBOUNCE 1   /*!< Switch is being debounced */
 
-typedef struct {
-    int state;
-    int mode;
-} SWITCH_STATE;
+/*! Switch debounce and logic handling */
+struct switch_t {
+    /*! Debounce/hold timer */
+    uint32_t    timer;
+    /*! Current/debounced observed switch state */
+    uint8_t     sw;
+    /*! Raw observed switch state (during debounce) */
+    uint8_t     raw;
+    /*! Last steady-state switch state */
+    uint8_t     last;
+    /*! Debouncer state */
+    uint8_t     state;
+};
 
-unsigned int downTicker = 0;
+struct switch_t sw_select;  /*!< Switch driver for SELECT button */
+struct switch_t sw_back;    /*!< Switch driver for BACK button */
+struct switch_t sw_ptt;     /*!< Switch driver for PTT buttons */
+
+/*!
+ * Count the tick timers on the switches.
+ */
+static void switch_tick(struct switch_t* const sw);
+
+/*!
+ * Update the state of a switch
+ */
+static void switch_update(struct switch_t* const sw, uint8_t state);
+
+/*! Return how long the switch has been pressed in ticks. */
+static uint32_t switch_pressed(const struct switch_t* const sw);
+
+/*! Return non-zero if the switch has been released. */
+static int switch_released(const struct switch_t* const sw);
+
+/*! Acknowledge the current state of the switch */
+static void switch_ack(struct switch_t* const sw);
+
 unsigned int announceTicker = 0;
+
+/*!
+ * User preferences
+ */
+static struct prefs_t {
+    /*! Operating mode */
+    uint8_t op_mode;
+    /* TODO: more to come */
+} prefs;
 
 struct tone_gen_t tone_gen;
 struct sfx_player_t sfx_player;
 struct morse_player_t morse_player;
 
 void SysTick_Handler(void);
-void iterate_select_state_machine(SWITCH_STATE *ss);
 
 int main(void) {
     struct freedv *f;
-    SWITCH_STATE   ss;
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
@@ -102,6 +139,11 @@ int main(void) {
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
         dac8k[i] = 0.0;
 
+    /* Clear out switch states */
+    memset(&sw_select, 0, sizeof(sw_select));
+    memset(&sw_back, 0, sizeof(sw_back));
+    memset(&sw_ptt, 0, sizeof(sw_ptt));
+
     morse_player.freq = 800;
     morse_player.dit_time = 60;    /* 20 WPM */
     morse_player.msg = NULL;
@@ -111,12 +153,41 @@ int main(void) {
     /* play a start-up tune. */
     sfx_play(&sfx_player, sound_startup);
 
-    ss.state = SS_IDLE;
-    ss.mode  = ANALOG;
+    prefs.op_mode = ANALOG;
 
     while(1) {
+        /* Read switch states */
+        switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
+        switch_update(&sw_back,     (!switch_back()) ? 1 : 0);
+        switch_update(&sw_ptt,      (switch_ptt() ||
+                                        (!ext_ptt())) ? 1 : 0);
 
-        iterate_select_state_machine(&ss);
+        /* Process mode */
+        uint8_t mode_change = 0;
+        if (switch_released(&sw_select)) {
+            prefs.op_mode = (prefs.op_mode + 1) % MAX_MODES;
+            mode_change = 1;
+        } else if (switch_released(&sw_back)) {
+            prefs.op_mode = (prefs.op_mode - 1) % MAX_MODES;
+            mode_change = 1;
+        }
+
+        /* Acknowledge new switch events */
+        switch_ack(&sw_select);
+        switch_ack(&sw_back);
+        switch_ack(&sw_ptt);
+
+        /* Announcement */
+        if (mode_change) {
+            sfx_play(&sfx_player, sound_click);
+            if (prefs.op_mode == ANALOG)
+                morse_play(&morse_player, "ANALOG");
+            else if (prefs.op_mode == DV)
+                morse_play(&morse_player, "DV");
+            else if (prefs.op_mode == TONE)
+                morse_play(&morse_player, "TONE");
+        }
+
         if (sfx_player.note) {
             int samples = 0;
             int sz_free = dac2_free();
@@ -170,20 +241,20 @@ int main(void) {
 
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
 
-                if (ss.mode == ANALOG) {
+                if (prefs.op_mode == ANALOG) {
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
-                if (ss.mode == DV) {
+                if (prefs.op_mode == DV) {
                     freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
-                if (ss.mode == TONE) {
+                if (prefs.op_mode == TONE) {
                     if (!tone_gen.remain)
                         /*
                          * Somewhat ugly, but UINT16_MAX is effectively
@@ -212,7 +283,7 @@ int main(void) {
 
             /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
-            if (ss.mode == ANALOG) {
+            if (prefs.op_mode == ANALOG) {
 
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
@@ -251,55 +322,70 @@ int main(void) {
 
 void SysTick_Handler(void)
 {
-    if (downTicker > 0) {
-        downTicker--;
-    }
+    switch_tick(&sw_select);
+    switch_tick(&sw_back);
+    switch_tick(&sw_ptt);
     if (announceTicker > 0) {
         announceTicker--;
     }
 }
 
-/* Select button state machine.  Debounces switches and enables cycling
-   through ANALOG-DV-TONE modes */
-
-void iterate_select_state_machine(SWITCH_STATE *ss) {
-    int next_state;
-
-    next_state = ss->state;
-    switch(ss->state) {
-        case SS_IDLE:
-            if (switch_select() == 0) {
-                downTicker = FIFTY_MS;
-                next_state = SS_DEBOUNCE_DOWN;
-            }
-            break;
-        case SS_DEBOUNCE_DOWN:
-            if (downTicker == 0) {
-                ss->mode++;
-                sfx_play(&sfx_player, sound_click);
-                if (ss->mode >= MAX_MODES)
-                    ss->mode = 0;
-                if (ss->mode == ANALOG)
-                    morse_play(&morse_player, "ANALOG");
-                else if (ss->mode == DV)
-                    morse_play(&morse_player, "DV");
-                else if (ss->mode == TONE)
-                    morse_play(&morse_player, "TONE");
-                next_state = SS_WAIT_BUTTON_UP;
-            }
-            break;
-        case SS_WAIT_BUTTON_UP:
-            if (switch_select() == 1) {
-                downTicker = FIFTY_MS;
-                next_state = SS_DEBOUNCE_UP;
-            }
-            break;
-        case SS_DEBOUNCE_UP:
-            if (downTicker == 0) {
-                next_state = SS_IDLE;
-            }
-            break;
-   }
-    ss->state = next_state;
+static void switch_tick(struct switch_t* const sw)
+{
+    if (sw->sw != sw->raw) {
+        /* State transition, reset timer */
+        if (sw->state == SW_STEADY)
+            sw->last = sw->sw;
+        sw->state = SW_DEBOUNCE;
+        sw->timer = DEBOUNCE_DELAY;
+        sw->sw = sw->raw;
+    } else if (sw->state == SW_DEBOUNCE) {
+        if (sw->timer > 0) {
+            /* Steady so far, keep waiting */
+            sw->timer--;
+        } else {
+            /* Steady state reached */
+            sw->state = SW_STEADY;
+        }
+    } else if (sw->sw) {
+        /* Hold state.  Yes this will wrap, but who cares? */
+        sw->timer++;
+    }
 }
 
+static void switch_update(struct switch_t* const sw, uint8_t state)
+{
+    sw->raw = state;
+    if (sw->raw == sw->sw)
+        return;
+
+    if (sw->state == SW_STEADY)
+        sw->last = sw->sw;
+    sw->timer = DEBOUNCE_DELAY;
+    sw->sw = sw->raw;
+    sw->state = SW_DEBOUNCE;
+}
+
+static uint32_t switch_pressed(const struct switch_t* const sw)
+{
+    if ((sw->state == SW_STEADY) && sw->sw)
+        return sw->timer;
+    return 0;
+}
+
+static int switch_released(const struct switch_t* const sw)
+{
+    if (sw->state != SW_STEADY)
+        return 0;
+    if (!sw->last)
+        return 0;
+    if (sw->sw)
+        return 0;
+    return 1;
+}
+
+static void switch_ack(struct switch_t* const sw)
+{
+    if (sw->state == SW_STEADY)
+        sw->last = sw->sw;
+}
