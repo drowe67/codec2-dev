@@ -470,6 +470,10 @@ libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 %.O3.o: %.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -O3 -c -o $@ $<
 
+# Kludgy target to build a file with CFLAGS -DPROFILE
+%.profile.o: %.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DPROFILE -c -o $@ $<
+
 # Rule for building .bin files from a .elf
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
@@ -493,7 +497,7 @@ src/init.c \
 src/system_stm32f4xx.c
 CODEC2_PROFILE_SRCS += $(CODEC2_SRCS)
 
-codec2_profile.elf: $(CODEC2_PROFILE_SRCS:.c=.o) libstm32f4.a
+codec2_profile.elf: $(CODEC2_PROFILE_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 fft_test.elf: $(FFT_TEST_SRCS:.c=.o) libstm32f4.a
@@ -644,7 +648,7 @@ src/stm32f4_machdep.c
 
 FDMDV_PROFILE_SRCS += $(CODEC2_SRCS)
 
-fdmdv_profile.elf: $(FDMDV_PROFILE_SRCS:.c=.o) libstm32f4.a
+fdmdv_profile.elf: $(FDMDV_PROFILE_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 SM1000_LEDS_SWITCHES_UT_SRCS=\
@@ -694,7 +698,7 @@ src/init.c
 
 FREEDV_TX_PROFILE_SRCS += $(CODEC2_SRCS)
 
-freedv_tx_profile.elf: $(FREEDV_TX_PROFILE_SRCS:.c=.o) libstm32f4.a
+freedv_tx_profile.elf: $(FREEDV_TX_PROFILE_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 FREEDV_RX_PROFILE_SRCS=\
