@@ -98,9 +98,9 @@ int main(void) {
     /* clear filter memories */
 
     for(i=0; i<FDMDV_OS_TAPS_16K; i++)
-	adc16k[i] = 0.0;
+        adc16k[i] = 0.0;
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
-	dac8k[i] = 0.0;
+        dac8k[i] = 0.0;
 
     morse_player.freq = 800;
     morse_player.dit_time = 60;    /* 20 WPM */
