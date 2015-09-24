@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: dump.c
-  AUTHOR......: David Rowe          
-  DATE CREATED: 25/8/09                                                       
-                                                                             
+  AUTHOR......: David Rowe
+  DATE CREATED: 25/8/09
+
   Routines to dump data to text files for Octave analysis.
 
 \*---------------------------------------------------------------------------*/
@@ -157,10 +157,10 @@ void dump_Sn(float Sn[]) {
 
     for(i=0; i<M/2; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
-    fprintf(fsn,"\n");    
+    fprintf(fsn,"\n");
     for(i=M/2; i<M; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
-    fprintf(fsn,"\n");    
+    fprintf(fsn,"\n");
 }
 
 void dump_Sw(COMP Sw[]) {
@@ -178,7 +178,7 @@ void dump_Sw(COMP Sw[]) {
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(fsw,"%f\t",
 		10.0*log10(Sw[i].real*Sw[i].real + Sw[i].imag*Sw[i].imag));
-    fprintf(fsw,"\n");    
+    fprintf(fsw,"\n");
 }
 
 void dump_Sw_(COMP Sw_[]) {
@@ -196,7 +196,7 @@ void dump_Sw_(COMP Sw_[]) {
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(fsw_,"%f\t",
 		10.0*log10(Sw_[i].real*Sw_[i].real + Sw_[i].imag*Sw_[i].imag));
-    fprintf(fsw_,"\n");    
+    fprintf(fsw_,"\n");
 }
 
 void dump_Ew(COMP Ew[]) {
@@ -214,7 +214,7 @@ void dump_Ew(COMP Ew[]) {
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(few,"%f\t",
 		10.0*log10(Ew[i].real*Ew[i].real + Ew[i].imag*Ew[i].imag));
-    fprintf(few,"\n");    
+    fprintf(few,"\n");
 }
 
 void dump_softdec(float *softdec, int n)
@@ -248,7 +248,7 @@ void dump_model(MODEL *model) {
 	assert(fmodel != NULL);
     }
 
-    sprintf(line,"%12f %12d ", model->Wo, model->L);    
+    sprintf(line,"%12f %12d ", model->Wo, model->L);
     for(l=1; l<=model->L; l++) {
 	sprintf(s,"%12f ",model->A[l]);
         strcat(line, s);
@@ -257,10 +257,10 @@ void dump_model(MODEL *model) {
 	sprintf(s,"%12f ", 0.0);
         strcat(line,s);
     }
-        
+
     sprintf(s,"%d\n",model->voiced);
     strcat(line,s);
-    fprintf(fmodel,"%s",line);    
+    fprintf(fmodel,"%s",line);
 }
 
 void dump_quantised_model(MODEL *model) {
@@ -276,7 +276,7 @@ void dump_quantised_model(MODEL *model) {
 	assert(fqmodel != NULL);
     }
 
-    sprintf(line,"%12f %12d ", model->Wo, model->L);    
+    sprintf(line,"%12f %12d ", model->Wo, model->L);
     for(l=1; l<=model->L; l++) {
 	sprintf(s,"%12f ",model->A[l]);
         strcat(line, s);
@@ -285,10 +285,10 @@ void dump_quantised_model(MODEL *model) {
 	sprintf(s,"%12f ", 0.0);
         strcat(line, s);
     }
-        
+
     sprintf(s,"%d\n",model->voiced);
     strcat(line, s);
-    fprintf(fqmodel, "%s", line);    
+    fprintf(fqmodel, "%s", line);
 }
 
 void dump_phase(float phase[], int L) {
@@ -307,7 +307,7 @@ void dump_phase(float phase[], int L) {
 	fprintf(fphase,"%f\t",phase[l]);
     for(l=L+1; l<=MAX_AMP; l++)
 	fprintf(fphase,"%f\t",0.0);
-    fprintf(fphase,"\n");    
+    fprintf(fphase,"\n");
 }
 
 void dump_phase_(float phase_[], int L) {
@@ -326,7 +326,7 @@ void dump_phase_(float phase_[], int L) {
 	fprintf(fphase_,"%f\t",phase_[l]);
     for(l=L+1; l<MAX_AMP; l++)
 	fprintf(fphase_,"%f\t",0.0);
-    fprintf(fphase_,"\n");    
+    fprintf(fphase_,"\n");
 }
 
 
@@ -344,7 +344,7 @@ void dump_hephase(int ind[], int dim) {
 
     for(m=0; m<dim; m++)
 	fprintf(fhephase,"%d\t",ind[m]);
-    fprintf(fhephase,"\n");    
+    fprintf(fhephase,"\n");
 }
 
 
@@ -372,7 +372,7 @@ void dump_lpc_snr(float snr) {
 	flpcsnr = fopen(s, "wt");
 	assert(flpcsnr != NULL);
     }
-    
+
     fprintf(flpcsnr,"%f\n",snr);
 }
 
@@ -392,7 +392,7 @@ void dump_Pwb(COMP Pwb[]) {
 
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(fpwb,"%f\t",Pwb[i].real);
-    fprintf(fpwb,"\n");    
+    fprintf(fpwb,"\n");
 }
 
 void dump_Pw(COMP Pw[]) {
@@ -409,7 +409,7 @@ void dump_Pw(COMP Pw[]) {
 
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(fpw,"%f\t",Pw[i].real);
-    fprintf(fpw,"\n");    
+    fprintf(fpw,"\n");
 }
 
 void dump_Rw(float Rw[]) {
@@ -426,7 +426,7 @@ void dump_Rw(float Rw[]) {
 
     for(i=0; i<FFT_ENC/2; i++)
 	fprintf(frw,"%f\t",Rw[i]);
-    fprintf(frw,"\n");    
+    fprintf(frw,"\n");
 }
 
 void dump_weights(float w[], int order) {
@@ -443,7 +443,7 @@ void dump_weights(float w[], int order) {
 
     for(i=0; i<order; i++)
 	fprintf(fweights,"%f\t", w[i]);
-    fprintf(fweights,"\n");    
+    fprintf(fweights,"\n");
 }
 
 void dump_lsp(float lsp[]) {
@@ -460,7 +460,7 @@ void dump_lsp(float lsp[]) {
 
     for(i=0; i<10; i++)
 	fprintf(flsp,"%f\t",lsp[i]);
-    fprintf(flsp,"\n");    
+    fprintf(flsp,"\n");
 }
 
 void dump_lsp_(float lsp_[]) {
@@ -477,7 +477,7 @@ void dump_lsp_(float lsp_[]) {
 
     for(i=0; i<10; i++)
 	fprintf(flsp_,"%f\t",lsp_[i]);
-    fprintf(flsp_,"\n");    
+    fprintf(flsp_,"\n");
 }
 
 void dump_mel(float mel[], int order) {
@@ -494,7 +494,7 @@ void dump_mel(float mel[], int order) {
 
     for(i=0; i<order; i++)
 	fprintf(fmel,"%f\t",mel[i]);
-    fprintf(fmel,"\n");    
+    fprintf(fmel,"\n");
 }
 
 void dump_mel_indexes(int mel_indexes[], int order) {
@@ -511,7 +511,7 @@ void dump_mel_indexes(int mel_indexes[], int order) {
 
     for(i=0; i<order; i++)
 	fprintf(fmel_indexes,"%d\t",mel_indexes[i]);
-    fprintf(fmel_indexes,"\n");    
+    fprintf(fmel_indexes,"\n");
 }
 
 void dump_ak(float ak[], int order) {
@@ -528,7 +528,7 @@ void dump_ak(float ak[], int order) {
 
     for(i=0; i<=order; i++)
 	fprintf(fak,"%f\t",ak[i]);
-    fprintf(fak,"\n");    
+    fprintf(fak,"\n");
 }
 
 void dump_ak_(float ak_[], int order) {
@@ -545,7 +545,7 @@ void dump_ak_(float ak_[], int order) {
 
     for(i=0; i<=order; i++)
 	fprintf(fak_,"%f\t",ak_[i]);
-    fprintf(fak_,"\n");    
+    fprintf(fak_,"\n");
 }
 
 void dump_Fw(COMP Fw[]) {
@@ -562,7 +562,7 @@ void dump_Fw(COMP Fw[]) {
 
     for(i=0; i<256; i++)
 	fprintf(ffw,"%f\t",Fw[i].real);
-    fprintf(ffw,"\n");    
+    fprintf(ffw,"\n");
 }
 
 void dump_e(float e_hz[]) {
@@ -579,10 +579,10 @@ void dump_e(float e_hz[]) {
 
     for(i=0; i<500/2; i++)
 	fprintf(fe,"%f\t",e_hz[i]);
-    fprintf(fe,"\n");    
+    fprintf(fe,"\n");
     for(i=500/2; i<500; i++)
 	fprintf(fe,"%f\t",e_hz[i]);
-    fprintf(fe,"\n");    
+    fprintf(fe,"\n");
 }
 
 void dump_sq(float sq[]) {
@@ -599,10 +599,10 @@ void dump_sq(float sq[]) {
 
     for(i=0; i<M/2; i++)
 	fprintf(fsq,"%f\t",sq[i]);
-    fprintf(fsq,"\n");    
+    fprintf(fsq,"\n");
     for(i=M/2; i<M; i++)
 	fprintf(fsq,"%f\t",sq[i]);
-    fprintf(fsq,"\n");    
+    fprintf(fsq,"\n");
 }
 
 void dump_dec(COMP Fw[]) {
@@ -619,7 +619,7 @@ void dump_dec(COMP Fw[]) {
 
     for(i=0; i<320/5; i++)
 	fprintf(fdec,"%f\t",Fw[i].real);
-    fprintf(fdec,"\n");    
+    fprintf(fdec,"\n");
 }
 
 void dump_bg(float e, float bg_est, float percent_uv) {
@@ -633,7 +633,7 @@ void dump_bg(float e, float bg_est, float percent_uv) {
 	assert(fbg != NULL);
     }
 
-    fprintf(fbg,"%f\t%f\t%f\n", e, bg_est, percent_uv);    
+    fprintf(fbg,"%f\t%f\t%f\n", e, bg_est, percent_uv);
 }
 
 void dump_E(float E) {
@@ -664,7 +664,7 @@ void dump_Rk(float Rk[]) {
 
     for(i=0; i<P_MAX; i++)
 	fprintf(frk,"%f\t",Rk[i]);
-    fprintf(frk,"\n");    
+    fprintf(frk,"\n");
 }
 
 #endif

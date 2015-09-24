@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: modem_stats.h
   AUTHOR......: David Rowe
   DATE CREATED: June 2015
-                                                                             
+
   Common structure for returning demod stats from fdmdv and cohpsk modems.
 
 \*---------------------------------------------------------------------------*/
@@ -43,22 +43,22 @@
 struct MODEM_STATS {
     int    Nc;
     float  snr_est;                          /* estimated SNR of rx signal in dB (3 kHz noise BW)  */
-    COMP   rx_symbols[MODEM_STATS_NR_MAX][MODEM_STATS_NC_MAX+1]; 
-                                             /* latest received symbols, for scatter plot          */ 
+    COMP   rx_symbols[MODEM_STATS_NR_MAX][MODEM_STATS_NC_MAX+1];
+                                             /* latest received symbols, for scatter plot          */
     int    nr;                               /* number of rows in rx_symbols                       */
-    int    sync;                             /* demod sync state                                   */ 
-    float  foff;                             /* estimated freq offset in Hz                        */       
+    int    sync;                             /* demod sync state                                   */
+    float  foff;                             /* estimated freq offset in Hz                        */
     float  rx_timing;                        /* estimated optimum timing offset in samples         */
     float  clock_offset;                     /* Estimated tx/rx sample clock offset in ppm         */
 
     /* Buf for FFT/waterfall */
 
     float        fft_buf[2*MODEM_STATS_NSPEC];
-    kiss_fft_cfg fft_cfg;  
+    kiss_fft_cfg fft_cfg;
 };
 
 void modem_stats_open(struct MODEM_STATS *f);
-void modem_stats_close(struct MODEM_STATS *f); 
+void modem_stats_close(struct MODEM_STATS *f);
 void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COMP rx_fdm[], int nin);
 
 #endif

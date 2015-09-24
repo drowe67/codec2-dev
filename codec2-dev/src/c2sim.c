@@ -56,9 +56,9 @@ void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 
 /*---------------------------------------------------------------------------*\
-                                                                          
-				MAIN                                        
-                                                                         
+
+				MAIN
+
 \*---------------------------------------------------------------------------*/
 
 int main(int argc, char *argv[])
@@ -93,14 +93,14 @@ int main(int argc, char *argv[])
     int lspres = 0;
     int lspjvm = 0, lspjnd = 0, lspmel = 0, lspmelvq = 0;
     #ifdef __EXPERIMENTAL__
-    int lspanssi = 0, 
+    int lspanssi = 0,
     #endif
     int prede = 0;
     float pre_mem = 0.0, de_mem = 0.0;
     float ak[order];
     COMP  Sw_[FFT_ENC];
-    COMP  Ew[FFT_ENC]; 
- 
+    COMP  Ew[FFT_ENC];
+
     int phase0 = 0;
     float ex_phase[MAX_AMP+1];
 
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 
     while(1) {
         int option_index = 0;
-        int opt = getopt_long(argc, argv, opt_string, 
+        int opt = getopt_long(argc, argv, opt_string,
                     long_options, &option_index);
         if (opt == -1)
             break;
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
                 order = orderi;
             #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
-                if (dump) 
+                if (dump)
 	            dump_on(optarg);
             #endif
             } else if(strcmp(long_options[option_index].name, "lsp") == 0
@@ -250,7 +250,7 @@ int main(int argc, char *argv[])
                   || strcmp(long_options[option_index].name, "lspvq") == 0) {
 	        assert(order == LPC_ORD);
             } else if(strcmp(long_options[option_index].name, "dec") == 0) {
-               
+
                 decimate = atoi(optarg);
 	        if ((decimate != 2) && (decimate != 3) && (decimate != 4)) {
 	            fprintf(stderr, "Error in --dec, must be 2, 3, or 4\n");
@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
                     printf("needs --lpc [order] to resample amplitudes when using --dec\n");
                     exit(1);
                 }
- 
+
             } else if(strcmp(long_options[option_index].name, "hand_voicing") == 0) {
 	        if ((fvoicing = fopen(optarg,"rt")) == NULL) {
 	            fprintf(stderr, "Error opening voicing file: %s: %s.\n",
@@ -432,15 +432,15 @@ int main(int argc, char *argv[])
 	    buf_float[i] = buf[i];
 
 	/* optionally filter input speech */
-	
+
         if (prede) {
            pre_emp(Sn_pre, buf_float, &pre_mem, N);
            for(i=0; i<N; i++)
                 buf_float[i] = Sn_pre[i];
         }
-         
+
         if (bpf_en) {
-            /* filter input speech to create buf_float_bpf[], this is fed to the 
+            /* filter input speech to create buf_float_bpf[], this is fed to the
                LPC modelling.  Unfiltered speech in in buf_float[], which is
                delayed to match that of the BPF */
 
@@ -477,8 +477,8 @@ int main(int argc, char *argv[])
 	dft_speech(fft_fwd_cfg, Sw, Sn, w);
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
- 
-        #ifdef DUMP 
+
+        #ifdef DUMP
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
@@ -494,7 +494,7 @@ int main(int argc, char *argv[])
 	    dump_phase_(&model.phi[0], model.L);
             #endif
 	}
-	
+
 	if (hi) {
 	    int m;
 	    for(m=1; m<model.L/2; m++)
@@ -512,7 +512,7 @@ int main(int argc, char *argv[])
 	if (phase0) {
 	    float Wn[M];		        /* windowed speech samples */
 	    float Rk[order+1];                  /* autocorrelation coeffs  */
-            COMP a[FFT_ENC];	                
+            COMP a[FFT_ENC];
 
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
@@ -544,13 +544,13 @@ int main(int argc, char *argv[])
 
 	    for(i=0; i<=MAX_AMP; i++)
 	    	model.phi[i] = 0;
-	    
+
             /* Determine DFT of A(exp(jw)), which is needed for phase0 model when
                LPC is not used, e.g. indecimate=1 (10ms) frames with no LPC */
 
             for(i=0; i<FFT_ENC; i++) {
                 a[i].real = 0.0;
-                a[i].imag = 0.0; 
+                a[i].imag = 0.0;
             }
 
             for(i=0; i<=order; i++)
@@ -564,12 +564,12 @@ int main(int argc, char *argv[])
 
 	/*------------------------------------------------------------*\
 
-	        LPC model amplitudes and LSP quantisation 
+	        LPC model amplitudes and LSP quantisation
 
 	\*------------------------------------------------------------*/
 
 	if (lpc_model) {
-	    
+
             e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
             for(i=0; i<LPC_ORD; i++)
                 lsps_[i] = lsps[i];
@@ -578,7 +578,7 @@ int main(int argc, char *argv[])
 	    dump_ak(ak, order);
             dump_E(e);
             #endif
-	
+
 	    /* tracking down -ve energy values with BW expansion */
 	    /*
 	    if (e < 0.0) {
@@ -627,10 +627,10 @@ int main(int argc, char *argv[])
 	    if (lspjvm) {
 		/* Jean-Marc's multi-stage, split VQ */
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
-		{ 
+		{
 		    float lsps_bw[LPC_ORD];
 		    memcpy(lsps_bw, lsps_, sizeof(float)*LPC_ORD);
-		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);			    
+		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);
 		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
 		}
 	    }
@@ -640,7 +640,7 @@ int main(int argc, char *argv[])
 		/*  multi-stage VQ from Anssi Ramo OH3GDD */
 
 		lspanssi_quantise(lsps, lsps_, LPC_ORD, 5);
-		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);			    
+		bw_expand_lsps(lsps_, LPC_ORD, 50.0, 100.0);
 		lsp_to_lpc(lsps_, ak, LPC_ORD);
 	    }
 #endif
@@ -670,7 +670,7 @@ int main(int argc, char *argv[])
 		    f = (4000.0/PI)*lsps[i];
 		    mel[i] = floor(2595.0*log10(1.0 + f/700.0) + 0.5);
 		}
-                
+
                 #define MEL_ROUND 25
 		for(i=1; i<order; i++) {
 		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
@@ -683,15 +683,15 @@ int main(int argc, char *argv[])
                 #ifdef DUMP
                 dump_mel(mel, order);
                 #endif
-                
+
  		encode_mels_scalar(mel_indexes, mel, 6);
                 #ifdef DUMP
                 dump_mel_indexes(mel_indexes, 6);
                 #endif
 		//decode_mels_scalar(mel, mel_indexes, 6);
-                
+
                 /* read in VQed lsp-mels from octave/melvq.m */
-           
+
                 if (lspmelread) {
                     float mel_[order];
                     int ret = fread(mel_, sizeof(float), order, flspmel);
@@ -701,15 +701,15 @@ int main(int argc, char *argv[])
                         mel[i] = mel_[i];
                     }
                 }
-                
+
                 if (lspmelvq) {
                     int indexes[3];
                     //lspmelvq_mse += lspmelvq_quantise(mel, mel, order);
                     lspmelvq_mse += lspmelvq_mbest_encode(indexes, mel, mel, order, 5);
                 }
-        
+
                 /* ensure no unstable filters after quantisation */
-                       
+
                 #define MEL_ROUND 25
 		for(i=1; i<order; i++) {
 		    if (mel[i] <= mel[i-1]+MEL_ROUND) {
@@ -718,37 +718,37 @@ int main(int argc, char *argv[])
                         i = 1;
                     }
 		}
-                
+
 		for(i=0; i<order; i++) {
 		    f_ = 700.0*( pow(10.0, mel[i]/2595.0) - 1.0);
 		    lsps_[i] = f_*(PI/4000.0);
 		}
-                
+
 		lsp_to_lpc(lsps_, ak, order);
-                
+
 	    }
-                
+
 	    if (scalar_quant_Wo_e) {
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
                 model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
-                
+
 	    if (scalar_quant_Wo_e_low) {
                 int ind;
 		e = decode_energy(ind = encode_energy(e, 3), 3);
                 model.Wo = decode_log_Wo(encode_log_Wo(model.Wo, 5), 5);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
-                
+
 	    if (vector_quant_Wo_e) {
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
 
 		quantise_WoE(&model, &e, Woe_);
 	    }
-            
+
 	}
 
         if (amread) {
@@ -762,7 +762,7 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-        /* 
+        /*
            if decimate == 2, we interpolate frame n from frame n-1 and n+1
            if decimate == 4, we interpolate frames n, n+1, n+2, from frames n-1 and n+3
 
@@ -775,7 +775,7 @@ int main(int argc, char *argv[])
         for(i=0; i<decimate-1; i++)
             model_dec[i] = model_dec[i+1];
         model_dec[decimate-1] = model;
-                
+
         if ((frames % decimate) == 0) {
             for(i=0; i<order; i++)
                 lsps_dec[decimate-1][i] = lsps_[i];
@@ -792,12 +792,12 @@ int main(int argc, char *argv[])
                 e_dec[i] = interp_energy2(prev_e_dec, e_dec[decimate-1],weight);
             }
 
-            /* then recover spectral amplitudes and synthesise */    
+            /* then recover spectral amplitudes and synthesise */
 
             for(i=0; i<decimate; i++) {
                 if (lpc_model) {
-                    lsp_to_lpc(&lsps_dec[i][0], &ak_dec[i][0], order);                
-                    aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i], 
+                    lsp_to_lpc(&lsps_dec[i][0], &ak_dec[i][0], order);
+                    aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i],
                               &snr, 0, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
                     apply_lpc_correction(&model_dec[i]);
                     sum_snr += snr;
@@ -822,7 +822,7 @@ int main(int argc, char *argv[])
                 }
 
                 if (phase0)
-                    phase_synth_zero_order(fft_fwd_cfg, &model_dec[i], ex_phase, Aw);	
+                    phase_synth_zero_order(fft_fwd_cfg, &model_dec[i], ex_phase, Aw);
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
@@ -834,11 +834,11 @@ int main(int argc, char *argv[])
             prev_model_dec = model_dec[decimate-1];
             prev_e_dec = e_dec[decimate-1];
             for(i=0; i<LPC_ORD; i++)
-                prev_lsps_dec[i] = lsps_dec[decimate-1][i];        
+                prev_lsps_dec[i] = lsps_dec[decimate-1][i];
        }
 
     }
-                
+
     /*----------------------------------------------------------------*\
 
                             End Main Loop
@@ -846,7 +846,7 @@ int main(int argc, char *argv[])
     \*----------------------------------------------------------------*/
 
     fclose(fin);
-                
+
     if (fout != NULL)
 	fclose(fout);
 
@@ -869,18 +869,18 @@ int main(int argc, char *argv[])
 	fclose(fvoicing);
 
     nlp_destroy(nlp_states);
-    
+
     return 0;
 }
-                
-void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[], 
+
+void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float Sn_[],
                      float Pn[], int prede, float *de_mem, float gain)
 {
     int     i;
 
     synthesise(fft_inv_cfg, Sn_, model, Pn, 1);
     if (prede)
-        de_emp(Sn_, Sn_, de_mem, N);	
+        de_emp(Sn_, Sn_, de_mem, N);
 
     for(i=0; i<N; i++) {
 	Sn_[i] *= gain;

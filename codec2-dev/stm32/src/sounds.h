@@ -4,7 +4,7 @@
  * Sound effect library.
  *
  * This provides some sound effects for the SM1000 UI.
- * 
+ *
  * Author Stuart Longland <me@vk4msl.id.au>
  * Copyright (C) 2015 FreeDV project.
  *

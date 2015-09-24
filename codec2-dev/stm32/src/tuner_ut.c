@@ -59,7 +59,7 @@ int main(void) {
     bufs = FS*REC_TIME_SECS/N;
     fifo_sz = ((4*N/ADC_TUNER_N)+1)*ADC_TUNER_N;
     printf("Starting! bufs: %d %d\n", bufs, fifo_sz);
- 
+
     //dac_open(DAC_BUF_SZ);
     adc_open(fifo_sz);
     sm1000_leds_switches_init();

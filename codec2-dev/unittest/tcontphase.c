@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tcontphase.c                                                  
-  AUTHOR......: David Rowe                                            
-  DATE CREATED: 11/9/09                                        
-                                                               
+
+  FILE........: tcontphase.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 11/9/09
+
   Test program for developing continuous phase track synthesis algorithm.
   However while developing this it was discovered that synthesis_mixed()
   worked just as well.
-                                                                   
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -58,13 +58,13 @@ float ak[] = {
 
 
 /*---------------------------------------------------------------------------*\
-                                                                             
-  switch_present()                                                            
-                                                                             
-  Searches the command line arguments for a "switch".  If the switch is       
-  found, returns the command line argument where it ws found, else returns    
-  NULL.                                                                       
-                                                                             
+
+  switch_present()
+
+  Searches the command line arguments for a "switch".  If the switch is
+  found, returns the command line argument where it ws found, else returns
+  NULL.
+
 \*---------------------------------------------------------------------------*/
 
 int switch_present(sw,argc,argv)
@@ -93,12 +93,12 @@ char *argv[];
 {
     FILE *fout;
     short buf[N];
-    int   i,j; 
+    int   i,j;
     int   dump;
     float phi_prev[MAX_AMP];
     float Wo_prev, ex_phase, G;
     //float ak[P+1];
-    COMP  H[MAX_AMP];  
+    COMP  H[MAX_AMP];
     float f0;
 
     if (argc < 3) {
@@ -116,7 +116,7 @@ char *argv[];
     f0 = atof(argv[2]);
 
     dump = switch_present("--dump",argc,argv);
-    if (dump) 
+    if (dump)
       dump_on(argv[dump+1]);
 
     init_decoder();
@@ -124,11 +124,11 @@ char *argv[];
     for(i=0; i<MAX_AMP; i++)
 	phi_prev[i] = 0.0;
     Wo_prev = 0.0;
-	
+
     model.Wo = PI*(f0/4000.0);
     G = 1000.0;
     model.L = floor(PI/model.Wo);
-    
+
     //aks_to_H(&model, ak, G , H, P);
     //for(i=1; i<=model.L; i++)
 	model.A[i] = sqrt(H[i].real*H[i].real + H[i].imag*H[i].imag);
@@ -182,5 +182,5 @@ char *argv[];
 
     return 0;
 }
- 
+
 

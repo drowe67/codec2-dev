@@ -1,6 +1,6 @@
 /*
   raw2h.c
-  David Rowe 
+  David Rowe
   10 April 2013
 
   Converts a raw sound file to a C header file.  Used for generating arrays to

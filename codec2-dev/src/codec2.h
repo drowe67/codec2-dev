@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: 21 August 2010
 
-  Codec 2 fully quantised encoder and decoder functions.  If you want use 
+  Codec 2 fully quantised encoder and decoder functions.  If you want use
   Codec 2, these are the functions you need to call.
 
 \*---------------------------------------------------------------------------*/

@@ -57,14 +57,14 @@ int main(void) {
         /* keep DAC FIFOs topped up */
 
         while(adc2_read(buf, SINE_SAMPLES) == -1);
-        
+
         if (!switch_select()) {
             for(i=0; i<SINE_SAMPLES; i++)
                 buf[i] = aSine[i];
         }
-            
+
         dac2_write(buf, SINE_SAMPLES);
     }
-   
+
 }
 

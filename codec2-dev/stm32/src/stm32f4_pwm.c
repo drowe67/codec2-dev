@@ -35,7 +35,7 @@
 
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
- 
+
 #define TIM1_CCR3_ADDRESS    0x4001003C
 //#define TIM1_CCR3_ADDRESS    0x4001223C
 #define SINE_SAMPLES         32
@@ -78,7 +78,7 @@ static void TIM_Config(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
   DMA_InitTypeDef DMA_InitStructure;
-  
+
   /* GPIOA and GPIOB clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
 
@@ -89,7 +89,7 @@ static void TIM_Config(void)
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
-  GPIO_Init(GPIOA, &GPIO_InitStructure); 
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
 
   /* GPIOB Configuration: Channel 3N as alternate function push-pull */
@@ -103,7 +103,7 @@ static void TIM_Config(void)
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2 , ENABLE);
 
   DMA_DeInit(DMA2_Stream6);
-  DMA_InitStructure.DMA_Channel = DMA_Channel_6;  
+  DMA_InitStructure.DMA_Channel = DMA_Channel_6;
   DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)(TIM1_CCR3_ADDRESS) ;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)aSRC_Buffer;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
@@ -131,13 +131,13 @@ void Timer1Config() {
     TIM_Config();
 
     /* TIM1 example -------------------------------------------------
-  
-       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2 
-       prescaler is different from 1.   
-       TIM1CLK = 2 * PCLK2  
-       PCLK2 = HCLK / 2 
+
+       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2
+       prescaler is different from 1.
+       TIM1CLK = 2 * PCLK2
+       PCLK2 = HCLK / 2
        => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
-  
+
        TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
        SystemCoreClock is set to 168 MHz for STM32F4xx devices.
 
@@ -146,16 +146,16 @@ void Timer1Config() {
        - TIM1_Period = (SystemCoreClock / F) - 1
 
        The number of this repetitive requests is defined by the TIM1 Repetion counter,
-       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
+       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new
        value defined by the aSRC_Buffer.
-  
-       Note: 
+
+       Note:
        SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
        Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
        function to update SystemCoreClock variable value. Otherwise, any configuration
-       based on this variable will be incorrect.  
+       based on this variable will be incorrect.
        -----------------------------------------------------------------------------*/
-  
+
     /* Compute the value to be set in ARR regiter to generate signal frequency at FS */
 
 #ifdef TMP
@@ -170,7 +170,7 @@ void Timer1Config() {
 #else
     uhTimerPeriod = (SystemCoreClock / 28000000) - 1;
     aSRC_Buffer[0] =   uhTimerPeriod/2 + 1;
-    
+
 #endif
 
     /* TIM1 clock enable */
@@ -224,13 +224,13 @@ void Timer1Config() {
 
     //TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
 #endif
- 
+
     /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
-  
+
     /* DMA enable*/
     //DMA_Cmd(DMA2_Stream6, ENABLE);
-  
+
     /* TIM1 Update DMA Request enable */
     //TIM_DMACmd(TIM1, TIM_DMA_CC3, ENABLE);
 

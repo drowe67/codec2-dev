@@ -17,7 +17,7 @@
   *
   * <h2><center>&copy; COPYRIGHT 2011 STMicroelectronics</center></h2>
   ******************************************************************************
-  */ 
+  */
 
 /* Includes ------------------------------------------------------------------*/
 
@@ -29,16 +29,16 @@
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
   * @{
   */
-  
+
 /** @defgroup usbd_cdc
   * @brief This file is the Header file for USBD_cdc.c
   * @{
-  */ 
+  */
 
 
 /** @defgroup usbd_cdc_Exported_Defines
   * @{
-  */ 
+  */
 #define USB_CDC_CONFIG_DESC_SIZ                (67)
 #define USB_CDC_DESC_SIZ                       (67-9)
 
@@ -57,7 +57,7 @@
 #define STANDARD_ENDPOINT_DESC_SIZE             0x09
 
 #define CDC_DATA_IN_PACKET_SIZE                 *(uint16_t *)(((USB_OTG_CORE_HANDLE *)pdev)->dev.pConfig_descriptor + 57)
-        
+
 #define CDC_DATA_OUT_PACKET_SIZE                *(uint16_t *)(((USB_OTG_CORE_HANDLE *)pdev)->dev.pConfig_descriptor + 64)
 
 /*---------------------------------------------------------------------*/
@@ -80,7 +80,7 @@
 
 /**
   * @}
-  */ 
+  */
 
 
 /** @defgroup USBD_CORE_Exported_TypesDefinitions
@@ -88,8 +88,8 @@
   */
 typedef struct _CDC_IF_PROP
 {
-  uint16_t (*pIf_Init)     (void);   
-  uint16_t (*pIf_DeInit)   (void);   
+  uint16_t (*pIf_Init)     (void);
+  uint16_t (*pIf_DeInit)   (void);
   uint16_t (*pIf_Ctrl)     (uint32_t Cmd, uint8_t* Buf, uint32_t Len);
   uint16_t (*pIf_DataTx)   (uint8_t* Buf, uint32_t Len);
   uint16_t (*pIf_DataRx)   (uint8_t* Buf, uint32_t Len);
@@ -97,41 +97,41 @@ typedef struct _CDC_IF_PROP
 CDC_IF_Prop_TypeDef;
 /**
   * @}
-  */ 
+  */
 
 
 
 /** @defgroup USBD_CORE_Exported_Macros
   * @{
-  */ 
-  
+  */
+
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USBD_CORE_Exported_Variables
   * @{
-  */ 
+  */
 
 extern USBD_Class_cb_TypeDef  USBD_CDC_cb;
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_CORE_Exported_Functions
   * @{
   */
 /**
   * @}
-  */ 
+  */
 
 #endif  // __USB_CDC_CORE_H_
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
-  
+  */
+
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/

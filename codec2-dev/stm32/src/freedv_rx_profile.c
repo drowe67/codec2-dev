@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 	adc16k[i] = 0.0;
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
 	dac8k[i] = 0.0;
-    
+
     nin = freedv_nin(f);
     nin_16k = 2*nin;
     nout = nin;
@@ -112,9 +112,9 @@ int main(int argc, char *argv[]) {
         nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
         nin = freedv_nin(f); nin_16k = 2*nin;
 
-        PROFILE_SAMPLE_AND_LOG(fdmdv_8_to_16_start, freedv_rx_start, "  freedv_rx");     
+        PROFILE_SAMPLE_AND_LOG(fdmdv_8_to_16_start, freedv_rx_start, "  freedv_rx");
 
-        fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
+        fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
 
         PROFILE_SAMPLE_AND_LOG2(fdmdv_8_to_16_start, "  fdmdv_8_to_16");
 
@@ -123,7 +123,7 @@ int main(int argc, char *argv[]) {
 
         fwrite(dac16k, sizeof(short), 2*nout, fout);
         freedv_get_modem_stats(f, &sync, &snr_est);
-        printf("frame: %d nin_16k: %d sync: %d SNR: %3.2f \n", 
+        printf("frame: %d nin_16k: %d sync: %d SNR: %3.2f \n",
                ++frame, nin_16k, sync, (double)snr_est);
     }
 

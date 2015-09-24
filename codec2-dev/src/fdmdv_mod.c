@@ -1,14 +1,14 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_mod.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 28 2012
-                                                                             
+
   Given an input file of bits outputs a raw file (8kHz, 16 bit shorts)
   of FDMDV modem samples ready to send over a HF radio channel.  The
   input file is assumed to be arranged as codec frames of 56 bits (7
   bytes) which we send as two 28 bit modem frames.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 
@@ -99,13 +99,13 @@ int main(int argc, char *argv[])
     assert(tx_bits != NULL);
 
     foff = -100;
-    foff_phase_rect.real = 1.0; foff_phase_rect.imag = 0.0; 
+    foff_phase_rect.real = 1.0; foff_phase_rect.imag = 0.0;
 
     frames = 0;
 
     while(fread(packed_bits, sizeof(char), bytes_per_codec_frame, fin) == bytes_per_codec_frame) {
 	frames++;
-	
+
 	/* unpack bits, MSB first */
 
 	bit = 7; byte = 0;
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     //fdmdv_dump_osc_mags(fdmdv);

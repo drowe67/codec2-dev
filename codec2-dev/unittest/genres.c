@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                           
-  FILE........: genres.c   
-  AUTHOR......: David Rowe                                                      
-  DATE CREATED: 24/8/09                                                   
-                                                                          
+
+  FILE........: genres.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 24/8/09
+
   Generates a file of LPC residual samples from original speech.
-                                                                          
+
 \*---------------------------------------------------------------------------*/
 
 /*

@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fm_demod.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: Feb 24 2015
-                                                                             
-  Given an input raw file (44.4 kHz, 16 bit shorts) with a FM signal centered 
+
+  Given an input raw file (44.4 kHz, 16 bit shorts) with a FM signal centered
   11.1 kHz, outputs a file of demodulated audio samples.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*

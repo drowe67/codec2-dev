@@ -9,14 +9,14 @@
 
   Note the semi-hosting system isn't fast enough to transfer 2 16 kHz
   streams at once.
-  
+
   ~/stlink$ sudo ./st-util -f ~/codec2-dev/stm32/adc_rec.elf
   ~/codec2-dev/stm32$ ~/gcc-arm-none-eabi-4_7-2013q1/bin/arm-none-eabi-gdb adc_rec.elf
-  
-  (when finished) 
+
+  (when finished)
   $ play -r 16000 -s -2 ~/stlink/adc.raw
 
-  adc1 -> "from radio"  
+  adc1 -> "from radio"
   adc2 -> "mic amp"
 
 \*---------------------------------------------------------------------------*/
@@ -67,7 +67,7 @@ int main(void){
 
     for(i=0; i<bufs; i++) {
         while(adc2_read(buf, N) == -1);
-        fwrite(buf, sizeof(short), N, fadc);  
+        fwrite(buf, sizeof(short), N, fadc);
         printf("adc_overflow1: %d  adc_overflow2: %d   \n", adc_overflow1, adc_overflow2);
     }
     fclose(fadc);

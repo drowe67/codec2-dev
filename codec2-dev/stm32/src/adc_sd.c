@@ -50,7 +50,7 @@ static float calc_sd(short x[], int n) {
     for(i=0; i<n;i++) {
         sum_diff += ((float)x[i] - mean)*((float)x[i] - mean);
     }
-    
+
     sd = sqrtf(sum_diff/n);
 
     return sd;

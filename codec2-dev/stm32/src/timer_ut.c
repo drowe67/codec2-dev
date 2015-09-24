@@ -31,7 +31,7 @@
 
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
- 
+
 #include "gdb_stdio.h"
 
 #define TIM1_CCR3_ADDRESS    0x4001223C
@@ -61,7 +61,7 @@ int main(void){
 static void TIM_Config(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
-  
+
   /* GPIOA and GPIOB clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
 
@@ -73,7 +73,7 @@ static void TIM_Config(void)
   GPIO_InitStructure.GPIO_Speed = GPIO_Speed_100MHz;
   GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
   GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
-  GPIO_Init(GPIOA, &GPIO_InitStructure); 
+  GPIO_Init(GPIOA, &GPIO_InitStructure);
   GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_TIM1);
 
   /* GPIOB Configuration: Channel 3N as alternate function push-pull */
@@ -91,13 +91,13 @@ void Timer1Config() {
     TIM_Config();
 
     /* TIM1 example -------------------------------------------------
-  
-       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2 
-       prescaler is different from 1.   
-       TIM1CLK = 2 * PCLK2  
-       PCLK2 = HCLK / 2 
+
+       TIM1 input clock (TIM1CLK) is set to 2 * APB2 clock (PCLK2), since APB2
+       prescaler is different from 1.
+       TIM1CLK = 2 * PCLK2
+       PCLK2 = HCLK / 2
        => TIM1CLK = 2 * (HCLK / 2) = HCLK = SystemCoreClock
-  
+
        TIM1CLK = SystemCoreClock, Prescaler = 0, TIM1 counter clock = SystemCoreClock
        SystemCoreClock is set to 168 MHz for STM32F4xx devices.
 
@@ -106,16 +106,16 @@ void Timer1Config() {
        - TIM1_Period = (SystemCoreClock / F) - 1
 
        The number of this repetitive requests is defined by the TIM1 Repetion counter,
-       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new 
+       each 3 Update Requests, the TIM1 Channel 3 Duty Cycle changes to the next new
        value defined by the aSRC_Buffer.
-  
-       Note: 
+
+       Note:
        SystemCoreClock variable holds HCLK frequency and is defined in system_stm32f4xx.c file.
        Each time the core clock (HCLK) changes, user had to call SystemCoreClockUpdate()
        function to update SystemCoreClock variable value. Otherwise, any configuration
-       based on this variable will be incorrect.  
+       based on this variable will be incorrect.
        -----------------------------------------------------------------------------*/
-  
+
     /* Compute the value to be set in ARR regiter to generate signal frequency at FS Hz */
     uhTimerPeriod = (SystemCoreClock / FS ) - 1;
     /* Compute CCR1 value to generate a duty cycle at 50% */
@@ -158,7 +158,7 @@ void Timer1Config() {
 
     /* Enable preload feature */
     TIM_OC3PreloadConfig(TIM1, TIM_OCPreload_Enable);
-  
+
     /* Automatic Output enable, Break, dead time and lock configuration*/
     TIM_BDTRInitStructure.TIM_OSSRState = TIM_OSSRState_Enable;
     TIM_BDTRInitStructure.TIM_OSSIState = TIM_OSSIState_Enable;
@@ -172,7 +172,7 @@ void Timer1Config() {
 
     /* TIM1 counter enable */
     TIM_Cmd(TIM1, ENABLE);
-  
+
     /* Main Output Enable */
     TIM_CtrlPWMOutputs(TIM1, ENABLE);
 }

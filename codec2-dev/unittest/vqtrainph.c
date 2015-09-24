@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     int     J;		/* number of vectors in training set		*/
     int     ind;	/* index of current vector			*/
     float   se;	        /* total squared error for this iteration       */
-    float   var;        /* variance                                     */ 
+    float   var;        /* variance                                     */
     float   var_1;	/* previous variance            	        */
     float   delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
 	    cb[i].real = 1.0;
 	    cb[i].imag = 0.0;
 	}
-	    
+
     //print_vec(cb, d, 1);
 
     /* main loop */
@@ -184,13 +184,13 @@ int main(int argc, char *argv[]) {
 	    n[ind]++;
 	    acc(&cent[ind*d], vec, d);
 	}
-	
+
 	/* work out stats */
 
-	var = se/var_n;	
+	var = se/var_n;
 	sd_vec = sqrt(var);
 
-	/* we need to know dimension of cb (which varies from vector to vector) 
+	/* we need to know dimension of cb (which varies from vector to vector)
            to calc bits_theory.  Maybe measure and use average dimension....
 	*/
 	//bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
@@ -209,8 +209,8 @@ int main(int argc, char *argv[]) {
 		delta = 0;
 	    if (delta < DELTAQ)
 		finished = 1;
-	}      
-		     
+	}
+
 	if (!finished) {
 	    /* determine new codebook from centroids */
 
@@ -221,13 +221,13 @@ int main(int argc, char *argv[]) {
 	}
 
 	printf("%2d         %4.3f  %4.3f  %4.3f \n",iterations, delta, var, sd_vec);
-	
+
 	var_1 = var;
     } while (!finished);
 
 
     //print_vec(cb, d, 1);
-    
+
     /* save codebook to disk */
 
     fvq = fopen(argv[4],"wt");
@@ -258,7 +258,7 @@ void print_vec(COMP cb[], int d, int e)
     int i,j;
 
     for(j=0; j<e; j++) {
-	for(i=0; i<d; i++) 
+	for(i=0; i<d; i++)
 	    printf("%f %f ", cb[j*d+i].real, cb[j*d+i].imag);
 	printf("\n");
     }
@@ -325,7 +325,7 @@ void zero(COMP v[], int d)
 
 	Adds d dimensional vectors v1 to v2 and stores the result back
 	in v1.  We add them like vectors on the complex plane, summing
-	the real and imag terms.  
+	the real and imag terms.
 
 	An unused entry in a sparse vector has both the real and imag
 	parts set to zero so won't affect the accumulation process.
@@ -380,7 +380,7 @@ void norm(COMP v[], int d)
 
 	Quantises vec by choosing the nearest vector in codebook cb, and
 	returns the vector index.  The squared error of the quantised vector
-	is added to se.  
+	is added to se.
 
 	Unused entries in sparse vectors are ignored.
 

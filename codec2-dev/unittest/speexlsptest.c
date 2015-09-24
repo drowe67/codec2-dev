@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                           
-  FILE........: speexlsptest.c   
-  AUTHOR......: David Rowe                                                      
-  DATE CREATED: 24/8/09                                                   
-                                                                          
+
+  FILE........: speexlsptest.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 24/8/09
+
   Test LPC to LSP conversion and quantisation using Speex LSP quantiser.
-                                                                          
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -42,19 +42,19 @@
 /* Speex lag window */
 
 const float lag_window[11] = {
-   1.00000, 0.99716, 0.98869, 0.97474, 0.95554, 0.93140, 0.90273, 0.86998, 
+   1.00000, 0.99716, 0.98869, 0.97474, 0.95554, 0.93140, 0.90273, 0.86998,
    0.83367, 0.79434, 0.75258
 };
 
 /*---------------------------------------------------------------------------*\
-                                                                            
+
   find_aks_for_lsp()
-                                                          
-  This function takes a frame of samples, and determines the linear           
+
+  This function takes a frame of samples, and determines the linear
   prediction coefficients for that frame of samples.  Modified version of
   find_aks from lpc.c to include autocorrelation noise floor and lag window
   to match Speex processing steps prior to LSP conversion.
-                                                                            
+
 \*---------------------------------------------------------------------------*/
 
 void find_aks_for_lsp(
@@ -86,9 +86,9 @@ void find_aks_for_lsp(
 }
 
 /*---------------------------------------------------------------------------*\
-                                                                            
-                                MAIN 
-                                   
+
+                                MAIN
+
 \*---------------------------------------------------------------------------*/
 
 int main(int argc, char *argv[])
@@ -152,9 +152,9 @@ int main(int argc, char *argv[])
     if (roots == P) {
 
         speex_bits_reset(&bits);
-	lsp_quant_lbr(lsp, lsp_, P, &bits);	
+	lsp_quant_lbr(lsp, lsp_, P, &bits);
 	lsp_to_lpc(lsp_, &ak_[1], P, NULL);
-	
+
 	/* measure spectral distortion */
 	sd = spectral_dist(ak, ak_, P, NDFT);
 	if (sd > 2.0) gt2++;

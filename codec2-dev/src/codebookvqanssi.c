@@ -1,7 +1,7 @@
 /* THIS IS A GENERATED FILE. Edit generate_codebook.c and its input */
 
 /*
- * This intermediary file and the files that used to create it are under 
+ * This intermediary file and the files that used to create it are under
  * The LGPL. See the file COPYING.
  */
 

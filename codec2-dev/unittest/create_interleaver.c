@@ -14,7 +14,7 @@ int main(int argc, char * argv[]) {
     int   m,i, src_bit, dest_bit;
     FILE *f;
     int  *interleaver;
-    
+
     if (argc != 3) {
 	printf("usage: %s InterleaverBits InterleaverFile\n", argv[0]);
 	exit(1);

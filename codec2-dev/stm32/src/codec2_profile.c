@@ -83,10 +83,10 @@ static void c2demo(int mode, char inputfile[], char outputfile[])
     while (fread(inbuf, sizeof(short), nsam, fin) == nsam) {
         PROFILE_SAMPLE(enc_start);
         codec2_encode(codec2, bits, inbuf);
-        PROFILE_SAMPLE_AND_LOG(dec_start, enc_start, "  enc");     
+        PROFILE_SAMPLE_AND_LOG(dec_start, enc_start, "  enc");
 	codec2_decode(codec2, outbuf, bits);
-        PROFILE_SAMPLE_AND_LOG2(dec_start, "  dec");     
-        PROFILE_SAMPLE_AND_LOG2(enc_start, "  enc & dec");     
+        PROFILE_SAMPLE_AND_LOG2(dec_start, "  dec");
+        PROFILE_SAMPLE_AND_LOG2(enc_start, "  enc & dec");
         fwrite((char*)outbuf, sizeof(short), nsam, fout);
         printf("frame: %d\n", ++frame);
         machdep_profile_print_logged_samples();
@@ -131,11 +131,11 @@ static void c2speedtest(int mode, char inputfile[])
 
     nread = fread(inbuf, sizeof(short), SPEED_TEST_SAMPLES, fin);
     if (nread != SPEED_TEST_SAMPLES) {
-        printf("error reading %s, %d samples reqd, %d read\n", 
+        printf("error reading %s, %d samples reqd, %d read\n",
                inputfile, SPEED_TEST_SAMPLES, nread);
     }
     fclose(fin);
-    
+
     pinbuf = inbuf;
     for(f=0; f<nframes; f++) {
 	GPIOD->ODR = (1 << 13);
@@ -152,15 +152,15 @@ static void c2speedtest(int mode, char inputfile[])
 }
 
 void gpio_init() {
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD 
-    GPIOD->MODER = (1 << 26);            // set pin 13 to be general 
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD
+    GPIOD->MODER = (1 << 26);            // set pin 13 to be general
                                          // purpose output
 }
 
 int main(int argc, char *argv[]) {
     gpio_init();
     machdep_profile_init ();
- 
+
     printf("Starting c2demo\n");
 
     /* File I/O test for profiling or (with #define DUMP)
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
     c2demo(CODEC2_MODE_1600, "stm_in.raw", "stm_out.raw");
 
     printf("Starting c2 speed test\n");
-    
+
     /* Another test of execution speed. Look at PD13 with a
        oscilliscope.  On time is enc, off is dec */
 

@@ -5,10 +5,10 @@
   DATE CREATED: 20 Feb 2015
 
   Filter/decimator function, broken out to this file so we can unit
-  test easily.  
+  test easily.
 
   Unit testing:
-  
+
     ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_tuner.c -o iir_tuner -lm -Wall
     ~/codec2-dev/stm32$ ./iir_tuner
 
@@ -46,7 +46,7 @@
    Note neat trick to relate BETA2 to BETA1 by the decimation rate */
 
 #define BETA1                    .9990234375			// B1MUL/(2**B1SHFT)
-#define B1MUL			 1023				
+#define B1MUL			 1023
 #define B1SMUL			 1204
 #define B1SHFT			 10				// 10 bits gives us plenty of headroom between 31 bits of int and 14 bits of ADC
 #define B2MUL			 979				// This actually matches BETA2 exactly with the supplied BETA1
@@ -90,7 +90,7 @@ void iir_tuner(float dec_50[], unsigned short adc_buf[]) {
             #endif
         }
 
-        /* Equaliser FIR filter, notch at Fs/(4*ADC_TUNER_M) to smooth out 
+        /* Equaliser FIR filter, notch at Fs/(4*ADC_TUNER_M) to smooth out
            IIR BPF passband response */
         #ifdef FIXED_IIR
 	o = n + ((B2MUL*o_2)>>B2SHFT);
@@ -98,12 +98,12 @@ void iir_tuner(float dec_50[], unsigned short adc_buf[]) {
 	o_2 = o_1;
 	o_1 = n;
         #else
-	z=y+BETA2*z_2;        
+	z=y+BETA2*z_2;
 	dec_50[j] = z;
         z_2 = z_1;
         z_1 = y;
         #endif
-       
+
     }
 }
 
@@ -121,7 +121,7 @@ void iir_tuner_dec_50_to_10(float dec_10[], float dec_50[], int n) {
             acc += dec_50[i-j]*fir_50_to_10[j];
         dec_10[k] = acc;
     }
-        
+
 }
 
 
@@ -171,7 +171,7 @@ int main(void) {
     for(i=0, j=0; i<NIN; i+=ADC_TUNER_BUF_SZ/2, j+=ADC_TUNER_N/2) {
         iir_tuner(&dec_50[j], &s[i]);
     }
-    
+
     f = fopen("iir_tuner_s.txt", "wt");  assert(f != NULL);
     for(i=0; i<NIN; i++)
         fprintf(f, "%d\n", s[i]);

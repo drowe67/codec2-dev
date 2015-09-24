@@ -1,17 +1,17 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: dvdongle2.c
-  AUTHOR......: David Rowe                                           
+  AUTHOR......: David Rowe
   DATE CREATED: 28 Oct 2010
-                                                                             
+
   Program to encode and decode raw speech samples using the AMBE codec
   implemented on a DV Dongle.
 
   The DV Dongle connects to a USB port and provides encoding and
   decoding of compressed audio using the DVSI AMBE2000 full duplex
   vocoder DSP chip.
-                       
-  Refs: 
+
+  Refs:
 
     [1] http://www.dvdongle.com/
     [2] http://www.moetronix.com/files/dvdongletechref100.pdf
@@ -49,13 +49,13 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <assert.h>  
-#include <stdio.h>  
-#include <stdlib.h> 
-#include <string.h> 
-#include <unistd.h> 
-#include <fcntl.h>  
-#include <errno.h>  
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <termios.h>
 
 #define MAX_STR                  1024
@@ -64,9 +64,9 @@
 
 /* message parsing state machine states */
 
-#define MSGSTATE_HDR1 0		
+#define MSGSTATE_HDR1 0
 #define MSGSTATE_HDR2 1
-#define MSGSTATE_DATA 2	    
+#define MSGSTATE_DATA 2
 
 #define LENGTH_MASK 0x1FFF    /* mask for message length            */
 #define TYPE_MASK   0xE0      /* mask for upper byte of header      */
@@ -181,7 +181,7 @@ void parse_message(int msg_type, int msg_len, char msg_data[]) {
     short buf[N];
     COMPRESSED *c_out;
 
-    //printf("msg_type: 0x%02x  msg_len: %d\n", msg_type, msg_len); 
+    //printf("msg_type: 0x%02x  msg_len: %d\n", msg_type, msg_len);
 
     /* echo compressed speech frames back to target */
 
@@ -203,22 +203,22 @@ void parse_message(int msg_type, int msg_len, char msg_data[]) {
 	printf("cd[5]    0x%04x\n", c_out->channel_data[5] & 0xffff);
 	printf("cd[6]    0x%04x\n", c_out->channel_data[6] & 0xffff);
 	printf("uc_msg %d\n", uc_msg);
-#endif	
+#endif
 	printf("bit errors %d\n", c_out->unused[2]);
-	memcpy(&c_in.channel_data, 
-	       &c_out->channel_data, 
+	memcpy(&c_in.channel_data,
+	       &c_out->channel_data,
 	       sizeof(c_in.channel_data));
-		
+
 	write_dongle(fd, data_item_1, sizeof(data_item_1));
 	write_dongle(fd, (char*)&c_in, sizeof(c_in));
-	
+
 	c_msg++;
     }
 
     /* write speech buffers to disk */
 
     if (msg_type == TYPE_UC) {
-       
+
 	if (fout != NULL) {
 	    fwrite(msg_data, sizeof(char), msg_len-2, fout);
 	    printf("msg_len %d\n", msg_len);
@@ -228,10 +228,10 @@ void parse_message(int msg_type, int msg_len, char msg_data[]) {
 	    fread(buf, sizeof(short), N, fin);
 	else
 	    memset(buf, 0, sizeof(buf));
-	
+
 	write_dongle(fd, data_item_0, sizeof(data_item_0));
 	write_dongle(fd, (char*)buf, sizeof(buf));
-	
+
 	uc_msg++;
     }
 }
@@ -260,7 +260,7 @@ int main(int argc, char **argv) {
     } else {
 	fcntl(fd, F_SETFL, 0);
     }
-	
+
     initport(fd);
 
     fin = NULL;
@@ -305,7 +305,7 @@ int main(int argc, char **argv) {
     c_in.rate[4]   = 0x6860;
 #endif
 
-    c_in.unused[0] = 0x0; 
+    c_in.unused[0] = 0x0;
     c_in.unused[1] = 0x0;
     c_in.unused[2] = 0x0;
     c_in.dtmf      = 0x00ff;
@@ -322,7 +322,7 @@ int main(int argc, char **argv) {
     c_msg = uc_msg = 0;
 
     for(i=0; i<100000; i++) {
-	/* 
+	/*
 	   We can only reliably read one byte at a time.  Until I
 	   realised this there was "much wailing and gnashing of
 	   teeth".  Trying to read() n bytes read() returns n but may
@@ -375,9 +375,9 @@ int main(int argc, char **argv) {
     write_dongle(fd, run_state_stop, sizeof(run_state_stop));
 
     close(fd);
-    if (fin != NULL) 
+    if (fin != NULL)
 	fclose(fin);
-    if (fout != NULL) 
+    if (fout != NULL)
 	fclose(fout);
     fclose(f);
 

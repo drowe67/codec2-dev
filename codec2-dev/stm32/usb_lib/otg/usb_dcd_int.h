@@ -6,7 +6,7 @@
   * @date    22-July-2011
   * @brief   Peripheral Device Interface Layer
   ******************************************************************************
-  * @attention 
+  * @attention
   *
   * THE PRESENT FIRMWARE WHICH IS FOR GUIDANCE ONLY AIMS AT PROVIDING CUSTOMERS
   * WITH CODING INFORMATION REGARDING THEIR PRODUCTS IN ORDER FOR THEM TO SAVE
@@ -31,16 +31,16 @@
 /** @addtogroup USB_OTG_DRIVER
   * @{
   */
-  
+
 /** @defgroup USB_DCD_INT
-  * @brief This file is the 
+  * @brief This file is the
   * @{
-  */ 
+  */
 
 
 /** @defgroup USB_DCD_INT_Exported_Defines
   * @{
-  */ 
+  */
 
 typedef struct _USBD_DCD_INT
 {
@@ -52,29 +52,29 @@ typedef struct _USBD_DCD_INT
   uint8_t (* Suspend) (USB_OTG_CORE_HANDLE *pdev);
   uint8_t (* Resume) (USB_OTG_CORE_HANDLE *pdev);
   uint8_t (* IsoINIncomplete) (USB_OTG_CORE_HANDLE *pdev);
-  uint8_t (* IsoOUTIncomplete) (USB_OTG_CORE_HANDLE *pdev);  
-  
+  uint8_t (* IsoOUTIncomplete) (USB_OTG_CORE_HANDLE *pdev);
+
   uint8_t (* DevConnected) (USB_OTG_CORE_HANDLE *pdev);
-  uint8_t (* DevDisconnected) (USB_OTG_CORE_HANDLE *pdev);   
-  
+  uint8_t (* DevDisconnected) (USB_OTG_CORE_HANDLE *pdev);
+
 }USBD_DCD_INT_cb_TypeDef;
 
 extern USBD_DCD_INT_cb_TypeDef *USBD_DCD_INT_fops;
 /**
   * @}
-  */ 
+  */
 
 
 /** @defgroup USB_DCD_INT_Exported_Types
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_DCD_INT_Exported_Macros
   * @{
-  */ 
+  */
 
 #define CLEAR_IN_EP_INTR(epnum,intr) \
   diepint.d32=0; \
@@ -88,34 +88,34 @@ extern USBD_DCD_INT_cb_TypeDef *USBD_DCD_INT_fops;
 
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_DCD_INT_Exported_Variables
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_DCD_INT_Exported_FunctionsPrototype
   * @{
-  */ 
+  */
 
 uint32_t USBD_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pdev);
 
 /**
   * @}
-  */ 
+  */
 
 
 #endif // USB_DCD_INT_H__
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
 

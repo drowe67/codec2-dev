@@ -54,6 +54,6 @@ int main(void) {
         dac1_write((short*)aSine, SINE_SAMPLES);
         dac2_write((short*)aSine, SINE_SAMPLES);
     }
-   
+
 }
 

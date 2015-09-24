@@ -82,11 +82,11 @@ static void c2speedtest(int mode, char inputfile[])
     printf("reading samples ....\n");
     nread = fread(inbuf, sizeof(short), SPEED_TEST_SAMPLES, fin);
     if (nread != SPEED_TEST_SAMPLES) {
-        printf("error reading %s, %d samples reqd, %d read\n", 
+        printf("error reading %s, %d samples reqd, %d read\n",
                inputfile, SPEED_TEST_SAMPLES, nread);
     }
     fclose(fin);
-    
+
     pinbuf = inbuf;
     for(f=0; f<nframes; f++) {
         //printf("read ADC\n");
@@ -99,7 +99,7 @@ static void c2speedtest(int mode, char inputfile[])
 	GPIOD->ODR &= ~(1 << 13);
         //printf("Codec 2 dec\n");
 	codec2_decode(codec2, outbuf, bits);
-        
+
         //printf("write to DAC\n");
         while(dac1_write(dummy_buf, nsam*2) == -1); /* runs at Fs = 16kHz */
         //printf(".");
@@ -112,8 +112,8 @@ static void c2speedtest(int mode, char inputfile[])
 }
 
 void gpio_init() {
-    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD 
-    GPIOD->MODER = (1 << 26);            // set pin 13 to be general 
+    RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN; // enable the clock to GPIOD
+    GPIOD->MODER = (1 << 26);            // set pin 13 to be general
                                          // purpose output
 }
 

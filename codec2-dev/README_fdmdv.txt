@@ -8,7 +8,7 @@ Introduction
 
 A 1400 bit/s (nominal) Frequency Division Multiplexed Digital Voice
 (FDMDV) modem based on [1].  Used for digital audio over HF SSB.
-                     
+
 The FDMDV modem was first implemented in GNU Octave, then ported to C.
 Algorithm development is generally easier in Octave, but for real time
 work we need the C version.  Automated units tests ensure the
@@ -24,11 +24,11 @@ Built as part of codec2-dev, see README for build instructions.
     $ ./fdmdv_get_test_bits test.c2 1400
     $ ./fdmdv_mod test.c2 test.raw
     $ play -r 8000 -s -2 test.raw
-    
-2. Two seconds of test frame data modulated and sent out of sound device: 
-    
+
+2. Two seconds of test frame data modulated and sent out of sound device:
+
     $ ./fdmdv_get_test_bits - 2800 | ./fdmdv_mod - - | play -t raw -r 8000 -s -2 -
- 
+
 3. Send 14000 modulated bits (10 seconds) to the demod and count errors:
 
     $  ./fdmdv_get_test_bits - 14000 | ./fdmdv_mod - - | ./fdmdv_demod - - 14 demod_dump.txt | ./fdmdv_put_test_bits -
@@ -125,7 +125,7 @@ fdmdv_ut.m - Unit test for fdmdv Octave code, useful while
                DBPSK pilot. Currently the noise generation code
                doesn't take the pilot power into account, so in this
                example the real SNR is actually 5dB.
-             
+
 fdmdv_mod.m - Octave version of modulator that outputs a raw file.
               The modulator is driven by a test frame of bits.  This
               can then be played over a real channel or through a
@@ -134,7 +134,7 @@ fdmdv_mod.m - Octave version of modulator that outputs a raw file.
               sample clocks.
 
 	      To generate 10 seconds of modulated signal:
-                
+
                 octave:8> fdmdv_mod("test.raw",1400*10);
 
 fdmdv_demod.m - Demodulator program that takes a raw file as input,

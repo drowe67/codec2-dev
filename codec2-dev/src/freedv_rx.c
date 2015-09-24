@@ -1,17 +1,17 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: freedv_rx.c
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
-                                                                             
+
   Demo receive program for FreeDV API functions, some side information
   written to freedv_rx_log.txt
- 
+
   Example usage (all one line):
 
-     codec2-dev/build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | 
+     codec2-dev/build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - |
                                  ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -
-                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
          argv[3], strerror(errno));
 	exit(1);
     }
-    
+
     freedv = freedv_open(mode);
     assert(freedv != NULL);
 
@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
-    
+
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_max_modem_samples = freedv_get_n_max_modem_samples(freedv);
     speech_out = (short*)malloc(sizeof(short)*n_speech_samples);
@@ -132,11 +132,11 @@ int main(int argc, char *argv[]) {
         fwrite(speech_out, sizeof(short), nout, fout);
         freedv_get_modem_stats(freedv, &sync, &snr_est);
         total_bit_errors = freedv_get_total_bit_errors(freedv);
-        
+
         /* log some side info to the txt file */
-               
+
         if (ftxt != NULL) {
-            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d\n", 
+            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d\n",
                     frame, sync, nin, snr_est, total_bit_errors);
         }
 
@@ -144,7 +144,7 @@ int main(int argc, char *argv[]) {
            buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     if (freedv_get_test_frames(freedv)) {

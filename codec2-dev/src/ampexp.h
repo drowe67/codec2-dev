@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
-  FILE........: ampexp.h                                     
-  AUTHOR......: David Rowe                                             
+
+  FILE........: ampexp.h
+  AUTHOR......: David Rowe
   DATE CREATED: & August 2012
-                                                                             
+
   Functions for experimenting with amplitude quantisation.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -22,7 +22,7 @@
   License for more details.
 
   You should have received a copy of the GNU Lesser General Public License
-  along with this program; if not,see <http://www.gnu.org/licenses/>. 
+  along with this program; if not,see <http://www.gnu.org/licenses/>.
 */
 
 #ifndef __AMPEX__

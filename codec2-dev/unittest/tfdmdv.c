@@ -1,14 +1,14 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: tfdmdv.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 16 2012
-                                                                             
+
   Tests for the C version of the FDMDV modem.  This program outputs a
   file of Octave vectors that are loaded and automatically tested
   against the Octave version of the modem by the Octave script
   tfmddv.m
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     printf("sizeof FDMDV states: %d bytes\n", sizeof(struct FDMDV));
 
     for(f=0; f<FRAMES; f++) {
-        
+
 	/* --------------------------------------------------------*\
 	                          Modulator
 	\*---------------------------------------------------------*/
@@ -113,7 +113,7 @@ int main(int argc, char *argv[])
 	fdmdv_get_test_bits(fdmdv, tx_bits);
 	bits_to_dqpsk_symbols(tx_symbols, FDMDV_NC, fdmdv->prev_tx_symbols, tx_bits, &fdmdv->tx_pilot_bit, 0);
 	memcpy(fdmdv->prev_tx_symbols, tx_symbols, sizeof(COMP)*(FDMDV_NC+1));
-        tx_filter_and_upconvert(tx_fdm, FDMDV_NC , tx_symbols, fdmdv->tx_filter_memory, 
+        tx_filter_and_upconvert(tx_fdm, FDMDV_NC , tx_symbols, fdmdv->tx_filter_memory,
                                 fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
 
 	/* --------------------------------------------------------*\
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
 	for(i=0,j=nin; j<channel_count; i++,j++)
 	    channel[i] = channel[j];
 	channel_count -= nin;
- 
+
 	/* --------------------------------------------------------*\
 	                        Demodulator
 	\*---------------------------------------------------------*/
@@ -161,13 +161,13 @@ int main(int argc, char *argv[])
 	if (fdmdv->sync == 0)
 	    fdmdv->foff = foff_coarse;
 	fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm, -fdmdv->foff, &fdmdv->foff_phase_rect, nin);
-	
+
 	/* baseband processing */
 
         rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, nin);
-        down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq, 
+        down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq,
                                    fdmdv->freq_pol, nin, M/Q);
-	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, M);	 
+	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, M);
 	foff_fine = qpsk_to_bits(rx_bits, &sync_bit, FDMDV_NC, fdmdv->phase_difference, fdmdv->prev_rx_symbols, rx_symbols, 0);
 
         //for(i=0; i<FDMDV_NC;i++)
@@ -178,20 +178,20 @@ int main(int argc, char *argv[])
 
 	snr_update(fdmdv->sig_est, fdmdv->noise_est, FDMDV_NC, fdmdv->phase_difference);
 	memcpy(fdmdv->prev_rx_symbols, rx_symbols, sizeof(COMP)*(FDMDV_NC+1));
-	
+
 	next_nin = M;
-	
+
 	if (rx_timing > 2*M/P)
 	    next_nin += M/P;
-    
+
 	if (rx_timing < 0)
 	    next_nin -= M/P;
-	
+
 	fdmdv->sync = freq_state(&reliable_sync_bit, sync_bit, &fdmdv->fest_state, &fdmdv->timer, fdmdv->sync_mem);
 	fdmdv->foff  -= TRACK_COEFF*foff_fine;
 
 	/* --------------------------------------------------------*\
-	                    Log each vector 
+	                    Log each vector
 	\*---------------------------------------------------------*/
 
 	memcpy(&tx_bits_log[FDMDV_BITS_PER_FRAME*f], tx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
@@ -211,7 +211,7 @@ int main(int argc, char *argv[])
 
 	for(c=0; c<NC+1; c++) {
 	    for(i=0; i<nin; i++)
-		rx_baseband_log[c][rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+		rx_baseband_log[c][rx_baseband_log_col_index + i] = rx_baseband[c][i];
 	}
 	rx_baseband_log_col_index += nin;
 
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
 
 	for(c=0; c<NC+1; c++) {
 	    for(i=0; i<(P*nin)/M; i++)
-		rx_filt_log[c][rx_filt_log_col_index + i] = rx_filt[c][i]; 
+		rx_filt_log[c][rx_filt_log_col_index + i] = rx_filt[c][i];
 	}
 	rx_filt_log_col_index += (P*nin)/M;
 
@@ -228,12 +228,12 @@ int main(int argc, char *argv[])
 	memcpy(&env_log[NT*P*f], env, sizeof(float)*NT*P);
 	rx_timing_log[f] = rx_timing;
 	nin_log[f] = nin;
-        
+
 	for(c=0; c<FDMDV_NC+1; c++) {
 	    rx_symbols_log[c][f] = rx_symbols[c];
 	    phase_difference_log[c][f] = fdmdv->phase_difference[c];
         }
-	
+
 	/* qpsk_to_bits() */
 
 	memcpy(&rx_bits_log[FDMDV_BITS_PER_FRAME*f], rx_bits, sizeof(int)*FDMDV_BITS_PER_FRAME);
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
 
 
     /*---------------------------------------------------------*\
-               Dump logs to Octave file for evaluation 
+               Dump logs to Octave file for evaluation
                       by tfdmdv.m Octave script
     \*---------------------------------------------------------*/
 
@@ -257,31 +257,31 @@ int main(int argc, char *argv[])
     assert(fout != NULL);
     fprintf(fout, "# Created by tfdmdv.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
-    octave_save_complex(fout, "tx_symbols_log_c", tx_symbols_log, 1, (FDMDV_NC+1)*FRAMES, (FDMDV_NC+1)*FRAMES);  
-    octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);  
-    octave_save_complex(fout, "pilot_lut_c", (COMP*)fdmdv->pilot_lut, 1, NPILOT_LUT, NPILOT_LUT);  
-    octave_save_complex(fout, "pilot_baseband1_log_c", pilot_baseband1_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
-    octave_save_complex(fout, "pilot_baseband2_log_c", pilot_baseband2_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);  
-    octave_save_float(fout, "pilot_coeff_c", pilot_coeff, 1, NPILOTCOEFF, NPILOTCOEFF);  
-    octave_save_complex(fout, "pilot_lpf1_log_c", pilot_lpf1_log, 1, NPILOTLPF*FRAMES, NPILOTLPF*FRAMES);  
-    octave_save_complex(fout, "pilot_lpf2_log_c", pilot_lpf2_log, 1, NPILOTLPF*FRAMES, NPILOTLPF*FRAMES);  
-    octave_save_complex(fout, "S1_log_c", S1_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);  
-    octave_save_complex(fout, "S2_log_c", S2_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);  
-    octave_save_float(fout, "foff_log_c", foff_log, 1, FRAMES, FRAMES);  
-    octave_save_float(fout, "foff_coarse_log_c", foff_coarse_log, 1, FRAMES, FRAMES);  
-    octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, (FDMDV_NC+1), rx_baseband_log_col_index, (M+M/P)*FRAMES);  
-    octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, (FDMDV_NC+1), rx_filt_log_col_index, (P+1)*FRAMES);  
-    octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES, NT*P*FRAMES);  
-    octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES, FRAMES);  
-    octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (FDMDV_NC+1), FRAMES, FRAMES);  
-    octave_save_complex(fout, "phase_difference_log_c", (COMP*)phase_difference_log, (FDMDV_NC+1), FRAMES, FRAMES);  
-    octave_save_float(fout, "sig_est_log_c", (float*)sig_est_log, (FDMDV_NC+1), FRAMES, FRAMES);  
-    octave_save_float(fout, "noise_est_log_c", (float*)noise_est_log, (FDMDV_NC+1), FRAMES, FRAMES);  
+    octave_save_complex(fout, "tx_symbols_log_c", tx_symbols_log, 1, (FDMDV_NC+1)*FRAMES, (FDMDV_NC+1)*FRAMES);
+    octave_save_complex(fout, "tx_fdm_log_c", (COMP*)tx_fdm_log, 1, M*FRAMES, M*FRAMES);
+    octave_save_complex(fout, "pilot_lut_c", (COMP*)fdmdv->pilot_lut, 1, NPILOT_LUT, NPILOT_LUT);
+    octave_save_complex(fout, "pilot_baseband1_log_c", pilot_baseband1_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);
+    octave_save_complex(fout, "pilot_baseband2_log_c", pilot_baseband2_log, 1, NPILOTBASEBAND*FRAMES, NPILOTBASEBAND*FRAMES);
+    octave_save_float(fout, "pilot_coeff_c", pilot_coeff, 1, NPILOTCOEFF, NPILOTCOEFF);
+    octave_save_complex(fout, "pilot_lpf1_log_c", pilot_lpf1_log, 1, NPILOTLPF*FRAMES, NPILOTLPF*FRAMES);
+    octave_save_complex(fout, "pilot_lpf2_log_c", pilot_lpf2_log, 1, NPILOTLPF*FRAMES, NPILOTLPF*FRAMES);
+    octave_save_complex(fout, "S1_log_c", S1_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);
+    octave_save_complex(fout, "S2_log_c", S2_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);
+    octave_save_float(fout, "foff_log_c", foff_log, 1, FRAMES, FRAMES);
+    octave_save_float(fout, "foff_coarse_log_c", foff_coarse_log, 1, FRAMES, FRAMES);
+    octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, (FDMDV_NC+1), rx_baseband_log_col_index, (M+M/P)*FRAMES);
+    octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, (FDMDV_NC+1), rx_filt_log_col_index, (P+1)*FRAMES);
+    octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES, NT*P*FRAMES);
+    octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES, FRAMES);
+    octave_save_complex(fout, "rx_symbols_log_c", (COMP*)rx_symbols_log, (FDMDV_NC+1), FRAMES, FRAMES);
+    octave_save_complex(fout, "phase_difference_log_c", (COMP*)phase_difference_log, (FDMDV_NC+1), FRAMES, FRAMES);
+    octave_save_float(fout, "sig_est_log_c", (float*)sig_est_log, (FDMDV_NC+1), FRAMES, FRAMES);
+    octave_save_float(fout, "noise_est_log_c", (float*)noise_est_log, (FDMDV_NC+1), FRAMES, FRAMES);
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, FDMDV_BITS_PER_FRAME*FRAMES);
-    octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES, FRAMES);  
-    octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);  
-    octave_save_int(fout, "sync_log_c", sync_log, 1, FRAMES);  
-    octave_save_int(fout, "nin_log_c", nin_log, 1, FRAMES);  
+    octave_save_float(fout, "foff_fine_log_c", foff_fine_log, 1, FRAMES, FRAMES);
+    octave_save_int(fout, "sync_bit_log_c", sync_bit_log, 1, FRAMES);
+    octave_save_int(fout, "sync_log_c", sync_log, 1, FRAMES);
+    octave_save_int(fout, "nin_log_c", nin_log, 1, FRAMES);
     fclose(fout);
 
     fdmdv_destroy(fdmdv);

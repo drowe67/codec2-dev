@@ -1,4 +1,4 @@
-/* 
+/*
    pre.c
    David Rowe
    Sep 26 2012
@@ -28,7 +28,7 @@ int main(int argc, char*argv[]) {
 	printf("e.g    pre input.raw output.raw");
 	exit(1);
     }
- 
+
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",

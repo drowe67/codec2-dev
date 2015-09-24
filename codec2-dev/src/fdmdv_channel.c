@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_channel.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: 2 August 2014
-                                                                             
+
   Given an input raw file (8kHz, 16 bit shorts) of FDMDV modem
   samples, adds channel impairments and outputs to another raw file.
 
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     fdmdv = fdmdv_create(FDMDV_NC);
 
     while(fread(rx_fdm_buf, sizeof(short), FDMDV_NOM_SAMPLES_PER_FRAME, fin) == FDMDV_NOM_SAMPLES_PER_FRAME) {
-        
+
 	for(i=0; i<FDMDV_NOM_SAMPLES_PER_FRAME; i++) {
 	    rx_fdm[i].real = (float)rx_fdm_buf[i]/FDMDV_SCALE;
             rx_fdm[i].imag = 0.0;
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 
         /* real signal so we adjust SNR to suit.  I think.  I always get confused by this! */
 
-        fdmdv_simulate_channel(fdmdv, rx_fdm, FDMDV_NOM_SAMPLES_PER_FRAME, snrdB - 3.0); 
+        fdmdv_simulate_channel(fdmdv, rx_fdm, FDMDV_NOM_SAMPLES_PER_FRAME, snrdB - 3.0);
 
 	for(i=0; i<FDMDV_NOM_SAMPLES_PER_FRAME; i++) {
 	    sam = FDMDV_SCALE*rx_fdm[i].real;
@@ -91,7 +91,7 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

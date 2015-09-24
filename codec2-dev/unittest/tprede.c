@@ -1,4 +1,4 @@
-/* 
+/*
    tpre_de.c
    David Rowe
    Sep 24 2012
@@ -21,7 +21,7 @@
 #include <stdio.h>
 #include "lpc.h"
 
-#define N                        10 
+#define N                        10
 #define F                        10
 
 int main() {
@@ -32,7 +32,7 @@ int main() {
 
     fprede = fopen("prede.txt", "wt");
     assert(fprede != NULL);
-    
+
     for(i=0; i<N; i++)
 	Sn[i] = 0.0;
 
@@ -42,7 +42,7 @@ int main() {
 	pre_emp(Sn_pre, Sn, &pre_mem, N);
 	de_emp(Sn_de, Sn_pre, &de_mem, N);
 	for(i=0; i<N; i++) {
-	    fprintf(fprede, "%f\n", Sn_de[i]);		
+	    fprintf(fprede, "%f\n", Sn_de[i]);
 	}
 	Sn[0] = 0.0;
     }

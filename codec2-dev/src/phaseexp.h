@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
-  FILE........: phaseexp.h                                          
-  AUTHOR......: David Rowe                                             
-  DATE CREATED: June 2012                                                
-                                                                             
+
+  FILE........: phaseexp.h
+  AUTHOR......: David Rowe
+  DATE CREATED: June 2012
+
   Experimental functions for quantising, modelling and synthesising phase.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*

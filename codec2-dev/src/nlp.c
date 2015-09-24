@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                 
-  FILE........: nlp.c                                                   
-  AUTHOR......: David Rowe                                      
-  DATE CREATED: 23/3/93                                    
-                                                         
+
+  FILE........: nlp.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 23/3/93
+
   Non Linear Pitch (NLP) estimation functions.
 
 \*---------------------------------------------------------------------------*/
@@ -37,9 +37,9 @@
 #include <stdlib.h>
 
 /*---------------------------------------------------------------------------*\
-                                                                             
- 				DEFINES                                       
-                                                                             
+
+ 				DEFINES
+
 \*---------------------------------------------------------------------------*/
 
 #define PMAX_M      600		/* maximum NLP analysis window size     */
@@ -56,9 +56,9 @@
 //#undef DUMP
 
 /*---------------------------------------------------------------------------*\
-                                                                            
- 				GLOBALS                                       
-                                                                             
+
+ 				GLOBALS
+
 \*---------------------------------------------------------------------------*/
 
 /* 48 tap 600Hz low pass FIR filter coefficients */
@@ -116,7 +116,7 @@ const float nlp_fir[] = {
 
 typedef struct {
     int           m;
-    float         w[PMAX_M/DEC];     /* DFT window                   */ 
+    float         w[PMAX_M/DEC];     /* DFT window                   */
     float         sq[PMAX_M];	     /* squared speech samples       */
     float         mem_x,mem_y;       /* memory for notch filter      */
     float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
@@ -125,14 +125,14 @@ typedef struct {
 
 float test_candidate_mbe(COMP Sw[], COMP W[], float f0);
 float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COMP W[], float *prev_Wo);
-float post_process_sub_multiples(COMP Fw[], 
+float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
 				 float *prev_Wo);
 
 /*---------------------------------------------------------------------------*\
-                                                                             
-  nlp_create()                                                                  
-                                                                             
+
+  nlp_create()
+
   Initialisation function for NLP pitch estimator.
 
 \*---------------------------------------------------------------------------*/
@@ -169,9 +169,9 @@ int    m			/* analysis window size */
 }
 
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   nlp_destroy()
-                                                                             
+
   Shut down function for NLP pitch estimator.
 
 \*---------------------------------------------------------------------------*/
@@ -187,9 +187,9 @@ void nlp_destroy(void *nlp_state)
 }
 
 /*---------------------------------------------------------------------------*\
-                                                                             
-  nlp()                                                                  
-                                                                             
+
+  nlp()
+
   Determines the pitch in samples using the Non Linear Pitch (NLP)
   algorithm [1]. Returns the fundamental in Hz.  Note that the actual
   pitch estimate is for the centre of the M sample Sn[] vector, not
@@ -213,11 +213,11 @@ void nlp_destroy(void *nlp_state)
   References:
 
     [1] http://www.itr.unisa.edu.au/~steven/thesis/dgr.pdf Chapter 4
-                                                              
+
 \*---------------------------------------------------------------------------*/
 
 float nlp(
-  void *nlp_state, 
+  void *nlp_state,
   float  Sn[],			/* input speech vector */
   int    n,			/* frames shift (no. new samples in Sn[]) */
   int    pmin,                  /* minimum pitch value */
@@ -237,7 +237,7 @@ float nlp(
     int    m, i,j;
     float  best_f0;
     PROFILE_VAR(start, tnotch, filter, peakpick, window, fft, magsq, shiftmem);
-    
+
     assert(nlp_state != NULL);
     nlp = (NLP*)nlp_state;
     m = nlp->m;
@@ -278,7 +278,7 @@ float nlp(
     }
 
     PROFILE_SAMPLE_AND_LOG(filter, tnotch, "      filter");
- 
+
     /* Decimate and DFT */
 
     for(i=0; i<PE_FFT_SIZE; i++) {
@@ -315,7 +315,7 @@ float nlp(
 	    gmax_bin = i;
 	}
     }
-    
+
     PROFILE_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
 
     //#define POST_PROCESS_MBE
@@ -340,13 +340,13 @@ float nlp(
 
     PROFILE_SAMPLE_AND_LOG2(start,  "      nlp int");
 
-    return(best_f0);  
+    return(best_f0);
 }
 
 /*---------------------------------------------------------------------------*\
-                                                                             
-  post_process_sub_multiples() 
-                                                                           
+
+  post_process_sub_multiples()
+
   Given the global maximma of Fw[] we search integer submultiples for
   local maxima.  If local maxima exist and they are above an
   experimentally derived threshold (OK a magic number I pulled out of
@@ -364,7 +364,7 @@ float nlp(
 
 \*---------------------------------------------------------------------------*/
 
-float post_process_sub_multiples(COMP Fw[], 
+float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
 				 float *prev_Wo)
 {
@@ -378,10 +378,10 @@ float post_process_sub_multiples(COMP Fw[],
     /* post process estimate by searching submultiples */
 
     mult = 2;
-    min_bin = PE_FFT_SIZE*DEC/pmax; 
+    min_bin = PE_FFT_SIZE*DEC/pmax;
     cmax_bin = gmax_bin;
     prev_f0_bin = *prev_Wo*(4000.0/PI)*(PE_FFT_SIZE*DEC)/SAMPLE_RATE;
-    
+
     while(gmax_bin/mult >= min_bin) {
 
 	b = gmax_bin/mult;			/* determine search interval */
@@ -418,11 +418,11 @@ float post_process_sub_multiples(COMP Fw[],
 
     return best_f0;
 }
-  
+
 /*---------------------------------------------------------------------------*\
-                                                                             
-  post_process_mbe() 
-                                                                           
+
+  post_process_mbe()
+
   Use the MBE pitch estimation algorithm to evaluate pitch candidates.  This
   works OK but the accuracy at low F0 is affected by NW, the analysis window
   size used for the DFT of the input speech Sw[].  Also favours high F0 in
@@ -522,14 +522,14 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 }
 
 /*---------------------------------------------------------------------------*\
-                                                                             
-  test_candidate_mbe()          
-                                                                             
-  Returns the error of the MBE cost function for the input f0.  
+
+  test_candidate_mbe()
+
+  Returns the error of the MBE cost function for the input f0.
 
   Note: I think a lot of the operations below can be simplified as
   W[].imag = 0 and has been normalised such that den always equals 1.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 float test_candidate_mbe(
@@ -546,7 +546,7 @@ float test_candidate_mbe(
     float error;          /* accumulated error between originl and synthesised */
     float Wo;             /* current "test" fundamental freq. */
     int   L;
-    
+
     L = floorf((SAMPLE_RATE/2.0)/f0);
     Wo = f0*(2*PI/SAMPLE_RATE);
 

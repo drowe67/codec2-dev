@@ -31,10 +31,10 @@
 #include "machdep.h"
 #include "gdb_stdio.h"
 
-volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004; 
+volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004;
 volatile unsigned int *DWT_CONTROL  = (volatile unsigned int *)0xE0001000;
 volatile unsigned int *SCB_DEMCR    = (volatile unsigned int *)0xE000EDFC;
- 
+
 #define CORE_CLOCK 168E6
 #define BUF_SZ     4096
 
@@ -43,12 +43,12 @@ static char buf[BUF_SZ];
 void machdep_profile_init(void)
 {
     static int enabled = 0;
- 
+
     if (!enabled) {
         *SCB_DEMCR = *SCB_DEMCR | 0x01000000;
         *DWT_CYCCNT = 0; // reset the counter
         *DWT_CONTROL = *DWT_CONTROL | 1 ; // enable the counter
- 
+
         enabled = 1;
     }
     *buf = 0;
@@ -83,4 +83,4 @@ void machdep_profile_print_logged_samples(void)
     gdb_stdio_printf("%s", buf);
     *buf = 0;
 }
- 
+

@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_demod.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 30 2012
-                                                                             
+
   Given an input raw file (8kHz, 16 bit shorts) of FDMDV modem samples
   outputs a file of bits.  The output file is assumed to be arranged
   as codec frames of 56 bits (7 bytes) which are received as two 28
@@ -12,7 +12,7 @@
   Demod states can be optionally logged to an Octave file for display
   using the Octave script fdmdv_demod_c.m.  This is useful for
   checking demod performance.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     }
     else
         Nc = FDMDV_NC;
-    
+
     fdmdv = fdmdv_create(Nc);
     modem_stats_open(&stats);
 
@@ -170,7 +170,7 @@ int main(int argc, char *argv[])
 
 	    f++;
 	}
-	
+
 	if ((f == MAX_FRAMES) && !max_frames_reached) {
 	    fprintf(stderr,"MAX_FRAMES exceed in Octave log, log truncated\n");
 	    max_frames_reached = 1;
@@ -203,13 +203,13 @@ int main(int argc, char *argv[])
             fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
             sync = 0;
         }
-           
+
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     /* Optional dump to Octave log file */
@@ -221,15 +221,15 @@ int main(int argc, char *argv[])
 		argv[4], strerror(errno));
 	    exit(1);
 	}
-	octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);  
-	octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);  
-	octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);  
-	octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);  
-	octave_save_int(foct, "sync_log_c", sync_log, 1, f);  
+	octave_save_complex(foct, "rx_fdm_log_c", rx_fdm_log, 1, rx_fdm_log_col_index, FDMDV_MAX_SAMPLES_PER_FRAME);
+	octave_save_complex(foct, "rx_symbols_log_c", (COMP*)rx_symbols_log, Nc+1, f, MAX_FRAMES);
+	octave_save_float(foct, "foff_log_c", foff_log, 1, f, MAX_FRAMES);
+	octave_save_float(foct, "rx_timing_log_c", rx_timing_log, 1, f, MAX_FRAMES);
+	octave_save_int(foct, "sync_log_c", sync_log, 1, f);
 	octave_save_int(foct, "rx_bits_log_c", rx_bits_log, 1, bits_per_fdmdv_frame*f);
-	octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);  
-	octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);  
-	octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, MODEM_STATS_NSPEC, MODEM_STATS_NSPEC);  
+	octave_save_int(foct, "sync_bit_log_c", sync_bit_log, 1, f);
+	octave_save_float(foct, "snr_est_log_c", snr_est_log, 1, f, MAX_FRAMES);
+	octave_save_float(foct, "rx_spec_log_c", rx_spec_log, f, MODEM_STATS_NSPEC, MODEM_STATS_NSPEC);
 	fclose(foct);
     }
 

@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
 			    if (diff < (PI/4000.0)*25.0) diff = (PI/4000.0)*25.0;
 			    fprintf(flsp,"%f ",log10(diff));
 			}
-		    } 
+		    }
 		    else {
 			fprintf(flsp,"%f ",lsp[0]);
 			for(i=1; i<P; i++)
@@ -146,13 +146,13 @@ int main(int argc, char *argv[]) {
 		    }
 
 		    fprintf(flsp,"\n");
-		    
+
 		}
 		else if (lspdt) {
 		    for(i=0; i<P; i++)
 			fprintf(flsp,"%f ",lsp[i]-lsp_prev[i]);
 		    fprintf(flsp,"\n");
-		    
+
 		}
 		else {
 		    if (log) {
@@ -166,10 +166,10 @@ int main(int argc, char *argv[]) {
 			fprintf(flsp,"\n");
 		    }
 
-		}		
+		}
 		memcpy(lsp_prev, lsp, sizeof(lsp));
 	    }
-	    else 
+	    else
 		unstables++;
 	}
     }

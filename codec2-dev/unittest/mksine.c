@@ -1,6 +1,6 @@
 /*
   mksine.c
-  David Rowe 
+  David Rowe
   10 Nov 2010
 
   Creates a file of sine wave samples.

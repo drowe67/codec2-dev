@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tcodec2.c                                                  
-  AUTHOR......: David Rowe                                            
-  DATE CREATED: 24/8/10                                        
-                                                               
+
+  FILE........: tcodec2.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 24/8/10
+
   Test program for codec2.c functions.
-                                                              
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -88,7 +88,7 @@ int test1()
 
     return 0;
 }
- 
+
 int test2()
 {
     FILE   *fin, *fout;
@@ -105,7 +105,7 @@ int test2()
     int     i;
     float   lsps[LPC_ORD];
     float   e;
-       
+
     c2 = codec2_create(CODEC2_MODE_2400);
     bits = (char*)malloc(codec2_bits_per_frame(c2));
     assert(bits != NULL);
@@ -124,7 +124,7 @@ int test2()
 
 	analyse_one_frame(c2, &model, &buf[N]);
 	voiced2 = model.voiced;
-    
+
 	Wo_index = encode_Wo(model.Wo);
 	e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
 	encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
@@ -137,7 +137,7 @@ int test2()
 	pack((unsigned char*)bits, (unsigned *)&nbit, energy_index, E_BITS);
 	pack((unsigned char*)bits, (unsigned *)&nbit, voiced1, 1);
 	pack((unsigned char*)bits, (unsigned *)&nbit, voiced2, 1);
- 
+
 	nbit = 0;
 	Wo_index = unpack((unsigned char*)bits, (unsigned *)&nbit, WO_BITS);
 	for(i=0; i<LPC_ORD; i++) {
@@ -149,7 +149,7 @@ int test2()
 
 	model.Wo = decode_Wo(Wo_index);
 	model.L = PI/model.Wo;
-	decode_amplitudes(&model, 
+	decode_amplitudes(&model,
 			  ak,
 			  lsp_indexes,
 			  energy_index,

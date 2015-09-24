@@ -5,7 +5,7 @@
   DATE CREATED: 3 March 2013
 
   To test:
-  
+
      src$ gcc golay23.c -o golay23 -Wall -DGOLAY23_UNITTEST -DRUN_TIME_TABLES
      src$ ./golay23
 
@@ -37,9 +37,9 @@
  *
  * Because of its relatively low length (23), dimension (12) and number of
  * redundant bits (11), the binary (23,12,7) Golay code can be encoded and
- * decoded simply by using look-up tables. The program below uses a 16K 
+ * decoded simply by using look-up tables. The program below uses a 16K
  * encoding table and an 8K decoding table.
- * 
+ *
  * For more information, suggestions, or other ideas on implementing error
  * correcting codes, please contact me at (I'm temporarily in Japan, but
  * below is my U.S. address):
@@ -54,7 +54,7 @@
  *                 extended Golay code.
  *
  * COPYRIGHT NOTICE: This computer program is free for non-commercial purposes.
- * You may implement this program for any non-commercial application. You may 
+ * You may implement this program for any non-commercial application. You may
  * also implement this program for commercial purposes, provided that you
  * obtain my written permission. Any modification of this program is covered
  * by this copyright.
@@ -113,7 +113,7 @@ static int arr2int(int a[], int r)
 {
    int i;
    long mul, result = 0, temp;
- 
+
    for (i=1; i<=r; i++) {
       mul = 1;
       temp = a[i]-1;
@@ -131,7 +131,7 @@ void nextcomb(int n, int r, int a[])
  */
 {
   int  i, j;
- 
+
   a[r]++;
   if (a[r] <= n)
       return;
@@ -155,7 +155,7 @@ int get_syndrome(int pattern)
  */
 {
     int aux = X22;
- 
+
     if (pattern >= X11)
        while (pattern & MASK12) {
            while (!(aux & pattern))
@@ -166,9 +166,9 @@ int get_syndrome(int pattern)
 }
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: golay23_init()   
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: golay23_init()
+  AUTHOR......: David Rowe
   DATE CREATED: 3 March 2013
 
   Call this once when you start your program to init the Golay tables.
@@ -192,7 +192,7 @@ void golay23_init(void) {
     * integer whose 23 least significant bits are coded bits: Of these, the
     * 12 most significant bits are information bits and the 11 least
     * significant bits are redundant bits (systematic encoding).
-    * --------------------------------------------------------------------- 
+    * ---------------------------------------------------------------------
     */
     for (pattern = 0; pattern < 4096; pattern++) {
         temp = pattern << 11;          /* multiply information by X^{11} */
@@ -207,18 +207,18 @@ void golay23_init(void) {
     * is the most likely error pattern. First an error pattern is generated.
     * Then its syndrome is calculated and used as a pointer to the table
     * where the error pattern value is stored.
-    * --------------------------------------------------------------------- 
-    *            
+    * ---------------------------------------------------------------------
+    *
     * (1) Error patterns of WEIGHT 1 (SINGLE ERRORS)
     */
     decoding_table[0] = 0;
     decoding_table[1] = 1;
-    temp = 1; 
+    temp = 1;
     for (i=2; i<= 23; i++) {
         temp *= 2;
         decoding_table[get_syndrome(temp)] = temp;
         }
-   /*            
+   /*
     * (2) Error patterns of WEIGHT 2 (DOUBLE ERRORS)
     */
     a[1] = 1; a[2] = 2;
@@ -229,7 +229,7 @@ void golay23_init(void) {
         temp = arr2int(a,2);
         decoding_table[get_syndrome(temp)] = temp;
         }
-   /*            
+   /*
     * (3) Error patterns of WEIGHT 3 (TRIPLE ERRORS)
     */
     a[1] = 1; a[2] = 2; a[3] = 3;
@@ -245,9 +245,9 @@ void golay23_init(void) {
 }
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: golay23_encode()   
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: golay23_encode()
+  AUTHOR......: David Rowe
   DATE CREATED: 3 March 2013
 
   Given 12 bits of data retiurns a 23 bit codeword for transmission
@@ -264,9 +264,9 @@ int golay23_encode(int data) {
 }
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: golay23_decode()   
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: golay23_decode()
+  AUTHOR......: David Rowe
   DATE CREATED: 3 March 2013
 
   Given a 23 bit received codeword, returns the 12 bit corrected data.
@@ -305,7 +305,7 @@ static int golay23_test(int error_pattern) {
     int pattern;
     int decerror;
     int i, tests;
-    
+
     decerror = 0;
     tests = 0;
 
@@ -336,7 +336,7 @@ int main(void)
    int a[4];
    int error_pattern;
 
-   golay23_init(); 
+   golay23_init();
 
    /* ---------------------------------------------------------------------
     *                        Generate DATA
@@ -345,7 +345,7 @@ int main(void)
 
     /* Test all combinations of data and 1,2 or 3 errors */
 
-    tests = 0;    
+    tests = 0;
     error_pattern = 1;
     for (i=0; i< 23; i++) {
         //printf("error_pattern: 0x%x\n", error_pattern);
@@ -394,7 +394,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(f,"/* Generated by golay23.c -DGOLAY23_MAKETABLE */\n\n");
     fprintf(f,"const int static encoding_table[]={\n");
-    
+
     for (i=0; i<4095; i++)
         fprintf(f,"  0x%x,\n", encoding_table[i]);
     fprintf(f, "  0x%x\n};\n", encoding_table[i]);
@@ -405,7 +405,7 @@ int main(int argc, char *argv[]) {
 
     fprintf(f,"/* Generated by golay23.c -DGOLAY23_MAKETABLE */\n\n");
     fprintf(f,"const int static decoding_table[]={\n");
-    
+
     for (i=0; i<2047; i++)
         fprintf(f,"  0x%x,\n", decoding_table[i]);
     fprintf(f, "  0x%x\n};\n", decoding_table[i]);

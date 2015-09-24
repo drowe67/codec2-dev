@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_get_test_bits.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: 1 May 2012
-                                                                             
+
   Generates a file of packed test bits, useful for input to fdmdv_mod.
 
 \*---------------------------------------------------------------------------*/
@@ -92,7 +92,7 @@ int main(int argc, char *argv[])
 
 	fdmdv_get_test_bits(fdmdv, tx_bits);
 	fdmdv_get_test_bits(fdmdv, &tx_bits[bits_per_fdmdv_frame]);
-	
+
 	/* pack bits, MSB received first  */
 
 	bit = 7; byte = 0;
@@ -107,7 +107,7 @@ int main(int argc, char *argv[])
 	}
 
 	fwrite(packed_bits, sizeof(char), bytes_per_codec_frame, fout);
- 
+
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 

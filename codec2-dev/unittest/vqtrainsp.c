@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
     int     J;		/* number of vectors in training set		*/
     int     ind;	/* index of current vector			*/
     float   se;	        /* total squared error for this iteration       */
-    float   var;        /* variance                                     */ 
+    float   var;        /* variance                                     */
     float   var_1;	/* previous variance            	        */
     float   delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 		    if (vec[j] != 0.0)
 			n[ind*d+j]++;
 	    }
-	
+
             #ifdef DBG
 	    printf("cent...\n");
 	    print_vec(cent, d, e);
@@ -224,7 +224,7 @@ int main(int argc, char *argv[]) {
 
 	    /* work out stats */
 
-	    var = se/var_n;	
+	    var = se/var_n;
 	    sd = sqrt(var);
 
 	    iterations++;
@@ -236,8 +236,8 @@ int main(int argc, char *argv[]) {
 		    delta = 0;
 		if (delta < DELTAQ)
 		    finished = 1;
-	    }      
-		     
+	    }
+
 	    if (!finished) {
 		/* determine new codebook from centroids */
 
@@ -260,10 +260,10 @@ int main(int argc, char *argv[]) {
 	} while (!finished);
 	printf("\n");
     }
-    
+
 
     //print_vec(cb, d, 1);
-    
+
     /* save codebook to disk */
 
     fvq = fopen(argv[4],"wt");
@@ -282,9 +282,9 @@ int main(int argc, char *argv[]) {
 
     /* optionally dump error file for multi-stage work */
 
-    if (argc == 6) {	
+    if (argc == 6) {
 	FILE *ferr = fopen(argv[5],"wt");
-	assert(ferr != NULL);	
+	assert(ferr != NULL);
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
 	    ret = fread(vec, sizeof(float), d, ftrain);
@@ -313,7 +313,7 @@ void print_vec(float cb[], int d, int e)
 
     for(j=0; j<e; j++) {
 	printf("    ");
-	for(i=0; i<d; i++) 
+	for(i=0; i<d; i++)
 	    printf("% 7.3f ", cb[j*d+i]);
 	printf("\n");
     }
@@ -348,7 +348,7 @@ void zero(float v[], int d)
 	DATE CREATED: 23/2/95
 
 	Adds d dimensional vectors v1 to v2 and stores the result back
-	in v1.  
+	in v1.
 
 	An unused entry in a sparse vector is set to zero so won't
 	affect the accumulation process.
@@ -393,7 +393,7 @@ void norm(float v[], int d, int n[])
 
 	Quantises vec by choosing the nearest vector in codebook cb, and
 	returns the vector index.  The squared error of the quantised vector
-	is added to se.  
+	is added to se.
 
 	Unused entries in sparse vectors are ignored.
 
@@ -452,7 +452,7 @@ int gain_shape_quantise(float cb[], float vec[], int d, int e, float *se, float 
 	   }
        }
        gain = (sumAm - sumCb)/m;
-       
+
        /* compute error */
 
        metric = error = 0.0;

@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tinterp.c                                                  
-  AUTHOR......: David Rowe                                            
-  DATE CREATED: 22/8/10                                        
-                                                               
+
+  FILE........: tinterp.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 22/8/10
+
   Tests interpolation functions.
-                                                                   
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -67,7 +67,7 @@ const char *get_next_float(const char *s, float *num)
     const char *p = s;
     char  tmp[MAX_STR];
 
-    while(*p && !isspace(*p)) 
+    while(*p && !isspace(*p))
 	p++;
     assert((p-s) < (int)(sizeof(tmp)-1));
     memcpy(tmp, s, p-s);
@@ -82,7 +82,7 @@ const char *get_next_int(const char *s, int *num)
     const char *p = s;
     char  tmp[MAX_STR];
 
-    while(*p && !isspace(*p)) 
+    while(*p && !isspace(*p))
 	p++;
     assert((p-s) < (int)(sizeof(tmp)-1));
     memcpy(tmp, s, p-s);
@@ -111,11 +111,11 @@ void load_amp(MODEL *model, const char * file, int frame)
     ps = get_next_int(ps, &model->L);
     for(i=1; i<=model->L; i++)
 	ps = get_next_float(ps, &model->A[i]);
-	
+
     fclose(f);
 }
 
-void load_or_make_amp(MODEL *model, 
+void load_or_make_amp(MODEL *model,
                       const char * filename, int frame,
                       float f0, float cdB, float mdBHz)
 {

@@ -111,9 +111,9 @@ void scan_line(FILE *fp, float f[], int n)
     char   s[MAX_STR];
     char   *ps,*pe;
     int	   i;
-    
+
     memset(s, 0, MAX_STR);
-    ps = pe = fgets(s,MAX_STR,fp); 
+    ps = pe = fgets(s,MAX_STR,fp);
     if (ps == NULL)
 	return;
     for(i=0; i<n; i++) {

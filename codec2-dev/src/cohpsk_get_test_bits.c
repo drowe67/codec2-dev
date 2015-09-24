@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk_put_test_bits.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 2015
-                                                                             
+
   Generates a file of test bits, useful for input to cohpsk_mod.
 
 \*---------------------------------------------------------------------------*/
@@ -73,7 +73,7 @@ int main(int argc, char *argv[])
             sd_tx_bits[i] = 1.0 - 2.0*tx_bits[i];
 
 	fwrite(sd_tx_bits, sizeof(float), COHPSK_BITS_PER_FRAME, fout);
- 
+
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 

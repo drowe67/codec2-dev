@@ -75,8 +75,8 @@ int main(int argc, char *argv[]) {
     while (fread(inbuf, sizeof(short), n_samples, fin) == n_samples) {
         PROFILE_SAMPLE(freedv_start);
         freedv_tx(f, outbuf, inbuf);
-        PROFILE_SAMPLE_AND_LOG2(freedv_start, "  freedv_tx");     
-       
+        PROFILE_SAMPLE_AND_LOG2(freedv_start, "  freedv_tx");
+
         fwrite(outbuf, sizeof(short), n_samples, fout);
         printf("frame: %d\n", ++frame);
         machdep_profile_print_logged_samples();

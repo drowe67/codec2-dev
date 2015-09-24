@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: quantise.h
-  AUTHOR......: David Rowe                                                          
-  DATE CREATED: 31/5/92                                                       
-                                                                             
-  Quantisation functions for the sinusoidal coder.  
-                                                                             
+  AUTHOR......: David Rowe
+  DATE CREATED: 31/5/92
+
+  Quantisation functions for the sinusoidal coder.
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -56,8 +56,8 @@
 void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
-void aks_to_M2(kiss_fft_cfg fft_fwd_cfg, float ak[], int order, MODEL *model, 
-	       float E, float *snr, int dump, int sim_pf, 
+void aks_to_M2(kiss_fft_cfg fft_fwd_cfg, float ak[], int order, MODEL *model,
+	       float E, float *snr, int dump, int sim_pf,
                int pf, int bass_boost, float beta, float gamma, COMP Aw[]);
 
 int   encode_Wo(float Wo, int bits);
@@ -72,12 +72,12 @@ void  encode_lspds_scalar(int indexes[], float lsp[], int order);
 void  decode_lspds_scalar(float lsp[], int indexes[], int order);
 void  encode_lsps_diff_freq_vq(int indexes[], float lsp[], int order);
 void  decode_lsps_diff_freq_vq(float lsp_[], int indexes[], int order);
-void  encode_lsps_diff_time(int indexes[], 
-			    float lsp[], 
-			    float lsp__prev[], 
+void  encode_lsps_diff_time(int indexes[],
+			    float lsp[],
+			    float lsp__prev[],
 			    int order);
-void decode_lsps_diff_time(float lsp_[], 
-			   int indexes[], 
+void decode_lsps_diff_time(float lsp_[],
+			   int indexes[],
 			   float lsp__prev[],
 			   int order);
 
@@ -85,7 +85,7 @@ void encode_lsps_vq(int *indexes, float *x, float *xq, int order);
 void decode_lsps_vq(int *indexes, float *xq, int order, int stages);
 
 long quantise(const float * cb, float vec[], float w[], int k, int m, float *se);
-void lspvq_quantise(float lsp[], float lsp_[], int order); 
+void lspvq_quantise(float lsp[], float lsp_[], int order);
 void lspjnd_quantise(float lsp[], float lsp_[], int order);
 void lspdt_quantise(float lsps[], float lsps_[], float lsps__prev[], int mode);
 void lspjvm_quantise(float lsps[], float lsps_[], int order);
@@ -120,7 +120,7 @@ int lspmelvq_cb_bits(int i);
 void apply_lpc_correction(MODEL *model);
 float speech_to_uq_lsps(float lsp[],
 			float ak[],
-		        float Sn[], 
+		        float Sn[],
 		        float w[],
 		        int   order
 			);
@@ -128,9 +128,9 @@ int check_lsp_order(float lsp[], int lpc_order);
 void bw_expand_lsps(float lsp[], int order, float min_sep_low, float min_sep_high);
 void bw_expand_lsps2(float lsp[], int order);
 void locate_lsps_jnd_steps(float lsp[], int order);
-float decode_amplitudes(MODEL *model, 
+float decode_amplitudes(MODEL *model,
 			float  ak[],
-		        int    lsp_indexes[], 
+		        int    lsp_indexes[],
 		        int    energy_index,
 			float  lsps[],
 			float *e);

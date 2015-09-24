@@ -32,8 +32,8 @@
 #include "codec2_fifo.h"
 #include "stm32f4_dacduc.h"
 #include "debugblinky.h"
- 
-/* write to these registers for 12 bit left aligned data, as per data sheet 
+
+/* write to these registers for 12 bit left aligned data, as per data sheet
    make sure 4 least sig bits set to 0 */
 
 #define DAC_DHR12R1_ADDRESS    0x40007408
@@ -80,7 +80,7 @@ void fast_dac_open(int dac1_fifo_size,int dac2_fifo_size) {
     /* DMA1 clock enable */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA1, ENABLE);
     /* GPIOA clock enable (to be used with DAC) */
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);                         
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
     /* DAC Periph clock enable */
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_DAC, ENABLE);
 
@@ -94,7 +94,7 @@ void fast_dac_open(int dac1_fifo_size,int dac2_fifo_size) {
 
     /* Timer and DAC 1 & 2 Configuration ----------------------------------------*/
     tim7_config();
-    tim6_config();  
+    tim6_config();
     dac1_config();
     dac2_config();
 
@@ -105,11 +105,11 @@ void fast_dac_open(int dac1_fifo_size,int dac2_fifo_size) {
 /* Call these puppies to send samples to the DACs.  For your
    convenience they accept signed 16 bit samples. */
 
-int dac1_write(short buf[], int n) {   
+int dac1_write(short buf[], int n) {
     return fifo_write(dac1_fifo, buf, n);
 }
 
-int dac2_write(short buf[], int n) {   
+int dac2_write(short buf[], int n) {
     return fifo_write(dac2_fifo, buf, n);
 }
 
@@ -119,31 +119,31 @@ static void tim6_config(void)
 
   /* TIM6 Periph clock enable */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
-  
+
   /* --------------------------------------------------------
-  
+
   TIM6 input clock (TIM6CLK) is set to 2 * APB1 clock (PCLK1), since
   APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
   13 clock tree figure in DM0031020.pdf).
 
-     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
+     Sample rate Fs = 2*PCLK1/TIM_ClockDivision
                     = (HCLK/2)/TIM_ClockDivision
-                    
+
   ----------------------------------------------------------- */
 
   /* Time base configuration */
 
-  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 5250;          
-  TIM_TimeBaseStructure.TIM_Prescaler = 0;       
-  TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
-  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
+  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+  TIM_TimeBaseStructure.TIM_Period = 5250;
+  TIM_TimeBaseStructure.TIM_Prescaler = 0;
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseInit(TIM6, &TIM_TimeBaseStructure);
 
   /* TIM6 TRGO selection */
 
   TIM_SelectOutputTrigger(TIM6, TIM_TRGOSource_Update);
-  
+
   /* TIM6 enable counter */
 
   TIM_Cmd(TIM6, ENABLE);
@@ -159,32 +159,32 @@ void tim7_config(void)
 
   /* TIM7 Periph clock enable */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM7, ENABLE);
-  
+
   /* --------------------------------------------------------
 
-  
+
   TIM7 input clock (TIM7CLK) is set to 2 * APB1 clock (PCLK1), since
   APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
   13 clock tree figure in DM0031020.pdf).
 
-     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
+     Sample rate Fs = 2*PCLK1/TIM_ClockDivision
                     = (HCLK/2)/TIM_ClockDivision
-                    
+
   ----------------------------------------------------------- */
 
   /* Time base configuration */
 
-  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 41;          
-  TIM_TimeBaseStructure.TIM_Prescaler = 0;       
-  TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
-  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
+  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+  TIM_TimeBaseStructure.TIM_Period = 41;
+  TIM_TimeBaseStructure.TIM_Prescaler = 0;
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseInit(TIM7, &TIM_TimeBaseStructure);
 
   /* TIM7 TRGO selection */
 
   TIM_SelectOutputTrigger(TIM7, TIM_TRGOSource_Update);
-  
+
   /* TIM7 enable counter */
 
   TIM_Cmd(TIM7, ENABLE);
@@ -195,19 +195,19 @@ static void dac1_config(void)
   DAC_InitTypeDef  DAC_InitStructure;
   DMA_InitTypeDef  DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
-  
+
   /* DAC channel 1 Configuration */
 
-  /* 
+  /*
      This line fixed a bug that cost me 5 days, bad wave amplitude
      value, and some STM32F4 periph library bugs caused triangle wave
      geneartion to be enable resulting in a low level tone on the
      SM1000, that we thought was caused by analog issues like layour
      or power supply biasing
   */
-  DAC_StructInit(&DAC_InitStructure); 
+  DAC_StructInit(&DAC_InitStructure);
 
-  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T7_TRGO; 
+  DAC_InitStructure.DAC_Trigger = DAC_Trigger_T7_TRGO;
   DAC_InitStructure.DAC_WaveGeneration = DAC_WaveGeneration_None;
 
   /*External buffering is needed to get nice square samples at Fs=2Mhz. See DM00129215.pdf */
@@ -218,7 +218,7 @@ static void dac1_config(void)
   /* Table 35 page 219 of the monster data sheet */
 
   DMA_DeInit(DMA1_Stream5);
-  DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
+  DMA_InitStructure.DMA_Channel = DMA_Channel_7;
   DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R1_ADDRESS;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac1_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
@@ -229,7 +229,7 @@ static void dac1_config(void)
   DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
   DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
   DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;         
+  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
   DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
   DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
@@ -245,7 +245,7 @@ static void dac1_config(void)
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);     
+  NVIC_Init(&NVIC_InitStructure);
 
   /* Enable DMA1_Stream5 */
 
@@ -265,7 +265,7 @@ static void dac2_config(void)
   DAC_InitTypeDef  DAC_InitStructure;
   DMA_InitTypeDef DMA_InitStructure;
   NVIC_InitTypeDef NVIC_InitStructure;
-  
+
   /* DAC channel 2 Configuration (see notes in dac1_config() above) */
 
   DAC_StructInit(&DAC_InitStructure);
@@ -277,7 +277,7 @@ static void dac2_config(void)
   /* DMA1_Stream6 channel7 configuration **************************************/
 
   DMA_DeInit(DMA1_Stream6);
-  DMA_InitStructure.DMA_Channel = DMA_Channel_7;  
+  DMA_InitStructure.DMA_Channel = DMA_Channel_7;
   DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)DAC_DHR12R2_ADDRESS;
   DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)dac2_buf;
   DMA_InitStructure.DMA_DIR = DMA_DIR_MemoryToPeripheral;
@@ -288,7 +288,7 @@ static void dac2_config(void)
   DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
   DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
   DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;         
+  DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
   DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
   DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
   DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
@@ -304,7 +304,7 @@ static void dac2_config(void)
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-  NVIC_Init(&NVIC_InitStructure);     
+  NVIC_Init(&NVIC_InitStructure);
 
   /* Enable DMA1_Stream6 */
 
@@ -341,7 +341,7 @@ void DMA1_Stream5_IRQHandler(void) {
 	fifo_read(dac1_fifo, (short*)dac1_buf, DAC_DUC_BUF_SZ/2);
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
-        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_HTIF5);  
+        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_HTIF5);
     }
 
     /* Transfer complete interrupt - refill 2nd half */
@@ -351,7 +351,7 @@ void DMA1_Stream5_IRQHandler(void) {
 	fifo_read(dac1_fifo, (short*)(dac1_buf+DAC_DUC_BUF_SZ/2), DAC_DUC_BUF_SZ/2);
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
-        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);  
+        DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
     }
 
     GPIOE->ODR &= ~(1 << 1);
@@ -386,7 +386,7 @@ void DMA1_Stream6_IRQHandler(void) {
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
-        DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);  
+        DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_HTIF6);
     }
 
     /* Transfer complete interrupt - refill 2nd half */
@@ -408,7 +408,7 @@ void DMA1_Stream6_IRQHandler(void) {
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
-        DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);  
+        DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);
     }
 
     GPIOE->ODR &= ~(1 << 2);

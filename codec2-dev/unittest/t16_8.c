@@ -1,4 +1,4 @@
-/* 
+/*
    t16_8.c
    David Rowe
    May 10 2012
@@ -48,7 +48,7 @@ int main() {
     assert(f16 != NULL);
     f8 = fopen("out8.raw", "wb");
     assert(f8 != NULL);
-    
+
     /* clear filter memories */
 
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
@@ -81,7 +81,7 @@ int main() {
 	for(i=0; i<N16; i++)
 	    out16k_short[i] = (short)out16k[i];
 	fwrite(out16k_short, sizeof(short), N16, f16);
-	
+
 	/* add a 6 kHz spurious signal, down sampler should
 	   knock this out */
 
@@ -101,7 +101,7 @@ int main() {
 	for(i=0; i<N8; i++)
 	    out8k_short[i] = (short)out8k[i];
 	fwrite(out8k_short, sizeof(short), N8, f8);
-	
+
     }
 
     fclose(f16);

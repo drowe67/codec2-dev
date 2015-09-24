@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: postfilter.c
-  AUTHOR......: David Rowe                                                          
+  AUTHOR......: David Rowe
   DATE CREATED: 13/09/09
-                                                                             
+
   Postfilter to improve sound quality for speech with high levels of
   background noise.  Unlike mixed-excitation models requires no bits
   to be transmitted to handle background noise.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -46,8 +46,8 @@
 
 #define BG_THRESH 40.0     /* only consider low levels signals for bg_est */
 #define BG_BETA    0.1     /* averaging filter constant                   */
-#define BG_MARGIN  6.0     /* harmonics this far above BG noise are 
-			      randomised.  Helped make bg noise less 
+#define BG_MARGIN  6.0     /* harmonics this far above BG noise are
+			      randomised.  Helped make bg noise less
 			      spikey (impulsive) for mmt1, but speech was
                               perhaps a little rougher.
 			   */
@@ -78,7 +78,7 @@
 
   This idea is rather experimental.  Some potential problems that may
   happen:
- 
+
   1/ If someone says "aaaaaaaahhhhhhhhh" will background estimator track
      up to speech level?  This would be a bad thing.
 
@@ -95,13 +95,13 @@
 
   5/ Not sure what happens during long periods of voiced speech
      e.g. "sshhhhhhh"
-  
+
 \*---------------------------------------------------------------------------*/
 
 void postfilter(
   MODEL *model,
   float *bg_est
-)	
+)
 {
   int   m, uv;
   float e, thresh;
@@ -111,7 +111,7 @@ void postfilter(
   e = 1E-12;
   for(m=1; m<=model->L; m++)
       e += model->A[m]*model->A[m];
-  
+
   assert(e > 0.0);
   e = 10.0*log10f(e/model->L);
 

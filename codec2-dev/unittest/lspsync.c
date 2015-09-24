@@ -31,7 +31,7 @@ static int check_candidate(char bits[], int offset)
     float        lsps[LPC_ORD];
     unsigned int nbit = offset;
     int          swaps;
-   
+
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	lsp_indexes[i] = unpack(bits, &nbit, lsp_bits(i));
     }
@@ -81,12 +81,12 @@ int main(int argc, char *argv[]) {
 	for(offset=0; offset<nbits; offset++) {
 	    swaps = check_candidate(bits, offset);
 	    if (swaps == 0) {
-	    
+
 		/* OK found a candidate .. lets check a F-1 frames in total */
 
 		for(i=0; i<(F-1); i++)
 		    swaps += check_candidate(bits, offset + nbits*i);
-		
+
 		if (swaps == 0) {
 		    printf("frame %d offset: %d swaps: %d\n", frames, offset, swaps);
 		    match++;
@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 		}
 	    }
 	}
-       
+
 	/* update F frame memory of bits */
 
 	for(i=0; i<nbytes*(F-1); i++)
