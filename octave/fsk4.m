@@ -8,7 +8,7 @@ fm;
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
 dmr.tx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
-dmr.rx_filt_resp = dmr_tx_filt_resp;
+dmr.rx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
 dmr.max_dev = 1944;
 dmr.syms = [-1944 -648 648 1944];
 
@@ -37,7 +37,7 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fm_states.pre_emp = fm_states.de_emp = 0;
     fm_states.output_filter = 1;
     fsk4_states.fm_states = analog_fm_init(fm_states);
-
+    fsk4_states.modinfo=fsk4_info;
 endfunction 
 
 function d = idmp(data, M)
@@ -74,12 +74,11 @@ endfunction
 % Integrate and Dump 4FSK demod
 
 function bits = fsk4_demod_thing(fsk4_states, rx)
-  global fsk4_symbols;
 
   M = fsk4_states.M;
   Fs = fsk4_states.Fs;
   t = (0:length(rx)-1);
-  symup = fsk4_symbols;
+  symup = fsk4_states.modinfo.syms;
   
   % Integrator is like an FIR filter with rectangular window coeffs.
   % This has some nasty side lobes so lets limit the overall amount
@@ -88,10 +87,10 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
 
   rx = filter(fsk4_states.rx_filter, 1, rx);
 
-  sym1m = exp(j*2*pi*(symup(1)/Fs)*t).*rx;
-  sym2m = exp(j*2*pi*(symup(2)/Fs)*t).*rx;
-  sym3m = exp(j*2*pi*(symup(3)/Fs)*t).*rx;
-  sym4m = exp(j*2*pi*(symup(4)/Fs)*t).*rx;
+  sym1m = exp(-j*2*pi*(symup(1)/Fs)*t).*rx;
+  sym2m = exp(-j*2*pi*(symup(2)/Fs)*t).*rx;
+  sym3m = exp(-j*2*pi*(symup(3)/Fs)*t).*rx;
+  sym4m = exp(-j*2*pi*(symup(4)/Fs)*t).*rx;
 
   % this puppy found by experiment between 1 and M. Will vary with different
   % filter impulse responses, as delay will vary.  f you add M to it coarse
@@ -105,18 +104,19 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   sym4m = idmp(sym4m(fine_timing:length(sym4m)),M); sym4m = (real(sym4m).^2+imag(sym4m).^2);
 
   figure(2);
-  nsym = 100;
-  subplot(411); plot(sym1m(1:nsym))
-  subplot(412); plot(sym2m(1:nsym))
-  subplot(413); plot(sym3m(1:nsym))
-  subplot(414); plot(sym4m(1:nsym))
+  nsym = 500;
+  %subplot(411); plot(sym1m(1:nsym))
+  %subplot(412); plot(sym2m(1:nsym))
+  %subplot(413); plot(sym3m(1:nsym))
+  %subplot(414); plot(sym4m(1:nsym))
+  plot((1:nsym),sym1m(1:nsym),(1:nsym),sym2m(1:nsym),(1:nsym),sym3m(1:nsym),(1:nsym),sym4m(1:nsym))
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
   figure(3);
   hist(iv);
   for i=1:length(iv)
-    bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](iv(i),(1:2));
+    bits(1+(i-1)*2:i*2) = [[0 0];[0 1];[1 0];[1 1]](iv(i),(1:2));
   end
 endfunction
 
@@ -239,8 +239,7 @@ function ber = nfbert(aEsNodB)
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-  rx = rx(10:length(rx));
-  rx_bits = fsk4_demod_fmrid(fsk4_states,rx);
+  rx_bits = fsk4_demod_thing(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
