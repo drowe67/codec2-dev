@@ -150,7 +150,7 @@ int lpc_to_lsp (float *a, int order, float *freq, int nb, float delta)
     float Q[order + 1];
     float P[order + 1];
 
-    flag = 1;                	
+    flag = 1;
     m = order/2;            	/* order of P'(z) & Q'(z) polynimials 	*/
 
     /* Allocate memory space for polynomials */
@@ -270,7 +270,7 @@ void lsp_to_lpc(float *lsp, float *ak, int order)
     float *pw,*n1,*n2,*n3,*n4 = 0;
     float freq[order];
     float Wp[(order * 4) + 2];
-    
+
     /* convert from radians to the x=cos(w) domain */
 
     for(i=0; i<order; i++)

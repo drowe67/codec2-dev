@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tlspsens.c                                                  
-  AUTHOR......: David Rowe                                            
+
+  FILE........: tlspsens.c
+  AUTHOR......: David Rowe
   DATE CREATED: 31 May 2012
-                                                               
+
   Testing bit error sensitivity of LSP bits, first step in devising an unequal
   error protection scheme.
-                                                              
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -94,7 +94,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
 	check_lsp_order(lsps, LPC_ORD);
 	bw_expand_lsps(lsps, LPC_ORD, 50.0, 100.0);
 	lsp_to_lpc(lsps, ak, LPC_ORD);
-	aks_to_M2(fft_fwd_cfg, ak, LPC_ORD, &model, e, &snr, 0, 0, 1, 1, LPCPF_BETA, LPCPF_GAMMA, Aw); 
+	aks_to_M2(fft_fwd_cfg, ak, LPC_ORD, &model, e, &snr, 0, 0, 1, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
 	snr_sum += snr;
 	frames++;
     }
@@ -105,7 +105,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
 
     return snr_sum/frames;
 }
- 
+
 int main(int argc, char *argv[]) {
     int   i;
     int   total_lsp_bits = 0;

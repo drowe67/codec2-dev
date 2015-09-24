@@ -3,7 +3,7 @@
 // Purpose:         Varicode encoded and decode functions
 // Created:         Nov 24, 2012
 // Authors:         David Rowe
-// 
+//
 // License:
 //
 //  This program is free software; you can redistribute it and/or modify
@@ -39,7 +39,7 @@ struct VARICODE_DEC {
     int            n_in;
     int            in[2];
 };
-    
+
 int varicode_encode(short varicode_out[], char ascii_in[], int max_out, int n_in, int code_num);
 void varicode_decode_init(struct VARICODE_DEC *dec_states, int code_num);
 int varicode_decode(struct VARICODE_DEC *dec_states, char ascii_out[], short varicode_in[], int max_out, int n_in);

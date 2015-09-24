@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk_internal.h
   AUTHOR......: David Rowe
   DATE CREATED: March 2015
-                                                                             
+
   Functions that implement a coherent PSK FDM modem.
-                                                               
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -29,7 +29,7 @@
 #define __COHPSK_INTERNAL__
 
 #define NCT_SYMB_BUF      (2*NSYMROWPILOT+2)
-#define ND                2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus 
+#define ND                2                           /* diversity factor ND 1 is no diveristy, ND we have orginal plus
                                                          one copy */
 #define NSW               4                           /* number of sync window frames */
 #define COHPSK_ND         2                           /* diversity factor   */
@@ -39,13 +39,13 @@
 #define COHPSK_EXCESS_BW  0.5                         /* excess BW factor of root nyq filter */
 #define COHPSK_NT         5                           /* number of symbols we estimate timing over */
 #define COHPSK_CLIP       6.5                         /* hard clipping for Nc*Nc=14 to reduce PAPR */
- 
+
 #include "fdmdv_internal.h"
 #include "kiss_fft.h"
 
 struct COHPSK {
     COMP         ch_fdm_frame_buf[NSW*NSYMROWPILOT*COHPSK_M];  /* buffer of several frames of symbols from channel      */
-    float        pilot2[2*NPILOTSFRAME][COHPSK_NC];    
+    float        pilot2[2*NPILOTSFRAME][COHPSK_NC];
     float        phi_[NSYMROW][COHPSK_NC*ND];           /* phase estimates for this frame of rx data symbols     */
     float        amp_[NSYMROW][COHPSK_NC*ND];           /* amplitude estimates for this frame of rx data symbols */
     COMP         rx_symb[NSYMROW][COHPSK_NC*ND];        /* demodulated symbols                                   */
@@ -69,7 +69,7 @@ struct COHPSK {
     float        noise_rms;
 
     struct FDMDV *fdmdv;
-    
+
     int           verbose;
 
     int          *ptest_bits_coh_tx;
@@ -96,9 +96,9 @@ struct COHPSK {
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);
 void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND]);
-void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[], 
+void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
                                  COMP tx_filter_memory[COHPSK_NC][COHPSK_NSYM],
-                                 COMP phase_tx[], COMP freq[], 
+                                 COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect);
 void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHPSK_NC+1][COHPSK_M+COHPSK_M/P], COMP rx_filter_memory[COHPSK_NC+1][COHPSK_NFILTER], int nin);

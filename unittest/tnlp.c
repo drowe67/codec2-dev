@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tnlp.c                                                  
-  AUTHOR......: David Rowe                                            
-  DATE CREATED: 23/3/93                                        
-                                                               
-  Test program for non linear pitch estimation functions.  
-                                                                   
+
+  FILE........: tnlp.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 23/3/93
+
+  Test program for non linear pitch estimation functions.
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -45,13 +45,13 @@
 int   frames;
 
 /*---------------------------------------------------------------------------*\
-                                                                             
- switch_present()                                                            
-                                                                             
- Searches the command line arguments for a "switch".  If the switch is       
- found, returns the command line argument where it ws found, else returns    
- NULL.                                                                       
-                                                                             
+
+ switch_present()
+
+ Searches the command line arguments for a "switch".  If the switch is
+ found, returns the command line argument where it ws found, else returns
+ NULL.
+
 \*---------------------------------------------------------------------------*/
 
 int switch_present(sw,argc,argv)
@@ -86,7 +86,7 @@ char *argv[];
     float w[M];	                /* time domain hamming window */
     COMP  W[FFT_ENC];	        /* DFT of w[] */
     float pitch;
-    int   i; 
+    int   i;
     float prev_Wo;
     void  *nlp_states;
 #ifdef DUMP
@@ -115,7 +115,7 @@ char *argv[];
 
 #ifdef DUMP
     dump = switch_present("--dump",argc,argv);
-    if (dump) 
+    if (dump)
       dump_on(argv[dump+1]);
 #else
 /// TODO
@@ -139,7 +139,7 @@ char *argv[];
         Sn[i+M-N] = buf[i];
       dft_speech(fft_fwd_cfg, Sw, Sn, w);
 #ifdef DUMP
-      dump_Sn(Sn); dump_Sw(Sw); 
+      dump_Sn(Sn); dump_Sw(Sw);
 #endif
 
       nlp(nlp_states,Sn,N,PITCH_MIN,PITCH_MAX,&pitch,Sw,W, &prev_Wo);
@@ -157,5 +157,5 @@ char *argv[];
 
     return 0;
 }
- 
+
 

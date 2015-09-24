@@ -106,10 +106,10 @@ int gdb_stdio_fwrite(void *ptr, int size, int nmem, FILE *file) {
     gdb_stdio_size = size;
     gdb_stdio_nmem = nmem;
     gdb_stdio_file = file;
- 
+
     gdb_stdio_func = GDB_STDIO_FWRITE;
     while(gdb_stdio_func);
-    return gdb_stdio_ret;       
+    return gdb_stdio_ret;
 }
 
 int gdb_stdio_fread(void *ptr, int size, int nmem, FILE *file) {
@@ -117,9 +117,9 @@ int gdb_stdio_fread(void *ptr, int size, int nmem, FILE *file) {
     gdb_stdio_size = size;
     gdb_stdio_nmem = nmem;
     gdb_stdio_file = file;
- 
+
     gdb_stdio_func = GDB_STDIO_FREAD;
     while(gdb_stdio_func);
-    return gdb_stdio_ret;       
+    return gdb_stdio_ret;
 }
 

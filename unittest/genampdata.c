@@ -43,7 +43,7 @@ int main(void) {
     #endif
 
     #ifdef TEST2
-    /* 
+    /*
        Bunch of amps uniformly distributed between -1 and 1.  With e
        entry "codebook" (1 dimensional vector or scalar):
 
@@ -61,7 +61,7 @@ int main(void) {
 
     #define TEST3
     #ifdef TEST3
-    /* 
+    /*
        Data for testing training of spare amplitudes.  Similar to TEST1, each
        sparse vector is set to the same amplitude.
 
@@ -73,7 +73,7 @@ int main(void) {
 	for(amp=1.0; amp<=8.0; amp++) {
 	    pitch = P_MIN + (P_MAX-P_MIN)*((float)rand()/RAND_MAX);
 	    Wo = TWO_PI/pitch;
-	    L = floor(PI/Wo); 
+	    L = floor(PI/Wo);
 	    //printf("pitch %f Wo %f L %d\n", pitch, Wo, L);
 
 	    for(m=0; m<MAX_AMP; m++) {

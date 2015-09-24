@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
 	printf("usage: %s InputRawSpeechFile OutputRawSpeechFile\n", argv[0]);
 	exit(1);
     }
- 
+
     if ( (fin = fopen(argv[1],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
          argv[1], strerror(errno));

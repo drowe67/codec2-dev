@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: modem_stats.c
   AUTHOR......: David Rowe
   DATE CREATED: June 2015
-                                                                             
+
   Common functions for returning demod stats from fdmdv and cohpsk modems.
 
 \*---------------------------------------------------------------------------*/
@@ -30,7 +30,7 @@
 #include "modem_stats.h"
 #include "codec2_fdmdv.h"
 
-void modem_stats_open(struct MODEM_STATS *f) 
+void modem_stats_open(struct MODEM_STATS *f)
 {
     int i;
 
@@ -40,15 +40,15 @@ void modem_stats_open(struct MODEM_STATS *f)
     assert(f->fft_cfg != NULL);
 }
 
-void modem_stats_close(struct MODEM_STATS *f) 
+void modem_stats_close(struct MODEM_STATS *f)
 {
     KISS_FFT_FREE(f->fft_cfg);
 }
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: modem_stats_get_rx_spectrum()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: modem_stats_get_rx_spectrum()
+  AUTHOR......: David Rowe
   DATE CREATED: 9 June 2012
 
   Returns the MODEM_STATS_NSPEC point magnitude spectrum of the rx signal in
@@ -74,7 +74,7 @@ void modem_stats_close(struct MODEM_STATS *f)
 
 \*---------------------------------------------------------------------------*/
 
-void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COMP rx_fdm[], int nin) 
+void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COMP rx_fdm[], int nin)
 {
     int   i,j;
     COMP  fft_in[2*MODEM_STATS_NSPEC];

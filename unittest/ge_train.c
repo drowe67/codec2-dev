@@ -4,7 +4,7 @@
 
  Joint pitch and energy VQ training program
 
- usage: 
+ usage:
 
    cat GE | ./ge_train 2 1000000 8 > quantized
 
@@ -14,7 +14,7 @@
 */
 
 /*
-  Copyright (C) 2012 Jean-Marc Valin 
+  Copyright (C) 2012 Jean-Marc Valin
 
   All rights reserved.
 
@@ -80,7 +80,7 @@ void compute_weights2(const float *x, const float *xp, float *w, int ndim)
 
   //w[0] = 30;
   //w[1] = 1;
-  
+
   /* Square the weights because it's applied on the squared error */
   w[0] *= w[0];
   w[1] *= w[1];
@@ -92,7 +92,7 @@ int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const
   int i, j;
   float min_dist = 1e15;
   int nearest = 0;
-  
+
   for (i=0;i<nb_entries;i++)
   {
     float dist=0;
@@ -112,13 +112,13 @@ int quantize_ge(const float *x, const float *codebook1, int nb_entries, float *x
   int i, n1;
   float err[ndim];
   float w[ndim];
-  
+
   compute_weights2(x, xq, w, ndim);
-  
+
   for (i=0;i<ndim;i++)
     err[i] = x[i]-COEF[i]*xq[i];
   n1 = find_nearest_weighted(codebook1, nb_entries, err, w, ndim);
-  
+
   for (i=0;i<ndim;i++)
   {
     xq[i] = COEF[i]*xq[i] + codebook1[ndim*n1+i];
@@ -147,19 +147,19 @@ void update_weighted(float *data, float *weight, int nb_vectors, float *codebook
   int i,j;
   float count[MAX_ENTRIES][ndim];
   int nearest[nb_vectors];
-  
+
   //fprintf(stderr, "weighted: %d %d\n", nb_entries, ndim);
   for (i=0;i<nb_entries;i++)
     for (j=0;j<ndim;j++)
       count[i][j] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     nearest[i] = find_nearest_weighted(codebook, nb_entries, data+i*ndim, weight+i*ndim, ndim);
   }
   for (i=0;i<nb_entries*ndim;i++)
     codebook[i] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     int n = nearest[i];
@@ -173,7 +173,7 @@ void update_weighted(float *data, float *weight, int nb_vectors, float *codebook
 
   //float w2=0;
   for (i=0;i<nb_entries;i++)
-  { 
+  {
     for (j=0;j<ndim;j++)
       codebook[i*ndim+j] *= (1./count[i][j]);
     //w2 += (count[i]/(float)nb_vectors)*(count[i]/(float)nb_vectors);
@@ -192,8 +192,8 @@ void vq_train_weighted(float *data, float *weight, int nb_vectors, float *codebo
       codebook[j] += data[i*ndim+j];
   for (j=0;j<ndim;j++)
     codebook[j] *= (1./nb_vectors);
-  
-  
+
+
   while (e< nb_entries)
   {
 #if 1
@@ -220,11 +220,11 @@ int main(int argc, char **argv)
   double err[2] = {0, 0};
   double werr[2] = {0, 0};
   double wsum[2] = {0, 0};
-  
+
   ndim = atoi(argv[1]);
   nb_vectors = atoi(argv[2]);
   nb_entries = 1<<atoi(argv[3]);
-  
+
   data = malloc(nb_vectors*ndim*sizeof(*data));
   weight = malloc(nb_vectors*ndim*sizeof(*weight));
   weight2 = malloc(nb_vectors*ndim*sizeof(*weight2));
@@ -233,7 +233,7 @@ int main(int argc, char **argv)
   codebook = malloc(nb_entries*ndim*sizeof(*codebook));
   codebook2 = malloc(nb_entries*ndim*sizeof(*codebook2));
   codebook3 = malloc(nb_entries*ndim*sizeof(*codebook3));
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     if (feof(stdin))
@@ -272,7 +272,7 @@ int main(int argc, char **argv)
     }
     printf("\n");
   }
-  
+
   delta = malloc(nb_vectors*ndim*sizeof(*data));
   float xq[2] = {0,0};
   for (i=0;i<nb_vectors;i++)

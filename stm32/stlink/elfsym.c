@@ -28,7 +28,7 @@ int elfsym_open(char file[]) {
     int fd; 		        /* File Descriptor             */
     char *base_ptr;		/* ptr to our object in memory */
     struct stat elf_stats;	/* fstat struct                */
-    
+
     if((fd = open(file, O_RDWR)) == ERR) {
         printf("couldnt open %s\n", file);
         return ERR;
@@ -92,7 +92,7 @@ unsigned int elfsym_get_symbol_address(int fd, char symbol_name[])
 
     while((scn = elf_nextscn(elf, scn)) != 0) {
         gelf_getshdr(scn, &shdr);
-        
+
         // When we find a section header marked SHT_SYMTAB stop and get symbols
         edata = NULL;
         if(shdr.sh_type == SHT_SYMTAB) {
@@ -104,10 +104,10 @@ unsigned int elfsym_get_symbol_address(int fd, char symbol_name[])
             symbol_count = shdr.sh_size / shdr.sh_entsize;
 
             // loop through to grab all symbols
-            for(i = 0; i < symbol_count; i++) {			
+            for(i = 0; i < symbol_count; i++) {
                 // libelf grabs the symbol data using gelf_getsym()
                 gelf_getsym(edata, i, &sym);
-                
+
                 if (strcmp(symbol_name,
                            elf_strptr(elf, shdr.sh_link, sym.st_name)) == 0) {
                     symbol_address = sym.st_value;

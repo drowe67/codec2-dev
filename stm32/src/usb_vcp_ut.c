@@ -14,7 +14,7 @@
   When I fired up Minicom, it echoed characters:
 
     $ sudo minicom -D /dev/ttyACM0
- 
+
 \*---------------------------------------------------------------------------*/
 
 #include <stm32f4xx.h>

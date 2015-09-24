@@ -109,11 +109,11 @@ int main(void) {
     ss.mode  = ANALOG;
 
     while(1) {
-        
+
         iterate_select_state_machine(&ss);
 
         if (switch_ptt() || (ext_ptt() == 0)) {
-            
+
             /* Transmit -------------------------------------------------------------------------*/
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
@@ -134,20 +134,20 @@ int main(void) {
                 if (ss.mode == ANALOG) {
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
                 if (ss.mode == DV) {
                     freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
                 if (ss.mode == TONE) {
                     short buf[SINE_SAMPLES];
                     for(i=0; i<n_samples; i++)
-                        buf[i] = aSine[i]*0.398; /* 8dB back off from peak */                   
+                        buf[i] = aSine[i]*0.398; /* 8dB back off from peak */
                     while(dac1_write(buf, SINE_SAMPLES) == 0);
                 }
 
@@ -157,10 +157,10 @@ int main(void) {
 
         }
         else {
-            
+
             /* Receive --------------------------------------------------------------------------*/
 
-            not_cptt(1); led_ptt(0); 
+            not_cptt(1); led_ptt(0);
 
             /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
@@ -170,7 +170,7 @@ int main(void) {
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);              
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac2_write(dac16k, n_samples_16k);
                     led_rt(0); led_err(0);
                }
@@ -179,14 +179,14 @@ int main(void) {
 
                 /* regular DV mode */
 
-                nin = freedv_nin(f);   
+                nin = freedv_nin(f);
                 nout = nin;
 		freedv_set_total_bit_errors(f, 0);
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                     GPIOE->ODR = (1 << 3);
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
                     nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
-                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
+                    fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
                     dac2_write(dac16k, 2*nout);
                     led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
                     GPIOE->ODR &= ~(1 << 3);
@@ -244,4 +244,4 @@ void iterate_select_state_machine(SWITCH_STATE *ss) {
    }
     ss->state = next_state;
 }
-            
+

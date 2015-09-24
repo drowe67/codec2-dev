@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: tquant.c                                                  
-  AUTHOR......: David Rowe                                            
-  DATE CREATED: 22/8/10                                        
-                                                               
+
+  FILE........: tquant.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 22/8/10
+
   Generates quantisation curves for plotting on Octave.
-                                                                   
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -22,7 +22,7 @@
   License for more details.
 
   You should have received a copy of the GNU Lesser General Public License
-  along with this program; if not, see <http://www.gnu.org/licenses/>.  
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <assert.h>
@@ -76,10 +76,10 @@ int test_energy_quant(int levels, float max_error_dB) {
 	e = decode_energy(index_in, E_BITS);
 	index_out = encode_energy(e, E_BITS);
 	if (index_in != index_out) {
-	    printf("edB: %f index_in: %d index_out: %d\n", 
+	    printf("edB: %f index_in: %d index_out: %d\n",
 		   10.0*log10(e), index_in, index_out);
 	    exit(0);
-	}	
+	}
     }
 
     /* check error over range of quantiser */
@@ -116,7 +116,7 @@ int test_lsp(int lsp_number, int levels, float max_error_hz) {
 
     lsp_number--;
     max_error_rads = max_error_hz*TWO_PI/FS;
-    
+
     for(i=0; i<LPC_ORD; i++)
 	indexes_in[i] = 0;
 
@@ -125,11 +125,11 @@ int test_lsp(int lsp_number, int levels, float max_error_hz) {
 	decode_lsps_scalar(lsp, indexes_in, LPC_ORD);
 	encode_lsps_scalar(indexes_out, lsp,LPC_ORD);
 	if (indexes_in[lsp_number] != indexes_out[lsp_number]) {
-	    printf("freq: %f index_in: %d index_out: %d\n", 
+	    printf("freq: %f index_in: %d index_out: %d\n",
 		   lsp[lsp_number]+1, indexes_in[lsp_number],
 		   indexes_out[lsp_number]);
 	    exit(0);
-	}	
+	}
     }
 
     for(i=0; i<LPC_ORD; i++)
@@ -187,7 +187,7 @@ int test_Wo_quant() {
 	Wo = decode_Wo(index_in, WO_BITS);
         index_out = encode_Wo(Wo, WO_BITS);
 	if (index_in != index_out)
-	    printf("  Wo %f index_in %d index_out %d\n", Wo, 
+	    printf("  Wo %f index_in %d index_out %d\n", Wo,
 		   index_in, index_out);
     }
 

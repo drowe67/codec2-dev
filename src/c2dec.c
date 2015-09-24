@@ -74,10 +74,10 @@ int main(int argc, char *argv[])
         { NULL, no_argument, NULL, 0 }
     };
     int num_opts=sizeof(long_options)/sizeof(struct option);
- 
+
     if (argc < 4)
         print_help(long_options, num_opts, argv);
-    
+
     if (strcmp(argv[1],"3200") == 0)
 	mode = CODEC2_MODE_3200;
     else if (strcmp(argv[1],"2400") == 0)
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
 
     while(1) {
         int option_index = 0;
-        int opt = getopt_long(argc, argv, opt_string, 
+        int opt = getopt_long(argc, argv, opt_string,
                     long_options, &option_index);
         if (opt == -1)
             break;
@@ -153,11 +153,11 @@ int main(int argc, char *argv[])
                             optarg, strerror(errno));
                     exit(1);
                 }
-            
-            } 
+
+            }
             #ifdef DUMP
             else if(strcmp(long_options[option_index].name, "dump") == 0) {
-                if (dump) 
+                if (dump)
 	            dump_on(optarg);
             }
             #endif
@@ -175,18 +175,18 @@ int main(int argc, char *argv[])
     assert(nend_bit <= nbit);
     codec2_set_natural_or_gray(codec2, !natural);
     //printf("%d %d\n", nstart_bit, nend_bit);
- 
+
     //fprintf(stderr, "softdec: %d natural: %d\n", softdec, natural);
     if (softdec)
         ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);
     else
         ret = (fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte);
-      
+
     while(ret) {
 	frames++;
 
         // apply bit errors, MSB of byte 0 is bit 0 in frame, only works in packed mode
-        
+
 	if ((error_mode == UNIFORM) || (error_mode == UNIFORM_RANGE)) {
             assert(softdec == 0);
 	    for(i=nstart_bit; i<nend_bit+1; i++) {
@@ -219,7 +219,7 @@ int main(int argc, char *argv[])
                 break;
 
             case 1:
-                
+
                 /* burst error state - 50% bit error rate */
 
                 for(i=nstart_bit; i<nend_bit+1; i++) {
@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
                 break;
 
 	    }
-               
+
             state = next_state;
         }
 
@@ -252,7 +252,7 @@ int main(int argc, char *argv[])
         }
         else
             ber_est = 0.0;
-            
+
         if (softdec) {
             /* pack bits, MSB received first  */
 
@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
         //buffering to occur
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
 
         if (softdec)
             ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);

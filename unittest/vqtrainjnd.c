@@ -9,7 +9,7 @@
 	algorithm:
 
         - we quantise each training vector to JND steps (say 100Hz for LSPs
-          5-10) 
+          5-10)
 	- we then use the most popular training vectors as our VQ codebook
 
 \*--------------------------------------------------------------------------*/
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
     /* Interpret command line arguments */
 
     if (argc != 6)	{
-	printf("usage: %s TrainFile K(dimension) JND popThresh VQFile\n", 
+	printf("usage: %s TrainFile K(dimension) JND popThresh VQFile\n",
 	       argv[0]);
 	exit(1);
     }
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
     k = atol(argv[2]);
     jnd = atof(argv[3]);
     pop_thresh = atol(argv[4]);
-    printf("dimension K=%d  popThresh=%d JND=%3.1f Hz\n", 
+    printf("dimension K=%d  popThresh=%d JND=%3.1f Hz\n",
 	   k, pop_thresh, jnd);
     vec = (float*)malloc(sizeof(float)*k);
     if (vec == NULL) {
@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
 
 	for(j=0; j<k; j++)
 	    vec[j] *= 4000.0/PI;
-	
+
 	/* quantise to JND steps */
 
 	locate_lsps_jnd_steps(vec, jnd, k);
@@ -201,7 +201,7 @@ int main(int argc, char *argv[]) {
 	printf("Error opening VQ file: %s\n",argv[4]);
 	exit(1);
     }
-    
+
     fprintf(fvq,"%d %d\n", k, popular[pop_thresh]);
     for(i=0; i<ntrain; i++) {
 	if (n[i] > pop_thresh) {
@@ -211,7 +211,7 @@ int main(int argc, char *argv[]) {
 	}
     }
     fclose(fvq);
-   
+
     return 0;
 }
 
@@ -222,10 +222,10 @@ int main(int argc, char *argv[]) {
 \*-----------------------------------------------------------------------*/
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: locate_lsps_jnd_steps()	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 27/10/2011 
+
+  FUNCTION....: locate_lsps_jnd_steps()
+  AUTHOR......: David Rowe
+  DATE CREATED: 27/10/2011
 
   Applies a form of Bandwidth Expansion (BW) to a vector of LSPs.
   Listening tests have determined that "quantising" the position of

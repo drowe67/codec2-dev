@@ -42,7 +42,7 @@
 /* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
    are 16 bit 2's complement, the DAC driver convertsto 12 bit
    unsigned. */
-   
+
 short aWave[] = {4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,
 	4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,4095,0,};
 
@@ -67,7 +67,7 @@ void setup_timer()
 {
     RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
 
-    TIM_TimeBaseInitTypeDef timerInitStructure; 
+    TIM_TimeBaseInitTypeDef timerInitStructure;
     timerInitStructure.TIM_Prescaler = 84;
     timerInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
     timerInitStructure.TIM_Period = 0x8FFFFFFF;
@@ -107,9 +107,9 @@ int main(void) {
 
 	tend = TIM_GetCounter(TIM2);
 
-        //Sit and spin until we can get more samples into the dac 
+        //Sit and spin until we can get more samples into the dac
 	while(dac1_write((short*)outbuf,DAC_DUC_BUF_SZ)<0);
     }
-   
+
 }
 

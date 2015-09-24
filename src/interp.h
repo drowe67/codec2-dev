@@ -32,7 +32,7 @@
 
 void interpolate(MODEL *interp, MODEL *prev, MODEL *next);
 void interpolate_lsp(kiss_fft_cfg  fft_dec_cfg,
-		     MODEL *interp, MODEL *prev, MODEL *next, 
+		     MODEL *interp, MODEL *prev, MODEL *next,
 		     float *prev_lsps, float  prev_e,
 		     float *next_lsps, float  next_e,
 		     float *ak_interp, float *lsps_interp);

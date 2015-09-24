@@ -1,4 +1,4 @@
-/* 
+/*
    tsrc.c
    David Rowe
    Sat Nov 3 2012
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
 
     fout = fopen(argv[2], "wb");
     assert(fout != NULL);
-    
+
     src = src_new(SRC_SINC_FASTEST, 1, &error);
     assert(src != NULL);
 

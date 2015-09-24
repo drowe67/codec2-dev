@@ -33,7 +33,7 @@
 #include "stm32f4xx_adc.h"
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
- 
+
 #include "codec2_fifo.h"
 #include "stm32f4_adc.h"
 #include "debugblinky.h"
@@ -66,13 +66,13 @@ void adc_open(int fifo_sz) {
 
 /* n signed 16 bit samples in buf[] if return != -1 */
 
-int adc1_read(short buf[], int n) {   
+int adc1_read(short buf[], int n) {
     return fifo_read(adc1_fifo, buf, n);
 }
 
 /* n signed 16 bit samples in buf[] if return != -1 */
 
-int adc2_read(short buf[], int n) {   
+int adc2_read(short buf[], int n) {
     return fifo_read(adc2_fifo, buf, n);
 }
 
@@ -83,31 +83,31 @@ static void tim2_config(void)
 
   /* TIM2 Periph clock enable */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-  
+
   /* --------------------------------------------------------
-  
+
   TIM2 input clock (TIM2CLK) is set to 2 * APB1 clock (PCLK1), since
   APB1 prescaler is different from 1 (see system_stm32f4xx.c and Fig
   13 clock tree figure in DM0031020.pdf).
 
-     Sample rate Fs = 2*PCLK1/TIM_ClockDivision 
+     Sample rate Fs = 2*PCLK1/TIM_ClockDivision
                     = (HCLK/2)/TIM_ClockDivision
-                    
+
   ----------------------------------------------------------- */
 
   /* Time base configuration */
 
-  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure); 
-  TIM_TimeBaseStructure.TIM_Period = 5250;          
-  TIM_TimeBaseStructure.TIM_Prescaler = 0;       
-  TIM_TimeBaseStructure.TIM_ClockDivision = 0;    
-  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;  
+  TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
+  TIM_TimeBaseStructure.TIM_Period = 5250;
+  TIM_TimeBaseStructure.TIM_Prescaler = 0;
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
 
   /* TIM2 TRGO selection */
 
   TIM_SelectOutputTrigger(TIM2, TIM_TRGOSource_Update);
-  
+
   /* TIM2 enable counter */
 
   TIM_Cmd(TIM2, ENABLE);
@@ -115,8 +115,8 @@ static void tim2_config(void)
 
 
 void adc_configure(){
-    ADC_InitTypeDef  ADC_init_structure; 
-    GPIO_InitTypeDef GPIO_initStructre; 
+    ADC_InitTypeDef  ADC_init_structure;
+    GPIO_InitTypeDef GPIO_initStructre;
     DMA_InitTypeDef  DMA_InitStructure;
     NVIC_InitTypeDef NVIC_InitStructure;
 
@@ -126,19 +126,19 @@ void adc_configure(){
     RCC_AHB1PeriphClockCmd(RCC_AHB1ENR_GPIOAEN,ENABLE);
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_DMA2, ENABLE);
 
-    // Analog pin configuration ADC1->PA1, ADC2->PA2 
+    // Analog pin configuration ADC1->PA1, ADC2->PA2
 
-    GPIO_initStructre.GPIO_Pin =  GPIO_Pin_1 | GPIO_Pin_2;    
-    GPIO_initStructre.GPIO_Mode = GPIO_Mode_AN;     
-    GPIO_initStructre.GPIO_PuPd = GPIO_PuPd_NOPULL; 
-    GPIO_Init(GPIOA,&GPIO_initStructre);            
+    GPIO_initStructre.GPIO_Pin =  GPIO_Pin_1 | GPIO_Pin_2;
+    GPIO_initStructre.GPIO_Mode = GPIO_Mode_AN;
+    GPIO_initStructre.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_Init(GPIOA,&GPIO_initStructre);
 
     // ADC structure configuration
 
     ADC_DeInit();
     ADC_init_structure.ADC_DataAlign = ADC_DataAlign_Left;
     ADC_init_structure.ADC_Resolution = ADC_Resolution_12b;
-    ADC_init_structure.ADC_ContinuousConvMode = DISABLE; 
+    ADC_init_structure.ADC_ContinuousConvMode = DISABLE;
     ADC_init_structure.ADC_ExternalTrigConv = ADC_ExternalTrigConv_T2_TRGO;
     ADC_init_structure.ADC_ExternalTrigConvEdge = ADC_ExternalTrigConvEdge_Rising;
     ADC_init_structure.ADC_NbrOfConversion = 2;
@@ -149,12 +149,12 @@ void adc_configure(){
 
     ADC_RegularChannelConfig(ADCx,ADC_Channel_1,1,ADC_SampleTime_144Cycles);
     ADC_RegularChannelConfig(ADCx,ADC_Channel_2,2,ADC_SampleTime_144Cycles);
-    //ADC_VBATCmd(ENABLE); 
+    //ADC_VBATCmd(ENABLE);
 
     /* DMA  configuration **************************************/
 
     DMA_DeInit(DMA_STREAMx);
-    DMA_InitStructure.DMA_Channel = DMA_CHANNELx;  
+    DMA_InitStructure.DMA_Channel = DMA_CHANNELx;
     DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)ADCx_DR_ADDRESS;
     DMA_InitStructure.DMA_Memory0BaseAddr = (uint32_t)adc_buf;
     DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralToMemory;
@@ -165,7 +165,7 @@ void adc_configure(){
     DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_HalfWord;
     DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
     DMA_InitStructure.DMA_Priority = DMA_Priority_High;
-    DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;         
+    DMA_InitStructure.DMA_FIFOMode = DMA_FIFOMode_Disable;
     DMA_InitStructure.DMA_FIFOThreshold = DMA_FIFOThreshold_HalfFull;
     DMA_InitStructure.DMA_MemoryBurst = DMA_MemoryBurst_Single;
     DMA_InitStructure.DMA_PeripheralBurst = DMA_PeripheralBurst_Single;
@@ -193,7 +193,7 @@ void adc_configure(){
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
     NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    NVIC_Init(&NVIC_InitStructure);     
+    NVIC_Init(&NVIC_InitStructure);
 
     // Enable and start ADC conversion
 
@@ -236,7 +236,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
-        DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_HTIF0);  
+        DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_HTIF0);
     }
 
     /* Transfer complete interrupt */
@@ -264,7 +264,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
-        DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);  
+        DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
     }
 
     GPIOE->ODR &= ~(1 << 0);

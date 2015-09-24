@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk_ch.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
-                                                                             
+
   Channel impairment program for testing command line versions of
   cohpsk modem.
-     
-  TODO: 
+
+  TODO:
     [ ] measure and prints pwrs to check, prints warning
     [ ] SNR in 3000Hz input
     [ ] example operation with sox for sample rate change
@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
     COMP           ch_fdm[BUF_N];
     float          ssbfiltbuf[SSBFILT_N+BUF_N];
     float          ssbfiltout[BUF_N];
-                                           
+
     COMP           phase_ch;
     int            noise_r, noise_end;
     float          No, variance;
@@ -113,16 +113,16 @@ int main(int argc, char *argv[])
         exit(1);
     }
     fprintf(stderr, "NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f\n", NodB, foff_hz, fading_en, inclip);
-    
-    phase_ch.real = 1.0; phase_ch.imag = 0.0; 
-    noise_r = 0; 
+
+    phase_ch.real = 1.0; phase_ch.imag = 0.0;
+    noise_r = 0;
     noise_end = sizeof(noise)/sizeof(COMP);
 
     /*  N = var = NoFs */
 
     No = pow(10.0, NodB/10.0);
     variance = COHPSK_FS*No;
-    
+
     tx_pwr = tx_pwr_fade = noise_pwr = 0.0;
     clipped = 0;
     peak = 0.0;
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
     /* --------------------------------------------------------*\
 	                          Main Loop
     \*---------------------------------------------------------*/
-    
+
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
 	frames++;
 
@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
 
         for(i=0, j=HT_N; i<BUF_N; i++,j++) {
 
-            /* 
+            /*
                Hilbert Transform to produce complex signal so we can do
                single sided freq shifts.  Essential filters out negative
                freqencies.
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
                 sam = -inclip*32767.0;
             //printf("sam: %f\n", sam);
             htbuf[j] = sam/FDMDV_SCALE;
-            
+
             if (fabs(htbuf[j]) > peak) {
                 peak = fabs(htbuf[j]);
             }
@@ -210,7 +210,7 @@ int main(int argc, char *argv[])
             //printf("%d %f %f\n", i, ch_in[i].real, ch_in[i].imag);
         }
         assert(j <= (BUF_N+HT_N));
-        
+
         /* update HT memory */
 
         for(i=0; i<HT_N; i++)
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
                 assert(ret == 1);
                 //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
-                
+
                 direct    = cmult(aspread, ch_fdm[i]);
                 delayed   = cmult(aspread_2ms, ch_fdm_delay[i]);
                 ch_fdm[i] = fcmult(hf_gain, cadd(direct, delayed));
@@ -266,8 +266,8 @@ int main(int argc, char *argv[])
             noise_r++;
             if (noise_r > noise_end) {
                 noise_r = 0;
-                //fprintf(stderr, "  [%d] noise wrap\n", f);            
-            }              
+                //fprintf(stderr, "  [%d] noise wrap\n", f);
+            }
         }
 
         /* FIR filter to simulate (a rather flat) SSB filter.  Might
@@ -309,15 +309,15 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);
     fclose(fout);
-    
-    fprintf(stderr, "peak pwr.....: %7.2f\nav input pwr.: %7.2f\nav pwr fading: %7.2f\nnoise pwr....: %7.2f\nclipping.....: %7.2f %%\n", 
+
+    fprintf(stderr, "peak pwr.....: %7.2f\nav input pwr.: %7.2f\nav pwr fading: %7.2f\nnoise pwr....: %7.2f\nclipping.....: %7.2f %%\n",
             peak*peak,
-            tx_pwr/(frames*BUF_N), 
+            tx_pwr/(frames*BUF_N),
             tx_pwr_fade/(frames*BUF_N),
             noise_pwr/(frames*BUF_N),
             100.0*clipped/frames
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
             snr3k,
             EbNo700
             );
- 
+
     return 0;
 }
 

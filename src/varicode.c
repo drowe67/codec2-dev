@@ -7,7 +7,7 @@
 // To test:
 //          $ gcc varicode.c -o varicode -DVARICODE_UNITTEST -Wall
 //          $ ./varicode
-// 
+//
 // License:
 //
 //  This program is free software; you can redistribute it and/or modify
@@ -72,11 +72,11 @@ int varicode_encode1(short varicode_out[], char ascii_in[], int max_out, int n_i
             packed <<= 1;
             varicode_out++;
             n_out++;
-            v_len++;                
+            v_len++;
         }
         assert(v_len <= VARICODE_MAX_BITS);
 
-        n_in--;            
+        n_in--;
     }
 
     return n_out;
@@ -86,7 +86,7 @@ int varicode_encode1(short varicode_out[], char ascii_in[], int max_out, int n_i
 /*
   Code 2 covers a subset, but is more efficient that Code 1 (282
   compared to 1315 bits on unittest) Unsupported characters are
-  replaced by spaces.  We encode/decode two bits at a time.  
+  replaced by spaces.  We encode/decode two bits at a time.
 */
 
 int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_in) {
@@ -98,7 +98,7 @@ int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_i
     while(n_in && (n_out < max_out)) {
 
         packed = varicode_table2[0]; // default to space if char not found
-          
+
         // see if our character exists
         for(i=0; i<sizeof(varicode_table2); i+=2) {
             if (varicode_table2[i] == *ascii_in)
@@ -115,12 +115,12 @@ int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_i
                 varicode_out[0] = 1;
             else
                 varicode_out[0] = 0;
-                    
+
             if (packed & 0x4000)
                 varicode_out[1] = 1;
             else
                 varicode_out[1] = 0;
-                
+
             if (packed & 0xc000)
                 n_zeros = 0;
             else
@@ -134,7 +134,7 @@ int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_i
         }
         assert(v_len <= VARICODE_MAX_BITS);
 
-        n_in--;            
+        n_in--;
     }
 
     assert((n_out % 2) == 0);  /* outputs two bits at a time */
@@ -144,7 +144,7 @@ int varicode_encode2(short varicode_out[], char ascii_in[], int max_out, int n_i
 
 
 int varicode_encode(short varicode_out[], char ascii_in[], int max_out, int n_in, int code_num) {
-    
+
     assert((code_num ==1) || (code_num ==2));
 
     if (code_num == 1)
@@ -188,7 +188,7 @@ static int decode_one_bit(struct VARICODE_DEC *s, char *single_ascii, short vari
     if (s->state == 0) {
         if (!varicode_in)
             return 0;
-        else 
+        else
             s->state = 1;
     }
 
@@ -243,7 +243,7 @@ static int decode_two_bits(struct VARICODE_DEC *s, char *single_ascii, short var
     if (s->state == 0) {
         if (!(varicode_in1 || varicode_in2))
             return 0;
-        else 
+        else
             s->state = 1;
     }
 
@@ -257,8 +257,8 @@ static int decode_two_bits(struct VARICODE_DEC *s, char *single_ascii, short var
         else
             s->n_zeros+=2;
 
-        s->v_len+=2;            
- 
+        s->v_len+=2;
+
         found = 0;
 
         /* end of character code */
@@ -307,7 +307,7 @@ int varicode_decode1(struct VARICODE_DEC *dec_states, char ascii_out[], short va
         if (output) {
             *ascii_out++ = single_ascii;
             n_out++;
-        }            
+        }
     }
 
     return n_out;
@@ -336,12 +336,12 @@ int varicode_decode2(struct VARICODE_DEC *dec_states, char ascii_out[], short va
             output = decode_two_bits(dec_states, &single_ascii, dec_states->in[0], dec_states->in[1]);
 
             dec_states->n_in = 0;
- 
+
             if (output) {
                 //printf("  output: %d single_ascii: 0x%x %c\n", output, (int)single_ascii, single_ascii);
                 *ascii_out++ = single_ascii;
                 n_out++;
-            }            
+            }
         }
     }
 
@@ -396,14 +396,14 @@ void test_varicode(int code_num) {
     //    printf("%d \n", varicode[i]);
     //}
 
-    // split decode in half to test how it preserves state between calls 
+    // split decode in half to test how it preserves state between calls
 
     varicode_decode_init(&dec_states, code_num);
     half = n_varicode_bits_out/2;
     n_ascii_chars_out  = varicode_decode(&dec_states, ascii_out, varicode, length, half);
     // printf("  n_ascii_chars_out: %d\n", n_ascii_chars_out);
 
-    n_ascii_chars_out += varicode_decode(&dec_states, &ascii_out[n_ascii_chars_out], 
+    n_ascii_chars_out += varicode_decode(&dec_states, &ascii_out[n_ascii_chars_out],
                                          &varicode[half], length-n_ascii_chars_out, n_varicode_bits_out - half);
     assert(n_ascii_chars_out == length);
 
@@ -420,7 +420,7 @@ void test_varicode(int code_num) {
     // 2. Test some ascii with a run of zeros -----------------------------------------------------
 
     sprintf(ascii_in, "CQ CQ CQ this is VK5DGR");
-        
+
     assert(strlen(ascii_in) < length);
     if (code_num == 2)
         for(i=0; i<strlen(ascii_in); i++)
@@ -461,7 +461,7 @@ void test_varicode(int code_num) {
         n_ascii_chars_out = 0;
         for(j=0; j<n_varicode_bits_out; j++) {
             n_out = varicode_decode(&dec_states, &ascii_out[n_ascii_chars_out], &varicode[j], 1, 1);
-            if (n_out) 
+            if (n_out)
                 n_ascii_chars_out++;
         }
         ascii_out[n_ascii_chars_out] = 0;

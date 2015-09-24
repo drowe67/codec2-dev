@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
     }
- 
+
     if (strcmp(argv[1],"3200") == 0)
 	mode = CODEC2_MODE_3200;
     else if (strcmp(argv[1],"2400") == 0)
@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
 
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
     unpacked_bits = (float*)malloc(nbit*sizeof(float));
-    
+
     gray = 1;
     softdec = 0;
     for (i=4; i<argc; i++) {

@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: codec2_fm.h
   AUTHOR......: David Rowe
   DATE CREATED: February 2015
-                                                                             
+
   Functions that implement analog FM, see also octave/fm.m.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -34,7 +34,7 @@ struct FM {
     float  Fs;               /* setme: sample rate                  */
     float  fm_max;           /* setme: maximum modulation frequency */
     float  fd;               /* setme: maximum deviation            */
-    float  fc;               /* setme: carrier frequency            */ 
+    float  fc;               /* setme: carrier frequency            */
     COMP  *rx_bb;
     COMP   rx_bb_filt_prev;
     float *rx_dem_mem;

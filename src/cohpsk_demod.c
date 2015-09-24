@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk_demod.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 6 2015
-                                                                             
+
   Given an input file of raw file (8kHz, 16 bit shorts) of COHPSK modem samples,
   outputs a file of bits (note one bit per int, not compressed).
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     if (argc == 4) {
         if ( (foct = fopen(argv[3],"wt")) == NULL ) {
             fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
-                    argv[3], strerror(errno));            
+                    argv[3], strerror(errno));
 	exit(1);
         }
         oct = 1;
@@ -124,9 +124,9 @@ int main(int argc, char *argv[])
             if (oct) {
                 for(r=0; r<NSYMROW; r++, log_data_r++) {
                     for(c=0; c<COHPSK_NC*ND; c++) {
-                        rx_amp_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->amp_[r][c]; 
-                        rx_phi_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->phi_[r][c]; 
-                        rx_symb_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->rx_symb[r][c]; 
+                        rx_amp_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->amp_[r][c];
+                        rx_phi_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->phi_[r][c];
+                        rx_symb_log[log_data_r*COHPSK_NC*ND+c] = cohpsk->rx_symb[r][c];
                     }
                 }
 
@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin); 
+        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);
@@ -153,17 +153,17 @@ int main(int argc, char *argv[])
     /* optionally dump Octave files */
 
     if (foct != NULL) {
-        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
-        octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
-        octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);  
-        octave_save_float(foct, "rx_timing_log_c", (float*)cohpsk->rx_timing_log, 1, cohpsk->rx_timing_log_index, cohpsk->rx_timing_log_index);  
-        octave_save_float(foct, "f_est_log_c", f_est_log, 1, logframes, logframes);  
-        octave_save_float(foct, "ratio_log_c", ratio_log, 1, logframes, logframes);  
+        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
+        octave_save_float(foct, "rx_phi_log_c", (float*)rx_phi_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
+        octave_save_complex(foct, "rx_symb_log_c", (COMP*)rx_symb_log, log_data_r, COHPSK_NC*ND, COHPSK_NC*ND);
+        octave_save_float(foct, "rx_timing_log_c", (float*)cohpsk->rx_timing_log, 1, cohpsk->rx_timing_log_index, cohpsk->rx_timing_log_index);
+        octave_save_float(foct, "f_est_log_c", f_est_log, 1, logframes, logframes);
+        octave_save_float(foct, "ratio_log_c", ratio_log, 1, logframes, logframes);
         fclose(foct);
     }
 
     cohpsk_destroy(cohpsk);
 
- 
+
     return 0;
 }

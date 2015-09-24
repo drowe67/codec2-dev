@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_put_test_bits.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: 1 May 2012
-                                                                             
+
   Using a file of packed test bits as input, determines bit error
   rate.  Useful for testing fdmdv_demod.
 
@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	    printf("-");
-	
+
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 

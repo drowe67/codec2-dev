@@ -51,7 +51,7 @@ static int codec2_new(struct ast_trans_pvt *pvt)
     tmp->codec2 = codec2_create(CODEC2_MODE_2400);
     if (!tmp->codec2)
         return -1;
-	
+
     return 0;
 }
 
@@ -124,7 +124,7 @@ static void codec2_destroy_stuff(struct ast_trans_pvt *pvt)
 }
 
 static struct ast_translator codec2tolin = {
-	.name = "codec2tolin", 
+	.name = "codec2tolin",
 	.srcfmt = AST_FORMAT_CODEC2,
 	.dstfmt = AST_FORMAT_SLINEAR,
 	.newpvt = codec2_new,
@@ -137,7 +137,7 @@ static struct ast_translator codec2tolin = {
 };
 
 static struct ast_translator lintocodec2 = {
-	.name = "lintocodec2", 
+	.name = "lintocodec2",
 	.srcfmt = AST_FORMAT_SLINEAR,
 	.dstfmt = AST_FORMAT_CODEC2,
 	.newpvt = codec2_new,
@@ -171,11 +171,11 @@ static int load_module(void)
 	int res;
 
 	res = ast_register_translator(&codec2tolin);
-	if (!res) 
+	if (!res)
 		res=ast_register_translator(&lintocodec2);
 	else
 		ast_unregister_translator(&codec2tolin);
-	if (res) 
+	if (res)
 		return AST_MODULE_LOAD_FAILURE;
 	return AST_MODULE_LOAD_SUCCESS;
 }

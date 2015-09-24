@@ -1,4 +1,4 @@
-/* 
+/*
    tfifo.c
    David Rowe
    Nov 19 2012
@@ -13,7 +13,7 @@
 
 #define FIFO_SZ  1024
 #define WRITE_SZ 10
-#define READ_SZ  8  
+#define READ_SZ  8
 #define N_MAX    100
 #define LOOPS    1000000
 
@@ -54,7 +54,7 @@ int main() {
 
 	if (sucess) {
 	    for(j=0; j<READ_SZ; j++) {
-                if (read_buf[j] != n_out) 
+                if (read_buf[j] != n_out)
                     printf("error: %d %d\n", read_buf[j], n_out);
                 n_out++;
                 if (n_out == N_MAX)
@@ -62,7 +62,7 @@ int main() {
             }
             i++;
         }
- 
+
     }
 
     #ifdef USE_THREADS
@@ -99,5 +99,5 @@ void *writer_thread(void *data) {
         writer();
     }
 
-    return NULL; 
+    return NULL;
 }

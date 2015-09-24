@@ -37,10 +37,10 @@ int main(void) {
     #endif
 
     #ifdef TEST2
-    /* 
+    /*
        Bunch of random phases, should get std dev per element of
        pi/(sqrt(3)*pow(2,b/D)), or 0.321 for (b=5, D=2):
-       
+
        ./vqtrainph testph.flt 2 32 test.txt
     */
 
@@ -54,7 +54,7 @@ int main(void) {
 
     #define TEST3
     #ifdef TEST3
-    /* 
+    /*
        Data for testing training in sparse phases. No correlation, so
        should be same performance as TEST2.  Attempting to train a
        MAX_AMP/4 = 20 (first 1 kHz) phase quantiser.
@@ -66,7 +66,7 @@ int main(void) {
 	pitch = P_MIN + (P_MAX-P_MIN)*((float)rand()/RAND_MAX);
 	//pitch = 40;
 	Wo = TWO_PI/pitch;
-	L = floor(PI/Wo); 
+	L = floor(PI/Wo);
 	//printf("pitch %f Wo %f L %d\n", pitch, Wo, L);
 
 	for(m=0; m<MAX_AMP; m++) {
@@ -76,8 +76,8 @@ int main(void) {
 
 	angle += PI/8;
 	for(m=1; m<=L; m++) {
-	    noisey_angle = angle + (PI/16)*(1.0 - 2.0*rand()/RAND_MAX);	    
-	    //angle = (PI/16)*(1.0 - 2.0*rand()/RAND_MAX);	    
+	    noisey_angle = angle + (PI/16)*(1.0 - 2.0*rand()/RAND_MAX);
+	    //angle = (PI/16)*(1.0 - 2.0*rand()/RAND_MAX);
 	    index = MAX_AMP*m*Wo/PI;
 	    assert(index < MAX_AMP);
 	    sparse_pe[index].real = cos(noisey_angle);
@@ -86,7 +86,7 @@ int main(void) {
 
 	fwrite(&sparse_pe, sizeof(COMP), MAX_AMP/4, f);
     }
-	    
+
     #endif
 
     return 0;

@@ -44,13 +44,13 @@ int main(void) {
             printf("Error opening input file: stm_in.raw\n\nTerminating....\n");
             exit(1);
         }
-    
+
         printf("Starting!\n");
 
         while(fread(buf, sizeof(short), N, fplay) == N) {
             while(dac1_write(buf, N) == -1);
             while(dac2_write(buf, N) == -1);
-        }  
+        }
 
         printf("Finished!\n");
         fclose(fplay);

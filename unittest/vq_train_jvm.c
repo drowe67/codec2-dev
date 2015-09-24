@@ -1,16 +1,16 @@
 /*---------------------------------------------------------------------------*\
-                                                                          
-  FILE........: vq_train_jvm.c                                                  
-  AUTHOR......: Jean-Marc Valin                                            
+
+  FILE........: vq_train_jvm.c
+  AUTHOR......: Jean-Marc Valin
   DATE CREATED: 21 Jan 2012
-                                                               
-  Multi-stage Vector Quantoser training program developed by Jean-Marc at 
+
+  Multi-stage Vector Quantoser training program developed by Jean-Marc at
   linux.conf.au 2012.  Minor mods by David Rowe
-                                                              
+
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2012 Jean-Marc Valin 
+  Copyright (C) 2012 Jean-Marc Valin
 
   All rights reserved.
 
@@ -47,7 +47,7 @@ void compute_weights(const float *x, float *w, int ndim)
   for (i=1;i<ndim-1;i++)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
   w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
-  
+
   for (i=0;i<ndim;i++)
     w[i] = 1./(.01+w[i]);
   w[0]*=3;
@@ -58,9 +58,9 @@ int find_nearest(const float *codebook, int nb_entries, float *x, int ndim, floa
 {
   int i, j;
   int nearest = 0;
-  
+
   *min_dist = 1E15;
-  
+
   for (i=0;i<nb_entries;i++)
   {
     float dist=0;
@@ -80,7 +80,7 @@ int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const
   int i, j;
   float min_dist = 1e15;
   int nearest = 0;
-  
+
   for (i=0;i<nb_entries;i++)
   {
     float dist=0;
@@ -95,29 +95,29 @@ int find_nearest_weighted(const float *codebook, int nb_entries, float *x, const
   return nearest;
 }
 
-int quantize_lsp(const float *x, const float *codebook1, const float *codebook2, 
+int quantize_lsp(const float *x, const float *codebook1, const float *codebook2,
 		 const float *codebook3, int nb_entries, float *xq, int ndim)
 {
   int i, n1, n2, n3;
   float err[ndim], err2[ndim], err3[ndim];
   float w[ndim], w2[ndim], w3[ndim], min_dist;
-  
+
   w[0] = MIN(x[0], x[1]-x[0]);
   for (i=1;i<ndim-1;i++)
     w[i] = MIN(x[i]-x[i-1], x[i+1]-x[i]);
   w[ndim-1] = MIN(x[ndim-1]-x[ndim-2], M_PI-x[ndim-1]);
-  
+
   /*
   for (i=0;i<ndim;i++)
     w[i] = 1./(.003+w[i]);
   w[0]*=3;
   w[1]*=2;*/
   compute_weights(x, w, ndim);
-  
+
   for (i=0;i<ndim;i++)
     err[i] = x[i]-COEF*xq[i];
   n1 = find_nearest(codebook1, nb_entries, err, ndim, &min_dist);
-  
+
   for (i=0;i<ndim;i++)
   {
     xq[i] = COEF*xq[i] + codebook1[ndim*n1+i];
@@ -125,14 +125,14 @@ int quantize_lsp(const float *x, const float *codebook1, const float *codebook2,
   }
   for (i=0;i<ndim/2;i++)
   {
-    err2[i] = err[2*i];  
+    err2[i] = err[2*i];
     err3[i] = err[2*i+1];
-    w2[i] = w[2*i];  
+    w2[i] = w[2*i];
     w3[i] = w[2*i+1];
   }
   n2 = find_nearest_weighted(codebook2, nb_entries, err2, w2, ndim/2);
   n3 = find_nearest_weighted(codebook3, nb_entries, err3, w3, ndim/2);
-  
+
   for (i=0;i<ndim/2;i++)
   {
     xq[2*i] += codebook2[ndim*n2/2+i];
@@ -165,7 +165,7 @@ void update(float *data, int nb_vectors, float *codebook, int nb_entries, int nd
 
   for (i=0;i<nb_entries;i++)
     count[i] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
       nearest[i] = find_nearest(codebook, nb_entries, data+i*ndim, ndim, &min_dist);
@@ -173,7 +173,7 @@ void update(float *data, int nb_vectors, float *codebook, int nb_entries, int nd
   }
   for (i=0;i<nb_entries*ndim;i++)
     codebook[i] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     int n = nearest[i];
@@ -184,7 +184,7 @@ void update(float *data, int nb_vectors, float *codebook, int nb_entries, int nd
 
   float w2=0;
   for (i=0;i<nb_entries;i++)
-  { 
+  {
     for (j=0;j<ndim;j++)
       codebook[i*ndim+j] *= (1./count[i]);
     w2 += (count[i]/(float)nb_vectors)*(count[i]/(float)nb_vectors);
@@ -197,18 +197,18 @@ void update_weighted(float *data, float *weight, int nb_vectors, float *codebook
   int i,j;
   float count[MAX_ENTRIES][ndim];
   int nearest[nb_vectors];
-  
+
   for (i=0;i<nb_entries;i++)
     for (j=0;j<ndim;j++)
       count[i][j] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     nearest[i] = find_nearest_weighted(codebook, nb_entries, data+i*ndim, weight+i*ndim, ndim);
   }
   for (i=0;i<nb_entries*ndim;i++)
     codebook[i] = 0;
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     int n = nearest[i];
@@ -222,7 +222,7 @@ void update_weighted(float *data, float *weight, int nb_vectors, float *codebook
 
   //float w2=0;
   for (i=0;i<nb_entries;i++)
-  { 
+  {
     for (j=0;j<ndim;j++)
       codebook[i*ndim+j] *= (1./count[i][j]);
     //w2 += (count[i]/(float)nb_vectors)*(count[i]/(float)nb_vectors);
@@ -242,7 +242,7 @@ void vq_train(float *data, int nb_vectors, float *codebook, int nb_entries, int 
       codebook[j] += data[i*ndim+j];
   for (j=0;j<ndim;j++)
     codebook[j] *= (1./nb_vectors);
-    
+
   while (e< nb_entries)
   {
     split(codebook, e, ndim);
@@ -264,7 +264,7 @@ void vq_train_weighted(float *data, float *weight, int nb_vectors, float *codebo
       codebook[j] += data[i*ndim+j];
   for (j=0;j<ndim;j++)
     codebook[j] *= (1./nb_vectors);
-   
+
   while (e<nb_entries)
   {
     split(codebook, e, ndim);
@@ -293,9 +293,9 @@ int main(int argc, char **argv)
 
   if (argc != 5) {
       printf("usage: %s TrainTextFile K(dimension) M(codebook size) VQFilesPrefix\n", argv[0]);
-      exit(1);      
+      exit(1);
   }
-  
+
   ndim = atoi(argv[2]);
   nb_vectors = atoi(argv[3]);
   nb_entries = atoi(argv[3]);
@@ -328,7 +328,7 @@ int main(int argc, char **argv)
   codebook = malloc(nb_entries*ndim*sizeof(*codebook));
   codebook2 = malloc(nb_entries*ndim*sizeof(*codebook2));
   codebook3 = malloc(nb_entries*ndim*sizeof(*codebook3));
-  
+
   for (i=0;i<nb_vectors;i++)
   {
     if (feof(ftrain))
@@ -377,7 +377,7 @@ int main(int argc, char **argv)
   /* train first stage */
 
   vq_train(pred, nb_vectors, codebook, nb_entries, ndim);
-  
+
   delta = malloc(nb_vectors*ndim*sizeof(*data));
   err = 0;
   total_min_dist = 0;
@@ -398,7 +398,7 @@ int main(int argc, char **argv)
   }
   fprintf(stderr, "Stage 1 LSP RMS error: %f\n", sqrt(err/nb_vectors/ndim));
   fprintf(stderr, "Stage 1 LSP variance.: %f\n", total_min_dist/nb_vectors);
-  
+
 #if 1
   vq_train(delta, nb_vectors, codebook2, nb_entries, ndim/2);
   vq_train(delta+ndim*nb_vectors/2, nb_vectors, codebook3, nb_entries, ndim/2);
@@ -408,8 +408,8 @@ int main(int argc, char **argv)
 #endif
 
   err = 0;
-  total_min_dist = 0; 
- 
+  total_min_dist = 0;
+
   delta2 = delta + nb_vectors*ndim/2;
 
   for (i=0;i<nb_vectors;i++)
@@ -433,20 +433,20 @@ int main(int argc, char **argv)
   }
   fprintf(stderr, "Stage 2 LSP RMS error: %f\n", sqrt(err/nb_vectors/ndim));
   fprintf(stderr, "Stage 2 LSP Variance.: %f\n", total_min_dist/nb_vectors);
-  
+
   float xq[ndim];
   for (i=0;i<ndim;i++)
     xq[i] = M_PI*(i+1)/(ndim+1);
-  
+
   for (i=0;i<nb_vectors;i++)
   {
-    quantize_lsp(data+i*ndim, codebook, codebook2, 
+    quantize_lsp(data+i*ndim, codebook, codebook2,
 		 codebook3, nb_entries, xq, ndim);
     /*for (j=0;j<ndim;j++)
       printf("%f ", xq[j]);
     printf("\n");*/
   }
-  
+
   /* save output tables to text files */
 
   sprintf(filename, "%s1.txt", argv[4]);

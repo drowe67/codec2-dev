@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Error in mode: %s.  Must be 2000, 1850, or 1600\n", argv[3]);
 	exit(1);
     }
-    
+
     /* input parameters and buffers */
 
     codec2 = codec2_create(codec2_mode);
@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     unpacked_input_bits = (int*)malloc(bits_per_input_frame*sizeof(int));
     assert(unpacked_input_bits != NULL);
 
-    /* 
+    /*
        Output parameters and buffers.  Data is split into two 20ms
        frames for transmission over modem, but this doesn't really
        bother us here, as fdmdv_mod takes care of that.
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     assert(packed_output_bits != NULL);
     unpacked_output_bits = (int*)malloc(bits_per_output_frame*sizeof(int));
     assert(unpacked_output_bits != NULL);
-    
+
     fprintf(stderr, "mode: %d  Nc: %d\n", mode, Nc);
     fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
             bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
@@ -221,7 +221,7 @@ int main(int argc, char *argv[])
             }
             codeword2 = golay23_encode(data);
             fprintf(stderr, "codeword2: 0x0%x\n", codeword2);
-            
+
             /* now pack output frame with parity bits at end to make them
                as far apart as possible from the data they protect.  Parity
                bits are LSB of the Golay codeword */
@@ -287,14 +287,14 @@ int main(int argc, char *argv[])
             }
         }
         assert(byte == bytes_per_output_frame);
-        
+
  	fwrite(packed_output_bits, sizeof(char), bytes_per_output_frame, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     codec2_destroy(codec2);

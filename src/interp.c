@@ -39,10 +39,10 @@ float sample_log_amp(MODEL *model, float w);
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp()	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 22/8/10 
-        
+  FUNCTION....: interp()
+  AUTHOR......: David Rowe
+  DATE CREATED: 22/8/10
+
   Given two frames decribed by model parameters 20ms apart, determines
   the model parameters of the 10ms frame between them.  Assumes
   voicing is available for middle (interpolated) frame.  Outputs are
@@ -56,7 +56,7 @@ float sample_log_amp(MODEL *model, float w);
   When this function is used (--dec mode) bg noise appears to be
   amplitude modulated, and gets louder.  The interp_lsp() function
   below seems to do a better job.
-  
+
 \*---------------------------------------------------------------------------*/
 
 void interpolate(
@@ -95,13 +95,13 @@ void interpolate(
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: sample_log_amp()
-  AUTHOR......: David Rowe			      
-  DATE CREATED: 22/8/10 
-        
+  AUTHOR......: David Rowe
+  DATE CREATED: 22/8/10
+
   Samples the amplitude envelope at an arbitrary frequency w.  Uses
   linear interpolation in the log domain to sample between harmonic
   amplitudes.
-  
+
 \*---------------------------------------------------------------------------*/
 
 float sample_log_amp(MODEL *model, float w)
@@ -122,7 +122,7 @@ float sample_log_amp(MODEL *model, float w)
 	log_amp = (1.0-f)*log10f(model->A[model->L] + 1E-6);
     }
     else {
-	log_amp = (1.0-f)*log10f(model->A[m] + 1E-6) + 
+	log_amp = (1.0-f)*log10f(model->A[m] + 1E-6) +
                   f*log10f(model->A[m+1] + 1E-6);
     }
 
@@ -133,10 +133,10 @@ float sample_log_amp(MODEL *model, float w)
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp_lsp()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interp_lsp()
+  AUTHOR......: David Rowe
   DATE CREATED: 10 Nov 2010
-        
+
   Given two frames decribed by model parameters 20ms apart, determines
   the model parameters of the 10ms frame between them.  Assumes
   voicing is available for middle (interpolated) frame.  Outputs are
@@ -144,11 +144,11 @@ float sample_log_amp(MODEL *model, float w)
 
   This version uses interpolation of LSPs, seems to do a better job
   with bg noise.
-  
+
 \*---------------------------------------------------------------------------*/
 
 void interpolate_lsp(
-  kiss_fft_cfg  fft_fwd_cfg, 
+  kiss_fft_cfg  fft_fwd_cfg,
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
   MODEL *next,      /* next frames model params                      */
@@ -168,8 +168,8 @@ void interpolate_lsp(
 
     if (interp->voiced && !prev->voiced && !next->voiced) {
 	interp->voiced = 0;
-    }	
-   
+    }
+
     /* Wo depends on voicing of this and adjacent frames */
 
     if (interp->voiced) {
@@ -203,21 +203,21 @@ void interpolate_lsp(
     /* convert back to amplitudes */
 
     lsp_to_lpc(lsps_interp, ak_interp, LPC_ORD);
-    aks_to_M2(fft_fwd_cfg, ak_interp, LPC_ORD, interp, e, &snr, 0, 0, 1, 1, LPCPF_BETA, LPCPF_GAMMA); 
+    aks_to_M2(fft_fwd_cfg, ak_interp, LPC_ORD, interp, e, &snr, 0, 0, 1, 1, LPCPF_BETA, LPCPF_GAMMA);
     //printf("  interp: ak[1]: %f A[1] %f\n", ak_interp[1], interp->A[1]);
 }
 #endif
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp_Wo()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interp_Wo()
+  AUTHOR......: David Rowe
   DATE CREATED: 22 May 2012
-        
+
   Interpolates centre 10ms sample of Wo and L samples given two
   samples 20ms apart. Assumes voicing is available for centre
   (interpolated) frame.
-  
+
 \*---------------------------------------------------------------------------*/
 
 void interp_Wo(
@@ -231,12 +231,12 @@ void interp_Wo(
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp_Wo2()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interp_Wo2()
+  AUTHOR......: David Rowe
   DATE CREATED: 22 May 2012
-        
+
   Weighted interpolation of two Wo samples.
-  
+
 \*---------------------------------------------------------------------------*/
 
 void interp_Wo2(
@@ -250,8 +250,8 @@ void interp_Wo2(
 
     if (interp->voiced && !prev->voiced && !next->voiced) {
 	interp->voiced = 0;
-    }	
-   
+    }
+
     /* Wo depends on voicing of this and adjacent frames */
 
     if (interp->voiced) {
@@ -271,48 +271,48 @@ void interp_Wo2(
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp_energy()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interp_energy()
+  AUTHOR......: David Rowe
   DATE CREATED: 22 May 2012
-        
+
   Interpolates centre 10ms sample of energy given two samples 20ms
   apart.
-  
+
 \*---------------------------------------------------------------------------*/
 
 float interp_energy(float prev_e, float next_e)
 {
     return powf(10.0, (log10f(prev_e) + log10f(next_e))/2.0);
- 
+
 }
 
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interp_energy2()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interp_energy2()
+  AUTHOR......: David Rowe
   DATE CREATED: 22 May 2012
-        
+
   Interpolates centre 10ms sample of energy given two samples 20ms
   apart.
-  
+
 \*---------------------------------------------------------------------------*/
 
 float interp_energy2(float prev_e, float next_e, float weight)
 {
     return powf(10.0, (1.0 - weight)*log10f(prev_e) + weight*log10f(next_e));
- 
+
 }
 
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: interpolate_lsp_ver2()	     
-  AUTHOR......: David Rowe			      
+  FUNCTION....: interpolate_lsp_ver2()
+  AUTHOR......: David Rowe
   DATE CREATED: 22 May 2012
-        
+
   Weighted interpolation of LSPs.
-  
+
 \*---------------------------------------------------------------------------*/
 
 void interpolate_lsp_ver2(float interp[], float prev[],  float next[], float weight, int order)

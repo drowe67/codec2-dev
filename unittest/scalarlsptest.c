@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                           
-  FILE........: scalarlsptest.c   
-  AUTHOR......: David Rowe                                                      
-  DATE CREATED: 8/2/12                                                   
-                                                                          
+
+  FILE........: scalarlsptest.c
+  AUTHOR......: David Rowe
+  DATE CREATED: 8/2/12
+
   Test Scalar LSP quantiser, output variance of quantisation error.
-                                                                          
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -33,9 +33,9 @@
 #include "quantise.h"
 
 /*---------------------------------------------------------------------------*\
-                                                                            
-                                MAIN 
-                                   
+
+                                MAIN
+
 \*---------------------------------------------------------------------------*/
 
 int main(int argc, char *argv[])
@@ -44,12 +44,12 @@ int main(int argc, char *argv[])
     float lsp[LPC_ORD];    /* LSP input vector in rads */
     float lsp_hz[LPC_ORD]; /* LSP input vector in Hz */
     int vectors;           /* number LSP vectors processed */
-    int k,m;             /* LSP vector order and codebook size */     
+    int k,m;             /* LSP vector order and codebook size */
     int    index;
     float  wt[1];        /* weighting (not used here for scalars) */
     const float *cb;           /* LSP quantiser codebook */
-    int i, ret;               
-    float  total_se; 
+    int i, ret;
+    float  total_se;
 
     if (argc < 2) {
 	printf("usage: %s InputFile\n", argv[0]);
@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
     total_se = 0.0;
     vectors = 0;
     wt[0] = 1.0;
- 
+
     /* Main loop */
 
     while(!feof(ftrain)) {
@@ -83,11 +83,11 @@ int main(int argc, char *argv[])
 
 	for(i=0; i<LPC_ORD; i++)
 	    lsp_hz[i] = (4000.0/PI)*lsp[i];
-    
+
 	/* simple uniform scalar quantisers */
 
 	for(i=0; i<LPC_ORD; i++) {
-	    k = lsp_cb[i].k;                                                                 
+	    k = lsp_cb[i].k;
 	    m = lsp_cb[i].m;
 	    cb = lsp_cb[i].cb;
 	    index = quantise(cb, &lsp_hz[i], wt, k, m, &total_se);

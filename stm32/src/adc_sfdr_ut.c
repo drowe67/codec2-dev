@@ -4,9 +4,9 @@
   AUTHOR......: David Rowe
   DATE CREATED: August 2015
 
-  Unit test for high speed ADC SFDR testing.  Samples ADC1 from in PA1 at 
-  Fs=2 MHz and write raw samples to a file, in discontinuus blocks of 
-  ADC_TUNER_BUF_SZ/2 samples.  The blocks are discontinuous as we 
+  Unit test for high speed ADC SFDR testing.  Samples ADC1 from in PA1 at
+  Fs=2 MHz and write raw samples to a file, in discontinuus blocks of
+  ADC_TUNER_BUF_SZ/2 samples.  The blocks are discontinuous as we
   don'thave the bandwitdh back to the host to support continuous sampling.
 
   To process the blocks, fread() ADC_TUNER_BUF_SZ/2 samples at a time,
@@ -61,7 +61,7 @@ int main(void) {
     }
     fifo_sz = ADC_TUNER_BUF_SZ;
     printf("Starting! bufs: %d %d\n", BUFS, fifo_sz);
- 
+
     adc_open(fifo_sz);
     adc_set_tuner_en(0); /* dump raw samples, no tuner */
 

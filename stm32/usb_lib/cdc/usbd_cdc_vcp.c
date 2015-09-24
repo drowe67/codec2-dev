@@ -19,8 +19,8 @@
  ******************************************************************************
  */
 
-#ifdef USB_OTG_HS_INTERNAL_DMA_ENABLED 
-#pragma     data_alignment = 4 
+#ifdef USB_OTG_HS_INTERNAL_DMA_ENABLED
+#pragma     data_alignment = 4
 #endif /* USB_OTG_HS_INTERNAL_DMA_ENABLED */
 
 /* Includes ------------------------------------------------------------------*/
@@ -38,7 +38,7 @@ LINE_CODING linecoding = {
 
 USART_InitTypeDef USART_InitStructure;
 
-/* These are external variables imported from CDC core to be used for IN 
+/* These are external variables imported from CDC core to be used for IN
  transfer management. */
 extern uint8_t APP_Rx_Buffer[]; /* Write CDC received data in this buffer.
  These data will be sent over USB IN endpoint

@@ -1,9 +1,9 @@
 /*----------------------------------------------------------------------------*\
 
   FILE....: speexnoisesup.c
-  AUTHOR..: David Rowe 
+  AUTHOR..: David Rowe
   CREATED.: Sun 22 June 2014
- 
+
   File I/O based test program for Speex pre-processor, used for
   initial testing of Speech noise supression.
 
@@ -34,19 +34,19 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error opening %s\n", argv[1]);
         exit(1);
     }
-    
+
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ((fout = fopen(argv[2],"wb")) == NULL) {
 	fprintf(stderr, "Error opening %s\n", argv[2]);
 	exit(1);
     }
-    
+
     st = speex_preprocess_state_init(N, FS);
 
     while(fread(buf, sizeof(short), N, fin) == N) {
 	speex_preprocess_run(st, buf);
 	fwrite(buf, sizeof(short), N, fout);
-        if (fin == stdin) fflush(stdin);     
+        if (fin == stdin) fflush(stdin);
         if (fout == stdout) fflush(stdout);
     }
 

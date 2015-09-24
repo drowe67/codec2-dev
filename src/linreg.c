@@ -53,12 +53,12 @@ void linreg(COMP *m, COMP *b, float x[], COMP y[], int n)
     COMP   zero;
     int    i;
 
-    for (i=0; i<n; i++) {   
-        sumx  += x[i];       
-        sumx2 += x[i]*x[i];  
+    for (i=0; i<n; i++) {
+        sumx  += x[i];
+        sumx2 += x[i]*x[i];
         sumxy = cadd(sumxy, fcmult(x[i], y[i]));
-        sumy  = cadd(sumy, y[i]);      
-        sumy2 = cadd(sumy2, cmult(y[i],y[i])); 
+        sumy  = cadd(sumy, y[i]);
+        sumy2 = cadd(sumy2, cmult(y[i],y[i]));
     }
 
   denom = (n * sumx2 - sumx*sumx);
@@ -91,12 +91,12 @@ static COMP  y[] = {
 int main(void) {
     float  x1;
     COMP   m,b,yfit;
-  
+
     linreg(&m, &b, x, y, sizeof(x)/sizeof(float));
 
     for (x1=1; x1<=8; x1++) {
         yfit = cadd(fcmult(x1, m),b);
-        printf("%f %f\n", yfit.real, yfit.imag); 
+        printf("%f %f\n", yfit.real, yfit.imag);
     }
 
     return 0;

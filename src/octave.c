@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: octave.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 28 2012
-                                                                             
+
   Functions to save C arrays in GNU Octave matrix format.  The output text
   file can be directly read into Octave using "load filename".
 
@@ -38,7 +38,7 @@ void octave_save_int(FILE *f, char name[], int data[], int rows, int cols)
     fprintf(f, "# type: matrix\n");
     fprintf(f, "# rows: %d\n", rows);
     fprintf(f, "# columns: %d\n", cols);
-    
+
     for(r=0; r<rows; r++) {
 	for(c=0; c<cols; c++)
 	    fprintf(f, " %d", data[r*cols+c]);
@@ -56,7 +56,7 @@ void octave_save_float(FILE *f, char name[], float data[], int rows, int cols, i
     fprintf(f, "# type: matrix\n");
     fprintf(f, "# rows: %d\n", rows);
     fprintf(f, "# columns: %d\n", cols);
-    
+
     for(r=0; r<rows; r++) {
 	for(c=0; c<cols; c++)
 	    fprintf(f, " %f", data[r*col_len+c]);
@@ -74,7 +74,7 @@ void octave_save_complex(FILE *f, char name[], COMP data[], int rows, int cols, 
     fprintf(f, "# type: complex matrix\n");
     fprintf(f, "# rows: %d\n", rows);
     fprintf(f, "# columns: %d\n", cols);
-    
+
     for(r=0; r<rows; r++) {
 	for(c=0; c<cols; c++)
 	    fprintf(f, " (%f,%f)", data[r*col_len+c].real, data[r*col_len+c].imag);

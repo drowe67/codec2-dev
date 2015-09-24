@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fifo.c
   AUTHOR......: David Rowe
   DATE CREATED: Oct 15 2012
-                                                                             
+
   A FIFO design useful in gluing the FDMDV modem and codec together in
   integrated applications.  The unittest/tfifo indicates these
   routines are thread safe without the need for syncronisation
@@ -98,7 +98,7 @@ int fifo_read(struct FIFO *fifo, short data[], int n)
 
     assert(fifo != NULL);
     assert(data != NULL);
- 
+
     if (n > fifo_used(fifo)) {
 	return -1;
     }

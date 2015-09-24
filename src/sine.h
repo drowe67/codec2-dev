@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: sine.h
-  AUTHOR......: David Rowe                                                          
+  AUTHOR......: David Rowe
   DATE CREATED: 1/11/94
-                                                                             
+
   Header file for sinusoidal analysis and synthesis functions.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*

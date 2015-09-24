@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: freedv_api_internal.h
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
-                                                                             
+
   This declares the structure freedv.  A pointer to this structure is
   returned by the FreeDV API freedv_open() function.  The pointer is used
   by the other FreeDV API functions declared in freedv_api.h.  This
@@ -11,7 +11,7 @@
   functions are declared in freedv_api.h.  Changes to this structure
   are expected.  Changes (except additions) to freedv_api.h are
   discouraged.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -110,7 +110,7 @@ struct freedv {
     short                tx_varicode_bits[VARICODE_MAX_BITS];
     int                  nvaricode_bits;
     int                  varicode_bit_index;
-    
+
     /* user defined function ptrs to produce and consume ASCII
       characters using aux txt channel */
 

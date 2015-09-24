@@ -70,7 +70,7 @@ int main(void) {
     short          dac16k[FREEDV_NSAMPLES_16K];
     short          adc8k[FREEDV_NSAMPLES];
     short          dac8k[FDMDV_OS_TAPS_8K+FREEDV_NSAMPLES];
- 
+
     int            nin, nout, i, j, frames, lines;
 
     COMP          *symb, *psymb;
@@ -105,7 +105,7 @@ int main(void) {
 
         /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
-        nin = freedv_nin(f);   
+        nin = freedv_nin(f);
         nout = nin;
         f->total_bit_errors = 0;
 
@@ -113,7 +113,7 @@ int main(void) {
             GPIOE->ODR = (1 << 3);
             fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
             nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
-            fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);              
+            fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
             dac2_write(dac16k, 2*nout);
             led_ptt(0); led_rt(f->fdmdv_stats.sync); led_err(f->total_bit_errors);
             GPIOE->ODR &= ~(1 << 3);
@@ -128,14 +128,14 @@ int main(void) {
                 psymb += (f->fdmdv_stats.Nc+1);
                 lines++;
             }
- 
+
             if (frames >= STOP_LOG_FRAMES) {
                 FILE *ft = fopen("scatter.txt", "wt");
                 assert(ft != NULL);
                 printf("Writing scatter file....\n");
                 for(j=0; j<LOG_FRAMES; j++) {
                     for(i=0; i<=f->fdmdv_stats.Nc; i++) {
-                        fprintf(ft, "%f\t%f\t", 
+                        fprintf(ft, "%f\t%f\t",
                                 (double)symb[j*(f->fdmdv_stats.Nc+1)+i].real,
                                 (double)symb[j*(f->fdmdv_stats.Nc+1)+i].imag);
                         printf("line: %d\n", j);
@@ -148,7 +148,7 @@ int main(void) {
             }
 #endif
         }
-      
+
     } /* while(1) ... */
 }
 

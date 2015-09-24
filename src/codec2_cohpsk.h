@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: codec2_cohpsk.h
   AUTHOR......: David Rowe
   DATE CREATED: March 2015
-                                                                             
+
   Functions that implement a coherent PSK FDM modem.
-                                                               
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -33,8 +33,8 @@
 #define COHPSK_NOM_SAMPLES_PER_FRAME 600
 #define COHPSK_MAX_SAMPLES_PER_FRAME 625
 #define COHPSK_RS                     75
-#define COHPSK_FS                   7500              /* note this is a wierd 
-                                                         value to get an integer 
+#define COHPSK_FS                   7500              /* note this is a wierd
+                                                         value to get an integer
                                                          oversampling rate */
 
 #include "comp.h"
@@ -56,6 +56,6 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
                           int *bit_errors, float rx_bits_sd[]);
 int cohpsk_error_pattern_size(void);
 void cohpsk_set_frame(struct COHPSK *coh, int frame);
-void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs, 
+void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs,
                           COMP *foff_phase_rect, int nin);
 #endif

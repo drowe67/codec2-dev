@@ -1,13 +1,13 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk_mod.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 5 2015
-                                                                             
+
   Given an input file of bits (note one bit per float, soft decision format),
   outputs a raw file (8kHz, 16 bit shorts) of COHPSK modem samples
   ready to send over a HF radio channel.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -90,7 +90,7 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     fclose(fin);

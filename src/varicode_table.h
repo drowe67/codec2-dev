@@ -3,7 +3,7 @@
 // Purpose:         Varicode look up table
 // Created:         Nov 24, 2012
 // Authors:         Clint Turner, KA7OEI,  Peter Martinez, G3PLX
-// 
+//
 // License:
 //
 //  This program is free software; you can redistribute it and/or modify
@@ -292,12 +292,12 @@ unsigned char const varicode_table1[256] =	{
 
 // This code was used on FDMDV version 1, and is more compact that Code 1, but only covers a subset
 // of the ASCII cahacter set
- 
+
 char const varicode_table2[] = {
 
     ' ' ,0b11000000,
     13  ,0b01000000, // CR, end of message
-    '=' ,0b10000000, 
+    '=' ,0b10000000,
     '1' ,0b11110000,
     '2' ,0b01110000,
     '3' ,0b10110000,

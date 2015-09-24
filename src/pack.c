@@ -79,7 +79,7 @@ pack_natural_or_gray(
     bitArray[wordIndex] |=
      ((unsigned char)((field >> (fieldWidth - sliceWidth))
      << (bitsLeft - sliceWidth)));
-    
+
     *bitIndex = bI + sliceWidth;
     fieldWidth -= sliceWidth;
   } while ( fieldWidth != 0 );
@@ -120,7 +120,7 @@ unpack_natural_or_gray(
 			 bitsLeft < fieldWidth ? bitsLeft : fieldWidth;
 
     field |= (((bitArray[bI >> ShiftRight] >> (bitsLeft - sliceWidth)) & ((1 << sliceWidth) - 1)) << (fieldWidth - sliceWidth));
-    
+
     *bitIndex = bI + sliceWidth;
     fieldWidth -= sliceWidth;
   } while ( fieldWidth != 0 );

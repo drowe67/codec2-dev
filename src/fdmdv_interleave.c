@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: fdmdv_interleave.c
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: May 27 2012
-                                                                             
+
   Given an input file of bits outputs an interleaved or optionally
   de-intervleaved file of bits.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 
@@ -86,12 +86,12 @@ int main(int argc, char *argv[])
 	    interleaver[dest_bit] = src_bit;
 	else
 	    interleaver[src_bit] = dest_bit;
-	    
+
 	src_bit++;
 	if (src_bit == MAX_INTERLEAVER) {
 	    fprintf(stderr, "Error interleaver too big\n");
 	    exit(1);
-	}	
+	}
     }
     fclose(finter);
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
 
     while(fread(packed_bits, sizeof(char), mpacked, fin) == mpacked) {
 	frames++;
-	
+
 	/* unpack bits, MSB first */
 
 	bit = 7; byte = 0;
@@ -150,7 +150,7 @@ int main(int argc, char *argv[])
 	   buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     free(packed_bits);

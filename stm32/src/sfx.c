@@ -3,7 +3,7 @@
  *
  * This implements a state machine for playing back various monophonic
  * sound effects such as morse code symbols, clicks and alert tones.
- * 
+ *
  * Author Stuart Longland <me@vk4msl.id.au>
  * Copyright (C) 2015 FreeDV project.
  *

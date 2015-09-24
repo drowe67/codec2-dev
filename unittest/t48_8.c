@@ -1,4 +1,4 @@
-/* 
+/*
    t48_8.c
    David Rowe
    May 10 2012
@@ -49,7 +49,7 @@ int main() {
     assert(f48 != NULL);
     f8 = fopen("out8.raw", "wb");
     assert(f8 != NULL);
-    
+
     /* clear filter memories */
 
     for(i=0; i<MEM8; i++)
@@ -82,7 +82,7 @@ int main() {
 	for(i=0; i<N48; i++)
 	    out48k_short[i] = (short)out48k[i];
 	fwrite(out48k_short, sizeof(short), N48, f48);
-	
+
 	/* add a 10 kHz spurious signal for fun, we want down sampler to
 	   knock this out */
 
@@ -102,7 +102,7 @@ int main() {
 	for(i=0; i<N8; i++)
 	    out8k_short[i] = (short)out8k[i];
 	fwrite(out8k_short, sizeof(short), N8, f8);
-	
+
     }
 
     fclose(f48);

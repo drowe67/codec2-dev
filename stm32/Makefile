@@ -397,7 +397,7 @@ $(CODEC2_SRC)/freedv_api.c \
 $(CODEC2_SRC)/varicode.c \
 $(CODEC2_SRC)/golay23.c
 
-CFLAGS += -D__EMBEDDED__ 
+CFLAGS += -D__EMBEDDED__
 
 #enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
@@ -423,7 +423,7 @@ ROOT=$(shell pwd)
 
 # Library paths
 
-LIBPATHS = 
+LIBPATHS =
 
 # Libraries to link
 
@@ -620,7 +620,7 @@ src/stm32f4_usb_vcp.c \
 src/sm1000_leds_switches.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c 
+src/init.c
 
 USB_VCP_UT+=$(USB_VCP)
 
@@ -660,15 +660,15 @@ src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c 
+src/init.c
 
 SM1000_SRCS += $(CODEC2_SRCS)
 
 src/stm32f4_dac.o: src/stm32f4_dac.c
-	$(CC) $(CFLAGS)  $^ -c -o $@ 
+	$(CC) $(CFLAGS)  $^ -c -o $@
 
 src/stm32f4_adc.o: src/stm32f4_adc.c
-	$(CC) $(CFLAGS)  $^ -c -o $@ 
+	$(CC) $(CFLAGS)  $^ -c -o $@
 
 sm1000.elf: $(SM1000_SRCS:.c=.O3.o) src/stm32f4_dac.O3.o \
 		src/stm32f4_adc.O3.o libstm32f4.a
@@ -680,7 +680,7 @@ src/stm32f4_machdep.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c 
+src/init.c
 
 FREEDV_TX_PROFILE_SRCS += $(CODEC2_SRCS)
 
@@ -693,7 +693,7 @@ src/stm32f4_machdep.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c 
+src/init.c
 
 FREEDV_RX_PROFILE_SRCS += $(CODEC2_SRCS)
 
@@ -708,7 +708,7 @@ src/debugblinky.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c 
+src/init.c
 
 FDMDV_DUMP_RT_SRCS += $(CODEC2_SRCS)
 
@@ -735,7 +735,7 @@ src/init.c \
 # would be nice to work out why as ISRs need to run fast
 
 src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
-	$(CC) $(CFLAGS) $^ -c -o $@ 
+	$(CC) $(CFLAGS) $^ -c -o $@
 
 tuner_ut.elf: $(TUNER_UT_SRCS:.c=.O3.o) \
 		src/stm32f4_adc_tuner.O3.o libstm32f4.a
@@ -758,7 +758,7 @@ src/init.c \
 # would be nice to work out why as ISRs need to run fast
 
 src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
-	$(CC) $(CFLAGS) $^ -c -o $@ 
+	$(CC) $(CFLAGS) $^ -c -o $@
 
 adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.o) src/stm32f4_adc_tuner.O3.o \
 		libstm32f4.a
@@ -768,7 +768,7 @@ adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.o) src/stm32f4_adc_tuner.O3.o \
 
 clean:
 	rm -f *.elf *.bin
-	rm -f libstm32f4.a	
+	rm -f libstm32f4.a
 	find $(PERIPHLIBDIR) -type f -name '*.o' | xargs rm -f
 
 # ---------------------------------------------------------------------------------

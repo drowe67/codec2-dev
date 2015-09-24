@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: genlspdtcb.c
-  AUTHOR......: David Rowe                                                     
+  AUTHOR......: David Rowe
   DATE CREATED: 2 Nov 2011
-                                                                             
+
   Generates codebooks (quantisation tables) for LSP delta-T VQ.
-                                                                             
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -48,20 +48,20 @@ float lsp5to10[] = {
 #include <string.h>
 #include <math.h>
 
-void create_codebook_text_file(char filename[], float lsp[], 
+void create_codebook_text_file(char filename[], float lsp[],
 			       int rows, int cols);
 
 int main(void) {
     create_codebook_text_file("codebook/lspdt1-4.txt",  lsp1to4,  4, 3);
-    create_codebook_text_file("codebook/lspdt5-10.txt", lsp5to10, 6, 3); 
+    create_codebook_text_file("codebook/lspdt5-10.txt", lsp5to10, 6, 3);
     return 0;
 }
 
-void create_codebook_text_file(char filename[], float lsp[], 
-			       int rows, int cols) 
+void create_codebook_text_file(char filename[], float lsp[],
+			       int rows, int cols)
 {
     FILE *f;
-    int   i, digits[MAX_ROWS]; 
+    int   i, digits[MAX_ROWS];
 
     f = fopen(filename, "wt");
     if (f == NULL) {
@@ -85,6 +85,6 @@ void create_codebook_text_file(char filename[], float lsp[],
 		digits[i+1]++;
 	    }
     } while (digits[rows-1] != cols);
-	
+
     fclose(f);
 }

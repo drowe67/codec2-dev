@@ -29,19 +29,19 @@
 /** @addtogroup USB_OTG_DRIVER
   * @{
   */
-  
+
 /** @defgroup USB_DEFINES
-  * @brief This file is the 
+  * @brief This file is the
   * @{
-  */ 
+  */
 
 
 /** @defgroup USB_DEFINES_Exported_Defines
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 
 /** @defgroup _CORE_DEFINES_
@@ -178,7 +178,7 @@
 
 /** @defgroup USB_DEFINES_Exported_Types
   * @{
-  */ 
+  */
 
 typedef enum
 {
@@ -187,29 +187,29 @@ typedef enum
 }USB_OTG_CORE_ID_TypeDef;
 /**
   * @}
-  */ 
+  */
 
 
 /** @defgroup USB_DEFINES_Exported_Macros
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_DEFINES_Exported_Variables
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 /** @defgroup USB_DEFINES_Exported_FunctionsPrototype
   * @{
-  */ 
+  */
 /**
   * @}
-  */ 
+  */
 
 
 /** @defgroup Internal_Macro's
@@ -235,10 +235,10 @@ enum USB_OTG_SPEED {
 
 /**
   * @}
-  */ 
+  */
 
 /**
   * @}
-  */ 
+  */
 /******************* (C) COPYRIGHT 2011 STMicroelectronics *****END OF FILE****/
 

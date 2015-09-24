@@ -7,7 +7,7 @@
   Interapolator/Filter for IF upconversion
 
   Unit testing:
-  
+
     ~/codec2-dev/stm32$ gcc -D__UNITTEST__ -Iinc src/iir_duc.c -o iir_duc -lm -Wall -I../src/
     ~/codec2-dev/stm32$ ./iir_duc
 
@@ -34,7 +34,7 @@
 #include "iir_duc.h"
 
 #define BETA1                    0.99002			// B1MUL/(2**B1SHFT)
-#define B1MUL			 32441	
+#define B1MUL			 32441
 #define B1SMUL			 -38328
 #define B1SHFT			 15				// 10 bits gives us plenty of headroom between 31 bits of int and 14 bits of ADC
 #define B2MUL			 24593  			// This actually matches BETA2 exactly with the supplied BETA1
@@ -51,7 +51,7 @@ int   n_1,n_2,n,m_1,m_2,m;
 
 /*
    Upconvert and bandpass filter a chunk of spectrum from Fs/M to Fs. We're going for 700khz here.
-   modin needs to be DUC_N long and dac_out needs to be DUC_N*DUC_M long. This 
+   modin needs to be DUC_N long and dac_out needs to be DUC_N*DUC_M long. This
 */
 
 void iir_upconv(float modin[], unsigned short dac_out[]){
@@ -81,7 +81,7 @@ void iir_upconv(float modin[], unsigned short dac_out[]){
 
 /*
    Upconvert and bandpass filter a chunk of spectrum from Fs/M to Fs. We're going for 700khz here.
-   modin needs to be DUC_N long and dac_out needs to be DUC_N*DUC_M long. This 
+   modin needs to be DUC_N long and dac_out needs to be DUC_N*DUC_M long. This
 */
 
 void iir_upconv_fixp(int modin[], unsigned short dac_out[]){
@@ -136,7 +136,7 @@ void upconv_48c_80r(COMP comp_48[],int real_80[],int count){
     int outidx = 0;
     int ncs_48c80r[3];
     for(i=0;i<count;i++){ //Iterate through sample blocks
-        for(j=0;j<DUC_N*3;j++){ //Iterate through high rate intermediate 
+        for(j=0;j<DUC_N*3;j++){ //Iterate through high rate intermediate
             if(js5==0){              //Upsample by 5
                 nr=(int)(comp_48[inidx].real*F48C80R_MUL);
                 ni=(int)(comp_48[inidx].imag*F48C80R_MUL);
@@ -145,7 +145,7 @@ void upconv_48c_80r(COMP comp_48[],int real_80[],int count){
                 fir_48c80r_re[ptr_48c80r+F48C80R_LEN] = nr;
                 fir_48c80r_im[ptr_48c80r+F48C80R_LEN] = ni;
                 inidx++;
-                js5=5; 
+                js5=5;
                 if(ptr_48c80r>=F48C80R_LEN)
                     ptr_48c80r-=F48C80R_LEN;
             }
@@ -154,7 +154,7 @@ void upconv_48c_80r(COMP comp_48[],int real_80[],int count){
                 /*This loop computes the FIR filter. It only computes from either the re or the im delay line,
                     depending on comp->re phase It also skips all 'zeros' in the delay line */
                 for(k=js5;k<F48C80R_LEN;k+=5)
-                    ni+=(fir_48c80r[k]*sel_48c80r[w48c80r&0x1][ptr_48c80r+k]);   
+                    ni+=(fir_48c80r[k]*sel_48c80r[w48c80r&0x1][ptr_48c80r+k]);
                 ncs_48c80r[0]=ni;
                 ncs_48c80r[2]=-ni;
                 ret=(ncs_48c80r[w48c80r&0x2]);
@@ -238,13 +238,13 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
             int2r = int1r + int2r;                //Integrator stage 2 re
             int3r = int2r + int3r;                //Integrator stage 3 re
             int4r = int3r + int4r;                //Integrator stage 4 re
-            int5i = int4i + int5i; 
+            int5i = int4i + int5i;
 
             int1i = cmbi + int1i;                //Integrator stage 1 im
             int2i = int1i + int2i;                //Integrator stage 2 im
             int3i = int2i + int3i;                //Integrator stage 3 im
             int4i = int3i + int4i;                //Integrator stage 4 im
-            int5r = int4r + int5r; 
+            int5r = int4r + int5r;
             //Convert this complex into real and cancel out the gain from CIC
             //This should probably spit out integers instead of going back to float
             switch(w8c80r&0x3){                   //Do comp->real conversion by hand
@@ -261,11 +261,11 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
                 int2r = int1r + int2r;            //Integrator stage 2 re
                 int3r = int2r + int3r;            //Integrator stage 3 re
                 int4r = int3r + int4r;            //Integrator stage 4 re
-		int5r = int4r + int5r; 
+		int5r = int4r + int5r;
                 int2i = int1i + int2i;            //Integrator stage 2 im
                 int3i = int2i + int3i;            //Integrator stage 3 im
                 int4i = int3i + int4i;            //Integrator stage 4 im
-	        int5i = int4i + int5i; 
+	        int5i = int4i + int5i;
                 switch(w8c80r&0x3){               //Do comp->real conversion by hand
                     case 0:ret=(float)(-int5i>>7);break;
                     case 1:ret=(float)(int5r>>7);break;
@@ -277,7 +277,7 @@ void upconv_8c_80r(COMP comp_8[],float real_80[],int count){
 		w8c80r++;
             }
         }
-    } 
+    }
 }
 
 #ifdef __UNITTEST__
@@ -329,12 +329,12 @@ int main(void) {
     //Impulse to give us an idea of our filter bands
     in[0].imag=0.70710678118;
     in[0].real=0.70710678118;
-    
+
     //interpolate from 8k comp to 80k real
     upconv_48c_80r(in,s,NOUT_BUFS);
     for(i=0;i<NOUT_BUFS;i++)
         iir_upconv_fixp(&s[i*(DUC_N)],&todac[i*(DUC_N*DUC_M)]);
-    
+
     f = fopen("iir_duc_s.txt", "wt");  assert(f != NULL);
     for(i=0; i<NIN; i++)
         fprintf(f, "%d\n", s[i]);
@@ -364,7 +364,7 @@ static int fir_8c80r_cic_i[] = {
 //Coeffs for fir filter used in 48k comp to 80k real conversion
 static int fir_48c80r[] = {
   -21,  -41,  -74, -109, -115,  -42,  153,  493,  958, 1483,
- 1970, 2316, 2441, 2316, 1970, 1483,  958,  493,  153,  -42, 
+ 1970, 2316, 2441, 2316, 1970, 1483,  958,  493,  153,  -42,
  -115, -109,  -74,  -41,  -21,
 };
 

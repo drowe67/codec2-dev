@@ -16,7 +16,7 @@
  * The samples are retrieved by repeatedly calling tone_next.  This
  * advances 'time' and decrements 'remain'.  The tone is complete when
  * 'remain' is zero.
- * 
+ *
  * Author Stuart Longland <me@vk4msl.id.au>
  * Copyright (C) 2015 FreeDV project.
  *

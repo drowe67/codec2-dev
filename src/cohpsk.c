@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: cohpsk.c
   AUTHOR......: David Rowe
   DATE CREATED: March 2015
-                                                                             
+
   Functions that implement a coherent PSK FDM modem.
-                                                                       
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -26,7 +26,7 @@
 */
 
 /*---------------------------------------------------------------------------*\
-                                                                             
+
                                INCLUDES
 
 \*---------------------------------------------------------------------------*/
@@ -54,24 +54,24 @@ static COMP qpsk_mod[] = {
     { 0.0,-1.0},
     {-1.0, 0.0}
 };
-    
+
 static int sampling_points[] = {0, 1, 6, 7};
 
 void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine);
 void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_NC*ND]);
 
 /*---------------------------------------------------------------------------*\
-                                                                             
+
                                FUNCTIONS
 
 \*---------------------------------------------------------------------------*/
 
 
 /*--------------------------------------------------------------------------* \
-                                                       
-  FUNCTION....: cohpsk_create	     
-  AUTHOR......: David Rowe			      
-  DATE CREATED: Marcg 2015 
+
+  FUNCTION....: cohpsk_create
+  AUTHOR......: David Rowe
+  DATE CREATED: Marcg 2015
 
   Create and initialise an instance of the modem.  Returns a pointer
   to the modem states or NULL on failure.  One set of states is
@@ -106,7 +106,7 @@ struct COHPSK *cohpsk_create(void)
             }
         }
     }
-    
+
     /* Clear symbol buffer memory */
 
     for (r=0; r<NCT_SYMB_BUF; r++) {
@@ -140,7 +140,7 @@ struct COHPSK *cohpsk_create(void)
         /* note non-linear carrier spacing to help PAPR, works v well in conjunction with CLIP */
 
         freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + pow(c + 1.0, 0.98) );
-        
+
 	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/COHPSK_FS);
  	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/COHPSK_FS);
  	fdmdv->freq_pol[c]  = 2.0*M_PI*freq_hz/COHPSK_FS;
@@ -183,15 +183,15 @@ struct COHPSK *cohpsk_create(void)
 
     coh->ptest_bits_coh_tx = coh->ptest_bits_coh_rx = (int*)test_bits_coh;
     coh->ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
-    
+
     return coh;
 }
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_destroy	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_destroy
+  AUTHOR......: David Rowe
   DATE CREATED: March 2015
 
   Destroy an instance of the modem.
@@ -207,9 +207,9 @@ void cohpsk_destroy(struct COHPSK *coh)
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: bits_to_qpsk_symbols()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: bits_to_qpsk_symbols()
+  AUTHOR......: David Rowe
   DATE CREATED: March 2015
 
   Rate Rs modulator.  Maps bits to parallel DQPSK symbols and inserts pilot symbols.
@@ -224,7 +224,7 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
     /* check number of bits supplied matchs number of QPSK symbols in the frame */
 
     assert((NSYMROW*COHPSK_NC)*2 == nbits);
- 
+
     /*
       Insert two rows of Nc pilots at beginning of data frame.
 
@@ -247,24 +247,24 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
         r++;
     }
     for(data_r=0; data_r<NSYMROW; data_r++, r++) {
-        
+
         for(c=0; c<COHPSK_NC; c++) {
             i = c*NSYMROW + data_r;
-            bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);          
+            bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);
             tx_symb[r][c] = fcmult(1.0/sqrtf(ND),qpsk_mod[bits]);
 
             /* test code to see what happens when we attenuate one
                carrier, this may happen in practice with tx SSB filter
-               ripple.  
+               ripple.
 
-               if (c==5) { 
+               if (c==5) {
                  COMP attn = {0.5,0.0};
                  tx_symb[r][c] = cmult(tx_symb[r][c], attn);
                }
             */
         }
     }
-    
+
     assert(p_r == NPILOTSFRAME);
     assert(r == NSYMROWPILOT);
 
@@ -276,15 +276,15 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
                 tx_symb[r][c+COHPSK_NC*d] = tx_symb[r][c];
             }
         }
-    }    
+    }
 
 }
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: qpsk_symbols_to_bits()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: qpsk_symbols_to_bits()
+  AUTHOR......: David Rowe
   DATE CREATED: March 2015
 
   Rate Rs demodulator. Extract pilot symbols and estimate amplitude and phase
@@ -308,7 +308,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
     COMP  s;
 
     pi_on_4.real = cosf(M_PI/4); pi_on_4.imag = sinf(M_PI/4);
-   
+
     for(c=0; c<COHPSK_NC*ND; c++) {
 
         /* Set up lin reg model and interpolate phase.  Works better than average for channels with
@@ -319,14 +319,14 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
             pc = c % COHPSK_NC;
             y[p] = fcmult(coh->pilot2[p][pc], ct_symb_buf[sampling_points[p]][c]);
         }
-        
+
         linreg(&m, &b, x, y, NPILOTSFRAME+2);
         for(r=0; r<NSYMROW; r++) {
             x1 = (float)(r+NPILOTSFRAME);
             yfit = cadd(fcmult(x1,m),b);
             coh->phi_[r][c] = atan2(yfit.imag, yfit.real);
         }
- 
+
         /* amplitude estimation */
 
         mag = 0.0;
@@ -338,7 +338,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
              coh->amp_[r][c] = amp_;
         }
     }
-    
+
     /* now correct phase of data symbols */
 
     for(c=0; c<COHPSK_NC*ND; c++) {
@@ -349,7 +349,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
             rx_symb_linear[i] = coh->rx_symb[r][c];
         }
     }
-    
+
     /* and finally optional diversity combination, note output is soft decn a "1" is < 0 */
 
     for(c=0; c<COHPSK_NC; c++) {
@@ -365,7 +365,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
         }
     }
 
-    
+
     /* estimate RMS signal and noise */
 
     mag = 0.0;
@@ -384,7 +384,7 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
         n++;
       }
     }
-   
+
     noise_var = 0;
     if (n > 1) {
       noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
@@ -395,22 +395,22 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: tx_filter_and_upconvert_coh()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: tx_filter_and_upconvert_coh()
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
   Given NC symbols construct M samples (1 symbol) of NC filtered
   and upconverted symbols.
- 
+
   TODO: work out a way to merge with fdmdv version, e.g. run time define M/NSYM,
   and run unittests on fdmdv and cohpsk modem afterwards.
 
 \*---------------------------------------------------------------------------*/
 
-void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[], 
+void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
                                  COMP tx_filter_memory[COHPSK_NC*ND][COHPSK_NSYM],
-                                 COMP phase_tx[], COMP freq[], 
+                                 COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect)
 {
     int     c;
@@ -423,7 +423,7 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 
     gain.real = sqrtf(2.0)/2.0;
     gain.imag = 0.0;
-    
+
     for(i=0; i<COHPSK_M; i++) {
 	tx_fdm[i].real = 0.0;
 	tx_fdm[i].imag = 0.0;
@@ -431,8 +431,8 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 
     for(c=0; c<Nc; c++)
 	tx_filter_memory[c][COHPSK_NSYM-1] = cmult(tx_symbols[c], gain);
-    
-    /* 
+
+    /*
        tx filter each symbol, generate M filtered output samples for
        each symbol, which we then freq shift and sum with other
        carriers.  Efficient polyphase filter techniques used as
@@ -447,7 +447,7 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 	    acc = 0.0;
 	    for(j=0,k=COHPSK_M-i-1; j<COHPSK_NSYM; j++,k+=COHPSK_M)
 		acc += COHPSK_M * tx_filter_memory[c][j].real * gt_alpha5_root_coh[k];
-	    tx_baseband.real = acc;	
+	    tx_baseband.real = acc;
 
 	    /* filter imag sample of symbol for carrier c */
 
@@ -456,7 +456,7 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 		acc += COHPSK_M * tx_filter_memory[c][j].imag * gt_alpha5_root_coh[k];
 	    tx_baseband.imag = acc;
             //printf("%d %d %f %f\n", c, i, tx_baseband.real, tx_baseband.imag);
-            
+
             /* freq shift and sum */
 
 	    phase_tx[c] = cmult(phase_tx[c], freq[c]);
@@ -480,20 +480,20 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
       shifting for the purpose of testing easier
     */
 
-    for (i=0; i<COHPSK_M; i++) 
+    for (i=0; i<COHPSK_M; i++)
 	tx_fdm[i] = cmult(two, tx_fdm[i]);
 
     /* normalise digital oscillators as the magnitude can drift over time */
 
     for (c=0; c<Nc; c++) {
         mag = cabsolute(phase_tx[c]);
-	phase_tx[c].real /= mag;	
-	phase_tx[c].imag /= mag;	
+	phase_tx[c].real /= mag;
+	phase_tx[c].imag /= mag;
     }
 
     mag = cabsolute(*fbb_phase);
-    fbb_phase->real /= mag;	
-    fbb_phase->imag /= mag;	
+    fbb_phase->real /= mag;
+    fbb_phase->imag /= mag;
 
     /* shift memory, inserting zeros at end */
 
@@ -509,12 +509,12 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
 
 
 
-void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine) 
+void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t, float f_fine)
 {
     COMP  acorr, f_fine_rect, f_corr;
     float mag, corr;
     int   c, p, pc;
-    
+
     corr = 0.0; mag = 0.0;
     for (c=0; c<COHPSK_NC*ND; c++) {
         acorr.real = 0.0; acorr.imag = 0.0;
@@ -535,9 +535,9 @@ void corr_with_pilots(float *corr_out, float *mag_out, struct COHPSK *coh, int t
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: frame_sync_fine_freq_est()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: frame_sync_fine_freq_est()
+  AUTHOR......: David Rowe
   DATE CREATED: April 2015
 
   Returns an estimate of frame sync (coarse timing) offset and fine
@@ -573,12 +573,12 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
             }
         }
 
-        
+
         coh->ff_rect.real = cosf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
         coh->ff_rect.imag = -sinf(coh->f_fine_est*2.0*M_PI/COHPSK_RS);
         if (coh->verbose)
             fprintf(stderr, "  [%d]   fine freq f: %6.2f max_ratio: %f ct: %d\n", coh->frame, coh->f_fine_est, max_corr/max_mag, coh->ct);
- 
+
         if (max_corr/max_mag > 0.9) {
             if (coh->verbose)
                 fprintf(stderr, "  [%d]   encouraging sync word!\n", coh->frame);
@@ -588,7 +588,7 @@ void frame_sync_fine_freq_est(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], 
         else {
             *next_sync = 0;
         }
-        coh->ratio = max_corr/max_mag;        
+        coh->ratio = max_corr/max_mag;
     }
 }
 
@@ -603,7 +603,7 @@ void update_ct_symb_buf(COMP ct_symb_buf[][COHPSK_NC*ND], COMP ch_symb[][COHPSK_
         for(c=0; c<COHPSK_NC*ND; c++)
             ct_symb_buf[r][c] = ct_symb_buf[r+NSYMROWPILOT][c];
     }
-  
+
     for(r=NCT_SYMB_BUF-NSYMROWPILOT, i=0; r<NCT_SYMB_BUF; r++, i++) {
         for(c=0; c<COHPSK_NC*ND; c++)
             ct_symb_buf[r][c] = ch_symb[i][c];
@@ -620,14 +620,14 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
         /* check that sync is still good, fall out of sync on consecutive bad frames */
 
         corr_with_pilots(&corr, &mag, coh, coh->ct, coh->f_fine_est);
-        coh->ratio = fabsf(corr)/mag;        
+        coh->ratio = fabsf(corr)/mag;
 
         // printf("%f\n", cabsolute(corr)/mag);
 
-        if (fabsf(corr)/mag < 0.8) 
+        if (fabsf(corr)/mag < 0.8)
             coh->sync_timer++;
         else
-            coh->sync_timer = 0;            
+            coh->sync_timer = 0;
 
         if (coh->sync_timer == 10) {
             if (coh->verbose)
@@ -635,7 +635,7 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
             next_sync = 0;
         }
     }
-              
+
     sync = next_sync;
 
     return sync;
@@ -643,9 +643,9 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_mod()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_mod()
+  AUTHOR......: David Rowe
   DATE CREATED: 5/4/2015
 
   COHPSK modulator, take a frame of COHPSK_BITS_PER_FRAME bits and
@@ -667,18 +667,18 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
     bits_to_qpsk_symbols(tx_symb, tx_bits, COHPSK_BITS_PER_FRAME);
 
     for(r=0; r<NSYMROWPILOT; r++) {
-        for(c=0; c<COHPSK_NC*ND; c++) 
-            tx_onesym[c] = tx_symb[r][c];         
-        tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory, 
+        for(c=0; c<COHPSK_NC*ND; c++)
+            tx_onesym[c] = tx_symb[r][c];
+        tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory,
                                     fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
     }
 }
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_clip()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_clip()
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
   Hard clips a cohpsk modulator signal to improve PAPR, CLIP threshold
@@ -694,18 +694,18 @@ void cohpsk_clip(COMP tx_fdm[])
 
     for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
         sam = tx_fdm[i];
-        mag = cabsolute(sam);            
+        mag = cabsolute(sam);
         if (mag >  COHPSK_CLIP)  {
             sam = fcmult( COHPSK_CLIP/mag, sam);
         }
         tx_fdm[i] = sam;
     }
  }
- 
+
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: fdm_downconvert_coh   
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: fdm_downconvert_coh
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
   Frequency shift each modem carrier down to NC baseband signals.
@@ -724,8 +724,8 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
     assert(nin <= (COHPSK_M+COHPSK_M/P));
 
     /* downconvert */
-  
-    for (c=0; c<Nc; c++) 
+
+    for (c=0; c<Nc; c++)
 	for (i=0; i<nin; i++) {
 	    phase_rx[c] = cmult(phase_rx[c], freq[c]);
 	    rx_baseband[c][i] = cmult(rx_fdm[i], cconj(phase_rx[c]));
@@ -735,19 +735,19 @@ void fdm_downconvert_coh(COMP rx_baseband[COHPSK_NC][COHPSK_M+COHPSK_M/P], int N
 
     for (c=0; c<Nc; c++) {
         mag = cabsolute(phase_rx[c]);
-	phase_rx[c].real /= mag;	  
-	phase_rx[c].imag /= mag;	  
+	phase_rx[c].real /= mag;
+	phase_rx[c].imag /= mag;
     }
 }
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: rx_filter_coh()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: rx_filter_coh()
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
-  cohpsk version of fdmdv.c rx_filter function.  
+  cohpsk version of fdmdv.c rx_filter function.
 
   TODO: see if we can merge the two!  Will require re-testing of fdmdv modem.
 
@@ -765,23 +765,23 @@ void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHP
     for(i=0, j=0; i<nin; i+=n,j++) {
 
 	/* latest input sample */
-	
+
 	for(c=0; c<Nc; c++)
-	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)	
+	    for(k=COHPSK_NFILTER-n,l=i; k<COHPSK_NFILTER; k++,l++)
 		rx_filter_memory[c][k] = rx_baseband[c][l];
-	
+
 	/* convolution (filtering) */
 
 	for(c=0; c<Nc; c++) {
 	    rx_filt[c][j].real = 0.0; rx_filt[c][j].imag = 0.0;
-	    for(k=0; k<COHPSK_NFILTER; k++) 
+	    for(k=0; k<COHPSK_NFILTER; k++)
 		rx_filt[c][j] = cadd(rx_filt[c][j], fcmult(gt_alpha5_root_coh[k], rx_filter_memory[c][k]));
 	}
 
 	/* make room for next input sample */
-	
+
 	for(c=0; c<Nc; c++)
-	    for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)	
+	    for(k=0,l=n; k<COHPSK_NFILTER-n; k++,l++)
 		rx_filter_memory[c][k] = rx_filter_memory[c][l];
     }
 
@@ -790,9 +790,9 @@ void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHP
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: fdmdv_freq_shift_coh()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: fdmdv_freq_shift_coh()
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
   Frequency shift modem signal.  The use of complex input and output allows
@@ -800,7 +800,7 @@ void rx_filter_coh(COMP rx_filt[COHPSK_NC+1][P+1], int Nc, COMP rx_baseband[COHP
 
 \*---------------------------------------------------------------------------*/
 
-void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs, 
+void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs,
                           COMP *foff_phase_rect, int nin)
 {
     COMP  foff_rect;
@@ -817,8 +817,8 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float 
     /* normalise digital oscilator as the magnitude can drfift over time */
 
     mag = cabsolute(*foff_phase_rect);
-    foff_phase_rect->real /= mag;	 
-    foff_phase_rect->imag /= mag;	 
+    foff_phase_rect->real /= mag;
+    foff_phase_rect->imag /= mag;
 }
 
 
@@ -843,7 +843,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         fdm_downconvert_coh(rx_baseband, COHPSK_NC*ND, rx_fdm_frame_bb, fdmdv->phase_rx, fdmdv->freq, nin);
         rx_filter_coh(rx_filt, COHPSK_NC*ND, rx_baseband, coh->rx_filter_memory, nin);
         rx_timing = rx_est_timing(rx_onesym, fdmdv->Nc, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, COHPSK_M);
-  
+
         for(c=0; c<COHPSK_NC*ND; c++) {
             ch_symb[r][c] = rx_onesym[c];
         }
@@ -868,7 +868,7 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
                 fdmdv->prev_rx_symbols[c] = rx_onesym[c];
 
                 /* 4th power strips QPSK modulation, by multiplying phase by 4
-                   Using the abs value of the real coord was found to help 
+                   Using the abs value of the real coord was found to help
                    non-linear issues when noise power was large. */
 
                 amod_strip = cmult(adiff, adiff);
@@ -880,19 +880,19 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
             /* loop filter made up of 1st order IIR plus integrator.  Integerator
                was found to be reqd  */
-        
+
             fdmdv->foff_filt = (1.0-beta)*fdmdv->foff_filt + beta*atan2(mod_strip.imag, mod_strip.real);
             //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2(mod_strip.imag, mod_strip.real));
             *f_est += g*fdmdv->foff_filt;
-        }    
+        }
 
         /* Optional logging used for testing against Octave version */
 
         if (coh->rx_baseband_log) {
             assert(nin <= (COHPSK_M+COHPSK_M/P));
-            for(c=0; c<COHPSK_NC*ND; c++) {       
+            for(c=0; c<COHPSK_NC*ND; c++) {
                 for(i=0; i<nin; i++) {
-                    coh->rx_baseband_log[c*coh->rx_baseband_log_col_sz + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i]; 
+                    coh->rx_baseband_log[c*coh->rx_baseband_log_col_sz + coh->rx_baseband_log_col_index + i] = rx_baseband[c][i];
                 }
             }
             coh->rx_baseband_log_col_index += nin;
@@ -900,17 +900,17 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
         }
 
         if (coh->rx_filt_log) {
- 	  for(c=0; c<COHPSK_NC*ND; c++) {     
+ 	  for(c=0; c<COHPSK_NC*ND; c++) {
             for(i=0; i<nin/(COHPSK_M/P); i++) {
-              coh->rx_filt_log[c*coh->rx_filt_log_col_sz + coh->rx_filt_log_col_index + i] = rx_filt[c][i]; 
+              coh->rx_filt_log[c*coh->rx_filt_log_col_sz + coh->rx_filt_log_col_index + i] = rx_filt[c][i];
             }
 	  }
-	  coh->rx_filt_log_col_index += nin/(COHPSK_M/P);        
+	  coh->rx_filt_log_col_index += nin/(COHPSK_M/P);
         }
 
         if (coh->ch_symb_log) {
             for(c=0; c<COHPSK_NC*ND; c++) {
-		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND + c] = ch_symb[r][c]; 
+		coh->ch_symb_log[coh->ch_symb_log_r*COHPSK_NC*ND + c] = ch_symb[r][c];
             }
             coh->ch_symb_log_r++;
         }
@@ -932,9 +932,9 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_demod()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_demod()
+  AUTHOR......: David Rowe
   DATE CREATED: 5/4/2015
 
   COHPSK demodulator, takes an array of (nominally) nin_frame =
@@ -972,7 +972,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
         max_ratio = 0.0;
         f_est = 0.0;
         for (coh->f_est = FDMDV_FCENTRE-40.0; coh->f_est <= FDMDV_FCENTRE+40.0; coh->f_est += 40.0) {
-        
+
             if (coh->verbose)
                 fprintf(stderr, "  [%d] acohpsk.f_est: %f +/- 20\n", coh->frame, coh->f_est);
 
@@ -1037,14 +1037,14 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
                 for(c=0; c<COHPSK_NC*ND; c++)
                     coh->ct_symb_ff_buf[r][c] = coh->ct_symb_buf[coh->ct+r][c];
         }
-    }  
+    }
 
     /* If in sync just do sample rate processing on latest frame */
 
     if (sync == 1) {
         rate_Fs_rx_processing(coh, ch_symb, rx_fdm, &coh->f_est, NSYMROWPILOT, coh->nin, 1);
         frame_sync_fine_freq_est(coh, ch_symb, sync, &next_sync);
- 
+
         for(r=0; r<2; r++)
             for(c=0; c<COHPSK_NC*ND; c++)
                 coh->ct_symb_ff_buf[r][c] = coh->ct_symb_ff_buf[r+NSYMROWPILOT][c];
@@ -1054,20 +1054,20 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
     }
 
     /* if we are in sync complete demodulation with symbol rate processing */
-  
+
     *sync_good = 0;
     if ((next_sync == 1) || (sync == 1)) {
         qpsk_symbols_to_bits(coh, rx_bits, coh->ct_symb_ff_buf);
         *sync_good = 1;
     }
 
-    sync = sync_state_machine(coh, sync, next_sync);        
+    sync = sync_state_machine(coh, sync, next_sync);
     coh->sync = sync;
 
     /* work out how many samples we need for the next call to account
        for differences in tx and rx sample clocks */
 
-    nin = COHPSK_M;   
+    nin = COHPSK_M;
     if (sync == 1) {
         if (coh->rx_timing > COHPSK_M/P)
             nin = COHPSK_M + COHPSK_M/P;
@@ -1082,9 +1082,9 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_fs_offset()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_fs_offset()
+  AUTHOR......: David Rowe
   DATE CREATED: May 2015
 
   Simulates small Fs offset between mod and demod.
@@ -1096,7 +1096,7 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
     double tin, f;
     int   tout, t1, t2;
 
-    tin = 0.0; tout = 0; 
+    tin = 0.0; tout = 0;
     while (tin < n) {
       t1 = floor(tin);
       t2 = ceil(tin);
@@ -1113,9 +1113,9 @@ int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_get_demod_stats()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_get_demod_stats()
+  AUTHOR......: David Rowe
   DATE CREATED: 14 June 2015
 
   Fills stats structure with a bunch of demod information.
@@ -1167,9 +1167,9 @@ void cohpsk_set_frame(struct COHPSK *coh, int frame)
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_get_test_bits()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_get_test_bits()
+  AUTHOR......: David Rowe
   DATE CREATED: June 2015
 
   Returns a frame of known test bits.
@@ -1187,9 +1187,9 @@ void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[])
 
 
 /*---------------------------------------------------------------------------*\
-                                                       
-  FUNCTION....: cohpsk_put_test_bits()	     
-  AUTHOR......: David Rowe			      
+
+  FUNCTION....: cohpsk_put_test_bits()
+  AUTHOR......: David Rowe
   DATE CREATED: June 2015
 
   Accepts bits from demod and attempts to sync with the known
@@ -1250,13 +1250,13 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
             coh->ptest_bits_coh_rx = (int*)test_bits_coh;
         }
     }
-   
+
     //fprintf(stderr, "state: %d next_state: %d bit_errors: %d\n", *state, next_state, *bit_errors);
 
     *state = next_state;
 }
 
-int cohpsk_error_pattern_size(void) { 
+int cohpsk_error_pattern_size(void) {
     return COHPSK_BITS_PER_FRAME;
 }
 

@@ -1,11 +1,11 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: freedv_tx.c
   AUTHOR......: David Rowe
   DATE CREATED: August 2014
-                                                                             
+
   Demo transmit program for FreeDV API functions.
-                                                                     
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -41,11 +41,11 @@ struct my_callback_state {
 char my_get_next_tx_char(void *callback_state) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     char  c = *pstate->ptx_str++;
-    
+
     if (*pstate->ptx_str == 0) {
         pstate->ptx_str = pstate->tx_str;
     }
-    
+
     return c;
 }
 
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
          argv[3], strerror(errno));
 	exit(1);
     }
-    
+
     freedv = freedv_open(mode);
     assert(freedv != NULL);
 
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
            buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     free(speech_in);

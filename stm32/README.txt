@@ -76,10 +76,10 @@ Getting Started
    $ cd ~
    $ git clone https://github.com/shenki/stlink.git
    $ cd stlink
-   ~/stlink$ sudo apt-get install libusb-1.0-0-dev libelf-dev automake 
+   ~/stlink$ sudo apt-get install libusb-1.0-0-dev libelf-dev automake
    ~/stlink$ ./autogen.sh
    ~/stlink$ ./configure
-   ~/stlink$ make 
+   ~/stlink$ make
 
 . Place a copy of hts1a.raw in the stlink directory and start st-util:
 
@@ -99,7 +99,7 @@ Getting Started
     Loading section .data, size 0x28f0 lma 0x801a63c
     Start address 0x800a885, load size 118572
     Transfer rate: 13 KB/sec, 10779 bytes/write.
- 
+
 . Power cycle Discovery.
 
 . Stop st-util using ctrl-C, then restart st-util
@@ -119,7 +119,7 @@ Getting Started
 
 . gdb will prints various debug messages, and the codec output file
   will be written to ~/stlink.
-  
+
   ~/stlink$ play -r 8000 -s -2 stm_out.raw
 
 Process

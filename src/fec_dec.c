@@ -110,7 +110,7 @@ int main(int argc, char *argv[])
     unpacked_input_bits = (int*)malloc(bits_per_input_frame*sizeof(int));
     assert(unpacked_input_bits != NULL);
 
-    /* 
+    /*
        Output parameters and buffers.
     */
 
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
     assert(packed_output_bits != NULL);
     unpacked_output_bits = (int*)malloc(bits_per_output_frame*sizeof(int));
     assert(unpacked_output_bits != NULL);
-    
+
     fprintf(stderr, "input bits: %d  input_bytes: %d  output_bits: %d  output_bytes: %d\n",
             bits_per_input_frame,  bytes_per_input_frame, bits_per_output_frame,  bytes_per_output_frame);
 
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
             for(i=24; i<bits_per_output_frame; i++)
                 unpacked_output_bits[i] = unpacked_input_bits[i];
         }
- 
+
         if (mode == MODE_1600) {
             recd_codeword = 0;
             for(i=0; i<8; i++) {
@@ -213,7 +213,7 @@ int main(int argc, char *argv[])
             codeword1 = golay23_decode(recd_codeword);
             //codeword1 = recd_codeword;
             //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
-           
+
             for(i=0; i<bits_per_output_frame; i++)
                 unpacked_output_bits[i] = unpacked_input_bits[i];
 
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
             codeword1 = golay23_decode(recd_codeword);
             //codeword1 = recd_codeword;
             //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
-           
+
             recd_codeword = 0;
             for(i=16; i<28; i++) {
                 recd_codeword <<= 1;
@@ -254,10 +254,10 @@ int main(int argc, char *argv[])
             }
             codeword2 = golay23_decode(recd_codeword);
             fprintf(stderr, "received codeword2: 0x%x  decoded codeword2: 0x%x\n", recd_codeword, codeword2);
-          
+
             for(i=0; i<bits_per_output_frame; i++)
                 unpacked_output_bits[i] = unpacked_input_bits[i];
-            
+
             for(i=0; i<8; i++) {
                 unpacked_output_bits[i] = (codeword1 >> (22-i)) & 0x1;
             }
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
             for(i=0,j=16; i<12; i++,j++) {
                 unpacked_output_bits[j] = (codeword2 >> (22-i)) & 0x1;
             }
-            
+
         }
 
         /* pack bits, MSB first  */
@@ -282,14 +282,14 @@ int main(int argc, char *argv[])
                 byte++;
             }
         }
-        
+
  	fwrite(packed_output_bits, sizeof(char), bytes_per_output_frame, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
 
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
+        if (fin == stdin) fflush(stdin);
     }
 
     codec2_destroy(codec2);

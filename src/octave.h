@@ -1,9 +1,9 @@
 /*---------------------------------------------------------------------------*\
-                                                                             
+
   FILE........: octave.h
-  AUTHOR......: David Rowe  
+  AUTHOR......: David Rowe
   DATE CREATED: April 28 2012
-                                                                             
+
   Functions to save C arrays in Octave matrix format.  the output text
   file can be directly read into octave using "load filename".
 

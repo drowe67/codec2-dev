@@ -78,9 +78,9 @@ int main(int argc, char *argv[])
     start_bit = 0; end_bit = bits_per_frame;
     if (argc == 7) {
  	start_bit = atoi(argv[5]);
-	end_bit = atoi(argv[6]);   
+	end_bit = atoi(argv[6]);
     }
-        
+
     bit = 0;
     bits = errors = 0;
 
@@ -106,8 +106,8 @@ int main(int argc, char *argv[])
         if (bits == bits_per_frame)
             bits = 0;
         if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);         
- 
+        if (fin == stdin) fflush(stdin);
+
     }
 
     fclose(fin);
