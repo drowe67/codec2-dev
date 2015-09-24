@@ -41,6 +41,35 @@ int switch_select(void);
 int switch_back(void);
 int ext_ptt(void);
 
+/*! Switch debounce and logic handling */
+struct switch_t {
+    /*! Debounce/hold timer */
+    uint32_t    timer;
+    /*! Current/debounced observed switch state */
+    uint8_t     sw;
+    /*! Raw observed switch state (during debounce) */
+    uint8_t     raw;
+    /*! Last steady-state switch state */
+    uint8_t     last;
+    /*! Debouncer state */
+    uint8_t     state;
+};
+
+/*! Update the state of a switch */
+void switch_update(struct switch_t* const sw, uint8_t state);
+
+/*! Acknowledge the current state of the switch */
+void switch_ack(struct switch_t* const sw);
+
+/*! Return how long the switch has been pressed in ticks. */
+uint32_t switch_pressed(const struct switch_t* const sw);
+
+/*! Return non-zero if the switch has been released. */
+int switch_released(const struct switch_t* const sw);
+
+/*! Count the tick timers on the switches. */
+void switch_tick(struct switch_t* const sw);
+
 void ColorfulRingOfDeath(int code);
 
 #endif
