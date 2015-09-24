@@ -477,6 +477,10 @@ libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 %.pgm: %.bin
 	$(SUDO) dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D $<
 
+# Rule for programming the SM1000
+%.pgm: %.bin
+	$(SUDO) dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D $<
+
 ####################################################
 
 CODEC2_PROFILE_SRCS=\
