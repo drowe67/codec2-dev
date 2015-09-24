@@ -71,29 +71,37 @@ void sm1000_leds_switches_init(void) {
 }
 
 void led_pwr(int state) {
-    if (state)
+    if (state > 0)
         GPIOD->ODR |= (1 << 12);
+    else if (state < 0)
+        GPIOD->ODR ^= (1 << 12);
     else
         GPIOD->ODR &= ~(1 << 12);
 }
 
 void led_ptt(int state) {
-    if (state)
+    if (state > 0)
+        GPIOD->ODR |= (1 << 13);
+    else if (state < 0)
         GPIOD->ODR |= (1 << 13);
     else
         GPIOD->ODR &= ~(1 << 13);
 }
 
 void led_rt(int state) {
-    if (state)
+    if (state > 0)
         GPIOD->ODR |= (1 << 14);
+    else if (state < 0)
+        GPIOD->ODR ^= (1 << 14);
     else
         GPIOD->ODR &= ~(1 << 14);
 }
 
 void led_err(int state) {
-    if (state)
+    if (state > 0)
         GPIOD->ODR |= (1 << 15);
+    else if (state < 0)
+        GPIOD->ODR ^= (1 << 15);
     else
         GPIOD->ODR &= ~(1 << 15);
 }
