@@ -659,6 +659,10 @@ sm1000_leds_switches_ut.elf: $(SM1000_LEDS_SWITCHES_UT_SRCS:.c=.o) \
 
 SM1000_SRCS=\
 src/sm1000_main.c \
+src/tone.c \
+src/sfx.c \
+src/sounds.c \
+src/morse.c \
 src/sm1000_leds_switches.c \
 ../src/fifo.c \
 src/debugblinky.c \
