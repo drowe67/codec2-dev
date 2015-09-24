@@ -663,6 +663,7 @@ src/tone.c \
 src/sfx.c \
 src/sounds.c \
 src/morse.c \
+src/menu.c \
 src/sm1000_leds_switches.c \
 ../src/fifo.c \
 src/debugblinky.c \
