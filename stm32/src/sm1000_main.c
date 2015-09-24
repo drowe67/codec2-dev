@@ -37,9 +37,14 @@
 #include <stm32f4xx_gpio.h>
 #include <stdlib.h>
 
+#include "sfx.h"
+#include "sounds.h"
+#include "morse.h"
+
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
 #define FIFTY_MS  50
+#define ANNOUNCE_DELAY  300000  /* Supposed to be msec, seems not */
 #define MAX_MODES  3
 #define ANALOG     0
 #define DV         1
@@ -55,7 +60,11 @@ typedef struct {
     int mode;
 } SWITCH_STATE;
 
-unsigned int downTicker;
+unsigned int downTicker = 0;
+unsigned int announceTicker = 0;
+
+struct sfx_player_t sfx_player;
+struct morse_player_t morse_player;
 
 void SysTick_Handler(void);
 void iterate_select_state_machine(SWITCH_STATE *ss);
@@ -105,16 +114,56 @@ int main(void) {
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
 	dac8k[i] = 0.0;
 
+    morse_player.freq = 800;
+    morse_player.dit_time = 60;    /* 20 WPM */
+    morse_player.msg = NULL;
+
+    /* play a start-up tune. */
+    sfx_play(&sfx_player, sound_startup);
+
     ss.state = SS_IDLE;
     ss.mode  = ANALOG;
 
     while(1) {
 
         iterate_select_state_machine(&ss);
-
-        if (switch_ptt() || (ext_ptt() == 0)) {
+        if (sfx_player.note) {
+            int samples = 0;
+            int sz_free = dac2_free();
+            if (sz_free > n_samples_16k)
+                sz_free = n_samples_16k;
+            for (i=0; i < sz_free; i++) {
+                dac16k[i] = sfx_next(&sfx_player) >> 2; /* -6dB */
+                samples++;
+                if (!sfx_player.note)
+                    break;
+            }
+            dac2_write(dac16k, samples);
+            if (!sfx_player.note && morse_player.msg)
+                announceTicker = ANNOUNCE_DELAY;
+        }
+        else if (!announceTicker && morse_player.msg) {
+            int samples = 0;
+            int sz_free = dac2_free();
+            if (sz_free > n_samples_16k)
+                sz_free = n_samples_16k;
+            for (i=0; i < sz_free; i++) {
+                dac16k[i] = morse_next(&morse_player) >> 2; /* -6dB */
+                samples++;
+                if (!morse_player.msg)
+                    break;
+            }
+            dac2_write(dac16k, samples);
+        }
+        else if (switch_ptt() || (ext_ptt() == 0)) {
 
             /* Transmit -------------------------------------------------------------------------*/
+
+            /* Cancel any announcement if scheduled */
+            if (announceTicker && morse_player.msg) {
+                announceTicker = 0;
+                morse_play(&morse_player, NULL);
+            }
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
@@ -206,6 +255,9 @@ void SysTick_Handler(void)
     if (downTicker > 0) {
         downTicker--;
     }
+    if (announceTicker > 0) {
+        announceTicker--;
+    }
 }
 
 /* Select button state machine.  Debounces switches and enables cycling
@@ -225,8 +277,15 @@ void iterate_select_state_machine(SWITCH_STATE *ss) {
         case SS_DEBOUNCE_DOWN:
             if (downTicker == 0) {
                 ss->mode++;
+                sfx_play(&sfx_player, sound_click);
                 if (ss->mode >= MAX_MODES)
                     ss->mode = 0;
+                if (ss->mode == ANALOG)
+                    morse_play(&morse_player, "ANALOG");
+                else if (ss->mode == DV)
+                    morse_play(&morse_player, "DV");
+                else if (ss->mode == TONE)
+                    morse_play(&morse_player, "TONE");
                 next_state = SS_WAIT_BUTTON_UP;
             }
             break;
