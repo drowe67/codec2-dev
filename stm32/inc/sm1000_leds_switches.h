@@ -32,6 +32,10 @@
 
 void sm1000_leds_switches_init(void);
 
+#define	LED_ON	1	/*!< Turn LED on */
+#define LED_OFF	0	/*!< Turn LED off */
+#define LED_INV	-1	/*!< Invert LED state */
+
 void led_pwr(int state);
 void led_ptt(int state);
 void led_rt(int state);
