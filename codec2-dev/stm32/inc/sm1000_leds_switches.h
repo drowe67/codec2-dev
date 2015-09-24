@@ -28,6 +28,8 @@
 #ifndef __LEDS_SWITCHES__
 #define __LEDS_SWITCHES__
 
+#include <stdint.h>
+
 void sm1000_leds_switches_init(void);
 
 void led_pwr(int state);
@@ -40,6 +42,11 @@ int switch_ptt(void);
 int switch_select(void);
 int switch_back(void);
 int ext_ptt(void);
+
+#define DEBOUNCE_DELAY 500 /*!< Delay to wait while switch bounces */
+
+#define SW_STEADY   0   /*!< Switch is in steady-state */
+#define SW_DEBOUNCE 1   /*!< Switch is being debounced */
 
 /*! Switch debounce and logic handling */
 struct switch_t {

@@ -160,7 +160,7 @@ void BusFault_Handler(void)  { ColorfulRingOfDeath(3); }
 void UsageFault_Handler(void){ ColorfulRingOfDeath(4); }
 
 
-static void switch_tick(struct switch_t* const sw)
+void switch_tick(struct switch_t* const sw)
 {
     if (sw->sw != sw->raw) {
         /* State transition, reset timer */

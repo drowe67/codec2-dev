@@ -43,16 +43,12 @@
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
-#define DEBOUNCE_DELAY     500
 #define ANNOUNCE_DELAY  300000  /* Supposed to be msec, seems not */
 
 #define MAX_MODES  3
 #define ANALOG     0
 #define DV         1
 #define TONE       2
-
-#define SW_STEADY   0   /*!< Switch is in steady-state */
-#define SW_DEBOUNCE 1   /*!< Switch is being debounced */
 
 struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
