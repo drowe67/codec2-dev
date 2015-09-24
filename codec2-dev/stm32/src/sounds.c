@@ -21,7 +21,6 @@
 
 #include "sounds.h"
 
-/*! Start-up tune */
 struct sfx_note_t sound_startup[] = {
 	{.freq = 600, .duration = 80},
 	{.freq = 800, .duration = 80},
@@ -29,7 +28,13 @@ struct sfx_note_t sound_startup[] = {
 	{.freq = 0, .duration = 0}
 };
 
-/*! Click sound */
+struct sfx_note_t sound_returned[] = {
+	{.freq = 1000, .duration = 80},
+	{.freq = 800, .duration = 80},
+	{.freq = 600, .duration = 80},
+	{.freq = 0, .duration = 0}
+};
+
 struct sfx_note_t sound_click[] = {
 	{.freq = 1200, .duration = 10},
 	{.freq = 0, .duration = 0}
