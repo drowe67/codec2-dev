@@ -158,3 +158,64 @@ void HardFault_Handler(void) { ColorfulRingOfDeath(1); }
 void MemManage_Handler(void) { ColorfulRingOfDeath(2); }
 void BusFault_Handler(void)  { ColorfulRingOfDeath(3); }
 void UsageFault_Handler(void){ ColorfulRingOfDeath(4); }
+
+
+static void switch_tick(struct switch_t* const sw)
+{
+    if (sw->sw != sw->raw) {
+        /* State transition, reset timer */
+        if (sw->state == SW_STEADY)
+            sw->last = sw->sw;
+        sw->state = SW_DEBOUNCE;
+        sw->timer = DEBOUNCE_DELAY;
+        sw->sw = sw->raw;
+    } else if (sw->state == SW_DEBOUNCE) {
+        if (sw->timer > 0) {
+            /* Steady so far, keep waiting */
+            sw->timer--;
+        } else {
+            /* Steady state reached */
+            sw->state = SW_STEADY;
+        }
+    } else if (sw->sw) {
+        /* Hold state.  Yes this will wrap, but who cares? */
+        sw->timer++;
+    }
+}
+
+void switch_update(struct switch_t* const sw, uint8_t state)
+{
+    sw->raw = state;
+    if (sw->raw == sw->sw)
+        return;
+
+    if (sw->state == SW_STEADY)
+        sw->last = sw->sw;
+    sw->timer = DEBOUNCE_DELAY;
+    sw->sw = sw->raw;
+    sw->state = SW_DEBOUNCE;
+}
+
+uint32_t switch_pressed(const struct switch_t* const sw)
+{
+    if ((sw->state == SW_STEADY) && sw->sw)
+        return sw->timer;
+    return 0;
+}
+
+int switch_released(const struct switch_t* const sw)
+{
+    if (sw->state != SW_STEADY)
+        return 0;
+    if (!sw->last)
+        return 0;
+    if (sw->sw)
+        return 0;
+    return 1;
+}
+
+void switch_ack(struct switch_t* const sw)
+{
+    if (sw->state == SW_STEADY)
+        sw->last = sw->sw;
+}

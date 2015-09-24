@@ -54,42 +54,9 @@
 #define SW_STEADY   0   /*!< Switch is in steady-state */
 #define SW_DEBOUNCE 1   /*!< Switch is being debounced */
 
-/*! Switch debounce and logic handling */
-struct switch_t {
-    /*! Debounce/hold timer */
-    uint32_t    timer;
-    /*! Current/debounced observed switch state */
-    uint8_t     sw;
-    /*! Raw observed switch state (during debounce) */
-    uint8_t     raw;
-    /*! Last steady-state switch state */
-    uint8_t     last;
-    /*! Debouncer state */
-    uint8_t     state;
-};
-
 struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
 struct switch_t sw_ptt;     /*!< Switch driver for PTT buttons */
-
-/*!
- * Count the tick timers on the switches.
- */
-static void switch_tick(struct switch_t* const sw);
-
-/*!
- * Update the state of a switch
- */
-static void switch_update(struct switch_t* const sw, uint8_t state);
-
-/*! Return how long the switch has been pressed in ticks. */
-static uint32_t switch_pressed(const struct switch_t* const sw);
-
-/*! Return non-zero if the switch has been released. */
-static int switch_released(const struct switch_t* const sw);
-
-/*! Acknowledge the current state of the switch */
-static void switch_ack(struct switch_t* const sw);
 
 unsigned int announceTicker = 0;
 
@@ -328,64 +295,4 @@ void SysTick_Handler(void)
     if (announceTicker > 0) {
         announceTicker--;
     }
-}
-
-static void switch_tick(struct switch_t* const sw)
-{
-    if (sw->sw != sw->raw) {
-        /* State transition, reset timer */
-        if (sw->state == SW_STEADY)
-            sw->last = sw->sw;
-        sw->state = SW_DEBOUNCE;
-        sw->timer = DEBOUNCE_DELAY;
-        sw->sw = sw->raw;
-    } else if (sw->state == SW_DEBOUNCE) {
-        if (sw->timer > 0) {
-            /* Steady so far, keep waiting */
-            sw->timer--;
-        } else {
-            /* Steady state reached */
-            sw->state = SW_STEADY;
-        }
-    } else if (sw->sw) {
-        /* Hold state.  Yes this will wrap, but who cares? */
-        sw->timer++;
-    }
-}
-
-static void switch_update(struct switch_t* const sw, uint8_t state)
-{
-    sw->raw = state;
-    if (sw->raw == sw->sw)
-        return;
-
-    if (sw->state == SW_STEADY)
-        sw->last = sw->sw;
-    sw->timer = DEBOUNCE_DELAY;
-    sw->sw = sw->raw;
-    sw->state = SW_DEBOUNCE;
-}
-
-static uint32_t switch_pressed(const struct switch_t* const sw)
-{
-    if ((sw->state == SW_STEADY) && sw->sw)
-        return sw->timer;
-    return 0;
-}
-
-static int switch_released(const struct switch_t* const sw)
-{
-    if (sw->state != SW_STEADY)
-        return 0;
-    if (!sw->last)
-        return 0;
-    if (sw->sw)
-        return 0;
-    return 1;
-}
-
-static void switch_ack(struct switch_t* const sw)
-{
-    if (sw->state == SW_STEADY)
-        sw->last = sw->sw;
 }
