@@ -747,7 +747,7 @@ src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
 	$(CC) $(CFLAGS) $^ -c -o $@
 
 tuner_ut.elf: $(TUNER_UT_SRCS:.c=.O3.o) \
-		src/stm32f4_adc_tuner.O3.o libstm32f4.a
+		src/stm32f4_adc_tuner.o libstm32f4.a
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------
@@ -763,13 +763,7 @@ src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c \
 
-# this needs to be compiled without the optimiser or ugly things happen
-# would be nice to work out why as ISRs need to run fast
-
-src/stm32f4_adc_tuner.o: src/stm32f4_adc_tuner.c
-	$(CC) $(CFLAGS) $^ -c -o $@
-
-adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.O3.o) src/stm32f4_adc_tuner.O3.o \
+adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.O3.o) src/stm32f4_adc_tuner.o \
 		libstm32f4.a
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
