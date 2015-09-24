@@ -40,10 +40,14 @@
 #include "sfx.h"
 #include "sounds.h"
 #include "morse.h"
+#include "menu.h"
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
+#define MENU_LED_PERIOD  30000
 #define ANNOUNCE_DELAY  300000  /* Supposed to be msec, seems not */
+#define HOLD_DELAY      100000
+#define MENU_DELAY      100000
 
 #define MAX_MODES  3
 #define ANALOG     0
@@ -55,6 +59,8 @@ struct switch_t sw_back;    /*!< Switch driver for BACK button */
 struct switch_t sw_ptt;     /*!< Switch driver for PTT buttons */
 
 unsigned int announceTicker = 0;
+unsigned int menuLEDTicker = 0;
+unsigned int menuTicker = 0;
 
 /*!
  * User preferences
@@ -62,6 +68,8 @@ unsigned int announceTicker = 0;
 static struct prefs_t {
     /*! Operating mode */
     uint8_t op_mode;
+    /*! Menu volume (attenuation) */
+    uint8_t menu_vol;
     /* TODO: more to come */
 } prefs;
 
@@ -71,10 +79,22 @@ struct morse_player_t morse_player;
 
 void SysTick_Handler(void);
 
+/*! Menu item root */
+static const struct menu_item_t menu_root;
+
+#define MENU_EVT_NEXT   0x10    /*!< Increment the current item */
+#define MENU_EVT_PREV   0x11    /*!< Decrement the current item */
+#define MENU_EVT_SELECT 0x20    /*!< Select current item */
+#define MENU_EVT_BACK   0x21    /*!< Go back one level */
+#define MENU_EVT_EXIT   0x30    /*!< Exit menu */
+
 int main(void) {
     struct freedv *f;
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
+
+    /* Menu data */
+    struct menu_t   menu;
 
     /* init all the drivers for various peripherals */
 
@@ -107,6 +127,9 @@ int main(void) {
     memset(&sw_back, 0, sizeof(sw_back));
     memset(&sw_ptt, 0, sizeof(sw_ptt));
 
+    /* Clear out menu state */
+    memset(&menu, 0, sizeof(menu));
+
     morse_player.freq = 800;
     morse_player.dit_time = 60;    /* 20 WPM */
     morse_player.msg = NULL;
@@ -117,6 +140,7 @@ int main(void) {
     sfx_play(&sfx_player, sound_startup);
 
     prefs.op_mode = ANALOG;
+    prefs.menu_vol = 7;
 
     while(1) {
         /* Read switch states */
@@ -125,31 +149,83 @@ int main(void) {
         switch_update(&sw_ptt,      (switch_ptt() ||
                                         (!ext_ptt())) ? 1 : 0);
 
-        /* Process mode */
-        uint8_t mode_change = 0;
-        if (switch_released(&sw_select)) {
-            prefs.op_mode = (prefs.op_mode + 1) % MAX_MODES;
-            mode_change = 1;
-        } else if (switch_released(&sw_back)) {
-            prefs.op_mode = (prefs.op_mode - 1) % MAX_MODES;
-            mode_change = 1;
+        /* Process menu */
+        if (!menuTicker) {
+            if (menu.stack_depth > 0) {
+                /* We are in a menu */
+                static uint8_t press_ack = 0;
+
+                if (press_ack == 1) {
+                    if ((sw_select.state == SW_STEADY)
+                            && (!sw_select.sw))
+                        press_ack = 0;
+                } else if (press_ack == 2) {
+                    if ((sw_back.state == SW_STEADY)
+                            && (!sw_back.sw))
+                        press_ack = 0;
+                } else {
+                    if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                        menu_exec(&menu, MENU_EVT_SELECT);
+                        press_ack = 1;
+                        menuTicker = MENU_DELAY;
+                    } else if (switch_pressed(&sw_back) > HOLD_DELAY) {
+                        menu_exec(&menu, MENU_EVT_BACK);
+                        press_ack = 2;
+                        menuTicker = MENU_DELAY;
+                    } else if (switch_released(&sw_select)) {
+                        menu_exec(&menu, MENU_EVT_NEXT);
+                        menuTicker = MENU_DELAY;
+                    } else if (switch_released(&sw_back)) {
+                        menu_exec(&menu, MENU_EVT_PREV);
+                        menuTicker = MENU_DELAY;
+                    } else if (switch_released(&sw_ptt)) {
+                        while(menu.stack_depth > 0)
+                            menu_exec(&menu, MENU_EVT_EXIT);
+                        sfx_play(&sfx_player, sound_returned);
+                    }
+
+                    /* If exited, put the LED back */
+                    if (!menu.stack_depth) {
+                        menuLEDTicker = 0;
+                        menuTicker = 0;
+                        led_pwr(LED_ON);
+                        morse_play(&morse_player, NULL);
+                    }
+                }
+            } else {
+                uint8_t mode_changed = 0;
+
+                if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                    /* Enter the menu */
+                    menu_enter(&menu, &menu_root);
+                    menuTicker = MENU_DELAY;
+                } else if (switch_released(&sw_select)) {
+                    /* Shortcut: change current mode */
+                    prefs.op_mode = (prefs.op_mode + 1) % MAX_MODES;
+                    mode_changed = 1;
+                } else if (switch_released(&sw_back)) {
+                    /* Shortcut: change current mode */
+                    prefs.op_mode = (prefs.op_mode - 1) % MAX_MODES;
+                    mode_changed = 1;
+                }
+
+                if (mode_changed) {
+                    /* Announce the new mode */
+                    if (prefs.op_mode == ANALOG)
+                        morse_play(&morse_player, "ANA");
+                    else if (prefs.op_mode == DV)
+                        morse_play(&morse_player, "1600");
+                    else if (prefs.op_mode == TONE)
+                        morse_play(&morse_player, "TONE");
+                    sfx_play(&sfx_player, sound_click);
+                }
+            }
         }
 
-        /* Acknowledge new switch events */
+        /* Acknowledge switch events */
         switch_ack(&sw_select);
         switch_ack(&sw_back);
         switch_ack(&sw_ptt);
-
-        /* Announcement */
-        if (mode_change) {
-            sfx_play(&sfx_player, sound_click);
-            if (prefs.op_mode == ANALOG)
-                morse_play(&morse_player, "ANALOG");
-            else if (prefs.op_mode == DV)
-                morse_play(&morse_player, "DV");
-            else if (prefs.op_mode == TONE)
-                morse_play(&morse_player, "TONE");
-        }
 
         if (sfx_player.note) {
             int samples = 0;
@@ -157,7 +233,7 @@ int main(void) {
             if (sz_free > n_samples_16k)
                 sz_free = n_samples_16k;
             for (i=0; i < sz_free; i++) {
-                dac16k[i] = sfx_next(&sfx_player) >> 2; /* -6dB */
+                dac16k[i] = sfx_next(&sfx_player) >> prefs.menu_vol;
                 samples++;
                 if (!sfx_player.note)
                     break;
@@ -172,12 +248,18 @@ int main(void) {
             if (sz_free > n_samples_16k)
                 sz_free = n_samples_16k;
             for (i=0; i < sz_free; i++) {
-                dac16k[i] = morse_next(&morse_player) >> 2; /* -6dB */
+                dac16k[i] = morse_next(&morse_player) >> prefs.menu_vol;
                 samples++;
                 if (!morse_player.msg)
                     break;
             }
             dac2_write(dac16k, samples);
+        }
+        else if (menu.stack_depth > 0) {
+            if (!menuLEDTicker) {
+                led_pwr(LED_INV);
+                menuLEDTicker = MENU_LED_PERIOD;
+            }
         }
         else if (switch_ptt() || (ext_ptt() == 0)) {
 
@@ -288,7 +370,400 @@ void SysTick_Handler(void)
     switch_tick(&sw_select);
     switch_tick(&sw_back);
     switch_tick(&sw_ptt);
+    if (menuTicker > 0) {
+        menuTicker--;
+    }
+    if (menuLEDTicker > 0) {
+        menuLEDTicker--;
+    }
     if (announceTicker > 0) {
         announceTicker--;
     }
 }
+
+/* ---------------------------- Menu data --------------------------- */
+
+/*!
+ * Default handler for menu callback.
+ */
+static void menu_default_cb(struct menu_t* const menu, uint32_t event)
+{
+    /* Get the current menu item */
+    const struct menu_item_t* item = menu_item(menu, 0);
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Choose first item */
+            menu->current = 0;
+        case MENU_EVT_RETURNED:
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            menu->current = (menu->current + 1) % item->num_children;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            menu->current = (menu->current - 1) % item->num_children;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Enter the sub-menu */
+            menu_enter(menu, item->children[menu->current]);
+            break;
+        case MENU_EVT_BACK:
+            /* Exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Announce the label of the selected child */
+        morse_play(&morse_player,
+                item->children[menu->current]->label);
+    }
+}
+
+/* Root menu item forward declarations */
+static const struct menu_item_t const* menu_root_children[];
+/* Root item definition */
+static const struct menu_item_t menu_root = {
+    .label          = "MENU",
+    .event_cb       = menu_default_cb,
+    .children       = menu_root_children,
+    .num_children   = 2,
+};
+
+/* Child declarations */
+static const struct menu_item_t menu_op_mode;
+static const struct menu_item_t menu_ui;
+static const struct menu_item_t const* menu_root_children[] = {
+    &menu_op_mode,
+    &menu_ui,
+};
+
+
+/* Operation Mode menu forward declarations */
+static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event);
+static struct menu_item_t const* menu_op_mode_children[];
+/* Operation mode menu */
+static const struct menu_item_t menu_op_mode = {
+    .label          = "MODE",
+    .event_cb       = menu_op_mode_cb,
+    .children       = menu_op_mode_children,
+    .num_children   = 3,
+};
+/* Children */
+static const struct menu_item_t menu_op_mode_analog = {
+    .label          = "ANA",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = ANALOG,
+    },
+};
+static const struct menu_item_t menu_op_mode_dv16k = {
+    .label          = "1600",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = DV,
+    },
+};
+/* static const struct menu_item_t menu_op_mode_dv700b
+    .label          = "700",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = DV,
+    },
+};*/
+static const struct menu_item_t menu_op_mode_tone = {
+    .label          = "TONE",
+    .event_cb       = NULL,
+    .children       = NULL,
+    .num_children   = 0,
+    .data           = {
+        .ui         = TONE,
+    },
+};
+static struct menu_item_t const* menu_op_mode_children[] = {
+    &menu_op_mode_analog,
+    &menu_op_mode_dv16k,
+    /* &menu_op_mode_dv700b, */
+    &menu_op_mode_tone,
+};
+/* Callback function */
+static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
+{
+    const struct menu_item_t* item = menu_item(menu, 0);
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Choose current item */
+            switch(prefs.op_mode) {
+                case DV:
+                    menu->current = 1;
+                    break;
+                case TONE:
+                    menu->current = 2;
+                    break;
+                default:
+                    menu->current = 0;
+            }
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            menu->current = (menu->current + 1) % item->num_children;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            menu->current = (menu->current - 1) % item->num_children;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Choose the selected mode */
+            prefs.op_mode = item->children[menu->current]->data.ui;
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Announce the label of the selected child */
+        morse_play(&morse_player,
+                item->children[menu->current]->label);
+    }
+}
+
+
+/* UI menu forward declarations */
+static struct menu_item_t const* menu_ui_children[];
+/* Operation mode menu */
+static const struct menu_item_t menu_ui = {
+    .label          = "UI",
+    .event_cb       = menu_default_cb,
+    .children       = menu_ui_children,
+    .num_children   = 3,
+};
+/* Children */
+static const struct menu_item_t menu_ui_freq;
+static const struct menu_item_t menu_ui_speed;
+static const struct menu_item_t menu_ui_vol;
+static struct menu_item_t const* menu_ui_children[] = {
+    &menu_ui_freq,
+    &menu_ui_speed,
+    &menu_ui_vol,
+};
+
+/* UI Frequency menu forward declarations */
+static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event);
+/* UI Frequency menu */
+static const struct menu_item_t menu_ui_freq = {
+    .label          = "FREQ",
+    .event_cb       = menu_ui_freq_cb,
+    .children       = NULL,
+    .num_children   = 0,
+};
+/* Callback function */
+static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event)
+{
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Get the current frequency */
+            menu->current = morse_player.freq;
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            /* Adjust the frequency up by 50 Hz */
+            if (morse_player.freq < 2000)
+                morse_player.freq += 50;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            if (morse_player.freq > 50)
+                morse_player.freq -= 50;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Restore the mode and exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            morse_player.freq = menu->current;
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Render the text, thankfully we don't need re-entrancy */
+        static char freq[5];
+        snprintf(freq, 4, "%d", morse_player.freq);
+        /* Announce the frequency */
+        morse_play(&morse_player, freq);
+    }
+};
+
+/* UI Speed menu forward declarations */
+static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event);
+/* UI Speed menu */
+static const struct menu_item_t menu_ui_speed = {
+    .label          = "WPM",
+    .event_cb       = menu_ui_speed_cb,
+    .children       = NULL,
+    .num_children   = 0,
+};
+/* Callback function */
+static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event)
+{
+    uint8_t announce = 0;
+
+    /* Get the current WPM */
+    uint16_t curr_wpm = 1200 / morse_player.dit_time;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Get the current frequency */
+            menu->current = morse_player.dit_time;
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            /* Increment WPM by 5 */
+            if (curr_wpm < 60)
+                curr_wpm += 5;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            if (curr_wpm > 5)
+                curr_wpm -= 5;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Restore the mode and exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            morse_player.dit_time = menu->current;
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Render the text, thankfully we don't need re-entrancy */
+        static char wpm[5];
+        snprintf(wpm, 4, "%d", curr_wpm);
+        /* Set the new parameter */
+        morse_player.dit_time = 1200 / curr_wpm;
+        /* Announce the words per minute */
+        morse_play(&morse_player, wpm);
+    }
+};
+
+/* UI volume menu forward declarations */
+static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event);
+/* UI volume menu */
+static const struct menu_item_t menu_ui_vol = {
+    .label          = "VOL",
+    .event_cb       = menu_ui_vol_cb,
+    .children       = NULL,
+    .num_children   = 0,
+};
+/* Callback function */
+static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
+{
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Get the current volume */
+            menu->current = prefs.menu_vol;
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            if (prefs.menu_vol > 0)
+                prefs.menu_vol--;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            if (prefs.menu_vol < 14)
+                prefs.menu_vol++;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Restore the mode and exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            morse_player.dit_time = menu->current;
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Render the text, thankfully we don't need re-entrancy */
+        static char vol[3];
+        snprintf(vol, 2, "%d", 15 - prefs.menu_vol);
+        /* Announce the volume level */
+        morse_play(&morse_player, vol);
+    }
+};
