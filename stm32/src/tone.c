@@ -36,16 +36,53 @@
 /*! Fixed-point shift factor */
 #define TONE_SHIFT	(12)
 
-/*! Static compiled sinusoid.  Nicked from original FreeDV code. */
-static const int16_t tone_sine[] = {
-     -16,    6384,   12528,   18192,   23200,   27232,   30256,   32128,
-   32752,   32128,   30256,   27232,   23152,   18192,   12528,    6384,
-     -16,   -6416,  -12560,  -18224,  -23184,  -27264,  -30288,  -32160,
-  -32768,  -32160,  -30288,  -27264,  -23184,  -18224,  -12560,   -6416
+/*! Static compiled quarter-sinusoid. */
+static const int16_t partial_sine[] = {
+   830,   2488,   4140,   5781,   7407,   9014,  10598,  12155,
+ 13681,  15171,  16623,  18031,  19394,  20707,  21967,  23170,
+ 24314,  25395,  26411,  27360,  28238,  29043,  29774,  30429,
+ 31006,  31503,  31919,  32253,  32504,  32672,  32756
 };
 
-/*! Length of sinusoid in samples */
-#define TONE_SINE_LEN	(sizeof(tone_sine)/sizeof(tone_sine[0]))
+/*! Length of quarter-sinusoid in samples */
+#define TONE_PART_SINE_LEN	(sizeof(partial_sine)\
+			/sizeof(partial_sine[0]))
+
+/*! Total length of sinusoid */
+#define TONE_SINE_LEN	((TONE_PART_SINE_LEN*4)+4)
+
+/*!
+ * Generate a sine from the quarter-waveform.
+ */
+static int16_t tone_sine(uint8_t sample)
+{
+	/* Key points */
+	if ((sample % (TONE_SINE_LEN/2)) == 0)
+		/* Zero crossings */
+		return 0;
+	if (sample == TONE_SINE_LEN/4)
+		/* Maximum */
+		return INT16_MAX;
+	if (sample == (3*TONE_SINE_LEN)/4)
+		/* Minimum */
+		return INT16_MIN;
+
+	if (sample < TONE_SINE_LEN/4)
+		/* First quarter of sine wave */
+		return partial_sine[sample-1];
+
+	if (sample < (TONE_SINE_LEN/2))
+		/* Second quarter */
+		return partial_sine[(TONE_SINE_LEN/2)-sample-1];
+	if (sample < ((3*TONE_SINE_LEN)/4))
+		/* Third quarter */
+		return -partial_sine[(sample-3) % TONE_PART_SINE_LEN];
+	if (sample < TONE_SINE_LEN)
+		/* Final quarter */
+		return -partial_sine[TONE_SINE_LEN-sample-1];
+	/* We should not get here */
+	return 0;
+}
 
 /*!
  * Re-set the tone generator.
@@ -99,7 +136,7 @@ int16_t tone_next(
 	tone_gen->sample += tone_gen->step;
 	tone_gen->remain--;
 
-	return tone_sine[sample_int];
+	return tone_sine(sample_int);
 }
 
 /*!
