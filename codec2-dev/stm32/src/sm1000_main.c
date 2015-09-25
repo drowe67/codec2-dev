@@ -61,6 +61,7 @@ struct switch_t sw_ptt;     /*!< Switch driver for PTT buttons */
 unsigned int announceTicker = 0;
 unsigned int menuLEDTicker = 0;
 unsigned int menuTicker = 0;
+unsigned int menuExit = 0;
 
 /*!
  * User preferences
@@ -190,12 +191,17 @@ int main(void) {
                         menuTicker = 0;
                         led_pwr(LED_ON);
                         morse_play(&morse_player, NULL);
+                        menuExit = 1;
                     }
                 }
             } else {
                 uint8_t mode_changed = 0;
 
-                if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                if (menuExit) {
+                    /* We've just exited a menu, wait for release of BACK */
+                    if (switch_released(&sw_back))
+                        menuExit = 0;
+                } else if (switch_pressed(&sw_select) > HOLD_DELAY) {
                     /* Enter the menu */
                     menu_enter(&menu, &menu_root);
                     menuTicker = MENU_DELAY;
