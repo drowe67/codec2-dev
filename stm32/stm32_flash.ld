@@ -10,8 +10,15 @@ _Min_Stack_Size = 0x400; /* required amount of stack */
 /* Specify the memory areas */
 MEMORY
 {
-  FLASH (rx)      : ORIGIN = 0x08000000, LENGTH = 1024K
+  /* ISR vectors *must* be placed here as they get mapped to address 0 */
+  VECTOR (rx)     : ORIGIN = 0x08000000, LENGTH = 16K
+  /* Virtual EEPROM area, we use the remaining 16kB blocks for this. */
+  EEPROM (rx)     : ORIGIN = 0x08004000, LENGTH = 48K
+  /* The rest of flash is used for program data */
+  FLASH (rx)      : ORIGIN = 0x08010000, LENGTH = 960K
+  /* Memory area */
   RAM (rwx)       : ORIGIN = 0x20000000, LENGTH = 128K
+  /* Core Coupled Memory */
   CCM (rwx)       : ORIGIN = 0x10000000, LENGTH = 64K
 }
 
@@ -22,7 +29,16 @@ SECTIONS
     . = ALIGN(4);
     KEEP(*(.isr_vector))
     . = ALIGN(4);
-  } >FLASH
+  } >VECTOR
+
+
+  .eeprom :
+  {
+    . = ALIGN(4);
+    *(.eeprom)         /* special section for persistent data */
+    . = ALIGN(4);
+  } >EEPROM
+
 
   .text :
   {
@@ -33,7 +49,7 @@ SECTIONS
     *(.rodata*)        /* .rodata* sections (constants, strings, etc.) */
     *(.glue_7)         /* glue arm to thumb code */
     *(.glue_7t)        /* glue thumb to arm code */
-	*(.eh_frame)
+    *(.eh_frame)
 
     KEEP (*(.init))
     KEEP (*(.fini))
