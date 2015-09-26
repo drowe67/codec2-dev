@@ -59,10 +59,10 @@
 #define VROM_APP_BLOCK_CNT	(VROM_SECT_CNT * VROM_SECT_APP_BLOCK_CNT)
 
 /*!
- * Maximum number of erase cycles per sector.  No idea what this actually
- * is, they don't say in the datasheet.
+ * Maximum number of erase cycles per sector.
+ * Table 42 (page 109) of STM32F405 datasheet (DocID022152 Rev 5).
  */
-#define VROM_MAX_CYCLES		(100000)
+#define VROM_MAX_CYCLES		(10000)
 
 /*!
  * EEPROM block header.
