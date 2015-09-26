@@ -131,6 +131,8 @@ struct vrom_sector_idx_t {
 	uint16_t		flags[VROM_SECT_APP_BLOCK_CNT];
 };
 
+#define VROM_SFLAGS_USED	(1 << 0)	/*!< Block in use */
+
 /*!
  * Return the address of a virtual EEPROM sector header.
  */
@@ -146,11 +148,9 @@ static const struct vrom_sector_idx_t* vrom_get_sector_hdr(uint8_t sector)
 static const struct vrom_data_block_t* vrom_get_block(
 		uint8_t sector, uint8_t block)
 {
-	const void* sector_hdr = (const void*)
-		vrom_get_sector_hdr(sector);
 	return (const struct vrom_data_block_t*)(
-			sector_hdr + (VROM_BLOCK_SZ 
-				* ((block % VROM_SECT_APP_BLOCK_CNT)+1)));
+			(void*)vrom_get_sector_hdr(sector)
+			+ (VROM_BLOCK_SZ * (block + 1)));
 }
 
 /*!
@@ -274,7 +274,7 @@ static int vrom_format_sector(const struct vrom_sector_idx_t* sector)
 
 		/* This sector has been formatted before */
 		cycles_remain = sector->cycles_remain - 1;
-		if (FLASH_EraseSector(sector_num, VoltageRange_3))
+		if (FLASH_EraseSector(sector_num + 1, VoltageRange_3))
 			/* Erase failed */
 			return -EIO;
 	}
@@ -347,14 +347,31 @@ static const struct vrom_data_block_t* vrom_find_free(uint8_t run_gc)
 }
 
 /*!
- * Mark a block as being obsolete
+ * Set flags for a block
  */
-static int vrom_mark_obsolete(const struct vrom_data_block_t* block)
+static int vrom_set_flags(const struct vrom_data_block_t* block,
+		uint16_t flags)
 {
 	const struct vrom_sector_idx_t* sector =
 		vrom_get_sector_hdr(vrom_sector_num(block));
 	uint8_t block_num = vrom_block_num(block);
 
+	/* Compute the new flags settings */
+	flags = sector->flags[block_num] & ~flags;
+
+	/* Write them */
+	if (FLASH_ProgramHalfWord(
+			(uint32_t)(&(sector->flags[block_num])),
+			flags) != FLASH_COMPLETE)
+		return -EIO;
+	return 0;
+}
+
+/*!
+ * Mark a block as being obsolete
+ */
+static int vrom_mark_obsolete(const struct vrom_data_block_t* block)
+{
 	/* Blank out the CRC */
 	if (FLASH_ProgramWord((uint32_t)(&(block->header.crc32)), 0)
 			!= FLASH_COMPLETE)
@@ -376,11 +393,7 @@ static int vrom_mark_obsolete(const struct vrom_data_block_t* block)
 			!= FLASH_COMPLETE)
 		return -EIO;
 	/* Blank out the flags */
-	if (FLASH_ProgramHalfWord(
-			(uint32_t)(&(sector->flags[block_num])), 0)
-			!= FLASH_COMPLETE)
-		return -EIO;
-	return 0;
+	return vrom_set_flags(block, -1);
 }
 
 /*!
@@ -392,8 +405,12 @@ static int vrom_write_block(uint8_t rom, uint8_t idx, uint8_t size,
 	/* Find a new home for the block */
 	const struct vrom_data_block_t* block = vrom_find_free(0);
 	struct vrom_data_block_t new_block;
-	uint8_t* out = (uint8_t*)(&block);
+	uint8_t* out = (uint8_t*)(block);
 	uint32_t rem = sizeof(new_block);
+	int res;
+
+	if (!block)
+		return -ENOSPC;
 
 	/* Prepare the new block */
 	memset(&new_block, 0xff, sizeof(new_block));
@@ -405,8 +422,9 @@ static int vrom_write_block(uint8_t rom, uint8_t idx, uint8_t size,
 
 	/* Start writing out the block */
 	in = (uint8_t*)(&new_block);
+	rem = VROM_BLOCK_SZ;
 	while(rem) {
-		if (*in != *out) {
+		if (*out != *in) {
 			if (FLASH_ProgramByte((uint32_t)out, *in)
 					!= FLASH_COMPLETE)
 				/* Failed! */
@@ -416,6 +434,9 @@ static int vrom_write_block(uint8_t rom, uint8_t idx, uint8_t size,
 		out++;
 		rem--;
 	}
+	res = vrom_set_flags(block, VROM_SFLAGS_USED);
+	if (res < 0)
+		return res;
 	return size;
 }
 
@@ -630,6 +651,12 @@ int vrom_write(uint8_t rom, uint16_t offset, uint16_t size,
 {
 	int res;
 	FLASH_Unlock();
+	FLASH_ClearFlag(FLASH_FLAG_EOP
+			| FLASH_FLAG_OPERR
+			| FLASH_FLAG_WRPERR
+			| FLASH_FLAG_PGAERR
+			| FLASH_FLAG_PGPERR
+			| FLASH_FLAG_PGSERR);
 	res = vrom_write_internal(rom, offset, size, in);
 	FLASH_Lock();
 	return res;
@@ -646,7 +673,12 @@ int vrom_erase(uint8_t rom)
 {
 	int sector, block;
 	FLASH_Unlock();
-
+	FLASH_ClearFlag(FLASH_FLAG_EOP
+			| FLASH_FLAG_OPERR
+			| FLASH_FLAG_WRPERR
+			| FLASH_FLAG_PGAERR
+			| FLASH_FLAG_PGPERR
+			| FLASH_FLAG_PGSERR);
 	for (sector = 0; sector < VROM_SECT_CNT; sector++) {
 		const struct vrom_sector_idx_t* sect_hdr
 			= vrom_get_sector_hdr(sector);
