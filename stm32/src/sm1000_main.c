@@ -758,7 +758,7 @@ static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
             /* Restore the mode and exit the menu */
             sfx_play(&sfx_player, sound_returned);
         case MENU_EVT_EXIT:
-            morse_player.dit_time = menu->current;
+            prefs.menu_vol = menu->current;
             menu_leave(menu);
             break;
         default:
