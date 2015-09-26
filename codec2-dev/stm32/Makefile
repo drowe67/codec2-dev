@@ -674,6 +674,7 @@ src/sm1000_leds_switches.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
+src/stm32f4_vrom.c \
 src/init.c
 
 SM1000_SRCS += $(CODEC2_SRCS)
