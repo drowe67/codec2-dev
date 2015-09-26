@@ -451,6 +451,9 @@ int main(void) {
                 spk_nsamples -= n_rem;
                 play_ptr += n_rem;
             }
+
+            /* Clear out buffer */
+            memset(dac16k, 0, sizeof(dac16k));
         }
 
     } /* while(1) ... */
