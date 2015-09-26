@@ -216,7 +216,8 @@ int main(void) {
                     /* We've just exited a menu, wait for release of BACK */
                     if (switch_released(&sw_back))
                         menuExit = 0;
-                } else if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                } else if (!switch_pressed(&sw_ptt) &&
+                        (switch_pressed(&sw_select) > HOLD_DELAY)) {
                     /* Enter the menu */
                     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
                     menu_enter(&menu, &menu_root);
