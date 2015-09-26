@@ -89,6 +89,18 @@ static const struct menu_item_t menu_root;
 #define MENU_EVT_BACK   0x21    /*!< Go back one level */
 #define MENU_EVT_EXIT   0x30    /*!< Exit menu */
 
+/*!
+ * Software-mix two 16-bit samples.
+ */
+int16_t software_mix(int16_t a, int16_t b) {
+    int32_t s = a + b;
+    if (s < INT16_MIN)
+        return INT16_MIN;   /* Clip! */
+    if (s > INT16_MAX)
+        return INT16_MAX;   /* Clip! */
+    return s;
+}
+
 int main(void) {
     struct freedv *f;
     int            nin, nout, i;
@@ -96,6 +108,9 @@ int main(void) {
 
     /* Menu data */
     struct menu_t   menu;
+
+    /* Outgoing sample counter */
+    int spk_nsamples = 0;
 
     /* init all the drivers for various peripherals */
 
@@ -233,35 +248,7 @@ int main(void) {
         switch_ack(&sw_back);
         switch_ack(&sw_ptt);
 
-        if (sfx_player.note) {
-            int samples = 0;
-            int sz_free = dac2_free();
-            if (sz_free > n_samples_16k)
-                sz_free = n_samples_16k;
-            for (i=0; i < sz_free; i++) {
-                dac16k[i] = sfx_next(&sfx_player) >> prefs.menu_vol;
-                samples++;
-                if (!sfx_player.note)
-                    break;
-            }
-            dac2_write(dac16k, samples);
-            if (!sfx_player.note && morse_player.msg)
-                announceTicker = ANNOUNCE_DELAY;
-        }
-        else if (!announceTicker && morse_player.msg) {
-            int samples = 0;
-            int sz_free = dac2_free();
-            if (sz_free > n_samples_16k)
-                sz_free = n_samples_16k;
-            for (i=0; i < sz_free; i++) {
-                dac16k[i] = morse_next(&morse_player) >> prefs.menu_vol;
-                samples++;
-                if (!morse_player.msg)
-                    break;
-            }
-            dac2_write(dac16k, samples);
-        }
-        else if (menu.stack_depth > 0) {
+        if (menu.stack_depth > 0) {
             if (!menuLEDTicker) {
                 led_pwr(LED_INV);
                 menuLEDTicker = MENU_LED_PERIOD;
@@ -341,7 +328,7 @@ int main(void) {
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
-                    dac2_write(dac16k, n_samples_16k);
+                    spk_nsamples = n_samples_16k;
                     led_rt(0); led_err(0);
                }
             }
@@ -357,13 +344,64 @@ int main(void) {
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
                     nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
-                    dac2_write(dac16k, 2*nout);
+                    spk_nsamples = 2*nout;
                     led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
                     GPIOE->ODR &= ~(1 << 3);
                 }
             }
 
         }
+
+        if (spk_nsamples || sfx_player.note || morse_player.msg) {
+            /* Make a note of our playback position */
+            int16_t* play_ptr = dac16k;
+
+            if (!spk_nsamples)
+                spk_nsamples = dac2_free();
+
+            /*
+             * There is audio to play on the external speaker.  If there
+             * is a sound or announcement, software-mix it into the outgoing
+             * buffer.
+             */
+            if (sfx_player.note) {
+                int i;
+                if (menu.stack_depth) {
+                    /* Exclusive */
+                    for (i = 0; i < spk_nsamples; i++)
+                        dac16k[i] = sfx_next(&sfx_player) >> prefs.menu_vol;
+                } else {
+                    /* Software mix */
+                    for (i = 0; i < spk_nsamples; i++)
+                        dac16k[i] = software_mix(dac16k[i],
+                                sfx_next(&sfx_player) >> prefs.menu_vol);
+                }
+                if (!sfx_player.note && morse_player.msg)
+                    announceTicker = ANNOUNCE_DELAY;
+            } else if (!announceTicker && morse_player.msg) {
+                int i;
+                if (menu.stack_depth) {
+                    for (i = 0; i < spk_nsamples; i++)
+                        dac16k[i] = morse_next(&morse_player) >> prefs.menu_vol;
+                } else {
+                    for (i = 0; i < spk_nsamples; i++)
+                        dac16k[i] = software_mix(dac16k[i],
+                                morse_next(&morse_player) >> prefs.menu_vol);
+                }
+            }
+
+            while (spk_nsamples) {
+                /* Get the number of samples to be played this time around */
+                int n_rem = dac2_free();
+                if (spk_nsamples < n_rem)
+                    n_rem = spk_nsamples;
+                /* Play the audio */
+                dac2_write(play_ptr, n_rem);
+                spk_nsamples -= n_rem;
+                play_ptr += n_rem;
+            }
+        }
+
     } /* while(1) ... */
 }
 
