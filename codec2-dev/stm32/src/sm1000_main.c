@@ -31,6 +31,7 @@
 
 #include "stm32f4_adc.h"
 #include "stm32f4_dac.h"
+#include "stm32f4_vrom.h"
 #include "freedv_api.h"
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
@@ -67,11 +68,14 @@ unsigned int menuExit = 0;
  * User preferences
  */
 static struct prefs_t {
-    /*! Operating mode */
-    uint8_t op_mode;
+    /*! Menu frequency */
+    uint16_t menu_freq;
+    /*! Menu speed */
+    uint8_t menu_speed;
     /*! Menu volume (attenuation) */
     uint8_t menu_vol;
-    /* TODO: more to come */
+    /*! Default operating mode */
+    uint8_t op_mode;
 } prefs;
 
 struct tone_gen_t tone_gen;
@@ -112,6 +116,9 @@ int main(void) {
     /* Outgoing sample counter */
     int spk_nsamples = 0;
 
+    /* Current runtime operation mode */
+    int op_mode = ANALOG;
+
     /* init all the drivers for various peripherals */
 
     SysTick_Config(SystemCoreClock/168000); /* 1 kHz SysTick */
@@ -138,6 +145,41 @@ int main(void) {
     for(i=0; i<FDMDV_OS_TAPS_8K; i++)
         dac8k[i] = 0.0;
 
+    if (!switch_back()) {
+        /* Play tone to acknowledge, wait for release */
+        tone_reset(&tone_gen, 1200, 1000);
+        while(!switch_back()) {
+            int dac_rem = dac2_free();
+            if (dac_rem) {
+                if (dac_rem > n_samples_16k)
+                    dac_rem = n_samples_16k;
+
+                for (i = 0; i < dac_rem; i++)
+                    dac16k[i] = tone_next(&tone_gen);
+                dac2_write(dac16k, dac_rem);
+            }
+            if (!menuLEDTicker) {
+                menuLEDTicker = MENU_LED_PERIOD;
+                led_rt(LED_INV);
+            }
+        }
+
+        /* Button released, do an EEPROM erase */
+        vrom_erase(0);
+    }
+    led_rt(LED_OFF);
+    tone_reset(&tone_gen, 0, 0);
+
+    /* Try to load preferences from flash */
+    if (vrom_read(0, 0, sizeof(prefs), &prefs) != sizeof(prefs)) {
+        /* Fail!  Load defaults. */
+        memset(&prefs, 0, sizeof(prefs));
+        prefs.op_mode = ANALOG;
+        prefs.menu_vol = 2;
+        prefs.menu_speed = 60;  /* 20 WPM */
+        prefs.menu_freq = 800;
+    }
+
     /* Clear out switch states */
     memset(&sw_select, 0, sizeof(sw_select));
     memset(&sw_back, 0, sizeof(sw_back));
@@ -146,17 +188,13 @@ int main(void) {
     /* Clear out menu state */
     memset(&menu, 0, sizeof(menu));
 
-    morse_player.freq = 800;
-    morse_player.dit_time = 60;    /* 20 WPM */
+    morse_player.freq = prefs.menu_freq;
+    morse_player.dit_time = prefs.menu_speed;
     morse_player.msg = NULL;
-
-    tone_reset(&tone_gen, 0, 0);
+    op_mode = prefs.op_mode;
 
     /* play a start-up tune. */
     sfx_play(&sfx_player, sound_startup);
-
-    prefs.op_mode = ANALOG;
-    prefs.menu_vol = 2;
 
     while(1) {
         /* Read switch states */
@@ -170,6 +208,7 @@ int main(void) {
             if (menu.stack_depth > 0) {
                 /* We are in a menu */
                 static uint8_t press_ack = 0;
+                uint8_t save_settings = 0;
 
                 if (press_ack == 1) {
                     if ((sw_select.state == SW_STEADY)
@@ -188,6 +227,10 @@ int main(void) {
                         menu_exec(&menu, MENU_EVT_BACK);
                         press_ack = 2;
                         menuTicker = MENU_DELAY;
+
+                        if (!menu.stack_depth)
+                            save_settings = 1;
+
                     } else if (switch_released(&sw_select)) {
                         menu_exec(&menu, MENU_EVT_NEXT);
                         menuTicker = MENU_DELAY;
@@ -207,6 +250,12 @@ int main(void) {
                         led_pwr(LED_ON);
                         morse_play(&morse_player, NULL);
                         menuExit = 1;
+                        if (save_settings) {
+                            /* Copy the settings in */
+                            prefs.menu_freq = morse_player.freq;
+                            prefs.menu_speed = morse_player.dit_time;
+                            vrom_write(0, 0, sizeof(prefs), &prefs);
+                        }
                     }
                 }
             } else {
@@ -224,21 +273,21 @@ int main(void) {
                     menuTicker = MENU_DELAY;
                 } else if (switch_released(&sw_select)) {
                     /* Shortcut: change current mode */
-                    prefs.op_mode = (prefs.op_mode + 1) % MAX_MODES;
+                    op_mode = (op_mode + 1) % MAX_MODES;
                     mode_changed = 1;
                 } else if (switch_released(&sw_back)) {
                     /* Shortcut: change current mode */
-                    prefs.op_mode = (prefs.op_mode - 1) % MAX_MODES;
+                    op_mode = (op_mode - 1) % MAX_MODES;
                     mode_changed = 1;
                 }
 
                 if (mode_changed) {
                     /* Announce the new mode */
-                    if (prefs.op_mode == ANALOG)
+                    if (op_mode == ANALOG)
                         morse_play(&morse_player, "ANA");
-                    else if (prefs.op_mode == DV)
+                    else if (op_mode == DV)
                         morse_play(&morse_player, "1600");
-                    else if (prefs.op_mode == TONE)
+                    else if (op_mode == TONE)
                         morse_play(&morse_player, "TONE");
                     sfx_play(&sfx_player, sound_click);
                 }
@@ -281,20 +330,20 @@ int main(void) {
 
                 fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
 
-                if (prefs.op_mode == ANALOG) {
+                if (op_mode == ANALOG) {
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
-                if (prefs.op_mode == DV) {
+                if (op_mode == DV) {
                     freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                     for(i=0; i<n_samples; i++)
                         dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
                     fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                     dac1_write(dac16k, n_samples_16k);
                 }
-                if (prefs.op_mode == TONE) {
+                if (op_mode == TONE) {
                     if (!tone_gen.remain)
                         /*
                          * Somewhat ugly, but UINT16_MAX is effectively
@@ -323,7 +372,7 @@ int main(void) {
 
             /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
-            if (prefs.op_mode == ANALOG) {
+            if (op_mode == ANALOG) {
 
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
