@@ -67,7 +67,7 @@
 /*!
  * EEPROM block header.
  */
-struct vrom_block_hdr_t {
+struct __attribute__ ((__packed__)) vrom_block_hdr_t {
 	/*!
 	 * CRC32 checksum of the data, offset, size and ROM ID.
 	 * A CRC32 of 0x00000000 indicates an obsoleted block.
@@ -105,7 +105,7 @@ struct vrom_block_hdr_t {
 /*!
  * EEPROM data block.
  */
-struct vrom_data_block_t {
+struct __attribute__ ((__packed__)) vrom_data_block_t {
 	/*! Block header */
 	struct vrom_block_hdr_t		header;
 
@@ -118,7 +118,7 @@ struct vrom_data_block_t {
  * the used/free state of the entire block and counts the number of
  * erase cycles for the sector.  The index block has no header.
  */
-struct vrom_sector_idx_t {
+struct __attribute__ ((__packed__)) vrom_sector_idx_t {
 	/*!
 	 * Number of erase cycles remaining for the sector.
 	 * 0xffffffff == unprogrammed.
