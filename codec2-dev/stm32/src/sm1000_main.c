@@ -141,7 +141,7 @@ int main(void) {
     sfx_play(&sfx_player, sound_startup);
 
     prefs.op_mode = ANALOG;
-    prefs.menu_vol = 7;
+    prefs.menu_vol = 2;
 
     while(1) {
         /* Read switch states */
@@ -351,7 +351,7 @@ int main(void) {
 
                 nin = freedv_nin(f);
                 nout = nin;
-		freedv_set_total_bit_errors(f, 0);
+                freedv_set_total_bit_errors(f, 0);
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                     GPIOE->ODR = (1 << 3);
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
