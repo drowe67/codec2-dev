@@ -16,7 +16,7 @@
  * 'remain' is zero.
  *
  * Author Stuart Longland <me@vk4msl.id.au>
- * Copyright (C) 2015 FreeDV <me@vk4msl.id.au>tors.
+ * Copyright (C) 2015 FreeDV project.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License version 2.1,
