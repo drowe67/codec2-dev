@@ -351,7 +351,7 @@ int main(void) {
 
                 nin = freedv_nin(f);
                 nout = nin;
-                freedv_set_total_bit_errors(f, 0);
+		freedv_set_total_bit_errors(f, 0);
                 if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                     GPIOE->ODR = (1 << 3);
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
@@ -768,7 +768,7 @@ static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
         static char vol[3];
-        snprintf(vol, 2, "%d", 15 - prefs.menu_vol);
+        snprintf(vol, 3, "%d", 15 - prefs.menu_vol);
         /* Announce the volume level */
         morse_play(&morse_player, vol);
     }
