@@ -35,9 +35,11 @@ SECTIONS
   .eeprom :
   {
     . = ALIGN(4);
-    *(.eeprom)         /* special section for persistent data */
+    KEEP(*(.eeprom))   /* special section for persistent data */
+    . = ORIGIN(EEPROM) + LENGTH(EEPROM) - 1;
+    BYTE(0xFF)
     . = ALIGN(4);
-  } >EEPROM
+  } >EEPROM = 0xff
 
 
   .text :
