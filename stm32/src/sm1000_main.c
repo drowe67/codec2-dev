@@ -69,6 +69,8 @@ unsigned int menuExit = 0;
  * User preferences
  */
 static struct prefs_t {
+    /*! Serial number */
+    uint64_t serial;
     /*! Menu frequency */
     uint16_t menu_freq;
     /*! Menu speed */
@@ -79,8 +81,20 @@ static struct prefs_t {
     uint8_t op_mode;
 } prefs;
 
-/* Preferences changed flag */
+/*! Preferences changed flag */
 int prefs_changed = 0;
+
+/*! Number of preference images kept */
+#define PREFS_IMG_NUM       (2)
+/*! Base ROM ID for preferences */
+#define PREFS_IMG_BASE      (0)
+/*! Minimum serial number */
+#define PREFS_SERIAL_MIN    8
+/*! Maximum serial number */
+#define PREFS_SERIAL_MAX    UINT64_MAX
+
+/*! Preference serial numbers, by slot */
+static uint64_t prefs_serial[PREFS_IMG_NUM];
 
 struct tone_gen_t tone_gen;
 struct sfx_player_t sfx_player;
@@ -107,6 +121,65 @@ int16_t software_mix(int16_t a, int16_t b) {
     if (s > INT16_MAX)
         return INT16_MAX;   /* Clip! */
     return s;
+}
+
+/*! Compare current serial with oldest and newest */
+void compare_prefs(int* const oldest, int* const newest, int idx)
+{
+    if (newest && prefs_serial[idx]) {
+        if ((*newest < 0)
+                || (prefs_serial[idx] > prefs_serial[*newest])
+                || ((prefs_serial[idx] == PREFS_SERIAL_MIN)
+                    && (prefs_serial[*newest] == PREFS_SERIAL_MAX)))
+            *newest = idx;
+    }
+
+    if (oldest) {
+        if ((*oldest < 0)
+                || (!prefs_serial[idx])
+                || (prefs_serial[idx] < prefs_serial[*oldest])
+                || ((prefs_serial[idx] == PREFS_SERIAL_MAX)
+                    && (prefs_serial[*oldest] == PREFS_SERIAL_MIN)))
+            *oldest = idx;
+    }
+}
+
+/*! Find oldest and newest images */
+void find_prefs(int* const oldest, int* const newest)
+{
+    int i;
+    if (newest) *newest = -1;
+    if (oldest) *oldest = -1;
+    for (i = 0; i < PREFS_IMG_NUM; i++)
+        compare_prefs(oldest, newest, i);
+}
+
+/*! Load preferences from flash */
+int load_prefs()
+{
+    struct prefs_t image[PREFS_IMG_NUM];
+    int newest = -1;
+    int i;
+
+    /* Load all copies into RAM */
+    for (i = 0; i < PREFS_IMG_NUM; i++) {
+        int res = vrom_read(PREFS_IMG_BASE + i, 0,
+                sizeof(image[i]), &image[i]);
+        if (res == sizeof(image[i])) {
+            prefs_serial[i] = image[i].serial;
+            compare_prefs(NULL, &newest, i);
+        } else {
+            prefs_serial[i] = 0;
+        }
+    }
+
+    if (newest < 0)
+        /* No newest image was found */
+        return -ENOENT;
+
+    /* Load from the latest image */
+    memcpy(&prefs, &image[newest], sizeof(prefs));
+    return 0;
 }
 
 int main(void) {
@@ -176,13 +249,14 @@ int main(void) {
         }
 
         /* Button released, do an EEPROM erase */
-        vrom_erase(0);
+        for (i = 0; i < PREFS_IMG_NUM; i++)
+            vrom_erase(i + PREFS_IMG_BASE);
     }
     led_rt(LED_OFF);
     tone_reset(&tone_gen, 0, 0);
 
     /* Try to load preferences from flash */
-    if (vrom_read(0, 0, sizeof(prefs), &prefs) != sizeof(prefs)) {
+    if (load_prefs() < 0) {
         /* Fail!  Load defaults. */
         memset(&prefs, 0, sizeof(prefs));
         prefs.op_mode = ANALOG;
@@ -262,10 +336,23 @@ int main(void) {
                         morse_play(&morse_player, NULL);
                         menuExit = 1;
                         if (save_settings) {
+                            int oldest = -1;
+                            int res;
                             /* Copy the settings in */
                             prefs.menu_freq = morse_player.freq;
                             prefs.menu_speed = morse_player.dit_time;
-                            vrom_write(0, 0, sizeof(prefs), &prefs);
+                            /* Increment serial number */
+                            prefs.serial++;
+                            /* Find the oldest image */
+                            find_prefs(&oldest, NULL);
+                            if (oldest < 0)
+                                oldest = 0; /* No current image */
+
+                            /* Write new settings over it */
+                            res = vrom_write(oldest + PREFS_IMG_BASE, 0,
+                                    sizeof(prefs), &prefs);
+                            if (res >= 0)
+                                prefs_serial[oldest] = prefs.serial;
                         }
                     }
                 }
