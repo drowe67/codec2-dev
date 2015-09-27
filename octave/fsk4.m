@@ -4,7 +4,7 @@
 graphics_toolkit("gnuplot");
 
 fm;
-
+pkg load signal;
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
 dmr.tx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
@@ -232,13 +232,13 @@ endfunction
 % Bit error rate test
 % for a noise-free channel
 % now supports noisy channels
-function [ber thrber] = nfbert(aEsNodB)
+function [ber thrcoh thrncoh] = nfbert(aEsNodB)
   global dmr_info;
   global nxdn_info;
   rand('state',1); 
   randn('state',1);
 
-  bitcnt = 96000;
+  bitcnt = 480000;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,2400,dmr_info);
@@ -273,23 +273,52 @@ function [ber thrber] = nfbert(aEsNodB)
   offset = ox;
   printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
 
-  thrber = erfc(sqrt(EbNo));
+  % Coherent BER theory
+  thrcoh = erfc(sqrt(EbNo));
+
+  % non-coherent BER theory calculation
+  % It was complicated, so I broke it up
+
+  ms = 4;
+  ns = (1:ms-1);
+  as = (-1).^(ns+1);
+  bs = (as./(ns+1));
+  
+  cs = ((ms-1)./ns);
+
+  ds = ns.*log2(ms);
+  es = ns+1;
+  fs = exp( -(ds./es)*EbNo );
+  
+  thrncoh = ((ms/2)/(ms-1)) * sum(bs.*((ms-1)./ns).*exp( -(ds./es)*EbNo ));
+  %thrncoh = (2/3)*sum( (((-1).^(ns+1))./(ns+1)) .* (3./ns) .* exp( -((ns.*2)./ns)*EbNo )
   %plot(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
   %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
 endfunction
 
-pkg load parallel
+
 function fsk4_ber_curves
   EbNodB = 4:13;
-  bers_tnco = bers_real = ones(1,length(EbNodB));
+  bers_tco = bers_real = bers_tnco = ones(1,length(EbNodB));
   %for ii=(1:length(EbNodB));
   %  [bers_real(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
   %end
-  [bers_real,bers_tnco] = pararrayfun(5,@nfbert,EbNodB);
+  try
+    pkg load parallel
+    [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB);
+  catch
+    printf("You should install package parallel. It'll make this run way faster\n");
+    for ii=(1:length(EbNodB));
+      [bers_real(ii),bers,tco(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
+    end
+  end_try_catch
   figure;
   clf;
+  bers_tnco
   semilogy(EbNodB, bers_tnco,'r;4FSK non-coherent theory;')
   hold on;
+
+  semilogy(EbNodB, bers_tco,'b;4FSK coherent theory;')
   semilogy(EbNodB, bers_real ,'g;4FSK non-coherent sim;')
   hold off;
   grid("minor");
