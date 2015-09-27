@@ -8,11 +8,29 @@ fm;
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
 dmr.tx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
-dmr.rx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
+dmr.rx_filt_resp = dmr.tx_filt_resp;
 dmr.max_dev = 1944;
 dmr.syms = [-1944 -648 648 1944];
-
 global dmr_info = dmr;
+
+%Some parameters for the NXDN filters
+nxdn_al = .2;
+nxdn_T = 416.7e-6;
+nxdn_fl = ((1-nxdn_al)/(2*nxdn_T));
+nxdn_fh = ((1+nxdn_al)/(2*nxdn_T));
+
+%Frequency response of the NXDN filters
+% from NXDN TS 1-A V1.3 page 13
+nxdn_H = @(f) 1.0*(f<nxdn_fl) + cos( (nxdn_T/(4*nxdn_al))*(2*pi*f-(pi*(1-nxdn_al)/nxdn_T)) ).*(f<=nxdn_fh & f>nxdn_fl);
+nxdn_P = @(f) (f<=nxdn_fh & f>0).*((sin(pi*f*nxdn_T))./(.00001+(pi*f*nxdn_T))) + 1.0*(f==0);
+nxdn_D = @(f) (f<=nxdn_fh & f>0).*((pi*f*nxdn_T)./(.00001+sin(pi*f*nxdn_T))) + 1.0*(f==0);
+
+nxdn.tx_filt_resp = @(f) nxdn_H(f).*nxdn_P(f);
+nxdn.rx_filt_resp = @(f) nxdn_H(f).*nxdn_D(f);
+nxdn.max_dev = 1050;
+nxdn.syms = [-1050,-350,350,1050];
+
+global nxdn_info = nxdn;
 
 function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     Fs = fsk4_states.Fs = 48000;  %Sample rate
@@ -35,7 +53,7 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fm_states.fm_max = fsk4_info.max_dev*2;
     fm_states.fd = fsk4_info.max_dev;
     fm_states.pre_emp = fm_states.de_emp = 0;
-    fm_states.output_filter = 1;
+    fm_states.output_filter = 0;
     fsk4_states.fm_states = analog_fm_init(fm_states);
     fsk4_states.modinfo=fsk4_info;
 endfunction 
@@ -64,10 +82,10 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
     tx_stream(1+(i-1)*M:i*M) = fsk4_states.symmap(tx_symbols(i));
   end
   tx_filt = filter(fsk4_states.tx_filter, 1, tx_stream);
-  %tx_filt = tx_filt / max(tx_filt);
+
   tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
-  figure(10);
-  plot(20*log10(abs(fft(tx))))
+  %figure(10);
+  %plot(20*log10(abs(fft(tx))))
 
 endfunction
 
@@ -103,18 +121,18 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   sym3m = idmp(sym3m(fine_timing:length(sym3m)),M); sym3m = (real(sym3m).^2+imag(sym3m).^2);
   sym4m = idmp(sym4m(fine_timing:length(sym4m)),M); sym4m = (real(sym4m).^2+imag(sym4m).^2);
 
-  figure(2);
+  %figure(2);
   nsym = 500;
   %subplot(411); plot(sym1m(1:nsym))
   %subplot(412); plot(sym2m(1:nsym))
   %subplot(413); plot(sym3m(1:nsym))
   %subplot(414); plot(sym4m(1:nsym))
-  plot((1:nsym),sym1m(1:nsym),(1:nsym),sym2m(1:nsym),(1:nsym),sym3m(1:nsym),(1:nsym),sym4m(1:nsym))
+  %plot((1:nsym),sym1m(1:nsym),(1:nsym),sym2m(1:nsym),(1:nsym),sym3m(1:nsym),(1:nsym),sym4m(1:nsym))
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
-  figure(3);
-  hist(iv);
+  %figure(3);
+  %hist(iv);
   for i=1:length(iv)
     bits(1+(i-1)*2:i*2) = [[0 0];[0 1];[1 0];[1 1]](iv(i),(1:2));
   end
@@ -174,32 +192,31 @@ function bits = fsk4_demod_two(fsk4_states,rx)
   hist(syms);
   
 endfunction
- 
-%My fourth attempt at a 4fsk demodulator. Based on the same paper as the previous.
-function bits = fsk4_demod_four(fsk4_states,rx)
-
-endfunction
 
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
 function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
-  
-  rx_filt = filter(fsk4_states.tx_filter, 1, rxd); 
+  M = fsk4_states.M;
+  fine_timing = M+11;
+
+  rx_filt = filter(fsk4_states.rx_filter, 1, rxd);
+
   %rx_filt=rxd;
   figure(1)
-  eyediagram(rxd,40);
-  sym = afsym = idmp(rx_filt,fsk4_states.M);
+  hist(rx_filt);
+  eyediagram(rx_filt,40);
+  sym = afsym = idmp(rx_filt(fine_timing:length(rx_filt)),fsk4_states.M/2);
   figure(4)
   eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
   % After integrating, the high symbol tends to be about 7.5
-  dmsyms = rot90(fsk4_states.symmap * 20);
+  dmsyms = rot90(fsk4_states.symmap * 15);
 
-  oddsyms  = afsym(1:2:length(afsym));
-  evensyms = afsym(2:2:length(afsym));
+  %oddsyms  = afsym(1:2:length(afsym));
+  %evensyms = afsym(2:2:length(afsym));
   figure(2)
-  hist(evensyms,30);
+  hist(afsym,30);
 
   [err, sym] = min(abs(afsym-dmsyms));
 
@@ -215,13 +232,13 @@ endfunction
 % Bit error rate test
 % for a noise-free channel
 % now supports noisy channels
-function ber = nfbert(aEsNodB)
+function [ber thrber] = nfbert(aEsNodB)
   global dmr_info;
+  global nxdn_info;
   rand('state',1); 
   randn('state',1);
 
-  bitcnt = 48000;
-  offset = 29;
+  bitcnt = 96000;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,2400,dmr_info);
@@ -229,7 +246,6 @@ function ber = nfbert(aEsNodB)
   Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
   
   tx = fsk4_mod(fsk4_states,test_bits);
-  printf("M: %d\n", fsk4_states.M);
 
   %add noise here
   %shamelessly copied from gmsk.m
@@ -245,7 +261,7 @@ function ber = nfbert(aEsNodB)
   %thing to account for offset from input data to output data
   %No preamble detection yet
   ox = 1;
-  for offset = (1:100)
+  for offset = (1:20)
     nerr = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
     bern = nerr/(bitcnt-offset);
     if(bern < ber)
@@ -255,8 +271,46 @@ function ber = nfbert(aEsNodB)
     ber = min([ber bern]);
   end
   offset = ox;
-  printf("coarse timing: %d nerr: %d\n", offset, best_nerr);
+  printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
+
+  thrber = erfc(sqrt(EbNo));
   %plot(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
   %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
 endfunction
+
+pkg load parallel
+function fsk4_ber_curves
+  EbNodB = 4:13;
+  bers_tnco = bers_real = ones(1,length(EbNodB));
+  %for ii=(1:length(EbNodB));
+  %  [bers_real(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
+  %end
+  [bers_real,bers_tnco] = pararrayfun(5,@nfbert,EbNodB);
+  figure;
+  clf;
+  semilogy(EbNodB, bers_tnco,'r;4FSK non-coherent theory;')
+  hold on;
+  semilogy(EbNodB, bers_real ,'g;4FSK non-coherent sim;')
+  hold off;
+  grid("minor");
+  axis([min(EbNodB) max(EbNodB) 1E-8 1])
+  legend("boxoff");
+  xlabel("Eb/No (dB)");
+  ylabel("Bit Error Rate (BER)")
+
+endfunction
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
