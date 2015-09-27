@@ -78,6 +78,9 @@ static struct prefs_t {
     uint8_t op_mode;
 } prefs;
 
+/* Preferences changed flag */
+int prefs_changed = 0;
+
 struct tone_gen_t tone_gen;
 struct sfx_player_t sfx_player;
 struct morse_player_t morse_player;
@@ -229,7 +232,7 @@ int main(void) {
                         menuTicker = MENU_DELAY;
 
                         if (!menu.stack_depth)
-                            save_settings = 1;
+                            save_settings = prefs_changed;
 
                     } else if (switch_released(&sw_select)) {
                         menu_exec(&menu, MENU_EVT_NEXT);
@@ -271,6 +274,7 @@ int main(void) {
                     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
                     menu_enter(&menu, &menu_root);
                     menuTicker = MENU_DELAY;
+                    prefs_changed = 0;
                 } else if (switch_released(&sw_select)) {
                     /* Shortcut: change current mode */
                     op_mode = (op_mode + 1) % MAX_MODES;
@@ -640,6 +644,7 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
             prefs.op_mode = item->children[menu->current]->data.ui;
             /* Play the "selected" tune and return. */
             sfx_play(&sfx_player, sound_startup);
+            prefs_changed = 1;
             menu_leave(menu);
             break;
         case MENU_EVT_BACK:
@@ -718,6 +723,7 @@ static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event)
         case MENU_EVT_SELECT:
             /* Play the "selected" tune and return. */
             sfx_play(&sfx_player, sound_startup);
+            prefs_changed = 1;
             menu_leave(menu);
             break;
         case MENU_EVT_BACK:
@@ -782,6 +788,7 @@ static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event)
         case MENU_EVT_SELECT:
             /* Play the "selected" tune and return. */
             sfx_play(&sfx_player, sound_startup);
+            prefs_changed = 1;
             menu_leave(menu);
             break;
         case MENU_EVT_BACK:
@@ -845,6 +852,7 @@ static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
             /* Play the "selected" tune and return. */
             sfx_play(&sfx_player, sound_startup);
             menu_leave(menu);
+            prefs_changed = 1;
             break;
         case MENU_EVT_BACK:
             /* Restore the mode and exit the menu */
