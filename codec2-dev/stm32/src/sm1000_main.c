@@ -36,6 +36,7 @@
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
 #include <stm32f4xx_gpio.h>
+#include <stm32f4xx_rcc.h>
 #include <stdlib.h>
 
 #include "sfx.h"
@@ -126,8 +127,15 @@ int main(void) {
 
     SysTick_Config(SystemCoreClock/168000); /* 1 kHz SysTick */
     sm1000_leds_switches_init();
+
+    /* Enable CRC clock */
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
+
+    /* Set up ADCs/DACs */
     dac_open(4*DAC_BUF_SZ);
     adc_open(4*ADC_BUF_SZ);
+
+    /* Set up FreeDV modem */
     f = freedv_open(FREEDV_MODE_1600);
     n_samples = freedv_get_n_speech_samples(f);
     n_samples_16k = 2*n_samples;
