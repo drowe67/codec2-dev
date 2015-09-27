@@ -159,10 +159,14 @@ static const struct vrom_data_block_t* vrom_get_block(
 static uint32_t vrom_crc32(
 		const struct vrom_data_block_t* const block)
 {
+	struct vrom_data_block_t temp_block;
+	uint32_t size = sizeof(temp_block);
+	const uint8_t* in = (const uint8_t*)(&temp_block);
 	uint32_t tmp;
 	uint32_t crc;
-	uint32_t size = VROM_BLOCK_SZ - sizeof(uint32_t);
-	const uint8_t* in = (const uint8_t*)(&(block->header.rom));
+
+	memcpy(&temp_block, block, sizeof(temp_block));
+	temp_block.header.crc32 = 0;
 
 	CRC_ResetDR();
 	while(size) {
