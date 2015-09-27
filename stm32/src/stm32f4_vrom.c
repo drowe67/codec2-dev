@@ -34,7 +34,7 @@
 #include "stm32f4xx_flash.h"
 #include "stm32f4xx_crc.h"
 
-#define VROM_SECT_SZ		(65536)	/*!< Size of a flash sector */
+#define VROM_SECT_SZ		(16384)	/*!< Size of a flash sector */
 #define VROM_SECT_CNT		(3)	/*!< Number of sectors */
 #define VROM_BLOCK_SZ		(256)	/*!< Size of a flash block */
 
