@@ -16,6 +16,8 @@ MEMORY
   EEPROM (rx)     : ORIGIN = 0x08004000, LENGTH = 48K
   /* The rest of flash is used for program data */
   FLASH (rx)      : ORIGIN = 0x08010000, LENGTH = 960K
+  /* Backup memory area */
+  BKPSRAM (rwx)   : ORIGIN = 0x40024000, LENGTH = 4K
   /* Memory area */
   RAM (rwx)       : ORIGIN = 0x20000000, LENGTH = 128K
   /* Core Coupled Memory */
@@ -41,6 +43,12 @@ SECTIONS
     . = ALIGN(4);
   } >EEPROM = 0xff
 
+  .bkpsram :
+  {
+    . = ALIGN(4);
+    KEEP(*(.bkpsram))
+    . = ALIGN(4);
+  } > BKPSRAM
 
   .text :
   {
