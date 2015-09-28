@@ -7,11 +7,17 @@ fm;
 pkg load signal;
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
-dmr.tx_filt_resp = @(f) 1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880);
+dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880));
 dmr.rx_filt_resp = dmr.tx_filt_resp;
 dmr.max_dev = 1944;
 dmr.syms = [-1944 -648 648 1944];
 global dmr_info = dmr;
+
+nfl.tx_filt_resp = @(f) 1;
+nfl.rx_filt_resp = nfl.tx_filt_resp;
+nfl.max_dev = 1944;
+nfl.syms = [-1944 -648 648 1944];
+global nflt_info = nfl;
 
 %Some parameters for the NXDN filters
 nxdn_al = .2;
@@ -42,8 +48,9 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     % and demods
 
     rf = (0:(Fs/2));
-    fsk4_states.tx_filter = fir2(100 ,rf/(Fs/2),fsk4_info.tx_filt_resp(rf));
-    fsk4_states.rx_filter = fir2(100 ,rf/(Fs/2),fsk4_info.rx_filt_resp(rf));
+    fsk4_states.tx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.tx_filt_resp(rf));
+    fsk4_states.rx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.rx_filt_resp(rf));
+    %fsk4_states.tx_filter = fsk4_states.rx_filter = [zeros(1,99) 1];
     %Set up the 4FSK symbols
     fsk4_states.symmap = fsk4_info.syms / fsk4_info.max_dev;
     
@@ -54,6 +61,7 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fm_states.fd = fsk4_info.max_dev;
     fm_states.pre_emp = fm_states.de_emp = 0;
     fm_states.output_filter = 0;
+    fm_states.no_limit_phase = 1;
     fsk4_states.fm_states = analog_fm_init(fm_states);
     fsk4_states.modinfo=fsk4_info;
 endfunction 
@@ -102,8 +110,12 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   % This has some nasty side lobes so lets limit the overall amount
   % of noise getting in.  tx filter just happens to work, but I imagine
   % other LPF would as well.
-
-  rx = filter(fsk4_states.rx_filter, 1, rx);
+ 
+  Fs = fsk4_states.Fs;
+  rf = (0:(Fs/2));
+  rx_filter_a = fir1(100 ,.5);
+  rx_filter_b = fsk4_states.rx_filter;
+  %rx = filter(rx_filter_a, 1, rx);
 
   sym1m = exp(-j*2*pi*(symup(1)/Fs)*t).*rx;
   sym2m = exp(-j*2*pi*(symup(2)/Fs)*t).*rx;
@@ -114,20 +126,20 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   % filter impulse responses, as delay will vary.  f you add M to it coarse
   % timing will adjust by 1.
 
-  fine_timing = M+1;
+  fine_timing = 11;
 
   sym1m = idmp(sym1m(fine_timing:length(sym1m)),M); sym1m = (real(sym1m).^2+imag(sym1m).^2);
   sym2m = idmp(sym2m(fine_timing:length(sym2m)),M); sym2m = (real(sym2m).^2+imag(sym2m).^2);
   sym3m = idmp(sym3m(fine_timing:length(sym3m)),M); sym3m = (real(sym3m).^2+imag(sym3m).^2);
   sym4m = idmp(sym4m(fine_timing:length(sym4m)),M); sym4m = (real(sym4m).^2+imag(sym4m).^2);
 
-  %figure(2);
+  figure(2);
   nsym = 500;
   %subplot(411); plot(sym1m(1:nsym))
   %subplot(412); plot(sym2m(1:nsym))
   %subplot(413); plot(sym3m(1:nsym))
   %subplot(414); plot(sym4m(1:nsym))
-  %plot((1:nsym),sym1m(1:nsym),(1:nsym),sym2m(1:nsym),(1:nsym),sym3m(1:nsym),(1:nsym),sym4m(1:nsym))
+  plot((1:nsym),sym1m(1:nsym),(1:nsym),sym2m(1:nsym),(1:nsym),sym3m(1:nsym),(1:nsym),sym4m(1:nsym))
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
@@ -198,34 +210,31 @@ endfunction
 function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
   M = fsk4_states.M;
-  fine_timing = M+11;
+  fine_timing = 10;
+  fine_timing = 51;
+  
+  rxd = filter(fsk4_states.rx_filter, 1, rxd);
 
-  rx_filt = filter(fsk4_states.rx_filter, 1, rxd);
-
-  %rx_filt=rxd;
-  figure(1)
-  hist(rx_filt);
-  eyediagram(rx_filt,40);
-  sym = afsym = idmp(rx_filt(fine_timing:length(rx_filt)),fsk4_states.M/2);
+  sym = rxd(fine_timing:M:length(rxd));
+  
   figure(4)
-  eyediagram(afsym,2);
+  plot(sym(1:1000));
+  %eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
   % After integrating, the high symbol tends to be about 7.5
-  dmsyms = rot90(fsk4_states.symmap * 15);
+  dmsyms = rot90(fsk4_states.symmap*.88);
 
-  %oddsyms  = afsym(1:2:length(afsym));
-  %evensyms = afsym(2:2:length(afsym));
   figure(2)
-  hist(afsym,30);
+  hist(sym,200);
 
-  [err, sym] = min(abs(afsym-dmsyms));
+  [err, symout] = min(abs(sym-dmsyms));
 
-  bits = zeros(1,length(sym)*2);
+  bits = zeros(1,length(symout)*2);
   %Translate symbols back into bits
   figure(3)
-  hist(sym);
-  for i=1:length(sym)
-    bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](sym(i),(1:2));
+  hist(symout);
+  for i=1:length(symout)
+    bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](symout(i),(1:2));
   end
 endfunction
 
@@ -235,13 +244,15 @@ endfunction
 function [ber thrcoh thrncoh] = nfbert(aEsNodB)
   global dmr_info;
   global nxdn_info;
+  global nflt_info;
+
   rand('state',1); 
   randn('state',1);
 
-  bitcnt = 480000;
+  bitcnt = 24000;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
-  fsk4_states = fsk4_init(fsk4_states,2400,dmr_info);
+  fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
   
@@ -255,13 +266,13 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB)
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-  rx_bits = fsk4_demod_thing(fsk4_states,rx);
+  rx_bits = fsk4_demod_fmrid(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
   %No preamble detection yet
   ox = 1;
-  for offset = (1:20)
+  for offset = (1:100)
     nerr = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
     bern = nerr/(bitcnt-offset);
     if(bern < ber)
@@ -298,7 +309,7 @@ endfunction
 
 
 function fsk4_ber_curves
-  EbNodB = 4:13;
+  EbNodB = 1:20;
   bers_tco = bers_real = bers_tnco = ones(1,length(EbNodB));
   %for ii=(1:length(EbNodB));
   %  [bers_real(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
@@ -313,8 +324,8 @@ function fsk4_ber_curves
     end
   end_try_catch
   figure;
+  close all
   clf;
-  bers_tnco
   semilogy(EbNodB, bers_tnco,'r;4FSK non-coherent theory;')
   hold on;
 
