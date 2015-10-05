@@ -18,6 +18,7 @@ function fm_states = analog_fm_init(fm_states)
   fm_states.Bfm = Bfm = 2*(fd+fm_max);       % Carson's rule for FM signal bandwidth
   fm_states.tc = tc = 50E-6;
   fm_states.prede = [1 -(1 - 1/(tc*Fs))];    % pre/de emp filter coeffs
+  fm_states.ph_dont_limit = 0;               % Limit rx delta-phase
   
   % Select length of filter to be an integer number of symbols to
   % assist with "fine" timing offset estimation.  Set Ts to 1 for
@@ -112,10 +113,10 @@ function [rx_out rx_bb] = analog_fm_demod(fm_states, rx)
   rx_out = atan2(imag(rx_bb_diff),real(rx_bb_diff));
 
   % limit maximum phase jumps, to remove static type noise at low SNRs
-
-  rx_out(find(rx_out > wd)) = wd;
-  rx_out(find(rx_out < -wd)) = -wd;
-
+  if !fm_states.ph_dont_limit
+    rx_out(find(rx_out > wd)) = wd;
+    rx_out(find(rx_out < -wd)) = -wd;
+  end
   rx_out *= (1/wd);
 
   if fm_states.output_filter
