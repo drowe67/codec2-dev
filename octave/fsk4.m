@@ -61,7 +61,7 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fm_states.fd = fsk4_info.max_dev;
     fm_states.pre_emp = fm_states.de_emp = 0;
     fm_states.output_filter = 0;
-    fm_states.no_limit_phase = 1;
+    fm_states.ph_dont_limit = 1;
     fsk4_states.fm_states = analog_fm_init(fm_states);
     fsk4_states.modinfo=fsk4_info;
 endfunction 
@@ -90,10 +90,9 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
     tx_stream(1+(i-1)*M:i*M) = fsk4_states.symmap(tx_symbols(i));
   end
   tx_filt = filter(fsk4_states.tx_filter, 1, tx_stream);
-
   tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
-  %figure(10);
-  %plot(20*log10(abs(fft(tx))))
+  figure(10);
+  plot(20*log10(abs(fft(tx))))
 
 endfunction
 
@@ -115,7 +114,8 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   rf = (0:(Fs/2));
   rx_filter_a = fir1(100 ,.5);
   rx_filter_b = fsk4_states.rx_filter;
-  %rx = filter(rx_filter_a, 1, rx);
+  rx_filter_n = [zeros(1,99) 1];
+  rx = filter(rx_filter_b, 1, rx);
 
   sym1m = exp(-j*2*pi*(symup(1)/Fs)*t).*rx;
   sym2m = exp(-j*2*pi*(symup(2)/Fs)*t).*rx;
@@ -126,7 +126,7 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   % filter impulse responses, as delay will vary.  f you add M to it coarse
   % timing will adjust by 1.
 
-  fine_timing = 11;
+  fine_timing = 51;
 
   sym1m = idmp(sym1m(fine_timing:length(sym1m)),M); sym1m = (real(sym1m).^2+imag(sym1m).^2);
   sym2m = idmp(sym2m(fine_timing:length(sym2m)),M); sym2m = (real(sym2m).^2+imag(sym2m).^2);
@@ -143,67 +143,13 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   
   [x iv] = max([sym1m; sym2m; sym3m; sym4m;]);
   bits = zeros(1,length(iv*2));
-  %figure(3);
-  %hist(iv);
+  figure(3);
+  hist(iv);
   for i=1:length(iv)
     bits(1+(i-1)*2:i*2) = [[0 0];[0 1];[1 0];[1 1]](iv(i),(1:2));
   end
 endfunction
 
-function bits = fsk4_demod_two(fsk4_states,rx)
-  global fsk4_symbols;
-  figure(4);
-
-  Fs = fsk4_states.Fs;
-  rf = (0:(Fs/2));
-  rx_filter = fir2(100 ,rf/(Fs/2),fsk4_rcf_resp(rf-1000));
-
-  plot(20*log10(abs(fft(rx))));
-  Fs = fsk4_states.Fs;
-  t = (1:length(rx));
-  fsk4_symbols
-  rx = filter(rx_filter, 1, rx);
-  sym1dc = exp(j*2*pi*(fsk4_symbols(1)/Fs)*t) .* rx;
-  sym2dc = exp(j*2*pi*(fsk4_symbols(2)/Fs)*t) .* rx;
-  sym3dc = exp(j*2*pi*(fsk4_symbols(3)/Fs)*t) .* rx;
-  sym4dc = exp(j*2*pi*(fsk4_symbols(4)/Fs)*t) .* rx;
- 
-  figure(1);
-  %plot(t(1:20:length(t)),abs(idmp(sym1dc,20)),t(1:20:length(t)),abs(idmp(sym2dc,20)));
-  
-  %figure(2);
-  %plot(t(1:20:length(t)),abs(idmp(sym3dc,20)),t(1:20:length(t)),abs(idmp(sym4dc,20)));
-  nsym = floor(length(rx)/fsk4_states.M)
-  bits = zeros(1,nsym*2);
-  syms = zeros(1,nsym);
- 
-  int1 = abs(idmp(sym1dc,10));  
-  int2 = abs(idmp(sym2dc,10));
-  int3 = abs(idmp(sym3dc,10));
-  int4 = abs(idmp(sym4dc,10));
-
-  plot((1:length(int1)),int1,(1:length(int1)),int2,(1:length(int1)),int3,(1:length(int1)),int4);
- 
-  for i=(1:nsym)
-      st = (i-1)*fsk4_states.M+1;
-      en = st+fsk4_states.M-1;
-      sym1i = sum(sym1dc(st:en));
-      %sym1i = ;
-      sym2i = sum(sym2dc(st:en));
-      %sym2i = real(sym2i)^2 + imag(sym2i)^2;
-      sym3i = sum(sym3dc(st:en));
-      %sym3i = real(sym3i)^2 + imag(sym3i)^2;
-      sym4i = sum(sym4dc(st:en));
-      %sym4i = real(sym4i)^2 + imag(sym4i)^2;
-      %[v iv] = max(abs([sym4i sym3i sym2i  sym1i]));
-      [v iv] = max([int4(i*2) int3(i*2) int2(i*2) int1(i*2)]);
-      syms(i) = iv;
-      bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](iv,(1:2));
-  end
-  figure(3);
-  hist(syms);
-  
-endfunction
 
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
@@ -216,13 +162,13 @@ function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   rxd = filter(fsk4_states.rx_filter, 1, rxd);
 
   sym = rxd(fine_timing:M:length(rxd));
-  
+
   figure(4)
   plot(sym(1:1000));
   %eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
-  % After integrating, the high symbol tends to be about 7.5
-  dmsyms = rot90(fsk4_states.symmap*.88);
+  % After sampling, the furthest symbols tend to be distributed about .80
+  dmsyms = rot90(fsk4_states.symmap*.80)
 
   figure(2)
   hist(sym,200);
@@ -339,7 +285,6 @@ function fsk4_ber_curves
   ylabel("Bit Error Rate (BER)")
 
 endfunction
-
 
 
 
