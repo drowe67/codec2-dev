@@ -39,3 +39,24 @@ const struct sfx_note_t sound_click[] = {
 	{.freq = 1200, .duration = 10},
 	{.freq = 0, .duration = 0}
 };
+
+const struct sfx_note_t sound_death_march[] = {
+	{.freq  = 340, 	.duration = 400},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 340, 	.duration = 400},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 340, 	.duration = 400},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 420, 	.duration = 400},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 400, 	.duration = 300},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 340, 	.duration = 120},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 340, 	.duration = 120},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 300, 	.duration = 200},
+	{.freq	= 0,	.duration = 80},
+	{.freq  = 340, 	.duration = 400},
+	{.freq	= 0, 	.duration = 0},
+};
