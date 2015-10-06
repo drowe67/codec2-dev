@@ -21,21 +21,21 @@
 
 #include "sounds.h"
 
-struct sfx_note_t sound_startup[] = {
+const struct sfx_note_t sound_startup[] = {
 	{.freq = 600, .duration = 80},
 	{.freq = 800, .duration = 80},
 	{.freq = 1000, .duration = 80},
 	{.freq = 0, .duration = 0}
 };
 
-struct sfx_note_t sound_returned[] = {
+const struct sfx_note_t sound_returned[] = {
 	{.freq = 1000, .duration = 80},
 	{.freq = 800, .duration = 80},
 	{.freq = 600, .duration = 80},
 	{.freq = 0, .duration = 0}
 };
 
-struct sfx_note_t sound_click[] = {
+const struct sfx_note_t sound_click[] = {
 	{.freq = 1200, .duration = 10},
 	{.freq = 0, .duration = 0}
 };
