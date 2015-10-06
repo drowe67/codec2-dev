@@ -24,12 +24,12 @@
 #include "sfx.h"
 
 /*! Start-up tune / selected tune */
-extern struct sfx_note_t sound_startup[];
+extern const struct sfx_note_t sound_startup[];
 
 /*! Returned tune */
-extern struct sfx_note_t sound_returned[];
+extern const struct sfx_note_t sound_returned[];
 
 /*! Click sound */
-extern struct sfx_note_t sound_click[];
+extern const struct sfx_note_t sound_click[];
 
 #endif
