@@ -43,6 +43,7 @@
 #include "sounds.h"
 #include "morse.h"
 #include "menu.h"
+#include "tot.h"
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
@@ -60,6 +61,8 @@ struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
 struct switch_t sw_ptt;     /*!< Switch driver for PTT buttons */
 
+struct tot_t tot;           /*!< Time-out timer */
+
 unsigned int announceTicker = 0;
 unsigned int menuLEDTicker = 0;
 unsigned int menuTicker = 0;
@@ -71,6 +74,10 @@ unsigned int menuExit = 0;
 static struct prefs_t {
     /*! Serial number */
     uint64_t serial;
+    /*! Time-out timer period, in seconds increment */
+    uint16_t tot_period;
+    /*! Time-out timer warning period, in seconds increment */
+    uint16_t tot_warn_period;
     /*! Menu frequency */
     uint16_t menu_freq;
     /*! Menu speed */
@@ -254,6 +261,7 @@ int main(void) {
     }
     led_rt(LED_OFF);
     tone_reset(&tone_gen, 0, 0);
+    tot_reset(&tot);
 
     /* Try to load preferences from flash */
     if (load_prefs() < 0) {
@@ -263,7 +271,12 @@ int main(void) {
         prefs.menu_vol = 2;
         prefs.menu_speed = 60;  /* 20 WPM */
         prefs.menu_freq = 800;
+        prefs.tot_period = 0; /* Disable time-out timer */
+        prefs.tot_warn_period = 15;
     }
+
+    /* Set up time-out timer */
+    tot.tick_period        = 600000;     /* TODO: calibrate */
 
     /* Clear out switch states */
     memset(&sw_select, 0, sizeof(sw_select));
@@ -287,6 +300,9 @@ int main(void) {
         switch_update(&sw_back,     (!switch_back()) ? 1 : 0);
         switch_update(&sw_ptt,      (switch_ptt() ||
                                         (!ext_ptt())) ? 1 : 0);
+
+        /* Update time-out timer state */
+        tot_update(&tot);
 
         /* Process menu */
         if (!menuTicker) {
@@ -404,7 +420,8 @@ int main(void) {
                 menuLEDTicker = MENU_LED_PERIOD;
             }
         }
-        else if (switch_ptt() || (ext_ptt() == 0)) {
+        else if ((switch_ptt() || (ext_ptt() == 0)) &&
+                        (!(tot.event & TOT_EVT_TIMEOUT))) {
 
             /* Transmit -------------------------------------------------------------------------*/
 
@@ -412,6 +429,19 @@ int main(void) {
             if (announceTicker && morse_player.msg) {
                 announceTicker = 0;
                 morse_play(&morse_player, NULL);
+            }
+
+            /* Handle the time-out timer events */
+            if (!tot.event) {
+                /* Time-out timer has not yet started */
+                if (prefs.tot_period)
+                    tot_start(&tot, prefs.tot_period,
+                            prefs.tot_warn_period);
+            } else if (tot.event & TOT_EVT_WARN_NEXT) {
+                /* Re-set warning flag */
+                tot.event &= ~TOT_EVT_WARN_NEXT;
+                /* Schedule a click tone */
+                sfx_play(&sfx_player, sound_click);
             }
 
             /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
@@ -466,6 +496,23 @@ int main(void) {
         else {
 
             /* Receive --------------------------------------------------------------------------*/
+
+            /* Did we just come out of transmit? */
+            if (tot.event) {
+                if (tot.event & TOT_EVT_TIMEOUT) {
+                    /*
+                     * Time-out reached, play time-out tune then reset
+                     * the timeout flag to acknowledge.
+                     */
+                    sfx_play(&sfx_player, sound_death_march);
+                    tot.event &= ~TOT_EVT_TIMEOUT;
+                }
+
+                /* Reset the timeout timer */
+                if (switch_ptt() || !ext_ptt()) {
+                    tot_reset(&tot);
+                }
+            }
 
             not_cptt(1); led_ptt(0);
 
@@ -576,6 +623,7 @@ void SysTick_Handler(void)
     if (announceTicker > 0) {
         announceTicker--;
     }
+    tot_tick(&tot);
 }
 
 /* ---------------------------- Menu data --------------------------- */
@@ -640,9 +688,11 @@ static const struct menu_item_t menu_root = {
 
 /* Child declarations */
 static const struct menu_item_t menu_op_mode;
+static const struct menu_item_t menu_tot;
 static const struct menu_item_t menu_ui;
 static const struct menu_item_t const* menu_root_children[] = {
     &menu_op_mode,
+    &menu_tot,
     &menu_ui,
 };
 
@@ -759,6 +809,149 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
     }
 }
 
+
+/* Time-out timer menu forward declarations */
+static struct menu_item_t const* menu_tot_children[];
+/* Operation mode menu */
+static const struct menu_item_t menu_tot = {
+    .label          = "TOT",
+    .event_cb       = menu_default_cb,
+    .children       = menu_tot_children,
+    .num_children   = 2,
+};
+/* Children */
+static const struct menu_item_t menu_tot_time;
+static const struct menu_item_t menu_tot_warn;
+static struct menu_item_t const* menu_tot_children[] = {
+    &menu_tot_time,
+    &menu_tot_warn,
+};
+
+/* TOT time menu forward declarations */
+static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event);
+/* TOT time menu */
+static const struct menu_item_t menu_tot_time = {
+    .label          = "TIME",
+    .event_cb       = menu_tot_time_cb,
+    .children       = NULL,
+    .num_children   = 0,
+};
+
+/* Callback function */
+static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event)
+{
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Get the current period */
+            menu->current = prefs.tot_period;
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            /* Adjust the frequency up by 50 Hz */
+            if (prefs.tot_period < 600)
+                prefs.tot_period += 5;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            if (prefs.tot_period > 0)
+                prefs.tot_period -= 5;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            prefs_changed = 1;
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Restore the mode and exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            prefs.tot_period = menu->current;
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Render the text, thankfully we don't need re-entrancy */
+        static char period[5];
+        snprintf(period, 4, "%d", prefs.tot_period);
+        /* Announce the period */
+        morse_play(&morse_player, period);
+    }
+};
+
+/* TOT warning time menu forward declarations */
+static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event);
+/* TOT warning time menu */
+static const struct menu_item_t menu_tot_warn = {
+    .label          = "WARN",
+    .event_cb       = menu_tot_warn_cb,
+    .children       = NULL,
+    .num_children   = 0,
+};
+
+/* Callback function */
+static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
+{
+    uint8_t announce = 0;
+
+    switch(event) {
+        case MENU_EVT_ENTERED:
+            sfx_play(&sfx_player, sound_startup);
+            /* Get the current period */
+            menu->current = prefs.tot_warn_period;
+        case MENU_EVT_RETURNED:
+            /* Shouldn't happen, but we handle it anyway */
+            announce = 1;
+            break;
+        case MENU_EVT_NEXT:
+            sfx_play(&sfx_player, sound_click);
+            /* Adjust the frequency up by 50 Hz */
+            if (prefs.tot_warn_period < 600)
+                prefs.tot_warn_period += 5;
+            announce = 1;
+            break;
+        case MENU_EVT_PREV:
+            sfx_play(&sfx_player, sound_click);
+            if (prefs.tot_warn_period > 0)
+                prefs.tot_warn_period -= 5;
+            announce = 1;
+            break;
+        case MENU_EVT_SELECT:
+            /* Play the "selected" tune and return. */
+            sfx_play(&sfx_player, sound_startup);
+            prefs_changed = 1;
+            menu_leave(menu);
+            break;
+        case MENU_EVT_BACK:
+            /* Restore the mode and exit the menu */
+            sfx_play(&sfx_player, sound_returned);
+        case MENU_EVT_EXIT:
+            prefs.tot_warn_period = menu->current;
+            menu_leave(menu);
+            break;
+        default:
+            break;
+    }
+
+    if (announce) {
+        /* Render the text, thankfully we don't need re-entrancy */
+        static char period[5];
+        snprintf(period, 4, "%d", prefs.tot_period);
+        /* Announce the period */
+        morse_play(&morse_player, period);
+    }
+};
 
 /* UI menu forward declarations */
 static struct menu_item_t const* menu_ui_children[];
