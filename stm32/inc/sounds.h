@@ -32,4 +32,7 @@ extern const struct sfx_note_t sound_returned[];
 /*! Click sound */
 extern const struct sfx_note_t sound_click[];
 
+/*! Death march tune */
+extern const struct sfx_note_t sound_death_march[];
+
 #endif
