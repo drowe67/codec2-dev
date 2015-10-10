@@ -154,11 +154,13 @@ endfunction
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
 function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
+
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
+
   M = fsk4_states.M;
-  fine_timing = 10;
   fine_timing = 51;
   
+  %RRC filter to get rid of some of the noise
   rxd = filter(fsk4_states.rx_filter, 1, rxd);
 
   sym = rxd(fine_timing:M:length(rxd));
@@ -168,11 +170,21 @@ function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   %eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
   % After sampling, the furthest symbols tend to be distributed about .80
-  dmsyms = rot90(fsk4_states.symmap*.80)
+
+  % A little cheating to demap the symbols
+  % Take a histogram of the sampled symbols, find the center of the largest distribution,
+  % and correct the symbol map to match it
+  [a b] = hist(sym,50)
+  [a ii] = max(a)
+  grmax = abs(b(ii))
+  grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax
+
+  dmsyms = rot90(fsk4_states.symmap*grmax)
 
   figure(2)
   hist(sym,200);
 
+  %demap the symbols
   [err, symout] = min(abs(sym-dmsyms));
 
   bits = zeros(1,length(symout)*2);
