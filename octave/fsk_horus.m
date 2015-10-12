@@ -408,7 +408,7 @@ endfunction
 
 function rx_bits_log = demod_file(filename)
   rx = load_raw(filename);
-  more off
+  more off;
   rand('state',1); 
   randn('state',1);
   states = fsk_horus_init();
@@ -425,6 +425,8 @@ function rx_bits_log = demod_file(filename)
   f2_int_resample_log = [];
 
   % First extract raw bits from samples ------------------------------------------------------
+
+  printf("demod of raw bits....\n");
 
   for f=1:frames
 
@@ -444,6 +446,8 @@ function rx_bits_log = demod_file(filename)
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
   end
 
+  printf("plotting...\n");
+
   figure(1);
   plot(f1_int_resample_log,'+')
   hold on;
@@ -457,15 +461,7 @@ function rx_bits_log = demod_file(filename)
   title('norm fine timing')
   grid
   
-  figure(3)
-  clf
-  step = 11;
-  hold on;
-  for i=1:step:length(rx_bits_log)-step
-    plot(rx_bits_log(i:i+step-1))
-  end
-  hold off;
-  axis([1 step -1 2])
+  printf("frame sync and data extraction...\n");
 
   % Now perform frame sync and extract ASCII text --------------------------------------------------------
 
@@ -489,19 +485,25 @@ function rx_bits_log = demod_file(filename)
       % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
       % change dynamically.
 
+      str = [];
       st += length(states.uw);  % first bit of first char
       for i=st:nfield+npad:uw_loc
         field = rx_bits_log(i:i+nfield-1);
         ch_dec = field * (2.^(0:nfield-1))';
-        printf("i: %d ch_dec: %d ch: %c\n", i, ch_dec, ch_dec);
+        %printf("i: %d ch_dec: %d ch: %c\n", i, ch_dec, ch_dec);
+        str = [str char(ch_dec)];
       end
+      printf("%s", str);
     end
+   
   endwhile
-  
+ 
 endfunction
 
+% run test functions from here during development
+
 %run_sim
-rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
+rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
 
 
 % [X] fixed test frame
@@ -512,3 +514,4 @@ rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 % [X] try to match bits with real data
 % [X] look for UW
 % [ ] try big amplitude fades at a few Hz to simulate spinning, see if timing loses it
+% [ ] streaming I/O
