@@ -49,17 +49,14 @@ function tx  = fsk_horus_mod(states, tx_bits)
     f1 = 1500; f2 = 1900;
 
     for i=1:length(tx_bits)
-      for k=1:Ts
-        if tx_bits(i) == 1
-          tx_phase += 2*pi*f1/states.Fs;
-        else
-          tx_phase += 2*pi*f2/states.Fs;
-        end
-        tx_phase = tx_phase - floor(tx_phase/(2*pi))*2*pi;
-        tx((i-1)*Ts+k) = 2.0*cos(tx_phase);
+      if tx_bits(i) == 1
+        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/states.Fs;
+      else
+        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/states.Fs;
       end
+      tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
+      tx_phase -= floor(tx_phase/(2*pi))*2*pi;
     end
-
 endfunction
 
 
@@ -200,11 +197,11 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % offsets
 
   next_nin = N;
-  if norm_rx_timing > 0.375
-     next_nin += Ts/P;
+  if norm_rx_timing > 0.25
+     next_nin += Ts/2;
   end
-  if norm_rx_timing < -0.375;
-     next_nin -= Ts/P;
+  if norm_rx_timing < -0.25;
+     next_nin -= Ts/2;
   end
   states.nin = next_nin;
 
@@ -240,9 +237,9 @@ endfunction
 
 function run_sim
   frames = 100;
-  EbNodB = 8;
-  timing_offset = 0.3;
-  test_frame_mode = 2;
+  EbNodB = 10;
+  timing_offset = 0.0;
+  test_frame_mode = 1;
 
   more off
   rand('state',1); 
@@ -255,6 +252,8 @@ function run_sim
 
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo);
+
+  % set up tx signal with payload bits based on test mode
 
   if test_frame_mode == 1
      % test frame of bits, which we repeat for convenience when BER testing
@@ -275,8 +274,8 @@ function run_sim
   end
 
   tx = fsk_horus_mod(states, tx_bits);
-  %tx = resample(tx, 1000, 1000);
 
+  tx = resample(tx, 1000, 1001);
   noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
   rx    = tx + noise;
 
@@ -335,7 +334,7 @@ function run_sim
         nerrs = sum(error_positions);
         Terrs += nerrs;
         Tbits += nsym;
-        err_log = [nerr_log nerrs];
+        nerr_log = [nerr_log nerrs];
       end
 
       state = next_state;
@@ -361,9 +360,13 @@ function run_sim
 
   figure(3)
   clf
+  subplot(211)
   plot(norm_rx_timing_log);
   axis([1 frames -1 1])
   title('norm fine timing')
+  subplot(212)
+  plot(nerr_log)
+  title('num bit errors each frame')
 endfunction
 
 
@@ -416,8 +419,8 @@ function rx_bits_log = demod_file(filename)
  
 endfunction
 
-run_sim
-%rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
+%run_sim
+rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 
 
 % [X] fixed test frame
