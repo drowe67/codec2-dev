@@ -34,9 +34,23 @@ function states = fsk_horus_init()
   states.f2_dc = zeros(1,Nmem);
   states.P = 8;                  % oversample rate out of filter
   states.nin = N;                % can be N +/- Ts/P = N +/- 40 samples to adjust for sample clock offsets
-  states.verbose = 1;
+  states.verbose = 0;
   states.phi1 = 0;               % keep down converter osc phase continuous
   states.phi2 = 0;
+
+  % Generate unque word that correlates against the ASCIi "$$$$$" that
+  % delimits start and end of frame Note use of zeros in UW as "don't
+  % cares", we ignore RS232 start/stop bits.  Not sure this is a good
+  % idea, we could include start and stop bits if we like.  Oh Well.
+
+  dollar_bits = fliplr([0 1 0 0 1 0 0]);
+  mapped_db = 2*dollar_bits - 1;
+  npad = states.npad = 3;   % one start and two stop bits between 7 bit ascii chars
+  nfield = states.nfield = 7; % length of ascii character field
+
+  states.uw = [mapped_db zeros(1,npad) mapped_db zeros(1,npad) mapped_db zeros(1,npad)  mapped_db zeros(1,npad) mapped_db zeros(1,npad)];
+
+  states.uw_thresh = 5*7 - 2; % allow 2 bit errors when looking for UW
 endfunction
 
 
@@ -49,7 +63,7 @@ function tx  = fsk_horus_mod(states, tx_bits)
     f1 = 1500; f2 = 1900;
 
     for i=1:length(tx_bits)
-      if tx_bits(i) == 1
+      if tx_bits(i) == 0
         tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/states.Fs;
       else
         tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/states.Fs;
@@ -60,14 +74,14 @@ function tx  = fsk_horus_mod(states, tx_bits)
 endfunction
 
 
-% Given a buffer of nin input samples, returns nsym bits.
+% Given a buffer of nin input Rs baud FSK samples, returns nsym bits.
 %
 % Automagically estimates the frequency of the two tones, or
 % looking at it another way, the frequency offset and shift
 %
 % nin is the number of input samples required by demodulator.  This is
-% time varying.  It will nominally be N (8000), and occasionally N +/-
-% Ts/P (8020 or 7980 for P=8).  This is how we compensate for differences between the
+% time varying.  It will nominally be N (8000), and occasionally N +/- 
+% Ts/2 (e.g. 8080 or 7920).  This is how we compensate for differences between the
 % remote tx sample clock and our sample clock.  This function always returns
 % N/Ts (50) demodulated bits.  Variable number of input samples, constant number
 % of output bits.
@@ -224,7 +238,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     f2_int_resample(i) = f2_int(st+low_sample)*(1-fract) + f2_int(st+high_sample)*fract;
     %f1_int_resample(i) = f1_int(st+1);
     %f2_int_resample(i) = f2_int(st+1);
-    rx_bits(i) = abs(f1_int_resample(i)) > abs(f2_int_resample(i));
+    rx_bits(i) = abs(f1_int_resample(i)) < abs(f2_int_resample(i));
   end
 
   states.f1_int_resample = f1_int_resample;
@@ -233,7 +247,26 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 endfunction
 
 
-% demo script --------------------------------------------------------
+% look for unique word and return index of first UW bit, or -1 if no UW found
+
+function uw_start = find_uw(states, start_bit, rx_bits)
+  uw = states.uw;
+
+  mapped_rx_bits = 2*rx_bits - 1;
+  found = 0;
+  uw_start = -1;
+
+  for i=start_bit:length(rx_bits) - length(uw)
+    corr  = mapped_rx_bits(i:i+length(uw)-1) * uw';
+    if !found && (corr >= states.uw_thresh)
+      uw_start = i;
+      found = 1;
+    end
+  end
+endfunction
+
+
+% Demo modem with simulated tx signal, add noise, channel impairments ----------------------
 
 function run_sim
   frames = 100;
@@ -275,7 +308,8 @@ function run_sim
 
   tx = fsk_horus_mod(states, tx_bits);
 
-  tx = resample(tx, 1000, 1001);
+  tx = resample(tx, 1000, 1001); % simulated sample clock offset
+
   noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
   rx    = tx + noise;
 
@@ -370,6 +404,8 @@ function run_sim
 endfunction
 
 
+% demodulate a file of 8kHz 16bit short samples --------------------------------
+
 function rx_bits_log = demod_file(filename)
   rx = load_raw(filename);
   more off
@@ -384,9 +420,11 @@ function rx_bits_log = demod_file(filename)
   frames = floor(length(rx)/N);
   st = 1;
   rx_bits_log = [];
-  rx_timing_log = [];
+  norm_rx_timing_log = [];
   f1_int_resample_log = [];
   f2_int_resample_log = [];
+
+  % First extract raw bits from samples ------------------------------------------------------
 
   for f=1:frames
 
@@ -401,7 +439,7 @@ function rx_bits_log = demod_file(filename)
 
     [rx_bits states] = fsk_horus_demod(states, sf);
     rx_bits_log = [rx_bits_log rx_bits];
-    rx_timing_log = [rx_timing_log states.rx_timing];
+    norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
   end
@@ -414,9 +452,52 @@ function rx_bits_log = demod_file(filename)
 
   figure(2)
   clf
-  plot(rx_timing_log)
-  axis([1 frames -1 1])
- 
+  plot(norm_rx_timing_log)
+  axis([1 frames -0.5 0.5])
+  title('norm fine timing')
+  grid
+  
+  figure(3)
+  clf
+  step = 11;
+  hold on;
+  for i=1:step:length(rx_bits_log)-step
+    plot(rx_bits_log(i:i+step-1))
+  end
+  hold off;
+  axis([1 step -1 2])
+
+  % Now perform frame sync and extract ASCII text --------------------------------------------------------
+
+  % use UWs to delimit start and end of data packets
+
+  bit = 1;
+  nbits = length(rx_bits_log);
+  uw_loc = find_uw(states, bit, rx_bits_log);
+  nfield = states.nfield;
+  npad = states.npad;
+
+  while (uw_loc != -1)
+
+    st = uw_loc;
+    bit = uw_loc + length(states.uw);
+    uw_loc = find_uw(states, bit, rx_bits_log);
+
+    if uw_loc != -1
+      % Now start picking out 7 bit ascii chars from frame.  It has some
+      % structure so we can guess where fields are.  I hope We don't get
+      % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
+      % change dynamically.
+
+      st += length(states.uw);  % first bit of first char
+      for i=st:nfield+npad:uw_loc
+        field = rx_bits_log(i:i+nfield-1);
+        ch_dec = field * (2.^(0:nfield-1))';
+        printf("i: %d ch_dec: %d ch: %c\n", i, ch_dec, ch_dec);
+      end
+    end
+  endwhile
+  
 endfunction
 
 %run_sim
@@ -428,5 +509,6 @@ rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 % [X] measure BER, and bits decoded
 % [X] test with sample clock slip
 % [X] test at Eb/No point
-% [ ] try to match bits with real data
-% [ ] look for UW
+% [X] try to match bits with real data
+% [X] look for UW
+% [ ] try big amplitude fades at a few Hz to simulate spinning, see if timing loses it
