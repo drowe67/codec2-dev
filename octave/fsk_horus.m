@@ -39,7 +39,7 @@ function states = fsk_horus_init()
   Rs = states.Rs = 50;
   Ts = states.Ts = Fs/Rs;
   states.nsym = N/Ts;
-  Nmem = states.Nmem  = N+2*Ts;    % one symbol memory in down converted signals to allow for timing adj
+  Nmem = states.Nmem  = N+2*Ts;    % two symbol memory in down converted signals to allow for timing adj
   states.f1_dc = zeros(1,Nmem);
   states.f2_dc = zeros(1,Nmem);
   states.P = 8;                  % oversample rate out of filter
@@ -63,6 +63,8 @@ function states = fsk_horus_init()
   states.uw_thresh = 5*7 - 4; % allow 24bit errors when looking for UW
 
   states.df = 0;
+  states.f1 = 0;
+  states.f2 = 0;
 endfunction
 
 
@@ -155,7 +157,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     %printf("f1: %4.0f Hz f2: %4.0f Hz\n", f1, f2);
   end
 
-  % down convert and filter at 4Rs ------------------------------
+  % down convert and filter at rate P ------------------------------
 
   % update filter (integrator) memory by shifting in nin samples
   
@@ -187,7 +189,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % integrate over symbol period, which is effectively a LPF, removing
   % the -2Fc frequency image.  Can also be interpreted as an ideal
   % integrate and dump, non-coherent demod.  We run the integrator at
-  % PRs (1/P symbol offsets) to get outputs at a range of different
+  % rate P (1/P symbol offsets) to get outputs at a range of different
   % fine timing offsets.  We calculate integrator output over nsym+1
   % symbols so we have extra samples for the fine timing re-sampler at either
   % end of the array.
@@ -234,7 +236,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   end
   states.nin = next_nin;
 
-  % Re sample integrator outputs using fine timing estimate and linear interpolation
+  % Re-sample integrator outputs using fine timing estimate and linear interpolation
 
   low_sample = floor(rx_timing);
   fract = rx_timing - low_sample;
@@ -467,8 +469,6 @@ endfunction
 function rx_bits_log = demod_file(filename)
   rx = load_raw(filename);
   more off;
-  rand('state',1); 
-  randn('state',1);
   states = fsk_horus_init();
   N = states.N;
   P = states.P;
@@ -574,7 +574,7 @@ endfunction
 %rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
-rx_bits = demod_file("fsk_horus_rx.raw");
+%rx_bits = demod_file("fsk_horus_rx.raw");
 %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
 
 % streaming version: take a buffer of say 1 sec.  demo to bits.  Add to buffer
