@@ -23,12 +23,12 @@
 % [X] compare to fldigi
 %     + in AWGN channel 3-4dB improvement.  In my tests fldigi can't decode  
 %       with fading model, requires Eb/No > 40dB, this demo useable at Eb/No = 20dB
-% [ ] test over range of f1/f2, shifts, timing offsets, clock offsets, Eb/No
+% [X] test over range of f1/f2, shifts, timing offsets, clock offsets, Eb/No
 %     [X] +/- 1000ppm clock offset OK at Eb/No = 10dB, starts to lose it at 8dB
 %     [X] tone freq est starts to lose it at 8dB in awgn.  Maybe wider window?
 % [ ] low snr detection of $$$$$$
 %     + we might be able to pick up a "ping" at very low SNRs to help find baloon on ground
-% [ ] streaming, indicator of audio freq, i.e. speaker output
+% [ ] streaming, indicator of audio freq, i.e. speaker output?
 
 1;
 
@@ -153,10 +153,8 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   states.f1 = f1;
   states.f2 = f2;
 
-  if verbose
-    %printf("f1: %4.0f Hz f2: %4.0f Hz\n", f1, f2);
-  end
-
+  %printf("f1: %4.0f Hz f2: %4.0f Hz a1: %f a2: %f p: %f\n", f1, f2, 2.0*abs(m1)/Ndft, 2.0*abs(m2)/Ndft, p);
+  
   % down convert and filter at rate P ------------------------------
 
   % update filter (integrator) memory by shifting in nin samples
@@ -261,6 +259,12 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   states.f1_int_resample = f1_int_resample;
   states.f2_int_resample = f2_int_resample;
 
+  % Eb/No estimation
+
+  x = abs(f1_int_resample) + abs(f2_int_resample);
+  Eb = mean(x);
+  No = var(x)/Rs;
+  states.EbNodB = 10*log10(Eb/No) + 3;  % fudge factor - can someone tell me why?
 endfunction
 
 
@@ -290,9 +294,9 @@ function run_sim
   EbNodB = 20;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
-  fading = 1;          % modulates tx power at 5Hz with 20dB fade depth, 
+  fading = 0;          % modulates tx power at 5Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
-  df     = 1;          % tx tone freq drift in Hz/s
+  df     = 0;          % tx tone freq drift in Hz/s
 
   more off
   rand('state',1); 
@@ -348,6 +352,7 @@ function run_sim
   if fading
      ltx = length(tx);
      tx = tx .* (1.1 + cos(2*pi*5*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
+     xx
   end
 
   noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
@@ -367,6 +372,7 @@ function run_sim
   f1_int_resample_log = [];
   f2_int_resample_log = [];
   f1_log = f2_log = [];
+  EbNodB_log = [];
 
   for f=1:frames
 
@@ -388,6 +394,7 @@ function run_sim
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
     f1_log = [f1_log states.f1];
     f2_log = [f2_log states.f2];
+    EbNodB_log = [EbNodB_log states.EbNodB];
 
     % frame sync based on min BER
 
@@ -461,6 +468,11 @@ function run_sim
   hold off;
   title('tone frequencies')
   axis([1 frames 0 Fs/2])
+
+  figure(6)
+  clf
+  plot(EbNodB_log);
+  title('Eb/No estimate')
 endfunction
 
 
@@ -570,13 +582,9 @@ endfunction
 
 % run test functions from here during development
 
-%run_sim
+run_sim
 %rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
 %rx_bits = demod_file("fsk_horus_rx.raw");
 %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
-
-% streaming version: take a buffer of say 1 sec.  demo to bits.  Add to buffer
-% of bits.  When two UWs found, demod and dump txt.  Shift buffer back that far.
-% how long to make buffer?  How to dunmp diagnostics?  printf f1, f2, clock offset est
