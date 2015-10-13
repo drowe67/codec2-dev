@@ -8,7 +8,7 @@
 %
 % usage:
 %  $ chmod 777 fsk_horus_stream.m
-%  $ rec -t raw -r 8000 -s -2 - | ./fsk_horus_stream.m
+%  $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m
 
 fsk_horus;  % include library (make sure calls to functions at bottom are commented out)
 
@@ -40,7 +40,8 @@ while c
     nin = states.nin;
     %printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
   endwhile
-  % printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
+  f = (states.f1+states.f2)/2; shift = states.f2 - states.f1;
+  printf("max: %d f: %d shift %d bits: %d\r", max(s), f, shift, length(rx_bits_buf));
 
   % look for complete Horus frame, delimited by 2 unique words
 
