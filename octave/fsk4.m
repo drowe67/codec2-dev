@@ -153,9 +153,19 @@ endfunction
 
 %incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
-function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
+function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
 
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
+
+  rxest = rxd.^2;
+  figure(11);
+  plot(20*log10(abs(fft(rxest))));
+  figure(12);
+  plot(rxest);
+  w = 2*pi*(12051/48000);
+  rxest = rxest .* exp(-j*w*(0:length(rxest)-1));
+  rxest = sum(rxest)
+  rxphi = angle(rxest)
 
   M = fsk4_states.M;
   fine_timing = 51;
@@ -174,10 +184,10 @@ function [bits err] = fsk4_demod_fmrid(fsk4_states, rx)
   % A little cheating to demap the symbols
   % Take a histogram of the sampled symbols, find the center of the largest distribution,
   % and correct the symbol map to match it
-  [a b] = hist(sym,50)
-  [a ii] = max(a)
-  grmax = abs(b(ii))
-  grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax
+  [a b] = hist(sym,50);
+  [a ii] = max(a);
+  grmax = abs(b(ii));
+  grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax;
 
   dmsyms = rot90(fsk4_states.symmap*grmax)
 
@@ -199,7 +209,7 @@ endfunction
 % Bit error rate test
 % for a noise-free channel
 % now supports noisy channels
-function [ber thrcoh thrncoh] = nfbert(aEsNodB)
+function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
   global dmr_info;
   global nxdn_info;
   global nflt_info;
@@ -224,7 +234,10 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB)
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-  rx_bits = fsk4_demod_fmrid(fsk4_states,rx);
+
+  rx    = rx(timing_offset:length(rx));
+
+  [rx_bits biterr rxphi] = fsk4_demod_fmrid(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
@@ -263,6 +276,16 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB)
   %thrncoh = (2/3)*sum( (((-1).^(ns+1))./(ns+1)) .* (3./ns) .* exp( -((ns.*2)./ns)*EbNo )
   %plot(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
   %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
+endfunction
+
+function fsk4_rx_phi
+  pkg load parallel
+  offrange = [1:100];
+  [a,b,c,phi] = pararrayfun(floor(1.25*nproc()),@nfbert,100.*ones(1,length(offrange)),offrange);
+  close all;
+  figure(1);
+  clf;
+  plot(offrange,phi);
 endfunction
 
 
