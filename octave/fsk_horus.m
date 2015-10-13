@@ -262,7 +262,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % Eb/No estimation
 
   x = abs(abs(f1_int_resample) - abs(f2_int_resample));
-  states.EbNodB = 20*log10(mean(x)/std(x));
+  states.EbNodB = 20*log10(1E-6+mean(x)/(1E-6+std(x)));
 endfunction
 
 

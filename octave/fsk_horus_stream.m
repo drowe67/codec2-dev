@@ -25,6 +25,8 @@ nin = states.nin;
 nfield = states.nfield;
 npad = states.npad;
 uw = states.uw;
+EbNo = 0;
+SNR = 0;
 
 rx = [];
 rx_bits_buf = [];
@@ -42,10 +44,12 @@ while c
     rx_bits_buf = [rx_bits_buf rx_bits];
     rx = rx(nin+1:length(rx));
     nin = states.nin;
+    EbNo = 0.9*EbNo + 0.1*states.EbNodB;
+    SNR = EbNo + 10*log10(states.Rs/3000);
     %printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
   endwhile
   f = (states.f1+states.f2)/2; shift = states.f2 - states.f1;
-  printf("max: %d f: %d shift %d bits: %d\r", max(s), f, shift, length(rx_bits_buf));
+  printf("max: %d f: %d fshift %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, shift, EbNo, SNR, length(rx_bits_buf));
 
   % look for complete Horus frame, delimited by 2 unique words
 
