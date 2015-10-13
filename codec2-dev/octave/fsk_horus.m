@@ -1,24 +1,34 @@
-% fsk_horus.txt
+% fsk_horus.m
 % David Rowe 10 Oct 2015
 %
 % Experimental near space balloon FSK demodulator
 % Assume high SNR, but fades near end of mission can wipe out a few bits
 % So low SNR perf not a huge issue
 %
-% [ ] processing buffers of 1 second
+% [X] processing buffers of 1 second
 %     + 8000 samples input
 %     + keep 30 second sliding window to extract packet from
 %     + do fine timing on this
 %     [X] estimate frequency of two tones
 %         + this way we cope with variable shift and drift
-%     [ ] estimate amplitudes and equalise, or limit
+%         + starts to lose it at 8 Eb/No = 8db.  Maybe wider window?
+%     [X] estimate amplitudes and equalise, or limit
+%         + not needed - tones so close in freq unlikely to be significant ampl diff
+%           across SSB rx filter
 % [X] Eb/No point 8dB, 2% ish
 % [X] fine timing and sample slips, +/- 1000ppm (0.1%) clock offset test
 % [ ] bit flipping against CRC
 % [ ] implement CRC
-% [ ] frame sync
-% [ ] compare to fldigi
-% [ ] test over range of f1/f2, shifts (varying), timing offsets, clock offsets, Eb/No
+% [X] frame sync
+% [X] compare to fldigi
+%     + in AWGN channel 3-4dB improvement.  In my tests fldigi can't decode  
+%       with fading model, requires Eb/No > 40dB, this demo useable at Eb/No = 20dB
+% [ ] test over range of f1/f2, shifts, timing offsets, clock offsets, Eb/No
+%     [X] +/- 1000ppm clock offset OK at Eb/No = 10dB, starts to lose it at 8dB
+%     [X] tone freq est starts to lose it at 8dB in awgn.  Maybe wider window?
+% [ ] low snr detection of $$$$$$
+%     + we might be able to pick up a "ping" at very low SNRs to help find baloon on ground
+% [ ] streaming, indicator of audio freq, i.e. speaker output
 
 1;
 
@@ -50,7 +60,9 @@ function states = fsk_horus_init()
 
   states.uw = [mapped_db zeros(1,npad) mapped_db zeros(1,npad) mapped_db zeros(1,npad)  mapped_db zeros(1,npad) mapped_db zeros(1,npad)];
 
-  states.uw_thresh = 5*7 - 2; % allow 2 bit errors when looking for UW
+  states.uw_thresh = 5*7 - 4; % allow 24bit errors when looking for UW
+
+  states.df = 0;
 endfunction
 
 
@@ -60,16 +72,19 @@ function tx  = fsk_horus_mod(states, tx_bits)
     tx = zeros(states.Ts*length(tx_bits),1);
     tx_phase = 0;
     Ts = states.Ts;
-    f1 = 1500; f2 = 1900;
+    Fs = states.Fs;
+    f1 = 1000; f2 = 1400;
+    df = states.df; % tone freq change in Hz/s
 
     for i=1:length(tx_bits)
       if tx_bits(i) == 0
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/states.Fs;
+        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/Fs;
       else
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/states.Fs;
+        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/Fs;
       end
       tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
       tx_phase -= floor(tx_phase/(2*pi))*2*pi;
+      f1 += df*Ts/Fs; f2 += df*Ts/Fs;
     end
 endfunction
 
@@ -270,9 +285,12 @@ endfunction
 
 function run_sim
   frames = 100;
-  EbNodB = 10;
-  timing_offset = 0.0;
-  test_frame_mode = 1;
+  EbNodB = 20;
+  timing_offset = 0.0; % see resample() for clock offset below
+  test_frame_mode = 4;
+  fading = 1;          % modulates tx power at 5Hz with 20dB fade depth, 
+                       % to simulate balloon rotating at end of mission
+  df     = 1;          % tx tone freq drift in Hz/s
 
   more off
   rand('state',1); 
@@ -282,6 +300,8 @@ function run_sim
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
+  Fs = states.Fs;
+  states.df = df;
 
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo);
@@ -306,12 +326,33 @@ function run_sim
     tx_bits(1:2:length(tx_bits)) = 1;
   end
 
+  if test_frame_mode == 4
+
+    % load up a horus msg from disk and modulate that
+
+    test_frame = load("horus_msg.txt");
+    ltf = length(test_frame);
+    ntest_frames = ceil((frames+1)*nsym/ltf);
+    tx_bits = [];
+    for i=1:ntest_frames
+      tx_bits = [tx_bits test_frame];
+    end
+  end
+
   tx = fsk_horus_mod(states, tx_bits);
 
-  tx = resample(tx, 1000, 1001); % simulated sample clock offset
+  tx = resample(tx, 1000, 1000); % simulated 1000ppm sample clock offset
+
+  if fading
+     ltx = length(tx);
+     tx = tx .* (1.1 + cos(2*pi*5*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
+  end
 
   noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
   rx    = tx + noise;
+
+  % dump simulated rx file
+  ftx=fopen("fsk_horus_rx.raw","wb"); rxg = rx*5000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
@@ -323,6 +364,7 @@ function run_sim
   nerr_log = [];
   f1_int_resample_log = [];
   f2_int_resample_log = [];
+  f1_log = f2_log = [];
 
   for f=1:frames
 
@@ -342,6 +384,8 @@ function run_sim
     x_log = [x_log states.x];
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
+    f1_log = [f1_log states.f1];
+    f2_log = [f2_log states.f2];
 
     % frame sync based on min BER
 
@@ -401,6 +445,20 @@ function run_sim
   subplot(212)
   plot(nerr_log)
   title('num bit errors each frame')
+
+  figure(4)
+  clf
+  plot(real(rx(1:Fs)))
+  title('rx signal at demod input')
+
+  figure(5)
+  clf
+  plot(f1_log)
+  hold on;
+  plot(f2_log,'g');
+  hold off;
+  title('tone frequencies')
+  axis([1 frames 0 Fs/2])
 endfunction
 
 
@@ -463,7 +521,7 @@ function rx_bits_log = demod_file(filename)
   
   printf("frame sync and data extraction...\n");
 
-  % Now perform frame sync and extract ASCII text --------------------------------------------------------
+  % Now perform frame sync and extract ASCII text -------------------------------------------
 
   % use UWs to delimit start and end of data packets
 
@@ -485,33 +543,40 @@ function rx_bits_log = demod_file(filename)
       % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
       % change dynamically.
 
+      % dump msg bits so we can use them as a test signal
+      %msg = rx_bits_log(st:uw_loc-1);
+      %save -ascii horus_msg.txt msg
+
       str = [];
       st += length(states.uw);  % first bit of first char
       for i=st:nfield+npad:uw_loc
         field = rx_bits_log(i:i+nfield-1);
         ch_dec = field * (2.^(0:nfield-1))';
+        % filter out unlikely characters that bit errors may introduce, and ignore \n
+        if (ch_dec > 31) && (ch_dec < 91)
+          str = [str char(ch_dec)];
+        else 
+          str = [str char(32)]; % space is "non sure"
+        end
         %printf("i: %d ch_dec: %d ch: %c\n", i, ch_dec, ch_dec);
-        str = [str char(ch_dec)];
       end
-      printf("%s", str);
+      printf("%s\n", str);
     end
    
   endwhile
  
 endfunction
 
+
 % run test functions from here during development
 
 %run_sim
-rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
+%rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
+%rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
+%rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
+rx_bits = demod_file("fsk_horus_rx.raw");
+%rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
 
-
-% [X] fixed test frame
-% [X] frame sync on that
-% [X] measure BER, and bits decoded
-% [X] test with sample clock slip
-% [X] test at Eb/No point
-% [X] try to match bits with real data
-% [X] look for UW
-% [ ] try big amplitude fades at a few Hz to simulate spinning, see if timing loses it
-% [ ] streaming I/O
+% streaming version: take a buffer of say 1 sec.  demo to bits.  Add to buffer
+% of bits.  When two UWs found, demod and dump txt.  Shift buffer back that far.
+% how long to make buffer?  How to dunmp diagnostics?  printf f1, f2, clock offset est
