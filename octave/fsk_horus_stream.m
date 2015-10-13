@@ -9,6 +9,10 @@
 % usage:
 %  $ chmod 777 fsk_horus_stream.m
 %  $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m
+%
+% or to test with a stored file:
+%  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
+%
 
 fsk_horus;  % include library (make sure calls to functions at bottom are commented out)
 
