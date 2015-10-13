@@ -261,10 +261,8 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   % Eb/No estimation
 
-  x = abs(f1_int_resample) + abs(f2_int_resample);
-  Eb = mean(x);
-  No = var(x)/Rs;
-  states.EbNodB = 10*log10(Eb/No) + 3;  % fudge factor - can someone tell me why?
+  x = abs(abs(f1_int_resample) - abs(f2_int_resample));
+  states.EbNodB = 20*log10(mean(x)/std(x));
 endfunction
 
 
@@ -291,7 +289,7 @@ endfunction
 
 function run_sim
   frames = 100;
-  EbNodB = 20;
+  EbNodB = 10;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
   fading = 0;          % modulates tx power at 5Hz with 20dB fade depth, 
@@ -352,10 +350,9 @@ function run_sim
   if fading
      ltx = length(tx);
      tx = tx .* (1.1 + cos(2*pi*5*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
-     xx
   end
 
-  noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
+  noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
 
   % dump simulated rx file
@@ -473,6 +470,7 @@ function run_sim
   clf
   plot(EbNodB_log);
   title('Eb/No estimate')
+  mean(EbNodB_log)
 endfunction
 
 
@@ -493,6 +491,7 @@ function rx_bits_log = demod_file(filename)
   norm_rx_timing_log = [];
   f1_int_resample_log = [];
   f2_int_resample_log = [];
+  EbNodB_log = [];
 
   % First extract raw bits from samples ------------------------------------------------------
 
@@ -514,6 +513,7 @@ function rx_bits_log = demod_file(filename)
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
+    EbNodB_log = [EbNodB_log states.EbNodB];
   end
 
   printf("plotting...\n");
@@ -531,6 +531,17 @@ function rx_bits_log = demod_file(filename)
   title('norm fine timing')
   grid
   
+  figure(3)
+  clf
+  plot(EbNodB_log);
+  title('Eb/No estimate')
+  mean(EbNodB_log)
+
+  figure(4)
+  clf
+  plot(rx);
+  title('input signal to demod')
+
   printf("frame sync and data extraction...\n");
 
   % Now perform frame sync and extract ASCII text -------------------------------------------
@@ -582,7 +593,7 @@ endfunction
 
 % run test functions from here during development
 
-run_sim
+%run_sim
 %rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
