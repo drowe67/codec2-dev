@@ -49,7 +49,7 @@ while c
     %printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
   endwhile
   f = (states.f1+states.f2)/2; shift = states.f2 - states.f1;
-  printf("max: %d f: %d fshift %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, shift, EbNo, SNR, length(rx_bits_buf));
+  printf("max: %d f: %d fshift %d ppm: %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, shift, states.ppm, EbNo, SNR, length(rx_bits_buf));
 
   % look for complete Horus frame, delimited by 2 unique words
 
