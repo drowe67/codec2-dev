@@ -65,6 +65,8 @@ function states = fsk_horus_init()
   states.df = 0;
   states.f1 = 0;
   states.f2 = 0;
+  states.norm_rx_timing = 0;
+  states.ppm = 0;
 endfunction
 
 
@@ -218,7 +220,20 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   states.x = x;
   states.rx_timing = rx_timing;
+  prev_norm_rx_timing = states.norm_rx_timing;
   states.norm_rx_timing = norm_rx_timing;
+
+  % estimate sample clock offset in ppm
+  % d_norm_timing is fraction of symbol period shift over nsym symbols
+
+  d_norm_rx_timing = norm_rx_timing - prev_norm_rx_timing;
+
+  % filter out big jumps due to nin changes
+
+  if abs(d_norm_rx_timing) < 0.1
+    appm = 1E6*d_norm_rx_timing/nsym;
+    states.ppm = 0.9*states.ppm + 0.1*appm;
+  end
 
   % work out how many input samples we need on the next call. The aim
   % is to keep angle(x) away from the -pi/pi (+/- 0.5 fine timing
@@ -492,6 +507,7 @@ function rx_bits_log = demod_file(filename)
   f1_int_resample_log = [];
   f2_int_resample_log = [];
   EbNodB_log = [];
+  ppm_log = [];
 
   % First extract raw bits from samples ------------------------------------------------------
 
@@ -514,6 +530,7 @@ function rx_bits_log = demod_file(filename)
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
     EbNodB_log = [EbNodB_log states.EbNodB];
+    ppm_log = [ppm_log states.ppm];
   end
 
   printf("plotting...\n");
@@ -535,12 +552,16 @@ function rx_bits_log = demod_file(filename)
   clf
   plot(EbNodB_log);
   title('Eb/No estimate')
-  mean(EbNodB_log)
 
   figure(4)
   clf
   plot(rx);
   title('input signal to demod')
+
+  figure(6);
+  clf
+  plot(ppm_log)
+  title('Sample clock (baud rate) offset in PPM');
 
   printf("frame sync and data extraction...\n");
 
@@ -594,8 +615,8 @@ endfunction
 % run test functions from here during development
 
 %run_sim
-%rx_bits = demod_file("~/Desktop/vk5arg-3.wav");
-%rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
+%rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
+rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
 %rx_bits = demod_file("fsk_horus_rx.raw");
 %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
