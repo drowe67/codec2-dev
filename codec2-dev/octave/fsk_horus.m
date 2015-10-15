@@ -302,22 +302,41 @@ endfunction
 
 % Extract ASCII string from a Horus frame of bits
 
-function str = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
+function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
   nfield = states.nfield;
   npad = states.npad;
 
-  str = [];
+  str = []; str_dec = []; nstr = 0;
   st = uw_loc1 + length(states.uw);  % first bit of first char
   for i=st:nfield+npad:uw_loc2
     field = rx_bits_buf(i:i+nfield-1);
     ch_dec = field * (2.^(0:nfield-1))';
-    
+
     % filter out unlikely characters that bit errors may introduce, and ignore \n
+
     if (ch_dec > 31) && (ch_dec < 91)
       str = [str char(ch_dec)];
     else 
       str = [str char(32)]; % space is "not sure"
     end
+    nstr++;
+
+    % build up array for CRC16 check
+
+    if ch_dec == 42
+      rx_crc = crc16(str_dec);
+      ptx_crc = nstr+1;
+    else
+      str_dec = [str_dec ch_dec];
+    end
+  end
+  tx_crc = str(ptx_crc:ptx_crc+3);
+  crc_ok = strcmp(tx_crc, rx_crc);
+  str = str(1:ptx_crc-2);
+  if crc_ok
+    str = sprintf("%s CRC OK", str);
+  else
+    str = sprintf("%s CRC BAD", str);
   end
 endfunction
 
@@ -367,7 +386,7 @@ function run_sim
   test_frame_mode = 4;
   fading = 1;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
-  df     = 1;          % tx tone freq drift in Hz/s
+  df     = 0;          % tx tone freq drift in Hz/s
 
   more off
   rand('state',1); 
@@ -637,9 +656,11 @@ endfunction
 
 % run test functions from here during development
 
-run_sim
-%rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
-%rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
-%rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
-%rx_bits = demod_file("fsk_horus_rx.raw");
-%rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
+if exist("fsk_horus_as_a_lib") == 0
+  run_sim
+  %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
+  %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
+  %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
+  %rx_bits = demod_file("fsk_horus_rx.raw");
+  %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
+end
