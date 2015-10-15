@@ -262,17 +262,20 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   f1_int_resample = zeros(1,nsym);
   f2_int_resample = zeros(1,nsym);
   rx_bits = zeros(1,nsym);
+  rx_bits_sd = zeros(1,nsym);
   for i=1:nsym
     st = i*P+1;
     f1_int_resample(i) = f1_int(st+low_sample)*(1-fract) + f1_int(st+high_sample)*fract;
     f2_int_resample(i) = f2_int(st+low_sample)*(1-fract) + f2_int(st+high_sample)*fract;
     %f1_int_resample(i) = f1_int(st+1);
     %f2_int_resample(i) = f2_int(st+1);
-    rx_bits(i) = abs(f1_int_resample(i)) < abs(f2_int_resample(i));
-  end
+    rx_bits(i) = abs(f2_int_resample(i)) > abs(f1_int_resample(i));
+    rx_bits_sd(i) = abs(f2_int_resample(i)) - abs(f1_int_resample(i));
+ end
 
   states.f1_int_resample = f1_int_resample;
   states.f2_int_resample = f2_int_resample;
+  states.rx_bits_sd = rx_bits_sd;
 
   % Eb/No estimation
 
@@ -348,7 +351,7 @@ endfunction
 
 % Extract as many ASCII packets as we can from a great big buffer of bits
 
-function extract_and_print_packets(states, rx_bits_log)
+function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
 
   % use UWs to delimit start and end of data packets
 
@@ -374,7 +377,52 @@ function extract_and_print_packets(states, rx_bits_log)
       %msg = rx_bits_log(st:uw_loc-1);
       %save -ascii horus_msg.txt msg
 
-      str = extract_ascii(states, rx_bits_log, st, uw_loc);
+      [str crc_ok] = extract_ascii(states, rx_bits_log, st, uw_loc);
+
+      if crc_ok == 0
+
+        % Use soft decision information to find bits most likely in error
+
+        [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):uw_loc)));
+        dodgy_bits_index += length(states.uw) + st - 1;
+        nbits = 8;
+        ntries = nbits^2;
+
+        % try various combinations of these bits
+
+        for i=1:ntries-1
+          error_mask = zeros(1, length(rx_bits_log));
+          for b=1:nbits
+            x = bitget(i,b);
+            bit_to_flip = dodgy_bits_index(b);
+            error_mask(bit_to_flip) = x;
+            %printf("st: %d i: %d b: %d x: %d index: %d\n", st, i,b,x,bit_to_flip);
+          end
+          rx_bits_log_flipped = xor(rx_bits_log, error_mask);
+          [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
+          if crc_ok_flipped
+            %printf("Yayy we fixed a packet by flipping with pattern %d\n", i);
+            str = sprintf("%s fixed", str_flipped);
+          end
+       end 
+
+if 0
+        % try flipping bits and see if we can get a checksum match
+        % this will fix single bit errors
+        
+        for i=st + length(states.uw):uw_loc
+          error_mask = zeros(1, length(rx_bits_log));
+          error_mask(i) = 1;
+          rx_bits_log_flipped = xor(rx_bits_log, error_mask);
+          [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
+          if crc_ok_flipped
+            printf("Yayy we fixed a packet by flipping bit %d\n", i);
+            str = str_flipped;
+          end
+        end
+end
+      end
+
       printf("%s\n", str);
     end
    
@@ -468,6 +516,7 @@ function run_sim
   f1_log = f2_log = [];
   EbNodB_log = [];
   rx_bits_log = [];
+  rx_bits_sd_log = [];
 
   for f=1:frames
 
@@ -484,6 +533,7 @@ function run_sim
     rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
     rx_bits_buf(nsym+1:2*nsym) = rx_bits;
     rx_bits_log = [rx_bits_log rx_bits];
+    rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
 
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     x_log = [x_log states.x];
@@ -530,7 +580,7 @@ function run_sim
   end
 
   if test_frame_mode == 4
-    extract_and_print_packets(states, rx_bits_log)
+    extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
   end
 
   figure(1);
