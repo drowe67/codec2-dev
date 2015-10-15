@@ -87,7 +87,7 @@ function tx  = fsk_horus_mod(states, tx_bits)
         tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/Fs;
       end
       tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
-      tx_phase -= floor(tx_phase/(2*pi))*2*pi;
+      tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
       f1 += df*Ts/Fs; f2 += df*Ts/Fs;
     end
 endfunction
@@ -362,10 +362,10 @@ endfunction
 
 function run_sim
   frames = 100;
-  EbNodB = 20;
+  EbNodB = 26;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
-  fading = 1;          % modulates tx power at 2Hz with 10dB fade depth, 
+  fading = 1;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 1;          % tx tone freq drift in Hz/s
 
@@ -418,11 +418,11 @@ function run_sim
 
   tx = fsk_horus_mod(states, tx_bits);
 
-  tx = resample(tx, 1000, 1000); % simulated 1000ppm sample clock offset
+  tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
 
   if fading
      ltx = length(tx);
-     tx = tx .* (1.316 + cos(2*pi*2*(0:ltx-1)/Fs))'; % min amplitude 0.1, -10dB fade, max 3dB
+     tx = tx .* (1.1 + cos(2*pi*2*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
   end
 
   noise = sqrt(variance)*randn(length(tx),1);
@@ -550,6 +550,7 @@ function run_sim
   clf
   plot(EbNodB_log);
   title('Eb/No estimate')
+
 endfunction
 
 
@@ -636,9 +637,9 @@ endfunction
 
 % run test functions from here during development
 
-%run_sim
+run_sim
 %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
-rx_bits = demod_file("fsk_horus_rx.raw");
+%rx_bits = demod_file("fsk_horus_rx.raw");
 %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
