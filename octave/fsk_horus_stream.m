@@ -36,6 +36,7 @@ SNR = 0;
 
 rx = [];
 rx_bits_buf = [];
+rx_bits_sd_buf = [];
 
 [s,c] = fread(stdin, N, "short");
 
@@ -48,6 +49,7 @@ while c
   while length(rx) > nin
     [rx_bits states] = fsk_horus_demod(states, rx(1:nin)');
     rx_bits_buf = [rx_bits_buf rx_bits];
+    rx_bits_sd_buf = [rx_bits_sd_buf states.rx_bits_sd];
     rx = rx(nin+1:length(rx));
     nin = states.nin;
     EbNo = 0.9*EbNo + 0.1*states.EbNodB;
@@ -67,7 +69,19 @@ while c
     uw_loc2 = find_uw(states, uw_loc1+length(uw), rx_bits_buf);
 
     if uw_loc2 != -1
+      % insert a single bit error for testing
+      %rx_bits_buf(uw_loc1+100) = xor(rx_bits_buf(uw_loc1+100),1);
+      %rx_bits_sd_buf(uw_loc1+100) = 0;
+
       [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2);
+
+      if crc_ok == 0
+        [str_flipped crc_flipped_ok] = sd_bit_flipping(states, rx_bits_buf, rx_bits_sd_buf, uw_loc1, uw_loc2); 
+        if crc_flipped_ok
+          str = sprintf("%s fixed", str_flipped);
+        end
+      end
+
       printf("%s         \n", str);
 
       % throw out used bits in buffer
@@ -90,6 +104,13 @@ while c
       % tell foxtrotGPS to plot track
 
       system(system_command);
+    end
+  else
+    % Truncate buffers if no UW found so they don't grow endlessly with no signal.
+    % Keep very end of it as it may have part of a UW in it
+    if length(rx_bits_buf) > length(uw)
+      rx_bits_buf = rx_bits_buf(length(rx_bits_buf)-length(uw):length(rx_bits_buf));
+      rx_bits_sd_buf = rx_bits_sd_buf(length(rx_bits_sd_buf)-length(uw):length(rx_bits_sd_buf));
     end
   end
   [s,c] = fread(stdin, N, "short");

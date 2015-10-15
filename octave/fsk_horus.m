@@ -349,6 +349,43 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
 endfunction
 
 
+% Use soft decision information to find bits most likely in error.  I think
+% this is some form of maximum likelihood decoding.
+% 
+% TODO: ignore rs232 start and stop bits, ie remove from weakest bit list
+%       insert known good bits (copy from prev packet with gd CRC)
+%       use other apriori info, like if a lat or long isn't a digit, use last packet as guess
+
+function [str crc_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc);
+
+  [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):uw_loc)));
+  dodgy_bits_index += length(states.uw) + st - 1;
+  nbits = 8;
+  ntries = nbits^2;
+  str = "";
+  crc_ok = 0;
+
+  % try various combinations of these bits
+
+  for i=1:ntries-1
+    error_mask = zeros(1, length(rx_bits_log));
+    for b=1:nbits
+      x = bitget(i,b);
+      bit_to_flip = dodgy_bits_index(b);
+      error_mask(bit_to_flip) = x;
+      %printf("st: %d i: %d b: %d x: %d index: %d\n", st, i,b,x,bit_to_flip);
+    end
+    rx_bits_log_flipped = xor(rx_bits_log, error_mask);
+    [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
+    if crc_ok_flipped
+      %printf("Yayy we fixed a packet by flipping with pattern %d\n", i);
+      str = str_flipped;
+      crc_ok = crc_ok_flipped;
+    end
+  end 
+endfunction
+
+
 % Extract as many ASCII packets as we can from a great big buffer of bits
 
 function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
@@ -378,49 +415,13 @@ function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
       %save -ascii horus_msg.txt msg
 
       [str crc_ok] = extract_ascii(states, rx_bits_log, st, uw_loc);
+      printf("%s\n", str);
 
       if crc_ok == 0
-
-        % Use soft decision information to find bits most likely in error
-
-        [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):uw_loc)));
-        dodgy_bits_index += length(states.uw) + st - 1;
-        nbits = 8;
-        ntries = nbits^2;
-
-        % try various combinations of these bits
-
-        for i=1:ntries-1
-          error_mask = zeros(1, length(rx_bits_log));
-          for b=1:nbits
-            x = bitget(i,b);
-            bit_to_flip = dodgy_bits_index(b);
-            error_mask(bit_to_flip) = x;
-            %printf("st: %d i: %d b: %d x: %d index: %d\n", st, i,b,x,bit_to_flip);
-          end
-          rx_bits_log_flipped = xor(rx_bits_log, error_mask);
-          [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
-          if crc_ok_flipped
-            %printf("Yayy we fixed a packet by flipping with pattern %d\n", i);
-            str = sprintf("%s fixed", str_flipped);
-          end
-       end 
-
-if 0
-        % try flipping bits and see if we can get a checksum match
-        % this will fix single bit errors
-        
-        for i=st + length(states.uw):uw_loc
-          error_mask = zeros(1, length(rx_bits_log));
-          error_mask(i) = 1;
-          rx_bits_log_flipped = xor(rx_bits_log, error_mask);
-          [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
-          if crc_ok_flipped
-            printf("Yayy we fixed a packet by flipping bit %d\n", i);
-            str = str_flipped;
-          end
+        [str_flipped crc_flipped_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
+        if crc_flipped_ok
+          str = sprintf("%s fixed", str_flipped);
         end
-end
       end
 
       printf("%s\n", str);
