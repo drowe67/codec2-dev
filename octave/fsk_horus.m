@@ -414,8 +414,11 @@ function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
       %msg = rx_bits_log(st:uw_loc-1);
       %save -ascii horus_msg.txt msg
 
+      % simulate bit error for testing
+      %rx_bits_log(st+100) = xor(rx_bits_log(st+100),1);
+      %rx_bits_sd_log(st+100) = 0;
+
       [str crc_ok] = extract_ascii(states, rx_bits_log, st, uw_loc);
-      printf("%s\n", str);
 
       if crc_ok == 0
         [str_flipped crc_flipped_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
@@ -438,7 +441,7 @@ function run_sim
   EbNodB = 26;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
-  fading = 1;          % modulates tx power at 2Hz with 20dB fade depth, 
+  fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 0;          % tx tone freq drift in Hz/s
 
@@ -643,6 +646,7 @@ function rx_bits_log = demod_file(filename)
   frames = floor(length(rx)/N);
   st = 1;
   rx_bits_log = [];
+  rx_bits_sd_log = [];
   norm_rx_timing_log = [];
   f1_int_resample_log = [];
   f2_int_resample_log = [];
@@ -666,6 +670,7 @@ function rx_bits_log = demod_file(filename)
 
     [rx_bits states] = fsk_horus_demod(states, sf);
     rx_bits_log = [rx_bits_log rx_bits];
+    rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
     f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
@@ -705,7 +710,7 @@ function rx_bits_log = demod_file(filename)
 
   printf("frame sync and data extraction...\n");
 
-  extract_and_print_packets(states, rx_bits_log)
+  extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
 
 endfunction
 
@@ -713,10 +718,11 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim
+  %run_sim
   %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
   %rx_bits = demod_file("fsk_horus_rx.raw");
+  rx_bits = demod_file("mp.raw");
   %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
 end
