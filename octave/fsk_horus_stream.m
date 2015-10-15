@@ -61,22 +61,8 @@ while c
     uw_loc2 = find_uw(states, uw_loc1+length(uw), rx_bits_buf);
 
     if uw_loc2 != -1
-
-      % Now we can extract ascii chars from the frame
-
-      str = [];
-      st = uw_loc1 + length(states.uw);  % first bit of first char
-      for i=st:nfield+npad:uw_loc2
-        field = rx_bits_buf(i:i+nfield-1);
-        ch_dec = field * (2.^(0:nfield-1))';
-        % filter out unlikely characters that bit errors may introduce, and ignore \n
-        if (ch_dec > 31) && (ch_dec < 91)
-          str = [str char(ch_dec)];
-        else 
-          str = [str char(32)]; % space is "not sure"
-        end
-      end
-      printf("%s\n", str);
+      str = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2);
+      printf("%s         \n", str);
 
       % throw out used bits in buffer
 
