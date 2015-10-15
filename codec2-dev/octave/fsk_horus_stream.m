@@ -20,7 +20,7 @@ fsk_horus_as_a_lib = 1;
 fsk_horus;  
 
 gps_log = "~/Desktop/gps_log.txt"
-system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.0.1 21234"
+system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.0.1 21234";
 
 more off;
 states = fsk_horus_init();
@@ -75,15 +75,17 @@ while c
       rx_bits_buf =  rx_bits_buf(uw_loc2-1:length(rx_bits_buf));
 
       % extract GPS coords and save to log file for mapping software
+      % TODO: sanitise, make sure they are all numbers, decimal point in right place
 
       str_split = strsplit(str,",");
-      lat = str_split{1,4}; long = str_split{1,5};
-      f = fopen(gps_log,"at");
-      fprintf(f,"%s,%s\n", lat, long);
-      fclose(f);
+      if length(str_split) > 4
+        lat = str_split{1,4}; long = str_split{1,5};
+        f = fopen(gps_log,"at");
+        fprintf(f,"%s,%s\n", lat, long);
+        fclose(f);
+      end
 
-      % thin out log file to points_max points to lighten plotting load
-      % TBC
+      % TODO: thin out log file to points_max points to lighten plotting load
 
       % tell foxtrotGPS to plot track
 
