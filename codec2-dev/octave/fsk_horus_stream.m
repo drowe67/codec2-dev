@@ -87,6 +87,7 @@ while c
       % throw out used bits in buffer
 
       rx_bits_buf =  rx_bits_buf(uw_loc2-1:length(rx_bits_buf));
+      rx_bits_sd_buf =  rx_bits_sd_buf(uw_loc2-1:length(rx_bits_sd_buf));
 
       % extract GPS coords and save to log file for mapping software
       % TODO: sanitise, make sure they are all numbers, decimal point in right place
