@@ -36,7 +36,7 @@ function states = fsk_horus_init()
   states.Ndft = 8192;
   Fs = states.Fs = 8000;
   N = states.N = Fs;             % processing buffer size, nice big window for f1,f2 estimation
-  Rs = states.Rs = 50;
+  Rs = states.Rs = 100;
   Ts = states.Ts = Fs/Rs;
   states.nsym = N/Ts;
   Nmem = states.Nmem  = N+2*Ts;    % two symbol memory in down converted signals to allow for timing adj
@@ -230,7 +230,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   % filter out big jumps due to nin changes
 
-  if abs(d_norm_rx_timing) < 0.1
+  if abs(d_norm_rx_timing) < 0.2
     appm = 1E6*d_norm_rx_timing/nsym;
     states.ppm = 0.9*states.ppm + 0.1*appm;
   end
@@ -300,16 +300,74 @@ function uw_start = find_uw(states, start_bit, rx_bits)
 endfunction
 
 
-% Demo modem with simulated tx signal, add noise, channel impairments ----------------------
+% Extract ASCII string from a Horus frame of bits
+
+function str = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
+  nfield = states.nfield;
+  npad = states.npad;
+
+  str = [];
+  st = uw_loc1 + length(states.uw);  % first bit of first char
+  for i=st:nfield+npad:uw_loc2
+    field = rx_bits_buf(i:i+nfield-1);
+    ch_dec = field * (2.^(0:nfield-1))';
+    
+    % filter out unlikely characters that bit errors may introduce, and ignore \n
+    if (ch_dec > 31) && (ch_dec < 91)
+      str = [str char(ch_dec)];
+    else 
+      str = [str char(32)]; % space is "not sure"
+    end
+  end
+endfunction
+
+
+% Extract as many ASCII packets as we can from a great big buffer of bits
+
+function extract_and_print_packets(states, rx_bits_log)
+
+  % use UWs to delimit start and end of data packets
+
+  bit = 1;
+  nbits = length(rx_bits_log);
+  uw_loc = find_uw(states, bit, rx_bits_log);
+  nfield = states.nfield;
+  npad = states.npad;
+
+  while (uw_loc != -1)
+
+    st = uw_loc;
+    bit = uw_loc + length(states.uw);
+    uw_loc = find_uw(states, bit, rx_bits_log);
+
+    if uw_loc != -1
+      % Now start picking out 7 bit ascii chars from frame.  It has some
+      % structure so we can guess where fields are.  I hope We don't get
+      % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
+      % change dynamically.
+
+      % dump msg bits so we can use them as a test signal
+      %msg = rx_bits_log(st:uw_loc-1);
+      %save -ascii horus_msg.txt msg
+
+      str = extract_ascii(states, rx_bits_log, st, uw_loc);
+      printf("%s\n", str);
+    end
+   
+  endwhile
+endfunction
+ 
+
+% simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim
   frames = 100;
-  EbNodB = 10;
+  EbNodB = 20;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
-  fading = 0;          % modulates tx power at 5Hz with 20dB fade depth, 
+  fading = 1;          % modulates tx power at 2Hz with 10dB fade depth, 
                        % to simulate balloon rotating at end of mission
-  df     = 0;          % tx tone freq drift in Hz/s
+  df     = 1;          % tx tone freq drift in Hz/s
 
   more off
   rand('state',1); 
@@ -364,14 +422,14 @@ function run_sim
 
   if fading
      ltx = length(tx);
-     tx = tx .* (1.1 + cos(2*pi*5*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
+     tx = tx .* (1.316 + cos(2*pi*2*(0:ltx-1)/Fs))'; % min amplitude 0.1, -10dB fade, max 3dB
   end
 
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
-
+  
   % dump simulated rx file
-  ftx=fopen("fsk_horus_rx.raw","wb"); rxg = rx*5000; fwrite(ftx, rxg, "short"); fclose(ftx);
+  ftx=fopen("fsk_horus_rx.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
@@ -385,6 +443,7 @@ function run_sim
   f2_int_resample_log = [];
   f1_log = f2_log = [];
   EbNodB_log = [];
+  rx_bits_log = [];
 
   for f=1:frames
 
@@ -400,6 +459,8 @@ function run_sim
     [rx_bits states] = fsk_horus_demod(states, sf);
     rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
     rx_bits_buf(nsym+1:2*nsym) = rx_bits;
+    rx_bits_log = [rx_bits_log rx_bits];
+
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     x_log = [x_log states.x];
     f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
@@ -441,7 +502,11 @@ function run_sim
   end
 
   if test_frame_mode == 1
-    printf("frames: %d Tbits: %d Terrs: %d BER %3.2f\n", frames, Tbits, Terrs, Terrs/Tbits);
+    printf("frames: %d Tbits: %d Terrs: %d BER %4.3f\n", frames, Tbits, Terrs, Terrs/Tbits);
+  end
+
+  if test_frame_mode == 4
+    extract_and_print_packets(states, rx_bits_log)
   end
 
   figure(1);
@@ -485,7 +550,6 @@ function run_sim
   clf
   plot(EbNodB_log);
   title('Eb/No estimate')
-  mean(EbNodB_log)
 endfunction
 
 
@@ -565,50 +629,8 @@ function rx_bits_log = demod_file(filename)
 
   printf("frame sync and data extraction...\n");
 
-  % Now perform frame sync and extract ASCII text -------------------------------------------
+  extract_and_print_packets(states, rx_bits_log)
 
-  % use UWs to delimit start and end of data packets
-
-  bit = 1;
-  nbits = length(rx_bits_log);
-  uw_loc = find_uw(states, bit, rx_bits_log);
-  nfield = states.nfield;
-  npad = states.npad;
-
-  while (uw_loc != -1)
-
-    st = uw_loc;
-    bit = uw_loc + length(states.uw);
-    uw_loc = find_uw(states, bit, rx_bits_log);
-
-    if uw_loc != -1
-      % Now start picking out 7 bit ascii chars from frame.  It has some
-      % structure so we can guess where fields are.  I hope We don't get
-      % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
-      % change dynamically.
-
-      % dump msg bits so we can use them as a test signal
-      %msg = rx_bits_log(st:uw_loc-1);
-      %save -ascii horus_msg.txt msg
-
-      str = [];
-      st += length(states.uw);  % first bit of first char
-      for i=st:nfield+npad:uw_loc
-        field = rx_bits_log(i:i+nfield-1);
-        ch_dec = field * (2.^(0:nfield-1))';
-        % filter out unlikely characters that bit errors may introduce, and ignore \n
-        if (ch_dec > 31) && (ch_dec < 91)
-          str = [str char(ch_dec)];
-        else 
-          str = [str char(32)]; % space is "non sure"
-        end
-        %printf("i: %d ch_dec: %d ch: %c\n", i, ch_dec, ch_dec);
-      end
-      printf("%s\n", str);
-    end
-   
-  endwhile
- 
 endfunction
 
 
@@ -616,7 +638,7 @@ endfunction
 
 %run_sim
 %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
-rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
+%rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
 %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
-%rx_bits = demod_file("fsk_horus_rx.raw");
+rx_bits = demod_file("fsk_horus_rx.raw");
 %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
