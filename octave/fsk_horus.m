@@ -306,7 +306,8 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
   nfield = states.nfield;
   npad = states.npad;
 
-  str = []; str_dec = []; nstr = 0;
+  str = []; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
+
   st = uw_loc1 + length(states.uw);  % first bit of first char
   for i=st:nfield+npad:uw_loc2
     field = rx_bits_buf(i:i+nfield-1);
@@ -330,8 +331,12 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
       str_dec = [str_dec ch_dec];
     end
   end
-  tx_crc = str(ptx_crc:ptx_crc+3);
-  crc_ok = strcmp(tx_crc, rx_crc);
+  if (ptx_crc+3) <= length(str)
+    tx_crc = str(ptx_crc:ptx_crc+3);
+    crc_ok = strcmp(tx_crc, rx_crc);
+  else
+    crc_ok = 0;
+  end
   str = str(1:ptx_crc-2);
   if crc_ok
     str = sprintf("%s CRC OK", str);
