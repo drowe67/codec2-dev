@@ -14,7 +14,10 @@
 %  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
 %
 
-fsk_horus;  % include library (make sure calls to functions at bottom are commented out)
+% include library (make sure calls to test functions at bottom are disabled)
+
+fsk_horus_as_a_lib = 1;
+fsk_horus;  
 
 more off;
 states = fsk_horus_init();
