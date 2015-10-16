@@ -67,6 +67,7 @@ function states = fsk_horus_init()
   states.f2 = 0;
   states.norm_rx_timing = 0;
   states.ppm = 0;
+  states.prev_pkt = [];
 endfunction
 
 
@@ -327,7 +328,7 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
 
     % build up array for CRC16 check
 
-    if ch_dec == 42
+    if ch_dec == 42 
       rx_crc = crc16(str_dec);
       ptx_crc = nstr+1;
     else
@@ -351,20 +352,27 @@ endfunction
 
 % Use soft decision information to find bits most likely in error.  I think
 % this is some form of maximum likelihood decoding.
-% 
-% TODO: ignore rs232 start and stop bits, ie remove from weakest bit list
-%       insert known good bits (copy from prev packet with gd CRC)
-%       use other apriori info, like if a lat or long isn't a digit, use last packet as guess
 
-function [str crc_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc);
+function [str crc_ok rx_bits_log_flipped] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc);
+
+  % force algorithm to ignore rs232 sync bits by marking them as "very likely", they have
+  % no input to crc algorithm
+
+  nfield = states.nfield;
+  npad = states.npad;
+  for i=st:nfield+npad:uw_loc
+    rx_bits_sd_log(i+nfield:i+nfield+npad-1) = 1E6;
+  end
+
+  % make a list of bits with smallest soft decn values
 
   [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):uw_loc)));
   dodgy_bits_index += length(states.uw) + st - 1;
-  nbits = 8;
-  ntries = nbits^2;
+  nbits = 6;
+  ntries = 2^nbits;
   str = "";
   crc_ok = 0;
-
+  
   % try various combinations of these bits
 
   for i=1:ntries-1
@@ -382,7 +390,7 @@ function [str crc_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st,
       str = str_flipped;
       crc_ok = crc_ok_flipped;
     end
-  end 
+  end
 endfunction
 
 
@@ -415,18 +423,22 @@ function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
       %save -ascii horus_msg.txt msg
 
       % simulate bit error for testing
-      %rx_bits_log(st+100) = xor(rx_bits_log(st+100),1);
+      %rx_bits_log(st+200) = xor(rx_bits_log(st+100),1);
       %rx_bits_sd_log(st+100) = 0;
 
       [str crc_ok] = extract_ascii(states, rx_bits_log, st, uw_loc);
 
       if crc_ok == 0
-        [str_flipped crc_flipped_ok] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
+        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
         if crc_flipped_ok
           str = sprintf("%s fixed", str_flipped);
         end
       end
 
+      % update memory of previous packet, we use this to guess where errors may be
+      if crc_ok || crc_flipped_ok
+        states.prev_pkt = rx_bits_log(st+length(states.uw):uw_loc);
+      end
       printf("%s\n", str);
     end
    
@@ -437,7 +449,7 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim
-  frames = 100;
+  frames = 10;
   EbNodB = 26;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 4;
