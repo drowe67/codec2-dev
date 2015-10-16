@@ -3,20 +3,20 @@
 % fsk_horus_stream.m
 % David Rowe 13 Oct 2015
 %
-% Experimental near space balloon FSK demodulator, takes 8kHz 16 bit samples from 
-% stdin, output txt string on stdout
+% Experimental real time near space balloon FSK demodulator, takes
+% 8kHz 16 bit samples from stdin, output txt string on stdout
 %
 % usage:
 %  $ chmod 777 fsk_horus_stream.m
 %  $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m
 %
-% or to test with a stored file:
+% OR to test with a stored file (8kHz 16-bit shorts):
 %  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
 %
 
-% include library (make sure calls to test functions at bottom are disabled)
+% include modem library
 
-fsk_horus_as_a_lib = 1;
+fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
 fsk_horus;  
 
 gps_log = "~/Desktop/gps_log.txt"
@@ -44,7 +44,7 @@ while c
 
   rx = [rx s'];
  
-  % demodulate to bit stream
+  % demodulate samples to bit stream
 
   while length(rx) > nin
     [rx_bits states] = fsk_horus_demod(states, rx(1:nin)');
@@ -79,6 +79,7 @@ while c
         [str_flipped crc_flipped_ok] = sd_bit_flipping(states, rx_bits_buf, rx_bits_sd_buf, uw_loc1, uw_loc2); 
         if crc_flipped_ok
           str = sprintf("%s fixed", str_flipped);
+          crc_ok = 1;
         end
       end
 
@@ -89,22 +90,23 @@ while c
       rx_bits_buf =  rx_bits_buf(uw_loc2-1:length(rx_bits_buf));
       rx_bits_sd_buf =  rx_bits_sd_buf(uw_loc2-1:length(rx_bits_sd_buf));
 
-      % extract GPS coords and save to log file for mapping software
-      % TODO: sanitise, make sure they are all numbers, decimal point in right place
+      if crc_ok
+        % extract GPS coords and save to log file for mapping software
 
-      str_split = strsplit(str,",");
-      if length(str_split) > 4
-        lat = str_split{1,4}; long = str_split{1,5};
-        f = fopen(gps_log,"at");
-        fprintf(f,"%s,%s\n", lat, long);
-        fclose(f);
+        str_split = strsplit(str,",");
+        if length(str_split) > 4
+          lat = str_split{1,4}; long = str_split{1,5};
+          f = fopen(gps_log,"at");
+          fprintf(f,"%s,%s\n", lat, long);
+          fclose(f);
+        end
+
+        % TODO: thin out log file to max_points to lighten plotting load
+
+        % tell foxtrotGPS to plot track
+
+        system(system_command);
       end
-
-      % TODO: thin out log file to points_max points to lighten plotting load
-
-      % tell foxtrotGPS to plot track
-
-      system(system_command);
     end
   else
     % Truncate buffers if no UW found so they don't grow endlessly with no signal.
@@ -114,6 +116,7 @@ while c
       rx_bits_sd_buf = rx_bits_sd_buf(length(rx_bits_sd_buf)-length(uw):length(rx_bits_sd_buf));
     end
   end
+
   [s,c] = fread(stdin, N, "short");
 
 endwhile
