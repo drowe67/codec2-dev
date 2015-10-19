@@ -1,10 +1,15 @@
-% fsk4.mf
+% fsk4.m
+%
+% Brady O'Brien October 2015
+%
 % 4FSK modem attempt from the DMR spec
 
 graphics_toolkit("gnuplot");
 
-fm;
+fm; % analog FM modulator functions
+
 pkg load signal;
+
 % Frequency response of the DMR raised cosine filter 
 % from ETSI TS 102 361-1 V2.2.1 page 111
 dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880));
@@ -38,6 +43,9 @@ nxdn.syms = [-1050,-350,350,1050];
 
 global nxdn_info = nxdn;
 
+
+% Init function for modem ------------------------------------------------------------
+
 function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     Fs = fsk4_states.Fs = 48000;  %Sample rate
     Rs = fsk4_states.Rs = Rs;     %Symbol rate
@@ -66,12 +74,16 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fsk4_states.modinfo=fsk4_info;
 endfunction 
 
+
 function d = idmp(data, M)
     d = zeros(1,length(data)/M);
     for i = 1:length(d)
       d(i) = sum(data(1+(i-1)*M:i*M));
     end
 endfunction
+
+
+% DMR modulator ----------------------------------------------------------
 
 function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
   hbits = tx_bits(1:2:length(tx_bits));
@@ -96,7 +108,8 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
 
 endfunction
 
-% Integrate and Dump 4FSK demod
+
+% Integrate and Dump 4FSK demod ----------------------------------------------------
 
 function bits = fsk4_demod_thing(fsk4_states, rx)
 
@@ -150,9 +163,10 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   end
 endfunction
 
-
-%incoherent demod loosly based on another paper. Works, more or less.
+% -----------------------------------------------------------------------------------------
+% Incoherent demod loosly based on another paper. Works, more or less.
 % Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
+
 function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
 
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
@@ -206,9 +220,11 @@ function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
   end
 endfunction
 
-% Bit error rate test
+
+% Bit error rate test ----------------------------------------------------------
 % for a noise-free channel
 % now supports noisy channels
+
 function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
   global dmr_info;
   global nxdn_info;
@@ -222,7 +238,7 @@ function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
   Fs = fsk4_states.Fs;
-  Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
+  Rb = fsk4_states.Rs * 2;  % Multiply symbol rate by 2, since we have 2 bits per symbol
   
   tx = fsk4_mod(fsk4_states,test_bits);
 
@@ -289,12 +305,18 @@ function fsk4_rx_phi
 endfunction
 
 
+% Run this function to compare the theoretical 4FSK modem performance
+% with our DMR modem simulation
+
 function fsk4_ber_curves
   EbNodB = 1:20;
   bers_tco = bers_real = bers_tnco = ones(1,length(EbNodB));
   %for ii=(1:length(EbNodB));
   %  [bers_real(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
   %end
+
+  % Lovely innovation by Brady to use all cores and really speed up the simulation
+
   try
     pkg load parallel
     [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB);
@@ -304,17 +326,18 @@ function fsk4_ber_curves
       [bers_real(ii),bers,tco(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
     end
   end_try_catch
-  figure;
+
   close all
+  figure(1);
   clf;
   semilogy(EbNodB, bers_tnco,'r;4FSK non-coherent theory;')
   hold on;
 
   semilogy(EbNodB, bers_tco,'b;4FSK coherent theory;')
-  semilogy(EbNodB, bers_real ,'g;4FSK non-coherent sim;')
+  semilogy(EbNodB, bers_real ,'g;4FSK DMR simulation;')
   hold off;
   grid("minor");
-  axis([min(EbNodB) max(EbNodB) 1E-8 1])
+  axis([min(EbNodB) max(EbNodB) 1E-5 1])
   legend("boxoff");
   xlabel("Eb/No (dB)");
   ylabel("Bit Error Rate (BER)")
@@ -322,7 +345,11 @@ function fsk4_ber_curves
 endfunction
 
 
-
+% David's Questions:
+% 1/ Can we disable all the plots when running fsk4_ber_curves?
+% 2/ Is there a function I can call to run just 1 BER point (run_single)
+% 3/ Can we switch between the two modems?  Do they have any difference in perf?  Plot both?
+% 4/ How do we swith between DMR and NXDN?
 
 
 
