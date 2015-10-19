@@ -16,12 +16,18 @@ dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<
 dmr.rx_filt_resp = dmr.tx_filt_resp;
 dmr.max_dev = 1944;
 dmr.syms = [-1944 -648 648 1944];
+dmr.rs = 4800;
+dmr.no_filter = 0;
 global dmr_info = dmr;
 
+
+% No-filter 4FSK 'ideal' parameters
 nfl.tx_filt_resp = @(f) 1;
 nfl.rx_filt_resp = nfl.tx_filt_resp;
 nfl.max_dev = 1944;
 nfl.syms = [-1944 -648 648 1944];
+nfl.rs = 4800;
+nfl.no_filter = 1;
 global nflt_info = nfl;
 
 %Some parameters for the NXDN filters
@@ -32,13 +38,16 @@ nxdn_fh = ((1+nxdn_al)/(2*nxdn_T));
 
 %Frequency response of the NXDN filters
 % from NXDN TS 1-A V1.3 page 13
+% Please note : NXDN not fully implemented or tested
 nxdn_H = @(f) 1.0*(f<nxdn_fl) + cos( (nxdn_T/(4*nxdn_al))*(2*pi*f-(pi*(1-nxdn_al)/nxdn_T)) ).*(f<=nxdn_fh & f>nxdn_fl);
 nxdn_P = @(f) (f<=nxdn_fh & f>0).*((sin(pi*f*nxdn_T))./(.00001+(pi*f*nxdn_T))) + 1.0*(f==0);
 nxdn_D = @(f) (f<=nxdn_fh & f>0).*((pi*f*nxdn_T)./(.00001+sin(pi*f*nxdn_T))) + 1.0*(f==0);
 
 nxdn.tx_filt_resp = @(f) nxdn_H(f).*nxdn_P(f);
 nxdn.rx_filt_resp = @(f) nxdn_H(f).*nxdn_D(f);
+nxdn.rs = 4800;
 nxdn.max_dev = 1050;
+nxdn.no_filter = 0;
 nxdn.syms = [-1050,-350,350,1050];
 
 global nxdn_info = nxdn;
@@ -46,18 +55,27 @@ global nxdn_info = nxdn;
 
 % Init function for modem ------------------------------------------------------------
 
-function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
+function fsk4_states = fsk4_init(fsk4_states,fsk4_info)
     Fs = fsk4_states.Fs = 48000;  %Sample rate
-    Rs = fsk4_states.Rs = Rs;     %Symbol rate
+    Rs = fsk4_states.Rs = fsk4_info.rs;     %Symbol rate
     M = fsk4_states.M = fsk4_states.Fs/fsk4_states.Rs; %Samples per symbol
     
     % Set up 4FSK raised cosine filter. This probably screws up perf if we were using
     % optimal mod and dmeods but helps performance when using nasty old analog FM mods
     % and demods
 
+    empty_filter = [zeros(1,99) 1];
+
     rf = (0:(Fs/2));
-    fsk4_states.tx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.tx_filt_resp(rf));
-    fsk4_states.rx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.rx_filt_resp(rf));
+    %If there's no filter with this modem configuration, don't bother generating one
+    if fsk4_info.no_filter
+      fsk4_states.tx_filter = empty_filter;
+      fsk4_states.rx_filter = empty_filter;
+    else
+      fsk4_states.tx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.tx_filt_resp(rf));
+      fsk4_states.rx_filter = fir2(400 ,rf/(Fs/2),fsk4_info.rx_filt_resp(rf));
+    endif
+
     %fsk4_states.tx_filter = fsk4_states.rx_filter = [zeros(1,99) 1];
     %Set up the 4FSK symbols
     fsk4_states.symmap = fsk4_info.syms / fsk4_info.max_dev;
@@ -71,10 +89,11 @@ function fsk4_states = fsk4_init(fsk4_states,Rs,fsk4_info)
     fm_states.output_filter = 0;
     fm_states.ph_dont_limit = 1;
     fsk4_states.fm_states = analog_fm_init(fm_states);
-    fsk4_states.modinfo=fsk4_info;
+    fsk4_states.modinfo = fsk4_info;
+    fsk4_states.verbose = 0;
 endfunction 
 
-
+%Integrate over data and dump every M samples
 function d = idmp(data, M)
     d = zeros(1,length(data)/M);
     for i = 1:length(d)
@@ -86,6 +105,8 @@ endfunction
 % DMR modulator ----------------------------------------------------------
 
 function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
+  verbose = fsk4_states.verbose
+
   hbits = tx_bits(1:2:length(tx_bits));
   lbits = tx_bits(2:2:length(tx_bits));
   %Pad odd bit lengths
@@ -103,8 +124,12 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
   end
   tx_filt = filter(fsk4_states.tx_filter, 1, tx_stream);
   tx = analog_fm_mod(fsk4_states.fm_states, tx_filt);
-  figure(10);
-  plot(20*log10(abs(fft(tx))))
+
+  if verbose
+    figure(10);
+    plot(20*log10(abs(fft(tx))))
+    title("Spectrum of modulated 4FSK")
+  endif
 
 endfunction
 
@@ -163,8 +188,8 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   end
 endfunction
 
+
 function out = fold_sum(in,l)
-  %in = diff(in);
   sublen = floor(length(in)/l);
   out = zeros(1,l);
   for i=(1:sublen)
@@ -173,28 +198,46 @@ function out = fold_sum(in,l)
   end
 endfunction
 
-function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
-
+function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx, enable_fine_timing = 0)
+  %Demodulate fsk signal with an analog fm demod
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
 
   M = fsk4_states.M;
-  fine_timing = 59;
+  verbose = fsk4_states.verbose;
+  %This is the ideal fine timing, assuming the same offset in nfbert
+  fine_timing = 61;
+
+  %This is meant to be adjusted by the fine timing estimator. comment out for
+  %ideal timing
+  %fine_timing = 59;
   
   %RRC filter to get rid of some of the noise
   rxd = filter(fsk4_states.rx_filter, 1, rxd);
 
+  %Try and figure out where sampling should happen over 30 symbol periods
   diffsel = fold_sum(abs(diff( rxd(3001:3001+(M*30)) )),10);
-  %diffsel = fold_sum(abs(diff( rxd(300:length(rxd)) )),10);
-  figure(11);
-  plot(diffsel);
+ 
+  if verbose
+    figure(11);
+    plot(diffsel);
+    title("Fine timing estimation");
+  endif
 
+  %adjust fine timing
   [v iv] = min(diffsel);
-  fine_timing = fine_timing + iv
+  if enable_fine_timing
+    fine_timing = 59 + iv;
+  endif
   rxphi = iv;
+
+  %sample symbols
   sym = rxd(fine_timing:M:length(rxd));
 
-  figure(4)
-  plot(sym(1:1000));
+  if verbose
+    figure(4)
+    plot(sym(1:1000));
+    title("Sampled symbols")
+  endif
   %eyediagram(afsym,2);
   % Demod symbol map. I should probably figure a better way to do this.
   % After sampling, the furthest symbols tend to be distributed about .80
@@ -209,16 +252,25 @@ function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
 
   dmsyms = rot90(fsk4_states.symmap*grmax)
   (dmsyms(2)+dmsyms(1))/2
-  figure(2)
-  hist(abs(sym),200);
+
+  if verbose
+    figure(2)
+    hist(abs(sym),200);
+    title("Sampled symbol histogram")
+  endif
 
   %demap the symbols
   [err, symout] = min(abs(sym-dmsyms));
+  
+  if verbose
+    figure(3)
+    hist(symout);
+    title("De-mapped symbols")
+  endif
 
   bits = zeros(1,length(symout)*2);
   %Translate symbols back into bits
-  figure(3)
-  hist(symout);
+
   for i=1:length(symout)
     bits(1+(i-1)*2:i*2) = [[1 1];[1 0];[0 1];[0 0]](symout(i),(1:2));
   end
@@ -226,20 +278,27 @@ endfunction
 
 
 % Bit error rate test ----------------------------------------------------------
-% for a noise-free channel
-% now supports noisy channels
-function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 10)
-  global dmr_info;
-  global nxdn_info;
-  global nflt_info;
+% Params - aEsNodB - EbNo in decibels
+%        - timing_offset - how far the fine timing is offset
+%        - bitcnt - how many bits to check
+%        - demod_fx - demodulator function
+% Returns - ber - teh measured BER
+%         - thrcoh - theory BER of a coherent demod
+%         - thrncoh - theory BER of non-coherent demod
+function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config,demod_fx = @fsk4_demod_fmrid, bitcnt=100000, timing_offset = 10)
 
   rand('state',1); 
   randn('state',1);
 
+  %How many bits should this test run?
   bitcnt = 120000;
+  
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
-  fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
+  fsk4_states = fsk4_init(fsk4_states,modem_config);
+  
+  %Set this to 0 to cut down on the plotting
+  fsk4_states.verbose = 0; 
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  % Multiply symbol rate by 2, since we have 2 bits per symbol
   
@@ -256,7 +315,7 @@ function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 10)
 
   rx    = rx(timing_offset:length(rx));
 
-  [rx_bits biterr rxphi] = fsk4_demod_fmrid(fsk4_states,rx);
+  rx_bits = demod_fx(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
@@ -310,8 +369,10 @@ function rxphi = fine_ex(timing_offset = 1)
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   t_vec = [0 0 1 1];
   %test_bits = repmat(t_vec,1,ceil(24000/length(t_vec)));
+
+
   fsk4_states.M = 1;
-  fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
+  fsk4_states = fsk4_init(fsk4_states,dmr_info);
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
   
@@ -365,17 +426,22 @@ endfunction
 % with our DMR modem simulation
 
 function fsk4_ber_curves
+  global dmr_info;
+  global nxdn_info;
+  global nflt_info;
+
   EbNodB = 1:20;
   bers_tco = bers_real = bers_tnco = ones(1,length(EbNodB));
-  %for ii=(1:length(EbNodB));
-  %  [bers_real(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
-  %end
+
+  %vectors of the same param to pass into pararrayfun
+  dmr_infos = repmat(dmr_info,1,length(EbNodB));
+  nflt_infos = repmat(dmr_info,1,length(EbNodB));
 
   % Lovely innovation by Brady to use all cores and really speed up the simulation
 
   try
     pkg load parallel
-    [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB,107*ones(1,length(EbNodB)));
+    [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB,dmr_infos);
   catch
     printf("You should install package parallel. It'll make this run way faster\n");
     for ii=(1:length(EbNodB));
@@ -406,10 +472,6 @@ endfunction
 % 2/ Is there a function I can call to run just 1 BER point (run_single)
 % 3/ Can we switch between the two modems?  Do they have any difference in perf?  Plot both?
 % 4/ How do we swith between DMR and NXDN?
-
-
-
-
 
 
 
