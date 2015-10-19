@@ -90,7 +90,7 @@ function [tx, tx_filt, tx_stream] = fsk4_mod(fsk4_states, tx_bits)
   lbits = tx_bits(2:2:length(tx_bits));
   %Pad odd bit lengths
   if(length(hbits)!=length(lbits))
-    lbits = [lbits 0]
+    lbits = [lbits 0];
   end
   tx_symbols = lbits + hbits*2 + 1;
   M = fsk4_states.M;
@@ -163,30 +163,34 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   end
 endfunction
 
-% -----------------------------------------------------------------------------------------
-% Incoherent demod loosly based on another paper. Works, more or less.
-% Paper is titled "Design and Implementation of a Fully Digital 4FSK Demodulator"
+function out = fold_sum(in,l)
+  %in = diff(in);
+  sublen = floor(length(in)/l);
+  out = zeros(1,l);
+  for i=(1:sublen)
+    v = in(1+(i-1)*l:i*l);
+    out = out + v;
+  end
+endfunction
 
 function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
 
   rxd = analog_fm_demod(fsk4_states.fm_states,rx);
 
-  rxest = rxd.^2;
-  figure(11);
-  plot(20*log10(abs(fft(rxest))));
-  figure(12);
-  plot(rxest);
-  w = 2*pi*(12051/48000);
-  rxest = rxest .* exp(-j*w*(0:length(rxest)-1));
-  rxest = sum(rxest)
-  rxphi = angle(rxest)
-
   M = fsk4_states.M;
-  fine_timing = 51;
+  fine_timing = 59;
   
   %RRC filter to get rid of some of the noise
   rxd = filter(fsk4_states.rx_filter, 1, rxd);
 
+  diffsel = fold_sum(abs(diff( rxd(3001:3001+(M*30)) )),10);
+  %diffsel = fold_sum(abs(diff( rxd(300:length(rxd)) )),10);
+  figure(11);
+  plot(diffsel);
+
+  [v iv] = min(diffsel);
+  fine_timing = fine_timing + iv
+  rxphi = iv;
   sym = rxd(fine_timing:M:length(rxd));
 
   figure(4)
@@ -198,15 +202,15 @@ function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx)
   % A little cheating to demap the symbols
   % Take a histogram of the sampled symbols, find the center of the largest distribution,
   % and correct the symbol map to match it
-  [a b] = hist(sym,50);
+  [a b] = hist(abs(sym),50);
   [a ii] = max(a);
   grmax = abs(b(ii));
   grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax;
 
   dmsyms = rot90(fsk4_states.symmap*grmax)
-
+  (dmsyms(2)+dmsyms(1))/2
   figure(2)
-  hist(sym,200);
+  hist(abs(sym),200);
 
   %demap the symbols
   [err, symout] = min(abs(sym-dmsyms));
@@ -224,8 +228,7 @@ endfunction
 % Bit error rate test ----------------------------------------------------------
 % for a noise-free channel
 % now supports noisy channels
-
-function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
+function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 10)
   global dmr_info;
   global nxdn_info;
   global nflt_info;
@@ -233,7 +236,7 @@ function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
   rand('state',1); 
   randn('state',1);
 
-  bitcnt = 24000;
+  bitcnt = 120000;
   test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
   fsk4_states.M = 1;
   fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
@@ -294,10 +297,63 @@ function [ber thrcoh thrncoh rxphi] = nfbert(aEsNodB,timing_offset = 1)
   %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
 endfunction
 
-function fsk4_rx_phi
-  pkg load parallel
-  offrange = [1:100];
-  [a,b,c,phi] = pararrayfun(floor(1.25*nproc()),@nfbert,100.*ones(1,length(offrange)),offrange);
+% RX fine timing estimation playground
+function rxphi = fine_ex(timing_offset = 1)
+  global dmr_info;
+  global nxdn_info;
+  global nflt_info;
+
+  rand('state',1); 
+  randn('state',1);
+
+  bitcnt = 12051;
+  test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
+  t_vec = [0 0 1 1];
+  %test_bits = repmat(t_vec,1,ceil(24000/length(t_vec)));
+  fsk4_states.M = 1;
+  fsk4_states = fsk4_init(fsk4_states,4800,dmr_info);
+  Fs = fsk4_states.Fs;
+  Rb = fsk4_states.Rs * 2;  %Multiply symbol rate by 2, since we have 2 bits per symbol
+  
+  tx = fsk4_mod(fsk4_states,test_bits);
+
+  %add noise here
+  %shamelessly copied from gmsk.m
+  %EsNo = 10^(aEsNodB/10);
+  %EbNo = EsNo
+  %variance = Fs/(Rb*EbNo);
+  %nsam = length(tx);
+  %noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+  %rx    = tx*exp(j*pi/2) + noise;
+  rx    = tx;
+  rx    = rx(timing_offset:length(rx));
+
+  [rx_bits biterr rxphi] = fsk4_demod_fmrid(fsk4_states,rx);
+  ber = 1;
+  
+  %thing to account for offset from input data to output data
+  %No preamble detection yet
+  ox = 1;
+  for offset = (1:100)
+    nerr = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
+    if(bern < ber)
+      ox = offset;
+      best_nerr = nerr;
+    end
+    ber = min([ber bern]);
+  end
+  offset = ox;
+  printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
+
+endfunction
+
+%Run over a wide range of offsets and make sure fine timing makes sense
+function fsk4_rx_phi(socket)
+  %pkg load parallel
+  offrange = [100:200];
+  [a b c phi] = pararrayfun(1.25*nproc(),@nfbert,10*length(offrange),offrange);
+  
   close all;
   figure(1);
   clf;
@@ -319,7 +375,7 @@ function fsk4_ber_curves
 
   try
     pkg load parallel
-    [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB);
+    [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB,107*ones(1,length(EbNodB)));
   catch
     printf("You should install package parallel. It'll make this run way faster\n");
     for ii=(1:length(EbNodB));
