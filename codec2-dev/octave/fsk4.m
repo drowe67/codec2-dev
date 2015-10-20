@@ -10,49 +10,6 @@ fm; % analog FM modulator functions
 
 pkg load signal;
 
-% Frequency response of the DMR raised cosine filter 
-% from ETSI TS 102 361-1 V2.2.1 page 111
-dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880));
-dmr.rx_filt_resp = dmr.tx_filt_resp;
-dmr.max_dev = 1944;
-dmr.syms = [-1944 -648 648 1944];
-dmr.rs = 4800;
-dmr.no_filter = 0;
-global dmr_info = dmr;
-
-
-% No-filter 4FSK 'ideal' parameters
-nfl.tx_filt_resp = @(f) 1;
-nfl.rx_filt_resp = nfl.tx_filt_resp;
-nfl.max_dev = 1944;
-nfl.syms = [-1944 -648 648 1944];
-nfl.rs = 4800;
-nfl.no_filter = 1;
-global nflt_info = nfl;
-
-%Some parameters for the NXDN filters
-nxdn_al = .2;
-nxdn_T = 416.7e-6;
-nxdn_fl = ((1-nxdn_al)/(2*nxdn_T));
-nxdn_fh = ((1+nxdn_al)/(2*nxdn_T));
-
-%Frequency response of the NXDN filters
-% from NXDN TS 1-A V1.3 page 13
-% Please note : NXDN not fully implemented or tested
-nxdn_H = @(f) 1.0*(f<nxdn_fl) + cos( (nxdn_T/(4*nxdn_al))*(2*pi*f-(pi*(1-nxdn_al)/nxdn_T)) ).*(f<=nxdn_fh & f>nxdn_fl);
-nxdn_P = @(f) (f<=nxdn_fh & f>0).*((sin(pi*f*nxdn_T))./(.00001+(pi*f*nxdn_T))) + 1.0*(f==0);
-nxdn_D = @(f) (f<=nxdn_fh & f>0).*((pi*f*nxdn_T)./(.00001+sin(pi*f*nxdn_T))) + 1.0*(f==0);
-
-nxdn.tx_filt_resp = @(f) nxdn_H(f).*nxdn_P(f);
-nxdn.rx_filt_resp = @(f) nxdn_H(f).*nxdn_D(f);
-nxdn.rs = 4800;
-nxdn.max_dev = 1050;
-nxdn.no_filter = 0;
-nxdn.syms = [-1050,-350,350,1050];
-
-global nxdn_info = nxdn;
-
-
 % Init function for modem ------------------------------------------------------------
 
 function fsk4_states = fsk4_init(fsk4_states,fsk4_info)
@@ -140,6 +97,7 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
 
   M = fsk4_states.M;
   Fs = fsk4_states.Fs;
+  verbose = fsk4_states.verbose;
   t = (0:length(rx)-1);
   symup = fsk4_states.modinfo.syms;
   
@@ -150,10 +108,11 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
  
   Fs = fsk4_states.Fs;
   rf = (0:(Fs/2));
-  rx_filter_a = fir1(100 ,.5);
+  rx_filter_a = fir1(100 ,.2);
   rx_filter_b = fsk4_states.rx_filter;
   rx_filter_n = [zeros(1,99) 1];
-  rx = filter(rx_filter_b, 1, rx);
+
+  rx = filter(rx_filter_a, 1, rx);
 
   sym1m = exp(-j*2*pi*(symup(1)/Fs)*t).*rx;
   sym2m = exp(-j*2*pi*(symup(2)/Fs)*t).*rx;
@@ -164,13 +123,14 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   % filter impulse responses, as delay will vary.  f you add M to it coarse
   % timing will adjust by 1.
 
-  fine_timing = 51;
+  fine_timing = 54;
 
   sym1m = idmp(sym1m(fine_timing:length(sym1m)),M); sym1m = (real(sym1m).^2+imag(sym1m).^2);
   sym2m = idmp(sym2m(fine_timing:length(sym2m)),M); sym2m = (real(sym2m).^2+imag(sym2m).^2);
   sym3m = idmp(sym3m(fine_timing:length(sym3m)),M); sym3m = (real(sym3m).^2+imag(sym3m).^2);
   sym4m = idmp(sym4m(fine_timing:length(sym4m)),M); sym4m = (real(sym4m).^2+imag(sym4m).^2);
 
+  
   figure(2);
   nsym = 500;
   %subplot(411); plot(sym1m(1:nsym))
@@ -276,6 +236,49 @@ function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx, enable_fine_timing
   end
 endfunction
 
+% Frequency response of the DMR raised cosine filter 
+% from ETSI TS 102 361-1 V2.2.1 page 111
+dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880));
+dmr.rx_filt_resp = dmr.tx_filt_resp;
+dmr.max_dev = 1944;
+dmr.syms = [-1944 -648 648 1944];
+dmr.rs = 4800;
+dmr.no_filter = 0;
+dmr.demod_fx = @fsk4_demod_fmrid;
+global dmr_info = dmr;
+
+
+% No-filter 4FSK 'ideal' parameters
+nfl.tx_filt_resp = @(f) 1;
+nfl.rx_filt_resp = nfl.tx_filt_resp;
+nfl.max_dev = 3600;
+nfl.syms = [-3600 -1200 1200 3600];
+nfl.rs = 4800;
+nfl.no_filter = 1;
+nfl.demod_fx = @fsk4_demod_thing;
+global nflt_info = nfl;
+
+%Some parameters for the NXDN filters
+nxdn_al = .2;
+nxdn_T = 416.7e-6;
+nxdn_fl = ((1-nxdn_al)/(2*nxdn_T));
+nxdn_fh = ((1+nxdn_al)/(2*nxdn_T));
+
+%Frequency response of the NXDN filters
+% from NXDN TS 1-A V1.3 page 13
+% Please note : NXDN not fully implemented or tested
+nxdn_H = @(f) 1.0*(f<nxdn_fl) + cos( (nxdn_T/(4*nxdn_al))*(2*pi*f-(pi*(1-nxdn_al)/nxdn_T)) ).*(f<=nxdn_fh & f>nxdn_fl);
+nxdn_P = @(f) (f<=nxdn_fh & f>0).*((sin(pi*f*nxdn_T))./(.00001+(pi*f*nxdn_T))) + 1.0*(f==0);
+nxdn_D = @(f) (f<=nxdn_fh & f>0).*((pi*f*nxdn_T)./(.00001+sin(pi*f*nxdn_T))) + 1.0*(f==0);
+
+nxdn.tx_filt_resp = @(f) nxdn_H(f).*nxdn_P(f);
+nxdn.rx_filt_resp = @(f) nxdn_H(f).*nxdn_D(f);
+nxdn.rs = 4800;
+nxdn.max_dev = 1050;
+nxdn.no_filter = 0;
+nxdn.syms = [-1050,-350,350,1050];
+nxdn.demod_fx = @fsk4_demod_fmrid;
+global nxdn_info = nxdn;
 
 % Bit error rate test ----------------------------------------------------------
 % Params - aEsNodB - EbNo in decibels
@@ -285,11 +288,11 @@ endfunction
 % Returns - ber - teh measured BER
 %         - thrcoh - theory BER of a coherent demod
 %         - thrncoh - theory BER of non-coherent demod
-function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config,demod_fx = @fsk4_demod_fmrid, bitcnt=100000, timing_offset = 10)
+function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config, bitcnt=100000, timing_offset = 10)
 
   rand('state',1); 
   randn('state',1);
-
+  
   %How many bits should this test run?
   bitcnt = 120000;
   
@@ -315,7 +318,7 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config,demod_fx = @fsk4_dem
 
   rx    = rx(timing_offset:length(rx));
 
-  rx_bits = demod_fx(fsk4_states,rx);
+  rx_bits = modem_config.demod_fx(fsk4_states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
@@ -351,9 +354,7 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config,demod_fx = @fsk4_dem
   fs = exp( -(ds./es)*EbNo );
   
   thrncoh = ((ms/2)/(ms-1)) * sum(bs.*((ms-1)./ns).*exp( -(ds./es)*EbNo ));
-  %thrncoh = (2/3)*sum( (((-1).^(ns+1))./(ns+1)) .* (3./ns) .* exp( -((ns.*2)./ns)*EbNo )
-  %plot(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
-  %plot((1:1000),rx_bits(1:1000),(1:1000),rx_err(1:1000));
+
 endfunction
 
 % RX fine timing estimation playground
@@ -431,23 +432,27 @@ function fsk4_ber_curves
   global nflt_info;
 
   EbNodB = 1:20;
-  bers_tco = bers_real = bers_tnco = ones(1,length(EbNodB));
+  bers_tco = bers_real = bers_tnco = bers_idealsim = ones(1,length(EbNodB));
 
   %vectors of the same param to pass into pararrayfun
   dmr_infos = repmat(dmr_info,1,length(EbNodB));
-  nflt_infos = repmat(dmr_info,1,length(EbNodB));
-
+  nflt_infos = repmat(nflt_info,1,length(EbNodB));
+  %demod_things = repmat(@fsk4_demod_thing,1,length(EbNodB));
+  thing = @fsk4_demod_thing;
+  %demod_things = repmat(thing,1,length(EbNodB));
+  %demod_things = [thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing]
   % Lovely innovation by Brady to use all cores and really speed up the simulation
 
-  try
+  %try
     pkg load parallel
+    bers_idealsim = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB,nflt_infos);
     [bers_real,bers_tco,bers_tnco] = pararrayfun(floor(1.25*nproc()),@nfbert,EbNodB,dmr_infos);
-  catch
-    printf("You should install package parallel. It'll make this run way faster\n");
-    for ii=(1:length(EbNodB));
-      [bers_real(ii),bers,tco(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
-    end
-  end_try_catch
+  %catch
+  %  printf("You should install package parallel. It'll make this run way faster\n");
+  %  for ii=(1:length(EbNodB));
+      %[bers_real(ii),bers,tco(ii),bers_tnco(ii)] = nfbert(EbNodB(ii));
+  %  end
+  %end_try_catch
 
   close all
   figure(1);
@@ -457,6 +462,7 @@ function fsk4_ber_curves
 
   semilogy(EbNodB, bers_tco,'b;4FSK coherent theory;')
   semilogy(EbNodB, bers_real ,'g;4FSK DMR simulation;')
+  semilogy(EbNodB, bers_idealsim, 'v;FSK4 Ideal Non-coherent simulation;')
   hold off;
   grid("minor");
   axis([min(EbNodB) max(EbNodB) 1E-5 1])
