@@ -20,36 +20,58 @@ fm; % analog FM library
 
 function states = legacyfsk_init()
   Fs = states.Fs = 96000;
-  Rs = states.Rs = 4800;          
-  Ts = states.Ts = Fs/Rs;
+  Rs = states.Rs = 4800;                       % symbol rate over channel
+  Ts = states.Ts = Fs/Rs;                      % symbol period in samples
+  M  = states.M  = 4;                          % mFSK, either 2 or 4
+  bpsym = state.Rb  = log2(M);                 % bits per symbol over channel
+  rate = states.rate = 0.5;                    % Manchester code rate
+  nbits = 100;
   nbits = states.nbits = 100;                  % number of payload data symbols/frame
-  nbits2 = states.nbits2 = states.nbits*2;     % number of bits/frame over channel after manchester encoding
+  nbits2 = states.nbits2 = nbits/rate;         % number of symbols/frame over channel after manchester encoding
+  nsym  = states.nsym = nbits2/log2(M);        % number of symbols per frame
+  nsam = states.nsam = nsym*Ts;
+
+  printf("Rs: %d M: %d bpsym: %d nbits: %d nbits2: %d nsym: %d nsam: %d\n", Rs, M, bpsym, nbits, nbits2, nsym, nsam);
 
   states.fc = states.Fs/4;
-  states.f1 = states.fc - Rs/2;
-  states.f2 = states.fc + Rs/2;
+  if states.M == 2
+    states.f(1) = states.fc - Rs/2;
+    states.f(2) = states.fc + Rs/2;
+  else
+    states.f(1) = states.fc - 3*Rs/2;
+    states.f(2) = states.fc - Rs/2;
+    states.f(3) = states.fc + Rs/2;
+    states.f(4) = states.fc + 3*Rs/2;   
+  end
 endfunction
 
 
 % test modulator function
 
 function tx = legacyfsk_mod(states, tx_bits)
-    tx = zeros(states.Ts*length(tx_bits),1);
-    tx_phase = 0;
-    Ts = states.Ts;
     Fs = states.Fs;
+    Ts = states.Ts;
     Rs = states.Rs;
-    f1 = states.f1; f2 = states.f2;
+    f  = states.f;
+    M  = states.M;
+    nsym = states.nsym;
 
-    for i=1:length(tx_bits)
-      if tx_bits(i) == 0
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/Fs;
+    tx = zeros(Ts*length(tx_bits)/log2(M),1);
+    tx_phase = 0;
+
+    step = log2(M);
+    k = 1;
+    for i=1:step:length(tx_bits)
+      if M == 2
+        tone = tx_bits(i) + 1;
       else
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/Fs;
+        tone = (tx_bits(i:i+1) * [2 1]') + 1;
       end
-      tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
+      tx_phase_vec = tx_phase + (1:Ts)*2*pi*f(tone)/Fs;
+      tx((k-1)*Ts+1:k*Ts) = 2.0*cos(tx_phase_vec); k++;
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
     end
+   
 endfunction
 
 
@@ -58,13 +80,14 @@ function run_sim
   frames = 100;
   timing_offset = 0.0;
   test_frame_mode = 1;
-  demod = 1;
+  demod = 2;
 
   if demod == 1
-    EbNodB = 8.5+4.7;
+    EbNodB = 8.5+5;
   else
     EbNodB = 8.5;
   end
+  EbNodB = 6;
 
   % init fsk modem
 
@@ -77,6 +100,9 @@ function run_sim
   nbits2 = states.nbits2;
   Ts = states.Ts;
   Rs = states.Rs;
+  nsam = states.nsam;
+  rate = states.rate;
+  M = states.M;
 
   % init analog FM modem
 
@@ -92,23 +118,27 @@ function run_sim
   fm_states = analog_fm_init(fm_states);
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
 
+  % init sim states
+
   rx_bits_buf = zeros(1,2*nbits2);
   Terrs = Tbits = 0;
   state = 0;
   nerr_log = [];
 
+  % set up the channel noise.  We have log(M)*rate payload bits/symbol
+  % we have log2(M) bits/symbol, and rate bits per payload symbol 
+  % TODO: explain this better as Im confused!
+  
   EbNo = 10^(EbNodB/10);
-  variance = states.Fs/((states.Rs/2)*EbNo);  % actual bit rate is Rs/2
+  EsNo = EbNo*rate*log2(M);               
+  variance = states.Fs/((states.Rs)*EsNo);  
+  printf("EbNodB: %3.1f EbNo: %3.2f EsNo: %3.2f\n", EbNodB, EbNo, EsNo);
 
-  % manchester code templates (matched filter coefficients)
-
-  manchester_one = ones(1,2*Ts);
-  manchester_zero = ones(1,2*Ts);
-  manchester_one(Ts+1:2*Ts) = manchester_zero(1:Ts) = -1;
+  % set up the input bits
 
   if test_frame_mode == 1
     % test frame of bits, which we repeat for convenience when BER testing
-    test_frame = round(rand(1, states.nbits));
+    test_frame = round(rand(1, nbits));
     tx_bits = [];
     for i=1:frames+1
       tx_bits = [tx_bits test_frame];
@@ -116,38 +146,44 @@ function run_sim
   end
   if test_frame_mode == 2
     % random bits, just to make sure sync algs work on random data
-    tx_bits = round(rand(1, states.nbits*(frames+1)));
+    tx_bits = round(rand(1, nbits*(frames+1)));
   end
   if test_frame_mode == 3
     % ...10101... sequence
-    tx_bits = zeros(1, states.nbits*(frames+1));
+    tx_bits = zeros(1, nbits*(frames+1));
     tx_bits(1:2:length(tx_bits)) = 1;
-    %tx_bits(10:length(tx_bits)) = 1;
   end
 
-  % Manchester encode, halving the payload bit rate, and removing DC
-  % term in baseband signal, which makes it a bit more friendly to 
-  % old-school legacy FM radios.
+  % Manchester encoding, which removes DC term in baseband signal,
+  % making the waveform friendly to old-school legacy FM radios with
+  % voiceband filtering.  The "code rate" is 0.5, which means we have
+  % encode one input bit into 2 output bits.  The 2FSK encoder takes
+  % one input bit, the 4FSK encoder two input bits.
 
-  tx_bits_mapped = zeros(1,length(tx_bits)*2);
-  k= 1;
-  for i=1:2:length(tx_bits_mapped)
-    if tx_bits(k)
-      tx_bits_mapped(i) = 1;
-      tx_bits_mapped(i+1) = 0;
-    else
-      tx_bits_mapped(i) = 0;
-      tx_bits_mapped(i+1) = 1;
+  tx_bits_encoded = zeros(1,length(tx_bits)*2);
+  fsk2_enc = [[1 0]; [0 1]];
+  %           -1.5 1.5    1.5 -1.5  -0.5 0.5    0.5 -0.5
+  %              0   3      3   0      1   2      2   1
+  fsk4_enc = [[0 0 1 1]; [1 1 0 0]; [0 1 1 0]; [1 0 0 1]];
+  k=1;
+  if M == 2
+    for i=1:2:length(tx_bits_encoded)
+      input_bit = tx_bits(k); k++;
+      tx_bits_encoded(i:i+1) = fsk2_enc(input_bit+1,:);
     end
-    k++;
+  else
+    for i=1:4:length(tx_bits_encoded)
+      input_bits = tx_bits(k:k+1) * [2 1]'; k+=2;
+      tx_bits_encoded(i:i+3) = fsk4_enc(input_bits+1,:);
+    end
   end
-
+  tx_bits_encoded(1:6*2)
   % use ideal FSK modulator (note: need to try using analog FM modulator)
 
-  tx = legacyfsk_mod(states, tx_bits_mapped);
+  tx = legacyfsk_mod(states, tx_bits_encoded);
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
-  timing_offset_samples = round(timing_offset*Ts)
+  timing_offset_samples = round(timing_offset*Ts);
   rx = [zeros(timing_offset_samples,1); rx];
 
   if demod == 1
@@ -156,47 +192,65 @@ function run_sim
     [rx_out rx_bb] = analog_fm_demod(fm_states, rx');
     rx_out_hp = filter(b,a,rx_out);
 
-    rx_sd = filter(ones(1,Ts),1,rx_out_hp);
+    rx_timing = filter(ones(1,Ts),1,rx_out_hp);
+
+    % TODO: for 4FSK determine amplitude/decn boundaries, choose closest to demod each symbol
   end
 
   if demod == 2
 
     % optimal non-coherent demod at Rs
 
-    phi1_vec = (1:length(rx))*2*pi*states.f1/Fs;
-    phi2_vec = (1:length(rx))*2*pi*states.f2/Fs;
-
-    f1_dc = rx' .* exp(-j*phi1_vec);
-    f2_dc = rx' .* exp(-j*phi2_vec);
-    
-    rx_filt_one = abs(filter(ones(1,Ts),1,f1_dc));
-    rx_filt_zero = abs(filter(ones(1,Ts),1,f2_dc));
-
-    rx_sd = rx_filt_one - rx_filt_zero;
+    rx_timing_sig = zeros(1,length(rx));
+    for m=1:M
+      phi_vec = (1:length(rx))*2*pi*states.f(m)/Fs;
+      dc = rx' .* exp(-j*phi_vec);
+      rx_filt(m,:) = abs(filter(ones(1,Ts),1,dc));
+      rx_timing_sig = rx_timing_sig + rx_filt(m,1:length(rx));
+    end 
   end
 
-  % From here on code is common to both demods....
-
   % Estimate fine timing using line at Rs/2 that Manchester encoding provides
+  % We need this to sync up to Manchester codewords.  TODO plot signal and 
+  % timing "line" we extract
   
-  Np = length(rx_sd);
-  w = 2*pi*(Rs/2)/Fs;
-  x = rx_sd * exp(-j*w*(0:Np-1))';
-  norm_rx_timing = angle(x)/(2*pi)
-  
-  % Sample at ideal timing estimate (rate Rs)
+  Np = length(rx_timing_sig);
+  w = 2*pi*(Rs)/Fs;
+  x = (rx_timing_sig .^ 2) * exp(-j*w*(0:Np-1))';
+  norm_rx_timing = angle(x)/(2*pi) - 0.42;
+  rx_timing = round(norm_rx_timing*Ts);
+  rx_timing = 0;
+  printf("norm_rx_timing: %4.4f rx_timing: %d\n", norm_rx_timing,  rx_timing);
 
-  %norm_rx_timing=0.25
-  rx_timing = round(norm_rx_timing*Ts)
-  rx_sd_sampled = rx_sd(Ts+rx_timing:Ts:Np);
+  % sample at optimal instant
 
-  % Manchester decoding, we combine energy of two bits at Rs to provide
-  % one bit at Rs/2
+  [tmp l] = size(rx_filt);
+  rx_filt_dec = rx_filt(:, Ts+rx_timing:Ts:l);
 
-  rx_dec = rx_sd_sampled(1:2:frames*nbits2) - rx_sd_sampled(2:2:frames*nbits2);
-  rx_bits = rx_dec < 0;
-  %tx_bits(1:20)
-  %rx_bits(1:20)
+  % Max likelihood decoding of Manchester encoded symbols.  Search
+  % through all ML possibilities to extract bits.  Use energy (filter
+  % output sq)
+
+  [tmp l] = size(rx_filt_dec);
+  if M == 2
+    rx_bits = zeros(1,l/2);
+    k = 1;
+    for i=1:2:l-1
+      ml = [rx_filt_dec(2,i)*rx_filt_dec(1,i+1) rx_filt_dec(1,i)*rx_filt_dec(2,i+1)];
+      [mx mx_ind] = max(ml);
+     rx_bits(k) = mx_ind-1; k++;
+    end 
+  else
+    rx_bits = zeros(1,l);
+    k = 1;
+    fsk4_dec = [[0 0]; [0 1]; [1 0]; [1 1]];
+    for i=1:2:l-1
+      %ml = [rx_filt_dec(1,i)*rx_filt_dec(4,i+1) rx_filt_dec(4,i)*rx_filt_dec(1,i+1) rx_filt_dec(2,i)*rx_filt_dec(3,i+1) rx_filt_dec(3,i)*rx_filt_dec(2,i+1)];
+      ml = [(rx_filt_dec(1,i)+rx_filt_dec(4,i+1)) (rx_filt_dec(4,i)+rx_filt_dec(1,i+1)) (rx_filt_dec(2,i)+rx_filt_dec(3,i+1)) (rx_filt_dec(3,i)+rx_filt_dec(2,i+1))];
+      [mx mx_ind] = max(ml);
+      rx_bits(k:k+1) = fsk4_dec(mx_ind,:); k+=2;
+    end 
+  end
 
   % Run frame sync and BER logic over demodulated bits
 
@@ -253,7 +307,7 @@ function run_sim
 
   % Bunch O'plots --------------------------------------------------------------
 
-  st = 1; en=20;
+  st = 1; en=10;
 
   Tx=fft(tx, Fs);
   TxdB = 20*log10(abs(Tx(1:Fs/2)));
@@ -274,10 +328,26 @@ function run_sim
     title('After 300Hz HPF');
   end
   if demod == 2
-    plot(rx_filt_one(st:en*states.Ts*2));
+    subplot(211);
+    plot(rx_filt(1,st*Ts:en*Ts));
     hold on;
-    plot(rx_filt_zero(st:en*states.Ts*2),'g');
+    plot(rx_filt(2,st*Ts:en*Ts),'g');
+    if M == 4
+      plot(rx_filt(3,st*Ts:en*Ts),'c');
+      plot(rx_filt(4,st*Ts:en*Ts),'r');          
+    end
     hold off;
+    title('Output of each filter');
+    subplot(212);
+    plot(rx_filt_dec(1,st:en),'+');
+    hold on;
+    plot(rx_filt_dec(2,st:en),'g+');
+    if M == 4
+      plot(rx_filt_dec(3,st:en),'c+');
+      plot(rx_filt_dec(4,st:en),'r+');          
+    end
+    hold off;
+    title('Decimated output of each filter');
   end
 
   figure(3);
@@ -293,6 +363,7 @@ function run_sim
     title('Spectrum of baseband modem signal after analog FM demod');
   end
 
+if 0
   figure(4);
   clf;
   subplot(211)
@@ -304,8 +375,16 @@ function run_sim
   plot(rx_sd_sampled(st:en),'g+')
   hold off;
   title('Both channels after sampling at ideal timing instant')
+end
   
-  hold off;
+  figure(5)
+  clf;  
+  subplot(211)
+  plot(rx_timing_sig(st*Ts:en*Ts).^2)
+  subplot(212)
+  F = abs(fft(rx_timing_sig(1:Fs)));
+  plot(F(100:8000))
+  title('FFT of rx_timing_sig')
 end
 
 run_sim;
