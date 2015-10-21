@@ -112,7 +112,7 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   rx_filter_b = fsk4_states.rx_filter;
   rx_filter_n = [zeros(1,99) 1];
 
-  rx = filter(rx_filter_a, 1, rx);
+  rx = filter(rx_filter_b, 1, rx);
 
   sym1m = exp(-j*2*pi*(symup(1)/Fs)*t).*rx;
   sym2m = exp(-j*2*pi*(symup(2)/Fs)*t).*rx;
@@ -207,9 +207,9 @@ function [bits err rxphi] = fsk4_demod_fmrid(fsk4_states, rx, enable_fine_timing
   % and correct the symbol map to match it
   [a b] = hist(abs(sym),50);
   [a ii] = max(a);
-  grmax = abs(b(ii));
-  grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax;
-
+  %grmax = abs(b(ii));
+  %grmax = (grmax<.65)*.65 + (grmax>=.65)*grmax;
+  grmax = .84;
   dmsyms = rot90(fsk4_states.symmap*grmax)
   (dmsyms(2)+dmsyms(1))/2
 
@@ -251,8 +251,9 @@ global dmr_info = dmr;
 % No-filter 4FSK 'ideal' parameters
 nfl.tx_filt_resp = @(f) 1;
 nfl.rx_filt_resp = nfl.tx_filt_resp;
-nfl.max_dev = 3600;
-nfl.syms = [-3600 -1200 1200 3600];
+nfl.max_dev = 7200;
+%nfl.syms = [-3600 -1200 1200 3600];
+nfl.syms = [-7200,-2400,2400,7200];
 nfl.rs = 4800;
 nfl.no_filter = 1;
 nfl.demod_fx = @fsk4_demod_thing;
@@ -301,7 +302,7 @@ function [ber thrcoh thrncoh] = nfbert(aEsNodB,modem_config, bitcnt=100000, timi
   fsk4_states = fsk4_init(fsk4_states,modem_config);
   
   %Set this to 0 to cut down on the plotting
-  fsk4_states.verbose = 0; 
+  fsk4_states.verbose = 1; 
   Fs = fsk4_states.Fs;
   Rb = fsk4_states.Rs * 2;  % Multiply symbol rate by 2, since we have 2 bits per symbol
   
@@ -437,10 +438,8 @@ function fsk4_ber_curves
   %vectors of the same param to pass into pararrayfun
   dmr_infos = repmat(dmr_info,1,length(EbNodB));
   nflt_infos = repmat(nflt_info,1,length(EbNodB));
-  %demod_things = repmat(@fsk4_demod_thing,1,length(EbNodB));
   thing = @fsk4_demod_thing;
-  %demod_things = repmat(thing,1,length(EbNodB));
-  %demod_things = [thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing thing]
+
   % Lovely innovation by Brady to use all cores and really speed up the simulation
 
   %try
@@ -472,12 +471,6 @@ function fsk4_ber_curves
 
 endfunction
 
-
-% David's Questions:
-% 1/ Can we disable all the plots when running fsk4_ber_curves?
-% 2/ Is there a function I can call to run just 1 BER point (run_single)
-% 3/ Can we switch between the two modems?  Do they have any difference in perf?  Plot both?
-% 4/ How do we swith between DMR and NXDN?
 
 
 
