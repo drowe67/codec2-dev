@@ -241,7 +241,7 @@ endfunction
 dmr.tx_filt_resp = @(f) sqrt(1.0*(f<=1920) - cos((pi*f)/1920).*1.0.*(f>1920 & f<=2880));
 dmr.rx_filt_resp = dmr.tx_filt_resp;
 dmr.max_dev = 1944;
-dmr.syms = [-1944 -648 648 1944];
+dmr.syms = [-1944 -648 1944 648];
 dmr.rs = 4800;
 dmr.no_filter = 0;
 dmr.demod_fx = @fsk4_demod_fmrid;
