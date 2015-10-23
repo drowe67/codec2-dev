@@ -154,19 +154,22 @@ function dat = bitreps(in,M)
   end
 endfunction
 
+% Minimal Running Disparity, 4 symbol encoder
+% This is a simple 1 bit to 1 symbol encoding for 4fsk modems built
+% on old fashoned FM radios.
 function syms = mrd4(bits)
   syms = zeros(1,length(bits));
   rd=0;
   lastsym=0;
   for n = (1:length(bits))
     bit = bits(n);
-    sp = 1+(bit*2.0);
-    [x,v] = min(abs([rd+sp rd-sp]));
+    sp = [1 3](bit); %Map a bit to a +1 or +3
+    [x,v] = min(abs([rd+sp rd-sp])); %Select +n or -n, whichever minimizes disparity
     ssel = [sp -sp](v);
-    if(ssel == lastsym)ssel = -ssel;endif
-    syms(n) = ssel;
-    rd = rd + ssel;
-    lastsym = ssel;
+    if(ssel == lastsym)ssel = -ssel;endif %never run 2 of the same syms in a row
+    syms(n) = ssel; %emit the symbol
+    rd = rd + ssel; %update running disparity
+    lastsym = ssel; %remember this symbol for next time
   end
 endfunction
 
