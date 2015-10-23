@@ -148,6 +148,27 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
   end
 endfunction
 
+function dat = bitreps(in,M)
+  for i=1:length(in)
+    dat(1+(i-1)*M:i*M) = in(i);
+  end
+endfunction
+
+function syms = mrd4(bits)
+  syms = zeros(1,length(bits));
+  rd=0;
+  lastsym=0;
+  for n = (1:length(bits))
+    bit = bits(n);
+    sp = 1+(bit*2.0);
+    [x,v] = min(abs([rd+sp rd-sp]));
+    ssel = [sp -sp](v);
+    if(ssel == lastsym)ssel = -ssel;endif
+    syms(n) = ssel;
+    rd = rd + ssel;
+    lastsym = ssel;
+  end
+endfunction
 
 function out = fold_sum(in,l)
   sublen = floor(length(in)/l);
