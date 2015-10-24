@@ -426,7 +426,7 @@ int main(void) {
                 break;
             case STATE_TX:
                 {
-                    if (switch_released(&sw_ptt)) {
+                    if (!switch_pressed(&sw_ptt)) {
                         /* PTT released, leave transmit mode */
                         tot_reset(&tot);
                         core_state = STATE_RX;
