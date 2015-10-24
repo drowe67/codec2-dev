@@ -992,7 +992,10 @@ static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
         case MENU_EVT_ENTERED:
             sfx_play(&sfx_player, sound_startup);
             /* Get the current period */
-            menu->current = prefs.tot_warn_period;
+            if (prefs.tot_warn_period < prefs.tot_period)
+                menu->current = prefs.tot_warn_period;
+            else
+                menu->current = prefs.tot_period;
         case MENU_EVT_RETURNED:
             /* Shouldn't happen, but we handle it anyway */
             announce = 1;
@@ -1000,7 +1003,7 @@ static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
         case MENU_EVT_NEXT:
             sfx_play(&sfx_player, sound_click);
             /* Adjust the frequency up by 50 Hz */
-            if (prefs.tot_warn_period < 600)
+            if (prefs.tot_warn_period < prefs.tot_period)
                 prefs.tot_warn_period += 5;
             announce = 1;
             break;
