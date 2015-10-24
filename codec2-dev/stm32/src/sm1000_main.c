@@ -1030,7 +1030,7 @@ static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
         static char period[5];
-        snprintf(period, 4, "%d", prefs.tot_period);
+        snprintf(period, 4, "%d", prefs.tot_warn_period);
         /* Announce the period */
         morse_play(&morse_player, period);
     }
