@@ -47,10 +47,10 @@
 
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 
-#define MENU_LED_PERIOD  30000
-#define ANNOUNCE_DELAY  300000  /* Supposed to be msec, seems not */
-#define HOLD_DELAY      100000
-#define MENU_DELAY      100000
+#define MENU_LED_PERIOD  100
+#define ANNOUNCE_DELAY  1500
+#define HOLD_DELAY      1000
+#define MENU_DELAY      1000
 
 #define MAX_MODES  3
 #define ANALOG     0
@@ -205,7 +205,7 @@ int main(void) {
 
     /* init all the drivers for various peripherals */
 
-    SysTick_Config(SystemCoreClock/168000); /* 1 kHz SysTick */
+    SysTick_Config(SystemCoreClock/1000); /* 1 kHz SysTick */
     sm1000_leds_switches_init();
 
     /* Enable CRC clock */
@@ -275,8 +275,9 @@ int main(void) {
         prefs.tot_warn_period = 15;
     }
 
-    /* Set up time-out timer */
-    tot.tick_period        = 600000;     /* TODO: calibrate */
+    /* Set up time-out timer, 100msec ticks */
+    tot.tick_period        = 100;
+    tot.remain_warn_ticks  = 10;
 
     /* Clear out switch states */
     memset(&sw_select, 0, sizeof(sw_select));
@@ -435,8 +436,8 @@ int main(void) {
             if (!tot.event) {
                 /* Time-out timer has not yet started */
                 if (prefs.tot_period)
-                    tot_start(&tot, prefs.tot_period,
-                            prefs.tot_warn_period);
+                    tot_start(&tot, prefs.tot_period*10,
+                            prefs.tot_warn_period*10);
             } else if (tot.event & TOT_EVT_WARN_NEXT) {
                 /* Re-set warning flag */
                 tot.event &= ~TOT_EVT_WARN_NEXT;
