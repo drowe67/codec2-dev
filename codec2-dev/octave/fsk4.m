@@ -149,6 +149,7 @@ function bits = fsk4_demod_thing(fsk4_states, rx)
 endfunction
 
 function dat = bitreps(in,M)
+  dat = zeros(1,length(in)*M);
   for i=1:length(in)
     dat(1+(i-1)*M:i*M) = in(i);
   end
@@ -163,7 +164,7 @@ function syms = mrd4(bits)
   lastsym=0;
   for n = (1:length(bits))
     bit = bits(n);
-    sp = [1 3](bit); %Map a bit to a +1 or +3
+    sp = [1 3](bit+1); %Map a bit to a +1 or +3
     [x,v] = min(abs([rd+sp rd-sp])); %Select +n or -n, whichever minimizes disparity
     ssel = [sp -sp](v);
     if(ssel == lastsym)ssel = -ssel;endif %never run 2 of the same syms in a row
@@ -171,6 +172,17 @@ function syms = mrd4(bits)
     rd = rd + ssel; %update running disparity
     lastsym = ssel; %remember this symbol for next time
   end
+endfunction
+
+% "Manchester 4" encoding
+function syms = mane4(bits)
+    syms = zeros(1,floor(bits/2)*2);
+    for n = (1:2:length(bits))
+      bit0 = bits(n);
+      bit1 = bits(n+1);
+      sel = 2*bit0+bit1+1;
+      syms(n:n+1) = [[3 -3];[-3 3];[1 -1];[-1 1]]( sel,(1:2) );
+    end
 endfunction
 
 function out = fold_sum(in,l)
