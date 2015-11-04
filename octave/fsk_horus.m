@@ -48,7 +48,7 @@ function states = fsk_horus_init()
   states.phi1 = 0;               % keep down converter osc phase continuous
   states.phi2 = 0;
 
-  % Generate unque word that correlates against the ASCIi "$$$$$" that
+  % Generate unque word that correlates against the ASCII "$$$$$" that
   % delimits start and end of frame Note use of zeros in UW as "don't
   % cares", we ignore RS232 start/stop bits.  Not sure this is a good
   % idea, we could include start and stop bits if we like.  Oh Well.
@@ -212,7 +212,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   %   http://www.rowetel.com/blog/?p=3573 
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
-
+ 
   Np = length(f1_int);
   w = 2*pi*(Rs)/(P*Rs);
   x = ((abs(f1_int)-abs(f2_int)).^2) * exp(-j*w*(0:Np-1))';
@@ -449,10 +449,10 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim
-  frames = 10;
-  EbNodB = 26;
+  frames = 100;
+  EbNodB = 8;
   timing_offset = 0.0; % see resample() for clock offset below
-  test_frame_mode = 4;
+  test_frame_mode = 1;
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 0;          % tx tone freq drift in Hz/s
@@ -490,7 +490,7 @@ function run_sim
     tx_bits = zeros(1, states.nsym*(frames+1));
     tx_bits(1:2:length(tx_bits)) = 1;
   end
-
+ 
   if test_frame_mode == 4
 
     % load up a horus msg from disk and modulate that
@@ -506,7 +506,7 @@ function run_sim
 
   tx = fsk_horus_mod(states, tx_bits);
 
-  tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
+  %tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
 
   if fading
      ltx = length(tx);
@@ -730,11 +730,11 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim
+  run_sim
   %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav");
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav");
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav");
   %rx_bits = demod_file("fsk_horus_rx.raw");
-  rx_bits = demod_file("mp.raw");
-  %rx_bits = demod_file("~/Desktop/fsk_horus_20dB_0ppm_20dBfade.wav");
+  %rx_bits = demod_file("mp.raw");
+  %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav");
 end
