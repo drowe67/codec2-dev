@@ -46,7 +46,7 @@
         compiler preprocessor.
    */
 #ifndef USE_USB_OTG_FS
-#define USE_USB_OTG_FS
+ //#define USE_USB_OTG_FS
 #endif /* USE_USB_OTG_FS */
 
 #ifndef USE_USB_OTG_HS
@@ -54,7 +54,7 @@
 #endif /* USE_USB_OTG_HS */
 
 #ifndef USE_ULPI_PHY
-#define USE_ULPI_PHY
+ //#define USE_ULPI_PHY
 #endif /* USE_ULPI_PHY */
 
 #ifndef USE_EMBEDDED_PHY
@@ -154,7 +154,7 @@
  #ifdef USE_I2C_PHY
   #define USB_OTG_I2C_PHY_ENABLED
  #endif
- #define USB_OTG_HS_INTERNAL_DMA_ENABLED
+//#define USB_OTG_HS_INTERNAL_DMA_ENABLED
  #define USB_OTG_HS_DEDICATED_EP1_ENABLED
 #endif
 
