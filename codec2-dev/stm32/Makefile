@@ -34,7 +34,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.6.0
+PERIPHLIBVER	= V1.6.1
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -436,7 +436,7 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin
+all: codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin
 
 # Rule for making directories automatically.
 # Note we don't use -p as it's a GNU extension.
@@ -635,6 +635,23 @@ CFLAGS += -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/cor
 
 usb_vcp_ut.elf: $(USB_VCP_UT:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+ADC_REC_USB_SRCS=\
+src/adc_rec_usb.c \
+../src/fifo.c \
+src/stm32f4_adc.c \
+src/stm32f4_usb_vcp.c \
+src/sm1000_leds_switches.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+ADC_REC_USB_SRCS+=$(USB_VCP)
+
+adc_rec_usb.elf: $(ADC_REC_USB_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
 
 FDMDV_PROFILE_SRCS=\
 src/fdmdv_profile.c \
