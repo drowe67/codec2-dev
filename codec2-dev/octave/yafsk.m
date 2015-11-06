@@ -1,0 +1,554 @@
+% yafsk.m
+% Yet-another-FSK
+% Brady O'Brien 20 October 2015
+%
+% This is a model for the first attempt at a C FSK modem. Based on fsk_horus and maybe a little fsk4.
+% First revision will just be 2fsk
+% [x] - Modem init and struct def
+% [x] - Direct SDR modulator, probably not FM based
+% [x] - Direct SDR non-coherent demodulator
+%    [x] - Core demodulation routine
+%    [ ] - Timing offset estimation
+%    [ ] - Freq. offset estimation
+%    [ ] - Bit slip, maybe
+% [ ] - The C port
+% [ ] - Some stuff to verify the C port
+
+%clear all;
+graphics_toolkit('gnuplot');
+%fm
+
+%Basic parameters for a simple FSK modem
+fsk_setup_info.Rs = 2400;  % Symbol rate
+fsk_setup_info.nfsk = 2;      % Number of unique symbols. Must be 2.
+fsk_setup_info.Fs = 48000; % Sample frequency
+fsk_setup_info.Fsym = fsk_setup_info.Rs; %Symbol spacing
+fsk_setup_info.txmap = @(bits) bits+1; %Map TX bits to 2fsk symbols
+fsk_setup_info.rxmap = @(syms) syms==1; %Map 2fsk RX symbols to bits
+global fsk_setup = fsk_setup_info
+
+function states = yafsk_init(fsk_config)
+  Fs = states.Fs = fsk_config.Fs;
+  Rs = states.Rs = fsk_config.Rs;
+  nfsk = states.nfsk = fsk_config.nfsk;
+  Ts = states.Ts = Fs/Rs;
+  Fsym = states.Fsym = fsk_config.Fsym;
+  states.config = fsk_config;
+
+  if nfsk != 2
+    error("Gotta be 2fsk")
+  endif
+ 
+  %Symbol frequencies. Fixed to intervals of Fsym.
+  states.fsyms = [-(Fsym/2) (Fsym/2)];
+  states.tx_phase = 0;
+
+  states.dc = zeros(1,nfsk);
+  states.rx_phi = ones(1,nfsk);
+  states.isamp = 0;
+  states.sums = zeros(1,nfsk);
+endfunction
+
+function [tx states] = yafsk_mod(states,bits)
+  Ts = states.Ts;
+  Fs = states.Fs;
+  fsyms = states.fsyms;
+  tx_phase = states.tx_phase;
+  %Map bits into symbols
+  syms = states.config.txmap(bits);
+  tx = zeros(1,Ts*length(syms));
+  
+  for ii = (1:length(syms))
+    cur_sym_f = fsyms(syms(ii));
+    tx_phase_i = tx_phase;
+    for jj = (1:Ts)
+        tx_phase_i = tx_phase + jj*2*pi*cur_sym_f/Fs;
+        tx((ii-1)*Ts+jj) = exp(j*tx_phase_i);   
+    end
+    tx_phase = tx_phase + Ts*2*pi*cur_sym_f/Fs;
+    if tx_phase>2*pi
+        tx_phase = tx_phase-2*pi;
+    elseif tx_phase<-2*pi
+        tx_phase = tx_phase+2*pi;
+    endif
+    %tx_phase_vec = tx_phase + (1:Ts)*2*pi*cur_sym_f/Fs;
+    %tx((ii-1)*Ts+1:ii*Ts) = exp(j*tx_phase_vec);
+  end
+  states.tx_phase = tx_phase;
+endfunction
+
+function d = idmp(data, M)
+    d = zeros(1,length(data)/M);
+    for i = 1:length(d)
+      d(i) = sum(data(1+(i-1)*M:i*M));
+    end
+endfunction
+
+function [bits states phi phis] = yafsk_demod_2a(states,rx)
+  fine_timing = 1;
+  Fs = states.Fs;
+  Rs = states.Rs;
+  Ts = states.Ts;
+  nfsk = states.nfsk;
+
+
+
+  phy_f1 = states.rx_phi(1);
+  phy_f2 = states.rx_phi(2);
+
+  dphase_f1 = exp(states.fsyms(1)*-j*2*pi/Fs);
+  dphase_f2 = exp(states.fsyms(2)*-j*2*pi/Fs);
+
+  sum_f1 = states.sums(1);
+  sum_f2 = states.sums(2);
+
+  isamp = states.isamp;
+  symcnt = 1;
+  subcnt = 1;
+  syms = [0];
+  sums1 = [0];
+  sums2 = [0];
+  phis = [0];
+  isamp = 1;
+  isub = 1;
+
+  ssum_f1 = 0;
+  ssum_f2 = 0;
+  ssamp=0;
+ 
+  timing_syms = 10;
+  timing_nudge = .085; %How far to 'nudge' the sampling point
+  timing_samps = timing_syms*(Ts/4);
+  timing_db = zeros(1,timing_samps);  
+
+  for ii = (1:length(rx))
+    phy_f1 *= dphase_f1;   %Spin the oscillators
+    phy_f2 *= dphase_f2;
+
+    dcs_f1 = rx(ii)*phy_f1; %Figure out the DC
+    dcs_f2 = rx(ii)*phy_f2;
+
+    sum_f1 += dcs_f1; %Integrate
+    sum_f2 += dcs_f2;
+    ssum_f1 += dcs_f1;
+    ssum_f2 += dcs_f2;
+
+    ssamp += 1;
+    isamp += 1;
+    if isamp>=Ts %If it's time to take a sample and spit out a symbol..
+      syms(symcnt) = (abs(sum_f1)>abs(sum_f2))+1; %Spit out a symbol
+      symcnt += 1;
+      tdmd = timing_db.*exp(-j*2*pi*(1:length(timing_db))*24000/Fs);
+
+      timing_phi = angle(sum(tdmd));
+      phis(symcnt) = timing_phi;
+      sums1(symcnt) = sum_f1;
+      sums2(symcnt) = sum_f2;
+      sum_f1 = 0;   %Reset integrators
+      sum_f2 = 0;
+      isamp -= Ts;    %Reset integrator count
+      phi_tgt = 1.252;
+      if(timing_phi>-1.88 && timing_phi<1.252)
+          isamp += timing_nudge;
+          ssamp += timing_nudge;
+      else
+          isamp -= timing_nudge;
+          ssamp -= timing_nudge;
+      endif
+    endif
+
+    if ssamp>= Ts/4
+      %sums1(subcnt) = ssum_f1;
+      %sums2(subcnt) = ssum_f2;
+      timing_db(1:timing_samps-1)=timing_db(2:timing_samps);
+      timing_db(timing_samps) = (abs(ssum_f1)-ssum_f2).^2;
+
+      subcnt += 1;
+      ssum_f1 = 0;
+      ssum_f2 = 0;
+      ssamp -= Ts/4;
+    endif
+
+  end
+
+  nlin = (abs(sums1)-sums2).^2;
+  %nlin = nlin.*exp(-j*2*pi*(1:length(nlin))*000/Fs);
+  nlen = length(nlin)
+  fto = sum(nlin)
+  fta = angle(fto)
+  phi = fto;
+
+  figure(1);
+  nlf = fft(nlin);
+  length(nlf)
+  plot(20*log10(abs(nlf)));
+
+  states.rx_phy(1) = phy_f1;
+  states.rx_phy(2) = phy_f2;
+ 
+  states.sums(1) = sum_f1;
+  states.sums(2) = sum_f2;
+
+  states.isamp = isamp;
+
+  figure(2)
+  plot((1:length(sums1)),sums1,(1:length(sums2)),sums2);
+
+  bits = states.config.rxmap(syms);
+endfunction
+function [bits states] = yafsk_demod_2(states,rx)
+  fine_timing = 1;
+  Fs = states.Fs;
+  Rs = states.Rs;
+  Ts = states.Ts;
+  nfsk = states.nfsk;
+
+  rx = rx(fine_timing:length(rx));
+  sym_phases = (1:length(rx)).*rot90(states.fsyms)*2*pi/Fs;
+
+  sym_mixers = exp(-j*sym_phases);
+  rx_mixd = repmat(rx,nfsk,1).*sym_mixers;
+  
+  dc1 = abs(idmp(rx_mixd(1,1:length(rx_mixd)),Ts));
+  dc2 = abs(idmp(rx_mixd(2,1:length(rx_mixd)),Ts));
+
+  t=(1:length(dc1));
+  
+  plot(t,dc1,t,dc2)
+
+endfunction
+
+% Simulation thing, shamelessly taken from fsk_horus.m
+% simulation of tx and rx side, add noise, channel impairments ----------------------
+
+function run_sim
+  global fsk_setup;
+  frames = 10;
+  EbNodB = 26;
+  timing_offset = 0.0; % see resample() for clock offset below
+  test_frame_mode = 2;
+  fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
+                       % to simulate balloon rotating at end of mission
+  df     = 0;          % tx tone freq drift in Hz/s
+
+  more off
+  rand('state',1); 
+  randn('state',1);
+  states = yafsk_init(fsk_setup);
+  N = states.N;
+  %P = states.P;
+  Rs = states.Rs;
+  nsym = states.nsym = 4096;
+  Fs = states.Fs;
+  states.df = df;
+
+  EbNo = 10^(EbNodB/10);
+  variance = states.Fs/(states.Rs*EbNo);
+
+  % set up tx signal with payload bits based on test mode
+
+  if test_frame_mode == 1
+     % test frame of bits, which we repeat for convenience when BER testing
+    test_frame = round(rand(1, states.nsym));
+    tx_bits = [];
+    for i=1:frames+1
+      tx_bits = [tx_bits test_frame];
+    end
+  end
+  if test_frame_mode == 2
+    % random bits, just to make sure sync algs work on random data
+    tx_bits = round(rand(1, states.nsym*(frames+1)));
+  end
+  if test_frame_mode == 3
+    % ...10101... sequence
+    tx_bits = zeros(1, states.nsym*(frames+1));
+    tx_bits(1:2:length(tx_bits)) = 1;
+  end
+
+  if test_frame_mode == 4
+
+    % load up a horus msg from disk and modulate that
+
+    test_frame = load("horus_msg.txt");
+    ltf = length(test_frame);
+    ntest_frames = ceil((frames+1)*nsym/ltf);
+    tx_bits = [];
+    for i=1:ntest_frames
+      tx_bits = [tx_bits test_frame];
+    end
+  end
+
+  tx = yafsk_mod(states, tx_bits);
+
+  %tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
+
+  if fading
+     ltx = length(tx);
+     tx = tx .* (1.1 + cos(2*pi*2*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
+  end
+
+  noise = sqrt(variance)*randn(length(tx),1);
+  rx    = tx + noise;
+  
+  % dump simulated rx file
+  ftx=fopen("ya_fsk_rx.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
+
+  timing_offset_samples = round(timing_offset*states.Ts);
+  st = 1 + timing_offset_samples;
+  rx_bits_buf = zeros(1,2*nsym);
+  Terrs = Tbits = 0;
+  state = 0;
+  x_log = [];
+  norm_rx_timing_log = [];
+  nerr_log = [];
+  f1_int_resample_log = [];
+  f2_int_resample_log = [];
+  f1_log = f2_log = [];
+  EbNodB_log = [];
+  rx_bits_log = [];
+  rx_bits_sd_log = [];
+
+  for f=1:frames
+
+    % extract nin samples from input stream
+
+    nin = states.nin;
+    en = st + states.nin - 1;
+    sf = rx(st:en);
+    st += nin;
+
+    % demodulate to stream of bits
+
+    [rx_bits states] = yafsk_demod(states, sf);
+    rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
+    rx_bits_buf(nsym+1:2*nsym) = rx_bits;
+    rx_bits_log = [rx_bits_log rx_bits];
+    rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
+
+    norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
+    x_log = [x_log states.x];
+    f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
+    f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
+    f1_log = [f1_log states.f1];
+    f2_log = [f2_log states.f2];
+    EbNodB_log = [EbNodB_log states.EbNodB];
+
+    % frame sync based on min BER
+
+    if test_frame_mode == 1
+      nerrs_min = nsym;
+      next_state = state;
+      if state == 0
+        for i=1:nsym
+          error_positions = xor(rx_bits_buf(i:nsym+i-1), test_frame);
+          nerrs = sum(error_positions);
+          if nerrs < nerrs_min
+            nerrs_min = nerrs;
+            coarse_offset = i;
+          end
+        end
+        if nerrs_min < 3
+          next_state = 1;
+          %printf("%d %d\n", coarse_offset, nerrs_min);
+        end
+      end
+
+      if state == 1  
+        error_positions = xor(rx_bits_buf(coarse_offset:coarse_offset+nsym-1), test_frame);
+        nerrs = sum(error_positions);
+        Terrs += nerrs;
+        Tbits += nsym;
+        nerr_log = [nerr_log nerrs];
+      end
+
+      state = next_state;
+    end
+  end
+
+  if test_frame_mode == 1
+    printf("frames: %d Tbits: %d Terrs: %d BER %4.3f\n", frames, Tbits, Terrs, Terrs/Tbits);
+  end
+
+  if test_frame_mode == 4
+    extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
+  end
+
+  figure(1);
+  plot(f1_int_resample_log,'+')
+  hold on;
+  plot(f2_int_resample_log,'g+')
+  hold off;
+
+  figure(2)
+  clf
+  m = max(abs(x_log));
+  plot(x_log,'+')
+  axis([-m m -m m])
+  title('fine timing metric')
+
+  figure(3)
+  clf
+  subplot(211)
+  plot(norm_rx_timing_log);
+  axis([1 frames -1 1])
+  title('norm fine timing')
+  subplot(212)
+  plot(nerr_log)
+  title('num bit errors each frame')
+
+  figure(4)
+  clf
+  plot(real(rx(1:Fs)))
+  title('rx signal at demod input')
+
+  figure(5)
+  clf
+  plot(f1_log)
+  hold on;
+  plot(f2_log,'g');
+  hold off;
+  title('tone frequencies')
+  axis([1 frames 0 Fs/2])
+
+  figure(6)
+  clf
+  plot(EbNodB_log);
+  title('Eb/No estimate')
+
+endfunction
+
+
+% Bit error rate test ----------------------------------------------------------
+% Params - aEsNodB - EbNo in decibels
+%        - timing_offset - how far the fine timing is offset
+%        - bitcnt - how many bits to check
+%        - demod_fx - demodulator function
+% Returns - ber - teh measured BER
+%         - thrcoh - theory BER of a coherent demod
+%         - thrncoh - theory BER of non-coherent demod
+function [ber thrcoh thrncoh rxphis] = nfbert_2(aEsNodB,modem_config, bitcnt=100000, timing_offset = 1)
+
+  rand('state',1); 
+  randn('state',1);
+  
+  %How many bits should this test run?
+  bitcnt = 12000;
+  
+  test_bits = [repmat([1 0],1,10) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
+  states.M = 1;
+  states = yafsk_init(modem_config);
+  
+  %Set this to 0 to cut down on the plotting
+  states.verbose = 1; 
+  Fs = states.Fs;
+  Rb = states.Rs;  % Multiply symbol rate by 2, since we have 2 bits per symbol
+  
+  tx = yafsk_mod(states,test_bits);
+
+  %add noise here
+  %shamelessly copied from gmsk.m
+  EsNo = 10^(aEsNodB/10);
+  EbNo = EsNo
+  variance = Fs/(Rb*EbNo);
+  nsam = length(tx);
+  noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
+  rx    = tx*exp(j*pi/2) + noise;
+
+  rx    = rx(timing_offset:length(rx));
+
+  [rx_bits states a rxphis] = yafsk_demod_2a(states,rx);
+  ber = 1;
+  
+  %thing to account for offset from input data to output data
+  %No preamble detection yet
+  plot(rxphis);
+  ox = 1;
+  for offset = (1:100)
+    nerr = sum(xor(test_bits(offset:length(rx_bits)),rx_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
+    if(bern < ber)
+      ox = offset;
+      best_nerr = nerr;
+    end
+    ber = min([ber bern]);
+  end
+  offset = ox;
+  printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
+
+  % Coherent BER theory
+  thrcoh = .5*erfc(sqrt(.5*EbNo));
+
+  % non-coherent BER theory calculation
+  % It was complicated, so I broke it up
+
+  ms = 2;
+  ns = (1:ms-1);
+  as = (-1).^(ns+1);
+  bs = (as./(ns+1));
+  
+  cs = ((ms-1)./ns);
+
+  ds = ns.*log2(ms);
+  es = ns+1;
+  fs = exp( -(ds./es)*EbNo );
+  
+  thrncoh = ((ms/2)/(ms-1)) * sum(bs.*((ms-1)./ns).*exp( -(ds./es)*EbNo ));
+
+endfunction
+
+
+function rxphi = fine_ex(timing_offset = 1,fsk_info)
+
+  rand('state',1); 
+  randn('state',1);
+
+  bitcnt = 12051;
+  test_bits = [zeros(1,100) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
+  t_vec = [0 0 1 1];
+  %test_bits = repmat(t_vec,1,ceil(24000/length(t_vec)));
+
+  states = yafsk_init(fsk_info);
+  Fs = states.Fs;
+  Rb = states.Rs; 
+  
+  tx = yafsk_mod(states,test_bits);
+
+  rx    = tx;
+  rx    = rx(timing_offset:length(rx));
+
+  [rx_bits states rxphi] = yafsk_demod_2a(states,rx);
+  ber = 1;
+  
+  %thing to account for offset from input data to output data
+  %No preamble detection yet
+  ox = 1;
+  for offset = (1:100)
+    nerr = sum(xor(rx_bits(offset:length(rx_bits)),test_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
+    if(bern < ber)
+      ox = offset;
+      best_nerr = nerr;
+    end
+    ber = min([ber bern]);
+  end
+  offset = ox;
+  printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
+
+endfunction
+
+function yafsk_rx_phi
+  global fsk_setup
+  pkg load parallel
+  offrange = [1:2:101];
+
+  setups = repmat(fsk_setup,1,length(offrange));
+  phi = pararrayfun(nproc(),@nfbert_2,100,setups,1,offrange);
+  
+  close all;
+  figure(1);
+  clf;
+  plot(offrange,real(phi),offrange,imag(phi));
+  figure(2);
+  plotyy(offrange,angle(phi),offrange,abs(phi))
+endfunction
+

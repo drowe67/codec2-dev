@@ -174,6 +174,30 @@ function syms = mrd4(bits)
   end
 endfunction
 
+% Minimal Running Disparity, 8 symbol encoder
+% This is a simple 2 bit to 1 symbol encoding for 8fsk modems built
+% on old fashoned FM radios.
+function syms = mrd8(bits)
+  bitlen = length(bits);
+  if mod(bitlen,2) == 1
+    bits = [bits 0]
+  endif
+
+  syms = zeros(1,length(bits)*.5);
+  rd=0;
+  lastsym=0;
+  for n = (1:2:length(bits))
+    bit = (bits(n)*2)+bits(n+1);
+    sp = [1 3 7 5](bit+1); %Map a bit to a +1 or +3
+    [x,v] = min(abs([rd+sp rd-sp])); %Select +n or -n, whichever minimizes disparity
+    ssel = [sp -sp](v);
+    if(ssel == lastsym)ssel = -ssel;endif %never run 2 of the same syms in a row
+    syms((n+1)/2) = ssel; %emit the symbol
+    rd = rd + ssel; %update running disparity
+    lastsym = ssel; %remember this symbol for next time
+  end
+endfunction
+
 % "Manchester 4" encoding
 function syms = mane4(bits)
     syms = zeros(1,floor(bits/2)*2);
