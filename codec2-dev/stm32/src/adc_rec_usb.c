@@ -37,8 +37,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include "stm32f4_adc.h"
-#include "gdb_stdio.h"
-#include "stm32f4xx_gpio.h"
+#include "stm32f4_usb_vcp.h"
+#include "sm1000_leds_switches.h"
 
 #define  N  (ADC_BUF_SZ*6)
 
@@ -53,12 +53,14 @@ extern int adc_overflow2;
 
 int main(void){
     short  buf[N];
+    #ifdef TEST_TONE
     float  phase = 0.0;
     float  sam;
     int    i;
+    #endif
 
     usb_vcp_init();
-    adc_open(4*N);
+    adc_open(ADC_FS_96KHZ, 4*N);
     sm1000_leds_switches_init();
 
     /* set up test buffer, lets us test USB comms indep of ADC, record to a file
