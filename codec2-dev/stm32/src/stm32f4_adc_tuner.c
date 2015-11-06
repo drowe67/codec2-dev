@@ -42,7 +42,7 @@
 #include "iir_tuner.h"
 
 struct FIFO *adc1_fifo;
-unsigned short adc_buf[ADC_TUNER_BUF_SZ];
+unsigned short adc_buf[ADC_TUNER_BUF_SZ], *padc_buf;
 int adc_overflow1;
 int half,full;
 static short tuner_en = 1;
@@ -56,6 +56,10 @@ void adc_configure();
 
 static void tim2_config(void);
 
+//#define DUMMY_SIGNAL
+#ifdef DUMMY_SIGNAL
+unsigned short sine[ADC_TUNER_BUF_SZ];
+#endif
 
 void adc_open(int fifo_sz) {
     adc1_fifo = fifo_create(fifo_sz);
@@ -201,6 +205,23 @@ void adc_configure() {
 
     ADC_Cmd(ADC1,ENABLE);
     ADC_SoftwareStartConv(ADC1);
+
+    padc_buf = adc_buf;
+
+    #ifdef DUMMY_SIGNAL
+    int i;
+
+    /* Fs/4 sine wave, right in the middle of the pass band ! */
+
+    for(i=0; i<ADC_TUNER_BUF_SZ; i++)
+        sine[i] = 32767;
+    for(i=1; i<ADC_TUNER_BUF_SZ; i+=4)
+        sine[i] += 32767/4;
+    for(i=3; i<ADC_TUNER_BUF_SZ; i+=4)
+        sine[i] -= 32767/4;
+    padc_buf = sine;
+    #endif
+
 }
 
 
@@ -213,25 +234,10 @@ void adc_configure() {
 
 void DMA2_Stream0_IRQHandler(void) {
     float dec_buf[ADC_TUNER_N/2];
-    int i;
 
     /* PE0 is asserted high for the duration of this ISR */
 
     GPIOE->ODR |= (1 << 0);
-
-    //#define DUMMY_SIGNAL
-    #ifdef DUMMY_SIGNAL
-
-    /* Fs/4 sine wave, right in the middle of the pass band ! */
-
-    for(i=0; i<ADC_TUNER_BUF_SZ; i++)
-        adc_buf[i] = 32767;
-    for(i=1; i<ADC_TUNER_BUF_SZ; i+=4)
-        adc_buf[i] += 32767;
-    for(i=3; i<ADC_TUNER_BUF_SZ; i+=4)
-        adc_buf[i] -= 32767;
-
-    #endif
 
     /* Half transfer interrupt */
 
@@ -239,16 +245,17 @@ void DMA2_Stream0_IRQHandler(void) {
         half++;
 
         if (tuner_en) {
-            iir_tuner(dec_buf, adc_buf);
+            iir_tuner(dec_buf, padc_buf);
 
-            /* write first half to fifo */
+            /* write first half to fifo.  Note we are writing ADC_TUNER_N/2 floats,
+               which is equivalent to ADC_TUNER_N shorts.  */
 
-            if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
+           if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
                 adc_overflow1++;
             }
         }
-        else
-            fifo_write(adc1_fifo, (short*)adc_buf, ADC_TUNER_BUF_SZ/2);
+        else // note: we dump signed shorts when tuner off
+            fifo_write(adc1_fifo, (short*)padc_buf, ADC_TUNER_BUF_SZ/2); 
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
@@ -261,7 +268,7 @@ void DMA2_Stream0_IRQHandler(void) {
         full++;
 
         if (tuner_en) {
-            iir_tuner(dec_buf, &adc_buf[ADC_TUNER_BUF_SZ/2]);
+            iir_tuner(dec_buf, &padc_buf[ADC_TUNER_BUF_SZ/2]);
 
             /* write second half to fifo */
 
@@ -270,7 +277,7 @@ void DMA2_Stream0_IRQHandler(void) {
             }
         }
         else
-            fifo_write(adc1_fifo, (short*)&adc_buf[ADC_TUNER_BUF_SZ/2], ADC_TUNER_BUF_SZ/2);
+            fifo_write(adc1_fifo, (short*)&padc_buf[ADC_TUNER_BUF_SZ/2], ADC_TUNER_BUF_SZ/2);
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 

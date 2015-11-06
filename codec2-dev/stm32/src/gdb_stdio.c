@@ -44,7 +44,7 @@
 /* globals we use to communicate with host */
 
 volatile int   gdb_stdio_func = 0;
-volatile int   gdb_stdio_ret = 0;
+volatile int   gdb_stdio_ret;
 volatile char *gdb_stdio_pstr1;
 volatile char *gdb_stdio_pstr2;
 volatile int   gdb_stdio_strlen1;
