@@ -67,7 +67,11 @@ float y_2, y_1, z_2, z_1;
    ADC -> signed conversion - IIR BPF - Decimate - FIR Equaliser -> FIFO
 */
 
-void iir_tuner(float dec_50[], unsigned short adc_buf[]) {
+void iir_tuner(
+               float          dec_50[],   // ADC_TUNER_N/2 output samples
+               unsigned short adc_buf[]   // ADC_TUNER_BUF_SZ/2 input samples
+) 
+{
     int i, j, k;
     float x, y, z;
     int n, m, o;
@@ -165,9 +169,9 @@ int main(void) {
 
     for(i=0; i<NIN; i++)
         s[i] = 32767;
-    synth_line(s, f2, 0.1, NIN);
-    synth_line(s, f3, 0.05, NIN);
-    synth_line(s, f4, 0.1, NIN);
+    synth_line(s, f1, 1, NIN);
+    //synth_line(s, f3, 0.1, NIN);
+    //synth_line(s, f4, 0.2, NIN);
     for(i=0, j=0; i<NIN; i+=ADC_TUNER_BUF_SZ/2, j+=ADC_TUNER_N/2) {
         iir_tuner(&dec_50[j], &s[i]);
     }

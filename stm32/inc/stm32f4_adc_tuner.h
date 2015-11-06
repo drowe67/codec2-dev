@@ -29,7 +29,7 @@
 #ifndef __STM32F4_ADC_TUNER__
 #define __STM32F4_ADC_TUNER__
 
-#define ADC_TUNER_M  55   /* decimation rate */
+#define ADC_TUNER_M  45   /* decimation rate */
 #define ADC_TUNER_N  160
 #define ADC_TUNER_BUF_SZ  (ADC_TUNER_M*ADC_TUNER_N)
 

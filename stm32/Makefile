@@ -436,8 +436,6 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-###################################################
-
 all: codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin
 
 # Rule for making directories automatically.
@@ -633,7 +631,7 @@ src/init.c
 
 USB_VCP_UT+=$(USB_VCP)
 
-CFLAGS += -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
+CFLAGS += -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
 
 usb_vcp_ut.elf: $(USB_VCP_UT:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
@@ -774,15 +772,33 @@ adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.O3.o) src/stm32f4_adc_tuner.o \
 		libstm32f4.a
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
-# ---------------------------------------------------------------------------------
 
-clean:
-	rm -f *.elf *.bin
-	rm -f libstm32f4.a
-	find . ../src -type f -name '*.o' | xargs rm -f
+
+FM_LODUC_PLAY_SRCS=\
+src/fm_loduc_play.c \
+gdb_stdio.c \
+../src/fifo.c \
+../src/fm.c \
+src/debugblinky.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+src/stm32f4_dacloduc.o: src/stm32f4_dacloduc.c
+	$(CC) $(CFLAGS)  $^ -c -o $@ 
+
+fm_loduc_play.elf: $(FM_LODUC_PLAY_SRCS) src/stm32f4_dacloduc.o
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------------
 
 # Objects that require the peripheral library
 src/sm1000_main.o: $(PERIPHLIBDIR)/.unpack
 src/codec2_profile.o: $(PERIPHLIBDIR)/.unpack
+
+# ---------------------------------------------------------------------------------
+
+clean:
+	rm -f *.elf *.bin
+	rm -f libstm32f4.a
+	find . ../src -type f -name '*.o' | xargs rm -f

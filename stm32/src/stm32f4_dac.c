@@ -403,4 +403,3 @@ void DMA1_Stream6_IRQHandler(void) {
 
     GPIOE->ODR &= ~(1 << 2);
 }
-
