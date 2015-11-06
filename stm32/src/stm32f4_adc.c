@@ -51,15 +51,15 @@ int half,full;
 
 void adc_configure();
 
-static void tim2_config(void);
+static void tim2_config(int fs_divisor);
 
-void adc_open(int fifo_sz) {
+void adc_open(int fs_divisor, int fifo_sz) {
     adc1_fifo = fifo_create(fifo_sz);
     assert(adc1_fifo != NULL);
     adc2_fifo = fifo_create(fifo_sz);
     assert(adc2_fifo != NULL);
 
-    tim2_config();
+    tim2_config(fs_divisor);
     adc_configure();
     init_debug_blinky();
 }
@@ -77,7 +77,7 @@ int adc2_read(short buf[], int n) {
 }
 
 
-static void tim2_config(void)
+static void tim2_config(int fs_divisor)
 {
   TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
 
@@ -98,7 +98,7 @@ static void tim2_config(void)
   /* Time base configuration */
 
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-  TIM_TimeBaseStructure.TIM_Period = 5250;
+  TIM_TimeBaseStructure.TIM_Period = fs_divisor;
   TIM_TimeBaseStructure.TIM_Prescaler = 0;
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;

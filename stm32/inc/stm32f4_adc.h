@@ -30,7 +30,12 @@
 
 #define ADC_BUF_SZ   320
 
-void adc_open(int fifo_sz);
+/* divisors for various sample rates */
+
+#define ADC_FS_16KHZ 5250
+#define ADC_FS_96KHZ 875
+
+void adc_open(int fs_divisor, int fifo_sz);
 int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
 int adc2_read(short buf[], int n); /* ADC2 Pin PA2 */
 
