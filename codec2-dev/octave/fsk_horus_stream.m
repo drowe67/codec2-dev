@@ -23,7 +23,7 @@ gps_log = "~/Desktop/gps_log.txt"
 system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.0.1 21234";
 
 more off;
-states = fsk_horus_init();
+states = fsk_horus_init(8000);
 N = states.N;
 Rs = states.Rs;
 nsym = states.nsym;
