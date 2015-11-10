@@ -8,9 +8,10 @@
 % [x] - Direct SDR modulator, probably not FM based
 % [x] - Direct SDR non-coherent demodulator
 %    [x] - Core demodulation routine
-%    [ ] - Timing offset estimation
-%    [ ] - Freq. offset estimation
-%    [ ] - Bit slip, maybe
+%    | | - Timing offset estimation
+%    < >- Freq. offset estimation
+%    ( ) - Bit slip, maybe
+% { } - Port sim from fsk_horus
 % [ ] - The C port
 % [ ] - Some stuff to verify the C port
 
@@ -90,7 +91,7 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
   Rs = states.Rs;
   Ts = states.Ts;
   nfsk = states.nfsk;
-
+  P = 5;
 
 
   phy_f1 = states.rx_phi(1);
@@ -117,9 +118,9 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
   ssamp=0;
  
   timing_syms = 10;
-  timing_nudge = .085; %How far to 'nudge' the sampling point
+  timing_nudge = .09; %How far to 'nudge' the sampling point
   timing_samps = timing_syms*(Ts/4);
-  timing_db = zeros(1,timing_samps);  
+  timing_db2 = timing_db1 = zeros(1,timing_samps);  
 
   for ii = (1:length(rx))
     phy_f1 *= dphase_f1;   %Spin the oscillators
@@ -138,17 +139,32 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
     if isamp>=Ts %If it's time to take a sample and spit out a symbol..
       syms(symcnt) = (abs(sum_f1)>abs(sum_f2))+1; %Spit out a symbol
       symcnt += 1;
-      tdmd = timing_db.*exp(-j*2*pi*(1:length(timing_db))*24000/Fs);
+      
+      
+      %tdmd = zeros(1,length(timing_db1));
+      for jj=(1:(length(timing_db1)-P))
+	    f1 = sum(timing_db1(jj:jj+P));
+        f2 = sum(timing_db2(jj:jj+P));
+        tdmd(jj) = (abs(f1)-abs(f2))^2;
+      end
+      
+      w = (2*pi*Rs)/(Rs*P);
+      tdmd = tdmd.*exp(-j*w*(1:length(tdmd)));
+    
 
       timing_phi = angle(sum(tdmd));
-      phis(symcnt) = timing_phi;
-      sums1(symcnt) = sum_f1;
-      sums2(symcnt) = sum_f2;
+      
+      norm_phi = timing_phi/(2*pi);
+      norm_timing = norm_phi*P;
+      phis(symcnt) = norm_timing;
+      %sums1(symcnt) = sum_f1;
+      %sums2(symcnt) = sum_f2;
       sum_f1 = 0;   %Reset integrators
       sum_f2 = 0;
       isamp -= Ts;    %Reset integrator count
-      phi_tgt = 1.252;
-      if(timing_phi>-1.88 && timing_phi<1.252)
+      norm_tgt = -1.37;
+      %if(timing_phi>-1.88 && timing_phi<1.252)
+      if(norm_timing>norm_tgt && norm_timing<norm_tgt+2.5)
           isamp += timing_nudge;
           ssamp += timing_nudge;
       else
@@ -157,22 +173,31 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
       endif
     endif
 
-    if ssamp>= Ts/4
-      %sums1(subcnt) = ssum_f1;
-      %sums2(subcnt) = ssum_f2;
-      timing_db(1:timing_samps-1)=timing_db(2:timing_samps);
-      timing_db(timing_samps) = (abs(ssum_f1)-ssum_f2).^2;
+    if ssamp>= (Ts/P)
+      sums1(subcnt) = ssum_f1;
+      sums2(subcnt) = ssum_f2;
+      timing_db1(1:timing_samps-1)=timing_db1(2:timing_samps);
+      timing_db1(timing_samps) = ssum_f1;
+      timing_db2(1:timing_samps-1)=timing_db2(2:timing_samps);
+      timing_db2(timing_samps) = ssum_f2;
 
       subcnt += 1;
       ssum_f1 = 0;
       ssum_f2 = 0;
-      ssamp -= Ts/4;
+      ssamp -= Ts/P;
     endif
 
   end
+  xsums2 = xsums1 = zeros(1,length(sums1));
 
-  nlin = (abs(sums1)-sums2).^2;
-  %nlin = nlin.*exp(-j*2*pi*(1:length(nlin))*000/Fs);
+  for ii = (1:length(sums1)-5)
+	xsums1(ii) = sum(sums1(ii:ii+4));
+	xsums2(ii) = sum(sums2(ii:ii+4));
+  end
+  
+  nlin = (abs(xsums1)-abs(xsums2)).^2;
+  w = (2*pi*Rs)/(Rs*4);
+  nlin = nlin.*exp(-j*(1:length(nlin))*w);
   nlen = length(nlin)
   fto = sum(nlin)
   fta = angle(fto)
@@ -196,6 +221,10 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
 
   bits = states.config.rxmap(syms);
 endfunction
+
+
+
+
 function [bits states] = yafsk_demod_2(states,rx)
   fine_timing = 1;
   Fs = states.Fs;
@@ -426,7 +455,7 @@ endfunction
 % Returns - ber - teh measured BER
 %         - thrcoh - theory BER of a coherent demod
 %         - thrncoh - theory BER of non-coherent demod
-function [ber thrcoh thrncoh rxphis] = nfbert_2(aEsNodB,modem_config, bitcnt=100000, timing_offset = 1)
+function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=100000, timing_offset = 1, freq_offset = 0)
 
   rand('state',1); 
   randn('state',1);
@@ -453,10 +482,12 @@ function [ber thrcoh thrncoh rxphis] = nfbert_2(aEsNodB,modem_config, bitcnt=100
   nsam = length(tx);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   rx    = tx*exp(j*pi/2) + noise;
-
+  t = (1:length(rx));
+  rx    = rx .* exp(t*2*pi*j*(freq_offset/Fs));
+  
   rx    = rx(timing_offset:length(rx));
 
-  [rx_bits states a rxphis] = yafsk_demod_2a(states,rx);
+  [rx_bits states rxphi rxphis] = yafsk_demod_2a(states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
@@ -536,13 +567,17 @@ function rxphi = fine_ex(timing_offset = 1,fsk_info)
 
 endfunction
 
+function phi=fine_2(aEsNodB,fsk_info,bits,offset,freq)
+  [ber coh ncoh phi] = nfbert_2(aEsNodB,fsk_info, bits, offset, freq)
+endfunction
+
 function yafsk_rx_phi
   global fsk_setup
   pkg load parallel
   offrange = [1:2:101];
 
   setups = repmat(fsk_setup,1,length(offrange));
-  phi = pararrayfun(nproc(),@nfbert_2,100,setups,1,offrange);
+  phi = pararrayfun(nproc(),@fine_2,100,setups,1,offrange,0*ones(1,length(offrange)));
   
   close all;
   figure(1);
