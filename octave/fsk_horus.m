@@ -90,14 +90,16 @@ function tx  = fsk_horus_mod(states, tx_bits)
     Fs = states.Fs;
     f1 = states.f1_tx;  f2 = states.f2_tx;
     df = states.df; % tone freq change in Hz/s
+    dA = states.dA;
 
     for i=1:length(tx_bits)
       if tx_bits(i) == 0
         tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/Fs;
+        tx((i-1)*Ts+1:i*Ts) = dA*2.0*cos(tx_phase_vec);
       else
         tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/Fs;
+        tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
       end
-      tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
       f1 += df*Ts/Fs; f2 += df*Ts/Fs;
     end
@@ -134,7 +136,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   h = hanning(nin);
   Sf = fft(sf .* h, Ndft);
-  [m1 m1_index] = max(Sf(1:Ndft/2));
+  [m1 m1_index] = max(Sf(100:Ndft/2));
 
   % zero out region 100Hz either side of max so we can find second highest peak
 
@@ -149,8 +151,8 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   end
   Sf2(st:en) = 0;
 
-  [m2 m2_index] = max(Sf2(1:Ndft/2));
-
+  [m2 m2_index] = max(Sf2(100:Ndft/2));
+  
   % f1 always the lower tone
 
   if m1_index < m2_index
@@ -167,6 +169,9 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   states.f2 = f2;
 
   if bitand(verbose,0x1)
+    printf("centre: %4.0f shift: %4.0f twist: %3.1f dB\n", (f2+f1)/2, f2-f1, twist);
+  end
+  if bitand(verbose,0x8)
     printf("f1: %4.0f Hz f2: %4.0f Hz a1: %f a2: %f\n", f1, f2, 2.0*abs(m1)/Ndft, 2.0*abs(m2)/Ndft);
   end
 
@@ -492,9 +497,13 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nsym-1), test_frame);
     nerrs = sum(error_positions);
-    states.Terrs += nerrs;
-    states.Tbits += nsym;
-    states.nerr_log = [states.nerr_log nerrs];
+    if nerrs/nsym > 0.1
+      next_state = 0;
+    else
+      states.Terrs += nerrs;
+      states.Tbits += nsym;
+      states.nerr_log = [states.nerr_log nerrs];
+    end
   end
 
   states.ber_state = next_state;
@@ -511,20 +520,22 @@ function run_sim
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 0;          % tx tone freq drift in Hz/s
+  dA     = 1;          % amplitude imbalance of tones (note this affects Eb so not a gd idea)
 
   more off
   rand('state',1); 
   randn('state',1);
   states = fsk_horus_init(96000, 1200);
-  states.f1_tx = 1200;
-  states.f2_tx = 2400;
-  states.verbose = 0x4;
+  states.f1_tx = 4000;
+  states.f2_tx = 5200;
+  states.verbose = 0x1 + 0x4;
   N = states.N;
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
   Fs = states.Fs;
   states.df = df;
+  states.dA = dA;
 
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo);
@@ -573,7 +584,15 @@ function run_sim
 
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
- 
+  %rx = real(rx);
+  %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);
+  %rx = filter(b1,1,rx);
+  %[b a] = cheby2(6,40,[3000 6000]/(Fs/2));
+  %rx = filter(b,a,rx);
+  %rx = sign(rx);
+  %rx(find (rx > 1)) = 1;
+  %rx(find (rx < -1)) = -1;
+
   % dump simulated rx file
   ftx=fopen("fsk_horus_rx_1200_96k.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
@@ -652,8 +671,11 @@ function run_sim
 
   figure(4)
   clf
+  subplot(211)
   plot(real(rx(1:Fs)))
   title('rx signal at demod input')
+  subplot(212)
+  plot(abs(fft(rx(1:Fs))))
 
   figure(5)
   clf
@@ -674,8 +696,8 @@ endfunction
 
 % demodulate a file of 8kHz 16bit short samples --------------------------------
 
-function rx_bits_log = demod_file(filename, test_frame_mode)
-  rx = load_raw(filename); 
+function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
+  fin = fopen(filename,"rb"); 
   more off;
   states = fsk_horus_init(96000, 1200);
   states.verbose = 0x1 + 0x4;
@@ -686,8 +708,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode)
   rand('state',1); 
   test_frame = round(rand(1, states.nsym));
 
-  frames = floor(length(rx)/N);
-  st = 1;
+  frames = 0;
+  rx = [];
   rx_bits_log = [];
   rx_bits_sd_log = [];
   norm_rx_timing_log = [];
@@ -701,71 +723,96 @@ function rx_bits_log = demod_file(filename, test_frame_mode)
 
   printf("demod of raw bits....\n");
 
-  for f=1:frames
+  finished = 0;
+  while (finished == 0)
+
+    % hit any key to finish (useful for real time streaming)
+
+    %x = kbhit(1);
+    %if length(x)
+    %  finished = 1;
+    %end
 
     % extract nin samples from input stream
 
     nin = states.nin;
-    en = st + states.nin - 1;
-    sf = rx(st:en);
-    st += nin;
+    [sf count] = fread(fin, nin, "short");
+    rx = [rx; sf];
 
-    % demodulate to stream of bits
+    if count == nin
+      frames++;
 
-    [rx_bits states] = fsk_horus_demod(states, sf);
-    rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
-    rx_bits_buf(nsym+1:2*nsym) = rx_bits; % xor(rx_bits,ones(1,nsym));
-    rx_bits_log = [rx_bits_log rx_bits];
-    rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
-    norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
-    f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
-    f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
-    EbNodB_log = [EbNodB_log states.EbNodB];
-    ppm_log = [ppm_log states.ppm];
+      % demodulate to stream of bits
 
-    if test_frame_mode == 1
-       states = ber_counter(states, test_frame, rx_bits_buf);
+      [rx_bits states] = fsk_horus_demod(states, sf);
+      rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
+      rx_bits_buf(nsym+1:2*nsym) = rx_bits; % xor(rx_bits,ones(1,nsym));
+      rx_bits_log = [rx_bits_log rx_bits];
+      rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
+      norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
+      f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
+      f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
+      EbNodB_log = [EbNodB_log states.EbNodB];
+      ppm_log = [ppm_log states.ppm];
+
+      if test_frame_mode == 1
+        states = ber_counter(states, test_frame, rx_bits_buf);
+        if states.ber_state == 1
+          states.verbose = 0;
+        end
+      end
+    else
+      finished = 1;
     end
   end
+  fclose(fin);
 
-  printf("plotting...\n");
+  if exist("noplot") == 0
+    printf("plotting...\n");
 
-  figure(1);
-  plot(f1_int_resample_log,'+')
-  hold on;
-  plot(f2_int_resample_log,'g+')
-  hold off;
+    figure(1);
+    plot(f1_int_resample_log,'+')
+    hold on;
+    plot(f2_int_resample_log,'g+')
+    hold off;
 
-  figure(2)
-  clf
-  subplot(211)
-  plot(norm_rx_timing_log)
-  axis([1 frames -0.5 0.5])
-  title('norm fine timing')
-  grid
-  subplot(212)
-  plot(states.nerr_log)
-  title('num bit errors each frame')
+    figure(2)
+    clf
+    subplot(211)
+    plot(norm_rx_timing_log)
+    axis([1 frames -0.5 0.5])
+    title('norm fine timing')
+    grid
+    subplot(212)
+    plot(states.nerr_log)
+    title('num bit errors each frame')
  
-  figure(3)
-  clf
-  plot(EbNodB_log);
-  title('Eb/No estimate')
+    figure(3)
+    clf
+    plot(EbNodB_log);
+    title('Eb/No estimate')
 
-  figure(4)
-  clf
-  subplot(211)
-  plot(rx);
-  title('input signal to demod')
-  subplot(212)
-  plot(20*log10(abs(fft(rx(1:states.Fs)))))
+    figure(4)
+    clf
+    subplot(211)
+    plot(rx(1:states.Fs));
+    title('input signal to demod (1 sec)')
+    xlabel('Time (samples)');
+    axis([1 states.Fs -35000 35000])
 
-  figure(5);
-  clf
-  plot(ppm_log)
-  title('Sample clock (baud rate) offset in PPM');
+    % normalise spectrum to 0dB full scale witha 32767 sine wave input
 
-  printf("frame sync and data extraction...\n");
+    subplot(212)
+    RxdBFS = 20*log10(abs(fft(rx(1:states.Fs)))) - 20*log10((states.Fs/2)*32767);
+    plot(RxdBFS)
+    axis([1 states.Fs/2 -80 0])
+    xlabel('Frequency (Hz)');
+
+    figure(5);
+    clf
+    plot(ppm_log)
+    title('Sample clock (baud rate) offset in PPM');
+  end
 
   if test_frame_mode == 1
     printf("frames: %d Tbits: %d Terrs: %d BER %4.3f EbNo: %3.2f\n", frames, states.Tbits,states. Terrs, states.Terrs/states.Tbits, mean(EbNodB_log));
@@ -780,11 +827,12 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim;
+  %run_sim;
   %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
-  %rx_bits = demod_file("../stm32/test1.raw",1);
+  rx_bits = demod_file("test.raw",1,1);
+  %rx_bits = demod_file("/dev/ttyACM0",1);
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
