@@ -19,8 +19,10 @@
 graphics_toolkit('gnuplot');
 %fm
 
+pkg load signal;
+
 %Basic parameters for a simple FSK modem
-fsk_setup_info.Rs = 2400;  % Symbol rate
+fsk_setup_info.Rs = 4800;  % Symbol rate
 fsk_setup_info.nfsk = 2;      % Number of unique symbols. Must be 2.
 fsk_setup_info.Fs = 48000; % Sample frequency
 fsk_setup_info.Fsym = fsk_setup_info.Rs; %Symbol spacing
@@ -85,7 +87,7 @@ function d = idmp(data, M)
     end
 endfunction
 
-function [bits states phi phis] = yafsk_demod_2a(states,rx)
+function [bits states phis] = yafsk_demod_2a(states,rx)
   fine_timing = 1;
   Fs = states.Fs;
   Rs = states.Rs;
@@ -119,6 +121,8 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
  
   timing_syms = 10;
   timing_nudge = .09; %How far to 'nudge' the sampling point
+                      %This really ought to be fixed somewhere else
+                      
   timing_samps = timing_syms*(Ts/4);
   timing_db2 = timing_db1 = zeros(1,timing_samps);  
 
@@ -134,36 +138,38 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
     ssum_f1 += dcs_f1;
     ssum_f2 += dcs_f2;
 
+
+    %Frequency of timing tracking nonlinearity
+    w = (2*pi*Rs)/(Rs*P);
+
+    %increment symbol and timing sub-loop counters
     ssamp += 1;
     isamp += 1;
     if isamp>=Ts %If it's time to take a sample and spit out a symbol..
       syms(symcnt) = (abs(sum_f1)>abs(sum_f2))+1; %Spit out a symbol
       symcnt += 1;
       
-      
-      %tdmd = zeros(1,length(timing_db1));
+      %Fine timing estimation and adjustment
+      %Re-integrate over entire symbol peiod and apply nonlinearity
+      %To-do - rewrite in more c-able loop
+      timing_phi = 0;
       for jj=(1:(length(timing_db1)-P))
-	    f1 = sum(timing_db1(jj:jj+P));
+	    f1 = sum(timing_db1(jj:jj+P)); 
         f2 = sum(timing_db2(jj:jj+P));
-        tdmd(jj) = (abs(f1)-abs(f2))^2;
+        tdmd = (abs(f1)-abs(f2))^2; 
+        timing_phi += tdmd*exp(-j*w*jj);
       end
       
-      w = (2*pi*Rs)/(Rs*P);
-      tdmd = tdmd.*exp(-j*w*(1:length(tdmd)));
-    
-
-      timing_phi = angle(sum(tdmd));
-      
+      %Take angle of nonlinear spectral line
+      timing_phi = angle(timing_phi);
+      %get another number
       norm_phi = timing_phi/(2*pi);
       norm_timing = norm_phi*P;
-      phis(symcnt) = norm_timing;
-      %sums1(symcnt) = sum_f1;
-      %sums2(symcnt) = sum_f2;
-      sum_f1 = 0;   %Reset integrators
-      sum_f2 = 0;
-      isamp -= Ts;    %Reset integrator count
+      
+      %Ideal fine timing point, determined experimentally
       norm_tgt = -1.37;
-      %if(timing_phi>-1.88 && timing_phi<1.252)
+      
+      %move sampling point a bit forward or backward
       if(norm_timing>norm_tgt && norm_timing<norm_tgt+2.5)
           isamp += timing_nudge;
           ssamp += timing_nudge;
@@ -171,42 +177,33 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
           isamp -= timing_nudge;
           ssamp -= timing_nudge;
       endif
+      
+      %save timing for debugging
+      phis(symcnt) = norm_timing;
+      
+      sum_f1 = 0;    %Reset integrators
+      sum_f2 = 0;
+      isamp -= Ts;    %Reset integrator count
+     
+
     endif
 
     if ssamp>= (Ts/P)
-      sums1(subcnt) = ssum_f1;
-      sums2(subcnt) = ssum_f2;
+    
+      %save timing samples
       timing_db1(1:timing_samps-1)=timing_db1(2:timing_samps);
       timing_db1(timing_samps) = ssum_f1;
       timing_db2(1:timing_samps-1)=timing_db2(2:timing_samps);
       timing_db2(timing_samps) = ssum_f2;
 
-      subcnt += 1;
-      ssum_f1 = 0;
+
+      %Reset integrators and sampling counter
+      ssum_f1 = 0; 
       ssum_f2 = 0;
-      ssamp -= Ts/P;
+      ssamp -= Ts/P; 
     endif
 
   end
-  xsums2 = xsums1 = zeros(1,length(sums1));
-
-  for ii = (1:length(sums1)-5)
-	xsums1(ii) = sum(sums1(ii:ii+4));
-	xsums2(ii) = sum(sums2(ii:ii+4));
-  end
-  
-  nlin = (abs(xsums1)-abs(xsums2)).^2;
-  w = (2*pi*Rs)/(Rs*4);
-  nlin = nlin.*exp(-j*(1:length(nlin))*w);
-  nlen = length(nlin)
-  fto = sum(nlin)
-  fta = angle(fto)
-  phi = fto;
-
-  figure(1);
-  nlf = fft(nlin);
-  length(nlf)
-  plot(20*log10(abs(nlf)));
 
   states.rx_phy(1) = phy_f1;
   states.rx_phy(2) = phy_f2;
@@ -216,13 +213,10 @@ function [bits states phi phis] = yafsk_demod_2a(states,rx)
 
   states.isamp = isamp;
 
-  figure(2)
-  plot((1:length(sums1)),sums1,(1:length(sums2)),sums2);
-
   bits = states.config.rxmap(syms);
+  
+  
 endfunction
-
-
 
 
 function [bits states] = yafsk_demod_2(states,rx)
@@ -261,8 +255,8 @@ function run_sim
   df     = 0;          % tx tone freq drift in Hz/s
 
   more off
-  rand('state',1); 
-  randn('state',1);
+  rand('state',100); 
+  randn('state',100);
   states = yafsk_init(fsk_setup);
   N = states.N;
   %P = states.P;
@@ -455,15 +449,15 @@ endfunction
 % Returns - ber - teh measured BER
 %         - thrcoh - theory BER of a coherent demod
 %         - thrncoh - theory BER of non-coherent demod
-function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=100000, timing_offset = 1, freq_offset = 0)
+function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=12000, timing_offset = 1, freq_offset = 0, burst = 0,samp_clk_offset = 0)
 
   rand('state',1); 
   randn('state',1);
   
   %How many bits should this test run?
-  bitcnt = 12000;
+  %bitcnt = 12000;
   
-  test_bits = [repmat([1 0],1,10) rand(1,bitcnt)>.5]; %Random bits. Pad with zeros to prime the filters
+  test_bits = [zeros(1,16) 1 0 0 1 1 0 0 1 0 1 0 1 0 1 0 1 (rand(1,bitcnt)>.5) ones(1,300) zeros(1,300)]; %Random bits. Pad with zeros to prime the filters
   states.M = 1;
   states = yafsk_init(modem_config);
   
@@ -473,6 +467,14 @@ function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=1000
   Rb = states.Rs;  % Multiply symbol rate by 2, since we have 2 bits per symbol
   
   tx = yafsk_mod(states,test_bits);
+
+  tx = resample(tx, 1000, 1000 + samp_clk_offset);
+  
+  %simulate a single frame in a pool of noise
+  if(burst)
+    tx = [zeros(1,Fs/2) tx zeros(1,Fs/2)];
+  end
+
 
   %add noise here
   %shamelessly copied from gmsk.m
@@ -486,23 +488,43 @@ function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=1000
   rx    = rx .* exp(t*2*pi*j*(freq_offset/Fs));
   
   rx    = rx(timing_offset:length(rx));
-
-  [rx_bits states rxphi rxphis] = yafsk_demod_2a(states,rx);
+  
+  
+  [rx_bits states rxphis] = yafsk_demod_2a(states,rx);
   ber = 1;
   
   %thing to account for offset from input data to output data
   %No preamble detection yet
   plot(rxphis);
   ox = 1;
-  for offset = (1:100)
-    nerr = sum(xor(test_bits(offset:length(rx_bits)),rx_bits(1:length(rx_bits)+1-offset)));
-    bern = nerr/(bitcnt-offset);
+  
+  if(burst)
+    orange = (1:length(rx_bits)-length(test_bits)-1);
+  else
+    orange = (1:100)
+  end
+  for offset = orange
+    if(burst)
+      perr = xor(test_bits,rx_bits(offset:offset-1+length(test_bits)));
+      nerr = sum(perr);
+      bern = nerr / length(test_bits);
+	else
+	  perr = xor(test_bits(offset:length(rx_bits)),rx_bits(1:length(rx_bits)+1-offset));
+      nerr = sum(perr);      
+      bern = nerr/(bitcnt-offset);
+    end
+    
     if(bern < ber)
       ox = offset;
       best_nerr = nerr;
+      xerr = perr;
     end
     ber = min([ber bern]);
   end
+  
+  figure(5);
+  stairs(1.0*xerr);
+  
   offset = ox;
   printf("\ncoarse timing: %d nerr: %d\n", offset, best_nerr);
 
