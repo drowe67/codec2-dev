@@ -104,16 +104,17 @@ struct CODEC2 * codec2_create(int mode)
     if (c2 == NULL)
 	return NULL;
 
-    assert(
-	   (mode == CODEC2_MODE_3200) ||
-	   (mode == CODEC2_MODE_2400) ||
-	   (mode == CODEC2_MODE_1600) ||
-	   (mode == CODEC2_MODE_1400) ||
-	   (mode == CODEC2_MODE_1300) ||
-	   (mode == CODEC2_MODE_1200) ||
-	   (mode == CODEC2_MODE_700) ||
-	   (mode == CODEC2_MODE_700B)
-	   );
+    if ((mode != CODEC2_MODE_3200) &&
+	   (mode != CODEC2_MODE_2400) &&
+	   (mode != CODEC2_MODE_1400) &&
+	   (mode != CODEC2_MODE_1300) &&
+	   (mode != CODEC2_MODE_1200) &&
+	   (mode != CODEC2_MODE_700) &&
+	   (mode != CODEC2_MODE_700B)
+        ) {
+        return NULL;
+    }
+
     c2->mode = mode;
     for(i=0; i<M; i++)
 	c2->Sn[i] = 1.0;
@@ -1392,7 +1393,7 @@ void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[])
         c2->bpf_buf[i] = c2->bpf_buf[4*N+i];
     for(i=0; i<4*N; i++)
         c2->bpf_buf[BPF_N+i] = speech[i];
-    inverse_filter(&c2->bpf_buf[BPF_N], bpf, 4*N, bpf_out, BPF_N);
+    inverse_filter(&c2->bpf_buf[BPF_N], bpf, 4*N, bpf_out, BPF_N-1);
     for(i=0; i<4*N; i++)
         bpf_speech[i] = bpf_out[i];
 
@@ -1604,7 +1605,7 @@ void codec2_encode_700b(struct CODEC2 *c2, unsigned char * bits, short speech[])
         c2->bpf_buf[i] = c2->bpf_buf[4*N+i];
     for(i=0; i<4*N; i++)
         c2->bpf_buf[BPF_N+i] = speech[i];
-    inverse_filter(&c2->bpf_buf[BPF_N], bpfb, 4*N, bpf_out, BPF_N);
+    inverse_filter(&c2->bpf_buf[BPF_N], bpfb, 4*N, bpf_out, BPF_N-1);
     for(i=0; i<4*N; i++)
         bpf_speech[i] = bpf_out[i];
 
