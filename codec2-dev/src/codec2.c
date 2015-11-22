@@ -100,12 +100,9 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-    c2 = (struct CODEC2*)malloc(sizeof(struct CODEC2));
-    if (c2 == NULL)
-	return NULL;
-
     if ((mode != CODEC2_MODE_3200) &&
 	   (mode != CODEC2_MODE_2400) &&
+	   (mode != CODEC2_MODE_1600) &&
 	   (mode != CODEC2_MODE_1400) &&
 	   (mode != CODEC2_MODE_1300) &&
 	   (mode != CODEC2_MODE_1200) &&
@@ -114,6 +111,10 @@ struct CODEC2 * codec2_create(int mode)
         ) {
         return NULL;
     }
+
+    c2 = (struct CODEC2*)malloc(sizeof(struct CODEC2));
+    if (c2 == NULL)
+	return NULL;
 
     c2->mode = mode;
     for(i=0; i<M; i++)
