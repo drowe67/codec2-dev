@@ -80,7 +80,8 @@ scAddPoint(zo);
   % Now convert to real component values
 
   w = 2*pi*150E6;
-  Ls = Xs/w;
+  Ls = Xs/w; diameter_mm = 6.25; 
+  Ls_turns = design_inductor(Ls*1E6, diameter_mm);
   Cp = 1/(w*(-Xp_match));
 
   printf("Input: Zi = %3.1f + %3.1fj ohms\n", real(Zi), imag(Zi));
@@ -89,15 +90,19 @@ scAddPoint(zo);
   printf("       Rs = %3.1f to Rl = %3.1f ohm matching network Xs = %3.1fj Xp = %3.1fj\n", Rs, Rl, Xs, Xp);
   printf("       with conj match to Zi Xs = %3.1fj Xp = %3.1fj\n", Xs, Xp_match);
   printf("       matching components Ls = %5.3f uH Cp = %4.1f pF\n", Ls*1E6, Cp*1E12);
+  printf("       Ls can be made from %3.1f turns on a %4.2f mm diameter air core\n", Ls_turns, diameter_mm);
 
 % Now Z match for output
 
   Lo = -imag(Zo)/w;
+  Lo_turns = design_inductor(Lo*1E6, diameter_mm);
   printf("Output: Zo = %3.1f + %3.1fj ohms\n", real(Zo), imag(Zo));
   printf("        So for a conjugate match transistor output wants to see:\n          Rl = %3.1f Xl = %3.1fj ohms\n", real(Zo), -imag(Zo));
   printf("        Which is a series inductor Lo = %5.3f uH\n", Lo*1E6);
+  printf("        Lo can be made from %3.1f turns on a %4.2f mm diameter air core\n", Lo_turns, diameter_mm);
 
 % Helper functions -------------------------------------------------
+
 
 % convert a parallel R/X to a series R/X
 
@@ -105,6 +110,7 @@ function Zs = zp_to_zs(Zp)
   Xp = j*imag(Zp); Rp = real(Zp);
   Zs = Xp*Rp/(Xp+Rp);
 endfunction
+
 
 % convert a series R/X to a parallel R/X
 
@@ -115,6 +121,7 @@ function Zp = zs_to_zp(Zs)
   Xp = Rp/Q;
   Zp = Rp + j*Xp;
 endfunction
+
 
 % Design a Z match network with a parallel and series reactance
 % to match between a low and high resistance:
@@ -132,3 +139,9 @@ function [Xs Xp] = z_match(Rlow, Rhigh)
   Xp = -Rhigh/Q; 
 endfunction
 
+
+% Design an air core inductor, Example 1-5 "RF Circuit Design"
+
+function Nturns = design_inductor(L_uH, diameter_mm)
+  Nturns = sqrt(29*L_uH/(0.394*(diameter_mm*0.1/2)));
+endfunction
