@@ -5,14 +5,76 @@
 % RF small signal amplifier design, using equations from "RF Cicruit
 % Design" by Chris Bowick
 
+1;
+
+% Helper functions -------------------------------------------------
+
+% convert a parallel R/X to a series R/X
+
+function Zs = zp_to_zs(Zp)
+  Xp = j*imag(Zp); Rp = real(Zp);
+  Zs = Xp*Rp/(Xp+Rp);
+endfunction
+
+
+% convert a series R/X to a parallel R/X
+
+function Zp = zs_to_zp(Zs)
+  Xs = imag(Zs); Rs = real(Zs);
+  Q = Xs/Rs;       
+  Rp = (Q*Q+1)*Rs;
+  Xp = Rp/Q;
+  Zp = Rp + j*Xp;
+endfunction
+
+
+% Design a Z match network with a parallel and series reactance
+% to match between a low and high resistance.  Note Xp and Xs
+% must be implemented as opposite sign, ie one a inductor, one
+% a capacitor (your choice).
+%
+%  /--Xs--+---\
+%  |      |   |
+% Rlow   Xp  Rhigh
+%  |      |   |
+%  \------+---/
+%        
+
+function [Xs Xp] = z_match(Rlow, Rhigh)
+  assert(Rlow < Rhigh, "Rlow must be < Rhigh");
+  Q = sqrt(Rhigh/Rlow -1);
+  Xs = Q*Rlow;
+  Xp = Rhigh/Q;
+endfunction
+
+
+% Design an air core inductor, Example 1-5 "RF Circuit Design"
+
+function Nturns = design_inductor(L_uH, diameter_mm)
+  Nturns = sqrt(29*L_uH/(0.394*(diameter_mm*0.1/2)));
+endfunction
+
 more off;
+
+Ic = 0.014;
 
 % BRF92 VCE=5V Ic=5mA 100MHz
  
-S11 = 0.727*exp(j*(-43)*pi/180);
-S12 = 0.028*exp(j*(69.6)*pi/180);
-S21 = 12.49*exp(j*(147)*pi/180);
-S22 = 0.891*exp(j*(-16)*pi/180);
+if Ic == 0.005
+  S11 = 0.727*exp(j*(-43)*pi/180);
+  S12 = 0.028*exp(j*(69.6)*pi/180);
+  S21 = 12.49*exp(j*(147)*pi/180);
+  S22 = 0.891*exp(j*(-16)*pi/180);
+end
+
+% BRF92 VCE=10V Ic=14mA 100MHz
+
+if Ic == 0.02
+  S11 = 0.548*exp(j*(-56.8)*pi/180);
+  S12 = 0.020*exp(j*(67.8)*pi/180);
+  S21 = 20.43*exp(j*(133.7)*pi/180);
+  S22 = 0.796*exp(j*(-18.5)*pi/180);
+end
 
 % Stability
 
@@ -41,7 +103,7 @@ end
 
 D2 = abs(S22)^2-abs(Ds)^2;
 C2 = S22 - Ds*conj(S11);
-GdB = 20; Glin = 10^(GdB/10);                     % lets shoot for 20dB gain
+GdB = 20; Glin = 10^(GdB/10);                                         % lets shoot for 20dB gain
 G = Glin/(abs(S21)^2);
 r0 = G*conj(C2)/(1+D2*G);                                             % centre of gain circle
 p0 = sqrt(1 - 2*K*abs(S12*S21)*G + (abs(S12*S21)^2)*(G^2))/(1+D2*G);  % radius of gain circle
@@ -49,20 +111,51 @@ p0 = sqrt(1 - 2*K*abs(S12*S21)*G + (abs(S12*S21)^2)*(G^2))/(1+D2*G);  % radius o
 scAddCircle(abs(r0),angle(r0)*180/pi,p0,'g')
 printf("Green is the %3.1f dB constant gain circle for gammaL\n",GdB);
 
-% Choose a gammaL on the gain circle
+% Note different design procedures for different operating points
 
-gammaL = 0.8 -j*0.4;
+if Ic == 0.005
+  % Choose a gammaL on the gain circle
 
-% Caclulate gammaS and make sure it's stable by visual inspection
-% compared to stability circle.
+  gammaL = 0.8 - 0.4*j;
 
-gammaS = conj(S11 + ((S12*S21*gammaL)/(1 - (gammaL*S22))));
+  % Caclulate gammaS and make sure it's stable by visual inspection
+  % compared to stability circle.
+
+  gammaS = conj(S11 + ((S12*S21*gammaL)/(1 - (gammaL*S22))));
+end
+
+if Ic == 0.014
+
+  % lets set zo (normalised Zo) based on Pout and get gammaL from that
+
+  Pout = 0.01;
+  Irms = 0.002;
+  Zo = Pout/(Irms*Irms);
+  zo = Zo/50;
+  [magL,angleL] = ztog(zo);
+  gammaL = magL*exp(j*angleL*pi/180);
+
+  % calculate gammaS
+
+  gammaS = conj(S11 + ((S12*S21*gammaL)/(1 - (gammaL*S22))));
+
+end
+
 [zo Zo] = gtoz(abs(gammaL), angle(gammaL)*180/pi,50);
 [zi Zi] = gtoz(abs(gammaS), angle(gammaS)*180/pi,50);
+
 scAddPoint(zi);
 scAddPoint(zo);
 
-% Lets design the z match for the input
+% Transducer gain
+
+Gt_num = (abs(S21)^2)*(1-abs(gammaS)^2)*(1-abs(gammaL)^2);
+Gt_den = abs((1-S11*gammaS)*(1-S22*gammaL) - S12*S21*gammaL*gammaS)^2;
+Gt = Gt_num/Gt_den;
+
+if Ic == 0.005
+
+  % Lets design the z match for the input ------------------------------
 
   % put input impedance in parallel form
 
@@ -74,8 +167,9 @@ scAddPoint(zo);
   [Xs Xp] = z_match(Rs,Rl);
   
   % Modify Xp so transistor input sees conjugate match to Zi
+  % Lets make Xp a capacitor, so negative sign
 
-  Xp_match = Xp - imag(Zip);
+  Xp_match = -Xp - imag(Zip);
 
   % Now convert to real component values
 
@@ -84,6 +178,7 @@ scAddPoint(zo);
   Ls_turns = design_inductor(Ls*1E6, diameter_mm);
   Cp = 1/(w*(-Xp_match));
 
+  printf("Transducer gain: %3.1f dB\n", 10*log10(Gt));
   printf("Input: Zi = %3.1f + %3.1fj ohms\n", real(Zi), imag(Zi));
   printf("       In parallel form Rp = %3.1f Xp = %3.1fj ohms\n", real(Zip), imag(Zip));
   printf("       So for a conjugate match transistor input wants to see:\n         Rp = %3.1f Xp = %3.1fj ohms\n", real(Zip), -imag(Zip));
@@ -92,7 +187,7 @@ scAddPoint(zo);
   printf("       matching components Ls = %5.3f uH Cp = %4.1f pF\n", Ls*1E6, Cp*1E12);
   printf("       Ls can be made from %3.1f turns on a %4.2f mm diameter air core\n", Ls_turns, diameter_mm);
 
-% Now Z match for output
+  % Now Z match for output -------------------------------------
 
   Lo = -imag(Zo)/w;
   Lo_turns = design_inductor(Lo*1E6, diameter_mm);
@@ -100,48 +195,59 @@ scAddPoint(zo);
   printf("        So for a conjugate match transistor output wants to see:\n          Rl = %3.1f Xl = %3.1fj ohms\n", real(Zo), -imag(Zo));
   printf("        Which is a series inductor Lo = %5.3f uH\n", Lo*1E6);
   printf("        Lo can be made from %3.1f turns on a %4.2f mm diameter air core\n", Lo_turns, diameter_mm);
-
-% Helper functions -------------------------------------------------
-
-
-% convert a parallel R/X to a series R/X
-
-function Zs = zp_to_zs(Zp)
-  Xp = j*imag(Zp); Rp = real(Zp);
-  Zs = Xp*Rp/(Xp+Rp);
-endfunction
+end
 
 
-% convert a series R/X to a parallel R/X
+if Ic == 0.014
+  printf("Transducer gain: %3.1f dB\n", 10*log10(Gt));
 
-function Zp = zs_to_zp(Zs)
-  Xs = imag(Zs); Rs = real(Zs);
-  Q = Xs/Rs;       
-  Rp = (Q*Q+1)*Rs;
-  Xp = Rp/Q;
-  Zp = Rp + j*Xp;
-endfunction
+  % Lets design the z match for the input ------------------------------
 
+  % put input impedance in parallel form
 
-% Design a Z match network with a parallel and series reactance
-% to match between a low and high resistance:
-%
-%  /--Xs--+---\
-%  |      |   |
-% Rlow   Xp  Rhigh
-%  |      |   |
-%  \------+---/
-%        
+  Zip = zs_to_zp(Zi);
 
-function [Xs Xp] = z_match(Rlow, Rhigh)
-  Q = sqrt(Rhigh/Rlow -1);
-  Xs = Q*Rlow;
-  Xp = -Rhigh/Q; 
-endfunction
+  % first match real part of impedance
 
+  Rs = 50; Rl = real(Zip);
+  [Xs Xp] = z_match(Rl,Rs);
+  
+  % Lets make Xs a capacitir to block DC, so Xp is an inductor.
+  % Modify Xs so transistor input sees conjugate match to Zi. Xs is a
+  % capacitor, so reactance is negative
 
-% Design an air core inductor, Example 1-5 "RF Circuit Design"
+  Xs_match = -Xs - imag(Zip);
 
-function Nturns = design_inductor(L_uH, diameter_mm)
-  Nturns = sqrt(29*L_uH/(0.394*(diameter_mm*0.1/2)));
-endfunction
+  % Now convert to real component values
+
+  w = 2*pi*150E6; diameter_mm = 6.25; 
+  Li = Xp/w;
+  Li_turns = design_inductor(Li*1E6, diameter_mm);
+  Ci = 1/(w*(-Xs_match));
+
+  printf("Input: Zi = %3.1f + %3.1fj ohms\n", real(Zi), imag(Zi));
+  printf("       In parallel form Rp = %3.1f Xp = %3.1fj ohms\n", real(Zip), imag(Zip));
+  printf("       So for a conjugate match transistor input wants to see:\n         Rp = %3.1f Xp = %3.1fj ohms\n", real(Zip), -imag(Zip));
+  printf("       Rs = %3.1f to Rl = %3.1f ohm matching network Xs = %3.1fj Xp = %3.1fj\n", Rs, Rl, Xs, Xp);
+  printf("         with Xs a capacitor, and Xp and inductor Xs = %3.1fj Xp = %3.1fj\n", -Xs, Xp);
+  printf("       With a conj match to Zi Xs = %3.1fj Xp = %3.1fj\n", Xs_match, Xp);
+  printf("       matching components Li = %5.3f uH Ci = %4.1f pF\n", Li*1E6, Ci*1E12);
+  printf("       Li can be made from %3.1f turns on a %4.2f mm diameter air core\n", Li_turns, diameter_mm);
+
+  % Design output Z match ----------------------------------------------
+
+  Rs = real(Zo);  Rl = 50;
+  [Xs Xp] = z_match(Rl,Rs);
+
+  % Lets make XP an inductor so it can double as a RF choke, and Xp as
+  % a capacitor will give us a convenient DC block
+
+  w = 2*pi*150E6; diameter_mm = 6.25;
+  Lo = Xp/w; Lo_turns = design_inductor(Lo*1E6, diameter_mm);
+  Co = 1/(w*Xs);
+  printf("Output: Zo = %3.1f + %3.1fj ohms\n", real(Zo), imag(Zo));
+  printf("        matching network Xp = %3.1f X = %3.1f ohms\n", Xp, Xs);
+  printf("        which is parallel Lo = %5.3f uH and series Co = %4.1f pF\n", Lo*1E6, Co*1E12);
+  printf("        Lo can be made from %3.1f turns on a %4.2f mm diameter air core\n", Lo_turns, diameter_mm);
+end
+
