@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
 
     /* set up callback for txt msg chars */
 
-    sprintf(my_cb_state.tx_str, "cq cq cq hello world\n");
+    sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
     my_cb_state.ptx_str = my_cb_state.tx_str;
     freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
 
