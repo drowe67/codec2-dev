@@ -5,9 +5,9 @@
   DATE CREATED: Dec 2015
 
   Horus telemetry layer 2 processing.  Takes an array of 8 bit payload
-  data, generates parity bits for (23,12) Golay, interleaves data and
-  parity bits, pre-pends a Unique Word for modem sync.  Caller is
-  responsible for providing storage for output packet.
+  data, generates parity bits for a (23,12) Golay code, interleaves
+  data and parity bits, pre-pends a Unique Word for modem sync.
+  Caller is responsible for providing storage for output packet.
 
   [X] work out number of golay codewords rqd
   [X] function to return storgage rqd for output packet
@@ -51,7 +51,17 @@
 
     $ gcc horus_l2.c -c -Wall
     
+  By default the RX side is #ifdef-ed out, leaving the minimal amount
+  of code for tx.
+
 \*---------------------------------------------------------------------------*/
+
+#include <assert.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdint.h>
+#include "horus_l2.h"
 
 #ifdef HORUS_L2_UNITTEST
 #define HORUS_L2_RX
@@ -59,17 +69,21 @@
 
 #define RUN_TIME_TABLES
 
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include "horus_l2.h"
-
 static char uw[] = {'$','$'};
 
-int get_syndrome(int pattern);
+int32_t get_syndrome(int32_t pattern);
 void golay23_init(void);
 int golay23_decode(int received_codeword);
+
+/*
+   We are using a Golay (23,12) code which has a codeword 23 bits
+   long.  The tx packet format is:
+
+      | Unique Word | payload data bits | parity bits |
+
+   This function works out how much storage the caller of
+   horus_l2_encode_tx_packet() will need to store the tx packet
+ */
 
 int horus_l2_get_num_tx_data_bytes(num_payload_data_bytes) {
     int num_payload_data_bits, num_golay_codewords;
@@ -77,12 +91,12 @@ int horus_l2_get_num_tx_data_bytes(num_payload_data_bytes) {
     
     num_payload_data_bits = num_payload_data_bytes*8;
     num_golay_codewords = num_payload_data_bits/12;
-    if (num_payload_data_bits % 12)
+    if (num_payload_data_bits % 12) /* round up to 12 bits, may mean some unused bits */
         num_golay_codewords++;
 
     num_tx_data_bits = sizeof(uw)*8 + num_payload_data_bits + num_golay_codewords*11;
     num_tx_data_bytes = num_tx_data_bits/8;
-    if (num_tx_data_bits % 8)
+    if (num_tx_data_bits % 8) /* round up to nearest byte, may mean some unused bits */
         num_tx_data_bytes++;
     
     #ifdef DEBUG0
@@ -97,6 +111,9 @@ int horus_l2_get_num_tx_data_bytes(num_payload_data_bytes) {
 
 
 /*
+  Takes an array of payload data bytes, prepends a unique word and appends
+  parity bits.
+
   The encoder will run on the payload on a small 8-bit uC.  As we are
   memory constrained so we do a lot of burrowing for bits out of
   packed arrays, and don't use a LUT for Golay encoding.  Hopefully it
@@ -111,8 +128,9 @@ int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
 {
     int            num_tx_data_bytes, num_payload_data_bits;
     unsigned char *pout = output_tx_data;
-    int            ninbit, ingolay, ningolay, paritybyte, nparitybits;
-    int            ninbyte, shift, inbit, golayparity, golayparitybit, i;
+    int            ninbit, ningolay, nparitybits;
+    int32_t        ingolay, paritybyte, inbit, golayparity;
+    int            ninbyte, shift, golayparitybit, i;
 
     num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(num_payload_data_bytes);
     memcpy(pout, uw, sizeof(uw)); pout += sizeof(uw);
@@ -423,7 +441,11 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
 
 
 #ifdef HORUS_L2_UNITTEST
-/* unit test designd to run on a Host PC */
+
+/*
+  Test function to construct a packet of payload data, encode, add
+  some bit errors, decode, count errors.
+*/
 
 int test_sending_bytes(int nbytes, float ber) {
     unsigned char input_payload[nbytes];
@@ -485,6 +507,8 @@ int test_sending_bytes(int nbytes, float ber) {
     
     return nerr;
 }
+
+/* unit test designed to run on a PC */
 
 int main(void) {
     printf("test 0: 22 bytes of payload data BER: 0.00 errors: %d\n", test_sending_bytes(22, 0.0));
@@ -580,15 +604,6 @@ static int encoding_table[4096], decoding_table[2048];
 #include "golaydectable.h"
 #endif
 
-#ifdef GOLAY23_UNITTEST
-static int position[23] = { 0x00000001, 0x00000002, 0x00000004, 0x00000008,
-                            0x00000010, 0x00000020, 0x00000040, 0x00000080,
-                            0x00000100, 0x00000200, 0x00000400, 0x00000800,
-                            0x00001000, 0x00002000, 0x00004000, 0x00008000,
-                            0x00010000, 0x00020000, 0x00040000, 0x00080000,
-                            0x00100000, 0x00200000, 0x00400000 };
-#endif
-
 #ifdef RUN_TIME_TABLES
 static int arr2int(int a[], int r)
 /*
@@ -610,6 +625,7 @@ static int arr2int(int a[], int r)
 }
 #endif
 
+#ifdef HORUS_L2_RX
 void nextcomb(int n, int r, int a[])
 /*
  * Calculate next r-combination of an n-set.
@@ -627,8 +643,9 @@ void nextcomb(int n, int r, int a[])
       a[i] = a[j] + i - j + 1;
   return;
 }
+#endif
 
-int get_syndrome(int pattern)
+int32_t get_syndrome(int32_t pattern)
 /*
  * Compute the syndrome corresponding to the given pattern, i.e., the
  * remainder after dividing the pattern (when considering it as the vector
@@ -639,7 +656,7 @@ int get_syndrome(int pattern)
  * obtain its syndrome in decoding.
  */
 {
-    int aux = X22;
+    int32_t aux = X22;
 
     if (pattern >= X11)
        while (pattern & MASK12) {
@@ -649,6 +666,8 @@ int get_syndrome(int pattern)
            }
     return(pattern);
 }
+
+#ifdef HORUS_L2_RX
 
 /*---------------------------------------------------------------------------*\
 
@@ -780,125 +799,5 @@ int golay23_count_errors(int recd_codeword, int corrected_codeword)
 
     return errors;
 }
-
-#ifdef GOLAY23_UNITTEST
-
-static int golay23_test(int error_pattern) {
-    int data;
-    int codeword;
-    int recd;
-    int pattern;
-    int decerror;
-    int i, tests;
-
-    decerror = 0;
-    tests = 0;
-
-    for (data = 0; data<(1<<12); data++) {
-
-        codeword = golay23_encode(data);
-        recd = codeword ^ error_pattern;
-        recd = golay23_decode(recd);
-        pattern = (recd ^ codeword) >> 11;
-        for (i=0; i<12; i++)
-            if (pattern & position[i])
-                decerror++;
-        if (decerror) {
-            printf("data: 0x%x codeword: 0x%x recd: 0x%x\n", data, codeword, recd);
-            printf("there were %d decoding errors\n", decerror);
-            exit(1);
-        }
-        tests++;
-    }
-
-    return tests;
-}
-
-int main(void)
-{
-   int i;
-   int  tests;
-   int a[4];
-   int error_pattern;
-
-   golay23_init();
-
-   /* ---------------------------------------------------------------------
-    *                        Generate DATA
-    * ---------------------------------------------------------------------
-    */
-
-    /* Test all combinations of data and 1,2 or 3 errors */
-
-    tests = 0;
-    error_pattern = 1;
-    for (i=0; i< 23; i++) {
-        //printf("error_pattern: 0x%x\n", error_pattern);
-        tests += golay23_test(error_pattern);
-        error_pattern *= 2;
-    }
-    printf("%d 1 bit error tests performed OK!\n", tests);
-
-    tests = 0;
-    a[1] = 1; a[2] = 2;
-    error_pattern = arr2int(a,2);
-    tests += golay23_test(error_pattern);
-    for (i=1; i<253; i++) {
-        nextcomb(23,2,a);
-        error_pattern = arr2int(a,2);
-        //printf("error_pattern: 0x%x\n", error_pattern);
-        tests += golay23_test(error_pattern);
-    }
-    printf("%d 2 bit error tests performed OK!\n", tests);
-
-    tests = 0;
-    a[1] = 1; a[2] = 2; a[3] = 3;
-    error_pattern = arr2int(a,3);
-    tests += golay23_test(error_pattern);
-    for (i=1; i<1771; i++) {
-        nextcomb(23,3,a);
-        error_pattern = arr2int(a,3);
-        //printf("error_pattern: 0x%x\n", error_pattern);
-        tests += golay23_test(error_pattern);
-    }
-    printf("%d 3 bit error tests performed OK!\n", tests);
-
-    return 0;
-}
 #endif
-
-#ifdef GOLAY23_MAKETABLES
-int main(int argc, char *argv[]) {
-    FILE *f;
-    int   i;
-
-    golay23_init();
-
-    f=fopen("golayenctable.h","wt");
-    assert(f != NULL);
-
-    fprintf(f,"/* Generated by golay23.c -DGOLAY23_MAKETABLE */\n\n");
-    fprintf(f,"const int static encoding_table[]={\n");
-
-    for (i=0; i<4095; i++)
-        fprintf(f,"  0x%x,\n", encoding_table[i]);
-    fprintf(f, "  0x%x\n};\n", encoding_table[i]);
-    fclose(f);
-
-    f=fopen("golaydectable.h","wt");
-    assert(f != NULL);
-
-    fprintf(f,"/* Generated by golay23.c -DGOLAY23_MAKETABLE */\n\n");
-    fprintf(f,"const int static decoding_table[]={\n");
-
-    for (i=0; i<2047; i++)
-        fprintf(f,"  0x%x,\n", decoding_table[i]);
-    fprintf(f, "  0x%x\n};\n", decoding_table[i]);
-    fclose(f);
-
-    return 0;
-}
-
-#endif
-
 
