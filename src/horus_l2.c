@@ -13,13 +13,12 @@
   [X] function to return storgage rqd for output packet
   [X] code (not table based) based golay encoder
   [X] #define switchable debug levels
-  [ ] unit test to check if working on payload
   [ ] code based interleaver
-  [ ] unit test to run with/without errors
+  [X] unit test to run with/without errors
       [X] test at BER = 0.01
-      [ ] switchable with defines
-  [ ] conditional defines so just encoder on the target
-  [ ] Octave code
+      [X] switchable with defines
+  [X] conditional defines so just encoder on the target
+  [ ] Octave code      
       [ ] new protocol decoder
       [ ] test file based
       [ ] test real time
@@ -519,6 +518,36 @@ int main(void) {
 }
 #endif
 
+#ifdef GEN_TX_BITS
+/* generate a file of tx_bits to modulate using fsk_horus.m for modem simulations */
+
+int main(void) {
+    int nbytes = 22;
+    unsigned char input_payload[nbytes];
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(sizeof(input_payload));
+    unsigned char tx[num_tx_data_bytes];
+    int i;
+
+    for(i=0; i<nbytes; i++)
+        input_payload[i] = i;
+
+    horus_l2_encode_tx_packet(tx, input_payload, sizeof(input_payload));
+    
+    FILE *f = fopen("../octave/horus_tx_bits_binary.txt","wt");
+    assert(f != NULL);
+    int b, tx_bit;
+    for(i=0; i<num_tx_data_bytes; i++) {
+        for(b=0; b<8; b++) {
+            tx_bit = (tx[i] >> (7-b)) & 0x1; /* msb first */
+            fprintf(f,"%d ", tx_bit);
+        }
+    }
+    fclose(f);
+
+    return 0;
+}
+#endif
+
 /*---------------------------------------------------------------------------*\
 
                                    GOLAY FUNCTIONS
@@ -595,6 +624,7 @@ int main(void) {
  * a[] = auxiliary array to generate correctable error patterns
  */
 
+#ifdef HORUS_L2_RX
 static int inited =  0;
 
 #ifdef RUN_TIME_TABLES
@@ -623,6 +653,7 @@ static int arr2int(int a[], int r)
       }
    return(result);
 }
+#endif
 #endif
 
 #ifdef HORUS_L2_RX
