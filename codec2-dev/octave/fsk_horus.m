@@ -70,7 +70,7 @@ function states = fsk_horus_init(Fs,Rs)
 
   states.uw = [mapped_db zeros(1,npad) mapped_db zeros(1,npad) mapped_db zeros(1,npad)  mapped_db zeros(1,npad) mapped_db zeros(1,npad)];
 
-  states.uw_thresh = 5*7 - 4; % allow 24bit errors when looking for UW
+  states.uw_thresh = 5*7 - 4; % allow a few bit errors when looking for UW
 
   states.df = 0;
   states.f1 = 0;
@@ -136,7 +136,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   h = hanning(nin);
   Sf = fft(sf .* h, Ndft);
-  [m1 m1_index] = max(Sf(100:Ndft/2));
+  [m1 m1_index] = max(Sf(1:Ndft/2));
 
   % zero out region 100Hz either side of max so we can find second highest peak
 
@@ -151,7 +151,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   end
   Sf2(st:en) = 0;
 
-  [m2 m2_index] = max(Sf2(100:Ndft/2));
+  [m2 m2_index] = max(Sf2(1:Ndft/2));
   
   % f1 always the lower tone
 
@@ -699,8 +699,9 @@ endfunction
 function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   fin = fopen(filename,"rb"); 
   more off;
-  states = fsk_horus_init(96000, 1200);
-  states.verbose = 0x1 + 0x4;
+  %states = fsk_horus_init(96000, 1200);
+  states = fsk_horus_init(8000, 100);
+  states.verbose = 0x1 + 0x8;
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -828,10 +829,10 @@ endfunction
 
 if exist("fsk_horus_as_a_lib") == 0
   %run_sim;
-  %rx_bits = demod_file("~/Desktop/vk5arg-3-1.wav",4);
+  rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
-  rx_bits = demod_file("test.raw",1,1);
+  % rx_bits = demod_file("test.raw",1,1);
   %rx_bits = demod_file("/dev/ttyACM0",1);
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
