@@ -58,6 +58,16 @@ function states = fsk_horus_init(Fs,Rs)
   states.Terrs = 0;
   states.nerr_log = 0;
 
+  states.df = 0;
+  states.f1 = 0;
+  states.f2 = 0;
+  states.norm_rx_timing = 0;
+  states.ppm = 0;
+  states.prev_pkt = [];
+endfunction
+
+
+function states = fsk_horus_init_rtty_uw(states)
   % Generate unque word that correlates against the ASCII "$$$$$" that
   % delimits start and end of frame Note use of zeros in UW as "don't
   % cares", we ignore RS232 start/stop bits.  Not sure this is a good
@@ -71,13 +81,19 @@ function states = fsk_horus_init(Fs,Rs)
   states.uw = [mapped_db zeros(1,npad) mapped_db zeros(1,npad) mapped_db zeros(1,npad)  mapped_db zeros(1,npad) mapped_db zeros(1,npad)];
 
   states.uw_thresh = 5*7 - 4; % allow a few bit errors when looking for UW
+endfunction
 
-  states.df = 0;
-  states.f1 = 0;
-  states.f2 = 0;
-  states.norm_rx_timing = 0;
-  states.ppm = 0;
-  states.prev_pkt = [];
+
+
+function states = fsk_horus_init_binary_uw(states)
+  % Generate 16 bit "$$" unique word that is at the front of every horus binary
+  % packet
+
+  dollar_bits = [0 0 1 0 0 1 0 0];
+  mapped_db = 2*dollar_bits - 1;
+
+  states.uw = [mapped_db mapped_db];
+  states.uw_thresh = length(states.uw);   % no bit errors when looking for UW
 endfunction
 
 
@@ -413,7 +429,7 @@ endfunction
 
 % Extract as many ASCII packets as we can from a great big buffer of bits
 
-function extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
+function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
   % use UWs to delimit start and end of data packets
 
@@ -513,10 +529,10 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim
-  frames = 60;
-  EbNodB = 8;
+  frames = 20;
+  EbNodB = 80;
   timing_offset = 0.0; % see resample() for clock offset below
-  test_frame_mode = 1;
+  test_frame_mode = 5;
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 0;          % tx tone freq drift in Hz/s
@@ -525,10 +541,35 @@ function run_sim
   more off
   rand('state',1); 
   randn('state',1);
-  states = fsk_horus_init(96000, 1200);
-  states.f1_tx = 4000;
-  states.f2_tx = 5200;
-  states.verbose = 0x1 + 0x4;
+
+  % ----------------------------------------------------------------------
+
+  % sm2000 config ------------------------
+  %states = fsk_horus_init(96000, 1200);
+  %states.f1_tx = 4000;
+  %states.f2_tx = 5200;
+
+  if test_frame_mode == 4
+    % horus rtty config ---------------------
+    states = fsk_horus_init(8000, 100);
+    states.f1_tx = 1200;
+    states.f2_tx = 1600;
+    states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
+    states = fsk_horus_init_rtty_uw(states);
+  end
+                               
+  if test_frame_mode == 5
+    % horus binary config ---------------------
+    states = fsk_horus_init(8000, 100);
+    states.f1_tx = 1200;
+    states.f2_tx = 1600;
+    states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
+    states = fsk_horus_init_binary_uw(states);
+  end
+
+  % ----------------------------------------------------------------------
+
+  states.verbose = 0x1;
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -560,11 +601,11 @@ function run_sim
     tx_bits(1:2:length(tx_bits)) = 1;
   end
  
-  if test_frame_mode == 4
+  if (test_frame_mode == 4) || (test_frame_mode == 5)
 
     % load up a horus msg from disk and modulate that
 
-    test_frame = load("horus_msg.txt");
+    test_frame = load(states.tx_bits_file);
     ltf = length(test_frame);
     ntest_frames = ceil((frames+1)*nsym/ltf);
     tx_bits = [];
@@ -643,7 +684,25 @@ function run_sim
   end
 
   if test_frame_mode == 4
-    extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
+    extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
+  end
+
+  if test_frame_mode == 5
+    printf("ltx_bits: %d lrx_bits_log: %d\n", length(tx_bits), length(rx_bits_log));
+    en = length(rx_bits_log);
+    uw_start = find_uw(states, 1, rx_bits_log)
+
+    % extract bytes and printf
+    pin = uw_start;    
+    for i=1:45
+      rx_bytes(i) = rx_bits_log(pin:pin+7) * (2.^(7:-1:0))';
+      pin += 8;
+      printf("%d 0x%02x\n", i, rx_bytes(i));
+    end
+
+    f=fopen("horus_rx_bits_binary.txt","wt");
+    fwrite(f, rx_bytes, "uchar");
+    fclose(f);
   end
 
   figure(1);
@@ -828,11 +887,11 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim;
-  rx_bits = demod_file("horus.raw",4);
+  run_sim;
+  %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
-  % rx_bits = demod_file("test.raw",1,1);
+  %rx_bits = demod_file("test.raw",1,1);
   %rx_bits = demod_file("/dev/ttyACM0",1);
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
