@@ -30,6 +30,9 @@
 %     + we might be able to pick up a "ping" at very low SNRs to help find baloon on ground
 % [ ] streaming, indicator of audio freq, i.e. speaker output?
 
+% horus binary:
+% [ ] BER estimate/found/corrected
+
 1;
 
 function states = fsk_horus_init(Fs,Rs)
@@ -479,6 +482,50 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 endfunction
  
 
+% Extract as many ASCII packets as we can from a great big buffer of bits,
+% and send them to the C decoder for FEC decoding.
+% horus_l2 can be compiled a bunch of different ways.  You need to
+% compile with:
+%   codec2-dev/src$ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
+
+function extract_and_decode_binary_packets(states, rx_bits_log)
+
+  % use UWs to delimit start and end of data packets
+
+  bit = 1;
+  nbits = length(rx_bits_log);
+  uw_loc = find_uw(states, bit, rx_bits_log);
+
+  while (uw_loc != -1)
+
+    st = uw_loc;
+    bit = uw_loc + length(states.uw);
+    uw_loc = find_uw(states, bit, rx_bits_log);
+
+    if uw_loc != -1
+      %printf("st: %d uw_loc: %d\n", st, uw_loc);
+
+      % OK we have a packet demilited by two UWs.  Lets convert the bit
+      % stream into bytes and save for decoding
+
+      pin = st;    
+      for i=1:45
+        rx_bytes(i) = rx_bits_log(pin:pin+7) * (2.^(7:-1:0))';
+        pin += 8;
+        %printf("%d 0x%02x\n", i, rx_bytes(i));
+      end
+
+      f=fopen("horus_rx_bits_binary.txt","wt");
+      fwrite(f, rx_bytes, "uchar");
+      fclose(f);
+
+      system("../src/horus_l2");  % compile instructions above
+    end
+   
+  endwhile
+endfunction
+ 
+
 % BER counter and test frame sync logic
 
 function states = ber_counter(states, test_frame, rx_bits_buf)
@@ -530,7 +577,7 @@ endfunction
 
 function run_sim
   frames = 20;
-  EbNodB = 80;
+  EbNodB = 40;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 5;
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -635,7 +682,7 @@ function run_sim
   %rx(find (rx < -1)) = -1;
 
   % dump simulated rx file
-  ftx=fopen("fsk_horus_rx_1200_96k.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
+  ftx=fopen("fsk_horus_100bd_binary.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
@@ -688,21 +735,7 @@ function run_sim
   end
 
   if test_frame_mode == 5
-    printf("ltx_bits: %d lrx_bits_log: %d\n", length(tx_bits), length(rx_bits_log));
-    en = length(rx_bits_log);
-    uw_start = find_uw(states, 1, rx_bits_log)
-
-    % extract bytes and printf
-    pin = uw_start;    
-    for i=1:45
-      rx_bytes(i) = rx_bits_log(pin:pin+7) * (2.^(7:-1:0))';
-      pin += 8;
-      printf("%d 0x%02x\n", i, rx_bytes(i));
-    end
-
-    f=fopen("horus_rx_bits_binary.txt","wt");
-    fwrite(f, rx_bytes, "uchar");
-    fclose(f);
+    extract_and_decode_binary_packets(states, rx_bits_log);
   end
 
   figure(1);
@@ -758,9 +791,23 @@ endfunction
 function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   fin = fopen(filename,"rb"); 
   more off;
+
   %states = fsk_horus_init(96000, 1200);
-  states = fsk_horus_init(8000, 100);
+
+  if test_frame_mode == 4
+    % horus rtty config ---------------------
+    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init_rtty_uw(states);
+  end
+                               
+  if test_frame_mode == 5
+    % horus binary config ---------------------
+    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init_binary_uw(states);
+  end
+
   states.verbose = 0x1 + 0x8;
+
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -881,14 +928,21 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   if test_frame_mode == 4
     extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
   end
+
+  if test_frame_mode == 5
+    extract_and_decode_binary_packets(states, rx_bits_log);
+  end
 endfunction
 
 
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim;
+  %run_sim;
   %rx_bits = demod_file("horus.raw",4);
+  %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
+  %rx_bits = demod_file("~/Desktop/gps_lock.wav",4);
+  rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
   %rx_bits = demod_file("test.raw",1,1);
