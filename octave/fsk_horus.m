@@ -56,6 +56,8 @@ function states = fsk_horus_init(Fs,Rs)
 
   printf("Fs: %d Rs: %d Ts: %d nsym: %d\n", states.Fs, states.Rs, states.Ts, states.nsym);
 
+  % BER stats 
+
   states.ber_state = 0;
   states.Tbits = 0;
   states.Terrs = 0;
@@ -67,36 +69,46 @@ function states = fsk_horus_init(Fs,Rs)
   states.norm_rx_timing = 0;
   states.ppm = 0;
   states.prev_pkt = [];
+
+  % protocol specific states
+
+  states.rtty = fsk_horus_init_rtty_uw(states);
+  states.binary = fsk_horus_init_binary_uw;
 endfunction
 
 
-function states = fsk_horus_init_rtty_uw(states)
+% init rtty protocol specifc states
+
+function rtty = fsk_horus_init_rtty_uw(states)
   % Generate unque word that correlates against the ASCII "$$$$$" that
-  % delimits start and end of frame Note use of zeros in UW as "don't
-  % cares", we ignore RS232 start/stop bits.  Not sure this is a good
-  % idea, we could include start and stop bits if we like.  Oh Well.
+  % is at the start of each frame.
 
   dollar_bits = fliplr([0 1 0 0 1 0 0]);
   mapped_db = 2*dollar_bits - 1;
-  npad = states.npad = 3;   % one start and two stop bits between 7 bit ascii chars
-  nfield = states.nfield = 7; % length of ascii character field
+  sync_bits = [1 1 0];
+  mapped_sb = 2*sync_bits - 1;
+  %mapped_sb = [ 0 0 0 ];
 
-  states.uw = [mapped_db zeros(1,npad) mapped_db zeros(1,npad) mapped_db zeros(1,npad)  mapped_db zeros(1,npad) mapped_db zeros(1,npad)];
+  mapped = [mapped_db mapped_sb];
+  npad = rtty.npad = 3;     % one start and two stop bits between 7 bit ascii chars
+  nfield = rtty.nfield = 7; % length of ascii character field
 
-  states.uw_thresh = 5*7 - 4; % allow a few bit errors when looking for UW
+  rtty.uw = [mapped mapped mapped mapped mapped];
+
+  rtty.uw_thresh = length(rtty.uw) - 4; % allow a few bit errors when looking for UW
 endfunction
 
 
 
-function states = fsk_horus_init_binary_uw(states)
+function binary = fsk_horus_init_binary_uw
   % Generate 16 bit "$$" unique word that is at the front of every horus binary
   % packet
 
   dollar_bits = [0 0 1 0 0 1 0 0];
   mapped_db = 2*dollar_bits - 1;
 
-  states.uw = [mapped_db mapped_db];
-  states.uw_thresh = length(states.uw);   % no bit errors when looking for UW
+  binary.uw = [mapped_db mapped_db];
+  binary.uw_thresh = length(binary.uw);   % no bit errors when looking for UW
 endfunction
 
 
@@ -321,20 +333,22 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 endfunction
 
 
-% look for unique word and return index of first UW bit, or -1 if no UW found
+% Look for unique word and return index of first UW bit, or -1 if no
+% UW found Sometimes there may be several matches, returns the
+% position of the best match to UW.
 
 function uw_start = find_uw(states, start_bit, rx_bits)
   uw = states.uw;
 
   mapped_rx_bits = 2*rx_bits - 1;
-  found = 0;
+  best_corr = 0;
   uw_start = -1;
 
   for i=start_bit:length(rx_bits) - length(uw)
     corr  = mapped_rx_bits(i:i+length(uw)-1) * uw';
-    if !found && (corr >= states.uw_thresh)
+    if (corr >= states.uw_thresh) && (corr > best_corr)
       uw_start = i;
-      found = 1;
+      best_corr = corr;
     end
   end
 endfunction
@@ -438,19 +452,20 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
   bit = 1;
   nbits = length(rx_bits_log);
-  uw_loc = find_uw(states, bit, rx_bits_log);
-  nfield = states.nfield;
-  npad = states.npad;
+  uw_loc = find_uw(states.rtty, bit, rx_bits_log);
+  nfield = states.rtty.nfield;
+  npad = states.rtty.npad;
 
   while (uw_loc != -1)
 
     st = uw_loc;
-    bit = uw_loc + length(states.uw);
-    uw_loc = find_uw(states, bit, rx_bits_log);
+    bit = uw_loc + length(states.rtty.uw);
+    uw_loc = find_uw(states.rtty, bit, rx_bits_log);
+    
 
     if uw_loc != -1
       % Now start picking out 7 bit ascii chars from frame.  It has some
-      % structure so we can guess where fields are.  I hope We don't get
+      % structure so we can guess where fields are.  I hope we don't get
       % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
       % change dynamically.
 
@@ -462,10 +477,10 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
       %rx_bits_log(st+200) = xor(rx_bits_log(st+100),1);
       %rx_bits_sd_log(st+100) = 0;
 
-      [str crc_ok] = extract_ascii(states, rx_bits_log, st, uw_loc);
+      [str crc_ok] = extract_ascii(states.rtty, rx_bits_log, st, uw_loc);
 
       if crc_ok == 0
-        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
+        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states.rtty, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
         if crc_flipped_ok
           str = sprintf("%s fixed", str_flipped);
         end
@@ -473,7 +488,7 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
       % update memory of previous packet, we use this to guess where errors may be
       if crc_ok || crc_flipped_ok
-        states.prev_pkt = rx_bits_log(st+length(states.uw):uw_loc);
+        states.prev_pkt = rx_bits_log(st+length(states.rtty.uw):uw_loc);
       end
       printf("%s\n", str);
     end
@@ -494,13 +509,13 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
 
   bit = 1;
   nbits = length(rx_bits_log);
-  uw_loc = find_uw(states, bit, rx_bits_log);
+  uw_loc = find_uw(states.binary, bit, rx_bits_log);
 
   while (uw_loc != -1)
 
     st = uw_loc;
-    bit = uw_loc + length(states.uw);
-    uw_loc = find_uw(states, bit, rx_bits_log);
+    bit = uw_loc + length(states.binary.uw);
+    uw_loc = find_uw(states.binary, bit, rx_bits_log);
 
     if uw_loc != -1
       %printf("st: %d uw_loc: %d\n", st, uw_loc);
@@ -576,8 +591,8 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim
-  frames = 20;
-  EbNodB = 40;
+  frames = 60;
+  EbNodB = 20;
   timing_offset = 0.0; % see resample() for clock offset below
   test_frame_mode = 5;
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -602,7 +617,6 @@ function run_sim
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
-    states = fsk_horus_init_rtty_uw(states);
   end
                                
   if test_frame_mode == 5
@@ -611,7 +625,6 @@ function run_sim
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
-    states = fsk_horus_init_binary_uw(states);
   end
 
   % ----------------------------------------------------------------------
@@ -797,13 +810,13 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   if test_frame_mode == 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100);
-    states = fsk_horus_init_rtty_uw(states);
+    uwstates = fsk_horus_init_rtty_uw(states);
   end
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
     states = fsk_horus_init(8000, 100);
-    states = fsk_horus_init_binary_uw(states);
+    uwstates = fsk_horus_init_binary_uw;
   end
 
   states.verbose = 0x1 + 0x8;
@@ -925,11 +938,10 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     printf("frames: %d Tbits: %d Terrs: %d BER %4.3f EbNo: %3.2f\n", frames, states.Tbits,states. Terrs, states.Terrs/states.Tbits, mean(EbNodB_log));
   end
 
-  if test_frame_mode == 4
-    extract_and_print_packets(states, rx_bits_log, rx_bits_sd_log)
-  end
+  % we can decode both protocols at the same time
 
-  if test_frame_mode == 5
+  if (test_frame_mode == 4) || (test_frame_mode == 5)
+    extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
     extract_and_decode_binary_packets(states, rx_bits_log);
   end
 endfunction
@@ -941,8 +953,8 @@ if exist("fsk_horus_as_a_lib") == 0
   %run_sim;
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
-  %rx_bits = demod_file("~/Desktop/gps_lock.wav",4);
-  rx_bits = demod_file("t.raw",5);
+  rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
+  %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
   %rx_bits = demod_file("test.raw",1,1);
