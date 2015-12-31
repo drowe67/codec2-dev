@@ -31,7 +31,7 @@
   [ ] does it run fast enough on target?
   [ ] test real time decode of both
 
-  To test on a PC:
+  1/ To test on a PC:
 
      $ gcc horus_l2.c -o horus_l2 -Wall -DHORUS_L2_UNITTEST
      $ ./horus_l2
@@ -45,13 +45,19 @@
      payload data, at bit error rate (BER) of 0, 0.01, 0.05.  It falls
      over at a BER of 0.10 which is expected.
 
-  To build with just the tx function, ie for linking with the payload
+  2/ To build with just the tx function, ie for linking with the payload
   firmware:
 
     $ gcc horus_l2.c -c -Wall
     
   By default the RX side is #ifdef-ed out, leaving the minimal amount
   of code for tx.
+
+  3/ Generate some tx_bits for testing with fsk_horus:
+ 
+    $ gcc horus_l2.c -o horus_l2 -Wall -DGEN_TX_BITS
+    $ ./horus_l2
+    $ more ../octave/horus_tx_bits_binary.txt
 
 \*---------------------------------------------------------------------------*/
 
@@ -84,7 +90,7 @@ int golay23_decode(int received_codeword);
    horus_l2_encode_tx_packet() will need to store the tx packet
  */
 
-int horus_l2_get_num_tx_data_bytes(num_payload_data_bytes) {
+int horus_l2_get_num_tx_data_bytes(int num_payload_data_bytes) {
     int num_payload_data_bits, num_golay_codewords;
     int num_tx_data_bits, num_tx_data_bytes;
     
@@ -523,9 +529,8 @@ int main(void) {
 
 int main(void) {
     int nbytes = 22;
-    unsigned char input_payload[nbytes];
-    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(sizeof(input_payload));
     unsigned char tx[num_tx_data_bytes];
+    unsigned char output_payload[nbytes];
     int i;
 
     for(i=0; i<nbytes; i++)
@@ -543,6 +548,34 @@ int main(void) {
         }
     }
     fclose(f);
+
+    return 0;
+}
+#endif
+
+
+#ifdef DEC_RX_BITS
+/* Decode a binary file rx_bytes, e.g. from fsk_horus.m */
+
+int main(void) {
+    int nbytes = 22;
+    unsigned char output_payload[nbytes];
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(nbytes);
+    unsigned char rx[num_tx_data_bytes];
+    int i, ret;
+
+    FILE *f = fopen("../octave/horus_rx_bits_binary.txt","rb");
+    assert(f != NULL);
+    ret = fread(rx, sizeof(char), num_tx_data_bytes, f);
+    assert(ret == num_tx_data_bytes);
+    fclose(f);
+
+    golay23_init();
+    horus_l2_decode_rx_packet(output_payload, rx, nbytes);
+
+    fprintf(stderr, "\nOutput Payload:\n");
+    for(i=0; i<nbytes; i++)
+        fprintf(stderr, "  %02d 0x%02x\n", i, output_payload[i]);
 
     return 0;
 }
