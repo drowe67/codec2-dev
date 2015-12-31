@@ -95,7 +95,9 @@ function rtty = fsk_horus_init_rtty_uw(states)
 
   rtty.uw = [mapped mapped mapped mapped mapped];
 
-  rtty.uw_thresh = length(rtty.uw) - 4; % allow a few bit errors when looking for UW
+  rtty.uw_thresh = length(rtty.uw) - 8; % allow a few bit errors when looking for UW
+
+  rtty.max_packet_len = 1000;
 endfunction
 
 
@@ -109,6 +111,8 @@ function binary = fsk_horus_init_binary_uw
 
   binary.uw = [mapped_db mapped_db];
   binary.uw_thresh = length(binary.uw);   % no bit errors when looking for UW
+
+  binary.max_packet_len = 400;
 endfunction
 
 
@@ -356,14 +360,16 @@ endfunction
 
 % Extract ASCII string from a Horus frame of bits
 
-function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
+function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
   nfield = states.nfield;
   npad = states.npad;
 
   str = []; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
 
-  st = uw_loc1 + length(states.uw);  % first bit of first char
-  for i=st:nfield+npad:uw_loc2
+  st = uw_loc + length(states.uw);  % first bit of first char
+  en = st+states.max_packet_len - nfield-1;
+
+  for i=st:nfield+npad:en
     field = rx_bits_buf(i:i+nfield-1);
     ch_dec = field * (2.^(0:nfield-1))';
 
@@ -379,19 +385,22 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc1, uw_loc2)
     % build up array for CRC16 check
 
     if ch_dec == 42 
-      rx_crc = crc16(str_dec);
-      ptx_crc = nstr+1;
+      rx_crc = crc16(str_dec);      % found a '*' so that's the end of the string for CRC calculations
+      ptx_crc = nstr+1;             % this is where the transmit CRC starts
     else
       str_dec = [str_dec ch_dec];
     end
   end
+
   if (ptx_crc+3) <= length(str)
     tx_crc = str(ptx_crc:ptx_crc+3);
     crc_ok = strcmp(tx_crc, rx_crc);
   else
     crc_ok = 0;
   end
+
   str = str(1:ptx_crc-2);
+
   if crc_ok
     str = sprintf("%s CRC OK", str);
   else
@@ -403,20 +412,20 @@ endfunction
 % Use soft decision information to find bits most likely in error.  I think
 % this is some form of maximum likelihood decoding.
 
-function [str crc_ok rx_bits_log_flipped] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, uw_loc);
+function [str crc_ok rx_bits_log_flipped] = sd_bit_flipping(states, rx_bits_log, rx_bits_sd_log, st, en);
 
   % force algorithm to ignore rs232 sync bits by marking them as "very likely", they have
   % no input to crc algorithm
 
   nfield = states.nfield;
   npad = states.npad;
-  for i=st:nfield+npad:uw_loc
+  for i=st:nfield+npad:en
     rx_bits_sd_log(i+nfield:i+nfield+npad-1) = 1E6;
   end
 
   % make a list of bits with smallest soft decn values
 
-  [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):uw_loc)));
+  [dodgy_bits_mag dodgy_bits_index] = sort(abs(rx_bits_sd_log(st+length(states.uw):en)));
   dodgy_bits_index += length(states.uw) + st - 1;
   nbits = 6;
   ntries = 2^nbits;
@@ -434,7 +443,7 @@ function [str crc_ok rx_bits_log_flipped] = sd_bit_flipping(states, rx_bits_log,
       %printf("st: %d i: %d b: %d x: %d index: %d\n", st, i,b,x,bit_to_flip);
     end
     rx_bits_log_flipped = xor(rx_bits_log, error_mask);
-    [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st, uw_loc);
+    [str_flipped crc_ok_flipped] = extract_ascii(states, rx_bits_log_flipped, st);
     if crc_ok_flipped
       %printf("Yayy we fixed a packet by flipping with pattern %d\n", i);
       str = str_flipped;
@@ -452,18 +461,14 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
   bit = 1;
   nbits = length(rx_bits_log);
-  uw_loc = find_uw(states.rtty, bit, rx_bits_log);
   nfield = states.rtty.nfield;
   npad = states.rtty.npad;
 
+  uw_loc = find_uw(states.rtty, bit, rx_bits_log);
+
   while (uw_loc != -1)
 
-    st = uw_loc;
-    bit = uw_loc + length(states.rtty.uw);
-    uw_loc = find_uw(states.rtty, bit, rx_bits_log);
-    
-
-    if uw_loc != -1
+    if (uw_loc + states.rtty.max_packet_len) < nbits
       % Now start picking out 7 bit ascii chars from frame.  It has some
       % structure so we can guess where fields are.  I hope we don't get
       % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
@@ -476,11 +481,11 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
       % simulate bit error for testing
       %rx_bits_log(st+200) = xor(rx_bits_log(st+100),1);
       %rx_bits_sd_log(st+100) = 0;
-
-      [str crc_ok] = extract_ascii(states.rtty, rx_bits_log, st, uw_loc);
+      
+      [str crc_ok] = extract_ascii(states.rtty, rx_bits_log, uw_loc);
 
       if crc_ok == 0
-        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states.rtty, rx_bits_log, rx_bits_sd_log, st, uw_loc); 
+        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states.rtty, rx_bits_log, rx_bits_sd_log, uw_loc, uw_loc+states.rtty.max_packet_len); 
         if crc_flipped_ok
           str = sprintf("%s fixed", str_flipped);
         end
@@ -488,11 +493,16 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
       % update memory of previous packet, we use this to guess where errors may be
       if crc_ok || crc_flipped_ok
-        states.prev_pkt = rx_bits_log(st+length(states.rtty.uw):uw_loc);
+        states.prev_pkt = rx_bits_log(uw_loc+length(states.rtty.uw):uw_loc+states.rtty.max_packet_len);
       end
       printf("%s\n", str);
     end
-   
+
+    % look for next packet
+
+    bit = uw_loc + length(states.rtty.uw);
+    uw_loc = find_uw(states.rtty, bit, rx_bits_log);
+
   endwhile
 endfunction
  
@@ -509,21 +519,18 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
 
   bit = 1;
   nbits = length(rx_bits_log);
+
   uw_loc = find_uw(states.binary, bit, rx_bits_log);
 
   while (uw_loc != -1)
 
-    st = uw_loc;
-    bit = uw_loc + length(states.binary.uw);
-    uw_loc = find_uw(states.binary, bit, rx_bits_log);
-
-    if uw_loc != -1
+    if (uw_loc+states.binary.max_packet_len) < nbits
       %printf("st: %d uw_loc: %d\n", st, uw_loc);
 
-      % OK we have a packet demilited by two UWs.  Lets convert the bit
+      % OK we have a packet delimited by two UWs.  Lets convert the bit
       % stream into bytes and save for decoding
 
-      pin = st;    
+      pin = uw_loc;    
       for i=1:45
         rx_bytes(i) = rx_bits_log(pin:pin+7) * (2.^(7:-1:0))';
         pin += 8;
@@ -536,6 +543,9 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
 
       system("../src/horus_l2");  % compile instructions above
     end
+
+    bit = uw_loc + length(states.binary.uw);
+    uw_loc = find_uw(states.binary, bit, rx_bits_log);
    
   endwhile
 endfunction
@@ -590,11 +600,10 @@ endfunction
 
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
-function run_sim
+function run_sim(test_frame_mode)
   frames = 60;
-  EbNodB = 20;
+  EbNodB = 10;
   timing_offset = 0.0; % see resample() for clock offset below
-  test_frame_mode = 5;
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
   df     = 0;          % tx tone freq drift in Hz/s
@@ -950,7 +959,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim;
+  %run_sim(5);
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
   rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
