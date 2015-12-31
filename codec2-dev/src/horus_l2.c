@@ -555,28 +555,70 @@ int main(void) {
 
 
 #ifdef DEC_RX_BITS
+
 /* Decode a binary file rx_bytes, e.g. from fsk_horus.m */
+
+/* Horus binary packet */
+
+struct TBinaryPacket
+{
+    uint8_t     PayloadID;
+    uint16_t	Counter;
+    uint8_t	Hours;
+    uint8_t	Minutes;
+    uint8_t	Seconds;
+    float	Latitude;
+    float	Longitude;
+    uint16_t  	Altitude;
+    uint8_t     Speed;       // Speed in Knots (1-255 knots)
+    uint8_t     Sats;
+    int8_t      Temp;        // Twos Complement Temp value.
+    uint8_t     BattVoltage; // 0 = 0.5v, 255 = 2.0V, linear steps in-between.
+    uint16_t    Checksum;    // CRC16-CCITT Checksum.
+}  __attribute__ ((packed));
 
 int main(void) {
     int nbytes = 22;
     unsigned char output_payload[nbytes];
     int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(nbytes);
-    unsigned char rx[num_tx_data_bytes];
+
+    /* real world data hrous payload generated when running tx above */
+    unsigned char rx[45] = {
+        0x24,0x24,0x01,0x0b,0x00,0x00,0x05,0x3b,0xf2,0xa7,0x0b,0xc2,0x1b,
+        0xaa,0x0a,0x43,0x7e,0x00,0x05,0x00,0x25,0xc0,0xce,0xbb,0x36,0x69,
+        0x50,0x00,0x41,0xb0,0xa6,0x5e,0x91,0xa2,0xa3,0xf8,0x1d,0x00,0x00,
+        0x0c,0x76,0xc6,0x05,0xb0,0xb8};
     int i, ret;
 
+    assert(num_tx_data_bytes == 45);
+
+    #define READ_FILE /* overwrite tx[] above, that's OK */
+    #ifdef READ_FILE
     FILE *f = fopen("../octave/horus_rx_bits_binary.txt","rb");
     assert(f != NULL);
     ret = fread(rx, sizeof(char), num_tx_data_bytes, f);
     assert(ret == num_tx_data_bytes);
     fclose(f);
+    #endif
 
     golay23_init();
     horus_l2_decode_rx_packet(output_payload, rx, nbytes);
 
+    #ifdef HEX_DUMP
     fprintf(stderr, "\nOutput Payload:\n");
     for(i=0; i<nbytes; i++)
-        fprintf(stderr, "  %02d 0x%02x\n", i, output_payload[i]);
+        fprintf(stderr, "  %02d 0x%02x 0x%02x\n", i, output_payload[i], rx[i+2]);
+    #endif
 
+    struct TBinaryPacket h;
+    assert(sizeof(h) == nbytes);
+    memcpy(&h, output_payload, nbytes);
+
+    fprintf(stderr, "%d,%d,%02d:%02d:%02d,%f,%f,%d,%d,%d,%d,%d,%04x\n",
+        h.PayloadID, h.Counter, h.Hours, h.Minutes, h.Seconds,
+        h.Latitude, h.Longitude, h.Altitude, h.Speed, h.Sats, h.Temp, 
+        h.BattVoltage, h.Checksum);
+    
     return 0;
 }
 #endif
