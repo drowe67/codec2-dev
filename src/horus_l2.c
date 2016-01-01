@@ -79,6 +79,7 @@ static char uw[] = {'$','$'};
 int32_t get_syndrome(int32_t pattern);
 void golay23_init(void);
 int golay23_decode(int received_codeword);
+unsigned short gen_crc16(unsigned char* data_p, unsigned char length);
 
 /*
    We are using a Golay (23,12) code which has a codeword 23 bits
@@ -614,10 +615,19 @@ int main(void) {
     assert(sizeof(h) == nbytes);
     memcpy(&h, output_payload, nbytes);
 
-    fprintf(stderr, "%d,%d,%02d:%02d:%02d,%f,%f,%d,%d,%d,%d,%d,%04x\n",
+    uint16_t crc_rx = gen_crc16(output_payload, nbytes-2);
+    char crc_str[80];
+    
+    if (crc_rx == h.Checksum) {
+        sprintf(crc_str, "CRC OK");
+    } else {
+        sprintf(crc_str, "CRC BAD");
+    }
+
+    fprintf(stderr, "%d,%d,%02d:%02d:%02d,%f,%f,%d,%d,%d,%d,%d,%04x %s\n",
         h.PayloadID, h.Counter, h.Hours, h.Minutes, h.Seconds,
         h.Latitude, h.Longitude, h.Altitude, h.Speed, h.Sats, h.Temp, 
-        h.BattVoltage, h.Checksum);
+            h.BattVoltage, h.Checksum, crc_str);
     
     /* Hex ASCII file output */
 
@@ -917,5 +927,21 @@ int golay23_count_errors(int recd_codeword, int corrected_codeword)
 
     return errors;
 }
+
+
+// from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
+
+unsigned short gen_crc16(unsigned char* data_p, unsigned char length){
+    unsigned char x;
+    unsigned short crc = 0xFFFF;
+
+    while (length--){
+        x = crc >> 8 ^ *data_p++;
+        x ^= x>>4;
+        crc = (crc << 8) ^ ((unsigned short)(x << 12)) ^ ((unsigned short)(x <<5)) ^ ((unsigned short)x);
+    }
+    return crc;
+}
+
 #endif
 
