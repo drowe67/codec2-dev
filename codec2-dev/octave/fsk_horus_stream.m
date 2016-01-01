@@ -31,7 +31,6 @@ nsym = states.nsym;
 nin = states.nin;
 nfield = states.rtty.nfield;
 npad = states.rtty.npad;
-uw = states.rtty.uw;
 EbNo = 0;
 SNR = 0;
 
@@ -71,10 +70,7 @@ while c
     packet_found = 1;
 
     if (uw_loc + states.rtty.max_packet_len) < nbits
-
-      % insert a single bit error for testing
-      %rx_bits_buf(uw_loc1+100) = xor(rx_bits_buf(uw_loc1+100),1);
-      %rx_bits_sd_buf(uw_loc1+100) = 0;
+      %printf("\n%d nbits: %d\n",uw_loc + states.rtty.max_packet_len, nbits);
 
       [str crc_ok] = extract_ascii(states.rtty, rx_bits_buf, uw_loc);
 
@@ -87,13 +83,13 @@ while c
       end
       
       printf("\n  %s         \n", str);
-
+      
       % throw out used bits in buffer.  We're not sure where the next packet starts
       % so lets remove everything up to just after the UW we just used to force
       % a search for the next UW.
 
-      rx_bits_buf    = rx_bits_buf(uw_loc+length(uw):length(rx_bits_buf));
-      rx_bits_sd_buf = rx_bits_sd_buf(uw_loc+length(uw):length(rx_bits_sd_buf));
+      rx_bits_buf    = rx_bits_buf(uw_loc+length(states.rtty.uw):length(rx_bits_buf));
+      rx_bits_sd_buf = rx_bits_sd_buf(uw_loc+length(states.rtty.uw):length(rx_bits_sd_buf));
 
       if crc_ok
         % extract GPS coords and save to log file for mapping software
@@ -114,7 +110,6 @@ while c
       end
     end
   end
-
 
   % Look for complete Horus BINARY frame -------------------------------------------------------------------
 
@@ -148,19 +143,19 @@ while c
       % so lets remove everything up to just after the UW we just used to force
       % a search for the next UW.
 
-      rx_bits_buf    = rx_bits_buf(uw_loc+length(uw):length(rx_bits_buf));
-      rx_bits_sd_buf = rx_bits_sd_buf(uw_loc+length(uw):length(rx_bits_sd_buf));
+      rx_bits_buf    = rx_bits_buf(uw_loc+length(states.binary.uw):length(rx_bits_buf));
+      rx_bits_sd_buf = rx_bits_sd_buf(uw_loc+length(states.binary.uw):length(rx_bits_sd_buf));
     end
   end
-
 
   % Truncate buffers if no UW found so they don't grow endlessly with no signal.
   % Keep very end of it as it may have part of a UW in it
 
   if packet_found == 0
-    if length(rx_bits_buf) > length(uw)
-      rx_bits_buf = rx_bits_buf(length(rx_bits_buf)-length(uw):length(rx_bits_buf));
-      rx_bits_sd_buf = rx_bits_sd_buf(length(rx_bits_sd_buf)-length(uw):length(rx_bits_sd_buf));
+    max_len = states.rtty.max_packet_len*4;
+    if length(rx_bits_buf) > max_len
+      rx_bits_buf = rx_bits_buf(length(rx_bits_buf)-states.rtty.max_packet_len:length(rx_bits_buf));
+      rx_bits_sd_buf = rx_bits_sd_buf(length(rx_bits_sd_buf)-states.rtty.max_packet_len:length(rx_bits_sd_buf));
     end
   end
 

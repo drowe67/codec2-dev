@@ -367,7 +367,8 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
   str = []; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
 
   st = uw_loc + length(states.uw);  % first bit of first char
-  en = st+states.max_packet_len - nfield-1;
+  en = uw_loc + states.max_packet_len - nfield;
+  %printf("\nst: %d en: %d len: %d\n", st, en, length(rx_bits_buf));
 
   for i=st:nfield+npad:en
     field = rx_bits_buf(i:i+nfield-1);
@@ -962,7 +963,8 @@ if exist("fsk_horus_as_a_lib") == 0
   %run_sim(5);
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
-  rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
+  rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
+  %rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
   %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
