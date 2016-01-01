@@ -619,6 +619,18 @@ int main(void) {
         h.Latitude, h.Longitude, h.Altitude, h.Speed, h.Sats, h.Temp, 
         h.BattVoltage, h.Checksum);
     
+    /* Hex ASCII file output */
+
+    #define WRITE_HEX_FILE /* overwrite tx[] above, that's OK */
+    #ifdef WRITE_HEX_FILE
+    FILE *fh = fopen("../octave/horus_rx_bits_hex.txt","wt");
+    assert(fh != NULL);
+    for(i=0; i<nbytes; i++) {
+        fprintf(fh, "%02X", (unsigned int)output_payload[i]);
+    }
+    fclose(fh);
+    #endif
+
     return 0;
 }
 #endif

@@ -82,7 +82,12 @@ while c
         end
       end
       
-      printf("\n  %s         \n", str);
+      if crc_ok
+        strok = sprintf("%s CRC OK", str);
+      else
+        strok = sprintf("%s CRC BAD", str);
+      end
+      printf("\n  %s         \n", strok);
       
       % throw out used bits in buffer.  We're not sure where the next packet starts
       % so lets remove everything up to just after the UW we just used to force

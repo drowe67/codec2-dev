@@ -405,11 +405,6 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
 
   str = str(1:ptx_crc-2);
 
-  if crc_ok
-    str = sprintf("%s CRC OK", str);
-  else
-    str = sprintf("%s CRC BAD", str);
-  end
 endfunction
 
 
@@ -498,6 +493,11 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
       % update memory of previous packet, we use this to guess where errors may be
       if crc_ok || crc_flipped_ok
         states.prev_pkt = rx_bits_log(uw_loc+length(states.rtty.uw):uw_loc+states.rtty.max_packet_len);
+      end
+      if crc_ok
+        str = sprintf("%s CRC OK", str);
+      else
+        str = sprintf("%s CRC BAD", str);
       end
       printf("%s\n", str);
     end
