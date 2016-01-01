@@ -365,6 +365,7 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
   npad = states.npad;
 
   str = []; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
+  endpacket = 0;
 
   st = uw_loc + length(states.uw);  % first bit of first char
   en = uw_loc + states.max_packet_len - nfield;
@@ -385,10 +386,12 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
 
     % build up array for CRC16 check
 
-    if ch_dec == 42 
+    if !endpacket && (ch_dec == 42)
+      endpacket = 1; 
       rx_crc = crc16(str_dec);      % found a '*' so that's the end of the string for CRC calculations
       ptx_crc = nstr+1;             % this is where the transmit CRC starts
-    else
+    end
+    if !endpacket
       str_dec = [str_dec ch_dec];
     end
   end
