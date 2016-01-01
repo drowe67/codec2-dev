@@ -58,6 +58,14 @@
     $ gcc horus_l2.c -o horus_l2 -Wall -DGEN_TX_BITS
     $ ./horus_l2
     $ more ../octave/horus_tx_bits_binary.txt
+   
+  4/ Testing interleaver:
+
+    $ gcc horus_l2.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER
+
+  5/ Use as decoder with fsk_horus.m and fsk_horus_stream.m:
+
+    $ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
 \*---------------------------------------------------------------------------*/
 
@@ -76,10 +84,15 @@
 
 static char uw[] = {'$','$'};
 
+/* Function Prototypes ------------------------------------------------*/
+
 int32_t get_syndrome(int32_t pattern);
 void golay23_init(void);
 int golay23_decode(int received_codeword);
 unsigned short gen_crc16(unsigned char* data_p, unsigned char length);
+void interleave(unsigned char *inout, int nbytes);
+
+/* Functions ----------------------------------------------------------*/
 
 /*
    We are using a Golay (23,12) code which has a codeword 23 bits
@@ -268,6 +281,12 @@ int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
     #endif
     assert(pout == (output_tx_data + num_tx_data_bytes));
 
+    /* optional interleaver - we dont interleave UW */
+
+    #ifdef INTERLEAVER
+    interleave(&output_tx_data[sizeof(uw)], num_tx_data_bytes-2);
+    #endif
+
     return num_tx_data_bytes;
 }
 
@@ -282,6 +301,13 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
     unsigned char *pin  = input_rx_data;
     int            ninbit, ingolay, ningolay, paritybyte, nparitybits;
     int            ninbyte, shift, inbit, golayparitybit, i, outbit, outbyte, noutbits, outdata;
+
+    /* optional interleaver - we dont interleave UW */
+
+    #ifdef INTERLEAVER
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(num_payload_data_bytes);
+    interleave(&input_rx_data[sizeof(uw)], num_tx_data_bytes-2);
+    #endif
 
     pin = input_rx_data + sizeof(uw) + num_payload_data_bytes;
 
@@ -445,6 +471,114 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
 }
 #endif
 
+#ifdef INTERLEAVER
+/* call for interleaving and de-interleaving, operates in place */
+
+static unsigned char scrambler[] = {
+    0,  
+    16, 
+    13, 
+    2, 
+    23,
+    28, 
+    3,  
+    21, 
+    4,  
+    5,  
+    22, 
+    6,  
+    7, 
+    15,
+    8,  
+    27, 
+    9, 
+    10, 
+    11, 
+    30, 
+    26, 
+    12, 
+    14, 
+    17, 
+    1,  
+    19, 
+    20, 
+    24, 
+    18, 
+    25, 
+    29, 
+    31
+};
+
+
+void interleave(unsigned char *inout, int nbytes)
+{
+    int nbits = nbytes*8;
+    int nbits2 = nbits/2;
+    int i, j, ibit, jbit, ibyte, ishift, jbyte, jshift, mask;
+
+    /* swap bits in first half with those in 2nd half, using
+       small scrambling table to move bits about a bit */
+
+    for(i=0; i<nbits2; i++) {
+        j = nbits2 + scrambler[i%32] + 32*(i/32);
+
+        /* swap bit i & j */
+
+        ibyte = i/8;
+        ishift = i%8;
+        ibit = (inout[ibyte] >> ishift) & 0x1;
+        //printf("i: %02d ibyte: %d ishift: %d ibit: %d\n", i, ibyte, ishift, ibit);
+
+        jbyte = j/8;
+        jshift = j%8;
+        jbit = (inout[jbyte] >> jshift) & 0x1;
+        //printf("j: %02d jbyte: %d jshift: %d jbit: %d\n", j, jbyte, jshift, jbit);
+
+        /* write jbit to ibit position */
+
+        mask = 1 << ishift;
+        inout[ibyte] &= ~mask;  // clear ibit
+        inout[ibyte] |= jbit << ishift;
+
+        /* write ibit to jbit position */
+
+        mask = 1 << jshift;
+        inout[jbyte] &= ~mask;  // clear jbit
+        inout[jbyte] |= ibit << jshift;
+    }
+}
+#endif
+
+
+#ifdef TEST_INTERLEAVER
+int main(void) {
+    int nbytes = 43;
+    unsigned char inout[nbytes];
+    unsigned char inter[nbytes];
+    unsigned char incopy[nbytes];
+    int i;
+
+    /* copy of input for later comp   */
+
+    for(i=0; i<nbytes; i++)
+        inout[i] = incopy[i] = rand() & 0xff;    
+
+    interleave(inout, nbytes);       /* interleave                     */
+    memcpy(inter, inout, nbytes);    /* snap shot of interleaved bytes */
+    interleave(inout, nbytes);       /* de-interleave                  */
+
+    /* all ones in last col means it worked! */
+
+    for(i=0; i<nbytes; i++) {
+        printf("%d 0x%02x 0x%02x 0x%02x %d\n", 
+               i, incopy[i], inter[i], inout[i],  incopy[i] == inout[i]);
+        assert(incopy[i] == inout[i]);
+    }
+    printf("Interleaver tested OK!\n");
+
+    return 0;
+}
+#endif
 
 #ifdef HORUS_L2_UNITTEST
 
@@ -453,7 +587,7 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
   some bit errors, decode, count errors.
 */
 
-int test_sending_bytes(int nbytes, float ber) {
+int test_sending_bytes(int nbytes, float ber, int burst) {
     unsigned char input_payload[nbytes];
     int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(sizeof(input_payload));
     unsigned char tx[num_tx_data_bytes];
@@ -473,25 +607,31 @@ int test_sending_bytes(int nbytes, float ber) {
 
     /* insert bit errors */
 
-    float r;
-    int b, nbiterrors = 0;
-    for(i=0; i<num_tx_data_bytes; i++) {
-        for (b=0; b<8; b++) {
-            r = (float)rand()/RAND_MAX;
-            if (r < ber) {
-                unsigned char mask = (1<<b);
-                #ifdef DEBUG1
-                fprintf("mask: 0x%x tx[%d] = 0x%x ", mask, i, tx[i]);
-                #endif
-                tx[i] ^= mask;
-                #ifdef DEBUG1
-                fprintf("0x%x\n", tx[i]);
-                #endif
-                nbiterrors++;
+    if (burst) {
+        tx[2] ^= 0xff;        /* if burst model consecutive errors */
+        tx[3] ^= 0xff;        
+    }
+    else {
+        float r;
+        int b, nbiterrors = 0;
+        for(i=0; i<num_tx_data_bytes; i++) {
+            for (b=0; b<8; b++) {
+                r = (float)rand()/RAND_MAX;
+                if (r < ber) {
+                    unsigned char mask = (1<<b);
+                    #ifdef DEBUG1
+                    fprintf("mask: 0x%x tx[%d] = 0x%x ", mask, i, tx[i]);
+                    #endif
+                    tx[i] ^= mask;
+                    #ifdef DEBUG1
+                    fprintf("0x%x\n", tx[i]);
+                    #endif
+                    nbiterrors++;
+                }
             }
         }
     }
-    
+
     #ifdef DEBUG0
     fprintf(stderr, "nbiterrors: %d BER: %3.2f\n", nbiterrors, (float)nbiterrors/(num_tx_data_bytes*8));
     #endif
@@ -517,10 +657,11 @@ int test_sending_bytes(int nbytes, float ber) {
 /* unit test designed to run on a PC */
 
 int main(void) {
-    printf("test 0: 22 bytes of payload data BER: 0.00 errors: %d\n", test_sending_bytes(22, 0.0));
-    printf("test 0: 22 bytes of payload data BER: 0.01 errors: %d\n", test_sending_bytes(22, 0.01));
-    printf("test 0: 22 bytes of payload data BER: 0.05 errors: %d\n", test_sending_bytes(22, 0.05));
-    printf("test 0: 22 bytes of payload data BER: 0.10 errors: %d\n", test_sending_bytes(22, 0.1));
+    printf("test 0: 22 bytes of payload data BER: 0.00 errors.: %d\n", test_sending_bytes(22, 0.00, 0));
+    printf("test 0: 22 bytes of payload data BER: 0.01 errors.: %d\n", test_sending_bytes(22, 0.01, 0));
+    printf("test 0: 22 bytes of payload data BER: 0.05 errors.: %d\n", test_sending_bytes(22, 0.05, 0));
+    printf("test 0: 22 bytes of payload data BER: 0.10 errors.: %d\n", test_sending_bytes(22, 0.10, 0));
+    printf("test 0: 22 bytes of payload data 8 bit burst error: %d\n", test_sending_bytes(22, 0.50, 1));
     return 0;
 }
 #endif
