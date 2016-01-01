@@ -9,6 +9,10 @@
 % usage:
 %  $ chmod 777 fsk_horus_stream.m
 %  $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m
+%  or (for those of us that avoid alsa like the plague)
+%  $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m
+%  and use the 'pavucontrol' utility to select a sound device for arecord.
+%
 %
 % OR to test with a stored file (8kHz 16-bit shorts):
 %  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
@@ -21,6 +25,11 @@ fsk_horus;
 
 gps_log = "~/Desktop/gps_log.txt"
 system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.0.1 21234";
+
+% Upload Telemetry to Habitat (http://tracker.habhub.org/)
+telem_upload_enabled = false;
+% Update this command with your own callsign.
+telem_upload_command = "python telem_upload.py -c N0CALL_Octave";
 
 more off;
 states = fsk_horus_init(8000, 100);
@@ -83,6 +92,13 @@ while c
       end
       
       if crc_ok
+        if telem_upload_enabled
+          % Upload to Habitat.
+          ascii_upload_cmd = sprintf("%s %s",telem_upload_command,str);
+          printf("Uploading ASCII to Habitat...\n");
+          system(ascii_upload_cmd,false,"async");
+        end
+
         strok = sprintf("%s CRC OK", str);
       else
         strok = sprintf("%s CRC BAD", str);
@@ -142,7 +158,14 @@ while c
       % compile with:
       %   codec2-dev/src$ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
-      system("../src/horus_l2"); 
+      system("../src/horus_l2");
+      if telem_upload_enabled
+        % Upload binary payload data to Habitat.
+        binary_upload_addition = "`cat horus_rx_bits_hex.txt`";
+        binary_upload_cmd = sprintf("%s %s",telem_upload_command,binary_upload_addition);
+        printf("Uploading Binary to Habitat...\n");
+        system(binary_upload_cmd,type="async");
+      end
 
       % throw out used bits in buffer.  We're not sure where the next packet starts
       % so lets remove everything up to just after the UW we just used to force
