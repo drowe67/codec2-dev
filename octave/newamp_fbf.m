@@ -8,6 +8,8 @@
 % modelling model.
 %
 % Usage:
+%   Make sure codec2-dev is compiled with the -DDUMP option - see README for
+%    instructions.
 %   ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
 %   $ cd ~/codec2-dev/octave
 %   octave:14> newamp_fbf("../build_linux/src/hts1a",50)
@@ -16,6 +18,8 @@ function newamp_fbf(samname, f)
   
   more off;
   newamp;
+  phase_stuff = 0;
+  plot_not_masked = 0;
 
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -60,7 +64,7 @@ function newamp_fbf(samname, f)
     % optionally show harmonics that are not masked
 
     not_masked_m = find(maskdB < AmdB);
-    if 0
+    if plot_not_masked
       plot(not_masked_m*Wo*4000/pi, 70*ones(1,length(not_masked_m)), 'bk+');
     end
 
@@ -111,23 +115,25 @@ function newamp_fbf(samname, f)
     ak_name = strcat(samname,"_ak.txt");
     ak = load(ak_name);
 
-    [phase Sdb s Aw] = determine_phase(model, f, ak(f,:));
-    figure(3)
-    subplot(211)
-    plot(Sdb)
-    title('Mag (dB)');
-    subplot(212)
-    plot(phase(1:256))
-    hold on;
-    plot(angle(Aw(1:256))+0.5,'g')
-    hold off;
-    title('Phase (rads)');
-    figure(4)
-    plot(s)
+    if phase_stuff
+      [phase Sdb s Aw] = determine_phase(model, f, ak(f,:));
+      figure(3)
+      subplot(211)
+      plot(Sdb)
+      title('Mag (dB)');
+      subplot(212)
+      plot(phase(1:256))
+      hold on;
+      plot(angle(Aw(1:256))+0.5,'g')
+      hold off;
+      title('Phase (rads)');
+      figure(4)
+      plot(s)
+    end
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back  p-png  q-quit m-all", f);
+    printf("\rframe: %d  menu: n-next  b-back a-allmasks o-notmasked q-quit", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -141,6 +147,13 @@ function newamp_fbf(samname, f)
          plot_all_masks = 1;
       else
          plot_all_masks = 0;
+      end
+    end
+    if k == 'o'
+      if plot_not_masked == 0
+         plot_not_masked = 1;
+      else
+         plot_not_masked = 0;
       end
     end
   until (k == 'q')
