@@ -20,6 +20,7 @@ function newamp_fbf(samname, f)
   newamp;
   phase_stuff = 0;
   plot_not_masked = 0;
+  thresh = 0;
 
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -30,6 +31,11 @@ function newamp_fbf(samname, f)
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames tmp] = size(model);
+
+  if phase_stuff
+    ak_name = strcat(samname,"_ak.txt");
+    ak = load(ak_name);
+  end
 
   plot_all_masks = 0;
   k = ' ';
@@ -63,7 +69,7 @@ function newamp_fbf(samname, f)
 
     % optionally show harmonics that are not masked
 
-    not_masked_m = find(maskdB < AmdB);
+    not_masked_m = find(maskdB < (AmdB+thresh));
     if plot_not_masked
       plot(not_masked_m*Wo*4000/pi, 70*ones(1,length(not_masked_m)), 'bk+');
     end
@@ -86,8 +92,9 @@ function newamp_fbf(samname, f)
     nlm = min(nlm,4);
     tonef_kHz = local_maxima(1:nlm,2)*Wo*4/pi;
     toneamp_dB = local_maxima(1:nlm,1);
-    %plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
-    %plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
+
+    plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
+    plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
 
     % fit a line to amplitudes
 
@@ -112,10 +119,8 @@ function newamp_fbf(samname, f)
 
     hold off;
 
-    ak_name = strcat(samname,"_ak.txt");
-    ak = load(ak_name);
-
     if phase_stuff
+
       [phase Sdb s Aw] = determine_phase(model, f, ak(f,:));
       figure(3)
       subplot(211)
@@ -133,7 +138,7 @@ function newamp_fbf(samname, f)
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back a-allmasks o-notmasked q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back m-allmasks o-notmasked q-quit", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -154,6 +159,13 @@ function newamp_fbf(samname, f)
          plot_not_masked = 1;
       else
          plot_not_masked = 0;
+      end
+    end
+    if k == 't'
+      if thresh == 0
+         thresh = -3;
+      else
+         thresh = 0;
       end
     end
   until (k == 'q')
