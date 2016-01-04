@@ -21,9 +21,10 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   more off;
 
   max_amp = 80;
-  use_decmask = 0;
-  postfilter_en = 1;
-  decimate = 1;
+  decimate_in_freq = 1;
+  postfilter = 1;
+  decimate_in_time = 0;
+  synth_phase = 0;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -44,38 +45,42 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   faw = fopen(Aw_out_name,"wb"); 
 
   for f=1:frames
-    printf("frame: %d", f);
+    printf("%d ", f);
     L = min([model(f,2) max_amp-1]);
     Wo = model(f,1);
     Am = model(f,3:(L+2));
 
     AmdB = 20*log10(Am);
 
-    % find mask and decimate mask samples
+    % find mask
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB = mask_model(AmdB, Wo, L);
-    [decmaskdB decmasksamples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
 
-    if use_decmask
+    if decimate_in_freq
+      % decimate in mask samples in frequency
+      [decmaskdB decmasksamples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
       non_masked_m = decmasksamples(:,2);
       maskdB_ = decmaskdB;
     else
+      % just approximate decimation in freq by using those mask samples we can hear
       maskdB_ = maskdB;
       non_masked_m = find(AmdB > maskdB);
     end
 
-    maskdB_ = decimate_frame_rate(maskdB_, model, decimate, f, frames, mask_sample_freqs_kHz);
+    if decimate_in_time
+      % decimate mask samples in time
+      maskdB_ = decimate_frame_rate(maskdB_, model, decimate, f, frames, mask_sample_freqs_kHz);
+    end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
-    if postfilter_en
+    if postfilter
       maskdB_pf = maskdB_ - 6;
       maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
     else
       maskdB_pf = maskdB_;
     end
-
 
     if 0 
       % Early work as per blog post part 1
@@ -93,14 +98,17 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
     Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);  % C array doesnt use A[0]
     fwrite(fam, Am_, "float32");
 
-    fft_enc = 512;
-    phase = determine_phase(model, f);
-    assert(length(phase) == fft_enc);
-    Aw = zeros(1, fft_enc*2); 
-    Aw(1:2:fft_enc*2) = cos(phase);
-    Aw(2:2:fft_enc*2) = -sin(phase);
+    if synth_phase
+      % synthesis phase spectra from magnitiude spectra using minimum phase techniques
+      fft_enc = 512;
+      phase = determine_phase(model, f);
+      assert(length(phase) == fft_enc);
+      Aw = zeros(1, fft_enc*2); 
+      Aw(1:2:fft_enc*2) = cos(phase);
+      Aw(2:2:fft_enc*2) = -sin(phase);
  
-    fwrite(faw, Aw, "float32");    
+      fwrite(faw, Aw, "float32");    
+    end
   end
 
   fclose(fam);
