@@ -20,7 +20,7 @@ function newamp_fbf(samname, f)
   newamp;
   phase_stuff = 0;
   plot_not_masked = 0;
-  thresh = 0;
+  plot_spectrum = 0;
 
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -58,18 +58,20 @@ function newamp_fbf(samname, f)
 
     % plotting
 
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
     axis([1 4000 0 80]);
     hold on;
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;r+");
-    plot((0:255)*4000/256, Sw(f,:),";Sw;");
+    if plot_spectrum
+      plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
+      plot((1:L)*Wo*4000/pi, AmdB,";Am;r+");
+      plot((0:255)*4000/256, Sw(f,:),";Sw;");
+    end
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
     plot(Am_freqs_kHz*1000, maskdB, 'g');
 
     % optionally show harmonics that are not masked
 
-    not_masked_m = find(maskdB < (AmdB+thresh));
+    not_masked_m = find(maskdB < AmdB);
     if plot_not_masked
       plot(not_masked_m*Wo*4000/pi, 70*ones(1,length(not_masked_m)), 'bk+');
     end
@@ -86,7 +88,7 @@ function newamp_fbf(samname, f)
     % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB local_maxima error_log candidate_log target_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB local_maxima mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
     
     [nlm tmp] = size(local_maxima(:,2));
     nlm = min(nlm,4);
@@ -95,6 +97,11 @@ function newamp_fbf(samname, f)
 
     plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
     plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
+
+    figure(3)
+    clf
+    plot((1:L)*Wo*4000/pi, mse_log');
+    axis([0 4000 0 max(mse_log(1,:))])
 
     % fit a line to amplitudes
 
@@ -138,7 +145,7 @@ function newamp_fbf(samname, f)
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back m-allmasks o-notmasked q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back m-allmasks o-notmasked s-spectrum q-quit", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -161,11 +168,11 @@ function newamp_fbf(samname, f)
          plot_not_masked = 0;
       end
     end
-    if k == 't'
-      if thresh == 0
-         thresh = -3;
+    if k == 's'
+      if plot_spectrum == 0
+         plot_spectrum = 1;
       else
-         thresh = 0;
+         plot_spectrum = 0;
       end
     end
   until (k == 'q')
