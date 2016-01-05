@@ -135,7 +135,9 @@ endfunction
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB dec_samples error_log candidate_log target_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+function [decmaskdB dec_samples mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+
+    Nsamples = 4;
 
     % band pass filter: limit search to 250 to 3800 Hz
 
@@ -149,8 +151,9 @@ function [decmaskdB dec_samples error_log candidate_log target_log] = make_decma
     dec_samples = [];
     error_log = [];
     candidate_log = [];
+    mse_log = zeros(Nsamples, L);
 
-    for sample=1:4
+    for sample=1:Nsamples
 
       target_log = target;
 
@@ -161,7 +164,7 @@ function [decmaskdB dec_samples error_log candidate_log target_log] = make_decma
         single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
         error = target - candidate;
-        mse = sum(abs(error)); % MSE in log domain
+        mse_log(sample,m) = mse = sum(abs(error)); % MSE in log domain
         error_log = [error_log; error];
         candidate_log = [candidate_log; candidate];
         %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
