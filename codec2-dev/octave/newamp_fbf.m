@@ -58,7 +58,7 @@ function newamp_fbf(samname, f)
 
     % plotting
 
-    axis([1 4000 0 80]);
+    axis([1 4000 -20 80]);
     hold on;
     if plot_spectrum
       plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
@@ -88,7 +88,7 @@ function newamp_fbf(samname, f)
     % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB local_maxima mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB local_maxima min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
     
     [nlm tmp] = size(local_maxima(:,2));
     nlm = min(nlm,4);
@@ -97,11 +97,13 @@ function newamp_fbf(samname, f)
 
     plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
     plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
+    plot(mask_sample_freqs_kHz*1000, min_error);
 
     figure(3)
     clf
-    plot((1:L)*Wo*4000/pi, mse_log');
-    axis([0 4000 0 max(mse_log(1,:))])
+    plot((1:L)*Wo*4000/pi, mse_log1');
+    axis([0 4000 0 max(mse_log1(1,:))])
+    title('Basis 1 MSE as a function of position for each stage');
 
     % fit a line to amplitudes
 

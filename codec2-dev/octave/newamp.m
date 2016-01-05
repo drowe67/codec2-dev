@@ -135,7 +135,7 @@ endfunction
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB dec_samples mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
 
     Nsamples = 4;
 
@@ -147,11 +147,17 @@ function [decmaskdB dec_samples mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L
     m_en = L;
 
     target = maskdB;
-    decmaskdB = zeros(1,L);
     dec_samples = [];
-    error_log = [];
-    candidate_log = [];
-    mse_log = zeros(Nsamples, L);
+    mse_log1 = mse_log2 = zeros(Nsamples, L);
+
+    % This step quite important.  Set noise floor to avoid washing machine/tinkling
+    % sounds with bg noise as chunks of spectrum come and go.  The masking model
+    % basis functions are not gd at representing continuous spectra.  But rather gd
+    % at voiced speech, which is a Tougher job.
+
+    decmaskdB = 10*ones(1,L);
+
+    % Lets find the best Nsample samples to use
 
     for sample=1:Nsamples
 
@@ -160,13 +166,12 @@ function [decmaskdB dec_samples mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L
       % find best position for sample to minimise distance to target
 
       min_mse = 1E32;
+
       for m=m_st:m_en
-        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,1) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
         error = target - candidate;
-        mse_log(sample,m) = mse = sum(abs(error)); % MSE in log domain
-        error_log = [error_log; error];
-        candidate_log = [candidate_log; candidate];
+        mse_log1(sample,m) = mse = sum(abs(error)); % MSE in log domain
         %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
 
         too_close = 0;
@@ -180,8 +185,11 @@ function [decmaskdB dec_samples mse_log] = make_decmask_abys(maskdB, AmdB, Wo, L
           min_mse = mse;
           min_mse_m = m;
           min_candidate = candidate;
+          min_error = error;
         end
       end
+
+      % Choose best candidate ------------------------------------------------
 
       decmaskdB = min_candidate;
       dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
@@ -280,19 +288,23 @@ endfunction
 
 % Calculate the Schroeder masking spectrum for a given frequency and SPL
 
-function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, modified_bark_en=1)
+function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, bark_model=1)
   f_kHz = mask_sample_freqs_kHz;
   f_Hz = f_kHz*1000;
 
   % Schroeder Spreading Function
 
-  if modified_bark_en == 1
+  if bark_model == 0
+    dz = bark(freq_tone_kHz*1000)-bark(f_Hz);
+  end
+
+  if bark_model == 1
 
     % Modification by DR: Piecewise linear model that makes bands
     % beneath 1.5kHz wider to match the width of F1 and
     % "fill in" the spectra better for UV sounds.
 
-    x1 = 0.5; x2 = 1.5;
+    x1 = 0.5; x2 = 2;
     y1 = 0.5; y2 = 1;
     grad  = (y2 - y1)/(x2 - x1);
     y_int = y1 - grad*x1;
@@ -307,8 +319,14 @@ function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, modified_bark_
       y = y2;
     end
     dz = y*(bark(freq_tone_kHz*1000) - bark(f_Hz));
-  else
-    dz = bark(freq_tone_kHz*1000)-bark(f_Hz);
+  end
+
+  if bark_model == 2
+
+    % constant bandwidth model, useful for bg noise and UV
+
+    %dz = bark(freq_tone_kHz*1000) - bark(f_Hz);
+    dz = 0.2*bark(freq_tone_kHz*1000-f_Hz);
   end
 
   maskdB = 15.81 + 7.5*(dz+0.474) - 17.5*sqrt(1 + (dz+0.474).^2);
@@ -394,13 +412,13 @@ function plot_masking
   maskdB_cb = schroeder(0.5, mask_sample_freqs_kHz, 1);
   plot(mask_sample_freqs_kHz, maskdB_cb);
   hold on;
-  maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
+  maskdB_res = schroeder(0.5, mask_sample_freqs_kHz, 2);
   plot(mask_sample_freqs_kHz, maskdB_res,'g');
 
   for f=0.5:0.5:3
     maskdB_cb = schroeder(f, mask_sample_freqs_kHz, 1);
     plot(mask_sample_freqs_kHz, maskdB_cb);
-    maskdB_res = resonator(f, mask_sample_freqs_kHz);
+    maskdB_res = schroeder(f, mask_sample_freqs_kHz, 2);
     plot(mask_sample_freqs_kHz, maskdB_res,'g');
   end
   hold off;
