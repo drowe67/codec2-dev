@@ -256,14 +256,21 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   %   http://www.rowetel.com/blog/?p=3573 
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
- 
+  %
+  % Note timing non-lineariry derivedby experiment.  Not quite sure what I'm doing here.....
+  % but it gives 0dB impl loss for 2FSK Eb/No=9dB, testmode 1:
+  %   Fs: 8000 Rs: 50 Ts: 160 nsym: 50
+  %   frames: 200 Tbits: 9700 Terrs: 93 BER 0.010
+
   Np = length(f_int(1,:));
   w = 2*pi*(Rs)/(P*Rs);
-  x = ((abs(f_int(1,:))-abs(f_int(2,:))).^2) * exp(-j*w*(0:Np-1))';
+  timing_nl = sum(abs(f_int(:,:)).^2);
+  x = timing_nl * exp(-j*w*(0:Np-1))';
   norm_rx_timing = angle(x)/(2*pi);
   rx_timing = norm_rx_timing*P;
 
   states.x = x;
+  states.timing_nl = timing_nl;
   states.rx_timing = rx_timing;
   prev_norm_rx_timing = states.norm_rx_timing;
   states.norm_rx_timing = norm_rx_timing;
@@ -594,8 +601,8 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  frames = 5;
-  EbNodB = 100;
+  frames = 200;
+  EbNodB = 9;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -710,6 +717,7 @@ function run_sim(test_frame_mode)
   st = 1 + timing_offset_samples;
   rx_bits_buf = zeros(1,2*nsym);
   x_log = [];
+  timing_nl_log = [];
   norm_rx_timing_log = [];
   f1_int_resample_log = [];
   f2_int_resample_log = [];
@@ -737,6 +745,7 @@ function run_sim(test_frame_mode)
 
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     x_log = [x_log states.x];
+    timing_nl_log = [timing_nl_log states.timing_nl];
     f1_int_resample_log = [f1_int_resample_log abs(states.f_int_resample(1,:))];
     f2_int_resample_log = [f2_int_resample_log abs(states.f_int_resample(2,:))];
     f1_log = [f1_log states.f(1)];
@@ -772,6 +781,14 @@ function run_sim(test_frame_mode)
   plot(x_log,'+')
   axis([-m m -m m])
   title('fine timing metric')
+
+  figure(7)
+  clf
+  subplot(211)
+  X = abs(fft(timing_nl_log));
+  plot(X(1:length(X)/2))
+  subplot(212)
+  plot(abs(timing_nl_log(1:100)))
 
   figure(3)
   clf
