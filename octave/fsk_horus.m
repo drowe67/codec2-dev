@@ -35,7 +35,9 @@
 
 1;
 
-function states = fsk_horus_init(Fs,Rs)
+function states = fsk_horus_init(Fs,Rs,M=2)
+  assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
+  states.M = M;                    
   states.Ndft = 2.^ceil(log2(Fs)); % find nearest power of 2 for effcient FFT
   states.Fs = Fs;
   N = states.N = Fs;             % processing buffer size, nice big window for f1,f2 estimation
@@ -44,15 +46,14 @@ function states = fsk_horus_init(Fs,Rs)
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
   states.nsym = N/Ts;            % number of symbols in one procesing frame
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
-  states.f1_dc = zeros(1,Nmem);
-  states.f2_dc = zeros(1,Nmem);
+
+  states.f_dc = zeros(M,Nmem);
   states.P = 8;                  % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
 
   states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
-  states.phi1 = 0;               % keep down converter osc phase continuous
-  states.phi2 = 0;
+  states.phi = zeros(1, M);       % keep down converter osc phase continuous
 
   printf("Fs: %d Rs: %d Ts: %d nsym: %d\n", states.Fs, states.Rs, states.Ts, states.nsym);
 
@@ -63,9 +64,8 @@ function states = fsk_horus_init(Fs,Rs)
   states.Terrs = 0;
   states.nerr_log = 0;
 
-  states.df = 0;
-  states.f1 = 0;
-  states.f2 = 0;
+  states.df(1:M) = 0;
+  states.f(1:M) = 0;
   states.norm_rx_timing = 0;
   states.ppm = 0;
   states.prev_pkt = [];
@@ -94,9 +94,7 @@ function rtty = fsk_horus_init_rtty_uw(states)
   nfield = rtty.nfield = 7; % length of ascii character field
 
   rtty.uw = [mapped mapped mapped mapped mapped];
-
   rtty.uw_thresh = length(rtty.uw) - 8; % allow a few bit errors when looking for UW
-
   rtty.max_packet_len = 1000;
 endfunction
 
@@ -121,22 +119,31 @@ endfunction
 function tx  = fsk_horus_mod(states, tx_bits)
     tx = zeros(states.Ts*length(tx_bits),1);
     tx_phase = 0;
+
+    M  = states.M; step = log2(M);
     Ts = states.Ts;
     Fs = states.Fs;
-    f1 = states.f1_tx;  f2 = states.f2_tx;
+    f  = states.f;
     df = states.df; % tone freq change in Hz/s
-    dA = states.dA;
+    dA = states.dA; % amplitude of each tone
 
-    for i=1:length(tx_bits)
-      if tx_bits(i) == 0
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f1/Fs;
-        tx((i-1)*Ts+1:i*Ts) = dA*2.0*cos(tx_phase_vec);
+    for i=1:step:length(tx_bits)
+
+      % map bits to tone number
+
+      if M == 2
+        tone = tx_bits(i) + 1;
       else
-        tx_phase_vec = tx_phase + (1:Ts)*2*pi*f2/Fs;
-        tx((i-1)*Ts+1:i*Ts) = 2.0*cos(tx_phase_vec);
+        tone = (tx_bits(i:i+1) * [2 1]') + 1;
       end
+ 
+      tx_phase_vec = tx_phase + (1:Ts)*2*pi*f(tone)/Fs;
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
-      f1 += df*Ts/Fs; f2 += df*Ts/Fs;
+      tx((i-1)*Ts+1:i*Ts) = dA(tone)*2.0*cos(tx_phase_vec);
+
+      % freq drift
+
+      f(1:M) += df*Ts/Fs;
     end
 endfunction
 
@@ -154,6 +161,7 @@ endfunction
 % of output bits.
 
 function [rx_bits states] = fsk_horus_demod(states, sf)
+  M = states.M;
   N = states.N;
   Ndft = states.Ndft;
   Fs = states.Fs;
@@ -200,44 +208,28 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     twist = 20*log10(m2/m1);
   end
 
-  states.f1 = f1;
-  states.f2 = f2;
-
-  if bitand(verbose,0x1)
-    printf("centre: %4.0f shift: %4.0f twist: %3.1f dB\n", (f2+f1)/2, f2-f1, twist);
-  end
-  if bitand(verbose,0x8)
-    printf("f1: %4.0f Hz f2: %4.0f Hz a1: %f a2: %f\n", f1, f2, 2.0*abs(m1)/Ndft, 2.0*abs(m2)/Ndft);
-  end
-
   % down convert and filter at rate P ------------------------------
 
   % update filter (integrator) memory by shifting in nin samples
   
   nold = Nmem-nin; % number of old samples we retain
 
-  f1_dc = states.f1_dc; 
-  f1_dc(1:nold) = f1_dc(Nmem-nold+1:Nmem);
-  f2_dc = states.f2_dc; 
-  f2_dc(1:nold) = f2_dc(Nmem-nold+1:Nmem);
+  f_dc = states.f_dc; 
+  f_dc(:,1:nold) = f_dc(:,Nmem-nold+1:Nmem);
+  f = [f1 f2];
 
   % shift down to around DC, ensuring continuous phase from last frame
 
-  phi1_vec = states.phi1 + (1:nin)*2*pi*f1/Fs;
-  phi2_vec = states.phi2 + (1:nin)*2*pi*f2/Fs;
-
-  f1_dc(nold+1:Nmem) = sf' .* exp(-j*phi1_vec);
-  f2_dc(nold+1:Nmem) = sf' .* exp(-j*phi2_vec);
-
-  states.phi1  = phi1_vec(nin);
-  states.phi1 -= 2*pi*floor(states.phi1/(2*pi));
-  states.phi2  = phi2_vec(nin);
-  states.phi2 -= 2*pi*floor(states.phi2/(2*pi));
+  for m=1:M
+    phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
+    f_dc(m,nold+1:Nmem) = sf' .* exp(-j*phi_vec);
+    states.phi(m)  = phi_vec(nin);
+    states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
+  end
 
   % save filter (integrator) memory for next time
 
-  states.f1_dc = f1_dc;
-  states.f2_dc = f2_dc;
+  states.f_dc = f_dc;
 
   % integrate over symbol period, which is effectively a LPF, removing
   % the -2Fc frequency image.  Can also be interpreted as an ideal
@@ -251,11 +243,11 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   for i=1:(nsym+1)*P
     st = 1 + (i-1)*Ts/P;
     en = st+Ts-1;
-    f1_int(i) = sum(f1_dc(st:en));
-    f2_int(i) = sum(f2_dc(st:en));
+    for m=1:M
+      f_int(m,i) = sum(f_dc(m,st:en));
+    end
   end
-  states.f1_int = f1_int;
-  states.f2_int = f2_int;
+  states.f_int = f_int;
 
   % fine timing estimation -----------------------------------------------
 
@@ -265,9 +257,9 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
  
-  Np = length(f1_int);
+  Np = length(f_int(1,:));
   w = 2*pi*(Rs)/(P*Rs);
-  x = ((abs(f1_int)-abs(f2_int)).^2) * exp(-j*w*(0:Np-1))';
+  x = ((abs(f_int(1,:))-abs(f_int(2,:))).^2) * exp(-j*w*(0:Np-1))';
   norm_rx_timing = angle(x)/(2*pi);
   rx_timing = norm_rx_timing*P;
 
@@ -312,27 +304,22 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     printf("rx_timing: %3.2f low_sample: %d high_sample: %d fract: %3.3f nin_next: %d\n", rx_timing, low_sample, high_sample, fract, next_nin);
   end
 
-  f1_int_resample = zeros(1,nsym);
-  f2_int_resample = zeros(1,nsym);
+  f_int_resample = zeros(M,nsym);
   rx_bits = zeros(1,nsym);
   rx_bits_sd = zeros(1,nsym);
   for i=1:nsym
     st = i*P+1;
-    f1_int_resample(i) = f1_int(st+low_sample)*(1-fract) + f1_int(st+high_sample)*fract;
-    f2_int_resample(i) = f2_int(st+low_sample)*(1-fract) + f2_int(st+high_sample)*fract;
-    %f1_int_resample(i) = f1_int(st+1);
-    %f2_int_resample(i) = f2_int(st+1);
-    rx_bits(i) = abs(f2_int_resample(i)) > abs(f1_int_resample(i));
-    rx_bits_sd(i) = abs(f2_int_resample(i)) - abs(f1_int_resample(i));
+    f_int_resample(:,i) = f_int(:,st+low_sample)*(1-fract) + f_int(:,st+high_sample)*fract;
+    rx_bits(i) = abs(f_int_resample(2,i)) > abs(f_int_resample(1,i));
+    rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
  end
 
-  states.f1_int_resample = f1_int_resample;
-  states.f2_int_resample = f2_int_resample;
+  states.f_int_resample = f_int_resample;
   states.rx_bits_sd = rx_bits_sd;
 
   % Eb/No estimation
 
-  x = abs(abs(f1_int_resample) - abs(f2_int_resample));
+  x = abs(abs(f_int_resample(1,:)) - abs(f_int_resample(2,:)));
   states.EbNodB = 20*log10(1E-6+mean(x)/(1E-6+std(x)));
 endfunction
 
@@ -607,8 +594,8 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  frames = 60;
-  EbNodB = 10;
+  frames = 5;
+  EbNodB = 100;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -625,6 +612,12 @@ function run_sim(test_frame_mode)
   %states = fsk_horus_init(96000, 1200);
   %states.f1_tx = 4000;
   %states.f2_tx = 5200;
+
+  if test_frame_mode < 4
+    % horus rtty config ---------------------
+    states = fsk_horus_init(8000, 50);
+    states.f = [1200 1600];
+  end
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
@@ -645,13 +638,14 @@ function run_sim(test_frame_mode)
   % ----------------------------------------------------------------------
 
   states.verbose = 0x1;
+  M = states.M;
   N = states.N;
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
   Fs = states.Fs;
-  states.df = df;
-  states.dA = dA;
+  states.df(1:M) = df;
+  states.dA(1:M) = dA;
 
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo);
@@ -743,10 +737,10 @@ function run_sim(test_frame_mode)
 
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     x_log = [x_log states.x];
-    f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
-    f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
-    f1_log = [f1_log states.f1];
-    f2_log = [f2_log states.f2];
+    f1_int_resample_log = [f1_int_resample_log abs(states.f_int_resample(1,:))];
+    f2_int_resample_log = [f2_int_resample_log abs(states.f_int_resample(2,:))];
+    f1_log = [f1_log states.f(1)];
+    f2_log = [f2_log states.f(2)];
     EbNodB_log = [EbNodB_log states.EbNodB];
 
     if test_frame_mode == 1
@@ -976,12 +970,12 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(5);
+  run_sim(1);
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
-  rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
+  %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
   %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
