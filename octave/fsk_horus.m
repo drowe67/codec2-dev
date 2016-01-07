@@ -38,13 +38,16 @@
 function states = fsk_horus_init(Fs,Rs,M=2)
   assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
   states.M = M;                    
-  states.Ndft = 2.^ceil(log2(Fs)); % find nearest power of 2 for effcient FFT
+  states.bitspersymbol = log2(M);
+  states.Ndft = 2.^ceil(log2(Fs)); % find nearest power of 2 for efficient FFT
   states.Fs = Fs;
   N = states.N = Fs;             % processing buffer size, nice big window for f1,f2 estimation
   states.Rs = Rs;
   Ts = states.Ts = Fs/Rs;
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
-  states.nsym = N/Ts;            % number of symbols in one procesing frame
+  states.nsym = N/Ts;            % number of symbols in one processing frame
+  states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
+
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
   states.f_dc = zeros(M,Nmem);
@@ -55,7 +58,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.verbose = 0;
   states.phi = zeros(1, M);       % keep down converter osc phase continuous
 
-  printf("Fs: %d Rs: %d Ts: %d nsym: %d\n", states.Fs, states.Rs, states.Ts, states.nsym);
+  printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
   % BER stats 
 
@@ -117,17 +120,21 @@ endfunction
 % test modulator function
 
 function tx  = fsk_horus_mod(states, tx_bits)
-    tx = zeros(states.Ts*length(tx_bits),1);
-    tx_phase = 0;
 
-    M  = states.M; step = log2(M);
+    M  = states.M;
     Ts = states.Ts;
     Fs = states.Fs;
-    f  = states.f;
+    ftx  = states.ftx;
     df = states.df; % tone freq change in Hz/s
     dA = states.dA; % amplitude of each tone
 
-    for i=1:step:length(tx_bits)
+    num_bits = length(tx_bits);
+    num_symbols = num_bits/states.bitspersymbol;
+    tx = zeros(states.Ts*num_symbols,1);
+    tx_phase = 0;
+    s = 1;
+
+    for i=1:states.bitspersymbol:num_bits
 
       % map bits to tone number
 
@@ -137,14 +144,16 @@ function tx  = fsk_horus_mod(states, tx_bits)
         tone = (tx_bits(i:i+1) * [2 1]') + 1;
       end
  
-      tx_phase_vec = tx_phase + (1:Ts)*2*pi*f(tone)/Fs;
+      tx_phase_vec = tx_phase + (1:Ts)*2*pi*ftx(tone)/Fs;
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
-      tx((i-1)*Ts+1:i*Ts) = dA(tone)*2.0*cos(tx_phase_vec);
+      tx((s-1)*Ts+1:s*Ts) = dA(tone)*2.0*cos(tx_phase_vec);
+      s++;
 
       % freq drift
 
-      f(1:M) += df*Ts/Fs;
+      ftx += df*Ts/Fs;
     end
+    states.ftx = ftx;
 endfunction
 
 
@@ -208,6 +217,9 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     twist = 20*log10(m2/m1);
   end
 
+  %f = [f1 f2];
+  f = [1200 1400 1600 1800];
+
   % down convert and filter at rate P ------------------------------
 
   % update filter (integrator) memory by shifting in nin samples
@@ -216,7 +228,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   f_dc = states.f_dc; 
   f_dc(:,1:nold) = f_dc(:,Nmem-nold+1:Nmem);
-  f = [f1 f2];
 
   % shift down to around DC, ensuring continuous phase from last frame
 
@@ -317,9 +328,18 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   for i=1:nsym
     st = i*P+1;
     f_int_resample(:,i) = f_int(:,st+low_sample)*(1-fract) + f_int(:,st+high_sample)*fract;
-    rx_bits(i) = abs(f_int_resample(2,i)) > abs(f_int_resample(1,i));
-    rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
- end
+    %rx_bits(i) = abs(f_int_resample(2,i)) > abs(f_int_resample(1,i));
+    %rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
+    [tone_max tone_index] = max(f_int_resample(:,i));
+    if M == 2
+      rx_bits(i) = tone_index - 1;
+      rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
+    else
+      demap = [[0 0]; [0 1]; [1 0]; [1 1]];      
+      rx_bits(2*i-1:2*i) = demap(tone_index,:);
+    end
+
+  end
 
   states.f_int_resample = f_int_resample;
   states.rx_bits_sd = rx_bits_sd;
@@ -554,7 +574,7 @@ endfunction
 % BER counter and test frame sync logic
 
 function states = ber_counter(states, test_frame, rx_bits_buf)
-  nsym = states.nsym;
+  nbit = states.nbit;
   state = states.ber_state;
   next_state = state;
 
@@ -562,16 +582,16 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     % try to sync up with test frame
 
-    nerrs_min = nsym;
-    for i=1:nsym
-      error_positions = xor(rx_bits_buf(i:nsym+i-1), test_frame);
+    nerrs_min = nbit;
+    for i=1:nbit
+      error_positions = xor(rx_bits_buf(i:nbit+i-1), test_frame);
       nerrs = sum(error_positions);
       if nerrs < nerrs_min
         nerrs_min = nerrs;
         states.coarse_offset = i;
       end
     end
-    if nerrs_min/nsym < 0.05 
+    if nerrs_min/nbit < 0.05 
       next_state = 1;
     end
     if bitand(states.verbose,0x4)
@@ -583,13 +603,13 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     % we're synced up, lets measure bit errors
 
-    error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nsym-1), test_frame);
+    error_positions = xor(rx_bits_buf(states.coarse_offset:states.coarse_offset+nbit-1), test_frame);
     nerrs = sum(error_positions);
-    if nerrs/nsym > 0.1
+    if nerrs/nbit > 0.1
       next_state = 0;
     else
       states.Terrs += nerrs;
-      states.Tbits += nsym;
+      states.Tbits += nbit;
       states.nerr_log = [states.nerr_log nerrs];
     end
   end
@@ -601,8 +621,8 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  frames = 200;
-  EbNodB = 9;
+  frames = 100;
+  EbNodB = 6;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -622,8 +642,12 @@ function run_sim(test_frame_mode)
 
   if test_frame_mode < 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 50);
-    states.f = [1200 1600];
+    states = fsk_horus_init(8000, 50, 4);
+    if states.M == 2
+      states.ftx = [1200 1400];
+    else
+      states.ftx = [1200 1400 1600 1800];
+    end
   end
 
   if test_frame_mode == 4
@@ -650,18 +674,19 @@ function run_sim(test_frame_mode)
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
+  nbit = states.nbit;
   Fs = states.Fs;
   states.df(1:M) = df;
   states.dA(1:M) = dA;
 
   EbNo = 10^(EbNodB/10);
-  variance = states.Fs/(states.Rs*EbNo);
+  variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
   % set up tx signal with payload bits based on test mode
 
   if test_frame_mode == 1
      % test frame of bits, which we repeat for convenience when BER testing
-    test_frame = round(rand(1, states.nsym));
+    test_frame = round(rand(1, states.nbit));
     tx_bits = [];
     for i=1:frames+1
       tx_bits = [tx_bits test_frame];
@@ -669,12 +694,25 @@ function run_sim(test_frame_mode)
   end
   if test_frame_mode == 2
     % random bits, just to make sure sync algs work on random data
-    tx_bits = round(rand(1, states.nsym*(frames+1)));
+    tx_bits = round(rand(1, states.nbit*(frames+1)));
   end
   if test_frame_mode == 3
-    % ...10101... sequence
-    tx_bits = zeros(1, states.nsym*(frames+1));
-    tx_bits(1:2:length(tx_bits)) = 1;
+    % repeating sequence of all symbols
+    % great for initial test of demod if nothing else works, 
+    % look for this pattern in rx_bits
+    if M == 2
+       % ...10101...
+      tx_bits = zeros(1, states.nbit*(frames+1));
+      tx_bits(1:2:length(tx_bits)) = 1;
+    else
+      % repeat each possible 4fsk symbol
+      pattern = [0 0 0 1 1 0 1 1];
+      nrepeats = states.nbit*(frames+1)/length(pattern);
+      tx_bits = [];
+      for b=1:nrepeats
+        tx_bits = [tx_bits pattern];
+      end   
+    end
   end
  
   if (test_frame_mode == 4) || (test_frame_mode == 5)
@@ -683,7 +721,7 @@ function run_sim(test_frame_mode)
 
     test_frame = load(states.tx_bits_file);
     ltf = length(test_frame);
-    ntest_frames = ceil((frames+1)*nsym/ltf);
+    ntest_frames = ceil((frames+1)*nbit/ltf);
     tx_bits = [];
     for i=1:ntest_frames
       tx_bits = [tx_bits test_frame];
@@ -715,12 +753,11 @@ function run_sim(test_frame_mode)
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
-  rx_bits_buf = zeros(1,2*nsym);
+  rx_bits_buf = zeros(1,2*nbit);
   x_log = [];
   timing_nl_log = [];
   norm_rx_timing_log = [];
-  f1_int_resample_log = [];
-  f2_int_resample_log = [];
+  f_int_resample_log = [];
   f1_log = f2_log = [];
   EbNodB_log = [];
   rx_bits_log = [];
@@ -738,16 +775,15 @@ function run_sim(test_frame_mode)
     % demodulate to stream of bits
 
     [rx_bits states] = fsk_horus_demod(states, sf);
-    rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
-    rx_bits_buf(nsym+1:2*nsym) = rx_bits;
+    rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
+    rx_bits_buf(nbit+1:2*nbit) = rx_bits;
     rx_bits_log = [rx_bits_log rx_bits];
     rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
 
     norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
     x_log = [x_log states.x];
     timing_nl_log = [timing_nl_log states.timing_nl];
-    f1_int_resample_log = [f1_int_resample_log abs(states.f_int_resample(1,:))];
-    f2_int_resample_log = [f2_int_resample_log abs(states.f_int_resample(2,:))];
+    f_int_resample_log = [f_int_resample_log abs(states.f_int_resample(:,:))];
     f1_log = [f1_log states.f(1)];
     f2_log = [f2_log states.f(2)];
     EbNodB_log = [EbNodB_log states.EbNodB];
@@ -758,7 +794,7 @@ function run_sim(test_frame_mode)
   end
 
   if test_frame_mode == 1
-    printf("frames: %d Tbits: %d Terrs: %d BER %4.3f\n", frames, states.Tbits,states. Terrs, states.Terrs/states.Tbits);
+    printf("frames: %d EbNo: %3.2f Tbits: %d Terrs: %d BER %4.3f\n", frames, EbNodB, states.Tbits,states. Terrs, states.Terrs/states.Tbits);
   end
 
   if test_frame_mode == 4
@@ -770,9 +806,7 @@ function run_sim(test_frame_mode)
   end
 
   figure(1);
-  plot(f1_int_resample_log,'+')
-  hold on;
-  plot(f2_int_resample_log,'g+')
+  plot(f_int_resample_log','+')
   hold off;
 
   figure(2)
