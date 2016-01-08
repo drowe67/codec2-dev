@@ -29,7 +29,7 @@ system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.
 % Upload Telemetry to Habitat (http://tracker.habhub.org/)
 telem_upload_enabled = false;
 % Update this command with your own callsign.
-telem_upload_command = "python telem_upload.py -c N0CALL_Octave";
+telem_upload_command = "python telem_upload.py -c vk5dgr_Octave";
 
 more off;
 states = fsk_horus_init(8000, 100);
@@ -150,7 +150,7 @@ while c
       end
 
       printf("\n  ");
-      f=fopen("horus_rx_bits_binary.txt","wt");
+      f=fopen("horus_rx_bits_binary.bin","wt");
       fwrite(f, rx_bytes, "uchar");
       fclose(f);
 
