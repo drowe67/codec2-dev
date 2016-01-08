@@ -40,7 +40,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Fs/2;               % processing buffer size, nice big window for timing est
+  N = states.N = Fs;                % processing buffer size, nice big window for timing est
   %states.Ndft = 2.^ceil(log2(N));  % find nearest power of 2 for efficient FFT
   states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
@@ -113,9 +113,9 @@ function binary = fsk_horus_init_binary_uw
   mapped_db = 2*dollar_bits - 1;
 
   binary.uw = [mapped_db mapped_db];
-  binary.uw_thresh = length(binary.uw);   % no bit errors when looking for UW
+  binary.uw_thresh = length(binary.uw) - 2;   % no bit errors when looking for UW
 
-  binary.max_packet_len = 400;
+  binary.max_packet_len = 360-16;
 endfunction
 
 
@@ -302,6 +302,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   timing_nl = sum(abs(f_int(:,:)).^2);
   x = timing_nl * exp(-j*w*(0:Np-1))';
   norm_rx_timing = angle(x)/(2*pi);
+  %norm_rx_timing = 0;
   rx_timing = norm_rx_timing*P;
 
   states.x = x;
@@ -385,14 +386,19 @@ function [uw_start best_corr] = find_uw(states, start_bit, rx_bits)
   mapped_rx_bits = 2*rx_bits - 1;
   best_corr = 0;
   uw_start = -1;
+  found_uw = 0;
 
+  % first first UW in buffer that exceeds threshold
+  
   for i=start_bit:length(rx_bits) - length(uw)
     corr  = mapped_rx_bits(i:i+length(uw)-1) * uw';
-    if (corr >= states.uw_thresh) && (corr > best_corr)
+    if (found_uw == 0) && (corr >= states.uw_thresh)
       uw_start = i;
       best_corr = corr;
+      found_uw = 1;
     end
   end
+
 endfunction
 
 
@@ -564,12 +570,12 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
   bit = 1;
   nbits = length(rx_bits_log);
 
-  uw_loc = find_uw(states.binary, bit, rx_bits_log);
+  [uw_loc best_corr] = find_uw(states.binary, bit, rx_bits_log);
 
   while (uw_loc != -1)
 
     if (uw_loc+states.binary.max_packet_len) < nbits
-      %printf("st: %d uw_loc: %d\n", st, uw_loc);
+      % printf("uw_loc: %d best_corr: %d\n", uw_loc, best_corr);
 
       % OK we have a packet delimited by two UWs.  Lets convert the bit
       % stream into bytes and save for decoding
@@ -581,15 +587,22 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
         %printf("%d 0x%02x\n", i, rx_bytes(i));
       end
 
-      f=fopen("horus_rx_bits_binary.txt","wt");
+      f=fopen("horus_rx_bits_binary.bin","wb");
       fwrite(f, rx_bytes, "uchar");
+      fclose(f);
+
+      % optionally write packet to disk to use as horus_tx_bits_binary.txt
+      f=fopen("horus_rx_bits_binary.txt","wt");
+      for i=uw_loc:uw_loc+45*8-1
+        fprintf(f, "%d ", rx_bits_log(i));
+      end
       fclose(f);
 
       system("../src/horus_l2");  % compile instructions above
     end
 
     bit = uw_loc + length(states.binary.uw);
-    uw_loc = find_uw(states.binary, bit, rx_bits_log);
+    [uw_loc best_corr] = find_uw(states.binary, bit, rx_bits_log);
    
   endwhile
 endfunction
@@ -645,7 +658,7 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  test_frame_mode = 1;
+  test_frame_mode=5;
   frames = 100;
   EbNodB = 6;
   timing_offset = 0.0; % see resample() for clock offset below
@@ -668,27 +681,24 @@ function run_sim(test_frame_mode)
   if test_frame_mode < 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 50, 4);
-    if states.M == 2
-      states.ftx = [1200 1400];
-    else
-      states.ftx = [1200 1400 1600 1800];
-    end
   end
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100);
-    states.f1_tx = 1200;
-    states.f2_tx = 1600;
     states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
   end
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 100);
-    states.f1_tx = 1200;
-    states.f2_tx = 1600;
+    states = fsk_horus_init(8000, 50, 4);
     states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
+  end
+
+  if states.M == 2
+    states.ftx = [1200 1400];
+  else
+    states.ftx = [1200 1400 1600 1800];
   end
 
   % ----------------------------------------------------------------------
@@ -802,6 +812,7 @@ function run_sim(test_frame_mode)
     % demodulate to stream of bits
 
     states = est_freq(states, sf, states.M);
+    %states.f = [1200 1400 1600 1800];
     [rx_bits states] = fsk_horus_demod(states, sf);
 
     rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
@@ -969,8 +980,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
           states.verbose = 0;
         end
       end
-    else
-      finished = 1;
+    else      finished = 1;
     end
   end
   fclose(fin);
@@ -1040,14 +1050,14 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(1);
-  %rx_bits = demod_file("horus.raw",4);
+  run_sim(5);
+  %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
-  rx_bits = demod_file("~/Desktop/FSK_4FSK.wav",4);
+  %rx_bits = demod_file("~/Desktop/FSK_4FSK.wav",4);
   %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
