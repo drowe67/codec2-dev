@@ -40,7 +40,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Fs;               % processing buffer size, nice big window for timing est
+  N = states.N = Fs/2;               % processing buffer size, nice big window for timing est
   %states.Ndft = 2.^ceil(log2(N));  % find nearest power of 2 for efficient FFT
   states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
@@ -175,7 +175,7 @@ function states = est_freq(states, sf, ntones)
   
   % set some limits to search range, which will mean some manual re-tuning
 
-  fmin = 1000; fmax = 2000;
+  fmin = 800; fmax = 2000;
   st = floor(fmin*Ndft/Fs);
   en = floor(fmax*Ndft/Fs);
   
@@ -894,7 +894,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init(8000, 50, 4);
     uwstates = fsk_horus_init_rtty_uw(states);
   end
                                
@@ -910,6 +910,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
+  nbit = states.nbit;
   rand('state',1); 
   test_frame = round(rand(1, states.nsym));
 
@@ -918,13 +919,11 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   rx_bits_log = [];
   rx_bits_sd_log = [];
   norm_rx_timing_log = [];
-  f1_int_resample_log = [];
-  f2_int_resample_log = [];
+  f_int_resample_log = [];
   EbNodB_log = [];
   ppm_log = [];
-  f1_log = [];
-  f2_log = [];
-  rx_bits_buf = zeros(1,2*nsym);
+  f_log = [];
+  rx_bits_buf = zeros(1,2*nbit);
 
   % First extract raw bits from samples ------------------------------------------------------
 
@@ -951,17 +950,18 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
 
       % demodulate to stream of bits
 
+      states = est_freq(states, sf, states.M);
       [rx_bits states] = fsk_horus_demod(states, sf);
-      rx_bits_buf(1:nsym) = rx_bits_buf(nsym+1:2*nsym);
-      rx_bits_buf(nsym+1:2*nsym) = rx_bits; % xor(rx_bits,ones(1,nsym));
+
+      rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
+      rx_bits_buf(nbit+1:2*nbit) = rx_bits; % xor(rx_bits,ones(1,nbit));
       rx_bits_log = [rx_bits_log rx_bits];
       rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
       norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
-      f1_int_resample_log = [f1_int_resample_log abs(states.f1_int_resample)];
-      f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
+      f_int_resample_log = [f_int_resample_log abs(states.f_int_resample)];
       EbNodB_log = [EbNodB_log states.EbNodB];
       ppm_log = [ppm_log states.ppm];
-      f_log = [f_log states.f];
+      f_log = [f_log; states.f];
 
       if test_frame_mode == 1
         states = ber_counter(states, test_frame, rx_bits_buf);
@@ -983,10 +983,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     hold off;
 
     figure(2);
-    plot(f1_int_resample_log,'+')
-    hold on;
-    plot(f2_int_resample_log,'g+')
-    hold off;
+    plot(f_int_resample_log','+')
 
     figure(3)
     clf
@@ -1043,13 +1040,14 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(1);
+  %run_sim(1);
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
+  rx_bits = demod_file("~/Desktop/FSK_4FSK.wav",4);
   %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_horus_6dB_0ppm.wav",4);
