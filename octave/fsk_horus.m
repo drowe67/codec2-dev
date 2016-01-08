@@ -39,9 +39,9 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
   states.M = M;                    
   states.bitspersymbol = log2(M);
-  states.Ndft = 2.^ceil(log2(Fs)); % find nearest power of 2 for efficient FFT
   states.Fs = Fs;
-  N = states.N = Fs;             % processing buffer size, nice big window for f1,f2 estimation
+  N = states.N = Fs*2;             % processing buffer size, nice big window for f1,f2 estimation
+  states.Ndft = 2.^ceil(log2(N)); % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
   Ts = states.Ts = Fs/Rs;
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
@@ -157,10 +157,63 @@ function tx  = fsk_horus_mod(states, tx_bits)
 endfunction
 
 
+% Estimate the frequency of the FSK tones.  In some applications (such
+% as balloon telemtry) these may not be well controlled by the
+% transmitter, so we have to try to estimate them.
+
+function [f ratio] = est_freq(states, sf, ntones)
+  N = states.N;
+  Ndft = states.Ndft;
+  Fs = states.Fs;
+  
+  % This assumption is OK for balloon telemtry but may not be true in
+  % general
+
+  min_tone_spacing = 200;
+  
+  % set some limits to search range, which will mean some manual re-tuning
+
+  fmin = 1000; fmax = 2000;
+  st = floor(fmin*Ndft/Fs);
+  en = floor(fmax*Ndft/Fs);
+  
+  % DFT and zero out forbidden zone  ---------------------------------------------
+
+  h = hanning(length(sf));
+  Sf = abs(fft(sf .* h, Ndft));
+  Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
+  f = []; a = [];
+
+  figure(8)
+  clf
+  plot(Sf(1:Ndft/2));
+
+  % Search for each tone --------------------------------------------------------
+
+  for m=1:ntones
+    [tone_amp tone_index] = max(Sf(1:Ndft/2));
+
+    f = [f (tone_index-1)*Fs/Ndft];
+    a = [a tone_amp];
+
+    % zero out region min_tone_spacing/2 either side of max so we can find next highest peak
+    % closest spacing for non-coh mFSK is Rs
+
+    st = tone_index - floor((min_tone_spacing/2)*Ndft/Fs);
+    st = max(1,st);
+    en = tone_index + floor((min_tone_spacing/2)*Ndft/Fs);
+    en = min(Ndft/2,en);
+    Sf(st:en) = 0;
+  end
+
+  f = sort(f);
+  m2 = max(Sf(1:Ndft/2));
+  ratio = a(1)/m2;
+  %printf("a1: %f m2: %f ratio: %f\n", a(1), m2, ratio);
+end
+
+
 % Given a buffer of nin input Rs baud FSK samples, returns nsym bits.
-%
-% Automagically estimates the frequency of the two tones, or
-% looking at it another way, the frequency offset and shift
 %
 % nin is the number of input samples required by demodulator.  This is
 % time varying.  It will nominally be N (8000), and occasionally N +/- 
@@ -181,44 +234,9 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   nin = states.nin;
   verbose = states.verbose;
   Nmem = states.Nmem;
+  f = states.f;
 
   assert(length(sf) == nin);
-
-  % find tone frequency and amplitudes ---------------------------------------------
-
-  h = hanning(nin);
-  Sf = fft(sf .* h, Ndft);
-  [m1 m1_index] = max(Sf(1:Ndft/2));
-
-  % zero out region 100Hz either side of max so we can find second highest peak
-
-  Sf2 = Sf;
-  st = m1_index - floor(100*Ndft/Fs);
-  if st < 1
-    st = 1;
-  end
-  en = m1_index + floor(100*Ndft/Fs);
-  if en > Ndft/2
-    en = Ndft/2;
-  end
-  Sf2(st:en) = 0;
-
-  [m2 m2_index] = max(Sf2(1:Ndft/2));
-  
-  % f1 always the lower tone
-
-  if m1_index < m2_index
-    f1 = (m1_index-1)*Fs/Ndft;
-    f2 = (m2_index-1)*Fs/Ndft;
-    twist = 20*log10(m1/m2);
-  else
-    f1 = (m2_index-1)*Fs/Ndft;
-    f2 = (m1_index-1)*Fs/Ndft;
-    twist = 20*log10(m2/m1);
-  end
-
-  %f = [f1 f2];
-  f = [1200 1400 1600 1800];
 
   % down convert and filter at rate P ------------------------------
 
@@ -621,8 +639,9 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
+  test_frame_mode = 1;
   frames = 100;
-  EbNodB = 6;
+  EbNodB = 4;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -706,12 +725,14 @@ function run_sim(test_frame_mode)
       tx_bits(1:2:length(tx_bits)) = 1;
     else
       % repeat each possible 4fsk symbol
-      pattern = [0 0 0 1 1 0 1 1];
+      %pattern = [0 0 0 1 1 0 1 1];
+      pattern = [0 0 0 1 0 0 0 1];
       nrepeats = states.nbit*(frames+1)/length(pattern);
       tx_bits = [];
       for b=1:nrepeats
         tx_bits = [tx_bits pattern];
       end   
+      %tx_bits = zeros(1, states.nbit*(frames+1));
     end
   end
  
@@ -758,7 +779,7 @@ function run_sim(test_frame_mode)
   timing_nl_log = [];
   norm_rx_timing_log = [];
   f_int_resample_log = [];
-  f1_log = f2_log = [];
+  f_log = [];
   EbNodB_log = [];
   rx_bits_log = [];
   rx_bits_sd_log = [];
@@ -774,7 +795,9 @@ function run_sim(test_frame_mode)
 
     % demodulate to stream of bits
 
+    states.f = est_freq(states, sf, states.M);
     [rx_bits states] = fsk_horus_demod(states, sf);
+
     rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
     rx_bits_buf(nbit+1:2*nbit) = rx_bits;
     rx_bits_log = [rx_bits_log rx_bits];
@@ -784,8 +807,7 @@ function run_sim(test_frame_mode)
     x_log = [x_log states.x];
     timing_nl_log = [timing_nl_log states.timing_nl];
     f_int_resample_log = [f_int_resample_log abs(states.f_int_resample(:,:))];
-    f1_log = [f1_log states.f(1)];
-    f2_log = [f2_log states.f(2)];
+    f_log = [f_log; states.f];
     EbNodB_log = [EbNodB_log states.EbNodB];
 
     if test_frame_mode == 1
@@ -840,14 +862,11 @@ function run_sim(test_frame_mode)
   plot(real(rx(1:Fs)))
   title('rx signal at demod input')
   subplot(212)
-  plot(abs(fft(rx(1:Fs))))
+  plot(abs(fft(sf)))
 
   figure(5)
   clf
-  plot(f1_log)
-  hold on;
-  plot(f2_log,'g');
-  hold off;
+  plot(f_log,'+')
   title('tone frequencies')
   axis([1 frames 0 Fs/2])
 
@@ -936,8 +955,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
       f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
       EbNodB_log = [EbNodB_log states.EbNodB];
       ppm_log = [ppm_log states.ppm];
-      f1_log = [f1_log states.f1];
-      f2_log = [f2_log states.f2];
+      f_log = [f_log states.f];
 
       if test_frame_mode == 1
         states = ber_counter(states, test_frame, rx_bits_buf);
@@ -955,9 +973,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     printf("plotting...\n");
 
     figure(1);
-    plot(f1_log);
-    hold on;
-    plot(f2_log,'g');
+    plot(f_log);
     hold off;
 
     figure(2);
