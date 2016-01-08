@@ -9,29 +9,10 @@
   data and parity bits, pre-pends a Unique Word for modem sync.
   Caller is responsible for providing storage for output packet.
 
-  [X] work out number of golay codewords rqd
-  [X] function to return storgage rqd for output packet
-  [X] code (not table based) based golay encoder
-  [X] #define switchable debug levels
   [ ] code based interleaver
-  [X] unit test to run with/without errors
-      [X] test at BER = 0.01
-      [X] switchable with defines
-  [X] conditional defines so just encoder on the target
-  [ ] Octave code      
-      [ ] new protocol decoder
-      [ ] test file based
-      [ ] test real time
-  [ ] version of ths module to work with Octave
-      [ ] e.g. mex file, or stdin/stdout
-      
-  Notes to Mark:
-  [X] what are the word lengths of ints and longs on the uC?
-  [X] alternate legacy RTTY/new protocol
-  [ ] does it run fast enough on target?
-  [ ] test real time decode of both
+  [ ] test correction of 1,2 & 3 error patterms    
 
-  1/ To test on a PC:
+  1/ Unit test on a PC:
 
      $ gcc horus_l2.c -o horus_l2 -Wall -DHORUS_L2_UNITTEST
      $ ./horus_l2
@@ -53,17 +34,17 @@
   By default the RX side is #ifdef-ed out, leaving the minimal amount
   of code for tx.
 
-  3/ Generate some tx_bits for testing with fsk_horus:
+  3/ Generate some tx_bits as input for testing with fsk_horus:
  
     $ gcc horus_l2.c -o horus_l2 -Wall -DGEN_TX_BITS
     $ ./horus_l2
     $ more ../octave/horus_tx_bits_binary.txt
    
-  4/ Testing interleaver:
+  4/ Unit testing interleaver:
 
     $ gcc horus_l2.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER
 
-  5/ Use as decoder with fsk_horus.m and fsk_horus_stream.m:
+  5/ Compile for use as decoder called by  fsk_horus.m and fsk_horus_stream.m:
 
     $ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
@@ -527,12 +508,12 @@ void interleave(unsigned char *inout, int nbytes)
         ibyte = i/8;
         ishift = i%8;
         ibit = (inout[ibyte] >> ishift) & 0x1;
-        //printf("i: %02d ibyte: %d ishift: %d ibit: %d\n", i, ibyte, ishift, ibit);
+        printf("i: %02d ibyte: %d ishift: %d ibit: %d\n", i, ibyte, ishift, ibit);
 
         jbyte = j/8;
         jshift = j%8;
         jbit = (inout[jbyte] >> jshift) & 0x1;
-        //printf("j: %02d jbyte: %d jshift: %d jbit: %d\n", j, jbyte, jshift, jbit);
+        printf("j: %02d jbyte: %d jshift: %d jbit: %d\n", j, jbyte, jshift, jbit);
 
         /* write jbit to ibit position */
 
@@ -546,6 +527,12 @@ void interleave(unsigned char *inout, int nbytes)
         inout[jbyte] &= ~mask;  // clear jbit
         inout[jbyte] |= ibit << jshift;
     }
+
+    #ifdef DEBUG0
+    printf("\nInterleaver Out:\n");
+    for (i=0; i<nbytes; i++)
+        printf("%02d 0x%02x\n", i, inout[i]);
+    #endif
 }
 #endif
 
@@ -587,15 +574,16 @@ int main(void) {
   some bit errors, decode, count errors.
 */
 
-int test_sending_bytes(int nbytes, float ber, int burst) {
+int test_sending_bytes(int nbytes, float ber, int error_pattern) {
     unsigned char input_payload[nbytes];
     int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(sizeof(input_payload));
     unsigned char tx[num_tx_data_bytes];
     unsigned char output_payload[sizeof(input_payload)];
+    int b, nbiterrors = 0;
     int i;
 
     for(i=0; i<nbytes; i++)
-        input_payload[i] = i;
+        input_payload[i] = 0x00;
 
     horus_l2_encode_tx_packet(tx, input_payload, sizeof(input_payload));
 
@@ -605,15 +593,10 @@ int test_sending_bytes(int nbytes, float ber, int burst) {
         fprintf(stderr, "  %02d 0x%02x\n", i, tx[i]);
     #endif
 
-    /* insert bit errors */
+    /* insert random bit errors */
 
-    if (burst) {
-        tx[2] ^= 0xff;        /* if burst model consecutive errors */
-        tx[3] ^= 0xff;        
-    }
-    else {
+    if (error_pattern == 0) {
         float r;
-        int b, nbiterrors = 0;
         for(i=0; i<num_tx_data_bytes; i++) {
             for (b=0; b<8; b++) {
                 r = (float)rand()/RAND_MAX;
@@ -632,6 +615,42 @@ int test_sending_bytes(int nbytes, float ber, int burst) {
         }
     }
 
+    /* insert and error burst */
+
+    if (error_pattern == 1) {
+        tx[2] ^= 0xff;
+        tx[3] ^= 0xff;
+    }
+
+    /* insert 1 error every 12 bits, this gives up to 3 errors per 23
+       bit codeword, which is the limit of the code */
+
+    if (error_pattern == 2) {
+        int bn = 0;
+        for(i=0; i<num_tx_data_bytes; i++) {
+            for (b=0; b<8; b++) {
+                bn++;
+                if ((bn % 12) == 0) {
+                    unsigned char mask = (1<<(7-b));
+                    #ifdef DEBUG1
+                    fprintf("mask: 0x%x tx[%d] = 0x%x ", mask, i, tx[i]);
+                    #endif
+                    tx[i] ^= mask;
+                    #ifdef DEBUG1
+                    fprintf("0x%x\n", tx[i]);
+                    #endif
+                    nbiterrors++;
+                }
+            }
+        }
+    }
+
+    #ifdef DEBUG0
+    fprintf(stderr, "\nTx Data after errors:\n");
+    for(i=0; i<num_tx_data_bytes; i++)
+        fprintf(stderr, "  %02d 0x%02x\n", i, tx[i]);
+    #endif
+
     #ifdef DEBUG0
     fprintf(stderr, "nbiterrors: %d BER: %3.2f\n", nbiterrors, (float)nbiterrors/(num_tx_data_bytes*8));
     #endif
@@ -645,10 +664,13 @@ int test_sending_bytes(int nbytes, float ber, int burst) {
         fprintf(stderr, "  %02d 0x%02x\n", i, output_payload[i]);
     #endif
 
+    /* count bit errors */
+
     int nerr = 0;
     for(i=0; i<nbytes; i++) {
-        if (input_payload[i] != output_payload[i])
-            nerr++;
+        int error_pattern = input_payload[i] ^ output_payload[i];
+        for(b=0; b<8; b++)
+            nerr += (error_pattern>>b) & 0x1;
     }
     
     return nerr;
@@ -657,11 +679,12 @@ int test_sending_bytes(int nbytes, float ber, int burst) {
 /* unit test designed to run on a PC */
 
 int main(void) {
-    printf("test 0: 22 bytes of payload data BER: 0.00 errors.: %d\n", test_sending_bytes(22, 0.00, 0));
-    printf("test 0: 22 bytes of payload data BER: 0.01 errors.: %d\n", test_sending_bytes(22, 0.01, 0));
-    printf("test 0: 22 bytes of payload data BER: 0.05 errors.: %d\n", test_sending_bytes(22, 0.05, 0));
-    printf("test 0: 22 bytes of payload data BER: 0.10 errors.: %d\n", test_sending_bytes(22, 0.10, 0));
-    printf("test 0: 22 bytes of payload data 8 bit burst error: %d\n", test_sending_bytes(22, 0.50, 1));
+    printf("test 0: BER: 0.00 ...........: %d\n", test_sending_bytes(22, 0.00, 0));
+    printf("test 1: BER: 0.01 ...........: %d\n", test_sending_bytes(22, 0.01, 0));
+    printf("test 2: BER: 0.05 ...........: %d\n", test_sending_bytes(22, 0.05, 0));
+    printf("test 3: BER: 0.10 ...........: %d\n", test_sending_bytes(22, 0.10, 0));
+    //printf("test 4: 8 bit burst error....: %d\n", test_sending_bytes(22, 0.00, 1));
+    //printf("test 5: 1 error every 12 bits: %d\n", test_sending_bytes(22, 0.00, 2));
     return 0;
 }
 #endif
@@ -736,7 +759,7 @@ int main(void) {
 
     #define READ_FILE /* overwrite tx[] above, that's OK */
     #ifdef READ_FILE
-    FILE *f = fopen("../octave/horus_rx_bits_binary.txt","rb");
+    FILE *f = fopen("../octave/horus_rx_bits_binary.bin","rb");
     assert(f != NULL);
     ret = fread(rx, sizeof(char), num_tx_data_bytes, f);
     assert(ret == num_tx_data_bytes);
