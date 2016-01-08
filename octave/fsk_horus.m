@@ -40,8 +40,9 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Fs*2;             % processing buffer size, nice big window for f1,f2 estimation
-  states.Ndft = 2.^ceil(log2(N)); % find nearest power of 2 for efficient FFT
+  N = states.N = Fs;               % processing buffer size, nice big window for timing est
+  %states.Ndft = 2.^ceil(log2(N));  % find nearest power of 2 for efficient FFT
+  states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
   Ts = states.Ts = Fs/Rs;
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
@@ -50,6 +51,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
 
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
+  states.Sf = zeros(states.Ndft/2,1); % currentmemory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = 8;                  % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
@@ -161,7 +163,7 @@ endfunction
 % as balloon telemtry) these may not be well controlled by the
 % transmitter, so we have to try to estimate them.
 
-function [f ratio] = est_freq(states, sf, ntones)
+function states = est_freq(states, sf, ntones)
   N = states.N;
   Ndft = states.Ndft;
   Fs = states.Fs;
@@ -177,12 +179,19 @@ function [f ratio] = est_freq(states, sf, ntones)
   st = floor(fmin*Ndft/Fs);
   en = floor(fmax*Ndft/Fs);
   
-  % DFT and zero out forbidden zone  ---------------------------------------------
+  % Update mag DFT  ---------------------------------------------
 
-  h = hanning(length(sf));
-  Sf = abs(fft(sf .* h, Ndft));
-  Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
+  numffts = floor(length(sf)/Ndft);
+  h = hanning(Ndft);
+  for i=1:numffts
+    a = (i-1)*Ndft+1; b = i*Ndft;
+    Sf = abs(fft(sf(a:b) .* h, Ndft));
+    Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
+    states.Sf = 0.95*states.Sf + 0.05*Sf(1:Ndft/2);
+  end
+
   f = []; a = [];
+  Sf = states.Sf;
 
   figure(8)
   clf
@@ -206,10 +215,7 @@ function [f ratio] = est_freq(states, sf, ntones)
     Sf(st:en) = 0;
   end
 
-  f = sort(f);
-  m2 = max(Sf(1:Ndft/2));
-  ratio = a(1)/m2;
-  %printf("a1: %f m2: %f ratio: %f\n", a(1), m2, ratio);
+  states.f = sort(f);
 end
 
 
@@ -641,7 +647,7 @@ endfunction
 function run_sim(test_frame_mode)
   test_frame_mode = 1;
   frames = 100;
-  EbNodB = 4;
+  EbNodB = 6;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -795,7 +801,7 @@ function run_sim(test_frame_mode)
 
     % demodulate to stream of bits
 
-    states.f = est_freq(states, sf, states.M);
+    states = est_freq(states, sf, states.M);
     [rx_bits states] = fsk_horus_demod(states, sf);
 
     rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
