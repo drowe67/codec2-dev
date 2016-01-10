@@ -36,13 +36,13 @@
 
   3/ Generate some tx_bits as input for testing with fsk_horus:
  
-    $ gcc horus_l2.c -o horus_l2 -Wall -DGEN_TX_BITS
+    $ gcc horus_l2.c -o horus_l2 -Wall -DGEN_TX_BITS -DSCRAMBLER
     $ ./horus_l2
     $ more ../octave/horus_tx_bits_binary.txt
    
   4/ Unit testing interleaver:
 
-    $ gcc horus_l2.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER
+    $ gcc horus_l2.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER -DSCRAMBLER
 
   5/ Compile for use as decoder called by  fsk_horus.m and fsk_horus_stream.m:
 
@@ -72,6 +72,7 @@ void golay23_init(void);
 int golay23_decode(int received_codeword);
 unsigned short gen_crc16(unsigned char* data_p, unsigned char length);
 void interleave(unsigned char *inout, int nbytes);
+void scramble(unsigned char *inout, int nbytes);
 
 /* Functions ----------------------------------------------------------*/
 
@@ -268,6 +269,13 @@ int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
     interleave(&output_tx_data[sizeof(uw)], num_tx_data_bytes-2);
     #endif
 
+    /* optional scrambler to prevent long strings of the same symbol
+       which upsets the modem - we dont scramble UW */
+
+    #ifdef SCRAMBLER
+    scramble(&output_tx_data[sizeof(uw)], num_tx_data_bytes-2);
+    #endif
+
     return num_tx_data_bytes;
 }
 
@@ -282,11 +290,15 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
     unsigned char *pin  = input_rx_data;
     int            ninbit, ingolay, ningolay, paritybyte, nparitybits;
     int            ninbyte, shift, inbit, golayparitybit, i, outbit, outbyte, noutbits, outdata;
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(num_payload_data_bytes);
 
-    /* optional interleaver - we dont interleave UW */
+    /* optional scrambler and interleaver - we dont interleave UW */
+
+    #ifdef SCRAMBLER
+    scramble(&input_rx_data[sizeof(uw)], num_tx_data_bytes-2);
+    #endif
 
     #ifdef INTERLEAVER
-    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(num_payload_data_bytes);
     interleave(&input_rx_data[sizeof(uw)], num_tx_data_bytes-2);
     #endif
 
@@ -567,6 +579,55 @@ int main(void) {
 }
 #endif
 
+
+#ifdef SCRAMBLER
+
+/* 16 bit DVB additive scrambler as per Wikpedia example */
+
+void scramble(unsigned char *inout, int nbytes)
+{
+    int nbits = nbytes*8;
+    int i, ibit, ibits, ibyte, ishift, mask;
+    uint16_t scrambler = 0x4a80;  /* init additive scrambler at start of every frame */
+    uint16_t scrambler_out;
+
+    /* in place modification of each bit */
+
+    for(i=0; i<nbits; i++) {
+
+        scrambler_out = ((scrambler & 0x2) >> 1) ^ (scrambler & 0x1);
+
+        /* modify i-th bit by xor-ing with scrambler output sequence */
+
+        ibyte = i/8;
+        ishift = i%8;
+        ibit = (inout[ibyte] >> ishift) & 0x1;
+        ibits = ibit ^ scrambler_out;                  // xor ibit with scrambler output
+
+        mask = 1 << ishift;
+        inout[ibyte] &= ~mask;                  // clear i-th bit
+        inout[ibyte] |= ibits << ishift;         // set to scrambled value
+
+        /* update scrambler */
+
+        scrambler >>= 1;
+        scrambler |= scrambler_out << 14;
+
+        #ifdef DEBUG0
+        printf("i: %02d ibyte: %d ishift: %d ibit: %d ibits: %d scrambler_out: %d\n", 
+               i, ibyte, ishift, ibit, ibits, scrambler_out);
+        #endif
+
+    }
+
+    #ifdef DEBUG0
+    printf("\nScrambler Out:\n");
+    for (i=0; i<nbytes; i++)
+        printf("%02d 0x%02x\n", i, inout[i]);
+    #endif
+}
+#endif
+
 #ifdef HORUS_L2_UNITTEST
 
 /*
@@ -583,7 +644,7 @@ int test_sending_bytes(int nbytes, float ber, int error_pattern) {
     int i;
 
     for(i=0; i<nbytes; i++)
-        input_payload[i] = 0x00;
+        input_payload[i] = i;
 
     horus_l2_encode_tx_packet(tx, input_payload, sizeof(input_payload));
 
@@ -683,25 +744,47 @@ int main(void) {
     printf("test 1: BER: 0.01 ...........: %d\n", test_sending_bytes(22, 0.01, 0));
     printf("test 2: BER: 0.05 ...........: %d\n", test_sending_bytes(22, 0.05, 0));
     printf("test 3: BER: 0.10 ...........: %d\n", test_sending_bytes(22, 0.10, 0));
-    //printf("test 4: 8 bit burst error....: %d\n", test_sending_bytes(22, 0.00, 1));
-    //printf("test 5: 1 error every 12 bits: %d\n", test_sending_bytes(22, 0.00, 2));
+    printf("test 4: 8 bit burst error....: %d\n", test_sending_bytes(22, 0.00, 1));
+    printf("test 5: 1 error every 12 bits: %d\n", test_sending_bytes(22, 0.00, 2));
     return 0;
 }
 #endif
+
+/* Horus binary packet */
+
+struct TBinaryPacket
+{
+    uint8_t     PayloadID;
+    uint16_t	Counter;
+    uint8_t	Hours;
+    uint8_t	Minutes;
+    uint8_t	Seconds;
+    float	Latitude;
+    float	Longitude;
+    uint16_t  	Altitude;
+    uint8_t     Speed;       // Speed in Knots (1-255 knots)
+    uint8_t     Sats;
+    int8_t      Temp;        // Twos Complement Temp value.
+    uint8_t     BattVoltage; // 0 = 0.5v, 255 = 2.0V, linear steps in-between.
+    uint16_t    Checksum;    // CRC16-CCITT Checksum.
+}  __attribute__ ((packed));
 
 #ifdef GEN_TX_BITS
 /* generate a file of tx_bits to modulate using fsk_horus.m for modem simulations */
 
 int main(void) {
-    int nbytes = 22;
+    int nbytes = sizeof(struct TBinaryPacket);
+    struct TBinaryPacket input_payload;
+    int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(nbytes);
     unsigned char tx[num_tx_data_bytes];
-    unsigned char output_payload[nbytes];
     int i;
 
-    for(i=0; i<nbytes; i++)
-        input_payload[i] = i;
+    /* all zeros is nastiest sequence for demod before scrambling */
 
-    horus_l2_encode_tx_packet(tx, input_payload, sizeof(input_payload));
+    memset(&input_payload, 0, nbytes);
+    input_payload.Checksum = gen_crc16((unsigned char*)&input_payload, nbytes-2);
+
+    horus_l2_encode_tx_packet(tx, (unsigned char*)&input_payload, nbytes);
     
     FILE *f = fopen("../octave/horus_tx_bits_binary.txt","wt");
     assert(f != NULL);
@@ -723,31 +806,12 @@ int main(void) {
 
 /* Decode a binary file rx_bytes, e.g. from fsk_horus.m */
 
-/* Horus binary packet */
-
-struct TBinaryPacket
-{
-    uint8_t     PayloadID;
-    uint16_t	Counter;
-    uint8_t	Hours;
-    uint8_t	Minutes;
-    uint8_t	Seconds;
-    float	Latitude;
-    float	Longitude;
-    uint16_t  	Altitude;
-    uint8_t     Speed;       // Speed in Knots (1-255 knots)
-    uint8_t     Sats;
-    int8_t      Temp;        // Twos Complement Temp value.
-    uint8_t     BattVoltage; // 0 = 0.5v, 255 = 2.0V, linear steps in-between.
-    uint16_t    Checksum;    // CRC16-CCITT Checksum.
-}  __attribute__ ((packed));
-
 int main(void) {
     int nbytes = 22;
     unsigned char output_payload[nbytes];
     int num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(nbytes);
 
-    /* real world data hrous payload generated when running tx above */
+    /* real world data horus payload generated when running tx above */
     unsigned char rx[45] = {
         0x24,0x24,0x01,0x0b,0x00,0x00,0x05,0x3b,0xf2,0xa7,0x0b,0xc2,0x1b,
         0xaa,0x0a,0x43,0x7e,0x00,0x05,0x00,0x25,0xc0,0xce,0xbb,0x36,0x69,
@@ -1092,6 +1156,7 @@ int golay23_count_errors(int recd_codeword, int corrected_codeword)
     return errors;
 }
 
+#endif
 
 // from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
 
@@ -1106,6 +1171,4 @@ unsigned short gen_crc16(unsigned char* data_p, unsigned char length){
     }
     return crc;
 }
-
-#endif
 
