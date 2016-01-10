@@ -152,8 +152,8 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
 
     % This step quite important.  Set noise floor to avoid washing machine/tinkling
     % sounds with bg noise as chunks of spectrum come and go.  The masking model
-    % basis functions are not gd at representing continuous spectra.  But rather gd
-    % at voiced speech, which is a Tougher job.
+    % basis functions are not gd at representing continuous spectra, especially at 
+    % LF.  Fortunately rather gd at voiced speech, which is a much tougher job.
 
     decmaskdB = 10*ones(1,L);
 
@@ -202,11 +202,36 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
       decmaskdB = max(decmaskdB, min_AmdB - 20);
     end
 
+    % subtract mean and limit
+    % ideas:
+    %   + try just one band at a time
+    %   + bark spacing of bands
+    %   + reverb is as levels bounce about, rather than actual value, how to smooth?  What to do?  How
+    %     to test this assumption?
+    %   + different quantiser for each band, different limited based on PDFs
+    
+    if 0
+      masker_amps_dB = dec_samples(:,1);
+      energy_dB = mean(masker_amps_dB);
+      masker_amps_dB -= energy_dB;
+      masker_amps_dB(find(masker_amps_dB > 20)) = 20;
+      masker_amps_dB(find(masker_amps_dB < -20)) = -20;
+      for i=1:4
+        masker_amps_dB(i) = quantise([-18 -12 -6 0 2 6 9 12 15 18], masker_amps_dB(i));
+      end
+      masker_amps_dB += energy_dB;
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+      for i=1:4
+        masker_freqs_kHz(i) = quantise([0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 1.2 1.4 1.6 2 2.2 2.4 2.6 3 3.4], masker_freqs_kHz(i));
+      end
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+
     % simulate quantisation of amplitudes by adding some noise
 
     if 0
       masker_amps_dB = dec_samples(:,1);
-      masker_amps_dB += 3*(1 - 2*rand(4,1));
+      masker_amps_dB += 3*(1 - 2*rand(Nsamples,1));
       masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
@@ -503,3 +528,50 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
 endfunction
 
 
+% AbyS returns f & a, this function plots values so we can consider quantisation
+
+function plot_f_a_stats(f,a)
+
+  [fsrt fsrt_ind] = sort(f,2);
+  figure(1)
+  for i=1:4
+    subplot(2,2,i)
+    hist(fsrt(:,i))
+  end
+
+  l = length(a);
+  for i=1:l
+    asrt(i,:) = a(i, fsrt_ind(i,:));
+  end
+  
+  figure(2)
+  for i=1:4
+    subplot(2,2,i)
+    hist(asrt(:,i) - mean(asrt(:,:),2))
+  end
+  
+  for i=1:l
+    [gradient intercept] = linreg(fsrt(i,:), asrt(i,:), 4);
+    alinreg(i,:) = gradient*fsrt(i,:) + intercept;
+    alinregres(i,:) = asrt(i,:) - alinreg(i,:);
+    m(i) = gradient; c(i) = intercept;
+  end
+
+  figure(3)
+  for i=1:4
+    subplot(2,2,i)
+    hist(alinregres(:,i))
+  end
+  
+  figure(4)
+  subplot(211)
+  m = m(find(m>-0.05));
+  m = m(find(m<0.03));
+  hist(m,50)
+  title('gradient');
+  subplot(212)
+  c = c(find(c>0));
+  hist(c,50)
+  title('y-int');
+
+endfunction
