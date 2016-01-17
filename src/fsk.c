@@ -167,7 +167,7 @@ void fsk_destroy(struct FSK *fsk){
  * fsk_in - block of samples in this demod cycles, must be nin long
  * f1_est - pointer to f1 estimate variable in demod
  * f2_est - pointer to f2 estimate variable in demod
- * twist - pointer to twist estimate in demod - Note: this isn't correct right now
+ * twist - pointer to twist estimate in demod
  */
 void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_est,float *twist){
     int Ndft = fsk->Ndft;
@@ -178,6 +178,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
     float hann;
     float max;
     int m1,m2;
+    float m1v,m2v,t;
     kiss_fftr_cfg fft_cfg = fsk->fft_cfg;
     
     /* Array to do complex FFT from using kiss_fft */
@@ -193,6 +194,8 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
         /* resulting in a dirty FFT */
         /* An easy fix would be to ensure that Ndft is always greater than N+Ts/2 
          * instead of N */
+        /* Another easy fix would be to apply the hann window over fft_samps
+         * instead of nin */
         /* This bug isn't a big deal and can't show up in the balloon config */
         /* as 8192 > 8040 */
         hann = sinf((M_PI*(float)i)/((float)nin-1));
@@ -225,6 +228,8 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
         }
     }
     
+    m1v = sqrtf(fftout[m1].r);
+    
     /* Zero out 100Hz around the maximum */
     i = m1 - 100*Ndft/Fs;
     i = i<0 ? 0 : i;
@@ -244,20 +249,23 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
         }
     }
     
+      m2v = sqrtf(fftout[m2].r);
+    
     /* f1 is always the lower tone */
     if(m1>m2){
         j=m1;
         m1=m2;
         m2=j;
+        t=m1v;
+        m1v=m2v;
+        m2v=t;
     }
     
     *f1_est = (float)m1*(float)Fs/(float)Ndft;
     *f2_est = (float)m2*(float)Fs/(float)Ndft;
-    *twist = 20*log10f((float)(m1)/(float)(m2));
+    *twist = 20*log10f(m1v/m2v);
     //printf("ESTF - f1 = %f, f2 = %f, twist = %f \n",*f1_est,*f2_est,*twist);
-    
-    free(fftin);
-    free(fftout);
+
 }
 
 /*
@@ -291,10 +299,9 @@ static inline int comp_mag_gt(COMP a,COMP b){
 /*
  * Normalize a complex number's magnitude to 1
  */
- 
 static inline COMP comp_normalize(COMP a){
-	float av = sqrtf((a.real*a.real)+(a.imag*a.imag));
 	COMP b;
+	float av = sqrtf((a.real*a.real)+(a.imag*a.imag));
 	b.real = a.real/av;
 	b.imag = a.imag/av;
 	return b;
@@ -312,7 +319,7 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int Nmem = fsk->Nmem;
     int i,j,dc_i,cbuf_i;
     float ft1,ft2;
-    float twist; /* NOTE: This is not correct ATM */
+    float twist;
     int nstash = fsk->nstash;
     COMP *f1_int, *f2_int;
     COMP t1,t2;
@@ -330,6 +337,9 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,&f1,&f2,&twist);
     
+    fsk->f1_est = f1;
+    fsk->f2_est = f2;
+    fsk->twist_est = twist;
     
     /* allocate memory for the integrated samples */
     /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
@@ -473,11 +483,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         rx_bits[i] = comp_mag_gt(t2,t1)?1:0;
         /* Soft output goes here */
     }
-    
-    free(f1_int);
-    free(f2_int);
-    free(f1_intbuf);
-    free(f2_intbuf);
     
     printf("rx_timing: %3.2f low_sample: %d high_sample: %d fract: %3.3f nin_next: %d\n", rx_timing, low_sample, high_sample, fract, fsk->nin);
 }
