@@ -8,14 +8,16 @@
 % [x] - Direct SDR modulator, probably not FM based
 % [x] - Direct SDR non-coherent demodulator
 %    [x] - Core demodulation routine
-%    | | - Timing offset estimation
+%    |o| - Timing offset estimation
 %    < >- Freq. offset estimation
-%    ( ) - Bit slip, maybe
+%    (+) - Bit slip, maybe
 % { } - Port sim from fsk_horus
 % [ ] - The C port
 % [ ] - Some stuff to verify the C port
-
+% [ ] - 4FSK variant
+%    ( ) - All of that other stuff, but for 4fsk
 %clear all;
+
 graphics_toolkit('gnuplot');
 %fm
 
@@ -24,7 +26,9 @@ pkg load signal;
 %Basic parameters for a simple FSK modem
 fsk_setup_info.Rs = 4800;  % Symbol rate
 fsk_setup_info.nfsk = 2;      % Number of unique symbols. Must be 2.
+fsk_setup_info.P = 5;		%Something something fine timing est
 fsk_setup_info.Fs = 48000; % Sample frequency
+fsk_setup_info.timing_syms = 10; %How many symbols over which to figure fine timing
 fsk_setup_info.Fsym = fsk_setup_info.Rs; %Symbol spacing
 fsk_setup_info.txmap = @(bits) bits+1; %Map TX bits to 2fsk symbols
 fsk_setup_info.rxmap = @(syms) syms==1; %Map 2fsk RX symbols to bits
@@ -37,7 +41,9 @@ function states = yafsk_init(fsk_config)
   Ts = states.Ts = Fs/Rs;
   Fsym = states.Fsym = fsk_config.Fsym;
   states.config = fsk_config;
-
+  P = states.P = fsk_config.P;
+  timing_syms = states.timing_syms = fsk_config.timing_syms;
+  
   if nfsk != 2
     error("Gotta be 2fsk")
   endif
@@ -49,7 +55,12 @@ function states = yafsk_init(fsk_config)
   states.dc = zeros(1,nfsk);
   states.rx_phi = ones(1,nfsk);
   states.isamp = 0;
+  states.ssamp = 0;
   states.sums = zeros(1,nfsk);
+  states.ssums = zeros(1,nfsk);
+  timing_db1 = timing_db2 = zeros(1,timing_syms*(Ts/P))
+  states.timing_db1 = timing_db1;
+  states.timing_db2 = timing_db2;
 endfunction
 
 function [tx states] = yafsk_mod(states,bits)
@@ -87,7 +98,7 @@ function d = idmp(data, M)
     end
 endfunction
 
-function [bits states phis] = yafsk_demod_2a(states,rx)
+function [bits states phis softsyms] = yafsk_demod_2a(states,rx)
   fine_timing = 1;
   Fs = states.Fs;
   Rs = states.Rs;
@@ -104,11 +115,20 @@ function [bits states phis] = yafsk_demod_2a(states,rx)
 
   sum_f1 = states.sums(1);
   sum_f2 = states.sums(2);
-
+  
+  ssum_f1 = states.ssums(1);
+  ssum_f2 = states.ssums(2);
+  
+  timing_db1 = states.timing_db1;
+  timing_db2 = states.timing_db2;
+  
+  ssamp = states.ssamp;
   isamp = states.isamp;
+  
   symcnt = 1;
   subcnt = 1;
   syms = [0];
+  softsyms = [0];
   sums1 = [0];
   sums2 = [0];
   phis = [0];
@@ -119,12 +139,11 @@ function [bits states phis] = yafsk_demod_2a(states,rx)
   ssum_f2 = 0;
   ssamp=0;
  
-  timing_syms = 10;
+  timing_syms = states.timing_syms;
   timing_nudge = .09; %How far to 'nudge' the sampling point
                       %This really ought to be fixed somewhere else
                       
-  timing_samps = timing_syms*(Ts/4);
-  timing_db2 = timing_db1 = zeros(1,timing_samps);  
+  timing_samps = timing_syms*(Ts/P);
 
   for ii = (1:length(rx))
     phy_f1 *= dphase_f1;   %Spin the oscillators
@@ -147,6 +166,7 @@ function [bits states phis] = yafsk_demod_2a(states,rx)
     isamp += 1;
     if isamp>=Ts %If it's time to take a sample and spit out a symbol..
       syms(symcnt) = (abs(sum_f1)>abs(sum_f2))+1; %Spit out a symbol
+      softsyms(symcnt) = abs(sum_f1) - abs(sum_f2);
       symcnt += 1;
       
       %Fine timing estimation and adjustment
@@ -185,6 +205,12 @@ function [bits states phis] = yafsk_demod_2a(states,rx)
       sum_f2 = 0;
       isamp -= Ts;    %Reset integrator count
      
+      if(mod(symcnt,10000)==0)
+        ab_f1 = abs(phy_f1)
+        phy_f1 = phy_f1/ab_f1;
+        ab_f2 = abs(phy_f2)
+        phy_f2 = phy_f2/ab_f2;
+	  endif
 
     endif
 
@@ -211,7 +237,14 @@ function [bits states phis] = yafsk_demod_2a(states,rx)
   states.sums(1) = sum_f1;
   states.sums(2) = sum_f2;
 
+  states.ssum(1) = ssum_f1;
+  states.ssum(2) = ssum_f2;
+
+  states.ssamp = ssamp;
   states.isamp = isamp;
+  
+  states.timing_db1 = timing_db1;
+  states.timing_db2 = timing_db2;
 
   bits = states.config.rxmap(syms);
   
@@ -440,7 +473,6 @@ function run_sim
 
 endfunction
 
-
 % Bit error rate test ----------------------------------------------------------
 % Params - aEsNodB - EbNo in decibels
 %        - timing_offset - how far the fine timing is offset
@@ -449,7 +481,7 @@ endfunction
 % Returns - ber - teh measured BER
 %         - thrcoh - theory BER of a coherent demod
 %         - thrncoh - theory BER of non-coherent demod
-function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=12000, timing_offset = 1, freq_offset = 0, burst = 0,samp_clk_offset = 0)
+function [ber thrcoh thrncoh rxphis] = nfbert_2(aEsNodB,modem_config, bitcnt=12000, timing_offset = 1, freq_offset = 0, burst = 0,samp_clk_offset = 0)
 
   rand('state',1); 
   randn('state',1);
@@ -457,7 +489,11 @@ function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=1200
   %How many bits should this test run?
   %bitcnt = 12000;
   
-  test_bits = [zeros(1,16) 1 0 0 1 1 0 0 1 0 1 0 1 0 1 0 1 (rand(1,bitcnt)>.5) ones(1,300) zeros(1,300)]; %Random bits. Pad with zeros to prime the filters
+  framesync = []
+  framehdr = [1 0 1 0 1 0 1 0 0 1 1 1 0 1 0 0]
+  convhdr = framehdr;%[.5 -.5 .5 -.5 1 -1 1 -1 -1 1 1 1 -1 1 -1 -1];
+  %framehdr = [1 0 1 0 0 0 1 0 1 0 0 1]
+  test_bits = [framesync framehdr (rand(1,bitcnt)>.5)]; %Random bits. Pad with zeros to prime the filters
   states.M = 1;
   states = yafsk_init(modem_config);
   
@@ -489,12 +525,21 @@ function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=1200
   
   rx    = rx(timing_offset:length(rx));
   
+  [rx_bits states rxphis sbits] = yafsk_demod_2a(states,rx);
   
-  [rx_bits states rxphis] = yafsk_demod_2a(states,rx);
+  
   ber = 1;
   
+  hsig = -1*fliplr((framehdr*2)-1);
+  figure(3);
+  corrfd = conv(hsig,sbits);
+  for ii = (1:length(corrfd)-length(hsig))
+    secte = sum(abs(sbits(ii:ii+length(hsig))).^2);
+	corrfd = corrfd(ii)/secte;
+  end
   %thing to account for offset from input data to output data
   %No preamble detection yet
+  figure(4);
   plot(rxphis);
   ox = 1;
   
@@ -520,6 +565,14 @@ function [ber thrcoh thrncoh rxphi] = nfbert_2(aEsNodB,modem_config, bitcnt=1200
       xerr = perr;
     end
     ber = min([ber bern]);
+  end
+  
+  %Try to find frame header
+  for offset = (1:length(rx_bits)-length(framehdr))
+	hd = sum(xor(framehdr,rx_bits(offset:offset-1+length(framehdr))));
+	if(hd<=2)
+		printf("Found possible header at offset %d\n",offset);
+	endif
   end
   
   figure(5);
