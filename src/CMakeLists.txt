@@ -141,7 +141,9 @@ set(CODEC2_SRCS
     fifo.c
     fdmdv.c
     fm.c
+    fsk.c
     kiss_fft.c
+    kiss_fftr.c
     linreg.c
     interp.c
     lsp.c
@@ -166,6 +168,7 @@ set(CODEC2_PUBLIC_HEADERS
     codec2_fdmdv.h
     codec2_cohpsk.h
     codec2_fm.h
+    fsk.h
     codec2_fifo.h
     comp.h
     comp_prim.h
@@ -232,6 +235,12 @@ target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(freedv_rx freedv_rx.c)
 target_link_libraries(freedv_rx ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(fsk_mod fsk_mod.c)
+target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(fsk_demod fsk_demod.c)
+target_link_libraries(fsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(fm_demod fm_demod.c fm.c)
 target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
 
@@ -270,6 +279,7 @@ install(TARGETS
     fdmdv_get_test_bits
     fdmdv_mod fdmdv_demod
     fm_demod
+    fsk_mod
     fdmdv_put_test_bits
     fdmdv_interleave
     insert_errors
