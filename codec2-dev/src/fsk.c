@@ -182,10 +182,8 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
     
     /* Array to do complex FFT from using kiss_fft */
     /* It'd probably make more sense here to use kiss_fftr */
-    //kiss_fft_scalar fftin[Ndft];
-    kiss_fft_scalar *fftin = (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar)*Ndft);
-    //kiss_fft_cpx fftout[(Ndft/2)+1];
-    kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
+    kiss_fft_scalar *fftin = (kiss_fft_scalar*)alloca(sizeof(kiss_fft_scalar)*Ndft);
+    kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
     fft_samps = nin<Ndft?nin:Ndft;
     
     /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
@@ -290,6 +288,10 @@ static inline int comp_mag_gt(COMP a,COMP b){
     return ((a.real*a.real)+(a.imag*a.imag)) > ((b.real*b.real)+(b.imag*b.imag));
 }
 
+/*
+ * Normalize a complex number's magnitude to 1
+ */
+ 
 static inline COMP comp_normalize(COMP a){
 	float av = sqrtf((a.real*a.real)+(a.imag*a.imag));
 	COMP b;
@@ -331,19 +333,13 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     
     /* allocate memory for the integrated samples */
     /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
-    //f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    //f2_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
+    f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
+    f2_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
     
     /* Allocate circular buffers for integration */
-    //f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    //f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-        /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
-    f1_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    f2_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    
-    /* Allocate circular buffers for integration */
-    f1_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    f2_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+    f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+
     
     /* Note: This would all be quite a bit faster with complex oscillators, like
      * TX. */
@@ -531,13 +527,8 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     COMP dosc_f1, dosc_f2;          /* phase shift per sample */
     COMP dph;                       /* phase shift of current bit */
     int i,j;
-    float tx_phase_mag;
     
     /* Figure out the amount of phase shift needed per sample */
-    /*dosc_f1.real = cosf(2*M_PI*((float)(f1_tx)/(float)(Fs)));
-    dosc_f1.imag = sinf(2*M_PI*((float)(f1_tx)/(float)(Fs)));
-    dosc_f2.real = cosf(2*M_PI*((float)(f2_tx)/(float)(Fs)));
-    dosc_f2.imag = sinf(2*M_PI*((float)(f2_tx)/(float)(Fs)));*/
     dosc_f1 = comp_exp_j(2*M_PI*((float)(f1_tx)/(float)(Fs)));
     dosc_f2 = comp_exp_j(2*M_PI*((float)(f2_tx)/(float)(Fs)));
     
@@ -552,9 +543,7 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     }
     
     /* Normalize TX phase to prevent drift */
-    tx_phase_mag = cabsolute(tx_phase_c);
-    tx_phase_c.real = tx_phase_c.real/tx_phase_mag;
-    tx_phase_c.imag = tx_phase_c.imag/tx_phase_mag;
+    tx_phase_c = comp_normalize(tx_phase_c);
     
     /* save TX phase */
     fsk->tx_phase_c = tx_phase_c;
