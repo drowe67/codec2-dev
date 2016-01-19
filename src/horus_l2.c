@@ -71,7 +71,7 @@ int32_t get_syndrome(int32_t pattern);
 void golay23_init(void);
 int golay23_decode(int received_codeword);
 unsigned short gen_crc16(unsigned char* data_p, unsigned char length);
-void interleave(unsigned char *inout, int nbytes);
+void interleave(unsigned char *inout, int nbytes, int dir);
 void scramble(unsigned char *inout, int nbytes);
 
 /* Functions ----------------------------------------------------------*/
@@ -266,7 +266,7 @@ int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
     /* optional interleaver - we dont interleave UW */
 
     #ifdef INTERLEAVER
-    interleave(&output_tx_data[sizeof(uw)], num_tx_data_bytes-2);
+    interleave(&output_tx_data[sizeof(uw)], num_tx_data_bytes-2, 0);
     #endif
 
     /* optional scrambler to prevent long strings of the same symbol
@@ -299,7 +299,7 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
     #endif
 
     #ifdef INTERLEAVER
-    interleave(&input_rx_data[sizeof(uw)], num_tx_data_bytes-2);
+    interleave(&input_rx_data[sizeof(uw)], num_tx_data_bytes-2, 1);
     #endif
 
     pin = input_rx_data + sizeof(uw) + num_payload_data_bytes;
@@ -465,80 +465,69 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
 #endif
 
 #ifdef INTERLEAVER
-/* call for interleaving and de-interleaving, operates in place */
 
-static unsigned char scrambler[] = {
-    0,  
-    16, 
-    13, 
-    2, 
-    23,
-    28, 
-    3,  
-    21, 
-    4,  
-    5,  
-    22, 
-    6,  
-    7, 
-    15,
-    8,  
-    27, 
-    9, 
-    10, 
-    11, 
-    30, 
-    26, 
-    12, 
-    14, 
-    17, 
-    1,  
-    19, 
-    20, 
-    24, 
-    18, 
-    25, 
-    29, 
-    31
+int primes[] = {
+    2,      3,      5,      7,      11,     13,     17,     19,     23,     29, 
+    31,     37,     41,     43,     47,     53,     59,     61,     67,     71, 
+    73,     79,     83,     89,     97,     101,    103,    107,    109,    113, 
+    127,    131,    137,    139,    149,    151,    157,    163,    167,    173, 
+    179,    181,    191,    193,    197,    199,    211,    223,    227,    229, 
+    233,    239,    241,    251,    257,    263,    269,    271,    277,    281, 
+    283,    293,    307,    311,    313,    317,    331,    337,    347
 };
 
-
-void interleave(unsigned char *inout, int nbytes)
+void interleave(unsigned char *inout, int nbytes, int dir)
 {
     int nbits = nbytes*8;
-    int nbits2 = nbits/2;
-    int i, j, ibit, jbit, ibyte, ishift, jbyte, jshift, mask;
+    int i, j, n, ibit, ibyte, ishift, jbyte, jshift;
+    int b;
+    unsigned char out[nbytes];
 
-    /* swap bits in first half with those in 2nd half, using
-       small scrambling table to move bits about a bit */
+    memset(out, 0, nbytes);
+           
+    /* b chosen to be co-prime with nbits, I'm cheating by just finding the 
+       nearest prime to nbits.  It also uses storage, is run on every call,
+       and has an upper limit.  Oh Well, still seems to interleave OK. */
+    i = 1;
+    int imax = sizeof(primes)/sizeof(int);
+    while ((primes[i] < nbits) && (i < imax))
+        i++;
+    b = primes[i-1];
 
-    for(i=0; i<nbits2; i++) {
-        j = nbits2 + scrambler[i%32] + 32*(i/32);
+    for(n=0; n<nbits; n++) {
 
-        /* swap bit i & j */
+        /*
+          "On the Analysis and Design of Good Algebraic Interleavers", Xie et al,eq (5)
+        */
+
+        i = n;
+        j = (b*i) % nbits;
+        
+        if (dir) {
+            int tmp = j;
+            j = i;
+            i = tmp;
+        }
+        
+        #ifdef DEBUG0
+        printf("i: %d j: %d\n",i, j);
+        #endif
+
+        /* read bit i and write to bit j postion */
 
         ibyte = i/8;
         ishift = i%8;
         ibit = (inout[ibyte] >> ishift) & 0x1;
-        printf("i: %02d ibyte: %d ishift: %d ibit: %d\n", i, ibyte, ishift, ibit);
 
         jbyte = j/8;
         jshift = j%8;
-        jbit = (inout[jbyte] >> jshift) & 0x1;
-        printf("j: %02d jbyte: %d jshift: %d jbit: %d\n", j, jbyte, jshift, jbit);
 
         /* write jbit to ibit position */
 
-        mask = 1 << ishift;
-        inout[ibyte] &= ~mask;  // clear ibit
-        inout[ibyte] |= jbit << ishift;
-
-        /* write ibit to jbit position */
-
-        mask = 1 << jshift;
-        inout[jbyte] &= ~mask;  // clear jbit
-        inout[jbyte] |= ibit << jshift;
+        out[jbyte] |= ibit << jshift; // replace with i-th bit
     }
+           
+    memcpy(inout, out, nbytes);
 
     #ifdef DEBUG0
     printf("\nInterleaver Out:\n");
@@ -561,10 +550,10 @@ int main(void) {
 
     for(i=0; i<nbytes; i++)
         inout[i] = incopy[i] = rand() & 0xff;    
-
-    interleave(inout, nbytes);       /* interleave                     */
+    
+    interleave(inout, nbytes, 0);    /* interleave                     */
     memcpy(inter, inout, nbytes);    /* snap shot of interleaved bytes */
-    interleave(inout, nbytes);       /* de-interleave                  */
+    interleave(inout, nbytes, 1);    /* de-interleave                  */
 
     /* all ones in last col means it worked! */
 
@@ -743,8 +732,20 @@ int main(void) {
     printf("test 0: BER: 0.00 ...........: %d\n", test_sending_bytes(22, 0.00, 0));
     printf("test 1: BER: 0.01 ...........: %d\n", test_sending_bytes(22, 0.01, 0));
     printf("test 2: BER: 0.05 ...........: %d\n", test_sending_bytes(22, 0.05, 0));
+
+    /* we expect this always to fail, as chance of > 3 errors/codeword is high */
+
     printf("test 3: BER: 0.10 ...........: %d\n", test_sending_bytes(22, 0.10, 0));
+
+    /* -DINTERLEAVER will make this puppy pass */
+
     printf("test 4: 8 bit burst error....: %d\n", test_sending_bytes(22, 0.00, 1));
+
+    /* Insert 2 errors in every codeword, the maximum correction
+       capability of a Golay (23,12) code. note this one will fail
+       with -DINTERLEAVER, as we can't guarantee <= 3 errors per
+       codeword after interleaving */
+
     printf("test 5: 1 error every 12 bits: %d\n", test_sending_bytes(22, 0.00, 2));
     return 0;
 }
