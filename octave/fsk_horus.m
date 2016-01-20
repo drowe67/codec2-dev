@@ -74,11 +74,12 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.norm_rx_timing = 0;
   states.ppm = 0;
   states.prev_pkt = [];
-
+ 
   % protocol specific states
 
   states.rtty = fsk_horus_init_rtty_uw(states);
   states.binary = fsk_horus_init_binary_uw;
+
 endfunction
 
 
@@ -87,6 +88,7 @@ endfunction
 function rtty = fsk_horus_init_rtty_uw(states)
   % Generate unque word that correlates against the ASCII "$$$$$" that
   % is at the start of each frame.
+  % $ -> 36 decimal -> 0 1 0 0 1 0 0 binary 
 
   dollar_bits = fliplr([0 1 0 0 1 0 0]);
   mapped_db = 2*dollar_bits - 1;
@@ -99,7 +101,7 @@ function rtty = fsk_horus_init_rtty_uw(states)
   nfield = rtty.nfield = 7; % length of ascii character field
 
   rtty.uw = [mapped mapped mapped mapped mapped];
-  rtty.uw_thresh = length(rtty.uw) - 8; % allow a few bit errors when looking for UW
+  rtty.uw_thresh = length(rtty.uw) - 2; % allow a few bit errors when looking for UW
   rtty.max_packet_len = 1000;
 endfunction
 
@@ -113,7 +115,7 @@ function binary = fsk_horus_init_binary_uw
   mapped_db = 2*dollar_bits - 1;
 
   binary.uw = [mapped_db mapped_db];
-  binary.uw_thresh = length(binary.uw) - 2;   % no bit errors when looking for UW
+  binary.uw_thresh = length(binary.uw)-2;   % no bit errors when looking for UW
 
   binary.max_packet_len = 360-16;
 endfunction
@@ -168,14 +170,14 @@ function states = est_freq(states, sf, ntones)
   Ndft = states.Ndft;
   Fs = states.Fs;
   
-  % This assumption is OK for balloon telemtry but may not be true in
+  % This assumption is OK for balloon telemetry but may not be true in
   % general
 
   min_tone_spacing = 200;
   
   % set some limits to search range, which will mean some manual re-tuning
 
-  fmin = 800; fmax = 2000;
+  fmin = 800; fmax = 2500;
   st = floor(fmin*Ndft/Fs);
   en = floor(fmax*Ndft/Fs);
   
@@ -193,9 +195,9 @@ function states = est_freq(states, sf, ntones)
   f = []; a = [];
   Sf = states.Sf;
 
-  figure(8)
-  clf
-  plot(Sf(1:Ndft/2));
+  %figure(8)
+  %clf
+  %plot(Sf(1:Ndft/2));
 
   % Search for each tone --------------------------------------------------------
 
@@ -292,7 +294,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % We have sampled the integrator output at Fs=P samples/symbol, so
   % lets do a single point DFT at w = 2*pi*f/Fs = 2*pi*Rs/(P*Rs)
   %
-  % Note timing non-lineariry derivedby experiment.  Not quite sure what I'm doing here.....
+  % Note timing non-lineariry derived by experiment.  Not quite sure what I'm doing here.....
   % but it gives 0dB impl loss for 2FSK Eb/No=9dB, testmode 1:
   %   Fs: 8000 Rs: 50 Ts: 160 nsym: 50
   %   frames: 200 Tbits: 9700 Terrs: 93 BER 0.010
@@ -380,7 +382,7 @@ endfunction
 % UW found Sometimes there may be several matches, returns the
 % position of the best match to UW.
 
-function [uw_start best_corr] = find_uw(states, start_bit, rx_bits)
+function [uw_start best_corr corr] = find_uw(states, start_bit, rx_bits)
   uw = states.uw;
 
   mapped_rx_bits = 2*rx_bits - 1;
@@ -391,8 +393,8 @@ function [uw_start best_corr] = find_uw(states, start_bit, rx_bits)
   % first first UW in buffer that exceeds threshold
   
   for i=start_bit:length(rx_bits) - length(uw)
-    corr  = mapped_rx_bits(i:i+length(uw)-1) * uw';
-    if (found_uw == 0) && (corr >= states.uw_thresh)
+    corr(i)  = mapped_rx_bits(i:i+length(uw)-1) * uw';
+    if (found_uw == 0) && (corr(i) >= states.uw_thresh)
       uw_start = i;
       best_corr = corr;
       found_uw = 1;
@@ -507,8 +509,8 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
   nfield = states.rtty.nfield;
   npad = states.rtty.npad;
 
-  uw_loc = find_uw(states.rtty, bit, rx_bits_log);
-
+  uw_loc = find_uw(states.rtty, bit, rx_bits_log, states.verbose);
+  
   while (uw_loc != -1)
 
     if (uw_loc + states.rtty.max_packet_len) < nbits
@@ -551,7 +553,7 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
     % look for next packet
 
     bit = uw_loc + length(states.rtty.uw);
-    uw_loc = find_uw(states.rtty, bit, rx_bits_log);
+    uw_loc = find_uw(states.rtty, bit, rx_bits_log, states.verbose);
 
   endwhile
 endfunction
@@ -563,14 +565,16 @@ endfunction
 % compile with:
 %   codec2-dev/src$ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
-function extract_and_decode_binary_packets(states, rx_bits_log)
+function corr_log = extract_and_decode_binary_packets(states, rx_bits_log)
+  corr_log = [];
 
   % use UWs to delimit start and end of data packets
 
   bit = 1;
   nbits = length(rx_bits_log);
 
-  [uw_loc best_corr] = find_uw(states.binary, bit, rx_bits_log);
+  [uw_loc best_corr corr] = find_uw(states.binary, bit, rx_bits_log, states.verbose);
+  corr_log = [corr_log corr];
 
   while (uw_loc != -1)
 
@@ -602,7 +606,8 @@ function extract_and_decode_binary_packets(states, rx_bits_log)
     end
 
     bit = uw_loc + length(states.binary.uw);
-    [uw_loc best_corr] = find_uw(states.binary, bit, rx_bits_log);
+    [uw_loc best_corr corr] = find_uw(states.binary, bit, rx_bits_log, states.verbose);
+    corr_log = [corr_log corr];
    
   endwhile
 endfunction
@@ -658,9 +663,9 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  test_frame_mode=5;
-  frames = 100;
-  EbNodB = 6;
+  test_frame_mode = 5;
+  frames = 10;
+  EbNodB = 60;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -741,8 +746,8 @@ function run_sim(test_frame_mode)
       tx_bits(1:2:length(tx_bits)) = 1;
     else
       % repeat each possible 4fsk symbol
-      %pattern = [0 0 0 1 1 0 1 1];
-      pattern = [0 0 0 1 0 0 0 1];
+      pattern = [0 0 0 1 1 0 1 1];
+      %pattern = [0 0 0 1 1 1 1 0];
       nrepeats = states.nbit*(frames+1)/length(pattern);
       tx_bits = [];
       for b=1:nrepeats
@@ -786,7 +791,7 @@ function run_sim(test_frame_mode)
   %rx(find (rx < -1)) = -1;
 
   % dump simulated rx file
-  ftx=fopen("fsk_horus_100bd_binary.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
+  ftx=fopen("fsk_horus.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
@@ -832,6 +837,7 @@ function run_sim(test_frame_mode)
     end
   end
 
+
   if test_frame_mode == 1
     printf("frames: %d EbNo: %3.2f Tbits: %d Terrs: %d BER %4.3f\n", frames, EbNodB, states.Tbits,states. Terrs, states.Terrs/states.Tbits);
   end
@@ -854,14 +860,6 @@ function run_sim(test_frame_mode)
   plot(x_log,'+')
   axis([-m m -m m])
   title('fine timing metric')
-
-  figure(7)
-  clf
-  subplot(211)
-  X = abs(fft(timing_nl_log));
-  plot(X(1:length(X)/2))
-  subplot(212)
-  plot(abs(timing_nl_log(1:100)))
 
   figure(3)
   clf
@@ -892,7 +890,15 @@ function run_sim(test_frame_mode)
   plot(EbNodB_log);
   title('Eb/No estimate')
 
-endfunction
+  figure(7)
+  clf
+  subplot(211)
+  X = abs(fft(timing_nl_log));
+  plot(X(1:length(X)/2))
+  subplot(212)
+  plot(abs(timing_nl_log(1:100)))
+
+ endfunction
 
 
 % demodulate a file of 8kHz 16bit short samples --------------------------------
@@ -905,17 +911,17 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 50, 4);
+    states = fsk_horus_init(8000, 100, 2);
     uwstates = fsk_horus_init_rtty_uw(states);
   end
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init(8000, 50, 4);
     uwstates = fsk_horus_init_binary_uw;
   end
 
-  states.verbose = 0x1;
+  states.verbose = 0x1 + 0x8;
 
   N = states.N;
   P = states.P;
@@ -962,6 +968,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
       % demodulate to stream of bits
 
       states = est_freq(states, sf, states.M);
+      %states.f = [1450 1590 1710 1850];
       [rx_bits states] = fsk_horus_demod(states, sf);
 
       rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
@@ -980,7 +987,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
           states.verbose = 0;
         end
       end
-    else      finished = 1;
+    else      
+      finished = 1;
     end
   end
   fclose(fin);
@@ -1042,17 +1050,27 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
 
   if (test_frame_mode == 4) || (test_frame_mode == 5)
     extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
-    extract_and_decode_binary_packets(states, rx_bits_log);
+    corr_log = extract_and_decode_binary_packets(states, rx_bits_log);
+
+    figure(8);
+    clf
+    plot(corr_log);
+    hold on;
+    plot([1 length(corr_log)],[states.binary.uw_thresh states.binary.uw_thresh],'g');
+    hold off;
+    title('UW correlation');
   end
+
 endfunction
 
 
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(5);
+  %run_sim(5);
+  rx_bits = demod_file("~/Desktop/4FSK_Scram_Interleaved.wav",5);
+  %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
-  %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
