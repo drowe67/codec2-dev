@@ -274,8 +274,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   %%# same as sum of ((abs(f1_int)-abs(f2_int)).^2) .* exp(-j*w*(0:Np-1))
   x = ((abs(f1_int)-abs(f2_int)).^2) * exp(-j*w*(0:Np-1))';
   
-
-  x;
   norm_rx_timing = angle(x)/(2*pi);
   rx_timing = norm_rx_timing*P;
 
@@ -344,6 +342,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   x = abs(abs(f1_int_resample) - abs(f2_int_resample));
   states.EbNodB = 20*log10(1E-6+mean(x)/(1E-6+std(x)));
+ % printf("EbNodB %f\n",states.EbNodB);
 endfunction
 
 

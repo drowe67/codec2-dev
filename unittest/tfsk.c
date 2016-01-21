@@ -1,12 +1,12 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: fsk_demod.c
+  FILE........: tfsk.c
   AUTHOR......: Brady O'Brien
-  DATE CREATED: 8 January 2016
+  DATE CREATED: 20 January 2016
 
-  C test driver for fsk_demod in fsk.c. Reads in a stream of 32 bit cpu endian
-  floats and writes out the detected bits
-   
+  C test driver for fsk_mod and fsk_demod in fsk.c. Reads a file with input
+  bits/rf and spits out modulated/demoduladed samples and a dump of internal
+  state 
 
 \*---------------------------------------------------------------------------*/
 
@@ -27,9 +27,15 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#include <stdio.h>
-#include "fsk.h"
+
+#define MODEMPROBE_ENABLE
+
 #include "modem_probe.h"
+#include <stdio.h>
+
+/* Note: This is a dirty hack to force fsk.c to compile with modem probing enabled */
+#include "fsk.c"
+
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
@@ -39,7 +45,7 @@ int main(int argc,char *argv[]){
     float *modbuf;
     
     if(argc<7){
-        printf("Usage: %s samplerate bitrate f1 f2 rffile bitfile [probefile]\n",argv[0]);
+        printf("Usage: %s samplerate bitrate f1 f2 infile outfile [probefile]\n",argv[0]);
         exit(1);
     }
     
