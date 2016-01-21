@@ -34,6 +34,10 @@
 /* P oversampling rate constant -- should probably be init-time configurable */
 #define ct_P 8
 
+/* Define this to enable EbNodB estimate */
+/* This needs square roots, may take more cpu time than it's worth */
+#define EST_EBNO
+
 /*---------------------------------------------------------------------------*\
 
                                INCLUDES
@@ -48,6 +52,7 @@
 #include "fsk.h"
 #include "comp_prim.h"
 #include "kiss_fftr.h"
+#include "modem_probe.h"
 
 /*---------------------------------------------------------------------------*\
 
@@ -323,16 +328,19 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int nstash = fsk->nstash;
     COMP *f1_int, *f2_int;
     COMP t1,t2;
-    float phi1_d = fsk->phi1_d;
-    float phi2_d = fsk->phi2_d;
-    float phi_ft = 0; /* Phase of fine timing estimator */
+    COMP phi1_c = fsk->phi1_c;
+    COMP phi2_c = fsk->phi2_c;
+    COMP phi_ft;                 /* Phase of fine timing estimator */
     int nold = Nmem-nin;
-    float dphi1,dphi2,dphift;
+    COMP dphi1,dphi2;
+    COMP dphift;
     float f1,f2;
     float rx_timing,norm_rx_timing;//,old_norm_rx_timing;//,d_norm_rx_timing;
     int using_old_samps;
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf;
+    
+    float meanebno,stdebno;
     
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,&f1,&f2,&twist);
@@ -350,14 +358,9 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
     f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
 
-    
-    /* Note: This would all be quite a bit faster with complex oscillators, like
-     * TX. */
-    /* TODO: change these to complex oscillators */
     /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = 2*M_PI*((float)(f1)/(float)(Fs));
-    dphi2 = 2*M_PI*((float)(f2)/(float)(Fs));
-
+    dphi1 = comp_exp_j(-2*M_PI*((float)(f1)/(float)(Fs)));
+    dphi2 = comp_exp_j(-2*M_PI*((float)(f2)/(float)(Fs)));
 
     dc_i = 0;
     cbuf_i = 0;
@@ -373,16 +376,20 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             using_old_samps = 0;
         }
         /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=fcmult(sample_src[dc_i],comp_exp_j(phi1_d));;
-        f2_intbuf[dc_i]=fcmult(sample_src[dc_i],comp_exp_j(phi2_d));;
+        f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
+        f2_intbuf[dc_i]=fcmult(sample_src[dc_i],phi2_c);
 
         /* Spin downconversion phases */
-        phi1_d -= dphi1;
-        phi2_d -= dphi2;
-        if(phi1_d<0) phi1_d+=2*M_PI;
-        if(phi2_d<0) phi2_d+=2*M_PI;
+        phi1_c = cmult(phi1_c,dphi1);
+        phi2_c = cmult(phi2_c,dphi2);
     }
+    modem_probe_samp_c("t_f1_dc",&f1_intbuf[0],Ts-(Ts/P));
+    modem_probe_samp_c("t_f2_dc",&f2_intbuf[0],Ts-(Ts/P));
     cbuf_i = dc_i;
+    
+    float f1_strs,f1_stis,f2_strs,f2_stis;
+    float f1_strc,f1_stic,f2_strc,f2_stic;
+    float y,t;
     
     /* Integrate over Ts at offsets of Ts/P */
     for(i=0; i<(nsym+1)*P; i++){
@@ -395,31 +402,61 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
                 using_old_samps = 0;
             }
             /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],comp_exp_j(phi1_d));;
-            f2_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],comp_exp_j(phi2_d));;
-
+            f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
+            f2_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi2_c);
+            
             /* Spin downconversion phases */
-            phi1_d -= dphi1;
-            phi2_d -= dphi2;
-            if(phi1_d<0) phi1_d+=2*M_PI;
-            if(phi2_d<0) phi2_d+=2*M_PI;
+            phi1_c = cmult(phi1_c,dphi1);
+            phi2_c = cmult(phi2_c,dphi2);
         }
+        
+        /* Dump internal samples */
+        modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i],Ts/P);
+        modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i],Ts/P);
+        
         cbuf_i += Ts/P;
         if(cbuf_i>=Ts) cbuf_i = 0;
         
         /* Integrate over the integration buffers, save samples */
+        /* This uses Kahan summation to reduce floating point funnyness */
         t1 = t2 = comp0();
+        f1_strc = f1_stic = 0;
+        f2_strc = f2_stic = 0;
+        f1_strs = f1_stis = 0;
+        f2_strs = f2_stis = 0;
         for(j=0; j<Ts; j++){
-            t1 = cadd(t1,f1_intbuf[j]);
-            t2 = cadd(t2,f2_intbuf[j]);
+            y = f1_intbuf[j].real - f1_strc;
+            t = f1_strs + y;
+            f1_strc = (t - f1_strs) - y;
+            f1_strs = t;
+            
+            y = f1_intbuf[j].imag - f1_stic;
+            t = f1_stis + y;
+            f1_stic = (t - f1_stis) - y;
+            f1_stis = t;
+            
+            y = f2_intbuf[j].real - f2_strc;
+            t = f2_strs + y;
+            f2_strc = (t - f2_strs) - y;
+            f2_strs = t;
+            
+            y = f2_intbuf[j].imag - f2_stic;
+            t = f2_stis + y;
+            f2_stic = (t - f2_stis) - y;
+            f2_stis = t;
+            
+            //t1 = cadd(t1,f1_intbuf[j]);
+            //t2 = cadd(t2,f2_intbuf[j]);
         }
-        f1_int[i] = t1;
-        f2_int[i] = t2;
+        f1_int[i].real = f1_strs;
+        f1_int[i].imag = f1_stis;
+        f2_int[i].real = f2_strs;
+        f2_int[i].imag = f2_stis;
         
     }
 
-    fsk->phi1_d = phi1_d;
-    fsk->phi2_d = phi2_d;
+    fsk->phi1_c = comp_normalize(phi1_c);
+    fsk->phi2_c = comp_normalize(phi2_c);
 
     /* Stash samples away in the old sample buffer for the next round of bit getting */
     memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(float)*nstash);
@@ -429,20 +466,23 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
      * exract angle */
      
     /* Figure out how much to spin the oscillator to extract magic spectral line */
-    dphift = 2*M_PI*((float)(Rs)/(float)(P*Rs));
+    dphift = comp_exp_j(-2*M_PI*((float)(Rs)/(float)(P*Rs)));
+    phi_ft.real = 1;
+    phi_ft.imag = 0;
     t1=comp0();
     for(i=0; i<(nsym+1)*P; i++){
         /* Get abs of f1_int[i] and f2_int[i] */
-        ft1 = sqrtf( (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag) );
-        ft2 = sqrtf( (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag) );
+        //ft1 = sqrtf( (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag) );
+        //ft2 = sqrtf( (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag) );
+        ft1 = cabsolute(f1_int[i]);
+        ft2 = cabsolute(f2_int[i]);
         /* Add and square 'em */
         ft1 = ft1-ft2;
         ft1 = ft1*ft1;
         /* Spin the oscillator for the magic line shift */
         /* Down shift and accumulate magic line */
-        t1 = cadd(t1,fcmult(ft1,comp_exp_j(phi_ft)));
-        phi_ft -= dphift;
-        if(phi_ft<0) phi_ft+=2*M_PI;
+        t1 = cadd(t1,fcmult(ft1,phi_ft));
+        phi_ft = cmult(phi_ft,dphift);
     }
     /* Get the magic angle */
     norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
@@ -465,10 +505,16 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     else
         fsk->nin = N;
     
+    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);;
+    
     /* Re-sample the integrators with linear interpolation magic */
     int low_sample = (int)floorf(rx_timing);
     float fract = rx_timing - (float)low_sample;
     int high_sample = (int)ceilf(rx_timing);
+    
+    #ifdef EST_EBNO
+    meanebno = 0;
+    #endif
   
     /* FINALLY, THE BITS */
     /* also, resample f1_int,f2_int */
@@ -479,12 +525,52 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
         t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
         
+        /* Accumulate resampled int magnitude for EbNodB estimation */
+        #ifdef EST_EBNO
+        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
+        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
+        ft1 = fabsf(ft1-ft2);
+        meanebno += ft1;
+        #endif
+        
         /* THE BIT! */
         rx_bits[i] = comp_mag_gt(t2,t1)?1:0;
         /* Soft output goes here */
     }
     
-    printf("rx_timing: %3.2f low_sample: %d high_sample: %d fract: %3.3f nin_next: %d\n", rx_timing, low_sample, high_sample, fract, fsk->nin);
+    #ifdef EST_EBNO
+    /* Calculate mean for EbNodB estimation */
+    meanebno = meanebno/(float)nsym;
+    stdebno = 0;
+    /* Go back through the data and figure the std dev */
+    for(i=0; i<nsym; i++){
+        int st = (i+1)*P;
+        t1 =         fcmult(1-fract,f1_int[st+ low_sample]);
+        t1 = cadd(t1,fcmult(  fract,f1_int[st+high_sample]));
+        t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
+        t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
+        
+        /* Accumulate resampled int magnitude for EbNodB estimation */
+        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
+        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
+        ft1 = fabsf(ft1-ft2);
+        ft2 = abs(meanebno-ft1);
+        stdebno += ft2*ft2;
+    }
+    /* Finish figuring std. dev. */
+    stdebno = sqrtf(stdebno/(float)(nsym-1));
+    fsk->EbNodB = 20*log10f((1e-6+meanebno)/(1e-6+stdebno));
+    #else
+    fsk->EbNodB = 0;
+    #endif
+    
+    /* Dump some internal samples */
+    modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
+    modem_probe_samp_f("t_f1",&f1,1);
+    modem_probe_samp_f("t_f2",&f2,1);
+    modem_probe_samp_c("t_f1_int",f1_int,(nsym+1)*P);
+    modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
+    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);;
 }
 
 
