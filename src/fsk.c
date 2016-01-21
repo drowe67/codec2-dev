@@ -387,10 +387,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     }
     cbuf_i = dc_i;
     
-    float f1_strs,f1_stis,f2_strs,f2_stis;
-    float f1_strc,f1_stic,f2_strc,f2_stic;
-    float y,t;
-    
     /* Integrate over Ts at offsets of Ts/P */
     for(i=0; i<(nsym+1)*P; i++){
         /* Downconvert and Place Ts/P samples in the integration buffers */
@@ -428,31 +424,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         f1_strs = f1_stis = 0;
         f2_strs = f2_stis = 0;
         for(j=0; j<Ts; j++){
-           /* y = f1_intbuf[j].real - f1_strc;
-            t = f1_strs + y;
-            f1_strc = (t - f1_strs) - y;
-            f1_strs = t;
-            
-            y = f1_intbuf[j].imag - f1_stic;
-            t = f1_stis + y;
-            f1_stic = (t - f1_stis) - y;
-            f1_stis = t;
-            
-            y = f2_intbuf[j].real - f2_strc;
-            t = f2_strs + y;
-            f2_strc = (t - f2_strs) - y;
-            f2_strs = t;
-            
-            y = f2_intbuf[j].imag - f2_stic;
-            t = f2_stis + y;
-            f2_stic = (t - f2_stis) - y;
-            f2_stis = t;
-            t1.real = f1_strs;
-            t1.imag = f1_stis;
-            t2.real = f2_strs;
-            t2.real = f2_stis;
-            */
-            
             t1 = cadd(t1,f1_intbuf[j]);
             t2 = cadd(t2,f2_intbuf[j]);
         }
@@ -483,30 +454,16 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* Get abs of f1_int[i] and f2_int[i] */
         ft1 = sqrtf( (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag) );
         ft2 = sqrtf( (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag) );
-        //ft1 = cabsolute(f1_int[i]);
-        //ft2 = cabsolute(f2_int[i]);
+        
         /* Add and square 'em */
         ft1 = ft1-ft2;
         ft1 = ft1*ft1;
         /* Spin the oscillator for the magic line shift */
         /* Down shift and accumulate magic line */
         t1 = cadd(t1,fcmult(ft1,phi_ft));
-        //t1 = fcmult(ft1,phi_ft);
-        
-        y = t1.real - ft_rc;
-        t = ft_rs + y;
-        ft_rc = (t - ft_rs) - y;
-        ft_rs = t;
-        
-        y = t1.imag - ft_ic;
-        t = ft_is + y;
-        ft_ic = (t - ft_is) - y;
-        ft_is = t;
-        
+
         phi_ft = cmult(phi_ft,dphift);
     }
-   // t1.real = ft_rs;
-   // t1.imag = ft_is;
     /* Get the magic angle */
     norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
