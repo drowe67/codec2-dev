@@ -22,7 +22,7 @@ graphics_toolkit('gnuplot');
 
 
 global mod_pass_fail_maxdiff = 1e-3/50000;
-global demod_pass_fail_maxdiff = .1;
+global demod_pass_fail_maxdiff = .01;
 
 function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
     %Name of executable containing the modulator
@@ -75,29 +75,33 @@ function bits = fsk_demod_c(Fs,Rs,f1,f2,mod)
 endfunction
 
 %Compare 2 vectors, fail if they are not close enough
-function pass = vcompare(va,vb,vname,tname)
-    global demod_pass_fail_maxdiff;
+function pass = vcompare(va,vb,vname,tname,tol)
     
     %Get delta of vectors
-    dvec = abs(va)-abs(vb);     
+    dvec = abs(abs(va)-abs(vb));     
     
     %Normalize difference
-    dvec = dvec ./ max(va);
+    dvec = dvec ./ abs(max(abs(va)));
     
-    titlestr = sprintf('Diff between C and Octave of %s for %s',vname,tname);
-    pass = max(dvec)<(demod_pass_fail_maxdiff)
-    maxdvec = max(dvec)
-    %figure(12)
-    %title(titlestr)
-    %plot(abs(dvec))
+    maxdvec = abs(max(dvec))
+    pass = maxdvec<tol
     
-    %figure(13)
-    %plot(abs(va))
+    printf('Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
     
-    %figure(14)
-    %plot(abs(vb))
+    if pass == 0
+        printf('\n*** vcompaire failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
+        
+        titlestr = sprintf('Diff between C and Octave of %s for %s',vname,tname)
+        figure(12)
+        plot(abs(dvec))
+        title(titlestr)
+        
+        figure(13)
+        plot(abs(va))
     
-    printf('Comparing vectors %s in test %s\n',vname,tname);
+        figure(14)
+        plot(abs(vb))
+    end
     assert(pass);
     
 endfunction
@@ -143,6 +147,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     o_rx_timing = [];
     %Run octave demod, dump some test vectors
     states = fsk_horus_init(Fs,Rs);
+    Ts = states.Ts;
+    P = states.P;
     states.f1_tx = f1;
     states.f2_tx = f2;
     states.dA = 1;
@@ -156,25 +162,36 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
         obits = [obits bitbuf];
         
         %Save other parameters
-        o_f1_dc = [o_f1_dc states.f1_dc];
-        o_f2_dc = [o_f2_dc states.f2_dc];
+        o_f1_dc = [o_f1_dc states.f1_dc(1:states.Nmem-Ts/P)];
+        o_f2_dc = [o_f2_dc states.f2_dc(1:states.Nmem-Ts/P)];
         o_f1_int = [o_f1_int states.f1_int];
         o_f2_int = [o_f2_int states.f2_int];
         o_EbNodB = [o_EbNodB states.EbNodB];
         o_rx_timing = [o_rx_timing states.rx_timing];
     end
     
-    pass = 1;
-    pass = and(pass,vcompare(o_rx_timing,t_rx_timing,'rx_timing',tname));
-    pass = and(pass,vcompare(o_f1_int,t_f1_int,'f1_int',tname));
-    pass = and(pass,vcompare(o_f2_int,t_f2_int,'f2_int',tname));
-     
-    diff = sum(xor(obits,bits'))
+    pass =         vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.011);
+    pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.15);
+    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.011);
+    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.011);
+    pass = pass && vcompare(o_f1_dc(1:length(t_f1_dc)),  t_f1_dc,    'f1_dc',    tname,.001);
+    pass = pass && vcompare(o_f2_dc(1:length(t_f1_dc)),  t_f2_dc,    'f2_dc',    tname,.001);
     
-    pass = pass && diff<2;
+    diffpass = sum(xor(obits,bits'))<3
+    
+    if diffpass==0
+        printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
+        figure(15)
+        plot(xor(obits,bits'))
+        title(sprintf('Bitcompare failure test %s',tname))
+    end
+    
+    pass = pass && diffpass;
+    
+    
     test_stats.pass = pass;
-    assert(pass)
-    test_stats.diff = diff;
+    test_stats.diff = sum(xor(obits,bits'));
+    
 endfunction
 
 function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,f2,bits,tname)
@@ -290,7 +307,7 @@ function pass = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     %%%states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
-	states.tx_bits_file = "horus_payload_rtty.txt"
+	states.tx_bits_file = "horus_payload_rtty.txt";
   end
 
   % ----------------------------------------------------------------------
@@ -362,25 +379,13 @@ function pass = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   
 endfunction
 
-function pass = ebno_battery_test(fading,df,dA)
-    pass = 1
-    ebnodbrange = (2:13)
-    timing_offset=0;
-  
-    npass=zeros(1,length(ebnodbrange));
-    for i=(1:length(npass))
-        npass(i) = tfsk_run_sim(5,ebnodbrange(i),0,0,df,dA)
-        assert(npass(i))
-        pass = npass(i) && pass
-    end
-endfunction
 
 function pass = ebno_battery_test(timing_offset,fading,df,dA)
     %Range of EbNodB over which to test
     ebnodbrange = fliplr(3:13);
     ebnodbs = length(ebnodbrange);
     
-    mode = 2;
+    mode = 5;
     %Replication of other parameters for parcellfun
     modev   = repmat(mode,1,ebnodbs);
     timingv = repmat(timing_offset,1,ebnodbs);
@@ -388,10 +393,14 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     
-    passv = pararrayfun(floor(.7*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    
+    passv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
     %passv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
     
-    pass = sum(passv)>=length(passv)
+    %All pass flags are '1'
+    pass = sum(passv)>=length(passv);
+    %and no tests died
+    pass = pass && length(passv)==ebnodbs;
     passv
     assert(pass)
 endfunction

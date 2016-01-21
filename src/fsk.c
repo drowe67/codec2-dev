@@ -379,12 +379,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
         f2_intbuf[dc_i]=fcmult(sample_src[dc_i],phi2_c);
 
+        modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
+        modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
         /* Spin downconversion phases */
         phi1_c = cmult(phi1_c,dphi1);
         phi2_c = cmult(phi2_c,dphi2);
     }
-    modem_probe_samp_c("t_f1_dc",&f1_intbuf[0],Ts-(Ts/P));
-    modem_probe_samp_c("t_f2_dc",&f2_intbuf[0],Ts-(Ts/P));
     cbuf_i = dc_i;
     
     float f1_strs,f1_stis,f2_strs,f2_stis;
@@ -405,14 +405,17 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
             f2_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi2_c);
             
+            
+            modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
+            modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);
+            
             /* Spin downconversion phases */
             phi1_c = cmult(phi1_c,dphi1);
             phi2_c = cmult(phi2_c,dphi2);
+            
         }
         
         /* Dump internal samples */
-        modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i],Ts/P);
-        modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i],Ts/P);
         
         cbuf_i += Ts/P;
         if(cbuf_i>=Ts) cbuf_i = 0;
@@ -425,7 +428,7 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         f1_strs = f1_stis = 0;
         f2_strs = f2_stis = 0;
         for(j=0; j<Ts; j++){
-            y = f1_intbuf[j].real - f1_strc;
+           /* y = f1_intbuf[j].real - f1_strc;
             t = f1_strs + y;
             f1_strc = (t - f1_strs) - y;
             f1_strs = t;
@@ -444,14 +447,17 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             t = f2_stis + y;
             f2_stic = (t - f2_stis) - y;
             f2_stis = t;
+            t1.real = f1_strs;
+            t1.imag = f1_stis;
+            t2.real = f2_strs;
+            t2.real = f2_stis;
+            */
             
-            //t1 = cadd(t1,f1_intbuf[j]);
-            //t2 = cadd(t2,f2_intbuf[j]);
+            t1 = cadd(t1,f1_intbuf[j]);
+            t2 = cadd(t2,f2_intbuf[j]);
         }
-        f1_int[i].real = f1_strs;
-        f1_int[i].imag = f1_stis;
-        f2_int[i].real = f2_strs;
-        f2_int[i].imag = f2_stis;
+        f1_int[i] = t1;
+        f2_int[i] = t2;
         
     }
 
@@ -465,6 +471,9 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
      * exract angle */
      
+    float ft_rc,ft_rs,ft_ic,ft_is;
+    ft_rc = ft_rs = 0;
+    ft_ic = ft_is = 0;
     /* Figure out how much to spin the oscillator to extract magic spectral line */
     dphift = comp_exp_j(-2*M_PI*((float)(Rs)/(float)(P*Rs)));
     phi_ft.real = 1;
@@ -472,18 +481,32 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     t1=comp0();
     for(i=0; i<(nsym+1)*P; i++){
         /* Get abs of f1_int[i] and f2_int[i] */
-        //ft1 = sqrtf( (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag) );
-        //ft2 = sqrtf( (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag) );
-        ft1 = cabsolute(f1_int[i]);
-        ft2 = cabsolute(f2_int[i]);
+        ft1 = sqrtf( (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag) );
+        ft2 = sqrtf( (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag) );
+        //ft1 = cabsolute(f1_int[i]);
+        //ft2 = cabsolute(f2_int[i]);
         /* Add and square 'em */
         ft1 = ft1-ft2;
         ft1 = ft1*ft1;
         /* Spin the oscillator for the magic line shift */
         /* Down shift and accumulate magic line */
         t1 = cadd(t1,fcmult(ft1,phi_ft));
+        //t1 = fcmult(ft1,phi_ft);
+        
+        y = t1.real - ft_rc;
+        t = ft_rs + y;
+        ft_rc = (t - ft_rs) - y;
+        ft_rs = t;
+        
+        y = t1.imag - ft_ic;
+        t = ft_is + y;
+        ft_ic = (t - ft_is) - y;
+        ft_is = t;
+        
         phi_ft = cmult(phi_ft,dphift);
     }
+   // t1.real = ft_rs;
+   // t1.imag = ft_is;
     /* Get the magic angle */
     norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
