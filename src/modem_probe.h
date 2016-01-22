@@ -34,6 +34,7 @@
 
 #ifdef MODEMPROBE_ENABLE
 
+/* Internal functions */
 void modem_probe_init_int(char *modname, char *runname);
 void modem_probe_close_int();
 
@@ -41,48 +42,72 @@ void modem_probe_samp_i_int(char * tracename,int samp[],size_t cnt);
 void modem_probe_samp_f_int(char * tracename,float samp[],size_t cnt);
 void modem_probe_samp_c_int(char * tracename,COMP samp[],size_t cnt);
 
-
+/* 
+ * Init the probe library.
+ * char *modname - Name of the modem under test
+ * char *runname - Name/path of the file data is dumped to
+ */
 static inline void modem_probe_init(char *modname,char *runname){
-	modem_probe_init_int(modname,runname);
+        modem_probe_init_int(modname,runname);
 }
 
+/*
+ * Dump traces to a file and clean up
+ */
 static inline void modem_probe_close(){
-	modem_probe_close_int();
+        modem_probe_close_int();
 }
 
+/*
+ * Save some number of int samples to a named trace
+ * char *tracename - name of trace being saved to
+ * int samp[] - int samples
+ * size_t cnt - how many samples to save
+ */
 static inline void modem_probe_samp_i(char *tracename,int samp[],size_t cnt){
-	modem_probe_samp_i_int(tracename,samp,cnt);
+        modem_probe_samp_i_int(tracename,samp,cnt);
 }
 
-
+/*
+ * Save some number of float samples to a named trace
+ * char *tracename - name of trace being saved to
+ * float samp[] - int samples
+ * size_t cnt - how many samples to save
+ */
 static inline void modem_probe_samp_f(char *tracename,float samp[],size_t cnt){
-	modem_probe_samp_f_int(tracename,samp,cnt);
-}	
+        modem_probe_samp_f_int(tracename,samp,cnt);
+}       
 
+/*
+ * Save some number of complex samples to a named trace
+ * char *tracename - name of trace being saved to
+ * COMP samp[] - int samples
+ * size_t cnt - how many samples to save
+ */
 static inline void modem_probe_samp_c(char *tracename,COMP samp[],size_t cnt){
-	modem_probe_samp_c_int(tracename,samp,cnt);
+        modem_probe_samp_c_int(tracename,samp,cnt);
 }
 
 #else
 
 static inline void modem_probe_init(char *modname,char *runname){
-	return;
+        return;
 }
 
 static inline void modem_probe_close(){
-	return;
+        return;
 }
 
 static inline void modem_probe_samp_i(char *name,int samp[],size_t sampcnt){
-	return;
+        return;
 }
 
 static inline void modem_probe_samp_f(char *name,float samp[],size_t cnt){
-	return;
+        return;
 }
 
 static inline void modem_probe_samp_c(char *name,COMP samp[],size_t cnt){
-	return;
+        return;
 }
 
 #endif

@@ -1,6 +1,24 @@
 % tfsk.m
-% Brady O'Brien 8 January 2016
+% Author: Brady O'Brien 8 January 2016
+
+
+
+%   Copyright 2016 David Rowe
+%  
+%  All rights reserved.
 %
+%  This program is free software; you can redistribute it and/or modify
+%  it under the terms of the GNU Lesser General Public License version 2, as
+%  published by the Free Software Foundation.  This program is
+%  distributed in the hope that it will be useful, but WITHOUT ANY
+%  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+%  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+%  License for more details.
+%
+%  You should have received a copy of the GNU Lesser General Public License
+%  along with this program; if not, see <http://www.gnu.org/licenses/>.
+
+
 % Octave script to check c port of fsk_horus against the fsk_horus.m
 %
 % [X] - Functions to wrap around fsk_mod and fsk_demod executables
@@ -10,19 +28,32 @@
 %       same dataset, compare outputs, and give clear go/no-go
 %     [X] - fsk_mod_test
 %     [X] - fsk_demod_test
-% [.] - Port of run_sim and EbNodB curve test battery
-% [ ] - Extract and compare more parameters from demod
-% [ ] - Run some tests in parallel
+% [X] - Port of run_sim and EbNodB curve test battery
+% [X] - Extract and compare more parameters from demod
+% [X] - Run some tests in parallel
+
+%
+% FSK Modem test instructions --
+% 1 - Compile tfsk.c and fm_mod.c
+%     - tfsk.c is in unittest/, so build must not be configured for release
+% 2 - Change tfsk_location and fsk_mod_location to point to tfsk and fsk_mod
+% 3 - Ensure octave packages signal and parallel are installed
+% 4 - run tfsk.m. It will take care of the rest.
+%
+
+
+global tfsk_location = '../build/unittest/tfsk';
+global fsk_mod_location = '../build/src/fsk_mod';
+
 
 fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
 fsk_horus_2fsk;  
 pkg load signal;
-
+pkg load parallel;
 graphics_toolkit('gnuplot');
 
 
 global mod_pass_fail_maxdiff = 1e-3/50000;
-global demod_pass_fail_maxdiff = .01;
 
 function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
     %Name of executable containing the modulator
@@ -45,34 +76,6 @@ function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
     
 endfunction
 
-function bits = fsk_demod_c(Fs,Rs,f1,f2,mod)
-    %Name of executable containing the modulator
-    fsk_demod_ex_file = '../build/unittest/tfsk';
-    modvecfilename = sprintf('fsk_demod_ut_modvec_%d',getpid());
-    bitvecfilename = sprintf('fsk_demod_ut_bitvec_%d',getpid());
-    tvecfilename = sprintf('fsk_demod_ut_tracevec_%d.txt',getpid());
-    
-    %command to be run by system to launch the demod
-    command = sprintf('%s %d %d %d %d %s %s %s',fsk_demod_ex_file,Fs,Rs,f1,f2,modvecfilename,bitvecfilename,tvecfilename);
-    
-    %save modulated input into a file
-    modvecfile = fopen(modvecfilename,'wb+');
-    fwrite(modvecfile,mod,'single');
-    fclose(modvecfile);
-    
-    %run the modulator
-    system(command);
-    
-    bitvecfile = fopen(bitvecfilename,'rb');
-    bits = fread(bitvecfile,'uint8');
-    fclose(bitvecfile);
-    bits = bits!=0;
-    
-    %Clean up files
-    delete(bitvecfilename);
-    delete(modvecfilename);
-    %delete(tvecfilename);
-endfunction
 
 %Compare 2 vectors, fail if they are not close enough
 function pass = vcompare(va,vb,vname,tname,tol)
@@ -138,12 +141,12 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     delete(modvecfilename);
     delete(tvecfilename);
     
-    
     o_f1_dc = [];
     o_f2_dc = [];
     o_f1_int = [];
     o_f2_int = [];
     o_EbNodB = [];
+    o_ppm = [];
     o_rx_timing = [];
     %Run octave demod, dump some test vectors
     states = fsk_horus_init(Fs,Rs);
@@ -167,15 +170,17 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
         o_f1_int = [o_f1_int states.f1_int];
         o_f2_int = [o_f2_int states.f2_int];
         o_EbNodB = [o_EbNodB states.EbNodB];
+        o_ppm = [o_ppm states.ppm];
         o_rx_timing = [o_rx_timing states.rx_timing];
     end
     
     pass =         vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.011);
     pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.15);
+    pass = pass && vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.011);
     pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.011);
     pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.011);
-    pass = pass && vcompare(o_f1_dc(1:length(t_f1_dc)),  t_f1_dc,    'f1_dc',    tname,.001);
-    pass = pass && vcompare(o_f2_dc(1:length(t_f1_dc)),  t_f2_dc,    'f2_dc',    tname,.001);
+    pass = pass && vcompare(o_f1_dc,      t_f1_dc,    'f1_dc',    tname,.001);
+    pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
     
     diffpass = sum(xor(obits,bits'))<3
     
@@ -210,39 +215,6 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,f2,bits,tname)
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod))
     if !pass
         printf('Mod failed test %s!\n',tname);
-    end
-endfunction
-
-function [cbits,obits,pass] = fsk_demod_test(Fs,Rs,f1,f2,mod,tname)
-    global pass_fail_maxdiff;
-    %Run the C demodulator
-    cbits = fsk_demod_c(Fs,Rs,f1,f2,mod)';
-    %Set up and run the octave demodulator
-    states = fsk_horus_init(Fs,Rs);
-    states.f1_tx = f1;
-    states.f2_tx = f2;
-    states.dA = 1;
-    states.dF = 0;
-    
-    modin = mod;
-    obits = [];
-    while length(modin)>=states.nin
-        ninold = states.nin;
-        [bitbuf,states] = fsk_horus_demod(states, modin(1:states.nin));
-        modin=modin(ninold+1:length(modin));
-        obits = [obits bitbuf];
-    end
-    
-    diff = sum(xor(obits,cbits))
-    
-    %Allow 2 bit difference between model and C
-    pass = diff < 3
-    if !pass
-        printf('Demod failed test %s!\n',tname);
-        figure(10);
-        plot((1:length(obits)),obits,(1:length(cbits)),cbits);
-        figure(11);
-        plot(xor(obits,cbits));
     end
 endfunction
 
@@ -432,3 +404,5 @@ function pass = test_fsk_battery()
         printf("***** All tests passed! *****\n");
     end
 endfunction
+
+test_fsk_battery
