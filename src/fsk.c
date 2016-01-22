@@ -127,7 +127,7 @@ struct FSK * fsk_create(int Fs, int Rs, int tx_f1,int tx_f2)
         return NULL;
     }
     
-    for(int i=0;i<memold;i++)fsk->samp_old[i]=0;
+    for(i=0;i<memold;i++) fsk->samp_old[i]=0;
     
     fsk->fft_cfg = kiss_fftr_alloc(Ndft,0,NULL,NULL);
     if(fsk->fft_cfg == NULL){
