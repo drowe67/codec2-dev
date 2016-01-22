@@ -511,6 +511,11 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* THE BIT! */
         rx_bits[i] = comp_mag_gt(t2,t1)?1:0;
         /* Soft output goes here */
+        
+        /* Log the bit */
+        /* We must do some bit monkeying here, as rx_bits is uint8 while samp_i expects an int32 */
+        j = rx_bits[i]>0;
+        modem_probe_samp_i("t_rxbit",&j,1);
     }
     
     #ifdef EST_EBNO
@@ -567,17 +572,22 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     for(i=0; i<fsk->Nsym; i++){
         /* select current bit phase shift */
         dph = tx_bits[i]==0?dosc_f1:dosc_f2;
+        
+        /* Log the bit being modulated */
+        j = tx_bits[i]>0;
+        modem_probe_samp_i("t_txbit",&j,1);
+        
         for(j=0; j<Ts; j++){
             tx_phase_c = cmult(tx_phase_c,dph);
             fsk_out[i*Ts+j] = 2*tx_phase_c.real;
         }
     }
     
-    /* Normalize TX phase to prevent drift */
-    tx_phase_c = comp_normalize(tx_phase_c);
+    /* Log the modulated samples */
+    modem_probe_samp_f("t_txmod",fsk_out,fsk->N);
     
     /* save TX phase */
-    fsk->tx_phase_c = tx_phase_c;
+    fsk->tx_phase_c = comp_normalize(tx_phase_c);
     
 }
 
