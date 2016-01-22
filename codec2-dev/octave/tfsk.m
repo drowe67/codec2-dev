@@ -41,8 +41,10 @@
 % 4 - run tfsk.m. It will take care of the rest.
 %
 
-
+%tfsk executable path/file
 global tfsk_location = '../build/unittest/tfsk';
+
+%fsk_mod path/file
 global fsk_mod_location = '../build/src/fsk_mod';
 
 
@@ -56,11 +58,10 @@ graphics_toolkit('gnuplot');
 global mod_pass_fail_maxdiff = 1e-3/50000;
 
 function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
-    %Name of executable containing the modulator
-    fsk_mod_ex_file = '../build/src/fsk_mod';
     
+    global fsk_mod_location;
     %command to be run by system to launch the modulator
-    command = sprintf('%s %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec',fsk_mod_ex_file,Fs,Rs,f1,f2);
+    command = sprintf('%s %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec',fsk_mod_location,Fs,Rs,f1,f2);
     
     %save input bits into a file
     bitvecfile = fopen('fsk_mod_ut_bitvec','wb+');
@@ -110,7 +111,7 @@ function pass = vcompare(va,vb,vname,tname,tol)
 endfunction
 
 function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
-    global mod_pass_fail_maxdiff;
+    global tfsk_location;
     %Name of executable containing the modulator
     fsk_demod_ex_file = '../build/unittest/tfsk';
     modvecfilename = sprintf('fsk_demod_ut_modvec_%d',getpid());
@@ -118,7 +119,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     tvecfilename = sprintf('fsk_demod_ut_tracevec_%d.txt',getpid());
     
     %command to be run by system to launch the demod
-    command = sprintf('%s %d %d %d %d %s %s %s',fsk_demod_ex_file,Fs,Rs,f1,f2,modvecfilename,bitvecfilename,tvecfilename);
+    command = sprintf('%s %d %d %d %d %s %s %s',tfsk_location,Fs,Rs,f1,f2,modvecfilename,bitvecfilename,tvecfilename);
     
     %save modulated input into a file
     modvecfile = fopen(modvecfilename,'wb+');
