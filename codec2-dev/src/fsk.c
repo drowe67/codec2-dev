@@ -113,8 +113,6 @@ struct FSK * fsk_create(int Fs, int Rs, int tx_f1,int tx_f2)
     fsk->nin = fsk->N;
     
     /* Set up rx state */
-    fsk->phi1_d = 0;
-    fsk->phi2_d = 0;
     fsk->phi1_c.real = 1;
     fsk->phi1_c.imag = 0;
     fsk->phi2_c.real = 1;
@@ -141,7 +139,6 @@ struct FSK * fsk_create(int Fs, int Rs, int tx_f1,int tx_f2)
     fsk->norm_rx_timing = 0;
     
     /* Set up tx state */
-    fsk->tx_phase = 0;
     fsk->tx_phase_c.imag = 0;
     fsk->tx_phase_c.real = 1;
     
@@ -269,7 +266,6 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
     *f1_est = (float)m1*(float)Fs/(float)Ndft;
     *f2_est = (float)m2*(float)Fs/(float)Ndft;
     *twist = 20*log10f(m1v/m2v);
-    //printf("ESTF - f1 = %f, f2 = %f, twist = %f \n",*f1_est,*f2_est,*twist);
 
 }
 
@@ -330,12 +326,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     COMP t1,t2;
     COMP phi1_c = fsk->phi1_c;
     COMP phi2_c = fsk->phi2_c;
-    COMP phi_ft;                 /* Phase of fine timing estimator */
+    COMP phi_ft;
     int nold = Nmem-nin;
     COMP dphi1,dphi2;
     COMP dphift;
     float f1,f2;
-    float rx_timing,norm_rx_timing;//,old_norm_rx_timing;//,d_norm_rx_timing;
+    float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int using_old_samps;
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf;
@@ -417,12 +413,7 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         if(cbuf_i>=Ts) cbuf_i = 0;
         
         /* Integrate over the integration buffers, save samples */
-        /* This uses Kahan summation to reduce floating point funnyness */
         t1 = t2 = comp0();
-        f1_strc = f1_stic = 0;
-        f2_strc = f2_stic = 0;
-        f1_strs = f1_stis = 0;
-        f2_strs = f2_stis = 0;
         for(j=0; j<Ts; j++){
             t1 = cadd(t1,f1_intbuf[j]);
             t2 = cadd(t2,f2_intbuf[j]);
@@ -442,9 +433,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
      * exract angle */
      
-    float ft_rc,ft_rs,ft_ic,ft_is;
-    ft_rc = ft_rs = 0;
-    ft_ic = ft_is = 0;
     /* Figure out how much to spin the oscillator to extract magic spectral line */
     dphift = comp_exp_j(-2*M_PI*((float)(Rs)/(float)(P*Rs)));
     phi_ft.real = 1;
@@ -458,24 +446,27 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* Add and square 'em */
         ft1 = ft1-ft2;
         ft1 = ft1*ft1;
-        /* Spin the oscillator for the magic line shift */
         /* Down shift and accumulate magic line */
         t1 = cadd(t1,fcmult(ft1,phi_ft));
 
+        /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
     /* Get the magic angle */
     norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
     
-    //old_norm_rx_timing = fsk->norm_rx_timing;
+    old_norm_rx_timing = fsk->norm_rx_timing;
     fsk->norm_rx_timing = norm_rx_timing;
     
     /* Estimate sample clock offset */
-    //d_norm_rx_timing = norm_rx_timing - old_norm_rx_timing;
+    d_norm_rx_timing = norm_rx_timing - old_norm_rx_timing;
     
     /* Filter out big jumps in due to nin change */
-    //if(fabsf(d_norm_rx_timing) < .2){
+    if(fabsf(d_norm_rx_timing) < .2){
+        appm = 1e6*d_norm_rx_timing/(float)nsym;
+        fsk->ppm = .9*fsk->ppm + .1*appm;
+    }
     
     /* Figure out how many samples are needed the next modem cycle */
     if(norm_rx_timing > 0.25)
@@ -494,6 +485,7 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     
     #ifdef EST_EBNO
     meanebno = 0;
+    stdebno = 0;
     #endif
   
     /* FINALLY, THE BITS */
@@ -506,11 +498,14 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
         
         /* Accumulate resampled int magnitude for EbNodB estimation */
+        /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
+        
         ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
         ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
         ft1 = fabsf(ft1-ft2);
         meanebno += ft1;
+        
         #endif
         
         /* THE BIT! */
@@ -546,47 +541,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
+    modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
     modem_probe_samp_f("t_f1",&f1,1);
     modem_probe_samp_f("t_f2",&f2,1);
     modem_probe_samp_c("t_f1_int",f1_int,(nsym+1)*P);
     modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
     modem_probe_samp_f("t_rx_timing",&(rx_timing),1);;
-}
-
-
-void fsk_mod_realphase(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
-    float tx_phase = fsk->tx_phase; /* current TX phase */
-    int f1_tx = fsk->f1_tx;         /* '0' frequency */
-    int f2_tx = fsk->f2_tx;         /* '1' frequency */
-    int Ts = fsk->Ts;               /* samples-per-symbol */
-    int Fs = fsk->Fs;               /* sample freq */
-    int i,j;
-    uint8_t bit;
-    
-    /* delta-phase per cycle for both symbol freqs */
-    float dph_f1 = 2*M_PI*((float)(f1_tx)/(float)(Fs));
-    float dph_f2 = 2*M_PI*((float)(f2_tx)/(float)(Fs));
-
-    /* Note: Right now, this mirrors fm.c and fsk_horus.m, but it
-     * ought to be possible to make it more efficent (one complex mul per
-     * cycle) by using a complex number for the phase. */
-     
-    /* Outer loop through bits */
-    for(i=0; i<fsk->Nsym; i++){
-        bit = tx_bits[i];
-        for(j=0; j<Ts; j++){
-            /* Nudge phase forward a bit */
-            tx_phase += (bit==0)?dph_f1:dph_f2;
-            /* Make sure phase stays on [0,2pi] */
-            if(tx_phase>2*M_PI)
-                tx_phase -= 2*M_PI;
-            fsk_out[i*Ts+j] = 2*cosf(tx_phase);
-        }
-    }
-    
-    /* save TX phase */
-    fsk->tx_phase = tx_phase;
-    
 }
 
 void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){

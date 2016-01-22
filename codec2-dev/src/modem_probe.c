@@ -4,7 +4,8 @@
   AUTHOR......: Brady O'Brien
   DATE CREATED: 9 January 2016
 
-  Library to easily extract debug traces from modems during development
+  Library to easily extract debug traces from modems during development and
+  verification
 
 \*---------------------------------------------------------------------------*/
 
@@ -110,7 +111,7 @@ void modem_probe_close_int(){
 		switch(cur->type){
 			case TRACE_I:
 				octave_save_int(dumpfile,cur->name,(int32_t*)dbuf,1,len/sizeof(int32_t));
-				break;
+	        	break;
 			case TRACE_F:
 				octave_save_float(dumpfile,cur->name,(float*)dbuf,1,len/sizeof(float),10);
 				break;

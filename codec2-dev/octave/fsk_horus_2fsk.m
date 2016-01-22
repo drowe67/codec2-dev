@@ -203,7 +203,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   states.f1 = f1;
   states.f2 = f2;
 
-  %printf("ESTF - f1 = %d, f2 = %d, twist = %f \n",f1,f2,twist);
   if bitand(verbose,0x1)
     printf("centre: %4.0f shift: %4.0f twist: %3.1f dB\n", (f2+f1)/2, f2-f1, twist);
   end
@@ -248,8 +247,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   % symbols so we have extra samples for the fine timing re-sampler at either
   % end of the array.
 
-
-  length(f1_dc);
   rx_bits = zeros(1, (nsym+1)*P);
   for i=1:(nsym+1)*P
     st = 1 + (i-1)*Ts/P;
@@ -259,7 +256,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
   end
   states.f1_int = f1_int;
   states.f2_int = f2_int;
-  length(f1_dc);
+
   % fine timing estimation -----------------------------------------------
 
   % Non linearity has a spectral line at Rs, with a phase
@@ -270,10 +267,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
  
   Np = length(f1_int);
   w = 2*pi*(Rs)/(P*Rs);
-
-  %%# same as sum of ((abs(f1_int)-abs(f2_int)).^2) .* exp(-j*w*(0:Np-1))
   x = ((abs(f1_int)-abs(f2_int)).^2) * exp(-j*w*(0:Np-1))';
-  
   norm_rx_timing = angle(x)/(2*pi);
   rx_timing = norm_rx_timing*P;
 
@@ -329,8 +323,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     %f1_int_resample(i) = f1_int(st+1);
     %f2_int_resample(i) = f2_int(st+1);
     rx_bits(i) = abs(f2_int_resample(i)) > abs(f1_int_resample(i));
-    
-    
     rx_bits_sd(i) = abs(f2_int_resample(i)) - abs(f1_int_resample(i));
  end
 
@@ -342,7 +334,6 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   x = abs(abs(f1_int_resample) - abs(f2_int_resample));
   states.EbNodB = 20*log10(1E-6+mean(x)/(1E-6+std(x)));
- % printf("EbNodB %f\n",states.EbNodB);
 endfunction
 
 
@@ -350,7 +341,7 @@ endfunction
 % UW found Sometimes there may be several matches, returns the
 % position of the best match to UW.
 
-function [uw_start best_corr] = find_uw(states, start_bit, rx_bits)
+function uw_start = find_uw(states, start_bit, rx_bits)
   uw = states.uw;
 
   mapped_rx_bits = 2*rx_bits - 1;
@@ -494,21 +485,19 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
       if crc_ok == 0
         [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states.rtty, rx_bits_log, rx_bits_sd_log, uw_loc, uw_loc+states.rtty.max_packet_len); 
+        if crc_flipped_ok
+          str = sprintf("%s fixed", str_flipped);
+        end
       end
 
       % update memory of previous packet, we use this to guess where errors may be
       if crc_ok || crc_flipped_ok
         states.prev_pkt = rx_bits_log(uw_loc+length(states.rtty.uw):uw_loc+states.rtty.max_packet_len);
       end
-
       if crc_ok
         str = sprintf("%s CRC OK", str);
       else
-        if crc_flipped_ok
-          str = sprintf("%s fixed", str_flipped);
-        else
-          str = sprintf("%s CRC BAD", str);
-        end
+        str = sprintf("%s CRC BAD", str);
       end
       printf("%s\n", str);
     end
@@ -522,7 +511,7 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 endfunction
  
 
-% Extract as many binary packets as we can from a great big buffer of bits,
+% Extract as many ASCII packets as we can from a great big buffer of bits,
 % and send them to the C decoder for FEC decoding.
 % horus_l2 can be compiled a bunch of different ways.  You need to
 % compile with:
@@ -641,7 +630,6 @@ function run_sim(test_frame_mode)
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
-    
   end
                                
   if test_frame_mode == 5
@@ -649,8 +637,7 @@ function run_sim(test_frame_mode)
     states = fsk_horus_init(8000, 100);
     states.f1_tx = 1200;
     states.f2_tx = 1600;
-    %%%states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
-	states.tx_bits_file = "horus_payload_rtty.txt"
+    states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
   end
 
   % ----------------------------------------------------------------------
@@ -845,7 +832,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     uwstates = fsk_horus_init_binary_uw;
   end
 
-  states.verbose = 0x1;
+  states.verbose = 0x1 + 0x8;
 
   N = states.N;
   P = states.P;
@@ -863,8 +850,6 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   f2_int_resample_log = [];
   EbNodB_log = [];
   ppm_log = [];
-  f1_log = [];
-  f2_log = [];
   rx_bits_buf = zeros(1,2*nsym);
 
   % First extract raw bits from samples ------------------------------------------------------
@@ -902,8 +887,6 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
       f2_int_resample_log = [f2_int_resample_log abs(states.f2_int_resample)];
       EbNodB_log = [EbNodB_log states.EbNodB];
       ppm_log = [ppm_log states.ppm];
-      f1_log = [f1_log states.f1];
-      f2_log = [f2_log states.f2];
 
       if test_frame_mode == 1
         states = ber_counter(states, test_frame, rx_bits_buf);
@@ -921,18 +904,12 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     printf("plotting...\n");
 
     figure(1);
-    plot(f1_log);
-    hold on;
-    plot(f2_log,'g');
-    hold off;
-
-    figure(2);
     plot(f1_int_resample_log,'+')
     hold on;
     plot(f2_int_resample_log,'g+')
     hold off;
 
-    figure(3)
+    figure(2)
     clf
     subplot(211)
     plot(norm_rx_timing_log)
@@ -943,29 +920,28 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     plot(states.nerr_log)
     title('num bit errors each frame')
  
-    figure(4)
+    figure(3)
     clf
     plot(EbNodB_log);
     title('Eb/No estimate')
 
-    figure(5)
+    figure(4)
     clf
-    rx_nowave = rx(1000:length(rx));
     subplot(211)
-    plot(rx_nowave(1:states.Fs));
+    plot(rx(1:states.Fs));
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
     axis([1 states.Fs -35000 35000])
 
-    % normalise spectrum to 0dB full scale with a 32767 sine wave input
+    % normalise spectrum to 0dB full scale witha 32767 sine wave input
 
     subplot(212)
-    RxdBFS = 20*log10(abs(fft(rx_nowave(1:states.Fs)))) - 20*log10((states.Fs/2)*32767);
+    RxdBFS = 20*log10(abs(fft(rx(1:states.Fs)))) - 20*log10((states.Fs/2)*32767);
     plot(RxdBFS)
     axis([1 states.Fs/2 -80 0])
     xlabel('Frequency (Hz)');
 
-    figure(6);
+    figure(5);
     clf
     plot(ppm_log)
     title('Sample clock (baud rate) offset in PPM');
@@ -987,14 +963,10 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(5);
+  %run_sim(5);
   %rx_bits = demod_file("horus.raw",4);
   %rx_bits = demod_file("fsk_horus_100bd_binary.raw",5);
-  %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
-  %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
-  
-  
-  %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
+  rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_rtty_binary.wav",4);
   %rx_bits = demod_file("t.raw",5);
   %rx_bits = demod_file("~/Desktop/fsk_horus_10dB_1000ppm.wav",4);

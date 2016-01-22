@@ -6,7 +6,7 @@
 
   C test driver for fsk_mod and fsk_demod in fsk.c. Reads a file with input
   bits/rf and spits out modulated/demoduladed samples and a dump of internal
-  state 
+  state. To run unit test, see octave/tfsk.m
 
 \*---------------------------------------------------------------------------*/
 
