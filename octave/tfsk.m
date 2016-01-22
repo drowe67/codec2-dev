@@ -36,7 +36,7 @@
 % FSK Modem test instructions --
 % 1 - Compile tfsk.c and fm_mod.c
 %     - tfsk.c is in unittest/, so build must not be configured for release
-% 2 - Change tfsk_location and fsk_mod_location to point to tfsk and fsk_mod
+% 2 - Change tfsk_location and fsk_mod_location to point to tfsk
 % 3 - Ensure octave packages signal and parallel are installed
 % 4 - run tfsk.m. It will take care of the rest.
 %
@@ -44,8 +44,6 @@
 %tfsk executable path/file
 global tfsk_location = '../build/unittest/tfsk';
 
-%fsk_mod path/file
-global fsk_mod_location = '../build/src/fsk_mod';
 
 
 fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
@@ -58,11 +56,9 @@ graphics_toolkit('gnuplot');
 global mod_pass_fail_maxdiff = 1e-3/50000;
 
 function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
-    
-    global fsk_mod_location;
+    global tfsk_location;
     %command to be run by system to launch the modulator
-    command = sprintf('%s %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec',fsk_mod_location,Fs,Rs,f1,f2);
-    
+    command = sprintf('%s M %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec fsk_mod_ut_log.txt',tfsk_location,f1,f2,Fs,Rs);
     %save input bits into a file
     bitvecfile = fopen('fsk_mod_ut_bitvec','wb+');
     fwrite(bitvecfile,bits,'uint8');
@@ -119,7 +115,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     tvecfilename = sprintf('fsk_demod_ut_tracevec_%d.txt',getpid());
     
     %command to be run by system to launch the demod
-    command = sprintf('%s %d %d %d %d %s %s %s',tfsk_location,Fs,Rs,f1,f2,modvecfilename,bitvecfilename,tvecfilename);
+    command = sprintf('%s D %d %d %d %d %s %s %s',tfsk_location,f1,f2,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename);
     
     %save modulated input into a file
     modvecfile = fopen(modvecfilename,'wb+');
@@ -406,4 +402,4 @@ function pass = test_fsk_battery()
     end
 endfunction
 
-test_fsk_battery
+%test_fsk_battery

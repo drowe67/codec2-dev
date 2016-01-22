@@ -29,6 +29,8 @@
 
 #include <stdio.h>
 #include "fsk.h"
+
+#define MODEMPROBE_ENABLE
 #include "modem_probe.h"
 
 int main(int argc,char *argv[]){
@@ -38,26 +40,24 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf;
     float *modbuf;
     
-    if(argc<7){
-        printf("Usage: %s samplerate bitrate f1 f2 rffile bitfile [probefile]\n",argv[0]);
+    if(argc<5){
+        printf("usage: %s SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
         exit(1);
     }
     
     /* Extract parameters */
     Fs = atoi(argv[1]);
     Rs = atoi(argv[2]);
-    f1 = atoi(argv[3]);
-    f2 = atoi(argv[4]);
     
     /* Open files */
-    fin = fopen(argv[5],"r");
-    fout = fopen(argv[6],"w");
+    fin = fopen(argv[3],"r");
+    fout = fopen(argv[4],"w");
     
-    if(argc>7)
-		modem_probe_init("fsk2",argv[7]);
+    if(argc>5)
+		modem_probe_init("fsk2",argv[5]);
 	
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,f1,f2);
+    fsk = fsk_create(Fs,Rs,0,0);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         printf("Couldn't open test vector files\n");

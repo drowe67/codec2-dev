@@ -39,7 +39,7 @@ int main(int argc,char *argv[]){
     float *modbuf;
     
     if(argc<7){
-        printf("Usage: %s samplerate bitrate f1 f2 bitfile modfile\n",argv[0]);
+        printf("usage: %s SampleFreq SymbolFreq TxFreq1 TxFreq2 InputOneBitPerCharFile OutputModFloatFile\n",argv[0]);
         exit(1);
     }
     
