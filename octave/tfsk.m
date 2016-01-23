@@ -83,13 +83,13 @@ function pass = vcompare(va,vb,vname,tname,tol)
     %Normalize difference
     dvec = dvec ./ abs(max(abs(va)));
     
-    maxdvec = abs(max(dvec))
-    pass = maxdvec<tol
+    maxdvec = abs(max(dvec));
+    pass = maxdvec<tol;
     
     printf('Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
     
     if pass == 0
-        printf('\n*** vcompaire failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
+        printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
         
         titlestr = sprintf('Diff between C and Octave of %s for %s',vname,tname)
         figure(12)
@@ -171,16 +171,17 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
         o_rx_timing = [o_rx_timing states.rx_timing];
     end
     
-    pass =         vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.011);
+    
+    pass =         vcompare(o_f1_dc,      t_f1_dc,    'f1_dc',    tname,.001);
+    pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
+    % Note fx_int tolerances higher because FP error is accumulated here 
+    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.02);
+    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.02);
+    pass = pass && vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.011);
     pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.15);
     pass = pass && vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.011);
-    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.011);
-    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.011);
-    pass = pass && vcompare(o_f1_dc,      t_f1_dc,    'f1_dc',    tname,.001);
-    pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
-    
-    diffpass = sum(xor(obits,bits'))<3
-    diffbits = sum(xor(obits,bits'))
+    diffpass = sum(xor(obits,bits'))<4;
+    diffbits = sum(xor(obits,bits'));
     
     if diffpass==0
         printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
@@ -345,7 +346,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
   
-  test_name = sprintf("tfsk_run_sim EbNodB:%d frames:%d timing_offset:%d fading:%d",EbNodB,frames,timing_offset,fading);
+  test_name = sprintf("tfsk_run_sim EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
   tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,states.f2_tx,rx,test_name); 
   printf("Test %s done\n",test_name);
   
@@ -409,7 +410,7 @@ endfunction
 
 function pass = ebno_battery_test(timing_offset,fading,df,dA)
     %Range of EbNodB over which to test
-    ebnodbrange = fliplr(3:13);
+    ebnodbrange = fliplr(5:13);
     ebnodbs = length(ebnodbrange);
     
     mode = 5;
@@ -419,7 +420,6 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
     fadingv = repmat(fading,1,ebnodbs);
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
-    
     
     statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
@@ -439,24 +439,32 @@ endfunction
 
 %Test with and without channel fading
 function pass = test_fading_var(timing_offset,df,dA)
-    pass = ebno_battery_test(timing_offset,0,df,dA)
+    pass = ebno_battery_test(timing_offset,1,df,dA)
     assert(pass)
-    pass = pass && ebno_battery_test(timing_offset,1,df,dA)
+    pass = pass && ebno_battery_test(timing_offset,0,df,dA)
     assert(pass)
 endfunction
 
 %Test with and without sample clock offset
 function pass = test_timing_var(df,dA)
-    pass = test_fading_var(0,df,dA)
+    pass = test_fading_var(1,df,dA)
     assert(pass)
-    pass = pass && test_fading_var(1,df,dA)
+    pass = pass && test_fading_var(0,df,dA)
+    assert(pass)
+endfunction
+
+%Test with and without 1 Hz/S freq drift
+function pass = test_drift_var()
+    pass = test_timing_var(1,1)
+    assert(pass)
+    pass = pass && test_timing_var(0,1)
     assert(pass)
 endfunction
 
 function pass = test_fsk_battery()
     pass = test_mod_horuscfg_randbits
     assert(pass)
-    pass = pass && test_timing_var(0,1);
+    pass = pass && test_drift_var();
     assert(pass)
     
     if pass
@@ -466,7 +474,7 @@ endfunction
 
 function plot_fsk_bers()
     %Range of EbNodB over which to plot
-    ebnodbrange = (3:13);
+    ebnodbrange = (5:13);
     
     berc = ones(1,length(ebnodbrange));
     bero = ones(1,length(ebnodbrange));
