@@ -180,6 +180,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
     
     diffpass = sum(xor(obits,bits'))<3
+    diffbits = sum(xor(obits,bits'))
     
     if diffpass==0
         printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
@@ -193,6 +194,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     
     test_stats.pass = pass;
     test_stats.diff = sum(xor(obits,bits'));
+    test_stats.cbits = bits';
+    test_stats.obits = obits;
     
 endfunction
 
@@ -206,7 +209,7 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,f2,bits,tname)
     states.f2_tx = f2;
     states.dA = 1;
     states.dF = 0;
-    omod = fsk_horus_mod(states,bits);
+    omod = fsk_horus_mod(states,bits');
     
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod))
@@ -223,9 +226,11 @@ function pass = test_mod_horuscfg_randbits
     bits = rand(1,10000)>.5;
     [dmod,cmod,omod,pass] = fsk_mod_test(8000,100,1200,1600,bits,"mod horuscfg randbits");
     
-    figure(1)
-    plot(dmod)
-    title("Difference between octave and C mod impl");
+    if(!pass)
+        figure(1)
+        plot(dmod)
+        title("Difference between octave and C mod impl");
+    end
     
 endfunction
 
@@ -233,7 +238,7 @@ endfunction
 % Shamlessly taken from fsk_horus
 % This throws some channel imparment or another at the C and octave modem so they 
 % may be compared.
-function pass = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
+function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   frames = 60;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
@@ -345,7 +350,60 @@ function pass = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   printf("Test %s done\n",test_name);
   
   pass = tstats.pass
+  obits = tstats.obits;
+  cbits = tstats.cbits;
   
+  % Figure out BER of octave and C modems
+  bitcnt = length(tx_bits)
+  rx_bits = obits;
+  ber = 1;
+  ox = 1;
+  for offset = (1:100)
+    nerr = sum(xor(rx_bits(offset:length(rx_bits)),tx_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
+    if(bern < ber)
+      ox = offset;
+      best_nerr = nerr;
+    end
+    ber = min([ber bern]);
+  end
+  offset = ox;
+  bero = ber;
+  ber = 1;
+  rx_bits = cbits;
+  ox = 1;
+  for offset = (1:100)
+    nerr = sum(xor(rx_bits(offset:length(rx_bits)),tx_bits(1:length(rx_bits)+1-offset)));
+    bern = nerr/(bitcnt-offset);
+    if(bern < ber)
+      ox = offset;
+      best_nerr = nerr;
+    end
+    ber = min([ber bern]);
+  end
+  offset = ox;
+  berc = ber;
+  stats.berc = berc;
+  stats.bero = bero;
+  
+  % non-coherent BER theory calculation
+  % It was complicated, so I broke it up
+
+  ms = 2;
+  ns = (1:ms-1);
+  as = (-1).^(ns+1);
+  bs = (as./(ns+1));
+  
+  cs = ((ms-1)./ns);
+
+  ds = ns.*log2(ms);
+  es = ns+1;
+  fs = exp( -(ds./es)*EbNo );
+  
+  thrncoh = ((ms/2)/(ms-1)) * sum(bs.*((ms-1)./ns).*exp( -(ds./es)*EbNo ));
+  
+  stats.thrncoh = thrncoh;
+  stats.pass = pass;
 endfunction
 
 
@@ -363,8 +421,13 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
     dav     = repmat(dA,1,ebnodbs);
     
     
-    passv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
-    %passv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+
+    passv = zeros(1,length(statv));
+    for ii=(1:length(statv))
+        passv(ii)=statv(ii).pass;
+    end
     
     %All pass flags are '1'
     pass = sum(passv)>=length(passv);
@@ -397,9 +460,49 @@ function pass = test_fsk_battery()
     assert(pass)
     
     if pass
-        close all;
         printf("***** All tests passed! *****\n");
     end
 endfunction
 
-%test_fsk_battery
+function plot_fsk_bers()
+    %Range of EbNodB over which to plot
+    ebnodbrange = (3:13);
+    
+    berc = ones(1,length(ebnodbrange));
+    bero = ones(1,length(ebnodbrange));
+    berinc = ones(1,length(ebnodbrange));
+    ebnodbs = length(ebnodbrange)
+    mode = 5;
+    %Replication of other parameters for parcellfun
+    modev   = repmat(mode,1,ebnodbs);
+    timingv = repmat(0,1,ebnodbs);
+    fadingv = repmat(0,1,ebnodbs);
+    dfv     = repmat(0,1,ebnodbs);
+    dav     = repmat(1,1,ebnodbs);
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    
+    for ii = (1:length(statv))
+        stat = statv(ii);
+        berc(ii)=stat.berc;
+        bero(ii)=stat.bero;
+        berinc(ii)=stat.thrncoh;
+    end
+    
+    close all
+    figure(2);
+    clf;
+    semilogy(ebnodbrange, berinc,'r;2FSK non-coherent theory;')
+    hold on;
+    semilogy(ebnodbrange, bero ,'g;Octave fsk horus 2FSK Demod;')
+    semilogy(ebnodbrange, berc, 'v;C fsk horus 2FSK Demod;')
+    hold off;
+    grid("minor");
+    axis([min(ebnodbrange) max(ebnodbrange) 1E-5 1])
+    legend("boxoff");
+    xlabel("Eb/No (dB)");
+    ylabel("Bit Error Rate (BER)")
+ 
+endfunction
+
+plot_fsk_bers
+test_fsk_battery
