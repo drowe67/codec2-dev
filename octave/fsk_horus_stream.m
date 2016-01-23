@@ -32,8 +32,8 @@ telem_upload_enabled = false;
 telem_upload_command = "python telem_upload.py -c vk5dgr_Octave";
 
 more off;
-states = fsk_horus_init(8000, 100);
-%states = fsk_horus_init_rtty_uw(states);
+states = fsk_horus_init(8000, 50, 4);
+uwstates = fsk_horus_init_rtty_uw(states);
 N = states.N;
 Rs = states.Rs;
 nsym = states.nsym;
@@ -56,6 +56,7 @@ while c
   % demodulate samples to bit stream
 
   while length(rx) > nin
+    states = est_freq(states, rx(1:nin)', states.M);
     [rx_bits states] = fsk_horus_demod(states, rx(1:nin)');
     rx_bits_buf = [rx_bits_buf rx_bits];
     rx_bits_sd_buf = [rx_bits_sd_buf states.rx_bits_sd];
@@ -65,7 +66,7 @@ while c
     SNR = EbNo + 10*log10(states.Rs/3000);
     %printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
   endwhile
-  f = (states.f1+states.f2)/2; shift = states.f2 - states.f1;
+  f = (states.f(1)+states.f(2))/2; shift = states.f(2) - states.f(1);
   printf("max: %d f: %d fshift %d ppm: %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, shift, states.ppm, EbNo, SNR, length(rx_bits_buf));
 
   packet_found = 0;

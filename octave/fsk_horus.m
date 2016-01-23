@@ -664,7 +664,7 @@ endfunction
 
 function run_sim(test_frame_mode)
   test_frame_mode = 5;
-  frames = 10;
+  frames = 100;
   EbNodB = 60;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -1068,7 +1068,7 @@ endfunction
 
 if exist("fsk_horus_as_a_lib") == 0
   %run_sim(5);
-  rx_bits = demod_file("~/Desktop/4FSK_Scram_Interleaved.wav",5);
+  rx_bits = demod_file("~/Desktop/test2.wav",4);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
