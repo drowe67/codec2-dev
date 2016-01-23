@@ -44,7 +44,7 @@
 
     $ gcc horus_l2.c -o horus_l2 -Wall -DINTERLEAVER -DTEST_INTERLEAVER -DSCRAMBLER
 
-  5/ Compile for use as decoder called by  fsk_horus.m and fsk_horus_stream.m:
+  5/ Compile for use as decoder called by fsk_horus.m and fsk_horus_stream.m:
 
     $ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
@@ -466,7 +466,7 @@ void horus_l2_decode_rx_packet(unsigned char *output_payload_data,
 
 #ifdef INTERLEAVER
 
-int primes[] = {
+uint16_t primes[] = {
     2,      3,      5,      7,      11,     13,     17,     19,     23,     29, 
     31,     37,     41,     43,     47,     53,     59,     61,     67,     71, 
     73,     79,     83,     89,     97,     101,    103,    107,    109,    113, 
@@ -478,9 +478,10 @@ int primes[] = {
 
 void interleave(unsigned char *inout, int nbytes, int dir)
 {
-    int nbits = nbytes*8;
-    int i, j, n, ibit, ibyte, ishift, jbyte, jshift;
-    int b;
+    /* note: to work on small uCs (e.g. AVR) needed to declare specific words sizes */
+    uint16_t nbits = (uint16_t)nbytes*8;
+    uint32_t i, j, n, ibit, ibyte, ishift, jbyte, jshift;
+    uint32_t b;
     unsigned char out[nbytes];
 
     memset(out, 0, nbytes);
@@ -489,7 +490,7 @@ void interleave(unsigned char *inout, int nbytes, int dir)
        nearest prime to nbits.  It also uses storage, is run on every call,
        and has an upper limit.  Oh Well, still seems to interleave OK. */
     i = 1;
-    int imax = sizeof(primes)/sizeof(int);
+    uint16_t imax = sizeof(primes)/sizeof(uint16_t);
     while ((primes[i] < nbits) && (i < imax))
         i++;
     b = primes[i-1];
@@ -501,10 +502,10 @@ void interleave(unsigned char *inout, int nbytes, int dir)
         */
 
         i = n;
-        j = (b*i) % nbits;
+        j = (b*i) % nbits; /* note these all need to be 32-bit ints to make multiply work without overflow */
         
         if (dir) {
-            int tmp = j;
+            uint16_t tmp = j;
             j = i;
             i = tmp;
         }
@@ -525,8 +526,9 @@ void interleave(unsigned char *inout, int nbytes, int dir)
         /* write jbit to ibit position */
 
         out[jbyte] |= ibit << jshift; // replace with i-th bit
+        //out[ibyte] |= ibit << ishift; // replace with i-th bit
     }
-           
+ 
     memcpy(inout, out, nbytes);
 
     #ifdef DEBUG0
