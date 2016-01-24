@@ -157,10 +157,17 @@ while c
   if uw_loc != -1
     packet_found = 1;
 
-    if (uw_loc + states.binary.max_packet_len+7) < nbits
-
-      pin = uw_loc;    
-      for i=1:45
+    if (uw_loc + states.binary.max_packet_len) < nbits
+     
+      pin = uw_loc; 
+      nbytes = states.binary.max_packet_len/8;
+      for i=1:nbytes
+        if (pin+7) > nbits
+          pin
+          nbits
+          uw_loc
+          states.binary.max_packet_len
+        end
         rx_bytes(i) = rx_bits_buf(pin:pin+7) * (2.^(7:-1:0))';
         pin += 8;
         %printf("%d 0x%02x\n", i, rx_bytes(i));
