@@ -18,6 +18,22 @@
 %  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
 %
 
+% command line arguments
+
+arg_list = argv ();
+if nargin == 0
+  printf("\nusage: %s [mFSKtones] [SymbolRateHz]\n\n", program_name());
+  printf("Horus RTTY 2FSK 100 baud:\n\n");
+  printf("  %s 2 100\n\n", program_name()); 
+  printf("Horus Binary 4FSK 50 baud\n\n");
+  printf("  %s 4 50\n\n", program_name()); 
+  exit(0);
+end
+
+mFSK = str2num(arg_list{1});
+Rs = str2num(arg_list{2});
+printf ("\nmFSK: %d Rs: %d\n", mFSK, Rs);
+
 % include modem library
 
 fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
@@ -32,7 +48,7 @@ telem_upload_enabled = false;
 telem_upload_command = "python telem_upload.py -c vk5dgr_Octave";
 
 more off;
-states = fsk_horus_init(8000, 50, 4);
+states = fsk_horus_init(8000, Rs, mFSK);
 uwstates = fsk_horus_init_rtty_uw(states);
 N = states.N;
 Rs = states.Rs;
@@ -66,8 +82,8 @@ while c
     SNR = EbNo + 10*log10(states.Rs/3000);
     %printf("nin: %d length(rx): %d length(rx_bits_buf): %d \n", nin, length(rx), length(rx_bits_buf));
   endwhile
-  f = (states.f(1)+states.f(2))/2; shift = states.f(2) - states.f(1);
-  printf("max: %d f: %d fshift %d ppm: %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, shift, states.ppm, EbNo, SNR, length(rx_bits_buf));
+  f = states.f(1);
+  printf("max: %d f1: %d ppm: %d Eb/No: %3.1f SNR: %3.1f bits: %d\r", max(s), f, states.ppm, EbNo, SNR, length(rx_bits_buf));
 
   packet_found = 0;
 
@@ -141,7 +157,7 @@ while c
   if uw_loc != -1
     packet_found = 1;
 
-    if (uw_loc + states.binary.max_packet_len) < nbits
+    if (uw_loc + states.binary.max_packet_len+7) < nbits
 
       pin = uw_loc;    
       for i=1:45
