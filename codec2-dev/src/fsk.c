@@ -146,6 +146,8 @@ struct FSK * fsk_create(int Fs, int Rs, int tx_f1,int tx_f2)
     fsk->EbNodB = 0;
     fsk->f1_est = 0;
     fsk->f2_est = 0;
+    fsk->twist_est = 0;
+    fsk->ppm = 0;
     
     return fsk;
 }
@@ -341,10 +343,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,&f1,&f2,&twist);
     
-    fsk->f1_est = f1;
-    fsk->f2_est = f2;
-    fsk->twist_est = twist;
-    
     /* allocate memory for the integrated samples */
     /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
     f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
@@ -353,10 +351,19 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Allocate circular buffers for integration */
     f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
     f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+    
+    /* If this is the first run and we haven't already estimated freq, save the new est */
+    if(fsk->f1_est<1 || fsk->f2_est<1){
+        fsk->f1_est = f1;
+        fsk->f2_est = f2;
+        fsk->twist_est = twist;
+    }
 
     /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = comp_exp_j(-2*M_PI*((float)(f1)/(float)(Fs)));
-    dphi2 = comp_exp_j(-2*M_PI*((float)(f2)/(float)(Fs)));
+    /* Use old freq. estimate here so that old samples will be converted at old 
+     * frequency, to match behaviour of fsk_horus */
+    dphi1 = comp_exp_j(-2*M_PI*((float)(fsk->f1_est)/(float)(Fs)));
+    dphi2 = comp_exp_j(-2*M_PI*((float)(fsk->f2_est)/(float)(Fs)));
 
     dc_i = 0;
     cbuf_i = 0;
@@ -370,6 +377,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             sample_src = &fsk_in[0];
             dc_i = 0;
             using_old_samps = 0;
+            
+            /* Recalculate delta-phi after switching to new sample source */
+            phi1_c = comp_normalize(phi1_c);
+            phi2_c = comp_normalize(phi2_c);
+            dphi1 = comp_exp_j(-2*M_PI*((float)(f1)/(float)(Fs)));
+            dphi2 = comp_exp_j(-2*M_PI*((float)(f2)/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
         f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
@@ -392,6 +405,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
                 sample_src = &fsk_in[0];
                 dc_i = 0;
                 using_old_samps = 0;
+                
+                /* Recalculate delta-phi after switching to new sample source */
+                phi1_c = comp_normalize(phi1_c);
+                phi2_c = comp_normalize(phi2_c);
+                dphi1 = comp_exp_j(-2*M_PI*((float)(f1)/(float)(Fs)));
+                dphi2 = comp_exp_j(-2*M_PI*((float)(f2)/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
             f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
@@ -423,8 +442,12 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         
     }
 
-    fsk->phi1_c = comp_normalize(phi1_c);
-    fsk->phi2_c = comp_normalize(phi2_c);
+    fsk->phi1_c = phi1_c;
+    fsk->phi2_c = phi2_c;
+    
+    fsk->f1_est = f1;
+    fsk->f2_est = f2;
+    fsk->twist_est = twist;
 
     /* Stash samples away in the old sample buffer for the next round of bit getting */
     memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(float)*nstash);
