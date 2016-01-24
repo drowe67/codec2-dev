@@ -7,15 +7,21 @@
 % 8kHz 16 bit samples from stdin, output txt string on stdout
 %
 % usage:
-%  $ chmod 777 fsk_horus_stream.m
-%  $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m
-%  or (for those of us that avoid alsa like the plague)
-%  $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m
-%  and use the 'pavucontrol' utility to select a sound device for arecord.
+$
+%   $ chmod 777 fsk_horus_stream.m
+%   $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m 2 100
 %
+% Or with pulseaudio you can decode two different waveforms at the
+% same time.  In two different shells start:
 %
-% OR to test with a stored file (8kHz 16-bit shorts):
-%  $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m
+%   $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m 2 100
+%   $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m 5 50
+%
+% 'pavucontrol' utility can be used to select a sound device for arecord.
+%
+% To test with a stored file (8kHz 16-bit shorts):
+%
+%   $ cat ~/Desktop/vk5arg-3.wav | ./fsk_horus_stream.m 2 100
 %
 
 % command line arguments
