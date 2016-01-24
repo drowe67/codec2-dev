@@ -75,13 +75,13 @@ endfunction
 
 
 %Compare 2 vectors, fail if they are not close enough
-function pass = vcompare(va,vb,vname,tname,tol)
+function pass = vcompare(vc,voct,vname,tname,tol)
     
     %Get delta of vectors
-    dvec = abs(abs(va)-abs(vb));     
+    dvec = abs(abs(vc)-abs(voct));     
     
     %Normalize difference
-    dvec = dvec ./ abs(max(abs(va)));
+    dvec = dvec ./ abs(max(abs(voct)));
     
     maxdvec = abs(max(dvec));
     pass = maxdvec<tol;
@@ -171,15 +171,17 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
         o_rx_timing = [o_rx_timing states.rx_timing];
     end
     
-    
+    % One part-per-thousand allowed on important parameters
     pass =         vcompare(o_f1_dc,      t_f1_dc,    'f1_dc',    tname,.001);
     pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
-    % Note fx_int tolerances higher because FP error is accumulated here 
-    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.02);
-    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.02);
-    pass = pass && vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.011);
-    pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.15);
-    pass = pass && vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.011);
+    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.001);
+    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.001);
+    pass = pass && vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.001);
+    
+    % Much larger tolerances on unimportant statistics
+    pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.05);
+    pass = pass && vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02);
+    
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
     
@@ -410,7 +412,7 @@ endfunction
 
 function pass = ebno_battery_test(timing_offset,fading,df,dA)
     %Range of EbNodB over which to test
-    ebnodbrange = fliplr(5:13);
+    ebnodbrange = (5:13);
     ebnodbs = length(ebnodbrange);
     
     mode = 5;
