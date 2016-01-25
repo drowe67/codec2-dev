@@ -7,7 +7,7 @@
 % 8kHz 16 bit samples from stdin, output txt string on stdout
 %
 % usage:
-$
+%
 %   $ chmod 777 fsk_horus_stream.m
 %   $ rec -t raw -r 8000 -s -2 -c 1 - -q | ./fsk_horus_stream.m 2 100
 %
