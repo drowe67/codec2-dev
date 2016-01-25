@@ -117,7 +117,7 @@ function binary = fsk_horus_init_binary_uw
   binary.uw = [mapped_db mapped_db];
   binary.uw_thresh = length(binary.uw)-2;   % no bit errors when looking for UW
 
-  binary.max_packet_len = 360-16;
+  binary.max_packet_len = 360;
 endfunction
 
 
@@ -351,13 +351,14 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   f_int_resample = zeros(M,nsym);
   rx_bits = zeros(1,nsym);
-  rx_bits_sd = zeros(1,nsym);
+  tone_max = rx_bits_sd = zeros(1,nsym);
+
   for i=1:nsym
     st = i*P+1;
     f_int_resample(:,i) = f_int(:,st+low_sample)*(1-fract) + f_int(:,st+high_sample)*fract;
     %rx_bits(i) = abs(f_int_resample(2,i)) > abs(f_int_resample(1,i));
     %rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
-    [tone_max tone_index] = max(f_int_resample(:,i));
+    [tone_max(i) tone_index] = max(f_int_resample(:,i));
     if M == 2
       rx_bits(i) = tone_index - 1;
       rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
@@ -373,8 +374,8 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   % Eb/No estimation
 
-  x = abs(abs(f_int_resample(1,:)) - abs(f_int_resample(2,:)));
-  states.EbNodB = 20*log10(1E-6+mean(x)/(1E-6+std(x)));
+  tone_max = abs(tone_max);
+  states.EbNodB = -6 + 20*log10(1E-6+mean(tone_max)/(1E-6+std(tone_max)));
 endfunction
 
 
@@ -663,9 +664,8 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function run_sim(test_frame_mode)
-  test_frame_mode = 5;
   frames = 100;
-  EbNodB = 60;
+  EbNodB = 3;
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -1068,7 +1068,7 @@ endfunction
 
 if exist("fsk_horus_as_a_lib") == 0
   %run_sim(5);
-  rx_bits = demod_file("~/Desktop/test2.wav",4);
+  rx_bits = demod_file("~/Desktop/RTTY_4FSK_Scram_Interleaved_v2.wav",4);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
