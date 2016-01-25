@@ -32,16 +32,19 @@
 
 #define MODEMPROBE_ENABLE
 #include "modem_probe.h"
+#include "codec2_fdmdv.h"
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs,f1,f2;
+    int Fs,Rs;
     FILE *fin,*fout;
     uint8_t *bitbuf;
+    int16_t *rawbuf;
     float *modbuf;
+    int i,t;
     
     if(argc<5){
-        printf("usage: %s SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
+        fprintf(stderr,"usage: %s SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
         exit(1);
     }
     
@@ -50,28 +53,52 @@ int main(int argc,char *argv[]){
     Rs = atoi(argv[2]);
     
     /* Open files */
-    fin = fopen(argv[3],"r");
-    fout = fopen(argv[4],"w");
+    if(strcmp(argv[3],"-")==0){
+		fin = stdin;
+	}else{
+		fin = fopen(argv[3],"r");
+	}
+	
+	if(strcmp(argv[4],"-")==0){
+		fout = stdout;
+	}else{
+		fout = fopen(argv[4],"w");
+	}
+
     
     if(argc>5)
 		modem_probe_init("fsk2",argv[5]);
 	
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,0,0);
+    fsk = fsk_create(Fs,Rs,1200,1600);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
-        printf("Couldn't open test vector files\n");
+        fprintf(stderr,"Couldn't open test vector files\n");
         goto cleanup;
     }
     
     /* allocate buffers for processing */
     bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nsym);
+    rawbuf = (int16_t*)alloca(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
     modbuf = (float*)alloca(sizeof(float)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
-    while( fread(modbuf,sizeof(float),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
+    while( fread(rawbuf,sizeof(int16_t),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
+		for(i=0;i<fsk_nin(fsk);i++){
+			modbuf[i] = ((float)rawbuf[i])/FDMDV_SCALE;
+		}
+		modem_probe_samp_f("t_d_sampin",modbuf,fsk_nin(fsk));
         fsk_demod(fsk,bitbuf,modbuf);
+        for(i=0;i<fsk->Nsym;i++){
+			t = (int)bitbuf[i];
+			modem_probe_samp_i("t_d_bitout",&t,1);
+		}
         fwrite(bitbuf,sizeof(uint8_t),fsk->Nsym,fout);
+        
+        if(fin == stdin || fout == stdin){
+			fflush(fin);
+			fflush(fout);
+		}
     }
     
     modem_probe_close();
