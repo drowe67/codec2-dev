@@ -38,7 +38,15 @@ end
 
 mFSK = str2num(arg_list{1});
 Rs = str2num(arg_list{2});
-printf ("\nmFSK: %d Rs: %d\n", mFSK, Rs);
+if nargin == 3
+  % Optionally upload Telemetry to Habitat (http://tracker.habhub.org/)
+  if strcmp(arg_list{3}, "telem")
+    telem_upload_enabled = true;
+  else
+    telem_upload_enabled = false;
+  end
+end
+printf ("\nmFSK: %d Rs: %d nargin: %d telem: %d\n", mFSK, Rs, nargin, telem_upload_enabled);
 
 % include modem library
 
@@ -48,8 +56,6 @@ fsk_horus;
 gps_log = "~/Desktop/gps_log.txt"
 system_command = "echo -n \"/home/david/Desktop/gps_log.txt\" | nc -u -q1 127.0.0.1 21234";
 
-% Upload Telemetry to Habitat (http://tracker.habhub.org/)
-telem_upload_enabled = false;
 % Update this command with your own callsign.
 telem_upload_command = "python telem_upload.py -c vk5dgr_Octave";
 

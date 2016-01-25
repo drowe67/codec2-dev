@@ -131,7 +131,7 @@ uploader_callsign = args.callsign
 raw_data = args.raw_data
 print(raw_data)
 
-if raw_data.startswith("HORUS"):
+if raw_data.startswith("AX5ARG"):
     # Assume the data is a standard telemetry string and just upload it.
     # Append a Newline and checksum (if not alread there) to the end, and "$$"'s to the start.
     if not '*' in raw_data:
