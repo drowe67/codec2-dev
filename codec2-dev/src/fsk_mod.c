@@ -29,17 +29,21 @@
 */
 
 #include <stdio.h>
+#include <string.h>
 #include "fsk.h"
+#include "codec2_fdmdv.h"
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
     int Fs,Rs,f1,f2;
+    int i;
     FILE *fin,*fout;
     uint8_t *bitbuf;
+    int16_t *rawbuf;
     float *modbuf;
     
     if(argc<7){
-        printf("usage: %s SampleFreq SymbolFreq TxFreq1 TxFreq2 InputOneBitPerCharFile OutputModFloatFile\n",argv[0]);
+        fprintf(stderr,"usage: %s SampleFreq SymbolFreq TxFreq1 TxFreq2 InputOneBitPerCharFile OutputModRawFile\n",argv[0]);
         exit(1);
     }
     
@@ -49,26 +53,44 @@ int main(int argc,char *argv[]){
     f1 = atoi(argv[3]);
     f2 = atoi(argv[4]);
     
-    /* Open files */
-    fin = fopen(argv[5],"r");
-    fout = fopen(argv[6],"w");
+    if(strcmp(argv[5],"-")==0){
+		fin = stdin;
+	}else{
+		fin = fopen(argv[5],"r");
+	}
+	
+	if(strcmp(argv[6],"-")==0){
+		fout = stdout;
+	}else{
+		fout = fopen(argv[6],"w");
+	}
+    
     
     /* set up FSK */
     fsk = fsk_create(Fs,Rs,f1,f2);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
-        printf("Couldn't open test vector files\n");
+        fprintf(stderr,"Couldn't open test vector files\n");
         goto cleanup;
     }
     
     /* allocate buffers for processing */
     bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nsym);
+    rawbuf = (int16_t*)alloca(sizeof(int16_t)*fsk->N);
     modbuf = (float*)alloca(sizeof(float)*fsk->N);
     
     /* Modulate! */
     while( fread(bitbuf,sizeof(uint8_t),fsk->Nsym,fin) == fsk->Nsym ){
         fsk_mod(fsk,modbuf,bitbuf);
-        fwrite(modbuf,sizeof(float),fsk->N,fout);
+        for(i=0; i<fsk->N; i++){
+			rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
+		}
+        fwrite(rawbuf,sizeof(int16_t),fsk->N,fout);
+        
+		if(fin == stdin || fout == stdin){
+			fflush(fin);
+			fflush(fout);
+		}
     }
     
     cleanup:
