@@ -268,7 +268,6 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *f1_est,float *f2_
     *f1_est = (float)m1*(float)Fs/(float)Ndft;
     *f2_est = (float)m2*(float)Fs/(float)Ndft;
     *twist = 20*log10f(m1v/m2v);
-
 }
 
 /*
