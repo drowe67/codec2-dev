@@ -62,7 +62,7 @@ int main(int argc,char *argv[]){
     }
     
 	
-	if(strcmp(argv[1],"-")==0){
+	if(strcmp(argv[1],"-")==0 || argc<2){
 		fin = stdin;
 	}else{
 		fin = fopen(argv[1],"r");
@@ -89,7 +89,7 @@ int main(int argc,char *argv[]){
 		if(fin == stdin)
 			fflush(fin);
 	}
-	fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d\n",((float)bitcorr/(float)bitcnt),bitcnt,bitcnt-bitcorr);
+	fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d\n",1-((float)bitcorr/(float)bitcnt),bitcnt,bitcnt-bitcorr);
     
     cleanup:
     fclose(fin);
