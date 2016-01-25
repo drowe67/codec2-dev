@@ -15,7 +15,7 @@
 % same time.  In two different shells start:
 %
 %   $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m 2 100
-%   $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m 5 50
+%   $ arecord -D pulse -r 8000 -c 1 -f S16_LE - | ./fsk_horus_stream.m 4 50
 %
 % 'pavucontrol' utility can be used to select a sound device for arecord.
 %
