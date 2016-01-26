@@ -38,12 +38,11 @@ end
 
 mFSK = str2num(arg_list{1});
 Rs = str2num(arg_list{2});
+telem_upload_enabled = false;
 if nargin == 3
   % Optionally upload Telemetry to Habitat (http://tracker.habhub.org/)
   if strcmp(arg_list{3}, "telem")
     telem_upload_enabled = true;
-  else
-    telem_upload_enabled = false;
   end
 end
 printf ("\nmFSK: %d Rs: %d nargin: %d telem: %d\n", mFSK, Rs, nargin, telem_upload_enabled);
