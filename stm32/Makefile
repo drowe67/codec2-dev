@@ -436,7 +436,7 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin
+all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin
 
 # Rule for making directories automatically.
 # Note we don't use -p as it's a GNU extension.
