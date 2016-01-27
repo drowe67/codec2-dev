@@ -32,17 +32,26 @@
 % [X] - Extract and compare more parameters from demod
 % [X] - Run some tests in parallel
 
-%
-% FSK Modem test instructions --
-% 1 - Compile tfsk.c and fm_mod.c
-%     - tfsk.c is in unittest/, so build must not be configured for release
-% 2 - Change tfsk_location and fsk_mod_location to point to tfsk
-% 3 - Ensure octave packages signal and parallel are installed
-% 4 - run tfsk.m. It will take care of the rest.
-%
+#{
+
+  FSK Modem automated test instructions:
+
+  1. Use cmake to build in debug mode to ensure unittest/tfsk is built:
+
+     $ cd ~/codec2
+     $ rm -Rf build_linux && mkdir build_linux
+     $ cd build_linux
+     $ cmake -DCMAKE_BUILD_TYPE=Debug ..
+     $ make
+
+  2 - Change tfsk_location below if required
+  3 - Ensure Octave packages signal and parallel are installed
+  4 - Start Octave and run tfsk.m. It will perform all tests automatically
+
+#}
 
 %tfsk executable path/file
-global tfsk_location = '../build/unittest/tfsk';
+global tfsk_location = '../build_linux/unittest/tfsk';
 
 
 
@@ -86,7 +95,7 @@ function pass = vcompare(vc,voct,vname,tname,tol)
     maxdvec = abs(max(dvec));
     pass = maxdvec<tol;
     
-    printf('Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
+    printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
     
     if pass == 0
         printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
@@ -215,7 +224,7 @@ function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,f2,bits,tname)
     omod = fsk_horus_mod(states,bits');
     
     dmod = cmod-omod;
-    pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod))
+    pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));
     if !pass
         printf('Mod failed test %s!\n',tname);
     end
@@ -352,12 +361,12 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,states.f2_tx,rx,test_name); 
   printf("Test %s done\n",test_name);
   
-  pass = tstats.pass
+  pass = tstats.pass;
   obits = tstats.obits;
   cbits = tstats.cbits;
   
   % Figure out BER of octave and C modems
-  bitcnt = length(tx_bits)
+  bitcnt = length(tx_bits);
   rx_bits = obits;
   ber = 1;
   ox = 1;
@@ -435,7 +444,7 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
     pass = sum(passv)>=length(passv);
     %and no tests died
     pass = pass && length(passv)==ebnodbs;
-    passv
+    passv;
     assert(pass)
 endfunction
 
