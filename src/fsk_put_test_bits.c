@@ -41,8 +41,8 @@ uint8_t finit[sizeof(init)];
 int find_init(uint8_t next){
 	memmove(&finit[0],&finit[1],sizeof(init)-1);
 	finit[sizeof(init)-1] = next;
-	int err = 0;
-	for(int i = 0;i<sizeof(init); i++){
+	int i, err = 0;
+	for(i = 0;i<sizeof(init); i++){
 		if(init[i]!=finit[i]) err++;
 	}
 	return err<=3;
