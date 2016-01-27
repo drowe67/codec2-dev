@@ -56,7 +56,7 @@ int main(int argc,char *argv[]){
     /* Seed the RNG with some constant */
     srand(158324);
     
-    if(argc<1){
+    if(argc==1){
         fprintf(stderr,"usage: %s InputBitsOnePerByte \n",argv[0]);
         exit(1);
     }
