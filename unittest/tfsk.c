@@ -40,8 +40,9 @@
 #define ST_FS 8000
 #define ST_RS 100
 #define ST_F1 1200
-#define ST_F2 1600
+#define ST_Fs 400
 #define ST_EBNO 8
+#define ST_M 2
 
 #define TEST_SELF_FULL 1    /* No-arg self test */
 #define TEST_MOD 2          /* Test modulator using in and out file */
@@ -50,7 +51,7 @@
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs,f1,f2;
+    int Fs,Rs,f1,fs,M;
     FILE *fin,*fout;
 
     uint8_t *bitbuf = NULL;
@@ -75,11 +76,11 @@ int main(int argc,char *argv[]){
         Fs = ST_FS;
         Rs = ST_RS;
         f1 = ST_F1;
-        f2 = ST_F2;
-        
-    } else if (argc<8){
+        fs = ST_Fs;
+        M = ST_M;
+    } else if (argc<9){
     /* Not running any test */
-        printf("Usage: %s [(M|D) TXFreq1 TXFreq2 SampleRate BitRate InputFile OutputFile OctaveLogFile]\n",argv[0]);
+        printf("Usage: %s [(M|D) Mode TXFreq1 TXFreqSpace SampleRate BitRate InputFile OutputFile OctaveLogFile]\n",argv[0]);
         exit(1);
     } else {
     /* Running stim-drivin test */
@@ -94,29 +95,30 @@ int main(int argc,char *argv[]){
             exit(1);
         }
         /* Extract parameters */
-        Fs = atoi(argv[4]);
-        Rs = atoi(argv[5]);
-        f1 = atoi(argv[2]);
-        f2 = atoi(argv[3]);
+        M = atoi(argv[2]);
+        f1 = atoi(argv[3]);
+        fs = atoi(argv[4]);
+        Fs = atoi(argv[5]);
+        Rs = atoi(argv[6]);
         
         /* Open files */
-        fin = fopen(argv[6],"r");
-        fout = fopen(argv[7],"w");
+        fin = fopen(argv[7],"r");
+        fout = fopen(argv[8],"w");
         
         if(fin == NULL || fout == NULL){
             printf("Couldn't open test vector files\n");
             exit(1);
         }
         /* Init modem probing */
-        modem_probe_init("fsk2",argv[8]);
+        modem_probe_init("fsk",argv[9]);
         
     }
     
 	srand(1);
     
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,f1,f2);
-    
+    fsk = fsk_create(Fs,Rs,M,f1,fs);
+    fprintf(stderr,"Running in mode %d\n",M);
     /* Modulate! */
     if(test_type == TEST_MOD || test_type == TEST_SELF_FULL){
         /* Generate random bits for self test */
@@ -136,26 +138,26 @@ int main(int argc,char *argv[]){
             i = 0;
             /* Read in some bits */
             bitbufp = bitbuf;
-            while( fread(bitbufp,sizeof(uint8_t),fsk->Nsym,fin) == fsk->Nsym){
+            while( fread(bitbufp,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits){
                 i++;
-                bitbufp+=fsk->Nsym;
+                bitbufp+=fsk->Nbits;
                 /* Make sure we don't break the buffer */
-                if(i*fsk->Nsym > bitbufsize){
-                    bitbuf = realloc(bitbuf,sizeof(uint8_t)*(bitbufsize+fsk->Nsym));
-                    bitbufsize += fsk->Nsym;
+                if(i*fsk->Nbits > bitbufsize){
+                    bitbuf = realloc(bitbuf,sizeof(uint8_t)*(bitbufsize+fsk->Nbits));
+                    bitbufsize += fsk->Nbits;
                 }
             }
         }
         /* Allocate modulation buffer */
-        modbuf = (float*)malloc(sizeof(float)*(bitbufsize/fsk->Nsym)*fsk->N*4);
-        modbufsize = (bitbufsize*fsk->Ts);
+        modbuf = (float*)malloc(sizeof(float)*(bitbufsize/fsk->Nbits)*fsk->N*4);
+        modbufsize = (bitbufsize/fsk->Nbits)*fsk->N;
         /* Do the modulation */
         modbufp = modbuf;
         bitbufp = bitbuf;
         while( bitbufp < bitbuf+bitbufsize){
             fsk_mod(fsk, modbufp, bitbufp);
             modbufp += fsk->N;
-            bitbufp += fsk->Nsym;
+            bitbufp += fsk->Nbits;
         }
         /* For a mod-only test, write out the result */
         if(test_type == TEST_MOD){
@@ -173,12 +175,12 @@ int main(int argc,char *argv[]){
     if(test_type == TEST_DEMOD || test_type == TEST_SELF_FULL){
         free(modbuf);
         modbuf = malloc(sizeof(float)*(fsk->N+fsk->Ts*2));
-        bitbuf = malloc(sizeof(uint8_t)*fsk->Nsym);
+        bitbuf = malloc(sizeof(uint8_t)*fsk->Nbits);
         /* Demod-only test */
         if(test_type == TEST_DEMOD){
             while( fread(modbuf,sizeof(float),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
                 fsk_demod(fsk,bitbuf,modbuf);
-                fwrite(bitbuf,sizeof(uint8_t),fsk->Nsym,fout);
+                fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
             }
         }
         /* Demod after channel imp. and mod */

@@ -56,18 +56,19 @@ global tfsk_location = '../build_linux/unittest/tfsk';
 
 
 fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
-fsk_horus_2fsk;  
+%fsk_horus_2fsk;  
+fsk_horus
 pkg load signal;
 pkg load parallel;
 graphics_toolkit('gnuplot');
 
 
-global mod_pass_fail_maxdiff = 1e-3/50000;
+global mod_pass_fail_maxdiff = 1e-3/5000;
 
-function mod = fsk_mod_c(Fs,Rs,f1,f2,bits)
+function mod = fsk_mod_c(Fs,Rs,f1,fsp,bits,M)
     global tfsk_location;
     %command to be run by system to launch the modulator
-    command = sprintf('%s M %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec fsk_mod_ut_log.txt',tfsk_location,f1,f2,Fs,Rs);
+    command = sprintf('%s M %d %d %d %d %d fsk_mod_ut_bitvec fsk_mod_ut_modvec fsk_mod_ut_log.txt',tfsk_location,M,f1,fsp,Fs,Rs);
     %save input bits into a file
     bitvecfile = fopen('fsk_mod_ut_bitvec','wb+');
     fwrite(bitvecfile,bits,'uint8');
@@ -84,13 +85,13 @@ endfunction
 
 
 %Compare 2 vectors, fail if they are not close enough
-function pass = vcompare(vc,voct,vname,tname,tol)
+function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     
     %Get delta of vectors
     dvec = abs(abs(vc)-abs(voct));     
     
     %Normalize difference
-    dvec = dvec ./ abs(max(abs(voct)));
+    dvec = dvec ./ abs(max(abs(voct))+1e-8);
     
     maxdvec = abs(max(dvec));
     pass = maxdvec<tol;
@@ -101,21 +102,18 @@ function pass = vcompare(vc,voct,vname,tname,tol)
         printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
         
         titlestr = sprintf('Diff between C and Octave of %s for %s',vname,tname)
-        figure(12)
+        figure(10+pnum*2)
         plot(abs(dvec))
         title(titlestr)
         
-        figure(13)
-        plot(abs(va))
+        figure(11+pnum*2)
+        plot((1:length(vc)),abs(vc),(1:length(voct)),abs(voct))
     
-        figure(14)
-        plot(abs(vb))
     end
-    assert(pass);
     
 endfunction
 
-function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
+function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     global tfsk_location;
     %Name of executable containing the modulator
     fsk_demod_ex_file = '../build/unittest/tfsk';
@@ -124,7 +122,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     tvecfilename = sprintf('fsk_demod_ut_tracevec_%d.txt',getpid());
     
     %command to be run by system to launch the demod
-    command = sprintf('%s D %d %d %d %d %s %s %s',tfsk_location,f1,f2,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename);
+    command = sprintf('%s D %d %d %d %d %d %s %s %s',tfsk_location,M,f1,fsp,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename);
     
     %save modulated input into a file
     modvecfile = fopen(modvecfilename,'wb+');
@@ -149,48 +147,94 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     
     o_f1_dc = [];
     o_f2_dc = [];
+    o_f3_dc = [];
+    o_f4_dc = [];
     o_f1_int = [];
     o_f2_int = [];
+    o_f3_int = [];
+    o_f4_int = [];
+    o_f1 = [];
+    o_f2 = [];
+    o_f3 = [];
+    o_f4 = [];
     o_EbNodB = [];
     o_ppm = [];
+    o_Sf = [];
+    o_fest = [];
     o_rx_timing = [];
     %Run octave demod, dump some test vectors
-    states = fsk_horus_init(Fs,Rs);
+    states = fsk_horus_init(Fs,Rs,M);
     Ts = states.Ts;
     P = states.P;
-    states.f1_tx = f1;
-    states.f2_tx = f2;
+    states.ftx(1) = f1;
+    states.ftx(2) = f1+fsp;
+    states.ftx(3) = f1+fsp*2;
+    states.ftx(4) = f1+fsp*3;
     states.dA = 1;
     states.dF = 0;
     modin = mod;
     obits = [];
     while length(modin)>=states.nin
         ninold = states.nin;
+        states = est_freq(states, modin(1:states.nin), states.M);
         [bitbuf,states] = fsk_horus_demod(states, modin(1:states.nin));
         modin=modin(ninold+1:length(modin));
         obits = [obits bitbuf];
         
         %Save other parameters
-        o_f1_dc = [o_f1_dc states.f1_dc(1:states.Nmem-Ts/P)];
-        o_f2_dc = [o_f2_dc states.f2_dc(1:states.Nmem-Ts/P)];
-        o_f1_int = [o_f1_int states.f1_int];
-        o_f2_int = [o_f2_int states.f2_int];
+        o_f1_dc = [o_f1_dc states.f_dc(1,1:states.Nmem-Ts/P)];
+        o_f2_dc = [o_f2_dc states.f_dc(2,1:states.Nmem-Ts/P)];
+        o_f1_int = [o_f1_int states.f_int(1,:)];
+        o_f2_int = [o_f2_int states.f_int(2,:)];
         o_EbNodB = [o_EbNodB states.EbNodB];
         o_ppm = [o_ppm states.ppm];
         o_rx_timing = [o_rx_timing states.rx_timing];
+        o_Sf = [o_Sf states.Sf'];
+        o_f1 = [o_f1 states.f(1)];
+        o_f2 = [o_f1 states.f(2)];
+        o_fest = [o_fest states.f];
+        if M==4
+			o_f3_dc = [o_f3_dc states.f_dc(3,1:states.Nmem-Ts/P)];
+			o_f4_dc = [o_f4_dc states.f_dc(4,1:states.Nmem-Ts/P)];
+			o_f3_int = [o_f3_int states.f_int(3,:)];
+			o_f4_int = [o_f4_int states.f_int(4,:)];
+			o_f3 = [o_f1 states.f(3)];
+			o_f4 = [o_f1 states.f(4)];
+        end
     end
     
+    close all
+    
     % One part-per-thousand allowed on important parameters
-    pass =         vcompare(o_f1_dc,      t_f1_dc,    'f1_dc',    tname,.001);
-    pass = pass && vcompare(o_f2_dc,      t_f2_dc,    'f2_dc',    tname,.001);
-    pass = pass && vcompare(o_f1_int,     t_f1_int,   'f1_int',   tname,.001);
-    pass = pass && vcompare(o_f2_int,     t_f2_int,   'f2_int',   tname,.001);
-    pass = pass && vcompare(o_rx_timing,  t_rx_timing,'rx_timing',tname,.001);
+    pass = 1;
     
+    
+    
+    pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,9) && pass;
+    pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,9) && pass;
+    pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.001,10) && pass;
+    
+    if M==4
+		pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.001,3) && pass;
+		pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.001,4) && pass;
+		pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.001,8) && pass;
+		pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.001,7) && pass;
+	%	pass = vcompare(o_f3,         t_f3,       'f3',       tname,.001,15) && pass;
+	%	pass = vcompare(o_f4,         t_f4,       'f4',       tname,.001,16) && pass;
+    end
+    
+    
+    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.001,1) && pass;
+    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.001,2) && pass;
+    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.001,6) && pass;
+    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.001,5) && pass;
+    %pass = vcompare(o_f1,         t_f1,       'f1',       tname,.001,15) && pass;
+	%pass = vcompare(o_f2,         t_f2,       'f2',       tname,.001,16) && pass;
+
     % Much larger tolerances on unimportant statistics
-    pass = pass && vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.05);
-    pass = pass && vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02);
-    
+    %pass = vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.05,12) && pass;
+    pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,11) && pass;
+    assert(pass);
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
     
@@ -211,17 +255,25 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,f2,mod,tname)
     
 endfunction
 
-function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,f2,bits,tname)
+function [dmod,cmod,omod,pass] = fsk_mod_test(Fs,Rs,f1,fsp,bits,tname,M=2)
     global mod_pass_fail_maxdiff;
     %Run the C modulator
-    cmod = fsk_mod_c(Fs,Rs,f1,f2,bits);
+    cmod = fsk_mod_c(Fs,Rs,f1,fsp,bits,M);
     %Set up and run the octave modulator
-    states = fsk_horus_init(Fs,Rs);
-    states.f1_tx = f1;
-    states.f2_tx = f2;
-    states.dA = 1;
+    states.M = M;
+    states = fsk_horus_init(Fs,Rs,M);
+    
+    states.ftx(1) = f1;
+    states.ftx(2) = f1+fsp;
+    
+    if states.M == 4
+		states.ftx(3) = f1+fsp*2;
+		states.ftx(4) = f1+fsp*3;
+    end
+    
+    states.dA = [1 1 1 1]; 
     states.dF = 0;
-    omod = fsk_horus_mod(states,bits');
+    omod = fsk_horus_mod(states,bits);
     
     dmod = cmod-omod;
     pass = max(dmod)<(mod_pass_fail_maxdiff*length(dmod));
@@ -246,11 +298,27 @@ function pass = test_mod_horuscfg_randbits
     
 endfunction
 
+% Random bit modulator test
+% Pass random bits through the modulators and compare
+function pass = test_mod_horuscfgm4_randbits
+    rand('state',1); 
+    randn('state',1);
+    bits = rand(1,10000)>.5;
+    [dmod,cmod,omod,pass] = fsk_mod_test(8000,100,1200,1600,bits,"mod horuscfg randbits",4);
+    
+    if(!pass)
+        figure(1)
+        plot(dmod)
+        title("Difference between octave and C mod impl");
+    end
+    
+endfunction
+
 % A big ol' channel impairment tester
 % Shamlessly taken from fsk_horus
 % This throws some channel imparment or another at the C and octave modem so they 
 % may be compared.
-function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
+function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
   frames = 60;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
@@ -272,7 +340,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   
   if test_frame_mode == 2
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init(8000, 100, M);
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     
@@ -280,7 +348,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init(8000, 100, M);
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
@@ -289,7 +357,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 100);
+    states = fsk_horus_init(8000, 100, M);
     states.f1_tx = 1200;
     states.f2_tx = 1600;
     %%%states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
@@ -305,10 +373,11 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   nsym = states.nsym;
   Fs = states.Fs;
   states.df = df;
-  states.dA = dA;
+  states.dA = [dA dA dA dA];
+  states.M = M;
 
   EbNo = 10^(EbNodB/10);
-  variance = states.Fs/(states.Rs*EbNo);
+  variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
   % set up tx signal with payload bits based on test mode
 
@@ -342,6 +411,17 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
       tx_bits = [tx_bits test_frame];
     end
   end
+  
+  f1 = states.f1_tx;
+  fsp = states.f2_tx-f1
+  states.dA = [dA dA dA dA];
+  states.ftx(1) = f1;
+  states.ftx(2) = f1+fsp;
+    
+  if states.M == 4
+	states.ftx(3) = f1+fsp*2;
+	states.ftx(4) = f1+fsp*3;
+  end
 
   tx = fsk_horus_mod(states, tx_bits);
 
@@ -357,8 +437,8 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
   
-  test_name = sprintf("tfsk_run_sim EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
-  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,states.f2_tx,rx,test_name); 
+  test_name = sprintf("tfsk run sim EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
+  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,fsp,rx,test_name,M); 
   printf("Test %s done\n",test_name);
   
   pass = tstats.pass;
@@ -419,9 +499,9 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA)
 endfunction
 
 
-function pass = ebno_battery_test(timing_offset,fading,df,dA)
+function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     %Range of EbNodB over which to test
-    ebnodbrange = (5:13);
+    ebnodbrange = fliplr(5:13);
     ebnodbs = length(ebnodbrange);
     
     mode = 5;
@@ -431,9 +511,9 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
     fadingv = repmat(fading,1,ebnodbs);
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
-    
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
-    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    mv      = repmat(M,1,ebnodbs);
+    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
@@ -449,41 +529,44 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA)
 endfunction
 
 %Test with and without channel fading
-function pass = test_fading_var(timing_offset,df,dA)
-    pass = ebno_battery_test(timing_offset,1,df,dA)
+function pass = test_fading_var(timing_offset,df,dA,M)
+    pass = ebno_battery_test(timing_offset,1,df,dA,M)
     assert(pass)
-    pass = pass && ebno_battery_test(timing_offset,0,df,dA)
+    pass = pass && ebno_battery_test(timing_offset,0,df,dA,M)
     assert(pass)
 endfunction
 
 %Test with and without sample clock offset
-function pass = test_timing_var(df,dA)
-    pass = test_fading_var(1,df,dA)
+function pass = test_timing_var(df,dA,M)
+    pass = test_fading_var(1,df,dA,M)
     assert(pass)
-    pass = pass && test_fading_var(0,df,dA)
+    pass = pass && test_fading_var(0,df,dA,M)
     assert(pass)
 endfunction
 
 %Test with and without 1 Hz/S freq drift
-function pass = test_drift_var()
-    pass = test_timing_var(1,1)
+function pass = test_drift_var(M)
+    pass = test_timing_var(1,1,M)
     assert(pass)
-    pass = pass && test_timing_var(0,1)
+    pass = pass && test_timing_var(0,1,M)
     assert(pass)
 endfunction
 
 function pass = test_fsk_battery()
-    pass = test_mod_horuscfg_randbits
+    pass = test_mod_horuscfg_randbits;
     assert(pass)
-    pass = pass && test_drift_var();
+    pass = pass && test_mod_horuscfgm4_randbits;
     assert(pass)
-    
+    pass = pass && test_drift_var(2);
+    assert(pass)
+    pass = pass && test_drift_var(4);
+    assert(pass)
     if pass
         printf("***** All tests passed! *****\n");
     end
 endfunction
 
-function plot_fsk_bers()
+function plot_fsk_bers(M=2)
     %Range of EbNodB over which to plot
     ebnodbrange = (5:13);
     
@@ -498,7 +581,9 @@ function plot_fsk_bers()
     fadingv = repmat(0,1,ebnodbs);
     dfv     = repmat(0,1,ebnodbs);
     dav     = repmat(1,1,ebnodbs);
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav);
+    Mv     = repmat(M,1,ebnodbs);
+    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
         stat = statv(ii);
@@ -508,7 +593,6 @@ function plot_fsk_bers()
     end
     
     close all
-    figure(2);
     clf;
     semilogy(ebnodbrange, berinc,'r;2FSK non-coherent theory;')
     hold on;
@@ -523,5 +607,5 @@ function plot_fsk_bers()
  
 endfunction
 
-plot_fsk_bers
-test_fsk_battery
+%plot_fsk_bers
+%test_fsk_battery

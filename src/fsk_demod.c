@@ -36,41 +36,42 @@
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs;
+    int Fs,Rs,M;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
     int i,t;
     
-    if(argc<5){
-        fprintf(stderr,"usage: %s SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
+    if(argc<6){
+        fprintf(stderr,"usage: %s Mode SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
         exit(1);
     }
     
     /* Extract parameters */
-    Fs = atoi(argv[1]);
-    Rs = atoi(argv[2]);
+    M  = atoi(argv[1]);
+    Fs = atoi(argv[2]);
+    Rs = atoi(argv[3]);
     
     /* Open files */
-    if(strcmp(argv[3],"-")==0){
+    if(strcmp(argv[4],"-")==0){
 		fin = stdin;
 	}else{
-		fin = fopen(argv[3],"r");
+		fin = fopen(argv[4],"r");
 	}
 	
-	if(strcmp(argv[4],"-")==0){
+	if(strcmp(argv[5],"-")==0){
 		fout = stdout;
 	}else{
-		fout = fopen(argv[4],"w");
+		fout = fopen(argv[5],"w");
 	}
 
     
-    if(argc>5)
-		modem_probe_init("fsk2",argv[5]);
+    if(argc>6)
+		modem_probe_init("fsk2",argv[6]);
 	
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,1200,1600);
+    fsk = fsk_create(Fs,Rs,M,1200,400);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
@@ -78,7 +79,7 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nsym);
+    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nbits);
     rawbuf = (int16_t*)alloca(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
     modbuf = (float*)alloca(sizeof(float)*(fsk->N+fsk->Ts*2));
     
@@ -89,11 +90,11 @@ int main(int argc,char *argv[]){
 		}
 		modem_probe_samp_f("t_d_sampin",modbuf,fsk_nin(fsk));
         fsk_demod(fsk,bitbuf,modbuf);
-        for(i=0;i<fsk->Nsym;i++){
+        for(i=0;i<fsk->Nbits;i++){
 			t = (int)bitbuf[i];
 			modem_probe_samp_i("t_d_bitout",&t,1);
 		}
-        fwrite(bitbuf,sizeof(uint8_t),fsk->Nsym,fout);
+        fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         
         if(fin == stdin || fout == stdin){
 			fflush(fin);

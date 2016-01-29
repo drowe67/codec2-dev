@@ -32,6 +32,9 @@
 #include "comp.h"
 #include "kiss_fftr.h"
 
+#define MODE_2FSK 2
+#define MODE_4FSK 4
+
 struct FSK {
     /*  Static parameters set up by fsk_init */
     int Ndft;               /* buffer size for freq offset est fft */
@@ -42,17 +45,23 @@ struct FSK {
     int Nmem;               /* size of extra mem for timing adj */
     int P;                  /* oversample rate for timing est/adj */
     int Nsym;               /* Number of symbols spat out in a processing frame */
+    int Nbits;              /* Number of bits spat out in a processing frame */
     int f1_tx;              /* f1 for modulator */
-    int f2_tx;              /* f2 for modulator */
+    int fs_tx;              /* Space between TX freqs for modulatosr */
+    int mode;               /* 2FSK or 4FSK */
     
     /*  Parameters used by demod */
     COMP phi1_c;
     COMP phi2_c;
+    COMP phi3_c;
+    COMP phi4_c;
     kiss_fftr_cfg fft_cfg;  /* Config for KISS FFT, used in freq est */
     float norm_rx_timing;   /* Normalized RX timing */
     
     float *samp_old;        /* Tail end of last batch of samples */
     int nstash;             /* How many elements are in there */
+    
+    float *fft_est;			/* Freq est FFT magnitude */
     
     /* Memory used by demod but not important between demod frames */
     
@@ -63,7 +72,8 @@ struct FSK {
     float EbNodB;           /* Estimated EbNo in dB */
     float f1_est;           /* Estimated f1 freq. */
     float f2_est;           /* Estimated f2 freq. */
-    float twist_est;        /* Estimaged 'twist' from freq est */
+    float f3_est;			/* Estimated f3 freq. */
+    float f4_est;			/* Estimated f4 freq. */
     float ppm;              /* Estimated PPM clock offset */
     
     /*  Parameters used by mod/demod and driving code */
@@ -79,7 +89,7 @@ struct FSK {
  * int tx_f1 - '0' frequency
  * int tx_f2 - '1' frequency
  */
-struct FSK * fsk_create(int Fs, int Rs, int tx_f1, int tx_f2);
+struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1,int tx_fs);
 
 /*
  * Destroy an FSK state struct and free it's memory
@@ -93,7 +103,7 @@ void fsk_destroy(struct FSK *fsk);
  * 
  * struct FSK *fsk - FSK config/state struct, set up by fsk_create
  * float fsk_out[] - Buffer for N samples of modulated FSK
- * uint8_t tx_bits[] - Buffer containing Nsym unpacked bits
+ * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
  */
 void fsk_mod(struct FSK *fsk, float fsk_out[], uint8_t tx_bits[]);
 
@@ -112,7 +122,7 @@ uint32_t fsk_nin(struct FSK *fsk);
  *  demodulated can be found by calling fsk_nin().
  * 
  * struct FSK *fsk - FSK config/state struct, set up by fsk_create
- * uint8_t rx_bits[] - Buffer for Nsym unpacked bits to be written
+ * uint8_t rx_bits[] - Buffer for Nbits unpacked bits to be written
  * float fsk_in[] - nin samples of modualted FSK
  */
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],float fsk_in[]);

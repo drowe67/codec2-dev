@@ -35,39 +35,40 @@
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs,f1,f2;
+    int Fs,Rs,f1,fs,M;
     int i;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
     
-    if(argc<7){
-        fprintf(stderr,"usage: %s SampleFreq SymbolFreq TxFreq1 TxFreq2 InputOneBitPerCharFile OutputModRawFile\n",argv[0]);
+    if(argc<8){
+        fprintf(stderr,"usage: %s Mode SampleFreq SymbolFreq TxFreq1 TxFreqSpace InputOneBitPerCharFile OutputModRawFile\n",argv[0]);
         exit(1);
     }
     
     /* Extract parameters */
-    Fs = atoi(argv[1]);
-    Rs = atoi(argv[2]);
-    f1 = atoi(argv[3]);
-    f2 = atoi(argv[4]);
+    M = atoi(argv[1]);
+    Fs = atoi(argv[2]);
+    Rs = atoi(argv[3]);
+    f1 = atoi(argv[4]);
+    fs = atoi(argv[5]);
     
-    if(strcmp(argv[5],"-")==0){
+    if(strcmp(argv[6],"-")==0){
 		fin = stdin;
 	}else{
-		fin = fopen(argv[5],"r");
+		fin = fopen(argv[6],"r");
 	}
 	
-	if(strcmp(argv[6],"-")==0){
+	if(strcmp(argv[7],"-")==0){
 		fout = stdout;
 	}else{
-		fout = fopen(argv[6],"w");
+		fout = fopen(argv[7],"w");
 	}
     
     
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,f1,f2);
+    fsk = fsk_create(Fs,Rs,M,f1,fs);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
@@ -75,12 +76,12 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nsym);
+    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nbits);
     rawbuf = (int16_t*)alloca(sizeof(int16_t)*fsk->N);
     modbuf = (float*)alloca(sizeof(float)*fsk->N);
     
     /* Modulate! */
-    while( fread(bitbuf,sizeof(uint8_t),fsk->Nsym,fin) == fsk->Nsym ){
+    while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
         fsk_mod(fsk,modbuf,bitbuf);
         for(i=0; i<fsk->N; i++){
 			rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
