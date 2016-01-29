@@ -49,7 +49,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "fsk4.h"
+#include "fsk.h"
 #include "comp_prim.h"
 #include "kiss_fftr.h"
 #include "modem_probe.h"
@@ -230,7 +230,7 @@ void fsk_destroy(struct FSK *fsk){
 }
 
 #define FEST_MIN 800
-#define FEST_MAX 2500
+#define FEST_MAX (Fs-1500)
 #define FEST_MIN_SPACING 200
 
 /*

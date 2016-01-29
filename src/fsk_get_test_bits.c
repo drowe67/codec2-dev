@@ -32,7 +32,7 @@
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 
-#define FSK_FRAME_SIZE 100
+#define FSK_FRAME_SIZE 400
 #define INIT_SEQ {0,1,1,0,1,0,0,1,1,1,1,0,1,1,0,0,0,0,1,0,1,1,0,1,0,1,0,1,0,0,1,1}
 
 uint8_t init[] = INIT_SEQ;
@@ -70,8 +70,14 @@ int main(int argc,char *argv[]){
     
     /* Write out sync frame and sequence */
     for(i=0; i<FSK_FRAME_SIZE; i++){
+		bitbuf[i++] = 0;
+		bitbuf[i++] = 0;
+		bitbuf[i++] = 0;
 		bitbuf[i++] = 1;
-		bitbuf[i  ] = 0;
+		bitbuf[i++] = 1;
+		bitbuf[i++] = 0;
+		bitbuf[i++] = 1;
+		bitbuf[i  ] = 1;
 	}
 	for(i=0;i<sizeof(init);i++){
 		bitbuf[FSK_FRAME_SIZE-sizeof(init)+i]=init[i];
