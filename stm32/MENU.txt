@@ -1,0 +1,45 @@
+UI layout
+=========
+
+There are two buttons for UI operation, SELECT and BACK. Outside of the menu,
+these simply cycle between the available modes. The current mode is announced
+(morse code) after a short delay.
+
+Holding down SELECT puts you in menu mode. The POWER LED will now flash to
+indicate this. To navigate, press the SELECT and BACK buttons momentarily to
+move up and down in the menu. Again, after a pause the item will be read out.
+Holding SELECT or BACK either chooses the option, or backs out.
+
+Pressing PTT while in a menu exits the entire menu tree without saving
+changes to flash storage.
+
+The menu structure looks like this:
+
+    -> Root menu:
+        |---> "MODE": Boot-up Operating mode
+        |       |---> "ANA":    Analogue mode
+        |       |---> "1600":   FreeDV 1600
+        |       '---> "TONE":   Test tone
+        |
+        |---> "TOT": Time-out timer
+        |       |---> "TIME":   Total time-out period (0 == disabled)
+        |       |               0-10 minutes in 5 second steps
+        |       '---> "WARN":   Warning beep period (0 == disabled)
+        |                       0-${TIME} seconds in 5 second steps
+        |
+        '---> "UI": User interface options
+                |---> "FREQ":   Morse frequency
+                |               50-2000 Hz in 50Hz steps
+                |---> "WPM":    Morse send speed (PARIS standard)
+                |               5-60 WPM in 5 WPM steps
+                '---> "VOL":    Menu volume
+                                1-15 units.
+
+Settings are saved when you hold down BACK to leave the root menu.
+
+Factory Reset
+=============
+
+To perform a factory reset, hold down BACK whilst powering the device on. A
+loud beep should be heard and the SYNC LED should flash. Release, and the
+device should boot up with factory defaults.
