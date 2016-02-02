@@ -175,6 +175,9 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->phi3_c = comp_exp_j(0);
     fsk->phi4_c = comp_exp_j(0);
     
+    fsk->phi1_c.real = 0;
+    fsk->phi1_c.imag = 1;
+    
     memold = (4*fsk->Ts);
     
     fsk->nstash = memold; 
@@ -230,7 +233,7 @@ void fsk_destroy(struct FSK *fsk){
 }
 
 #define FEST_MIN 800
-#define FEST_MAX (Fs-1500)
+#define FEST_MAX 2500
 #define FEST_MIN_SPACING 200
 
 /*
@@ -380,6 +383,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     float f_est[M];
     float meanebno,stdebno;
     
+    
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
     modem_probe_samp_f("t_f_est",f_est,M);
@@ -397,16 +401,19 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     if(fsk->f1_est<1){
 		fsk->f1_est = f_est[0];
 		fsk->f2_est = f_est[1];
-		printf("using fest\n");
 	}
+    
+    /* Back the stored phase off to account for re-integraton of old samples */
+    dphi1 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f1_est)/(float)(Fs)));
+    dphi2 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f2_est)/(float)(Fs)));
+
+    phi1_c = cmult(dphi1,phi1_c);
+    phi2_c = cmult(dphi2,phi2_c);
 
     /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = comp_exp_j(-2*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(-2*M_PI*((fsk->f2_est)/(float)(Fs)));
-
-    //dphi1 = comp_exp_j(-2*M_PI*((float)(f_est[0])/(float)(Fs)));
-    //dphi2 = comp_exp_j(-2*M_PI*((float)(f_est[1])/(float)(Fs)));
-
+    dphi1 = comp_exp_j(2*M_PI*((fsk->f1_est)/(float)(Fs)));
+    dphi2 = comp_exp_j(2*M_PI*((fsk->f2_est)/(float)(Fs)));
+    
     dc_i = 0;
     cbuf_i = 0;
     sample_src = &(fsk->samp_old[nstash-nold]);
@@ -422,8 +429,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             /* Recalculate delta-phi after switching to new sample source */
             phi1_c = comp_normalize(phi1_c);
             phi2_c = comp_normalize(phi2_c);
-            dphi1 = comp_exp_j(-2*M_PI*(f_est[0]/(float)(Fs)));
-            dphi2 = comp_exp_j(-2*M_PI*(f_est[1]/(float)(Fs)));
+            dphi1 = comp_exp_j(2*M_PI*(f_est[0]/(float)(Fs)));
+            dphi2 = comp_exp_j(2*M_PI*(f_est[1]/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
         f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
@@ -450,8 +457,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 				/* Recalculate delta-phi after switching to new sample source */
 				phi1_c = comp_normalize(phi1_c);
 				phi2_c = comp_normalize(phi2_c);
-				dphi1 = comp_exp_j(-2*M_PI*((f_est[0])/(float)(Fs)));
-				dphi2 = comp_exp_j(-2*M_PI*((f_est[1])/(float)(Fs)));
+				dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
+				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
             f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
@@ -480,10 +487,10 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         f2_int[i] = t2;
         
     }
-
-    fsk->phi1_c = phi1_c;
-	fsk->phi2_c = phi2_c;
-	
+    
+	fsk->phi1_c = phi1_c;
+    fsk->phi2_c = phi2_c;
+    
 	fsk->f1_est = f_est[0];
 	fsk->f2_est = f_est[1];
 
@@ -495,7 +502,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
      * exract angle */
      
     /* Figure out how much to spin the oscillator to extract magic spectral line */
-    dphift = comp_exp_j(-2*M_PI*((float)(Rs)/(float)(P*Rs)));
+    dphift = comp_exp_j(2*M_PI*((float)(Rs)/(float)(P*Rs)));
     phi_ft.real = 1;
     phi_ft.imag = 0;
     t1=comp0();
@@ -511,7 +518,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         phi_ft = cmult(phi_ft,dphift);
     }
     /* Get the magic angle */
-    norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
+    norm_rx_timing =  atan2f(t1.imag,t1.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
     
     old_norm_rx_timing = fsk->norm_rx_timing;
@@ -667,11 +674,22 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 		fsk->f4_est = f_est[3];
 	}
 
+    /* Back the stored phase off to account for re-integraton of old samples */
+    dphi1 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f1_est)/(float)(Fs)));
+    dphi2 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f2_est)/(float)(Fs)));
+    dphi3 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f3_est)/(float)(Fs)));
+    dphi4 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f4_est)/(float)(Fs)));
+    
+    phi1_c = cmult(dphi1,phi1_c);
+    phi2_c = cmult(dphi2,phi2_c);
+    phi3_c = cmult(dphi3,phi3_c);
+    phi4_c = cmult(dphi4,phi4_c);
+
     /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = comp_exp_j(-2*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(-2*M_PI*((fsk->f2_est)/(float)(Fs)));
-    dphi3 = comp_exp_j(-2*M_PI*((fsk->f3_est)/(float)(Fs)));
-    dphi4 = comp_exp_j(-2*M_PI*((fsk->f4_est)/(float)(Fs)));
+    dphi1 = comp_exp_j(2*M_PI*((fsk->f1_est)/(float)(Fs)));
+    dphi2 = comp_exp_j(2*M_PI*((fsk->f2_est)/(float)(Fs)));
+    dphi3 = comp_exp_j(2*M_PI*((fsk->f3_est)/(float)(Fs)));
+    dphi4 = comp_exp_j(2*M_PI*((fsk->f4_est)/(float)(Fs)));
 
     dc_i = 0;
     cbuf_i = 0;
@@ -687,14 +705,14 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             using_old_samps = 0;
             
             /* Recalculate delta-phi after switching to new sample source */
-            //phi1_c = comp_normalize(phi1_c);
-            //phi2_c = comp_normalize(phi2_c);
-            //phi3_c = comp_normalize(phi3_c);
-            //phi4_c = comp_normalize(phi4_c);
-            dphi1 = comp_exp_j(-2*M_PI*((f_est[0])/(float)(Fs)));
-            dphi2 = comp_exp_j(-2*M_PI*((f_est[1])/(float)(Fs)));
-            dphi3 = comp_exp_j(-2*M_PI*((f_est[2])/(float)(Fs)));
-            dphi4 = comp_exp_j(-2*M_PI*((f_est[3])/(float)(Fs)));
+            phi1_c = comp_normalize(phi1_c);
+            phi2_c = comp_normalize(phi2_c);
+            phi3_c = comp_normalize(phi3_c);
+            phi4_c = comp_normalize(phi4_c);
+            dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
+            dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
+            dphi3 = comp_exp_j(2*M_PI*((f_est[2])/(float)(Fs)));
+            dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
         f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
@@ -725,14 +743,14 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
                 using_old_samps = 0;
                 
 				/* Recalculate delta-phi after switching to new sample source */
-				//phi1_c = comp_normalize(phi1_c);
-				//phi2_c = comp_normalize(phi2_c);
-				//phi3_c = comp_normalize(phi3_c);
-				//phi4_c = comp_normalize(phi4_c);
-				dphi1 = comp_exp_j(-2*M_PI*((f_est[0])/(float)(Fs)));
-				dphi2 = comp_exp_j(-2*M_PI*((f_est[1])/(float)(Fs)));
-				dphi3 = comp_exp_j(-2*M_PI*((f_est[2])/(float)(Fs)));
-				dphi4 = comp_exp_j(-2*M_PI*((f_est[3])/(float)(Fs)));
+				phi1_c = comp_normalize(phi1_c);
+				phi2_c = comp_normalize(phi2_c);
+				phi3_c = comp_normalize(phi3_c);
+				phi4_c = comp_normalize(phi4_c);
+				dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
+				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
+				dphi3 = comp_exp_j(2*M_PI*((f_est[2])/(float)(Fs)));
+				dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
             f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
@@ -770,10 +788,6 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         f4_int[i] = t4;
         
     }
-	phi1_c = comp_normalize(phi1_c);
-	phi2_c = comp_normalize(phi2_c);
-	phi3_c = comp_normalize(phi3_c);
-	phi4_c = comp_normalize(phi4_c);
 
     fsk->phi1_c = phi1_c;
 	fsk->phi2_c = phi2_c;
