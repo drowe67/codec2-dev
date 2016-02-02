@@ -209,34 +209,33 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     pass = 1;
     
     
+   
     
     pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,9) && pass;
     pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,9) && pass;
     pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.001,10) && pass;
     
     if M==4
-		pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.001,3) && pass;
-		pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.001,4) && pass;
-		pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.001,8) && pass;
-		pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.001,7) && pass;
-	%	pass = vcompare(o_f3,         t_f3,       'f3',       tname,.001,15) && pass;
-	%	pass = vcompare(o_f4,         t_f4,       'f4',       tname,.001,16) && pass;
+		pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.003,3) && pass;
+		pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.003,4) && pass;
+		pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.003,8) && pass;
+		pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.003,7) && pass;
     end
     
     
-    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.001,1) && pass;
-    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.001,2) && pass;
-    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.001,6) && pass;
-    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.001,5) && pass;
-    %pass = vcompare(o_f1,         t_f1,       'f1',       tname,.001,15) && pass;
-	%pass = vcompare(o_f2,         t_f2,       'f2',       tname,.001,16) && pass;
+    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.003,1) && pass;
+    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.003,2) && pass;
+    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.003,6) && pass;
+    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.003,5) && pass;
 
     % Much larger tolerances on unimportant statistics
-    %pass = vcompare(o_EbNodB,     t_EbNodB,   'EbNodB',   tname,.05,12) && pass;
     pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,11) && pass;
+    
     assert(pass);
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
+    
+    
     
     if diffpass==0
         printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
@@ -391,7 +390,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   end
   if test_frame_mode == 2
     % random bits, just to make sure sync algs work on random data
-    tx_bits = round(rand(1, states.nsym*(frames+1)));
+    tx_bits = round(rand(1, states.nbit*(frames+1)));
   end
   if test_frame_mode == 3
     % ...10101... sequence
@@ -481,7 +480,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   % non-coherent BER theory calculation
   % It was complicated, so I broke it up
 
-  ms = 2;
+  ms = M;
   ns = (1:ms-1);
   as = (-1).^(ns+1);
   bs = (as./(ns+1));
@@ -501,10 +500,10 @@ endfunction
 
 function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     %Range of EbNodB over which to test
-    ebnodbrange = fliplr(5:13);
+    ebnodbrange = (3:2:13);
     ebnodbs = length(ebnodbrange);
     
-    mode = 5;
+    mode = 2;
     %Replication of other parameters for parcellfun
     modev   = repmat(mode,1,ebnodbs);
     timingv = repmat(timing_offset,1,ebnodbs);
@@ -512,8 +511,8 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
@@ -528,19 +527,11 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     assert(pass)
 endfunction
 
-%Test with and without channel fading
-function pass = test_fading_var(timing_offset,df,dA,M)
-    pass = ebno_battery_test(timing_offset,1,df,dA,M)
-    assert(pass)
-    pass = pass && ebno_battery_test(timing_offset,0,df,dA,M)
-    assert(pass)
-endfunction
-
 %Test with and without sample clock offset
 function pass = test_timing_var(df,dA,M)
-    pass = test_fading_var(1,df,dA,M)
+    pass = ebno_battery_test(1,0,df,dA,M)
     assert(pass)
-    pass = pass && test_fading_var(0,df,dA,M)
+    pass = pass && ebno_battery_test(0,0,df,dA,M)
     assert(pass)
 endfunction
 
@@ -557,9 +548,9 @@ function pass = test_fsk_battery()
     assert(pass)
     pass = pass && test_mod_horuscfgm4_randbits;
     assert(pass)
-    pass = pass && test_drift_var(2);
-    assert(pass)
     pass = pass && test_drift_var(4);
+    assert(pass)
+    pass = pass && test_drift_var(2);
     assert(pass)
     if pass
         printf("***** All tests passed! *****\n");
@@ -568,13 +559,13 @@ endfunction
 
 function plot_fsk_bers(M=2)
     %Range of EbNodB over which to plot
-    ebnodbrange = (5:13);
+    ebnodbrange = (3:13);
     
     berc = ones(1,length(ebnodbrange));
     bero = ones(1,length(ebnodbrange));
     berinc = ones(1,length(ebnodbrange));
     ebnodbs = length(ebnodbrange)
-    mode = 5;
+    mode = 2;
     %Replication of other parameters for parcellfun
     modev   = repmat(mode,1,ebnodbs);
     timingv = repmat(0,1,ebnodbs);
@@ -582,8 +573,10 @@ function plot_fsk_bers(M=2)
     dfv     = repmat(0,1,ebnodbs);
     dav     = repmat(1,1,ebnodbs);
     Mv     = repmat(M,1,ebnodbs);
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
-    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    
+    
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
         stat = statv(ii);
@@ -591,13 +584,13 @@ function plot_fsk_bers(M=2)
         bero(ii)=stat.bero;
         berinc(ii)=stat.thrncoh;
     end
-    
-    close all
     clf;
-    semilogy(ebnodbrange, berinc,'r;2FSK non-coherent theory;')
+    figure(M)
+    
+    semilogy(ebnodbrange, berinc,sprintf('r;%dFSK non-coherent theory;',M))
     hold on;
-    semilogy(ebnodbrange, bero ,'g;Octave fsk horus 2FSK Demod;')
-    semilogy(ebnodbrange, berc, 'v;C fsk horus 2FSK Demod;')
+    semilogy(ebnodbrange, bero ,sprintf('g;Octave fsk horus %dFSK Demod;',M))
+    semilogy(ebnodbrange, berc,sprintf('v;C fsk horus %dFSK Demod;',M))
     hold off;
     grid("minor");
     axis([min(ebnodbrange) max(ebnodbrange) 1E-5 1])
@@ -607,5 +600,7 @@ function plot_fsk_bers(M=2)
  
 endfunction
 
-%plot_fsk_bers
-%test_fsk_battery
+
+test_fsk_battery
+plot_fsk_bers(2)
+plot_fsk_bers(4)
