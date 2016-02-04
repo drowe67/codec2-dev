@@ -139,12 +139,10 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
 
     Nsamples = 4;
 
-    % band pass filter: limit search to 250 to 3800 Hz
+    % search range
 
-    %m_st = max(1,floor((pi*250/4000)/Wo));
-    %m_en = floor((pi*3800/4000)/Wo);
     m_st = 1;
-    m_en = L;
+    m_en = floor(L*3200/4000);
 
     target = maskdB;
     dec_samples = [];
@@ -156,8 +154,6 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
     % LF.  Fortunately rather gd at voiced speech, which is a much tougher job.
 
     decmaskdB = 10*ones(1,L);
-
-    % Lets find the best Nsample samples to use
 
     for sample=1:Nsamples
 
@@ -173,7 +169,7 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
         error = target - candidate;
         mse_log1(sample,m) = mse = sum(abs(error)); % MSE in log domain
         %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
-
+      
         too_close = 0;
         for x=1:sample-1
           if abs(dec_samples(x,2) - m) < 2
@@ -194,6 +190,33 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
       decmaskdB = min_candidate;
       dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
       %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
+    end
+
+    % Freq Quantisers
+
+    if 1
+      fposs(1,:) = zeros(1,8); % dynamic, one harm steps, see below
+      fposs(2,:) = [600  700 800 900 1000 1200 1400 1600];
+      fposs(3,:) = [900 1100 1400 1800 2200 2400 2800 3200];
+      fposs(4,:) = [900 1100 1400 1800 2200 2400 2800 3200];
+
+      % sort into incr freq order
+
+      masker_amps_dB = dec_samples(:,1);
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+      [fsrt fsrt_ind] = sort(masker_freqs_kHz);
+            
+      % first freq quant to harmonic m=1:8
+      f0_kHz = Wo*4/pi;
+      masker_freqs_kHz(1) = quantise((1:8)*f0_kHz, fsrt(1));
+      % use LUT for quantising frequencies of other harmonics
+      for i=2:4
+        masker_freqs_kHz(i) = quantise(fposs(i,:)/1000, fsrt(i));
+        %masker_freqs_kHz(i) = fsrt(i);
+      end
+
+      asrt = masker_amps_dB(fsrt_ind);
+      decmaskdB = determine_mask(asrt,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
     if 0
@@ -532,24 +555,43 @@ endfunction
 
 function plot_f_a_stats(f,a)
 
+  % freq pdfs
+
   [fsrt fsrt_ind] = sort(f,2);
   figure(1)
   for i=1:4
     subplot(2,2,i)
-    hist(fsrt(:,i))
+    hist(fsrt(:,i),50)
+    printf("%d min: %d max: %d\n", i, min(fsrt(:,i)), max(fsrt(:,i)))
   end
+
+  % freq diff pdfs
+
+  figure(2)
+  for i=1:4
+    subplot(2,2,i)
+    if i == 1
+      hist(fsrt(:,i),50)
+    else
+      hist(fsrt(:,i) - fsrt(:,i-1),50)
+    end
+  end
+
+  % amplitude PDFs
 
   l = length(a);
   for i=1:l
     asrt(i,:) = a(i, fsrt_ind(i,:));
   end
   
-  figure(2)
+  figure(3)
   for i=1:4
     subplot(2,2,i)
     hist(asrt(:,i) - mean(asrt(:,:),2))
   end
   
+  % find straight line fit
+
   for i=1:l
     [gradient intercept] = linreg(fsrt(i,:), asrt(i,:), 4);
     alinreg(i,:) = gradient*fsrt(i,:) + intercept;
@@ -557,13 +599,13 @@ function plot_f_a_stats(f,a)
     m(i) = gradient; c(i) = intercept;
   end
 
-  figure(3)
+  figure(4)
   for i=1:4
     subplot(2,2,i)
     hist(alinregres(:,i))
   end
   
-  figure(4)
+  figure(5)
   subplot(211)
   m = m(find(m>-0.05));
   m = m(find(m<0.03));
