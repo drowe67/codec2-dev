@@ -142,7 +142,7 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
     % search range
 
     m_st = 1;
-    m_en = floor(L*3200/4000);
+    m_en = L;
 
     target = maskdB;
     dec_samples = [];
@@ -192,27 +192,25 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
       %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
     end
 
-    % Freq Quantisers
+    % Differential freq Quantisers
 
     if 1
-      fposs(1,:) = zeros(1,8); % dynamic, one harm steps, see below
-      fposs(2,:) = [600  700 800 900 1000 1200 1400 1600];
-      fposs(3,:) = [900 1100 1400 1800 2200 2400 2800 3200];
-      fposs(4,:) = [900 1100 1400 1800 2200 2400 2800 3200];
-
-      % sort into incr freq order
+      % sort into increasing freq order
 
       masker_amps_dB = dec_samples(:,1);
       masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
       [fsrt fsrt_ind] = sort(masker_freqs_kHz);
             
       % first freq quant to harmonic m=1:8
+
       f0_kHz = Wo*4/pi;
       masker_freqs_kHz(1) = quantise((1:8)*f0_kHz, fsrt(1));
-      % use LUT for quantising frequencies of other harmonics
+      
+      % then quantise differences
+
       for i=2:4
-        masker_freqs_kHz(i) = quantise(fposs(i,:)/1000, fsrt(i));
-        %masker_freqs_kHz(i) = fsrt(i);
+        targ = fsrt(i) - masker_freqs_kHz(i-1);
+        masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + quantise(0.2:0.2:1.6, targ);
       end
 
       asrt = masker_amps_dB(fsrt_ind);
