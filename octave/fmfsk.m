@@ -145,37 +145,41 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     apodd = 0;
     oss = states.lastint;
     
-    % Figure first 'odd' bit from the last sampled output and first new sampled output
-    mediff = oss-rx_symsamp(1);
-    rx_odd(1) = mediff>0;
-    
+    % Figure out the bits of the 'even' and 'odd' ME streams
     % Note: ii is a zero-indexed array pointer, for less mind-breaking c portage
-    for ii = (1:nsym-2)
-        mediff = rx_symsamp(ii+1)-rx_symsamp(ii+1+1);
-        mebit = mediff>0;
+    lastv = states.lastint;
+    for ii = (0:nsym-1)
+        mdiff = lastv-rx_symsamp(ii+1);
+        lastv = rx_symsamp(ii+1);
+        mbit = mdiff>0;
         
-        if mod(ii,2)==0
-            apeven += abs(mediff);
-            rx_even( floor(ii/2)+1 ) = mebit;
+        if mod(ii,2)==1
+            apeven += abs(mdiff);
+            rx_even( floor(ii/2)+1 ) = mbit;
+            %printf("ie %d iie %d\n",floor(ii/2)+1,ii);
         else
-            apodd += abs(mediff);
-            rx_odd(   floor(ii/2)+2 ) = mebit;
+            apodd  += abs(mdiff);
+            rx_odd(  floor(ii/2)+1 ) = mbit;
+            %printf("io %d iio %d\n",floor(ii/2)+2,ii );
         end
     end
+    
     % Decide on the correct ME alignment
     if(apeven>apodd)
         rx_bits = rx_even;
+        printf("using even\n");
     else
         rx_bits = rx_odd;
+        printf("using odd\n");
     end
     
-    states.lastint = rx_symsamp(nsym);
+    %states.lastint = rx_symsamp(nsym);
 endfunction
 
 % run_sim copypasted from fsk_horus.m
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
-function fmfsk_run_sim(EbNodB,timing_offset,fading,df,dA)
+function fmfsk_run_sim(EbNodB,timing_offset=0,fading=0,de=0,of=0,hpf=0)
   test_frame_mode = 2;
   frames = 70;
   %EbNodB = 3;
@@ -195,13 +199,13 @@ function fmfsk_run_sim(EbNodB,timing_offset,fading,df,dA)
   % ----------------------------------------------------------------------
 
   fm_states.pre_emp = 0;
-  fm_states.de_emp  = 0;
+  fm_states.de_emp  = de;
   fm_states.Ts      = Fs/(Rbit*2);
   fm_states.Fs      = Fs; 
   fm_states.fc      = Fs/4; 
   fm_states.fm_max  = 3E3;
   fm_states.fd      = 5E3;
-  fm_states.output_filter = 0;
+  fm_states.output_filter = of;
   fm_states = analog_fm_init(fm_states);
 
   % ----------------------------------------------------------------------
@@ -243,6 +247,7 @@ function fmfsk_run_sim(EbNodB,timing_offset,fading,df,dA)
   end
 
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
+  
   tx_pmod = fmfsk_mod(states, tx_bits);
   figure(10)
   plot(tx_pmod);
@@ -266,7 +271,11 @@ function fmfsk_run_sim(EbNodB,timing_offset,fading,df,dA)
   %Demod by analog fm
   rx    = analog_fm_demod(fm_states, rx);
   
-  
+  %High-pass filter to simulate the FM radios
+  if hpf>0
+    printf("high-pass filtering!\n")
+    rx = filter(b,a,rx);
+  end
   %rx = real(rx);
   %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);
   %rx = filter(b1,1,rx);
