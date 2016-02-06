@@ -40,9 +40,8 @@ function states = fmfsk_init(Fs,Rb)
     states.nstash = states.Ts*2;    % How many samples to stash away between proc cycles for timing adjust
     states.nmem =  states.N+(6*states.Ts);
     states.nsym = floor(states.Rs*.080);
-    states.nbit = floor(states.Rb*.080)
+    states.nbit = floor(states.Rb*.080);
     %Old sample memory
-    %states.oldsamps = zeros(1,states.nstash);
     
     states.oldsamps = zeros(1,states.nmem);
     
@@ -113,8 +112,8 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     Np = length(rx_filt);
     w = 2*pi*(Rs)/Fs;
     x = (rx_filt .^ 2) * exp(-j*w*(0:Np-1))';
-    norm_rx_timing = angle(x)/(2*pi) - 0.42
-    rx_timing = round(norm_rx_timing*Ts)
+    norm_rx_timing = angle(x)/(2*pi) - 0.42;
+    rx_timing = round(norm_rx_timing*Ts);
     
     %If rx timing is too far out, ask for more or less sample the next time
     % around to even it all out
@@ -128,58 +127,49 @@ function [rx_bits states] = fmfsk_demod(states,rx)
 
     states.nin = next_nin;
     
-    % Sample rx_filt at the optimum inst, as figured by rx_timing
-    rx_symsamp = rx_filt((Ts/2)+Ts+rx_timing:Ts:length(rx_filt));
-    length(rx_symsamp)
-    
-    figure(1);
-    plot(rx_filt);
-    figure(2);
-    stairs(rx_symsamp);
-    
     %'Even' and 'Odd' manchester bitstream.
     % We'll figure out which to produce later
     rx_even = zeros(1,nbits);
     rx_odd = zeros(1,nbits);
     apeven = 0;
     apodd = 0;
-    oss = states.lastint;
+    
+    sample_offset = (Ts/2)+Ts+rx_timing-1;
     
     % Figure out the bits of the 'even' and 'odd' ME streams
+    % Also sample rx_filt offset by what fine timing determined along the way
     % Note: ii is a zero-indexed array pointer, for less mind-breaking c portage
     lastv = states.lastint;
     for ii = (0:nsym-1)
-        mdiff = lastv-rx_symsamp(ii+1);
-        lastv = rx_symsamp(ii+1);
+        currv = rx_filt(sample_offset+(ii*Ts)+1);
+        %currv = rx_symsamp(ii+1);
+        mdiff = lastv-currv;
+        lastv = currv;
         mbit = mdiff>0;
         
         if mod(ii,2)==1
             apeven += abs(mdiff);
             rx_even( floor(ii/2)+1 ) = mbit;
-            %printf("ie %d iie %d\n",floor(ii/2)+1,ii);
         else
             apodd  += abs(mdiff);
             rx_odd(  floor(ii/2)+1 ) = mbit;
-            %printf("io %d iio %d\n",floor(ii/2)+2,ii );
         end
     end
     
     % Decide on the correct ME alignment
     if(apeven>apodd)
         rx_bits = rx_even;
-        printf("using even\n");
     else
         rx_bits = rx_odd;
-        printf("using odd\n");
     end
-    
-    %states.lastint = rx_symsamp(nsym);
+
+    states.lastint = rx_filt(sample_offset+((nsym-1)*Ts)+1);
 endfunction
 
 % run_sim copypasted from fsk_horus.m
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
-function fmfsk_run_sim(EbNodB,timing_offset=0,fading=0,de=0,of=0,hpf=0)
+function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
   test_frame_mode = 2;
   frames = 70;
   %EbNodB = 3;
@@ -252,20 +242,15 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,fading=0,de=0,of=0,hpf=0)
   figure(10)
   plot(tx_pmod);
   tx = analog_fm_mod(fm_states, tx_pmod);
-  %tx = fsk_horus_mod(states, tx_bits);
+  
+  tx = tx(10:length(tx));
 
   if(timing_offset>0)
     tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
   end
   
-  if fading
-     ltx = length(tx);
-     tx = tx .* (1.1 + cos(2*pi*2*(0:ltx-1)/Fs))'; % min amplitude 0.1, -20dB fade, max 3dB
-  end
 
   noise = sqrt(variance)*randn(length(tx),1);
-  size(tx)
-  size(noise)
   rx    = tx + noise';
   
   %Demod by analog fm
@@ -343,7 +328,7 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,fading=0,de=0,of=0,hpf=0)
   figure(3);
   plot(xor(rx_bits(ox:length(rx_bits)),tx_bits(1:length(rx_bits)+1-ox)))
   
-  ber
+  printf("BER: %f Errors: %d Bits:%d\n",ber,best_nerr,bitcnt-offset);
   
  endfunction
 
