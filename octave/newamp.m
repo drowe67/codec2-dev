@@ -192,16 +192,16 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
       %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
     end
 
-    % Differential freq Quantisers
+    % Differential Freq Quantisers - sounds acceptable
 
-    if 1
+    if 0
       % sort into increasing freq order
 
       masker_amps_dB = dec_samples(:,1);
       masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
       [fsrt fsrt_ind] = sort(masker_freqs_kHz);
             
-      % first freq quant to harmonic m=1:8
+      % first freq quant to harmonic number m=1:8
 
       f0_kHz = Wo*4/pi;
       masker_freqs_kHz(1) = quantise((1:8)*f0_kHz, fsrt(1));
@@ -281,10 +281,16 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
 
     % fit straight line to amplitudes (sounds bad, still a bug somewhere)
 
-    if 0
-      [gradient intercept] = linreg(dec_samples(:,2), dec_samples(:,1), 4);
-      masker_amps_dB = dec_samples(:,2)*gradient + intercept;
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+    if 1
+      f = dec_samples(:,2)*Wo*4000/pi;
+      [gradient intercept] = linreg(f, dec_samples(:,1), 4);
+      masker_amps_dB_lin = f*gradient + intercept;
+      masker_amps_dB_lin_delta = dec_samples(:,1) - masker_amps_dB_lin;
+      gradient_ = quantise(-0.04:0.005:0.04, gradient);
+      printf("gradient: %f gradient_: %f\n", gradient, gradient_);
+      %masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta + intercept;
+      masker_amps_dB = f*gradient_ + intercept;
+      masker_freqs_kHz = f/1000;
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 endfunction
