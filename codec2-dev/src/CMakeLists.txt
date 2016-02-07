@@ -142,6 +142,7 @@ set(CODEC2_SRCS
     fdmdv.c
     fm.c
     fsk.c
+    fmfsk.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
@@ -252,6 +253,9 @@ target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(cohpsk_mod cohpsk_mod.c)
 target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(fmfsk_mod fmfsk_mod.c)
+target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(cohpsk_demod cohpsk_demod.c octave.c)
 target_link_libraries(cohpsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)

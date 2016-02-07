@@ -4,7 +4,7 @@
   AUTHOR......: Brady O'Brien
   DATE CREATED: 7 January 2016
 
-  C Implementation of 2FSK modulator/demodulator, based on octave/fsk_horus.m
+  C Implementation of 2/4FSK modulator/demodulator, based on octave/fsk_horus.m
 
 \*---------------------------------------------------------------------------*/
 
