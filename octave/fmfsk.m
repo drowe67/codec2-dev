@@ -32,16 +32,23 @@ function states = fmfsk_init(Fs,Rb)
     %Current fixed processing buffer size, in non-ME bits
     nbit = 192;
     
+    
     states.Rb = Rb;
     states.Rs = Rb*2;   % Manchester-encoded bitrate
     states.Fs = Fs;
     states.Ts = Fs/states.Rs;
-    states.N = nbit*states.Ts;     
+    states.N = nbit*2*states.Ts;     
+    %states.N
+    %states.N = floor(states.Rs*.080)*states.Ts
+    %states.N
     states.nin = states.N;          % Samples in the next demod cycle
     states.nstash = states.Ts*2;    % How many samples to stash away between proc cycles for timing adjust
     states.nmem =  states.N+(4*states.Ts);
     states.nsym = nbit*2;
     states.nbit = nbit;
+    
+    %tates.nsym = floor(states.Rs*.080);
+    %states.nbit = floor(states.Rb*.080)
     %Old sample memory
     
     states.oldsamps = zeros(1,states.nmem);
@@ -95,16 +102,19 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     ssamps(nold+1:nmem) = rx;
     states.oldsamps = ssamps;
     
-    rx_filt = zeros(1,nsym*Ts);
+    rx_filt = zeros(1,(nsym+1)*Ts);
+    length(rx_filt)
     %Integrate Ts input samples at every offset
     %This is the same thing as filtering with a filter of all ones
     % out to Ts.
     % It's implemented like this for ease of C-porting
     for ii=(1:(nsym+1)*Ts)
         st = ii;
-        en = st+Ts;
+        en = st+Ts-1;
         rx_filt(ii) = sum(ssamps(st:en));
     end
+    
+    length(rx_filt)
  
     % Fine timing estimation ------------------------------------------------------
 
