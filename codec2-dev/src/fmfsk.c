@@ -31,6 +31,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <stdio.h>
+
 
 #include "fmfsk.h"
 #include "modem_probe.h"
@@ -60,7 +62,7 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
     fmfsk->Rs = Rb*2;
     fmfsk->Fs = Fs;
     fmfsk->Ts = Fs/fmfsk->Rs;
-    fmfsk->N = nbits*fmfsk->Ts;
+    fmfsk->N = nbits*2*fmfsk->Ts;
     fmfsk->nmem = fmfsk->N+(fmfsk->Ts*4);
     fmfsk->nsym = nbits*2;
     fmfsk->nbit = nbits;
@@ -103,6 +105,28 @@ uint32_t fmfsk_nin(struct FMFSK *fmfsk){
  * float mod_out[] - Buffer for N samples of modulated FMFSK
  * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
  */
+//void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
+//    int i,j;
+//    int Ts = fmfsk->Ts;
+//    int N = fmfsk->N;
+//    
+//    for(i=0;i<N;){
+//        /* Save a manchester-encoded 0 */
+//        if(bits_in[i] == 0){
+//            for(j=0; j<Ts; j++)
+//                fmfsk_out[i++] = -1;
+//            for(j=0; j<Ts; j++)
+//                fmfsk_out[i++] =  1;
+//        } else {
+//        /* Save a manchester-encoded 1 */
+//            for(j=0; j<Ts; j++)
+//                fmfsk_out[i++] =  1;
+//            for(j=0; j<Ts; j++)
+//                fmfsk_out[i++] = -1;
+//        }
+//    }
+//}
+
 void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
     int i,j;
     int nbit = fmfsk->nbit;
@@ -112,19 +136,18 @@ void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
         /* Save a manchester-encoded 0 */
         if(bits_in[i] == 0){
             for(j=0; j<Ts; j++)
-                fmfsk_out[   j+i*Ts] = -1;
+                fmfsk_out[   j+i*Ts*2] = -1;
             for(j=0; j<Ts; j++)
-                fmfsk_out[Ts+j+i*Ts] =  1;
+                fmfsk_out[Ts+j+i*Ts*2] =  1;
         } else {
         /* Save a manchester-encoded 1 */
             for(j=0; j<Ts; j++)
-                fmfsk_out[   j+i*Ts] =  1;
+                fmfsk_out[   j+i*Ts*2] =  1;
             for(j=0; j<Ts; j++)
-                fmfsk_out[Ts+j+i*Ts] = -1;
+                fmfsk_out[Ts+j+i*Ts*2] = -1;
         }
     }
 }
-
 
 /*
  * Demodulate some number of FMFSK samples. The number of samples to be 
@@ -161,13 +184,13 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     memcpy(&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
     /* Allocate memory for filtering */
-    float *rx_filt = alloca(sizeof(float)*nsym*Ts);
+    float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
     
     /* Integrate over Ts input symbols at every offset */
     for(i=0; i<(nsym+1)*Ts; i++){
         t=0;
         /* Integrate over some samples */
-        for(j=i;j<i+Ts;j++){
+        for(j=i;j<i+Ts-1;j++){
             t += oldsamps[j];
         }
         rx_filt[i] = t;
@@ -188,7 +211,10 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     dphi_ft.real = cos(2*M_PI*(float)Rs/(float)Fs);
     dphi_ft.imag = sin(2*M_PI*(float)Rs/(float)Fs);
     
-    for(i=0; i<nsym*Ts; i++){
+    x.real = 0;
+    x.imag = 0;
+    
+    for(i=0; i<(nsym+1)*Ts; i++){
         /* Apply non-linearity */
         t = rx_filt[i]*rx_filt[i];
         
@@ -200,9 +226,10 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     }
     
     /* Figure out the normalized RX timing, using David's magic number */
-    norm_rx_timing =  atan2f(x.imag,x.real)/(2*M_PI) - .042;
+    norm_rx_timing =  atan2f(x.imag,x.real)/(2*M_PI) - .42;
     rx_timing = (int)lroundf(norm_rx_timing*(float)Ts);
     
+    fprintf(stderr,"norm_rx_timing: %f rx_timing:%d\n",norm_rx_timing,rx_timing);
     /* Figure out how far offset the sample points are */
     sample_offset = (Ts/2)+Ts+rx_timing-1;
     
@@ -225,31 +252,35 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         currv = rx_filt[sample_offset+(i*Ts)];
         mdiff = lastv - currv;
         mbit = mdiff>0 ? 1 : 0;
+        lastv = currv;
         
+        mdiff = mdiff>0 ? mdiff : 0-mdiff;
+        //printf("md %f\n",mdiff);
         /* Put bit in it's stream */
-        if((i&2)==1){
+        if((i%2)==1){
             apeven += mdiff;
             /* Even stream goes in LSB */
             rx_bits[i>>1] |= mbit ? 0x1 : 0x0;
         }else{
             apodd += mdiff;
             /* Odd in second-to-LSB */
-            rx_bits[i>>1] |= mbit ? 0x2 : 0x0;
+            rx_bits[i>>1]  = mbit ? 0x2 : 0x0;
         }
     }
-    
     if(apeven>apodd){
+        fprintf(stderr,"even has it\n");
         /* Zero out odd bits from output bitstream */
         for(i=0;i<nbit;i++)
             rx_bits[i] &= 0x1;
     }else{
+        fprintf(stderr,"it's odd\n");
         /* Shift odd bits into LSB and even bits out of existence */
         for(i=0;i<nbit;i++)
             rx_bits[i] = (rx_bits[i]&0x2)>>1;
     }
     
     /* Save last sample of int stream for next demod round */
-    fmfsk->lodd = rx_filt[sample_offset+((nsym-1)*Ts)];
+    fmfsk->lodd = lastv;
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,nsym*Ts);

@@ -257,6 +257,9 @@ target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(fmfsk_mod fmfsk_mod.c)
 target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(fmfsk_demod fmfsk_demod.c modem_probe.c octave.c)
+target_link_libraries(fmfsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
 add_executable(cohpsk_demod cohpsk_demod.c octave.c)
 target_link_libraries(cohpsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 

@@ -81,14 +81,14 @@ int main(int argc,char *argv[]){
     while( fread(bitbuf,sizeof(uint8_t),fmfsk->nbit,fin) == fmfsk->nbit ){
         fmfsk_mod(fmfsk,modbuf,bitbuf);
         for(i=0; i<fmfsk->N; i++){
-			rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
-		}
+	    rawbuf[i] = (int16_t)(modbuf[i]*(float)FDMDV_SCALE);
+	}
         fwrite(rawbuf,sizeof(int16_t),fmfsk->N,fout);
         
-		if(fin == stdin || fout == stdin){
-			fflush(fin);
-			fflush(fout);
-		}
+	if(fin == stdin || fout == stdin){
+	    fflush(fin);
+	    fflush(fout);
+	}
     }
     
     cleanup:
