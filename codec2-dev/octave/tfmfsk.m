@@ -136,7 +136,7 @@ function test_stats = fmfsk_demod_xt(Fs,Rs,mod,tname,M=2)
     %Clean up files
     delete(bitvecfilename);
     delete(modvecfilename);
-    %delete(tvecfilename);
+    delete(tvecfilename);
     
     o_norm_rx_timing = [];
     o_symsamp = [];
@@ -160,23 +160,17 @@ function test_stats = fmfsk_demod_xt(Fs,Rs,mod,tname,M=2)
     end
     
     close all
-    
-    % One part-per-thousand allowed on important parameters
     pass = 1;
     
-    figure(8)
-    plot((1:length(t_rx_filt)),t_rx_filt,(1:length(o_rx_filt)),o_rx_filt);
-        figure(9)
-    plot((1:length(t_symsamp)),t_symsamp,(1:length(o_symsamp)),o_symsamp);
+    % One part-per-thousand allowed on important parameters
     
-    %vcompare(t_rx_filt,o_rx_filt,.001,8);
-    vcompare(t_norm_rx_timing,o_norm_rx_timing,'norm rx timing',.001,9);
-    vcompare(t_symsamp,o_symsamp,'symsamp',.001,10);
+    pass = vcompare(t_rx_filt,o_rx_filt,'rx filt',tname,.001,8) && pass;
+    pass = vcompare(t_norm_rx_timing,o_norm_rx_timing,'norm rx timing',tname,.001,9) && pass;
+    pass = vcompare(t_symsamp,o_symsamp,'symsamp',tname,.001,10) && pass;
     
     assert(pass);
     diffpass = sum(xor(obits,bits'))<4;
     diffbits = sum(xor(obits,bits'));
-    
     
     
     if diffpass==0
@@ -233,15 +227,13 @@ endfunction
 % run_sim copypasted from fsk_horus.m
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
-function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,M=2)
+function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   test_frame_mode = 2;
   frames = 70;
   %EbNodB = 3;
   %timing_offset = 0.0; % see resample() for clock offset below
   %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
-  df     = 0;          % tx tone freq drift in Hz/s
-  dA     = 1;          % amplitude imbalance of tones (note this affects Eb so not a gd idea)
 
   more off
   rand('state',1); 
@@ -303,16 +295,18 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,M=2)
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
   
   tx_pmod = fmfsk_mod(states, tx_bits);
-  figure(10)
-  plot(tx_pmod);
+  
   tx = analog_fm_mod(fm_states, tx_pmod);
   
-  tx = tx(10:length(tx));
   if(timing_offset>0)
     tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
   end
   
-
+  %Add frequency drift
+  fdrift = df/Fs
+  fshift = 2*pi*fdrift*(1:length(tx));
+  fshift = exp(j*(fshift.^2));
+  tx = tx.*fshift;
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise';
   
@@ -324,29 +318,10 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,M=2)
     printf("high-pass filtering!\n")
     rx = filter(b,a,rx);
   end
-  %rx = real(rx);
-  %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);
-  %rx = filter(b1,1,rx);
-  %[b a] = cheby2(6,40,[3000 6000]/(Fs/2));
-  %rx = filter(b,a,rx);
-  %rx = sign(rx);
-  %rx(find (rx > 1)) = 1;
-  %rx(find (rx < -1)) = -1;
-
-  % dump simulated rx file
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
   rx_bits_buf = zeros(1,2*nbit);
-  x_log = [];
-  timing_nl_log = [];
-  norm_rx_timing_log = [];
-  f_int_resample_log = [];
-  f_log = [];
-  EbNodB_log = [];
-  rx_bits_log = [];
-  rx_bits_sd_log = [];
-
 
   test_name = sprintf("tfmfsk run sim EbNodB:%d frames:%d timing_offset:%d df:%d",EbNodB,frames,timing_offset,df);
   tstats = fmfsk_demod_xt(Fs,Rbit,rx',test_name,M); 
@@ -409,20 +384,19 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,M=2)
  endfunction
 
 
-function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
+function pass = ebno_battery_test(timing_offset,drift,hpf,deemp,outfilt)
     %Range of EbNodB over which to test
-    ebnodbrange = (3:2:13);
+    ebnodbrange = (8:2:20);
     ebnodbs = length(ebnodbrange);
     
-    mode = 2;
     %Replication of other parameters for parcellfun
-    modev   = repmat(mode,1,ebnodbs);
     timingv = repmat(timing_offset,1,ebnodbs);
-    fadingv = repmat(fading,1,ebnodbs);
-    dfv     = repmat(df,1,ebnodbs);
-    dav     = repmat(dA,1,ebnodbs);
-    mv      = repmat(M,1,ebnodbs);
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    driftv = repmat(timing_offset,1,ebnodbs);
+    hpfv = repmat(timing_offset,1,ebnodbs);
+    deempv = repmat(timing_offset,1,ebnodbs);
+    outfv = repmat(timing_offset,1,ebnodbs);
+    
+    statv = pararrayfun(floor(1.25*nproc()),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
     passv = zeros(1,length(statv));
@@ -439,29 +413,25 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
 endfunction
 
 %Test with and without sample clock offset
-function pass = test_timing_var(df,dA,M)
-    pass = ebno_battery_test(1,0,df,dA,M)
+function pass = test_timing_var(drift,hpf,deemp,outfilt)
+    pass = ebno_battery_test(1,drift,hpf,deemp,outfilt)
     assert(pass)
-    pass = pass && ebno_battery_test(0,0,df,dA,M)
+    pass = ebno_battery_test(0,drift,hpf,deemp,outfilt)
     assert(pass)
 endfunction
 
 %Test with and without 1 Hz/S freq drift
-function pass = test_drift_var(M)
-    pass = test_timing_var(1,1,M)
+function pass = test_drift_var(hpf,deemp,outfilt)
+    pass = test_timing_var(1,hpf,deemp,outfilt)
     assert(pass)
-    pass = pass && test_timing_var(0,1,M)
+    pass = pass && test_timing_var(0,hpf,deemp,outfilt)
     assert(pass)
 endfunction
 
-function pass = test_fsk_battery()
+function pass = test_fmfsk_battery()
     pass = test_mod_horuscfg_randbits;
     assert(pass)
-    pass = pass && test_mod_horuscfgm4_randbits;
-    assert(pass)
-    pass = pass && test_drift_var(4);
-    assert(pass)
-    pass = pass && test_drift_var(2);
+    pass = pass && test_drift_var(1,1,1);
     assert(pass)
     if pass
         printf("***** All tests passed! *****\n");
