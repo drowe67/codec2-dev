@@ -103,7 +103,6 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     states.oldsamps = ssamps;
     
     rx_filt = zeros(1,(nsym+1)*Ts);
-    length(rx_filt)
     %Integrate Ts input samples at every offset
     %This is the same thing as filtering with a filter of all ones
     % out to Ts.
@@ -113,7 +112,6 @@ function [rx_bits states] = fmfsk_demod(states,rx)
         en = st+Ts-1;
         rx_filt(ii) = sum(ssamps(st:en));
     end
-    length(rx_filt)
     states.rx_filt = rx_filt;
     % Fine timing estimation ------------------------------------------------------
 
@@ -122,9 +120,9 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     Np = length(rx_filt);
     w = 2*pi*(Rs)/Fs;
     x = (rx_filt .^ 2) * exp(-j*w*(0:Np-1))';
-    norm_rx_timing = angle(x)/(2*pi) - 0.42;
+    norm_rx_timing = angle(x)/(2*pi)-.42;
+     
     rx_timing = round(norm_rx_timing*Ts);
-    exp(-j*w*(0:Np-1))(1)
     
     %If rx timing is too far out, ask for more or less sample the next time
     % around to even it all out
@@ -138,7 +136,6 @@ function [rx_bits states] = fmfsk_demod(states,rx)
 
     states.nin = next_nin;
     states.norm_rx_timing = norm_rx_timing;
-    norm_rx_timing
     %'Even' and 'Odd' manchester bitstream.
     % We'll figure out which to produce later
     rx_even = zeros(1,nbits);
@@ -146,7 +143,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     apeven = 0;
     apodd = 0;
 
-    sample_offset = (Ts/2)+Ts+rx_timing-1;
+    sample_offset = (Ts/2)+Ts+rx_timing-1
     
     symsamp = zeros(1,nsym);
     
@@ -156,7 +153,6 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     lastv = states.lastint;
     for ii = (0:nsym-1)
         currv = rx_filt(sample_offset+(ii*Ts)+1);
-        %currv = rx_symsamp(ii+1);
         mdiff = lastv-currv;
         lastv = currv;
         mbit = mdiff>0;
@@ -170,7 +166,6 @@ function [rx_bits states] = fmfsk_demod(states,rx)
         end
     end
     states.symsamp = symsamp;
-    
     % Decide on the correct ME alignment
     if(apeven>apodd)
         rx_bits = rx_even;
@@ -250,6 +245,7 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
       tx_bits(1:2:length(tx_bits)) = 1;
 
   end
+  
 
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
   
