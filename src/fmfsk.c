@@ -162,8 +162,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     memcpy(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
     memcpy(&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
-    fprintf(stderr,"nold:%d nmem:%d nin:%d\n",nold,nmem,nin);
-    
     /* Allocate memory for filtering */
     float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
     
@@ -192,7 +190,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     dphi_ft.real = cosf(2*M_PI*((float)Rs)/((float)Fs));
     dphi_ft.imag = sinf(2*M_PI*((float)Rs)/((float)Fs));
     
-    fprintf(stderr,"phift_r %f phift_i %f\n",dphi_ft.real,dphi_ft.imag);
     x.real = 0;
     x.imag = 0;
     
@@ -212,7 +209,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     norm_rx_timing =  atan2f(x.imag,x.real)/(2*M_PI) - .42;
     rx_timing = (int)lroundf(norm_rx_timing*(float)Ts);
     
-    fprintf(stderr,"norm_rx_timing: %f rx_timing:%d\n",norm_rx_timing,rx_timing);
     /* Figure out how far offset the sample points are */
     sample_offset = (Ts/2)+Ts+rx_timing-1;
     
@@ -252,12 +248,10 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         }
     }
     if(apeven>apodd){
-        fprintf(stderr,"even has it\n");
         /* Zero out odd bits from output bitstream */
         for(i=0;i<nbit;i++)
             rx_bits[i] &= 0x1;
     }else{
-        fprintf(stderr,"it's odd\n");
         /* Shift odd bits into LSB and even bits out of existence */
         for(i=0;i<nbit;i++)
             rx_bits[i] = (rx_bits[i]&0x2)>>1;
@@ -268,5 +262,4 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
-    fprintf(stderr,"rxfiltl %d\n",(nsym+1)*Ts);
 }
