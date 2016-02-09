@@ -105,27 +105,6 @@ uint32_t fmfsk_nin(struct FMFSK *fmfsk){
  * float mod_out[] - Buffer for N samples of modulated FMFSK
  * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
  */
-//void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
-//    int i,j;
-//    int Ts = fmfsk->Ts;
-//    int N = fmfsk->N;
-//    
-//    for(i=0;i<N;){
-//        /* Save a manchester-encoded 0 */
-//        if(bits_in[i] == 0){
-//            for(j=0; j<Ts; j++)
-//                fmfsk_out[i++] = -1;
-//            for(j=0; j<Ts; j++)
-//                fmfsk_out[i++] =  1;
-//        } else {
-//        /* Save a manchester-encoded 1 */
-//            for(j=0; j<Ts; j++)
-//                fmfsk_out[i++] =  1;
-//            for(j=0; j<Ts; j++)
-//                fmfsk_out[i++] = -1;
-//        }
-//    }
-//}
 
 void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
     int i,j;
@@ -160,7 +139,7 @@ void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
 void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     int i,j;
     int Ts          = fmfsk->Ts;
-    int Fs          = fmfsk->Ts;
+    int Fs          = fmfsk->Fs;
     int Rs          = fmfsk->Rs;
     int nin         = fmfsk->nin;
     int N           = fmfsk->N;
@@ -183,6 +162,8 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     memcpy(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
     memcpy(&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
+    fprintf(stderr,"nold:%d nmem:%d nin:%d\n",nold,nmem,nin);
+    
     /* Allocate memory for filtering */
     float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
     
@@ -190,7 +171,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     for(i=0; i<(nsym+1)*Ts; i++){
         t=0;
         /* Integrate over some samples */
-        for(j=i;j<i+Ts-1;j++){
+        for(j=i;j<i+Ts;j++){
             t += oldsamps[j];
         }
         rx_filt[i] = t;
@@ -207,10 +188,11 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     phi_ft.real = 1;
     phi_ft.imag = 0;
     
-    /* Set up delta-phase */
-    dphi_ft.real = cos(2*M_PI*(float)Rs/(float)Fs);
-    dphi_ft.imag = sin(2*M_PI*(float)Rs/(float)Fs);
+    /* Set up delta-phase */ 
+    dphi_ft.real = cosf(2*M_PI*((float)Rs)/((float)Fs));
+    dphi_ft.imag = sinf(2*M_PI*((float)Rs)/((float)Fs));
     
+    fprintf(stderr,"phift_r %f phift_i %f\n",dphi_ft.real,dphi_ft.imag);
     x.real = 0;
     x.imag = 0;
     
@@ -223,6 +205,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         
         /* Spin downshift oscillator */
         phi_ft = cmult(dphi_ft,phi_ft);
+        modem_probe_samp_c("t_phi_ft",&phi_ft,1);
     }
     
     /* Figure out the normalized RX timing, using David's magic number */
@@ -238,7 +221,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     next_nin = N;
     if(norm_rx_timing > .5)
         next_nin += Ts/2;
-    if(norm_rx_timing < .5)
+    if(norm_rx_timing < -.5)
         next_nin -= Ts/2;
     fmfsk->nin = next_nin;
     
@@ -250,6 +233,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     for(i=0; i<nsym; i++){
         /* Sample a filtered value */
         currv = rx_filt[sample_offset+(i*Ts)];
+        modem_probe_samp_f("t_symsamp",&currv,1);
         mdiff = lastv - currv;
         mbit = mdiff>0 ? 1 : 0;
         lastv = currv;
@@ -283,5 +267,6 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     fmfsk->lodd = lastv;
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
-    modem_probe_samp_f("t_rx_filt",rx_filt,nsym*Ts);
+    modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
+    fprintf(stderr,"rxfiltl %d\n",(nsym+1)*Ts);
 }

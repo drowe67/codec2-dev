@@ -113,9 +113,8 @@ function [rx_bits states] = fmfsk_demod(states,rx)
         en = st+Ts-1;
         rx_filt(ii) = sum(ssamps(st:en));
     end
-    
     length(rx_filt)
- 
+    states.rx_filt = rx_filt;
     % Fine timing estimation ------------------------------------------------------
 
     % Estimate fine timing using line at Rs/2 that Manchester encoding provides
@@ -125,6 +124,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     x = (rx_filt .^ 2) * exp(-j*w*(0:Np-1))';
     norm_rx_timing = angle(x)/(2*pi) - 0.42;
     rx_timing = round(norm_rx_timing*Ts);
+    exp(-j*w*(0:Np-1))(1)
     
     %If rx timing is too far out, ask for more or less sample the next time
     % around to even it all out
@@ -137,15 +137,18 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     end
 
     states.nin = next_nin;
-    
+    states.norm_rx_timing = norm_rx_timing;
+    norm_rx_timing
     %'Even' and 'Odd' manchester bitstream.
     % We'll figure out which to produce later
     rx_even = zeros(1,nbits);
     rx_odd = zeros(1,nbits);
     apeven = 0;
     apodd = 0;
-    
+
     sample_offset = (Ts/2)+Ts+rx_timing-1;
+    
+    symsamp = zeros(1,nsym);
     
     % Figure out the bits of the 'even' and 'odd' ME streams
     % Also sample rx_filt offset by what fine timing determined along the way
@@ -157,7 +160,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
         mdiff = lastv-currv;
         lastv = currv;
         mbit = mdiff>0;
-        
+        symsamp(ii+1) = currv;
         if mod(ii,2)==1
             apeven += abs(mdiff);
             rx_even( floor(ii/2)+1 ) = mbit;
@@ -166,6 +169,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
             rx_odd(  floor(ii/2)+1 ) = mbit;
         end
     end
+    states.symsamp = symsamp;
     
     % Decide on the correct ME alignment
     if(apeven>apodd)
@@ -174,7 +178,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
         rx_bits = rx_odd;
     end
 
-    states.lastint = rx_filt(sample_offset+((nsym-1)*Ts)+1);
+    states.lastint = lastv;
 endfunction
 
 % run_sim copypasted from fsk_horus.m
@@ -311,14 +315,6 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
     rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
     rx_bits_buf(nbit+1:2*nbit) = rx_bits;
     rx_bits_log = [rx_bits_log rx_bits];
-    %rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
-
-    %norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
-    %x_log = [x_log states.x];
-    %timing_nl_log = [timing_nl_log states.timing_nl];
-    %f_int_resample_log = [f_int_resample_log abs(states.f_int_resample(:,:))];
-    %f_log = [f_log; states.f];
-    %EbNodB_log = [EbNodB_log states.EbNodB];
 
   end
 

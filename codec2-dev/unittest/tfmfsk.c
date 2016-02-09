@@ -168,6 +168,8 @@ int main(int argc,char *argv[]){
         bitbuf = malloc(sizeof(uint8_t)*fmfsk->nbit);
         /* Demod-only test */
         if(test_type == TEST_DEMOD){
+            
+            fprintf(stderr,"%d\n",(fmfsk->N+fmfsk->Ts*2));
             while( fread(modbuf,sizeof(float),fmfsk_nin(fmfsk),fin) == fmfsk_nin(fmfsk) ){
                 fmfsk_demod(fmfsk,bitbuf,modbuf);
                 fwrite(bitbuf,sizeof(uint8_t),fmfsk->nbit,fout);
