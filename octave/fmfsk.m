@@ -246,6 +246,7 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
 
   end
   
+  load fm_radio_filt_model.txt
 
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
   
@@ -272,6 +273,12 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
     printf("high-pass filtering!\n")
     rx = filter(b,a,rx);
   end
+  rx = filter(filt,1,rx);
+  
+  figure(4)
+  plot(20*log10(abs(fft(rx))))
+    figure(5)
+  plot(rx)
   %rx = real(rx);
   %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);
   %rx = filter(b1,1,rx);
