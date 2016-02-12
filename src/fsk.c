@@ -32,7 +32,7 @@
 \*---------------------------------------------------------------------------*/
 
 /* P oversampling rate constant -- should probably be init-time configurable */
-#define ct_P 8
+#define horus_P 8
 
 /* Define this to enable EbNodB estimate */
 /* This needs square roots, may take more cpu time than it's worth */
@@ -110,6 +110,129 @@ static inline COMP comp_normalize(COMP a){
 }
 
 
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fsk_create_hbr
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 11 February 2016
+  
+  Create and initialize an instance of the FSK modem. Returns a pointer
+  to the modem state/config struct. One modem config struct may be used
+  for both mod and demod. returns NULL on failure.
+
+\*---------------------------------------------------------------------------*/
+
+struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
+{
+    struct FSK *fsk;
+    int i;
+    int memold;
+    int Ndft = 0;
+    
+    /* Number of symbols in a processing frame */
+    int nsyms = 192;
+    
+    /* Check configuration validity */
+    assert(Fs > 0 );
+    assert(Rs > 0 );
+    assert(tx_f1 > 0);
+    assert(tx_fs > 0);
+    assert(P > 0);
+    /* Ts (Fs/Rs) must be an integer */
+    assert( (Fs%Rs) == 0 );
+    /* Ts/P (Fs/Rs/P) must be an integer */
+    assert( ((Fs/Rs)%P) == 0 );
+    assert( M==2 || M==4);
+    
+    fsk = (struct FSK*) malloc(sizeof(struct FSK));
+    if(fsk == NULL) return NULL;
+     
+    
+    /* Set constant config parameters */
+    fsk->Fs = Fs;
+    fsk->Rs = Rs;
+    fsk->Ts = Fs/Rs;
+    fsk->N = fsk->Ts*nsyms;
+    fsk->P = P;
+    fsk->Nsym = nsyms;
+    fsk->Nmem = fsk->N+(2*fsk->Ts);
+    fsk->f1_tx = tx_f1;
+    fsk->fs_tx = tx_fs;
+    fsk->nin = fsk->N;
+    fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
+    fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
+    
+    /* Find smallest 2^N value that fits Fs for efficient FFT */
+    /* It would probably be better to use KISS-FFt's routine here */
+    for(i=1; i; i<<=1)
+        if((fsk->N)&i)
+            Ndft = i;
+    
+    fsk->Ndft = Ndft;
+    
+    fsk->est_min = tx_f1-3*Rs;
+    if(fsk->est_min<0) fsk->est_min = 0;
+    
+    fsk->est_max = (Fs/2)-Rs;
+    
+    fsk->est_space = (Rs/2)-(Rs/10);
+    
+    /* Set up rx state */
+    fsk->phi1_c = comp_exp_j(0);
+    fsk->phi2_c = comp_exp_j(0);
+    fsk->phi3_c = comp_exp_j(0);
+    fsk->phi4_c = comp_exp_j(0);
+    
+    fsk->phi1_c.real = 0;
+    fsk->phi1_c.imag = 1;
+    
+    memold = (4*fsk->Ts);
+    
+    fsk->nstash = memold; 
+    fsk->samp_old = (float*) malloc(sizeof(float)*memold);
+    if(fsk->samp_old == NULL){
+        free(fsk);
+        return NULL;
+    }
+    
+    for(i=0;i<memold;i++)fsk->samp_old[i]=0;
+    
+    fsk->fft_cfg = kiss_fftr_alloc(fsk->Ndft,0,NULL,NULL);
+    if(fsk->fft_cfg == NULL){
+        free(fsk->samp_old);
+        free(fsk);
+        return NULL;
+    }
+    
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
+    if(fsk->fft_est == NULL){
+        free(fsk->samp_old);
+        free(fsk->fft_cfg);
+        free(fsk);
+        return NULL;
+    }
+    
+    for(i=0;i<fsk->Ndft/2;i++)fsk->fft_est[i] = 0;
+    
+    fsk->norm_rx_timing = 0;
+    
+    /* Set up tx state */
+    fsk->tx_phase_c = comp_exp_j(0);
+    
+    /* Set up demod stats */
+    fsk->EbNodB = 0;
+    fsk->f1_est = 0;
+    fsk->f2_est = 0;
+    fsk->f3_est = 0;
+    fsk->f4_est = 0;    
+    fsk->ppm = 0;
+
+    return fsk;
+}
+
+#define HORUS_MIN 800
+#define HORUS_MAX 2500
+#define HORUS_MIN_SPACING 200
 
 /*---------------------------------------------------------------------------*\
 
@@ -135,31 +258,24 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     assert(Rs > 0 );
     assert(tx_f1 > 0);
     assert(tx_fs > 0);
-    assert(ct_P > 0);
+    assert(horus_P > 0);
     /* Ts (Fs/Rs) must be an integer */
     assert( (Fs%Rs) == 0 );
     /* Ts/P (Fs/Rs/P) must be an integer */
-    assert( ((Fs/Rs)%ct_P) == 0 );
+    assert( ((Fs/Rs)%horus_P) == 0 );
     assert( M==2 || M==4);
     
     fsk = (struct FSK*) malloc(sizeof(struct FSK));
     if(fsk == NULL) return NULL;
-    
-    /* Find smallest 2^N value that fits Fs for efficient FFT */
-    /* It would probably be better to use KISS-FFt's routine here */
-    for(i=1; i; i<<=1)
-        if(Fs&i)
-            Ndft = i<<1;
      
     Ndft = 1024;
     
-    //Ndft = 4096;
     /* Set constant config parameters */
     fsk->Fs = Fs;
     fsk->Rs = Rs;
     fsk->Ts = Fs/Rs;
     fsk->N = Fs;
-    fsk->P = ct_P;
+    fsk->P = horus_P;
     fsk->Nsym = fsk->N/fsk->Ts;
     fsk->Ndft = Ndft;
     fsk->Nmem = fsk->N+(2*fsk->Ts);
@@ -168,6 +284,9 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->nin = fsk->N;
     fsk->mode = M==2 ? MODE_2FSK : MODE_4FSK;
     fsk->Nbits = M==2 ? fsk->Nsym : fsk->Nsym*2;
+    fsk->est_min = HORUS_MIN;
+    fsk->est_max = HORUS_MAX;
+    fsk->est_space = HORUS_MIN_SPACING;
     
     /* Set up rx state */
     fsk->phi1_c = comp_exp_j(0);
@@ -232,9 +351,6 @@ void fsk_destroy(struct FSK *fsk){
     free(fsk);
 }
 
-#define FEST_MIN 800
-#define FEST_MAX 2500
-#define FEST_MIN_SPACING 200
 
 /*
  * Internal function to estimate the frequencies of the two tones within a block of samples.
@@ -265,9 +381,9 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
     fft_samps = Ndft;
     
-    f_min  = (FEST_MIN*Ndft)/Fs;
-    f_max  = (FEST_MAX*Ndft)/Fs;
-    f_zero = (FEST_MIN_SPACING*Ndft)/(2*Fs);
+    f_min  = (fsk->est_min*Ndft)/Fs;
+    f_max  = (fsk->est_max*Ndft)/Fs;
+    f_zero = (fsk->est_space*Ndft)/(2*Fs);
 
     int fft_loops = nin/Ndft;
     for(j=0; j<fft_loops; j++){
@@ -350,9 +466,6 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 	for(i=0; i<M; i++){
 		freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
 	}
-		
-	
-		
 }
 
 void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){

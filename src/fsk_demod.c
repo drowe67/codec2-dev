@@ -36,42 +36,57 @@
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
-    int Fs,Rs,M;
+    int Fs,Rs,M,P;
+    int hbr = 0;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
     int i,t;
     
-    if(argc<6){
-        fprintf(stderr,"usage: %s Mode SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
+    if(argc<7){
+        fprintf(stderr,"usage: %s Mode P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
         exit(1);
     }
     
     /* Extract parameters */
-    M  = atoi(argv[1]);
-    Fs = atoi(argv[2]);
-    Rs = atoi(argv[3]);
+    P  = atoi(argv[2]);
+    Fs = atoi(argv[3]);
+    Rs = atoi(argv[4]);
     
     /* Open files */
-    if(strcmp(argv[4],"-")==0){
-		fin = stdin;
-	}else{
-		fin = fopen(argv[4],"r");
-	}
+    if(strcmp(argv[5],"-")==0){
+	fin = stdin;
+    }else{
+	fin = fopen(argv[5],"r");
+    }
 	
-	if(strcmp(argv[5],"-")==0){
-		fout = stdout;
-	}else{
-		fout = fopen(argv[5],"w");
-	}
+    if(strcmp(argv[6],"-")==0){
+	fout = stdout;
+    }else{
+	fout = fopen(argv[6],"w");
+    }
 
+    /* Handle high-bit-rate special cases */
+    if(strcmp(argv[1],"2X")==0){
+	M = 2;
+	hbr = 1;
+    }else if(strcmp(argv[1],"4X")==0){
+	M = 4;
+	hbr = 1;
+    }else {
+	M = atoi(argv[1]);
+    }
     
-    if(argc>6)
-		modem_probe_init("fsk2",argv[6]);
+    if(argc>7)
+		modem_probe_init("fsk2",argv[7]);
 	
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,M,1200,400);
+    if(!hbr)
+	fsk = fsk_create(Fs,Rs,M,1200,400);
+    else
+	fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+    
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
@@ -101,6 +116,7 @@ int main(int argc,char *argv[]){
 	    fflush(fout);
 	}
     }
+    
     
     modem_probe_close();
     cleanup:

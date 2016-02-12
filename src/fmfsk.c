@@ -38,7 +38,7 @@
 #include "modem_probe.h"
 #include "comp_prim.h"
 
-#define STD_PROC_BITS 192
+#define STD_PROC_BITS 96
 
 
 /*
