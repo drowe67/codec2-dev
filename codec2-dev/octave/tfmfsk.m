@@ -103,19 +103,13 @@ endfunction
 function test_stats = fmfsk_demod_xt(Fs,Rs,mod,tname,M=2)
     global tfsk_location;
     
-    size(mod)
-    
     %Name of executable containing the modulator
     modvecfilename = sprintf('fmfsk_demod_ut_modvec_%d',getpid());
     bitvecfilename = sprintf('fmfsk_demod_ut_bitvec_%d',getpid());
     tvecfilename = sprintf('fmfsk_demod_ut_tracevec_%d.txt',getpid());
     
-    delete(bitvecfilename);
-    delete(modvecfilename);
-    delete(tvecfilename);
-    
     %command to be run by system to launch the demod
-    command = sprintf('%s D %d %d %s %s %s',tfsk_location,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename)
+    command = sprintf('%s D %d %d %s %s %s',tfsk_location,Fs,Rs,modvecfilename,bitvecfilename,tvecfilename);
     
     %save modulated input into a file
     modvecfile = fopen(modvecfilename,'wb+');
@@ -303,7 +297,7 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   end
   
   %Add frequency drift
-  fdrift = df/Fs
+  fdrift = df/Fs;
   fshift = 2*pi*fdrift*(1:length(tx));
   fshift = exp(j*(fshift.^2));
   tx = tx.*fshift;
@@ -315,7 +309,6 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   
   %High-pass filter to simulate the FM radios
   if hpf>0
-    printf("high-pass filtering!\n")
     rx = filter(b,a,rx);
   end
 
@@ -390,13 +383,13 @@ function pass = ebno_battery_test(timing_offset,drift,hpf,deemp,outfilt)
     ebnodbs = length(ebnodbrange);
     
     %Replication of other parameters for parcellfun
-    timingv = repmat(timing_offset,1,ebnodbs);
-    driftv = repmat(timing_offset,1,ebnodbs);
-    hpfv = repmat(timing_offset,1,ebnodbs);
-    deempv = repmat(timing_offset,1,ebnodbs);
-    outfv = repmat(timing_offset,1,ebnodbs);
+    timingv     = repmat(timing_offset  ,1,ebnodbs);
+    driftv      = repmat(drift          ,1,ebnodbs);
+    hpfv        = repmat(hpf            ,1,ebnodbs);
+    deempv      = repmat(deemp          ,1,ebnodbs);
+    outfv       = repmat(outfilt        ,1,ebnodbs);
     
-    statv = pararrayfun(floor(1.25*nproc()),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);
+    statv = pararrayfun(floor(.75*nproc()),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
     passv = zeros(1,length(statv));
@@ -429,7 +422,7 @@ function pass = test_drift_var(hpf,deemp,outfilt)
 endfunction
 
 function pass = test_fmfsk_battery()
-    pass = test_mod_horuscfg_randbits;
+    pass = test_mod_fdvbcfg_randbits;
     assert(pass)
     pass = pass && test_drift_var(1,1,1);
     assert(pass)
@@ -439,24 +432,18 @@ function pass = test_fmfsk_battery()
 endfunction
 
 function plot_fsk_bers(M=2)
-    %Range of EbNodB over which to plot
-    ebnodbrange = (3:13);
+    %Range of EbNodB over which to test
+    ebnodbrange = (8:14);
+    ebnodbs = length(ebnodbrange);
     
-    berc = ones(1,length(ebnodbrange));
-    bero = ones(1,length(ebnodbrange));
-    berinc = ones(1,length(ebnodbrange));
-    ebnodbs = length(ebnodbrange)
-    mode = 2;
     %Replication of other parameters for parcellfun
-    modev   = repmat(mode,1,ebnodbs);
-    timingv = repmat(0,1,ebnodbs);
-    fadingv = repmat(0,1,ebnodbs);
-    dfv     = repmat(0,1,ebnodbs);
-    dav     = repmat(1,1,ebnodbs);
-    Mv     = repmat(M,1,ebnodbs);
+    timingv     = repmat(1  ,1,ebnodbs);
+    driftv      = repmat(1  ,1,ebnodbs);
+    hpfv        = repmat(1  ,1,ebnodbs);
+    deempv      = repmat(1  ,1,ebnodbs);
+    outfv       = repmat(1  ,1,ebnodbs);
     
-    
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    statv = pararrayfun(nproc(),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
@@ -468,10 +455,10 @@ function plot_fsk_bers(M=2)
     clf;
     figure(M)
     
-    semilogy(ebnodbrange, berinc,sprintf('r;%dFSK non-coherent theory;',M))
+    semilogy(ebnodbrange, berinc,sprintf('r;2FSK non-coherent theory;',M))
     hold on;
-    semilogy(ebnodbrange, bero ,sprintf('g;Octave fsk horus %dFSK Demod;',M))
-    semilogy(ebnodbrange, berc,sprintf('v;C fsk horus %dFSK Demod;',M))
+    semilogy(ebnodbrange, bero ,sprintf('g;Octave ME-FM-FSK Demod;',M))
+    semilogy(ebnodbrange, berc,sprintf('v;C ME-FM-FSK Demod;',M))
     hold off;
     grid("minor");
     axis([min(ebnodbrange) max(ebnodbrange) 1E-5 1])

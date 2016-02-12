@@ -30,17 +30,13 @@ function states = fmfsk_init(Fs,Rb)
     assert(mod(Fs,Rb*2)==0);
     
     %Current fixed processing buffer size, in non-ME bits
-    nbit = 192;
-    
+    nbit = 96;
     
     states.Rb = Rb;
     states.Rs = Rb*2;   % Manchester-encoded bitrate
     states.Fs = Fs;
     states.Ts = Fs/states.Rs;
     states.N = nbit*2*states.Ts;     
-    %states.N
-    %states.N = floor(states.Rs*.080)*states.Ts
-    %states.N
     states.nin = states.N;          % Samples in the next demod cycle
     states.nstash = states.Ts*2;    % How many samples to stash away between proc cycles for timing adjust
     states.nmem =  states.N+(4*states.Ts);
@@ -143,7 +139,7 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     apeven = 0;
     apodd = 0;
 
-    sample_offset = (Ts/2)+Ts+rx_timing-1
+    sample_offset = (Ts/2)+Ts+rx_timing-1;
     
     symsamp = zeros(1,nsym);
     
@@ -251,8 +247,6 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
   [b, a] = cheby1(4, 1, 300/Fs, 'high');   % 300Hz HPF to simulate FM radios
   
   tx_pmod = fmfsk_mod(states, tx_bits);
-  figure(10)
-  plot(tx_pmod);
   tx = analog_fm_mod(fm_states, tx_pmod);
   
   tx = tx(10:length(tx));
@@ -276,8 +270,10 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
   rx = filter(filt,1,rx);
   
   figure(4)
+  title("Spectrum of rx-ed signal after FM demod and FM radio channel");
   plot(20*log10(abs(fft(rx))))
-    figure(5)
+  figure(5)
+  title("Time domain of rx-ed signal after FM demod and FM radio channel");
   plot(rx)
   %rx = real(rx);
   %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);

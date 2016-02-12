@@ -49,6 +49,9 @@ struct FSK {
     int f1_tx;              /* f1 for modulator */
     int fs_tx;              /* Space between TX freqs for modulatosr */
     int mode;               /* 2FSK or 4FSK */
+    int est_min;            /* Minimum frequency for freq. estimator */
+    int est_max;            /* Maximum frequency for freq. estimaotr */
+    int est_space;          /* Minimum frequency spacing for freq. estimator */
     
     /*  Parameters used by demod */
     COMP phi1_c;
@@ -87,9 +90,19 @@ struct FSK {
  * int Fs - Sample frequency
  * int Rs - Symbol rate
  * int tx_f1 - '0' frequency
- * int tx_f2 - '1' frequency
+ * int tx_fs - frequency spacing
  */
-struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1,int tx_fs);
+struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs);
+
+/*
+ * Create an FSK config/state struct from a set of config parameters
+ * 
+ * int Fs - Sample frequency
+ * int Rs - Symbol rate
+ * int tx_f1 - '0' frequency
+ * int tx_fs - frequency spacing
+ */
+struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs);
 
 /*
  * Destroy an FSK state struct and free it's memory

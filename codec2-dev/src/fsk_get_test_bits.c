@@ -43,8 +43,6 @@ int main(int argc,char *argv[]){
     FILE *fout;
     uint8_t *bitbuf;
     
-    /* Seed the RNG with some constant */
-    srand(158324);
     
     if(argc != 3){
         fprintf(stderr,"usage: %s OutputBitsOnePerByte FrameCount\n",argv[0]);
@@ -69,29 +67,26 @@ int main(int argc,char *argv[]){
     bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*FSK_FRAME_SIZE);
     
     /* Write out sync frame and sequence */
-    for(i=0; i<FSK_FRAME_SIZE; i++){
-		bitbuf[i++] = 0;
-		bitbuf[i++] = 0;
-		bitbuf[i++] = 0;
-		bitbuf[i++] = 1;
-		bitbuf[i++] = 1;
-		bitbuf[i++] = 0;
-		bitbuf[i++] = 1;
-		bitbuf[i  ] = 1;
-	}
-	for(i=0;i<sizeof(init);i++){
-		bitbuf[FSK_FRAME_SIZE-sizeof(init)+i]=init[i];
+    for(i=0; i<FSK_FRAME_SIZE; i){
+	bitbuf[i++] = rand()&0x1;
+    }
+    for(i=0;i<sizeof(init);i++){
+	bitbuf[FSK_FRAME_SIZE-sizeof(init)+i]=init[i];
+    }
+    fwrite(bitbuf,sizeof(uint8_t),FSK_FRAME_SIZE,fout);
+    
+    
+    /* Seed the RNG with some constant */
+    srand(158324);
+    for(i=0; i<bitcnt; i++){
+	for(j=0; j<FSK_FRAME_SIZE; j++){
+		bitbuf[j] = rand()&0x1;
 	}
 	fwrite(bitbuf,sizeof(uint8_t),FSK_FRAME_SIZE,fout);
-    for(i=0; i<bitcnt; i++){
-		for(j=0; j<FSK_FRAME_SIZE; j++){
-			bitbuf[j] = rand()&0x1;
-		}
-		fwrite(bitbuf,sizeof(uint8_t),FSK_FRAME_SIZE,fout);
-		if(fout == stdout){
-			fflush(fout);
-		}
+	if(fout == stdout){
+	    fflush(fout);
 	}
+    }
     
     cleanup:
     fclose(fout);
