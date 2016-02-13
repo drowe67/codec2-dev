@@ -94,9 +94,9 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nbits);
-    rawbuf = (int16_t*)alloca(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
-    modbuf = (float*)alloca(sizeof(float)*(fsk->N+fsk->Ts*2));
+    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+    rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
+    modbuf = (float*)malloc(sizeof(float)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
     while( fread(rawbuf,sizeof(int16_t),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
@@ -117,6 +117,9 @@ int main(int argc,char *argv[]){
 	}
     }
     
+    free(bitbuf);
+    free(rawbuf);
+    free(modbuf);
     
     modem_probe_close();
     cleanup:

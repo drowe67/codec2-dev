@@ -76,9 +76,9 @@ int main(int argc,char *argv[]){
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*fsk->Nbits);
-    rawbuf = (int16_t*)alloca(sizeof(int16_t)*fsk->N);
-    modbuf = (float*)alloca(sizeof(float)*fsk->N);
+    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+    rawbuf = (int16_t*)malloc(sizeof(int16_t)*fsk->N);
+    modbuf = (float*)malloc(sizeof(float)*fsk->N);
     
     /* Modulate! */
     while( fread(bitbuf,sizeof(uint8_t),fsk->Nbits,fin) == fsk->Nbits ){
@@ -93,6 +93,9 @@ int main(int argc,char *argv[]){
 			fflush(fout);
 		}
     }
+    free(bitbuf);
+    free(rawbuf);
+    free(modbuf);
     
     cleanup:
     fclose(fin);
