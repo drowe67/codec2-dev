@@ -38,6 +38,9 @@
 /* This needs square roots, may take more cpu time than it's worth */
 #define EST_EBNO
 
+/* This is a flag to make the mod/demod allocate their memory on the stack instead of the heap */
+/* At large sample rates, there's not enough stack space to run the demod */
+#define DEMOD_ALLOC_STACK
 /*---------------------------------------------------------------------------*\
 
                                INCLUDES
@@ -377,8 +380,15 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     
     /* Array to do complex FFT from using kiss_fft */
     /* It'd probably make more sense here to use kiss_fftr */
+    
+    #ifdef DEMOD_ALLOC_STACK
     kiss_fft_scalar *fftin = (kiss_fft_scalar*)alloca(sizeof(kiss_fft_scalar)*Ndft);
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
+    #else
+    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar)*(Ndft+4));
+    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   malloc(sizeof(kiss_fft_cpx)  *((Ndft/2)+4));
+    #endif
+
     fft_samps = Ndft;
     
     f_min  = (fsk->est_min*Ndft)/Fs;
@@ -466,6 +476,11 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 	for(i=0; i<M; i++){
 		freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
 	}
+    
+    #ifndef DEMOD_ALLOC_STACK
+    free(fftin);
+    free(fftout);
+    #endif
 }
 
 void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
@@ -502,6 +517,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     modem_probe_samp_f("t_f_est",f_est,M);
     
     /* allocate memory for the integrated samples */
+    #ifdef DEMOD_ALLOC_STACK
+    /* allocate memory for the integrated samples */
     /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
     f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
     f2_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
@@ -509,6 +526,13 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Allocate circular buffers for integration */
     f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
     f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+    #else
+    f1_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+    f2_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+    
+    f1_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f2_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    #endif
     
     /* If this is the first run, we won't have any valid f_est */
     if(fsk->f1_est<1){
@@ -722,6 +746,13 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     fsk->EbNodB = 1;
     #endif
     
+    #ifndef DEMOD_ALLOC_STACK
+    free(f1_int);
+    free(f2_int);
+    free(f1_intbuf);
+    free(f2_intbuf);
+    #endif
+    
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
     modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
@@ -765,7 +796,8 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
     modem_probe_samp_f("t_f_est",f_est,M);
-    
+
+    #ifdef DEMOD_ALLOC_STACK
     /* allocate memory for the integrated samples */
     /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
     f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
@@ -778,7 +810,17 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
     f3_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
     f4_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+    #else
+    f1_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+    f2_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+    f3_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+    f4_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
     
+    f1_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f2_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f3_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f4_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    #endif
     /* If this is the first run, we won't have any valid f_est */
     if(fsk->f1_est<1){
 		fsk->f1_est = f_est[0];
@@ -1068,6 +1110,17 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     fsk->EbNodB = 20*log10f((1e-6+meanebno)/(1e-6+stdebno));
     #else
     fsk->EbNodB = 0;
+    #endif
+    
+    #ifndef DEMOD_ALLOC_STACK
+    free(f1_int);
+    free(f2_int);
+    free(f3_int);
+    free(f4_int);
+    free(f1_intbuf);
+    free(f2_intbuf);
+    free(f3_intbuf);
+    free(f4_intbuf);
     #endif
     
     /* Dump some internal samples */
