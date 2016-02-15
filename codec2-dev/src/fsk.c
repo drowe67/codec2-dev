@@ -382,11 +382,11 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     /* It'd probably make more sense here to use kiss_fftr */
     
     #ifdef DEMOD_ALLOC_STACK
-    kiss_fft_scalar *fftin = (kiss_fft_scalar*)alloca(sizeof(kiss_fft_scalar)*Ndft);
-    kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
+    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)alloca(sizeof(kiss_fft_scalar)*Ndft);
+    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
     #else
-    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar)*(Ndft+4));
-    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   malloc(sizeof(kiss_fft_cpx)  *((Ndft/2)+4));
+    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar)*Ndft);
+    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   malloc(sizeof(kiss_fft_cpx)*((Ndft/2)+1));
     #endif
 
     fft_samps = Ndft;
@@ -986,15 +986,9 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         
         c.real = (t.real-t2.real) - y.real;
         c.imag = (t.imag-t2.imag) - y.imag;
-        
-        //t2 = y;
+     
         t2 = cadd(t2,t1);
         
-        /*y = csub(t1,c);
-        t = cadd(t2,y);
-		c = csub(csub(t,t2),y);
-		t2 = y;*/
-
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
