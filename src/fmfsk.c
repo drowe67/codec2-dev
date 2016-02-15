@@ -235,7 +235,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         lastv = currv;
         
         mdiff = mdiff>0 ? mdiff : 0-mdiff;
-        //printf("md %f\n",mdiff);
+        
         /* Put bit in it's stream */
         if((i%2)==1){
             apeven += mdiff;

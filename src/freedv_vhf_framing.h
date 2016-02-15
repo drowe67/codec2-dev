@@ -39,14 +39,6 @@
 /* Standard frame type */
 #define FREEDV_VHF_FRAME_A 1
 
-/* Unique word for A type frame */
-#define FREEDV_VHF_FRAME_A_UW {0,1,1,0,0,1,1,1,1,0,1,0,1,1,0,1}
-
-/* States */
-/* TODO: Move into the C file */
-#define ST_NOSYNC 0 /* Not synchronized */
-#define ST_SYNC 1   /* Synchronized */
-
 struct freedv_vhf_deframer {
     int ftype;          /* Type of frame to be looking for */
     int state;          /* State of deframer */
@@ -54,7 +46,7 @@ struct freedv_vhf_deframer {
     int bitptr;         /* Pointer into circular bit buffer */
     int miss_cnt;       /* How many UWs have been missed */
     int last_uw;        /* How many bits since the last UW? */
-    
+    int frame_size;     /* How big is a frame? */
 };
 
 /* Init and allocate memory for a freedv-vhf framer/deframer */
@@ -67,7 +59,7 @@ void fvhff_destroy_deframer(struct freedv_vhf_deframer * def);
 void fvhff_frame_bits(int frame_type,uint8_t bits_out[],uint8_t codec2_in[],uint8_t proto_in[],uint8_t vc_in[]);
 
 /* Find and extract frames from a stream of bits */
-int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]);
+int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[],uint8_t bits_in[]);
 
 /* Is the de-framer synchronized? */
 int fvhff_synchronized(struct freedv_vhf_deframer * def);
