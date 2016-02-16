@@ -159,6 +159,7 @@ set(CODEC2_SRCS
     codebookge.c
     golay23.c
     freedv_api.c
+    freedv_vhf_framing.c
     varicode.c
     modem_stats.c
 )

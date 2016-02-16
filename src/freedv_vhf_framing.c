@@ -46,8 +46,8 @@
 static const uint8_t A_uw[] =      {0,1,1,0,0,1,1,1,
                                     1,0,1,0,1,1,0,1};
 /* Blank VHF type A frame */
-static const uint8_t A_blank[] =   {0,0,1,0,0,1,1,1, /* Padding[0:3] Proto[0:3]   */
-                                    0,0,1,0,0,1,1,1, /* Proto[4:11]               */
+static const uint8_t A_blank[] =   {1,0,1,0,0,1,1,1, /* Padding[0:3] Proto[0:3]   */
+                                    1,0,1,0,0,1,1,1, /* Proto[4:11]               */
                                     0,0,0,0,0,0,0,0, /* Voice[0:7]                */
                                     0,0,0,0,0,0,0,0, /* Voice[8:15]               */
                                     0,0,0,0,0,0,0,0, /* Voice[16:23]              */
@@ -151,14 +151,15 @@ void fvhff_destroy_deframer(struct freedv_vhf_deframer * def){
     free(def);
 }
 
+int fvhff_synchronized(struct freedv_vhf_deframer * def){
+    return (def->state) == ST_SYNC;
+}
+
 /* See if the UW is where it should be, to within a tolerance, in a bit buffer */
 static int fvhff_match_uw(struct freedv_vhf_deframer * def,int tol){
     uint8_t * bits  = def->bits;
     int frame_type  = def->ftype;
-    int state       = def->state;
     int bitptr      = def->bitptr;
-    int last_uw     = def->last_uw;
-    int miss_cnt    = def->miss_cnt;
     int frame_size  = def->frame_size;
     int iuw,ibit;
     const uint8_t * uw;
@@ -190,10 +191,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,int tol){
 static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]){
     uint8_t * bits  = def->bits;
     int frame_type  = def->ftype;
-    int state       = def->state;
     int bitptr      = def->bitptr;
-    int last_uw     = def->last_uw;
-    int miss_cnt    = def->miss_cnt;
     int frame_size  = def->frame_size;
     int iframe,ibit;
     
@@ -268,13 +266,13 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     int uw_first_tol;   
     int uw_sync_tol;
     int miss_tol;
-    int extracted_frame;
+    int extracted_frame = 0;
     
     /* Possibly set up frame-specific params here */
     if(frame_type == FREEDV_VHF_FRAME_A){
-        uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
-        uw_sync_tol = 0;    /* The UW bit error tolerance for frames after sync */
-        miss_tol = 3;       /* How many UWs may be missed before going into the de-synced state */
+        uw_first_tol = 2;   /* The UW bit-error tolerance for the first frame */
+        uw_sync_tol = 1;    /* The UW bit error tolerance for frames after sync */
+        miss_tol = 2;       /* How many UWs may be missed before going into the de-synced state */
     }else{
         return 0;
     }
@@ -302,6 +300,7 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
                 if(miss_cnt>miss_tol)
                     state = ST_NOSYNC;
                 /* Extract the bits */
+                extracted_frame = 1;
                 fvhff_extract_frame(def,codec2_out,proto_out,vc_out);
             }
         /* Not yet sunk */
@@ -320,32 +319,4 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     def->last_uw = last_uw;
     def->miss_cnt = miss_cnt;
     return extracted_frame;
-}
-
-/* Ugly test function, to be removed */
-int main(){
-    uint8_t bitbuf[96];
-    uint8_t c2buf[7];
-    uint8_t protobuf[3];
-    FILE * out = fopen("frame_test_out","w");
-    struct freedv_vhf_deframer * def = fvhff_create_deframer(FREEDV_VHF_FRAME_A);
-    
-    srand(5);
-    def->bitptr = 47;
-    for(int i=0;i<30;i++){
-        snprintf(c2buf,7,"%d TEST",i);
-        snprintf(protobuf,3,"%d",i);
-        for(int j=0;j<96;j++)
-            bitbuf[j] = rand()&0x1;
-        
-        fvhff_frame_bits(FREEDV_VHF_FRAME_A,bitbuf,c2buf,NULL,NULL);
-        fwrite(bitbuf,sizeof(uint8_t),96,out);
-        memset(c2buf,0,7);
-        
-        if(fvhff_deframe_bits(def,c2buf,NULL,NULL,bitbuf)){
-            printf("deframed codec2 %s protocol %s\n",c2buf,protobuf);
-        }
-    }
-    fclose(out);
-    fvhff_destroy_deframer(def);
 }

@@ -38,6 +38,8 @@
 #ifndef __FREEDV__
 
 #include "varicode.h"
+#include "fsk.h"
+#include "fmfsk.h"
 #include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
 
@@ -63,6 +65,10 @@ struct freedv {
     struct FDMDV        *fdmdv;
     struct MODEM_STATS   stats;
     struct COHPSK       *cohpsk;
+    struct FSK          *fsk;
+    struct FMFSK        *fmfsk;
+    
+    struct freedv_vhf_deframer * deframer;      //Extracts frames from VHF stream
 
     struct quisk_cfFilter * ptFilter7500to8000;     // Filters to change to/from 7500 and 8000 sps
     struct quisk_cfFilter * ptFilter8000to7500;
