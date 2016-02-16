@@ -38,19 +38,21 @@
 
 /* Standard frame type */
 #define FREEDV_VHF_FRAME_A 1
-
 struct freedv_vhf_deframer {
     int ftype;          /* Type of frame to be looking for */
     int state;          /* State of deframer */
     uint8_t * bits;     /* Bits currently being decanted */
+    uint8_t * invbits;  /* Inversion of bits currently being decanted, for FMFSK */
+    
     int bitptr;         /* Pointer into circular bit buffer */
     int miss_cnt;       /* How many UWs have been missed */
     int last_uw;        /* How many bits since the last UW? */
     int frame_size;     /* How big is a frame? */
+    int on_inv_bits;    /* Are we using the inverted bits? */
 };
 
 /* Init and allocate memory for a freedv-vhf framer/deframer */
-struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type);
+struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type,int enable_bit_flip);
 
 /* Free the memory used by a freedv-vhf framer/deframer */
 void fvhff_destroy_deframer(struct freedv_vhf_deframer * def);
