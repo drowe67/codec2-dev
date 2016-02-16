@@ -28,10 +28,14 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 
+
+#include "fsk.h"
+#include "fmfsk.h"
 #include "codec2.h"
 #include "codec2_fdmdv.h"
 #include "fdmdv_internal.h"
@@ -39,6 +43,7 @@
 #include "varicode.h"
 #include "freedv_api.h"
 #include "freedv_api_internal.h"
+#include "freedv_vhf_framing.h"
 #include "comp_prim.h"
 
 #define VERSION     11    /* The API version number.  The first version
@@ -70,7 +75,9 @@ struct freedv *freedv_open(int mode) {
     struct freedv *f;
     int            Nc, codec2_mode, nbit, nbyte;
 
-    if ((mode != FREEDV_MODE_1600) && (mode != FREEDV_MODE_700) && (mode != FREEDV_MODE_700B))
+    if ((mode != FREEDV_MODE_1600) && (mode != FREEDV_MODE_700) && 
+        (mode != FREEDV_MODE_700B) && (mode != FREEDV_MODE_2400A) &&
+        (mode != FREEDV_MODE_2400B))
         return NULL;
 
     f = (struct freedv*)malloc(sizeof(struct freedv));
@@ -131,6 +138,56 @@ struct freedv *freedv_open(int mode) {
             return NULL;
         f->sz_error_pattern = cohpsk_error_pattern_size();
     }
+    
+    if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)){
+        /* Create the framer|deframer */
+        f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A);
+        if(f->deframer == NULL)
+            return NULL;
+        
+        /* Set up the C2 mode */
+        codec2_mode = CODEC2_MODE_1300;
+    }
+    
+    if (mode == FREEDV_MODE_2400A) {
+        f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
+        
+        /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
+        f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
+        
+        if(f->fsk == NULL){
+            fvhff_destroy_deframer(f->deframer);
+            return NULL;
+        }
+        
+        f->n_nom_modem_samples = f->fsk->N;
+        f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
+        f->n_nat_modem_samples = f->fsk->N;
+        f->nin = fsk_nin(f->fsk);
+        f->modem_sample_rate = 48000;
+        /* Malloc something to appease freedv_init and freedv_destroy */
+        f->codec_bits = malloc(1);
+    }
+    
+    if (mode == FREEDV_MODE_2400B) {
+        f->fmfsk = fmfsk_create(48000,2400);
+         
+        if(f->fmfsk == NULL){
+            fvhff_destroy_deframer(f->deframer);
+            return NULL;
+        }
+        /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
+        f->tx_bits = (int*)malloc(f->fmfsk->nbit*sizeof(uint8_t));
+        
+        f->n_nom_modem_samples = f->fmfsk->N;
+        f->n_max_modem_samples = f->fmfsk->N + (f->fmfsk->Ts);
+        f->n_nat_modem_samples = f->fmfsk->N;
+        f->nin = fmfsk_nin(f->fmfsk);
+        f->modem_sample_rate = 48000;
+        /* Malloc something to appease freedv_init and freedv_destroy */
+        f->codec_bits = malloc(1);
+    }
+    
 #endif
 
     f->test_frame_sync_state = 0;
@@ -140,10 +197,11 @@ struct freedv *freedv_open(int mode) {
     f->codec2 = codec2_create(codec2_mode);
     if (f->codec2 == NULL)
         return NULL;
-    if (mode == FREEDV_MODE_1600)
+    if ((mode == FREEDV_MODE_1600) || (mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B))
         f->n_speech_samples = codec2_samples_per_frame(f->codec2);
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B))
         f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+    
     f->prev_rx_bits = (float*)malloc(sizeof(float)*2*codec2_bits_per_frame(f->codec2));
     if (f->prev_rx_bits == NULL)
         return NULL;
@@ -155,7 +213,8 @@ struct freedv *freedv_open(int mode) {
         f->codec_bits = (int*)malloc(nbit*sizeof(int));
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B))
         f->codec_bits = (int*)malloc(COHPSK_BITS_PER_FRAME*sizeof(int));
-
+    
+    /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
     if ((f->packed_codec_bits == NULL) || (f->codec_bits == NULL))
         return NULL;
 
@@ -262,11 +321,42 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
     int  i;
-
-    freedv_comptx(f, tx_fdm, speech_in);
-
-    for(i=0; i<f->n_nom_modem_samples; i++)
-        mod_out[i] = tx_fdm[i].real;
+    float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
+    
+    assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
+           (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_2400A) || 
+           (f->mode == FREEDV_MODE_2400B));
+    
+    /* FSK and MEFSK/FMFSK modems work only on real samples. It's simpler to just 
+     * stick them in the real sample tx/rx functions than to add a comp->real converter
+     * to comptx */
+    if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+        codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
+        
+        /* TODO: add varicode/protocol insertion */
+        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
+        
+        /* Allocate floating point buffer for FSK mod */
+        tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+        
+        /* do 4fsk mod */
+        if(f->mode == FREEDV_MODE_2400A){
+            fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+        
+        /* do me-fsk mod */
+        }else if(f->mode == FREEDV_MODE_2400B){
+            fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
+        }
+        
+        /* Convert float samps to short */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = (short)(tx_float[i]*FDMDV_SCALE);
+        }
+    }else{
+        freedv_comptx(f, tx_fdm, speech_in);
+        for(i=0; i<f->n_nom_modem_samples; i++)
+            mod_out[i] = tx_fdm[i].real;
+    }
 }
 
 /* complex valued output, useful for suitable for single sided freq shifting */
@@ -277,8 +367,11 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     int    bits_per_codec_frame, bits_per_modem_frame;
     int    data, codeword1, data_flag_index, nspare;
     COMP   tx_fdm[f->n_nat_modem_samples];
+    short  tx_real[f->n_nom_modem_samples];
 
-    assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B));
+    assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
+           (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_2400A) || 
+           (f->mode == FREEDV_MODE_2400B));
 
     if (f->mode == FREEDV_MODE_1600) {
         bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
@@ -439,6 +532,15 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         //assert(i == f->n_nom_modem_samples);
         // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
     }
+    /* 2400 A and B are handled by the real-mode TX */
+    if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+        freedv_tx(f,tx_real,speech_in);
+        /* Convert to complex-mode */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i].real = (float) tx_real[i];
+            mod_out[i].imag = 0;
+        }
+    }
 #endif
 }
 
@@ -502,17 +604,28 @@ int freedv_nin(struct freedv *f) {
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
+    float rx_float[f->n_max_modem_samples];
     int i;
     int nin = freedv_nin(f);
 
     assert(nin <= f->n_max_modem_samples);
+    
+    /* FSK RX happens in real floats, so convert to those and call their demod here */
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
+        for(i=0; i<nin; i++) {
+            rx_float[i] = ((float)demod_in[i]);
+        }
+        return freedv_floatrx(f,speech_out,rx_float);
+    }else { /* FDM RX happens with complex samps, so do that */
 
-    for(i=0; i<nin; i++) {
-        rx_fdm[i].real = (float)demod_in[i];
-        rx_fdm[i].imag = 0.0;
+        for(i=0; i<nin; i++) {
+            rx_fdm[i].real = (float)demod_in[i];
+            rx_fdm[i].imag = 0.0;
+        }
+        
+        return freedv_comprx(f, speech_out, rx_fdm);
     }
-
-    return freedv_comprx(f, speech_out, rx_fdm);
+    return 0; /* should never get here */
 }
 
 
@@ -525,13 +638,37 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     int nin = freedv_nin(f);
 
     assert(nin <= f->n_max_modem_samples);
-
-    for(i=0; i<nin; i++) {
-        rx_fdm[i].real = demod_in[i];
-        rx_fdm[i].imag = 0;
+    
+    /* FSK RX happens in real floats, so demod for those goes here */
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
+        if(f->mode == FREEDV_MODE_2400A){
+            fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
+            f->nin = fsk_nin(f->fsk);
+        }else{            
+            fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
+            f->nin = fmfsk_nin(f->fmfsk);
+        }
+        /* TODO: Protocol and varicode bits */
+        if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,NULL,(uint8_t*)f->tx_bits)){
+            /* Decode the codec data */
+            codec2_decode(f->codec2,speech_out,f->packed_codec_bits);
+            f->sync = 1;
+        } else {
+            /* Fill with silence */
+            for(i=0;i<f->n_speech_samples;i++){
+                speech_out[i] = 0;
+            }
+            f->sync = 0;
+        }
+        return f->n_speech_samples;
+    }else { 
+        for(i=0; i<nin; i++) {
+            rx_fdm[i].real = demod_in[i];
+            rx_fdm[i].imag = 0;
+        }
+        return freedv_comprx(f, speech_out, rx_fdm);
     }
-
-    return freedv_comprx(f, speech_out, rx_fdm);
+    return 0; //should never get here
 }
 
 // complex input samples version

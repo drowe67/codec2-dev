@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
     int                        n_max_modem_samples;
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
+	printf("usage: %s 1600|700|700B|2400A|2400B InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -80,6 +80,10 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_700;
     if (!strcmp(argv[1],"700B"))
         mode = FREEDV_MODE_700B;
+    if (!strcmp(argv[1],"2400A"))
+        mode = FREEDV_MODE_2400A;
+    if (!strcmp(argv[1],"2400B"))
+        mode = FREEDV_MODE_2400B;
     assert(mode != -1);
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;

@@ -133,8 +133,9 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     int Ndft = 0;
     
     /* Number of symbols in a processing frame */
-    int nsyms = 192;
-    
+    //int nsyms = 24;
+    //int nsyms = 192;
+    int nsyms = 48;
     /* Check configuration validity */
     assert(Fs > 0 );
     assert(Rs > 0 );
@@ -178,7 +179,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->est_max = (Fs/2)-Rs;
     
-    fsk->est_space = (Rs/2)-(Rs/10);
+    fsk->est_space = Rs;
     
     /* Set up rx state */
     fsk->phi1_c = comp_exp_j(0);
@@ -463,7 +464,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 	/* My favorite sort of sort*/
 	i = 1;
 	while(i<M){
-		if(freqi[i] > freqi[i-1]) i++;
+		if(freqi[i] >= freqi[i-1]) i++;
 		else{
 			j = freqi[i];
 			freqi[i] = freqi[i-1];
