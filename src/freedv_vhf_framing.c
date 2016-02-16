@@ -115,32 +115,39 @@ void fvhff_frame_bits(  int frame_type,
 }
 
 /* Init and allocate memory for a freedv-vhf framer/deframer */
-struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type){
+struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enable_bit_flip){
     struct freedv_vhf_deframer * deframer;
-    uint8_t * bits;
+    uint8_t *bits,*invbits;
     /* It's a Type A frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
         /* Allocate memory for the thing */
         deframer = malloc(sizeof(struct freedv_vhf_deframer));
-        if(deframer == NULL){
+        if(deframer == NULL)
             return NULL;
+            
+        /* Allocate the not-bit buffer */
+        if(enable_bit_flip){
+            invbits = malloc(sizeof(uint8_t)*96);
+            if(invbits == NULL)
+                return NULL;
+        }else{
+            invbits = NULL;
         }
         
         /* Allocate the bit buffer */
         bits = malloc(sizeof(uint8_t)*96);
-        if(bits == NULL){
-            free(deframer);
+        if(bits == NULL)
             return NULL;
-        }
         
         deframer->bits = bits;
+        deframer->invbits = invbits;
         deframer->ftype = frame_type;
         deframer->state = ST_NOSYNC;
         deframer->bitptr = 0;
         deframer->last_uw = 0;
         deframer->miss_cnt = 0;
         deframer->frame_size = 96;
-        
+        deframer->on_inv_bits = 0;
         return deframer;
     }
     return NULL;
@@ -156,8 +163,7 @@ int fvhff_synchronized(struct freedv_vhf_deframer * def){
 }
 
 /* See if the UW is where it should be, to within a tolerance, in a bit buffer */
-static int fvhff_match_uw(struct freedv_vhf_deframer * def,int tol){
-    uint8_t * bits  = def->bits;
+static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int tol){
     int frame_type  = def->ftype;
     int bitptr      = def->bitptr;
     int frame_size  = def->frame_size;
@@ -188,8 +194,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,int tol){
     return diff <= tol;
 }
 
-static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]){
-    uint8_t * bits  = def->bits;
+static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t bits[],uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]){
     int frame_type  = def->ftype;
     int bitptr      = def->bitptr;
     int frame_size  = def->frame_size;
@@ -255,7 +260,10 @@ static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t codec2_
  * Try to find the UW and extract codec/proto/vc bits in def->frame_size bits 
  */
 int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[],uint8_t bits_in[]){
-    uint8_t * bits  = def->bits;
+    uint8_t * strbits  = def->bits;
+    uint8_t * invbits  = def->invbits;
+    uint8_t * bits;
+    int on_inv_bits = def->on_inv_bits;
     int frame_type  = def->ftype;
     int state       = def->state;
     int bitptr      = def->bitptr;
@@ -270,15 +278,16 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     
     /* Possibly set up frame-specific params here */
     if(frame_type == FREEDV_VHF_FRAME_A){
-        uw_first_tol = 2;   /* The UW bit-error tolerance for the first frame */
+        uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
         uw_sync_tol = 1;    /* The UW bit error tolerance for frames after sync */
-        miss_tol = 2;       /* How many UWs may be missed before going into the de-synced state */
+        miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */
     }else{
         return 0;
     }
     for(i=0; i<frame_size; i++){
         /* Put a bit in the buffer */
-        bits[bitptr] = bits_in[i];
+        strbits[bitptr] = bits_in[i];
+        invbits[bitptr] = bits_in[i]?0:1;
         bitptr++;
         if(bitptr >= frame_size) bitptr = 0;
         def->bitptr = bitptr;
@@ -286,37 +295,58 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
         if(state==ST_SYNC){
             /* Already synchronized, just wait till UW is back where it should be */
             last_uw++;
+            if(invbits!=NULL){
+                if(on_inv_bits)
+                    bits = invbits;
+                else
+                    bits = strbits;
+            }else{
+                bits=strbits;
+            }
             /* UW should be here. We're sunk, so deframe anyway */
             if(last_uw == frame_size){
                 last_uw = 0;
                 extracted_frame = 1;
                 
-                if(!fvhff_match_uw(def,uw_sync_tol))
+                if(!fvhff_match_uw(def,bits,uw_sync_tol))
                     miss_cnt++;
                 else
                     miss_cnt=0;
                 
                 /* If we go over the miss tolerance, go into no-sync */
-                if(miss_cnt>miss_tol)
+                if(miss_cnt>miss_tol){
                     state = ST_NOSYNC;
+                }
                 /* Extract the bits */
                 extracted_frame = 1;
-                fvhff_extract_frame(def,codec2_out,proto_out,vc_out);
+                fvhff_extract_frame(def,bits,codec2_out,proto_out,vc_out);
             }
         /* Not yet sunk */
         }else{
             /* It's a sync!*/
-            if(fvhff_match_uw(def,uw_first_tol)){
+            if(invbits!=NULL){
+                if(fvhff_match_uw(def,invbits,uw_first_tol)){
+                    state = ST_SYNC;
+                    last_uw = 0;
+                    miss_cnt = 0;
+                    extracted_frame = 1;
+                    on_inv_bits = 1;
+                    fvhff_extract_frame(def,invbits,codec2_out,proto_out,vc_out);
+                }
+            }
+            if(fvhff_match_uw(def,strbits,uw_first_tol)){
                 state = ST_SYNC;
                 last_uw = 0;
                 miss_cnt = 0;
                 extracted_frame = 1;
-                fvhff_extract_frame(def,codec2_out,proto_out,vc_out);
+                on_inv_bits = 0;
+                fvhff_extract_frame(def,strbits,codec2_out,proto_out,vc_out);
             }
         }
     }
     def->state = state;
     def->last_uw = last_uw;
     def->miss_cnt = miss_cnt;
+    def->on_inv_bits = on_inv_bits;
     return extracted_frame;
 }

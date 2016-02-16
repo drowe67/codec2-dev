@@ -140,16 +140,17 @@ struct freedv *freedv_open(int mode) {
     }
     
     if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)){
-        /* Create the framer|deframer */
-        f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A);
-        if(f->deframer == NULL)
-            return NULL;
-        
+      
         /* Set up the C2 mode */
         codec2_mode = CODEC2_MODE_1300;
     }
     
     if (mode == FREEDV_MODE_2400A) {
+        /* Create the framer|deframer */
+        f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,0);
+        if(f->deframer == NULL)
+            return NULL;
+  
         f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
@@ -170,6 +171,11 @@ struct freedv *freedv_open(int mode) {
     }
     
     if (mode == FREEDV_MODE_2400B) {
+        /* Create the framer|deframer */
+        f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
+        if(f->deframer == NULL)
+            return NULL;
+        
         f->fmfsk = fmfsk_create(48000,2400);
          
         if(f->fmfsk == NULL){
@@ -658,7 +664,6 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
             for(i=0;i<f->n_speech_samples;i++){
                 speech_out[i] = 0;
             }
-            f->sync = 0;
         }
         return f->n_speech_samples;
     }else { 
