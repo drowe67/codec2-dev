@@ -268,6 +268,12 @@ void freedv_close(struct freedv *freedv) {
 #ifndef CORTEX_M4
     if (freedv->mode == FREEDV_MODE_700)
         cohpsk_destroy(freedv->cohpsk);
+        
+    if (freedv->mode == FREEDV_MODE_2400A)
+        fsk_destroy(freedv->fsk);
+    
+    if (freedv->mode == FREEDV_MODE_2400B)
+        fmfsk_destroy(freedv->fmfsk);
 #endif
     codec2_destroy(freedv->codec2);
     if (freedv->ptFilter8000to7500) {
@@ -328,6 +334,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     COMP tx_fdm[f->n_nom_modem_samples];
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
+    uint8_t vc_bits[2]; /* Varicode bits for 2400 framing */
     
     assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
            (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_2400A) || 
@@ -339,8 +346,31 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         
-        /* TODO: add varicode/protocol insertion */
-        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
+        /* Get varicode bits for TX and possibly ask for a new char */
+        /* 2 bits per 2400A/B frame, so this has to be done twice */
+        for(i=0;i<2;i++){
+            if (f->nvaricode_bits) {
+                vc_bits[i] = f->tx_varicode_bits[f->varicode_bit_index++];
+                f->nvaricode_bits--;
+            }
+
+            if (f->nvaricode_bits == 0) {
+                /* get new char and encode */
+                char s[2];
+                if (f->freedv_get_next_tx_char != NULL) {
+                    s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
+                    f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                    f->varicode_bit_index = 0;
+                }
+            }
+        }
+        
+        /* If the API user hasn't set up message callbacks, don't bother with varicode bits */
+        if(f->freedv_get_next_tx_char == NULL){
+            fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
+        }else{
+            fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,vc_bits);
+        }
         
         /* Allocate floating point buffer for FSK mod */
         tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
@@ -615,7 +645,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     int nin = freedv_nin(f);
 
     assert(nin <= f->n_max_modem_samples);
-    
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
         for(i=0; i<nin; i++) {
@@ -650,6 +679,8 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         if(f->mode == FREEDV_MODE_2400A){
             fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
             f->nin = fsk_nin(f->fsk);
+            f->stats.snr_est = f->fsk->EbNodB;
+            f->stats.clock_offset = f->fsk->ppm;
         }else{            
             fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
             f->nin = fmfsk_nin(f->fmfsk);
@@ -659,11 +690,14 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
             /* Decode the codec data */
             codec2_decode(f->codec2,speech_out,f->packed_codec_bits);
             f->sync = 1;
+            f->stats.sync = 1;
         } else {
             /* Fill with silence */
             for(i=0;i<f->n_speech_samples;i++){
                 speech_out[i] = 0;
             }
+            f->sync = 0;
+            f->stats.sync = 0;
         }
         return f->n_speech_samples;
     }else { 

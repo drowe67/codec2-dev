@@ -215,9 +215,9 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Request fewer or greater samples next time, if fine timing is far
      * enough off. This also makes it possible to tolerate clock offsets */
     next_nin = N;
-    if(norm_rx_timing > .5)
+    if(norm_rx_timing > 0)
         next_nin += Ts/2;
-    if(norm_rx_timing < -.5)
+    if(norm_rx_timing < -.8)
         next_nin -= Ts/2;
     fmfsk->nin = next_nin;
     
