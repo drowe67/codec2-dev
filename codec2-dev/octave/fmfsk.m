@@ -123,10 +123,10 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     %If rx timing is too far out, ask for more or less sample the next time
     % around to even it all out
     next_nin = N;
-    if norm_rx_timing > .5;
+    if norm_rx_timing > 0;
        next_nin += Ts/2;
     end
-    if norm_rx_timing < -.5;
+    if norm_rx_timing < -.8;
        next_nin -= Ts/2;
     end
 
