@@ -287,7 +287,8 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     for(i=0; i<frame_size; i++){
         /* Put a bit in the buffer */
         strbits[bitptr] = bits_in[i];
-        invbits[bitptr] = bits_in[i]?0:1;
+        if(invbits!=NULL)
+            invbits[bitptr] = bits_in[i]?0:1;
         bitptr++;
         if(bitptr >= frame_size) bitptr = 0;
         def->bitptr = bitptr;
