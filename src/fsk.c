@@ -231,6 +231,8 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     fsk->f4_est = 0;    
     fsk->ppm = 0;
 
+    fsk->stats = NULL;
+    
     return fsk;
 }
 
@@ -342,6 +344,8 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->f4_est = 0;    
     fsk->ppm = 0;
 
+    fsk->stats = NULL;
+    
     return fsk;
 }
 
@@ -353,6 +357,10 @@ void fsk_destroy(struct FSK *fsk){
     free(fsk->fft_cfg);
     free(fsk->samp_old);
     free(fsk);
+}
+
+void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats){
+    fsk->stats = stats;
 }
 
 
@@ -477,7 +485,6 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 	for(i=0; i<M; i++){
 		freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
 	}
-    
     #ifndef DEMOD_ALLOC_STACK
     free(fftin);
     free(fftout);
@@ -495,7 +502,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int Nmem = fsk->Nmem;
     int M = fsk->mode;
     int i,j,dc_i,cbuf_i;
-    float ft1,ft2;
+    float ft1;
     int nstash = fsk->nstash;
     COMP *f1_int, *f2_int;
     COMP t1,t2;
@@ -509,7 +516,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int using_old_samps;
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf;
-    float f_est[M];
+    float f_est[M],fc_avg,fc_tx;
     float meanebno,stdebno;
     
     
@@ -711,12 +718,12 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
+        /* Accumulate the square of the sampled value */
+        ft1 = tmax[ (tmax[1]>tmax[0]) ];
+        stdebno += ft1;
         
-        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
-        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
-        ft1 = fabsf(ft1-ft2);
-        meanebno += ft1;
-        
+        /* Figure the abs value of the max tone */
+        meanebno += sqrtf(ft1);
         #endif
         /* Soft output goes here */
     }
@@ -724,25 +731,12 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     #ifdef EST_EBNO
     /* Calculate mean for EbNodB estimation */
     meanebno = meanebno/(float)nsym;
-    stdebno = 0;
-    /* Go back through the data and figure the std dev */
-    for(i=0; i<nsym; i++){
-        int st = (i+1)*P;
-        t1 =         fcmult(1-fract,f1_int[st+ low_sample]);
-        t1 = cadd(t1,fcmult(  fract,f1_int[st+high_sample]));
-        t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
-        t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
-        
-        /* Accumulate resampled int magnitude for EbNodB estimation */
-        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
-        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
-        ft1 = fabsf(ft1-ft2);
-        ft2 = abs(meanebno-ft1);
-        stdebno += ft2*ft2;
-    }
-    /* Finish figuring std. dev. */
-    stdebno = sqrtf(stdebno/(float)(nsym-1));
-    fsk->EbNodB = 20*log10f((1e-6+meanebno)/(1e-6+stdebno));
+    
+    /* Calculate the std. dev for EbNodB estimate */
+    stdebno = (stdebno/(float)nsym) - (meanebno*meanebno);
+    stdebno = sqrt(stdebno);
+    
+    fsk->EbNodB = -6+(20*log10f((1e-6+meanebno)/(1e-6+stdebno)));
     #else
     fsk->EbNodB = 1;
     #endif
@@ -753,6 +747,26 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     free(f1_intbuf);
     free(f2_intbuf);
     #endif
+    
+    /* Write some statistics out to the stats struct, if present */
+    if( fsk->stats != NULL ){
+        /* Save clock offset in ppm */
+        fsk->stats->clock_offset = fsk->ppm;
+        
+        /* Calculate and save SNR from EbNodB estimate */
+        fsk->stats->snr_est = fsk->EbNodB + 10*log10f(((float)Rs)/((float)Rs*M));
+        
+        /* Save rx timing */
+        fsk->stats->rx_timing = (float)rx_timing;
+        
+        /* Estimate and save frequency offset */
+        fc_avg = (f_est[0]+f_est[1])/2;
+        fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
+        fsk->stats->foff = fc_tx-fc_avg;
+    
+        fsk->stats->nr = 0;
+        fsk->stats->Nc = 0;
+    }
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
@@ -775,7 +789,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int Nmem = fsk->Nmem;
     int M = fsk->mode;
     int i,j,dc_i,cbuf_i;
-    float ft1,ft2;
+    float ft1;
     int nstash = fsk->nstash;
     COMP *f1_int, *f2_int, *f3_int, *f4_int;
     COMP t1,t2,t3,t4;
@@ -791,7 +805,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     int using_old_samps;
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf,*f3_intbuf,*f4_intbuf;
-    float f_est[M];
+    float f_est[M],fc_avg,fc_tx;
     float meanebno,stdebno;
     
     /* Estimate tone frequencies */
@@ -1071,40 +1085,27 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
+        /* Accumulate the square of the sampled value */
+        ft1 = max;
+        stdebno += ft1;
         
-        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
-        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
-        ft1 = fabsf(ft1-ft2);
-        meanebno += ft1;
-        
+        /* Figure the abs value of the max tone */
+        meanebno += sqrtf(ft1);
         #endif
         /* Soft output goes here */
     }
     
-    #ifdef EST_EBNO
+     #ifdef EST_EBNO
     /* Calculate mean for EbNodB estimation */
     meanebno = meanebno/(float)nsym;
-    stdebno = 0;
-    /* Go back through the data and figure the std dev */
-    for(i=0; i<nsym; i++){
-        int st = (i+1)*P;
-        t1 =         fcmult(1-fract,f1_int[st+ low_sample]);
-        t1 = cadd(t1,fcmult(  fract,f1_int[st+high_sample]));
-        t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
-        t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
-        
-        /* Accumulate resampled int magnitude for EbNodB estimation */
-        ft1 = sqrtf(t1.real*t1.real + t1.imag*t1.imag);
-        ft2 = sqrtf(t2.real*t2.real + t2.imag*t2.imag);
-        ft1 = fabsf(ft1-ft2);
-        ft2 = abs(meanebno-ft1);
-        stdebno += ft2*ft2;
-    }
-    /* Finish figuring std. dev. */
-    stdebno = sqrtf(stdebno/(float)(nsym-1));
-    fsk->EbNodB = 20*log10f((1e-6+meanebno)/(1e-6+stdebno));
+    
+    /* Calculate the std. dev for EbNodB estimate */
+    stdebno = (stdebno/(float)nsym) - (meanebno*meanebno);
+    stdebno = sqrt(stdebno);
+    
+    fsk->EbNodB = -6+(20*log10f((1e-6+meanebno)/(1e-6+stdebno)));
     #else
-    fsk->EbNodB = 0;
+    fsk->EbNodB = 1;
     #endif
     
     #ifndef DEMOD_ALLOC_STACK
@@ -1117,6 +1118,26 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     free(f3_intbuf);
     free(f4_intbuf);
     #endif
+    
+    /* Write some statistics out to the stats struct, if present */
+    if( fsk->stats != NULL ){
+        /* Save clock offset in ppm */
+        fsk->stats->clock_offset = fsk->ppm;
+        
+        /* Calculate and save SNR from EbNodB estimate */
+        fsk->stats->snr_est = fsk->EbNodB + 10*log10f(((float)Rs*2)/((float)Rs*M));
+        
+        /* Save rx timing */
+        fsk->stats->rx_timing = (float)rx_timing;
+        
+        /* Estimate and save frequency offset */
+        fc_avg = (f_est[0]+f_est[1]+f_est[2]+f_est[3])/4;
+        fc_tx = (fsk->f1_tx+fsk->f1_tx+(fsk->fs_tx*3))/2;
+        fsk->stats->foff = fc_tx-fc_avg;
+    
+        fsk->stats->nr = 0;
+        fsk->stats->Nc = 0;
+    }
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);

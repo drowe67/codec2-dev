@@ -31,6 +31,7 @@
 #include <stdint.h>
 #include "comp.h"
 #include "kiss_fftr.h"
+#include "modem_stats.h"
 
 #define MODE_2FSK 2
 #define MODE_4FSK 4
@@ -82,6 +83,8 @@ struct FSK {
     /*  Parameters used by mod/demod and driving code */
     int nin;                /* Number of samples to feed the next demod cycle */
     
+    /*  Pointer to modem statistic struct */
+    struct MODEM_STATS *stats;
 };
 
 /*
@@ -103,6 +106,11 @@ struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs);
  * int tx_fs - frequency spacing
  */
 struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs);
+
+/*
+ * Set a MODEM_STATS struct in which to deposit demod statistics
+ */
+void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats);
 
 /*
  * Destroy an FSK state struct and free it's memory

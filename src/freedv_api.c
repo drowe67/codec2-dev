@@ -168,6 +168,9 @@ struct freedv *freedv_open(int mode) {
         f->modem_sample_rate = 48000;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
+        
+        /* Set up the stats */
+        fsk_setup_modem_stats(f->fsk,&(f->stats));
     }
     
     if (mode == FREEDV_MODE_2400B) {
@@ -643,7 +646,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     float rx_float[f->n_max_modem_samples];
     int i;
     int nin = freedv_nin(f);
-
     assert(nin <= f->n_max_modem_samples);
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
@@ -669,9 +671,14 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
+    uint8_t vc_bits[2];
+    short vc_bit;
     int  i;
-    int nin = freedv_nin(f);
-
+    int nin = freedv_nin(f);    
+    int n_ascii;
+    char ascii_out;
+    float Rs;
+    
     assert(nin <= f->n_max_modem_samples);
     
     /* FSK RX happens in real floats, so demod for those goes here */
@@ -679,18 +686,28 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         if(f->mode == FREEDV_MODE_2400A){
             fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
             f->nin = fsk_nin(f->fsk);
-            f->stats.snr_est = f->fsk->EbNodB;
-            f->stats.clock_offset = f->fsk->ppm;
         }else{            
             fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
             f->nin = fmfsk_nin(f->fmfsk);
+            f->stats.clock_offset = f->fsk->ppm;
         }
-        /* TODO: Protocol and varicode bits */
-        if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,NULL,(uint8_t*)f->tx_bits)){
+        /* TODO: Protocol bits */
+        if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,vc_bits,(uint8_t*)f->tx_bits)){
+            /* Decode varicode text */
+            for(i=0; i<2; i++){
+                /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
+                vc_bit = vc_bits[i];
+                n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &vc_bit, 1, 1);
+                if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                    (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+                }
+            }
             /* Decode the codec data */
             codec2_decode(f->codec2,speech_out,f->packed_codec_bits);
             f->sync = 1;
             f->stats.sync = 1;
+            
+            
         } else {
             /* Fill with silence */
             for(i=0;i<f->n_speech_samples;i++){
