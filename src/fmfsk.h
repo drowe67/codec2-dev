@@ -30,6 +30,7 @@
 #define __C2FMFSK_H
 #include <stdint.h>
 #include "comp.h"
+#include "modem_stats.h"
 
 /* 
  * fm-me-2fsk state
@@ -54,7 +55,8 @@ struct FMFSK{
     float norm_rx_timing; /* RX Timing, used to calculate clock offset */
     int ppm;			/* Clock offset in parts-per-million */
     
-    
+    /* Modem stat structure */
+    struct MODEM_STATS * stats;
 };
 
 /*
@@ -70,6 +72,11 @@ struct FMFSK * fmfsk_create(int Fs,int Rb);
  * Destroys an fmfsk modem and deallocates memory
  */
 void fmfsk_destroy(struct FMFSK *fmfsk);
+
+/*
+ * Set a MODEM_STATS struct in which to deposit demod statistics
+ */
+void fmfsk_setup_modem_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats);
 
 /*
  * Returns the number of samples that must be fed to fmfsk_demod the next

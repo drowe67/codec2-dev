@@ -88,6 +88,7 @@ struct freedv *freedv_open(int mode) {
     f->test_frames = f->smooth_symbols = 0;
     f->freedv_put_error_pattern = NULL;
     f->error_pattern_callback_state = NULL;
+    f->n_protocol_bits = 0;
 
     if (mode == FREEDV_MODE_1600) {
         f->snr_squelch_thresh = 2.0;
@@ -143,6 +144,8 @@ struct freedv *freedv_open(int mode) {
       
         /* Set up the C2 mode */
         codec2_mode = CODEC2_MODE_1300;
+        /* Set the number of protocol bits */
+        f->n_protocol_bits = 20;
     }
     
     if (mode == FREEDV_MODE_2400A) {
@@ -195,6 +198,9 @@ struct freedv *freedv_open(int mode) {
         f->modem_sample_rate = 48000;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
+        
+        /* Set up the stats */
+        fmfsk_setup_modem_stats(f->fmfsk,&(f->stats));
     }
     
 #endif
@@ -677,7 +683,6 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     int nin = freedv_nin(f);    
     int n_ascii;
     char ascii_out;
-    float Rs;
     
     assert(nin <= f->n_max_modem_samples);
     
@@ -689,7 +694,6 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         }else{            
             fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
             f->nin = fmfsk_nin(f->fmfsk);
-            f->stats.clock_offset = f->fsk->ppm;
         }
         /* TODO: Protocol bits */
         if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,vc_bits,(uint8_t*)f->tx_bits)){
@@ -1065,6 +1069,28 @@ void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_cal
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTION....: freedv_set_callback_protocol
+  AUTHOR......: Brady OBrien
+  DATE CREATED: 21 February 2016
+
+  Set the callback functions and callback pointer that will be used for the
+  protocol data channel. freedv_callback_protorx will be called when a frame
+  containing protocol data arrives. freedv_callback_prototx will be called
+  when a frame containing protocol information is being generated. Protocol
+  information is intended to be used to develop protocols and fancy features
+  atop VHF freedv, much like those present in DMR.
+   Protocol bits are to be passed in an msb-first char array
+   The number of protocol bits are findable with freedv_get_protocol_bits
+\*---------------------------------------------------------------------------*/
+
+void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state){
+    f->freedv_put_next_proto = rx;
+    f->freedv_get_next_proto = tx;
+    f->proto_callback_state = callback_state;
+}
+
+/*---------------------------------------------------------------------------*\
+
   FUNCTION....: freedv_get_modem_stats
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
@@ -1126,6 +1152,7 @@ void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_erro
 \*---------------------------------------------------------------------------*/
 
 // Get integers
+int freedv_get_protocol_bits              (struct freedv *f) {return  f->n_protocol_bits;}
 int freedv_get_mode                       (struct freedv *f) {return f->mode;}
 int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
 int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
@@ -1144,6 +1171,9 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, stats);
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+        memcpy(stats,&(f->stats),sizeof(struct MODEM_STATS));
+    }
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B))
         cohpsk_get_demod_stats(f->cohpsk, stats);

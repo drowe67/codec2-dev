@@ -122,9 +122,14 @@ struct freedv {
 
     char (*freedv_get_next_tx_char)(void *callback_state);
     void (*freedv_put_next_rx_char)(void *callback_state, char c);
-
     void                *callback_state;
-
+    
+    /* user defined functions to produce and consume protocol bits */
+    /* Protocol bits are packed MSB-first */
+    void (*freedv_put_next_proto)(void *callback_state, char *proto_bits_packed);
+    void (*freedv_get_next_proto)(void *callback_state);
+    void *proto_callback_state;
+    int n_protocol_bits;
 };
 
 // FIR filter suitable for changing rates 7500 to/from 8000

@@ -78,6 +78,7 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
     }
     
     fmfsk->oldsamps = oldsamps;
+    fmfsk->stats = NULL;
     
     return fmfsk;
 }
@@ -96,6 +97,10 @@ void fmfsk_destroy(struct FMFSK *fmfsk){
  */
 uint32_t fmfsk_nin(struct FMFSK *fmfsk){
     return (uint32_t)fmfsk->nin;
+}
+
+void fmfsk_setup_modem_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats){
+    fmfsk->stats = stats;
 }
 
 /*
@@ -271,6 +276,20 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     
     /* Save last sample of int stream for next demod round */
     fmfsk->lodd = lastv;
+    
+    /* Save demod statistics */
+    if(fmfsk->stats != NULL){
+        fmfsk->stats->Nc = 0;
+        fmfsk->stats->nr = 0;
+        
+        /* Clock offset and RX timing are all we know here */
+        fmfsk->stats->clock_offset = fmfsk->ppm;
+        fmfsk->stats->rx_timing = (float)rx_timing;
+        
+        /* Zero out all of the other things */
+        fmfsk->stats->foff = 0;
+        fmfsk->stats->snr_est = 0;
+    }
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
