@@ -40,6 +40,7 @@
 #include <stdio.h>
 
 #include "freedv_api.h"
+#include "modem_stats.h"
 
 struct my_callback_state {
     FILE *ftxt;
@@ -59,6 +60,7 @@ int main(int argc, char *argv[]) {
     struct freedv             *freedv;
     int                        nin, nout, frame = 0;
     struct my_callback_state   my_cb_state;
+    struct MODEM_STATS         stats;
     int                        mode;
     int                        sync;
     int                        total_bits;
@@ -66,6 +68,7 @@ int main(int argc, char *argv[]) {
     float                      snr_est;
     int                        n_speech_samples;
     int                        n_max_modem_samples;
+    float                      clock_offset;
 
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|2400A|2400B InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
@@ -135,13 +138,15 @@ int main(int argc, char *argv[]) {
 
         fwrite(speech_out, sizeof(short), nout, fout);
         freedv_get_modem_stats(freedv, &sync, &snr_est);
+        freedv_get_modem_extended_stats(freedv,&stats);
         total_bit_errors = freedv_get_total_bit_errors(freedv);
+        clock_offset = stats.clock_offset;
 
         /* log some side info to the txt file */
 
         if (ftxt != NULL) {
-            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d\n",
-                    frame, sync, nin, snr_est, total_bit_errors);
+            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
+                    frame, sync, nin, snr_est, total_bit_errors, clock_offset);
         }
 
 	/* if this is in a pipeline, we probably don't want the usual
