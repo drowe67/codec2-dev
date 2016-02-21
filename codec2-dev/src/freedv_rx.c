@@ -48,7 +48,7 @@ struct my_callback_state {
 void my_put_next_rx_char(void *callback_state, char c) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     if (pstate->ftxt != NULL) {
-        //fprintf(pstate->ftxt, "%c\n", c);
+        fprintf(pstate->ftxt, "%c", c);
     }
 }
 

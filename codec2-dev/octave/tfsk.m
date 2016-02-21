@@ -230,6 +230,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
 
     % Much larger tolerances on unimportant statistics
     pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,11) && pass;
+    pass = vcompare(o_EbNodB   ,     t_EbNodB,      'EbNodB',      tname,.02,11) && pass;
     
     assert(pass);
     diffpass = sum(xor(obits,bits'))<4;
@@ -548,9 +549,9 @@ function pass = test_fsk_battery()
     assert(pass)
     pass = pass && test_mod_horuscfgm4_randbits;
     assert(pass)
-    pass = pass && test_drift_var(4);
-    assert(pass)
     pass = pass && test_drift_var(2);
+    assert(pass)
+    pass = pass && test_drift_var(4);
     assert(pass)
     if pass
         printf("***** All tests passed! *****\n");

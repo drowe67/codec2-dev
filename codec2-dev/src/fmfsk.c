@@ -151,7 +151,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     COMP phi_ft,dphi_ft;    /* Phase and delta-phase for fine timing estimator */
     float t;
     COMP x;                 /* Magic fine timing angle */
-    float norm_rx_timing;
+    float norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int rx_timing,sample_offset;
     int next_nin;
     float apeven,apodd;     /* Approx. prob of even or odd stream being correct */
@@ -208,6 +208,18 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Figure out the normalized RX timing, using David's magic number */
     norm_rx_timing =  atan2f(x.imag,x.real)/(2*M_PI) - .42;
     rx_timing = (int)lroundf(norm_rx_timing*(float)Ts);
+    
+    old_norm_rx_timing = fmfsk->norm_rx_timing;
+    fmfsk->norm_rx_timing = norm_rx_timing;
+    
+    /* Estimate sample clock offset */
+    d_norm_rx_timing = norm_rx_timing - old_norm_rx_timing;
+    
+    /* Filter out big jumps in due to nin change */
+    if(fabsf(d_norm_rx_timing) < .2){
+        appm = 1e6*d_norm_rx_timing/(float)nsym;
+        fmfsk->ppm = .9*fmfsk->ppm + .1*appm;
+    }
     
     /* Figure out how far offset the sample points are */
     sample_offset = (Ts/2)+Ts+rx_timing-1;
