@@ -1187,12 +1187,13 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     }
 #endif
 
-    if (valid == 0) {
-        int bytes_per_frame;
-        bytes_per_frame = (f->n_codec_bits + 7) / 8;
+    if (valid == 1) {
+        int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+        int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+        int codec_frames = f->n_codec_bits / bits_per_codec_frame;
 
-        memcpy(packed_codec_bits, f->packed_codec_bits, bytes_per_frame);
-	ret = bytes_per_frame;
+        memcpy(packed_codec_bits, f->packed_codec_bits, bytes_per_codec_frame * codec_frames);
+	ret = bytes_per_codec_frame * codec_frames;
     }
     
     return ret;
