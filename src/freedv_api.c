@@ -212,17 +212,22 @@ struct freedv *freedv_open(int mode) {
     f->codec2 = codec2_create(codec2_mode);
     if (f->codec2 == NULL)
         return NULL;
-    if ((mode == FREEDV_MODE_1600) || (mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B))
+    if ((mode == FREEDV_MODE_1600) || (mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
         f->n_speech_samples = codec2_samples_per_frame(f->codec2);
-    if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B))
+	f->n_codec_bits = codec2_bits_per_frame(f->codec2);
+        nbit = f->n_codec_bits;
+        nbyte = (nbit + 7) / 8;
+    } else { /* ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B)) */
         f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
+	f->n_codec_bits = 2*codec2_bits_per_frame(f->codec2);
+        nbit = f->n_codec_bits;
+        nbyte = 2*((codec2_bits_per_frame(f->codec2) + 7) / 8);
+    }
     
     f->prev_rx_bits = (float*)malloc(sizeof(float)*2*codec2_bits_per_frame(f->codec2));
     if (f->prev_rx_bits == NULL)
         return NULL;
 
-    nbit = codec2_bits_per_frame(f->codec2);
-    nbyte = (nbit + 7) / 8;
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
     if (mode == FREEDV_MODE_1600)
         f->codec_bits = (int*)malloc(nbit*sizeof(int));
@@ -338,12 +343,61 @@ void freedv_close(struct freedv *freedv) {
 
 /* real-valued short sample output, useful for going straight to DAC */
 
+/* TX routines for 2400 FSK modes, after codec2 encoding */
+static void freedv_tx_fsk(struct freedv *f, short mod_out[]) {
+    int  i;
+    float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
+    uint8_t vc_bits[2]; /* Varicode bits for 2400 framing */
+    
+        
+    /* Get varicode bits for TX and possibly ask for a new char */
+    /* 2 bits per 2400A/B frame, so this has to be done twice */
+    for(i=0;i<2;i++){
+        if (f->nvaricode_bits) {
+            vc_bits[i] = f->tx_varicode_bits[f->varicode_bit_index++];
+            f->nvaricode_bits--;
+        }
+
+        if (f->nvaricode_bits == 0) {
+            /* get new char and encode */
+            char s[2];
+            if (f->freedv_get_next_tx_char != NULL) {
+                s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
+                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                f->varicode_bit_index = 0;
+            }
+        }
+    }
+        
+    /* If the API user hasn't set up message callbacks, don't bother with varicode bits */
+    if(f->freedv_get_next_tx_char == NULL){
+        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
+    }else{
+        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,vc_bits);
+    }
+        
+    /* Allocate floating point buffer for FSK mod */
+    tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+        
+    /* do 4fsk mod */
+    if(f->mode == FREEDV_MODE_2400A){
+        fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+        
+    /* do me-fsk mod */
+    }else if(f->mode == FREEDV_MODE_2400B){
+        fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
+    }
+        
+    /* Convert float samps to short */
+    for(i=0; i<f->n_nom_modem_samples; i++){
+        mod_out[i] = (short)(tx_float[i]*FDMDV_SCALE);
+    }
+}
+
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
     int  i;
-    float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
-    uint8_t vc_bits[2]; /* Varicode bits for 2400 framing */
     
     assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
            (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_2400A) || 
@@ -355,11 +409,149 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         
-        /* Get varicode bits for TX and possibly ask for a new char */
-        /* 2 bits per 2400A/B frame, so this has to be done twice */
-        for(i=0;i<2;i++){
+	freedv_tx_fsk(f, mod_out);
+    }else{
+        freedv_comptx(f, tx_fdm, speech_in);
+        for(i=0; i<f->n_nom_modem_samples; i++)
+            mod_out[i] = tx_fdm[i].real;
+    }
+}
+
+/* complex valued output, useful for suitable for single sided freq shifting */
+
+static void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
+    int    bit, byte, i, j;
+    int    bits_per_codec_frame, bits_per_modem_frame;
+    int    data, codeword1, data_flag_index;
+    COMP   tx_fdm[f->n_nat_modem_samples];
+
+    bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    bits_per_modem_frame = fdmdv_bits_per_frame(f->fdmdv);
+
+    /* unpack bits, MSB first */
+
+    bit = 7; byte = 0;
+    for(i=0; i<bits_per_codec_frame; i++) {
+        f->codec_bits[i] = (f->packed_codec_bits[byte] >> bit) & 0x1;
+        bit--;
+        if (bit < 0) {
+            bit = 7;
+            byte++;
+        }
+    }
+
+    // spare bit in frame that codec defines.  Use this 1
+    // bit/frame to send txt messages
+
+    data_flag_index = codec2_get_spare_bit_index(f->codec2);
+
+    if (f->nvaricode_bits) {
+        f->codec_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
+        f->nvaricode_bits--;
+    }
+
+    if (f->nvaricode_bits == 0) {
+        /* get new char and encode */
+        char s[2];
+        if (f->freedv_get_next_tx_char != NULL) {
+            s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
+            f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+            f->varicode_bit_index = 0;
+        }
+    }
+
+    /* Protect first 12 out of first 16 excitation bits with (23,12) Golay Code:
+
+       0,1,2,3: v[0]..v[1]
+       4,5,6,7: MSB of pitch
+       11,12,13,14: MSB of energy
+
+    */
+
+    data = 0;
+    for(i=0; i<8; i++) {
+        data <<= 1;
+        data |= f->codec_bits[i];
+    }
+    for(i=11; i<15; i++) {
+        data <<= 1;
+        data |= f->codec_bits[i];
+    }
+    codeword1 = golay23_encode(data);
+
+    /* now pack output frame with parity bits at end to make them
+       as far apart as possible from the data they protect.  Parity
+       bits are LSB of the Golay codeword */
+
+    for(i=0; i<bits_per_codec_frame; i++)
+        f->tx_bits[i] = f->codec_bits[i];
+    for(j=0; i<bits_per_codec_frame+11; i++,j++) {
+        f->tx_bits[i] = (codeword1 >> (10-j)) & 0x1;
+    }
+    f->tx_bits[i] = 0; /* spare bit */
+
+    /* optionally overwrite with test frames */
+
+    if (f->test_frames) {
+        fdmdv_get_test_bits(f->fdmdv, f->tx_bits);
+        fdmdv_get_test_bits(f->fdmdv, &f->tx_bits[bits_per_modem_frame]);
+        //fprintf(stderr, "test frames on tx\n");
+    }
+
+    /* modulate even and odd frames */
+
+    fdmdv_mod(f->fdmdv, tx_fdm, f->tx_bits, &f->tx_sync_bit);
+    assert(f->tx_sync_bit == 1);
+
+    fdmdv_mod(f->fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &f->tx_bits[bits_per_modem_frame], &f->tx_sync_bit);
+    assert(f->tx_sync_bit == 0);
+
+    assert(2*FDMDV_NOM_SAMPLES_PER_FRAME == f->n_nom_modem_samples);
+
+    for(i=0; i<f->n_nom_modem_samples; i++)
+        mod_out[i] = fcmult(FDMDV_SCALE, tx_fdm[i]);
+}
+
+static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
+    int    bit, byte, i, j, k;
+    int    bits_per_codec_frame, bits_per_modem_frame;
+    int    data_flag_index, nspare;
+    COMP   tx_fdm[f->n_nat_modem_samples];
+
+    bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    bits_per_modem_frame = COHPSK_BITS_PER_FRAME;
+
+    byte = 0;
+    for (j=0; j<bits_per_modem_frame; j+=bits_per_codec_frame) {
+
+        /* unpack bits, MSB first */
+
+        bit = 7;
+        for(i=0; i<bits_per_codec_frame; i++) {
+            f->codec_bits[j+i] = (f->packed_codec_bits[byte] >> bit) & 0x1;
+            bit--;
+            if (bit < 0) {
+                bit = 7;
+                byte++;
+            }
+        }
+	if (bit != 7)
+	    byte++;
+
+        // spare bits in frame that codec defines.  Use these spare
+        // bits/frame to send txt messages
+
+        if (f->mode == FREEDV_MODE_700)
+            nspare = 2;
+        else
+            nspare = 1; // Just one spare bit for FREEDV_MODE_700B
+
+        data_flag_index = codec2_get_spare_bit_index(f->codec2);
+
+        for(k=0; k<nspare; k++) {
             if (f->nvaricode_bits) {
-                vc_bits[i] = f->tx_varicode_bits[f->varicode_bit_index++];
+                f->codec_bits[j+data_flag_index+k] = f->tx_varicode_bits[f->varicode_bit_index++];
+                //fprintf(stderr, "%d %d\n", j+data_flag_index+k, f->codec_bits[j+data_flag_index+k]);
                 f->nvaricode_bits--;
             }
 
@@ -373,45 +565,32 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
                 }
             }
         }
-        
-        /* If the API user hasn't set up message callbacks, don't bother with varicode bits */
-        if(f->freedv_get_next_tx_char == NULL){
-            fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
-        }else{
-            fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,vc_bits);
-        }
-        
-        /* Allocate floating point buffer for FSK mod */
-        tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
-        
-        /* do 4fsk mod */
-        if(f->mode == FREEDV_MODE_2400A){
-            fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
-        
-        /* do me-fsk mod */
-        }else if(f->mode == FREEDV_MODE_2400B){
-            fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
-        }
-        
-        /* Convert float samps to short */
-        for(i=0; i<f->n_nom_modem_samples; i++){
-            mod_out[i] = (short)(tx_float[i]*FDMDV_SCALE);
-        }
-    }else{
-        freedv_comptx(f, tx_fdm, speech_in);
-        for(i=0; i<f->n_nom_modem_samples; i++)
-            mod_out[i] = tx_fdm[i].real;
-    }
-}
 
-/* complex valued output, useful for suitable for single sided freq shifting */
+    }
+
+    /* optionally ovwerwrite the codec bits with test frames */
+
+    if (f->test_frames) {
+        cohpsk_get_test_bits(f->cohpsk, f->codec_bits);
+    }
+
+    /* cohpsk modulator */
+
+    cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits);
+    if (f->clip)
+        cohpsk_clip(tx_fdm);
+    for(i=0; i<f->n_nat_modem_samples; i++)
+        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
+    i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
+    //assert(i == f->n_nom_modem_samples);
+    // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
+
+}
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
-    int    bit, byte, i, j, k;
-    int    bits_per_codec_frame, bits_per_modem_frame;
-    int    data, codeword1, data_flag_index, nspare;
-    COMP   tx_fdm[f->n_nat_modem_samples];
+    int    i, j;
+    int    bits_per_codec_frame;
     short  tx_real[f->n_nom_modem_samples];
 
     assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
@@ -419,163 +598,25 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
            (f->mode == FREEDV_MODE_2400B));
 
     if (f->mode == FREEDV_MODE_1600) {
-        bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
-        bits_per_modem_frame = fdmdv_bits_per_frame(f->fdmdv);
 
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
 
-        /* unpack bits, MSB first */
-
-        bit = 7; byte = 0;
-        for(i=0; i<bits_per_codec_frame; i++) {
-            f->codec_bits[i] = (f->packed_codec_bits[byte] >> bit) & 0x1;
-            bit--;
-            if (bit < 0) {
-                bit = 7;
-                byte++;
-            }
-        }
-
-        // spare bit in frame that codec defines.  Use this 1
-        // bit/frame to send txt messages
-
-        data_flag_index = codec2_get_spare_bit_index(f->codec2);
-
-        if (f->nvaricode_bits) {
-            f->codec_bits[data_flag_index] = f->tx_varicode_bits[f->varicode_bit_index++];
-            f->nvaricode_bits--;
-        }
-
-        if (f->nvaricode_bits == 0) {
-            /* get new char and encode */
-            char s[2];
-            if (f->freedv_get_next_tx_char != NULL) {
-                s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
-                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
-                f->varicode_bit_index = 0;
-            }
-        }
-
-        /* Protect first 12 out of first 16 excitation bits with (23,12) Golay Code:
-
-           0,1,2,3: v[0]..v[1]
-           4,5,6,7: MSB of pitch
-           11,12,13,14: MSB of energy
-
-        */
-
-        data = 0;
-        for(i=0; i<8; i++) {
-            data <<= 1;
-            data |= f->codec_bits[i];
-        }
-        for(i=11; i<15; i++) {
-            data <<= 1;
-            data |= f->codec_bits[i];
-        }
-        codeword1 = golay23_encode(data);
-
-        /* now pack output frame with parity bits at end to make them
-           as far apart as possible from the data they protect.  Parity
-           bits are LSB of the Golay codeword */
-
-        for(i=0; i<bits_per_codec_frame; i++)
-            f->tx_bits[i] = f->codec_bits[i];
-        for(j=0; i<bits_per_codec_frame+11; i++,j++) {
-            f->tx_bits[i] = (codeword1 >> (10-j)) & 0x1;
-        }
-        f->tx_bits[i] = 0; /* spare bit */
-
-        /* optionally overwrite with test frames */
-
-        if (f->test_frames) {
-            fdmdv_get_test_bits(f->fdmdv, f->tx_bits);
-            fdmdv_get_test_bits(f->fdmdv, &f->tx_bits[bits_per_modem_frame]);
-            //fprintf(stderr, "test frames on tx\n");
-        }
-
-        /* modulate even and odd frames */
-
-        fdmdv_mod(f->fdmdv, tx_fdm, f->tx_bits, &f->tx_sync_bit);
-        assert(f->tx_sync_bit == 1);
-
-        fdmdv_mod(f->fdmdv, &tx_fdm[FDMDV_NOM_SAMPLES_PER_FRAME], &f->tx_bits[bits_per_modem_frame], &f->tx_sync_bit);
-        assert(f->tx_sync_bit == 0);
-
-        assert(2*FDMDV_NOM_SAMPLES_PER_FRAME == f->n_nom_modem_samples);
-
-        for(i=0; i<f->n_nom_modem_samples; i++)
-            mod_out[i] = fcmult(FDMDV_SCALE, tx_fdm[i]);
+        freedv_comptx_fdmdv_1600(f, mod_out);
     }
 
 
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
         bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
-        bits_per_modem_frame = COHPSK_BITS_PER_FRAME;
+	int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+	int codec_frames = f->n_codec_bits / bits_per_codec_frame;
 
-        for (j=0; j<bits_per_modem_frame; j+=bits_per_codec_frame) {
-            codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
+        for (j=0; j < codec_frames; j++) {
+            codec2_encode(f->codec2, f->packed_codec_bits + j * bytes_per_codec_frame, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
-
-            /* unpack bits, MSB first */
-
-            bit = 7; byte = 0;
-            for(i=0; i<bits_per_codec_frame; i++) {
-                f->codec_bits[j+i] = (f->packed_codec_bits[byte] >> bit) & 0x1;
-                bit--;
-                if (bit < 0) {
-                    bit = 7;
-                    byte++;
-                }
-            }
-
-            // spare bits in frame that codec defines.  Use these spare
-            // bits/frame to send txt messages
-
-            if (f->mode == FREEDV_MODE_700)
-                nspare = 2;
-            else
-                nspare = 1; // Just one spare bit for FREEDV_MODE_700B
-
-            data_flag_index = codec2_get_spare_bit_index(f->codec2);
-
-            for(k=0; k<nspare; k++) {
-                if (f->nvaricode_bits) {
-                    f->codec_bits[j+data_flag_index+k] = f->tx_varicode_bits[f->varicode_bit_index++];
-                    //fprintf(stderr, "%d %d\n", j+data_flag_index+k, f->codec_bits[j+data_flag_index+k]);
-                    f->nvaricode_bits--;
-                }
-
-                if (f->nvaricode_bits == 0) {
-                    /* get new char and encode */
-                    char s[2];
-                    if (f->freedv_get_next_tx_char != NULL) {
-                        s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
-                        f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
-                        f->varicode_bit_index = 0;
-                    }
-                }
-            }
-
         }
-
-        /* optionally ovwerwrite the codec bits with test frames */
-
-        if (f->test_frames) {
-            cohpsk_get_test_bits(f->cohpsk, f->codec_bits);
-        }
-
-        /* cohpsk modulator */
-
-        cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits);
-        if (f->clip)
-            cohpsk_clip(tx_fdm);
-        for(i=0; i<f->n_nat_modem_samples; i++)
-            mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
-        i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
-        //assert(i == f->n_nom_modem_samples);
-        // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
+	
+	freedv_comptx_fdmdv_700(f, mod_out);
     }
     /* 2400 A and B are handled by the real-mode TX */
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
@@ -587,6 +628,37 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         }
     }
 #endif
+}
+
+void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_codec_bits) {
+    assert(f != NULL);
+    COMP tx_fdm[f->n_nom_modem_samples];
+    int bits_per_codec_frame;
+    int bytes_per_codec_frame;
+    int codec_frames;
+    int  i;
+    bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+    codec_frames = f->n_codec_bits / bits_per_codec_frame;
+
+    memcpy(f->packed_codec_bits, packed_codec_bits, bytes_per_codec_frame * codec_frames);
+    
+    switch(f->mode) {
+        case FREEDV_MODE_700:
+	case FREEDV_MODE_700B:
+            freedv_comptx_fdmdv_700(f, tx_fdm);
+	    break;
+	case FREEDV_MODE_1600:
+	    freedv_comptx_fdmdv_1600(f, tx_fdm);
+	    break;
+        case FREEDV_MODE_2400A:
+	case FREEDV_MODE_2400B:       
+            freedv_tx_fsk(f, mod_out);
+	    return; /* output is already real */
+    }
+    /* convert complex to real */
+    for(i=0; i<f->n_nom_modem_samples; i++)
+        mod_out[i] = tx_fdm[i].real;
 }
 
 int freedv_nin(struct freedv *f) {
@@ -674,51 +746,71 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
 // float input samples version
 
+int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
+    uint8_t vc_bits[2];
+    short vc_bit;
+    int i;
+    int n_ascii;
+    char ascii_out;
+    
+    if(f->mode == FREEDV_MODE_2400A){
+        fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
+        f->nin = fsk_nin(f->fsk);
+    }else{            
+        fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
+        f->nin = fmfsk_nin(f->fmfsk);
+    }
+    /* TODO: Protocol and varicode bits */
+    if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,NULL,(uint8_t*)f->tx_bits)){
+        /* Decode varicode text */
+        for(i=0; i<2; i++){
+            /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
+            vc_bit = vc_bits[i];
+            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &vc_bit, 1, 1);
+            if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+            }
+        }
+        *valid = 1;
+        f->sync = 1;
+        f->stats.sync = 1;
+    } else {
+        /* Fill with silence */
+        *valid = 0;
+        f->sync = 0;
+        f->stats.sync = 0;
+    }
+    return f->n_speech_samples;
+}
+
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
-    uint8_t vc_bits[2];
-    short vc_bit;
     int  i;
     int nin = freedv_nin(f);    
-    int n_ascii;
-    char ascii_out;
     
     assert(nin <= f->n_max_modem_samples);
     
     /* FSK RX happens in real floats, so demod for those goes here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
-        if(f->mode == FREEDV_MODE_2400A){
-            fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
-            f->nin = fsk_nin(f->fsk);
-        }else{            
-            fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
-            f->nin = fmfsk_nin(f->fmfsk);
-        }
-        /* TODO: Protocol bits */
-        if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,vc_bits,(uint8_t*)f->tx_bits)){
-            /* Decode varicode text */
-            for(i=0; i<2; i++){
-                /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
-                vc_bit = vc_bits[i];
-                n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &vc_bit, 1, 1);
-                if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
-                    (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
-                }
-            }
-            /* Decode the codec data */
-            codec2_decode(f->codec2,speech_out,f->packed_codec_bits);
-            f->sync = 1;
-            f->stats.sync = 1;
-            
-            
-        } else {
-            /* Fill with silence */
-            for(i=0;i<f->n_speech_samples;i++){
+        int valid;
+	int nout = freedv_floatrx_fsk_2400(f, demod_in, &valid);
+	
+	if (valid == 0)
+            for (i = 0; i < nout; i++)
                 speech_out[i] = 0;
+        else if (valid < 0)
+            for (i = 0; i < nout; i++)
+	        speech_out[i] = demod_in[i];
+        else {
+            int bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
+            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+            int frames = f->n_codec_bits / bits_per_codec_frame;
+            for (i = 0; i < frames; i++) {
+                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
+                speech_out += codec2_samples_per_frame(f->codec2);
             }
-            f->sync = 0;
-            f->stats.sync = 0;
+
         }
         return f->n_speech_samples;
     }else { 
@@ -733,297 +825,377 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
 
 // complex input samples version
 
-int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
-    assert(f != NULL);
+static int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *valid) {
     int                 bits_per_codec_frame, bytes_per_codec_frame, bits_per_fdmdv_frame;
-    int                 i, j, bit, byte, nin_prev, nout, k;
-    int                 recd_codeword, codeword1, data_flag_index, n_ascii, nspare;
+    int                 i, j, bit, byte, nin_prev, nout;
+    int                 recd_codeword, codeword1, data_flag_index, n_ascii;
     short               abit[1];
     char                ascii_out;
     int                 reliable_sync_bit;
-
-    assert(f->nin <= f->n_max_modem_samples);
 
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     nout = f->n_speech_samples;
 
-    if (f->mode == FREEDV_MODE_1600) {
+    for(i=0; i<f->nin; i++)
+        demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
-        for(i=0; i<f->nin; i++)
-            demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+    bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
-        bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
+    nin_prev = f->nin;
+    fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
+    fdmdv_get_demod_stats(f->fdmdv, &f->stats);
+    f->sync = f->fdmdv->sync;
+    f->snr_est = f->stats.snr_est;
 
-        nin_prev = f->nin;
-        fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
-        fdmdv_get_demod_stats(f->fdmdv, &f->stats);
-        f->sync = f->fdmdv->sync;
-        f->snr_est = f->stats.snr_est;
+    if (reliable_sync_bit == 1) {
+        f->evenframe = 1;
+    }
 
-        if (reliable_sync_bit == 1) {
-            f->evenframe = 1;
+    if (f->stats.sync) {
+        if (f->evenframe == 0) {
+            memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
+            nout = 0;
         }
+        else {
+            memcpy(&f->rx_bits[bits_per_fdmdv_frame], f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
 
-        if (f->stats.sync) {
-            if (f->evenframe == 0) {
-                memcpy(f->rx_bits, f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
-                nout = 0;
+            if (f->test_frames == 0) {
+                recd_codeword = 0;
+                for(i=0; i<8; i++) {
+                    recd_codeword <<= 1;
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
+                }
+                for(i=11; i<15; i++) {
+                    recd_codeword <<= 1;
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
+                }
+                for(i=bits_per_codec_frame; i<bits_per_codec_frame+11; i++) {
+                    recd_codeword <<= 1;
+                    recd_codeword |= (f->rx_bits[i] & 0x1);
+                }
+                codeword1 = golay23_decode(recd_codeword);
+                f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
+                f->total_bits       += 23;
+
+                //codeword1 = recd_codeword;
+                //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
+
+                for(i=0; i<bits_per_codec_frame; i++)
+                    f->codec_bits[i] = f->rx_bits[i];
+
+                for(i=0; i<8; i++) {
+                    f->codec_bits[i] = (codeword1 >> (22-i)) & 0x1;
+                }
+                for(i=8,j=11; i<12; i++,j++) {
+                    f->codec_bits[j] = (codeword1 >> (22-i)) & 0x1;
+                }
+
+                // extract txt msg data bit ------------------------------------------------------------
+
+                data_flag_index = codec2_get_spare_bit_index(f->codec2);
+                abit[0] = f->codec_bits[data_flag_index];
+
+                n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, abit, 1, 1);
+                if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
+                    (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
+                }
+
+                // reconstruct missing bit we steal for data bit and decode speech
+
+                codec2_rebuild_spare_bit(f->codec2, f->codec_bits);
+
+                // pack bits, MSB received first
+
+                bit  = 7;
+                byte = 0;
+                memset(f->packed_codec_bits, 0,  bytes_per_codec_frame);
+                for(i=0; i<bits_per_codec_frame; i++) {
+                    f->packed_codec_bits[byte] |= (f->codec_bits[i] << bit);
+                    bit--;
+                    if(bit < 0) {
+                        bit = 7;
+                        byte++;
+                    }
+                }
+                *valid = 1;
             }
             else {
-                memcpy(&f->rx_bits[bits_per_fdmdv_frame], f->fdmdv_bits, bits_per_fdmdv_frame*sizeof(int));
+                int   test_frame_sync, bit_errors, ntest_bits, k;
+                short error_pattern[fdmdv_error_pattern_size(f->fdmdv)];
 
-                if (f->test_frames == 0) {
-                    recd_codeword = 0;
-                    for(i=0; i<8; i++) {
-                        recd_codeword <<= 1;
-                        recd_codeword |= (f->rx_bits[i] & 0x1);
-                    }
-                    for(i=11; i<15; i++) {
-                        recd_codeword <<= 1;
-                        recd_codeword |= (f->rx_bits[i] & 0x1);
-                    }
-                    for(i=bits_per_codec_frame; i<bits_per_codec_frame+11; i++) {
-                        recd_codeword <<= 1;
-                        recd_codeword |= (f->rx_bits[i] & 0x1);
-                    }
-                    codeword1 = golay23_decode(recd_codeword);
-                    f->total_bit_errors += golay23_count_errors(recd_codeword, codeword1);
-                    f->total_bits       += 23;
+                for(k=0; k<2; k++) {
+                    /* test frames, so lets sync up to the test frames and count any errors */
+                    fdmdv_put_test_bits(f->fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, &f->rx_bits[k*bits_per_fdmdv_frame]);
 
-                    //codeword1 = recd_codeword;
-                    //fprintf(stderr, "received codeword1: 0x%x  decoded codeword1: 0x%x\n", recd_codeword, codeword1);
-
-                    for(i=0; i<bits_per_codec_frame; i++)
-                        f->codec_bits[i] = f->rx_bits[i];
-
-                    for(i=0; i<8; i++) {
-                        f->codec_bits[i] = (codeword1 >> (22-i)) & 0x1;
-                    }
-                    for(i=8,j=11; i<12; i++,j++) {
-                        f->codec_bits[j] = (codeword1 >> (22-i)) & 0x1;
+                    if (test_frame_sync == 1) {
+                        f->test_frame_sync_state = 1;
+                        f->test_frame_count = 0;
                     }
 
-                    // extract txt msg data bit ------------------------------------------------------------
+                    if (f->test_frame_sync_state) {
+                        if (f->test_frame_count == 0) {
+                            f->total_bit_errors += bit_errors;
+                            f->total_bits += ntest_bits;
+                            if (f->freedv_put_error_pattern != NULL) {
+                                (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, fdmdv_error_pattern_size(f->fdmdv));
+                            }
+                        }
+                        f->test_frame_count++;
+                        if (f->test_frame_count == 4)
+                            f->test_frame_count = 0;
+                    }
 
-                    data_flag_index = codec2_get_spare_bit_index(f->codec2);
-                    abit[0] = f->codec_bits[data_flag_index];
+                    //fprintf(stderr, "test_frame_sync: %d test_frame_sync_state: %d bit_errors: %d ntest_bits: %d\n",
+                    //        test_frame_sync, f->test_frame_sync_state, bit_errors, ntest_bits);
+                }
+            }
+
+
+            /* squelch if beneath SNR threshold or test frames enabled */
+
+            if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
+                //fprintf(stderr,"squelch %f %f !\n", f->stats.snr_est, f->snr_squelch_thresh);
+                *valid = 0;
+            }
+
+            nout = f->n_speech_samples;
+
+        }
+
+        /* note this freewheels if reliable sync dissapears on bad channels */
+
+        if (f->evenframe)
+            f->evenframe = 0;
+        else
+            f->evenframe = 1;
+        //fprintf(stderr,"%d\n",  f->evenframe);
+
+    } /* if (sync) .... */
+    else {
+        /* if not in sync pass through analog samples */
+        /* this lets us "hear" whats going on, e.g. during tuning */
+
+        //fprintf(stderr, "out of sync\n");
+
+        if (f->squelch_en == 0) {
+	    *valid = -1;
+        }
+        else {
+	    *valid = 0;
+        }
+        //fprintf(stderr, "%d %d %d\n", nin_prev, speech_out[0], speech_out[nin_prev-1]);
+        nout = nin_prev;
+    }
+    return nout;
+}
+
+#ifndef CORTEX_M4
+static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in[], int *valid) {
+    int                 bits_per_codec_frame, bytes_per_codec_frame;
+    int                 i, j, bit, byte, nout, k;
+    int                 data_flag_index, n_ascii, nspare;
+    short               abit[1];
+    char                ascii_out;
+    float rx_bits[COHPSK_BITS_PER_FRAME];
+    int   sync;
+    int   frames;
+
+    bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
+    bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+    frames = f->n_codec_bits / bits_per_codec_frame;
+    nout = f->n_speech_samples;
+
+    // echo samples back out as default (say if sync not found)
+    *valid = -1;
+
+    i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
+    //if (i != f->nin)
+    //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
+
+    for(i=0; i<f->nin; i++)
+        demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+
+    cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
+    f->sync = sync;
+    cohpsk_get_demod_stats(f->cohpsk, &f->stats);
+    f->snr_est = f->stats.snr_est;
+
+    memset(f->packed_codec_bits, 0, bytes_per_codec_frame * frames);
+
+    if (sync) {
+
+        if (f->test_frames == 0) {
+            data_flag_index = codec2_get_spare_bit_index(f->codec2);
+
+            /* optional smoothing of codec symbols */
+
+            if (f->smooth_symbols) {
+
+                for(i=0; i<bits_per_codec_frame; i++) {
+                    rx_bits[i] += rx_bits[i+bits_per_codec_frame];
+                    rx_bits[i+bits_per_codec_frame] = rx_bits[i];
+                }
+            }
+
+            byte = 0;
+            for (j=0; j<COHPSK_BITS_PER_FRAME; j+=bits_per_codec_frame) {
+
+                /* extract txt msg data bit(s) */
+
+                if (f->mode == FREEDV_MODE_700)
+                    nspare = 2;
+                else
+                    nspare = 1;
+
+                for(k=0; k<nspare; k++)  {
+                    abit[0] = rx_bits[data_flag_index+j+k] < 0.0;
 
                     n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, abit, 1, 1);
                     if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                         (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
                     }
-
-                    // reconstruct missing bit we steal for data bit and decode speech
-
-                    codec2_rebuild_spare_bit(f->codec2, f->codec_bits);
-
-                    // pack bits, MSB received first
-
-                    bit  = 7;
-                    byte = 0;
-                    memset(f->packed_codec_bits, 0,  bytes_per_codec_frame);
-                    for(i=0; i<bits_per_codec_frame; i++) {
-                        f->packed_codec_bits[byte] |= (f->codec_bits[i] << bit);
-                        bit--;
-                        if(bit < 0) {
-                            bit = 7;
-                            byte++;
-                        }
-                    }
-
-                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits);
                 }
-                else {
-                    int   test_frame_sync, bit_errors, ntest_bits, k;
-                    short error_pattern[fdmdv_error_pattern_size(f->fdmdv)];
 
-                    for(k=0; k<2; k++) {
-                        /* test frames, so lets sync up to the test frames and count any errors */
-                        fdmdv_put_test_bits(f->fdmdv, &test_frame_sync, error_pattern, &bit_errors, &ntest_bits, &f->rx_bits[k*bits_per_fdmdv_frame]);
+                /* pack bits, MSB received first */
 
-                        if (test_frame_sync == 1) {
-                            f->test_frame_sync_state = 1;
-                            f->test_frame_count = 0;
-                        }
-
-                        if (f->test_frame_sync_state) {
-                            if (f->test_frame_count == 0) {
-                                f->total_bit_errors += bit_errors;
-                                f->total_bits += ntest_bits;
-                                if (f->freedv_put_error_pattern != NULL) {
-                                    (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, fdmdv_error_pattern_size(f->fdmdv));
-                                }
-                           }
-                            f->test_frame_count++;
-                            if (f->test_frame_count == 4)
-                                f->test_frame_count = 0;
-                        }
-
-                        //fprintf(stderr, "test_frame_sync: %d test_frame_sync_state: %d bit_errors: %d ntest_bits: %d\n",
-                        //        test_frame_sync, f->test_frame_sync_state, bit_errors, ntest_bits);
+                bit = 7;
+                for(i=0; i<bits_per_codec_frame; i++) {
+                    f->packed_codec_bits[byte] |= ((rx_bits[j+i] < 0.0) << bit);
+                    bit--;
+                    if (bit < 0) {
+                        bit = 7;
+                        byte++;
                     }
                 }
+		if (bit != 7)
+		    byte++;
 
-
-                /* squelch if beneath SNR threshold or test frames enabled */
-
-                if ((f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) || f->test_frames) {
-                    //fprintf(stderr,"squelch %f %f !\n", f->stats.snr_est, f->snr_squelch_thresh);
-                    for(i=0; i<f->n_speech_samples; i++)
-                        speech_out[i] = 0;
+                if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
+		   *valid = 0;
                 }
-
-                nout = f->n_speech_samples;
-
+		*valid = 1;
             }
-
-            /* note this freewheels if reliable sync dissapears on bad channels */
-
-            if (f->evenframe)
-                f->evenframe = 0;
-            else
-                f->evenframe = 1;
-            //fprintf(stderr,"%d\n",  f->evenframe);
-
-        } /* if (sync) .... */
-        else {
-            /* if not in sync pass through analog samples */
-            /* this lets us "hear" whats going on, e.g. during tuning */
-
-            //fprintf(stderr, "out of sync\n");
-
-           if (f->squelch_en == 0) {
-                for(i=0; i<nin_prev; i++)
-                    speech_out[i] = FDMDV_SCALE*demod_in[i].real;
-            }
-            else {
-                for(i=0; i<nin_prev; i++)
-                    speech_out[i] = 0;
-             }
-            //fprintf(stderr, "%d %d %d\n", nin_prev, speech_out[0], speech_out[nin_prev-1]);
-            nout = nin_prev;
+            nout = f->n_speech_samples;
         }
+        else {
+            short error_pattern[COHPSK_BITS_PER_FRAME];
+            int   bit_errors;
+
+            /* test data, lets see if we can sync to the test data sequence */
+
+            cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors, rx_bits);
+            if (f->test_frame_sync_state) {
+                f->total_bit_errors += bit_errors;
+                f->total_bits       += COHPSK_BITS_PER_FRAME;
+                if (f->freedv_put_error_pattern != NULL) {
+                    (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
+                }
+            }
+            
+	    *valid = 0;
+            nout = f->n_speech_samples;
+        }
+
     }
 
 
+    /* no valid FreeDV signal - squelch output */
+
+    if (sync == 0) {
+        nout = freedv_nin(f);
+        if (f->squelch_en) {
+	    *valid = 0;
+        }
+    }
+    return nout;
+}
+#endif
+
+
+int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
+    assert(f != NULL);
+    int                 bits_per_codec_frame, bytes_per_codec_frame;
+    int                 i, nout = 0;
+    int valid;
+    
+    assert(f->nin <= f->n_max_modem_samples);
+
+    bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
+    bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+
+    if (f->mode == FREEDV_MODE_1600) {
+        nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
+    }
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
-        float rx_bits[COHPSK_BITS_PER_FRAME];
-        int   sync;
-
-        // echo samples back out as default (say if sync not found)
-
-        for(i=0; i<freedv_nin(f); i++)
-            speech_out[i] = demod_in[i].real;
-
-        i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
-        //if (i != f->nin)
-        //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
-
-        for(i=0; i<f->nin; i++)
-            demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
-
-        nin_prev = f->nin;
-        cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
-        f->sync = sync;
-        cohpsk_get_demod_stats(f->cohpsk, &f->stats);
-        f->snr_est = f->stats.snr_est;
-
-        if (sync) {
-
-            if (f->test_frames == 0) {
-                data_flag_index = codec2_get_spare_bit_index(f->codec2);
-
-                /* optional smoothing of codec symbols */
-
-                if (f->smooth_symbols) {
-
-                    for(i=0; i<bits_per_codec_frame; i++) {
-                        rx_bits[i] += rx_bits[i+bits_per_codec_frame];
-                        rx_bits[i+bits_per_codec_frame] = rx_bits[i];
-                    }
-                }
-
-                for (j=0; j<COHPSK_BITS_PER_FRAME; j+=bits_per_codec_frame) {
-
-                    /* extract txt msg data bit(s) */
-
-                    if (f->mode == FREEDV_MODE_700)
-                        nspare = 2;
-                    else
-                        nspare = 1;
-
-                    for(k=0; k<nspare; k++)  {
-                        abit[0] = rx_bits[data_flag_index+j+k] < 0.0;
-
-                        n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, abit, 1, 1);
-                        if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
-                            (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
-                        }
-                    }
-
-                    /* pack bits, MSB received first */
-
-                    bit = 7; byte = 0;
-                    memset(f->packed_codec_bits, 0, bytes_per_codec_frame);
-                    for(i=0; i<bits_per_codec_frame; i++) {
-                        f->packed_codec_bits[byte] |= ((rx_bits[j+i] < 0.0) << bit);
-                        bit--;
-                        if (bit < 0) {
-                            bit = 7;
-                            byte++;
-                        }
-                    }
-
-                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits);
-
-                    if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
-                        for(i=0; i<f->n_speech_samples; i++)
-                            speech_out[i] = 0;
-                    }
-                    speech_out += codec2_samples_per_frame(f->codec2);
-                }
-                nout = f->n_speech_samples;
-            }
-            else {
-                short error_pattern[COHPSK_BITS_PER_FRAME];
-                int   bit_errors;
-
-                /* test data, lets see if we can sync to the test data sequence */
-
-                cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors, rx_bits);
-                if (f->test_frame_sync_state) {
-                    f->total_bit_errors += bit_errors;
-                    f->total_bits       += COHPSK_BITS_PER_FRAME;
-                    if (f->freedv_put_error_pattern != NULL) {
-                        (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
-                    }
-                }
-
-                for(i=0; i<f->n_speech_samples; i++)
-                    speech_out[i] = 0;
-                nout = f->n_speech_samples;
-            }
-
-        }
-
-
-        /* no valid FreeDV signal - squelch output */
-
-        if (sync == 0) {
-            nout = freedv_nin(f);
-            if (f->squelch_en) {
-                for(i=0; i<nout; i++)
-                    speech_out[i] = 0;
-            }
-        }
-
+        nout = freedv_comprx_fdmdv_700(f, demod_in, &valid);
     }
 #endif
 
+    if (valid == 0)
+        for (i = 0; i < nout; i++)
+            speech_out[i] = 0;
+    else if (valid < 0)
+        for (i = 0; i < nout; i++)
+	    speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+    else {
+	int frames = f->n_codec_bits / bits_per_codec_frame;
+	for (i = 0; i < frames; i++) {
+            codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
+            speech_out += codec2_samples_per_frame(f->codec2);
+	}
+    }
+
     //fprintf(stderr,"freedv_nin(f): %d nout: %d\n", freedv_nin(f), nout);
     return nout;
+}
+
+int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short demod_in[])
+{
+    assert(f != NULL);
+    COMP rx_fdm[f->n_max_modem_samples];
+    int i;
+    int nin = freedv_nin(f);
+    int valid;
+    int ret = 0;
+    float rx_float[f->n_max_modem_samples];
+
+    assert(nin <= f->n_max_modem_samples);
+
+    /* FSK RX happens in real floats, so convert to those and call their demod here */
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
+        for(i=0; i<nin; i++) {
+            rx_float[i] = ((float)demod_in[i]);
+        }
+    } else {
+        for(i=0; i<nin; i++) {
+            rx_fdm[i].real = (float)demod_in[i];
+            rx_fdm[i].imag = 0.0;
+        }
+    }
+    
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
+        freedv_floatrx_fsk_2400(f, rx_float, &valid);
+    }
+    if (f->mode == FREEDV_MODE_1600) {
+        freedv_comprx_fdmdv_1600(f, rx_fdm, &valid);
+    }
+#ifndef CORTEX_M4
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
+        freedv_comprx_fdmdv_700(f, rx_fdm, &valid);
+    }
+#endif
+
+    if (valid == 0) {
+        int bytes_per_frame;
+        bytes_per_frame = (f->n_codec_bits + 7) / 8;
+
+        memcpy(packed_codec_bits, f->packed_codec_bits, bytes_per_frame);
+	ret = bytes_per_frame;
+    }
+    
+    return ret;
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1156,7 +1328,7 @@ int freedv_get_protocol_bits              (struct freedv *f) {return  f->n_proto
 int freedv_get_mode                       (struct freedv *f) {return f->mode;}
 int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
 int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
-int freedv_get_modem_sample_rate          (struct freedv *f) {return FS;}
+int freedv_get_modem_sample_rate          (struct freedv *f) {return f->modem_sample_rate;}
 int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
@@ -1166,6 +1338,7 @@ int freedv_get_sz_error_pattern           (struct freedv *f) {return  f->sz_erro
 // Get floats
 
 struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}
+int freedv_get_n_codec_bits             (struct freedv *f){return f->n_codec_bits;}
 
 void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats)
 {

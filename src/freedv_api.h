@@ -65,11 +65,13 @@ void freedv_close   (struct freedv *freedv);
 // Transmit
 void freedv_tx      (struct freedv *freedv, short mod_out[], short speech_in[]);
 void freedv_comptx  (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
+void freedv_codectx (struct freedv *f, short mod_out[], unsigned char *packed_codec_bits);
 // Receive
 int freedv_nin      (struct freedv *freedv);
 int freedv_rx       (struct freedv *freedv, short speech_out[], short demod_in[]);
 int freedv_floatrx  (struct freedv *freedv, short speech_out[], float demod_in[]);
 int freedv_comprx   (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
+int freedv_codecrx  (struct freedv *freedv, unsigned char *packed_codec_bits, short demod_in[]);
 // Set parameters
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
@@ -97,6 +99,7 @@ int freedv_get_total_bits			(struct freedv *freedv);
 int freedv_get_total_bit_errors		(struct freedv *freedv);
 int freedv_get_sync		            (struct freedv *freedv);
 struct CODEC2 *freedv_get_codec2	(struct freedv *freedv);
+int freedv_get_n_codec_bits             (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
 #endif
