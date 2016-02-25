@@ -89,6 +89,7 @@ struct freedv {
     int                  tx_sync_bit;
     int                  smooth_symbols;
     float               *prev_rx_bits;
+    int                  n_codec_bits;           // amount of codec bits in a frame
 
     int                 *ptest_bits_coh;
     int                 *ptest_bits_coh_end;
