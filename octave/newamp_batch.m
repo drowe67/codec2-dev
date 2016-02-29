@@ -16,15 +16,20 @@
 
 % process a whole file and write results
 
-function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
   max_amp = 80;
   decimate_in_freq = 1;
   postfilter = 1;
-  decimate_in_time = 0;
+  decimate_in_time = 1;
   synth_phase = 0;
+  freq_quant = 1;
+  amp_quant = 1;
+  non_masked_f_log = [];
+  non_masked_m_log = [];
+  non_masked_amp_log = [];
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -39,10 +44,10 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   end
   if nargin >= 3
     Aw_out_name = optional_Aw_out_name;
+    faw = fopen(Aw_out_name,"wb"); 
   end
    
   fam  = fopen(Am_out_name,"wb"); 
-  faw = fopen(Aw_out_name,"wb"); 
 
   for f=1:frames
     printf("%d ", f);
@@ -58,9 +63,14 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
     maskdB = mask_model(AmdB, Wo, L);
 
     if decimate_in_freq
-      % decimate in mask samples in frequency
-      [decmaskdB decmasksamples] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
-      non_masked_m = decmasksamples(:,2);
+      % decimate mask samples in frequency
+      [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      non_masked_amp = decmaskdB;
+      non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
+      Wo*4/pi
+      non_masked_m = round(masker_freqs_kHz/(Wo*4/pi))
+      non_masked_m_log = [non_masked_m_log; non_masked_m'];
+      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
       maskdB_ = decmaskdB;
     else
       % just approximate decimation in freq by using those mask samples we can hear
@@ -70,7 +80,7 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
 
     if decimate_in_time
       % decimate mask samples in time
-      maskdB_ = decimate_frame_rate(maskdB_, model, decimate, f, frames, mask_sample_freqs_kHz);
+      maskdB_ = decimate_frame_rate(maskdB_, model, 4, f, frames, mask_sample_freqs_kHz);
     end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
@@ -112,10 +122,11 @@ function newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   end
 
   fclose(fam);
-  fclose(faw);
+  if synth_phase
+    fclose(faw);
+  end
 
   printf("\n");
-
 endfunction
 
 

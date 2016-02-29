@@ -14,13 +14,15 @@
 %   $ cd ~/codec2-dev/octave
 %   octave:14> newamp_fbf("../build_linux/src/hts1a",50)
 
-function newamp_fbf(samname, f)
+function newamp_fbf(samname, f=10)
   
   more off;
   newamp;
   phase_stuff = 0;
   plot_not_masked = 0;
-  plot_spectrum = 0;
+  plot_spectrum = 1;
+  freq_quant = 0;
+  amp_quant = 0;
 
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -62,19 +64,12 @@ function newamp_fbf(samname, f)
     hold on;
     if plot_spectrum
       plot((1:L)*Wo*4000/pi, AmdB,";Am;r");
-      plot((1:L)*Wo*4000/pi, AmdB,";Am;r+");
-      plot((0:255)*4000/256, Sw(f,:),";Sw;");
+      plot((1:L)*Wo*4000/pi, AmdB,"r+");
+      %plot((0:255)*4000/256, Sw(f,:),";Sw;");
     end
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    plot(Am_freqs_kHz*1000, maskdB, 'g');
-
-    % optionally show harmonics that are not masked
-
-    not_masked_m = find(maskdB < AmdB);
-    if plot_not_masked
-      plot(not_masked_m*Wo*4000/pi, 70*ones(1,length(not_masked_m)), 'bk+');
-    end
+    %plot(Am_freqs_kHz*1000, maskdB, 'g');
 
     % optionally plot synthesised spectrum (early simple model)
 
@@ -88,28 +83,21 @@ function newamp_fbf(samname, f)
     % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB local_maxima min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz);
+    [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
     
-    [nlm tmp] = size(local_maxima(:,2));
-    nlm = min(nlm,4);
-    tonef_kHz = local_maxima(1:nlm,2)*Wo*4/pi;
-    toneamp_dB = local_maxima(1:nlm,1);
+    tonef_kHz = masker_freqs_kHz;
+    nlm = length(tonef_kHz);
 
-    plot(tonef_kHz*1000, 70*ones(1,nlm), 'bk+');
-    plot(mask_sample_freqs_kHz*1000, decmaskdB, 'm');
+    plot(tonef_kHz*1000, 20*ones(1,nlm), ';AbyS Mask Freqs;bk+');
+    plot(mask_sample_freqs_kHz*1000, decmaskdB, ';AbyS Mask;m');
     plot(mask_sample_freqs_kHz*1000, min_error);
+    hold off;
 
     figure(3)
     clf
     plot((1:L)*Wo*4000/pi, mse_log1');
     axis([0 4000 0 max(mse_log1(1,:))])
-    title('Basis 1 MSE as a function of position for each stage');
-
-    % fit a line to amplitudes
-
-    %[m b] = linreg(tonef_kHz, toneamp_dB, nlm);
-    %plot(tonef_kHz*1000, tonef_kHz*m + b, "bk");
-    %plot(tonef_kHz*1000, 60 + toneamp_dB - (tonef_kHz*m + b), "r+");
+    title('Error as a function of position for each AbyS stage');
 
     % decimated in time
 
@@ -147,7 +135,7 @@ function newamp_fbf(samname, f)
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back m-allmasks o-notmasked s-spectrum q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back a-Am f-freq_quant m-amp_quant q-quit", f);
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
@@ -157,20 +145,20 @@ function newamp_fbf(samname, f)
       f = f - 1;
     endif
     if k == 'm'
-      if plot_all_masks == 0
-         plot_all_masks = 1;
+      if amp_quant == 0
+         amp_quant = 1;
       else
-         plot_all_masks = 0;
+         amp_quant = 0;
       end
     end
-    if k == 'o'
-      if plot_not_masked == 0
-         plot_not_masked = 1;
+    if k == 'f'
+      if freq_quant == 0
+        freq_quant = 1;
       else
-         plot_not_masked = 0;
+        freq_quant = 0;
       end
     end
-    if k == 's'
+    if k == 'a'
       if plot_spectrum == 0
          plot_spectrum = 1;
       else
