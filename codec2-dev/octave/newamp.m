@@ -135,7 +135,7 @@ endfunction
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
+function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
 
     Nsamples = 4;
 
@@ -189,32 +189,40 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
 
       decmaskdB = min_candidate;
       dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
+      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
       %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
     end
 
+    bits = [];
+
+    % sort into increasing freq order
+
+    masker_amps_dB = dec_samples(:,1);
+    masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+    [fsrt fsrt_ind] = sort(masker_freqs_kHz);
+    masker_freqs_kHz = fsrt;
+    masker_amps_dB = masker_amps_dB(fsrt_ind);
+
     % Differential Freq Quantisers - sounds acceptable
 
-    if 0
-      % sort into increasing freq order
-
-      masker_amps_dB = dec_samples(:,1);
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-      [fsrt fsrt_ind] = sort(masker_freqs_kHz);
-            
+    if freq_quant
+           
       % first freq quant to harmonic number m=1:8
 
       f0_kHz = Wo*4/pi;
-      masker_freqs_kHz(1) = quantise((1:8)*f0_kHz, fsrt(1));
-      
+      [masker_freqs_kHz(1) abits] = quantise((1:8)*f0_kHz, masker_freqs_kHz(1));
+      bits = [bits abits];
+     
       % then quantise differences
 
       for i=2:4
-        targ = fsrt(i) - masker_freqs_kHz(i-1);
-        masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + quantise(0.2:0.2:1.6, targ);
+        targ = masker_freqs_kHz(i) - masker_freqs_kHz(i-1);
+        [q_freq abits] = quantise(0.2:0.2:1.6, targ);
+        bits = [bits abits];
+        masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freq;
       end
 
-      asrt = masker_amps_dB(fsrt_ind);
-      decmaskdB = determine_mask(asrt,  masker_freqs_kHz, mask_sample_freqs_kHz);
+       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
     if 0
@@ -279,33 +287,82 @@ function [decmaskdB dec_samples min_error mse_log1 mse_log2] = make_decmask_abys
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
-    % fit straight line to amplitudes (sounds bad, still a bug somewhere)
+    % Amplitude quantisation by fitting a straight line -------------------------
 
-    if 1
-      f = dec_samples(:,2)*Wo*4000/pi;
-      [gradient intercept] = linreg(f, dec_samples(:,1), 4);
-      masker_amps_dB_lin = f*gradient + intercept;
-      masker_amps_dB_lin_delta = dec_samples(:,1) - masker_amps_dB_lin;
+    if amp_quant
+
+      % Fit straight line
+
+      f = masker_freqs_kHz*1000;
+      [gradient intercept] = linreg(f, masker_amps_dB, 4);
+      % use quantised gradient to take into account quantisation
+      % errors in rest of quantisation
+
       gradient_ = quantise(-0.04:0.005:0.04, gradient);
-      printf("gradient: %f gradient_: %f\n", gradient, gradient_);
-      %masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta + intercept;
-      masker_amps_dB = f*gradient_ + intercept;
-      masker_freqs_kHz = f/1000;
+      
+      % determine deltas, or errors in straight line fit
+
+      masker_amps_dB_lin = f*gradient_ + intercept;
+      masker_amps_dB_lin_delta = masker_amps_dB - masker_amps_dB_lin;
+
+      % quantise the deltas
+
+      masker_amps_dB_lin_delta_ = zeros(4,1);
+      for i=1:4
+        masker_amps_dB_lin_delta_(i) = quantise(-15:5:20, masker_amps_dB_lin_delta(i));
+      end
+      %masker_amps_dB_lin_delta
+      %masker_amps_dB_lin_delta_
+
+      masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta_ + intercept;
+      %decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 endfunction
 
 
-% quantise input sample to nearest value in table 
+% quantise input sample to nearest value in table, optionally return bianry code
 
-function quant_out = quantise(levels, quant_in)
+function [quant_out bits] = quantise(levels, quant_in)
+
+  % find closest quantiser level
+
   best_se = 1E32;
   for i=1:length(levels)
     se = (levels(i) - quant_in)^2;
     if se < best_se
       quant_out = levels(i);
       best_se = se;
+      best_i = i;
     end
+  end
+
+  % convert index to binary bits
+
+  numbits = ceil(log2(length(levels)));
+  bits = zeros(1, numbits);
+  for b=1:numbits
+    bits(b) = bitand(best_i-1,2^(numbits-b)) != 0;
+  end
+
+endfunction
+
+
+function masker_freqs_kHz = unquantise_freqs(bits, Wo)
+  for i=1:4
+    st = (i-1)*3+1; en=i*3; 
+    index(i) = bits(st:en) * [4 2 1]' + 1;
+  end
+  f0_kHz = Wo*4/pi;
+
+  masker_freqs_kHz(1) = index(1)*f0_kHz;
+     
+  % then unquantise differences
+
+  q_freqs = 0.2:0.2:1.6;
+
+  for i=2:4
+    masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freqs(index(i));
   end
 endfunction
 
