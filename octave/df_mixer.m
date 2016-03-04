@@ -17,7 +17,7 @@
 
 fm;
 
-function tx = fm_mod
+function tx = fm_mod(fmod)
   fm_states.Fs = 192E3;  
   fm_states.fm_max = 3E3;
   fm_states.fd = 5E3;
@@ -30,10 +30,13 @@ function tx = fm_mod
 
   nsam = fm_states.Fs/2;
   t = 0:(nsam-1);
-  fm = 0; wm = 2*pi*fm/fm_states.Fs;
-  mod = sin(wm*t);
+  wmod = 2*pi*fmod/fm_states.Fs;
+  mod = sin(wmod*t);
   tx = analog_fm_mod(fm_states, mod);
 endfunction
+
+
+% Constants -------------------------------------------------------------------
 
 randn('state',1);
 more off;
@@ -41,19 +44,21 @@ format short
 
 f     = 48E3;          % signal frequency
 flo   = 32.768E3;      % LO frequency
-m     = 10^(-10/20);   % modulation index of our mixer, how far each 
+m     = 10^(-0/20);    % modulation index of our mixer, how far each 
                        % sideband is down wrt carrier (0.1 == 20dB)
                        % note: not FM modulation index
 bw    = 16E3;          % signal bandwidth
 
-phi   = 0.5;           % phase difference between antennas
+phi   = 0.5;           % phase difference between antennas - 
+                       % ->> what we are trying to estimate
 
 theta = 0;             % phase term constant to ant1 and ant2
 alpha = 0;             % LO phase
 
 Fs    = 192E3;         % sample rate
-CNodB = 80;            % C/No of carrier, which dominates power
+CNodB = 60;            % C/No of carrier, which dominates power
                        % Around C/No = 50dB is min for FM (12dB-ish SINAD)
+fmod  = 1000;          % Audio modulation on FM signal (0 for carrier)
 N     = Fs/2;          % processing block size
 
 % BW is Fs Hz.  No=(total noise power Nt)/Fs. N=noise power=variance of noise source
@@ -69,104 +74,108 @@ w   = 2*pi*f/Fs;
 wlo = 2*pi*flo/Fs;
 wbw = 2*pi*bw/Fs;
 
-% FIR filter prototype that we mix up to be a BPF.  Use a 15kHz cut
-% off to catch energy from FN signals
 
-Nf = 6;
-[bcentre acentre] = butter(Nf, [f-bw/2 f+bw/2]/(Fs/2));
-[blow alow] = butter(Nf, [f-flo-bw/2 f-flo+bw/2]/(Fs/2));
-[bhigh ahigh] = butter(Nf, [f+flo-bw/2 f+flo+bw/2]/(Fs/2));
+% Check Filters -------------------------------------------------------------
 
-ntrials = 1;
+% FIR filter BPF for centre signal.  Use a 15kHz cut off to catch
+% energy from FM signals.  Important: we need identical phase response
+% for each BPF.  I couldn't work out how to design these filter using
+% the built-in Octave functions.  So I use a bunch of freq shifts at
+% run time instead, so we use the centre BPF for all three filters.
+
+bcentre  = fir2(200, [0, f-bw/2, f, f+bw/2, Fs/2]/(Fs/2), [0 0 1 0 0]);
+
+% Run some test signals through all three filters.  Real signals used
+% for convenience, also works with complex.  If another set of filter
+% is used you need to prove net reponse is a delay.  Fig 2
+% subplot(211) must be a straight line.
+
+x = cos(w*t) + cos((w-wlo)*t) + cos((w-wlo)*t); 
+ycenter = filter(bcentre,1,x);
+ylow    = exp(-j*wlo*t) .* filter(bcentre, 1, x .* exp(j*wlo*t));
+yhigh   = exp(j*wlo*t) .* filter(bcentre, 1, x .* exp(-j*wlo*t));
+y = ycenter + ylow + yhigh;
+
+
+figure(1)
+clf
+h=freqz(bcentre,1,Fs/2);
+plot(20*log10(abs(h)))
+hold on;
+plot([f-bw/2 f-bw/2 f+bw/2 f+bw/2],[-60 -3 -3 -60],'r');
+hold off;
+axis([f-bw f+bw -60 0])
+title('Centre BPF');
+grid;
+
+figure(2)
+clf;
+Ns = 200;
+Np = 200;
+
+% y should be a delayed version of x
+
+subplot(211)
+plot(x(Ns:Ns+Np-1))
+hold on;
+plot(y(Ns:Ns+Np-1),'g')
+hold off;
+title('Filter Check');
+
+% should see a straight line on this plot
+
+subplot(212)
+plot(x(Ns:Ns+Np-1), y(Ns:Ns+Np-1))
+
+
+% Main -------------------------------------------------------------------------
+
 phi_est = zeros(1,ntrials);
-block_based = 0;
 
-for nn=1:ntrials
-  % theta = 2*pi*rand(1,1);
-  % alpha = 2*pi*rand(1,1);
+% tx signal
 
-  % tx signal
+tx = fm_mod(fmod); 
 
-  %tx = exp(j*w*t); 
-  tx = fm_mod; 
+% simulate rx signals at antenna 1 and 2 by adding noise.  Note signal
+% at antenna 2 is phase shifted phi due to path difference. Both signals
+% experience a time of flight path different theta.
 
-  % simulate rx signals at antenna 1 and 2 by adding noise.  Note signal
-  % at antenna 2 is phase shifted phi due to path difference. Both signals
-  % experience a time of flight path different theta.
+n = sqrt(var/2)*randn(1,N) + j*sqrt(var/2)*randn(1,N);
+ant1 = tx*exp(j*(theta+phi)) + n;
+ant2 = tx*exp(j*(theta)) + n;
 
-  n = sqrt(var/2)*randn(1,N) + j*sqrt(var/2)*randn(1,N);
-  ant1 = tx*exp(j*(theta+phi)) + n;
-  ant2 = tx*exp(j*(theta)) + n;
+% ant2 passed through mixer with local osc frequency wlo and phase alpha
 
-  % ant2 passed through mixer with local osc frequency wlo and phase alpha
+ant2_mix = 2.0*m*(ant2 .* cos(t*wlo + alpha));
 
-  ant2_mix = 2.0*m*(ant2 .* cos(t*wlo + alpha));
+% The SDR receives the sum of the two signals
 
-  % The SDR recieves the sum of the two signals
+rx = ant1 + ant2_mix;
 
-  rx = ant1 + ant2_mix;
+% Uncomment to use HackRF file as input, ow test sig generated baove is used 
 
-  if block_based 
-    % Lets go to work on it and see if we can recover phi, the phase
-    % difference between ant1 and ant2
+% rx=hackrf_dc("df1.iq"); rx = rx(1000:length(rx)); % discard initial transients
+  
+Rx = (1/N)*fft(rx,N);
 
-    Rx = (1/N)*fft(rx,N);
+% BPF each signal
 
-    % The peak is the carrier location
+sam1 = filter(bcentre,1,rx);
+sam2 = exp( j*wlo*t) .* filter(bcentre, 1, rx .* exp(-j*wlo*t));
+sam3 = exp(-j*wlo*t) .* filter(bcentre, 1, rx .* exp( j*wlo*t));
 
-    [sam1_mag sam1_ind] = max(abs(Rx));
+%sam1 = sign(sam1); sam2 = sign(sam2); sam3 = sign(sam3);
 
-    sam1_freq = sam1_ind*Fs/N;
+% Do the math on phases using rect math
 
-    % lets find and sample the peaks either side from the "sidebands"
-
-    lo_offset_ind = flo*N/Fs;
-    st = round(0.9*(sam1_ind + lo_offset_ind));
-    en = round(1.1*(sam1_ind + lo_offset_ind));
-    [sam2_mag sam2_ind] = max(abs(Rx(st:en)));
-    sam2_ind += st - 1;
-    sam2_freq = sam2_ind*Fs/N;
-
-    st = round(0.9*(sam1_ind - lo_offset_ind));
-    en = round(1.1*(sam1_ind - lo_offset_ind));
-    [sam3 sam3_ind] = max(abs(Rx(st:en)));
-    sam3_ind += st - 1;
-    sam3_freq = sam3_ind*Fs/N;
-
-    % Now use the math to find the unknowns ....
-
-    sam1 = Rx(sam1_ind);
-    sam2 = Rx(sam2_ind);
-    sam3 = Rx(sam3_ind);
-
-    phi_est(nn) = angle(sam1) - (angle(sam2) + angle(sam3))/2;
-
-    printf("carrier: %6.0f Hz LSB: %6.0f Hz USB: %6.0f Hz phi_est: %4.3f\n", sam1_freq, sam3_freq, sam2_freq, phi_est(nn));
-  else
-    printf("sample by sample...\n");
-    rx=hackrf_dc("df1.iq"); rx = rx(1000:length(rx)); % discard initial transients
-    Rx = (1/N)*fft(rx,N);
-
-    % BPF each signal
-
-    sam1 = filter(bcentre,acentre,rx);      
-    sam2 = filter(bhigh,ahigh,rx);      
-    sam3 = filter(blow,alow,rx);      
-    %phi_est = angle(sam1) - (angle(sam2) + angle(sam3))/2;    
-    %phi_est -= pi*floor(phi_est/(pi));
-
-    two_phi_est_rect = conj(sam2.*sam3) .* (sam1.^2);
-    phi_est = angle(two_phi_est_rect)/2;
-  end
-
-  t += N;
-end
+two_phi_est_rect = conj(sam2.*sam3) .* (sam1.^2);
+phi_est = angle(two_phi_est_rect)/2;
 
 angle(mean(two_phi_est_rect))/2
 
 % some plots ....
 
-figure(1);
+figure(2);
 clf;
 plot((1:N)*Fs/N, 20*log10(abs(Rx)),'markersize', 10, 'linewidth', 2);
 axis([1 Fs -60 0])
@@ -188,40 +197,37 @@ subplot(313)
 plot((1:N)*Fs/N, 20*log10(abs(Sam3)),'markersize', 10, 'linewidth', 2);
 axis([1 Fs/2 -60 0])
 
-figure(3);
-clf;
-hcentre = freqz(bcentre,acentre,Fs/2);
-hlow = freqz(blow,alow,Fs/2);
-hhigh = freqz(bhigh,ahigh,Fs/2);
-
-plot(1:Fs/2, 20*log10(hcentre));
-hold on;
-plot(1:Fs/2, 20*log10(hlow));
-plot(1:Fs/2, 20*log10(hhigh));
-hold off;
-axis([1 Fs/2 -60 0])
-title('Band Pass Filters');
+figure(3)
+Np = 1000;
+subplot(311)
+plot(real(sam1(1:Np)))
+title('Band Pass filtered signals');
+subplot(312)
+plot(real(sam2(1:Np)))
+subplot(313)
+plot(real(sam3(1:Np)))
 
 figure(4)
 clf;
-plot(two_phi_est_rect,'+')
+plot(two_phi_est_rect)
 xmax = 2*mean(abs(two_phi_est_rect));
 axis([-xmax xmax -xmax xmax])
 title('Scatter Plot');
 
 figure(5)
-hist(angle(two_phi_est_rect)/2,50)
+clf;
+subplot(211)
+plot(real(two_phi_est_rect(1:Np)))
+subplot(212)
+plot(imag(two_phi_est_rect(1:Np)))
+title('two phi est rect')
 
 figure(6)
+clf
+hist([angle(two_phi_est_rect)/2 -pi/2 pi/2],100)
+
+figure(7)
+clf
 plot(phi_est)
-
-figure(7);
-Np = 1000;
-subplot(311)
-plot(real(sam1(1:Np)));
-subplot(312)
-plot(real(sam2(1:Np)));
-subplot(313)
-plot(real(sam3(1:Np)));
-title('BPF filter Output');
-
+axis([0 length(phi_est(1:Np)) -pi/2 pi/2]);
+title('phi est')
