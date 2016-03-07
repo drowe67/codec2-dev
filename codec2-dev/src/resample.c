@@ -29,7 +29,7 @@
 */
 
 
-#define BUF_PERIOD 0.1   /* length of processingbuffer in seconds */
+#define BUF_PERIOD 0.02   /* length of processingbuffer in seconds */
 
 #include <assert.h>
 #include <stdlib.h>
@@ -46,7 +46,9 @@ int resample(SRC_STATE *src,
              int        output_sample_rate,
              int        input_sample_rate,
              int        length_output_short,  /* maximum output array length in samples */
-             int        length_input_short
+             int        length_input_short,
+             int       *input_samples_used,
+             int        last
             )
 {
     SRC_DATA src_data;
@@ -62,9 +64,9 @@ int resample(SRC_STATE *src,
     src_data.data_out = output;
     src_data.input_frames = length_input_short;
     src_data.output_frames = length_output_short;
-    src_data.end_of_input = 0;
+    src_data.end_of_input = last;
     src_data.src_ratio = (float)output_sample_rate/input_sample_rate;
-    printf("ratio: %f\n",  src_data.src_ratio);
+    //printf("ratio: %f\n",  src_data.src_ratio);
 
     ret = src_process(src, &src_data);
     assert(ret == 0);
@@ -72,6 +74,7 @@ int resample(SRC_STATE *src,
     assert(src_data.output_frames_gen <= length_output_short);
     src_float_to_short_array(output, output_short, src_data.output_frames_gen);
 
+    *input_samples_used = src_data.input_frames_used;
     return src_data.output_frames_gen;
 }
 
@@ -81,7 +84,7 @@ int main(int argc, char *argv[]) {
     SRC_STATE  *src;
     int         FsIn, FsOut;
     int         length_input_short, length_output_short;
-    int         src_error;
+    int         src_error, nin, left_over, nread;
 
     if (argc < 5) {
 	printf("usage: resample FsIn FsOut InputFileOfShorts OutputFileOfShortsn");
@@ -95,8 +98,8 @@ int main(int argc, char *argv[]) {
 
     length_input_short = BUF_PERIOD*FsIn;
     length_output_short = BUF_PERIOD*FsOut;
-    printf("FsIn: %d FsOut: %d length_input_short: %d length_output_short: %d\n",
-           FsIn, FsOut, length_input_short, length_output_short);
+    //printf("FsIn: %d FsOut: %d length_input_short: %d length_output_short: %d\n",
+    //       FsIn, FsOut, length_input_short, length_output_short);
 
     short input_short[length_input_short];
     short output_short[length_output_short];
@@ -118,17 +121,35 @@ int main(int argc, char *argv[]) {
     src = src_new(SRC_SINC_FASTEST, 1, &src_error);
     assert(src != NULL);
 
-    while(fread(input_short, sizeof(short), length_input_short, fin) == length_input_short) {
+    nin = length_input_short;
+    left_over = 0;
+    while((nread = fread(&input_short[left_over], sizeof(short), nin, fin)) == nin) {
         length_output_short = resample(src, 
                                        output_short, 
                                        input_short, 
                                        FsOut,
                                        FsIn,
                                        length_output_short,
-                                       length_input_short);
-        printf("length_output_short: %d\n", length_output_short);
+                                       length_input_short,
+                                       &nin,
+                                       0);
+        left_over = length_input_short - nin;
+        memcpy(input_short, &input_short[nin], left_over);
+        //printf("length_output_short: %d length_input_short: %d nin: %d left_over: %d\n", 
+        //       length_output_short, length_input_short, nin, left_over);
         fwrite(output_short, sizeof(short), length_output_short, fout);
     }
+
+    length_output_short = resample(src, 
+                                   output_short, 
+                                   input_short, 
+                                   FsOut,
+                                   FsIn,
+                                   length_output_short,
+                                   length_input_short,
+                                   &nin,
+                                   1);
+    fwrite(output_short, sizeof(short), length_output_short, fout);
 
     fclose(fin);
     fclose(fout);
