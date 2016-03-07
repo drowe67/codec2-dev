@@ -24,7 +24,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   decimate_in_freq = 1;
   postfilter = 1;
   decimate_in_time = 1;
-  synth_phase = 0;
+  synth_phase = 1;
   freq_quant = 1;
   amp_quant = 1;
   non_masked_f_log = [];
@@ -67,8 +67,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
       [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
       non_masked_amp = decmaskdB;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
-      Wo*4/pi
-      non_masked_m = round(masker_freqs_kHz/(Wo*4/pi))
+      non_masked_m = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
       non_masked_m_log = [non_masked_m_log; non_masked_m'];
       non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
       maskdB_ = decmaskdB;
@@ -111,6 +110,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     if synth_phase
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
       fft_enc = 512;
+      model(f,3:(L+1)) = Am_(2:L);
       phase = determine_phase(model, f);
       assert(length(phase) == fft_enc);
       Aw = zeros(1, fft_enc*2); 

@@ -84,13 +84,15 @@ function newamp_fbf(samname, f=10)
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+    figure(2)
     
     tonef_kHz = masker_freqs_kHz;
     nlm = length(tonef_kHz);
 
-    plot(tonef_kHz*1000, 20*ones(1,nlm), ';AbyS Mask Freqs;bk+');
+    plot(tonef_kHz*1000, zeros(1,nlm), ';AbyS Mask Freqs;bk+');
     plot(mask_sample_freqs_kHz*1000, decmaskdB, ';AbyS Mask;m');
-    plot(mask_sample_freqs_kHz*1000, min_error);
+    legend('boxoff');
+    %plot(mask_sample_freqs_kHz*1000, min_error);
     hold off;
 
     figure(3)
@@ -135,7 +137,20 @@ function newamp_fbf(samname, f=10)
 
     % interactive menu
 
-    printf("\rframe: %d  menu: n-next  b-back a-Am f-freq_quant m-amp_quant q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back a-Am ", f);
+    if freq_quant
+      printf("F");
+    else
+      printf("f");
+    end
+    printf("-freq_quant ");
+    if amp_quant
+      printf("M");
+    else
+      printf("m");
+    end
+    printf("-amp_quant q-quit");
+
     fflush(stdout);
     k = kbhit();
     if (k == 'n')
