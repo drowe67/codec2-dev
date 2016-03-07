@@ -225,71 +225,11 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
        decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
-    if 0
-      % add floor to mask - unsuccessful attempt at fixing tinkle noises
-      min_AmdB = max(dec_samples(:,1));
-      decmaskdB = max(decmaskdB, min_AmdB - 20);
-    end
-
-    % subtract mean and limit
-    % ideas:
-    %   + try just one band at a time
-    %   + bark spacing of bands
-    %   + reverb is as levels bounce about, rather than actual value, how to smooth?  What to do?  How
-    %     to test this assumption?
-    %   + different quantiser for each band, different limited based on PDFs
-    
-    if 0
-      masker_amps_dB = dec_samples(:,1);
-      energy_dB = mean(masker_amps_dB);
-      masker_amps_dB -= energy_dB;
-      masker_amps_dB(find(masker_amps_dB > 20)) = 20;
-      masker_amps_dB(find(masker_amps_dB < -20)) = -20;
-      for i=1:4
-        masker_amps_dB(i) = quantise([-18 -12 -6 0 2 6 9 12 15 18], masker_amps_dB(i));
-      end
-      masker_amps_dB += energy_dB;
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-      for i=1:4
-        masker_freqs_kHz(i) = quantise([0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1 1.2 1.4 1.6 2 2.2 2.4 2.6 3 3.4], masker_freqs_kHz(i));
-      end
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-    % simulate quantisation of amplitudes by adding some noise
-
-    if 0
-      masker_amps_dB = dec_samples(:,1);
-      masker_amps_dB += 3*(1 - 2*rand(Nsamples,1));
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-    
-    % quantisation of amplitudes.  Determine and subtract mean.  Quantise difference
-    % from mean to 4 levels (2 bits), at 6dB/level:
-    %
-    %           Level
-    %    0       -9            
-    %    1       -3
-    %    2       +3
-    %    3       +9
-
-    if 0
-      masker_amps_dB = dec_samples(:,1);
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-
-      energy_dB = mean(masker_amps_dB);
-      masker_amps_dB -= energy_dB;
-      for i=1:4
-        masker_amps_dB(i) = quantise([-9 -3 3 9], masker_amps_dB(i));
-      end
-      masker_amps_dB += energy_dB;
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
     % Amplitude quantisation by fitting a straight line -------------------------
+    % amp_quant == 1: high rate, quantise deltas
+    % amp_quant == 2: low rate, don't quantise deltas
 
-    if amp_quant
+    if amp_quant > 0
 
       % Fit straight line
 
@@ -299,24 +239,55 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       % errors in rest of quantisation
 
       gradient_ = quantise(-0.04:0.005:0.04, gradient);
-      
+      %gradient_ = gradient;
+      printf("gradient; %f gradient_: %f\n", gradient, gradient_);
+
       % determine deltas, or errors in straight line fit
 
       masker_amps_dB_lin = f*gradient_ + intercept;
       masker_amps_dB_lin_delta = masker_amps_dB - masker_amps_dB_lin;
 
+      % optional plots
+
+      if 0
+        figure(10)
+        clf;
+        plot(f, masker_amps_dB, 'r+', 'markersize', 10, 'linewidth', 2)
+
+        fplt = 0:100:3900
+        hold on;
+        plot(fplt, fplt*gradient + intercept, 'b')
+        fplt*gradient + intercept
+
+        % plot lines for deltas
+
+        for i=1:length(f)
+          y1 = f(i)*gradient + intercept;
+          y2 = masker_amps_dB(i);
+          plot([f(i) f(i)], [y1 y2], 'markersize', 10, 'linewidth', 2)
+        end
+        hold off;
+      end
+
       % quantise the deltas
 
       masker_amps_dB_lin_delta_ = zeros(4,1);
-      for i=1:4
-        masker_amps_dB_lin_delta_(i) = quantise(-15:5:20, masker_amps_dB_lin_delta(i));
+      if amp_quant == 1
+        for i=1:4
+          masker_amps_dB_lin_delta_(i) = quantise(-21:3:21, masker_amps_dB_lin_delta(i));
+          printf("dlin: %f dlin_: %f\n", masker_amps_dB_lin_delta(i), masker_amps_dB_lin_delta_(i));
+          % masker_amps_dB_lin_delta_(i) = masker_amps_dB_lin_delta(i);
+        end
       end
-      %masker_amps_dB_lin_delta
-      %masker_amps_dB_lin_delta_
 
       masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta_ + intercept;
       %decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+
+    printf("\n");
+    for i=1:4
+      printf("freq: %f amp: %f\n", masker_freqs_kHz(i), masker_amps_dB(i));
     end
 endfunction
 
@@ -495,7 +466,7 @@ function maskdB_ = decimate_frame_rate(maskdB, model, decimate, f, frames, mask_
       right_fraction  = mod(f-1,decimate)/decimate;
       left_fraction = 1 - right_fraction;
 
-      printf("\nf: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n",f,left_f,right_f,left_fraction,right_fraction)
+      %printf("\nf: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n",f,left_f,right_f,left_fraction,right_fraction)
 
       % determine mask for left and right frames, sampling at Wo for this frame
 
@@ -619,11 +590,14 @@ function plot_f_a_stats(f,a)
   % freq pdfs
 
   [fsrt fsrt_ind] = sort(f,2);
+  fsrt /= 1000;
   figure(1)
   for i=1:4
     subplot(2,2,i)
     hist(fsrt(:,i),50)
     printf("%d min: %d max: %d\n", i, min(fsrt(:,i)), max(fsrt(:,i)))
+    an_axis = axis;
+    axis([0 4 an_axis(3) an_axis(4)])
   end
 
   % freq diff pdfs
@@ -636,6 +610,8 @@ function plot_f_a_stats(f,a)
     else
       hist(fsrt(:,i) - fsrt(:,i-1),50)
     end
+    an_axis = axis;
+    axis([0 4 an_axis(3) an_axis(4)])
   end
 
   % amplitude PDFs
@@ -649,13 +625,15 @@ function plot_f_a_stats(f,a)
   for i=1:4
     subplot(2,2,i)
     hist(asrt(:,i) - mean(asrt(:,:),2))
+    an_axis = axis;
+    axis([-40 40 an_axis(3) an_axis(4)])
   end
   
   % find straight line fit
 
   for i=1:l
-    [gradient intercept] = linreg(fsrt(i,:), asrt(i,:), 4);
-    alinreg(i,:) = gradient*fsrt(i,:) + intercept;
+    [gradient intercept] = linreg(1000*fsrt(i,:), asrt(i,:), 4);
+    alinreg(i,:) = gradient*1000*fsrt(i,:) + intercept;
     alinregres(i,:) = asrt(i,:) - alinreg(i,:);
     m(i) = gradient; c(i) = intercept;
   end
@@ -664,6 +642,8 @@ function plot_f_a_stats(f,a)
   for i=1:4
     subplot(2,2,i)
     hist(alinregres(:,i))
+    an_axis = axis;
+    axis([-40 40 an_axis(3) an_axis(4)])
   end
   
   figure(5)
