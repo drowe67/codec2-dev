@@ -279,7 +279,7 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     /* Possibly set up frame-specific params here */
     if(frame_type == FREEDV_VHF_FRAME_A){
         uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
-        uw_sync_tol = 2;    /* The UW bit error tolerance for frames after sync */
+        uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
         miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */
     }else{
         return 0;

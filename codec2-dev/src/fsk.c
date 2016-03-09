@@ -133,8 +133,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     int Ndft = 0;
     
     /* Number of symbols in a processing frame */
-    //int nsyms = 24;
-    //int nsyms = 192;
+    //int nsyms = 96;
     int nsyms = 48;
     /* Check configuration validity */
     assert(Fs > 0 );
@@ -174,12 +173,12 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->Ndft = Ndft;
     
-    fsk->est_min = tx_f1-3*Rs;
+    fsk->est_min = Rs/2;
     if(fsk->est_min<0) fsk->est_min = 0;
     
     fsk->est_max = (Fs/2)-Rs;
     
-    fsk->est_space = Rs;
+    fsk->est_space = Rs-(Rs/5);
     
     /* Set up rx state */
     fsk->phi1_c = comp_exp_j(0);
@@ -679,10 +678,12 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     }
     
     /* Figure out how many samples are needed the next modem cycle */
-    if(norm_rx_timing > 0.25)
+    if(norm_rx_timing > 0.25){
         fsk->nin = N+Ts/2;
-    else if(norm_rx_timing < -0.25)
+    }
+    else if(norm_rx_timing < -0.25){
         fsk->nin = N-Ts/2;
+    }
     else
         fsk->nin = N;
     
@@ -1022,13 +1023,18 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     if(fabsf(d_norm_rx_timing) < .2){
         appm = 1e6*d_norm_rx_timing/(float)nsym;
         fsk->ppm = .9*fsk->ppm + .1*appm;
+        fprintf(stderr,"ppm:%f\n",fsk->ppm);
     }
     
     /* Figure out how many samples are needed the next modem cycle */
-    if(norm_rx_timing > 0.25)
+    if(norm_rx_timing > 0.25){
         fsk->nin = N+Ts/2;
-    else if(norm_rx_timing < -0.25)
+        fprintf(stderr,"+\n");
+    }
+    else if(norm_rx_timing < -0.25){
         fsk->nin = N-Ts/2;
+        fprintf(stderr,"-\n");
+    }
     else
         fsk->nin = N;
     

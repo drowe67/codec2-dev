@@ -154,7 +154,7 @@ struct freedv *freedv_open(int mode) {
         if(f->deframer == NULL)
             return NULL;
   
-        f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
+        f->fsk = fsk_create_hbr(48000,1200,40,4,1200,1200);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
         f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
