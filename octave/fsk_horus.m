@@ -80,8 +80,65 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.rtty = fsk_horus_init_rtty_uw(states);
   states.binary = fsk_horus_init_binary_uw;
 
+  % Freq. estimator limits
+  states.fest_fmin = 800;
+  states.fest_fmax = 2500;
+  states.fest_tone_spacing = 200;
 endfunction
 
+
+%Init 'high-bit-rate horus'
+function states = fsk_horus_init_hbr(Fs,P,Rs,M=2)
+  assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
+  states.M = M;                    
+  states.bitspersymbol = log2(M);
+  states.Fs = Fs;
+  N = states.N = Fs;                % processing buffer size, nice big window for timing est
+  states.Ndft = 2.^ceil(log2(N))/2;  % find nearest power of 2 for efficient FFT
+  %states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
+  states.Rs = Rs;
+  Ts = states.Ts = Fs/Rs;
+  assert(Ts == floor(Ts), "Fs/Rs must be an integer");
+  states.nsym = N/Ts;            % number of symbols in one processing frame
+  states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
+
+  Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
+
+  states.Sf = zeros(states.Ndft/2,1); % currentmemory of dft mag samples
+  states.f_dc = zeros(M,Nmem);
+  states.P = P;                  % oversample rate out of filter
+  assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
+
+  states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
+  states.verbose = 0;
+  states.phi = zeros(1, M);       % keep down converter osc phase continuous
+
+  printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
+
+  % Freq estimator limits
+  states.fest_fmax = (Fs/2)-Rs;
+  states.fest_fmin = Rs/2;
+  states.fest_min_spacing = Rs-(Rs/5);
+
+  % BER stats 
+
+  states.ber_state = 0;
+  states.Tbits = 0;
+  states.Terrs = 0;
+  states.nerr_log = 0;
+
+  states.df(1:M) = 0;
+  states.f(1:M) = 0;
+  states.norm_rx_timing = 0;
+  states.ppm = 0;
+  states.prev_pkt = [];
+ 
+  % protocol specific states
+
+  states.rtty = fsk_horus_init_rtty_uw(states);
+  states.binary = fsk_horus_init_binary_uw;
+
+endfunction
 
 % init rtty protocol specifc states
 
@@ -173,11 +230,12 @@ function states = est_freq(states, sf, ntones)
   % This assumption is OK for balloon telemetry but may not be true in
   % general
 
-  min_tone_spacing = 200;
+  min_tone_spacing = states.fest_tone_spacing;
   
   % set some limits to search range, which will mean some manual re-tuning
 
-  fmin = 800; fmax = 2500;
+  fmin = states.fest_fmin;
+  fmax = states.fest_fmax;
   st = floor(fmin*Ndft/Fs);
   en = floor(fmax*Ndft/Fs);
   
