@@ -38,6 +38,7 @@
 
 /* Standard frame type */
 #define FREEDV_VHF_FRAME_A 1
+
 struct freedv_vhf_deframer {
     int ftype;          /* Type of frame to be looking for */
     int state;          /* State of deframer */
