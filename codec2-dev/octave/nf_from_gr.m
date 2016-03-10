@@ -1,58 +1,100 @@
 % nf_from_gr.m
 % David Rowe Mar 2016
 %
-% Calculate NF from GNU Radio ...IQIQ... (32 bit float) sample files
+% Calculate NF from GNU Radio output samples in 
+% ...IQIQ... (32 bit float) sample files
+%
+% 1/ Take one sample with a -100dBm input carrier
+% 2/ Take another sample with no signal (just rx noise)
+% 3/ Set Fs, adjust st and en to use a chunk of spectrum without too
+%     many birdies.
 
-% Take one sample with a -100dBm input carrier
-% Take another sample with no signal (just rx noise)
+1;
+
+function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB)
+
+  p =  load_comp(p_filename);
+  pn = load_comp(n_filename);
+ 
+  P = fft(p(1:Fs));
+  N = fft(pn(1:Fs));
+
+  PdB = 10*log10(abs(P));
+  NdB = 10*log10(abs(N));
+
+  figure;
+  clf;
+
+  subplot(211)
+  plot(st:en, PdB(st:en));
+  
+  subplot(212)
+  plot(st:en, NdB(st:en));
+
+  #{------------------------------------------------------------------------
+
+  From Wikipedia: The Noise Figure is the difference in decibels
+     (dB) between the noise output of the actual receiver to the noise
+     output of an “ideal” receiver
+  
+  An ideal receiver would have an output noise power of:
+ 
+    Nout_dB = 10log10(B) -174 + G_dB
+ 
+  The -174 dBm/Hz figure is the thermal noise density at 25C, for
+  every 1Hz of bandwidth your will get -174dBm of noise power.  It's
+  the lower limit set by the laws of physics.  G_dB is the Rx gain. The
+  10log10(B) term takes into account the bandwidth of the Rx.  A wider
+  bandwidth means more total noise power.
+
+  So if you have a 1Hz bandwidth, and a gain of 100dB, you would
+  expect Nout_NdB = 0 -174 + 100 = -74dBm at the rx output with no
+  signal.  If you have a 1000Hz bandwidth receiver you would have NdB_out
+  = 20 -174 + 100 = -44dBm of noise power at the output.
+
+  To determine Noise Figure:
+    1) Sample the Rx output first with a test signal and then with noise only.
+    2) Find the Rx gain using the test signal.
+    3) Find the noise output power, then using the gain we can find the noise
+       input power. 
+    4) Normalise the noise input power to 1Hz noise bandwidth and
+       compare to the thermal noise floor.
+
+  ----------------------------------------------------------------------------#}
+
+  % variance is the power of a sampled signal
+
+  Pout_dB = 10*log10(var(P(st:en)));           % Rx output power with test signal
+  G_dB    = Pout_dB - Pin_dB;                  % Gain of Rx                           
+  Nout_dB = 10*log10(var(N(st:en)));           % Rx output power with noise
+  Nin_dB  = Nout_dB - G_dB;                    % Rx input power with noise
+  No_dB   = Nin_dB - 10*log10(en-st);          % Rx input power with noise in 1Hz bandwidth
+  NF_dB   = No_dB + 174;                       % compare to thermal noise to get NF
+  printf("%10s: Pin: %4.1f  Pout: %4.1f  G: %4.1f  NF: %3.1f dB\n", title, Pin_dB, Pout_dB, G_dB, NF_dB);
+endfunction
+
+close all;
 
 % HackRF --------------------------
 
-%p = load_comp("~/Desktop/nf/hackrf_100dbm_4MHz.bin");
-%pn = load_comp("~/Desktop/nf/hackrf_nosignal_4MHz.bin");
-%Fs = 4E6;                 % sample rate in Hz
-%st = 180E3; en = 400E3;   % frequencies window to use
+p_filename = "~/Desktop/nf/hackrf_100dbm_4MHz.bin";
+n_filename = "~/Desktop/nf/hackrf_nosignal_4MHz.bin";
+det_nf(p_filename, n_filename, "HackRF", 4E6, 180E3, 600E3, -100);
 
 % RTL-SDR --------------------------
 
-%p = load_comp("~/Desktop/nf/neg100dBm_2MHz.bin");
-%pn = load_comp("~/Desktop/nf/nosignal_2MHz.bin");
-%Fs = 2E6;               % sample rate in Hz
-%st = 100E3; en = 300E3;   % frequencies window to use
+p_filename = "~/Desktop/nf/neg100dBm_2MHz.bin";
+n_filename = "~/Desktop/nf/nosignal_2MHz.bin";
+det_nf(p_filename, n_filename, "RTL-SDR", 2E6, 100E3, 300E3, -100);
 
 % AirSpy -------------------------
 
-p =  load_comp("~/Desktop/nf/airspy_gain_-100dBm_2.5MHz.bin");
-pn = load_comp("~/Desktop/nf/airspy_gain_nosig_2.5MHz.bin");
-Fs = 2.5E6;               % sample rate in Hz
-st = 795E3; en = 820E3;   % frequencies window to use
+p_filename = "~/Desktop/nf/airspy_100dbm_2.5MSPS.bin";
+n_filename = "~/Desktop/nf/airspy_nosig_2.5MSPS.bin";
+det_nf(p_filename, n_filename, "AirSpy", 2.5E6, 100E3, 300E3, -100);
 
 % Fun Cube Dongle Pro Plus -------------------------
 
-%p =  load_comp("~/Desktop/nf/fcdpp_100dbm_192khz.bin");
-%pn = load_comp("~/Desktop/nf/fcdpp_nosig_192khz.bin");
-%Fs = 192E3;               % sample rate in Hz
-%st = 25E3; en = 125E3;    % frequencies window to use
-
-Pin = -100;               % rx power input of p in dBm 
- 
-P = fft(p(1:Fs));
-N = fft(pn(1:Fs));
-
-PdB = 10*log10(abs(P));
-NdB = 10*log10(abs(N));
-
-figure(1)
-clf;
-
-subplot(211)
-plot(st:en, PdB(st:en));
-
-subplot(212)
-plot(st:en, NdB(st:en));
-
-P_dB = 10*log10(var(P(st:en)));
-No_dB = 10*log10(var(N(st:en))/(en-st));
-G = P_dB - Pin;
-NF  = No_dB - G + 174;
-printf("Pin: %4.1f  Pout: %4.1f  G: %4.1f  NF: %3.1f\n", Pin, P_dB, G, NF);
+p_filename = "~/Desktop/nf/fcdpp_100dbm_192khz.bin";
+n_filename = "~/Desktop/nf/fcdpp_nosig_192khz.bin";
+det_nf(p_filename, n_filename, "FunCube PP", 192E3, 25E3, 125E3, -100);
