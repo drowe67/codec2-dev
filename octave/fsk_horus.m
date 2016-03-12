@@ -837,6 +837,8 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   states.df(1:M) = df;
   states.dA(1:M) = dA;
 
+  % optional noise.  Useful for testing performance of waveforms from real world modulators
+
   EbNo = 10^(EbNodB/10);
   variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
@@ -1044,7 +1046,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
 % demodulate a file of 8kHz 16bit short samples --------------------------------
 
-function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
+function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=100)
   fin = fopen(filename,"rb"); 
   more off;
 
@@ -1054,23 +1056,33 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100, 2);
     uwstates = fsk_horus_init_rtty_uw(states);
+    states.ntestframebits = states.nbits;
   end
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
     states = fsk_horus_init(8000, 50, 4);
     uwstates = fsk_horus_init_binary_uw;
+    states.ntestframebits = states.nbits;
   end
 
   states.verbose = 0x1 + 0x8;
+
+  if test_frame_mode == 6
+    % Horus high speed config --------------
+    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states.tx_bits_file = "horus_high_speed.bin";
+    states.verbose += 0x4;
+    ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
+    states.ntestframebits = length(test_frame);
+    printf("length test frame: %d\n", states.ntestframebits);
+  end
 
   N = states.N;
   P = states.P;
   Rs = states.Rs;
   nsym = states.nsym;
   nbit = states.nbit;
-  rand('state',1); 
-  test_frame = round(rand(1, states.nsym));
 
   frames = 0;
   rx = [];
@@ -1081,7 +1093,13 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   EbNodB_log = [];
   ppm_log = [];
   f_log = [];
-  rx_bits_buf = zeros(1,2*nbit);
+  rx_bits_buf = zeros(1,nbit + states.ntestframebits);
+
+  % optional noise.  Useful for testing performance of waveforms from real world modulators
+
+  EbNo = 10^(EbNodB/10);
+  ftmp = fopen(filename,"rb"); s = fread(ftmp,Inf,"short"); fclose(ftmp); tx_pwr = var(s);
+  variance = (tx_pwr/2)*states.Fs/(states.Rs*EbNo*states.bitspersymbol);
 
   % First extract raw bits from samples ------------------------------------------------------
 
@@ -1090,18 +1108,18 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
   finished = 0;
   while (finished == 0)
 
-    % hit any key to finish (useful for real time streaming)
-
-    %x = kbhit(1);
-    %if length(x)
-    %  finished = 1;
-    %end
-
     % extract nin samples from input stream
 
     nin = states.nin;
     [sf count] = fread(fin, nin, "short");
     rx = [rx; sf];
+    
+    % add optional noise
+
+    if count
+      noise = sqrt(variance)*randn(count,1);
+      sf += noise;
+    end
 
     if count == nin
       frames++;
@@ -1112,8 +1130,9 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
       %states.f = [1450 1590 1710 1850];
       [rx_bits states] = fsk_horus_demod(states, sf);
 
-      rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
-      rx_bits_buf(nbit+1:2*nbit) = rx_bits; % xor(rx_bits,ones(1,nbit));
+      rx_bits_buf(1:states.ntestframebits) = rx_bits_buf(nbit+1:states.ntestframebits+nbit);
+      rx_bits_buf(states.ntestframebits+1:states.ntestframebits+nbit) = rx_bits;
+
       rx_bits_log = [rx_bits_log rx_bits];
       rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
       norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
@@ -1128,13 +1147,16 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
           states.verbose = 0;
         end
       end
-    else      
+      if test_frame_mode == 6
+        states = ber_counter_packet(states, test_frame, rx_bits_buf);
+      end
+     else      
       finished = 1;
     end
   end
   fclose(fin);
 
-  if exist("noplot") == 0
+  if noplot == 0
     printf("plotting...\n");
 
     figure(1);
@@ -1183,7 +1205,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot)
     title('Sample clock (baud rate) offset in PPM');
   end
 
-  if test_frame_mode == 1
+  if (test_frame_mode == 1) || (test_frame_mode == 6)
     printf("frames: %d Tbits: %d Terrs: %d BER %4.3f EbNo: %3.2f\n", frames, states.Tbits,states. Terrs, states.Terrs/states.Tbits, mean(EbNodB_log));
   end
 
@@ -1208,8 +1230,8 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(6);
-  %rx_bits = demod_file("~/Desktop/RTTY_4FSK_Scram_Interleaved_v2.wav",4);
+  %run_sim(6, 10, 9);
+  rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
