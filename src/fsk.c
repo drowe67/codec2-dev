@@ -131,7 +131,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     int i;
     int memold;
     int Ndft = 0;
-    
+    printf(stdout,"hbr_initing\n");
     /* Number of symbols in a processing frame */
     //int nsyms = 96;
     int nsyms = 48;
@@ -178,7 +178,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->est_max = (Fs/2)-Rs;
     
-    fsk->est_space = Rs-(Rs/5);
+    fsk->est_space = Rs-(Rs/10);
     
     /* Set up rx state */
     fsk->phi1_c = comp_exp_j(0);
@@ -235,8 +235,8 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     return fsk;
 }
 
-#define HORUS_MIN 800
-#define HORUS_MAX 2500
+#define HORUS_MIN 100
+#define HORUS_MAX 4000
 #define HORUS_MIN_SPACING 200
 
 /*---------------------------------------------------------------------------*\
@@ -401,7 +401,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     
     f_min  = (fsk->est_min*Ndft)/Fs;
     f_max  = (fsk->est_max*Ndft)/Fs;
-    f_zero = (fsk->est_space*Ndft)/(2*Fs);
+    f_zero = (fsk->est_space*Ndft)/(Fs);
 
     int fft_loops = nin/Ndft;
     for(j=0; j<fft_loops; j++){
