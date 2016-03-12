@@ -344,7 +344,7 @@ void freedv_close(struct freedv *freedv) {
 /* real-valued short sample output, useful for going straight to DAC */
 
 /* TX routines for 2400 FSK modes, after codec2 encoding */
-static void freedv_tx_fsk(struct freedv *f, short mod_out[]) {
+static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
     uint8_t vc_bits[2]; /* Varicode bits for 2400 framing */
@@ -382,15 +382,44 @@ static void freedv_tx_fsk(struct freedv *f, short mod_out[]) {
     /* do 4fsk mod */
     if(f->mode == FREEDV_MODE_2400A){
         fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
-        
+        /* Convert float samps to short */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
+        }
     /* do me-fsk mod */
     }else if(f->mode == FREEDV_MODE_2400B){
         fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
+        /* Convert float samps to short */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = (short)(tx_float[i]*FMFSK_SCALE);
+        }
     }
+}
+
+/* TX routines for 2400 FSK modes, data channel */
+static void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
+    int  i;
+    float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
         
-    /* Convert float samps to short */
-    for(i=0; i<f->n_nom_modem_samples; i++){
-        mod_out[i] = (short)(tx_float[i]*FDMDV_SCALE);
+    fvhff_frame_data_bits(f->deframer, FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits));
+        
+    /* Allocate floating point buffer for FSK mod */
+    tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
+        
+    /* do 4fsk mod */
+    if(f->mode == FREEDV_MODE_2400A){
+        fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+        /* Convert float samps to short */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
+        }
+    /* do me-fsk mod */
+    }else if(f->mode == FREEDV_MODE_2400B){
+        fmfsk_mod(f->fmfsk,tx_float,(uint8_t*)(f->tx_bits));
+        /* Convert float samps to short */
+        for(i=0; i<f->n_nom_modem_samples; i++){
+            mod_out[i] = (short)(tx_float[i]*FMFSK_SCALE);
+        }
     }
 }
 
@@ -409,7 +438,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         
-	freedv_tx_fsk(f, mod_out);
+	freedv_tx_fsk_voice(f, mod_out);
     }else{
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
@@ -653,12 +682,30 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
 	    break;
         case FREEDV_MODE_2400A:
 	case FREEDV_MODE_2400B:       
-            freedv_tx_fsk(f, mod_out);
+            freedv_tx_fsk_voice(f, mod_out);
 	    return; /* output is already real */
     }
     /* convert complex to real */
     for(i=0; i<f->n_nom_modem_samples; i++)
         mod_out[i] = tx_fdm[i].real;
+}
+
+void freedv_datatx  (struct freedv *f, short mod_out[]){
+    assert(f != NULL);
+
+    if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B) {
+            freedv_tx_fsk_data(f, mod_out);
+    }
+}
+
+int  freedv_data_ntxframes (struct freedv *f){
+    assert(f != NULL);
+
+    if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B) {
+        if (f->deframer->fdc)
+            return freedv_data_get_n_tx_frames(f->deframer->fdc);
+    }
+    return 0;
 }
 
 int freedv_nin(struct freedv *f) {
@@ -1261,6 +1308,55 @@ void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, 
     f->freedv_get_next_proto = tx;
     f->proto_callback_state = callback_state;
 }
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: freedv_set_callback_datarx / freedv_set_callback_datatx
+  AUTHOR......: Jeroen Vreeken
+  DATE CREATED: 04 March 2016
+
+  Set the callback functions and callback pointer that will be used for the
+  data channel. freedv_callback_datarx will be called when a packet has been
+  successfully received. freedv_callback_data_tx will be called when 
+  transmission of a new packet can begin.
+  If the returned size of the datatx callback is zero the data frame is still
+  generated, but will contain only a header update.
+\*---------------------------------------------------------------------------*/
+void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state) {
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+        if (!f->deframer->fdc)
+            f->deframer->fdc = freedv_data_channel_create();
+        if (!f->deframer->fdc)
+            return;
+        
+        freedv_data_set_cb_rx(f->deframer->fdc, datarx, callback_state);
+        freedv_data_set_cb_tx(f->deframer->fdc, datatx, callback_state);
+    }
+}
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: freedv_set_data_header
+  AUTHOR......: Jeroen Vreeken
+  DATE CREATED: 04 March 2016
+
+  Set the data header for the data channel.
+  Header compression will be used whenever packets from this header are sent.
+  The header will also be used for fill packets when a data frame is requested
+  without a packet available.
+\*---------------------------------------------------------------------------*/
+void freedv_set_data_header(struct freedv *f, unsigned char *header)
+{
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+        if (!f->deframer->fdc)
+            f->deframer->fdc = freedv_data_channel_create();
+        if (!f->deframer->fdc)
+            return;
+        
+        freedv_data_set_header(f->deframer->fdc, header);
+    }
+}
+
 
 /*---------------------------------------------------------------------------*\
 
