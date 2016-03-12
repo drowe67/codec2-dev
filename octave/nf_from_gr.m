@@ -31,7 +31,8 @@ function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB)
   subplot(212)
   plot(st:en, NdB(st:en));
 
-  #{------------------------------------------------------------------------
+  #{ 
+  ------------------------------------------------------------------------
 
   From Wikipedia: The Noise Figure is the difference in decibels
      (dB) between the noise output of the actual receiver to the noise
@@ -60,7 +61,8 @@ function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB)
     4) Normalise the noise input power to 1Hz noise bandwidth and
        compare to the thermal noise floor.
 
-  ----------------------------------------------------------------------------#}
+  ---------------------------------------------------------------------------- 
+  #}
 
   % variance is the power of a sampled signal
 
