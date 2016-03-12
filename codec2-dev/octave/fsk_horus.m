@@ -80,30 +80,33 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.rtty = fsk_horus_init_rtty_uw(states);
   states.binary = fsk_horus_init_binary_uw;
 
-  % Freq. estimator limits
+  % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
+
   states.fest_fmin = 800;
   states.fest_fmax = 2500;
-  states.fest_tone_spacing = 200;
+  states.fest_min_spacing = 200;
 endfunction
 
 
-%Init 'high-bit-rate horus'
-function states = fsk_horus_init_hbr(Fs,P,Rs,M=2)
+% Alternative init function, useful for high speed (non telemetry) modems
+%   Allows fine grained control of decimation P
+%   Small, processing window nsym rather than nsym=Fs (1 second window)
+%   Wider freq est limits
+
+function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=96)
   assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
-  
-  nsym = 96;
-  
+    
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Ts*nsym;            % processing buffer size, nice big window for timing est
-  states.Ndft = 2.^ceil(log2(N))/2;  % find nearest power of 2 for efficient FFT
-  %states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
   Ts = states.Ts = Fs/Rs;
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
+  N = states.N = Ts*nsym;        % processing buffer nsym wide
   states.nsym = N/Ts;            % number of symbols in one processing frame
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
+
+  states.Ndft = 2.^ceil(log2(N))/2;  % find nearest power of 2 for efficient FFT
 
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
@@ -119,6 +122,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2)
   printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
   % Freq estimator limits
+
   states.fest_fmax = (Fs/2)-Rs;
   states.fest_fmin = Rs/2;
   states.fest_min_spacing = Rs-(Rs/5);
@@ -142,6 +146,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2)
   states.binary = fsk_horus_init_binary_uw;
 
 endfunction
+
 
 % init rtty protocol specifc states
 
@@ -233,7 +238,7 @@ function states = est_freq(states, sf, ntones)
   % This assumption is OK for balloon telemetry but may not be true in
   % general
 
-  min_tone_spacing = states.fest_tone_spacing;
+  min_tone_spacing = states.fest_min_spacing;
   
   % set some limits to search range, which will mean some manual re-tuning
 
@@ -723,10 +728,18 @@ endfunction
 
 
 % simulation of tx and rx side, add noise, channel impairments ----------------------
+%
+% test_frame_mode     Description
+% 1                   BER testing using known test frames
+% 2                   random bits
+% 3                   repeating sequence of all symbols
+% 4                   Horus RTTY
+% 5                   Horus Binary
+% 6                   Horus High Speed: A 8x oversampled modem, e.g. Fs=9600, Rs=1200
+%                     which is the same as Fs=921600 Rs=115200
+%                     Uses packed based BER counter
 
-function run_sim(test_frame_mode)
-  frames = 100;
-  EbNodB = 3;
+function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -761,10 +774,18 @@ function run_sim(test_frame_mode)
     states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
   end
 
+  if test_frame_mode == 6
+    % horus high speed ---------------------
+    states = fsk_horus_init_hbr(9600, 8, 1200, 2, 16);
+    states.tx_bits_file = "horus_high_speed.bin";
+  end
+
+  % Tones must be at least Rs apart for ideal non-coherent FSK
+
   if states.M == 2
-    states.ftx = [1200 1400];
+    states.ftx = 1200 + [ 0 states.Rs ];
   else
-    states.ftx = [1200 1400 1600 1800];
+    states.ftx = 1200 + states.Rs*(0:3)
   end
 
   % ----------------------------------------------------------------------
@@ -785,8 +806,8 @@ function run_sim(test_frame_mode)
 
   % set up tx signal with payload bits based on test mode
 
-  if test_frame_mode == 1
-     % test frame of bits, which we repeat for convenience when BER testing
+  if (test_frame_mode == 1) || (test_frame_mode == 6)
+    % test frame of bits, which we repeat for convenience when BER testing
     test_frame = round(rand(1, states.nbit));
     tx_bits = [];
     for i=1:frames+1
@@ -842,16 +863,9 @@ function run_sim(test_frame_mode)
 
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
-  %rx = real(rx);
-  %b1 = fir2(100, [0 4000 5200 48000]/48000, [1 1 0.5 0.5]);
-  %rx = filter(b1,1,rx);
-  %[b a] = cheby2(6,40,[3000 6000]/(Fs/2));
-  %rx = filter(b,a,rx);
-  %rx = sign(rx);
-  %rx(find (rx > 1)) = 1;
-  %rx(find (rx < -1)) = -1;
 
   % dump simulated rx file
+
   ftx=fopen("fsk_horus.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
@@ -893,7 +907,7 @@ function run_sim(test_frame_mode)
     f_log = [f_log; states.f];
     EbNodB_log = [EbNodB_log states.EbNodB];
 
-    if test_frame_mode == 1
+    if (test_frame_mode == 1) || (test_frame_mode == 6)
        states = ber_counter(states, test_frame, rx_bits_buf);
     end
   end
@@ -935,7 +949,7 @@ function run_sim(test_frame_mode)
   figure(4)
   clf
   subplot(211)
-  plot(real(rx(1:Fs)))
+  plot(real(rx(1:min(Fs,length(rx)))))
   title('rx signal at demod input')
   subplot(212)
   plot(abs(fft(sf)))
@@ -1128,8 +1142,8 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(5);
-  rx_bits = demod_file("~/Desktop/RTTY_4FSK_Scram_Interleaved_v2.wav",4);
+  run_sim(6);
+  %rx_bits = demod_file("~/Desktop/RTTY_4FSK_Scram_Interleaved_v2.wav",4);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
