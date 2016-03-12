@@ -32,7 +32,7 @@
 #include "comp.h"
 #include "modem_stats.h"
 
-#define FMFSK_SCALE 32767
+#define FMFSK_SCALE 16383
 
 /* 
  * fm-me-2fsk state
