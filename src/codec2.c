@@ -1752,6 +1752,80 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTION....: codec2_get_energy()
+  AUTHOR......: Jeroen Vreeken
+  DATE CREATED: 08/03/2016
+
+  Extract energy value from an encoded frame.
+
+\*---------------------------------------------------------------------------*/
+
+float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
+{
+    assert(c2 != NULL);
+    assert(
+	   (c2->mode == CODEC2_MODE_3200) ||
+	   (c2->mode == CODEC2_MODE_2400) ||
+	   (c2->mode == CODEC2_MODE_1600) ||
+	   (c2->mode == CODEC2_MODE_1400) ||
+	   (c2->mode == CODEC2_MODE_1300) ||
+	   (c2->mode == CODEC2_MODE_1200) ||
+	   (c2->mode == CODEC2_MODE_700) ||
+	   (c2->mode == CODEC2_MODE_700B)
+	   );
+    MODEL model;
+    float xq_dec[2] = {};
+    int e_index, WoE_index;
+    float e;
+    unsigned int nbit;
+
+    if (c2->mode == CODEC2_MODE_3200) {
+        nbit = 1 + 1 + WO_BITS;
+	e_index = unpack(bits, &nbit, E_BITS);
+        e = decode_energy(e_index, E_BITS);
+    }
+    if (c2->mode == CODEC2_MODE_2400) {
+        nbit = 1 + 1;
+        WoE_index = unpack(bits, &nbit, WO_E_BITS);
+        decode_WoE(&model, &e, xq_dec, WoE_index);
+    }
+    if (c2->mode == CODEC2_MODE_1600) {
+        nbit = 1 + 1 + WO_BITS;
+        e_index = unpack(bits, &nbit, E_BITS);
+        e = decode_energy(e_index, E_BITS);
+    }
+    if (c2->mode == CODEC2_MODE_1400) {
+        nbit = 1 + 1;
+        WoE_index = unpack(bits, &nbit, WO_E_BITS);
+        decode_WoE(&model, &e, xq_dec, WoE_index);
+    }
+    if (c2->mode == CODEC2_MODE_1300) {
+        nbit = 1 + 1 + 1 + 1 + WO_BITS;
+        e_index = unpack_natural_or_gray(bits, &nbit, E_BITS, c2->gray);
+        e = decode_energy(e_index, E_BITS);
+    }
+    if (c2->mode == CODEC2_MODE_1200) {
+        nbit = 1 + 1;
+        WoE_index = unpack(bits, &nbit, WO_E_BITS);
+        decode_WoE(&model, &e, xq_dec, WoE_index);
+    }
+    if (c2->mode == CODEC2_MODE_700) {
+        nbit = 1 + 5;
+        e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
+        e = decode_energy(e_index, 3);
+    }
+    if (c2->mode == CODEC2_MODE_700B) {
+        nbit = 1 + 5;
+        e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
+        e = decode_energy(e_index, 3);
+    }
+
+    return e;
+}
+
+
+/*---------------------------------------------------------------------------*\
+
   FUNCTION....: synthesise_one_frame()
   AUTHOR......: David Rowe
   DATE CREATED: 23/8/2010

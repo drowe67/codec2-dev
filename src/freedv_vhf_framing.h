@@ -36,6 +36,8 @@
 #ifndef _FREEDV_VHF_FRAMING_H
 #define _FREEDV_VHF_FRAMING_H
 
+#include "freedv_data_channel.h"
+
 /* Standard frame type */
 #define FREEDV_VHF_FRAME_A 1
 
@@ -50,6 +52,8 @@ struct freedv_vhf_deframer {
     int last_uw;        /* How many bits since the last UW? */
     int frame_size;     /* How big is a frame? */
     int on_inv_bits;    /* Are we using the inverted bits? */
+
+    struct freedv_data_channel *fdc;
 };
 
 /* Init and allocate memory for a freedv-vhf framer/deframer */
@@ -60,6 +64,7 @@ void fvhff_destroy_deframer(struct freedv_vhf_deframer * def);
 
 /* Place codec and other bits into a frame */
 void fvhff_frame_bits(int frame_type,uint8_t bits_out[],uint8_t codec2_in[],uint8_t proto_in[],uint8_t vc_in[]);
+void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,uint8_t bits_out[]);
 
 /* Find and extract frames from a stream of bits */
 int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[],uint8_t bits_in[]);

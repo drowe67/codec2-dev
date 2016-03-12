@@ -36,6 +36,8 @@
 #define MODE_2FSK 2
 #define MODE_4FSK 4
 
+#define FSK_SCALE 16383
+
 struct FSK {
     /*  Static parameters set up by fsk_init */
     int Ndft;               /* buffer size for freq offset est fft */
