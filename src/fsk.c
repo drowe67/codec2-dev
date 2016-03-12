@@ -131,9 +131,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     int i;
     int memold;
     int Ndft = 0;
-    printf(stdout,"hbr_initing\n");
     /* Number of symbols in a processing frame */
-    //int nsyms = 96;
     int nsyms = 48;
     /* Check configuration validity */
     assert(Fs > 0 );
@@ -236,7 +234,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
 }
 
 #define HORUS_MIN 100
-#define HORUS_MAX 4000
+#define HORUS_MAX 4800
 #define HORUS_MIN_SPACING 200
 
 /*---------------------------------------------------------------------------*\
@@ -1023,17 +1021,14 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     if(fabsf(d_norm_rx_timing) < .2){
         appm = 1e6*d_norm_rx_timing/(float)nsym;
         fsk->ppm = .9*fsk->ppm + .1*appm;
-        //fprintf(stderr,"ppm:%f\n",fsk->ppm);
     }
     
     /* Figure out how many samples are needed the next modem cycle */
     if(norm_rx_timing > 0.25){
         fsk->nin = N+Ts/2;
-        //fprintf(stderr,"+\n");
     }
     else if(norm_rx_timing < -0.25){
         fsk->nin = N-Ts/2;
-        //fprintf(stderr,"-\n");
     }
     else
         fsk->nin = N;
