@@ -90,10 +90,13 @@ endfunction
 %Init 'high-bit-rate horus'
 function states = fsk_horus_init_hbr(Fs,P,Rs,M=2)
   assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
+  
+  nsym = 96;
+  
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Fs;                % processing buffer size, nice big window for timing est
+  N = states.N = Ts*nsym;            % processing buffer size, nice big window for timing est
   states.Ndft = 2.^ceil(log2(N))/2;  % find nearest power of 2 for efficient FFT
   %states.Ndft = 1024;               % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
