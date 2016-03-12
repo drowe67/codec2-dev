@@ -246,7 +246,11 @@ function states = est_freq(states, sf, ntones)
   fmax = states.fest_fmax;
   st = floor(fmin*Ndft/Fs);
   en = floor(fmax*Ndft/Fs);
-  
+
+  % scale averaging time constant based on number of samples 
+
+  tc = 0.95*Ndft/Fs;
+
   % Update mag DFT  ---------------------------------------------
 
   numffts = floor(length(sf)/Ndft);
@@ -255,7 +259,7 @@ function states = est_freq(states, sf, ntones)
     a = (i-1)*Ndft+1; b = i*Ndft;
     Sf = abs(fft(sf(a:b) .* h, Ndft));
     Sf(1:st) = 0; Sf(en:Ndft/2) = 0;
-    states.Sf = 0.95*states.Sf + 0.05*Sf(1:Ndft/2);
+    states.Sf = (1-tc)*states.Sf + tc*Sf(1:Ndft/2);
   end
 
   f = []; a = [];
@@ -727,6 +731,38 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 endfunction
 
 
+% Alternative stateless BER counter that works on packets that may have gaps betwene them
+
+function states = ber_counter_packet(states, test_frame, rx_bits_buf)
+  ntestframebits = states.ntestframebits;
+  nbit = states.nbit;
+
+  % look for offset with min errors
+
+  nerrs_min = ntestframebits; coarse_offset = 1;
+  for i=1:nbit
+    error_positions = xor(rx_bits_buf(i:ntestframebits+i-1), test_frame);
+    nerrs = sum(error_positions);
+    %printf("i: %d nerrs: %d\n", i, nerrs);
+    if nerrs < nerrs_min
+      nerrs_min = nerrs;
+      coarse_offset = i;
+    end
+  end
+
+  % if less than threshold count errors
+
+  if nerrs_min/ntestframebits < 0.05 
+    states.Terrs += nerrs_min;
+    states.Tbits += ntestframebits;
+    states.nerr_log = [states.nerr_log nerrs_min];
+    if bitand(states.verbose, 0x4)
+      printf("coarse_offset: %d nerrs_min: %d\n", coarse_offset, nerrs_min);
+    end
+  end
+endfunction
+
+
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 %
 % test_frame_mode     Description
@@ -785,7 +821,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   if states.M == 2
     states.ftx = 1200 + [ 0 states.Rs ];
   else
-    states.ftx = 1200 + states.Rs*(0:3)
+    states.ftx = 1200 + 2*states.Rs*(1:4);
   end
 
   % ----------------------------------------------------------------------
@@ -806,18 +842,21 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
   % set up tx signal with payload bits based on test mode
 
-  if (test_frame_mode == 1) || (test_frame_mode == 6)
+  if (test_frame_mode == 1)
     % test frame of bits, which we repeat for convenience when BER testing
-    test_frame = round(rand(1, states.nbit));
+    states.ntestframebits = states.nbit;
+    test_frame = round(rand(1, states.ntestframebits));
     tx_bits = [];
     for i=1:frames+1
       tx_bits = [tx_bits test_frame];
     end
   end
+
   if test_frame_mode == 2
     % random bits, just to make sure sync algs work on random data
     tx_bits = round(rand(1, states.nbit*(frames+1)));
   end
+
   if test_frame_mode == 3
     % repeating sequence of all symbols
     % great for initial test of demod if nothing else works, 
@@ -852,6 +891,19 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
     end
   end
 
+  if test_frame_mode == 6
+    states.verbose += 0x4;
+    ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
+    states.ntestframebits = length(test_frame);
+    printf("length test frame: %d\n", states.ntestframebits);
+    %test_frame = rand(1,states.ntestframebits) > 0.5;
+
+    tx_bits = [];
+    for i=1:frames+1
+      tx_bits = [tx_bits test_frame];
+    end
+  end
+
   tx = fsk_horus_mod(states, tx_bits);
 
   %tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
@@ -870,7 +922,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
-  rx_bits_buf = zeros(1,2*nbit);
+  rx_bits_buf = zeros(1,nbit+states.ntestframebits);
   x_log = [];
   timing_nl_log = [];
   norm_rx_timing_log = [];
@@ -880,40 +932,53 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   rx_bits_log = [];
   rx_bits_sd_log = [];
 
-  for f=1:frames
+  % main loop ---------------------------------------------------------------
+
+  run_frames = floor(length(rx)/N)-1;
+  for f=1:run_frames
 
     % extract nin samples from input stream
 
     nin = states.nin;
     en = st + states.nin - 1;
-    sf = rx(st:en);
-    st += nin;
 
-    % demodulate to stream of bits
+    if en < length(rx) % due to nin variations its possible to overrun buffer
+      sf = rx(st:en);
+      st += nin;
 
-    states = est_freq(states, sf, states.M);
-    %states.f = [1200 1400 1600 1800];
-    [rx_bits states] = fsk_horus_demod(states, sf);
+      % demodulate to stream of bits
 
-    rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
-    rx_bits_buf(nbit+1:2*nbit) = rx_bits;
-    rx_bits_log = [rx_bits_log rx_bits];
-    rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
+      states = est_freq(states, sf, states.M);
+      %states.f = [1200 1400 1600 1800];
+      [rx_bits states] = fsk_horus_demod(states, sf);
 
-    norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
-    x_log = [x_log states.x];
-    timing_nl_log = [timing_nl_log states.timing_nl];
-    f_int_resample_log = [f_int_resample_log abs(states.f_int_resample(:,:))];
-    f_log = [f_log; states.f];
-    EbNodB_log = [EbNodB_log states.EbNodB];
+      rx_bits_buf(1:states.ntestframebits) = rx_bits_buf(nbit+1:states.ntestframebits+nbit);
+      rx_bits_buf(states.ntestframebits+1:states.ntestframebits+nbit) = rx_bits;
+      %rx_bits_buf(1:nbit) = rx_bits_buf(nbit+1:2*nbit);
+      %rx_bits_buf(nbit+1:2*nbit) = rx_bits;
 
-    if (test_frame_mode == 1) || (test_frame_mode == 6)
-       states = ber_counter(states, test_frame, rx_bits_buf);
-    end
+      rx_bits_log = [rx_bits_log rx_bits];
+      rx_bits_sd_log = [rx_bits_sd_log states.rx_bits_sd];
+
+      norm_rx_timing_log = [norm_rx_timing_log states.norm_rx_timing];
+      x_log = [x_log states.x];
+      timing_nl_log = [timing_nl_log states.timing_nl];
+      f_int_resample_log = [f_int_resample_log abs(states.f_int_resample(:,:))];
+      f_log = [f_log; states.f];
+      EbNodB_log = [EbNodB_log states.EbNodB];
+
+      if test_frame_mode == 1
+        states = ber_counter(states, test_frame, rx_bits_buf);
+      end
+      if test_frame_mode == 6
+        states = ber_counter_packet(states, test_frame, rx_bits_buf);
+      end
+   end
   end
 
+  % print stats, count errors, decode packets  ------------------------------------------
 
-  if test_frame_mode == 1
+  if (test_frame_mode == 1) || (test_frame_mode == 6)
     printf("frames: %d EbNo: %3.2f Tbits: %d Terrs: %d BER %4.3f\n", frames, EbNodB, states.Tbits,states. Terrs, states.Terrs/states.Tbits);
   end
 
@@ -940,7 +1005,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   clf
   subplot(211)
   plot(norm_rx_timing_log);
-  axis([1 frames -1 1])
+  axis([1 run_frames -1 1])
   title('norm fine timing')
   subplot(212)
   plot(states.nerr_log)
@@ -949,16 +1014,17 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   figure(4)
   clf
   subplot(211)
-  plot(real(rx(1:min(Fs,length(rx)))))
+  one_sec_rx = rx(1:min(Fs,length(rx)));
+  plot(one_sec_rx)
   title('rx signal at demod input')
   subplot(212)
-  plot(abs(fft(sf)))
+  plot(abs(fft(one_sec_rx)))
 
   figure(5)
   clf
   plot(f_log,'+')
   title('tone frequencies')
-  axis([1 frames 0 Fs/2])
+  axis([1 run_frames 0 Fs/2])
 
   figure(6)
   clf
