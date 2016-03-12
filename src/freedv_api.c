@@ -437,8 +437,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
      * to comptx */
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
-        
-	freedv_tx_fsk_voice(f, mod_out);
+        freedv_tx_fsk_voice(f, mod_out);
     }else{
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
