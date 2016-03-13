@@ -162,6 +162,8 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     o_Sf = [];
     o_fest = [];
     o_rx_timing = [];
+    o_norm_rx_timing = [];
+    o_nin = [];
     %Run octave demod, dump some test vectors
     states = fsk_horus_init(Fs,Rs,M);
     Ts = states.Ts;
@@ -189,10 +191,12 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         o_EbNodB = [o_EbNodB states.EbNodB];
         o_ppm = [o_ppm states.ppm];
         o_rx_timing = [o_rx_timing states.rx_timing];
+        o_norm_rx_timing = [o_norm_rx_timing states.norm_rx_timing];
         o_Sf = [o_Sf states.Sf'];
         o_f1 = [o_f1 states.f(1)];
         o_f2 = [o_f1 states.f(2)];
         o_fest = [o_fest states.f];
+        o_nin = [o_nin states.nin];
         if M==4
 			o_f3_dc = [o_f3_dc states.f_dc(3,1:states.Nmem-Ts/P)];
 			o_f4_dc = [o_f4_dc states.f_dc(4,1:states.Nmem-Ts/P)];
@@ -208,29 +212,27 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     % One part-per-thousand allowed on important parameters
     pass = 1;
     
-    
-   
-    
-    pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,9) && pass;
-    pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,9) && pass;
-    pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.001,10) && pass;
+    pass = vcompare(o_Sf,  t_fft_est,'fft est',tname,.001,1) && pass;
+    pass = vcompare(o_fest,  t_f_est,'f est',tname,.001,2) && pass;
+    pass = vcompare(o_rx_timing,  t_rx_timing,'rx timing',tname,.02,3) && pass;
     
     if M==4
-		pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.003,3) && pass;
-		pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.003,4) && pass;
-		pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.003,8) && pass;
-		pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.003,7) && pass;
+        pass = vcompare(o_f3_dc,      t_f3_dc,    'f3 dc',    tname,.005,4) && pass;
+        pass = vcompare(o_f4_dc,      t_f4_dc,    'f4 dc',    tname,.005,5) && pass;
+        pass = vcompare(o_f3_int,     t_f3_int,   'f3 int',   tname,.005,6) && pass;
+        pass = vcompare(o_f4_int,     t_f4_int,   'f4 int',   tname,.005,7) && pass;
     end
     
-    
-    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.003,1) && pass;
-    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.003,2) && pass;
-    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.003,6) && pass;
-    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.003,5) && pass;
+    pass = vcompare(o_f1_dc,      t_f1_dc,    'f1 dc',    tname,.005,8) && pass;
+    pass = vcompare(o_f2_dc,      t_f2_dc,    'f2 dc',    tname,.005,9) && pass;
+    pass = vcompare(o_f2_int,     t_f2_int,   'f2 int',   tname,.005,10) && pass;
+    pass = vcompare(o_f1_int,     t_f1_int,   'f1 int',   tname,.005,11) && pass;
 
     % Much larger tolerances on unimportant statistics
-    pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,11) && pass;
-    pass = vcompare(o_EbNodB   ,     t_EbNodB,      'EbNodB',      tname,.02,11) && pass;
+    pass = vcompare(o_ppm   ,     t_ppm,      'ppm',      tname,.02,12) && pass;
+    pass = vcompare(o_EbNodB,     t_EbNodB,'EbNodB',      tname,.02,13) && pass;
+    pass = vcompare(o_nin,        t_nin,      'nin',      tname,.0001,14) && pass;
+    pass = vcompare(o_norm_rx_timing,  t_norm_rx_timing,'norm rx timing',tname,.02,15) && pass;
     
     assert(pass);
     diffpass = sum(xor(obits,bits'))<4;
@@ -477,6 +479,9 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   berc = ber;
   stats.berc = berc;
   stats.bero = bero;
+  % coherent BER theory calculation
+  
+  stats.thrcoh = .5*(M-1)*erfc(sqrt( (log2(M)/2) * EbNo ));
   
   % non-coherent BER theory calculation
   % It was complicated, so I broke it up
@@ -501,7 +506,7 @@ endfunction
 
 function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     %Range of EbNodB over which to test
-    ebnodbrange = (3:2:13);
+    ebnodbrange = (5:2:13);
     ebnodbs = length(ebnodbrange);
     
     mode = 2;
@@ -549,9 +554,9 @@ function pass = test_fsk_battery()
     assert(pass)
     pass = pass && test_mod_horuscfgm4_randbits;
     assert(pass)
-    pass = pass && test_drift_var(2);
-    assert(pass)
     pass = pass && test_drift_var(4);
+    assert(pass)
+    pass = pass && test_drift_var(2);
     assert(pass)
     if pass
         printf("***** All tests passed! *****\n");
@@ -565,18 +570,19 @@ function plot_fsk_bers(M=2)
     berc = ones(1,length(ebnodbrange));
     bero = ones(1,length(ebnodbrange));
     berinc = ones(1,length(ebnodbrange));
+    beric = ones(1,length(ebnodbrange));
     ebnodbs = length(ebnodbrange)
     mode = 2;
     %Replication of other parameters for parcellfun
     modev   = repmat(mode,1,ebnodbs);
-    timingv = repmat(0,1,ebnodbs);
+    timingv = repmat(1,1,ebnodbs);
     fadingv = repmat(0,1,ebnodbs);
-    dfv     = repmat(0,1,ebnodbs);
+    dfv     = repmat(1,1,ebnodbs);
     dav     = repmat(1,1,ebnodbs);
     Mv     = repmat(M,1,ebnodbs);
     
     
-    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    statv = pararrayfun(floor(.5*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
@@ -584,14 +590,16 @@ function plot_fsk_bers(M=2)
         berc(ii)=stat.berc;
         bero(ii)=stat.bero;
         berinc(ii)=stat.thrncoh;
+        beric(ii) = stat.thrcoh;
     end
     clf;
     figure(M)
     
     semilogy(ebnodbrange, berinc,sprintf('r;%dFSK non-coherent theory;',M))
     hold on;
-    semilogy(ebnodbrange, bero ,sprintf('g;Octave fsk horus %dFSK Demod;',M))
-    semilogy(ebnodbrange, berc,sprintf('v;C fsk horus %dFSK Demod;',M))
+    semilogy(ebnodbrange, beric ,sprintf('g;%dFSK coherent theory;',M))
+    semilogy(ebnodbrange, bero ,sprintf('b;Octave fsk horus %dFSK Demod;',M))
+    semilogy(ebnodbrange, berc,sprintf('+;C fsk horus %dFSK Demod;',M))
     hold off;
     grid("minor");
     axis([min(ebnodbrange) max(ebnodbrange) 1E-5 1])
@@ -602,6 +610,6 @@ function plot_fsk_bers(M=2)
 endfunction
 
 
-test_fsk_battery
-plot_fsk_bers(2)
-plot_fsk_bers(4)
+%test_fsk_battery
+%plot_fsk_bers(2)
+%plot_fsk_bers(4)
