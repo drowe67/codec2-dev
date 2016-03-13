@@ -44,7 +44,7 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
-    int i;
+    int i,j;
     stats_loop = 0;
     
     if(argc<7){
@@ -121,7 +121,18 @@ int main(int argc,char *argv[]){
 	    if(fsk->mode == 4){
 		fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
 	    }
-	    fprintf(stderr,"}\n");
+	    fprintf(stderr,",\t\"eye_diagram\":[");
+	    for(i=0;i<stats.neyetr;i++){
+		fprintf(stderr,"[");
+		for(j=0;j<stats.neyesamp;j++){
+		    fprintf(stderr,"%f",stats.rx_eye[i][j]);
+		    if(j<stats.neyesamp-1) fprintf(stderr,",");
+		}
+		fprintf(stderr,"]");
+		if(i<stats.neyetr-1) fprintf(stderr,",");
+	    }
+	    
+	    fprintf(stderr,"]}\n");
 	    stats_ctr = stats_loop;
 	}
 	stats_ctr--;

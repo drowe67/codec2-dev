@@ -37,6 +37,7 @@
 
 #define MODEM_STATS_NC_MAX 20
 #define MODEM_STATS_NR_MAX 6
+#define MODEM_STATS_ET_MAX 8
 #define MODEM_STATS_NSPEC            512
 #define MODEM_STATS_MAX_F_HZ         4000
 
@@ -50,6 +51,12 @@ struct MODEM_STATS {
     float  foff;                             /* estimated freq offset in Hz                        */
     float  rx_timing;                        /* estimated optimum timing offset in samples         */
     float  clock_offset;                     /* Estimated tx/rx sample clock offset in ppm         */
+
+    /* eye diagram traces */
+    /* Eye diagram plot -- first dim is trace number, second is the trace idx */
+    float  rx_eye[MODEM_STATS_ET_MAX][MODEM_STATS_NC_MAX+1];
+    int    neyetr;                           /* How many eye traces are plotted */
+    int    neyesamp;                         /* How many samples in the eye diagram */
 
     /* Buf for FFT/waterfall */
 

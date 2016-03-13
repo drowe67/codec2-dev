@@ -517,8 +517,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf;
     float f_est[M],fc_avg,fc_tx;
-    float meanebno,stdebno;
-    
+    float meanebno,stdebno,eye_max;
+    int neyesamp,neyeoffset;
     
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
@@ -744,13 +744,6 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     fsk->EbNodB = 1;
     #endif
     
-    #ifndef DEMOD_ALLOC_STACK
-    free(f1_int);
-    free(f2_int);
-    free(f1_intbuf);
-    free(f2_intbuf);
-    #endif
-    
     /* Write some statistics out to the stats struct, if present */
     if( fsk->stats != NULL ){
         /* Save clock offset in ppm */
@@ -758,7 +751,6 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         
         /* Calculate and save SNR from EbNodB estimate */
         fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
-        
         
         /* Save rx timing */
         fsk->stats->rx_timing = (float)rx_timing;
@@ -768,6 +760,35 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
         fsk->stats->foff = fc_tx-fc_avg;
     
+        /* Take a sample for the eye diagrams */
+        neyesamp = fsk->stats->neyesamp = P*2;
+        neyeoffset = high_sample+1+P;
+        
+        fsk->stats->neyetr = fsk->mode*3;
+        for(j=0; j<neyesamp; j++)
+            fsk->stats->rx_eye[0][j] = cabsolute(f1_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)                       
+            fsk->stats->rx_eye[1][j] = cabsolute(f2_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)                      
+            fsk->stats->rx_eye[2][j] = cabsolute(f1_int[neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                                 
+            fsk->stats->rx_eye[3][j] = cabsolute(f2_int[neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                      
+            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[2*neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                                 
+            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[2*neyeoffset+neyesamp+j]);    
+        
+        eye_max = 0;
+        /* Normalize eye to +/- 1 */
+        for(i=0; i<fsk->mode*3; i++)
+            for(j=0; j<neyesamp; j++)
+                if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
+                    eye_max = fabsf(fsk->stats->rx_eye[i][j]);
+        
+        for(i=0; i<fsk->mode*3; i++)
+            for(j=0; j<neyesamp; j++)
+                fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
+        
         fsk->stats->nr = 0;
         fsk->stats->Nc = 0;
     }
@@ -779,7 +800,14 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     modem_probe_samp_f("t_f2",&f_est[1],1);
     modem_probe_samp_c("t_f1_int",f1_int,(nsym+1)*P);
     modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
-    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);;
+    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
+    
+    #ifndef DEMOD_ALLOC_STACK
+    free(f1_int);
+    free(f2_int);
+    free(f1_intbuf);
+    free(f2_intbuf);
+    #endif
 }
 
 void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
@@ -810,7 +838,8 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     float *sample_src;
     COMP *f1_intbuf,*f2_intbuf,*f3_intbuf,*f4_intbuf;
     float f_est[M],fc_avg,fc_tx;
-    float meanebno,stdebno;
+    float meanebno,stdebno,eye_max;
+    int neyesamp,neyeoffset;
     
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
@@ -1115,33 +1144,55 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     fsk->EbNodB = 1;
     #endif
     
-    #ifndef DEMOD_ALLOC_STACK
-    free(f1_int);
-    free(f2_int);
-    free(f3_int);
-    free(f4_int);
-    free(f1_intbuf);
-    free(f2_intbuf);
-    free(f3_intbuf);
-    free(f4_intbuf);
-    #endif
-    
     /* Write some statistics out to the stats struct, if present */
     if( fsk->stats != NULL ){
         /* Save clock offset in ppm */
         fsk->stats->clock_offset = fsk->ppm;
         
         /* Calculate and save SNR from EbNodB estimate */
-        fsk->stats->snr_est = fsk->EbNodB + 10*log10f(((float)Rs*2)/((float)Rs*M));
+        fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
         
         /* Save rx timing */
         fsk->stats->rx_timing = (float)rx_timing;
         
         /* Estimate and save frequency offset */
-        fc_avg = (f_est[0]+f_est[1]+f_est[2]+f_est[3])/4;
-        fc_tx = (fsk->f1_tx+fsk->f1_tx+(fsk->fs_tx*3))/2;
+        fc_avg = (f_est[0]+f_est[1]+f_est[3]+f_est[2])/4;
+        fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
         fsk->stats->foff = fc_tx-fc_avg;
     
+        /* Take a sample for the eye diagrams */
+        neyesamp = fsk->stats->neyesamp = P*2;
+        neyeoffset = high_sample+1+P;
+        fsk->stats->neyetr = fsk->mode*2;
+        
+        for(j=0; j<neyesamp; j++)
+            fsk->stats->rx_eye[0][j] = cabsolute(f1_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)                       
+            fsk->stats->rx_eye[1][j] = cabsolute(f2_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)
+            fsk->stats->rx_eye[2][j] = cabsolute(f3_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)                       
+            fsk->stats->rx_eye[3][j] = cabsolute(f4_int[neyeoffset+j]);
+        for(j=0; j<neyesamp; j++)                      
+            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                                 
+            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                      
+            fsk->stats->rx_eye[6][j] = cabsolute(f3_int[neyeoffset+neyesamp+j]);
+        for(j=0; j<neyesamp; j++)                                 
+            fsk->stats->rx_eye[7][j] = cabsolute(f4_int[neyeoffset+neyesamp+j]);    
+        
+        eye_max = 0;
+        /* Normalize eye to +/- 1 */
+        for(i=0; i<fsk->mode*2; i++)
+            for(j=0; j<neyesamp; j++)
+                if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
+                    eye_max = fabsf(fsk->stats->rx_eye[i][j]);
+        
+        for(i=0; i<fsk->mode*2; i++)
+            for(j=0; j<neyesamp; j++)
+                fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
+        
         fsk->stats->nr = 0;
         fsk->stats->Nc = 0;
     }
@@ -1157,7 +1208,18 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
     modem_probe_samp_c("t_f3_int",f3_int,(nsym+1)*P);
     modem_probe_samp_c("t_f4_int",f4_int,(nsym+1)*P);
-    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);;
+    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
+
+    #ifndef DEMOD_ALLOC_STACK
+    free(f1_int);
+    free(f2_int);
+    free(f3_int);
+    free(f4_int);
+    free(f1_intbuf);
+    free(f2_intbuf);
+    free(f3_intbuf);
+    free(f4_intbuf);
+    #endif
 }
 
 
