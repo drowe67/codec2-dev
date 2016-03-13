@@ -36,7 +36,8 @@
 int main(int argc,char *argv[]){
     struct FSK *fsk;
     struct MODEM_STATS stats;
-    int Fs,Rs,M,P;
+    int Fs,Rs,M,P,stats_ctr,stats_loop;
+    float loop_time;
     int enable_stats = 0;
     int hbr = 0;
     FILE *fin,*fout;
@@ -90,10 +91,14 @@ int main(int argc,char *argv[]){
         goto cleanup;
     }
     
+    /* Check for and enable stat printing */
     if(argc>7){
 	if(strcmp(argv[7],"S")==0){
 	    enable_stats = 1;
 	    fsk_setup_modem_stats(fsk,&stats);
+	    loop_time = ((float)fsk_nin(fsk))/((float)Fs);
+	    stats_loop = (int)(.125/loop_time);
+	    stats_ctr = 0;
 	}
     }
     
@@ -109,15 +114,16 @@ int main(int argc,char *argv[]){
 	}
         fsk_demod(fsk,bitbuf,modbuf);
 	
-	if(enable_stats){
-	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d",fsk->EbNodB,(int)fsk->ppm);
+	if(enable_stats && stats_ctr <= 0){
+	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d",stats.snr_est,(int)fsk->ppm);
 	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
 	    if(fsk->mode == 4){
 		fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
 	    }
 	    fprintf(stderr,"}\n");
+	    stats_ctr = stats_loop;
 	}
-	
+	stats_ctr--;
         /*for(i=0;i<fsk->Nbits;i++){
 	    t = (int)bitbuf[i];
 	}*/
