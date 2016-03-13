@@ -1184,13 +1184,13 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
             speech_out[i] = 0;
     else if (valid < 0)
         for (i = 0; i < nout; i++)
-	    speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+            speech_out[i] = FDMDV_SCALE*demod_in[i].real;
     else {
-	int frames = f->n_codec_bits / bits_per_codec_frame;
-	for (i = 0; i < frames; i++) {
+        int frames = f->n_codec_bits / bits_per_codec_frame;
+        for (i = 0; i < frames; i++) {
             codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
             speech_out += codec2_samples_per_frame(f->codec2);
-	}
+        }
     }
 
     //fprintf(stderr,"freedv_nin(f): %d nout: %d\n", freedv_nin(f), nout);

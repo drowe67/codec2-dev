@@ -233,9 +233,9 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     return fsk;
 }
 
-#define HORUS_MIN 100
-#define HORUS_MAX 4800
-#define HORUS_MIN_SPACING 200
+#define HORUS_MIN 800
+#define HORUS_MAX 2500
+#define HORUS_MIN_SPACING 100
 
 /*---------------------------------------------------------------------------*\
 
@@ -379,11 +379,11 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     int fft_samps;
     float hann;
     float max;
+    float tc;
     int imax;
     kiss_fftr_cfg fft_cfg = fsk->fft_cfg;
     int freqi[M];
     int f_min,f_max,f_zero;
-    
     /* Array to do complex FFT from using kiss_fft */
     /* It'd probably make more sense here to use kiss_fftr */
     
@@ -399,8 +399,11 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     
     f_min  = (fsk->est_min*Ndft)/Fs;
     f_max  = (fsk->est_max*Ndft)/Fs;
-    f_zero = (fsk->est_space*Ndft)/(Fs);
-
+    f_zero = (fsk->est_space*Ndft)/Fs;
+  
+    /* scale averaging time constant based on number of samples */
+    tc = 0.95*Ndft/Fs;
+    
     int fft_loops = nin/Ndft;
     for(j=0; j<fft_loops; j++){
     /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
@@ -435,7 +438,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		/* Mix back in with the previous fft block */
 		/* Copy new fft est into imag of fftout for frequency divination below */
 		for(i=0; i<Ndft/2; i++){
-			fsk->fft_est[i] = fsk->fft_est[i]*.95 + sqrtf(fftout[i].r)*.05;
+			fsk->fft_est[i] = (fsk->fft_est[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
 			fftout[i].i = fsk->fft_est[i];
 		}
 	}
@@ -448,7 +451,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		imax = 0;
 		max = 0;
 		for(j=0;j<Ndft/2;j++){
-			if(fftout[j].i > max){
+			if(fftout[j].i >= max){
 				max = fftout[j].i;
 				imax = j;
 			}
@@ -458,7 +461,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		f_min = f_min < 0 ? 0 : f_min;
 		f_max = imax + f_zero;
 		f_max = f_max > Ndft ? Ndft : f_max;
-		for(j=f_min; j<f_max; j++)
+		for(j=f_min+1; j<f_max; j++)
 			fftout[j].i = 0;
 		
 		/* Stick the freq index on the list */
@@ -685,7 +688,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     else
         fsk->nin = N;
     
-    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);;
+    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
+    modem_probe_samp_i("t_nin",&(fsk->nin),1);
     
     /* Re-sample the integrators with linear interpolation magic */
     int low_sample = (int)floorf(rx_timing);
@@ -1033,7 +1037,8 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     else
         fsk->nin = N;
     
-    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);;
+    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
+    modem_probe_samp_i("t_nin",&(fsk->nin),1);
     
     /* Re-sample the integrators with linear interpolation magic */
     int low_sample = (int)floorf(rx_timing);
