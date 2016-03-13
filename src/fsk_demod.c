@@ -45,6 +45,7 @@ int main(int argc,char *argv[]){
     int16_t *rawbuf;
     float *modbuf;
     int i;
+    stats_loop = 0;
     
     if(argc<7){
         fprintf(stderr,"usage: %s Mode P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
@@ -115,7 +116,7 @@ int main(int argc,char *argv[]){
         fsk_demod(fsk,bitbuf,modbuf);
 	
 	if(enable_stats && stats_ctr <= 0){
-	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d",stats.snr_est,(int)fsk->ppm);
+	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
 	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
 	    if(fsk->mode == 4){
 		fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
