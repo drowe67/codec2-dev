@@ -30,22 +30,23 @@
 #include <stdio.h>
 #include "fsk.h"
 
-#define MODEMPROBE_ENABLE
-#include "modem_probe.h"
 #include "codec2_fdmdv.h"
+#include "modem_stats.h"
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
+    struct MODEM_STATS stats;
     int Fs,Rs,M,P;
+    int enable_stats = 0;
     int hbr = 0;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
-    int i,t;
+    int i;
     
     if(argc<7){
-        fprintf(stderr,"usage: %s Mode P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
+        fprintf(stderr,"usage: %s Mode P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
         exit(1);
     }
     
@@ -77,9 +78,6 @@ int main(int argc,char *argv[]){
     }else {
 	M = atoi(argv[1]);
     }
-    
-    if(argc>7)
-		modem_probe_init("fsk2",argv[7]);
 	
     /* set up FSK */
     if(!hbr)
@@ -87,10 +85,16 @@ int main(int argc,char *argv[]){
     else
 	fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
     
-    
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
         goto cleanup;
+    }
+    
+    if(argc>7){
+	if(strcmp(argv[7],"S")==0){
+	    enable_stats = 1;
+	    fsk_setup_modem_stats(fsk,&stats);
+	}
     }
     
     /* allocate buffers for processing */
@@ -103,12 +107,20 @@ int main(int argc,char *argv[]){
 	for(i=0;i<fsk_nin(fsk);i++){
 	    modbuf[i] = ((float)rawbuf[i])/FDMDV_SCALE;
 	}
-	modem_probe_samp_f("t_d_sampin",modbuf,fsk_nin(fsk));
         fsk_demod(fsk,bitbuf,modbuf);
-        for(i=0;i<fsk->Nbits;i++){
-	    t = (int)bitbuf[i];
-	    modem_probe_samp_i("t_d_bitout",&t,1);
+	
+	if(enable_stats){
+	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d",fsk->EbNodB,(int)fsk->ppm);
+	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
+	    if(fsk->mode == 4){
+		fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
+	    }
+	    fprintf(stderr,"}\n");
 	}
+	
+        /*for(i=0;i<fsk->Nbits;i++){
+	    t = (int)bitbuf[i];
+	}*/
         fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         
         if(fin == stdin || fout == stdin){
@@ -121,7 +133,6 @@ int main(int argc,char *argv[]){
     free(rawbuf);
     free(modbuf);
     
-    modem_probe_close();
     cleanup:
     fclose(fin);
     fclose(fout);
