@@ -137,7 +137,7 @@ endfunction
 
 function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
 
-    Nsamples = 4;
+    Nsamples = 3;
 
     % search range
 
@@ -215,9 +215,14 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
      
       % then quantise differences
 
-      for i=2:4
+      % create table of freq quantiser levels with log spacing
+      %m = (log10(2)-log10(0.2))/(8-1); c = log10(0.2)-m;
+      %logf_steps = 10.^(m*(1:8)+c)
+      logf_steps = [0.4 0.7 1 1 1.3 1.6 2 2.4]; 
+      
+      for i=2:Nsamples
         targ = masker_freqs_kHz(i) - masker_freqs_kHz(i-1);
-        [q_freq abits] = quantise(0.2:0.2:1.6, targ);
+        [q_freq abits] = quantise(logf_steps, targ);
         bits = [bits abits];
         masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freq;
       end
@@ -234,13 +239,13 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       % Fit straight line
 
       f = masker_freqs_kHz*1000;
-      [gradient intercept] = linreg(f, masker_amps_dB, 4);
+      [gradient intercept] = linreg(f, masker_amps_dB, Nsamples);
       % use quantised gradient to take into account quantisation
       % errors in rest of quantisation
 
       gradient_ = quantise(-0.04:0.005:0.04, gradient);
       %gradient_ = gradient;
-      printf("gradient; %f gradient_: %f\n", gradient, gradient_);
+      %printf("gradient; %f gradient_: %f\n", gradient, gradient_);
 
       % determine deltas, or errors in straight line fit
 
@@ -254,10 +259,9 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
         clf;
         plot(f, masker_amps_dB, 'r+', 'markersize', 10, 'linewidth', 2)
 
-        fplt = 0:100:3900
+        fplt = 0:100:3900;
         hold on;
         plot(fplt, fplt*gradient + intercept, 'b')
-        fplt*gradient + intercept
 
         % plot lines for deltas
 
@@ -266,28 +270,30 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
           y2 = masker_amps_dB(i);
           plot([f(i) f(i)], [y1 y2], 'markersize', 10, 'linewidth', 2)
         end
+        axis([0 4000 0 80])
         hold off;
+
       end
 
-      % quantise the deltas
-
-      masker_amps_dB_lin_delta_ = zeros(4,1);
+      masker_amps_dB_lin_delta_ = zeros(Nsamples,1);
       if amp_quant == 1
-        for i=1:4
+        for i=1:Nsamples
           masker_amps_dB_lin_delta_(i) = quantise(-21:3:21, masker_amps_dB_lin_delta(i));
-          printf("dlin: %f dlin_: %f\n", masker_amps_dB_lin_delta(i), masker_amps_dB_lin_delta_(i));
+          %printf("dlin: %f dlin_: %f\n", masker_amps_dB_lin_delta(i), masker_amps_dB_lin_delta_(i));
           % masker_amps_dB_lin_delta_(i) = masker_amps_dB_lin_delta(i);
         end
       end
 
-      masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta_ + intercept;
+      masker_amps_dB = f*gradient + masker_amps_dB_lin_delta_ + intercept;
       %decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
+    if 0
     printf("\n");
-    for i=1:4
+    for i=1:Nsamples
       printf("freq: %f amp: %f\n", masker_freqs_kHz(i), masker_amps_dB(i));
+    end
     end
 endfunction
 
@@ -477,7 +483,7 @@ function maskdB_ = decimate_frame_rate(maskdB, model, decimate, f, frames, mask_
       maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
     else
       maskdB_ = maskdB;
-      printf("\n");
+      %printf("\n");
     end
 endfunction
 
