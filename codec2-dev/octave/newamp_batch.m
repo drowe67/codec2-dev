@@ -26,7 +26,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   decimate_in_time = 1;
   synth_phase = 1;
   freq_quant = 1;
-  amp_quant = 1;
+  amp_quant = 2;
   non_masked_f_log = [];
   non_masked_m_log = [];
   non_masked_amp_log = [];
@@ -48,9 +48,12 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   end
    
   fam  = fopen(Am_out_name,"wb"); 
+  if synth_phase
+    faw = fopen(Aw_out_name,"wb"); 
+  end
 
   for f=1:frames
-    printf("%d ", f);
+    %printf("%d ", f);
     L = min([model(f,2) max_amp-1]);
     Wo = model(f,1);
     Am = model(f,3:(L+2));
@@ -110,8 +113,9 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     if synth_phase
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
       fft_enc = 512;
-      model(f,3:(L+1)) = Am_(2:L);
-      phase = determine_phase(model, f);
+      model_ = model;
+      model_(f,3:(L+1)) = Am_(2:L);
+      phase = determine_phase(model_, f);
       assert(length(phase) == fft_enc);
       Aw = zeros(1, fft_enc*2); 
       Aw(1:2:fft_enc*2) = cos(phase);

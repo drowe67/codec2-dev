@@ -23,6 +23,7 @@ function newamp_fbf(samname, f=10)
   plot_spectrum = 1;
   freq_quant = 0;
   amp_quant = 0;
+  abys = 1;
 
   sn_name = strcat(samname,"_sn.txt");
   Sn = load(sn_name);
@@ -83,7 +84,12 @@ function newamp_fbf(samname, f=10)
     % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+    if abys == 1
+      [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+    end
+    if abys == 2
+      [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys2(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+    end
     figure(2)
     
     tonef_kHz = masker_freqs_kHz;
@@ -94,6 +100,7 @@ function newamp_fbf(samname, f=10)
     legend('boxoff');
     %plot(mask_sample_freqs_kHz*1000, min_error);
     hold off;
+    grid
 
     figure(3)
     clf
@@ -138,6 +145,7 @@ function newamp_fbf(samname, f=10)
     % interactive menu
 
     printf("\rframe: %d  menu: n-next  b-back a-Am ", f);
+
     if freq_quant
       printf("F");
     else
@@ -145,11 +153,11 @@ function newamp_fbf(samname, f=10)
     end
     printf("-freq_quant ");
     if amp_quant
-      printf("M");
+      printf("M-amp_quant ");
     else
-      printf("m");
+      printf("m-amp_quant ");
     end
-    printf("-amp_quant q-quit");
+    printf("q-quit");
 
     fflush(stdout);
     k = kbhit();
@@ -161,7 +169,7 @@ function newamp_fbf(samname, f=10)
     endif
     if k == 'm'
       if amp_quant == 0
-         amp_quant = 1;
+         amp_quant = 2;
       else
          amp_quant = 0;
       end
