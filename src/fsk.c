@@ -757,7 +757,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         fsk->stats->clock_offset = fsk->ppm;
         
         /* Calculate and save SNR from EbNodB estimate */
-        fsk->stats->snr_est = fsk->EbNodB + 10*log10f(((float)Rs)/((float)Rs*M));
+        fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
+        
         
         /* Save rx timing */
         fsk->stats->rx_timing = (float)rx_timing;
