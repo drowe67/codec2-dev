@@ -41,17 +41,24 @@ fest_plot = win.addPlot(title="Tone Frequency Estimation")
 fest_plot.setLabel('left','Frequency (Hz)')
 fest_plot.setLabel('bottom','Time (seconds)')
 eye_plot = win.addPlot(title="Eye Diagram")
+# Disable auto-ranging on eye plot and fix axes for a big speedup...
+eye_plot.disableAutoRange()
+eye_plot.setYRange(0,1)
+eye_plot.setXRange(0,15)
+
 
 # Data arrays...
-ebno_data = np.zeros(history_size)
-ppm_data = np.zeros(history_size)
-fest_data = np.zeros((4,history_size))
+ebno_data = np.zeros(history_size)*np.nan
+ppm_data = np.zeros(history_size)*np.nan
+fest_data = np.zeros((4,history_size))*np.nan
 
 # Curve objects, so we can update them...
 ebno_curve = ebno_plot.plot(x=history_scale,y=ebno_data)
 ppm_curve = ppm_plot.plot(x=history_scale,y=ppm_data)
-fest1_curve = fest_plot.plot(x=history_scale,y=fest_data[0,:],pen=(255,0,0)) # f1 = Red
-fest2_curve = fest_plot.plot(x=history_scale,y=fest_data[1,:],pen=(0,255,0)) # f2 = Blue
+fest1_curve = fest_plot.plot(x=history_scale,y=fest_data[0,:],pen='r') # f1 = Red
+fest2_curve = fest_plot.plot(x=history_scale,y=fest_data[1,:],pen='g') # f2 = Blue
+fest3_curve = fest_plot.plot(x=history_scale,y=fest_data[2,:],pen='b') # f3 = Greem
+fest4_curve = fest_plot.plot(x=history_scale,y=fest_data[3,:],pen='m') # f4 = Magenta
 
 # Plot update function. Reads from queue, processes and updates plots.
 def update_plots():
@@ -67,6 +74,13 @@ def update_plots():
 		sys.stderr.write(str(e))
 		return
 
+	# Roll data arrays
+	ebno_data[:-1] = ebno_data[1:]
+	ppm_data[:-1] = ppm_data[1:]
+	fest_data = np.roll(fest_data,-1,axis=1)
+
+
+	# Try reading in the new data points from the dictionary.
 	try:
 		new_ebno = in_data['EbNodB']
 		new_ppm = in_data['ppm']
@@ -75,42 +89,49 @@ def update_plots():
 	except Exception as e:
 		print("ERROR reading dict: %s" % e)
 
+	# Try reading in the other 2 tones.
 	try:
-		# Roll data arrays
-		ebno_data[:-1] = ebno_data[1:]
-		ppm_data[:-1] = ppm_data[1:]
-		fest_data = np.roll(fest_data,-1,axis=1)
+		new_fest1 = in_data['f3_est']
+		new_fest2 = in_data['f4_est']
+		fest_data[2,-1] = new_fest3
+		fest_data[3,-1] = new_fest4
+	except:
+		# If we can't read these tones out of the dict, fill with NaN
+		fest_data[2,-1] = np.nan
+		fest_data[3,-1] = np.nan
 
-		# Add in new data points
-		ebno_data[-1] = new_ebno
-		ppm_data[-1] = new_ppm
-		fest_data[0,-1] = new_fest1
-		fest_data[1,-1] = new_fest2
+	# Add in new data points
+	ebno_data[-1] = new_ebno
+	ppm_data[-1] = new_ppm
+	fest_data[0,-1] = new_fest1
+	fest_data[1,-1] = new_fest2
 
-		# Update plots
-		ebno_curve.setData(x=history_scale,y=ebno_data)
-		ppm_curve.setData(x=history_scale,y=ppm_data)
-		fest1_curve.setData(x=history_scale,y=fest_data[0,:],pen=(255,0,0)) # f1 = Red
-		fest2_curve.setData(x=history_scale,y=fest_data[1,:],pen=(0,255,0)) # f2 = Blue
+	# Update plots
+	ebno_curve.setData(x=history_scale,y=ebno_data)
+	ppm_curve.setData(x=history_scale,y=ppm_data)
+	fest1_curve.setData(x=history_scale,y=fest_data[0,:],pen='r') # f1 = Red
+	fest2_curve.setData(x=history_scale,y=fest_data[1,:],pen='g') # f2 = Blue
+	fest3_curve.setData(x=history_scale,y=fest_data[2,:],pen='b') # f3 = Green
+	fest4_curve.setData(x=history_scale,y=fest_data[3,:],pen='m') # f4 = Magenta
 
-	except Exception as e:
-		print(e.strerror)
-
-	# Now try reading in the eye diagram and other tone estimates.
+	#Now try reading in and plotting the eye diagram
 	try:
 		eye_data = np.array(in_data['eye_diagram'])
+		#eye_plot.disableAutoRange()
 		eye_plot.clear()
+		col_index = 0
 		for line in eye_data:
-			eye_plot.plot(line)
+			eye_plot.plot(line,pen=(col_index,eye_data.shape[0]))
+			col_index += 1
+		#eye_plot.autoRange()
 
 	except Exception as e:
 		pass
 
-	
 
 timer = pg.QtCore.QTimer()
 timer.timeout.connect(update_plots)
-timer.start(30)
+timer.start(80)
 
 
 # Thread to read from stdin and push into a queue to be processed.
