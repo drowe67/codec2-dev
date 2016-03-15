@@ -25,8 +25,8 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   postfilter = 1;
   decimate_in_time = 1;
   synth_phase = 1;
-  freq_quant = 1;
-  amp_quant = 2;
+  freq_quant = 0;
+  amp_quant = 0;
   non_masked_f_log = [];
   non_masked_m_log = [];
   non_masked_amp_log = [];
@@ -34,6 +34,8 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
+  model_ = zeros(frames, nc);
+  nom_masked_m = zeros(frames,max_amp);
 
   if nargin == 1
     Am_out_name = sprintf("%s_am.out", samname);
@@ -52,11 +54,13 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     faw = fopen(Aw_out_name,"wb"); 
   end
 
+  % encoder loop ------------------------------------------------------
+
   for f=1:frames
-    %printf("%d ", f);
-    L = min([model(f,2) max_amp-1]);
-    Wo = model(f,1);
-    Am = model(f,3:(L+2));
+    printf("%d ", f);   
+    model_(f,2) = L = min([model(f,2) max_amp-1]);
+    model_(f,1) = Wo = model(f,1);
+    model_(f,3:(L+2)) = Am = model(f,3:(L+2));
 
     AmdB = 20*log10(Am);
 
@@ -70,40 +74,47 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
       [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
       non_masked_amp = decmaskdB;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
-      non_masked_m = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
-      non_masked_m_log = [non_masked_m_log; non_masked_m'];
+      non_masked_m(f,:) = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
+      non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)'];
       non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
       maskdB_ = decmaskdB;
     else
       % just approximate decimation in freq by using those mask samples we can hear
       maskdB_ = maskdB;
-      non_masked_m = find(AmdB > maskdB);
+      a_non_masked_m = find(AmdB > maskdB);
+      non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
     end
+
+    Am_ = zeros(1,max_amp);
+    Am_ = 10 .^ (maskdB_(1:L-1)/20); 
+    model_(f,3:(L+1)) = Am_;
+  end
+
+ 
+  % decoder loop -----------------------------------------------------
+
+  for f=1:frames
+    L = min([model_(f,2) max_amp-1]);
+    Wo = model_(f,1);
+    Am_ = model_(f,3:(L+2));
+
+    maskdB_ = 20*log10(Am_);
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
 
     if decimate_in_time
       % decimate mask samples in time
-      maskdB_ = decimate_frame_rate(maskdB_, model, 4, f, frames, mask_sample_freqs_kHz);
+      maskdB_ = decimate_frame_rate(maskdB_, model_, 4, f, frames, mask_sample_freqs_kHz);
     end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
     if postfilter
       maskdB_pf = maskdB_ - 6;
-      maskdB_pf(non_masked_m) = maskdB_pf(non_masked_m) + 6;
+      m = max(find(non_masked_m(f,:) > 0));
+      a_non_masked_m = non_masked_m(f,1:m);
+      maskdB_pf(a_non_masked_m) = maskdB_pf(a_non_masked_m) + 6;
     else
       maskdB_pf = maskdB_;
-    end
-
-    if 0 
-      % Early work as per blog post part 1
-      % Attempt 1
-      maskdB_pf = zeros(1,L);
-      maskdB_pf(non_masked_m) = maskdB(non_masked_m);
-      % Attempt 2
-      %maskdB_pf = maskdB;
-      % Attempt 3
-      %maskdB_pf = maskdB;
-      %maskdB_pf(non_masked_m) += 6;
     end
 
     Am_ = zeros(1,max_amp);
@@ -113,8 +124,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     if synth_phase
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
       fft_enc = 512;
-      model_ = model;
-      model_(f,3:(L+1)) = Am_(2:L);
+      model_(f,3:(L+2)) = 10 .^ (maskdB_pf(1:L)/20);
       phase = determine_phase(model_, f);
       assert(length(phase) == fft_enc);
       Aw = zeros(1, fft_enc*2); 
