@@ -137,7 +137,7 @@ endfunction
 
 function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
 
-    Nsamples = 4;
+    Nsamples = 3;
 
     % search range
 
@@ -215,7 +215,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
      
       % then quantise differences
 
-      for i=2:4
+      for i=2:Nsamples
         targ = masker_freqs_kHz(i) - masker_freqs_kHz(i-1);
         [q_freq abits] = quantise(0.2:0.2:1.6, targ);
         bits = [bits abits];
@@ -234,7 +234,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       % Fit straight line
 
       f = masker_freqs_kHz*1000;
-      [gradient intercept] = linreg(f, masker_amps_dB, 4);
+      [gradient intercept] = linreg(f, masker_amps_dB, Nsamples);
       % use quantised gradient to take into account quantisation
       % errors in rest of quantisation
 
@@ -273,7 +273,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
       masker_amps_dB_lin_delta_ = zeros(4,1);
       if amp_quant == 1
-        for i=1:4
+        for i=1:Nsamples
           masker_amps_dB_lin_delta_(i) = quantise(-21:3:21, masker_amps_dB_lin_delta(i));
           printf("dlin: %f dlin_: %f\n", masker_amps_dB_lin_delta(i), masker_amps_dB_lin_delta_(i));
           % masker_amps_dB_lin_delta_(i) = masker_amps_dB_lin_delta(i);
@@ -287,7 +287,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
     if 0
     printf("\n");
-    for i=1:4
+    for i=1:Nsamples
       printf("freq: %f amp: %f\n", masker_freqs_kHz(i), masker_amps_dB(i));
     end
     end
@@ -450,37 +450,49 @@ endfunction
 
 % decimate frame rate of mask, use linear interpolation in the log domain 
 
-function maskdB_ = decimate_frame_rate(maskdB, model, decimate, f, frames, mask_sample_freqs_kHz)
+function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
     max_amp = 80;
 
     Wo = model(f,1);
     L = min([model(f,2) max_amp-1]);
 
-    if (mod(f-1,decimate) && (f < (frames-decimate)))
+    % determine frames that bracket the one we need to interp
 
-      % determine frames that bracket the one we need to interp
-
-      left_f = decimate*floor(f/decimate)+1; 
-      right_f = decimate*ceil(f/decimate)+1;
-
-      % determine fraction of each frame to use
-
-      right_fraction  = mod(f-1,decimate)/decimate;
-      left_fraction = 1 - right_fraction;
-
-      printf("f: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n",f,left_f,right_f,left_fraction,right_fraction)
-
-      % determine mask for left and right frames, sampling at Wo for this frame
-
-      mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-      maskdB_left = resample_mask(model, left_f, mask_sample_freqs_kHz);
-      maskdB_right = resample_mask(model, right_f, mask_sample_freqs_kHz);
-
-      maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
-    else
-      printf("\n");
-      maskdB_ = maskdB;
+    left_f = decimate*floor((f-1)/decimate)+1; 
+    right_f = left_f + decimate;
+    if right_f > frames
+      right_f = left_f;
     end
+
+    % determine fraction of each frame to use
+
+    left_fraction  = 1 - mod((f-1),decimate)/decimate;
+    right_fraction = 1 - left_fraction;
+
+    printf("f: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n", f, left_f, right_f, left_fraction, right_fraction)
+
+    % fit splines to left and right masks
+
+    left_Wo = model(left_f,1);
+    left_L = min([model(left_f,2) max_amp-1]);
+    left_AmdB = 20*log10(model(left_f,3:(left_L+2)));
+    left_mask_sample_freqs_kHz = (1:left_L)*left_Wo*4/pi;
+
+    right_Wo = model(right_f,1);
+    right_L = min([model(right_f,2) max_amp-1]);
+    right_AmdB = 20*log10(model(right_f,3:(right_L+2)));
+    right_mask_sample_freqs_kHz = (1:right_L)*right_Wo*4/pi;
+
+    maskdB_left_pp = splinefit(left_mask_sample_freqs_kHz, left_AmdB, left_L);
+    maskdB_right_pp = splinefit(right_mask_sample_freqs_kHz, right_AmdB, right_L);
+
+    % determine mask for left and right frames, sampling at Wo for this frame
+
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    maskdB_left = ppval(maskdB_left_pp, mask_sample_freqs_kHz);
+    maskdB_right = ppval(maskdB_right_pp, mask_sample_freqs_kHz);
+
+    maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
 endfunction
 
 
