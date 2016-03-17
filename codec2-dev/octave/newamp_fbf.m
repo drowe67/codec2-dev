@@ -69,28 +69,35 @@ function newamp_fbf(samname, f=10)
     end
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
+    [maskdB2 Am_freqs_kHz2] = mask_model(maskdB, Wo, L);
+
     %plot(Am_freqs_kHz*1000, maskdB, 'g');
+    %plot(Am_freqs_kHz2*1000, maskdB2, 'r');
 
     % optionally plot synthesised spectrum (early simple model)
 
     if 0
       AmdB_ = maskdB;
-      AmdB_(not_masked_m) += 6;
       plot(Am_freqs_kHz*1000, AmdB_, 'g');
       plot(Am_freqs_kHz*1000, AmdB_, 'g+');
     end
 
     % decimate in frequency
 
+    if 1
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+    end
+
     figure(2)
     
     tonef_kHz = masker_freqs_kHz;
     nlm = length(tonef_kHz);
 
+    if 1
     plot(tonef_kHz*1000, zeros(1,nlm), ';AbyS Mask Freqs;bk+');
     plot(mask_sample_freqs_kHz*1000, decmaskdB, ';AbyS Mask;m');
+    end
     legend('boxoff');
     %plot(mask_sample_freqs_kHz*1000, min_error);
     hold off;
