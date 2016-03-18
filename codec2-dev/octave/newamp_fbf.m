@@ -69,7 +69,6 @@ function newamp_fbf(samname, f=10)
     end
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    [maskdB2 Am_freqs_kHz2] = mask_model(maskdB, Wo, L);
 
     %plot(Am_freqs_kHz*1000, maskdB, 'g');
     %plot(Am_freqs_kHz2*1000, maskdB2, 'r');
@@ -84,9 +83,17 @@ function newamp_fbf(samname, f=10)
 
     % decimate in frequency
 
-    if 1
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+
+    % find turning points - prototype for finding PF freqs when we decimate in time
+    
+    d = decmaskdB(2:L) - decmaskdB(1:L-1);
+    tp = [];
+    for m=1:L-1
+      if (d(m) > 0) && (d(m+1) < 0)
+        tp = [tp m+1];
+      end
     end
 
     figure(2)
@@ -94,10 +101,9 @@ function newamp_fbf(samname, f=10)
     tonef_kHz = masker_freqs_kHz;
     nlm = length(tonef_kHz);
 
-    if 1
     plot(tonef_kHz*1000, zeros(1,nlm), ';AbyS Mask Freqs;bk+');
     plot(mask_sample_freqs_kHz*1000, decmaskdB, ';AbyS Mask;m');
-    end
+    plot(tp*Wo*4000/pi, 5*ones(1,length(tp)), ';PF Freqs;r+');
     legend('boxoff');
     %plot(mask_sample_freqs_kHz*1000, min_error);
     hold off;

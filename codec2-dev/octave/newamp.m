@@ -271,7 +271,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
       % quantise the deltas
 
-      masker_amps_dB_lin_delta_ = zeros(4,1);
+      masker_amps_dB_lin_delta_ = zeros(Nsamples,1);
       if amp_quant == 1
         for i=1:Nsamples
           masker_amps_dB_lin_delta_(i) = quantise(-21:3:21, masker_amps_dB_lin_delta(i));
