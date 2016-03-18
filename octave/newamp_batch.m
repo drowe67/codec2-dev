@@ -21,7 +21,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   more off;
 
   max_amp = 80;
-  decimate_in_freq = 1;
+  decimate_in_freq = 0;
   postfilter = 1;
   decimate_in_time = 1;
   synth_phase = 1;
@@ -74,7 +74,12 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
       [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
       non_masked_amp = decmaskdB;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
+
+      % Save this for decoder, so it knows where to apply post filter
+      % Basically the frequencies of the AbyS samples
+
       non_masked_m(f,:) = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
+
       non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)'];
       non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
       maskdB_ = decmaskdB;
@@ -94,25 +99,52 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   % decoder loop -----------------------------------------------------
 
   for f=1:frames
+    %printf("frame: %d\n", f);
     L = min([model_(f,2) max_amp-1]);
     Wo = model_(f,1);
     Am_ = model_(f,3:(L+2));
 
     maskdB_ = 20*log10(Am_);
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    %maskdB_ = mask_model(maskdB_, Wo, L);
 
     if decimate_in_time
       % decimate mask samples in time
-      maskdB_ = decimate_frame_rate(maskdB_, model_, 4, f, frames, mask_sample_freqs_kHz);
+      maskdB_ = decimate_frame_rate(model_, 4, f, frames, mask_sample_freqs_kHz);
+
+      % find turning points - prototype for finding PF freqs when we decimate in time
+
+      d = maskdB_(2:L) - maskdB_(1:L-1);
+      tp = [];
+      for m=1:L-2
+        if (d(m) > 0) && (d(m+1) < 0)
+          tp = [tp m+1];
+        end
+      end
+      a_non_masked_m = tp;
+    else
+      % read non-maksed (PF freqs) from analysis stage
+      % number of non-masked samples is variable when not using AbyS,
+      % but fixed when using AbyS
+
+      m = max(find(non_masked_m(f,:) > 0)); 
+      a_non_masked_m = non_masked_m(f,1:m);
+
     end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
     if postfilter
+
+      % Apply post filter - enhances formants, suppresses others, as pe Part 1 blog
+      % Pretty simple but makes a big difference
+
       maskdB_pf = maskdB_ - 6;
-      m = max(find(non_masked_m(f,:) > 0));
-      a_non_masked_m = non_masked_m(f,1:m);
       maskdB_pf(a_non_masked_m) = maskdB_pf(a_non_masked_m) + 6;
+
+      Am_ = zeros(1,max_amp);
+      Am_ = 10 .^ (maskdB_pf(1:L-1)/20); 
+      model_(f,3:(L+1)) = Am_;
     else
       maskdB_pf = maskdB_;
     end
@@ -122,15 +154,33 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     fwrite(fam, Am_, "float32");
 
     if synth_phase
+
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
+
       fft_enc = 512;
-      model_(f,3:(L+2)) = 10 .^ (maskdB_pf(1:L)/20);
+      model_(f,3:(L+2)) = 10 .^ (maskdB_(1:L)/20);
       phase = determine_phase(model_, f);
       assert(length(phase) == fft_enc);
       Aw = zeros(1, fft_enc*2); 
       Aw(1:2:fft_enc*2) = cos(phase);
       Aw(2:2:fft_enc*2) = -sin(phase);
- 
+
+      if 0
+         % optional plotting to ensure amd and phase aligned on a few frames
+         figure(1)
+         clf;
+         subplot(211)
+         plot(mask_sample_freqs_kHz, maskdB_);
+         hold on;
+         plot(mask_sample_freqs_kHz, maskdB_pf,'g');
+         hold off;
+         axis([0 4 0 70])
+
+         subplot(212)
+         plot((0:(fft_enc/2)-1)*8000/fft_enc, phase(1:fft_enc/2))
+         axis([0 4000 -pi pi])
+         k = kbhit();         
+      end 
       fwrite(faw, Aw, "float32");    
     end
   end
