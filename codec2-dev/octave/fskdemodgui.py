@@ -9,14 +9,18 @@
 #	updates at about 10Hz. Anything faster will fill up the input queue and be discarded.
 #
 #	Call using: 
-#	<producer>| ./fsk_demod 2X 8 923096 115387 - - S 2> >(python ~/Dev/codec2-dev/python/fskdemodgui.py) | <consumer>
+#	<producer>| ./fsk_demod 2X 8 923096 115387 - - S 2> >(python ~/Dev/codec2-dev/octave/fskdemodgui.py) | <consumer>
 #
 #
-import sys, time, json, Queue
+import sys, time, json, Queue, argparse
 from threading import Thread
 from pyqtgraph.Qt import QtGui, QtCore
 import numpy as np
 import pyqtgraph as pg
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--wide", action="store_true", default=False, help="Alternate wide arrangement of widgets, for placement at bottom of 4:3 screen.")
+args = parser.parse_args()
 
 # Some settings...
 update_rate = 10 # Hz
@@ -29,19 +33,26 @@ in_queue = Queue.Queue(history_size) # 1-element FIFO...
 win = pg.GraphicsWindow()
 win.setWindowTitle('FSK Demodulator Modem Statistics')
 
+
 # Plot objects
 ebno_plot = win.addPlot(title="Eb/No")
-ebno_plot.setLabel('left','Eb/No (dB)')
-ebno_plot.setLabel('bottom','Time (seconds)')
 ppm_plot = win.addPlot(title="Symbol Rate Offset")
-ppm_plot.setLabel('left','Offset (ppm)')
-ppm_plot.setLabel('bottom','Time (seconds)')
-win.nextRow()
+if args.wide == False:
+	win.nextRow()
+else:
+	win.resize(1024,200)
 fest_plot = win.addPlot(title="Tone Frequency Estimation")
-fest_plot.setLabel('left','Frequency (Hz)')
-fest_plot.setLabel('bottom','Time (seconds)')
 eye_plot = win.addPlot(title="Eye Diagram")
 # Disable auto-ranging on eye plot and fix axes for a big speedup...
+
+
+# Configure plot labels and scales.
+ebno_plot.setLabel('left','Eb/No (dB)')
+ebno_plot.setLabel('bottom','Time (seconds)')
+ppm_plot.setLabel('left','Offset (ppm)')
+ppm_plot.setLabel('bottom','Time (seconds)')
+fest_plot.setLabel('left','Frequency (Hz)')
+fest_plot.setLabel('bottom','Time (seconds)')
 eye_plot.disableAutoRange()
 eye_plot.setYRange(0,1)
 eye_plot.setXRange(0,15)
