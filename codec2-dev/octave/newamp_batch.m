@@ -21,7 +21,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   more off;
 
   max_amp = 80;
-  decimate_in_freq = 0;
+  decimate_in_freq = 1;
   postfilter = 1;
   decimate_in_time = 1;
   synth_phase = 1;
@@ -56,6 +56,8 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
   % encoder loop ------------------------------------------------------
 
+  pp_bw = gen_pp_bw;
+
   for f=1:frames
     printf("%d ", f);   
     model_(f,2) = L = min([model(f,2) max_amp-1]);
@@ -71,7 +73,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
     if decimate_in_freq
       % decimate mask samples in frequency
-      [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant, pp_bw);
       non_masked_amp = decmaskdB;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
 
