@@ -130,14 +130,26 @@ function [decmaskdB local_maxima_sort] = make_decmask(maskdB, AmdB, Wo, L, mask_
 endfunction
 
 
+% generate LUT
+
+function pp_bw = gen_pp_bw
+   for m=1:40
+      f=m*0.1;
+      %printf("f %f m: %d\n", f, m);
+      [single_mask_m pp] = resonator(f, 0.1:0.1:4);
+      pp_bw(m) = pp;
+    end
+    pp_bw(6);
+end
+
 % Alternative way to come up with a decimated mask model, using
 % analysis by synthesis to determine the best place to put samples.
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
+function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant, pp_bw)
 
-    Nsamples = 3;
+    Nsamples = 4;
 
     % search range
 
@@ -153,7 +165,8 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
     % basis functions are not gd at representing continuous spectra, especially at 
     % LF.  Fortunately rather gd at voiced speech, which is a much tougher job.
 
-    decmaskdB = 10*ones(1,L);
+    % decmaskdB = 20*ones(1,L);
+    decmaskdB = zeros(1,L);
 
     for sample=1:Nsamples
 
@@ -164,7 +177,10 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       min_mse = 1E32;
 
       for m=m_st:m_en
-        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,1) + AmdB(m);
+        %single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,0) + AmdB(m);
+        %single_mask_m = resonator_fast(pp_bw, m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        %single_mask_m = resonator( m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        single_mask_m = parabolic_resonator(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
         error = target - candidate;
         mse_log1(sample,m) = mse = sum(abs(error)); % MSE in log domain
@@ -217,7 +233,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
       for i=2:Nsamples
         targ = masker_freqs_kHz(i) - masker_freqs_kHz(i-1);
-        [q_freq abits] = quantise(0.2:0.2:1.6, targ);
+        [q_freq abits] = quantise(0.2:0.2:2.4, targ);
         bits = [bits abits];
         masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freq;
       end
@@ -238,7 +254,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       % use quantised gradient to take into account quantisation
       % errors in rest of quantisation
 
-      gradient_ = quantise(-0.04:0.005:0.04, gradient);
+      gradient_ = quantise(-0.08:0.002:0.08, gradient);
       %gradient_ = gradient;
       printf("gradient; %f gradient_: %f\n", gradient, gradient_);
 
@@ -423,14 +439,88 @@ function b=bark(f)
 endfunction
 
 
-% -12dB/octave mask to model speech articulation
+% Alternative mask function that has a gentler slope than schroeder.
+% Idea is to get sharp formant definition, but also fill in gaps so we
+% dont get chunks of spectrum coming and going
 
-function maskdB = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
+function [maskdB pp] = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
+  % note all frequencies in kHz
+
+  f1  = 0.1; f2  = 3;
+  bw1 = 0.1; bw2 = 0.5; 
+  m = (bw2-bw1)/(log10(f2)-log10(f1));
+  c = bw1 - m*log10(f1);
+
+  Fs    = 8;
+  slope = -12;     % filter falls off by this slope/octave
+
   maskdB = zeros(1, length(mask_sample_freqs_kHz));
-  for m=1:length(mask_sample_freqs_kHz)
-    maskdB(m) = -24*abs(log2(freq_tone_kHz/mask_sample_freqs_kHz(m)));
-    %printf("m: %d ft: %f fm: %f ft/fm: %f maskdB: %f\n", m, freq_tone_kHz, mask_sample_freqs_kHz(m), freq_tone_kHz/mask_sample_freqs_kHz(m), maskdB(m));
-  end
+
+  % frequency dependant bandwidth
+
+  bw = m*log10(freq_tone_kHz) + c;
+  %printf("freq_tone_kHz: %f bw: %f\n", freq_tone_kHz, bw);
+
+  % Design spline to set shape based on current bandwidth
+
+  x = [-Fs/2 -bw/2 0 +bw/2 +Fs/2];
+  delta = slope*log2(Fs/bw);                 % gain is delta down from -3dB to Fs/2
+  y = [-3 + delta, -3, 0, -3, -3 + delta];
+  pp = splinefit(x, y, 4);
+  maskdB = ppval(pp, mask_sample_freqs_kHz - freq_tone_kHz);
+endfunction
+
+
+function maskdB = resonator_fast(pp_bw, freq_tone_kHz, mask_sample_freqs_kHz)
+
+  % note all frequencies on kHz
+
+  max_ind = length(pp_bw);
+  ind = round(freq_tone_kHz/0.1);
+  ind = min(ind, max_ind);
+  ind = max(ind, 1);
+  %printf("freq_tone_kHz: %f ind: %d\n", freq_tone_kHz, ind);
+  %[maskdB_res1 pp] = resonator(0.5, mask_sample_freqs_kHz);
+
+  %maskdB = ppval(pp, mask_sample_freqs_kHz - freq_tone_kHz);
+  maskdB = ppval(pp_bw(ind), mask_sample_freqs_kHz - freq_tone_kHz);
+endfunction
+
+
+% Alternative mask function that uses parabolas for fast computetion.
+
+function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
+
+  % note all frequencies in kHz
+
+  % bandwidth as a function of log(f)
+
+  f1  = 0.1; f2  = 3;
+  bw1 = 0.1; bw2 = 0.3; 
+  m = (bw2-bw1)/(log10(f2)-log10(f1));
+  c = bw1 - m*log10(f1);
+
+  Fs = 8;
+  slope = -12;
+
+  % frequency dependant bandwidth
+
+  bw = m*log10(freq_tone_kHz) + c;
+
+  % Design parabola to fit bandwidth
+
+  a = -3/((bw/2)^2);
+  %printf("freq_tone_kHz: %f bw: %f a: %f\n", freq_tone_kHz, bw, a);
+
+  % Design straight line to fit slope
+ 
+  delta = slope*log2(Fs/bw);                 % gain is delta down from -3dB to Fs/2
+  m1 = 2*delta/Fs;
+
+  maskdB_par  = a*((mask_sample_freqs_kHz - freq_tone_kHz).^2);
+  maskdB_line = m1*abs(mask_sample_freqs_kHz - freq_tone_kHz) - 20;
+
+  maskdB = max(maskdB_par, maskdB_line);
 endfunction
 
 
@@ -503,27 +593,38 @@ function plot_masking
 
   figure(1)
   mask_sample_freqs_kHz = 0.1:0.1:(Fs/1000)/2;
-  maskdB_cb = schroeder(0.5, mask_sample_freqs_kHz, 1);
-  plot(mask_sample_freqs_kHz, maskdB_cb);
+  maskdB_s0 = schroeder(0.5, mask_sample_freqs_kHz, 0);
+  plot(mask_sample_freqs_kHz, maskdB_s0);
   hold on;
-  maskdB_res = schroeder(0.5, mask_sample_freqs_kHz, 2);
-  plot(mask_sample_freqs_kHz, maskdB_res,'g');
+  maskdB_s1 = schroeder(0.5, mask_sample_freqs_kHz, 1);
+  plot(mask_sample_freqs_kHz, maskdB_s1,'g');
+  maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_res,'r');
 
   for f=0.5:0.5:3
-    maskdB_cb = schroeder(f, mask_sample_freqs_kHz, 1);
-    plot(mask_sample_freqs_kHz, maskdB_cb);
-    maskdB_res = schroeder(f, mask_sample_freqs_kHz, 2);
-    plot(mask_sample_freqs_kHz, maskdB_res,'g');
+    maskdB_s0 = schroeder(f, mask_sample_freqs_kHz, 0);
+    plot(mask_sample_freqs_kHz, maskdB_s0);
+    maskdB_s1 = schroeder(f, mask_sample_freqs_kHz, 1);
+    plot(mask_sample_freqs_kHz, maskdB_s1,'g');
+    maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
+    plot(mask_sample_freqs_kHz, maskdB_res,'r');
   end
   hold off;
   axis([0.1 4 -30 0])
   grid
 
+  pp_bw = gen_pp_bw;
   figure(2)
   clf;
-  w = pi/4; beta = 0.9;
-  X = freqz(1,[1 -2*beta*cos(w) beta*beta],4000);
-  plot(10*log10(abs(X)))
+  maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_res);  
+  hold on;
+  maskdB_res_fast = resonator_fast(pp_bw, 0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_res_fast, "g");  
+  maskdB_par = parabolic_resonator(0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_par, "r");  
+  hold off;
+  axis([0 4 -80 0]);
   grid
 endfunction
 
