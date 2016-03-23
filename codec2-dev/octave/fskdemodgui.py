@@ -36,7 +36,7 @@ win.setWindowTitle('FSK Demodulator Modem Statistics')
 
 # Plot objects
 ebno_plot = win.addPlot(title="Eb/No")
-ppm_plot = win.addPlot(title="Symbol Rate Offset")
+ppm_plot = win.addPlot(title="Sample Clock Offset")
 if args.wide == False:
 	win.nextRow()
 else:
@@ -49,7 +49,7 @@ eye_plot = win.addPlot(title="Eye Diagram")
 # Configure plot labels and scales.
 ebno_plot.setLabel('left','Eb/No (dB)')
 ebno_plot.setLabel('bottom','Time (seconds)')
-ppm_plot.setLabel('left','Offset (ppm)')
+ppm_plot.setLabel('left','Clock Offset (ppm)')
 ppm_plot.setLabel('bottom','Time (seconds)')
 fest_plot.setLabel('left','Frequency (Hz)')
 fest_plot.setLabel('bottom','Time (seconds)')
