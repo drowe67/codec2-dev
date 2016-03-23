@@ -25,8 +25,8 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   postfilter = 1;
   decimate_in_time = 1;
   synth_phase = 1;
-  freq_quant = 0;
-  amp_quant = 0;
+  freq_quant = 2;
+  amp_quant = 3;
   non_masked_f_log = [];
   non_masked_m_log = [];
   non_masked_amp_log = [];
@@ -56,7 +56,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
   % encoder loop ------------------------------------------------------
 
-  pp_bw = gen_pp_bw;
+  %pp_bw = gen_pp_bw;
 
   for f=1:frames
     printf("%d ", f);   
@@ -73,17 +73,17 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
     if decimate_in_freq
       % decimate mask samples in frequency
-      [decmaskdB masker_freqs_kHz] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant, pp_bw);
-      non_masked_amp = decmaskdB;
+      [decmaskdB masker_freqs_kHz masker_amps_dB ] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      non_masked_amp = masker_amps_dB ;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
 
       % Save this for decoder, so it knows where to apply post filter
       % Basically the frequencies of the AbyS samples
 
       non_masked_m(f,:) = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
-
       non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)'];
-      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
+
+      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz'];
       maskdB_ = decmaskdB;
     else
       % just approximate decimation in freq by using those mask samples we can hear
@@ -97,7 +97,6 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     model_(f,3:(L+1)) = Am_;
   end
 
- 
   % decoder loop -----------------------------------------------------
 
   for f=1:frames

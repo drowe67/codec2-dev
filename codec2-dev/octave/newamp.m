@@ -29,6 +29,7 @@
 %   [ ] phase model?  Fit LPC, just swing phase at peaks? Try no phase tweaks
 
 1;
+melvq;
 
 % Create a "decimated mask" model using just a few samples of
 % critical band filter centre frequencies.  For voiced speech,
@@ -147,25 +148,29 @@ end
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant, pp_bw)
+function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 ] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
 
     Nsamples = 4;
 
     % search range
 
-    m_st = 1;
+    f_min = 0;
+    f0 = Wo*4000/pi;
+    m_st = max(1, round(f_min/f0));
     m_en = L;
 
     target = maskdB;
     dec_samples = [];
-    mse_log1 = mse_log2 = zeros(Nsamples, L);
+    mse_log1 = zeros(Nsamples, L);
 
-    % This step quite important.  Set noise floor to avoid washing machine/tinkling
-    % sounds with bg noise as chunks of spectrum come and go.  The masking model
-    % basis functions are not gd at representing continuous spectra, especially at 
-    % LF.  Fortunately rather gd at voiced speech, which is a much tougher job.
+    % load VQ file if necc
 
-    % decmaskdB = 20*ones(1,L);
+    if (freq_quant == 2) || (amp_quant == 3)
+      load newamp_vq;
+    end
+
+    % set some sort of noise floor
+
     decmaskdB = zeros(1,L);
 
     for sample=1:Nsamples
@@ -177,10 +182,10 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
       min_mse = 1E32;
 
       for m=m_st:m_en
-        %single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,0) + AmdB(m);
+        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,1) + AmdB(m);
         %single_mask_m = resonator_fast(pp_bw, m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         %single_mask_m = resonator( m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
-        single_mask_m = parabolic_resonator(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
+        %single_mask_m = parabolic_resonator(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
         candidate = max(decmaskdB, single_mask_m);
         error = target - candidate;
         mse_log1(sample,m) = mse = sum(abs(error)); % MSE in log domain
@@ -221,7 +226,7 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
     % Differential Freq Quantisers - sounds acceptable
 
-    if freq_quant
+    if freq_quant == 1
            
       % first freq quant to harmonic number m=1:8
 
@@ -241,11 +246,21 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
        decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
+
+    % Freq Vector Quantiser
+
+    if freq_quant == 2
+      [res masker_freqs_kHz ind] = mbest(fvq, masker_freqs_kHz', 2);
+      std(res)
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+
+
     % Amplitude quantisation by fitting a straight line -------------------------
     % amp_quant == 1: high rate, quantise deltas
     % amp_quant == 2: low rate, don't quantise deltas
 
-    if amp_quant > 0
+    if (amp_quant == 1) || (amp_quant == 2)
 
       % Fit straight line
 
@@ -298,6 +313,15 @@ function [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask
 
       masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta_ + intercept;
       %decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
+    end
+
+
+    % Amplitude vector quantiser
+
+    if amp_quant == 3
+      [res masker_amps_dB ind] = mbest(avq, masker_amps_dB', 2);
+      std(res)
       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
     end
 
@@ -518,7 +542,7 @@ function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   m1 = 2*delta/Fs;
 
   maskdB_par  = a*((mask_sample_freqs_kHz - freq_tone_kHz).^2);
-  maskdB_line = m1*abs(mask_sample_freqs_kHz - freq_tone_kHz) - 20;
+  maskdB_line = m1*abs(mask_sample_freqs_kHz - freq_tone_kHz) - 10;
 
   maskdB = max(maskdB_par, maskdB_line);
 endfunction

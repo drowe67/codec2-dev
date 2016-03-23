@@ -39,7 +39,7 @@ function newamp_fbf(samname, f=10)
     ak = load(ak_name);
   end
 
-  pp_bw = gen_pp_bw;
+  % pp_bw = gen_pp_bw;
 
   plot_all_masks = 0;
   k = ' ';
@@ -86,7 +86,7 @@ function newamp_fbf(samname, f=10)
     % decimate in frequency
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    [decmaskdB masker_freqs_kHz min_error mse_log1 mse_log2] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant, pp_bw);
+    [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
 
     % find turning points - prototype for finding PF freqs when we decimate in time
     
