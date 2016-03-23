@@ -250,7 +250,7 @@ function states = est_freq(states, sf, ntones)
   % scale averaging time constant based on number of samples 
 
   tc = 0.95*Ndft/Fs;
-
+  %tc = .95;
   % Update mag DFT  ---------------------------------------------
 
   numffts = floor(length(sf)/Ndft);

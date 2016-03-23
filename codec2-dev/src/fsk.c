@@ -762,7 +762,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     
         /* Take a sample for the eye diagrams */
         neyesamp = fsk->stats->neyesamp = P*2;
-        neyeoffset = high_sample+1+P;
+        neyeoffset = high_sample+1+(P*28);
         
         fsk->stats->neyetr = fsk->mode*3;
         for(j=0; j<neyesamp; j++)
@@ -1162,7 +1162,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     
         /* Take a sample for the eye diagrams */
         neyesamp = fsk->stats->neyesamp = P*2;
-        neyeoffset = high_sample+1+P;
+        neyeoffset = low_sample+1+(P*(nsym/4));
         fsk->stats->neyetr = fsk->mode*2;
         
         for(j=0; j<neyesamp; j++)

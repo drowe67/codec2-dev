@@ -54,7 +54,7 @@ struct MODEM_STATS {
 
     /* eye diagram traces */
     /* Eye diagram plot -- first dim is trace number, second is the trace idx */
-    float  rx_eye[MODEM_STATS_ET_MAX][MODEM_STATS_NC_MAX+1];
+    float  rx_eye[MODEM_STATS_ET_MAX][80];
     int    neyetr;                           /* How many eye traces are plotted */
     int    neyesamp;                         /* How many samples in the eye diagram */
 
