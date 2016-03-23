@@ -56,7 +56,7 @@ fest_plot.setLabel('bottom','Time (seconds)')
 eye_plot.disableAutoRange()
 eye_plot.setYRange(0,1)
 eye_plot.setXRange(0,15)
-
+eye_xr = 15
 
 # Data arrays...
 ebno_data = np.zeros(history_size)*np.nan
@@ -73,7 +73,7 @@ fest4_curve = fest_plot.plot(x=history_scale,y=fest_data[3,:],pen='m') # f4 = Ma
 
 # Plot update function. Reads from queue, processes and updates plots.
 def update_plots():
-	global timeout,timeout_counter,eye_plot,ebno_curve, ppm_curve, fest1_curve, fest2_curve, ebno_data, ppm_data, fest_data, in_queue
+	global timeout,timeout_counter,eye_plot,ebno_curve, ppm_curve, fest1_curve, fest2_curve, ebno_data, ppm_data, fest_data, in_queue, eye_xr
 
 	try:
 		if in_queue.empty():
@@ -102,8 +102,8 @@ def update_plots():
 
 	# Try reading in the other 2 tones.
 	try:
-		new_fest1 = in_data['f3_est']
-		new_fest2 = in_data['f4_est']
+		new_fest3 = in_data['f3_est']
+		new_fest4 = in_data['f4_est']
 		fest_data[2,-1] = new_fest3
 		fest_data[3,-1] = new_fest4
 	except:
@@ -128,6 +128,7 @@ def update_plots():
 	#Now try reading in and plotting the eye diagram
 	try:
 		eye_data = np.array(in_data['eye_diagram'])
+
 		#eye_plot.disableAutoRange()
 		eye_plot.clear()
 		col_index = 0
@@ -135,7 +136,12 @@ def update_plots():
 			eye_plot.plot(line,pen=(col_index,eye_data.shape[0]))
 			col_index += 1
 		#eye_plot.autoRange()
-
+		
+		#Quick autoranging for x-axis to allow for differing P and Ts values
+		if eye_xr != len(eye_data[0]) - 1:
+			eye_xr = len(eye_data[0]) - 1
+			eye_plot.setXRange(0,len(eye_data[0])-1)
+			
 	except Exception as e:
 		pass
 

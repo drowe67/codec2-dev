@@ -142,7 +142,7 @@ void fmfsk_mod(struct FMFSK *fmfsk, float fmfsk_out[],uint8_t bits_in[]){
  * float fsk_in[] - nin samples of modualted FMFSK from an FM radio
  */
 void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
-    int i,j;
+    int i,j,k;
     int Ts          = fmfsk->Ts;
     int Fs          = fmfsk->Fs;
     int Rs          = fmfsk->Rs;
@@ -161,6 +161,9 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     int next_nin;
     float apeven,apodd;     /* Approx. prob of even or odd stream being correct */
     float currv,mdiff,lastv;
+    int neyesamp;
+    int neyeoffset;
+    float eye_max;
     uint8_t mbit;
     
     /* Shift in nin samples */
@@ -289,6 +292,28 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         /* Zero out all of the other things */
         fmfsk->stats->foff = 0;
         fmfsk->stats->snr_est = 0;
+        
+        /* Collect an eye diagram */
+        /* Take a sample for the eye diagrams */
+        neyesamp = fmfsk->stats->neyesamp = Ts*4;
+        neyeoffset = sample_offset+(Ts*2*28);
+        
+        fmfsk->stats->neyetr = 8;
+        for(k=0; k<fmfsk->stats->neyetr; k++)
+            for(j=0; j<neyesamp; j++)                                 
+                fmfsk->stats->rx_eye[k][j] = rx_filt[k*neyesamp+neyeoffset+j];
+        
+        eye_max = 0;
+        
+        /* Normalize eye to +/- 1 */
+        for(i=0; i<fmfsk->stats->neyetr; i++)
+            for(j=0; j<neyesamp; j++)
+                if(fabsf(fmfsk->stats->rx_eye[i][j])>eye_max)
+                    eye_max = fabsf(fmfsk->stats->rx_eye[i][j]);
+        
+        for(i=0; i<fmfsk->stats->neyetr; i++)
+            for(j=0; j<neyesamp; j++)
+                fmfsk->stats->rx_eye[i][j] = (fmfsk->stats->rx_eye[i][j]/(2*eye_max))+.5;
     }
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);

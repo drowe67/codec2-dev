@@ -29,7 +29,7 @@
 
 #include <stdio.h>
 #include "fmfsk.h"
-
+#include "modem_stats.h"
 #define MODEMPROBE_ENABLE
 #include "modem_probe.h"
 #include "codec2_fdmdv.h"
@@ -37,14 +37,19 @@
 int main(int argc,char *argv[]){
     struct FMFSK *fmfsk;
     int Fs,Rb;
+    struct MODEM_STATS stats;
+    float loop_time;
+    int enable_stats = 0;
+    int stats_ctr = 0;
+    int stats_loop = 0;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf;
-    int i,t;
+    int i,j,t;
     
     if(argc<4){
-        fprintf(stderr,"usage: %s SampleFreq BitRate InputModemRawFile OutputOneBitPerCharFile [OctaveLogFile]\n",argv[0]);
+        fprintf(stderr,"usage: %s SampleFreq BitRate InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
         exit(1);
     }
     
@@ -64,13 +69,19 @@ int main(int argc,char *argv[]){
     }else{
 	fout = fopen(argv[4],"w");
     }
-
-    
-    if(argc>4)
-	modem_probe_init("fmfsk2",argv[5]);
 	
     /* set up FSK */
     fmfsk = fmfsk_create(Fs,Rb);
+
+    if(argc>5){
+	if(strcmp(argv[5],"S")==0){
+	    enable_stats = 1;
+	    fmfsk_setup_modem_stats(fmfsk,&stats);
+	    loop_time = ((float)fmfsk_nin(fmfsk))/((float)Fs);
+	    stats_loop = (int)(.125/loop_time);
+	    stats_ctr = 0;
+	}
+    }
     
     if(fin==NULL || fout==NULL || fmfsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
@@ -98,6 +109,25 @@ int main(int argc,char *argv[]){
         
 	fwrite(bitbuf,sizeof(uint8_t),fmfsk->nbit,fout);
         
+	if(enable_stats && stats_ctr <= 0){
+	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)stats.clock_offset);
+	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",0,0);
+	    fprintf(stderr,",\t\"eye_diagram\":[");
+	    for(i=0;i<stats.neyetr;i++){
+		fprintf(stderr,"[");
+		for(j=0;j<stats.neyesamp;j++){
+		    fprintf(stderr,"%f",stats.rx_eye[i][j]);
+		    if(j<stats.neyesamp-1) fprintf(stderr,",");
+		}
+		fprintf(stderr,"]");
+		if(i<stats.neyetr-1) fprintf(stderr,",");
+	    }
+	    
+	    fprintf(stderr,"]}\n");
+	    stats_ctr = stats_loop;
+	}
+	stats_ctr--;
+	
         if(fin == stdin || fout == stdin){
 	    fflush(fin);
 	    fflush(fout);

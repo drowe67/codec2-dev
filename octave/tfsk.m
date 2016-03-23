@@ -565,7 +565,7 @@ endfunction
 
 function plot_fsk_bers(M=2)
     %Range of EbNodB over which to plot
-    ebnodbrange = (3:13);
+    ebnodbrange = (4:13);
     
     berc = ones(1,length(ebnodbrange));
     bero = ones(1,length(ebnodbrange));
@@ -582,8 +582,8 @@ function plot_fsk_bers(M=2)
     Mv     = repmat(M,1,ebnodbs);
     
     
-    statv = pararrayfun(floor(.5*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
-    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    %statv = pararrayfun(floor(.5*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
         stat = statv(ii);
