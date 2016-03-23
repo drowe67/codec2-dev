@@ -17,8 +17,8 @@
 
 fm;
 
-function tx = fm_mod(fmod)
-  fm_states.Fs = 192E3;  
+function tx = fm_mod(Fs, fmod)
+  fm_states.Fs = Fs;  
   fm_states.fm_max = 3E3;
   fm_states.fd = 5E3;
   fm_states.fc = 48E3;
@@ -55,10 +55,10 @@ phi   = 0.5;           % phase difference between antennas -
 theta = 0;             % phase term constant to ant1 and ant2
 alpha = 0;             % LO phase
 
-Fs    = 192E3;         % sample rate
-CNodB = 60;            % C/No of carrier, which dominates power
+Fs    = 200E3;         % sample rate
+CNodB = 100;           % C/No of carrier, which dominates power
                        % Around C/No = 50dB is min for FM (12dB-ish SINAD)
-fmod  = 1000;          % Audio modulation on FM signal (0 for carrier)
+fmod  = 0;             % Audio modulation on FM signal (0 for carrier)
 N     = Fs/2;          % processing block size
 
 % BW is Fs Hz.  No=(total noise power Nt)/Fs. N=noise power=variance of noise source
@@ -130,11 +130,9 @@ plot(x(Ns:Ns+Np-1), y(Ns:Ns+Np-1))
 
 % Main -------------------------------------------------------------------------
 
-phi_est = zeros(1,ntrials);
-
 % tx signal
 
-tx = fm_mod(fmod); 
+tx = fm_mod(Fs, fmod); 
 
 % simulate rx signals at antenna 1 and 2 by adding noise.  Note signal
 % at antenna 2 is phase shifted phi due to path difference. Both signals
@@ -154,8 +152,8 @@ rx = ant1 + ant2_mix;
 
 % Uncomment to use HackRF file as input, ow test sig generated baove is used 
 
-% rx=hackrf_dc("df1.iq"); rx = rx(1000:length(rx)); % discard initial transients
-  
+rx=hackrf_dc("df1.iq"); rx = rx(1000:length(rx)); % discard initial transients
+t = 1:length(rx);  
 Rx = (1/N)*fft(rx,N);
 
 % BPF each signal
@@ -171,17 +169,18 @@ sam3 = exp(-j*wlo*t) .* filter(bcentre, 1, rx .* exp( j*wlo*t));
 two_phi_est_rect = conj(sam2.*sam3) .* (sam1.^2);
 phi_est = angle(two_phi_est_rect)/2;
 
-angle(mean(two_phi_est_rect))/2
+phi_est_av = angle(mean(two_phi_est_rect))/2;
+printf("phi_est : %3.2f rads %3.1f degrees\n", phi_est_av, phi_est_av*180/pi);
 
 % some plots ....
 
 figure(2);
 clf;
 plot((1:N)*Fs/N, 20*log10(abs(Rx)),'markersize', 10, 'linewidth', 2);
-axis([1 Fs -60 0])
+axis([1 Fs -80 0])
 title('Rx signal at SDR input');
 
-figure(2)
+figure(3)
 clf
 Sam1 = (1/N)*fft(sam1,N);
 Sam2 = (1/N)*fft(sam2,N);
@@ -197,7 +196,7 @@ subplot(313)
 plot((1:N)*Fs/N, 20*log10(abs(Sam3)),'markersize', 10, 'linewidth', 2);
 axis([1 Fs/2 -60 0])
 
-figure(3)
+figure(4)
 Np = 1000;
 subplot(311)
 plot(real(sam1(1:Np)))
@@ -207,14 +206,14 @@ plot(real(sam2(1:Np)))
 subplot(313)
 plot(real(sam3(1:Np)))
 
-figure(4)
+figure(5)
 clf;
 plot(two_phi_est_rect)
 xmax = 2*mean(abs(two_phi_est_rect));
 axis([-xmax xmax -xmax xmax])
 title('Scatter Plot');
 
-figure(5)
+figure(6)
 clf;
 subplot(211)
 plot(real(two_phi_est_rect(1:Np)))
@@ -222,11 +221,11 @@ subplot(212)
 plot(imag(two_phi_est_rect(1:Np)))
 title('two phi est rect')
 
-figure(6)
+figure(7)
 clf
 hist([angle(two_phi_est_rect)/2 -pi/2 pi/2],100)
 
-figure(7)
+figure(8)
 clf
 plot(phi_est)
 axis([0 length(phi_est(1:Np)) -pi/2 pi/2]);
