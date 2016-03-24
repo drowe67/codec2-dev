@@ -23,13 +23,14 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   max_amp = 80;
   decimate_in_freq = 1;
   postfilter = 1;
-  decimate_in_time = 1;
-  synth_phase = 1;
-  freq_quant = 2;
-  amp_quant = 3;
+  decimate_in_time = 0;
+  synth_phase = 0;
+  freq_quant = 0;
+  amp_quant = 0;
   non_masked_f_log = [];
   non_masked_m_log = [];
   non_masked_amp_log = [];
+  best_min_mse_log = [];
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -73,7 +74,9 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
     if decimate_in_freq
       % decimate mask samples in frequency
-      [decmaskdB masker_freqs_kHz masker_amps_dB ] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      best_min_mse_log = [best_min_mse_log best_min_mse];
+
       non_masked_amp = masker_amps_dB ;
       non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
 
@@ -192,6 +195,9 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   end
 
   printf("\n");
+
+  printf("mse std: %5.2f\n", std(best_min_mse_log));
+
 endfunction
 
 

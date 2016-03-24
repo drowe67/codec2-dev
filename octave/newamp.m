@@ -143,12 +143,26 @@ function pp_bw = gen_pp_bw
     pp_bw(6);
 end
 
+
+% See where we can best place a mask to minimise MSE
+
+function mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en)
+  mse = zeros(1, l_en);
+  for l=l_st:l_en
+    single_mask_l = schroeder(l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(l);
+    candidate = max(decmaskdB, single_mask_l);
+    error = target - candidate;
+    mse(l) = sum(abs(error)); % MSE in log domain
+  end
+end
+
+
 % Alternative way to come up with a decimated mask model, using
 % analysis by synthesis to determine the best place to put samples.
 % Ahh, takes me back to when I was a slip of a speech coder, playing
 % with my first CELP codec!
 
-function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 ] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
+function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
 
     Nsamples = 4;
 
@@ -156,8 +170,8 @@ function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 ] = make_
 
     f_min = 0;
     f0 = Wo*4000/pi;
-    m_st = max(1, round(f_min/f0));
-    m_en = L;
+    l_st = max(1, round(f_min/f0));
+    l_en = L;
 
     target = maskdB;
     dec_samples = [];
@@ -173,46 +187,67 @@ function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 ] = make_
 
     decmaskdB = zeros(1,L);
 
-    for sample=1:Nsamples
+    % loop to fit Nsample masks to spectrum -----------------------------------------------
 
-      target_log = target;
+    % find mses for first sample
 
-      % find best position for sample to minimise distance to target
+    mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en);
+    mse_log1(1,:) = mse;
 
-      min_mse = 1E32;
+    % find m-best for searching for next sample positions
 
-      for m=m_st:m_en
-        single_mask_m = schroeder(m*Wo*4/pi, mask_sample_freqs_kHz,1) + AmdB(m);
-        %single_mask_m = resonator_fast(pp_bw, m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
-        %single_mask_m = resonator( m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
-        %single_mask_m = parabolic_resonator(m*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(m);
-        candidate = max(decmaskdB, single_mask_m);
-        error = target - candidate;
-        mse_log1(sample,m) = mse = sum(abs(error)); % MSE in log domain
-        %printf("m: %d f: %f error: %f\n", m, m*Wo*4/pi, mse);
-      
-        too_close = 0;
-        for x=1:sample-1
-          if abs(dec_samples(x,2) - m) < 2
-            too_close = 1;
+    [best_mse best_l] = sort(mse);
+
+    printf("\n");
+    m = 1; best_min_mse = 1E32;
+
+    for t=1:m
+      min_mse_l = best_l(t);
+      decmaskdB = schroeder(min_mse_l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(min_mse_l);
+      printf("t: %d best_l: %4.0f sample: %d\n", t, best_l(t)*Wo*4000/pi, 1);
+
+      for sample=2:Nsamples
+
+        % find mse for all possible positions ---------------------------------
+
+        mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en);
+        mse_log1(sample,:) = mse;
+
+        % Choose best candidate ------------------------------------------------
+
+        min_mse = 1E32;
+        for l=l_st:l_en
+          if mse(l) < min_mse
+            min_mse = mse(l);
+            min_mse_l = l;
           end
-        end
+        end 
 
-        if (mse < min_mse) && (too_close == 0)
-          min_mse = mse;
-          min_mse_m = m;
-          min_candidate = candidate;
-          min_error = error;
-        end
+        % Get ready for next iteration ------------------------------------------------
+
+        single_mask_l = schroeder(min_mse_l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(min_mse_l);
+        decmaskdB  = max(decmaskdB, single_mask_l);
+ 
+        dec_samples = [dec_samples; AmdB(min_mse_l) min_mse_l];
+        masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
+        printf("  min_mse_l: %4.0f min_mse: %5.1f\n", min_mse_l*Wo*4000/pi, min_mse);
       end
 
-      % Choose best candidate ------------------------------------------------
-
-      decmaskdB = min_candidate;
-      dec_samples = [dec_samples; AmdB(min_mse_m) min_mse_m];
-      masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-      %printf("sample: %d min_mse_m: %d\n", sample, min_mse_m);
+      % OK now we have mse and mask for t-th iteration.  Lets see if this is the best so far 
+      
+      if min_mse < best_min_mse
+        best_t = t;
+        best_min_mse =  min_mse;
+        best_decmaskdB = decmaskdB;
+        best_masker_freqs_kHz = masker_freqs_kHz;
+      end
+      printf("  best_t...: %4d best_min_mse: %5.1f\n", best_t, best_min_mse);
     end
+
+    decmaskdB = best_decmaskdB;
+    masker_freqs_kHz = best_masker_freqs_kHz;
+   
+    min_error = target - decmaskdB;
 
     bits = [];
 
