@@ -6,10 +6,10 @@
 % antennas.  This simulation tests estimation of phase and freq of 
 % mixer LO.
 %
-% [ ] built in hackrf_dc
-% [ ] test mode
-% [ ] compass needle
-% [ ] real time operation (or close to it)
+% [X] built in hackrf_dc
+% [X] test mode
+% [X] compass needle
+% [X] real time operation (or close to it)
 
 fm;
 
@@ -86,8 +86,6 @@ randn('state',1);
 more off;
 format short
 
-simulate = 0;          % set to 0 for HackRF input, 1 for simulated input
-
 f     = 48E3;          % signal frequency
 flo   = 32.768E3;      % LO frequency
 m     = 10^(-0/20);    % modulation index of our mixer, how far each 
@@ -131,128 +129,144 @@ bcentre  = fir2(200, [0, f-bw/2, f, f+bw/2, Fs/2]/(Fs/2), [0 0 1 0 0]);
 
 % Main -------------------------------------------------------------------------
 
-if simulate
-  % Simulate rx signal ---------------------------------------------------------
+mode = "sample";
+finished = 0;
+while !finished
 
-  t=0:N-1;
+  if strcmp(mode, "simulate")
+    % Simulate rx signal ---------------------------------------------------------
 
-  % tx signal
+    t=0:N-1;
 
-  tx = fm_mod(Fs, fmod); 
+    % tx signal
 
-  % simulate rx signals at antenna 1 and 2 by adding noise.  Note signal
-  % at antenna 2 is phase shifted phi due to path difference. Both signals
-  % experience a time of flight path different theta.
+    tx = fm_mod(Fs, fmod); 
 
-  n = sqrt(var/2)*randn(1,N) + j*sqrt(var/2)*randn(1,N);
-  ant1 = tx*exp(j*(theta+phi)) + n;
-  ant2 = tx*exp(j*(theta)) + n;
+    % simulate rx signals at antenna 1 and 2 by adding noise.  Note signal
+    % at antenna 2 is phase shifted phi due to path difference. Both signals
+    % experience a time of flight path different theta.
 
-  % ant2 passed through mixer with local osc frequency wlo and phase alpha
+    n = sqrt(var/2)*randn(1,N) + j*sqrt(var/2)*randn(1,N);
+    ant1 = tx*exp(j*(theta+phi)) + n;
+    ant2 = tx*exp(j*(theta)) + n;
 
-  ant2_mix = 2.0*m*(ant2 .* cos(t*wlo + alpha));
+    % ant2 passed through mixer with local osc frequency wlo and phase alpha
 
-  % The SDR receives the sum of the two signals
+    ant2_mix = 2.0*m*(ant2 .* cos(t*wlo + alpha));
 
-  rx = ant1 + ant2_mix;
+    % The SDR receives the sum of the two signals
 
-else
-  % Off air signal from HackRF -------------------------------------------------------
+    rx = ant1 + ant2_mix;
+  end
 
-  s1 = load_hackrf("df1.iq");
-  rx = downsample(rot90(s1), Fshrf/Fs)/127;
-  t = 1:length(rx);  
-end
+  if strcmp(mode,"file") || strcmp(mode,"sample")
+    % Off air signal from HackRF stored in file ----------------------------------------------
 
-Rx = (1/N)*fft(rx,N);
+    if strcmp(mode,"sample")
+      [status output] = system("hackrf_transfer -r df1.iq -f 439000000  -n 10000000 -l 20 -g 40");
+    end
+    s1 = load_hackrf("df1.iq");
+    rx = downsample(rot90(s1), Fshrf/Fs)/127;
+    t = 1:length(rx);  
+  end
 
-% BPF each signal
+  Rx = (1/N)*fft(rx,N);
 
-sam1 = filter(bcentre,1,rx);
-sam2 = exp( j*wlo*t) .* filter(bcentre, 1, rx .* exp(-j*wlo*t));
-sam3 = exp(-j*wlo*t) .* filter(bcentre, 1, rx .* exp( j*wlo*t));
+  % BPF each signal
 
-% Do the math on phases using rect math
+  sam1 = filter(bcentre,1,rx);
+  sam2 = exp( j*wlo*t) .* filter(bcentre, 1, rx .* exp(-j*wlo*t));
+  sam3 = exp(-j*wlo*t) .* filter(bcentre, 1, rx .* exp( j*wlo*t));
 
-two_phi_est_rect = conj(sam2.*sam3) .* (sam1.^2);
-phi_est = angle(two_phi_est_rect)/2;
+  % Do the math on phases using rect math
 
-phi_est_av = angle(mean(two_phi_est_rect))/2;
+  two_phi_est_rect = conj(sam2.*sam3) .* (sam1.^2);
+  phi_est = angle(two_phi_est_rect)/2;
 
-printf("phi_est : %3.2f rads %3.1f degrees\n", phi_est_av, phi_est_av*180/pi);
+  phi_est_av = angle(mean(two_phi_est_rect))/2;
 
-% some plots ....
+  printf("phi_est : %3.2f rads %3.1f degrees\n", phi_est_av, phi_est_av*180/pi);
 
-figs = 0x1 + 0x20;
+  % some plots ....
 
-if bitand(figs, 0x1)
-  figure(1);
-  clf;
-  plot((1:N)*Fs/N, 20*log10(abs(Rx)),'markersize', 10, 'linewidth', 2);
-  axis([1 Fs -80 0])
-  title('Rx signal at SDR input');
-end
+  figs = 0x1 + 0x2 + 0x20;
 
-if bitand(figs, 0x2)
-  figure(2)
-  clf
-  Sam1 = (1/N)*fft(sam1,N);
-  Sam2 = (1/N)*fft(sam2,N);
-  Sam3 = (1/N)*fft(sam3,N);
-  subplot(311)
-  plot((1:N)*Fs/N, 20*log10(abs(Sam1)),'markersize', 10, 'linewidth', 2);
-  axis([1 Fs/2 -60 0])
-  title('Band Pass filtered signals');
-  subplot(312)
-  plot((1:N)*Fs/N, 20*log10(abs(Sam2)),'markersize', 10, 'linewidth', 2);
-  axis([1 Fs/2 -60 0])
-  subplot(313)
-  plot((1:N)*Fs/N, 20*log10(abs(Sam3)),'markersize', 10, 'linewidth', 2);
-  axis([1 Fs/2 -60 0])
-end
+  if bitand(figs, 0x1)
+    figure(1);
+    clf;
+    plot((1:N)*Fs/N, 20*log10(abs(Rx)),'markersize', 10, 'linewidth', 2);
+    axis([1 Fs -80 0])
+    title('Rx signal at SDR input');
+  end
 
-if bitand(figs, 0x4)
-  figure(3)
-  Np = 1000;
-  subplot(311)
-  plot(real(sam1(1:Np)))
-  title('Band Pass filtered signals');
-  subplot(312)
-  plot(real(sam2(1:Np)))
-  subplot(313)
-  plot(real(sam3(1:Np)))
-end
+  if bitand(figs, 0x2)
+    figure(2)
+    clf
+    Sam1 = (1/N)*fft(sam1,N);
+    Sam2 = (1/N)*fft(sam2,N);
+    Sam3 = (1/N)*fft(sam3,N);
+    subplot(311)
+    plot((1:N)*Fs/N, 20*log10(abs(Sam1)),'markersize', 10, 'linewidth', 2);
+    axis([f-bw/2 f+bw/2 -60 0])
+    title('Band Pass filtered signals');
+    subplot(312)
+    plot((1:N)*Fs/N, 20*log10(abs(Sam2)),'markersize', 10, 'linewidth', 2);
+    axis([f+flo-bw/2 f+flo+bw/2 -60 0])
+    subplot(313)
+    plot((1:N)*Fs/N, 20*log10(abs(Sam3)),'markersize', 10, 'linewidth', 2);
+    axis([f-flo-bw/2 f-flo+bw/2 -60 0])
+  end
 
-if bitand(figs, 0x8)
-  figure(4)
-  clf;
-  hist2d([real(two_phi_est_rect)' imag(two_phi_est_rect)'],50)
-  xmax = 2*mean(abs(two_phi_est_rect));
-  axis([-xmax xmax -xmax xmax])
-  title('Scatter Plot');
-end
+  if bitand(figs, 0x4)
+    figure(3)
+    Np = 1000;
+    subplot(311)
+    plot(real(sam1(1:Np)))
+    title('Band Pass filtered signals');
+    subplot(312)
+    plot(real(sam2(1:Np)))
+    subplot(313)
+    plot(real(sam3(1:Np)))
+  end
 
-if bitand(figs, 0x10)
-  figure(5)
-  clf;
-  subplot(211)
-  plot(real(two_phi_est_rect(1:Np)))
-  subplot(212)
-  plot(imag(two_phi_est_rect(1:Np)))
-  title('two phi est rect')
-end
+  if bitand(figs, 0x8)
+    figure(4)
+    clf;
+    hist2d([real(two_phi_est_rect)' imag(two_phi_est_rect)'],50)
+    xmax = 2*mean(abs(two_phi_est_rect));
+    axis([-xmax xmax -xmax xmax])
+    title('Scatter Plot');
+  end
 
-if bitand(figs, 0x20)
-  figure(6)
-  clf
-  [r theta] = hist([angle(two_phi_est_rect)/2 -pi/2 pi/2],100);
-  polar([theta pi+theta],[r r])
-end
+  if bitand(figs, 0x10)
+    figure(5)
+    clf;
+    subplot(211)
+    plot(real(two_phi_est_rect(1:Np)))
+    subplot(212)
+    plot(imag(two_phi_est_rect(1:Np)))
+    title('two phi est rect')
+  end
 
-if bitand(figs, 0x40)
-  figure(7)
-  clf
-  plot(phi_est)
-  axis([0 length(phi_est(1:Np)) -pi/2 pi/2]);
-  title('phi est')
+  if bitand(figs, 0x20)
+    figure(6)
+    clf
+    [r theta] = hist([angle(two_phi_est_rect)/2 -pi/2 pi/2],100);
+    polar([theta pi+theta],[r r])
+  end
+
+  if bitand(figs, 0x40)
+    figure(7)
+    clf
+    plot(phi_est)
+    axis([0 length(phi_est(1:Np)) -pi/2 pi/2]);
+    title('phi est')
+  end
+
+  % when sampling hit any key to finish, finish after one pass in other modes
+
+  finished = 1;
+  if strcmp(mode, "sample")
+    finished = length(kbhit(1));
+  end
 end
