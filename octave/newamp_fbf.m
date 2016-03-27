@@ -110,11 +110,13 @@ function newamp_fbf(samname, f=10)
     %plot(mask_sample_freqs_kHz*1000, min_error);
     hold off;
 
+    if 0
     figure(3)
     clf
     plot((1:L)*Wo*4000/pi, mse_log1');
     axis([0 4000 0 max(mse_log1(1,:))])
     title('Error as a function of position for each AbyS stage');
+    end
 
     % decimated in time
 
@@ -176,14 +178,14 @@ function newamp_fbf(samname, f=10)
     endif
     if k == 'm'
       if amp_quant == 0
-         amp_quant = 1;
+         amp_quant = 3;
       else
          amp_quant = 0;
       end
     end
     if k == 'f'
       if freq_quant == 0
-        freq_quant = 1;
+        freq_quant = 3;
       else
         freq_quant = 0;
       end

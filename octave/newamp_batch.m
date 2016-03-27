@@ -23,10 +23,10 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   max_amp = 80;
   decimate_in_freq = 1;
   postfilter = 1;
-  decimate_in_time = 0;
-  synth_phase = 0;
-  freq_quant = 0;
-  amp_quant = 0;
+  decimate_in_time = 1;
+  synth_phase = 1;
+  freq_quant = 3;
+  amp_quant = 3;
   non_masked_f_log = [];
   non_masked_m_log = [];
   non_masked_amp_log = [];
@@ -74,20 +74,22 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
     if decimate_in_freq
       % decimate mask samples in frequency
-      [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
+      [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse ind_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
       best_min_mse_log = [best_min_mse_log best_min_mse];
+      ind_log
 
       non_masked_amp = masker_amps_dB ;
-      non_masked_amp_log = [non_masked_amp_log; non_masked_amp'];
+      non_masked_amp_log = [non_masked_amp_log; non_masked_amp];
 
       % Save this for decoder, so it knows where to apply post filter
       % Basically the frequencies of the AbyS samples
 
       non_masked_m(f,:) = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
-      non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)'];
+      non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)];
 
-      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz'];
+      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
       maskdB_ = decmaskdB;
+
     else
       % just approximate decimation in freq by using those mask samples we can hear
       maskdB_ = maskdB;
@@ -127,7 +129,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
       end
       a_non_masked_m = tp;
     else
-      % read non-maksed (PF freqs) from analysis stage
+      % read non-masked (PF freqs) from analysis stage
       % number of non-masked samples is variable when not using AbyS,
       % but fixed when using AbyS
 
