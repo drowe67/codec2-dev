@@ -157,6 +157,34 @@ function mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l
 end
 
 
+% simple resampling to a fixed length vector on mel scale
+% fixed freq grid resampling
+
+function [decmaskdB mel_sample_freqs_kHz mel_masker_amps_dB min_error mse_log1 best_min_mse ind_log] = make_decmask_mel(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)  
+
+  % set up mel sampling grid
+
+  Nmel = 20;
+  mel_st = freq2mel(Wo*4000/pi);
+  mel_en = freq2mel(L*Wo*4000/pi);
+  m_step = (mel_en-mel_st)/Nmel;
+  m = mel_st:m_step:mel_en;
+  mel_sample_freqs_kHz = mel2freq(m)/1000;
+
+  % resample on mel grid
+
+  mask_pp = splinefit(mask_sample_freqs_kHz, maskdB, L);
+  mel_masker_amps_dB = ppval(mask_pp, mel_sample_freqs_kHz);
+
+  % resample on Wo grid
+
+  mel_pp = splinefit(mel_sample_freqs_kHz, mel_masker_amps_dB, L);
+  decmaskdB = ppval(mel_pp, mask_sample_freqs_kHz);
+  size(decmaskdB)
+  min_error = 0; mse_log1=[]; best_min_mse=0; ind_log=[];
+end
+
+
 function mel = freq2mel(f)
   mel = 70*log10(1 + f/700);
 endfunction
