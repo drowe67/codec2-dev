@@ -31,6 +31,47 @@
 1;
 melvq;
 
+
+function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, Nkeep=7)
+
+    % Lets try to come up with a smoothed, cyclic model.  Replace
+    % points from 3500 Hz to 4000Hz with a sequence that joins without
+    % a step to points at the 0Hz end of the spectrum.  This will make
+    % it more cyclical and make the DFT happier, less high freq
+    % energy.  Yes, happier is an extremely technical term.
+
+    L = length(maskdB);
+    anchor = floor(7*L/8);
+    xpts = [ anchor-1 anchor L+1 L+2];
+    ypts = [ maskdB(anchor-1) maskdB(anchor) maskdB(1) maskdB(2)];
+    mask_pp = splinefit(xpts, ypts, 1);
+    maskdB_cyclic = [maskdB(1:anchor) ppval(mask_pp, anchor+1:L)];
+
+    % Now DFT, truncating DFT coeffs to undersample
+
+    if cyclic
+      D = fft(maskdB_cyclic);
+    else
+      D = fft(maskdB);
+    end
+    Dabs = abs(D);                        % this returned for plotting
+    D_ = D; % + 10*randn(1,L) + 10*j*randn(1,L);
+    D_(Nkeep+1:L-Nkeep) = 0;              % truncate
+    d = ifft(D_);                         % back to spectrum at rate L
+    maskdB_ = real(d);
+    Dk_ = [0 D(2:Nkeep-1) real(D(Nkeep)) D(L-Nkeep+1:L)];  % build rate Nkeep vector for quantisation
+    dk_ = real(ifft(Dk_));
+
+    % OK now fix up last 500Hz, taper down 10dB at 4000Hz
+
+    xpts = [ anchor-1 anchor L];
+    ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
+    mask_pp = splinefit(xpts, ypts, 1);
+    maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
+
+endfunction
+
+
 % Create a "decimated mask" model using just a few samples of
 % critical band filter centre frequencies.  For voiced speech,
 % we fit the amplitude of these samples to a straight line.

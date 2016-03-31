@@ -16,21 +16,18 @@
 
 % process a whole file and write results
 
-function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
   max_amp = 80;
-  decimate_in_freq = 1;
+  dec_in_freq = 1;
   postfilter = 1;
-  decimate_in_time = 0;
-  synth_phase = 1;
+  dec_in_time = 0;
+  synth_phase = 0;
   freq_quant = 0;
   amp_quant = 0;
-  non_masked_f_log = [];
-  non_masked_m_log = [];
-  non_masked_amp_log = [];
-  best_min_mse_log = [];
+  dk_log = [];
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -59,6 +56,7 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
   %pp_bw = gen_pp_bw;
 
+  sd_sum = 0;
   for f=1:frames
     printf("%d ", f);   
     model_(f,2) = L = min([model(f,2) max_amp-1]);
@@ -72,35 +70,23 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB = mask_model(AmdB, Wo, L);
 
-    if decimate_in_freq
-      % decimate mask samples in frequency
-      [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse ind_log] = make_decmask_mel(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant);
-      best_min_mse_log = [best_min_mse_log best_min_mse];
-      ind_log
+    % save post filter positions for decode
 
-      non_masked_amp = masker_amps_dB ;
-      non_masked_amp_log = [non_masked_amp_log; non_masked_amp];
+    maskdB_ = maskdB;
+    a_non_masked_m = find(AmdB > maskdB);
+    non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
 
-      % Save this for decoder, so it knows where to apply post filter
-      % Basically the frequencies of the AbyS samples
-
-      non_masked_m(f,:) = min(round(masker_freqs_kHz/(Wo*4/pi)),L);
-      non_masked_m_log = [non_masked_m_log; non_masked_m(f,:)];
-
-      non_masked_f_log = [non_masked_f_log; masker_freqs_kHz];
-      maskdB_ = decmaskdB;
-
-    else
-      % just approximate decimation in freq by using those mask samples we can hear
-      maskdB_ = maskdB;
-      a_non_masked_m = find(AmdB > maskdB);
-      non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
+    if dec_in_freq
+      [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1);
+      dk_log = [dk_log; dk_];
     end
+    sd_sum += sum(maskdB - maskdB_);
 
     Am_ = zeros(1,max_amp);
     Am_ = 10 .^ (maskdB_(1:L-1)/20); 
     model_(f,3:(L+1)) = Am_;
   end
+  printf("\nsd_sum: %5.2f\n", sd_sum/frames);
 
   % decoder loop -----------------------------------------------------
 
@@ -112,9 +98,8 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
     maskdB_ = 20*log10(Am_);
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    %maskdB_ = mask_model(maskdB_, Wo, L);
 
-    if decimate_in_time
+    if dec_in_time
       % decimate mask samples in time
       maskdB_ = decimate_frame_rate(model_, 4, f, frames, mask_sample_freqs_kHz);
 
@@ -135,7 +120,6 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
 
       m = max(find(non_masked_m(f,:) > 0)); 
       a_non_masked_m = non_masked_m(f,1:m);
-
     end
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
@@ -171,22 +155,6 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
       Aw(1:2:fft_enc*2) = cos(phase);
       Aw(2:2:fft_enc*2) = -sin(phase);
 
-      if 0
-         % optional plotting to ensure amd and phase aligned on a few frames
-         figure(1)
-         clf;
-         subplot(211)
-         plot(mask_sample_freqs_kHz, maskdB_);
-         hold on;
-         plot(mask_sample_freqs_kHz, maskdB_pf,'g');
-         hold off;
-         axis([0 4 0 70])
-
-         subplot(212)
-         plot((0:(fft_enc/2)-1)*8000/fft_enc, phase(1:fft_enc/2))
-         axis([0 4000 -pi pi])
-         k = kbhit();         
-      end 
       fwrite(faw, Aw, "float32");    
     end
   end
@@ -197,8 +165,6 @@ function [non_masked_f_log non_masked_amp_log] = newamp_batch(samname, optional_
   end
 
   printf("\n");
-
-  printf("mse std: %5.2f\n", std(best_min_mse_log));
 
 endfunction
 
