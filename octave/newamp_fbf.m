@@ -20,6 +20,7 @@ function newamp_fbf(samname, f=10)
   newamp;
   more off;
   plot_spectrum = 1;
+  vq_en = 1;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -30,6 +31,10 @@ function newamp_fbf(samname, f=10)
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames tmp] = size(model);
+
+  if vq_en
+    load vq;
+  end
 
   % Keyboard loop --------------------------------------------------------------
 
@@ -58,7 +63,11 @@ function newamp_fbf(samname, f=10)
 
     [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
     [tmp1 tmp2 D] = decimate_in_freq(maskdB, 0);
-    [maskdB_ maskdB_cyclic D_cyclic dk_] = decimate_in_freq(maskdB, 1);
+    if vq_en
+      [maskdB_ maskdB_cyclic D_cyclic dk_] = decimate_in_freq(maskdB, 1, 7, vq);
+    else
+      [maskdB_ maskdB_cyclic D_cyclic dk_] = decimate_in_freq(maskdB, 1);
+    end
 
     plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
     plot(Am_freqs_kHz*1000, maskdB_cyclic, ';mask cyclic;b');

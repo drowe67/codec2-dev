@@ -25,8 +25,7 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
   postfilter = 1;
   dec_in_time = 0;
   synth_phase = 0;
-  freq_quant = 0;
-  amp_quant = 0;
+  vq_en = 1;
   dk_log = [];
 
   model_name = strcat(samname,"_model.txt");
@@ -52,9 +51,12 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
     faw = fopen(Aw_out_name,"wb"); 
   end
 
+  if vq_en
+    load vq;
+  end
+
   % encoder loop ------------------------------------------------------
 
-  %pp_bw = gen_pp_bw;
 
   sd_sum = 0;
   for f=1:frames
@@ -77,7 +79,11 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
     non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
 
     if dec_in_freq
-      [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1);
+      if vq_en
+        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 7, vq);
+      else
+        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1);
+      end
       dk_log = [dk_log; dk_];
     end
     sd_sum += sum(maskdB - maskdB_);
