@@ -32,7 +32,7 @@
 melvq;
 
 
-function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, Nkeep=7)
+function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
 
     % Lets try to come up with a smoothed, cyclic model.  Replace
     % points from 3500 Hz to 4000Hz with a sequence that joins without
@@ -55,14 +55,39 @@ function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, N
       D = fft(maskdB);
     end
     Dabs = abs(D);                        % this returned for plotting
+
+if 0
     D_ = D; % + 10*randn(1,L) + 10*j*randn(1,L);
     D_(Nkeep+1:L-Nkeep) = 0;              % truncate
     d = ifft(D_);                         % back to spectrum at rate L
     maskdB_ = real(d);
-    Dk_ = [0 D(2:Nkeep-1) real(D(Nkeep)) D(L-Nkeep+1:L)];  % build rate Nkeep vector for quantisation
-    dk_ = real(ifft(Dk_));
+end
 
-    % OK now fix up last 500Hz, taper down 10dB at 4000Hz
+    % truncate D to rate k, convert to 2k length real vector for quantisation and transmission
+
+    Dk = [0 D(2:k-1) real(D(k)) D(L-k+1:L)]; 
+    dk = real(ifft(Dk));
+    
+    % quantisation
+
+    if nargin == 4
+       [res dk_ ] = mbest(vq, dk, 4);
+       std(dk_ - dk)
+    else
+       dk_ = dk;
+    end
+
+    % convert quantised dk back to rate L magnitude spectrum
+
+    Dk_ = fft(dk_);
+    D_ = zeros(1,L);
+    D_(1) = D(1);                         % lets assume energy comes through separately
+    D_(2:k-1) = Dk_(2:k-1);
+    D_(L-k+1:L) = Dk_(k+1:2*k);
+    d_ = ifft(D_);                        % back to spectrum at rate L
+    maskdB_ = real(d_);
+    
+    % Finally fix up last 500Hz, taper down 10dB at 4000Hz
 
     xpts = [ anchor-1 anchor L];
     ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
