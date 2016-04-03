@@ -21,18 +21,18 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
   more off;
 
   max_amp = 80;
-  dec_in_freq = 1;
-  postfilter = 1;
-  dec_in_time = 0;
-  synth_phase = 0;
-  vq_en = 1;
+  dec_in_freq = 0;
+  postfilter = 3;
+  dec_in_time = 1;
+  synth_phase = 1;
+  vq_en = 0;
   dk_log = [];
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
   model_ = zeros(frames, nc);
-  nom_masked_m = zeros(frames,max_amp);
+  non_masked_m = zeros(frames,max_amp);
 
   if nargin == 1
     Am_out_name = sprintf("%s_am.out", samname);
@@ -57,7 +57,6 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
 
   % encoder loop ------------------------------------------------------
 
-
   sd_sum = 0;
   for f=1:frames
     printf("%d ", f);   
@@ -75,18 +74,31 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
     % save post filter positions for decode
 
     maskdB_ = maskdB;
-    a_non_masked_m = find(AmdB > maskdB);
-    non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
+    if (postfilter == 1) || (postfilter == 3)
+      a_non_masked_m = find(AmdB > maskdB);
+    end
+    if postfilter == 2
+      a_non_masked_m = est_pf_locations(maskdB_);
+    end
+    if length(a_non_masked_m)
+      non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
+    end
+
+    if postfilter == 3
+       maskdB_ = maskdB_ - 9;
+       maskdB_(a_non_masked_m) = maskdB_(a_non_masked_m) + 9;
+    end
 
     if dec_in_freq
       if vq_en
-        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 7, vq);
+        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB_, 1, 7, vq);
       else
-        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1);
+        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB_, 1);
       end
       dk_log = [dk_log; dk_];
+      sd_sum += sum(maskdB - maskdB_);
     end
-    sd_sum += sum(maskdB - maskdB_);
+
 
     Am_ = zeros(1,max_amp);
     Am_ = 10 .^ (maskdB_(1:L-1)/20); 
@@ -107,18 +119,27 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
 
     if dec_in_time
       % decimate mask samples in time
-      maskdB_ = decimate_frame_rate(model_, 4, f, frames, mask_sample_freqs_kHz);
 
-      % find turning points - prototype for finding PF freqs when we decimate in time
+      decimate = 4;
+      maskdB_ = decimate_frame_rate(model_, decimate, f, frames, mask_sample_freqs_kHz);
 
-      d = maskdB_(2:L) - maskdB_(1:L-1);
-      tp = [];
-      for m=1:L-2
-        if (d(m) > 0) && (d(m+1) < 0)
-          tp = [tp m+1];
-        end
+      if 0
+      a_non_masked_m = est_pf_locations(maskdB_);
       end
-      a_non_masked_m = tp;
+
+      if 0
+
+      left_f = decimate*floor((f-1)/decimate)+1; 
+      right_f = left_f + decimate;
+
+      m = max(find(non_masked_m(left_f,:) > 0)); 
+      a_non_masked_m = non_masked_m(left_f,1:m);
+
+      % now convert these to m on current frame
+
+      left_L = min([model_(left_f,2) max_amp-1]);
+      a_non_masked_m = round(a_non_masked_m*L/left_L);
+      end
     else
       % read non-masked (PF freqs) from analysis stage
       % number of non-masked samples is variable when not using AbyS,
@@ -130,7 +151,7 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
 
     % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
 
-    if postfilter
+    if (postfilter == 1) || (postfilter == 2)
 
       % Apply post filter - enhances formants, suppresses others, as pe Part 1 blog
       % Pretty simple but makes a big difference
