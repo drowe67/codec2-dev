@@ -56,13 +56,6 @@ function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k
     end
     Dabs = abs(D);                        % this returned for plotting
 
-if 0
-    D_ = D; % + 10*randn(1,L) + 10*j*randn(1,L);
-    D_(Nkeep+1:L-Nkeep) = 0;              % truncate
-    d = ifft(D_);                         % back to spectrum at rate L
-    maskdB_ = real(d);
-end
-
     % truncate D to rate k, convert to 2k length real vector for quantisation and transmission
 
     Dk = [0 D(2:k-1) real(D(k)) D(L-k+1:L)]; 
@@ -94,6 +87,20 @@ end
     mask_pp = splinefit(xpts, ypts, 1);
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
 
+endfunction
+
+
+function tp = est_pf_locations(maskdB_)
+  % find turning points - used for finding PF freqs when we decimate in time
+
+  L = length(maskdB_);
+  d = maskdB_(2:L) - maskdB_(1:L-1);
+  tp = [];
+  for m=1:L-2
+    if (d(m) > 0) && (d(m+1) < 0)
+      tp = [tp m+1];
+    end
+  end
 endfunction
 
 
