@@ -21,12 +21,13 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
   more off;
 
   max_amp = 80;
-  dec_in_freq = 0;
-  postfilter = 3;
+  dec_in_freq = 1;
+  postfilter = 0;
   dec_in_time = 1;
   synth_phase = 1;
-  vq_en = 0;
+  vq_en = 1;
   dk_log = [];
+  train = 0;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -80,8 +81,10 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
     if postfilter == 2
       a_non_masked_m = est_pf_locations(maskdB_);
     end
-    if length(a_non_masked_m)
-      non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
+    if postfilter
+      if length(a_non_masked_m)
+        non_masked_m(f,1:length(a_non_masked_m)) = a_non_masked_m;
+      end
     end
 
     if postfilter == 3
@@ -89,24 +92,32 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
        maskdB_(a_non_masked_m) = maskdB_(a_non_masked_m) + 9;
     end
 
+    AmdB_ = maskdB;
     if dec_in_freq
       if vq_en
-        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB_, 1, 7, vq);
+        [AmdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 10, vq);
       else
-        [maskdB_ tmp1 D dk_] = decimate_in_freq(maskdB_, 1);
+        [AmdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 10);
       end
       dk_log = [dk_log; dk_];
-      sd_sum += sum(maskdB - maskdB_);
     end
-
+    AmdB_pf = AmdB_*1.5;
+    AmdB_pf += max(AmdB_) - max(AmdB_pf);
+    %sd_sum += sum(maskdB - AmdB_pf);
+    %AmdB_pf = AmdB_;
 
     Am_ = zeros(1,max_amp);
-    Am_ = 10 .^ (maskdB_(1:L-1)/20); 
+    Am_ = 10 .^ (AmdB_pf(1:L-1)/20); 
     model_(f,3:(L+1)) = Am_;
   end
   printf("\nsd_sum: %5.2f\n", sd_sum/frames);
 
   % decoder loop -----------------------------------------------------
+
+  if train
+    % short circuit decoder
+    frames = 0;
+  end
 
   for f=1:frames
     %printf("frame: %d\n", f);
@@ -192,7 +203,6 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
   end
 
   printf("\n");
-
 endfunction
 
 

@@ -60,7 +60,7 @@ function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k
 
     Dk = [0 D(2:k-1) real(D(k)) D(L-k+1:L)]; 
     dk = real(ifft(Dk));
-    
+        
     % quantisation
 
     if nargin == 4
@@ -593,8 +593,11 @@ function maskdB = schroeder(freq_tone_kHz, mask_sample_freqs_kHz, bark_model=1)
     % beneath 1.5kHz wider to match the width of F1 and
     % "fill in" the spectra better for UV sounds.
 
-    x1 = 0.5; x2 = 2;
-    y1 = 0.5; y2 = 1;
+    %x1 = 0.5; x2 = 2;
+    %y1 = 0.5; y2 = 1;
+    x1 = 0.5; x2 = 3;
+    y1 = 1; y2 = 3;
+
     grad  = (y2 - y1)/(x2 - x1);
     y_int = y1 - grad*x1;
 
@@ -735,7 +738,7 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     max_amp = 80;
 
     Wo = model(f,1);
-    L = min([model(f,2) max_amp-1]);
+    L = min([model(f,2) max_amp]);
 
     % determine frames that bracket the one we need to interp
 
@@ -755,12 +758,12 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     % fit splines to left and right masks
 
     left_Wo = model(left_f,1);
-    left_L = min([model(left_f,2) max_amp-1]);
+    left_L = min([model(left_f,2) max_amp]);
     left_AmdB = 20*log10(model(left_f,3:(left_L+2)));
     left_mask_sample_freqs_kHz = (1:left_L)*left_Wo*4/pi;
 
     right_Wo = model(right_f,1);
-    right_L = min([model(right_f,2) max_amp-1]);
+    right_L = min([model(right_f,2) max_amp]);
     right_AmdB = 20*log10(model(right_f,3:(right_L+2)));
     right_mask_sample_freqs_kHz = (1:right_L)*right_Wo*4/pi;
 
@@ -797,8 +800,8 @@ function plot_masking
     plot(mask_sample_freqs_kHz, maskdB_s0);
     maskdB_s1 = schroeder(f, mask_sample_freqs_kHz, 1);
     plot(mask_sample_freqs_kHz, maskdB_s1,'g');
-    maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
-    plot(mask_sample_freqs_kHz, maskdB_res,'r');
+    % maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
+    % plot(mask_sample_freqs_kHz, maskdB_res,'r');
   end
   hold off;
 
