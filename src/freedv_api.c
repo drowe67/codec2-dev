@@ -793,7 +793,9 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 // float input samples version
 
 int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
+    /* Varicode and protocol bits */
     uint8_t vc_bits[2];
+    uint8_t proto_bits[3];
     short vc_bit;
     int i;
     int n_ascii;
@@ -807,7 +809,7 @@ int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
         f->nin = fmfsk_nin(f->fmfsk);
     }
     /* TODO: Protocol and varicode bits */
-    if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,NULL,NULL,(uint8_t*)f->tx_bits)){
+    if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits)){
         /* Decode varicode text */
         for(i=0; i<2; i++){
             /* Note: deframe_bits spits out bits in uint8_ts while varicode_decode expects shorts */
@@ -816,6 +818,10 @@ int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }
+        }
+        /* Pass proto bits on if callback is present */
+        if( f->freedv_put_next_proto != NULL){
+            (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
         *valid = 1;
         f->sync = 1;

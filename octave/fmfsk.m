@@ -123,10 +123,10 @@ function [rx_bits states] = fmfsk_demod(states,rx)
     %If rx timing is too far out, ask for more or less sample the next time
     % around to even it all out
     next_nin = N;
-    if norm_rx_timing > 0;
+    if norm_rx_timing > -.2;
        next_nin += Ts/2;
     end
-    if norm_rx_timing < -.8;
+    if norm_rx_timing < -.65;
        next_nin -= Ts/2;
     end
 
@@ -252,7 +252,7 @@ function fmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0)
   tx = tx(10:length(tx));
 
   if(timing_offset>0)
-    tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
+    tx = resample(tx, 1000,1001); % simulated 1000ppm sample clock offset
   end
   
 
