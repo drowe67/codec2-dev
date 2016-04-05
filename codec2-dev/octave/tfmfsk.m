@@ -293,7 +293,7 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   tx = analog_fm_mod(fm_states, tx_pmod);
   
   if(timing_offset>0)
-    tx = resample(tx, 1000, 1001); % simulated 1000ppm sample clock offset
+    tx = resample(tx, 2000, 1999); % simulated 1000ppm sample clock offset
   end
   
   %Add frequency drift
@@ -328,7 +328,7 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   rx_bits = obits;
   ber = 1;
   ox = 1;
-  for offset = (1:100)
+  for offset = (1:400)
     nerr = sum(xor(rx_bits(offset:length(rx_bits)),tx_bits(1:length(rx_bits)+1-offset)));
     bern = nerr/(bitcnt-offset);
     if(bern < ber)
@@ -342,7 +342,7 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   ber = 1;
   rx_bits = cbits;
   ox = 1;
-  for offset = (1:100)
+  for offset = (1:400)
     nerr = sum(xor(rx_bits(offset:length(rx_bits)),tx_bits(1:length(rx_bits)+1-offset)));
     bern = nerr/(bitcnt-offset);
     if(bern < ber)
@@ -353,6 +353,10 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   end
   offset = ox;
   berc = ber;
+  
+  printf("C BER %f in test %s\n",berc,test_name);
+  printf("Oct BER %f in test %s\n",bero,test_name);
+  
   stats.berc = berc;
   stats.bero = bero;
   
@@ -431,19 +435,20 @@ function pass = test_fmfsk_battery()
     end
 endfunction
 
-function plot_fsk_bers(M=2)
+function plot_fmfsk_bers(M=2)
     %Range of EbNodB over which to test
     ebnodbrange = (8:14);
     ebnodbs = length(ebnodbrange);
     
     %Replication of other parameters for parcellfun
+    %Turn on all of the impairments
     timingv     = repmat(1  ,1,ebnodbs);
     driftv      = repmat(1  ,1,ebnodbs);
     hpfv        = repmat(1  ,1,ebnodbs);
     deempv      = repmat(1  ,1,ebnodbs);
     outfv       = repmat(1  ,1,ebnodbs);
     
-    statv = pararrayfun(nproc(),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);
+    statv = pararrayfun(nproc(),@tfmfsk_run_sim,ebnodbrange,timingv,deempv,outfv,hpfv,driftv);    
     %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
@@ -469,6 +474,5 @@ function plot_fsk_bers(M=2)
 endfunction
 
 
-%test_fsk_battery
-%plot_fsk_bers(2)
-%plot_fsk_bers(4)
+test_fmfsk_battery
+plot_fmfsk_bers(2)

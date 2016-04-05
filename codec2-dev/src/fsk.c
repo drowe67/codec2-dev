@@ -774,9 +774,9 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         for(j=0; j<neyesamp; j++)                                 
             fsk->stats->rx_eye[3][j] = cabsolute(f2_int[neyeoffset+neyesamp+j]);
         for(j=0; j<neyesamp; j++)                      
-            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[2*neyeoffset+neyesamp+j]);
+            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[neyeoffset+2*neyesamp+j]);
         for(j=0; j<neyesamp; j++)                                 
-            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[2*neyeoffset+neyesamp+j]);    
+            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[neyeoffset+2*neyesamp+j]);    
         
         eye_max = 0;
         /* Normalize eye to +/- 1 */

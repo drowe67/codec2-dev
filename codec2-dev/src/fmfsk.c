@@ -235,9 +235,9 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Request fewer or greater samples next time, if fine timing is far
      * enough off. This also makes it possible to tolerate clock offsets */
     next_nin = N;
-    if(norm_rx_timing > 0)
+    if(norm_rx_timing > -.2)
         next_nin += Ts/2;
-    if(norm_rx_timing < -.8)
+    if(norm_rx_timing < -.65)
         next_nin -= Ts/2;
     fmfsk->nin = next_nin;
     
@@ -302,7 +302,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         for(k=0; k<fmfsk->stats->neyetr; k++)
             for(j=0; j<neyesamp; j++)                                 
                 fmfsk->stats->rx_eye[k][j] = rx_filt[k*neyesamp+neyeoffset+j];
-        
+               //fmfsk->stats->rx_eye[k][j] = fmfsk_in[k*neyesamp+neyeoffset+j];
         eye_max = 0;
         
         /* Normalize eye to +/- 1 */

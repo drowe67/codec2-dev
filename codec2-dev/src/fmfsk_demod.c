@@ -111,7 +111,7 @@ int main(int argc,char *argv[]){
         
 	if(enable_stats && stats_ctr <= 0){
 	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)stats.clock_offset);
-	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",0,0);
+	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",0.0,0.0);
 	    fprintf(stderr,",\t\"eye_diagram\":[");
 	    for(i=0;i<stats.neyetr;i++){
 		fprintf(stderr,"[");

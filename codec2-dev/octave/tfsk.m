@@ -207,7 +207,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
         end
     end
     
-    close all
+    %close all
     
     % One part-per-thousand allowed on important parameters
     pass = 1;
@@ -321,7 +321,7 @@ endfunction
 % This throws some channel imparment or another at the C and octave modem so they 
 % may be compared.
 function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
-  frames = 60;
+  frames = 90;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
   %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -582,8 +582,8 @@ function plot_fsk_bers(M=2)
     Mv     = repmat(M,1,ebnodbs);
     
     
-    %statv = pararrayfun(floor(.5*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
-    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    statv = pararrayfun(floor(nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,Mv);
     
     for ii = (1:length(statv))
         stat = statv(ii);
@@ -610,6 +610,6 @@ function plot_fsk_bers(M=2)
 endfunction
 
 
-%test_fsk_battery
-%plot_fsk_bers(2)
-%plot_fsk_bers(4)
+test_fsk_battery
+plot_fsk_bers(2)
+plot_fsk_bers(4)
