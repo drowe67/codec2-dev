@@ -88,12 +88,6 @@ void fvhff_frame_bits(  int frame_type,
         for(i=0; i<96; i++)
             bits_out[i] = A_blank[i];
         
-        /* Fill in varicode bits, if present */
-        if(vc_in!=NULL){
-            bits_out[90] = vc_in[0];
-            bits_out[91] = vc_in[1];
-        }
-        
         /* Fill in protocol bits, if present */
         if(proto_in!=NULL){
             ibit = 0;
@@ -108,6 +102,12 @@ void fvhff_frame_bits(  int frame_type,
                 bits_out[i] = UNPACK_BIT_MSBFIRST(proto_in,ibit);
                 ibit++;
             }
+        }
+        
+        /* Fill in varicode bits, if present */
+        if(vc_in!=NULL){
+            bits_out[90] = vc_in[0];
+            bits_out[91] = vc_in[1];
         }
         
         /* Fill in codec2 bits, present or not */

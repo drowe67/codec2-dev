@@ -36,6 +36,7 @@
 struct my_callback_state {
     char  tx_str[80];
     char *ptx_str;
+    int calls;
 };
 
 char my_get_next_tx_char(void *callback_state) {
@@ -49,6 +50,12 @@ char my_get_next_tx_char(void *callback_state) {
     return c;
 }
 
+void my_get_next_proto(void *callback_state,char *proto_bits){
+    struct my_callback_state* cb_states = (struct my_callback_state*)(callback_state);
+    snprintf(proto_bits,3,"%2d",cb_states->calls);
+    cb_states->calls = cb_states->calls + 1;
+}
+
 int main(int argc, char *argv[]) {
     FILE                     *fin, *fout;
     short                    *speech_in;
@@ -60,9 +67,9 @@ int main(int argc, char *argv[]) {
     int                       n_nom_modem_samples;
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|2400A|2400B InputRawSpeechFile OutputModemRawFile [--testframes]\n", argv[0]);
-	printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
-	exit(1);
+        printf("usage: %s 1600|700|700B|2400A|2400B InputRawSpeechFile OutputModemRawFile [--testframes]\n", argv[0]);
+        printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
+        exit(1);
     }
 
     mode = -1;
@@ -80,16 +87,14 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n",
-         argv[2], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening input raw speech sample file: %s: %s.\n", argv[2], strerror(errno));
+        exit(1);
     }
 
     if (strcmp(argv[3], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
-         argv[3], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n", argv[3], strerror(errno));
+        exit(1);
     }
 
     freedv = freedv_open(mode);
@@ -112,7 +117,11 @@ int main(int argc, char *argv[]) {
 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
     my_cb_state.ptx_str = my_cb_state.tx_str;
+    my_cb_state.calls = 0;
     freedv_set_callback_txt(freedv, NULL, &my_get_next_tx_char, &my_cb_state);
+    
+    /* set up callback for protocol bits */
+    freedv_set_callback_protocol(freedv, NULL, &my_get_next_proto, &my_cb_state);
 
     /* OK main loop */
 

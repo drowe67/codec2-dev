@@ -128,7 +128,7 @@ struct freedv {
     /* user defined functions to produce and consume protocol bits */
     /* Protocol bits are packed MSB-first */
     void (*freedv_put_next_proto)(void *callback_state, char *proto_bits_packed);
-    void (*freedv_get_next_proto)(void *callback_state);
+    void (*freedv_get_next_proto)(void *callback_state, char *proto_bits_packed);
     void *proto_callback_state;
     int n_protocol_bits;
 };
