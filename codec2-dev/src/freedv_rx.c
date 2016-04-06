@@ -49,7 +49,14 @@ struct my_callback_state {
 void my_put_next_rx_char(void *callback_state, char c) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
     if (pstate->ftxt != NULL) {
-        fprintf(pstate->ftxt, "%c", c);
+        fprintf(pstate->ftxt, "text msg: %c\n", c);
+    }
+}
+
+void my_put_next_rx_proto(void *callback_state,char *proto_bits){
+    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+    if (pstate->ftxt != NULL) {
+        fprintf(pstate->ftxt, "proto chars: %.*s\n",2, proto_bits);
     }
 }
 
@@ -123,6 +130,7 @@ int main(int argc, char *argv[]) {
     assert(ftxt != NULL);
     my_cb_state.ftxt = ftxt;
     freedv_set_callback_txt(freedv, &my_put_next_rx_char, NULL, &my_cb_state);
+    freedv_set_callback_protocol(freedv, &my_put_next_rx_proto, NULL, &my_cb_state);
 
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx

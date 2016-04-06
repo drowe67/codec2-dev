@@ -349,7 +349,7 @@ static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
     uint8_t vc_bits[2]; /* Varicode bits for 2400 framing */
-    
+    uint8_t proto_bits[3]; /* Prococol bits for 2400 framing */
         
     /* Get varicode bits for TX and possibly ask for a new char */
     /* 2 bits per 2400A/B frame, so this has to be done twice */
@@ -371,10 +371,13 @@ static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     }
         
     /* If the API user hasn't set up message callbacks, don't bother with varicode bits */
-    if(f->freedv_get_next_tx_char == NULL){
-        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
-    }else{
+    if(f->freedv_get_next_proto != NULL){
+        (*f->freedv_get_next_proto)(f->proto_callback_state,(char*)proto_bits);
+        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),proto_bits,vc_bits);
+    }else if(f->freedv_get_next_tx_char != NULL){
         fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,vc_bits);
+    }else {
+        fvhff_frame_bits(FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits),(uint8_t*)(f->packed_codec_bits),NULL,NULL);
     }
         
     /* Allocate floating point buffer for FSK mod */
@@ -441,10 +444,10 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
      * to comptx */
      
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
-        #ifndef CORTEX_M4
+#ifndef CORTEX_M4
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         freedv_tx_fsk_voice(f, mod_out);
-        #endif
+#endif
     }else{
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
@@ -589,7 +592,6 @@ static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
                 //fprintf(stderr, "%d %d\n", j+data_flag_index+k, f->codec_bits[j+data_flag_index+k]);
                 f->nvaricode_bits--;
             }
-
             if (f->nvaricode_bits == 0) {
                 /* get new char and encode */
                 char s[2];
@@ -600,9 +602,7 @@ static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
                 }
             }
         }
-
     }
-
     /* optionally ovwerwrite the codec bits with test frames */
 
     if (f->test_frames) {
@@ -634,12 +634,9 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
            (f->mode == FREEDV_MODE_2400B));
 
     if (f->mode == FREEDV_MODE_1600) {
-
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
-
         freedv_comptx_fdmdv_1600(f, mod_out);
     }
-
 
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
@@ -651,7 +648,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             codec2_encode(f->codec2, f->packed_codec_bits + j * bytes_per_codec_frame, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
         }
-	
 	freedv_comptx_fdmdv_700(f, mod_out);
     }
     /* 2400 A and B are handled by the real-mode TX */
@@ -779,12 +775,14 @@ int freedv_nin(struct freedv *f) {
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     COMP rx_fdm[f->n_max_modem_samples];
-    float rx_float[f->n_max_modem_samples];
     int i;
     int nin = freedv_nin(f);
     assert(nin <= f->n_max_modem_samples);
     
     #ifndef CORTEX_M4
+    /* Moved inside of cortex_m4 ifdef to silence unused var warning */
+    float rx_float[f->n_max_modem_samples];
+    
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
         for(i=0; i<nin; i++) {
@@ -823,7 +821,7 @@ int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
         fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
         f->nin = fmfsk_nin(f->fmfsk);
     }
-    /* TODO: Protocol and varicode bits */
+    
     if(fvhff_deframe_bits(f->deframer,f->packed_codec_bits,proto_bits,vc_bits,(uint8_t*)f->tx_bits)){
         /* Decode varicode text */
         for(i=0; i<2; i++){
@@ -834,7 +832,7 @@ int freedv_floatrx_fsk_2400(struct freedv *f, float demod_in[], int *valid) {
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }
         }
-        /* Pass proto bits on if callback is present */
+        /* Pass proto bits on down if callback is present */
         if( f->freedv_put_next_proto != NULL){
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }

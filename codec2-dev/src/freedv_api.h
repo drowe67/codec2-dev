@@ -56,7 +56,7 @@ typedef void (*freedv_calback_error_pattern)
 /* Called when a frame containing protocol data is decoded */
 typedef void (*freedv_callback_protorx)(void *, char *);
 /* Called when a frame containing protocol data is to be sent */
-typedef char * (*freedv_callback_prototx)(void *);
+typedef void (*freedv_callback_prototx)(void *, char *);
 
 /* Data packet callbacks */
 /* Called when a packet has been received */
