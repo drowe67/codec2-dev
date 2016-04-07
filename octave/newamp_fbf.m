@@ -23,7 +23,7 @@ function newamp_fbf(samname, f=10)
   dec_in_freq = 1;
   dec_in_time = 0;
   vq_en = 0;
-  mask_en = 0;
+  mask_en = 1;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -69,30 +69,33 @@ function newamp_fbf(samname, f=10)
     %plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
 
     if mask_en
-      AmdB_ = maskdB;
+      AmdB_ = AmdB = maskdB;
     else
-      AmdB_ = AmdB;
+      AmdB_ = AmdB = AmdB;
     end
     if dec_in_freq
       [tmp1 tmp2 D] = decimate_in_freq(AmdB, 0);
       if vq_en
         [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB, 1, 10, vq);
+        plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc vq;c');
       else
         [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB_, 1, 10);
+        plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc;c');
       end
 
       plot(Am_freqs_kHz*1000, AmdB_cyclic, ';mask cyclic;b');
-      plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc;c');
       AmdB_pf = AmdB_*(1.5);
-      AmdB_pf += mean(AmdB) - mean(AmdB_pf);
+      AmdB_pf += max(AmdB_) - max(AmdB_pf);
       %max(AmdB_pf)-max(AmdB_)
       %AmdB_pf -= max(AmdB_pf)-max(AmdB_);
     end
 
     %AmdB_pf = AmdB_*(1.5);
     %AmdB_pf += mean(AmdB) - mean(AmdB_pf);
-    AmdB_pf = AmdB_;
-    plot(Am_freqs_kHz*1000, AmdB_pf, ';mask trunc pf;g');
+    %AmdB_pf = AmdB_;
+
+    %plot(Am_freqs_kHz*1000, AmdB_pf, ';after pf;g');
+    axis([0 4000 20 80]);
 
     % Optional decimated parameters
     %   need to general model_ parameters either side
@@ -132,7 +135,8 @@ function newamp_fbf(samname, f=10)
 
       figure(5)
       clf
-      stem(dk_)
+      stem(dk_);
+      axis([0 20 -60 60])
     end
 
     % interactive menu ------------------------------------------

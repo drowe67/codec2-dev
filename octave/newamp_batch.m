@@ -16,7 +16,7 @@
 
 % process a whole file and write results
 
-function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
@@ -26,7 +26,7 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
   dec_in_time = 1;
   synth_phase = 1;
   vq_en = 1;
-  dk_log = [];
+  D_log = []; dk_log = []; D1_log = []; ind_log = [];
   train = 0;
 
   model_name = strcat(samname,"_model.txt");
@@ -92,25 +92,29 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
        maskdB_(a_non_masked_m) = maskdB_(a_non_masked_m) + 9;
     end
 
-    AmdB_ = maskdB;
+    AmdB_ = AmdB;
     if dec_in_freq
       if vq_en
-        [AmdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 10, vq);
+        [AmdB_ tmp1 Dabs dk_ D1 ind] = decimate_in_freq(maskdB, 1, 10, vq);
+        ind_log = [ind_log; ind];
       else
-        [AmdB_ tmp1 D dk_] = decimate_in_freq(maskdB, 1, 10);
+        [AmdB_ tmp1 D dk_ D1] = decimate_in_freq(maskdB, 0, 10);
       end
-      dk_log = [dk_log; dk_];
+      if train
+        dk_log = [dk_log; dk_];
+        D1_log = [D1_log D1];
+      end
     end
+    %AmdB_(1:L/8) = maskdB(1:L/8);
     AmdB_pf = AmdB_*1.5;
     AmdB_pf += max(AmdB_) - max(AmdB_pf);
-    %sd_sum += sum(maskdB - AmdB_pf);
+    sd_sum += std(maskdB - AmdB_);
     %AmdB_pf = AmdB_;
 
     Am_ = zeros(1,max_amp);
     Am_ = 10 .^ (AmdB_pf(1:L-1)/20); 
     model_(f,3:(L+1)) = Am_;
   end
-  printf("\nsd_sum: %5.2f\n", sd_sum/frames);
 
   % decoder loop -----------------------------------------------------
 
@@ -202,6 +206,7 @@ function dk_log = newamp_batch(samname, optional_Am_out_name, optional_Aw_out_na
     fclose(faw);
   end
 
+  printf("\nsd_sum: %5.2f\n", sd_sum/frames);
   printf("\n");
 endfunction
 
