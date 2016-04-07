@@ -32,7 +32,7 @@
 melvq;
 
 
-function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
+function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
 
     % Lets try to come up with a smoothed, cyclic model.  Replace
     % points from 3500 Hz to 4000Hz with a sequence that joins without
@@ -55,26 +55,31 @@ function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k
       D = fft(maskdB);
     end
     Dabs = abs(D);                        % this returned for plotting
+    D1 = D(1);                            % pass energy back for training
 
     % truncate D to rate k, convert to 2k length real vector for quantisation and transmission
+    % note we remove DC term as this is the frame energy that we quantise elsewhere
 
     Dk = [0 D(2:k-1) real(D(k)) D(L-k+1:L)]; 
-    dk = real(ifft(Dk));
+    dk = real(ifft(Dk));                     % Q: why is there any imag part at all?
         
     % quantisation
 
     if nargin == 4
-       [res dk_ ] = mbest(vq, dk, 4);
-       std(dk_ - dk)
+       [res dk_ vq_ind] = mbest(vq, dk, 4);
+       [D1_ D1_ind] = quantise(0:(2000/15):2500, D1);
+       ind = [vq_ind D1_ind];
+       printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
     else
        dk_ = dk;
+       D1_ = D1;
     end
 
     % convert quantised dk back to rate L magnitude spectrum
 
     Dk_ = fft(dk_);
     D_ = zeros(1,L);
-    D_(1) = D(1);                         % lets assume energy comes through separately
+    D_(1) = D1;                           % energy seprately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
     d_ = ifft(D_);                        % back to spectrum at rate L
@@ -86,8 +91,9 @@ function [maskdB_ maskdB_cyclic Dabs dk_] = decimate_in_freq(maskdB, cyclic=1, k
     ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
     mask_pp = splinefit(xpts, ypts, 1);
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
-
+   
 endfunction
+
 
 
 function tp = est_pf_locations(maskdB_)
@@ -503,7 +509,7 @@ endfunction
 
 % quantise input sample to nearest value in table, optionally return bianry code
 
-function [quant_out bits] = quantise(levels, quant_in)
+function [quant_out best_i bits] = quantise(levels, quant_in)
 
   % find closest quantiser level
 
@@ -753,7 +759,7 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     left_fraction  = 1 - mod((f-1),decimate)/decimate;
     right_fraction = 1 - left_fraction;
 
-    printf("f: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n", f, left_f, right_f, left_fraction, right_fraction)
+    printf("f: %d left_f: %d right_f: %d left_fraction: %3.2f right_fraction: %3.2f \n", f, left_f, right_f, left_fraction, right_fraction)
 
     % fit splines to left and right masks
 
