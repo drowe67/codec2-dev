@@ -66,20 +66,58 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
     % quantisation
 
     if nargin == 4
-       [res dk_ vq_ind] = mbest(vq, dk, 4);
-       [D1_ D1_ind] = quantise(0:(2000/15):2500, D1);
+       [res tmp vq_ind] = mbest(vq, dk, 4);
+       [tmp D1_ind] = quantise(0:(2000/15):2500, D1);
        ind = [vq_ind D1_ind];
+       [dk_ D1_] = index_to_params(ind, vq);
        printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
     else
        dk_ = dk;
        D1_ = D1;
     end
 
+    maskdB_ = params_to_mask(L, k, dk_, D1_);
+ 
+endfunction
+
+
+function amodel = post_filter(amodel)
+    max_amp = 80;
+
+    % post filter 
+
+    L = min([amodel(2) max_amp-1]);
+    Wo = amodel(1);
+    Am_ = amodel(3:(L+2));
+    AmdB_ = 20*log10(Am_);
+    AmdB_pf = AmdB_*1.5;
+    AmdB_pf += max(AmdB_) - max(AmdB_pf);
+    amodel(3:(L+2)) = 10 .^ (AmdB_pf(1:L)/20);
+endfunction
+
+
+function [dk_ D1_] = index_to_params(ind, vq)
+    [Nvec order stages] = size(vq);
+    dk_ = zeros(1,order);
+    for s=1:stages
+      dk_ = dk_ + vq(ind(s),:,s);
+    end
+    D1_tab = 0:(2000/15):2500;
+    D1_ = D1_tab(ind(stages+1));
+endfunction
+
+
+% decoder side
+
+function maskdB_ = params_to_mask(L, k, dk_, D1_)
+
+    anchor = floor(7*L/8);
+
     % convert quantised dk back to rate L magnitude spectrum
 
     Dk_ = fft(dk_);
     D_ = zeros(1,L);
-    D_(1) = D1;                           % energy seprately quantised
+    D_(1) = D1_;                          % energy seprately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
     d_ = ifft(D_);                        % back to spectrum at rate L
@@ -91,9 +129,30 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
     ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
     mask_pp = splinefit(xpts, ypts, 1);
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
-   
 endfunction
 
+function index = encode_log_Wo(Wo, bits)
+    Wo_levels = 2.^bits;
+    Wo_min = 2*pi/160;
+    Wo_max = 2*pi/20;
+
+    norm = (log10(Wo) - log10(Wo_min))/(log10(Wo_max) - log10(Wo_min));
+    index = floor(Wo_levels * norm + 0.5);
+    index = max(index, 0);
+    index = min(index, Wo_levels-1)
+endfunction
+
+
+function Wo = decode_log_Wo(index, bits)
+    Wo_levels = 2.^bits;
+    Wo_min = 2*pi/160;
+    Wo_max = 2*pi/20;
+
+    step = (log10(Wo_max) - log10(Wo_min))/Wo_levels;
+    Wo   = log10(Wo_min) + step*index;
+
+    Wo = 10 .^ Wo;
+endfunction
 
 
 function tp = est_pf_locations(maskdB_)

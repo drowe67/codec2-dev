@@ -47,14 +47,10 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
     faw = fopen(Aw_out_name,"wb"); 
   end
    
-  fam  = fopen(Am_out_name,"wb"); 
-  if synth_phase
-    faw = fopen(Aw_out_name,"wb"); 
-  end
-
   if vq_en
     load vq;
   end
+
 
   % encoder loop ------------------------------------------------------
 
@@ -105,84 +101,63 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
         D1_log = [D1_log D1];
       end
     end
-    %AmdB_(1:L/8) = maskdB(1:L/8);
-    AmdB_pf = AmdB_*1.5;
-    AmdB_pf += max(AmdB_) - max(AmdB_pf);
     sd_sum += std(maskdB - AmdB_);
-    %AmdB_pf = AmdB_;
 
     Am_ = zeros(1,max_amp);
-    Am_ = 10 .^ (AmdB_pf(1:L-1)/20); 
+    Am_ = 10 .^ (AmdB_(1:L-1)/20); 
     model_(f,3:(L+1)) = Am_;
+  end
+
+  if train == 0
+    decode_model(model_, Am_out_name, Aw_out_name, synth_phase, dec_in_time);
+  end
+
+  printf("\nsd_sum: %5.2f\n", sd_sum/frames);
+  printf("\n");
+endfunction
+
+
+% generate array of indexes
+% convert to bits and save to file of one char/bit
+% function to encode and save to file of bits
+% function to decode from file of bits
+% quantise Wo
+% move voicing bit through, move Wo through, maybe just load Wo and L and v?
+
+function decode_model(model_, Am_out_name, Aw_out_name, synth_phase, dec_in_time)
+  max_amp = 80;
+
+  fam  = fopen(Am_out_name,"wb"); 
+  if synth_phase
+    faw = fopen(Aw_out_name,"wb"); 
   end
 
   % decoder loop -----------------------------------------------------
 
-  if train
-    % short circuit decoder
-    frames = 0;
-  end
-
+  [frames tmp] = size(model_);
   for f=1:frames
     %printf("frame: %d\n", f);
     L = min([model_(f,2) max_amp-1]);
     Wo = model_(f,1);
     Am_ = model_(f,3:(L+2));
+    AmdB_ = 20*log10(Am_);
+    sample_freqs_kHz = (1:L)*Wo*4/pi;
 
-    maskdB_ = 20*log10(Am_);
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    % run post filter ahead of time so dec in time has post filtered frames to work with
+
+    if f+3 <= frames
+      model_(f+3,:) = post_filter(model_(f+3,:));
+    end
 
     if dec_in_time
       % decimate mask samples in time
 
       decimate = 4;
-      maskdB_ = decimate_frame_rate(model_, decimate, f, frames, mask_sample_freqs_kHz);
-
-      if 0
-      a_non_masked_m = est_pf_locations(maskdB_);
-      end
-
-      if 0
-
-      left_f = decimate*floor((f-1)/decimate)+1; 
-      right_f = left_f + decimate;
-
-      m = max(find(non_masked_m(left_f,:) > 0)); 
-      a_non_masked_m = non_masked_m(left_f,1:m);
-
-      % now convert these to m on current frame
-
-      left_L = min([model_(left_f,2) max_amp-1]);
-      a_non_masked_m = round(a_non_masked_m*L/left_L);
-      end
-    else
-      % read non-masked (PF freqs) from analysis stage
-      % number of non-masked samples is variable when not using AbyS,
-      % but fixed when using AbyS
-
-      m = max(find(non_masked_m(f,:) > 0)); 
-      a_non_masked_m = non_masked_m(f,1:m);
-    end
-
-    % post filter - bump up samples by 6dB, reduce mask by same level to normalise gain
-
-    if (postfilter == 1) || (postfilter == 2)
-
-      % Apply post filter - enhances formants, suppresses others, as pe Part 1 blog
-      % Pretty simple but makes a big difference
-
-      maskdB_pf = maskdB_ - 6;
-      maskdB_pf(a_non_masked_m) = maskdB_pf(a_non_masked_m) + 6;
-
-      Am_ = zeros(1,max_amp);
-      Am_ = 10 .^ (maskdB_pf(1:L-1)/20); 
-      model_(f,3:(L+1)) = Am_;
-    else
-      maskdB_pf = maskdB_;
+      AmdB_ = decimate_frame_rate(model_, decimate, f, frames, sample_freqs_kHz);
     end
 
     Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (maskdB_pf(1:L-1)/20);  % C array doesnt use A[0]
+    Am_(2:L) = 10 .^ (AmdB_(1:L-1)/20);  % C array doesnt use A[0]
     fwrite(fam, Am_, "float32");
 
     if synth_phase
@@ -190,7 +165,7 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
 
       fft_enc = 512;
-      model_(f,3:(L+2)) = 10 .^ (maskdB_(1:L)/20);
+      model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
       phase = determine_phase(model_, f);
       assert(length(phase) == fft_enc);
       Aw = zeros(1, fft_enc*2); 
@@ -202,12 +177,7 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
   end
 
   fclose(fam);
-  if synth_phase
-    fclose(faw);
-  end
-
-  printf("\nsd_sum: %5.2f\n", sd_sum/frames);
-  printf("\n");
+  fclose(faw);
 endfunction
 
 
