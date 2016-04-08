@@ -408,7 +408,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     for(j=0; j<fft_loops; j++){
     /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
 		for(i=0; i<fft_samps; i++){
-			hann = 1-cosf((2*M_PI*(float)i)/((float)fft_samps-1));
+			hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
 			
 			fftin[i] = (kiss_fft_scalar)0.5*hann*fsk_in[i+Ndft*j];
 		}
@@ -451,7 +451,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		imax = 0;
 		max = 0;
 		for(j=0;j<Ndft/2;j++){
-			if(fftout[j].i >= max){
+			if(fftout[j].i > max){
 				max = fftout[j].i;
 				imax = j;
 			}
@@ -461,7 +461,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		f_min = f_min < 0 ? 0 : f_min;
 		f_max = imax + f_zero;
 		f_max = f_max > Ndft ? Ndft : f_max;
-		for(j=f_min+1; j<f_max; j++)
+		for(j=f_min; j<f_max; j++)
 			fftout[j].i = 0;
 		
 		/* Stick the freq index on the list */

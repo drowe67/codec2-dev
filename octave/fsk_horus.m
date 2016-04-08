@@ -93,7 +93,7 @@ endfunction
 %   Small, processing window nsym rather than nsym=Fs (1 second window)
 %   Wider freq est limits
 
-function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=96)
+function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=48)
   assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
     
   states.M = M;                    
@@ -106,7 +106,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=96)
   states.nsym = N/Ts;            % number of symbols in one processing frame
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
 
-  states.Ndft = 2.^ceil(log2(N))/2;  % find nearest power of 2 for efficient FFT
+  states.Ndft = (2.^ceil(log2(N)))/2;  % find nearest power of 2 for efficient FFT
 
   Nmem = states.Nmem  = N+2*Ts;  % two symbol memory in down converted signals to allow for timing adj
 
@@ -125,7 +125,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=96)
 
   states.fest_fmax = (Fs/2)-Rs;
   states.fest_fmin = Rs/2;
-  states.fest_min_spacing = Rs-(Rs/5);
+  states.fest_min_spacing = 2*(Rs-(Rs/5));
 
   % BER stats 
 

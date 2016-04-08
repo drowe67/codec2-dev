@@ -46,7 +46,9 @@
 
 #define TEST_SELF_FULL 1    /* No-arg self test */
 #define TEST_MOD 2          /* Test modulator using in and out file */
-#define TEST_DEMOD 3        /* Test demodulator using in and out file */
+#define TEST_MOD_H 3          /* Test modulator using in and out file */
+#define TEST_DEMOD 4        /* Test demodulator using in and out file */
+#define TEST_DEMOD_H 5      /* Test demodulator using in and out file */
 
 
 int main(int argc,char *argv[]){
@@ -80,14 +82,18 @@ int main(int argc,char *argv[]){
         M = ST_M;
     } else if (argc<9){
     /* Not running any test */
-        printf("Usage: %s [(M|D) Mode TXFreq1 TXFreqSpace SampleRate BitRate InputFile OutputFile OctaveLogFile]\n",argv[0]);
+        printf("Usage: %s [(M|D|DX) Mode TXFreq1 TXFreqSpace SampleRate BitRate InputFile OutputFile OctaveLogFile]\n",argv[0]);
         exit(1);
     } else {
     /* Running stim-drivin test */
         /* Mod test */
-        if(strcmp(argv[1],"M")==0 || strcmp(argv[1],"m")==0) {
+        if(strcmp(argv[1],"MX")==0){
+            test_type = TEST_MOD_H;
+        } else if(strcmp(argv[1],"M")==0 || strcmp(argv[1],"m")==0) {
             test_type = TEST_MOD;
         /* Demod test */
+        } else if(strcmp(argv[1],"DX")==0)  {
+            test_type = TEST_DEMOD_H;
         } else if(strcmp(argv[1],"D")==0 || strcmp(argv[1],"d")==0) {
             test_type = TEST_DEMOD;
         } else {
@@ -115,9 +121,16 @@ int main(int argc,char *argv[]){
     }
     
 	srand(1);
-    
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,M,f1,fs);
+    if(test_type == TEST_DEMOD_H || test_type == TEST_MOD_H){
+        fsk = fsk_create_hbr(Fs,Rs,10,M,f1,fs);
+        if(test_type == TEST_DEMOD_H)
+            test_type = TEST_DEMOD;
+        else
+            test_type = TEST_MOD;
+    }else{
+        fsk = fsk_create(Fs,Rs,M,f1,fs);
+    }
     fprintf(stderr,"Running in mode %d\n",M);
     /* Modulate! */
     if(test_type == TEST_MOD || test_type == TEST_SELF_FULL){
