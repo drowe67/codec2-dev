@@ -176,7 +176,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->est_max = (Fs/2)-Rs;
     
-    fsk->est_space = Rs-(Rs/10);
+    fsk->est_space = Rs-(Rs/5);
     
     /* Set up rx state */
     fsk->phi1_c = comp_exp_j(0);

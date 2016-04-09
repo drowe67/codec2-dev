@@ -233,7 +233,7 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     pass = vcompare(o_norm_rx_timing,  t_norm_rx_timing,'norm rx timing',tname,1,15) && pass;
     
     
-    diffpass = sum(xor(obits,bits'))<4;
+    diffpass = sum(xor(obits,bits'))<5;
     diffbits = sum(xor(obits,bits'));
     
     
@@ -305,7 +305,7 @@ endfunction
 % This throws some channel imparment or another at the C and octave modem so they 
 % may be compared.
 function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
-  frames = 90;
+  frames = 190;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
   %fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
@@ -314,8 +314,8 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   %dA     = 1;          % amplitude imbalance of tones (note this affects Eb so not a gd idea)
 
   more off
-  rand('state',1); 
-  randn('state',1);
+  rand('state',10); 
+  randn('state',10);
 
   % ----------------------------------------------------------------------
 
@@ -331,23 +331,40 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
     states.f2_tx = 2400;
     states.f3_tx = 3600;
     states.f4_tx = 4800;
+    states.ftx(1) = 1200;
+    states.ftx(2) = 2400;
+    states.ftx(3) = 3600;
+    states.ftx(4) = 4800;
     
   end
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 100, M);
+    states = fsk_horus_init_hbr(48000,10, 1200, M);
     states.f1_tx = 1200;
-    states.f2_tx = 1600;
+    states.f2_tx = 2400;
+    states.f3_tx = 3600;
+    states.f4_tx = 4800;
+    states.ftx(1) = 1200;
+    states.ftx(2) = 2400;
+    states.ftx(3) = 3600;
+    states.ftx(4) = 4800;
+    
     states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
     
   end
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 100, M);
+    states = fsk_horus_init_hbr(48000,10, 1200, M);
     states.f1_tx = 1200;
-    states.f2_tx = 1600;
+    states.f2_tx = 2400;
+    states.f3_tx = 3600;
+    states.f4_tx = 4800;
+    states.ftx(1) = 1200;
+    states.ftx(2) = 2400;
+    states.ftx(3) = 3600;
+    states.ftx(4) = 4800;
     %%%states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
 	states.tx_bits_file = "horus_payload_rtty.txt";
   end
@@ -469,6 +486,8 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   stats.bero = bero;
   % coherent BER theory calculation
   
+  printf("C BER: %f Oct BER: %f Test %s\n",berc,bero,test_name);
+  
   stats.thrcoh = .5*(M-1)*erfc(sqrt( (log2(M)/2) * EbNo ));
   
   % non-coherent BER theory calculation
@@ -505,8 +524,8 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     dfv     = repmat(df,1,ebnodbs);
     dav     = repmat(dA,1,ebnodbs);
     mv      = repmat(M,1,ebnodbs);
-    %statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
-    statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    statv = pararrayfun(floor(1.25*nproc()),@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
+    %statv = arrayfun(@tfsk_run_sim,modev,ebnodbrange,timingv,fadingv,dfv,dav,mv);
 
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
