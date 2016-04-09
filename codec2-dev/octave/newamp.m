@@ -70,7 +70,7 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
        [tmp D1_ind] = quantise(0:(2000/15):2500, D1);
        ind = [vq_ind D1_ind];
        [dk_ D1_] = index_to_params(ind, vq);
-       printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
+       %printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
     else
        dk_ = dk;
        D1_ = D1;
@@ -117,7 +117,7 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
 
     Dk_ = fft(dk_);
     D_ = zeros(1,L);
-    D_(1) = D1_;                          % energy seprately quantised
+    D_(1) = D1_;                          % energy seperately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
     d_ = ifft(D_);                        % back to spectrum at rate L
@@ -130,6 +130,7 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
     mask_pp = splinefit(xpts, ypts, 1);
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
 endfunction
+
 
 function index = encode_log_Wo(Wo, bits)
     Wo_levels = 2.^bits;
@@ -799,11 +800,8 @@ endfunction
 
 % decimate frame rate of mask, use linear interpolation in the log domain 
 
-function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
+function [maskdB_ Wo L] = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
     max_amp = 80;
-
-    Wo = model(f,1);
-    L = min([model(f,2) max_amp]);
 
     % determine frames that bracket the one we need to interp
 
@@ -836,6 +834,9 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     maskdB_right_pp = splinefit(right_mask_sample_freqs_kHz, right_AmdB, right_L);
 
     % determine mask for left and right frames, sampling at Wo for this frame
+
+    Wo = left_fraction*left_Wo + right_fraction*right_Wo;
+    L = floor(pi/Wo);
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB_left = ppval(maskdB_left_pp, mask_sample_freqs_kHz);

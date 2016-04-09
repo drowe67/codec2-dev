@@ -142,8 +142,8 @@ int main(int argc, char *argv[])
     int   bpfb_en = 0;
     float bpf_buf[BPF_N+N];
     float lspmelvq_mse = 0.0;
-    int   amread;
-    FILE *fam;
+    int   amread, Woread;
+    FILE *fam, *fWo;
     int   awread;
     FILE *faw;
 
@@ -182,6 +182,7 @@ int main(int argc, char *argv[])
         { "bpfb", no_argument, &bpfb_en, 1 },
         { "amread", required_argument, &amread, 1 },
         { "awread", required_argument, &awread, 1 },
+        { "Woread", required_argument, &Woread, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -275,6 +276,12 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "lspmelread") == 0) {
 	        if ((flspmel = fopen(optarg,"rb")) == NULL) {
 	            fprintf(stderr, "Error opening float lspmel file: %s: %s.\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "Woread") == 0) {
+	        if ((fWo = fopen(optarg,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float Wo file: %s: %s.\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }
@@ -754,6 +761,11 @@ int main(int argc, char *argv[])
         if (amread) {
             int ret = fread(model.A, sizeof(float), MAX_AMP, fam);
             assert(ret == MAX_AMP);
+        }
+
+        if (Woread) {
+            int ret = fread(&model.Wo, sizeof(float), 1, fWo);
+            assert(ret == 1);
         }
 
 	/*------------------------------------------------------------*\
