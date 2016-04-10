@@ -21,7 +21,7 @@ function newamp_fbf(samname, f=10)
   more off;
   plot_spectrum = 1;
   dec_in_freq = 1;
-  dec_in_time = 0;
+  dec_in_time = 1;
   vq_en = 0;
   mask_en = 1;
 
@@ -95,16 +95,16 @@ function newamp_fbf(samname, f=10)
     %AmdB_pf = AmdB_;
 
     %plot(Am_freqs_kHz*1000, AmdB_pf, ';after pf;g');
-    axis([0 4000 20 80]);
+    axis([0 4000 00 80]);
 
     % Optional decimated parameters
     %   need to general model_ parameters either side
     
     if dec_in_time
       decimate = 4;
-      model_ = set_up_model_(model, f, decimate, vq_en, vq);    
-      maskdB_dit = decimate_frame_rate(model_, decimate, f, frames, Am_freqs_kHz);
-      plot(Am_freqs_kHz*1000, maskdB_dit, ';mask dit;b');
+      model_  = set_up_model_(model, f, decimate, vq_en, vq);    
+      [maskdB_dit Wo_ L_] = decimate_frame_rate(model_, decimate, f, frames, Am_freqs_kHz);
+      plot((1:L_)*Wo_*4000/pi, maskdB_dit, ';mask dit;b');
     end
 
     hold off;
@@ -171,7 +171,9 @@ function model_ = set_up_model_(model, f, decimate, vq_en, vq)
     right_f = left_f + decimate;
 
     model_(left_f,:) = set_up_maskdB_(model, left_f, vq_en, vq); 
+    model_(left_f,:) = post_filter(model_(left_f,:));
     model_(right_f,:) = set_up_maskdB_(model, right_f, vq_en, vq); 
+    model_(right_f,:) = post_filter(model_(right_f,:));
 
     model_(f,1) = model(f,1);  % Wo
     model_(f,2) = model(f,2);  % L
@@ -188,16 +190,11 @@ function amodel_row = set_up_maskdB_(model, f, vq_en, vq)
   AmdB = 20*log10(Am);
 
   [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-  a_non_masked_m = find(AmdB > maskdB);
-  maskdB = maskdB - 6;
-  maskdB(a_non_masked_m) = maskdB(a_non_masked_m) + 6;
 
-  if 0
   if vq_en
-    maskdB_ = decimate_in_freq(maskdB, 1, 7, vq);
+    maskdB_ = decimate_in_freq(maskdB, 1, 10, vq);
   else
-    maskdB_ = decimate_in_freq(maskdB, 1);
-  end
+    maskdB_ = decimate_in_freq(maskdB, 1, 10);
   end
 
   maskdB_ = maskdB;
