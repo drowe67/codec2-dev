@@ -69,6 +69,9 @@ target_link_libraries(tfsk m)
 add_executable(tfmfsk tfmfsk.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfmfsk m)
 
+add_executable(tdeframer tdeframer.c)
+target_link_libraries(tdeframer m codec2)
+
 #add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
 #target_link_libraries(t48_8 codec2)
 
