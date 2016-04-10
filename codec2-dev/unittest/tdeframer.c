@@ -76,7 +76,7 @@ int main(int argc,char *argv[]){
     
     /* Flip bits */
     for(i=0; i<bitbufferlen; i++){
-        if( (rand()&0xFFFF) < (int)(TESTBER*0xFFFF)){
+        if( (rand()&0xFFFFFF) < (int)(TESTBER*0xFFFFFF)){
             bit_buffer[i] = bit_buffer[i]?0:1;
         }
     }
