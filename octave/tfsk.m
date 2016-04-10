@@ -550,9 +550,9 @@ function pass = test_drift_var(M)
 endfunction
 
 function pass = test_fsk_battery()
-    %pass = test_mod_horuscfg_randbits;
+    pass = test_mod_horuscfg_randbits;
     assert(pass)
-    %pass = pass && test_mod_horuscfgm4_randbits;
+    pass = pass && test_mod_horuscfgm4_randbits;
     assert(pass)
     pass = pass && test_drift_var(4);
     assert(pass)
