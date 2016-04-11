@@ -38,44 +38,58 @@ int main(int argc,char *argv[]){
     FILE *fin,*fout;
     uint8_t *bitbuf;
     uint8_t *c2buf;
-    uint8_t zbuf[] = {0,0,0,0,0,0,0};
+    uint8_t zbuf[] = {0,0,0,0,0,0,0,0};
+    int frame_fmt = 0;
+    int fsize,c2size;
     
     if(argc<3){
-        fprintf(stderr,"usage: %s InputOneBitPerCharFile OutputC2File\n",argv[0]);
+        fprintf(stderr,"usage: %s (A|B) InputOneBitPerCharFile OutputC2File\n",argv[0]);
+        exit(1);
+    }
+    
+    if(strcmp(argv[1],"A")==0){
+        frame_fmt = FREEDV_VHF_FRAME_A;
+    } else if (strcmp(argv[1],"B")==0) {
+        frame_fmt = FREEDV_HF_FRAME_B;
+    } else {
+        fprintf(stderr,"usage: %s (A|B) InputOneBitPerCharFile OutputC2File\n",argv[0]);
         exit(1);
     }
     
     /* Open files */
-    if(strcmp(argv[1],"-")==0){
+    if(strcmp(argv[2],"-")==0){
         fin = stdin;
     }else{
-        fin = fopen(argv[1],"r");
+        fin = fopen(argv[2],"r");
     }
 	
-    if(strcmp(argv[2],"-")==0){
+    if(strcmp(argv[3],"-")==0){
         fout = stdout;
     }else{
-        fout = fopen(argv[2],"w");
+        fout = fopen(argv[3],"w");
     }
 
     /* Set up deframer */
-    deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,0);
+    deframer = fvhff_create_deframer(frame_fmt,0);
     
     if(fin==NULL || fout==NULL || deframer==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
         goto cleanup;
     }
     
+    c2size = fvhff_get_codec2_size(deframer);
+    fsize = fvhff_get_frame_size(deframer);
+    
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*96);
-    c2buf = (uint8_t*)malloc(sizeof(uint8_t)*7);
+    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsize);
+    c2buf = (uint8_t*)malloc(sizeof(uint8_t)*c2size);
     
     /* Deframe! */
-    while( fread(bitbuf,sizeof(uint8_t),96,fin) == 96 ){
+    while( fread(bitbuf,sizeof(uint8_t),fsize,fin) == fsize ){
         if(fvhff_deframe_bits(deframer,c2buf,NULL,NULL,bitbuf))
-            fwrite(c2buf,sizeof(uint8_t),7,fout);
+            fwrite(c2buf,sizeof(uint8_t),c2size,fout);
         else
-            fwrite(zbuf,sizeof(uint8_t),7,fout);
+            fwrite(zbuf,sizeof(uint8_t),c2size,fout);
         
         if(fin == stdin || fout == stdin){
             fflush(fin);

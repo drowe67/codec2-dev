@@ -39,7 +39,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
+#include <assert.h>
 #include "freedv_vhf_framing.h"
 
 /* The voice UW of the VHF type A frame */
@@ -63,6 +63,19 @@ static const uint8_t A_blank[] =   {1,0,1,0,0,1,1,1, /* Padding[0:3] Proto[0:3] 
                                     0,0,0,0,0,0,0,0, /* Voice[40:47]              */
                                     0,0,0,0,0,0,1,0, /* Voice[48:51] Proto[12:15] */
                                     0,1,1,1,0,0,1,0};/* Proto[16:19] Padding[4:7] */
+
+/* HF Type B UW */
+static const uint8_t B_uw_v[] =    {0,1,1,0,0,1,1,1};
+                                    
+/* Blank HF type B frame */
+static const uint8_t B_blank[] =   {0,1,1,0,0,1,1,1, /* UW[0:7]					  */
+									0,0,0,0,0,0,0,0, /* Voice1[0:7]				  */
+									0,0,0,0,0,0,0,0, /* Voice1[8:15]			  */
+									0,0,0,0,0,0,0,0, /* Voice1[16:23]			  */
+									0,0,0,0,0,0,0,0, /* Voice1[24:28] Voice2[0:3] */
+									0,0,0,0,0,0,0,0, /* Voice2[4:11]			  */
+									0,0,0,0,0,0,0,0, /* Voice2[12:19]			  */
+									0,0,0,0,0,0,0,0};/* Voice2[20:28]			  */
 
 /* States */
 #define ST_NOSYNC 0 /* Not synchronized */
@@ -120,6 +133,26 @@ void fvhff_frame_bits(  int frame_type,
             bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in,ibit);
             ibit++;
         }
+    }else if(frame_type == FREEDV_HF_FRAME_B){
+        /* Pointers to both c2 frames so the bit unpack macro works */
+        uint8_t * codec2_in1 = &codec2_in[0];
+        uint8_t * codec2_in2 = &codec2_in[4];
+        /* Fill out frame with blank prototype */
+        for(i=0; i<64; i++)
+            bits_out[i] = B_blank[i];
+        
+        /* Fill out first codec2 block */
+        ibit=0;
+        for(i=8; i<36; i++){
+            bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in1,ibit);
+            ibit++;
+        }
+        /* Fill out second codec2 block */
+        ibit=0;
+        for(i=36; i<64; i++){
+            bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in2,ibit);
+            ibit++;
+        }
     }
 }
 
@@ -159,7 +192,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
             bits_out[i] = UNPACK_BIT_MSBFIRST(data,ibit);
             ibit++;
         }
-        for(i=56; i<88; i++){   /* Second half */
+        for(i=56; i<88; i++){  /* Second half */
             bits_out[i] = UNPACK_BIT_MSBFIRST(data,ibit);
             ibit++;
         }
@@ -173,42 +206,89 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
 struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enable_bit_flip){
     struct freedv_vhf_deframer * deframer;
     uint8_t *bits,*invbits;
+    int frame_size;
+    
+    assert( (frame_type == FREEDV_VHF_FRAME_A) || (frame_type == FREEDV_HF_FRAME_B) );
+    
     /* It's a Type A frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
-        /* Allocate memory for the thing */
-        deframer = malloc(sizeof(struct freedv_vhf_deframer));
-        if(deframer == NULL)
-            return NULL;
-            
-        /* Allocate the not-bit buffer */
-        if(enable_bit_flip){
-            invbits = malloc(sizeof(uint8_t)*96);
-            if(invbits == NULL)
-                return NULL;
-        }else{
-            invbits = NULL;
-        }
-        
-        /* Allocate the bit buffer */
-        bits = malloc(sizeof(uint8_t)*96);
-        if(bits == NULL)
-            return NULL;
-        
-        deframer->bits = bits;
-        deframer->invbits = invbits;
-        deframer->ftype = frame_type;
-        deframer->state = ST_NOSYNC;
-        deframer->bitptr = 0;
-        deframer->last_uw = 0;
-        deframer->miss_cnt = 0;
-        deframer->frame_size = 96;
-        deframer->on_inv_bits = 0;
-
-        deframer->fdc = NULL;
-
-        return deframer;
+        frame_size = 96;
+    }else if(frame_type == FREEDV_HF_FRAME_B){
+        frame_size = 64;
+    }else{
+        return NULL;
     }
-    return NULL;
+    
+    /* Allocate memory for the thing */
+    deframer = malloc(sizeof(struct freedv_vhf_deframer));
+    if(deframer == NULL)
+        return NULL;
+        
+    /* Allocate the not-bit buffer */
+    if(enable_bit_flip){
+        invbits = malloc(sizeof(uint8_t)*frame_size);
+        if(invbits == NULL)
+            return NULL;
+    }else{
+        invbits = NULL;
+    }
+    
+    /* Allocate the bit buffer */
+    bits = malloc(sizeof(uint8_t)*frame_size);
+    if(bits == NULL)
+        return NULL;
+    
+    deframer->bits = bits;
+    deframer->invbits = invbits;
+    deframer->ftype = frame_type;
+    deframer->state = ST_NOSYNC;
+    deframer->bitptr = 0;
+    deframer->last_uw = 0;
+    deframer->miss_cnt = 0;
+    deframer->frame_size = frame_size;
+    deframer->on_inv_bits = 0;
+
+    deframer->fdc = NULL;
+
+    return deframer;
+}
+
+/* Get size of frame in bits */
+int fvhff_get_frame_size(struct freedv_vhf_deframer * def){
+    return def->frame_size;
+}
+
+/* Codec2 size in bytes */
+int fvhff_get_codec2_size(struct freedv_vhf_deframer * def){
+    if(def->ftype == FREEDV_VHF_FRAME_A){
+        return 7;
+    } else if(def->ftype == FREEDV_HF_FRAME_B){
+        return 8;
+    } else{
+        return 0;
+    }
+}
+
+/* Protocol bits in bits */
+int fvhff_get_proto_size(struct freedv_vhf_deframer * def){
+    if(def->ftype == FREEDV_VHF_FRAME_A){
+        return 20;
+    } else if(def->ftype == FREEDV_HF_FRAME_B){
+        return 0;
+    } else{
+        return 0;
+    }
+}
+
+/* Varicode bits in bits */
+int fvhff_get_varicode_size(struct freedv_vhf_deframer * def){
+    if(def->ftype == FREEDV_VHF_FRAME_A){
+        return 2;
+    } else if(def->ftype == FREEDV_HF_FRAME_B){
+        return 0;
+    } else{
+        return 0;
+    }
 }
 
 void fvhff_destroy_deframer(struct freedv_vhf_deframer * def){
@@ -229,6 +309,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     int iuw,ibit;
     const uint8_t * uw[2];
     int uw_len;
+    int can_be_data;
     int uw_offset;
     int diff[2] = { 0, 0 };
     int i;
@@ -238,9 +319,16 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     /* Set up parameters for the standard type of frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
         uw[0] = A_uw_v;
-    uw[1] = A_uw_d;
+		uw[1] = A_uw_d;
         uw_len = 16;
         uw_offset = 40;
+        can_be_data = 1;
+    } else if(frame_type == FREEDV_HF_FRAME_B){
+        uw[0] = B_uw_v;
+        uw[1] = B_uw_v;
+        uw_len = 8;
+        uw_offset = 0;
+        can_be_data = 0;
     } else {
         return 0;
     }
@@ -259,7 +347,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
         match[i] = diff[i] <= tol;
     }
     /* Pick the best matching UW */
-    if (diff[0] < diff[1]) {
+    if (diff[0] < diff[1] || !can_be_data) {
         r = match[0];
         *pt = FRAME_PAYLOAD_TYPE_VOICE;
     } else {
@@ -329,6 +417,33 @@ static void fvhff_extract_frame_voice(struct freedv_vhf_deframer * def,uint8_t b
             }
         }
 
+    }else if(frame_type == FREEDV_HF_FRAME_B){
+        /* Pointers to both c2 frames */
+        uint8_t * codec2_out1 = &codec2_out[0];
+        uint8_t * codec2_out2 = &codec2_out[4];
+        
+        /* Extract codec2 bits */
+        memset(codec2_out,0,8);
+        ibit = 0;
+        
+        /* Extract and pack first c2 frame, MSB first */
+        iframe = bitptr+8;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<28;ibit++){
+            codec2_out1[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
+        
+        /* Extract and pack second c2 frame, MSB first */
+        iframe = bitptr+36;
+        ibit = 0;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<28;ibit++){
+            codec2_out2[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
     }
 }
 
@@ -422,6 +537,10 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     
     /* Possibly set up frame-specific params here */
     if(frame_type == FREEDV_VHF_FRAME_A){
+        uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
+        uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
+        miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */
+    }else if(frame_type == FREEDV_HF_FRAME_B){
         uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
         uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
         miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */

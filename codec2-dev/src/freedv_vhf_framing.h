@@ -40,6 +40,7 @@
 
 /* Standard frame type */
 #define FREEDV_VHF_FRAME_A 1
+#define FREEDV_HF_FRAME_B 2
 
 struct freedv_vhf_deframer {
     int ftype;          /* Type of frame to be looking for */
@@ -58,6 +59,16 @@ struct freedv_vhf_deframer {
 
 /* Init and allocate memory for a freedv-vhf framer/deframer */
 struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type,int enable_bit_flip);
+
+/* Get size of various frame parameters */
+/* Frame size in bits */
+int fvhff_get_frame_size(struct freedv_vhf_deframer * def);
+/* Codec2 size in bytes */
+int fvhff_get_codec2_size(struct freedv_vhf_deframer * def);
+/* Protocol bits in bits */
+int fvhff_get_proto_size(struct freedv_vhf_deframer * def);
+/* Varicode bits in bits */
+int fvhff_get_varicode_size(struct freedv_vhf_deframer * def);
 
 /* Free the memory used by a freedv-vhf framer/deframer */
 void fvhff_destroy_deframer(struct freedv_vhf_deframer * def);
