@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
     FILE          *fin, *fout, *foct;
     struct COHPSK *cohpsk;
     float         rx_bits[COHPSK_BITS_PER_FRAME];
+    char          rx_bits_char[COHPSK_BITS_PER_FRAME];
     COMP          rx_fdm[COHPSK_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_MAX_SAMPLES_PER_FRAME];
     int           frames, sync, nin_frame;
@@ -119,7 +120,9 @@ int main(int argc, char *argv[])
 	cohpsk_demod(cohpsk, rx_bits, &sync, rx_fdm, &nin_frame);
 
  	if (sync) {
-            fwrite(rx_bits, sizeof(float), COHPSK_BITS_PER_FRAME, fout);
+            for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                rx_bits_char[i] = rx_bits[i] < 0.0;
+            fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
 
             if (oct) {
                 for(r=0; r<NSYMROW; r++, log_data_r++) {

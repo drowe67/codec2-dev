@@ -40,12 +40,12 @@ int main(int argc, char *argv[])
 {
     FILE         *fout;
     int           tx_bits[COHPSK_BITS_PER_FRAME];
-    float         sd_tx_bits[COHPSK_BITS_PER_FRAME];
+    char          tx_bits_char[COHPSK_BITS_PER_FRAME];
     int           numBits, nFrames, n;
     int           *ptest_bits_coh, *ptest_bits_coh_end, i;
 
     if (argc < 2) {
-	printf("usage: %s OutputOneFloatPerBitFile numBits\n", argv[0]);
+	printf("usage: %s OutputOneCharPerBitFile numBits\n", argv[0]);
 	exit(1);
     }
 
@@ -70,9 +70,9 @@ int main(int argc, char *argv[])
         }
 
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-            sd_tx_bits[i] = 1.0 - 2.0*tx_bits[i];
+            tx_bits_char[i] = tx_bits[i];
 
-	fwrite(sd_tx_bits, sizeof(float), COHPSK_BITS_PER_FRAME, fout);
+	fwrite(tx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
