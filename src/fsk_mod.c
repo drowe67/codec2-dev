@@ -37,6 +37,7 @@ int main(int argc,char *argv[]){
     struct FSK *fsk;
     int Fs,Rs,f1,fs,M;
     int i;
+    int p;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
@@ -66,9 +67,10 @@ int main(int argc,char *argv[]){
 		fout = fopen(argv[7],"w");
 	}
     
+    p = Fs/Rs;
     
     /* set up FSK */
-    fsk = fsk_create(Fs,Rs,M,f1,fs);
+    fsk = fsk_create_hbr(Fs,Rs,p,M,f1,fs);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
