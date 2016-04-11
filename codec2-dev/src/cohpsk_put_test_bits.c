@@ -42,7 +42,7 @@
 int main(int argc, char *argv[])
 {
     FILE         *fin, *foct;
-    float         rx_bits_sd[COHPSK_BITS_PER_FRAME];
+    char          rx_bits[COHPSK_BITS_PER_FRAME];
     int           state, i, nbits, bit_errors, nerrors;
     short         error_pattern[COHPSK_BITS_PER_FRAME];
     int           error_positions_hist[COHPSK_BITS_PER_FRAME], logframes;
@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
         error_positions_hist[i] = 0;
 
     if (argc < 2) {
-	fprintf(stderr, "usage: %s InputOneFloatPerBitFile [OctaveLogFile]\n", argv[0]);
+	fprintf(stderr, "usage: %s InputOneCharPerBitFile [OctaveLogFile]\n", argv[0]);
 	exit(1);
     }
 
@@ -80,9 +80,9 @@ int main(int argc, char *argv[])
         error_positions_hist[i] = 0;
 
     state = 0; nbits = 0; nerrors = 0;
-    while (fread(rx_bits_sd, sizeof(float), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
+    while (fread(rx_bits, sizeof(char), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
 
-        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_sd);
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits);
         if (state == 1) {
             for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
                 error_positions_hist[i] += error_pattern[i];

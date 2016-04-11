@@ -1198,13 +1198,13 @@ void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[])
 \*---------------------------------------------------------------------------*/
 
 void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
-			 int *bit_errors, float rx_bits_sd[])
+			 int *bit_errors, char rx_bits_char[])
 {
     int i, next_state, anerror;
     int rx_bits[COHPSK_BITS_PER_FRAME];
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-        rx_bits[i] = rx_bits_sd[i] < 0.0;
+        rx_bits[i] = rx_bits_char[i];
     }
 
     *bit_errors = 0;

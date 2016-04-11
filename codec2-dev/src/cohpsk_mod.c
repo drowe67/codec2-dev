@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
 {
     FILE          *fin, *fout;
     struct COHPSK *cohpsk;
-    float         tx_bits_sd[COHPSK_BITS_PER_FRAME];
+    char          tx_bits_char[COHPSK_BITS_PER_FRAME];
     int           tx_bits[COHPSK_BITS_PER_FRAME];
     COMP          tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[COHPSK_NOM_SAMPLES_PER_FRAME];
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     int           i;
 
     if (argc < 3) {
-	printf("usage: %s InputOneFloatPerBitFile OutputModemRawFile\n", argv[0]);
+	printf("usage: %s InputOneCharPerBitFile OutputModemRawFile\n", argv[0]);
 	exit(1);
     }
 
@@ -71,11 +71,11 @@ int main(int argc, char *argv[])
 
     frames = 0;
 
-    while(fread(tx_bits_sd, sizeof(float), COHPSK_BITS_PER_FRAME, fin) == COHPSK_BITS_PER_FRAME) {
+    while(fread(tx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fin) == COHPSK_BITS_PER_FRAME) {
 	frames++;
 
         for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-            tx_bits[i] = tx_bits_sd[i] < 0.0;
+            tx_bits[i] = tx_bits_char[i];
 	cohpsk_mod(cohpsk, tx_fdm, tx_bits);
         cohpsk_clip(tx_fdm);
 
