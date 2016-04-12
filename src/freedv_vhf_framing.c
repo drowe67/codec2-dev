@@ -207,14 +207,17 @@ struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enabl
     struct freedv_vhf_deframer * deframer;
     uint8_t *bits,*invbits;
     int frame_size;
+    int uw_size;
     
     assert( (frame_type == FREEDV_VHF_FRAME_A) || (frame_type == FREEDV_HF_FRAME_B) );
     
     /* It's a Type A frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
         frame_size = 96;
+        uw_size = 16;
     }else if(frame_type == FREEDV_HF_FRAME_B){
         frame_size = 64;
+        uw_size = 8;
     }else{
         return NULL;
     }
@@ -246,8 +249,9 @@ struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enabl
     deframer->last_uw = 0;
     deframer->miss_cnt = 0;
     deframer->frame_size = frame_size;
+    deframer->uw_size = uw_size;
     deframer->on_inv_bits = 0;
-
+    deframer->ber_est = 0;
     deframer->fdc = NULL;
 
     return deframer;
@@ -302,13 +306,13 @@ int fvhff_synchronized(struct freedv_vhf_deframer * def){
 }
 
 /* See if the UW is where it should be, to within a tolerance, in a bit buffer */
-static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int tol, enum frame_payload_type *pt){
+static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int tol,int *rdiff, enum frame_payload_type *pt){
     int frame_type  = def->ftype;
     int bitptr      = def->bitptr;
     int frame_size  = def->frame_size;
+    int uw_len      = def->uw_size;
     int iuw,ibit;
     const uint8_t * uw[2];
-    int uw_len;
     int can_be_data;
     int uw_offset;
     int diff[2] = { 0, 0 };
@@ -349,9 +353,11 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     /* Pick the best matching UW */
     if (diff[0] < diff[1] || !can_be_data) {
         r = match[0];
+        *rdiff = diff[0];
         *pt = FRAME_PAYLOAD_TYPE_VOICE;
     } else {
         r = match[1];
+        *rdiff = diff[1];
         *pt = FRAME_PAYLOAD_TYPE_DATA;
     }
     
@@ -528,6 +534,8 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     int last_uw     = def->last_uw;
     int miss_cnt    = def->miss_cnt;
     int frame_size  = def->frame_size;
+    int uw_size     = def->uw_size;
+    int uw_diff;
     int i;
     int uw_first_tol;   
     int uw_sync_tol;
@@ -539,11 +547,11 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     if(frame_type == FREEDV_VHF_FRAME_A){
         uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
         uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
-        miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */
+        miss_tol = 4;       /* How many UWs may be missed before going into the de-synced state */
     }else if(frame_type == FREEDV_HF_FRAME_B){
-        uw_first_tol = 1;   /* The UW bit-error tolerance for the first frame */
-        uw_sync_tol = 3;    /* The UW bit error tolerance for frames after sync */
-        miss_tol = 5;       /* How many UWs may be missed before going into the de-synced state */
+        uw_first_tol = 0;   /* The UW bit-error tolerance for the first frame */
+        uw_sync_tol = 1;    /* The UW bit error tolerance for frames after sync */
+        miss_tol = 3;       /* How many UWs may be missed before going into the de-synced state */
     }else{
         return 0;
     }
@@ -572,7 +580,7 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
             if(last_uw == frame_size){
                 last_uw = 0;
                 
-                if(!fvhff_match_uw(def,bits,uw_sync_tol, &pt))
+                if(!fvhff_match_uw(def,bits,uw_sync_tol,&uw_diff, &pt))
                     miss_cnt++;
                 else
                     miss_cnt=0;
@@ -584,27 +592,34 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
                 /* Extract the bits */
                 extracted_frame = 1;
                 fvhff_extract_frame(def,bits,codec2_out,proto_out,vc_out,pt);
+                
+                /* Update BER estimate */
+                def->ber_est = (.99*def->ber_est) + (.01*((float)uw_diff)/((float)uw_size));
             }
         /* Not yet sunk */
         }else{
             /* It's a sync!*/
             if(invbits!=NULL){
-                if(fvhff_match_uw(def,invbits,uw_first_tol, &pt)){
+                if(fvhff_match_uw(def,invbits,uw_first_tol, &uw_diff, &pt)){
                     state = ST_SYNC;
                     last_uw = 0;
                     miss_cnt = 0;
                     extracted_frame = 1;
                     on_inv_bits = 1;
                     fvhff_extract_frame(def,invbits,codec2_out,proto_out,vc_out,pt);
+                    /* Update BER estimate */
+                    def->ber_est = (.99*def->ber_est) + (.01*((float)uw_diff)/((float)uw_size));
                 }
             }
-            if(fvhff_match_uw(def,strbits,uw_first_tol, &pt)){
+            if(fvhff_match_uw(def,strbits,uw_first_tol, &uw_diff, &pt)){
                 state = ST_SYNC;
                 last_uw = 0;
                 miss_cnt = 0;
                 extracted_frame = 1;
                 on_inv_bits = 0;
                 fvhff_extract_frame(def,strbits,codec2_out,proto_out,vc_out,pt);
+                /* Update BER estimate */
+                def->ber_est = (.98*def->ber_est) + (.02*((float)uw_diff)/((float)uw_size));
             }
         }
     }
