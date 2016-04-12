@@ -29,31 +29,54 @@
 #define TESTBER 0.01
 
 /* Frame count */
-#define FRCNT 1500
+#define FRCNT 15000
 
 /* Random bits leading frame */
-#define LRCNT 142
+#define LRCNT 55
 
 #include <stdio.h>
 #include <math.h>
 #include <stdint.h>
 #include <freedv_vhf_framing.h>
 #include <golay23.h>
+#include <string.h>
 
 /* The main loop of the test driver */
 int main(int argc,char *argv[]){
     uint8_t * bit_buffer;
-    uint8_t c2_buffer[7] = {0,0,0,0,0,0,0};
+    uint8_t c2_buffer[10];
     struct freedv_vhf_deframer * fvd;
     int i,p,k;
-    int bitbufferlen = (LRCNT+96*FRCNT);
+    int bitbufferlen;
+    int fsize;
+    int ftype;
+    int first_tol;
+    
+    if(argc<2){
+        fprintf(stderr,"Usage: %s [A|B]\n",argv[0]);
+        exit(1);
+    }
+    
+    if(strcmp(argv[1],"A")==0){
+        ftype = FREEDV_VHF_FRAME_A;
+        first_tol = 2;
+    }else if(strcmp(argv[1],"B")==0){
+        ftype = FREEDV_HF_FRAME_B;
+        first_tol = 5;
+    }else{
+        fprintf(stderr,"Usage: %s [A|B]\n",argv[0]);
+        exit(1);
+    }
     
     srand(1);
     golay23_init();
     
     /* Set up the deframer */
-    fvd = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
+    fvd = fvhff_create_deframer(ftype,1);
 
+    fsize = fvhff_get_frame_size(fvd);
+    bitbufferlen = (LRCNT+fsize*FRCNT);
+    
     /* Allocate bit buffer */
     bit_buffer = (uint8_t *) malloc(sizeof(uint8_t)*bitbufferlen);
     p = 0;
@@ -67,11 +90,11 @@ int main(int argc,char *argv[]){
     for(i=0; i<FRCNT; i++){
         /* Encode frame index into golay codeword to protect from test BER*/
         k = golay23_encode((i+1)&0x0FFF);
-        c2_buffer[0] = (k    )&0xFF;
+        c2_buffer[5] = (k    )&0xFF;
         c2_buffer[1] = (k>>8 )&0xFF;
-        c2_buffer[2] = (k>>16)&0x7F;
+        c2_buffer[0] = (k>>16)&0x7F;
         /* Frame the bits */
-        fvhff_frame_bits(FREEDV_VHF_FRAME_A, &bit_buffer[p+(i*96)], c2_buffer,NULL,NULL);
+        fvhff_frame_bits(ftype, &bit_buffer[p+(i*fsize)], c2_buffer,NULL,NULL);
     }
     
     /* Flip bits */
@@ -85,32 +108,35 @@ int main(int argc,char *argv[]){
     int first_extract = 0;
     int total_extract = 0;
     int err_count = 0;
+    printf("\n");
     /* Deframe some bits */
-    for(i=0; i<bitbufferlen; i+=96){
+    for(i=0; i<bitbufferlen; i+=fsize){
         if( fvhff_deframe_bits(fvd, c2_buffer, NULL, NULL, &bit_buffer[i])){
             /* Extract golay23 codeword */
-            k  = ((int)c2_buffer[0])    ;
+            k  = ((int)c2_buffer[5])    ;
             k |= ((int)c2_buffer[1])<<8 ;
-            k |= ((int)c2_buffer[2])<<16;
+            k |= ((int)c2_buffer[0])<<16;
             k = k & 0x7FFFFF;
             /* Decode frame index */
             p = golay23_decode(k);
             err_count += golay23_count_errors(k,p);
             p = p>>11;
-            printf("Got frame %d\n",p);
+
+            printf("%d,\t",p);
             total_extract++;
             if(first_extract==0)
                 first_extract=p;
         }
     }
-    
+    printf("\n");
     float measured_ber = (float)err_count/(float)(23*total_extract);
     
     printf("First extracted frame %d\n",first_extract);
     printf("Extracted %d frames of %d, %f hit rate\n",total_extract,FRCNT,((float)total_extract/(float)FRCNT));
-    printf("Bit error rate %f measured\n",measured_ber);
+    printf("Bit error rate %f measured from golay code\n",measured_ber);
+    printf("Bit error rate %f measured by deframer\n",fvd->ber_est);
     /* Check test condition */
-    if(first_extract<2){
+    if(first_extract<first_tol){
         printf("Test passed at test BER of %f!\n",TESTBER);
         exit(0);
     }else{

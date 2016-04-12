@@ -52,7 +52,10 @@ struct freedv_vhf_deframer {
     int miss_cnt;       /* How many UWs have been missed */
     int last_uw;        /* How many bits since the last UW? */
     int frame_size;     /* How big is a frame? */
+    int uw_size;        /* How big is the UW */
     int on_inv_bits;    /* Are we using the inverted bits? */
+
+    float ber_est;      /* Bit error rate estimate */
 
     struct freedv_data_channel *fdc;
 };
