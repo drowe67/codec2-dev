@@ -251,7 +251,12 @@ struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enabl
     deframer->frame_size = frame_size;
     deframer->uw_size = uw_size;
     deframer->on_inv_bits = 0;
+    deframer->sym_size = 1;
+    
     deframer->ber_est = 0;
+    deframer->total_uw_bits = 0;
+    deframer->total_uw_err = 0;
+    
     deframer->fdc = NULL;
 
     return deframer;
@@ -555,14 +560,16 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     }else{
         return 0;
     }
+    /* Skip N bits for multi-bit symbol modems */
     for(i=0; i<frame_size; i++){
         /* Put a bit in the buffer */
         strbits[bitptr] = bits_in[i];
         /* If we're checking the inverted bitstream, put a bit in it */
         if(invbits!=NULL)
             invbits[bitptr] = bits_in[i]?0:1;
+        
         bitptr++;
-        if(bitptr >= frame_size) bitptr = 0;
+        if(bitptr >= frame_size) bitptr -= frame_size;
         def->bitptr = bitptr;
         /* Enter state machine */
         if(state==ST_SYNC){
@@ -594,7 +601,9 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
                 fvhff_extract_frame(def,bits,codec2_out,proto_out,vc_out,pt);
                 
                 /* Update BER estimate */
-                def->ber_est = (.99*def->ber_est) + (.01*((float)uw_diff)/((float)uw_size));
+                def->ber_est = (.995*def->ber_est) + (.005*((float)uw_diff)/((float)uw_size));
+                def->total_uw_bits += uw_size;
+                def->total_uw_err += uw_diff;
             }
         /* Not yet sunk */
         }else{
@@ -608,7 +617,9 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
                     on_inv_bits = 1;
                     fvhff_extract_frame(def,invbits,codec2_out,proto_out,vc_out,pt);
                     /* Update BER estimate */
-                    def->ber_est = (.99*def->ber_est) + (.01*((float)uw_diff)/((float)uw_size));
+                    def->ber_est = (.995*def->ber_est) + (.005*((float)uw_diff)/((float)uw_size));
+                    def->total_uw_bits += uw_size;
+                    def->total_uw_err += uw_diff;
                 }
             }
             if(fvhff_match_uw(def,strbits,uw_first_tol, &uw_diff, &pt)){
@@ -619,7 +630,9 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
                 on_inv_bits = 0;
                 fvhff_extract_frame(def,strbits,codec2_out,proto_out,vc_out,pt);
                 /* Update BER estimate */
-                def->ber_est = (.98*def->ber_est) + (.02*((float)uw_diff)/((float)uw_size));
+                def->ber_est = (.995*def->ber_est) + (.005*((float)uw_diff)/((float)uw_size));
+                def->total_uw_bits += uw_size;
+                def->total_uw_err += uw_diff;
             }
         }
     }

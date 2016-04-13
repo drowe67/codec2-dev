@@ -54,8 +54,11 @@ struct freedv_vhf_deframer {
     int frame_size;     /* How big is a frame? */
     int uw_size;        /* How big is the UW */
     int on_inv_bits;    /* Are we using the inverted bits? */
+    int sym_size;       /* How many bits in a modem symbol */ 
 
     float ber_est;      /* Bit error rate estimate */
+    int total_uw_bits;  /* Total RX-ed bits of UW */
+    int total_uw_err;   /* Total errors in UW bits */
 
     struct freedv_data_channel *fdc;
 };

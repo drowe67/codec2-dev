@@ -346,6 +346,37 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     return fsk;
 }
 
+
+void fsk_set_nsym(struct FSK *fsk,int nsyms){
+    assert(nsyms>0);
+    int Ndft,i;
+    Ndft = 0;
+    
+    /* Set constant config parameters */
+    fsk->N = fsk->Ts*nsyms;
+    fsk->Nsym = nsyms;
+    fsk->Nmem = fsk->N+(2*fsk->Ts);
+    fsk->nin = fsk->N;
+    fsk->Nbits = fsk->mode==2 ? fsk->Nsym : fsk->Nsym*2;
+    
+    /* Find smallest 2^N value that fits Fs for efficient FFT */
+    /* It would probably be better to use KISS-FFt's routine here */
+    for(i=1; i; i<<=1)
+        if((fsk->N)&i)
+            Ndft = i;
+    
+    fsk->Ndft = Ndft;
+    
+    free(fsk->fft_cfg);
+    free(fsk->fft_est);
+    
+    fsk->fft_cfg = kiss_fftr_alloc(Ndft,0,NULL,NULL);
+    fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
+    
+    for(i=0;i<Ndft/2;i++)fsk->fft_est[i] = 0;
+    
+}
+
 uint32_t fsk_nin(struct FSK *fsk){
     return (uint32_t)fsk->nin;
 }
