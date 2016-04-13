@@ -207,3 +207,17 @@ if(WIN32)
     set(CPACK_NSIS_MODIFY_PATH ON)
     include(CPack)
 endif(WIN32)
+
+########################################################################
+# Create Pkg Config File
+########################################################################
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/codec2.pc.in
+    ${CMAKE_CURRENT_BINARY_DIR}/codec2.pc
+@ONLY)
+
+install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/codec2.pc
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
+    COMPONENT "codec2_devel"
+)
