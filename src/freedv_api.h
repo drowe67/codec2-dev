@@ -42,6 +42,7 @@
 #define FREEDV_MODE_700B        2
 #define FREEDV_MODE_2400A       3
 #define FREEDV_MODE_2400B       4
+#define FREEDV_MODE_800XA       5
 
 struct freedv;
 

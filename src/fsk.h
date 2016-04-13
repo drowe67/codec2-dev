@@ -109,6 +109,11 @@ struct FSK * fsk_create(int Fs, int Rs, int M, int tx_f1, int tx_fs);
  */
 struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs);
 
+/* 
+ * Set a new number of symbols per processing frame
+ */
+void fsk_set_nsym(struct FSK *fsk,int nsym);
+
 /*
  * Set a MODEM_STATS struct in which to deposit demod statistics
  */

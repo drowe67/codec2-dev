@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     float                      clock_offset;
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|2400A|2400B InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
+	printf("usage: %s 1600|700|700B|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -94,6 +94,8 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400A;
     if (!strcmp(argv[1],"2400B"))
         mode = FREEDV_MODE_2400B;
+    if (!strcmp(argv[1],"800XA"))
+        mode = FREEDV_MODE_800XA;
     assert(mode != -1);
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;

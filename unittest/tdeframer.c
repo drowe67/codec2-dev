@@ -29,10 +29,10 @@
 #define TESTBER 0.01
 
 /* Frame count */
-#define FRCNT 15000
+#define FRCNT 1500
 
 /* Random bits leading frame */
-#define LRCNT 55
+#define LRCNT 44
 
 #include <stdio.h>
 #include <math.h>
@@ -135,6 +135,7 @@ int main(int argc,char *argv[]){
     printf("Extracted %d frames of %d, %f hit rate\n",total_extract,FRCNT,((float)total_extract/(float)FRCNT));
     printf("Bit error rate %f measured from golay code\n",measured_ber);
     printf("Bit error rate %f measured by deframer\n",fvd->ber_est);
+    printf("Bit error rate %f measured by deframer\n",(float)fvd->total_uw_err/(float)fvd->total_uw_bits);
     /* Check test condition */
     if(first_extract<first_tol){
         printf("Test passed at test BER of %f!\n",TESTBER);
@@ -143,4 +144,5 @@ int main(int argc,char *argv[]){
         printf("** Test failed at test BER of %f!\n",TESTBER);
         exit(1);
     }
+    fvhff_destroy_deframer(fvd);
 }
