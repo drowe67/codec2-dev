@@ -480,7 +480,6 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
     COMP tx_fdm[f->n_nom_modem_samples];
     int  i;
-    uint8_t c2_buf[8];
     assert((f->mode == FREEDV_MODE_1600)  || (f->mode == FREEDV_MODE_700)   || 
            (f->mode == FREEDV_MODE_700B)  || (f->mode == FREEDV_MODE_2400A) || 
            (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA));
@@ -493,11 +492,8 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
 #ifndef CORTEX_M4
         /* 800XA has two codec frames per modem frame */
         if((f->mode == FREEDV_MODE_800XA)){
-            memset(f->packed_codec_bits,0,8);
             codec2_encode(f->codec2, &f->packed_codec_bits[0], &speech_in[  0]);
             codec2_encode(f->codec2, &f->packed_codec_bits[4], &speech_in[320]);
-            uint8_t * cb = &f->packed_codec_bits[0];
-            fprintf(stderr,"%02x%02x%02x%02x %02x%02x%02x%02x\n",cb[0],cb[1],cb[2],cb[3],cb[4],cb[5],cb[6],cb[7]);
         }else{
             codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         }
