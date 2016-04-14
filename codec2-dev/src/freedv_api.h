@@ -98,6 +98,7 @@ void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
 
 // Get parameters
+struct MODEM_STATS;
 int freedv_get_version(void);
 int freedv_get_mode                 (struct freedv *freedv);
 void freedv_get_modem_stats         (struct freedv *freedv, int *sync, float *snr_est);
