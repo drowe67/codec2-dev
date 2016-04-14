@@ -277,7 +277,7 @@ int main(void) {
 
     /* Set up ADCs/DACs */
     dac_open(4*DAC_BUF_SZ);
-    adc_open(ADC_FS_96KHZ, 4*ADC_BUF_SZ);
+    adc_open(ADC_FS_16KHZ, 4*ADC_BUF_SZ);
 
     /* Set up FreeDV modem */
     f = freedv_open(FREEDV_MODE_1600);
