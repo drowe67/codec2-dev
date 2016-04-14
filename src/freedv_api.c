@@ -888,14 +888,13 @@ int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
         *valid = 1;
-        f->sync = 1;
-        f->stats.sync = 1;
     } else {
         /* Fill with silence */
         *valid = 0;
-        f->sync = 0;
-        f->stats.sync = 0;
     }
+    f->sync = f->deframer->state;
+    f->stats.sync = f->deframer->state;
+
     return f->n_speech_samples;
 }
 #endif

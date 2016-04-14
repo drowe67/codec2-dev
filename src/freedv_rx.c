@@ -42,6 +42,8 @@
 #include "freedv_api.h"
 #include "modem_stats.h"
 
+#include "codec2.h"
+
 struct my_callback_state {
     FILE *ftxt;
 };
@@ -60,6 +62,27 @@ void my_put_next_rx_proto(void *callback_state,char *proto_bits){
     }
 }
 
+/* Called when a packet has been received */
+void my_datarx(void *callback_state, unsigned char *packet, size_t size) {
+    struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+    if (pstate->ftxt != NULL) {
+        size_t i;
+	
+	fprintf(pstate->ftxt, "data (%zd bytes): ", size);
+	for (i = 0; i < size; i++) {
+	    fprintf(pstate->ftxt, "0x%02x ", packet[i]);
+	}
+	fprintf(pstate->ftxt, "\n");
+    }
+}
+
+/* Called when a new packet can be send */
+void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
+    /* This should not happen while receiving.. */
+    fprintf(stderr, "datarx callback called, this should not happen!\n");    
+    *size = 0;
+}
+
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt;
     short                     *speech_out;
@@ -76,9 +99,13 @@ int main(int argc, char *argv[]) {
     int                        n_speech_samples;
     int                        n_max_modem_samples;
     float                      clock_offset;
+    int                        use_codecrx;
+    struct CODEC2             *c2 = NULL;
+    int                        i;
+
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--test_frames]\n", argv[0]);
+	printf("usage: %s 1600|700|700B|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--test_frames] [--codecrx]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -115,8 +142,29 @@ int main(int argc, char *argv[]) {
     freedv = freedv_open(mode);
     assert(freedv != NULL);
 
-    if ( (argc > 4) && (strcmp(argv[4], "--testframes") == 0) ) {
-      freedv_set_test_frames(freedv, 1);
+    use_codecrx = 0;
+
+    if (argc > 4) {
+        for (i = 4; i < argc; i++) {
+            if (strcmp(argv[i], "--testframes") == 0) {
+                freedv_set_test_frames(freedv, 1);
+            }
+            if (strcmp(argv[i], "--codecrx") == 0) {
+                int c2_mode;
+
+                if (mode == FREEDV_MODE_700)  {
+		    c2_mode = CODEC2_MODE_700;
+		} else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
+                    c2_mode = CODEC2_MODE_700B;
+                } else {
+                    c2_mode = CODEC2_MODE_1300;
+                }
+                use_codecrx = 1;
+
+                c2 = codec2_create(c2_mode);
+                assert(c2 != NULL);
+            }
+        }
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
@@ -133,6 +181,7 @@ int main(int argc, char *argv[]) {
     my_cb_state.ftxt = ftxt;
     freedv_set_callback_txt(freedv, &my_put_next_rx_char, NULL, &my_cb_state);
     freedv_set_callback_protocol(freedv, &my_put_next_rx_proto, NULL, &my_cb_state);
+    freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
 
     /* Note we need to work out how many samples demod needs on each
        call (nin).  This is used to adjust for differences in the tx and rx
@@ -143,7 +192,34 @@ int main(int argc, char *argv[]) {
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
 
-        nout = freedv_rx(freedv, speech_out, demod_in);
+        if (use_codecrx == 0) {
+            /* Use the freedv_api to do everything: speech decoding, demodulating */
+            nout = freedv_rx(freedv, speech_out, demod_in);
+        } else {
+            int bits_per_codec_frame = codec2_bits_per_frame(c2);
+            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+            int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
+            int samples_per_frame = codec2_samples_per_frame(c2);
+            unsigned char encoded[bytes_per_codec_frame * codec_frames];
+
+            /* Use the freedv_api to demodulate only */
+            nout = freedv_codecrx(freedv, encoded, demod_in);
+
+            /* deccode the speech ourself (or send it to elsewhere, e.g. network) */
+            if (nout) {
+                unsigned char *enc_frame = encoded;
+		short *speech_frame = speech_out;
+		
+		nout = 0;
+	        for (i = 0; i < codec_frames; i++) {
+		    codec2_decode(c2, speech_frame, enc_frame);
+		    enc_frame += bytes_per_codec_frame;
+		    speech_frame += samples_per_frame;
+		    nout += samples_per_frame;
+		}
+	    }
+        }
+
         nin = freedv_nin(freedv);
 
         fwrite(speech_out, sizeof(short), nout, fout);
