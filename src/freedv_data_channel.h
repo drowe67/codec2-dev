@@ -61,10 +61,10 @@ void freedv_data_channel_destroy(struct freedv_data_channel *fdc);
 void freedv_data_set_cb_rx(struct freedv_data_channel *fdc, freedv_data_callback_rx cb, void *state);
 void freedv_data_set_cb_tx(struct freedv_data_channel *fdc, freedv_data_callback_tx cb, void *state);
 
-void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char data[8], int from_bit, int bcast_bit, int end_bits);
-void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char data[8], int *from_bit, int *bcast_bit, int *end_bits);
+void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int from_bit, int bcast_bit, int crc_bit, int end_bits);
+void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int *from_bit, int *bcast_bit, int *crc_bit, int *end_bits);
 
 void freedv_data_set_header(struct freedv_data_channel *fdc, unsigned char *header);
-int freedv_data_get_n_tx_frames(struct freedv_data_channel *fdc);
+int freedv_data_get_n_tx_frames(struct freedv_data_channel *fdc, size_t size);
 
 #endif /* _FREEDV_DATA_CHANNEL_H */

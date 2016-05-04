@@ -72,6 +72,9 @@ target_link_libraries(tfmfsk m)
 add_executable(tdeframer tdeframer.c)
 target_link_libraries(tdeframer m codec2)
 
+add_executable(tfreedv_data_channel tfreedv_data_channel.c)
+target_link_libraries(tfreedv_data_channel codec2)
+
 #add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
 #target_link_libraries(t48_8 codec2)
 

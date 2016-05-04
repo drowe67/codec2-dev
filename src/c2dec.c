@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
     float          ber, r, burst_length, burst_period, burst_timer, ber_est;
     unsigned char  mask;
     int            natural, dump, softdec, bit, ret;
+    int            report_energy;
 
     char* opt_string = "h:";
     struct option long_options[] = {
@@ -70,6 +71,7 @@ int main(int argc, char *argv[])
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
+	{ "energy", no_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -119,6 +121,7 @@ int main(int argc, char *argv[])
     burst_length = burst_period = 0.0;
     burst_timer = 0.0;
     dump = natural = softdec = 0;
+    report_energy = 0;
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
@@ -147,7 +150,7 @@ int main(int argc, char *argv[])
 	        nstart_bit = atoi(optarg);
             } else if(strcmp(long_options[option_index].name, "endbit") == 0) {
 	        nend_bit = atoi(optarg);
-             } else if(strcmp(long_options[option_index].name, "berfile") == 0) {
+            } else if(strcmp(long_options[option_index].name, "berfile") == 0) {
 	        if ((fber = fopen(optarg,"wt")) == NULL) {
 	            fprintf(stderr, "Error opening BER file: %s %s.\n",
                             optarg, strerror(errno));
@@ -161,6 +164,9 @@ int main(int argc, char *argv[])
 	            dump_on(optarg);
             }
             #endif
+	    else if (strcmp(long_options[option_index].name, "energy") == 0) {
+	        report_energy = 1;
+	    }
             break;
 
         case 'h':
@@ -269,6 +275,9 @@ int main(int argc, char *argv[])
             codec2_set_softdec(codec2, softdec_bits);
         }
 
+        if (report_energy)
+           fprintf(stderr, "Energy: %1.3f\n", codec2_get_energy(codec2, bits));
+
 	codec2_decode_ber(codec2, buf, bits, ber_est);
  	fwrite(buf, sizeof(short), nsam, fout);
 
@@ -303,7 +312,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 	int i;
 	char *option_parameters;
 	fprintf(stderr, "\nc2dec - Codec 2 decoder and bit error simulation program\n"
-		"usage: %s 3200|2400|1400}1300|1200 InputFile OutputRawFile [OPTIONS]\n\n"
+		"usage: %s 3200|2400|1600|1400|1300|1200|700|700B InputFile OutputRawFile [OPTIONS]\n\n"
                 "Options:\n", argv[0]);
         for(i=0; i<num_opts-1; i++) {
 		if(long_options[i].has_arg == no_argument) {

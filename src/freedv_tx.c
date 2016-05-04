@@ -75,7 +75,7 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
         int i;
 	for (i = 0; i < 64; i++)
 	    packet[i] = i;
-	*size = i;
+        *size = i;
     } else {
         /* set size to zero, the freedv api will insert a header frame */
         *size = 0;
@@ -143,24 +143,23 @@ int main(int argc, char *argv[]) {
             }
             if (strcmp(argv[i], "--codectx") == 0) {
                 int c2_mode;
-
+                
                 if (mode == FREEDV_MODE_700)  {
-		    c2_mode = CODEC2_MODE_700;
-		} else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
+                    c2_mode = CODEC2_MODE_700;
+                } else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
                     c2_mode = CODEC2_MODE_700B;
                 } else {
                     c2_mode = CODEC2_MODE_1300;
                 }
                 use_codectx = 1;
-
                 c2 = codec2_create(c2_mode);
                 assert(c2 != NULL);
             }
-	    if (strcmp(argv[i], "--datatx") == 0) {
-	        unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
-	        freedv_set_data_header(freedv, header);
-		use_datatx = 1;
-	    }
+            if (strcmp(argv[i], "--datatx") == 0) {
+                unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
+                freedv_set_data_header(freedv, header);
+                use_datatx = 1;
+            }
         }
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
@@ -200,30 +199,30 @@ int main(int argc, char *argv[]) {
             unsigned char encoded[bytes_per_codec_frame * codec_frames];
             unsigned char *enc_frame = encoded;
             short *speech_frame = speech_in;
-	    float energy = 0;
+            float energy = 0;
 
             /* Encode the speech ourself (or get it from elsewhere, e.g. network) */
             for (i = 0; i < codec_frames; i++) {
                 codec2_encode(c2, enc_frame, speech_frame);
                 energy += codec2_get_energy(c2, enc_frame);
-	        enc_frame += bytes_per_codec_frame;
+                enc_frame += bytes_per_codec_frame;
                 speech_frame += samples_per_frame;
-	    }
-	    energy /= codec_frames;
-	    
-	    /* Is the audio fragment quiet? */
-	    if (use_datatx && energy < 1.0) {
+            }
+            energy /= codec_frames;
+            fprintf(stderr,"energy:%f\n",energy);
+            /* Is the audio fragment quiet? */
+            if (use_datatx && energy < 1.0) {
                 /* Insert a frame with data instead of speech */
-		freedv_datatx(freedv, mod_out);
+                freedv_datatx(freedv, mod_out);
             } else {
                 /* Use the freedv_api to modulate already encoded frames */
                 freedv_codectx(freedv, mod_out, encoded);
             }
-	}
+        }
 
         fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
 
-	/* if this is in a pipeline, we probably don't want the usual
+        /* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
 
         if (fout == stdout) fflush(stdout);

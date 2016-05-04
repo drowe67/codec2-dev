@@ -453,13 +453,16 @@ static void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
     
-    fvhff_frame_data_bits(f->deframer, FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits));
+    if (f->mode != FREEDV_MODE_800XA)
+    	fvhff_frame_data_bits(f->deframer, FREEDV_VHF_FRAME_A,(uint8_t*)(f->tx_bits));
+    else
+        fvhff_frame_data_bits(f->deframer, FREEDV_HF_FRAME_B,(uint8_t*)(f->tx_bits));
         
     /* Allocate floating point buffer for FSK mod */
     tx_float = alloca(sizeof(float)*f->n_nom_modem_samples);
         
     /* do 4fsk mod */
-    if(f->mode == FREEDV_MODE_2400A){
+    if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){
         fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
         /* Convert float samps to short */
         for(i=0; i<f->n_nom_modem_samples; i++){
@@ -760,7 +763,10 @@ int  freedv_data_ntxframes (struct freedv *f){
     #ifndef CORTEX_M4
     if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B) {
         if (f->deframer->fdc)
-            return freedv_data_get_n_tx_frames(f->deframer->fdc);
+            return freedv_data_get_n_tx_frames(f->deframer->fdc, 8);
+    } else if (f->mode == FREEDV_MODE_800XA) {
+        if (f->deframer->fdc)
+            return freedv_data_get_n_tx_frames(f->deframer->fdc, 6);
     }
     #endif
     return 0;

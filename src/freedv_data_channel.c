@@ -82,6 +82,27 @@ static unsigned short fdc_crc(unsigned char *buffer, size_t len)
 
     return crc ^ 0xffff;
 }
+
+/* CRC4 0x03 polynomal */
+static unsigned char fdc_crc4(unsigned char *buffer, size_t len)
+{
+    unsigned char crc = 0x0f;
+    size_t i;
+    
+    for (i = 0; i < len; i++, buffer++) {
+        int shift;
+	
+        for (shift = 7; shift <= 0; shift--) {
+            crc <<= 1;
+            if ((*buffer >> shift) & 0x1)
+                crc |= 1;
+            if (crc & 0x10)
+                crc ^= 0x03;
+	}
+    }
+    
+    return crc & 0x0f;
+}
  
 struct freedv_data_channel *freedv_data_channel_create(void)
 {
@@ -118,8 +139,15 @@ void freedv_data_set_cb_tx(struct freedv_data_channel *fdc, freedv_data_callback
     fdc->cb_tx_state = state;
 }
 
-void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char data[8], int from_bit, int bcast_bit, int end_bits)
+void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int from_bit, int bcast_bit, int crc_bit, int end_bits)
 {
+    int copy_bits;
+    if (end_bits) {
+        copy_bits = end_bits;
+    } else {
+        copy_bits = size;
+    }
+
     /* New packet? */
     if (fdc->packet_rx_cnt == 0) {
         /* Does the packet have a compressed from field? */
@@ -129,18 +157,34 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
 	    fdc->packet_rx_cnt += 6;	    
        	}
 	if (bcast_bit) {
-	    /* Compressed to: fill in broadcast address */
-	    memcpy(fdc->packet_rx + fdc->packet_rx_cnt, fdc_header_bcast, sizeof(fdc_header_bcast));
-	    fdc->packet_rx_cnt += 6;
+            if (!from_bit) {
+                /* Copy from header and modify size and end_bits accordingly */
+                memcpy(fdc->packet_rx + fdc->packet_rx_cnt, data, 6);
+                fdc->packet_rx_cnt += 6;
+                copy_bits -= 6;
+                if (copy_bits < 0)
+                    copy_bits = 0;
+                data += 6;
+            }
+            /* Compressed to: fill in broadcast address */
+            memcpy(fdc->packet_rx + fdc->packet_rx_cnt, fdc_header_bcast, sizeof(fdc_header_bcast));
+            fdc->packet_rx_cnt += 6;
 	}
+        if (crc_bit) {
+            unsigned char calc_crc = fdc_crc4(data, size);
+            if (calc_crc == end_bits) {
+	        /* It is a single header field, remember it for later */
+                memcpy(fdc->packet_rx + 6, data, 6);
+		memcpy(fdc->packet_rx, fdc_header_bcast, 6);
+                if (fdc->cb_rx) {
+                    fdc->cb_rx(fdc->cb_rx_state, fdc->packet_rx, 12);
+                }
+            }
+            fdc->packet_rx_cnt = 0;
+            return;
+        }
     }
     
-    int copy_bits;
-    if (end_bits) {
-        copy_bits = end_bits;
-    } else {
-        copy_bits = 8;
-    }
     if (fdc->packet_rx_cnt + copy_bits >= FREEDV_DATA_CHANNEL_PACKET_MAX) {
         /* Something went wrong... this can not be a real packet */
 	fdc->packet_rx_cnt = 0;
@@ -157,7 +201,7 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
         rx_crc |= fdc->packet_rx[fdc->packet_rx_cnt - 2];
 
         if (rx_crc == calc_crc) {
-            if (fdc->packet_rx_cnt == 8) {
+            if (fdc->packet_rx_cnt == size) {
 	        /* It is a single header field, remember it for later */
                 memcpy(fdc->rx_header, fdc->packet_rx, 6);
             }
@@ -179,10 +223,11 @@ void freedv_data_channel_rx_frame(struct freedv_data_channel *fdc, unsigned char
     }
 }
 
-void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char data[8], int *from_bit, int *bcast_bit, int *end_bits)
+void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char *data, size_t size, int *from_bit, int *bcast_bit, int *crc_bit, int *end_bits)
 {
     *from_bit = 0;
     *bcast_bit = 0;
+    *crc_bit = 0;
     
     if (!fdc->packet_tx_size) {
         fdc->packet_tx_cnt = 0;
@@ -193,12 +238,23 @@ void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char
         }
 	if (!fdc->packet_tx_size) {
 	    /* Nothing to send, insert a header frame */
-	    memcpy(fdc->packet_tx, fdc->tx_header, 8);
-	    fdc->packet_tx_size = 8;
+	    memcpy(fdc->packet_tx, fdc->tx_header, size);
+            if (size < 8) {
+                *end_bits = fdc_crc4(fdc->tx_header, size);
+                *crc_bit = 1;
+                memcpy(data, fdc->tx_header, size);
+
+                return;
+            } else {
+                fdc->packet_tx_size = size;
+            }            
 	} else {
 	    /* new packet */
 	    unsigned short crc;
             unsigned char tmp[6];
+            
+            *from_bit = !memcmp(fdc->packet_tx + 6, fdc->tx_header, 6);
+            *bcast_bit = !memcmp(fdc->packet_tx, fdc_header_bcast, 6);
 
             memcpy(tmp, fdc->packet_tx, 6);
 	    memcpy(fdc->packet_tx, fdc->packet_tx + 6, 6);
@@ -211,22 +267,23 @@ void freedv_data_channel_tx_frame(struct freedv_data_channel *fdc, unsigned char
 	    fdc->packet_tx[fdc->packet_tx_size] = (crc >> 8) & 0xff;
 	    fdc->packet_tx_size++;
 	    
-	    if (!memcmp(fdc->packet_tx, fdc->tx_header, 6)) {
-	        *from_bit = 1;
+	    if (*from_bit) {
 		fdc->packet_tx_cnt = 6;
-		
-		if (!memcmp(fdc->packet_tx + 6, fdc_header_bcast, 6)) {
-		    *bcast_bit = 1;
-		    fdc->packet_tx_cnt += 6;
-		}
-	    }
+            } else {
+                if (*bcast_bit) {
+                    memcpy(fdc->packet_tx + 6, fdc->packet_tx, 6);
+                }
+            }
+            if (*bcast_bit) {
+                fdc->packet_tx_cnt += 6;
+            }
 	}
     }
     if (fdc->packet_tx_size) {
         int copy = fdc->packet_tx_size - fdc->packet_tx_cnt;
        
-        if (copy > 8) {
-            copy = 8;
+        if (copy > size) {
+            copy = size;
 	    *end_bits = 0;
         } else {
             *end_bits = copy;
@@ -246,8 +303,8 @@ void freedv_data_set_header(struct freedv_data_channel *fdc, unsigned char *head
     fdc->tx_header[7] = (crc >> 8) & 0xff;
 }
 
-int freedv_data_get_n_tx_frames(struct freedv_data_channel *fdc)
+int freedv_data_get_n_tx_frames(struct freedv_data_channel *fdc, size_t size)
 {
-    /* packet will be send in 8 byte frames */
-    return (fdc->packet_tx_size + 7) / 8;
+    /* packet will be send in 'size' byte frames */
+    return (fdc->packet_tx_size + size-1) / size;
 }
