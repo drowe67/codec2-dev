@@ -208,16 +208,16 @@ int main(int argc, char *argv[]) {
             /* deccode the speech ourself (or send it to elsewhere, e.g. network) */
             if (nout) {
                 unsigned char *enc_frame = encoded;
-		short *speech_frame = speech_out;
-		
-		nout = 0;
-	        for (i = 0; i < codec_frames; i++) {
-		    codec2_decode(c2, speech_frame, enc_frame);
-		    enc_frame += bytes_per_codec_frame;
-		    speech_frame += samples_per_frame;
-		    nout += samples_per_frame;
-		}
-	    }
+                short *speech_frame = speech_out;
+                
+                nout = 0;
+                for (i = 0; i < codec_frames; i++) {
+                    codec2_decode(c2, speech_frame, enc_frame);
+                    enc_frame += bytes_per_codec_frame;
+                    speech_frame += samples_per_frame;
+                    nout += samples_per_frame;
+                }
+            }
         }
 
         nin = freedv_nin(freedv);

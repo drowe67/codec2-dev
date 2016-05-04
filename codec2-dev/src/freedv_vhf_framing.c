@@ -64,8 +64,11 @@ static const uint8_t A_blank[] =   {1,0,1,0,0,1,1,1, /* Padding[0:3] Proto[0:3] 
                                     0,0,0,0,0,0,1,0, /* Voice[48:51] Proto[12:15] */
                                     0,1,1,1,0,0,1,0};/* Proto[16:19] Padding[4:7] */
 
-/* HF Type B UW */
+/* HF Type B voice UW */
 static const uint8_t B_uw_v[] =    {0,1,1,0,0,1,1,1};
+
+/* HF Type B data UW */
+static const uint8_t B_uw_d[] =    {1,1,1,1,0,0,1,0};
                                     
 /* Blank HF type B frame */
 static const uint8_t B_blank[] =   {0,1,1,0,0,1,1,1, /* UW[0:7]					  */
@@ -165,6 +168,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
         int end_bits;
         int from_bit;
         int bcast_bit;
+	int crc_bit;
 
         /* Fill out frame with blank frame prototype */
         for(i=0; i<4; i++)
@@ -177,7 +181,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
             bits_out[40 + i] = A_uw_d[i];
         
         if (def->fdc)
-                freedv_data_channel_tx_frame(def->fdc, data, &from_bit, &bcast_bit, &end_bits);
+                freedv_data_channel_tx_frame(def->fdc, data, 8, &from_bit, &bcast_bit, &crc_bit, &end_bits);
         else
             return;
 
@@ -198,7 +202,40 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
         }
 
         for (i = 0; i < 4; i++)
-        bits_out[88 + i] = (end_bits >> (3-i)) & 0x1;
+            bits_out[88 + i] = (end_bits >> (3-i)) & 0x1;
+    } else if (frame_type == FREEDV_HF_FRAME_B){
+        uint8_t data[6];
+        int end_bits;
+        int from_bit;
+        int bcast_bit;
+	int crc_bit;
+
+        /* Fill out frame with blank prototype */
+        for(i=0; i<64; i++)
+            bits_out[i] = B_blank[i];
+
+        /* UW data */
+        for (i=0; i < 8; i++)
+            bits_out[0 + i] = B_uw_d[i];
+        
+        if (def->fdc)
+                freedv_data_channel_tx_frame(def->fdc, data, 6, &from_bit, &bcast_bit, &crc_bit, &end_bits);
+        else
+            return;
+
+        bits_out[56] = from_bit;
+        bits_out[57] = bcast_bit;
+        bits_out[58] = crc_bit;
+        bits_out[59] = 0; /* unused */
+
+        /* Fill in data bits */
+        ibit = 0;
+        for(i=8; i<56; i++){   /* First half */
+            bits_out[i] = UNPACK_BIT_MSBFIRST(data,ibit);
+            ibit++;
+        }
+        for (i = 0; i < 4; i++)
+            bits_out[60 + i] = (end_bits >> (3-i)) & 0x1;
     }
 }
 
@@ -318,7 +355,6 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     int uw_len      = def->uw_size;
     int iuw,ibit;
     const uint8_t * uw[2];
-    int can_be_data;
     int uw_offset;
     int diff[2] = { 0, 0 };
     int i;
@@ -328,16 +364,14 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     /* Set up parameters for the standard type of frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
         uw[0] = A_uw_v;
-		uw[1] = A_uw_d;
+        uw[1] = A_uw_d;
         uw_len = 16;
         uw_offset = 40;
-        can_be_data = 1;
     } else if(frame_type == FREEDV_HF_FRAME_B){
         uw[0] = B_uw_v;
-        uw[1] = B_uw_v;
+        uw[1] = B_uw_d;
         uw_len = 8;
         uw_offset = 0;
-        can_be_data = 0;
     } else {
         return 0;
     }
@@ -356,7 +390,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
         match[i] = diff[i] <= tol;
     }
     /* Pick the best matching UW */
-    if (diff[0] < diff[1] || !can_be_data) {
+    if (diff[0] < diff[1]) {
         r = match[0];
         *rdiff = diff[0];
         *pt = FRAME_PAYLOAD_TYPE_VOICE;
@@ -509,7 +543,49 @@ static void fvhff_extract_frame_data(struct freedv_vhf_deframer * def,uint8_t bi
         }
     
         if (def->fdc) {
-            freedv_data_channel_rx_frame(def->fdc, data, from_bit, bcast_bit, end_bits);
+            freedv_data_channel_rx_frame(def->fdc, data, 8, from_bit, bcast_bit, 0, end_bits);
+        }
+    } else if(frame_type == FREEDV_HF_FRAME_B){
+        uint8_t data[6];
+        int end_bits = 0;
+        int from_bit;
+        int bcast_bit;
+	int crc_bit;
+        
+        ibit = 0;
+        memset(data,0,6);
+        
+        /* Extract and pack first c2 frame, MSB first */
+        iframe = bitptr+8;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<48;ibit++){
+            data[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
+
+        iframe = bitptr+56;
+        if(iframe >= frame_size) iframe-=frame_size;
+        from_bit = bits[iframe];
+        iframe++;
+        if(iframe >= frame_size) iframe-=frame_size;
+        bcast_bit = bits[iframe];
+        iframe++;
+        if(iframe >= frame_size) iframe-=frame_size;
+        crc_bit = bits[iframe];
+        
+        /* Extract endbits value, MSB first*/
+        iframe = bitptr+60;
+        ibit = 0;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<4;ibit++){
+            end_bits |= (bits[iframe]&0x1)<<(3-(ibit));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
+
+        if (def->fdc) {
+            freedv_data_channel_rx_frame(def->fdc, data, 7, from_bit, bcast_bit, crc_bit, end_bits);
         }
     }
 }
