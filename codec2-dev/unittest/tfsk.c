@@ -131,7 +131,6 @@ int main(int argc,char *argv[]){
     }else{
         fsk = fsk_create(Fs,Rs,M,f1,fs);
     }
-    fprintf(stderr,"Running in mode %d\n",M);
     /* Modulate! */
     if(test_type == TEST_MOD || test_type == TEST_SELF_FULL){
         /* Generate random bits for self test */

@@ -60,7 +60,7 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.verbose = 0;
   states.phi = zeros(1, M);       % keep down converter osc phase continuous
 
-  printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
+  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
   % BER stats 
 
@@ -119,7 +119,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=48)
   states.verbose = 0;
   states.phi = zeros(1, M);       % keep down converter osc phase continuous
 
-  printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
+  %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
   % Freq estimator limits
 
