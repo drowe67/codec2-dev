@@ -42,6 +42,9 @@
 %tfsk executable path/file
 global tfsk_location = '../build_linux/unittest/tfmfsk';
 
+%Set to 1 for verbose printouts
+global print_verbose = 0;
+
 
 
 fmfsk
@@ -73,6 +76,7 @@ endfunction
 
 %Compare 2 vectors, fail if they are not close enough
 function pass = vcompare(vc,voct,vname,tname,tol,pnum)
+    global print_verbose;
     
     %Get delta of vectors
     dvec = abs(abs(vc)-abs(voct));     
@@ -82,8 +86,9 @@ function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     
     maxdvec = abs(max(dvec));
     pass = maxdvec<tol;
-    
-    printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
+    if print_verbose == 1
+        printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
+    end
     
     if pass == 0
         printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
@@ -222,6 +227,7 @@ endfunction
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 
 function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
+  global print_verbose;
   test_frame_mode = 2;
   frames = 70;
   %EbNodB = 3;
@@ -354,12 +360,14 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
   offset = ox;
   berc = ber;
   
-  printf("C BER %f in test %s\n",berc,test_name);
-  printf("Oct BER %f in test %s\n",bero,test_name);
+  if print_verbose == 1
+    printf("C BER %f in test %s\n",berc,test_name);
+    printf("Oct BER %f in test %s\n",bero,test_name);
+  end
   
   stats.berc = berc;
   stats.bero = bero;
-  
+  stats.name = test_name;
     % non-coherent BER theory calculation
   % It was complicated, so I broke it up
 
@@ -382,6 +390,7 @@ function stats = tfmfsk_run_sim(EbNodB,timing_offset=0,de=0,of=0,hpf=0,df=0,M=2)
 
 
 function pass = ebno_battery_test(timing_offset,drift,hpf,deemp,outfilt)
+    global print_verbose;
     %Range of EbNodB over which to test
     ebnodbrange = (8:2:20);
     ebnodbs = length(ebnodbrange);
@@ -399,6 +408,11 @@ function pass = ebno_battery_test(timing_offset,drift,hpf,deemp,outfilt)
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
         passv(ii)=statv(ii).pass;
+        if statv(ii).pass
+            printf("Test %s passed\n",statv(ii).name);
+        else
+            printf("Test %s failed\n",statv(ii).name);
+        end
     end
     
     %All pass flags are '1'
@@ -473,6 +487,11 @@ function plot_fmfsk_bers(M=2)
  
 endfunction
 
-
-test_fmfsk_battery
+xpass = test_fmfsk_battery
 plot_fmfsk_bers(2)
+
+if xpass
+    printf("***** All tests passed! *****\n");
+else
+    printf("***** Some test failed! Look back thorugh output to find failed test *****\n");
+end

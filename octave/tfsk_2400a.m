@@ -46,13 +46,17 @@
 
   2 - Change tfsk_location below if required
   3 - Ensure Octave packages signal and parallel are installed
-  4 - Start Octave and run tfsk.m. It will perform all tests automatically
+  4 - Start Octave and run tfsk_2400a.m. It will perform all tests automatically
 
 #}
+
+
 
 %tfsk executable path/file
 global tfsk_location = '../build_linux/unittest/tfsk';
 
+%Set to 1 for verbose printouts
+global print_verbose = 0;
 
 
 fsk_horus_as_a_lib = 1; % make sure calls to test functions at bottom are disabled
@@ -86,7 +90,7 @@ endfunction
 
 %Compare 2 vectors, fail if they are not close enough
 function pass = vcompare(vc,voct,vname,tname,tol,pnum)
-    
+    global print_verbose;
     %Get delta of vectors
     dvec = abs(abs(vc)-abs(voct));     
     
@@ -96,7 +100,9 @@ function pass = vcompare(vc,voct,vname,tname,tol,pnum)
     maxdvec = abs(max(dvec));
     pass = maxdvec<tol;
     
-    printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
+    if print_verbose == 1
+        printf('  Comparing vectors %s in test %s. Diff is %f\n',vname,tname,maxdvec);
+    end
     
     if pass == 0
         printf('\n*** vcompare failed %s in test %s. Diff: %f Tol: %f\n\n',vname,tname,maxdvec,tol);
@@ -115,6 +121,7 @@ endfunction
 
 function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     global tfsk_location;
+    global print_verbose;
     %Name of executable containing the modulator
     fsk_demod_ex_file = '../build/unittest/tfsk';
     modvecfilename = sprintf('fsk_demod_ut_modvec_%d',getpid());
@@ -236,8 +243,9 @@ function test_stats = fsk_demod_xt(Fs,Rs,f1,fsp,mod,tname,M=2)
     diffpass = sum(xor(obits,bits'))<5;
     diffbits = sum(xor(obits,bits'));
     
-    
-    printf('%d bit diff in test %s\n',diffbits,tname);
+    if print_verbose == 1
+        printf('%d bit diff in test %s\n',diffbits,tname);
+    end
     if diffpass==0
         printf('\n***bitcompare test failed test %s diff %d\n\n',tname,sum(xor(obits,bits')))
         figure(15)
@@ -305,6 +313,7 @@ endfunction
 % This throws some channel imparment or another at the C and octave modem so they 
 % may be compared.
 function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,M=2)
+  global print_verbose;
   frames = 190;
   %EbNodB = 10;
   %timing_offset = 2.0; % see resample() for clock offset below
@@ -420,7 +429,7 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   
   
   f1 = states.f1_tx;
-  fsp = states.f2_tx-f1
+  fsp = states.f2_tx-f1;
   states.dA = [dA dA dA dA];
   states.ftx(1) = f1;
   states.ftx(2) = f1+fsp;
@@ -444,13 +453,19 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
   
-  test_name = sprintf("tfsk run sim EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
-  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,fsp,rx,test_name,M); 
-  printf("Test %s done\n",test_name);
+  test_name = sprintf("tfsk EbNodB:%d frames:%d timing_offset:%d fading:%d df:%d",EbNodB,frames,timing_offset,fading,df);
+  tstats = fsk_demod_xt(Fs,Rs,states.f1_tx,fsp,rx,test_name,M);
   
   pass = tstats.pass;
   obits = tstats.obits;
   cbits = tstats.cbits;
+  stats.name = test_name;
+  
+  if tstats.pass 
+    printf("Test %s passed\n",test_name);
+  else
+    printf("Test %s failed\n",test_name);
+  end
   
   % Figure out BER of octave and C modems
   bitcnt = length(tx_bits);
@@ -486,7 +501,9 @@ function stats = tfsk_run_sim(test_frame_mode,EbNodB,timing_offset,fading,df,dA,
   stats.bero = bero;
   % coherent BER theory calculation
   
-  printf("C BER: %f Oct BER: %f Test %s\n",berc,bero,test_name);
+  if print_verbose == 1
+    printf("C BER: %f Oct BER: %f Test %s\n",berc,bero,test_name);
+  end
   
   stats.thrcoh = .5*(M-1)*erfc(sqrt( (log2(M)/2) * EbNo ));
   
@@ -530,6 +547,12 @@ function pass = ebno_battery_test(timing_offset,fading,df,dA,M)
     passv = zeros(1,length(statv));
     for ii=(1:length(statv))
         passv(ii)=statv(ii).pass;
+        if statv(ii).pass
+            printf("Test %s passed\n",statv(ii).name);
+        else
+            printf("Test %s failed\n",statv(ii).name);
+        end
+            
     end
     
     %All pass flags are '1'
@@ -614,6 +637,12 @@ function plot_fsk_bers(M=2)
 endfunction
 
 
-test_fsk_battery
+xpass = test_fsk_battery
 %plot_fsk_bers(2)
 plot_fsk_bers(4)
+
+if xpass
+    printf("***** All tests passed! *****\n");
+else
+    printf("***** Some test failed! Look back thorugh output to find failed test *****\n");
+end
