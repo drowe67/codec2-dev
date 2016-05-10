@@ -585,7 +585,7 @@ static void fvhff_extract_frame_data(struct freedv_vhf_deframer * def,uint8_t bi
         }
 
         if (def->fdc) {
-            freedv_data_channel_rx_frame(def->fdc, data, 7, from_bit, bcast_bit, crc_bit, end_bits);
+            freedv_data_channel_rx_frame(def->fdc, data, 6, from_bit, bcast_bit, crc_bit, end_bits);
         }
     }
 }

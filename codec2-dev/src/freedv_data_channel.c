@@ -305,6 +305,8 @@ void freedv_data_set_header(struct freedv_data_channel *fdc, unsigned char *head
 
 int freedv_data_get_n_tx_frames(struct freedv_data_channel *fdc, size_t size)
 {
+    if (fdc->packet_tx_size == 0)
+        return 0;
     /* packet will be send in 'size' byte frames */
-    return (fdc->packet_tx_size + size-1) / size;
+    return (fdc->packet_tx_size - fdc->packet_tx_cnt + size-1) / size;
 }

@@ -730,18 +730,19 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
     memcpy(f->packed_codec_bits, packed_codec_bits, bytes_per_codec_frame * codec_frames);
     
     switch(f->mode) {
-	case FREEDV_MODE_1600:
-	    freedv_comptx_fdmdv_1600(f, tx_fdm);
-	    break;
+        case FREEDV_MODE_1600:
+            freedv_comptx_fdmdv_1600(f, tx_fdm);
+            break;
     #ifndef CORTEX_M4
-    case FREEDV_MODE_700:
-	case FREEDV_MODE_700B:
-        freedv_comptx_fdmdv_700(f, tx_fdm);
-	    break;
-    case FREEDV_MODE_2400A:
-	case FREEDV_MODE_2400B:       
-        freedv_tx_fsk_voice(f, mod_out);
-        return; /* output is already real */
+        case FREEDV_MODE_700:
+        case FREEDV_MODE_700B:
+            freedv_comptx_fdmdv_700(f, tx_fdm);
+            break;
+        case FREEDV_MODE_2400A:
+        case FREEDV_MODE_2400B:
+        case FREEDV_MODE_800XA:
+            freedv_tx_fsk_voice(f, mod_out);
+            return; /* output is already real */
     #endif
     }
     /* convert complex to real */
@@ -752,7 +753,7 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
 void freedv_datatx  (struct freedv *f, short mod_out[]){
     assert(f != NULL);
     #ifndef CORTEX_M4
-    if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B) {
+    if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B || f->mode == FREEDV_MODE_800XA) {
             freedv_tx_fsk_data(f, mod_out);
     }
     #endif
@@ -1289,7 +1290,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     
 #ifndef CORTEX_M4
     /* FSK RX happens in real floats, so convert to those and call their demod here */
-    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) ){
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
         }
@@ -1362,9 +1363,11 @@ int freedv_get_version(void)
 
 void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_callback_tx tx, void *state)
 {
-    f->freedv_put_next_rx_char = rx;
-    f->freedv_get_next_tx_char = tx;
-    f->callback_state = state;
+    if (f->mode != FREEDV_MODE_800XA) {
+        f->freedv_put_next_rx_char = rx;
+        f->freedv_get_next_tx_char = tx;
+        f->callback_state = state;
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1384,9 +1387,11 @@ void freedv_set_callback_txt(struct freedv *f, freedv_callback_rx rx, freedv_cal
 \*---------------------------------------------------------------------------*/
 
 void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state){
-    f->freedv_put_next_proto = rx;
-    f->freedv_get_next_proto = tx;
-    f->proto_callback_state = callback_state;
+    if (f->mode != FREEDV_MODE_800XA) {
+        f->freedv_put_next_proto = rx;
+        f->freedv_get_next_proto = tx;
+        f->proto_callback_state = callback_state;
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1404,7 +1409,7 @@ void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, 
 \*---------------------------------------------------------------------------*/
 #ifndef CORTEX_M4
 void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state) {
-    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         if (!f->deframer->fdc)
             f->deframer->fdc = freedv_data_channel_create();
         if (!f->deframer->fdc)
@@ -1430,7 +1435,7 @@ void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, f
 #ifndef CORTEX_M4
 void freedv_set_data_header(struct freedv *f, unsigned char *header)
 {
-    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         if (!f->deframer->fdc)
             f->deframer->fdc = freedv_data_channel_create();
         if (!f->deframer->fdc)

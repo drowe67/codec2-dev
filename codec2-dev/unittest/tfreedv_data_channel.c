@@ -222,6 +222,7 @@ int main(int argc, char **argv)
         int i;
         size_t check_size;
         unsigned char flags;
+        int nr_frames;
 	
         freedv_data_channel_tx_frame(fdc, frame, frame_size, &from, &bcast, &crc, &end);
 
@@ -252,14 +253,28 @@ int main(int argc, char **argv)
 
         frame_data_pos += frame_size;
 
+        nr_frames = freedv_data_get_n_tx_frames(fdc, frame_size);
+
         if (frame_data_pos >= testvec[vector].frame_data_size) {
-                vector++;
-                frame_data_pos = 0;
-                if (!rx_done) {
-                    printf("FAIL: RX callback not executed\n");
-                    ret++;
-                }
-                rx_done = 0;
+    	    if (nr_frames) {
+    	        printf("FAIL: nr_frames is not zero: %d\n", nr_frames);
+    	    	ret++;
+    	    }
+            vector++;
+            frame_data_pos = 0;
+            if (!rx_done) {
+                printf("FAIL: RX callback not executed\n");
+                ret++;
+            }
+            rx_done = 0;
+        } else {
+            int vec_frames = (testvec[vector].frame_data_size - frame_data_pos);
+            vec_frames /= frame_size;
+            vec_frames++;
+            if (nr_frames != vec_frames) {
+                printf("FAIL: nr_frames != vec_frames: %d != %d\n", nr_frames, vec_frames);
+                ret++;
+            }
         }
     }
 
