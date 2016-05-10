@@ -132,6 +132,9 @@ int main(int argc, char *argv[])
 
     tx_pwr = rx_pwr = noise_pwr = 0.0;
 
+    nerrors = 0;
+    nbits = 0;
+
     /* init HF fading model */
 
     if (fading_en) {
