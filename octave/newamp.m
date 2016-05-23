@@ -34,13 +34,14 @@ melvq;
 
 function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
 
+    L = length(maskdB);
+
     % Lets try to come up with a smoothed, cyclic model.  Replace
     % points from 3500 Hz to 4000Hz with a sequence that joins without
     % a step to points at the 0Hz end of the spectrum.  This will make
     % it more cyclical and make the DFT happier, less high freq
     % energy.  Yes, happier is an extremely technical term.
 
-    L = length(maskdB);
     anchor = floor(7*L/8);
     xpts = [ anchor-1 anchor L+1 L+2];
     ypts = [ maskdB(anchor-1) maskdB(anchor) maskdB(1) maskdB(2)];
@@ -70,6 +71,7 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
        [tmp D1_ind] = quantise(0:(2500/15):2500, D1);
        ind = [vq_ind D1_ind];
        [dk_ D1_] = index_to_params(ind, vq);
+       D1_ = D1;
        %printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
     else
        dk_ = dk;
@@ -120,7 +122,7 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
     D_(1) = D1_;                          % energy seperately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
-    d_ = ifft(D_);                        % back to spectrum at rate L
+    d_ = ifft(D_);                  % back to spectrum at rate L
     maskdB_ = real(d_);
     
     % Finally fix up last 500Hz, taper down 10dB at 4000Hz
@@ -1065,12 +1067,14 @@ endfunction
 
 % Decode from a bit stream file
 
-function decode_bit_stream_file(samname, bits_per_param)
+function decode_bit_stream_file(samname, bits_per_param, ber_mask, ber)
   max_amp = 80;
   nc = max_amp + 3;
   load vq;
   [tmp1 k2 tmp2] = size(vq);
   k = k2/2;
+  rand("seed", 0);
+  f = 1;
 
   bit_stream_name = strcat(samname,".bit");
   fbit  = fopen(bit_stream_name, "rb"); 
@@ -1084,6 +1088,13 @@ function decode_bit_stream_file(samname, bits_per_param)
   [frame nread] = fread(fbit, sum(bits_per_param), "uchar");
   while (nread == bits_per_frame)
 
+    % optionally add bit errors
+
+    if nargin == 4
+      error_pattern = bitand(rand(bits_per_frame,1) < ber, ber_mask);
+      frame = bitxor(frame, error_pattern);
+    end
+
     % read a frame, convert to indexes
 
     nbit = 1;
@@ -1094,6 +1105,16 @@ function decode_bit_stream_file(samname, bits_per_param)
       ind = [ind bits_to_index(field, bits_per_param(i))];
     end
     ind_log = [ind_log; ind];
+    printf("f: %d\n", f);
+    ind
+    if 0
+    if sum(error_pattern)
+       printf("  Error f: %d\n", f);
+       %if f == 169
+       %   ind(1) = 50;
+       %end
+    end
+    end
     
     % convert index to model parameters
 
@@ -1109,6 +1130,7 @@ function decode_bit_stream_file(samname, bits_per_param)
     Am_ = 10 .^ (AmdB_(1:L_)/20); 
     amodel_(3:(L_+2)) = Am_;
     model_ = [ model_; amodel_; zeros(3,nc)];
+    f+=4;
 
     log_v = [log_v ind(2)];
 
@@ -1131,6 +1153,7 @@ function decode_bit_stream_file(samname, bits_per_param)
     end
   end
   fclose(fv);
+
 endfunction
 
 
@@ -1165,14 +1188,15 @@ function decode_model(model_, samname, synth_phase, dec_in_time)
   % decoder loop -----------------------------------------------------
 
   [frames tmp] = size(model_);
-  
+
   for f=1:frames
-    %printf("frame: %d\n", f);
     L = min([model_(f,2) max_amp-1]);
     Wo = model_(f,1);
+
     Am_ = model_(f,3:(L+2));
     AmdB_ = 20*log10(Am_);
     sample_freqs_kHz = (1:L)*Wo*4/pi;
+    printf("frame: %d Fo: %f L: %d\n", f, Wo*4000/pi, L);
 
     % run post filter ahead of time so dec in time has post filtered frames to work with
 
@@ -1216,4 +1240,40 @@ function decode_model(model_, samname, synth_phase, dec_in_time)
   fclose(faw);
 endfunction
 
+
+% work out a gradient m and y intercept c to map x to y using
+% a least sqaures fit, y_ = m*x + c
+
+function [m c] = map_vector(x, y)
+  L = length(x);
+  num = sum(x.*y) - sum(y)*sum(x)/L;
+  den = sum(x.*x) - sum(x)*sum(x)/L;
+  m = num/den;
+  c = (sum(y) - m*sum(x))/L;
+endfunction
+
+
+% for each target
+%   run thru each cb entry
+%   find m and c
+%   measure MSE
+%   record best
+
+function [best_i best_mse best_vec] = search_linear_fit(target, vq)
+  [rows cols] = size(vq);
+  best_mse = 1E32;
+  best_i = 1;
+  for i=1:rows
+    [m c] = map_vector(vq(i,:),target);
+    error = m*vq(i,:) + c - target;
+    mse   = sum(error.^2);
+    if mse < best_mse
+      best_mse = mse;
+      best_i = i;
+      best_vec = m*vq(i,:) + c;
+      best_m = m; best_c = c;
+    end
+  end
+  printf("best_m: %f best_c: %f\n", best_m, best_c);
+endfunction
 
