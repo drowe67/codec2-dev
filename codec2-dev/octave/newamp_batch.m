@@ -18,7 +18,7 @@
 % $ ./c2sim ../../raw/hts2a.raw --dump hts2a --lpc 10 --phase0 --dump_pitch_e hts2a_pitche.txt
 
 % Bit stream decode:
-% $ ./c2sim ../../raw/hts2a.raw --amead hts2a_am.out --awread hts2a_aw.out --Woread hts2a_Wo.out --phase0 --postfilter -o - | play -t raw -r 8000 -s -2 -
+% $ ./c2sim ../../raw/hts2a.raw --amread hts2a_am.out --awread hts2a_aw.out --Woread hts2a_Wo.out --phase0 --postfilter -o - | play -t raw -r 8000 -s -2 -
 
 
 % process a whole file and write results
@@ -30,13 +30,14 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
   max_amp = 80;
   dec_in_freq = 1;
   postfilter = 0;
-  dec_in_time = 1;
+  dec_in_time = 0;
   synth_phase = 1;
   vq_en = 1;
   D_log = []; dk_log = []; D1_log = []; ind_log = [];
   train = 0;
-  fully_quant = 1;
-  Wo_quant = 1;
+  fully_quant = 0;
+  Wo_quant = 0;
+  diff_freq = 0;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -65,8 +66,11 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
    
   if vq_en
     load vq;
+    load d20_vq;
   end
+  load d20_vq;
 
+  prev_dk_ = zeros(1,2*10);
 
   % encoder loop ------------------------------------------------------
 
@@ -105,6 +109,15 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
         dk_log = [dk_log; dk_];
         D1_log = [D1_log D1];
       end
+
+      if diff_freq
+        diff_dk = dk_ - 0.9*prev_dk_;
+        [res tmp vq_ind] = mbest(d20_vq, diff_dk, 4);
+        %printf("vq_ind: %d\n", vq_ind);
+        dk_d = 0.9*prev_dk_ + tmp;
+        prev_dk_ = dk_d;
+        AmdB_ = params_to_mask(L, 10, dk_d, D1);
+      end 
     end
     sd_sum += std(maskdB - AmdB_);
 

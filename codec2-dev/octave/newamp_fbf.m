@@ -21,9 +21,10 @@ function newamp_fbf(samname, f=10)
   more off;
   plot_spectrum = 1;
   dec_in_freq = 1;
-  dec_in_time = 1;
-  vq_en = 0;
+  dec_in_time = 0;
+  vq_en = 1;
   mask_en = 1;
+  k = 10;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -36,10 +37,13 @@ function newamp_fbf(samname, f=10)
   [frames tmp] = size(model);
 
   load vq;
+  load d20_vq;
+
+  prev_dk_ = zeros(1,2*k);
 
   % Keyboard loop --------------------------------------------------------------
 
-  k = ' ';
+  key = ' ';
   do 
     figure(1);
     clf;
@@ -66,7 +70,7 @@ function newamp_fbf(samname, f=10)
     %a_non_masked_m = find(AmdB > maskdB);
     %maskdB = maskdB - 6;
     %maskdB(a_non_masked_m) = maskdB(a_non_masked_m) + 6;
-    %plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
+    plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
 
     if mask_en
       AmdB_ = AmdB = maskdB;
@@ -75,26 +79,40 @@ function newamp_fbf(samname, f=10)
     end
     if dec_in_freq
       [tmp1 tmp2 D] = decimate_in_freq(AmdB, 0);
+      [AmdB_ AmdB_cyclic D_cyclic dk D1] = decimate_in_freq(AmdB_, 1, k);
       if vq_en
-        [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB, 1, 10, vq);
-        plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc vq;c');
-      else
-        [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB_, 1, 10);
-        plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc;c');
+        [AmdB_ AmdB_cyclic D_cyclic dk_ D1_ ind] = decimate_in_freq(AmdB, 1, k, vq);
+        plot(Am_freqs_kHz*1000, AmdB_, ';vq;c');
       end
 
-      plot(Am_freqs_kHz*1000, AmdB_cyclic, ';mask cyclic;b');
-      AmdB_pf = AmdB_*(1.5);
-      AmdB_pf += max(AmdB_) - max(AmdB_pf);
-      %max(AmdB_pf)-max(AmdB_)
-      %AmdB_pf -= max(AmdB_pf)-max(AmdB_);
+      % experimental differential in time
+      % get mask from 20ms ago (two frames), VQ delta, put back together.
+
+      diff_dk = dk - prev_dk_;
+      [res tmp vq_ind] = mbest(d20_vq, diff_dk, 1);
+      dk_d = prev_dk_ + tmp;
+      prev_dk_ = dk_d;
+      AmdB_d_ = params_to_mask(L, k, dk_d, D1);
+      plot(Am_freqs_kHz*1000, AmdB_d_, ';vq diff;bk');
+      
+      %plot(Am_freqs_kHz*1000, AmdB_cyclic, ';mask cyclic;b');
+      %AmdB_pf = AmdB_*1.5;
+      %AmdB_pf += max(AmdB_) - max(AmdB_pf);
+      %plot(Am_freqs_kHz*1000, AmdB_, ';ind vq;g');
+
+      % option decode from indexes, used to test effect of bit errors on Wo
+
+      if 0
+        Wo_ = pi*169/4000;
+        L_  = floor(pi/Wo_);
+        if vq_en
+          [dk_ D1_] = index_to_params(ind, vq);
+        end
+        maskdB_ = params_to_mask(L_, k, dk_, D1_);
+        plot((1:L_)*Wo_*4000/pi, maskdB_, ';ind vq;b-+');
+      end
     end
 
-    %AmdB_pf = AmdB_*(1.5);
-    %AmdB_pf += mean(AmdB) - mean(AmdB_pf);
-    %AmdB_pf = AmdB_;
-
-    %plot(Am_freqs_kHz*1000, AmdB_pf, ';after pf;g');
     axis([0 4000 00 80]);
 
     % Optional decimated parameters
@@ -135,30 +153,32 @@ function newamp_fbf(samname, f=10)
 
       figure(5)
       clf
-      stem(dk_);
-      axis([0 20 -60 60])
+      stem(dk,'b');
+      hold on;
+      stem(dk_,'g');
+      hold off;
     end
 
     % interactive menu ------------------------------------------
 
     printf("\rframe: %d  menu: n-next  b-back  q-quit  m-mask_en", f);
     fflush(stdout);
-    k = kbhit();
+    key = kbhit();
 
-    if (k == 'm')
+    if (key == 'm')
       if mask_en
         mask_en = 0;
       else
         mask_en = 1; 
       end
     endif
-    if (k == 'n')
+    if (key == 'n')
       f = f + 1;
     endif
-    if (k == 'b')
+    if (key == 'b')
       f = f - 1;
     endif
-  until (k == 'q')
+  until (key == 'q')
   printf("\n");
 
 endfunction
