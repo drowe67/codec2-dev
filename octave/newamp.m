@@ -32,9 +32,7 @@
 melvq;
 
 
-function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
-
-    L = length(maskdB);
+function [maskdB_ maskdB_cyclic Dabs dk_ D1_ ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
 
     % Lets try to come up with a smoothed, cyclic model.  Replace
     % points from 3500 Hz to 4000Hz with a sequence that joins without
@@ -42,6 +40,7 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
     % it more cyclical and make the DFT happier, less high freq
     % energy.  Yes, happier is an extremely technical term.
 
+    L = length(maskdB);
     anchor = floor(7*L/8);
     xpts = [ anchor-1 anchor L+1 L+2];
     ypts = [ maskdB(anchor-1) maskdB(anchor) maskdB(1) maskdB(2)];
@@ -51,51 +50,56 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1 ind] = decimate_in_freq(maskdB, cycl
     % Now DFT, truncating DFT coeffs to undersample
 
     if cyclic
-      D = fft(maskdB_cyclic);
+      D = fft(maskdB_cyclic)/L;
     else
-      D = fft(maskdB);
+      D = fft(maskdB)/L;
     end
     Dabs = abs(D);                        % this returned for plotting
-    D1 = D(1);                            % pass energy back for training
 
     % truncate D to rate k, convert to 2k length real vector for quantisation and transmission
-    % note we remove DC term as this is the frame energy that we quantise elsewhere
 
     Dk = [0 D(2:k-1) real(D(k)) D(L-k+1:L)]; 
-    dk = real(ifft(Dk));                     % Q: why is there any imag part at all?
-        
+    dk = real(ifft(Dk));
+    D1 = D(1);
+       
     % quantisation
 
     if nargin == 4
        [res tmp vq_ind] = mbest(vq, dk, 4);
-       [tmp D1_ind] = quantise(0:(2500/15):2500, D1);
+       D1_tab = 0:(60/15):60;
+       assert(length(D1_tab) == 16);
+       [tmp D1_ind] = quantise(D1_tab, D1);
        ind = [vq_ind D1_ind];
        [dk_ D1_] = index_to_params(ind, vq);
-       D1_ = D1;
-       %printf(" vq: %4.1f D1: %4.1f\n", std(dk_ - dk), D1_- D1);       
+       %std(dk_ - dk)
     else
        dk_ = dk;
        D1_ = D1;
     end
 
+    if 0
+    % convert quantised dk back to rate L magnitude spectrum
+
+    Dk_ = fft(dk_);
+    D_ = zeros(1,L);
+    D_(1) = D1_;                         % lets assume energy comes through separately
+    D_(2:k-1) = Dk_(2:k-1);
+    D_(L-k+1:L) = Dk_(k+1:2*k);
+    d_ = L*ifft(D_);                        % back to spectrum at rate L
+    maskdB_ = real(d_);
+    
+    % Finally fix up last 500Hz, taper down 10dB at 4000Hz
+
+    xpts = [ anchor-1 anchor L];
+    ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
+    mask_pp = splinefit(xpts, ypts, 1);
+    maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
+    %printf("two masks: %f\n", std(maskdB_-maskdB1_));
+    end
+
     maskdB_ = params_to_mask(L, k, dk_, D1_);
- 
 endfunction
 
-
-function amodel = post_filter(amodel)
-    max_amp = 80;
-
-    % post filter 
-
-    L = min([amodel(2) max_amp-1]);
-    Wo = amodel(1);
-    Am_ = amodel(3:(L+2));
-    AmdB_ = 20*log10(Am_);
-    AmdB_pf = AmdB_*1.5;
-    AmdB_pf += max(AmdB_) - max(AmdB_pf);
-    amodel(3:(L+2)) = 10 .^ (AmdB_pf(1:L)/20);
-endfunction
 
 
 function [dk_ D1_] = index_to_params(ind, vq)
@@ -104,7 +108,7 @@ function [dk_ D1_] = index_to_params(ind, vq)
     for s=1:stages
       dk_ = dk_ + vq(ind(s),:,s);
     end
-    D1_tab = 0:(2500/15):2500;
+    D1_tab = 0:(60/15):60;
     D1_ = D1_tab(ind(stages+1));
 endfunction
 
@@ -122,7 +126,7 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
     D_(1) = D1_;                          % energy seperately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
-    d_ = ifft(D_);                  % back to spectrum at rate L
+    d_ = L*ifft(D_);                  % back to spectrum at rate L
     maskdB_ = real(d_);
     
     % Finally fix up last 500Hz, taper down 10dB at 4000Hz
@@ -131,30 +135,6 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
     ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
     mask_pp = splinefit(xpts, ypts, 1);
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
-endfunction
-
-
-function index = encode_log_Wo(Wo, bits)
-    Wo_levels = 2.^bits;
-    Wo_min = 2*pi/160;
-    Wo_max = 2*pi/20;
-
-    norm = (log10(Wo) - log10(Wo_min))/(log10(Wo_max) - log10(Wo_min));
-    index = floor(Wo_levels * norm + 0.5);
-    index = max(index, 0);
-    index = min(index, Wo_levels-1);
-endfunction
-
-
-function Wo = decode_log_Wo(index, bits)
-    Wo_levels = 2.^bits;
-    Wo_min = 2*pi/160;
-    Wo_max = 2*pi/20;
-
-    step = (log10(Wo_max) - log10(Wo_min))/Wo_levels;
-    Wo   = log10(Wo_min) + step*index;
-
-    Wo = 10 .^ Wo;
 endfunction
 
 
@@ -802,8 +782,11 @@ endfunction
 
 % decimate frame rate of mask, use linear interpolation in the log domain 
 
-function [maskdB_ Wo L] = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
+function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
     max_amp = 80;
+
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp]);
 
     % determine frames that bracket the one we need to interp
 
@@ -818,7 +801,7 @@ function [maskdB_ Wo L] = decimate_frame_rate(model, decimate, f, frames, mask_s
     left_fraction  = 1 - mod((f-1),decimate)/decimate;
     right_fraction = 1 - left_fraction;
 
-    % printf("f: %d left_f: %d right_f: %d left_fraction: %3.2f right_fraction: %3.2f \n", f, left_f, right_f, left_fraction, right_fraction)
+    printf("f: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n", f, left_f, right_f, left_fraction, right_fraction)
 
     % fit splines to left and right masks
 
@@ -832,16 +815,10 @@ function [maskdB_ Wo L] = decimate_frame_rate(model, decimate, f, frames, mask_s
     right_AmdB = 20*log10(model(right_f,3:(right_L+2)));
     right_mask_sample_freqs_kHz = (1:right_L)*right_Wo*4/pi;
 
-    % printf("  right_Wo: %f left_Wo: %f  right_L: %d  left_L %d\n",right_Wo,left_Wo,right_L,left_L);
- 
     maskdB_left_pp = splinefit(left_mask_sample_freqs_kHz, left_AmdB, left_L);
     maskdB_right_pp = splinefit(right_mask_sample_freqs_kHz, right_AmdB, right_L);
 
     % determine mask for left and right frames, sampling at Wo for this frame
-
-    Wo = left_fraction*left_Wo + right_fraction*right_Wo;
-    L = floor(pi/Wo);
-    %Wo = model(f,1); L = model(f,2);
 
     mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
     maskdB_left = ppval(maskdB_left_pp, mask_sample_freqs_kHz);
@@ -1039,241 +1016,3 @@ function plot_f_a_stats(f,a)
   title('y-int');
 
 endfunction
-
-
-% Given a matrix with indexes on each row, convert to a bit stream and
-% write to file.  We only write every 4th frame due to DIT
-
-function write_bit_stream_file(fn, ind_log, bits_per_param)
-  fbit  = fopen(fn,"wb"); 
-  decimate = 4;
-
-  % take a row of quantiser indexes, convert to bits, save to file
-
-  [frames nind] = size(ind_log);
-  for f=1:decimate:frames
-    frame_of_bits = [];
-    arow = ind_log(f,:);
-    for i=1:nind
-      %printf("i: %d bits_per_param: %d\n", i, bits_per_param(i));
-      some_bits = index_to_bits(arow(i), bits_per_param(i));
-      frame_of_bits = [frame_of_bits some_bits];
-    end
-    fwrite(fbit, frame_of_bits, "uchar");
-  end
-  fclose(fbit);
-endfunction
-
-
-% Decode from a bit stream file
-
-function decode_bit_stream_file(samname, bits_per_param, ber_mask, ber)
-  max_amp = 80;
-  nc = max_amp + 3;
-  load vq;
-  [tmp1 k2 tmp2] = size(vq);
-  k = k2/2;
-  rand("seed", 0);
-  f = 1;
-
-  bit_stream_name = strcat(samname,".bit");
-  fbit  = fopen(bit_stream_name, "rb"); 
-
-  model_= []; log_v = []; ind_log = [];
-  nind = length(bits_per_param);
-  bits_per_frame = sum(bits_per_param);
-
-  % read a frame, decode to indexes, fill in model_ array
-
-  [frame nread] = fread(fbit, sum(bits_per_param), "uchar");
-  while (nread == bits_per_frame)
-
-    % optionally add bit errors
-
-    if nargin == 4
-      error_pattern = bitand(rand(bits_per_frame,1) < ber, ber_mask);
-      frame = bitxor(frame, error_pattern);
-    end
-
-    % read a frame, convert to indexes
-
-    nbit = 1;
-    ind = [];
-    for i=1:nind
-      field = frame(nbit:nbit+bits_per_param(i)-1);
-      nbit += bits_per_param(i);
-      ind = [ind bits_to_index(field, bits_per_param(i))];
-    end
-    ind_log = [ind_log; ind];
-    printf("f: %d\n", f);
-    ind
-    if 0
-    if sum(error_pattern)
-       printf("  Error f: %d\n", f);
-       %if f == 169
-       %   ind(1) = 50;
-       %end
-    end
-    end
-    
-    % convert index to model parameters
-
-    amodel_ = zeros(1,nc);
-    amodel_(1) = Wo_ = decode_log_Wo(ind(1), 6);
-    L_  = floor(pi/Wo_);
-    amodel_(2) = L_ = min([L_ max_amp-1]);
-
-    [dk_ D1_] = index_to_params(ind(3:5)+1, vq);
-    AmdB_ = params_to_mask(L_, k, dk_, D1_);
-
-    Am_ = zeros(1,max_amp);
-    Am_ = 10 .^ (AmdB_(1:L_)/20); 
-    amodel_(3:(L_+2)) = Am_;
-    model_ = [ model_; amodel_; zeros(3,nc)];
-    f+=4;
-
-    log_v = [log_v ind(2)];
-
-    % read next frame
-
-    [frame nread] = fread(fbit, sum(bits_per_param), "uchar");
-  endwhile
-  
-  % decode entire array of model parameters
-
-  decode_model(model_, samname, 1, 1);
-
-  % save voicing file
-  
-  v_out_name = sprintf("%s_v.txt", samname);
-  fv  = fopen(v_out_name,"wt"); 
-  for f=1:length(log_v)
-    for i=1:4
-      fprintf(fv,"%d\n",log_v(f));
-    end
-  end
-  fclose(fv);
-
-endfunction
-
-
-% convert index to binary bits
-
-function bits = index_to_bits(value, numbits)
-  levels = 2.^numbits;
-  bits = zeros(1, numbits);
-  for b=1:numbits
-    bits(b) = bitand(value,2^(numbits-b)) != 0;
-  end
-end
-
-
-function value = bits_to_index(bits, numbits)
-  value = 2.^(numbits-1:-1:0) * bits;
-endfunction
-
-
-function decode_model(model_, samname, synth_phase, dec_in_time)
-  max_amp = 80;
-
-  Am_out_name = sprintf("%s_am.out", samname);
-  Aw_out_name = sprintf("%s_aw.out", samname);
-  Wo_out_name = sprintf("%s_Wo.out", samname);
-  fam  = fopen(Am_out_name,"wb"); 
-  fWo  = fopen(Wo_out_name,"wb"); 
-  if synth_phase
-    faw = fopen(Aw_out_name,"wb"); 
-  end
-
-  % decoder loop -----------------------------------------------------
-
-  [frames tmp] = size(model_);
-
-  for f=1:frames
-    L = min([model_(f,2) max_amp-1]);
-    Wo = model_(f,1);
-
-    Am_ = model_(f,3:(L+2));
-    AmdB_ = 20*log10(Am_);
-    sample_freqs_kHz = (1:L)*Wo*4/pi;
-    printf("frame: %d Fo: %f L: %d\n", f, Wo*4000/pi, L);
-
-    % run post filter ahead of time so dec in time has post filtered frames to work with
-
-    if f+4 <= frames
-      model_(f+4,:) = post_filter(model_(f+4,:));
-      % printf("pf on %d\n", f+4);
-    end
-
-    if dec_in_time
-      % decimate mask samples in time
-
-      decimate = 4;
-      [AmdB_ Wo L] = decimate_frame_rate(model_, decimate, f, frames, sample_freqs_kHz);
-    end
-
-    Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (AmdB_(1:L-1)/20);  % C array doesnt use A[0]
-    fwrite(fam, Am_, "float32");
-    fwrite(fWo, Wo, "float32");
-
-    if synth_phase
-
-      % synthesis phase spectra from magnitiude spectra using minimum phase techniques
-
-      fft_enc = 512;
-      model_(f,1) = Wo;
-      model_(f,2) = L;
-      model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
-      phase = determine_phase(model_, f);
-      assert(length(phase) == fft_enc);
-      Aw = zeros(1, fft_enc*2); 
-      Aw(1:2:fft_enc*2) = cos(phase);
-      Aw(2:2:fft_enc*2) = -sin(phase);
-
-      fwrite(faw, Aw, "float32");    
-    end
-  end
-
-  fclose(fam);
-  fclose(fWo);
-  fclose(faw);
-endfunction
-
-
-% work out a gradient m and y intercept c to map x to y using
-% a least sqaures fit, y_ = m*x + c
-
-function [m c] = map_vector(x, y)
-  L = length(x);
-  num = sum(x.*y) - sum(y)*sum(x)/L;
-  den = sum(x.*x) - sum(x)*sum(x)/L;
-  m = num/den;
-  c = (sum(y) - m*sum(x))/L;
-endfunction
-
-
-% for each target
-%   run thru each cb entry
-%   find m and c
-%   measure MSE
-%   record best
-
-function [best_i best_mse best_vec] = search_linear_fit(target, vq)
-  [rows cols] = size(vq);
-  best_mse = 1E32;
-  best_i = 1;
-  for i=1:rows
-    [m c] = map_vector(vq(i,:),target);
-    error = m*vq(i,:) + c - target;
-    mse   = sum(error.^2);
-    if mse < best_mse
-      best_mse = mse;
-      best_i = i;
-      best_vec = m*vq(i,:) + c;
-      best_m = m; best_c = c;
-    end
-  end
-  printf("best_m: %f best_c: %f\n", best_m, best_c);
-endfunction
-

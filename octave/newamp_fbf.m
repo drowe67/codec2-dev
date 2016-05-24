@@ -22,9 +22,8 @@ function newamp_fbf(samname, f=10)
   plot_spectrum = 1;
   dec_in_freq = 1;
   dec_in_time = 0;
-  vq_en = 1;
-  mask_en = 1;
-  k = 10;
+  vq_en = 0;
+  mask_en = 0;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -37,13 +36,10 @@ function newamp_fbf(samname, f=10)
   [frames tmp] = size(model);
 
   load vq;
-  load d20_vq;
-
-  prev_dk_ = zeros(1,2*k);
 
   % Keyboard loop --------------------------------------------------------------
 
-  key = ' ';
+  k = ' ';
   do 
     figure(1);
     clf;
@@ -70,59 +66,42 @@ function newamp_fbf(samname, f=10)
     %a_non_masked_m = find(AmdB > maskdB);
     %maskdB = maskdB - 6;
     %maskdB(a_non_masked_m) = maskdB(a_non_masked_m) + 6;
-    plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
+    %plot(Am_freqs_kHz*1000, maskdB, ';mask;g');
 
     if mask_en
-      AmdB_ = AmdB = maskdB;
+      AmdB_ = maskdB;
     else
-      AmdB_ = AmdB = AmdB;
+      AmdB_ = AmdB;
     end
     if dec_in_freq
       [tmp1 tmp2 D] = decimate_in_freq(AmdB, 0);
-      [AmdB_ AmdB_cyclic D_cyclic dk D1] = decimate_in_freq(AmdB_, 1, k);
       if vq_en
-        [AmdB_ AmdB_cyclic D_cyclic dk_ D1_ ind] = decimate_in_freq(AmdB, 1, k, vq);
-        plot(Am_freqs_kHz*1000, AmdB_, ';vq;c');
+        [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB, 1, 10, vq);
+      else
+        [AmdB_ AmdB_cyclic D_cyclic dk_] = decimate_in_freq(AmdB_, 1, 10);
       end
 
-      % experimental differential in time
-      % get mask from 20ms ago (two frames), VQ delta, put back together.
-
-      diff_dk = dk - prev_dk_;
-      [res tmp vq_ind] = mbest(d20_vq, diff_dk, 1);
-      dk_d = prev_dk_ + tmp;
-      prev_dk_ = dk_d;
-      AmdB_d_ = params_to_mask(L, k, dk_d, D1);
-      plot(Am_freqs_kHz*1000, AmdB_d_, ';vq diff;bk');
-      
-      %plot(Am_freqs_kHz*1000, AmdB_cyclic, ';mask cyclic;b');
-      %AmdB_pf = AmdB_*1.5;
-      %AmdB_pf += max(AmdB_) - max(AmdB_pf);
-      %plot(Am_freqs_kHz*1000, AmdB_, ';ind vq;g');
-
-      % option decode from indexes, used to test effect of bit errors on Wo
-
-      if 0
-        Wo_ = pi*169/4000;
-        L_  = floor(pi/Wo_);
-        if vq_en
-          [dk_ D1_] = index_to_params(ind, vq);
-        end
-        maskdB_ = params_to_mask(L_, k, dk_, D1_);
-        plot((1:L_)*Wo_*4000/pi, maskdB_, ';ind vq;b-+');
-      end
+      plot(Am_freqs_kHz*1000, AmdB_cyclic, ';mask cyclic;b');
+      plot(Am_freqs_kHz*1000, AmdB_, ';mask trunc;c');
+      AmdB_pf = AmdB_*(1.5);
+      AmdB_pf += mean(AmdB) - mean(AmdB_pf);
+      %max(AmdB_pf)-max(AmdB_)
+      %AmdB_pf -= max(AmdB_pf)-max(AmdB_);
     end
 
-    axis([0 4000 00 80]);
+    %AmdB_pf = AmdB_*(1.5);
+    %AmdB_pf += mean(AmdB) - mean(AmdB_pf);
+    AmdB_pf = AmdB_;
+    plot(Am_freqs_kHz*1000, AmdB_pf, ';mask trunc pf;g');
 
     % Optional decimated parameters
     %   need to general model_ parameters either side
     
     if dec_in_time
       decimate = 4;
-      model_  = set_up_model_(model, f, decimate, vq_en, vq);    
-      [maskdB_dit Wo_ L_] = decimate_frame_rate(model_, decimate, f, frames, Am_freqs_kHz);
-      plot((1:L_)*Wo_*4000/pi, maskdB_dit, ';mask dit;b');
+      model_ = set_up_model_(model, f, decimate, vq_en, vq);    
+      maskdB_dit = decimate_frame_rate(model_, decimate, f, frames, Am_freqs_kHz);
+      plot(Am_freqs_kHz*1000, maskdB_dit, ';mask dit;b');
     end
 
     hold off;
@@ -153,32 +132,29 @@ function newamp_fbf(samname, f=10)
 
       figure(5)
       clf
-      stem(dk,'b');
-      hold on;
-      stem(dk_,'g');
-      hold off;
+      stem(dk_)
     end
 
     % interactive menu ------------------------------------------
 
     printf("\rframe: %d  menu: n-next  b-back  q-quit  m-mask_en", f);
     fflush(stdout);
-    key = kbhit();
+    k = kbhit();
 
-    if (key == 'm')
+    if (k == 'm')
       if mask_en
         mask_en = 0;
       else
         mask_en = 1; 
       end
     endif
-    if (key == 'n')
+    if (k == 'n')
       f = f + 1;
     endif
-    if (key == 'b')
+    if (k == 'b')
       f = f - 1;
     endif
-  until (key == 'q')
+  until (k == 'q')
   printf("\n");
 
 endfunction
@@ -191,9 +167,7 @@ function model_ = set_up_model_(model, f, decimate, vq_en, vq)
     right_f = left_f + decimate;
 
     model_(left_f,:) = set_up_maskdB_(model, left_f, vq_en, vq); 
-    model_(left_f,:) = post_filter(model_(left_f,:));
     model_(right_f,:) = set_up_maskdB_(model, right_f, vq_en, vq); 
-    model_(right_f,:) = post_filter(model_(right_f,:));
 
     model_(f,1) = model(f,1);  % Wo
     model_(f,2) = model(f,2);  % L
@@ -210,11 +184,16 @@ function amodel_row = set_up_maskdB_(model, f, vq_en, vq)
   AmdB = 20*log10(Am);
 
   [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
+  a_non_masked_m = find(AmdB > maskdB);
+  maskdB = maskdB - 6;
+  maskdB(a_non_masked_m) = maskdB(a_non_masked_m) + 6;
 
+  if 0
   if vq_en
-    maskdB_ = decimate_in_freq(maskdB, 1, 10, vq);
+    maskdB_ = decimate_in_freq(maskdB, 1, 7, vq);
   else
-    maskdB_ = decimate_in_freq(maskdB, 1, 10);
+    maskdB_ = decimate_in_freq(maskdB, 1);
+  end
   end
 
   maskdB_ = maskdB;
