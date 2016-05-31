@@ -8,25 +8,6 @@
 % (spectral envelope) modelling.  See newamp_fby (frame by frame
 % analysis) and newamp_batch (batch processing for listening tests)
 %
-% we don't care about
-%  + spectral tilt, in can vary on input and our model shouldnt care.
-%    We can vary it on output and the listener won't care 
-%  + absolute energy of entire signal
-%  + harmonics beneath the masking curve
-% we do care about:
-%  + clearly defined formant formation
-%  + some relative amplitude info, like dominance of HF for UV sounds
-%
-% TODO:
-%   [ ] waterfall sounds
-%       [X] tweak CB bandwidths at LF to be wider
-%       [ ] consider a floor in mask to interpolate missing bits
-%       [ ] some sort of filter on min amp/diff from previous peak, e.g. vk5qi:161, 172
-%           + min spacing in bark?  Make larger at higher freq?
-%           + or some other measure, like making sure choice minimises MSE
-%   [ ] way to output at various processing steps, like PF initial mask, pre PF
-%   [ ] BPF at all?
-%   [ ] phase model?  Fit LPC, just swing phase at peaks? Try no phase tweaks
 
 1;
 melvq;
@@ -77,26 +58,6 @@ function [maskdB_ maskdB_cyclic Dabs dk_ D1_ ind] = decimate_in_freq(maskdB, cyc
        D1_ = D1;
     end
 
-    if 0
-    % convert quantised dk back to rate L magnitude spectrum
-
-    Dk_ = fft(dk_);
-    D_ = zeros(1,L);
-    D_(1) = D1_;                         % lets assume energy comes through separately
-    D_(2:k-1) = Dk_(2:k-1);
-    D_(L-k+1:L) = Dk_(k+1:2*k);
-    d_ = L*ifft(D_);                        % back to spectrum at rate L
-    maskdB_ = real(d_);
-    
-    % Finally fix up last 500Hz, taper down 10dB at 4000Hz
-
-    xpts = [ anchor-1 anchor L];
-    ypts = [ maskdB_(anchor-1) maskdB_(anchor) (maskdB_(anchor)-10)];
-    mask_pp = splinefit(xpts, ypts, 1);
-    maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
-    %printf("two masks: %f\n", std(maskdB_-maskdB1_));
-    end
-
     maskdB_ = params_to_mask(L, k, dk_, D1_);
 endfunction
 
@@ -123,7 +84,7 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
 
     Dk_ = fft(dk_);
     D_ = zeros(1,L);
-    D_(1) = D1_;                          % energy seperately quantised
+    D_(1) = D1_;                      % energy seperately quantised
     D_(2:k-1) = Dk_(2:k-1);
     D_(L-k+1:L) = Dk_(k+1:2*k);
     d_ = L*ifft(D_);                  % back to spectrum at rate L
@@ -151,401 +112,12 @@ function tp = est_pf_locations(maskdB_)
   end
 endfunction
 
-
-% Create a "decimated mask" model using just a few samples of
-% critical band filter centre frequencies.  For voiced speech,
-% we fit the amplitude of these samples to a straight line.
-% TODO: 
-%  [ ] track down bg noises on vk5qi and kristoff
-%  [ ] return data for plotting, like slope m
-%  [ ] quantise m
-
-% dealing with UV, BG noise. Prob is flat spectra.  When we fit a low
-% freq masking model it's formant shaped rather than flat.  So we get
-% these gaps in spectra that come and go - waterfall noises.  In
-% particular at low frequencies.  Good news is they don't need to be
-% quantised too finely.  This model has the disadvantage of not having
-% variable bandwidths.
-% when do waterfall noises appear?
-% idea: we could add the ability to have wider bands
-%        Add some sort of slope or floor
-%        increase spacing of samples?  Like min spacing in bark dimension
-
-% can we fit a different shape?
-
-function [decmaskdB local_maxima_sort] = make_decmask(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz)
-
-    % band pass filter: limit search to 250 to 3800 Hz
-
-    m_st = max(1,floor((pi*250/4000)/Wo));
-    m_en = floor((pi*3800/4000)/Wo);
-
-    % We start off by assuming that the local maxima in the masking
-    % curve are the centres of the samples we want to keep.
-
-    local_maxima = [];
-    if maskdB(m_st) > maskdB(m_st+1)
-      local_maxima = [local_maxima; AmdB(m_st) m_st];
-    end
-    for m=m_st+1:m_en-1
-      if (maskdB(m-1) < maskdB(m)) && (maskdB(m) > maskdB(m+1))
-        local_maxima = [local_maxima; AmdB(m) m];
-      end
-    end
-    [nlm tmp] = size(local_maxima);
-
-    % Occasionally there are no local maxima so pop one in
-
-    if nlm == 0
-      local_maxima = [AmdB(m_st) m_st];
-      nlm = 1;
-    end
-    
-    % fit a straight line to the amplitudes of our candidate samples,
-    % this will help us later when we code and transmit the amplitude 
-    % of each sample
-
-    if nlm > 1
-      [m b] = linreg(local_maxima(:,2), local_maxima(:,1), nlm);
-      local_maxima_fit = local_maxima(:,2)*m + b;
-    else
-      local_maxima_fit = local_maxima(1,1);
-    end
-
-    % Remove any outliers to the straight line fit: Sometimes local
-    % maxima appear in an antiformant regions, say if F1 and F2 are a
-    % long way apart.  After a straight line fit the anti-format
-    % amplitide sample will be way off the straight line, which will
-    % cause a spike of spectral energy right where we don't want it -
-    % in the middle of an antiformat.  So lets test the fit of each
-    % sample, and only include those that work well with the straight
-    % line fit.  For voiced frames, m < 0.  For UV frames, we don't
-    % care about the straight line fit as unvoiced speech is all over
-    % the place in amplitude anyway.
-    
-    local_maxima2 = [];
-    for i=1:nlm
-      if (local_maxima_fit(i) - local_maxima(i,1) < 6) || (m > 0)
-        local_maxima2 = [local_maxima2; local_maxima(i,1) local_maxima(i,2)];
-      end
-    end
-
-    % now sort and keep the top 4 samples
-    
-    local_maxima_sort = flipud(sortrows(local_maxima2,1));
-    [nlm tmp] = size(local_maxima_sort);
-    nlm = min(nlm,4);
-    local_maxima_sort = local_maxima_sort(1:nlm,:);
-
-    % fit straight line again, this time with outliers removed
-
-    [m b] = linreg(local_maxima_sort(:,2), local_maxima_sort(:,1), nlm);
-    masker_amps_dB = local_maxima_sort(:,2)*m + b;
-    masker_freqs_kHz = local_maxima_sort(:,2)*Wo*4/pi;
-    %masker_amps_dB = local_maxima_sort(:,1);
-    %masker_freqs_kHz = local_maxima_sort(:,2)*Wo*4/pi;
-
-    % and construct new, decimated mask using our small set of
-    % samples, with amplitudes fitted to a linear line
-
-    decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-endfunction
-
-
-% generate LUT
-
-function pp_bw = gen_pp_bw
-   for m=1:40
-      f=m*0.1;
-      %printf("f %f m: %d\n", f, m);
-      [single_mask_m pp] = resonator(f, 0.1:0.1:4);
-      pp_bw(m) = pp;
-    end
-    pp_bw(6);
-end
-
-
-% See where we can best place a mask to minimise MSE
-
-function mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en)
-  mse = zeros(1, l_en);
-  for l=l_st:l_en
-    single_mask_l = schroeder(l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(l);
-    candidate = max(decmaskdB, single_mask_l);
-    error = target - candidate;
-    mse(l) = sum(abs(error)); % MSE in log domain
-  end
-end
-
-
-% simple resampling to a fixed length vector on mel scale
-% fixed freq grid resampling
-
-function [decmaskdB mel_sample_freqs_kHz mel_masker_amps_dB min_error mse_log1 best_min_mse ind_log] = make_decmask_mel(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)  
-
-  % set up mel sampling grid
-
-  Nmel = 20;
-  mel_st = freq2mel(Wo*4000/pi);
-  mel_en = freq2mel(L*Wo*4000/pi);
-  m_step = (mel_en-mel_st)/Nmel;
-  m = mel_st:m_step:mel_en;
-  mel_sample_freqs_kHz = mel2freq(m)/1000;
-
-  % resample on mel grid
-
-  mask_pp = splinefit(mask_sample_freqs_kHz, maskdB, L);
-  mel_masker_amps_dB = ppval(mask_pp, mel_sample_freqs_kHz);
-
-  % resample on Wo grid
-
-  mel_pp = splinefit(mel_sample_freqs_kHz, mel_masker_amps_dB, L);
-  decmaskdB = ppval(mel_pp, mask_sample_freqs_kHz);
-  size(decmaskdB)
-  min_error = 0; mse_log1=[]; best_min_mse=0; ind_log=[];
-end
-
-
 function mel = freq2mel(f)
   mel = 70*log10(1 + f/700);
 endfunction
 
 function freq = mel2freq(m)
   freq = 700*(10 .^ (m/70) - 1);
-endfunction
-
-
-% Alternative way to come up with a decimated mask model, using
-% analysis by synthesis to determine the best place to put samples.
-% Ahh, takes me back to when I was a slip of a speech coder, playing
-% with my first CELP codec!
-
-function [decmaskdB masker_freqs_kHz masker_amps_dB min_error mse_log1 best_min_mse ind_log] = make_decmask_abys(maskdB, AmdB, Wo, L, mask_sample_freqs_kHz, freq_quant, amp_quant)
-
-    Nsamples = 4;
-
-    % search range
-
-    f_min = 0;
-    f0 = Wo*4000/pi;
-    l_st = max(1, round(f_min/f0));
-    l_en = L;
-
-    target = maskdB;
-    dec_samples = [];
-    mse_log1 = zeros(Nsamples, L);
-    ind_log = [];
-
-    % load VQ file if necc
-
-    if (freq_quant == 2) || (freq_quant == 3) || (amp_quant == 3)
-      load avq;
-      load fmelvq;
-    end
-
-    % set some sort of noise floor
-
-    decmaskdB = 20*ones(1,L);
-
-    % fit Nsample masks to spectrum using mbest algorithm ----------------------------
-
-    m = 1; best_min_mse = 1E32;
-
-    % find MSEs for first sample and kick off mbest list
-    %   best_mse......: list of best MSEs lowest to highest
-    %   best_l........: harmonic number of mask position
-    %   best_decmaskdB: cumulative mask at current stage
-
-    mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en);
-    [best_mse best_l] = sort(mse);
-    
-    for t=1:m
-      l = best_l(t); 
-      best_decmaskdB(t,:) = schroeder(l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(l);
-      %best_decmaskdB(t,:) = parabolic_resonator(l*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(l);
-      best_path(t,:) = l;
-    end
-
-    printf("\n");
-
-    for sample=2:Nsamples
-    
-      % using the mbest list, search from that point and log MSEs for this stage
-
-      cand_list = [];
-      for t=1:m
-        %printf("sample: %d t: %d\n", sample, t);
-
-        % find mse for all possible positions ---------------------------------
-
-        decmaskdB = best_decmaskdB(t,:);
-        mse = search_mask(target, decmaskdB, mask_sample_freqs_kHz, AmdB, Wo, l_st, l_en);
-        [abest_mse abest_l] = sort(mse);
-
-        % insert into list of MSEs and indexes
-
-        cand_list = [cand_list; abest_mse' t*ones(l_en,1) abest_l'];
-      end
-
-      % OK we've tried all mbest starting points and have a list of
-      % candidates.  Now sort and just keep the mbest
-
-      cand_list = sortrows(cand_list, 1);
-      %cand_list(1:m,:)
-      
-      % now re-build mbest list for next iteration
-
-      new_best_path = zeros(t,sample);
-      for t=1:m
-        best_mse(t)   = cand_list(t,1);
-        l = best_l(t) = cand_list(t,3); 
-
-        best_t        = cand_list(t,2); 
-        single_mask = schroeder(l*Wo*4/pi, mask_sample_freqs_kHz, 1) + AmdB(l);
-        %single_mask = parabolic_resonator(l*Wo*4/pi, mask_sample_freqs_kHz) + AmdB(l);
-
-        new_best_decmaskdB(t,:)  = max(best_decmaskdB(best_t,:), single_mask);
-
-        new_best_path(t,:) = [ best_path(t,:) l];
-        %printf("  t: %d best_t...: %4d best_mse: %5.1f\n", t, best_t, best_mse(t));
-      end
-      best_decmaskdB = new_best_decmaskdB;
-      best_path = new_best_path;
-    end
-    
-    best_min_mse = best_mse(1);
-    decmaskdB = best_decmaskdB(1,:);
-    masker_freqs_kHz = best_path(1,:)*Wo*4/pi;
-    masker_amps_dB = AmdB(best_path(1,:));
-
-    min_error = target - decmaskdB;
-
-    bits = [];
-
-    % sort into increasing freq order
-
-    %masker_amps_dB = dec_samples(:,1);
-    %masker_freqs_kHz = dec_samples(:,2)*Wo*4/pi;
-    [fsrt fsrt_ind] = sort(masker_freqs_kHz);
-    masker_freqs_kHz = fsrt;
-    masker_amps_dB = masker_amps_dB(fsrt_ind);
-
-    % Differential Freq Quantisers - sounds acceptable
-
-    if freq_quant == 1
-           
-      % first freq quant to harmonic number m=1:8
-
-      f0_kHz = Wo*4/pi;
-      [masker_freqs_kHz(1) abits] = quantise((1:8)*f0_kHz, masker_freqs_kHz(1));
-      bits = [bits abits];
-     
-      % then quantise differences
-
-      for i=2:Nsamples
-        targ = masker_freqs_kHz(i) - masker_freqs_kHz(i-1);
-        [q_freq abits] = quantise(0.2:0.2:2.4, targ);
-        bits = [bits abits];
-        masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freq;
-      end
-
-       decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-
-    % Freq Vector Quantiser
-
-    if freq_quant == 2
-      [res masker_freqs_kHz ind] = mbest(fvq, masker_freqs_kHz, 4);
-      std(res)
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-    if freq_quant == 3
-      masker_freqs_mel = freq2mel(masker_freqs_kHz*1000);
-      [res masker_freqs_mel ind] = mbest(fmelvq, masker_freqs_mel, 4);
-      ind_log = [ind_log ind];
-      masker_freqs_kHz = mel2freq(masker_freqs_mel)/1000;
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-
-    % Amplitude quantisation by fitting a straight line -------------------------
-    % amp_quant == 1: high rate, quantise deltas
-    % amp_quant == 2: low rate, don't quantise deltas
-
-    if (amp_quant == 1) || (amp_quant == 2)
-
-      % Fit straight line
-
-      f = masker_freqs_kHz*1000;
-      [gradient intercept] = linreg(f, masker_amps_dB, Nsamples);
-      % use quantised gradient to take into account quantisation
-      % errors in rest of quantisation
-
-      gradient_ = quantise(-0.08:0.002:0.08, gradient);
-      %gradient_ = gradient;
-      printf("gradient; %f gradient_: %f\n", gradient, gradient_);
-
-      % determine deltas, or errors in straight line fit
-
-      masker_amps_dB_lin = f*gradient_ + intercept;
-      masker_amps_dB_lin_delta = masker_amps_dB - masker_amps_dB_lin;
-
-      % optional plots
-
-      if 0
-        figure(10)
-        clf;
-        plot(f, masker_amps_dB, 'r+', 'markersize', 10, 'linewidth', 2)
-
-        fplt = 0:100:3900
-        hold on;
-        plot(fplt, fplt*gradient + intercept, 'b')
-        fplt*gradient + intercept
-
-        % plot lines for deltas
-
-        for i=1:length(f)
-          y1 = f(i)*gradient + intercept;
-          y2 = masker_amps_dB(i);
-          plot([f(i) f(i)], [y1 y2], 'markersize', 10, 'linewidth', 2)
-        end
-        hold off;
-      end
-
-      % quantise the deltas
-
-      masker_amps_dB_lin_delta_ = zeros(Nsamples,1);
-      if amp_quant == 1
-        for i=1:Nsamples
-          masker_amps_dB_lin_delta_(i) = quantise(-21:3:21, masker_amps_dB_lin_delta(i));
-          printf("dlin: %f dlin_: %f\n", masker_amps_dB_lin_delta(i), masker_amps_dB_lin_delta_(i));
-          % masker_amps_dB_lin_delta_(i) = masker_amps_dB_lin_delta(i);
-        end
-      end
-
-      masker_amps_dB = f*gradient_ + masker_amps_dB_lin_delta_ + intercept;
-      %decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-
-    % Amplitude vector quantiser
-
-    if amp_quant == 3
-      [res masker_amps_dB ind] = mbest(avq, masker_amps_dB, 4);
-      ind_log = [ind_log ind];
-      std(res)
-      decmaskdB = determine_mask(masker_amps_dB,  masker_freqs_kHz, mask_sample_freqs_kHz);
-    end
-
-    if 0
-    printf("\n");
-    for i=1:Nsamples
-      printf("freq: %f amp: %f\n", masker_freqs_kHz(i), masker_amps_dB(i));
-    end
-    end
 endfunction
 
 
@@ -574,26 +146,6 @@ function [quant_out best_i bits] = quantise(levels, quant_in)
   end
 
 endfunction
-
-
-function masker_freqs_kHz = unquantise_freqs(bits, Wo)
-  for i=1:4
-    st = (i-1)*3+1; en=i*3; 
-    index(i) = bits(st:en) * [4 2 1]' + 1;
-  end
-  f0_kHz = Wo*4/pi;
-
-  masker_freqs_kHz(1) = index(1)*f0_kHz;
-     
-  % then unquantise differences
-
-  q_freqs = 0.2:0.2:1.6;
-
-  for i=2:4
-    masker_freqs_kHz(i) = masker_freqs_kHz(i-1) + q_freqs(index(i));
-  end
-endfunction
-
 
 % determine cumulative mask, using amplitude of each harmonic.  Mask is
 % sampled across L points in the linear domain
@@ -1017,7 +569,7 @@ function plot_f_a_stats(f,a)
 
 endfunction
 
-function decode_from_bit_stream(samname)
+function D1_log = decode_from_bit_stream(samname)
   max_amp = 80;
   bits_per_param = [6 1 8 8 4 1];
   load vq;
@@ -1065,6 +617,7 @@ function decode_from_bit_stream(samname)
   frames = 4*length(ind_log);
   model_ = zeros(frames, max_amp+2);
   v      = zeros(frames,1);
+  D1_log = [];
 
   fdec = 1;
   for f=1:4:frames
@@ -1086,6 +639,7 @@ function decode_from_bit_stream(samname)
 
     ind_vq = ind_log(fdec,3:5) + 1;
     [dk_ D1_] = index_to_params(ind_vq, vq);
+    D1_log = [D1_log; D1_];
     maskdB_ = params_to_mask(L, k, dk_, D1_);
     Am_ = zeros(1,max_amp);
     Am_ = 10 .^ (maskdB_(1:L)/20); 
@@ -1162,8 +716,6 @@ endfunction
 
 
 
-
-
 % decimate frame rate of mask, use linear interpolation in the log domain 
 
 function [maskdB_ Wo L] = decimate_frame_rate2(model, decimate, f, frames)
@@ -1214,6 +766,7 @@ function [maskdB_ Wo L] = decimate_frame_rate2(model, decimate, f, frames)
 
     maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
 endfunction
+
 
 function amodel = post_filter(amodel)
     max_amp = 80;
