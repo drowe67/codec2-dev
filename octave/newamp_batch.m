@@ -86,10 +86,8 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
       else
         [maskdB_ tmp1 D dk_ D1_] = decimate_in_freq(maskdB, 1, k);
       end
-      if train
-        dk_log = [dk_log; dk_];
-        D1_log = [D1_log; D1_];
-      end
+      dk_log = [dk_log; dk_];
+      D1_log = [D1_log; D1_];
     end
     %maskdB_pf = maskdB_*1.5;
     %maskdB_pf += max(maskdB_) - max(maskdB_pf);
@@ -109,5 +107,6 @@ function [dk_log D1_log] = newamp_batch(samname, optional_Am_out_name, optional_
   bits_per_param = [6 1 8 8 4 1];
   write_bit_stream_file(bit_stream_name, ind_log, bits_per_param);
   decode_from_bit_stream(samname);
+
 endfunction
   
