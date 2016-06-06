@@ -152,7 +152,7 @@ function ind = test_run(samplename)
   fclose(fmel_);
 end
 
-ind = test_run("hts1a");
+%ind = test_run("hts1a");
 
 %load "../build_linux/src/all_mel.txt"
 %vq = trainvq(all_mel, 64, 3);
