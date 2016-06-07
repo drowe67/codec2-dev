@@ -10,7 +10,7 @@
 
 
 /*
-  Copyright (C) 2016 David Rowe
+  Copyright (C) 2016 Leon
 
   All rights reserved.
 
@@ -264,19 +264,19 @@ uint32_t I2C_NewReadRegister(uint8_t Addr,uint8_t Register) {
     }
     (void) I2C_DEVICE->SR2;
     Timeout = I2C_STIMEOUT;
-    while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_TXE)) {
+    while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_TXE)) {
         if ((Timeout--) == 0) return I2C_timeout(0x104);
     }
     I2C_SendData(I2C_DEVICE, Register);
     Timeout = I2C_STIMEOUT;
     while ( (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_TXE)) ||
-            (!I2C_GetFlagStatus(I2C1, I2C_FLAG_BTF))
+            (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_BTF))
           )  {
         if ((Timeout--) == 0) return I2C_timeout(0x105);
     }
     I2C_GenerateSTART(I2C_DEVICE, ENABLE);
     Timeout = I2C_STIMEOUT;
-    while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_SB)) {
+    while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_SB)) {
         if ((Timeout--) == 0) return I2C_timeout(0x106);
     }
     I2C_Send7bitAddress(I2C_DEVICE, Addr, I2C_Direction_Receiver);
@@ -285,7 +285,7 @@ uint32_t I2C_NewReadRegister(uint8_t Addr,uint8_t Register) {
         if ((Timeout--) == 0) return I2C_timeout(0x107);
     }
     (void) I2C_DEVICE->SR2;
-    while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_RXNE)) {
+    while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_RXNE)) {
         if ((Timeout--) == 0) return I2C_timeout(0x108);
     }
     I2C_GenerateSTOP(I2C_DEVICE, ENABLE);
@@ -381,19 +381,19 @@ uint32_t I2C_NewReadRegisterN(uint8_t Addr,uint8_t Register,uint8_t *buffer, uin
     }
     (void) I2C_DEVICE->SR2;
     Timeout = I2C_STIMEOUT;
-    while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_TXE)) {
+    while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_TXE)) {
         if ((Timeout--) == 0) return I2C_timeout(0x104);
     }
     I2C_SendData(I2C_DEVICE, Register);
     Timeout = I2C_STIMEOUT;
     while ( (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_TXE)) ||
-            (!I2C_GetFlagStatus(I2C1, I2C_FLAG_BTF))
+            (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_BTF))
           )  {
         if ((Timeout--) == 0) return I2C_timeout(0x105);
     }
     I2C_GenerateSTART(I2C_DEVICE, ENABLE);
     Timeout = I2C_STIMEOUT;
-    while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_SB)) {
+    while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_SB)) {
         if ((Timeout--) == 0) return I2C_timeout(0x106);
     }
     I2C_Send7bitAddress(I2C_DEVICE, Addr, I2C_Direction_Receiver);
@@ -405,12 +405,12 @@ uint32_t I2C_NewReadRegisterN(uint8_t Addr,uint8_t Register,uint8_t *buffer, uin
     for (cnt=0; cnt<N; cnt++) {
         if((cnt+1) >= N) {
             // ACK disable
-            I2C_AcknowledgeConfig(I2C1, DISABLE);
+            I2C_AcknowledgeConfig(I2C_DEVICE, DISABLE);
             // Stop-Sequenz
-            I2C_GenerateSTOP(I2C1, ENABLE);
+            I2C_GenerateSTOP(I2C_DEVICE, ENABLE);
         }
         Timeout = I2C_STIMEOUT;
-        while (!I2C_GetFlagStatus(I2C1, I2C_FLAG_RXNE)) {
+        while (!I2C_GetFlagStatus(I2C_DEVICE, I2C_FLAG_RXNE)) {
             if ((Timeout--) == 0) return I2C_timeout(0x108);
         }
         result=I2C_ReceiveData(I2C_DEVICE);

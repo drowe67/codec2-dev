@@ -29,10 +29,19 @@
 #include <assert.h>
 #include "new_i2c.h"
 #include "si53xx.h"
+#include "gdb_stdio.h"
+
+#define printf gdb_stdio_printf
 
 int main(void) {
+    int ret;
+
+    printf("starting\n");
     I2C_Setup();
-    si5351_init(0x60, 5, 25000000);
-    si5351_set_freq(10000000, 0, SI5351_CLK0);
+    si5351_init(0, SI5351_CRYSTAL_LOAD_6PF, 0);
+    
+    ret = si5351_set_freq(1000000000ULL, 0, SI5351_CLK0);
+    printf(" ret = %d\n", ret);
+
     while(1);
 }

@@ -809,6 +809,7 @@ fm_loduc_play.elf: $(FM_LODUC_PLAY_SRCS) src/stm32f4_dacloduc.o
 # ---------------------------------------------------------------------------------
 
 SI5351_UT_SRCS=\
+gdb_stdio.c \
 src/si5351_ut.c \
 src/new_i2c.c \
 src/si53xx.c \
@@ -816,8 +817,8 @@ src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c \
 
-si5351_ut.elf: $(SI5351_UT_SRCS:.c=.O3.o) libstm32f4.a
-	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+si5351_ut.elf: $(SI5351_UT_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------------
 
