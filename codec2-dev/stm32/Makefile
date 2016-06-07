@@ -809,7 +809,6 @@ fm_loduc_play.elf: $(FM_LODUC_PLAY_SRCS) src/stm32f4_dacloduc.o
 # ---------------------------------------------------------------------------------
 
 SI5351_UT_SRCS=\
-gdb_stdio.c \
 src/si5351_ut.c \
 src/new_i2c.c \
 src/si53xx.c \
