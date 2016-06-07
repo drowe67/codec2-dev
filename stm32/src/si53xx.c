@@ -42,11 +42,19 @@
 #include "math.h"
 #include "si53xx.h"
 
+#include "gdb_stdio.h"
+#define printf gdb_stdio_printf
+
 
 void si5351_write(uint8_t REGaddr, uint8_t data) {
     // ignoring errors
     // Waiting for the bite
     Si5351_Config.I2C_ErrorCode=I2C_NewWriteRegister(Si5351_Config.I2C_add, REGaddr, data);
+    printf("  si5351_write: REGaddr: 0x%02x data...: 0x%02x", REGaddr, data);
+    if (Si5351_Config.I2C_ErrorCode > 0xff)
+        printf("  ErrorCode: 0x%02x\n", Si5351_Config.I2C_ErrorCode);
+    else
+        printf("\n");
 }
 
 void si5351_write_bulk(uint8_t REGaddr, uint8_t bytes, uint8_t *data) {
@@ -57,11 +65,14 @@ void si5351_write_bulk(uint8_t REGaddr, uint8_t bytes, uint8_t *data) {
 uint8_t si5351_read(uint8_t REGaddr) {
     uint8_t reg_val;
     Si5351_Config.I2C_ErrorCode=I2C_NewReadRegister(Si5351_Config.I2C_add,REGaddr);
+    printf("  si5351_read.: REGaddr: 0x%02x", REGaddr);
     if (Si5351_Config.I2C_ErrorCode>0xff) {
         reg_val=0;
+        printf(" ErrorCode: 0x%02x\n", Si5351_Config.I2C_ErrorCode);
     } else {
         reg_val=(uint8_t)(Si5351_Config.I2C_ErrorCode & 0xff);
         Si5351_Config.I2C_ErrorCode=0;
+        printf(" reg_val: 0x%02x\n", reg_val);
     }
     return reg_val;
 }
@@ -82,6 +93,8 @@ uint8_t si5351_read(uint8_t REGaddr) {
  *------------------------------------------------------------------------------
  */
 void si5351_init(uint8_t I2C_Address, uint8_t xtal_load_c, uint32_t ref_osc_freq) {
+    printf("si5351_init\n");
+
     Si5351_Config.clk0_freq=0;
     Si5351_Config.lock_plla = SI5351_CLKNONE;
     Si5351_Config.lock_pllb = SI5351_CLKNONE;
@@ -100,6 +113,11 @@ void si5351_init(uint8_t I2C_Address, uint8_t xtal_load_c, uint32_t ref_osc_freq
     uint8_t reg_val = 0x12; // 0b010010 reserved value bits
     reg_val |= xtal_load_c;
     si5351_write(SI5351_CRYSTAL_LOAD, reg_val);
+
+    // DR: test of I2C
+    reg_val = si5351_read(SI5351_CRYSTAL_LOAD);
+    printf("reg_val: 0x%02x\n", reg_val);
+
     // Change the ref osc freq if different from default
     // Divide down if greater than 30 MHz
     if (ref_osc_freq != 0) {
@@ -160,6 +178,8 @@ uint8_t si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk)
     uint8_t int_mode = 0;
     uint8_t div_by_4 = 0;
 
+    printf("si5351_set_freq:\n");
+
     // PLL bounds checking
     if(pll_freq != 0) {
         if ((pll_freq < SI5351_PLL_VCO_MIN * SI5351_FREQ_MULT)
@@ -167,6 +187,8 @@ uint8_t si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk)
             return 1;
         }
     }
+
+    printf("freq: 0x%0x 0x%0x\n", (uint32_t)(freq >> 32), (uint32_t)(freq & 0xffffffff));
 
     // Lower bounds check
     if(freq < SI5351_CLKOUT_MIN_FREQ * SI5351_FREQ_MULT) {
@@ -177,6 +199,8 @@ uint8_t si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk)
     if(freq > SI5351_MULTISYNTH_MAX_FREQ * SI5351_FREQ_MULT) {
         freq = SI5351_MULTISYNTH_MAX_FREQ * SI5351_FREQ_MULT;
     }
+
+    printf("freq: 0x%0x 0x%0x\n", (uint32_t)(freq >> 32), (uint32_t)(freq & 0xffffffff));
 
     // Select the proper R div value
     r_div = si5351_select_r_div(&freq);
@@ -217,10 +241,14 @@ uint8_t si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk)
         // Only good for Si5351A3 variant at the moment
         switch(clk) {
             case SI5351_CLK0:
+                    printf("case SI5351_CLK0\n");
                     pll_freq = si5351_multisynth_calc(freq, 0, &ms_reg);
                     target_pll = SI5351_PLLA;
                     write_pll = 1;
                     si5351_set_ms_source(SI5351_CLK0, SI5351_PLLA);
+
+                    printf("pll_freq: 0x%0x 0x%0x\n", (uint32_t)(pll_freq >> 32), (uint32_t)(pll_freq & 0xffffffff));
+                    printf("freq: 0x%0x 0x%0x\n", (uint32_t)(freq >> 32), (uint32_t)(freq & 0xffffffff));
 
                     Si5351_Config.plla_freq = pll_freq;
                     Si5351_Config.clk0_freq = freq;
