@@ -161,7 +161,8 @@ void si5351_init(uint8_t I2C_Address, uint8_t xtal_load_c, uint32_t ref_osc_freq
  * @brief si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock output)
  * Sets the clock frequency of the specified CLK output
  *
- * @param freq - Output frequency in Hz
+ * @param freq - Output frequency in 0.01 Hz increments, so for 10MHz 
+ *               use 1000000000ULL
  * 
  * @param pll_freq - Frequency of the PLL driving the Multisynth
  *   Use a 0 to have the function choose a PLL frequency
