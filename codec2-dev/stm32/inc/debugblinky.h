@@ -4,7 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: 12 August 2014
 
-  Configures GPIO pins used for debug blinkies
+  Configures Port E GPIO pins used for debug blinkies, and control lines
+  for SM2000 +12V switching.
 
 \*---------------------------------------------------------------------------*/
 
@@ -29,5 +30,6 @@
 #define __DEBUGBLINKY__
 
 void init_debug_blinky(void);
+void txrx_12V(int state);
 
 #endif
