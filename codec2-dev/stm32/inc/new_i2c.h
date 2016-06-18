@@ -9,7 +9,7 @@
  */
 
 /*
-  Copyright (C) 2016 David Rowe
+  Copyright (C) 2016 Leon
 
   All rights reserved.
 

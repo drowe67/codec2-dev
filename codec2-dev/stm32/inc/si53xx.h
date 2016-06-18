@@ -310,6 +310,6 @@ void si5351_init(uint8_t I2C_Address,  uint8_t xtal_load_c, uint32_t ref_osc_fre
 void si5351_pll_reset(enum si5351_pll target_pll);
 void si5351_set_clock_pwr(enum si5351_clock clk, uint8_t pwr);
 void si5351_set_clock_invert(enum si5351_clock clk, uint8_t inv);
-uint8_t si5351_set_freq(uint64_t freq, uint64_t pll_freq, enum si5351_clock clk);
+uint8_t si5351_set_freq(uint64_t freq_in_Hz_times_100, uint64_t pll_freq, enum si5351_clock clk);
 
 #endif
