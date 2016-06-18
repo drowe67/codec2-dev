@@ -36,7 +36,7 @@ int main(void) {
     short  buf[N];
     FILE  *fplay;
 
-    dac_open(2*N);
+    dac_open(DAC_FS_16KHZ, 2*N);
 
     while(1) {
         fplay = fopen("stm_in.raw", "rb");

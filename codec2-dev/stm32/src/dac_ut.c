@@ -31,7 +31,6 @@
 
 #define SINE_SAMPLES   32
 
-
 /* 32 sample sine wave which at Fs=16kHz will be 500Hz.  Note samples
    are 16 bit 2's complement, the DAC driver convertsto 12 bit
    unsigned. */
@@ -45,7 +44,7 @@ short aSine[] = {
 
 int main(void) {
 
-    dac_open(4*DAC_BUF_SZ);
+    dac_open(DAC_FS_16KHZ, 4*DAC_BUF_SZ);
 
     while (1) {
 
