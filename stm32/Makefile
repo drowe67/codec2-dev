@@ -436,7 +436,7 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin
+all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin
 
 # Rule for making directories automatically.
 # Note we don't use -p as it's a GNU extension.
@@ -817,6 +817,41 @@ src/startup_stm32f4xx.s \
 src/init.c \
 
 si5351_ut.elf: $(SI5351_UT_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# ---------------------------------------------------------------------------------
+
+MCO_UT_SRCS=\
+src/mco_ut.c \
+src/tm_stm32f4_mco_output.c \
+src/tm_stm32f4_gpio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+
+mco_ut.elf: $(MCO_UT_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+
+SM2000_STW_SRCS=\
+src/sm2000_stw.c \
+src/sm1000_leds_switches.c \
+src/debugblinky.c \
+src/new_i2c.c \
+src/si53xx.c \
+src/stm32f4_dac.c \
+../src/fifo.c \
+src/stm32f4_usb_vcp.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c \
+
+SM2000_STW_SRCS+=$(USB_VCP)
+
+sm2000_stw.elf: $(SM2000_STW_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------------
