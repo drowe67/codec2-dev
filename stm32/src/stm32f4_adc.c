@@ -98,7 +98,7 @@ static void tim2_config(int fs_divisor)
   /* Time base configuration */
 
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-  TIM_TimeBaseStructure.TIM_Period = fs_divisor;
+  TIM_TimeBaseStructure.TIM_Period = fs_divisor - 1;
   TIM_TimeBaseStructure.TIM_Prescaler = 0;
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
