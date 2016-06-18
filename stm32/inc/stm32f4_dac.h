@@ -30,7 +30,12 @@
 
 #define DAC_BUF_SZ   320
 
-void dac_open(int fifo_sz);
+/* divisors for various sample rates */
+
+#define DAC_FS_16KHZ 5250
+#define DAC_FS_96KHZ 875
+
+void dac_open(int fs_divisor, int fifo_sz);
 int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
 int dac1_free();
 int dac2_write(short buf[], int n); /* DAC2 pin PA5 */

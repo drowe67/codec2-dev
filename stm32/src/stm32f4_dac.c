@@ -56,13 +56,14 @@ static struct FIFO *dac2_fifo;
 static unsigned short dac1_buf[DAC_BUF_SZ];
 static unsigned short dac2_buf[DAC_BUF_SZ];
 
-static void tim6_config(void);
+static void tim6_config(int fs_divisor);
 static void dac1_config(void);
 static void dac2_config(void);
 
 int dac_underflow;
 
-void dac_open(int fifo_size) {
+
+void dac_open(int fs_divisor, int fifo_size) {
 
     memset(dac1_buf, 32768, sizeof(short)*DAC_BUF_SZ);
     memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
@@ -93,7 +94,7 @@ void dac_open(int fifo_size) {
 
     /* Timer and DAC 1 & 2 Configuration ----------------------------------------*/
 
-    tim6_config();
+    tim6_config(fs_divisor);
     dac1_config();
     dac2_config();
 
@@ -119,7 +120,7 @@ int dac2_free() {
     return fifo_free(dac2_fifo);
 }
 
-static void tim6_config(void)
+static void tim6_config(int fs_divisor)
 {
   TIM_TimeBaseInitTypeDef    TIM_TimeBaseStructure;
 
@@ -140,7 +141,7 @@ static void tim6_config(void)
   /* Time base configuration */
 
   TIM_TimeBaseStructInit(&TIM_TimeBaseStructure);
-  TIM_TimeBaseStructure.TIM_Period = 5250;
+  TIM_TimeBaseStructure.TIM_Period = fs_divisor - 1;
   TIM_TimeBaseStructure.TIM_Prescaler = 0;
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
