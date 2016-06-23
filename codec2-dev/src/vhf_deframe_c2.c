@@ -39,6 +39,7 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf;
     uint8_t *c2buf;
     uint8_t zbuf[] = {0,0,0,0,0,0,0,0};
+    int count = 0;
     int frame_fmt = 0;
     int fsize,c2size;
     
@@ -95,6 +96,9 @@ int main(int argc,char *argv[]){
             fflush(fin);
             fflush(fout);
         }
+		if(count%100==0){
+			fprintf(stderr,"BER Estimate: %f\n",((float)deframer->total_uw_err)/((float)deframer->total_uw_bits));
+		}
     }
     
     free(bitbuf);

@@ -77,6 +77,8 @@ int main(int argc,char *argv[]){
         goto cleanup;
     }
     
+    fprintf(stderr,"fsk->n: %d\n",fsk->N);
+    
     /* allocate buffers for processing */
     bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
     rawbuf = (int16_t*)malloc(sizeof(int16_t)*fsk->N);
