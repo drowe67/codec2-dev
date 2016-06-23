@@ -32,9 +32,9 @@ endif
 
 # Definitions for the STM32F4 Standard Peripheral Library
 
-PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware/
+PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.6.1
+PERIPHLIBVER	= V1.7.1
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -382,6 +382,7 @@ $(CODEC2_SRC)/postfilter.c \
 $(CODEC2_SRC)/sine.c \
 $(CODEC2_SRC)/codec2.c \
 $(CODEC2_SRC)/kiss_fft.c \
+$(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
 $(CODEC2_SRC)/lsp.c \
 $(CODEC2_SRC)/phase.c \
@@ -395,7 +396,11 @@ $(CODEC2_SRC)/dump.c \
 $(CODEC2_SRC)/fdmdv.c \
 $(CODEC2_SRC)/freedv_api.c \
 $(CODEC2_SRC)/varicode.c \
-$(CODEC2_SRC)/golay23.c
+$(CODEC2_SRC)/golay23.c \
+$(CODEC2_SRC)/fsk.c \
+$(CODEC2_SRC)/fmfsk.c \
+$(CODEC2_SRC)/freedv_vhf_framing.c \
+$(CODEC2_SRC)/freedv_data_channel.c
 
 CFLAGS += -D__EMBEDDED__
 
@@ -843,15 +848,40 @@ src/debugblinky.c \
 src/new_i2c.c \
 src/si53xx.c \
 src/stm32f4_dac.c \
+src/stm32f4_adc.c \
 ../src/fifo.c \
-src/stm32f4_usb_vcp.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
-src/init.c \
+src/init.c 
 
-SM2000_STW_SRCS+=$(USB_VCP)
+SM2000_STW_SRCS+=$(CODEC2_SRCS)
 
-sm2000_stw.elf: $(SM2000_STW_SRCS:.c=.o) libstm32f4.a
+#SM2000_STW_SRCS+=$(USB_VCP)
+
+sm2000_stw.elf: $(SM2000_STW_SRCS:.c=.O3.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# ---------------------------------------------------------------------------------
+
+SM2000_ADCDUMP_SRCS=\
+src/sm2000_adc_dump.c \
+src/sm1000_leds_switches.c \
+src/debugblinky.c \
+src/new_i2c.c \
+src/si53xx.c \
+src/stm32f4_dac.c \
+src/stm32f4_usb_vcp.c \
+src/stm32f4_adc.c \
+../src/fifo.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c 
+
+SM2000_ADCDUMP_SRCS_SRCS+=$(CODEC2_SRCS)
+
+SM2000_ADCDUMP_SRCS+=$(USB_VCP)
+
+sm2000_adcdump.elf: $(SM2000_ADCDUMP_SRCS:.c=.O3.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------------

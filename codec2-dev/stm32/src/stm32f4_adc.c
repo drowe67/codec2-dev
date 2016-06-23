@@ -76,6 +76,15 @@ int adc2_read(short buf[], int n) {
     return fifo_read(adc2_fifo, buf, n);
 }
 
+/* Returns number of signed 16 bit samples in the FIFO currently */
+int adc1_samps(){
+	return fifo_used(adc1_fifo);
+}
+
+/* Returns number of signed 16 bit samples in the FIFO currently */
+int adc2_samps(){
+	return fifo_used(adc2_fifo);
+}
 
 static void tim2_config(int fs_divisor)
 {
