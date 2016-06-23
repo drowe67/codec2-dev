@@ -26,12 +26,17 @@
 */
 
 #include <assert.h>
+#include <stdint.h>
 #include "new_i2c.h"
 #include "si53xx.h"
 #include "debugblinky.h"
 #include "sm1000_leds_switches.h"
 #include "stm32f4_dac.h"
-#include "stm32f4_usb_vcp.h"
+#include "stm32f4_adc.h"
+//#include "stm32f4_usb_vcp.h"
+#include "fsk.h"
+#include "freedv_vhf_framing.h"
+#include "golay23.h"
 
 #define SINE_SAMPLES   24
 
@@ -47,17 +52,36 @@ short aSine[] = {
 };
 short zeros[SINE_SAMPLES];
 
+uint8_t bit_buf[] = { 1,0,1,1,0,0,0,1,
+                  1,0,1,1,0,1,0,1,
+                  0,1,0,0,1,0,1,1,
+                  1,0,0,0,0,0,0,1,
+                  1,1,0,0,0,0,0,1,
+                  1,0,1,0,0,0,0,1,
+                  1,0,0,1,0,0,0,1,
+                  1,0,0,0,1,0,0,1,
+                  1,0,0,0,0,1,0,1,
+                  1,0,0,0,0,0,1,1,
+                  1,0,0,0,0,0,1,1,
+                  1,0,0,0,0,0,1,1, };
 int main(void) {
     int ret, ptt, i;
     uint64_t freq_in_Hz_times_100;
-
-    for(i=0; i<SINE_SAMPLES; i++)
-        aSine[i] *= 1.5;
-
+    struct FSK * fsk;
+    struct freedv_vhf_deframer * deframer;
+    
+    float * mod_buf;
+    
     sm1000_leds_switches_init();
     led_pwr(1);
-    led_ptt(0);
-
+    
+    fsk = fsk_create_hbr(96000,1200,10,4,32000-1800,1200);
+    deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
+    if(fsk==NULL){
+		led_err(1);
+		while(1);
+	}
+    mod_buf = malloc(sizeof(float)*fsk->Nmem);
     init_debug_blinky();
     txrx_12V(0);
 
@@ -66,40 +90,78 @@ int main(void) {
     freq_in_Hz_times_100 = 1070000000ULL - 3200000ULL;
     ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
 
-    dac_open(DAC_FS_96KHZ, 4*DAC_BUF_SZ);
+    dac_open(DAC_FS_96KHZ, 2000);
+    adc_open(ADC_FS_96KHZ, 2000);
 
-    usb_vcp_init();
-
+    //usb_vcp_init();
+    int mbptr = 0;
+	int golay_ctr = 0;
+	uint8_t c2_buffer[8];
+	int k;
+	int spstate;
+	ptt = 1;
+	int nin = fsk_nin(fsk);
+	spstate = 0;
     while(1) {
-        ptt = switch_ptt();
+		if(switch_ptt() && (!spstate)){
+			ptt = ptt ? 0 : 1;
+			mbptr = 0;
+		}
+		spstate = switch_ptt();
+		
         led_ptt(ptt);
         txrx_12V(ptt);
-
-        /*
-        if (ptt)
-            dac1_write((short*)aSine, SINE_SAMPLES);
-        else
-            dac1_write((short*)zeros, SINE_SAMPLES);
-        */
-
-        /* read another buffer from USB when DAC empties */
-        /* note assumes USB host write two bytes at a time */
-        /* and assumes enough bytes are available, need to test that
-           host is throttled appropriately */
-
-        int n = dac1_free();
-        if (n) {
-            uint16_t  s, buf[n];
-            uint8_t   b;
-            for(i=0; i<n; i++) {
-                //VCP_get_char(&b);
-                s = b << 8;
-                //VCP_get_char(&b);
-                s += b;
-                buf[i] = s;
-            }
-            dac1_write((short*)buf, n);
-        }
-                
+        
+        if(ptt){
+			int n = dac1_free();
+			if (n) {
+				int16_t  buf[n];
+				for(i=0; i<n && mbptr<fsk->N; i++,mbptr++) {
+					buf[i] = (short)(mod_buf[mbptr]*700);
+				}
+				dac1_write((short*)buf, i);
+			}
+			if(mbptr>=fsk->N){
+				/* Encode frame index into golay codeword to protect from test BER*/
+				k = golay23_encode((golay_ctr)&0x0FFF);
+				c2_buffer[5] = (k    )&0xFF;
+				c2_buffer[1] = (k>>8 )&0xFF;
+				c2_buffer[0] = (k>>16)&0x7F;
+				/* Frame the bits */
+				fvhff_frame_bits(FREEDV_VHF_FRAME_A, bit_buf, c2_buffer,NULL,NULL);
+				/* Mod the FSK */
+				fsk_mod(fsk,mod_buf,bit_buf);
+				mbptr = 0;
+				golay_ctr++;
+			}
+		}else{
+			
+			int n = adc1_samps();
+			if (n) {
+				int16_t buf[n];
+				adc1_read(buf,n);
+				for(i=0; i<n && mbptr<nin; i++,mbptr++){
+					mod_buf[mbptr] = ((float)buf[i]);
+				}
+				if(mbptr>=nin){
+					led_rt(1);
+					fsk_demod(fsk,bit_buf,mod_buf);
+					led_rt(0);
+					if(fvhff_deframe_bits(deframer,c2_buffer,NULL,NULL,bit_buf)){
+						led_err(1);		
+					}else{
+						//led_err(0);
+						led_err(0);
+					}
+					mbptr = 0;
+					if(fsk_nin(fsk)!=nin){
+						led_ptt(1);
+					}else{
+						led_ptt(0);
+					}
+					nin = fsk_nin(fsk);
+				}
+			}
+		}
     }
 }

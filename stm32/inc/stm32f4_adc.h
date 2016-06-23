@@ -38,5 +38,7 @@
 void adc_open(int fs_divisor, int fifo_sz);
 int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
 int adc2_read(short buf[], int n); /* ADC2 Pin PA2 */
+int adc1_samps();
+int adc2_samps();
 
 #endif
