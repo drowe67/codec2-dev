@@ -20,10 +20,10 @@
 
 
 %adc_file_name = '/home/baobrien/workspace/freetel-code/codec2-dev/stm32/adc_samp'
-%adc_file_name = '/dev/ttyACM1'
+adc_file_name = '/dev/ttyACM0'
 %adc_file_name = 'infifo';
 fs = 96000
-sampsize = 96000
+sampsize = 19200
 %graphics_toolkit('gnuplot')
 
 fin = fopen(adc_file_name,'r')
