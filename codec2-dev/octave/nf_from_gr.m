@@ -11,11 +11,22 @@
 
 1;
 
-function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB)
+function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB, real_file=0)
 
-  p =  load_comp(p_filename);
-  pn = load_comp(n_filename);
- 
+  if real_file
+    % real samples files of 16 bit shorts
+    fs=fopen(p_filename,"rb");
+    p = fread(fs,Inf,"short");
+    fclose(fs);
+    fs=fopen(n_filename,"rb");
+    pn = fread(fs,Inf,"short");
+    fclose(fs);
+  else
+    % GNU radio complex file input
+    p =  load_comp(p_filename);
+    pn = load_comp(n_filename);
+  end
+
   P = fft(p(1:Fs));
   N = fft(pn(1:Fs));
 
