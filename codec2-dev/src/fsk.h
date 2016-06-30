@@ -115,6 +115,11 @@ struct FSK * fsk_create_hbr(int Fs, int Rs, int P, int M, int tx_f1, int tx_fs);
 void fsk_set_nsym(struct FSK *fsk,int nsym);
 
 /*
+ * Set the minimum and maximum frequencies at which the freq. estimator can find tones
+ */
+void fsk_set_est_limits(struct FSK *fsk,int fmin, int fmax);
+
+/*
  * Set a MODEM_STATS struct in which to deposit demod statistics
  */
 void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats);

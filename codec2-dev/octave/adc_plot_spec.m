@@ -36,7 +36,7 @@ y = (1:(sampsize/2));
 yp = (1:sampsize/2)*(fs/(sampsize/2));
 pltdat = plot(10*log10(abs(fft(samps)(y))));
 pltx = 10*log10(abs(fft(samps)(y)));
-axis([0 fs 20 90])
+axis([0 fs 30 80])
 set (pltdat, "ydatasource", "pltx"); 
 set (pltdat, "xdatasource", "yp"); 
 %set (pltdat, "ydatasource", "y"); 

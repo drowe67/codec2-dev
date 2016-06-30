@@ -110,8 +110,9 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_700;
     if (!strcmp(argv[1],"700B"))
         mode = FREEDV_MODE_700B;
-    if (!strcmp(argv[1],"2400A"))
+    if (!strcmp(argv[1],"2400A")){
         mode = FREEDV_MODE_2400A;
+	}
     if (!strcmp(argv[1],"2400B"))
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
@@ -131,6 +132,7 @@ int main(int argc, char *argv[]) {
     }
 
     freedv = freedv_open(mode);
+    freedv_set_alt_modem_samp_rate(freedv,96000);
     assert(freedv != NULL);
 
     use_codectx = 0;

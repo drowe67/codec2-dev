@@ -139,7 +139,7 @@ struct freedv *freedv_open(int mode) {
             return NULL;
         f->sz_error_pattern = cohpsk_error_pattern_size();
     }
-    
+#endif  
     if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)){
       
         /* Set up the C2 mode */
@@ -235,7 +235,6 @@ struct freedv *freedv_open(int mode) {
         fsk_setup_modem_stats(f->fsk,&(f->stats));
     }
     
-#endif
 
     f->test_frame_sync_state = 0;
     f->total_bits = 0;
@@ -322,13 +321,13 @@ void freedv_close(struct freedv *freedv) {
 #ifndef CORTEX_M4
     if (freedv->mode == FREEDV_MODE_700)
         cohpsk_destroy(freedv->cohpsk);
-        
+#endif
     if (freedv->mode == FREEDV_MODE_2400A)
         fsk_destroy(freedv->fsk);
     
     if (freedv->mode == FREEDV_MODE_2400B)
         fmfsk_destroy(freedv->fmfsk);
-#endif
+    
     codec2_destroy(freedv->codec2);
     if (freedv->ptFilter8000to7500) {
         quisk_filt_destroy(freedv->ptFilter8000to7500);
@@ -384,7 +383,6 @@ void freedv_close(struct freedv *freedv) {
 /* real-valued short sample output, useful for going straight to DAC */
 
 /* TX routines for 2400 FSK modes, after codec2 encoding */
-#ifndef CORTEX_M4
 static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
@@ -445,10 +443,8 @@ static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
         }
     }
 }
-#endif
 
 /* TX routines for 2400 FSK modes, data channel */
-#ifndef CORTEX_M4
 static void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
     int  i;
     float *tx_float; /* To hold on to modulated samps from fsk/fmfsk */
@@ -477,7 +473,6 @@ static void freedv_tx_fsk_data(struct freedv *f, short mod_out[]) {
         }
     }
 }
-#endif
 
 void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -492,7 +487,6 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
      * to comptx */
      
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
-#ifndef CORTEX_M4
         /* 800XA has two codec frames per modem frame */
         if((f->mode == FREEDV_MODE_800XA)){
             codec2_encode(f->codec2, &f->packed_codec_bits[0], &speech_in[  0]);
@@ -501,7 +495,6 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
             codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
         }
         freedv_tx_fsk_voice(f, mod_out);
-#endif
     }else{
         freedv_comptx(f, tx_fdm, speech_in);
         for(i=0; i<f->n_nom_modem_samples; i++)
@@ -704,6 +697,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         }
 	freedv_comptx_fdmdv_700(f, mod_out);
     }
+#endif
     /* 2400 A and B are handled by the real-mode TX */
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
         freedv_tx(f,tx_real,speech_in);
@@ -713,7 +707,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             mod_out[i].imag = 0;
         }
     }
-#endif
 }
 
 void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_codec_bits) {
@@ -752,16 +745,13 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
 
 void freedv_datatx  (struct freedv *f, short mod_out[]){
     assert(f != NULL);
-    #ifndef CORTEX_M4
     if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B || f->mode == FREEDV_MODE_800XA) {
             freedv_tx_fsk_data(f, mod_out);
     }
-    #endif
 }
 
 int  freedv_data_ntxframes (struct freedv *f){
     assert(f != NULL);
-    #ifndef CORTEX_M4
     if (f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_2400B) {
         if (f->deframer->fdc)
             return freedv_data_get_n_tx_frames(f->deframer->fdc, 8);
@@ -769,7 +759,6 @@ int  freedv_data_ntxframes (struct freedv *f){
         if (f->deframer->fdc)
             return freedv_data_get_n_tx_frames(f->deframer->fdc, 6);
     }
-    #endif
     return 0;
 }
 
@@ -837,8 +826,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     int nin = freedv_nin(f);
     assert(nin <= f->n_max_modem_samples);
     
-    #ifndef CORTEX_M4
-    /* Moved inside of cortex_m4 ifdef to silence unused var warning */
     float rx_float[f->n_max_modem_samples];
     
     /* FSK RX happens in real floats, so convert to those and call their demod here */
@@ -848,7 +835,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         }
         return freedv_floatrx(f,speech_out,rx_float);
     }
-    #endif
+    
     if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)){
         /* FDM RX happens with complex samps, so do that */
         for(i=0; i<nin; i++) {
@@ -862,7 +849,6 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
 
 // float input samples version
-#ifndef CORTEX_M4
 int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
     /* Varicode and protocol bits */
     uint8_t vc_bits[2];
@@ -904,7 +890,6 @@ int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
 
     return f->n_speech_samples;
 }
-#endif
 
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(f != NULL);
@@ -915,7 +900,6 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(nin <= f->n_max_modem_samples);
     
     /* FSK RX happens in real floats, so demod for those goes here */
-    #ifndef CORTEX_M4
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         int valid;
         int nout = freedv_floatrx_fsk(f, demod_in, &valid);
@@ -936,7 +920,7 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         }
         return f->n_speech_samples;
     }
-    #endif
+    
     if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)){
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = demod_in[i];
@@ -1288,14 +1272,13 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
 
     assert(nin <= f->n_max_modem_samples);
     
-#ifndef CORTEX_M4
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
         }
     }
-#endif
+    
     if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)){
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = (float)demod_in[i];
@@ -1309,11 +1292,11 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)) {
         freedv_comprx_fdmdv_700(f, rx_fdm, &valid);
     }
+#endif
     
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         freedv_floatrx_fsk(f, rx_float, &valid);
     }
-#endif
 
     if (valid == 1) {
         int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
@@ -1407,7 +1390,6 @@ void freedv_set_callback_protocol(struct freedv *f, freedv_callback_protorx rx, 
   If the returned size of the datatx callback is zero the data frame is still
   generated, but will contain only a header update.
 \*---------------------------------------------------------------------------*/
-#ifndef CORTEX_M4
 void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state) {
     if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         if (!f->deframer->fdc)
@@ -1419,7 +1401,6 @@ void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, f
         freedv_data_set_cb_tx(f->deframer->fdc, datatx, callback_state);
     }
 }
-#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -1432,7 +1413,6 @@ void freedv_set_callback_data(struct freedv *f, freedv_callback_datarx datarx, f
   The header will also be used for fill packets when a data frame is requested
   without a packet available.
 \*---------------------------------------------------------------------------*/
-#ifndef CORTEX_M4
 void freedv_set_data_header(struct freedv *f, unsigned char *header)
 {
     if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
@@ -1444,7 +1424,6 @@ void freedv_set_data_header(struct freedv *f, unsigned char *header)
         freedv_data_set_header(f->deframer->fdc, header);
     }
 }
-#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -1499,6 +1478,50 @@ void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_erro
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTIONS...: freedv_set_alt_modem_samp_rate
+  AUTHOR......: Brady O'Brien
+  DATE CREATED: 25 June 2016
+
+  Attempt to set the alternative sample rate on the modem side of the api. Only
+   a few alternative sample rates are supported. Please see below.
+   
+   2400A - 48000, 96000
+   2400B - 48000, 96000
+  
+  TODO: Implement 2400B rate changing, allow other rate changing.
+   
+
+\*---------------------------------------------------------------------------*/
+
+int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
+	if(f->mode == FREEDV_MODE_2400A){ 
+		if(samp_rate == 48000 || samp_rate == 96000){
+			fsk_destroy(f->fsk);
+			f->fsk = fsk_create_hbr(samp_rate,1200,10,4,1200,1200);
+        
+			free(f->tx_bits);
+			/* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
+			f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
+        
+			f->n_nom_modem_samples = f->fsk->N;
+			f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
+			f->n_nat_modem_samples = f->fsk->N;
+			f->nin = fsk_nin(f->fsk);
+			f->modem_sample_rate = samp_rate;
+			return 0;
+		}else
+			return -1;
+	}else if(f->mode == FREEDV_MODE_2400B){
+		if(samp_rate == 48000 || samp_rate == 96000){
+			return -1;
+		}else
+			return -1;
+	}
+	return -1;
+}
+
+/*---------------------------------------------------------------------------*\
+
   FUNCTIONS...: freedv_get_*
   AUTHOR......: Jim Ahlstrom
   DATE CREATED: 28 July 2015
@@ -1529,10 +1552,10 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, stats);
-#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B))
         memcpy(stats,&(f->stats),sizeof(struct MODEM_STATS));
     
+#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B))
         cohpsk_get_demod_stats(f->cohpsk, stats);
 #endif
