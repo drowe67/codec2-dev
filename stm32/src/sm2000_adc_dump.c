@@ -67,8 +67,9 @@ int main(void) {
     freq_in_Hz_times_100 = 1070000000ULL - 3200000ULL;
     ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
 
-    dac_open(DAC_FS_96KHZ, 4*DAC_BUF_SZ);
-
+    //dac_open(DAC_FS_96KHZ, 4*DAC_BUF_SZ);
+    adc_open(ADC_FS_96KHZ, 10*ADC_BUF_SZ);
+    
     usb_vcp_init();
 
     while(1) {
@@ -88,18 +89,23 @@ int main(void) {
         /* and assumes enough bytes are available, need to test that
            host is throttled appropriately */
 
-        int n = dac1_free();
+        int n = adc1_samps();
         if (n) {
             uint16_t  s, buf[n];
             uint8_t   b;
+            adc1_read(buf,n);
             for(i=0; i<n; i++) {
+				b = (uint8_t)(buf[i]&0xFF);
+				VCP_put_char(b);
+				b = (uint8_t)((buf[i]>>8)&0xFF);
+				VCP_put_char(b);
                 //VCP_get_char(&b);
-                s = b << 8;
+                //s = b << 8;
                 //VCP_get_char(&b);
-                s += b;
-                buf[i] = s;
+                //s += b;
+                //buf[i] = s;
             }
-            dac1_write((short*)buf, n);
+            //dac1_write((short*)buf, n);
         }
                 
     }
