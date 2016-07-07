@@ -32,7 +32,9 @@
 
 /* divisors for various sample rates */
 
+#define DAC_FS_8KHZ 10500
 #define DAC_FS_16KHZ 5250
+#define DAC_FS_48KHZ 1750
 #define DAC_FS_96KHZ 875
 
 void dac_open(int fs_divisor, int fifo_sz);
