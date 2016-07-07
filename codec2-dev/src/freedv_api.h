@@ -112,6 +112,7 @@ int freedv_get_n_nom_modem_samples	(struct freedv *freedv);
 int freedv_get_total_bits			(struct freedv *freedv);
 int freedv_get_total_bit_errors		(struct freedv *freedv);
 int freedv_get_sync		            (struct freedv *freedv);
+struct FSK * freedv_get_fsk(struct freedv *f);
 struct CODEC2 *freedv_get_codec2	(struct freedv *freedv);
 int freedv_get_n_codec_bits             (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
