@@ -33,6 +33,7 @@
 #include <string.h>
 #include <math.h>
 
+#include <malloc.h>
 
 #include "fsk.h"
 #include "fmfsk.h"
@@ -293,7 +294,8 @@ struct freedv *freedv_open(int mode) {
     f->varicode_bit_index = 0;
     f->freedv_get_next_tx_char = NULL;
     f->freedv_put_next_rx_char = NULL;
-
+	f->freedv_put_next_proto = NULL;
+	f->freedv_get_next_proto = NULL;
     f->total_bit_errors = 0;
 
     return f;
@@ -322,11 +324,15 @@ void freedv_close(struct freedv *freedv) {
     if (freedv->mode == FREEDV_MODE_700)
         cohpsk_destroy(freedv->cohpsk);
 #endif
-    if (freedv->mode == FREEDV_MODE_2400A)
+    if (freedv->mode == FREEDV_MODE_2400A || freedv->mode == FREEDV_MODE_800XA){
         fsk_destroy(freedv->fsk);
+        fvhff_destroy_deframer(freedv->deframer);
+	}
     
-    if (freedv->mode == FREEDV_MODE_2400B)
+    if (freedv->mode == FREEDV_MODE_2400B){
         fmfsk_destroy(freedv->fmfsk);
+		fvhff_destroy_deframer(freedv->deframer);
+    }
     
     codec2_destroy(freedv->codec2);
     if (freedv->ptFilter8000to7500) {
@@ -821,15 +827,14 @@ int freedv_nin(struct freedv *f) {
 
 int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
-    COMP rx_fdm[f->n_max_modem_samples];
     int i;
     int nin = freedv_nin(f);
     assert(nin <= f->n_max_modem_samples);
     
-    float rx_float[f->n_max_modem_samples];
     
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA) ){
+		float rx_float[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
         }
@@ -838,6 +843,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     
     if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)){
         /* FDM RX happens with complex samps, so do that */
+		COMP rx_fdm[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = (float)demod_in[i];
             rx_fdm[i].imag = 0.0;
@@ -893,7 +899,6 @@ int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
 
 int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(f != NULL);
-    COMP rx_fdm[f->n_max_modem_samples];
     int  i;
     int nin = freedv_nin(f);    
     
@@ -906,22 +911,23 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
         if (valid == 0)
             for (i = 0; i < nout; i++)
                 speech_out[i] = 0;
-        else if (valid < 0)
+        else if (valid < 0){
             for (i = 0; i < nout; i++)
-                speech_out[i] = demod_in[i];
-        else {
+                speech_out[i] = demod_in[i];  
+        }else {
             int bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
             int frames = f->n_codec_bits / bits_per_codec_frame;
             for (i = 0; i < frames; i++) {
                 codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-                speech_out += codec2_samples_per_frame(f->codec2);
+                //speech_out += codec2_samples_per_frame(f->codec2);
             }
         }
         return f->n_speech_samples;
     }
     
     if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)){
+		COMP rx_fdm[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = demod_in[i];
             rx_fdm[i].imag = 0;
@@ -1518,6 +1524,10 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 			return -1;
 	}
 	return -1;
+}
+
+struct FSK * freedv_get_fsk(struct freedv *f){
+	return f->fsk;
 }
 
 /*---------------------------------------------------------------------------*\
