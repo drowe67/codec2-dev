@@ -395,8 +395,7 @@ void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats){
  * Set the minimum and maximum frequencies at which the freq. estimator can find tones
  */
 void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
-	int Fs = fsk->Fs;
-	
+    
 	fsk->est_min = est_min;
     if(fsk->est_min<0) fsk->est_min = 0;
     
