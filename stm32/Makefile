@@ -434,6 +434,8 @@ LIBPATHS =
 # Libraries to link
 
 LIBS = -lg -lnosys -lm
+#Uncomment for standard arm semihosting
+#LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 
 # startup file
 
@@ -441,7 +443,7 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin
+all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin sm2000_rxdemo.bin
 
 # Rule for making directories automatically.
 # Note we don't use -p as it's a GNU extension.
