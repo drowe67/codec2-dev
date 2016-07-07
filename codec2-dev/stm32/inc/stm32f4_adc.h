@@ -32,7 +32,9 @@
 
 /* divisors for various sample rates */
 
+#define ADC_FS_8KHZ 10500
 #define ADC_FS_16KHZ 5250
+#define ADC_FS_48KHZ 1750
 #define ADC_FS_96KHZ 875
 
 void adc_open(int fs_divisor, int fifo_sz);
