@@ -377,6 +377,17 @@ void fsk_set_nsym(struct FSK *fsk,int nsyms){
     
 }
 
+
+void fsk_clear_estimators(struct FSK *fsk){
+    int i;
+    /* Clear freq estimator state */
+    for(i=0; i < (fsk->Ndft/2); i++){
+        fsk->fft_est[i] = 0;
+    }
+    /* Reset timing diff correction */
+    fsk->nin = fsk->N;
+}
+
 uint32_t fsk_nin(struct FSK *fsk){
     return (uint32_t)fsk->nin;
 }
