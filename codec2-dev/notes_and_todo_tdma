@@ -1,0 +1,34 @@
+Aug 15, 2016
+
+Random Thoughts and todos for FreeDV FSK TDMA:
+
+Ideas for TDMA layer structure-
+-TDMAModem Struct containing
+    -half-frame 'pilot' modem struct for pilot sync 
+        -Pilot modem used to locate a UW in half frame chunks with a large bit error tolerance
+        -Once a frame is located, TDMA can set up coarse timing for slot modems
+        -Pilot modem would not keep freq est info between half frame chunks
+        -Slot modems would not keep clock offset tracking between frame-length sample chunks, this would be taken care of by coarse timing
+    -modem and deframer struct for each slot in TDMA setup
+        -Deframer would look for most likely frame coarse offset within sample buffer while in 'sync' state
+        -Slot modem deframer will feed frame offset back into main TDMA modem to handle both coarse timing and clock offset
+    -support for N slot setup at configuration
+    -sync state machine:
+        Unsynched - No sync at all
+        Pilot sync - Pilot demod has found UW but slot demods have not locked on
+        Full sync - Any slot has pulled out a UW and is individually in 'sync' state
+    -TX -- Need some way of scheduling TX bursts
+        -Should be fairly hardware-independant
+        -Hardware timer of some sort synched with ADC?
+        -Should ADC keep sampling during TX period or throw away samples? Software option, maybe?
+        
+API Skeleton-
+
+TDMA_init/TDMA_destory - do what you think they do
+    Should TDMA init take a simple mode or a more granular config? Different inits for both?
+    - Probably just a mode to begin with
+TDMA_rx(samples) - Accept some number of samps -- probably variable n samples up to some number
+TDMA_get_frames() - Get frame structs if any frames have been decoded by rx -- only hold up to 1 frame per slot -- could probably be rolled into TDMA_rx
+TDMA_reset_slot(n) - reset the estimators/sync state for any single slot -- useful from a protocol point of view if a master is scheduling slots to multiple clients
+TDMA_sched_tx(slot_n,tx_frame,tx_samps_out,tx_time_out) - Schedule a frame transmission
+    -Difficult part is to actually ensure timing here

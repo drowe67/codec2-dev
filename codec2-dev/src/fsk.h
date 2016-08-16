@@ -119,6 +119,11 @@ void fsk_set_nsym(struct FSK *fsk,int nsym);
  */
 void fsk_set_est_limits(struct FSK *fsk,int fmin, int fmax);
 
+/* 
+ * Clear the estimator states
+ */
+void fsk_clear_estimators(struct FSK *fsk);
+
 /*
  * Set a MODEM_STATS struct in which to deposit demod statistics
  */
