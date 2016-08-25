@@ -120,7 +120,10 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
   float  wd = 2*M_PI*fd/Fs;
   COMP  *rx_bb = fm_states->rx_bb + FILT_MEM;
   COMP   wc_rect, rx_bb_filt, rx_bb_diff;
-  float  rx_dem, acc;
+  float  rx_dem;
+  /*
+  float acc;
+  */
   float *rx_dem_mem = fm_states->rx_dem_mem + FILT_MEM;
   int    nsam = fm_states->nsam;
   float  mag;
@@ -170,8 +173,8 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
       rx_dem *= (1/wd);
       //printf("%f %f\n", rx_bb_diff.real, rx_bb_diff.imag);
       rx_dem_mem[i] = rx_dem;
-      acc = 0;
       /*
+      acc = 0;
         for(k=0; k<FILT_MEM; k++) {
           acc += rx_dem_mem[i-k] * bout[k];
       }

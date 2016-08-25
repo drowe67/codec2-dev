@@ -678,8 +678,11 @@ static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
-    int    i, j;
+    int    i;
+#ifndef CORTEX_M4
+    int    j;	
     int    bits_per_codec_frame;
+#endif
     short  tx_real[f->n_nom_modem_samples];
 
     assert((f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || 
