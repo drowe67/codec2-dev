@@ -56,7 +56,6 @@ int main(int argc, char *argv[])
     int           nin, next_nin;
     COMP          rx_fdm_fcorr[M+M/P];
     COMP          rx_fdm_filter[M+M/P];
-    COMP          rx_baseband[NC+1][M+M/P];
     COMP          rx_filt[NC+1][P+1];
     float         rx_timing;
     float         env[NT*P];
@@ -76,8 +75,8 @@ int main(int argc, char *argv[])
     COMP          S2_log[MPILOTFFT*FRAMES];
     float         foff_coarse_log[FRAMES];
     float         foff_log[FRAMES];
-    COMP          rx_baseband_log[(NC+1)][(M+M/P)*FRAMES];
-    int           rx_baseband_log_col_index;
+    COMP          rx_fdm_filter_log[(M+M/P)*FRAMES];
+    int           rx_fdm_filter_log_index;
     COMP          rx_filt_log[NC+1][(P+1)*FRAMES];
     int           rx_filt_log_col_index;
     float         env_log[NT*P*FRAMES];
@@ -99,7 +98,7 @@ int main(int argc, char *argv[])
     next_nin = M;
     channel_count = 0;
 
-    rx_baseband_log_col_index = 0;
+    rx_fdm_filter_log_index = 0;
     rx_filt_log_col_index = 0;
 
     printf("sizeof FDMDV states: %zd bytes\n", sizeof(struct FDMDV));
@@ -122,7 +121,7 @@ int main(int argc, char *argv[])
 
 	nin = next_nin;
 
-        //nin = M;  // when debugging good idea to uncomment this to "open loop"
+        // nin = M;  // when debugging good idea to uncomment this to "open loop"
 
 	/* add M tx samples to end of buffer */
 
@@ -154,7 +153,7 @@ int main(int argc, char *argv[])
 
 	/* freq offset estimation and correction */
 
-        //fdmdv->sync = 0; // when debugging good idea to uncomment this to "open loop"
+        // fdmdv->sync = 0; // when debugging good idea to uncomment this to "open loop"
 
 	foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm, nin, !fdmdv->sync);
 
@@ -165,6 +164,7 @@ int main(int argc, char *argv[])
 	/* baseband processing */
 
         rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, nin);
+        
         down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq,
                                    fdmdv->freq_pol, nin, M/Q);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, M);
@@ -206,16 +206,12 @@ int main(int argc, char *argv[])
 	memcpy(&S2_log[f*MPILOTFFT], fdmdv->S2, sizeof(COMP)*MPILOTFFT);
  	foff_coarse_log[f] = foff_coarse;
  	foff_log[f] = fdmdv->foff;
-
-	/* rx down conversion */
-
-	for(c=0; c<NC+1; c++) {
-	    for(i=0; i<nin; i++)
-		rx_baseband_log[c][rx_baseband_log_col_index + i] = rx_baseband[c][i];
-	}
-	rx_baseband_log_col_index += nin;
-
+       
 	/* rx filtering */
+
+        for(i=0; i<nin; i++)
+            rx_fdm_filter_log[rx_fdm_filter_log_index + i] = rx_fdm_filter[i];
+        rx_fdm_filter_log_index += nin;
 
 	for(c=0; c<NC+1; c++) {
 	    for(i=0; i<(P*nin)/M; i++)
@@ -269,7 +265,7 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "S2_log_c", S2_log, 1, MPILOTFFT*FRAMES, MPILOTFFT*FRAMES);
     octave_save_float(fout, "foff_log_c", foff_log, 1, FRAMES, FRAMES);
     octave_save_float(fout, "foff_coarse_log_c", foff_coarse_log, 1, FRAMES, FRAMES);
-    octave_save_complex(fout, "rx_baseband_log_c", (COMP*)rx_baseband_log, (FDMDV_NC+1), rx_baseband_log_col_index, (M+M/P)*FRAMES);
+    octave_save_complex(fout, "rx_fdm_filter_log_c", (COMP*)rx_fdm_filter_log, 1, rx_fdm_filter_log_index, rx_fdm_filter_log_index);
     octave_save_complex(fout, "rx_filt_log_c", (COMP*)rx_filt_log, (FDMDV_NC+1), rx_filt_log_col_index, (P+1)*FRAMES);
     octave_save_float(fout, "env_log_c", env_log, 1, NT*P*FRAMES, NT*P*FRAMES);
     octave_save_float(fout, "rx_timing_log_c", rx_timing_log, 1, FRAMES, FRAMES);

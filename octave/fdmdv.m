@@ -191,7 +191,15 @@ function f = fdmdv_init
     % decimation filter
 
     f.Nrxdec = 31;
-    f.rxdec_coeff = fir1(f.Nrxdec-1, 0.25);
+    % fir1() output appears to have changed from when coeffs used in C port were used
+    %f.rxdec_coeff = fir1(f.Nrxdec-1, 0.25);
+    f.rxdec_coeff = [-0.00125472 -0.00204605   -0.0019897  0.000163906  0.00490937 0.00986375  ...
+                      0.0096718  -0.000480351  -0.019311  -0.0361822   -0.0341251  0.000827866 ...
+                      0.0690577   0.152812      0.222115   0.249004     0.222115   0.152812    ...
+                      0.0690577   0.000827866  -0.0341251 -0.0361822   -0.019311  -0.000480351 ...
+                      0.0096718   0.00986375    0.00490937 0.000163906 -0.0019897 -0.00204605  ...
+                      -0.00125472];
+
     f.rxdec_lpf_mem = zeros(1,f.Nrxdec-1+M);
     f.Q=M/4;
 
@@ -199,7 +207,16 @@ function f = fdmdv_init
 
     f.Mpilotfft      = 256;
     f.Npilotcoeff    = 30;                              
-    f.pilot_coeff    = fir1(f.Npilotcoeff-1, 200/(Fs/2))'; % 200Hz LPF
+
+    % here's how to make this filter from scratch, however it appeared to change over different
+    % octave versions so have hard coded to version used for C port
+    %f.pilot_coeff    = fir1(f.Npilotcoeff-1, 200/(Fs/2))'; % 200Hz LPF
+    f.pilot_coeff    = [0.00223001 0.00301037 0.00471258 0.0075934 0.0118145 0.0174153 ...
+                       0.0242969  0.0322204  0.0408199 0.0496286  0.0581172 0.0657392 ...
+                       0.0719806  0.0764066  0.0787022 0.0787022  0.0764066 0.0719806 ...
+                       0.0657392  0.0581172  0.0496286 0.0408199  0.0322204 0.0242969 ...
+                       0.0174153  0.0118145  0.0075934 0.00471258 0.00301037 0.00223001];
+
     f.Npilotbaseband = f.Npilotcoeff + M + M/P;            % number of pilot baseband samples 
     f.Npilotlpf      = 4*M;                                % reqd for pilot LPF
                                                            % number of symbols we DFT pilot over
@@ -529,7 +546,7 @@ function [foff imax pilot_lpf_out S] = lpf_peak_pick(f, pilot_baseband, pilot_lp
   pilot_lpf(1:Npilotlpf-nin) = pilot_lpf(nin+1:Npilotlpf);
   k = Npilotbaseband-nin+1;;
   for i = Npilotlpf-nin+1:Npilotlpf
-    pilot_lpf(i) = pilot_baseband(k-Npilotcoeff+1:k) * pilot_coeff;
+    pilot_lpf(i) = pilot_baseband(k-Npilotcoeff+1:k) * pilot_coeff';
     k++;
   end
   
@@ -566,7 +583,7 @@ endfunction
 % Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
 % sensitive to pilot tone level wrt other carriers
 
-function [foff S1 S2] = rx_est_freq_offset(f, rx_fdm, pilot, pilot_prev, nin, do_fft)
+function [foff S1 S2 f] = rx_est_freq_offset(f, rx_fdm, pilot, pilot_prev, nin, do_fft)
   M = f.M;
   Npilotbaseband = f.Npilotbaseband;
   pilot_baseband1 = f.pilot_baseband1;
@@ -725,6 +742,7 @@ endfunction
 function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(f, prev_rx_symbols, rx_symbols, modulation)
   Nc = f.Nc;
   Nb = f.Nb;
+
   m4_binary_to_gray = [
     bin2dec("00") 
     bin2dec("01")
@@ -902,7 +920,7 @@ endfunction
 % returns nbits from a repeating sequence of random data
 
 function [bits f] = get_test_bits(f, nbits)
- 
+
   for i=1:nbits
     bits(i) = f.test_bits(f.current_test_bit++);
     
