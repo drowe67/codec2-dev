@@ -16,11 +16,14 @@ Ideas for TDMA layer structure-
     -sync state machine:
         Unsynched - No sync at all
         Pilot sync - Pilot demod has found UW but slot demods have not locked on
-        Full sync - Any slot has pulled out a UW and is individually in 'sync' state
+        Full sync - Any slot has pulled out a UW and is individually in 'sync' state\
+        Master - 
     -TX -- Need some way of scheduling TX bursts
         -Should be fairly hardware-independant
         -Hardware timer of some sort synched with ADC?
         -Should ADC keep sampling during TX period or throw away samples? Software option, maybe?
+        -Maybe start a 'sample' timer in hardware synched to what the ADC sample number should be?
+        --reset sample timer on pilot sync 
         
 API Skeleton-
 
@@ -32,3 +35,14 @@ TDMA_get_frames() - Get frame structs if any frames have been decoded by rx -- o
 TDMA_reset_slot(n) - reset the estimators/sync state for any single slot -- useful from a protocol point of view if a master is scheduling slots to multiple clients
 TDMA_sched_tx(slot_n,tx_frame,tx_samps_out,tx_time_out) - Schedule a frame transmission
     -Difficult part is to actually ensure timing here
+    
+Random TODOs:
+[ ] Deframer work:
+  [ ] Framer for shorter frames (minus padding bits)
+  [ ] New deframer for extracting burst frames and keeping slot sync state
+        [ ] Looks +/- a few symbols in a demodulated chunk instead of pulling frames out of a steram
+        [ ] Provides frame location feedback to the TDMA part for coarse sync tracking
+        [ ] Add deframer mode for pilot modem end?
+            -Possibly just expose UW matching and let TDMA handle the rest. Frames will be extracted by slot demods
+        [ ] Add bit extraction code for new UW frame
+
