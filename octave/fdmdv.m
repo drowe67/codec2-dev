@@ -7,15 +7,22 @@
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-
+% TODO:
+%   [ ] refactor with states
+%   [ ] remove commented out globals
+%   [ ] tfdmdv works
+%   [ ] fdmdv_ut works
+ 
 % reqd to make sure we get same random bits at mod and demod
 
 rand('state',1); 
 randn('state',1);
 
+#{
+
 % Constants
 
-if 0
+
 global Fs = 8000;      % sample rate in Hz
 global T  = 1/Fs;      % sample period in seconds
 global Rs;
@@ -59,7 +66,7 @@ global Nrxdec;
        Nrxdec=31;
 global rxdec_coeff;
        rxdec_coeff = fir1(Nrxdec-1, 0.25);
-end
+
 if 0
   % tmp code to plot freq resp.  20dB attn of any aliases should be fine
   % not real sensitive to in-band attn, e.g. outer tones a dB down should be OK
@@ -111,19 +118,138 @@ global m8_binary_to_gray = [
                            ];
 
 % temp logging stuff
+#}
 
 % Functions ----------------------------------------------------
+
+
+function f = fdmdv_init
+    Fs   = f.Fs = 8000;      % sample rate in Hz
+    T    = f.T  = 1/Fs;      % sample period in seconds
+    Rs   = f.Rs = 50;        % symbol rate in Hz
+    Nc   = f.Nc = 14;
+    Nb   = f.Nb = 2;         % Bits/symbol for PSK modulation
+    Rb   = f.Rb = Nc*Rs*Nb;  % bit rate
+    M    = f.M  = Fs/Rs;     % oversampling factor
+    Nsym = f.Nsym  = 6;      % number of symbols to filter over
+
+    Fsep    = f.Fsep = 75;             % Separation between carriers (Hz)
+    Fcenter = f.Fcentre = 1500;        % Centre frequency, Nc/2 carriers below this, 
+                                       % Nc/2 carriers above (Hz)
+    Nt      = f.Nt = 5;                % number of symbols we estimate timing over
+    P       = f.P = 4;                 % oversample factor used for rx symbol filtering
+    Nfilter = f.Nfilter = Nsym*M;
+
+    Nfiltertiming = f.Nfiltertiming = M+Nfilter+M;
+
+    Nsync_mem = f.Nsync_mem = 6;
+    f.sync_uw = [1 -1 1 -1 1 -1];
+
+    alpha = 0.5;
+    f.gt_alpha5_root = gen_rn_coeffs(alpha, T, Rs, Nsym, M);
+
+    f.pilot_bit = 0;                   % current value of pilot bit
+
+    f.tx_filter_memory = zeros(Nc+1, Nfilter);
+    f.rx_filter_memory = zeros(Nc+1, Nfilter);
+    f.rx_fdm_mem = zeros(1,Nfilter+M);
+
+    f.snr_coeff = 0.9;        % SNR est averaging filter coeff
+
+    % phasors used for up and down converters
+
+    f.freq = zeros(Nc+1,1);
+    f.freq_pol = zeros(Nc+1,1);
+
+    for c=1:Nc/2
+      carrier_freq = (-Nc/2 - 1 + c)*Fsep;
+      f.freq_pol(c)   = 2*pi*carrier_freq/Fs;
+      f.freq(c)       = exp(j*f.freq_pol(c));
+    end
+
+    for c=floor(Nc/2)+1:Nc
+      carrier_freq = (-Nc/2 + c)*Fsep;
+      f.freq_pol(c)  = 2*pi*carrier_freq/Fs;
+      f.freq(c)      = exp(j*f.freq_pol(c));
+    end
+
+    f.freq_pol(Nc+1)  = 2*pi*0/Fs;
+    f.freq(Nc+1) = exp(j*f.freq_pol(Nc+1));
+
+    f.fbb_rect = exp(j*2*pi*f.Fcentre/Fs);
+    f.fbb_phase_tx = 1;
+    f.fbb_phase_rx = 1;
+
+    % Spread initial FDM carrier phase out as far as possible.  This
+    % helped PAPR for a few dB.  We don't need to adjust rx phase as DQPSK
+    % takes care of that.
+
+    f.phase_tx = ones(Nc+1,1);
+    f.phase_tx = exp(j*2*pi*(0:Nc)/(Nc+1));
+    f.phase_rx = ones(Nc+1,1);
+
+    % decimation filter
+
+    f.Nrxdec = 31;
+    f.rxdec_coeff = fir1(f.Nrxdec-1, 0.25);
+    f.rxdec_lpf_mem = zeros(1,f.Nrxdec-1+M);
+    f.Q=M/4;
+
+    % freq offset estimation
+
+    f.Mpilotfft      = 256;
+    f.Npilotcoeff    = 30;                              
+    f.pilot_coeff    = fir1(f.Npilotcoeff-1, 200/(Fs/2))'; % 200Hz LPF
+    f.Npilotbaseband = f.Npilotcoeff + M + M/P;            % number of pilot baseband samples 
+    f.Npilotlpf      = 4*M;                                % reqd for pilot LPF
+                                                           % number of symbols we DFT pilot over
+                                                           % pilot est window
+
+    % pilot LUT, used for copy of pilot at rx
+  
+    f.pilot_lut = generate_pilot_lut(f);
+    f.pilot_lut_index = 1;
+    f.prev_pilot_lut_index = 3*M+1;
+
+    % Freq offset estimator states 
+
+    f.pilot_baseband1 = zeros(1, f.Npilotbaseband);        % pilot baseband samples
+    f.pilot_baseband2 = zeros(1, f.Npilotbaseband);        % pilot baseband samples
+    f.pilot_lpf1 = zeros(1, f.Npilotlpf);                  % LPF pilot samples
+    f.pilot_lpf2 = zeros(1, f.Npilotlpf);                  % LPF pilot samples
+
+    % Timing estimator states
+
+    f.rx_filter_mem_timing = zeros(Nc+1, Nt*P);
+    f.rx_baseband_mem_timing = zeros(Nc+1, f.Nfiltertiming);
+
+    % Test bit stream state variables
+
+    f = init_test_bits(f);
+endfunction
 
 
 % generate Nc+1 PSK symbols from vector of (1,Nc*Nb) input bits.  The
 % Nc+1 symbol is the +1 -1 +1 .... BPSK sync carrier
 
-function tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits)
-  global Nc;
-  global Nb;
-  global pilot_bit;
-  global m4_gray_to_binary;
-  global m8_gray_to_binary;
+function [tx_symbols f] = bits_to_psk(f, prev_tx_symbols, tx_bits)
+  Nc = f.Nc; Nb = f.Nb;
+  m4_gray_to_binary = [
+    bin2dec("00") 
+    bin2dec("01")
+    bin2dec("11")
+    bin2dec("10")
+  ];
+  m8_gray_to_binary = [
+    bin2dec("000")
+    bin2dec("001")
+    bin2dec("011")
+    bin2dec("010")
+    bin2dec("111")
+    bin2dec("110")
+    bin2dec("100")
+    bin2dec("101")
+  ];
 
   assert(length(tx_bits) == Nc*Nb, "Incorrect number of bits");
 
@@ -153,15 +279,15 @@ function tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits)
   % +1 -1 +1 -1 BPSK sync carrier, once filtered becomes two spectral
   % lines at +/- Rs/2
  
-  if pilot_bit
+  if f.pilot_bit
      tx_symbols(Nc+1) = -prev_tx_symbols(Nc+1);
   else
      tx_symbols(Nc+1) = prev_tx_symbols(Nc+1);
   end
-  if pilot_bit 
-    pilot_bit = 0;
+  if f.pilot_bit 
+    f.pilot_bit = 0;
   else
-    pilot_bit = 1;
+    f.pilot_bit = 1;
   end
 
 endfunction
@@ -315,7 +441,7 @@ function [rx_fdm_filter fdmdv] = rxdec_filter(fdmdv, rx_fdm, nin)
 
   rx_fdm_filter = zeros(1,nin);
   for i=1:nin
-    rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec_coeff;
+    rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec_coeff';
   end
 
   fdmdv.rxdec_lpf_mem = rxdec_lpf_mem;
@@ -389,21 +515,21 @@ endfunction
 
 % LPF and peak pick part of freq est, put in a function as we call it twice
 
-function [foff imax pilot_lpf_out S] = lpf_peak_pick(pilot_baseband, pilot_lpf, nin, do_fft)
-  global M;
-  global Npilotlpf;
-  global Npilotbaseband;
-  global Npilotcoeff;
-  global Fs;
-  global Mpilotfft;
-  global pilot_coeff;
+function [foff imax pilot_lpf_out S] = lpf_peak_pick(f, pilot_baseband, pilot_lpf, nin, do_fft)
+  M = f.M;
+  Npilotlpf = f.Npilotlpf;
+  Npilotbaseband = f.Npilotbaseband;
+  Npilotcoeff = f.Npilotcoeff;
+  Fs = f.Fs;
+  Mpilotfft = f.Mpilotfft;
+  pilot_coeff = f.pilot_coeff;
 
   % LPF cutoff 200Hz, so we can handle max +/- 200 Hz freq offset
 
   pilot_lpf(1:Npilotlpf-nin) = pilot_lpf(nin+1:Npilotlpf);
   k = Npilotbaseband-nin+1;;
   for i = Npilotlpf-nin+1:Npilotlpf
-    pilot_lpf(i) = pilot_baseband(k-Npilotcoeff+1:k) * pilot_coeff';
+    pilot_lpf(i) = pilot_baseband(k-Npilotcoeff+1:k) * pilot_coeff;
     k++;
   end
   
@@ -440,13 +566,13 @@ endfunction
 % Estimate frequency offset of FDM signal using BPSK pilot.  This is quite
 % sensitive to pilot tone level wrt other carriers
 
-function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin, do_fft)
-  global M;
-  global Npilotbaseband;
-  global pilot_baseband1;
-  global pilot_baseband2;
-  global pilot_lpf1;
-  global pilot_lpf2;
+function [foff S1 S2] = rx_est_freq_offset(f, rx_fdm, pilot, pilot_prev, nin, do_fft)
+  M = f.M;
+  Npilotbaseband = f.Npilotbaseband;
+  pilot_baseband1 = f.pilot_baseband1;
+  pilot_baseband2 = f.pilot_baseband2;
+  pilot_lpf1 = f.pilot_lpf1;
+  pilot_lpf2 = f.pilot_lpf2;
 
   % down convert latest nin samples of pilot by multiplying by ideal
   % BPSK pilot signal we have generated locally.  The peak of the DFT
@@ -461,14 +587,19 @@ function [foff S1 S2] = rx_est_freq_offset(rx_fdm, pilot, pilot_prev, nin, do_ff
     pilot_baseband2(Npilotbaseband-nin+i) = rx_fdm(i) * conj(pilot_prev(i)); 
   end
 
-  [foff1 max1 pilot_lpf1 S1] = lpf_peak_pick(pilot_baseband1, pilot_lpf1, nin, do_fft);
-  [foff2 max2 pilot_lpf2 S2] = lpf_peak_pick(pilot_baseband2, pilot_lpf2, nin, do_fft);
+  [foff1 max1 pilot_lpf1 S1] = lpf_peak_pick(f, pilot_baseband1, pilot_lpf1, nin, do_fft);
+  [foff2 max2 pilot_lpf2 S2] = lpf_peak_pick(f, pilot_baseband2, pilot_lpf2, nin, do_fft);
 
   if max1 > max2
     foff = foff1;
   else
     foff = foff2;
   end  
+
+  f.pilot_baseband1 = pilot_baseband1;
+  f.pilot_baseband2 = pilot_baseband2;
+  f.pilot_lpf1 = pilot_lpf1;
+  f.pilot_lpf2 = pilot_lpf2;
 endfunction
 
 
@@ -541,12 +672,12 @@ endfunction
 % well on HF channels but lets see.  Has a phase ambiguity of m(pi/4)
 % where m=0,1,2 which needs to be corrected outside of this function
 
-function [phase_offsets ferr] = rx_est_phase(rx_symbols)
+function [phase_offsets ferr f] = rx_est_phase(f, rx_symbols)
   global rx_symbols_mem;
   global prev_phase_offsets;
   global phase_amb;
-  global Nph;
-  global Nc;
+  Nph = f.Nph;
+  Nc = f.Nc;
 
   % keep record of Nph symbols
 
@@ -591,11 +722,26 @@ endfunction
 
 % convert symbols back to an array of bits
 
-function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation)
-  global Nc;
-  global Nb;
-  global m4_binary_to_gray;
-  global m8_binary_to_gray;
+function [rx_bits sync_bit f_err phase_difference] = psk_to_bits(f, prev_rx_symbols, rx_symbols, modulation)
+  Nc = f.Nc;
+  Nb = f.Nb;
+  m4_binary_to_gray = [
+    bin2dec("00") 
+    bin2dec("01")
+    bin2dec("11")
+    bin2dec("10")
+  ];
+
+  m8_binary_to_gray = [
+    bin2dec("000")
+    bin2dec("001")
+    bin2dec("011")
+    bin2dec("010")
+    bin2dec("110")
+    bin2dec("111")
+    bin2dec("101")
+    bin2dec("100")
+  ];
 
   m = 2 .^ Nb;
   assert((m == 4) || (m == 8));
@@ -681,9 +827,9 @@ endfunction
 
 % given phase differences update estimates of signal and noise levels
 
-function [sig_est noise_est] = snr_update(sig_est, noise_est, phase_difference)
-    global snr_coeff;
-    global Nc;
+function [sig_est noise_est] = snr_update(f, sig_est, noise_est, phase_difference)
+    snr_coeff = f.snr_coeff;
+    Nc = f.Nc;
 
     % mag of each symbol is distance from origin, this gives us a
     % vector of mags, one for each carrier.
@@ -716,8 +862,8 @@ endfunction
 
 % calculate current sig estimate for eeach carrier
 
-function snr_dB = calc_snr(sig_est, noise_est)
-  global Rs;
+function snr_dB = calc_snr(f, sig_est, noise_est)
+  Rs = f.Rs;
 
   % find total signal power by summing power in all carriers
 
@@ -742,23 +888,26 @@ function snr_dB = calc_snr(sig_est, noise_est)
 endfunction
 
 
+% sets up test bits system.  make sure rand('state', 1) has just beed called
+% so we generate the right test_bits pattern!
+
+function f = init_test_bits(f)
+  f.Ntest_bits  = f.Nc*f.Nb*4;                % length of test sequence
+  f.test_bits = rand(1,f.Ntest_bits) > 0.5;   % test pattern of bits
+  f.current_test_bit = 1;
+  f.rx_test_bits_mem = zeros(1,f.Ntest_bits);
+endfunction
+
+
 % returns nbits from a repeating sequence of random data
 
-function bits = get_test_bits(nbits)
-  global Ntest_bits;       % length of test sequence
-  global current_test_bit; 
-  global test_bits;
+function [bits f] = get_test_bits(f, nbits)
  
   for i=1:nbits
-    bits(i) = test_bits(current_test_bit++);
-    %if (mod(i,2) == 0)
-    %  bits(i) = 1;
-    %else
-    %  bits(i) = 0;
-    %end
+    bits(i) = f.test_bits(f.current_test_bit++);
     
-    if (current_test_bit > Ntest_bits)
-      current_test_bit = 1;
+    if (f.current_test_bit > f.Ntest_bits)
+      f.current_test_bit = 1;
     endif
   end
  
@@ -768,24 +917,24 @@ endfunction
 % Accepts nbits from rx and attempts to sync with test_bits sequence.
 % if sync OK measures bit errors
 
-function [sync bit_errors error_pattern] = put_test_bits(test_bits, rx_bits)
-  global Ntest_bits;       % length of test sequence
-  global rx_test_bits_mem;
+function [sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits)
+  Ntest_bits = f.Ntest_bits;      
+  rx_test_bits_mem = f.rx_test_bits_mem;
 
   % Append to our memory
 
   [m n] = size(rx_bits);
-  rx_test_bits_mem(1:Ntest_bits-n) = rx_test_bits_mem(n+1:Ntest_bits);
-  rx_test_bits_mem(Ntest_bits-n+1:Ntest_bits) = rx_bits;
+  f.rx_test_bits_mem(1:f.Ntest_bits-n) = freedv.rx_test_bits_mem(n+1:f.Ntest_bits);
+  f.rx_test_bits_mem(f.Ntest_bits-n+1:f.Ntest_bits) = rx_bits;
 
   % see how many bit errors we get when checked against test sequence
 
-  error_pattern = xor(test_bits,rx_test_bits_mem);
+  error_pattern = xor(test_bits, f.rx_test_bits_mem);
   bit_errors = sum(error_pattern);
 
   % if less than a thresh we are aligned and in sync with test sequence
 
-  ber = bit_errors/Ntest_bits;
+  ber = bit_errors/f.Ntest_bits;
   
   sync = 0;
   if (ber < 0.2)
@@ -795,10 +944,10 @@ endfunction
 
 % Generate M samples of DBPSK pilot signal for Freq offset estimation
 
-function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(bit, symbol, filter_mem, phase, freq)
-  global M;
-  global Nfilter;
-  global gt_alpha5_root;
+function [pilot_fdm bit symbol filter_mem phase] = generate_pilot_fdm(f, bit, symbol, filter_mem, phase, freq)
+  M = f.M;
+  Nfilter = f.Nfilter;
+  gt_alpha5_root = f.gt_alpha5_root;
 
   % +1 -1 +1 -1 DBPSK sync carrier, once filtered becomes two spectral
   % lines at +/- Rs/2
@@ -837,11 +986,11 @@ endfunction
 % is periodic in 4M samples we can then use this vector as a look up table
 % for pilot signal generation in the demod.
 
-function pilot_lut = generate_pilot_lut()
-  global Nc;
-  global Nfilter;
-  global M;
-  global freq;
+function pilot_lut = generate_pilot_lut(f)
+  Nc = f.Nc;
+  Nfilter = f.Nfilter;
+  M = f.M;
+  freq = f.freq;
 
   % pilot states
 
@@ -856,8 +1005,8 @@ function pilot_lut = generate_pilot_lut()
 
   F=8;
 
-  for f=1:F
-    [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
+  for fr=1:F
+    [pilot pilot_rx_bit pilot_symbol pilot_filter_mem pilot_phase] = generate_pilot_fdm(f, pilot_rx_bit, pilot_symbol, pilot_filter_mem, pilot_phase, pilot_freq);
     %prev_pilot = pilot;
     pilot_lut = [pilot_lut pilot];
   end
@@ -872,9 +1021,9 @@ endfunction
 
 % grab next pilot samples for freq offset estimation at demod
 
-function [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin)
-  global M;
-  global pilot_lut;
+function [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(f, pilot_lut_index, prev_pilot_lut_index, nin)
+  M = f.M;
+  pilot_lut = f.pilot_lut;
 
   for i=1:nin
     pilot(i) = pilot_lut(pilot_lut_index);
@@ -890,46 +1039,6 @@ function [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pil
   end
 endfunction
 
-if 0
-% want to use Octave resample function!
-
-% Change the sample rate by a small amount, for example 1000ppm (ratio
-% = 1.001).  Always returns nout samples in buf_out, but uses a
-% variable number of input samples nin to accomodate the change in
-% sample rate.  nin is nominally set to nout, but may use nout +/- 2
-% samples to accomodate the different sample rates.  buf_in should be
-% of length nout+6 samples to accomodate this, and buf_in should be
-% updated externally based on the nin returned each time. "ratio" is
-% Fs_in/Fs_out, for example 48048/48000 = 1.001 (+1000ppm) or
-% 47952/48000 = 0.999 (-1000ppm).  Uses linear interpolation to
-% perform the resampling.  This requires a highly over-sampled signal,
-% for example 48000Hz sample rate for the modem signal centred on
-% 1kHz, otherwise linear interpolation will have a low pass filter effect
-% (for example an 8000Hz sample rate for modem signal centred on 1kHz
-% would cause problems).
-
-function [buf_out t nin] = resample(buf_in, t, ratio, nout)
-
-  for i=1:nout
-    c = floor(t);
-    a = t - c;
-    b = 1 - a;
-    buf_out(i) = buf_in(c)*b + buf_in(c+1)*a;
-    t += ratio;
-  end
-
-  t -= nout;
-  
-  % adjust nin and t so that on next call we start with 3 < t < 4,
-  % this gives us +/- 2 samples room to move before we hit start or
-  % end of buf_in
-
-  delta = floor(t - 3);
-  nin = nout + delta;
-  t -= delta;
-
-endfunction
-end
 
 % freq offset state machine.  Moves between acquire and track states based
 % on BPSK pilot sequence.  Freq offset estimator occasionally makes mistakes
@@ -937,9 +1046,9 @@ end
 % then switch to a more robust tracking algorithm.  If we lose sync we switch
 % back to acquire mode for fast-requisition.
 
-function [sync reliable_sync_bit state timer sync_mem] = freq_state(sync_bit, state, timer, sync_mem)
-  global Nsync_mem;
-  global sync_uw;
+function [sync reliable_sync_bit state timer sync_mem] = freq_state(f, sync_bit, state, timer, sync_mem)
+  Nsync_mem = f.Nsync_mem;
+  sync_uw = f.sync_uw;
 
   % look for 6 symbol (120ms) 010101 of sync sequence
 
@@ -1055,9 +1164,9 @@ endfunction
 
 % Saves rx decimation filter coeffs to a text file in the form of a C array
 
-function rxdec_file(filename)
-  global rxdec_coeff;
-  global Nrxdec;
+function rxdec_file(fdmdv, filename)
+  rxdec_coeff = fdmdv.rxdec_coeff;
+  Nrxdec = fdmdv.Nrxdec;
 
   f=fopen(filename,"wt");
   fprintf(f,"/* Generated by rxdec_file() Octave function */\n\n");
@@ -1069,9 +1178,10 @@ function rxdec_file(filename)
   fclose(f);
 endfunction
 
-function pilot_coeff_file(filename)
-  global pilot_coeff;
-  global Npilotcoeff;
+
+function pilot_coeff_file(fdmdv, filename)
+  pilot_coeff = fdmdv.pilot_coeff;
+  Npilotcoeff = fdmdv.Npilotcoeff;
 
   f=fopen(filename,"wt");
   fprintf(f,"/* Generated by pilot_coeff_file() Octave function */\n\n");
@@ -1086,8 +1196,8 @@ endfunction
 
 % Saves hanning window coeffs to a text file in the form of a C array
 
-function hanning_file(filename)
-  global Npilotlpf;
+function hanning_file(fdmdv, filename)
+  Npilotlpf = fdmdv.Npilotlpf;
 
   h = hanning(Npilotlpf);
 

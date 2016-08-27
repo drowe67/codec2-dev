@@ -10,14 +10,24 @@
 %
 
 more off
-NumCarriers = 14;
-fdmdv; % load modem code
-autotest;
+format
+
+fdmdv;                 % load modem code
+autotest;              % automatic testing library
+
+
+% init fdmdv modem states and load up a few constants in this scope for convenience
+
+f = fdmdv_init;
+Nc = f.Nc;
+Nb = f.Nb;
+M  = f.M;
+Fs = f.Fs;
+P  = f.P;
+Q  = f.Q;
 
 % Generate reference vectors using Octave implementation of FDMDV modem
 
-global passes;
-global fails;
 passes = fails = 0;
 frames = 35;
 prev_tx_symbols = ones(Nc+1,1); prev_tx_symbols(Nc+1) = 2;
@@ -32,7 +42,7 @@ noise_est = zeros(Nc+1,1);
 sync = 0;
 fest_state = 0;
 fest_timer = 0;
-sync_mem = zeros(1,Nsync_mem);
+sync_mem = zeros(1,f.Nsync_mem);
 
 % Octave outputs we want to collect for comparison to C version
 
@@ -64,21 +74,20 @@ noise_est_log = [];
 
 % adjust this if the screen is getting a bit cluttered
 
-global no_plot_list;
 no_plot_list = [1 2 3 4 5 6 7 8 11 12 13 14 15 16];
 
-for f=1:frames
+for fr=1:frames
 
   % modulator
 
-  tx_bits = get_test_bits(Nc*Nb);
+  [tx_bits f] = get_test_bits(f, Nc*Nb);
   tx_bits_log = [tx_bits_log tx_bits];
-  tx_symbols = bits_to_psk(prev_tx_symbols, tx_bits, 'dqpsk');
+  [tx_symbols f] = bits_to_psk(f, prev_tx_symbols, tx_bits, 'dqpsk');
   prev_tx_symbols = tx_symbols;
   tx_symbols_log = [tx_symbols_log tx_symbols];
-  tx_baseband = tx_filter(tx_symbols);
+  [tx_baseband ] = tx_filter(f, tx_symbols);
   tx_baseband_log = [tx_baseband_log tx_baseband];
-  tx_fdm = fdm_upconvert(tx_baseband);
+  tx_fdm = fdm_upconvert(f, tx_baseband);
   tx_fdm_log = [tx_fdm_log tx_fdm];
 
   % channel
@@ -98,14 +107,14 @@ for f=1:frames
   % shift down to complex baseband
 
   for i=1:nin
-    fbb_phase_rx = fbb_phase_rx*fbb_rect';
-    rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+    f.fbb_phase_rx = f.fbb_phase_rx*f.fbb_rect';
+    rx_fdm(i) = rx_fdm(i)*f.fbb_phase_rx;
   end
-  mag = abs(fbb_phase_rx);
-  fbb_phase_rx /= mag;
+  mag = abs(f.fbb_phase_rx);
+  f.fbb_phase_rx /= mag;
 
-  [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
-  [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin, !sync);
+  [pilot prev_pilot f.pilot_lut_index f.prev_pilot_lut_index] = get_pilot(f, f.pilot_lut_index, f.prev_pilot_lut_index, nin);
+  [foff_coarse S1 S2] = rx_est_freq_offset(f, rx_fdm, pilot, prev_pilot, nin, !sync);
 
   %sync = 0; % when debugging good idea to uncomment this to "open loop"
 
@@ -114,10 +123,10 @@ for f=1:frames
   end
   foff_coarse_log = [foff_coarse_log foff_coarse];
 
-  pilot_baseband1_log = [pilot_baseband1_log pilot_baseband1];
-  pilot_baseband2_log = [pilot_baseband2_log pilot_baseband2];
-  pilot_lpf1_log = [pilot_lpf1_log pilot_lpf1];
-  pilot_lpf2_log = [pilot_lpf2_log pilot_lpf2];
+  pilot_baseband1_log = [pilot_baseband1_log f.pilot_baseband1];
+  pilot_baseband2_log = [pilot_baseband2_log f.pilot_baseband2];
+  pilot_lpf1_log = [pilot_lpf1_log f.pilot_lpf1];
+  pilot_lpf2_log = [pilot_lpf2_log f.pilot_lpf2];
   S1_log  = [S1_log S1];
   S2_log  = [S2_log S2];
 
@@ -128,12 +137,12 @@ for f=1:frames
     rx_fdm_fcorr(i) = rx_fdm(i)*foff_phase_rect;
   end
 
-  rx_fdm_filter = rxdec_filter(rx_fdm_fcorr, nin);
-  rx_filt = down_convert_and_rx_filter(rx_fdm_filter, nin, M/Q);
+  [rx_fdm_filter f] = rxdec_filter(f, rx_fdm_fcorr, nin);
+  [rx_filt f] = down_convert_and_rx_filter(f, rx_fdm_filter, nin, M/Q);
 
   rx_filt_log = [rx_filt_log rx_filt];
 
-  [rx_symbols rx_timing env] = rx_est_timing(rx_filt, nin);
+  [rx_symbols rx_timing env f] = rx_est_timing(f, rx_filt, nin);
   env_log = [env_log env];
   rx_timing_log = [rx_timing_log rx_timing];
   rx_symbols_log = [rx_symbols_log rx_symbols];
@@ -147,14 +156,14 @@ for f=1:frames
   end
   nin_log = [nin_log nin];
 
-  [rx_bits sync_bit foff_fine pd] = psk_to_bits(prev_rx_symbols, rx_symbols, 'dqpsk');
+  [rx_bits sync_bit foff_fine pd] = psk_to_bits(f, prev_rx_symbols, rx_symbols, 'dqpsk');
   phase_difference_log = [phase_difference_log pd];
 
   foff_fine_log = [foff_fine_log foff_fine];
   foff -= 0.5*foff_fine;
   foff_log = [foff_log foff];
 
-  [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
+  [sig_est noise_est] = snr_update(f, sig_est, noise_est, pd);
   sig_est_log = [sig_est_log sig_est];
   noise_est_log = [noise_est_log noise_est];
 
@@ -164,13 +173,13 @@ for f=1:frames
 
   % freq est state machine
 
-  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+  [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(f, sync_bit, fest_state, fest_timer, sync_mem);
   sync_log = [sync_log sync];
 end
 
 % Compare to the output from the C version
 
-load ../unittest/tfdmdv_out.txt
+load ../build_src/unittest/tfdmdv_out.txt
 
 
 % ---------------------------------------------------------------------------------------
