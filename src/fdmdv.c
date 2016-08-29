@@ -676,6 +676,12 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 	if (f >= 4)
 	    memcpy(&pilot_lut[M*(f-4)], pilot, M*sizeof(COMP));
     }
+   
+    // create complex conjugate since we need this and only this later on 
+
+    for (f=0;f<4*M;f++) {
+        pilot_lut[f] = cconj(pilot_lut[f]);
+    }
 
 }
 
@@ -806,10 +812,18 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 	f->pilot_baseband2[i] = f->pilot_baseband2[i+nin];
     }
 
+#ifndef ARM_MATH_CM4
     for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
-       	f->pilot_baseband1[j] = cmult(rx_fdm[i], cconj(pilot[i]));
-	f->pilot_baseband2[j] = cmult(rx_fdm[i], cconj(prev_pilot[i]));
+       	f->pilot_baseband1[j] = cmult(rx_fdm[i], pilot[i]);
+	f->pilot_baseband2[j] = cmult(rx_fdm[i], prev_pilot[i]);
     }
+#else
+    // TODO: Maybe a handwritten mult taking advantage of rx_fdm[0] being 
+    // used twice would be faster but this is for sure faster than 
+    // the implementation above in any case.
+    arm_cmplx_mult_cmplx_f32(&rx_fdm[0].real,&pilot[0].real,&f->pilot_baseband1[NPILOTBASEBAND-nin].real,nin);
+    arm_cmplx_mult_cmplx_f32(&rx_fdm[0].real,&prev_pilot[0].real,&f->pilot_baseband2[NPILOTBASEBAND-nin].real,nin);
+#endif
 
     lpf_peak_pick(&foff1, &max1, f->pilot_baseband1, f->pilot_lpf1, f->fft_pilot_cfg, f->S1, nin, do_fft);
     lpf_peak_pick(&foff2, &max2, f->pilot_baseband2, f->pilot_lpf2, f->fft_pilot_cfg, f->S2, nin, do_fft);
@@ -970,28 +984,44 @@ void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int
     }
 }
 
-
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: fir_filter()
-  AUTHOR......: David Rowe
-  DATE CREATED: July 2014
+  FUNCTION....: fir_filter2()
+  AUTHOR......: Danilo Beuche
+  DATE CREATED: Auhust 2016
 
-  Helper fir filter function.
+  Ths version submitted by Danilo for the STM32F4 platform.  The idea
+  is to avoid reading the same value from the STM32F4 "slow" flash
+  twice. 2-4ms of savings per frame were measured by Danilo and the mcHF
+  team.
 
 \*---------------------------------------------------------------------------*/
 
-static float fir_filter(float mem[], float coeff[], int dec_rate) {
-    float acc = 0.0;
-    int   m;
+static void fir_filter2(float acc[2], float mem[], float coeff[], const unsigned int dec_rate) {
+    acc[0] = 0.0;
+    acc[1] = 0.0;
+
+    float c,m1,m2,a1,a2;
+    float* inpCmplx = &mem[0];
+    float* coeffPtr = &coeff[0];
+
+    int m;
 
     for(m=0; m<NFILTER; m+=dec_rate) {
-        acc += coeff[m] * mem[2*m];
+        c = *coeffPtr;
+        m1 = inpCmplx[0];
+        m2 = inpCmplx[1];
+        a1 = c * m1;
+        a2 = c * m2;
+        acc[0] += a1;
+        inpCmplx+= dec_rate*2;
+        acc[1] += a2;
+        coeffPtr+= dec_rate;
     }
 
-    return dec_rate*acc;
+    acc[0] *= dec_rate;
+    acc[1] *= dec_rate;
 }
-
 
 /*---------------------------------------------------------------------------*\
 
@@ -1082,8 +1112,9 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
            for(m=0; m<NFILTER; m++)
                rx_filt[c][k] = cadd(rx_filt[c][k], fcmult(gt_alpha5_root[m], rx_baseband[st+i+m]));
            #else
-           rx_filt[c][k].real = fir_filter(&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
-           rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
+           // rx_filt[c][k].real = fir_filter(&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
+           // rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
+	        fir_filter2(&rx_filt[c][k].real,&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
            #endif
         }
         //PROFILE_SAMPLE_AND_LOG2(filter_start, "        filter");
