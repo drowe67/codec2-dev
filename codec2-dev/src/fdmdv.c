@@ -37,6 +37,13 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef ARM_MATH_CM4
+  #include "stm32f4xx.h"
+  #include "core_cm4.h"
+  #include "arm_math.h"
+#endif
+
+
 #include "fdmdv_internal.h"
 #include "codec2_fdmdv.h"
 #include "comp_prim.h"
@@ -50,10 +57,20 @@
 #include "machdep.h"
 
 static int sync_uw[] = {1,-1,1,-1,1,-1};
-
 #ifdef __EMBEDDED__
 #define printf gdb_stdio_printf
 #endif
+
+#ifndef ARM_MATH_CM4
+  #define SINF(a) sinf(a)
+  #define COSF(a) cosf(a)
+#else
+  #define SINF(a) arm_sin_f32(a)
+  #define COSF(a) arm_cos_f32(a)
+#endif
+
+static const COMP  pi_on_4 = { .70710678118654752439, .70710678118654752439 }; // COSF(PI/4) , SINF(PI/4)
+
 
 /*--------------------------------------------------------------------------* \
 
@@ -110,8 +127,8 @@ struct FDMDV * fdmdv_create(int Nc)
            This helped PAPR for a few dB.  We don't need to adjust rx
            phase as DQPSK takes care of that. */
 
-	f->phase_tx[c].real = cosf(2.0*PI*c/(Nc+1));
- 	f->phase_tx[c].imag = sinf(2.0*PI*c/(Nc+1));
+	f->phase_tx[c].real = COSF(2.0*PI*c/(Nc+1));
+ 	f->phase_tx[c].imag = SINF(2.0*PI*c/(Nc+1));
 
 	f->phase_rx[c].real = 1.0;
  	f->phase_rx[c].imag = 0.0;
@@ -124,12 +141,12 @@ struct FDMDV * fdmdv_create(int Nc)
     f->prev_tx_symbols[Nc].real = 2.0;
 
     fdmdv_set_fsep(f, FSEP);
-    f->freq[Nc].real = cosf(2.0*PI*0.0/FS);
-    f->freq[Nc].imag = sinf(2.0*PI*0.0/FS);
+    f->freq[Nc].real = COSF(2.0*PI*0.0/FS);
+    f->freq[Nc].imag = SINF(2.0*PI*0.0/FS);
     f->freq_pol[Nc]  = 2.0*PI*0.0/FS;
 
-    f->fbb_rect.real     = cosf(2.0*PI*FDMDV_FCENTRE/FS);
-    f->fbb_rect.imag     = sinf(2.0*PI*FDMDV_FCENTRE/FS);
+    f->fbb_rect.real     = COSF(2.0*PI*FDMDV_FCENTRE/FS);
+    f->fbb_rect.imag     = SINF(2.0*PI*FDMDV_FCENTRE/FS);
     f->fbb_pol           = 2.0*PI*FDMDV_FCENTRE/FS;
     f->fbb_phase_tx.real = 1.0;
     f->fbb_phase_tx.imag = 0.0;
@@ -257,15 +274,15 @@ void fdmdv_set_fsep(struct FDMDV *f, float fsep) {
 
     for(c=0; c<f->Nc/2; c++) {
 	carrier_freq = (-f->Nc/2 + c)*f->fsep;
-	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = COSF(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = SINF(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 
     for(c=f->Nc/2; c<f->Nc; c++) {
 	carrier_freq = (-f->Nc/2 + c + 1)*f->fsep;
-	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = COSF(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = SINF(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 }
@@ -678,8 +695,8 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
     }
    
     // create complex conjugate since we need this and only this later on 
-
-    for (f=0;f<4*M;f++) {
+    for (f=0;f<4*M;f++)
+    {
         pilot_lut[f] = cconj(pilot_lut[f]);
     }
 
@@ -777,7 +794,10 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 
 float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 {
-    int  i,j;
+    int  i;
+#ifndef ARM_MATH_CM4
+    int j;
+#endif
     COMP pilot[M+M/P];
     COMP prev_pilot[M+M/P];
     float foff, foff1, foff2;
@@ -854,8 +874,8 @@ void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
     float mag;
     int   i;
 
-    foff_rect.real = cosf(2.0*PI*foff/FS);
-    foff_rect.imag = sinf(2.0*PI*foff/FS);
+    foff_rect.real = COSF(2.0*PI*foff/FS);
+    foff_rect.imag = SINF(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
@@ -1079,8 +1099,8 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
 
         //PROFILE_SAMPLE(windback_start);
         windback_phase           = -freq_pol[c]*NFILTER;
-        windback_phase_rect.real = cosf(windback_phase);
-        windback_phase_rect.imag = sinf(windback_phase);
+        windback_phase_rect.real = COSF(windback_phase);
+        windback_phase_rect.imag = SINF(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
         //PROFILE_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback");
 
@@ -1112,9 +1132,9 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
            for(m=0; m<NFILTER; m++)
                rx_filt[c][k] = cadd(rx_filt[c][k], fcmult(gt_alpha5_root[m], rx_baseband[st+i+m]));
            #else
-           // rx_filt[c][k].real = fir_filter(&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
-           // rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
-	        fir_filter2(&rx_filt[c][k].real,&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
+            // rx_filt[c][k].real = fir_filter(&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
+            // rx_filt[c][k].imag = fir_filter(&rx_baseband[st+i].imag, (float*)gt_alpha5_root, dec_rate);
+	    fir_filter2(&rx_filt[c][k].real,&rx_baseband[st+i].real, (float*)gt_alpha5_root, dec_rate);
            #endif
         }
         //PROFILE_SAMPLE_AND_LOG2(filter_start, "        filter");
@@ -1186,8 +1206,8 @@ float rx_est_timing(COMP rx_symbols[],
        out single DFT at frequency 2*pi/P */
 
     x.real = 0.0; x.imag = 0.0;
-    freq.real = cosf(2*PI/P);
-    freq.imag = sinf(2*PI/P);
+    freq.real = COSF(2*PI/P);
+    freq.imag = SINF(2*PI/P);
     phase.real = 1.0;
     phase.imag = 0.0;
 
@@ -1244,13 +1264,10 @@ float qpsk_to_bits(int rx_bits[], int *sync_bit, int Nc, COMP phase_difference[]
                    COMP rx_symbols[], int old_qpsk_mapping)
 {
     int   c;
-    COMP  pi_on_4;
     COMP  d;
     int   msb=0, lsb=0;
     float ferr, norm;
 
-    pi_on_4.real = cosf(PI/4.0);
-    pi_on_4.imag = sinf(PI/4.0);
 
     /* Extra 45 degree clockwise lets us use real and imag axis as
        decision boundaries. "norm" makes sure the phase subtraction
@@ -1327,11 +1344,8 @@ void snr_update(float sig_est[], float noise_est[], int Nc, COMP phase_differenc
     float s[NC+1];
     COMP  refl_symbols[NC+1];
     float n[NC+1];
-    COMP  pi_on_4;
     int   c;
 
-    pi_on_4.real = cosf(PI/4.0);
-    pi_on_4.imag = sinf(PI/4.0);
 
     /* mag of each symbol is distance from origin, this gives us a
        vector of mags, one for each carrier. */
