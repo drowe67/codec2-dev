@@ -39,7 +39,9 @@
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef PI
 #define PI             3.141592654
+#endif
 #define FS                    8000  /* sample rate in Hz                                                    */
 #define T                 (1.0/FS)  /* sample period in seconds                                             */
 #define RS                      50  /* symbol rate in Hz                                                    */

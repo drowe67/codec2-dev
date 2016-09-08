@@ -35,6 +35,7 @@
 #ifndef __FREEDV__
 
 // This declares a single-precision (float) complex number
+#include <sys/types.h>
 #include "comp.h"
 
 #define FREEDV_MODE_1600        0
