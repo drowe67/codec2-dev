@@ -39,8 +39,9 @@
 #include "freedv_data_channel.h"
 
 /* Standard frame type */
-#define FREEDV_VHF_FRAME_A 1
-#define FREEDV_HF_FRAME_B 2
+#define FREEDV_VHF_FRAME_A 1    /* 2400A/B Frame */
+#define FREEDV_HF_FRAME_B 2     /* 800XA Frame */
+#define FREEDV_VHF_FRAME_AT 3   /* 4800T Frame */
 
 struct freedv_vhf_deframer {
     int ftype;          /* Type of frame to be looking for */

@@ -543,7 +543,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     #endif
 }
 
-void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
+void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[]){
     int N = fsk->N;
     int Ts = fsk->Ts;
     int Rs = fsk->Rs;
@@ -768,8 +768,15 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
         /* Figure mag^2 of each resampled fx_int */
         tmax[0] = (t1.real*t1.real) + (t1.imag*t1.imag);
         tmax[1] = (t2.real*t2.real) + (t2.imag*t2.imag);
-        rx_bits[i] = (tmax[1]>tmax[0])?1:0;
         
+        /* Get the actual bit */
+        if(rx_bits != NULL){
+            rx_bits[i] = (tmax[1]>tmax[0])?1:0;
+        }
+        /* Produce soft decision symbols */
+        if(rx_sd != NULL){
+            rx_sd[i] = sqrtf(tmax[1]) - sqrtf(tmax[0]);
+        }
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
@@ -1279,7 +1286,16 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 	if(fsk->mode == 4){
 		fsk4_demod(fsk,rx_bits,fsk_in);
 	}else{
-		fsk2_demod(fsk,rx_bits,fsk_in);
+		fsk2_demod(fsk,rx_bits,NULL,fsk_in);
+	}
+}
+
+void fsk_demod_sd(struct FSK *fsk, float rx_sd[],float fsk_in[]){
+	if(fsk->mode == 4){
+		//TODO: Add 4FSK soft decision
+        //fsk4_demod(fsk,rx_bits,fsk_in);
+	}else{
+		fsk2_demod(fsk,NULL,rx_sd,fsk_in);
 	}
 }
 

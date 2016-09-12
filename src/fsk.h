@@ -165,6 +165,14 @@ uint32_t fsk_nin(struct FSK *fsk);
  */
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],float fsk_in[]);
 
-
+/*
+ * Demodulate some number of FSK samples. The number of samples to be 
+ *  demodulated can be found by calling fsk_nin().
+ * 
+ * struct FSK *fsk - FSK config/state struct, set up by fsk_create
+ * float rx_bits[] - Buffer for Nbits soft decision bits to be written
+ * float fsk_in[] - nin samples of modualted FSK
+ */
+void fsk_demod_sd(struct FSK *fsk, float rx_bits[],float fsk_in[]);
 
 #endif
