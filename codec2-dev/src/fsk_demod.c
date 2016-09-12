@@ -43,12 +43,14 @@ int main(int argc,char *argv[]){
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
-    float *modbuf;
+    float *modbuf,*sdbuf;
     int i,j;
+    int soft_dec_mode = 0;
     stats_loop = 0;
     
+    
     if(argc<7){
-        fprintf(stderr,"usage: %s Mode P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
+        fprintf(stderr,"usage: %s (2|4|2X|4X|2XS) P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
         exit(1);
     }
     
@@ -59,33 +61,37 @@ int main(int argc,char *argv[]){
     
     /* Open files */
     if(strcmp(argv[5],"-")==0){
-	fin = stdin;
+        fin = stdin;
     }else{
-	fin = fopen(argv[5],"r");
+        fin = fopen(argv[5],"r");
     }
-	
+    
     if(strcmp(argv[6],"-")==0){
-	fout = stdout;
+        fout = stdout;
     }else{
-	fout = fopen(argv[6],"w");
+        fout = fopen(argv[6],"w");
     }
 
     /* Handle high-bit-rate special cases */
     if(strcmp(argv[1],"2X")==0){
-	M = 2;
-	hbr = 1;
+        M = 2;
+        hbr = 1;
+    }else if(strcmp(argv[1],"2XS")==0){
+        M = 2;
+        hbr = 1;
+        soft_dec_mode = 1;
     }else if(strcmp(argv[1],"4X")==0){
-	M = 4;
-	hbr = 1;
+        M = 4;
+        hbr = 1;
     }else {
-	M = atoi(argv[1]);
+        M = atoi(argv[1]);
     }
-	
+    
     /* set up FSK */
     if(!hbr)
-	fsk = fsk_create(Fs,Rs,M,1200,400);
+    fsk = fsk_create(Fs,Rs,M,1200,400);
     else
-	fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+    fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
@@ -94,60 +100,76 @@ int main(int argc,char *argv[]){
     
     /* Check for and enable stat printing */
     if(argc>7){
-	if(strcmp(argv[7],"S")==0){
-	    enable_stats = 1;
-	    fsk_setup_modem_stats(fsk,&stats);
-	    loop_time = ((float)fsk_nin(fsk))/((float)Fs);
-	    stats_loop = (int)(.125/loop_time);
-	    stats_ctr = 0;
-	}
+        if(strcmp(argv[7],"S")==0){
+            enable_stats = 1;
+            fsk_setup_modem_stats(fsk,&stats);
+            loop_time = ((float)fsk_nin(fsk))/((float)Fs);
+            stats_loop = (int)(.125/loop_time);
+            stats_ctr = 0;
+        }
     }
     
     /* allocate buffers for processing */
-    bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+    if(soft_dec_mode){
+        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits);
+    }else{
+        bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+    }
     rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
     modbuf = (float*)malloc(sizeof(float)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
     while( fread(rawbuf,sizeof(int16_t),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-	for(i=0;i<fsk_nin(fsk);i++){
-	    modbuf[i] = ((float)rawbuf[i])/FDMDV_SCALE;
-	}
-        fsk_demod(fsk,bitbuf,modbuf);
-	
-	if(enable_stats && stats_ctr <= 0){
-	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
-	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
-	    if(fsk->mode == 4){
-		fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
-	    }
-	    fprintf(stderr,",\t\"eye_diagram\":[");
-	    for(i=0;i<stats.neyetr;i++){
-		fprintf(stderr,"[");
-		for(j=0;j<stats.neyesamp;j++){
-		    fprintf(stderr,"%f",stats.rx_eye[i][j]);
-		    if(j<stats.neyesamp-1) fprintf(stderr,",");
-		}
-		fprintf(stderr,"]");
-		if(i<stats.neyetr-1) fprintf(stderr,",");
-	    }
-	    
-	    fprintf(stderr,"]}\n");
-	    stats_ctr = stats_loop;
-	}
-	stats_ctr--;
-        /*for(i=0;i<fsk->Nbits;i++){
-	    t = (int)bitbuf[i];
-	}*/
-        fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
+        for(i=0;i<fsk_nin(fsk);i++){
+            modbuf[i] = ((float)rawbuf[i])/FDMDV_SCALE;
+        }
+        if(soft_dec_mode){
+            fsk_demod_sd(fsk,sdbuf,modbuf);
+        }else{
+            fsk_demod(fsk,bitbuf,modbuf);
+        }
         
-        if(fin == stdin || fout == stdin){
-	    fflush(fin);
-	    fflush(fout);
-	}
+        if(enable_stats && stats_ctr <= 0){
+            fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
+            fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
+            if(fsk->mode == 4){
+                fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
+            }
+            fprintf(stderr,",\t\"eye_diagram\":[");
+            for(i=0;i<stats.neyetr;i++){
+                fprintf(stderr,"[");
+                for(j=0;j<stats.neyesamp;j++){
+                    fprintf(stderr,"%f",stats.rx_eye[i][j]);
+                    if(j<stats.neyesamp-1) fprintf(stderr,",");
+                }
+                fprintf(stderr,"]");
+                if(i<stats.neyetr-1) fprintf(stderr,",");
+            }
+            
+            fprintf(stderr,"]}\n");
+            stats_ctr = stats_loop;
+        }
+        stats_ctr--;
+            /*for(i=0;i<fsk->Nbits;i++){
+            t = (int)bitbuf[i];
+        }*/
+        if(soft_dec_mode){
+            fwrite(sdbuf,sizeof(float),fsk->Nbits,fout);
+        }else{
+            fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
+        }
+            if(fin == stdin || fout == stdin){
+            fflush(fin);
+            fflush(fout);
+        }
     }
     
-    free(bitbuf);
+    if(soft_dec_mode){
+        free(sdbuf);
+    }else{
+        free(bitbuf);
+    }
+    
     free(rawbuf);
     free(modbuf);
     
