@@ -9,7 +9,7 @@
 % decode_from_file() below, and can optionally generate include file for
 % C version of decoder.
 
-function data = simple_ut(c_include_file)
+function [data code_param] = simple_ut(c_include_file)
   load('H2064_516_sparse.mat');
   HRA = full(HRA);  
   max_iterations = 100;
@@ -37,8 +37,7 @@ function data = simple_ut(c_include_file)
   error_positions = xor(detected_data(1:code_param.data_bits_per_frame), data);
   Nerrs = sum(error_positions);
 
-  printf("  Nerrs = %d\n", Nerrs);
-
+  printf("Nerrs = %d\n", Nerrs);
 end
 
 
@@ -107,6 +106,52 @@ function plot_curve
 end
 
 
+% Test C encoder
+
+function test_c_encoder
+  load('H2064_516_sparse.mat');
+  HRA = full(HRA);  
+  max_iterations = 100;
+  decoder_type = 0;
+  EsNodB = 3;
+  mod_order = 2;
+  frames = 100;
+
+  EsNo = 10^(EsNodB/10);
+  variance = 1/(2*EsNo);
+
+  code_param = ldpc_init(HRA, mod_order);
+
+  data = round(rand(1,frames*code_param.data_bits_per_frame));
+  f = fopen("data.bin","wt"); fwrite(f, data, "uint8"); fclose(f);
+
+  % Outboard C encoder
+
+  system("../src/ldpc_enc data.bin codewords.bin"); 
+
+  % Test with Octave decoder
+
+  f = fopen("codewords.bin","rb"); codewords = fread(f, "uint8")'; fclose(f);
+  
+  Nerrs = 0;
+  for i=1:frames
+    st = (i-1)*code_param.symbols_per_frame+1; en = st+code_param.symbols_per_frame-1;
+    tx = 1 - 2 * codewords(st:en);   
+
+    noise = sqrt(variance)*randn(1,code_param.symbols_per_frame); 
+    rx = tx + noise;
+
+    [detected_data Niters] = ldpc_decode(rx, code_param, max_iterations, decoder_type);
+
+    st = (i-1)*code_param.data_bits_per_frame+1; en = st+code_param.data_bits_per_frame-1;
+    error_positions = xor(detected_data(1:code_param.data_bits_per_frame), data(st:en));
+    Nerrs += sum(error_positions);
+  end
+
+  printf("Nerrs = %d\n", Nerrs);
+end
+
+
 % Start simulation --------------------------------------------------------
 
 more off;
@@ -138,9 +183,9 @@ ldpc_fsk_lib;
 randn('state',1);
 rand('state',1);
 
-% binary flags to run various demos, e.g. "15" runs them all
+% binary flags to run various demos, e.g. "15" to run 1 .. 8
 
-demos = 2;
+demos = 32;
 
 if bitand(demos,1)
   printf("simple_ut....\n");
@@ -154,6 +199,7 @@ end
 
 if bitand(demos,4)
   printf("decode_from_file ......\n");
+  data = simple_ut;
   detected_data = decode_from_file("codeword.bin");
   error_positions = xor( detected_data(1:length(data)), data );
   Nerrs = sum(error_positions);
@@ -165,3 +211,26 @@ if bitand(demos,8)
   plot_curve;
 end
 
+if bitand(demos,16)
+
+  % generate test data and save to disk
+
+  [data code_param] = simple_ut;
+  f = fopen("dat_in2064.bin","wb"); fwrite(f, data, "uint8"); fclose(f);
+
+  % Outboard C encoder
+
+  system("../src/ldpc_enc dat_in2064.bin dat_op2064.bin"); 
+
+  % Test with Octave decoder
+
+  detected_data = decode_from_file("dat_op2064.bin");
+  error_positions = xor(detected_data(1:length(data)), data);
+  Nerrs = sum(error_positions);
+  printf("Nerrs = %d\n", Nerrs);
+end
+
+
+if bitand(demos,32)
+  test_c_encoder;
+end
