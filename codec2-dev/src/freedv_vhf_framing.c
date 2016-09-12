@@ -63,6 +63,20 @@ static const uint8_t A_blank[] =   {1,0,1,0,0,1,1,1, /* Padding[0:3] Proto[0:3] 
                                     0,0,0,0,0,0,0,0, /* Voice[40:47]              */
                                     0,0,0,0,0,0,1,0, /* Voice[48:51] Proto[12:15] */
                                     0,1,1,1,0,0,1,0};/* Proto[16:19] Padding[4:7] */
+                    
+/* Blank VHF type AT (A for TDMA; padding bits not transmitted) frame */
+static const uint8_t AT_blank[] =  {        0,1,1,1, /*              Proto[0:3]   */
+                                    1,0,1,0,0,1,1,1, /* Proto[4:11]               */
+                                    0,0,0,0,0,0,0,0, /* Voice[0:7]                */
+                                    0,0,0,0,0,0,0,0, /* Voice[8:15]               */
+                                    0,0,0,0,0,0,0,0, /* Voice[16:23]              */
+                                    0,1,1,0,0,1,1,1, /* UW[0:7]                   */
+                                    1,0,1,0,1,1,0,1, /* UW[8:15]                  */
+                                    0,0,0,0,0,0,0,0, /* Voice[24:31]              */
+                                    0,0,0,0,0,0,0,0, /* Voice[32:39]              */
+                                    0,0,0,0,0,0,0,0, /* Voice[40:47]              */
+                                    0,0,0,0,0,0,1,0, /* Voice[48:51] Proto[12:15] */
+                                    0,1,1,1        };/* Proto[16:19]              */
 
 /* HF Type B voice UW */
 static const uint8_t B_uw_v[] =    {0,1,1,0,0,1,1,1};
@@ -156,6 +170,43 @@ void fvhff_frame_bits(  int frame_type,
             bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in2,ibit);
             ibit++;
         }
+    }else if(frame_type == FREEDV_VHF_FRAME_AT){
+        /* Fill out frame with blank frame prototype */
+        for(i=0; i<88; i++)
+            bits_out[i] = AT_blank[i];
+        
+        /* Fill in protocol bits, if present */
+        if(proto_in!=NULL){
+            ibit = 0;
+            /* First half of protocol bits */
+            /* Extract and place in frame, MSB first */
+            for(i=0 ; i<12; i++){
+                bits_out[i] = UNPACK_BIT_MSBFIRST(proto_in,ibit);
+                ibit++;
+            }
+            /* Last set of protocol bits */
+            for(i=80; i<88; i++){
+                bits_out[i] = UNPACK_BIT_MSBFIRST(proto_in,ibit);
+                ibit++;
+            }
+        }
+        
+        /* Fill in varicode bits, if present */
+        if(vc_in!=NULL){
+            bits_out[86] = vc_in[0];
+            bits_out[87] = vc_in[1];
+        }
+        
+        /* Fill in codec2 bits, present or not */
+        ibit = 0;
+        for(i=12; i<36; i++){   /* First half */
+            bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in,ibit);
+            ibit++;
+        }
+        for(i=52; i<80; i++){   /* Second half */
+            bits_out[i] = UNPACK_BIT_MSBFIRST(codec2_in,ibit);
+            ibit++;
+        }
     }
 }
 
@@ -168,7 +219,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
         int end_bits;
         int from_bit;
         int bcast_bit;
-	int crc_bit;
+        int crc_bit;
 
         /* Fill out frame with blank frame prototype */
         for(i=0; i<4; i++)
@@ -208,7 +259,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
         int end_bits;
         int from_bit;
         int bcast_bit;
-	int crc_bit;
+        int crc_bit;
 
         /* Fill out frame with blank prototype */
         for(i=0; i<64; i++)
@@ -219,7 +270,7 @@ void fvhff_frame_data_bits(struct freedv_vhf_deframer * def, int frame_type,
             bits_out[0 + i] = B_uw_d[i];
         
         if (def->fdc)
-                freedv_data_channel_tx_frame(def->fdc, data, 6, &from_bit, &bcast_bit, &crc_bit, &end_bits);
+            freedv_data_channel_tx_frame(def->fdc, data, 6, &from_bit, &bcast_bit, &crc_bit, &end_bits);
         else
             return;
 
@@ -489,6 +540,59 @@ static void fvhff_extract_frame_voice(struct freedv_vhf_deframer * def,uint8_t b
             iframe++;
             if(iframe >= frame_size) iframe=0;
         }
+    }else if(frame_type == FREEDV_VHF_FRAME_AT){
+        /* Extract codec2 bits */
+        memset(codec2_out,0,7);
+        ibit = 0;
+        /* Extract and pack first half, MSB first */
+        iframe = bitptr+12;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<24;ibit++){
+            codec2_out[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
+        
+        /* Extract and pack last half, MSB first */
+        iframe = bitptr+52;
+        if(iframe >= frame_size) iframe-=frame_size;
+        for(;ibit<52;ibit++){
+            codec2_out[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+            iframe++;
+            if(iframe >= frame_size) iframe=0;
+        }
+        /* Extract varicode bits, if wanted */
+        if(vc_out!=NULL){
+            iframe = bitptr+86;
+            if(iframe >= frame_size) iframe-=frame_size;
+            vc_out[0] = bits[iframe];
+            iframe++;
+            vc_out[1] = bits[iframe];
+        }
+        /* Extract protocol bits, if proto is passed through */
+        if(proto_out!=NULL){
+            /* Clear protocol bit array */
+            memset(proto_out,0,3);
+            ibit = 0;
+            /* Extract and pack first half, MSB first */
+            iframe = bitptr+4;
+            if(iframe >= frame_size) iframe-=frame_size;
+            for(;ibit<12;ibit++){
+                proto_out[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+                iframe++;
+                if(iframe >= frame_size) iframe=0;
+            }
+            
+            /* Extract and pack last half, MSB first */
+            iframe = bitptr+84;
+            if(iframe >= frame_size) iframe-=frame_size;
+            for(;ibit<20;ibit++){
+                proto_out[ibit>>3] |= (bits[iframe]&0x1)<<(7-(ibit&0x7));
+                iframe++;
+                if(iframe >= frame_size) iframe=0;
+            }
+        }
+
     }
 }
 
