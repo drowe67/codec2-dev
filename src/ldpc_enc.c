@@ -41,9 +41,11 @@ int main(int argc, char *argv[])
     unsigned char ibits[NUMBERROWSHCOLS];
     unsigned char pbits[NUMBERPARITYBITS];
     FILE         *fin, *fout;
+    int           sd, i;
+    double        sdout[NUMBERROWSHCOLS+NUMBERPARITYBITS];
 
-    if (argc < 2) {
-        fprintf(stderr, "usage: %s InputOneBytePerBit OuputOneBytePerBit\n", argv[0]);
+    if (argc < 3) {
+        fprintf(stderr, "usage: %s InputOneBytePerBit OuputFile [--sd]\n", argv[0]);
         exit(0);
     }
 
@@ -60,13 +62,27 @@ int main(int argc, char *argv[])
                 argv[2], strerror(errno));
         exit(1);
     }
+    
+    sd = 0;
+    if (argc == 4) 
+        if (strcmp(argv[3], "--sd") == 0)
+            sd = 1;
 
     while (fread(ibits, sizeof(char), NUMBERROWSHCOLS, fin) == NUMBERROWSHCOLS) {
 
         encode(ibits, pbits);  
         
-        fwrite(ibits, sizeof(char), NUMBERROWSHCOLS, fout); 
-        fwrite(pbits, sizeof(char), NUMBERPARITYBITS, fout); 
+        if (sd) {
+            for (i=0; i<NUMBERROWSHCOLS; i++)
+                sdout[i] = 1.0 - 2.0 * ibits[i];
+            for (i=0; i<NUMBERPARITYBITS; i++)
+                sdout[i+NUMBERROWSHCOLS] = 1.0 - 2.0 * pbits[i];
+            fwrite(sdout, sizeof(double), NUMBERROWSHCOLS+NUMBERPARITYBITS, fout); 
+        }
+        else {
+            fwrite(ibits, sizeof(char), NUMBERROWSHCOLS, fout); 
+            fwrite(pbits, sizeof(char), NUMBERPARITYBITS, fout); 
+        }
     }
 
     fclose(fin);  
