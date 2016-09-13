@@ -24,7 +24,7 @@
       [X] test mode or file I/O (incl stdin/stdout)
       [X] Octave code to generate include file
           + MAX_ITER as well
-      [ ] check into SVN
+      [X] check into SVN
       [ ] enc/dec running on cmd line
       [ ] fsk_demod modified for soft decisions
       [ ] drs232 modified for SD
@@ -51,7 +51,8 @@ int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits, max_iter;
     int         i, j, r, num_ok, num_runs;
-    
+    char        out_char[CODELENGTH];
+
     /* derive some parameters */
 
     max_iter   = MAX_ITER;
@@ -60,7 +61,7 @@ int main(int argc, char *argv[])
 	
     if (argc < 2) {
         fprintf(stderr, "usage: %s --test\n", argv[0]);
-        fprintf(stderr, "usage: %s InOneSDSymbolPerDouble OutOneBitPerInt\n", argv[0]);
+        fprintf(stderr, "usage: %s InOneSDSymbolPerDouble OutOneBitPerByte\n", argv[0]);
         exit(0);
     }
 
@@ -115,22 +116,37 @@ int main(int argc, char *argv[])
         if (strcmp(argv[1], "-")  == 0) fin = stdin;
         else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
             fprintf(stderr, "Error opening input SD file: %s: %s.\n",
-                    argv[2], strerror(errno));
+                    argv[1], strerror(errno));
             exit(1);
         }
         
         if (strcmp(argv[2], "-") == 0) fout = stdout;
         else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
             fprintf(stderr, "Error opening output bit file: %s: %s.\n",
-                    argv[3], strerror(errno));
+                    argv[2], strerror(errno));
             exit(1);
         }
 
         double *input_double  =  calloc(CodeLength, sizeof(double));
 
-        while(fread(input_double, sizeof(double), CodeLength, fin) == 1) {
+        while(fread(input_double, sizeof(double), CodeLength, fin) == CodeLength) {
             run_ldpc_decoder(DecodedBits, ParityCheckCount, input_double);
-            fwrite(DecodedBits, sizeof(int), CodeLength, fout);
+
+            /* default is all zeros - just in case we don't get a decode */
+
+            memset(out_char, sizeof(out_char), 0);
+
+            /* extract output bits from ouput iteration that solved all paritry equations */
+
+            for (i=0;i<max_iter;i++) {
+                if (ParityCheckCount[i] == NumberParityBits) {
+                    for (j=0; j<CodeLength; j++) {
+                        out_char[j] = DecodedBits[i+j*max_iter];                  
+                    }
+                }
+            }
+
+            fwrite(out_char, sizeof(char), CodeLength, fout);
         }
 
         free(input_double);
