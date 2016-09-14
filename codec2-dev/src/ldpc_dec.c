@@ -66,7 +66,12 @@ int main(int argc, char *argv[])
 	
     if (argc < 2) {
         fprintf(stderr, "usage: %s --test\n", argv[0]);
-        fprintf(stderr, "usage: %s InOneSDSymbolPerDouble OutOneBitPerByte\n", argv[0]);
+        fprintf(stderr, "  Run internal self test and print code parameters.\n\n");
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sdinput]\n", argv[0]);
+        fprintf(stderr, "  InOneSymbolPerDouble is a file of double LLRs.  If the\n");
+        fprintf(stderr, "  --sd flag is used the input file can be Soft Decision\n");
+        fprintf(stderr, "  symbols, and LLRs will be calculated internally. Use -\n");
+        fprintf(stderr, "  for the file names to use stdin/stdout.\n");
         exit(0);
     }
 
@@ -81,7 +86,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Codeword length: %d\n",  CodeLength);
         fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
 
-        num_runs = 1; num_ok = 0;
+        num_runs = 100; num_ok = 0;
 
         for(r=0; r<num_runs; r++) {
 
@@ -107,6 +112,7 @@ int main(int argc, char *argv[])
     }
     else {
         FILE *fin, *fout;
+        int   sdinput;
 
         /* File I/O mode ------------------------------------------------*/
 
@@ -124,10 +130,47 @@ int main(int argc, char *argv[])
             exit(1);
         }
 
-        double *input_double  =  calloc(CodeLength, sizeof(double));
+        sdinput = 0;
+        printf("argc: %d\n", argc);
+        if (argc == 4)
+            if (strcmp(argv[3], "--sdinput") == 0)
+                sdinput = 1;
+
+        double *input_double = calloc(CodeLength, sizeof(double));
+        double sum, mean, sign, sumsq, estvar, estEsN0, x;
 
         while(fread(input_double, sizeof(double), CodeLength, fin) == CodeLength) {
- 
+            if (sdinput) {
+                /* convert SD samples to LLRs -------------------------------*/
+
+                sum = 0.0;
+                for(i=0; i<CodeLength; i++)
+                    sum += fabs(input_double[i]);
+                mean = sum/CodeLength;
+                
+                /* scale by mean to map onto +/- 1 symbol position */
+
+                for(i=0; i<CodeLength; i++) {
+                    input_double[i] /= mean;
+                }
+
+                /* find variance from +/-1 symbol position */
+
+                sum = sumsq = 0.0; 
+                for(i=0; i<CodeLength; i++) {
+                    sign = (input_double[i] > 0.0) - (input_double[i] < 0.0);
+                    x = (input_double[i] - sign);
+                    sum += x;
+                    sumsq += x*x;
+                }
+                mean = sum/CodeLength;
+                estvar = sumsq/CodeLength - mean*mean;
+
+                estEsN0 = 1.0/(2.0 * estvar + 1E-3); 
+                for(i=0; i<CodeLength; i++)
+                    input_double[i] = 4.0 * estEsN0 * input_double[i];              
+            }
+
             run_ldpc_decoder(DecodedBits, ParityCheckCount, input_double);
             
             /* extract output bits from ouput iteration that solved all parity equations, or failing that
