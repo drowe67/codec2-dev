@@ -14,7 +14,12 @@
 
   Build:
 
-    $ gcc -o ldpc_dec ldpc_dec.c mpdecode_core.c -Wall -lm -g
+    $ gcc -O2 -o ldpc_dec ldpc_dec.c mpdecode_core.c -Wall -lm -g
+
+  Note: -O2 option was required to get identical results to MpDecode,
+  which is also compiled with -O2.  Without it the number of bit errors
+  between C and Octave was different, especially when the code did
+  not converge and hit max_iters.
 
   TODO:
   [ ] C cmd line encoder
@@ -76,28 +81,20 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Codeword length: %d\n",  CodeLength);
         fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
 
-        num_runs = 100; num_ok = 0;
+        num_runs = 1; num_ok = 0;
 
         for(r=0; r<num_runs; r++) {
 
             run_ldpc_decoder(DecodedBits, ParityCheckCount, input);
 
-            /* Check output. Bill has modified decoded to write number of parity checks that are correct
-               to the BitErrors array.  So if decoding is correct the final BitErrors entry will have 
-               NumberParityBits */
-
-            /* find output bit row where decoding has finished */
+            /* Check output by comparing every output iteration */
 
             int ok = 0;
-            for (i=0;i<max_iter;i++) {
-                if (ParityCheckCount[i] == NumberParityBits) {
-                    for (j=0;j<CodeLength;j++) {
-                        if (output[i + j*max_iter] == DecodedBits[i+j*max_iter])                    
+            for (i=0;i<max_iter*CodeLength;i++) {
+                if (output[i] == DecodedBits[i])                    
                             ok++;
-                    }
-                }
             }
-            if (ok == CodeLength)
+            if (ok == max_iter*CodeLength)
                 num_ok++;            
         }
 
@@ -130,22 +127,30 @@ int main(int argc, char *argv[])
         double *input_double  =  calloc(CodeLength, sizeof(double));
 
         while(fread(input_double, sizeof(double), CodeLength, fin) == CodeLength) {
+ 
             run_ldpc_decoder(DecodedBits, ParityCheckCount, input_double);
+            
+            /* extract output bits from ouput iteration that solved all parity equations, or failing that
+               the last iteration. */
 
-            /* default is all zeros - just in case we don't get a decode */
-
-            memset(out_char, sizeof(out_char), 0);
-
-            /* extract output bits from ouput iteration that solved all paritry equations */
-
+            int converged = 0;
+            int iter = 0;
             for (i=0;i<max_iter;i++) {
-                if (ParityCheckCount[i] == NumberParityBits) {
+                if (converged == 0)
+                    iter++;
+                if ((ParityCheckCount[i] == NumberParityBits)) {
                     for (j=0; j<CodeLength; j++) {
-                        out_char[j] = DecodedBits[i+j*max_iter];                  
+                        out_char[j] = DecodedBits[i+j*max_iter];
                     }
+                    converged = 1;
+                }               
+            }
+            if (converged == 0) {
+                for (j=0; j<CodeLength; j++) {
+                    out_char[j] = DecodedBits[max_iter-1+j*max_iter];
                 }
             }
-
+            //printf("%4d ", iter);
             fwrite(out_char, sizeof(char), CodeLength, fout);
         }
 
@@ -194,25 +199,6 @@ void run_ldpc_decoder(int DecodedBits[], int ParityCheckCount[], double input[])
     max_row_weight = MAX_ROW_WEIGHT;
     max_col_weight = MAX_COL_WEIGHT;
 	
-#ifdef TT
-    /* check H_rows[] */
-
-    int length;
-    int gd = 0, bd = 0;
-    length = NumberRowsHcols*max_col_weight;
-    for (i=0;i<length;i++) {
-        if (H_cols[i] == H_cols2[i])
-            gd++;
-        else {
-            bd++;
-            printf("%d H_cols: %f H_cols2: %f\n", i, H_cols[i], H_cols2[i]);
-        }
-        if (bd == 10)
-            exit(0);
-    }
-    printf("gd: %d bd: %d\n", gd, bd);
-#endif
-
     c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
     v_nodes = calloc( CodeLength, sizeof( struct v_node));
 	
@@ -227,6 +213,13 @@ void run_ldpc_decoder(int DecodedBits[], int ParityCheckCount[], double input[])
     int DataLength = CodeLength - NumberParityBits;
     int *data_int = calloc( DataLength, sizeof(int) );
 	
+    /* need to clear these on each call */
+
+    for(i=0; i<max_iter; i++)
+        ParityCheckCount[i] = 0;
+     for(i=0; i<max_iter*CodeLength; i++)
+         DecodedBits[i] = 0;
+
     /* Call function to do the actual decoding */
 
     if ( dec_type == 1) {
