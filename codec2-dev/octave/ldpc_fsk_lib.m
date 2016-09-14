@@ -141,23 +141,44 @@ function codeword = ldpc_encode(code_param, data)
 endfunction
 
 
+function llr = sd_to_llr(sd)
+    %printf("mean: %2.17g\n", mean(abs(sd)));
+    sd = sd / mean(abs(sd));
+    x = sd - sign(sd);
+    sumsq = sum(x.^2);
+    summ = sum(x);
+    mn = summ/length(sd);
+    estvar = sumsq/length(sd) - mn*mn; 
+    %printf("estvar: %2.17g\n", estvar);
+    estEsN0 = 1/(2* estvar + 1E-3); 
+    llr = 4 * estEsN0 * sd;
+    %printf("\n");
+    %for i=st:st+4
+    %  printf("%2.17g ", input_decoder_c(i))
+    %end
+    %printf("\n");
+endfunction
+
 % LDPC decoder - note it estimates EsNo from received symbols
 
 function [detected_data Niters] = ldpc_decode(r, code_param, max_iterations, decoder_type)
   % in the binary case the LLRs are just a scaled version of the rx samples ..
 
+ #{
   r = r / mean(abs(r));       % scale for signal unity signal  
   estvar = var(r-sign(r)); 
   estEsN0 = 1/(2* estvar + 1E-3); 
   input_decoder_c = 4 * estEsN0 * r;
+ #}
+  llr = sd_to_llr(r);
 
-  [x_hat, PCcnt] = MpDecode( input_decoder_c, code_param.H_rows, code_param.H_cols, ...
-                             max_iterations, decoder_type, 1, 1);         
+  [x_hat, PCcnt] = MpDecode(llr, code_param.H_rows, code_param.H_cols, ...
+                            max_iterations, decoder_type, 1, 1);         
   Niters = sum(PCcnt!=0);
   detected_data = x_hat(Niters,:);
-
+  
   if isfield(code_param, "c_include_file")
-    write_code_to_C_include_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat);
+    write_code_to_C_include_file(code_param, max_iterations, decoder_type, llr, x_hat);
   end
 end
 
@@ -210,7 +231,7 @@ function write_code_to_C_include_file(code_param, max_iterations, decoder_type, 
 
   fprintf(f,"\ndouble input[] = {\n");
   for i=1:length(input_decoder_c)
-    fprintf(f, "%f", input_decoder_c(i));
+    fprintf(f, "%.17g", input_decoder_c(i));
     if i == length(input_decoder_c)
       fprintf(f,"\n};\n");
     else

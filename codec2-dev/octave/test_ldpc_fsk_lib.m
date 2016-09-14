@@ -14,7 +14,7 @@ function [data code_param] = simple_ut(c_include_file)
   HRA = full(HRA);  
   max_iterations = 100;
   decoder_type = 0;
-  EsNodB = 4;
+  EsNodB = 3;
   mod_order = 2;
 
   code_param = ldpc_init(HRA, mod_order);
@@ -152,6 +152,87 @@ function test_c_encoder
 end
 
 
+function test_c_decoder
+  load('H2064_516_sparse.mat');
+  HRA = full(HRA);  
+  max_iterations = 100;
+  decoder_type = 0;
+  mod_order = 2;
+  frames = 10;
+  EsNodB = 2;
+  sdinput = 1;
+
+  EsNo = 10^(EsNodB/10);
+  variance = 1/(2*EsNo);
+
+  code_param = ldpc_init(HRA, mod_order);
+  data = round(rand(1,code_param.data_bits_per_frame*frames));
+  
+  f = fopen("data.bin","wt"); fwrite(f, data, "uint8"); fclose(f);
+  system("../src/ldpc_enc data.bin codewords.bin"); 
+  f = fopen("codewords.bin","rb"); codewords = fread(f, "uint8")'; fclose(f);
+
+  s = 1 - 2 * codewords;   
+  noise = sqrt(variance)*randn(1,code_param.symbols_per_frame*frames); 
+  r = s + noise;
+
+  % calc LLRs frame by frame
+
+  for i=1:frames
+    st = (i-1)*code_param.symbols_per_frame+1;
+    en = st + code_param.symbols_per_frame-1;
+    llr(st:en) = sd_to_llr(r(st:en));    
+  end
+
+  % Outboard C decoder
+
+  if sdinput
+    f = fopen("sd.bin","wb"); fwrite(f, r, "double"); fclose(f);
+    system("../src/ldpc_dec sd.bin data_out.bin --sdinput"); 
+  else
+    f = fopen("llr.bin","wb"); fwrite(f, llr, "double"); fclose(f);
+    system("../src/ldpc_dec llr.bin data_out.bin"); 
+  end
+
+  f = fopen("data_out.bin","rb"); data_out = fread(f, "uint8")'; fclose(f);
+  
+  Nerrs = Nerrs2 = zeros(1,frames);;
+  for i=1:frames
+
+    % Check C decoder
+    
+    data_st = (i-1)*code_param.data_bits_per_frame+1;
+    data_en = data_st+code_param.data_bits_per_frame-1;
+    st = (i-1)*code_param.symbols_per_frame+1;
+    en = st+code_param.data_bits_per_frame-1;
+    data_out_c = data_out(st:en);
+    error_positions = xor(data_out_c, data(data_st:data_en));
+    Nerrs(i) = sum(error_positions);
+
+    % Octave decoder 
+
+    st = (i-1)*code_param.symbols_per_frame+1; en = st+code_param.symbols_per_frame-1;
+    [detected_data Niters] = ldpc_decode(r(st:en), code_param, max_iterations, decoder_type);
+    st = (i-1)*code_param.data_bits_per_frame+1; en = st+code_param.data_bits_per_frame-1;
+    data_out_octave = detected_data(1:code_param.data_bits_per_frame);
+    error_positions = xor(data_out_octave, data(st:en));
+    Nerrs2(i) = sum(error_positions);
+    %printf("%4d ", Niters);
+  end
+  printf("Errors per frame:\nC.....:");
+  for i=1:frames
+    printf("%4d ", Nerrs(i));
+  end
+  printf("\nOctave:");
+  for i=1:frames
+    printf("%4d ", Nerrs2(i));
+  end
+  printf("\n");
+
+end
+
+
+
 % Start simulation --------------------------------------------------------
 
 more off;
@@ -185,7 +266,7 @@ rand('state',1);
 
 % binary flags to run various demos, e.g. "15" to run 1 .. 8
 
-demos = 32;
+demos = 64;
 
 if bitand(demos,1)
   printf("simple_ut....\n");
@@ -230,7 +311,10 @@ if bitand(demos,16)
   printf("Nerrs = %d\n", Nerrs);
 end
 
-
 if bitand(demos,32)
   test_c_encoder;
+end
+
+if bitand(demos,64)
+  test_c_decoder;
 end
