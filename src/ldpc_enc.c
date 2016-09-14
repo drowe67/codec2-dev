@@ -5,6 +5,8 @@
 
   RA LDPC encoder program. Using the elegant back substitution of RA
   LDPC codes.
+
+  building: gcc ldpc_enc.c -o ldpc_enc -Wall -g
 */
 
 #include <stdio.h>
