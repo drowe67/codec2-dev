@@ -846,7 +846,7 @@ void force_min_lsp_dist(float lsp[], int order)
 
 \*---------------------------------------------------------------------------*/
 
-void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
+void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, float Pw[], float ak[],
                      int order, int dump, float beta, float gamma, int bass_boost, float E)
 {
     int   i;
@@ -888,7 +888,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 
     max_Rw = 0.0; min_Rw = 1E32;
     for(i=0; i<FFT_ENC/2; i++) {
-	Rw[i] = sqrtf(Ww[i].real * Pw[i].real);
+	Rw[i] = sqrtf(Ww[i].real * Pw[i]);
 	if (Rw[i] > max_Rw)
 	    max_Rw = Rw[i];
 	if (Rw[i] < min_Rw)
@@ -909,7 +909,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 
     e_before = 1E-4;
     for(i=0; i<FFT_ENC/2; i++)
-	e_before += Pw[i].real;
+	e_before += Pw[i];
 
     /* apply post filter and measure energy  */
 
@@ -922,8 +922,8 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
     e_after = 1E-4;
     for(i=0; i<FFT_ENC/2; i++) {
         Pfw = powf(Rw[i], beta);
-        Pw[i].real *= Pfw * Pfw;
-        e_after += Pw[i].real;
+        Pw[i] *= Pfw * Pfw;
+        e_after += Pw[i];
     }
     gain = e_before/e_after;
 
@@ -931,14 +931,14 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, COMP Pw[], float ak[],
 
     gain *= E;
     for(i=0; i<FFT_ENC/2; i++) {
-	Pw[i].real *= gain;
+	Pw[i] *= gain;
     }
 
     if (bass_boost) {
         /* add 3dB to first 1 kHz to account for LP effect of PF */
 
         for(i=0; i<FFT_ENC/8; i++) {
-            Pw[i].real *= 1.4*1.4;
+            Pw[i] *= 1.4*1.4;
         }
     }
 
@@ -972,8 +972,6 @@ void aks_to_M2(
   COMP          Aw[]         /* output power spectrum */
 )
 {
-  COMP a[FFT_ENC];	/* input to FFT for power spectrum */
-  COMP Pw[FFT_ENC];	/* output power spectrum */
   int i,m;		/* loop variables */
   int am,bm;		/* limits of current band */
   float r;		/* no. rads/bin */
@@ -987,25 +985,46 @@ void aks_to_M2(
   r = TWO_PI/(FFT_ENC);
 
   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
+  {
+      COMP a[FFT_ENC];  /* input to FFT for power spectrum */
 
-  for(i=0; i<FFT_ENC; i++) {
-    a[i].real = 0.0;
-    a[i].imag = 0.0;
-    Pw[i].real = 0.0;
-    Pw[i].imag = 0.0;
+      for(i=0; i<FFT_ENC; i++) {
+          a[i].real = 0.0;
+          a[i].imag = 0.0;
+      }
+
+      for(i=0; i<=order; i++)
+          a[i].real = ak[i];
+      kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)a, (kiss_fft_cpx *)Aw);
   }
-
-  for(i=0; i<=order; i++)
-    a[i].real = ak[i];
-  kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)a, (kiss_fft_cpx *)Aw);
-
   PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft");
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
+#ifndef ARM_MATH_CM4
+  float Pw[FFT_ENC];
   for(i=0; i<FFT_ENC/2; i++) {
-    Pw[i].real = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag + 1E-6);
+    Pw[i] = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag + 1E-6);
   }
+#else
+  // this difference may seem strange, but the gcc for STM32F4 generates almost 5 times
+  // faster code with the two loops: 1120 ms -> 242 ms
+  // so please leave it as is or improve further
+  // since this code is called 4 times it results in almost 4ms gain (21ms -> 17ms per audio frame decode @ 1300 )
+
+  float Pw[FFT_ENC];
+  for(i=FFT_ENC/2; i<FFT_ENC; i++) {
+    Pw[i] = 0.0;
+  }
+
+  for(i=0; i<FFT_ENC/2; i++)
+  {
+      Pw[i] = Aw[i].real * Aw[i].real + Aw[i].imag * Aw[i].imag  + 1E-6;
+  }
+  for(i=0; i<FFT_ENC/2; i++) {
+      Pw[i] = 1.0/(Pw[i]);
+  }
+#endif
 
   PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw");
 
@@ -1013,7 +1032,7 @@ void aks_to_M2(
       lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost, E);
   else {
       for(i=0; i<FFT_ENC; i++) {
-          Pw[i].real *= E;
+          Pw[i] *= E;
       }
   }
 
@@ -1037,7 +1056,7 @@ void aks_to_M2(
       Em = 0.0;
 
       for(i=am; i<bm; i++)
-          Em += Pw[i].real;
+          Em += Pw[i];
       Am = sqrtf(Em);
 
       signal += model->A[m]*model->A[m];
