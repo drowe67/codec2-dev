@@ -60,7 +60,7 @@
 #define BITS_PER_BYTE          10
 #define UNPACKED_PACKET_BYTES  ((UW_BYTES+BYTES_PER_PACKET+CRC_BYTES)*BITS_PER_BYTE)
 
-/* UW pattern we look for, inclduing start/stop bits */
+/* UW pattern we look for, including start/stop bits */
 
 uint8_t uw[] = {
     /* 0xb                0xa */
@@ -95,20 +95,20 @@ int main(int argc, char *argv[]) {
     uint16_t    tx_checksum, rx_checksum;
 
     if (argc < 3) {
-	printf("usage: drs232 InputOneBitPerChar OutputPackets\n");
-	exit(1);
+	fprintf(stderr, "usage: drs232 InputOneBitPerChar OutputPackets [--sd]\n");
+ 	exit(1);
     }
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
+	fprintf(stderr, "Error opening input file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output speech file: %s: %s.\n",
+	fprintf(stderr, "Error opening output file: %s: %s.\n",
          argv[3], strerror(errno));
 	exit(1);
     }

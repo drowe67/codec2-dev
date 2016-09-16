@@ -4,11 +4,30 @@
   CREATED: Sep 2016
 
   C-callable core functions for MpDecode, so they can be used for
-  Octave and C programs.
+  Octave and C programs.  Also some convenience functions to help use
+  the C-callable LDPC decoder in C programs.
 */
 
 #ifndef __MPDECODE_CORE__
 #define __MPDECODE_CORE__
+
+struct LDPC {
+    int max_iter;
+    int dec_type;
+    int q_scale_factor;
+    int r_scale_factor;
+    int CodeLength;
+    int NumberParityBits;
+    int NumberRowsHcols;
+    int max_row_weight;
+    int max_col_weight;
+    double *H_rows;
+    double *H_cols;
+};
+
+void run_ldpc_decoder(struct LDPC *ldpc, int DecodedBits[], int ParityCheckCount[], double input[]);
+
+void sd_to_llr(double llr[], double sd[], int n);
 
 struct v_node {
   int degree;

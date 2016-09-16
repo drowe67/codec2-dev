@@ -50,13 +50,12 @@
 
 #include "ldpc_code.h"  
 
-void run_ldpc_decoder(int DecodedBits[], int ParityCheckCount[], double input[]);
-
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits, max_iter;
     int         i, j, r, num_ok, num_runs;
     char        out_char[CODELENGTH];
+    struct LDPC ldpc;
 
     /* derive some parameters */
 
@@ -75,6 +74,20 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
+    /* set up LDPC code from include file constants */
+
+    ldpc.max_iter = MAX_ITER;
+    ldpc.dec_type = 0;
+    ldpc.q_scale_factor = 1;
+    ldpc.r_scale_factor = 1;
+    ldpc.CodeLength = CODELENGTH;
+    ldpc.NumberParityBits = NUMBERPARITYBITS;
+    ldpc.NumberRowsHcols = NUMBERROWSHCOLS;
+    ldpc.max_row_weight = MAX_ROW_WEIGHT;
+    ldpc.max_col_weight = MAX_COL_WEIGHT;
+    ldpc.H_rows = H_rows;
+    ldpc.H_cols = H_cols;
+
     int *DecodedBits = calloc( max_iter*CodeLength, sizeof( int ) );
     int *ParityCheckCount = calloc( max_iter, sizeof(int) );
 
@@ -90,7 +103,7 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(DecodedBits, ParityCheckCount, input);
+            run_ldpc_decoder(&ldpc, DecodedBits, ParityCheckCount, input);
 
             /* Check output by comparing every output iteration */
 
@@ -137,41 +150,13 @@ int main(int argc, char *argv[])
                 sdinput = 1;
 
         double *input_double = calloc(CodeLength, sizeof(double));
-        double sum, mean, sign, sumsq, estvar, estEsN0, x;
 
         while(fread(input_double, sizeof(double), CodeLength, fin) == CodeLength) {
             if (sdinput) {
-                /* convert SD samples to LLRs -------------------------------*/
-
-                sum = 0.0;
-                for(i=0; i<CodeLength; i++)
-                    sum += fabs(input_double[i]);
-                mean = sum/CodeLength;
-                
-                /* scale by mean to map onto +/- 1 symbol position */
-
-                for(i=0; i<CodeLength; i++) {
-                    input_double[i] /= mean;
-                }
-
-                /* find variance from +/-1 symbol position */
-
-                sum = sumsq = 0.0; 
-                for(i=0; i<CodeLength; i++) {
-                    sign = (input_double[i] > 0.0) - (input_double[i] < 0.0);
-                    x = (input_double[i] - sign);
-                    sum += x;
-                    sumsq += x*x;
-                }
-                mean = sum/CodeLength;
-                estvar = sumsq/CodeLength - mean*mean;
-
-                estEsN0 = 1.0/(2.0 * estvar + 1E-3); 
-                for(i=0; i<CodeLength; i++)
-                    input_double[i] = 4.0 * estEsN0 * input_double[i];              
+                sd_to_llr(input_double, input_double, CodeLength);
             }
 
-            run_ldpc_decoder(DecodedBits, ParityCheckCount, input_double);
+            run_ldpc_decoder(&ldpc, DecodedBits, ParityCheckCount, input_double);
             
             /* extract output bits from ouput iteration that solved all parity equations, or failing that
                the last iteration. */
@@ -209,97 +194,5 @@ int main(int argc, char *argv[])
 }
 
 
-void run_ldpc_decoder(int DecodedBits[], int ParityCheckCount[], double input[]) {
-    int		max_iter, dec_type;
-    float       q_scale_factor, r_scale_factor;
-    int		max_row_weight, max_col_weight;
-    int         CodeLength, NumberParityBits, NumberRowsHcols, shift, H1;
-    int         i;
-    struct c_node *c_nodes;
-    struct v_node *v_nodes;
-    
-    /* default values */
 
-    max_iter  = MAX_ITER;
-    dec_type  = 0;
-    q_scale_factor = 1;
-    r_scale_factor = 1;
 
-    /* derive some parameters */
-
-    CodeLength = CODELENGTH;                    /* length of entire codeword */
-    NumberParityBits = NUMBERPARITYBITS;
-    NumberRowsHcols = NUMBERROWSHCOLS;
-
-    shift = (NumberParityBits + NumberRowsHcols) - CodeLength;
-    if (NumberRowsHcols == CodeLength) {
-        H1=0;
-        shift=0;
-    } else {
-        H1=1;
-    }
-	
-    max_row_weight = MAX_ROW_WEIGHT;
-    max_col_weight = MAX_COL_WEIGHT;
-	
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
-	
-    /* initialize c-node and v-node structures */
-
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
-	
-    init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, H_rows, H1, CodeLength, 
-                   v_nodes, NumberRowsHcols, H_cols, max_col_weight, dec_type, input);
-
-    int DataLength = CodeLength - NumberParityBits;
-    int *data_int = calloc( DataLength, sizeof(int) );
-	
-    /* need to clear these on each call */
-
-    for(i=0; i<max_iter; i++)
-        ParityCheckCount[i] = 0;
-     for(i=0; i<max_iter*CodeLength; i++)
-         DecodedBits[i] = 0;
-
-    /* Call function to do the actual decoding */
-
-    if ( dec_type == 1) {
-        MinSum( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength, 
-                NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int );
-    } else if ( dec_type == 2) {
-        fprintf(stderr, "dec_type = 2 not currently supported");
-        /* ApproximateMinStar( BitErrors, DecodedBits, c_nodes, v_nodes, 
-           CodeLength, NumberParityBits, max_iter, r_scale_factor, q_scale_factor );*/
-    } else {
-        SumProduct( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength, 
-                    NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int ); 
-    }
-
-    /* Clean up memory */
-
-    free( data_int );
-
-    /*  Cleaning c-node elements */
-
-    for (i=0;i<NumberParityBits;i++) {
-        free( c_nodes[i].index );
-        free( c_nodes[i].message );
-        free( c_nodes[i].socket );
-    }
-	
-    /* printf( "Cleaning c-nodes \n" ); */
-    free( c_nodes );
-	
-    /* printf( "Cleaning v-node elements\n" ); */
-    for (i=0;i<CodeLength;i++) {
-        free( v_nodes[i].index);
-        free( v_nodes[i].sign );
-        free( v_nodes[i].message );
-        free( v_nodes[i].socket );
-    }
-	
-    /* printf( "Cleaning v-nodes \n" ); */
-    free( v_nodes );
-}
