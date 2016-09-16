@@ -1,7 +1,7 @@
 % test_ldpc_fsk_lib
 % David Rowe 16 April 2016
 %
-% Some tests for ldpc_fsk_lib
+% Some tests for ldpc_fsk_lib, and C versions ldpc_enc and ldpc_dec
 
 1;
 
@@ -266,19 +266,19 @@ rand('state',1);
 
 % binary flags to run various demos, e.g. "15" to run 1 .. 8
 
-demos = 64;
+demo = 7;
 
-if bitand(demos,1)
+if demo == 1
   printf("simple_ut....\n");
   data = simple_ut;
 end
 
-if bitand(demos,2)
+if demo == 2
   printf("generate C header file....\n");
-  data = simple_ut("../src/ldpc_code.h");
+  data = simple_ut("../src/H2064_516_sparse.h");
 end
 
-if bitand(demos,4)
+if demo == 3
   printf("decode_from_file ......\n");
   data = simple_ut;
   detected_data = decode_from_file("codeword.bin");
@@ -287,12 +287,12 @@ if bitand(demos,4)
   printf("  Nerrs = %d\n", Nerrs);
 end
 
-if bitand(demos,8)
+if demo == 4
   printf("plot a curve....\n");
   plot_curve;
 end
 
-if bitand(demos,16)
+if demo == 5
 
   % generate test data and save to disk
 
@@ -311,10 +311,15 @@ if bitand(demos,16)
   printf("Nerrs = %d\n", Nerrs);
 end
 
-if bitand(demos,32)
+if demo == 6
   test_c_encoder;
 end
 
-if bitand(demos,64)
+if demo == 7
   test_c_decoder;
+end
+
+if demo == 8
+   [bytes rs232_bits] = gen_sstv_frame;
+   f = fopen("sstv.bin","wb"); fwrite(f, rs232_bits, "uint8"); fclose(f);
 end
