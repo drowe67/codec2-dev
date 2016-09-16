@@ -48,18 +48,19 @@
 /* Machine generated consts, H_rows, H_cols, test input/output data to
    change LDPC code regenerate this file. */
 
-#include "ldpc_code.h"  
+#include "H2064_516_sparse.h"  
+
+void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits);
 
 int main(int argc, char *argv[])
 {    
-    int         CodeLength, NumberParityBits, max_iter;
-    int         i, j, r, num_ok, num_runs;
+    int         CodeLength, NumberParityBits;
+    int         i, r, num_ok, num_runs;
     char        out_char[CODELENGTH];
     struct LDPC ldpc;
 
     /* derive some parameters */
 
-    max_iter   = MAX_ITER;
     CodeLength = CODELENGTH;                    /* length of entire codeword */
     NumberParityBits = NUMBERPARITYBITS;
 	
@@ -88,9 +89,6 @@ int main(int argc, char *argv[])
     ldpc.H_rows = H_rows;
     ldpc.H_cols = H_cols;
 
-    int *DecodedBits = calloc( max_iter*CodeLength, sizeof( int ) );
-    int *ParityCheckCount = calloc( max_iter, sizeof(int) );
-
     if (!strcmp(argv[1],"--test")) {
 
         /* test mode --------------------------------------------------------*/
@@ -103,16 +101,15 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(&ldpc, DecodedBits, ParityCheckCount, input);
-
-            /* Check output by comparing every output iteration */
+            run_ldpc_decoder(&ldpc, out_char, input);
 
             int ok = 0;
-            for (i=0;i<max_iter*CodeLength;i++) {
-                if (output[i] == DecodedBits[i])                    
-                            ok++;
+            for (i=0; i<CodeLength; i++) {
+                if (out_char[i] == detected_data[i])                    
+                    ok++;
             }
-            if (ok == max_iter*CodeLength)
+
+            if (ok == CodeLength)
                 num_ok++;            
         }
 
@@ -156,28 +153,8 @@ int main(int argc, char *argv[])
                 sd_to_llr(input_double, input_double, CodeLength);
             }
 
-            run_ldpc_decoder(&ldpc, DecodedBits, ParityCheckCount, input_double);
-            
-            /* extract output bits from ouput iteration that solved all parity equations, or failing that
-               the last iteration. */
+            run_ldpc_decoder(&ldpc, out_char, input_double);
 
-            int converged = 0;
-            int iter = 0;
-            for (i=0;i<max_iter;i++) {
-                if (converged == 0)
-                    iter++;
-                if ((ParityCheckCount[i] == NumberParityBits)) {
-                    for (j=0; j<CodeLength; j++) {
-                        out_char[j] = DecodedBits[i+j*max_iter];
-                    }
-                    converged = 1;
-                }               
-            }
-            if (converged == 0) {
-                for (j=0; j<CodeLength; j++) {
-                    out_char[j] = DecodedBits[max_iter-1+j*max_iter];
-                }
-            }
             //printf("%4d ", iter);
             fwrite(out_char, sizeof(char), CodeLength, fout);
         }
@@ -185,14 +162,7 @@ int main(int argc, char *argv[])
         free(input_double);
     }
 
-    /* Clean up memory */
-
-    free(ParityCheckCount);
-    free(DecodedBits);
-
     return 0;
 }
-
-
 
 
