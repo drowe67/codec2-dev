@@ -9,6 +9,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include "mpdecode_core.h"
 
 /* Phi function */
@@ -553,9 +554,137 @@ void SumProduct(	 int	  BitErrors[],
   }
    
   // printf(" ssum is %d \n",   ssum); 
-   
- 
-    
 }
 
 
+/* Convenience function to call LDPC decoder from C programs */
+
+void run_ldpc_decoder(struct LDPC *ldpc, int DecodedBits[], int ParityCheckCount[], double input[]) {
+    int		max_iter, dec_type;
+    float       q_scale_factor, r_scale_factor;
+    int		max_row_weight, max_col_weight;
+    int         CodeLength, NumberParityBits, NumberRowsHcols, shift, H1;
+    int         i;
+    struct c_node *c_nodes;
+    struct v_node *v_nodes;
+    
+    /* default values */
+
+    max_iter  = ldpc->max_iter;
+    dec_type  = ldpc->dec_type;
+    q_scale_factor = ldpc->q_scale_factor;
+    r_scale_factor = ldpc->r_scale_factor;
+
+    CodeLength = ldpc->CodeLength;                    /* length of entire codeword */
+    NumberParityBits = ldpc->NumberParityBits;
+    NumberRowsHcols = ldpc->NumberRowsHcols;
+
+    /* derive some parameters */
+
+    shift = (NumberParityBits + NumberRowsHcols) - CodeLength;
+    if (NumberRowsHcols == CodeLength) {
+        H1=0;
+        shift=0;
+    } else {
+        H1=1;
+    }
+	
+    max_row_weight = ldpc->max_row_weight;
+    max_col_weight = ldpc->max_col_weight;
+	
+    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
+    v_nodes = calloc( CodeLength, sizeof( struct v_node));
+	
+    /* initialize c-node and v-node structures */
+
+    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
+    v_nodes = calloc( CodeLength, sizeof( struct v_node));
+	
+    init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, ldpc->H_rows, H1, CodeLength, 
+                   v_nodes, NumberRowsHcols, ldpc->H_cols, max_col_weight, dec_type, input);
+
+    int DataLength = CodeLength - NumberParityBits;
+    int *data_int = calloc( DataLength, sizeof(int) );
+	
+    /* need to clear these on each call */
+
+    for(i=0; i<max_iter; i++)
+        ParityCheckCount[i] = 0;
+     for(i=0; i<max_iter*CodeLength; i++)
+         DecodedBits[i] = 0;
+
+    /* Call function to do the actual decoding */
+
+    if ( dec_type == 1) {
+        MinSum( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength, 
+                NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int );
+    } else if ( dec_type == 2) {
+        fprintf(stderr, "dec_type = 2 not currently supported");
+        /* ApproximateMinStar( BitErrors, DecodedBits, c_nodes, v_nodes, 
+           CodeLength, NumberParityBits, max_iter, r_scale_factor, q_scale_factor );*/
+    } else {
+        SumProduct( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength, 
+                    NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int ); 
+    }
+
+    /* Clean up memory */
+
+    free( data_int );
+
+    /*  Cleaning c-node elements */
+
+    for (i=0;i<NumberParityBits;i++) {
+        free( c_nodes[i].index );
+        free( c_nodes[i].message );
+        free( c_nodes[i].socket );
+    }
+	
+    /* printf( "Cleaning c-nodes \n" ); */
+    free( c_nodes );
+	
+    /* printf( "Cleaning v-node elements\n" ); */
+    for (i=0;i<CodeLength;i++) {
+        free( v_nodes[i].index);
+        free( v_nodes[i].sign );
+        free( v_nodes[i].message );
+        free( v_nodes[i].socket );
+    }
+	
+    /* printf( "Cleaning v-nodes \n" ); */
+    free( v_nodes );
+}
+
+
+void sd_to_llr(double llr[], double sd[], int n) {
+    double sum, mean, sign, sumsq, estvar, estEsN0, x;
+    int i;
+
+    /* convert SD samples to LLRs -------------------------------*/
+
+    sum = 0.0;
+    for(i=0; i<n; i++)
+        sum += fabs(sd[i]);
+    mean = sum/n;
+                
+    /* scale by mean to map onto +/- 1 symbol position */
+
+    for(i=0; i<n; i++) {
+        sd[i] /= mean;
+    }
+
+    /* find variance from +/-1 symbol position */
+
+    sum = sumsq = 0.0; 
+    for(i=0; i<n; i++) {
+        sign = (sd[i] > 0.0) - (sd[i] < 0.0);
+        x = (sd[i] - sign);
+        sum += x;
+        sumsq += x*x;
+    }
+    mean = sum/n;
+    estvar = sumsq/n - mean*mean;
+
+    estEsN0 = 1.0/(2.0 * estvar + 1E-3); 
+    for(i=0; i<n; i++)
+        llr[i] = 4.0 * estEsN0 * sd[i];              
+}
