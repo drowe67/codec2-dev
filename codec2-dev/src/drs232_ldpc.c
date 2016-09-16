@@ -184,8 +184,8 @@ int main(int argc, char *argv[]) {
             //printf("\n");
             
             //fprintf(stderr,"UW score: %d\n", score);
-            if (score == UW_BITS) {
-                fprintf(stderr,"UW found!\n");
+            if (score >= (UW_BITS-3)) {
+                //fprintf(stderr,"UW found!\n");
                 ind = 0;
                 next_state = COLLECT_PACKET;
             }             
@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
                    }
                    k += 8;
                }
-               printf("k: %d CodeLength: %d\n", k, CodeLength);
+               //printf("k: %d CodeLength: %d\n", k, CodeLength);
 
                /* now LDPC decode */
 
@@ -225,7 +225,8 @@ int main(int argc, char *argv[]) {
                rx_checksum = gen_crc16(packet, BYTES_PER_PACKET);
                tx_checksum = packet[BYTES_PER_PACKET] + (packet[BYTES_PER_PACKET+1] << 8);
 
-               fprintf(stderr, "tx_checksum: 0x%02x rx_checksum: 0x%02x\n", tx_checksum, rx_checksum);
+               if (rx_checksum != tx_checksum)
+                   fprintf(stderr, "tx_checksum: 0x%02x rx_checksum: 0x%02x\n", tx_checksum, rx_checksum);
 
                packets++;
                if (rx_checksum == tx_checksum) {
