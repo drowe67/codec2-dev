@@ -141,23 +141,22 @@ function codeword = ldpc_encode(code_param, data)
 endfunction
 
 
+% Takes soft decision symbols (e.g. output of 2fsk demod) and converts
+% them to LLRs.  Note we calculate mean and var manually instead of
+% using internal functions.  This was required to get a bit exact
+% results against the C code.
+
 function llr = sd_to_llr(sd)
-    %printf("mean: %2.17g\n", mean(abs(sd)));
     sd = sd / mean(abs(sd));
     x = sd - sign(sd);
     sumsq = sum(x.^2);
     summ = sum(x);
     mn = summ/length(sd);
     estvar = sumsq/length(sd) - mn*mn; 
-    %printf("estvar: %2.17g\n", estvar);
     estEsN0 = 1/(2* estvar + 1E-3); 
     llr = 4 * estEsN0 * sd;
-    %printf("\n");
-    %for i=st:st+4
-    %  printf("%2.17g ", input_decoder_c(i))
-    %end
-    %printf("\n");
 endfunction
+
 
 % LDPC decoder - note it estimates EsNo from received symbols
 
@@ -178,14 +177,14 @@ function [detected_data Niters] = ldpc_decode(r, code_param, max_iterations, dec
   detected_data = x_hat(Niters,:);
   
   if isfield(code_param, "c_include_file")
-    write_code_to_C_include_file(code_param, max_iterations, decoder_type, llr, x_hat);
+    write_code_to_C_include_file(code_param, max_iterations, decoder_type, llr, x_hat, detected_data);
   end
 end
 
 
 % optionally create a C include file for use in mpdecode.c C cmd line LDPC decoder
 
-function write_code_to_C_include_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat)
+function write_code_to_C_include_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat, detected_data)
        
   f = fopen(code_param.c_include_file, "wt");
 
@@ -207,7 +206,7 @@ function write_code_to_C_include_file(code_param, max_iterations, decoder_type, 
   [r c] = size(code_param.H_rows);
   for j=1:c
     for i=1:r
-      fprintf(f, "%f", code_param.H_rows(i,j));
+      fprintf(f, "%d", code_param.H_rows(i,j));
       if (i == r) && (j ==c)
         fprintf(f,"\n};\n");
       else
@@ -220,7 +219,7 @@ function write_code_to_C_include_file(code_param, max_iterations, decoder_type, 
   [r c] = size(code_param.H_cols);
   for j=1:c
     for i=1:r
-      fprintf(f, "%f", code_param.H_cols(i,j));
+      fprintf(f, "%d", code_param.H_cols(i,j));
       if (i == r) && (j == c)
         fprintf(f,"\n};\n");
       else
@@ -239,18 +238,34 @@ function write_code_to_C_include_file(code_param, max_iterations, decoder_type, 
     end
   end
 
-  fprintf(f,"\nint output[] = {\n");
-  [r c] = size(x_hat);
-  for j=1:c
-    for i=1:r
-      fprintf(f, "%d", x_hat(i,j));
-      if (i == r) && (j == c)
-        fprintf(f,"\n};\n");
-      else
-        fprintf(f,", ");
-      end
+  fprintf(f,"\nchar detected_data[] = {\n");
+  for i=1:length(detected_data)
+    fprintf(f, "%d", detected_data(i));
+    if i == length(detected_data)
+      fprintf(f,"\n};\n");
+    else
+      fprintf(f,", ");            
     end
   end
 
   fclose(f);
 end
+
+
+% One application of FSK LDPC work is SSTV.  This function generates a
+% simulated frame for testing
+
+function [bytes rs232_bits] = gen_sstv_frame
+  data = floor(rand(1,256)*256);
+  checksum = crc16(data);
+  uw = 'abcd';
+  bytes = [hex2dec('55')*ones(1,16) hex2dec('ab') hex2dec('cd')];
+  bytes = [bytes data hex2dec(checksum(3:4)) hex2dec(checksum(1:2))];
+
+  mask = 2.^(0:7); rs232_bits = [];
+  for b=1:length(bytes)
+    bits = bitand(bytes(b),mask) > 0;
+    rs232_bits = [rs232_bits 0 bits 1];
+  end
+endfunction
+
