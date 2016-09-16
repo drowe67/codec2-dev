@@ -12,6 +12,9 @@
 #include <stdio.h>
 #include "mpdecode_core.h"
 
+void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
+                    int max_iter, int CodeLength, int NumberParityBits);
+
 /* Phi function */
 static float phi0(
 		  float x )
@@ -559,7 +562,7 @@ void SumProduct(	 int	  BitErrors[],
 
 /* Convenience function to call LDPC decoder from C programs */
 
-void run_ldpc_decoder(struct LDPC *ldpc, int DecodedBits[], int ParityCheckCount[], double input[]) {
+void run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
     int		max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
     int		max_row_weight, max_col_weight;
@@ -578,6 +581,9 @@ void run_ldpc_decoder(struct LDPC *ldpc, int DecodedBits[], int ParityCheckCount
     CodeLength = ldpc->CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc->NumberParityBits;
     NumberRowsHcols = ldpc->NumberRowsHcols;
+
+    int *DecodedBits = calloc( max_iter*CodeLength, sizeof( int ) );
+    int *ParityCheckCount = calloc( max_iter, sizeof(int) );
 
     /* derive some parameters */
 
@@ -627,8 +633,12 @@ void run_ldpc_decoder(struct LDPC *ldpc, int DecodedBits[], int ParityCheckCount
                     NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int ); 
     }
 
+    extract_output(out_char, DecodedBits, ParityCheckCount, max_iter, CodeLength, NumberParityBits);
+
     /* Clean up memory */
 
+    free(ParityCheckCount);
+    free(DecodedBits);
     free( data_int );
 
     /*  Cleaning c-node elements */
@@ -688,3 +698,30 @@ void sd_to_llr(double llr[], double sd[], int n) {
     for(i=0; i<n; i++)
         llr[i] = 4.0 * estEsN0 * sd[i];              
 }
+
+
+void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
+    int i, j;
+
+    /* extract output bits from iteration that solved all parity
+       equations, or failing that the last iteration. */
+
+    int converged = 0;
+    int iter = 0;
+    for (i=0;i<max_iter;i++) {
+        if (converged == 0)
+            iter++;
+        if ((ParityCheckCount[i] == NumberParityBits)) {
+            for (j=0; j<CodeLength; j++) {
+                out_char[j] = DecodedBits[i+j*max_iter];
+            }
+            converged = 1;
+        }               
+    }
+    if (converged == 0) {
+        for (j=0; j<CodeLength; j++) {
+            out_char[j] = DecodedBits[max_iter-1+j*max_iter];
+        }
+    }
+}
+
