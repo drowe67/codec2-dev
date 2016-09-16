@@ -52,6 +52,7 @@
 #define F0_MAX      500
 #define CNLP        0.3	        /* post processor constant              */
 #define NLP_NTAP 48	        /* Decimation LPF order */
+#undef  POST_PROCESS_MBE        /* choose post processor                */
 
 //#undef DUMP
 
@@ -123,8 +124,10 @@ typedef struct {
     kiss_fft_cfg  fft_cfg;           /* kiss FFT config              */
 } NLP;
 
+#ifdef POST_PROCESS_MBE
 float test_candidate_mbe(COMP Sw[], COMP W[], float f0);
 float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COMP W[], float *prev_Wo);
+#endif
 float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
 				 float *prev_Wo);
@@ -318,7 +321,6 @@ float nlp(
 
     PROFILE_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
 
-    //#define POST_PROCESS_MBE
     #ifdef POST_PROCESS_MBE
     best_f0 = post_process_mbe(Fw, pmin, pmax, gmax, Sw, W, prev_Wo);
     #else
@@ -418,6 +420,8 @@ float post_process_sub_multiples(COMP Fw[],
 
     return best_f0;
 }
+
+#ifdef POST_PROCESS_MBE
 
 /*---------------------------------------------------------------------------*\
 
@@ -587,3 +591,4 @@ float test_candidate_mbe(
     return error;
 }
 
+#endif
