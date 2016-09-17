@@ -775,7 +775,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
         }
         /* Produce soft decision symbols */
         if(rx_sd != NULL){
-            rx_sd[i] = sqrtf(tmax[1]) - sqrtf(tmax[0]);
+            rx_sd[i] = sqrtf(tmax[0]) - sqrtf(tmax[1]);
         }
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
