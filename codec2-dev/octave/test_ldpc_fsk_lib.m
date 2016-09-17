@@ -266,7 +266,7 @@ rand('state',1);
 
 % binary flags to run various demos, e.g. "15" to run 1 .. 8
 
-demo = 7;
+demo = 8;
 
 if demo == 1
   printf("simple_ut....\n");
@@ -320,6 +320,24 @@ if demo == 7
 end
 
 if demo == 8
-   [bytes rs232_bits] = gen_sstv_frame;
-   f = fopen("sstv.bin","wb"); fwrite(f, rs232_bits, "uint8"); fclose(f);
+  frames = 100;
+  EsNodB = 3;
+  EsNo = 10^(EsNodB/10);
+  variance = 1/(2*EsNo);
+
+  frame_rs232 = [];
+  for i=1:frames
+    frame_rs232 = [frame_rs232 gen_sstv_frame];
+  end
+
+  % write hard decn version to disk file, useful for fsk_mod input
+
+  f = fopen("sstv.bin","wb"); fwrite(f, frame_rs232, "char"); fclose(f);
+
+  % soft decision version (with noise)
+
+  s = 1 - 2*frame_rs232;
+  noise = sqrt(variance)*randn(1,length(frame_rs232)); 
+  r = s + noise;
+  f = fopen("sstv_sd.bin","wb"); fwrite(f, r, "float32"); fclose(f);
 end
