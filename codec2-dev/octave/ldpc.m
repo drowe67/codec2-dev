@@ -9,10 +9,11 @@
 % $ sudo apt-get install liboctave-dev
 % $ wget http://www.iterativesolutions.com/user/image/cml.1.10.zip
 % $ unzip cml.1.10.zip
-% $ patch < ~/codec2-dev/octave/cml.patch
-% $ cd source
+% $ patch -p0 < ~/codec2-dev/octave/cml.patch
+% $ cd cml/source
 % $ octave
 % octave:> make
+% (you'll see a few warnings but hopefully no errors)
 
 1;
 
