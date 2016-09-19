@@ -522,17 +522,17 @@ void make_synthesis_window(float Pn[])
   /* Generate Parzen window in time domain */
 
   win = 0.0;
-  for(i=0; i<N/2-TW; i++)
+  for(i=0; i<N_SAMP/2-TW; i++)
     Pn[i] = 0.0;
   win = 0.0;
-  for(i=N/2-TW; i<N/2+TW; win+=1.0/(2*TW), i++ )
+  for(i=N_SAMP/2-TW; i<N_SAMP/2+TW; win+=1.0/(2*TW), i++ )
     Pn[i] = win;
-  for(i=N/2+TW; i<3*N/2-TW; i++)
+  for(i=N_SAMP/2+TW; i<3*N_SAMP/2-TW; i++)
     Pn[i] = 1.0;
   win = 1.0;
-  for(i=3*N/2-TW; i<3*N/2+TW; win-=1.0/(2*TW), i++)
+  for(i=3*N_SAMP/2-TW; i<3*N_SAMP/2+TW; win-=1.0/(2*TW), i++)
     Pn[i] = win;
-  for(i=3*N/2+TW; i<2*N; i++)
+  for(i=3*N_SAMP/2+TW; i<2*N_SAMP; i++)
     Pn[i] = 0.0;
 }
 
@@ -562,10 +562,10 @@ void synthesise(
 
     if (shift) {
 	/* Update memories */
-	for(i=0; i<N-1; i++) {
-	    Sn_[i] = Sn_[i+N];
+	for(i=0; i<N_SAMP-1; i++) {
+	    Sn_[i] = Sn_[i+N_SAMP];
 	}
-	Sn_[N-1] = 0.0;
+	Sn_[N_SAMP-1] = 0.0;
     }
 
     for(i=0; i<FFT_DEC; i++) {
@@ -615,25 +615,25 @@ void synthesise(
        is zero.
     */
     for(l=1; l<=model->L; l++) {
-	for(i=0,j=-N+1; i<N-1; i++,j++) {
-	    Sw_[FFT_DEC-N+1+i].real += 2.0*model->A[l]*cosf(j*model->Wo*l + model->phi[l]);
+	for(i=0,j=-N_SAMP+1; i<N_SAMP-1; i++,j++) {
+	    Sw_[FFT_DEC-N_SAMP+1+i].real += 2.0*model->A[l]*cosf(j*model->Wo*l + model->phi[l]);
 	}
- 	for(i=N-1,j=0; i<2*N; i++,j++)
+ 	for(i=N_SAMP-1,j=0; i<2*N_SAMP; i++,j++)
 	    Sw_[j].real += 2.0*model->A[l]*cosf(j*model->Wo*l + model->phi[l]);
     }
 #endif
 
     /* Overlap add to previous samples */
 
-    for(i=0; i<N-1; i++) {
-	Sn_[i] += sw_[FFT_DEC-N+1+i].real*Pn[i];
+    for(i=0; i<N_SAMP-1; i++) {
+	Sn_[i] += sw_[FFT_DEC-N_SAMP+1+i].real*Pn[i];
     }
 
     if (shift)
-	for(i=N-1,j=0; i<2*N; i++,j++)
+	for(i=N_SAMP-1,j=0; i<2*N_SAMP; i++,j++)
 	    Sn_[i] = sw_[j].real*Pn[i];
     else
-	for(i=N-1,j=0; i<2*N; i++,j++)
+	for(i=N_SAMP-1,j=0; i<2*N_SAMP; i++,j++)
 	    Sn_[i] += sw_[j].real*Pn[i];
 }
 

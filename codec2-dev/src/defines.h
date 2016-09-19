@@ -36,9 +36,11 @@
 
 /* General defines */
 
-#define N          80		/* number of samples per frame          */
+#define N_SAMP          80		/* number of samples per frame          */
 #define MAX_AMP    80		/* maximum number of harmonics          */
+#ifndef PI
 #define PI         3.141592654	/* mathematical constant                */
+#endif
 #define TWO_PI     6.283185307	/* mathematical constant                */
 #define FS         8000		/* sample rate in Hz                    */
 #define MAX_STR    256          /* maximum string size                  */

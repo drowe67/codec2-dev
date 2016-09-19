@@ -65,20 +65,19 @@ int main(int argc, char *argv[])
 {
     FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
-    short buf[N];	/* input/output buffer                   */
-    float buf_float[N];
-    float buf_float_bpf[N];
+    short buf[N_SAMP];	/* input/output buffer                   */
+    float buf_float[N_SAMP];
+    float buf_float_bpf[N_SAMP];
     float Sn[M];	/* float input speech samples            */
-    float Sn_pre[N];	/* pre-emphasised input speech samples   */
+    float Sn_pre[N_SAMP];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     kiss_fft_cfg  fft_fwd_cfg;
-    kiss_fftr_cfg  fftr_fwd_cfg;
     kiss_fft_cfg  fft_inv_cfg;
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
-    float Pn[2*N];	/* trapezoidal synthesis window          */
-    float Sn_[2*N];	/* synthesised speech */
+    float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
+    float Sn_[2*N_SAMP];	/* synthesised speech */
     int   i,m;		/* loop variable                         */
     int   frames;
     float prev_Wo, prev__Wo, prev_uq_Wo;
@@ -141,7 +140,7 @@ int main(int argc, char *argv[])
     float gain = 1.0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
-    float bpf_buf[BPF_N+N];
+    float bpf_buf[BPF_N+N_SAMP];
     float lspmelvq_mse = 0.0;
     int   amread, Woread;
     FILE *fam, *fWo;
@@ -197,7 +196,7 @@ int main(int argc, char *argv[])
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
     }
-    for(i=0; i<2*N; i++)
+    for(i=0; i<2*N_SAMP; i++)
 	Sn_[i] = 0;
 
     prev_uq_Wo = prev_Wo = prev__Wo = TWO_PI/P_MAX;
@@ -399,7 +398,6 @@ int main(int argc, char *argv[])
     /* Initialise ------------------------------------------------------------*/
 
     fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
-    fftr_fwd_cfg = kiss_fftr_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
     fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
     make_analysis_window(fft_fwd_cfg, w, W);
     make_synthesis_window(Pn);
@@ -434,17 +432,17 @@ int main(int argc, char *argv[])
 
     frames = 0;
     sum_snr = 0;
-    while(fread(buf,sizeof(short),N,fin)) {
+    while(fread(buf,sizeof(short),N_SAMP,fin)) {
 	frames++;
 
-	for(i=0; i<N; i++)
+	for(i=0; i<N_SAMP; i++)
 	    buf_float[i] = buf[i];
 
 	/* optionally filter input speech */
 
         if (prede) {
-           pre_emp(Sn_pre, buf_float, &pre_mem, N);
-           for(i=0; i<N; i++)
+           pre_emp(Sn_pre, buf_float, &pre_mem, N_SAMP);
+           for(i=0; i<N_SAMP; i++)
                 buf_float[i] = Sn_pre[i];
         }
 
@@ -456,22 +454,22 @@ int main(int argc, char *argv[])
             /* BPF speech */
 
             for(i=0; i<BPF_N; i++)
-                bpf_buf[i] =  bpf_buf[N+i];
-            for(i=0; i<N; i++)
+                bpf_buf[i] =  bpf_buf[N_SAMP+i];
+            for(i=0; i<N_SAMP; i++)
                 bpf_buf[BPF_N+i] = buf_float[i];
             if (bpfb_en)
-                inverse_filter(&bpf_buf[BPF_N], bpfb, N, buf_float, BPF_N);
+                inverse_filter(&bpf_buf[BPF_N], bpfb, N_SAMP, buf_float, BPF_N);
             else
-                inverse_filter(&bpf_buf[BPF_N], bpf, N, buf_float, BPF_N);
+                inverse_filter(&bpf_buf[BPF_N], bpf, N_SAMP, buf_float, BPF_N);
         }
 
         /* shift buffer of input samples, and insert new samples */
 
-	for(i=0; i<M-N; i++) {
-	    Sn[i] = Sn[i+N];
+	for(i=0; i<M-N_SAMP; i++) {
+	    Sn[i] = Sn[i+N_SAMP];
 	}
-	for(i=0; i<N; i++) {
-	    Sn[i+M-N] = buf_float[i];
+	for(i=0; i<N_SAMP; i++) {
+	    Sn[i+M-N_SAMP] = buf_float[i];
         }
 
 	/*------------------------------------------------------------*\
@@ -480,7 +478,7 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-	nlp(nlp_states,Sn,N,P_MIN,P_MAX,&pitch,Sw,W,&prev_uq_Wo);
+	nlp(nlp_states,Sn,N_SAMP,P_MIN,P_MAX,&pitch,Sw,W,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 
 	dft_speech(fft_fwd_cfg, Sw, Sn, w);
@@ -811,7 +809,7 @@ int main(int argc, char *argv[])
             for(i=0; i<decimate; i++) {
                 if (lpc_model) {
                     lsp_to_lpc(&lsps_dec[i][0], &ak_dec[i][0], order);
-                    aks_to_M2(fftr_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i],
+                    aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i],
                               &snr, 0, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
                     apply_lpc_correction(&model_dec[i]);
                     sum_snr += snr;
@@ -840,7 +838,7 @@ int main(int argc, char *argv[])
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(fft_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
-                if (fout != NULL) fwrite(buf,sizeof(short),N,fout);
+                if (fout != NULL) fwrite(buf,sizeof(short),N_SAMP,fout);
             }
 
             /* update memories for next frame ----------------------------*/
@@ -894,9 +892,9 @@ void synth_one_frame(kiss_fft_cfg fft_inv_cfg, short buf[], MODEL *model, float 
 
     synthesise(fft_inv_cfg, Sn_, model, Pn, 1);
     if (prede)
-        de_emp(Sn_, Sn_, de_mem, N);
+        de_emp(Sn_, Sn_, de_mem, N_SAMP);
 
-    for(i=0; i<N; i++) {
+    for(i=0; i<N_SAMP; i++) {
 	Sn_[i] *= gain;
 	if (Sn_[i] > 32767.0)
 	    buf[i] = 32767;

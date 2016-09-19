@@ -248,7 +248,7 @@ static void print_pred_error(struct PEXP *pexp, MODEL *model, int start, int end
 
     if (mag > mag_thresh) {
 	for(i=start; i<=end; i++) {
-	    float pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
+	    float pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
 	    float err = pred - model->phi[i];
 	    err = atan2(sin(err),cos(err));
 	    printf("%f\n",err);
@@ -263,7 +263,7 @@ static void predict_phases(struct PEXP *pexp, MODEL *model, int start, int end) 
     int i;
 
     for(i=start; i<=end; i++) {
-	model->phi[i] = pexp->phi_prev[i] + N*i*model->Wo;
+	model->phi[i] = pexp->phi_prev[i] + N_SAMP*i*model->Wo;
     }
 
 }
@@ -311,7 +311,7 @@ static void predict_phases_state(struct PEXP *pexp, MODEL *model, int start, int
 	}
     else
 	for(i=start; i<=end; i++) {
-	    model->phi[i] = pexp->phi_prev[i] + N*i*best_Wo;
+	    model->phi[i] = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
 	}
     printf("state %d\n", pexp->state);
 }
@@ -330,7 +330,7 @@ static void predict_phases2(struct PEXP *pexp, MODEL *model, int start, int end)
     float pred, str, diff;
 
     for(i=start; i<=end; i++) {
-	pred = pexp->phi_prev[i] + N*i*model->Wo;
+	pred = pexp->phi_prev[i] + N_SAMP*i*model->Wo;
 	str = pexp->phi1*i;
 	diff = str - pred;
 	diff = atan2(sin(diff), cos(diff));
@@ -533,7 +533,7 @@ static void top_amp(struct PEXP *pexp, MODEL *model, int start, int end, int n_h
 	if (!top) {
 	    model->phi[i] = 0.0; /* make sure */
 	    if (pred)  {
-		//model->phi[i] = pexp->phi_prev[i] + i*N*(model->Wo + pexp->Wo_prev)/2.0;
+		//model->phi[i] = pexp->phi_prev[i] + i*N_SAMP*(model->Wo + pexp->Wo_prev)/2.0;
 		model->phi[i] = i*model->phi[1];
 	    }
 	    else
@@ -558,7 +558,7 @@ static void limit_prediction_error(struct PEXP *pexp, MODEL *model, int start, i
     float pred, pred_error, error;
 
     for(i=start; i<=end; i++) {
-	pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
+	pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
 	pred_error = pred - model->phi[i];
 	pred_error -= TWO_PI*floor((pred_error+PI)/TWO_PI);
 	quant_phase(&pred_error, -limit, limit, 2);
@@ -577,7 +577,7 @@ static void quant_prediction_error(struct PEXP *pexp, MODEL *model, int start, i
     float pred, pred_error;
 
     for(i=start; i<=end; i++) {
-	pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
+	pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
 	pred_error = pred - model->phi[i];
 	pred_error -= TWO_PI*floor((pred_error+PI)/TWO_PI);
 
@@ -604,7 +604,7 @@ static void print_sparse_pred_error(struct PEXP *pexp, MODEL *model, int start, 
 	}
 
 	for(i=start; i<=end; i++) {
-	    pred = pexp->phi_prev[i] + N*i*(model->Wo + pexp->Wo_prev)/2.0;
+	    pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
 	    error = pred - model->phi[i];
 	    error = atan2(sin(error),cos(error));
 
@@ -756,7 +756,7 @@ static float refine_Wo(struct PEXP     *pexp,
 
 	var = 0.0;
 	for(i=start; i<=end; i++) {
-	    pred = pexp->phi_prev[i] + N*i*Wo;
+	    pred = pexp->phi_prev[i] + N_SAMP*i*Wo;
 	    error = pred - model->phi[i];
 	    error = atan2(sin(error),cos(error));
 	    var += error*error;
@@ -816,7 +816,7 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 
     //printf("\n");
     for(i=1; i<=model->L; i++) {
-	pred = pexp->phi_prev[i] + N*i*best_Wo;
+	pred = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
 	error = pred - model->phi[i];
 
 	index = MAX_AMP*i*model->Wo/PI;
@@ -839,7 +839,7 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
     /* transform quantised phases back */
 
     for(i=1; i<=model->L; i++) {
-	pred = pexp->phi_prev[i] + N*i*best_Wo;
+	pred = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
 
 	index = MAX_AMP*i*model->Wo/PI;
 	assert(index < MAX_AMP);
@@ -858,7 +858,7 @@ static void predict_phases1(struct PEXP *pexp, MODEL *model, int start, int end)
     best_Wo = refine_Wo(pexp, model, 1, model->L);
 
     for(i=start; i<=end; i++) {
-	model->phi[i] = pexp->phi_prev[i] + N*i*best_Wo;
+	model->phi[i] = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
     }
 }
 
@@ -890,7 +890,7 @@ void smooth_phase(struct PEXP *pexp, MODEL *model, int mode)
     /* set up sparse array */
 
     for(m=1; m<=model->L; m++) {
-	pred = pexp->phi_prev[m] + N*m*best_Wo;
+	pred = pexp->phi_prev[m] + N_SAMP*m*best_Wo;
 	err = model->phi[m] - pred;
 	err = atan2(sin(err),cos(err));
 
@@ -958,7 +958,7 @@ void smooth_phase(struct PEXP *pexp, MODEL *model, int mode)
     for(m=1; m<=model->L; m++) {
 	index = MAX_AMP*m*model->Wo/PI;
 	assert(index < MAX_AMP);
-	pred = pexp->phi_prev[m] + N*m*best_Wo;
+	pred = pexp->phi_prev[m] + N_SAMP*m*best_Wo;
 	err = atan2(sparse_pe_out[index].imag, sparse_pe_out[index].real);
 	model->phi[m] = pred + err;
     }
@@ -992,13 +992,13 @@ void smooth_phase2(struct PEXP *pexp, MODEL *model) {
 	c = s = 0.0;
 	if (h>1) {
 	    for(i=a; i<b; i++) {
-		pred = pexp->phi_prev[i] + N*i*best_Wo;
+		pred = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
 		err = model->phi[i] - pred;
 		c += cos(err); s += sin(err);
 	    }
 	    phi1_ = atan2(s,c);
 	    for(i=a; i<b; i++) {
-		pred = pexp->phi_prev[i] + N*i*best_Wo;
+		pred = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
 		printf("%d: %4.3f -> ", i, model->phi[i]);
 		model->phi[i] = pred + phi1_;
 		model->phi[i] = atan2(sin(model->phi[i]),cos(model->phi[i]));
@@ -1051,7 +1051,7 @@ void smooth_phase3(struct PEXP *pexp, MODEL *model) {
 
 	    /* est predicted phase from average */
 
-	    pred = pexp->phi_prev[m] + N*m*best_Wo;
+	    pred = pexp->phi_prev[m] + N_SAMP*m*best_Wo;
 	    err = model->phi[m] - pred;
 	    av[b].real += cos(err); av[b].imag += sin(err);
 	}
@@ -1075,7 +1075,7 @@ void smooth_phase3(struct PEXP *pexp, MODEL *model) {
 
 	    printf("L %d m %d f %4.f b %d\n", model->L, m, f, b);
 
-	    pred = pexp->phi_prev[m] + N*m*best_Wo;
+	    pred = pexp->phi_prev[m] + N_SAMP*m*best_Wo;
 	    err = atan2(av[b].imag, av[b].real);
 	    printf(" %d: %4.3f -> ", m, model->phi[m]);
 	    model->phi[m] = pred + err;
@@ -1142,7 +1142,7 @@ void cb_phase1(struct PEXP *pexp, MODEL *model) {
 	    assert(b < MAX_BINS);
 
 	    if (m != max_ind[b])
-		model->phi[m] = pexp->phi_prev[m] + N*m*best_Wo;
+		model->phi[m] = pexp->phi_prev[m] + N_SAMP*m*best_Wo;
 	}
     }
 }
@@ -1166,7 +1166,7 @@ void cb_phase2(struct PEXP *pexp, MODEL *model) {
 
     st = 2*model->L/4;
     step = 3;
-    model->phi[1] = pexp->phi_prev[1] + (pexp->Wo_prev+model->Wo)*N/2.0;
+    model->phi[1] = pexp->phi_prev[1] + (pexp->Wo_prev+model->Wo)*N_SAMP/2.0;
 
     printf("L=%d ", model->L);
     for(m=st; m<st+step*2; m+=step) {
@@ -1187,7 +1187,7 @@ void cb_phase2(struct PEXP *pexp, MODEL *model) {
 	for(i=a; i<b; i++) {
 	    //model->phi[i] = i*phi1_;
 	    //model->phi[i] = i*model->phi[1];
-	    //model->phi[i] = m*(pexp->Wo_prev+model->Wo)*N/2.0;
+	    //model->phi[i] = m*(pexp->Wo_prev+model->Wo)*N_SAMP/2.0;
 	    model->A[m] = A[m];
 	    printf("%d ", i);
 	}
@@ -1223,7 +1223,7 @@ static void repeat_phases(struct PEXP *pexp, MODEL *model) {
 
     *model = pexp->prev_model;
     for(m=1; m<=model->L; m++)
-	model->phi[m] += N*m*model->Wo;
+	model->phi[m] += N_SAMP*m*model->Wo;
 
 }
 
@@ -1347,7 +1347,7 @@ void phase_experiment(struct PEXP *pexp, MODEL *model, char *arg) {
     /* update states */
 
     //best_Wo = refine_Wo(pexp, model,  model->L/2, model->L);
-    pexp->phi1 += N*model->Wo;
+    pexp->phi1 += N_SAMP*model->Wo;
 
     for(m=1; m<=model->L; m++)
 	pexp->phi_prev[m] = model->phi[m];
