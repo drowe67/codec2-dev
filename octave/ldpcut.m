@@ -8,15 +8,15 @@
 % Start CML library (see CML set up instructions in ldpc.m)
 
 currentdir = pwd;
-addpath '/home/david/tmp/cml/mat'    % assume the source files stored here
-cd /home/david/tmp/cml
-CmlStartup                           % note that this is not in the cml path!
+addpath '/home/david/Desktop/cml/mat' % assume the source files stored here
+cd /home/david/Desktop/cml
+CmlStartup                            % note that this is not in the cml path!
 cd(currentdir)
 
 % Our LDPC library
 
 ldpc;
-qpsk_;
+qpsk;
 
 function sim_out = run_simulation(sim_in)
 
