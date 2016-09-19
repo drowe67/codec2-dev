@@ -48,21 +48,21 @@
 #define NC                      20  /* max number of data carriers (plus one pilot in the centre)           */
 #define NB                       2  /* Bits/symbol for QPSK modulation                                      */
 #define RB              (NC*RS*NB)  /* bit rate                                                             */
-#define M                  (FS/RS)  /* oversampling factor                                                  */
+#define M_FAC                  (FS/RS)  /* oversampling factor                                                  */
 #define NSYM                     6  /* number of symbols to filter over                                     */
-#define NFILTER            (NSYM*M) /* size of tx/rx filters at sample rate M                               */
+#define NFILTER            (NSYM*M_FAC) /* size of tx/rx filters at sample rate M                               */
 
 #define FSEP                    75  /* Default separation between carriers (Hz)                             */
 
 #define NT                       5  /* number of symbols we estimate timing over                            */
 #define P                        4  /* oversample factor used for initial rx symbol filtering output        */
-#define Q                     (M/4) /* oversample factor used for initial rx symbol filtering input         */
+#define Q                     (M_FAC/4) /* oversample factor used for initial rx symbol filtering input         */
 #define NRXDEC                  31  /* number of taps in the rx decimation filter                           */
 
-#define NPILOT_LUT                 (4*M)    /* number of pilot look up table samples                 */
+#define NPILOT_LUT                 (4*M_FAC)    /* number of pilot look up table samples                 */
 #define NPILOTCOEFF                   30    /* number of FIR filter coeffs in LP filter              */
-#define NPILOTBASEBAND (NPILOTCOEFF+M+M/P)  /* number of pilot baseband samples reqd for pilot LPF   */
-#define NPILOTLPF                  (4*M)    /* number of samples we DFT pilot over, pilot est window */
+#define NPILOTBASEBAND (NPILOTCOEFF+M_FAC+M_FAC/P)  /* number of pilot baseband samples reqd for pilot LPF   */
+#define NPILOTLPF                  (4*M_FAC)    /* number of samples we DFT pilot over, pilot est window */
 #define MPILOTFFT                    256
 
 #define NSYNC_MEM                6
@@ -130,8 +130,8 @@ struct FDMDV {
 
     /* Demodulator */
 
-    COMP  rxdec_lpf_mem[NRXDEC-1+M];
-    COMP  rx_fdm_mem[NFILTER+M];
+    COMP  rxdec_lpf_mem[NRXDEC-1+M_FAC];
+    COMP  rx_fdm_mem[NFILTER+M_FAC];
     COMP  phase_rx[NC+1];
     COMP  rx_filter_mem_timing[NC+1][NT*P];
     float rx_timing;
@@ -162,8 +162,8 @@ struct FDMDV {
 \*---------------------------------------------------------------------------*/
 
 void bits_to_dqpsk_symbols(COMP tx_symbols[], int Nc, COMP prev_tx_symbols[], int tx_bits[], int *pilot_bit, int old_qpsk_mapping);
-void tx_filter(COMP tx_baseband[NC+1][M], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
-void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M], COMP phase_tx[], COMP freq_tx[],
+void tx_filter(COMP tx_baseband[NC+1][M_FAC], int Nc, COMP tx_symbols[], COMP tx_filter_memory[NC+1][NSYM]);
+void fdm_upconvert(COMP tx_fdm[], int Nc, COMP tx_baseband[NC+1][M_FAC], COMP phase_tx[], COMP freq_tx[],
                    COMP *fbb_phase, COMP fbb_rect);
 void tx_filter_and_upconvert(COMP tx_fdm[], int Nc, COMP tx_symbols[],
                              COMP tx_filter_memory[NC+1][NSYM],
@@ -172,9 +172,9 @@ void generate_pilot_fdm(COMP *pilot_fdm, int *bit, float *symbol, float *filter_
 void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq);
 float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft);
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[], COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin, int do_fft);
-void fdm_downconvert(COMP rx_baseband[NC+1][M+M/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
+void fdm_downconvert(COMP rx_baseband[NC+1][M_FAC+M_FAC/P], int Nc, COMP rx_fdm[], COMP phase_rx[], COMP freq[], int nin);
 void rxdec_filter(COMP rx_fdm_filter[], COMP rx_fdm[], COMP rxdec_lpf_mem[], int nin);
-void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M+M/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
+void rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_baseband[NC+1][M_FAC+M_FAC/P], COMP rx_filter_memory[NC+1][NFILTER], int nin);
 void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
                                 COMP rx_fdm_mem[], COMP phase_rx[], COMP freq[],
                                 float freq_pol[], int nin, int dec_rate);

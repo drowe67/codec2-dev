@@ -72,16 +72,16 @@
 
    As we don't transmit the pulse position for this model, we need to
    synthesise it.  Now the excitation pulses occur at a rate of Wo.
-   This means the phase of the first harmonic advances by N samples
-   over a synthesis frame of N samples.  For example if Wo is pi/20
-   (200 Hz), then over a 10ms frame (N=80 samples), the phase of the
+   This means the phase of the first harmonic advances by N_SAMP samples
+   over a synthesis frame of N_SAMP samples.  For example if Wo is pi/20
+   (200 Hz), then over a 10ms frame (N_SAMP=80 samples), the phase of the
    first harmonic would advance (pi/20)*80 = 4*pi or two complete
    cycles.
 
    We generate the excitation phase of the fundamental (first
    harmonic):
 
-     arg[E[1]] = Wo*N;
+     arg[E[1]] = Wo*N_SAMP;
 
    We then relate the phase of the m-th excitation harmonic to the
    phase of the fundamental as:
@@ -158,10 +158,10 @@ void phase_synth_zero_order(
        I found that using just this frame's Wo improved quality for UV
        sounds compared to interpolating two frames Wo like this:
 
-       ex_phase[0] += (*prev_Wo+model->Wo)*N/2;
+       ex_phase[0] += (*prev_Wo+model->Wo)*N_SAMP/2;
     */
 
-    ex_phase[0] += (model->Wo)*N;
+    ex_phase[0] += (model->Wo)*N_SAMP;
     ex_phase[0] -= TWO_PI*floorf(ex_phase[0]/TWO_PI + 0.5);
 
     for(m=1; m<=model->L; m++) {

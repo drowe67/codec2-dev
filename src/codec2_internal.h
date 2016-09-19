@@ -35,7 +35,7 @@ struct CODEC2 {
     kiss_fftr_cfg fftr_fwd_cfg;            /* forward real FFT config                   */
     float         w[M];	                   /* time domain hamming window                */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
-    float         Pn[2*N];	           /* trapezoidal synthesis window              */
+    float         Pn[2*N_SAMP];	           /* trapezoidal synthesis window              */
     float        *bpf_buf;                 /* buffer for band pass filter               */
     float         Sn[M];                   /* input speech                              */
     float         hpf_states[2];           /* high pass filter states                   */
@@ -43,7 +43,7 @@ struct CODEC2 {
     int           gray;                    /* non-zero for gray encoding                */
 
     kiss_fft_cfg  fft_inv_cfg;             /* inverse FFT config                        */
-    float         Sn_[2*N];	           /* synthesised output speech                 */
+    float         Sn_[2*N_SAMP];	           /* synthesised output speech                 */
     float         ex_phase;                /* excitation model phase track              */
     float         bg_est;                  /* background noise estimate for post filter */
     float         prev_Wo_enc;             /* previous frame's pitch estimate           */

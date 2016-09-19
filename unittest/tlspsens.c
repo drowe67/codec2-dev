@@ -41,7 +41,7 @@
 float run_a_test(char raw_file_name[], int bit_to_corrupt)
 {
     FILE   *fin;
-    short   buf[N];
+    short   buf[N_SAMP];
     struct  CODEC2 *c2;
     kiss_fft_cfg  fft_fwd_cfg;
     MODEL   model;
@@ -79,7 +79,7 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
 
     snr_sum = 0.0;
     frames = 0;
-    while(fread(buf, sizeof(short), N, fin) == N) {
+    while(fread(buf, sizeof(short), N_SAMP, fin) == N_SAMP) {
 	analyse_one_frame(c2, &model, buf);
 	e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, LPC_ORD);
 	encode_lsps_scalar(lsp_indexes, lsps, LPC_ORD);
