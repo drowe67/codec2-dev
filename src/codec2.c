@@ -187,6 +187,7 @@ void codec2_destroy(struct CODEC2 *c2)
     free(c2->bpf_buf);
     nlp_destroy(c2->nlp);
     KISS_FFT_FREE(c2->fft_fwd_cfg);
+    KISS_FFT_FREE(c2->fftr_fwd_cfg);
     KISS_FFT_FREE(c2->fft_inv_cfg);
     free(c2);
 }
