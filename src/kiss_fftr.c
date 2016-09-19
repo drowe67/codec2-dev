@@ -14,6 +14,7 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 #include "kiss_fftr.h"
 #include "_kiss_fft_guts.h"
+#include "assert.h"
 
 struct kiss_fftr_state{
     kiss_fft_cfg substate;
@@ -70,10 +71,7 @@ void kiss_fftr(kiss_fftr_cfg st,const kiss_fft_scalar *timedata,kiss_fft_cpx *fr
     int k,ncfft;
     kiss_fft_cpx fpnk,fpk,f1k,f2k,tw,tdc;
 
-    if ( st->substate->inverse) {
-        fprintf(stderr,"kiss fft usage error: improper alloc\n");
-        exit(1);
-    }
+    assert(st->substate->inverse==0);
 
     ncfft = st->substate->nfft;
 
@@ -125,10 +123,7 @@ void kiss_fftri(kiss_fftr_cfg st,const kiss_fft_cpx *freqdata,kiss_fft_scalar *t
     /* input buffer timedata is stored row-wise */
     int k, ncfft;
 
-    if (st->substate->inverse == 0) {
-        fprintf (stderr, "kiss fft usage error: improper alloc\n");
-        exit (1);
-    }
+    assert(st->substate->inverse == 1);
 
     ncfft = st->substate->nfft;
 

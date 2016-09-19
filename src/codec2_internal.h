@@ -32,6 +32,7 @@
 struct CODEC2 {
     int           mode;
     kiss_fft_cfg  fft_fwd_cfg;             /* forward FFT config                        */
+    kiss_fftr_cfg fftr_fwd_cfg;            /* forward real FFT config                   */
     float         w[M];	                   /* time domain hamming window                */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
     float         Pn[2*N];	           /* trapezoidal synthesis window              */

@@ -846,13 +846,13 @@ void force_min_lsp_dist(float lsp[], int order)
 
 \*---------------------------------------------------------------------------*/
 
-void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, float Pw[], float ak[],
+void lpc_post_filter(kiss_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
                      int order, int dump, float beta, float gamma, int bass_boost, float E)
 {
     int   i;
-    COMP  x[FFT_ENC];   /* input to FFTs                */
-    COMP  Ww[FFT_ENC];  /* weighting spectrum           */
-    float Rw[FFT_ENC];  /* R = WA                       */
+    float x[FFT_ENC];   /* input to FFTs                */
+    COMP  Ww[FFT_ENC/2+1];  /* weighting spectrum           */
+    float Rw[FFT_ENC/2+1];  /* R = WA                       */
     float e_before, e_after, gain;
     float Pfw;
     float max_Rw, min_Rw;
@@ -864,17 +864,16 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, float Pw[], float ak[],
     /* Determine weighting filter spectrum W(exp(jw)) ---------------*/
 
     for(i=0; i<FFT_ENC; i++) {
-	x[i].real = 0.0;
-	x[i].imag = 0.0;
+	x[i] = 0.0;
     }
 
-    x[0].real = ak[0];
+    x[0]  = ak[0];
     coeff = gamma;
     for(i=1; i<=order; i++) {
-	x[i].real = ak[i] * coeff;
+	x[i] = ak[i] * coeff;
         coeff *= gamma;
     }
-    kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)x, (kiss_fft_cpx *)Ww);
+    kiss_fftr(fftr_fwd_cfg, (kiss_fft_scalar *)x, (kiss_fft_cpx *)Ww);
 
     PROFILE_SAMPLE_AND_LOG(tfft2, taw, "        fft2");
 
@@ -957,7 +956,7 @@ void lpc_post_filter(kiss_fft_cfg fft_fwd_cfg, float Pw[], float ak[],
 \*---------------------------------------------------------------------------*/
 
 void aks_to_M2(
-  kiss_fft_cfg  fft_fwd_cfg,
+  kiss_fftr_cfg  fftr_fwd_cfg,
   float         ak[],	     /* LPC's */
   int           order,
   MODEL        *model,	     /* sinusoidal model parameters for this frame */
@@ -986,23 +985,23 @@ void aks_to_M2(
 
   /* Determine DFT of A(exp(jw)) --------------------------------------------*/
   {
-      COMP a[FFT_ENC];  /* input to FFT for power spectrum */
+      float a[FFT_ENC];  /* input to FFT for power spectrum */
 
       for(i=0; i<FFT_ENC; i++) {
-          a[i].real = 0.0;
-          a[i].imag = 0.0;
+          a[i] = 0.0;
       }
 
       for(i=0; i<=order; i++)
-          a[i].real = ak[i];
-      kiss_fft(fft_fwd_cfg, (kiss_fft_cpx *)a, (kiss_fft_cpx *)Aw);
+          a[i] = ak[i];
+      kiss_fftr(fftr_fwd_cfg, (kiss_fft_scalar *)a, (kiss_fft_cpx *)Aw);
   }
   PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft");
 
   /* Determine power spectrum P(w) = E/(A(exp(jw))^2 ------------------------*/
 
+  float Pw[FFT_ENC/2];
+
 #ifndef ARM_MATH_CM4
-  float Pw[FFT_ENC];
   for(i=0; i<FFT_ENC/2; i++) {
     Pw[i] = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag + 1E-6);
   }
@@ -1011,11 +1010,6 @@ void aks_to_M2(
   // faster code with the two loops: 1120 ms -> 242 ms
   // so please leave it as is or improve further
   // since this code is called 4 times it results in almost 4ms gain (21ms -> 17ms per audio frame decode @ 1300 )
-
-  float Pw[FFT_ENC];
-  for(i=FFT_ENC/2; i<FFT_ENC; i++) {
-    Pw[i] = 0.0;
-  }
 
   for(i=0; i<FFT_ENC/2; i++)
   {
@@ -1029,9 +1023,9 @@ void aks_to_M2(
   PROFILE_SAMPLE_AND_LOG(tpw, tfft, "      Pw");
 
   if (pf)
-      lpc_post_filter(fft_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost, E);
+      lpc_post_filter(fftr_fwd_cfg, Pw, ak, order, dump, beta, gamma, bass_boost, E);
   else {
-      for(i=0; i<FFT_ENC; i++) {
+      for(i=0; i<FFT_ENC/2; i++) {
           Pw[i] *= E;
       }
   }

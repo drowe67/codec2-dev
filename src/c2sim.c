@@ -72,6 +72,7 @@ int main(int argc, char *argv[])
     float Sn_pre[N];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     kiss_fft_cfg  fft_fwd_cfg;
+    kiss_fftr_cfg  fftr_fwd_cfg;
     kiss_fft_cfg  fft_inv_cfg;
     float w[M];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
@@ -398,6 +399,7 @@ int main(int argc, char *argv[])
     /* Initialise ------------------------------------------------------------*/
 
     fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
+    fftr_fwd_cfg = kiss_fftr_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
     fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
     make_analysis_window(fft_fwd_cfg, w, W);
     make_synthesis_window(Pn);
@@ -809,7 +811,7 @@ int main(int argc, char *argv[])
             for(i=0; i<decimate; i++) {
                 if (lpc_model) {
                     lsp_to_lpc(&lsps_dec[i][0], &ak_dec[i][0], order);
-                    aks_to_M2(fft_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i],
+                    aks_to_M2(fftr_fwd_cfg, &ak_dec[i][0], order, &model_dec[i], e_dec[i],
                               &snr, 0, simlpcpf, lpcpf, 1, LPCPF_BETA, LPCPF_GAMMA, Aw);
                     apply_lpc_correction(&model_dec[i]);
                     sum_snr += snr;
