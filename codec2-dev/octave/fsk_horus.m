@@ -69,6 +69,10 @@ function states = fsk_horus_init(Fs,Rs,M=2)
   states.Terrs = 0;
   states.nerr_log = 0;
 
+  % extra simulation parameters
+
+  states.tx_real = 1;
+  states.dA(1:M) = 1;
   states.df(1:M) = 0;
   states.f(1:M) = 0;
   states.norm_rx_timing = 0;
@@ -117,7 +121,7 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=48)
 
   states.nin = N;                % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
-  states.phi = zeros(1, M);       % keep down converter osc phase continuous
+  states.phi = zeros(1, M);      % keep down converter osc phase continuous
 
   %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
@@ -134,6 +138,8 @@ function states = fsk_horus_init_hbr(Fs,P,Rs,M=2,nsym=48)
   states.Terrs = 0;
   states.nerr_log = 0;
 
+  states.tx_real = 1;
+  states.dA(1:M) = 1;
   states.df(1:M) = 0;
   states.f(1:M) = 0;
   states.norm_rx_timing = 0;
@@ -215,7 +221,11 @@ function tx  = fsk_horus_mod(states, tx_bits)
  
       tx_phase_vec = tx_phase + (1:Ts)*2*pi*ftx(tone)/Fs;
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
-      tx((s-1)*Ts+1:s*Ts) = dA(tone)*2.0*cos(tx_phase_vec);
+      if states.tx_real
+        tx((s-1)*Ts+1:s*Ts) = dA(tone)*2.0*cos(tx_phase_vec);
+      else
+        tx((s-1)*Ts+1:s*Ts) = dA(tone)*exp(j*tx_phase_vec);
+      end
       s++;
 
       % freq drift
@@ -329,7 +339,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
 
   for m=1:M
     phi_vec = states.phi(m) + (1:nin)*2*pi*f(m)/Fs;
-    f_dc(m,nold+1:Nmem) = sf' .* exp(-j*phi_vec);
+    f_dc(m,nold+1:Nmem) = sf .* exp(j*phi_vec)';
     states.phi(m)  = phi_vec(nin);
     states.phi(m) -= 2*pi*floor(states.phi(m)/(2*pi));
   end
@@ -917,6 +927,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
   noise = sqrt(variance)*randn(length(tx),1);
   rx    = tx + noise;
+  printf("SNRdB meas: %4.1f\n", 10*log10(var(tx)/var(noise)));
 
   % dump simulated rx file
 
@@ -1230,8 +1241,8 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(6, 10, 9);
-  rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
+  run_sim(6, 10, 9);
+  %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
