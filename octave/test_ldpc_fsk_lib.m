@@ -57,7 +57,7 @@ function detected_data = decode_from_file(filename)
 end
 
 
-% plots a BER cuvre for the decoder.  Takes a while to run, uses parallel cores
+% plots a BER curve for the decoder.  Takes a while to run, uses parallel cores
 
 function plot_curve
   num_cores = 4;              % set this to the number of cores you have
@@ -246,6 +246,165 @@ function save_rtlsdr(filename, s)
   fclose(fs);
 endfunction
 
+
+% Using simulated SSTV packet, generate complex fsk mod signals, 8-bit
+% unsigned IQ for feeding into demod chain
+#{
+todo: [X] uncoded BER
+          [X] octave fsk demod
+          [X] use C demod
+      [ ] compared unsigned 8 bit IQ to regular 16-bit
+          + modulate complex signal
+          + check BER
+          + feed into csdr stack
+      [ ] test with resampler
+      [ ] measure effect on PER with coding
+#}
+
+function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
+
+  frames = sim_in.frames;
+  c_demod = sim_in.c_demod;
+
+  % init LDPC code
+
+  load('H2064_516_sparse.mat');
+  HRA = full(HRA);  
+  max_iterations = 100;
+  decoder_type = 0;
+  mod_order = 2;
+
+  code_param = ldpc_init(HRA, mod_order);
+
+  % note fixed frame of bits used for BER testing
+
+  tx_codeword = gen_sstv_frame;
+
+  % init FSK modem
+
+  fsk_horus_as_a_lib = 1;
+  fsk_horus;
+  states         = fsk_horus_init_hbr(9600, 8, 1200, 2, length(tx_codeword));
+  states.ftx     = [1200 2400];
+  states.df(1:states.M) = 0;
+  states.dA(1:states.M) = 1;
+  states.tx_real = 0;
+
+  % set up AWGN channel 
+
+  EbNo = 10^(EbNodB/10);
+  variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
+
+  % start simulation ----------------------------------------
+
+  tx_bit_stream = [];
+  for i=1:frames+1
+    tx_bit_stream = [tx_bit_stream tx_codeword];
+  end
+
+  % modulate and channel model
+
+  tx = fsk_horus_mod(states, tx_bit_stream);
+  noise_real = sqrt(variance)*randn(length(tx),1);
+  noise_complex = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
+
+  % demodulate
+
+  if c_demod
+    if states.tx_real
+      rx = tx + noise_real;
+    else
+      rx = 2*real(tx) + noise_real;
+    end
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    rx_scaled = 1000*real(rx);
+    f = fopen("fsk_demod.raw","wb"); fwrite(f, rx_scaled, "short"); fclose(f);
+    system("../build_linux/src/fsk_demod 2X 8 9600 1200 fsk_demod.raw fsk_demod.bin");
+    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+  else
+    if states.tx_real
+      rx = tx + noise_real;
+    else
+      rx = tx + noise_complex;
+    end
+    SNRdB = 10*log10(var(tx)/var(noise_complex));
+
+    % demodulate frame by frame using Octave demod
+
+    st = 1;
+    run_frames = floor(length(rx)/states.N);
+    rx_bit_stream = [];
+    rx_sd_stream = [];
+    for f=1:run_frames
+
+      % extract nin samples from rx sample stream
+
+      nin = states.nin;
+      en = st + states.nin - 1;
+
+      if en <= length(rx) % due to nin variations its possible to overrun buffer
+        sf = rx(st:en);
+        st += nin;
+
+        % demodulate to stream of bits
+
+        states.f = [1200 2400];
+        [rx_bits states] = fsk_horus_demod(states, sf);
+        rx_bit_stream = [rx_bit_stream rx_bits];
+        rx_sd_stream = [rx_sd_stream states.rx_bits_sd];
+      end
+    end
+  end
+
+  % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
+
+  state = "wait for uw";
+  start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 2*10 - 1;
+  uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
+  start_frame_ind =  end_uw_ind + 1;
+  nbits = length(rx_bit_stream);
+  uw_thresh = 0;
+  n_uncoded_errs = 0;
+  n_uncoded_bits = 0;
+
+  % might as well include RS232 framing bits in uncoded error count
+
+  nbits_frame = code_param.data_bits_per_frame*10/8;  
+
+  for i=luw:nbits
+    next_state = state;
+    if strcmp(state, 'wait for uw')
+      uw_errs = xor(rx_bit_stream(i-luw+1:i), uw_rs232);
+      if uw_errs <= uw_thresh
+        next_state = 'count errors';
+        tx_frame_ind = start_frame_ind;
+        rx_frame_ind = i + 1;
+        n_uncoded_errs_this_frame = 0;
+        %printf("%d %s %s\n", i, state, next_state);
+      end
+    end
+    if strcmp(state, 'count errors')
+      n_uncoded_errs_this_frame += xor(rx_bit_stream(i), tx_codeword(tx_frame_ind));
+      n_uncoded_bits++;
+      tx_frame_ind++;
+      if tx_frame_ind == (start_frame_ind+nbits_frame)
+        n_uncoded_errs += n_uncoded_errs_this_frame;
+        printf("n_uncoded_errs_this_frame: %d\n", n_uncoded_errs_this_frame);
+        frame_rx232_rx = rx_bit_stream(rx_frame_ind:rx_frame_ind+nbits_frame-1);
+        %tx_codeword(start_frame_ind+1:start_frame_ind+10)
+        %frame_rx232_rx(1:10)
+        sstv_checksum(frame_rx232_rx);
+        next_state = 'wait for uw';
+      end
+    end
+    state = next_state;
+  end
+
+  uncoded_ber = n_uncoded_errs/n_uncoded_bits;
+  printf("EbNodB: %4.1f SNRdB: %4.1f n_uncoded_bits: %d n_uncoded_errs: %d BER: %4.3f\n", 
+          EbNodB, SNRdB, n_uncoded_bits, n_uncoded_errs, uncoded_ber);  
+endfunction
+
 % Start simulation --------------------------------------------------------
 
 more off;
@@ -355,6 +514,7 @@ if demo == 8
   f = fopen("sstv_sd.bin","wb"); fwrite(f, r, "float32"); fclose(f);
 end
 
+
 if demo == 9
   frames = 100;
   EbNodB = 11;
@@ -375,7 +535,7 @@ if demo == 9
   Fs = 9600; Rs=1200; EbNolin = 10 ^ (EbNodB/10);
   variance = (tx_pwr/2)*states.Fs/(states.Rs*EbNolin*states.bitspersymbol);
   noise = sqrt(variance)*randn(1,length(tx)); 
-  printf("SNRdB meas: %4.1f\n", 10*log10(var(tx)/var(noise)));
+  SNRdB = 10*log10(var(tx)/var(noise));
   rx = tx + noise;
   f = fopen("fsk_demod.raw","wb"); tx = fwrite(f, rx, "short"); fclose(f);
  
@@ -385,262 +545,34 @@ if demo == 9
 end
 
 
-% Using simulated SSTV packet, generate complex fsk mod signals, 8-bit
-% unsigned IQ for feeding into demod chain
-% todo: [ ] uncoded BER
-%       [ ] octave fsk demod
-%       [ ] compared unsigned 8 bit IQ to regular 16-bit
-%       [ ] run python dashboard
-%       [ ] compare measured Eb/No
-%       [ ] drs232_ldpc has built in test frame
-%           [ ] use test frame that comes with code?
-%           [ ] Octave code to generate
-%           [ ] print test results
-%       [ ] test with resampler
-
 if demo == 10
-% init LDPC code
-
-load('H2064_516_sparse.mat');
-HRA = full(HRA);  
-max_iterations = 100;
-decoder_type = 0;
-mod_order = 2;
-
-code_param = ldpc_init(HRA, mod_order);
-tx_codeword = gen_sstv_frame;
-
-% init FSK modem
-
-fsk_horus_as_a_lib = 1;
-fsk_horus;
-states         = fsk_horus_init_hbr(9600, 8, 1200, 2, length(tx_codeword));
-states.ftx     = [1200 2400];
-states.df(1:states.M) = 0;
-states.dA(1:states.M) = 1;
-
-% set up AWGN channel 
-
-frames = 10;
-EbNodB = 9;
-EbNo = 10^(EbNodB/10);
-variance = states.Fs/(states.Rs*EbNo*states.bitspersymbol);
-
-% start simulation ----------------------------------------
-
-%tx_data = round(rand(1, code_param.data_bits_per_frame));
-%tx_codeword = ldpc_encode(code_param, tx_data);
-tx_bit_stream = [];
-for i=1:frames+1
-  tx_bit_stream = [tx_bit_stream tx_codeword];
-end
-
-% modulate and channel model
-
-tx = fsk_horus_mod(states, tx_bit_stream);
-noise = sqrt(variance)*randn(length(tx),1);
-rx = tx + noise;
-printf("SNRdB meas: %4.1f\n", 10*log10(var(tx)/var(noise)));
-
-% demodulate frame by frame
-
-st = 1;
-run_frames = floor(length(rx)/states.N);
-rx_bit_stream = [];
-rx_sd_stream = [];
-for f=1:run_frames
-
-  % extract nin samples from rx sample stream
-
-  nin = states.nin;
-  en = st + states.nin - 1;
-
-  if en <= length(rx) % due to nin variations its possible to overrun buffer
-    sf = rx(st:en);
-    st += nin;
-
-    % demodulate to stream of bits
-
-    states.f = [1200 2400];
-    [rx_bits states] = fsk_horus_demod(states, sf);
-    rx_bit_stream = [rx_bit_stream rx_bits];
-    rx_sd_stream = [rx_sd_stream states.rx_bits_sd];
-  end
-end
-
-#{
-% measure BER, there is an annoying one bit delay in rx
-% which means we waste a frame
-
-n_coded_bits = n_uncoded_bits = n_coded_errs = n_uncoded_errs = 0;
-for f=1:run_frames
-  st = (f-1)*states.nbit + 2; en = st+states.nbit-1;
-  if en < length(rx_bit_stream)
-    rx_codeword =  rx_bit_stream(st:en);
-    n_uncoded_errs += sum(xor(tx_codeword, rx_codeword));
-    n_uncoded_bits += code_param.symbols_per_frame;
-
-    #{
-    r = rx_sd_stream(st:en);
-    [detected_data Niters] = ldpc_decode(r, code_param, max_iterations, decoder_type);
-    coded_errors = sum(xor(detected_data(1:code_param.data_bits_per_frame), tx_data));
-    n_coded_errs += coded_errors;
-    n_coded_bits += code_param.data_bits_per_frame;
-    printf("f: %d Niters: %d coded_errors: %d\n", f, Niters, coded_errors);
-    #}
-  end
-end
-
-uncoded_ber = n_uncoded_errs/n_uncoded_bits;
-printf("n_uncoded_bits: %d n_uncoded_errs: %d BER: %4.3f\n", n_uncoded_bits, n_uncoded_errs, uncoded_ber);
-%coded_ber = n_coded_errs/n_coded_bits;
-%printf("n_coded_bits..: %d n_coded_errs..: %d BER: %4.3f\n", n_coded_bits, n_coded_errs, coded_ber);
-#}
-
-  % state machine. look for UW.  When found count bit errors over one frame of bits
-
-  state = "wait for uw";
-  start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 2*10 - 1;
-  uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
-  start_frame_ind =  end_uw_ind + 1;
-  nbits = length(rx_bit_stream);
-  uw_thresh = 0;
-  n_uncoded_errs = 0;
-  n_uncoded_bits = 0;
-
-  % might as well count uncoded errors use RS232 framing bits
-
-  nbits_frame = code_param.data_bits_per_frame*10/8;  
-
-  for i=luw:nbits
-    next_state = state;
-    if strcmp(state, 'wait for uw')
-      uw_errs = xor(rx_bit_stream(i-luw+1:i), uw_rs232);
-      if uw_errs <= uw_thresh
-        next_state = 'count errors';
-        tx_frame_ind = start_frame_ind;
-        %printf("%d %s %s\n", i, state, next_state);
-      end
-    end
-    if strcmp(state, 'count errors')
-      n_uncoded_errs += xor(rx_bit_stream(i), tx_codeword(tx_frame_ind));
-      n_uncoded_bits++;
-      tx_frame_ind++;
-      if tx_frame_ind == (start_frame_ind+nbits_frame)
-        next_state = 'wait for uw';
-      end
-    end
-    state = next_state;
-  end
-
-uncoded_ber = n_uncoded_errs/n_uncoded_bits;
-printf("n_uncoded_bits: %d n_uncoded_errs: %d BER: %4.3f\n", n_uncoded_bits, n_uncoded_errs, uncoded_ber);
+  sim_in.frames = 3;
+  EbNodBvec = 9;
   
-#{
-  frames = 2;
-  EbNodB = 100;
-
-  % init LPDC code - we need code_param.symbols_per_frame to init fsk modem,
-  % which is actually unused as we aren't running the fsk modem lol
-
-  load('H2064_516_sparse.mat');
-  HRA = full(HRA);  
-  max_iterations = 100; decoder_type = 0; mod_order = 2;
-  code_param = ldpc_init(HRA, mod_order);
-
-  % init 8x oversampled FSK modulator
-
-  fsk_horus_as_a_lib = 1;
-  fsk_horus;
-  states = fsk_horus_init_hbr(9600, 8, 1200, 2, code_param.symbols_per_frame);
-  states.ftx = [1200 2400];
-  states.tx_real = 0;
-
-  % Generate some SSTV frames, note it's the same frame repeated which
-  % isn't ideal for testing the LDPC code but good for uncoded BER
-  % testing.  For testing PER best to send frames of random payload data
-  % and measure PER based on checksum/LDPC decoder convergence.
-
-  printf("generating LPDC encoded frames...\n");
-  aframe_rs232 = gen_sstv_frame;
-  frames_rs232 = [];
-  for i=1:frames
-    frames_rs232 = [frames_rs232 aframe_rs232];
-  end
-  nbits = length(frame_rs232); bit_rate = 115200; Nsecs = nbits/bit_rate;
-  printf("%d frames, %d bits, %3.1f seconds at %d bit/s\n", frames, nbits, Nsecs, bit_rate);
-
-  % FSK modulate and add noise
-
-  printf("fsk mod and AWGN noise...\n");
-  tx = fsk_horus_mod(states, frame_rs232);
-
-  EbNolin = 10 ^ (EbNodB/10);
-  tx_pwr = var(tx);
-  variance = (tx_pwr)*states.Fs/(states.Rs*EbNolin*states.bitspersymbol);
-  noise = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1)); 
-  rx = tx + noise;
-
-  % Octave demodulator 
-
-  printf("fsk demod ....\n");
-  st = 1;
-  run_frames = floor(length(rx)/states.N);
-  rx_bit_stream = [];
-  rx_sd_stream = [];
-  for f=1:run_frames
-
-    % extract nin samples from rx sample stream
-
-    nin = states.nin;
-    en = st + states.nin - 1;
-
-    if en <= length(rx) % due to nin variations its possible to overrun buffer
-      sf = rx(st:en);
-      st += nin;
-
-      % demodulate to stream of bits
-
-      states.f = [1200 2400];
-      [rx_bits states] = fsk_horus_demod(states, sf);
-      rx_bit_stream = [rx_bit_stream rx_bits];
-      rx_sd_stream = [rx_sd_stream states.rx_bits_sd];
-    end
+  sim_in.c_demod = 0;
+  ber_octave = [];
+  for i = 1:length(EbNodBvec)
+    [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
+    ber_octave(i) = n_uncoded_errs/n_uncoded_bits;
   end
 
-  % arrange into 10 bit columns
-
-  % look for SSTV packet UW
-
-  uw_rs232 = aframe_rs232(16*10+1:18*10); luw = length(uw_rs232);
-  nbits = length(rx_bit_stream);
-  uw_score = zeros(1, nbits);
-  for i=1:nbits-luw
-    errs = xor(rx_bit_stream(i:i+luw-1), uw_rs232);
-    uw_score(i) = sum(errs);
+  sim_in.c_demod = 1;
+  ber_c = [];
+  for i = 1:length(EbNodBvec)
+    [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
+    ber_c(i) = n_uncoded_errs/n_uncoded_bits;
   end
-  figure(1)
-  clf
-  plot(uw_score)
 
-  % pass through drs232 to provide UW sync 
-
-#}
-#{
-  % determine raw BER from rx_frames
-
-  % read in test frame output from drs232_ldpc, determine raw BER
-
-
-  % Use Octave demodulator to check uncoded BER and PER.  Use UW to sync.
-  % Idea - how abt using C code for this?  Or just copy state machine logic
-  % here.  Wld need drs232_ldpc to have known test frame.  Hmmm... that is a 
-  % great idea for testing ... especially repeats across different rx set-ups.ñ
- 
-  printf("save IQ to disk...\n");
   figure(1);
-  subplot(211); plot(real(rx(1:1000)));
-  subplot(212); plot(imag(rx(1:1000)));
-  save_hackrf("fsk_modiq.raw", rx);
-#}
+  clf;
+  semilogy(EbNodBvec,  ber_octave, '+-;Octave demod;')
+  grid;
+  xlabel('Eb/No (dB)')
+  ylabel('BER')
+
+  hold on;
+  semilogy(EbNodBvec,  ber_c, 'g+-;C demod;')
+  legend("boxoff");
+  hold off;
 end
+
