@@ -270,7 +270,7 @@ function frame_rs232 = gen_sstv_frame
 
   % unpack bytes to bits and LPDC encode
 
-  mask = 2.^(0:7);
+  mask = 2.^(0:7);          % LSB to MSB
   unpacked_data = [];
   for b=1:length(data)
     unpacked_data = [unpacked_data bitand(data(b), mask) > 0];
@@ -295,3 +295,30 @@ function frame_rs232 = gen_sstv_frame
   end
 endfunction
 
+
+% calculates and compares the checksum of a SSTV frame, that has RS232
+% start and stop bits
+
+function checksum_ok = sstv_checksum(frame_rs232)
+  l = length(frame_rs232);
+  expected_l = (256+2)*10;
+  assert(l == expected_l);
+
+  % extract rx bytes
+
+  rx_data = zeros(1,256);
+  mask = 2.^(0:7);          % LSB to MSB
+  k = 1;
+  for i=1:10:expected_l
+    rx_bits = frame_rs232(i+1:i+8);
+    rx_data(k) = sum(rx_bits .* mask); 
+    k++;
+  end
+
+  % calc rx checksum and extract tx checksum
+
+  rx_checksum = crc16(rx_data(1:256));
+  tx_checksum = sprintf("%02X%02X", rx_data(258), rx_data(257));
+  %printf("tx_checksum: %s rx_checksum: %s\n", tx_checksum, rx_checksum);
+  checksum_ok = strcmp(tx_checksum, rx_checksum);
+endfunction
