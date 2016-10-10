@@ -36,7 +36,7 @@
 #include "quantise.h"
 #include "lpc.h"
 #include "lsp.h"
-#include "kiss_fft.h"
+#include "codec2_fft.h"
 #undef PROFILE
 #include "machdep.h"
 
@@ -846,7 +846,7 @@ void force_min_lsp_dist(float lsp[], int order)
 
 \*---------------------------------------------------------------------------*/
 
-void lpc_post_filter(kiss_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
+void lpc_post_filter(codec2_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
                      int order, int dump, float beta, float gamma, int bass_boost, float E)
 {
     int   i;
@@ -873,7 +873,7 @@ void lpc_post_filter(kiss_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
 	x[i] = ak[i] * coeff;
         coeff *= gamma;
     }
-    kiss_fftr(fftr_fwd_cfg, (kiss_fft_scalar *)x, (kiss_fft_cpx *)Ww);
+    codec2_fftr(fftr_fwd_cfg, x, Ww);
 
     PROFILE_SAMPLE_AND_LOG(tfft2, taw, "        fft2");
 
@@ -956,7 +956,7 @@ void lpc_post_filter(kiss_fftr_cfg fftr_fwd_cfg, float Pw[], float ak[],
 \*---------------------------------------------------------------------------*/
 
 void aks_to_M2(
-  kiss_fftr_cfg  fftr_fwd_cfg,
+  codec2_fftr_cfg  fftr_fwd_cfg,
   float         ak[],	     /* LPC's */
   int           order,
   MODEL        *model,	     /* sinusoidal model parameters for this frame */
@@ -993,7 +993,7 @@ void aks_to_M2(
 
       for(i=0; i<=order; i++)
           a[i] = ak[i];
-      kiss_fftr(fftr_fwd_cfg, (kiss_fft_scalar *)a, (kiss_fft_cpx *)Aw);
+      codec2_fftr(fftr_fwd_cfg, a, Aw);
   }
   PROFILE_SAMPLE_AND_LOG(tfft, tstart, "      fft");
 
@@ -1047,6 +1047,16 @@ void aks_to_M2(
   for(m=1; m<=model->L; m++) {
       am = (int)((m - 0.5)*model->Wo/r + 0.5);
       bm = (int)((m + 0.5)*model->Wo/r + 0.5);
+
+      // FIXME: With arm_rfft_fast_f32 we have to use this
+      // otherwise sometimes a to high bm is calculated
+      // which causes trouble later in the calculation
+      // chain
+      // it seems for some reason model->Wo is calculated somewhat too high
+      if (bm>FFT_ENC/2)
+      {
+          bm = FFT_ENC/2;
+      }
       Em = 0.0;
 
       for(i=am; i<bm; i++)
@@ -1070,7 +1080,6 @@ void aks_to_M2(
           if (Am < model->A[m])
               Am *= 1.4;
       }
-
       model->A[m] = Am;
   }
   *snr = 10.0*log10f(signal/noise);
@@ -1274,12 +1283,12 @@ float speech_to_uq_lsps(float lsp[],
 )
 {
     int   i, roots;
-    float Wn[M];
+    float Wn[M_PITCH];
     float R[order+1];
     float e, E;
 
     e = 0.0;
-    for(i=0; i<M; i++) {
+    for(i=0; i<M_PITCH; i++) {
 	Wn[i] = Sn[i]*w[i];
 	e += Wn[i]*Wn[i];
     }
@@ -1292,7 +1301,7 @@ float speech_to_uq_lsps(float lsp[],
 	return 0.0;
     }
 
-    autocorrelate(Wn, R, M, order);
+    autocorrelate(Wn, R, M_PITCH, order);
     levinson_durbin(R, ak, order);
 
     E = 0.0;
@@ -1932,7 +1941,7 @@ float decode_energy(int index, int bits)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_amplitudes(kiss_fft_cfg  fft_fwd_cfg,
+float decode_amplitudes(codec2_fft_cfg  fft_fwd_cfg,
 			MODEL *model,
 			float  ak[],
 		        int    lsp_indexes[],

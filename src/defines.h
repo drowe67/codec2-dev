@@ -55,7 +55,7 @@
 
 /* Pitch estimation defines */
 
-#define M        320		/* pitch analysis frame size            */
+#define M_PITCH        320		/* pitch analysis frame size            */
 #define P_MIN    20		/* minimum pitch                        */
 #define P_MAX    160		/* maximum pitch                        */
 

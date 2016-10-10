@@ -28,10 +28,10 @@
 #ifndef __PHASE__
 #define __PHASE__
 
-#include "kiss_fft.h"
+#include "codec2_fft.h"
 #include "comp.h"
 
-void phase_synth_zero_order(kiss_fft_cfg fft_dec_cfg,
+void phase_synth_zero_order(codec2_fft_cfg fft_dec_cfg,
 			    MODEL *model,
                             float *ex_phase,
                             COMP   A[]);

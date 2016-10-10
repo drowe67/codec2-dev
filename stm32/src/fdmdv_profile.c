@@ -56,12 +56,12 @@ static COMP channel[CHANNEL_BUF_SIZE];
 static void channel_in(COMP tx_fdm[], int nout) {
     int i;
 
-    /* add M tx samples to end of buffer */
+    /* add M_PITCH tx samples to end of buffer */
 
     assert((channel_count + nout) < CHANNEL_BUF_SIZE);
     for(i=0; i<nout; i++)
         channel[channel_count+i] = tx_fdm[i];
-    channel_count += M;
+    channel_count += M_PITCH;
 }
 
 static void channel_out(COMP rx_fdm[], int nin) {

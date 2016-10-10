@@ -29,20 +29,22 @@
 #ifndef __CODEC2_INTERNAL__
 #define __CODEC2_INTERNAL__
 
+#include "codec2_fft.h"
+
 struct CODEC2 {
     int           mode;
-    kiss_fft_cfg  fft_fwd_cfg;             /* forward FFT config                        */
-    kiss_fftr_cfg fftr_fwd_cfg;            /* forward real FFT config                   */
-    float         w[M];	                   /* time domain hamming window                */
+    codec2_fft_cfg  fft_fwd_cfg;             /* forward FFT config                        */
+    codec2_fftr_cfg fftr_fwd_cfg;            /* forward real FFT config                   */
+    float         w[M_PITCH];	                   /* time domain hamming window                */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
     float         Pn[2*N_SAMP];	           /* trapezoidal synthesis window              */
     float        *bpf_buf;                 /* buffer for band pass filter               */
-    float         Sn[M];                   /* input speech                              */
+    float         Sn[M_PITCH];                   /* input speech                              */
     float         hpf_states[2];           /* high pass filter states                   */
     void         *nlp;                     /* pitch predictor states                    */
     int           gray;                    /* non-zero for gray encoding                */
 
-    kiss_fft_cfg  fft_inv_cfg;             /* inverse FFT config                        */
+    codec2_fftr_cfg  fftr_inv_cfg;             /* inverse FFT config                        */
     float         Sn_[2*N_SAMP];	           /* synthesised output speech                 */
     float         ex_phase;                /* excitation model phase track              */
     float         bg_est;                  /* background noise estimate for post filter */

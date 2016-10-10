@@ -51,7 +51,7 @@
 #include "rxdec_coeff.h"
 #include "test_bits.h"
 #include "pilot_coeff.h"
-#include "kiss_fft.h"
+#include "codec2_fft.h"
 #include "hanning.h"
 #include "os.h"
 #include "machdep.h"
@@ -159,7 +159,7 @@ struct FDMDV * fdmdv_create(int Nc)
 
     /* freq Offset estimation states */
 
-    f->fft_pilot_cfg = kiss_fft_alloc (MPILOTFFT, 0, NULL, NULL);
+    f->fft_pilot_cfg = codec2_fft_alloc (MPILOTFFT, 0, NULL, NULL);
     assert(f->fft_pilot_cfg != NULL);
 
     for(i=0; i<NPILOTBASEBAND; i++) {
@@ -218,7 +218,7 @@ struct FDMDV * fdmdv_create(int Nc)
 void fdmdv_destroy(struct FDMDV *fdmdv)
 {
     assert(fdmdv != NULL);
-    KISS_FFT_FREE(fdmdv->fft_pilot_cfg);
+    codec2_fft_free(fdmdv->fft_pilot_cfg);
     free(fdmdv->rx_test_bits_mem);
     free(fdmdv);
 }
@@ -713,12 +713,11 @@ void generate_pilot_lut(COMP pilot_lut[], COMP *pilot_freq)
 \*---------------------------------------------------------------------------*/
 
 void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
-		   COMP pilot_lpf[], kiss_fft_cfg fft_pilot_cfg, COMP S[], int nin,
+		   COMP pilot_lpf[], codec2_fft_cfg fft_pilot_cfg, COMP S[], int nin,
                    int do_fft)
 {
     int   i,j,k;
     int   mpilot;
-    COMP  s[MPILOTFFT];
     float mag, imax;
     int   ix;
     float r;
@@ -770,16 +769,12 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
     if (do_fft) {
 
         /* decimate to improve DFT resolution, window and DFT */
-
         mpilot = FS/(2*200);  /* calc decimation rate given new sample rate is twice LPF freq */
-        for(i=0; i<MPILOTFFT; i++) {
-            s[i].real = 0.0; s[i].imag = 0.0;
-        }
         for(i=0,j=0; i<NPILOTLPF; i+=mpilot,j++) {
-            s[j] = fcmult(hanning[i], pilot_lpf[i]);
+            S[j] = fcmult(hanning[i], pilot_lpf[i]);
         }
 
-        kiss_fft(fft_pilot_cfg, (kiss_fft_cpx *)s, (kiss_fft_cpx *)S);
+        codec2_fft_inplace(fft_pilot_cfg, S);
 
         /* peak pick and convert to Hz */
 

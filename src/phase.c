@@ -129,7 +129,7 @@
 \*---------------------------------------------------------------------------*/
 
 void phase_synth_zero_order(
-    kiss_fft_cfg fft_fwd_cfg,
+    codec2_fft_cfg fft_fwd_cfg,
     MODEL *model,
     float *ex_phase,            /* excitation phase of fundamental */
     COMP   A[]

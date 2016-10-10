@@ -28,8 +28,7 @@
 
 #include "defines.h"
 #include "comp.h"
-#include "kiss_fft.h"
-#include "kiss_fftr.h"
+#include "codec2_fft.h"
 #include "codec2_internal.h"
 
 void dump_on(char filename_prefix[]);

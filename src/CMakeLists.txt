@@ -137,6 +137,7 @@ set(CODEC2_SRCS
     postfilter.c
     sine.c
     codec2.c
+    codec2_fft.c
     cohpsk.c
     fifo.c
     fdmdv.c
@@ -205,16 +206,16 @@ target_link_libraries(c2dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(c2sim c2sim.c ampexp.c phaseexp.c)
 target_link_libraries(c2sim ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(fdmdv_get_test_bits fdmdv_get_test_bits.c fdmdv.c kiss_fft.c)
+add_executable(fdmdv_get_test_bits fdmdv_get_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
 target_link_libraries(fdmdv_get_test_bits ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(fdmdv_mod fdmdv_mod.c fdmdv.c kiss_fft.c)
+add_executable(fdmdv_mod fdmdv_mod.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
 target_link_libraries(fdmdv_mod ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c modem_stats.c)
+add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c modem_stats.c codec2_fft.c kiss_fftr.c)
 target_link_libraries(fdmdv_demod ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c)
+add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
 target_link_libraries(fdmdv_put_test_bits ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_channel fdmdv_channel.c)
