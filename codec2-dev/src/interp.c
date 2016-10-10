@@ -148,7 +148,7 @@ float sample_log_amp(MODEL *model, float w)
 \*---------------------------------------------------------------------------*/
 
 void interpolate_lsp(
-  kiss_fft_cfg  fft_fwd_cfg,
+  codec2_fft_cfg  fft_fwd_cfg,
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
   MODEL *next,      /* next frames model params                      */
@@ -282,8 +282,8 @@ void interp_Wo2(
 
 float interp_energy(float prev_e, float next_e)
 {
-    return powf(10.0, (log10f(prev_e) + log10f(next_e))/2.0);
-
+    //return powf(10.0, (log10f(prev_e) + log10f(next_e))/2.0);
+    return sqrtf(prev_e * next_e); //looks better is math. identical and faster math
 }
 
 

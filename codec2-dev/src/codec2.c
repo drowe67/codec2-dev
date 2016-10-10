@@ -33,6 +33,7 @@
 #include <math.h>
 
 #include "defines.h"
+#include "codec2_fft.h"
 #include "sine.h"
 #include "nlp.h"
 #include "dump.h"
@@ -117,16 +118,16 @@ struct CODEC2 * codec2_create(int mode)
 	return NULL;
 
     c2->mode = mode;
-    for(i=0; i<M; i++)
+    for(i=0; i<M_PITCH; i++)
 	c2->Sn[i] = 1.0;
     c2->hpf_states[0] = c2->hpf_states[1] = 0.0;
     for(i=0; i<2*N_SAMP; i++)
 	c2->Sn_[i] = 0;
-    c2->fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
-    c2->fftr_fwd_cfg = kiss_fftr_alloc(FFT_ENC, 0, NULL, NULL);
+    c2->fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);
+    c2->fftr_fwd_cfg = codec2_fftr_alloc(FFT_ENC, 0, NULL, NULL);
     make_analysis_window(c2->fft_fwd_cfg, c2->w,c2->W);
     make_synthesis_window(c2->Pn);
-    c2->fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL);
+    c2->fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL);
     quantise_init();
     c2->prev_Wo_enc = 0.0;
     c2->bg_est = 0.0;
@@ -143,7 +144,7 @@ struct CODEC2 * codec2_create(int mode)
     }
     c2->prev_e_dec = 1;
 
-    c2->nlp = nlp_create(M);
+    c2->nlp = nlp_create(M_PITCH);
     if (c2->nlp == NULL) {
 	free (c2);
 	return NULL;
@@ -186,9 +187,9 @@ void codec2_destroy(struct CODEC2 *c2)
     assert(c2 != NULL);
     free(c2->bpf_buf);
     nlp_destroy(c2->nlp);
-    KISS_FFT_FREE(c2->fft_fwd_cfg);
-    KISS_FFT_FREE(c2->fftr_fwd_cfg);
-    KISS_FFT_FREE(c2->fft_inv_cfg);
+    codec2_fft_free(c2->fft_fwd_cfg);
+    codec2_fftr_free(c2->fftr_fwd_cfg);
+    codec2_fftr_free(c2->fftr_inv_cfg);
     free(c2);
 }
 
@@ -1855,7 +1856,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
     PROFILE_SAMPLE_AND_LOG(synth_start, pf_start, "    postfilter");
 
-    synthesise(c2->fft_inv_cfg, c2->Sn_, model, c2->Pn, 1);
+    synthesise(c2->fftr_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
     PROFILE_SAMPLE_AND_LOG2(synth_start, "    synth");
 
@@ -1886,18 +1887,16 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 {
     COMP    Sw[FFT_ENC];
-    COMP    Sw_[FFT_ENC];
-    COMP    Ew[FFT_ENC];
     float   pitch;
     int     i;
     PROFILE_VAR(dft_start, nlp_start, model_start, two_stage, estamps);
 
     /* Read input speech */
 
-    for(i=0; i<M-N_SAMP; i++)
+    for(i=0; i<M_PITCH-N_SAMP; i++)
       c2->Sn[i] = c2->Sn[i+N_SAMP];
     for(i=0; i<N_SAMP; i++)
-      c2->Sn[i+M-N_SAMP] = speech[i];
+      c2->Sn[i+M_PITCH-N_SAMP] = speech[i];
 
     PROFILE_SAMPLE(dft_start);
     dft_speech(c2->fft_fwd_cfg, Sw, c2->Sn, c2->w);
@@ -1917,7 +1916,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     PROFILE_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage");
     estimate_amplitudes(model, Sw, c2->W, 0);
     PROFILE_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps");
-    est_voicing_mbe(model, Sw, c2->W, Sw_, Ew);
+    est_voicing_mbe(model, Sw, c2->W);
     c2->prev_Wo_enc = model->Wo;
     PROFILE_SAMPLE_AND_LOG2(estamps, "    est_voicing");
     #ifdef DUMP

@@ -11,13 +11,14 @@ FLOAT_TYPE=hard
 
 CROSS_COMPILE ?= arm-none-eabi-
 CC=$(BINPATH)$(CROSS_COMPILE)gcc
+AS=$(BINPATH)$(CROSS_COMPILE)as
 OBJCOPY=$(BINPATH)$(CROSS_COMPILE)objcopy
 SIZE=$(BINPATH)$(CROSS_COMPILE)size
 SUDO ?= sudo
 
 ###################################################
 
-CFLAGS  = -std=gnu99 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F40_41xxx -DCORTEX_M4
+CFLAGS  = -std=gnu11 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F40_41xxx -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -368,7 +369,8 @@ $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_rfft_init_q31.c\
 $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_rfft_q15.c\
 $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_rfft_q31.c\
 
-CMSIS_OBJS = $(CMSIS_SRCS:.c=.o)
+
+CMSIS_OBJS = $(CMSIS_SRCS:.c=.o) $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_bitreversal2.o
 
 ###################################################
 
@@ -381,6 +383,7 @@ $(CODEC2_SRC)/nlp.c \
 $(CODEC2_SRC)/postfilter.c \
 $(CODEC2_SRC)/sine.c \
 $(CODEC2_SRC)/codec2.c \
+$(CODEC2_SRC)/codec2_fft.c \
 $(CODEC2_SRC)/kiss_fft.c \
 $(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
@@ -433,7 +436,7 @@ LIBPATHS =
 
 # Libraries to link
 
-LIBS = -lg -lnosys -lm
+LIBS = -lg -lnosys -lm 
 #Uncomment for standard arm semihosting
 #LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 

@@ -28,7 +28,7 @@
 #include "defines.h"
 #include "nlp.h"
 #include "dump.h"
-#include "kiss_fft.h"
+#include "codec2_fft.h"
 #undef PROFILE
 #include "machdep.h"
 
@@ -121,7 +121,7 @@ typedef struct {
     float         sq[PMAX_M];	     /* squared speech samples       */
     float         mem_x,mem_y;       /* memory for notch filter      */
     float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
-    kiss_fft_cfg  fft_cfg;           /* kiss FFT config              */
+    codec2_fft_cfg  fft_cfg;           /* kiss FFT config              */
 } NLP;
 
 #ifdef POST_PROCESS_MBE
@@ -165,7 +165,7 @@ int    m			/* analysis window size */
     for(i=0; i<NLP_NTAP; i++)
 	nlp->mem_fir[i] = 0.0;
 
-    nlp->fft_cfg = kiss_fft_alloc (PE_FFT_SIZE, 0, NULL, NULL);
+    nlp->fft_cfg = codec2_fft_alloc (PE_FFT_SIZE, 0, NULL, NULL);
     assert(nlp->fft_cfg != NULL);
 
     return (void*)nlp;
@@ -185,7 +185,7 @@ void nlp_destroy(void *nlp_state)
     assert(nlp_state != NULL);
     nlp = (NLP*)nlp_state;
 
-    KISS_FFT_FREE(nlp->fft_cfg);
+    codec2_fft_free(nlp->fft_cfg);
     free(nlp_state);
 }
 
@@ -233,8 +233,7 @@ float nlp(
 {
     NLP   *nlp;
     float  notch;		    /* current notch filter output    */
-    COMP   fw[PE_FFT_SIZE];	    /* DFT of squared signal (input)  */
-    COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal (output) */
+    COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal (input/output) */
     float  gmax;
     int    gmax_bin;
     int    m, i,j;
@@ -285,18 +284,20 @@ float nlp(
     /* Decimate and DFT */
 
     for(i=0; i<PE_FFT_SIZE; i++) {
-	fw[i].real = 0.0;
-	fw[i].imag = 0.0;
+	Fw[i].real = 0.0;
+	Fw[i].imag = 0.0;
     }
     for(i=0; i<m/DEC; i++) {
-	fw[i].real = nlp->sq[i*DEC]*nlp->w[i];
+	Fw[i].real = nlp->sq[i*DEC]*nlp->w[i];
     }
     PROFILE_SAMPLE_AND_LOG(window, filter, "      window");
     #ifdef DUMP
     dump_dec(Fw);
     #endif
 
-    kiss_fft(nlp->fft_cfg, (kiss_fft_cpx *)fw, (kiss_fft_cpx *)Fw);
+    // FIXME: check if this can be converted to a real fft
+    // since all imag inputs are 0
+    codec2_fft_inplace(nlp->fft_cfg, Fw);
     PROFILE_SAMPLE_AND_LOG(fft, window, "      fft");
 
     for(i=0; i<PE_FFT_SIZE; i++)

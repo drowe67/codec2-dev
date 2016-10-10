@@ -68,12 +68,12 @@ int main(int argc, char *argv[])
     short buf[N_SAMP];	/* input/output buffer                   */
     float buf_float[N_SAMP];
     float buf_float_bpf[N_SAMP];
-    float Sn[M];	/* float input speech samples            */
+    float Sn[M_PITCH];	/* float input speech samples            */
     float Sn_pre[N_SAMP];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
-    kiss_fft_cfg  fft_fwd_cfg;
-    kiss_fft_cfg  fft_inv_cfg;
-    float w[M];	        /* time domain hamming window            */
+    codec2_fft_cfg  fft_fwd_cfg;
+    codec2_fft_cfg  fft_inv_cfg;
+    float w[M_PITCH];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
     float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
@@ -192,7 +192,7 @@ int main(int argc, char *argv[])
     int num_opts=sizeof(long_options)/sizeof(struct option);
     COMP Aw[FFT_ENC];
 
-    for(i=0; i<M; i++) {
+    for(i=0; i<M_PITCH; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
     }
@@ -214,7 +214,7 @@ int main(int argc, char *argv[])
     e = prev_e = 1;
     hpf_states[0] = hpf_states[1] = 0.0;
 
-    nlp_states = nlp_create(M);
+    nlp_states = nlp_create(M_PITCH);
 
     if (argc < 2) {
         print_help(long_options, num_opts, argv);
@@ -397,8 +397,8 @@ int main(int argc, char *argv[])
 
     /* Initialise ------------------------------------------------------------*/
 
-    fft_fwd_cfg = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
-    fft_inv_cfg = kiss_fft_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
+    fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
+    fft_inv_cfg = codec2_fft_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
     make_analysis_window(fft_fwd_cfg, w, W);
     make_synthesis_window(Pn);
     quantise_init();
@@ -465,11 +465,11 @@ int main(int argc, char *argv[])
 
         /* shift buffer of input samples, and insert new samples */
 
-	for(i=0; i<M-N_SAMP; i++) {
+	for(i=0; i<M_PITCH-N_SAMP; i++) {
 	    Sn[i] = Sn[i+N_SAMP];
 	}
 	for(i=0; i<N_SAMP; i++) {
-	    Sn[i+M-N_SAMP] = buf_float[i];
+	    Sn[i+M_PITCH-N_SAMP] = buf_float[i];
         }
 
 	/*------------------------------------------------------------*\
@@ -517,7 +517,7 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (phase0) {
-	    float Wn[M];		        /* windowed speech samples */
+	    float Wn[M_PITCH];		        /* windowed speech samples */
 	    float Rk[order+1];                  /* autocorrelation coeffs  */
             COMP a[FFT_ENC];
 
@@ -527,14 +527,18 @@ int main(int argc, char *argv[])
 
 	    /* find aks here, these are overwritten if LPC modelling is enabled */
 
-            for(i=0; i<M; i++)
+            for(i=0; i<M_PITCH; i++)
                 Wn[i] = Sn[i]*w[i];
-	    autocorrelate(Wn,Rk,M,order);
+	    autocorrelate(Wn,Rk,M_PITCH,order);
 	    levinson_durbin(Rk,ak,order);
 
 	    /* determine voicing */
 
+	    #if 0
 	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew);
+            #else
+	    snr = est_voicing_mbe(&model, Sw, W);
+            #endif
 
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f %f %d ", model.Wo, snr, model.voiced);
@@ -591,7 +595,7 @@ int main(int argc, char *argv[])
 	    if (e < 0.0) {
 		int i;
 		FILE*f=fopen("x.txt","wt");
-		for(i=0; i<M; i++)
+		for(i=0; i<M_PITCH; i++)
 		    fprintf(f,"%f\n", Sn[i]);
 		fclose(f);
 		printf("e = %f frames = %d\n", e, frames);

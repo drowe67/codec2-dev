@@ -26,8 +26,7 @@
 #ifndef __QUANTISE__
 #define __QUANTISE__
 
-#include "kiss_fft.h"
-#include "kiss_fftr.h"
+#include "codec2_fft.h"
 #include "comp.h"
 
 #define WO_BITS     7
@@ -57,7 +56,7 @@
 void quantise_init();
 float lpc_model_amplitudes(float Sn[], float w[], MODEL *model, int order,
 			   int lsp,float ak[]);
-void aks_to_M2(kiss_fftr_cfg fftr_fwd_cfg, float ak[], int order, MODEL *model,
+void aks_to_M2(codec2_fftr_cfg fftr_fwd_cfg, float ak[], int order, MODEL *model,
 	       float E, float *snr, int dump, int sim_pf,
                int pf, int bass_boost, float beta, float gamma, COMP Aw[]);
 
