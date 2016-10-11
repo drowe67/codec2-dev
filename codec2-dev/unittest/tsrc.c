@@ -47,6 +47,7 @@ int main(int argc, char *argv[]) {
     assert(fout != NULL);
 
     src = src_new(SRC_SINC_FASTEST, 1, &error);
+    //src = src_new(SRC_LINEAR, 1, &error);
     assert(src != NULL);
 
     data.data_in = in8k;

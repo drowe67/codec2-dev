@@ -167,8 +167,7 @@ int main(int argc, char *argv[]) {
     }
 
     state = LOOK_FOR_UW;
-    for(i=0; i<UNPACKED_PACKET_BYTES; i++)
-        bit_buffer[i] = 0;
+    memset(bit_buffer,0,  sizeof(bit_buffer));
 
     packet_errors = packets = 0;
 

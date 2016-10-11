@@ -225,5 +225,8 @@ int main(int argc, char *argv[]) {
     fclose(fin);
     fclose(fout);
 
+    fprintf(stderr, "packets: %d packet_errors: %d PER: %4.3f\n", packets, packet_errors, 
+            (float)packet_errors/packets);
+
     return 0;
 }
