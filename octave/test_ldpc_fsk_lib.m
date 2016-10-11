@@ -239,11 +239,36 @@ function save_rtlsdr(filename, s)
   re = real(s); im = imag(s);
   l = length(s);
   iq = zeros(1,2*l);
-  iq(1:2:2*l) = 127 + re*(127/mx); 
-  iq(2:2:2*l) = 127 + im*(127/mx); 
+  %iq(1:2:2*l) = 127 + re*(127/mx); 
+  %iq(2:2:2*l) = 127 + im*(127/mx); 
+  iq(1:2:2*l) = 127 + 32*re; 
+  iq(2:2:2*l) = 127 + 32*im; 
+  figure(3); clf; plot(iq);
   fs = fopen(filename,"wb");
   fwrite(fs,iq,"uchar");
   fclose(fs);
+endfunction
+
+
+% Oversamples by a factor of 2 using Octaves resample() function then
+% uses linear interpolation to achive fractional sample rate
+
+function rx_resample_fract = fractional_resample(rx, resample_rate);
+    assert(resample_rate < 2, "keep resample_rate between 0 and 2");
+    rx_resample2 = resample(rx, 2, 1);
+    l = length(rx_resample2);
+    rx_resample_fract = zeros(1,l);
+    k = 1;
+    step = 2/resample_rate;
+    for i=1:step:l-1
+      i_low = floor(i);
+      i_high = ceil(i);
+      f = i - i_low;
+      rx_resample_fract(k) = (1-f)*rx_resample2(i_low) + f*rx_resample2(i_high); 
+      %printf("i: %f i_low: %d i_high: %d f: %f\n", i, i_low, i_high, f);
+      k++;
+    end
+    rx_resample_fract = rx_resample_fract(1:k-1);
 endfunction
 
 
@@ -253,10 +278,9 @@ endfunction
 todo: [X] uncoded BER
           [X] octave fsk demod
           [X] use C demod
-      [ ] compared unsigned 8 bit IQ to regular 16-bit
-          + modulate complex signal
-          + check BER
-          + feed into csdr stack
+      [ ] compare uncoded BER to unsigned 8 bit IQ to regular 16-bit
+          [ ] generate complex rx signal with noise
+          [ ] used cmd line utils to drive demod
       [ ] test with resampler
       [ ] measure effect on PER with coding
 #}
@@ -264,7 +288,7 @@ todo: [X] uncoded BER
 function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
   frames = sim_in.frames;
-  c_demod = sim_in.c_demod;
+  demod_type = sim_in.demod_type;
 
   % init LDPC code
 
@@ -279,16 +303,24 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   % note fixed frame of bits used for BER testing
 
   tx_codeword = gen_sstv_frame;
-
+  length(tx_codeword)
   % init FSK modem
 
   fsk_horus_as_a_lib = 1;
   fsk_horus;
   states         = fsk_horus_init_hbr(9600, 8, 1200, 2, length(tx_codeword));
-  states.ftx     = [1200 2400];
   states.df(1:states.M) = 0;
   states.dA(1:states.M) = 1;
-  states.tx_real = 0;
+  states.tx_real = 0;  % Octave fsk_mod generates complex valued output
+
+  % Set up simulated tx tones to sit in teh middle of cdsr passband
+
+  filt_low_norm = 0.1; filt_high_norm = 0.4;
+  fc = states.Fs*(filt_low_norm + filt_high_norm)/2;
+  %fc = 1800;
+  f1 = fc - states.Rs/2
+  f2 = fc + states.Rs/2
+  states.ftx = [f1 f2];
 
   % set up AWGN channel 
 
@@ -298,7 +330,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   % start simulation ----------------------------------------
 
   tx_bit_stream = [];
-  for i=1:frames+1
+  for i=1:frames
     tx_bit_stream = [tx_bit_stream tx_codeword];
   end
 
@@ -310,18 +342,10 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
   % demodulate
 
-  if c_demod
-    if states.tx_real
-      rx = tx + noise_real;
-    else
-      rx = 2*real(tx) + noise_real;
-    end
-    SNRdB = 10*log10(var(tx)/var(noise_real));
-    rx_scaled = 1000*real(rx);
-    f = fopen("fsk_demod.raw","wb"); fwrite(f, rx_scaled, "short"); fclose(f);
-    system("../build_linux/src/fsk_demod 2X 8 9600 1200 fsk_demod.raw fsk_demod.bin");
-    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
-  else
+  if demod_type == 1
+
+    % Octave demod
+
     if states.tx_real
       rx = tx + noise_real;
     else
@@ -348,7 +372,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
         % demodulate to stream of bits
 
-        states.f = [1200 2400];
+        states.f = [f1 f2];
         [rx_bits states] = fsk_horus_demod(states, sf);
         rx_bit_stream = [rx_bit_stream rx_bits];
         rx_sd_stream = [rx_sd_stream states.rx_bits_sd];
@@ -356,31 +380,87 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     end
   end
 
-  % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
+  if demod_type == 2
+    % baseline C demod
+
+    if states.tx_real
+      rx = tx + noise_real;
+    else
+      rx = 2*real(tx) + noise_real;
+    end
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    rx_scaled = 1000*real(rx);
+    f = fopen("fsk_demod.raw","wb"); fwrite(f, rx_scaled, "short"); fclose(f);
+    system("../build_linux/src/fsk_demod 2X 8 9600 1200 fsk_demod.raw fsk_demod.bin");
+    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+  end
+
+  if demod_type == 3
+    % C demod driven by command line kung fu
+
+    assert(states.tx_real == 0, "need complex signal for this test");
+    rx = tx + noise_complex;
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    save_rtlsdr("fsk_demod.iq", rx);
+    system("cat fsk_demod.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
+    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+  end
+
+  if demod_type == 4
+    % C demod with resampler ....... getting closer to Mark's real time cmd line
+
+    assert(states.tx_real == 0, "need complex signal for this test");
+    rx = tx + noise_complex;
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    
+    % interpolate by factor or 2, then use straight line interpolation
+
+    printf("resampling ...\n");
+    rx_resample_fract = fractional_resample(rx, 1.08331);
+    %rx_resample_fract = fractional_resample(rx_resample_fract, 1/1.08331);
+    save_rtlsdr("fsk_demod_resample.iq", rx_resample_fract);
+
+    printf("run C cmd line chain ...\n");
+%    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
+    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
+%    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr fractional_decimator_ff 1.08331 | csdr realpart_cf | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
+    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+  end
+
+ % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
 
   state = "wait for uw";
-  start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 2*10 - 1;
+  start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 5*10 - 1;
   uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
   start_frame_ind =  end_uw_ind + 1;
   nbits = length(rx_bit_stream);
-  uw_thresh = 0;
+  uw_thresh = 5;
   n_uncoded_errs = 0;
   n_uncoded_bits = 0;
+  n_packets_rx = 0;
+  last_i = 0;
 
   % might as well include RS232 framing bits in uncoded error count
 
   nbits_frame = code_param.data_bits_per_frame*10/8;  
 
+  uw_errs = zeros(1, nbits);
+  for i=luw:nbits
+    uw_errs(i) = sum(xor(rx_bit_stream(i-luw+1:i), uw_rs232));
+  end
+
   for i=luw:nbits
     next_state = state;
     if strcmp(state, 'wait for uw')
-      uw_errs = xor(rx_bit_stream(i-luw+1:i), uw_rs232);
-      if uw_errs <= uw_thresh
+      if uw_errs(i) <= uw_thresh
         next_state = 'count errors';
         tx_frame_ind = start_frame_ind;
         rx_frame_ind = i + 1;
         n_uncoded_errs_this_frame = 0;
         %printf("%d %s %s\n", i, state, next_state);
+        if last_i
+          printf("i: %d i-last_i: %d ", i, i-last_i);
+        end
       end
     end
     if strcmp(state, 'count errors')
@@ -394,6 +474,8 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
         %tx_codeword(start_frame_ind+1:start_frame_ind+10)
         %frame_rx232_rx(1:10)
         sstv_checksum(frame_rx232_rx);
+        last_i = i;
+        n_packets_rx++;
         next_state = 'wait for uw';
       end
     end
@@ -401,8 +483,12 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   end
 
   uncoded_ber = n_uncoded_errs/n_uncoded_bits;
-  printf("EbNodB: %4.1f SNRdB: %4.1f n_uncoded_bits: %d n_uncoded_errs: %d BER: %4.3f\n", 
-          EbNodB, SNRdB, n_uncoded_bits, n_uncoded_errs, uncoded_ber);  
+  printf("EbNodB: %4.1f SNRdB: %4.1f pkts: %d bits: %d errs: %d BER: %4.3f\n", 
+          EbNodB, SNRdB, n_packets_rx, n_uncoded_bits, n_uncoded_errs, uncoded_ber);  
+
+  figure(2);
+  plot(uw_errs);
+
 endfunction
 
 % Start simulation --------------------------------------------------------
@@ -546,17 +632,17 @@ end
 
 
 if demo == 10
-  sim_in.frames = 3;
-  EbNodBvec = 9;
-  
-  sim_in.c_demod = 0;
+  sim_in.frames = 100;
+  EbNodBvec = 7;
+
+  sim_in.demod_type = 4;
   ber_octave = [];
   for i = 1:length(EbNodBvec)
     [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
     ber_octave(i) = n_uncoded_errs/n_uncoded_bits;
   end
-
-  sim_in.c_demod = 1;
+  #{
+  sim_in.demod_type = 4;
   ber_c = [];
   for i = 1:length(EbNodBvec)
     [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
@@ -565,14 +651,15 @@ if demo == 10
 
   figure(1);
   clf;
-  semilogy(EbNodBvec,  ber_octave, '+-;Octave demod;')
+  semilogy(EbNodBvec,  ber_octave, '+-;first test;')
   grid;
   xlabel('Eb/No (dB)')
   ylabel('BER')
 
   hold on;
-  semilogy(EbNodBvec,  ber_c, 'g+-;C demod;')
+  semilogy(EbNodBvec,  ber_c, 'g+-;second test;')
   legend("boxoff");
   hold off;
+  #}
 end
 

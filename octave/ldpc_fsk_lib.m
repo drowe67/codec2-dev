@@ -279,8 +279,7 @@ function frame_rs232 = gen_sstv_frame
 
   % generate unpacked header bits
 
-  uw = 'abcd';
-  header = [hex2dec('55')*ones(1,16) hex2dec('ab') hex2dec('cd')];
+  header = [hex2dec('55')*ones(1,16) hex2dec('ab') hex2dec('cd') hex2dec('ef') hex2dec('01')];
   unpacked_header = [];
   for b=1:length(header)
     unpacked_header = [unpacked_header bitand(header(b), mask) > 0];
