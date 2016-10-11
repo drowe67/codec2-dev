@@ -5,6 +5,8 @@
 
    Unit test for libresample code.
 
+   build: gcc tsrc.c -o tsrc -lm -lsamplerate
+
   */
 
 #include <assert.h>
