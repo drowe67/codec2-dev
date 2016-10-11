@@ -11,7 +11,7 @@
 
   Frame format:
 
-    16 bytes 0x55 - 0xabcd UW - 256 bytes of payload - 2 bytes CRC - 65 bytes LPDC Parity
+    16 bytes 0x55 - 0xabcdef01 UW - 256 bytes of payload - 2 bytes CRC - 65 bytes LPDC Parity
 
   Each byte is encoded as a 10 bit RS232 serial word: 
   
@@ -63,7 +63,8 @@
 /* packet parameters */
 
 #define UW_BYTES               2
-#define UW_BITS                20
+#define UW_BITS                40
+#define UW_ALLOWED_ERRORS      5
 #define BYTES_PER_PACKET       256
 #define CRC_BYTES              2
 #define PARITY_BYTES           65
@@ -78,6 +79,10 @@ uint8_t uw[] = {
     0, 1, 1, 0, 1, 0, 1, 0, 1, 1,
     /* 0xd                0xc */
     0, 1, 0, 1, 1, 0, 0, 1, 1, 1,
+    /* 0xf                0xe */
+    0, 1, 1, 1, 1, 0, 1, 1, 1, 1,
+    /* 0x1                0x0 */
+    0, 1, 0, 0, 0, 0, 0, 0, 0, 1,
 };
 
 
@@ -99,7 +104,7 @@ unsigned short gen_crc16(unsigned char* data_p, int length){
 
 int main(int argc, char *argv[]) {
     FILE       *fin, *fout;
-    int         state, next_state, i, j, k, ind, score;
+    int         state, next_state, i, j, k, ind, score, verbose;
     float       symbol;
     uint8_t     bit, bit_buffer[UW_BITS];
     double      symbol_buf[SYMBOLS_PER_PACKET];
@@ -118,7 +123,7 @@ int main(int argc, char *argv[]) {
 
     /* set up LDPC code from include file constants */
 
-    ldpc.max_iter = MAX_ITER;
+    ldpc.max_iter = 100;
     ldpc.dec_type = 0;
     ldpc.q_scale_factor = 1;
     ldpc.r_scale_factor = 1;
@@ -133,22 +138,32 @@ int main(int argc, char *argv[]) {
     /* process command line ----------------------------------------------*/
 
     if (argc < 3) {
-	fprintf(stderr, "usage: drs232 InputOneSymbolPerFloat OutputPackets\n");
+	fprintf(stderr, "usage: drs232 InputOneSymbolPerFloat OutputPackets [-v[v]]\n");
  	exit(1);
     }
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input file: %s: %s.\n",
-         argv[2], strerror(errno));
+         argv[1], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output file: %s: %s.\n",
-         argv[3], strerror(errno));
+         argv[2], strerror(errno));
 	exit(1);
+    }
+
+    verbose = 0;
+    if (argc > 3) {
+        if (strcmp(argv[3], "-v") == 0) {
+            verbose = 1;
+        }
+        if (strcmp(argv[3], "-vv") == 0) {
+            verbose = 2;
+        }
     }
 
     state = LOOK_FOR_UW;
@@ -184,7 +199,7 @@ int main(int argc, char *argv[]) {
             //printf("\n");
             
             //fprintf(stderr,"UW score: %d\n", score);
-            if (score >= (UW_BITS-3)) {
+            if (score >= (UW_BITS-UW_ALLOWED_ERRORS)) {
                 //fprintf(stderr,"UW found!\n");
                 ind = 0;
                 next_state = COLLECT_PACKET;
@@ -225,8 +240,12 @@ int main(int argc, char *argv[]) {
                rx_checksum = gen_crc16(packet, BYTES_PER_PACKET);
                tx_checksum = packet[BYTES_PER_PACKET] + (packet[BYTES_PER_PACKET+1] << 8);
 
-               if (rx_checksum != tx_checksum)
-                   fprintf(stderr, "tx_checksum: 0x%02x rx_checksum: 0x%02x\n", tx_checksum, rx_checksum);
+               if (verbose == 2) {
+                   if (rx_checksum != tx_checksum) {
+                       fprintf(stderr, "tx_checksum: 0x%02x rx_checksum: 0x%02x\n", 
+                               tx_checksum, rx_checksum);
+                   }
+               }
 
                packets++;
                if (rx_checksum == tx_checksum) {
@@ -234,6 +253,12 @@ int main(int argc, char *argv[]) {
                }
                else
                    packet_errors++;
+
+               if (verbose) {
+                   fprintf(stderr, "packets: %d packet_errors: %d PER: %4.3f\n", 
+                           packets, packet_errors, 
+                           (float)packet_errors/packets);
+               }
 
                next_state = LOOK_FOR_UW;
             }

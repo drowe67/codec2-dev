@@ -9,7 +9,7 @@
 
   Frame format:
 
-    16 bytes 0x55 - 0xabcd UW - 256 bytes of payload - 2 bytes CRC
+    16 bytes 0x55 - 0xabcdef01 UW - 256 bytes of payload - 2 bytes CRC
 
   Each byte is encoded as a 10 bit RS232 serial word: 
   
@@ -17,7 +17,7 @@
 
   Building:
    
-    $ gcc drs232.c -o drs232.c -Wall
+    $ gcc drs232.c -o drs232 -Wall
 
 \*---------------------------------------------------------------------------*/
 
@@ -53,8 +53,9 @@
 
 /* packet parameters */
 
-#define UW_BYTES               2
-#define UW_BITS                20
+#define UW_BYTES               4
+#define UW_BITS                40
+#define UW_ALLOWED_ERRORS      5
 #define BYTES_PER_PACKET       256
 #define CRC_BYTES              2
 #define BITS_PER_BYTE          10
@@ -67,6 +68,10 @@ uint8_t uw[] = {
     0, 1, 1, 0, 1, 0, 1, 0, 1, 1,
     /* 0xd                0xc */
     0, 1, 0, 1, 1, 0, 0, 1, 1, 1,
+    /* 0xf                0xe */
+    0, 1, 1, 1, 1, 0, 1, 1, 1, 1,
+    /* 0x1                0x0 */
+    0, 1, 0, 0, 0, 0, 0, 0, 0, 1,
 };
 
  // from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
@@ -93,30 +98,43 @@ int main(int argc, char *argv[]) {
     uint8_t     packet[BYTES_PER_PACKET+CRC_BYTES];
     uint8_t     abyte;
     uint16_t    tx_checksum, rx_checksum;
+    int         verbose, packet_errors, packets;
 
     if (argc < 3) {
-	fprintf(stderr, "usage: drs232 InputOneBitPerChar OutputPackets [--sd]\n");
+	fprintf(stderr, "usage: drs232 InputOneBitPerChar OutputPackets [-v[v]]\n");
  	exit(1);
     }
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input file: %s: %s.\n",
-         argv[2], strerror(errno));
+         argv[1], strerror(errno));
 	exit(1);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output file: %s: %s.\n",
-         argv[3], strerror(errno));
+         argv[2], strerror(errno));
 	exit(1);
+    }
+
+    verbose = 0;
+    if (argc > 3) {
+        if (strcmp(argv[3], "-v") == 0) {
+            verbose = 1;
+        }
+        if (strcmp(argv[3], "-vv") == 0) {
+            verbose = 2;
+        }
     }
 
     state = LOOK_FOR_UW;
     for(i=0; i<UNPACKED_PACKET_BYTES; i++)
         unpacked_packet[i] = 0;
-    bits_read = 0;
+    bits_read = 0; 
+
+    packet_errors = packets = 0;
 
     while(fread(&bit, sizeof(char), 1, fin) == 1) {
         bits_read++;
@@ -141,8 +159,10 @@ int main(int argc, char *argv[]) {
             //printf("\n");
             
             //fprintf(stderr,"UW score: %d\n", score);
-            if (score == UW_BITS) {
-                fprintf(stderr,"UW found!\n");
+            if (score > (UW_BITS-UW_ALLOWED_ERRORS)) {
+                if (verbose == 2) {
+                    fprintf(stderr,"UW found!\n");
+                }
                 ind = UW_BITS;
                 next_state = COLLECT_PACKET;
             }             
@@ -174,10 +194,22 @@ int main(int argc, char *argv[]) {
                rx_checksum = gen_crc16(packet, BYTES_PER_PACKET);
                tx_checksum = packet[BYTES_PER_PACKET] + (packet[BYTES_PER_PACKET+1] << 8);
 
-               fprintf(stderr, "k=%d bytes after UW  tx_checksum: 0x%02x rx_checksum: 0x%02x\n", k, tx_checksum, rx_checksum);
+               if (verbose == 2) {
+                   fprintf(stderr, "k=%d bytes after UW  tx_checksum: 0x%02x rx_checksum: 0x%02x\n", 
+                           k, tx_checksum, rx_checksum);
+               }
 
+               packets++;
                if (rx_checksum == tx_checksum) {
                    fwrite(packet, sizeof(char), BYTES_PER_PACKET, fout);
+               }
+               else
+                   packet_errors++;
+
+               if (verbose) {
+                   fprintf(stderr, "packets: %d packet_errors: %d PER: %4.3f\n", 
+                           packets, packet_errors, 
+                           (float)packet_errors/packets);
                }
 
                next_state = LOOK_FOR_UW;
