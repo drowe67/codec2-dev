@@ -1,7 +1,9 @@
 % test_ldpc_fsk_lib
 % David Rowe 16 April 2016
 %
-% Some tests for ldpc_fsk_lib, and C versions ldpc_enc and ldpc_dec
+% A series of tests for ldpc_fsk_lib, and C versions ldpc_enc and ldpc_dec.
+% Gradually builds up complete C command line for SSTV balloon system,
+% using Octave versions of LDPC and FSK modem as reference points.
 
 1;
 
@@ -57,7 +59,7 @@ function detected_data = decode_from_file(filename)
 end
 
 
-% plots a BER curve for the decoder.  Takes a while to run, uses parallel cores
+% plots a BER curve for the LDPC decoder.  Takes a while to run, uses parallel cores
 
 function plot_curve
   num_cores = 4;              % set this to the number of cores you have
@@ -243,7 +245,7 @@ function save_rtlsdr(filename, s)
   %iq(2:2:2*l) = 127 + im*(127/mx); 
   iq(1:2:2*l) = 127 + 32*re; 
   iq(2:2:2*l) = 127 + 32*im; 
-  figure(3); clf; plot(iq);
+  figure(3); clf; plot(iq); title('simulated IQ signal from RTL SDR');
   fs = fopen(filename,"wb");
   fwrite(fs,iq,"uchar");
   fclose(fs);
@@ -273,16 +275,20 @@ endfunction
 
 
 % Using simulated SSTV packet, generate complex fsk mod signals, 8-bit
-% unsigned IQ for feeding into demod chain
+% unsigned IQ for feeding into C demod chain.  Can also be used to
+% generate BER curves.  Found bugs in UW size and our use of csdr
+% re-sampler using this function, and by gradually and carefully
+% building up the C command line.
+
 #{
 todo: [X] uncoded BER
           [X] octave fsk demod
           [X] use C demod
-      [ ] compare uncoded BER to unsigned 8 bit IQ to regular 16-bit
-          [ ] generate complex rx signal with noise
-          [ ] used cmd line utils to drive demod
-      [ ] test with resampler
-      [ ] measure effect on PER with coding
+      [X] compare uncoded BER to unsigned 8 bit IQ to regular 16-bit
+          [X] generate complex rx signal with noise
+          [X] used cmd line utils to drive demod
+      [X] test with resampler
+      [X] measure effect on PER with coding
 #}
 
 function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
@@ -303,7 +309,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   % note fixed frame of bits used for BER testing
 
   tx_codeword = gen_sstv_frame;
-  length(tx_codeword)
+
   % init FSK modem
 
   fsk_horus_as_a_lib = 1;
@@ -313,13 +319,13 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   states.dA(1:states.M) = 1;
   states.tx_real = 0;  % Octave fsk_mod generates complex valued output
 
-  % Set up simulated tx tones to sit in teh middle of cdsr passband
+  % Set up simulated tx tones to sit in the middle of cdsr passband
 
   filt_low_norm = 0.1; filt_high_norm = 0.4;
   fc = states.Fs*(filt_low_norm + filt_high_norm)/2;
   %fc = 1800;
-  f1 = fc - states.Rs/2
-  f2 = fc + states.Rs/2
+  f1 = fc - states.Rs/2;
+  f2 = fc + states.Rs/2;
   states.ftx = [f1 f2];
 
   % set up AWGN channel 
@@ -340,7 +346,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   noise_real = sqrt(variance)*randn(length(tx),1);
   noise_complex = sqrt(variance/2)*(randn(length(tx),1) + j*randn(length(tx),1));
 
-  % demodulate
+  % demodulate -----------------------------------------------------
 
   if demod_type == 1
 
@@ -396,7 +402,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   end
 
   if demod_type == 3
-    % C demod driven by command line kung fu
+    % C demod driven by csdr command line kung fu
 
     assert(states.tx_real == 0, "need complex signal for this test");
     rx = tx + noise_complex;
@@ -413,8 +419,6 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     rx = tx + noise_complex;
     SNRdB = 10*log10(var(tx)/var(noise_real));
     
-    % interpolate by factor or 2, then use straight line interpolation
-
     printf("resampling ...\n");
     rx_resample_fract = fractional_resample(rx, 1.08331);
     %rx_resample_fract = fractional_resample(rx_resample_fract, 1/1.08331);
@@ -423,71 +427,96 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     printf("run C cmd line chain ...\n");
 %    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
     system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
-%    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr fractional_decimator_ff 1.08331 | csdr realpart_cf | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
+%    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr fractional_decimator_ff 1.08331 | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin");
     f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
   end
 
- % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
 
-  state = "wait for uw";
-  start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 5*10 - 1;
-  uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
-  start_frame_ind =  end_uw_ind + 1;
-  nbits = length(rx_bit_stream);
-  uw_thresh = 5;
-  n_uncoded_errs = 0;
-  n_uncoded_bits = 0;
-  n_packets_rx = 0;
-  last_i = 0;
+  if demod_type == 5
 
-  % might as well include RS232 framing bits in uncoded error count
+    % C demod with resampler and use C code to measure PER, in this
+    % test we don't need to run state machine below as C code gives us
+    % the ouputs we need
 
-  nbits_frame = code_param.data_bits_per_frame*10/8;  
+    assert(states.tx_real == 0, "need complex signal for this test");
+    rx = tx + noise_complex;
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    
+    printf("resampling ...\n");
+    rx_resample_fract = fractional_resample(rx, 1.08331);
+    save_rtlsdr("fsk_demod_resample.iq", rx_resample_fract);
 
-  uw_errs = zeros(1, nbits);
-  for i=luw:nbits
-    uw_errs(i) = sum(xor(rx_bit_stream(i-luw+1:i), uw_rs232));
+    printf("run C cmd line chain - uncoded PER\n");
+    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - - | ../src/drs232 - /dev/null -v");
+
+    printf("run C cmd line chain - LDPC coded PER\n");
+    system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - | ../src/drs232_ldpc - /dev/null -v");
   end
 
-  for i=luw:nbits
-    next_state = state;
-    if strcmp(state, 'wait for uw')
-      if uw_errs(i) <= uw_thresh
-        next_state = 'count errors';
-        tx_frame_ind = start_frame_ind;
-        rx_frame_ind = i + 1;
-        n_uncoded_errs_this_frame = 0;
-        %printf("%d %s %s\n", i, state, next_state);
-        if last_i
-          printf("i: %d i-last_i: %d ", i, i-last_i);
+  if demod_type != 5
+    % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
+
+    state = "wait for uw";
+    start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 5*10 - 1;
+    uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
+    start_frame_ind =  end_uw_ind + 1;
+    nbits = length(rx_bit_stream);
+    uw_thresh = 5;
+    n_uncoded_errs = 0;
+    n_uncoded_bits = 0;
+    n_packets_rx = 0;
+    last_i = 0;
+
+    % might as well include RS232 framing bits in uncoded error count
+
+    nbits_frame = code_param.data_bits_per_frame*10/8;  
+
+    uw_errs = zeros(1, nbits);
+    for i=luw:nbits
+      uw_errs(i) = sum(xor(rx_bit_stream(i-luw+1:i), uw_rs232));
+    end
+
+    for i=luw:nbits
+      next_state = state;
+      if strcmp(state, 'wait for uw')
+        if uw_errs(i) <= uw_thresh
+          next_state = 'count errors';
+          tx_frame_ind = start_frame_ind;
+          rx_frame_ind = i + 1;
+          n_uncoded_errs_this_frame = 0;
+          %printf("%d %s %s\n", i, state, next_state);
+          if last_i
+            printf("i: %d i-last_i: %d ", i, i-last_i);
+          end
         end
       end
-    end
-    if strcmp(state, 'count errors')
-      n_uncoded_errs_this_frame += xor(rx_bit_stream(i), tx_codeword(tx_frame_ind));
-      n_uncoded_bits++;
-      tx_frame_ind++;
-      if tx_frame_ind == (start_frame_ind+nbits_frame)
-        n_uncoded_errs += n_uncoded_errs_this_frame;
-        printf("n_uncoded_errs_this_frame: %d\n", n_uncoded_errs_this_frame);
-        frame_rx232_rx = rx_bit_stream(rx_frame_ind:rx_frame_ind+nbits_frame-1);
-        %tx_codeword(start_frame_ind+1:start_frame_ind+10)
-        %frame_rx232_rx(1:10)
-        sstv_checksum(frame_rx232_rx);
-        last_i = i;
-        n_packets_rx++;
-        next_state = 'wait for uw';
+      if strcmp(state, 'count errors')
+        n_uncoded_errs_this_frame += xor(rx_bit_stream(i), tx_codeword(tx_frame_ind));
+        n_uncoded_bits++;
+        tx_frame_ind++;
+        if tx_frame_ind == (start_frame_ind+nbits_frame)
+          n_uncoded_errs += n_uncoded_errs_this_frame;
+          printf("n_uncoded_errs_this_frame: %d\n", n_uncoded_errs_this_frame);
+          frame_rx232_rx = rx_bit_stream(rx_frame_ind:rx_frame_ind+nbits_frame-1);
+          %tx_codeword(start_frame_ind+1:start_frame_ind+10)
+          %frame_rx232_rx(1:10)
+          sstv_checksum(frame_rx232_rx);
+          last_i = i;
+          n_packets_rx++;
+          next_state = 'wait for uw';
+        end
       end
+      state = next_state;
     end
-    state = next_state;
+
+    uncoded_ber = n_uncoded_errs/n_uncoded_bits;
+    printf("EbNodB: %4.1f SNRdB: %4.1f pkts: %d bits: %d errs: %d BER: %4.3f\n", 
+            EbNodB, SNRdB, n_packets_rx, n_uncoded_bits, n_uncoded_errs, uncoded_ber);  
+
+    figure(2);
+    plot(uw_errs);
+    title('Unique Word Hamming Distance')
   end
-
-  uncoded_ber = n_uncoded_errs/n_uncoded_bits;
-  printf("EbNodB: %4.1f SNRdB: %4.1f pkts: %d bits: %d errs: %d BER: %4.3f\n", 
-          EbNodB, SNRdB, n_packets_rx, n_uncoded_bits, n_uncoded_errs, uncoded_ber);  
-
-  figure(2);
-  plot(uw_errs);
 
 endfunction
 
@@ -524,7 +553,7 @@ rand('state',1);
 
 % ------------------ select which demo/test to run here ---------------
 
-demo = 10;
+demo = 11;
 
 if demo == 1
   printf("simple_ut....\n");
@@ -576,6 +605,8 @@ end
 if demo == 7
   test_c_decoder;
 end
+
+% generates simulated demod soft decision symbols to drive C ldpc decoder with
 
 if demo == 8
   frames = 100;
@@ -631,35 +662,49 @@ if demo == 9
 end
 
 
-if demo == 10
-  sim_in.frames = 100;
-  EbNodBvec = 7;
+% Plots uncoded BER curves for two different SSTV simulations.  Used
+% to compare results with different processing steps as we build up C
+% command line.  BER curves are powerful ways to confirm system is
+% operating as expected, several bugs were found using this system.
 
-  sim_in.demod_type = 4;
-  ber_octave = [];
+if demo == 10
+  sim_in.frames = 10;
+  EbNodBvec = 7:10;
+
+  sim_in.demod_type = 3;
+  ber_test1 = [];
   for i = 1:length(EbNodBvec)
     [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
-    ber_octave(i) = n_uncoded_errs/n_uncoded_bits;
+    ber_test1(i) = n_uncoded_errs/n_uncoded_bits;
   end
-  #{
+  
   sim_in.demod_type = 4;
   ber_c = [];
   for i = 1:length(EbNodBvec)
     [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodBvec(i));
-    ber_c(i) = n_uncoded_errs/n_uncoded_bits;
+    ber_test2(i) = n_uncoded_errs/n_uncoded_bits;
   end
 
   figure(1);
   clf;
-  semilogy(EbNodBvec,  ber_octave, '+-;first test;')
+  semilogy(EbNodBvec,  ber_test1, '+-;first test;')
   grid;
   xlabel('Eb/No (dB)')
   ylabel('BER')
 
   hold on;
-  semilogy(EbNodBvec,  ber_c, 'g+-;second test;')
+  semilogy(EbNodBvec,  ber_test2, 'g+-;second test;')
   legend("boxoff");
   hold off;
-  #}
+  
 end
 
+
+% Measure PER of complete coded and uncoded system
+
+if demo == 11
+  sim_in.frames = 100;
+  EbNodB = 13;
+  sim_in.demod_type = 5;
+  run_sstv_sim(sim_in, EbNodB);
+end
