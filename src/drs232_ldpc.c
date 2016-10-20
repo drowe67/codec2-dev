@@ -62,7 +62,7 @@
 
 /* packet parameters */
 
-#define UW_BYTES               2
+#define UW_BYTES               4
 #define UW_BITS                40
 #define UW_ALLOWED_ERRORS      5
 #define BYTES_PER_PACKET       256
@@ -117,13 +117,15 @@ int main(int argc, char *argv[]) {
     int         CodeLength;
     struct LDPC ldpc;
 
+    assert(sizeof(uw) == UW_BITS);
+
     /* LDPC parameters */
 
     CodeLength = CODELENGTH;                    /* length of entire codeword in bits */
 
     /* set up LDPC code from include file constants */
 
-    ldpc.max_iter = 100;
+    ldpc.max_iter = MAX_ITER;
     ldpc.dec_type = 0;
     ldpc.q_scale_factor = 1;
     ldpc.r_scale_factor = 1;
@@ -177,6 +179,7 @@ int main(int argc, char *argv[]) {
 
         bit = symbol < 0;
         //printf("symbol; %f bit: %d\n", symbol, bit);
+        next_state = state;
         if (state == LOOK_FOR_UW) {
 
             /* put latest input bit into sliding buffer */
@@ -199,7 +202,7 @@ int main(int argc, char *argv[]) {
             
             //fprintf(stderr,"UW score: %d\n", score);
             if (score >= (UW_BITS-UW_ALLOWED_ERRORS)) {
-                //fprintf(stderr,"UW found!\n");
+                //fprintf(stderr,"UW found! score: %d\n verbose: %d\n", score, verbose);
                 ind = 0;
                 next_state = COLLECT_PACKET;
             }             
@@ -210,15 +213,16 @@ int main(int argc, char *argv[]) {
  
             if (ind == SYMBOLS_PER_PACKET) {
 
-               /* OK we have enough bits, remove RS232 sync symbols */
+               /* OK we have enough bits, remove RS232 sync symbols.
+                  This is set up for bit<->byte ordering as per python
+                  tx code */
 
                for(i=0,k=0; i<SYMBOLS_PER_PACKET; i+=BITS_PER_BYTE) {
                    for(j=0; j<8; j++) {
-                       symbol_buf_no_rs232[k+j] = symbol_buf[i+j+1];
+                       symbol_buf_no_rs232[k+j] = symbol_buf[i+7-j+1];
                    }
                    k += 8;
                }
-               //printf("k: %d CodeLength: %d\n", k, CodeLength);
 
                /* now LDPC decode */
 
@@ -230,7 +234,7 @@ int main(int argc, char *argv[]) {
                for(i=0; i<BYTES_PER_PACKET+CRC_BYTES; i++) {
                    abyte = 0;
                    for(j=0; j<8; j++)
-                       abyte |= unpacked_packet[8*i+j] << j;
+                       abyte |= unpacked_packet[8*i+j] << (7-j);
                    packet[i] = abyte;
                }
 
@@ -245,7 +249,7 @@ int main(int argc, char *argv[]) {
                                tx_checksum, rx_checksum);
                    }
                }
-
+               
                packets++;
                if (rx_checksum == tx_checksum) {
                    fwrite(packet, sizeof(char), BYTES_PER_PACKET, fout);
@@ -258,7 +262,7 @@ int main(int argc, char *argv[]) {
                            packets, packet_errors, 
                            (float)packet_errors/packets);
                }
-
+               //exit(0);
                next_state = LOOK_FOR_UW;
             }
 
