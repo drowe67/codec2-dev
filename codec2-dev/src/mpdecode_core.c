@@ -723,5 +723,6 @@ void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
             out_char[j] = DecodedBits[max_iter-1+j*max_iter];
         }
     }
+    //fprintf(stderr, "iter: %d\n", iter);
 }
 
