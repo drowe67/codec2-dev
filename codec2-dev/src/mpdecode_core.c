@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include "mpdecode_core.h"
 
-void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
+int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
                     int max_iter, int CodeLength, int NumberParityBits);
 
 /* Phi function */
@@ -562,7 +562,7 @@ void SumProduct(	 int	  BitErrors[],
 
 /* Convenience function to call LDPC decoder from C programs */
 
-void run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
     int		max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
     int		max_row_weight, max_col_weight;
@@ -633,7 +633,7 @@ void run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
                     NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int ); 
     }
 
-    extract_output(out_char, DecodedBits, ParityCheckCount, max_iter, CodeLength, NumberParityBits);
+    int iter = extract_output(out_char, DecodedBits, ParityCheckCount, max_iter, CodeLength, NumberParityBits);
 
     /* Clean up memory */
 
@@ -662,6 +662,8 @@ void run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
 	
     /* printf( "Cleaning v-nodes \n" ); */
     free( v_nodes );
+
+    return iter;
 }
 
 
@@ -700,7 +702,7 @@ void sd_to_llr(double llr[], double sd[], int n) {
 }
 
 
-void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
+int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
     int i, j;
 
     /* extract output bits from iteration that solved all parity
@@ -724,5 +726,6 @@ void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
         }
     }
     //fprintf(stderr, "iter: %d\n", iter);
+    return iter;
 }
 
