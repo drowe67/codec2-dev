@@ -309,7 +309,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   % note fixed frame of bits used for BER testing
 
   tx_codeword = gen_sstv_frame;
-
+  
   % init FSK modem
 
   fsk_horus_as_a_lib = 1;
@@ -318,6 +318,7 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   states.df(1:states.M) = 0;
   states.dA(1:states.M) = 1;
   states.tx_real = 0;  % Octave fsk_mod generates complex valued output
+                       % so we can simulate rtl_sdr complex ouput
 
   % Set up simulated tx tones to sit in the middle of cdsr passband
 
@@ -337,9 +338,13 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
   tx_bit_stream = [];
   for i=1:frames
+    % uncomment for different data on each frame
+    %tx_codeword = gen_sstv_frame;
     tx_bit_stream = [tx_bit_stream tx_codeword];
   end
 
+  printf("%d bits at %d bit/s is a %3.1f second run\n", length(tx_bit_stream), 115200,length(tx_bit_stream)/115200);
+ 
   % modulate and channel model
 
   tx = fsk_horus_mod(states, tx_bit_stream);
@@ -378,7 +383,9 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
 
         % demodulate to stream of bits
 
-        states.f = [f1 f2];
+        states.f = [f1 f2]; % note that for Octave demod we cheat and use known tone frequencies
+                            % allows us to determine if freq offset estimation in C demod is a problem
+
         [rx_bits states] = fsk_horus_demod(states, sf);
         rx_bit_stream = [rx_bit_stream rx_bits];
         rx_sd_stream = [rx_sd_stream states.rx_bits_sd];
@@ -519,6 +526,93 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
   end
 
 endfunction
+
+
+% Function to test flight mode software.  Takes a rx stream of
+% demodulated bits, and locates frames using UW detection.  Extracts
+% data and parity bits.  Uses data bits to generate parity bits here
+% and compare.
+
+function compare_parity_bits(rx_bit_stream)
+    nframes = 2;
+
+    % init LDPC code
+
+    load('H2064_516_sparse.mat');
+    HRA = full(HRA);  
+    max_iterations = 100;
+    decoder_type = 0;
+    mod_order = 2;
+
+    code_param = ldpc_init(HRA, mod_order);
+
+    % generate frame, this will have random bits not related to
+    % rx_stream, however we just use it for the UW
+
+    tx_codeword = gen_sstv_frame;
+    l = length(tx_codeword);
+    printf("expected rs232 frames codeword length: %d\n", l);
+
+    % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
+
+    state = "wait for uw";
+    start_uw_ind = 16*10+1; end_uw_ind = start_uw_ind + 4*10 - 1;
+    uw_rs232 = tx_codeword(start_uw_ind:end_uw_ind); luw = length(uw_rs232);
+    start_frame_ind =  end_uw_ind + 1;
+    nbits = nframes*l;
+    uw_thresh = 5;
+    n_uncoded_errs = 0;
+    n_uncoded_bits = 0;
+    n_packets_rx = 0;
+    last_i = 0;
+
+    % might as well include RS232 framing bits in uncoded error count
+
+    uw_errs = luw*ones(1, nbits);
+    for i=luw:nbits
+      uw_errs(i) = sum(xor(rx_bit_stream(i-luw+1:i), uw_rs232));
+    end
+
+    frame_start = find(uw_errs < 6)+1;
+    nframes = length(frame_start);
+    for i=1:nframes
+
+      % double check UW OK
+
+      st_uw = frame_start(i) - luw; en_uw = frame_start(i) - 1;
+      uw_err_check = sum(xor(rx_bit_stream(st_uw:en_uw), uw_rs232));
+      printf("uw_err_check: %d\n", uw_err_check);
+
+      % strip off rs232 start/stop bits
+
+      nbits_rs232 = (256+2+65)*10;
+      nbits = (256+2+65)*8
+      nbits_byte = 10;
+      rx_codeword = zeros(1,nbits);
+      pdb = 1;
+
+      for k=1:nbits_byte:nbits_rs232
+        for l=1:8
+          rx_codeword(pdb) = rx_bit_stream(frame_start(i)-1+k+l);
+          pdb++;
+        end
+      end
+      assert(pdb == (nbits+1));
+      
+      data_bits = rx_codeword(1:256*8);
+      checksum_bits = rx_codeword(256*8+1:258*8);
+      parity_bits = rx_codeword(258*8+1:258*8+516);
+      padding_bits = rx_codeword(258*8+516+1:258*8+516+1);
+
+      % stopped here as we found bug lol!
+    end
+
+    figure(1); clf;
+    plot(uw_errs);
+    title('Unique Word Hamming Distance')
+
+endfunction
+
 
 % Start simulation --------------------------------------------------------
 
@@ -704,7 +798,16 @@ end
 
 if demo == 11
   sim_in.frames = 100;
-  EbNodB = 13;
+  EbNodB = 7;
   sim_in.demod_type = 5;
   run_sstv_sim(sim_in, EbNodB);
+end
+
+
+% Compare parity bits from an off-air stream of demodulated bits
+
+if demo == 12
+  f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+
+  compare_parity_bits(rx_bit_stream);
 end

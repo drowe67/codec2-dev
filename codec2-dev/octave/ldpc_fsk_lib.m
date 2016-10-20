@@ -270,21 +270,35 @@ function frame_rs232 = gen_sstv_frame
 
   % unpack bytes to bits and LPDC encode
 
-  mask = 2.^(0:7);          % LSB to MSB
+  mask = 2.^(7:-1:0);       % MSB to LSB unpacking to match python tx code.
   unpacked_data = [];
   for b=1:length(data)
     unpacked_data = [unpacked_data bitand(data(b), mask) > 0];
   end
-  codeword = ldpc_encode(code_param, unpacked_data);
+  codeword = [ldpc_encode(code_param, unpacked_data) 0 0 0 0];  % pad with 0s to get integer number of bytes
 
-  % generate unpacked header bits
+  % pack back into bytes to match python code 
+
+  lpacked_codeword = length(codeword)/8
+  packed_codeword = zeros(1,lpacked_codeword);
+  for b=1:lpacked_codeword
+    st = (b-1)*8 + 1;
+    packed_codeword(b) = sum(codeword(st:st+7) .* mask);
+  end
+
+  % generate header bits
 
   header = [hex2dec('55')*ones(1,16) hex2dec('ab') hex2dec('cd') hex2dec('ef') hex2dec('01')];
-  unpacked_header = [];
-  for b=1:length(header)
-    unpacked_header = [unpacked_header bitand(header(b), mask) > 0];
+
+  % now construct entire unpacked frame
+
+  packed_frame = [header packed_codeword];
+  mask = 2.^(0:7);        % LSB to MSB packing for header
+  lpacked_frame = length(packed_frame);
+  frame = [];
+  for b=1:lpacked_frame
+    frame = [frame bitand(packed_frame(b), mask) > 0];
   end
-  frame = [unpacked_header codeword 0 0 0 0]; % integer number of bytes
 
   % insert rs232 framing bits
 
@@ -292,6 +306,8 @@ function frame_rs232 = gen_sstv_frame
   for b=1:8:length(frame)
     frame_rs232 = [frame_rs232 0 frame(b:b+7) 1];
   end
+
+  %printf("codeword: %d unpacked_header: %d frame: %d frame_rs232: %d \n", length(codeword), length(unpacked_header), length(frame), length(frame_rs232));
 endfunction
 
 
