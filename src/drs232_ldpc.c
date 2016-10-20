@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     uint8_t     packet[BYTES_PER_PACKET+CRC_BYTES];
     uint8_t     abyte;
     uint16_t    tx_checksum, rx_checksum, packet_errors, packets;
-    int         CodeLength;
+    int         CodeLength, iter;
     struct LDPC ldpc;
 
     assert(sizeof(uw) == UW_BITS);
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
                /* now LDPC decode */
 
                sd_to_llr(llr, symbol_buf_no_rs232, CodeLength);
-               run_ldpc_decoder(&ldpc, unpacked_packet, llr);
+               iter = run_ldpc_decoder(&ldpc, unpacked_packet, llr);
 
                /* pack into bytes */
 
@@ -258,9 +258,9 @@ int main(int argc, char *argv[]) {
                    packet_errors++;
 
                if (verbose) {
-                   fprintf(stderr, "packets: %d packet_errors: %d PER: %4.3f\n", 
+                   fprintf(stderr, "packets: %d packet_errors: %d PER: %4.3f iter: %d\n", 
                            packets, packet_errors, 
-                           (float)packet_errors/packets);
+                           (float)packet_errors/packets, iter);
                }
                //exit(0);
                next_state = LOOK_FOR_UW;

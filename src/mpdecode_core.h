@@ -25,7 +25,7 @@ struct LDPC {
     double *H_cols;
 };
 
-void run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]);
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]);
 
 void sd_to_llr(double llr[], double sd[], int n);
 
