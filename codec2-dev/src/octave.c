@@ -74,7 +74,7 @@ signed int printf_buffer(FILE* f, char* buffer,const size_t max_buf, size_t* buf
 }
 
 
-signed int printf_header(FILE* f, char* buffer,const size_t max_buf, size_t* buf_idx_ptr, const char *name, const char *dtype, int rows, int cols, int isFloat)
+void printf_header(FILE* f, char* buffer,const size_t max_buf, size_t* buf_idx_ptr, const char *name, const char *dtype, int rows, int cols, int isFloat)
 {
 #ifdef ARM_MATH_CM4
     printf_buffer(f, buffer, OCTAVE_BUFSIZE, buf_idx_ptr, "# hex: %s\n", isFloat?"true":"false");

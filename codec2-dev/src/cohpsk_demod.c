@@ -51,9 +51,9 @@ int main(int argc, char *argv[])
     COMP          rx_fdm[COHPSK_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_MAX_SAMPLES_PER_FRAME];
     int           frames, sync, nin_frame;
-    float        *rx_amp_log;
-    float        *rx_phi_log;
-    COMP         *rx_symb_log;
+    float        *rx_amp_log = NULL;
+    float        *rx_phi_log = NULL;
+    COMP         *rx_symb_log = NULL;
     float         f_est_log[LOG_FRAMES], ratio_log[LOG_FRAMES];
     int           i, r, c, log_data_r, oct, logframes;
 

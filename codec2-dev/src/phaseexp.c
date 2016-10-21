@@ -750,6 +750,7 @@ static float refine_Wo(struct PEXP     *pexp,
 
     Wo_est = (model->Wo + pexp->Wo_prev)/2.0;
     best_var = 1E32;
+    best_Wo = Wo_est;
     for(Wo=0.97*Wo_est; Wo<=1.03*Wo_est; Wo+=0.001*Wo_est) {
 
 	/* predict phase and sum differences between harmonics */
@@ -1044,6 +1045,7 @@ void smooth_phase3(struct PEXP *pexp, MODEL *model) {
 
 	    /* find bin  */
 
+	    b = MAX_BINS;
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;
@@ -1066,6 +1068,7 @@ void smooth_phase3(struct PEXP *pexp, MODEL *model) {
 
 	    /* find bin */
 
+            b = MAX_BINS; 
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;
@@ -1115,6 +1118,7 @@ void cb_phase1(struct PEXP *pexp, MODEL *model) {
 
 	    /* find bin  */
 
+	    b = MAX_BINS;
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;
@@ -1136,6 +1140,7 @@ void cb_phase1(struct PEXP *pexp, MODEL *model) {
 
 	    /* find bin */
 
+	    b = MAX_BINS;
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;

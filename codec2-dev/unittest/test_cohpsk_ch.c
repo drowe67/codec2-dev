@@ -68,6 +68,7 @@ int main(int argc, char *argv[])
     COMP           ch_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     COMP           ch_buf[CH_BUF_SZ];
     float          rx_bits_sd[COHPSK_BITS_PER_FRAME];
+    char           rx_bits_char[COHPSK_BITS_PER_FRAME];
     float         *rx_amp_log;
     float         *rx_phi_log;
     COMP          *rx_symb_log;
@@ -136,6 +137,8 @@ int main(int argc, char *argv[])
     nbits = 0;
 
     /* init HF fading model */
+    ffading = NULL;
+    ch_fdm_delay = NULL;
 
     if (fading_en) {
         ffading = fopen(FADING_FILE_NAME, "rb");
@@ -247,7 +250,13 @@ int main(int argc, char *argv[])
             memcpy(ch_buf, &ch_buf[nin_frame], sizeof(COMP)*ch_buf_n);
         nin_frame = tmp;
 
-        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_sd);
+	
+    	for (int i = 0; i < COHPSK_BITS_PER_FRAME; i++)
+	{
+           rx_bits_char[i] = rx_bits_sd[i];
+	}
+
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_char);
         nerrors += bit_errors;
         nbits   += COHPSK_BITS_PER_FRAME;
 
