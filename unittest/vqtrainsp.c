@@ -87,7 +87,6 @@ int main(int argc, char *argv[]) {
     float   delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
-    int     ret;
     int     i,j, finished, iterations;
     float   sd;
     int     var_n, bits, b, levels;
@@ -147,7 +146,7 @@ int main(int argc, char *argv[]) {
     printf("initial codebook...\n");
     #endif
     for(i=0; i<J; i++) {
-	ret = fread(vec, sizeof(float), d, ftrain);
+	fread(vec, sizeof(float), d, ftrain);
         #ifdef DBG
 	print_vec(vec, d, 1);
 	#endif
@@ -168,6 +167,8 @@ int main(int argc, char *argv[]) {
     printf("\n");
     printf("bits  Iteration  delta  var     std dev\n");
     printf("---------------------------------------\n");
+
+    levels = 0;
 
     for(b=1; b<=bits; b++) {
 	levels = 1<<b;
@@ -200,7 +201,7 @@ int main(int argc, char *argv[]) {
 	    se = 0.0;
 	    rewind(ftrain);
 	    for(i=0; i<J; i++) {
-		ret = fread(vec, sizeof(float), d, ftrain);
+		fread(vec, sizeof(float), d, ftrain);
 		ind = quantise(cb, vec, d, levels, &se);
 		//ind = gain_shape_quantise(cb, vec, d, levels, &se, &best_gain);
  		//for(j=0; j<d; j++)
@@ -287,7 +288,7 @@ int main(int argc, char *argv[]) {
 	assert(ferr != NULL);
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(float), d, ftrain);
+	    fread(vec, sizeof(float), d, ftrain);
 	    ind = quantise(cb, vec, d, levels, &se);
 	    for(j=0; j<d; j++) {
 		if (vec[j] != 0.0)

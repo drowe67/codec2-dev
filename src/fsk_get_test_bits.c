@@ -67,7 +67,7 @@ int main(int argc,char *argv[]){
     bitbuf = (uint8_t*)alloca(sizeof(uint8_t)*FSK_FRAME_SIZE);
     
     /* Write out sync frame and sequence */
-    for(i=0; i<FSK_FRAME_SIZE; i){
+    for(i=0; i<FSK_FRAME_SIZE; ){
 	bitbuf[i++] = rand()&0x1;
     }
     for(i=0;i<sizeof(init);i++){

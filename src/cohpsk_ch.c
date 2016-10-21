@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
     float          No, variance;
     COMP           scaled_noise;
     float          hf_gain;
-    COMP          *ch_fdm_delay, aspread, aspread_2ms, delayed, direct;
+    COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
     int            frames, i, j, k, ret, clipped;
     float          sam, peak, inclip, papr, CNo, snr3k, EbNo700;
@@ -129,6 +129,8 @@ int main(int argc, char *argv[])
 
     /* init HF fading model */
 
+    ffading = NULL;
+    nhfdelay = 0;
     if (fading_en) {
         if (fading_en == 1) {
             ffading = fopen(FAST_FADING_FILE_NAME, "rb");
@@ -169,7 +171,7 @@ int main(int argc, char *argv[])
     /* --------------------------------------------------------*\
 	                          Main Loop
     \*---------------------------------------------------------*/
-
+    frames = 0;
     while(fread(buf, sizeof(short), BUF_N, fin) == BUF_N) {
 	frames++;
 

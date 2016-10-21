@@ -34,6 +34,7 @@
 #include <errno.h>
 
 #include "codec2_fdmdv.h"
+#include "fdmdv_internal.h"
 
 int main(int argc, char *argv[])
 {
@@ -76,7 +77,7 @@ int main(int argc, char *argv[])
 
         /* real signal so we adjust SNR to suit.  I think.  I always get confused by this! */
 
-        fdmdv_simulate_channel(fdmdv, rx_fdm, FDMDV_NOM_SAMPLES_PER_FRAME, snrdB - 3.0);
+        fdmdv_simulate_channel(&fdmdv->sig_pwr_av, rx_fdm, FDMDV_NOM_SAMPLES_PER_FRAME, snrdB - 3.0);
 
 	for(i=0; i<FDMDV_NOM_SAMPLES_PER_FRAME; i++) {
 	    sam = FDMDV_SCALE*rx_fdm[i].real;

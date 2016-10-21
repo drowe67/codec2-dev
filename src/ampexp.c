@@ -979,6 +979,7 @@ void smooth_amp(struct AEXP *aexp, MODEL *model) {
 
 	    /* find bin  */
 
+	    b = MAX_BINS;
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;
@@ -998,6 +999,7 @@ void smooth_amp(struct AEXP *aexp, MODEL *model) {
 
 	    /* find bin */
 
+	    b = MAX_BINS;
 	    for(i=0; i<nbins; i++)
 		if ((f > bins[i]) && (f <= bins[i+1]))
 		    b = i;

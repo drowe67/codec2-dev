@@ -34,6 +34,7 @@
 #include "defines.h"
 #include "comp.h"
 #include "codec2.h"
+#include "lsp.h"
 #include "quantise.h"
 #include "interp.h"
 #include "codec2_internal.h"
@@ -61,6 +62,8 @@ float run_a_test(char raw_file_name[], int bit_to_corrupt)
     /* find bit we are corrupting */
 
     found_bit = 0;
+    mask = 0;
+    index = -1;
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	if (!found_bit) {
 	    if (bit_to_corrupt > lsp_bits(i))

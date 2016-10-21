@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 	printf("Error in malloc.\n");
 	exit(1);
     }
-    printf("training array is %d bytes\n", sizeof(float)*k*J);
+    printf("training array is %lu bytes\n", sizeof(float)*k*J);
 
     n = (int*)malloc(sizeof(int)*J);
     if (n == NULL) {

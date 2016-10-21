@@ -24,7 +24,7 @@
 #define CORRECT_OFFSET 10  /* LSPs start 10 bits int frame qt 2400 bit/s */
 
 
-static int check_candidate(char bits[], int offset)
+static int check_candidate(unsigned char bits[], int offset)
 {
     int          i;
     int          lsp_indexes[LPC_ORD];
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     struct CODEC2 *c2;
     int            i,offset, nsamples, nbits, nbytes, frames;
     short         *speech;
-    char          *bits;
+    unsigned char          *bits;
     FILE          *fin;
     int            swaps, pass, fail, match;
 
@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
 
     /* keep FRAMES frame memory of bit stream */
 
-    bits = (char*)malloc(F*nbytes*sizeof(char));
+    bits = (unsigned char*)malloc(F*nbytes*sizeof(unsigned char));
     for(i=0; i<F*nbytes; i++)
 	bits[i] = 0;
 
