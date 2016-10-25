@@ -41,6 +41,12 @@
 #include "machdep.h"
 
 #define LSP_DELTA1 0.01         /* grid spacing for LSP root searches */
+// #define MBEST_PRINT_OUT
+#ifdef MBEST_PRINT_OUT
+ #define MBEST_PRINT(a,b) mbest_print((a),(b))
+#else
+ #define MBEST_PRINT(a,b) 
+#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -656,6 +662,7 @@ static void mbest_insert(struct MBEST *mbest, int index[], float error) {
 }
 
 
+#ifdef MBEST_PRINT_OUT
 static void mbest_print(char title[], struct MBEST *mbest) {
     int i,j;
 
@@ -666,6 +673,7 @@ static void mbest_print(char title[], struct MBEST *mbest) {
 	fprintf(stderr, " %f\n", mbest->list[i].error);
     }
 }
+#endif
 
 
 /*---------------------------------------------------------------------------*\
@@ -729,7 +737,8 @@ float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbe
   /* Stage 1 */
 
   mbest_search(codebook1, x, w, ndim, lspmelvq_cb[0].m, mbest_stage1, index);
-  //mbest_print("Stage 1:", mbest_stage1);
+  MBEST_PRINT("Stage 1:", mbest_stage1);
+
 
   /* Stage 2 */
 
@@ -739,7 +748,7 @@ float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbe
 	  target[i] = x[i] - codebook1[ndim*n1+i];
       mbest_search(codebook2, target, w, ndim, lspmelvq_cb[1].m, mbest_stage2, index);
   }
-  //mbest_print("Stage 2:", mbest_stage2);
+  MBEST_PRINT("Stage 2:", mbest_stage2);
 
   /* Stage 3 */
 
@@ -750,7 +759,7 @@ float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbe
 	  target[i] = x[i] - codebook1[ndim*n1+i] - codebook2[ndim*n2+i];
       mbest_search(codebook3, target, w, ndim, lspmelvq_cb[2].m, mbest_stage3, index);
   }
-  //mbest_print("Stage 3:", mbest_stage3);
+  MBEST_PRINT("Stage 3:", mbest_stage3);
 
   n1 = mbest_stage3->list[0].index[2];
   n2 = mbest_stage3->list[0].index[1];

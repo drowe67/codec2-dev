@@ -86,11 +86,8 @@ int main(int argc, char *argv[]) {
     float   delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
-    int     ret;
     int     i,j, finished, iterations;
-    float   b;          /* equivalent number of bits                    */
-    float   improvement;
-    float   sd_vec, sd_element, sd_theory, bits_theory;
+    float   sd_vec;
     int     var_n;
 
     /* Interpret command line arguments */
@@ -138,7 +135,7 @@ int main(int argc, char *argv[]) {
     /* set up initial codebook state from samples of training set */
 
     rewind(ftrain);
-    ret = fread(cb, sizeof(COMP), d*e, ftrain);
+    fread(cb, sizeof(COMP), d*e, ftrain);
 
     /* codebook can't have any zero phase angle entries, these need to be set to
        zero angle so cmult used to find phase angle differences works */
@@ -157,8 +154,8 @@ int main(int argc, char *argv[]) {
     printf("Iteration  delta  var    std dev\n");
     printf("--------------------------------\n");
 
-    b = log10((float)e)/log10(2.0);
-    sd_theory = (PI/sqrt(3.0))*pow(2.0, -b/(float)d);
+    // float b = log10((float)e)/log10(2.0);
+    // float sd_theory = (PI/sqrt(3.0))*pow(2.0, -b/(float)d);
 
     iterations = 0;
     finished = 0;
@@ -178,7 +175,7 @@ int main(int argc, char *argv[]) {
 	se = 0.0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(COMP), d, ftrain);
+	    fread(vec, sizeof(COMP), d, ftrain);
 	    ind = quantise(cb, vec, d, e, &se);
 	    //printf("%d ", ind);
 	    n[ind]++;
@@ -193,8 +190,9 @@ int main(int argc, char *argv[]) {
 	/* we need to know dimension of cb (which varies from vector to vector)
            to calc bits_theory.  Maybe measure and use average dimension....
 	*/
-	//bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
-	//improvement = bits_theory - b;
+	//float sd_element;
+	//float bits_theory = d*log10(PI/(sd_element*sqrt(3.0)))/log10(2.0);
+	//float improvement = bits_theory - b;
 
 	//print_vec(cent, d, 1);
 

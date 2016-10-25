@@ -83,6 +83,7 @@ void create_codebook_text_file(char filename[], float lsp[],
 	    if (digits[i]== cols) {
 		digits[i] = 0;
 		digits[i+1]++;
+                printf("i = %d\n", i);
 	    }
     } while (digits[rows-1] != cols);
 

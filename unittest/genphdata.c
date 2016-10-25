@@ -25,10 +25,10 @@ int main(void) {
     FILE *f=fopen("testph.flt", "wb");
     int   i, m, L, index;
     float angle, noisey_angle, pitch, Wo;
-    COMP  c;
     COMP  sparse_pe[MAX_AMP];
 
     #ifdef TEST1
+    COMP  c;
     for(i=0; i<D*E; i++) {
 	c.real = cos(i*TWO_PI/(M*D));
 	c.imag = sin(i*TWO_PI/(M*D));

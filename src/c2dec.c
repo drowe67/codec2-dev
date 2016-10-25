@@ -57,7 +57,10 @@ int main(int argc, char *argv[])
     int            state, next_state;
     float          ber, r, burst_length, burst_period, burst_timer, ber_est;
     unsigned char  mask;
-    int            natural, dump, softdec, bit, ret;
+    int            natural, softdec, bit, ret;
+#ifdef DUMP
+    int dump;
+#endif
     int            report_energy;
 
     char* opt_string = "h:";
@@ -120,8 +123,11 @@ int main(int argc, char *argv[])
     ber = 0.0;
     burst_length = burst_period = 0.0;
     burst_timer = 0.0;
-    dump = natural = softdec = 0;
+    natural = softdec = 0;
     report_energy = 0;
+#ifdef DUMP
+    dump = 0;
+#endif
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);

@@ -23,7 +23,7 @@ typedef struct {
 
 int main(void) {
     FILE *f=fopen("testamp.flt", "wb");
-    int   i, j, m, L, index;
+    int   i, m, L, index;
     float amp, noisey_amp, pitch, Wo;
     float sparse_pe[MAX_AMP];
 
@@ -37,7 +37,7 @@ int main(void) {
     */
     for(i=0; i<E; i++) {
 	amp = i+1;
-	for(j=0; j<D; j++)
+	for(int j=0; j<D; j++)
 	    fwrite(&amp, sizeof(float), 1, f);
     }
     #endif

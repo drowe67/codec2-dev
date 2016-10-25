@@ -53,8 +53,10 @@ int main(int argc, char *argv[])
     int           bits_per_codec_frame;
     int           bytes_per_codec_frame;
     int           Nc;
+#ifdef CHANNEL_SIM
     COMP          foff_phase_rect;
     float         foff;
+#endif
 
     if (argc < 3) {
 	printf("usage: %s InputBitFile OutputModemRawFile [Nc]\n", argv[0]);
@@ -98,8 +100,10 @@ int main(int argc, char *argv[])
     tx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame);
     assert(tx_bits != NULL);
 
+#ifdef CHANNEL_SIM
     foff = -100;
     foff_phase_rect.real = 1.0; foff_phase_rect.imag = 0.0;
+#endif
 
     frames = 0;
 

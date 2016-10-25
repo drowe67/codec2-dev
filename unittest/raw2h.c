@@ -14,7 +14,7 @@
 
 int main(int argc, char *argv[]) {
     FILE *fraw, *fheader;
-    int   i, samples, ret;
+    int   i, samples;
     short sam;
 
     if (argc != 5) {
@@ -30,10 +30,10 @@ int main(int argc, char *argv[]) {
 
     fprintf(fheader, "short %s[] = {\n", argv[3]);
     for(i=0; i<samples-1; i++) {
-	ret = fread(&sam, sizeof(short), 1, fraw);
+	fread(&sam, sizeof(short), 1, fraw);
         fprintf(fheader, "%d,\n", sam);
     }
-    ret = fread(&sam, sizeof(short), 1, fraw);
+    fread(&sam, sizeof(short), 1, fraw);
     fprintf(fheader, "%d\n};\n", sam);
 
     fclose(fraw);

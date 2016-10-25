@@ -209,55 +209,6 @@ void phase_experiment_destroy(struct PEXP *pexp) {
 
 \*---------------------------------------------------------------------------*/
 
-/* Bubblesort to find highest amplitude harmonics */
-
-struct AMPINDEX {
-    float amp;
-    int   index;
-};
-
-static void bubbleSort(struct AMPINDEX numbers[], int array_size)
-{
-    int i, j;
-    struct AMPINDEX temp;
-
-  for (i = (array_size - 1); i > 0; i--)
-  {
-    for (j = 1; j <= i; j++)
-    {
-	//printf("i %d j %d %f %f \n", i, j, numbers[j-1].amp, numbers[j].amp);
-      if (numbers[j-1].amp < numbers[j].amp)
-      {
-        temp = numbers[j-1];
-        numbers[j-1] = numbers[j];
-        numbers[j] = temp;
-      }
-    }
-  }
-}
-
-
-static void print_pred_error(struct PEXP *pexp, MODEL *model, int start, int end, float mag_thresh) {
-    int   i;
-    float mag;
-
-    mag = 0.0;
-    for(i=start; i<=end; i++)
-	mag += model->A[i]*model->A[i];
-    mag = 10*log10(mag/(end-start));
-
-    if (mag > mag_thresh) {
-	for(i=start; i<=end; i++) {
-	    float pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
-	    float err = pred - model->phi[i];
-	    err = atan2(sin(err),cos(err));
-	    printf("%f\n",err);
-	}
-	//printf("\n");
-    }
-
-}
-
 
 static void predict_phases(struct PEXP *pexp, MODEL *model, int start, int end) {
     int i;
@@ -343,14 +294,6 @@ static void predict_phases2(struct PEXP *pexp, MODEL *model, int start, int end)
 
 }
 
-static void rand_phases(MODEL *model, int start, int end) {
-    int i;
-
-    for(i=start; i<=end; i++)
-	model->phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX);
-
-}
-
 static void quant_phase(float *phase, float min, float max, int bits) {
     int   levels = 1 << bits;
     int   index;
@@ -374,6 +317,64 @@ static void quant_phases(MODEL *model, int start, int end, int bits) {
     for(i=start; i<=end; i++) {
 	quant_phase(&model->phi[i], -PI, PI, bits);
     }
+}
+
+#if 0
+/* Bubblesort to find highest amplitude harmonics */
+
+struct AMPINDEX {
+    float amp;
+    int   index;
+};
+
+static void bubbleSort(struct AMPINDEX numbers[], int array_size)
+{
+    int i, j;
+    struct AMPINDEX temp;
+
+  for (i = (array_size - 1); i > 0; i--)
+  {
+    for (j = 1; j <= i; j++)
+    {
+	//printf("i %d j %d %f %f \n", i, j, numbers[j-1].amp, numbers[j].amp);
+      if (numbers[j-1].amp < numbers[j].amp)
+      {
+        temp = numbers[j-1];
+        numbers[j-1] = numbers[j];
+        numbers[j] = temp;
+      }
+    }
+  }
+}
+
+static void print_pred_error(struct PEXP *pexp, MODEL *model, int start, int end, float mag_thresh) {
+    int   i;
+    float mag;
+
+    mag = 0.0;
+    for(i=start; i<=end; i++)
+	mag += model->A[i]*model->A[i];
+    mag = 10*log10(mag/(end-start));
+
+    if (mag > mag_thresh) {
+	for(i=start; i<=end; i++) {
+	    float pred = pexp->phi_prev[i] + N_SAMP*i*(model->Wo + pexp->Wo_prev)/2.0;
+	    float err = pred - model->phi[i];
+	    err = atan2(sin(err),cos(err));
+	    printf("%f\n",err);
+	}
+	//printf("\n");
+    }
+
+}
+
+
+static void rand_phases(MODEL *model, int start, int end) {
+    int i;
+
+    for(i=start; i<=end; i++)
+	model->phi[i] = PI*(1.0 - 2.0*(float)rand()/RAND_MAX);
+
 }
 
 static void fixed_bits_per_frame(struct PEXP *pexp, MODEL *model, int m, int budget) {
@@ -586,7 +587,6 @@ static void quant_prediction_error(struct PEXP *pexp, MODEL *model, int start, i
     }
 }
 
-
 static void print_sparse_pred_error(struct PEXP *pexp, MODEL *model, int start, int end, float mag_thresh)
 {
     int    i, index;
@@ -621,6 +621,19 @@ static void print_sparse_pred_error(struct PEXP *pexp, MODEL *model, int start, 
     }
 }
 
+static void predict_phases1(struct PEXP *pexp, MODEL *model, int start, int end) {
+    int i;
+    float best_Wo;
+
+    best_Wo = refine_Wo(pexp, model, 1, model->L);
+
+    for(i=start; i<=end; i++) {
+	model->phi[i] = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
+    }
+}
+
+
+#endif
 
 static void update_snr_calc(struct PEXP *pexp, MODEL *model, float before[])
 {
@@ -848,18 +861,6 @@ static void sparse_vq_pred_error(struct PEXP     *pexp,
 	error_q_angle = atan2(error_q_rect.imag, error_q_rect.real);
 	model->phi[i] = pred - error_q_angle;
 	model->phi[i] = atan2(sin(model->phi[i]), cos(model->phi[i]));
-    }
-}
-
-
-static void predict_phases1(struct PEXP *pexp, MODEL *model, int start, int end) {
-    int i;
-    float best_Wo;
-
-    best_Wo = refine_Wo(pexp, model, 1, model->L);
-
-    for(i=start; i<=end; i++) {
-	model->phi[i] = pexp->phi_prev[i] + N_SAMP*i*best_Wo;
     }
 }
 
@@ -1161,7 +1162,7 @@ void cb_phase1(struct PEXP *pexp, MODEL *model) {
 
 void cb_phase2(struct PEXP *pexp, MODEL *model) {
     int   st, m, i, a, b, step;
-    float diff,w,c,s,phi1_;
+    float diff,w,c,s;
     float A[MAX_AMP];
 
     for(m=1; m<=model->L; m++) {
@@ -1187,7 +1188,7 @@ void cb_phase2(struct PEXP *pexp, MODEL *model) {
 	    w = 1.0;
 	    c += w*cos(diff); s += w*sin(diff);
 	}
-	phi1_ = atan2(s,c);
+	// float phi1_ = atan2(s,c);
 	printf("replacing: ");
 	for(i=a; i<b; i++) {
 	    //model->phi[i] = i*phi1_;
