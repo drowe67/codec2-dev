@@ -10,6 +10,9 @@
 #include "_kiss_fft_guts.h"
 
 #else
+#if 0
+// caching constants in RAM did not seem to have an effect on performance
+// TODO: Decide what to with this code
 #define FFT_INIT_CACHE_SIZE 4
 const arm_cfft_instance_f32* fft_init_cache[FFT_INIT_CACHE_SIZE];
 
@@ -52,6 +55,7 @@ static const arm_cfft_instance_f32* arm_fft_cache_get(const arm_cfft_instance_f3
     }
     return retval;
 }
+#endif
 #endif
 
 void codec2_fft_free(codec2_fft_cfg cfg)

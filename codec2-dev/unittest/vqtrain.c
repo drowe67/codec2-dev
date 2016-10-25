@@ -79,7 +79,6 @@ int main(int argc, char *argv[]) {
     float  delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
-    int     ret;
 
     /* Interpret command line arguments */
 
@@ -120,7 +119,7 @@ int main(int argc, char *argv[]) {
     /* set up initial codebook state from samples of training set */
 
     rewind(ftrain);
-    ret = fread(cb, sizeof(float), k*m, ftrain);
+    fread(cb, sizeof(float), k*m, ftrain);
 
     /* main loop */
 
@@ -141,7 +140,7 @@ int main(int argc, char *argv[]) {
 	se = 0.0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
-	    ret = fread(vec, sizeof(float), k, ftrain);
+	    fread(vec, sizeof(float), k, ftrain);
 	    ind = quantise(cb, vec, k, m, &se);
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);

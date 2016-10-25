@@ -285,7 +285,6 @@ int main(int argc, char **argv)
   float *weight, *weight2, *weight3;
   float *delta, *delta2;
   float tmp, err, min_dist, total_min_dist;
-  int ret;
   char filename[256];
   FILE *fcb;
 
@@ -309,7 +308,7 @@ int main(int argc, char **argv)
       break;
     for (j=0;j<ndim;j++)
     {
-	ret = fscanf(ftrain, "%f ", &tmp);
+	fscanf(ftrain, "%f ", &tmp);
     }
     nb_vectors++;
     if ((nb_vectors % 1000) == 0)
@@ -335,7 +334,7 @@ int main(int argc, char **argv)
       break;
     for (j=0;j<ndim;j++)
     {
-	ret = fscanf(ftrain, "%f ", &data[i*ndim+j]);
+	fscanf(ftrain, "%f ", &data[i*ndim+j]);
     }
   }
   nb_vectors = i;

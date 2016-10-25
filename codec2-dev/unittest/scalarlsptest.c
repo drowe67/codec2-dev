@@ -45,10 +45,9 @@ int main(int argc, char *argv[])
     float lsp_hz[LPC_ORD]; /* LSP input vector in Hz */
     int vectors;           /* number LSP vectors processed */
     int k,m;             /* LSP vector order and codebook size */
-    int    index;
     float  wt[1];        /* weighting (not used here for scalars) */
     const float *cb;           /* LSP quantiser codebook */
-    int i, ret;
+    int i;
     float  total_se;
 
     if (argc < 2) {
@@ -72,7 +71,7 @@ int main(int argc, char *argv[])
 	/* Read LSP input vector speech */
 
 	for (i=0; i<LPC_ORD; i++) {
-	    ret = fscanf(ftrain, "%f ", &lsp[i]);
+	    fscanf(ftrain, "%f ", &lsp[i]);
 	}
 	vectors++;
 	if ((vectors % 1000) == 0)
@@ -90,8 +89,12 @@ int main(int argc, char *argv[])
 	    k = lsp_cb[i].k;
 	    m = lsp_cb[i].m;
 	    cb = lsp_cb[i].cb;
-	    index = quantise(cb, &lsp_hz[i], wt, k, m, &total_se);
-	    //printf("k %d m %d lsp[%d] %f %f se %f\n", k,m,i,lsp_hz[i], cb[index],se);
+	    #if 1
+	       quantise(cb, &lsp_hz[i], wt, k, m, &total_se);
+	    #else
+               int index = quantise(cb, &lsp_hz[i], wt, k, m, &total_se);
+	       printf("k %d m %d lsp[%d] %f %f se %f\n", k,m,i,lsp_hz[i], cb[index],se);
+            #endif
 	}
 	//printf("total se %f\n", total_se);
 	//exit(0);

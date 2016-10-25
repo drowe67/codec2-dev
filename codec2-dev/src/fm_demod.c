@@ -46,7 +46,9 @@ int main(int argc, char *argv[])
     struct FM    *fm;
     short         buf[N*2];
     float         rx[N];
+#if defined(TEST_MODE) && !defined(TEST_MODE_COMP)
     float         rx_out[N];
+#endif
     COMP          out_comp[N];
     int           i;
 

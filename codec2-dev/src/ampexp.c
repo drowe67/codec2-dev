@@ -299,41 +299,6 @@ static void add_quant_noise(struct AEXP *aexp, MODEL *model, int start, int end,
  */
 
 
-static void print_sparse_pred_error(struct AEXP *aexp, MODEL *model, float mag_thresh)
-{
-    int    m, index;
-    float  mag, error;
-    float  sparse_pe[MAX_AMP];
-
-    mag = 0.0;
-    for(m=1; m<=model->L; m++)
-	mag += model->A[m]*model->A[m];
-    mag = 10*log10(mag/model->L);
-
-    if (mag > mag_thresh) {
-	for(m=0; m<MAX_AMP; m++) {
-	    sparse_pe[m] = 0.0;
-	}
-
-	for(m=1; m<=model->L; m++) {
-	    assert(model->A[m] > 0.0);
-	    error = PRED_COEFF*20.0*log10(aexp->A_prev[m]) - 20.0*log10(model->A[m]);
-	    //error = 20.0*log10(model->A[m]) - mag;
-
-	    index = MAX_AMP*m*model->Wo/PI;
-	    assert(index < MAX_AMP);
-	    sparse_pe[index] = error;
-	}
-
-	/* dump sparse amp vector */
-
-	for(m=0; m<MAX_AMP; m++)
-	    printf("%f ", sparse_pe[m]);
-	printf("\n");
-    }
-}
-
-
 static float frame_energy(MODEL *model, float *enormdB) {
     int   m;
     float e, edB;
@@ -453,6 +418,41 @@ static int split_vq(float sparse_pe_out[], struct AEXP *aexp, struct codebook *v
     return vq_ind;
 }
 
+#if 0
+static void print_sparse_pred_error(struct AEXP *aexp, MODEL *model, float mag_thresh)
+{
+    int    m, index;
+    float  mag, error;
+    float  sparse_pe[MAX_AMP];
+
+    mag = 0.0;
+    for(m=1; m<=model->L; m++)
+	mag += model->A[m]*model->A[m];
+    mag = 10*log10(mag/model->L);
+
+    if (mag > mag_thresh) {
+	for(m=0; m<MAX_AMP; m++) {
+	    sparse_pe[m] = 0.0;
+	}
+
+	for(m=1; m<=model->L; m++) {
+	    assert(model->A[m] > 0.0);
+	    error = PRED_COEFF*20.0*log10(aexp->A_prev[m]) - 20.0*log10(model->A[m]);
+	    //error = 20.0*log10(model->A[m]) - mag;
+
+	    index = MAX_AMP*m*model->Wo/PI;
+	    assert(index < MAX_AMP);
+	    sparse_pe[index] = error;
+	}
+
+	/* dump sparse amp vector */
+
+	for(m=0; m<MAX_AMP; m++)
+	    printf("%f ", sparse_pe[m]);
+	printf("\n");
+    }
+}
+
 
 static void sparse_vq_pred_error(struct AEXP *aexp,
 				 MODEL       *model
@@ -532,7 +532,7 @@ static void split_error(struct AEXP *aexp, struct codebook *vq, float sparse_pe_
     }
 }
 
-
+#endif
 static void sparse_vq_amp(struct AEXP *aexp, MODEL *model)
 {
     int    m, index;

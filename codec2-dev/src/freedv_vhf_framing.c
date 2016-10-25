@@ -411,7 +411,12 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     int i;
     int match[2];
     int r;
-    
+
+    /* defaults to make compiler happy on -O3 */
+
+    *pt = FRAME_PAYLOAD_TYPE_VOICE; 
+    *rdiff = 0;
+
     /* Set up parameters for the standard type of frame */
     if(frame_type == FREEDV_VHF_FRAME_A){
         uw[0] = A_uw_v;
@@ -441,6 +446,7 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
         match[i] = diff[i] <= tol;
     }
     /* Pick the best matching UW */
+
     if (diff[0] < diff[1]) {
         r = match[0];
         *rdiff = diff[0];
