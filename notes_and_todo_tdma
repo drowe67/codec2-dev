@@ -38,7 +38,7 @@ TDMA_sched_tx(slot_n,tx_frame,tx_samps_out,tx_time_out) - Schedule a frame trans
     
 Random TODOs:
 [ ] Deframer work:
-  [ ] Framer for shorter frames (minus padding bits)
+  [x] Framer for shorter frames (minus padding bits)
   [ ] New deframer for extracting burst frames and keeping slot sync state
         [ ] Looks +/- a few symbols in a demodulated chunk instead of pulling frames out of a steram
         [ ] Provides frame location feedback to the TDMA part for coarse sync tracking

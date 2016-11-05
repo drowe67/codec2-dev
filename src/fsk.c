@@ -556,7 +556,9 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
     int i,j,dc_i,cbuf_i;
     float ft1;
     int nstash = fsk->nstash;
+    
     COMP *f1_int, *f2_int;
+    
     COMP t1,t2;
     COMP phi1_c = fsk->phi1_c;
     COMP phi2_c = fsk->phi2_c;
@@ -567,7 +569,9 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int using_old_samps;
     float *sample_src;
+    
     COMP *f1_intbuf,*f2_intbuf;
+    
     float f_est[M],fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
     int neyesamp,neyeoffset;
