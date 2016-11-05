@@ -597,10 +597,10 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
 	
     max_row_weight = ldpc->max_row_weight;
     max_col_weight = ldpc->max_col_weight;
-	
+    /*	
     c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
     v_nodes = calloc( CodeLength, sizeof( struct v_node));
-	
+    */
     /* initialize c-node and v-node structures */
 
     c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
