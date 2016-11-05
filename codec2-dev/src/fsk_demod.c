@@ -44,7 +44,7 @@ int main(int argc,char *argv[]){
     uint8_t *bitbuf;
     int16_t *rawbuf;
     float *modbuf,*sdbuf;
-    int i,j;
+    int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
     
@@ -130,23 +130,35 @@ int main(int argc,char *argv[]){
         }
         
         if(enable_stats && stats_ctr <= 0){
+	    /* Print standard 2FSK stats */
             fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
             fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
+	    /* Print 4FSK stats if in 4FSK mode */
             if(fsk->mode == 4){
                 fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
             }
+	    
+	    /* Print the eye diagram */
             fprintf(stderr,",\t\"eye_diagram\":[");
             for(i=0;i<stats.neyetr;i++){
                 fprintf(stderr,"[");
                 for(j=0;j<stats.neyesamp;j++){
-                    fprintf(stderr,"%f",stats.rx_eye[i][j]);
+                    fprintf(stderr,"%f ",stats.rx_eye[i][j]);
                     if(j<stats.neyesamp-1) fprintf(stderr,",");
                 }
                 fprintf(stderr,"]");
                 if(i<stats.neyetr-1) fprintf(stderr,",");
             }
-            
-            fprintf(stderr,"]}\n");
+            fprintf(stderr,"],\n");
+	    
+	    /* Print a sample of the FFT from the freq estimator */
+	    fprintf(stderr,"\"samp_fft\":[");
+	    Ndft = fsk->Ndft/2;
+	    for(i=0; i<Ndft; i++){
+		fprintf(stderr,"%f ",(fsk->fft_est)[i]);
+		if(i<Ndft-1) fprintf(stderr,",");
+	    }
+	    fprintf(stderr,"]}\n");
             stats_ctr = stats_loop;
         }
         stats_ctr--;
