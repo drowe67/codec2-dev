@@ -149,7 +149,7 @@ int main(int argc,char *argv[]){
                 fprintf(stderr,"]");
                 if(i<stats.neyetr-1) fprintf(stderr,",");
             }
-            fprintf(stderr,"],\n");
+            fprintf(stderr,"],");
 	    
 	    /* Print a sample of the FFT from the freq estimator */
 	    fprintf(stderr,"\"samp_fft\":[");
