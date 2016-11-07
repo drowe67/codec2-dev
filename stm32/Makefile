@@ -19,7 +19,7 @@ SUDO ?= sudo
 ###################################################
 
 CFLAGS  = -std=gnu11 -O0 -g -Wall -Tstm32_flash.ld -DSTM32F40_41xxx -DCORTEX_M4
-CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4
+CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4 -Wno-unused-function
 
 ifeq ($(FLOAT_TYPE), hard)
 CFLAGS += -fsingle-precision-constant -Wdouble-promotion

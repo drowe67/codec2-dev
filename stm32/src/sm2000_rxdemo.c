@@ -55,7 +55,7 @@ size_t stack_size(){
 //short speechbuf[320];
 
 int main(void) {
-    int ret, ptt, i;
+    int ptt;
     uint64_t freq_in_Hz_times_100;
     struct freedv * fdv;
     struct FSK * fsk;
@@ -73,7 +73,8 @@ int main(void) {
     I2C_Setup();
     si5351_init(0, SI5351_CRYSTAL_LOAD_6PF, 0);
     freq_in_Hz_times_100 = 1070000000ULL - 3200000ULL;
-    ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
+    // int ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
+    si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
     
     /* Open up the FreeDV thing */
 	fdv = freedv_open(FREEDV_MODE_2400A);
@@ -89,10 +90,8 @@ int main(void) {
     //short buf[ADC_BUF_SZ*4];
     dac_open(DAC_FS_16KHZ*2, DAC_BUF_SZ*4);
     adc_open(ADC_FS_96KHZ, ADC_BUF_SZ*11);
-    size_t lss;
     //usb_vcp_init();
     int mbptr = 0;
-	int k;
 	int spstate;
 	ptt = 0;
 	int nin = freedv_nin(fdv);

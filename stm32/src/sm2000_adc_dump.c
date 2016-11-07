@@ -49,7 +49,7 @@ short aSine[] = {
 short zeros[SINE_SAMPLES];
 
 int main(void) {
-    int ret, ptt, i;
+    int ptt, i;
     uint64_t freq_in_Hz_times_100;
 
     for(i=0; i<SINE_SAMPLES; i++)
@@ -65,7 +65,8 @@ int main(void) {
     I2C_Setup();
     si5351_init(0, SI5351_CRYSTAL_LOAD_6PF, 0);
     freq_in_Hz_times_100 = 1070000000ULL - 3200000ULL;
-    ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
+    // int ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
+    si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
 
     //dac_open(DAC_FS_96KHZ, 4*DAC_BUF_SZ);
     adc_open(ADC_FS_96KHZ, 10*ADC_BUF_SZ);
@@ -91,16 +92,16 @@ int main(void) {
 
         int n = adc1_samps();
         if (n) {
-            uint16_t  s, buf[n];
+            uint16_t  buf[n];
             uint8_t   b;
-            adc1_read(buf,n);
+            adc1_read((short*)buf,n);
             for(i=0; i<n; i++) {
 				b = (uint8_t)(buf[i]&0xFF);
 				VCP_put_char(b);
 				b = (uint8_t)((buf[i]>>8)&0xFF);
 				VCP_put_char(b);
                 //VCP_get_char(&b);
-                //s = b << 8;
+                //uint16_t s = b << 8;
                 //VCP_get_char(&b);
                 //s += b;
                 //buf[i] = s;

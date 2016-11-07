@@ -645,6 +645,8 @@ void si5351_ms_div(enum si5351_clock clk, uint8_t r_div, uint8_t div_by_4) {
                 return;
         case SI5351_CLKNONE:
                 return;
+	default:
+		return;
     }
 
     reg_val = si5351_read(reg_addr);
@@ -761,7 +763,7 @@ uint64_t si5351_multisynth_calc(uint64_t freq, uint64_t pll_freq, struct Si5351R
 uint64_t si5351_pll_calc(uint64_t freq, struct Si5351RegSet *reg, int32_t correction) {
     uint64_t ref_freq = Si5351_Config.xtal_freq * SI5351_FREQ_MULT;
     uint32_t a, b, c, p1, p2, p3;
-    uint64_t lltmp, rfrac, denom;
+    uint64_t lltmp, denom;
 
 
     // Factor calibration value into nominal crystal frequency
@@ -792,7 +794,6 @@ uint64_t si5351_pll_calc(uint64_t freq, struct Si5351RegSet *reg, int32_t correc
     lltmp = freq % ref_freq;
     lltmp *= denom;
     do_div(lltmp, ref_freq);
-    rfrac = lltmp;
 
     b = (((uint64_t)(freq % ref_freq)) * RFRAC_DENOM) / ref_freq;
     c = b ? RFRAC_DENOM : 1;

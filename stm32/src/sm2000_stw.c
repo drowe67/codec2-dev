@@ -66,11 +66,10 @@ uint8_t bit_buf[] = { 1,0,1,1,0,0,0,1,
                   1,0,0,0,0,0,1,1, };
                   
 int main(void) {
-    int ret, ptt, i;
+    int ptt, i;
     uint64_t freq_in_Hz_times_100;
     struct FSK * fsk;
     struct freedv_vhf_deframer * deframer;
-    char chbuf[100];
     float * mod_buf;
     
     sm1000_leds_switches_init();
@@ -90,7 +89,7 @@ int main(void) {
     I2C_Setup();
     si5351_init(0, SI5351_CRYSTAL_LOAD_6PF, 0);
     freq_in_Hz_times_100 = 1070000000ULL - 3200000ULL;
-    ret = si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
+    si5351_set_freq(freq_in_Hz_times_100, 0, SI5351_CLK0);
 
     dac_open(DAC_FS_96KHZ, 2000);
     adc_open(ADC_FS_96KHZ, 2000);
