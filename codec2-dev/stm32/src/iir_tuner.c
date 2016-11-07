@@ -73,7 +73,9 @@ void iir_tuner(
 ) 
 {
     int i, j, k;
+#ifndef FIXED_IIR
     float x, y, z;
+#endif
     int n, m, o;
 
     for(i=0, j=0; i<ADC_TUNER_BUF_SZ/2; j++) {

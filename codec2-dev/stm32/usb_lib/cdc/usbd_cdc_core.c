@@ -497,7 +497,7 @@ static uint8_t  usbd_cdc_DeInit (void  *pdev,
 static uint8_t  usbd_cdc_Setup (void  *pdev,
                                 USB_SETUP_REQ *req)
 {
-  uint16_t len;
+  uint16_t len = 0;
   uint8_t  *pbuf;
 
   switch (req->bmRequest & USB_REQ_TYPE_MASK)

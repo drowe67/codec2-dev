@@ -77,7 +77,6 @@ int main(void){
 static void TIM_Config(void)
 {
   GPIO_InitTypeDef GPIO_InitStructure;
-  DMA_InitTypeDef DMA_InitStructure;
 
   /* GPIOA and GPIOB clock enable */
   RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA | RCC_AHB1Periph_GPIOB, ENABLE);
@@ -124,8 +123,6 @@ static void TIM_Config(void)
 }
 
 void Timer1Config() {
-    int i;
-
     /* TIM Configuration */
 
     TIM_Config();

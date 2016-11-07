@@ -33,12 +33,12 @@
 //#define printf gdb_stdio_printf
 
 int main(void) {
-    int ret;
 
     //printf("starting\n");
     I2C_Setup();
     si5351_init(0, SI5351_CRYSTAL_LOAD_6PF, 0);
-    ret = si5351_set_freq(1000000000ULL, 0, SI5351_CLK0);
+    si5351_set_freq(1000000000ULL, 0, SI5351_CLK0);
+    // int ret = si5351_set_freq(1000000000ULL, 0, SI5351_CLK0);
     //printf(" ret = %d\n", ret);
 
     while(1);

@@ -35,6 +35,7 @@
 #include <stm32f4xx_rcc.h>
 #include "gdb_stdio.h"
 #include "comp.h"
+#include <string.h> 
 //#include "gmsk_test_dat_m4.h"
 #define SINE_SAMPLES  32
 
@@ -59,7 +60,8 @@ float f4sine[] = {1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0,1,0,-1,0
 int tx_imm[DUC_N];
 
 //Complex input to chain
-COMP comp_in[DUC_N/10];
+#define COMP_IN_SZ (DUC_48N)
+COMP comp_in[COMP_IN_SZ];
 
 unsigned short outbuf[DAC_DUC_BUF_SZ];
 
@@ -85,7 +87,7 @@ int main(void) {
     fast_dac_open(2*DAC_DUC_BUF_SZ,2*DAC_BUF_SZ);
     tstart=tend=tup=cyc=0;
     //Initalize complex input with signal at zero
-    for(i=0;i<DUC_48N;i++){
+    for(i=0;i<COMP_IN_SZ;i++){
         comp_in[i].real=1;
         comp_in[i].imag=0;
     }
