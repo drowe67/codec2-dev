@@ -43,7 +43,8 @@ int main(int argc,char *argv[]){
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
-    float *modbuf,*sdbuf;
+    COMP *modbuf;
+    float *sdbuf;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -116,12 +117,13 @@ int main(int argc,char *argv[]){
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
     }
     rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
-    modbuf = (float*)malloc(sizeof(float)*(fsk->N+fsk->Ts*2));
+    modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
     while( fread(rawbuf,sizeof(int16_t),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
         for(i=0;i<fsk_nin(fsk);i++){
-            modbuf[i] = ((float)rawbuf[i])/FDMDV_SCALE;
+            modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
+            modbuf[i].imag = 0.0;
         }
         if(soft_dec_mode){
             fsk_demod_sd(fsk,sdbuf,modbuf);

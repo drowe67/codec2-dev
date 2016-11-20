@@ -61,10 +61,10 @@ struct FSK {
     COMP phi2_c;
     COMP phi3_c;
     COMP phi4_c;
-    kiss_fftr_cfg fft_cfg;  /* Config for KISS FFT, used in freq est */
+    kiss_fft_cfg fft_cfg;  /* Config for KISS FFT, used in freq est */
     float norm_rx_timing;   /* Normalized RX timing */
     
-    float *samp_old;        /* Tail end of last batch of samples */
+    COMP *samp_old;        /* Tail end of last batch of samples */
     int nstash;             /* How many elements are in there */
     
     float *fft_est;			/* Freq est FFT magnitude */
@@ -163,7 +163,7 @@ uint32_t fsk_nin(struct FSK *fsk);
  * uint8_t rx_bits[] - Buffer for Nbits unpacked bits to be written
  * float fsk_in[] - nin samples of modualted FSK
  */
-void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],float fsk_in[]);
+void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],COMP fsk_in[]);
 
 /*
  * Demodulate some number of FSK samples. The number of samples to be 
@@ -173,6 +173,6 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],float fsk_in[]);
  * float rx_bits[] - Buffer for Nbits soft decision bits to be written
  * float fsk_in[] - nin samples of modualted FSK
  */
-void fsk_demod_sd(struct FSK *fsk, float rx_bits[],float fsk_in[]);
+void fsk_demod_sd(struct FSK *fsk, float rx_bits[],COMP fsk_in[]);
 
 #endif

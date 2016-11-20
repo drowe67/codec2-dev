@@ -190,15 +190,18 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     memold = (4*fsk->Ts);
     
     fsk->nstash = memold; 
-    fsk->samp_old = (float*) malloc(sizeof(float)*memold);
+    fsk->samp_old = (COMP*) malloc(sizeof(COMP)*memold);
     if(fsk->samp_old == NULL){
         free(fsk);
         return NULL;
     }
     
-    for(i=0;i<memold;i++)fsk->samp_old[i]=0;
-    
-    fsk->fft_cfg = kiss_fftr_alloc(fsk->Ndft,0,NULL,NULL);
+    for(i=0;i<memold;i++) {
+        fsk->samp_old[i].real = 0;
+        fsk->samp_old[i].imag = 0;
+    }
+
+    fsk->fft_cfg = kiss_fft_alloc(fsk->Ndft,0,NULL,NULL);
     if(fsk->fft_cfg == NULL){
         free(fsk->samp_old);
         free(fsk);
@@ -303,15 +306,18 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     memold = (4*fsk->Ts);
     
     fsk->nstash = memold; 
-    fsk->samp_old = (float*) malloc(sizeof(float)*memold);
+    fsk->samp_old = (COMP*) malloc(sizeof(COMP)*memold);
     if(fsk->samp_old == NULL){
         free(fsk);
         return NULL;
     }
     
-    for(i=0;i<memold;i++)fsk->samp_old[i]=0;
+    for(i=0;i<memold;i++) {
+        fsk->samp_old[i].real = 0.0;
+        fsk->samp_old[i].imag = 0.0;
+    }
     
-    fsk->fft_cfg = kiss_fftr_alloc(Ndft,0,NULL,NULL);
+    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
     if(fsk->fft_cfg == NULL){
         free(fsk->samp_old);
         free(fsk);
@@ -370,7 +376,7 @@ void fsk_set_nsym(struct FSK *fsk,int nsyms){
     free(fsk->fft_cfg);
     free(fsk->fft_est);
     
-    fsk->fft_cfg = kiss_fftr_alloc(Ndft,0,NULL,NULL);
+    fsk->fft_cfg = kiss_fft_alloc(Ndft,0,NULL,NULL);
     fsk->fft_est = (float*)malloc(sizeof(float)*fsk->Ndft/2);
     
     for(i=0;i<Ndft/2;i++)fsk->fft_est[i] = 0;
@@ -423,7 +429,7 @@ void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
  * freqs - Array for the estimated frequencies
  * M - number of frequency peaks to find
  */
-void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
+void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     int Ndft = fsk->Ndft;
     int Fs = fsk->Fs;
     int nin = fsk->nin;
@@ -433,18 +439,17 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     float max;
     float tc;
     int imax;
-    kiss_fftr_cfg fft_cfg = fsk->fft_cfg;
+    kiss_fft_cfg fft_cfg = fsk->fft_cfg;
     int freqi[M];
     int f_min,f_max,f_zero;
     /* Array to do complex FFT from using kiss_fft */
-    /* It'd probably make more sense here to use kiss_fftr */
     
     #ifdef DEMOD_ALLOC_STACK
-    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)alloca(sizeof(kiss_fft_scalar)*Ndft);
-    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   alloca(sizeof(kiss_fft_cpx)*(Ndft/2)+1);
+    kiss_fft_cpx *fftin  = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
+    kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
     #else
-    kiss_fft_scalar *fftin  = (kiss_fft_scalar*)malloc(sizeof(kiss_fft_scalar)*Ndft);
-    kiss_fft_cpx    *fftout = (kiss_fft_cpx*)   malloc(sizeof(kiss_fft_cpx)*((Ndft/2)+1));
+    kiss_fft_cpx *fftin  = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
+    kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     #endif
 
     fft_samps = Ndft;
@@ -462,15 +467,17 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
 		for(i=0; i<fft_samps; i++){
 			hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
 			
-			fftin[i] = (kiss_fft_scalar)0.5*hann*fsk_in[i+Ndft*j];
+			fftin[i].r = 0.5*hann*fsk_in[i+Ndft*j].real;
+			fftin[i].i = 0.5*hann*fsk_in[i+Ndft*j].imag;
 		}
 		/* Zero out the remaining slots */
 		for(; i<Ndft;i++){
-			fftin[i] = 0;
+			fftin[i].r = 0;
+			fftin[i].i = 0;
 		}
 		
 		/* Do the FFT */
-		kiss_fftr(fft_cfg,fftin,fftout);
+		kiss_fft(fft_cfg,fftin,fftout);
 		
 		/* Find the magnitude^2 of each freq slot and stash away in the real
 		* value, so this only has to be done once. Since we're only comparing
@@ -543,7 +550,7 @@ void fsk_demod_freq_est(struct FSK *fsk, float fsk_in[],float *freqs,int M){
     #endif
 }
 
-void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[]){
+void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]){
     int N = fsk->N;
     int Ts = fsk->Ts;
     int Rs = fsk->Rs;
@@ -568,7 +575,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int using_old_samps;
-    float *sample_src;
+    COMP *sample_src;
     
     COMP *f1_intbuf,*f2_intbuf;
     
@@ -603,7 +610,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
 		fsk->f1_est = f_est[0];
 		fsk->f2_est = f_est[1];
 	}
-    
+
     /* Back the stored phase off to account for re-integraton of old samples */
     dphi1 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f1_est)/(float)(Fs)));
     dphi2 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f2_est)/(float)(Fs)));
@@ -634,8 +641,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
             dphi2 = comp_exp_j(2*M_PI*(f_est[1]/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
-        f2_intbuf[dc_i]=fcmult(sample_src[dc_i],phi2_c);
+        f1_intbuf[dc_i]=cmult(sample_src[dc_i],phi1_c);
+        f2_intbuf[dc_i]=cmult(sample_src[dc_i],phi2_c);
 
         modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
         modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
@@ -662,8 +669,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
 				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
-            f2_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi2_c);
+            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi1_c);
+            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi2_c);
     
             modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
             modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);
@@ -696,11 +703,11 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
 	fsk->f2_est = f_est[1];
 
     /* Stash samples away in the old sample buffer for the next round of bit getting */
-    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(float)*nstash);
+    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(COMP)*nstash);
     
     /* Fine Timing Estimation */
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
-     * exract angle */
+     * extract angle */
      
     /* Figure out how much to spin the oscillator to extract magic spectral line */
     dphift = comp_exp_j(2*M_PI*((float)(Rs)/(float)(P*Rs)));
@@ -873,7 +880,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], float fsk_in[
     #endif
 }
 
-void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
+void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
     int N = fsk->N;
     int Ts = fsk->Ts;
     int Rs = fsk->Rs;
@@ -898,7 +905,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int using_old_samps;
-    float *sample_src;
+    COMP *sample_src;
     COMP *f1_intbuf,*f2_intbuf,*f3_intbuf,*f4_intbuf;
     float f_est[M],fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
@@ -981,10 +988,10 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
             dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=fcmult(sample_src[dc_i],phi1_c);
-        f2_intbuf[dc_i]=fcmult(sample_src[dc_i],phi2_c);
-        f3_intbuf[dc_i]=fcmult(sample_src[dc_i],phi3_c);
-        f4_intbuf[dc_i]=fcmult(sample_src[dc_i],phi4_c);
+        f1_intbuf[dc_i]=cmult(sample_src[dc_i],phi1_c);
+        f2_intbuf[dc_i]=cmult(sample_src[dc_i],phi2_c);
+        f3_intbuf[dc_i]=cmult(sample_src[dc_i],phi3_c);
+        f4_intbuf[dc_i]=cmult(sample_src[dc_i],phi4_c);
 
         modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
         modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
@@ -1019,10 +1026,10 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 				dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi1_c);
-            f2_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi2_c);
-            f3_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi3_c);
-            f4_intbuf[cbuf_i+j]=fcmult(sample_src[dc_i],phi4_c);
+            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi1_c);
+            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi2_c);
+            f3_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi3_c);
+            f4_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi4_c);
     
             modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
             modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);
@@ -1066,7 +1073,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 	fsk->f4_est = f_est[3];
 
     /* Stash samples away in the old sample buffer for the next round of bit getting */
-    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(float)*nstash);
+    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(COMP)*nstash);
     
     /* Fine Timing Estimation */
     /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
@@ -1286,7 +1293,7 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 }
 
 
-void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
+void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
 	if(fsk->mode == 4){
 		fsk4_demod(fsk,rx_bits,fsk_in);
 	}else{
@@ -1294,10 +1301,11 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], float fsk_in[]){
 	}
 }
 
-void fsk_demod_sd(struct FSK *fsk, float rx_sd[],float fsk_in[]){
+void fsk_demod_sd(struct FSK *fsk, float rx_sd[], COMP fsk_in[]){
 	if(fsk->mode == 4){
-		//TODO: Add 4FSK soft decision
-        //fsk4_demod(fsk,rx_bits,fsk_in);
+            assert(0);
+            //TODO: Add 4FSK soft decision
+            //fsk4_demod(fsk,rx_bits,fsk_in);
 	}else{
 		fsk2_demod(fsk,NULL,rx_sd,fsk_in);
 	}
