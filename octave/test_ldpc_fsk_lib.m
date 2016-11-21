@@ -449,9 +449,14 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     rx = tx + noise_complex;
     SNRdB = 10*log10(var(tx)/var(noise_real));
     
-    printf("resampling ...\n");
+    printf("fract resampling ...\n");
     rx_resample_fract = fractional_resample(rx, 1.08331);
     save_rtlsdr("fsk_demod_resample.iq", rx_resample_fract);
+
+    % useful for HackRF
+    %printf("10X resampling ...\n");
+    %rx_resample_10M = resample(rx_resample_fract, 10, 1);
+    %save_rtlsdr("fsk_demod_10M.iq", rx_resample_10M);
 
     printf("run C cmd line chain - uncoded PER\n");
     system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - - | ../src/drs232 - /dev/null -v");
@@ -460,7 +465,34 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     system("cat fsk_demod_resample.iq | csdr convert_u8_f | csdr bandpass_fir_fft_cc 0.1 0.4 0.05 | csdr realpart_cf | csdr convert_f_s16 | ../unittest/tsrc - - 0.9230968 | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - | ../src/drs232_ldpc - /dev/null -v");
   end
 
-  if demod_type != 5
+  if demod_type == 6
+    % C demod with complex input driven simplfied csdr command line, just measure BER of demod
+
+    assert(states.tx_real == 0, "need complex signal for this test");
+    rx = tx + noise_complex;
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    save_rtlsdr("fsk_demod.iq", rx);
+    system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin C");
+
+    f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
+  end
+
+  if demod_type == 7
+    % C demod with complex input, measure uncoded and uncoded PER
+
+    assert(states.tx_real == 0, "need complex signal for this test");
+    rx = tx + noise_complex;
+    SNRdB = 10*log10(var(tx)/var(noise_real));
+    save_rtlsdr("fsk_demod.iq", rx);
+
+    printf("run C cmd line chain - uncoded PER\n");
+    system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - - C | ../src/drs232 - /dev/null -v");
+
+    printf("run C cmd line chain - LDPC coded PER\n");
+    system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - C | ../src/drs232_ldpc - /dev/null -v");
+  end
+
+  if (demod_type != 5) && (demod_type != 7)
     % state machine. Look for SSTV UW.  When found count bit errors over one frame of bits
 
     state = "wait for uw";
@@ -793,13 +825,12 @@ if demo == 10
   
 end
 
-
 % Measure PER of complete coded and uncoded system
 
 if demo == 11
   sim_in.frames = 100;
   EbNodB = 7;
-  sim_in.demod_type = 5;
+  sim_in.demod_type = 7;
   run_sstv_sim(sim_in, EbNodB);
 end
 

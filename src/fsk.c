@@ -641,8 +641,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
             dphi2 = comp_exp_j(2*M_PI*(f_est[1]/(float)(Fs)));
         }
         /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=cmult(sample_src[dc_i],phi1_c);
-        f2_intbuf[dc_i]=cmult(sample_src[dc_i],phi2_c);
+        f1_intbuf[dc_i]=cmult(sample_src[dc_i],cconj(phi1_c));
+        f2_intbuf[dc_i]=cmult(sample_src[dc_i],cconj(phi2_c));
 
         modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
         modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
@@ -669,8 +669,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
 				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi1_c);
-            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi2_c);
+            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi1_c));
+            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi2_c));
     
             modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
             modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);

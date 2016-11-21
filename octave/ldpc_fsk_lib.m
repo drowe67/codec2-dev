@@ -264,7 +264,7 @@ function frame_rs232 = gen_sstv_frame
   % generate payload data bytes and checksum
 
   data = floor(rand(1,256)*256);
-  % data = zeros(1,256);
+  %data = zeros(1,256);
   checksum = crc16(data);
   data = [data hex2dec(checksum(3:4)) hex2dec(checksum(1:2))];
 
@@ -279,7 +279,7 @@ function frame_rs232 = gen_sstv_frame
 
   % pack back into bytes to match python code 
 
-  lpacked_codeword = length(codeword)/8
+  lpacked_codeword = length(codeword)/8;
   packed_codeword = zeros(1,lpacked_codeword);
   for b=1:lpacked_codeword
     st = (b-1)*8 + 1;
