@@ -191,7 +191,14 @@ int main(int argc,char *argv[]){
         /* Demod-only test */
         if(test_type == TEST_DEMOD){
             while( fread(modbuf,sizeof(float),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-                fsk_demod(fsk,bitbuf,modbuf);
+                /* DR 21/11/16 temp code during port to complex */
+                int n = fsk_nin(fsk);
+                COMP modbuf_comp[n];
+                for(i=0; i<n; i++) {
+                    modbuf_comp[i].real = modbuf[i];
+                    modbuf_comp[i].imag = 0.0;
+                }
+                fsk_demod(fsk,bitbuf,modbuf_comp);
                 fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
             }
         }
@@ -200,7 +207,14 @@ int main(int argc,char *argv[]){
             bitbufp = bitbuf;
             modbufp = modbuf;
             while( modbufp < modbuf + modbufsize){
-                fsk_demod(fsk,bitbuf,modbuf);
+                /* DR 21/11/16 temp code during port to complex */
+                int n = fsk_nin(fsk);
+                COMP modbuf_comp[n];
+                for(i=0; i<n; i++) {
+                    modbuf_comp[i].real = modbuf[i];
+                    modbuf_comp[i].imag = 0.0;
+                }
+                fsk_demod(fsk,bitbuf,modbuf_comp);
                 modbufp += fsk_nin(fsk);
             }
         }

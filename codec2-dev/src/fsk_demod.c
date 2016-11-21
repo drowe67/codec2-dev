@@ -48,11 +48,15 @@ int main(int argc,char *argv[]){
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
-    
+    int complex_input = 1;
     
     if(argc<7){
-        fprintf(stderr,"usage: %s (2|4|2X|4X|2XS) P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S]\n",argv[0]);
-        exit(1);
+        fprintf(stderr,"usage: %s (2|4|2X|4X|2XS) P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S] [C]\n",argv[0]);
+        fprintf(stderr, "2   - 2FSK low bit rate\n4   - 4FSK low bit rate\n2X  - 2FSK high bit rate\n4   - 4FSK high bit rate\n2XS - high bit rate soft decision output\n\n");
+         fprintf(stderr, "P   - timing estimator window size, see README_fsk\n");
+         fprintf(stderr, "S   - dump demod stats to stderr for plotting with octave/fskdemodgui.py\n");
+         fprintf(stderr, "C   - complex (two sample) input\n");
+       exit(1);
     }
     
     /* Extract parameters */
@@ -99,7 +103,8 @@ int main(int argc,char *argv[]){
         goto cleanup;
     }
     
-    /* Check for and enable stat printing */
+    /* Check for and enable stat printing and complex input */
+    /* TODO: design better command line arguments */
     if(argc>7){
         if(strcmp(argv[7],"S")==0){
             enable_stats = 1;
@@ -108,22 +113,45 @@ int main(int argc,char *argv[]){
             stats_loop = (int)(.125/loop_time);
             stats_ctr = 0;
         }
+        if(strcmp(argv[7],"C")==0){
+            complex_input = 2;
+        }
     }
-    
+    if(argc>8){
+        if(strcmp(argv[8],"S")==0){
+            enable_stats = 1;
+            fsk_setup_modem_stats(fsk,&stats);
+            loop_time = ((float)fsk_nin(fsk))/((float)Fs);
+            stats_loop = (int)(.125/loop_time);
+            stats_ctr = 0;
+        }
+        if(strcmp(argv[8],"C")==0){
+            complex_input = 2;
+        }
+    }
+       
     /* allocate buffers for processing */
     if(soft_dec_mode){
         sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits);
     }else{
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
     }
-    rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2));
+    rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2)*complex_input);
     modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
-    while( fread(rawbuf,sizeof(int16_t),fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-        for(i=0;i<fsk_nin(fsk);i++){
-            modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
-            modbuf[i].imag = 0.0;
+    while( fread(rawbuf,sizeof(int16_t)*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
+        if (complex_input == 1) {
+            for(i=0;i<fsk_nin(fsk);i++){
+                modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
+                modbuf[i].imag = 0.0;
+            }
+        }
+        else {
+            for(i=0;i<fsk_nin(fsk);i++){
+                modbuf[i].real = ((float)rawbuf[2*i])/FDMDV_SCALE;
+                modbuf[i].imag = ((float)rawbuf[2*i+1])/FDMDV_SCALE;
+            }
         }
         if(soft_dec_mode){
             fsk_demod_sd(fsk,sdbuf,modbuf);
