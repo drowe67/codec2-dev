@@ -23,12 +23,12 @@ parser.add_argument("--wide", action="store_true", default=False, help="Alternat
 args = parser.parse_args()
 
 # Some settings...
-update_rate = 10 # Hz
-history_size = 10*10 # 10 seconds at 10Hz...
-history_scale = np.linspace((-1*history_size+1)/10.0,0,history_size)
+update_rate = 2 # Hz
+history_size = 100 # 10 seconds at 10Hz...
+history_scale = np.linspace((-1*history_size+1)/float(update_rate),0,history_size)
 
 # Input queue
-in_queue = Queue.Queue(history_size) # 1-element FIFO... 
+in_queue = Queue.Queue(1) # 1-element FIFO... 
 
 win = pg.GraphicsWindow()
 win.setWindowTitle('FSK Demodulator Modem Statistics')
@@ -148,7 +148,7 @@ def update_plots():
 
 timer = pg.QtCore.QTimer()
 timer.timeout.connect(update_plots)
-timer.start(80)
+timer.start(1000/update_rate))
 
 
 # Thread to read from stdin and push into a queue to be processed.
