@@ -148,7 +148,7 @@ def update_plots():
 
 timer = pg.QtCore.QTimer()
 timer.timeout.connect(update_plots)
-timer.start(1000/update_rate))
+timer.start(1000/update_rate)
 
 
 # Thread to read from stdin and push into a queue to be processed.
