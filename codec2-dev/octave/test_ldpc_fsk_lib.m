@@ -190,7 +190,7 @@ function test_c_decoder
 
   if sdinput
     f = fopen("sd.bin","wb"); fwrite(f, r, "double"); fclose(f);
-    system("../src/ldpc_dec sd.bin data_out.bin --sdinput"); 
+    system("../src/ldpc_dec sd.bin data_out.bin --sd"); 
   else
     f = fopen("llr.bin","wb"); fwrite(f, llr, "double"); fclose(f);
     system("../src/ldpc_dec llr.bin data_out.bin"); 
