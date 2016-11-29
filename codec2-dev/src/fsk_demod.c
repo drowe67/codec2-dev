@@ -48,14 +48,15 @@ int main(int argc,char *argv[]){
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
-    int complex_input = 1;
+    int complex_input = 1, bytes_per_sample = 2;
     
     if(argc<7){
         fprintf(stderr,"usage: %s (2|4|2X|4X|2XS) P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S] [C]\n",argv[0]);
         fprintf(stderr, "2   - 2FSK low bit rate\n4   - 4FSK low bit rate\n2X  - 2FSK high bit rate\n4   - 4FSK high bit rate\n2XS - high bit rate soft decision output\n\n");
          fprintf(stderr, "P   - timing estimator window size, see README_fsk\n");
          fprintf(stderr, "S   - dump demod stats to stderr for plotting with octave/fskdemodgui.py\n");
-         fprintf(stderr, "C   - complex (two sample) input\n");
+         fprintf(stderr, "C   - complex (two sample s16) input\n");
+         fprintf(stderr, "CU8   - complex (two sample u8) input\n");
        exit(1);
     }
     
@@ -116,6 +117,10 @@ int main(int argc,char *argv[]){
         if(strcmp(argv[7],"C")==0){
             complex_input = 2;
         }
+        if(strcmp(argv[7],"CU8")==0){
+            complex_input = 2;
+            bytes_per_sample = 1;
+        }
     }
     if(argc>8){
         if(strcmp(argv[8],"S")==0){
@@ -128,6 +133,10 @@ int main(int argc,char *argv[]){
         if(strcmp(argv[8],"C")==0){
             complex_input = 2;
         }
+        if(strcmp(argv[7],"CU8")==0){
+            complex_input = 2;
+            bytes_per_sample = 1;
+        }
     }
        
     /* allocate buffers for processing */
@@ -136,22 +145,37 @@ int main(int argc,char *argv[]){
     }else{
         bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
     }
-    rawbuf = (int16_t*)malloc(sizeof(int16_t)*(fsk->N+fsk->Ts*2)*complex_input);
+    rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
     modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
     
     /* Demodulate! */
-    while( fread(rawbuf,sizeof(int16_t)*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
-        if (complex_input == 1) {
+    while( fread(rawbuf,bytes_per_sample*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
+ 
+        /* convert input to a buffer of floats.  Note scaling isn't really necessary for FSK */
+
+       if (complex_input == 1) {
+            /* S16 real input */
             for(i=0;i<fsk_nin(fsk);i++){
                 modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
                 modbuf[i].imag = 0.0;
             }
         }
         else {
-            for(i=0;i<fsk_nin(fsk);i++){
-                modbuf[i].real = ((float)rawbuf[2*i])/FDMDV_SCALE;
-                modbuf[i].imag = ((float)rawbuf[2*i+1])/FDMDV_SCALE;
+            if (bytes_per_sample == 1) {
+                /* U8 complex */
+                uint8_t *rawbuf_u8 = (uint8_t*)rawbuf;
+                for(i=0;i<fsk_nin(fsk);i++){
+                    modbuf[i].real = ((float)rawbuf_u8[2*i]-127.0)/128.0;
+                    modbuf[i].imag = ((float)rawbuf_u8[2*i+1]-127.0)/128.0;
+                }
             }
+            else {
+                /* S16 complex */
+                for(i=0;i<fsk_nin(fsk);i++){
+                    modbuf[i].real = ((float)rawbuf[2*i])/FDMDV_SCALE;
+                    modbuf[i].imag = ((float)rawbuf[2*i+1]/FDMDV_SCALE);
+                }
+            }            
         }
         if(soft_dec_mode){
             fsk_demod_sd(fsk,sdbuf,modbuf);
