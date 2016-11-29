@@ -489,7 +489,8 @@ function [n_uncoded_errs n_uncoded_bits] = run_sstv_sim(sim_in, EbNodB)
     system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2X 8 9600 1200 - - C | ../src/drs232 - /dev/null -v");
 
     printf("run C cmd line chain - LDPC coded PER\n");
-    system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - C | ../src/drs232_ldpc - /dev/null -v");
+    %system("cat fsk_demod.iq | csdr convert_u8_f | csdr convert_f_s16 | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - C | ../src/drs232_ldpc - /dev/null -v");
+    system("cat fsk_demod.iq | ../build_linux/src/fsk_demod 2XS 8 9600 1200 - - CU8 | ../src/drs232_ldpc - /dev/null -v");
   end
 
   if (demod_type != 5) && (demod_type != 7)
@@ -566,7 +567,7 @@ endfunction
 % and compare.
 
 function compare_parity_bits(rx_bit_stream)
-    nframes = 2;
+    nframes = 500;
 
     % init LDPC code
 
@@ -605,20 +606,20 @@ function compare_parity_bits(rx_bit_stream)
       uw_errs(i) = sum(xor(rx_bit_stream(i-luw+1:i), uw_rs232));
     end
 
-    frame_start = find(uw_errs < 6)+1;
-    nframes = length(frame_start);
+    frame_start = find(uw_errs < 2)+1;
+    nframes = length(frame_start)
     for i=1:nframes
 
       % double check UW OK
 
       st_uw = frame_start(i) - luw; en_uw = frame_start(i) - 1;
       uw_err_check = sum(xor(rx_bit_stream(st_uw:en_uw), uw_rs232));
-      printf("uw_err_check: %d\n", uw_err_check);
+      %printf("uw_err_check: %d\n", uw_err_check);
 
       % strip off rs232 start/stop bits
 
       nbits_rs232 = (256+2+65)*10;
-      nbits = (256+2+65)*8
+      nbits = (256+2+65)*8;
       nbits_byte = 10;
       rx_codeword = zeros(1,nbits);
       pdb = 1;
@@ -642,6 +643,10 @@ function compare_parity_bits(rx_bit_stream)
     figure(1); clf;
     plot(uw_errs);
     title('Unique Word Hamming Distance')
+    figure(2); clf;
+    lframe_start = length(frame_start);
+    plot(frame_start(2:lframe_start)-frame_start(1:lframe_start-1));
+    %title('Unique Word Hamming Distance')
 
 endfunction
 
@@ -679,7 +684,7 @@ rand('state',1);
 
 % ------------------ select which demo/test to run here ---------------
 
-demo = 11;
+demo = 12;
 
 if demo == 1
   printf("simple_ut....\n");
@@ -828,15 +833,17 @@ end
 % Measure PER of complete coded and uncoded system
 
 if demo == 11
-  sim_in.frames = 100;
-  EbNodB = 7;
+  sim_in.frames = 10;
+  EbNodB = 9;
   sim_in.demod_type = 7;
   run_sstv_sim(sim_in, EbNodB);
 end
 
 
 % Compare parity bits from an off-air stream of demodulated bits
-
+% Use something like:
+%   cat ~/Desktop/923096fs_wenet.iq | ../build_linux/src/fsk_demod 2X 8 9600 1200 - fsk_demod.bin CU8
+% (note not soft dec mode)
 if demo == 12
   f = fopen("fsk_demod.bin","rb"); rx_bit_stream = fread(f, "uint8")'; fclose(f);
 

@@ -281,6 +281,11 @@ target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(cohpsk_ch cohpsk_ch.c)
 target_link_libraries(cohpsk_ch ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(drs232 drs232.c)
+target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(drs232_ldpc drs232_ldpc.c mpdecode_core.c)
+target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES})
+
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
@@ -307,5 +312,7 @@ install(TARGETS
     insert_errors
     fec_enc
     fec_dec
+    drs232
+    drs232_ldpc
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
