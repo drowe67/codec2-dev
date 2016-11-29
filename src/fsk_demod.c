@@ -133,7 +133,7 @@ int main(int argc,char *argv[]){
         if(strcmp(argv[8],"C")==0){
             complex_input = 2;
         }
-        if(strcmp(argv[7],"CU8")==0){
+        if(strcmp(argv[8],"CU8")==0){
             complex_input = 2;
             bytes_per_sample = 1;
         }
