@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         fprintf(stderr, "usage: %s --test\n", argv[0]);
         fprintf(stderr, "  Run internal self test and print code parameters.\n\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sdinput]\n", argv[0]);
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd]\n", argv[0]);
         fprintf(stderr, "  InOneSymbolPerDouble is a file of double LLRs.  If the\n");
         fprintf(stderr, "  --sd flag is used the input file can be Soft Decision\n");
         fprintf(stderr, "  symbols, and LLRs will be calculated internally. Use -\n");
@@ -143,7 +143,7 @@ int main(int argc, char *argv[])
         sdinput = 0;
         printf("argc: %d\n", argc);
         if (argc == 4)
-            if (strcmp(argv[3], "--sdinput") == 0)
+            if (strcmp(argv[3], "--sd") == 0)
                 sdinput = 1;
 
         double *input_double = calloc(CodeLength, sizeof(double));
