@@ -41,14 +41,17 @@ if args.wide == False:
 	win.nextRow()
 else:
 	win.resize(1024,200)
-fest_plot = win.addPlot(title="Tone Frequency Estimation")
+fest_plot =pg.PlotItem() # win.addPlot(title="Tone Frequency Estimation")
 eye_plot = win.addPlot(title="Eye Diagram")
 # Disable auto-ranging on eye plot and fix axes for a big speedup...
-
-
+spec_plot = win.addPlot(title="Spectrum")
+spec_plot.setYRange(0,40)
+spec_plot.setLabel('left','SNR (dB)')
+spec_plot.setLabel('bottom','FFT Bin')
 # Configure plot labels and scales.
 ebno_plot.setLabel('left','Eb/No (dB)')
 ebno_plot.setLabel('bottom','Time (seconds)')
+ebno_plot.setYRange(0,25)
 ppm_plot.setLabel('left','Clock Offset (ppm)')
 ppm_plot.setLabel('bottom','Time (seconds)')
 fest_plot.setLabel('left','Frequency (Hz)')
@@ -64,6 +67,7 @@ ppm_data = np.zeros(history_size)*np.nan
 fest_data = np.zeros((4,history_size))*np.nan
 
 # Curve objects, so we can update them...
+spec_curve = spec_plot.plot([0])
 ebno_curve = ebno_plot.plot(x=history_scale,y=ebno_data)
 ppm_curve = ppm_plot.plot(x=history_scale,y=ppm_data)
 fest1_curve = fest_plot.plot(x=history_scale,y=fest_data[0,:],pen='r') # f1 = Red
@@ -73,7 +77,7 @@ fest4_curve = fest_plot.plot(x=history_scale,y=fest_data[3,:],pen='m') # f4 = Ma
 
 # Plot update function. Reads from queue, processes and updates plots.
 def update_plots():
-	global timeout,timeout_counter,eye_plot,ebno_curve, ppm_curve, fest1_curve, fest2_curve, ebno_data, ppm_data, fest_data, in_queue, eye_xr
+	global timeout,timeout_counter,eye_plot,ebno_curve, ppm_curve, fest1_curve, fest2_curve, ebno_data, ppm_data, fest_data, in_queue, eye_xr, spec_curve
 
 	try:
 		if in_queue.empty():
@@ -97,6 +101,7 @@ def update_plots():
 		new_ppm = in_data['ppm']
 		new_fest1 = in_data['f1_est']
 		new_fest2 = in_data['f2_est']
+		new_spec = in_data['samp_fft']
 	except Exception as e:
 		print("ERROR reading dict: %s" % e)
 
@@ -118,6 +123,9 @@ def update_plots():
 	fest_data[1,-1] = new_fest2
 
 	# Update plots
+	spec_data_log = 20*np.log10(np.array(new_spec)+0.01)
+	spec_curve.setData(spec_data_log)
+	spec_plot.setYRange(spec_data_log.max()-50,spec_data_log.max()+10)
 	ebno_curve.setData(x=history_scale,y=ebno_data)
 	ppm_curve.setData(x=history_scale,y=ppm_data)
 	fest1_curve.setData(x=history_scale,y=fest_data[0,:],pen='r') # f1 = Red
