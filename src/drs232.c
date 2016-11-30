@@ -138,6 +138,9 @@ int main(int argc, char *argv[]) {
 
     while(fread(&bit, sizeof(char), 1, fin) == 1) {
         bits_read++;
+
+        next_state = state;
+
         if (state == LOOK_FOR_UW) {
 
             /* put latest input bit into sliding buffer */
