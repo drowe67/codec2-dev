@@ -10,7 +10,7 @@
 %
 
 1;
-melvq;
+melvq; % mbest VQ functions
 
 
 function [maskdB_ maskdB_cyclic Dabs dk_ D1_ ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
@@ -99,28 +99,6 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
 endfunction
 
 
-function tp = est_pf_locations(maskdB_)
-  % find turning points - used for finding PF freqs when we decimate in time
-
-  L = length(maskdB_);
-  d = maskdB_(2:L) - maskdB_(1:L-1);
-  tp = [];
-  for m=1:L-2
-    if (d(m) > 0) && (d(m+1) < 0)
-      tp = [tp m+1];
-    end
-  end
-endfunction
-
-function mel = freq2mel(f)
-  mel = 70*log10(1 + f/700);
-endfunction
-
-function freq = mel2freq(m)
-  freq = 700*(10 .^ (m/70) - 1);
-endfunction
-
-
 % quantise input sample to nearest value in table, optionally return bianry code
 
 function [quant_out best_i bits] = quantise(levels, quant_in)
@@ -147,6 +125,7 @@ function [quant_out best_i bits] = quantise(levels, quant_in)
 
 endfunction
 
+
 % determine cumulative mask, using amplitude of each harmonic.  Mask is
 % sampled across L points in the linear domain
 
@@ -156,7 +135,8 @@ function maskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_f
 
     maskdB = zeros(1,length(mask_sample_freqs_kHz));
     for m=1:length(masker_freqs_kHz)
-      maskdB = max(maskdB, schroeder(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
+      %maskdB = max(maskdB, schroeder(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
+      maskdB = max(maskdB, parabolic_resonator(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
     end
 end
 
@@ -241,7 +221,7 @@ function [maskdB pp] = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   % note all frequencies in kHz
 
   f1  = 0.1; f2  = 3;
-  bw1 = 0.1; bw2 = 0.5; 
+  bw1 = 0.1; bw2 = 0.1; 
   m = (bw2-bw1)/(log10(f2)-log10(f1));
   c = bw1 - m*log10(f1);
 
@@ -253,7 +233,7 @@ function [maskdB pp] = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
   % frequency dependant bandwidth
 
   bw = m*log10(freq_tone_kHz) + c;
-  %printf("freq_tone_kHz: %f bw: %f\n", freq_tone_kHz, bw);
+  printf("freq_tone_kHz: %f bw: %f\n", freq_tone_kHz, bw);
 
   % Design spline to set shape based on current bandwidth
 
@@ -265,19 +245,21 @@ function [maskdB pp] = resonator(freq_tone_kHz, mask_sample_freqs_kHz)
 endfunction
 
 
-function maskdB = resonator_fast(pp_bw, freq_tone_kHz, mask_sample_freqs_kHz)
+function maskdB = resonator_fast(freq_tone_kHz, mask_sample_freqs_kHz)
 
   % note all frequencies on kHz
 
+  #{
   max_ind = length(pp_bw);
   ind = round(freq_tone_kHz/0.1);
   ind = min(ind, max_ind);
   ind = max(ind, 1);
+  #}
   %printf("freq_tone_kHz: %f ind: %d\n", freq_tone_kHz, ind);
-  %[maskdB_res1 pp] = resonator(0.5, mask_sample_freqs_kHz);
+  [maskdB_res1 pp] = resonator(0.5, mask_sample_freqs_kHz);
 
-  %maskdB = ppval(pp, mask_sample_freqs_kHz - freq_tone_kHz);
-  maskdB = ppval(pp_bw(ind), mask_sample_freqs_kHz - freq_tone_kHz);
+  maskdB = ppval(pp, mask_sample_freqs_kHz - freq_tone_kHz);
+  %maskdB = ppval(pp_bw(ind), mask_sample_freqs_kHz - freq_tone_kHz);
 endfunction
 
 
@@ -289,8 +271,8 @@ function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
 
   % bandwidth as a function of log(f)
 
-  f1  = 0.05; f2  = 3;
-  bw1 = 0.01; bw2 = 0.7; 
+  f1  = 0.5; f2  = 3;
+  bw1 = 0.1; bw2 = 0.3; 
   m = (bw2-bw1)/(log10(f2)-log10(f1));
   c = bw1 - m*log10(f1);
 
@@ -299,7 +281,12 @@ function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
 
   % frequency dependant bandwidth
 
-  bw = m*log10(freq_tone_kHz) + c;
+  if freq_tone_kHz < f1
+    bw = bw1;
+  else
+    bw = m*log10(freq_tone_kHz) + c;
+  end
+  %printf("freq_tone_kHz: %f bw: %f\n", freq_tone_kHz, bw);
 
   % Design parabola to fit bandwidth
 
@@ -313,6 +300,8 @@ function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
 
   maskdB_par  = a*((mask_sample_freqs_kHz - freq_tone_kHz).^2);
   maskdB_line = m1*abs(mask_sample_freqs_kHz - freq_tone_kHz) - 10;
+  %indx = find(mask_sample_freqs_kHz < freq_tone_kHz);
+  %maskdB_line(indx) = -50;
 
   maskdB = max(maskdB_par, maskdB_line);
 endfunction
@@ -360,21 +349,18 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     left_Wo = model(left_f,1);
     left_L = min([model(left_f,2) max_amp]);
     left_AmdB = 20*log10(model(left_f,3:(left_L+2)));
-    left_mask_sample_freqs_kHz = (1:left_L)*left_Wo*4/pi;
+    left_sample_freqs_kHz = (1:left_L)*left_Wo*4/pi;
 
     right_Wo = model(right_f,1);
     right_L = min([model(right_f,2) max_amp]);
     right_AmdB = 20*log10(model(right_f,3:(right_L+2)));
-    right_mask_sample_freqs_kHz = (1:right_L)*right_Wo*4/pi;
-
-    maskdB_left_pp = splinefit(left_mask_sample_freqs_kHz, left_AmdB, left_L);
-    maskdB_right_pp = splinefit(right_mask_sample_freqs_kHz, right_AmdB, right_L);
+    right_sample_freqs_kHz = (1:right_L)*right_Wo*4/pi;
 
     % determine mask for left and right frames, sampling at Wo for this frame
 
-    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    maskdB_left = ppval(maskdB_left_pp, mask_sample_freqs_kHz);
-    maskdB_right = ppval(maskdB_right_pp, mask_sample_freqs_kHz);
+    sample_freqs_kHz = (1:L)*Wo*4/pi;
+    maskdB_left = interp1(left_sample_freqs_kHz, left_AmdB, sample_freqs_kHz);
+    maskdB_right = interp1(right_sample_freqs_kHz, right_AmdB, sample_freqs_kHz);
 
     maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
 endfunction
@@ -386,41 +372,47 @@ function plot_masking
   Fs = 8000;
 
   figure(1)
-  mask_sample_freqs_kHz = 0.1:0.1:(Fs/1000)/2;
+  mask_sample_freqs_kHz = 0.1:0.025:(Fs/1000)/2;
+  #{
   maskdB_s0 = schroeder(0.5, mask_sample_freqs_kHz, 0);
-  plot(mask_sample_freqs_kHz, maskdB_s0);
-  hold on;
+  plot(mask_sample_freqs_kHz, maskdB_s0,';schroeder 0;');
   maskdB_s1 = schroeder(0.5, mask_sample_freqs_kHz, 1);
-  plot(mask_sample_freqs_kHz, maskdB_s1,'g');
-  maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
-  plot(mask_sample_freqs_kHz, maskdB_res,'r');
+  plot(mask_sample_freqs_kHz, maskdB_s1,'g;schroeder 1;');
+  #}
+  maskdB_res = parabolic_resonator(0.5, mask_sample_freqs_kHz);
+  plot(mask_sample_freqs_kHz, maskdB_res,'r;resonator;');
+  hold on;
 
   for f=0.5:0.5:3
+    #{
     maskdB_s0 = schroeder(f, mask_sample_freqs_kHz, 0);
     plot(mask_sample_freqs_kHz, maskdB_s0);
     maskdB_s1 = schroeder(f, mask_sample_freqs_kHz, 1);
     plot(mask_sample_freqs_kHz, maskdB_s1,'g');
-    % maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
-    % plot(mask_sample_freqs_kHz, maskdB_res,'r');
+    #}
+    maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
+    plot(mask_sample_freqs_kHz, maskdB_res,'r;resonator;');
   end
   hold off;
 
   axis([0.1 4 -30 0])
   grid
 
-  pp_bw = gen_pp_bw;
+  #{
+  %pp_bw = gen_pp_bw;
   figure(2)
   clf;
   maskdB_res = resonator(0.5, mask_sample_freqs_kHz);
   plot(mask_sample_freqs_kHz, maskdB_res);  
   hold on;
-  maskdB_res_fast = resonator_fast(pp_bw, 0.5, mask_sample_freqs_kHz);
+  maskdB_res_fast = resonator_fast(0.5, mask_sample_freqs_kHz);
   plot(mask_sample_freqs_kHz, maskdB_res_fast, "g");  
   maskdB_par = parabolic_resonator(0.5, mask_sample_freqs_kHz);
   plot(mask_sample_freqs_kHz, maskdB_par, "r");  
   hold off;
   axis([0 4 -80 0]);
   grid
+  #}
 endfunction
 
 
@@ -569,9 +561,10 @@ function plot_f_a_stats(f,a)
 
 endfunction
 
-function D1_log = decode_from_bit_stream(samname)
+function D1_log = decode_from_bit_stream(samname, ber = 0, bit_error_mask = ones(28,1))
   max_amp = 80;
   bits_per_param = [6 1 8 8 4 1];
+  assert(sum(bits_per_param) == 28);
   load vq;
   k = 10;
   dec_in_time = 1;
@@ -595,9 +588,18 @@ function D1_log = decode_from_bit_stream(samname)
   fbit  = fopen(bit_stream_name, "rb"); 
   bits_per_frame = sum(bits_per_param);
   nind = length(bits_per_param);
-
+  nerr = 0; nbits = 0;
   [frame nread] = fread(fbit, sum(bits_per_param), "uchar");
   while (nread == bits_per_frame)
+
+    % optionally introduce bit errors
+
+    error_bits = rand(sum(bits_per_param), 1) < ber;
+    error_bits_masked = bitand(error_bits, bit_error_mask);
+    frame = bitxor(frame, error_bits_masked);
+    nerr += sum(error_bits_masked);
+    nbits += sum(bits_per_param);
+
     % read a frame, convert to indexes
 
     nbit = 1;
@@ -611,7 +613,8 @@ function D1_log = decode_from_bit_stream(samname)
     [frame nread] = fread(fbit, sum(bits_per_param), "uchar");
   endwhile
   fclose(fbit);
-
+  printf("nerr: %d nbits: %d %f\n", nerr, nbits, nerr/nbits);
+  
   % convert ind_log to modem params
 
   frames = 4*length(ind_log);
@@ -855,4 +858,34 @@ function [v] = est_voicing_bits(v1, v5)
     v(1:2) = v1;
     v(3:4) = v5;
   end
+endfunction
+
+
+function AmdB_ = piecewise_model(AmdB, Wo) 
+    L = length(AmdB);
+    l1000 = floor(L/4);     
+    l2000 = floor(2*L/4);     
+    l3000 = floor(3*L/4);     
+    AmdB_ = ones(1,L);
+
+    % fit a resonator to max of first 1000 Hz
+
+    [mx mx_ind] = max(AmdB(1:l1000));
+    mask_sample_freqs_kHz = (1:l1000)*Wo*4/pi;
+    AmdB_(1:l1000) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+
+    % fit a resonator to max of second 1000 Hz
+
+    [mx mx_ind] = max(AmdB(l1000+1:l2000));
+    mx_ind += l1000;
+    mask_sample_freqs_kHz = (l1000+1:l2000)*Wo*4/pi;
+    AmdB_(l1000+1:l2000) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+
+    % fit a resonator to max of third 1000 Hz
+
+    [mx mx_ind] = max(AmdB(l2000+1:L));
+    mx_ind += l2000;
+    mask_sample_freqs_kHz = (l2000+1:L)*Wo*4/pi;
+    AmdB_(l2000+1:L) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+
 endfunction
