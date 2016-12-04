@@ -143,6 +143,15 @@ void fsk_destroy(struct FSK *fsk);
  */
 void fsk_mod(struct FSK *fsk, float fsk_out[], uint8_t tx_bits[]);
 
+/*
+ * Modulates Nsym bits into N complex samples
+ * 
+ * struct FSK *fsk - FSK config/state struct, set up by fsk_create
+ * comp fsk_out[] - Buffer for N samples of modulated FSK
+ * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
+ */
+void fsk_mod_c(struct FSK *fsk, COMP fsk_out[], uint8_t tx_bits[]);
+
 
 /*
  * Returns the number of samples needed for the next fsk_demod() cycle

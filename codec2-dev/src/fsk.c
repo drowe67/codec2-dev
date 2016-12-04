@@ -974,39 +974,34 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     int fs_tx = fsk->fs_tx;         /* space between frequencies */
     int Ts = fsk->Ts;               /* samples-per-symbol */
     int Fs = fsk->Fs;               /* sample freq */
-    COMP dosc_f[4];                 /* phase shift per sample */
+    int M = fsk->mode;
+    COMP dosc_f[M];                 /* phase shift per sample */
     COMP dph;                       /* phase shift of current bit */
-    int i,j,sym;
+    size_t i,j,m,bit_i,sym;
     
-    /* Figure out the amount of phase shift needed per sample */
-    dosc_f[0] = comp_exp_j(2*M_PI*((float)(f1_tx        )/(float)(Fs)));
-    dosc_f[1] = comp_exp_j(2*M_PI*((float)(f1_tx+fs_tx  )/(float)(Fs)));
+    /* Init the per sample phase shift complex numbers */
+    for( m=0; m<M; m++){
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+    }
     
-    dosc_f[2] = comp_exp_j(2*M_PI*((float)(f1_tx+fs_tx*2)/(float)(Fs)));
-    dosc_f[3] = comp_exp_j(2*M_PI*((float)(f1_tx+fs_tx*3)/(float)(Fs)));
-    
-    if(fsk->mode == 2){
-        /* Outer loop through bits */
-        for(i=0; i<fsk->Nsym; i++){
-            /* select current bit phase shift */
-            dph = tx_bits[i]==0?dosc_f[0]:dosc_f[1];
-            for(j=0; j<Ts; j++){
-                tx_phase_c = cmult(tx_phase_c,dph);
-                fsk_out[i*Ts+j] = 2*tx_phase_c.real;
-            }
+    bit_i = 0;
+    for( i=0; i<fsk->Nsym; i++){
+        sym = 0;
+        /* Pack the symbol number from the bit stream */
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
         }
-    }else {
-        /* Same thing as above, but with more bits and phases */
-        for(i=0; i<fsk->Nsym; i++){
-            /* select current bit phase shift */
-            sym = tx_bits[ i*2   ]==0?0:2;
-            sym+= tx_bits[(i*2)+1]==0?0:1;
-            dph = dosc_f[sym];
-            for(j=0; j<Ts; j++){
-                tx_phase_c = cmult(tx_phase_c,dph);
-                fsk_out[i*Ts+j] = 2*tx_phase_c.real;
-            }
+        /* Look up symbol phase shift */
+        dph = dosc_f[sym];
+        /* Spin the oscillator for a symbol period */
+        for(j=0; j<Ts; j++){
+            tx_phase_c = cmult(tx_phase_c,dph);
+            fsk_out[i*Ts+j] = 2*tx_phase_c.real;
         }
+    
     }
     
     /* Normalize TX phase to prevent drift */
@@ -1017,6 +1012,48 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     
 }
 
+void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
+    COMP tx_phase_c = fsk->tx_phase_c; /* Current complex TX phase */
+    int f1_tx = fsk->f1_tx;         /* '0' frequency */
+    int fs_tx = fsk->fs_tx;         /* space between frequencies */
+    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int Fs = fsk->Fs;               /* sample freq */
+    int M = fsk->mode;
+    COMP dosc_f[M];                 /* phase shift per sample */
+    COMP dph;                       /* phase shift of current bit */
+    size_t i,j,m,bit_i,sym;
+    
+    /* Init the per sample phase shift complex numbers */
+    for( m=0; m<M; m++){
+        dosc_f[m] = comp_exp_j(2*M_PI*((float)(f1_tx+(fs_tx*m))/(float)(Fs)));
+    }
+    
+    bit_i = 0;
+    for( i=0; i<fsk->Nsym; i++){
+        sym = 0;
+        /* Pack the symbol number from the bit stream */
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
+        }
+        /* Look up symbol phase shift */
+        dph = dosc_f[sym];
+        /* Spin the oscillator for a symbol period */
+        for(j=0; j<Ts; j++){
+            tx_phase_c = cmult(tx_phase_c,dph);
+            fsk_out[i*Ts+j] = fcmult(2,tx_phase_c);
+        }
+    }
+    
+    /* Normalize TX phase to prevent drift */
+    tx_phase_c = comp_normalize(tx_phase_c);
+    
+    /* save TX phase */
+    fsk->tx_phase_c = tx_phase_c;
+    
+}
 
 
 
