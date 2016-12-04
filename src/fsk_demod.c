@@ -51,7 +51,7 @@ int main(int argc,char *argv[]){
     int soft_dec_mode = 0;
     stats_loop = 0;
     int complex_input = 1, bytes_per_sample = 2;
-    
+    int stats_rate = 8;
     P = 0;
     M = 0;
     
@@ -76,12 +76,12 @@ int main(int argc,char *argv[]){
             {"conv",      required_argument,  0, 'p'},
             {"cs16",      no_argument,        0, 'c'},
             {"cu8",       no_argument,        0, 'd'},
-            {"stats",     no_argument,        0, 't'},
+            {"stats",     optional_argument,  0, 't'},
             {"soft-dec",  no_argument,        0, 's'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hlp:cdts",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hlp:cdt::s",long_opts,&opt_idx);
         
         switch(o){
             case 'l':
@@ -97,6 +97,12 @@ int main(int argc,char *argv[]){
                 break;
             case 't':
                 enable_stats = 1;
+                if(optarg != NULL){
+                    stats_rate = atoi(optarg);
+                    if(stats_rate == 0){
+                        stats_rate = 8;
+                    }
+                }
                 break;
             case 's':
                 soft_dec_mode = 1;
@@ -121,16 +127,17 @@ int main(int argc,char *argv[]){
     if( (argc - dx) > 5){
         fprintf(stderr, "Too many arguments\n");
         helpmsg:
-        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
-        fprintf(stderr," -l P --conv P   -  P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t [r]] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
+        fprintf(stderr," -lP --conv=P      -  P specifies the rate at which symbols are down-converted before further processing\n");
         fprintf(stderr,"                        P must be divisible by the symbol size. Smaller P values will result in faster\n");
         fprintf(stderr,"                        processing but lower demodulation preformance. If no P value is specified,\n");
         fprintf(stderr,"                        P will default to it's highes possible value\n");
-        fprintf(stderr," -c --cs16       -  The raw input file will be in complex signed 16 bit format.\n");
-        fprintf(stderr," -d --cu8        -  The raw input file will be in complex unsigned 8 bit format.\n");
+        fprintf(stderr," -c --cs16         -  The raw input file will be in complex signed 16 bit format.\n");
+        fprintf(stderr," -d --cu8          -  The raw input file will be in complex unsigned 8 bit format.\n");
         fprintf(stderr,"                        If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
-        fprintf(stderr," -t --stats      -  Print out modem statistics to stderr in JSON.\n");
-        fprintf(stderr," -s --soft-dec   -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
+        fprintf(stderr," -t[r] --stats=[r] -  Print out modem statistics to stderr in JSON.\n");
+        fprintf(stderr,"                         r, if provided, sets the number of modem frames between statistic printouts\n");
+        fprintf(stderr," -s --soft-dec     -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                        If -s is not used, the output will be in a 1 byte-per-bit format.\n");
         exit(1);
     }
@@ -177,7 +184,7 @@ int main(int argc,char *argv[]){
     if(enable_stats){
         fsk_setup_modem_stats(fsk,&stats);
         loop_time = ((float)fsk_nin(fsk))/((float)Fs);
-        stats_loop = (int)(.125/loop_time);
+        stats_loop = (int)(1/(stats_rate*loop_time));
         stats_ctr = 0;
     }
     
