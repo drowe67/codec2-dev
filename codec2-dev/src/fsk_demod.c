@@ -186,10 +186,10 @@ int main(int argc,char *argv[]){
         if(enable_stats && stats_ctr <= 0){
 	    /* Print standard 2FSK stats */
             fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
-            fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f1_est,fsk->f2_est);
+            fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
 	    /* Print 4FSK stats if in 4FSK mode */
             if(fsk->mode == 4){
-                fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f3_est,fsk->f4_est);
+                fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
             }
 	    
 	    /* Print the eye diagram */

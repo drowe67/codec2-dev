@@ -105,11 +105,11 @@ static inline int comp_mag_gt(COMP a,COMP b){
  * Normalize a complex number's magnitude to 1
  */
 static inline COMP comp_normalize(COMP a){
-	COMP b;
-	float av = sqrtf((a.real*a.real)+(a.imag*a.imag));
-	b.real = a.real/av;
-	b.imag = a.imag/av;
-	return b;
+    COMP b;
+    float av = sqrtf((a.real*a.real)+(a.imag*a.imag));
+    b.real = a.real/av;
+    b.imag = a.imag/av;
+    return b;
 }
 
 
@@ -179,13 +179,9 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     fsk->est_space = Rs-(Rs/5);
     
     /* Set up rx state */
-    fsk->phi1_c = comp_exp_j(0);
-    fsk->phi2_c = comp_exp_j(0);
-    fsk->phi3_c = comp_exp_j(0);
-    fsk->phi4_c = comp_exp_j(0);
     
-    fsk->phi1_c.real = 0;
-    fsk->phi1_c.imag = 1;
+    for( i=0; i<M; i++)
+        fsk->phi_c[i] = comp_exp_j(0);
     
     memold = (4*fsk->Ts);
     
@@ -225,10 +221,10 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     /* Set up demod stats */
     fsk->EbNodB = 0;
-    fsk->f1_est = 0;
-    fsk->f2_est = 0;
-    fsk->f3_est = 0;
-    fsk->f4_est = 0;    
+    
+    for( i=0; i<M; i++)
+        fsk->f_est[i] = 0;
+    
     fsk->ppm = 0;
 
     fsk->stats = NULL;
@@ -295,13 +291,8 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->est_space = HORUS_MIN_SPACING;
     
     /* Set up rx state */
-    fsk->phi1_c = comp_exp_j(0);
-    fsk->phi2_c = comp_exp_j(0);
-    fsk->phi3_c = comp_exp_j(0);
-    fsk->phi4_c = comp_exp_j(0);
-    
-    fsk->phi1_c.real = 0;
-    fsk->phi1_c.imag = 1;
+    for( i=0; i<M; i++)
+        fsk->phi_c[i] = comp_exp_j(0);
     
     memold = (4*fsk->Ts);
     
@@ -341,10 +332,10 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     
     /* Set up demod stats */
     fsk->EbNodB = 0;
-    fsk->f1_est = 0;
-    fsk->f2_est = 0;
-    fsk->f3_est = 0;
-    fsk->f4_est = 0;    
+    
+    for( i=0; i<M; i++)
+        fsk->f_est[i] = 0; 
+    
     fsk->ppm = 0;
 
     fsk->stats = NULL;
@@ -413,7 +404,7 @@ void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats){
  */
 void fsk_set_est_limits(struct FSK *fsk,int est_min, int est_max){
     
-	fsk->est_min = est_min;
+    fsk->est_min = est_min;
     if(fsk->est_min<0) fsk->est_min = 0;
     
     fsk->est_max = est_max;
@@ -433,7 +424,7 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     int Ndft = fsk->Ndft;
     int Fs = fsk->Fs;
     int nin = fsk->nin;
-    int i,j;
+    size_t i,j;
     int fft_samps;
     float hann;
     float max;
@@ -442,8 +433,8 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     kiss_fft_cfg fft_cfg = fsk->fft_cfg;
     int freqi[M];
     int f_min,f_max,f_zero;
-    /* Array to do complex FFT from using kiss_fft */
     
+    /* Array to do complex FFT from using kiss_fft */
     #ifdef DEMOD_ALLOC_STACK
     kiss_fft_cpx *fftin  = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)alloca(sizeof(kiss_fft_cpx)*Ndft);
@@ -464,86 +455,85 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     int fft_loops = nin/Ndft;
     for(j=0; j<fft_loops; j++){
     /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
-		for(i=0; i<fft_samps; i++){
-			hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
-			
-			fftin[i].r = 0.5*hann*fsk_in[i+Ndft*j].real;
-			fftin[i].i = 0.5*hann*fsk_in[i+Ndft*j].imag;
-		}
-		/* Zero out the remaining slots */
-		for(; i<Ndft;i++){
-			fftin[i].r = 0;
-			fftin[i].i = 0;
-		}
-		
-		/* Do the FFT */
-		kiss_fft(fft_cfg,fftin,fftout);
-		
-		/* Find the magnitude^2 of each freq slot and stash away in the real
-		* value, so this only has to be done once. Since we're only comparing
-		* these values and only need the mag of 2 points, we don't need to do
-		* a sqrt to each value */
-		for(i=0; i<Ndft/2; i++){
-			fftout[i].r = (fftout[i].r*fftout[i].r) + (fftout[i].i*fftout[i].i) ;
-		}
-		
-		/* Zero out the minimum and maximum ends */
-		for(i=0; i<f_min; i++){
-			fftout[i].r = 0;
-		}
-		for(i=f_max-1; i<Ndft/2; i++){
-			fftout[i].r = 0;
-		}
-		/* Mix back in with the previous fft block */
-		/* Copy new fft est into imag of fftout for frequency divination below */
-		for(i=0; i<Ndft/2; i++){
-			fsk->fft_est[i] = (fsk->fft_est[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
-			fftout[i].i = fsk->fft_est[i];
-		}
-	}
-	
+        for(i=0; i<fft_samps; i++){
+            hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
+            fftin[i].r = 0.5*hann*fsk_in[i+Ndft*j].real;
+            fftin[i].i = 0.5*hann*fsk_in[i+Ndft*j].imag;
+        }
+        /* Zero out the remaining slots */
+        for(; i<Ndft;i++){
+            fftin[i].r = 0;
+            fftin[i].i = 0;
+        }
+        
+        /* Do the FFT */
+        kiss_fft(fft_cfg,fftin,fftout);
+        
+        /* Find the magnitude^2 of each freq slot and stash away in the real
+        * value, so this only has to be done once. Since we're only comparing
+        * these values and only need the mag of 2 points, we don't need to do
+        * a sqrt to each value */
+        for(i=0; i<Ndft/2; i++){
+            fftout[i].r = (fftout[i].r*fftout[i].r) + (fftout[i].i*fftout[i].i) ;
+        }
+        
+        /* Zero out the minimum and maximum ends */
+        for(i=0; i<f_min; i++){
+            fftout[i].r = 0;
+        }
+        for(i=f_max-1; i<Ndft/2; i++){
+            fftout[i].r = 0;
+        }
+        /* Mix back in with the previous fft block */
+        /* Copy new fft est into imag of fftout for frequency divination below */
+        for(i=0; i<Ndft/2; i++){
+            fsk->fft_est[i] = (fsk->fft_est[i]*(1-tc)) + (sqrtf(fftout[i].r)*tc);
+            fftout[i].i = fsk->fft_est[i];
+        }
+    }
+    
     modem_probe_samp_f("t_fft_est",fsk->fft_est,Ndft/2);
     
     max = 0;
     /* Find the M frequency peaks here */
     for(i=0; i<M; i++){
-		imax = 0;
-		max = 0;
-		for(j=0;j<Ndft/2;j++){
-			if(fftout[j].i > max){
-				max = fftout[j].i;
-				imax = j;
-			}
-		}
-		/* Blank out FMax +/-Fspace/2 */
-		f_min = imax - f_zero;
-		f_min = f_min < 0 ? 0 : f_min;
-		f_max = imax + f_zero;
-		f_max = f_max > Ndft ? Ndft : f_max;
-		for(j=f_min; j<f_max; j++)
-			fftout[j].i = 0;
-		
-		/* Stick the freq index on the list */
-		freqi[i] = imax;
-	}
-	
-	/* Gnome sort the freq list */
-	/* My favorite sort of sort*/
-	i = 1;
-	while(i<M){
-		if(freqi[i] >= freqi[i-1]) i++;
-		else{
-			j = freqi[i];
-			freqi[i] = freqi[i-1];
-			freqi[i-1] = j;
-			if(i>1) i--;
-		}
-	}
+        imax = 0;
+        max = 0;
+        for(j=0;j<Ndft/2;j++){
+            if(fftout[j].i > max){
+                max = fftout[j].i;
+                imax = j;
+            }
+        }
+        /* Blank out FMax +/-Fspace/2 */
+        f_min = imax - f_zero;
+        f_min = f_min < 0 ? 0 : f_min;
+        f_max = imax + f_zero;
+        f_max = f_max > Ndft ? Ndft : f_max;
+        for(j=f_min; j<f_max; j++)
+            fftout[j].i = 0;
+        
+        /* Stick the freq index on the list */
+        freqi[i] = imax;
+    }
+    
+    /* Gnome sort the freq list */
+    /* My favorite sort of sort*/
+    i = 1;
+    while(i<M){
+        if(freqi[i] >= freqi[i-1]) i++;
+        else{
+            j = freqi[i];
+            freqi[i] = freqi[i-1];
+            freqi[i-1] = j;
+            if(i>1) i--;
+        }
+    }
 
-	/* Convert freqs from indices to frequencies */
-	for(i=0; i<M; i++){
-		freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
-	}
+    /* Convert freqs from indices to frequencies */
+    for(i=0; i<M; i++){
+        freqs[i] = (float)(freqi[i])*((float)Fs/(float)Ndft);
+    }
     #ifndef DEMOD_ALLOC_STACK
     free(fftin);
     free(fftout);
@@ -560,147 +550,161 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     int P = fsk->P;
     int Nmem = fsk->Nmem;
     int M = fsk->mode;
-    int i,j,dc_i,cbuf_i;
+    size_t i,j,m,dc_i,cbuf_i;
     float ft1;
     int nstash = fsk->nstash;
     
-    COMP *f1_int, *f2_int;
-    
-    COMP t1,t2;
-    COMP phi1_c = fsk->phi1_c;
-    COMP phi2_c = fsk->phi2_c;
-    COMP phi_ft;
+    COMP* f_int[M];     /* Filtered and downsampled symbol tones */
+    COMP t[M];          /* complex number temps */
+    COMP t_c;           /* another complex temp */
+    COMP phi_c[M];  
+    COMP phi_ft;        
     int nold = Nmem-nin;
-    COMP dphi1,dphi2;
+    
+    COMP dphi[M];
     COMP dphift;
     float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
     int using_old_samps;
-    COMP *sample_src;
-    
-    COMP *f1_intbuf,*f2_intbuf;
+
+    COMP* sample_src;
+    COMP* f_intbuf_m;
     
     float f_est[M],fc_avg,fc_tx;
     float meanebno,stdebno,eye_max;
     int neyesamp,neyeoffset;
     
+    #ifdef MODEMPROBE_ENABLE
+    char mp_name_tmp[20]; /* Temporary string for modem probe trace names */
+    #endif
+    
+    /* Load up demod phases from struct */
+    for( m=0; m<M; m++)
+        phi_c[m] = fsk->phi_c[m];
+    
     /* Estimate tone frequencies */
     fsk_demod_freq_est(fsk,fsk_in,f_est,M);
     modem_probe_samp_f("t_f_est",f_est,M);
     
-    /* allocate memory for the integrated samples */
+    
+    /* Allocate circular buffer for integration */
     #ifdef DEMOD_ALLOC_STACK
-    /* allocate memory for the integrated samples */
-    /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
-    f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    f2_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    
-    /* Allocate circular buffers for integration */
-    f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
+    f_intbuf_m = (COMP*) alloca(sizeof(COMP)*Ts);
     #else
-    f1_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    f2_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    
-    f1_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    f2_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
+    f_intbuf_m = (COMP*) malloc(sizeof(COMP)*Ts);    
     #endif
     
-    /* If this is the first run, we won't have any valid f_est */
-    if(fsk->f1_est<1){
-		fsk->f1_est = f_est[0];
-		fsk->f2_est = f_est[1];
-	}
-
-    /* Back the stored phase off to account for re-integraton of old samples */
-    dphi1 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f2_est)/(float)(Fs)));
-
-    phi1_c = cmult(dphi1,phi1_c);
-    phi2_c = cmult(dphi2,phi2_c);
-
-    /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = comp_exp_j(2*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(2*M_PI*((fsk->f2_est)/(float)(Fs)));
-    
-    dc_i = 0;
-    cbuf_i = 0;
-    sample_src = &(fsk->samp_old[nstash-nold]);
-    using_old_samps = 1;
-    /* Pre-fill integration buffer */
-    for(dc_i=0; dc_i<Ts-(Ts/P); dc_i++){
-        /* Switch sample source to new samples when we run out of old ones */
-        if(dc_i>=nold && using_old_samps){
-            sample_src = &fsk_in[0];
-            dc_i = 0;
-            using_old_samps = 0;
-            
-            /* Recalculate delta-phi after switching to new sample source */
-            phi1_c = comp_normalize(phi1_c);
-            phi2_c = comp_normalize(phi2_c);
-            dphi1 = comp_exp_j(2*M_PI*(f_est[0]/(float)(Fs)));
-            dphi2 = comp_exp_j(2*M_PI*(f_est[1]/(float)(Fs)));
-        }
-        /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=cmult(sample_src[dc_i],cconj(phi1_c));
-        f2_intbuf[dc_i]=cmult(sample_src[dc_i],cconj(phi2_c));
-
-        modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
-        modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
-        /* Spin downconversion phases */
-        phi1_c = cmult(phi1_c,dphi1);
-        phi2_c = cmult(phi2_c,dphi2);
+    /* allocate memory for the integrated samples */
+    for( m=0; m<M; m++){
+        #ifdef DEMOD_ALLOC_STACK
+        /* allocate memory for the integrated samples */
+        /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
+        f_int[m] = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
+        
+        #else
+        f_int[m] = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
+        #endif
     }
-    cbuf_i = dc_i;
     
-    /* Integrate over Ts at offsets of Ts/P */
-    for(i=0; i<(nsym+1)*P; i++){
-        /* Downconvert and Place Ts/P samples in the integration buffers */
-        for(j=0; j<(Ts/P); j++,dc_i++){
+    /* If this is the first run, we won't have any valid f_est */
+    /* TODO: add first_run flag to FSK to make negative freqs possible */
+    if(fsk->f_est[0]<1){
+        for( m=0; m<M; m++)
+            fsk->f_est[m] = f_est[m];
+    }
+    
+    /* Initalize downmixers for each symbol tone */
+    for( m=0; m<M; m++){
+        /* Back the stored phase off to account for re-integraton of old samples */
+        dphi[m] = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f_est[m])/(float)(Fs)));
+        phi_c[m] = cmult(dphi[m],phi_c[m]);
+
+        /* Figure out how much to nudge each sample downmixer for every sample */
+        dphi[m] = comp_exp_j(2*M_PI*((fsk->f_est[m])/(float)(Fs)));
+    }
+    
+    /* Integrate and downsample for symbol tones */
+    for(m=0; m<M; m++){
+        /* Copy buffer pointers in to avoid second buffer indirection */
+        float f_est_m = f_est[m];
+        COMP* f_int_m = &(f_int[m][0]);
+        COMP dphi_m = dphi[m];
+        
+        dc_i = 0;
+        cbuf_i = 0;
+        sample_src = &(fsk->samp_old[nstash-nold]);
+        using_old_samps = 1;
+        
+        /* Pre-fill integration buffer */
+        for(dc_i=0; dc_i<Ts-(Ts/P); dc_i++){
             /* Switch sample source to new samples when we run out of old ones */
             if(dc_i>=nold && using_old_samps){
                 sample_src = &fsk_in[0];
                 dc_i = 0;
                 using_old_samps = 0;
                 
-				/* Recalculate delta-phi after switching to new sample source */
-				phi1_c = comp_normalize(phi1_c);
-				phi2_c = comp_normalize(phi2_c);
-				dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
-				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
+                /* Recalculate delta-phi after switching to new sample source */
+                phi_c[m] = comp_normalize(phi_c[m]);
+                dphi_m = comp_exp_j(2*M_PI*((f_est_m)/(float)(Fs)));
             }
             /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi1_c));
-            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi2_c));
-    
-            modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
-            modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);
-            /* Spin downconversion phases */
-            phi1_c = cmult(phi1_c,dphi1);
-            phi2_c = cmult(phi2_c,dphi2);
+            f_intbuf_m[dc_i]=cmult(sample_src[dc_i],cconj(phi_c[m]));
             
+            #ifdef MODEMPROBE_ENABLE
+            snprintf(mp_name_tmp,19,"t_f%zd_dc",m+1);
+            modem_probe_samp_c(mp_name_tmp,&f_intbuf_m[dc_i],1);
+            #endif
+            /* Spin downconversion phases */
+            phi_c[m] = cmult(phi_c[m],dphi_m);
         }
+        cbuf_i = dc_i;
         
-        /* Dump internal samples */
+        /* Integrate over Ts at offsets of Ts/P */
+        for(i=0; i<(nsym+1)*P; i++){
+            /* Downconvert and Place Ts/P samples in the integration buffers */
+            for(j=0; j<(Ts/P); j++,dc_i++){
+                /* Switch sample source to new samples when we run out of old ones */
+                if(dc_i>=nold && using_old_samps){
+                    sample_src = &fsk_in[0];
+                    dc_i = 0;
+                    using_old_samps = 0;
+                    
+                    /* Recalculate delta-phi after switching to new sample source */
+                    phi_c[m] = comp_normalize(phi_c[m]);
+                    dphi_m = comp_exp_j(2*M_PI*((f_est_m)/(float)(Fs)));
+                }
+                /* Downconvert and place into integration buffer */
+                f_intbuf_m[cbuf_i+j]=cmult(sample_src[dc_i],cconj(phi_c[m]));
         
-        cbuf_i += Ts/P;
-        if(cbuf_i>=Ts) cbuf_i = 0;
-        
-        /* Integrate over the integration buffers, save samples */
-        t1 = t2 = comp0();
-        for(j=0; j<Ts; j++){
-            t1 = cadd(t1,f1_intbuf[j]);
-            t2 = cadd(t2,f2_intbuf[j]);
+                #ifdef MODEMPROBE_ENABLE
+                snprintf(mp_name_tmp,19,"t_f%zd_dc",m+1);
+                modem_probe_samp_c(mp_name_tmp,&f_intbuf_m[cbuf_i+j],1);
+                #endif
+                /* Spin downconversion phases */
+                phi_c[m] = cmult(phi_c[m],dphi_m);
+                
+            }
+            
+            /* Dump internal samples */
+            cbuf_i += Ts/P;
+            if(cbuf_i>=Ts) cbuf_i = 0;
+            
+            /* Integrate over the integration buffers, save samples */
+            float it_r = 0;
+            float it_i = 0;
+            for(j=0; j<Ts; j++){
+                it_r += f_intbuf_m[j].real;
+                it_i += f_intbuf_m[j].imag;
+            }
+            f_int_m[i].real = it_r;
+            f_int_m[i].imag = it_i;
         }
-        f1_int[i] = t1;
-        f2_int[i] = t2;
-        
     }
     
-	fsk->phi1_c = phi1_c;
-    fsk->phi2_c = phi2_c;
-    
-	fsk->f1_est = f_est[0];
-	fsk->f2_est = f_est[1];
+    /* Save phases back into FSK struct */
+    for(m=0; m<M; m++){
+        fsk->phi_c[m] = phi_c[m];
+        fsk->f_est[m] = f_est[m];
+    }
 
     /* Stash samples away in the old sample buffer for the next round of bit getting */
     memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(COMP)*nstash);
@@ -713,20 +717,22 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     dphift = comp_exp_j(2*M_PI*((float)(Rs)/(float)(P*Rs)));
     phi_ft.real = 1;
     phi_ft.imag = 0;
-    t1=comp0();
+    t_c=comp0();
     for(i=0; i<(nsym+1)*P; i++){
         /* Get abs^2 of fx_int[i], and add 'em */
-        ft1  = (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag);
-        ft1 += (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag);
+        ft1 = 0;
+        for( m=0; m<M; m++){
+            ft1 += (f_int[m][i].real*f_int[m][i].real) + (f_int[m][i].imag*f_int[m][i].imag);
+        }
         
         /* Down shift and accumulate magic line */
-        t1 = cadd(t1,fcmult(ft1,phi_ft));
+        t_c = cadd(t_c,fcmult(ft1,phi_ft));
 
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
     /* Get the magic angle */
-    norm_rx_timing =  atan2f(t1.imag,t1.real)/(2*M_PI);
+    norm_rx_timing =  atan2f(t_c.imag,t_c.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
     
     old_norm_rx_timing = fsk->norm_rx_timing;
@@ -742,12 +748,10 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     }
     
     /* Figure out how many samples are needed the next modem cycle */
-    if(norm_rx_timing > 0.25){
+    if(norm_rx_timing > 0.25)
         fsk->nin = N+Ts/2;
-    }
-    else if(norm_rx_timing < -0.25){
+    else if(norm_rx_timing < -0.25)
         fsk->nin = N-Ts/2;
-    }
     else
         fsk->nin = N;
     
@@ -759,8 +763,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     float fract = rx_timing - (float)low_sample;
     int high_sample = (int)ceilf(rx_timing);
  
-	/* Vars for finding the max-of-4 for each bit */
-	float tmax[2];
+    /* Vars for finding the max-of-4 for each bit */
+    float tmax[M];
     
     #ifdef EST_EBNO
     meanebno = 0;
@@ -771,28 +775,64 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     /* also, resample fx_int */
     for(i=0; i<nsym; i++){
         int st = (i+1)*P;
-        t1 =         fcmult(1-fract,f1_int[st+ low_sample]);
-        t1 = cadd(t1,fcmult(  fract,f1_int[st+high_sample]));
-        t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
-        t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
+        for( m=0; m<M; m++){
+            t[m] =           fcmult(1-fract,f_int[m][st+ low_sample]);
+            t[m] = cadd(t[m],fcmult(  fract,f_int[m][st+high_sample]));
+            /* Figure mag^2 of each resampled fx_int */
+            tmax[m] = (t[m].real*t[m].real) + (t[m].imag*t[m].imag);
+        }
         
-        /* Figure mag^2 of each resampled fx_int */
-        tmax[0] = (t1.real*t1.real) + (t1.imag*t1.imag);
-        tmax[1] = (t2.real*t2.real) + (t2.imag*t2.imag);
+        float max = tmax[0]; /* Maximum for figuring correct symbol */
+        float min = tmax[0];
+        int sym = 0; /* Index of maximum */
+        for( m=0; m<M; m++){
+            if(tmax[m]>max){
+                max = tmax[m];
+                sym = m;
+            }
+            if(tmax[m]<min){
+                min = tmax[m];
+            }
+        }
         
         /* Get the actual bit */
         if(rx_bits != NULL){
-            rx_bits[i] = (tmax[1]>tmax[0])?1:0;
+            /* Get bits for 2FSK and 4FSK */
+            /* TODO: Replace this with something more generic maybe */
+            if(M==2){
+                rx_bits[i] = sym==1;                /* 2FSK. 1 bit per symbol */
+            }else if(M==4){
+                rx_bits[(i*2)+1] = (sym&0x1);       /* 4FSK. 2 bits per symbol */
+                rx_bits[(i*2)  ] = (sym&0x2)>>1;
+            }
         }
+        
         /* Produce soft decision symbols */
         if(rx_sd != NULL){
-            rx_sd[i] = sqrtf(tmax[0]) - sqrtf(tmax[1]);
+            /* Convert symbols from max^2 into max */
+            for( m=0; m<M; m++)
+                tmax[m] = sqrtf(tmax[m]);
+            
+            if(M==2){
+                rx_sd[i] = tmax[0] - tmax[1];
+            }else if(M==4){
+                /* TODO: Find a soft-decision mode that works for 4FSK */
+                min = sqrtf(min);
+                rx_sd[(i*2)+1] = - tmax[0] ;  /* Bits=00 */
+                rx_sd[(i*2)  ] = - tmax[0] ;
+                rx_sd[(i*2)+1]+=   tmax[1] ;  /* Bits=01 */
+                rx_sd[(i*2)  ]+= - tmax[1] ;
+                rx_sd[(i*2)+1]+= - tmax[2] ;  /* Bits=10 */
+                rx_sd[(i*2)  ]+=   tmax[2] ;
+                rx_sd[(i*2)+1]+=   tmax[3] ;  /* Bits=11 */
+                rx_sd[(i*2)  ]+=   tmax[3] ;
+            }
         }
         /* Accumulate resampled int magnitude for EbNodB estimation */
         /* Standard deviation is calculated by algorithm devised by crafty soviets */
         #ifdef EST_EBNO
         /* Accumulate the square of the sampled value */
-        ft1 = tmax[ (tmax[1]>tmax[0]) ];
+        ft1 = max;
         stdebno += ft1;
         
         /* Figure the abs value of the max tone */
@@ -834,432 +874,24 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         neyesamp = fsk->stats->neyesamp = P*2;
         neyeoffset = high_sample+1+(P*28);
         
-        fsk->stats->neyetr = fsk->mode*3;
-        for(j=0; j<neyesamp; j++)
-            fsk->stats->rx_eye[0][j] = cabsolute(f1_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)                       
-            fsk->stats->rx_eye[1][j] = cabsolute(f2_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)                      
-            fsk->stats->rx_eye[2][j] = cabsolute(f1_int[neyeoffset+neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                                 
-            fsk->stats->rx_eye[3][j] = cabsolute(f2_int[neyeoffset+neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                      
-            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[neyeoffset+2*neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                                 
-            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[neyeoffset+2*neyesamp+j]);    
+        int eye_traces = MODEM_STATS_ET_MAX/M;
         
-        eye_max = 0;
-        /* Normalize eye to +/- 1 */
-        for(i=0; i<fsk->mode*3; i++)
-            for(j=0; j<neyesamp; j++)
-                if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
-                    eye_max = fabsf(fsk->stats->rx_eye[i][j]);
-        
-        for(i=0; i<fsk->mode*3; i++)
-            for(j=0; j<neyesamp; j++)
-                fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
-        
-        fsk->stats->nr = 0;
-        fsk->stats->Nc = 0;
-    }
-    
-    /* Dump some internal samples */
-    modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
-    modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
-    modem_probe_samp_f("t_f1",&f_est[0],1);
-    modem_probe_samp_f("t_f2",&f_est[1],1);
-    modem_probe_samp_c("t_f1_int",f1_int,(nsym+1)*P);
-    modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
-    modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
-    
-    #ifndef DEMOD_ALLOC_STACK
-    free(f1_int);
-    free(f2_int);
-    free(f1_intbuf);
-    free(f2_intbuf);
-    #endif
-}
-
-void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
-    int N = fsk->N;
-    int Ts = fsk->Ts;
-    int Rs = fsk->Rs;
-    int Fs = fsk->Fs;
-    int nsym = fsk->Nsym;
-    int nin = fsk->nin;
-    int P = fsk->P;
-    int Nmem = fsk->Nmem;
-    int M = fsk->mode;
-    int i,j,dc_i,cbuf_i;
-    float ft1;
-    int nstash = fsk->nstash;
-    COMP *f1_int, *f2_int, *f3_int, *f4_int;
-    COMP t1,t2,t3,t4;
-    COMP phi1_c = fsk->phi1_c;
-    COMP phi2_c = fsk->phi2_c;
-    COMP phi3_c = fsk->phi3_c;
-    COMP phi4_c = fsk->phi4_c;
-    COMP phi_ft;
-    int nold = Nmem-nin;
-    COMP dphi1,dphi2,dphi3,dphi4;
-    COMP dphift;
-    float rx_timing,norm_rx_timing,old_norm_rx_timing,d_norm_rx_timing,appm;
-    int using_old_samps;
-    COMP *sample_src;
-    COMP *f1_intbuf,*f2_intbuf,*f3_intbuf,*f4_intbuf;
-    float f_est[M],fc_avg,fc_tx;
-    float meanebno,stdebno,eye_max;
-    int neyesamp,neyeoffset;
-    
-    /* Estimate tone frequencies */
-    fsk_demod_freq_est(fsk,fsk_in,f_est,M);
-    modem_probe_samp_f("t_f_est",f_est,M);
-
-    #ifdef DEMOD_ALLOC_STACK
-    /* allocate memory for the integrated samples */
-    /* Note: This must be kept after fsk_demod_freq_est for memory usage reasons */
-    f1_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    f2_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    f3_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    f4_int = (COMP*) alloca(sizeof(COMP)*(nsym+1)*P);
-    
-    /* Allocate circular buffers for integration */
-    f1_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    f2_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    f3_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    f4_intbuf = (COMP*) alloca(sizeof(COMP)*Ts);
-    #else
-    f1_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    f2_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    f3_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    f4_int = (COMP*) malloc(sizeof(COMP)*(nsym+1)*P);
-    
-    f1_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    f2_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    f3_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    f4_intbuf = (COMP*) malloc(sizeof(COMP)*Ts);
-    #endif
-    /* If this is the first run, we won't have any valid f_est */
-    if(fsk->f1_est<1){
-		fsk->f1_est = f_est[0];
-		fsk->f2_est = f_est[1];
-		fsk->f3_est = f_est[2];
-		fsk->f4_est = f_est[3];
-	}
-
-    /* Back the stored phase off to account for re-integraton of old samples */
-    dphi1 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f2_est)/(float)(Fs)));
-    dphi3 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f3_est)/(float)(Fs)));
-    dphi4 = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f4_est)/(float)(Fs)));
-    
-    phi1_c = cmult(dphi1,phi1_c);
-    phi2_c = cmult(dphi2,phi2_c);
-    phi3_c = cmult(dphi3,phi3_c);
-    phi4_c = cmult(dphi4,phi4_c);
-
-    /* Figure out how much to nudge each sample downmixer for every sample */
-    dphi1 = comp_exp_j(2*M_PI*((fsk->f1_est)/(float)(Fs)));
-    dphi2 = comp_exp_j(2*M_PI*((fsk->f2_est)/(float)(Fs)));
-    dphi3 = comp_exp_j(2*M_PI*((fsk->f3_est)/(float)(Fs)));
-    dphi4 = comp_exp_j(2*M_PI*((fsk->f4_est)/(float)(Fs)));
-
-    dc_i = 0;
-    cbuf_i = 0;
-    sample_src = &(fsk->samp_old[nstash-nold]);
-    using_old_samps = 1;
-    
-    /* Pre-fill integration buffer */
-    for(dc_i=0; dc_i<Ts-(Ts/P); dc_i++){
-        /* Switch sample source to new samples when we run out of old ones */
-        if(dc_i>=nold && using_old_samps){
-            sample_src = &fsk_in[0];
-            dc_i = 0;
-            using_old_samps = 0;
-            
-            /* Recalculate delta-phi after switching to new sample source */
-            phi1_c = comp_normalize(phi1_c);
-            phi2_c = comp_normalize(phi2_c);
-            phi3_c = comp_normalize(phi3_c);
-            phi4_c = comp_normalize(phi4_c);
-            dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
-            dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
-            dphi3 = comp_exp_j(2*M_PI*((f_est[2])/(float)(Fs)));
-            dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
-        }
-        /* Downconvert and place into integration buffer */
-        f1_intbuf[dc_i]=cmult(sample_src[dc_i],phi1_c);
-        f2_intbuf[dc_i]=cmult(sample_src[dc_i],phi2_c);
-        f3_intbuf[dc_i]=cmult(sample_src[dc_i],phi3_c);
-        f4_intbuf[dc_i]=cmult(sample_src[dc_i],phi4_c);
-
-        modem_probe_samp_c("t_f1_dc",&f1_intbuf[dc_i],1);
-        modem_probe_samp_c("t_f2_dc",&f2_intbuf[dc_i],1);
-        modem_probe_samp_c("t_f3_dc",&f3_intbuf[dc_i],1);
-        modem_probe_samp_c("t_f4_dc",&f4_intbuf[dc_i],1);
-        /* Spin downconversion phases */
-        phi1_c = cmult(phi1_c,dphi1);
-        phi2_c = cmult(phi2_c,dphi2);
-        phi3_c = cmult(phi3_c,dphi3);
-        phi4_c = cmult(phi4_c,dphi4);
-    }
-    cbuf_i = dc_i;
-    
-    /* Integrate over Ts at offsets of Ts/P */
-    for(i=0; i<(nsym+1)*P; i++){
-        /* Downconvert and Place Ts/P samples in the integration buffers */
-        for(j=0; j<(Ts/P); j++,dc_i++){
-            /* Switch sample source to new samples when we run out of old ones */
-            if(dc_i>=nold && using_old_samps){
-                sample_src = &fsk_in[0];
-                dc_i = 0;
-                using_old_samps = 0;
-                
-				/* Recalculate delta-phi after switching to new sample source */
-				phi1_c = comp_normalize(phi1_c);
-				phi2_c = comp_normalize(phi2_c);
-				phi3_c = comp_normalize(phi3_c);
-				phi4_c = comp_normalize(phi4_c);
-				dphi1 = comp_exp_j(2*M_PI*((f_est[0])/(float)(Fs)));
-				dphi2 = comp_exp_j(2*M_PI*((f_est[1])/(float)(Fs)));
-				dphi3 = comp_exp_j(2*M_PI*((f_est[2])/(float)(Fs)));
-				dphi4 = comp_exp_j(2*M_PI*((f_est[3])/(float)(Fs)));
+        fsk->stats->neyetr = fsk->mode*eye_traces;
+        for( i=0; i<eye_traces; i++){
+            for ( m=0; m<M; m++){
+                for(j=0; j<neyesamp; j++)
+                    fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][neyesamp*i+neyeoffset+j]);
             }
-            /* Downconvert and place into integration buffer */
-            f1_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi1_c);
-            f2_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi2_c);
-            f3_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi3_c);
-            f4_intbuf[cbuf_i+j]=cmult(sample_src[dc_i],phi4_c);
-    
-            modem_probe_samp_c("t_f1_dc",&f1_intbuf[cbuf_i+j],1);
-            modem_probe_samp_c("t_f2_dc",&f2_intbuf[cbuf_i+j],1);
-            modem_probe_samp_c("t_f3_dc",&f3_intbuf[cbuf_i+j],1);
-            modem_probe_samp_c("t_f4_dc",&f4_intbuf[cbuf_i+j],1);
-            /* Spin downconversion phases */
-            phi1_c = cmult(phi1_c,dphi1);
-            phi2_c = cmult(phi2_c,dphi2);
-            phi3_c = cmult(phi3_c,dphi3);
-            phi4_c = cmult(phi4_c,dphi4);
-            
         }
-        
-        /* Dump internal samples */
-        
-        cbuf_i += Ts/P;
-        if(cbuf_i>=Ts) cbuf_i = 0;
-        /* Integrate over the integration buffers, save samples */
-        t1 = t2 = t3 = t4 = comp0();
-        for(j=0; j<Ts; j++){
-            t1 = cadd(t1,f1_intbuf[j]);
-            t2 = cadd(t2,f2_intbuf[j]);
-            t3 = cadd(t3,f3_intbuf[j]);
-            t4 = cadd(t4,f4_intbuf[j]);
-        }
-        f1_int[i] = t1;
-        f2_int[i] = t2;
-        f3_int[i] = t3;
-        f4_int[i] = t4;
-        
-    }
-
-    fsk->phi1_c = phi1_c;
-	fsk->phi2_c = phi2_c;
-	fsk->phi3_c = phi3_c;
-	fsk->phi4_c = phi4_c;
-
-	fsk->f1_est = f_est[0];
-	fsk->f2_est = f_est[1];
-	fsk->f3_est = f_est[2];
-	fsk->f4_est = f_est[3];
-
-    /* Stash samples away in the old sample buffer for the next round of bit getting */
-    memcpy((void*)&(fsk->samp_old[0]),(void*)&(fsk_in[nin-nstash]),sizeof(COMP)*nstash);
-    
-    /* Fine Timing Estimation */
-    /* Apply magic nonlinearity to f1_int and f2_int, shift down to 0, 
-     * exract angle */
-     
-    /* Figure out how much to spin the oscillator to extract magic spectral line */
-    dphift = comp_exp_j(-2*M_PI*((float)(Rs)/(float)(P*Rs)));
-    phi_ft.real = 1;
-    phi_ft.imag = 0;
-    t1=comp0();
-    COMP c,y,t;
-    c = comp0();
-    t2 = comp0();
-    for(i=0; i<(nsym+1)*P; i++){
-        /* Get abs^2 of fx_int[i], and add 'em */
-        ft1  = (f1_int[i].real*f1_int[i].real) + (f1_int[i].imag*f1_int[i].imag);
-        ft1 += (f2_int[i].real*f2_int[i].real) + (f2_int[i].imag*f2_int[i].imag);
-        ft1 += (f3_int[i].real*f3_int[i].real) + (f3_int[i].imag*f3_int[i].imag);
-        ft1 += (f4_int[i].real*f4_int[i].real) + (f4_int[i].imag*f4_int[i].imag);
-        
-        /* Down shift and accumulate magic line */
-        t1 = fcmult(ft1,phi_ft);
-        y.real = t1.real-c.real;
-        y.imag = t1.imag-c.imag;
-        
-        t.real = t2.real + y.real;
-        t.imag = t2.imag + y.imag;
-        
-        c.real = (t.real-t2.real) - y.real;
-        c.imag = (t.imag-t2.imag) - y.imag;
-     
-        t2 = cadd(t2,t1);
-        
-        /* Spin the oscillator for the magic line shift */
-        phi_ft = cmult(phi_ft,dphift);
-    }
-    t1 = t2;
-    /* Get the magic angle */
-    norm_rx_timing =  -atan2f(t1.imag,t1.real)/(2*M_PI);
-    rx_timing = norm_rx_timing*(float)P;
-    
-    old_norm_rx_timing = fsk->norm_rx_timing;
-    fsk->norm_rx_timing = norm_rx_timing;
-    
-    /* Estimate sample clock offset */
-    d_norm_rx_timing = norm_rx_timing - old_norm_rx_timing;
-    
-    /* Filter out big jumps in due to nin change */
-    if(fabsf(d_norm_rx_timing) < .2){
-        appm = 1e6*d_norm_rx_timing/(float)nsym;
-        fsk->ppm = .9*fsk->ppm + .1*appm;
-    }
-    
-    /* Figure out how many samples are needed the next modem cycle */
-    if(norm_rx_timing > 0.25){
-        fsk->nin = N+Ts/2;
-    }
-    else if(norm_rx_timing < -0.25){
-        fsk->nin = N-Ts/2;
-    }
-    else
-        fsk->nin = N;
-    
-    modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
-    modem_probe_samp_i("t_nin",&(fsk->nin),1);
-    
-    /* Re-sample the integrators with linear interpolation magic */
-    int low_sample = (int)floorf(rx_timing);
-    float fract = rx_timing - (float)low_sample;
-    int high_sample = (int)ceilf(rx_timing);
- 
-	/* Vars for finding the max-of-4 for each bit */
-	float tmax[4];
-    float max = 0;
-    int sym = 0;
-    
-    #ifdef EST_EBNO
-    meanebno = 0;
-    stdebno = 0;
-    #endif
-  
-    /* FINALLY, THE BITS */
-    /* also, resample fx_int */
-    for(i=0; i<nsym; i++){
-        int st = (i+1)*P;
-        t1 =         fcmult(1-fract,f1_int[st+ low_sample]);
-        t1 = cadd(t1,fcmult(  fract,f1_int[st+high_sample]));
-        t2 =         fcmult(1-fract,f2_int[st+ low_sample]);
-        t2 = cadd(t2,fcmult(  fract,f2_int[st+high_sample]));
-        t3 =         fcmult(1-fract,f3_int[st+ low_sample]);
-        t3 = cadd(t3,fcmult(  fract,f3_int[st+high_sample]));
-        t4 =         fcmult(1-fract,f4_int[st+ low_sample]);
-        t4 = cadd(t4,fcmult(  fract,f4_int[st+high_sample]));
-        
-        /* Figure mag^2 of each resampled fx_int */
-        tmax[0] = (t1.real*t1.real) + (t1.imag*t1.imag);
-        tmax[1] = (t2.real*t2.real) + (t2.imag*t2.imag);
-        tmax[2] = (t3.real*t3.real) + (t3.imag*t3.imag);
-        tmax[3] = (t4.real*t4.real) + (t4.imag*t4.imag);
-        
-        /* Find the maximum symbol */
-        max = 0;
-        sym = 0;
-        for(j=0; j<4; j++){
-			if(tmax[j]>max){
-				sym = j;
-				max = tmax[j];
-			}
-		}
-        
-        /* Turn into bits */
-        rx_bits[(i*2)+1] = (sym&0x1);
-        rx_bits[(i*2)  ] = (sym&0x2)>>1;
-        
-        /* Accumulate resampled int magnitude for EbNodB estimation */
-        /* Standard deviation is calculated by algorithm devised by crafty soviets */
-        #ifdef EST_EBNO
-        /* Accumulate the square of the sampled value */
-        ft1 = max;
-        stdebno += ft1;
-        
-        /* Figure the abs value of the max tone */
-        meanebno += sqrtf(ft1);
-        #endif
-        /* Soft output goes here */
-    }
-    
-     #ifdef EST_EBNO
-    /* Calculate mean for EbNodB estimation */
-    meanebno = meanebno/(float)nsym;
-    
-    /* Calculate the std. dev for EbNodB estimate */
-    stdebno = (stdebno/(float)nsym) - (meanebno*meanebno);
-    stdebno = sqrt(stdebno);
-    
-    fsk->EbNodB = -6+(20*log10f((1e-6+meanebno)/(1e-6+stdebno)));
-    #else
-    fsk->EbNodB = 1;
-    #endif
-    
-    /* Write some statistics out to the stats struct, if present */
-    if( fsk->stats != NULL ){
-        /* Save clock offset in ppm */
-        fsk->stats->clock_offset = fsk->ppm;
-        
-        /* Calculate and save SNR from EbNodB estimate */
-        fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
-        
-        /* Save rx timing */
-        fsk->stats->rx_timing = (float)rx_timing;
-        
-        /* Estimate and save frequency offset */
-        fc_avg = (f_est[0]+f_est[1]+f_est[3]+f_est[2])/4;
-        fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
-        fsk->stats->foff = fc_tx-fc_avg;
-    
-        /* Take a sample for the eye diagrams */
-        neyesamp = fsk->stats->neyesamp = P*2;
-        neyeoffset = low_sample+1+(P*(nsym/4));
-        fsk->stats->neyetr = fsk->mode*2;
-        
-        for(j=0; j<neyesamp; j++)
-            fsk->stats->rx_eye[0][j] = cabsolute(f1_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)                       
-            fsk->stats->rx_eye[1][j] = cabsolute(f2_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)
-            fsk->stats->rx_eye[2][j] = cabsolute(f3_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)                       
-            fsk->stats->rx_eye[3][j] = cabsolute(f4_int[neyeoffset+j]);
-        for(j=0; j<neyesamp; j++)                      
-            fsk->stats->rx_eye[4][j] = cabsolute(f1_int[neyeoffset+neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                                 
-            fsk->stats->rx_eye[5][j] = cabsolute(f2_int[neyeoffset+neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                      
-            fsk->stats->rx_eye[6][j] = cabsolute(f3_int[neyeoffset+neyesamp+j]);
-        for(j=0; j<neyesamp; j++)                                 
-            fsk->stats->rx_eye[7][j] = cabsolute(f4_int[neyeoffset+neyesamp+j]);    
         
         eye_max = 0;
         /* Normalize eye to +/- 1 */
-        for(i=0; i<fsk->mode*2; i++)
+        for(i=0; i<M*eye_traces; i++)
             for(j=0; j<neyesamp; j++)
                 if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
                     eye_max = fabsf(fsk->stats->rx_eye[i][j]);
         
-        for(i=0; i<fsk->mode*2; i++)
+        for(i=0; i<M*eye_traces; i++)
             for(j=0; j<neyesamp; j++)
                 fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
         
@@ -1270,45 +902,31 @@ void fsk4_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
     modem_probe_samp_f("t_ppm",&(fsk->ppm),1);
-    modem_probe_samp_f("t_f1",&f_est[0],1);
-    modem_probe_samp_f("t_f2",&f_est[1],1);
-    modem_probe_samp_f("t_f3",&f_est[2],1);
-    modem_probe_samp_f("t_f4",&f_est[3],1);
-    modem_probe_samp_c("t_f1_int",f1_int,(nsym+1)*P);
-    modem_probe_samp_c("t_f2_int",f2_int,(nsym+1)*P);
-    modem_probe_samp_c("t_f3_int",f3_int,(nsym+1)*P);
-    modem_probe_samp_c("t_f4_int",f4_int,(nsym+1)*P);
     modem_probe_samp_f("t_rx_timing",&(rx_timing),1);
-
+    
+    #ifdef MODEMPROBE_ENABLE
+    for( m=0; m<M; m++){
+        snprintf(mp_name_tmp,19,"t_f%zd_int",m+1);
+        modem_probe_samp_c(mp_name_tmp,f_int[m],(nsym+1)*P);
+        snprintf(mp_name_tmp,19,"t_f%zd",m+1);
+        modem_probe_samp_f(mp_name_tmp,&f_est[m],1);
+    }
+    #endif
+    
     #ifndef DEMOD_ALLOC_STACK
-    free(f1_int);
-    free(f2_int);
-    free(f3_int);
-    free(f4_int);
-    free(f1_intbuf);
-    free(f2_intbuf);
-    free(f3_intbuf);
-    free(f4_intbuf);
+    for( m=0; m<M; m++){
+        free(f_int[m]);
+    }
+    free(f_intbuf_m);
     #endif
 }
-
 
 void fsk_demod(struct FSK *fsk, uint8_t rx_bits[], COMP fsk_in[]){
-	if(fsk->mode == 4){
-		fsk4_demod(fsk,rx_bits,fsk_in);
-	}else{
-		fsk2_demod(fsk,rx_bits,NULL,fsk_in);
-	}
+    fsk2_demod(fsk,rx_bits,NULL,fsk_in);
 }
 
 void fsk_demod_sd(struct FSK *fsk, float rx_sd[], COMP fsk_in[]){
-	if(fsk->mode == 4){
-            assert(0);
-            //TODO: Add 4FSK soft decision
-            //fsk4_demod(fsk,rx_bits,fsk_in);
-	}else{
-		fsk2_demod(fsk,NULL,rx_sd,fsk_in);
-	}
+    fsk2_demod(fsk,NULL,rx_sd,fsk_in);
 }
 
 void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
@@ -1329,28 +947,28 @@ void fsk_mod(struct FSK *fsk,float fsk_out[],uint8_t tx_bits[]){
     dosc_f[3] = comp_exp_j(2*M_PI*((float)(f1_tx+fs_tx*3)/(float)(Fs)));
     
     if(fsk->mode == 2){
-		/* Outer loop through bits */
-		for(i=0; i<fsk->Nsym; i++){
-			/* select current bit phase shift */
-			dph = tx_bits[i]==0?dosc_f[0]:dosc_f[1];
-			for(j=0; j<Ts; j++){
-				tx_phase_c = cmult(tx_phase_c,dph);
-				fsk_out[i*Ts+j] = 2*tx_phase_c.real;
-			}
-		}
-	}else {
-		/* Same thing as above, but with more bits and phases */
-		for(i=0; i<fsk->Nsym; i++){
-			/* select current bit phase shift */
-			sym = tx_bits[ i*2   ]==0?0:2;
-			sym+= tx_bits[(i*2)+1]==0?0:1;
-			dph = dosc_f[sym];
-			for(j=0; j<Ts; j++){
-				tx_phase_c = cmult(tx_phase_c,dph);
-				fsk_out[i*Ts+j] = 2*tx_phase_c.real;
-			}
-		}
-	}
+        /* Outer loop through bits */
+        for(i=0; i<fsk->Nsym; i++){
+            /* select current bit phase shift */
+            dph = tx_bits[i]==0?dosc_f[0]:dosc_f[1];
+            for(j=0; j<Ts; j++){
+                tx_phase_c = cmult(tx_phase_c,dph);
+                fsk_out[i*Ts+j] = 2*tx_phase_c.real;
+            }
+        }
+    }else {
+        /* Same thing as above, but with more bits and phases */
+        for(i=0; i<fsk->Nsym; i++){
+            /* select current bit phase shift */
+            sym = tx_bits[ i*2   ]==0?0:2;
+            sym+= tx_bits[(i*2)+1]==0?0:1;
+            dph = dosc_f[sym];
+            for(j=0; j<Ts; j++){
+                tx_phase_c = cmult(tx_phase_c,dph);
+                fsk_out[i*Ts+j] = 2*tx_phase_c.real;
+            }
+        }
+    }
     
     /* Normalize TX phase to prevent drift */
     tx_phase_c = comp_normalize(tx_phase_c);
