@@ -92,9 +92,18 @@
 */
 static void fsk_generate_hann_table(struct FSK* fsk){
     int Ndft = fsk->Ndft;
+    /* Set up complex oscilator to calculate hann function */
+    COMP dphi = comp_exp_j((2*M_PI)/((float)Ndft-1));
+    COMP rphi = {.5,0};
+    
+    rphi = cmult(cconj(dphi),rphi);
+    
     for(size_t i=0; i<Ndft; i++){
-        float hann = 1-cosf((2*M_PI*(float)(i))/((float)Ndft-1));
-        fsk->hann_table[i] = hann;
+        rphi = cmult(dphi,rphi);
+        float hannc = .5-rphi.real;
+        //float hann = .5-(.5*cosf((2*M_PI*(float)(i))/((float)Ndft-1)));
+        
+        fsk->hann_table[i] = hannc;
     }  
 }
 #endif
@@ -460,6 +469,12 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     kiss_fft_cpx *fftin  = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     kiss_fft_cpx *fftout = (kiss_fft_cpx*)malloc(sizeof(kiss_fft_cpx)*Ndft);
     #endif
+    
+    #ifndef USE_HANN_TABLE
+    COMP dphi = comp_exp_j((2*M_PI)/((float)Ndft-1));
+    COMP rphi = {.5,0};
+    rphi = cmult(cconj(dphi),rphi);
+    #endif
 
     fft_samps = Ndft;
     
@@ -477,10 +492,12 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
             #ifdef USE_HANN_TABLE
             hann = fsk->hann_table[i];
             #else
-            hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
+            //hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
+            rphi = cmult(dphi,rphi);
+            hann = .5-rphi.real;
             #endif
-            fftin[i].r = 0.5*hann*fsk_in[i+Ndft*j].real;
-            fftin[i].i = 0.5*hann*fsk_in[i+Ndft*j].imag;
+            fftin[i].r = hann*fsk_in[i+Ndft*j].real;
+            fftin[i].i = hann*fsk_in[i+Ndft*j].imag;
         }
         /* Zero out the remaining slots */
         for(; i<Ndft;i++){
