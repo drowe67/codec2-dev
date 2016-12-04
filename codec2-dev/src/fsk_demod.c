@@ -28,8 +28,10 @@
 */
 
 #include <stdio.h>
-#include "fsk.h"
+#include <stdlib.h>
+#include <getopt.h>
 
+#include "fsk.h"
 #include "codec2_fdmdv.h"
 #include "modem_stats.h"
 
@@ -39,7 +41,7 @@ int main(int argc,char *argv[]){
     int Fs,Rs,M,P,stats_ctr,stats_loop;
     float loop_time;
     int enable_stats = 0;
-    int hbr = 0;
+    int hbr = 1;
     FILE *fin,*fout;
     uint8_t *bitbuf;
     int16_t *rawbuf;
@@ -50,48 +52,116 @@ int main(int argc,char *argv[]){
     stats_loop = 0;
     int complex_input = 1, bytes_per_sample = 2;
     
-    if(argc<7){
-        fprintf(stderr,"usage: %s (2|4|2X|4X|2XS) P SampleFreq SymbolFreq InputModemRawFile OutputOneBitPerCharFile [S] [C]\n",argv[0]);
-        fprintf(stderr, "2   - 2FSK low bit rate\n4   - 4FSK low bit rate\n2X  - 2FSK high bit rate\n4   - 4FSK high bit rate\n2XS - high bit rate soft decision output\n\n");
-         fprintf(stderr, "P   - timing estimator window size, see README_fsk\n");
-         fprintf(stderr, "S   - dump demod stats to stderr for plotting with octave/fskdemodgui.py\n");
-         fprintf(stderr, "C   - complex (two sample s16) input\n");
-         fprintf(stderr, "CU8   - complex (two sample u8) input\n");
-       exit(1);
+    P = 0;
+    M = 0;
+    
+    /* -m 2/4 --mode 2/4  - FSK mode
+     * -l --lbr      - Low bit rate mode
+     * -p n --conv n    - Downconverted symbol size
+     * If p is unspecified, it will default to Ts
+     * -c --cs16      - Complex (signed 16-bit)
+     * -d --cu8      - Complex (unsigned 8-bit)
+     * If neither -c or -d are specified, input will be real valued signed 16-bit
+     * -t --stats - dump demod statistics to stderr
+     * -s --soft-dec - ouput soft decision (float 32-bit)
+     */
+     /* usage: [-l] [-p P]  [-s] [(-c|-d)] [-t] (2|4) SampleRate SymbolRatez InputModemRawFile OutputOneBitPerCharFile */
+     
+     int o = 0;
+     int opt_idx = 0;
+     while( o != -1 ){
+        static struct option long_opts[] = {
+            {"help",      no_argument,        0, 'h'},
+            {"lbr",       no_argument,        0, 'l'},
+            {"conv",      required_argument,  0, 'p'},
+            {"cs16",      no_argument,        0, 'c'},
+            {"cu8",       no_argument,        0, 'd'},
+            {"stats",     no_argument,        0, 't'},
+            {"soft-dec",  no_argument,        0, 's'},
+            {0, 0, 0, 0}
+        };
+        
+        o = getopt_long(argc,argv,"hlp:cdts",long_opts,&opt_idx);
+        
+        switch(o){
+            case 'l':
+                hbr = 0;
+                break;
+            case 'c':
+                complex_input = 2;
+                bytes_per_sample = 2;
+                break;
+            case 'd':
+                complex_input = 2;
+                bytes_per_sample = 1;
+                break;
+            case 't':
+                enable_stats = 1;
+                break;
+            case 's':
+                soft_dec_mode = 1;
+                break;
+            case 'p':
+                P = atoi(optarg);
+                fprintf(stderr,"P:%d\n",P);
+                break;
+            case 'h':
+            case '?':
+                goto helpmsg;
+                break;
+        }
+    }
+    int dx = optind;
+    
+    if( (argc - dx) < 5){
+        fprintf(stderr, "Too few arguments\n");
+        goto helpmsg;
+    }
+    
+    if( (argc - dx) > 5){
+        fprintf(stderr, "Too many arguments\n");
+        helpmsg:
+        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
+        fprintf(stderr," -l P --conv P   -  P specifies the rate at which symbols are down-converted before further processing\n");
+        fprintf(stderr,"                        P must be divisible by the symbol size. Smaller P values will result in faster\n");
+        fprintf(stderr,"                        processing but lower demodulation preformance. If no P value is specified,\n");
+        fprintf(stderr,"                        P will default to it's highes possible value\n");
+        fprintf(stderr," -c --cs16       -  The raw input file will be in complex signed 16 bit format.\n");
+        fprintf(stderr," -d --cu8        -  The raw input file will be in complex unsigned 8 bit format.\n");
+        fprintf(stderr,"                        If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
+        fprintf(stderr," -t --stats      -  Print out modem statistics to stderr in JSON.\n");
+        fprintf(stderr," -s --soft-dec   -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
+        fprintf(stderr,"                        If -s is not used, the output will be in a 1 byte-per-bit format.\n");
+        exit(1);
     }
     
     /* Extract parameters */
-    P  = atoi(argv[2]);
-    Fs = atoi(argv[3]);
-    Rs = atoi(argv[4]);
+    M = atoi(argv[dx]);
+    Fs = atoi(argv[dx + 1]);
+    Rs = atoi(argv[dx + 2]);
+    
+    if( P == 0 ){
+        P = Fs/Rs;
+    }
+    
+    if( (M!=2) && (M!=4) ){
+        fprintf(stderr,"Mode %d is not valid. Mode must be 2 or 4.\n",M);
+        goto helpmsg;
+    }
     
     /* Open files */
-    if(strcmp(argv[5],"-")==0){
+    if(strcmp(argv[dx + 3],"-")==0){
         fin = stdin;
     }else{
-        fin = fopen(argv[5],"r");
+        fin = fopen(argv[dx + 3],"r");
     }
     
-    if(strcmp(argv[6],"-")==0){
+    if(strcmp(argv[dx + 4],"-")==0){
         fout = stdout;
     }else{
-        fout = fopen(argv[6],"w");
+        fout = fopen(argv[dx + 4],"w");
     }
-
-    /* Handle high-bit-rate special cases */
-    if(strcmp(argv[1],"2X")==0){
-        M = 2;
-        hbr = 1;
-    }else if(strcmp(argv[1],"2XS")==0){
-        M = 2;
-        hbr = 1;
-        soft_dec_mode = 1;
-    }else if(strcmp(argv[1],"4X")==0){
-        M = 4;
-        hbr = 1;
-    }else {
-        M = atoi(argv[1]);
-    }
+    
     
     /* set up FSK */
     if(!hbr)
@@ -101,44 +171,16 @@ int main(int argc,char *argv[]){
     
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open test vector files\n");
-        goto cleanup;
+        exit(1);
     }
     
-    /* Check for and enable stat printing and complex input */
-    /* TODO: design better command line arguments */
-    if(argc>7){
-        if(strcmp(argv[7],"S")==0){
-            enable_stats = 1;
-            fsk_setup_modem_stats(fsk,&stats);
-            loop_time = ((float)fsk_nin(fsk))/((float)Fs);
-            stats_loop = (int)(.125/loop_time);
-            stats_ctr = 0;
-        }
-        if(strcmp(argv[7],"C")==0){
-            complex_input = 2;
-        }
-        if(strcmp(argv[7],"CU8")==0){
-            complex_input = 2;
-            bytes_per_sample = 1;
-        }
+    if(enable_stats){
+        fsk_setup_modem_stats(fsk,&stats);
+        loop_time = ((float)fsk_nin(fsk))/((float)Fs);
+        stats_loop = (int)(.125/loop_time);
+        stats_ctr = 0;
     }
-    if(argc>8){
-        if(strcmp(argv[8],"S")==0){
-            enable_stats = 1;
-            fsk_setup_modem_stats(fsk,&stats);
-            loop_time = ((float)fsk_nin(fsk))/((float)Fs);
-            stats_loop = (int)(.125/loop_time);
-            stats_ctr = 0;
-        }
-        if(strcmp(argv[8],"C")==0){
-            complex_input = 2;
-        }
-        if(strcmp(argv[8],"CU8")==0){
-            complex_input = 2;
-            bytes_per_sample = 1;
-        }
-    }
-       
+    
     /* allocate buffers for processing */
     if(soft_dec_mode){
         sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits);
@@ -239,10 +281,8 @@ int main(int argc,char *argv[]){
     free(rawbuf);
     free(modbuf);
     
-    cleanup:
     fclose(fin);
     fclose(fout);
     fsk_destroy(fsk);
-    exit(0);
 }
 
