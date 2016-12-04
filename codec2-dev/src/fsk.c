@@ -41,6 +41,27 @@
 /* This is a flag to make the mod/demod allocate their memory on the stack instead of the heap */
 /* At large sample rates, there's not enough stack space to run the demod */
 #define DEMOD_ALLOC_STACK
+
+/* This is a flag for the freq. estimator to use a precomputed/rt computed hann window table
+   On platforms with slow cosf, this will produce a substantial speedup at the cost of a small
+    amount of memory 
+*/
+#define USE_HANN_TABLE
+
+/* This flag turns on run-time hann table generation. If USE_HANN_TABLE is unset,
+    this flag has no effect. If USE_HANN_TABLE is set and this flag is set, the
+    hann table will be allocated and generated when fsk_init or fsk_init_hbr is 
+    called. If this flag is not set, a hann function table of size fsk->Ndft MUST
+    be provided. On small platforms, this can be used with a precomputed table to
+    save memory at the cost of flash space.
+*/
+#define GENERATE_HANN_TABLE_RUNTIME
+
+/* Turn off table generation if on cortex M4 to save memory */
+#ifdef CORTEX_M4
+#undef USE_HANN_TABLE
+#endif
+
 /*---------------------------------------------------------------------------*\
 
                                INCLUDES
@@ -112,6 +133,19 @@ static inline COMP comp_normalize(COMP a){
     return b;
 }
 
+#ifdef USE_HANN_TABLE
+/*
+   This is used by fsk_create and fsk_create_hbr to generate a hann function
+   table
+*/
+static void fsk_generate_hann_table(struct FSK* fsk){
+    int Ndft = fsk->Ndft;
+    for(size_t i=0; i<Ndft; i++){
+        float hann = 1-cosf((2*M_PI*(float)(i))/((float)Ndft-1));
+        fsk->hann_table[i] = hann;
+    }  
+}
+#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -211,6 +245,22 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    
+    #ifdef USE_HANN_TABLE
+        #ifdef GENERATE_HANN_TABLE_RUNTIME
+            fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft);
+            if(fsk->hann_table == NULL){
+                free(fsk->fft_est);
+                free(fsk->samp_old);
+                free(fsk->fft_cfg);
+                free(fsk);
+                return NULL;
+            }
+            fsk_generate_hann_table(fsk);
+        #else
+            fsk->hann_table = NULL;
+        #endif
+    #endif
     
     for(i=0;i<fsk->Ndft/2;i++)fsk->fft_est[i] = 0;
     
@@ -322,6 +372,22 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    
+    #ifdef USE_HANN_TABLE
+        #ifdef GENERATE_HANN_TABLE_RUNTIME
+            fsk->hann_table = (float*)malloc(sizeof(float)*fsk->Ndft);
+            if(fsk->hann_table == NULL){
+                free(fsk->fft_est);
+                free(fsk->samp_old);
+                free(fsk->fft_cfg);
+                free(fsk);
+                return NULL;
+            }
+            fsk_generate_hann_table(fsk);
+        #else
+            fsk->hann_table = NULL;
+        #endif
+    #endif
     
     for(i=0;i<Ndft/2;i++)fsk->fft_est[i] = 0;
     
@@ -456,7 +522,11 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     for(j=0; j<fft_loops; j++){
     /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
         for(i=0; i<fft_samps; i++){
+            #ifdef USE_HANN_TABLE
+            hann = fsk->hann_table[i];
+            #else
             hann = 1-cosf((2*M_PI*(float)(i))/((float)fft_samps-1));
+            #endif
             fftin[i].r = 0.5*hann*fsk_in[i+Ndft*j].real;
             fftin[i].i = 0.5*hann*fsk_in[i+Ndft*j].imag;
         }
