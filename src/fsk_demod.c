@@ -109,7 +109,6 @@ int main(int argc,char *argv[]){
                 break;
             case 'p':
                 P = atoi(optarg);
-                fprintf(stderr,"P:%d\n",P);
                 break;
             case 'h':
             case '?':
