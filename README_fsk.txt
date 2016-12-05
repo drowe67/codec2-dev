@@ -34,34 +34,41 @@ Built as part of codec2-dev, see README for build instructions.
 
 2. Measure the bit error rate of 100 frames of 100 bit/s 2FSK:
 
-    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod 2 0 8000 100 - - | ./fsk_put_test_bits -
+    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -
     FSK BER 0.000000, bits tested 39899, bit errors 0
 
     In this example the two tones are at 1200 and 1200+100 = 1300Hz.
     A shift of 100Hz is the minimum possible for an incoherent FSK
-    demodulator that is running at 100 symbols/s.
-
-    Note the "P" parameter (explained below) is don't care when mode
-    is 2 or 4, so we set it to 0.
+    demodulator that is running at 100 symbols/s. Note that -l or --lbr
+    initalizes the demodulator in 'low bit rate' mode. In low bit rate
+    mode, incoming samples are processed in 1 second chunks, giving a 
+    very wide window for frequency and timing estimaton. Low speed mode
+    is well suited to applications that can tolerate long latency, such
+    as balloon telemetry.
 
 3. Measure the bit error rate of 100 frames at 1200 bits/s, using a
    sample rate of 9600 Hz:
 
-    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 9600 1200 1200 1200 - - | ./fsk_demod 2X 8 9600 1200 - - | ./fsk_put_test_bits -
+    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 9600 1200 1200 1200 - - | ./fsk_demod -p 8 2 9600 1200 - - | ./fsk_put_test_bits -
     FSK BER 0.000000, bits tested 39967, bit errors 0
 
-    The 2X option is a "high speed" mode, which narrows the parameter
-    estimation window to make demod synchronise quickly in low-latency
-    applications like PTT digital voice.  For low speed telemetry
-    applications we use low speed mode (a wider window) as processing
-    latency isn't important and we want the best possible estimate.
-   
-    In 2X/4X mode the P parameter _is_ used, in this example we set it
-    to 8.  This means the timing estimator uses a window that is 8
-    symbols wide.  There are some restrictions on P, Fs/(Rs*P) needs
-    to be an integer.  So for Fs=9600Hz, Rs=1200Hz Fs/Rs=8, so P=8
-    would be OK but P=10 not OK.  An assert will fire if you get it
-    wrong.
+    In this example, the -l and --lbr options are left out setting the modem
+    up in "high speed" mode. In this mode, the demodulator operates on blocks of
+    24 symbols at a time. In modes with a higher bitrate, this allows the modem
+    to operate with a much lower bit rate. High speed mode is well suited to 
+    applications without much tolerance for latency or with limited processing
+    power and memory, such as PTT digital voice.
+    
+    In this example, the -p (or --conv) option is used. This specifies the
+    downconverted symbol size. The symbol period (Ts) must be divisible by
+    the supplied P parameter. In this case, Fs is 9600 and Rs is 1200, so Ts
+    is Fs/Rs, which is 8. In this case, 8 is the maximum P value allowed, 
+    though 4 and 2 would also work. If P is not divisible by Ts, a failed
+    assert will fire and fsk_demod will exit. If -p is not supplied, it 
+    will default to match Ts. In general, lower values of P result in less
+    memory use and CPU time spend, but may result in worse modem preformance.
+    P should be left alone unless CPU and memory usage needs to be lowered
+    for the application.
 
 4.  (TODO High bit rate example like 115k project Horus)
 
