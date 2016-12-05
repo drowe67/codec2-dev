@@ -861,31 +861,50 @@ function [v] = est_voicing_bits(v1, v5)
 endfunction
 
 
-function AmdB_ = piecewise_model(AmdB, Wo) 
+function [AmdB_ residual] = piecewise_model(AmdB, Wo) 
     L = length(AmdB);
     l1000 = floor(L/4);     
-    l2000 = floor(2*L/4);     
-    l3000 = floor(3*L/4);     
     AmdB_ = ones(1,L);
+    mask_sample_freqs_kHz = (1:L)*Wo*4/pi;
 
-    % fit a resonator to max of first 1000 Hz
+    % fit a resonator to max of first 300 - 1000 Hz
 
-    [mx mx_ind] = max(AmdB(1:l1000));
-    mask_sample_freqs_kHz = (1:l1000)*Wo*4/pi;
-    AmdB_(1:l1000) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+    fmin = 0.150;
+    lmin = floor(L*fmin/4);
+    [mx mx_ind] = max(AmdB(lmin+1:l1000));
+    mx_ind += lmin;
+    AmdB_ = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
 
-    % fit a resonator to max of second 1000 Hz
+    % fit a 2nd resonator, must be above 1000Hz
 
-    [mx mx_ind] = max(AmdB(l1000+1:l2000));
-    mx_ind += l1000;
-    mask_sample_freqs_kHz = (l1000+1:l2000)*Wo*4/pi;
-    AmdB_(l1000+1:l2000) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+    fr1 = mx_ind*Wo*4/pi;
+    fmin = 1;
+    lmin = round(L*fmin/4);
 
-    % fit a resonator to max of third 1000 Hz
+    [mx mx_ind] = max(AmdB(lmin+1:L));
+    mx_ind += lmin;
+    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
+    fr2 = mx_ind*Wo*4/pi;
 
-    [mx mx_ind] = max(AmdB(l2000+1:L));
-    mx_ind += l2000;
-    mask_sample_freqs_kHz = (l2000+1:L)*Wo*4/pi;
-    AmdB_(l2000+1:L) = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+    % fit a third resonator, must be +/- 300 Hz after 2nd resonator
 
+    residual = AmdB;
+    residual(1:lmin) = 0;
+
+    fr2 = mx_ind*Wo*4/pi;
+    fmin = fr2 - 0.300;
+    fmax = fr2 + 0.300;
+    
+    lmin = max(1, round(L*fmin/4));
+    lmax = min(L, round(L*fmax/4));
+    residual(lmin:lmax) = 0;
+
+    [mx mx_ind] = max(residual);
+    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
+    fr3 = mx_ind*Wo*4/pi;
+   
+    %figure(3);
+    %plot(mask_sample_freqs_kHz, residual);
+
+    printf("\nfr1: %f fr2: %f fr3: %f\n", fr1, fr2, fr3);
 endfunction
