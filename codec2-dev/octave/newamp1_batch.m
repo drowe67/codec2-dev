@@ -15,14 +15,14 @@
 % Or with a little more processing:
 %   codec2-dev/build_linux/src$ ./c2sim ../../raw/hts2a.raw --amread hts2a_am.out --awread hts2a_aw.out --phase0 --postfilter --Woread hts2a_Wo.out -o - | play -q -t raw -r 8000 -s -2 -
 
-
 % process a whole file and write results
 
-function  newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function fvec_log = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
   max_amp = 80;
+  load vq;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
@@ -37,6 +37,8 @@ function  newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   fam  = fopen(Am_out_name,"wb"); 
 
   % encoder loop ------------------------------------------------------
+
+  fvec_log = [];
 
   for f=1:frames
     printf("%d ", f);   
@@ -55,7 +57,8 @@ function  newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
     AmdB_(mx_ind) += 6;
     #}
 
-    AmdB_ = piecewise_model(AmdB, Wo);
+    [AmdB_ res fvec] = piecewise_model(AmdB, Wo, vq, 2);
+    fvec_log = [fvec_log; fvec];
     #{
     l1000 = floor(L/4);     
     AmdB_ = AmdB;

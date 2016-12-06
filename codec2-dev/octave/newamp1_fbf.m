@@ -19,8 +19,9 @@
 function newamp1_fbf(samname, f=10)
   newamp;
   more off;
-  plot_spectrum = 1;
-  mask_en = 1;
+  quant_en = 0;
+
+  load vq;
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -57,7 +58,11 @@ function newamp1_fbf(samname, f=10)
     AmdB_(mx_ind) += 6;
     #}
 
-    [AmdB_ residual] = piecewise_model(AmdB, Wo);
+    if quant_en
+      [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, 2);
+    else
+      [AmdB_ residual fvec] = piecewise_model(AmdB, Wo);
+    end
 
     figure(2);
     clf;
@@ -67,21 +72,24 @@ function newamp1_fbf(samname, f=10)
     hold on;
     plot((1:L)*Wo*4000/pi, AmdB,";Am;r+-");
     plot(Am_freqs_kHz*1000, AmdB_, ';model;c');
-    plot(Am_freqs_kHz*1000, residual, ';model;g');
+    plot(fvec*1000, 60*ones(1,4), ';fvec;go');
+    if quant_en
+      plot(fvec_*1000, 60*ones(1,4), ';fvec q;ro');
+    end
 
     hold off;
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-mask_en", f);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en", f);
     fflush(stdout);
     k = kbhit();
 
     if (k == 'm')
-      if mask_en
-        mask_en = 0;
+      if quant_en
+        quant_en = 0;
       else
-        mask_en = 1; 
+        quant_en = 1; 
       end
     endif
     if (k == 'n')

@@ -861,7 +861,7 @@ function [v] = est_voicing_bits(v1, v5)
 endfunction
 
 
-function [AmdB_ residual] = piecewise_model(AmdB, Wo) 
+function [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, vq_m) 
     L = length(AmdB);
     l1000 = floor(L/4);     
     AmdB_ = ones(1,L);
@@ -872,6 +872,7 @@ function [AmdB_ residual] = piecewise_model(AmdB, Wo)
     fmin = 0.150;
     lmin = floor(L*fmin/4);
     [mx mx_ind] = max(AmdB(lmin+1:l1000));
+    amp(1) = mx;
     mx_ind += lmin;
     AmdB_ = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
 
@@ -879,9 +880,10 @@ function [AmdB_ residual] = piecewise_model(AmdB, Wo)
 
     fr1 = mx_ind*Wo*4/pi;
     fmin = 1;
-    lmin = round(L*fmin/4);
+    lmin = round(fmin*L/4);
 
     [mx mx_ind] = max(AmdB(lmin+1:L));
+    amp(2) = mx;
     mx_ind += lmin;
     AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
     fr2 = mx_ind*Wo*4/pi;
@@ -889,7 +891,7 @@ function [AmdB_ residual] = piecewise_model(AmdB, Wo)
     % fit a third resonator, must be +/- 300 Hz after 2nd resonator
 
     residual = AmdB;
-    residual(1:lmin) = 0;
+    residual(1:lmin) = -40;
 
     fr2 = mx_ind*Wo*4/pi;
     fmin = fr2 - 0.300;
@@ -897,14 +899,41 @@ function [AmdB_ residual] = piecewise_model(AmdB, Wo)
     
     lmin = max(1, round(L*fmin/4));
     lmax = min(L, round(L*fmax/4));
-    residual(lmin:lmax) = 0;
+    residual(lmin:lmax) = -40;
 
     [mx mx_ind] = max(residual);
+    amp(3) = mx;
     AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
     fr3 = mx_ind*Wo*4/pi;
    
+    % 4th resonator 
+
+    fmin = fr3 - 0.300;
+    fmax = fr3 + 0.300;
+    
+    lmin = max(1, round(L*fmin/4));
+    lmax = min(L, round(L*fmax/4));
+    residual(lmin:lmax) = 0;
+    [mx mx_ind] = max(residual);
+    amp(4) = mx;
+    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
+    fr4 = mx_ind*Wo*4/pi;
+
     %figure(3);
     %plot(mask_sample_freqs_kHz, residual);
 
-    printf("\nfr1: %f fr2: %f fr3: %f\n", fr1, fr2, fr3);
+    %printf("\nfr1: %f fr2: %f fr3: %f fr4: %f\n", fr1, fr2, fr3, fr4);
+    [fvec fvec_ind] = sort([fr1 fr2 fr3 fr4]);
+
+    % optional VQ of freqeuncies
+ 
+    if nargin == 4
+      AmdB_ = ones(1,L);
+      [mes fvec_ ind] = mbest(vq, fvec, vq_m);
+      for i=1:4
+        an_amp = amp(fvec_ind(i));
+        AmdB_ = max(AmdB_, parabolic_resonator(fvec_(i), mask_sample_freqs_kHz) + an_amp);      
+      end
+    end
+
 endfunction
