@@ -17,7 +17,7 @@
 
 % process a whole file and write results
 
-function fvec_log = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function [fvec_log amps_log] = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
@@ -38,7 +38,7 @@ function fvec_log = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out
 
   % encoder loop ------------------------------------------------------
 
-  fvec_log = [];
+  fvec_log = []; amps_log = [];
 
   for f=1:frames
     printf("%d ", f);   
@@ -57,8 +57,9 @@ function fvec_log = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out
     AmdB_(mx_ind) += 6;
     #}
 
-    [AmdB_ res fvec] = piecewise_model(AmdB, Wo, vq, 2);
+    [AmdB_ res fvec fvec_ amps] = piecewise_model(AmdB, Wo, vq, 1);
     fvec_log = [fvec_log; fvec];
+    amps_log = [amps_log; amps];
     #{
     l1000 = floor(L/4);     
     AmdB_ = AmdB;

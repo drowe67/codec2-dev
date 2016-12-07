@@ -861,7 +861,7 @@ function [v] = est_voicing_bits(v1, v5)
 endfunction
 
 
-function [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, vq_m) 
+function [AmdB_ residual fvec fvec_ amps] = piecewise_model(AmdB, Wo, vq, vq_m) 
     L = length(AmdB);
     l1000 = floor(L/4);     
     AmdB_ = ones(1,L);
@@ -875,10 +875,10 @@ function [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, vq_m)
     amp(1) = mx;
     mx_ind += lmin;
     AmdB_ = parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx;  
+    fr1 = mx_ind*Wo*4/pi;
 
     % fit a 2nd resonator, must be above 1000Hz
 
-    fr1 = mx_ind*Wo*4/pi;
     fmin = 1;
     lmin = round(fmin*L/4);
 
@@ -890,20 +890,31 @@ function [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, vq_m)
 
     % fit a third resonator, must be +/- 300 Hz after 2nd resonator
 
-    residual = AmdB;
-    residual(1:lmin) = -40;
+    residual = AmdB - AmdB_;
+    keep_out = [1:lmin];
+    lmax = round(L*3500/4000);
+    keep_out = [1:lmin lmax:L];
+    residual(keep_out) = -40;
 
     fr2 = mx_ind*Wo*4/pi;
     fmin = fr2 - 0.300;
-    fmax = fr2 + 0.300;
-    
+    fmax = fr2 + 0.300;   
     lmin = max(1, round(L*fmin/4));
     lmax = min(L, round(L*fmax/4));
-    residual(lmin:lmax) = -40;
+    keep_out = [keep_out lmin:lmax];
+
+    residual = AmdB;
+    residual(keep_out) = -40;
+
+    if 0
+    figure(3); clf;
+    subplot(211)
+    plot(mask_sample_freqs_kHz, residual);
+    end
 
     [mx mx_ind] = max(residual);
-    amp(3) = mx;
-    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
+    amp(3) = AmdB(mx_ind);
+    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + amp(3));  
     fr3 = mx_ind*Wo*4/pi;
    
     % 4th resonator 
@@ -913,27 +924,93 @@ function [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, vq_m)
     
     lmin = max(1, round(L*fmin/4));
     lmax = min(L, round(L*fmax/4));
-    residual(lmin:lmax) = 0;
+    keep_out = [keep_out lmin:lmax];
+
+    residual = AmdB - AmdB_;
+    residual(keep_out) = -40;
+
     [mx mx_ind] = max(residual);
-    amp(4) = mx;
-    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + mx);  
+    amp(4) = AmdB(mx_ind);
+    AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + amp(4));  
     fr4 = mx_ind*Wo*4/pi;
 
-    %figure(3);
-    %plot(mask_sample_freqs_kHz, residual);
+    if 0
+    subplot(212)
+    plot(mask_sample_freqs_kHz, residual);
+    end
 
     %printf("\nfr1: %f fr2: %f fr3: %f fr4: %f\n", fr1, fr2, fr3, fr4);
     [fvec fvec_ind] = sort([fr1 fr2 fr3 fr4]);
+    amps = amp(fvec_ind(1:4));
 
-    % optional VQ of freqeuncies
+    fvec_ = zeros(1, 4);
+
+    #{
+    % optional VQ of frequencies
  
     if nargin == 4
       AmdB_ = ones(1,L);
       [mes fvec_ ind] = mbest(vq, fvec, vq_m);
       for i=1:4
         an_amp = amp(fvec_ind(i));
-        AmdB_ = max(AmdB_, parabolic_resonator(fvec_(i), mask_sample_freqs_kHz) + an_amp);      
+        AmdB_ = max(AmdB_, parabolic_resonator(fvec_(i), mask_sample_freqs_kHz) + an_amp);
+      end
+    end
+    #}
+
+    % optional VQ of amplitudes
+ 
+    if nargin == 4
+      AmdB_ = ones(1,L);
+      %amps_(1) = amps(1);
+      %[mes tmp ind] = mbest(vq,  amps(2:4) -  amps_(1), vq_m);
+      %amps_(2:4) = amps_(1) + tmp;
+      [mes amps_ ind] = mbest(vq,  amps, vq_m);
+      amps-amps_
+      for i=1:4
+        AmdB_ = max(AmdB_, parabolic_resonator(fvec(i), mask_sample_freqs_kHz) + amps_(i));
       end
     end
 
+    %amps = amps(2:4) - amps(1);
 endfunction
+
+
+% find best place for resonator by closed loop min MSE search
+
+function lmin = abys(AmdB_, AmdB, Wo, L, mask_sample_freqs_kHz)
+  lstart = round(L/4);
+  lmin = lstart;
+  emin = 1E6;
+
+  printf("lstart: %d L: %d\n", lstart, L);
+
+  figure(3);
+  subplot(211)
+  plot(mask_sample_freqs_kHz*1000, AmdB,'r+-');
+  
+  e = zeros(1,L);
+  for l=lstart:L
+
+    % calc mse
+
+    f_l = l*Wo*4/pi;
+    AmdB_l = max(AmdB_, parabolic_resonator(f_l, mask_sample_freqs_kHz) + AmdB(l));
+    hold on;
+    if l == 23
+      plot(mask_sample_freqs_kHz*1000, AmdB_l,'c');
+    end
+    hold off;
+    e(l) = sum((AmdB_l - AmdB) .^ 2);
+    %printf("l: %5d f_l: %4.3f e: %4.0f emin: %4.0f lmin: %5d\n", l, f_l, emin, lmin);
+    printf("l: %5d f_l: %4.3f e: %4.0f emin: %4.0f lmin: %5d\n", l, f_l, e(l), emin, lmin);
+    if e(l) < emin
+       emin = e(l);
+       lmin = l;
+    end
+  end
+
+  subplot(212)
+  plot(mask_sample_freqs_kHz*1000, e)
+endfunction
+
