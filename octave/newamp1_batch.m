@@ -25,29 +25,63 @@
     [ ] refactor
 #}
 
+% In general, this function processes a bunch of amplitudes, we then
+% use c2sim to hear the results
+
 function [fvec_log amps_log] = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
   newamp;
   more off;
 
   max_amp = 80;
-  decimate = 4;
-  load vq;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
 
+  model_ = experiment_filter(model);
+
+  if nargin == 2
+    Am_out_name = optional_Am_out_name;
+  else
+    Am_out_name = sprintf("%s_am.out", samname);
+  end
+
+  fam  = fopen(Am_out_name,"wb"); 
+
+  Wo_out_name = sprintf("%s_Wo.out", samname);
+  fWo  = fopen(Wo_out_name,"wb"); 
+  
+  for f=1:frames
+    printf("%d ", f);   
+    Wo = model_(f,1);
+    L = min([model_(f,2) max_amp-1]);
+    Am = model_(f,3:(L+2));
+
+    Am_ = zeros(1,max_amp);
+    Am_(2:L) = Am(1:L-1);
+    fwrite(fam, Am_, "float32");
+    fwrite(fWo, Wo, "float32");
+  end
+ 
+  fclose(fam);
+  fclose(fWo);
+  printf("\n")
+
+endfunction
+ 
+ 
+#{ 
+  Filtering time axis or surface, as a first step before decimation.
+  So given surface, lets look at spectral content and see if we can
+  reduce it while maintaining speech quality.  First step is to dft
+  across time and plot.
+#}
+
+function model_ =  experiment_filter(model)
+  [frames nc] = size(model);
   K = 40;
   [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, K);
-
-  #{
-  So given surface, lets look at spectral content and see if we can reduce it while maintaining
-  speech quality.  First step is to dft across time and plot.
-  #}
   
-  %Nf=20; Nf2 = floor(Nf/2)+1;
-  %b = fir1(Nf,0.25)
-  %b = zeros(1, Nf2);
   Nf = 4; Nf2 = 5;
   [b a]= cheby1(4, 1, 0.20);
   dft_surface = zeros(frames,K);
@@ -88,31 +122,13 @@ function [fvec_log amps_log] = newamp1_batch(samname, optional_Am_out_name, opti
   % back down to rate L
 
   model_ = resample_rate_L(model, rate_K_surface_filt, rate_K_sample_freqs_kHz);
+endfunction
 
-  if nargin == 2
-    Am_out_name = optional_Am_out_name;
-  else
-    Am_out_name = sprintf("%s_am.out", samname);
-  end
 
-  fam  = fopen(Am_out_name,"wb"); 
-
-  Wo_out_name = sprintf("%s_Wo.out", samname);
-  fWo  = fopen(Wo_out_name,"wb"); 
-  
-  for f=1:frames
-    printf("%d ", f);   
-    Wo = model_(f,1);
-    L = min([model_(f,2) max_amp-1]);
-    Am = model_(f,3:(L+2));
-
-    Am_ = zeros(1,max_amp);
-    Am_(2:L) = Am(1:L-1);
-    fwrite(fam, Am_, "float32");
-    fwrite(fWo, Wo, "float32");
-  end
- 
 #{
+todo: get this working again
+
+function model_ = experiment_piecewise(model)
   % encoder loop ------------------------------------------------------
 
   fvec_log = []; amps_log = [];
@@ -152,25 +168,15 @@ function [fvec_log amps_log] = newamp1_batch(samname, optional_Am_out_name, opti
     fwrite(fam, Am_, "float32");
     fwrite(fWo, Wo, "float32");
   end
-#}
-
-  fclose(fam);
-  fclose(fWo);
-  printf("\n")
-
 endfunction
-  
 
-#{
-  [X] resample A(mWo,t) to fixed rate, creating a surface
-  [X] resample surface at half frame increments
-      + this will test resampling in freq is OK
-  [X] listen to a few files and determine if any distortion
-  [X] experiment with filtering in time
-  [ ] decimate to 25Hz
-  [ ] resample to 100Hz
-  [ ] listen to a few files and compare to just filtering at 12Hz
 #}
+
+
+
+% Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
+% as a 3D surface with tim, freq, nd ampitude axis.
+
 
 function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, K=50)
 
@@ -192,6 +198,8 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
   end
 endfunction
 
+
+% Take a rate K surface and convert back to time varying rate L
 
 function model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, K=50)
   max_amp = 80;
