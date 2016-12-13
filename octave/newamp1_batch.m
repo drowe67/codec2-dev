@@ -41,10 +41,12 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   % Choose experiment to run test here -----------------------
 
-  %model_ = experiment_dec_linear(model);
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
-  [model_ surface] = experiment_mel_freq(model, 1);
+  [model_ surface] = experiment_mel_freq(model, 0);
+  %[model_ surface] = experiment_mel_diff_freq(model, 0);
+  %model_ = experiment_dec_linear(model_);
+  %[model_ rate_K_surface] = experiment_closed_loop_mean(model);
 
   % ----------------------------------------------------
 
@@ -95,16 +97,23 @@ function mel = ftomel(fHz)
   mel = floor(2595*log10(1+fHz/700)+0.5);
 endfunction
 
-function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
   [frames nc] = size(model);
-  K = 15; 
-  mel_start = ftomel(300); mel_end = ftomel(3000); 
+  mel_start = ftomel(200); mel_end = ftomel(3700); 
   step = (mel_end-mel_start)/(K-1);
   mel = mel_start:step:mel_end;
   rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
   rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
 
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
+endfunction
+
+
+function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
+  [frames nc] = size(model);
+  K = 20; 
+  [rate_K_surface  rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
   
   figure(1); clf; mesh(rate_K_surface);
 
@@ -114,10 +123,13 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
    
     for f=1:frames
       mean_f(f) = mean(rate_K_surface(f,:));
-      rate_K_surface(f,:) -= mean_f(f);
+      rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
     end
     
-    [res rate_K_surface_ ind] = mbest(surface_vq, rate_K_surface, m);
+    [res rate_K_surface_ ind] = mbest(surface_vq, rate_K_surface_no_mean, m);
+
+    % pf, needs some energy equalisation, does gd things for hts1a
+    rate_K_surface_ *= 1.2;
 
     for f=1:frames
       rate_K_surface_(f,:) += mean_f(f);
@@ -143,9 +155,82 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
   for f=1:frames
     rate_K_surface(f,:) -= mean(rate_K_surface(f,:));
   end
+endfunction
+
+
+% mel spaced sampling, differential in time VQ.  Curiously, couldn't
+% get very good results out of this, I suspect a bug
+
+function [model_ rate_K_surface_diff] = experiment_mel_diff_freq(model, vq_en=0)
+  [frames nc] = size(model);
+  K = 20; 
+  [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
   
+  if vq_en
+    melvq;
+    load surface_diff_vq; m=5;
+  end
+
+  for f=1:frames
+    mean_f(f,:) = mean(rate_K_surface(f,:));
+    rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f,:);
+  end
+
+  rate_K_surface_no_mean_ = zeros(frames, K);
+  rate_K_surface_no_mean_diff = zeros(frames, K);
+  rate_K_surface_(1,:) = rate_K_surface_diff(1,:) = zeros(1, K);
+
+  for f=2:frames
+    rate_K_surface_diff(f,:) = rate_K_surface_no_mean(f,:) - 0.8*rate_K_surface_no_mean_(f-1,:);
+    if vq_en
+      [res arate_K_surface_diff_ ind] = mbest(surface_diff_vq, rate_K_surface_diff(f,:), m);
+      rate_K_surface_diff_(f,:) = arate_K_surface_diff_;
+    else
+      rate_K_surface_diff_(f,:) = rate_K_surface_diff(f,:);
+    end
+    rate_K_surface_no_mean_(f,:) = 0.8*rate_K_surface_no_mean_(f-1,:) + rate_K_surface_diff_(f,:);
+  end
+  
+  for f=1:frames
+    rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + mean_f(f,:);
+  end
+
+  model_ = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz);
 
 endfunction
+
+
+% try vq with open and closed loop mean removal, turns out they give
+% identical results lol
+
+function [model_ rate_K_surface] = experiment_closed_loop_mean(model)
+  [frames nc] = size(model);
+  K = 15; 
+  mel_start = ftomel(300); mel_end = ftomel(3000); 
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start:step:mel_end;
+  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
+  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
+  
+  load surface_vq; m=1;
+   
+  for f=1:frames
+    amean = mean(rate_K_surface(f,:));
+    rate_K_target_no_mean = rate_K_surface(f,:) - amean;
+    mse_open_loop(f) = search_vq2(surface_vq(:,:,1), rate_K_target_no_mean, m, 0);
+    mse_closed_loop(f) = search_vq2(surface_vq(:,:,1), rate_K_surface(f,:), m, 1);
+  end
+
+  printf("rms open loop..: %f\nrms closed loop: %f\n", sqrt(mean(mse_open_loop)), sqrt(mean(mse_closed_loop)));
+
+  % just return model_ as we have to so nothing breaks, it's not actually useful
+
+  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz);
+    
+endfunction
+
 
 % conventional decimation in time without any filtering, then linear
 % interpolation.  Linear interpolation is a two-tap (weak) form of fir
@@ -441,4 +526,35 @@ function model_ = resample_half_frame_offset(model, rate_K_surface, rate_K_sampl
 
     model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
    end
+endfunction
+
+
+% vq search with optional closed loop mean estimation, turns out this gives
+% identical results to extracting the mean externally
+
+function [mse_list index_list] = search_vq2(vq, target, m, closed_loop_dc = 0)
+
+  [Nvec order] = size(vq);
+
+  mse = zeros(1, Nvec);
+
+  % find mse for each vector
+
+  for i=1:Nvec
+     if closed_loop_dc
+       sum(target - vq(i,:))
+       g = sum(target - vq(i,:))/order;
+       mse(i) = sum((target - vq(i,:) - g) .^2);
+     else
+       mse(i) = sum((target - vq(i,:)) .^2);
+    end
+  end
+
+  % sort and keep top m matches
+
+  [mse_list index_list ] = sort(mse);
+
+  mse_list = mse_list(1:m);
+  index_list = index_list(1:m);
+
 endfunction
