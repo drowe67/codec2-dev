@@ -19,9 +19,10 @@
 function newamp1_fbf(samname, f=10)
   newamp;
   more off;
-  quant_en = 0;
+  quant_en = 0; pf_en = 0;
+  melvq;
 
-  load vq;
+  K=20; load train_120_vq; m=5; 
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -40,7 +41,6 @@ function newamp1_fbf(samname, f=10)
     figure(1);
     clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    size(s);
     plot(s);
     axis([1 length(s) -20000 20000]);
     title('Time Domain Speech');
@@ -51,45 +51,68 @@ function newamp1_fbf(samname, f=10)
     AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
-    #{   
-    [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    AmdB_ = maskdB;
-    [mx mx_ind] = max(AmdB_);
-    AmdB_(mx_ind) += 6;
-    #}
+    % plots for mel sampling
 
-    if quant_en
-      [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, 2);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
+
+    mean_f = mean(rate_K_vec);
+    rate_K_vec_no_mean = rate_K_vec - mean_f;
+    
+    if quant_en == 2
+      [res rate_K_vec_no_mean_ ind] = mbest(train_120_vq, rate_K_vec_no_mean, m);
     else
-      [AmdB_ residual fvec] = piecewise_model(AmdB, Wo);
+      rate_K_vec_no_mean_ = rate_K_vec_no_mean;
     end
+
+    if pf_en
+      % pf, needs some energy equalisation, does gd things for hts1a
+      rate_K_surface_ *= 1.2;
+    end
+
+    rate_K_vec_ = rate_K_vec_no_mean_ + mean_f;
+    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz);
+
+    % plots ----------------------------------
 
     figure(2);
     clf;
-    title('Frequency Domain');
+    title('Frequency Domain 1');
 
     axis([1 4000 -20 80]);
     hold on;
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;r+-");
-    plot(Am_freqs_kHz*1000, AmdB_, ';model;c');
-    plot(fvec*1000, 60*ones(1,4), ';fvec;go');
-    if quant_en
-      plot(fvec_*1000, 60*ones(1,4), ';fvec q;ro');
+    plot((1:L)*Wo*4000/pi, AmdB,";Am;b+-");
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ';rate K mel;g+-');
+    if quant_en >= 1
+      plot((1:L)*Wo*4000/pi, AmdB_,";Am quant;k+-");
+    end
+    if quant_en == 2
+      plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_, ';rate K mel quant;r+-');   
     end
 
     hold off;
 
+    figure(3);
+    clf;
+    title('Frequency Domain 2');
+    axis([1 4000 -80 80]);
+    hold on;
+    plot((1:L)*Wo*4000/pi, AmdB,";Am;b+-");
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_no_mean, ';rate K mel no mean;g+-');
+    if quant_en == 2
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_no_mean_, ';rate K mel no mean quant;r+-');
+    end
+    hold off;
+
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en", f);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en[%d]", f, quant_en);
     fflush(stdout);
     k = kbhit();
 
     if (k == 'm')
-      if quant_en
+      quant_en++;
+      if quant_en > 2
         quant_en = 0;
-      else
-        quant_en = 1; 
       end
     endif
     if (k == 'n')
@@ -104,3 +127,17 @@ function newamp1_fbf(samname, f=10)
 endfunction
 
  
+#{ Piecewise model stuff, organise later if rqd
+    [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
+    AmdB_ = maskdB;
+    [mx mx_ind] = max(AmdB_);
+    AmdB_(mx_ind) += 6;
+   
+
+    if quant_en
+      [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, 1);
+    else
+      [AmdB_ residual fvec] = piecewise_model(AmdB, Wo);
+    end
+    fvec
+#}

@@ -43,9 +43,18 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
-  [model_ surface] = experiment_mel_freq(model, 0);
+
+  [model_ surface] = experiment_mel_freq(model, 1);
+
+  % extract energy
+
+  % interpolate
+
+  model_ = experiment_dec_linear(model_);
+
+  % add energy back in
+
   %[model_ surface] = experiment_mel_diff_freq(model, 0);
-  %model_ = experiment_dec_linear(model_);
   %[model_ rate_K_surface] = experiment_closed_loop_mean(model);
 
   % ----------------------------------------------------
@@ -70,8 +79,9 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
     Am_ = zeros(1,max_amp);
     Am_(2:L) = Am(1:L-1);
 
-    % post filter, boosts higher amplitudes more than lower, improving
-    % shape of formants and reducing muffling.  Note energy normalisation
+    % optional post filter on linear {Am}, boosts higher amplitudes more than lower,
+    % improving shape of formants and reducing muffling.  Note energy
+    % normalisation
 
     if postfilter
       e1 = sum(Am_(2:L).^2);
@@ -90,43 +100,28 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
 endfunction
  
-% Non linear sampling of frequency axis, reducing the "rate" is a
-% first step before VQ
 
-function mel = ftomel(fHz)
-  mel = floor(2595*log10(1+fHz/700)+0.5);
-endfunction
+% experiment to resample freq axis on mel scale, then optionally vq
 
-
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
-  [frames nc] = size(model);
-  mel_start = ftomel(200); mel_end = ftomel(3700); 
-  step = (mel_end-mel_start)/(K-1);
-  mel = mel_start:step:mel_end;
-  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
-  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
-
-  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
-endfunction
-
-
-function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
+function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
   [frames nc] = size(model);
   K = 20; 
-  [rate_K_surface  rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
+  [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
   
-  figure(1); clf; mesh(rate_K_surface);
+  if plots
+    figure(1); clf; mesh(rate_K_surface);
+  end
+
+  for f=1:frames
+    mean_f(f) = mean(rate_K_surface(f,:));
+    rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
+  end
 
   if vq_en
     melvq;
-    load surface_vq; m=5;
-   
-    for f=1:frames
-      mean_f(f) = mean(rate_K_surface(f,:));
-      rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
-    end
-    
-    [res rate_K_surface_ ind] = mbest(surface_vq, rate_K_surface_no_mean, m);
+    load train_120_vq; m=5;
+       
+    [res rate_K_surface_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
 
     % pf, needs some energy equalisation, does gd things for hts1a
     rate_K_surface_ *= 1.2;
@@ -149,9 +144,10 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0)
 
   model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz);
 
-  %figure(2); clf; mesh(model_);
+  if plots
+    figure(2); clf; mesh(rate_K_surface_no_mean);
+  end
 
-  
   for f=1:frames
     rate_K_surface(f,:) -= mean(rate_K_surface(f,:));
   end
@@ -430,70 +426,6 @@ endfunction
 
 
 
-% Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
-% as a 3D surface with time, freq, and ampitude axis.
-
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, K=50)
-
-  % convert rate L=pi/Wo amplitude samples to fixed rate K
-
-  max_amp = 80;
-  [frames col] = size(model);
-  rate_K_sample_freqs_kHz = (1:K)*4/K;
-  rate_K_surface = zeros(frames, K);
-
-  for f=1:frames
-    Wo = model(f,1);
-    L = min([model(f,2) max_amp-1]);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
-    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-  end
-endfunction
-
-
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
-
-  % convert rate L=pi/Wo amplitude samples to fixed rate K
-
-  max_amp = 80;
-  [frames col] = size(model);
-  K = length(rate_K_sample_freqs_kHz);
-  rate_K_surface = zeros(frames, K);
-
-  for f=1:frames
-    Wo = model(f,1);
-    L = min([model(f,2) max_amp-1]);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
-    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", 0);
-  end
-endfunction
-
-
-% Take a rate K surface and convert back to time varying rate L
-
-function model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
-  max_amp = 80;
-  [frames col] = size(model);
-
-  model_ = zeros(frames, max_amp+3);
-  for f=1:frames-1
-    Wo = model(f,1);
-    L = min(pi/Wo, max_amp-1);
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
-    % back down to rate L
-
-    AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
-
-    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
-   end
-endfunction
 
 
 % early test, devised to test rate K<->L changes along frequency axis
