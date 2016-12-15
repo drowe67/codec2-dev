@@ -40,6 +40,9 @@
 
 #define STD_PROC_BITS 96
 
+/* Define this to enable EbNodB estimate */
+/* This needs square roots, may take more cpu time than it's worth */
+#define EST_EBNO
 
 /*
  * Create a new fmfsk modem instance.
@@ -70,6 +73,7 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
     /* Set up demod state */
     fmfsk->lodd = 0;
     fmfsk->nin = fmfsk->N;
+    fmfsk->snr_mean = 0;
     
     float *oldsamps = malloc(sizeof(float)*fmfsk->nmem);
     if(oldsamps == NULL){
@@ -165,6 +169,9 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     int neyeoffset;
     float eye_max;
     uint8_t mbit;
+    #ifdef EST_EBNO
+    float amp_even = 0, amp_odd = 0, amp_bit, amp_noise;
+    #endif
     
     /* Shift in nin samples */
     memcpy(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
@@ -261,20 +268,38 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
             apeven += mdiff;
             /* Even stream goes in LSB */
             rx_bits[i>>1] |= mbit ? 0x1 : 0x0;
+            #ifdef EST_EBNO
+            amp_even += currv * currv;
+            #endif
         }else{
             apodd += mdiff;
             /* Odd in second-to-LSB */
             rx_bits[i>>1]  = mbit ? 0x2 : 0x0;
+            #ifdef EST_EBNO
+            amp_odd += currv * currv;
+            #endif
         }
     }
+    #ifdef EST_EBNO
+    amp_even = sqrt(amp_even);
+    amp_odd = sqrt(amp_odd);
+    #endif
     if(apeven>apodd){
         /* Zero out odd bits from output bitstream */
         for(i=0;i<nbit;i++)
             rx_bits[i] &= 0x1;
+        #ifdef EST_EBNO
+        amp_bit = amp_even;
+        amp_noise = amp_odd;
+        #endif
     }else{
         /* Shift odd bits into LSB and even bits out of existence */
         for(i=0;i<nbit;i++)
             rx_bits[i] = (rx_bits[i]&0x2)>>1;
+        #ifdef EST_EBNO
+        amp_bit = amp_odd;
+        amp_noise = amp_even;
+        #endif
     }
     
     /* Save last sample of int stream for next demod round */
@@ -291,7 +316,15 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         
         /* Zero out all of the other things */
         fmfsk->stats->foff = 0;
+
+        #ifdef EST_EBNO
+        amp_bit = fabsf(amp_bit - amp_noise);
+        fmfsk->snr_mean *= .9;
+        fmfsk->snr_mean += (amp_bit+1e-6)/(amp_noise+1e-6);
+        fmfsk->stats->snr_est = 20+20*log10f(fmfsk->snr_mean); 
+        #else
         fmfsk->stats->snr_est = 0;
+        #endif
         
         /* Collect an eye diagram */
         /* Take a sample for the eye diagrams */

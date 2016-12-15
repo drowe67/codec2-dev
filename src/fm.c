@@ -213,7 +213,7 @@ void fm_demod(struct FM *fm_states, float rx_out[], float rx[])
 
 \*---------------------------------------------------------------------------*/
 
-void fm_mod(struct FM *fm_states, float tx_in[], float tx_out[]){
+void fm_mod(struct FM *fm_states, float tx_in[], float tx_out[]) {
   float  Fs = fm_states->Fs;    //Sampling freq
   float  fc = fm_states->fc;    //Center freq
   float  wc = 2*M_PI*fc/Fs;     //Center freq in rads/samp
@@ -236,7 +236,6 @@ void fm_mod(struct FM *fm_states, float tx_in[], float tx_out[]){
       // rate.
       if(tx_phase > 2*M_PI)
           tx_phase -= 2*M_PI;
-
       tx_out[i] = cosf(tx_phase);
   }
   //Save phase back into state struct
@@ -273,7 +272,7 @@ void fm_mod_comp(struct FM *fm_states, float tx_in[], COMP tx_out[]){
   for(i=0; i<nsam; i++){
       w = wc + wd*tx_in[i];   //Calculate phase of VFO
       tx_phase += w;          //Spin TX oscillator
-
+      
       //TODO: Add pre-emphasis and pre-emph AGC for voice
 
       //Make sure tx_phase stays from 0 to 2PI.

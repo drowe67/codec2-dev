@@ -867,17 +867,17 @@ int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
     int n_ascii;
     char ascii_out;
 
-    /* DR: 21/11/16 - temp code while porting fsk_demod to complex */
-
-    int n = fsk_nin(f->fsk);
-    COMP demod_comp[n];
-    for(i=0; i<n; i++) {
-        demod_comp[i].real = demod_in[i];
-        demod_comp[i].imag = 0.0;;        
-    }
 
     if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){
-        fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_comp);
+        /* DR: 21/11/16 - temp code while porting fsk_demod to complex */
+        int n = fsk_nin(f->fsk);
+        COMP demod_comp[n];
+        for(i=0; i<n; i++) {
+            demod_comp[i].real = demod_in[i];
+            demod_comp[i].imag = 0.0;;        
+        }
+        
+	fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_comp);
         f->nin = fsk_nin(f->fsk);
     }else{            
         fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
