@@ -263,7 +263,7 @@ function maskdB = resonator_fast(freq_tone_kHz, mask_sample_freqs_kHz)
 endfunction
 
 
-% Alternative mask function that uses parabolas for fast computetion.
+% Alternative mask function that uses parabolas for fast computation
 
 function maskdB = parabolic_resonator(freq_tone_kHz, mask_sample_freqs_kHz)
 
@@ -323,7 +323,7 @@ endfunction
 
 % decimate frame rate of mask, use linear interpolation in the log domain 
 
-function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_freqs_kHz)
+function maskdB_ = decimate_frame_rate(model, decimate, f, frames)
     max_amp = 80;
 
     Wo = model(f,1);
@@ -342,7 +342,7 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     left_fraction  = 1 - mod((f-1),decimate)/decimate;
     right_fraction = 1 - left_fraction;
 
-    printf("f: %d left_f: %d right_f: %d left_fraction: %f right_fraction: %f \n", f, left_f, right_f, left_fraction, right_fraction)
+    printf("f: %d left_f: %d right_f: %d left_fraction: %3.2f right_fraction: %3.2f \n", f, left_f, right_f, left_fraction, right_fraction)
 
     % fit splines to left and right masks
 
@@ -359,8 +359,8 @@ function maskdB_ = decimate_frame_rate(model, decimate, f, frames, mask_sample_f
     % determine mask for left and right frames, sampling at Wo for this frame
 
     sample_freqs_kHz = (1:L)*Wo*4/pi;
-    maskdB_left = interp1(left_sample_freqs_kHz, left_AmdB, sample_freqs_kHz);
-    maskdB_right = interp1(right_sample_freqs_kHz, right_AmdB, sample_freqs_kHz);
+    maskdB_left = interp1(left_sample_freqs_kHz, left_AmdB, sample_freqs_kHz, "extrap");
+    maskdB_right = interp1(right_sample_freqs_kHz, right_AmdB, sample_freqs_kHz, "extrap");
 
     maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
 endfunction
@@ -916,7 +916,7 @@ function [AmdB_ residual fvec fvec_ amps] = piecewise_model(AmdB, Wo, vq, vq_m)
     amp(3) = AmdB(mx_ind);
     AmdB_ = max(AmdB_, parabolic_resonator(mx_ind*Wo*4/pi, mask_sample_freqs_kHz) + amp(3));  
     fr3 = mx_ind*Wo*4/pi;
-   
+
     % 4th resonator 
 
     fmin = fr3 - 0.300;
@@ -1014,3 +1014,79 @@ function lmin = abys(AmdB_, AmdB, Wo, L, mask_sample_freqs_kHz)
   plot(mask_sample_freqs_kHz*1000, e)
 endfunction
 
+
+% Non linear sampling of frequency axis, reducing the "rate" is a
+% first step before VQ
+
+function mel = ftomel(fHz)
+  mel = floor(2595*log10(1+fHz/700)+0.5);
+endfunction
+
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
+  [frames nc] = size(model);
+  mel_start = ftomel(200); mel_end = ftomel(3700); 
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start:step:mel_end;
+  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
+  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
+endfunction
+
+
+% Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
+% as a 3D surface with time, freq, and ampitude axis.
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
+
+  % convert rate L=pi/Wo amplitude samples to fixed rate K
+
+  max_amp = 80;
+  [frames col] = size(model);
+  K = length(rate_K_sample_freqs_kHz);
+  rate_K_surface = zeros(frames, K);
+
+
+  for f=1:frames
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp-1]);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));    
+    %AmdB += pre;
+
+    % clip between peak and peak -50dB, to reduce dynamic range
+
+    AmdB_peak = max(AmdB);
+    AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
+
+    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    
+    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+    
+    %printf("\r%d/%d", f, frames);
+  end
+  %printf("\n");
+endfunction
+
+
+% Take a rate K surface and convert back to time varying rate L
+
+function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
+  max_amp = 80;
+  [frames col] = size(model);
+
+  model_ = zeros(frames, max_amp+3);
+  for f=1:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    
+    % back down to rate L
+
+    AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
+
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+   end
+endfunction
