@@ -1098,25 +1098,34 @@ endfunction
 % prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
 % (dB) seems to work OK.
 
-function vec = post_filter(vec, pf_gain = 1.5, voicing)
-    % rate K vector describing spectrum of current frame
+function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
+    % vec is rate K vector describing spectrum of current frame
+    % lets pre-emp before applying PF. 20dB/dec over 300Hz
+    
+    pre = 20*log10(sample_freq_kHz/0.3);
+    vec += pre;
 
     levels_before_linear = 10 .^ (vec/20);
     e_before = sum(levels_before_linear .^2);
 
     % if voicing flag supplied use it apply PF just for voiced frames
 
-    if nargin == 3
+   #{ 
+   if nargin == 3
       if voicing
         vec *= pf_gain;
       end
     else
       vec *= pf_gain;
     end
-
+    #}
+       vec *= pf_gain;
+   
     levels_after_linear = 10 .^ (vec/20);
     e_after = sum(levels_after_linear .^2);
     gain = e_after/e_before;
     gaindB = 10*log10(gain);
     vec -= gaindB;
+
+    vec -= pre;
 endfunction

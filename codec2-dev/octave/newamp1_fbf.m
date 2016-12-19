@@ -81,7 +81,7 @@ function newamp1_fbf(samname, f=10)
     end
 
     if pf_en
-      rate_K_vec_no_mean_ = post_filter(rate_K_vec_no_mean_, pf_gain = 1.5, voicing(f));
+      rate_K_vec_no_mean_ = post_filter(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, pf_gain = 1.5, voicing(f));
     end
 
     rate_K_vec_ = rate_K_vec_no_mean_ + mean_f;

@@ -53,7 +53,7 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
 
-  %[model_ surface] = experiment_mel_freq(model, 1, 0);
+  %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
   model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
   
   %model_ = experiment_dec_linear(model_);
@@ -129,7 +129,7 @@ endfunction
 
 % experiment to resample freq axis on mel scale, then optionally vq
 
-function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
+function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
   K = 20; 
   [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
@@ -150,8 +150,9 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
        
     [res rate_K_surface_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
 
-    % pf, needs some energy equalisation, does gd things for hts1a/hts2a
-    rate_K_surface_ *= 1.2;
+    for f=1:frames
+        rate_K_surface_(f,:) = post_filter(rate_K_surface_(f,:), 1.5, voicing(f));
+    end
 
     for f=1:frames
       rate_K_surface_(f,:) += mean_f(f);
@@ -343,7 +344,7 @@ function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0,
 
     if pf_en == 1
       for f=1:frames
-        rate_K_surface_(f,:) = post_filter(rate_K_surface_(f,:), 1.5, voicing(f));
+        rate_K_surface_(f,:) = post_filter(rate_K_surface_(f,:), sample_freqs_kHz, 1.5, voicing(f));
       end
     end
     
@@ -368,16 +369,17 @@ function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0,
     best_mse = 1E32;
     best_m = f+1;
     
-    printf("%d %d\n", f+1, M+f-1);
 
     if fixed_dec
       m = f+M/2;
+      printf("%d %d %d\n", f, m, M+f);
       centre_vec = surface(m,:);
       sample_points = [f m f+M];
       for k=1:K
         best_surface_(resample_points,k)  = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
       end 
     else
+      printf("%d %d\n", f, M+f);
       for m=f+1:M+f-2
 
         % Use interpolation to construct candidate surface_ segment 
@@ -420,6 +422,10 @@ function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0,
   end
 
   model_ = resample_rate_L(model, best_surface_, sample_freqs_kHz);
+  figure(5);
+  plot(mean_f,'+-')
+  figure(6)
+  hist(mean_f)
 endfunction
 
 
