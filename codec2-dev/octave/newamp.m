@@ -1090,3 +1090,33 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
    end
 endfunction
+
+
+% Post Filter, has a big impact on speech quality after VQ.  When used
+% on a mean removed rate K vector, it raises formants, and supresses
+% anti-formants.  As it manipulates amplitudes, we normalise energy to
+% prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
+% (dB) seems to work OK.
+
+function vec = post_filter(vec, pf_gain = 1.5, voicing)
+    % rate K vector describing spectrum of current frame
+
+    levels_before_linear = 10 .^ (vec/20);
+    e_before = sum(levels_before_linear .^2);
+
+    % if voicing flag supplied use it apply PF just for voiced frames
+
+    if nargin == 3
+      if voicing
+        vec *= pf_gain;
+      end
+    else
+      vec *= pf_gain;
+    end
+
+    levels_after_linear = 10 .^ (vec/20);
+    e_after = sum(levels_after_linear .^2);
+    gain = e_after/e_before;
+    gaindB = 10*log10(gain);
+    vec -= gaindB;
+endfunction
