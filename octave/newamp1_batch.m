@@ -34,25 +34,30 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   max_amp = 80;
   postfilter = 0;
+  synth_phase = 1;
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
-  [frames nc] = size(model);
+  [frames nc] = size(model)
+
+  voicing_name = strcat(samname,"_pitche.txt");
+  voicing = zeros(1,frames);
+  
+  if exist(voicing_name, "file") == 2
+    pitche = load(voicing_name);
+    voicing = pitche(:, 3);
+  end
 
   % Choose experiment to run test here -----------------------
 
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
 
-  [model_ surface] = experiment_mel_freq(model, 1);
-
-  % extract energy
-
-  % interpolate
-
-  model_ = experiment_dec_linear(model_);
-
-  % add energy back in
+  %[model_ surface] = experiment_mel_freq(model, 1, 0);
+  model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
+  
+  %model_ = experiment_dec_linear(model_);
+  %model_ = experiment_energy_rate_linear(model, 1, 0);
 
   %[model_ surface] = experiment_mel_diff_freq(model, 0);
   %[model_ rate_K_surface] = experiment_closed_loop_mean(model);
@@ -70,6 +75,11 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   Wo_out_name = sprintf("%s_Wo.out", samname);
   fWo  = fopen(Wo_out_name,"wb"); 
   
+  if synth_phase
+    Aw_out_name = sprintf("%s_aw.out", samname);
+    faw = fopen(Aw_out_name,"wb"); 
+  end
+
   for f=1:frames
     printf("%d ", f);   
     Wo = model_(f,1);
@@ -92,10 +102,26 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
     fwrite(fam, Am_, "float32");
     fwrite(fWo, Wo, "float32");
+
+    if synth_phase
+
+      % synthesis phase spectra from magnitiude spectra using minimum phase techniques
+
+      fft_enc = 512;
+      phase = determine_phase(model_, f);
+      assert(length(phase) == fft_enc);
+      Aw = zeros(1, fft_enc*2); 
+      Aw(1:2:fft_enc*2) = cos(phase);
+      Aw(2:2:fft_enc*2) = -sin(phase);
+      fwrite(faw, Aw, "float32");    
+    end
   end
  
   fclose(fam);
   fclose(fWo);
+  if synth_phase
+    fclose(faw);
+  end
   printf("\n")
 
 endfunction
@@ -110,6 +136,7 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
   
   if plots
     figure(1); clf; mesh(rate_K_surface);
+    figure(2); clf; plot_dft_surface(rate_K_surface)
   end
 
   for f=1:frames
@@ -123,7 +150,7 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
        
     [res rate_K_surface_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
 
-    % pf, needs some energy equalisation, does gd things for hts1a
+    % pf, needs some energy equalisation, does gd things for hts1a/hts2a
     rate_K_surface_ *= 1.2;
 
     for f=1:frames
@@ -131,21 +158,13 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1)
     end
 
     rate_K_surface = rate_K_surface_;
-     
-    #{
-    Nf = 4; Nf2 = 6;
-    [b a]= cheby1(4, 1, 0.20);
-    for k=1:K
-      rate_K_surface_(:,k) = filter(b, a,  rate_K_surface_(:,k));
-    end
-    rate_K_surface_ = [rate_K_surface_(Nf2:frames,:); zeros(Nf2, K)];
-    #}
   end
 
   model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz);
 
   if plots
-    figure(2); clf; mesh(rate_K_surface_no_mean);
+    figure(3); clf; mesh(rate_K_surface_no_mean);
+    figure(4); clf; plot_dft_surface(rate_K_surface)
   end
 
   for f=1:frames
@@ -228,6 +247,49 @@ function [model_ rate_K_surface] = experiment_closed_loop_mean(model)
 endfunction
 
 
+% Experiment with 10ms update rate for energy but 40ms update for spectrum,
+% using linear interpolation for spectrum.
+
+function model_c = experiment_energy_rate_linear(model, vq_en, plot_en)
+  max_amp = 80;
+  [frames nc] = size(model);
+
+  % 10ms mel freq modelling and VQ
+
+  model_ = experiment_mel_freq(model, vq_en, plot_en);
+
+  % Remove energy.  Hmmmm, this is done on Ams rather than surface but that's
+  % similar I guess
+
+  e = zeros(1,frames);
+  model_a = zeros(frames,max_amp+3);
+  for f=1:frames
+    L = min([model_(f,2) max_amp-1]);
+    Am_ = model_(f,3:(L+2));
+    AmdB_ = 20*log10(Am_);
+    mean_f(f) = mean(AmdB_);
+    AmdB_ -= mean_f(f);
+    model_a(f,1) = model_(f,1); model_a(f,2) = L; model_a(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+  end
+
+  % linear interp after removing energy (mean AmdB)
+
+  model_b = experiment_dec_linear(model_a);
+
+  % add back in energy
+
+  model_c = zeros(frames,max_amp+3);
+  for f=1:frames
+    L = min([model_b(f,2) max_amp-1]);
+    Am_ = model_b(f,3:(L+2));
+    AmdB_ = 20*log10(Am_);
+    AmdB_ += mean_f(f);
+    model_c(f,1) = model_b(f,1); model_c(f,2) = L; model_c(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+  end
+
+endfunction
+
+
 % conventional decimation in time without any filtering, then linear
 % interpolation.  Linear interpolation is a two-tap (weak) form of fir
 % filtering that may have problems with signals with high freq
@@ -247,6 +309,119 @@ function model_ = experiment_dec_linear(model)
     model_(f,1) = model(f,1); model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
   end
 endfunction
+
+
+% Experimental AbyS decimator that chooses best frames to match surface
+% based on AbyS approach.  Can apply post filter at different points, 
+% and optionally do fixed decimation, at rate K.
+ 
+function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0, voicing)
+  max_amp = 80;
+  [frames nc] = size(model);
+  model_ = zeros(frames, max_amp+3);
+
+  printf("M: %d vq_en: %d pf_en: %d fixed_dec: %d\n", M, vq_en, pf_en, fixed_dec)
+
+  % create frames x K surface
+
+  K = 20; 
+  [surface sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
+  target_surface = surface;
+
+  % optionaly VQ surface
+
+  if vq_en
+    melvq;
+    load train_120_vq; m=5;
+       
+    for f=1:frames
+      mean_f(f) = mean(surface(f,:));
+      rate_K_surface_no_mean(f,:) = surface(f,:) - mean_f(f);
+    end
+
+    [res rate_K_surface_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
+
+    if pf_en == 1
+      for f=1:frames
+        rate_K_surface_(f,:) = post_filter(rate_K_surface_(f,:), 1.5, voicing(f));
+      end
+    end
+    
+    for f=1:frames
+      rate_K_surface_(f,:) += mean_f(f);
+    end
+
+    surface = rate_K_surface_;
+  end
+
+  % break into segments of M frames.  Fix end points, that two of the
+  % frames we sample.  Then find best choice in between
+
+  surface_ = zeros(frames, K);
+  best_surface_ = zeros(frames, K);
+
+  for f=1:M:frames-M
+
+    left_vec = surface(f,:);
+    right_vec = surface(f+M,:);
+    resample_points = f:f+M-1;
+    best_mse = 1E32;
+    best_m = f+1;
+    
+    printf("%d %d\n", f+1, M+f-1);
+
+    if fixed_dec
+      m = f+M/2;
+      centre_vec = surface(m,:);
+      sample_points = [f m f+M];
+      for k=1:K
+        best_surface_(resample_points,k)  = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+      end 
+    else
+      for m=f+1:M+f-2
+
+        % Use interpolation to construct candidate surface_ segment 
+        % using just threee samples
+
+        centre_vec = surface(m,:);
+        sample_points = [f m f+M];
+        mse = 0;
+        for k=1:K
+          surface_(resample_points,k)  = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+          mse += sum((target_surface(resample_points,k) - surface_(resample_points,k)).^2);
+        end 
+
+        % compare synthesised candidate to orginal and chose min ased on MSE
+
+        if mse < best_mse
+          best_mse = mse;
+          best_m = m;
+          best_surface_(resample_points,:) = surface_(resample_points,:);
+        end
+
+        printf("  m: %d mse: %f best_mse: %f best_m: %d\n", m, mse, best_mse, best_m);
+      end
+    end
+  end
+
+  if pf_en == 2
+
+    % Optionally apply pf after interpolation, theory is interpolation
+    % smooths spectrum in time so post filtering afterwards may be
+    % useful.  Note we remove mean, this tends to move formats up and
+    % anti-formants down when we multiply by a constant
+
+    for f=1:frames
+      mean_f = mean(best_surface_(f,:));
+      rate_K_vec_no_mean = best_surface_(f,:) - mean_f;
+      rate_K_vec_no_mean *= 1.2;
+      best_surface_(f,:) = rate_K_vec_no_mean + mean_f;
+    end
+  end
+
+  model_ = resample_rate_L(model, best_surface_, sample_freqs_kHz);
+endfunction
+
 
 #{ 
   Filtering time axis or surface, as a first step before decimation.
@@ -489,4 +664,19 @@ function [mse_list index_list] = search_vq2(vq, target, m, closed_loop_dc = 0)
   mse_list = mse_list(1:m);
   index_list = index_list(1:m);
 
+endfunction
+
+function plot_dft_surface(surface)
+  [frames K] = size(surface);
+
+  dft_surface = zeros(frames,K);
+  for k=1:K
+    dft_surface(:,k) = fft(surface(:,k).*hanning(frames));
+  end
+
+  % Set up a meaninful freq axis.  We only need real side. Sample rate
+  % (frame rate) Fs=100Hz 
+
+  Fs = 100; dF = Fs/frames;
+  mesh(1:K, (1:frames/2)*dF, 20*log10(abs(dft_surface(1:frames/2,:,:))));
 endfunction

@@ -9,7 +9,7 @@
 % is rather dim, but a working example is good place to start!
 
 
-function [phase s] = mag_to_phase(Gdbfk)
+function [phase s] = mag_to_phase(Gdbfk, verbose_en = 0)
   Nfft    = 512;  % FFT size to use 
 
   Ns = length(Gdbfk); if Ns~=Nfft/2+1, error("confusion"); end
@@ -19,12 +19,16 @@ function [phase s] = mag_to_phase(Gdbfk)
   s = ifft(S);        % desired impulse response
   s = real(s);        % any imaginary part is quantization noise
   tlerr = 100*norm(s(round(0.9*Ns:1.1*Ns)))/norm(s);
-  disp(sprintf(['  Time-limitedness check: Outer 20%% of impulse ' ...
+  if verbose_en
+    disp(sprintf(['  Time-limitedness check: Outer 20%% of impulse ' ...
                'response is %0.2f %% of total rms'],tlerr));
+  end
   % = 0.02 percent
 
-  if tlerr>1.0 % arbitrarily set 1% as the upper limit allowed
-    disp('  Increase Nfft and/or smooth Sdb\n');
+  if verbose_en
+    if tlerr>1.0 % arbitrarily set 1% as the upper limit allowed
+      disp('  Increase Nfft and/or smooth Sdb\n');
+    end
   end
 
   c = ifft(Sdb); % compute real cepstrum from log magnitude spectrum
@@ -32,11 +36,15 @@ function [phase s] = mag_to_phase(Gdbfk)
   % Check aliasing of cepstrum (in theory there is always some):
 
   caliaserr = 100*norm(c(round(Ns*0.9:Ns*1.1)))/norm(c);
-  disp(sprintf(['  Cepstral time-aliasing check: Outer 20%% of ' ...
-               'cepstrum holds %0.2f %% of total rms\n'],caliaserr));
+  if verbose_en
+    disp(sprintf(['  Cepstral time-aliasing check: Outer 20%% of ' ...
+                 'cepstrum holds %0.2f %% of total rms\n'],caliaserr));
+  end
 
-  if caliaserr>1.0 % arbitrary limit
-    disp('  Increase Nfft and/or smooth Sdb to shorten cepstrum\n');
+  if verbose_en
+    if caliaserr>1.0 % arbitrary limit
+      disp('  Increase Nfft and/or smooth Sdb to shorten cepstrum\n');
+    end
   end
 
   % Fold cepstrum to reflect non-min-phase zeros inside unit circle:

@@ -15,7 +15,6 @@
 %   octave:14> newamp1_fbf("../build_linux/src/hts1a",50)
 
 
-
 function newamp1_fbf(samname, f=10)
   newamp;
   more off;
@@ -34,6 +33,15 @@ function newamp1_fbf(samname, f=10)
   model = load(model_name);
   [frames tmp] = size(model);
 
+  voicing_name = strcat(samname,"_pitche.txt");
+  voicing = zeros(1,frames);
+  
+  if exist(voicing_name, "file") == 2
+    pitche = load(voicing_name);
+    voicing = pitche(:, 3);
+  end
+  size(voicing)
+
   % Keyboard loop --------------------------------------------------------------
 
   k = ' ';
@@ -43,7 +51,15 @@ function newamp1_fbf(samname, f=10)
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
     plot(s);
     axis([1 length(s) -20000 20000]);
-    title('Time Domain Speech');
+    if exist(voicing_name, "file") == 2
+      if voicing(f)
+        title('Time Domain Speech (Voiced)');
+      else
+        title('Time Domain Speech (Unvoiced)');
+      end
+    else
+      title('Time Domain Speech');
+    end
 
     Wo = model(f,1);
     L = model(f,2);
@@ -65,8 +81,7 @@ function newamp1_fbf(samname, f=10)
     end
 
     if pf_en
-      % pf, needs some energy equalisation, does gd things for hts1a
-      rate_K_surface_ *= 1.2;
+      rate_K_vec_no_mean_ = post_filter(rate_K_vec_no_mean_, pf_gain = 1.5, voicing(f));
     end
 
     rate_K_vec_ = rate_K_vec_no_mean_ + mean_f;
@@ -105,20 +120,27 @@ function newamp1_fbf(samname, f=10)
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en[%d]", f, quant_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en[%d] p-pf[%d]", f, quant_en, pf_en);
     fflush(stdout);
     k = kbhit();
 
-    if (k == 'm')
+    if k == 'm'
       quant_en++;
       if quant_en > 2
         quant_en = 0;
       end
     endif
-    if (k == 'n')
+    if k == 'p'
+      if pf_en == 1
+        pf_en = 0;
+      else
+        pf_en = 1;
+      end
+    end
+    if k == 'n'
       f = f + 1;
     endif
-    if (k == 'b')
+    if k == 'b'
       f = f - 1;
     endif
   until (k == 'q')
