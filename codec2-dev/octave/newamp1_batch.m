@@ -38,7 +38,7 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
-  [frames nc] = size(model)
+  [frames nc] = size(model);
 
   voicing_name = strcat(samname,"_pitche.txt");
   voicing = zeros(1,frames);
@@ -54,8 +54,9 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   %model_ = experiment_filter_dec_filter(model);
 
   %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
-  model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
-  
+  %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
+  [model_ voicing_] = experiment_rate_K_dec(model, voicing);
+
   %model_ = experiment_dec_linear(model_);
   %model_ = experiment_energy_rate_linear(model, 1, 0);
 
@@ -122,6 +123,18 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   if synth_phase
     fclose(faw);
   end
+
+  % save voicing file
+  
+  if exist("voicing_", "var")
+    v_out_name = sprintf("%s_v.txt", samname);
+    fv  = fopen(v_out_name,"wt"); 
+    for f=1:length(voicing_)
+      fprintf(fv,"%d\n", voicing_(f));
+    end
+    fclose(fv);
+  end
+
   printf("\n")
 
 endfunction
@@ -312,9 +325,112 @@ function model_ = experiment_dec_linear(model)
 endfunction
 
 
-% Experimental AbyS decimator that chooses best frames to match surface
-% based on AbyS approach.  Can apply post filter at different points, 
-% and optionally do fixed decimation, at rate K.
+% Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
+% quantisation.  Evevoled from abys decimator below.
+ 
+function [model_ voicing_ ] = experiment_rate_K_dec(model, voicing)
+  max_amp = 80;
+  [frames nc] = size(model);
+  model_ = zeros(frames, max_amp+3);
+  
+  M = 8;
+ 
+  % create frames x K surface.  TODO make all of this operate frame by
+  % frame, or at least M/2=4 frames rather than one big chunk
+
+  K = 20; 
+  [surface sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
+  target_surface = surface;
+
+  % VQ rate K surface.  TODO: If we are decimating by M/2=4 we really
+  % only need to do this every 4th frame.
+
+  melvq;
+  load train_120_vq; m=5;
+       
+  for f=1:frames
+    mean_f(f) = mean(surface(f,:));
+    surface_no_mean(f,:) = surface(f,:) - mean_f(f);
+  end
+
+  [res surface_no_mean_ ind] = mbest(train_120_vq, surface_no_mean, m);
+
+  for f=1:frames
+    surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
+  end
+    
+  surface_ = zeros(frames, K);
+  for f=1:frames
+    surface_(f,:) = surface_no_mean_(f,:) + mean_f(f);
+  end
+
+  % break into segments of M frames.  We have 3 samples in M frame
+  % segment spaced M/2 apart and interpolate the rest.  This evolved
+  % from AbyS scheme below but could be simplified to simple linear
+  % interpolation, or using 3 or 4 points but shift of M/2=4 frames.
+
+  interpolated_surface_ = zeros(frames, K);
+  for f=1:M:frames-M
+    left_vec = surface_(f,:);
+    m = f+M/2;
+    centre_vec = surface_(m,:);
+    right_vec = surface_(f+M,:);
+    sample_points = [f m f+M];
+    resample_points = f:f+M-1;
+    for k=1:K
+      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+    end    
+  end
+
+  % break into M/2 segments for purposes of Wo interpolation
+
+  voicing_ = zeros(1, frames);
+  for f=1:M/2:frames-M/2
+
+    if !voicing(f) && !voicing(f+M/2)
+       model_(f:f+M/2-1,1) = 2*pi/100;
+    end
+
+    if voicing(f) && !voicing(f+M/2)
+       model_(f:f+M/4-1,1) = model(f,1);
+       model_(f+M/4:f+M/2-1,1) = 2*pi/100;
+       voicing_(f:f+M/4-1) = 1;
+    end
+
+    if !voicing(f) && voicing(f+M/2)
+       model_(f:f+M/4-1,1) = 2*pi/100;
+       model_(f+M/4:f+M/2-1,1) = model(f+M/2,1);
+       voicing_(f+M/4:f+M/2-1) = 1;
+    end
+
+    if voicing(f) && voicing(f+M/2)
+      Wo_samples = [model(f,1) model(f+M/2,1)];
+      model_(f:f+M/2-1,1) = interp1([f f+M/2], Wo_samples, f:f+M/2-1, "linear", 0);
+      voicing_(f:f+M/2-1) = 1;
+    end
+
+    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model_(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
+    for i=f:f+M/2-1
+      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
+    end
+  end
+  model_(frames-M/2:frames,1) = pi/100; % set end frames to something sensible
+
+  voicing_ = voicing;
+  model_(:,1) = model(:,1);
+  %model_(221:225,1) = model(221:225,1);
+  %model_(223:224,1) = model(223:224,1);
+  model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
+  model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
+
+endfunction
+
+
+% Experimental AbyS decimator that chooses best frames to match
+% surface based on AbyS approach.  Can apply post filter at different
+% points, and optionally do fixed decimation, at rate K.  Didn't
+% produce anything spectacular in AbyS mode, suggest anotehr look with
+% some sort of fbf display to see what's going on internally.
  
 function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0, voicing)
   max_amp = 80;
