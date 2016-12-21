@@ -66,8 +66,8 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
-  [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing);
-  indexes
+  [amodel_ avoicing_ indexes] = experiment_rate_K_dec(model, voicing);
+  [model_ voicing_] = model_from_indexes(indexes);
 
   %model_ = experiment_dec_linear(model_);
   %model_ = experiment_energy_rate_linear(model, 1, 0);
@@ -338,7 +338,7 @@ endfunction
 
 
 % Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
-% quantisation.  Evevoled from abys decimator below.
+% quantisation.  Evolved from abys decimator below.
  
 function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   max_amp = 80;
@@ -374,7 +374,7 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   end
     
   surface_ = zeros(frames, K);
-  energy_q = 10 + 40/16*(0:15)
+  energy_q = 10 + 40/16*(0:15);
   for f=1:frames   
     [mean_f_ indx] = quantise(energy_q, mean_f(f));
     indexes(f,3) = indx - 1;
@@ -407,11 +407,28 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
 
     % quantise Wo
 
-    index = encode_log_Wo(model(f,1), 6);
-    Wo1_ = decode_log_Wo(index, 6);
-    indexes(f,4) = index;
-    index = encode_log_Wo(model(f+M/2,1), 6);
-    Wo2_ = decode_log_Wo(index, 6);
+    % UV/V flag is coded using a zero index for Wo, this means we need to
+    % adjust Wo index slightly for the lowest Wo V frames
+
+    if voicing(f)
+      index = encode_log_Wo(model(f,1), 6);
+      if index == 0
+        index = 1;
+      end
+      Wo1_ = decode_log_Wo(index, 6);
+      indexes(f,4) = index;
+    else
+      indexes(f,4) = 0;
+      Wo1_ = 2*pi/100;
+    end
+      
+    if voicing(f+M/2)
+      index = encode_log_Wo(model(f+M/2,1), 6);
+      if index == 0
+        index = 1;
+      end
+      Wo2_ = decode_log_Wo(index, 6);
+    end
 
     % uncomment to use unquantised values
     %Wo1_ = model(f,1);
@@ -456,6 +473,110 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
 
 endfunction
+
+
+% Stand alone decoder that takes indexes and creates model_
+ 
+function [model_ voicing_] = model_from_indexes(indexes)
+  max_amp = 80;
+  [frames nc] = size(indexes);
+  model = model_ = zeros(frames, max_amp+3);
+  K = 20;
+  sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  M = 8;
+  energy_q = 10 + 40/16*(0:15);
+
+  melvq;
+  load train_120_vq;
+
+  surface_no_mean_ = zeros(frames,K);
+  surface_ = zeros(frames, K);
+  for f=1:M/2:frames
+    surface_no_mean_(f,:) = train_120_vq(indexes(f,1),:,1) + train_120_vq(indexes(f,2),:,2);
+    surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
+    mean_f_ = energy_q(indexes(f,3)+1);
+    surface_(f,:) = surface_no_mean_(f,:) + mean_f_;
+  end
+    
+  % break into segments of M frames.  We have 3 samples in M frame
+  % segment spaced M/2 apart and interpolate the rest.  This evolved
+  % from AbyS scheme below but could be simplified to simple linear
+  % interpolation, or using 3 or 4 points but shift of M/2=4 frames.
+  
+  interpolated_surface_ = zeros(frames, K);
+  for f=1:M:frames-M
+    left_vec = surface_(f,:);
+    m = f+M/2;
+    centre_vec = surface_(m,:);
+    right_vec = surface_(f+M,:);
+    sample_points = [f m f+M];
+    resample_points = f:f+M-1;
+    for k=1:K
+      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+    end    
+  end
+
+  % recover Wo and voicing
+
+  voicing = zeros(1, frames);
+  for f=1:M/2:frames-M/2
+    if indexes(f,4) == 0
+      voicing(f) = 0;
+      model(f,1) = 2*pi/100;
+    else
+      voicing(f) = 1;
+      model(f,1) = decode_log_Wo(indexes(f,4), 6);
+    end
+  end
+
+  % break into M/2 segments for purposes of Wo interpolation
+
+  voicing_ = zeros(1, frames);
+  for f=1:M/2:frames-M/2
+
+    Wo1_ = model(f,1);
+    Wo2_ = model(f+M/2,1);
+
+    if !voicing(f) && !voicing(f+M/2)
+       model_(f:f+M/2-1,1) = 2*pi/100;
+    end
+
+    if voicing(f) && !voicing(f+M/2)
+       model_(f:f+M/4-1,1) = Wo1_;
+       model_(f+M/4:f+M/2-1,1) = 2*pi/100;
+       voicing_(f:f+M/4-1) = 1;
+    end
+
+    if !voicing(f) && voicing(f+M/2)
+       model_(f:f+M/4-1,1) = 2*pi/100;
+       model_(f+M/4:f+M/2-1,1) = Wo2_;
+       voicing_(f+M/4:f+M/2-1) = 1;
+    end
+
+    if voicing(f) && voicing(f+M/2)
+      Wo_samples = [Wo1_ Wo2_];
+      model_(f:f+M/2-1,1) = interp1([f f+M/2], Wo_samples, f:f+M/2-1, "linear", 0);
+      voicing_(f:f+M/2-1) = 1;
+    end
+
+    #{
+    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
+    for i=f:f+M/2-1
+      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
+    end
+    #}
+  end
+  model_(frames-M/2:frames,1) = pi/100; % set end frames to something sensible
+
+  % enable these to use original (non interpolated) voicing and Wo
+  %voicing_ = voicing;
+  %model_(:,1) = model(:,1);
+
+  model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
+  model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
+
+endfunction
+
 
 
 % Experimental AbyS decimator that chooses best frames to match
