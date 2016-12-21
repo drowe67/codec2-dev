@@ -8,9 +8,225 @@
 % (spectral envelope) modelling.  See newamp_fby (frame by frame
 % analysis) and newamp_batch (batch processing for listening tests)
 %
+% Code here to support a bunch of experimental ideas, many that didn't work out.
 
 1;
 melvq; % mbest VQ functions
+
+% --------------------------------------------------------------------------------
+% Function used by rate K mel work
+% --------------------------------------------------------------------------------
+
+
+% quantise input sample to nearest value in table, optionally return binary code
+
+function [quant_out best_i bits] = quantise(levels, quant_in)
+
+  % find closest quantiser level
+
+  best_se = 1E32;
+  for i=1:length(levels)
+    se = (levels(i) - quant_in)^2;
+    if se < best_se
+      quant_out = levels(i);
+      best_se = se;
+      best_i = i;
+    end
+  end
+
+  % convert index to binary bits
+
+  numbits = ceil(log2(length(levels)));
+  bits = zeros(1, numbits);
+  for b=1:numbits
+    bits(b) = bitand(best_i-1,2^(numbits-b)) != 0;
+  end
+
+endfunction
+
+
+% Quantisation functions for Wo in log freq domain
+
+function index = encode_log_Wo(Wo, bits)
+    Wo_levels = 2.^bits;
+    Wo_min = 2*pi/160;
+    Wo_max = 2*pi/20;
+
+    norm = (log10(Wo) - log10(Wo_min))/(log10(Wo_max) - log10(Wo_min));
+    index = floor(Wo_levels * norm + 0.5);
+    index = max(index, 0);
+    index = min(index, Wo_levels-1);
+endfunction
+
+
+function Wo = decode_log_Wo(index, bits)
+    Wo_levels = 2.^bits;
+    Wo_min = 2*pi/160;
+    Wo_max = 2*pi/20;
+
+    step = (log10(Wo_max) - log10(Wo_min))/Wo_levels;
+    Wo   = log10(Wo_min) + step*index;
+
+    Wo = 10 .^ Wo;
+endfunction
+
+
+% convert index to binary bits
+
+function bits = index_to_bits(value, numbits)
+  levels = 2.^numbits;
+  bits = zeros(1, numbits);
+  for b=1:numbits
+    bits(b) = bitand(value,2^(numbits-b)) != 0;
+  end
+end
+
+
+function value = bits_to_index(bits, numbits)
+  value = 2.^(numbits-1:-1:0) * bits;
+endfunction
+
+
+% Determine a phase spectra from a magnitude spectra
+% from http://www.dsprelated.com/showcode/20.php
+% Haven't _quite_ figured out how this works but have to start somewhere ....
+%
+% TODO: we may be able to sample at a lower rate, like mWo
+%       but start with something that works
+
+function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
+  Nfft    = 512;  % FFT size to use 
+  Fs      = 8000;
+  max_amp = 80;
+  L       = min([model(f,2) max_amp-1]);
+  Wo      = model(f,1);
+
+  mask_sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
+  Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
+
+  % optional input of aks for testing
+
+  if nargin == 3
+    Aw = 1 ./ fft(ak,Nfft);
+    Gdbfk = 20*log10(abs(Aw(1:Nfft/2+1)));
+  end
+
+  [phase s] = mag_to_phase(Gdbfk);
+
+endfunction
+
+
+% Non linear sampling of frequency axis, reducing the "rate" is a
+% first step before VQ
+
+function mel = ftomel(fHz)
+  mel = floor(2595*log10(1+fHz/700)+0.5);
+endfunction
+
+
+function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
+  mel_start = ftomel(200); mel_end = ftomel(3700); 
+  step = (mel_end-mel_start)/(K-1);
+  mel = mel_start:step:mel_end;
+  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
+  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+endfunction
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
+endfunction
+
+
+% Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
+% as a 3D surface with time, freq, and ampitude axis.
+
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
+
+  % convert rate L=pi/Wo amplitude samples to fixed rate K
+
+  max_amp = 80;
+  [frames col] = size(model);
+  K = length(rate_K_sample_freqs_kHz);
+  rate_K_surface = zeros(frames, K);
+
+
+  for f=1:frames
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp-1]);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));    
+    %AmdB += pre;
+
+    % clip between peak and peak -50dB, to reduce dynamic range
+
+    AmdB_peak = max(AmdB);
+    AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
+
+    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    
+    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+    
+    %printf("\r%d/%d", f, frames);
+  end
+  %printf("\n");
+endfunction
+
+
+% Take a rate K surface and convert back to time varying rate L
+
+function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
+  max_amp = 80;
+  [frames col] = size(model);
+
+  model_ = zeros(frames, max_amp+3);
+  for f=1:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    
+    % back down to rate L
+
+    AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
+
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+   end
+endfunction
+
+
+% Post Filter, has a big impact on speech quality after VQ.  When used
+% on a mean removed rate K vector, it raises formants, and supresses
+% anti-formants.  As it manipulates amplitudes, we normalise energy to
+% prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
+% (dB) seems to work OK.  Good area for further investigations and
+% improvements in speech quality.
+
+function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
+    % vec is rate K vector describing spectrum of current frame
+    % lets pre-emp before applying PF. 20dB/dec over 300Hz
+    
+    pre = 20*log10(sample_freq_kHz/0.3);
+    vec += pre;
+
+    levels_before_linear = 10 .^ (vec/20);
+    e_before = sum(levels_before_linear .^2);
+
+    vec *= pf_gain;
+   
+    levels_after_linear = 10 .^ (vec/20);
+    e_after = sum(levels_after_linear .^2);
+    gain = e_after/e_before;
+    gaindB = 10*log10(gain);
+    vec -= gaindB;
+
+    vec -= pre;
+endfunction
+
+
+% --------------------------------------------------------------------------------
+% Experimental functions used for masking, piecewise models
+% --------------------------------------------------------------------------------
 
 
 function [maskdB_ maskdB_cyclic Dabs dk_ D1_ ind] = decimate_in_freq(maskdB, cyclic=1, k=7, vq)
@@ -98,32 +314,6 @@ function maskdB_ = params_to_mask(L, k, dk_, D1_)
     maskdB_ = [maskdB_(1:anchor) ppval(mask_pp, anchor+1:L)];
 endfunction
 
-
-% quantise input sample to nearest value in table, optionally return bianry code
-
-function [quant_out best_i bits] = quantise(levels, quant_in)
-
-  % find closest quantiser level
-
-  best_se = 1E32;
-  for i=1:length(levels)
-    se = (levels(i) - quant_in)^2;
-    if se < best_se
-      quant_out = levels(i);
-      best_se = se;
-      best_i = i;
-    end
-  end
-
-  % convert index to binary bits
-
-  numbits = ceil(log2(length(levels)));
-  bits = zeros(1, numbits);
-  for b=1:numbits
-    bits(b) = bitand(best_i-1,2^(numbits-b)) != 0;
-  end
-
-endfunction
 
 
 % determine cumulative mask, using amplitude of each harmonic.  Mask is
@@ -456,34 +646,6 @@ function amp_scatter(samname)
 endfunction
 
 
-% Determine a phase spectra from a magnitude spectra
-% from http://www.dsprelated.com/showcode/20.php
-% Haven't _quite_ figured out how this works but have to start somewhere ....
-%
-% TODO: we may be able to sample at a lower rate, like mWo
-%       but start with something that works
-
-function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
-  Nfft    = 512;  % FFT size to use 
-  Fs      = 8000;
-  max_amp = 80;
-  L       = min([model(f,2) max_amp-1]);
-  Wo      = model(f,1);
-
-  mask_sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
-  Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
-
-  % optional input of aks for testing
-
-  if nargin == 3
-    Aw = 1 ./ fft(ak,Nfft);
-    Gdbfk = 20*log10(abs(Aw(1:Nfft/2+1)));
-  end
-
-  [phase s] = mag_to_phase(Gdbfk);
-
-endfunction
-
 
 % AbyS returns f & a, this function plots values so we can consider quantisation
 
@@ -770,7 +932,7 @@ function [maskdB_ Wo L] = decimate_frame_rate2(model, decimate, f, frames)
     maskdB_ = left_fraction*maskdB_left + right_fraction*maskdB_right;
 endfunction
 
-
+#{
 function amodel = post_filter(amodel)
     max_amp = 80;
 
@@ -784,30 +946,8 @@ function amodel = post_filter(amodel)
     AmdB_pf += max(AmdB_) - max(AmdB_pf);
     amodel(3:(L+2)) = 10 .^ (AmdB_pf(1:L)/20);
 endfunction
+#}
 
-
-function index = encode_log_Wo(Wo, bits)
-    Wo_levels = 2.^bits;
-    Wo_min = 2*pi/160;
-    Wo_max = 2*pi/20;
-
-    norm = (log10(Wo) - log10(Wo_min))/(log10(Wo_max) - log10(Wo_min));
-    index = floor(Wo_levels * norm + 0.5);
-    index = max(index, 0);
-    index = min(index, Wo_levels-1);
-endfunction
-
-
-function Wo = decode_log_Wo(index, bits)
-    Wo_levels = 2.^bits;
-    Wo_min = 2*pi/160;
-    Wo_max = 2*pi/20;
-
-    step = (log10(Wo_max) - log10(Wo_min))/Wo_levels;
-    Wo   = log10(Wo_min) + step*index;
-
-    Wo = 10 .^ Wo;
-endfunction
 
 % Given a matrix with indexes on each row, convert to a bit stream and
 % write to file.  We only write every 4th frame due to DIT
@@ -832,21 +972,6 @@ function write_bit_stream_file(fn, ind_log, bits_per_param)
   fclose(fbit);
 endfunction
 
-
-% convert index to binary bits
-
-function bits = index_to_bits(value, numbits)
-  levels = 2.^numbits;
-  bits = zeros(1, numbits);
-  for b=1:numbits
-    bits(b) = bitand(value,2^(numbits-b)) != 0;
-  end
-end
-
-
-function value = bits_to_index(bits, numbits)
-  value = 2.^(numbits-1:-1:0) * bits;
-endfunction
 
 
 % determine 4 voicing bits based on 2 decimated voicing bits
@@ -1015,119 +1140,3 @@ function lmin = abys(AmdB_, AmdB, Wo, L, mask_sample_freqs_kHz)
 endfunction
 
 
-% Non linear sampling of frequency axis, reducing the "rate" is a
-% first step before VQ
-
-function mel = ftomel(fHz)
-  mel = floor(2595*log10(1+fHz/700)+0.5);
-endfunction
-
-
-function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
-  mel_start = ftomel(200); mel_end = ftomel(3700); 
-  step = (mel_end-mel_start)/(K-1);
-  mel = mel_start:step:mel_end;
-  rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
-  rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
-endfunction
-
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
-  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
-  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
-endfunction
-
-
-% Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
-% as a 3D surface with time, freq, and ampitude axis.
-
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
-
-  % convert rate L=pi/Wo amplitude samples to fixed rate K
-
-  max_amp = 80;
-  [frames col] = size(model);
-  K = length(rate_K_sample_freqs_kHz);
-  rate_K_surface = zeros(frames, K);
-
-
-  for f=1:frames
-    Wo = model(f,1);
-    L = min([model(f,2) max_amp-1]);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
-    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));    
-    %AmdB += pre;
-
-    % clip between peak and peak -50dB, to reduce dynamic range
-
-    AmdB_peak = max(AmdB);
-    AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
-
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
-    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-    
-    %printf("\r%d/%d", f, frames);
-  end
-  %printf("\n");
-endfunction
-
-
-% Take a rate K surface and convert back to time varying rate L
-
-function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
-  max_amp = 80;
-  [frames col] = size(model);
-
-  model_ = zeros(frames, max_amp+3);
-  for f=1:frames
-    Wo = model(f,1);
-    L = model(f,2);
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-    
-    % back down to rate L
-
-    AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
-
-    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
-   end
-endfunction
-
-
-% Post Filter, has a big impact on speech quality after VQ.  When used
-% on a mean removed rate K vector, it raises formants, and supresses
-% anti-formants.  As it manipulates amplitudes, we normalise energy to
-% prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
-% (dB) seems to work OK.
-
-function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
-    % vec is rate K vector describing spectrum of current frame
-    % lets pre-emp before applying PF. 20dB/dec over 300Hz
-    
-    pre = 20*log10(sample_freq_kHz/0.3);
-    vec += pre;
-
-    levels_before_linear = 10 .^ (vec/20);
-    e_before = sum(levels_before_linear .^2);
-
-    % if voicing flag supplied use it apply PF just for voiced frames
-
-   #{ 
-   if nargin == 3
-      if voicing
-        vec *= pf_gain;
-      end
-    else
-      vec *= pf_gain;
-    end
-    #}
-       vec *= pf_gain;
-   
-    levels_after_linear = 10 .^ (vec/20);
-    e_after = sum(levels_after_linear .^2);
-    gain = e_after/e_before;
-    gaindB = 10*log10(gain);
-    vec -= gaindB;
-
-    vec -= pre;
-endfunction
