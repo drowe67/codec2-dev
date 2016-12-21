@@ -839,7 +839,7 @@ int main(int argc, char *argv[])
                     assert(ret == FFT_ENC);
                 }
 
-                fprintf(stderr, "frame: %d Wo: %f L: %d v: %d\n", frames, model_dec[i].Wo, model_dec[i].L,  model_dec[i].voiced);
+                //fprintf(stderr, "frame: %d Wo: %f L: %d v: %d\n", frames, model_dec[i].Wo, model_dec[i].L,  model_dec[i].voiced);
                 if (phase0)
                     phase_synth_zero_order(fft_fwd_cfg, &model_dec[i], ex_phase, Aw);
                 if (postfilt)
