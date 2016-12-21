@@ -1023,14 +1023,16 @@ function mel = ftomel(fHz)
 endfunction
 
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
-  [frames nc] = size(model);
+function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
   mel_start = ftomel(200); mel_end = ftomel(3700); 
   step = (mel_end-mel_start)/(K-1);
   mel = mel_start:step:mel_end;
   rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
   rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
+endfunction
 
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
 endfunction
 
