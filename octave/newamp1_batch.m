@@ -19,6 +19,8 @@
 
   Usage:
 
+    build codec2 with -DDUMP - see codec2-dev/README, then:
+
     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
     $ cd ~/codec2-dev/octave
     octave:14> newamp1_batch("../build_linux/src/hts1a")
@@ -155,7 +157,13 @@ endfunction
 % -----------------------------------------------------------------------------------------
 % Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
 % quantisation.  Evolved from abys decimator below.  Simulates the entire encoder/decoder.
- 
+
+#{
+   todo: 
+     [ ] M=8 nomenclature, make it closer to existing 25ms C modes
+     [ ] frame by frame-ish operation, close to C implementations
+#}
+
 function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   max_amp = 80;
   [frames nc] = size(model);
@@ -171,6 +179,9 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   [surface sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
   target_surface = surface;
 
+  figure(1);
+  mesh(surface);
+
   % VQ rate K surface.  TODO: If we are decimating by M/2=4 we really
   % only need to do this every 4th frame.
 
@@ -181,6 +192,8 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
     mean_f(f) = mean(surface(f,:));
     surface_no_mean(f,:) = surface(f,:) - mean_f(f);
   end
+  figure(2);
+  mesh(surface_no_mean);
 
   [res surface_no_mean_ ind] = mbest(train_120_vq, surface_no_mean, m);
   indexes(:,1:2) = ind;
@@ -188,6 +201,8 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   for f=1:frames
     surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
   end
+  figure(3);
+  mesh(surface_no_mean_);
     
   surface_ = zeros(frames, K);
   energy_q = 10 + 40/16*(0:15);
@@ -197,6 +212,9 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
     %mean_f_ = mean_f(f);
     surface_(f,:) = surface_no_mean_(f,:) + mean_f_;
   end
+
+  figure();
+  mesh(surface_);
 
   % break into segments of M frames.  We have 3 samples in M frame
   % segment spaced M/2 apart and interpolate the rest.  This evolved
