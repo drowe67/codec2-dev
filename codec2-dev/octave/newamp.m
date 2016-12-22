@@ -14,8 +14,35 @@
 melvq; % mbest VQ functions
 
 % --------------------------------------------------------------------------------
-% Function used by rate K mel work
+% Functions used by rate K mel work
 % --------------------------------------------------------------------------------
+
+% General 2nd order parabolic interpolator.  Used splines orginally,
+% but this is much simpler and we don't need much accuracy.  Given two
+% vectors of points xp and yp, find interpolated values y at points x
+
+function y = interp_para(xp, yp, x)
+  assert( (length(xp) >=3) && (length(yp) >= 3) );
+
+  y = zeros(1,length(x));
+  for i=1:length(x)
+    xi = x(i);
+
+    % k is index into xp of where we start 3 points used to form parabola
+
+    k = 1;
+    while ((xp(k+1) < xi) && (k < (length(xp)-2))) 
+      k++;
+    end
+    
+    x1 = xp(k); y1 = yp(k); x2 = xp(k+1); y2 = yp(k+1); x3 = xp(k+2); y3 = yp(k+2);
+
+    a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
+    b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
+  
+    y(i) = a*(xi-x2)^2 + b*(xi-x2) + y2;
+  end
+endfunction
 
 
 % quantise input sample to nearest value in table, optionally return binary code
@@ -150,7 +177,6 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
   K = length(rate_K_sample_freqs_kHz);
   rate_K_surface = zeros(frames, K);
 
-
   for f=1:frames
     Wo = model(f,1);
     L = min([model(f,2) max_amp-1]);
@@ -166,8 +192,9 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
     
-    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-    
+    %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);    
+
     %printf("\r%d/%d", f, frames);
   end
   %printf("\n");
@@ -188,7 +215,8 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     
     % back down to rate L
 
-    AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
+    % AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
+    AmdB_ = interp_para([ 0 rate_K_sample_freqs_kHz 4], [0 rate_K_surface(f,:) 0], rate_L_sample_freqs_kHz);
 
     model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
    end
