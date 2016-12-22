@@ -155,10 +155,10 @@ void dump_Sn(float Sn[]) {
     /* split across two lines to avoid max line length problems */
     /* reconstruct in Octave */
 
-    for(i=0; i<M/2; i++)
+    for(i=0; i<M_PITCH/2; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
     fprintf(fsn,"\n");
-    for(i=M/2; i<M; i++)
+    for(i=M_PITCH/2; i<M_PITCH; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
     fprintf(fsn,"\n");
 }
@@ -597,10 +597,10 @@ void dump_sq(float sq[]) {
 	assert(fsq != NULL);
     }
 
-    for(i=0; i<M/2; i++)
+    for(i=0; i<M_PITCH/2; i++)
 	fprintf(fsq,"%f\t",sq[i]);
     fprintf(fsq,"\n");
-    for(i=M/2; i<M; i++)
+    for(i=M_PITCH/2; i<M_PITCH; i++)
 	fprintf(fsq,"%f\t",sq[i]);
     fprintf(fsq,"\n");
 }
