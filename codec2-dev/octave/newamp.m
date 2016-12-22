@@ -128,8 +128,13 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
   L       = min([model(f,2) max_amp-1]);
   Wo      = model(f,1);
 
-  mask_sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
-  Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
+  sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
+  Am = model(f,3:(L+2));
+  AmdB = 20*log10(Am);
+  rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+  Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, sample_freqs_kHz);    
+
+  % Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
 
   % optional input of aks for testing
 
