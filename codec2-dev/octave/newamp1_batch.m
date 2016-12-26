@@ -230,7 +230,7 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
     sample_points = [f m f+M];
     resample_points = f:f+M-1;
     for k=1:K
-      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "linear", 0);
     end    
   end
 
@@ -340,15 +340,17 @@ function [model_ voicing_] = model_from_indexes(indexes)
   % interpolation, or using 3 or 4 points but shift of M/2=4 frames.
   
   interpolated_surface_ = zeros(frames, K);
-  for f=1:M:frames-M
+  for f=1:M/2:frames-M
     left_vec = surface_(f,:);
     m = f+M/2;
     centre_vec = surface_(m,:);
     right_vec = surface_(f+M,:);
-    sample_points = [f m f+M];
+    %sample_points = [f m f+M];
+    sample_points = [f m];
     resample_points = f:f+M-1;
     for k=1:K
-      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+      % interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
+      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k)], resample_points, "spline", 0);
     end    
   end
 
