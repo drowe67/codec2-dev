@@ -71,7 +71,7 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
 
-  [amodel_ avoicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder, toss away results except for indexes
+  [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder, toss away results except for indexes
   [model_ voicing_] = model_from_indexes(indexes);                     % decoder uses just indexes, outputs vecs for synthesis
 
   %model_ = experiment_dec_linear(model_);
@@ -168,7 +168,7 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   model_ = zeros(frames, max_amp+3);
   indexes = zeros(frames,4);
 
-  M = 8;
+  M = 4;
  
   % create frames x K surface.  TODO make all of this operate frame by
   % frame, or at least M/2=4 frames rather than one big chunk
@@ -222,21 +222,17 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   interpolated_surface_ = zeros(frames, K);
   for f=1:M:frames-M
     left_vec = surface_(f,:);
-    m = f+M/2;
-    centre_vec = surface_(m,:);
     right_vec = surface_(f+M,:);
-    sample_points = [f m f+M];
+    sample_points = [f f+M];
     resample_points = f:f+M-1;
     for k=1:K
-      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "linear", 0);
+      interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
     end    
   end
 
-  % break into M/2 segments for purposes of Wo interpolation
+  % break into segments for purposes of Wo interpolation
 
-  voicing_ = zeros(1, frames);
-  for f=1:M/2:frames-M/2
-
+  for f=1:M:frames
     % quantise Wo
 
     % UV/V flag is coded using a zero index for Wo, this means we need to
@@ -247,45 +243,47 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
       if index == 0
         index = 1;
       end
-      Wo1_ = decode_log_Wo(index, 6);
       indexes(f,4) = index;
+      voicing(f) = 1;
+      model_(f,1) = decode_log_Wo(indexes(f,4), 6);
     else
       indexes(f,4) = 0;
-      Wo1_ = 2*pi/100;
+      voicing(f) = 0;
+      model_(f,1) = 2*pi/100;
     end
-      
-    if voicing(f+M/2)
-      index = encode_log_Wo(model(f+M/2,1), 6);
-      if index == 0
-        index = 1;
-      end
-      Wo2_ = decode_log_Wo(index, 6);
-    end
+  end      
+
+
+  voicing_ = zeros(1, frames);
+  for f=1:M:frames-M
+
+    Wo1_ = model_(f,1);
+    Wo2_ = model_(f+M,1);
 
     % uncomment to use unquantised values
     %Wo1_ = model(f,1);
-    %Wo2_ = model(f+M/2,1);
+    %Wo2_ = model(f+M,1);
 
-    if !voicing(f) && !voicing(f+M/2)
+    if !voicing(f) && !voicing(f+M)
+       model_(f:f+M-1,1) = 2*pi/100;
+    end
+
+    if voicing(f) && !voicing(f+M)
+       model_(f:f+M/2-1,1) = Wo1_;
+       model_(f+M/2:f+M-1,1) = 2*pi/100;
+       voicing_(f:f+M/2-1) = 1;
+    end
+
+    if !voicing(f) && voicing(f+M)
        model_(f:f+M/2-1,1) = 2*pi/100;
+       model_(f+M/2:f+M-1,1) = Wo2_;
+       voicing_(f+M/2:f+M-1) = 1;
     end
 
-    if voicing(f) && !voicing(f+M/2)
-       model_(f:f+M/4-1,1) = Wo1_;
-       model_(f+M/4:f+M/2-1,1) = 2*pi/100;
-       voicing_(f:f+M/4-1) = 1;
-    end
-
-    if !voicing(f) && voicing(f+M/2)
-       model_(f:f+M/4-1,1) = 2*pi/100;
-       model_(f+M/4:f+M/2-1,1) = Wo2_;
-       voicing_(f+M/4:f+M/2-1) = 1;
-    end
-
-    if voicing(f) && voicing(f+M/2)
+    if voicing(f) && voicing(f+M)
       Wo_samples = [Wo1_ Wo2_];
-      model_(f:f+M/2-1,1) = interp1([f f+M/2], Wo_samples, f:f+M/2-1, "linear", 0);
-      voicing_(f:f+M/2-1) = 1;
+      model_(f:f+M-1,1) = interp1([f f+M], Wo_samples, f:f+M-1, "linear", 0);
+      voicing_(f:f+M-1) = 1;
     end
 
     #{
@@ -295,7 +293,7 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
     end
     #}
   end
-  model_(frames-M/2:frames,1) = pi/100; % set end frames to something sensible
+  model_(frames-M:frames,1) = pi/100; % set end frames to something sensible
 
   % enable these to use original (non interpolated) voicing and Wo
   %voicing_ = voicing;
@@ -350,7 +348,7 @@ function [model_ voicing_] = model_from_indexes(indexes)
   % recover Wo and voicing
 
   voicing = zeros(1, frames);
-  for f=1:M:frames-M
+  for f=1:M:frames
     if indexes(f,4) == 0
       voicing(f) = 0;
       model(f,1) = 2*pi/100;
