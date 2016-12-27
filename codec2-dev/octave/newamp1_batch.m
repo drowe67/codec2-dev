@@ -40,7 +40,7 @@
 % In general, this function processes a bunch of amplitudes, we then
 % use c2sim to hear the results.  Bunch of different experiments below
 
-function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_name)
+function surface = newamp1_batch(input_prefix, output_prefix)
   newamp;
   more off;
 
@@ -48,11 +48,14 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
 
-  model_name = strcat(samname,"_model.txt");
+  if nargin == 1
+    output_prefix = input_prefix;
+  end
+  model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
 
-  voicing_name = strcat(samname,"_pitche.txt");
+  voicing_name = strcat(input_prefix,"_pitche.txt");
   voicing = zeros(1,frames);
   
   if exist(voicing_name, "file") == 2
@@ -79,19 +82,14 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
 
   % ----------------------------------------------------
 
-  if nargin == 2
-    Am_out_name = optional_Am_out_name;
-  else
-    Am_out_name = sprintf("%s_am.out", samname);
-  end
-
+  Am_out_name = sprintf("%s_am.out", output_prefix);
   fam  = fopen(Am_out_name,"wb"); 
 
-  Wo_out_name = sprintf("%s_Wo.out", samname);
+  Wo_out_name = sprintf("%s_Wo.out", output_prefix);
   fWo  = fopen(Wo_out_name,"wb"); 
   
   if synth_phase
-    Aw_out_name = sprintf("%s_aw.out", samname);
+    Aw_out_name = sprintf("%s_aw.out", output_prefix);
     faw = fopen(Aw_out_name,"wb"); 
   end
 
@@ -141,7 +139,7 @@ function surface = newamp1_batch(samname, optional_Am_out_name, optional_Aw_out_
   % save voicing file
   
   if exist("voicing_", "var")
-    v_out_name = sprintf("%s_v.txt", samname);
+    v_out_name = sprintf("%s_v.txt", output_prefix);
     fv  = fopen(v_out_name,"wt"); 
     for f=1:length(voicing_)
       fprintf(fv,"%d\n", voicing_(f));
@@ -408,7 +406,7 @@ function [model_ voicing_] = model_from_indexes(indexes)
 
   % enable these to use original (non interpolated) voicing and Wo
   %voicing_ = voicing;
-  %model_(:,1) = model(:,1);
+   %model_(:,1) = model(:,1);
 
   model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
   model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
