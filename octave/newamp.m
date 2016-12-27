@@ -45,6 +45,21 @@ function y = interp_para(xp, yp, x)
 endfunction
 
 
+% simple linear interpolator
+
+function y = interp_linear(xp, yp, x)
+  assert( (length(xp) == 2) && (length(yp) == 2) );
+
+  m = (yp(2) - yp(1))/(xp(2) - xp(1));
+  c = yp(1) - m*xp(1);
+
+  y = zeros(1,length(x));
+  for i=1:length(x)
+    y(i) = m*x(i) + c;
+  end
+endfunction
+
+
 % quantise input sample to nearest value in table, optionally return binary code
 
 function [quant_out best_i bits] = quantise(levels, quant_in)
@@ -216,6 +231,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
+    f
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
     
     % back down to rate L
