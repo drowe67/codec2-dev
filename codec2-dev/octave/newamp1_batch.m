@@ -312,50 +312,45 @@ endfunction
 % decoder and an important step in proving everything works
  
 function [model_ voicing_] = model_from_indexes(indexes)
-  max_amp = 80;
+  max_amp = 80;  K = 20;  M = 4;
+
   [frames nc] = size(indexes);
   model = model_ = zeros(frames, max_amp+3);
-  K = 20;
   sample_freqs_kHz = mel_sample_freqs_kHz(K);
-  M = 8;
   energy_q = 10 + 40/16*(0:15);
 
   melvq;
   load train_120_vq;
 
+  % decode vector quantised surface
+
   surface_no_mean_ = zeros(frames,K);
   surface_ = zeros(frames, K);
-  for f=1:M/2:frames
+  for f=1:M:frames
     surface_no_mean_(f,:) = train_120_vq(indexes(f,1),:,1) + train_120_vq(indexes(f,2),:,2);
     surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
     mean_f_ = energy_q(indexes(f,3)+1);
     surface_(f,:) = surface_no_mean_(f,:) + mean_f_;
   end
     
-  % break into segments of M frames.  We have 3 samples in M frame
-  % segment spaced M/2 apart and interpolate the rest.  This evolved
-  % from AbyS scheme below but could be simplified to simple linear
-  % interpolation, or using 3 or 4 points but shift of M/2=4 frames.
+  % break into segments of M frames.  We have 2 samples spaced M apart
+  % and interpolate the rest.
   
   interpolated_surface_ = zeros(frames, K);
-  for f=1:M/2:frames-M
+  for f=1:M:frames-M
     left_vec = surface_(f,:);
-    m = f+M/2;
-    centre_vec = surface_(m,:);
     right_vec = surface_(f+M,:);
-    %sample_points = [f m f+M];
-    sample_points = [f m];
+    sample_points = [f f+M];
     resample_points = f:f+M-1;
     for k=1:K
-      % interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k) right_vec(k)], resample_points, "spline", 0);
-      interpolated_surface_(resample_points,k) = interp1(sample_points, [left_vec(k) centre_vec(k)], resample_points, "spline", 0);
+      interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
     end    
   end
 
   % recover Wo and voicing
 
   voicing = zeros(1, frames);
-  for f=1:M/2:frames-M/2
+  for f=1:M:frames-M
     if indexes(f,4) == 0
       voicing(f) = 0;
       model(f,1) = 2*pi/100;
@@ -365,34 +360,34 @@ function [model_ voicing_] = model_from_indexes(indexes)
     end
   end
 
-  % break into M/2 segments for purposes of Wo interpolation
+  % break into M segments for purposes of Wo interpolation
 
   voicing_ = zeros(1, frames);
-  for f=1:M/2:frames-M/2
+  for f=1:M:frames-M
 
     Wo1_ = model(f,1);
-    Wo2_ = model(f+M/2,1);
+    Wo2_ = model(f+M,1);
 
-    if !voicing(f) && !voicing(f+M/2)
+    if !voicing(f) && !voicing(f+M)
+       model_(f:f+M-1,1) = 2*pi/100;
+    end
+
+    if voicing(f) && !voicing(f+M)
+       model_(f:f+M/2-1,1) = Wo1_;
+       model_(f+M/2:f+M-1,1) = 2*pi/100;
+       voicing_(f:f+M/2-1) = 1;
+    end
+
+    if !voicing(f) && voicing(f+M)
        model_(f:f+M/2-1,1) = 2*pi/100;
+       model_(f+M/2:f+M-1,1) = Wo2_;
+       voicing_(f+M/2:f+M-1) = 1;
     end
 
-    if voicing(f) && !voicing(f+M/2)
-       model_(f:f+M/4-1,1) = Wo1_;
-       model_(f+M/4:f+M/2-1,1) = 2*pi/100;
-       voicing_(f:f+M/4-1) = 1;
-    end
-
-    if !voicing(f) && voicing(f+M/2)
-       model_(f:f+M/4-1,1) = 2*pi/100;
-       model_(f+M/4:f+M/2-1,1) = Wo2_;
-       voicing_(f+M/4:f+M/2-1) = 1;
-    end
-
-    if voicing(f) && voicing(f+M/2)
+    if voicing(f) && voicing(f+M)
       Wo_samples = [Wo1_ Wo2_];
-      model_(f:f+M/2-1,1) = interp1([f f+M/2], Wo_samples, f:f+M/2-1, "linear", 0);
-      voicing_(f:f+M/2-1) = 1;
+      model_(f:f+M-1,1) = interp_linear([f f+M], Wo_samples, f:f+M-1);
+      voicing_(f:f+M-1) = 1;
     end
 
     #{
@@ -402,11 +397,11 @@ function [model_ voicing_] = model_from_indexes(indexes)
     end
     #}
   end
-  model_(frames-M/2:frames,1) = pi/100; % set end frames to something sensible
+  model_(frames-M:frames,1) = pi/100; % set end frames to something sensible
 
   % enable these to use original (non interpolated) voicing and Wo
   %voicing_ = voicing;
-   %model_(:,1) = model(:,1);
+  %model_(:,1) = model(:,1);
 
   model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
   model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
