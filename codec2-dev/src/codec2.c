@@ -1848,7 +1848,9 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
     PROFILE_SAMPLE(phase_start);
 
-    phase_synth_zero_order(c2->fft_fwd_cfg, model, &c2->ex_phase, Aw);
+    COMP H[MAX_AMP];
+    sample_phase(model, H, Aw);
+    phase_synth_zero_order(model, &c2->ex_phase, H);
 
     PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth");
 

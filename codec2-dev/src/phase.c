@@ -37,6 +37,32 @@
 #include <string.h>
 #include <stdlib.h>
 
+/*---------------------------------------------------------------------------*\
+
+  sample_phase()
+
+  Samples phase at centre of each harmonic from and array of FFT_ENC
+  DFT samples.
+
+\*---------------------------------------------------------------------------*/
+
+void sample_phase(MODEL *model, COMP H[], COMP A[])
+{
+    int   m, b;
+    float phi_, r;
+
+    r = TWO_PI/(FFT_ENC);
+
+    /* Sample phase at harmonics */
+
+    for(m=1; m<=model->L; m++) {
+        b = (int)(m*model->Wo/r + 0.5);
+        phi_ = -atan2f(A[b].imag, A[b].real);
+        H[m].real = cosf(phi_);
+        H[m].imag = sinf(phi_);
+    }
+}
+
 
 /*---------------------------------------------------------------------------*\
 
@@ -46,10 +72,11 @@
    parameters are required apart from the SNR (which can be reduced to a
    1 bit V/UV decision per frame).
 
-   The phase of each harmonic is modelled as the phase of a LPC
-   synthesis filter excited by an impulse.  Unlike the first order
-   model the position of the impulse is not transmitted, so we create
-   an excitation pulse train using a rule based approach.
+   The phase of each harmonic is modelled as the phase of a synthesis
+   filter excited by an impulse.  In many Codec 2 modes the synthesis
+   filter is a LPC filter. Unlike the first order model the position
+   of the impulse is not transmitted, so we create an excitation pulse
+   train using a rule based approach.
 
    Consider a pulse train with a pulse starting time n=0, with pulses
    repeated at a rate of Wo, the fundamental frequency.  A pulse train
@@ -99,7 +126,7 @@
    - If there are voicing errors, the speech can sound clicky or
      staticy.  If V speech is mistakenly declared UV, this model tends to
      synthesise impulses or clicks, as there is usually very little shift or
-     dispersion through the LPC filter.
+     dispersion through the LPC synthesis filter.
 
    - When combined with LPC amplitude modelling there is an additional
      drop in quality.  I am not sure why, theory is interformant energy
@@ -129,28 +156,16 @@
 \*---------------------------------------------------------------------------*/
 
 void phase_synth_zero_order(
-    codec2_fft_cfg fft_fwd_cfg,
     MODEL *model,
-    float *ex_phase,            /* excitation phase of fundamental */
-    COMP   A[]
+    float *ex_phase,            /* excitation phase of fundamental        */
+    COMP   H[]                  /* L synthesis filter freq domain samples */
+
 )
 {
-    int   m, b;
-    float phi_, new_phi, r;
+    int   m;
+    float new_phi;
     COMP  Ex[MAX_AMP+1];	  /* excitation samples */
     COMP  A_[MAX_AMP+1];	  /* synthesised harmonic samples */
-    COMP  H[MAX_AMP+1];           /* LPC freq domain samples */
-
-    r = TWO_PI/(FFT_ENC);
-
-    /* Sample phase at harmonics */
-
-    for(m=1; m<=model->L; m++) {
-        b = (int)(m*model->Wo/r + 0.5);
-        phi_ = -atan2f(A[b].imag, A[b].real);
-        H[m].real = cosf(phi_);
-        H[m].imag = sinf(phi_);
-    }
 
     /*
        Update excitation fundamental phase track, this sets the position
