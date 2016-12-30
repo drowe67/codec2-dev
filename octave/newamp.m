@@ -136,8 +136,7 @@ endfunction
 % TODO: we may be able to sample at a lower rate, like mWo
 %       but start with something that works
 
-function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
-  Nfft    = 512;  % FFT size to use 
+function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Fs      = 8000;
   max_amp = 80;
   L       = min([model(f,2) max_amp-1]);
@@ -153,12 +152,12 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, ak)
 
   % optional input of aks for testing
 
-  if nargin == 3
+  if nargin == 4
     Aw = 1 ./ fft(ak,Nfft);
     Gdbfk = 20*log10(abs(Aw(1:Nfft/2+1)));
   end
 
-  [phase s] = mag_to_phase(Gdbfk);
+  [phase s] = mag_to_phase(Gdbfk, Nfft);
 
 endfunction
 
@@ -231,7 +230,6 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
-    f
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
     
     % back down to rate L

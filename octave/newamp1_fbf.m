@@ -18,7 +18,7 @@
 function newamp1_fbf(samname, f=10)
   newamp;
   more off;
-  quant_en = 0; pf_en = 0;
+  quant_en = 0; pf_en = 0; plot_phase = 1;
   melvq;
 
   K=20; load train_120_vq; m=5; 
@@ -40,7 +40,6 @@ function newamp1_fbf(samname, f=10)
     pitche = load(voicing_name);
     voicing = pitche(:, 3);
   end
-  size(voicing)
 
   % Keyboard loop --------------------------------------------------------------
 
@@ -118,6 +117,16 @@ function newamp1_fbf(samname, f=10)
     end
     hold off;
 
+    if plot_phase
+      phase_512 = determine_phase(model_, 1, 512);
+      phase_128 = determine_phase(model_, 1, 128);
+      figure(4); clf;
+      plot((1:512/2)*8000/512, phase_512(1:256), ';512;b');
+      hold on;
+      plot((1:128/2)*8000/128, phase_128(1:64), ';128;g');
+      hold off;
+    end
+     
     % interactive menu ------------------------------------------
 
     printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en[%d] p-pf[%d]", f, quant_en, pf_en);

@@ -15,7 +15,7 @@
  
   The newamp1_xxx scripts have evolved to (i) resample {Am} using a
   mel frequency axis, (ii) 2 stage VQ the mean removed vector.  Seems to work
-  OK at 700 bit/s.
+  OK at 700 bit/s, comparable to 1300.
 
   Usage:
 
@@ -71,8 +71,8 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
 
-  [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder, toss away results except for indexes
-  [model_ voicing_] = model_from_indexes(indexes);                     % decoder uses just indexes, outputs vecs for synthesis
+  [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder/decoder, lets toss away results except for indexes
+  [model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
 
   %model_ = experiment_dec_linear(model_);
   %model_ = experiment_energy_rate_linear(model, 1, 0);
@@ -89,8 +89,8 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   fWo  = fopen(Wo_out_name,"wb"); 
   
   if synth_phase
-    Aw_out_name = sprintf("%s_aw.out", output_prefix);
-    faw = fopen(Aw_out_name,"wb"); 
+    Hm_out_name = sprintf("%s_hm.out", output_prefix);
+    fhm = fopen(Hm_out_name,"wb"); 
   end
 
   for f=1:frames
@@ -120,20 +120,30 @@ function surface = newamp1_batch(input_prefix, output_prefix)
 
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
 
-      fft_enc = 512;
-      phase = determine_phase(model_, f);
+      fft_enc = 128;
+      phase = determine_phase(model_, f, fft_enc);
       assert(length(phase) == fft_enc);
-      Aw = zeros(1, fft_enc*2); 
-      Aw(1:2:fft_enc*2) = cos(phase);
-      Aw(2:2:fft_enc*2) = -sin(phase);
-      fwrite(faw, Aw, "float32");    
+      %Aw = zeros(1, fft_enc*2); 
+      %Aw(1:2:fft_enc*2) = cos(phase);
+      %Aw(2:2:fft_enc*2) = -sin(phase);
+
+      % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
+      % is not used
+
+      Hm = zeros(1, 2*max_amp);
+      for m=1:L
+        b = round(m*Wo*fft_enc/(2*pi));
+        Hm(2*m) = cos(phase(b));
+        Hm(2*m+1) = -sin(phase(b));
+      end
+      fwrite(fhm, Hm, "float32");    
     end
   end
  
   fclose(fam);
   fclose(fWo);
   if synth_phase
-    fclose(faw);
+    fclose(fhm);
   end
 
   % save voicing file
@@ -155,12 +165,6 @@ endfunction
 % -----------------------------------------------------------------------------------------
 % Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
 % quantisation.  Evolved from abys decimator below.  Simulates the entire encoder/decoder.
-
-#{
-   todo: 
-     [ ] M=8 nomenclature, make it closer to existing 25ms C modes
-     [ ] frame by frame-ish operation, close to C implementations
-#}
 
 function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   max_amp = 80;
@@ -599,7 +603,7 @@ endfunction
 % Experimental AbyS decimator that chooses best frames to match
 % surface based on AbyS approach.  Can apply post filter at different
 % points, and optionally do fixed decimation, at rate K.  Didn't
-% produce anything spectacular in AbyS mode, suggest anotehr look with
+% produce anything spectacular in AbyS mode, suggest another look with
 % some sort of fbf display to see what's going on internally.
  
 function model_ = experiment_dec_abys(model, M=8, vq_en=0, pf_en=1, fixed_dec=0, voicing)
@@ -849,7 +853,7 @@ endfunction
   My original idea was to used a 3-4 "resonators" to construct a
   piecewise model of the spectrum.  Kind of got distracted by the
   surface and mel sampling that ended up working OK.  This method was
-  working OK, soem issues with backgorund noise but rather easy to
+  working OK, soem issues with background noise but rather easy to
   quantise.
 
   todo: get this working again
