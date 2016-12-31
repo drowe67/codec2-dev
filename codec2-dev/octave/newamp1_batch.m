@@ -72,7 +72,8 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
 
   [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder/decoder, lets toss away results except for indexes
-  [model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
+  %[model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
+  [model_ voicing_] = model_from_indexes_fbf(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
 
   %model_ = experiment_dec_linear(model_);
   %model_ = experiment_energy_rate_linear(model, 1, 0);
@@ -408,6 +409,116 @@ function [model_ voicing_] = model_from_indexes(indexes)
   model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
   model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
 
+endfunction
+
+
+% ---------------------------------------------------------------------------------------
+% Stand alone decoder that takes indexes and creates model_, just like 
+% model_from_indexes above. This version is refactored to perform frame by frame
+% processing, as a stepping stone to C.
+
+function [model_ voicing_] = model_from_indexes_fbf(indexes)
+  max_amp = 80;  K = 20;  M = 4;
+
+  [frames nc] = size(indexes);
+  model = model_ = zeros(frames, max_amp+3);
+  sample_freqs_kHz = mel_sample_freqs_kHz(K);
+  energy_q = 10 + 40/16*(0:15);
+
+  melvq;
+  load train_120_vq;
+
+  surface_no_mean_ = zeros(frames,K);
+  surface_ = zeros(frames, K);
+  interpolated_surface_ = zeros(frames, K);
+  voicing = zeros(1, frames);
+  voicing_ = zeros(1, frames);
+
+  for f=1:M:frames
+    % decode vector quantised surface
+
+    surface_no_mean_(f,:) = train_120_vq(indexes(f,1),:,1) + train_120_vq(indexes(f,2),:,2);
+    surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
+    mean_f_ = energy_q(indexes(f,3)+1);
+    surface_(f,:) = surface_no_mean_(f,:) + mean_f_;
+
+    % break into segments of M frames.  We have 2 samples spaced M apart
+    % and interpolate the rest.
+
+    if f > M
+      left_vec = surface_(f-M,:);
+      right_vec = surface_(f,:);
+      sample_points = [f-M f];
+      resample_points = f-M:f-1;
+      for k=1:K
+        interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
+      end    
+    end
+
+    % recover Wo and voicing
+
+    if indexes(f,4) == 0
+      voicing(f) = 0;
+      model(f,1) = 2*pi/100;
+    else
+      voicing(f) = 1;
+      model(f,1) = decode_log_Wo(indexes(f,4), 6);
+    end
+
+    if f > M
+      Wo1 = model(f-M,1);
+      Wo2 = model(f,1);
+
+      [Wo_ avoicing_] = interp_Wo_v(Wo1, Wo2, voicing(f-M), voicing(f));
+      model_(f-M:f-1,1) = Wo_;
+      voicing_(f-M:f-1) = avoicing_;
+      model_(f-M:f-1,2) = floor(pi ./ model_(f-M:f-1,1)); % calculate L for each interpolated Wo
+    end
+
+  end
+  
+  model_(frames-M:frames,1) = pi/100; % set end frames to something sensible
+  model_(frames-M:frames,2) = floor(pi ./ model_(frames-M:frames,1));
+
+  model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
+
+endfunction
+
+
+function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
+    M = 4;
+    max_amp = 80;
+
+    Wo_ = zeros(1,M); 
+    voicing_ = zeros(1,M);
+    if !voicing1 && !voicing2
+       Wo_(1:M) = 2*pi/100;
+    end
+
+    if voicing1 && !voicing2
+       Wo_(1:M/2) = Wo1;
+       Wo_(M/2+1:M) = 2*pi/100;
+       voicing_(1:M/2) = 1;
+    end
+
+    if !voicing1 && voicing2
+       Wo_(1:M/2) = 2*pi/100;
+       Wo_(M/2+1:M) = Wo2;
+       voicing_(M/2+1:M) = 1;
+    end
+
+    if voicing1 && voicing2
+      Wo_samples = [Wo1 Wo2];
+      Wo_(1:M) = interp_linear([1 M+1], Wo_samples, 1:M);
+      voicing_(1:M) = 1;
+    end
+
+    #{
+    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
+    for i=f:f+M/2-1
+      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
+    end
+    #}
 endfunction
 
 
