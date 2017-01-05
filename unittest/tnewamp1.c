@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     MODEL model;
     void *nlp_states;
     float pitch, prev_uq_Wo;
-    int   i,m,f;
+    int   i,m,f,k;
     
     if (argc != 2) {
         printf("usage: ./tnewamp1 RawFile\n");
@@ -65,14 +65,20 @@ int main(int argc, char *argv[]) {
 
     int K = 20;
     float rate_K_sample_freqs_kHz[K];
-    float model_octave[FRAMES][MAX_AMP+2]; // model params in matrix format, useful for C <-> Octave  
-    float rate_K_surface[FRAMES][K];       // rate K vecs for each frame, form a surface that makes pretty graphs
+    float model_octave[FRAMES][MAX_AMP+2];    // model params in matrix format, useful for C <-> Octave  
+    float rate_K_surface[FRAMES][K];          // rate K vecs for each frame, form a surface that makes pretty graphs
+    float rate_K_surface_no_mean[FRAMES][K];  // mean removed surface  
+    float rate_K_surface_no_mean_[FRAMES][K]; // quantised mean removed surface  
+    float mean[FRAMES];
+    float mean_[FRAMES];
+    float rate_K_surface_[FRAMES][K];         // quantised rate K vecs for each frame
 
     for(f=0; f<FRAMES; f++)
         for(m=0; m<MAX_AMP+2; m++)
             model_octave[f][m] = 0.0;
 
     mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K);
+
     //for(int k=0; k<K; k++)
     //    printf("k: %d sf: %f\n", k, rate_K_sample_freqs_kHz[k]);
 
@@ -103,12 +109,33 @@ int main(int argc, char *argv[]) {
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
-        /* Resample at rate K ----------------------------------------*/
+        /* newamp1 processing ----------------------------------------*/
 
         resample_const_rate_f(&model, &rate_K_surface[f][0], rate_K_sample_freqs_kHz, K);
-        for(int k=0; k<K; k++)
-            printf("k: %d sf: %f sv: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_surface[f][k]);
-        printf("\n");
+        float sum = 0.0;
+        for(k=0; k<K; k++)
+            sum += rate_K_surface[f][k];
+        mean[f] = sum/K;
+        for(k=0; k<K; k++)
+            rate_K_surface_no_mean[f][k] = rate_K_surface[f][k] - mean[f];
+
+        int vq_indexes[2];
+        rate_K_mbest_encode(vq_indexes, &rate_K_surface_no_mean[f][0], &rate_K_surface_no_mean_[f][0], K, 5);
+
+        post_filter_newamp1(&rate_K_surface_no_mean_[f][0], rate_K_sample_freqs_kHz, K, 1.5);
+
+        int energy_index;
+        float w[1] = {1.0};
+        float se;
+        energy_index = quantise(newamp1_energy_cb[0].cb, &mean[f], w, newamp1_energy_cb[0].k, newamp1_energy_cb[0].m, &se);
+        mean_[f] = newamp1_energy_cb[0].cb[energy_index];
+
+        for(k=0; k<K; k++)
+            rate_K_surface_[f][k] = rate_K_surface_no_mean_[f][k] + mean_[f];
+
+        //for(int k=0; k<K; k++)
+        //    printf("k: %d sf: %f sv: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_surface[f][k]);
+        //printf("\n");
 
         /* log vectors */
  
@@ -127,6 +154,11 @@ int main(int argc, char *argv[]) {
     assert(fout != NULL);
     fprintf(fout, "# Created by tnewamp1.c\n");
     octave_save_float(fout, "rate_K_surface_c", (float*)rate_K_surface, FRAMES, K, K);
+    octave_save_float(fout, "mean_c", (float*)mean, FRAMES, 1, 1);
+    octave_save_float(fout, "rate_K_surface_no_mean_c", (float*)rate_K_surface_no_mean, FRAMES, K, K);
+    octave_save_float(fout, "rate_K_surface_no_mean__c", (float*)rate_K_surface_no_mean_, FRAMES, K, K);
+    octave_save_float(fout, "mean__c", (float*)mean_, FRAMES, 1, 1);
+    octave_save_float(fout, "rate_K_surface__c", (float*)rate_K_surface_, FRAMES, K, K);
     octave_save_float(fout, "model_c", (float*)model_octave, FRAMES, MAX_AMP+2, MAX_AMP+2);
     fclose(fout);
 

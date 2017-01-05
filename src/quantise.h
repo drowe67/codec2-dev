@@ -139,5 +139,7 @@ void interp_para(float y[], float xp[], float yp[], int np, float x[], int n);
 float ftomel(float fHz);
 void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K);
 void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K);
+float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest_entries);
+void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_gain);
 
 #endif

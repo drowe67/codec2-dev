@@ -55,12 +55,16 @@ set(CODEBOOKSLSPMELVQ
     ${D}/lspmelvq3.txt
 )
 
+set(CODEBOOKSGE ${D}/gecb.txt)
+
 set(CODEBOOKSNEWAMP1
     ${D}/train_120_1.txt
     ${D}/train_120_2.txt
 )
 
-set(CODEBOOKSGE ${D}/gecb.txt)
+set(CODEBOOKSNEWAMP1_ENERGY
+    ${D}/newamp1_energy_q.txt
+)
 
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
@@ -138,6 +142,13 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSNEWAMP1}
 )
 
+# codebooknewamp1_energy.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp1_energy.c
+    COMMAND generate_codebook newamp1_energy_cb ${CODEBOOKSNEWAMP1_ENERGY} > ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp1_energy.c
+    DEPENDS generate_codebook ${CODEBOOKSNEWAMP1_ENERGY}
+)
+
 #
 # codec2 library sources
 #
@@ -169,8 +180,9 @@ set(CODEC2_SRCS
     codebookjvm.c
     codebookmel.c
     codebooklspmelvq.c
-    codebooknewamp1.c
     codebookge.c
+    codebooknewamp1.c
+    codebooknewamp1_energy.c
     golay23.c
     freedv_api.c
     freedv_vhf_framing.c
