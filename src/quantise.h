@@ -135,4 +135,9 @@ float decode_amplitudes(MODEL *model,
 			float  lsps[],
 			float *e);
 
+void interp_para(float y[], float xp[], float yp[], int np, float x[], int n);
+float ftomel(float fHz);
+void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K);
+void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K);
+
 #endif

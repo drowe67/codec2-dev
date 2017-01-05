@@ -45,7 +45,7 @@ void dump_softdec(float *softdec, int n);
 void dump_model(MODEL *m);
 void dump_quantised_model(MODEL *m);
 void dump_Pwn(COMP Pw[]);
-void dump_Pw(COMP Pw[]);
+void dump_Pw(float Pw[]);
 void dump_Rw(float Rw[]);
 void dump_lsp(float lsp[]);
 void dump_weights(float w[], int ndim);
@@ -75,6 +75,6 @@ void dump_Rk(float Rk[]);
 /* post filter */
 
 void dump_bg(float e, float bg_est, float percent_uv);
-void dump_Pwb(COMP Pwb[]);
+void dump_Pwb(float Pwb[]);
 
 #endif

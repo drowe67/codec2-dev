@@ -113,3 +113,6 @@ target_link_libraries(raw2h codec2)
 add_definitions(-D__UNITTEST__)
 add_executable(c2validate c2validate.c)
 target_link_libraries(c2validate codec2)
+
+add_executable(tnewamp1 tnewamp1.c ../src/quantise.c ../src/kiss_fft.c ../src/sine.c ../src/nlp.c ../src/dump.c ../src/octave.c ${CODEBOOKS})
+target_link_libraries(tnewamp1 codec2)
