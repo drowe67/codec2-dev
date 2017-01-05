@@ -378,7 +378,7 @@ void dump_lpc_snr(float snr) {
 
 /* Pw "before" post filter so we can plot before and after */
 
-void dump_Pwb(COMP Pwb[]) {
+void dump_Pwb(float Pwb[]) {
     int i;
     char s[MAX_STR];
 
@@ -391,11 +391,11 @@ void dump_Pwb(COMP Pwb[]) {
     }
 
     for(i=0; i<FFT_ENC/2; i++)
-	fprintf(fpwb,"%f\t",Pwb[i].real);
+	fprintf(fpwb,"%f\t",Pwb[i]);
     fprintf(fpwb,"\n");
 }
 
-void dump_Pw(COMP Pw[]) {
+void dump_Pw(float Pw[]) {
     int i;
     char s[MAX_STR];
 
@@ -408,7 +408,7 @@ void dump_Pw(COMP Pw[]) {
     }
 
     for(i=0; i<FFT_ENC/2; i++)
-	fprintf(fpw,"%f\t",Pw[i].real);
+	fprintf(fpw,"%f\t",Pw[i]);
     fprintf(fpw,"\n");
 }
 

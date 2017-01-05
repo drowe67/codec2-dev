@@ -2167,3 +2167,114 @@ void decode_WoE(MODEL *model, float *e, float xq[], int n1)
   *e = powf(10.0, xq[1]/10.0);
 }
 
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_para()
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  General 2nd order parabolic interpolator.  Used splines orginally,
+  but this is much simpler and we don't need much accuracy.  Given two
+  vectors of points xp and yp, find interpolated values y at points x.
+
+\*---------------------------------------------------------------------------*/
+
+void interp_para(float y[], float xp[], float yp[], int np, float x[], int n)
+{
+    assert(np >= 3);
+
+    int k,i;
+    float xi, x1, y1, x2, y2, x3, y3, a, b;
+
+    k = 0;
+    for (i=0; i<n; i++) {
+        xi = x[i];
+
+        /* k is index into xp of where we start 3 points used to form parabola */
+
+        while ((xp[k+1] < xi) && (k < (np-3)))
+            k++;
+    
+        x1 = xp[k]; y1 = yp[k]; x2 = xp[k+1]; y2 = yp[k+1]; x3 = xp[k+2]; y3 = yp[k+2];
+
+        printf("k: %d np: %d i: %d xi: %f x1: %f y1: %f\n", k, np, i, xi, x1, y1);
+
+        a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
+        b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
+  
+        y[i] = a*(xi-x2)*(xi-x2) + b*(xi-x2) + y2;
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: ftomel()
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Non linear sampling of frequency axis, reducing the "rate" is a
+  first step before VQ
+
+\*---------------------------------------------------------------------------*/
+
+float ftomel(float fHz) {
+    float mel = floorf(2595.0*log10f(1.0 + fHz/700.0)+0.5);
+    return mel;
+}
+
+void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K)
+{
+    float mel_start = ftomel(200.0); float mel_end = ftomel(3700.0); 
+    float step = (mel_end-mel_start)/(K-1);
+    float mel;
+    int k;
+
+    mel = mel_start;
+    for (k=0; k<K; k++) {
+        rate_K_sample_freqs_kHz[k] = 0.7*(pow(10.0, (mel/2595.0)) - 1.0);
+        mel += step;
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: resample_const_rate_f()
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.
+
+\*---------------------------------------------------------------------------*/
+
+void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
+{
+    int m;
+    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1], AmdB_peak;
+
+    /* convert rate L=pi/Wo amplitude samples to fixed rate K */
+
+    AmdB_peak = -100.0;
+    for(m=1; m<=model->L; m++) {
+        AmdB[m] = 20.0*log10(model->A[m]+1E-16);
+        if (AmdB[m] > AmdB_peak) {
+            AmdB_peak = AmdB[m];
+        }
+        rate_L_sample_freqs_kHz[m] = m*model->Wo*4.0/M_PI;
+        printf("m: %d AmdB: %f AmdB_peak: %f  sf: %f\n", m, AmdB[m], AmdB_peak, rate_L_sample_freqs_kHz[m]);
+    }
+    
+    /* clip between peak and peak -50dB, to reduce dynamic range */
+
+    for(m=1; m<=model->L; m++) {
+        if (AmdB[m] < (AmdB_peak-50.0)) {
+            AmdB[m] = AmdB_peak-50.0;
+        }
+    }
+
+    interp_para(rate_K_vec, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, rate_K_sample_freqs_kHz, K);    
+}
+
+
+
