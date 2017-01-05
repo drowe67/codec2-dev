@@ -95,5 +95,6 @@ extern const struct lsp_codebook mel_cb[];
 extern const struct lsp_codebook ge_cb[];
 extern const struct lsp_codebook lspmelvq_cb[];
 extern const struct lsp_codebook newamp1vq_cb[];
+extern const struct lsp_codebook newamp1_energy_cb[];
 
 #endif

@@ -2197,7 +2197,7 @@ void interp_para(float y[], float xp[], float yp[], int np, float x[], int n)
     
         x1 = xp[k]; y1 = yp[k]; x2 = xp[k+1]; y2 = yp[k+1]; x3 = xp[k+2]; y3 = yp[k+2];
 
-        printf("k: %d np: %d i: %d xi: %f x1: %f y1: %f\n", k, np, i, xi, x1, y1);
+        //printf("k: %d np: %d i: %d xi: %f x1: %f y1: %f\n", k, np, i, xi, x1, y1);
 
         a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
         b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
@@ -2262,7 +2262,7 @@ void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample
             AmdB_peak = AmdB[m];
         }
         rate_L_sample_freqs_kHz[m] = m*model->Wo*4.0/M_PI;
-        printf("m: %d AmdB: %f AmdB_peak: %f  sf: %f\n", m, AmdB[m], AmdB_peak, rate_L_sample_freqs_kHz[m]);
+        //printf("m: %d AmdB: %f AmdB_peak: %f  sf: %f\n", m, AmdB[m], AmdB_peak, rate_L_sample_freqs_kHz[m]);
     }
     
     /* clip between peak and peak -50dB, to reduce dynamic range */
@@ -2277,4 +2277,110 @@ void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample
 }
 
 
+/*---------------------------------------------------------------------------*\
 
+  FUNCTION....: rate_K_mbest_encode
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Two stage rate K newamp1 VQ quantiser using mbest search.
+
+\*---------------------------------------------------------------------------*/
+
+float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest_entries)
+{
+  int i, j, n1, n2;
+  const float *codebook1 = newamp1vq_cb[0].cb;
+  const float *codebook2 = newamp1vq_cb[1].cb;
+  struct MBEST *mbest_stage1, *mbest_stage2;
+  float target[ndim];
+  float w[ndim];
+  int   index[MBEST_STAGES];
+  float mse, tmp;
+
+  for(i=0; i<ndim; i++)
+      w[i] = 1.0;
+
+  mbest_stage1 = mbest_create(mbest_entries);
+  mbest_stage2 = mbest_create(mbest_entries);
+  for(i=0; i<MBEST_STAGES; i++)
+      index[i] = 0;
+
+  /* Stage 1 */
+
+  mbest_search(codebook1, x, w, ndim, newamp1vq_cb[0].m, mbest_stage1, index);
+  MBEST_PRINT("Stage 1:", mbest_stage1);
+
+  /* Stage 2 */
+
+  for (j=0; j<mbest_entries; j++) {
+      index[1] = n1 = mbest_stage1->list[j].index[0];
+      for(i=0; i<ndim; i++)
+	  target[i] = x[i] - codebook1[ndim*n1+i];
+      mbest_search(codebook2, target, w, ndim, newamp1vq_cb[1].m, mbest_stage2, index);
+  }
+  MBEST_PRINT("Stage 2:", mbest_stage2);
+
+  n1 = mbest_stage2->list[0].index[1];
+  n2 = mbest_stage2->list[0].index[0];
+  mse = 0.0;
+  for (i=0;i<ndim;i++) {
+      tmp = codebook1[ndim*n1+i] + codebook2[ndim*n2+i];
+      mse += (x[i]-tmp)*(x[i]-tmp);
+      xq[i] = tmp;
+  }
+
+  mbest_destroy(mbest_stage1);
+  mbest_destroy(mbest_stage2);
+
+  indexes[0] = n1; indexes[1] = n2;;
+
+  return mse;
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: post_filter
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Post Filter, has a big impact on speech quality after VQ.  When used
+  on a mean removed rate K vector, it raises formants, and supresses
+  anti-formants.  As it manipulates amplitudes, we normalise energy to
+  prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
+  (dB) seems to work OK.  Good area for further investigations and
+  improvements in speech quality.
+
+\*---------------------------------------------------------------------------*/
+
+void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_gain)
+{
+    int k;
+
+    /*
+      vec is rate K vector describing spectrum of current frame lets
+      pre-emp before applying PF. 20dB/dec over 300Hz.  Postfilter
+      affects energy of frame so we measure energy before and after
+      and normalise.  Plenty of room for experiment here as well.
+    */
+    
+    float pre[K];
+    float e_before = 0.0;
+    float e_after = 0.0;
+    for(k=0; k<K; k++) {
+        pre[k] = 20.0*log10f(sample_freq_kHz[k]/0.3);
+        vec[k] += pre[k];
+        e_before += powf(10.0, 2.0*vec[k]/20.0);
+        vec[k] *= pf_gain;
+        e_after += powf(10.0, 2.0*vec[k]/20.0);        
+    }
+
+    float gain = e_after/e_before;
+    float gaindB = 10*log10f(gain);
+  
+    for(k=0; k<K; k++) {
+        vec[k] -= gaindB;
+        vec[k] -= pre[k];
+    }
+}

@@ -25,17 +25,18 @@ function y = interp_para(xp, yp, x)
   assert( (length(xp) >=3) && (length(yp) >= 3) );
 
   y = zeros(1,length(x));
+  k = 1;
   for i=1:length(x)
     xi = x(i);
 
     % k is index into xp of where we start 3 points used to form parabola
 
-    k = 1;
     while ((xp(k+1) < xi) && (k < (length(xp)-2))) 
       k++;
     end
     
     x1 = xp(k); y1 = yp(k); x2 = xp(k+1); y2 = yp(k+1); x3 = xp(k+2); y3 = yp(k+2);
+    %printf("k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
 
     a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
     b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
@@ -178,6 +179,7 @@ function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
   rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
 endfunction
 
+
 function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
@@ -208,7 +210,7 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
     AmdB_peak = max(AmdB);
     AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
-
+    
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
     
     %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
@@ -271,8 +273,44 @@ function vec = post_filter(vec, sample_freq_kHz, pf_gain = 1.5, voicing)
 endfunction
 
 
+% construct energy quantiser table, and save to text file to include in C
+
+function energy_q = create_energy_q
+    energy_q = 10 + 40/16*(0:15);
+endfunction
+
+function save_energy_q(fn)
+  energy_q = create_energy_q;
+  f = fopen(fn, "wt");
+  fprintf(f, "1 %d\n", length(energy_q));
+  for n=1:length(energy_q)
+    fprintf(f, "%f\n", energy_q(n));
+  end
+  fclose(f);
+endfunction
+
+
+% save's VQ in format that can be compiled by Codec 2 build system
+
+function save_vq(vqset, filenameprefix)
+  [Nvec order stages] = size(vqset);
+  for s=1:stages
+    fn = sprintf("%s_%d.txt", filenameprefix, s);
+    f = fopen(fn, "wt");
+    fprintf(f, "%d %d\n", order, Nvec);
+    for n=1:Nvec
+      for k=1:order
+        fprintf(f, "% 8.4f ", vqset(n,k,s));
+      end
+      fprintf(f, "\n");
+    end
+    fclose(f);
+  end
+endfunction
+
+
 % --------------------------------------------------------------------------------
-% Experimental functions used for masking, piecewise models
+% Experimental functions used for masking, piecewise models, not part of newamp1
 % --------------------------------------------------------------------------------
 
 

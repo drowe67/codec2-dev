@@ -61,14 +61,36 @@ function tnewamp1(input_prefix)
   K = 20;
   [frames tmp] = size(rate_K_surface_c);
   [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_mel(model(1:frames,:), K);
-rate_K_surface
-  figure(1);
-  mesh(rate_K_surface);
-  figure(2);
-  mesh(rate_K_surface_c);
-  figure(3);
-  mesh(rate_K_surface - rate_K_surface_c);
 
+  melvq;
+  load train_120_vq; m=5;
+       
+  for f=1:frames
+    mean_f(f) = mean(rate_K_surface(f,:));
+    rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
+  end
+
+  [res rate_K_surface_no_mean_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
+
+  for f=1:frames
+    rate_K_surface_no_mean_(f,:) = post_filter(rate_K_surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
+  end
+    
+  rate_K_surface_ = zeros(frames, K);
+  energy_q = create_energy_q;
+  for f=1:frames   
+    [mean_f_ indx] = quantise(energy_q, mean_f(f));
+    indexes(f,3) = indx - 1;
+    rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + mean_f_;
+  end
+
+  figure(1);
+  mesh(rate_K_surface_);
+  figure(2);
+  mesh(rate_K_surface__c);
+  figure(3);
+  mesh(rate_K_surface_ - rate_K_surface__c);
+  axis([1 K 1 frames -1 1])
   #{
 
   for f=1:frames
