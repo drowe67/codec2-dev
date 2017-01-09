@@ -9,8 +9,7 @@
 % is rather dim, but a working example is good place to start!
 
 
-function [phase s] = mag_to_phase(Gdbfk, verbose_en = 0)
-  Nfft    = 512;  % FFT size to use 
+function [phase s] = mag_to_phase(Gdbfk, Nfft = 512, verbose_en = 0)
 
   Ns = length(Gdbfk); if Ns~=Nfft/2+1, error("confusion"); end
   Sdb = [Gdbfk,Gdbfk(Ns-1:-1:2)]; % install negative-frequencies
@@ -31,7 +30,27 @@ function [phase s] = mag_to_phase(Gdbfk, verbose_en = 0)
     end
   end
 
+  printf("  Sdb..: ");
+  for i=1:5
+      printf("%5.2f ", real(Sdb(i)));
+  end
+  printf("\n         ");
+  for i=1:5
+      printf("%5.2f ", imag(Sdb(i)));
+  end
+  printf("\n");
+
   c = ifft(Sdb); % compute real cepstrum from log magnitude spectrum
+ 
+  printf("  c....: ");
+  for i=1:5
+      printf("%5.2f ", real(c(i)));
+  end
+  printf("\n         ");
+  for i=1:5
+      printf("%5.2f ", imag(c(i)));
+  end
+  printf("\n");
 
   % Check aliasing of cepstrum (in theory there is always some):
 
@@ -50,10 +69,11 @@ function [phase s] = mag_to_phase(Gdbfk, verbose_en = 0)
   % Fold cepstrum to reflect non-min-phase zeros inside unit circle:
 
   cf = [c(1), c(2:Ns-1)+c(Nfft:-1:Ns+1), c(Ns), zeros(1,Nfft-Ns)];
+
   Cf = fft(cf); % = dB_magnitude + j * minimum_phase
 
   % The maths says we are meant to be using log(x), not 20*log10(x),
-  % so we need to sclae the phase toa ccount for this:
+  % so we need to scale the phase to account for this:
   % log(x) = 20*log10(x)/scale;
 
   scale = (20/log(10));

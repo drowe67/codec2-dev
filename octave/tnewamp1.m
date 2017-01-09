@@ -34,6 +34,7 @@
 
 function tnewamp1(input_prefix)
   newamp;
+  autotest;
   more off;
 
   max_amp = 80;
@@ -58,6 +59,7 @@ function tnewamp1(input_prefix)
   % Load in C vectors and compare -----------------------------------------
  
   load("../build_linux/unittest/tnewamp1_out.txt");
+  
   K = 20;
   [frames tmp] = size(rate_K_surface_c);
   [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_mel(model(1:frames,:), K);
@@ -77,20 +79,116 @@ function tnewamp1(input_prefix)
   end
     
   rate_K_surface_ = zeros(frames, K);
+  interpolated_surface_ = zeros(frames, K);
   energy_q = create_energy_q;
+  M = 4;
   for f=1:frames   
     [mean_f_ indx] = quantise(energy_q, mean_f(f));
     indexes(f,3) = indx - 1;
     rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + mean_f_;
   end
 
+  % simulated decoder
+  % break into segments of M frames.  We have 2 samples spaced M apart
+  % and interpolate the rest.
+
+  Nfft_phase = 128;
+  model_ = zeros(frames, max_amp+2);
+  voicing_ = zeros(1,frames);
+  Hm = zeros(frames, max_amp);
+  phi = zeros(1,max_amp);
+  for f=1:M:frames   
+    if voicing(f)
+      index = encode_log_Wo(model(f,1), 6);
+      if index == 0
+        index = 1;
+      end
+      model_(f,1) = decode_log_Wo(index, 6);
+    else
+      model_(f,1) = 2*pi/100;
+    end
+
+    if f > M
+      Wo1 = model_(f-M,1);
+      Wo2 = model_(f,1);
+      [Wo_ avoicing_] = interp_Wo_v(Wo1, Wo2, voicing(f-M), voicing(f));
+      model_(f-M:f-1,1) = Wo_;
+      voicing_(f-M:f-1) = avoicing_;
+      model_(f-M:f-1,2) = floor(pi ./ model_(f-M:f-1,1)); % calculate L for each interpolated Wo
+
+      left_vec = rate_K_surface_(f-M,:);
+      right_vec = rate_K_surface_(f,:);
+      sample_points = [f-M f];
+      resample_points = f-M:f-1;
+      for k=1:K
+        interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
+      end
+      
+      for k=f-M:f-1
+        model_(k,:) = resample_rate_L(model_(k,:), interpolated_surface_(k,:), sample_freqs_kHz);
+        printf("\n");
+        printf("frame: %d Wo: %4.3f L: %d\n", k, model_(k,1), model_(k,2));
+        phase = determine_phase(model_, k, Nfft_phase);
+        printf("  phase: ");
+        for i=1:5
+          printf("%5.2f ", phase(i));
+        end
+        printf("\n");
+        printf("  b....: ");
+        for m=1:model_(k,2)
+          b = round(m*model_(k,1)*Nfft_phase/(2*pi));  % map harmonic centre to DFT bin
+          if m <= 5
+            printf("%5d ", b);
+          end
+          phi(m) = phase(b+1);
+          Hm(k,m) = exp(-j*phi(m));
+        end  
+        printf("\n");
+        printf("  phi..: ");
+        for m=1:5
+          printf("%5.2f ", phi(m));
+        end
+        printf("\n");
+        %if k == 2
+        %  xx
+        %end
+     
+      end
+    end
+  end
+
+  %model_(1,1:77)
+  %model__c(1,1:77)
+  %sum(model_(1,1:77)-model__c(1,1:77))
+  %[mx mxi] = max(model_(1,1:77)-model__c(1,1:77))
+
+  %interpolated_surface_(1,:)
+  %interpolated_surface__c(1,:)
+  %sum(interpolated_surface_(1,:) - interpolated_surface__c(1,:))
+
+
+  %Hm(2,:) - Hm_c(2,:)
+  for f=1:frames
+    s = abs(sum(Hm(f,:) - Hm_c(f,:)));
+    printf("f: %d s: %f \n", f, s);
+  end
+  
   figure(1);
-  mesh(rate_K_surface_);
+  mesh(angle(Hm));
   figure(2);
-  mesh(rate_K_surface__c);
+  mesh(angle(Hm_c));
   figure(3);
-  mesh(rate_K_surface_ - rate_K_surface__c);
-  axis([1 K 1 frames -1 1])
+  mesh(abs(Hm - Hm_c));
+
+  check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
+  check(mean_f, mean_c, 'mean', 0.01);
+  check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01);
+  check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
+  check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
+  check(voicing_, voicing__c, 'interpolated voicing');
+  check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L surface at dec', 0.1);
+  check(Hm, Hm_c, 'phase surface');
+
   #{
 
   for f=1:frames

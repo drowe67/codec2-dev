@@ -29,6 +29,7 @@
 #include "phase.h"
 #include "kiss_fft.h"
 #include "comp.h"
+#include "comp_prim.h"
 #include "sine.h"
 
 #include <assert.h>
@@ -212,3 +213,105 @@ void phase_synth_zero_order(
 
 }
 
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: mag_to_phase
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Algorithm for http://www.dsprelated.com/showcode/20.php ported to C.  See
+  also Octave function mag_to_phase.m
+
+  Given a magnitude spectrum in dB, returns a minimum-phase phase
+  spectra.
+
+\*---------------------------------------------------------------------------*/
+
+void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in radians       */
+                  float Gdbfk[],             /* Nfft/2+1 postive freq amplitudes samples in dB */
+                  int Nfft, 
+                  codec2_fft_cfg fft_fwd_cfg,
+                  codec2_fft_cfg fft_inv_cfg
+                  )
+{
+    COMP Sdb[Nfft], c[Nfft], cf[Nfft], Cf[Nfft];
+    int  Ns = Nfft/2+1;
+    int  i;
+
+    /* install negative frequency components, 1/Nfft takes into
+       account kiss fft lack of scaling on ifft */
+
+    Sdb[0].real = Gdbfk[0];
+    Sdb[Ns].real = Gdbfk[Ns];
+    Sdb[0].imag = Sdb[Ns].imag = 0.0;
+    for(i=1; i<Ns; i++) {
+        Sdb[i].real = Sdb[Nfft-i].real = Gdbfk[i];
+        Sdb[i].imag = Sdb[Nfft-i].imag = 0.0;
+    }
+
+    printf("  Sdb..: ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", Sdb[i].real);
+    }
+    printf("\n         ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", Sdb[i].imag);
+    }
+    printf("\n");
+
+    /* compute real cepstrum from log magnitude spectrum */
+
+    codec2_fft(fft_inv_cfg, Sdb, c);
+    for(i=0; i<Nfft; i++) {
+        c[i].real /= (float)Nfft;
+        c[i].imag /= (float)Nfft;
+    }
+
+    printf("  c....: ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", c[i].real);
+    }
+    printf("\n         ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", c[i].imag);
+    }
+    printf("\n");
+    /*
+    for(i=0; i<Nfft; i++) {
+        printf("i: %d c: %f %f\n", i, c[i].real, c[i].imag);
+    }
+    */
+
+    /* Fold cepstrum to reflect non-min-phase zeros inside unit circle */
+
+    cf[0] = c[0];
+    for(i=1; i<Ns-1; i++) {
+        cf[i] = cadd(c[i],c[Nfft-i]);
+    }
+    cf[Ns] = c[Ns];
+    for(i=Ns; i<Nfft; i++) {
+        cf[i].real = 0.0;
+        cf[i].imag = 0.0;
+    }
+
+    /* Cf = dB_magnitude + j * minimum_phase */
+
+    codec2_fft(fft_fwd_cfg, cf, Cf);
+
+    /*  The maths says we are meant to be using log(x), not 20*log10(x),
+        so we need to scale the phase to account for this:
+        log(x) = 20*log10(x)/scale */
+                          
+    float scale = (20.0/logf(10.0));
+    
+    for(i=0; i<Ns; i++) {
+        phase[i] = Cf[i].imag/scale;
+    }
+    
+    printf("  phase: ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", phase[i]);
+    }
+    printf("\n");
+}
