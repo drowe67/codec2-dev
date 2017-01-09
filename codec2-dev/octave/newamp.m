@@ -149,6 +149,17 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
   Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, sample_freqs_kHz);    
 
+  printf("  AmdB.: ");
+  for m=1:5
+    printf("%5.2f ", AmdB(m));
+  end
+  printf("\n");
+  printf("  Gdbfk: ");
+  for m=1:5
+    printf("%5.2f ", Gdbfk(m));
+  end
+  printf("\n");
+
   % Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
 
   % optional input of aks for testing
@@ -228,7 +239,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
   max_amp = 80;
   [frames col] = size(model);
 
-  model_ = zeros(frames, max_amp+3);
+  model_ = zeros(frames, max_amp+2);
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
@@ -306,6 +317,47 @@ function save_vq(vqset, filenameprefix)
     end
     fclose(f);
   end
+endfunction
+
+
+% Decoder side interpolation of Wo and voicing, to go from 25 Hz
+% sample rate used over channel to 100Hz internal sample rate of Codec
+% 2.
+
+function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
+    M = 4;
+    max_amp = 80;
+
+    Wo_ = zeros(1,M); 
+    voicing_ = zeros(1,M);
+    if !voicing1 && !voicing2
+       Wo_(1:M) = 2*pi/100;
+    end
+
+    if voicing1 && !voicing2
+       Wo_(1:M/2) = Wo1;
+       Wo_(M/2+1:M) = 2*pi/100;
+       voicing_(1:M/2) = 1;
+    end
+
+    if !voicing1 && voicing2
+       Wo_(1:M/2) = 2*pi/100;
+       Wo_(M/2+1:M) = Wo2;
+       voicing_(M/2+1:M) = 1;
+    end
+
+    if voicing1 && voicing2
+      Wo_samples = [Wo1 Wo2];
+      Wo_(1:M) = interp_linear([1 M+1], Wo_samples, 1:M);
+      voicing_(1:M) = 1;
+    end
+
+    #{
+    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
+    for i=f:f+M/2-1
+      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
+    end
+    #}
 endfunction
 
 

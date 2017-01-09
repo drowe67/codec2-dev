@@ -37,6 +37,7 @@
 #include "lpc.h"
 #include "lsp.h"
 #include "codec2_fft.h"
+#include "phase.h"
 #undef PROFILE
 #include "machdep.h"
 
@@ -2383,4 +2384,150 @@ void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_g
         vec[k] -= gaindB;
         vec[k] -= pre[k];
     }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: interp_Wo_v
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Decoder side interpolation of Wo and voicing, to go from 25 Hz
+  sample rate used over channle to 100Hz internal sample rate of Codec 2.
+
+\*---------------------------------------------------------------------------*/
+
+void interp_Wo_v(float Wo_[], int voicing_[], float Wo1, float Wo2, int voicing1, int voicing2)
+{
+    int i;
+    int M = 4;
+
+    for(i=0; i<M; i++)
+        voicing_[i] = 0;
+
+    if (!voicing1 && !voicing2) {
+        for(i=0; i<M; i++)
+            Wo_[i] = 2.0*M_PI/100.0;
+    }
+
+    if (voicing1 && !voicing2) {
+       Wo_[0] = Wo_[1] = Wo1;
+       Wo_[2] = Wo_[3] = 2.0*M_PI/100.0;
+       voicing_[0] = voicing_[1] = 1;
+    }
+
+    if (!voicing1 && voicing2) {
+       Wo_[0] = Wo_[1] = 2.0*M_PI/100.0;
+       Wo_[2] = Wo_[3] = Wo2;
+       voicing_[2] = voicing_[3] = 1;
+    }
+
+    if (voicing1 && voicing2) {
+        float c;
+        for(i=0,c=1.0; i<M; i++,c-=1.0/M) {
+            Wo_[i] = Wo1*c + Wo2*(1.0-c);
+            voicing_[i] = 1;
+        }
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: resample_rate_L
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Decoder side conversion of rate K vector back to rate L.
+
+\*---------------------------------------------------------------------------*/
+
+void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
+{
+   float rate_K_vec_term[K+2], rate_K_sample_freqs_kHz_term[K+2];
+   float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
+   int m;
+
+   /* terminate either end of the rate K vecs with 0dB points */
+
+   rate_K_vec_term[0] = rate_K_vec_term[K+1] = 0.0;
+   rate_K_sample_freqs_kHz_term[0] = 0.0;
+   rate_K_sample_freqs_kHz_term[K+1] = 4.0;
+
+   for(int k=0; k<K; k++) {
+       rate_K_vec_term[k+1] = rate_K_vec[k];
+       rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];
+  
+       //printf("k: %d f: %f rate_K: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_vec[k]);
+   }
+
+   for(m=1; m<=model->L; m++) {
+       rate_L_sample_freqs_kHz[m] = m*model->Wo*4.0/M_PI;
+   }
+
+   interp_para(&AmdB[1], rate_K_sample_freqs_kHz_term, rate_K_vec_term, K+2, &rate_L_sample_freqs_kHz[1], model->L);    
+   for(m=1; m<=model->L; m++) {
+       model->A[m] = pow(10.0,  AmdB[m]/20.0);
+       // printf("m: %d f: %f AdB: %f A: %f\n", m, rate_L_sample_freqs_kHz[m], AmdB[m], model->A[m]);
+   }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: determine_phase
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Given a magnitude spectrum determine a phase spectrum, used for
+  phase synthesis with newamp1.
+
+\*---------------------------------------------------------------------------*/
+
+void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
+{
+    int i,m,b;
+    int Ns = Nfft/2+1;
+    float Gdbfk[Ns], sample_freqs_kHz[Ns], phase[Ns];
+    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
+
+    printf("  AmdB.: ");
+    for(m=1; m<=model->L; m++) {
+        AmdB[m] = 20.0*log10(model->A[m]);
+        rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*4.0/M_PI;
+        if (m <=5) {
+            printf("%5.2f ", AmdB[m]);
+        }
+    }
+    printf("\n");
+    
+    for(i=0; i<Ns; i++) {
+        sample_freqs_kHz[i] = (FS/1000.0)*(float)i/Nfft;
+    }
+
+    interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
+
+    printf("  Gdbfk: ");
+    for(i=0; i<5; i++) {
+        printf("%5.2f ", Gdbfk[i]);
+    }
+    printf("\n");
+
+    mag_to_phase(phase, Gdbfk, Nfft, fwd_cfg, inv_cfg);
+
+    printf("  b....: ");
+    for(m=1; m<=model->L; m++) {
+        b = floorf(0.5+m*model->Wo*Nfft/(2.0*M_PI));
+        model->phi[m] = phase[b];
+        if (m <= 5) {
+            printf("%5d ", b);
+        }
+    }
+    printf("\n");
+    printf("  phi..: ");
+    for(m=1; m<=5; m++) {
+        printf("% 5.2f ", model->phi[m]);
+    }
+    printf("\n");
 }

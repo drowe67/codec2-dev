@@ -208,7 +208,7 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
   mesh(surface_no_mean_);
     
   surface_ = zeros(frames, K);
-  energy_q = 10 + 40/16*(0:15);
+  energy_q = create_energy_q;
   for f=1:frames   
     [mean_f_ indx] = quantise(energy_q, mean_f(f));
     indexes(f,3) = indx - 1;
@@ -249,11 +249,9 @@ function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
         index = 1;
       end
       indexes(f,4) = index;
-      voicing(f) = 1;
       model_(f,1) = decode_log_Wo(indexes(f,4), 6);
     else
       indexes(f,4) = 0;
-      voicing(f) = 0;
       model_(f,1) = 2*pi/100;
     end
   end      
@@ -485,41 +483,6 @@ function [model_ voicing_] = model_from_indexes_fbf(indexes)
 endfunction
 
 
-function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
-    M = 4;
-    max_amp = 80;
-
-    Wo_ = zeros(1,M); 
-    voicing_ = zeros(1,M);
-    if !voicing1 && !voicing2
-       Wo_(1:M) = 2*pi/100;
-    end
-
-    if voicing1 && !voicing2
-       Wo_(1:M/2) = Wo1;
-       Wo_(M/2+1:M) = 2*pi/100;
-       voicing_(1:M/2) = 1;
-    end
-
-    if !voicing1 && voicing2
-       Wo_(1:M/2) = 2*pi/100;
-       Wo_(M/2+1:M) = Wo2;
-       voicing_(M/2+1:M) = 1;
-    end
-
-    if voicing1 && voicing2
-      Wo_samples = [Wo1 Wo2];
-      Wo_(1:M) = interp_linear([1 M+1], Wo_samples, 1:M);
-      voicing_(1:M) = 1;
-    end
-
-    #{
-    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
-    for i=f:f+M/2-1
-      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
-    end
-    #}
-endfunction
 
 
 % ---------------------------------------------------------------------------------------
