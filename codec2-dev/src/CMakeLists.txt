@@ -172,6 +172,8 @@ set(CODEC2_SRCS
     linreg.c
     interp.c
     lsp.c
+    mbest.c
+    newamp1.c
     phase.c
     quantise.c
     pack.c
