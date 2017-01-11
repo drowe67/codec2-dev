@@ -83,6 +83,7 @@ int main(int argc, char *argv[]) {
     int   voicing_[FRAMES];
     float model_octave_[FRAMES][MAX_AMP+2];
     COMP  Hm[FRAMES][MAX_AMP];
+    int indexes[FRAMES][NEWAMP1_N_INDEXES];
 
     for(f=0; f<FRAMES; f++) {
         for(m=0; m<MAX_AMP+2; m++) {
@@ -136,8 +137,7 @@ int main(int argc, char *argv[]) {
 
         /* newamp1 processing ----------------------------------------*/
 
-        int indexes[3];
-        newamp1_model_to_indexes(indexes, 
+        newamp1_model_to_indexes(&indexes[f][0], 
                                  &model, 
                                  &rate_K_surface[f][0], 
                                  rate_K_sample_freqs_kHz,
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
                                  rate_K_sample_freqs_kHz,
                                  K,
                                  &mean_[f],
-                                 indexes);
+                                 &indexes[f][0]);
 
         /* log vectors */
  
@@ -169,6 +169,7 @@ int main(int argc, char *argv[]) {
 
     for(f=0; f<FRAMES; f+=M) {
 
+#ifdef TMP1
         /* Quantise Wo. V/UV flag is coded using a zero index for Wo,
            this means we need to adjust Wo index slightly for the
            lowest Wo V frames */
@@ -183,7 +184,23 @@ int main(int argc, char *argv[]) {
         else {
             model_octave_[f][0] = 2.0*M_PI/100.0;
         }
+#endif
 
+        if (indexes[f][3]) {
+            model_octave_[f][0] = decode_log_Wo(indexes[f][3], 6);
+        }
+        else {
+            model_octave_[f][0] = 2.0*M_PI/100.0;
+        }
+
+        /*
+          pass in left and right rate K vectors, Wo, v
+          interpolate at rate K
+          convert to rate L
+          output 4 model parameters
+          ref indexes to 0...3
+          slowly change
+        */
         float c;
         if (f >= M) {
 
@@ -216,8 +233,8 @@ int main(int argc, char *argv[]) {
                 model_.Wo = model_octave_[i][0];
                 model_.L  = model_octave_[i][1];
                 resample_rate_L(&model_, &interpolated_surface_[i][0], rate_K_sample_freqs_kHz, K);
-                printf("\n");
-                printf("frame: %d Wo: %4.3f L: %d\n", i+1, model_.Wo, model_.L);
+                //printf("\n");
+                //printf("frame: %d Wo: %4.3f L: %d\n", i+1, model_.Wo, model_.L);
                 determine_phase(&model_, PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
                 //if (i == 1) {
                 //    exit(0);

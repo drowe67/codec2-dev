@@ -250,16 +250,6 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
         Sdb[i].imag = Sdb[Nfft-i].imag = 0.0;
     }
 
-    printf("  Sdb..: ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", Sdb[i].real);
-    }
-    printf("\n         ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", Sdb[i].imag);
-    }
-    printf("\n");
-
     /* compute real cepstrum from log magnitude spectrum */
 
     codec2_fft(fft_inv_cfg, Sdb, c);
@@ -267,21 +257,6 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
         c[i].real /= (float)Nfft;
         c[i].imag /= (float)Nfft;
     }
-
-    printf("  c....: ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", c[i].real);
-    }
-    printf("\n         ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", c[i].imag);
-    }
-    printf("\n");
-    /*
-    for(i=0; i<Nfft; i++) {
-        printf("i: %d c: %f %f\n", i, c[i].real, c[i].imag);
-    }
-    */
 
     /* Fold cepstrum to reflect non-min-phase zeros inside unit circle */
 
@@ -309,9 +284,4 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
         phase[i] = Cf[i].imag/scale;
     }
     
-    printf("  phase: ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", phase[i]);
-    }
-    printf("\n");
 }

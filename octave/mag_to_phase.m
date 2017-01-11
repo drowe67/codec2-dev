@@ -30,28 +30,8 @@ function [phase s] = mag_to_phase(Gdbfk, Nfft = 512, verbose_en = 0)
     end
   end
 
-  printf("  Sdb..: ");
-  for i=1:5
-      printf("%5.2f ", real(Sdb(i)));
-  end
-  printf("\n         ");
-  for i=1:5
-      printf("%5.2f ", imag(Sdb(i)));
-  end
-  printf("\n");
-
   c = ifft(Sdb); % compute real cepstrum from log magnitude spectrum
  
-  printf("  c....: ");
-  for i=1:5
-      printf("%5.2f ", real(c(i)));
-  end
-  printf("\n         ");
-  for i=1:5
-      printf("%5.2f ", imag(c(i)));
-  end
-  printf("\n");
-
   % Check aliasing of cepstrum (in theory there is always some):
 
   caliaserr = 100*norm(c(round(Ns*0.9:Ns*1.1)))/norm(c);
