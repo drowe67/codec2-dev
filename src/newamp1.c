@@ -40,6 +40,9 @@
 #include "mbest.h"
 #include "newamp1.h"
 
+#define NEWAMP1_VQ_MBEST_DEPTH 5  /* how many candidates we keep for each stage of mbest search */
+#define NEWAMP1_VQ_STAGES   2     /* hard coded two stage VQ */
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: interp_para()
@@ -171,6 +174,12 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   int   index[MBEST_STAGES];
   float mse, tmp;
 
+  /* codebook is compiled for a fixed K */
+
+  assert(ndim == newamp1vq_cb[0].k);
+
+  /* equal weights, could be argued mel freq axis gives freq dep weighting */
+
   for(i=0; i<ndim; i++)
       w[i] = 1.0;
 
@@ -206,7 +215,7 @@ float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest
   mbest_destroy(mbest_stage1);
   mbest_destroy(mbest_stage2);
 
-  indexes[0] = n1; indexes[1] = n2;;
+  indexes[0] = n1; indexes[1] = n2;
 
   return mse;
 }
@@ -403,3 +412,92 @@ void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_
     }
     printf("\n");
 }
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: newamp1_model_to_indexes
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  newamp1 encoder for amplitdues {Am}.  Given the rate L model
+  parameters, outputs VQ and energy quantiser indexes.
+
+\*---------------------------------------------------------------------------*/
+
+void newamp1_model_to_indexes(int    indexes[], 
+                              MODEL *model, 
+                              float  rate_K_vec[], 
+                              float  rate_K_sample_freqs_kHz[], 
+                              int    K,
+                              float *mean,
+                              float  rate_K_vec_no_mean[], 
+                              float  rate_K_vec_no_mean_[]
+                              )
+{
+    int k;
+
+    /* convert variable rate L to fixed rate K */
+
+    resample_const_rate_f(model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+
+    /* remove mean and two stage VQ */
+
+    float sum = 0.0;
+    for(k=0; k<K; k++)
+        sum += rate_K_vec[k];
+    *mean = sum/K;
+    for(k=0; k<K; k++)
+        rate_K_vec_no_mean[k] = rate_K_vec[k] - *mean;
+    rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
+
+    /* scalar quantise mean (effectively the frame energy) */
+
+    float w[1] = {1.0};
+    float se;
+    indexes[NEWAMP1_VQ_STAGES] = quantise(newamp1_energy_cb[0].cb, 
+                                          mean, 
+                                          w, 
+                                          newamp1_energy_cb[0].k, 
+                                          newamp1_energy_cb[0].m, 
+                                          &se);
+ }
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: newamp1_indexes_to_model
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  newamp1 decoder for amplitudes {Am}.  Given the rate K VQ and energy
+  indexes at a 25Hz sample rate, outputs 4 100Hz rate L model structures.
+
+\*---------------------------------------------------------------------------*/
+
+void newamp1_indexes_to_model(float  rate_K_vec_[],  
+                              float  rate_K_vec_no_mean_[],
+                              float  rate_K_sample_freqs_kHz[], 
+                              int    K,
+                              float *mean_,
+                              int    indexes[])
+{
+    int   k;
+    const float *codebook1 = newamp1vq_cb[0].cb;
+    const float *codebook2 = newamp1vq_cb[1].cb;
+    int n1 = indexes[0];
+    int n2 = indexes[1];
+    
+    for(k=0; k<K; k++) {
+      rate_K_vec_no_mean_[k] = codebook1[K*n1+k] + codebook2[K*n2+k];
+    }
+
+    post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
+
+    *mean_ = newamp1_energy_cb[0].cb[indexes[NEWAMP1_VQ_STAGES]];
+
+    for(k=0; k<K; k++) {
+        rate_K_vec_[k] = rate_K_vec_no_mean_[k] + *mean_;
+    }
+}
+

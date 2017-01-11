@@ -34,6 +34,7 @@
 #include "nlp.h"
 #include "dump.h"
 #include "octave.h"
+#include "newamp1.h"
 #include "quantise.h"
 
 #define FRAMES 100
@@ -135,31 +136,22 @@ int main(int argc, char *argv[]) {
 
         /* newamp1 processing ----------------------------------------*/
 
-        resample_const_rate_f(&model, &rate_K_surface[f][0], rate_K_sample_freqs_kHz, K);
-        float sum = 0.0;
-        for(k=0; k<K; k++)
-            sum += rate_K_surface[f][k];
-        mean[f] = sum/K;
-        for(k=0; k<K; k++)
-            rate_K_surface_no_mean[f][k] = rate_K_surface[f][k] - mean[f];
+        int indexes[3];
+        newamp1_model_to_indexes(indexes, 
+                                 &model, 
+                                 &rate_K_surface[f][0], 
+                                 rate_K_sample_freqs_kHz,
+                                 K,
+                                 &mean[f],
+                                 &rate_K_surface_no_mean[f][0],
+                                 &rate_K_surface_no_mean_[f][0]);
 
-        int vq_indexes[2];
-        rate_K_mbest_encode(vq_indexes, &rate_K_surface_no_mean[f][0], &rate_K_surface_no_mean_[f][0], K, 5);
-
-        post_filter_newamp1(&rate_K_surface_no_mean_[f][0], rate_K_sample_freqs_kHz, K, 1.5);
-
-        int energy_index;
-        float w[1] = {1.0};
-        float se;
-        energy_index = quantise(newamp1_energy_cb[0].cb, &mean[f], w, newamp1_energy_cb[0].k, newamp1_energy_cb[0].m, &se);
-        mean_[f] = newamp1_energy_cb[0].cb[energy_index];
-
-        for(k=0; k<K; k++)
-            rate_K_surface_[f][k] = rate_K_surface_no_mean_[f][k] + mean_[f];
-
-        //for(int k=0; k<K; k++)
-        //    printf("k: %d sf: %f sv: %f\n", k, rate_K_sample_freqs_kHz[k], rate_K_surface[f][k]);
-        //printf("\n");
+        newamp1_indexes_to_model(&rate_K_surface_[f][0],
+                                 &rate_K_surface_no_mean_[f][0],
+                                 rate_K_sample_freqs_kHz,
+                                 K,
+                                 &mean_[f],
+                                 indexes);
 
         /* log vectors */
  
