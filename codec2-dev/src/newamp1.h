@@ -30,6 +30,8 @@
 #ifndef __NEWAMP1__
 #define __NEWAMP1__
 
+#define NEWAMP1_N_INDEXES 4 /* Number of indexes to pack: vq1, vq2, energy, Wo */
+
 #include "codec2_fft.h"
 #include "comp.h"
 

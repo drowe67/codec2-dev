@@ -149,17 +149,6 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
   Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, sample_freqs_kHz);    
 
-  printf("  AmdB.: ");
-  for m=1:5
-    printf("%5.2f ", AmdB(m));
-  end
-  printf("\n");
-  printf("  Gdbfk: ");
-  for m=1:5
-    printf("%5.2f ", Gdbfk(m));
-  end
-  printf("\n");
-
   % Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
 
   % optional input of aks for testing

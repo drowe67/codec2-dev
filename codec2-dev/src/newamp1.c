@@ -41,7 +41,6 @@
 #include "newamp1.h"
 
 #define NEWAMP1_VQ_MBEST_DEPTH 5  /* how many candidates we keep for each stage of mbest search */
-#define NEWAMP1_VQ_STAGES   2     /* hard coded two stage VQ */
 
 /*---------------------------------------------------------------------------*\
 
@@ -373,15 +372,10 @@ void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_
     float Gdbfk[Ns], sample_freqs_kHz[Ns], phase[Ns];
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
 
-    printf("  AmdB.: ");
     for(m=1; m<=model->L; m++) {
         AmdB[m] = 20.0*log10(model->A[m]);
         rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*4.0/M_PI;
-        if (m <=5) {
-            printf("%5.2f ", AmdB[m]);
-        }
     }
-    printf("\n");
     
     for(i=0; i<Ns; i++) {
         sample_freqs_kHz[i] = (FS/1000.0)*(float)i/Nfft;
@@ -389,28 +383,12 @@ void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_
 
     interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
 
-    printf("  Gdbfk: ");
-    for(i=0; i<5; i++) {
-        printf("%5.2f ", Gdbfk[i]);
-    }
-    printf("\n");
-
     mag_to_phase(phase, Gdbfk, Nfft, fwd_cfg, inv_cfg);
 
-    printf("  b....: ");
     for(m=1; m<=model->L; m++) {
         b = floorf(0.5+m*model->Wo*Nfft/(2.0*M_PI));
         model->phi[m] = phase[b];
-        if (m <= 5) {
-            printf("%5d ", b);
-        }
     }
-    printf("\n");
-    printf("  phi..: ");
-    for(m=1; m<=5; m++) {
-        printf("% 5.2f ", model->phi[m]);
-    }
-    printf("\n");
 }
 
 
@@ -455,12 +433,27 @@ void newamp1_model_to_indexes(int    indexes[],
 
     float w[1] = {1.0};
     float se;
-    indexes[NEWAMP1_VQ_STAGES] = quantise(newamp1_energy_cb[0].cb, 
-                                          mean, 
-                                          w, 
-                                          newamp1_energy_cb[0].k, 
-                                          newamp1_energy_cb[0].m, 
-                                          &se);
+    indexes[2] = quantise(newamp1_energy_cb[0].cb, 
+                          mean, 
+                          w, 
+                          newamp1_energy_cb[0].k, 
+                          newamp1_energy_cb[0].m, 
+                          &se);
+
+    /* scalar quantise Wo.  We steal the smallest Wo index to signal
+       an unvoiced frame */
+
+    if (model->voiced) {
+        int index = encode_log_Wo(model->Wo, 6);
+        if (index == 0) {
+            index = 1;
+        }
+        indexes[3] = index;
+    }
+    else {
+        indexes[3] = 0;
+    }
+
  }
 
 
@@ -494,7 +487,7 @@ void newamp1_indexes_to_model(float  rate_K_vec_[],
 
     post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
 
-    *mean_ = newamp1_energy_cb[0].cb[indexes[NEWAMP1_VQ_STAGES]];
+    *mean_ = newamp1_energy_cb[0].cb[indexes[2]];
 
     for(k=0; k<K; k++) {
         rate_K_vec_[k] = rate_K_vec_no_mean_[k] + *mean_;

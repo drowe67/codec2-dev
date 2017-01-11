@@ -126,33 +126,13 @@ function tnewamp1(input_prefix)
       
       for k=f-M:f-1
         model_(k,:) = resample_rate_L(model_(k,:), interpolated_surface_(k,:), sample_freqs_kHz);
-        printf("\n");
-        printf("frame: %d Wo: %4.3f L: %d\n", k, model_(k,1), model_(k,2));
         phase = determine_phase(model_, k, Nfft_phase);
-        printf("  phase: ");
-        for i=1:5
-          printf("%5.2f ", phase(i));
-        end
-        printf("\n");
-        printf("  b....: ");
         for m=1:model_(k,2)
           b = round(m*model_(k,1)*Nfft_phase/(2*pi));  % map harmonic centre to DFT bin
-          if m <= 5
-            printf("%5d ", b);
-          end
           phi(m) = phase(b+1);
           Hm(k,m) = exp(-j*phi(m));
         end  
-        printf("\n");
-        printf("  phi..: ");
-        for m=1:5
-          printf("%5.2f ", phi(m));
-        end
-        printf("\n");
-        %if k == 2
-        %  xx
-        %end
-     
+   
       end
     end
   end
@@ -168,10 +148,6 @@ function tnewamp1(input_prefix)
 
 
   %Hm(2,:) - Hm_c(2,:)
-  for f=1:frames
-    s = abs(sum(Hm(f,:) - Hm_c(f,:)));
-    printf("f: %d s: %f \n", f, s);
-  end
   
   figure(1);
   mesh(angle(Hm));
