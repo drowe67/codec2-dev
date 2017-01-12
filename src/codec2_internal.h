@@ -30,6 +30,7 @@
 #define __CODEC2_INTERNAL__
 
 #include "codec2_fft.h"
+#include "newamp1.h"
 
 struct CODEC2 {
     int           mode;
@@ -63,6 +64,15 @@ struct CODEC2 {
 
     int           smoothing;               /* enable smoothing for channels with errors */
     float        *softdec;                 /* optional soft decn bits from demod        */
+
+    /* newamp1 states */
+
+    float          rate_K_sample_freqs_kHz[NEWAMP1_K];
+    float          prev_rate_K_vec_[NEWAMP1_K];
+    float          Wo_left;
+    int            voicing_left;
+    codec2_fft_cfg phase_fft_fwd_cfg;
+    codec2_fft_cfg phase_fft_inv_cfg;      
 };
 
 // test and debug

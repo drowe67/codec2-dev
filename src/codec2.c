@@ -74,6 +74,8 @@ void codec2_encode_700(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_700b(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
 
 /*---------------------------------------------------------------------------*\
@@ -101,17 +103,9 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-    if ((mode != CODEC2_MODE_3200) &&
-	   (mode != CODEC2_MODE_2400) &&
-	   (mode != CODEC2_MODE_1600) &&
-	   (mode != CODEC2_MODE_1400) &&
-	   (mode != CODEC2_MODE_1300) &&
-	   (mode != CODEC2_MODE_1200) &&
-	   (mode != CODEC2_MODE_700) &&
-	   (mode != CODEC2_MODE_700B)
-        ) {
+    if (!((mode >= 0) && (mode <= CODEC2_MODE_700C))) {
         return NULL;
-    }
+    }  
 
     c2 = (struct CODEC2*)malloc(sizeof(struct CODEC2));
     if (c2 == NULL)
@@ -169,6 +163,22 @@ struct CODEC2 * codec2_create(int mode)
 
     c2->softdec = NULL;
 
+    /* newamp1 initialisation */
+
+    if (c2->mode == CODEC2_MODE_700C) {
+        mel_sample_freqs_kHz(c2->rate_K_sample_freqs_kHz, NEWAMP1_K);
+        int k;
+        for(k=0; k<NEWAMP1_K; k++) {
+            c2->prev_rate_K_vec_[k] = 0.0;
+        }
+        c2->Wo_left = 0.0;
+        c2->voicing_left = 0;;
+        c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
+        c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
+        printf("c2->phase_fft_fwd_cfg: %x\n", c2->phase_fft_fwd_cfg);
+        printf("c2->phase_fft_inv_cfg: %x\n", c2->phase_fft_inv_cfg);
+    }
+
     return c2;
 }
 
@@ -190,6 +200,10 @@ void codec2_destroy(struct CODEC2 *c2)
     codec2_fft_free(c2->fft_fwd_cfg);
     codec2_fftr_free(c2->fftr_fwd_cfg);
     codec2_fftr_free(c2->fftr_inv_cfg);
+    if (c2->mode == CODEC2_MODE_700C) {
+        codec2_fft_free(c2->phase_fft_fwd_cfg);
+        codec2_fft_free(c2->phase_fft_inv_cfg);
+    }
     free(c2);
 }
 
@@ -219,6 +233,8 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
     if  (c2->mode == CODEC2_MODE_700)
 	return 28;
     if  (c2->mode == CODEC2_MODE_700B)
+	return 28;
+    if  (c2->mode == CODEC2_MODE_700C)
 	return 28;
 
     return 0; /* shouldn't get here */
@@ -252,6 +268,8 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 320;
     if  (c2->mode == CODEC2_MODE_700B)
 	return 320;
+    if  (c2->mode == CODEC2_MODE_700C)
+	return 320;
 
     return 0; /* shouldnt get here */
 }
@@ -259,16 +277,7 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 {
     assert(c2 != NULL);
-    assert(
-	   (c2->mode == CODEC2_MODE_3200) ||
-	   (c2->mode == CODEC2_MODE_2400) ||
-	   (c2->mode == CODEC2_MODE_1600) ||
-	   (c2->mode == CODEC2_MODE_1400) ||
-	   (c2->mode == CODEC2_MODE_1300) ||
-	   (c2->mode == CODEC2_MODE_1200) ||
-	   (c2->mode == CODEC2_MODE_700)  ||
-	   (c2->mode == CODEC2_MODE_700B)
-	   );
+    assert((c2->mode >= CODEC2_MODE_3200) && (c2->mode <= CODEC2_MODE_700C));
 
     if (c2->mode == CODEC2_MODE_3200)
 	codec2_encode_3200(c2, bits, speech);
@@ -287,6 +296,8 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 	codec2_encode_700(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_700B)
 	codec2_encode_700b(c2, bits, speech);
+    if (c2->mode == CODEC2_MODE_700C)
+	codec2_encode_700c(c2, bits, speech);
 #endif
 }
 
@@ -298,16 +309,7 @@ void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
 void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)
 {
     assert(c2 != NULL);
-    assert(
-	   (c2->mode == CODEC2_MODE_3200) ||
-	   (c2->mode == CODEC2_MODE_2400) ||
-	   (c2->mode == CODEC2_MODE_1600) ||
-	   (c2->mode == CODEC2_MODE_1400) ||
-	   (c2->mode == CODEC2_MODE_1300) ||
-	   (c2->mode == CODEC2_MODE_1200) ||
-	   (c2->mode == CODEC2_MODE_700) ||
-	   (c2->mode == CODEC2_MODE_700B)
-	   );
+    assert((c2->mode >= CODEC2_MODE_3200) && (c2->mode <= CODEC2_MODE_700C));
 
     if (c2->mode == CODEC2_MODE_3200)
 	codec2_decode_3200(c2, speech, bits);
@@ -326,6 +328,8 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
  	codec2_decode_700(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_700B)
  	codec2_decode_700b(c2, speech, bits);
+    if (c2->mode == CODEC2_MODE_700C)
+ 	codec2_decode_700c(c2, speech, bits);
 #endif
 }
 
@@ -1751,6 +1755,165 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<LPC_ORD_LOW; i++)
 	c2->prev_lsps_dec[i] = lsps[3][i];
 }
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: codec2_encode_700c
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  Version c of 700 bit/s codec that uses newamp1 fixed rate VQ of amplitudes.
+
+  Encodes 320 speech samples (40ms of speech) into 28 bits.
+
+  The codec2 algorithm actually operates internally on 10ms (80
+  sample) frames, so we run the encoding algorithm four times:
+
+  frame 0: nothing
+  frame 1: nothing
+  frame 2: nothing
+  frame 3: 18 bit 2 stage VQ (9 bits/stage), 4 bits energy, 
+           6 bit scalar Wo/voicing. No spare bits.
+
+  Voicing is encoded using the 0 index of the Wo quantiser.
+
+  The bit allocation is:
+
+    Parameter                      frames 1-3   frame 4   Total
+    -----------------------------------------------------------
+    Harmonic magnitudes (rate k VQ)     0         18        18
+    Energy                              0          4         4
+    log Wo/voicing                      0          6         6
+    TOTAL                               0         28        28
+
+\*---------------------------------------------------------------------------*/
+
+void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
+{
+    MODEL        model;
+    int          indexes[4], i, M=4;
+    unsigned int nbit = 0;
+    static   int f = 0;
+
+    assert(c2 != NULL);
+
+    memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
+
+    analyse_one_frame(c2, &model, speech);
+    fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
+    f++;
+
+    int K = 20;
+    float rate_K_vec[K], mean;
+    float rate_K_vec_no_mean[K], rate_K_vec_no_mean_[K];
+
+    newamp1_model_to_indexes(indexes, 
+                             &model, 
+                             rate_K_vec, 
+                             c2->rate_K_sample_freqs_kHz,
+                             K,
+                             &mean,
+                             rate_K_vec_no_mean,
+                             rate_K_vec_no_mean_);
+
+    for(i=0; i<5; i++) {
+      fprintf(stderr,"  %5.3f", rate_K_vec[i]);
+    }
+    fprintf(stderr,"\n");
+    fprintf(stderr,"  %d %d %d %d\n", indexes[0], indexes[1], indexes[2], indexes[3]);
+
+    for(i=1; i<M; i++) {
+        analyse_one_frame(c2, &model, &speech[i*N_SAMP]);
+        fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
+        f++;
+    }
+
+    //if (f == 8)
+    //    exit(0);
+
+    pack_natural_or_gray(bits, &nbit, indexes[0], 9, 0);
+    pack_natural_or_gray(bits, &nbit, indexes[1], 9, 0);
+    pack_natural_or_gray(bits, &nbit, indexes[2], 4, 0);
+    pack_natural_or_gray(bits, &nbit, indexes[3], 6, 0);
+
+    assert(nbit == (unsigned)codec2_bits_per_frame(c2));
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: codec2_decode_700c
+  AUTHOR......: David Rowe
+  DATE CREATED: August 2015
+
+  Decodes frames of 28 bits into 320 samples (40ms) of speech.
+
+\*---------------------------------------------------------------------------*/
+
+void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char * bits)
+{
+    MODEL   model[4];
+    int     indexes[4];
+    int     i;
+    unsigned int nbit = 0;
+    static   int f = 0;
+
+    assert(c2 != NULL);
+
+    /* unpack bits from channel ------------------------------------*/
+
+    indexes[0] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    indexes[1] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    indexes[2] = unpack_natural_or_gray(bits, &nbit, 4, 0);
+    indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
+    
+    int M = 4;
+    COMP  HH[M][MAX_AMP+1];
+    float interpolated_surface_[M][NEWAMP1_K];
+
+    newamp1_indexes_to_model(model,
+                             (COMP*)HH,
+                             (float*)interpolated_surface_,
+                             c2->prev_rate_K_vec_,
+                             &c2->Wo_left,
+                             &c2->voicing_left,
+                             c2->rate_K_sample_freqs_kHz, 
+                             NEWAMP1_K,
+                             c2->phase_fft_fwd_cfg, 
+                             c2->phase_fft_inv_cfg,
+                             indexes);
+
+   fprintf(stderr,"f: %d\n", f);
+   fprintf(stderr,"  %d %d %d %d\n", indexes[0], indexes[1], indexes[2], indexes[3]);
+   for(i=0; i<4; i++) {
+       fprintf(stderr,"  Wo: %4.3f L: %d v: %d\n", model[i].Wo, model[i].L, model[i].voiced);
+   }
+   fprintf(stderr,"  rate_K_vec:  ");
+   for(i=0; i<5; i++) {
+       fprintf(stderr,"%5.3f  ", c2->prev_rate_K_vec_[i]);
+   }
+   fprintf(stderr,"\n");
+   fprintf(stderr,"  H:\n");
+
+   for(int m=0; m<M; m++) {
+       fprintf(stderr,"    ");  
+       for(i=1; i<=5; i++) {
+           fprintf(stderr,"(%5.3f %5.3f)  ", HH[m][i].real, HH[m][i].imag);
+       }
+       fprintf(stderr,"\n");
+   }
+   fprintf(stderr,"\n");
+   fprintf(stderr,"\n");
+
+   if (f == 80)
+       exit(0);
+   f += 4;
+   for(i=0; i<M; i++) {
+	synthesise_one_frame(c2, &speech[N_SAMP*i], &model[i], &HH[i][0]);
+   }
+}
+
 #endif
 
 /*---------------------------------------------------------------------------*\
@@ -1848,9 +2011,16 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
     PROFILE_SAMPLE(phase_start);
 
-    COMP H[MAX_AMP];
-    sample_phase(model, H, Aw);
-    phase_synth_zero_order(model, &c2->ex_phase, H);
+    if (c2->mode == CODEC2_MODE_700C) {
+        /* newamp1, we've already worked out rate L phase */
+        COMP *H = Aw;
+        phase_synth_zero_order(model, &c2->ex_phase, H);       
+    } else {
+        /* LPC based phase synthesis */
+        COMP H[MAX_AMP];
+        sample_phase(model, H, Aw);
+        phase_synth_zero_order(model, &c2->ex_phase, H);
+    }
 
     PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth");
 
