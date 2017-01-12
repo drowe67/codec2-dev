@@ -101,6 +101,7 @@ function tnewamp1(input_prefix)
   left_vec = zeros(1,K);
 
   for f=1:M:frames   
+
     if voicing(f)
       index = encode_log_Wo(model(f,1), 6);
       if index == 0
@@ -111,39 +112,41 @@ function tnewamp1(input_prefix)
       model_(f,1) = 2*pi/100;
     end
 
+    Wo_right = model_(f,1);
+    voicing_right = voicing(f);
+    [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
+
     if f > M
-      %Wo1 = model_(f-M,1);
-      Wo_right = model_(f,1);
-      voicing_right = voicing(f);
-      [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
       model_(f-M:f-1,1) = Wo_;
       voicing_(f-M:f-1) = avoicing_;
       model_(f-M:f-1,2) = floor(pi ./ model_(f-M:f-1,1)); % calculate L for each interpolated Wo
+    end
 
-      %left_vec = rate_K_surface_(f-M,:);
-      right_vec = rate_K_surface_(f,:);
+    right_vec = rate_K_surface_(f,:);
+
+    if f > M
       sample_points = [f-M f];
       resample_points = f-M:f-1;
       for k=1:K
         interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
       end
-      
+
       for k=f-M:f-1
         model_(k,:) = resample_rate_L(model_(k,:), interpolated_surface_(k,:), sample_freqs_kHz);
         phase = determine_phase(model_, k, Nfft_phase);
         for m=1:model_(k,2)
           b = round(m*model_(k,1)*Nfft_phase/(2*pi));  % map harmonic centre to DFT bin
           H(k,m) = exp(-j*phase(b+1));
-        end  
-   
+        end     
       end
+   end
+   
+   % update for next time
 
-      % update for next time
-
-      Wo_left = Wo_right;
-      voicing_left = voicing_right;
-      left_vec = right_vec;
-    end
+   Wo_left = Wo_right;
+   voicing_left = voicing_right;
+   left_vec = right_vec;
+   
   end
 
   %model_(1,1:77)

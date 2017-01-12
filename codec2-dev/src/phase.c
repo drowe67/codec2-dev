@@ -264,16 +264,26 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
     for(i=1; i<Ns-1; i++) {
         cf[i] = cadd(c[i],c[Nfft-i]);
     }
-    cf[Ns] = c[Ns];
+    cf[Ns-1] = c[Ns-1];
     for(i=Ns; i<Nfft; i++) {
         cf[i].real = 0.0;
         cf[i].imag = 0.0;
     }
 
+    fprintf(stderr, "  cf:  ");
+    for(i=0; i<Nfft; i++)
+        fprintf(stderr, "[%d] (%5.3f %5.3f)\n", i, cf[i].real, cf[i].imag);
+    fprintf(stderr,"\n");
+    
     /* Cf = dB_magnitude + j * minimum_phase */
 
     codec2_fft(fft_fwd_cfg, cf, Cf);
 
+    fprintf(stderr, "  Cf:  ");
+    for(i=0; i<5; i++)
+        fprintf(stderr, "(%5.3f %5.3f)  ", Cf[i].real, Cf[i].imag);
+    fprintf(stderr,"\n");
+    
     /*  The maths says we are meant to be using log(x), not 20*log10(x),
         so we need to scale the phase to account for this:
         log(x) = 20*log10(x)/scale */
@@ -283,5 +293,6 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
     for(i=0; i<Ns; i++) {
         phase[i] = Cf[i].imag/scale;
     }
+
     
 }

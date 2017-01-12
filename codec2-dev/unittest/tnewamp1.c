@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     float mean_[FRAMES];
     float rate_K_surface_[FRAMES][K];         // quantised rate K vecs for each frame
     float interpolated_surface_[FRAMES][K];   // dec/interpolated surface
-    int   voicing[FRAMES];
+    //int   voicing[FRAMES];
     int   voicing_[FRAMES];
     float model_octave_[FRAMES][MAX_AMP+2];
     COMP  H[FRAMES][MAX_AMP];
@@ -132,7 +132,7 @@ int main(int argc, char *argv[]) {
 	two_stage_pitch_refinement(&model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
         est_voicing_mbe(&model, Sw, W);
-        voicing[f] = model.voiced;
+        //voicing[f] = model.voiced;
 
         /* newamp1 processing ----------------------------------------*/
 
@@ -152,6 +152,14 @@ int main(int argc, char *argv[]) {
                                       &mean_[f],
                                       &indexes[f][0]);
 
+        fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
+        if ((f % M) == 0) {
+            for(i=0; i<5; i++) {
+                fprintf(stderr,"  %5.3f", rate_K_surface_[f][i]);
+            }
+            fprintf(stderr,"\n");
+            fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
+        }
         /* log vectors */
  
         model_octave[f][0] = model.Wo;
@@ -161,8 +169,7 @@ int main(int argc, char *argv[]) {
         }        
     }
 
- 
-    /* Decoder */
+     /* Decoder */
 
     MODEL model__[M];
     float prev_rate_K_vec_[K];
@@ -170,44 +177,67 @@ int main(int argc, char *argv[]) {
     float Wo_left;
     int   voicing_left;
 
-    /*
-    for(k=0; k<K; k++)
-        prev_rate_K_vec_[k] = rate_K_surface_[0][k];
-
-    if (indexes[0][3]) {
-        model_octave_[0][0] = decode_log_Wo(indexes[0][3], 6);
-        voicing_left = 1;
-    }
-    else {
-        voicing_left = 0;
-        model_octave_[0][0] = 2.0*M_PI/100.0;
-    }
-
-    Wo_left = model_octave_[0][0];
-    */
+    /* initial conditions */
 
     for(k=0; k<K; k++)
         prev_rate_K_vec_[k] = 0.0;
     voicing_left = 0;
     Wo_left = 2.0*M_PI/100.0;
 
+    /* decoder runs on every M-th frame, 25Hz frame rate */
+
+    fprintf(stderr,"\n");
     for(f=0; f<FRAMES; f+=M) {
 
+        float a_interpolated_surface_[M][K];
+        newamp1_indexes_to_model(model__,
+                                 (COMP*)HH,
+                                 (float*)a_interpolated_surface_,
+                                 prev_rate_K_vec_,
+                                 &Wo_left,
+                                 &voicing_left,
+                                 rate_K_sample_freqs_kHz, 
+                                 K,
+                                 phase_fft_fwd_cfg, 
+                                 phase_fft_inv_cfg,
+                                 &indexes[f][0]);
+
+        fprintf(stderr,"f: %d\n", f);
+        fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
+        for(i=0; i<M; i++) {
+            fprintf(stderr,"  Wo: %4.3f L: %d v: %d\n", model__[i].Wo, model__[i].L, model__[i].voiced);
+        }
+        fprintf(stderr,"  rate_K_vec: ");
+        for(i=0; i<5; i++) {
+            fprintf(stderr,"%5.3f  ", prev_rate_K_vec_[i]);
+        }
+        fprintf(stderr,"\n");
+        fprintf(stderr,"  H:\n");
+
+        for(m=0; m<M; m++) {
+            fprintf(stderr,"    ");  
+            for(i=1; i<=5; i++) {
+                fprintf(stderr,"(%5.3f %5.3f)  ", HH[m][i].real, HH[m][i].imag);
+            }
+            fprintf(stderr,"\n");
+        }
+
+        fprintf(stderr,"\n\n");
+
+        if (f == 80)
+            exit(0);
+
+        /* with f == 0, we don't store ouput, but memories are updated, helps to match
+           what happens in Codec 2 mode */
+
         if (f >= M) {
-
-            newamp1_indexes_to_model(model__,
-                                     (COMP*)HH,
-                                     &interpolated_surface_[f-M][0],
-                                     prev_rate_K_vec_,
-                                     &Wo_left,
-                                     &voicing_left,
-                                     rate_K_sample_freqs_kHz, 
-                                     K,
-                                     phase_fft_fwd_cfg, 
-                                     phase_fft_inv_cfg,
-                                     &indexes[f][0]);
-
-            /* store test vectors */
+           for(i=0; i<M; i++) {
+               for(k=0; k<K; k++) {
+                   interpolated_surface_[f-M+i][k] = a_interpolated_surface_[i][k];
+               }
+           }
+          
+             /* store test vectors */
 
             for(i=f-M, m=0; i<f; i++,m++) {
                 model_octave_[i][0] = model__[m].Wo;
