@@ -26,6 +26,12 @@
 
       octave:1> tnewamp1("../build_linux/src/hts1a")
 
+    5/ Optionally listen to output
+
+     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --phase0 --postfilter \
+                                   --amread hts1a_am.out --hmread hts1a_hm.out \
+                                   --Woread hts1a_Wo.out --hand_voicing hts1a_v.txt -o - \
+                                      | play -q -t raw -r 8000 -s -2 -
 #}
 
 
@@ -92,9 +98,11 @@ function tnewamp1(input_prefix)
   % break into segments of M frames.  We have 2 samples spaced M apart
   % and interpolate the rest.
 
-  Nfft_phase = 128;
+  Nfft_phase = 128;  % note this needs to be 512 (FFT_ENC in codec2 if using --awread)
+                     % with --hmread 128 is preferred as less memory/CPU
   model_ = zeros(frames, max_amp+2);
   voicing_ = zeros(1,frames);
+  Aw = zeros(frames, Nfft_phase);
   H = zeros(frames, max_amp);
   model_(1,1) = Wo_left = 2*pi/100;
   voicing_left = 0;
@@ -133,10 +141,10 @@ function tnewamp1(input_prefix)
 
       for k=f-M:f-1
         model_(k,:) = resample_rate_L(model_(k,:), interpolated_surface_(k,:), sample_freqs_kHz);
-        phase = determine_phase(model_, k, Nfft_phase);
+        Aw(k,:) = determine_phase(model_, k, Nfft_phase);
         for m=1:model_(k,2)
           b = round(m*model_(k,1)*Nfft_phase/(2*pi));  % map harmonic centre to DFT bin
-          H(k,m) = exp(-j*phase(b+1));
+          H(k,m) = exp(j*Aw(k, b+1));          
         end     
       end
    end
@@ -148,24 +156,12 @@ function tnewamp1(input_prefix)
    left_vec = right_vec;
    
   end
-
-  %model_(1,1:77)
-  %model__c(1,1:77)
-  %sum(model_(1,1:77)-model__c(1,1:77))
-  %[mx mxi] = max(model_(1,1:77)-model__c(1,1:77))
-
-  %interpolated_surface_(1,:)
-  %interpolated_surface__c(1,:)
-  %sum(interpolated_surface_(1,:) - interpolated_surface__c(1,:))
-
-
-  %Hm(2,:) - Hm_c(2,:)
   
-  figure(1);
+  figure(1); clf;
   mesh(angle(H));
-  figure(2);
+  figure(2); clf;
   mesh(angle(H_c));
-  figure(3);
+  figure(3); clf;
   mesh(abs(H - H_c));
 
   check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
@@ -177,7 +173,20 @@ function tnewamp1(input_prefix)
   check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
   check(H, H_c, 'phase surface');
 
-  #{
+  % Save to disk to check synthesis is OK with c2sim  
+
+  output_prefix = input_prefix;
+  Am_out_name = sprintf("%s_am.out", output_prefix);
+  fam  = fopen(Am_out_name,"wb"); 
+
+  Wo_out_name = sprintf("%s_Wo.out", output_prefix);
+  fWo  = fopen(Wo_out_name,"wb"); 
+  
+  Aw_out_name = sprintf("%s_aw.out", output_prefix);
+  faw = fopen(Aw_out_name,"wb"); 
+
+  Hm_out_name = sprintf("%s_hm.out", output_prefix);
+  fhm = fopen(Hm_out_name,"wb"); 
 
   for f=1:frames
     printf("%d ", f);   
@@ -188,193 +197,37 @@ function tnewamp1(input_prefix)
     Am_ = zeros(1,max_amp);
     Am_(2:L) = Am(1:L-1);
 
-    % optional post filter on linear {Am}, boosts higher amplitudes more than lower,
-    % improving shape of formants and reducing muffling.  Note energy
-    % normalisation
-
-    if postfilter
-      e1 = sum(Am_(2:L).^2);
-      Am_(2:L) = Am_(2:L) .^ 1.5;         
-      e2 = sum(Am_(2:L).^2);
-      Am_(2:L) *= sqrt(e1/e2);
-    end
-
     fwrite(fam, Am_, "float32");
     fwrite(fWo, Wo, "float32");
 
-    if synth_phase
+    % Note we send opposite phase as c2sim expects phase of LPC
+    % analysis filter, just a convention based on historical
+    % development of Codec 2
 
-      % synthesis phase spectra from magnitiude spectra using minimum phase techniques
+    Aw1 = zeros(1, Nfft_phase*2); 
+    Aw1(1:2:Nfft_phase*2) = cos(Aw(f,:));
+    Aw1(2:2:Nfft_phase*2) = -sin(Aw(f,:));
+    fwrite(faw, Aw1, "float32");    
 
-      fft_enc = 128;
-      phase = determine_phase(model_, f, fft_enc);
-      assert(length(phase) == fft_enc);
-      %Aw = zeros(1, fft_enc*2); 
-      %Aw(1:2:fft_enc*2) = cos(phase);
-      %Aw(2:2:fft_enc*2) = -sin(phase);
-
-      % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
-      % is not used
-
-      Hm = zeros(1, 2*max_amp);
-      for m=1:L
-        b = round(m*Wo*fft_enc/(2*pi));
-        Hm(2*m) = cos(phase(b));
-        Hm(2*m+1) = -sin(phase(b));
-      end
-      fwrite(fhm, Hm, "float32");    
-    end
+    Hm = zeros(1, 2*max_amp);
+    for m=1:L
+        Hm(2*m+1) = real(H(f,m));
+        Hm(2*m+2) = imag(H(f,m));
+    end    
+    fwrite(fhm, Hm, "float32");    
   end
 
-  #}
+  fclose(fam); fclose(fWo); fclose(faw); fclose(fhm);
+
+  v_out_name = sprintf("%s_v.txt", output_prefix);
+  fv  = fopen(v_out_name,"wt"); 
+  for f=1:length(voicing__c)
+    fprintf(fv,"%d\n", voicing__c(f));
+  end
+  fclose(fv);
 
   printf("\n")
 
 endfunction
  
 
-% -----------------------------------------------------------------------------------------
-% Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
-% quantisation.  Evolved from abys decimator below.  Simulates the entire encoder/decoder.
-
-function [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing)
-  max_amp = 80;
-  [frames nc] = size(model);
-  model_ = zeros(frames, max_amp+3);
-  indexes = zeros(frames,4);
-
-  M = 4;
- 
-  % create frames x K surface.  TODO make all of this operate frame by
-  % frame, or at least M/2=4 frames rather than one big chunk
-
-  K = 20; 
-  [surface sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
-  target_surface = surface;
-
-  figure(1);
-  mesh(surface);
-
-  % VQ rate K surface.  TODO: If we are decimating by M/2=4 we really
-  % only need to do this every 4th frame.
-
-  melvq;
-  load train_120_vq; m=5;
-       
-  for f=1:frames
-    mean_f(f) = mean(surface(f,:));
-    surface_no_mean(f,:) = surface(f,:) - mean_f(f);
-  end
-  figure(2);
-  mesh(surface_no_mean);
-
-  [res surface_no_mean_ ind] = mbest(train_120_vq, surface_no_mean, m);
-  indexes(:,1:2) = ind;
-
-  for f=1:frames
-    surface_no_mean_(f,:) = post_filter(surface_no_mean_(f,:), sample_freqs_kHz, 1.5);
-  end
-  figure(3);
-  mesh(surface_no_mean_);
-    
-  surface_ = zeros(frames, K);
-  energy_q = 10 + 40/16*(0:15);
-  for f=1:frames   
-    [mean_f_ indx] = quantise(energy_q, mean_f(f));
-    indexes(f,3) = indx - 1;
-    %mean_f_ = mean_f(f);
-    surface_(f,:) = surface_no_mean_(f,:) + mean_f_;
-  end
-
-  figure();
-  mesh(surface_);
-
-  % break into segments of M frames.  We have 3 samples in M frame
-  % segment spaced M/2 apart and interpolate the rest.  This evolved
-  % from AbyS scheme below but could be simplified to simple linear
-  % interpolation, or using 3 or 4 points but shift of M/2=4 frames.
-  
-  interpolated_surface_ = zeros(frames, K);
-  for f=1:M:frames-M
-    left_vec = surface_(f,:);
-    right_vec = surface_(f+M,:);
-    sample_points = [f f+M];
-    resample_points = f:f+M-1;
-    for k=1:K
-      interpolated_surface_(resample_points,k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
-    end    
-  end
-
-  % break into segments for purposes of Wo interpolation
-
-  for f=1:M:frames
-    % quantise Wo
-
-    % UV/V flag is coded using a zero index for Wo, this means we need to
-    % adjust Wo index slightly for the lowest Wo V frames
-
-    if voicing(f)
-      index = encode_log_Wo(model(f,1), 6);
-      if index == 0
-        index = 1;
-      end
-      indexes(f,4) = index;
-      voicing(f) = 1;
-      model_(f,1) = decode_log_Wo(indexes(f,4), 6);
-    else
-      indexes(f,4) = 0;
-      voicing(f) = 0;
-      model_(f,1) = 2*pi/100;
-    end
-  end      
-
-
-  voicing_ = zeros(1, frames);
-  for f=1:M:frames-M
-
-    Wo1_ = model_(f,1);
-    Wo2_ = model_(f+M,1);
-
-    % uncomment to use unquantised values
-    %Wo1_ = model(f,1);
-    %Wo2_ = model(f+M,1);
-
-    if !voicing(f) && !voicing(f+M)
-       model_(f:f+M-1,1) = 2*pi/100;
-    end
-
-    if voicing(f) && !voicing(f+M)
-       model_(f:f+M/2-1,1) = Wo1_;
-       model_(f+M/2:f+M-1,1) = 2*pi/100;
-       voicing_(f:f+M/2-1) = 1;
-    end
-
-    if !voicing(f) && voicing(f+M)
-       model_(f:f+M/2-1,1) = 2*pi/100;
-       model_(f+M/2:f+M-1,1) = Wo2_;
-       voicing_(f+M/2:f+M-1) = 1;
-    end
-
-    if voicing(f) && voicing(f+M)
-      Wo_samples = [Wo1_ Wo2_];
-      model_(f:f+M-1,1) = interp1([f f+M], Wo_samples, f:f+M-1, "linear", 0);
-      voicing_(f:f+M-1) = 1;
-    end
-
-    #{
-    printf("f: %d f+M/2: %d Wo: %f %f (%f %%) v: %d %d \n", f, f+M/2, model(f,1), model(f+M/2,1), 100*abs(model(f,1) - model(f+M/2,1))/model(f,1), voicing(f), voicing(f+M/2));
-    for i=f:f+M/2-1
-      printf("  f: %d v: %d v_: %d Wo: %f Wo_: %f\n", i, voicing(i), voicing_(i), model(i,1),  model_(i,1));
-    end
-    #}
-  end
-  model_(frames-M:frames,1) = pi/100; % set end frames to something sensible
-
-  % enable these to use original (non interpolated) voicing and Wo
-  %voicing_ = voicing;
-  %model_(:,1) = model(:,1);
-
-  model_(:,2) = floor(pi ./ model_(:,1)); % calculate L for each interpolated Wo
-  model_ = resample_rate_L(model_, interpolated_surface_, sample_freqs_kHz);
-
-endfunction
