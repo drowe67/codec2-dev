@@ -278,10 +278,10 @@ void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_g
 
 \*---------------------------------------------------------------------------*/
 
-void interp_Wo_v(float Wo_[], int voicing_[], float Wo1, float Wo2, int voicing1, int voicing2)
+void interp_Wo_v(float Wo_[], int L_[], int voicing_[], float Wo1, float Wo2, int voicing1, int voicing2)
 {
     int i;
-    int M = 4;
+    int M = 4;  /* interpolation rate */
 
     for(i=0; i<M; i++)
         voicing_[i] = 0;
@@ -309,6 +309,10 @@ void interp_Wo_v(float Wo_[], int voicing_[], float Wo1, float Wo2, int voicing1
             Wo_[i] = Wo1*c + Wo2*(1.0-c);
             voicing_[i] = 1;
         }
+    }
+
+    for(i=0; i<M; i++) {
+        L_[i] = floorf(M_PI/Wo_[i]);
     }
 }
 
@@ -365,7 +369,7 @@ void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs
 
 \*---------------------------------------------------------------------------*/
 
-void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
+void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
 {
     int i,m,b;
     int Ns = Nfft/2+1;
@@ -387,7 +391,7 @@ void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_
 
     for(m=1; m<=model->L; m++) {
         b = floorf(0.5+m*model->Wo*Nfft/(2.0*M_PI));
-        model->phi[m] = phase[b];
+        H[m].real = cos(phase[b]); H[m].imag = -sin(phase[b]);
     }
 }
 
@@ -459,21 +463,45 @@ void newamp1_model_to_indexes(int    indexes[],
 
 /*---------------------------------------------------------------------------*\
 
-  FUNCTION....: newamp1_indexes_to_model
+  FUNCTION....: newamp1_interpolate
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+\*---------------------------------------------------------------------------*/
+
+void newamp1_interpolate(float interpolated_surface_[], float left_vec[], float right_vec[], int K)
+{
+    int  i, k;
+    int  M = 4;
+    float c;
+
+    /* (linearly) interpolate 25Hz amplitude vectors back to 100Hz */
+
+    for(i=0,c=1.0; i<M; i++,c-=1.0/M) {
+        for(k=0; k<K; k++) {
+            interpolated_surface_[i*K+k] = left_vec[k]*c + right_vec[k]*(1.0-c);
+        }
+    }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: newamp1_indexes_to_rate_K_vec
   AUTHOR......: David Rowe
   DATE CREATED: Jan 2017
 
   newamp1 decoder for amplitudes {Am}.  Given the rate K VQ and energy
-  indexes at a 25Hz sample rate, outputs 4 100Hz rate L model structures.
+  indexes, outputs rate K vector.
 
 \*---------------------------------------------------------------------------*/
 
-void newamp1_indexes_to_model(float  rate_K_vec_[],  
-                              float  rate_K_vec_no_mean_[],
-                              float  rate_K_sample_freqs_kHz[], 
-                              int    K,
-                              float *mean_,
-                              int    indexes[])
+void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],  
+                                   float  rate_K_vec_no_mean_[],
+                                   float  rate_K_sample_freqs_kHz[], 
+                                   int    K,
+                                   float *mean_,
+                                   int    indexes[])
 {
     int   k;
     const float *codebook1 = newamp1vq_cb[0].cb;
@@ -492,5 +520,87 @@ void newamp1_indexes_to_model(float  rate_K_vec_[],
     for(k=0; k<K; k++) {
         rate_K_vec_[k] = rate_K_vec_no_mean_[k] + *mean_;
     }
+}
+
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: newamp1_indexes_to_model
+  AUTHOR......: David Rowe
+  DATE CREATED: Jan 2017
+
+  newamp1 decoder.
+
+\*---------------------------------------------------------------------------*/
+
+void newamp1_indexes_to_model(MODEL  model_[],
+                              COMP   H[],
+                              float *interpolated_surface_,
+                              float  prev_rate_K_vec_[],
+                              float  *Wo_left,
+                              int    *voicing_left,
+                              float  rate_K_sample_freqs_kHz[], 
+                              int    K,
+                              codec2_fft_cfg fwd_cfg, 
+                              codec2_fft_cfg inv_cfg,
+                              int    indexes[])
+{
+    float rate_K_vec_[K], rate_K_vec_no_mean_[K], mean_, Wo_right;
+    int   voicing_right, k;
+    int   M = 4;
+
+    /* extract latest rate K vector */
+
+    newamp1_indexes_to_rate_K_vec(rate_K_vec_, 
+                                  rate_K_vec_no_mean_,
+                                  rate_K_sample_freqs_kHz, 
+                                  K,
+                                  &mean_,
+                                  indexes);
+
+
+    /* decode latest Wo and voicing */
+
+    if (indexes[3]) {
+        Wo_right = decode_log_Wo(indexes[3], 6);
+        voicing_right = 1;
+    }
+    else {
+        Wo_right  = 2.0*M_PI/100.0;
+        voicing_right = 0;
+    }
+
+    /* interpolate 25Hz rate K vec back to 100Hz */
+
+    float *left_vec = prev_rate_K_vec_;
+    float *right_vec = rate_K_vec_;
+    newamp1_interpolate(interpolated_surface_, left_vec, right_vec, K);
+
+    /* interpolate 25Hz v and Wo back to 100Hz */
+
+    float aWo_[M];
+    int avoicing_[M], aL_[M], i;
+
+    interp_Wo_v(aWo_, aL_, avoicing_, *Wo_left, Wo_right, *voicing_left, voicing_right);
+
+    /* back to rate L amplitudes, synthesis phase for each frame */
+
+    for(i=0; i<M; i++) {
+        model_[i].Wo = aWo_[i];
+        model_[i].L  = aL_[i];
+        model_[i].voiced = avoicing_[i];
+
+        resample_rate_L(&model_[i], &interpolated_surface_[K*i], rate_K_sample_freqs_kHz, K);
+        determine_phase(&H[(MAX_AMP+1)*i], &model_[i], NEWAMP1_PHASE_NFFT, fwd_cfg, inv_cfg);
+    }
+
+    /* update memories for next time */
+
+    for(k=0; k<K; k++) {
+        prev_rate_K_vec_[k] = rate_K_vec_[k];
+    }
+    *Wo_left = Wo_right;
+    *voicing_left = voicing_right;
+
 }
 

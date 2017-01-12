@@ -38,7 +38,6 @@
 #include "quantise.h"
 
 #define FRAMES 100
-#define PHASE_NFFT 128
 
 int main(int argc, char *argv[]) {
     short buf[N_SAMP];	        /* input/output buffer                   */
@@ -62,8 +61,8 @@ int main(int argc, char *argv[]) {
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); 
     make_analysis_window(fft_fwd_cfg, w, W);
 
-    phase_fft_fwd_cfg = codec2_fft_alloc(PHASE_NFFT, 0, NULL, NULL);
-    phase_fft_inv_cfg = codec2_fft_alloc(PHASE_NFFT, 1, NULL, NULL);
+    phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
+    phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
 
     for(i=0; i<M_PITCH; i++) {
 	Sn[i] = 1.0;
@@ -82,7 +81,7 @@ int main(int argc, char *argv[]) {
     int   voicing[FRAMES];
     int   voicing_[FRAMES];
     float model_octave_[FRAMES][MAX_AMP+2];
-    COMP  Hm[FRAMES][MAX_AMP];
+    COMP  H[FRAMES][MAX_AMP];
     int indexes[FRAMES][NEWAMP1_N_INDEXES];
 
     for(f=0; f<FRAMES; f++) {
@@ -91,8 +90,8 @@ int main(int argc, char *argv[]) {
             model_octave_[f][m] = 0.0;
         }
         for(m=0; m<MAX_AMP; m++) {
-            Hm[f][m].real = 0.0;
-            Hm[f][m].imag = 0.0;
+            H[f][m].real = 0.0;
+            H[f][m].imag = 0.0;
         }
         for(k=0; m<K; k++)
             interpolated_surface_[f][k] = 0.0;
@@ -146,12 +145,12 @@ int main(int argc, char *argv[]) {
                                  &rate_K_surface_no_mean[f][0],
                                  &rate_K_surface_no_mean_[f][0]);
 
-        newamp1_indexes_to_model(&rate_K_surface_[f][0],
-                                 &rate_K_surface_no_mean_[f][0],
-                                 rate_K_sample_freqs_kHz,
-                                 K,
-                                 &mean_[f],
-                                 &indexes[f][0]);
+        newamp1_indexes_to_rate_K_vec(&rate_K_surface_[f][0],
+                                      &rate_K_surface_no_mean_[f][0],
+                                      rate_K_sample_freqs_kHz,
+                                      K,
+                                      &mean_[f],
+                                      &indexes[f][0]);
 
         /* log vectors */
  
@@ -165,7 +164,14 @@ int main(int argc, char *argv[]) {
  
     /* Decoder */
 
-    MODEL model_;
+    MODEL model__[M];
+    float prev_rate_K_vec_[K];
+    COMP  HH[M][MAX_AMP+1];
+    float Wo_left;
+    int   voicing_left;
+
+    for(k=0; k<K; k++)
+        prev_rate_K_vec_[k] = rate_K_surface_[0][k];
 
     for(f=0; f<FRAMES; f+=M) {
 
@@ -197,59 +203,71 @@ int main(int argc, char *argv[]) {
           pass in left and right rate K vectors, Wo, v
           interpolate at rate K
           convert to rate L
-          output 4 model parameters
+          indexes for current plus decoded rate K, Wo, v from frame[0], model[4] out parameters,
+          then plug them into model_octave for testing
           ref indexes to 0...3
           slowly change
+          
+          [ ] model[4] out
+          [ ] change to 1:M processing
+              + not sure how to handle Octave side of this
         */
-        float c;
+
         if (f >= M) {
-
-            /* interpolate 25Hz amplitude vectors back to 100Hz */
-
+            /*
             float *left_vec = &rate_K_surface_[f-M][0];
             float *right_vec = &rate_K_surface_[f][0];
-            for(i=f-M,c=1.0; i<f; i++,c-=1.0/M) {
-                for(k=0; k<K; k++) {
-                    interpolated_surface_[i][k] = left_vec[k]*c + right_vec[k]*(1.0-c);
-                }
-            }
-            
+            newamp1_interpolate(&interpolated_surface_[f-M][0], left_vec, right_vec, K);
+            */
+
+            Wo_left = model_octave_[f-M][0];
+            voicing_left = voicing[f-M];
+
+            newamp1_indexes_to_model(model__,
+                                     (COMP*)HH,
+                                     &interpolated_surface_[f-M][0],
+                                     prev_rate_K_vec_,
+                                     &Wo_left,
+                                     &voicing_left,
+                                     rate_K_sample_freqs_kHz, 
+                                     K,
+                                     phase_fft_fwd_cfg, 
+                                     phase_fft_inv_cfg,
+                                     &indexes[f][0]);
+
             /* interpolate 25Hz v and Wo back to 100Hz */
 
             float aWo_[M];
-            int avoicing_[M], m;
+            int avoicing_[M], aL_[M], m;
             float Wo1 = model_octave_[f-M][0];
             float Wo2 = model_octave_[f][0];
-            interp_Wo_v(aWo_, avoicing_, Wo1, Wo2, voicing[f-M], voicing[f]);
+            interp_Wo_v(aWo_, aL_, avoicing_, Wo1, Wo2, voicing[f-M], voicing[f]);
+
             for(i=f-M, m=0; i<f; i++,m++) {
-                model_octave_[i][0] = aWo_[m];
-                model_octave_[i][1] = floorf(M_PI/model_octave_[i][0]); 
+                model_octave_[i][0] = model__[m].Wo; //aWo_[m];
+                model_octave_[i][1] = model__[m].L; //aL_[m]; 
                 voicing_[i] = avoicing_[m];
             }
 
             /* back to rate L, synth phase */
 
-            for(i=f-M; i<f; i++) {
+            MODEL model_;
+            COMP aH[MAX_AMP+1];
+            int j;
+            for(i=f-M, j=0; i<f; i++,j++) {
+                /*
                 model_.Wo = model_octave_[i][0];
                 model_.L  = model_octave_[i][1];
                 resample_rate_L(&model_, &interpolated_surface_[i][0], rate_K_sample_freqs_kHz, K);
-                //printf("\n");
-                //printf("frame: %d Wo: %4.3f L: %d\n", i+1, model_.Wo, model_.L);
-                determine_phase(&model_, PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
-                //if (i == 1) {
-                //    exit(0);
-                //}
-                        
+                determine_phase(aH, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
+                */
+                model_.L  = model_octave_[i][1];
                 for(m=1; m<=model_.L; m++) {
-                    model_octave_[i][m+1] = model_.A[m];
-                    Hm[i][m-1].real = cos(model_.phi[m]);
-                    Hm[i][m-1].imag = -sin(model_.phi[m]);
-                    //printf("m: %d Hm: %f %f\n", m, Hm[i][m].real, Hm[i][m].imag);
-                }   
+                    model_octave_[i][m+1] = model__[j].A[m]; // = model_.A[m];
+                    H[i][m-1] = HH[j][m];// aH[m];
+                }
             }
-
         }
-
     }
 
     fclose(fin);
@@ -269,7 +287,7 @@ int main(int argc, char *argv[]) {
     octave_save_float(fout, "model_c", (float*)model_octave, FRAMES, MAX_AMP+2, MAX_AMP+2);
     octave_save_float(fout, "model__c", (float*)model_octave_, FRAMES, MAX_AMP+2, MAX_AMP+2);
     octave_save_int(fout, "voicing__c", (int*)voicing_, 1, FRAMES);
-    octave_save_complex(fout, "Hm_c", (COMP*)Hm, FRAMES, MAX_AMP, MAX_AMP);
+    octave_save_complex(fout, "H_c", (COMP*)H, FRAMES, MAX_AMP, MAX_AMP);
     fclose(fout);
 
     printf("Done! Now run\n  octave:1> tnewamp1(\"../build_linux/src/hts1a\")\n");
