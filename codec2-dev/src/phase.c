@@ -47,10 +47,13 @@
 
 \*---------------------------------------------------------------------------*/
 
-void sample_phase(MODEL *model, COMP H[], COMP A[])
+void sample_phase(MODEL *model, 
+                  COMP H[], 
+                  COMP A[]        /* LPC analysis filter in freq domain */
+                  )                  
 {
     int   m, b;
-    float phi_, r;
+    float r;
 
     r = TWO_PI/(FFT_ENC);
 
@@ -58,9 +61,7 @@ void sample_phase(MODEL *model, COMP H[], COMP A[])
 
     for(m=1; m<=model->L; m++) {
         b = (int)(m*model->Wo/r + 0.5);
-        phi_ = -atan2f(A[b].imag, A[b].real);
-        H[m].real = cosf(phi_);
-        H[m].imag = sinf(phi_);
+        H[m] = cconj(A[b]);      /* synth filter 1/A is opposite phase to analysis filter */
     }
 }
 
@@ -270,20 +271,10 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
         cf[i].imag = 0.0;
     }
 
-    fprintf(stderr, "  cf:  ");
-    for(i=0; i<Nfft; i++)
-        fprintf(stderr, "[%d] (%5.3f %5.3f)\n", i, cf[i].real, cf[i].imag);
-    fprintf(stderr,"\n");
-    
     /* Cf = dB_magnitude + j * minimum_phase */
 
     codec2_fft(fft_fwd_cfg, cf, Cf);
 
-    fprintf(stderr, "  Cf:  ");
-    for(i=0; i<5; i++)
-        fprintf(stderr, "(%5.3f %5.3f)  ", Cf[i].real, Cf[i].imag);
-    fprintf(stderr,"\n");
-    
     /*  The maths says we are meant to be using log(x), not 20*log10(x),
         so we need to scale the phase to account for this:
         log(x) = 20*log10(x)/scale */
