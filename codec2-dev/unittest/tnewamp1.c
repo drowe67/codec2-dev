@@ -37,7 +37,7 @@
 #include "newamp1.h"
 #include "quantise.h"
 
-#define FRAMES 100
+#define FRAMES 300
 
 int main(int argc, char *argv[]) {
     short buf[N_SAMP];	        /* input/output buffer                   */
@@ -224,8 +224,8 @@ int main(int argc, char *argv[]) {
 
         fprintf(stderr,"\n\n");
 
-        if (f == 80)
-            exit(0);
+        //if (f == 80)
+        //    exit(0);
 
         /* with f == 0, we don't store ouput, but memories are updated, helps to match
            what happens in Codec 2 mode */

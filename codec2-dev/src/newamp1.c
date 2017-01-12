@@ -387,21 +387,11 @@ void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, c
 
     interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
 
-    fprintf(stderr, "  Gdbfk:  ");
-    for(i=0; i<5; i++)
-        fprintf(stderr, "%5.3f  ", Gdbfk[i]);
-    fprintf(stderr,"\n");
-    
     mag_to_phase(phase, Gdbfk, Nfft, fwd_cfg, inv_cfg);
-
-    fprintf(stderr, "  phase:  ");
-    for(i=0; i<5; i++)
-        fprintf(stderr, "%5.3f  ", phase[i]);
-    fprintf(stderr,"\n");
 
     for(m=1; m<=model->L; m++) {
         b = floorf(0.5+m*model->Wo*Nfft/(2.0*M_PI));
-        H[m].real = cosf(phase[b]); H[m].imag = -sinf(phase[b]);
+        H[m].real = cosf(phase[b]); H[m].imag = sinf(phase[b]);
     }
 }
 
@@ -602,18 +592,6 @@ void newamp1_indexes_to_model(MODEL  model_[],
 
         resample_rate_L(&model_[i], &interpolated_surface_[K*i], rate_K_sample_freqs_kHz, K);
         determine_phase(&H[(MAX_AMP+1)*i], &model_[i], NEWAMP1_PHASE_NFFT, fwd_cfg, inv_cfg);
-
-        if (i == 0) {
-            int m;
-            fprintf(stderr, "  Am:  ");
-            for(m=1; m<=5; m++)
-                fprintf(stderr, "%5.3f  ", model_[i].A[m]);
-            fprintf(stderr,"\n");
-            fprintf(stderr, "  H:  ");
-            for(m=1; m<=5; m++)
-                fprintf(stderr, "(%5.3f %5.3f)  ",  H[(MAX_AMP+1)*i+m].real, H[(MAX_AMP+1)*i+m].imag);
-            fprintf(stderr,"\n");
-        }
     }
 
     /* update memories for next time */
