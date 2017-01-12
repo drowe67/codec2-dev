@@ -96,6 +96,10 @@ function tnewamp1(input_prefix)
   model_ = zeros(frames, max_amp+2);
   voicing_ = zeros(1,frames);
   H = zeros(frames, max_amp);
+  model_(1,1) = Wo_left = 2*pi/100;
+  voicing_left = 0;
+  left_vec = zeros(1,K);
+
   for f=1:M:frames   
     if voicing(f)
       index = encode_log_Wo(model(f,1), 6);
@@ -108,14 +112,15 @@ function tnewamp1(input_prefix)
     end
 
     if f > M
-      Wo1 = model_(f-M,1);
-      Wo2 = model_(f,1);
-      [Wo_ avoicing_] = interp_Wo_v(Wo1, Wo2, voicing(f-M), voicing(f));
+      %Wo1 = model_(f-M,1);
+      Wo_right = model_(f,1);
+      voicing_right = voicing(f);
+      [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
       model_(f-M:f-1,1) = Wo_;
       voicing_(f-M:f-1) = avoicing_;
       model_(f-M:f-1,2) = floor(pi ./ model_(f-M:f-1,1)); % calculate L for each interpolated Wo
 
-      left_vec = rate_K_surface_(f-M,:);
+      %left_vec = rate_K_surface_(f-M,:);
       right_vec = rate_K_surface_(f,:);
       sample_points = [f-M f];
       resample_points = f-M:f-1;
@@ -132,6 +137,12 @@ function tnewamp1(input_prefix)
         end  
    
       end
+
+      % update for next time
+
+      Wo_left = Wo_right;
+      voicing_left = voicing_right;
+      left_vec = right_vec;
     end
   end
 
