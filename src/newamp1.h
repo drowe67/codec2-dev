@@ -30,7 +30,8 @@
 #ifndef __NEWAMP1__
 #define __NEWAMP1__
 
-#define NEWAMP1_N_INDEXES 4 /* Number of indexes to pack: vq1, vq2, energy, Wo */
+#define NEWAMP1_N_INDEXES    4  /* Number of indexes to pack: vq1, vq2, energy, Wo */
+#define NEWAMP1_PHASE_NFFT 128  /* size of FFT used for phase synthesis            */
 
 #include "codec2_fft.h"
 #include "comp.h"
@@ -41,9 +42,9 @@ void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K);
 void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K);
 float rate_K_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbest_entries);
 void post_filter_newamp1(float vec[], float sample_freq_kHz[], int K, float pf_gain);
-void interp_Wo_v(float Wo_[], int voicing_[], float Wo1, float Wo2, int voicing1, int voicing2);
+void interp_Wo_v(float Wo_[], int L_[], int voicing_[], float Wo1, float Wo2, int voicing1, int voicing2);
 void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K);
-void determine_phase(MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg);
+void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg);
 void newamp1_model_to_indexes(int    indexes[], 
                               MODEL *model, 
                               float  rate_K_vec[], 
@@ -53,11 +54,24 @@ void newamp1_model_to_indexes(int    indexes[],
                               float  rate_K_vec_no_mean[], 
                               float  rate_K_vec_no_mean_[]
                               );
-void newamp1_indexes_to_model(float  rate_K_vec_[],  
-                              float  rate_K_vec_no_mean_[],
+void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],  
+                                   float  rate_K_vec_no_mean_[],
+                                   float  rate_K_sample_freqs_kHz[], 
+                                   int    K,
+                                   float *mean_,
+                                   int    indexes[]);
+void newamp1_interpolate(float interpolated_surface_[], float left_vec[], float right_vec[], int K);
+
+void newamp1_indexes_to_model(MODEL  model_[],
+                              COMP   H[],
+                              float  interpolated_surface_[],
+                              float  prev_rate_K_vec_[],
+                              float  *Wo_left,
+                              int    *voicing_left,
                               float  rate_K_sample_freqs_kHz[], 
                               int    K,
-                              float *mean_,
+                              codec2_fft_cfg fwd_cfg, 
+                              codec2_fft_cfg inv_cfg,
                               int    indexes[]);
 
 #endif

@@ -95,8 +95,7 @@ function tnewamp1(input_prefix)
   Nfft_phase = 128;
   model_ = zeros(frames, max_amp+2);
   voicing_ = zeros(1,frames);
-  Hm = zeros(frames, max_amp);
-  phi = zeros(1,max_amp);
+  H = zeros(frames, max_amp);
   for f=1:M:frames   
     if voicing(f)
       index = encode_log_Wo(model(f,1), 6);
@@ -129,8 +128,7 @@ function tnewamp1(input_prefix)
         phase = determine_phase(model_, k, Nfft_phase);
         for m=1:model_(k,2)
           b = round(m*model_(k,1)*Nfft_phase/(2*pi));  % map harmonic centre to DFT bin
-          phi(m) = phase(b+1);
-          Hm(k,m) = exp(-j*phi(m));
+          H(k,m) = exp(-j*phase(b+1));
         end  
    
       end
@@ -150,11 +148,11 @@ function tnewamp1(input_prefix)
   %Hm(2,:) - Hm_c(2,:)
   
   figure(1);
-  mesh(angle(Hm));
+  mesh(angle(H));
   figure(2);
-  mesh(angle(Hm_c));
+  mesh(angle(H_c));
   figure(3);
-  mesh(abs(Hm - Hm_c));
+  mesh(abs(H - H_c));
 
   check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
   check(mean_f, mean_c, 'mean', 0.01);
@@ -162,8 +160,8 @@ function tnewamp1(input_prefix)
   check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
   check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
   check(voicing_, voicing__c, 'interpolated voicing');
-  check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L surface at dec', 0.1);
-  check(Hm, Hm_c, 'phase surface');
+  check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
+  check(H, H_c, 'phase surface');
 
   #{
 
