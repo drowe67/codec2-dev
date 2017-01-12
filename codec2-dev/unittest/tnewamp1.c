@@ -170,6 +170,7 @@ int main(int argc, char *argv[]) {
     float Wo_left;
     int   voicing_left;
 
+    /*
     for(k=0; k<K; k++)
         prev_rate_K_vec_[k] = rate_K_surface_[0][k];
 
@@ -183,6 +184,12 @@ int main(int argc, char *argv[]) {
     }
 
     Wo_left = model_octave_[0][0];
+    */
+
+    for(k=0; k<K; k++)
+        prev_rate_K_vec_[k] = 0.0;
+    voicing_left = 0;
+    Wo_left = 2.0*M_PI/100.0;
 
     for(f=0; f<FRAMES; f+=M) {
 
@@ -200,18 +207,18 @@ int main(int argc, char *argv[]) {
                                      phase_fft_inv_cfg,
                                      &indexes[f][0]);
 
+            /* store test vectors */
+
             for(i=f-M, m=0; i<f; i++,m++) {
                 model_octave_[i][0] = model__[m].Wo;
                 model_octave_[i][1] = model__[m].L; 
                 voicing_[i] = model__[m].voiced;
             }
 
-            /* back to rate L, synth phase */
-
             int j;
             for(i=f-M, j=0; i<f; i++,j++) {
                 for(m=1; m<=model__[j].L; m++) {
-                    model_octave_[i][m+1] = model__[j].A[m]; // = model_.A[m];
+                    model_octave_[i][m+1] = model__[j].A[m]; 
                     H[i][m-1] = HH[j][m];// aH[m];
                 }
             }
