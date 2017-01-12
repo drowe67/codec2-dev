@@ -173,55 +173,20 @@ int main(int argc, char *argv[]) {
     for(k=0; k<K; k++)
         prev_rate_K_vec_[k] = rate_K_surface_[0][k];
 
+    if (indexes[0][3]) {
+        model_octave_[0][0] = decode_log_Wo(indexes[0][3], 6);
+        voicing_left = 1;
+    }
+    else {
+        voicing_left = 0;
+        model_octave_[0][0] = 2.0*M_PI/100.0;
+    }
+
+    Wo_left = model_octave_[0][0];
+
     for(f=0; f<FRAMES; f+=M) {
 
-#ifdef TMP1
-        /* Quantise Wo. V/UV flag is coded using a zero index for Wo,
-           this means we need to adjust Wo index slightly for the
-           lowest Wo V frames */
-
-        if (voicing[f]) {
-            int index = encode_log_Wo(model_octave[f][0], 6);
-            if (index == 0) {
-                index = 1;
-            }
-            model_octave_[f][0] = decode_log_Wo(index, 6);
-         }
-        else {
-            model_octave_[f][0] = 2.0*M_PI/100.0;
-        }
-#endif
-
-        if (indexes[f][3]) {
-            model_octave_[f][0] = decode_log_Wo(indexes[f][3], 6);
-        }
-        else {
-            model_octave_[f][0] = 2.0*M_PI/100.0;
-        }
-
-        /*
-          pass in left and right rate K vectors, Wo, v
-          interpolate at rate K
-          convert to rate L
-          indexes for current plus decoded rate K, Wo, v from frame[0], model[4] out parameters,
-          then plug them into model_octave for testing
-          ref indexes to 0...3
-          slowly change
-          
-          [ ] model[4] out
-          [ ] change to 1:M processing
-              + not sure how to handle Octave side of this
-        */
-
         if (f >= M) {
-            /*
-            float *left_vec = &rate_K_surface_[f-M][0];
-            float *right_vec = &rate_K_surface_[f][0];
-            newamp1_interpolate(&interpolated_surface_[f-M][0], left_vec, right_vec, K);
-            */
-
-            Wo_left = model_octave_[f-M][0];
-            voicing_left = voicing[f-M];
 
             newamp1_indexes_to_model(model__,
                                      (COMP*)HH,
@@ -235,34 +200,17 @@ int main(int argc, char *argv[]) {
                                      phase_fft_inv_cfg,
                                      &indexes[f][0]);
 
-            /* interpolate 25Hz v and Wo back to 100Hz */
-
-            float aWo_[M];
-            int avoicing_[M], aL_[M], m;
-            float Wo1 = model_octave_[f-M][0];
-            float Wo2 = model_octave_[f][0];
-            interp_Wo_v(aWo_, aL_, avoicing_, Wo1, Wo2, voicing[f-M], voicing[f]);
-
             for(i=f-M, m=0; i<f; i++,m++) {
-                model_octave_[i][0] = model__[m].Wo; //aWo_[m];
-                model_octave_[i][1] = model__[m].L; //aL_[m]; 
-                voicing_[i] = avoicing_[m];
+                model_octave_[i][0] = model__[m].Wo;
+                model_octave_[i][1] = model__[m].L; 
+                voicing_[i] = model__[m].voiced;
             }
 
             /* back to rate L, synth phase */
 
-            MODEL model_;
-            COMP aH[MAX_AMP+1];
             int j;
             for(i=f-M, j=0; i<f; i++,j++) {
-                /*
-                model_.Wo = model_octave_[i][0];
-                model_.L  = model_octave_[i][1];
-                resample_rate_L(&model_, &interpolated_surface_[i][0], rate_K_sample_freqs_kHz, K);
-                determine_phase(aH, &model_, NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
-                */
-                model_.L  = model_octave_[i][1];
-                for(m=1; m<=model_.L; m++) {
+                for(m=1; m<=model__[j].L; m++) {
                     model_octave_[i][m+1] = model__[j].A[m]; // = model_.A[m];
                     H[i][m-1] = HH[j][m];// aH[m];
                 }
