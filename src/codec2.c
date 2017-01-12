@@ -175,8 +175,6 @@ struct CODEC2 * codec2_create(int mode)
         c2->voicing_left = 0;;
         c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
         c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
-        printf("c2->phase_fft_fwd_cfg: %x\n", c2->phase_fft_fwd_cfg);
-        printf("c2->phase_fft_inv_cfg: %x\n", c2->phase_fft_inv_cfg);
     }
 
     return c2;
@@ -1794,15 +1792,12 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
     MODEL        model;
     int          indexes[4], i, M=4;
     unsigned int nbit = 0;
-    static   int f = 0;
 
     assert(c2 != NULL);
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
 
     analyse_one_frame(c2, &model, speech);
-    fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
-    f++;
 
     int K = 20;
     float rate_K_vec[K], mean;
@@ -1817,20 +1812,9 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_);
 
-    for(i=0; i<5; i++) {
-      fprintf(stderr,"  %5.3f", rate_K_vec[i]);
-    }
-    fprintf(stderr,"\n");
-    fprintf(stderr,"  %d %d %d %d\n", indexes[0], indexes[1], indexes[2], indexes[3]);
-
     for(i=1; i<M; i++) {
         analyse_one_frame(c2, &model, &speech[i*N_SAMP]);
-        fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
-        f++;
     }
-
-    //if (f == 8)
-    //    exit(0);
 
     pack_natural_or_gray(bits, &nbit, indexes[0], 9, 0);
     pack_natural_or_gray(bits, &nbit, indexes[1], 9, 0);
@@ -1857,7 +1841,6 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
     int     indexes[4];
     int     i;
     unsigned int nbit = 0;
-    static   int f = 0;
 
     assert(c2 != NULL);
 
@@ -1884,31 +1867,7 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
                              c2->phase_fft_inv_cfg,
                              indexes);
 
-   fprintf(stderr,"f: %d\n", f);
-   fprintf(stderr,"  %d %d %d %d\n", indexes[0], indexes[1], indexes[2], indexes[3]);
-   for(i=0; i<4; i++) {
-       fprintf(stderr,"  Wo: %4.3f L: %d v: %d\n", model[i].Wo, model[i].L, model[i].voiced);
-   }
-   fprintf(stderr,"  rate_K_vec:  ");
-   for(i=0; i<5; i++) {
-       fprintf(stderr,"%5.3f  ", c2->prev_rate_K_vec_[i]);
-   }
-   fprintf(stderr,"\n");
-   fprintf(stderr,"  H:\n");
 
-   for(int m=0; m<M; m++) {
-       fprintf(stderr,"    ");  
-       for(i=1; i<=5; i++) {
-           fprintf(stderr,"(%5.3f %5.3f)  ", HH[m][i].real, HH[m][i].imag);
-       }
-       fprintf(stderr,"\n");
-   }
-   fprintf(stderr,"\n");
-   fprintf(stderr,"\n");
-
-   if (f == 80)
-       exit(0);
-   f += 4;
    for(i=0; i<M; i++) {
 	synthesise_one_frame(c2, &speech[N_SAMP*i], &model[i], &HH[i][0]);
    }

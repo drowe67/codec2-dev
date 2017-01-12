@@ -188,8 +188,9 @@ function tnewamp1(input_prefix)
   Hm_out_name = sprintf("%s_hm.out", output_prefix);
   fhm = fopen(Hm_out_name,"wb"); 
 
+  printf("Generating files for c2sim: ");
   for f=1:frames
-    printf("%d ", f);   
+    printf(".", f);   
     Wo = model_(f,1);
     L = min([model_(f,2) max_amp-1]);
     Am = model_(f,3:(L+2));

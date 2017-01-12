@@ -99,8 +99,10 @@ int main(int argc, char *argv[])
 	mode = CODEC2_MODE_700;
     else if (strcmp(argv[1],"700B") == 0)
 	mode = CODEC2_MODE_700B;
-    else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700 or 700B\n", argv[1]);
+     else if (strcmp(argv[1],"700C") == 0)
+	mode = CODEC2_MODE_700C;
+   else {
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B or 700C\n", argv[1]);
 	exit(1);
     }
     bit_rate = atoi(argv[1]);
