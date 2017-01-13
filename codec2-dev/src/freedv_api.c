@@ -230,7 +230,7 @@ struct freedv *freedv_open(int mode) {
         f->codec_bits = malloc(1);
         
         f->n_protocol_bits = 0;
-        codec2_mode = CODEC2_MODE_700B;
+        codec2_mode = CODEC2_MODE_700C;
         
         /* Set up the stats */
         fsk_setup_modem_stats(f->fsk,&(f->stats));
@@ -932,7 +932,7 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
             int frames = f->n_codec_bits / bits_per_codec_frame;
             for (i = 0; i < frames; i++) {
                 codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-                //speech_out += codec2_samples_per_frame(f->codec2);
+                speech_out += codec2_samples_per_frame(f->codec2);
             }
         }
         return f->n_speech_samples;
