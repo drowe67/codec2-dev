@@ -25,6 +25,8 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#ifndef __CODEC_2_TDMA_H
+#define __CODEC_2_TDMA_H
 
 #include "fsk.h"
 #include "freedv_vhf_framing.h"
@@ -34,7 +36,7 @@ enum slot_state {
     rx_no_sync,         /* Not synched */
     rx_sync,            /* Sunk */
     tx_client,          /* TX but timed from a different master */
-    tx_master
+    tx_master           /* TX in master mode */
 };
 
 /* The state of the entire TDMA modem */
@@ -42,6 +44,7 @@ enum tdma_state {
     no_sync,            /* No sync */
     pilot_sync,         /* Pilot modem has gotten sync, but slots haven't*/
     slot_sync,          /* One or more slots are sunk */
+    master_sync,        /* This modem is the TDMA master */
 };
 
 /* TDMA slot struct */
@@ -50,4 +53,10 @@ struct TDMA_SLOT {
     struct FSK * fsk;   /* The FSK modem for this slot */
     enum slot_state state;
 };
+
+/* TDMA modem */
+struct TDMA_MODEM {
     
+};
+
+#endif
