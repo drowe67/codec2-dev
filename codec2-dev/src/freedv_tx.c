@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
     int                       i;
 
     if (argc < 4) {
-        printf("usage: %s 1600|700|700B|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile [--testframes] [--codectx] [--datatx]\n", argv[0]);
+        printf("usage: %s 1600|700|700B|700C|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile [--testframes] [--codectx] [--datatx]\n", argv[0]);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -110,6 +110,8 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_700;
     if (!strcmp(argv[1],"700B"))
         mode = FREEDV_MODE_700B;
+    if (!strcmp(argv[1],"700C"))
+        mode = FREEDV_MODE_700C;
     if (!strcmp(argv[1],"2400A")){
         mode = FREEDV_MODE_2400A;
 	}
