@@ -1124,7 +1124,7 @@ static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in[], int *valid
     int                 data_flag_index, n_ascii, nspare;
     short               abit[1];
     char                ascii_out;
-    char  rx_bits[COHPSK_BITS_PER_FRAME];
+    float  rx_bits[COHPSK_BITS_PER_FRAME];
     int   sync;
     int   frames;
 
@@ -1143,7 +1143,7 @@ static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in[], int *valid
     for(i=0; i<f->nin; i++)
         demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
-    cohpsk_demod(f->cohpsk, (float*)rx_bits, &sync, demod_in, &f->nin);
+    cohpsk_demod(f->cohpsk, rx_bits, &sync, demod_in, &f->nin);
     f->sync = sync;
     cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     f->snr_est = f->stats.snr_est;
