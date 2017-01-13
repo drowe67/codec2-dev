@@ -132,7 +132,6 @@ int main(int argc, char *argv[]) {
     }
 
     freedv = freedv_open(mode);
-    freedv_set_alt_modem_samp_rate(freedv,96000);
     assert(freedv != NULL);
 
     use_codectx = 0;
