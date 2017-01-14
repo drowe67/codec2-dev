@@ -1578,7 +1578,7 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, stats);
-    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B))
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA))
         memcpy(stats,&(f->stats),sizeof(struct MODEM_STATS));
     
 #ifndef CORTEX_M4
