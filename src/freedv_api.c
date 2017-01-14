@@ -880,7 +880,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
 
 // float input samples version
-int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
+int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
     /* Varicode and protocol bits */
     uint8_t vc_bits[2];
     uint8_t proto_bits[3];
@@ -889,20 +889,17 @@ int freedv_floatrx_fsk(struct freedv *f, float demod_in[], int *valid) {
     int n_ascii;
     char ascii_out;
 
-
-    if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){
-        /* DR: 21/11/16 - temp code while porting fsk_demod to complex */
-        int n = fsk_nin(f->fsk);
-        COMP demod_comp[n];
-        for(i=0; i<n; i++) {
-            demod_comp[i].real = demod_in[i];
-            demod_comp[i].imag = 0.0;;        
-        }
-        
-	fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_comp);
+    if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){        
+	fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
         f->nin = fsk_nin(f->fsk);
-    }else{            
-        fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in);
+    }else{      
+        /* 2400B needs real input samples */
+        int n = fmfsk_nin(f->fmfsk);
+        float demod_in_float[n];
+        for(i=0; i<n; i++) {
+            demod_in_float[i] = demod_in[i].real;
+        }
+        fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in_float);
         f->nin = fmfsk_nin(f->fmfsk);
     }
     
@@ -938,37 +935,13 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     
     assert(nin <= f->n_max_modem_samples);
     
-    /* FSK RX happens in real floats, so demod for those goes here */
-    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
-        int valid;
-        int nout = freedv_floatrx_fsk(f, demod_in, &valid);
-        if (valid == 0)
-            for (i = 0; i < nout; i++)
-                speech_out[i] = 0;
-        else if (valid < 0){
-            for (i = 0; i < nout; i++)
-                speech_out[i] = demod_in[i];  
-        }else {
-            int bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
-            int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-            int frames = f->n_codec_bits / bits_per_codec_frame;
-            for (i = 0; i < frames; i++) {
-                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-                speech_out += codec2_samples_per_frame(f->codec2);
-            }
-        }
-        return f->n_speech_samples;
+    COMP rx_fdm[f->n_max_modem_samples];
+    for(i=0; i<nin; i++) {
+        rx_fdm[i].real = demod_in[i];
+        rx_fdm[i].imag = 0;
     }
-    
-    if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)){
-		COMP rx_fdm[f->n_max_modem_samples];
-        for(i=0; i<nin; i++) {
-            rx_fdm[i].real = demod_in[i];
-            rx_fdm[i].imag = 0;
-        }
-        return freedv_comprx(f, speech_out, rx_fdm);
-    }
-    return 0; //should never get here
+
+    return freedv_comprx(f, speech_out, rx_fdm);
 }
 
 // complex input samples version
@@ -1293,6 +1266,10 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         nout = freedv_comprx_fdmdv_700(f, demod_in, &valid);
     }
+
+    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
+        nout = freedv_comprx_fsk(f, demod_in, &valid);
+    }
 #endif
 
     if (valid == 0)
@@ -1321,26 +1298,18 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     int nin = freedv_nin(f);
     int valid;
     int ret = 0;
-    float rx_float[f->n_max_modem_samples];
 
     assert(nin <= f->n_max_modem_samples);
     
-    /* FSK RX happens in real floats, so convert to those and call their demod here */
-    if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
-        for(i=0; i<nin; i++) {
-            rx_float[i] = ((float)demod_in[i]);
-        }
+    for(i=0; i<nin; i++) {
+        rx_fdm[i].real = (float)demod_in[i];
+        rx_fdm[i].imag = 0.0;
     }
-    
-    if( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)){
-        for(i=0; i<nin; i++) {
-            rx_fdm[i].real = (float)demod_in[i];
-            rx_fdm[i].imag = 0.0;
-        }
-    }
+
     if (f->mode == FREEDV_MODE_1600) {
         freedv_comprx_fdmdv_1600(f, rx_fdm, &valid);
     }
+
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         freedv_comprx_fdmdv_700(f, rx_fdm, &valid);
@@ -1348,7 +1317,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
 #endif
     
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
-        freedv_floatrx_fsk(f, rx_float, &valid);
+        freedv_comprx_fsk(f, rx_fdm, &valid);
     }
 
     if (valid == 1) {
