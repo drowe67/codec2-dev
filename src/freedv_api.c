@@ -140,10 +140,10 @@ struct freedv *freedv_open(int mode) {
 
         f->cohpsk = cohpsk_create();
         f->nin = COHPSK_NOM_SAMPLES_PER_FRAME;
-        f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;          // native modem samples as used by the modem
-        f->n_nom_modem_samples = f->n_nat_modem_samples * 8000 / 7500;  // number of samples after native samples are interpolated to 8000 sps
-        f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * 8000 / 7500 + 1;
-        f->modem_sample_rate = COHPSK_FS;                /* note wierd sample rate */
+        f->n_nat_modem_samples = COHPSK_NOM_SAMPLES_PER_FRAME;             // native modem samples as used by the modem
+        f->n_nom_modem_samples = f->n_nat_modem_samples * FS / COHPSK_FS;  // number of samples after native samples are interpolated to 8000 sps
+        f->n_max_modem_samples = COHPSK_MAX_SAMPLES_PER_FRAME * FS / COHPSK_FS + 1;
+        f->modem_sample_rate = FS;                                         /* note wierd sample rate tamed by interpolator */
         f->clip = 1;
         nbit = COHPSK_BITS_PER_FRAME;
         f->tx_bits = (int*)malloc(nbit*sizeof(int));
