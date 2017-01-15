@@ -108,7 +108,10 @@ function tnewamp1(input_prefix)
   voicing_left = 0;
   left_vec = zeros(1,K);
 
-  for f=1:M:frames   
+  % decoder runs on every M-th frame, 25Hz frame rate, offset at
+  % start is to minimise processing delay (thanks Jeroen!)
+
+  for f=M:M:frames   
 
     if voicing(f)
       index = encode_log_Wo(model(f,1), 6);
