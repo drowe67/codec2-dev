@@ -1873,6 +1873,38 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
    }
 }
 
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: codec2_energy_700c
+  AUTHOR......: Jeroen Vreeken
+  DATE CREATED: Jan 2017
+
+  Decodes energy value from encoded bits.
+
+\*---------------------------------------------------------------------------*/
+
+float codec2_energy_700c(struct CODEC2 *c2, const unsigned char * bits)
+{
+    int     indexes[4];
+    unsigned int nbit = 0;
+
+    assert(c2 != NULL);
+
+    /* unpack bits from channel ------------------------------------*/
+
+    indexes[0] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    indexes[1] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    indexes[2] = unpack_natural_or_gray(bits, &nbit, 4, 0);
+    indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
+
+    float mean = newamp1_energy_cb[0].cb[indexes[2]];
+    mean -= 10;
+    if (indexes[3] == 0)
+    	mean -= 10;
+
+    return powf(10.0, mean/10.0);
+}
+
 #endif
 
 /*---------------------------------------------------------------------------*\
@@ -1896,7 +1928,8 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 	   (c2->mode == CODEC2_MODE_1300) ||
 	   (c2->mode == CODEC2_MODE_1200) ||
 	   (c2->mode == CODEC2_MODE_700) ||
-	   (c2->mode == CODEC2_MODE_700B)
+	   (c2->mode == CODEC2_MODE_700B) ||
+	   (c2->mode == CODEC2_MODE_700C)
 	   );
     MODEL model;
     float xq_dec[2] = {};
@@ -1944,7 +1977,10 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
         e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
         e = decode_energy(e_index, 3);
     }
-
+    if (c2->mode == CODEC2_MODE_700C) {
+        e = codec2_energy_700c(c2, bits);
+    }
+    
     return e;
 }
 
