@@ -85,6 +85,7 @@ struct FSK {
     
     /*  modem statistic struct */
     struct MODEM_STATS *stats;
+    int normalise_eye;      /* enables/disables normalisation of eye diagram */
 };
 
 /*
@@ -181,5 +182,9 @@ void fsk_demod(struct FSK *fsk, uint8_t rx_bits[],COMP fsk_in[]);
  * float fsk_in[] - nin samples of modualted FSK
  */
 void fsk_demod_sd(struct FSK *fsk, float rx_bits[],COMP fsk_in[]);
+
+/* enables/disables normalisation of eye diagram samples */
+  
+void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable);
 
 #endif
