@@ -183,9 +183,6 @@ struct freedv *freedv_open(int mode) {
         f->modem_sample_rate = 48000;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
-        
-        /* Set up the stats */
-        fsk_setup_modem_stats(f->fsk,&(f->stats));
     }
     
     if (mode == FREEDV_MODE_2400B) {
@@ -210,9 +207,6 @@ struct freedv *freedv_open(int mode) {
         f->modem_sample_rate = 48000;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
-        
-        /* Set up the stats */
-        fmfsk_setup_modem_stats(f->fmfsk,&(f->stats));
     }
     
     if (mode == FREEDV_MODE_800XA) {
@@ -242,9 +236,6 @@ struct freedv *freedv_open(int mode) {
         
         f->n_protocol_bits = 0;
         codec2_mode = CODEC2_MODE_700C;
-        
-        /* Set up the stats */
-        fsk_setup_modem_stats(f->fsk,&(f->stats));
     }
     
 
@@ -1578,8 +1569,14 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, stats);
-    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA))
-        memcpy(stats,&(f->stats),sizeof(struct MODEM_STATS));
+
+    if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_800XA)) {
+        fsk_get_demod_stats(f->fsk, stats);
+    }
+
+    if (f->mode == FREEDV_MODE_2400B) {
+        fmfsk_get_demod_stats(f->fmfsk, stats);
+    }
     
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C))

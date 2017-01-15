@@ -77,9 +77,9 @@ struct FMFSK * fmfsk_create(int Fs,int Rb);
 void fmfsk_destroy(struct FMFSK *fmfsk);
 
 /*
- * Set a MODEM_STATS struct in which to deposit demod statistics
+ * Deposit demod statistics into a MODEM_STATS struct
  */
-void fmfsk_setup_modem_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats);
+void fmfsk_get_demod_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats);
 
 /*
  * Returns the number of samples that must be fed to fmfsk_demod the next

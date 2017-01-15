@@ -181,7 +181,6 @@ int main(int argc,char *argv[]){
     }
     
     if(enable_stats){
-        fsk_setup_modem_stats(fsk,&stats);
         loop_time = ((float)fsk_nin(fsk))/((float)Fs);
         stats_loop = (int)(1/(stats_rate*loop_time));
         stats_ctr = 0;
@@ -232,6 +231,7 @@ int main(int argc,char *argv[]){
         }
         
         if(enable_stats && stats_ctr <= 0){
+            fsk_get_demod_stats(fsk,&stats);
 	    /* Print standard 2FSK stats */
             fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
             fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
