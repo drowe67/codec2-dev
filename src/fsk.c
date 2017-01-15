@@ -246,6 +246,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    fsk->normalise_eye = 1;
 
     return fsk;
 }
@@ -380,6 +381,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    fsk->normalise_eye = 1;
 
     return fsk;
 }
@@ -956,17 +958,19 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         }
     }
         
-    eye_max = 0;
-    /* Normalize eye to +/- 1 */
-    for(i=0; i<M*eye_traces; i++)
-        for(j=0; j<neyesamp; j++)
-            if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
-                eye_max = fabsf(fsk->stats->rx_eye[i][j]);
+    if (fsk->normalise_eye) {
+        eye_max = 0;
+        /* Normalize eye to +/- 1 */
+        for(i=0; i<M*eye_traces; i++)
+            for(j=0; j<neyesamp; j++)
+                if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
+                    eye_max = fabsf(fsk->stats->rx_eye[i][j]);
         
-    for(i=0; i<M*eye_traces; i++)
-        for(j=0; j<neyesamp; j++)
-            fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
-        
+        for(i=0; i<M*eye_traces; i++)
+            for(j=0; j<neyesamp; j++)
+                fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
+    }
+
     fsk->stats->nr = 0;
     fsk->stats->Nc = 0;
     
@@ -1087,7 +1091,9 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
     
 }
 
-
+void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable) {
+    fsk->normalise_eye = normalise_enable;
+}
 
 
 

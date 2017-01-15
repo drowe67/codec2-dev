@@ -236,6 +236,7 @@ struct freedv *freedv_open(int mode) {
         
         f->n_protocol_bits = 0;
         codec2_mode = CODEC2_MODE_700C;
+        fsk_stats_normalise_eye(f->fsk, 0);
     }
     
 
