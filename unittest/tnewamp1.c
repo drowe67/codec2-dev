@@ -184,10 +184,11 @@ int main(int argc, char *argv[]) {
     voicing_left = 0;
     Wo_left = 2.0*M_PI/100.0;
 
-    /* decoder runs on every M-th frame, 25Hz frame rate */
+    /* decoder runs on every M-th frame, 25Hz frame rate, offset at
+       start is to minimise processing delay (thanks Jeroen!) */
 
     fprintf(stderr,"\n");
-    for(f=0; f<FRAMES; f+=M) {
+    for(f=M-1; f<FRAMES; f+=M) {
 
         float a_interpolated_surface_[M][K];
         newamp1_indexes_to_model(model__,

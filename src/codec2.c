@@ -1797,7 +1797,9 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
 
     memset(bits, '\0',  ((codec2_bits_per_frame(c2) + 7) / 8));
 
-    analyse_one_frame(c2, &model, speech);
+    for(i=0; i<M; i++) {
+        analyse_one_frame(c2, &model, &speech[i*N_SAMP]);
+    }
 
     int K = 20;
     float rate_K_vec[K], mean;
@@ -1811,10 +1813,6 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              &mean,
                              rate_K_vec_no_mean,
                              rate_K_vec_no_mean_);
-
-    for(i=1; i<M; i++) {
-        analyse_one_frame(c2, &model, &speech[i*N_SAMP]);
-    }
 
     pack_natural_or_gray(bits, &nbit, indexes[0], 9, 0);
     pack_natural_or_gray(bits, &nbit, indexes[1], 9, 0);
