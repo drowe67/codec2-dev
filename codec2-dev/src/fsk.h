@@ -83,7 +83,7 @@ struct FSK {
     /*  Parameters used by mod/demod and driving code */
     int nin;                /* Number of samples to feed the next demod cycle */
     
-    /*  Pointer to modem statistic struct */
+    /*  modem statistic struct */
     struct MODEM_STATS *stats;
 };
 
@@ -123,9 +123,9 @@ void fsk_set_est_limits(struct FSK *fsk,int fmin, int fmax);
 void fsk_clear_estimators(struct FSK *fsk);
 
 /*
- * Set a MODEM_STATS struct in which to deposit demod statistics
+ * Fills MODEM_STATS struct with demod statistics
  */
-void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats);
+void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats);
 
 /*
  * Destroy an FSK state struct and free it's memory

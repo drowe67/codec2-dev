@@ -238,8 +238,15 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->ppm = 0;
 
-    fsk->stats = NULL;
-    
+    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
+    if(fsk->stats == NULL){
+        free(fsk->fft_est);
+        free(fsk->samp_old);
+        free(fsk->fft_cfg);
+        free(fsk);
+        return NULL;
+    }
+
     return fsk;
 }
 
@@ -364,9 +371,16 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         fsk->f_est[i] = 0; 
     
     fsk->ppm = 0;
-
-    fsk->stats = NULL;
     
+    fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
+    if(fsk->stats == NULL){
+        free(fsk->fft_est);
+        free(fsk->samp_old);
+        free(fsk->fft_cfg);
+        free(fsk);
+        return NULL;
+    }
+
     return fsk;
 }
 
@@ -419,11 +433,30 @@ uint32_t fsk_nin(struct FSK *fsk){
 void fsk_destroy(struct FSK *fsk){
     free(fsk->fft_cfg);
     free(fsk->samp_old);
+    free(fsk->stats);
     free(fsk);
 }
 
-void fsk_setup_modem_stats(struct FSK *fsk,struct MODEM_STATS *stats){
-    fsk->stats = stats;
+void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
+    /* copy from internal stats, note we can't overwrite stats completely
+       as it has other states rqd by caller, also we want a consistent
+       interface across modem types for the freedv_api.
+    */
+
+    stats->clock_offset = fsk->stats->clock_offset;
+    stats->snr_est = fsk->stats->snr_est;           // TODO: make this SNR not Eb/No
+    stats->rx_timing = fsk->stats->rx_timing;
+    stats->foff = fsk->stats->foff;
+
+    stats->neyesamp = fsk->stats->neyesamp;
+    stats->neyetr = fsk->stats->neyetr;
+    memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
+
+    /* these fields not used for FSK so set to something sensible */
+
+    stats->sync = 0;
+    stats->nr = fsk->stats->nr;
+    stats->Nc = fsk->stats->Nc;
 }
 
 /*
@@ -893,50 +926,49 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     fsk->EbNodB = 1;
     #endif
     
-    /* Write some statistics out to the stats struct, if present */
-    if( fsk->stats != NULL ){
-        /* Save clock offset in ppm */
-        fsk->stats->clock_offset = fsk->ppm;
+    /* Write some statistics to the stats struct */
+
+    /* Save clock offset in ppm */
+    fsk->stats->clock_offset = fsk->ppm;
         
-        /* Calculate and save SNR from EbNodB estimate */
-        fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
+    /* Calculate and save SNR from EbNodB estimate */
+    fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
         
-        /* Save rx timing */
-        fsk->stats->rx_timing = (float)rx_timing;
+    /* Save rx timing */
+    fsk->stats->rx_timing = (float)rx_timing;
         
-        /* Estimate and save frequency offset */
-        fc_avg = (f_est[0]+f_est[1])/2;
-        fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
-        fsk->stats->foff = fc_tx-fc_avg;
+    /* Estimate and save frequency offset */
+    fc_avg = (f_est[0]+f_est[1])/2;
+    fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
+    fsk->stats->foff = fc_tx-fc_avg;
     
-        /* Take a sample for the eye diagrams */
-        neyesamp = fsk->stats->neyesamp = P*2;
-        neyeoffset = high_sample+1+(P*28);
+    /* Take a sample for the eye diagrams */
+    neyesamp = fsk->stats->neyesamp = P*2;
+    neyeoffset = high_sample+1+(P*28);
         
-        int eye_traces = MODEM_STATS_ET_MAX/M;
+    int eye_traces = MODEM_STATS_ET_MAX/M;
         
-        fsk->stats->neyetr = fsk->mode*eye_traces;
-        for( i=0; i<eye_traces; i++){
-            for ( m=0; m<M; m++){
-                for(j=0; j<neyesamp; j++)
-                    fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][neyesamp*i+neyeoffset+j]);
-            }
+    fsk->stats->neyetr = fsk->mode*eye_traces;
+    for( i=0; i<eye_traces; i++){
+        for ( m=0; m<M; m++){
+            for(j=0; j<neyesamp; j++)
+                fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][neyesamp*i+neyeoffset+j]);
         }
-        
-        eye_max = 0;
-        /* Normalize eye to +/- 1 */
-        for(i=0; i<M*eye_traces; i++)
-            for(j=0; j<neyesamp; j++)
-                if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
-                    eye_max = fabsf(fsk->stats->rx_eye[i][j]);
-        
-        for(i=0; i<M*eye_traces; i++)
-            for(j=0; j<neyesamp; j++)
-                fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
-        
-        fsk->stats->nr = 0;
-        fsk->stats->Nc = 0;
     }
+        
+    eye_max = 0;
+    /* Normalize eye to +/- 1 */
+    for(i=0; i<M*eye_traces; i++)
+        for(j=0; j<neyesamp; j++)
+            if(fabsf(fsk->stats->rx_eye[i][j])>eye_max)
+                eye_max = fabsf(fsk->stats->rx_eye[i][j]);
+        
+    for(i=0; i<M*eye_traces; i++)
+        for(j=0; j<neyesamp; j++)
+            fsk->stats->rx_eye[i][j] = fsk->stats->rx_eye[i][j]/eye_max;
+        
+    fsk->stats->nr = 0;
+    fsk->stats->Nc = 0;
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);

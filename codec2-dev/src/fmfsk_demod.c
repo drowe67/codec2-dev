@@ -76,7 +76,6 @@ int main(int argc,char *argv[]){
     if(argc>5){
 	if(strcmp(argv[5],"S")==0){
 	    enable_stats = 1;
-	    fmfsk_setup_modem_stats(fmfsk,&stats);
 	    loop_time = ((float)fmfsk_nin(fmfsk))/((float)Fs);
 	    stats_loop = (int)(.125/loop_time);
 	    stats_ctr = 0;
@@ -110,6 +109,7 @@ int main(int argc,char *argv[]){
 	fwrite(bitbuf,sizeof(uint8_t),fmfsk->nbit,fout);
         
 	if(enable_stats && stats_ctr <= 0){
+	    fmfsk_get_demod_stats(fmfsk,&stats);
 	    fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)stats.clock_offset);
 	    fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",0.0,0.0);
 	    fprintf(stderr,",\t\"eye_diagram\":[");

@@ -82,7 +82,13 @@ struct FMFSK * fmfsk_create(int Fs,int Rb){
     }
     
     fmfsk->oldsamps = oldsamps;
-    fmfsk->stats = NULL;
+
+    fmfsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
+    if (fmfsk->stats == NULL) {
+        free(oldsamps);
+        free(fmfsk);
+        return NULL;
+    }
     
     return fmfsk;
 }
@@ -103,8 +109,26 @@ uint32_t fmfsk_nin(struct FMFSK *fmfsk){
     return (uint32_t)fmfsk->nin;
 }
 
-void fmfsk_setup_modem_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats){
-    fmfsk->stats = stats;
+void fmfsk_get_demod_stats(struct FMFSK *fmfsk,struct MODEM_STATS *stats){
+    /* copy from internal stats, note we can't overwrite stats completely
+       as it has other states rqd by caller, also we want a consistent
+       interface across modem types for the freedv_api.
+    */
+
+    stats->clock_offset = fmfsk->stats->clock_offset;
+    stats->snr_est = fmfsk->stats->snr_est;           // TODO: make this SNR not Eb/No
+    stats->rx_timing = fmfsk->stats->rx_timing;
+    stats->foff = fmfsk->stats->foff;
+
+    stats->neyesamp = fmfsk->stats->neyesamp;
+    stats->neyetr = fmfsk->stats->neyetr;
+    memcpy(stats->rx_eye, fmfsk->stats->rx_eye, sizeof(stats->rx_eye));
+
+    /* these fields not used for FSK so set to something sensible */
+
+    stats->sync = 0;
+    stats->nr = fmfsk->stats->nr;
+    stats->Nc = fmfsk->stats->Nc;
 }
 
 /*
@@ -306,48 +330,46 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     fmfsk->lodd = lastv;
     
     /* Save demod statistics */
-    if(fmfsk->stats != NULL){
-        fmfsk->stats->Nc = 0;
-        fmfsk->stats->nr = 0;
+    fmfsk->stats->Nc = 0;
+    fmfsk->stats->nr = 0;
         
-        /* Clock offset and RX timing are all we know here */
-        fmfsk->stats->clock_offset = fmfsk->ppm;
-        fmfsk->stats->rx_timing = (float)rx_timing;
+    /* Clock offset and RX timing are all we know here */
+    fmfsk->stats->clock_offset = fmfsk->ppm;
+    fmfsk->stats->rx_timing = (float)rx_timing;
         
-        /* Zero out all of the other things */
-        fmfsk->stats->foff = 0;
+    /* Zero out all of the other things */
+    fmfsk->stats->foff = 0;
 
-        #ifdef EST_EBNO
-        amp_bit = fabsf(amp_bit - amp_noise);
-        fmfsk->snr_mean *= .9;
-        fmfsk->snr_mean += (amp_bit+1e-6)/(amp_noise+1e-6);
-        fmfsk->stats->snr_est = 20+20*log10f(fmfsk->snr_mean); 
-        #else
-        fmfsk->stats->snr_est = 0;
-        #endif
+#ifdef EST_EBNO
+    amp_bit = fabsf(amp_bit - amp_noise);
+    fmfsk->snr_mean *= .9;
+    fmfsk->snr_mean += (amp_bit+1e-6)/(amp_noise+1e-6);
+    fmfsk->stats->snr_est = 20+20*log10f(fmfsk->snr_mean); 
+#else
+    fmfsk->stats->snr_est = 0;
+#endif
         
-        /* Collect an eye diagram */
-        /* Take a sample for the eye diagrams */
-        neyesamp = fmfsk->stats->neyesamp = Ts*4;
-        neyeoffset = sample_offset+(Ts*2*28);
+    /* Collect an eye diagram */
+    /* Take a sample for the eye diagrams */
+    neyesamp = fmfsk->stats->neyesamp = Ts*4;
+    neyeoffset = sample_offset+(Ts*2*28);
         
-        fmfsk->stats->neyetr = 8;
-        for(k=0; k<fmfsk->stats->neyetr; k++)
-            for(j=0; j<neyesamp; j++)                                 
-                fmfsk->stats->rx_eye[k][j] = rx_filt[k*neyesamp+neyeoffset+j];
-               //fmfsk->stats->rx_eye[k][j] = fmfsk_in[k*neyesamp+neyeoffset+j];
-        eye_max = 0;
+    fmfsk->stats->neyetr = 8;
+    for(k=0; k<fmfsk->stats->neyetr; k++)
+        for(j=0; j<neyesamp; j++)                                 
+            fmfsk->stats->rx_eye[k][j] = rx_filt[k*neyesamp+neyeoffset+j];
+    //fmfsk->stats->rx_eye[k][j] = fmfsk_in[k*neyesamp+neyeoffset+j];
+    eye_max = 0;
         
-        /* Normalize eye to +/- 1 */
-        for(i=0; i<fmfsk->stats->neyetr; i++)
-            for(j=0; j<neyesamp; j++)
-                if(fabsf(fmfsk->stats->rx_eye[i][j])>eye_max)
-                    eye_max = fabsf(fmfsk->stats->rx_eye[i][j]);
+    /* Normalize eye to +/- 1 */
+    for(i=0; i<fmfsk->stats->neyetr; i++)
+        for(j=0; j<neyesamp; j++)
+            if(fabsf(fmfsk->stats->rx_eye[i][j])>eye_max)
+                eye_max = fabsf(fmfsk->stats->rx_eye[i][j]);
         
-        for(i=0; i<fmfsk->stats->neyetr; i++)
-            for(j=0; j<neyesamp; j++)
-                fmfsk->stats->rx_eye[i][j] = (fmfsk->stats->rx_eye[i][j]/(2*eye_max))+.5;
-    }
+    for(i=0; i<fmfsk->stats->neyetr; i++)
+        for(j=0; j<neyesamp; j++)
+            fmfsk->stats->rx_eye[i][j] = (fmfsk->stats->rx_eye[i][j]/(2*eye_max))+.5;
     
     modem_probe_samp_f("t_norm_rx_timing",&norm_rx_timing,1);
     modem_probe_samp_f("t_rx_filt",rx_filt,(nsym+1)*Ts);
