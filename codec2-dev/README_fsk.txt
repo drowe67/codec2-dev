@@ -18,24 +18,19 @@ Quickstart
 
 Built as part of codec2-dev, see README for build instructions.
 
-1. Using 10 test frames as a source of bits, generate 2FSK using a
-   8000 Hz sample rate, at 100 symbols/s (== 100 bit/s for 2FSK), with
-   two frequencies of 1200 and 2400 Hz, and stream via stdout to
-   "play" out speaker:
+1. Using 1000 test bits, generate 2FSK using a 8000 Hz sample rate, at
+   100 symbols/s (== 100 bit/s for 2FSK), with two frequencies of 1200
+   and 2400 Hz, and stream via stdout to "play" out speaker:
     
     $ cd build_linux/src
-    $ ./fsk_get_test_bits - 10 | ./fsk_mod 2 8000 100 1200 1200 - - | play -t raw -r 8000 -s -2 -
-
-    Each test frame has 400 bits, and the "fsk_get_test_bits"
-    generates 1+10=11 test frames in the example above - an extra
-    first frame is always generated to give the demod time to sync.
+    $ ./fsk_get_test_bits - 1000 | ./fsk_mod 2 8000 100 1200 1200 - - | play -t raw -r 8000 -s -2 -
 
     The low tone frequency is 1200Hz, and the upper tone 1200 + 1200 = 2400Hz.
 
-2. Measure the bit error rate of 100 frames of 100 bit/s 2FSK:
+2. Measure the bit error rate over 10,000 bits of 100 bit/s 2FSK:
 
-    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -
-    FSK BER 0.000000, bits tested 39899, bit errors 0
+    $ ./fsk_get_test_bits - 10000 | ./fsk_mod 2 8000 100 1200 100 - - | ./fsk_demod -l 2 8000 100 - - | ./fsk_put_test_bits -
+    FSK BER 0.000000, bits tested 9800, bit errors 0
 
     In this example the two tones are at 1200 and 1200+100 = 1300Hz.
     A shift of 100Hz is the minimum possible for an incoherent FSK
@@ -46,11 +41,15 @@ Built as part of codec2-dev, see README for build instructions.
     is well suited to applications that can tolerate long latency, such
     as balloon telemetry.
 
-3. Measure the bit error rate of 100 frames at 1200 bits/s, using a
+    The demod and test frame logic takes a few frames to sync up, so
+    although we sent 10,000 bits, only 9800 are received.  However
+    there were no errors in those received bits.
+
+3. Measure the bit error rate of 5000 bits at 1200 bits/s, using a
    sample rate of 9600 Hz:
 
-    $ ./fsk_get_test_bits - 100 | ./fsk_mod 2 9600 1200 1200 1200 - - | ./fsk_demod -p 8 2 9600 1200 - - | ./fsk_put_test_bits -
-    FSK BER 0.000000, bits tested 39967, bit errors 0
+    $ ./fsk_get_test_bits - 5000 | ./fsk_mod 2 9600 1200 1200 1200 - - | ./fsk_demod -p 8 2 9600 1200 - - | ./fsk_put_test_bits -
+    FSK BER 0.000000, bits tested 4900, bit errors 0
 
     In this example, the -l and --lbr options are left out setting the modem
     up in "high speed" mode. In this mode, the demodulator operates on blocks of
@@ -69,6 +68,8 @@ Built as part of codec2-dev, see README for build instructions.
     memory use and CPU time spend, but may result in worse modem preformance.
     P should be left alone unless CPU and memory usage needs to be lowered
     for the application.
+
+    (TODO, make this easier to understand, perhaps with figure)
 
 4.  (TODO High bit rate example like 115k project Horus)
 
