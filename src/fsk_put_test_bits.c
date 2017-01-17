@@ -91,11 +91,11 @@ int main(int argc,char *argv[]){
             /* OK, we have a valid test frame sync, so lets count errors */
             bitcnt += TEST_FRAME_SIZE;
             biterr += errs;
+            fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
+                    errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
         }
     }
  
-   fprintf(stderr,"FSK BER %f, bits tested %d, bit errors %d\n",
-           ((float)biterr/(float)bitcnt),bitcnt,biterr);
     
  cleanup:
     fclose(fin);
