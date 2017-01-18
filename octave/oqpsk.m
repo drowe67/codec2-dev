@@ -64,9 +64,9 @@ endfunction
 
 % Unfiltered OQPSK modulator 
 
-function [tx tx_filt tx_symb] = oqpsk_mod(oqpsk_states, tx_bits)
+function tx  = oqpsk_mod(oqpsk_states, tx_bits)
   M = oqpsk_states.M;
-  bps = oqpsk_states.bps
+  bps = oqpsk_states.bps;
   nsym = length(tx_bits)/bps;
   nsam = nsym*M;
   verbose = oqpsk_states.verbose;
@@ -144,7 +144,7 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
           l = i - tw+1;
           xr = abs(real(rx_int(l:l+tw-1)));
           xi = abs(imag(rx_int(l:l+tw-1)));
-          w = exp(j*(l:l+tw-1)*2*pi*(Rs/2)/Fs);
+          w = exp(j*(l:l+tw-1)*2*pi*Rs/Fs);
           X = xr * w';
           timing_clock_phase = timing_angle = angle(X);
           k++;
@@ -152,7 +152,7 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
           xi_log = [xi_log xi];
           w_log = [w_log w];
         else
-          timing_clock_phase += (2*pi)/(2*M);
+          timing_clock_phase += (2*pi)/M;
         end
         timing_angle_log(i) = timing_angle;
 
@@ -187,16 +187,17 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
   re_syms = im_syms = zeros(1,nsym);  
   rx_bits = []; rx_symb = [];
   for i=M:M:nsam
-    re_syms(k) = real(rx_int(i-Toff(i)));
-    im_syms(k) = imag(rx_int(i-Toff(i)+M/2));
-    %re_syms(k) = real(rx_int(i));
-    %im_syms(k) = imag(rx_int(i));
-    rx_symb = [rx_symb re_syms(k) + j*im_syms(k)];
-    rx_bits = [rx_bits qpsk_demod((re_syms(k) + j*im_syms(k))*exp(-j*pi/4))];
-    k++;
+    if i-Toff(i)+M/2 < nsam
+      re_syms(k) = real(rx_int(i-Toff(i)));
+      im_syms(k) = imag(rx_int(i-Toff(i)+M/2));
+      %re_syms(k) = real(rx_int(i));
+      %im_syms(k) = imag(rx_int(i));
+      rx_symb = [rx_symb re_syms(k) + j*im_syms(k)];
+      rx_bits = [rx_bits qpsk_demod((re_syms(k) + j*im_syms(k))*exp(-j*pi/4))];
+      k++;
+    end
   end
-  
-  
+    
   figure(11);
   subplot(211)
   plot(timing_adj);
@@ -233,7 +234,7 @@ function sim_out = oqpsk_test(sim_in)
 
     tx_bits = round(rand(1, nbits));
     %tx_bits = zeros(1,nbits);
-    [tx tx_filt tx_symbols] = oqpsk_mod(oqpsk_states, tx_bits);
+    tx = oqpsk_mod(oqpsk_states, tx_bits);
     nsam = length(tx);
     
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
@@ -253,7 +254,7 @@ function sim_out = oqpsk_test(sim_in)
     end
  
     TERvec(ne) = Nerrs_min;
-    BERvec(ne) = Nerrs_min/nbits
+    BERvec(ne) = Nerrs_min/nbits;
     
     if verbose > 0
       printf("EbNo dB: %3.1f Nbits: %d Nerrs: %d BER: %4.3f BER Theory: %4.3f\n", 
@@ -270,7 +271,7 @@ function sim_out = oqpsk_test(sim_in)
     figure(2); clf;
     f = fftshift(fft(rx));
     Tx = 20*log10(abs(f));
-    plot(Tx)
+    plot((1:length(f))*Fs/length(f) - Fs/2, Tx)
     grid;
     title('OQPSK Demodulator Input Spectrum');
 
@@ -306,7 +307,7 @@ endfunction
 
 function run_oqpsk_single
   sim_in.coherent_demod = 1;
-  sim_in.phase_track    = 0;
+  sim_in.phase_track    = 1;
   sim_in.nbits          = 10000;
   sim_in.EbNodB         = 4;
   sim_in.verbose        = 2;
