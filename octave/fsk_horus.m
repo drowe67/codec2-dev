@@ -806,6 +806,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   if test_frame_mode < 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 50, 4);
+    %states = fsk_horus_init_hbr(8000, 10, 400, 4); % EME
   end
 
   if test_frame_mode == 4
@@ -831,7 +832,8 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
   if states.M == 2
     states.ftx = 1200 + [ 0 states.Rs ];
   else
-    states.ftx = 1200 + 2*states.Rs*(1:4);
+    states.ftx = 1200 + 2*states.Rs*(1:4)
+    %states.ftx = 200 + states.Rs*(1:4); % EME
   end
 
   % ----------------------------------------------------------------------
@@ -1089,6 +1091,16 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=10
     printf("length test frame: %d\n", states.ntestframebits);
   end
 
+  if test_frame_mode == 7
+    % 800XA 4FSK modem --------------
+    states = fsk_horus_init_hbr(8000, 10, 400, 4, 256);
+    states.tx_bits_file = "horus_high_speed.bin";
+    states.verbose += 0x4;
+    ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
+    states.ntestframebits = length(test_frame);
+    printf("length test frame: %d\n", states.ntestframebits);
+  end
+
   N = states.N;
   P = states.P;
   Rs = states.Rs;
@@ -1241,7 +1253,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(6, 10, 9);
+  %run_sim(1, 100, 6);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
@@ -1258,4 +1270,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
+  rx_bits = demod_file("~/Desktop/bench_test_002.wav",7);
 end
