@@ -64,7 +64,7 @@ endfunction
 
 % Unfiltered OQPSK modulator 
 
-function [tx tx_filt tx_symbols] = oqpsk_mod(oqpsk_states, tx_bits)
+function [tx tx_filt tx_symb] = oqpsk_mod(oqpsk_states, tx_bits)
   M = oqpsk_states.M;
   bps = oqpsk_states.bps
   nsym = length(tx_bits)/bps;
@@ -229,7 +229,7 @@ function sim_out = oqpsk_test(sim_in)
   for ne = 1:length(EbNodB)
     aEbNodB = EbNodB(ne);
     EbNo = 10^(aEbNodB/10);
-    variance = Fs/(Rs*EbNo);
+    variance = Fs/(Rs*EbNo*oqpsk_states.bps);
 
     tx_bits = round(rand(1, nbits));
     %tx_bits = zeros(1,nbits);
@@ -253,10 +253,11 @@ function sim_out = oqpsk_test(sim_in)
     end
  
     TERvec(ne) = Nerrs_min;
-    BERvec(ne) = Nerrs_min/Nbits_min;
+    BERvec(ne) = Nerrs_min/nbits
     
     if verbose > 0
-      printf("EbNo dB: %3.1f Nerrs: %d BER: %f BER Theory: %f\n", aEbNodB, Nerrs_min, BERvec(ne), 0.5*erfc(sqrt(0.75*EbNo)));
+      printf("EbNo dB: %3.1f Nbits: %d Nerrs: %d BER: %4.3f BER Theory: %4.3f\n", 
+      aEbNodB, nbits, Nerrs_min, BERvec(ne), 0.5*erfc(sqrt(EbNo)));
     end
 
     figure(1); clf;
@@ -267,7 +268,7 @@ function sim_out = oqpsk_test(sim_in)
     title('OQPSK tx sequence');
 
     figure(2); clf;
-    f = fft(rx);
+    f = fftshift(fft(rx));
     Tx = 20*log10(abs(f));
     plot(Tx)
     grid;
@@ -306,8 +307,8 @@ endfunction
 function run_oqpsk_single
   sim_in.coherent_demod = 1;
   sim_in.phase_track    = 0;
-  sim_in.nbits          = 10;
-  sim_in.EbNodB         = 100;
+  sim_in.nbits          = 10000;
+  sim_in.EbNodB         = 4;
   sim_in.verbose        = 2;
 
   sim_out = oqpsk_test(sim_in);
