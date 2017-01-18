@@ -5,11 +5,11 @@
 % derived from GMSK
 
 #{
-  [ ] remove FM mod
-  [ ] need OQPSK mod
-  [ ] remove GMSK filters
-  [ ] convert to QPSK from GMSK/BPSK 2T->T
-  [ ] change names to oqpsk
+  TODO
+    [ ] freq and timing offset
+        [ ] modify BER counter to deal with sync up time
+    [ ] roofing filter
+    [ ] BER curves
 #}
 
 rand('state',1); 
@@ -26,11 +26,12 @@ function oqpsk_states = oqpsk_init(oqpsk_states, Rs)
   % general 
 
   verbose = oqpsk_states.verbose;
-  oqpsk_states.Fs  = 48000;
+  oqpsk_states.Fs  = 4*Rs;
   oqpsk_states.Rs  = Rs;
   oqpsk_states.bps = 2;              % two bit/symbol for QPSK    
 
   M = oqpsk_states.M = oqpsk_states.Fs/oqpsk_states.Rs;
+  printf("M = %d\n", M);
   assert(floor(M) == M, "oversampling factor M must be an integer");
   assert(floor(M/2) == M/2, "(oversampling factor M)/2 must be an integer to offset QPSK");
 endfunction
@@ -97,6 +98,7 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
   Fs = oqpsk_states.Fs;
   nsam = length(rx);
   nsym = floor(nsam/M);
+  verbose = oqpsk_states.verbose;
 
   timing_angle_log = zeros(1,length(rx));
   rx_int = zeros(1,length(rx));
@@ -165,15 +167,16 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
         dco_log(i) = dco;
       end
       
-      figure(10);
-      clf
-      subplot(211);
-      plot(filt_log);
-      title('PLL filter')
-      subplot(212);
-      plot(dco_log/pi);
-      title('PLL DCO phase');
-      %axis([1 nsam -0.5 0.5])
+      if verbose
+        figure(10);
+        clf
+        subplot(211);
+        plot(filt_log);
+        title('PLL filter')
+        subplot(212);
+        plot(dco_log/pi);
+        title('PLL DCO phase');
+      end
   end
 
   % sample integrator output at correct timing instant
@@ -198,13 +201,15 @@ function [rx_bits rx_int rx_symb] = oqpsk_demod(oqpsk_states, rx)
     end
   end
     
-  figure(11);
-  subplot(211)
-  plot(timing_adj);
-  title('Timing est');
-  subplot(212)
-  plot(Toff);
-  title('Timing est unwrap');
+  if verbose
+    figure(11);
+    subplot(211)
+    plot(timing_adj);
+    title('Timing est');
+    subplot(212)
+    plot(Toff);
+    title('Timing est unwrap');
+  end
 
 endfunction
 
@@ -233,7 +238,6 @@ function sim_out = oqpsk_test(sim_in)
     variance = Fs/(Rs*EbNo*oqpsk_states.bps);
 
     tx_bits = round(rand(1, nbits));
-    %tx_bits = zeros(1,nbits);
     tx = oqpsk_mod(oqpsk_states, tx_bits);
     nsam = length(tx);
     
@@ -424,22 +428,19 @@ function plot_spectrum(oqpsk_states, rx, preamble_location, title_str)
   title(title_str);
 endfunction
 
+
 % Give the demod a hard time: frequency, phase, time offsets, sample clock difference
    
 function run_test_channel_impairments
-  Rs = 1200;
-  verbose = 1;
-  aEbNodB = 6;
-  phase_offset = pi/2;
-  freq_offset  = -104;
-  timing_offset = 100E3;
-  sample_clock_offset_ppm = -500;
-  interferer_freq = -1500;
-  interferer_amp  = 0;
-  nsym = 4800*2;
-  npreamble = 480;
+  Rs = 4800;
+  verbose = 0;
+  aEbNodB = 4;
+  phase_offset = pi;
+  freq_offset  = 0;
+  timing_offset = 1;
+  sample_clock_offset_ppm = 0;
+  nsym = Rs*2;
 
-  oqpsk_states.npreamble = npreamble;
   oqpsk_states.verbose = verbose;
   oqpsk_states.coherent_demod = 1;
   oqpsk_states.phase_track    = 1;
@@ -448,49 +449,32 @@ function run_test_channel_impairments
   Rs = oqpsk_states.Rs;
   M  = oqpsk_states.M;
 
-  % A frame consists of nsym random data bits.  Some experimentation
-  % has shown they must be random-ish data (not say 11001100...) for
-  % timing estimator to work.  However initial freq offset estimation
-  % is a lot easier with a 01010 type sequence, so we construct a 
-  % frame with a pre-amble followed by frames of random data.
+  % A frame consists of nsym random data bits.
 
   framesize = 480;
   nframes = floor(nsym/framesize);
   tx_frame = round(rand(1, framesize));
-  tx_bits = zeros(1,npreamble);
-  tx_bits(1:2:npreamble) = 1;
+  tx_bits = [];
   for i=1:nframes
     tx_bits = [tx_bits tx_frame];
   end
 
-  [tx tx_filt tx_symbols] = oqpsk_mod(oqpsk_states, tx_bits);
+  tx = oqpsk_mod(oqpsk_states, tx_bits);
 
   tx = resample(tx, 1E6, 1E6-sample_clock_offset_ppm);
   tx = [zeros(1,timing_offset) tx];
   nsam = length(tx);
 
-  if verbose > 1
-    figure;
-    subplot(211)
-    st = timing_offset; en = st+M*10;
-    plot(real(tx(st:en)))
-    title('Real part of tx');
-    subplot(212)
-    plot(imag(tx(st:en)))
-    title('Imag part of tx');
-  end
-
   EbNo = 10^(aEbNodB/10);
-  variance = Fs/(Rs*EbNo);
+  variance = Fs/(Rs*EbNo*oqpsk_states.bps);
   noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
   w  = (0:nsam-1)*2*pi*freq_offset/Fs + phase_offset;
-  interferer = interferer_amp*exp(j*interferer_freq*(2*pi/Fs)*(0:nsam-1));
 
-  rx = sqrt(2)*tx.*exp(j*w) + noise + interferer;
+  rx = sqrt(2)*tx.*exp(j*w) + noise;
   
   % optional dump to file
 
-  if 1
+  if 0
     fc = 1500; gain = 10000;
     wc = 2*pi*fc/Fs;
     w1 = exp(j*wc*(1:nsam));
@@ -500,40 +484,43 @@ function run_test_channel_impairments
     fclose(fout);
   end
 
-  rx = rx1 .* conj(w1);
-
-  [preamble_location freq_offset_est] = find_preamble(oqpsk_states, M, npreamble, rx);
-  w_est  = (0:nsam-1)*2*pi*freq_offset_est/Fs;
-  rx = rx.*exp(-j*w_est);
-
-  plot_spectrum(oqpsk_states, rx, preamble_location, "OQPSK rx just after preamble");
-
   % printf("ntx: %d nrx: %d ntx_bits: %d\n", length(tx), length(rx), length(tx_bits));
 
-  [rx_bits rx_out rx_filt] = oqpsk_demod(oqpsk_states, rx(preamble_location+framesize:nsam));
+  [rx_bits rx_out rx_symb] = oqpsk_demod(oqpsk_states, rx);
   nframes_rx = length(rx_bits)/framesize;
 
   % printf("ntx: %d nrx: %d ntx_bits: %d nrx_bits: %d\n", length(tx), length(rx), length(tx_bits), length(rx_bits));
 
-  [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
+  % try different possible phase ambiguities, a UW would sort this out in the real world
 
-  ber = total_errors/total_bits;
+  for i=1:4
+    phase_amb = i*pi/2;
+    rx_bits = [];
+    for k=1:length(rx_symb)     
+      rx_bits = [rx_bits qpsk_demod(rx_symb(k)*exp(j*(-pi/4+phase_amb)))];
+    end
 
-  printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
-         aEbNodB, freq_offset, phase_offset, nframes_rx, total_bits, total_errors, ber);
+    [total_errors total_bits Nerrs_log Nerrs_all_log] = coarse_sync_ber(nframes_rx, tx_frame, rx_bits);
 
-  figure;
-  clf
-  subplot(211)
-  plot(Nerrs_log,'r;errors/frame counted for BER;');
-  hold on;
-  plot(Nerrs_all_log,'g;all errors/frame;');
-  hold off;
-  legend("boxoff");
-  title('Bit Errors')
-  subplot(212)
-  stem(real(cumsum(Nerrs_log)))
-  title('Cumulative Bit Errors')
+    if total_bits
+      ber = total_errors/total_bits;
+      printf("Eb/No: %3.1f f_off: %4.1f ph_off: %4.3f ph_amb: %4.3f Nframes: %d Nbits: %d Nerrs: %d BER: %f\n", 
+             aEbNodB, freq_offset, phase_amb, phase_offset, nframes_rx, total_bits, total_errors, ber);
+
+      figure(1); clf;
+      subplot(211)
+      plot(Nerrs_log,'r;errors/frame counted for BER;');
+      hold on;
+      plot(Nerrs_all_log,'g;all errors/frame;');
+      hold off;
+      legend("boxoff");
+      title('Bit Errors')
+      subplot(212)
+      stem(real(cumsum(Nerrs_log)))
+      title('Cumulative Bit Errors')
+
+    end
+  end
 
 endfunction
     
@@ -541,6 +528,7 @@ endfunction
 % Choose one of these to run ------------------------------------------
 
 run_oqpsk_single
+%run_test_channel_impairments
 %run_oqpsk_curves
 %run_oqpsk_init
 
