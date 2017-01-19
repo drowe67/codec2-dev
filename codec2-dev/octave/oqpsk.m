@@ -146,7 +146,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       xr_log = []; xi_log = [];
       w_log = [];
       timing_clock_phase = 0;
-      timing_angle = -pi;  % XXX
+      timing_angle = pi;  % XXX
       timing_angle_log = zeros(1,nsam);
   end
 
@@ -278,13 +278,31 @@ function sim_out = oqpsk_test(sim_in)
 
     % correlate with I and Q tx sequences at various offsets
 
-    for offset=1:nrx_symb-nsymb+1
-      corr_ii(offset) = real(atx_symb) * real(rx_symb(offset:offset+nsymb-1))';
-      corr_qq(offset) = imag(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))';
-      corr_iq(offset) = real(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))';
-      corr_qi(offset) = imag(atx_symb) * real(rx_symb(offset:offset+nsymb-1))';
-      printf("offset: %2d ii: % 5f qq: % 5f iq: % 5f qi: % 5f\n", 
-      offset, corr_ii(offset), corr_qq(offset), corr_iq(offset), corr_qi(offset));
+    max_corr = real(atx_symb) * real(atx_symb)';
+    for offset=2:nrx_symb-nsymb+1
+      corr_ii(offset) = real(atx_symb) * real(rx_symb(offset:offset+nsymb-1))'/max_corr;
+      corr_qq(offset) = imag(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))'/max_corr;
+      corr_iq(offset) = real(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))'/max_corr;
+      corr_qi(offset) = imag(atx_symb) * real(rx_symb(offset:offset+nsymb-1))'/max_corr;
+      %printf("offset: %2d ii: % 5f qq: % 5f iq: % 5f qi: % 5f\n", 
+      %offset, corr_ii(offset), corr_qq(offset), corr_iq(offset), corr_qi(offset));
+
+      if abs(corr_ii(offset)) > 0.8
+        % no IQ swap, or time offset
+        arx_symb = real(rx_symb(offset:offset+nsymb-1)) + j*imag(rx_symb(offset:offset+nsymb-1));
+      end
+      if abs(corr_qi(offset)) > 0.8
+        % IQ swap, I part in Q part of symbol before
+        i_sign = sign(corr_iq(offset-1));
+        q_sign = sign(corr_qi(offset));
+        arx_symb = i_sign*imag(rx_symb(offset-1:offset+nsymb-2)) + j*q_sign*real(rx_symb(offset:offset+nsymb-1));
+        for i=1:nsymb
+          rx_bits(2*i-1:2*i) = qpsk_demod(arx_symb(i)*exp(-j*pi/4));
+        end
+        nerr = sum(xor(tx_testframe, rx_bits));
+        printf("offset: %5d swap: %d i_sign: % 2.1f q_sign: % 2.1f nerr: %d\n", 
+        offset, 1, i_sign, q_sign, nerr);
+      end
     end
 
 
@@ -303,11 +321,6 @@ function sim_out = oqpsk_test(sim_in)
       end
     end
 #}
-
-    arx_symb = rx_symb_phase_rot(1,:);
-    for i=1:nsymb
-      rx_bits(2*i-1:2*i) = qpsk_demod(arx_symb(i)*exp(-j*pi/4));
-    end
 
     TERvec(ne) = 0;
     BERvec(ne) = 0;
@@ -402,8 +415,8 @@ function run_oqpsk_single
   sim_in.coherent_demod   = 1;
   sim_in.phase_est        = 1;
   sim_in.timing_est       = 1;
-  sim_in.bitspertestframe = 32;
-  sim_in.nbits            = 64;
+  sim_in.bitspertestframe = 100;
+  sim_in.nbits            = 1000;
   sim_in.EbNodB           = 100;
   sim_in.verbose          = 2;
   sim_in.phase_offset     = pi/2;
