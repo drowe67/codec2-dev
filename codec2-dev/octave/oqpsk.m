@@ -176,7 +176,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
         xi = abs(imag(rx_int(l:l+tw-1)));
         w = exp(j*(l:l+tw-1)*2*pi*Rs/Fs);
         X = xr * w';
-        timing_clock_phase = timing_angle = angle(X);
+        timing_clock_phase = timing_angle = angle(X)
         k++;
         xr_log = [xr_log xr];
         xi_log = [xi_log xi];
@@ -269,7 +269,8 @@ function sim_out = oqpsk_test(sim_in)
     nsam = length(tx);
     
     noise = sqrt(variance/2)*(randn(1,nsam) + j*randn(1,nsam));
-    rx    = tx*exp(j*sim_in.phase_offset) + noise;
+    st = 1+sim_in.timing_offset; en = length(tx);
+    rx = tx(st:en)*exp(j*sim_in.phase_offset) + noise(st:en);
 
     [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_states, rx);
     
@@ -283,15 +284,25 @@ function sim_out = oqpsk_test(sim_in)
     corr = energy = zeros(1,nrx_symb);
     rx_bits = zeros(1, bitspertestframe);
     for i=1:nrx_symb-nsymb+1
-      corr(i) = rx_symb(i:i+nsymb-1) * tx_symb';
-      energy(i) = rx_symb(i:i+nsymb-1) * rx_symb(i:i+nsymb-1)';
-      if corr(i)/energy(i) > 0.5
-        % OK we have found the alignment for a test frame, lets
-        % work out the phase ambiguity and extract the bits
-        %printf("i: %d corr: %f %f angle: %f\n", i, real(corr(i)), imag(corr(i)), angle(corr(i)));
+      for k=0:3
+        phase_amb = exp(j*k*pi/2);
+        arx_symb = rx_symb(i:i+nsymb-1) .* phase_amb;
+        for l=1:nsymb
+          rx_bits(2*l-1:2*l) = qpsk_demod(arx_symb(l).*exp(-j*pi/4));
+        end
+        nerr = sum(xor(tx_testframe, rx_bits));
+        if nerr == 0
+          printf("i: %d k: %d nerr: %d\n", i, k, nerr);
+        end
       end
     end
 
+    for l=1:nsymb
+      rx_bits(2*l-1:2*l) = qpsk_demod(rx_symb(l)*exp(-j*pi/4));
+    end
+
+    TERvec(ne) = 0;
+    BERvec(ne) = 0;
 #{
     Nerrs_min = nbits; Nbits_min = nbits; l = length(rx_bits);
     for i=1:1
@@ -312,11 +323,11 @@ function sim_out = oqpsk_test(sim_in)
 #}
 
     figure(1); clf;
-    subplot(211)
-    plot(real(tx))
-    subplot(212)
-    plot(imag(tx))
     title('OQPSK tx sequence');
+    subplot(211)
+    stem(real(tx))
+    subplot(212)
+    stem(imag(tx))
 
     figure(2); clf;
     f = fftshift(fft(rx));
@@ -327,14 +338,13 @@ function sim_out = oqpsk_test(sim_in)
 
     figure(3); clf;
     nplot = min(16, nbits/oqpsk_states.bps);
+    title('Rx Integrator');
     subplot(211)
-    plot(real(rx_int(1:nplot*M))/(M))
-    title('Integrator');
+    stem(real(rx_int(1:nplot*M)))
     axis([1 nplot*M -1 1])
     subplot(212)
-    plot(imag(rx_int(1:nplot*M)/(M)))
+    stem(imag(rx_int(1:nplot*M)))
     axis([1 nplot*M -1 1])
-    title('Rx integrator');
 
     figure(4); clf;
     subplot(211);
@@ -353,15 +363,18 @@ function sim_out = oqpsk_test(sim_in)
     title('Timing est unwrap');
 
     figure(6); clf;
-    st = floor(0.2*nrx_symb);
+    st = floor(0.2*nrx_symb); st = 1;
     plot(rx_symb(st:nrx_symb), '+');
     title('Scatter Diagram');
+    axis([-1.5 1.5 -1.5 1.5])
 
     figure(7); clf;
-    plot(abs(corr));
+    plot(abs(corr))
+    title('UW correlation');
+
     figure(8); clf;
     subplot(211)
-    stem(tx_bits(1:min(20,nbits)))
+    stem(tx_testframe(1:min(20,length(rx_bits))))
     title('Tx Bits')
     subplot(212)
     stem(rx_bits(1:min(20,length(rx_bits))))
@@ -379,10 +392,11 @@ function run_oqpsk_single
   sim_in.phase_est        = 1;
   sim_in.timing_est       = 1;
   sim_in.bitspertestframe = 100;
-  sim_in.nbits            = 10000;
-  sim_in.EbNodB           = 4;
+  sim_in.nbits            = 2000;
+  sim_in.EbNodB           = 10;
   sim_in.verbose          = 2;
   sim_in.phase_offset     = pi/2;
+  sim_in.timing_offset    = 0;
 
   sim_out = oqpsk_test(sim_in);
 endfunction
