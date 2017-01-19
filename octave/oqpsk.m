@@ -3,6 +3,8 @@
 %
 % Unfiltered OQPSK modem implementation and simulations to test,
 % derived from GMSK modem in gmsk.m
+%
+% Usage: see "choose one of these to run" at the end of this file.
 
 rand('state',1); 
 randn('state',1);
@@ -91,7 +93,7 @@ endfunction
 
   Note demodulator returns phase corrected symbols sampled at ideal
   timing instant.  These symbols may have a m*pi/2 phase ambiguity due
-  to properties of phase tracking loop.  teh aller is responsible for
+  to properties of phase tracking loop.  The caller is responsible for
   determining this ambiguity and recovering the actual bits.
 
   [1] GMSK demodulator in IEEE Trans on Comms, Muroyta et al, 1981,
@@ -147,7 +149,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       xr_log = []; xi_log = [];
       w_log = [];
       timing_clock_phase = 0;
-      timing_angle = 0;  % XXX
+      timing_angle = 0;
       timing_angle_log = zeros(1,nsam);
   end
 
@@ -169,7 +171,6 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
         w = exp(j*(l:l+tw-1)*2*pi*Rs/Fs);
         X = xr * w';
         timing_clock_phase = timing_angle = angle(X);
-        %timing_clock_phase = timing_angle = 0; % XXX
         k++;
         xr_log = [xr_log xr];
         xi_log = [xi_log xi];
@@ -188,7 +189,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*cos(timing_clock_phase);
       lower = ph_err*G2 + lower;
       filt  = ph_err*G1 + lower;
-      dco_log(i) = dco; % XXX
+      dco_log(i) = dco; 
       dco   = dco + filt;
       filt_log(i) = filt;
 
@@ -225,10 +226,9 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
 endfunction
 
 
-
-% Test modem over a range Eb/No points in AWGN channel.  Doesn't resolve
-% phase ambiguity or time offsets in received bit stream, so we can't test
-% phase or timing offsets.  Does test basic lock of phase and timing loops.
+% Test modem over a range Eb/No points in an AWGN channel.  Can
+% simulate a variety of channel impairments and performs ambiguity
+% resolution.
 
 function sim_out = oqpsk_test(sim_in)
   bitspertestframe =  sim_in.bitspertestframe;
@@ -276,7 +276,7 @@ function sim_out = oqpsk_test(sim_in)
     % OK so the phase and timing estimators get us close (e.g. a good
     % scatter diagram), but no banana just yet.  One problem is the
     % PLL can lock up on mulitples of pi/2.  Combinations of phase
-    % offsets can confuse the timing estimator. On tricky example is a
+    % offsets can confuse the timing estimator. One tricky example is a
     % phase offset of pi/2 which swaps I & Q, and with OQPSK (unlike
     % MSK and friends) we can't easily tell which is I and which is Q
     % after a phase rotation, e.g. could be IQIQIQI or QIQIQIQ
@@ -363,10 +363,12 @@ function sim_out = oqpsk_test(sim_in)
     if find(sim_in.plots == 1)
       figure(1); clf;
       subplot(211)
-      stem(real(tx_symb))
-      title('Tx symbols');
+      stem(real(tx))
+      title('Tx samples');
+      ylabel('Inphase');
       subplot(212)
-      stem(imag(tx_symb))
+      stem(imag(tx))
+      ylabel('Quadrature');
     end
 
     if find(sim_in.plots == 2)
@@ -467,7 +469,7 @@ function run_oqpsk_single
   sim_in.phase_offset     = 3*pi/4;  % in radians
   sim_in.timing_offset    = 4;       % in samples 0..M-1
   sim_in.freq_offset      = 0.001;   % fraction of Symbol Rate
-  sim_in.plots            = [2 4 5 6 7];
+  sim_in.plots            = [1 2 4 5 6 7];
   sim_in.sample_clock_offset_ppm = 100;
 
   sim_out = oqpsk_test(sim_in);
@@ -514,6 +516,6 @@ endfunction
 
 % Choose one of these to run ------------------------------------------
 
-%run_oqpsk_single
-run_oqpsk_curves
+run_oqpsk_single
+%run_oqpsk_curves
 
