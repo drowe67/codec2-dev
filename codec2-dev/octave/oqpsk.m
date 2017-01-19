@@ -1,25 +1,15 @@
 % oqpsk.m
-% David Rowe Jan 17
+% David Rowe Jan 2017
 %
 % Unfiltered OQPSK modem implementation and simulations to test,
-% derived from GMSK
-
-#{
-  TODO
-    [ ] freq and timing offset
-        [ ] modify BER counter to deal with sync up time
-    [ ] roofing filter
-    [ ] BER curves
-#}
+% derived from GMSK modem in gmsk.m
 
 rand('state',1); 
 randn('state',1);
 graphics_toolkit ("gnuplot");
 format
 
-%
-% Functions that implement the GMSK modem ------------------------------------------------------
-%
+% init nodem states
 
 function oqpsk_states = oqpsk_init(oqpsk_states, Rs)
 
@@ -74,6 +64,7 @@ function [tx tx_symb] = oqpsk_mod(oqpsk_states, tx_bits)
   % Map bits to Gray coded QPSK symbols
 
   tx_symb = zeros(1,nsym);
+
   for i=1:nsym
     tx_symb(i) = qpsk_mod(tx_bits(2*i-1:2*i))*exp(j*pi/4);
   end
@@ -155,7 +146,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       xr_log = []; xi_log = [];
       w_log = [];
       timing_clock_phase = 0;
-      timing_angle = 0;
+      timing_angle = -pi;  % XXX
       timing_angle_log = zeros(1,nsam);
   end
 
@@ -176,7 +167,8 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
         xi = abs(imag(rx_int(l:l+tw-1)));
         w = exp(j*(l:l+tw-1)*2*pi*Rs/Fs);
         X = xr * w';
-        timing_clock_phase = timing_angle = angle(X)
+        %timing_clock_phase = timing_angle = angle(X);
+        timing_clock_phase = timing_angle = pi; % XXX
         k++;
         xr_log = [xr_log xr];
         xi_log = [xi_log xi];
@@ -195,9 +187,9 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
       ph_err = sign(real(rx_int(i))*imag(rx_int(i)))*cos(timing_clock_phase);
       lower = ph_err*G2 + lower;
       filt  = ph_err*G1 + lower;
+      dco_log(i) = dco = pi; % XXX
       dco   = dco + filt;
       filt_log(i) = filt;
-      dco_log(i) = dco;
 
     end
   
@@ -219,7 +211,7 @@ function [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_s
   re_syms = im_syms = zeros(1,nsym);  
   rx_symb = [];
   for i=M:M:nsam
-    if i-Toff(i)+M/2 < nsam
+    if i-Toff(i)+M/2 <= nsam
       re_syms(k) = real(rx_int(i-Toff(i)));
       im_syms(k) = imag(rx_int(i-Toff(i)+M/2));
       %re_syms(k) = real(rx_int(i));
@@ -274,15 +266,29 @@ function sim_out = oqpsk_test(sim_in)
 
     [rx_symb rx_int filt_log dco_log timing_adj Toff] = oqpsk_demod(oqpsk_states, rx);
     
-    % correlate rx_symbol sequence with the tx_symb sequence for one
-    % test frame.  A peak indicates time alignment with a test frame.
-    % We can then resolve the phase ambiguity
+    % Determine ambiguities:
+    %   a) could be m*pi/2 rotations of phase by phase est
+    %   b) could be I and Q swapped by timing est
+    %   c) time alignment of test frame
 
     nsymb = bitspertestframe/oqpsk_states.bps;
-    tx_symb = tx_symb(1:nsymb);
     nrx_symb = length(rx_symb);
-    corr = energy = zeros(1,nrx_symb);
     rx_bits = zeros(1, bitspertestframe);
+    atx_symb = tx_symb(1:nsymb);
+
+    % correlate with I and Q tx sequences at various offsets
+
+    for offset=1:nrx_symb-nsymb+1
+      corr_ii(offset) = real(atx_symb) * real(rx_symb(offset:offset+nsymb-1))';
+      corr_qq(offset) = imag(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))';
+      corr_iq(offset) = real(atx_symb) * imag(rx_symb(offset:offset+nsymb-1))';
+      corr_qi(offset) = imag(atx_symb) * real(rx_symb(offset:offset+nsymb-1))';
+      printf("offset: %2d ii: % 5f qq: % 5f iq: % 5f qi: % 5f\n", 
+      offset, corr_ii(offset), corr_qq(offset), corr_iq(offset), corr_qi(offset));
+    end
+
+
+#{
     for i=1:nrx_symb-nsymb+1
       for k=0:3
         phase_amb = exp(j*k*pi/2);
@@ -296,9 +302,11 @@ function sim_out = oqpsk_test(sim_in)
         end
       end
     end
+#}
 
-    for l=1:nsymb
-      rx_bits(2*l-1:2*l) = qpsk_demod(rx_symb(l)*exp(-j*pi/4));
+    arx_symb = rx_symb_phase_rot(1,:);
+    for i=1:nsymb
+      rx_bits(2*i-1:2*i) = qpsk_demod(arx_symb(i)*exp(-j*pi/4));
     end
 
     TERvec(ne) = 0;
@@ -323,11 +331,11 @@ function sim_out = oqpsk_test(sim_in)
 #}
 
     figure(1); clf;
-    title('OQPSK tx sequence');
     subplot(211)
-    stem(real(tx))
+    stem(real(tx_symb))
+    title('Tx symbols');
     subplot(212)
-    stem(imag(tx))
+    stem(imag(tx_symb))
 
     figure(2); clf;
     f = fftshift(fft(rx));
@@ -351,7 +359,7 @@ function sim_out = oqpsk_test(sim_in)
     plot(filt_log);
     title('PLL filter')
     subplot(212);
-    plot(dco_log/pi);
+    plot(dco_log);
     title('PLL DCO phase');
     
     figure(5); clf;
@@ -363,15 +371,18 @@ function sim_out = oqpsk_test(sim_in)
     title('Timing est unwrap');
 
     figure(6); clf;
-    st = floor(0.2*nrx_symb); st = 1;
+    st = floor(0.5*nrx_symb);
     plot(rx_symb(st:nrx_symb), '+');
     title('Scatter Diagram');
     axis([-1.5 1.5 -1.5 1.5])
 
     figure(7); clf;
-    plot(abs(corr))
-    title('UW correlation');
-
+    subplot(211);
+    stem(real(arx_symb));
+    title('Rx symbols')
+    subplot(212);
+    stem(imag(arx_symb));
+   
     figure(8); clf;
     subplot(211)
     stem(tx_testframe(1:min(20,length(rx_bits))))
@@ -391,9 +402,9 @@ function run_oqpsk_single
   sim_in.coherent_demod   = 1;
   sim_in.phase_est        = 1;
   sim_in.timing_est       = 1;
-  sim_in.bitspertestframe = 100;
-  sim_in.nbits            = 2000;
-  sim_in.EbNodB           = 10;
+  sim_in.bitspertestframe = 32;
+  sim_in.nbits            = 64;
+  sim_in.EbNodB           = 100;
   sim_in.verbose          = 2;
   sim_in.phase_offset     = pi/2;
   sim_in.timing_offset    = 0;
