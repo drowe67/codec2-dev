@@ -58,8 +58,8 @@
  *              Changed all input and output sample rates to 8000 sps.  Rates for FREEDV_MODE_700 and 700B were 7500.
  */
 
-#define NORM_PWR  1.74   /* experimentally derived fudge factor so 1600 and
-                            700 mode have the same tx power */
+#define NORM_PWR_COHPSK  1.74   /* experimentally derived fudge factor to normalise power for cohpsk modes */
+#define NORM_PWR_FSK     0.193  /* experimentally derived fudge factor to normalise power for fsk modes    */
 
 /*---------------------------------------------------------------------------*\
 
@@ -215,7 +215,7 @@ struct freedv *freedv_open(int mode) {
         if(f->deframer == NULL)
             return NULL;
   
-        f->fsk = fsk_create_hbr(8000,400,10,4,400,400);
+        f->fsk = fsk_create_hbr(8000,400,10,4,800,400);
         fsk_set_nsym(f->fsk,32);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
@@ -441,7 +441,7 @@ static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
         fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
         /* Convert float samps to short */
         for(i=0; i<f->n_nom_modem_samples; i++){
-            mod_out[i] = (short)(tx_float[i]*FSK_SCALE);
+            mod_out[i] = (short)(tx_float[i]*FSK_SCALE*NORM_PWR_FSK);
         }
     /* do me-fsk mod */
     }else if(f->mode == FREEDV_MODE_2400B){
@@ -681,7 +681,7 @@ static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
     if (f->clip)
         cohpsk_clip(tx_fdm);
     for(i=0; i<f->n_nat_modem_samples; i++)
-        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR, tx_fdm[i]);
+        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
     i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
     //assert(i == f->n_nom_modem_samples);
     // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
