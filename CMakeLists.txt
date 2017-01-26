@@ -69,7 +69,7 @@ endif()
 
 message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
 string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
-if(NOT "_FLAGS" STREQUAL "NONE")
+if(NOT _FLAGS STREQUAL "NONE")
     set(BUILD_FLAGS "${CMAKE_C_FLAGS_${_FLAGS}}")
 endif()
 message(STATUS "Compiler Flags: " ${BUILD_FLAGS})
@@ -186,7 +186,6 @@ if(WIN32)
     if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
         set(CMAKE_CL_64 TRUE)
     endif()
-
     configure_file(cmake/GetDependencies.cmake.in cmake/GetDependencies.cmake
         @ONLY
     )
@@ -216,7 +215,8 @@ endif(WIN32)
 configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/codec2.pc.in
     ${CMAKE_CURRENT_BINARY_DIR}/codec2.pc
-@ONLY)
+    @ONLY
+)
 
 install(
     FILES ${CMAKE_CURRENT_BINARY_DIR}/codec2.pc
