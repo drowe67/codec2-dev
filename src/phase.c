@@ -244,8 +244,7 @@ void mag_to_phase(float phase[],             /* Nfft/2+1 output phase samples in
        account kiss fft lack of scaling on ifft */
 
     Sdb[0].real = Gdbfk[0];
-    Sdb[Ns].real = Gdbfk[Ns];
-    Sdb[0].imag = Sdb[Ns].imag = 0.0;
+    Sdb[0].imag = 0.0;
     for(i=1; i<Ns; i++) {
         Sdb[i].real = Sdb[Nfft-i].real = Gdbfk[i];
         Sdb[i].imag = Sdb[Nfft-i].imag = 0.0;
