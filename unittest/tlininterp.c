@@ -82,7 +82,7 @@ int main(int argc, char *argv[]) {
         while (t < 1.0) {
 
             for (i=0; i<channels; i++) {
-                out[j+i] = (1.0 - t)*left[i] + t*right[i];
+                out[2*j+i] = (1.0 - t)*left[i] + t*right[i];
             }
 
             if (freq_shift) {
@@ -93,13 +93,13 @@ int main(int argc, char *argv[]) {
 
                 /* complex mixer to up-shift complex samples */
 
-                int a = out[0];
-                int b = out[1];
+                int a = out[2*j];
+                int b = out[2*j+1];
                 int c = lo_i[2];
                 int d = lo_q[2];
 
-                out[j]   = a*c - b*d;
-                out[j+1] = b*c + a*d;
+                out[2*j]   = a*c - b*d;
+                out[2*j+1] = b*c + a*d;
 
                 //fprintf(stderr, "% d % d % 5d % 5d\n", lo_i[2], lo_q[2], out[0], out[1]);
 
@@ -135,12 +135,12 @@ int main(int argc, char *argv[]) {
     /* write remaining samples to disk */
 
     if (format == SIGNED_16BIT) {
-        fwrite(&out, sizeof(short)*channels, j, fout);
+        fwrite(&out, sizeof(short), j, fout);
     } else {
-        for (i=0; i<channels*j; i++) {
+        for (i=0; i<j; i++) {
             out_s8[i] = out[i] >> 8;
         }
-        fwrite(&out_s8, sizeof(int8_t)*channels, j, fout);
+        fwrite(&out_s8, sizeof(int8_t), j, fout);
     }
 
     fclose(fout);
