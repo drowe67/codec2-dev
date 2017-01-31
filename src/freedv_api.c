@@ -33,7 +33,11 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef __APPLE__
+#include <malloc/malloc.h>
+#else
 #include <malloc.h>
+#endif /* __APPLE__ */
 
 #include "fsk.h"
 #include "fmfsk.h"
@@ -851,7 +855,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     
     /* FSK RX happens in real floats, so convert to those and call their demod here */
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA) ){
-		float rx_float[f->n_max_modem_samples];
+        float rx_float[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_float[i] = ((float)demod_in[i]);
         }
@@ -1106,7 +1110,7 @@ static int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *vali
 }
 
 #ifndef CORTEX_M4
-static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in[], int *valid) {
+static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in_8kHz[], int *valid) {
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, j, bit, byte, nout, k;
     int                 data_flag_index, n_ascii, nspare;
@@ -1123,6 +1127,13 @@ static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in[], int *valid
 
     // echo samples back out as default (say if sync not found)
     *valid = -1;
+
+    // quisk_cfInterpDecim() modifies input data so lets make a copy just in case there
+    // is no sync and we need to echo inout to output
+
+    COMP demod_in[freedv_nin(f)];
+    for(i=0; i<freedv_nin(f); i++)
+        demod_in[i] = demod_in_8kHz[i];
 
     i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
     //if (i != f->nin)
@@ -1257,6 +1268,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         nout = freedv_comprx_fdmdv_700(f, demod_in, &valid);
+        //valid = -1;
     }
 
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
@@ -1264,12 +1276,14 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 #endif
 
-    if (valid == 0)
+    if (valid == 0) {
         for (i = 0; i < nout; i++)
             speech_out[i] = 0;
-    else if (valid < 0)
+    }
+    else if (valid < 0) {
         for (i = 0; i < nout; i++)
-            speech_out[i] = FDMDV_SCALE*demod_in[i].real;
+            speech_out[i] = demod_in[i].real;
+    }
     else {
         int frames = f->n_codec_bits / bits_per_codec_frame;
         for (i = 0; i < frames; i++) {
@@ -1278,7 +1292,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         }
     }
 
-    //fprintf(stderr,"freedv_nin(f): %d nout: %d\n", freedv_nin(f), nout);
+    //fprintf(stderr,"freedv_nin(f): %d nout: %d valid: %d\n", freedv_nin(f), nout, valid);
     return nout;
 }
 
