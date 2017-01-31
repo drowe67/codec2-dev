@@ -888,7 +888,10 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
     if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){        
 	fsk_demod(f->fsk,(uint8_t*)f->tx_bits,demod_in);
         f->nin = fsk_nin(f->fsk);
-    }else{      
+        float EbNodB = f->fsk->stats->snr_est;           /* fsk demod actually estimates Eb/No     */
+        f->snr_est = EbNodB + 10.0*log10f(800.0/3000.0); /* so convert to SNR Rb=800, noise B=3000 */
+        //fprintf(stderr," %f %f\n", EbNodB, f->snr_est);
+    } else{      
         /* 2400B needs real input samples */
         int n = fmfsk_nin(f->fmfsk);
         float demod_in_float[n];
@@ -920,6 +923,11 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
     }
     f->sync = f->deframer->state;
     f->stats.sync = f->deframer->state;
+
+    if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
+        //fprintf(stderr,"squelch %f %f !\n", f->stats.snr_est, f->snr_squelch_thresh);
+        *valid = 0;
+    }
 
     return f->n_speech_samples;
 }
@@ -1587,6 +1595,8 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
 
     if ((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_800XA)) {
         fsk_get_demod_stats(f->fsk, stats);
+        float EbNodB = stats->snr_est;                       /* fsk demod actually estimates Eb/No     */
+        stats->snr_est = EbNodB + 10.0*log10f(800.0/3000.0); /* so convert to SNR Rb=800, noise B=3000 */
     }
 
     if (f->mode == FREEDV_MODE_2400B) {
