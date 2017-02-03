@@ -247,7 +247,7 @@ int main(int argc, char *argv[]) {
     if (freedv_get_test_frames(freedv)) {
         total_bits = freedv_get_total_bits(freedv);
         total_bit_errors = freedv_get_total_bit_errors(freedv);
-        fprintf(stderr, "bits: %d errors: %d BER: %3.2f\n", total_bits, total_bit_errors, (float)total_bit_errors/total_bits);
+        fprintf(stderr, "bits: %d errors: %d BER: %4.3f\n", total_bits, total_bit_errors, (float)total_bit_errors/total_bits);
     }
 
     free(speech_out);
