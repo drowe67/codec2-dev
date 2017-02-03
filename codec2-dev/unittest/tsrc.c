@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <samplerate.h>
+#include <unistd.h>
 
 #define N    10000                   /* processing buffer size */
 
