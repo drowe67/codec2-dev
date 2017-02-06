@@ -35,9 +35,9 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 # file at some point.
 #
 set(CODEC2_VERSION_MAJOR 0)
-set(CODEC2_VERSION_MINOR 4)
+set(CODEC2_VERSION_MINOR 6)
 # Set to patch level if needed, otherwise leave FALSE.
-set(CODEC2_VERSION_PATCH 1)
+set(CODEC2_VERSION_PATCH FALSE)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
 set(SOVERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
@@ -102,11 +102,11 @@ endif(MINGW)
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 # Unittest should be on for dev builds and off for releases.
-if(CMAKE_BUILD_TYPE MATCHES "Release")
+#if(CMAKE_BUILD_TYPE MATCHES "Release")
     option(UNITTEST "Build unittest binaries." OFF)
-else()
-    option(UNITTEST "Build unittest binaries." ON)
-endif()
+#else()
+    #option(UNITTEST "Build unittest binaries." ON)
+#endif()
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
