@@ -962,13 +962,14 @@ static int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *vali
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     nout = f->n_speech_samples;
 
+    COMP ademod_in[f->nin];
     for(i=0; i<f->nin; i++)
-        demod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
+        ademod_in[i] = fcmult(1.0/FDMDV_SCALE, demod_in[i]);
 
     bits_per_fdmdv_frame  = fdmdv_bits_per_frame(f->fdmdv);
 
     nin_prev = f->nin;
-    fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, demod_in, &f->nin);
+    fdmdv_demod(f->fdmdv, f->fdmdv_bits, &reliable_sync_bit, ademod_in, &f->nin);
     fdmdv_get_demod_stats(f->fdmdv, &f->stats);
     f->sync = f->fdmdv->sync;
     f->snr_est = f->stats.snr_est;
