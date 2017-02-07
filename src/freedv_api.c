@@ -162,6 +162,7 @@ struct freedv *freedv_open(int mode) {
         codec2_mode = CODEC2_MODE_1300;
         /* Set the number of protocol bits */
         f->n_protocol_bits = 20;
+        f->sz_error_pattern = 0;
     }
     
     if (mode == FREEDV_MODE_2400A) {
@@ -241,6 +242,7 @@ struct freedv *freedv_open(int mode) {
         f->n_protocol_bits = 0;
         codec2_mode = CODEC2_MODE_700C;
         fsk_stats_normalise_eye(f->fsk, 0);
+        f->sz_error_pattern = 0;
     }
     
 
