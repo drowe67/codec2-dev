@@ -917,17 +917,20 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
             (*f->freedv_put_next_proto)(f->proto_callback_state,(char*)proto_bits);
         }
         *valid = 1;
+
+        /* squelch if if sync but SNR too low */
+        if (f->squelch_en && (f->snr_est < f->snr_squelch_thresh)) {
+            *valid = 0;
+        }
     } else {
-        /* Fill with silence */
-        *valid = 0;
+        /* squelch if out of sync, or echo input of squelch off */
+        if (f->squelch_en) 
+            *valid = 0;
+        else
+            *valid = -1;
     }
     f->sync = f->deframer->state;
     f->stats.sync = f->deframer->state;
-
-    if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
-        //fprintf(stderr,"squelch %f %f !\n", f->stats.snr_est, f->snr_squelch_thresh);
-        *valid = 0;
-    }
 
     return f->n_speech_samples;
 }
