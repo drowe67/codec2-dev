@@ -732,7 +732,7 @@ int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uin
     int uw_sync_tol;
     int miss_tol;
     int extracted_frame = 0;
-    enum frame_payload_type pt;
+    enum frame_payload_type pt = FRAME_PAYLOAD_TYPE_VOICE;
     
     /* Possibly set up frame-specific params here */
     if(frame_type == FREEDV_VHF_FRAME_A){

@@ -69,7 +69,7 @@ float get_float(FILE * in, const char * name, char * * cursor, char * buffer, in
 
       if ( end != s )
         *cursor = end;
-        return f;
+      return f;
     }
 
     if ( fgets(buffer, size, in) == NULL ) {
