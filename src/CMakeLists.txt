@@ -83,11 +83,8 @@ else(CMAKE_CROSSCOMPILING)
     # generate_codebook
     add_executable(generate_codebook generate_codebook.c)
     target_link_libraries(generate_codebook ${CMAKE_REQUIRED_LIBRARIES})
-    # genlspdtcb
-    add_executable(genlspdtcb genlspdtcb.c)
-    target_link_libraries(genlspdtcb ${CMAKE_REQUIRED_LIBRARIES})
     # Make native builds available for cross-compiling.
-    export(TARGETS generate_codebook genlspdtcb
+    export(TARGETS generate_codebook
         FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
 endif(CMAKE_CROSSCOMPILING)
 
