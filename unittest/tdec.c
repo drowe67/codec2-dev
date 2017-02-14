@@ -25,7 +25,7 @@ void display_help(void) {
     fprintf(stderr, "\nusage: tdec inputRawFile OutputRawFile DecimationRatio [-c]\n");
     fprintf(stderr, "\nUse - for stdin/stdout\n\n");
     fprintf(stderr, "-c complex signed 16 bit input and output\n");
-    fprintf(stderr, "-d complex signed 8 bit input, complex signed 16 bit output\n\n");
+    fprintf(stderr, "-d complex signed 8 bit input, complex signed 16 bit output\n");
     fprintf(stderr, "-f -Fs/4 freq shift\n\n");
 }
 

@@ -26,8 +26,7 @@ void display_help(void) {
     fprintf(stderr, "\nusage: tlininterp inputRawFile OutputRawFile OverSampleRatio [-c]\n");
     fprintf(stderr, "\nUse - for stdin/stdout\n\n");
     fprintf(stderr, "-c complex signed 16 bit input and output\n");
-    fprintf(stderr, "-d complex signed 16 bit input, complex signed 8 bit output\n\n");
-    fprintf(stderr, "-d complex signed 16 bit input, complex signed 8 bit output\n\n");
+    fprintf(stderr, "-d complex signed 16 bit input, complex signed 8 bit output\n");
     fprintf(stderr, "-f +Fs/4 freq shift\n\n");
 }
 
@@ -56,7 +55,11 @@ int main(int argc, char *argv[]) {
     assert(fout != NULL);
 
     oversample = atof(argv[3]);
-
+    if (oversample <= 1) {
+ 	display_help();
+	exit(1);
+    }
+       
     int channels = 1;
     int freq_shift = 0;
     lo_i[0] = -1; lo_i[1] =  0;
@@ -90,7 +93,7 @@ int main(int argc, char *argv[]) {
                 /* update local osc recursion */
 
                 lo_i[2] = -lo_i[0]; lo_q[2] = -lo_q[0];
-
+                
                 /* complex mixer to up-shift complex samples */
 
                 int a = out[2*j];
@@ -126,7 +129,7 @@ int main(int argc, char *argv[]) {
 
             t += 1.0/oversample;
         }
-
+        
         t -= 1.0;
         for (i=0; i<channels; i++)
             left[i] = right[i];
