@@ -199,6 +199,8 @@ acohpsk.do_write_pilot_file = 1;      % enable this to dump pilot symbols to C .
 acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
+acohpsk.npilotbits       = 0;
+acohpsk.npilotbiterrors  = 0;
 
 ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*afdmdv.M);
 
@@ -490,7 +492,7 @@ for f=1:frames;
   % if we are in sync complete demodulation with symbol rate processing
 
   if (next_sync == 1) || (sync == 1)
-    [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
+    [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms acohpsk] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
     rx_symb_log = [rx_symb_log; rx_symb];
     rx_amp_log = [rx_amp_log; amp_];
     rx_phi_log = [rx_phi_log; phi_];
@@ -545,7 +547,9 @@ for f=1:frames;
 end
 
 ber = Nerrs/Tbits;
-printf("\nOctave EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
+printf("\nOctave EsNodB: %4.1f BER......: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
+pilot_ber = acohpsk.npilotbiterrors/acohpsk.npilotbits;
+printf("                    Pilot BER: %4.3f Nerrs..: %d Tbits..: %d\n", pilot_ber, acohpsk.npilotbiterrors, acohpsk.npilotbits);
 
 if compare_with_c
 
