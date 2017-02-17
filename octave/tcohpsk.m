@@ -1,7 +1,7 @@
 % tcohpsk.m
 % David Rowe Oct 2014
 %
-% Octave coherent PSK modem script that hs two modes:
+% Octave coherent PSK modem script that has two modes:
 %
 % i) tests the C port of the coherent PSK modem.  This script loads
 %    the output of unittest/tcohpsk.c and compares it to the output of
@@ -153,7 +153,7 @@ Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
 % non linear carrier spacing, combined with clip, helps PAPR a lot!
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
+%freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
