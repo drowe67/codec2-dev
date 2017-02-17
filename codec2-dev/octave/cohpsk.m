@@ -282,6 +282,7 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms cohpsk] = q
 
     % and finally optional diversity combination and make decn on data and pilot bits
 
+    tx_pilot_bits = rx_pilot_bits = zeros(Npilotsframe*Nc,1);
     for c=1:Nc
       for r=1:Nsymbrowpilot
         div_symb = rx_symb(r,c);
@@ -289,11 +290,24 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms cohpsk] = q
           div_symb += rx_symb(r,c + Nc*d);
         end
         if r > Npilotsframe
+          % data symbols, ouput of demod
           i = (c-1)*Nsymbrow + r - Npilotsframe;
           rx_bits((2*(i-1)+1):(2*i)) = qpsk_demod(div_symb);
+        else 
+          % demodulated pilot symbols, which we can use to estimate BER
+          %printf("%d %d (%f %f) (%f %f)\n", r, c, real(div_symb), imag(div_symb), real(cohpsk.pilot(r,c)), imag(cohpsk.pilot(r,c)));
+          i = (c-1)*Npilotsframe + r;
+          tx_pilot_bits((2*(i-1)+1):(2*i)) = qpsk_demod(cohpsk.pilot(r,c));
+          rx_pilot_bits((2*(i-1)+1):(2*i)) = qpsk_demod(div_symb);
         end
       end
     end
+
+    % estimate BER from pilot bits
+
+    cohpsk.npilotbits += Npilotsframe*Nc;
+    nerr = sum(xor(tx_pilot_bits, rx_pilot_bits));
+    cohpsk.npilotbiterrors += nerr;
 
     % Estimate noise power from demodulated symbols.  One method is to
     % calculate the distance of each symbol from the average symbol
