@@ -1,7 +1,7 @@
 % tcohpsk.m
 % David Rowe Oct 2014
 %
-% Octave coherent PSK modem script that has two modes:
+% Octave coherent PSK modem script that hs two modes:
 %
 % i) tests the C port of the coherent PSK modem.  This script loads
 %    the output of unittest/tcohpsk.c and compares it to the output of
@@ -64,8 +64,8 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-%test = 'compare to c';
-test = 'awgn';
+test = 'compare to c';
+%test = 'awgn';
 %test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
@@ -153,7 +153,7 @@ Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
 % non linear carrier spacing, combined with clip, helps PAPR a lot!
-%freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -199,8 +199,6 @@ acohpsk.do_write_pilot_file = 1;      % enable this to dump pilot symbols to C .
 acohpsk = symbol_rate_init(acohpsk);
 acohpsk.Ndft = 1024;
 acohpsk.f_est = afdmdv.Fcentre;
-acohpsk.npilotbits       = 0;
-acohpsk.npilotbiterrors  = 0;
 
 ch_fdm_frame_buf = zeros(1, Nsw*acohpsk.Nsymbrowpilot*afdmdv.M);
 
@@ -492,7 +490,7 @@ for f=1:frames;
   % if we are in sync complete demodulation with symbol rate processing
 
   if (next_sync == 1) || (sync == 1)
-    [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms acohpsk] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
+    [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms] = qpsk_symbols_to_bits(acohpsk, acohpsk.ct_symb_ff_buf);
     rx_symb_log = [rx_symb_log; rx_symb];
     rx_amp_log = [rx_amp_log; amp_];
     rx_phi_log = [rx_phi_log; phi_];
@@ -547,9 +545,7 @@ for f=1:frames;
 end
 
 ber = Nerrs/Tbits;
-printf("\nOctave EsNodB: %4.1f BER......: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
-pilot_ber = acohpsk.npilotbiterrors/acohpsk.npilotbits;
-printf("                    Pilot BER: %4.3f Nerrs..: %d Tbits..: %d\n", pilot_ber, acohpsk.npilotbiterrors, acohpsk.npilotbits);
+printf("\nOctave EsNodB: %4.1f ber..: %4.3f Nerrs..: %d Tbits..: %d\n", EsNodB, ber, Nerrs, Tbits);
 
 if compare_with_c
 
