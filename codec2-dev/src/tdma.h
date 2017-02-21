@@ -50,13 +50,16 @@ enum tdma_state {
 /* TDMA slot struct */
 
 struct TDMA_SLOT {
-    struct FSK * fsk;   /* The FSK modem for this slot */
-    enum slot_state state;
+    struct FSK * fsk;               /* The FSK modem for this slot */
+    enum slot_state state;          /* Current local slot state */
+    int slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
+    struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
+    
 };
 
 /* TDMA modem */
 struct TDMA_MODEM {
-    
+
 };
 
 #endif
