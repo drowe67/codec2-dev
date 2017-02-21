@@ -4,7 +4,7 @@ Random Thoughts and todos for FreeDV FSK TDMA:
 
 Ideas for TDMA layer structure-
 -TDMAModem Struct containing
-    -half-frame 'pilot' modem struct for pilot sync 
+    -half-frame 'pilot' modem struct for pilot sync
         -Pilot modem used to locate a UW in half frame chunks with a large bit error tolerance
         -Once a frame is located, TDMA can set up coarse timing for slot modems
         -Pilot modem would not keep freq est info between half frame chunks
@@ -17,25 +17,26 @@ Ideas for TDMA layer structure-
         Unsynched - No sync at all
         Pilot sync - Pilot demod has found UW but slot demods have not locked on
         Full sync - Any slot has pulled out a UW and is individually in 'sync' state\
-        Master - 
+        Master -
     -TX -- Need some way of scheduling TX bursts
         -Should be fairly hardware-independant
         -Hardware timer of some sort synched with ADC?
         -Should ADC keep sampling during TX period or throw away samples? Software option, maybe?
         -Maybe start a 'sample' timer in hardware synched to what the ADC sample number should be?
-        --reset sample timer on pilot sync 
-        
+        --reset sample timer on pilot sync
+
 API Skeleton-
 
 TDMA_init/TDMA_destory - do what you think they do
     Should TDMA init take a simple mode or a more granular config? Different inits for both?
     - Probably just a mode to begin with
 TDMA_rx(samples) - Accept some number of samps -- probably variable n samples up to some number
+    -- probably shouldn't be variable sample number, tracking will happen in slot modems
 TDMA_get_frames() - Get frame structs if any frames have been decoded by rx -- only hold up to 1 frame per slot -- could probably be rolled into TDMA_rx
 TDMA_reset_slot(n) - reset the estimators/sync state for any single slot -- useful from a protocol point of view if a master is scheduling slots to multiple clients
 TDMA_sched_tx(slot_n,tx_frame,tx_samps_out,tx_time_out) - Schedule a frame transmission
     -Difficult part is to actually ensure timing here
-    
+
 Random TODOs:
 [ ] Deframer work:
   [x] Framer for shorter frames (minus padding bits)
@@ -46,3 +47,6 @@ Random TODOs:
             -Possibly just expose UW matching and let TDMA handle the rest. Frames will be extracted by slot demods
         [ ] Add bit extraction code for new UW frame
 
+More specific TODOs:
+  [ ] Write TDMA RX simulator in octave/c/python/whatever
+  [ ] Get TDMA to point of picking up on pilot sync

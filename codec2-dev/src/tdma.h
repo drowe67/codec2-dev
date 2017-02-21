@@ -31,6 +31,8 @@
 #include "fsk.h"
 #include "freedv_vhf_framing.h"
 
+//typedef void (*tdma_cb_rx_frame)()
+
 /* The state for an individual slot */
 enum slot_state {
     rx_no_sync,         /* Not synched */
@@ -47,6 +49,19 @@ enum tdma_state {
     master_sync,        /* This modem is the TDMA master */
 };
 
+/* TDMA frame type */
+enum tdma_frame_type{
+    frame_master,
+    frame_client,
+};
+
+/* TDMA frame struct */
+struct TDMA_FRAME {
+    enum tdma_frame_type type;      /* Type of frame */
+    int slot_idx;                   /* Index of slot from where frame was rx-ed */
+    uint8_t frame_payload[];        /* Frame payload. TODO: figure out how to sling payloads around */
+};
+
 /* TDMA slot struct */
 
 struct TDMA_SLOT {
@@ -54,11 +69,16 @@ struct TDMA_SLOT {
     enum slot_state state;          /* Current local slot state */
     int slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
     struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
-    
+
 };
 
 /* TDMA modem */
 struct TDMA_MODEM {
+    struct FSK * fsk_pilot;         /* Pilot modem */
+    enum tdma_state state;          /* Current state of modem */
+    struct TDMA_SLOT * slots;       /* Linked list of slot structs */
+
+    int total_slot_count;
 
 };
 
