@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     state = 0; nbits = 0; nerrors = 0;
     while (fread(rx_bits, sizeof(char), COHPSK_BITS_PER_FRAME, fin) ==  COHPSK_BITS_PER_FRAME) {
 
-        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits);
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits, 0);
         if (state == 1) {
             for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
                 error_positions_hist[i] += error_pattern[i];

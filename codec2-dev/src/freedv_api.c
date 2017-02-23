@@ -156,7 +156,7 @@ struct freedv *freedv_open(int mode) {
         f->sz_error_pattern = cohpsk_error_pattern_size();
     }
 #endif  
-    if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)){
+    if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
       
         /* Set up the C2 mode */
         codec2_mode = CODEC2_MODE_1300;
@@ -246,7 +246,9 @@ struct freedv *freedv_open(int mode) {
     }
     
 
+    f->test_frames_diversity = 1;
     f->test_frame_sync_state = 0;
+    f->test_frame_sync_state_upper = 0;
     f->total_bits = 0;
     f->total_bit_errors = 0;
 
@@ -1229,21 +1231,63 @@ static int freedv_comprx_fdmdv_700(struct freedv *f, COMP demod_in_8kHz[], int *
             nout = f->n_speech_samples;
         }
         else {
-            short error_pattern[COHPSK_BITS_PER_FRAME];
-            int   bit_errors;
+            //fprintf(stderr, " freedv_api:  f->test_frames_diversity: %d\n", f->test_frames_diversity);
 
-            /* test data, lets see if we can sync to the test data sequence */
+            if (f->test_frames_diversity) {
+                /* normal operation - error pattern on frame after diveristy combination */
+                short error_pattern[COHPSK_BITS_PER_FRAME];
+                int   bit_errors;
 
-            char rx_bits_char[COHPSK_BITS_PER_FRAME];
-            for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                rx_bits_char[i] = rx_bits[i] < 0.0;
-            cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors, rx_bits_char);
-            if (f->test_frame_sync_state) {
-                f->total_bit_errors += bit_errors;
-                f->total_bits       += COHPSK_BITS_PER_FRAME;
-                if (f->freedv_put_error_pattern != NULL) {
-                    (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
+                /* test data, lets see if we can sync to the test data sequence */
+
+                char rx_bits_char[COHPSK_BITS_PER_FRAME];
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                    rx_bits_char[i] = rx_bits[i] < 0.0;
+                cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors, rx_bits_char, 0);
+                if (f->test_frame_sync_state) {
+                    f->total_bit_errors += bit_errors;
+                    f->total_bits       += COHPSK_BITS_PER_FRAME;
+                    if (f->freedv_put_error_pattern != NULL) {
+                        (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, COHPSK_BITS_PER_FRAME);
+                    }
                 }
+            } 
+            else {
+                /* calculate error pattern on uncombined carriers - test mode to spot any carrier specific issues like
+                   tx passband filtering */
+
+                short error_pattern[2*COHPSK_BITS_PER_FRAME];
+                char  rx_bits_char[COHPSK_BITS_PER_FRAME];
+                int   bit_errors_lower, bit_errors_upper;
+
+                /* lower group of carriers */
+
+                float *rx_bits_lower = cohpsk_get_rx_bits_lower(f->cohpsk);
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
+                    rx_bits_char[i] = rx_bits_lower[i] < 0.0;
+                }
+                cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state, error_pattern, &bit_errors_lower, rx_bits_char, 0);
+
+                /* upper group of carriers */
+
+                float *rx_bits_upper = cohpsk_get_rx_bits_upper(f->cohpsk);
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
+                    rx_bits_char[i] = rx_bits_upper[i] < 0.0;
+                }
+                cohpsk_put_test_bits(f->cohpsk, &f->test_frame_sync_state_upper, &error_pattern[COHPSK_BITS_PER_FRAME], &bit_errors_upper, rx_bits_char, 1);
+                //                fprintf(stderr, " freedv_api:  f->test_frame_sync_state: %d f->test_frame_sync_state_upper: %d\n", 
+                //        f->test_frame_sync_state, f->test_frame_sync_state_upper);
+
+                /* combine total errors and call callback */
+
+                if (f->test_frame_sync_state && f->test_frame_sync_state_upper) {
+                    f->total_bit_errors += bit_errors_lower + bit_errors_upper;
+                    f->total_bits       += 2*COHPSK_BITS_PER_FRAME;
+                    if (f->freedv_put_error_pattern != NULL) {
+                        (*f->freedv_put_error_pattern)(f->error_pattern_callback_state, error_pattern, 2*COHPSK_BITS_PER_FRAME);
+                    }
+                }
+
             }
             
 	    *valid = 0;
@@ -1503,10 +1547,11 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 
 // Set integers
 void freedv_set_test_frames               (struct freedv *f, int val) {f->test_frames = val;}
+void freedv_set_test_frames_diversity	  (struct freedv *f, int val) {f->test_frames_diversity = val;}
 void freedv_set_squelch_en                (struct freedv *f, int val) {f->squelch_en = val;}
 void freedv_set_total_bit_errors          (struct freedv *f, int val) {f->total_bit_errors = val;}
 void freedv_set_total_bits                (struct freedv *f, int val) {f->total_bits = val;}
-void freedv_set_clip                       (struct freedv *f, int val) {f->clip = val;}
+void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
 
 // Set floats
@@ -1587,8 +1632,19 @@ int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_mo
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}
 int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bit_errors;}
-int freedv_get_sync                       (struct freedv *f) {return  f->stats.sync;}
-int freedv_get_sz_error_pattern           (struct freedv *f) {return  f->sz_error_pattern;}
+int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
+
+int freedv_get_sz_error_pattern(struct freedv *f) 
+{
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
+        /* if diversity disabled callback sends error pattern for upper and lower carriers */
+        return f->sz_error_pattern * (2 - f->test_frames_diversity);
+    }
+    else {
+        return f->sz_error_pattern;
+    }
+}
+
 // Get floats
 
 struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}

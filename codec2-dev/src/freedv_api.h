@@ -89,6 +89,7 @@ void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data         (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
 void freedv_set_test_frames			    (struct freedv *freedv, int test_frames);
+void freedv_set_test_frames_diversity	(struct freedv *freedv, int test_frames_diversity);
 void freedv_set_smooth_symbols		    (struct freedv *freedv, int smooth_symbols);
 void freedv_set_squelch_en			    (struct freedv *freedv, int squelch_en);
 void freedv_set_snr_squelch_thresh	    (struct freedv *freedv, float snr_squelch_thresh);

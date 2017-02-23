@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     }
 
     cohpsk = cohpsk_create();
-    cohpsk_set_verbose(cohpsk, 1);
+    cohpsk_set_verbose(cohpsk, 0);
 
     if (oct) {
         logframes = LOG_FRAMES;
