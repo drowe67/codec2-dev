@@ -46,9 +46,9 @@
 struct COHPSK {
     COMP         ch_fdm_frame_buf[NSW*NSYMROWPILOT*COHPSK_M];  /* buffer of several frames of symbols from channel      */
     float        pilot2[2*NPILOTSFRAME][COHPSK_NC];
-    float        phi_[NSYMROW][COHPSK_NC*ND];           /* phase estimates for this frame of rx data symbols     */
+    float        phi_[NSYMROWPILOT][COHPSK_NC*ND];      /* phase estimates for this frame of rx data symbols     */
     float        amp_[NSYMROW][COHPSK_NC*ND];           /* amplitude estimates for this frame of rx data symbols */
-    COMP         rx_symb[NSYMROW][COHPSK_NC*ND];        /* demodulated symbols                                   */
+    COMP         rx_symb[NSYMROWPILOT][COHPSK_NC*ND];   /* demodulated symbols                                   */
     float        f_est;
     COMP         rx_filter_memory[COHPSK_NC*ND][COHPSK_NFILTER];
     COMP         ct_symb_buf[NCT_SYMB_BUF][COHPSK_NC*ND];
@@ -73,8 +73,13 @@ struct COHPSK {
     int           verbose;
 
     int          *ptest_bits_coh_tx;
-    int          *ptest_bits_coh_rx;
+    int          *ptest_bits_coh_rx[2];
     int          *ptest_bits_coh_end;
+
+    /* counting bit errors using pilots */
+
+    int           npilotbits;
+    int           npilotbiterrors;
 
     /* optional log variables used for testing Octave to C port */
 
@@ -92,6 +97,11 @@ struct COHPSK {
 
     float         *rx_timing_log;
     int            rx_timing_log_index;
+
+    /* demodulated bits before diversity combination for test/instrumentation purposes */
+
+    float          rx_bits_lower[COHPSK_BITS_PER_FRAME];
+    float          rx_bits_upper[COHPSK_BITS_PER_FRAME];
 };
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);

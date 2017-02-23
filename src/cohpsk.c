@@ -181,7 +181,7 @@ struct COHPSK *cohpsk_create(void)
 
     /* test frames */
 
-    coh->ptest_bits_coh_tx = coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+    coh->ptest_bits_coh_tx = coh->ptest_bits_coh_rx[0] = coh->ptest_bits_coh_rx[1] = (int*)test_bits_coh;
     coh->ptest_bits_coh_end = (int*)test_bits_coh + sizeof(test_bits_coh)/sizeof(int);
 
     return coh;
@@ -362,6 +362,18 @@ void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[
             i = c*NSYMROW + r;
             rx_bits[2*i+1] = rot.real;
             rx_bits[2*i]   = rot.imag;
+
+            /* demodulate bits from upper and lower carriers separately for test purposes */
+
+            assert(ND == 2);
+
+            i = c*NSYMROW + r;
+            rot = cmult(coh->rx_symb[r][c], pi_on_4);
+            coh->rx_bits_lower[2*i+1] = rot.real;
+            coh->rx_bits_lower[2*i]   = rot.imag;
+            rot = cmult(coh->rx_symb[r][c + COHPSK_NC], pi_on_4);
+            coh->rx_bits_upper[2*i+1] = rot.real;
+            coh->rx_bits_upper[2*i]   = rot.imag;
         }
     }
 
@@ -1195,13 +1207,19 @@ void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[])
   Accepts bits from demod and attempts to sync with the known
   test_bits sequence.  When synced measures bit errors.
 
+  Has states to track two separate received test sequences based on
+  channel 0 or 1.
+
 \*---------------------------------------------------------------------------*/
 
 void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
-			 int *bit_errors, char rx_bits_char[])
+                          int *bit_errors, char rx_bits_char[], int channel)
 {
     int i, next_state, anerror;
     int rx_bits[COHPSK_BITS_PER_FRAME];
+
+    assert((channel == 0) || (channel == 1));
+    int *ptest_bits_coh_rx = coh->ptest_bits_coh_rx[channel];
 
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
         rx_bits[i] = rx_bits_char[i];
@@ -1209,9 +1227,9 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
 
     *bit_errors = 0;
     for(i=0; i<COHPSK_BITS_PER_FRAME; i++) {
-        anerror = (rx_bits[i] & 0x1) ^ coh->ptest_bits_coh_rx[i];
+        anerror = (rx_bits[i] & 0x1) ^ ptest_bits_coh_rx[i];
         if ((anerror < 0) || (anerror > 1)) {
-            fprintf(stderr, "i: %d rx_bits: %d ptest_bits_coh_rx: %d\n", i, rx_bits[i], coh->ptest_bits_coh_rx[i]);
+            fprintf(stderr, "i: %d rx_bits: %d ptest_bits_coh_rx: %d\n", i, rx_bits[i], ptest_bits_coh_rx[i]);
         }
         *bit_errors += anerror;
         error_pattern[i] = anerror;
@@ -1224,9 +1242,9 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
     if (*state == 0) {
         if (*bit_errors < 4) {
             next_state = 1;
-            coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
-            if (coh->ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
-                coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+            ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
+            if (ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
+                ptest_bits_coh_rx = (int*)test_bits_coh;
             }
         }
     }
@@ -1245,19 +1263,30 @@ void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
     }
 
     if (*state > 0) {
-        coh->ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
-        if (coh->ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
-            coh->ptest_bits_coh_rx = (int*)test_bits_coh;
+        ptest_bits_coh_rx += COHPSK_BITS_PER_FRAME;
+        if (ptest_bits_coh_rx >= coh->ptest_bits_coh_end) {
+            ptest_bits_coh_rx = (int*)test_bits_coh;
         }
     }
 
     //fprintf(stderr, "state: %d next_state: %d bit_errors: %d\n", *state, next_state, *bit_errors);
 
     *state = next_state;
+    coh->ptest_bits_coh_rx[channel] = ptest_bits_coh_rx;
 }
+
 
 int cohpsk_error_pattern_size(void) {
     return COHPSK_BITS_PER_FRAME;
 }
 
+
+float *cohpsk_get_rx_bits_lower(struct COHPSK *coh) {
+    return coh->rx_bits_lower;
+}
+
+
+float *cohpsk_get_rx_bits_upper(struct COHPSK *coh) {
+    return coh->rx_bits_upper;
+}
 

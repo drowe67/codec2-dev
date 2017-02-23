@@ -95,7 +95,9 @@ struct freedv {
     int                 *ptest_bits_coh_end;
 
     int                  test_frames;            // set this baby for 1 to tx/rx test frames to look at bit error stats
+    int                  test_frames_diversity;  // 1 -> used combined carriers for error counting on 700 waveforms
     int                  test_frame_sync_state;
+    int                  test_frame_sync_state_upper;  // when test_frames_diveristy==0 we need extra states for upper carriers
     int                  test_frame_count;
     int                  total_bits;
     int                  total_bit_errors;

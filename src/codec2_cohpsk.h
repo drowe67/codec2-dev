@@ -53,9 +53,15 @@ void cohpsk_get_demod_stats(struct COHPSK *cohpsk, struct MODEM_STATS *stats);
 void cohpsk_set_verbose(struct COHPSK *coh, int verbose);
 void cohpsk_get_test_bits(struct COHPSK *coh, int rx_bits[]);
 void cohpsk_put_test_bits(struct COHPSK *coh, int *state, short error_pattern[],
-                          int *bit_errors, char rx_bits[]);
+                          int *bit_errors, char rx_bits[], int channel);
 int cohpsk_error_pattern_size(void);
 void cohpsk_set_frame(struct COHPSK *coh, int frame);
 void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs,
                           COMP *foff_phase_rect, int nin);
+
+/* used for accessing upper and lower bits before diversity combination */
+
+float *cohpsk_get_rx_bits_lower(struct COHPSK *coh);
+float *cohpsk_get_rx_bits_upper(struct COHPSK *coh);
+
 #endif
