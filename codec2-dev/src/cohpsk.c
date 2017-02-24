@@ -150,6 +150,10 @@ struct COHPSK *cohpsk_create(void)
             coh->rx_filter_memory[c][i].real = 0.0;
             coh->rx_filter_memory[c][i].imag = 0.0;
         }
+
+        /* optional per-carrier amplitude weighting for testing */
+
+        coh->carrier_ampl[c] = 1.0;
     }
     fdmdv->fbb_rect.real     = cosf(2.0*PI*FDMDV_FCENTRE/COHPSK_FS);
     fdmdv->fbb_rect.imag     = sinf(2.0*PI*FDMDV_FCENTRE/COHPSK_FS);
@@ -252,16 +256,6 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
             i = c*NSYMROW + data_r;
             bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);
             tx_symb[r][c] = fcmult(1.0/sqrtf(ND),qpsk_mod[bits]);
-
-            /* test code to see what happens when we attenuate one
-               carrier, this may happen in practice with tx SSB filter
-               ripple.
-
-               if (c==5) {
-                 COMP attn = {0.5,0.0};
-                 tx_symb[r][c] = cmult(tx_symb[r][c], attn);
-               }
-            */
         }
     }
 
@@ -680,7 +674,7 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
 
     for(r=0; r<NSYMROWPILOT; r++) {
         for(c=0; c<COHPSK_NC*ND; c++)
-            tx_onesym[c] = tx_symb[r][c];
+            tx_onesym[c] = fcmult(coh->carrier_ampl[c], tx_symb[r][c]);
         tx_filter_and_upconvert_coh(&tx_fdm[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory,
                                     fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
     }
@@ -1285,8 +1279,13 @@ float *cohpsk_get_rx_bits_lower(struct COHPSK *coh) {
     return coh->rx_bits_lower;
 }
 
-
 float *cohpsk_get_rx_bits_upper(struct COHPSK *coh) {
     return coh->rx_bits_upper;
+}
+
+void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl) {
+    assert(c < COHPSK_NC*ND);
+    coh->carrier_ampl[c] = ampl;
+    fprintf(stderr, "cohpsk_set_carrier_ampl: %d %f\n", c, ampl);
 }
 

@@ -102,6 +102,10 @@ struct COHPSK {
 
     float          rx_bits_lower[COHPSK_BITS_PER_FRAME];
     float          rx_bits_upper[COHPSK_BITS_PER_FRAME];
+
+    /* tx amplitude weights for each carrier for test/instrumentation */
+
+    float          carrier_ampl[COHPSK_NC*ND];
 };
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);

@@ -1563,6 +1563,11 @@ void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_erro
     f->error_pattern_callback_state = state;
 }
 
+void freedv_set_carrier_ampl(struct freedv *freedv, int c, float ampl) {
+    assert(freedv->mode == FREEDV_MODE_700C);
+    cohpsk_set_carrier_ampl(freedv->cohpsk, c, ampl);
+}
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTIONS...: freedv_set_alt_modem_samp_rate

@@ -63,5 +63,6 @@ void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float 
 
 float *cohpsk_get_rx_bits_lower(struct COHPSK *coh);
 float *cohpsk_get_rx_bits_upper(struct COHPSK *coh);
+void cohpsk_set_carrier_ampl(struct COHPSK *coh, int c, float ampl);
 
 #endif
