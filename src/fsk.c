@@ -92,13 +92,15 @@
 */
 static void fsk_generate_hann_table(struct FSK* fsk){
     int Ndft = fsk->Ndft;
+    size_t i;
+
     /* Set up complex oscilator to calculate hann function */
     COMP dphi = comp_exp_j((2*M_PI)/((float)Ndft-1));
     COMP rphi = {.5,0};
     
     rphi = cmult(cconj(dphi),rphi);
     
-    for(size_t i=0; i<Ndft; i++){
+    for(i=0; i<Ndft; i++){
         rphi = cmult(dphi,rphi);
         float hannc = .5-rphi.real;
         //float hann = .5-(.5*cosf((2*M_PI*(float)(i))/((float)Ndft-1)));

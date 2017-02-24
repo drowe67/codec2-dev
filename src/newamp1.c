@@ -331,7 +331,7 @@ void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs
 {
    float rate_K_vec_term[K+2], rate_K_sample_freqs_kHz_term[K+2];
    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
-   int m;
+   int m,k;
 
    /* terminate either end of the rate K vecs with 0dB points */
 
@@ -339,7 +339,7 @@ void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs
    rate_K_sample_freqs_kHz_term[0] = 0.0;
    rate_K_sample_freqs_kHz_term[K+1] = 4.0;
 
-   for(int k=0; k<K; k++) {
+   for(k=0; k<K; k++) {
        rate_K_vec_term[k+1] = rate_K_vec[k];
        rate_K_sample_freqs_kHz_term[k+1] = rate_K_sample_freqs_kHz[k];
   
