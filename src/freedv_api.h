@@ -68,23 +68,35 @@ typedef void (*freedv_callback_datarx)(void *, unsigned char *packet, size_t siz
 typedef void (*freedv_callback_datatx)(void *, unsigned char *packet, size_t *size);
 
 
-// FreeDV API functions:
-// open, close
+/*---------------------------------------------------------------------------*\
+
+                                 FreeDV API functions
+
+\*---------------------------------------------------------------------------*/
+
+// open, close ----------------------------------------------------------------
+
 struct freedv *freedv_open(int mode);
 void freedv_close   (struct freedv *freedv);
-// Transmit
+
+// Transmit -------------------------------------------------------------------
+
 void freedv_tx      (struct freedv *freedv, short mod_out[], short speech_in[]);
 void freedv_comptx  (struct freedv *freedv, COMP  mod_out[], short speech_in[]);
 void freedv_codectx (struct freedv *f, short mod_out[], unsigned char *packed_codec_bits);
 void freedv_datatx  (struct freedv *f, short mod_out[]);
 int  freedv_data_ntxframes (struct freedv *freedv);
-// Receive
+
+// Receive -------------------------------------------------------------------
+
 int freedv_nin      (struct freedv *freedv);
 int freedv_rx       (struct freedv *freedv, short speech_out[], short demod_in[]);
 int freedv_floatrx  (struct freedv *freedv, short speech_out[], float demod_in[]);
 int freedv_comprx   (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
 int freedv_codecrx  (struct freedv *freedv, unsigned char *packed_codec_bits, short demod_in[]);
-// Set parameters
+
+// Set parameters ------------------------------------------------------------
+
 void freedv_set_callback_txt            (struct freedv *freedv, freedv_callback_rx rx, freedv_callback_tx tx, void *callback_state);
 void freedv_set_callback_protocol       (struct freedv *freedv, freedv_callback_protorx rx, freedv_callback_prototx tx, void *callback_state);
 void freedv_set_callback_data         (struct freedv *freedv, freedv_callback_datarx datarx, freedv_callback_datatx datatx, void *callback_state);
@@ -100,8 +112,10 @@ void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_e
 void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
 int freedv_set_alt_modem_samp_rate      (struct freedv *freedv, int samp_rate);
+void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
 
-// Get parameters
+// Get parameters -------------------------------------------------------------------------
+
 struct MODEM_STATS;
 int freedv_get_version(void);
 int freedv_get_mode                 (struct freedv *freedv);
@@ -120,6 +134,7 @@ struct CODEC2 *freedv_get_codec2	(struct freedv *freedv);
 int freedv_get_n_codec_bits             (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
+
 #endif
 
 #ifdef __cplusplus
