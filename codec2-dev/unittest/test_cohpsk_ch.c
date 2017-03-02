@@ -250,13 +250,13 @@ int main(int argc, char *argv[])
             memcpy(ch_buf, &ch_buf[nin_frame], sizeof(COMP)*ch_buf_n);
         nin_frame = tmp;
 
-	
-    	for (int i = 0; i < COHPSK_BITS_PER_FRAME; i++)
+	int i;
+    	for (i = 0; i < COHPSK_BITS_PER_FRAME; i++)
 	{
            rx_bits_char[i] = rx_bits_sd[i];
 	}
 
-        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_char);
+        cohpsk_put_test_bits(coh, &state, error_pattern, &bit_errors, rx_bits_char, 0);
         nerrors += bit_errors;
         nbits   += COHPSK_BITS_PER_FRAME;
 

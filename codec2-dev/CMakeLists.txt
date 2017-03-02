@@ -103,11 +103,11 @@ endif(MINGW)
 option(BUILD_SHARED_LIBS
     "Build shared library. Set to OFF for static library." ON)
 # Unittest should be on for dev builds and off for releases.
-#if(CMAKE_BUILD_TYPE MATCHES "Release")
+if(CMAKE_BUILD_TYPE MATCHES "Release")
     option(UNITTEST "Build unittest binaries." OFF)
-#else()
-    #option(UNITTEST "Build unittest binaries." ON)
-#endif()
+else()
+    option(UNITTEST "Build unittest binaries." ON)
+endif()
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
