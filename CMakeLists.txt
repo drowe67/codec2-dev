@@ -172,6 +172,24 @@ if(UNITTEST)
         message(FATAL_ERROR "Speex DSP library not found!")
     endif()
 
+    #
+    # Samplerate Library
+    #
+    message(STATUS "Looking for samplerate...")
+    find_library(LIBSAMPLERATE samplerate)
+    find_path(LIBSAMPLERATE_INCLUDE_DIR samplerate.h)
+    message(STATUS "  samplerate headers: ${LIBSAMPLERATE_INCLUDE_DIR}")
+    message(STATUS "  samplerate library: ${LIBSAMPLERATE}")
+    if(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
+        list(APPEND FREEDV_LINK_LIBS ${CMAKE_REQUIRED_LIBRARIES})
+        include_directories(${LIBSAMPLERATE_INCLUDE_DIR})
+    else(LIBSTAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
+        message(FATAL_ERROR "samplerate library not found.
+On Linux systems try installing:
+    samplerate-devel  (RPM based systems)
+    libsamplerate-dev (DEB based systems)")
+    endif(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
+
     add_subdirectory(unittest)
 endif(UNITTEST)
 
