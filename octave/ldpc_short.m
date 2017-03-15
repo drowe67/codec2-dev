@@ -24,16 +24,15 @@ function init_cml
   cd(currentdir); 
 end
 
-function sim_out = ldpc4(HRA, sim_in, genie_Es);
 
-  estEsN0 = 0
+function sim_out = ldpc4(HRA, Ntrials, Esvec, genie_Es);
 
-  framesize = sim_in.framesize;
-  rate      = sim_in.rate;
-  mod_order = sim_in.mod_order;
-  Ntrials   = sim_in.Ntrials;
-  Esvec     = sim_in.Esvec;
+  [Nr Nc] = size(HRA);  
 
+  rate = (Nc-Nr)/Nc;
+  framesize = Nc;
+  mod_order = 2; 
+  modulation = 'BPSK';
   demod_type = 0;
   decoder_type = 0;
   max_iterations = 100;
@@ -102,41 +101,48 @@ function sim_out = ldpc4(HRA, sim_in, genie_Es);
     sim_out.Ebvec = Ebvec;
     sim_out.FERvec = FERvec;
     sim_out.TERvec  = TERvec;
-    sim_out.cpumins = cputime/60;    
+    sim_out.framesize = framesize;
   end
 endfunction
 
+% Start simulation here ----------------------------------------------
 
 more off;
 format;
 init_cml
 
-sim_in.Esvec = -3:0.5:6; 
-load Hs_112_112.mat
+Ntrials =  2000;
+Esvec = -3:0.5:3; 
 
-HRA = H2;
+sim_out1 = ldpc4(H1, Ntrials, Esvec, 1);
+sim_out2 = ldpc4(H2, Ntrials, Esvec, 1);
+sim_out3 = ldpc4(H3, Ntrials, Esvec, 1);
+sim_out4 = ldpc4(H4, Ntrials, Esvec, 1);
 
-[Nr Nc] = size(HRA);  
+EbNodBvec = sim_out1.Ebvec;
+uncoded_BER_theory = 0.5*erfc(sqrt(10.^(EbNodBvec/10)));
+uncoded_PER_theory = uncoded_BER_theory*sim_out1.framesize;
 
-sim_in.rate = (Nc-Nr)/Nc
-sim_in.framesize = Nc;
-
-sim_in.mod_order = 2; 
-sim_in.modulation = 'BPSK';
-sim_in.mapping = 'gray';
-
-sim_in.Lim_Ferrs= 100;
-sim_in.Ntrials =  500;
-
-sim_out = ldpc4(HRA, sim_in, 1);
-
-figure(1)
-semilogy(sim_out.Ebvec,  sim_out.BERvec)
-xlabel('Eb/N0')
+figure(1); clf;
+semilogy(EbNodBvec,  uncoded_BER_theory, 'b')
+hold on;
+semilogy(EbNodBvec,  sim_out1.BERvec, 'g')
+semilogy(EbNodBvec,  sim_out2.BERvec, 'r')
+semilogy(EbNodBvec,  sim_out3.BERvec, 'c')
+semilogy(EbNodBvec,  sim_out4.BERvec, 'k')
+hold off;
+xlabel('Eb/No')
 ylabel('BER')
 grid
-figure(2)
-semilogy(sim_out.Ebvec,  sim_out.FERvec/sim_in.Ntrials ,  col)
-xlabel('Eb/N0')
+
+figure(2); clf;
+semilogy(EbNodBvec,  uncoded_PER_theory, 'b')
+hold on;
+semilogy(EbNodBvec,  sim_out1.FERvec/Ntrials, 'g')
+semilogy(EbNodBvec,  sim_out2.FERvec/Ntrials, 'r')
+semilogy(EbNodBvec,  sim_out3.FERvec/Ntrials, 'c')
+semilogy(EbNodBvec,  sim_out4.FERvec/Ntrials, 'k')
+hold off;
+xlabel('Eb/No')
 ylabel('PER')
 grid
