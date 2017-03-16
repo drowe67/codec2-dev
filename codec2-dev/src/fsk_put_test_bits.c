@@ -99,4 +99,6 @@ int main(int argc,char *argv[]){
     
  cleanup:
     fclose(fin);
+
+    return 0;
 }
