@@ -13,15 +13,6 @@ target_link_libraries(extract codec2)
 add_executable(vqtrain vqtrain.c)
 target_link_libraries(vqtrain codec2)
 
-add_executable(vqtrainjnd vqtrainjnd.c)
-target_link_libraries(vqtrainjnd codec2)
-
-add_executable(vqtrainph vqtrainph.c)
-target_link_libraries(vqtrainph codec2)
-
-add_executable(vqtrainsp vqtrainsp.c)
-target_link_libraries(vqtrainsp codec2)
-
 add_executable(genphdata genphdata.c)
 target_link_libraries(genphdata codec2)
 
@@ -74,12 +65,6 @@ target_link_libraries(tdeframer m codec2)
 
 add_executable(tfreedv_data_channel tfreedv_data_channel.c)
 target_link_libraries(tfreedv_data_channel codec2)
-
-#add_executable(t48_8 t48_8.c ../src/fdmdv.c ../src/kiss_fft.c)
-#target_link_libraries(t48_8 codec2)
-
-add_executable(lspsync lspsync.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/postfilter.c ../src/phase.c ../src/interp.c ../src/pack.c ${CODEBOOKS})
-target_link_libraries(lspsync codec2)
 
 add_executable(create_interleaver create_interleaver.c)
 target_link_libraries(create_interleaver codec2)

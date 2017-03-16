@@ -4,7 +4,7 @@
   AUTHOR......: Jean-Marc Valin
   DATE CREATED: 21 Jan 2012
 
-  Multi-stage Vector Quantoser training program developed by Jean-Marc at
+  Multi-stage Vector Quantiser training program developed by Jean-Marc at
   linux.conf.au 2012.  Minor mods by David Rowe
 
 \*---------------------------------------------------------------------------*/
@@ -284,7 +284,7 @@ int main(int argc, char **argv)
   float *data, *pred, *codebook, *codebook2, *codebook3;
   float *weight, *weight2, *weight3;
   float *delta, *delta2;
-  float tmp, err, min_dist, total_min_dist;
+  float tmp, err, min_dist, total_min_dist, ret;
   char filename[256];
   FILE *fcb;
 
@@ -308,7 +308,8 @@ int main(int argc, char **argv)
       break;
     for (j=0;j<ndim;j++)
     {
-	fscanf(ftrain, "%f ", &tmp);
+	ret = fscanf(ftrain, "%f ", &tmp);
+        assert(ret == 1);
     }
     nb_vectors++;
     if ((nb_vectors % 1000) == 0)
@@ -334,7 +335,8 @@ int main(int argc, char **argv)
       break;
     for (j=0;j<ndim;j++)
     {
-	fscanf(ftrain, "%f ", &data[i*ndim+j]);
+	ret = fscanf(ftrain, "%f ", &data[i*ndim+j]);
+        assert(ret == 1);
     }
   }
   nb_vectors = i;

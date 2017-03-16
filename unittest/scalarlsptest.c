@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
     int k,m;             /* LSP vector order and codebook size */
     float  wt[1];        /* weighting (not used here for scalars) */
     const float *cb;           /* LSP quantiser codebook */
-    int i;
+    int i, ret;
     float  total_se;
 
     if (argc < 2) {
@@ -71,7 +71,8 @@ int main(int argc, char *argv[])
 	/* Read LSP input vector speech */
 
 	for (i=0; i<LPC_ORD; i++) {
-	    fscanf(ftrain, "%f ", &lsp[i]);
+	    ret = fscanf(ftrain, "%f ", &lsp[i]);
+            assert(ret == 1);
 	}
 	vectors++;
 	if ((vectors % 1000) == 0)
