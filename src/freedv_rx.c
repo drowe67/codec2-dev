@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
         }
     }
     freedv_set_snr_squelch_thresh(freedv, -100.0);
-    freedv_set_squelch_en(freedv, 1);
+    freedv_set_squelch_en(freedv, 0);
 
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_max_modem_samples = freedv_get_n_max_modem_samples(freedv);

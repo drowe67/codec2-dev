@@ -290,5 +290,7 @@ int main(int argc,char *argv[]){
     fclose(fin);
     fclose(fout);
     fsk_destroy(fsk);
+
+    return 0;
 }
 
