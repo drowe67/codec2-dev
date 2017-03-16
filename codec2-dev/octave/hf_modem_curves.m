@@ -42,8 +42,9 @@ endfunction
 % Rate Rs modem simulation model -------------------------------------------------------
 
 function sim_out = ber_test(sim_in)
-    bps     = 2; % two bits/symbol for QPSK
-
+    bps     = 2;     % two bits/symbol for QPSK
+    Rs      = 50;    % symbol rate (needed for HF model)
+    
     verbose = sim_in.verbose;
     EbNovec = sim_in.EbNovec;
     hf_en   = sim_in.hf_en;
@@ -61,14 +62,16 @@ function sim_out = ber_test(sim_in)
     % init HF model
 
     if hf_en
+
       % some typical values
-      Rs = 50; dopplerSpreadHz = 1; path_delay = 0.001/Rs;
+
+      dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
       nsymb = max(nbitsvec)/2;
       spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
       spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
       hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
-      %printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
+      % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
     end
 
     for ne = 1:length(EbNovec)
@@ -84,7 +87,7 @@ function sim_out = ber_test(sim_in)
 
         % modulator ------------------------
 
-        tx_bits = rand(1,nbits) > 0.5;
+        tx_bits = rand(1,nbits) > 0.5;        
         tx_symb = [];
         prev_tx_symb = 1;
         for s=1:nsymb
@@ -105,10 +108,20 @@ function sim_out = ber_test(sim_in)
           % simplified rate Rs simulation model that doesn't include
           % ISI, just freq filtering.  We assume perfect phase estimation
           % so it's just amplitude distortion.
- 
+
+          hf_model1 = hf_model2 = zeros(1, nsymb);
           for s=1:nsymb 
-            hf_model = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
-            rx_symb(s) = rx_symb(s)*abs(hf_model);
+            hf_model1(s) = hf_gain*(spread1(s) + exp(-j*path_delay)*spread2(s));
+            hf_model     = abs(hf_model1(s));
+
+            if sim_in.diversity
+              % include amplitude information from another frequency in channel model
+              w1 = 7*2*pi;
+              hf_model2(s) = hf_gain*(spread1(s) + exp(-j*w1*path_delay)*spread2(s));
+              hf_model     = 0.5*abs(hf_model1(s)) + 0.5*abs(hf_model2(s));
+            end
+
+            rx_symb(s) = rx_symb(s).*hf_model;
           end
         end
 
@@ -120,6 +133,8 @@ function sim_out = ber_test(sim_in)
 
         % demodulator ------------------------------------------
 
+        % demodulate rx symbols to bits
+ 
         rx_bits = [];
         prev_rx_symb = 1;
         for s=1:nsymb
@@ -139,10 +154,16 @@ function sim_out = ber_test(sim_in)
         nerrors = sum(error_pattern);
         bervec(ne) = nerrors/nbits;
         if verbose
-          printf("EbNodB: %3.1f nerrors: %5d ber: %4.3f\n", EbNodB, nerrors, bervec(ne));
+          printf("EbNodB: % 3.1f nbits: %5d nerrors: %5d ber: %4.3f\n", EbNodB, nbits, nerrors, bervec(ne));
           if verbose == 2
             figure(2); clf;
-            plot(rx_symb,'+');
+            plot(rx_symb*exp(j*pi/4),'+','markersize', 10);
+            mx = max(abs(rx_symb));
+            axis([-mx mx -mx mx]);
+            if sim_in.diversity && sim_in.hf_en 
+              figure(3);
+              plot(1:nsymb, abs(hf_model1), 1:nsymb, abs(hf_model2), 'linewidth', 2);
+            end
           end
         end
     end
@@ -155,26 +176,29 @@ endfunction
 
 
 function run_single
-    sim_in.verbose = 2;
-    sim_in.nbits   = 10000;
-    sim_in.EbNovec = 8;
-    sim_in.dqpsk   = 0;
-    sim_in.hf_en   = 1;
+    sim_in.verbose   = 2;
+    sim_in.nbits     = 1000;
+    sim_in.EbNovec   = 4;
+    sim_in.dqpsk     = 0;
+    sim_in.hf_en     = 0;
+    sim_in.diversity = 0;
 
     sim_qpsk = ber_test(sim_in);
 endfunction
 
 
 function run_curves
+    max_nbits = 1E5;
     sim_in.verbose = 1;
     sim_in.EbNovec = 0:10;
     sim_in.dqpsk   = 0;
     sim_in.hf_en   = 0;
+    sim_in.diversity = 0;
 
     % AWGN -----------------------------
 
     ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNovec/10)));
-    sim_in.nbits    = min(1E5, floor(500 ./ ber_awgn_theory));
+    sim_in.nbits    = min(max_nbits, floor(500 ./ ber_awgn_theory));
 
     sim_qpsk = ber_test(sim_in);
     sim_in.dqpsk = 1;
@@ -188,24 +212,52 @@ function run_curves
     EbNoLin = 10.^(hf_sim_in.EbNovec/10);
     ber_hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
-    hf_sim_in.nbits = min(1E5, floor(500 ./ ber_hf_theory));
+    hf_sim_in.nbits = min(max_nbits, floor(500 ./ ber_hf_theory));
     sim_qpsk_hf = ber_test(hf_sim_in);
 
     hf_sim_in.dqpsk = 1; 
     sim_dqpsk_hf = ber_test(hf_sim_in);
 
+    hf_sim_in.dqpsk = 0; 
+    hf_sim_in.diversity = 1;
+    sim_qpsk_hf_div = ber_test(hf_sim_in);
+
     % Plot results --------------------
 
-    figure(1); clf;
+    close all;
+    figure (1, 'position', [100, 10, 600, 400]); clf;
+
+    semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;', 'linewidth', 2)
+    xlabel('Eb/No (dB)')
+    ylabel('BER')
+    grid("minor")
+    axis([min(sim_in.EbNovec) max(sim_in.EbNovec) 1E-3 1])
+    hold on;
+    
+    semilogy([0 4 4], [ber_awgn_theory(5) ber_awgn_theory(5) 1E-3],'k--', 'linewidth', 2);
+    hold off;
+
+    figure (2, 'position', [300, 10, 600, 400]); clf;
     semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;','markersize', 10, 'linewidth', 2)
     hold on;
-    semilogy(hf_sim_in.EbNovec, ber_hf_theory,'r+-;QPSK HF theory;','markersize', 10, 'linewidth', 2)
     semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
     semilogy(sim_in.EbNovec, sim_dqpsk.bervec,'b+-;DQPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'c+-;QPSK HF simulated;','markersize', 10, 'linewidth', 2)
-    semilogy(hf_sim_in.EbNovec, sim_dqpsk_hf.bervec,'k+-;DQPSK HF simulated;','markersize', 10, 'linewidth', 2)
+    xlabel('Eb/No (dB)')
+    ylabel('BER')
+    grid("minor")
+    axis([min(sim_in.EbNovec) max(sim_in.EbNovec) 1E-3 1])
+
+    figure (3, 'position', [400, 10, 600, 400]); clf;
+    semilogy(sim_in.EbNovec, ber_awgn_theory,'r+-;QPSK AWGN theory;','markersize', 10, 'linewidth', 2)
+    hold on;
+    semilogy(sim_in.EbNovec, sim_qpsk.bervec,'g+-;QPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(sim_in.EbNovec, sim_dqpsk.bervec,'b+-;DQPSK AWGN simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, ber_hf_theory,'r+-;QPSK HF theory;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_dqpsk_hf.bervec,'b+-;DQPSK HF simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf.bervec,'g+-;QPSK HF simulated;','markersize', 10, 'linewidth', 2)
+    semilogy(hf_sim_in.EbNovec, sim_qpsk_hf_div.bervec,'c+-;QPSK Diversity HF simulated;','markersize', 10, 'linewidth', 2)
     hold off;
-    xlabel('Eb/N0')
+    xlabel('Eb/No (dB)')
     ylabel('BER')
     grid("minor")
     axis([min(hf_sim_in.EbNovec) max(hf_sim_in.EbNovec) 1E-3 1])
@@ -216,5 +268,5 @@ endfunction
 
 more off;
 rand('seed',1); randn('seed', 1);
-run_curves
-%run_single
+%run_curves
+run_single
