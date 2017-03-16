@@ -34,7 +34,7 @@ target_link_libraries(polar2rect codec2)
 add_executable(vq_train_jvm vq_train_jvm.c)
 target_link_libraries(vq_train_jvm codec2)
 
-set(CODEBOOKS ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookjnd.c ../src/codebookdt.c ../src/codebookjvm.c ../src/codebookvqanssi.c ../src/codebookge.c)
+set(CODEBOOKS ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/codebookdt.c ../src/codebookjvm.c  ../src/codebookge.c)
 
 add_executable(tnlp tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c)
 target_link_libraries(tnlp codec2)
