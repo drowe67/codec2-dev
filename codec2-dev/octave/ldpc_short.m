@@ -25,15 +25,21 @@ function init_cml
 end
 
 
-function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0)
+function sim_out = run_sim(sim_in, HRA, Ntrials)
 
-  if golay
+  genie_Es    = sim_in.genie_Es;
+  packet_size = sim_in.packet_size;
+  code        = sim_in.code;
+  hf_en       = sim_in.hf_en;
+  diversity   = sim_in.diversity;
+  Esvec       = sim_in.Esvec;
+
+  if strcmp(code, 'golay')
     rate = 0.5;
     code_param.data_bits_per_frame = 12;
     framesize = 24;
-  else
-    % LDPC code
-
+  end
+  if strcmp(code, 'ldpc')
     [Nr Nc] = size(HRA);  
     rate = (Nc-Nr)/Nc;
     framesize = Nc;
@@ -47,9 +53,29 @@ function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0
     code_param.P_matrix = [];
     code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix ); 
   end
+  if strcmp(code, 'diversity')
+    rate = 0.5;
+    code_param.data_bits_per_frame = 7;
+    framesize = 14;
+  end
 
   mod_order = 2; 
   bps = code_param.bits_per_symbol = log2(mod_order);
+
+  % init HF model
+
+  if hf_en
+
+    % some typical values
+
+    Rs = 50; dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
+
+    nsymb = Ntrials*framesize*bps;
+    spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
+    spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
+    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
+    % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
+  end
 
   % loop around each Esvec point
   
@@ -60,32 +86,59 @@ function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0
 
     Terrs = 0;  Tbits = 0;  Ferrs = 0; 
     tx_bits = rx_bits = [];
+    hfi = 1;
 
     for nn = 1: Ntrials        
       data = round( rand( 1, code_param.data_bits_per_frame ) );
       tx_bits = [tx_bits data];
-      if golay
+      if strcmp(code, 'golay')
         codeword = egolayenc(data);
-      else
+      end
+      if strcmp(code, 'ldpc')
         codeword = LdpcEncode( data, code_param.H_rows, code_param.P_matrix );
       end
+      if strcmp(code, 'diversity')
+        codeword = [data data];
+      end
+
       code_param.code_bits_per_frame = length( codeword );
       Nsymb = code_param.code_bits_per_frame/bps;      
        
       % modulate
+
       s = 1 - 2 * codeword;   
       code_param.symbols_per_frame = length( s );
               
+      if hf_en
+
+        % simplified rate Rs simulation model that doesn't include
+        % ISI, just freq filtering.  We assume perfect phase estimation
+        % so it's just amplitude distortion.
+
+        for i=1:length(s)
+
+          % 1.5*Rs carrier spacing, symbols mapped to 14 carriers
+          % OK we'd probably use QPSK in practice but meh a few approximations....
+
+          w = 1.5*mod(i,14)*2*pi;  
+          hf_model(i) = hf_gain*(spread1(hfi) + exp(-j*w*path_delay)*spread2(hfi));
+          s(i) *= abs(hf_model(i));
+          hfi++;
+        end
+      end
+
       variance = 1/(2*EsNo);
       noise = sqrt(variance)* randn(1,code_param.symbols_per_frame); 
       r = s + noise;
 
       Nr = length(r);  
 
-      if golay
+      if strcmp(code, 'golay')
         detected_data = egolaydec(r < 0);
         detected_data = detected_data(code_param.data_bits_per_frame+1:framesize);
-      else
+      end
+
+      if strcmp(code, 'ldpc')
 
         % in the binary case the LLRs are just a scaled version of the rx samples ...
         % if the EsNo is known -- use the following 
@@ -106,6 +159,10 @@ function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0
         detected_data = detected_data(1:code_param.data_bits_per_frame);
       end
 
+      if strcmp(code, 'diversity')
+        detected_data = (r(1:7) + r(8:14)) < 0;
+      end
+
       rx_bits = [rx_bits detected_data];
 
       error_positions = xor( detected_data, data );
@@ -121,10 +178,10 @@ function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0
     % one big string of bits lets us account for cases were FEC framesize
     % is less than packet size
 
+    error_positions = xor(tx_bits, rx_bits);
     Perrs = 0; Tpackets = 0;
     for i=1:packet_size:length(tx_bits)-packet_size
-      error_positions = xor( tx_bits(i:i+packet_size-1), rx_bits(i:i+packet_size-1));
-      Nerrs = sum(error_positions);
+      Nerrs = sum(error_positions(i:i+packet_size-1));
       if Nerrs>0,  Perrs = Perrs +1;  end
       Tpackets++;
     end
@@ -143,7 +200,88 @@ function sim_out = run_sim(HRA, Ntrials, Esvec, genie_Es, packet_size, golay = 0
     sim_out.FERvec = FERvec;
     sim_out.TERvec  = TERvec;
     sim_out.framesize = framesize;
+    sim_out.error_positions = error_positions;
   end
+endfunction
+
+
+function plot_curves(hf_en)
+
+  Ntrials = 500;
+
+  sim_in.genie_Es    = 1;
+  sim_in.packet_size = 28;
+  sim_in.code        = 'ldpc';
+  sim_in.hf_en       = hf_en;
+  sim_in.diversity   = 0;
+
+  if hf_en
+    Esvec = -3:0.5:6; 
+  else
+    Esvec = 0:0.5:6; 
+  end
+  sim_in.Esvec = Esvec;
+
+  load HRA_112_112.txt
+  load HRA_112_56.txt
+  load HRA_56_56.txt
+  load HRA_56_28.txt
+
+  sim_out1 = run_sim(sim_in, HRA_112_112, Ntrials);
+  sim_out2 = run_sim(sim_in, HRA_112_56 , Ntrials);
+  sim_out3 = run_sim(sim_in, HRA_56_56  , Ntrials*2);
+  sim_out4 = run_sim(sim_in, HRA_56_28  , Ntrials*2);
+  sim_in.code = 'golay';
+  sim_out5 = run_sim(sim_in, [], Ntrials*10);
+  sim_in.code = 'diversity';
+  sim_out6 = run_sim(sim_in, [], Ntrials*10);
+
+  if hf_en
+    Ebvec_theory = 0.5:9;
+    EbNoLin = 10.^(Ebvec_theory/10);
+    uncoded_BER_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+  else
+    Ebvec_theory = -2:0.5:6;
+    uncoded_BER_theory = 0.5*erfc(sqrt(10.^(Ebvec_theory/10)));
+  end
+
+  % need standard packet size to compare
+  % packet error if bit 0, or bit 1, or bit 2 .....
+  %              or bit 0 and bit 1
+  % no packet error if all bits ok (1-p(0))*(1-p(1))
+  % P(packet error) = p(0)+p(1)+....
+
+  uncoded_PER_theory = 1 - (1-uncoded_BER_theory).^sim_in.packet_size;
+
+  figure(1); clf;
+  semilogy(Ebvec_theory,  uncoded_BER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
+  hold on;
+  semilogy(sim_out1.Ebvec, sim_out1.BERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out2.Ebvec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out3.Ebvec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out4.Ebvec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out5.Ebvec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out6.Ebvec, sim_out6.BERvec, 'bo-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  hold off;
+  xlabel('Eb/No')
+  ylabel('BER')
+  grid
+  legend("boxoff");
+
+  figure(2); clf;
+  semilogy(Ebvec_theory,  uncoded_PER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
+  hold on;
+  semilogy(sim_out1.Ebvec, sim_out1.PERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out2.Ebvec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out3.Ebvec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out4.Ebvec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out5.Ebvec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out6.Ebvec, sim_out6.PERvec, 'bo-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  hold off;
+  xlabel('Eb/No')
+  ylabel('PER')
+  grid
+  legend("boxoff");
 endfunction
 
 % Start simulation here ----------------------------------------------
@@ -154,61 +292,6 @@ more off;
 format;
 init_cml;
 
-Ntrials = 500;
-Esvec = -3:0.5:3; 
-packet_size = 28;
-
-
-load HRA_112_112.txt
-load HRA_112_56.txt
-load HRA_56_56.txt
-load HRA_56_28.txt
-
-sim_out1 = run_sim(HRA_112_112, Ntrials, Esvec, 1, packet_size);
-sim_out2 = run_sim(HRA_112_56 , Ntrials, Esvec, 1, packet_size);
-sim_out3 = run_sim(HRA_56_56  , Ntrials*2, Esvec, 1, packet_size);
-sim_out4 = run_sim(HRA_56_28  , Ntrials*2, Esvec, 1, packet_size);
-sim_out5 = run_sim([], Ntrials*10, Esvec, 1, packet_size, 1);
-
-Ebvec_theory = -2:0.5:6;
-uncoded_BER_theory = 0.5*erfc(sqrt(10.^(Ebvec_theory/10)));
-
-% need standard packet size to compare
-% packet error if bit 0, or bit 1, or bit 2 .....
-%              or bit 0 and bit 1
-% no packet error if all bits ok (1-p(0))*(1-p(1))
-% P(packet error) = p(0)+p(1)+....
-
-uncoded_PER_theory = 1 - (1-uncoded_BER_theory).^packet_size;
-
-figure(1); clf;
-semilogy(Ebvec_theory,  uncoded_BER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
-hold on;
-semilogy(sim_out1.Ebvec, sim_out1.BERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out2.Ebvec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out3.Ebvec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out4.Ebvec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out5.Ebvec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-hold off;
-xlabel('Eb/No')
-ylabel('BER')
-grid
-legend("boxoff");
-
-
-figure(2); clf;
-semilogy(Ebvec_theory,  uncoded_PER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
-hold on;
-semilogy(sim_out1.Ebvec, sim_out1.PERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out2.Ebvec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out3.Ebvec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out4.Ebvec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
-semilogy(sim_out5.Ebvec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-hold off;
-xlabel('Eb/No')
-ylabel('PER')
-grid
-legend("boxoff");
-
+plot_curves('hf');
 
 
