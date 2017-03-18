@@ -6,22 +6,27 @@
 % Octave simulation of BPSK with short LDPC codes developed by Bill.  First step
 % in use of LDPC codes with FreeDV and Codec 2 700C.
 %
-% See lpdc.m for instruction son how to install CML library
+% NOTE: You will need to set the CML path in the call to init_cml() below
+%       for you CML install.  See lpdc.m for instructions on how to install 
+%       CML library
 
 1;
 
-function init_cml
-  currentdir = pwd;
-  thiscomp = computer;
 
-  if strfind(thiscomp, 'pc-linux-gnu')==8 
-     if exist('LdpcEncode')==0, 
-        %cd '~/cml'
-        cd '/home/david/Desktop/cml'
-        CmlStartup      
-     end
+function init_cml(path_to_cml)
+  currentdir = pwd;
+  
+  if exist(path_to_cml, 'dir') == 7
+    cd(path_to_cml)
+    CmlStartup      
+    cd(currentdir); 
+  else
+    printf("\n---------------------------------------------------\n");
+    printf("Can't start CML in path: %s\n", path_to_cml);
+    printf("See CML path instructions at top of this script\n");
+    printf("-----------------------------------------------------\n\n");
+    assert(0);
   end
-  cd(currentdir); 
 end
 
 
@@ -155,6 +160,15 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
                                    max_iterations, decoder_type, 1, 1);
         Niters = sum(PCcnt!=0);
         detected_data = x_hat(Niters,:);
+
+        if isfield(sim_in, "c_include_file") 
+
+          % optionally dump code and unit test data to a C header file
+
+          code_param.c_include_file = sim_in.c_include_file;
+          ldpc_gen_h_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat, detected_data);
+        end
+
         detected_data = detected_data(1:code_param.data_bits_per_frame);
       end
 
@@ -339,20 +353,51 @@ function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, error_pattern
 endfunction
 
 
+% Used to generate C header file for C port
+
+function run_c_header
+
+  sim_in.code = 'ldpc';
+  load HRA_112_112.txt
+  data_bits_per_frame = 112;
+  rate = 0.5;
+  bits = data_bits_per_frame;
+  Ntrials = bits/data_bits_per_frame;
+  sim_in.genie_Es    = 1;
+  sim_in.packet_size = 28;
+  EbNodB = 2;
+  sim_in.hf_en = 0;
+  sim_in.Esvec = EbNodB + 10*log10(rate);
+  sim_in.c_include_file = "../src/HRA_112_112.h";
+
+  sim_out = run_sim(sim_in, HRA_112_112, Ntrials);
+endfunction
+
+
 % Start simulation here ----------------------------------------------
+
+% change this path for your CML installation
+
+init_cml('/home/david/Desktop/cml');
 
 rand('seed',1);
 randn('seed',1);
 more off;
 format;
-init_cml;
 close all;
 
-plot_curves(0);
-plot_curves(1);
+% plotting curves (may take a while)
 
-%run_single(700*10, 'ldpc', 'awgn', 2, 'awgn_2dB_ldpc.err')
-%run_single(700*10, 'diversity', 'awgn', 2, 'awgn_2dB_diversity.err')
-%run_single(700*10, 'ldpc', 'hf', 6, 'hf_6dB_ldpc.err')
-%run_single(700*10, 'diversity', 'hf', 6, 'hf_6dB_diversity.err')
+%plot_curves(0);
+%plot_curves(1);
 
+% generating error files 
+
+run_single(700*10, 'ldpc', 'awgn', 2, 'awgn_2dB_ldpc.err')
+run_single(700*10, 'diversity', 'awgn', 2, 'awgn_2dB_diversity.err')
+run_single(700*10, 'ldpc', 'hf', 6, 'hf_6dB_ldpc.err')
+run_single(700*10, 'diversity', 'hf', 6, 'hf_6dB_diversity.err')
+
+% generate C header for C port of code
+
+%run_c_header
