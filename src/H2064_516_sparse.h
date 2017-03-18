@@ -1,7 +1,7 @@
 /*
   FILE....: ../src/H2064_516_sparse.h
 
-  Static arrays for TRC HF modem, generated
+  Static arrays for CML LDPC codec, generated
   by test_ldpc_fsk.m:simple_ut().
 
 */
