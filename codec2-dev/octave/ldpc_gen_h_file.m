@@ -7,7 +7,7 @@ function ldpc_gen_h_file(code_param, max_iterations, decoder_type, input_decoder
        
   f = fopen(code_param.c_include_file, "wt");
 
-  fprintf(f, "/*\n  FILE....: %s\n\n  Static arrays for TRC HF modem, generated", code_param.c_include_file);
+  fprintf(f, "/*\n  FILE....: %s\n\n  Static arrays for LDPC codec, generated", code_param.c_include_file);
   fprintf(f, "\n  ldpc_gen_h_file.m.\n\n*/\n\n");
    
   fprintf(f,"#define NUMBERPARITYBITS %d\n", rows(code_param.H_rows));
