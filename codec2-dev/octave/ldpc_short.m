@@ -31,7 +31,6 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
   packet_size = sim_in.packet_size;
   code        = sim_in.code;
   hf_en       = sim_in.hf_en;
-  diversity   = sim_in.diversity;
   Esvec       = sim_in.Esvec;
 
   if strcmp(code, 'golay')
@@ -207,18 +206,23 @@ endfunction
 
 function plot_curves(hf_en)
 
+  if hf_en
+    epslabel = 'hf';
+  else
+    epslabel = 'awgn';
+  end
+
   Ntrials = 500;
 
   sim_in.genie_Es    = 1;
   sim_in.packet_size = 28;
   sim_in.code        = 'ldpc';
   sim_in.hf_en       = hf_en;
-  sim_in.diversity   = 0;
 
   if hf_en
-    Esvec = -3:0.5:6; 
+    Esvec = 0:0.5:9; 
   else
-    Esvec = 0:0.5:6; 
+    Esvec = -3:0.5:3; 
   end
   sim_in.Esvec = Esvec;
 
@@ -237,11 +241,11 @@ function plot_curves(hf_en)
   sim_out6 = run_sim(sim_in, [], Ntrials*10);
 
   if hf_en
-    Ebvec_theory = 0.5:9;
+    Ebvec_theory = 2:0.5:12;
     EbNoLin = 10.^(Ebvec_theory/10);
     uncoded_BER_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
   else
-    Ebvec_theory = -2:0.5:6;
+    Ebvec_theory = 0:0.5:8;
     uncoded_BER_theory = 0.5*erfc(sqrt(10.^(Ebvec_theory/10)));
   end
 
@@ -261,12 +265,15 @@ function plot_curves(hf_en)
   semilogy(sim_out3.Ebvec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
   semilogy(sim_out4.Ebvec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
   semilogy(sim_out5.Ebvec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out6.Ebvec, sim_out6.BERvec, 'bo-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out6.Ebvec, sim_out6.BERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('BER')
   grid
   legend("boxoff");
+  axis([min(Ebvec_theory) max(Ebvec_theory) 1E-3 2E-1]);
+  epsname = sprintf("ldpc_short_%s_ber.eps", epslabel);
+  print('-deps', '-color', epsname)
 
   figure(2); clf;
   semilogy(Ebvec_theory,  uncoded_PER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
@@ -276,13 +283,61 @@ function plot_curves(hf_en)
   semilogy(sim_out3.Ebvec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
   semilogy(sim_out4.Ebvec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
   semilogy(sim_out5.Ebvec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out6.Ebvec, sim_out6.PERvec, 'bo-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(sim_out6.Ebvec, sim_out6.PERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('PER')
   grid
   legend("boxoff");
+  if hf_en
+    legend("location", "southwest");
+  end
+  axis([min(Ebvec_theory) max(Ebvec_theory) 1E-2 1]);
+  epsname = sprintf("ldpc_short_%s_per.eps", epslabel);
+  print('-deps', '-color', epsname)
 endfunction
+
+
+function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, error_pattern_filename)
+
+  sim_in.code = code;
+  load HRA_112_112.txt
+
+  if strcmp(code, 'ldpc')
+    data_bits_per_frame = 112;
+    rate = 0.5;
+  end
+
+  if strcmp(code, 'diversity')
+    data_bits_per_frame = 7;
+    rate = 0.5;
+  end
+
+  Ntrials = bits/data_bits_per_frame;
+  sim_in.genie_Es    = 1;
+  sim_in.packet_size = 28;
+
+  if strcmp(channel, 'awgn')
+    sim_in.hf_en = 0;
+    sim_in.Esvec = EbNodB + 10*log10(rate);
+  else
+    sim_in.hf_en = 1;
+    sim_in.Esvec = EbNodB + 10*log10(rate);
+  end
+
+  sim_out = run_sim(sim_in, HRA_112_112, Ntrials);
+
+  if nargin == 5
+    fep = fopen(error_pattern_filename, "wb");
+    fwrite(fep, sim_out.error_positions, "short");
+    fclose(fep);
+  end
+
+  figure
+  plot(sim_out.error_positions);
+  axis([1 length(sim_out.error_positions) -0.2 1.2])
+endfunction
+
 
 % Start simulation here ----------------------------------------------
 
@@ -291,7 +346,13 @@ randn('seed',1);
 more off;
 format;
 init_cml;
+close all;
 
-plot_curves('hf');
+plot_curves(0);
+plot_curves(1);
 
+%run_single(700*10, 'ldpc', 'awgn', 2, 'awgn_2dB_ldpc.err')
+%run_single(700*10, 'diversity', 'awgn', 2, 'awgn_2dB_diversity.err')
+%run_single(700*10, 'ldpc', 'hf', 6, 'hf_6dB_ldpc.err')
+%run_single(700*10, 'diversity', 'hf', 6, 'hf_6dB_diversity.err')
 
