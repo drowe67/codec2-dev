@@ -37,19 +37,33 @@
 #include "codec2_cohpsk.h"
 #include "codec2_fdmdv.h"
 
+int opt_exists(char *argv[], int argc, char opt[]) {
+    int i;
+    for (i=0; i<argc; i++) {
+        if (strcmp(argv[i], opt) == 0) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     FILE          *fin, *fout;
     struct COHPSK *cohpsk;
-    char          tx_bits_char[COHPSK_BITS_PER_FRAME];
-    int           tx_bits[COHPSK_BITS_PER_FRAME];
+    char          tx_bits_char[2*COHPSK_BITS_PER_FRAME];
+    int           tx_bits[2*COHPSK_BITS_PER_FRAME];
     COMP          tx_fdm[COHPSK_NOM_SAMPLES_PER_FRAME];
     short         tx_fdm_scaled[COHPSK_NOM_SAMPLES_PER_FRAME];
-    int           frames;
+    int           frames, diversity;
     int           i;
 
     if (argc < 3) {
-	printf("usage: %s InputOneCharPerBitFile OutputModemRawFile\n", argv[0]);
+        fprintf(stderr, "\n");
+	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [-nd]\n", argv[0]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "  --nd        non-diversity mode, input frames of %d bits\n", 2*COHPSK_BITS_PER_FRAME);
+        fprintf(stderr, "\n");
 	exit(1);
     }
 
@@ -69,14 +83,22 @@ int main(int argc, char *argv[])
 
     cohpsk = cohpsk_create();
 
+    if (opt_exists(argv, argc, "--nd")) {
+        diversity = 2;
+    }
+    else {
+        diversity = 1;
+    }
+    fprintf(stderr, "diversity: %d\n", diversity);
+
     frames = 0;
 
-    while(fread(tx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fin) == COHPSK_BITS_PER_FRAME) {
+    while(fread(tx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME*diversity, fin) == COHPSK_BITS_PER_FRAME*diversity) {
 	frames++;
-
-        for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+        
+        for(i=0; i<COHPSK_BITS_PER_FRAME*diversity; i++)
             tx_bits[i] = tx_bits_char[i];
-	cohpsk_mod(cohpsk, tx_fdm, tx_bits);
+	cohpsk_mod(cohpsk, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME*diversity);
         cohpsk_clip(tx_fdm);
 
 	/* scale and save to disk as shorts */

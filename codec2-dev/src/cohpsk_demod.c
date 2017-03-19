@@ -42,6 +42,16 @@
 #define LOG_FRAMES 100
 #define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 
+int opt_exists(char *argv[], int argc, char opt[]) {
+    int i;
+    for (i=0; i<argc; i++) {
+        if (strcmp(argv[i], opt) == 0) {
+            return i;
+        }
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     FILE          *fin, *fout, *foct;
@@ -55,10 +65,15 @@ int main(int argc, char *argv[])
     float        *rx_phi_log = NULL;
     COMP         *rx_symb_log = NULL;
     float         f_est_log[LOG_FRAMES], ratio_log[LOG_FRAMES];
-    int           i, r, c, log_data_r, oct, logframes;
+    int           i, r, c, log_data_r, oct, logframes, arg, diversity;
 
     if (argc < 3) {
-	printf("usage: %s InputModemRawFile OutputOneBitPerIntFile [OctaveLogFile]\n", argv[0]);
+        fprintf(stderr, "\n");
+	printf("usage: %s InputModemRawFile OutputOneCharPerBitFile [-o OctaveLogFile] [--nd]\n", argv[0]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "  -o          Octave log file for testing\n");
+        fprintf(stderr, "  --nd        non-diversity mode, output frames of %d bits\n", ND*COHPSK_BITS_PER_FRAME);
+        fprintf(stderr, "\n");
 	exit(1);
     }
 
@@ -78,14 +93,21 @@ int main(int argc, char *argv[])
 
     foct = NULL;
     oct = 0;
-    if (argc == 4) {
-        if ( (foct = fopen(argv[3],"wt")) == NULL ) {
+    if ((arg = opt_exists(argv, argc, "-o")) != 0) {
+        if ( (foct = fopen(argv[arg+1],"wt")) == NULL ) {
             fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
-                    argv[3], strerror(errno));
+                    argv[4], strerror(errno));
 	exit(1);
         }
         oct = 1;
     }
+
+    if (opt_exists(argv, argc, "--nd")) {
+        diversity = 2;
+    } else {
+        diversity = 1;
+    }
+    fprintf(stderr, "cohpsk_demod: diversity: %d\n", diversity);
 
     cohpsk = cohpsk_create();
     cohpsk_set_verbose(cohpsk, 0);
@@ -120,9 +142,19 @@ int main(int argc, char *argv[])
 	cohpsk_demod(cohpsk, rx_bits, &sync, rx_fdm, &nin_frame);
 
  	if (sync) {
-            for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                rx_bits_char[i] = rx_bits[i] < 0.0;
-            fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+            if (diversity == 1) {
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                    rx_bits_char[i] = rx_bits[i] < 0.0;
+                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+            }
+            else {
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                    rx_bits_char[i] = cohpsk->rx_bits_lower[i] < 0.0;
+                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                    rx_bits_char[i] = cohpsk->rx_bits_upper[i] < 0.0;
+                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+            }
 
             if (oct) {
                 for(r=0; r<NSYMROW; r++, log_data_r++) {
