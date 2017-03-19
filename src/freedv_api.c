@@ -685,7 +685,7 @@ static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
 
     /* cohpsk modulator */
 
-    cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits);
+    cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits, COHPSK_BITS_PER_FRAME);
     if (f->clip)
         cohpsk_clip(tx_fdm);
     for(i=0; i<f->n_nat_modem_samples; i++)

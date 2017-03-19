@@ -222,12 +222,22 @@ void cohpsk_destroy(struct COHPSK *coh)
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits)
 {
-    int   i, r, c, p_r, data_r, d;
+    int   i, r, c, p_r, data_r, d, diversity;
     short bits;
 
-    /* check number of bits supplied matchs number of QPSK symbols in the frame */
+    /* check allowed number of bits supplied matches number of QPSK
+       symbols in the frame */
 
-    assert((NSYMROW*COHPSK_NC)*2 == nbits);
+    assert( (NSYMROW*COHPSK_NC*2 == nbits) || (NSYMROW*COHPSK_NC*2*ND == nbits));
+    
+    /* if we input twice as many bits we don't do diversity */
+
+    if (NSYMROW*COHPSK_NC*2 == nbits) {    
+        diversity = 1; /* diversity mode                         */
+    }
+    else {
+        diversity = 2; /* twice as many bits, non diversity mode */
+    }
 
     /*
       Insert two rows of Nc pilots at beginning of data frame.
@@ -244,15 +254,14 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
 
     r = 0;
     for(p_r=0; p_r<2; p_r++) {
-        for(c=0; c<COHPSK_NC; c++) {
-            tx_symb[r][c].real = pilots_coh[p_r][c]/sqrtf(ND);
+        for(c=0; c<COHPSK_NC*ND; c++) {
+            tx_symb[r][c].real = pilots_coh[p_r][c % COHPSK_NC]/sqrtf(ND);
             tx_symb[r][c].imag = 0.0;
         }
         r++;
     }
     for(data_r=0; data_r<NSYMROW; data_r++, r++) {
-
-        for(c=0; c<COHPSK_NC; c++) {
+        for(c=0; c<COHPSK_NC*diversity; c++) {
             i = c*NSYMROW + data_r;
             bits = (tx_bits[2*i]&0x1)<<1 | (tx_bits[2*i+1]&0x1);
             tx_symb[r][c] = fcmult(1.0/sqrtf(ND),qpsk_mod[bits]);
@@ -262,16 +271,15 @@ void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*ND], int tx_bits[], int nbits
     assert(p_r == NPILOTSFRAME);
     assert(r == NSYMROWPILOT);
 
-    /* copy to other carriers (diversity) */
+    /* if in diversity mode, copy symbols to upper carriers */
 
-    for(d=1; d<ND; d++) {
+    for(d=1; d<1+ND-diversity; d++) {
         for(r=0; r<NSYMROWPILOT; r++) {
             for(c=0; c<COHPSK_NC; c++) {
                 tx_symb[r][c+COHPSK_NC*d] = tx_symb[r][c];
             }
         }
     }
-
 }
 
 
@@ -654,8 +662,12 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
   AUTHOR......: David Rowe
   DATE CREATED: 5/4/2015
 
-  COHPSK modulator, take a frame of COHPSK_BITS_PER_FRAME bits and
-  generates a frame of COHPSK_NOM_SAMPLES_PER_FRAME modulated symbols.
+  COHPSK modulator, take a frame of COHPSK_BITS_PER_FRAME or
+  2*COHPSK_BITS_PER_FRAME bits and generates a frame of
+  COHPSK_NOM_SAMPLES_PER_FRAME modulated symbols.
+
+  if nbits == COHPSK_BITS_PER_FRAME, diveristy mode is used, if nbits
+  == 2*COHPSK_BITS_PER_FRAME diversity mode is not used.
 
   The output signal is complex to support single sided frequency
   shifting, for example when testing frequency offsets in channel
@@ -663,14 +675,14 @@ int sync_state_machine(struct COHPSK *coh, int sync, int next_sync)
 
 \*---------------------------------------------------------------------------*/
 
-void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[])
+void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[], int nbits)
 {
     struct FDMDV *fdmdv = coh->fdmdv;
     COMP  tx_symb[NSYMROWPILOT][COHPSK_NC*ND];
     COMP  tx_onesym[COHPSK_NC*ND];
     int  r,c;
 
-    bits_to_qpsk_symbols(tx_symb, tx_bits, COHPSK_BITS_PER_FRAME);
+    bits_to_qpsk_symbols(tx_symb, tx_bits, nbits);
 
     for(r=0; r<NSYMROWPILOT; r++) {
         for(c=0; c<COHPSK_NC*ND; c++)

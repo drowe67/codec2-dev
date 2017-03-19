@@ -54,6 +54,16 @@
 #include "H2064_516_sparse.h"  
 #endif
 
+int opt_exists(char *argv[], int argc, char opt[]) {
+    int i;
+    for (i=0; i<argc; i++) {
+        if (strcmp(argv[i], opt) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits);
 
 int main(int argc, char *argv[])
@@ -69,13 +79,18 @@ int main(int argc, char *argv[])
     NumberParityBits = NUMBERPARITYBITS;
 	
     if (argc < 2) {
-        fprintf(stderr, "usage: %s --test\n", argv[0]);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "usage: %s --test\n\n", argv[0]);
         fprintf(stderr, "  Run internal self test and print code parameters.\n\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd]\n", argv[0]);
-        fprintf(stderr, "  InOneSymbolPerDouble is a file of double LLRs.  If the\n");
-        fprintf(stderr, "  --sd flag is used the input file can be Soft Decision\n");
-        fprintf(stderr, "  symbols, and LLRs will be calculated internally. Use -\n");
-        fprintf(stderr, "  for the file names to use stdin/stdout.\n");
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half]\n\n", argv[0]);
+        fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
+        fprintf(stderr, "                           file names to use stdin/stdout\n");
+        fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
+        fprintf(stderr, "                           demod outputs rather than LLRs\n");
+        fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
+        fprintf(stderr, "                           attempt, only output decoded bits if decoder\n");
+        fprintf(stderr, "                           converges.  Form of frame sync.\n");
+        fprintf(stderr, "\n");
         exit(0);
     }
 
@@ -126,7 +141,7 @@ int main(int argc, char *argv[])
     }
     else {
         FILE *fin, *fout;
-        int   sdinput;
+        int   sdinput, readhalfframe, nread, offset, iter;
 
         /* File I/O mode ------------------------------------------------*/
 
@@ -145,23 +160,43 @@ int main(int argc, char *argv[])
         }
 
         sdinput = 0;
-        //printf("argc: %d\n", argc);
-        if (argc == 4)
-            if (strcmp(argv[3], "--sd") == 0)
-                sdinput = 1;
+        readhalfframe = 0;
+        if (opt_exists(argv, argc, "--sd")) {
+            sdinput = 1;
+        }
+        if (opt_exists(argv, argc, "--half")) {
+            readhalfframe = 1;
+        }
 
         double *input_double = calloc(CodeLength, sizeof(double));
 
-        while(fread(input_double, sizeof(double), CodeLength, fin) == CodeLength) {
+        nread = CodeLength;
+        offset = 0;
+        if (readhalfframe) {
+            nread = CodeLength/2;
+            offset = CodeLength/2;
+            for(i=0; i<offset; i++) {
+                input_double[i] = 0.0;
+            }
+        }
+
+        while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
             if (sdinput) {
                 sd_to_llr(input_double, input_double, CodeLength);
             }
 
-            run_ldpc_decoder(&ldpc, out_char, input_double);
+            iter = run_ldpc_decoder(&ldpc, out_char, input_double);
+            fprintf(stderr, "%4d ", iter);
 
-            //printf("%4d ", iter);
-            // just output data bits
-            fwrite(out_char, sizeof(char), NUMBERROWSHCOLS, fout);
+            // output data bits if decoder converged
+
+            if (iter != MAX_ITER) {
+              fwrite(out_char, sizeof(char), NUMBERROWSHCOLS, fout);
+            }
+
+            for(i=0; i<offset; i++) {
+                input_double[i] = input_double[i+offset];
+            }
         }
 
         free(input_double);
