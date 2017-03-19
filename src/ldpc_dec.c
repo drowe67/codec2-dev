@@ -48,17 +48,16 @@
 /* Machine generated consts, H_rows, H_cols, test input/output data to
    change LDPC code regenerate this file. */
 
-#ifdef HRA_112_112
-#include "HRA_112_112.h"  
-#else
+/* TODO: Better octave/C support for multuple codes */
+
 #include "H2064_516_sparse.h"  
-#endif
+#include "HRA_112_112.h"  
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {
         if (strcmp(argv[i], opt) == 0) {
-            return 1;
+            return i;
         }
     }
     return 0;
@@ -69,22 +68,24 @@ void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs;
-    char        out_char[CODELENGTH];
+    int         i, r, num_ok, num_runs, codename;
+    char        out_char[CODELENGTH], *adetected_data;
     struct LDPC ldpc;
-
-    /* derive some parameters */
-
-    CodeLength = CODELENGTH;                    /* length of entire codeword */
-    NumberParityBits = NUMBERPARITYBITS;
+    double     *ainput;
 	
     if (argc < 2) {
         fprintf(stderr, "\n");
-        fprintf(stderr, "usage: %s --test\n\n", argv[0]);
-        fprintf(stderr, "  Run internal self test and print code parameters.\n\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half]\n\n", argv[0]);
+        fprintf(stderr, "usage: %s --test [--code CodeName]\n\n", argv[0]);
+        fprintf(stderr, "  Run internal self test and print code parameters.\n");
+        fprintf(stderr, "\n");
+        fprintf(stderr, "usage: %s --listcodes\n\n", argv[0]);
+        fprintf(stderr, "  List supported codes (more can be added via using Octave ldpc scripts)\n");
+        fprintf(stderr, "\n");
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName]\n\n", argv[0]);
         fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
+        fprintf(stderr, "   --code                  Treat input file samples as Soft Decision\n");
+        fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
@@ -94,7 +95,16 @@ int main(int argc, char *argv[])
         exit(0);
     }
 
-    /* set up LDPC code from include file constants */
+
+    if ((codename = opt_exists(argv, argc, "--listcodes")) != 0) {
+        fprintf(stderr,"\n");
+        fprintf(stderr,"H2064_516_sparse\n");
+        fprintf(stderr,"HRA_112_112\n");
+        fprintf(stderr,"\n");
+        exit(0);
+    }
+
+    /* default Wenet High Alitiude Balloon rate 0.8 code */
 
     ldpc.max_iter = MAX_ITER;
     ldpc.dec_type = 0;
@@ -107,6 +117,33 @@ int main(int argc, char *argv[])
     ldpc.max_col_weight = MAX_COL_WEIGHT;
     ldpc.H_rows = H_rows;
     ldpc.H_cols = H_cols;
+    ainput = input;
+    adetected_data = detected_data;
+
+    if ((codename = opt_exists(argv, argc, "--code")) != 0) {
+
+        /* short rate 1/2 code for FreeDV HF digital voice */
+        
+        if (strcmp(argv[codename+1], "HRA_112_112") == 0) {
+            fprintf(stderr, "code: %s\n", argv[codename+1]);
+            ldpc.max_iter = HRA_112_112_MAX_ITER;
+            ldpc.dec_type = 0;
+            ldpc.q_scale_factor = 1;
+            ldpc.r_scale_factor = 1;
+            ldpc.CodeLength = HRA_112_112_CODELENGTH;
+            ldpc.NumberParityBits = HRA_112_112_NUMBERPARITYBITS;
+            ldpc.NumberRowsHcols = HRA_112_112_NUMBERROWSHCOLS;
+            ldpc.max_row_weight = HRA_112_112_MAX_ROW_WEIGHT;
+            ldpc.max_col_weight = HRA_112_112_MAX_COL_WEIGHT;
+            ldpc.H_rows = HRA_112_112_H_rows;
+            ldpc.H_cols = HRA_112_112_H_cols;
+            ainput = HRA_112_112_input;
+            adetected_data = HRA_112_112_detected_data;
+        }
+    }
+
+    CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
+    NumberParityBits = ldpc.NumberParityBits;
 
     if (!strcmp(argv[1],"--test")) {
 
@@ -120,11 +157,11 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(&ldpc, out_char, input);
+            run_ldpc_decoder(&ldpc, out_char, ainput);
 
             int ok = 0;
             for (i=0; i<CodeLength; i++) {
-                if (out_char[i] == detected_data[i])                    
+                if (out_char[i] == adetected_data[i])                    
                     ok++;
             }
 
@@ -191,7 +228,7 @@ int main(int argc, char *argv[])
             // output data bits if decoder converged
 
             if (iter != MAX_ITER) {
-              fwrite(out_char, sizeof(char), NUMBERROWSHCOLS, fout);
+              fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
             }
 
             for(i=0; i<offset; i++) {
