@@ -48,7 +48,11 @@
 /* Machine generated consts, H_rows, H_cols, test input/output data to
    change LDPC code regenerate this file. */
 
+#ifdef HRA_112_112
+#include "HRA_112_112.h"  
+#else
 #include "H2064_516_sparse.h"  
+#endif
 
 void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits);
 
@@ -141,7 +145,7 @@ int main(int argc, char *argv[])
         }
 
         sdinput = 0;
-        printf("argc: %d\n", argc);
+        //printf("argc: %d\n", argc);
         if (argc == 4)
             if (strcmp(argv[3], "--sd") == 0)
                 sdinput = 1;
@@ -156,7 +160,8 @@ int main(int argc, char *argv[])
             run_ldpc_decoder(&ldpc, out_char, input_double);
 
             //printf("%4d ", iter);
-            fwrite(out_char, sizeof(char), CodeLength, fout);
+            // just output data bits
+            fwrite(out_char, sizeof(char), NUMBERROWSHCOLS, fout);
         }
 
         free(input_double);
