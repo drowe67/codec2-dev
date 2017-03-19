@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
     struct COHPSK *cohpsk;
     float         rx_bits[COHPSK_BITS_PER_FRAME];
     char          rx_bits_char[COHPSK_BITS_PER_FRAME];
+    double        rx_bits_double[COHPSK_BITS_PER_FRAME];
     COMP          rx_fdm[COHPSK_MAX_SAMPLES_PER_FRAME];
     short         rx_fdm_scaled[COHPSK_MAX_SAMPLES_PER_FRAME];
     int           frames, sync, nin_frame;
@@ -65,14 +66,16 @@ int main(int argc, char *argv[])
     float        *rx_phi_log = NULL;
     COMP         *rx_symb_log = NULL;
     float         f_est_log[LOG_FRAMES], ratio_log[LOG_FRAMES];
-    int           i, r, c, log_data_r, oct, logframes, arg, diversity;
+    int           i, r, c, log_data_r, oct, logframes, arg, diversity, sd;
 
     if (argc < 3) {
         fprintf(stderr, "\n");
-	printf("usage: %s InputModemRawFile OutputOneCharPerBitFile [-o OctaveLogFile] [--nd]\n", argv[0]);
+	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--nd]\n", argv[0]);
         fprintf(stderr, "\n");
+        fprintf(stderr, "              Default output file format is one byte per bit\n");
         fprintf(stderr, "  -o          Octave log file for testing\n");
         fprintf(stderr, "  --nd        non-diversity mode, output frames of %d bits\n", ND*COHPSK_BITS_PER_FRAME);
+        fprintf(stderr, "  --sd        soft decision output, one double per symbol\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -107,7 +110,10 @@ int main(int argc, char *argv[])
     } else {
         diversity = 1;
     }
-    fprintf(stderr, "cohpsk_demod: diversity: %d\n", diversity);
+    sd = 0;
+    if (opt_exists(argv, argc, "--sd")) {
+        sd = 1;
+    }
 
     cohpsk = cohpsk_create();
     cohpsk_set_verbose(cohpsk, 0);
@@ -143,17 +149,34 @@ int main(int argc, char *argv[])
 
  	if (sync) {
             if (diversity == 1) {
-                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                    rx_bits_char[i] = rx_bits[i] < 0.0;
-                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                if (sd == 0) {
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_char[i] = rx_bits[i] < 0.0;
+                    fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                }
+                else {
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_double[i] = rx_bits[i];
+                    fwrite(rx_bits_double, sizeof(double), COHPSK_BITS_PER_FRAME, fout);
+                }
             }
             else {
-                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                    rx_bits_char[i] = cohpsk->rx_bits_lower[i] < 0.0;
-                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
-                for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
-                    rx_bits_char[i] = cohpsk->rx_bits_upper[i] < 0.0;
-                fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                if (sd == 0) {
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_char[i] = cohpsk->rx_bits_lower[i] < 0.0;
+                    fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_char[i] = cohpsk->rx_bits_upper[i] < 0.0;
+                    fwrite(rx_bits_char, sizeof(char), COHPSK_BITS_PER_FRAME, fout);
+                }
+                else {
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_double[i] = cohpsk->rx_bits_lower[i];
+                    fwrite(rx_bits_double, sizeof(double), COHPSK_BITS_PER_FRAME, fout);
+                    for(i=0; i<COHPSK_BITS_PER_FRAME; i++)
+                        rx_bits_double[i] = cohpsk->rx_bits_upper[i];
+                    fwrite(rx_bits_double, sizeof(double), COHPSK_BITS_PER_FRAME, fout);
+                }
             }
 
             if (oct) {
