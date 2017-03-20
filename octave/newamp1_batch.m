@@ -31,8 +31,8 @@
   DSP.  We switch on lpc 10 just to dump voicing.
 
     $ ./c2sim ../../raw/vk5qi.raw --phase0 --postfilter --dump vk5qi --lpc 10 --dump_pitch_e vk5qi_pitche.txt
-    octave:14> newamp1_batch("../build_linux/src/vk5qi", "../build_linux/src/vk5qi_am_Wo.out");
-    $ ./c2sim ../../raw/vk5qi.raw --phase0 --postfilter --amread vk5qi_am_Wo.out --awread vk5qi_aw.out --Woread vk5qi_Wo.out --hand_voicing vk5qi_v.txt -o - | play -q -t raw -r 8000 -s -2 -
+    octave:14> newamp1_batch("../build_linux/src/vk5qi", "../build_linux/src/vk5qi.out");
+    $ ./c2sim ../../raw/vk5qi.raw --phase0 --postfilter --amread vk5qi_am.out --hmread vk5qi_hm.out --Woread vk5qi_Wo.out --hand_voicing vk5qi_v.txt -o - | play -q -t raw -r 8000 -s -2 -
 
 #}
 
