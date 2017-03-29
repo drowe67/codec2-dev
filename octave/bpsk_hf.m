@@ -1,7 +1,14 @@
 % bpsk_hf.m
 % David Rowe Mar 2017
 %
-% Rate Rs BPSK simulation to explore phase over multiple carriers in HF channel
+% Rate Rs BPSK simulation to explore phase estimation
+% over multiple carriers in HF channel
+
+#{
+ TODO:
+   [ ] sim pilot based phase est using known symbols
+   [ ] test AWGN BER with averaging pilots from adj carriers
+#}
 
 1;
 
@@ -12,8 +19,10 @@ function sim_out = run_sim(sim_in)
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
   hf_en = sim_in.hf_en;
+  Ns = sim_in.Ns;          % step size for pilots
   Nc = sim_in.Nc;          % Number of cols, aka number of carriers
   Nr = Nbits/Nc;           % Number of rows to get Nbits total
+  phase_offset = sim_in.phase_offset;
 
   assert(Nbits/Nc == floor(Nbits/Nc), "Nbits/Nc must be an integer");
   
@@ -44,7 +53,7 @@ function sim_out = run_sim(sim_in)
     tx_bits = rand(Nr,Nc) > 0.5;
     tx = 1 - 2*tx_bits;
 
-    rx = tx;
+    rx = tx * exp(j*phase_offset);
 
     if hf_en
 
@@ -54,7 +63,7 @@ function sim_out = run_sim(sim_in)
       
       % Note Rs carrier spacing, sample rate is Rs
 
-      hf_model = zeros(Nr,Nc); phase_est = zeros(1,Nr);
+      hf_model = zeros(Nr,Nc); phase_est = zeros(Nr,Nc);
       for i=1:Nr
         for c=1:Nc
           w = 2*pi*c*Rs/Rs; 
@@ -78,36 +87,85 @@ function sim_out = run_sim(sim_in)
             end
             phase_est(i,c) = angle(phase_sum); 
           end
-          for c=1:Nc
-            rx(i,c) = rx(i,c) .* hf_model(i,c) * exp(-j*phase_est(i,c));
-          end
+          rx(i,:) = rx(i,:) .* hf_model(i,:) .* exp(-j*phase_est(i,:));
 
         else
 
           % just apply amplitude fading, assume we have ideal phase est
 
-          for c=1:Nc
-            rx(i,c) = rx(i,c) .* abs(hf_model(i,c));
-          end
+          rx(i,:) = rx(i,:) .* abs(hf_model(i,:));
         end
       end
     end
 
     rx += noise;
-    rx_bits = real(rx) < 0;
-    errors = xor(tx_bits, rx_bits);
-    Nerrs = sum(errors);
-    printf("EbNodB: %3.2f BER: %4.3f Nbits: %d Nerrs: %d\n", EbNodB(nn), sum(Nerrs)/Nbits, Nbits, sum(Nerrs));
+
+    Nbits_np = Nbits;
+    rx_np = rx;
+    tx_bits_np = tx_bits;
+
+    % pilot based phase est, we use known tx symbols as pilots ----------
+
+    if sim_in.pilot_phase_est
+
+      % est phase from pilots either side of data symbols
+      % adjust phase of data symbol
+      % demodulate and count errors of just data
+ 
+      phase_est_log = zeros(Nr,Nc);
+      for c=1:Nc
+        for r=1:Ns:Nr-Ns
+
+          % estimate phase using average of two pilots at either end of frame
+
+          %aphase_est_rect = rx(r,c)*tx(r,c)' +  rx(r+Ns,c)*tx(r+Ns,c)';
+          aphase_est_rect = sum(rx(r,:)*tx(r,:)') +  sum(rx(r+Ns,:)*tx(r+Ns,:)');
+          aphase_est = angle(aphase_est_rect);
+
+          % apply this phase estimate to symbols in frame, and check for error
+
+          for rr=r+1:r+Ns-1
+            rx(rr,c) *= exp(-j*aphase_est);
+            phase_est_log(rr,c) = aphase_est;
+          end
+        end
+      end
+
+      % build up tx_bits and rx symbols matrices without pilots
+      
+      tx_bits_np = []; rx_np = []; Nbits_np = 0;
+      for r=1:Nr
+        if mod(r-1,Ns) != 0
+          tx_bits_np = [tx_bits_np; tx_bits(r,:)];
+          rx_np = [rx_np; rx(r,:)];
+          Nbits_np += Nc;
+        end
+      end
+    end
+
+    % calculate BER stats as a block, after pilots extracted
+
+    rx_bits_np = real(rx_np) < 0;
+    errors = xor(tx_bits_np, rx_bits_np);
+    Nerrs = sum(sum(errors));
+
+    printf("EbNodB: %3.2f BER: %4.3f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits_np, Nbits_np, Nerrs);
 
     if verbose
       figure(1); clf; 
-      plot(rx,'+');
+      plot(rx_np,'+');
       axis([-2 2 -2 2]);
-      figure(2); clf; 
-      plot(abs(hf_model));
-      figure(3); clf; 
-      plot(angle(hf_model));
-      hold on; plot(phase_est,'+'); hold off;
+      if sim_in.pilot_phase_est
+        figure(2); clf;
+        plot(phase_est_log,'+');
+      end
+      if hf_en
+        figure(2); clf; 
+        plot(abs(hf_model));
+        figure(3); clf; 
+        plot(angle(hf_model));
+        hold on; plot(phase_est,'+'); hold off;
+      end
     end
 
     sim_out.ber(nn) = sum(Nerrs)/Nbits;
@@ -117,7 +175,7 @@ endfunction
 
 function run_curves
   sim_in.verbose = 0;
-  sim_in.Nbits = 12000;
+  sim_in.Nbits = 90000;
   sim_in.EbNodB = 2:8;
   sim_in.hf_en = 1;
   sim_in.Nc = 3;
@@ -137,17 +195,20 @@ function run_curves
   ylabel('BER');
   grid;
   legend('boxoff');
-
 end
 
 
 function run_single
-  sim_in.Nbits = 3000;
-  sim_in.EbNodB = 6;
-  sim_in.verbose = 0;
-  sim_in.hf_en = 1;
+  data_rows = 1000;
   sim_in.Nc = 3;
-  sim_in.av_phase = 1;
+  sim_in.Ns = 6;
+  sim_in.Nbits = (data_rows*sim_in.Ns+1)*sim_in.Nc;
+  sim_in.EbNodB = 2;
+  sim_in.verbose = 1;
+  sim_in.pilot_phase_est = 1;
+  sim_in.phase_offset = -pi;
+  sim_in.hf_en = 0;
+  sim_in.av_phase = 0;
 
   run_sim(sim_in);
 end
