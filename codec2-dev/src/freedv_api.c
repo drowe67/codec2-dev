@@ -614,6 +614,7 @@ static void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
     for(i=0; i<f->n_nom_modem_samples; i++)
         mod_out[i] = fcmult(FDMDV_SCALE, tx_fdm[i]);
 }
+
 #ifndef CORTEX_M4
 static void freedv_comptx_fdmdv_700(struct freedv *f, COMP mod_out[]) {
     int    bit, byte, i, j, k;
@@ -1563,10 +1564,12 @@ void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_erro
     f->error_pattern_callback_state = state;
 }
 
+#ifndef CORTEX_M4
 void freedv_set_carrier_ampl(struct freedv *freedv, int c, float ampl) {
     assert(freedv->mode == FREEDV_MODE_700C);
     cohpsk_set_carrier_ampl(freedv->cohpsk, c, ampl);
 }
+#endif
 
 /*---------------------------------------------------------------------------*\
 
