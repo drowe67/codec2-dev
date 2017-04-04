@@ -11,10 +11,12 @@
    [X] refactor to insert pilot rows
    [X] add border cols, not used for data
    [X] centre est on current carrier, extend to > 3
-   [ ] test single points
-   [ ] first pass curves taking into account pilot losses
-   [ ] consider interpolation
-   [ ] consider combining mod stripping phase est techniques inside frame
+   [X] test single points
+       + 1dB IL @ 6dB HF, 0.4 dB @ 2dB AWGN
+   [ ] try linear interpolation
+   [ ] try longer time windows
+   [ ] try combining mod stripping phase est inside frame
+   [ ] curves taking into account pilot losses
    [ ] remove border carriers, interpolate edge carrier
 #}
 
@@ -157,12 +159,16 @@ function sim_out = run_sim(sim_in)
 
     % pilot based phase est, we use known tx symbols as pilots ----------
 
+    rx_corr = rx;
+
     if sim_in.pilot_phase_est
 
       % est phase from pilots either side of data symbols
       % adjust phase of data symbol
       % demodulate and count errors of just data
  
+      phase_est_pilot_log = 10*ones(Nrp,Nc+2);
+      phase_est_stripped_log = 10*ones(Nrp,Nc+2);
       phase_est_log = 10*ones(Nrp,Nc+2);
       for c=2:Nc+1
         for r=1:Ns:Nrp-Ns
@@ -175,30 +181,73 @@ function sim_out = run_sim(sim_in)
           % PPP
           
           cr = c-1:c+1;
-          aphase_est_rect = sum(rx(r,cr)*tx(r,cr)') +  sum(rx(r+Ns,cr)*tx(r+Ns,cr)');
-          aphase_est = angle(aphase_est_rect);
+          aphase_est_pilot_rect = sum(rx(r,cr)*tx(r,cr)') +  sum(rx(r+Ns,cr)*tx(r+Ns,cr)');
 
-          % apply this phase estimate to symbols in frame, and check for error
+          % optionally use next step of pilots in past and future
+
+          if sim_in.pilot_wide
+            if r > Ns+1
+              aphase_est_pilot_rect += sum(rx(r-Ns,cr)*tx(r-Ns,cr)');
+            end
+            if r < Nrp - 2*Ns
+              aphase_est_pilot_rect += sum(rx(r+2*Ns,cr)*tx(r+2*Ns,cr)');
+            end
+          end
+
+          aphase_est_pilot = angle(aphase_est_pilot_rect);
+
+          % correct phase offset using phase estimate
 
           for rr=r+1:r+Ns-1
-            rx(rr,c) *= exp(-j*aphase_est);
-            phase_est_log(rr,c) = aphase_est;
+            phase_est_pilot_log(rr,c) = aphase_est_pilot;
+            rx_corr(rr,c) = rx(rr,c) * exp(-j*aphase_est_pilot);
           end
-        end
-      end
-    end
 
-    % strip pilots to give us just data symbols
+          if sim_in.stripped_phase_est
+            % Optional modulation stripping feed fwd phase estimation, to refine
+            % pilot-based phase estimate.  Doing it after pilot based phase estimation
+            % means we don't need to deal with ambiguity, which is difficult to handle
+            % in low SNR channels.
+
+            % Use vector of 7 symbols around current data symbol.  We could use a 2D
+            % window if we can work out how best to correct with pilot-est and avoid
+            % ambiguities
+
+            for rr=r+1:r+Ns-1
+
+              % extract a matrix of nearby samples with pilot-based offset removed
+ 
+              amatrix = rx(max(1,rr-3):min(Nrp,rr+3),c) .* exp(-j*aphase_est_pilot);
+
+              % modulation strip and est phase
+
+              stripped = abs(amatrix) .* exp(j*2*angle(amatrix));
+              aphase_est_stripped = angle(sum(sum(stripped)))/2;
+              phase_est_stripped_log(rr,c) = aphase_est_stripped;
+
+              % correct rx symbols based on both phase ests
+
+              phase_est_log(rr,c) = angle(exp(j*(aphase_est_pilot+aphase_est_stripped)));
+              rx_corr(rr,c) = rx(rr,c) * exp(-j*phase_est_log(rr,c));
+            end       
+          end % sim_in.stripped_phase_est
+
+        end % r=1:Ns:Nrp-Ns
+
+      end % c=2:Nc+1
+    end % sim_in.pilot_phase_est
+
+    % remove pilots to give us just data symbols
       
     rx_np = [];
     for r=1:Nrp
       if mod(r-1,Ns) != 0
-        rx_np = [rx_np; rx(r,2:Nc+1)];
+        rx_np = [rx_np; rx_corr(r,2:Nc+1)];
       end
     end
 
-   %phase_test
-   %phase_est_log
+    %phase_test
+    %phase_est_log
 
     % calculate BER stats as a block, after pilots extracted
 
@@ -212,31 +261,27 @@ function sim_out = run_sim(sim_in)
       figure(1); clf; 
       plot(rx_np,'+');
       axis([-2 2 -2 2]);
+
       if hf_en
         figure(2); clf; 
         plot(abs(hf_model(:,2:Nc+1)));
-        if sim_in.hf_phase
-          figure(3); clf; 
-          plot(angle(hf_model(:,2:Nc+1)));
-          if sim_in.pilot_phase_est
-            hold on; plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); hold off;
-          end
-          axis([1 Nrp -pi pi]);
-        end
-      else
-        if sim_in.pilot_phase_est
-          figure(3); clf;
-          plot(phase_est_log,'+');
-        end
       end
 
-      if sim_in.phase_test
-          figure(3); clf;
+      if sim_in.pilot_phase_est
+        figure(3); clf;
+        plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); 
+        hold on; 
+        plot(phase_est_pilot_log(:,2:Nc+1),'g+', 'markersize', 5); 
+        if sim_in.stripped_phase_est
+          plot(phase_est_stripped_log(:,2:Nc+1),'ro', 'markersize', 5); 
+        end
+        if sim_in.hf_phase
+          plot(angle(hf_model(:,2:Nc+1)));
+        end
+        if sim_in.phase_test
           plot(phase_test(:,2:Nc+1));
-          if sim_in.pilot_phase_est
-            hold on; plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); hold off;
-          end
-          axis([1 Nrp -pi pi]);
+        end
+        axis([1 Nrp -pi pi]);
       end
     end
 
@@ -271,16 +316,18 @@ end
 
 
 function run_single
-  sim_in.Nc = 3;
+  sim_in.Nc = 7;
   sim_in.Ns = 8;
-  sim_in.Nbits = 5000*sim_in.Nc*(sim_in.Ns-1);
+  sim_in.Nbits = 1000*sim_in.Nc*(sim_in.Ns-1);
   sim_in.EbNodB = 6;
   sim_in.verbose = 1;
-  sim_in.pilot_phase_est = 1;
+  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_wide = 1;
+  sim_in.stripped_phase_est = 0;
   sim_in.phase_offset = 0;
   sim_in.phase_test = 0;
   sim_in.hf_en = 1;
-  sim_in.hf_phase = 1;
+  sim_in.hf_phase = 0;
 
   run_sim(sim_in);
 end
