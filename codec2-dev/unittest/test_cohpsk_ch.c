@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
 	\*---------------------------------------------------------*/
 
         cohpsk_get_test_bits(coh, tx_bits);
-	cohpsk_mod(coh, tx_fdm, tx_bits);
+	cohpsk_mod(coh, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME);
         cohpsk_clip(tx_fdm);
 
         for(r=0; r<COHPSK_NOM_SAMPLES_PER_FRAME; r++) {
