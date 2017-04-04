@@ -297,18 +297,19 @@ function sim_out = run_sim(sim_in)
       end
     end
 
-    sim_out.ber(nn) = sum(Nerrs)/Nbits;
+    sim_out.ber(nn) = sum(Nerrs)/Nbits; 
+    sim_out.pilot_overhead = 10*log10(Ns/(Ns-1));
   end
 endfunction
 
 
-function run_curves
+function run_curves_hf
   sim_in.Nc = 7;
   sim_in.Ns = 5;
-  sim_in.Nbits = 2000*sim_in.Nc*(sim_in.Ns-1);
-  sim_in.EbNodB = 2:8;
-  sim_in.verbose = 1;
-  sim_in.pilot_phase_est = 1;
+  sim_in.Nsec = 240;
+  sim_in.EbNodB = 5:0.5:8;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 0;
   sim_in.pilot_wide = 1;
   sim_in.pilot_interp = 0;
   sim_in.stripped_phase_est = 0;
@@ -317,21 +318,139 @@ function run_curves
   sim_in.hf_en = 1;
   sim_in.hf_phase = 0;
 
-  no_phase = run_sim(sim_in);
+  sim_in.Ns = 5;
+  hf_ref_Ns_5_no_phase = run_sim(sim_in);
+  sim_in.Ns = 9;
+  hf_ref_Ns_9_no_phase = run_sim(sim_in);
+
   sim_in.hf_phase = 1;
+  sim_in.pilot_phase_est = 1;
 
-  sim_in.av_phase = 1;
-  bpsk_hf_av_phase = run_sim(sim_in);
+  sim_in.Ns = 5;
+  hf_Ns_5 = run_sim(sim_in);
 
-  figure(3); clf;
-  semilogy(sim_in.EbNodB, bpsk_hf.ber,'b+-;BPSK HF;');
+  sim_in.Ns = 9;
+  hf_Ns_9 = run_sim(sim_in);
+
+  sim_in.Ns = 17;
+  hf_Ns_17 = run_sim(sim_in);
+
+  figure(4); clf;
+  semilogy(sim_in.EbNodB, hf_ref_Ns_5_no_phase.ber,'b+-;Ns=5 HF ref no phase;');
   hold on;
-  semilogy(sim_in.EbNodB, bpsk_hf_av_phase.ber,'g+-;BPSK HF average phase;');
+  semilogy(sim_in.EbNodB, hf_ref_Ns_9_no_phase.ber,'c+-;Ns=9 HF ref no phase;');
+  semilogy(sim_in.EbNodB, hf_Ns_5.ber,'g+--;Ns=5;');
+  semilogy(sim_in.EbNodB + hf_Ns_5.pilot_overhead, hf_Ns_5.ber,'go-;Ns=5 with pilot overhead;');
+  semilogy(sim_in.EbNodB, hf_Ns_9.ber,'r+--;Ns=9;');
+  semilogy(sim_in.EbNodB + hf_Ns_9.pilot_overhead, hf_Ns_9.ber,'ro-;Ns=9 with pilot overhead;');
+  semilogy(sim_in.EbNodB, hf_Ns_17.ber,'k+--;Ns=17;');
+  semilogy(sim_in.EbNodB + hf_Ns_17.pilot_overhead, hf_Ns_17.ber,'ko-;Ns=17 with pilot overhead;');
   hold off;
+  axis([5 8 4E-2 1E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
-  grid;
+  grid; grid minor on;
   legend('boxoff');
+  title('HF Multipath 1Hz Doppler 1ms delay');
+
+end
+
+
+% Some alternative, experimental methods tested during development
+
+function run_curves_hf_alt
+  sim_in.Nc = 7;
+  sim_in.Ns = 5;
+  sim_in.Nsec = 60;
+  sim_in.EbNodB = 5:0.5:8;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 0;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
+  sim_in.hf_en = 1;
+  sim_in.hf_phase = 0;
+
+  sim_in.Ns = 9;
+  hf_ref_Ns_9_no_phase = run_sim(sim_in);
+
+  sim_in.hf_phase = 1;
+  sim_in.pilot_phase_est = 1;
+  hf_Ns_9 = run_sim(sim_in);
+
+  sim_in.stripped_phase_est = 1;
+  hf_Ns_9_stripped = run_sim(sim_in);
+
+  sim_in.stripped_phase_est = 0;
+  sim_in.pilot_wide = 0;
+  hf_Ns_9_narrow = run_sim(sim_in);
+
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 1;
+  hf_Ns_9_interp = run_sim(sim_in);
+
+  figure(6); clf;
+  semilogy(sim_in.EbNodB, hf_ref_Ns_9_no_phase.ber,'c+-;Ns=9 HF ref no phase;');
+  hold on;
+  semilogy(sim_in.EbNodB, hf_Ns_9.ber,'r+--;Ns=9;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_stripped.ber,'g+--;Ns=9 stripped refinement;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_narrow.ber,'b+--;Ns=9 narrow;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_interp.ber,'k+--;Ns=9 interp;');
+  hold off;
+  axis([5 8 4E-2 1E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('HF Multipath 1Hz Doppler 1ms delay');
+
+end
+
+
+function run_curves_awgn
+  sim_in.Nc = 7;
+  sim_in.Ns = 5;
+  sim_in.Nsec = 240;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 0;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
+  sim_in.hf_en = 0;
+  sim_in.hf_phase = 0;
+
+  sim_in.EbNodB = 0:8;
+
+  ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNodB/10)));
+  sim_in.hf_en = 0;
+  sim_in.Ns = 5;
+  awgn_Ns_5 = run_sim(sim_in);
+  sim_in.Ns = 9;
+  awgn_Ns_9 = run_sim(sim_in);
+  sim_in.Ns = 17;
+  awgn_Ns_17 = run_sim(sim_in);
+
+  figure(5); clf;
+  semilogy(sim_in.EbNodB, ber_awgn_theory,'b+-;AWGN Theory;');
+  hold on;
+  semilogy(sim_in.EbNodB, awgn_Ns_5.ber,'g+-;Ns=5;');
+  semilogy(sim_in.EbNodB + awgn_Ns_5.pilot_overhead, awgn_Ns_5.ber,'go-;Ns=5 with pilot overhead;');
+  semilogy(sim_in.EbNodB, awgn_Ns_9.ber,'r+--;Ns=9;');
+  semilogy(sim_in.EbNodB + awgn_Ns_9.pilot_overhead, awgn_Ns_9.ber,'ro-;Ns=9 with pilot overhead;');
+  semilogy(sim_in.EbNodB, awgn_Ns_17.ber,'k+--;Ns=17;');
+  semilogy(sim_in.EbNodB + awgn_Ns_17.pilot_overhead, awgn_Ns_17.ber,'ko-;Ns=17 with pilot overhead;');
+  hold off;
+  axis([0 8 1E-3 2E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('AWGN');
+
 end
 
 
@@ -357,8 +476,9 @@ end
 format;
 more off;
 
-run_single
-%run_curves
+%run_single
+run_curves_hf_alt
+
 
 
 
