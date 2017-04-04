@@ -25,47 +25,53 @@
 function sim_out = run_sim(sim_in)
   Rs = 100;
 
-  Nbits = sim_in.Nbits;
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
   hf_en = sim_in.hf_en;
   hf_phase = sim_in.hf_phase;
-  Ns = sim_in.Ns;          % step size for pilots
-  Nc = sim_in.Nc;          % Number of cols, aka number of carriers
-  Nr = Nbits/Nc;           % Number of rows to get Nbits total
   phase_offset = sim_in.phase_offset;
 
-  if verbose
-    printf("Nbits: %d\n", Nbits);
-    printf("Nc: %d\n", Nc);
-    printf("Nr: %d\n", Nr);
-    printf("Ns: %d (step size for pilots, Ns-1 data symbols between pilots)\n", Ns);
-  end
+  Ns = sim_in.Ns;          % step size for pilots
+  Nc = sim_in.Nc;          % Number of cols, aka number of carriers
 
-  % check if Nbits fit neatly into carriers
-
-  assert(Nbits/Nc == floor(Nbits/Nc), "Nbits/Nc must be an integer");
-
-  % check if bits fit neatly into frames with rows of pilots above and below
-  % PPP
-  % DDD
-  % DDD
-  % PPP
-  
   Nbitsperframe = (Ns-1)*Nc;
   printf("Nbitsperframe: %d\n", Nbitsperframe);
-  Nframes = Nbits/Nbitsperframe;
   Nrowsperframe = Nbitsperframe/Nc;
   printf("Nrowsperframe: %d\n", Nrowsperframe);
 
-  % check if Nbits fit neatly into frames delineated by pilots
+  % Important to define run time in seconds so HF model will evolve the same way
+  % for different pilot insertion rates.  So lets work backwards from approx
+  % seconds in run to get Nbits, the total number of payload data bits
 
-  assert(Nframes == floor(Nframes), "Nbits/Nbits/frame must be an integer");
+  % frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
+  %
+  % PPP
+  % DDD
+  % DDD
+  % PPP
+
+  Nrows = sim_in.Nsec*Rs;
+  Nframes = floor((Nrows-1)/Ns);
+  Nbits = Nframes * Nbitsperframe;    % number of payload data bits
+
+  Nr = Nbits/Nc;                      % Number of data rows to get Nbits total
+
+  if verbose
+    printf("Nc.....: %d\n", Nc);
+    printf("Ns.....: %d (step size for pilots, Ns-1 data symbols between pilots)\n", Ns);
+    printf("Nr.....: %d\n", Nr);
+    printf("Nbits..: %d\n", Nbits);
+  end
+
+  % double check if Nbits fit neatly into carriers
+
+  assert(Nbits/Nc == floor(Nbits/Nc), "Nbits/Nc must be an integer");
+ 
   printf("Nframes: %d\n", Nframes);
 
   Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
                            % extra row of pilots at end
-  printf("Nrp: %d (number of rows including pilots)\n", Nrp);
+  printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
 
   % set up HF model
 
@@ -75,8 +81,9 @@ function sim_out = run_sim(sim_in)
 
     dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
-    spread1 = doppler_spread(dopplerSpreadHz, Rs, Nrp+10);
-    spread2 = doppler_spread(dopplerSpreadHz, Rs, Nrp+10);
+    randn('seed',1);
+    spread1 = doppler_spread(dopplerSpreadHz, Rs, sim_in.Nsec*Rs*1.1);
+    spread2 = doppler_spread(dopplerSpreadHz, Rs, sim_in.Nsec*Rs*1.1);
 
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
@@ -181,24 +188,29 @@ function sim_out = run_sim(sim_in)
           % PPP
           
           cr = c-1:c+1;
-          aphase_est_pilot_rect = sum(rx(r,cr)*tx(r,cr)') +  sum(rx(r+Ns,cr)*tx(r+Ns,cr)');
+          aphase_est_pilot_rect1 = sum(rx(r,cr)*tx(r,cr)');
+          aphase_est_pilot_rect2 = sum(rx(r+Ns,cr)*tx(r+Ns,cr)');
 
           % optionally use next step of pilots in past and future
 
           if sim_in.pilot_wide
             if r > Ns+1
-              aphase_est_pilot_rect += sum(rx(r-Ns,cr)*tx(r-Ns,cr)');
+              aphase_est_pilot_rect1 += sum(rx(r-Ns,cr)*tx(r-Ns,cr)');
             end
             if r < Nrp - 2*Ns
-              aphase_est_pilot_rect += sum(rx(r+2*Ns,cr)*tx(r+2*Ns,cr)');
+              aphase_est_pilot_rect2 += sum(rx(r+2*Ns,cr)*tx(r+2*Ns,cr)');
             end
           end
-
-          aphase_est_pilot = angle(aphase_est_pilot_rect);
 
           % correct phase offset using phase estimate
 
           for rr=r+1:r+Ns-1
+            a = b = 1;
+            if sim_in.pilot_interp
+              b = (rr-r)/Ns; a = 1 - b;
+            end
+            %printf("rr: %d a: %4.3f b: %4.3f\n", rr, a, b);
+            aphase_est_pilot = angle(a*aphase_est_pilot_rect1 + b*aphase_est_pilot_rect2);
             phase_est_pilot_log(rr,c) = aphase_est_pilot;
             rx_corr(rr,c) = rx(rr,c) * exp(-j*aphase_est_pilot);
           end
@@ -275,7 +287,7 @@ function sim_out = run_sim(sim_in)
         if sim_in.stripped_phase_est
           plot(phase_est_stripped_log(:,2:Nc+1),'ro', 'markersize', 5); 
         end
-        if sim_in.hf_phase
+        if sim_in.hf_en && sim_in.hf_phase
           plot(angle(hf_model(:,2:Nc+1)));
         end
         if sim_in.phase_test
@@ -291,14 +303,22 @@ endfunction
 
 
 function run_curves
-  sim_in.verbose = 0;
-  sim_in.Nbits = 90000;
+  sim_in.Nc = 7;
+  sim_in.Ns = 5;
+  sim_in.Nbits = 2000*sim_in.Nc*(sim_in.Ns-1);
   sim_in.EbNodB = 2:8;
+  sim_in.verbose = 1;
+  sim_in.pilot_phase_est = 1;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 0;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
   sim_in.hf_en = 1;
-  sim_in.Nc = 3;
+  sim_in.hf_phase = 0;
 
-  sim_in.av_phase = 0;
-  bpsk_hf = run_sim(sim_in);
+  no_phase = run_sim(sim_in);
+  sim_in.hf_phase = 1;
 
   sim_in.av_phase = 1;
   bpsk_hf_av_phase = run_sim(sim_in);
@@ -316,18 +336,19 @@ end
 
 
 function run_single
+  sim_in.Nsec = 120;
   sim_in.Nc = 7;
-  sim_in.Ns = 8;
-  sim_in.Nbits = 1000*sim_in.Nc*(sim_in.Ns-1);
+  sim_in.Ns = 9;
   sim_in.EbNodB = 6;
   sim_in.verbose = 1;
-  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_phase_est = 1;
   sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
   sim_in.stripped_phase_est = 0;
   sim_in.phase_offset = 0;
   sim_in.phase_test = 0;
   sim_in.hf_en = 1;
-  sim_in.hf_phase = 0;
+  sim_in.hf_phase = 1;
 
   run_sim(sim_in);
 end
