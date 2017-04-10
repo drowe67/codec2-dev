@@ -1,7 +1,7 @@
-% bpsk_hf.m
+% bpsk_hf_rs.m
 % David Rowe Mar 2017
 %
-% Rate Rs BPSK simulation to explore phase estimation
+% Rate Rs BPSK simulation to explore techniques for phase estimation
 % over multiple carriers in HF channel
 
 #{
@@ -13,18 +13,43 @@
    [X] centre est on current carrier, extend to > 3
    [X] test single points
        + 1dB IL @ 6dB HF, 0.4 dB @ 2dB AWGN
-   [ ] try linear interpolation
-   [ ] try longer time windows
-   [ ] try combining mod stripping phase est inside frame
-   [ ] curves taking into account pilot losses
+   [X] try linear interpolation
+   [X] try longer time windows
+   [X] try combining mod stripping phase est inside frame
+   [X] curves taking into account pilot losses
    [ ] remove border carriers, interpolate edge carrier
+   [ ] modify for QPSK
+       [ ] change name
 #}
 
 1;
 
+% Gray coded QPSK modulation function
+
+function symbol = qpsk_mod(two_bits)
+    two_bits_decimal = sum(two_bits .* [2 1]); 
+    switch(two_bits_decimal)
+        case (0) symbol =  1;
+        case (1) symbol =  j;
+        case (2) symbol = -j;
+        case (3) symbol = -1;
+    endswitch
+endfunction
+
+
+% Gray coded QPSK demodulation function
+
+function two_bits = qpsk_demod(symbol)
+    bit0 = real(symbol*exp(j*pi/4)) < 0;
+    bit1 = imag(symbol*exp(j*pi/4)) < 0;
+    two_bits = [bit1 bit0];
+endfunction
+
+
 function sim_out = run_sim(sim_in)
   Rs = 100;
 
+  bps = sim_in.bps;
   EbNodB = sim_in.EbNodB;
   verbose = sim_in.verbose;
   hf_en = sim_in.hf_en;
@@ -34,10 +59,13 @@ function sim_out = run_sim(sim_in)
   Ns = sim_in.Ns;          % step size for pilots
   Nc = sim_in.Nc;          % Number of cols, aka number of carriers
 
-  Nbitsperframe = (Ns-1)*Nc;
-  printf("Nbitsperframe: %d\n", Nbitsperframe);
-  Nrowsperframe = Nbitsperframe/Nc;
-  printf("Nrowsperframe: %d\n", Nrowsperframe);
+  Nbitsperframe = (Ns-1)*Nc*bps;
+  Nrowsperframe = Nbitsperframe/(Nc*bps);
+  if verbose
+    printf("bps:.........: %d\n", bps);
+    printf("Nbitsperframe: %d\n", Nbitsperframe);
+    printf("Nrowsperframe: %d\n", Nrowsperframe);
+  end
 
   % Important to define run time in seconds so HF model will evolve the same way
   % for different pilot insertion rates.  So lets work backwards from approx
@@ -54,7 +82,7 @@ function sim_out = run_sim(sim_in)
   Nframes = floor((Nrows-1)/Ns);
   Nbits = Nframes * Nbitsperframe;    % number of payload data bits
 
-  Nr = Nbits/Nc;                      % Number of data rows to get Nbits total
+  Nr = Nbits/(Nc*bps);                % Number of data rows to get Nbits total
 
   if verbose
     printf("Nc.....: %d\n", Nc);
@@ -65,22 +93,29 @@ function sim_out = run_sim(sim_in)
 
   % double check if Nbits fit neatly into carriers
 
-  assert(Nbits/Nc == floor(Nbits/Nc), "Nbits/Nc must be an integer");
+  assert(Nbits/(Nc*bps) == floor(Nbits/(Nc*bps)), "Nbits/(Nc*bps) must be an integer");
  
   printf("Nframes: %d\n", Nframes);
 
   Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
                            % extra row of pilots at end
   printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
-
+  
   % set up HF model
 
   if hf_en
 
-    % some typical values
+    % some typical values, or replace with user supplied
 
     dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
 
+    if isfield(sim_in, "dopplerSpreadHz") 
+      dopplerSpreadHz = sim_in.dopplerSpreadHz;
+    end
+    if isfield(sim_in, "path_delay") 
+      path_delay = sim_in.path_delay;
+    end
+    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f symbols\n", dopplerSpreadHz, path_delay);
     randn('seed',1);
     spread1 = doppler_spread(dopplerSpreadHz, Rs, sim_in.Nsec*Rs*1.1);
     spread2 = doppler_spread(dopplerSpreadHz, Rs, sim_in.Nsec*Rs*1.1);
@@ -112,28 +147,42 @@ function sim_out = run_sim(sim_in)
     rand('seed',1);
     randn('seed',1);
 
-    EbNo = 10 .^ (EbNodB(nn)/10);
-    variance = 1/(EbNo/2);
+    EsNo = bps * (10 .^ (EbNodB(nn)/10));
+    variance = 1/(EsNo/2);
     noise = sqrt(variance)*(0.5*randn(Nrp,Nc+2) + j*0.5*randn(Nrp,Nc+2));
 
-    % generate tx bits and insert pilot rows and border cols
+    % generate tx bits
 
-    tx_bits = []; tx_bits_np = [];
-    for f=1:Nframes
-      tx_bits = [tx_bits; ones(1,Nc+2)];
-      for r=1:Nrowsperframe
-        arowofbits = rand(1,Nc) > 0.5;
-        tx_bits = [tx_bits; [1 arowofbits 1]];
-        tx_bits_np = [tx_bits_np; arowofbits];
+    tx_bits = rand(1,Nbits) > 0.5;
+
+    % map to symbols 
+
+    if bps == 1
+      tx_symb = 2*tx_bits - 1;
+    end
+    if bps == 2
+      for s=1:Nbits/bps
+        tx_symb(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
       end
+    end
+
+    % place symbols in multi-carrier frame with pilots and boundary carriers
+
+    tx = []; s = 1;
+    for f=1:Nframes
+      aframe = zeros(Nrowsperframe,Nc+2);
+      aframe(1,:) = 1;
+      for r=1:Nrowsperframe
+        arowofsymbols = tx_symb(s:s+Nc-1);
+        s += Nc;
+        aframe(r+1,2:Nc+1) = arowofsymbols;
+      end
+      tx = [tx; aframe];
     end      
-    tx_bits = [tx_bits; [1 ones(1,Nc) 1]]; % final row of pilots
-    [nr nc] = size(tx_bits);
+    tx = [tx; ones(1,Nc+2)];  % final row of pilots
+    [nr nc] = size(tx);
     assert(nr == Nrp);
-    %tx_bits
-
-    tx = 2*tx_bits - 1;
-
+    
     rx = tx * exp(j*phase_offset);
 
     if sim_in.phase_test
@@ -249,23 +298,66 @@ function sim_out = run_sim(sim_in)
       end % c=2:Nc+1
     end % sim_in.pilot_phase_est
 
-    % remove pilots to give us just data symbols
+
+    if isfield(sim_in, "ml_pd") && sim_in.ml_pd
+
+      % Bill's ML with pilots phase detector, does phase est and demodulation 
+
+      rx_bits = []; rx_np = [];
+      aframeofbits = zeros(Ns-1, Nc);
+      for r=1:Ns:Nrp-Ns
+
+        % demodulate this frame, ML operates carrier by carrier 
+
+        for c=2:Nc+1
+          arxcol = rx(r:r+Ns, c);
+          arxcol(1) = rx(r, c-1) + rx(r, c+1);
+          arxcol(Ns+1) = rx(r+Ns, c-1) + rx(r+Ns, c+1);
+          [acolofbits aphase_est] = ml_pd(rot90(arxcol),  bps, [1 Ns+1]);
+          aframeofbits(:,c-1) = xor(acolofbits, ones(1,Ns-1));
+          rx_np = [rx_np rot90(arxcol) .* exp(-j*aphase_est)];
+        end
+        
+        % unpack from frame into linear array of bits
+
+        for rr=1:Ns-1
+          rx_bits = [rx_bits aframeofbits(rr,:)];
+        end
+ 
+      end
+    else
+
+      % remove pilots to give us just data symbols and demodulate
       
-    rx_np = [];
-    for r=1:Nrp
-      if mod(r-1,Ns) != 0
-        rx_np = [rx_np; rx_corr(r,2:Nc+1)];
+      rx_bits = []; rx_np = [];
+      for r=1:Nrp
+        if mod(r-1,Ns) != 0
+          arowofsymbols = rx_corr(r,2:Nc+1);
+          rx_np = [rx_np arowofsymbols];
+          if bps == 1
+            arowofbits = real(arowofsymbols) > 0;
+          end
+          if bps == 2
+            arowofbits = zeros(1,Nc);
+            for c=1:Nc
+              arowofbits((c-1)*2+1:c*2) = qpsk_demod(arowofsymbols(c));
+            end
+          end
+          rx_bits = [rx_bits arowofbits];
+        end
       end
     end
+    %tx_bits
+    %rx_bits
+    assert(length(rx_bits) == Nbits);
 
     %phase_test
     %phase_est_log
 
     % calculate BER stats as a block, after pilots extracted
 
-    rx_bits_np = real(rx_np) > 0;
-    errors = xor(tx_bits_np, rx_bits_np);
-    Nerrs = sum(sum(errors));
+    errors = xor(tx_bits, rx_bits);
+    Nerrs = sum(errors);
 
     printf("EbNodB: %3.2f BER: %4.3f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
 
@@ -303,11 +395,21 @@ function sim_out = run_sim(sim_in)
 endfunction
 
 
+% Plot BER against Eb/No curves at various pilot insertion rates Ns
+% using the HF multipath channel.  Second set of curves includes Eb/No
+% loss for pilot insertion, so small Ns means better tracking of phase
+% but large pilot insertion loss
+
+% Target operating point Eb/No is 6dB, as this is where our rate 1/2
+% LDPC code gives good results (10% PER, 1% BER).  However this means
+% the Eb/No at the input is 10*log(1/2) or 3dB less, so we need to
+% make sure phase est works at Eb/No = 6 - 3 = 3dB
+
 function run_curves_hf
   sim_in.Nc = 7;
   sim_in.Ns = 5;
   sim_in.Nsec = 240;
-  sim_in.EbNodB = 5:0.5:8;
+  sim_in.EbNodB = 1:8;
   sim_in.verbose = 0;
   sim_in.pilot_phase_est = 0;
   sim_in.pilot_wide = 1;
@@ -346,7 +448,7 @@ function run_curves_hf
   semilogy(sim_in.EbNodB, hf_Ns_17.ber,'k+--;Ns=17;');
   semilogy(sim_in.EbNodB + hf_Ns_17.pilot_overhead, hf_Ns_17.ber,'ko-;Ns=17 with pilot overhead;');
   hold off;
-  axis([5 8 4E-2 1E-1])
+  axis([1 8 4E-2 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
@@ -356,13 +458,15 @@ function run_curves_hf
 end
 
 
-% Some alternative, experimental methods tested during development
+% Generate HF curves for some alternative, experimental methods tested
+% during development, such as interpolation, refinements using
+% modulation stripping, narrow window.
 
 function run_curves_hf_alt
   sim_in.Nc = 7;
   sim_in.Ns = 5;
   sim_in.Nsec = 60;
-  sim_in.EbNodB = 5:0.5:8;
+  sim_in.EbNodB = 1:8;
   sim_in.verbose = 0;
   sim_in.pilot_phase_est = 0;
   sim_in.pilot_wide = 1;
@@ -399,7 +503,7 @@ function run_curves_hf_alt
   semilogy(sim_in.EbNodB, hf_Ns_9_narrow.ber,'b+--;Ns=9 narrow;');
   semilogy(sim_in.EbNodB, hf_Ns_9_interp.ber,'k+--;Ns=9 interp;');
   hold off;
-  axis([5 8 4E-2 1E-1])
+  axis([1 8 4E-2 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
@@ -409,10 +513,13 @@ function run_curves_hf_alt
 end
 
 
-function run_curves_awgn
+% Generate HF curves for fixed Ns but different HF channels.
+
+function run_curves_hf_channels
   sim_in.Nc = 7;
-  sim_in.Ns = 5;
+  sim_in.Ns = 9;
   sim_in.Nsec = 240;
+  sim_in.EbNodB = 1:8;
   sim_in.verbose = 0;
   sim_in.pilot_phase_est = 0;
   sim_in.pilot_wide = 1;
@@ -420,46 +527,111 @@ function run_curves_awgn
   sim_in.stripped_phase_est = 0;
   sim_in.phase_offset = 0;
   sim_in.phase_test = 0;
+  sim_in.hf_en = 1;
+  sim_in.hf_phase = 0;
+
+  hf_Ns_9_1hz_1ms_no_phase = run_sim(sim_in);
+
+  sim_in.hf_phase = 1;
+  sim_in.pilot_phase_est = 1;
+  hf_Ns_9_1hz_1ms = run_sim(sim_in);
+
+  Rs = 100;
+
+  sim_in.dopplerSpreadHz = 1.0; 
+  sim_in.path_delay = 500E-6*Rs;
+  hf_Ns_9_1hz_500us = run_sim(sim_in);
+
+  sim_in.dopplerSpreadHz = 1.0; 
+  sim_in.path_delay = 2E-3*Rs;
+  hf_Ns_9_1hz_2ms = run_sim(sim_in);
+
+  sim_in.dopplerSpreadHz = 2.0; 
+  sim_in.path_delay = 1E-3*Rs;
+  hf_Ns_9_2hz_1ms = run_sim(sim_in);
+
+  sim_in.dopplerSpreadHz = 2.0; 
+  sim_in.path_delay = 1E-3*Rs;
+  hf_Ns_9_2hz_2ms = run_sim(sim_in);
+
+  sim_in.dopplerSpreadHz = 2.0; 
+  sim_in.path_delay = 2E-3*Rs;
+  hf_Ns_9_2hz_2ms = run_sim(sim_in);
+
+  sim_in.dopplerSpreadHz = 4.0; 
+  sim_in.path_delay = 1E-3*Rs;
+  hf_Ns_9_4hz_1ms = run_sim(sim_in);
+
+  figure(6); clf;
+  semilogy(sim_in.EbNodB, hf_Ns_9_1hz_1ms_no_phase.ber,'c+-;Ns=9 1Hz 1ms ref no phase;');
+  hold on;
+  semilogy(sim_in.EbNodB, hf_Ns_9_1hz_500us.ber,'k+-;Ns=9 1Hz 500us;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_1hz_1ms.ber,'r+-;Ns=9 1Hz 1ms;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_1hz_2ms.ber,'bo-;Ns=9 1Hz 2ms;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_2hz_1ms.ber,'g+-;Ns=9 2Hz 1ms;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_2hz_2ms.ber,'mo-;Ns=9 2Hz 2ms;');
+  semilogy(sim_in.EbNodB, hf_Ns_9_4hz_1ms.ber,'c+-;Ns=9 4Hz 1ms;');
+  hold off;
+  axis([1 8 4E-2 2E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('HF Multipath Ns = 9');
+
+end
+
+
+% AWGN curves for BPSK and QPSK.  Coded Eb/No operating point is 2dB,
+% so raw BER for rate 1/2 will be -1dB
+
+function run_curves_awgn_bpsk_qpsk
+  sim_in.Nc = 7;
+  sim_in.Ns = 7;
+  sim_in.Nsec = 30;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 1;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
   sim_in.hf_en = 0;
   sim_in.hf_phase = 0;
 
-  sim_in.EbNodB = 0:8;
+  sim_in.EbNodB = -3:5;
 
   ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNodB/10)));
-  sim_in.hf_en = 0;
-  sim_in.Ns = 5;
-  awgn_Ns_5 = run_sim(sim_in);
-  sim_in.Ns = 9;
-  awgn_Ns_9 = run_sim(sim_in);
-  sim_in.Ns = 17;
-  awgn_Ns_17 = run_sim(sim_in);
+
+  sim_in.bps = 1;
+  awgn_bpsk = run_sim(sim_in);
+  sim_in.bps = 2;
+  awgn_qpsk = run_sim(sim_in);
 
   figure(5); clf;
   semilogy(sim_in.EbNodB, ber_awgn_theory,'b+-;AWGN Theory;');
   hold on;
-  semilogy(sim_in.EbNodB, awgn_Ns_5.ber,'g+-;Ns=5;');
-  semilogy(sim_in.EbNodB + awgn_Ns_5.pilot_overhead, awgn_Ns_5.ber,'go-;Ns=5 with pilot overhead;');
-  semilogy(sim_in.EbNodB, awgn_Ns_9.ber,'r+--;Ns=9;');
-  semilogy(sim_in.EbNodB + awgn_Ns_9.pilot_overhead, awgn_Ns_9.ber,'ro-;Ns=9 with pilot overhead;');
-  semilogy(sim_in.EbNodB, awgn_Ns_17.ber,'k+--;Ns=17;');
-  semilogy(sim_in.EbNodB + awgn_Ns_17.pilot_overhead, awgn_Ns_17.ber,'ko-;Ns=17 with pilot overhead;');
+  semilogy(sim_in.EbNodB, awgn_bpsk.ber,'g+-;Ns=7 BPSK;');
+  semilogy(sim_in.EbNodB + awgn_bpsk.pilot_overhead, awgn_bpsk.ber,'go-;Ns=7 BPSK with pilot overhead;');
+  semilogy(sim_in.EbNodB, awgn_qpsk.ber,'r+-;Ns=7 QPSK;');
+  semilogy(sim_in.EbNodB + awgn_qpsk.pilot_overhead, awgn_qpsk.ber,'ro-;Ns=7 QPSK with pilot overhead;');
   hold off;
-  axis([0 8 1E-3 2E-1])
+  axis([-3 5 4E-3 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
   legend('boxoff');
   title('AWGN');
-
 end
 
 
-function run_single
-  sim_in.Nsec = 120;
+% HF multipath curves for BPSK and QPSK.  Coded operating point is about 3dB
+
+function run_curves_hf_bpsk_qpsk
   sim_in.Nc = 7;
-  sim_in.Ns = 9;
-  sim_in.EbNodB = 6;
-  sim_in.verbose = 1;
+  sim_in.Ns = 7;
+  sim_in.Nsec = 120;
+  sim_in.verbose = 0;
   sim_in.pilot_phase_est = 1;
   sim_in.pilot_wide = 1;
   sim_in.pilot_interp = 0;
@@ -469,6 +641,134 @@ function run_single
   sim_in.hf_en = 1;
   sim_in.hf_phase = 1;
 
+  sim_in.EbNodB = 1:8;
+
+  EbNoLin = 10.^(sim_in.EbNodB/10);
+  hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+
+  sim_in.bps = 1;
+  hf_bpsk = run_sim(sim_in);
+  sim_in.bps = 2;
+  hf_qpsk = run_sim(sim_in);
+
+  figure(5); clf;
+  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF Theory;');
+  hold on;
+  semilogy(sim_in.EbNodB, hf_bpsk.ber,'g+-;Ns=7 BPSK;');
+  semilogy(sim_in.EbNodB + hf_bpsk.pilot_overhead, hf_bpsk.ber,'go-;Ns=7 BPSK with pilot overhead;');
+  semilogy(sim_in.EbNodB, hf_qpsk.ber,'r+-;Ns=7 QPSK;');
+  semilogy(sim_in.EbNodB + hf_qpsk.pilot_overhead, hf_qpsk.ber,'ro-;Ns=7 QPSK with pilot overhead;');
+  hold off;
+  axis([1 8 4E-3 2E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('HF Multipath');
+end
+
+
+% AWGN curves for BPSK using 3 carrier 2D matrix pilot and ML pilot
+
+function run_curves_awgn_ml
+  sim_in.bps = 1;
+  sim_in.Nc = 7;
+  sim_in.Ns = 7;
+  sim_in.Nsec = 10;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 1;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 1;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
+  sim_in.hf_en = 0;
+  sim_in.hf_phase = 0;
+
+  sim_in.EbNodB = -3:5;
+
+  ber_awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNodB/10)));
+
+  awgn_2d = run_sim(sim_in);
+  sim_in.pilot_phase_est = 0;
+  sim_in.ml_pd = 1;
+  awgn_ml = run_sim(sim_in);
+
+  figure(5); clf;
+  semilogy(sim_in.EbNodB, ber_awgn_theory,'b+-;AWGN Theory;');
+  hold on;
+  semilogy(sim_in.EbNodB, awgn_2d.ber,'g+-;Ns=7 3 carrier pilot BPSK;');
+  semilogy(sim_in.EbNodB, awgn_ml.ber,'ro-;Ns=7 ML pilot BPSK;');
+  hold off;
+  axis([-3 5 4E-3 5E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('AWGN');
+end
+
+
+% HF multipath curves for ML
+
+function run_curves_hf_ml
+  sim_in.bps = 1;
+  sim_in.Nc = 7;
+  sim_in.Ns = 14;
+  sim_in.Nsec = 120;
+  sim_in.verbose = 0;
+  sim_in.pilot_phase_est = 1;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 0;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
+  sim_in.hf_en = 1;
+  sim_in.hf_phase = 1;
+
+  sim_in.EbNodB = 1:8;
+
+  EbNoLin = 10.^(sim_in.EbNodB/10);
+  hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+
+  hf_2d = run_sim(sim_in);
+  sim_in.pilot_phase_est = 0;
+  sim_in.ml_pd = 1;
+  hf_ml = run_sim(sim_in);
+
+  figure(7); clf;
+  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF Theory;');
+  hold on;
+  semilogy(sim_in.EbNodB, hf_2d.ber,'g+-;Ns=7 3 carrier pilot BPSK;');
+  semilogy(sim_in.EbNodB, hf_ml.ber,'ro-;Ns=7 ML pilot BPSK;');
+  hold off;
+  axis([1 8 4E-3 2E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  title('HF Multipath');
+end
+
+
+
+function run_single
+  sim_in.bps = 1;
+  sim_in.Nsec = 30;
+  sim_in.Nc = 3;
+  sim_in.Ns = 9;
+  sim_in.EbNodB = -1;
+  sim_in.verbose = 1;
+  sim_in.pilot_phase_est = 1;
+  sim_in.pilot_wide = 1;
+  sim_in.pilot_interp = 0;
+  sim_in.stripped_phase_est = 0;
+  sim_in.phase_offset = 0;
+  sim_in.phase_test = 0;
+  sim_in.hf_en = 0;
+  sim_in.hf_phase = 0;
+  sim_in.ml_pd = 1;
+
   run_sim(sim_in);
 end
 
@@ -477,7 +777,9 @@ format;
 more off;
 
 %run_single
-run_curves_hf_alt
+%run_curves_hf_bpsk_qpsk
+%run_curves_hf_channels
+run_curves_hf_ml
 
 
 
