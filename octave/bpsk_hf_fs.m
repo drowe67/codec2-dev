@@ -8,8 +8,12 @@
    [X] strip back experimental stuff to just features we need
    [X] ZOH/integrator
    [X] OFDM up and down conversion
-   [ ] rate Fs HF model and HF results
-   [ ] handle boarder carriers
+   [X] rate Fs HF model and HF results
+   [X] add QPSK
+   [X] add CP
+   [ ] adjust waveform parameters for real world
+   [ ] Nsec run time take into account CP
+   [ ] handle border carriers
        [ ] start with phantom carriers 
            + but unhappy with 1800Hz bandwidth
        [ ] also try interpolation or just single row
@@ -46,7 +50,7 @@ function sim_out = run_sim(sim_in)
   Rs = 62.5;
   Fs = 8000;
   M  = Fs/Rs;
-  Tcp = 0.004; Ncp = Tcp*M;
+  Tcp = 0.002; Ncp = Tcp*Fs;
   foffset = 0;
   woffset = 2*pi*foffset/Fs;
 
@@ -79,7 +83,7 @@ function sim_out = run_sim(sim_in)
   % DDD
   % PPP
 
-  Nrows = sim_in.Nsec*Rs;
+  Nrows = sim_in.Nsec*Rs
   Nframes = floor((Nrows-1)/Ns);
   Nbits = Nframes * Nbitsperframe;    % number of payload data bits
 
@@ -116,13 +120,12 @@ function sim_out = run_sim(sim_in)
     if isfield(sim_in, "path_delay_ms") 
       path_delay_ms = sim_in.path_delay_ms;
     end
-    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms\n", dopplerSpreadHz, path_delay_ms);
-
     path_delay_samples = path_delay_ms*Fs/1000;
+    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     randn('seed',1);
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, sim_in.Nsec*Fs*1.1);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, sim_in.Nsec*Fs*1.1);
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, (sim_in.Nsec*(M+Ncp)/M+0.2)*Fs);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, (sim_in.Nsec*(M+Ncp)/M+0.2)*Fs);
 
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
@@ -141,7 +144,6 @@ function sim_out = run_sim(sim_in)
 
     EbNo = bps * (10 .^ (EbNodB(nn)/10));
     variance = 1/(M*EbNo/2);
-
 
     % generate tx bits
 
@@ -175,7 +177,7 @@ function sim_out = run_sim(sim_in)
     [nr nc] = size(tx_sym);
     assert(nr == Nrp);
 
-    % OFDM up conversion and upsampling to rate Fs
+    % OFDM up conversion and upsampling to rate Fs ---------------------
 
     w = (0:Nc+1)*2*pi*Rs/Fs;
     W = zeros(Nc+2,M);
@@ -183,21 +185,26 @@ function sim_out = run_sim(sim_in)
       W(c,:) = exp(j*w(c)*(0:M-1));
     end
 
-    Nsam = Nrp*M;
-    tx = zeros(1,Nrp*M);
+    Nsam = Nrp*(M+Ncp);
+    tx = [];
+
+    % OFDM upconvert symbol by symbol so we can add CP
+
     for r=1:Nrp
-      for c=1:Nc+2
-        acarrier = tx_sym(r,c) * W(c,:);
-        tx((r-1)*M+1:r*M) += acarrier/M;
-      end
+      asymbol = tx_sym(r,:) * W/M;
+      asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
+      tx = [tx asymbol_cp];
     end
-        
+    assert(length(tx) == Nsam);
+
+    % channel simulation ---------------------------------------------------------------
+
     rx = tx;
     
     if hf_en
-      %rx  = hf_gain * tx(1:Nsam) .* spread1(1:Nsam);
-      %rx  = hf_gain * [tx(path_delay_samples+1:Nsam) zeros(1,path_delay_samples)] .* spread2(1:Nsam);
-      rx  = hf_gain * [tx(path_delay_samples+1:Nsam) zeros(1,path_delay_samples)];
+      %rx  =  [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)];
+      rx  = hf_gain * tx(1:Nsam) .* spread1(1:Nsam);
+      rx  += hf_gain * [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
     end
 
     rx = rx .* exp(j*woffset*(1:Nsam));
@@ -205,12 +212,15 @@ function sim_out = run_sim(sim_in)
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
     rx += noise;
     
-    % downconvert, downsample and integrate using OFDM
+    % downconvert, downsample and integrate using OFDM.  Start integrating just after CP 
+    % when ISI has died down
 
     rx_sym = zeros(Nrp, Nc+2);
     for r=1:Nrp
+      st = (r-1)*(M+Ncp)+Ncp+1; en = st + M - 1;
+      %printf("st: %d en: %d\n", st, en);
       for c=1:Nc+2
-        acarrier = rx((r-1)*M+1:r*M) .* conj(W(c,:));
+        acarrier = rx(st:en) .* conj(W(c,:));
         rx_sym(r,c) = sum(acarrier);
       end
     end
@@ -252,7 +262,6 @@ function sim_out = run_sim(sim_in)
 
       end % r=1:Ns:Nrp-Ns
     end % c=2:Nc+1
-
 
     % remove pilots to give us just data symbols and demodulate
 
@@ -329,35 +338,43 @@ function sim_out = run_sim(sim_in)
 endfunction
 
 
-% Plot BER against Eb/No curves at various pilot insertion rates Ns
-% using the HF multipath channel.  Second set of curves includes Eb/No
-% loss for pilot insertion, so small Ns means better tracking of phase
-% but large pilot insertion loss
+% Plot BER against Eb/No curves for AWGN and HF
 
-% Target operating point Eb/No is 6dB, as this is where our rate 1/2
+% Target operating point Eb/No for HF is 6dB, as this is where our rate 1/2
 % LDPC code gives good results (10% PER, 1% BER).  However this means
 % the Eb/No at the input is 10*log(1/2) or 3dB less, so we need to
 % make sure phase est works at Eb/No = 6 - 3 = 3dB
+%
+% For AWGN target is 2dB so -1dB op point.
 
-function run_curves_hf
-  sim_in.Nc = 8;
-  sim_in.Ns = 8;
-  sim_in.Nsec = 240;
-  sim_in.EbNodB = 1:8;
-  sim_in.verbose = 0;
+function run_curves
+  sim_in.bps = 2; sim_in.Nc = 8; sim_in.Ns = 7; sim_in.verbose = 0;
+
   sim_in.hf_en = 0;
+  sim_in.Nsec = 30;
+  sim_in.EbNodB = -3:5;
+  awgn_EbNodB = sim_in.EbNodB;
+
+  awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNodB/10)));
+  awgn = run_sim(sim_in);
+
+  sim_in.hf_en = 1;
+  sim_in.Nsec = 120;
+  sim_in.EbNodB = 1:8;
 
   EbNoLin = 10.^(sim_in.EbNodB/10);
   hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
-  hf_sim = run_sim(sim_in);
+  hf = run_sim(sim_in);
 
   figure(4); clf;
-  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
+  semilogy(awgn_EbNodB, awgn_theory,'b+-;AWGN theory;');
   hold on;
-  semilogy(sim_in.EbNodB, hf.ber,'c+-;Ns=8 HFsim;');
+  semilogy(sim_in.EbNodB, hf_theory,'g+-;HF theory;');
+  semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN sim;');
+  semilogy(sim_in.EbNodB, hf.ber,'c+-;HF sim;');
   hold off;
-  axis([1 8 4E-2 2E-1])
+  axis([-3 8 1E-2 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
@@ -368,11 +385,13 @@ end
 function run_single
   sim_in.bps = 2;
   sim_in.Nc = 8;
-  sim_in.Ns = 8;
-  sim_in.Nsec = 10;
-  sim_in.EbNodB = 4;
+  sim_in.Ns = 7;
+  % sim_in.Nsec = (sim_in.Ns+1)/62.5; % one frame
+  sim_in.Nsec = 120;
+  sim_in.EbNodB = 3;
   sim_in.verbose = 1;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
+  sim_in.path_delay_ms = 1;
 
   run_sim(sim_in);
 end
@@ -381,9 +400,8 @@ end
 format;
 more off;
 
-
-run_single
-%run_curves_hf
+%run_single
+run_curves
 
 
 
