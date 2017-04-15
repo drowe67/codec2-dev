@@ -13,11 +13,13 @@
    [X] add CP
    [ ] adjust waveform parameters for real world
    [ ] Nsec run time take into account CP
+   [ ] plot phase ests
    [ ] handle border carriers
        [ ] start with phantom carriers 
            + but unhappy with 1800Hz bandwidth
        [ ] also try interpolation or just single row
    [ ] compute SNR and PAPR
+   [ ] timing estimator
    [ ] acquisition & freq offset estimation
    [ ] SSB bandpass filtering
 #}
@@ -46,13 +48,55 @@ function two_bits = qpsk_demod(symbol)
 endfunction
 
 
-function sim_out = run_sim(sim_in)
-  Rs = 62.5;
+% Returns the most likely place for the start of a frame, as a
+% a candidate for coarse frame sync.  Combines two frames pilots
+% so we need at least Nsamperframe+M+Ncp samples in rx
+
+function [ct_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
+    Nsamperframe = states.Nsamperframe; M = states.M; Ncp = states.Ncp; Fs = states.Fs;
+    verbose  = states.verbose;
+
+    Ncorr = length(rx) - (Nsamperframe+M+Ncp) + 1;
+    assert(Ncorr > 0);
+    corr = zeros(1,Ncorr);
+    for i=1:Ncorr
+      corr(i)   = abs(rx(i:i+M+Ncp-1) * rate_fs_pilot_samples');
+      corr(i)  += abs(rx(i+Nsamperframe:i+Nsamperframe+M+Ncp-1) * rate_fs_pilot_samples');
+    end
+
+    [mx ct_est] = max(abs(corr));
+
+    C  = abs(fft(rx(ct_est:ct_est+M+Ncp-1) .* conj(rate_fs_pilot_samples), Fs));
+    C += abs(fft(rx(ct_est+Nsamperframe:ct_est+Nsamperframe+M+Ncp-1) .* conj(rate_fs_pilot_samples), Fs));
+
+    fmax = 30;
+    [mx_pos foff_est_pos] = max(C(1:fmax));
+    [mx_neg foff_est_neg] = max(C(Fs-fmax+1:Fs));
+
+    if mx_pos > mx_neg
+      foff_est = foff_est_pos - 1;
+    else
+      foff_est = foff_est_neg - fmax - 1;
+    end
+
+    if verbose
+      %printf("ct_est: %d\n", ct_est);
+      figure(6); clf;
+      plot(abs(corr))
+      figure(7)
+      plot(C)
+      axis([0 200 0 0.4])
+    end
+endfunction
+
+
+function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
   Fs = 8000;
+  Rs = sim_in.Rs;
+  Tcp = sim_in.Tcp;
   M  = Fs/Rs;
-  Tcp = 0.002; Ncp = Tcp*Fs;
-  foffset = 0;
-  woffset = 2*pi*foffset/Fs;
+  Ncp = Tcp*Fs;
+  woffset = 2*pi*sim_in.foff_hz/Fs;
 
   bps = sim_in.bps;
   EbNodB  = sim_in.EbNodB;
@@ -83,28 +127,28 @@ function sim_out = run_sim(sim_in)
   % DDD
   % PPP
 
-  Nrows = sim_in.Nsec*Rs
+  Nrows = sim_in.Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
   Nbits = Nframes * Nbitsperframe;    % number of payload data bits
 
   Nr = Nbits/(Nc*bps);                % Number of data rows to get Nbits total
+
+  % double check if Nbits fit neatly into carriers
+
+  assert(Nbits/(Nc*bps) == floor(Nbits/(Nc*bps)), "Nbits/(Nc*bps) must be an integer");
+
+  Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
+                           % extra row of pilots at end
+  Nsamperframe =  (Nrowsperframe+1)*(M+Ncp);
 
   if verbose
     printf("Nc.....: %d\n", Nc);
     printf("Ns.....: %d (step size for pilots, Ns-1 data symbols between pilots)\n", Ns);
     printf("Nr.....: %d\n", Nr);
     printf("Nbits..: %d\n", Nbits);
+    printf("Nframes: %d\n", Nframes);
+    printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
   end
-
-  % double check if Nbits fit neatly into carriers
-
-  assert(Nbits/(Nc*bps) == floor(Nbits/(Nc*bps)), "Nbits/(Nc*bps) must be an integer");
- 
-  printf("Nframes: %d\n", Nframes);
-
-  Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
-                           % extra row of pilots at end
-  printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
 
   % set up HF model ---------------------------------------------------------------
 
@@ -162,10 +206,13 @@ function sim_out = run_sim(sim_in)
 
     % place symbols in multi-carrier frame with pilots and boundary carriers
 
+    %pilots = ones(1,Nc+2);
+    %pilots(1:2:Nc+2) = -1;
+    pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
     tx_sym = []; s = 1;
     for f=1:Nframes
       aframe = zeros(Nrowsperframe,Nc+2);
-      aframe(1,:) = 1;
+      aframe(1,:) = pilots;
       for r=1:Nrowsperframe
         arowofsymbols = tx_sym_lin(s:s+Nc-1);
         s += Nc;
@@ -173,7 +220,7 @@ function sim_out = run_sim(sim_in)
       end
       tx_sym = [tx_sym; aframe];
     end      
-    tx_sym = [tx_sym; ones(1,Nc+2)];  % final row of pilots
+    tx_sym = [tx_sym; pilots];  % final row of pilots
     [nr nc] = size(tx_sym);
     assert(nr == Nrp);
 
@@ -196,6 +243,10 @@ function sim_out = run_sim(sim_in)
       tx = [tx asymbol_cp];
     end
     assert(length(tx) == Nsam);
+
+    % these are used for coarse timing and freq acquisition
+
+    rate_fs_pilot_samples = tx(1:M+Ncp);
 
     % channel simulation ---------------------------------------------------------------
 
@@ -329,13 +380,32 @@ function sim_out = run_sim(sim_in)
       end
 #}
 
-      axis([1 Nrp -pi pi]);
+      axis([1 Nrp -pi pi]);  
     end
 
     sim_out.ber(nn) = sum(Nerrs)/Nbits; 
     sim_out.pilot_overhead = 10*log10(Ns/(Ns-1));
+    sim_out.M = M; sim_out.Fs = Fs; sim_out.Ncp = Ncp;
+    sim_out.Nrowsperframe = Nrowsperframe; sim_out.Nsamperframe = Nsamperframe;
   end
 endfunction
+
+
+function run_single
+  Ts = 0.016; 
+  sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+
+  sim_in.Nsec = 3*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  %sim_in.Nsec = 1;
+
+  sim_in.EbNodB = 20;
+  sim_in.verbose = 1;
+  sim_in.hf_en = 0;
+  sim_in.foff_hz = 0;
+
+  run_sim(sim_in);
+end
 
 
 % Plot BER against Eb/No curves for AWGN and HF
@@ -348,7 +418,15 @@ endfunction
 % For AWGN target is 2dB so -1dB op point.
 
 function run_curves
-  sim_in.bps = 2; sim_in.Nc = 8; sim_in.Ns = 7; sim_in.verbose = 0;
+  Ts = 0.010;
+  sim_in.Rs = 1/Ts;
+  sim_in.Tcp = 0.002; 
+  sim_in.bps = 2; sim_in.Ns = 8; sim_in.Nc = 8; sim_in.verbose = 0;
+  sim_in.foff_hz = 0;
+
+  pilot_overhead = (sim_in.Ns-1)/sim_in.Ns;
+  cp_overhead = Ts/(Ts+sim_in.Tcp);
+  overhead_dB = -10*log10(pilot_overhead*cp_overhead);
 
   sim_in.hf_en = 0;
   sim_in.Nsec = 30;
@@ -370,9 +448,11 @@ function run_curves
   figure(4); clf;
   semilogy(awgn_EbNodB, awgn_theory,'b+-;AWGN theory;');
   hold on;
-  semilogy(sim_in.EbNodB, hf_theory,'g+-;HF theory;');
-  semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN sim;');
-  semilogy(sim_in.EbNodB, hf.ber,'c+-;HF sim;');
+  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
+  semilogy(awgn_EbNodB+overhead_dB, awgn_theory,'g+-;AWGN lower bound with pilot + CP overhead;');
+  semilogy(sim_in.EbNodB+overhead_dB, hf_theory,'g+-;HF lower bound with pilot + CP overhead;');
+  semilogy(awgn_EbNodB+overhead_dB, awgn.ber,'r+-;AWGN sim;');
+  semilogy(sim_in.EbNodB+overhead_dB, hf.ber,'r+-;HF sim;');
   hold off;
   axis([-3 8 1E-2 2E-1])
   xlabel('Eb/No (dB)');
@@ -382,27 +462,102 @@ function run_curves
 end
 
 
-function run_single
-  sim_in.bps = 2;
-  sim_in.Nc = 8;
-  sim_in.Ns = 7;
-  % sim_in.Nsec = (sim_in.Ns+1)/62.5; % one frame
-  sim_in.Nsec = 120;
-  sim_in.EbNodB = 3;
-  sim_in.verbose = 1;
-  sim_in.hf_en = 1;
-  sim_in.path_delay_ms = 1;
+% Run an acquisition test, returning vectors of estimation errors
 
-  run_sim(sim_in);
-end
+function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0)
 
+  % generate test signal at a given Eb/No and frequency offset
+
+  Ts = 0.016; 
+  sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+
+  sim_in.Nsec = Ntests*(sim_in.Ns+1)/sim_in.Rs;
+
+  sim_in.EbNodB = EbNodB;
+  sim_in.verbose = 0;
+  sim_in.hf_en = hf_en;
+  sim_in.foff_hz = foff_hz;
+
+  [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in);
+
+  % set up acquistion 
+
+  states.Nsamperframe = sim_out.Nsamperframe;
+  states.M = sim_out.M; states.Ncp = sim_out.Ncp;
+  states.verbose = 0;
+  states.Fs = sim_out.Fs;
+
+  % test acquisition over test signal
+
+  delta_ct = []; delta_foff = [];
+  for w=1:Nsamperframe:length(rx)-3*Nsamperframe
+     st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
+     [ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
+     %printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+
+     % valid coarse timing ests are modulo Nsamperframe
+
+     delta_ct = [delta_ct ct_est-Nsamperframe/2];
+     delta_foff = [delta_foff (foff_est-foff_hz)];
+  end
+endfunction
+
+
+% Run some tests for various acquisition conditions. Probability of
+% acquistion is what matters, e.g. if it's 50% we can expect sync
+% within 2 frames
+%                 P(t)/P(f)  P(t)/P(f)
+%          Eb/No  AWGN       HF
+% +/- 25Hz -1/3   1.0/0.3    0.96/0.3 
+% +/-  5Hz -1/3   1.0/0.347  0.96/0.55 
+% +/- 25Hz  10/10 1.00/0.92  0.99/0.77
+
+function acquisition_curves
+  Fs = 8000;
+  Ntests = 100;
+
+  % allowable tolerance for acquistion
+
+  ftol_hz = 2.0;
+  ttol_samples = 0.002*Fs;
+
+  % AWGN channel operating point
+
+  [dct dfoff] = acquisition_test(Ntests, 10, 25);
+
+  % Probability of acquistion is what matters, e.g. if it's 50% we can
+  % expect sync within 2 frames
+
+  printf("AWGN P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
+  printf("AWGN P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
+ 
+  figure(1)
+  hist(dct(find (abs(dct) < ttol_samples)))
+  figure(2)
+  hist(dfoff)
+
+  % HF channel operating point
+
+  [dct dfoff] = acquisition_test(Ntests, 10, 25, 1);
+
+  printf("AWGN P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
+  printf("HF P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
+
+  figure(3)
+  hist(dct(find (abs(dct) < ttol_samples)))
+  figure(4)
+  hist(dfoff)
+
+endfunction
+
+
+% choose simulation to run here -------------------------------------------------------
 
 format;
 more off;
 
-%run_single
-run_curves
-
-
-
+run_single
+%run_curves
+%acquisition_curves
 
