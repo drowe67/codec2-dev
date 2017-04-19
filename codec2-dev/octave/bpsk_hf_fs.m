@@ -90,6 +90,33 @@ function [ct_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
 endfunction
 
 
+% Estimate fine timing instant using a window of samples rx.  We
+% exploit similarity in waveform M-Ncp samples apart due to CP
+
+function ft_est = fine_timing(states, rx)
+    Nsamperframe = states.Nsamperframe; M = states.M; Ncp = states.Ncp; Fs = states.Fs;
+    verbose  = states.verbose;
+    
+    Ncorr = length(rx) - (M+Ncp-1);
+    printf("length %d Ncorr %d mx %d", length(rx), Ncorr, Ncorr+M+Ncp-1);
+    printf("M: %d Ncp: %d\n", M, Ncp);
+ 
+    assert(Ncorr > 0, "length(rx) too small");
+    corr = zeros(1,Ncorr);
+    for i=1:Ncorr
+      corr(i) = abs(rx(i:i+Ncp-1) * rx(i+M:i+M+Ncp-1)')/(rx(i:i+Ncp-1) * rx(i:i+Ncp-1)');
+    end
+
+    [mx ft_est] = max(abs(corr));
+
+    if verbose
+      printf("ft_est: %d\n", ft_est);
+      figure(6); clf;
+      plot(abs(corr))
+    end
+endfunction
+
+
 function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
   Fs = 8000;
   Rs = sim_in.Rs;
@@ -464,7 +491,7 @@ end
 
 % Run an acquisition test, returning vectors of estimation errors
 
-function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0)
+function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en)
 
   % generate test signal at a given Eb/No and frequency offset
 
@@ -483,24 +510,61 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
 
   % set up acquistion 
 
-  states.Nsamperframe = sim_out.Nsamperframe;
+  Nsamperframe = states.Nsamperframe = sim_out.Nsamperframe;
   states.M = sim_out.M; states.Ncp = sim_out.Ncp;
   states.verbose = 0;
   states.Fs = sim_out.Fs;
 
-  % test acquisition over test signal
+  % test fine or acquisition over test signal
+  #{
+    fine: - start with coarse timing instant
+          - on each frame est timing a few samples about that point
+          - update timing instant
+
+    corr: - where is best plcase to sample
+          - just before end of symbol?
+          - how long should sequence be?
+          - add extra?
+          - aim for last possible moment?
+          - man I hope IL isn't too big.....
+  #}
 
   delta_ct = []; delta_foff = [];
-  for w=1:Nsamperframe:length(rx)-3*Nsamperframe
-     st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
-     [ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
-     %printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
 
-     % valid coarse timing ests are modulo Nsamperframe
+  if fine_en
 
-     delta_ct = [delta_ct ct_est-Nsamperframe/2];
-     delta_foff = [delta_foff (foff_est-foff_hz)];
+    window_width = 5;                   % search +/-2 samples from current timing instant
+    timing_instant = Nsamperframe+1;    % start at correct instant for AWGN
+                                        % start at second frame so we can search -2 ... +2
+
+    while timing_instant < (length(rx) - (Nsamperframe + length(rate_fs_pilot_samples) + window_width))
+      st = timing_instant - ceil(window_width/2); 
+      en = st + Nsamperframe-1 + length(rate_fs_pilot_samples) + window_width-1;
+      [ft_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
+      printf("ft_est: %d timing_instant %d %d\n", ft_est, timing_instant, mod(timing_instant, Nsamperframe));
+      timing_instant += Nsamperframe + ft_est - ceil(window_width/2);
+      delta_ct = [delta_ct ft_est - ceil(window_width/2)];
+    end
+  else
+    % for coarse simulation we just use contant window shifts
+
+    st = 0.5*Nsamperframe; 
+    en = 2.5*Nsamperframe - 1;
+    ct_target = Nsamperframe/2;
+
+    for w=1:Nsamperframe:length(rx)-3*Nsamperframe
+      %st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
+      %[ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
+      [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
+      printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+
+      % valid coarse timing ests are modulo Nsamperframe
+
+      delta_ct = [delta_ct ct_est-ct_target];
+      delta_foff = [delta_foff (foff_est-foff_hz)];
+    end
   end
+
 endfunction
 
 
@@ -513,7 +577,7 @@ endfunction
 % +/-  5Hz -1/3   1.0/0.347  0.96/0.55 
 % +/- 25Hz  10/10 1.00/0.92  0.99/0.77
 
-function acquisition_curves
+function acquisition_histograms(fine_en = 0)
   Fs = 8000;
   Ntests = 100;
 
@@ -524,31 +588,91 @@ function acquisition_curves
 
   % AWGN channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, 10, 25);
+  [dct dfoff] = acquisition_test(Ntests, -1, 25, 0, fine_en);
 
   % Probability of acquistion is what matters, e.g. if it's 50% we can
   % expect sync within 2 frames
 
   printf("AWGN P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
-  printf("AWGN P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
- 
+  if fine_en == 0
+    printf("AWGN P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
+  end
+
   figure(1)
   hist(dct(find (abs(dct) < ttol_samples)))
-  figure(2)
-  hist(dfoff)
+  if fine_en == 0
+    figure(2)
+    hist(dfoff)
+  end
 
   % HF channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, 10, 25, 1);
+  [dct dfoff] = acquisition_test(Ntests, 3, 25, 1, fine_en);
 
-  printf("AWGN P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
-  printf("HF P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
+  printf("HF P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
+  if fine_en == 0
+    printf("HF P(freq offset acq) = %3.2f\n", length(find (abs(dfoff) < ftol_hz))/length(dfoff));
+  end
 
   figure(3)
   hist(dct(find (abs(dct) < ttol_samples)))
-  figure(4)
-  hist(dfoff)
+  if fine_en == 0
+    figure(4)
+    hist(dfoff)
+  end
 
+endfunction
+
+
+function fine_timing_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0)
+
+  % generate test signal at a given Eb/No and frequency offset
+
+  Ts = 0.016; 
+  sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+
+  sim_in.Nsec = Ntests*(sim_in.Ns+1)/sim_in.Rs;
+
+  sim_in.EbNodB = EbNodB;
+  sim_in.verbose = 0;
+  sim_in.hf_en = hf_en;
+  sim_in.foff_hz = foff_hz;
+
+  [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in);
+
+  % set up fine timing states
+
+  Nsamperframe = states.Nsamperframe = sim_out.Nsamperframe;
+  M = states.M = sim_out.M; Ncp = states.Ncp = sim_out.Ncp;
+  states.verbose = 1;
+  states.Fs = sim_out.Fs;
+
+  figure(5); clf;
+  subplot(211)
+  plot(real(rx(1:1+Ncp-1)))
+  hold on;
+  plot(real(rx(M+1:M+1+Ncp-1)),'g')
+  hold off;
+  subplot(212)
+  plot(imag(rx(1:1+Ncp-1)))
+  hold on;
+  plot(imag(rx(M+1:M+1+Ncp-1)),'g')
+  hold off;
+  rx(1:1+Ncp-1) * rx(1:1+Ncp-1)'
+  rx(1:1+Ncp-1) * rx(M+1:M+1+Ncp-1)'
+
+  st = 1; 
+  en = 2*(M+Ncp);
+
+  figure(4); clf;
+  subplot(211)
+  plot(real(rx(st:en)))
+  subplot(212)
+  plot(imag(rx(st:en)))
+  
+  %%xx
+  ft_est = fine_timing(states, rx(st:en));
 endfunction
 
 
@@ -557,7 +681,8 @@ endfunction
 format;
 more off;
 
-run_single
+%run_single
 %run_curves
-%acquisition_curves
+acquisition_histograms(1)
+%fine_timing_test
 
