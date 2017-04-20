@@ -48,26 +48,29 @@ function two_bits = qpsk_demod(symbol)
 endfunction
 
 
-% Returns the most likely place for the start of a frame, as a
-% a candidate for coarse frame sync.  Combines two frames pilots
-% so we need at least Nsamperframe+M+Ncp samples in rx
+% Correlates the OFDM pilot symbol samples with a window of received
+% samples to determine the most likely timing offset.  Combines two
+% frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
+% Also determines frequency offset at maximimum correlation.  Can be
+% used for acquisition (coarse timing a freq offset), and fine timing
 
-function [ct_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
-    Nsamperframe = states.Nsamperframe; M = states.M; Ncp = states.Ncp; Fs = states.Fs;
+function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
+    Nsamperframe = states.Nsamperframe; Fs = states.Fs;
+    Npsam = length(rate_fs_pilot_samples);
     verbose  = states.verbose;
 
-    Ncorr = length(rx) - (Nsamperframe+M+Ncp) + 1;
+    Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
     assert(Ncorr > 0);
     corr = zeros(1,Ncorr);
     for i=1:Ncorr
-      corr(i)   = abs(rx(i:i+M+Ncp-1) * rate_fs_pilot_samples');
-      corr(i)  += abs(rx(i+Nsamperframe:i+Nsamperframe+M+Ncp-1) * rate_fs_pilot_samples');
+      corr(i)   = abs(rx(i:i+Npsam-1) * rate_fs_pilot_samples');
+      corr(i)  += abs(rx(i+Nsamperframe:i+Nsamperframe+Npsam-1) * rate_fs_pilot_samples');
     end
 
-    [mx ct_est] = max(abs(corr));
+    [mx t_est] = max(abs(corr));
 
-    C  = abs(fft(rx(ct_est:ct_est+M+Ncp-1) .* conj(rate_fs_pilot_samples), Fs));
-    C += abs(fft(rx(ct_est+Nsamperframe:ct_est+Nsamperframe+M+Ncp-1) .* conj(rate_fs_pilot_samples), Fs));
+    C  = abs(fft(rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
+    C += abs(fft(rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
 
     fmax = 30;
     [mx_pos foff_est_pos] = max(C(1:fmax));
@@ -80,10 +83,10 @@ function [ct_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     end
 
     if verbose
-      %printf("ct_est: %d\n", ct_est);
-      figure(6); clf;
+      %printf("t_est: %d\n", t_est);
+      figure(7); clf;
       plot(abs(corr))
-      figure(7)
+      figure(8)
       plot(C)
       axis([0 200 0 0.4])
     end
@@ -263,6 +266,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
     % channel simulation ---------------------------------------------------------------
 
+    tx = resample(tx, 2000, 2000);
+    tx = [tx zeros(1,Nsam-length(tx))];
+    tx = tx(1:Nsam);
     rx = tx;
 
     if hf_en
@@ -278,7 +284,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
     % some spare samples at end to allow for timing est window
 
-    rx = [rx zeros(1,M)];
+    rx = [rx zeros(1,Nsamperframe)];
     
     % pilot based phase est, we use known tx symbols as pilots ----------
  
@@ -287,7 +293,12 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     phase_est_stripped_log = 10*ones(Nrp,Nc+2);
     phase_est_log = 10*ones(Nrp,Nc+2);
     timing_est_log = [];
-    timing_est = Ncp/2;
+    timing_est = 1;
+    if timing_en
+      sample_point = timing_est;
+    else
+      sample_point = Ncp/2;
+    end
 
     for r=1:Ns:Nrp-Ns
 
@@ -296,15 +307,16 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % update timing every frame
 
         if (mod(r-1,Ns) == 0) && (r != 1) && (r != Nrp)
-          %st = (r-1)*(M+Ncp) - ceil(window_width/2);
           st = (r-1)*(M+Ncp) + 1 - floor(window_width/2) + (timing_est-1);
-          en = st + Nsamperframe-1 + length(rate_fs_pilot_samples) + window_width-1;
+          en = st + Nsamperframe-1 + M+Ncp + window_width-1;
           ft_est = coarse_sync(tstates, rx(st:en), rate_fs_pilot_samples);
           timing_est += ft_est - ceil(window_width/2);
-          %if verbose
-          %  printf("ft_est: %d timing_est %d\n", ft_est, timing_est);
-          %end
+          if verbose
+            printf("ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
+          end
           delta_t = [delta_t ft_est - ceil(window_width/2)];
+          sample_point = max(timing_est+Ncp/4, sample_point);
+          sample_point = min(timing_est+Ncp, sample_point);
         end
       end
 
@@ -316,7 +328,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       if r > Ns+1
         rr = r-Ns;
-        st = (rr-1)*(M+Ncp) + 1 + timing_est; en = st + M - 1;
+        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
           acarrier = rx(st:en) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
@@ -327,7 +339,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       for rr=r:r+Ns
  
-        st = (rr-1)*(M+Ncp) + 1 + timing_est; en = st + M - 1;
+        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
           acarrier = rx(st:en) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
@@ -338,7 +350,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       if r < Nrp - 2*Ns
         rr = r+2*Ns;
-        st = (rr-1)*(M+Ncp) + 1 + timing_est; en = st + M - 1;
+        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
           acarrier = rx(st:en) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
@@ -412,8 +424,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     if verbose
       figure(1)
       plot(real(tx))
+
       figure(2)
-      Tx = abs(fft(tx.*hanning(Nsam)'));
+      Tx = abs(fft(tx(1:Nsam).*hanning(Nsam)'));
       Tx_dB = 20*log10(Tx);
       dF = Fs/Nsam;
       plot((1:Nsam)*dF, Tx_dB);
@@ -423,7 +436,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       figure(3); clf; 
       plot(rx_np,'+');
       axis([-2 2 -2 2]);
-
+      title('Scatter');
       
       if hf_en
         figure(4); clf; 
@@ -432,6 +445,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         %hold on; plot(abs(spread2(1:Nsam)),'g'); hold off;
         subplot(212)
         plot(angle(spread1(1:Nsam)));
+        title('spread1 amp and phase');
       end
       
 
@@ -439,6 +453,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); 
       hold on; 
       plot(phase_est_pilot_log(:,2:Nc+1),'g+', 'markersize', 5); 
+      title('Phase est');
 
 #{
       % todo, work out a way to plot rate Fs hf model phase
@@ -454,6 +469,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       stem(delta_t)
       subplot(212)
       plot(timing_est_log);
+      title('Timing');
     end
 
     sim_out.ber(nn) = sum(Nerrs)/Nbits; 
@@ -472,11 +488,11 @@ function run_single
   %sim_in.Nsec = 3*(sim_in.Ns+1)/sim_in.Rs;  % one frame
   sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 6;
+  sim_in.EbNodB = 3;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
-  sim_in.timing_en = 0;
+  sim_in.timing_en = 1;
 
   run_sim(sim_in);
 end
@@ -538,7 +554,7 @@ end
 
 % Run an acquisition test, returning vectors of estimation errors
 
-function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en)
+function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
 
   % generate test signal at a given Eb/No and frequency offset
 
@@ -551,9 +567,7 @@ function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=
   sim_in.EbNodB = EbNodB;
   sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
-  sim_in.foff_hz = foff_hz;
-
-  [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in);
+  sim_in.foff_hz = foff_hz; sim_in.timing_en = 0;
 
   % set up acquistion 
 
