@@ -1,7 +1,8 @@
-% bpsk_hf_fs.m
+% ofdm_fs.m
 % David Rowe Mar 2017
 %
-% Rate Fs BPSK simulation, development of bpsk_hf_rs.m
+% Rate Fs BPSK/QPSK OFDM simulation, rate Fs verison of ofdm_rs.m with
+% OFDM based up and down conversion.
 
 #{
  TODO:
@@ -11,6 +12,8 @@
    [X] rate Fs HF model and HF results
    [X] add QPSK
    [X] add CP
+   [X] fine timing estimator and sample clock offset tracking
+   [X] acquisition coarse timing & freq offset estimation
    [ ] adjust waveform parameters for real world
    [ ] Nsec run time take into account CP
    [ ] plot phase ests
@@ -19,8 +22,6 @@
            + but unhappy with 1800Hz bandwidth
        [ ] also try interpolation or just single row
    [ ] compute SNR and PAPR
-   [ ] timing estimator
-   [ ] acquisition & freq offset estimation
    [ ] SSB bandpass filtering
 #}
 
@@ -82,7 +83,7 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
       foff_est = foff_est_neg - fmax - 1;
     end
 
-    if verbose
+    if verbose > 1
       %printf("t_est: %d\n", t_est);
       figure(7); clf;
       plot(abs(corr))
@@ -93,25 +94,56 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
 endfunction
 
 
-function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
-  Fs = 8000;
-  Rs = sim_in.Rs;
-  Tcp = sim_in.Tcp;
-  M  = Fs/Rs;
-  Ncp = Tcp*Fs;
-  woffset = 2*pi*sim_in.foff_hz/Fs;
+% init function
+% load function
+% default est on, but way to optionally disable
 
-  bps = sim_in.bps;
+#{
+  Frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
+  
+    PPP
+    DDD
+    DDD
+    PPP
+#}
+
+function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
+  states.Fs = 8000;
+  states.bps = bps;
+  states.Rs = Rs;
+  states.Tcp = Tcp;
+  states.Ns = Ns;       % step size for pilots
+  states.Nc = Nc;       % Number of cols, aka number of carriers
+  states.M  = states.Fs/Rs;
+  states.Ncp = Tcp*states.Fs;
+  states.Nbitsperframe = (Ns-1)*Nc*bps;
+  states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
+  states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
+
+  % generate same pilots each time
+
+  rand('seed',1);
+  states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
+endfunction
+
+
+function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
+
+  % set up core modem constants
+
+  states = ofdm_init(sim_in.bps, sim_in.Rs, sim_in.Tcp, sim_in.Ns, sim_in.Nc);
+  ofdm_load_const;
+  
+  % simulation parameters and flags
+
+  woffset = 2*pi*sim_in.foff_hz/Fs;
   EbNodB  = sim_in.EbNodB;
-  verbose = sim_in.verbose;
+  verbose = states.verbose = sim_in.verbose;
   hf_en   = sim_in.hf_en;
   timing_en = sim_in.timing_en;
+  foff_est_en = sim_in.foff_est_en;
+  phase_est_en = sim_in.phase_est_en;
 
-  Ns = sim_in.Ns;          % step size for pilots
-  Nc = sim_in.Nc;          % Number of cols, aka number of carriers
-
-  Nbitsperframe = (Ns-1)*Nc*bps;
-  Nrowsperframe = Nbitsperframe/(Nc*bps);
   if verbose
     printf("Rs:.........: %4.2f\n", Rs);
     printf("M:..........: %d\n", M);
@@ -123,13 +155,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
   % Important to define run time in seconds so HF model will evolve the same way
   % for different pilot insertion rates.  So lets work backwards from approx
   % seconds in run to get Nbits, the total number of payload data bits
-
-  % frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
-  %
-  % PPP
-  % DDD
-  % DDD
-  % PPP
 
   Nrows = sim_in.Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
@@ -143,7 +168,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
   Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
                            % extra row of pilots at end
-  Nsamperframe =  (Nrowsperframe+1)*(M+Ncp);
 
   if verbose
     printf("Nc.....: %d\n", Nc);
@@ -153,11 +177,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     printf("Nframes: %d\n", Nframes);
     printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
   end
-
-  % generate same pilots each time
-
-  rand('seed',1);
-  pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
 
   % set up HF model ---------------------------------------------------------------
 
@@ -265,10 +284,24 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     rate_fs_pilot_samples = tx(1:M+Ncp);
 
     % channel simulation ---------------------------------------------------------------
+    
+    if isfield(sim_in, "sample_clock_offset_ppm") 
 
-    tx = resample(tx, 2000, 2000);
-    tx = [tx zeros(1,Nsam-length(tx))];
-    tx = tx(1:Nsam);
+      if sim_in.sample_clock_offset_ppm
+        timebase = floor(abs(1E6/sim_in.sample_clock_offset_ppm));
+        if sim_in.sample_clock_offset_ppm > 0
+          tx = resample(tx, timebase+1, timebase);
+        else
+          tx = resample(tx, timebase, timebase+1);
+        end
+
+        % make sure length is correct for rest of simulation
+
+        tx = [tx zeros(1,Nsam-length(tx))];
+        tx = tx(1:Nsam);
+      end
+    end
+
     rx = tx;
 
     if hf_en
@@ -297,10 +330,18 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     if timing_en
       sample_point = timing_est;
     else
-      sample_point = Ncp/2;
+      sample_point = Ncp;
     end
+    foff_est_hz_log = [];
+    foff_est_hz = 0;    
+    foff_est_gain = 0.1;
+    Nerrs_log = [];
 
     for r=1:Ns:Nrp-Ns
+
+      % printf("symbol r: %d\n", r);
+
+      woff_est = 2*pi*foff_est_hz/Fs;
 
       if timing_en
 
@@ -309,10 +350,11 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         if (mod(r-1,Ns) == 0) && (r != 1) && (r != Nrp)
           st = (r-1)*(M+Ncp) + 1 - floor(window_width/2) + (timing_est-1);
           en = st + Nsamperframe-1 + M+Ncp + window_width-1;
-          ft_est = coarse_sync(tstates, rx(st:en), rate_fs_pilot_samples);
+          ft_est = coarse_sync(states, rx(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
           timing_est += ft_est - ceil(window_width/2);
-          if verbose
-            printf("ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
+          if verbose > 1
+            printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
+            %printf("  r : %d st: %d en: %d\n", r, st, en);
           end
           delta_t = [delta_t ft_est - ceil(window_width/2)];
           sample_point = max(timing_est+Ncp/4, sample_point);
@@ -326,36 +368,47 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % previous pilot
 
-      if r > Ns+1
+      if r >= Ns+1
         rr = r-Ns;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
-          acarrier = rx(st:en) .* conj(W(c,:));
+          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
         end
+        %printf("  rr: %d st: %d en: %d\n", rr, st, en);
       end
 
       % pilot - this frame - pilot
 
-      for rr=r:r+Ns
- 
+      for rr=r:r+Ns 
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
-          acarrier = rx(st:en) .* conj(W(c,:));
+          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
         end
+        %printf("  rr: %d st: %d en: %d\n", rr, st, en);
       end
 
       % next pilot
 
-      if r < Nrp - 2*Ns
+      if r <= Nrp - 2*Ns
         rr = r+2*Ns;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         for c=1:Nc+2
-          acarrier = rx(st:en) .* conj(W(c,:));
+          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
           rx_sym(rr,c) = sum(acarrier);
         end
+        % printf("  rr: %d st: %d en: %d\n", rr, st, en);
       end
+
+      % est freq err based on all carriers
+      
+      if foff_est_en
+        freq_err_rect = sum(rx_sym(r,:))' * sum(rx_sym(r+Ns,:));
+        freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
+        foff_est_hz += foff_est_gain*freq_err_hz;
+      end
+      foff_est_hz_log = [foff_est_hz_log foff_est_hz];     
 
       % OK - now estimate and correct phase 
 
@@ -373,10 +426,10 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
         % use next step of pilots in past and future
 
-        if r > Ns+1
+        if r >= Ns+1
           aphase_est_pilot_rect += sum(rx_sym(r-Ns,cr)*tx_sym(r-Ns,cr)');
         end
-        if r < Nrp - 2*Ns
+        if r <= Nrp - 2*Ns
           aphase_est_pilot_rect += sum(rx_sym(r+2*Ns,cr)*tx_sym(r+2*Ns,cr)');
         end
 
@@ -385,7 +438,11 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         for rr=r+1:r+Ns-1
           aphase_est_pilot = angle(aphase_est_pilot_rect);
           phase_est_pilot_log(rr,c) = aphase_est_pilot;
-          rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
+          if phase_est_en
+            rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
+          else
+            rx_corr(rr,c) = rx_sym(rr,c);
+          end
         end
 
       end % c=2:Nc+1
@@ -418,13 +475,43 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
     errors = xor(tx_bits, rx_bits);
     Nerrs = sum(errors);
+    for f=1:Nframes
+      st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe-1;
+      Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
+    end
 
-    printf("EbNodB: %3.2f BER: %4.3f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
+    printf("EbNodB: %3.2f BER: %5.4f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
 
     if verbose
-      figure(1)
-      plot(real(tx))
 
+      figure(1); clf; 
+      plot(rx_np,'+');
+      axis([-2 2 -2 2]);
+      title('Scatter');
+      
+      figure(2); clf;
+      plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); 
+      hold on; 
+      plot(phase_est_pilot_log(:,2:Nc+1),'g+', 'markersize', 5); 
+      title('Phase est');
+      axis([1 Nrp -pi pi]);  
+
+      figure(3); clf;
+      subplot(211)
+      stem(delta_t)
+      title('Fine Timing');
+      subplot(212)
+      plot(timing_est_log);
+
+      figure(4); clf;
+      plot(foff_est_hz_log)
+      axis([1 max(Nframes,2) -3 3]);
+      title('Fine Freq');
+
+      figure(5); clf;
+      plot(Nerrs_log);
+
+#{
       figure(2)
       Tx = abs(fft(tx(1:Nsam).*hanning(Nsam)'));
       Tx_dB = 20*log10(Tx);
@@ -432,12 +519,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       plot((1:Nsam)*dF, Tx_dB);
       mx = max(Tx_dB);
       axis([0 Fs/2 mx-60 mx])
+#}
      
-      figure(3); clf; 
-      plot(rx_np,'+');
-      axis([-2 2 -2 2]);
-      title('Scatter');
-      
+#{
       if hf_en
         figure(4); clf; 
         subplot(211)
@@ -447,14 +531,8 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         plot(angle(spread1(1:Nsam)));
         title('spread1 amp and phase');
       end
+#}
       
-
-      figure(5); clf;
-      plot(phase_est_log(:,2:Nc+1),'+', 'markersize', 10); 
-      hold on; 
-      plot(phase_est_pilot_log(:,2:Nc+1),'g+', 'markersize', 5); 
-      title('Phase est');
-
 #{
       % todo, work out a way to plot rate Fs hf model phase
       if sim_in.hf_en
@@ -462,14 +540,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       end
 #}
 
-      axis([1 Nrp -pi pi]);  
 
-      figure(6); clf;
-      subplot(211)
-      stem(delta_t)
-      subplot(212)
-      plot(timing_est_log);
-      title('Timing');
     end
 
     sim_out.ber(nn) = sum(Nerrs)/Nbits; 
@@ -481,18 +552,21 @@ endfunction
 
 
 function run_single
-  Ts = 0.016; 
+  Ts = 0.018; 
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  %sim_in.Nsec = 3*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 30;
+  %sim_in.Nsec = 1*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  sim_in.Nsec = 10;
 
-  sim_in.EbNodB = 3;
+  sim_in.EbNodB = 6;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.timing_en = 1;
+  sim_in.sample_clock_offset_ppm = 0;
+  sim_in.foff_est_en = 1;
+  sim_in.phase_est_en = 1;
 
   run_sim(sim_in);
 end
