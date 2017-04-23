@@ -1,8 +1,9 @@
-% bpsk_hf_rs.m
+% ofdm_rs.m
 % David Rowe Mar 2017
 %
-% Rate Rs BPSK simulation to explore techniques for phase estimation
-% over multiple carriers in HF channel
+% Rate Rs BPSK/QPSK simulation to explore techniques for
+% phase estimation over multiple carriers in HF channel.  Rate
+% Rs version of ofdm_fs.m
 
 #{
  TODO:
@@ -18,8 +19,7 @@
    [X] try combining mod stripping phase est inside frame
    [X] curves taking into account pilot losses
    [ ] remove border carriers, interpolate edge carrier
-   [ ] modify for QPSK
-       [ ] change name
+   [X] modify for QPSK
 #}
 
 1;
@@ -359,7 +359,7 @@ function sim_out = run_sim(sim_in)
     errors = xor(tx_bits, rx_bits);
     Nerrs = sum(errors);
 
-    printf("EbNodB: %3.2f BER: %4.3f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
+    printf("EbNodB: %3.2f BER: %5.4f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
 
     if verbose
       figure(1); clf; 
@@ -753,21 +753,23 @@ end
 
 
 function run_single
-  sim_in.bps = 1;
+  sim_in.bps = 2;
   sim_in.Nsec = 30;
-  sim_in.Nc = 3;
-  sim_in.Ns = 9;
-  sim_in.EbNodB = -1;
+  sim_in.Nc = 16;
+  sim_in.Ns = 8;
+  sim_in.EbNodB = 4;
   sim_in.verbose = 1;
-  sim_in.pilot_phase_est = 1;
+
+  sim_in.pilot_phase_est = 0;
   sim_in.pilot_wide = 1;
   sim_in.pilot_interp = 0;
   sim_in.stripped_phase_est = 0;
+  sim_in.ml_pd = 0;
+
   sim_in.phase_offset = 0;
   sim_in.phase_test = 0;
   sim_in.hf_en = 0;
-  sim_in.hf_phase = 0;
-  sim_in.ml_pd = 1;
+  sim_in.hf_phase = 1;
 
   run_sim(sim_in);
 end
@@ -776,10 +778,10 @@ end
 format;
 more off;
 
-%run_single
+run_single
 %run_curves_hf_bpsk_qpsk
 %run_curves_hf_channels
-run_curves_hf_ml
+%run_curves_hf_ml
 
 
 
