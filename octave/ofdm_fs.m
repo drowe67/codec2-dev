@@ -94,10 +94,6 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
 endfunction
 
 
-% init function
-% load function
-% default est on, but way to optionally disable
-
 #{
   Frame has Ns-1 data symbols between pilots, e.g. for Ns=3: 
   
@@ -124,6 +120,58 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
+
+  w = (0:Nc+1)*2*pi*Rs/states.Fs;
+  W = zeros(Nc+2,states.M);
+  for c=1:Nc+2
+    W(c,:) = exp(j*w(c)*(0:states.M-1));
+  end
+  states.w = w;
+  states.W = W;
+
+endfunction
+
+
+% ---------------------------
+% Modulates one frame of bits
+% ---------------------------
+
+function tx = ofdm_mod(states, tx_bits)
+  ofdm_load_const;
+
+  assert(length(tx_bits) == Nbitsperframe);
+
+  % map to symbols in linear array
+
+  if bps == 1
+    tx_sym_lin = 2*tx_bits - 1;
+  end
+  if bps == 2
+    for s=1:Nbitsperframe/bps
+      tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
+    end
+  end
+
+  % place symbols in multi-carrier frame with pilots and boundary carriers
+
+  tx_sym = []; s = 1;
+  aframe = zeros(Ns,Nc+2);
+  aframe(1,:) = pilots;
+  for r=1:Nrowsperframe
+    arowofsymbols = tx_sym_lin(s:s+Nc-1);
+    s += Nc;
+    aframe(r+1,2:Nc+1) = arowofsymbols;
+  end
+  tx_sym = [tx_sym; aframe];
+
+  % OFDM upconvert symbol by symbol so we can add CP
+
+  tx = [];
+  for r=1:Ns
+    asymbol = tx_sym(r,:) * W/M;
+    asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
+    tx = [tx asymbol_cp];
+  end
 endfunction
 
 
@@ -145,11 +193,13 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
   phase_est_en = sim_in.phase_est_en;
 
   if verbose
-    printf("Rs:.........: %4.2f\n", Rs);
-    printf("M:..........: %d\n", M);
+    printf("Rs:..........: %4.2f\n", Rs);
+    printf("M:...........: %d\n", M);
+    printf("Ncp:.........: %d\n", Ncp);
     printf("bps:.........: %d\n", bps);
     printf("Nbitsperframe: %d\n", Nbitsperframe);
     printf("Nrowsperframe: %d\n", Nrowsperframe);
+    printf("Nsamperframe.: %d\n", Nsamperframe);
   end
 
   % Important to define run time in seconds so HF model will evolve the same way
@@ -213,8 +263,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
  
   % init timing est states
 
-  tstates.Nsamperframe = Nsamperframe; tstates.M = M; tstates.Ncp = Ncp;
-  tstates.verbose = 0; tstates.Fs = Fs;
   delta_t = []; 
   window_width = 11;     % search window_width/2 from current timing instant
 
@@ -227,59 +275,26 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     EbNo = bps * (10 .^ (EbNodB(nn)/10));
     variance = 1/(M*EbNo/2);
 
-    % generate tx bits
+    Nsam = Nrp*(M+Ncp);
+
+    % generate tx bits and run OFDM modulator
 
     tx_bits = rand(1,Nbits) > 0.5;
 
-    % map to symbols in linear array
-
-    if bps == 1
-      tx_sym_lin = 2*tx_bits - 1;
-    end
-    if bps == 2
-      for s=1:Nbits/bps
-        tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
-      end
-    end
-
-    % place symbols in multi-carrier frame with pilots and boundary carriers
-
-    tx_sym = []; s = 1;
-    for f=1:Nframes
-      aframe = zeros(Nrowsperframe,Nc+2);
-      aframe(1,:) = pilots;
-      for r=1:Nrowsperframe
-        arowofsymbols = tx_sym_lin(s:s+Nc-1);
-        s += Nc;
-        aframe(r+1,2:Nc+1) = arowofsymbols;
-      end
-      tx_sym = [tx_sym; aframe];
-    end      
-    tx_sym = [tx_sym; pilots];  % final row of pilots
-    [nr nc] = size(tx_sym);
-    assert(nr == Nrp);
-
-    % OFDM up conversion and upsampling to rate Fs ---------------------
-
-    w = (0:Nc+1)*2*pi*Rs/Fs;
-    W = zeros(Nc+2,M);
-    for c=1:Nc+2
-      W(c,:) = exp(j*w(c)*(0:M-1));
-    end
-
-    Nsam = Nrp*(M+Ncp);
     tx = [];
-
-    % OFDM upconvert symbol by symbol so we can add CP
-
-    for r=1:Nrp
-      asymbol = tx_sym(r,:) * W/M;
-      asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
-      tx = [tx asymbol_cp];
+    for f=1:Nframes
+      tx = [tx ofdm_mod(states, tx_bits((f-1)*Nbitsperframe+1:f*Nbitsperframe))];
     end
+
+    % add extra row of pilots at end, to allow one frame simulations,
+    % useful for development
+
+    st = Nsamperframe*(Nframes-1)+1; en = st+Ncp+M-1;
+    tx = [tx tx(st:en)];
     assert(length(tx) == Nsam);
 
     % OFDM symbol of pilots is used for coarse timing and freq during acquisition, and fine timing
+    % TODO: put this in init code
 
     rate_fs_pilot_samples = tx(1:M+Ncp);
 
@@ -322,6 +337,8 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     % pilot based phase est, we use known tx symbols as pilots ----------
  
     rx_sym = zeros(Nrp, Nc+2);
+    rx_sym1 = zeros(1+Ns+1+1, Nc+2);
+
     phase_est_pilot_log = 10*ones(Nrp,Nc+2);
     phase_est_stripped_log = 10*ones(Nrp,Nc+2);
     phase_est_log = 10*ones(Nrp,Nc+2);
@@ -337,7 +354,44 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     foff_est_gain = 0.1;
     Nerrs_log = [];
 
+    % place samples in rx_buf, which is 3 and a bit frame long
+
+#{
+  [ ] OK have rxbuf doing ofdm d/c using fixed time refs and rxbuf update
+  [ ] now need rx_sym to work based on fixed time refs
+      + but then need to make that work with moving time ref output for now
+      + so transition works after phase correction
+#}
+
+    nin = Nsamperframe;
+
+    % Maintain buffer of 3 frames plus one pilot:
+    %
+    % P DDD P DDD P DDD P
+
+    Nrxbuf = 3*Nsamperframe+M+Ncp;
+    rxbuf = zeros(1, Nrxbuf);
+    prx = 1;
+
+    % for this simulation we "prime" buffer to allow one frame runs during development
+
+    rxbuf(2*Nsamperframe+1:Nrxbuf) = rx(prx:Nsamperframe+M+Ncp);
+    prx += Nsamperframe+M+Ncp;
+
     for r=1:Ns:Nrp-Ns
+
+      % insert samples at end of buffer, set to zero if no samples
+      % available to disable phase estimation on future pilots at end
+      % of simulation
+
+      rxbuf(1:Nrxbuf-Nsamperframe) = rxbuf(Nsamperframe+1:Nrxbuf);
+      rxbuf(Nrxbuf-Nsamperframe+1:Nrxbuf) = zeros(1,Nsamperframe);
+      lnew = min(Nsam-prx,Nsamperframe);
+      printf("prx: %d lnew: %d Nrxbuf: %d\n", prx, lnew, Nrxbuf);
+      if lnew
+        rxbuf(Nrxbuf-Nsamperframe+1:Nrxbuf-Nsamperframe+lnew) = rx(prx:prx+lnew-1);
+      end
+      prx += Nsamperframe;
 
       % printf("symbol r: %d\n", r);
 
@@ -368,38 +422,56 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % previous pilot
 
-      if r >= Ns+1
+      %if r >= Ns+1
         rr = r-Ns;
+        rrr = rr - r + 1;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+        printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
         for c=1:Nc+2
-          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-          rx_sym(rr,c) = sum(acarrier);
+          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
+          %rx_sym(rr,c) = sum(acarrier);
+          rx_sym1(1,c) = sum(acarrier);
         end
         %printf("  rr: %d st: %d en: %d\n", rr, st, en);
-      end
+      %end
 
       % pilot - this frame - pilot
 
+      printf("-------------frame r: %d\n", r);
+      rrrr = 2;
       for rr=r:r+Ns 
+        rrr = rr - r + 1;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+        printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
+        rx(st:st+3)
+        rxbuf(st1:st1+3)
         for c=1:Nc+2
-          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-          rx_sym(rr,c) = sum(acarrier);
+          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
+          %rx_sym(rr,c) = sum(acarrier);
+          rx_sym1(rrrr,c) = sum(acarrier);
         end
+        rrrr++;
         %printf("  rr: %d st: %d en: %d\n", rr, st, en);
       end
 
       % next pilot
 
-      if r <= Nrp - 2*Ns
+      %if r <= Nrp - 2*Ns
         rr = r+2*Ns;
+        rrr = rr - r + 1;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
+        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
         for c=1:Nc+2
-          acarrier = rx(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-          rx_sym(rr,c) = sum(acarrier);
+          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
+          %rx_sym(rr,c) = sum(acarrier);
+          rx_sym1(rrrr,c) = sum(acarrier);
         end
         % printf("  rr: %d st: %d en: %d\n", rr, st, en);
-      end
+      %end
+      rrrr
+      assert(rrrr == (Ns+3));
 
       % est freq err based on all carriers
       
@@ -422,30 +494,39 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % PPP
           
         cr = c-1:c+1;
-        aphase_est_pilot_rect = sum(rx_sym(r,cr)*tx_sym(r,cr)') + sum(rx_sym(r+Ns,cr)*tx_sym(r+Ns,cr)');
+        %aphase_est_pilot_rect = sum(rx_sym(r,cr)*pilots(cr)') + sum(rx_sym(r+Ns,cr)*pilots(cr)');
+        aphase_est_pilot_rect = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
 
         % use next step of pilots in past and future
 
-        if r >= Ns+1
-          aphase_est_pilot_rect += sum(rx_sym(r-Ns,cr)*tx_sym(r-Ns,cr)');
-        end
-        if r <= Nrp - 2*Ns
-          aphase_est_pilot_rect += sum(rx_sym(r+2*Ns,cr)*tx_sym(r+2*Ns,cr)');
-        end
+        %if r >= Ns+1
+          %aphase_est_pilot_rect += sum(rx_sym(r-Ns,cr)*pilots(cr)');
+          aphase_est_pilot_rect += sum(rx_sym1(1,cr)*pilots(cr)');
+        %end
+        %if r <= Nrp - 2*Ns
+          %aphase_est_pilot_rect += sum(rx_sym(r+2*Ns,cr)*pilots(cr)');
+          aphase_est_pilot_rect += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
+        %end
 
         % correct phase offset using phase estimate
 
+        rrrr = 3;
         for rr=r+1:r+Ns-1
           aphase_est_pilot = angle(aphase_est_pilot_rect);
           phase_est_pilot_log(rr,c) = aphase_est_pilot;
           if phase_est_en
+            % rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
             rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
+            rx_corr(rr,c) = rx_sym1(rrrr,c) * exp(-j*aphase_est_pilot);
           else
-            rx_corr(rr,c) = rx_sym(rr,c);
+            %rx_corr(rr,c) = rx_sym(rr,c);
+            rx_corr(rr,c) = rx_sym1(rrrr,c);
           end
+          rrrr++;
         end
 
       end % c=2:Nc+1
+
     end % r=1:Ns:Nrp-Ns
 
 
@@ -556,16 +637,16 @@ function run_single
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  %sim_in.Nsec = 1*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 10;
+  sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  %sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 6;
+  sim_in.EbNodB = 100;
   sim_in.verbose = 1;
-  sim_in.hf_en = 1;
+  sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
-  sim_in.timing_en = 1;
+  sim_in.timing_en = 0;
   sim_in.sample_clock_offset_ppm = 0;
-  sim_in.foff_est_en = 1;
+  sim_in.foff_est_en = 0;
   sim_in.phase_est_en = 1;
 
   run_sim(sim_in);
