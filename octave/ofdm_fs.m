@@ -402,14 +402,26 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % update timing every frame
 
         if (mod(r-1,Ns) == 0) && (r != 1) && (r != Nrp)
+
           st = (r-1)*(M+Ncp) + 1 - floor(window_width/2) + (timing_est-1);
           en = st + Nsamperframe-1 + M+Ncp + window_width-1;
-          ft_est = coarse_sync(states, rx(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+
+          st1 = Nsamperframe + 1 - floor(window_width/2) + (timing_est-1);
+          en1 = st1 + Nsamperframe-1 + M+Ncp + window_width-1;
+          %printf("  r : %d st1: %d en1: %d\n", r, st1, en1);
+          %rx(st:st+3)
+          %rxbuf(st1:st1+3)
+          
+          ft_est = coarse_sync(states, rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)), rate_fs_pilot_samples);
           timing_est += ft_est - ceil(window_width/2);
+
           if verbose > 1
             printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
             %printf("  r : %d st: %d en: %d\n", r, st, en);
           end
+
+          % black magic to keep sample_point inside cyclic prefix.  Or something like that.
+
           delta_t = [delta_t ft_est - ceil(window_width/2)];
           sample_point = max(timing_est+Ncp/4, sample_point);
           sample_point = min(timing_est+Ncp, sample_point);
@@ -427,9 +439,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         rrr = rr - r + 1;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
-        printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
+        %printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
         for c=1:Nc+2
-          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
+          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
           %rx_sym(rr,c) = sum(acarrier);
           rx_sym1(1,c) = sum(acarrier);
         end
@@ -444,9 +456,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         rrr = rr - r + 1;
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
-        printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
-        rx(st:st+3)
-        rxbuf(st1:st1+3)
+        %printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
+        %rx(st:st+3)
+        %rxbuf(st1:st1+3)
         for c=1:Nc+2
           acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
           %rx_sym(rr,c) = sum(acarrier);
@@ -464,7 +476,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
         for c=1:Nc+2
-          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
+          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
           %rx_sym(rr,c) = sum(acarrier);
           rx_sym1(rrrr,c) = sum(acarrier);
         end
@@ -476,7 +488,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       % est freq err based on all carriers
       
       if foff_est_en
-        freq_err_rect = sum(rx_sym(r,:))' * sum(rx_sym(r+Ns,:));
+        freq_err_rect = sum(rx_sym1(2,:))' * sum(rx_sym1(2+Ns,:));
         freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
         foff_est_hz += foff_est_gain*freq_err_hz;
       end
@@ -637,16 +649,16 @@ function run_single
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  %sim_in.Nsec = 30;
+  %sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  sim_in.Nsec = 10;
 
   sim_in.EbNodB = 100;
   sim_in.verbose = 1;
   sim_in.hf_en = 0;
-  sim_in.foff_hz = 0;
-  sim_in.timing_en = 0;
+  sim_in.foff_hz = 0.5;
+  sim_in.timing_en = 1;
   sim_in.sample_clock_offset_ppm = 0;
-  sim_in.foff_est_en = 0;
+  sim_in.foff_est_en = 1;
   sim_in.phase_est_en = 1;
 
   run_sim(sim_in);
