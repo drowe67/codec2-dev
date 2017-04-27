@@ -339,7 +339,8 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     rx_sym = zeros(Nrp, Nc+2);
     rx_sym1 = zeros(1+Ns+1+1, Nc+2);
 
-    phase_est_pilot_log = 10*ones(Nrp,Nc+2);
+    %phase_est_pilot_log = 10*ones(Nrp,Nc+2);
+    phase_est_pilot_log = [];
     phase_est_stripped_log = 10*ones(Nrp,Nc+2);
     phase_est_log = 10*ones(Nrp,Nc+2);
     timing_est_log = [];
@@ -420,9 +421,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % previous pilot
 
-      rr = r-Ns;
-      rrr = rr - r + 1;
-      st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+      st1 = Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
 
       for c=1:Nc+2
         acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
@@ -431,25 +430,22 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % pilot - this frame - pilot
 
-      rrrr = 2;
-      for rr=r:r+Ns 
-        rrr = rr - r + 1;
-        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+      %rrrr = 2;
+      %for rr=r:r+Ns 
+      for rr=1:Ns+1 
+        st1 = Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
         for c=1:Nc+2
           acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
-          rx_sym1(rrrr,c) = sum(acarrier);
+          rx_sym1(rr+1,c) = sum(acarrier);
         end
-        rrrr++;
       end
 
       % next pilot
 
-      rr = r+2*Ns;
-      rrr = rr - r + 1;
-      st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+      st1 = Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
       for c=1:Nc+2
         acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
-        rx_sym1(rrrr,c) = sum(acarrier);
+        rx_sym1(Ns+3,c) = sum(acarrier);
       end
       
       % est freq err based on all carriers
@@ -463,6 +459,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % OK - now estimate and correct phase 
 
+      aphase_est_pilot = 10*ones(1,Nc+2);
       for c=2:Nc+1
 
         % estimate phase using average of 6 pilots in a rect 2D window centred
@@ -473,27 +470,25 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % PPP
           
         cr = c-1:c+1;
-        aphase_est_pilot_rect(c) = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
+        aphase_est_pilot_rect = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
 
         % use next step of pilots in past and future
 
-        aphase_est_pilot_rect(c) += sum(rx_sym1(1,cr)*pilots(cr)');
-        aphase_est_pilot_rect(c) += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
+        aphase_est_pilot_rect += sum(rx_sym1(1,cr)*pilots(cr)');
+        aphase_est_pilot_rect += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
+        aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
       end
 
       % correct phase offset using phase estimate, and demodulate
       % bits, separate loop as it runs across cols (carriers) to get
       % frame bit ordering correct
 
-      rrrr = 3;
-      for rr=r+1:r+Ns-1
+      for rr=1:Ns-1
         for c=2:Nc+1
-          aphase_est_pilot = angle(aphase_est_pilot_rect(c));
-          phase_est_pilot_log(rr,c) = aphase_est_pilot;
           if phase_est_en
-            rx_corr = rx_sym1(rrrr,c) * exp(-j*aphase_est_pilot);
+            rx_corr = rx_sym1(rr+2,c) * exp(-j*aphase_est_pilot(c));
           else
-            rx_corr = rx_sym1(rrrr,c);
+            rx_corr = rx_sym1(rr+2,c);
           end
           rx_np = [rx_np rx_corr];
           if bps == 1
@@ -504,34 +499,12 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
           end
           rx_bits = [rx_bits abit];
         end % c=2:Nc+1
-        rrrr++;
+        phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot 0];
       end 
 
     end % r=1:Ns:Nrp-Ns
 
-#{
-    % remove pilots to give us just data symbols and demodulate
-
-    rx_bits = []; rx_np = [];
-    for r=1:Nrp
-      if mod(r-1,Ns) != 0
-        arowofsymbols = rx_corr(r,2:Nc+1);
-        rx_np = [rx_np arowofsymbols];
-        if bps == 1
-          arowofbits = real(arowofsymbols) > 0;
-        end
-        if bps == 2
-          arowofbits = zeros(1,Nc);
-          for c=1:Nc
-            arowofbits((c-1)*2+1:c*2) = qpsk_demod(arowofsymbols(c));
-          end
-        end
-        rx_bits = [rx_bits arowofbits];
-      end
-    end
-#}
     assert(length(rx_bits) == Nbits);
-
 
     % calculate BER stats as a block, after pilots extracted
 
