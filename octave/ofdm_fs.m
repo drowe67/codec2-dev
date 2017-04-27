@@ -387,7 +387,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       rxbuf(1:Nrxbuf-Nsamperframe) = rxbuf(Nsamperframe+1:Nrxbuf);
       rxbuf(Nrxbuf-Nsamperframe+1:Nrxbuf) = zeros(1,Nsamperframe);
       lnew = min(Nsam-prx,Nsamperframe);
-      printf("prx: %d lnew: %d Nrxbuf: %d\n", prx, lnew, Nrxbuf);
+      %printf("prx: %d lnew: %d Nrxbuf: %d\n", prx, lnew, Nrxbuf);
       if lnew
         rxbuf(Nrxbuf-Nsamperframe+1:Nrxbuf-Nsamperframe+lnew) = rx(prx:prx+lnew-1);
       end
@@ -399,25 +399,18 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       if timing_en
 
-        % update timing every frame
+        % update timing at start of every frame
 
         if (mod(r-1,Ns) == 0) && (r != 1) && (r != Nrp)
 
-          st = (r-1)*(M+Ncp) + 1 - floor(window_width/2) + (timing_est-1);
-          en = st + Nsamperframe-1 + M+Ncp + window_width-1;
-
           st1 = Nsamperframe + 1 - floor(window_width/2) + (timing_est-1);
           en1 = st1 + Nsamperframe-1 + M+Ncp + window_width-1;
-          %printf("  r : %d st1: %d en1: %d\n", r, st1, en1);
-          %rx(st:st+3)
-          %rxbuf(st1:st1+3)
           
           ft_est = coarse_sync(states, rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)), rate_fs_pilot_samples);
           timing_est += ft_est - ceil(window_width/2);
 
           if verbose > 1
             printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
-            %printf("  r : %d st: %d en: %d\n", r, st, en);
           end
 
           % black magic to keep sample_point inside cyclic prefix.  Or something like that.
@@ -434,57 +427,38 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % previous pilot
 
-      %if r >= Ns+1
-        rr = r-Ns;
-        rrr = rr - r + 1;
-        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
-        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
-        %printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
-        for c=1:Nc+2
-          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
-          %rx_sym(rr,c) = sum(acarrier);
-          rx_sym1(1,c) = sum(acarrier);
-        end
-        %printf("  rr: %d st: %d en: %d\n", rr, st, en);
-      %end
+      rr = r-Ns;
+      rrr = rr - r + 1;
+      st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+
+      for c=1:Nc+2
+        acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
+        rx_sym1(1,c) = sum(acarrier);
+      end
 
       % pilot - this frame - pilot
 
-      printf("-------------frame r: %d\n", r);
       rrrr = 2;
       for rr=r:r+Ns 
         rrr = rr - r + 1;
-        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
         st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
-        %printf("  r: %d rr: %d rrr: %d st: %d st1: %d\n", r, rr, rrr, st, st1);
-        %rx(st:st+3)
-        %rxbuf(st1:st1+3)
         for c=1:Nc+2
           acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
-          %rx_sym(rr,c) = sum(acarrier);
           rx_sym1(rrrr,c) = sum(acarrier);
         end
         rrrr++;
-        %printf("  rr: %d st: %d en: %d\n", rr, st, en);
       end
 
       % next pilot
 
-      %if r <= Nrp - 2*Ns
-        rr = r+2*Ns;
-        rrr = rr - r + 1;
-        st = (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
-        st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
-        for c=1:Nc+2
-          acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
-          %rx_sym(rr,c) = sum(acarrier);
-          rx_sym1(rrrr,c) = sum(acarrier);
-        end
-        % printf("  rr: %d st: %d en: %d\n", rr, st, en);
-      %end
-      rrrr
-      assert(rrrr == (Ns+3));
-
+      rr = r+2*Ns;
+      rrr = rr - r + 1;
+      st1 = Nsamperframe + (rrr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
+      for c=1:Nc+2
+        acarrier = rxbuf(st1:en1) .* exp(-j*woff_est*(st1:en1)) .* conj(W(c,:));
+        rx_sym1(rrrr,c) = sum(acarrier);
+      end
+      
       % est freq err based on all carriers
       
       if foff_est_en
@@ -506,19 +480,12 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % PPP
           
         cr = c-1:c+1;
-        %aphase_est_pilot_rect = sum(rx_sym(r,cr)*pilots(cr)') + sum(rx_sym(r+Ns,cr)*pilots(cr)');
         aphase_est_pilot_rect = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
 
         % use next step of pilots in past and future
 
-        %if r >= Ns+1
-          %aphase_est_pilot_rect += sum(rx_sym(r-Ns,cr)*pilots(cr)');
-          aphase_est_pilot_rect += sum(rx_sym1(1,cr)*pilots(cr)');
-        %end
-        %if r <= Nrp - 2*Ns
-          %aphase_est_pilot_rect += sum(rx_sym(r+2*Ns,cr)*pilots(cr)');
-          aphase_est_pilot_rect += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
-        %end
+        aphase_est_pilot_rect += sum(rx_sym1(1,cr)*pilots(cr)');
+        aphase_est_pilot_rect += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
 
         % correct phase offset using phase estimate
 
@@ -527,11 +494,8 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
           aphase_est_pilot = angle(aphase_est_pilot_rect);
           phase_est_pilot_log(rr,c) = aphase_est_pilot;
           if phase_est_en
-            % rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
-            rx_corr(rr,c) = rx_sym(rr,c) * exp(-j*aphase_est_pilot);
             rx_corr(rr,c) = rx_sym1(rrrr,c) * exp(-j*aphase_est_pilot);
           else
-            %rx_corr(rr,c) = rx_sym(rr,c);
             rx_corr(rr,c) = rx_sym1(rrrr,c);
           end
           rrrr++;
@@ -654,8 +618,8 @@ function run_single
 
   sim_in.EbNodB = 100;
   sim_in.verbose = 1;
-  sim_in.hf_en = 0;
-  sim_in.foff_hz = 0.5;
+  sim_in.hf_en = 1;
+  sim_in.foff_hz = 0;
   sim_in.timing_en = 1;
   sim_in.sample_clock_offset_ppm = 0;
   sim_in.foff_est_en = 1;
