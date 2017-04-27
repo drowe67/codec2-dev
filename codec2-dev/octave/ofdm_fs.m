@@ -430,8 +430,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       % pilot - this frame - pilot
 
-      %rrrr = 2;
-      %for rr=r:r+Ns 
       for rr=1:Ns+1 
         st1 = Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en1 = st1 + M - 1;
         for c=1:Nc+2
@@ -499,7 +497,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
           end
           rx_bits = [rx_bits abit];
         end % c=2:Nc+1
-        phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot 0];
+        phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot];
       end 
 
     end % r=1:Ns:Nrp-Ns
