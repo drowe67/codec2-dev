@@ -354,21 +354,14 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     foff_est_gain = 0.1;
     Nerrs_log = [];
 
+    rx_bits = []; rx_np = [];
+
     % place samples in rx_buf, which is 3 and a bit frame long
-
-#{
-  [ ] OK have rxbuf doing ofdm d/c using fixed time refs and rxbuf update
-  [ ] now need rx_sym to work based on fixed time refs
-      + but then need to make that work with moving time ref output for now
-      + so transition works after phase correction
-#}
-
-    nin = Nsamperframe;
-
     % Maintain buffer of 3 frames plus one pilot:
     %
     % P DDD P DDD P DDD P
 
+    nin = Nsamperframe;
     Nrxbuf = 3*Nsamperframe+M+Ncp;
     rxbuf = zeros(1, Nrxbuf);
     prx = 1;
@@ -480,32 +473,43 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         % PPP
           
         cr = c-1:c+1;
-        aphase_est_pilot_rect = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
+        aphase_est_pilot_rect(c) = sum(rx_sym1(2,cr)*pilots(cr)') + sum(rx_sym1(2+Ns,cr)*pilots(cr)');
 
         % use next step of pilots in past and future
 
-        aphase_est_pilot_rect += sum(rx_sym1(1,cr)*pilots(cr)');
-        aphase_est_pilot_rect += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
+        aphase_est_pilot_rect(c) += sum(rx_sym1(1,cr)*pilots(cr)');
+        aphase_est_pilot_rect(c) += sum(rx_sym1(2+Ns+1,cr)*pilots(cr)');
+      end
 
-        % correct phase offset using phase estimate
+      % correct phase offset using phase estimate, and demodulate
+      % bits, separate loop as it runs across cols (carriers) to get
+      % frame bit ordering correct
 
-        rrrr = 3;
-        for rr=r+1:r+Ns-1
-          aphase_est_pilot = angle(aphase_est_pilot_rect);
+      rrrr = 3;
+      for rr=r+1:r+Ns-1
+        for c=2:Nc+1
+          aphase_est_pilot = angle(aphase_est_pilot_rect(c));
           phase_est_pilot_log(rr,c) = aphase_est_pilot;
           if phase_est_en
-            rx_corr(rr,c) = rx_sym1(rrrr,c) * exp(-j*aphase_est_pilot);
+            rx_corr = rx_sym1(rrrr,c) * exp(-j*aphase_est_pilot);
           else
-            rx_corr(rr,c) = rx_sym1(rrrr,c);
+            rx_corr = rx_sym1(rrrr,c);
           end
-          rrrr++;
-        end
-
-      end % c=2:Nc+1
+          rx_np = [rx_np rx_corr];
+          if bps == 1
+            abit = real(rx_corr) > 0;
+          end
+          if bps == 2
+            abit = qpsk_demod(rx_corr);
+          end
+          rx_bits = [rx_bits abit];
+        end % c=2:Nc+1
+        rrrr++;
+      end 
 
     end % r=1:Ns:Nrp-Ns
 
-
+#{
     % remove pilots to give us just data symbols and demodulate
 
     rx_bits = []; rx_np = [];
@@ -525,6 +529,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
         rx_bits = [rx_bits arowofbits];
       end
     end
+#}
     assert(length(rx_bits) == Nbits);
 
 
