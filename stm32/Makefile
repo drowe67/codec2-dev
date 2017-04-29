@@ -23,7 +23,7 @@ CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m
 
 ifeq ($(FLOAT_TYPE), hard)
 CFLAGS += -fsingle-precision-constant -Wdouble-promotion
-#CFLAGS += -fsingle-precision-constant
+CFLAGS += -fdata-sections -ffunction-sections -Xlinker --gc-sections
 CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1
 else
 CFLAGS += -msoft-float
@@ -35,7 +35,7 @@ endif
 
 PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.7.1
+PERIPHLIBVER	= V1.8.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
 PERIPHLIBDIR	= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
@@ -485,10 +485,6 @@ libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 # Rule for building .bin files from a .elf
 %.bin: %.elf
 	$(OBJCOPY) -O binary $< $@
-
-# Rule for programming the SM1000
-%.pgm: %.bin
-	$(SUDO) dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D $<
 
 # Rule for programming the SM1000
 %.pgm: %.bin
