@@ -121,6 +121,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
 
+  % carrier tables for up and down conversion
+
   w = (0:Nc+1)*2*pi*Rs/states.Fs;
   W = zeros(Nc+2,states.M);
   for c=1:Nc+2
@@ -129,7 +131,28 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.w = w;
   states.W = W;
 
-  states.window_width = 11;     % search window_width/2 from current timing instant
+  % fine timing search +/- window_width/2 from current timing instant
+
+  states.window_width = 11; 
+ 
+  % Receive buffer: D P DDD P DDD P DDD P D
+  %                         ^
+  % also see ofdm_demod() ...
+
+  states.Nrxbuf = 3*states.Nsamperframe+states.M+states.Ncp + 2*(states.M + states.Ncp);
+  states.rxbuf = zeros(1, states.Nrxbuf);
+ 
+  % default settings on a bunch of options and states
+
+  states.verbose = 0;
+  states.timing_en = 1;
+  states.foff_est_en = 1;
+  states.phase_est_en = 1;
+
+  states.foff_est_gain = 0.1;
+  states.foff_est_hz = 0;
+  states.sample_point = states.timing_est = 1;
+  states.nin = states.Nsamperframe;
 
 endfunction
 
@@ -197,7 +220,7 @@ endfunction
           ^
 #}
 
-function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf)
+function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
 
   % extra states that are st up at run time rather than init time
@@ -212,10 +235,16 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf)
   verbose = states.verbose;
   phase_est_en = states.phase_est_en;
 
+  % insert latest input samples into rxbuf
+
+  rxbuf(1:Nrxbuf-states.nin) = rxbuf(states.nin+1:Nrxbuf);
+  rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
+
   woff_est = 2*pi*foff_est_hz/Fs;
 
   % update timing estimate --------------------------------------------------
 
+  delta_t = sample_point = 0;
   if timing_en
     % update timing at start of every frame
 
@@ -325,10 +354,10 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf)
     aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot];
   end 
 
-  % Adjust nin to take care of sample clock differences
+  % Adjust nin to take care of sample clock offset
 
+  nin = Nsamperframe;
   if timing_en
-    nin = Nsamperframe;
     thresh = (M+Ncp)/8;
     tshift = (M+Ncp)/4;
     if timing_est > thresh
@@ -343,6 +372,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf)
     end
   end
 
+  states.rxbuf = rxbuf;
   states.nin = nin;
   states.timing_est = timing_est;
   states.sample_point = sample_point;
@@ -373,7 +403,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
   EbNodB  = sim_in.EbNodB;
   verbose = states.verbose = sim_in.verbose;
   hf_en   = sim_in.hf_en;
-  timing_en = sim_in.timing_en;
+  timing_en = states.timing_en = sim_in.timing_en;
   states.foff_est_en = foff_est_en = sim_in.foff_est_en;
   states.phase_est_en = phase_est_en = sim_in.phase_est_en;
 
@@ -446,11 +476,9 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
   end
  
-  % init timing est states
-
-  delta_t_log = []; 
-
-  % simulate for each Eb/No point ------------------------------------
+  % ------------------------------------------------------------------
+  % simulate for each Eb/No point 
+  % ------------------------------------------------------------------
 
   for nn=1:length(EbNodB)
     rand('seed',1);
@@ -485,6 +513,8 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     % channel simulation ---------------------------------------------------------------
     
     if isfield(sim_in, "sample_clock_offset_ppm") 
+      % todo: this only works for large ppm like 500, runs out of memory
+      %       for small ppm
 
       if sim_in.sample_clock_offset_ppm
         timebase = floor(abs(1E6/sim_in.sample_clock_offset_ppm));
@@ -514,39 +544,32 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
     rx += noise;
 
-    % some spare samples at end to allow for timing est window
+    % some spare samples at end to avoid overflow as est windows may poke into the future a bit
 
     rx = [rx zeros(1,Nsamperframe)];
     
-    % pilot based phase est, we use known tx symbols as pilots ----------
- 
-    %rx_sym = zeros(Nrp, Nc+2);
+    % bunch of logs
 
     phase_est_pilot_log = [];
+    delta_t_log = []; 
     timing_est_log = [];
     foff_est_hz_log = [];
     Nerrs_log = [];
     rx_bits = []; rx_np = [];
 
-    states.timing_en = timing_en;
-    states.timing_est = 1;
-    if timing_en
-      states.sample_point = states.timing_est;
-    else
+    % reset some states for each EbNo simulation point
+
+    states.sample_point = states.timing_est = 1;
+    if timing_en == 0
       states.sample_point = Ncp;
     end
     states.nin = Nsamperframe;
-
     states.foff_est_hz = 0;    
-    states.foff_est_gain = 0.1;
-
-    Nrxbuf = 3*Nsamperframe+M+Ncp + 2*(M+Ncp);
-    rxbuf = zeros(1, Nrxbuf);
-    prx = 1;
 
     % for this simulation we "prime" buffer to allow one frame runs during development
 
-    rxbuf(M+Ncp+2*Nsamperframe+1:Nrxbuf) = rx(prx:Nsamperframe+2*(M+Ncp));
+    prx = 1;
+    states.rxbuf(M+Ncp+2*Nsamperframe+1:Nrxbuf) = rx(prx:Nsamperframe+2*(M+Ncp));
     prx += Nsamperframe+2*(M+Ncp);
 
     for f=1:Nframes
@@ -556,15 +579,14 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       % frame of simulation
 
       lnew = min(Nsam-prx,states.nin);
-      rxbuf(1:Nrxbuf-states.nin) = rxbuf(states.nin+1:Nrxbuf);
-      rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = zeros(1,states.nin);
+      rxbuf_in = zeros(1,states.nin);
 
       if lnew
-        rxbuf(Nrxbuf-states.nin+1:Nrxbuf-states.nin+lnew) = rx(prx:prx+lnew-1);
+        rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
       end
       prx += states.nin;
 
-      [arx_bits states aphase_est_pilot_log arx_np] = ofdm_demod(states, rxbuf);
+      [arx_bits states aphase_est_pilot_log arx_np] = ofdm_demod(states, rxbuf_in);
 
       rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np];
       timing_est_log = [timing_est_log states.timing_est];
@@ -601,10 +623,10 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       figure(3); clf;
       subplot(211)
       stem(delta_t_log)
-      title('delta_t');
+      title('delta t');
       subplot(212)
       plot(timing_est_log);
-      title('timing_est');
+      title('timing est');
 
       figure(4); clf;
       plot(foff_est_hz_log)
@@ -612,7 +634,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       title('Fine Freq');
 
       figure(5); clf;
-      plot(Nerrs_log);
+      plot(Nerrs log);
 
 #{
       figure(2)
@@ -662,7 +684,7 @@ function run_single
   %sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
   sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 6;
+  sim_in.EbNodB = 3;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
