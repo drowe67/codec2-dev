@@ -2012,7 +2012,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
         phase_synth_zero_order(model, &c2->ex_phase, H);       
     } else {
         /* LPC based phase synthesis */
-        COMP H[MAX_AMP];
+        COMP H[MAX_AMP+1];
         sample_phase(model, H, Aw);
         phase_synth_zero_order(model, &c2->ex_phase, H);
     }
