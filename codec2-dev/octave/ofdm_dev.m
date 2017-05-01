@@ -11,10 +11,16 @@ ofdm_lib;
     [ ] compute SNR and PAPR
     [ ] SSB bandpass filtering
     [ ] way to simulate aquisition and demod
-    [ ] testframe based 
+    [ ] testframe based, maybe repeat every 10 seconds
+        + work out which pattern we match to sync up
+    [ ] acquisition curves
+        + plot error versus freq and timing offset
+        + plot pro acquisition versus freq offset, timing and freq sep and together
+        + plot total acquist prob at various SNRs ... maybe mean number of frames to sync?
+
 #}
 
-function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
+function [sim_out rx states] = run_sim(sim_in)
 
   % set up core modem constants
 
@@ -289,8 +295,6 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
     sim_out.ber(nn) = sum(Nerrs)/Nbits; 
     sim_out.pilot_overhead = 10*log10(Ns/(Ns-1));
-    sim_out.M = M; sim_out.Fs = Fs; sim_out.Ncp = Ncp;
-    sim_out.Nrowsperframe = Nrowsperframe; sim_out.Nsamperframe = Nsamperframe;
   end
 endfunction
 
@@ -373,11 +377,9 @@ end
 
 % Run an acquisition test, returning vectors of estimation errors
 
-function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
+function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
 
-  % generate test signal at a given Eb/No and frequency offset
-
-  Ts = 0.016; 
+  Ts = 0.018; 
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
@@ -386,14 +388,17 @@ function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=
   sim_in.EbNodB = EbNodB;
   sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
-  sim_in.foff_hz = foff_hz; sim_in.timing_en = 0;
+  sim_in.foff_hz = foff_hz; 
+  sim_in.timing_en = 0;
+  sim_in.foff_est_en = 0;
+  sim_in.phase_est_en = 0;
+
+  [sim_out rx states] = run_sim(sim_in);
 
   % set up acquistion 
 
-  Nsamperframe = states.Nsamperframe = sim_out.Nsamperframe;
-  states.M = sim_out.M; states.Ncp = sim_out.Ncp;
-  states.verbose = 0;
-  states.Fs = sim_out.Fs;
+  Nsamperframe = states.Nsamperframe;
+  rate_fs_pilot_samples = states.rate_fs_pilot_samples;
 
   % test fine or acquisition over test signal
   #{
@@ -409,7 +414,7 @@ function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=
           - man I hope IL isn't too big.....
   #}
 
-  delta_t = []; delta_t = [];  delta_foff = [];
+  delta_ct = []; delta_foff = [];
 
   if fine_en
 
@@ -436,11 +441,13 @@ function [delta_t delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=
       %st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
       %[ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
       [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
-      printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+      if states.verbose
+        printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+      end
 
       % valid coarse timing ests are modulo Nsamperframe
 
-      delta_t = [delta_ct ct_est-ct_target];
+      delta_ct = [delta_ct ct_est-ct_target];
       delta_foff = [delta_foff (foff_est-foff_hz)];
     end
   end
@@ -463,12 +470,12 @@ function acquisition_histograms(fine_en = 0)
 
   % allowable tolerance for acquistion
 
-  ftol_hz = 2.0;
-  ttol_samples = 0.002*Fs;
+  ftol_hz = 2.0;            % fine freq can track this out
+  ttol_samples = 0.002*Fs;  % 2ms, ie CP length
 
   % AWGN channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, -1, 25, 0, fine_en);
+  [dct dfoff] = acquisition_test(Ntests, -1, -20, 0, fine_en);
 
   % Probability of acquistion is what matters, e.g. if it's 50% we can
   % expect sync within 2 frames
@@ -480,14 +487,16 @@ function acquisition_histograms(fine_en = 0)
 
   figure(1)
   hist(dct(find (abs(dct) < ttol_samples)))
+  title('Coarse Timing error AWGN')
   if fine_en == 0
     figure(2)
     hist(dfoff)
+  title('Coarse Freq error AWGN')
   end
 
   % HF channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, 3, 25, 1, fine_en);
+  [dct dfoff] = acquisition_test(Ntests, 3, -20, 1, fine_en);
 
   printf("HF P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
   if fine_en == 0
@@ -496,9 +505,11 @@ function acquisition_histograms(fine_en = 0)
 
   figure(3)
   hist(dct(find (abs(dct) < ttol_samples)))
+  title('Coarse Timing error HF')
   if fine_en == 0
     figure(4)
     hist(dfoff)
+    title('Coarse Freq error HF')
   end
 
 endfunction
@@ -511,7 +522,7 @@ endfunction
 format;
 more off;
 
-run_single
+%run_single
 %run_curves
-%acquisition_histograms(1)
+acquisition_histograms
 
