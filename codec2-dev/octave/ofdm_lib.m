@@ -108,7 +108,9 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % carrier tables for up and down conversion
 
-  w = (0:Nc+1)*2*pi*Rs/states.Fs;
+  fcentre = 1500;
+  Nlower = floor((fcentre - Rs*Nc/2)/Rs);
+  w = (Nlower:Nlower+Nc+1)*2*pi*Rs/states.Fs;
   W = zeros(Nc+2,states.M);
   for c=1:Nc+2
     W(c,:) = exp(j*w(c)*(0:states.M-1));
@@ -118,7 +120,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % fine timing search +/- window_width/2 from current timing instant
 
-  states.window_width = 11; 
+  states.ftwindow_width = 11; 
  
   % Receive buffer: D P DDD P DDD P DDD P D
   %                         ^
@@ -213,18 +215,6 @@ endfunction
 function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
 
-  % extra states that are st up at run time rather than init time
-
-  timing_est = states.timing_est;
-  timing_en = states.timing_en;
-  foff_est_hz = states.foff_est_hz;
-  foff_est_gain = states.foff_est_gain;
-  foff_est_en = states.foff_est_en;
-  sample_point = states.sample_point;
-  rate_fs_pilot_samples = states.rate_fs_pilot_samples;
-  verbose = states.verbose;
-  phase_est_en = states.phase_est_en;
-
   % insert latest input samples into rxbuf
 
   rxbuf(1:Nrxbuf-states.nin) = rxbuf(states.nin+1:Nrxbuf);
@@ -234,15 +224,15 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
 
   % update timing estimate --------------------------------------------------
 
-  delta_t = sample_point = 0;
+  delta_t = 0;
   if timing_en
     % update timing at start of every frame
 
-    st = M+Ncp + Nsamperframe + 1 - floor(window_width/2) + (timing_est-1);
-    en = st + Nsamperframe-1 + M+Ncp + window_width-1;
+    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
+    en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
     ft_est = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
-    timing_est += ft_est - ceil(window_width/2);
+    timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
     if verbose > 1
       printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
@@ -250,7 +240,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
 
     % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
 
-    delta_t = ft_est - ceil(window_width/2);
+    delta_t = ft_est - ceil(ftwindow_width/2);
     sample_point = max(timing_est+Ncp/4, sample_point);
     sample_point = min(timing_est+Ncp, sample_point);
   end
@@ -262,7 +252,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
   rx_sym = zeros(1+Ns+1+1, Nc+2);
 
   % previous pilot
-
+  
   st = M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
 
   for c=1:Nc+2
@@ -293,7 +283,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
   if foff_est_en
     freq_err_rect = sum(rx_sym(2,:))' * sum(rx_sym(2+Ns,:));
     freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
-    foff_est_hz += foff_est_gain*freq_err_hz;
+    foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
   end
 
   % OK - now estimate and correct phase  ----------------------------------

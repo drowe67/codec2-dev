@@ -231,7 +231,7 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
 
       figure(1); clf; 
       plot(rx_np,'+');
-      axis([-2 2 -2 2]);
+      %axis([-2 2 -2 2]);
       title('Scatter');
       
       figure(2); clf;
@@ -255,15 +255,15 @@ function [sim_out rate_fs_pilot_samples rx] = run_sim(sim_in)
       figure(5); clf;
       plot(Nerrs_log);
 
-#{
-      figure(2)
+
+      figure(6)
       Tx = abs(fft(tx(1:Nsam).*hanning(Nsam)'));
       Tx_dB = 20*log10(Tx);
       dF = Fs/Nsam;
       plot((1:Nsam)*dF, Tx_dB);
       mx = max(Tx_dB);
       axis([0 Fs/2 mx-60 mx])
-#}
+
      
 #{
       if hf_en
@@ -300,15 +300,16 @@ function run_single
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  %sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 30;
+  sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  %sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 3;
+  sim_in.EbNodB = 10;
   sim_in.verbose = 1;
-  sim_in.hf_en = 1;
+  sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
-  sim_in.timing_en = 1;
   sim_in.sample_clock_offset_ppm = 0;
+
+  sim_in.timing_en = 1;
   sim_in.foff_est_en = 1;
   sim_in.phase_est_en = 1;
 

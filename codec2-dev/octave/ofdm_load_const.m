@@ -8,8 +8,30 @@ Ns = states.Ns;
 Nc = states.Nc;
 M = states.M;
 Ncp = states.Ncp;
-bps = sim_in.bps;
+bps = states.bps;
 Nbitsperframe = states.Nbitsperframe;
 Nrowsperframe = states.Nrowsperframe;
 Nsamperframe = states.Nsamperframe;
+
+W = states.W;
+w = states.w;
+
+timing_est = states.timing_est;
+sample_point = states.sample_point;
+ftwindow_width = states.ftwindow_width;
+
+Nrxbuf = states.Nrxbuf;
+rxbuf = states.rxbuf;
+
 pilots = states.pilots;
+rate_fs_pilot_samples = states.rate_fs_pilot_samples;
+
+foff_est_gain = states.foff_est_gain;
+foff_est_hz = states.foff_est_hz;
+
+timing_en = states.timing_en;
+foff_est_en = states.foff_est_en;
+phase_est_en = states.phase_est_en;
+
+verbose = states.verbose;
+
