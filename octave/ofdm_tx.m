@@ -12,6 +12,7 @@ function ofdm_tx(filename, Nsec)
   ofdm_load_const;
 
   % generate fixed test frame of tx bits and run OFDM modulator
+  % todo: maybe extend this to 4 or 8 frames, one is a bit short
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
@@ -24,6 +25,6 @@ function ofdm_tx(filename, Nsec)
     tx = [tx ofdm_mod(states, tx_bits)];
   end
 
-  Ascale = 32000/max(real(tx));
+  Ascale = 4E5;
   ftx=fopen(filename,"wb"); fwrite(ftx, Ascale*real(tx), "short"); fclose(ftx);
 endfunction
