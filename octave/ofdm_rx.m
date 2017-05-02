@@ -10,6 +10,8 @@ function ofdm_rx(filename)
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
+  states.verbose = 1;
+
   % fixed test frame of tx bits
 
   rand('seed', 100);
@@ -19,7 +21,7 @@ function ofdm_rx(filename)
 
   rx_bits = []; rx_np = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = [];
-  Nerrs = Nbits = 0;
+  Terrs = Tbits = 0;
 
   % load real samples from file
 
@@ -31,8 +33,12 @@ function ofdm_rx(filename)
   % 'prime' rx buf to get correct coarse timing (for now)
 
   prx = 1;
-  states.rxbuf(M+Ncp+2*Nsamperframe+1:Nrxbuf) = rx(prx:Nsamperframe+2*(M+Ncp));
-  prx += Nsamperframe+2*(M+Ncp);
+  %nin = Nsamperframe+2*(M+Ncp);
+  nin = Nsamperframe+M+Ncp;
+  states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
+  prx += nin;
+
+  state = 'searching';
 
   % main loop ----------------------------------------------------------------
 
@@ -52,21 +58,57 @@ function ofdm_rx(filename)
 
     [rx_bits states aphase_est_pilot_log arx_np] = ofdm_demod(states, rxbuf_in);
 
-    rx_np = [rx_np arx_np];
-    timing_est_log = [timing_est_log states.timing_est];
-    delta_t_log = [delta_t_log states.delta_t];
-    foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
-    phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
-
-    % measure bit errors
+    % measure errors and iterate start machine
 
     errors = xor(tx_bits, rx_bits);
-    Nerrs += sum(errors);
-    Nerrs_log(f) = sum(errors);
-    Nbits += Nbitsperframe;
+    Nerrs = sum(errors);
+    next_state = state;
+
+    if strcmp(state,'searching')  
+      if Nerrs/Nbitsperframe < 0.1
+        next_state = 'synced';
+      end
+    end
+    state = next_state;
+
+    if strcmp(state,'searching') 
+
+      % attempt coarse timing estimate (i.e. detect start of frame)
+
+      st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
+      [ct_est foff_est] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+      if states.verbose
+        printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+      end
+
+      % calculate number of samples we need on next buffer to get into sync
+     
+      states.nin = Nsamperframe + ct_est - 1;
+
+      % reset modem states
+
+      states.sample_point = states.timing_est = 1;
+      states.foff_est_hz = 0;
+
+    else
+
+      % we are in sync so log states and bit errors
+
+      rx_np = [rx_np arx_np];
+      timing_est_log = [timing_est_log states.timing_est];
+      delta_t_log = [delta_t_log states.delta_t];
+      foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
+      phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+
+      % measure bit errors
+
+      Terrs += Nerrs;
+      Nerrs_log(f) = Nerrs;
+      Tbits += Nbitsperframe;
+    end
   end
 
-  printf("BER: %5.4f Nbits: %d Nerrs: %d\n", Nerrs/Nbits, Nbits, Nerrs);
+  printf("BER: %5.4f Tbits: %d Terrs: %d\n", Terrs/Tbits, Tbits, Terrs);
 
   figure(1); clf; 
   plot(rx_np,'+');

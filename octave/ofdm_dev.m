@@ -386,7 +386,7 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   sim_in.Nsec = Ntests*(sim_in.Ns+1)/sim_in.Rs;
 
   sim_in.EbNodB = EbNodB;
-  sim_in.verbose = 0;
+  sim_in.verbose = 2;
   sim_in.hf_en = hf_en;
   sim_in.foff_hz = foff_hz; 
   sim_in.timing_en = 0;
@@ -524,5 +524,5 @@ more off;
 
 %run_single
 %run_curves
-acquisition_histograms
-
+%acquisition_histograms
+acquisition_test
