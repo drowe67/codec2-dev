@@ -220,6 +220,8 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
   rxbuf(1:Nrxbuf-states.nin) = rxbuf(states.nin+1:Nrxbuf);
   rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
+  % get latest freq offset estimate
+
   woff_est = 2*pi*foff_est_hz/Fs;
 
   % update timing estimate --------------------------------------------------
@@ -247,7 +249,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
 
   % down convert at current timing instant----------------------------------
 
-    % todo: this cld be more efficent, as pilot r becomes r-Ns on next frame
+  % todo: this cld be more efficent, as pilot r becomes r-Ns on next frame
 
   rx_sym = zeros(1+Ns+1+1, Nc+2);
 
