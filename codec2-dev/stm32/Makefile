@@ -33,7 +33,7 @@ endif
 
 # Definitions for the STM32F4 Standard Peripheral Library
 
-PERIPHLIBURL    = http://www.st.com/st-web-ui/static/active/en/st_prod_software_internet/resource/technical/software/firmware
+PERIPHLIBURL    = http://www.st.com/resource/en/firmware
 PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
 PERIPHLIBVER	= V1.8.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
