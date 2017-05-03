@@ -1,10 +1,14 @@
 % ofdm_lib.m
 % David Rowe Mar 2017
-%
 
-% Library of functions that implement a BPSK/QPSK OFDM modem.  Rate Fs
-% verison of ofdm_rs.m with OFDM based up and down conversion, and all
-% those nasty real-world details like fine freq, timing.
+#{
+  Library of functions that implement a BPSK/QPSK OFDM modem.  Rate Fs
+  verison of ofdm_rs.m with OFDM based up and down conversion, and all
+  those nasty real-world details like fine freq, timing.
+
+  
+#}
+
 
 1;
 
@@ -35,6 +39,22 @@ endfunction
 % frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
 % Also determines frequency offset at maximimum correlation.  Can be
 % used for acquisition (coarse timing a freq offset), and fine timing
+
+#{
+  TODO: 
+    [ ] attempt to speed up sync
+        + tis rather stateless, this current demod, which is nice
+        [ ] 0.5Hz grid and measure BER
+            + so run demod a bunch of times at different offsets
+            + Hmm cld also try +/- 20Hz multiples as it's aliased?
+            + might to use 
+            + need metric for sync, could be callback.
+        [ ] or refine freq offset using pilots
+        [ ] different error measure that 10% maybe soft dec
+            + 10% very high BER
+    [ ] simpler CPU/DFT for freq offset estimation
+        + more suitable for real time implementation
+#}
 
 function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     Nsamperframe = states.Nsamperframe; Fs = states.Fs;
