@@ -65,7 +65,7 @@ function ofdm_rx(filename)
     next_state = state;
 
     if strcmp(state,'searching')  
-      if Nerrs/Nbitsperframe < 0.1
+      if Nerrs/Nbitsperframe < 0.15
         next_state = 'synced';
       end
     end
@@ -88,7 +88,7 @@ function ofdm_rx(filename)
       % reset modem states
 
       states.sample_point = states.timing_est = 1;
-      states.foff_est_hz = 0;
+      states.foff_est_hz = foff_est;
 
     else
 
@@ -130,7 +130,8 @@ function ofdm_rx(filename)
 
   figure(4); clf;
   plot(foff_est_hz_log)
-  axis([1 max(Nframes,2) -3 3]);
+  mx = max(abs(foff_est_hz_log));
+  axis([1 max(Nframes,2) -mx mx]);
   title('Fine Freq');
 
   figure(5); clf;

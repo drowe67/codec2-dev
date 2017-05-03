@@ -4,6 +4,14 @@
 % File based ofdm tx.  Generate a file of ofdm samples, inclduing
 % optional channel simulation.
 
+#{
+  TODO: 
+    [ ] Optional LDPC code
+    [ ] measure and report raw and coded BER
+    [ ] maybe 10s worth of frames, sync up to any one automatically
+        + or start with maybe 10 frames
+        + measure BER match on each one
+#}
 
 function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
@@ -38,7 +46,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   % mumble not understood very well mumble magic number.
 
   SNRdB = EbNodB + 10*log10(bps*Rs*Nc/Fs) + 3;
-  printf("EbNo: %3.1f SNR(3k): %3.1f foff: %3.1f\n", EbNodB, SNRdB, freq_offset_Hz);
+  printf("EbNo: %3.1f dB  SNR(3k): %3.1f dB  foff: %3.1fHz\n", EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 
@@ -75,12 +83,13 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
 
   rx = rx .* exp(j*woffset*(1:Nsam));
 
-  % note variance/2 as we are using real() operator
+  % note variance/2 as we are using real() operator, mumble,
+  % reflection of -ve freq to +ve, mumble, hand wave
 
-  noise = sqrt(variance/2)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
-  rx += noise;
-  10*log10(var(tx)/var(noise))
+  noise = sqrt(variance/2)*0.5*randn(1,Nsam);
+  rx = real(rx) + noise;
+  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)));
 
   Ascale = 4E5;
-  frx=fopen(filename,"wb"); fwrite(frx, Ascale*real(rx), "short"); fclose(frx);
+  frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
 endfunction
