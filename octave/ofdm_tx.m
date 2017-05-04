@@ -11,6 +11,9 @@
     [ ] maybe 10s worth of frames, sync up to any one automatically
         + or start with maybe 10 frames
         + measure BER match on each one
+    [ ] model clipping/PA compression
+    [ ] sample clock offsets
+    [ ] compare with same SNR from pathsim
 #}
 
 function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
@@ -90,6 +93,6 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   rx = real(rx) + noise;
   printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)));
 
-  Ascale = 4E5;
+  Ascale = 2E5;
   frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
 endfunction

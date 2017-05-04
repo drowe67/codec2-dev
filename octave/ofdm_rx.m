@@ -3,6 +3,12 @@
 %
 % OFDM file based rx.
 
+#{
+  TODO: 
+    [ ] some sort of real time GUI display to watch signal evolving
+    [ ] est SNR or Eb/No of recieved signal
+    [ ] way to fall out of sync
+#}
 
 function ofdm_rx(filename)
   ofdm_lib;
@@ -25,7 +31,7 @@ function ofdm_rx(filename)
 
   % load real samples from file
 
-  Ascale= 4E5;
+  Ascale= 2E5;
   frx=fopen(filename,"rb"); rx = 2*fread(frx, Inf, "short")/4E5; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
@@ -33,8 +39,7 @@ function ofdm_rx(filename)
   % 'prime' rx buf to get correct coarse timing (for now)
 
   prx = 1;
-  %nin = Nsamperframe+2*(M+Ncp);
-  nin = Nsamperframe+M+Ncp;
+  nin = Nsamperframe+2*(M+Ncp);
   states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   prx += nin;
 
