@@ -33,5 +33,14 @@ timing_en = states.timing_en;
 foff_est_en = states.foff_est_en;
 phase_est_en = states.phase_est_en;
 
+rate = states.rate;
+ldpc_en = states.ldpc_en;
+if ldpc_en
+  code_param = states.code_param;
+  max_iterations = states.ldpc_max_iterations;
+  demod_type = states.ldpc_demod_type;
+  decoder_type = states.ldpc_decoder_type;
+end
+
 verbose = states.verbose;
 
