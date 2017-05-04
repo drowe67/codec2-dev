@@ -17,7 +17,8 @@ ofdm_lib;
         + plot error versus freq and timing offset
         + plot pro acquisition versus freq offset, timing and freq sep and together
         + plot total acquist prob at various SNRs ... maybe mean number of frames to sync?
-
+    [ ] replace genie EsNo est used for ldpc dec
+    [ ] clean up text 
 #}
 
 function [sim_out rx states] = run_sim(sim_in)
@@ -36,7 +37,7 @@ function [sim_out rx states] = run_sim(sim_in)
   timing_en = states.timing_en = sim_in.timing_en;
   states.foff_est_en = foff_est_en = sim_in.foff_est_en;
   states.phase_est_en = phase_est_en = sim_in.phase_est_en;
-
+ 
   if verbose
     printf("Rs:..........: %4.2f\n", Rs);
     printf("M:...........: %d\n", M);
@@ -46,7 +47,7 @@ function [sim_out rx states] = run_sim(sim_in)
     printf("Nrowsperframe: %d\n", Nrowsperframe);
     printf("Nsamperframe.: %d\n", Nsamperframe);
   end
-
+  
   % Important to define run time in seconds so HF model will evolve the same way
   % for different pilot insertion rates.  So lets work backwards from approx
   % seconds in run to get Nbits, the total number of payload data bits
@@ -71,6 +72,34 @@ function [sim_out rx states] = run_sim(sim_in)
     printf("Nbits..: %d\n", Nbits);
     printf("Nframes: %d\n", Nframes);
     printf("Nrp....: %d (number of rows including pilots)\n", Nrp);
+  end
+
+  % Optional LPDC code -----------------------------------------------
+
+  if isfield(sim_in, "ldpc_code") 
+    assert(bps == 2, "Only QPSK supported for LDPC so far.....");
+    HRA = sim_in.ldpc_code;
+    [aNr aNc] = size(HRA);
+    rate = states.rate = (aNc-aNr)/aNc;
+    assert(aNc == Nbitsperframe, "Dude: Num cols of LDPC HRA must == Nbitsperframe");
+    [H_rows, H_cols] = Mat2Hrows(HRA); 
+    code_param.H_rows = H_rows; 
+    code_param.H_cols = H_cols;
+    code_param.P_matrix = [];
+    code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix ); 
+    code_param.code_bits_per_frame = aNc;
+    assert(aNr == Nbitsperframe*rate);
+
+    ldpc_en = states.ldpc_en = 1;
+    modulation = states.ldpc_modulation = 'QPSK';
+    mapping = states.ldpc_mapping = 'gray';
+    demod_type = states.ldpc_demod_type = 0;
+    decoder_type = states.ldpc_decoder_type = 0;
+    max_iterations = states.ldpc_max_iterations = 100;
+
+    code_param.S_matrix = CreateConstellation( modulation, 4, mapping );
+
+    states.code_param = code_param;
   end
 
   % set up HF model ---------------------------------------------------------------
@@ -114,18 +143,26 @@ function [sim_out rx states] = run_sim(sim_in)
     rand('seed',1);
     randn('seed',1);
 
-    EbNo = bps * (10 .^ (EbNodB(nn)/10));
-    variance = 1/(M*EbNo/2);
+    EsNo = bps * (10 .^ (EbNodB(nn)/10));
+    variance = 1/(M*EsNo/2);
 
     Nsam = Nrp*(M+Ncp);
 
     % generate tx bits and run OFDM modulator
+    % note for reasons unknown LdpcEncode() returns garbage if we use > 0.5 rather than round()
 
-    tx_bits = rand(1,Nbits) > 0.5;
+    tx_data_bits = round(rand(1,Nbits*rate));
 
-    tx = [];
+    tx = []; tx_bits = [];
     for f=1:Nframes
-      tx = [tx ofdm_mod(states, tx_bits((f-1)*Nbitsperframe+1:f*Nbitsperframe))];
+      st = (f-1)*Nbitsperframe*rate+1; en = st + Nbitsperframe*rate - 1;
+      if ldpc_en
+        codeword = LdpcEncode(tx_data_bits(st:en), code_param.H_rows, code_param.P_matrix);
+      else
+        codeword = tx_data_bits(st:en);
+      end
+      tx = [tx ofdm_mod(states, codeword)];
+      tx_bits = [tx_bits codeword];
     end
 
     % add extra row of pilots at end, to allow one frame simulations,
@@ -179,7 +216,7 @@ function [sim_out rx states] = run_sim(sim_in)
     delta_t_log = []; 
     timing_est_log = [];
     foff_est_hz_log = [];
-    Nerrs_log = [];
+    Nerrs_log = []; Nerrs_coded_log = [];
     rx_bits = []; rx_np = [];
 
     % reset some states for each EbNo simulation point
@@ -225,13 +262,34 @@ function [sim_out rx states] = run_sim(sim_in)
     % calculate BER stats as a block, after pilots extracted
 
     errors = xor(tx_bits, rx_bits);
-    Nerrs = sum(errors);
+    Terrs = sum(errors);
+
+    Terrs_coded = 0; Tper_coded = 0;
     for f=1:Nframes
-      st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe-1;
+      st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe - 1;
       Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
+
+      % optional LDPC decode
+     
+      if ldpc_en
+        st = (f-1)*Nbitsperframe/bps + 1;
+        en = st + Nbitsperframe/bps - 1;
+        rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np(st:en), EsNo);
+        st = (f-1)*Nbitsperframe*rate + 1;
+        en = st + Nbitsperframe*rate - 1;
+        Nerrs_coded = sum(xor(tx_data_bits(st:en), rx_codeword(1:Nbitsperframe*rate)));
+        Nerrs_coded_log(f) = Nerrs_coded;
+        Terrs_coded += Nerrs_coded;
+        if Nerrs_coded
+          Tper_coded++;
+        end
+      end
     end
 
-    printf("EbNodB: %3.2f BER: %5.4f Nbits: %d Nerrs: %d\n", EbNodB(nn), Nerrs/Nbits, Nbits, Nerrs);
+    printf("EbNodB: %3.2f BER: %5.4f Tbits: %d Terrs: %d\n", EbNodB(nn), Terrs/Nbits, Nbits, Terrs);
+    if ldpc_en
+      printf("       Coded BER: %5.4f Tbits: %d Terrs: %d PER: %5.4f\n", Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, Tper_coded/Nframes);
+    end
 
     if verbose
 
@@ -259,8 +317,17 @@ function [sim_out rx states] = run_sim(sim_in)
       title('Fine Freq');
 
       figure(5); clf;
-      plot(Nerrs_log);
-
+      if ldpc_en
+        subplot(211)
+        plot(Nerrs_log);
+        title("Uncoded Errors/frame");
+        subplot(212)
+        plot(Nerrs_coded_log);
+        title("Coded Errors/frame");
+     else
+        title("Errors/frame");
+        plot(Nerrs_log);
+      end
 
       figure(6)
       Tx = abs(fft(tx(1:Nsam).*hanning(Nsam)'));
@@ -293,7 +360,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
     end
 
-    sim_out.ber(nn) = sum(Nerrs)/Nbits; 
+    sim_out.ber(nn) = Terrs/Nbits; 
     sim_out.pilot_overhead = 10*log10(Ns/(Ns-1));
   end
 endfunction
@@ -304,10 +371,10 @@ function run_single
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  %sim_in.Nsec = 30;
+  %sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
+  sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 10;
+  sim_in.EbNodB = 100;
   sim_in.verbose = 1;
   sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
@@ -316,6 +383,9 @@ function run_single
   sim_in.timing_en = 1;
   sim_in.foff_est_en = 1;
   sim_in.phase_est_en = 1;
+
+  load HRA_112_112.txt
+  sim_in.ldpc_code = HRA_112_112;
 
   run_sim(sim_in);
 end
@@ -522,7 +592,9 @@ endfunction
 format;
 more off;
 
-%run_single
+init_cml('/home/david/Desktop/cml/');
+
+run_single
 %run_curves
 %acquisition_histograms
-acquisition_test
+%acquisition_test
