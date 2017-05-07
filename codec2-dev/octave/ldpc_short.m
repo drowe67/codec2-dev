@@ -1,4 +1,4 @@
-% ldpc.m
+% ldpc_short.m
 %
 % David Rowe Mar 2017
 % Based on Bill Cowley's LDPC simulations
@@ -32,11 +32,17 @@ end
 
 function sim_out = run_sim(sim_in, HRA, Ntrials)
 
+  % Note this is effective Eb/No of payload data bits, sorta thing we
+  % plot on BER versus Eb/No graphs of decoded data.  So if we have a
+  % rate 1/2 code, each codeword bit will have Eb/No - 3dB.
+
+  EbNovec     = sim_in.EbNovec;
+
   genie_Es    = sim_in.genie_Es;
   packet_size = sim_in.packet_size;
   code        = sim_in.code;
   hf_en       = sim_in.hf_en;
-  Esvec       = sim_in.Esvec;
+  verbose     = sim_in.verbose;
 
   if strcmp(code, 'golay')
     rate = 0.5;
@@ -70,27 +76,37 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
 
   if hf_en
 
-    % some typical values
+    % some typical values, assume symbols spread acroos Nc OFDM carriers
 
-    Rs = 50; dopplerSpreadHz = 1.0; path_delay = 1E-3*Rs;
+    Nc = 28;
+    Rs = 50; dopplerSpreadHz = 0.5; path_delay = 2E-3*Rs;
 
-    nsymb = Ntrials*framesize*bps;
-    spread1 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
-    spread2 = doppler_spread(dopplerSpreadHz, Rs, nsymb);
+    nsymb = Ntrials*framesize;
+    Tp = (framesize/Nc)/Rs;
+    spread1 = doppler_spread(dopplerSpreadHz, Rs, 1.1*ceil(nsymb/Nc));
+    spread2 = doppler_spread(dopplerSpreadHz, Rs, 1.1*ceil(nsymb/Nc));
     hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
     % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
-  end
+    hf_model = zeros(ceil(nsymb/Nc),Nc);
+   end
 
-  % loop around each Esvec point
+  % loop around each EbNovec point
   
-  for ne = 1:length(Esvec)
-    Es = Esvec(ne);
-    EsNo = 10^(Es/10);
-    EbNodB = Es - 10*log10(code_param.bits_per_symbol * rate);
+  for ne = 1:length(EbNovec)
 
-    Terrs = 0;  Tbits = 0;  Ferrs = 0; 
+    % Given Eb/No of payload data bits, work out Es/No we need to
+    % apply to each codeword symbol, e.g. for rate 1/2 code:
+    %
+    % Es/No = Eb/No - 3 dB
+
+    EbNodB = EbNovec(ne);
+    EsNodB = EbNodB + 10*log10(code_param.bits_per_symbol*rate);
+    EsNo = 10^(EsNodB/10);
+    hf_r = 1;
+
+    Terrs = 0;  Tbits = 0;  Ferrs = 0;  Terrs_raw = Tbits_raw = 0;
     tx_bits = rx_bits = [];
-    hfi = 1;
+    r_log = []; Nerrs_log = []; Nerrs_raw_log = [];
 
     for nn = 1: Ntrials        
       data = round( rand( 1, code_param.data_bits_per_frame ) );
@@ -111,34 +127,50 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
       % modulate
 
       s = 1 - 2 * codeword;   
-      code_param.symbols_per_frame = length( s );
+      Ns = code_param.symbols_per_frame = length(s);
               
       if hf_en
 
-        % simplified rate Rs simulation model that doesn't include
-        % ISI, just freq filtering.  We assume perfect phase estimation
-        % so it's just amplitude distortion.
+        % Simplified rate Rs OFDM simulation model that doesn't
+        % include ISI, just freq filtering.  We assume perfect phase
+        % estimation so it's just amplitude distortion.  We distribute
+        % symbols across Nc carriers
 
-        for i=1:length(s)
+        Nr = ceil(length(s)/Nc);
+        w = (1:Nc)*2*pi;  
+        s = [s zeros(1,Nr*Nc-Ns)];  % pad out to integer number of rows
 
-          % 1.5*Rs carrier spacing, symbols mapped to 14 carriers
-          % OK we'd probably use QPSK in practice but meh a few approximations....
-
-          w = 1.5*mod(i,14)*2*pi;  
-          hf_model(i) = hf_gain*(spread1(hfi) + exp(-j*w*path_delay)*spread2(hfi));
-          s(i) *= abs(hf_model(i));
-          hfi++;
+        for r=1:Nr
+          for c=1:Nc
+            hf_model(hf_r,c) = hf_gain*(spread1(hf_r) + exp(-j*w(c)*path_delay)*spread2(hf_r));
+            s(Nc*(r-1)+c) *= abs(hf_model(hf_r,c));
+          end
+          hf_r++;
         end
+        s = s(1:Ns); % remove padding
       end
-
-      variance = 1/(2*EsNo);
-      noise = sqrt(variance)* randn(1,code_param.symbols_per_frame); 
+      
+      variance = 1/(EsNo);
+      noise = sqrt(variance/2)*(randn(1,Ns) + j*randn(1,Ns));
       r = s + noise;
 
       Nr = length(r);  
+      r_log = [r_log r];
+
+      % raw BER
+
+      detected_data = real(r) < 0;
+      error_positions = xor(detected_data, codeword);
+
+      Nerrs_raw = sum(error_positions);
+      Terrs_raw += Nerrs_raw;
+      Tbits_raw += length(codeword);
+      Nerrs_raw_log = [Nerrs_raw_log Nerrs_raw];
+
+      % other decoders
 
       if strcmp(code, 'golay')
-        detected_data = egolaydec(r < 0);
+        detected_data = egolaydec(real(r) < 0);
         detected_data = detected_data(code_param.data_bits_per_frame+1:framesize);
       end
 
@@ -173,18 +205,18 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
       end
 
       if strcmp(code, 'diversity')
-        detected_data = (r(1:7) + r(8:14)) < 0;
+        detected_data = real(r(1:7) + r(8:14)) < 0;
       end
 
       rx_bits = [rx_bits detected_data];
 
       error_positions = xor( detected_data, data );
       Nerrs = sum(error_positions);
-        
+      Nerrs_log = [Nerrs_log Nerrs];
+      
       if Nerrs>0,  Ferrs = Ferrs +1;  end
       Terrs = Terrs + Nerrs;
       Tbits = Tbits + code_param.data_bits_per_frame;
-
     end
       
     % count packet errors using supplied packet size.  Operating one
@@ -199,21 +231,52 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
       Tpackets++;
     end
 
-    printf("EbNo: %3.1f dB BER: %5.4f PER: %5.4f Nbits: %4d Nerrs: %4d Tpackets: %4d Perr: %4d\n", EbNodB, Terrs/Tbits, Perrs/ Tpackets, Tbits, Terrs, Tpackets, Perrs);
+    printf("Coded EbNo: %3.1f dB BER: %5.4f PER: %5.4f Nbits: %4d Nerrs: %4d Tpackets: %4d Perr: %4d\n", 
+            EbNodB, Terrs/Tbits, Perrs/ Tpackets, Tbits, Terrs, Tpackets, Perrs);
+    EbNodB_raw = EsNodB - 10*log10(code_param.bits_per_symbol);
+    printf("Raw EbNo..: %3.1f dB BER: %5.4f Nbits: %4d Nerrs: %4d\n", EbNodB_raw, 
+            Terrs_raw/Tbits_raw, Tbits_raw, Terrs_raw);
 
     TERvec(ne) = Terrs;
     FERvec(ne) = Ferrs;
     BERvec(ne) = Terrs/ Tbits;
     PERvec(ne) = Perrs/ Tpackets;
-    Ebvec = Esvec - 10*log10(code_param.bits_per_symbol * rate);
-    
+
     sim_out.BERvec = BERvec;
     sim_out.PERvec = PERvec;
-    sim_out.Ebvec = Ebvec;
     sim_out.FERvec = FERvec;
     sim_out.TERvec  = TERvec;
     sim_out.framesize = framesize;
     sim_out.error_positions = error_positions;
+
+    if verbose
+      figure(3); clf;
+      plot(real(r_log),imag(r_log),'+')
+      axis([-2 2 -2 2])
+      title('Scatter');
+
+      figure(4)
+
+      subplot(211);
+      stem((1:Ntrials)*Tp, Nerrs_raw_log);
+      subplot(212);
+      stem((1:Ntrials)*Tp, Nerrs_log);
+      %axis([1 Ntrials*Tp -0.2 1.2])
+
+      if hf_en
+        figure(5); clf;
+
+        % limit mesh plot to Np points to plot quickly
+      
+        Np = 500;
+        step = ceil(hf_r/Np);
+        mesh(1:Nc, (1:step:hf_r-1)/Rs, abs(hf_model(1:step:hf_r-1,:)))
+        title('HF channel amplitude');
+        xlabel('Carrier');
+        ylabel('Time (s)');
+      end
+
+    end
   end
 endfunction
 
@@ -232,27 +295,36 @@ function plot_curves(hf_en)
   sim_in.packet_size = 28;
   sim_in.code        = 'ldpc';
   sim_in.hf_en       = hf_en;
+  sim_in.verbose     = 0;
 
   if hf_en
-    Esvec = 0:0.5:9; 
+    EbNovec = 2:0.5:10; 
   else
-    Esvec = -3:0.5:3; 
+    EbNovec = 0:0.5:8; 
   end
-  sim_in.Esvec = Esvec;
+  sim_in.EbNovec = EbNovec;
 
   load HRA_112_112.txt
   load HRA_112_56.txt
   load HRA_56_56.txt
   load HRA_56_28.txt
 
+  printf("HRA_112_112-------------\n");
   sim_out1 = run_sim(sim_in, HRA_112_112, Ntrials);
+  printf("HRA_112_56-------------\n");
   sim_out2 = run_sim(sim_in, HRA_112_56 , Ntrials);
+#{
+  printf("HRA_56_56-------------\n");
   sim_out3 = run_sim(sim_in, HRA_56_56  , Ntrials*2);
+  printf("HRA_56_28-------------\n");
   sim_out4 = run_sim(sim_in, HRA_56_28  , Ntrials*2);
-  sim_in.code = 'golay';
-  sim_out5 = run_sim(sim_in, [], Ntrials*10);
-  sim_in.code = 'diversity';
-  sim_out6 = run_sim(sim_in, [], Ntrials*10);
+  %printf("Golay -------------\n");
+  %sim_in.code = 'golay';
+  %sim_out5 = run_sim(sim_in, [], Ntrials*10);
+  %printf("Diversity -------------\n");
+  %sim_in.code = 'diversity';
+  %sim_out6 = run_sim(sim_in, [], Ntrials*10);
+#}
 
   if hf_en
     Ebvec_theory = 2:0.5:12;
@@ -274,12 +346,12 @@ function plot_curves(hf_en)
   figure(1); clf;
   semilogy(Ebvec_theory,  uncoded_BER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
   hold on;
-  semilogy(sim_out1.Ebvec, sim_out1.BERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out2.Ebvec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out3.Ebvec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out4.Ebvec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out5.Ebvec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out6.Ebvec, sim_out6.BERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out1.BERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out6.BERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('BER')
@@ -292,12 +364,12 @@ function plot_curves(hf_en)
   figure(2); clf;
   semilogy(Ebvec_theory,  uncoded_PER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
   hold on;
-  semilogy(sim_out1.Ebvec, sim_out1.PERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out2.Ebvec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out3.Ebvec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out4.Ebvec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out5.Ebvec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  semilogy(sim_out6.Ebvec, sim_out6.PERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out1.PERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out6.PERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('PER')
@@ -333,12 +405,13 @@ function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, error_pattern
 
   if strcmp(channel, 'awgn')
     sim_in.hf_en = 0;
-    sim_in.Esvec = EbNodB + 10*log10(rate);
+    sim_in.EbNovec = EbNodB;
   else
     sim_in.hf_en = 1;
-    sim_in.Esvec = EbNodB + 10*log10(rate);
+    sim_in.EbNovec = EbNodB;
   end
 
+  sim_in.verbose = 1;
   sim_out = run_sim(sim_in, HRA_112_112, Ntrials);
 
   if nargin == 5
@@ -347,9 +420,6 @@ function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, error_pattern
     fclose(fep);
   end
 
-  figure
-  plot(sim_out.error_positions);
-  axis([1 length(sim_out.error_positions) -0.2 1.2])
 endfunction
 
 
@@ -365,9 +435,8 @@ function run_c_header
   Ntrials = bits/data_bits_per_frame;
   sim_in.genie_Es    = 1;
   sim_in.packet_size = 28;
-  EbNodB = 2;
   sim_in.hf_en = 0;
-  sim_in.Esvec = EbNodB + 10*log10(rate);
+  sim_in.Esvec = 2;
   sim_in.c_include_file = "../src/HRA_112_112.h";
 
   sim_out = run_sim(sim_in, HRA_112_112, Ntrials);
@@ -384,7 +453,10 @@ rand('seed',1);
 randn('seed',1);
 more off;
 format;
-close all;
+
+% simple single point test
+
+run_single(700*120, 'ldpc', 'hf', 12)
 
 % plotting curves (may take a while)
 
@@ -393,10 +465,12 @@ close all;
 
 % generating error files 
 
+#{
 run_single(700*10, 'ldpc', 'awgn', 2, 'awgn_2dB_ldpc.err')
 run_single(700*10, 'diversity', 'awgn', 2, 'awgn_2dB_diversity.err')
 run_single(700*10, 'ldpc', 'hf', 6, 'hf_6dB_ldpc.err')
 run_single(700*10, 'diversity', 'hf', 6, 'hf_6dB_diversity.err')
+#}
 
 % generate C header for C port of code
 
