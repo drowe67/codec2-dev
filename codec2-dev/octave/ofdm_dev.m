@@ -204,6 +204,7 @@ function [sim_out rx states] = run_sim(sim_in)
     rx = rx .* exp(j*woffset*(1:Nsam));
 
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
+    10*log10(var(rx)/var(noise))
     rx += noise;
 
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
@@ -217,7 +218,7 @@ function [sim_out rx states] = run_sim(sim_in)
     timing_est_log = [];
     foff_est_hz_log = [];
     Nerrs_log = []; Nerrs_coded_log = [];
-    rx_bits = []; rx_np = [];
+    rx_bits = []; rx_np = []; rx_amp = [];
 
     % reset some states for each EbNo simulation point
 
@@ -248,9 +249,9 @@ function [sim_out rx states] = run_sim(sim_in)
       end
       prx += states.nin;
 
-      [arx_bits states aphase_est_pilot_log arx_np] = ofdm_demod(states, rxbuf_in);
+      [arx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
 
-      rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np];
+      rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np]; rx_amp = [rx_amp arx_amp];
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
@@ -264,7 +265,7 @@ function [sim_out rx states] = run_sim(sim_in)
     errors = xor(tx_bits, rx_bits);
     Terrs = sum(errors);
 
-    Terrs_coded = 0; Tper_coded = 0;
+    Terrs_coded = 0; Tpackets = 0; Tpacketerrs_coded = 0;
     for f=1:Nframes
       st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe - 1;
       Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
@@ -274,21 +275,39 @@ function [sim_out rx states] = run_sim(sim_in)
       if ldpc_en
         st = (f-1)*Nbitsperframe/bps + 1;
         en = st + Nbitsperframe/bps - 1;
-        rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np(st:en), EsNo);
+        r = rx_np(st:en); fade = rx_amp(st:en);
+        rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fade);
+
+        % running coded BER calcs
+
         st = (f-1)*Nbitsperframe*rate + 1;
         en = st + Nbitsperframe*rate - 1;
         Nerrs_coded = sum(xor(tx_data_bits(st:en), rx_codeword(1:Nbitsperframe*rate)));
         Nerrs_coded_log(f) = Nerrs_coded;
         Terrs_coded += Nerrs_coded;
-        if Nerrs_coded
-          Tper_coded++;
+
+        % PER based on vocoder packet size, not sure it makes much difference compared to using
+        % all bits in LDPC code for packet
+
+        atx_data_bits = tx_data_bits(st:en);
+        Nbitspervocframe = 28;
+        Nvocframes = Nbitsperframe*rate/Nbitspervocframe;
+        for fv=1:Nvocframes
+          st = (fv-1)*Nbitspervocframe + 1;
+          en = st + Nbitspervocframe - 1;
+          Nvocpacketerrs = sum(xor(atx_data_bits(st:en), rx_codeword(st:en)));
+          if Nvocpacketerrs
+            Tpacketerrs_coded++;
+          end
+          Tpackets++;
         end
       end
     end
 
-    printf("EbNodB: %3.2f BER: %5.4f Tbits: %d Terrs: %d\n", EbNodB(nn), Terrs/Nbits, Nbits, Terrs);
+    printf("EbNodB: %4.2f BER: %5.4f Tbits: %d Terrs: %d\n", EbNodB(nn), Terrs/Nbits, Nbits, Terrs);
     if ldpc_en
-      printf("       Coded BER: %5.4f Tbits: %d Terrs: %d PER: %5.4f\n", Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, Tper_coded/Nframes);
+      printf("        Coded BER: %5.4f Tbits: %d Terrs: %d PER: %5.4f Tpackets: %d Tpacket_errs: %d\n", 
+             Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, Tpacketerrs_coded/Tpackets, Tpackets, Tpacketerrs_coded);
     end
 
     if verbose
@@ -319,14 +338,14 @@ function [sim_out rx states] = run_sim(sim_in)
       figure(5); clf;
       if ldpc_en
         subplot(211)
-        plot(Nerrs_log);
-        title("Uncoded Errors/frame");
+        stem(Nerrs_log/Nbitsperframe);
+        title("Uncoded BER/frame");
         subplot(212)
-        plot(Nerrs_coded_log);
-        title("Coded Errors/frame");
+        stem(Nerrs_coded_log/(Nbitsperframe*rate));
+        title("Coded BER/frame");
      else
-        title("Errors/frame");
-        plot(Nerrs_log);
+        title("BER/frame");
+        stem(Nerrs_log/Nbitsperframe);
       end
 
       figure(6)
@@ -372,11 +391,11 @@ function run_single
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   %sim_in.Nsec = 5*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 30;
+  sim_in.Nsec = 60;
 
-  sim_in.EbNodB = 100;
+  sim_in.EbNodB = 6;
   sim_in.verbose = 1;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.sample_clock_offset_ppm = 0;
 

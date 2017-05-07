@@ -258,7 +258,7 @@ endfunction
           ^
 #}
 
-function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_in)
+function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states, rxbuf_in)
   ofdm_load_const;
 
   % insert latest input samples into rxbuf
@@ -337,6 +337,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
   % OK - now estimate and correct phase  ----------------------------------
 
   aphase_est_pilot = 10*ones(1,Nc+2);
+  aamp_est_pilot = zeros(1,Nc+2);
   for c=2:Nc+1
 
     % estimate phase using average of 6 pilots in a rect 2D window centred
@@ -355,14 +356,15 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
     aphase_est_pilot_rect += sum(rx_sym(2+Ns+1,cr)*pilots(cr)');
 
     aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
+    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
   end
-
+ 
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
 
   aphase_est_pilot_log = [];
-  rx_bits = []; rx_np = [];
+  rx_bits = []; rx_np = []; rx_amp = [];
   for rr=1:Ns-1
     for c=2:Nc+1
       if phase_est_en
@@ -371,6 +373,7 @@ function [rx_bits states aphase_est_pilot_log rx_np] = ofdm_demod(states, rxbuf_
         rx_corr = rx_sym(rr+2,c);
       end
       rx_np = [rx_np rx_corr];
+      rx_amp = [rx_amp aamp_est_pilot(c)];
       if bps == 1
         abit = real(rx_corr) > 0;
       end
