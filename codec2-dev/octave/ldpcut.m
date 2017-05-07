@@ -59,7 +59,7 @@ function sim_out = run_simulation(sim_in)
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   end
 
-  % set up option HF (multipath) model ------------------------------------
+  % set up optional HF (multipath) model ------------------------------------
 
   fading = ones(1,Ntrials*code_param.code_bits_per_frame/bps);
 
@@ -248,7 +248,9 @@ endfunction
 more off;
 format
 
-wimax_en = 1;
+% set to 1 to use wimax codes built into CML library
+
+wimax_en = 1; 
 
 % ---------------------------------------------------------------------------------
 % 1/ Simplest possible one frame simulation
@@ -264,7 +266,7 @@ decoder_type = 0;
 max_iterations = 100;
 
 if wimax_en
-  framesize = 576*2;         % CML library has a bunch of different framesizes available
+  framesize = 576*2;     % CML library has a bunch of different framesizes available
   rate = 1/2;
   code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
 else
@@ -294,16 +296,17 @@ if sim_in.wimax_en
   % these are inputs for Wimax mode, e.g. framesize defines code used
   sim_in.rate = 0.5; 
   sim_in.framesize = 576*2;  % long codes smooth over fades but increase latency
+                             % e.g. try *4 and note difference in HF perf
 end
 sim_in.verbose = 2;
-sim_in.Ntrials = 1000/4;
+sim_in.Ntrials = 100;
 sim_in.EbNodBvec = 9;
-sim_in.hf_en = 1;
+sim_in.hf_en = 0;
 run_simulation(sim_in);
 
 
 % ---------------------------------------------------------------------------------
-% 3/ Lets draw an Eb/No versus BER curve 
+% 3/ Lets draw some Eb/No versus BER curves 
 % ---------------------------------------------------------------------------------
 
 printf("\n\nTest 3\n------\n");
