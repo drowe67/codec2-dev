@@ -4,7 +4,8 @@
 % Based on Bill Cowley's LDPC simulations
 %
 % Octave simulation of BPSK with short LDPC codes developed by Bill.  First step
-% in use of LDPC codes with FreeDV and Codec 2 700C.
+% in use of LDPC codes with FreeDV and Codec 2 700C.  BPSK makes life a bits easier
+% for simulation
 %
 % NOTE: You will need to set the CML path in the call to init_cml() below
 %       for you CML install.  See lpdc.m for instructions on how to install 
@@ -12,6 +13,7 @@
 
 1;
 
+gp_interleaver;
 
 function init_cml(path_to_cml)
   currentdir = pwd;
@@ -32,6 +34,9 @@ end
 
 function sim_out = run_sim(sim_in, HRA, Ntrials)
 
+  rand('seed',1);
+  randn('seed',1);
+
   % Note this is effective Eb/No of payload data bits, sorta thing we
   % plot on BER versus Eb/No graphs of decoded data.  So if we have a
   % rate 1/2 code, each codeword bit will have Eb/No - 3dB.
@@ -39,20 +44,29 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
   EbNovec     = sim_in.EbNovec;
 
   genie_Es    = sim_in.genie_Es;
-  packet_size = sim_in.packet_size;
   code        = sim_in.code;
   hf_en       = sim_in.hf_en;
   verbose     = sim_in.verbose;
 
-  if strcmp(code, 'golay')
-    rate = 0.5;
-    code_param.data_bits_per_frame = 12;
-    framesize = 24;
+  if isfield(sim_in, "interleave_en") 
+    interleave_en = sim_in.interleave_en;
+    interleave_frames = sim_in.interleave_frames;
+  else
+    interleave_en = 0;
+    interleave_frames = 1;
   end
+
+  % default number of carriers for HF model, we fiddle with this a bit
+  % for different FEC schemes
+
+  Nc = 28;
+
+  % set up for different FEC, get roughly the same frame size so for
+  % HF channels the simulation runs over roughly the same time
+
   if strcmp(code, 'ldpc')
-    [Nr Nc] = size(HRA);  
-    rate = (Nc-Nr)/Nc;
-    framesize = Nc;
+    [numr numc] = size(HRA);
+    rate = (numc-numr)/numc;
     modulation = 'BPSK';
     demod_type = 0;
     decoder_type = 0;
@@ -62,12 +76,34 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
     code_param.H_cols = H_cols;
     code_param.P_matrix = [];
     code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix ); 
+    code_param.code_bits_per_frame = numc;
+    Ncodewordsperframe = interleave_frames*224/numc;
+    framesize = Ncodewordsperframe*numc;
   end
+
+  if strcmp(code, 'golay')
+    rate = 0.5;
+    code_param.data_bits_per_frame = 12;
+    code_param.code_bits_per_frame = 24;
+
+    % one Golay (24,12) codeword per row
+
+    Nc = 24;   
+    Ncodewordsperframe = 9;
+    framesize = Nc*Ncodewordsperframe;
+  end
+
   if strcmp(code, 'diversity')
     rate = 0.5;
-    code_param.data_bits_per_frame = 7;
-    framesize = 14;
+    code_param.data_bits_per_frame = Nc/2;
+    code_param.code_bits_per_frame = Nc;
+    Ncodewordsperframe = 8;
+    framesize = Nc*Ncodewordsperframe;
   end
+
+  Rs = 50; Tp = (framesize/Nc)/Rs; Tp_codec2 = 0.04;
+
+  % we are using BPSK here
 
   mod_order = 2; 
   bps = code_param.bits_per_symbol = log2(mod_order);
@@ -76,22 +112,22 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
 
   if hf_en
 
-    % some typical values, assume symbols spread acroos Nc OFDM carriers
+    % some typical values, assume symbols spread across Nc OFDM carriers
 
-    Nc = 28;
-    Rs = 50; dopplerSpreadHz = 0.5; path_delay = 2E-3*Rs;
+    dopplerSpreadHz = 1; path_delay = 1E-3*Rs;
 
-    nsymb = Ntrials*framesize;
-    Tp = (framesize/Nc)/Rs;
+    nsymb = Ntrials*framesize*bps;
     spread1 = doppler_spread(dopplerSpreadHz, Rs, 1.1*ceil(nsymb/Nc));
     spread2 = doppler_spread(dopplerSpreadHz, Rs, 1.1*ceil(nsymb/Nc));
     hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
     % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
     hf_model = zeros(ceil(nsymb/Nc),Nc);
-   end
+  end
 
-  % loop around each EbNovec point
-  
+  % --------------------------------------------------------------------
+  % Sun a simulation for every EbNovec point
+  %---------------------------------------------------------------------
+
   for ne = 1:length(EbNovec)
 
     % Given Eb/No of payload data bits, work out Es/No we need to
@@ -102,26 +138,52 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
     EbNodB = EbNovec(ne);
     EsNodB = EbNodB + 10*log10(code_param.bits_per_symbol*rate);
     EsNo = 10^(EsNodB/10);
+
+    % reset Hf channel index here so each run gets exactly the same HF channel
+
     hf_r = 1;
 
+    % bunch of counters and logs
+
     Terrs = 0;  Tbits = 0;  Ferrs = 0;  Terrs_raw = Tbits_raw = 0;
-    tx_bits = rx_bits = [];
     r_log = []; Nerrs_log = []; Nerrs_raw_log = [];
+    tx_bits_log = rx_bits_log = [];
 
     for nn = 1: Ntrials        
-      data = round( rand( 1, code_param.data_bits_per_frame ) );
-      tx_bits = [tx_bits data];
-      if strcmp(code, 'golay')
-        codeword = egolayenc(data);
-      end
+
+      % Each trial is one complete frame - OK first set up frame to tx
+
+      codeword = tx_bits = [];
+
       if strcmp(code, 'ldpc')
-        codeword = LdpcEncode( data, code_param.H_rows, code_param.P_matrix );
-      end
-      if strcmp(code, 'diversity')
-        codeword = [data data];
+        for f=1:Ncodewordsperframe
+          data = round( rand( 1, code_param.data_bits_per_frame ) );
+          tx_bits = [tx_bits data];
+          codeword = [codeword LdpcEncode(data, code_param.H_rows, code_param.P_matrix) ];
+        end
+        if interleave_en
+          codeword = gp_interleave(codeword);
+        end
       end
 
-      code_param.code_bits_per_frame = length( codeword );
+      if strcmp(code, 'golay')
+        for f=1:Ncodewordsperframe
+          data = round( rand( 1, code_param.data_bits_per_frame ) );
+          tx_bits = [tx_bits data];
+          codeword = [codeword egolayenc(data)];
+        end
+      end
+
+      if strcmp(code, 'diversity')
+        for f=1:Ncodewordsperframe
+          data = round( rand( 1, code_param.data_bits_per_frame ) );
+          tx_bits = [tx_bits data];
+          codeword = [codeword data data];
+        end
+      end
+
+      tx_bits_log = [tx_bits_log tx_bits];
+
       Nsymb = code_param.code_bits_per_frame/bps;      
        
       % modulate
@@ -167,14 +229,14 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
       Tbits_raw += length(codeword);
       Nerrs_raw_log = [Nerrs_raw_log Nerrs_raw];
 
-      % other decoders
+      % FEC decoder
 
-      if strcmp(code, 'golay')
-        detected_data = egolaydec(real(r) < 0);
-        detected_data = detected_data(code_param.data_bits_per_frame+1:framesize);
-      end
+      rx_bits = [];
 
       if strcmp(code, 'ldpc')
+        if interleave_en
+          r = gp_deinterleave(r);
+        end
 
         % in the binary case the LLRs are just a scaled version of the rx samples ...
         % if the EsNo is known -- use the following 
@@ -188,65 +250,93 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
 	  input_decoder_c = 4 * estEsN0 * r;
         end
 
-        [x_hat, PCcnt] = MpDecode( input_decoder_c, code_param.H_rows, code_param.H_cols, ...
+        for f=1:Ncodewordsperframe
+          st = (f-1)*code_param.code_bits_per_frame + 1;
+          en = st + code_param.code_bits_per_frame - 1;
+          [x_hat, PCcnt] = MpDecode(input_decoder_c(st:en), code_param.H_rows, code_param.H_cols, ...
                                    max_iterations, decoder_type, 1, 1);
-        Niters = sum(PCcnt!=0);
-        detected_data = x_hat(Niters,:);
+          Niters = sum(PCcnt!=0);
+          arx_bits = x_hat(Niters,:);
+          rx_bits = [rx_bits arx_bits(1:code_param.data_bits_per_frame)];
 
-        if isfield(sim_in, "c_include_file") 
+          #{
+            if isfield(sim_in, "c_include_file") 
 
-          % optionally dump code and unit test data to a C header file
+            % optionally dump code and unit test data to a C header file
 
-          code_param.c_include_file = sim_in.c_include_file;
-          ldpc_gen_h_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat, detected_data);
+            code_param.c_include_file = sim_in.c_include_file;
+            ldpc_gen_h_file(code_param, max_iterations, decoder_type, input_decoder_c, x_hat, detected_data);
+          #}
         end
 
         detected_data = detected_data(1:code_param.data_bits_per_frame);
       end
 
-      if strcmp(code, 'diversity')
-        detected_data = real(r(1:7) + r(8:14)) < 0;
+      if strcmp(code, 'golay')
+        for f=1:Ncodewordsperframe
+          st = (f-1)*code_param.code_bits_per_frame+1; en=st+code_param.code_bits_per_frame-1;
+          arx_codeword = egolaydec(real(r(st:en)) < 0);
+          rx_bits = [rx_bits arx_codeword(code_param.data_bits_per_frame+1:code_param.code_bits_per_frame)];
+        end
       end
 
-      rx_bits = [rx_bits detected_data];
+      if strcmp(code, 'diversity')
+        for f=1:Ncodewordsperframe
+          st = (f-1)*Nc+1;
+          r_combined = r(st:st+Nc/2-1) + r(st+Nc/2:st+Nc-1);
+          arx_data = real(r_combined) < 0;
+          rx_bits = [rx_bits arx_data];
+        end
 
-      error_positions = xor( detected_data, data );
+        #{
+        % simulate low rate code to mop up errors
+
+        error_positions = xor(rx_bits, tx_bits);
+        Nerrs = sum(error_positions);
+        if Nerrs < 6
+          rx_bits = tx_bits;
+        end        
+        #}
+      end
+
+      rx_bits_log = [rx_bits_log rx_bits];
+
+      error_positions = xor(rx_bits, tx_bits);
       Nerrs = sum(error_positions);
       Nerrs_log = [Nerrs_log Nerrs];
       
-      if Nerrs>0,  Ferrs = Ferrs +1;  end
+      if Nerrs>0,  Ferrs += 1;  end
       Terrs = Terrs + Nerrs;
-      Tbits = Tbits + code_param.data_bits_per_frame;
+      Tbits = Tbits + code_param.data_bits_per_frame*Ncodewordsperframe;
     end
       
-    % count packet errors using supplied packet size.  Operating one
-    % one big string of bits lets us account for cases were FEC framesize
-    % is less than packet size
+    % Alternative Codec 2 packet rate measurement indep of framesize
 
-    error_positions = xor(tx_bits, rx_bits);
-    Perrs = 0; Tpackets = 0;
-    for i=1:packet_size:length(tx_bits)-packet_size
-      Nerrs = sum(error_positions(i:i+packet_size-1));
-      if Nerrs>0,  Perrs = Perrs +1;  end
-      Tpackets++;
+    Nerrs_codec2_log = [];
+    Ncodecpacketsize = 28;
+    Perrs = 0; Npackets = floor(length(tx_bits_log)/Ncodecpacketsize);
+    for p=1:Ncodecpacketsize:Npackets*Ncodecpacketsize
+      Nerrs = sum(xor(tx_bits_log(p:p+Ncodecpacketsize-1), rx_bits_log(p:p+Ncodecpacketsize-1)));
+      if Nerrs
+        Perrs++;
+      end
+      Nerrs_codec2_log = [Nerrs_codec2_log Nerrs];
     end
 
     printf("Coded EbNo: %3.1f dB BER: %5.4f PER: %5.4f Nbits: %4d Nerrs: %4d Tpackets: %4d Perr: %4d\n", 
-            EbNodB, Terrs/Tbits, Perrs/ Tpackets, Tbits, Terrs, Tpackets, Perrs);
+            EbNodB, Terrs/Tbits, Ferrs/ Ntrials, Tbits, Terrs, Ntrials, Ferrs);
     EbNodB_raw = EsNodB - 10*log10(code_param.bits_per_symbol);
     printf("Raw EbNo..: %3.1f dB BER: %5.4f Nbits: %4d Nerrs: %4d\n", EbNodB_raw, 
             Terrs_raw/Tbits_raw, Tbits_raw, Terrs_raw);
-
-    TERvec(ne) = Terrs;
-    FERvec(ne) = Ferrs;
-    BERvec(ne) = Terrs/ Tbits;
-    PERvec(ne) = Perrs/ Tpackets;
+    printf("Codec 2 PER: %5.4f Npackets: %d Perrs: %d\n", Perrs/Npackets, Npackets, Perrs);
+    
+    BERvec(ne) = Terrs/Tbits;
+    PERvec(ne) = Perrs/Npackets;
 
     sim_out.BERvec = BERvec;
     sim_out.PERvec = PERvec;
-    sim_out.FERvec = FERvec;
-    sim_out.TERvec  = TERvec;
-    sim_out.framesize = framesize;
+
+    error_positions = xor(tx_bits_log, rx_bits_log);
     sim_out.error_positions = error_positions;
 
     if verbose
@@ -255,16 +345,14 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
       axis([-2 2 -2 2])
       title('Scatter');
 
-      figure(4)
-
+      figure(4); clf;
       subplot(211);
       stem((1:Ntrials)*Tp, Nerrs_raw_log);
       subplot(212);
-      stem((1:Ntrials)*Tp, Nerrs_log);
-      %axis([1 Ntrials*Tp -0.2 1.2])
+      stem((1:Npackets)*Tp_codec2, Nerrs_codec2_log);
 
       if hf_en
-        figure(5); clf;
+        figure(6); clf;
 
         % limit mesh plot to Np points to plot quickly
       
@@ -281,7 +369,7 @@ function sim_out = run_sim(sim_in, HRA, Ntrials)
 endfunction
 
 
-function plot_curves(hf_en)
+function plot_curves(Ntrials=100, hf_en=0)
 
   if hf_en
     epslabel = 'hf';
@@ -289,10 +377,7 @@ function plot_curves(hf_en)
     epslabel = 'awgn';
   end
 
-  Ntrials = 500;
-
   sim_in.genie_Es    = 1;
-  sim_in.packet_size = 28;
   sim_in.code        = 'ldpc';
   sim_in.hf_en       = hf_en;
   sim_in.verbose     = 0;
@@ -311,20 +396,26 @@ function plot_curves(hf_en)
 
   printf("HRA_112_112-------------\n");
   sim_out1 = run_sim(sim_in, HRA_112_112, Ntrials);
+
+#{
   printf("HRA_112_56-------------\n");
   sim_out2 = run_sim(sim_in, HRA_112_56 , Ntrials);
-#{
+#}
+
   printf("HRA_56_56-------------\n");
   sim_out3 = run_sim(sim_in, HRA_56_56  , Ntrials*2);
+#{
   printf("HRA_56_28-------------\n");
   sim_out4 = run_sim(sim_in, HRA_56_28  , Ntrials*2);
-  %printf("Golay -------------\n");
-  %sim_in.code = 'golay';
-  %sim_out5 = run_sim(sim_in, [], Ntrials*10);
-  %printf("Diversity -------------\n");
-  %sim_in.code = 'diversity';
-  %sim_out6 = run_sim(sim_in, [], Ntrials*10);
+
+  printf("Golay -------------\n");
+  sim_in.code = 'golay';
+  sim_out5 = run_sim(sim_in, [], Ntrials);
+  
 #}
+  printf("Diversity -------------\n");
+  sim_in.code = 'diversity';
+  sim_out6 = run_sim(sim_in, [], Ntrials);
 
   if hf_en
     Ebvec_theory = 2:0.5:12;
@@ -341,17 +432,17 @@ function plot_curves(hf_en)
   % no packet error if all bits ok (1-p(0))*(1-p(1))
   % P(packet error) = p(0)+p(1)+....
 
-  uncoded_PER_theory = 1 - (1-uncoded_BER_theory).^sim_in.packet_size;
+  uncoded_PER_theory = 1 - (1-uncoded_BER_theory).^28;
 
   figure(1); clf;
   semilogy(Ebvec_theory,  uncoded_BER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
   hold on;
   semilogy(EbNovec, sim_out1.BERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-  semilogy(EbNovec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-  %semilogy(EbNovec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out2.BERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out3.BERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
   %semilogy(EbNovec, sim_out4.BERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
   %semilogy(EbNovec, sim_out5.BERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  %semilogy(EbNovec, sim_out6.BERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out6.BERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('BER')
@@ -365,11 +456,11 @@ function plot_curves(hf_en)
   semilogy(Ebvec_theory,  uncoded_PER_theory, 'b+-;BPSK theory;','markersize', 10, 'linewidth', 2)
   hold on;
   semilogy(EbNovec, sim_out1.PERvec, 'g+-;rate 1/2 HRA 112 112;','markersize', 10, 'linewidth', 2)
-  semilogy(EbNovec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
-  %semilogy(EbNovec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
+  %semilogy(EbNovec, sim_out2.PERvec, 'r+-;rate 2/3 HRA 112 56;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out3.PERvec, 'c+-;rate 1/2 HRA 56 56;','markersize', 10, 'linewidth', 2)
   %semilogy(EbNovec, sim_out4.PERvec, 'k+-;rate 2/3 HRA 56 28;','markersize', 10, 'linewidth', 2)
   %semilogy(EbNovec, sim_out5.PERvec, 'm+-;rate 1/2 Golay (24,12);','markersize', 10, 'linewidth', 2)
-  %semilogy(EbNovec, sim_out6.PERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
+  semilogy(EbNovec, sim_out6.PERvec, 'go-;rate 1/2 Diversity;','markersize', 10, 'linewidth', 2)
   hold off;
   xlabel('Eb/No')
   ylabel('PER')
@@ -384,37 +475,32 @@ function plot_curves(hf_en)
 endfunction
 
 
-function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, error_pattern_filename)
+function run_single(bits, code = 'ldpc', channel = 'awgn', EbNodB, interleave=0, error_pattern_filename)
 
   sim_in.code = code;
   load HRA_112_112.txt
+  HRA = HRA_112_112;
 
-  if strcmp(code, 'ldpc')
-    data_bits_per_frame = 112;
-    rate = 0.5;
-  end
+  sim_in.genie_Es = 1;
 
-  if strcmp(code, 'diversity')
-    data_bits_per_frame = 7;
-    rate = 0.5;
-  end
-
-  Ntrials = bits/data_bits_per_frame;
-  sim_in.genie_Es    = 1;
-  sim_in.packet_size = 28;
-
+  sim_in.EbNovec = EbNodB;
   if strcmp(channel, 'awgn')
     sim_in.hf_en = 0;
-    sim_in.EbNovec = EbNodB;
   else
     sim_in.hf_en = 1;
-    sim_in.EbNovec = EbNodB;
   end
 
+  if interleave
+    sim_in.interleave_en = 1;
+    sim_in.interleave_frames = interleave;
+  else
+    sim_in.interleave_frames = 1;
+  end
+  Ntrials = floor(bits/(112*sim_in.interleave_frames));
   sim_in.verbose = 1;
-  sim_out = run_sim(sim_in, HRA_112_112, Ntrials);
+  sim_out = run_sim(sim_in, HRA, Ntrials);
 
-  if nargin == 5
+  if nargin == 6
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, sim_out.error_positions, "short");
     fclose(fep);
@@ -434,7 +520,6 @@ function run_c_header
   bits = data_bits_per_frame;
   Ntrials = bits/data_bits_per_frame;
   sim_in.genie_Es    = 1;
-  sim_in.packet_size = 28;
   sim_in.hf_en = 0;
   sim_in.Esvec = 2;
   sim_in.c_include_file = "../src/HRA_112_112.h";
@@ -449,28 +534,24 @@ endfunction
 
 init_cml('/home/david/Desktop/cml');
 
-rand('seed',1);
-randn('seed',1);
 more off;
 format;
 
 % simple single point test
 
-run_single(700*120, 'ldpc', 'hf', 12)
+run_single(700*60, 'ldpc', 'hf', 6, 32)
 
 % plotting curves (may take a while)
 
 %plot_curves(0);
-%plot_curves(1);
+%plot_curves(500,1);
 
 % generating error files 
 
-#{
-run_single(700*10, 'ldpc', 'awgn', 2, 'awgn_2dB_ldpc.err')
-run_single(700*10, 'diversity', 'awgn', 2, 'awgn_2dB_diversity.err')
-run_single(700*10, 'ldpc', 'hf', 6, 'hf_6dB_ldpc.err')
-run_single(700*10, 'diversity', 'hf', 6, 'hf_6dB_diversity.err')
-#}
+%run_single(700*10, 'ldpc', 'awgn', 3, 0, 'awgn_3dB_ldpc.err')
+%run_single(700*10, 'diversity', 'awgn', 3, 0, 'awgn_3dB_diversity.err')
+%run_single(700*10, 'ldpc', 'hf', 10, 0, 'hf_10dB_ldpc.err')
+%run_single(700*10, 'diversity', 'hf', 10, 0, 'hf_10dB_diversity.err')
 
 % generate C header for C port of code
 
