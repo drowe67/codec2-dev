@@ -200,7 +200,6 @@ end
 % --------------------------------------
 
 function tx = ofdm_mod(states, tx_bits)
-  ofdm_load_const;
 
   assert(length(tx_bits) == Nbitsperframe);
 
@@ -214,6 +213,18 @@ function tx = ofdm_mod(states, tx_bits)
       tx_sym_lin(s) = qpsk_mod(tx_bits(2*(s-1)+1:2*s));
     end
   end
+
+  tx = ofdm_tx(states, tx_sym_lin);
+endfunction
+
+% -----------------------------------------
+% ofdm_tx - modulates one frame of symbols
+% ----------------------------------------
+
+function tx = ofdm_tx(states, tx_sym_lin)
+  ofdm_load_const;
+
+  assert(length(tx_sym_lin) == Nbitsperframe/bps);
 
   % place symbols in multi-carrier frame with pilots and boundary carriers
 
