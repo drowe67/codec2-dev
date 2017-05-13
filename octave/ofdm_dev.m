@@ -125,8 +125,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
     states.code_param = code_param;
   elseif diversity_en
-    rate = 0.5;
-    
+    rate = 0.5;    
   else
     rate = 1;
   end
@@ -216,7 +215,7 @@ function [sim_out rx states] = run_sim(sim_in)
     tx = []; 
     for f=1:Nframes
       st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe/bps - 1;
-      tx = [tx ofdm_tx(states, tx_symbols(st:en))];
+      tx = [tx ofdm_txframe(states, tx_symbols(st:en))];
     end
     
     % add extra row of pilots at end, to allow one frame simulations,
@@ -247,12 +246,14 @@ function [sim_out rx states] = run_sim(sim_in)
       end
     end
 
-    rx = tx;    if hf_en
+    rx = tx;    
+
+    if hf_en
 
       rx  = tx(1:Nsam) .* spread1(1:Nsam);
       rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
 
-      % normalise rx power to same as tx (e.g. 1/M)
+      % normalise rx power to same as tx
 
       nom_rx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
       rx_pwr = var(rx);
@@ -426,7 +427,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
     % returns results for plotting curves
 
-    if ldpc_en
+    if ldpc_en || diversity_en
       sim_out.ber(nn) = Terrs_coded/(Nbits*rate); 
       sim_out.per(nn) = Tpacketerrs_coded/Tpackets_coded; 
     else
@@ -568,7 +569,7 @@ function run_curves
   sim_in.ldpc_en = 0;
   sim_in.hf_en = 0;
 
-  sim_in.Nsec = 10;
+  sim_in.Nsec = 20;
   sim_in.EbNodB = 0:8;
   awgn_EbNodB = sim_in.EbNodB;
 
@@ -580,12 +581,13 @@ function run_curves
 
   sim_in.hf_en = 1; sim_in.ldpc_en = 0; 
   sim_in.Nsec = 60;
-  sim_in.EbNodB = 4:1:14;
+  sim_in.EbNodB = 4:2:14;
 
   EbNoLin = 10.^(sim_in.EbNodB/10);
   hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
 
   hf = run_sim(sim_in);
+  sim_in.diversity_en = 1; hf_diversity = run_sim(sim_in); sim_in.diversity_en = 0; 
   sim_in.ldpc_en = 1;  hf_ldpc = run_sim(sim_in);
 
   % try a few interleavers
@@ -594,7 +596,7 @@ function run_curves
   sim_in.interleave_frames = 8; hf_ldpc_8 = run_sim(sim_in);
   sim_in.interleave_frames = 16; hf_ldpc_16 = run_sim(sim_in);
   sim_in.interleave_frames = 32; hf_ldpc_32 = run_sim(sim_in);
-
+  
   % Rate Fs modem BER curves of various coding schemes
 
   figure(1); clf;
@@ -603,6 +605,7 @@ function run_curves
   semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
   semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN;');
   semilogy(sim_in.EbNodB, hf.ber,'r+-;HF;');
+  semilogy(sim_in.EbNodB, hf_diversity.ber,'ro-;HF diversity;');
   semilogy(awgn_EbNodB, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
   semilogy(sim_in.EbNodB, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
   semilogy(sim_in.EbNodB, hf_ldpc_1.ber,'m+-;HF LDPC (224,112) interleave 1;');
@@ -630,11 +633,12 @@ function run_curves
   semilogy(sim_in.EbNodB, hf_per_theory,'b+-;HF theory;');
   semilogy(awgn_EbNodB, awgn.per,'r+-;AWGN;');
   semilogy(sim_in.EbNodB, hf.per,'r+-;HF sim;');
+  semilogy(sim_in.EbNodB, hf_diversity.per,'ro-;HF diversity;');
   semilogy(awgn_EbNodB, awgn_ldpc.per,'c+-;AWGN LDPC (224,112);');
   semilogy(sim_in.EbNodB, hf_ldpc.per,'c+-;HF LDPC (224,112);');
   semilogy(sim_in.EbNodB, hf_ldpc_1.per,'m+-;HF LDPC (224,112) interleave 1;');
   semilogy(sim_in.EbNodB, hf_ldpc_8.per,'g+-;HF LDPC (224,112) interleave 8;');
-  semilogy(sim_in.EbNodB, hf_ldpc_16.per,'k+-;HF LDPC (224,112) interleave 16;');
+  semilogy(sim_in.EbNodB, hf_ldpc_16.per,'ko-;HF LDPC (224,112) interleave 16;');
   semilogy(sim_in.EbNodB, hf_ldpc_32.per,'k+-;HF LDPC (224,112) interleave 32;');
   hold off;
   axis([0 14 1E-2 1])
@@ -693,17 +697,20 @@ function run_curves
   snr_awgn        = snr_awgn_theory + overhead_dB;
   snr_hf          = sim_in.EbNodB + 10*log10(700/3000) + overhead_dB;
 
-  % 2/6 symbols are pilots, 1dB implementation loss
+  % est 700C: 2/6 symbols are pilots, 1dB implementation loss
 
   snr_awgn_700c   = awgn_EbNodB + 10*log10(700/3000) + 10*log10(6/4) + 1;
+  snr_hf_700c     = sim_in.EbNodB + 10*log10(700/3000) + 10*log10(6/4) + 1;
 
   figure(5); clf;
   semilogy(snr_awgn_theory, awgn_theory,'b+-;AWGN theory;');
   hold on;
   semilogy(snr_awgn_700c, awgn_theory,'g+-;AWGN 700C;');
+  semilogy(snr_hf_700c, hf_diversity.ber,'go-;AWGN 700C;');
   semilogy(snr_hf_theory, hf_theory,'b+-;HF theory;');
   semilogy(snr_awgn, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
   semilogy(snr_hf, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
+  semilogy(snr_hf, hf_diversity.ber,'bo-;HF diversity;');
   semilogy(snr_hf, hf_ldpc_16.ber,'k+-;HF LDPC (224,112) interleave 16;');
   hold off;
   axis([-5 8 1E-3 2E-1])
@@ -712,7 +719,7 @@ function run_curves
   grid; grid minor on;
   legend('boxoff');
   legend("location", "southwest");
-  title('Rate Fs modem BER versus SNR inclduing pilot/CP overhead');
+  title('Rate Fs modem BER versus SNR including pilot/CP overhead');
   print('-deps', '-color', "ofdm_dev_ber_snr.eps")
 
 end

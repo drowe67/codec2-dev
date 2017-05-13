@@ -174,33 +174,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 endfunction
 
 
-% NOTE: You will need to set the CML path in the call to init_cml() below
-%       for you CML install.  See lpdc.m for instructions on how to install 
-%       CML library
-
-function init_cml(path_to_cml)
-  currentdir = pwd;
-  
-  if exist(path_to_cml, 'dir') == 7
-    cd(path_to_cml)
-    CmlStartup      
-    cd(currentdir); 
-  else
-    printf("\n---------------------------------------------------\n");
-    printf("Can't start CML in path: %s\n", path_to_cml);
-    printf("See CML path instructions at top of this script\n");
-    printf("-----------------------------------------------------\n\n");
-    assert(0);
-  end
-end
-
 
 % --------------------------------------
 % ofdm_mod - modulates one frame of bits
 % --------------------------------------
 
 function tx = ofdm_mod(states, tx_bits)
-
+  ofdm_load_const;
   assert(length(tx_bits) == Nbitsperframe);
 
   % map to symbols in linear array
@@ -214,7 +194,7 @@ function tx = ofdm_mod(states, tx_bits)
     end
   end
 
-  tx = ofdm_tx(states, tx_sym_lin);
+  tx = ofdm_txframe(states, tx_sym_lin);
 endfunction
 
 % -----------------------------------------
@@ -234,9 +214,8 @@ endfunction
 
 #}
 
-function tx = ofdm_tx(states, tx_sym_lin)
+function tx = ofdm_txframe(states, tx_sym_lin)
   ofdm_load_const;
-
   assert(length(tx_sym_lin) == Nbitsperframe/bps);
 
   % place symbols in multi-carrier frame with pilots and boundary carriers
@@ -433,25 +412,5 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.sample_point = sample_point;
   states.delta_t = delta_t;
   states.foff_est_hz = foff_est_hz;
-endfunction
-
-
-function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fading)
-    if nargin == 6
-      fading = ones(1, length(r));
-    end
-
-    symbol_likelihood = Demod2D( r, code_param.S_matrix, EsNo, fading);
-         
-    % initialize the extrinsic decoder input
-
-    input_somap_c = zeros(1, code_param.code_bits_per_frame );
-    bit_likelihood = Somap( symbol_likelihood, demod_type, input_somap_c );
-        
-    input_decoder_c = bit_likelihood(1:code_param.code_bits_per_frame);
-        
-    x_hat= MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
-                     max_iterations, decoder_type, 1, 1);
-    detected_data = x_hat(max_iterations,:);
 endfunction
 

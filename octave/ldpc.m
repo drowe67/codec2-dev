@@ -17,21 +17,59 @@
 
 1;
 
+% NOTE: You will need to set the CML path in the call to init_cml() below
+%       for you CML install.  See lpdc.m for instructions on how to install 
+%       CML library
 
-function code_param = ldpc_init(rate, framesize, modulation, mod_order, mapping)
+function init_cml(path_to_cml)
+  currentdir = pwd;
+  
+  if exist(path_to_cml, 'dir') == 7
+    cd(path_to_cml)
+    CmlStartup      
+    cd(currentdir); 
+  else
+    printf("\n---------------------------------------------------\n");
+    printf("Can't start CML in path: %s\n", path_to_cml);
+    printf("See CML path instructions at top of this script\n");
+    printf("-----------------------------------------------------\n\n");
+    assert(0);
+  end
+end
+
+% init using built in WiMax code
+
+function code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping)
     [code_param.H_rows, code_param.H_cols, code_param.P_matrix] = InitializeWiMaxLDPC( rate, framesize,  0 );
     code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix );
     code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
     code_param.bits_per_symbol = log2(mod_order);
     code_param.code_bits_per_frame = framesize;
-    code_param.symbols_per_frame = framesize/2;
+    code_param.symbols_per_frame = framesize/code_param.bits_per_symbol;
 endfunction
 
 
+% init using user supplied code
+
+function [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping)
+    [Nr Nc] = size(HRA);  
+    rate = (Nc-Nr)/Nc;
+    framesize = Nc;
+    [H_rows, H_cols] = Mat2Hrows(HRA); 
+    code_param.H_rows = H_rows; 
+    code_param.H_cols = H_cols;
+    code_param.P_matrix = [];
+    code_param.data_bits_per_frame = length(code_param.H_cols) - length(code_param.P_matrix); 
+    code_param.S_matrix = CreateConstellation( modulation, mod_order, mapping );
+    code_param.bits_per_symbol = log2(mod_order);
+    code_param.code_bits_per_frame = framesize;
+    code_param.symbols_per_frame = framesize/code_param.bits_per_symbol;
+endfunction
+
 
 function [codeword s] = ldpc_enc(data, code_param)
-        codeword = LdpcEncode( data, code_param.H_rows, code_param.P_matrix );
-        s = Modulate( codeword, code_param.S_matrix );
+    codeword = LdpcEncode( data, code_param.H_rows, code_param.P_matrix );
+    s = Modulate( codeword, code_param.S_matrix );
 endfunction
 
 
