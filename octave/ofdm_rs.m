@@ -124,9 +124,6 @@ function sim_out = run_sim(sim_in)
  
     assert(length(spread1) >= Nrp, "not enough doppler spreading samples");
     assert(length(spread2) >= Nrp, "not enough doppler spreading samples");
-
-    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
-    % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
   end
   
   % construct an artificial phase countour for testing, linear across freq and time
@@ -200,7 +197,7 @@ function sim_out = run_sim(sim_in)
       for r=1:Nrp
         for c=1:Nc+2
           w = 2*pi*c*Rs/Rs; 
-          hf_model(r,c) = hf_gain*(spread1(r) + exp(-j*w*path_delay)*spread2(r));
+          hf_model(r,c) = spread1(r) + exp(-j*w*path_delay)*spread2(r);
         end
         
         if hf_phase
@@ -209,6 +206,11 @@ function sim_out = run_sim(sim_in)
           rx(r,:) = rx(r,:) .* abs(hf_model(r,:));
         end
       end
+
+      % normalise power over HF simulation run
+
+      p = sum(var(rx));
+      rx *= sqrt(Nc/p);
     end
 
     rx += noise;
@@ -754,13 +756,13 @@ end
 
 function run_single
   sim_in.bps = 2;
-  sim_in.Nsec = 30;
+  sim_in.Nsec = 60;
   sim_in.Nc = 16;
   sim_in.Ns = 8;
-  sim_in.EbNodB = 4;
+  sim_in.EbNodB = 6;
   sim_in.verbose = 1;
 
-  sim_in.pilot_phase_est = 0;
+  sim_in.pilot_phase_est = 1;
   sim_in.pilot_wide = 1;
   sim_in.pilot_interp = 0;
   sim_in.stripped_phase_est = 0;
@@ -768,10 +770,15 @@ function run_single
 
   sim_in.phase_offset = 0;
   sim_in.phase_test = 0;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
   sim_in.hf_phase = 1;
+  sim_in.path_delay = 0;
 
   run_sim(sim_in);
+
+  EbNoLin = 10.^(sim_in.EbNodB/10);
+  hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+  printf("HF theory: %5.4f\n", hf_theory);
 end
 
 

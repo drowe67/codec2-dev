@@ -156,7 +156,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.foff_est_en = 1;
   states.phase_est_en = 1;
 
-  states.foff_est_gain = 0.1;
+  states.foff_est_gain = 0.01;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -220,6 +220,19 @@ endfunction
 % -----------------------------------------
 % ofdm_tx - modulates one frame of symbols
 % ----------------------------------------
+
+#{ 
+   Each carrier amplitude is 1/M.  There are two edge carriers that
+   are just tx-ed for pilots plus plus Nc continuous carriers. So
+   power is:
+
+     p = 2/(Ns*(M*M)) + Nc/(M*M)
+
+   e.g. Ns=8, Nc=16, M=144 
+   
+     p = 2/(8*(144*144)) + 16/(144*144) = 7.84-04
+
+#}
 
 function tx = ofdm_tx(states, tx_sym_lin)
   ofdm_load_const;

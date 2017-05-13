@@ -42,6 +42,11 @@ function [sim_out rx states] = run_sim(sim_in)
   if hf_en
     assert(phase_est_en == 1, "\nNo point running HF simulation without phase est!!\n");
   end
+  if isfield(sim_in, "diversity_en")
+    diversity_en = sim_in.diversity_en;
+  else
+    diversity_en = 0;
+  end
 
   if verbose
     printf("Rs:..........: %4.2f\n", Rs);
@@ -119,6 +124,9 @@ function [sim_out rx states] = run_sim(sim_in)
     code_param.S_matrix = CreateConstellation( modulation, 4, mapping );
 
     states.code_param = code_param;
+  elseif diversity_en
+    rate = 0.5;
+    
   else
     rate = 1;
   end
@@ -144,16 +152,13 @@ function [sim_out rx states] = run_sim(sim_in)
 
     randn('seed',1);
 
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, (sim_in.Nsec*(M+Ncp)/M+0.2)*Fs);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, (sim_in.Nsec*(M+Ncp)/M+0.2)*Fs);
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, Nrp*(M+Ncp)*1.1);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, Nrp*(M+Ncp)*1.1);
 
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
-    assert(length(spread1) >= Nrp*M, "not enough doppler spreading samples");
-    assert(length(spread2) >= Nrp*M, "not enough doppler spreading samples");
-
-    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
-    % printf("nsymb: %d lspread1: %d\n", nsymb, length(spread1));
+    assert(length(spread1) >= Nrp*(M+Ncp), "not enough doppler spreading samples");
+    assert(length(spread2) >= Nrp*(M+Ncp), "not enough doppler spreading samples");
   end
  
   % ------------------------------------------------------------------
@@ -179,7 +184,16 @@ function [sim_out rx states] = run_sim(sim_in)
       st = (f-1)*Nbitsperframe*rate+1; en = st + Nbitsperframe*rate - 1;
       if ldpc_en
         codeword = LdpcEncode(tx_data_bits(st:en), code_param.H_rows, code_param.P_matrix);
+      elseif diversity_en
+        % Nc carriers, so Nc*bps bits/row coded, or Nc*bps*rate data bits that we repeat
+        codeword = [];
+        for rr=1:Ns-1
+          st1 = st + (rr-1)*Nc*bps*rate; en1 = st1 + Nc*bps*rate - 1;
+          codeword = [codeword tx_data_bits(st1:en1) tx_data_bits(st1:en1)];
+        end
+        assert(length(codeword) == Nbitsperframe);
       else
+        % uncoded mode
         codeword = tx_data_bits(st:en);
       end
       tx_bits = [tx_bits codeword];
@@ -204,7 +218,7 @@ function [sim_out rx states] = run_sim(sim_in)
       st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe/bps - 1;
       tx = [tx ofdm_tx(states, tx_symbols(st:en))];
     end
-
+    
     % add extra row of pilots at end, to allow one frame simulations,
     % useful for development
 
@@ -233,17 +247,22 @@ function [sim_out rx states] = run_sim(sim_in)
       end
     end
 
-    rx = tx;
+    rx = tx;    if hf_en
 
-    if hf_en
-      rx  = hf_gain * tx(1:Nsam) .* spread1(1:Nsam);
-      rx  += hf_gain * [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
+      rx  = tx(1:Nsam) .* spread1(1:Nsam);
+      rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
+
+      % normalise rx power to same as tx (e.g. 1/M)
+
+      nom_rx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
+      rx_pwr = var(rx);
+      rx *= sqrt(nom_rx_pwr/rx_pwr);
     end
 
     rx = rx .* exp(j*woffset*(1:Nsam));
-
+   
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
-    snrdB = 10*log10(var(rx)/var(noise));
+    snrdB = 10*log10(var(rx)/var(noise)) - 10*log10(4000) + 10*log10(3000);
     rx += noise;
 
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
@@ -299,7 +318,24 @@ function [sim_out rx states] = run_sim(sim_in)
 
     assert(length(rx_bits) == Nbits);
 
-    % calculate raw BER/PER stats, after pilots extracted
+    % Optional de-interleave on rx QPSK symbols
+
+    if interleave_en
+      for f=1:interleave_frames:Nframes
+       st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe*interleave_frames/bps - 1;
+       rx_np(st:en) = gp_deinterleave(rx_np(st:en));
+       rx_amp(st:en) = gp_deinterleave(rx_amp(st:en));
+      end 
+    end
+
+    % Calculate raw BER/PER stats, after pilots extracted.  As we may
+    % have used interleaving, we qpsk_demod() here rather than using
+    % rx_bits from ofdm_demod()
+
+    rx_bits = zeros(1, Nbits);
+    for s=1:Nbits/bps
+      rx_bits(2*(s-1)+1:2*s) = qpsk_demod(rx_np(s));
+    end
 
     errors = xor(tx_bits, rx_bits);
     Terrs = sum(errors);
@@ -316,34 +352,41 @@ function [sim_out rx states] = run_sim(sim_in)
       Tpackets++;
     end
  
-    % Optional de-interleave on rx QPSK symbols
-
-    if interleave_en
-      for f=1:interleave_frames:Nframes
-       st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe*interleave_frames/bps - 1;
-       rx_np(st:en) = gp_deinterleave(rx_np(st:en));
-      end 
-    end
-
-    % Per-modem frame error log and optional LDPC error stats
+    % Per-modem frame error log and optional LDPC/diversity error stats
 
     Terrs_coded = 0; Tpackets_coded = 0; Tpacketerrs_coded = 0;
     for f=1:Nframes
       st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe - 1;
       Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
 
+      st = (f-1)*Nbitsperframe/bps + 1;
+      en = st + Nbitsperframe/bps - 1;
+      r = rx_np(st:en); fade = rx_amp(st:en);
+
       % optional LDPC decode
      
       if ldpc_en
-        st = (f-1)*Nbitsperframe/bps + 1;
-        en = st + Nbitsperframe/bps - 1;
-        r = rx_np(st:en); fade = rx_amp(st:en);
-
         % note we put ceiling on EsNo as decoder misbehaives with high EsNo
 
         rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, min(EsNo,30), fade);
+      end
 
-        % running coded BER calcs
+      % optional diversity demod
+
+      if diversity_en
+        rx_codeword = [];
+        for rr=1:Ns-1
+          for c=1:Nc/2
+            s = (rr-1)*Nc + c;
+            rx_codeword = [rx_codeword qpsk_demod(r(s)+r(s+Nc/2))];
+          end
+        end
+        assert(length(rx_codeword) == Nbitsperframe*rate);
+      end
+
+      % running coded BER calcs
+
+      if ldpc_en || diversity_en
 
         st = (f-1)*Nbitsperframe*rate + 1;
         en = st + Nbitsperframe*rate - 1;
@@ -351,8 +394,9 @@ function [sim_out rx states] = run_sim(sim_in)
         Nerrs_coded_log(f) = Nerrs_coded;
         Terrs_coded += Nerrs_coded;
 
-        % PER based on vocoder packet size, not sure it makes much difference compared to using
-        % all bits in LDPC code for packet
+        % PER based on vocoder packet size, not sure it makes much
+        % difference compared to using all bits in LDPC code for
+        % packet
 
         atx_data_bits = tx_data_bits(st:en);
         Nvocframes = Nbitsperframe*rate/Nbitspervocframe;
@@ -370,13 +414,13 @@ function [sim_out rx states] = run_sim(sim_in)
 
     % print results of this simulation point to the console
 
-    if ldpc_en
-      printf("Coded EbNodB: % -4.1f BER: %5.4f Tbits: %d Terrs: %d PER: %5.4f Tpackets: %d Tpacket_errs: %d\n", 
+    if ldpc_en || diversity_en
+      printf("Coded EbNodB: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
               EbNodB(nn), Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, 
               Tpacketerrs_coded/Tpackets_coded, Tpackets_coded, Tpacketerrs_coded);
     end
     EbNodB_raw = EbNodB(nn) + 10*log10(rate);
-    printf("Raw EbNodB..: % -4.1f BER: %5.4f Tbits: %d Terrs: %d PER: %5.4f Tpackets: %d Tpacket_errs: %d\n", 
+    printf("Raw EbNodB..: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
            EbNodB_raw, Terrs/Nbits, Nbits, Terrs,
            Tpacketerrs/Tpackets, Tpackets, Tpacketerrs);
 
@@ -473,7 +517,7 @@ function run_single
   %sim_in.Nsec = 2*(sim_in.Ns+1)/sim_in.Rs;  % one frame
   sim_in.Nsec = 60;
 
-  sim_in.EbNodB = 8;
+  sim_in.EbNodB = 9;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
@@ -485,22 +529,21 @@ function run_single
 
   load HRA_112_112.txt
   sim_in.ldpc_code = HRA_112_112;
-  sim_in.ldpc_en = 1;
+  sim_in.ldpc_en = 0;
 
-  sim_in.interleave_frames = 32;
+  %sim_in.interleave_frames = 8;
+
+  sim_in.diversity_en = 1;
 
   run_sim(sim_in);
 end
 
 
-% Plot BER against Eb/No curves for AWGN and HF
-
-% Target operating point Eb/No for HF is 6dB, as this is where our rate 1/2
-% LDPC code gives good results (10% PER, 1% BER).  However this means
-% the Eb/No at the input is 10*log(1/2) or 3dB less, so we need to
-% make sure phase est works at Eb/No = 6 - 3 = 3dB
+% Plot BER and PER curves for AWGN and HF:
 %
-% For AWGN target is 2dB so -1dB op point.
+% i) BER/PER against Eb/No for various coding schemes
+% ii) BER/PER against Eb/No showing Pilot/CP overhead
+% iii) BER/PER against SNR, with pilot/CP overhead, comparing 700C
 
 function run_curves
 
@@ -525,7 +568,7 @@ function run_curves
   sim_in.ldpc_en = 0;
   sim_in.hf_en = 0;
 
-  sim_in.Nsec = 2;
+  sim_in.Nsec = 10;
   sim_in.EbNodB = 0:8;
   awgn_EbNodB = sim_in.EbNodB;
 
@@ -536,8 +579,8 @@ function run_curves
   % Note for HF sim you really need >= 60 seconds (at Rs-50) to get sensible results c.f. theory
 
   sim_in.hf_en = 1; sim_in.ldpc_en = 0; 
-  sim_in.Nsec = 10;
-  sim_in.EbNodB = 4:12;
+  sim_in.Nsec = 60;
+  sim_in.EbNodB = 4:1:14;
 
   EbNoLin = 10.^(sim_in.EbNodB/10);
   hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
@@ -545,18 +588,29 @@ function run_curves
   hf = run_sim(sim_in);
   sim_in.ldpc_en = 1;  hf_ldpc = run_sim(sim_in);
 
+  % try a few interleavers
+
+  sim_in.interleave_frames = 1; hf_ldpc_1 = run_sim(sim_in);
+  sim_in.interleave_frames = 8; hf_ldpc_8 = run_sim(sim_in);
+  sim_in.interleave_frames = 16; hf_ldpc_16 = run_sim(sim_in);
+  sim_in.interleave_frames = 32; hf_ldpc_32 = run_sim(sim_in);
+
   % Rate Fs modem BER curves of various coding schemes
 
   figure(1); clf;
   semilogy(awgn_EbNodB, awgn_theory,'b+-;AWGN theory;');
   hold on;
   semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
-  semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN sim;');
-  semilogy(sim_in.EbNodB, hf.ber,'r+-;HF sim;');
-  semilogy(awgn_EbNodB, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112) sim;');
-  semilogy(sim_in.EbNodB, hf_ldpc.ber,'c+-;HF LDPC (224,112) sim;');
+  semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN;');
+  semilogy(sim_in.EbNodB, hf.ber,'r+-;HF;');
+  semilogy(awgn_EbNodB, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
+  semilogy(sim_in.EbNodB, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
+  semilogy(sim_in.EbNodB, hf_ldpc_1.ber,'m+-;HF LDPC (224,112) interleave 1;');
+  semilogy(sim_in.EbNodB, hf_ldpc_8.ber,'g+-;HF LDPC (224,112) interleave 8;');
+  semilogy(sim_in.EbNodB, hf_ldpc_16.ber,'k+-;HF LDPC (224,112) interleave 16;');
+  semilogy(sim_in.EbNodB, hf_ldpc_32.ber,'k+-;HF LDPC (224,112) interleave 32;');
   hold off;
-  axis([0 12 1E-3 2E-1])
+  axis([0 14 1E-3 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
@@ -574,12 +628,16 @@ function run_curves
   semilogy(awgn_EbNodB, awgn_per_theory,'b+-;AWGN theory;');
   hold on;
   semilogy(sim_in.EbNodB, hf_per_theory,'b+-;HF theory;');
-  semilogy(awgn_EbNodB, awgn.per,'r+-;AWGN sim;');
+  semilogy(awgn_EbNodB, awgn.per,'r+-;AWGN;');
   semilogy(sim_in.EbNodB, hf.per,'r+-;HF sim;');
-  semilogy(awgn_EbNodB, awgn_ldpc.per,'c+-;AWGN LDPC (224,112) sim;');
-  semilogy(sim_in.EbNodB, hf_ldpc.per,'c+-;HF LDPC (224,112) sim;');
+  semilogy(awgn_EbNodB, awgn_ldpc.per,'c+-;AWGN LDPC (224,112);');
+  semilogy(sim_in.EbNodB, hf_ldpc.per,'c+-;HF LDPC (224,112);');
+  semilogy(sim_in.EbNodB, hf_ldpc_1.per,'m+-;HF LDPC (224,112) interleave 1;');
+  semilogy(sim_in.EbNodB, hf_ldpc_8.per,'g+-;HF LDPC (224,112) interleave 8;');
+  semilogy(sim_in.EbNodB, hf_ldpc_16.per,'k+-;HF LDPC (224,112) interleave 16;');
+  semilogy(sim_in.EbNodB, hf_ldpc_32.per,'k+-;HF LDPC (224,112) interleave 32;');
   hold off;
-  axis([0 12 1E-2 1])
+  axis([0 14 1E-2 1])
   xlabel('Eb/No (dB)');
   ylabel('PER');
   grid; grid minor on;
@@ -599,7 +657,7 @@ function run_curves
   semilogy(awgn_EbNodB+overhead_dB, awgn.ber,'r+-;AWGN sim;');
   semilogy(sim_in.EbNodB+overhead_dB, hf.ber,'r+-;HF sim;');
   hold off;
-  axis([0 12 1E-3 2E-1])
+  axis([0 14 1E-3 2E-1])
   xlabel('Eb/No (dB)');
   ylabel('BER');
   grid; grid minor on;
@@ -619,7 +677,7 @@ function run_curves
   semilogy(awgn_EbNodB+overhead_dB, awgn.per,'r+-;AWGN sim;');
   semilogy(sim_in.EbNodB+overhead_dB, hf.per,'r+-;HF sim;');
   hold off;
-  axis([0 12 1E-2 1])
+  axis([0 14 1E-2 1])
   xlabel('Eb/No (dB)');
   ylabel('PER');
   grid; grid minor on;
@@ -627,6 +685,126 @@ function run_curves
   legend("location", "southwest");
   title('Rate Fs modem PER Pilot/Cyclic Prefix overhead');
   print('-deps', '-color', "ofdm_dev_per_overhead.eps")
+
+  % SNR including pilots, CP, and 700C est
+
+  snr_awgn_theory = awgn_EbNodB + 10*log10(700/3000);
+  snr_hf_theory   = sim_in.EbNodB + 10*log10(700/3000);
+  snr_awgn        = snr_awgn_theory + overhead_dB;
+  snr_hf          = sim_in.EbNodB + 10*log10(700/3000) + overhead_dB;
+
+  % 2/6 symbols are pilots, 1dB implementation loss
+
+  snr_awgn_700c   = awgn_EbNodB + 10*log10(700/3000) + 10*log10(6/4) + 1;
+
+  figure(5); clf;
+  semilogy(snr_awgn_theory, awgn_theory,'b+-;AWGN theory;');
+  hold on;
+  semilogy(snr_awgn_700c, awgn_theory,'g+-;AWGN 700C;');
+  semilogy(snr_hf_theory, hf_theory,'b+-;HF theory;');
+  semilogy(snr_awgn, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
+  semilogy(snr_hf, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
+  semilogy(snr_hf, hf_ldpc_16.ber,'k+-;HF LDPC (224,112) interleave 16;');
+  hold off;
+  axis([-5 8 1E-3 2E-1])
+  xlabel('SNR (3000Hz noise BW) (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  legend("location", "southwest");
+  title('Rate Fs modem BER versus SNR inclduing pilot/CP overhead');
+  print('-deps', '-color', "ofdm_dev_ber_snr.eps")
+
+end
+
+
+% Plot BER and PER curves for AWGN and HF with various estimators
+
+function run_curves_estimators
+
+  % waveform
+
+  Ts = 0.018; sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+
+  % simulation parameters
+
+  sim_in.verbose = 0; sim_in.foff_hz = 0; sim_in.ldpc_en = 0;
+
+  sim_in.phase_est_en = 1;
+  sim_in.timing_en = sim_in.foff_est_en = 0;
+
+  % AWGN simulations
+
+  sim_in.hf_en = 0; sim_in.Nsec = 20; sim_in.EbNodB = 0:2:6;
+  sim_in.timing_en = sim_in.foff_est_en = 0;
+
+  awgn_EbNodB = sim_in.EbNodB;
+  awgn_theory = 0.5*erfc(sqrt(10.^(sim_in.EbNodB/10)));
+  awgn = run_sim(sim_in);
+  sim_in.timing_en = 1; awgn_timing = run_sim(sim_in);
+  sim_in.foff_est_en = 1; awgn_foff_est = run_sim(sim_in);
+
+  % HF simulations
+
+  sim_in.hf_en = 1; sim_in.Nsec = 60; sim_in.EbNodB = 4:2:8;
+  sim_in.timing_en = sim_in.foff_est_en = 0;
+
+  EbNoLin = 10.^(sim_in.EbNodB/10);
+  hf_theory = 0.5.*(1-sqrt(EbNoLin./(EbNoLin+1)));
+
+  hf = run_sim(sim_in);
+  sim_in.timing_en = 1; hf_timing = run_sim(sim_in);
+  sim_in.timing_en = 0; sim_in.foff_est_en = 1; hf_foff_est = run_sim(sim_in);
+  sim_in.timing_en = 1; hf_timing_foff_est = run_sim(sim_in);
+
+  figure(1); clf;
+  semilogy(awgn_EbNodB, awgn_theory,'b+-;AWGN theory;');
+  hold on;
+  semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN phase;');
+  semilogy(awgn_EbNodB, awgn_timing.ber,'g+-;AWGN phase+timing;');
+  semilogy(awgn_EbNodB, awgn_foff_est.ber,'c+-;AWGN phase+timing+foff_est;');
+  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
+  semilogy(sim_in.EbNodB, hf.ber,'r+-;HF phase;');
+  semilogy(sim_in.EbNodB, hf_timing.ber,'g+-;HF phase+timing;');
+  semilogy(sim_in.EbNodB, hf_timing_foff_est.ber,'k+-;HF phase+foff_est;');
+  semilogy(sim_in.EbNodB, hf_foff_est.ber,'c+-;HF phase+timing+foff_est;');
+  hold off;
+  axis([0 8 5E-3 1E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  legend("location", "southeast");
+  title('Rate Fs modem BER with estimators');
+  print('-deps', '-color', "ofdm_dev_estimators.eps")
+
+  % Simulate different HF path delays
+
+  sim_in.hf_en = 1; sim_in.Nsec = 60; sim_in.EbNodB = 4:2:8;
+  sim_in.timing_en = sim_in.foff_est_en = 0;
+
+  sim_in.path_delay_ms = 0; hf0 = run_sim(sim_in);
+  sim_in.path_delay_ms = 0.5; hf500us = run_sim(sim_in);
+  sim_in.path_delay_ms = 1; hf1ms = run_sim(sim_in);
+  sim_in.path_delay_ms = 2; hf2ms = run_sim(sim_in);
+
+  figure(2); clf;
+  semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
+  hold on;
+  semilogy(sim_in.EbNodB, hf0.ber,'r+-;HF phase 0 ms;');
+  semilogy(sim_in.EbNodB, hf500us.ber,'g+-;HF phase 0.5 ms;');
+  semilogy(sim_in.EbNodB, hf1ms.ber,'c+-;HF phase 1 ms;');
+  semilogy(sim_in.EbNodB, hf2ms.ber,'k+-;HF phase 2 ms;');
+  hold off;
+  axis([3 9 1E-2 1E-1])
+  xlabel('Eb/No (dB)');
+  ylabel('BER');
+  grid; grid minor on;
+  legend('boxoff');
+  legend("location", "southeast");
+  title('Rate Fs modem BER across HF path delay');
+  print('-deps', '-color', "ofdm_dev_estimators.eps")
 end
 
 
@@ -781,5 +959,6 @@ init_cml('/home/david/Desktop/cml/');
 
 run_single
 %run_curves
+%run_curves_estimators
 %acquisition_histograms
 %acquisition_test
