@@ -6,7 +6,6 @@
 
 #{
   TODO: 
-    [ ] Optional LDPC code
     [ ] measure and report raw and coded BER
     [ ] maybe 10s worth of frames, sync up to any one automatically
         + or start with maybe 10 frames
@@ -14,13 +13,30 @@
     [ ] model clipping/PA compression
     [ ] sample clock offsets
     [ ] compare with same SNR from pathsim
+    [ ] How to pack arbitrary frames into ofdm frame and codec 2 frames
+        + integer number of ofdm frames?
+        + how to sync at other end
+ 
 #}
 
 function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
+  ldpc;
+
+  % init modem
+
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
+
+  % Set up LDPC code
+
+  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+
+  init_cml('/home/david/Desktop/cml/');
+  load HRA_112_112.txt
+  [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+  assert(Nbitsperframe == code_param.code_bits_per_frame);
 
   % generate fixed test frame of tx bits and run OFDM modulator
   % todo: maybe extend this to 4 or 8 frames, one is a bit short
@@ -29,35 +45,32 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   Nframes = floor((Nrows-1)/Ns);
 
   rand('seed', 100);
-  tx_bits = rand(1,Nbitsperframe) > 0.5;
+  tx_bits = round(rand(1,code_param.data_bits_per_frame));
+  tx_codeword = LdpcEncode(tx_bits, code_param.H_rows, code_param.P_matrix);
 
   tx = [];
   for f=1:Nframes
-    tx = [tx ofdm_mod(states, tx_bits)];
+    tx = [tx ofdm_mod(states, tx_codeword)];
   end
   Nsam = length(tx);
 
   % channel simulation
 
-  EbNo = bps * (10 .^ (EbNodB/10));
-  variance = 1/(M*EbNo/2);
+  EsNo = rate * bps * (10 .^ (EbNodB/10));
+  variance = 1/(M*EsNo/2);
   woffset = 2*pi*freq_offset_Hz/Fs;
 
-  % SNR calculation is probably a bit off or confused, need to compare
-  % to cohpsk_frame_design.ods and make sure I've got it right.  PLus
-  % 3 is used as we are dealing with real channels because mumble
-  % mumble not understood very well mumble magic number.
-
-  SNRdB = EbNodB + 10*log10(bps*Rs*Nc/Fs) + 3;
-  printf("EbNo: %3.1f dB  SNR(3k): %3.1f dB  foff: %3.1fHz\n", EbNodB, SNRdB, freq_offset_Hz);
+  SNRdB = EbNodB + 10*log10(700/3000);
+  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz\n", EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 
   if strcmp(channel, 'hf')
+    randn('seed',1);
 
     % some typical values, or replace with user supplied
 
-    dopplerSpreadHz = 1.0; path_delay_ms = 1;
+    dopplerSpreadHz = 1; path_delay_ms = 1;
 
     path_delay_samples = path_delay_ms*Fs/1000;
     printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
@@ -66,22 +79,26 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
 
     randn('seed',1);
 
-    spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M+0.2)*Fs);
-    spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M+0.2)*Fs);
+    spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
+    spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
 
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
     assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
     assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
-
-    hf_gain = 1.0/sqrt(var(spread1)+var(spread2));
   end
 
   rx = tx;
 
   if strcmp(channel, 'hf')
-    rx  = hf_gain * tx(1:Nsam) .* spread1(1:Nsam);
-    rx += hf_gain * [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
+    rx  = tx(1:Nsam) .* spread1(1:Nsam);
+    rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
+
+    % normalise rx power to same as tx
+
+    nom_rx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
+    rx_pwr = var(rx);
+    rx *= sqrt(nom_rx_pwr/rx_pwr);
   end
 
   rx = rx .* exp(j*woffset*(1:Nsam));

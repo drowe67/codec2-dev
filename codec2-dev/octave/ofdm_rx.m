@@ -5,6 +5,7 @@
 
 #{
   TODO: 
+    [ ] proper EsNo estimation
     [ ] some sort of real time GUI display to watch signal evolving
     [ ] est SNR or Eb/No of recieved signal
     [ ] way to fall out of sync
@@ -12,16 +13,33 @@
 
 function ofdm_rx(filename)
   ofdm_lib;
+  ldpc;
+  more off;
+
+  % init modem
+
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-
   states.verbose = 1;
+
+  % Set up LDPC code
+
+  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+  demod_type = 0; decoder_type = 0; max_iterations = 100;
+
+  EsNo = 10; % TODO: fixme
+
+  init_cml('/home/david/Desktop/cml/');
+  load HRA_112_112.txt
+  [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+  assert(Nbitsperframe == code_param.code_bits_per_frame);
 
   % fixed test frame of tx bits
 
   rand('seed', 100);
-  tx_bits = rand(1,Nbitsperframe) > 0.5;
+  tx_bits = round(rand(1,code_param.data_bits_per_frame));
+  tx_codeword = LdpcEncode(tx_bits, code_param.H_rows, code_param.P_matrix);
 
   % init logs and BER stats
 
@@ -61,7 +79,9 @@ function ofdm_rx(filename)
     end
     prx += states.nin;
 
-    [rx_bits states aphase_est_pilot_log arx_np] = ofdm_demod(states, rxbuf_in);
+    [rx_bits_raw states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+    rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, arx_np, min(EsNo,30), arx_amp);
+    rx_bits = rx_codeword(1:code_param.data_bits_per_frame);
 
     % measure errors and iterate start machine
 
@@ -70,7 +90,7 @@ function ofdm_rx(filename)
     next_state = state;
 
     if strcmp(state,'searching')  
-      if Nerrs/Nbitsperframe < 0.15
+      if Nerrs == 0
         next_state = 'synced';
       end
     end
@@ -83,7 +103,7 @@ function ofdm_rx(filename)
       st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
       [ct_est foff_est] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
       if states.verbose
-        printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+        printf("Nerrs: %d ct_est: %4d foff_est: %3.1f\n", Nerrs, ct_est, foff_est);
       end
 
       % calculate number of samples we need on next buffer to get into sync
@@ -109,11 +129,11 @@ function ofdm_rx(filename)
 
       Terrs += Nerrs;
       Nerrs_log(f) = Nerrs;
-      Tbits += Nbitsperframe;
+      Tbits += code_param.data_bits_per_frame;
     end
   end
 
-  printf("BER: %5.4f Tbits: %d Terrs: %d\n", Terrs/Tbits, Tbits, Terrs);
+  printf("Coded BER: %5.4f Tbits: %d Terrs: %d\n", Terrs/Tbits, Tbits, Terrs);
 
   figure(1); clf; 
   plot(rx_np,'+');
