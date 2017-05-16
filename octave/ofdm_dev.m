@@ -6,6 +6,7 @@
 
 ofdm_lib;
 gp_interleaver;
+ldpc;
 
 #{
   TODO: 
@@ -263,7 +264,7 @@ function [sim_out rx states] = run_sim(sim_in)
     rx = rx .* exp(j*woffset*(1:Nsam));
    
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
-    snrdB = 10*log10(var(rx)/var(noise)) - 10*log10(4000) + 10*log10(3000);
+    snrdB = 10*log10(var(rx)/var(noise)) + 10*log10(8000) - 10*log10(3000)
     rx += noise;
 
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
@@ -355,7 +356,7 @@ function [sim_out rx states] = run_sim(sim_in)
  
     % Per-modem frame error log and optional LDPC/diversity error stats
 
-    Terrs_coded = 0; Tpackets_coded = 0; Tpacketerrs_coded = 0;
+    Terrs_coded = 0; Tpackets_coded = 0; Tpacketerrs_coded = 0; sim_out.error_positions = [];
     for f=1:Nframes
       st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe - 1;
       Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
@@ -391,9 +392,11 @@ function [sim_out rx states] = run_sim(sim_in)
 
         st = (f-1)*Nbitsperframe*rate + 1;
         en = st + Nbitsperframe*rate - 1;
-        Nerrs_coded = sum(xor(tx_data_bits(st:en), rx_codeword(1:Nbitsperframe*rate)));
+        errors = xor(tx_data_bits(st:en), rx_codeword(1:Nbitsperframe*rate));
+        Nerrs_coded = sum(errors);
         Nerrs_coded_log(f) = Nerrs_coded;
         Terrs_coded += Nerrs_coded;
+        sim_out.error_positions = [sim_out.error_positions errors];
 
         % PER based on vocoder packet size, not sure it makes much
         % difference compared to using all bits in LDPC code for
@@ -510,15 +513,15 @@ function [sim_out rx states] = run_sim(sim_in)
 endfunction
 
 
-function run_single
+function run_single(EbNodB = 100, error_pattern_filename);
   Ts = 0.018; 
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   %sim_in.Nsec = 2*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 60;
+  sim_in.Nsec = 30;
 
-  sim_in.EbNodB = 9;
+  sim_in.EbNodB = EbNodB;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
@@ -530,13 +533,20 @@ function run_single
 
   load HRA_112_112.txt
   sim_in.ldpc_code = HRA_112_112;
-  sim_in.ldpc_en = 0;
+  sim_in.ldpc_en = 1;
 
-  %sim_in.interleave_frames = 8;
+  sim_in.interleave_frames = 32;
 
-  sim_in.diversity_en = 1;
+  %sim_in.diversity_en = 1;
 
-  run_sim(sim_in);
+  sim_out = run_sim(sim_in);
+
+  if nargin == 2
+    fep = fopen(error_pattern_filename, "wb");
+    fwrite(fep, sim_out.error_positions, "short");
+    fclose(fep);
+  end
+
 end
 
 
@@ -706,7 +716,7 @@ function run_curves
   semilogy(snr_awgn_theory, awgn_theory,'b+-;AWGN theory;');
   hold on;
   semilogy(snr_awgn_700c, awgn_theory,'g+-;AWGN 700C;');
-  semilogy(snr_hf_700c, hf_diversity.ber,'go-;AWGN 700C;');
+  semilogy(snr_hf_700c, hf_diversity.ber,'go-;HF 700C;');
   semilogy(snr_hf_theory, hf_theory,'b+-;HF theory;');
   semilogy(snr_awgn, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
   semilogy(snr_hf, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
@@ -964,7 +974,7 @@ more off;
 
 init_cml('/home/david/Desktop/cml/');
 
-run_single
+run_single(6, "hf_6dB_ldpc224_32.err") 
 %run_curves
 %run_curves_estimators
 %acquisition_histograms
