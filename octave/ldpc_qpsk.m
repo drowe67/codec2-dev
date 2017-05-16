@@ -48,11 +48,18 @@ function sim_out = run_simulation(sim_in)
   decoder_type = 0;
   max_iterations = 100;
 
-  if wimax_en
+  if wimax_en == 1
     code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
-  else 
+  end
+  if wimax_en == 0
     load HRA_112_112.txt
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+  end
+  if wimax_en == 2
+    load('H2064_516_sparse.mat');
+    HRA = full(HRA);  
+    [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
+    printf("framesize: %d rate: %f\n", framesize, rate);
   end
 
   % set up optional HF (multipath) model ------------------------------------
@@ -228,7 +235,7 @@ function sim_out = run_simulation(sim_in)
 
     if verbose
       printf("\nCoded EbNodB: %3.2f BER: %4.3f Tbits: %6d Terrs: %6d FER: %4.3f Tframes: %d Ferrs: %d\n",
-             EsNodB, Terrs/Tbits, Tbits, Terrs,  Ferrs/Ntrials, Ntrials, Ferrs);
+             EbNodBvec(ne), Terrs/Tbits, Tbits, Terrs,  Ferrs/Ntrials, Ntrials, Ferrs);
       EbNodB_raw = EbNodBvec(ne) + 10*log10(rate);
       printf("Raw EbNodB..: %3.2f BER: %4.3f Tbits: %6d Terrs: %6d\n", 
              EbNodB_raw, Terrs_raw/Tbits_raw, Tbits_raw, Terrs_raw);
@@ -279,15 +286,22 @@ endfunction
 
 function run_single(Nbits=700*10, EbNodB=9, hf_en=0, wimax_en=1, framesize=576, interleave_en=0, error_pattern_filename)
   sim_in.wimax_en = wimax_en;
-  if sim_in.wimax_en
+
+  if sim_in.wimax_en == 1
     % CML wimax codes
     sim_in.rate = 0.5; 
     sim_in.framesize = framesize;
-  else 
+  end
+  if sim_in.wimax_en == 2
+    sim_in.rate=0.8;
+    sim_in.framesize=2064+516; 
+  end 
+  if sim_in.wimax_en == 0
     % Our HRA short LDPC code
     sim_in.rate=0.5;
     sim_in.framesize=224; 
   end
+
   sim_in.verbose = 2;
   sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
   sim_in.EbNodBvec = EbNodB;
@@ -309,9 +323,9 @@ end
 % ---------------------------------------------------------------------------------
 
 function plot_curves(Nbits=700*60)
-  sim_in.EbNodBvec = -2:10;
+  sim_in.EbNodBvec = -2:12;
   sim_in.verbose = 2;
-  sim_in.interleave_en = 2;
+  sim_in.interleave_en = 1;
 
   % Wimax codes
 
@@ -333,6 +347,16 @@ function plot_curves(Nbits=700*60)
   sim_in.hf_en = 0; sim_out_awgn_short = run_simulation(sim_in);
   sim_in.hf_en = 1; sim_out_hf_short = run_simulation(sim_in);
 
+  % Rate 0.8 Wenet code
+
+  sim_in.wimax_en = 2;
+  sim_in.rate = 0.8;
+  sim_in.framesize = 2064+512;  
+  sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
+
+  sim_in.hf_en = 0; sim_out_awgn_wenet = run_simulation(sim_in);
+  sim_in.hf_en = 1; sim_out_hf_wenet = run_simulation(sim_in);
+
   EbNodB = sim_in.EbNodBvec;
   uncoded_awgn_ber_theory = 0.5*erfc(sqrt(10.^(EbNodB/10)));
 
@@ -348,12 +372,16 @@ function plot_curves(Nbits=700*60)
   semilogy(EbNodB, sim_out_hf_wimax.BER+1E-10,'g-o;HF LDPC (2304,1152);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_awgn_short.BER+1E-10,'b-+;AWGN LDPC (224,112);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_hf_short.BER+1E-10,'b-o;HF LDPC (224,112);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_awgn_wenet.BER+1E-10,'c-+;AWGN LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_hf_wenet.BER+1E-10,'c-o;HF LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
   hold off;
   grid('minor')
   xlabel('Eb/No (dB)')
   ylabel('BER')
   axis([min(EbNodB) max(EbNodB) 1E-3 5E-1])
   legend('boxoff')
+  epsname = sprintf("ldpc_qpsk_ber.eps");
+  print('-deps', '-color', epsname)
 
   uncoded_awgn_per_theory = 1 - (1-uncoded_awgn_ber_theory).^28;
   uncoded_hf_per_theory = 1 - (1-uncoded_hf_ber_theory).^28;
@@ -367,6 +395,8 @@ function plot_curves(Nbits=700*60)
   semilogy(EbNodB, sim_out_hf_wimax.PER+1E-10,'g-o;HF LDPC (2304,1152);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_awgn_short.PER+1E-10,'b-+;AWGN LDPC (224,112);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_hf_short.PER+1E-10,'b-o;HF LDPC (224,112);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_awgn_wenet.PER+1E-10,'c-+;AWGN LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_hf_wenet.PER+1E-10,'c-o;HF LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
   hold off;
   grid('minor')
   xlabel('Eb/No (dB)')
@@ -374,6 +404,8 @@ function plot_curves(Nbits=700*60)
   axis([min(EbNodB) max(EbNodB) 1E-2 1])
   legend('boxoff')
   legend("location", "southwest");
+  epsname = sprintf("ldpc_qpsk_per.eps");
+  print('-deps', '-color', epsname)
 end
 
 
@@ -391,8 +423,8 @@ addpath '/home/david/Desktop/cml/mat' % assume the source files stored here
 cd /home/david/Desktop/cml
 CmlStartup                            % note that this is not in the cml path!
 cd(currentdir)
+run_single(Nbits=700*60, EbNo=6, hf_en=1, wimax_en=1, framesize=576*4, 1)
+%plot_curves;
 
-run_single(Nbits=700*60, EbNo=6, hf_en=1, wimax_en=1, framesize=4*576, 1)
-%plot_curves
 
 
