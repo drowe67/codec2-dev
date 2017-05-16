@@ -35,7 +35,7 @@ function sim_out = run_simulation(sim_in)
   else
     hf_en = 0;
   end
-  wimax_en = sim_in.wimax_en;
+  ldpc_code = sim_in.ldpc_code;
   interleave_en = sim_in.interleave_en;
 
   % Init LDPC code ------------------------------------
@@ -48,24 +48,37 @@ function sim_out = run_simulation(sim_in)
   decoder_type = 0;
   max_iterations = 100;
 
-  if wimax_en == 1
+  if ldpc_code == 1
     code_param = ldpc_init_wimax(rate, framesize, modulation, mod_order, mapping);
   end
-  if wimax_en == 0
+  if ldpc_code == 0
     load HRA_112_112.txt
     [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   end
-  if wimax_en == 2
+  if ldpc_code == 2
     load('H2064_516_sparse.mat');
     HRA = full(HRA);  
     [code_param framesize rate] = ldpc_init_user(HRA, modulation, mod_order, mapping);
-    printf("framesize: %d rate: %f\n", framesize, rate);
+  end 
+  if ldpc_code == 3
+    load('h0p25d.mat');
+    %HRA = full(HRA);  
+    [code_param framesize rate] = ldpc_init_user(H, modulation, mod_order, mapping);
   end
 
   % set up optional HF (multipath) model ------------------------------------
 
+  % signal is arranged as Nc parallel carriers.  Nc is chosen such
+  % that payload data rate is 700 bits/s.  So for higher rate codes Nc
+  % will be smaller.
+
+  Rs = 50;
+  vocoder_bps = 700; raw_bps = vocoder_bps/rate;  
+  Nc = round(raw_bps/(Rs*bps));
+  Tp = (framesize/Nc)/Rs; Tp_codec2 = 0.04;
   fading = ones(1,Ntrials*code_param.code_bits_per_frame/bps);
-  Nc = 14; Rs = 50; Tp = (framesize/Nc)/Rs; Tp_codec2 = 0.04;
+
+  printf("framesize: %d  rate: %3.2f  Nc: %d\n", framesize, rate, Nc);
 
   if hf_en
 
@@ -284,26 +297,30 @@ endfunction
 % Run a bunch of trials at just one EbNo point
 % ---------------------------------------------------------------------------------
 
-function run_single(Nbits=700*10, EbNodB=9, hf_en=0, wimax_en=1, framesize=576, interleave_en=0, error_pattern_filename)
-  sim_in.wimax_en = wimax_en;
+function run_single(Nbits=700*10, EbNodB=9, hf_en=0, ldpc_code=1, framesize=576, interleave_en=0, error_pattern_filename)
+  sim_in.ldpc_code = ldpc_code;
 
-  if sim_in.wimax_en == 1
+  if sim_in.ldpc_code == 0
+    % Our HRA short LDPC code
+    sim_in.rate=0.5;
+    sim_in.framesize=448*4+448; 
+  end
+  if sim_in.ldpc_code == 1
     % CML wimax codes
     sim_in.rate = 0.5; 
     sim_in.framesize = framesize;
   end
-  if sim_in.wimax_en == 2
+  if sim_in.ldpc_code == 2
     sim_in.rate=0.8;
     sim_in.framesize=2064+516; 
   end 
-  if sim_in.wimax_en == 0
-    % Our HRA short LDPC code
-    sim_in.rate=0.5;
-    sim_in.framesize=224; 
-  end
+  if sim_in.ldpc_code == 3
+    sim_in.rate=0.25;
+    sim_in.framesize=2064+516; 
+  end 
 
   sim_in.verbose = 2;
-  sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
+  sim_in.Ntrials = ceil(Nbits/(sim_in.framesize*sim_in.rate));
   sim_in.EbNodBvec = EbNodB;
   sim_in.hf_en = hf_en;
   sim_in.interleave_en = interleave_en;
@@ -327,9 +344,19 @@ function plot_curves(Nbits=700*60)
   sim_in.verbose = 2;
   sim_in.interleave_en = 1;
 
-  % Wimax codes
+  % Low rate 0.25 VK5DSP code
 
-  sim_in.wimax_en = 1;
+  sim_in.ldpc_code = 3;
+  sim_in.rate = 0.25;
+  sim_in.framesize = 448*4+448;  
+  sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
+
+  sim_in.hf_en = 0; sim_out_awgn_low = run_simulation(sim_in);
+  sim_in.hf_en = 1; sim_out_hf_low = run_simulation(sim_in);
+
+  % Wimax code
+
+  sim_in.ldpc_code = 1;
   sim_in.rate = 0.5; 
   sim_in.framesize = 576*4;
   sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
@@ -337,9 +364,9 @@ function plot_curves(Nbits=700*60)
   sim_in.hf_en = 0; sim_out_awgn_wimax = run_simulation(sim_in);
   sim_in.hf_en = 1; sim_out_hf_wimax = run_simulation(sim_in);
 
-  % Our short HRA codes
+  % Our short code from VK5DSP
 
-  sim_in.wimax_en = 0;
+  sim_in.ldpc_code = 0;
   sim_in.rate = 0.5;
   sim_in.framesize = 224;  
   sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
@@ -347,15 +374,17 @@ function plot_curves(Nbits=700*60)
   sim_in.hf_en = 0; sim_out_awgn_short = run_simulation(sim_in);
   sim_in.hf_en = 1; sim_out_hf_short = run_simulation(sim_in);
 
-  % Rate 0.8 Wenet code
+  % Rate 0.8 Wenet code from VK5DSP
 
-  sim_in.wimax_en = 2;
+  sim_in.ldpc_code = 2;
   sim_in.rate = 0.8;
   sim_in.framesize = 2064+512;  
   sim_in.Ntrials = floor(Nbits/(sim_in.framesize*sim_in.rate));
 
   sim_in.hf_en = 0; sim_out_awgn_wenet = run_simulation(sim_in);
   sim_in.hf_en = 1; sim_out_hf_wenet = run_simulation(sim_in);
+
+  % plots -------------------------
 
   EbNodB = sim_in.EbNodBvec;
   uncoded_awgn_ber_theory = 0.5*erfc(sqrt(10.^(EbNodB/10)));
@@ -374,6 +403,8 @@ function plot_curves(Nbits=700*60)
   semilogy(EbNodB, sim_out_hf_short.BER+1E-10,'b-o;HF LDPC (224,112);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_awgn_wenet.BER+1E-10,'c-+;AWGN LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_hf_wenet.BER+1E-10,'c-o;HF LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_awgn_low.BER+1E-10,'k-+;AWGN LDPC (1792,448);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_hf_low.BER+1E-10,'k-o;HF LDPC (1792,448);','markersize', 10, 'linewidth', 2);
   hold off;
   grid('minor')
   xlabel('Eb/No (dB)')
@@ -397,7 +428,9 @@ function plot_curves(Nbits=700*60)
   semilogy(EbNodB, sim_out_hf_short.PER+1E-10,'b-o;HF LDPC (224,112);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_awgn_wenet.PER+1E-10,'c-+;AWGN LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
   semilogy(EbNodB, sim_out_hf_wenet.PER+1E-10,'c-o;HF LDPC (2576,2064);','markersize', 10, 'linewidth', 2);
-  hold off;
+  semilogy(EbNodB, sim_out_awgn_low.PER+1E-10,'k-+;AWGN LDPC (1792,448);','markersize', 10, 'linewidth', 2);
+  semilogy(EbNodB, sim_out_hf_low.PER+1E-10,'k-o;HF LDPC (1792,448);','markersize', 10, 'linewidth', 2);
+   hold off;
   grid('minor')
   xlabel('Eb/No (dB)')
   ylabel('PER')
@@ -416,15 +449,10 @@ end
 more off;
 format;
 
-% Start CML library (see CML set up instructions in ldpc.m)
+init_cml('/home/david/Desktop/cml/');
 
-currentdir = pwd;
-addpath '/home/david/Desktop/cml/mat' % assume the source files stored here
-cd /home/david/Desktop/cml
-CmlStartup                            % note that this is not in the cml path!
-cd(currentdir)
-run_single(Nbits=700*60, EbNo=6, hf_en=1, wimax_en=1, framesize=576*4, 1)
-%plot_curves;
+%run_single(Nbits=700*5, EbNo=6, hf_en=1, ldpc_code=3, framesize=576*4, 1)
+plot_curves(700*60);
 
 
 
