@@ -19,9 +19,10 @@
  
 #}
 
-function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
+  gp_interleaver;
 
   % init modem
 
@@ -38,20 +39,56 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   assert(Nbitsperframe == code_param.code_bits_per_frame);
 
-  % generate fixed test frame of tx bits and run OFDM modulator
-  % todo: maybe extend this to 4 or 8 frames, one is a bit short
+  % Generate fixed test frame of tx bits and run OFDM modulator
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
 
-  rand('seed', 100);
-  tx_bits = round(rand(1,code_param.data_bits_per_frame));
-  tx_codeword = LdpcEncode(tx_bits, code_param.H_rows, code_param.P_matrix);
+  % Adjust Nframes so we have an integer number of interleaver frames
+  % in simulation
 
-  tx = [];
-  for f=1:Nframes
-    tx = [tx ofdm_mod(states, tx_codeword)];
+  Nframes = interleave_frames*round(Nframes/interleave_frames);
+
+  % OK generate an interleaver frame of codewords from random data bits
+
+  rand('seed', 100);
+  tx_bits = tx_symbols = [];
+  for f=1:interleave_frames
+    atx_bits = round(rand(1,code_param.data_bits_per_frame));
+    tx_bits = [tx_bits atx_bits];
+    codeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
+    for b=1:2:Nbitsperframe
+      tx_symbols = [tx_symbols qpsk_mod(codeword(b:b+1))];
+    end
   end
+ 
+  tx_symbols = gp_interleave(tx_symbols);
+  
+  atx = [];
+  for f=1:interleave_frames
+    st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe/bps-1;
+    atx = [atx ofdm_txframe(states, tx_symbols(st:en))];
+  end
+ 
+  tx = [];
+  for f=1:Nframes/interleave_frames
+    tx = [tx atx];
+  end
+
+  % not very pretty way to process analog signals with exactly the same channel
+
+  analog_hack = 0;
+  if analog_hack
+    s = load_raw('../raw/ve9qrp_10s.raw')';
+    tx = hilbert(s);
+
+    % normalise power to same as ofdm tx
+
+    nom_tx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
+    tx_pwr = var(tx);
+    tx *= sqrt(nom_tx_pwr/tx_pwr);
+  end
+
   Nsam = length(tx);
 
   % channel simulation
@@ -61,7 +98,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   woffset = 2*pi*freq_offset_Hz/Fs;
 
   SNRdB = EbNodB + 10*log10(700/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz\n", EbNodB, SNRdB, freq_offset_Hz);
+  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
 
@@ -108,7 +145,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
 
   noise = sqrt(variance/2)*0.5*randn(1,Nsam);
   rx = real(rx) + noise;
-  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)));
+  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise))+10*log10(4000) - 10*log10(3000));
 
   Ascale = 2E5;
   frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
