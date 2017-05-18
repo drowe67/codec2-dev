@@ -11,7 +11,7 @@
     [ ] way to fall out of sync
 #}
 
-function ofdm_rx(filename, interleave_frames = 1)
+function ofdm_rx(filename, interleave_frames = 1, error_pattern_filename)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -83,6 +83,7 @@ function ofdm_rx(filename, interleave_frames = 1)
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
+  error_positions = [];
 
   % 'prime' rx buf to get correct coarse timing (for now)
 
@@ -139,14 +140,20 @@ function ofdm_rx(filename, interleave_frames = 1)
         printf("  ff: %d Nerrs: %d\n", ff, Nerrs);
         if Nerrs/Nbitsperframe < 0.1
           next_state = 'synced';
-          frame_count = ff;
-          if f < interleave_frames
-            % point trying a LDPC decode if we don't have a full frame!
-            frame_count -= interleave_frames;
-          end
+          % make sure we get an interleave frame with correct freq offset
+          % note this introduces a lot of delay, a better idea would be to
+          % run demod again from interleave_frames back with now-known freq offset
+          frame_count = ff - interleave_frames;
         end
       end
     end
+
+    if strcmp(state,'synced')  
+      if Nerrs/Nbitsperframe > 0.2
+        %next_state = 'searching';
+      end
+    end
+
     state = next_state;
 
     if strcmp(state,'searching') 
@@ -170,6 +177,7 @@ function ofdm_rx(filename, interleave_frames = 1)
     end
     
     if strcmp(state,'synced')
+
       % we are in sync so log states
 
       rx_np_log = [rx_np_log arx_np];
@@ -186,6 +194,23 @@ function ofdm_rx(filename, interleave_frames = 1)
       arx_np = gp_deinterleave(rx_np);
       arx_amp = gp_deinterleave(rx_amp);
 
+      % measure uncoded bit errors per modem frame
+
+      rx_bits_raw = [];
+      for s=1:Nsymbolsperinterleavedframe
+        rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np(s))];
+      end
+      for ff=1:interleave_frames
+        st = (ff-1)*Nbitsperframe+1; en = st+Nbitsperframe-1;
+        errors = xor(tx_bits_raw(st:en), rx_bits_raw(st:en));
+        Nerrs = sum(errors);
+        if Nerrs/Nbitsperframe < 0.2
+          Terrs += Nerrs;
+          Nerrs_log = [Nerrs_log Nerrs];
+          Tbits += Nbitsperframe;
+        end
+      end
+
       % LDPC decode
 
       rx_bits = [];
@@ -197,39 +222,26 @@ function ofdm_rx(filename, interleave_frames = 1)
 
       errors_coded = xor(tx_bits, rx_bits);
       Nerrs_coded = sum(errors_coded);
-      Terrs_coded += Nerrs_coded;
-      Tbits_coded += code_param.data_bits_per_frame*interleave_frames;
+      if Nerrs/Nbitsperframe < 0.2
+        Terrs_coded += Nerrs_coded;
+        Tbits_coded += code_param.data_bits_per_frame*interleave_frames;
+        error_positions = [error_positions errors_coded];
 
-      printf("  Nerrs_coded: %d\n", Nerrs_coded);
+        % measure packet errors based on Codec 2 packet size
 
-      % measure uncoded bit errors per modem frame
-
-      rx_bits_raw = [];
-      for s=1:Nsymbolsperinterleavedframe
-        rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np(s))];
-      end
-      for ff=1:interleave_frames
-        st = (ff-1)*Nbitsperframe+1; en = st+Nbitsperframe-1;
-        errors = xor(tx_bits_raw(st:en), rx_bits_raw(st:en));
-        Nerrs = sum(errors);
-        Terrs += Nerrs;
-        Nerrs_log = [Nerrs_log Nerrs];
-        Tbits += Nbitsperframe;
-      end
-
-      % measure packet errors based on Codec 2 packet size
-
-      Nvocframes = floor(code_param.data_bits_per_frame*interleave_frames/Nbitspervocframe);
-      for fv=1:Nvocframes
-        st = (fv-1)*Nbitspervocframe + 1;
-        en = st + Nbitspervocframe - 1;
-        Nvocpacketerrs = sum(xor(tx_bits(st:en), rx_bits(st:en)));
-        if Nvocpacketerrs
-          Tpacketerrs++;
+        Nvocframes = floor(code_param.data_bits_per_frame*interleave_frames/Nbitspervocframe);
+        for fv=1:Nvocframes
+          st = (fv-1)*Nbitspervocframe + 1;
+          en = st + Nbitspervocframe - 1;
+          Nvocpacketerrs = sum(xor(tx_bits(st:en), rx_bits(st:en)));
+          if Nvocpacketerrs
+            Tpacketerrs++;
+          end
+          Tpackets++;
+          Nerrs_coded_log = [Nerrs_coded_log Nvocpacketerrs];
         end
-        Tpackets++;
-        Nerrs_coded_log = [Nerrs_coded_log Nvocpacketerrs];
       end
+      printf("  Nerrs_coded: %d\n", Nerrs_coded);
 
       frame_count = 0;
     end
@@ -241,7 +253,8 @@ function ofdm_rx(filename, interleave_frames = 1)
 
   figure(1); clf; 
   plot(rx_np_log,'+');
-  axis([-2 2 -2 2]);
+  mx = max(abs(rx_np_log))
+  axis([-mx mx -mx mx]);
   title('Scatter');
 
   figure(2); clf;
@@ -259,7 +272,8 @@ function ofdm_rx(filename, interleave_frames = 1)
 
   figure(4); clf;
   plot(foff_est_hz_log)
-  axis([1 max(Nframes,2) -2 2]);
+  mx = max(abs(foff_est_hz_log));
+  axis([1 max(Nframes,2) -mx mx]);
   title('Fine Freq');
   ylabel('Hz')
 
@@ -267,7 +281,15 @@ function ofdm_rx(filename, interleave_frames = 1)
   subplot(211)
   stem(Nerrs_log);
   title('Uncoded errrors/modem frame')
+  axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
   subplot(212)
   stem(Nerrs_coded_log);
   title('Coded errrors/vocoder frame')
+  axis([1 length(Nerrs_coded_log) 0 Nbitspervocframe/2]);
+
+  if nargin == 3
+    fep = fopen(error_pattern_filename, "wb");
+    fwrite(fep, error_positions, "short");
+    fclose(fep);
+  end
 endfunction
