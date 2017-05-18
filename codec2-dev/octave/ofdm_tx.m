@@ -5,6 +5,19 @@
 % optional channel simulation.
 
 #{
+  Examples:
+ 
+  i) 4 frame interleaver, 10 seconds, AWGN channel at Eb/No=3dB
+
+    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw',4, 10,3);
+
+  ii) 4 frame interleaver, 10 seconds, HF channel at Eb/No=6dB
+
+    ofdm_tx('hf_ebno_6dB_700d.raw', 4, 10, 6, 'hf');
+#}
+
+
+#{
   TODO: 
     [ ] measure and report raw and coded BER
     [ ] maybe 10s worth of frames, sync up to any one automatically
@@ -76,11 +89,27 @@ function ofdm_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awg
   end
 
   % not very pretty way to process analog signals with exactly the same channel
+  % todo: work out a cleaner way
 
-  analog_hack = 0;
+  analog_hack = 0; rx_filter = 0;
+  if analog_hack || rx_filter
+
+    % simulated SSB tx filter
+
+    [b, a] = cheby1(4, 3, [600, 2600]/(Fs/2));
+    h = freqz(b,a,(600:2600)/(Fs/(2*pi)));
+    filt_gain = (2600-600)/sum(abs(h) .^ 2);   % ensures power after filter == before filter
+  end
+
   if analog_hack
+    % load analog signal and convert to complex
+
     s = load_raw('../raw/ve9qrp_10s.raw')';
     tx = hilbert(s);
+
+    % ssb tx filter
+
+    tx = filter(b,a,sqrt(filt_gain)*tx);
 
     % normalise power to same as ofdm tx
 
@@ -147,6 +176,14 @@ function ofdm_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awg
   rx = real(rx) + noise;
   printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise))+10*log10(4000) - 10*log10(3000));
 
-  Ascale = 2E5;
+  if rx_filter
+    % ssb rx filter
+    rx = filter(b,a,sqrt(filt_gain)*rx);
+  end
+
+  % adjusted by experiment to match rms power of early test signals
+
+  Ascale = 2E5*1.1491;
+
   frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
 endfunction
