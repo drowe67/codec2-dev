@@ -14,6 +14,7 @@
 function ofdm_rx(filename, interleave_frames = 1)
   ofdm_lib;
   ldpc;
+  gp_interleaver;
   more off;
 
   % init modem
@@ -37,7 +38,7 @@ function ofdm_rx(filename, interleave_frames = 1)
 
   % load real samples from file
 
-  Ascale= 2E5;
+  Ascale= 2E5*1.1491;
   frx=fopen(filename,"rb"); rx = 2*fread(frx, Inf, "short")/4E5; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
@@ -81,6 +82,7 @@ function ofdm_rx(filename, interleave_frames = 1)
   phase_est_pilot_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
   Nbitspervocframe = 28;
+  Nerrs_coded_log = Nerrs_log = [];
 
   % 'prime' rx buf to get correct coarse timing (for now)
 
@@ -167,6 +169,16 @@ function ofdm_rx(filename, interleave_frames = 1)
       states.foff_est_hz = foff_est;
     end
     
+    if strcmp(state,'synced')
+      % we are in sync so log states
+
+      rx_np_log = [rx_np_log arx_np];
+      timing_est_log = [timing_est_log states.timing_est];
+      delta_t_log = [delta_t_log states.delta_t];
+      foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
+      phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+    end
+
     if strcmp(state,'synced') && (frame_count == interleave_frames)
 
       % de-interleave QPSK symbols
@@ -187,29 +199,23 @@ function ofdm_rx(filename, interleave_frames = 1)
       Nerrs_coded = sum(errors_coded);
       Terrs_coded += Nerrs_coded;
       Tbits_coded += code_param.data_bits_per_frame*interleave_frames;
-      Nerrs_coded_log(f) = Nerrs_coded;
 
       printf("  Nerrs_coded: %d\n", Nerrs_coded);
 
-      % we are in sync so log states and bit/packet error stats
-
-      rx_np_log = [rx_np_log arx_np];
-      timing_est_log = [timing_est_log states.timing_est];
-      delta_t_log = [delta_t_log states.delta_t];
-      foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
-      phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
-
-      % measure uncoded bit errors
+      % measure uncoded bit errors per modem frame
 
       rx_bits_raw = [];
       for s=1:Nsymbolsperinterleavedframe
         rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np(s))];
       end
-      errors = xor(tx_bits_raw, rx_bits_raw);
-      Nerrs = sum(errors);
-      Terrs += Nerrs;
-      Nerrs_log(f) = Nerrs;
-      Tbits += code_param.code_bits_per_frame*interleave_frames;
+      for ff=1:interleave_frames
+        st = (ff-1)*Nbitsperframe+1; en = st+Nbitsperframe-1;
+        errors = xor(tx_bits_raw(st:en), rx_bits_raw(st:en));
+        Nerrs = sum(errors);
+        Terrs += Nerrs;
+        Nerrs_log = [Nerrs_log Nerrs];
+        Tbits += Nbitsperframe;
+      end
 
       % measure packet errors based on Codec 2 packet size
 
@@ -222,6 +228,7 @@ function ofdm_rx(filename, interleave_frames = 1)
           Tpacketerrs++;
         end
         Tpackets++;
+        Nerrs_coded_log = [Nerrs_coded_log Nvocpacketerrs];
       end
 
       frame_count = 0;
@@ -258,8 +265,9 @@ function ofdm_rx(filename, interleave_frames = 1)
 
   figure(5); clf;
   subplot(211)
-  title('Nerrs Log')
   stem(Nerrs_log);
+  title('Uncoded errrors/modem frame')
   subplot(212)
   stem(Nerrs_coded_log);
+  title('Coded errrors/vocoder frame')
 endfunction
