@@ -34,9 +34,14 @@ function [sim_out rx states] = run_sim(sim_in)
   % simulation parameters and flags
 
   woffset = 2*pi*sim_in.foff_hz/Fs;
+  dwoffset = 0;
+  if isfield(sim_in, "dfoff_hz_per_sec")
+    dwoffset = 2*pi*sim_in.dfoff_hz_per_sec/(Fs*Fs);
+  end
   EbNodB  = sim_in.EbNodB;
   verbose = states.verbose = sim_in.verbose;
   hf_en   = sim_in.hf_en;
+
   timing_en = states.timing_en = sim_in.timing_en;
   states.foff_est_en = foff_est_en = sim_in.foff_est_en;
   states.phase_est_en = phase_est_en = sim_in.phase_est_en;
@@ -49,7 +54,7 @@ function [sim_out rx states] = run_sim(sim_in)
     diversity_en = 0;
   end
 
-  if verbose
+  if verbose == 2
     printf("Rs:..........: %4.2f\n", Rs);
     printf("M:...........: %d\n", M);
     printf("Ncp:.........: %d\n", Ncp);
@@ -87,7 +92,7 @@ function [sim_out rx states] = run_sim(sim_in)
   Nrp = Nr + Nframes + 1;  % number of rows once pilots inserted
                            % extra row of pilots at end
 
-  if verbose
+  if verbose == 2
     printf("Nc...........: %d\n", Nc);
     printf("Ns...........: %d (step size for pilots, Ns-1 data symbols between pilots)\n", Ns);
     printf("Nr...........: %d\n", Nr);
@@ -261,10 +266,11 @@ function [sim_out rx states] = run_sim(sim_in)
       rx *= sqrt(nom_rx_pwr/rx_pwr);
     end
 
-    rx = rx .* exp(j*woffset*(1:Nsam));
+    phase_offset = woffset*(1:Nsam) + 0.5*dwoffset*((1:Nsam).^2);
+    rx = rx .* exp(j*phase_offset);
    
     noise = sqrt(variance)*(0.5*randn(1,Nsam) + j*0.5*randn(1,Nsam));
-    snrdB = 10*log10(var(rx)/var(noise)) + 10*log10(8000) - 10*log10(3000)
+    snrdB = 10*log10(var(rx)/var(noise)) + 10*log10(8000) - 10*log10(3000);
     rx += noise;
 
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
@@ -519,12 +525,13 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   %sim_in.Nsec = 2*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 30;
+  sim_in.Nsec = 50;
 
   sim_in.EbNodB = EbNodB;
   sim_in.verbose = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
+  sim_in.dfoff_hz_per_sec = 0.02;
   sim_in.sample_clock_offset_ppm = 0;
 
   sim_in.timing_en = 1;
@@ -683,13 +690,13 @@ function run_curves
   % Rate Fs modem pilot/CP overhead PER curves
 
   figure(4); clf;
-  semilogy(awgn_EbNodB, awgn_per_theory,'b+-;AWGN theory;');
+  semilogy(awgn_EbNodB, awgn_per_theory,'b+-;AWGN theory;','markersize', 10, 'linewidth', 2);
   hold on;
-  semilogy(sim_in.EbNodB, hf_per_theory,'b+-;HF theory;');
-  semilogy(awgn_EbNodB+overhead_dB, awgn_per_theory,'g+-;AWGN lower bound pilot + CP;');
-  semilogy(sim_in.EbNodB+overhead_dB, hf_per_theory,'g+-;HF lower bound pilot + CP;');
-  semilogy(awgn_EbNodB+overhead_dB, awgn.per,'r+-;AWGN sim;');
-  semilogy(sim_in.EbNodB+overhead_dB, hf.per,'r+-;HF sim;');
+  semilogy(sim_in.EbNodB, hf_per_theory,'b+-;HF theory;','markersize', 10, 'linewidth', 2);
+  semilogy(awgn_EbNodB+overhead_dB, awgn_per_theory,'g+-;AWGN lower bound pilot + CP;','markersize', 10, 'linewidth', 2);
+  semilogy(sim_in.EbNodB+overhead_dB, hf_per_theory,'g+-;HF lower bound pilot + CP;','markersize', 10, 'linewidth', 2);
+  semilogy(awgn_EbNodB+overhead_dB, awgn.per,'r+-;AWGN sim;','markersize', 10, 'linewidth', 2);
+  semilogy(sim_in.EbNodB+overhead_dB, hf.per,'r+-;HF sim;','markersize', 10, 'linewidth', 2);
   hold off;
   axis([0 14 1E-2 1])
   xlabel('Eb/No (dB)');
@@ -713,15 +720,15 @@ function run_curves
   snr_hf_700c     = sim_in.EbNodB + 10*log10(700/3000) + 10*log10(6/4) + 1;
 
   figure(5); clf;
-  semilogy(snr_awgn_theory, awgn_theory,'b+-;AWGN theory;');
+  semilogy(snr_awgn_theory, awgn_theory,'b+-;AWGN theory;','markersize', 10, 'linewidth', 2);
   hold on;
-  semilogy(snr_awgn_700c, awgn_theory,'g+-;AWGN 700C;');
-  semilogy(snr_hf_700c, hf_diversity.ber,'go-;HF 700C;');
-  semilogy(snr_hf_theory, hf_theory,'b+-;HF theory;');
-  semilogy(snr_awgn, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);');
-  semilogy(snr_hf, hf_ldpc.ber,'c+-;HF LDPC (224,112);');
-  semilogy(snr_hf, hf_diversity.ber,'bo-;HF diversity;');
-  semilogy(snr_hf, hf_ldpc_16.ber,'k+-;HF LDPC (224,112) interleave 16;');
+  semilogy(snr_awgn_700c, awgn_theory,'g+-;AWGN 700C;','markersize', 10, 'linewidth', 2);
+  semilogy(snr_hf_700c, hf_diversity.ber,'go-;HF 700C;','markersize', 10, 'linewidth', 2);
+  semilogy(snr_hf_theory, hf_theory,'b+-;HF theory;','markersize', 10, 'linewidth', 2);
+  semilogy(snr_awgn, awgn_ldpc.ber,'c+-;AWGN LDPC (224,112);','markersize', 10, 'linewidth', 2);
+  semilogy(snr_hf, hf_ldpc.ber,'c+-;HF LDPC (224,112);','markersize', 10, 'linewidth', 2);
+  semilogy(snr_hf, hf_diversity.ber,'bo-;HF diversity;','markersize', 10, 'linewidth', 2);
+  semilogy(snr_hf, hf_ldpc_16.ber,'k+-;HF LDPC (224,112) interleave 16;','markersize', 10, 'linewidth', 2);
   hold off;
   axis([-5 8 1E-3 2E-1])
   xlabel('SNR (3000Hz noise BW) (dB)');
@@ -739,6 +746,9 @@ end
 
 function run_curves_estimators
 
+  Nsec_awgn = 20;
+  Nsec_hf = 60;
+
   % waveform
 
   Ts = 0.018; sim_in.Tcp = 0.002; 
@@ -753,7 +763,7 @@ function run_curves_estimators
 
   % AWGN simulations
 
-  sim_in.hf_en = 0; sim_in.Nsec = 20; sim_in.EbNodB = 0:2:6;
+  sim_in.hf_en = 0; sim_in.Nsec = Nsec_awgn; sim_in.EbNodB = 0:2:6;
   sim_in.timing_en = sim_in.foff_est_en = 0;
 
   awgn_EbNodB = sim_in.EbNodB;
@@ -762,9 +772,11 @@ function run_curves_estimators
   sim_in.timing_en = 1; awgn_timing = run_sim(sim_in);
   sim_in.foff_est_en = 1; awgn_foff_est = run_sim(sim_in);
 
+  sim_in.dfoff_hz_per_sec = 0.02; awgn_dfoff = run_sim(sim_in);
+
   % HF simulations
 
-  sim_in.hf_en = 1; sim_in.Nsec = 60; sim_in.EbNodB = 4:2:8;
+  sim_in.hf_en = 1; sim_in.Nsec = Nsec_hf; sim_in.EbNodB = 4:2:8;
   sim_in.timing_en = sim_in.foff_est_en = 0;
 
   EbNoLin = 10.^(sim_in.EbNodB/10);
@@ -775,17 +787,21 @@ function run_curves_estimators
   sim_in.timing_en = 0; sim_in.foff_est_en = 1; hf_foff_est = run_sim(sim_in);
   sim_in.timing_en = 1; hf_timing_foff_est = run_sim(sim_in);
 
+  sim_in.dfoff_hz_per_sec = 0.02; hf_dfoff = run_sim(sim_in); sim_in.dfoff_hz_per_sec = 0.0;
+
   figure(1); clf;
   semilogy(awgn_EbNodB, awgn_theory,'b+-;AWGN theory;');
   hold on;
   semilogy(awgn_EbNodB, awgn.ber,'r+-;AWGN phase;');
-  semilogy(awgn_EbNodB, awgn_timing.ber,'g+-;AWGN phase+timing;');
-  semilogy(awgn_EbNodB, awgn_foff_est.ber,'c+-;AWGN phase+timing+foff_est;');
+  semilogy(awgn_EbNodB, awgn_timing.ber,'go-;AWGN phase+timing;');
+  semilogy(awgn_EbNodB, awgn_foff_est.ber,'d+-;AWGN phase+timing+foff_est;');
+  semilogy(awgn_EbNodB, awgn_dfoff.ber,'m+-;AWGN all + 0.02Hz/s drift;');
   semilogy(sim_in.EbNodB, hf_theory,'b+-;HF theory;');
   semilogy(sim_in.EbNodB, hf.ber,'r+-;HF phase;');
-  semilogy(sim_in.EbNodB, hf_timing.ber,'g+-;HF phase+timing;');
-  semilogy(sim_in.EbNodB, hf_timing_foff_est.ber,'k+-;HF phase+foff_est;');
+  semilogy(sim_in.EbNodB, hf_timing.ber,'go-;HF phase+timing;');
+  semilogy(sim_in.EbNodB, hf_timing_foff_est.ber,'kd-;HF phase+foff_est;');
   semilogy(sim_in.EbNodB, hf_foff_est.ber,'c+-;HF phase+timing+foff_est;');
+  semilogy(sim_in.EbNodB, hf_dfoff.ber,'m+-;HF + 0.02Hz/s drift;');
   hold off;
   axis([0 8 5E-3 1E-1])
   xlabel('Eb/No (dB)');
@@ -798,7 +814,7 @@ function run_curves_estimators
 
   % Simulate different HF path delays
 
-  sim_in.hf_en = 1; sim_in.Nsec = 60; sim_in.EbNodB = 4:2:8;
+  sim_in.hf_en = 1; sim_in.Nsec = Nsec_hf; sim_in.EbNodB = 4:2:8;
   sim_in.timing_en = sim_in.foff_est_en = 0;
 
   sim_in.path_delay_ms = 0; hf0 = run_sim(sim_in);
@@ -974,8 +990,8 @@ more off;
 
 init_cml('/home/david/Desktop/cml/');
 
-run_single(6, "hf_6dB_ldpc224_32.err") 
-%run_curves
+%run_single(6) 
+run_curves
 %run_curves_estimators
 %acquisition_histograms
 %acquisition_test
