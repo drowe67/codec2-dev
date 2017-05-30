@@ -369,7 +369,7 @@ void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs
 
 \*---------------------------------------------------------------------------*/
 
-void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
+void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, codec2_fft_cfg inv_cfg)
 {
     int i,m,b;
     int Ns = Nfft/2+1;
@@ -382,7 +382,7 @@ void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, c
     }
     
     for(i=0; i<Ns; i++) {
-        sample_freqs_kHz[i] = (FS/1000.0)*(float)i/Nfft;
+        sample_freqs_kHz[i] = (c2const->Fs/1000.0)*(float)i/Nfft;
     }
 
     interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
@@ -407,7 +407,8 @@ void determine_phase(COMP H[], MODEL *model, int Nfft, codec2_fft_cfg fwd_cfg, c
 
 \*---------------------------------------------------------------------------*/
 
-void newamp1_model_to_indexes(int    indexes[], 
+void newamp1_model_to_indexes(C2CONST *c2const,
+                              int    indexes[], 
                               MODEL *model, 
                               float  rate_K_vec[], 
                               float  rate_K_sample_freqs_kHz[], 
@@ -448,7 +449,7 @@ void newamp1_model_to_indexes(int    indexes[],
        an unvoiced frame */
 
     if (model->voiced) {
-        int index = encode_log_Wo(model->Wo, 6);
+        int index = encode_log_Wo(c2const, model->Wo, 6);
         if (index == 0) {
             index = 1;
         }
@@ -533,7 +534,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
 
 \*---------------------------------------------------------------------------*/
 
-void newamp1_indexes_to_model(MODEL  model_[],
+void newamp1_indexes_to_model(C2CONST *c2const,
+                              MODEL  model_[],
                               COMP   H[],
                               float *interpolated_surface_,
                               float  prev_rate_K_vec_[],
@@ -562,7 +564,7 @@ void newamp1_indexes_to_model(MODEL  model_[],
     /* decode latest Wo and voicing */
 
     if (indexes[3]) {
-        Wo_right = decode_log_Wo(indexes[3], 6);
+        Wo_right = decode_log_Wo(c2const, indexes[3], 6);
         voicing_right = 1;
     }
     else {
@@ -591,7 +593,7 @@ void newamp1_indexes_to_model(MODEL  model_[],
         model_[i].voiced = avoicing_[i];
 
         resample_rate_L(&model_[i], &interpolated_surface_[K*i], rate_K_sample_freqs_kHz, K);
-        determine_phase(&H[(MAX_AMP+1)*i], &model_[i], NEWAMP1_PHASE_NFFT, fwd_cfg, inv_cfg);
+        determine_phase(c2const, &H[(MAX_AMP+1)*i], &model_[i], NEWAMP1_PHASE_NFFT, fwd_cfg, inv_cfg);
     }
 
     /* update memories for next time */

@@ -37,6 +37,7 @@
 
 float sample_log_amp(MODEL *model, float w);
 
+#if 0
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: interp()
@@ -62,7 +63,8 @@ float sample_log_amp(MODEL *model, float w);
 void interpolate(
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
-  MODEL *next       /* next frames model params                      */
+  MODEL *next,      /* next frames model params                      */
+  float Wo_min 
 )
 {
     int   l;
@@ -79,7 +81,7 @@ void interpolate(
 	    interp->Wo = prev->Wo;
     }
     else {
-	interp->Wo = TWO_PI/P_MAX;
+	interp->Wo = Wo_min;
     }
     interp->L = PI/interp->Wo;
 
@@ -91,6 +93,7 @@ void interpolate(
 	interp->A[l] = powf(10.0, log_amp);
     }
 }
+#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -149,15 +152,16 @@ float sample_log_amp(MODEL *model, float w)
 
 void interpolate_lsp(
   codec2_fft_cfg  fft_fwd_cfg,
-  MODEL *interp,    /* interpolated model params                     */
-  MODEL *prev,      /* previous frames model params                  */
-  MODEL *next,      /* next frames model params                      */
-  float *prev_lsps, /* previous frames LSPs                          */
-  float  prev_e,    /* previous frames LPC energy                    */
-  float *next_lsps, /* next frames LSPs                              */
-  float  next_e,    /* next frames LPC energy                        */
-  float *ak_interp, /* interpolated aks for this frame               */
-  float *lsps_interp/* interpolated lsps for this frame              */
+  MODEL *interp,      /* interpolated model params                     */
+  MODEL *prev,        /* previous frames model params                  */
+  MODEL *next,        /* next frames model params                      */
+  float *prev_lsps,   /* previous frames LSPs                          */
+  float  prev_e,      /* previous frames LPC energy                    */
+  float *next_lsps,   /* next frames LSPs                              */
+  float  next_e,      /* next frames LPC energy                        */
+  float *ak_interp,   /* interpolated aks for this frame               */
+  float *lsps_interp, /* interpolated lsps for this frame              */
+  float  Wo_min
 )
 {
     int   i;
@@ -181,7 +185,7 @@ void interpolate_lsp(
 	    interp->Wo = prev->Wo;
     }
     else {
-	interp->Wo = TWO_PI/P_MAX;
+	interp->Wo = Wo_min;
     }
     interp->L = PI/interp->Wo;
 
@@ -223,10 +227,11 @@ void interpolate_lsp(
 void interp_Wo(
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
-  MODEL *next       /* next frames model params                      */
+  MODEL *next,      /* next frames model params                      */
+  float  Wo_min
 	       )
 {
-    interp_Wo2(interp, prev, next, 0.5);
+    interp_Wo2(interp, prev, next, 0.5, Wo_min);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -243,7 +248,8 @@ void interp_Wo2(
   MODEL *interp,    /* interpolated model params                     */
   MODEL *prev,      /* previous frames model params                  */
   MODEL *next,      /* next frames model params                      */
-  float  weight
+  float  weight,
+  float  Wo_min
 )
 {
     /* trap corner case where voicing est is probably wrong */
@@ -263,7 +269,7 @@ void interp_Wo2(
 	    interp->Wo = prev->Wo;
     }
     else {
-	interp->Wo = TWO_PI/P_MAX;
+	interp->Wo = Wo_min;
     }
     interp->L = PI/interp->Wo;
 }

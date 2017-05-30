@@ -66,17 +66,19 @@ int main(int argc, char *argv[])
 {
     C2CONST c2const = c2const_create(8000);
     int   n_samp = c2const.n_samp;
+    int   m_pitch = c2const.m_pitch;
+
     FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
     short buf[N_SAMP];	/* input/output buffer                   */
     float buf_float[N_SAMP];
-    float Sn[M_PITCH];	/* float input speech samples            */
-    float Sn_pre[M_PITCH];	/* pre-emphasised input speech samples   */
+    float Sn[m_pitch];	/* float input speech samples            */
+    float Sn_pre[m_pitch];	/* pre-emphasised input speech samples   */
     COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
     codec2_fft_cfg  fft_fwd_cfg;
     codec2_fftr_cfg  fftr_fwd_cfg;
     codec2_fftr_cfg  fftr_inv_cfg;
-    float w[M_PITCH];	        /* time domain hamming window            */
+    float w[m_pitch];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	/* DFT of w[]                            */
     MODEL model;
     float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
@@ -201,16 +203,16 @@ int main(int argc, char *argv[])
     COMP Aw[FFT_ENC];
     COMP H[MAX_AMP];
 
-    for(i=0; i<M_PITCH; i++) {
+    for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
 	Sn_pre[i] = 1.0;
     }
     for(i=0; i<2*N_SAMP; i++)
 	Sn_[i] = 0;
 
-    prev_uq_Wo = prev_Wo = prev__Wo = TWO_PI/P_MAX;
+    prev_uq_Wo = prev_Wo = prev__Wo = c2const.Wo_min;
 
-    prev_model.Wo = TWO_PI/P_MIN;
+    prev_model.Wo = c2const.Wo_max;
     prev_model.L = floor(PI/prev_model.Wo);
     for(i=1; i<=prev_model.L; i++) {
 	prev_model.A[i] = 0.0;
@@ -223,7 +225,7 @@ int main(int argc, char *argv[])
     e = prev_e = 1;
     hpf_states[0] = hpf_states[1] = 0.0;
 
-    nlp_states = nlp_create(M_PITCH);
+    nlp_states = nlp_create(m_pitch);
 
     if (argc < 2) {
         print_help(long_options, num_opts, argv);
@@ -440,7 +442,7 @@ int main(int argc, char *argv[])
     prev_e_dec = 1;
     for(m=1; m<=MAX_AMP; m++)
 	prev_model_dec.A[m] = 0.0;
-    prev_model_dec.Wo = TWO_PI/P_MAX;
+    prev_model_dec.Wo = c2const.Wo_min;
     prev_model_dec.L = PI/prev_model_dec.Wo;
     prev_model_dec.voiced = 0;
 
@@ -485,11 +487,11 @@ int main(int argc, char *argv[])
 
         /* shift buffer of input samples, and insert new samples */
 
-	for(i=0; i<M_PITCH-N_SAMP; i++) {
+	for(i=0; i<m_pitch-N_SAMP; i++) {
 	    Sn[i] = Sn[i+N_SAMP];
 	}
 	for(i=0; i<N_SAMP; i++) {
-	    Sn[i+M_PITCH-N_SAMP] = buf_float[i];
+	    Sn[i+m_pitch-N_SAMP] = buf_float[i];
         }
 
 	/*------------------------------------------------------------*\
@@ -498,15 +500,15 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-	nlp(nlp_states,Sn,N_SAMP,P_MIN,P_MAX,&pitch,Sw,W,&prev_uq_Wo);
+        nlp(nlp_states,Sn,N_SAMP,c2const.p_min,c2const.p_max,&pitch,Sw,W,&prev_uq_Wo);
 	model.Wo = TWO_PI/pitch;
 
-	dft_speech(fft_fwd_cfg, Sw, Sn, w);
-	two_stage_pitch_refinement(&model, Sw);
+        dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
+	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
         #ifdef DUMP
-	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
+        dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
         #if 0
@@ -539,7 +541,7 @@ int main(int argc, char *argv[])
 	\*------------------------------------------------------------*/
 
 	if (phase0) {
-	    float Wn[M_PITCH];		        /* windowed speech samples */
+	    float Wn[m_pitch];		        /* windowed speech samples */
 	    float Rk[order+1];                  /* autocorrelation coeffs  */
             COMP a[FFT_ENC];
 
@@ -549,17 +551,17 @@ int main(int argc, char *argv[])
 
 	    /* find aks here, these are overwritten if LPC modelling is enabled */
 
-            for(i=0; i<M_PITCH; i++)
+            for(i=0; i<m_pitch; i++)
                 Wn[i] = Sn[i]*w[i];
-	    autocorrelate(Wn,Rk,M_PITCH,order);
+	    autocorrelate(Wn,Rk,m_pitch,order);
 	    levinson_durbin(Rk,ak,order);
 
 	    /* determine voicing */
 
 	    #if 0
-	    snr = est_voicing_mbe(&model, Sw, W, Sw_, Ew);
+            snr = est_voicing_mbe(&c2const, &model, Sw, W, Sw_, Ew);
             #else
-	    snr = est_voicing_mbe(&model, Sw, W);
+	    snr = est_voicing_mbe(&c2const, &model, Sw, W);
             #endif
 
 	    if (dump_pitch_e)
@@ -604,7 +606,7 @@ int main(int argc, char *argv[])
 
 	if (lpc_model) {
 
-            e = speech_to_uq_lsps(lsps, ak, Sn, w, order);
+            e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
             for(i=0; i<LPC_ORD; i++)
                 lsps_[i] = lsps[i];
 
@@ -765,14 +767,14 @@ int main(int argc, char *argv[])
 	    if (scalar_quant_Wo_e) {
 
 		e = decode_energy(encode_energy(e, E_BITS), E_BITS);
-                model.Wo = decode_Wo(encode_Wo(model.Wo, WO_BITS), WO_BITS);
+                model.Wo = decode_Wo(&c2const, encode_Wo(&c2const, model.Wo, WO_BITS), WO_BITS);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
 
 	    if (scalar_quant_Wo_e_low) {
                 int ind;
 		e = decode_energy(ind = encode_energy(e, 3), 3);
-                model.Wo = decode_log_Wo(encode_log_Wo(model.Wo, 5), 5);
+                model.Wo = decode_log_Wo(&c2const, encode_log_Wo(&c2const, model.Wo, 5), 5);
 		model.L  = PI/model.Wo; /* if we quantise Wo re-compute L */
 	    }
 
@@ -780,7 +782,7 @@ int main(int argc, char *argv[])
 
 		/* JVM's experimental joint Wo & LPC energy quantiser */
 
-		quantise_WoE(&model, &e, Woe_);
+		quantise_WoE(&c2const, &model, &e, Woe_);
 	    }
 
 	}
@@ -828,7 +830,7 @@ int main(int argc, char *argv[])
             for(i=0, weight=weight_inc; i<decimate-1; i++, weight += weight_inc) {
                 //model_dec[i].voiced = model_dec[decimate-1].voiced;
                 interpolate_lsp_ver2(&lsps_dec[i][0], prev_lsps_dec, &lsps_dec[decimate-1][0], weight, order);
-                interp_Wo2(&model_dec[i], &prev_model_dec, &model_dec[decimate-1], weight);
+                interp_Wo2(&model_dec[i], &prev_model_dec, &model_dec[decimate-1], weight, c2const.Wo_min);
                 e_dec[i] = interp_energy2(prev_e_dec, e_dec[decimate-1],weight);
             }
 

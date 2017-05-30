@@ -305,7 +305,7 @@ float nlp(
 
     PROFILE_SAMPLE_AND_LOG(magsq, fft, "      mag sq");
     #ifdef DUMP
-    dump_sq(nlp->sq);
+    dump_sq(m, nlp->sq);
     dump_Fw(Fw);
     #endif
 

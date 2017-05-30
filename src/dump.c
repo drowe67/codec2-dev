@@ -140,7 +140,7 @@ void dump_off(){
 	fclose(fhephase);
 }
 
-void dump_Sn(float Sn[]) {
+void dump_Sn(int m_pitch, float Sn[]) {
     int i;
     char s[MAX_STR];
 
@@ -155,10 +155,10 @@ void dump_Sn(float Sn[]) {
     /* split across two lines to avoid max line length problems */
     /* reconstruct in Octave */
 
-    for(i=0; i<M_PITCH/2; i++)
+    for(i=0; i<m_pitch/2; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
     fprintf(fsn,"\n");
-    for(i=M_PITCH/2; i<M_PITCH; i++)
+    for(i=m_pitch/2; i<m_pitch; i++)
 	fprintf(fsn,"%f\t",Sn[i]);
     fprintf(fsn,"\n");
 }
@@ -585,7 +585,7 @@ void dump_e(float e_hz[]) {
     fprintf(fe,"\n");
 }
 
-void dump_sq(float sq[]) {
+void dump_sq(int m_pitch, float sq[]) {
     int i;
     char s[MAX_STR];
 
@@ -597,10 +597,10 @@ void dump_sq(float sq[]) {
 	assert(fsq != NULL);
     }
 
-    for(i=0; i<M_PITCH/2; i++)
+    for(i=0; i<m_pitch/2; i++)
 	fprintf(fsq,"%f\t",sq[i]);
     fprintf(fsq,"\n");
-    for(i=M_PITCH/2; i<M_PITCH; i++)
+    for(i=m_pitch/2; i<m_pitch; i++)
 	fprintf(fsq,"%f\t",sq[i]);
     fprintf(fsq,"\n");
 }
@@ -650,6 +650,7 @@ void dump_E(float E) {
     fprintf(fE,"%f\n", 10.0*log10(E));
 }
 
+#if 0
 void dump_Rk(float Rk[]) {
     int i;
     char s[MAX_STR];
@@ -666,5 +667,6 @@ void dump_Rk(float Rk[]) {
 	fprintf(frk,"%f\t",Rk[i]);
     fprintf(frk,"\n");
 }
+#endif
 
 #endif

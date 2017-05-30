@@ -36,12 +36,11 @@
 
 /* General defines */
 
-#define MAX_AMP    80		/* maximum number of harmonics          */
+#define MAX_AMP    160		/* maximum number of harmonics          */
 #ifndef PI
 #define PI         3.141592654	/* mathematical constant                */
 #endif
 #define TWO_PI     6.283185307	/* mathematical constant                */
-#define FS         8000		/* sample rate in Hz                    */
 #define MAX_STR    256          /* maximum string size                  */
 
 #define NW         279          /* analysis window size                 */
@@ -54,9 +53,9 @@
 
 /* Pitch estimation defines */
 
-#define M_PITCH        320		/* pitch analysis frame size            */
-#define P_MIN    20		/* minimum pitch                        */
-#define P_MAX    160		/* maximum pitch                        */
+#define M_PITCH_S  0.0400       /* pitch analysis window in s           */
+#define P_MIN_S    0.0025	/* minimum pitch period in s            */
+#define P_MAX_S    0.0200	/* maximum pitch period in s            */
 
 /*---------------------------------------------------------------------------*\
 
@@ -65,8 +64,14 @@
 \*---------------------------------------------------------------------------*/
 
 typedef struct {
-    int  Fs;
-    int  n_samp;
+    int   Fs;            /* sample rate of this instance             */
+    int   n_samp;        /* number of samples per 10ms frame at Fs   */
+    int   max_amp;       /* maximum number of harmonics              */
+    int   m_pitch;       /* pitch estimation window size in samples  */
+    int   p_min;         /* minimum pitch period in samples          */
+    int   p_max;         /* maximum pitch period in samples          */
+    float Wo_min;        
+    float Wo_max;        
 } C2CONST;
 
 /* Structure to hold model parameters for one frame */

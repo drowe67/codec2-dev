@@ -62,6 +62,17 @@ C2CONST c2const_create(int Fs) {
     assert((Fs == 8000) || (Fs = 16000));
     c2const.Fs = Fs;
     c2const.n_samp = Fs*0.01;
+    c2const.max_amp = floor(Fs*P_MIN_S/2);
+    c2const.p_min = floor(Fs*P_MIN_S);
+    c2const.p_max = floor(Fs*P_MAX_S);
+    c2const.m_pitch = floor(Fs*M_PITCH_S);
+    c2const.Wo_min = TWO_PI/c2const.p_max;
+    c2const.Wo_max = TWO_PI/c2const.p_min;
+
+    fprintf(stderr, "max_amp: %d m_pitch: %d\n", c2const.n_samp, c2const.m_pitch);
+    fprintf(stderr, "p_min: %d p_max: %d\n", c2const.p_min, c2const.p_max);
+    fprintf(stderr, "Wo_min: %f Wo_max: %f\n", c2const.Wo_min, c2const.Wo_max);
+
     return c2const;
 }
 
@@ -81,6 +92,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
   COMP  wshift[FFT_ENC];
   COMP  temp;
   int   i,j;
+  int   m_pitch = c2const->m_pitch;
 
   /*
      Generate Hamming window centered on M-sample pitch analysis window
@@ -94,20 +106,20 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
   */
 
   m = 0.0;
-  for(i=0; i<M_PITCH/2-NW/2; i++)
+  for(i=0; i<m_pitch/2-NW/2; i++)
     w[i] = 0.0;
-  for(i=M_PITCH/2-NW/2,j=0; i<M_PITCH/2+NW/2; i++,j++) {
+  for(i=m_pitch/2-NW/2,j=0; i<m_pitch/2+NW/2; i++,j++) {
     w[i] = 0.5 - 0.5*cosf(TWO_PI*j/(NW-1));
     m += w[i]*w[i];
   }
-  for(i=M_PITCH/2+NW/2; i<M_PITCH; i++)
+  for(i=m_pitch/2+NW/2; i<m_pitch; i++)
     w[i] = 0.0;
 
   /* Normalise - makes freq domain amplitude estimation straight
      forward */
 
   m = 1.0/sqrtf(m*FFT_ENC);
-  for(i=0; i<M_PITCH; i++) {
+  for(i=0; i<m_pitch; i++) {
     w[i] *= m;
   }
 
@@ -137,8 +149,8 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
     wshift[i].imag = 0.0;
   }
   for(i=0; i<NW/2; i++)
-    wshift[i].real = w[i+M_PITCH/2];
-  for(i=FFT_ENC-NW/2,j=M_PITCH/2-NW/2; i<FFT_ENC; i++,j++)
+    wshift[i].real = w[i+m_pitch/2];
+  for(i=FFT_ENC-NW/2,j=m_pitch/2-NW/2; i<FFT_ENC; i++,j++)
    wshift[i].real = w[j];
 
   codec2_fft(fft_fwd_cfg, wshift, W);
@@ -211,28 +223,30 @@ float hpf(float x, float states[])
 // TODO: we can either go for a faster FFT using fftr and some stack usage
 // or we can reduce stack usage to almost zero on STM32 by switching to fft_inplace
 #if 1
-void dft_speech(codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[])
+void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float Sn[], float w[])
 {
     int  i;
-  for(i=0; i<FFT_ENC; i++) {
-    Sw[i].real = 0.0;
-    Sw[i].imag = 0.0;
-  }
+    int  m_pitch = c2const->m_pitch;
 
-  /* Centre analysis window on time axis, we need to arrange input
-     to FFT this way to make FFT phases correct */
+    for(i=0; i<FFT_ENC; i++) {
+        Sw[i].real = 0.0;
+        Sw[i].imag = 0.0;
+    }
 
-  /* move 2nd half to start of FFT input vector */
+    /* Centre analysis window on time axis, we need to arrange input
+       to FFT this way to make FFT phases correct */
 
-  for(i=0; i<NW/2; i++)
-    Sw[i].real = Sn[i+M_PITCH/2]*w[i+M_PITCH/2];
+    /* move 2nd half to start of FFT input vector */
 
-  /* move 1st half to end of FFT input vector */
+    for(i=0; i<NW/2; i++)
+        Sw[i].real = Sn[i+m_pitch/2]*w[i+m_pitch/2];
 
-  for(i=0; i<NW/2; i++)
-    Sw[FFT_ENC-NW/2+i].real = Sn[i+M_PITCH/2-NW/2]*w[i+M_PITCH/2-NW/2];
+    /* move 1st half to end of FFT input vector */
 
-  codec2_fft_inplace(fft_fwd_cfg, Sw);
+    for(i=0; i<NW/2; i++)
+        Sw[FFT_ENC-NW/2+i].real = Sn[i+m_pitch/2-NW/2]*w[i+m_pitch/2-NW/2];
+
+    codec2_fft_inplace(fft_fwd_cfg, Sw);
 }
 #else
 void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
@@ -250,12 +264,12 @@ void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
   /* move 2nd half to start of FFT input vector */
 
   for(i=0; i<NW/2; i++)
-    sw[i] = Sn[i+M_PITCH/2]*w[i+M_PITCH/2];
+    sw[i] = Sn[i+m_pitch/2]*w[i+m_pitch/2];
 
   /* move 1st half to end of FFT input vector */
 
   for(i=0; i<NW/2; i++)
-    sw[FFT_ENC-NW/2+i] = Sn[i+M_PITCH/2-NW/2]*w[i+M_PITCH/2-NW/2];
+    sw[FFT_ENC-NW/2+i] = Sn[i+m_pitch/2-NW/2]*w[i+m_pitch/2-NW/2];
 
   codec2_fftr(fftr_fwd_cfg, sw, Sw);
 }
@@ -273,7 +287,7 @@ void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
 
 \*---------------------------------------------------------------------------*/
 
-void two_stage_pitch_refinement(MODEL *model, COMP Sw[])
+void two_stage_pitch_refinement(C2CONST *c2const, MODEL *model, COMP Sw[])
 {
   float pmin,pmax,pstep;	/* pitch refinment minimum, maximum and step */
 
@@ -293,10 +307,10 @@ void two_stage_pitch_refinement(MODEL *model, COMP Sw[])
 
   /* Limit range */
 
-  if (model->Wo < TWO_PI/P_MAX)
-    model->Wo = TWO_PI/P_MAX;
-  if (model->Wo > TWO_PI/P_MIN)
-    model->Wo = TWO_PI/P_MIN;
+  if (model->Wo < TWO_PI/c2const->p_max)
+    model->Wo = TWO_PI/c2const->p_max;
+  if (model->Wo > TWO_PI/c2const->p_min)
+    model->Wo = TWO_PI/c2const->p_min;
 
   model->L = floorf(PI/model->Wo);
 }
@@ -423,10 +437,11 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[], int est_phase)
 \*---------------------------------------------------------------------------*/
 
 float est_voicing_mbe(
-    MODEL *model,
-    COMP   Sw[],
-    COMP   W[]
-    )          /* DFT of error                          */
+                      C2CONST *c2const,
+                      MODEL *model,
+                      COMP   Sw[],
+                      COMP   W[]
+                      )
 {
     int   l,al,bl,m;    /* loop variables */
     COMP  Am;             /* amplitude sample for this band */
@@ -525,7 +540,7 @@ float est_voicing_mbe(
 	   These errors are much more common than people with 50Hz3
 	   pitch, so we have just a small eratio threshold. */
 
-	sixty = 60.0*TWO_PI/FS;
+	sixty = 60.0*TWO_PI/c2const->Fs;
 	if ((eratio < -4.0) && (model->Wo <= sixty))
 	    model->voiced = 0;
     }
