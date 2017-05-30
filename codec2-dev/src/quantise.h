@@ -60,12 +60,14 @@ void aks_to_M2(codec2_fftr_cfg fftr_fwd_cfg, float ak[], int order, MODEL *model
 	       float E, float *snr, int dump, int sim_pf,
                int pf, int bass_boost, float beta, float gamma, COMP Aw[]);
 
-int   encode_Wo(float Wo, int bits);
-float decode_Wo(int index, int bits);
-int   encode_log_Wo(float Wo, int bits);
-float decode_log_Wo(int index, int bits);
-int   encode_Wo_dt(float Wo, float prev_Wo);
-float decode_Wo_dt(int index, float prev_Wo);
+int   encode_Wo(C2CONST *c2const, float Wo, int bits);
+float decode_Wo(C2CONST *c2const, int index, int bits);
+int   encode_log_Wo(C2CONST *c2const, float Wo, int bits);
+float decode_log_Wo(C2CONST *c2const, int index, int bits);
+#if 0
+int   encode_Wo_dt(C2CONST *c2const, float Wo, float prev_Wo);
+float decode_Wo_dt(C2CONST *c2const, int index, float prev_Wo);
+#endif
 void  encode_lsps_scalar(int indexes[], float lsp[], int order);
 void  decode_lsps_scalar(float lsp[], int indexes[], int order);
 void  encode_lspds_scalar(int indexes[], float lsp[], int order);
@@ -98,9 +100,9 @@ void lspmelvq_decode(int *indexes, float *xq, int ndim);
 void encode_mels_scalar(int mel_indexes[], float mels[], int order);
 void decode_mels_scalar(float mels[], int mel_indexes[], int order);
 
-void quantise_WoE(MODEL *model, float *e, float xq[]);
+void quantise_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[]);
 int  encode_WoE(MODEL *model, float e, float xq[]);
-void decode_WoE(MODEL *model, float *e, float xq[], int n1);
+void decode_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[], int n1);
 
 int encode_energy(float e, int bits);
 float decode_energy(int index, int bits);
@@ -122,7 +124,8 @@ float speech_to_uq_lsps(float lsp[],
 			float ak[],
 		        float Sn[],
 		        float w[],
-		        int   order
+		        int m_pitch,
+                        int   order
 			);
 int check_lsp_order(float lsp[], int lpc_order);
 void bw_expand_lsps(float lsp[], int order, float min_sep_low, float min_sep_high);

@@ -34,15 +34,17 @@
 
 struct CODEC2 {
     int           mode;
+    C2CONST       c2const;
     int           Fs;
     int           n_samp;
+    int           m_pitch;
     codec2_fft_cfg  fft_fwd_cfg;           /* forward FFT config                        */
     codec2_fftr_cfg fftr_fwd_cfg;          /* forward real FFT config                   */
-    float         w[M_PITCH];	           /* time domain hamming window                */
+    float        *w;	                   /* [m_pitch] time domain hamming window      */
     COMP          W[FFT_ENC];	           /* DFT of w[]                                */
     float        *Pn;	                   /* [2*n_samp] trapezoidal synthesis window   */
     float        *bpf_buf;                 /* buffer for band pass filter               */
-    float         Sn[M_PITCH];             /* input speech                              */
+    float        *Sn;                      /* [m_pitch] input speech                    */
     float         hpf_states[2];           /* high pass filter states                   */
     void         *nlp;                     /* pitch predictor states                    */
     int           gray;                    /* non-zero for gray encoding                */

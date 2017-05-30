@@ -52,7 +52,7 @@
 \*---------------------------------------------------------------------------*/
 
 float speech_to_uq_lsps(float lsp[], float ak[], float Sn[], float w[],
-			int order);
+			int m_pitch, int order);
 
 /*---------------------------------------------------------------------------*\
 
@@ -984,11 +984,11 @@ void aks_to_M2(
 
 \*---------------------------------------------------------------------------*/
 
-int encode_Wo(float Wo, int bits)
+int encode_Wo(C2CONST *c2const, float Wo, int bits)
 {
     int   index, Wo_levels = 1<<bits;
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float norm;
 
     norm = (Wo - Wo_min)/(Wo_max - Wo_min);
@@ -1009,10 +1009,10 @@ int encode_Wo(float Wo, int bits)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_Wo(int index, int bits)
+float decode_Wo(C2CONST *c2const, int index, int bits)
 {
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float step;
     float Wo;
     int   Wo_levels = 1<<bits;
@@ -1033,11 +1033,11 @@ float decode_Wo(int index, int bits)
 
 \*---------------------------------------------------------------------------*/
 
-int encode_log_Wo(float Wo, int bits)
+int encode_log_Wo(C2CONST *c2const, float Wo, int bits)
 {
     int   index, Wo_levels = 1<<bits;
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float norm;
 
     norm = (log10f(Wo) - log10f(Wo_min))/(log10f(Wo_max) - log10f(Wo_min));
@@ -1058,10 +1058,10 @@ int encode_log_Wo(float Wo, int bits)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_log_Wo(int index, int bits)
+float decode_log_Wo(C2CONST *c2const, int index, int bits)
 {
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float step;
     float Wo;
     int   Wo_levels = 1<<bits;
@@ -1072,6 +1072,7 @@ float decode_log_Wo(int index, int bits)
     return powf(10,Wo);
 }
 
+#if 0
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: encode_Wo_dt()
@@ -1082,11 +1083,11 @@ float decode_log_Wo(int index, int bits)
 
 \*---------------------------------------------------------------------------*/
 
-int encode_Wo_dt(float Wo, float prev_Wo)
+int encode_Wo_dt(C2CONST *c2const, float Wo, float prev_Wo)
 {
     int   index, mask, max_index, min_index;
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float norm;
 
     norm = (Wo - prev_Wo)/(Wo_max - Wo_min);
@@ -1121,10 +1122,10 @@ int encode_Wo_dt(float Wo, float prev_Wo)
 
 \*---------------------------------------------------------------------------*/
 
-float decode_Wo_dt(int index, float prev_Wo)
+float decode_Wo_dt(C2CONST *c2const, int index, float prev_Wo)
 {
-    float Wo_min = TWO_PI/P_MAX;
-    float Wo_max = TWO_PI/P_MIN;
+    float Wo_min = c2const->Wo_min;
+    float Wo_max = c2const->Wo_max;
     float step;
     float Wo;
     int   mask;
@@ -1149,6 +1150,7 @@ float decode_Wo_dt(int index, float prev_Wo)
 
     return Wo;
 }
+#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -1166,16 +1168,17 @@ float speech_to_uq_lsps(float lsp[],
 			float ak[],
 		        float Sn[],
 		        float w[],
-		        int   order
+		        int m_pitch,
+                        int   order
 )
 {
     int   i, roots;
-    float Wn[M_PITCH];
+    float Wn[m_pitch];
     float R[order+1];
     float e, E;
 
     e = 0.0;
-    for(i=0; i<M_PITCH; i++) {
+    for(i=0; i<m_pitch; i++) {
 	Wn[i] = Sn[i]*w[i];
 	e += Wn[i]*Wn[i];
     }
@@ -1188,7 +1191,7 @@ float speech_to_uq_lsps(float lsp[],
 	return 0.0;
     }
 
-    autocorrelate(Wn, R, M_PITCH, order);
+    autocorrelate(Wn, R, m_pitch, order);
     levinson_durbin(R, ak, order);
 
     E = 0.0;
@@ -1917,7 +1920,7 @@ void compute_weights2(const float *x, const float *xp, float *w)
 
 \*---------------------------------------------------------------------------*/
 
-void quantise_WoE(MODEL *model, float *e, float xq[])
+void quantise_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[])
 {
   int          i, n1;
   float        x[2];
@@ -1926,8 +1929,13 @@ void quantise_WoE(MODEL *model, float *e, float xq[])
   const float *codebook1 = ge_cb[0].cb;
   int          nb_entries = ge_cb[0].m;
   int          ndim = ge_cb[0].k;
-  float Wo_min = TWO_PI/P_MAX;
-  float Wo_max = TWO_PI/P_MIN;
+  float Wo_min = c2const->Wo_min;
+  float Wo_max = c2const->Wo_max;
+  float Fs = c2const->Fs;
+
+  /* VQ is only trained for Fs = 8000 Hz */
+
+  assert(Fs == 8000);
 
   x[0] = log10f((model->Wo/PI)*4000.0/50.0)/log10f(2);
   x[1] = 10.0*log10f(1e-4 + *e);
@@ -2018,13 +2026,13 @@ int encode_WoE(MODEL *model, float e, float xq[])
 
 \*---------------------------------------------------------------------------*/
 
-void decode_WoE(MODEL *model, float *e, float xq[], int n1)
+void decode_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[], int n1)
 {
   int          i;
   const float *codebook1 = ge_cb[0].cb;
   int          ndim = ge_cb[0].k;
-  float Wo_min = TWO_PI/P_MAX;
-  float Wo_max = TWO_PI/P_MIN;
+  float Wo_min = c2const->Wo_min;
+  float Wo_max = c2const->Wo_max;
 
   for (i=0;i<ndim;i++)
   {

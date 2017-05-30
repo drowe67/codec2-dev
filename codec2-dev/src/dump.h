@@ -34,7 +34,7 @@
 void dump_on(char filename_prefix[]);
 void dump_off();
 
-void dump_Sn(float Sn[]);
+void dump_Sn(int m_pitch, float Sn[]);
 void dump_Sw(COMP Sw[]);
 void dump_Sw_(COMP Sw_[]);
 void dump_Ew(COMP Ew[]);
@@ -66,11 +66,13 @@ void dump_hephase(int ind[], int dim);
 
 /* NLP states */
 
-void dump_sq(float sq[]);
+void dump_sq(int m_pitch, float sq[]);
 void dump_dec(COMP Fw[]);
 void dump_Fw(COMP Fw[]);
 void dump_e(float e_hz[]);
+#if 0
 void dump_Rk(float Rk[]);
+#endif
 
 /* post filter */
 
