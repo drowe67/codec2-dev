@@ -158,6 +158,7 @@ void sample_phase(MODEL *model,
 \*---------------------------------------------------------------------------*/
 
 void phase_synth_zero_order(
+    int    n_samp,
     MODEL *model,
     float *ex_phase,            /* excitation phase of fundamental        */
     COMP   H[]                  /* L synthesis filter freq domain samples */
@@ -178,7 +179,7 @@ void phase_synth_zero_order(
        ex_phase[0] += (*prev_Wo+model->Wo)*N_SAMP/2;
     */
 
-    ex_phase[0] += (model->Wo)*N_SAMP;
+    ex_phase[0] += (model->Wo)*n_samp;
     ex_phase[0] -= TWO_PI*floorf(ex_phase[0]/TWO_PI + 0.5);
 
     for(m=1; m<=model->L; m++) {

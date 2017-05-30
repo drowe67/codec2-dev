@@ -51,9 +51,10 @@
 #include "bpf.h"
 #include "bpfb.h"
 
-void synth_one_frame(codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
+void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
+#define N_SAMP n_samp  /* quick fix for run time sample rate selection */
 
 /*---------------------------------------------------------------------------*\
 
@@ -63,6 +64,8 @@ void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 int main(int argc, char *argv[])
 {
+    C2CONST c2const = c2const_create(8000);
+    int   n_samp = c2const.n_samp;
     FILE *fout = NULL;	/* output speech file                    */
     FILE *fin;		/* input speech file                     */
     short buf[N_SAMP];	/* input/output buffer                   */
@@ -135,8 +138,10 @@ int main(int argc, char *argv[])
     #ifdef DUMP
     int   dump;
     #endif
+    #if 0
     struct PEXP *pexp = NULL;
     struct AEXP *aexp = NULL;
+    #endif
     float gain = 1.0;
     int   bpf_en = 0;
     int   bpfb_en = 0;
@@ -410,13 +415,17 @@ int main(int argc, char *argv[])
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
     fftr_fwd_cfg = codec2_fftr_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
     fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
-    make_analysis_window(fft_fwd_cfg, w, W);
-    make_synthesis_window(Pn);
+    make_analysis_window(&c2const, fft_fwd_cfg, w, W);
+    make_synthesis_window(&c2const, Pn);
     quantise_init();
+
+    /* disabled for now while we convert to runtime n_samp */
+    #if 0
     if (phaseexp)
 	pexp = phase_experiment_create();
     if (ampexp)
 	aexp = amp_experiment_create();
+    #endif
 
     if (bpfb_en)
         bpf_en = 1;
@@ -500,6 +509,7 @@ int main(int argc, char *argv[])
 	dump_Sn(Sn); dump_Sw(Sw); dump_model(&model);
         #endif
 
+        #if 0
 	if (ampexp)
 	    amp_experiment(aexp, &model, ampexp_arg);
 
@@ -512,6 +522,7 @@ int main(int argc, char *argv[])
 	    dump_phase_(&model.phi[0], model.L);
             #endif
 	}
+        #endif
 
 	if (hi) {
 	    int m;
@@ -853,11 +864,11 @@ int main(int argc, char *argv[])
                     } else {
                         sample_phase(&model_dec[i], H, Aw);
                     }
-                    phase_synth_zero_order(&model_dec[i], ex_phase, H);
+                    phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
-                synth_one_frame(fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
+                synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
                 if (fout != NULL) fwrite(buf,sizeof(short),N_SAMP,fout);
             }
 
@@ -888,10 +899,12 @@ int main(int argc, char *argv[])
             fprintf(stderr, "lspmelvq std = %3.1f Hz\n", sqrt(lspmelvq_mse/frames));
     }
 
+    #if 0
     if (phaseexp)
 	phase_experiment_destroy(pexp);
     if (ampexp)
 	amp_experiment_destroy(aexp);
+    #endif
     #ifdef DUMP
     if (dump)
 	dump_off();
@@ -905,16 +918,16 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void synth_one_frame(codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[],
+void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[],
                      float Pn[], int prede, float *de_mem, float gain)
 {
     int     i;
 
-    synthesise(fftr_inv_cfg, Sn_, model, Pn, 1);
+    synthesise(n_samp, fftr_inv_cfg, Sn_, model, Pn, 1);
     if (prede)
-        de_emp(Sn_, Sn_, de_mem, N_SAMP);
+        de_emp(Sn_, Sn_, de_mem, n_samp);
 
-    for(i=0; i<N_SAMP; i++) {
+    for(i=0; i<n_samp; i++) {
 	Sn_[i] *= gain;
 	if (Sn_[i] > 32767.0)
 	    buf[i] = 32767;

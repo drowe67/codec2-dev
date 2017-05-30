@@ -36,7 +36,6 @@
 
 /* General defines */
 
-#define N_SAMP          80		/* number of samples per frame          */
 #define MAX_AMP    80		/* maximum number of harmonics          */
 #ifndef PI
 #define PI         3.141592654	/* mathematical constant                */
@@ -64,6 +63,11 @@
 				TYPEDEFS
 
 \*---------------------------------------------------------------------------*/
+
+typedef struct {
+    int  Fs;
+    int  n_samp;
+} C2CONST;
 
 /* Structure to hold model parameters for one frame */
 
