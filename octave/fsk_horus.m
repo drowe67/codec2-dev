@@ -36,7 +36,7 @@
 1;
 
 function states = fsk_horus_init(Fs,Rs,M=2)
-  assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
+  %assert((M==2) || (M==4), "Only M=2 and M=4 FSK supported");
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
@@ -211,14 +211,19 @@ function tx  = fsk_horus_mod(states, tx_bits)
 
     for i=1:states.bitspersymbol:num_bits
 
-      % map bits to tone number
+      % map bits to FSK symbol (tone number)
 
+      K = states.bitspersymbol;
+      tone = tx_bits(i:i+(K-1)) * (2.^(K-1:-1:0))' + 1;
+      
+      #{
       if M == 2
         tone = tx_bits(i) + 1;
       else
         tone = (tx_bits(i:i+1) * [2 1]') + 1;
       end
- 
+      #}
+
       tx_phase_vec = tx_phase + (1:Ts)*2*pi*ftx(tone)/Fs;
       tx_phase = tx_phase_vec(Ts) - floor(tx_phase_vec(Ts)/(2*pi))*2*pi;
       if states.tx_real
@@ -439,6 +444,15 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
     %rx_bits(i) = abs(f_int_resample(2,i)) > abs(f_int_resample(1,i));
     %rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
     [tone_max(i) tone_index] = max(f_int_resample(:,i));
+
+    st = (i-1)*states.bitspersymbol + 1
+    en = st + states.bitspersymbol-1
+    %print("st: %d en: %d i: %d\n", st, en, i);
+    tone_index - 1
+    arx_bits = dec2bin(tone_index - 1, states.bitspersymbol) - '0'
+    rx_bits(st:en) = arx_bits;
+
+    #{
     if M == 2
       rx_bits(i) = tone_index - 1;
       rx_bits_sd(i) = abs(f_int_resample(2,i)) - abs(f_int_resample(2,i));
@@ -446,6 +460,7 @@ function [rx_bits states] = fsk_horus_demod(states, sf)
       demap = [[0 0]; [0 1]; [1 0]; [1 1]];      
       rx_bits(2*i-1:2*i) = demap(tone_index,:);
     end
+    #}
 
   end
 
@@ -741,7 +756,7 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 endfunction
 
 
-% Alternative stateless BER counter that works on packets that may have gaps betwene them
+% Alternative stateless BER counter that works on packets that may have gaps between them
 
 function states = ber_counter_packet(states, test_frame, rx_bits_buf)
   ntestframebits = states.ntestframebits;
@@ -783,9 +798,9 @@ endfunction
 % 5                   Horus Binary
 % 6                   Horus High Speed: A 8x oversampled modem, e.g. Fs=9600, Rs=1200
 %                     which is the same as Fs=921600 Rs=115200
-%                     Uses packed based BER counter
+%                     Uses packet based BER counter
 
-function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
+function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -805,7 +820,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
   if test_frame_mode < 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 50, 4);
+    states = fsk_horus_init(8000, 8, M);
     %states = fsk_horus_init_hbr(8000, 10, 400, 4); % EME
   end
 
@@ -829,12 +844,15 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
 
   % Tones must be at least Rs apart for ideal non-coherent FSK
 
+  #{
   if states.M == 2
-    states.ftx = 1200 + [ 0 states.Rs ];
+    states.ftx = 1200 + [ 0 2*states.Rs ];
   else
-    states.ftx = 1200 + 2*states.Rs*(1:4)
+    states.ftx = 1200 + 2*states.Rs*(1:4);
     %states.ftx = 200 + states.Rs*(1:4); % EME
   end
+  #}
+  states.ftx = 900 + 2*states.Rs*(1:states.M);
 
   % ----------------------------------------------------------------------
 
@@ -964,6 +982,7 @@ function run_sim(test_frame_mode, frames = 10, EbNodB = 100)
       % demodulate to stream of bits
 
       states = est_freq(states, sf, states.M);
+      states.f = 900 + 2*states.Rs*(1:states.M);
       %states.f = [1200 1400 1600 1800];
       [rx_bits states] = fsk_horus_demod(states, sf);
 
@@ -1253,7 +1272,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(1, 100, 6);
+  run_sim(1, 16, 100, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
@@ -1270,5 +1289,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
-  rx_bits = demod_file("~/Desktop/bench_test_002.wav",7);
+  %rx_bits = demod_file("~/Desktop/bench_test_003.wav",7);
 end
