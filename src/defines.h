@@ -36,6 +36,8 @@
 
 /* General defines */
 
+#define N_S        0.010        /* buffer size in s                     */
+#define TW_S       0.005        /* trapezoidal synth window overlap     */
 #define MAX_AMP    160		/* maximum number of harmonics          */
 #ifndef PI
 #define PI         3.141592654	/* mathematical constant                */
@@ -43,10 +45,8 @@
 #define TWO_PI     6.283185307	/* mathematical constant                */
 #define MAX_STR    256          /* maximum string size                  */
 
-#define NW         279          /* analysis window size                 */
 #define FFT_ENC    512		/* size of FFT used for encoder         */
 #define FFT_DEC    512	    	/* size of FFT used in decoder          */
-#define TW         40		/* Trapezoidal synthesis window overlap */
 #define V_THRESH   6.0          /* voicing threshold in dB              */
 #define LPC_ORD    10		/* LPC order                            */
 #define LPC_ORD_LOW 6		/* LPC order for lower rates            */
@@ -63,6 +63,8 @@
 
 \*---------------------------------------------------------------------------*/
 
+/* Structure to hold constants calculated at run time based on sample rate */
+
 typedef struct {
     int   Fs;            /* sample rate of this instance             */
     int   n_samp;        /* number of samples per 10ms frame at Fs   */
@@ -71,17 +73,19 @@ typedef struct {
     int   p_min;         /* minimum pitch period in samples          */
     int   p_max;         /* maximum pitch period in samples          */
     float Wo_min;        
-    float Wo_max;        
+    float Wo_max;  
+    int   nw;            /* analysis window size in samples          */      
+    int   tw;            /* trapezoidal synthesis window overlap     */
 } C2CONST;
 
 /* Structure to hold model parameters for one frame */
 
 typedef struct {
-  float Wo;		/* fundamental frequency estimate in radians  */
-  int   L;		/* number of harmonics                        */
-  float A[MAX_AMP+1];	/* amplitiude of each harmonic                */
-  float phi[MAX_AMP+1];	/* phase of each harmonic                     */
-  int   voiced;	        /* non-zero if this frame is voiced           */
+    float Wo;		  /* fundamental frequency estimate in radians  */
+    int   L;		  /* number of harmonics                        */
+    float A[MAX_AMP+1];	  /* amplitiude of each harmonic                */
+    float phi[MAX_AMP+1]; /* phase of each harmonic                     */
+    int   voiced;	  /* non-zero if this frame is voiced           */
 } MODEL;
 
 /* describes each codebook  */

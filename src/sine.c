@@ -61,13 +61,21 @@ C2CONST c2const_create(int Fs) {
 
     assert((Fs == 8000) || (Fs = 16000));
     c2const.Fs = Fs;
-    c2const.n_samp = Fs*0.01;
+    c2const.n_samp = Fs*N_S;
     c2const.max_amp = floor(Fs*P_MIN_S/2);
     c2const.p_min = floor(Fs*P_MIN_S);
     c2const.p_max = floor(Fs*P_MAX_S);
     c2const.m_pitch = floor(Fs*M_PITCH_S);
     c2const.Wo_min = TWO_PI/c2const.p_max;
     c2const.Wo_max = TWO_PI/c2const.p_min;
+
+    if (Fs == 8000) {
+        c2const.nw = 279;
+    } else {
+        c2const.nw = 511;  /* actually a bit shorter in time but lets us maintain constant FFT size */
+    }
+
+    c2const.tw = Fs*TW_S;
 
     fprintf(stderr, "max_amp: %d m_pitch: %d\n", c2const.n_samp, c2const.m_pitch);
     fprintf(stderr, "p_min: %d p_max: %d\n", c2const.p_min, c2const.p_max);
@@ -93,6 +101,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
   COMP  temp;
   int   i,j;
   int   m_pitch = c2const->m_pitch;
+  int   nw      = c2const->nw;
 
   /*
      Generate Hamming window centered on M-sample pitch analysis window
@@ -100,19 +109,19 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
   0            M/2           M-1
   |-------------|-------------|
         |-------|-------|
-            NW samples
+            nw samples
 
      All our analysis/synthsis is centred on the M/2 sample.
   */
 
   m = 0.0;
-  for(i=0; i<m_pitch/2-NW/2; i++)
+  for(i=0; i<m_pitch/2-nw/2; i++)
     w[i] = 0.0;
-  for(i=m_pitch/2-NW/2,j=0; i<m_pitch/2+NW/2; i++,j++) {
-    w[i] = 0.5 - 0.5*cosf(TWO_PI*j/(NW-1));
+  for(i=m_pitch/2-nw/2,j=0; i<m_pitch/2+nw/2; i++,j++) {
+    w[i] = 0.5 - 0.5*cosf(TWO_PI*j/(nw-1));
     m += w[i]*w[i];
   }
-  for(i=m_pitch/2+NW/2; i<m_pitch; i++)
+  for(i=m_pitch/2+nw/2; i<m_pitch; i++)
     w[i] = 0.0;
 
   /* Normalise - makes freq domain amplitude estimation straight
@@ -127,7 +136,7 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
      Generate DFT of analysis window, used for later processing.  Note
      we modulo FFT_ENC shift the time domain window w[], this makes the
      imaginary part of the DFT W[] equal to zero as the shifted w[] is
-     even about the n=0 time axis if NW is odd.  Having the imag part
+     even about the n=0 time axis if nw is odd.  Having the imag part
      of the DFT W[] makes computation easier.
 
      0                      FFT_ENC-1
@@ -141,16 +150,16 @@ void make_analysis_window(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, float w[
                -------
 
      |---------|     |---------|
-       NW/2              NW/2
+       nw/2              nw/2
   */
 
   for(i=0; i<FFT_ENC; i++) {
     wshift[i].real = 0.0;
     wshift[i].imag = 0.0;
   }
-  for(i=0; i<NW/2; i++)
+  for(i=0; i<nw/2; i++)
     wshift[i].real = w[i+m_pitch/2];
-  for(i=FFT_ENC-NW/2,j=m_pitch/2-NW/2; i<FFT_ENC; i++,j++)
+  for(i=FFT_ENC-nw/2,j=m_pitch/2-nw/2; i<FFT_ENC; i++,j++)
    wshift[i].real = w[j];
 
   codec2_fft(fft_fwd_cfg, wshift, W);
@@ -227,6 +236,7 @@ void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float S
 {
     int  i;
     int  m_pitch = c2const->m_pitch;
+    int   nw      = c2const->nw;
 
     for(i=0; i<FFT_ENC; i++) {
         Sw[i].real = 0.0;
@@ -238,13 +248,13 @@ void dft_speech(C2CONST *c2const, codec2_fft_cfg fft_fwd_cfg, COMP Sw[], float S
 
     /* move 2nd half to start of FFT input vector */
 
-    for(i=0; i<NW/2; i++)
+    for(i=0; i<nw/2; i++)
         Sw[i].real = Sn[i+m_pitch/2]*w[i+m_pitch/2];
 
     /* move 1st half to end of FFT input vector */
 
-    for(i=0; i<NW/2; i++)
-        Sw[FFT_ENC-NW/2+i].real = Sn[i+m_pitch/2-NW/2]*w[i+m_pitch/2-NW/2];
+    for(i=0; i<nw/2; i++)
+        Sw[FFT_ENC-nw/2+i].real = Sn[i+m_pitch/2-nw/2]*w[i+m_pitch/2-nw/2];
 
     codec2_fft_inplace(fft_fwd_cfg, Sw);
 }
@@ -263,13 +273,13 @@ void dft_speech(codec2_fftr_cfg fftr_fwd_cfg, COMP Sw[], float Sn[], float w[])
 
   /* move 2nd half to start of FFT input vector */
 
-  for(i=0; i<NW/2; i++)
+  for(i=0; i<nw/2; i++)
     sw[i] = Sn[i+m_pitch/2]*w[i+m_pitch/2];
 
   /* move 1st half to end of FFT input vector */
 
-  for(i=0; i<NW/2; i++)
-    sw[FFT_ENC-NW/2+i] = Sn[i+m_pitch/2-NW/2]*w[i+m_pitch/2-NW/2];
+  for(i=0; i<nw/2; i++)
+    sw[FFT_ENC-nw/2+i] = Sn[i+m_pitch/2-nw/2]*w[i+m_pitch/2-nw/2];
 
   codec2_fftr(fftr_fwd_cfg, sw, Sw);
 }
@@ -564,21 +574,22 @@ void make_synthesis_window(C2CONST *c2const, float Pn[])
   int   i;
   float win;
   int   n_samp = c2const->n_samp;
+  int   tw     = c2const->tw;
 
   /* Generate Parzen window in time domain */
 
   win = 0.0;
-  for(i=0; i<n_samp/2-TW; i++)
+  for(i=0; i<n_samp/2-tw; i++)
     Pn[i] = 0.0;
   win = 0.0;
-  for(i=n_samp/2-TW; i<n_samp/2+TW; win+=1.0/(2*TW), i++ )
+  for(i=n_samp/2-tw; i<n_samp/2+tw; win+=1.0/(2*tw), i++ )
     Pn[i] = win;
-  for(i=n_samp/2+TW; i<3*n_samp/2-TW; i++)
+  for(i=n_samp/2+tw; i<3*n_samp/2-tw; i++)
     Pn[i] = 1.0;
   win = 1.0;
-  for(i=3*n_samp/2-TW; i<3*n_samp/2+TW; win-=1.0/(2*TW), i++)
+  for(i=3*n_samp/2-tw; i<3*n_samp/2+tw; win-=1.0/(2*tw), i++)
     Pn[i] = win;
-  for(i=3*n_samp/2+TW; i<2*n_samp; i++)
+  for(i=3*n_samp/2+tw; i<2*n_samp; i++)
     Pn[i] = 0.0;
 }
 
