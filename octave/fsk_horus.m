@@ -298,8 +298,6 @@ function corr_log = extract_and_decode_binary_packets(states, rx_bits_log)
 endfunction
  
 
-% Alternative stateless BER counter that works on packets that may have gaps between them
-
 % simulation of tx and rx side, add noise, channel impairments ----------------------
 %
 % test_frame_mode     Description
@@ -332,7 +330,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
 
   if test_frame_mode < 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 8, M);
+    states = fsk_horus_init(8000, 50, M);
     %states = fsk_horus_init_hbr(8000, 10, 400, 4); % EME
   end
 
@@ -784,7 +782,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(1, 16, 100, 100);
+  run_sim(1, 2, 100, 9);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);

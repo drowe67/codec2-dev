@@ -19,25 +19,26 @@ function states = fsk_init(Fs, Rs, M=2)
   states.M = M;                    
   states.bitspersymbol = log2(M);
   states.Fs = Fs;
-  N = states.N = Fs;                  % processing buffer size, nice big window for timing est
-  %states.Ndft = 2.^ceil(log2(N));    % find nearest power of 2 for efficient FFT
-  states.Ndft = 1024;                 % find nearest power of 2 for efficient FFT
   states.Rs = Rs;
-  Ts = states.Ts = Fs/Rs;
+
+  states.nsym = 50;                               % need enough symbols for good timing and freq offset est
+  Ts = states.Ts = Fs/Rs;                         % number of samples per symbol
   assert(Ts == floor(Ts), "Fs/Rs must be an integer");
-  states.nsym = N/Ts;                 % number of symbols in one processing frame
+
+  N = states.N = Ts*states.nsym;                  % processing buffer size, nice big window for timing est
+  states.Ndft = min(1024, 2.^ceil(log2(N)));      % find nearest power of 2 for efficient FFT
   states.nbit = states.nsym*states.bitspersymbol; % number of bits per processing frame
 
-  Nmem = states.Nmem  = N+2*Ts;       % two symbol memory in down converted signals to allow for timing adj
+  Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
   states.Sf = zeros(states.Ndft/2,1); % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
-  states.P = 8;                       % oversample rate out of filter
+  states.P = 8;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
 
-  states.nin = N;                     % can be N +/- Ts/P samples to adjust for sample clock offsets
+  states.nin = N;                                 % can be N +/- Ts/P samples to adjust for sample clock offsets
   states.verbose = 0;
-  states.phi = zeros(1, M);           % keep down converter osc phase continuous
+  states.phi = zeros(1, M);                       % keep down converter osc phase continuous
 
   %printf("M: %d Fs: %d Rs: %d Ts: %d nsym: %d nbit: %d\n", states.M, states.Fs, states.Rs, states.Ts, states.nsym, states.nbit);
 
@@ -387,7 +388,7 @@ function [rx_bits states] = fsk_demod(states, sf)
   states.f_int_resample = f_int_resample;
   states.rx_bits_sd = rx_bits_sd;
 
-  % Eb/No estimation (todo: this needs some work, like calibrartion, low Eb/No perf)
+  % Eb/No estimation (todo: this needs some work, like calibration, low Eb/No perf)
 
   tone_max = abs(tone_max);
   states.EbNodB = -6 + 20*log10(1E-6+mean(tone_max)/(1E-6+std(tone_max)));
