@@ -378,7 +378,7 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
 
     for(m=1; m<=model->L; m++) {
         AmdB[m] = 20.0*log10(model->A[m]);
-        rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*4.0/M_PI;
+        rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*(c2const->Fs/2000.0)/M_PI;
     }
     
     for(i=0; i<Ns; i++) {

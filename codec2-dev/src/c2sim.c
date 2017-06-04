@@ -50,6 +50,7 @@
 #include "phaseexp.h"
 #include "bpf.h"
 #include "bpfb.h"
+#include "newamp1.h"
 
 void synth_one_frame(int n_samp, codec2_fftr_cfg fftr_inv_cfg, short buf[], MODEL *model, float Sn_[], float Pn[], int prede, float *de_mem, float gain);
 void print_help(const struct option *long_options, int num_opts, char* argv[]);
@@ -430,9 +431,12 @@ int main(int argc, char *argv[])
 
     /* Initialise ------------------------------------------------------------*/
 
-    fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
+    fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);   /* fwd FFT,used in several places   */
     fftr_fwd_cfg = codec2_fftr_alloc(FFT_ENC, 0, NULL, NULL); /* fwd FFT,used in several places   */
     fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL); /* inverse FFT, used just for synth */
+    codec2_fft_cfg phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
+    codec2_fft_cfg phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
+
     make_analysis_window(&c2const, fft_fwd_cfg, w, W);
     make_synthesis_window(&c2const, Pn);
     quantise_init();
@@ -880,7 +884,8 @@ int main(int argc, char *argv[])
                         int ret = fread(H, sizeof(COMP), MAX_AMP, fhm);
                         assert(ret == MAX_AMP);
                     } else {
-                        sample_phase(&model_dec[i], H, Aw);
+                         determine_phase(&c2const, H, &model_dec[i], NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
+                         //sample_phase(&model_dec[i], H, Aw);
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
