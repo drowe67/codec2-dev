@@ -31,6 +31,7 @@
 #include "codec2_fft.h"
 #undef PROFILE
 #include "machdep.h"
+#include "os.h"
 
 #include <assert.h>
 #include <math.h>
@@ -42,7 +43,7 @@
 
 \*---------------------------------------------------------------------------*/
 
-#define PMAX_M      600		/* maximum NLP analysis window size     */
+#define PMAX_M      320		/* maximum NLP analysis window size     */
 #define COEFF       0.95	/* notch filter parameter               */
 #define PE_FFT_SIZE 512		/* DFT size for pitch estimation        */
 #define DEC         5		/* decimation factor                    */
@@ -54,7 +55,11 @@
 #define NLP_NTAP 48	        /* Decimation LPF order */
 #undef  POST_PROCESS_MBE        /* choose post processor                */
 
-//#undef DUMP
+/* 8 to 16 kHz sample rate conversion */
+
+#define FDMDV_OS                 2                            /* oversampling rate                   */
+#define FDMDV_OS_TAPS_16K       48                            /* number of OS filter taps at 16kHz   */
+#define FDMDV_OS_TAPS_8K        (FDMDV_OS_TAPS_16K/FDMDV_OS)  /* number of OS filter taps at 8kHz    */
 
 /*---------------------------------------------------------------------------*\
 
@@ -116,12 +121,15 @@ const float nlp_fir[] = {
 };
 
 typedef struct {
+    int           Fs;                /* sample rate in Hz            */
     int           m;
     float         w[PMAX_M/DEC];     /* DFT window                   */
     float         sq[PMAX_M];	     /* squared speech samples       */
     float         mem_x,mem_y;       /* memory for notch filter      */
     float         mem_fir[NLP_NTAP]; /* decimation FIR filter memory */
-    codec2_fft_cfg  fft_cfg;           /* kiss FFT config              */
+    codec2_fft_cfg  fft_cfg;         /* kiss FFT config              */
+    float        *Sn16k;	     /* Fs=16kHz input speech vector */
+    FILE         *f;
 } NLP;
 
 #ifdef POST_PROCESS_MBE
@@ -130,7 +138,8 @@ float post_process_mbe(COMP Fw[], int pmin, int pmax, float gmax, COMP Sw[], COM
 #endif
 float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
-				 float *prev_Wo);
+				 float *prev_f0);
+static void fdmdv_16_to_8(float out8k[], float in16k[], int n);
 
 /*---------------------------------------------------------------------------*\
 
@@ -140,20 +149,41 @@ float post_process_sub_multiples(COMP Fw[],
 
 \*---------------------------------------------------------------------------*/
 
-void *nlp_create(
-int    m			/* analysis window size */
-)
+void *nlp_create(C2CONST *c2const)
 {
     NLP *nlp;
     int  i;
-
-    assert(m <= PMAX_M);
+    int  m = c2const->m_pitch;
+    int  Fs = c2const->Fs;
 
     nlp = (NLP*)malloc(sizeof(NLP));
     if (nlp == NULL)
 	return NULL;
 
+    assert((Fs == 8000) || (Fs == 16000));
+    nlp->Fs = Fs;
+
     nlp->m = m;
+
+    /* if running at 16kHz allocate storage for decimating filter memory */
+
+    if (Fs == 16000) {
+        nlp->Sn16k = (float*)malloc(sizeof(float)*(FDMDV_OS_TAPS_16K + c2const->n_samp));
+        for(i=0; i<FDMDV_OS_TAPS_16K; i++) {
+           nlp->Sn16k[i] = 0.0;
+        }
+        if (nlp->Sn16k == NULL) {
+            free(nlp);
+            return NULL;
+        }
+
+        /* most processing occurs at 8 kHz sample rate so halve m */
+
+        m /= 2;
+    }
+
+    assert(m <= PMAX_M);
+    
     for(i=0; i<m/DEC; i++) {
 	nlp->w[i] = 0.5 - 0.5*cosf(2*PI*i/(m/DEC-1));
     }
@@ -186,6 +216,9 @@ void nlp_destroy(void *nlp_state)
     nlp = (NLP*)nlp_state;
 
     codec2_fft_free(nlp->fft_cfg);
+    if (nlp->Fs == 16000) {
+        free(nlp->Sn16k);
+    }
     free(nlp_state);
 }
 
@@ -215,28 +248,26 @@ void nlp_destroy(void *nlp_state)
 
   References:
 
-    [1] http://www.itr.unisa.edu.au/~steven/thesis/dgr.pdf Chapter 4
+    [1] http://rowetel.com/downloads/1997_rowe_phd_thesis.pdf Chapter 4
 
 \*---------------------------------------------------------------------------*/
 
 float nlp(
   void *nlp_state,
-  float  Sn[],			/* input speech vector */
-  int    n,			/* frames shift (no. new samples in Sn[]) */
-  int    pmin,                  /* minimum pitch value */
-  int    pmax,			/* maximum pitch value */
-  float *pitch,			/* estimated pitch period in samples */
-  COMP   Sw[],                  /* Freq domain version of Sn[] */
-  COMP   W[],                   /* Freq domain window */
-  float *prev_Wo
+  float  Sn[],			/* input speech vector                                */
+  int    n,			/* frames shift (no. new samples in Sn[])             */
+  float *pitch,			/* estimated pitch period in samples at current Fs    */
+  COMP   Sw[],                  /* Freq domain version of Sn[]                        */
+  COMP   W[],                   /* Freq domain window                                 */
+  float *prev_f0                /* previous pitch f0 in Hz, memory for pitch tracking */
 )
 {
     NLP   *nlp;
-    float  notch;		    /* current notch filter output    */
+    float  notch;		    /* current notch filter output          */
     COMP   Fw[PE_FFT_SIZE];	    /* DFT of squared signal (input/output) */
     float  gmax;
     int    gmax_bin;
-    int    m, i,j;
+    int    m, i, j;
     float  best_f0;
     PROFILE_VAR(start, tnotch, filter, peakpick, window, fft, magsq, shiftmem);
 
@@ -244,12 +275,43 @@ float nlp(
     nlp = (NLP*)nlp_state;
     m = nlp->m;
 
-    PROFILE_SAMPLE(start);
-
     /* Square, notch filter at DC, and LP filter vector */
 
-    for(i=m-n; i<m; i++) 	    /* square latest speech samples */
-	nlp->sq[i] = Sn[i]*Sn[i];
+    /* If running at 16 kHz decimate to 8 kHz, as NLP ws designed for
+       Fs = 8kHz. The decimating filter introduces about 3ms of delay,
+       that shouldn't be a problem as pitch changes slowly. */
+
+    if (nlp->Fs == 8000) {
+        /* Square latest input samples */
+
+        for(i=m-n; i<m; i++) {
+	  nlp->sq[i] = Sn[i]*Sn[i];
+        }
+    }
+    else {
+        assert(nlp->Fs == 16000);
+
+        /* re-sample at 8 KHz */
+
+        for(i=0; i<n; i++) {
+            nlp->Sn16k[FDMDV_OS_TAPS_16K+i] = Sn[m-n+i];
+        }
+
+        m /= 2; n /= 2;
+
+        float Sn8k[n];
+        fdmdv_16_to_8(Sn8k, &nlp->Sn16k[FDMDV_OS_TAPS_16K], n);
+
+        /* Square latest input samples */
+
+        for(i=m-n, j=0; i<m; i++, j++) {
+	    nlp->sq[i] = Sn8k[j]*Sn8k[j];
+        }
+        assert(j <= n);
+    }
+    //fprintf(stderr, "n: %d m: %d\n", n, m);
+
+    PROFILE_SAMPLE(start);
 
     for(i=m-n; i<m; i++) {	/* notch filter at DC */
 	notch = nlp->sq[i] - nlp->mem_x;
@@ -309,6 +371,11 @@ float nlp(
     dump_Fw(Fw);
     #endif
 
+    /* todo: express everything in f0, as pitch in samples is dep on Fs */
+
+    int pmin = floor(SAMPLE_RATE*P_MIN_S);
+    int pmax = floor(SAMPLE_RATE*P_MAX_S);
+
     /* find global peak */
 
     gmax = 0.0;
@@ -323,9 +390,9 @@ float nlp(
     PROFILE_SAMPLE_AND_LOG(peakpick, magsq, "      peak pick");
 
     #ifdef POST_PROCESS_MBE
-    best_f0 = post_process_mbe(Fw, pmin, pmax, gmax, Sw, W, prev_Wo);
+    best_f0 = post_process_mbe(Fw, pmin, pmax, gmax, Sw, W, prev_f0);
     #else
-    best_f0 = post_process_sub_multiples(Fw, pmin, pmax, gmax, gmax_bin, prev_Wo);
+    best_f0 = post_process_sub_multiples(Fw, pmin, pmax, gmax, gmax_bin, prev_f0);
     #endif
 
     PROFILE_SAMPLE_AND_LOG(shiftmem, peakpick,  "      post process");
@@ -335,13 +402,15 @@ float nlp(
     for(i=0; i<m-n; i++)
 	nlp->sq[i] = nlp->sq[i+n];
 
-    /* return pitch and F0 estimate */
+    /* return pitch period in samples and F0 estimate */
 
-    *pitch = (float)SAMPLE_RATE/best_f0;
+    *pitch = (float)nlp->Fs/best_f0;
 
     PROFILE_SAMPLE_AND_LOG2(shiftmem,  "      shift mem");
 
     PROFILE_SAMPLE_AND_LOG2(start,  "      nlp int");
+
+    *prev_f0 = best_f0;
 
     return(best_f0);
 }
@@ -369,7 +438,7 @@ float nlp(
 
 float post_process_sub_multiples(COMP Fw[],
 				 int pmin, int pmax, float gmax, int gmax_bin,
-				 float *prev_Wo)
+				 float *prev_f0)
 {
     int   min_bin, cmax_bin;
     int   mult;
@@ -383,7 +452,7 @@ float post_process_sub_multiples(COMP Fw[],
     mult = 2;
     min_bin = PE_FFT_SIZE*DEC/pmax;
     cmax_bin = gmax_bin;
-    prev_f0_bin = *prev_Wo*(4000.0/PI)*(PE_FFT_SIZE*DEC)/SAMPLE_RATE;
+    prev_f0_bin = *prev_f0*(PE_FFT_SIZE*DEC)/SAMPLE_RATE;
 
     while(gmax_bin/mult >= min_bin) {
 
@@ -593,3 +662,41 @@ float test_candidate_mbe(
 }
 
 #endif
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fdmdv_16_to_8()
+  AUTHOR......: David Rowe
+  DATE CREATED: 9 May 2012
+
+  Changes the sample rate of a signal from 16 to 8 kHz.
+
+  n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n
+  samples at the 48 kHz rate.  As above however a memory of
+  FDMDV_OS_TAPS samples is reqd for in16k[] (see t16_8.c unit test as example).
+
+  Low pass filter the 16 kHz signal at 4 kHz using the same filter as
+  the upsampler, then just output every FDMDV_OS-th filtered sample.
+
+  Note: this function copied from fdmdv.c, included in nlp.c as a convenience
+  to avoid linking with another source file.
+
+\*---------------------------------------------------------------------------*/
+
+static void fdmdv_16_to_8(float out8k[], float in16k[], int n)
+{
+    float acc;
+    int   i,j,k;
+
+    for(i=0, k=0; k<n; i+=FDMDV_OS, k++) {
+	acc = 0.0;
+	for(j=0; j<FDMDV_OS_TAPS_16K; j++)
+	    acc += fdmdv_os_filter[j]*in16k[i-j];
+        out8k[k] = acc;
+    }
+
+    /* update filter memory */
+
+    for(i=-FDMDV_OS_TAPS_16K; i<0; i++)
+	in16k[i] = in16k[i + n*FDMDV_OS];
+}

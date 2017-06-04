@@ -1,6 +1,6 @@
 /* Generate using fir1(47,1/2) in Octave */
 
-const float fdmdv_os_filter[]= {
+static const float fdmdv_os_filter[]= {
     -0.0008215855034550382,
     -0.0007833023901802921,
      0.001075563790768233,
