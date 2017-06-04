@@ -238,7 +238,7 @@ void dump_softdec(float *softdec, int n)
 void dump_model(MODEL *model) {
     int l;
     char s[MAX_STR];
-    char line[2048];
+    char line[MAX_STR*10];
 
     if (!dumpon) return;
 
@@ -252,10 +252,12 @@ void dump_model(MODEL *model) {
     for(l=1; l<=model->L; l++) {
 	sprintf(s,"%12f ",model->A[l]);
         strcat(line, s);
+        assert(strlen(line) < MAX_STR*10);
     }
     for(l=model->L+1; l<=MAX_AMP; l++) {
 	sprintf(s,"%12f ", 0.0);
         strcat(line,s);
+        assert(strlen(line) < MAX_STR*10);
     }
 
     sprintf(s,"%d\n",model->voiced);
