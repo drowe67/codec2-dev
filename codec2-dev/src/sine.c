@@ -80,6 +80,7 @@ C2CONST c2const_create(int Fs) {
     fprintf(stderr, "max_amp: %d m_pitch: %d\n", c2const.n_samp, c2const.m_pitch);
     fprintf(stderr, "p_min: %d p_max: %d\n", c2const.p_min, c2const.p_max);
     fprintf(stderr, "Wo_min: %f Wo_max: %f\n", c2const.Wo_min, c2const.Wo_max);
+    fprintf(stderr, "nw: %d tw: %d\n", c2const.nw, c2const.tw);
 
     return c2const;
 }

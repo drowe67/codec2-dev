@@ -64,34 +64,10 @@ void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 int main(int argc, char *argv[])
 {
-    C2CONST c2const = c2const_create(8000);
-    int   n_samp = c2const.n_samp;
-    int   m_pitch = c2const.m_pitch;
 
-    FILE *fout = NULL;	/* output speech file                    */
-    FILE *fin;		/* input speech file                     */
-    short buf[N_SAMP];	/* input/output buffer                   */
-    float buf_float[N_SAMP];
-    float Sn[m_pitch];	/* float input speech samples            */
-    float Sn_pre[m_pitch];	/* pre-emphasised input speech samples   */
-    COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
-    codec2_fft_cfg  fft_fwd_cfg;
-    codec2_fftr_cfg  fftr_fwd_cfg;
-    codec2_fftr_cfg  fftr_inv_cfg;
-    float w[m_pitch];	        /* time domain hamming window            */
-    COMP  W[FFT_ENC];	/* DFT of w[]                            */
-    MODEL model;
-    float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
-    float Sn_[2*N_SAMP];	/* synthesised speech */
-    int   i,m;		/* loop variable                         */
-    int   frames;
-    float prev_Wo, prev__Wo, prev_uq_Wo;
-    float pitch;
-    char  out_file[MAX_STR];
-    char  ampexp_arg[MAX_STR];
-    char  phaseexp_arg[MAX_STR];
-    float snr;
-    float sum_snr;
+    int Fs = 8000;
+    int set_fs;
+
     int orderi;
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
@@ -101,63 +77,39 @@ int main(int argc, char *argv[])
     int lspanssi = 0,
     #endif
     int prede = 0;
-    float pre_mem = 0.0, de_mem = 0.0;
-    float ak[order];
-    // COMP  Sw_[FFT_ENC];
-    // COMP  Ew[FFT_ENC];
-
-    int phase0 = 0;
-    float ex_phase[MAX_AMP+1];
-
     int   postfilt;
-    float bg_est = 0.0;
-
     int   hand_voicing = 0, phaseexp = 0, ampexp = 0, hi = 0, simlpcpf = 0, lspmelread = 0;
     int   lpcpf = 0;
     FILE *fvoicing = 0;
     FILE *flspmel = 0;
-
-    MODEL prev_model;
     int dec;
     int decimate = 1;
-    float lsps[order];
-    float e, prev_e;
-    int   lsp_indexes[order];
-    float lsps_[order];
-    float Woe_[2];
-
-    float lsps_dec[4][LPC_ORD], e_dec[4], weight, weight_inc, ak_dec[4][LPC_ORD];
-    MODEL model_dec[4], prev_model_dec;
-    float prev_lsps_dec[order], prev_e_dec;
-
-    void *nlp_states;
-    float hpf_states[2];
+    int   amread, Woread;
+    int   awread;
+    int   hmread;
+    int   phase0 = 0;
     int   scalar_quant_Wo_e = 0;
     int   scalar_quant_Wo_e_low = 0;
     int   vector_quant_Wo_e = 0;
     int   dump_pitch_e = 0;
+    float gain = 1.0;
+    int   bpf_en = 0;
+    int   bpfb_en = 0;
+    FILE *fam = NULL, *fWo = NULL;
+    FILE *faw = NULL;
+    FILE *fhm = NULL;
     FILE *fjvm = NULL;
     #ifdef DUMP
     int   dump;
     #endif
-    #if 0
-    struct PEXP *pexp = NULL;
-    struct AEXP *aexp = NULL;
-    #endif
-    float gain = 1.0;
-    int   bpf_en = 0;
-    int   bpfb_en = 0;
-    float bpf_buf[BPF_N+N_SAMP];
-    float lspmelvq_mse = 0.0;
-    int   amread, Woread;
-    FILE *fam = NULL, *fWo = NULL;
-    int   awread;
-    FILE *faw = NULL;
-    int   hmread;
-    FILE *fhm = NULL;
+    char  ampexp_arg[MAX_STR];
+    char  phaseexp_arg[MAX_STR];
+    char  out_file[MAX_STR];
+    FILE *fout = NULL;	/* output speech file */
 
     char* opt_string = "ho:";
     struct option long_options[] = {
+        { "Fs", required_argument, &set_fs, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lspjnd", no_argument, &lspjnd, 1 },
         { "lspmel", no_argument, &lspmel, 1 },
@@ -200,36 +152,6 @@ int main(int argc, char *argv[])
         { NULL, no_argument, NULL, 0 }
     };
     int num_opts=sizeof(long_options)/sizeof(struct option);
-    COMP Aw[FFT_ENC];
-    COMP H[MAX_AMP];
-
-    for(i=0; i<m_pitch; i++) {
-	Sn[i] = 1.0;
-	Sn_pre[i] = 1.0;
-    }
-    for(i=0; i<2*N_SAMP; i++)
-	Sn_[i] = 0;
-
-    prev_uq_Wo = prev_Wo = prev__Wo = c2const.Wo_min;
-
-    prev_model.Wo = c2const.Wo_max;
-    prev_model.L = floor(PI/prev_model.Wo);
-    for(i=1; i<=prev_model.L; i++) {
-	prev_model.A[i] = 0.0;
-	prev_model.phi[i] = 0.0;
-    }
-    for(i=1; i<=MAX_AMP; i++) {
-	//ex_phase[i] = (PI/3)*(float)rand()/RAND_MAX;
-	ex_phase[i] = 0.0;
-    }
-    e = prev_e = 1;
-    hpf_states[0] = hpf_states[1] = 0.0;
-
-    nlp_states = nlp_create(m_pitch);
-
-    if (argc < 2) {
-        print_help(long_options, num_opts, argv);
-    }
 
     /*----------------------------------------------------------------*\
 
@@ -245,7 +167,13 @@ int main(int argc, char *argv[])
             break;
         switch (opt) {
          case 0:
-            if(strcmp(long_options[option_index].name, "lpc") == 0) {
+            if(strcmp(long_options[option_index].name, "Fs") == 0) {
+                Fs= atoi(optarg);
+                if((Fs != 8000) && (Fs != 16000)) {
+                    fprintf(stderr, "Error Fs must be 8000 or 16000\n");
+                    exit(1);
+                }
+            } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
                 orderi = atoi(optarg);
                 if((orderi < 4) || (orderi > order)) {
                     fprintf(stderr, "Error in LPC order (4 to %d): %s\n", order, optarg);
@@ -396,12 +324,100 @@ int main(int argc, char *argv[])
 
     /* Input file */
 
+    FILE *fin;		/* input speech file                     */
     if (strcmp(argv[optind], "-")  == 0) fin = stdin;
     else if ((fin = fopen(argv[optind],"rb")) == NULL) {
 	fprintf(stderr, "Error opening input speech file: %s: %s.\n",
 		argv[optind], strerror(errno));
 	exit(1);
     }
+
+    C2CONST c2const = c2const_create(Fs);
+    int   n_samp = c2const.n_samp;
+    int   m_pitch = c2const.m_pitch;
+
+    short buf[N_SAMP];	/* input/output buffer                   */
+    float buf_float[N_SAMP];
+    float Sn[m_pitch];	/* float input speech samples            */
+    float Sn_pre[m_pitch];	/* pre-emphasised input speech samples   */
+    COMP  Sw[FFT_ENC];	/* DFT of Sn[]                           */
+    codec2_fft_cfg  fft_fwd_cfg;
+    codec2_fftr_cfg  fftr_fwd_cfg;
+    codec2_fftr_cfg  fftr_inv_cfg;
+    float w[m_pitch];	        /* time domain hamming window            */
+    COMP  W[FFT_ENC];	/* DFT of w[]                            */
+    MODEL model;
+    float Pn[2*N_SAMP];	/* trapezoidal synthesis window          */
+    float Sn_[2*N_SAMP];	/* synthesised speech */
+    int   i,m;		/* loop variable                         */
+    int   frames;
+    float prev_f0;
+    float pitch;
+    float snr;
+    float sum_snr;
+
+    float pre_mem = 0.0, de_mem = 0.0;
+    float ak[order];
+    // COMP  Sw_[FFT_ENC];
+    // COMP  Ew[FFT_ENC];
+
+    float ex_phase[MAX_AMP+1];
+
+    float bg_est = 0.0;
+
+
+    MODEL prev_model;
+    float lsps[order];
+    float e, prev_e;
+    int   lsp_indexes[order];
+    float lsps_[order];
+    float Woe_[2];
+
+    float lsps_dec[4][LPC_ORD], e_dec[4], weight, weight_inc, ak_dec[4][LPC_ORD];
+    MODEL model_dec[4], prev_model_dec;
+    float prev_lsps_dec[order], prev_e_dec;
+
+    void *nlp_states;
+    float hpf_states[2];
+    #if 0
+    struct PEXP *pexp = NULL;
+    struct AEXP *aexp = NULL;
+    #endif
+    float bpf_buf[BPF_N+N_SAMP];
+    float lspmelvq_mse = 0.0;
+
+    COMP Aw[FFT_ENC];
+    COMP H[MAX_AMP];
+
+ 
+    for(i=0; i<m_pitch; i++) {
+	Sn[i] = 1.0;
+	Sn_pre[i] = 1.0;
+    }
+    for(i=0; i<2*N_SAMP; i++)
+	Sn_[i] = 0;
+
+    prev_f0 = 1/P_MAX_S;
+
+    prev_model.Wo = c2const.Wo_max;
+    prev_model.L = floor(PI/prev_model.Wo);
+    for(i=1; i<=prev_model.L; i++) {
+	prev_model.A[i] = 0.0;
+	prev_model.phi[i] = 0.0;
+    }
+    for(i=1; i<=MAX_AMP; i++) {
+	//ex_phase[i] = (PI/3)*(float)rand()/RAND_MAX;
+	ex_phase[i] = 0.0;
+    }
+    e = prev_e = 1;
+    hpf_states[0] = hpf_states[1] = 0.0;
+
+    nlp_states = nlp_create(&c2const);
+
+    if (argc < 2) {
+        print_help(long_options, num_opts, argv);
+    }
+
 
     ex_phase[0] = 0;
     Woe_[0] = Woe_[1] = 1.0;
@@ -500,7 +516,7 @@ int main(int argc, char *argv[])
 
 	\*------------------------------------------------------------*/
 
-        nlp(nlp_states,Sn,N_SAMP,c2const.p_min,c2const.p_max,&pitch,Sw,W,&prev_uq_Wo);
+        nlp(nlp_states, Sn, N_SAMP, &pitch, Sw, W, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
         dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);

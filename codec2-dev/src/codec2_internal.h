@@ -53,7 +53,7 @@ struct CODEC2 {
     float        *Sn_;	                   /* [2*n_samp] synthesised output speech      */
     float         ex_phase;                /* excitation model phase track              */
     float         bg_est;                  /* background noise estimate for post filter */
-    float         prev_Wo_enc;             /* previous frame's pitch estimate           */
+    float         prev_f0_enc;             /* previous frame's f0    estimate           */
     MODEL         prev_model_dec;          /* previous frame's model parameters         */
     float         prev_lsps_dec[LPC_ORD];  /* previous frame's LSPs                     */
     float         prev_e_dec;              /* previous frame's LPC energy               */

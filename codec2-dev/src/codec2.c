@@ -148,7 +148,7 @@ struct CODEC2 * codec2_create(int mode)
     make_synthesis_window(&c2->c2const, c2->Pn);
     c2->fftr_inv_cfg = codec2_fftr_alloc(FFT_DEC, 1, NULL, NULL);
     quantise_init();
-    c2->prev_Wo_enc = 0.0;
+    c2->prev_f0_enc = 1/P_MAX_S;
     c2->bg_est = 0.0;
     c2->ex_phase = 0.0;
 
@@ -163,7 +163,7 @@ struct CODEC2 * codec2_create(int mode)
     }
     c2->prev_e_dec = 1;
 
-    c2->nlp = nlp_create(m_pitch);
+    c2->nlp = nlp_create(&c2->c2const);
     if (c2->nlp == NULL) {
 	return NULL;
     }
@@ -2103,7 +2103,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
 
     /* Estimate pitch */
 
-    nlp(c2->nlp,c2->Sn,n_samp,c2->c2const.p_min,c2->c2const.p_max,&pitch,Sw, c2->W, &c2->prev_Wo_enc);
+    nlp(c2->nlp, c2->Sn, n_samp, &pitch, Sw, c2->W, &c2->prev_f0_enc);
     PROFILE_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp");
 
     model->Wo = TWO_PI/pitch;
@@ -2116,7 +2116,6 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     estimate_amplitudes(model, Sw, c2->W, 0);
     PROFILE_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps");
     est_voicing_mbe(&c2->c2const, model, Sw, c2->W);
-    c2->prev_Wo_enc = model->Wo;
     PROFILE_SAMPLE_AND_LOG2(estamps, "    est_voicing");
     #ifdef DUMP
     dump_model(model);
