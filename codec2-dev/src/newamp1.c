@@ -98,9 +98,8 @@ float ftomel(float fHz) {
     return mel;
 }
 
-void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K)
+void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K, float mel_start, float mel_end)
 {
-    float mel_start = ftomel(200.0); float mel_end = ftomel(3700.0); 
     float step = (mel_end-mel_start)/(K-1);
     float mel;
     int k;
@@ -123,7 +122,7 @@ void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K)
 
 \*---------------------------------------------------------------------------*/
 
-void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
+void resample_const_rate_f(C2CONST *c2const, MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
 {
     int m;
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1], AmdB_peak;
@@ -136,7 +135,7 @@ void resample_const_rate_f(MODEL *model, float rate_K_vec[], float rate_K_sample
         if (AmdB[m] > AmdB_peak) {
             AmdB_peak = AmdB[m];
         }
-        rate_L_sample_freqs_kHz[m] = m*model->Wo*4.0/M_PI;
+        rate_L_sample_freqs_kHz[m] = m*model->Wo*(c2const->Fs/2000.0)/M_PI;
         //printf("m: %d AmdB: %f AmdB_peak: %f  sf: %f\n", m, AmdB[m], AmdB_peak, rate_L_sample_freqs_kHz[m]);
     }
     
@@ -327,7 +326,7 @@ void interp_Wo_v(float Wo_[], int L_[], int voicing_[], float Wo1, float Wo2, in
 
 \*---------------------------------------------------------------------------*/
 
-void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
+void resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float rate_K_sample_freqs_kHz[], int K)
 {
    float rate_K_vec_term[K+2], rate_K_sample_freqs_kHz_term[K+2];
    float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
@@ -347,7 +346,7 @@ void resample_rate_L(MODEL *model, float rate_K_vec[], float rate_K_sample_freqs
    }
 
    for(m=1; m<=model->L; m++) {
-       rate_L_sample_freqs_kHz[m] = m*model->Wo*4.0/M_PI;
+       rate_L_sample_freqs_kHz[m] = m*model->Wo*(c2const->Fs/2000.0)/M_PI;
    }
 
    interp_para(&AmdB[1], rate_K_sample_freqs_kHz_term, rate_K_vec_term, K+2, &rate_L_sample_freqs_kHz[1], model->L);    
@@ -422,7 +421,7 @@ void newamp1_model_to_indexes(C2CONST *c2const,
 
     /* convert variable rate L to fixed rate K */
 
-    resample_const_rate_f(model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+    resample_const_rate_f(c2const, model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
     /* remove mean and two stage VQ */
 
@@ -592,7 +591,7 @@ void newamp1_indexes_to_model(C2CONST *c2const,
         model_[i].L  = aL_[i];
         model_[i].voiced = avoicing_[i];
 
-        resample_rate_L(&model_[i], &interpolated_surface_[K*i], rate_K_sample_freqs_kHz, K);
+        resample_rate_L(c2const, &model_[i], &interpolated_surface_[K*i], rate_K_sample_freqs_kHz, K);
         determine_phase(c2const, &H[(MAX_AMP+1)*i], &model_[i], NEWAMP1_PHASE_NFFT, fwd_cfg, inv_cfg);
     }
 
