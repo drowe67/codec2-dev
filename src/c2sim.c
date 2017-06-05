@@ -107,10 +107,13 @@ int main(int argc, char *argv[])
     char  phaseexp_arg[MAX_STR];
     char  out_file[MAX_STR];
     FILE *fout = NULL;	/* output speech file */
+    int   mel_resampling = 0;
+    int   K = 20;
 
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
+        { "mel", required_argument, &mel_resampling, 1 },
         { "lpc", required_argument, &lpc_model, 1 },
         { "lspjnd", no_argument, &lspjnd, 1 },
         { "lspmel", no_argument, &lspmel, 1 },
@@ -160,6 +163,10 @@ int main(int argc, char *argv[])
 
     \*----------------------------------------------------------------*/
 
+    if (argc < 2) {
+        print_help(long_options, num_opts, argv);
+    }
+
     while(1) {
         int option_index = 0;
         int opt = getopt_long(argc, argv, opt_string,
@@ -174,6 +181,8 @@ int main(int argc, char *argv[])
                     fprintf(stderr, "Error Fs must be 8000 or 16000\n");
                     exit(1);
                 }
+            } else if(strcmp(long_options[option_index].name, "mel") == 0) {
+                K = atoi(optarg);
             } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
                 orderi = atoi(optarg);
                 if((orderi < 4) || (orderi > order)) {
@@ -415,11 +424,6 @@ int main(int argc, char *argv[])
 
     nlp_states = nlp_create(&c2const);
 
-    if (argc < 2) {
-        print_help(long_options, num_opts, argv);
-    }
-
-
     ex_phase[0] = 0;
     Woe_[0] = Woe_[1] = 1.0;
 
@@ -465,6 +469,17 @@ int main(int argc, char *argv[])
     prev_model_dec.Wo = c2const.Wo_min;
     prev_model_dec.L = PI/prev_model_dec.Wo;
     prev_model_dec.voiced = 0;
+
+    /* mel resampling experiments */
+
+    float rate_K_sample_freqs_kHz[K];
+    if (mel_resampling) {
+        float mel_start = ftomel(100); 
+        float mel_end = ftomel(0.95*Fs/2);
+        mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K, mel_start, mel_end);
+        //for(i=0; i<K; i++)
+        //    fprintf(stderr, "%d %f\n", i, rate_K_sample_freqs_kHz[i]);
+    }
 
     /*----------------------------------------------------------------* \
 
@@ -556,25 +571,26 @@ int main(int argc, char *argv[])
 
 	/*------------------------------------------------------------*\
 
+	                     Mel scale resampling
+
+	\*------------------------------------------------------------*/
+
+        if (mel_resampling) {
+            float rate_K_vec[K];
+            resample_const_rate_f(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+            resample_rate_L(&c2const, &model, rate_K_vec, rate_K_sample_freqs_kHz, K);
+        }
+
+	/*------------------------------------------------------------*\
+
                             Zero-phase modelling
 
 	\*------------------------------------------------------------*/
 
 	if (phase0) {
-	    float Wn[m_pitch];		        /* windowed speech samples */
-	    float Rk[order+1];                  /* autocorrelation coeffs  */
-            COMP a[FFT_ENC];
-
             #ifdef DUMP
 	    dump_phase(&model.phi[0], model.L);
             #endif
-
-	    /* find aks here, these are overwritten if LPC modelling is enabled */
-
-            for(i=0; i<m_pitch; i++)
-                Wn[i] = Sn[i]*w[i];
-	    autocorrelate(Wn,Rk,m_pitch,order);
-	    levinson_durbin(Rk,ak,order);
 
 	    /* determine voicing */
 
@@ -599,18 +615,6 @@ int main(int argc, char *argv[])
 
 	    for(i=0; i<=MAX_AMP; i++)
 	    	model.phi[i] = 0;
-
-            /* Determine DFT of A(exp(jw)), which is needed for phase0 model when
-               LPC is not used, e.g. indecimate=1 (10ms) frames with no LPC */
-
-            for(i=0; i<FFT_ENC; i++) {
-                a[i].real = 0.0;
-                a[i].imag = 0.0;
-            }
-
-            for(i=0; i<=order; i++)
-                a[i].real = ak[i];
-            codec2_fft(fft_fwd_cfg, a, Aw);
 
 	    if (hand_voicing) {
 		int ret = fscanf(fvoicing,"%d\n",&model.voiced);

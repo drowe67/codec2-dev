@@ -191,7 +191,7 @@ struct CODEC2 * codec2_create(int mode)
     /* newamp1 initialisation */
 
     if (c2->mode == CODEC2_MODE_700C) {
-        mel_sample_freqs_kHz(c2->rate_K_sample_freqs_kHz, NEWAMP1_K);
+        mel_sample_freqs_kHz(c2->rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
         int k;
         for(k=0; k<NEWAMP1_K; k++) {
             c2->prev_rate_K_vec_[k] = 0.0;
