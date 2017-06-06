@@ -43,7 +43,6 @@ struct OFDM {
     float Ts;
     float Rs;
     float Tcp;
-    float Ncp;
     float Fcentre;
     float foff_est_gain;
     float foff_est_hz;
@@ -61,6 +60,7 @@ struct OFDM {
     int timing_est;
     int nin;
     int Nrxbuf;
+    int Ncp;
 
     bool timing_en;
     bool foff_est_en;
