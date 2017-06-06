@@ -888,11 +888,12 @@ int main(int argc, char *argv[])
                         int ret = fread(H, sizeof(COMP), MAX_AMP, fhm);
                         assert(ret == MAX_AMP);
                     } else {
-                         determine_phase(&c2const, H, &model_dec[i], NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
-                         //sample_phase(&model_dec[i], H, Aw);
+                        determine_phase(&c2const, H, &model_dec[i], NEWAMP1_PHASE_NFFT, phase_fft_fwd_cfg, phase_fft_inv_cfg);
                     }
                     phase_synth_zero_order(n_samp, &model_dec[i], ex_phase, H);
                 }
+
+                
                 if (postfilt)
                     postfilter(&model_dec[i], &bg_est);
                 synth_one_frame(n_samp, fftr_inv_cfg, buf, &model_dec[i], Sn_, Pn, prede, &de_mem, gain);
