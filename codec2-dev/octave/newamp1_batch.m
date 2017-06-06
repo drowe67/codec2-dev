@@ -7,7 +7,7 @@
 #{
 
   Octave script to batch process model parameters using the new
-  amplitude model, version 1.  Outputs anotehr set of model parameters
+  amplitude model, version 1.  Outputs another set of model parameters
   that can be fed to c2sim for listening tests.  The companion
   newamp1_fbf.m script is used to visualise the processing frame by frame
  
@@ -44,7 +44,7 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   newamp;
   more off;
 
-  max_amp = 80;
+  max_amp = 160;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
 
@@ -68,12 +68,16 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
 
-  %[model_ surface] = experiment_mel_freq(model, 1, 1, voicing);
+  [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
+
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
 
+#{
   [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder/decoder, lets toss away results except for indexes
-  %[model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
   [model_ voicing_] = model_from_indexes_fbf(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
+#}
+
+  %[model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
 
   %model_ = experiment_dec_linear(model_);
   %model_ = experiment_energy_rate_linear(model, 1, 0);
@@ -121,7 +125,7 @@ function surface = newamp1_batch(input_prefix, output_prefix)
 
       % synthesis phase spectra from magnitiude spectra using minimum phase techniques
 
-      fft_enc = 128;
+      fft_enc = 256;
       phase = determine_phase(model_, f, fft_enc);
       assert(length(phase) == fft_enc);
       %Aw = zeros(1, fft_enc*2); 
@@ -492,9 +496,21 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
-  K = 20; 
-  [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K);
-  
+  K = 20; Fs = 8000;
+
+  for f=1:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+    Am_freqs_kHz = (1:L)*Wo*4/pi;
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
+    [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
+    [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
+    %rate_K_surface(f,:) = rate_K_vec;
+    rate_K_surface(f,:) = rate_K_vec_corrected;
+  end
+
   if plots
     figure(1); clf; mesh(rate_K_surface);
     figure(2); clf; plot_dft_surface(rate_K_surface)
@@ -1057,3 +1073,4 @@ function plot_dft_surface(surface)
   Fs = 100; dF = Fs/frames;
   mesh(1:K, (1:frames/2)*dF, 20*log10(abs(dft_surface(1:frames/2,:,:))));
 endfunction
+
