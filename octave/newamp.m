@@ -46,6 +46,43 @@ function y = interp_para(xp, yp, x)
 endfunction
 
 
+% choose largest sample in band, idea is we care more about finding
+% peaks, can handle some error in frequency. x are non linear
+% (arbitrary) sampling points in kHz
+
+function y = interp_largest(f0_Hz, AmdB, x_kHz)
+  L = length(AmdB);
+  x = x_kHz*1000;
+  y = zeros(1,length(x));
+  bw = x(2) - x(1);
+  k = 1;
+
+  for i=1:length(x)
+
+    % determine limits of this band
+
+    if i>1
+      bw = x(i) - x(i-1);
+    end
+    band_low = x(i) - bw/2; band_high = x(i) + bw/2;
+
+    % map band limits to harmonics    
+ 
+    if x(i) < f0_Hz
+      m_low = m_high = 1;
+    else
+      m_low = round(band_low/f0_Hz); m_high = round(band_high/f0_Hz)-1;
+      m_low = max(1, m_low); m_high = min(L, m_high); m_high = max(m_low, m_high);
+    end
+
+    printf("L: %d f0: %f i: %d band_low: %f band_high: %f m_low: %d m_high: %d\n",L, f0_Hz, i, band_low, band_high, m_low, m_high);
+    % find max in band
+
+    y(i) = max(AmdB(m_low:m_high));
+  end
+
+endfunction
+
 % simple linear interpolator
 
 function y = interp_linear(xp, yp, x)
@@ -172,7 +209,7 @@ endfunction
 
 
 function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
-  mel_start = ftomel(200); mel_end = ftomel(3700); 
+  mel_start = ftomel(100); mel_end = ftomel(0.95*4000); 
   step = (mel_end-mel_start)/(K-1);
   mel = mel_start:step:mel_end;
   rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
@@ -219,6 +256,64 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     %printf("\r%d/%d", f, frames);
   end
   %printf("\n");
+endfunction
+
+
+function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs)
+
+    % aliasing correction --------------------------------------
+
+    % The mel sample rate decreases as frequency increases. Look for
+    % any regions above 1000Hz where we have missed definition of a
+    % spectral peak (formant) due to aliasing.  Adjust the rate K
+    % sample levels to restore peaks.  Theory is that correct
+    % definition of a formant is less important than the frequency of
+    % the formant.  As long as we define a formant in that general
+    % frequency area it will sound OK.
+
+    Am_freqs_kHz = (1:L)*Wo*4/pi;
+
+    % Lets see where we have made an error
+
+    error = orig_error = AmdB - AmdB_;
+
+    Ncorrections = 3;      % maximum number of rate K samples to correct
+    error_thresh = 3;      % only worry about errors larger than thresh
+
+    start_m = floor(L*1000/(Fs/2));
+    error(1:start_m) = 0;  % first 1000Hz is densly sampled so ignore
+    nasty_error_m_log = []; nasty_error_log = [];
+
+
+    rate_K_vec_corrected = rate_K_vec;
+    for i=1:Ncorrections
+      [mx mx_m] = max(error);
+
+      if mx > error_thresh
+        nasty_error_log = [nasty_error_log mx];
+        nasty_error_m_log = [nasty_error_m_log mx_m];
+
+        % find closest rate K sample to nasty error
+
+        nasty_error_freq = mx_m*Wo*Fs/(2*pi*1000)
+        [tmp closest_k] = min(abs(rate_K_sample_freqs_kHz - nasty_error_freq));
+        rate_K_vec_corrected(closest_k) = AmdB(mx_m);
+
+        % zero out error in this region and look for another large error region
+
+        k = max(1, closest_k-1); 
+        rate_K_prev_sample_kHz = rate_K_sample_freqs_kHz(k)
+        k = min(K, closest_k+1); 
+        rate_K_next_sample_kHz = rate_K_sample_freqs_kHz(k)
+
+        [tmp st_m] = min(abs(Am_freqs_kHz - rate_K_prev_sample_kHz));
+        [tmp en_m] = min(abs(Am_freqs_kHz - rate_K_next_sample_kHz));
+        if closest_k == K
+         en_m = L;
+        end 
+        error(st_m:en_m) = 0;
+      end
+    end
 endfunction
 
 
@@ -1266,3 +1361,12 @@ function lmin = abys(AmdB_, AmdB, Wo, L, mask_sample_freqs_kHz)
 endfunction
 
 
+function rate_K_surface_no_slope = remove_slope(rate_K_surface)
+  [frames K] = size(rate_K_surface);
+  rate_K_surface_no_slope = zeros(frames,K);
+  for f=1:frames
+    [gradient intercept] = linreg(1:K, rate_K_surface(f,:), K);
+    printf("f: %d gradient: %f intercept: %f\n", f, gradient, intercept);
+    rate_K_surface_no_slope(f,:) = rate_K_surface(f,:) - (intercept + gradient*(1:K));
+  end
+endfunction

@@ -18,10 +18,10 @@
 function newamp1_fbf(samname, f=10)
   newamp;
   more off;
-  quant_en = 0; pf_en = 0; plot_phase = 1;
+  quant_en = 0; pf_en = 0; plot_phase = 0;
   melvq;
-
-  K=20; load train_120_vq; m=5; 
+ 
+  Fs = 8000; K=20; load train_120_vq; m=5; 
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -66,9 +66,14 @@ function newamp1_fbf(samname, f=10)
     AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
-    % plots for mel sampling
+    % resample at rate K
 
     [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
+    [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
+    [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
+    [tmp_ AmdB_corrected] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
+
+    % quantisation simulation ---------------------------------
 
     mean_f = mean(rate_K_vec);
     rate_K_vec_no_mean = rate_K_vec - mean_f;
@@ -85,6 +90,7 @@ function newamp1_fbf(samname, f=10)
 
     rate_K_vec_ = rate_K_vec_no_mean_ + mean_f;
     [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz);
+    %[model_ AmdB_largest] = resample_rate_L(model(f,:), rate_K_largest, rate_K_sample_freqs_kHz);
 
     % plots ----------------------------------
 
@@ -94,17 +100,20 @@ function newamp1_fbf(samname, f=10)
 
     axis([1 4000 -20 80]);
     hold on;
+
     plot((1:L)*Wo*4000/pi, AmdB,";Am;b+-");
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ';rate K mel;g+-');
-    if quant_en >= 1
-      plot((1:L)*Wo*4000/pi, AmdB_,";Am quant;k+-");
-    end
-    if quant_en == 2
-      plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_, ';rate K mel quant;r+-');   
-    end
+    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, 'g');   
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ';rate K;g:');   
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_corrected, ';rate K;g-', 'linewidth', 2);   
+
+    plot((1:L)*Wo*4000/pi, -10 + orig_error ,";AmdB - AmdB_ error;k+-");
+    plot((1:L)*Wo*4000/pi, -10 + error ,";AmdB - AmdB_ error;r-");
+    plot(nasty_error_m_log*Wo*4000/pi, AmdB(nasty_error_m_log), 'ro', 'markersize', 10);
+
 
     hold off;
 
+    #{
     figure(3);
     clf;
     title('Frequency Domain 2');
@@ -116,6 +125,7 @@ function newamp1_fbf(samname, f=10)
     plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_no_mean_, ';rate K mel no mean quant;r+-');
     end
     hold off;
+    #}
 
     if plot_phase
       phase_512 = determine_phase(model_, 1, 512);
@@ -135,7 +145,7 @@ function newamp1_fbf(samname, f=10)
 
     if k == 'm'
       quant_en++;
-      if quant_en > 2
+      if quant_en > 1
         quant_en = 0;
       end
     endif
