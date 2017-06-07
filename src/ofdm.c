@@ -7,8 +7,6 @@
  * See LICENSE file for information
  */
 
-#define CORRELATE
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -22,15 +20,6 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 
-#ifdef CORRELATE
-#include "codec2_fft.h"
-#include "comp_prim.h"
-
-#define FFT_SIZE 512
-
-static codec2_fft_cfg fft_cfg;
-#endif
-
 /*
  * Library of functions that implement a BPSK/QPSK OFDM modem
  *
@@ -39,7 +28,7 @@ static codec2_fft_cfg fft_cfg;
 
 /* Static Prototypes */
 
-static void matrix_vector_multiply(complex float *, int, int, complex float **, int *);
+static void matrix_vector_multiply(complex float *, int, int, complex float **, complex float *);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float **, complex float *);
@@ -64,12 +53,12 @@ static void qpsk_demod(complex float symbol, int *bits) {
 }
 
 static void matrix_vector_multiply(complex float *result,
-        int columns, int rows, complex float **array, int *vector) {
+        int columns, int rows, complex float **array, complex float *vector) {
     int i, j, k;
 
     for (i = 0; i < columns; i++) {
         for (j = 0; j < rows; j++) {
-            result[j] = CMPLXF(0.0f, 0.0f);
+            result[j] = 0.0f + 0.0f * I;
 
             for (k = 0; k < columns; k++) {
                 result[j] += (vector[k] * (array[k][j] / (float) rows));    /* complex result */
@@ -115,73 +104,6 @@ static int coarse_sync(struct OFDM *ofdm, int *foff_est, complex float *rx, int 
         }
     }
 
-#ifdef CORRELATE
-    COMP binl[FFT_SIZE];
-    COMP binr[FFT_SIZE];
-    int i, j;
-
-    /* determines frequency offset at maximum correlation */
-
-    for (i = t_est, j = 0; i < (t_est + Npsam); i++, j++) {
-        complex float csam = conjf(ofdm->rate_fs_pilot_samples[j]);
-        complex float templ = (rx[i] * csam);
-        complex float tempr = (rx[i + ofdm->Nsamperframe] * csam);
-
-        binl[j].real = crealf(templ);
-        binl[j].imag = cimagf(templ);
-
-        binr[j].real = crealf(tempr);
-        binr[j].imag = cimagf(tempr);
-    }
-
-    /* Initialize rest of the FFT bins */
-
-    for (i = Npsam; i < FFT_SIZE; i++) {
-        binl[i].real = 0.0f;
-        binl[i].imag = 0.0f;
-        
-        binr[i].real = 0.0f;
-        binr[i].imag = 0.0f;
-    }
-
-    codec2_fft_inplace(fft_cfg, binl);
-    codec2_fft_inplace(fft_cfg, binr);
-
-    int fmax = 30;
-    float C[fmax] = 0.0f;
-
-    for (i = 0; i < (FFT_SIZE / 2); i++) {
-        C[i] = cabsolute(binl[i]);
-        C[i] += cabsolute(binr[i]);
-    }
-
-    float mx_pos = 0.0f;
-    float mx_neg = 0.0f;
-
-    int foff_est_pos = 0;
-    int foff_est_neg = 0;
-
-    for (i = 0; i < fmax; i++) {
-        if (C[i] > mx_pos) {
-            mx_pos = C[i];
-            foff_est_pos = i;
-        }
-    }
-
-    for (i = ((FFT_SIZE / 2) - fmax); i < (FFT_SIZE / 2); i++) {
-        if (C[i] > mx_neg) {
-            mx_neg = C[i];
-            foff_est_neg = i;
-        }
-    }
-
-    if (mx_pos > mx_neg) {
-      *foff_est = foff_est_pos;
-    } else {
-      *foff_est = foff_est_neg - fmax;
-    }
-#endif
-
     return t_est;
 }
 
@@ -210,7 +132,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float **tx, complex float *t
 
     for (i = 0; i < ofdm->Nrowsperframe; i++) {
         for (j = 0; j < (ofdm->Nc + 2); j++) {
-            aframe[i][j] = CMPLXF(0.0f, 0.0f);
+            aframe[i][j] = 0.0f + 0.0f * I;
         }
     }
 
@@ -239,7 +161,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float **tx, complex float *t
         complex float asymbol[ofdm->M];
         complex float asymbol_cp[ofdm->M + ofdm->Ncp];
 
-        matrix_vector_multiply(&asymbol, (ofdm->Nc + 2), ofdm->M, ofdm->W, &aframe[i]);
+        matrix_vector_multiply(asymbol, (ofdm->Nc + 2), ofdm->M, ofdm->W, aframe[i]);
 
         /* Copy the last Ncp + 2 columns to the front */
 
@@ -353,7 +275,7 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
         return NULL;
     }
 
-    if ((ofdm->pilots = (int *) malloc((ofdm->Nc + 2) * sizeof (int))) == NULL) {
+    if ((ofdm->pilots = (complex float *) malloc((ofdm->Nc + 2) * sizeof (complex float))) == NULL) {
         free(ofdm->rxbuf);
         free(ofdm->w);
         free(ofdm->rate_fs_pilot_samples);
@@ -386,22 +308,6 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
         }
     }
 
-#ifdef CORRELATE
-    if ((fft_cfg = codec2_fft_alloc(FFT_SIZE, 0, NULL, NULL)) == NULL) {
-        for (i = 0; i < ofdm->M; i++) {
-            free(*(ofdm->W + i));
-        }
-
-        free(ofdm->W);
-        free(ofdm->pilots);
-        free(ofdm->rxbuf);
-        free(ofdm->w);
-        free(ofdm->rate_fs_pilot_samples);
-        errno = 7000;
-        return NULL;
-    }
-#endif
-
     /* same pilots each time */
 
     srand(1);
@@ -409,7 +315,7 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
     /* store pilot symbols in allocated memory */
 
     for (i = 0; i < (ofdm->Nc + 2); i++) {
-        ofdm->pilots[i] = 1 - 2 * (((float)rand() / (float)RAND_MAX) > 0.5f);
+        ofdm->pilots[i] = (float)(1 - 2 * (((float)rand() / (float)RAND_MAX) > 0.5f)) + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
@@ -474,9 +380,6 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
-#ifdef CORRELATE
-    codec2_fft_free(fft_cfg);
-#endif
     for (i = 0; i < ofdm->M; i++) {
         free(*(ofdm->W + i));
     }
@@ -543,7 +446,7 @@ COMP *ofdm_mod(struct OFDM *ofdm, int *tx_bits) {
             /* Here we will have Nbitsperframe / 1 */
 
             for (int s = 0; s < length; s++) {
-                tx_sym_lin[s] = CMPLXF((float)(2 * tx_bits[s] - 1), 0.0f);
+                tx_sym_lin[s] = (float)(2 * tx_bits[s] - 1) + 0.0f * I;
             }
             break;
         default:

@@ -71,8 +71,8 @@ struct OFDM {
     complex float *rate_fs_pilot_samples;
     complex float **W;
     complex float *rxbuf;
+    complex float *pilots;
     float *w;
-    int *pilots;
 };
 
 #ifdef __cplusplus
