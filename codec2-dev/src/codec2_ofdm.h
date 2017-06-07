@@ -31,7 +31,7 @@ struct OFDM *ofdm_create(float, float, int, float, float, int, int);
 void ofdm_destroy(struct OFDM *);
 int ofdm_errno(void);
 COMP *ofdm_mod(struct OFDM *ofdm, int *);
-int *ofdm_demod(struct OFDM *ofdm, COMP []);
+int *ofdm_demod(struct OFDM *ofdm, COMP *);
 
 /* getters and setters */
 
