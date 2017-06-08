@@ -27,16 +27,14 @@ struct OFDM;
 
 /* Prototypes */
 
-struct OFDM *ofdm_create(float, float, int, float, float, int, int);
+struct OFDM *ofdm_create(void);
 void ofdm_destroy(struct OFDM *);
-int ofdm_errno(void);
-COMP *ofdm_mod(struct OFDM *ofdm, int *);
+void ofdm_mod(struct OFDM *ofdm, COMP [OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], int *);
 int *ofdm_demod(struct OFDM *ofdm, COMP *);
 
-/* getters and setters */
+/* option setters */
 
 void set_verbose(struct OFDM *, int);
-int get_verbose(struct OFDM *);
 void set_timing_enable(struct OFDM *, bool);
 void set_foff_est_enable(struct OFDM *, bool);
 void set_phase_est_enable(struct OFDM *, bool);
