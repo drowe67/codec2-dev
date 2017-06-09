@@ -17,8 +17,8 @@
 #include <complex.h>
 
 #include "comp.h"
-#include "codec2_ofdm.h"
 #include "ofdm_internal.h"
+#include "codec2_ofdm.h"
 
 /*
  * Library of functions that implement a BPSK/QPSK OFDM modem
@@ -28,20 +28,16 @@
 
 /* Static Prototypes */
 
-static void matrix_vector_multiply(complex float *, int, int, complex float **, complex float *);
+static void matrix_vector_multiply(complex float *, complex float [OFDM_NC + 2][OFDM_M], complex float *);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
-static void ofdm_txframe(struct OFDM *, complex float **, complex float *);
-static int coarse_sync(struct OFDM *, int *, complex float *, int);
-
-/* global error value */
-
-static int errno;
+static void ofdm_txframe(struct OFDM *, complex float [OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], complex float *);
+static int coarse_sync(struct OFDM *, complex float *, int);
 
 /* Gray coded QPSK modulation function */
 
 static complex float qpsk_mod(int *bits) {
-    return constellation[(bits[1] << 1) | bits[0]];
+    return constellation[(bits[0] << 1) + bits[1]];
 }
 
 /* Gray coded QPSK demodulation function */
@@ -53,15 +49,15 @@ static void qpsk_demod(complex float symbol, int *bits) {
 }
 
 static void matrix_vector_multiply(complex float *result,
-        int columns, int rows, complex float **array, complex float *vector) {
+        complex float array[OFDM_NC + 2][OFDM_M], complex float *vector) {
     int i, j, k;
 
-    for (i = 0; i < columns; i++) {
-        for (j = 0; j < rows; j++) {
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        for (j = 0; j < OFDM_M; j++) {
             result[j] = 0.0f + 0.0f * I;
 
-            for (k = 0; k < columns; k++) {
-                result[j] += (vector[k] * (array[k][j] / (float) rows));    /* complex result */
+            for (k = 0; k < (OFDM_NC + 2); k++) {
+                result[j] += (vector[k] * (array[k][j] / (float) OFDM_M));    /* complex result */
             }
         }
     }
@@ -76,9 +72,9 @@ static void matrix_vector_multiply(complex float *result,
  * used for acquisition (coarse timing a freq offset), and fine timing
  */
 
-static int coarse_sync(struct OFDM *ofdm, int *foff_est, complex float *rx, int length) {
-    int Npsam = (ofdm->M + ofdm->Ncp);
-    int Ncorr = length - (ofdm->Nsamperframe + Npsam);
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
+    int Npsam = (OFDM_M + OFDM_NCP);
+    int Ncorr = length - (OFDM_SAMPLESPERFRAME + Npsam);
     int i;
 
     assert(Ncorr > 0);
@@ -89,7 +85,7 @@ static int coarse_sync(struct OFDM *ofdm, int *foff_est, complex float *rx, int 
         complex float csam = conjf(ofdm->rate_fs_pilot_samples[i]);
 
         corr[i]  = cabsf(rx[i] * csam);
-        corr[i] += cabsf(rx[i + ofdm->Nsamperframe] * csam);
+        corr[i] += cabsf(rx[i + OFDM_SAMPLESPERFRAME] * csam);
     }
 
     /* find the max magnitude and its index */
@@ -124,60 +120,60 @@ static int coarse_sync(struct OFDM *ofdm, int *foff_est, complex float *rx, int 
  *
  */
 
-static void ofdm_txframe(struct OFDM *ofdm, complex float **tx, complex float *tx_sym_lin) {
-    complex float aframe[ofdm->Nrowsperframe][ofdm->Nc + 2];   /* [8][18] */
+static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP],
+        complex float *tx_sym_lin) {
+    complex float aframe[OFDM_NS][OFDM_NC + 2];
     int i, j, k;
 
     /* initialize aframe to complex zero */
 
-    for (i = 0; i < ofdm->Nrowsperframe; i++) {
-        for (j = 0; j < (ofdm->Nc + 2); j++) {
+    for (i = 0; i < OFDM_NS; i++) {
+        for (j = 0; j < (OFDM_NC + 2); j++) {
             aframe[i][j] = 0.0f + 0.0f * I;
         }
     }
 
     /* copy in a row of complex pilots to first row */
 
-    for (i = 0; i < (ofdm->Nc + 2); i++) {
+    for (i = 0; i < (OFDM_NC + 2); i++) {
         aframe[0][i] = ofdm->pilots[i];
     }
 
     /* Place symbols in multi-carrier frame with pilots */
     /* This will place boundary values of complex zero around data */
 
-    for (i = 1; i < ofdm->Nrowsperframe; i++) {
+    for (i = 1; i < OFDM_ROWSPERFRAME; i++) {
 
         /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
 
-
-        for (j = 1; j < (ofdm->Nc + 1); j++) {
-            aframe[i][j] = tx_sym_lin[((i - 1) * ofdm->Nc) + (j - 1)];
+        for (j = 1; j < (OFDM_NC + 1); j++) {
+            aframe[i][j] = tx_sym_lin[((i - 1) * OFDM_NC) + (j - 1)];
         }
     }
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0; i < ofdm->Nrowsperframe; i++) {
-        complex float asymbol[ofdm->M];
-        complex float asymbol_cp[ofdm->M + ofdm->Ncp];
+    for (i = 0; i < OFDM_NS; i++) {
+        complex float asymbol[OFDM_M];
+        complex float asymbol_cp[OFDM_M + OFDM_NCP];
 
-        matrix_vector_multiply(asymbol, (ofdm->Nc + 2), ofdm->M, ofdm->W, aframe[i]);
+        matrix_vector_multiply(asymbol, ofdm->W, aframe[i]);
 
-        /* Copy the last Ncp + 2 columns to the front */
+        /* Copy the last Ncp columns to the front */
 
-        for (j = (ofdm->M - (ofdm->Ncp + 2)), k = 0; j < ofdm->M; j++, k++) {
+        for (j = (OFDM_M - OFDM_NCP), k = 0; j < OFDM_M; j++, k++) {
             asymbol_cp[k] = asymbol[j];
         }
 
         /* Now copy the whole row after it */
 
-        for (j = (ofdm->Ncp + 2), k = 0; j < ofdm->M; j++, k++) {
+        for (j = OFDM_NCP, k = 0; k < OFDM_M; j++, k++) {
             asymbol_cp[j] = asymbol[k];
         }
 
         /* Now move row to the tx reference */
 
-        for (j = 0; j < (ofdm->M + ofdm->Ncp); j++) {
+        for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             tx[i][j] = asymbol_cp[j];
         }
     }
@@ -197,10 +193,10 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float **tx, complex float *t
  *   PPP
  *
  * Returns OFDM data structure on success
- * Return NULL with errno set to error code on fail
+ * Return NULL on fail
  */
 
-struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int ns, int nc) {
+struct OFDM *ofdm_create() {
     struct OFDM *ofdm;
     int i, j;
 
@@ -208,133 +204,29 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
 	return NULL;
     }
 
-    ofdm->Fcentre = freq;
-    ofdm->Fs = fs;                        /* Sample Rate */
-    ofdm->bps = bps;                      /* bits per symbol (1 = BPSK/ 2 = QPSK) */
-    ofdm->Ts = ts;                        /* Symbol Time .018 */
-    ofdm->Rs = (1.0f / ofdm->Ts);         /* Symbol Rate */
-    ofdm->Tcp = tcp;
-    ofdm->Ns = ns;
-    ofdm->Nc = nc;
-    ofdm->M = (int)(ofdm->Fs / ofdm->Rs);                                   /* 144 */
-    ofdm->Ncp = (int)(ofdm->Tcp * ofdm->Fs);                                /* 16 */
-    ofdm->Nbitsperframe = (ofdm->Ns * ofdm->Nc * ofdm->bps);                /* 256 */
-    ofdm->Nrowsperframe = (ofdm->Nbitsperframe / (ofdm->Nc * ofdm->bps));   /* 8 */
-    ofdm->Nsamperframe = (ofdm->Nrowsperframe * (ofdm->M + ofdm->Ncp));     /* 1280 */
-
-    if (ofdm->Fs < 8000.0f) {
-        errno = 1;
-        return NULL;
-    }
-
-    if ((ofdm->bps < 1) || (ofdm->bps > 2)) {
-        errno = 2;
-        return NULL;
-    }
-
-    if (ofdm->Ts >= 1.0f) {
-        errno = 3;
-        return NULL;
-    }
-
-    /*
-     * Since the modem can be configured using different parameters, we use dynamic
-     * memory allocation to build the data structures.
-     *
-     * Whether malloc or calloc is called, is dependent on whether the array or vector
-     * is assigned values here that completely fill the structure.
-     */
-
-    if ((ofdm->rate_fs_pilot_samples = (complex float *) malloc((ofdm->M + ofdm->Nc) * sizeof (complex float))) == NULL) {
-        errno = 1000;
-        return NULL;
-    }
-
-    if ((ofdm->w = (float *) malloc((ofdm->Nc + 2) * sizeof (float))) == NULL) {
-        free(ofdm->rate_fs_pilot_samples);
-        errno = 2000;
-        return NULL;
-    }
-
-    /*
-     * Receive buffer: D P DDD P DDD P DDD P D
-     *                         ^
-     * also see ofdm_demod() ...
-     *
-     * 4320 complex floats (@ 34560 bytes)
-     *
-     * This buffer should be zero'd out as per octave
-     */
-
-    ofdm->Nrxbuf = 3 * ofdm->Nsamperframe + 3 * (ofdm->M + ofdm->Ncp);
-
-    if ((ofdm->rxbuf = (complex float *) calloc(ofdm->Nrxbuf, sizeof (complex float))) == NULL) {
-        free(ofdm->w);
-        free(ofdm->rate_fs_pilot_samples);
-        errno = 3000;
-        return NULL;
-    }
-
-    if ((ofdm->pilots = (complex float *) malloc((ofdm->Nc + 2) * sizeof (complex float))) == NULL) {
-        free(ofdm->rxbuf);
-        free(ofdm->w);
-        free(ofdm->rate_fs_pilot_samples);
-        errno = 4000;
-        return NULL;
-    }
-
-    /* Allocate Nc + 2 columns of complex pointers */
-
-    if ((ofdm->W = (complex float **) malloc((ofdm->Nc + 2) * sizeof (complex float *))) == NULL) {
-        free(ofdm->pilots);
-        free(ofdm->rxbuf);
-        free(ofdm->w);
-        free(ofdm->rate_fs_pilot_samples);
-        errno = 5000;
-        return NULL;
-    }
-
-    /* Allocate M rows of complex pointers */
-
-    for (i = 0; i < ofdm->M; i++) {
-        if ((*(ofdm->W + i) = (complex float *) malloc(ofdm->M * sizeof (complex float))) == NULL) {
-            free(ofdm->W);
-            free(ofdm->pilots);
-            free(ofdm->rxbuf);
-            free(ofdm->w);
-            free(ofdm->rate_fs_pilot_samples);
-            errno = 6000;
-            return NULL;
-        }
-    }
-
     /* same pilots each time */
 
     srand(1);
 
-    /* store pilot symbols in allocated memory */
+    /* store complex pilot symbols in allocated memory */
 
-    for (i = 0; i < (ofdm->Nc + 2); i++) {
+    for (i = 0; i < (OFDM_NC + 2); i++) {
         ofdm->pilots[i] = (float)(1 - 2 * (((float)rand() / (float)RAND_MAX) > 0.5f)) + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
 
-    int Nlower = floorf((ofdm->Fcentre - ofdm->Rs * (ofdm->Nc / 2)) / ofdm->Rs);
+    int Nlower = floorf((OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS);
 
-    for (i = 0, j = Nlower; i < (ofdm->Nc + 2); i++, j++) {
-        ofdm->w[i] = j * TAU * ofdm->Rs / ofdm->Fs;
+    for (i = 0, j = Nlower; i < (OFDM_NC + 2); i++, j++) {
+        ofdm->w[i] = j * TAU * OFDM_RS / OFDM_FS;
     }
 
-    for (i = 0; i < (ofdm->Nc + 2); i++) {
-        for (j = 0; j < ofdm->M; j++) {
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        for (j = 0; j < OFDM_M; j++) {
             ofdm->W[i][j] = cexpf(I * ofdm->w[i] * j);
         }
     }
-
-    /* fine timing search +/- window_width/2 from current timing instant */
-
-    ofdm->ftwindow_width = 11;
 
     /* default settings of options and states */
 
@@ -347,13 +239,13 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
     ofdm->foff_est_hz = 0.0f;
     ofdm->sample_point = 1;
     ofdm->timing_est = 1;
-    ofdm->nin = ofdm->Nsamperframe;
+    ofdm->nin = OFDM_SAMPLESPERFRAME;
 
     /* create the OFDM waveform */
 
-    complex float temp[ofdm->Ncp + ofdm->M];
+    complex float temp[OFDM_NC + OFDM_M];
 
-    matrix_vector_multiply(temp, (ofdm->Nc + 2), ofdm->M, ofdm->W, ofdm->pilots);
+    matrix_vector_multiply(temp, ofdm->W, ofdm->pilots);
 
     /*
      * rate_fs_pilot_samples is 160 samples, as we take the last 16 and copy to the front
@@ -362,50 +254,24 @@ struct OFDM *ofdm_create(float freq, float fs, int bps, float ts, float tcp, int
 
     /* first copy the last Ncp values */
 
-    for (i = 0, j = (ofdm->M - ofdm->Ncp); i < (ofdm->M - ofdm->Ncp); i++, j++) {
+    for (i = 0, j = (OFDM_M - OFDM_NC); i < (OFDM_M - OFDM_NC); i++, j++) {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
 
     /* Now copy the whole thing after the above */
 
-    for (i = ofdm->Ncp, j = 0; i < ofdm->M; i++, j++) {
+    for (i = OFDM_NCP, j = 0; i < OFDM_M; i++, j++) {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
-
-    errno = 0;
 
     return ofdm;     /* Success */
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
-    int i;
-
-    for (i = 0; i < ofdm->M; i++) {
-        free(*(ofdm->W + i));
-    }
-
-    free(ofdm->W);
-    free(ofdm->pilots);
-    free(ofdm->rxbuf);
-    free(ofdm->w);
-    free(ofdm->rate_fs_pilot_samples);
-}
-
-/*
- * Optional function in case the user wants
- * to know where the library failed.
- */
-
-int ofdm_errno() {
-    return errno;
 }
 
 void set_verbose(struct OFDM *ofdm, int level) {
     ofdm->verbose = level;
-}
-
-int get_verbose(struct OFDM *ofdm) {
-    return ofdm->verbose;
 }
 
 void set_timing_enable(struct OFDM *ofdm, bool val) {
@@ -434,62 +300,40 @@ void set_off_est_hz(struct OFDM *ofdm, float val) {
  * --------------------------------------
  */
 
-COMP *ofdm_mod(struct OFDM *ofdm, int *tx_bits) {
-    int length = ofdm->Nbitsperframe / ofdm->bps;
-    complex float tx[ofdm->Nrowsperframe][ofdm->M + ofdm->Ncp];
+void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], int *tx_bits) {
+    int length = OFDM_BITSPERFRAME / OFDM_BPS;
+    complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP];
     complex float tx_sym_lin[length];
-    struct COMP result[ofdm->Nrowsperframe][ofdm->M + ofdm->Ncp];
-    int i, j;
+    int dibit[2];
+    int s, j;
 
-    switch (ofdm->bps) {
-        case 1:
-            /* Here we will have Nbitsperframe / 1 */
+    if (OFDM_BPS == 1) {
+        /* Here we will have Nbitsperframe / 1 */
 
-            for (int s = 0; s < length; s++) {
-                tx_sym_lin[s] = (float)(2 * tx_bits[s] - 1) + 0.0f * I;
-            }
-            break;
-        default:
-        case 2:
-            /* Here we will have Nbitsperframe / 2 */
+        for (s = 0; s < length; s++) {
+            tx_sym_lin[s] = (float) (2 * tx_bits[s] - 1) + 0.0f * I;
+        }
+    } else if (OFDM_BPS == 2) {
+        /* Here we will have Nbitsperframe / 2 */
 
-            for (int s = 0; s < length; s++) {
-                tx_sym_lin[s] = qpsk_mod(tx_bits);
-            }
+        for (s = 0; s < length; s += 2) {
+            dibit[0] = tx_bits[s];
+            dibit[1] = tx_bits[s + 1];
+            tx_sym_lin[s] = qpsk_mod(dibit);
+        }
     }
 
     ofdm_txframe(ofdm, tx, tx_sym_lin);
 
     /* convert to comp */
 
-    for (i = 0; i < ofdm->Nrowsperframe; i++) {
-        for (j = 0; j < (ofdm->M + ofdm->Ncp); j++) {
-            result[i][j].real = crealf(tx[i][j]);
-            result[i][j].imag = cimagf(tx[i][j]);
+    for (s = 0; s < OFDM_ROWSPERFRAME; s++) {
+        for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
+            result[s][j].real = crealf(tx[s][j]);
+            result[s][j].imag = cimagf(tx[s][j]);
         }
     }
-
-    return result;
 }
-
-/*
- * ------------------------------------------
- * ofdm_demod - Demodulates one frame of bits
- * ------------------------------------------
- *
- * For phase estimation we need to maintain buffer of 3 frames plus
- * one pilot, so we have 4 pilots total. '^' is the start of current
- * frame that we are demodulating.
- *
- * P DDD P DDD P DDD P
- *       ^
- *
- * Then add one symbol either side to account for movement in
- * sampling instant due to sample clock differences:
- *
- * D P DDD P DDD P DDD P D
- *         ^
- */
 
 //function [rx_bits states aphase_est_pilot_log rx_np rx_amp] =
 int *ofdm_demod(struct OFDM *ofdm, COMP *rxbuf_in) {
