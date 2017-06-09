@@ -254,7 +254,7 @@ struct OFDM *ofdm_create() {
 
     /* first copy the last Ncp values */
 
-    for (i = 0, j = (OFDM_M - OFDM_NC); i < (OFDM_M - OFDM_NC); i++, j++) {
+    for (i = 0, j = (OFDM_M - OFDM_NC); i < OFDM_NC; i++, j++) {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
 
