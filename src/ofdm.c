@@ -28,7 +28,7 @@
 
 /* Static Prototypes */
 
-static void matrix_vector_multiply(complex float *, complex float [OFDM_NC + 2][OFDM_M], complex float *);
+static void matrix_vector_multiply(complex float *, complex float [OFDM_M][OFDM_NC + 2], complex float *);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], complex float *);
@@ -49,16 +49,14 @@ static void qpsk_demod(complex float symbol, int *bits) {
 }
 
 static void matrix_vector_multiply(complex float *result,
-        complex float array[OFDM_NC + 2][OFDM_M], complex float *vector) {
+        complex float array[OFDM_M][OFDM_NC + 2], complex float *vector) {
     int i, j, k;
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
-        for (j = 0; j < OFDM_M; j++) {
-            result[j] = 0.0f + 0.0f * I;
+    for (j = 0; j < OFDM_M; j++) {
+        result[j] = 0.0f + 0.0f * I;
 
-            for (k = 0; k < (OFDM_NC + 2); k++) {
-                result[j] += (vector[k] * (array[k][j] / (float) OFDM_M));    /* complex result */
-            }
+        for (k = 0; k < (OFDM_NC + 2); k++) {
+            result[j] += (vector[k] * (array[j][k] / (float) OFDM_M)); /* complex result */
         }
     }
 }
@@ -67,9 +65,6 @@ static void matrix_vector_multiply(complex float *result,
  * Correlates the OFDM pilot symbol samples with a window of received
  * samples to determine the most likely timing offset.  Combines two
  * frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
- *
- * Also determines frequency offset at maximum correlation.  Can be
- * used for acquisition (coarse timing a freq offset), and fine timing
  */
 
 static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
@@ -120,14 +115,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
  *
  */
 
-static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP],
+void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP],
         complex float *tx_sym_lin) {
-    complex float aframe[OFDM_NS][OFDM_NC + 2];
+    complex float aframe[OFDM_ROWSPERFRAME][OFDM_NC + 2];
+    complex float asymbol[OFDM_M];
+    complex float asymbol_cp[OFDM_M + OFDM_NCP];
     int i, j, k;
 
     /* initialize aframe to complex zero */
 
-    for (i = 0; i < OFDM_NS; i++) {
+    for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
             aframe[i][j] = 0.0f + 0.0f * I;
         }
@@ -154,9 +151,6 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][
     /* OFDM up-convert symbol by symbol so we can add CP */
 
     for (i = 0; i < OFDM_NS; i++) {
-        complex float asymbol[OFDM_M];
-        complex float asymbol_cp[OFDM_M + OFDM_NCP];
-
         matrix_vector_multiply(asymbol, ofdm->W, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
@@ -204,14 +198,10 @@ struct OFDM *ofdm_create() {
 	return NULL;
     }
 
-    /* same pilots each time */
-
-    srand(1);
-
-    /* store complex pilot symbols in allocated memory */
+    /* store complex pilot symbols */
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
-        ofdm->pilots[i] = (float)(1 - 2 * (((float)rand() / (float)RAND_MAX) > 0.5f)) + 0.0f * I;
+        ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
@@ -222,9 +212,9 @@ struct OFDM *ofdm_create() {
         ofdm->w[i] = j * TAU * OFDM_RS / OFDM_FS;
     }
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
-        for (j = 0; j < OFDM_M; j++) {
-            ofdm->W[i][j] = cexpf(I * ofdm->w[i] * j);
+    for (i = 0; i < OFDM_M; i++) {
+        for (j = 0; j < (OFDM_NC + 2); j++) {
+            ofdm->W[i][j] = cexpf(I * ofdm->w[j] * i);
         }
     }
 
@@ -260,7 +250,7 @@ struct OFDM *ofdm_create() {
 
     /* Now copy the whole thing after the above */
 
-    for (i = OFDM_NCP, j = 0; i < OFDM_M; i++, j++) {
+    for (i = OFDM_NCP, j = 0; j < OFDM_M; i++, j++) {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
 

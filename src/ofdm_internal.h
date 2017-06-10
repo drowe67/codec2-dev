@@ -65,6 +65,14 @@ const complex float constellation[] = {
     -1.0f + 0.0f * I
 };
 
+/*
+ * These pilots are compatible with Octave version
+ */
+const char pilotvalues[] = {
+    -1, -1, 1, 1, -1, -1, -1, 1, -1,
+     1, -1, 1, 1,  1,  1,  1, 1,  1
+};
+
 struct OFDM {
     float foff_est_gain;
     float foff_est_hz;
@@ -79,7 +87,7 @@ struct OFDM {
     bool phase_est_en;
 
     complex float rate_fs_pilot_samples[OFDM_M + OFDM_NC];
-    complex float W[OFDM_NC + 2][OFDM_M];
+    complex float W[OFDM_M][OFDM_NC + 2];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
     float w[OFDM_NC + 2];
