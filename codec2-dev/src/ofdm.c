@@ -146,7 +146,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
-    int i, j, k;
+    int i, j, k, l;
 
     /* initialize aframe to complex zero */
 
@@ -176,7 +176,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0, k = 0; i < OFDM_NS; i++, k += (OFDM_M + OFDM_NCP)) {
+    for (i = 0, l = 0; i < OFDM_NS; i++, l += (OFDM_M + OFDM_NCP)) {
         matrix_vector_multiply(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
@@ -194,7 +194,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
         /* Now move row to the tx reference */
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            tx[k] = asymbol_cp[j];
+            tx[l] = asymbol_cp[j];
         }
     }
 }
@@ -316,9 +316,9 @@ void set_off_est_hz(struct OFDM *ofdm, float val) {
  * --------------------------------------
  */
 
-void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_NS][OFDM_M + OFDM_NCP], int *tx_bits) {
+void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], int *tx_bits) {
     int length = OFDM_BITSPERFRAME / OFDM_BPS;
-    complex float tx[OFDM_NS][OFDM_M + OFDM_NCP];
+    complex float tx[OFDM_SAMPLESPERFRAME];
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, j;
@@ -343,11 +343,9 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_NS][OFDM_M + OFDM_NCP], int *t
 
     /* convert to comp */
 
-    for (s = 0; s < OFDM_NS; s++) {
-        for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            result[s][j].real = crealf(tx[s][j]);
-            result[s][j].imag = cimagf(tx[s][j]);
-        }
+    for (s = 0; s < OFDM_SAMPLESPERFRAME; s++) {
+        result[s].real = crealf(tx[s]);
+        result[s].imag = cimagf(tx[s]);
     }
 }
 
