@@ -232,7 +232,7 @@ struct OFDM *ofdm_create() {
 
     /* create the OFDM waveform */
 
-    complex float temp[OFDM_NC + OFDM_M];
+    complex float temp[OFDM_M + OFDM_NCP];
 
     matrix_vector_multiply(ofdm, temp, ofdm->pilots);
 
@@ -241,9 +241,9 @@ struct OFDM *ofdm_create() {
      * Thus resulting in 16 + 128 + 16 = 160
      */
 
-    /* first copy the last Ncp values */
+    /* first copy the last Cyclic Prefix (CP) values */
 
-    for (i = 0, j = (OFDM_M - OFDM_NC); i < OFDM_NC; i++, j++) {
+    for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
 
