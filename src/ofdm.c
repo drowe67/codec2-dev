@@ -52,7 +52,7 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
     int row, col;
 
     for (row = 0; row < OFDM_M; row++) {
-        result[j] = 0.0f + 0.0f * I;
+        result[row] = 0.0f + 0.0f * I;
 
         for (col = 0; col < (OFDM_NC + 2); col++) {
             result[row] += (vector[col] * (ofdm->W[row][col] / (float) OFDM_M)); /* complex result */
@@ -234,7 +234,7 @@ struct OFDM *ofdm_create() {
 
     complex float temp[OFDM_NC + OFDM_M];
 
-    matrix_vector_multiply(temp, ofdm->W, ofdm->pilots);
+    matrix_vector_multiply(ofdm, temp, ofdm->pilots);
 
     /*
      * rate_fs_pilot_samples is 160 samples, as we take the last 16 and copy to the front
