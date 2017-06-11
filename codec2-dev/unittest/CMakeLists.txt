@@ -13,12 +13,6 @@ target_link_libraries(extract codec2)
 add_executable(vqtrain vqtrain.c)
 target_link_libraries(vqtrain codec2)
 
-add_executable(genphdata genphdata.c)
-target_link_libraries(genphdata codec2)
-
-add_executable(genampdata genampdata.c)
-target_link_libraries(genampdata codec2)
-
 add_executable(polar2rect polar2rect.c)
 target_link_libraries(polar2rect codec2)
 
@@ -29,9 +23,6 @@ set(CODEBOOKS ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/co
 
 add_executable(tnlp tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c)
 target_link_libraries(tnlp codec2)
-
-add_executable(tinterp tinterp.c ../src/sine.c ../src/kiss_fft.c ../src/interp.c ../src/lpc.c ../src/lsp.c ../src/quantise.c ${CODEBOOKS} ../src/dump.c)
-target_link_libraries(tinterp codec2)
 
 add_executable(tquant tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ${CODEBOOKS})
 target_link_libraries(tquant codec2)
@@ -63,14 +54,14 @@ target_link_libraries(tfmfsk m)
 add_executable(tdeframer tdeframer.c)
 target_link_libraries(tdeframer m codec2)
 
+add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c)
+target_link_libraries(tofdm m)
+
 add_executable(tfreedv_data_channel tfreedv_data_channel.c)
 target_link_libraries(tfreedv_data_channel codec2)
 
 add_executable(create_interleaver create_interleaver.c)
 target_link_libraries(create_interleaver codec2)
-
-add_executable(tlspsens tlspsens.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ../src/codec2.c ../src/sine.c ../src/nlp.c ../src/pack.c ../src/interp.c ../src/postfilter.c ../src/phase.c ${CODEBOOKS})
-target_link_libraries(tlspsens codec2)
 
 add_executable(tprede tprede.c ../src/lpc.c)
 target_link_libraries(tprede codec2)
