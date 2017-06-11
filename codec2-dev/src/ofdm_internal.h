@@ -47,31 +47,8 @@ extern "C" {
 #define OFDM_FTWINDOWWIDTH      11
 #define OFDM_BITSPERFRAME       ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
 #define OFDM_ROWSPERFRAME       (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
-#define OFDM_SAMPLESPERFRAME    (OFDM_ROWSPERFRAME * (OFDM_M + OFDM_NCP))
+#define OFDM_SAMPLESPERFRAME    (OFDM_NS * (OFDM_M + OFDM_NCP))
 #define OFDM_RXBUF              (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
-
-/*
- * QPSK Quadrant bit-pair values - Gray Coded
- *
- *   0.0 -  89.9 = 00
- *  90.0 - 179.9 = 01
- * 180.0 - 269.9 = 11
- * 270.0 - 359.9 = 10
- */
-const complex float constellation[] = {
-     1.0f + 0.0f * I,
-     0.0f + 1.0f * I,
-     0.0f - 1.0f * I,
-    -1.0f + 0.0f * I
-};
-
-/*
- * These pilots are compatible with Octave version
- */
-const char pilotvalues[] = {
-    -1, -1, 1, 1, -1, -1, -1, 1, -1,
-     1, -1, 1, 1,  1,  1,  1, 1,  1
-};
 
 struct OFDM {
     float foff_est_gain;
