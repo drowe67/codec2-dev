@@ -183,6 +183,7 @@ function [sim_out rx states] = run_sim(sim_in)
     % note for reasons unknown LdpcEncode() returns garbage if we use > 0.5 rather than round()
 
     tx_data_bits = round(rand(1,Nbits*rate));
+    %test_bits_ofdm_file(tx_data_bits);
 
     tx_bits = []; tx_symbols = [];
     for f=1:Nframes
@@ -524,14 +525,14 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  %sim_in.Nsec = 2*(sim_in.Ns+1)/sim_in.Rs;  % one frame
-  sim_in.Nsec = 50;
+  sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
+  %sim_in.Nsec = 1;
 
   sim_in.EbNodB = EbNodB;
-  sim_in.verbose = 1;
-  sim_in.hf_en = 1;
+  sim_in.verbose = 2;
+  sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
-  sim_in.dfoff_hz_per_sec = 0.02;
+  sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
 
   sim_in.timing_en = 1;
@@ -542,7 +543,7 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.ldpc_code = HRA_112_112;
   sim_in.ldpc_en = 1;
 
-  sim_in.interleave_frames = 32;
+  sim_in.interleave_frames = 1;
 
   %sim_in.diversity_en = 1;
 
@@ -990,8 +991,8 @@ more off;
 
 init_cml('/home/david/Desktop/cml/');
 
-%run_single(6) 
-run_curves
+run_single(6) 
+%run_curves
 %run_curves_estimators
 %acquisition_histograms
 %acquisition_test
