@@ -194,7 +194,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
         /* Now move row to the tx reference */
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            tx[l] = asymbol_cp[j];
+            tx[l + j] = asymbol_cp[j];
         }
     }
 }
