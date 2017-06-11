@@ -31,8 +31,35 @@
 static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
-static void ofdm_txframe(struct OFDM *, complex float [OFDM_NS][OFDM_M + OFDM_NCP], complex float *);
+static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
+
+/* Constants */
+
+/*
+ * QPSK Quadrant bit-pair values - Gray Coded
+ *
+ *   0.0 -  89.9 = 00
+ *  90.0 - 179.9 = 01
+ * 180.0 - 269.9 = 11
+ * 270.0 - 359.9 = 10
+ */
+const complex float constellation[] = {
+     1.0f + 0.0f * I,
+     0.0f + 1.0f * I,
+     0.0f - 1.0f * I,
+    -1.0f + 0.0f * I
+};
+
+/*
+ * These pilots are compatible with Octave version
+ */
+const char pilotvalues[] = {
+    -1, -1, 1, 1, -1, -1, -1, 1, -1,
+     1, -1, 1, 1,  1,  1,  1, 1,  1
+};
+
+/* Functions */
 
 /* Gray coded QPSK modulation function */
 
@@ -114,7 +141,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
  *
  */
 
-void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_NS][OFDM_M + OFDM_NCP],
+static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME],
         complex float *tx_sym_lin) {
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
@@ -149,7 +176,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_NS][OFDM_M + OFDM_NCP
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0; i < OFDM_NS; i++) {
+    for (i = 0, k = 0; i < OFDM_NS; i++, k += (OFDM_M + OFDM_NCP)) {
         matrix_vector_multiply(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
@@ -167,7 +194,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_NS][OFDM_M + OFDM_NCP
         /* Now move row to the tx reference */
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            tx[i][j] = asymbol_cp[j];
+            tx[k] = asymbol_cp[j];
         }
     }
 }
