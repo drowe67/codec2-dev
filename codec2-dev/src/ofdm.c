@@ -28,10 +28,10 @@
 
 /* Static Prototypes */
 
-static void matrix_vector_multiply(complex float *, complex float [OFDM_M][OFDM_NC + 2], complex float *);
+static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
-static void ofdm_txframe(struct OFDM *, complex float [OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], complex float *);
+static void ofdm_txframe(struct OFDM *, complex float [OFDM_NS][OFDM_M + OFDM_NCP], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
 
 /* Gray coded QPSK modulation function */
@@ -48,15 +48,14 @@ static void qpsk_demod(complex float symbol, int *bits) {
     bits[1] = cimagf(rotate) < 0.0f;
 }
 
-static void matrix_vector_multiply(complex float *result,
-        complex float array[OFDM_M][OFDM_NC + 2], complex float *vector) {
-    int i, j, k;
+static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
+    int row, col;
 
-    for (j = 0; j < OFDM_M; j++) {
+    for (row = 0; row < OFDM_M; row++) {
         result[j] = 0.0f + 0.0f * I;
 
-        for (k = 0; k < (OFDM_NC + 2); k++) {
-            result[j] += (vector[k] * (array[j][k] / (float) OFDM_M)); /* complex result */
+        for (col = 0; col < (OFDM_NC + 2); col++) {
+            result[row] += (vector[col] * (ofdm->W[row][col] / (float) OFDM_M)); /* complex result */
         }
     }
 }
@@ -115,16 +114,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
  *
  */
 
-void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP],
+void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_NS][OFDM_M + OFDM_NCP],
         complex float *tx_sym_lin) {
-    complex float aframe[OFDM_ROWSPERFRAME][OFDM_NC + 2];
+    complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
     int i, j, k;
 
     /* initialize aframe to complex zero */
 
-    for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
+    for (i = 0; i < OFDM_NS; i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
             aframe[i][j] = 0.0f + 0.0f * I;
         }
@@ -139,7 +138,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M 
     /* Place symbols in multi-carrier frame with pilots */
     /* This will place boundary values of complex zero around data */
 
-    for (i = 1; i < OFDM_ROWSPERFRAME; i++) {
+    for (i = 1; i <= OFDM_ROWSPERFRAME; i++) {
 
         /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
 
@@ -151,7 +150,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_ROWSPERFRAME][OFDM_M 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
     for (i = 0; i < OFDM_NS; i++) {
-        matrix_vector_multiply(asymbol, ofdm->W, aframe[i]);
+        matrix_vector_multiply(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
 
@@ -290,9 +289,9 @@ void set_off_est_hz(struct OFDM *ofdm, float val) {
  * --------------------------------------
  */
 
-void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP], int *tx_bits) {
+void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_NS][OFDM_M + OFDM_NCP], int *tx_bits) {
     int length = OFDM_BITSPERFRAME / OFDM_BPS;
-    complex float tx[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NCP];
+    complex float tx[OFDM_NS][OFDM_M + OFDM_NCP];
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, j;
@@ -317,7 +316,7 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_ROWSPERFRAME][OFDM_M + OFDM_NC
 
     /* convert to comp */
 
-    for (s = 0; s < OFDM_ROWSPERFRAME; s++) {
+    for (s = 0; s < OFDM_NS; s++) {
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             result[s][j].real = crealf(tx[s][j]);
             result[s][j].imag = cimagf(tx[s][j]);
