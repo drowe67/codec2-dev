@@ -183,7 +183,6 @@ function [sim_out rx states] = run_sim(sim_in)
     % note for reasons unknown LdpcEncode() returns garbage if we use > 0.5 rather than round()
 
     tx_data_bits = round(rand(1,Nbits*rate));
-    %test_bits_ofdm_file(tx_data_bits);
 
     tx_bits = []; tx_symbols = [];
     for f=1:Nframes
