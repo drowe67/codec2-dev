@@ -24,9 +24,6 @@ set(CODEBOOKS ../src/codebook.c ../src/codebookd.c ../src/codebookvq.c ../src/co
 add_executable(tnlp tnlp.c ../src/sine.c ../src/nlp.c ../src/kiss_fft.c ../src/dump.c)
 target_link_libraries(tnlp codec2)
 
-add_executable(tquant tquant.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ${CODEBOOKS})
-target_link_libraries(tquant codec2)
-
 add_executable(scalarlsptest scalarlsptest.c ../src/quantise.c ../src/lpc.c ../src/lsp.c ../src/dump.c ../src/kiss_fft.c ${CODEBOOKS})
 target_link_libraries(scalarlsptest codec2)
 
