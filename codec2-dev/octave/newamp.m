@@ -20,8 +20,13 @@ melvq; % mbest VQ functions
 % General 2nd order parabolic interpolator.  Used splines orginally,
 % but this is much simpler and we don't need much accuracy.  Given two
 % vectors of points xp and yp, find interpolated values y at points x
+%
 
-function y = interp_para(xp, yp, x)
+% If a point in x is less than the smallest point in xp, we linearly
+% interpolate down to (0,0).  If a point in x is greater than the
+% greatest value in xp, we linearly interpolate down to (xp_max, 0)
+
+function y = interp_para(xp, yp, xp_max, x)
   assert( (length(xp) >=3) && (length(yp) >= 3) );
 
   y = zeros(1,length(x));
@@ -31,17 +36,45 @@ function y = interp_para(xp, yp, x)
 
     % k is index into xp of where we start 3 points used to form parabola
 
-    while ((xp(k+1) < xi) && (k < (length(xp)-2))) 
+    while (xp(k) < xi) && (k < length(xp)) 
       k++;
     end
     
-    x1 = xp(k); y1 = yp(k); x2 = xp(k+1); y2 = yp(k+1); x3 = xp(k+2); y3 = yp(k+2);
-    %printf("k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
+    %printf("xi: %f k = %d\n", xi, k);
+    if k == 1
+      % linear interpolation at low end
+      x1 = 0; y1 = 0;
+      x2 = xp(k); y2 = yp(k); 
+      b = (y2-y1)/(x2-x1);
+      y(i) = b*(xi-x2) + y2;
+      %printf("lin1 k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
+    elseif k < length(xp)
+      % parabolic interpolation
+      x1 = xp(k-1); y1 = yp(k-1); 
+      x2 = xp(k); y2 = yp(k); 
+      x3 = xp(k+1); y3 = yp(k+1);
+      a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
+      b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
+      y(i) = a*(xi-x2)^2 + b*(xi-x2) + y2;
+      %printf("para1 k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
+    elseif (k == length(xp)) && (xi < xp(k))
+      % parabolic interpolation, but shift xp points back by 1
+      x1 = xp(k-2); y1 = yp(k-2); 
+      x2 = xp(k-1); y2 = yp(k-1); 
+      x3 = xp(k); y3 = yp(k);
+      a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
+      b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
+      y(i) = a*(xi-x2)^2 + b*(xi-x2) + y2;
+      %printf("para2 k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
+    elseif k == length(xp)
+      % linear interpolation at high end
+      x1 = xp(k); y1 = yp(k); 
+      x2 = xp_max; y2 = 0;
+      b = (y2-y1)/(x2-x1);
+      y(i) = b*(xi-x1) + y1;
+      %printf("lin2 k: %d i: %d xi: %f x1: %f y1: %f\n", k, i, xi, x1, y1);
+    end
 
-    a = ((y3-y2)/(x3-x2)-(y2-y1)/(x2-x1))/(x3-x1);
-    b = ((y3-y2)/(x3-x2)*(x2-x1)+(y2-y1)/(x2-x1)*(x3-x2))/(x3-x1);
-  
-    y(i) = a*(xi-x2)^2 + b*(xi-x2) + y2;
   end
 endfunction
 
@@ -184,7 +217,7 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Am = model(f,3:(L+2));
   AmdB = 20*log10(Am);
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-  Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, sample_freqs_kHz);    
+  Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), sample_freqs_kHz);    
 
   % Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
 
@@ -208,14 +241,20 @@ function mel = ftomel(fHz)
 endfunction
 
 
-function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K)
-  mel_start = ftomel(100); mel_end = ftomel(0.95*4000); 
+function rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, fstart_hz=100, fend_hz=0.95*4000)
+  mel_start = ftomel(fstart_hz); mel_end = ftomel(fend_hz); 
   step = (mel_end-mel_start)/(K-1);
   mel = mel_start:step:mel_end;
   rate_K_sample_freqs_Hz = 700*((10 .^ (mel/2595)) - 1);
   rate_K_sample_freqs_kHz = rate_K_sample_freqs_Hz/1000;
 endfunction
 
+
+function plot_mel_sample_freqs(K, f_start_hz, f_end_hz)
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, f_start_hz, f_end_hz);
+  figure(1); clf;
+  plot(rate_K_sample_freqs_kHz,'+');
+endfunction
 
 function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
@@ -230,7 +269,7 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
   % convert rate L=pi/Wo amplitude samples to fixed rate K
 
-  max_amp = 80;
+  Fs = 8000; max_amp = 80;
   [frames col] = size(model);
   K = length(rate_K_sample_freqs_kHz);
   rate_K_surface = zeros(frames, K);
@@ -251,7 +290,7 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
     
     %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz);    
+    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
 
     %printf("\r%d/%d", f, frames);
   end
@@ -295,16 +334,16 @@ function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_lo
 
         % find closest rate K sample to nasty error
 
-        nasty_error_freq = mx_m*Wo*Fs/(2*pi*1000)
+        nasty_error_freq = mx_m*Wo*Fs/(2*pi*1000);
         [tmp closest_k] = min(abs(rate_K_sample_freqs_kHz - nasty_error_freq));
         rate_K_vec_corrected(closest_k) = AmdB(mx_m);
 
         % zero out error in this region and look for another large error region
 
         k = max(1, closest_k-1); 
-        rate_K_prev_sample_kHz = rate_K_sample_freqs_kHz(k)
+        rate_K_prev_sample_kHz = rate_K_sample_freqs_kHz(k);
         k = min(K, closest_k+1); 
-        rate_K_next_sample_kHz = rate_K_sample_freqs_kHz(k)
+        rate_K_next_sample_kHz = rate_K_sample_freqs_kHz(k);
 
         [tmp st_m] = min(abs(Am_freqs_kHz - rate_K_prev_sample_kHz));
         [tmp en_m] = min(abs(Am_freqs_kHz - rate_K_next_sample_kHz));
@@ -320,7 +359,7 @@ endfunction
 % Take a rate K surface and convert back to time varying rate L
 
 function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
-  max_amp = 80;
+  max_amp = 80; Fs=8;
   [frames col] = size(model);
 
   model_ = zeros(frames, max_amp+2);
@@ -332,7 +371,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     % back down to rate L
 
     % AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
-    AmdB_ = interp_para([ 0 rate_K_sample_freqs_kHz 4], [0 rate_K_surface(f,:) 0], rate_L_sample_freqs_kHz);
+    AmdB_ = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);
 
     model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
    end
@@ -540,24 +579,24 @@ endfunction
 % determine cumulative mask, using amplitude of each harmonic.  Mask is
 % sampled across L points in the linear domain
 
-function maskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz)
+function maskdB = determine_mask(masker_amps_dB, masker_freqs_kHz, mask_sample_freqs_kHz, bark_model=1)
 
     % calculate and plot masking curve
 
     maskdB = zeros(1,length(mask_sample_freqs_kHz));
     for m=1:length(masker_freqs_kHz)
-      %maskdB = max(maskdB, schroeder(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
-      maskdB = max(maskdB, parabolic_resonator(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
+      maskdB = max(maskdB, schroeder(masker_freqs_kHz(m), mask_sample_freqs_kHz, bark_model) + masker_amps_dB(m)); 
+      %maskdB = max(maskdB, parabolic_resonator(masker_freqs_kHz(m), mask_sample_freqs_kHz) + masker_amps_dB(m)); 
     end
 end
 
 
 % Sample mask as model for Am
 
-function [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L)
+function [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L, bark_model=1)
 
     Am_freqs_kHz = (1:L)*Wo*4/pi;
-    maskdB = determine_mask(AmdB, Am_freqs_kHz, Am_freqs_kHz);
+    maskdB = determine_mask(AmdB, Am_freqs_kHz, Am_freqs_kHz, bark_model);
 endfunction
 
 
@@ -779,30 +818,30 @@ endfunction
 
 % plot some masking curves, used for working on masking filter changes
 
-function plot_masking
+function plot_masking(bark_model=0);
   Fs = 8000;
 
   figure(1)
   mask_sample_freqs_kHz = 0.1:0.025:(Fs/1000)/2;
-  #{
-  maskdB_s0 = schroeder(0.5, mask_sample_freqs_kHz, 0);
-  plot(mask_sample_freqs_kHz, maskdB_s0,';schroeder 0;');
-  maskdB_s1 = schroeder(0.5, mask_sample_freqs_kHz, 1);
+  %maskdB_s0 = schroeder(0.5, mask_sample_freqs_kHz, 0);
+  %plot(mask_sample_freqs_kHz, maskdB_s0,';schroeder 0;');
+  maskdB_s1 = schroeder(0.5, mask_sample_freqs_kHz, bark_model);
   plot(mask_sample_freqs_kHz, maskdB_s1,'g;schroeder 1;');
-  #}
+  #{
   maskdB_res = parabolic_resonator(0.5, mask_sample_freqs_kHz);
   plot(mask_sample_freqs_kHz, maskdB_res,'r;resonator;');
+  #}
   hold on;
 
   for f=0.5:0.5:3
-    #{
-    maskdB_s0 = schroeder(f, mask_sample_freqs_kHz, 0);
-    plot(mask_sample_freqs_kHz, maskdB_s0);
-    maskdB_s1 = schroeder(f, mask_sample_freqs_kHz, 1);
+    %maskdB_s0 = schroeder(f, mask_sample_freqs_kHz, 0);
+    %plot(mask_sample_freqs_kHz, maskdB_s0);
+    maskdB_s1 = schroeder(f, mask_sample_freqs_kHz, bark_model);
     plot(mask_sample_freqs_kHz, maskdB_s1,'g');
-    #}
+    #{
     maskdB_res = parabolic_resonator(f, mask_sample_freqs_kHz);
     plot(mask_sample_freqs_kHz, maskdB_res,'r;resonator;');
+    #}
   end
   hold off;
 
