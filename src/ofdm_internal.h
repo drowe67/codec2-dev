@@ -64,7 +64,7 @@ struct OFDM {
     bool phase_est_en;
 
     complex float rate_fs_pilot_samples[OFDM_M + OFDM_NCP];
-    complex float W[OFDM_M][OFDM_NC + 2];
+    complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
     float w[OFDM_NC + 2];
