@@ -82,7 +82,7 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
         result[row] = 0.0f + 0.0f * I;
 
         for (col = 0; col < (OFDM_NC + 2); col++) {
-            result[row] += (vector[col] * (ofdm->W[row][col] / (float) OFDM_M)); /* complex result */
+            result[row] += (vector[col] * (ofdm->W[col][row] / (float) OFDM_M)); /* complex result */
         }
     }
 }
@@ -238,9 +238,9 @@ struct OFDM *ofdm_create() {
         ofdm->w[i] = j * TAU * OFDM_RS / OFDM_FS;
     }
 
-    for (i = 0; i < OFDM_M; i++) {
-        for (j = 0; j < (OFDM_NC + 2); j++) {
-            ofdm->W[i][j] = cexpf(I * ofdm->w[j] * i);
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        for (j = 0; j < OFDM_M; j++) {
+            ofdm->W[i][j] = cexpf(I * ofdm->w[i] * j);
         }
     }
 
