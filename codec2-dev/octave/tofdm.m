@@ -31,11 +31,11 @@ system('../build_linux/unittest/tofdm');
 load tofdm_out.txt;
 
 stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
-stem_sig_and_error(2, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -1.5 1.5])
-stem_sig_and_error(2, 212, imag(tx_log_c), real(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -1.5 1.5])
+stem_sig_and_error(2, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
+stem_sig_and_error(2, 212, imag(tx_log_c), real(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
 
 % Run through checklist -----------------------------
 
 check(W, W_c, 'W');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
-check(tx_symbols_log, tx_log_c, 'tx');
+check(tx_log, tx_log_c, 'tx');
