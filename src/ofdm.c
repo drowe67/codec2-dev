@@ -64,7 +64,7 @@ const char pilotvalues[] = {
 /* Gray coded QPSK modulation function */
 
 static complex float qpsk_mod(int *bits) {
-    return constellation[(bits[0] << 1) + bits[1]];
+    return constellation[(bits[1] << 1) | bits[0]];
 }
 
 /* Gray coded QPSK demodulation function */
@@ -332,10 +332,10 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
     } else if (OFDM_BPS == 2) {
         /* Here we will have Nbitsperframe / 2 */
 
-        for (s = 0; s < length; s += 2) {
-            dibit[0] = tx_bits[s];
-            dibit[1] = tx_bits[s + 1];
-            tx_sym_lin[s] = qpsk_mod(dibit);
+        for (s = 0, i = 0; i < length; s += 2, i++) {
+            dibit[0] = tx_bits[s + 1] & 0x1;
+            dibit[1] = tx_bits[s] & 0x1;
+            tx_sym_lin[i] = qpsk_mod(dibit);
         }
     }
 
@@ -343,9 +343,9 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
 
     /* convert to comp */
 
-    for (s = 0; s < OFDM_SAMPLESPERFRAME; s++) {
-        result[s].real = crealf(tx[s]);
-        result[s].imag = cimagf(tx[s]);
+    for (i = 0; i < OFDM_SAMPLESPERFRAME; i++) {
+        result[i].real = crealf(tx[i]);
+        result[i].imag = cimagf(tx[i]);
     }
 }
 
