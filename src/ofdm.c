@@ -316,7 +316,7 @@ void set_off_est_hz(struct OFDM *ofdm, float val) {
  * --------------------------------------
  */
 
-void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], int *tx_bits) {
+void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *tx_bits) {
     int length = OFDM_BITSPERFRAME / OFDM_BPS;
     complex float tx[OFDM_SAMPLESPERFRAME];
     complex float tx_sym_lin[length];
