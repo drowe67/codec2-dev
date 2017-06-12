@@ -29,7 +29,7 @@ struct OFDM;
 
 struct OFDM *ofdm_create(void);
 void ofdm_destroy(struct OFDM *);
-void ofdm_mod(struct OFDM *ofdm, COMP [OFDM_SAMPLESPERFRAME], int *);
+void ofdm_mod(struct OFDM *ofdm, COMP [OFDM_SAMPLESPERFRAME], const int *);
 int *ofdm_demod(struct OFDM *ofdm, COMP *);
 
 /* option setters */
