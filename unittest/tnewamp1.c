@@ -40,31 +40,35 @@
 #define FRAMES 300
 
 int main(int argc, char *argv[]) {
-    short buf[N_SAMP];	        /* input/output buffer                   */
-    float Sn[M_PITCH];	        /* float input speech samples            */
+    int Fs = 8000;
+    C2CONST c2const = c2const_create(Fs);
+    int   n_samp = c2const.n_samp;
+    int   m_pitch = c2const.m_pitch;
+    short buf[n_samp];	        /* input/output buffer                   */
+    float Sn[m_pitch];	        /* float input speech samples            */
     COMP  Sw[FFT_ENC];	        /* DFT of Sn[]                           */
     codec2_fft_cfg fft_fwd_cfg; /* fwd FFT states                        */
-    float w[M_PITCH];	        /* time domain hamming window            */
+    float w[m_pitch];	        /* time domain hamming window            */
     COMP  W[FFT_ENC];	        /* DFT of w[]                            */
     MODEL model;
     void *nlp_states;
     codec2_fft_cfg phase_fft_fwd_cfg, phase_fft_inv_cfg;
-    float pitch, prev_uq_Wo;
+    float pitch, prev_f0;
     int   i,m,f,k;
     
     if (argc != 2) {
         printf("usage: ./tnewamp1 RawFile\n");
         exit(1);
     }
-    nlp_states = nlp_create(M_PITCH);
-    prev_uq_Wo = TWO_PI/P_MAX;
+    nlp_states = nlp_create(&c2const);
+    prev_f0 = 1.0/P_MAX_S;
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL); 
-    make_analysis_window(fft_fwd_cfg, w, W);
+    make_analysis_window(&c2const,fft_fwd_cfg, w, W);
 
     phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
     phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
 
-    for(i=0; i<M_PITCH; i++) {
+    for(i=0; i<m_pitch; i++) {
 	Sn[i] = 1.0;
     }
 
@@ -98,7 +102,7 @@ int main(int argc, char *argv[]) {
         voicing_[f] = 0;
     }
 
-    mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K);
+    mel_sample_freqs_kHz(rate_K_sample_freqs_kHz, K, ftomel(200.0), ftomel(3700.0));
 
     //for(int k=0; k<K; k++)
     //    printf("k: %d sf: %f\n", k, rate_K_sample_freqs_kHz[k]);
@@ -112,31 +116,32 @@ int main(int argc, char *argv[]) {
     int M = 4; 
 
     for(f=0; f<FRAMES; f++) {
-        assert(fread(buf,sizeof(short),N_SAMP,fin) == N_SAMP);
+        assert(fread(buf,sizeof(short),n_samp,fin) == n_samp);
 
         /* shift buffer of input samples, and insert new samples */
 
-	for(i=0; i<M_PITCH-N_SAMP; i++) {
-	    Sn[i] = Sn[i+N_SAMP];
+	for(i=0; i<m_pitch-n_samp; i++) {
+	    Sn[i] = Sn[i+n_samp];
 	}
-	for(i=0; i<N_SAMP; i++) {
-	    Sn[i+M_PITCH-N_SAMP] = buf[i];
+	for(i=0; i<n_samp; i++) {
+	    Sn[i+m_pitch-n_samp] = buf[i];
         }
 
 	/* Estimate Sinusoidal Model Parameters ----------------------*/
 
-	nlp(nlp_states, Sn, N_SAMP, P_MIN, P_MAX, &pitch, Sw, W, &prev_uq_Wo);
+	nlp(nlp_states, Sn, n_samp, &pitch, Sw, W, &prev_f0);
 	model.Wo = TWO_PI/pitch;
 
-	dft_speech(fft_fwd_cfg, Sw, Sn, w);
-	two_stage_pitch_refinement(&model, Sw);
+	dft_speech(&c2const, fft_fwd_cfg, Sw, Sn, w);
+	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
-        est_voicing_mbe(&model, Sw, W);
+        est_voicing_mbe(&c2const, &model, Sw, W);
         //voicing[f] = model.voiced;
 
-        /* newamp1 processing ----------------------------------------*/
+        /* newamp1  processing ----------------------------------------*/
 
-        newamp1_model_to_indexes(&indexes[f][0], 
+        newamp1_model_to_indexes(&c2const, 
+                                 &indexes[f][0], 
                                  &model, 
                                  &rate_K_surface[f][0], 
                                  rate_K_sample_freqs_kHz,
@@ -191,7 +196,8 @@ int main(int argc, char *argv[]) {
     for(f=M-1; f<FRAMES; f+=M) {
 
         float a_interpolated_surface_[M][K];
-        newamp1_indexes_to_model(model__,
+        newamp1_indexes_to_model(&c2const,
+                                 model__,
                                  (COMP*)HH,
                                  (float*)a_interpolated_surface_,
                                  prev_rate_K_vec_,
