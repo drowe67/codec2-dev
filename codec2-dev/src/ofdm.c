@@ -321,7 +321,7 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
     complex float tx[OFDM_SAMPLESPERFRAME];
     complex float tx_sym_lin[length];
     int dibit[2];
-    int s, j;
+    int s, i;
 
     if (OFDM_BPS == 1) {
         /* Here we will have Nbitsperframe / 1 */
