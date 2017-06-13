@@ -70,6 +70,8 @@ function surface = newamp1_batch(input_prefix, output_prefix)
 
   [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
 
+  %model_  = experiment_smoothed(model, 0);
+
   %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
 
 #{
@@ -488,7 +490,6 @@ endfunction
 
 
 
-
 % ---------------------------------------------------------------------------------------
 % Various experiments tried during development
 
@@ -496,7 +497,11 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
-  K = 20; Fs = 8000;
+  K = 20; Fs = 8000; correct_rate_K_en = 1;
+
+  quantisers = load("dct2quant.txt"); 
+  nbits = load("dct2quantnbits.txt");
+  map = load("dct2map.txt");
 
   for f=1:frames
     Wo = model(f,1);
@@ -505,15 +510,17 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
     [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
-    [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
-    [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
-    %rate_K_surface(f,:) = rate_K_vec;
-    rate_K_surface(f,:) = rate_K_vec_corrected;
+    if correct_rate_K_en
+      [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
+      [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
+      rate_K_surface(f,:) = rate_K_vec_corrected;
+    else
+      rate_K_surface(f,:) = rate_K_vec;
+    end
   end
 
   if plots
     figure(1); clf; mesh(rate_K_surface);
-    figure(2); clf; plot_dft_surface(rate_K_surface)
   end
 
   for f=1:frames
@@ -538,16 +545,50 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     rate_K_surface = rate_K_surface_;
   end
 
+
+  % break into 160ms blocks, 2D DCT, truncate, IDCT
+
+  Nt = 16;  % 16 blocks in time
+  Nblocks = floor(frames/Nt);
+  unwrapped_dcts = zeros(Nblocks,Nt*K);
+
+  for n=1:Nblocks
+    st = (n-1)*Nt+1; en = st + Nt - 1;
+    D = dct2(rate_K_surface(st:en,:));
+
+    % move over surface and work out quantiser
+    % quantise, replace on map
+
+    E = zeros(Nt,K);
+    E = D;
+    for r=1:Nt
+      for c=1:K
+        quantiser_num = map(r,c);
+        nlevels = 2^nbits(quantiser_num);
+        if quantiser_num < 10
+          printf("r %d c %d quantiser_num %d nlevels %d\n", r,c,quantiser_num,nlevels);
+          levels = quantisers(quantiser_num,1:nlevels);
+          quant_out = quantise(levels, D(r,c));
+          printf("%f %f\n", D(r,c), quant_out );
+          E(r,c) = quant_out;
+        end
+      end
+    end
+
+    rate_K_surface(st:en,:) = idct2(E);
+  end
+
   model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz);
 
+  #{
   if plots
-    figure(3); clf; mesh(rate_K_surface_no_mean);
-    figure(4); clf; plot_dft_surface(rate_K_surface)
+    figure(2); clf; mesh(rate_K_surface_no_mean);
   end
 
   for f=1:frames
     rate_K_surface(f,:) -= mean(rate_K_surface(f,:));
   end
+  #}
 endfunction
 
 
@@ -937,6 +978,24 @@ function model_ =  experiment_filter_dec_filter(model)
   model_ = resample_rate_L(model, rate_K_surface_filt_recon, rate_K_sample_freqs_kHz);
 endfunction
 
+
+% smoothing using masking functions
+
+function model_ = experiment_smoothed(model, bark_model=1)
+  [frames nc] = size(model);
+
+  model_ = model;
+
+  for f=1:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+    [AmdB_ Am_freqs_kHz] = mask_model(AmdB, Wo, L, bark_model);
+    model_(f,3:(L+2)) = 10 .^ ((AmdB_)/20);
+  end
+
+endfunction
 
 #{
   
