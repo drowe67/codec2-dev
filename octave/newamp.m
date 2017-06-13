@@ -200,13 +200,68 @@ function value = bits_to_index(bits, numbits)
 endfunction
 
 
+% generate a zig-zag linear to square mapping matrix
+
+function map = zigzag(nr,nc)
+  map = zeros(nr, nc);
+
+  state = 'zig';
+  r = c = 1;
+
+  for i=1:nr*nc
+
+    printf("%s r: %d c: %d i %d\n", state, r, c, i);
+    map(r,c) = i;
+
+    next_state = state;
+    if state == 'zig'
+      % move SE
+      c -= 1; r += 1;
+      if r > nr
+        r = nr; c+=2;
+        next_state = 'zag';
+      end
+      if c < 1
+        c = 1;
+        next_state = 'zag';
+      end
+    end
+
+    if state == 'zag'
+      % move SE
+      r -= 1; c +=1;
+      if c > nc
+        c = nc; r+=2;
+        next_state = 'zig';
+      end
+      if r < 1
+        r = 1;
+        next_state = 'zig';
+      end
+    end
+    state = next_state;
+  end
+endfunction
+
+
+function v = mtov_zigzag(m)
+  [nr nc] = size(m);
+  map = zigzag(nr,nc)
+  v = zeros(1,nr*nc);
+  for r=1:nr
+    for c=1:nc
+      v(map(r,c)) = m(r,c);
+    end
+  end
+endfunction
+
+
 % Determine a phase spectra from a magnitude spectra
 % from http://www.dsprelated.com/showcode/20.php
 % Haven't _quite_ figured out how this works but have to start somewhere ....
 %
 % TODO: we may be able to sample at a lower rate, like mWo
 %       but start with something that works
-
 function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Fs      = 8000;
   max_amp = 80;
