@@ -202,7 +202,7 @@ endfunction
 
 % generate a zig-zag linear to square mapping matrix
 
-function map = zigzag(nr,nc)
+function map = create_zigzag_map(nr,nc)
   map = zeros(nr, nc);
 
   state = 'zig';
@@ -244,6 +244,8 @@ function map = zigzag(nr,nc)
 endfunction
 
 
+% reshape matrix m as a vector v by reading out elements in zig-zag pattern
+
 function v = mtov_zigzag(m)
   [nr nc] = size(m);
   map = zigzag(nr,nc)
@@ -251,6 +253,68 @@ function v = mtov_zigzag(m)
   for r=1:nr
     for c=1:nc
       v(map(r,c)) = m(r,c);
+    end
+  end
+endfunction
+
+
+% extracts DCT information for rate K surface
+
+function unwrapped_dcts = dct_blocks(surf)
+  [frames K] = size(surf);
+
+  % break into 160ms blocks, 2D DCT, truncate, IDCT
+
+  Nt = 16;  % 16 blocks in time
+  Nblocks = floor(frames/Nt);
+  unwrapped_dcts = zeros(Nblocks,Nt*K);
+
+  for n=1:Nblocks
+    st = (n-1)*Nt+1; en = st + Nt - 1;
+    D = dct2(surf(st:en,:));
+    unwrapped_dcts(n,:) = reshape(D',1,Nt*K);
+  end
+endfunction
+
+
+% Determines a map for quantising 2D DCT coeffs in order of rms value
+% (ie std dev) of each coeff.  Those coeffs with the greatest change
+% need the most bits to quantise
+
+function [map rms_map mx unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc)
+  unwrapped_dcts = dct_blocks(rate_K_surface);
+  [mx mx_ind] = sort(std(unwrapped_dcts));
+  mx_ind = fliplr(mx_ind); mx = fliplr(mx);
+  map = rms_map = zeros(nr,nc);
+  for i=1:nr*nc
+    r = floor((mx_ind(i)-1)/nc) + 1;
+    c = mx_ind(i) - (r-1)*nc;
+    %printf("%d %d %d\n", i, r, c);
+    map(r,c) = i;
+    rms_map(r,c) = mx(i);
+  end
+endfunction
+
+
+% Design quantisers for each DCT coeff
+
+function [quantisers nbits] = design_quantisters(rate_K_surface, nr, nc, nbits_max)
+  [map rms_map mx unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc);
+  nq = nr*nc;
+  quantisers = zeros(nq, 2^nbits_max); nbits = zeros(nq,1);
+  for i=1:nq
+
+    % work out number of levels for this quantiser such that it is a
+    % power of 2 for integer number of bits
+
+    nlevels = (2^nbits_max);
+    nbits(i) = round(log2(nlevels));
+    nlevels = 2 .^ nbits(i);
+
+    if i <= 100
+      printf("%d %d\n", i, nlevels);
+      [idx, centers] = kmeans(unwrapped_dcts(:,i), nlevels);
+      quantisers(i,1:nlevels) = sort(centers);
     end
   end
 endfunction
