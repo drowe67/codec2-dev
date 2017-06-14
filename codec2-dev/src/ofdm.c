@@ -49,6 +49,11 @@ static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
 
+/* Defines */
+
+#define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
+#define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
+
 /* Constants */
 
 /*
@@ -403,7 +408,254 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
     }
 }
 
-int *ofdm_demod(struct OFDM *ofdm, COMP *rxbuf_in) {
-/* TODO */
+/*
+ * ------------------------------------------
+ * ofdm_demod - Demodulates one frame of bits
+ * ------------------------------------------
+ *
+ * For phase estimation we need to maintain buffer of 3 frames plus
+ * one pilot, so we have 4 pilots total. '^' is the start of current
+ * frame that we are demodulating.
+ *
+ * P DDD P DDD P DDD P
+ *       ^
+ *
+ * Then add one symbol either side to account for movement in
+ * sampling instant due to sample clock differences:
+ *
+ * D P DDD P DDD P DDD P D
+ *         ^
+ */
+
+// UNTESTED
+
+void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
+    complex float acarrier[OFDM_NC + 2];
+    complex float aphase_est_pilot_rect;
+    float aphase_est_pilot[OFDM_NC + 2];
+    float aamp_est_pilot[OFDM_NC + 2];
+    float freq_err_hz;
+    int i, j, k, rr, st, en, ft_est;
+
+    /* shift the buffer left based on nin */
+
+    for (i = 0, j = ofdm->nin; i < (OFDM_RXBUF - ofdm->nin); i++, j++) {
+        ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    }
+
+    /* insert latest input samples onto tail of rxbuf */
+
+    for (i = (OFDM_RXBUF - ofdm->nin), j = 0; i < OFDM_RXBUF; i++, j++) {
+        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+    }
+
+    /*
+     * get latest freq offset estimate
+     *
+     * ofdm->foff_est_hz will be 0.0 unless
+     * ofdm->foff_est_en is enabled
+     */
+
+    float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+
+    /* update timing estimate -------------------------------------------------- */
+
+    if (ofdm->timing_en == true) {
+        /* update timing at start of every frame */
+
+        st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + 1) - floorf(OFDM_FTWINDOWWIDTH / 2) + (ofdm->timing_est - 1);
+        en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH-1;
+
+        complex float work[(en - st)];
+
+        for (i = st, j = 0; i < en; i++, j++) {
+            work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
+        }
+
+        ft_est = coarse_sync(ofdm, work, (en - st));
+        ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
+
+        if (ofdm->verbose > 1) {
+            fprintf(stdout, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
+        }
+
+        /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
+
+        ofdm->sample_point = max(ofdm->timing_est + (OFDM_NCP / 4), ofdm->sample_point);
+        ofdm->sample_point = min(ofdm->timing_est + OFDM_NCP, ofdm->sample_point);
+    }
+
+    /* down-convert at current timing instant---------------------------------- */
+
+    complex float rx_sym[OFDM_NS + 3][OFDM_NC + 2];
+
+    for (i = 0; i < (OFDM_NS + 3); i++) {
+        for (j = 0; j < (OFDM_NC + 2); j++) {
+            rx_sym[i][j] = 0.0f + 0.0f * I;
+        }
+    }
+
+    /* previous pilot */
+
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    en = st + OFDM_M;
+
+    complex float work[OFDM_M];
+
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        for (j = st, k = 0; j < en; j++, k++) {
+            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+        }
+    
+        matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
+
+        rx_sym[0][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+    }
+
+    /* pilot - this frame - pilot */
+
+    for (rr = 1; rr < (OFDM_NS + 3); rr++) {
+        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (rr - 1) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+        en = st + OFDM_M;
+        
+        for (i = 0; i < (OFDM_NC + 2); i++) {
+            for (j = st, k = 0; j < en; j++, k++) {
+                work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+            }
+    
+            matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
+
+            rx_sym[rr][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+        }
+    }
+
+    /* next pilot */
+
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    en = st + OFDM_M;
+
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        for (j = st, k = 0; j < en; j++, k++) {
+            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+        }
+    
+        matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
+
+        rx_sym[(OFDM_NS + 2)][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+    }
+
+    /* est freq err based on all carriers ------------------------------------ */
+
+    if (ofdm->foff_est_en == true) {
+        complex float freq_err_rect = vector_conjugate_sum(rx_sym[1], 0, (OFDM_NC + 2)) * vector_sum(rx_sym[1], OFDM_NS, (OFDM_NC + 2));
+        freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
+
+        ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
+    }
+
+    /* OK - now estimate and correct phase  ---------------------------------- */
+
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        aphase_est_pilot[i] = 10.0f;
+        aamp_est_pilot[i] = 0.0f;
+    }
+
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        /*
+         * estimate phase using average of 6 pilots in a rect 2D window centered on this carrier
+         *
+         * PPP
+         * DDD
+         * DDD
+         * PPP
+         */
+        
+        complex float symbol[3];
+        
+        for (j = i, k = 0; j < (i + 3); j++, k++) {
+            symbol[k] = rx_sym[2][j] * conjf(ofdm->pilots[j]);
+        }
+
+        aphase_est_pilot_rect = vector_sum(symbol, 0, 3);
+
+        for (j = i, k = 0; j < (i + 3); j++, k++) {
+            symbol[k] = rx_sym[(OFDM_NS + 2)][j] * conjf(ofdm->pilots[j]);
+        }
+        
+        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+        
+        /* use next step of pilots in past and future */
+        
+        for (j = i, k = 0; j < (i + 3); j++, k++) {
+            symbol[k] = rx_sym[1][j] * ofdm->pilots[j];
+        }
+        
+        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+        
+        for (j = i, k = 0; j < (i + 3); j++, k++) {
+            symbol[k] = rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j];
+        }
+        
+        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+
+        aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
+    }
+
+    /*
+     * correct phase offset using phase estimate, and demodulate
+     * bits, separate loop as it runs across cols (carriers) to get
+     * frame bit ordering correct
+     */
+
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        ofdm->aphase_est_pilot_log[i] = aphase_est_pilot[i];
+    }
+
+    complex float rx_corr;
+    int abit[2];
+    int bit_index = 0;
+
+    /* skip pilots and boundaries */
+
+    for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
+        for (i = 1; i < (OFDM_NC + 1); i++) {
+            if (ofdm->phase_est_en == true) {
+                rx_corr = rx_sym[rr][i] * cexpf(I * aphase_est_pilot[i]);
+            } else {
+                rx_corr = rx_sym[rr][i];
+            }
+
+            ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
+            ofdm->rx_amp[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = aamp_est_pilot[i];
+
+            if (OFDM_BPS == 1) {
+                rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
+            } else if (OFDM_BPS == 2) {
+                qpsk_demod(rx_corr, abit);
+                rx_bits[bit_index++] = abit[0];
+                rx_bits[bit_index++] = abit[1];
+            }
+        }
+    }
+
+    /* Adjust nin to take care of sample clock offset */
+
+    ofdm->nin = OFDM_SAMPLESPERFRAME;
+
+    if (ofdm->timing_en == true) {
+        int thresh = (OFDM_M + OFDM_NCP) / 8;
+        int tshift = (OFDM_M + OFDM_NCP) / 4;
+
+        if (ofdm->timing_est > thresh) {
+            ofdm->nin = OFDM_SAMPLESPERFRAME + tshift;
+            ofdm->timing_est -= tshift;
+            ofdm->sample_point -= tshift;
+        } else if (ofdm->timing_est < -thresh) {
+            ofdm->nin = OFDM_SAMPLESPERFRAME - tshift;
+            ofdm->timing_est += tshift;
+            ofdm->sample_point += tshift;
+        }
+    }
 }
 
