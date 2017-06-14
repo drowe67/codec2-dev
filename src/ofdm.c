@@ -621,9 +621,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
         for (i = 1; i < (OFDM_NC + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = rx_sym[rr][i] * cexpf(I * aphase_est_pilot[i]);
+                rx_corr = rx_sym[rr+1][i] * cexpf(I * aphase_est_pilot[i]);
             } else {
-                rx_corr = rx_sym[rr][i];
+                rx_corr = rx_sym[rr+1][i];
             }
 
             ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
