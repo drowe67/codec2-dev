@@ -40,24 +40,25 @@
 #include "octave.h"
 #include "test_bits_ofdm.h"
 
-#define FRAMES 1
+#define NFRAMES 2
 
 int main(int argc, char *argv[])
 {
     struct OFDM   *ofdm;
     COMP           tx[OFDM_SAMPLESPERFRAME];      /* one frame of tx samples */
 
-    int            tx_bits_log[OFDM_BITSPERFRAME*FRAMES];
-    COMP           tx_log[OFDM_SAMPLESPERFRAME*FRAMES];
+    int            tx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
+    COMP           tx_log[OFDM_SAMPLESPERFRAME*NFRAMES];
+    COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
 
     FILE          *fout;
-    int            f;
+    int            f,i;
 
     ofdm = ofdm_create(); assert(ofdm != NULL);
 
     /* Main Loop ---------------------------------------------------------------------*/
 
-    for(f=0; f<FRAMES; f++) {
+    for(f=0; f<NFRAMES; f++) {
 
 	/* --------------------------------------------------------*\
 	                          Mod
@@ -78,8 +79,12 @@ int main(int argc, char *argv[])
 	                        Demod
     \*---------------------------------------------------------*/
 
-    for(f=0; f<FRAMES; f++) {
+    for(f=0; f<NFRAMES; f++) {
         /* todo: run demod and log states as it runs */
+        for(i=0; i<OFDM_RXBUF; i++) {
+            rxbuf_log[OFDM_RXBUF*f+i].real = crealf(ofdm->rxbuf[i]);
+            rxbuf_log[OFDM_RXBUF*f+i].imag = cimagf(ofdm->rxbuf[i]);
+       }
     }
 
     /*---------------------------------------------------------*\
@@ -91,8 +96,9 @@ int main(int argc, char *argv[])
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
     octave_save_complex(fout, "W_c", (COMP*)ofdm->W, OFDM_NC + 2, OFDM_M, OFDM_M);
-    octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*FRAMES);
-    octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, OFDM_SAMPLESPERFRAME*FRAMES,  OFDM_SAMPLESPERFRAME*FRAMES);
+    octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
+    octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, OFDM_SAMPLESPERFRAME*NFRAMES,  OFDM_SAMPLESPERFRAME*NFRAMES);
+    octave_save_complex(fout, "rxbuf_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     fclose(fout);
 
     ofdm_destroy(ofdm);
