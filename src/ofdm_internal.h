@@ -1,11 +1,29 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: ofdm_internal.h
+  AUTHORS.....: David Rowe & Steve Sampson
+  DATE CREATED: June 2017
+
+  OFDM Internal definitions.
+
+\*---------------------------------------------------------------------------*/
+
 /*
- * Copyright (C) 2017 David Rowe
- *
- * All rights reserved
- * 
- * Licensed under GNU LGPL V2.1
- * See LICENSE file for information
- */
+  Copyright (C) 2017 David Rowe
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
 
 #ifndef OFDM_INTERNAL_H
 #define OFDM_INTERNAL_H
@@ -68,6 +86,12 @@ struct OFDM {
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
     float w[OFDM_NC + 2];
+    
+    /* Demodulator data */
+
+    float aphase_est_pilot_log[OFDM_NC + 2];
+    float rx_np[OFDM_NC];
+    float rx_amp[OFDM_NC];
 };
 
 #ifdef __cplusplus

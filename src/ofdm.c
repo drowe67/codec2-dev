@@ -1,11 +1,29 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: ofdm.c
+  AUTHORS.....: David Rowe & Steve Sampson
+  DATE CREATED: June 2017
+
+  A Library of functions that implement a BPSK/QPSK OFDM modem
+
+\*---------------------------------------------------------------------------*/
+
 /*
- * Copyright (C) 2017 David Rowe
- *
- * All rights reserved
- *
- * Licensed under GNU LGPL V2.1
- * See LICENSE file for information
- */
+  Copyright (C) 2017 David Rowe
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,15 +38,12 @@
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
 
-/*
- * Library of functions that implement a BPSK/QPSK OFDM modem
- *
- * Translated from Octave by Steve Sampson
- */
-
 /* Static Prototypes */
 
 static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
+static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, complex float *);
+static complex float vector_sum(complex float *, int, int);
+static complex float vector_conjugate_sum(complex float *, int, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
@@ -71,9 +86,11 @@ static complex float qpsk_mod(int *bits) {
 
 static void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cexpf(I * (M_PI / 4.0f));
-    bits[0] = crealf(rotate) < 0.0f;
-    bits[1] = cimagf(rotate) < 0.0f;
+    bits[1] = crealf(rotate) < 0.0f;
+    bits[0] = cimagf(rotate) < 0.0f;
 }
+
+/* convert frequency domain into time domain */
 
 static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
     int row, col;
@@ -85,6 +102,44 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
             result[row] += (vector[col] * (ofdm->W[col][row] / (float) OFDM_M)); /* complex result */
         }
     }
+}
+
+/* convert time domain into frequency domain */
+
+static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
+    int row, col;
+
+    for (col = 0; col < (OFDM_NC + 2); col++) {
+        result[col] = 0.0f + 0.0f * I;
+
+        for (row = 0; row < OFDM_M; row++) {
+            result[col] += (vector[row] * conjf(ofdm->W[col][row])); /* complex result */
+        }
+    }
+}
+
+static complex float vector_sum(complex float *a, int index, int num_elements) {
+    int i;
+    
+    complex float sum = 0.0f + 0.0f * I;
+
+    for (i = index; i < (index + num_elements); i++) {
+        sum += a[i];
+    }
+
+    return sum;
+}
+
+static complex float vector_conjugate_sum(complex float *a, int index, int num_elements) {
+    int i;
+    
+    complex float sum = 0.0f + 0.0f * I;
+
+    for (i = index; i < (index + num_elements); i++) {
+        sum += conjf(a[i]);
+    }
+
+    return sum;
 }
 
 /*
@@ -224,7 +279,7 @@ struct OFDM *ofdm_create() {
 	return NULL;
     }
 
-    /* store complex pilot symbols */
+    /* store complex BPSK pilot symbols */
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
         ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
@@ -265,7 +320,6 @@ struct OFDM *ofdm_create() {
 
     /*
      * rate_fs_pilot_samples is 160 samples, as we take the last 16 and copy to the front
-     * Thus resulting in 16 + 128 + 16 = 160
      */
 
     /* first copy the last Cyclic Prefix (CP) values */
@@ -349,7 +403,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
     }
 }
 
-//function [rx_bits states aphase_est_pilot_log rx_np rx_amp] =
 int *ofdm_demod(struct OFDM *ofdm, COMP *rxbuf_in) {
 /* TODO */
 }
