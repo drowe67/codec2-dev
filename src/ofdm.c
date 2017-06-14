@@ -487,11 +487,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* down-convert at current timing instant---------------------------------- */
 
-    complex float rx_sym[OFDM_NS + 3][OFDM_NC + 2];
-
     for (i = 0; i < (OFDM_NS + 3); i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
-            rx_sym[i][j] = 0.0f + 0.0f * I;
+            ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
         }
     }
 
@@ -509,7 +507,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     
         matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
 
-        rx_sym[0][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+        ofdm->rx_sym[0][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
     }
 
     /* pilot - this frame - pilot */
@@ -525,7 +523,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     
             matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
 
-            rx_sym[rr][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+            ofdm->rx_sym[rr][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
         }
     }
 
@@ -541,13 +539,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     
         matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
 
-        rx_sym[(OFDM_NS + 2)][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+        ofdm->rx_sym[(OFDM_NS + 2)][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
     }
 
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = vector_conjugate_sum(rx_sym[1], 0, (OFDM_NC + 2)) * vector_sum(rx_sym[1], OFDM_NS, (OFDM_NC + 2));
+        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[1], 0, (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[1], OFDM_NS, (OFDM_NC + 2));
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
 
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
@@ -573,13 +571,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         complex float symbol[3];
         
         for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = rx_sym[2][j] * conjf(ofdm->pilots[j]);
+            symbol[k] = ofdm->rx_sym[2][j] * conjf(ofdm->pilots[j]);
         }
 
         aphase_est_pilot_rect = vector_sum(symbol, 0, 3);
 
         for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = rx_sym[(OFDM_NS + 2)][j] * conjf(ofdm->pilots[j]);
+            symbol[k] = ofdm->rx_sym[(OFDM_NS + 2)][j] * conjf(ofdm->pilots[j]);
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
@@ -587,13 +585,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /* use next step of pilots in past and future */
         
         for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = rx_sym[1][j] * ofdm->pilots[j];
+            symbol[k] = ofdm->rx_sym[1][j] * ofdm->pilots[j];
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
         
         for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j];
+            symbol[k] = ofdm->rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j];
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
@@ -621,9 +619,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
         for (i = 1; i < (OFDM_NC + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = rx_sym[rr+1][i] * cexpf(I * aphase_est_pilot[i]);
+                rx_corr = ofdm->rx_sym[rr+1][i] * cexpf(I * aphase_est_pilot[i]);
             } else {
-                rx_corr = rx_sym[rr+1][i];
+                rx_corr = ofdm->rx_sym[rr+1][i];
             }
 
             ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
