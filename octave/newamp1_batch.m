@@ -500,7 +500,7 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
   K = 20; Fs = 8000; correct_rate_K_en = 1;
 
   quantisers = load("dct2quant.txt"); 
-  nbits = load("dct2quantnbits.txt");
+  nlevels = load("dct2quantnlevels.txt");
   map = load("dct2map.txt");
 
   for f=1:frames
@@ -560,16 +560,15 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     % quantise, replace on map
 
     E = zeros(Nt,K);
-    E = D;
     for r=1:Nt
       for c=1:K
         quantiser_num = map(r,c);
-        nlevels = 2^nbits(quantiser_num);
-        if quantiser_num < 10
-          printf("r %d c %d quantiser_num %d nlevels %d\n", r,c,quantiser_num,nlevels);
-          levels = quantisers(quantiser_num,1:nlevels);
+        if quantiser_num < 100
+          printf("r %d c %d quantiser_num %d nlevels %d ", r, c, quantiser_num, nlevels(quantiser_num));
+          levels = quantisers(quantiser_num, 1:nlevels(quantiser_num));
           quant_out = quantise(levels, D(r,c));
-          printf("%f %f\n", D(r,c), quant_out );
+          %quant_out = 8*round(D(r,c)/8);
+          printf("in %f out %f\n", D(r,c), quant_out );
           E(r,c) = quant_out;
         end
       end

@@ -281,7 +281,7 @@ endfunction
 % (ie std dev) of each coeff.  Those coeffs with the greatest change
 % need the most bits to quantise
 
-function [map rms_map mx unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc)
+function [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc)
   unwrapped_dcts = dct_blocks(rate_K_surface);
   [mx mx_ind] = sort(std(unwrapped_dcts));
   mx_ind = fliplr(mx_ind); mx = fliplr(mx);
@@ -296,9 +296,33 @@ function [map rms_map mx unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc
 endfunction
 
 
-% Design quantisers for each DCT coeff
+% plot histogram of each 2D DCT coeff, so we can get a feel for
+% quantiser design
 
-function [quantisers nbits] = design_quantisters(rate_K_surface, nr, nc, nbits_max)
+function plot_dct2_hists(rate_K_surface, nr, nc)
+  [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc);
+  Ncoeff = nr*nc;
+  fign = 1; subplotn = 1;
+  close all; figure(fign); clf;
+  Nplot = 60;
+  for i=1:Nplot   
+    subplot(5,4,subplotn);
+    d = unwrapped_dcts(:,mx_ind(i));
+    d = round(d);
+    hist(d);
+    subplotn++;
+    if (subplotn > 20) && (i != Nplot)
+      subplotn = 1;
+      fign++;
+      figure(fign); clf;
+    end
+  end
+endfunction
+
+
+% Design kmeans quantisers for each DCT coeff.  This didn't work very well.
+
+function [quantisers nbits] = design_quantisters_kmeans(rate_K_surface, nr, nc, nbits_max)
   [map rms_map mx unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc);
   nq = nr*nc;
   quantisers = zeros(nq, 2^nbits_max); nbits = zeros(nq,1);
@@ -316,6 +340,25 @@ function [quantisers nbits] = design_quantisters(rate_K_surface, nr, nc, nbits_m
       [idx, centers] = kmeans(unwrapped_dcts(:,i), nlevels);
       quantisers(i,1:nlevels) = sort(centers);
     end
+  end
+endfunction
+
+
+% Uniform quantisers designed to fit limits of each DCT coeff
+
+function [quantisers nlevels] = design_quantisters_uniform(rate_K_surface, nr, nc, nlevels_max)
+  [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc);
+  
+  nq = nr*nc;
+  quantisers = zeros(nq, nlevels_max); nlevels = zeros(nq, 1);
+
+  for i=1:nq
+    d = unwrapped_dcts(:,mx_ind(i));
+    d = floor(d/16);
+    q_min = floor(min(d));
+    q_max = ceil(max(d));
+    nlevels(i) = q_max-q_min+1;
+    quantisers(i,1:nlevels(i)) = 16*(q_min:q_max);
   end
 endfunction
 
