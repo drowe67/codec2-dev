@@ -1,11 +1,29 @@
+/*---------------------------------------------------------------------------*\
+
+  FILE........: codec2_ofdm.h
+  AUTHORS.....: David Rowe & Steve Sampson
+  DATE CREATED: June 2017
+
+ External user references to the modem library.
+
+\*---------------------------------------------------------------------------*/
+
 /*
- * Copyright (C) 2017 David Rowe
- *
- * All rights reserved
- * 
- * Licensed under GNU LGPL V2.1
- * See LICENSE file for information
- */
+  Copyright (C) 2017 David Rowe
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
 
 #ifndef CODEC2_OFDM_H
 #define CODEC2_OFDM_H
@@ -29,8 +47,8 @@ struct OFDM;
 
 struct OFDM *ofdm_create(void);
 void ofdm_destroy(struct OFDM *);
-void ofdm_mod(struct OFDM *ofdm, COMP [OFDM_SAMPLESPERFRAME], const int *);
-int *ofdm_demod(struct OFDM *ofdm, COMP *);
+void ofdm_mod(struct OFDM *, COMP *, const int *);
+void ofdm_demod(struct OFDM *, int *, COMP *);
 
 /* option setters */
 
