@@ -128,8 +128,8 @@ static complex float vector_sum(complex float *a, int index, int num_elements) {
     
     complex float sum = 0.0f + 0.0f * I;
 
-    for (i = index; i < (index + num_elements); i++) {
-        sum += a[i];
+    for (i = 0; i < num_elements; i++) {
+        sum += a[index];
     }
 
     return sum;
@@ -140,8 +140,8 @@ static complex float vector_conjugate_sum(complex float *a, int index, int num_e
     
     complex float sum = 0.0f + 0.0f * I;
 
-    for (i = index; i < (index + num_elements); i++) {
-        sum += conjf(a[i]);
+    for (i = 0; i < num_elements; i++) {
+        sum += conjf(a[index]);
     }
 
     return sum;
@@ -464,7 +464,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /* update timing at start of every frame */
 
         st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + 1) - floorf(OFDM_FTWINDOWWIDTH / 2) + (ofdm->timing_est - 1);
-        en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH-1;
+        en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH - 1;
 
         complex float work[(en - st)];
 
@@ -545,7 +545,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[1], 0, (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[1], OFDM_NS, (OFDM_NC + 2));
+        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[1], 1, (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[1 + OFDM_NS], 1 + OFDM_NS, (OFDM_NC + 2));
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
 
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
@@ -558,7 +558,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aamp_est_pilot[i] = 0.0f;
     }
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
+    for (i = 1; i < (OFDM_NC + 1); i++) {
         /*
          * estimate phase using average of 6 pilots in a rect 2D window centered on this carrier
          *
@@ -570,28 +570,28 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         
         complex float symbol[3];
         
-        for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = ofdm->rx_sym[2][j] * conjf(ofdm->pilots[j]);
+        for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+            symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]);
         }
 
         aphase_est_pilot_rect = vector_sum(symbol, 0, 3);
 
-        for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = ofdm->rx_sym[(OFDM_NS + 2)][j] * conjf(ofdm->pilots[j]);
+        for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+            symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * conjf(ofdm->pilots[j]);
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
         
         /* use next step of pilots in past and future */
         
-        for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = ofdm->rx_sym[1][j] * ofdm->pilots[j];
+        for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+            symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j];
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
         
-        for (j = i, k = 0; j < (i + 3); j++, k++) {
-            symbol[k] = ofdm->rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j];
+        for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+            symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * ofdm->pilots[j];
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
