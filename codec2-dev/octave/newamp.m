@@ -260,12 +260,11 @@ endfunction
 
 % extracts DCT information for rate K surface
 
-function unwrapped_dcts = dct_blocks(surf)
+function unwrapped_dcts = dct_blocks(surf, Nt=16)
   [frames K] = size(surf);
 
   % break into 160ms blocks, 2D DCT, truncate, IDCT
 
-  Nt = 16;  % 16 blocks in time
   Nblocks = floor(frames/Nt);
   unwrapped_dcts = zeros(Nblocks,Nt*K);
 
@@ -282,7 +281,7 @@ endfunction
 % need the most bits to quantise
 
 function [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc)
-  unwrapped_dcts = dct_blocks(rate_K_surface);
+  unwrapped_dcts = dct_blocks(rate_K_surface, nr);
   [mx mx_ind] = sort(std(unwrapped_dcts));
   mx_ind = fliplr(mx_ind); mx = fliplr(mx);
   map = rms_map = zeros(nr,nc);
@@ -308,7 +307,7 @@ function plot_dct2_hists(rate_K_surface, nr, nc)
   for i=1:Nplot   
     subplot(5,4,subplotn);
     d = unwrapped_dcts(:,mx_ind(i));
-    d = round(d);
+    d = round(d/4);
     hist(d);
     subplotn++;
     if (subplotn > 20) && (i != Nplot)
@@ -317,6 +316,73 @@ function plot_dct2_hists(rate_K_surface, nr, nc)
       figure(fign); clf;
     end
   end
+endfunction
+
+
+% Gather run length data for each 2D DCT coeff, to see if run length encoding
+% can help
+
+function [run_length d]= plot_run_length(rate_K_surface, nr, nc)
+  [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(rate_K_surface, nr, nc);
+  Ncoeff = nr*nc;
+  [Nblocks tmp] = size(unwrapped_dcts);
+
+  % first get histogram of DCT values -----------------------------------
+
+  % some mild quantisation
+
+  unwrapped_dcts = round(unwrapped_dcts/4);
+
+  % note we only consider first half of DCT coeffs, unlikely to use all 
+
+  d = [];
+  for i=1:Nblocks
+    d = [d unwrapped_dcts(i,mx_ind(1:Ncoeff/2))]; 
+  end
+
+  % note we remove outliers from plot as very low prob symbols
+
+  d = d(find(abs(d)<10));
+  figure(1); clf; [Wi, ii] = hist(d,-10:10,1); plot(ii,Wi);
+  length(d)
+  Wi = Wi(find(Wi > 0));
+  %sum(Wi)
+  %-log2(Wi)
+  %-Wi .* log2(Wi)
+  printf("bits/symbol: %2.2f\n", sum(-Wi .* log2(Wi)));
+
+  % now measure run lengths --------------------------------------------
+  
+  run_length = zeros(21,Ncoeff);
+  state = 'idle';
+
+  for i=2:length(d)
+
+    next_state = state;
+
+    if state == 'idle'
+      if d(i-1) == d(i)
+        next_state = 'trac';
+        arun_length = 2;
+      else
+        run_length(d(i)+10, 1)++;
+      end
+    end
+
+    if state == 'trac'
+      if d(i-1) == d(i)
+        arun_length++;
+      else
+        next_state = 'idle';
+        run_length(d(i-1)+10, arun_length)++;
+      end
+    end
+
+    state = next_state;
+
+  end
+
+  figure(2); clf; mesh(run_length(:,1:10));
 endfunction
 
 
