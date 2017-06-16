@@ -43,6 +43,10 @@ prx += nin;
 
 rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = [];
 
+states.timing_en = 0;
+states.foff_est_en = 0;
+states.phase_est_en = 0;
+
 for f=1:Nframes
 
   % insert samples at end of buffer, set to zero if no samples
