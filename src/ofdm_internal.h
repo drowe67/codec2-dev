@@ -62,11 +62,12 @@ extern "C" {
 #define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
 #endif
 
-#define OFDM_FTWINDOWWIDTH      11
-#define OFDM_BITSPERFRAME       ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
-#define OFDM_ROWSPERFRAME       (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
-#define OFDM_SAMPLESPERFRAME    (OFDM_NS * (OFDM_M + OFDM_NCP))
-#define OFDM_RXBUF              (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
+#define OFDM_FTWINDOWWIDTH       11
+#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
+#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
+#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
+#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
+#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
 struct OFDM {
     float foff_est_gain;
