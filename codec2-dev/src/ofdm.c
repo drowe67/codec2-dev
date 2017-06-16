@@ -355,6 +355,14 @@ int ofdm_get_nin(struct OFDM *ofdm) {
     return ofdm->nin;
 }
 
+int ofdm_get_samples_per_frame() {
+    return OFDM_SAMPLESPERFRAME;
+}
+
+int ofdm_get_max_samples_per_frame() {
+    return OFDM_MAX_SAMPLESPERFRAME;
+}
+
 void ofdm_set_verbose(struct OFDM *ofdm, int level) {
     ofdm->verbose = level;
 }
