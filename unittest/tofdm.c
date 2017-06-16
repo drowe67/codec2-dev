@@ -40,15 +40,19 @@
 #include "octave.h"
 #include "test_bits_ofdm.h"
 
-#define NFRAMES 2
+#define NFRAMES 3
 
 int main(int argc, char *argv[])
 {
     struct OFDM   *ofdm;
     COMP           tx[OFDM_SAMPLESPERFRAME];      /* one frame of tx samples */
+    int            rx_bits[OFDM_BITSPERFRAME];    /* one frame of rx bits    */
+
+    /* log arrays */
 
     int            tx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
     COMP           tx_log[OFDM_SAMPLESPERFRAME*NFRAMES];
+    COMP           rxbuf_in_log[OFDM_SAMPLESPERFRAME*NFRAMES];
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
 
     FILE          *fout;
@@ -79,8 +83,63 @@ int main(int argc, char *argv[])
 	                        Demod
     \*---------------------------------------------------------*/
 
+    COMP *rx = tx_log;
+
+    /* Init rx with ideal timing so we can test with timing estimation disabled */
+
+    int  Nsam = OFDM_SAMPLESPERFRAME*NFRAMES;
+    int  prx = 0;
+    int  nin = OFDM_SAMPLESPERFRAME + 2*(OFDM_M+OFDM_NCP);
+
+    int  lnew;
+    COMP rxbuf_in[OFDM_SAMPLESPERFRAME];
+
+    for (i=0; i<nin; i++,prx++) {
+         ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx[prx].real + I*rx[prx].imag;
+    }
+
+    int nin_tot = 0;
+
     for(f=0; f<NFRAMES; f++) {
-        /* todo: run demod and log states as it runs */
+        /* For initial testng, timing est is off, so nin is always
+           fixed.  TODO: we need a constant for rxbuf_in[] size that
+           is the maximum possible nin */
+
+        nin = ofdm->nin;
+        assert(nin == OFDM_SAMPLESPERFRAME);
+
+        /* Insert samples at end of buffer, set to zero if no samples
+           available to disable phase estimation on future pilots on
+           last frame of simulation. */
+
+        if ((Nsam-prx) < nin) {
+            lnew = Nsam-prx;
+        } else {
+            lnew = nin;
+        }
+        //printf("nin: %d prx: %d lnew: %d\n", nin, prx, lnew);
+        for(i=0; i<nin; i++) {
+            rxbuf_in[i].real = 0.0;
+            rxbuf_in[i].imag = 0.0;
+        }
+
+        if (lnew) {
+            for(i=0; i<lnew; i++, prx++) {
+                rxbuf_in[i] = rx[prx];
+            }
+        }
+        assert(prx <= OFDM_SAMPLESPERFRAME*NFRAMES);
+#ifdef T
+
+        //ofdm_demod(ofdm, rx_bits, rxbuf_in);
+
+        /* rx vector logging -----------------------------------*/
+
+#endif
+        assert(nin_tot < OFDM_SAMPLESPERFRAME*NFRAMES);
+	memcpy(&rxbuf_in_log[nin_tot], rxbuf_in, sizeof(COMP)*nin);
+        nin_tot += nin;
+
         for(i=0; i<OFDM_RXBUF; i++) {
             rxbuf_log[OFDM_RXBUF*f+i].real = crealf(ofdm->rxbuf[i]);
             rxbuf_log[OFDM_RXBUF*f+i].imag = cimagf(ofdm->rxbuf[i]);
@@ -98,7 +157,8 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "W_c", (COMP*)ofdm->W, OFDM_NC + 2, OFDM_M, OFDM_M);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, OFDM_SAMPLESPERFRAME*NFRAMES,  OFDM_SAMPLESPERFRAME*NFRAMES);
-    octave_save_complex(fout, "rxbuf_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
+    octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
+    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     fclose(fout);
 
     ofdm_destroy(ofdm);
