@@ -68,8 +68,8 @@ function surface = newamp1_batch(input_prefix, output_prefix)
   %model_ = experiment_filter(model);
   %model_ = experiment_filter_dec_filter(model);
 
-  [model_ surface] = experiment_rate_K_dct2(model, 0, 1, voicing);
-  %[model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
+  %[model_ surface] = experiment_rate_K_dct2(model, 0, 1, voicing);
+  [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
 
   %model_  = experiment_smoothed(model, 0);
 
@@ -522,16 +522,21 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, vq_en=0, plots=
 
   % break into 160ms blocks, 2D DCT, truncate, IDCT
 
-  Tf = 0.01; % frame period in seconds
-  Nt = 32;  % number of 10ms frames blocks in time
-  Nblocks = floor(frames/Nt);
+  Tf = 0.01;   % frame period in seconds
+  Nt = 16;     % number of 10ms frames blocks in time
+  dec = 2;     % decimation factor
+  dist_dB = 2; % use enough coefficients to get this distortion ond DCT coeffs
+
+  Nblocks = floor(frames/(Nt*dec));
+  printf("frames: %d Nblocks: %d\n", frames, Nblocks);
 
   unwrapped_dcts = zeros(Nblocks,Nt*K);
   rate_K_surface_ = zeros(frames, K);
   
   % create map on the fly from train database
 
-  asurf = load("all_surf.txt");
+  asurf = load("all_surf.txt"); [nr nc] = size(asurf);
+  asurf = asurf(1:dec:nr,:);
   [map rms_map mx mx_ind unwrapped_dcts] = create_map_rms(asurf, Nt, K);
   %map = create_zigzag_map(Nt,K);
 
@@ -553,8 +558,9 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, vq_en=0, plots=
   end
 
   for n=1:Nblocks
-    st = (n-1)*Nt+1; en = st + Nt - 1;
-    D = dct2(rate_K_surface(st:en,:));
+    st = (n-1)*dec*Nt+1; en = st + dec*Nt - 1;
+    %printf("st: %d en: %d\n", st, en);
+    D = dct2(rate_K_surface(st:dec:en,:));
 
     % move over surface and work out quantiser
     % quantise, replace on map
@@ -580,7 +586,7 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, vq_en=0, plots=
 
     qn = 0;
     adct2_sd = mean(std(D-E));
-    while adct2_sd > 3
+    while adct2_sd > dist_dB
       qn++;
       E(rmap(qn), cmap(qn)) = 1*round(D(rmap(qn), cmap(qn))/1);
       adct2_sd = mean(std(D-E));
@@ -588,24 +594,45 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, vq_en=0, plots=
     end
     sumnz(n) = qn;
 
-    rate_K_surface_(st:en,:) = idct2(E);
+    % note neat trick to interpolate to 10ms frames despite dec
+
+    #{
+    energy = sum(sum(E));
+    Edc = E(1,1);
+    E = E*1.2;
+    E(1,1) = Edc/1.2;
+    #}
+    %E *= energy/sum(sum(E));
+    rate_K_surface_(st:en,:) = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
+
     dct2_sd(n) = mean(std(D-E));
   end
 
-  figure(3); clf; mesh(mapped);
+  % figure(3); clf; mesh(mapped);
   figure(4); clf; plot(sumnz); hold on; plot([1 length(sumnz)],[mean(sumnz) mean(sumnz)]); hold off; title('Non Zero');
   figure(5); clf; plot(dct2_sd); title('DCT SD');
   printf("average dct spectral distortion: %3.2f dB\n", mean(dct2_sd));
   printf("mean number of coeffs/DCT: %3.2f/%d\n", mean(sumnz), Nt*K);
-  printf("coeffs/second: %3.2f\n", mean(sumnz)/(Nt*Tf));
-  printf("bits/s: %3.2f\n", 2.9*mean(sumnz)/(Nt*Tf));
+  printf("coeffs/second: %3.2f\n", mean(sumnz)/(Nt*Tf*dec));
+  printf("bits/s: %3.2f\n", 2.9*mean(sumnz)/(Nt*Tf*dec));
+
+  % optional 700C style post filter
+
+  post_filter_en = 0;
+  if post_filter_en
+    for f=1:Nt*Nblocks
+      mn = mean(rate_K_surface_(f,:));
+      rate_K_surface_no_mean_(f,:) =  rate_K_surface_(f,:) - mn;
+      rate_K_surface_(f,:) = mn + post_filter(rate_K_surface_no_mean_(f,:), rate_K_sample_freqs_kHz);
+    end
+  end
 
   % prevent /0 errors at end of run
 
-  rate_K_surface_(Nt*Nblocks+1:frames,:) = rate_K_surface(Nt*Nblocks+1:frames,:); 
+  rate_K_surface_(dec*Nt*Nblocks+1:frames,:) = rate_K_surface(dec*Nt*Nblocks+1:frames,:); 
   model_ = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz);
   
-  dist = std((rate_K_surface_ - rate_K_surface)');
+  dist = std((rate_K_surface_(1:dec:frames,:) - rate_K_surface(1:dec:frames,:))');
   figure(1); clf; plot(dist); title('Rate K SD');
   printf("Rate K spectral distortion mean: %3.2f dB var: %3.2f\n", mean(dist), var(dist));
 endfunction
@@ -615,17 +642,17 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
-  K = 20; Fs = 8000; correct_rate_K_en = 1;
+  K = 20; Fs = 16000; correct_rate_K_en = 0;
 
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
-    Am_freqs_kHz = (1:L)*Wo*4/pi;
-    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
+    Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs);
     if correct_rate_K_en
-      [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
+      [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs);
       [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
       rate_K_surface(f,:) = rate_K_vec_corrected;
     else
@@ -633,8 +660,8 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     end
   end
 
-  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz);
-
+  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs);
+ 
 endfunction
 
 
