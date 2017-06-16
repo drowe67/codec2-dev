@@ -484,20 +484,20 @@ function plot_mel_sample_freqs(K, f_start_hz, f_end_hz)
   plot(rate_K_sample_freqs_kHz,'+');
 endfunction
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K) 
-  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K);
-  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz);
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K, Fs=8000) 
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, 100, 0.95*Fs/2);
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
 endfunction
 
 
 % Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
 % as a 3D surface with time, freq, and ampitude axis.
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz)
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs)
 
   % convert rate L=pi/Wo amplitude samples to fixed rate K
 
-  Fs = 8000; max_amp = 80;
+  max_amp = 160;
   [frames col] = size(model);
   K = length(rate_K_sample_freqs_kHz);
   rate_K_surface = zeros(frames, K);
@@ -507,15 +507,16 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     L = min([model(f,2) max_amp-1]);
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
-    %pre = 10*log10((1:L)*Wo*4/(pi*0.3));    
-    %AmdB += pre;
 
-    % clip between peak and peak -50dB, to reduce dynamic range
+    clip_en = 0;
+    if clip_en
+      % clip between peak and peak -50dB, to reduce dynamic range
 
-    AmdB_peak = max(AmdB);
-    AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
-    
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+      AmdB_peak = max(AmdB);
+      AmdB(find(AmdB < (AmdB_peak-50))) = AmdB_peak-50;
+    end
+
+    rate_L_sample_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     
     %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
     rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
@@ -586,15 +587,15 @@ endfunction
 
 % Take a rate K surface and convert back to time varying rate L
 
-function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz)
-  max_amp = 80; Fs=8;
+function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs=8000)
+  max_amp = 1600;
   [frames col] = size(model);
 
   model_ = zeros(frames, max_amp+2);
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
-    rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
+    rate_L_sample_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     
     % back down to rate L
 
@@ -606,7 +607,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
 endfunction
 
 
-% Post Filter, has a big impact on speech quality after VQ.  When used
+% PostFilter, has a big impact on speech quality after VQ.  When used
 % on a mean removed rate K vector, it raises formants, and supresses
 % anti-formants.  As it manipulates amplitudes, we normalise energy to
 % prevent clipping or large level variations.  pf_gain of 1.2 to 1.5
