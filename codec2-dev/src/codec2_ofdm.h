@@ -49,15 +49,16 @@ struct OFDM *ofdm_create(void);
 void ofdm_destroy(struct OFDM *);
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
+int ofdm_get_nin(struct OFDM *);
 
 /* option setters */
 
-void set_verbose(struct OFDM *, int);
-void set_timing_enable(struct OFDM *, bool);
-void set_foff_est_enable(struct OFDM *, bool);
-void set_phase_est_enable(struct OFDM *, bool);
-void set_foff_est_gain(struct OFDM *, float);
-void set_off_est_hz(struct OFDM *, float);
+void ofdm_set_verbose(struct OFDM *, int);
+void ofdm_set_timing_enable(struct OFDM *, bool);
+void ofdm_set_foff_est_enable(struct OFDM *, bool);
+void ofdm_set_phase_est_enable(struct OFDM *, bool);
+void ofdm_set_foff_est_gain(struct OFDM *, float);
+void ofdm_set_off_est_hz(struct OFDM *, float);
 
 #ifdef __cplusplus
 }
