@@ -404,6 +404,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
   end
 
+  states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
   states.timing_est = timing_est;
