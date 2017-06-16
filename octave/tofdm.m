@@ -41,8 +41,7 @@ nin = Nsamperframe+2*(M+Ncp);
 states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
-rxbuf_log = [];
-rxbuf_in_log = [];
+rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = [];
 
 for f=1:Nframes
 
@@ -58,13 +57,14 @@ for f=1:Nframes
     rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
   end
   prx += lnew;
-#{
+
   [rx_bits_raw states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-#}
+
   % log some states for comparison to C
 
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
+  rx_sym_log = [rx_sym_log; states.rx_sym];
 end
 
 % ---------------------------------------------------------------------
@@ -82,6 +82,10 @@ stem_sig_and_error(3, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_lo
 stem_sig_and_error(4, 211, real(rxbuf_log_c), real(rxbuf_log - rxbuf_log_c), 'rxbuf re', [1 length(rxbuf_log_c) -0.1 0.1])
 stem_sig_and_error(4, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rxbuf im', [1 length(rxbuf_log_c) -0.1 0.1])
 
+r=1;
+stem_sig_and_error(4, 211, real(rx_sym_log_c(r,:)), real(rx_sym_log(r,:) - rx_sym_log_c(r,:)), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
+stem_sig_and_error(4, 212, imag(rx_sym_log_c(r,:)), imag(rx_sym_log(r,:) - rx_sym_log_c(r,:)), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
+
 % Run through checklist -----------------------------
 
 check(W, W_c, 'W');
@@ -89,3 +93,4 @@ check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
 check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
+check(rx_sym_log, rx_sym_log_c, 'rx_sym');
