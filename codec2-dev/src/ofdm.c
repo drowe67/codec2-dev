@@ -304,7 +304,6 @@ struct OFDM *ofdm_create() {
         }
     }
 
-
     for (i = 0; i < (OFDM_NS + 3); i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
