@@ -50,6 +50,8 @@ void ofdm_destroy(struct OFDM *);
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
 int ofdm_get_nin(struct OFDM *);
+int ofdm_get_samples_per_frame(void);
+int ofdm_get_max_samples_per_frame(void);
 
 /* option setters */
 
