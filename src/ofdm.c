@@ -495,7 +495,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* previous pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
     en = st + OFDM_M;
 
     complex float work[OFDM_M];
@@ -512,8 +512,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* pilot - this frame - pilot */
 
-    for (rr = 1; rr < (OFDM_NS + 3); rr++) {
-        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (rr - 1) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    for (rr = 0; rr < (OFDM_NS + 1); rr++) {
+        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + rr * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
         en = st + OFDM_M;
         
         for (i = 0; i < (OFDM_NC + 2); i++) {
@@ -523,13 +523,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     
             matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
 
-            ofdm->rx_sym[rr][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
+            ofdm->rx_sym[rr + 1][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
         }
     }
 
     /* next pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
     en = st + OFDM_M;
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
