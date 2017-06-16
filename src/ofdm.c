@@ -304,6 +304,13 @@ struct OFDM *ofdm_create() {
         }
     }
 
+
+    for (i = 0; i < (OFDM_NS + 3); i++) {
+        for (j = 0; j < (OFDM_NC + 2); j++) {
+            ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
+        }
+    }
+
     /* default settings of options and states */
 
     ofdm->verbose = 0;
@@ -345,27 +352,31 @@ struct OFDM *ofdm_create() {
 void ofdm_destroy(struct OFDM *ofdm) {
 }
 
-void set_verbose(struct OFDM *ofdm, int level) {
+int ofdm_get_nin(struct OFDM *ofdm) {
+    return ofdm->nin;
+}
+
+void ofdm_set_verbose(struct OFDM *ofdm, int level) {
     ofdm->verbose = level;
 }
 
-void set_timing_enable(struct OFDM *ofdm, bool val) {
+void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     ofdm->timing_en = val;
 }
 
-void set_foff_est_enable(struct OFDM *ofdm, bool val) {
+void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
 
-void set_phase_est_enable(struct OFDM *ofdm, bool val) {
+void ofdm_set_phase_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->phase_est_en = val;
 }
 
-void set_foff_est_gain(struct OFDM *ofdm, float val) {
+void ofdm_set_foff_est_gain(struct OFDM *ofdm, float val) {
     ofdm->foff_est_gain = val;
 }
 
-void set_off_est_hz(struct OFDM *ofdm, float val) {
+void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
 }
 
