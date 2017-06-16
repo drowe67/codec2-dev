@@ -4,7 +4,7 @@
 % Octave script for comparing Octave and C versions of OFDZM modem
 
 
-Nframes = 2;
+Nframes = 3;
 
 more off;
 ofdm_lib;
@@ -42,24 +42,28 @@ states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
 rxbuf_log = [];
+rxbuf_in_log = [];
 
 for f=1:Nframes
 
   % insert samples at end of buffer, set to zero if no samples
   % available to disable phase estimation on future pilots on last
   % frame of simulation
-
-  lnew = min(Nsam-prx,states.nin);
-  rxbuf_in = zeros(1,states.nin);
-
+ 
+  nin = states.nin;
+  lnew = min(Nsam-prx+1,nin);
+  rxbuf_in = zeros(1,nin);
+  %printf("nin: %d prx: %d lnew: %d\n", nin, prx, lnew);
   if lnew
     rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
   end
-  prx += states.nin;
+  prx += lnew;
+#{
   [rx_bits_raw states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-
+#}
   % log some states for comparison to C
 
+  rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
 end
 
@@ -72,10 +76,16 @@ load tofdm_out.txt;
 
 stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
 stem_sig_and_error(2, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
-stem_sig_and_error(2, 212, imag(tx_log_c), real(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
+stem_sig_and_error(2, 212, imag(tx_log_c), imag(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
+stem_sig_and_error(3, 211, real(rxbuf_in_log_c), real(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in re', [1 length(rxbuf_in_log_c) -0.1 0.1])
+stem_sig_and_error(3, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in im', [1 length(rxbuf_in_log_c) -0.1 0.1])
+stem_sig_and_error(4, 211, real(rxbuf_log_c), real(rxbuf_log - rxbuf_log_c), 'rxbuf re', [1 length(rxbuf_log_c) -0.1 0.1])
+stem_sig_and_error(4, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rxbuf im', [1 length(rxbuf_log_c) -0.1 0.1])
 
 % Run through checklist -----------------------------
 
 check(W, W_c, 'W');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
+check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
+check(rxbuf_log, rxbuf_log_c, 'rxbuf');
