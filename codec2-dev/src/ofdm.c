@@ -41,7 +41,7 @@
 /* Static Prototypes */
 
 static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
-static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, complex float *);
+static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, int, complex float *);
 static complex float vector_sum(complex float *, int, int);
 static complex float vector_conjugate_sum(complex float *, int, int);
 static complex float qpsk_mod(int *);
@@ -111,14 +111,14 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
 
 /* convert time domain into frequency domain */
 
-static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
+static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *result, int index, complex float *vector) {
     int row, col;
 
     for (col = 0; col < (OFDM_NC + 2); col++) {
         result[col] = 0.0f + 0.0f * I;
 
         for (row = 0; row < OFDM_M; row++) {
-            result[col] += (vector[row] * conjf(ofdm->W[col][row])); /* complex result */
+            result[col] += (vector[row] * conjf(ofdm->W[index][row])); /* complex result */
         }
     }
 }
@@ -518,13 +518,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     complex float work[OFDM_M];
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
-        for (j = st, k = 0; j < en; j++, k++) {
-            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
-        }
-    
-        matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
+    for (j = st, k = 0; j < en; j++, k++) {
+        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+    }
 
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        matrix_vector_conjugate_multiply(ofdm, acarrier, i, work);        
         ofdm->rx_sym[0][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
     }
 
@@ -533,14 +532,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     for (rr = 0; rr < (OFDM_NS + 1); rr++) {
         st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + rr * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
         en = st + OFDM_M;
+
+        for (j = st, k = 0; j < en; j++, k++) {
+            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+        }
         
         for (i = 0; i < (OFDM_NC + 2); i++) {
-            for (j = st, k = 0; j < en; j++, k++) {
-                work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
-            }
-    
-            matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
-
+            matrix_vector_conjugate_multiply(ofdm, acarrier, i, work);        
             ofdm->rx_sym[rr + 1][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
         }
     }
@@ -550,13 +548,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
     en = st + OFDM_M;
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
-        for (j = st, k = 0; j < en; j++, k++) {
-            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
-        }
-    
-        matrix_vector_conjugate_multiply(ofdm, acarrier, work);        
+    for (j = st, k = 0; j < en; j++, k++) {
+        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+    }
 
+    for (i = 0; i < (OFDM_NC + 2); i++) {
+        matrix_vector_conjugate_multiply(ofdm, acarrier, i, work);        
         ofdm->rx_sym[(OFDM_NS + 2)][i] = vector_sum(acarrier, 0, (OFDM_NC + 2));
     }
 
