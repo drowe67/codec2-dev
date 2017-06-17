@@ -609,7 +609,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
         
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * ofdm->pilots[j];
+            symbol[k] = ofdm->rx_sym[2 + OFDM_NS][j] * ofdm->pilots[j];
         }
         
         aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
@@ -623,10 +623,6 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * bits, separate loop as it runs across cols (carriers) to get
      * frame bit ordering correct
      */
-
-    for (i = 0; i < (OFDM_NC + 2); i++) {
-        ofdm->aphase_est_pilot_log[i] = aphase_est_pilot[i];
-    }
 
     complex float rx_corr;
     int abit[2];
@@ -653,6 +649,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
                 rx_bits[bit_index++] = abit[1];
             }
         }
+
+        ofdm->aphase_est_pilot_log[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = aphase_est_pilot[i];
     }
 
     /* Adjust nin to take care of sample clock offset */
