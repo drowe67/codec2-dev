@@ -313,14 +313,14 @@ struct OFDM *ofdm_create() {
     /* default settings of options and states */
 
     ofdm->verbose = 0;
-    ofdm->timing_en = true;
-    ofdm->foff_est_en = true;
-    ofdm->phase_est_en = true;
+    ofdm->timing_en = false;
+    ofdm->foff_est_en = false;
+    ofdm->phase_est_en = false;
 
     ofdm->foff_est_gain = 0.01f;
     ofdm->foff_est_hz = 0.0f;
-    ofdm->sample_point = 1;
-    ofdm->timing_est = 1;
+    ofdm->sample_point = 0;
+    ofdm->timing_est = 0;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
 
     /* create the OFDM waveform */
@@ -481,7 +481,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + 1) - floorf(OFDM_FTWINDOWWIDTH / 2) + (ofdm->timing_est - 1);
+        st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + 1) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
         en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH - 1;
 
         complex float work[(en - st)];
@@ -633,7 +633,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
         for (i = 1; i < (OFDM_NC + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = ofdm->rx_sym[rr+1][i] * cexpf(I * aphase_est_pilot[i]);
+                rx_corr = ofdm->rx_sym[rr+1][i] * cexpf(-I * aphase_est_pilot[i]);
             } else {
                 rx_corr = ofdm->rx_sym[rr+1][i];
             }
