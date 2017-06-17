@@ -91,9 +91,9 @@ struct OFDM {
     /* Demodulator data */
 
     complex float rx_sym[OFDM_NS + 3][OFDM_NC + 2];
-    complex float rx_np[(OFDM_NS + 3) * OFDM_NC];
-    float rx_amp[(OFDM_NS + 3) * OFDM_NC];
-    float aphase_est_pilot_log[OFDM_NC + 2];
+    complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NC];
+    float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
+    float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
 };
 
 #ifdef __cplusplus
