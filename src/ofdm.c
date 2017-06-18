@@ -42,8 +42,8 @@
 
 static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
 static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, complex float *);
-static complex float vector_sum(complex float *, int, int);
-static complex float vector_conjugate_sum(complex float *, int, int);
+static complex float vector_sum(complex float *, int);
+static complex float vector_conjugate_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
@@ -123,25 +123,25 @@ static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *r
     }
 }
 
-static complex float vector_sum(complex float *a, int index, int num_elements) {
+static complex float vector_sum(complex float *a, int num_elements) {
     int i;
     
     complex float sum = 0.0f + 0.0f * I;
 
     for (i = 0; i < num_elements; i++) {
-        sum += a[index];
+        sum += a[i];
     }
 
     return sum;
 }
 
-static complex float vector_conjugate_sum(complex float *a, int index, int num_elements) {
+static complex float vector_conjugate_sum(complex float *a, int num_elements) {
     int i;
     
     complex float sum = 0.0f + 0.0f * I;
 
     for (i = 0; i < num_elements; i++) {
-        sum += conjf(a[index]);
+        sum += conjf(a[i]);
     }
 
     return sum;
@@ -550,7 +550,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[1], 1, (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[1 + OFDM_NS], 1 + OFDM_NS, (OFDM_NC + 2));
+        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[0], (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], (OFDM_NC + 2));
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
 
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
@@ -579,13 +579,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]);
         }
 
-        aphase_est_pilot_rect = vector_sum(symbol, 0, 3);
+        aphase_est_pilot_rect = vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
             symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * conjf(ofdm->pilots[j]);
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+        aphase_est_pilot_rect += vector_sum(symbol, 3);
         
         /* use next step of pilots in past and future */
         
@@ -593,13 +593,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j];
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+        aphase_est_pilot_rect += vector_sum(symbol, 3);
         
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
             symbol[k] = ofdm->rx_sym[2 + OFDM_NS][j] * ofdm->pilots[j];
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 0, 3);
+        aphase_est_pilot_rect += vector_sum(symbol, 3);
 
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
         aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
@@ -615,14 +615,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     int abit[2];
     int bit_index = 0;
 
-    /* skip pilots and boundaries */
-
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
         for (i = 1; i < (OFDM_NC + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = ofdm->rx_sym[rr+1][i] * cexpf(-I * aphase_est_pilot[i]);
+                rx_corr = ofdm->rx_sym[rr+2][i] * cexpf(-I * aphase_est_pilot[i]);
             } else {
-                rx_corr = ofdm->rx_sym[rr+1][i];
+                rx_corr = ofdm->rx_sym[rr+2][i];
             }
 
             ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
