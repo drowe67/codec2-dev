@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
     COMP           rxbuf_in_log[max_samples_per_frame*NFRAMES];
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
     COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
+    float          foff_hz_log[NFRAMES];
 
     FILE          *fout;
     int            f,i,j;
@@ -107,7 +108,7 @@ int main(int argc, char *argv[])
     /* disable estimators for initial testing */
 
     ofdm_set_timing_enable(ofdm, false);
-    ofdm_set_foff_est_enable(ofdm, false);
+    ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, false);
 
     for(f=0; f<NFRAMES; f++) {
@@ -159,6 +160,8 @@ int main(int argc, char *argv[])
                 rx_sym_log[(OFDM_NS + 3)*f+i][j].imag = cimagf(ofdm->rx_sym[i][j]);
             }
         }
+
+        foff_hz_log[f] = ofdm->foff_est_hz;
     }
 
     /*---------------------------------------------------------*\
@@ -175,6 +178,7 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
     octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
+    octave_save_float(fout, "foff_hz_log_c", foff_hz_log, 1, NFRAMES, 1);
     fclose(fout);
 
     ofdm_destroy(ofdm);

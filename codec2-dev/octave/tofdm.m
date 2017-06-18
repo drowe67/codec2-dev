@@ -41,10 +41,10 @@ nin = Nsamperframe+2*(M+Ncp);
 states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
-rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = [];
+rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = [];
 
 states.timing_en = 0;
-states.foff_est_en = 0;
+states.foff_est_en = 1;
 states.phase_est_en = 0;
 
 for f=1:Nframes
@@ -69,26 +69,31 @@ for f=1:Nframes
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
   rx_sym_log = [rx_sym_log; states.rx_sym];
+  foff_hz_log = [foff_hz_log; states.foff_est_hz];
 end
 
 % ---------------------------------------------------------------------
 % Run C version and plot Octave and C states and differences 
 % ---------------------------------------------------------------------
 
-system('../build_linux/unittest/tofdm');
+system('/home/ssampson/testing/tofdm');
 load tofdm_out.txt;
 
 stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
+
 stem_sig_and_error(2, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
 stem_sig_and_error(2, 212, imag(tx_log_c), imag(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
+
 stem_sig_and_error(3, 211, real(rxbuf_in_log_c), real(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in re', [1 length(rxbuf_in_log_c) -0.1 0.1])
 stem_sig_and_error(3, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in im', [1 length(rxbuf_in_log_c) -0.1 0.1])
+
 stem_sig_and_error(4, 211, real(rxbuf_log_c), real(rxbuf_log - rxbuf_log_c), 'rxbuf re', [1 length(rxbuf_log_c) -0.1 0.1])
 stem_sig_and_error(4, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rxbuf im', [1 length(rxbuf_log_c) -0.1 0.1])
 
-r=1;
-stem_sig_and_error(4, 211, real(rx_sym_log_c(r,:)), real(rx_sym_log(r,:) - rx_sym_log_c(r,:)), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
-stem_sig_and_error(4, 212, imag(rx_sym_log_c(r,:)), imag(rx_sym_log(r,:) - rx_sym_log_c(r,:)), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
+stem_sig_and_error(5, 211, real(rx_sym_log_c), real(rx_sym_log - rx_sym_log_c), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
+stem_sig_and_error(5, 212, imag(rx_sym_log_c), imag(rx_sym_log - rx_sym_log_c), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
+
+stem_sig_and_error(6, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
 
 % Run through checklist -----------------------------
 
@@ -98,3 +103,4 @@ check(tx_log, tx_log_c, 'tx');
 check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
 check(rx_sym_log, rx_sym_log_c, 'rx_sym');
+check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
