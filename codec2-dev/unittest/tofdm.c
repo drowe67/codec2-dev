@@ -59,6 +59,7 @@ int main(int argc, char *argv[])
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
     COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
     float          foff_hz_log[NFRAMES];
+    int            rx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
 
     FILE          *fout;
     int            f,i,j;
@@ -107,6 +108,7 @@ int main(int argc, char *argv[])
 
     /* disable estimators for initial testing */
 
+    ofdm_set_verbose(ofdm, true);
     ofdm_set_timing_enable(ofdm, false);
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, false);
@@ -162,6 +164,8 @@ int main(int argc, char *argv[])
         }
 
         foff_hz_log[f] = ofdm->foff_est_hz;
+
+        memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
     }
 
     /*---------------------------------------------------------*\
@@ -179,6 +183,7 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
     octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     fclose(fout);
 
     ofdm_destroy(ofdm);

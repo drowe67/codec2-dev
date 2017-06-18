@@ -6,7 +6,7 @@
 
 Nframes = 3;
 
-more off;
+more off; format;
 ofdm_lib;
 autotest;
 
@@ -41,7 +41,7 @@ nin = Nsamperframe+2*(M+Ncp);
 states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
-rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = [];
+rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; rx_bits_log = [];
 
 states.timing_en = 0;
 states.foff_est_en = 1;
@@ -62,7 +62,7 @@ for f=1:Nframes
   end
   prx += lnew;
 
-  [rx_bits_raw states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+  [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
 
   % log some states for comparison to C
 
@@ -70,13 +70,21 @@ for f=1:Nframes
   rxbuf_log = [rxbuf_log states.rxbuf];
   rx_sym_log = [rx_sym_log; states.rx_sym];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
+  rx_bits_log = [rx_bits_log rx_bits];
+  
 end
 
 % ---------------------------------------------------------------------
 % Run C version and plot Octave and C states and differences 
 % ---------------------------------------------------------------------
 
-system('/home/ssampson/testing/tofdm');
+% Override default path by setting path_to_tofdm = "/your/path/to/tofdm"
+
+if exist("path_to_tofdm", "var") == 0
+   path_to_tofdm = "../build_linux/unittest/tofdm";
+end
+system(path_to_tofdm) 
+
 load tofdm_out.txt;
 
 stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
@@ -95,6 +103,8 @@ stem_sig_and_error(5, 212, imag(rx_sym_log_c), imag(rx_sym_log - rx_sym_log_c), 
 
 stem_sig_and_error(6, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
 
+stem_sig_and_error(7, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
+
 % Run through checklist -----------------------------
 
 check(W, W_c, 'W');
@@ -104,3 +114,4 @@ check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
 check(rx_sym_log, rx_sym_log_c, 'rx_sym');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
+check(rx_bits_log, rx_bits_log_c, 'rx_bits');

@@ -630,8 +630,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
                 rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
             } else if (OFDM_BPS == 2) {
                 qpsk_demod(rx_corr, abit);
-                rx_bits[bit_index++] = abit[0];
                 rx_bits[bit_index++] = abit[1];
+                rx_bits[bit_index++] = abit[0];
             }
         }
 
