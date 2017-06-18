@@ -512,7 +512,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* previous pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
     en = st + OFDM_M;
 
     complex float work[OFDM_M];
@@ -526,7 +526,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* pilot - this frame - pilot */
 
     for (rr = 0; rr < (OFDM_NS + 1); rr++) {
-        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + rr * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
+        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + rr * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
         en = st + OFDM_M;
 
         for (j = st, k = 0; j < en; j++, k++) {
@@ -538,7 +538,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* next pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + ofdm->sample_point;
+    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
     en = st + OFDM_M;
 
     for (j = st, k = 0; j < en; j++, k++) {
