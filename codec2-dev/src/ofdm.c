@@ -372,6 +372,11 @@ void ofdm_set_verbose(struct OFDM *ofdm, int level) {
 
 void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     ofdm->timing_en = val;
+
+    if (ofdm->timing_en == false) {
+        /* manually set ideal timing instant */
+        ofdm->sample_point = OFDM_NCP-1;
+    }
 }
 
 void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {

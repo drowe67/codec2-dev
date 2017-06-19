@@ -42,12 +42,18 @@ states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
 rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; 
+timing_est_log = []; sample_point_log = []; 
 phase_est_pilot_log = []; rx_amp_log = [];
-rx_bits_log = [];
+rx_np_log = []; rx_bits_log = [];
 
-states.timing_en = 0;
-states.foff_est_en = 1;
-states.phase_est_en = 0;
+states.timing_en = 1;
+states.foff_est_en = 0;
+states.phase_est_en = 1;
+
+if states.timing_en == 0
+  % manually set ideal timing instant
+  states.sample_point = Ncp;
+end
 
 for f=1:Nframes
 
@@ -74,6 +80,9 @@ for f=1:Nframes
   phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
   rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
+  timing_est_log = [timing_est_log; states.timing_est];
+  sample_point_log = [sample_point_log; states.sample_point];
+  rx_np_log = [rx_np_log arx_np];
   rx_bits_log = [rx_bits_log rx_bits];
   
 end
@@ -91,28 +100,37 @@ system(path_to_tofdm);
 
 load tofdm_out.txt;
 
-stem_sig_and_error(1, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
+fg = 1;
+figure(fg++); clf; plot(rx_np_log,'+'); title('Octave Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
+figure(fg++); clf; plot(rx_np_log_c,'+'); title('C Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
 
-stem_sig_and_error(2, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
-stem_sig_and_error(2, 212, imag(tx_log_c), imag(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
+stem_sig_and_error(fg++, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bits', [1 length(tx_bits_log) -1.5 1.5])
 
-stem_sig_and_error(3, 211, real(rxbuf_in_log_c), real(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in re', [1 length(rxbuf_in_log_c) -0.1 0.1])
-stem_sig_and_error(3, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in im', [1 length(rxbuf_in_log_c) -0.1 0.1])
+stem_sig_and_error(fg, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
+stem_sig_and_error(fg++, 212, imag(tx_log_c), imag(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
 
-stem_sig_and_error(4, 211, real(rxbuf_log_c), real(rxbuf_log - rxbuf_log_c), 'rxbuf re', [1 length(rxbuf_log_c) -0.1 0.1])
-stem_sig_and_error(4, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rxbuf im', [1 length(rxbuf_log_c) -0.1 0.1])
+stem_sig_and_error(fg, 211, real(rxbuf_in_log_c), real(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in re', [1 length(rxbuf_in_log_c) -0.1 0.1])
+stem_sig_and_error(fg++, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in im', [1 length(rxbuf_in_log_c) -0.1 0.1])
 
-stem_sig_and_error(5, 211, real(rx_sym_log_c), real(rx_sym_log - rx_sym_log_c), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
-stem_sig_and_error(5, 212, imag(rx_sym_log_c), imag(rx_sym_log - rx_sym_log_c), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
+stem_sig_and_error(fg, 211, real(rxbuf_log_c), real(rxbuf_log - rxbuf_log_c), 'rxbuf re', [1 length(rxbuf_log_c) -0.1 0.1])
+stem_sig_and_error(fg++, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rxbuf im', [1 length(rxbuf_log_c) -0.1 0.1])
+
+stem_sig_and_error(fg, 211, real(rx_sym_log_c), real(rx_sym_log - rx_sym_log_c), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
+stem_sig_and_error(fg++, 212, imag(rx_sym_log_c), imag(rx_sym_log - rx_sym_log_c), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
 
 % for angles pi and -pi are the same
+
 d = phase_est_pilot_log - phase_est_pilot_log_c; d = angle(exp(j*d));
-stem_sig_and_error(6, 211, phase_est_pilot_log_c, d, 'phase est pilot', [1 length(phase_est_pilot_log_c) -1.5 1.5])
-stem_sig_and_error(6, 212, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'rx amp', [1 length(rx_amp_log_c) -1.5 1.5])
 
-stem_sig_and_error(7, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+stem_sig_and_error(fg, 211, phase_est_pilot_log_c, d, 'phase est pilot', [1 length(phase_est_pilot_log_c) -1.5 1.5])
+stem_sig_and_error(fg++, 212, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'rx amp', [1 length(rx_amp_log_c) -1.5 1.5])
 
-stem_sig_and_error(8, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
+stem_sig_and_error(fg++, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+
+stem_sig_and_error(fg,   211, timing_est_log_c, (timing_est_log - timing_est_log_c), 'timing est', [1 length(timing_est_log_c) -1.5 1.5])
+stem_sig_and_error(fg++, 212, sample_point_log_c, (sample_point_log - sample_point_log_c), 'sample point', [1 length(sample_point_log_c) -1.5 1.5])
+
+stem_sig_and_error(fg++, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
 
 % Run through checklist -----------------------------
 
@@ -124,5 +142,7 @@ check(rxbuf_log, rxbuf_log_c, 'rxbuf');
 check(rx_sym_log, rx_sym_log_c, 'rx_sym');
 check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=1E-3, its_an_angle=1);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp');
+check(timing_est_log, timing_est_log_c, 'timing_est');
+check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
