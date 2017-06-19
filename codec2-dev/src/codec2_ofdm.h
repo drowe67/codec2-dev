@@ -59,7 +59,6 @@ void ofdm_set_verbose(struct OFDM *, int);
 void ofdm_set_timing_enable(struct OFDM *, bool);
 void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
-void ofdm_set_foff_est_gain(struct OFDM *, float);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 
 #ifdef __cplusplus
