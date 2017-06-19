@@ -383,7 +383,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       end
       rx_bits = [rx_bits abit];
     end % c=2:Nc+1
-    aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot];
+    aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot(2:Nc+1)];
   end 
 
   % Adjust nin to take care of sample clock offset
