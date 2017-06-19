@@ -155,23 +155,20 @@ static complex float vector_conjugate_sum(complex float *a, int num_elements) {
 
 static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
     complex float csam;
-    complex float rxa;
-    complex float rxb;
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
     float corr[Ncorr];
     int i, j;
 
     for (i = 0; i < Ncorr; i++) {
-        rxa = 0.0f + 0.0f *I;
-        rxb = 0.0f + 0.0f *I;
+        complex float temp = 0.0f + 0.0f *I;
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             csam = conjf(ofdm->rate_fs_pilot_samples[j]);
-            rxa += (rx[i + j] * csam);
-            rxb += (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
+            temp += (rx[i + j] * csam);
+            temp += (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
         }
 
-        corr[i] = cabsf(rxa) + cabsf(rxb);
+        corr[i] = cabsf(temp);
     }
 
     /* find the max magnitude and its index */
@@ -484,9 +481,6 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
-
-        //st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + 1) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
-        //en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH - 1;
 
         st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
         en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH;
