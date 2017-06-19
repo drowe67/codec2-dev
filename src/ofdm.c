@@ -351,6 +351,7 @@ struct OFDM *ofdm_create() {
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
+    free(ofdm);
 }
 
 int ofdm_get_nin(struct OFDM *ofdm) {
