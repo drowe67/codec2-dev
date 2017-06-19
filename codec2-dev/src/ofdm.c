@@ -628,7 +628,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
                 rx_corr = ofdm->rx_sym[rr+2][i];
             }
 
-            ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
+            ofdm->rx_np[(rr * OFDM_NC) + (i - 1)] = rx_corr;
 
             /* note even though amp ests are the same for each col,
                the FEC decoder likes to have one amplitude per symbol
@@ -648,9 +648,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
                 rx_bits[bit_index++] = abit[1];
                 rx_bits[bit_index++] = abit[0];
             }
-
        }
-
     }
 
     /* Adjust nin to take care of sample clock offset */
