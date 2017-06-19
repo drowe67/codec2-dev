@@ -44,7 +44,7 @@ function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
 endfunction
 
 
-function check(a, b, test_name, tol)
+function check(a, b, test_name, tol, its_an_angle = 0)
   global passes;
   global fails;
 
@@ -65,7 +65,13 @@ function check(a, b, test_name, tol)
   end
   printf(": ");  
   
-  e = sum(sum(abs(a - b))/ll);
+  if its_an_angle
+    % take into account pi is close to -pi for angles in rads
+    e = sum(sum(abs(exp(j*a) - exp(j*b)))/ll);
+  else
+    e = sum(sum(abs(a - b))/ll);
+  end
+
   if e < tol
     printf("OK\n");
     passes++;

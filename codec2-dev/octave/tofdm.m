@@ -41,7 +41,9 @@ nin = Nsamperframe+2*(M+Ncp);
 states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
 prx += nin;
 
-rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; rx_bits_log = [];
+rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; 
+phase_est_pilot_log = []; rx_amp_log = [];
+rx_bits_log = [];
 
 states.timing_en = 0;
 states.foff_est_en = 1;
@@ -69,6 +71,8 @@ for f=1:Nframes
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
   rxbuf_log = [rxbuf_log states.rxbuf];
   rx_sym_log = [rx_sym_log; states.rx_sym];
+  phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+  rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
   rx_bits_log = [rx_bits_log rx_bits];
   
@@ -83,7 +87,7 @@ end
 if exist("path_to_tofdm", "var") == 0
    path_to_tofdm = "../build_linux/unittest/tofdm";
 end
-system(path_to_tofdm) 
+system(path_to_tofdm);
 
 load tofdm_out.txt;
 
@@ -101,9 +105,14 @@ stem_sig_and_error(4, 212, imag(rxbuf_log_c), imag(rxbuf_log - rxbuf_log_c), 'rx
 stem_sig_and_error(5, 211, real(rx_sym_log_c), real(rx_sym_log - rx_sym_log_c), 'rx sym re', [1 length(rx_sym_log_c) -1.5 1.5])
 stem_sig_and_error(5, 212, imag(rx_sym_log_c), imag(rx_sym_log - rx_sym_log_c), 'rx sym im', [1 length(rx_sym_log_c) -1.5 1.5])
 
-stem_sig_and_error(6, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+% for angles pi and -pi are the same
+d = phase_est_pilot_log - phase_est_pilot_log_c; d = angle(exp(j*d));
+stem_sig_and_error(6, 211, phase_est_pilot_log_c, d, 'phase est pilot', [1 length(phase_est_pilot_log_c) -1.5 1.5])
+stem_sig_and_error(6, 212, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'rx amp', [1 length(rx_amp_log_c) -1.5 1.5])
 
-stem_sig_and_error(7, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
+stem_sig_and_error(7, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+
+stem_sig_and_error(8, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bits', [1 length(rx_bits_log) -1.5 1.5])
 
 % Run through checklist -----------------------------
 
@@ -113,5 +122,7 @@ check(tx_log, tx_log_c, 'tx');
 check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
 check(rx_sym_log, rx_sym_log_c, 'rx_sym');
+check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=1E-3, its_an_angle=1);
+check(rx_amp_log, rx_amp_log_c, 'rx_amp');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');

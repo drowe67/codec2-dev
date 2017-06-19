@@ -602,6 +602,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect += vector_sum(symbol, 3);
 
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+
+        /* TODO David: WTF 12.0 constant?  Something to do with LDPC input scaling? */
+
         aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
     }
 
@@ -624,7 +627,17 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             }
 
             ofdm->rx_np[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = rx_corr;
-            ofdm->rx_amp[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = aamp_est_pilot[i];
+
+            /* note even though amp ests are the same for each col,
+               the FEC decoder likes to have one amplitude per symbol
+               so convenient to log them all */
+
+            ofdm->rx_amp[(rr * OFDM_NC) + (i - 1)] = aamp_est_pilot[i];
+
+            /* note like amps in this implementation phase ests the
+               same for each col, but we log them for each symbol anyway */
+
+            ofdm->aphase_est_pilot_log[(rr * OFDM_NC) + (i - 1)] = aphase_est_pilot[i];
 
             if (OFDM_BPS == 1) {
                 rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
@@ -633,9 +646,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
                 rx_bits[bit_index++] = abit[1];
                 rx_bits[bit_index++] = abit[0];
             }
-        }
 
-        ofdm->aphase_est_pilot_log[(rr * OFDM_ROWSPERFRAME) + (i - 1)] = aphase_est_pilot[i];
+       }
+
     }
 
     /* Adjust nin to take care of sample clock offset */

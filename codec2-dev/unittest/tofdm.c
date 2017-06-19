@@ -48,7 +48,8 @@ int main(int argc, char *argv[])
     int            max_samples_per_frame = ofdm_get_max_samples_per_frame();
 
     struct OFDM   *ofdm;
-    COMP           tx[samples_per_frame];      /* one frame of tx samples */
+    COMP           tx[samples_per_frame];         /* one frame of tx samples */
+
     int            rx_bits[OFDM_BITSPERFRAME];    /* one frame of rx bits    */
 
     /* log arrays */
@@ -58,6 +59,8 @@ int main(int argc, char *argv[])
     COMP           rxbuf_in_log[max_samples_per_frame*NFRAMES];
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
     COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
+    float          phase_est_pilot_log[OFDM_ROWSPERFRAME*NFRAMES][OFDM_NC];
+    float          rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
     float          foff_hz_log[NFRAMES];
     int            rx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
 
@@ -163,6 +166,15 @@ int main(int argc, char *argv[])
             }
         }
 
+        /* note phase/amp ests the same for each col, but check them all anyway */
+
+        for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
+            for (j = 0; j < OFDM_NC; j++) {
+                phase_est_pilot_log[OFDM_ROWSPERFRAME*f+i][j] = ofdm->aphase_est_pilot_log[OFDM_NC*i+j];
+                rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*f+OFDM_NC*i+j] = ofdm->rx_amp[OFDM_NC*i+j];
+            }
+        }
+
         foff_hz_log[f] = ofdm->foff_est_hz;
 
         memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
@@ -182,6 +194,8 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
     octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
+    octave_save_float(fout, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, OFDM_ROWSPERFRAME*NFRAMES, OFDM_NC, OFDM_NC);
+    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
     octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     fclose(fout);

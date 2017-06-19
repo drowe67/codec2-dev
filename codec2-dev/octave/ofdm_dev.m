@@ -454,7 +454,7 @@ function [sim_out rx states] = run_sim(sim_in)
       title('Scatter');
       
       figure(2); clf;
-      plot(phase_est_pilot_log(:,2:Nc+1),'g+', 'markersize', 5); 
+      plot(phase_est_pilot_log,'g+', 'markersize', 5); 
       title('Phase est');
       axis([1 Nrp -pi pi]);  
 
