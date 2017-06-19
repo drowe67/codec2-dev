@@ -315,9 +315,9 @@ struct OFDM *ofdm_create() {
     /* default settings of options and states */
 
     ofdm->verbose = 0;
-    ofdm->timing_en = false;
-    ofdm->foff_est_en = false;
-    ofdm->phase_est_en = false;
+    ofdm->timing_en = true;
+    ofdm->foff_est_en = true;
+    ofdm->phase_est_en = true;
 
     ofdm->foff_est_gain = 0.01f;
     ofdm->foff_est_hz = 0.0f;
@@ -382,10 +382,6 @@ void ofdm_set_phase_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->phase_est_en = val;
 }
 
-void ofdm_set_foff_est_gain(struct OFDM *ofdm, float val) {
-    ofdm->foff_est_gain = val;
-}
-
 void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
 }
@@ -447,8 +443,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
  * D P DDD P DDD P DDD P D
  *         ^
  */
-
-// UNTESTED
 
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float aphase_est_pilot_rect;
