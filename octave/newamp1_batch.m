@@ -40,7 +40,7 @@
 % In general, this function processes a bunch of amplitudes, we then
 % use c2sim to hear the results.  Bunch of different experiments below
 
-function surface = newamp1_batch(input_prefix, output_prefix)
+function surface = newamp1_batch(input_prefix, output_prefix, mode)
   newamp;
   more off;
 
@@ -65,28 +65,12 @@ function surface = newamp1_batch(input_prefix, output_prefix)
 
   % Choose experiment to run test here -----------------------
 
-  %model_ = experiment_filter(model);
-  %model_ = experiment_filter_dec_filter(model);
-
-  %[model_ surface] = experiment_rate_K_dct2(model, 0, 1, voicing);
-  [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
-
-  %model_  = experiment_smoothed(model, 0);
-
-  %model_ = experiment_dec_abys(model, 8, 1, 1, 1, voicing);
-
-#{
-  [model_ voicing_ indexes] = experiment_rate_K_dec(model, voicing); % encoder/decoder, lets toss away results except for indexes
-  [model_ voicing_] = model_from_indexes_fbf(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
-#}
-
-  %[model_ voicing_] = model_from_indexes(indexes);                   % decoder uses just indexes, outputs vecs for synthesis
-
-  %model_ = experiment_dec_linear(model_);
-  %model_ = experiment_energy_rate_linear(model, 1, 0);
-
-  %[model_ surface] = experiment_mel_diff_freq(model, 0);
-  %[model_ rate_K_surface] = experiment_closed_loop_mean(model);
+  if strcmp(mode, 'dct2')
+    [model_ surface] = experiment_rate_K_dct2(model, 0, 1, voicing);
+  end
+  if strcmp(mode, 'mel')
+    [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
+  end
 
   % ----------------------------------------------------
 
