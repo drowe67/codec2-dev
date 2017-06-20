@@ -43,7 +43,6 @@
 static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
 static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
-static complex float vector_conjugate_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
@@ -130,18 +129,6 @@ static complex float vector_sum(complex float *a, int num_elements) {
 
     for (i = 0; i < num_elements; i++) {
         sum += a[i];
-    }
-
-    return sum;
-}
-
-static complex float vector_conjugate_sum(complex float *a, int num_elements) {
-    int i;
-    
-    complex float sum = 0.0f + 0.0f * I;
-
-    for (i = 0; i < num_elements; i++) {
-        sum += conjf(a[i]);
     }
 
     return sum;
@@ -552,7 +539,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = vector_conjugate_sum(ofdm->rx_sym[0], (OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], (OFDM_NC + 2));
+        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1], OFDM_NC)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC);
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
 
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
