@@ -63,7 +63,7 @@ static int coarse_sync(struct OFDM *, complex float *, int);
  * 180.0 - 269.9 = 11
  * 270.0 - 359.9 = 10
  */
-const complex float constellation[] = {
+static const complex float constellation[] = {
      1.0f + 0.0f * I,
      0.0f + 1.0f * I,
      0.0f - 1.0f * I,
@@ -73,7 +73,7 @@ const complex float constellation[] = {
 /*
  * These pilots are compatible with Octave version
  */
-const char pilotvalues[] = {
+static const char pilotvalues[] = {
     -1, -1, 1, 1, -1, -1, -1, 1, -1,
      1, -1, 1, 1,  1,  1,  1, 1,  1
 };
@@ -195,7 +195,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
-    int i, j, k, l;
+    int i, j, k, m;
 
     /* initialize aframe to complex zero */
 
@@ -225,7 +225,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0, l = 0; i < OFDM_NS; i++, l += (OFDM_M + OFDM_NCP)) {
+    for (i = 0, m = 0; i < OFDM_NS; i++, m += (OFDM_M + OFDM_NCP)) {
         matrix_vector_multiply(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
@@ -243,7 +243,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
         /* Now move row to the tx reference */
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            tx[l + j] = asymbol_cp[j];
+            tx[m + j] = asymbol_cp[j];
         }
     }
 }
@@ -281,10 +281,10 @@ struct OFDM *ofdm_create() {
 
     /* carrier tables for up and down conversion */
 
-    int Nlower = floorf((OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS);
+    int Nlower = floorf( (OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS );
 
     for (i = 0, j = Nlower; i < (OFDM_NC + 2); i++, j++) {
-        ofdm->w[i] = j * TAU * OFDM_RS / OFDM_FS;
+        ofdm->w[i] = j * TAU / OFDM_M;
     }
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
@@ -314,12 +314,12 @@ struct OFDM *ofdm_create() {
 
     /* create the OFDM waveform */
 
-    complex float temp[OFDM_M + OFDM_NCP];
+    complex float temp[OFDM_M];
 
     matrix_vector_multiply(ofdm, temp, ofdm->pilots);
 
     /*
-     * rate_fs_pilot_samples is 160 samples, as we take the last 16 and copy to the front
+     * rate_fs_pilot_samples is 160 samples, as we copy the last 16 to the front
      */
 
     /* first copy the last Cyclic Prefix (CP) values */
