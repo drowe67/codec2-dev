@@ -331,6 +331,12 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       
   if foff_est_en
     freq_err_rect = sum(rx_sym(2,:))' * sum(rx_sym(2+Ns,:));
+
+    % prevent instability in atan(im/re) when real part near 0 
+
+    freq_err_rect += 1E-6;
+
+    %printf("freq_err_rect: %f %f angle: %f\n", real(freq_err_rect), imag(freq_err_rect), angle(freq_err_rect));
     freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
     foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
   end

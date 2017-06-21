@@ -539,7 +539,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1], OFDM_NC)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC);
+        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1], OFDM_NC+2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC+2);
+
+        /* prevent instability in atan(im/re) when real part near 0 */
+
+        freq_err_rect += 1E-6;
+
+        // fprintf(stderr, "freq_err_rect: %f %f angle: %f\n", crealf(freq_err_rect), cimagf(freq_err_rect),cargf(freq_err_rect) );
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
 
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);

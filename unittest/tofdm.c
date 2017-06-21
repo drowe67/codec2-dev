@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 
     ofdm_set_verbose(ofdm, true);
     ofdm_set_timing_enable(ofdm, true);
-    ofdm_set_foff_est_enable(ofdm, false);
+    ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
     for(f=0; f<NFRAMES; f++) {
