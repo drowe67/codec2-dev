@@ -47,7 +47,7 @@ phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
 
 states.timing_en = 1;
-states.foff_est_en = 0;
+states.foff_est_en = 1;
 states.phase_est_en = 1;
 
 if states.timing_en == 0
