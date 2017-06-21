@@ -103,7 +103,7 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
         result[row] = 0.0f + 0.0f * I;
 
         for (col = 0; col < (OFDM_NC + 2); col++) {
-            result[row] += (vector[col] * (ofdm->W[col][row] / (float) OFDM_M)); /* complex result */
+            result[row] = result[row] + (vector[col] * (ofdm->W[col][row] / (float) OFDM_M)); /* complex result */
         }
     }
 }
@@ -117,7 +117,7 @@ static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *r
         result[col] = 0.0f + 0.0f * I;
 
         for (row = 0; row < OFDM_M; row++) {
-            result[col] += (vector[row] * conjf(ofdm->W[col][row])); /* complex result */
+            result[col] = result[col] + (vector[row] * conjf(ofdm->W[col][row])); /* complex result */
         }
     }
 }
@@ -128,7 +128,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
     complex float sum = 0.0f + 0.0f * I;
 
     for (i = 0; i < num_elements; i++) {
-        sum += a[i];
+        sum = sum + a[i];
     }
 
     return sum;
@@ -151,8 +151,8 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             csam = conjf(ofdm->rate_fs_pilot_samples[j]);
-            temp += (rx[i + j] * csam);
-            temp += (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
+            temp = temp + (rx[i + j] * csam);
+            temp = temp + (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
         }
 
         corr[i] = cabsf(temp);
@@ -574,7 +574,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * conjf(ofdm->pilots[j]);
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 3);
+        aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
         
         /* use next step of pilots in past and future */
         
@@ -582,13 +582,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j];
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 3);
+        aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
         
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
             symbol[k] = ofdm->rx_sym[2 + OFDM_NS][j] * ofdm->pilots[j];
         }
         
-        aphase_est_pilot_rect += vector_sum(symbol, 3);
+        aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
 
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
