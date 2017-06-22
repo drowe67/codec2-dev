@@ -3,8 +3,10 @@
 %
 % Octave script for comparing Octave and C versions of OFDZM modem
 
+% ------------------------------------------------------------------
 
-Nframes = 3;
+Nframes = 30;
+sample_clock_offset_ppm = 100;
 
 more off; format;
 ofdm_lib;
@@ -29,16 +31,18 @@ for f=1:Nframes
   tx_log = [tx_log ofdm_mod(states, tx_bits)];
 end
 
-% Channel simulation
+% Channel simulation ----------------------------------------------
 
-rx = tx_log;
+rx_log = sample_clock_offset(tx_log, sample_clock_offset_ppm);
+
+% Rx ---------------------------------------------------------------
 
 % Init rx with ideal timing so we can test with timing estimation disabled
 
-Nsam = length(rx);
+Nsam = length(rx_log);
 prx = 1;
 nin = Nsamperframe+2*(M+Ncp);
-states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
+states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx_log(prx:nin);
 prx += nin;
 
 rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; 
@@ -66,7 +70,7 @@ for f=1:Nframes
   rxbuf_in = zeros(1,nin);
   %printf("nin: %d prx: %d lnew: %d\n", nin, prx, lnew);
   if lnew
-    rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
+    rxbuf_in(1:lnew) = rx_log(prx:prx+lnew-1);
   end
   prx += lnew;
 
@@ -109,6 +113,9 @@ stem_sig_and_error(fg++, 111, tx_bits_log_c, tx_bits_log - tx_bits_log_c, 'tx bi
 stem_sig_and_error(fg, 211, real(tx_log_c), real(tx_log - tx_log_c), 'tx re', [1 length(tx_log_c) -0.1 0.1])
 stem_sig_and_error(fg++, 212, imag(tx_log_c), imag(tx_log - tx_log_c), 'tx im', [1 length(tx_log_c) -0.1 0.1])
 
+stem_sig_and_error(fg, 211, real(rx_log_c), real(rx_log - rx_log_c), 'rx re', [1 length(rx_log_c) -0.1 0.1])
+stem_sig_and_error(fg++, 212, imag(rx_log_c), imag(rx_log - rx_log_c), 'rx im', [1 length(rx_log_c) -0.1 0.1])
+
 stem_sig_and_error(fg, 211, real(rxbuf_in_log_c), real(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in re', [1 length(rxbuf_in_log_c) -0.1 0.1])
 stem_sig_and_error(fg++, 212, imag(rxbuf_in_log_c), imag(rxbuf_in_log - rxbuf_in_log_c), 'rxbuf in im', [1 length(rxbuf_in_log_c) -0.1 0.1])
 
@@ -137,6 +144,7 @@ stem_sig_and_error(fg++, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bi
 check(W, W_c, 'W');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
+check(rx_log, rx_log_c, 'rx');
 check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
 check(rx_sym_log, rx_sym_log_c, 'rx_sym');
@@ -146,3 +154,4 @@ check(timing_est_log, timing_est_log_c, 'timing_est');
 check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
+

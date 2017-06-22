@@ -40,7 +40,10 @@
 #include "octave.h"
 #include "test_bits_ofdm.h"
 
-#define NFRAMES 3
+#define NFRAMES 30
+#define SAMPLE_CLOCK_OFFSET_PPM 100
+
+int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm);
 
 int main(int argc, char *argv[])
 {
@@ -56,6 +59,7 @@ int main(int argc, char *argv[])
 
     int            tx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
     COMP           tx_log[samples_per_frame*NFRAMES];
+    COMP           rx_log[samples_per_frame*NFRAMES];
     COMP           rxbuf_in_log[max_samples_per_frame*NFRAMES];
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
     COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
@@ -92,10 +96,14 @@ int main(int argc, char *argv[])
     }
 
     /* --------------------------------------------------------*\
-	                        Demod
+	                        Channel
     \*---------------------------------------------------------*/
 
-    COMP *rx = tx_log;
+    cohpsk_fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
+
+    /* --------------------------------------------------------*\
+	                        Demod
+    \*---------------------------------------------------------*/
 
     /* Init rx with ideal timing so we can test with timing estimation disabled */
 
@@ -107,7 +115,7 @@ int main(int argc, char *argv[])
     COMP rxbuf_in[max_samples_per_frame];
 
     for (i=0; i<nin; i++,prx++) {
-         ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx[prx].real + I*rx[prx].imag;
+         ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
     }
 
     int nin_tot = 0;
@@ -144,7 +152,7 @@ int main(int argc, char *argv[])
 
         if (lnew) {
             for(i=0; i<lnew; i++, prx++) {
-                rxbuf_in[i] = rx[prx];
+                rxbuf_in[i] = rx_log[prx];
             }
         }
         assert(prx <= max_samples_per_frame*NFRAMES);
@@ -203,6 +211,7 @@ int main(int argc, char *argv[])
     octave_save_complex(fout, "W_c", (COMP*)ofdm->W, OFDM_NC + 2, OFDM_M, OFDM_M);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
+    octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
     octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
     octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
@@ -218,5 +227,35 @@ int main(int argc, char *argv[])
     ofdm_destroy(ofdm);
 
     return 0;
+}
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: cohpsk_fs_offset()
+  AUTHOR......: David Rowe
+  DATE CREATED: May 2015
+
+  Simulates small Fs offset between mod and demod.
+
+\*---------------------------------------------------------------------------*/
+
+int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
+{
+    double tin, f;
+    int   tout, t1, t2;
+
+    tin = 0.0; tout = 0;
+    while (tin < n) {
+      t1 = floor(tin);
+      t2 = ceil(tin);
+      f = tin - t1;
+      out[tout].real = (1.0-f)*in[t1].real + f*in[t2].real;
+      out[tout].imag = (1.0-f)*in[t1].imag + f*in[t2].imag;
+      tout += 1;
+      tin  += 1.0 + sample_rate_ppm/1E6;
+      //printf("tin: %f tout: %d f: %f\n", tin, tout, f);
+    }
+
+    return tout;
 }
 
