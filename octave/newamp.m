@@ -518,10 +518,10 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
     rate_L_sample_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     
-    %rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
-    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
+    rate_K_surface(f,:) = interp1(rate_L_sample_freqs_kHz, AmdB, rate_K_sample_freqs_kHz, "spline", "extrap");
+    %rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
 
-    %printf("\r%d/%d", f, frames);
+    %printf("%d\n", f);
   end
   %printf("\n");
 endfunction
@@ -588,9 +588,10 @@ endfunction
 % Take a rate K surface and convert back to time varying rate L
 
 function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs=8000)
-  max_amp = 1600;
+  max_amp = 160;
   [frames col] = size(model);
 
+  AmdB_ = zeros(frames, max_amp);
   model_ = zeros(frames, max_amp+2);
   for f=1:frames
     Wo = model(f,1);
@@ -599,10 +600,10 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     
     % back down to rate L
 
-    % AmdB_ = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", 0);
-    AmdB_ = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);
-
-    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+    AmdB_(f,1:L) = interp1(rate_K_sample_freqs_kHz, rate_K_surface(f,:), rate_L_sample_freqs_kHz, "spline", rate_K_surface(f,1));
+    %AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);
+    %printf("f: %d %f %f %f\n", f, rate_K_sample_freqs_kHz(1), rate_L_sample_freqs_kHz(1), AmdB_(1));
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(f, 1:L)/20);
    end
 endfunction
 
@@ -1553,7 +1554,7 @@ function [AmdB_ residual fvec fvec_ amps] = piecewise_model(AmdB, Wo, vq, vq_m)
     plot(mask_sample_freqs_kHz, residual);
     end
 
-    %printf("\nfr1: %f fr2: %f fr3: %f fr4: %f\n", fr1, fr2, fr3, fr4);
+    printf("\nfr1: %f fr2: %f fr3: %f fr4: %f\n", fr1, fr2, fr3, fr4);
     [fvec fvec_ind] = sort([fr1 fr2 fr3 fr4]);
     amps = amp(fvec_ind(1:4));
 

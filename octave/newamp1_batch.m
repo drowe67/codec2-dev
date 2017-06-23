@@ -124,6 +124,7 @@ function surface = newamp1_batch(input_prefix, varargin)
   for f=1:frames
     %printf("%d ", f);   
     Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
+    assert(Wo*L < pi);
 
     Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
     fwrite(fWo, Wo, "float32");
@@ -186,6 +187,13 @@ endfunction
 function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq_filename)
   [frames nc] = size(model);
   Fs = 8000;
+  fg = 1;
+
+  energy = zeros(1,frames);
+  for f=1:frames
+    L = model(f,2);
+    energy(f) = 10*log10(sum( model(f,3:(L+2)) .^ 2 ));
+  end
 
   melvq;
   if length(vq_filename) 
@@ -194,7 +202,7 @@ function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq
     size(vq)
   end
 
-  rate_K_sample_freqs_kHz = [0.1:0.1:3.9];
+  rate_K_sample_freqs_kHz = [0.1:0.1:4];
   K = length(rate_K_sample_freqs_kHz);
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
 
@@ -209,13 +217,8 @@ function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq
   if length(vq_filename) 
     [res rate_K_surface_ ind] = mbest(vq, rate_K_surface, m);
     sd_per_frame = std(res');
-    energy = zeros(1,frames);
-    for f=1:frames
-      L = model(f,2);
-      energy(f) = 10*log10(sum( model(f,3:(L+2)) .^ 2 ));
-    end
-    figure(1); subplot(211); plot(energy); subplot(212); plot(sd_per_frame);
-    figure(2); hist(sd_per_frame);
+    figure(fg++); subplot(211); plot(energy); subplot(212); plot(sd_per_frame);
+    figure(fg); hist(sd_per_frame);
     printf("VQ rms SD: %3.2f\n", mean(sd_per_frame));
   else
     rate_K_surface_ = rate_K_surface;
@@ -229,14 +232,26 @@ function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq
 
   [model_ AmdB_] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
 
-  sum_sd = 0;
+  % Measure distortion between AmdB and AmdB_, ths includes distortion
+  % in the rate K <-> L transition.  Can optionally plot distorted
+  % frames
+
+  plot_sd_thresh = 10;
+  sd = zeros(1,frames);
   for f=1:frames
+    Wo = model(f,1);
     L = model(f,2);
     AmdB = 20*log10(model(f,3:(L+2)));
-    sum_sd = std(AmdB(1:L) - AmdB_(f,1:L));
+    sd(f) = std(AmdB(1:L) - AmdB_(f,1:L));
+    if sd(f) > plot_sd_thresh
+      printf("fg: %d f: %d\n", fg, f);
+      figure(fg++); clf; plot((1:L)*Wo*4/pi, AmdB(1:L),'b+-'); hold on; plot((1:L)*Wo*4/pi, AmdB_(f,1:L),'r+-');
+      plot(rate_K_sample_freqs_kHz, rate_K_surface_(f,:), 'c+-'); hold off;
+    end
   end
-  printf("rate K resampling SD: %3.2f\n", mean(sum_sd));
-
+  printf("rate K resampling SD: %3.2f\n", mean(sd));
+  figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd);
+  figure(fg++); clf; hist(sd);
 endfunction
 
 
