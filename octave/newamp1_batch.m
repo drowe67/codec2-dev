@@ -40,17 +40,44 @@
 % In general, this function processes a bunch of amplitudes, we then
 % use c2sim to hear the results.  Bunch of different experiments below
 
-function surface = newamp1_batch(input_prefix, output_prefix, mode)
+function surface = newamp1_batch(input_prefix, varargin)
   newamp;
   more off;
 
   max_amp = 160;
-  postfilter = 0;   % optional postfiler that runs on Am, not used atm
-  synth_phase = 1;
 
-  if nargin == 1
-    output_prefix = input_prefix;
+  % defaults
+
+  synth_phase = 1;
+  output_prefix = input_prefix;
+  vq_filename = "";
+  mean_removal = 0;
+  mode = "const";
+
+  % parse variable argument list
+
+  if (length (varargin) > 0)
+
+    % check for the "output_prefix" option
+
+    ind = arg_exists(varargin, "output_prefix");
+    if ind
+      output_prefix =  varargin{ind+1};
+    end
+    ind = arg_exists(varargin, "mode");
+    if ind
+      mode =  varargin{ind+1};
+    end
+    ind = arg_exists(varargin, "nomean");
+    if ind
+      mean_removal = 1;
+    end
+    ind = arg_exists(varargin, "vq");
+    if ind
+      vq_filename = varargin{ind+1};
+    end
   end
+  
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
@@ -71,6 +98,15 @@ function surface = newamp1_batch(input_prefix, output_prefix, mode)
   if strcmp(mode, 'mel')
     [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
   end
+  if strcmp(mode, 'const')
+    [model_ surface] = experiment_const_freq(model, mean_removal, vq_filename);
+  end
+  if strcmp(mode, 'piecewise')
+    model_ = experiment_piecewise(model);
+  end
+  if strcmp(mode, 'dct')
+    model_ = experiment_dct(model);
+  end
 
   % ----------------------------------------------------
 
@@ -87,25 +123,9 @@ function surface = newamp1_batch(input_prefix, output_prefix, mode)
 
   for f=1:frames
     %printf("%d ", f);   
-    Wo = model_(f,1);
-    L = min([model_(f,2) max_amp-1]);
-    Am = model_(f,3:(L+2));
+    Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
 
-    Am_ = zeros(1,max_amp);
-    Am_(2:L) = Am(1:L-1);
-
-    % optional post filter on linear {Am}, boosts higher amplitudes more than lower,
-    % improving shape of formants and reducing muffling.  Note energy
-    % normalisation
-
-    if postfilter
-      e1 = sum(Am_(2:L).^2);
-      Am_(2:L) = Am_(2:L) .^ 1.5;         
-      e2 = sum(Am_(2:L).^2);
-      Am_(2:L) *= sqrt(e1/e2);
-    end
-
-    fwrite(fam, Am_, "float32");
+    Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
     fwrite(fWo, Wo, "float32");
 
     if synth_phase
@@ -115,9 +135,6 @@ function surface = newamp1_batch(input_prefix, output_prefix, mode)
       fft_enc = 256;
       phase = determine_phase(model_, f, fft_enc);
       assert(length(phase) == fft_enc);
-      %Aw = zeros(1, fft_enc*2); 
-      %Aw(1:2:fft_enc*2) = cos(phase);
-      %Aw(2:2:fft_enc*2) = -sin(phase);
 
       % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
       % is not used
@@ -153,6 +170,99 @@ function surface = newamp1_batch(input_prefix, output_prefix, mode)
 
 endfunction
  
+
+function ind = arg_exists(v, str) 
+   ind = 0;
+   for i=1:length(v)
+      if strcmp(v{i}, str)
+        ind = i;
+      end     
+    end
+endfunction
+
+% Basic unquantised rate K linear sampling then back to rate L.  Used for generating 
+% training vectors and testing vector quntisers.
+
+function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq_filename)
+  [frames nc] = size(model);
+  Fs = 8000;
+
+  melvq;
+  if length(vq_filename) 
+    x = load(vq_filename); m=5;
+    vq = x.vq;
+    size(vq)
+  end
+
+  rate_K_sample_freqs_kHz = [0.1:0.1:3.9];
+  K = length(rate_K_sample_freqs_kHz);
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
+
+  mean_f = zeros(1,frames);
+  if mean_removal
+    for f=1:frames
+      mean_f(f) = mean(rate_K_surface(f,:));
+      rate_K_surface(f,:) -= mean_f(f);
+    end
+  end
+
+  if length(vq_filename) 
+    [res rate_K_surface_ ind] = mbest(vq, rate_K_surface, m);
+    sd_per_frame = std(res');
+    energy = zeros(1,frames);
+    for f=1:frames
+      L = model(f,2);
+      energy(f) = 10*log10(sum( model(f,3:(L+2)) .^ 2 ));
+    end
+    figure(1); subplot(211); plot(energy); subplot(212); plot(sd_per_frame);
+    figure(2); hist(sd_per_frame);
+    printf("VQ rms SD: %3.2f\n", mean(sd_per_frame));
+  else
+    rate_K_surface_ = rate_K_surface;
+  end
+
+  if mean_removal
+    for f=1:frames
+      rate_K_surface_(f,:) += mean_f(f);
+    end
+  end
+
+  [model_ AmdB_] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
+
+  sum_sd = 0;
+  for f=1:frames
+    L = model(f,2);
+    AmdB = 20*log10(model(f,3:(L+2)));
+    sum_sd = std(AmdB(1:L) - AmdB_(f,1:L));
+  end
+  printf("rate K resampling SD: %3.2f\n", mean(sum_sd));
+
+endfunction
+
+
+function model_ = experiment_dct(model)
+
+  [frames tmp] = size(model); max_amp = 160;
+
+  for f=1:frames
+    printf("%d ", f);   
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp-1]);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+
+    % fit model
+
+    D = dct(AmdB);
+    E = zeros(1,L);
+    E(1:min(20,L)) = D(1:min(20,L));
+    AmdB_ = idct(D);
+
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+  end
+
+endfunction
+
 
 % -----------------------------------------------------------------------------------------
 % Linear decimator/interpolator that operates at rate K, includes VQ, post filter, and Wo/E
@@ -649,6 +759,7 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
 endfunction
 
 
+
 % mel spaced sampling, differential in time VQ.  Curiously, couldn't
 % get very good results out of this, I suspect a bug
 
@@ -1063,9 +1174,11 @@ endfunction
   quantise.
 
   todo: get this working again
+#}
 
 function model_ = experiment_piecewise(model)
-  % encoder loop ------------------------------------------------------
+
+  [frames tmp] = size(model); max_amp = 160;
 
   fvec_log = []; amps_log = [];
 
@@ -1083,30 +1196,10 @@ function model_ = experiment_piecewise(model)
     fvec_log = [fvec_log; fvec];
     amps_log = [amps_log; amps];
 
-    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB(1:L)/20);
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
   end
 
-  for f=1:frames
-    if 0
-    if (f > 1) && (e(f) > (e(f-1)+3))
-        decimate = 2;
-      else
-        decimate = 4;
-    end
-    end
-    printf("%d ", decimate);   
-    
-    AmdB_ = decimate_frame_rate(model_, decimate, f, frames);
-    L = length(AmdB_);
-
-    Am_ = zeros(1,max_amp);
-    Am_(2:L) = 10 .^ (AmdB_(1:L-1)/20);  % C array doesnt use A[0]
-    fwrite(fam, Am_, "float32");
-    fwrite(fWo, Wo, "float32");
-  end
 endfunction
-
-#}
 
 
 % early test, devised to test rate K<->L changes along frequency axis
