@@ -324,6 +324,12 @@ void two_stage_pitch_refinement(C2CONST *c2const, MODEL *model, COMP Sw[])
     model->Wo = TWO_PI/c2const->p_min;
 
   model->L = floorf(PI/model->Wo);
+
+  /* trap occasional round off issues with floorf() */
+  if (model->Wo*model->L >= PI) {
+      model->L--;
+  }
+  assert(model->Wo*model->L < PI);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -475,9 +481,10 @@ float est_voicing_mbe(
     Wo = model->Wo;
     error = 1E-4;
 
-    /* Just test across the harmonics in the first 1000 Hz (L/4) */
+    /* Just test across the harmonics in the first 1000 Hz */
 
-    for(l=1; l<=model->L/4; l++) {
+    int l_1000hz = model->L*1000.0/(c2const->Fs/2);
+    for(l=1; l<=l_1000hz; l++) {
 	Am.real = 0.0;
 	Am.imag = 0.0;
 	den = 0.0;
@@ -522,11 +529,13 @@ float est_voicing_mbe(
        determine if we have made any gross errors.
     */
 
+    int l_2000hz = model->L*2000.0/(c2const->Fs/2);
+    int l_4000hz = model->L*4000.0/(c2const->Fs/2);
     elow = ehigh = 1E-4;
-    for(l=1; l<=model->L/2; l++) {
+    for(l=1; l<=l_2000hz; l++) {
 	elow += model->A[l]*model->A[l];
     }
-    for(l=model->L/2; l<=model->L; l++) {
+    for(l=l_2000hz; l<=l_4000hz; l++) {
 	ehigh += model->A[l]*model->A[l];
     }
     eratio = 10.0*log10f(elow/ehigh);
