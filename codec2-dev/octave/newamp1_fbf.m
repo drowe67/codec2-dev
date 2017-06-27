@@ -83,44 +83,63 @@ function newamp1_fbf(samname, f=10, varargin)
     axis([1 4000 -20 80]);
     hold on;
     plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
-    if quant_en != 2
-      plot(rate_K_sample_freqs_kHz*1000, maskdB, ";mask;c+-");
-    end
+    %if quant_en != 2
+    %  plot(rate_K_sample_freqs_kHz*1000, maskdB, ";mask;c+-");
+    %end
     if quant_en == 2
       plot(rate_K_sample_freqs_kHz*1000, maskdB-rate_K_vec, ";maskdB - rate K;m+-");
     end
+    #{
     masked_indx = find(maskdB >= rate_K_vec);
     unmasked_indx = find(maskdB < rate_K_vec);
+    masked_indx = (vq_en-5:vq_en);
+    unmasked_indx = (vq_st:vq_en-6);
     stem(rate_K_sample_freqs_kHz(unmasked_indx)*1000, 10*ones(1,length(unmasked_indx)), ";unmasked_index;ko-");
+    #}
 
     if quant_en
       error = g = zeros(1, vq_rows);
 
       % find mse for each vector
 
-      target = rate_K_vec(vq_st:vq_en);
-      masked_indx = find(maskdB(vq_st:vq_en) >= rate_K_vec(vq_st:vq_en));
-      diff = diff_mask = zeros(vq_rows, vq_cols);
+      target = rate_K_vec_no_mean(vq_st:vq_en);
+      weight_gain = 0.1;
+      %masked_indx = find(maskdB(vq_en-5:vq_en) >= rate_K_vec(vq_en-5:vq_en));
+      %masked_indx = find(masked_indx > (vq_cols-5))
+      diff =  weights = diff_weighted = zeros(vq_rows, vq_cols);
       for i=1:vq_rows
+
+        % work out gain for best match
+
         g(i) = sum(target - vq(i,:))/vq_cols;
+
+        % Find weighted difference.  This allocated more importance
+        % (error) to samples with higher energy, and stops really low
+        % level harmonics from having any impact.  Note addition in dB
+        % is multiplication in linear
+
         diff(i,:) = target - vq(i,:) - g(i);
-        diff_mask(i,:) = diff(i,:);
-        %masked_indx
-        diff_mask(i,masked_indx) = 0;
-        error(i) = sum(abs(diff_mask(i,:)));
+        weights(i,:) = max(0.1,weight_gain .* (target + 20));
+        
+        diff_weighted(i,:) = diff(i,:) .* weights(i,:);
+
+        error(i) = sum(abs(diff_weighted(i,:)));
       end
 
       [mn mn_ind] = min(error);
 
-      rate_K_vec_ = rate_K_vec;
-      rate_K_vec_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      rate_K_vec_no_mean_ = rate_K_vec_no_mean;
+      rate_K_vec_no_mean_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      rate_K_vec_ = rate_K_vec_no_mean_ + mean(rate_K_vec);
       [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
       AmdB_ = AmdB_(1:L);
       if quant_en == 2
-        plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, diff(mn_ind,:), ";diff;k+-");
+        plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, diff_weighted(mn_ind,:), ";diff;k+-");
       end
       plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
       hold off;
+
+      figure (4); clf; plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, weights(mn_ind,:), ";weights;k+-");
 
       % sort and plot top m matches
 
@@ -133,16 +152,17 @@ function newamp1_fbf(samname, f=10, varargin)
       for i=1:m
         subplot(sqrt(m),sqrt(m),i);
         indx = index_list(i);
-        plot(target,'b+-');
+        plot(target + mean(rate_K_vec),'b+-');
         hold on;
         if index_list(i) == mn_ind
-          plot(vq(indx,:) + g(indx),'r+-');
+          plot(vq(indx,:) + g(indx) + mean(rate_K_vec),'r+-');
         else
-          plot(vq(indx,:) + g(indx),'g+-');
+          plot(vq(indx,:) + g(indx) + mean(rate_K_vec),'g+-');
         end
         plot(diff(indx,:), ";diff;k+-");
-        plot(diff_mask(indx,:), ";diff;ko-");
+        plot(diff_weighted(indx,:), ";weighted diff;ko-");
         hold off;
+        legend("location", "southwest");
       end
     end
 
