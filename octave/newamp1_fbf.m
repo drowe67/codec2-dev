@@ -15,13 +15,34 @@
 %   octave:14> newamp1_fbf("../build_linux/src/hts1a",50)
 
 
-function newamp1_fbf(samname, f=10)
-  newamp;
+function newamp1_fbf(samname, f=10, varargin)
   more off;
-  quant_en = 0; pf_en = 0; plot_phase = 0;
+
+  newamp;
   melvq;
- 
-  Fs = 8000; K=20; load train_120_vq; m=5; 
+
+  Fs = 8000; rate_K_sample_freqs_kHz = [0.1:0.1:4]; K = length(rate_K_sample_freqs_kHz);
+  quant_en = 0;
+
+  % optional split VQ low freq quantiser
+
+  ind = arg_exists(varargin, "vql");
+  if ind
+    quant_en = 1;
+    vq_filename = varargin{ind+1};
+    x = load(vq_filename); vq = x.vq;
+    [vq_rows vq_cols] = size(vq); vq_st = 1; vq_en = vq_st + vq_cols - 1;
+  end
+  
+  % optional split VQ high freq quantiser
+
+  ind = arg_exists(varargin, "vqh");
+  if ind
+    quant_en = 1;
+    vq_filename = varargin{ind+1};
+    x = load(vq_filename); vq = x.vq;
+    [vq_rows vq_cols] = size(vq); vq_st = 11; vq_en = K;
+  end
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -45,117 +66,98 @@ function newamp1_fbf(samname, f=10)
 
   k = ' ';
   do 
-    figure(1);
-    clf;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    plot(s);
-    axis([1 length(s) -20000 20000]);
-    if exist(voicing_name, "file") == 2
-      if voicing(f)
-        title('Time Domain Speech (Voiced)');
-      else
-        title('Time Domain Speech (Unvoiced)');
-      end
-    else
-      title('Time Domain Speech');
-    end
+    figure(1); clf; plot(s); axis([1 length(s) -20000 20000]);
 
-    Wo = model(f,1);
-    L = model(f,2);
-    Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
+    Wo = model(f,1); L = model(f,2); Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
-    % resample at rate K
-
-    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K);
-    [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
-    [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
-    [tmp_ AmdB_corrected] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz);
-
-    % quantisation simulation ---------------------------------
-
-    mean_f = mean(rate_K_vec);
-    rate_K_vec_no_mean = rate_K_vec - mean_f;
-    
-    if quant_en == 2
-      [res rate_K_vec_no_mean_ ind] = mbest(train_120_vq, rate_K_vec_no_mean, m);
-    else
-      rate_K_vec_no_mean_ = rate_K_vec_no_mean;
-    end
-
-    if pf_en
-      rate_K_vec_no_mean_ = post_filter(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, pf_gain = 1.5, voicing(f));
-    end
-
-    rate_K_vec_ = rate_K_vec_no_mean_ + mean_f;
-    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz);
-    %[model_ AmdB_largest] = resample_rate_L(model(f,:), rate_K_largest, rate_K_sample_freqs_kHz);
+    rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs);
+    maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz);
+    rate_K_vec_no_mean = rate_K_vec - mean(rate_K_vec);
 
     % plots ----------------------------------
-
-    figure(2);
-    clf;
-    title('Frequency Domain 1');
-
+  
+    figure(2); clf; 
+    plot((1:L)*Wo*4000/pi, AmdB,";AmdB;g+-");
     axis([1 4000 -20 80]);
     hold on;
-
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;b+-");
-    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, 'g');   
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ';rate K;g:');   
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_corrected, ';rate K;g-', 'linewidth', 2);   
-
-    plot((1:L)*Wo*4000/pi, -10 + orig_error ,";AmdB - AmdB_ error;k+-");
-    plot((1:L)*Wo*4000/pi, -10 + error ,";AmdB - AmdB_ error;r-");
-    plot(nasty_error_m_log*Wo*4000/pi, AmdB(nasty_error_m_log), 'ro', 'markersize', 10);
-
-
-    hold off;
-
-    #{
-    figure(3);
-    clf;
-    title('Frequency Domain 2');
-    axis([1 4000 -80 80]);
-    hold on;
-    plot((1:L)*Wo*4000/pi, AmdB,";Am;b+-");
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_no_mean, ';rate K mel no mean;g+-');
+    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
+    if quant_en != 2
+      plot(rate_K_sample_freqs_kHz*1000, maskdB, ";mask;c+-");
+    end
     if quant_en == 2
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec_no_mean_, ';rate K mel no mean quant;r+-');
+      plot(rate_K_sample_freqs_kHz*1000, maskdB-rate_K_vec, ";maskdB - rate K;m+-");
     end
-    hold off;
-    #}
+    masked_indx = find(maskdB >= rate_K_vec);
+    unmasked_indx = find(maskdB < rate_K_vec);
+    stem(rate_K_sample_freqs_kHz(unmasked_indx)*1000, 10*ones(1,length(unmasked_indx)), ";unmasked_index;ko-");
 
-    if plot_phase
-      phase_512 = determine_phase(model_, 1, 512);
-      phase_128 = determine_phase(model_, 1, 128);
-      figure(4); clf;
-      plot((1:512/2)*8000/512, phase_512(1:256), ';512;b');
-      hold on;
-      plot((1:128/2)*8000/128, phase_128(1:64), ';128;g');
+    if quant_en
+      error = g = zeros(1, vq_rows);
+
+      % find mse for each vector
+
+      target = rate_K_vec(vq_st:vq_en);
+      masked_indx = find(maskdB(vq_st:vq_en) >= rate_K_vec(vq_st:vq_en));
+      diff = diff_mask = zeros(vq_rows, vq_cols);
+      for i=1:vq_rows
+        g(i) = sum(target - vq(i,:))/vq_cols;
+        diff(i,:) = target - vq(i,:) - g(i);
+        diff_mask(i,:) = diff(i,:);
+        %masked_indx
+        diff_mask(i,masked_indx) = 0;
+        error(i) = sum(abs(diff_mask(i,:)));
+      end
+
+      [mn mn_ind] = min(error);
+
+      rate_K_vec_ = rate_K_vec;
+      rate_K_vec_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
+      AmdB_ = AmdB_(1:L);
+      if quant_en == 2
+        plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, diff(mn_ind,:), ";diff;k+-");
+      end
+      plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
       hold off;
+
+      % sort and plot top m matches
+
+      figure(3); clf;
+      m = 4;
+      [mse_list index_list] = sort(error);
+
+      mse_list = mse_list(1:m);
+      index_list = index_list(1:m);
+      for i=1:m
+        subplot(sqrt(m),sqrt(m),i);
+        indx = index_list(i);
+        plot(target,'b+-');
+        hold on;
+        if index_list(i) == mn_ind
+          plot(vq(indx,:) + g(indx),'r+-');
+        else
+          plot(vq(indx,:) + g(indx),'g+-');
+        end
+        plot(diff(indx,:), ";diff;k+-");
+        plot(diff_mask(indx,:), ";diff;ko-");
+        hold off;
+      end
     end
-     
+
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-quant_en[%d] p-pf[%d]", f, quant_en, pf_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-show_quant[%d]", f, quant_en);
     fflush(stdout);
     k = kbhit();
 
     if k == 'm'
       quant_en++;
-      if quant_en > 1
+      if quant_en > 2
         quant_en = 0;
       end
     endif
-    if k == 'p'
-      if pf_en == 1
-        pf_en = 0;
-      else
-        pf_en = 1;
-      end
-    end
     if k == 'n'
       f = f + 1;
     endif
@@ -168,17 +170,11 @@ function newamp1_fbf(samname, f=10)
 endfunction
 
  
-#{ Piecewise model stuff, organise later if rqd
-    [maskdB Am_freqs_kHz] = mask_model(AmdB, Wo, L);
-    AmdB_ = maskdB;
-    [mx mx_ind] = max(AmdB_);
-    AmdB_(mx_ind) += 6;
-   
-
-    if quant_en
-      [AmdB_ residual fvec fvec_] = piecewise_model(AmdB, Wo, vq, 1);
-    else
-      [AmdB_ residual fvec] = piecewise_model(AmdB, Wo);
+function ind = arg_exists(v, str) 
+   ind = 0;
+   for i=1:length(v)
+      if strcmp(v{i}, str)
+        ind = i;
+      end     
     end
-    fvec
-#}
+endfunction
