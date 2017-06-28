@@ -40,16 +40,18 @@
 % In general, this function processes a bunch of amplitudes, we then
 % use c2sim to hear the results.  Bunch of different experiments below
 
-function surface = newamp1_batch(input_prefix, varargin)
+function [surface mean_f] = newamp1_batch(input_prefix, varargin)
   newamp;
   more off;
 
   max_amp = 160;
+  mean_f = [];
 
   % defaults
 
-  synth_phase = 1;
+  synth_phase = output = 1;
   output_prefix = input_prefix;
+  vq_type = "";
   vq_filename = "";
   mean_removal = 0;
   mode = "const";
@@ -72,11 +74,21 @@ function surface = newamp1_batch(input_prefix, varargin)
     if ind
       mean_removal = 1;
     end
-    ind = arg_exists(varargin, "vq");
+    ind = arg_exists(varargin, "vqh");
     if ind
+      vq_type = varargin{ind};
       vq_filename = varargin{ind+1};
+      printf("vq_type: %s vq_filename: %s\n", vq_type, vq_filename);
+    end
+    ind = arg_exists(varargin, "no_output");
+    if ind
+      output = 0;
+      synth_phase = 0;
     end
   end
+
+  printf("output_prefix: %s\nnomean: %d output: %d vq_type: %s\nvq_filename: %s\n", 
+         output_prefix, mean_removal, output, vq_type, vq_filename);
   
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
@@ -99,7 +111,7 @@ function surface = newamp1_batch(input_prefix, varargin)
     [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
   end
   if strcmp(mode, 'const')
-    [model_ surface] = experiment_const_freq(model, mean_removal, vq_filename);
+    [model_ surface mean_f] = experiment_const_freq(model, mean_removal, vq_type, vq_filename);
   end
   if strcmp(mode, 'piecewise')
     model_ = experiment_piecewise(model);
@@ -110,61 +122,69 @@ function surface = newamp1_batch(input_prefix, varargin)
 
   % ----------------------------------------------------
 
-  Am_out_name = sprintf("%s_am.out", output_prefix);
-  fam  = fopen(Am_out_name,"wb"); 
-
-  Wo_out_name = sprintf("%s_Wo.out", output_prefix);
-  fWo  = fopen(Wo_out_name,"wb"); 
-  
-  if synth_phase
-    Hm_out_name = sprintf("%s_hm.out", output_prefix);
-    fhm = fopen(Hm_out_name,"wb"); 
-  end
-
-  for f=1:frames
-    %printf("%d ", f);   
-    Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
-    assert(Wo*L < pi);
-
-    Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
-    fwrite(fWo, Wo, "float32");
-
-    if synth_phase
-
-      % synthesis phase spectra from magnitiude spectra using minimum phase techniques
-
-      fft_enc = 256;
-      phase = determine_phase(model_, f, fft_enc);
-      assert(length(phase) == fft_enc);
-
-      % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
-      % is not used
-
-      Hm = zeros(1, 2*max_amp);
-      for m=1:L
-        b = round(m*Wo*fft_enc/(2*pi));
-        Hm(2*m) = cos(phase(b));
-        Hm(2*m+1) = -sin(phase(b));
-      end
-      fwrite(fhm, Hm, "float32");    
-    end
-  end
+  if output
+    Am_out_name = sprintf("%s_am.out", output_prefix);
+    fam  = fopen(Am_out_name,"wb"); 
  
-  fclose(fam);
-  fclose(fWo);
-  if synth_phase
-    fclose(fhm);
+    Wo_out_name = sprintf("%s_Wo.out", output_prefix);
+    fWo  = fopen(Wo_out_name,"wb"); 
+  
+    if synth_phase
+     Hm_out_name = sprintf("%s_hm.out", output_prefix);
+     fhm = fopen(Hm_out_name,"wb"); 
+    end
+
+    for f=1:frames
+      %printf("%d ", f);   
+      Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
+      if Wo*L > pi
+        printf("Problem: %d  Wo*L > pi\n", f);   
+      end
+
+      Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
+      fwrite(fWo, Wo, "float32");
+
+      if synth_phase
+
+        % synthesis phase spectra from magnitiude spectra using minimum phase techniques
+
+        fft_enc = 256;
+        phase = determine_phase(model_, f, fft_enc);
+        assert(length(phase) == fft_enc);
+
+        % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
+        % is not used
+
+        Hm = zeros(1, 2*max_amp);
+        for m=1:L
+          b = round(m*Wo*fft_enc/(2*pi));
+          Hm(2*m) = cos(phase(b));
+          Hm(2*m+1) = -sin(phase(b));
+        end
+        fwrite(fhm, Hm, "float32");    
+      end
+      fclose(fhm);
+    end
+ 
+   fclose(fam);
+   fclose(fWo);
+
+   % save voicing file
+  
+   if exist("voicing_", "var")
+     v_out_name = sprintf("%s_v.txt", output_prefix);
+     fv  = fopen(v_out_name,"wt"); 
+     for f=1:length(voicing_)
+       fprintf(fv,"%d\n", voicing_(f));
+     end
+     fclose(fv);
+    end
   end
 
-  % save voicing file
-  
-  if exist("voicing_", "var")
-    v_out_name = sprintf("%s_v.txt", output_prefix);
-    fv  = fopen(v_out_name,"wt"); 
-    for f=1:length(voicing_)
-      fprintf(fv,"%d\n", voicing_(f));
+  if mean_removal
+    for f=1:frames
+      surface(f,:) -= mean_f(f);
     end
-    fclose(fv);
   end
 
   printf("\n")
@@ -181,13 +201,32 @@ function ind = arg_exists(v, str)
     end
 endfunction
 
+
 % Basic unquantised rate K linear sampling then back to rate L.  Used for generating 
 % training vectors and testing vector quntisers.
 
-function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq_filename)
+function [model_ rate_K_surface mean_f] = experiment_const_freq(model, mean_removal, vq_type, vq_filename)
+  melvq;
+
   [frames nc] = size(model);
   Fs = 8000;
   fg = 1;
+  quant_en = 0;
+
+  rate_K_sample_freqs_kHz = [0.1:0.1:4];
+  K = length(rate_K_sample_freqs_kHz);
+
+  if strcmp(vq_type, "vql")
+    quant_en = 1;
+    x = load(vq_filename); vq = x.vq;
+    [vq_rows vq_cols] = size(vq); vq_st = 1; vq_en = vq_st + vq_cols - 1;
+  end
+
+  if strcmp(vq_type, "vqh")
+    quant_en = 1;
+    x = load(vq_filename); vq = x.vq;
+    [vq_rows vq_cols] = size(vq); vq_st = 11; vq_en = K;
+  end
 
   energy = zeros(1,frames);
   for f=1:frames
@@ -195,38 +234,55 @@ function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq
     energy(f) = 10*log10(sum( model(f,3:(L+2)) .^ 2 ));
   end
 
-  melvq;
-  if length(vq_filename) 
-    x = load(vq_filename); m=5;
-    vq = x.vq;
-    size(vq)
-  end
-
-  rate_K_sample_freqs_kHz = [0.1:0.1:4];
-  K = length(rate_K_sample_freqs_kHz);
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
 
   mean_f = zeros(1,frames);
   if mean_removal
     for f=1:frames
       mean_f(f) = mean(rate_K_surface(f,:));
-      rate_K_surface(f,:) -= mean_f(f);
+      rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
     end
   end
 
-  if length(vq_filename) 
-    [res rate_K_surface_ ind] = mbest(vq, rate_K_surface, m);
-    sd_per_frame = std(res');
+  % optional vector quantise
+  
+  if quant_en
+    assert(mean_removal == 1);
+ 
+    weight_gain = 0.1; % I like this vairable name as it is funny
+
+    rate_K_surface_no_mean_ = zeros(frames, K);
+    res = zeros(frames,vq_cols); ind = [];
+
+    for f=1:frames
+      target = rate_K_surface_no_mean(f, vq_st:vq_en);
+
+      [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq, weight_gain);
+
+      rate_K_surface_no_mean_(f,:) = rate_K_surface_no_mean(f,:);
+      rate_K_surface_no_mean_(f, vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+
+      %res(f,vq_st:vq_en) = rate_K_surface_no_mean(f,vq_st:vq_en) - rate_K_surface_no_mean_(f,vq_st:vq_en);
+      res(f,vq_st:vq_en) = diff_weighted(mn_ind,:);
+      ind = [ind mn_ind];
+    end
+    
+    figure(fg++); clf; mesh(res);
+    sd_per_frame = std(res(:,vq_st:vq_en)');
     figure(fg++); subplot(211); plot(energy); subplot(212); plot(sd_per_frame);
-    figure(fg); hist(sd_per_frame);
+    figure(fg++); subplot(211); hist(sd_per_frame); subplot(212); hist(ind,100);
     printf("VQ rms SD: %3.2f\n", mean(sd_per_frame));
   else
-    rate_K_surface_ = rate_K_surface;
+    if mean_removal
+       rate_K_surface_no_mean_ = rate_K_surface_no_mean;
+    else
+      rate_K_surface_ = rate_K_surface;
+    end
   end
 
   if mean_removal
     for f=1:frames
-      rate_K_surface_(f,:) += mean_f(f);
+      rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + mean_f(f);
     end
   end
 
@@ -243,7 +299,7 @@ function [model_ rate_K_surface] = experiment_const_freq(model, mean_removal, vq
     L = model(f,2);
     AmdB = 20*log10(model(f,3:(L+2)));
     sd(f) = std(AmdB(1:L) - AmdB_(f,1:L));
-    if sd(f) > plot_sd_thresh
+    if (sd(f) > plot_sd_thresh) && (fg < 10)
       printf("fg: %d f: %d\n", fg, f);
       figure(fg++); clf; plot((1:L)*Wo*4/pi, AmdB(1:L),'b+-'); hold on; plot((1:L)*Wo*4/pi, AmdB_(f,1:L),'r+-');
       plot(rate_K_sample_freqs_kHz, rate_K_surface_(f,:), 'c+-'); hold off;
