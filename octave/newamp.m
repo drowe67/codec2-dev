@@ -743,7 +743,7 @@ function [diff_weighted weights error g min_ind] = search_vq_weighted(target, vq
 
     % abs in dB is MSE in linear
 
-    error(i) = sum(abs(diff_weighted(i,:)));
+    error(i) = mean(abs(diff_weighted(i,:)));
   end
 
   [mn min_ind] = min(error);
