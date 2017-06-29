@@ -714,50 +714,39 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
 endfunction
 
 
-function [diff_weighted weights error g slope min_ind] = search_vq_weighted(target, vq, weight_gain, fit_order)
+function [diff_weighted weights error g min_ind] = search_vq_weighted(target, vq, weight_gain)
   [vq_rows vq_cols] = size(vq);
+
+  weight_gain = 0.1; % I like this vairable name as it is funny
 
   % find mse for each vector
 
-  error = g = slope = zeros(1, vq_rows);
-  diff =  weights = diff_weighted = zeros(vq_rows, vq_cols);
+  error = g = zeros(1, vq_rows);
+  diff = weights = diff_weighted = zeros(vq_rows, vq_cols);
+
+  weights = max(0.1, weight_gain .* (target + 20));
 
   for i=1:vq_rows
 
-    if fit_order == 0
+    % work out gain for best match
 
-      % work out gain for best match
-
-      g(i) = sum(target - vq(i,:))/vq_cols;
-      slope(i) = 1;
-    end
-
-    if fit_order == 1
-      % work out linear + gradient fit 
-      vi = vq(i,:);
-      A = [sum(vi) vq_cols; vi*vi' sum(vi)];
-      c = [sum(target) target*vi']';
-      b = inv(A)*c;
-      g(i) = b(2);
-      slope(i) = b(1);
-    end
+    g(i) = sum((target - vq(i,:)).*weights)/vq_cols;
 
     % Find weighted difference.  This allocated more importance
     % (error) to samples with higher energy, and stops really low
     % level harmonics from having any impact.  Note addition in dB
     % is multiplication in linear
 
-    diff(i,:) = target - slope(i)*vq(i,:) - g(i);
-    weights(i,:) = max(0.1, weight_gain .* (target + 20));
+    diff(i,:) = target - vq(i,:) - g(i);
  
-    diff_weighted(i,:) = diff(i,:) .* weights(i,:);
+    diff_weighted(i,:) = diff(i,:) .* weights;
 
     % abs in dB is MSE in linear
 
     error(i) = sum(abs(diff_weighted(i,:)));
   end
 
-  [mn min_ind] = min(error)
+  [mn min_ind] = min(error);
   
 endfunction
 

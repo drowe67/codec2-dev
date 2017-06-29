@@ -53,7 +53,7 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
   output_prefix = input_prefix;
   vq_type = "";
   vq_filename = "";
-  mean_removal = 0;
+  fit_order = 0;
   mode = "const";
 
   % parse variable argument list
@@ -72,7 +72,11 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     end
     ind = arg_exists(varargin, "nomean");
     if ind
-      mean_removal = 1;
+      fit_order = 0;
+    end
+    ind = arg_exists(varargin, "noslope");
+    if ind
+      fit_order = 1;
     end
     ind = arg_exists(varargin, "vqh");
     if ind
@@ -87,8 +91,7 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     end
   end
 
-  printf("output_prefix: %s\nnomean: %d output: %d vq_type: %s\nvq_filename: %s\n", 
-         output_prefix, mean_removal, output, vq_type, vq_filename);
+  printf("output_prefix: %s\nfit_order %d output: %d\n", output_prefix, fit_order, output);
   
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
@@ -111,7 +114,7 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
   end
   if strcmp(mode, 'const')
-    [model_ surface mean_f] = experiment_const_freq(model, mean_removal, vq_type, vq_filename);
+    [model_ surface] = experiment_const_freq(model, fit_order, vq_type, vq_filename);
   end
   if strcmp(mode, 'piecewise')
     model_ = experiment_piecewise(model);
@@ -163,11 +166,13 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
         end
         fwrite(fhm, Hm, "float32");    
       end
-      fclose(fhm);
     end
  
    fclose(fam);
    fclose(fWo);
+   if synth_phase
+     fclose(fhm);
+   end
 
    % save voicing file
   
@@ -181,16 +186,31 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     end
   end
 
-  if mean_removal
+  if fit_order == 0;
     for f=1:frames
-      surface(f,:) -= mean_f(f);
+      surface(f,:) -= mean(surface(f,:));
     end
+  end
+
+  if fit_order == 1
+    surface = slope_and_mean_removal(surface);
   end
 
   printf("\n")
 
 endfunction
  
+
+function surface = slope_and_mean_removal(surface)
+  [frames K] = size(surface);
+  for f=1:frames
+    v = surface(f,:);
+    [m b] = linreg(1:K, v, K);
+    v -= m*(1:K) + b;
+    surface(f,:) = v;
+  end
+endfunction
+
 
 function ind = arg_exists(v, str) 
    ind = 0;
@@ -205,7 +225,7 @@ endfunction
 % Basic unquantised rate K linear sampling then back to rate L.  Used for generating 
 % training vectors and testing vector quntisers.
 
-function [model_ rate_K_surface mean_f] = experiment_const_freq(model, mean_removal, vq_type, vq_filename)
+function [model_ rate_K_surface] = experiment_const_freq(model, fit_order, vq_type, vq_filename)
   melvq;
 
   [frames nc] = size(model);
@@ -236,31 +256,39 @@ function [model_ rate_K_surface mean_f] = experiment_const_freq(model, mean_remo
 
   rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
 
-  mean_f = zeros(1,frames);
-  if mean_removal
+  rate_K_surface_fit = zeros(frames,K);
+  b = slope = zeros(1,frames);
+
+  if fit_order == 0
     for f=1:frames
-      mean_f(f) = mean(rate_K_surface(f,:));
-      rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
+      b(f) = mean(rate_K_surface(f,:));
+      rate_K_surface_fit(f,:) = rate_K_surface(f,:) - b(f);
+    end
+  end
+
+  if fit_order == 1
+    for f=1:frames
+      [aslope ab] = linreg(1:K, rate_K_surface(f,:), K);
+      rate_K_surface_fit(f,:) = rate_K_surface(f,:) - aslope*(1:K) - ab;
+      slope(f) = aslope; b(f) = ab;
     end
   end
 
   % optional vector quantise
   
   if quant_en
-    assert(mean_removal == 1);
  
-    weight_gain = 0.1; % I like this vairable name as it is funny
-
-    rate_K_surface_no_mean_ = zeros(frames, K);
+    rate_K_surface_fit_ = zeros(frames, K);
     res = zeros(frames,vq_cols); ind = [];
 
     for f=1:frames
-      target = rate_K_surface_no_mean(f, vq_st:vq_en);
+      target = rate_K_surface_fit(f, vq_st:vq_en);
 
-      [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq, weight_gain);
-
-      rate_K_surface_no_mean_(f,:) = rate_K_surface_no_mean(f,:);
-      rate_K_surface_no_mean_(f, vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq);
+      if (f>=73) && (f<=75)
+        printf("f: %d mn_ind: %d g: %3.2f sd: %3.2f\n", f, mn_ind, g(mn_ind), error(mn_ind));
+      end
+      rate_K_surfacurface_fit_(f, vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
 
       %res(f,vq_st:vq_en) = rate_K_surface_no_mean(f,vq_st:vq_en) - rate_K_surface_no_mean_(f,vq_st:vq_en);
       res(f,vq_st:vq_en) = diff_weighted(mn_ind,:);
@@ -273,17 +301,11 @@ function [model_ rate_K_surface mean_f] = experiment_const_freq(model, mean_remo
     figure(fg++); subplot(211); hist(sd_per_frame); subplot(212); hist(ind,100);
     printf("VQ rms SD: %3.2f\n", mean(sd_per_frame));
   else
-    if mean_removal
-       rate_K_surface_no_mean_ = rate_K_surface_no_mean;
-    else
-      rate_K_surface_ = rate_K_surface;
-    end
+    rate_K_surface_fit_ = rate_K_surface_fit;
   end
 
-  if mean_removal
-    for f=1:frames
-      rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + mean_f(f);
-    end
+  for f=1:frames
+    rate_K_surface_(f,:) = rate_K_surface_fit_(f,:) + slope(f)*(1:K) + b(f);
   end
 
   [model_ AmdB_] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);

@@ -44,6 +44,12 @@ function newamp1_fbf(samname, f=10, varargin)
     [vq_rows vq_cols] = size(vq); vq_st = 11; vq_en = K;
   end
 
+  fit_order = 0;
+  ind = arg_exists(varargin, "noslope");
+  if ind
+    fit_order = 1;
+  end
+
   % load up text files dumped from c2sim ---------------------------------------
 
   sn_name = strcat(samname,"_sn.txt");
@@ -73,8 +79,14 @@ function newamp1_fbf(samname, f=10, varargin)
     Am_freqs_kHz = (1:L)*Wo*4/pi;
 
     rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs);
-    maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz);
-    rate_K_vec_no_mean = rate_K_vec - mean(rate_K_vec);
+    if fit_order == 0
+      slope = 0; b = mean(rate_K_vec); 
+      rate_K_vec_fit = rate_K_vec - b;
+    end
+    if fit_order == 1
+      [slope b] = linreg(1:K, rate_K_vec, K);
+      rate_K_vec_fit = rate_K_vec - slope*(1:K) - b;
+    end
 
     % plots ----------------------------------
   
@@ -85,14 +97,14 @@ function newamp1_fbf(samname, f=10, varargin)
     plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
 
     if quant_en
-      target = rate_K_vec_no_mean(vq_st:vq_en);
-      weight_gain = 0.1; % I like this vairable name as it is funny
-
-      [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq, weight_gain);
-
-      rate_K_vec_no_mean_ = rate_K_vec_no_mean;
-      rate_K_vec_no_mean_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
-      rate_K_vec_ = rate_K_vec_no_mean_ + mean(rate_K_vec);
+      target = rate_K_vec_fit(vq_st:vq_en);
+      
+      [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq);
+      printf("f: %d mn_ind: %d g: %3.2f sd: %3.2f\n", f, mn_ind, g(mn_ind), error(mn_ind));
+ 
+      rate_K_vec_fit_ = rate_K_vec_fit;
+      rate_K_vec_fit_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      rate_K_vec_ = slope*(1:K) + rate_K_vec_fit_ + b;
       [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
       AmdB_ = AmdB_(1:L);
 
@@ -101,42 +113,44 @@ function newamp1_fbf(samname, f=10, varargin)
       hold off;
 
       figure (4); clf; 
-      plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, weights(mn_ind,:), ";weights;k+-");  
-      axis([0 4000 0 max(weights(mn_ind,:))]);
+      plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, weights, ";weights;k+-");  
+      axis([0 4000 0 max(weights)]);
+
+      figure (5); clf; plot(error);
 
       % sort and plot top m matches
 
       figure(3); clf;
       m = 4;
-      [mse_list index_list] = sort(error);
+      [error_list index_list] = sort(error);
 
-      mse_list = mse_list(1:m);
+      mse_list = error_list(1:m);
       index_list = index_list(1:m);
       for i=1:m
         subplot(sqrt(m),sqrt(m),i);
         indx = index_list(i);
-        y_offset = mean(rate_K_vec);
+        y_offset = g(indx) + b;
         if quant_en == 2
            y_offset = 0;
         end
-        plot(target + y_offset,'b+-');
+        l = sprintf("b+-;ind %d g %3.2f sd %3.2f;",indx, g(indx), error(indx));
+        plot(target + y_offset,l);
         hold on;
         if index_list(i) == mn_ind
-          plot(vq(indx,:) + g(indx) + y_offset,'r+-');
+          plot(vq(indx,:) + y_offset,'r-+');
         else
-          plot(vq(indx,:) + g(indx) + y_offset,'g+-');
+          plot(vq(indx,:) + y_offset,'g+-');
         end
         if quant_en != 2
           plot(diff_weighted(indx,:), "ko-");
         end
         hold off;
-        legend("location", "southwest");
       end
     end
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-show_quant[%d]", f, quant_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  m-show_quant[%d] o-fit order[%d]", f, quant_en, fit_order);
     fflush(stdout);
     k = kbhit();
 
@@ -151,6 +165,12 @@ function newamp1_fbf(samname, f=10, varargin)
     endif
     if k == 'b'
       f = f - 1;
+    endif
+    if k == 'o'
+      fit_order++;
+      if fit_order == 2
+        fit_order = 0;
+      end
     endif
   until (k == 'q')
   printf("\n");
