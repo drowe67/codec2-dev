@@ -100,13 +100,16 @@ function newamp1_fbf(samname, f=10, varargin)
       target = rate_K_vec_fit(vq_st:vq_en);
       
       [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq);
-      printf("f: %d mn_ind: %d g: %3.2f sd: %3.2f\n", f, mn_ind, g(mn_ind), error(mn_ind));
  
       rate_K_vec_fit_ = rate_K_vec_fit;
       rate_K_vec_fit_(vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
       rate_K_vec_ = slope*(1:K) + rate_K_vec_fit_ + b;
       [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
       AmdB_ = AmdB_(1:L);
+
+      sdL = std(AmdB - AmdB_);
+      printf("f: %d mn_ind: %d g: %3.2f sdK: %3.2f sdL: %3.2f\n", 
+             f, mn_ind, g(mn_ind), error(mn_ind), sdL);
 
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, diff_weighted(mn_ind,:), ";diff;k+-");
       plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");

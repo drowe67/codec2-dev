@@ -227,7 +227,6 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_const_freq(model, fit_order, vq_type, vq_filename)
   melvq;
-
   [frames nc] = size(model);
   Fs = 8000;
   fg = 1;
@@ -278,7 +277,7 @@ function [model_ rate_K_surface] = experiment_const_freq(model, fit_order, vq_ty
   
   if quant_en
  
-    rate_K_surface_fit_ = zeros(frames, K);
+    rate_K_surface_fit_ = rate_K_surface_fit;
     res = zeros(frames,vq_cols); ind = [];
 
     for f=1:frames
@@ -286,12 +285,12 @@ function [model_ rate_K_surface] = experiment_const_freq(model, fit_order, vq_ty
 
       [diff_weighted weights error g mn_ind] = search_vq_weighted(target, vq);
       if (f>=73) && (f<=75)
-        printf("f: %d mn_ind: %d g: %3.2f sd: %3.2f\n", f, mn_ind, g(mn_ind), error(mn_ind));
+        printf("f: %d mn_ind: %d g: %3.2f sdK: %3.2f\n", f, mn_ind, g(mn_ind), error(mn_ind));
       end
-      rate_K_surfacurface_fit_(f, vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
+      rate_K_surface_fit_(f, vq_st:vq_en) = vq(mn_ind,:) + g(mn_ind);
 
-      %res(f,vq_st:vq_en) = rate_K_surface_no_mean(f,vq_st:vq_en) - rate_K_surface_no_mean_(f,vq_st:vq_en);
-      res(f,vq_st:vq_en) = diff_weighted(mn_ind,:);
+      res(f,vq_st:vq_en) = rate_K_surface_fit(f,vq_st:vq_en) - rate_K_surface_fit_(f,vq_st:vq_en);
+      %res(f,vq_st:vq_en) = diff_weighted(mn_ind,:);
       ind = [ind mn_ind];
     end
     
@@ -321,14 +320,17 @@ function [model_ rate_K_surface] = experiment_const_freq(model, fit_order, vq_ty
     L = model(f,2);
     AmdB = 20*log10(model(f,3:(L+2)));
     sd(f) = std(AmdB(1:L) - AmdB_(f,1:L));
+    if (f>=73) && (f<=75)
+      printf("f: %d sdL: %3.2f\n", f, sd(f));
+    end
     if (sd(f) > plot_sd_thresh) && (fg < 10)
       printf("fg: %d f: %d\n", fg, f);
       figure(fg++); clf; plot((1:L)*Wo*4/pi, AmdB(1:L),'b+-'); hold on; plot((1:L)*Wo*4/pi, AmdB_(f,1:L),'r+-');
       plot(rate_K_sample_freqs_kHz, rate_K_surface_(f,:), 'c+-'); hold off;
-    end
+     end
   end
   printf("rate K resampling SD: %3.2f\n", mean(sd));
-  figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd);
+  figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');
   figure(fg++); clf; hist(sd);
 endfunction
 
