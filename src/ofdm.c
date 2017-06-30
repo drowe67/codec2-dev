@@ -23,7 +23,7 @@
 
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,9 +64,9 @@ static int coarse_sync(struct OFDM *, complex float *, int);
  * 270.0 - 359.9 = 10
  */
 static const complex float constellation[] = {
-     1.0f + 0.0f * I,
-     0.0f + 1.0f * I,
-     0.0f - 1.0f * I,
+    1.0f + 0.0f * I,
+    0.0f + 1.0f * I,
+    0.0f - 1.0f * I,
     -1.0f + 0.0f * I
 };
 
@@ -75,7 +75,7 @@ static const complex float constellation[] = {
  */
 static const char pilotvalues[] = {
     -1, -1, 1, 1, -1, -1, -1, 1, -1,
-     1, -1, 1, 1,  1,  1,  1, 1,  1
+    1, -1, 1, 1, 1, 1, 1, 1, 1
 };
 
 /* Functions */
@@ -124,7 +124,7 @@ static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *r
 
 static complex float vector_sum(complex float *a, int num_elements) {
     int i;
-    
+
     complex float sum = 0.0f + 0.0f * I;
 
     for (i = 0; i < num_elements; i++) {
@@ -147,7 +147,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
     int i, j;
 
     for (i = 0; i < Ncorr; i++) {
-        complex float temp = 0.0f + 0.0f *I;
+        complex float temp = 0.0f + 0.0f * I;
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             csam = conjf(ofdm->rate_fs_pilot_samples[j]);
@@ -174,20 +174,9 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
 }
 
 /*
- * ----------------------------------------
+ * ----------------------------------------------
  * ofdm_txframe - modulates one frame of symbols
- * ----------------------------------------
- *
- * Each carrier amplitude is 1/M.  There are two edge carriers that
- * are just tx-ed for pilots plus plus Nc continuous carriers. So
- * power is:
- *
- *  p = 2/(Ns*(M*M)) + Nc/(M*M)
- *
- *  e.g. Ns=8, Nc=16, M=144
- *
- * p = 2/(8*(144*144)) + 16/(144*144) = 7.84-04
- *
+ * ----------------------------------------------
  */
 
 static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME],
@@ -249,17 +238,9 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
 }
 
 /*
- * ------------------------------------------------------------
+ * ------------
  * ofdm_create
- *-------------------------------------------------------------
- *
- * Frame has Ns - 1 OFDM data symbols between pilots
- * e.g. for Ns = 3:
- *
- *   PPP
- *   DDD
- *   DDD
- *   PPP
+ * ------------
  *
  * Returns OFDM data structure on success
  * Return NULL on fail
@@ -270,7 +251,7 @@ struct OFDM *ofdm_create() {
     int i, j;
 
     if ((ofdm = (struct OFDM *) malloc(sizeof (struct OFDM))) == NULL) {
-	return NULL;
+        return NULL;
     }
 
     /* store complex BPSK pilot symbols */
@@ -281,10 +262,15 @@ struct OFDM *ofdm_create() {
 
     /* carrier tables for up and down conversion */
 
-    int Nlower = floorf( (OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS );
+    int Nlower = floorf((OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS);
 
     for (i = 0, j = Nlower; i < (OFDM_NC + 2); i++, j++) {
-        ofdm->w[i] = j * TAU / OFDM_M;
+        /*
+         * 2 * pi * j/144  j=19..36
+         * j = 1 kHz to 2 kHz (1.5 kHz center)
+         */
+
+        ofdm->w[i] = TAU * (float) j / (OFDM_FS / OFDM_RS);
     }
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
@@ -334,7 +320,7 @@ struct OFDM *ofdm_create() {
         ofdm->rate_fs_pilot_samples[i] = temp[j];
     }
 
-    return ofdm;     /* Success */
+    return ofdm; /* Success */
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
@@ -362,7 +348,7 @@ void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
 
     if (ofdm->timing_en == false) {
         /* manually set ideal timing instant */
-        ofdm->sample_point = OFDM_NCP-1;
+        ofdm->sample_point = (OFDM_NCP - 1);
     }
 }
 
@@ -422,18 +408,18 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
  * ofdm_demod - Demodulates one frame of bits
  * ------------------------------------------
  *
- * For phase estimation we need to maintain buffer of 3 frames plus
- * one pilot, so we have 4 pilots total. '^' is the start of current
- * frame that we are demodulating.
+ * For phase estimation we need to maintain buffer of 3 modem frames
+ * plus one pilot, so we have 4 pilots total. '^' is the start of
+ * current frame that we are demodulating.
  *
- * P DDD P DDD P DDD P
- *       ^
+ * P DDDDDDD P DDDDDDD P DDDDDDD P
+ *           ^
  *
- * Then add one symbol either side to account for movement in
- * sampling instant due to sample clock differences:
+ * Then add one data symbol (M+Ncp) either side to account for
+ * movement in sampling instant due to sample clock differences:
  *
- * D P DDD P DDD P DDD P D
- *         ^
+ * D P DDDDDDD P DDDDDDD P DDDDDDD P D
+ *             ^
  */
 
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
@@ -458,8 +444,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /*
      * get latest freq offset estimate
      *
-     * ofdm->foff_est_hz will be 0.0 unless
-     * ofdm->foff_est_en is enabled
+     * foff_est_hz will be 0.0 unless
+     * foff_est_en is enabled
      */
 
     float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
@@ -491,7 +477,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         ofdm->sample_point = min(ofdm->timing_est + OFDM_NCP, ofdm->sample_point);
     }
 
-    /* down-convert at current timing instant---------------------------------- */
+    /*
+     * Convert the time-domain samples to the frequency-domain using the rx_sym
+     * data matrix. This will be 18 carriers of 11 symbols (P P DDDDDDD P)
+     *
+     * So we will have one modem data frame and three pilots to do magic.
+     */
 
     for (i = 0; i < (OFDM_NS + 3); i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
@@ -501,100 +492,159 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* previous pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (-OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    /*
+     * Previous pilot symbol is OFDM_SAMPLESPERFRAME to the left
+     * Right after the extra symbol on the left
+     *
+     * (OFDM_M + OFDM_NCP) + (OFDM_SAMPLESPERFRAME - OFDM_SAMPLESPERFRAME) + 1 + ofdm->sample_point;
+     *                                            ^^^^ --- cancels
+     */
+
+    st = (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
     en = st + OFDM_M;
 
     complex float work[OFDM_M];
 
+    /* down-convert at current timing instant---------------------------------- */
+
     for (j = st, k = 0; j < en; j++, k++) {
         work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work);        
+    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work); /* sym[0] = previous pilot */
 
     /* pilot - this frame - pilot */
 
+    /*
+     * This pilot is after the extra symbol on the left, and after the OFDM_SAMPLESPERFRAME
+     * So we will now be starting at this pilot symbol, and continuing past the next pilot symbol
+     * rr = 0 = this pilot, rr = 8 = next pilot
+     *
+     * Each symbol is of course OFDM_M samples long.
+     *
+     * In this routine we process the data symbols. These are the ones we want right now.
+     */
+
     for (rr = 0; rr < (OFDM_NS + 1); rr++) {
-        st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + rr * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+        st = (OFDM_M + OFDM_NCP) + OFDM_SAMPLESPERFRAME + (rr * (OFDM_M + OFDM_NCP)) + 1 + ofdm->sample_point;
         en = st + OFDM_M;
+
+        /* down-convert at current timing instant---------------------------------- */
 
         for (j = st, k = 0; j < en; j++, k++) {
             work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
         }
-        
-        matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work);        
+
+        matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work); /* sym[1..9] = this pilot + Data + next pilot */
     }
 
     /* next pilot */
 
-    st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME + (2 * OFDM_NS) * (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
+    /*
+     * OK, now we want to process to the next pilot symbol. This is OFDM_SAMPLESPERFRAME symbols to the right
+     * Remember now, we are 1 extra symbol + (2 * SAMPLESPERFRAME) symbols from the start right now
+     * So in effect, we want to go (3 * SAMPLESPERFRAME) to the right, +/- sample_point
+     *
+     * We are ignoring the data symbols between the previous pilot and here, we just want the pilot.
+     */
+
+    st = (OFDM_M + OFDM_NCP) + (3 * OFDM_SAMPLESPERFRAME) + 1 + ofdm->sample_point;
     en = st + OFDM_M;
+
+    /* down-convert at current timing instant---------------------------------- */
 
     for (j = st, k = 0; j < en; j++, k++) {
         work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work);        
+    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work); /* sym[10] = last pilot */
+
+    /*
+     * We are finished now with the DFT and down conversion
+     * From here on down we are in the frequency domain
+     */
 
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
-        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1], OFDM_NC+2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC+2);
+        /*
+         * Subtract the two complex pilot frequency values
+         * sym[1] is the 18 (this) pilot carriers, sym[9] is (next) 18 pilot carriers.
+         *
+         * So we sum the carriers all together. Since we hope the two pilots are identical,
+         * then by conjugating one of them, we should get a real only value, and the
+         * imaginary part should be zero.
+         *
+         * If we find the angle using atan2, then it would be atan2(im, re).
+         * but if the im is zero, then we basically at 0 degrees radian at some real x.
+         *
+         * If the two pilots are different, then we will get a positive or negative angle
+         * in radians, and we can use this to correct the frequency.
+         */
+
+        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1],
+                OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC + 2);
 
         /* prevent instability in atan(im/re) when real part near 0 */
 
-        freq_err_rect += 1E-6;
+        freq_err_rect = freq_err_rect + 1E-6f;
 
-        // fprintf(stderr, "freq_err_rect: %f %f angle: %f\n", crealf(freq_err_rect), cimagf(freq_err_rect),cargf(freq_err_rect) );
         freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
-
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
     }
 
-    /* OK - now estimate and correct phase  ---------------------------------- */
+    /* OK - now estimate and correct pilot phase  ---------------------------------- */
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
         aphase_est_pilot[i] = 10.0f;
         aamp_est_pilot[i] = 0.0f;
     }
 
+    /*
+     * Basically we divide the 18 pilots into groups of 3
+     */
+
     for (i = 1; i < (OFDM_NC + 1); i++) {
-        /*
-         * estimate phase using average of 6 pilots in a rect 2D window centered on this carrier
-         *
-         * PPP
-         * DDD
-         * DDD
-         * PPP
-         */
-        
         complex float symbol[3];
-        
+
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]);
+            symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
         }
 
         aphase_est_pilot_rect = vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[1 + OFDM_NS][j] * conjf(ofdm->pilots[j]);
+            symbol[k] = ofdm->rx_sym[OFDM_NS + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
         }
-        
+
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
-        
+
         /* use next step of pilots in past and future */
-        
+
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j];
+            symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j]; /* previous pilot */
         }
-        
+
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
-        
+
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[2 + OFDM_NS][j] * ofdm->pilots[j];
+            symbol[k] = ofdm->rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j]; /* last pilot */
         }
-        
+
+        /*
+         * sum the three carrier values, and they should cancel
+         * giving us an imaginary value of 0, and thus an angle of 0 degrees radians.
+         */
+
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
+
+        /*
+         * Note that i has an index of 1 to 16, so the carriers 0 and 17 will
+         * be set to default, or 10 degrees radians, as assigned above.
+         *
+         * I'm assuming they are just filler, as we don't need them to decode
+         * and correct the data symbols. There are only 16 data samples.
+         */
 
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
@@ -614,34 +664,53 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     int bit_index = 0;
 
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
+        /*
+         * Note the i has an index of 1 to 16, so we ignore carriers 0 and 17.
+         *
+         * Also note we are using sym[2..8] or the 7 data symbols.
+         */
+
         for (i = 1; i < (OFDM_NC + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = ofdm->rx_sym[rr+2][i] * cexpf(-I * aphase_est_pilot[i]);
+                rx_corr = ofdm->rx_sym[rr + 2][i] * cexpf(-I * aphase_est_pilot[i]);
             } else {
-                rx_corr = ofdm->rx_sym[rr+2][i];
+                rx_corr = ofdm->rx_sym[rr + 2][i];
             }
+
+            /*
+             * For testing, we want to save these complex data values
+             * without the pilots. Thus, the name rx (no pilot) np
+             */
 
             ofdm->rx_np[(rr * OFDM_NC) + (i - 1)] = rx_corr;
 
-            /* note even though amp ests are the same for each col,
-               the FEC decoder likes to have one amplitude per symbol
-               so convenient to log them all */
+            /*
+             * Note even though amp ests are the same for each col,
+             * the FEC decoder likes to have one amplitude per symbol
+             * so convenient to log them all
+             */
 
             ofdm->rx_amp[(rr * OFDM_NC) + (i - 1)] = aamp_est_pilot[i];
 
-            /* note like amps in this implementation phase ests the
-               same for each col, but we log them for each symbol anyway */
+            /*
+             * Note like amps in this implementation phase ests are the
+             * same for each col, but we log them for each symbol anyway
+             */
 
             ofdm->aphase_est_pilot_log[(rr * OFDM_NC) + (i - 1)] = aphase_est_pilot[i];
 
             if (OFDM_BPS == 1) {
                 rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
             } else if (OFDM_BPS == 2) {
+                /*
+                 * Only one final task, decode what quadrant the phase
+                 * is in, and return the dibits
+                 */
                 qpsk_demod(rx_corr, abit);
                 rx_bits[bit_index++] = abit[1];
                 rx_bits[bit_index++] = abit[0];
             }
-       }
+        }
     }
 
     /* Adjust nin to take care of sample clock offset */
