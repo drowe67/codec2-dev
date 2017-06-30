@@ -72,7 +72,6 @@ extern "C" {
 struct OFDM {
     float foff_est_gain;
     float foff_est_hz;
-    float rx_foff_hz;
 
     int verbose;
     int sample_point;
@@ -86,7 +85,6 @@ struct OFDM {
     complex float rate_fs_pilot_samples[OFDM_M + OFDM_NCP];
     complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
-    complex float rxbuf_fcorr[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
     float w[OFDM_NC + 2];
     
