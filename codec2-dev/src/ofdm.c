@@ -23,7 +23,7 @@
 
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
- */
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -47,6 +47,7 @@ static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
+static void freq_shift(struct OFDM *, complex float [], complex float [], int);
 
 /* Defines */
 
@@ -64,9 +65,9 @@ static int coarse_sync(struct OFDM *, complex float *, int);
  * 270.0 - 359.9 = 10
  */
 static const complex float constellation[] = {
-    1.0f + 0.0f * I,
-    0.0f + 1.0f * I,
-    0.0f - 1.0f * I,
+     1.0f + 0.0f * I,
+     0.0f + 1.0f * I,
+     0.0f - 1.0f * I,
     -1.0f + 0.0f * I
 };
 
@@ -75,7 +76,7 @@ static const complex float constellation[] = {
  */
 static const char pilotvalues[] = {
     -1, -1, 1, 1, -1, -1, -1, 1, -1,
-    1, -1, 1, 1, 1, 1, 1, 1, 1
+     1, -1, 1, 1,  1,  1,  1, 1,  1
 };
 
 /* Functions */
@@ -294,6 +295,7 @@ struct OFDM *ofdm_create() {
 
     ofdm->foff_est_gain = 0.01f;
     ofdm->foff_est_hz = 0.0f;
+    ofdm->rx_foff_hz = 0.0f;
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
@@ -364,6 +366,12 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
 }
 
+void ofdm_rx_shift_freq(struct OFDM *ofdm, float val) {
+    if (val > -500.0f && val < 500.0) {
+        ofdm->rx_foff_hz = val;
+    }
+}
+
 /*
  * --------------------------------------
  * ofdm_mod - modulates one frame of bits
@@ -404,6 +412,25 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
 }
 
 /*
+ * -----------------------------
+ * Frequency shift modem signal
+ * -----------------------------
+ *
+ * The use of complex input and output allows single sided
+ * frequency shifting (no images).
+ */
+
+static void freq_shift(struct OFDM *ofdm, complex float rxbuf_fcorr[], complex float rx[], int nin) {
+    int   i;
+
+    float woff = TAU * ofdm->rx_foff_hz / OFDM_FS;
+
+    for (i = 0; i < nin; i++) {
+	rxbuf_fcorr[i] = rx[i] * cexpf(I * woff * i);
+    }
+}
+
+/*
  * ------------------------------------------
  * ofdm_demod - Demodulates one frame of bits
  * ------------------------------------------
@@ -420,6 +447,7 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
  *
  * D P DDDDDDD P DDDDDDD P DDDDDDD P D
  *             ^
+ * Obviously this introduces some latency.
  */
 
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
@@ -442,13 +470,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     }
 
     /*
-     * get latest freq offset estimate
-     *
-     * foff_est_hz will be 0.0 unless
-     * foff_est_en is enabled
+     * get user and calculated freq offset
      */
 
     float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+
+    freq_shift(ofdm, ofdm->rxbuf_fcorr, ofdm->rxbuf, ofdm->nin);
 
     /* update timing estimate -------------------------------------------------- */
 
@@ -460,8 +487,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         complex float work[(en - st)];
 
+        /*
+         * Adjust for the frequency error by shifting the phase
+         * using a conjugate multiply
+         */
+
         for (i = st, j = 0; i < en; i++, j++) {
-            work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
+            work[j] = ofdm->rxbuf_fcorr[i] * cexpf(-I * woff_est * i);
         }
 
         ft_est = coarse_sync(ofdm, work, (en - st));
@@ -508,7 +540,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* down-convert at current timing instant---------------------------------- */
 
     for (j = st, k = 0; j < en; j++, k++) {
-        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+        work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
     }
 
     matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work); /* sym[0] = previous pilot */
@@ -520,7 +552,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * So we will now be starting at this pilot symbol, and continuing past the next pilot symbol
      * rr = 0 = this pilot, rr = 8 = next pilot
      *
-     * Each symbol is of course OFDM_M samples long.
+     * Each symbol is of course (OFDM_M + OFDM_NCP) samples long.
      *
      * In this routine we process the data symbols. These are the ones we want right now.
      */
@@ -532,7 +564,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /* down-convert at current timing instant---------------------------------- */
 
         for (j = st, k = 0; j < en; j++, k++) {
-            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+            work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
         }
 
         matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work); /* sym[1..9] = this pilot + Data + next pilot */
@@ -554,32 +586,32 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* down-convert at current timing instant---------------------------------- */
 
     for (j = st, k = 0; j < en; j++, k++) {
-        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
+        work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
     }
 
     matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work); /* sym[10] = last pilot */
 
     /*
      * We are finished now with the DFT and down conversion
-     * From here on down we are in the frequency domain
+     * From here on down we are in baseband frequency domain
      */
 
     /* est freq err based on all carriers ------------------------------------ */
 
     if (ofdm->foff_est_en == true) {
         /*
-         * Subtract the two complex pilot frequency values
+         * Conjugate multiply the two complex pilot frequency values
          * sym[1] is the 18 (this) pilot carriers, sym[9] is (next) 18 pilot carriers.
          *
-         * So we sum the carriers all together. Since we hope the two pilots are identical,
-         * then by conjugating one of them, we should get a real only value, and the
+         * So we sum the carriers all together. Since we hope the two pilots have identical
+         * phases, then by conjugating one of them, we should get a real only value, and the
          * imaginary part should be zero.
          *
          * If we find the angle using atan2, then it would be atan2(im, re).
          * but if the im is zero, then we basically at 0 degrees radian at some real x.
          *
-         * If the two pilots are different, then we will get a positive or negative angle
-         * in radians, and we can use this to correct the frequency.
+         * If the two pilot phases are different, then we will get a positive or negative angle
+         * offset by some angle in radians, and we can use this to correct the frequency.
          */
 
         complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1],
