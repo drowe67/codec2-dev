@@ -47,7 +47,6 @@ static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
-static void freq_shift(struct OFDM *, complex float [], complex float [], int);
 
 /* Defines */
 
@@ -295,7 +294,6 @@ struct OFDM *ofdm_create() {
 
     ofdm->foff_est_gain = 0.01f;
     ofdm->foff_est_hz = 0.0f;
-    ofdm->rx_foff_hz = 0.0f;
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
@@ -366,12 +364,6 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
 }
 
-void ofdm_rx_shift_freq(struct OFDM *ofdm, float val) {
-    if (val > -500.0f && val < 500.0) {
-        ofdm->rx_foff_hz = val;
-    }
-}
-
 /*
  * --------------------------------------
  * ofdm_mod - modulates one frame of bits
@@ -408,25 +400,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
     for (i = 0; i < OFDM_SAMPLESPERFRAME; i++) {
         result[i].real = crealf(tx[i]);
         result[i].imag = cimagf(tx[i]);
-    }
-}
-
-/*
- * -----------------------------
- * Frequency shift modem signal
- * -----------------------------
- *
- * The use of complex input and output allows single sided
- * frequency shifting (no images).
- */
-
-static void freq_shift(struct OFDM *ofdm, complex float rxbuf_fcorr[], complex float rx[], int nin) {
-    int   i;
-
-    float woff = TAU * ofdm->rx_foff_hz / OFDM_FS;
-
-    for (i = 0; i < nin; i++) {
-	rxbuf_fcorr[i] = rx[i] * cexpf(I * woff * i);
     }
 }
 
@@ -475,15 +448,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
 
-    freq_shift(ofdm, ofdm->rxbuf_fcorr, ofdm->rxbuf, ofdm->nin);
-
     /* update timing estimate -------------------------------------------------- */
 
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = (OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
-        en = st + OFDM_SAMPLESPERFRAME - 1 + OFDM_M + OFDM_NCP + OFDM_FTWINDOWWIDTH;
+        st = ((OFDM_M + OFDM_NCP) + OFDM_SAMPLESPERFRAME) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
+        en = st + OFDM_SAMPLESPERFRAME - 1 + (OFDM_M + OFDM_NCP) + OFDM_FTWINDOWWIDTH;
 
         complex float work[(en - st)];
 
@@ -493,7 +464,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
          */
 
         for (i = st, j = 0; i < en; i++, j++) {
-            work[j] = ofdm->rxbuf_fcorr[i] * cexpf(-I * woff_est * i);
+            work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
         ft_est = coarse_sync(ofdm, work, (en - st));
@@ -513,7 +484,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * Convert the time-domain samples to the frequency-domain using the rx_sym
      * data matrix. This will be 18 carriers of 11 symbols (P P DDDDDDD P P)
      *
-     * So we will have one modem data frame and four pilots to do magic.
+     * So we will have one modem data frame and four pilots.
      */
 
     for (i = 0; i < (OFDM_NS + 3); i++) {
@@ -540,7 +511,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* down-convert at current timing instant---------------------------------- */
 
     for (j = st, k = 0; j < en; j++, k++) {
-        work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
+        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
     matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work); /* sym[0] = previous pilot */
@@ -564,7 +535,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /* down-convert at current timing instant---------------------------------- */
 
         for (j = st, k = 0; j < en; j++, k++) {
-            work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
+            work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
         }
 
         matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work); /* sym[1..9] = this pilot + Data + next pilot */
@@ -586,7 +557,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* down-convert at current timing instant---------------------------------- */
 
     for (j = st, k = 0; j < en; j++, k++) {
-        work[k] = ofdm->rxbuf_fcorr[j] * cexpf(-I * woff_est * j);
+        work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
     matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work); /* sym[10] = last pilot */
