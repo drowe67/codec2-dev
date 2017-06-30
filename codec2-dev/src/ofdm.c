@@ -481,7 +481,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * Convert the time-domain samples to the frequency-domain using the rx_sym
      * data matrix. This will be 18 carriers of 11 symbols (P P DDDDDDD P P)
      *
-     * So we will have one modem data frame and three pilots to do magic.
+     * So we will have one modem data frame and four pilots to do magic.
      */
 
     for (i = 0; i < (OFDM_NS + 3); i++) {
