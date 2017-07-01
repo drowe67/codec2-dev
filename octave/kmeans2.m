@@ -71,8 +71,9 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
 
     ## check for the ‘search_func’ property, user defined vq_search function
 
-    if find (strcmpi (prop, "search_func") == 1)
-      search_func = (prop{found+1});
+    found = find (strcmpi (prop, "search_func") == 1);
+    if found
+      search_func = prop{found+1};
     end
   endif
 
@@ -89,7 +90,7 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
   ## Run the algorithm
 
   while err > .001
-    classes = search_func(centers, data);
+    classes = feval(search_func, centers, data);
 
     ## Calculate new centroids
 
@@ -135,12 +136,11 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
 endfunction
 
 
-function [idx errors g test_] = vq_search_mse(vq, data)
+function idx = vq_search_mse(vq, data)
     [nVec nCols] = size(vq);
     nRows = length(data);
 
     error = zeros(1,nVec);
-    errors = zeros(1, nRows);
     idx = zeros(1, nRows);
 
     for f=1:nRows
@@ -150,9 +150,8 @@ function [idx errors g test_] = vq_search_mse(vq, data)
         error(i) = diff * diff';
       end
       [mn min_ind] = min(error);
-      errors(f) = mn; idx(f) = min_ind;
-      test_(f,:) = vq(min_ind,:);
-    end
+      idx(f) = min_ind;
+     end
 endfunction
 
 
