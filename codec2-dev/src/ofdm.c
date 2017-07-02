@@ -150,7 +150,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         complex float temp = 0.0f + 0.0f * I;
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
-            csam = conjf(ofdm->rate_fs_pilot_samples[j]);
+            csam = conjf(ofdm->pilot_samples[j]);
             temp = temp + (rx[i + j] * csam);
             temp = temp + (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
         }
@@ -305,19 +305,19 @@ struct OFDM *ofdm_create() {
     matrix_vector_multiply(ofdm, temp, ofdm->pilots);
 
     /*
-     * rate_fs_pilot_samples is 160 samples, as we copy the last 16 to the front
+     * pilot_samples is 160 samples, as we copy the last 16 to the front
      */
 
     /* first copy the last Cyclic Prefix (CP) values */
 
     for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
-        ofdm->rate_fs_pilot_samples[i] = temp[j];
+        ofdm->pilot_samples[i] = temp[j];
     }
 
     /* Now copy the whole thing after the above */
 
     for (i = OFDM_NCP, j = 0; j < OFDM_M; i++, j++) {
-        ofdm->rate_fs_pilot_samples[i] = temp[j];
+        ofdm->pilot_samples[i] = temp[j];
     }
 
     return ofdm; /* Success */
@@ -407,20 +407,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
  * ------------------------------------------
  * ofdm_demod - Demodulates one frame of bits
  * ------------------------------------------
- *
- * For phase estimation we need to maintain buffer of 3 modem frames
- * plus one pilot, so we have 4 pilots total. '^' is the start of
- * current frame that we are demodulating.
- *
- * P DDDDDDD P DDDDDDD P DDDDDDD P
- *           ^
- *
- * Then add one data symbol (M+Ncp) either side to account for
- * movement in sampling instant due to sample clock differences:
- *
- * D P DDDDDDD P DDDDDDD P DDDDDDD P D
- *             ^
- * Obviously this introduces some latency.
  */
 
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
@@ -482,9 +468,41 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /*
      * Convert the time-domain samples to the frequency-domain using the rx_sym
-     * data matrix. This will be 18 carriers of 11 symbols (P P DDDDDDD P P)
+     * data matrix. This will be 18 carriers of 11 symbols.
      *
-     * So we will have one modem data frame and four pilots.
+     * You will notice there are 18 BPSK symbols for each pilot symbol, and that there
+     * are 16 QPSK symbols for each data symbol.
+     *
+     *  XXXXXXXXXXXXXXXX  <-- Timing Slip
+     * PPPPPPPPPPPPPPPPPP <-- Previous Frames Pilot
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD      Ignore these past data symbols
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     * PPPPPPPPPPPPPPPPPP <-- This Frames Pilot
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD      These are the current data symbols to be decoded
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     * PPPPPPPPPPPPPPPPPP <-- Next Frames Pilot
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD      Ignore these next data symbols
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     *  DDDDDDDDDDDDDDDD
+     * PPPPPPPPPPPPPPPPPP <-- Future Frames Pilot
+     *  XXXXXXXXXXXXXXXX  <-- Timing Slip
+     *
+     * So this algorithm will have seven data symbols and four pilot symbols to process.
+     * The average of the four pilot symbols is our phase estimation.
      */
 
     for (i = 0; i < (OFDM_NS + 3); i++) {
@@ -493,14 +511,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         }
     }
 
-    /* previous pilot */
-
     /*
-     * Previous pilot symbol is OFDM_SAMPLESPERFRAME to the left
-     * Right after the extra symbol on the left
-     *
-     * (OFDM_M + OFDM_NCP) + (OFDM_SAMPLESPERFRAME - OFDM_SAMPLESPERFRAME) + 1 + ofdm->sample_point;
-     *                                            ^^^^ --- cancels
+     * "Previous" pilot symbol is one modem frame above.
      */
 
     st = (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
@@ -514,18 +526,32 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work); /* sym[0] = previous pilot */
+    /*
+     * Each symbol is of course (OFDM_M + OFDM_NCP) samples long and
+     * becomes 18 carriers after DFT.
+     *
+     * We put this 18 carrier pilot symbol at the top of our matrix:
+     *
+     * 0 ................... 17
+     *
+     * +----------------------+
+     * |    Previous Pilot    |  rx_sym[0]
+     * +----------------------+
+     * |                      |
+     *
+     */
 
-    /* pilot - this frame - pilot */
+    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work);
 
     /*
-     * This pilot is after the extra symbol on the left, and after the OFDM_SAMPLESPERFRAME
-     * So we will now be starting at this pilot symbol, and continuing past the next pilot symbol
-     * rr = 0 = this pilot, rr = 8 = next pilot
+     * "This" pilot comes after the extra symbol alloted at the top, and after
+     * the "previous" pilot and previous data symbols (let's call it, the previous
+     * modem frame).
      *
-     * Each symbol is of course (OFDM_M + OFDM_NCP) samples long.
+     * So we will now be starting at "this" pilot symbol, and continuing to the
+     * "next" pilot symbol.
      *
-     * In this routine we process the data symbols. These are the ones we want right now.
+     * In this routine we also process the current data symbols.
      */
 
     for (rr = 0; rr < (OFDM_NS + 1); rr++) {
@@ -538,17 +564,43 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
         }
 
-        matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work); /* sym[1..9] = this pilot + Data + next pilot */
+        /*
+         * We put these 18 carrier symbols into our matrix after the previous pilot:
+         *
+         * 0 ................... 17
+         *
+         * |    Previous Pilot    |  rx_sym[0]
+         * +----------------------+
+         * |      This Pilot      |  rx_sym[1]
+         * +----------------------+
+         * |         Data         |  rx_sym[2]
+         * +----------------------+
+         * |         Data         |  rx_sym[3]
+         * +----------------------+
+         * |         Data         |  rx_sym[4]
+         * +----------------------+
+         * |         Data         |  rx_sym[5]
+         * +----------------------+
+         * |         Data         |  rx_sym[6]
+         * +----------------------+
+         * |         Data         |  rx_sym[7]
+         * +----------------------+
+         * |         Data         |  rx_sym[8]
+         * +----------------------+
+         * |      Next Pilot      |  rx_sym[9]
+         * +----------------------+
+         * |                      |  rx_sym[10]
+         */
+
+        matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work);
     }
 
-    /* next pilot */
-
     /*
-     * OK, now we want to process to the next pilot symbol. This is OFDM_SAMPLESPERFRAME symbols to the right
-     * Remember now, we are 1 extra symbol + (2 * SAMPLESPERFRAME) symbols from the start right now
-     * So in effect, we want to go (3 * SAMPLESPERFRAME) to the right, +/- sample_point
+     * OK, now we want to process to the "future" pilot symbol. This is after
+     * the "next" modem frame.
      *
-     * We are ignoring the data symbols between the previous pilot and here, we just want the pilot.
+     * We are ignoring the data symbols between the "next" pilot and "future" pilot.
+     * We only want the "future" pilot symbol, to perform the averaging of all pilots.
      */
 
     st = (OFDM_M + OFDM_NCP) + (3 * OFDM_SAMPLESPERFRAME) + 1 + ofdm->sample_point;
@@ -560,7 +612,18 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         work[k] = ofdm->rxbuf[j] * cexpf(-I * woff_est * j);
     }
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work); /* sym[10] = last pilot */
+    /*
+     * We put the future pilot after all the previous symbols in the matrix:
+     *
+     * 0 ................... 17
+     *
+     * |                      |  rx_sym[9]
+     * +----------------------+
+     * |     Future Pilot     |  rx_sym[10]
+     * +----------------------+
+     */
+
+    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work);
 
     /*
      * We are finished now with the DFT and down conversion
@@ -571,18 +634,10 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     if (ofdm->foff_est_en == true) {
         /*
-         * Conjugate multiply the two complex pilot frequency values
-         * sym[1] is the 18 (this) pilot carriers, sym[9] is (next) 18 pilot carriers.
+         * sym[1] is (this) pilot symbol, sym[9] is (next) pilot symbol.
          *
-         * So we sum the carriers all together. Since we hope the two pilots have identical
-         * phases, then by conjugating one of them, we should get a real only value, and the
-         * imaginary part should be zero.
-         *
-         * If we find the angle using atan2, then it would be atan2(im, re).
-         * but if the im is zero, then we basically at 0 degrees radian at some real x.
-         *
-         * If the two pilot phases are different, then we will get a positive or negative angle
-         * offset by some angle in radians, and we can use this to correct the frequency.
+         * By subtracting the two averages of these pilots, we find the frequency
+         * by the change in phase over time.
          */
 
         complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1],
@@ -605,6 +660,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /*
      * Basically we divide the 18 pilots into groups of 3
+     *
+     * Then average the phase surrounding each of the data symbols.
      */
 
     for (i = 1; i < (OFDM_NC + 1); i++) {
@@ -634,21 +691,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             symbol[k] = ofdm->rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j]; /* last pilot */
         }
 
-        /*
-         * sum the three carrier values, and they should cancel
-         * giving us an imaginary value of 0, and thus an angle of 0 degrees radians.
-         */
-
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
-
-        /*
-         * Note that i has an index of 1 to 16, so the carriers 0 and 17 will
-         * be set to default, or 10 degrees radians, as assigned above.
-         *
-         * I'm assuming they are just filler, as we don't need them to decode
-         * and correct the data symbols. There are only 16 data samples.
-         */
-
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
         /* TODO David: WTF 12.0 constant?  Something to do with LDPC input scaling? */
@@ -670,7 +713,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /*
          * Note the i has an index of 1 to 16, so we ignore carriers 0 and 17.
          *
-         * Also note we are using sym[2..8] or the 7 data symbols.
+         * Also note we are using sym[2..8] or the seven data symbols.
          */
 
         for (i = 1; i < (OFDM_NC + 1); i++) {
