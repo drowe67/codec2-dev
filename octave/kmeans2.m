@@ -62,12 +62,14 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
     ## check for the ‘emptyaction’ property
 
     found = find (strcmpi (prop, "emptyaction") == 1);
-    switch (lower (prop{found+1}))
-      case "singleton"
-        emptyaction = "singleton";
-      otherwise
-        error ("kmeans: unsupported empty cluster action parameter");
-    endswitch
+    if found 
+      switch (lower (prop{found+1}))
+        case "singleton"
+          emptyaction = "singleton";
+        otherwise
+          error ("kmeans: unsupported empty cluster action parameter");
+      endswitch
+    end
 
     ## check for the ‘search_func’ property, user defined vq_search function
 
@@ -75,17 +77,22 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
     if found
       search_func = prop{found+1};
     end
-  endif
 
-  ## check for the ‘start’ property
+    ## check for the ‘start’ property
 
-  switch (lower (start))
-    case "sample"
-      idx = randperm (nRows) (1:k);
-      centers = data (idx, :);
-    otherwise
-      error ("kmeans: unsupported initial clustering parameter");
-  endswitch
+    found = find (strcmpi (prop, "start") == 1);
+    if found
+      switch (lower (prop{found+1}))
+        case "sample"
+          idx = randperm (nRows) (1:k);
+          centers = data (idx, :);
+        case "first"
+          centers = data (1:k, :);
+        otherwise
+          error ("kmeans: unsupported initial clustering parameter");
+      endswitch
+    end
+  end
 
   ## Run the algorithm
 
@@ -116,7 +123,7 @@ function [classes, centers, sumd, D] = kmeans2 (data, k, varargin)
           otherwise
             error ("kmeans: empty cluster created");
         endswitch
-     endif ## end check for empty clusters
+      endif ## end check for empty clusters
 
       ## update the centroids
 
