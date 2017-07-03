@@ -16,13 +16,14 @@
 
 % standard mean squared error search
 
-function [idx errors test_ g mg] = vq_search_mse(vq, data)
+function [idx contrib errors test_ g mg] = vq_search_mse(vq, data)
   [nVec nCols] = size(vq);
   nRows = length(data);
   
   error = zeros(1,nVec);
   errors = zeros(1, nRows);
   idx = zeros(1, nRows);
+  contrib = zeros(nRows, nCols);
   test_ = zeros(nVec, nCols);
 
   for f=1:nRows
@@ -32,7 +33,7 @@ function [idx errors test_ g mg] = vq_search_mse(vq, data)
       error(i) = diff * diff';
     end
     [mn min_ind] = min(error);
-    errors(f) = mn; idx(f) = min_ind;
+    errors(f) = mn; idx(f) = min_ind; contrib(f,:) = vq(min_ind,:);
     test_(f,:) = vq(min_ind,:);
   end
 
@@ -42,7 +43,7 @@ endfunction
 
 % abs() search with a linear gain term
 
-function [idx errors test_ g mg] = vq_search_gain(vq, data)
+function [idx contrib errors test_ g mg] = vq_search_gain(vq, data)
   
   [nVec nCols] = size(vq);
   nRows = length(data);
@@ -52,6 +53,7 @@ function [idx errors test_ g mg] = vq_search_gain(vq, data)
   diff  = zeros(nVec, nCols);
   errors = zeros(1, nRows);
   idx = zeros(1, nRows);
+  contrib = zeros(nRows, nCols);
   test_ = zeros(nVec, nCols);
 
   for f=1:nRows
@@ -69,8 +71,11 @@ function [idx errors test_ g mg] = vq_search_gain(vq, data)
       %printf("f: %d i: %d g: %f error: %f\n", f, i, g(f, i), error(i));
     end
     [mn min_ind] = min(error);
-    errors(f) = mn; idx(f) = min_ind;
-    test_(f,:) = vq(min_ind,:) + g(f,min_ind);
+
+    idx(f) = min_ind;
+
+    errors(f) = mn; 
+    contrib(f,:) = test_(f,:) = vq(min_ind,:) + g(f,min_ind);
   end
   mg = 1;
 endfunction
@@ -78,7 +83,7 @@ endfunction
 
 % abs() search with a linear plus ampl scaling term
 
-function [idx errors test_ g mg] = vq_search_mag(vq, data)
+function [idx contrib errors test_ g mg] = vq_search_mag(vq, data)
   [nVec nCols] = size(vq);
   nRows = length(data);
   
@@ -86,6 +91,7 @@ function [idx errors test_ g mg] = vq_search_mag(vq, data)
   diff  = zeros(nVec, nCols);
   errors = zeros(1, nRows);
   idx = error = zeros(1, nVec);
+  contrib = zeros(nRows, nCols);
   mg_log = [];
   test_ = zeros(nVec, nCols);
 
@@ -117,7 +123,8 @@ function [idx errors test_ g mg] = vq_search_mag(vq, data)
     [mn min_ind] = min(error);
     errors(f) = mn; 
     idx(f) = min_ind;
-    test_(f,:) = mg(f,min_ind) * vq(min_ind,:) + g(f,min_ind);
+
+    contrib(f,:) = test_(f,:) = mg(f,min_ind) * vq(min_ind,:) + g(f,min_ind);
     mg_log = [mg_log mg(f,min_ind)];
   end
 
@@ -139,11 +146,11 @@ function sd_per_frame = run_test(vq, test, nVec, search_func, gui_en = 1)
   
   [nRows nCols] = size(test);
 
-  [idx errors test_ g mg] = feval(search_func, vq, test);
+  [idx contrib errors test_ g mg] = feval(search_func, vq, test);
   
   % sd over time
  
-  sd_per_frame = zeros(1,nRows);
+  sd_per_frame = zeros(nRows,1);
   for i=1:nRows
     sd_per_frame(i) = mean(abs(test(i,:) - test_(i,:)));
   end
@@ -205,7 +212,12 @@ function compare_hist(atitle, sdpf_mse, sdpf_gain, sdpf_mag)
 end
 
 
-function sd = three_tests(trainvec, testvec, Nvec, train_func)
+function sd = three_tests(sim_in)
+  trainvec = sim_in.trainvec;
+  testvec = sim_in.testvec;
+  Nvec = sim_in.Nvec;
+  train_func = sim_in.train_func;
+
   printf("  Nvec: %d\n", Nvec);
 
   [idx vq] = kmeans(trainvec, Nvec, 
@@ -217,15 +229,49 @@ function sd = three_tests(trainvec, testvec, Nvec, train_func)
   sd_gain = run_test(vq, testvec, Nvec, 'vq_search_gain', gui_en=0);
   sd_mag = run_test(vq, testvec, Nvec, 'vq_search_mag', gui_en=0);
 
-  sd = [sd_mse; sd_gain; sd_mag];
+  sd = [sd_mse sd_gain sd_mag];
+endfunction
+
+function plot_sd_results(title_str, fg, offset, sd)
+  figure(fg); clf;  
+  samples = offset+[1 4 7];
+  bits = log2([64 128 256]);
+  errorbar(bits-0.1, mean(sd(:,samples)), std(sd(:, samples),[]),'b+-; MSE search;');
+  hold on;
+  samples = offset+[2 5 8];
+  errorbar(bits+0.0, mean(sd(:,samples)), std(sd(:,samples),[]),'g+-;Gain search;');
+  samples = offset+[3 6 9];
+  errorbar(bits+0.1, mean(sd(:,samples)), std(sd(:,samples),[]),'r+-;Mag search;');
+  hold off;
+  xlabel('VQ size (bits)')
+  ylabel('mean SD (dB)');
+  title(title_str);
 endfunction
 
 
-function sd_log = long_tests(quick_check=0)
+function plot_sd_results2(title_str, fg, sd)
+  figure(fg); clf;  
+  samples = 0+[3 6 9];
+  bits = log2([64 128 256]);
+  errorbar(bits-0.1, mean(sd(:,samples)), std(sd(:, samples),[]),'b+-; MSE train;');
+  hold on;
+  samples = 9+[3 6 9];
+  errorbar(bits+0.0, mean(sd(:,samples)), std(sd(:,samples),[]),'g+-;Gain train;');
+  samples = 18+[3 6 9];
+  errorbar(bits+0.1, mean(sd(:,samples)), std(sd(:,samples),[]),'r+-;Mag train;');
+  hold off;
+  xlabel('VQ size (bits)')
+  ylabel('mean SD (dB)');
+  title(title_str);
+endfunction
 
+
+function sd = long_tests(quick_check=0)
+  num_cores = 4;
   K = 10;
-  load surf_train_120;
-  load surf_all;
+  load surf_train_120; load surf_all;
+  load surf_train_120_hpf150; load surf_all_hpf150;
+
   if quick_check
     NtrainVec = 1000;
     NtestVec = 100;
@@ -236,89 +282,30 @@ function sd_log = long_tests(quick_check=0)
 
   trainvec = surf_train_120(1:NtrainVec,1:K);
   testvec = surf_all(1:NtestVec,1:K);
-
-  load surf_train_120_hpf150;
   trainvec_hpf150 = surf_train_120_hpf150(1:NtrainVec,1:K);
-  load surf_all_hpf150;
   testvec_hpf150 = surf_all_hpf150(1:NtestVec,1:K);
 
-  sd_log = [];
+  sim_in.trainvec = trainvec; sim_in.testvec = testvec; sim_in.Nvec = 64; sim_in.train_func = 'vq_search_mse';
+  sim_in_vec(1:3) = sim_in;
+  sim_in_vec(2).Nvec = 128; sim_in_vec(3).Nvec = 256;
+  sd =  pararrayfun(num_cores, @three_tests, sim_in_vec);
+  plot_sd_results("MSE Training", 1, 0, sd)
 
-  % Standard MSE training
+  for i=1:3, sim_in_vec(i).trainvec = trainvec_hpf150; sim_in_vec(i).testvec = testvec_hpf150; end;
+  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
+  plot_sd_results("MSE training 150Hz HPF", 2, 9, sd)
 
-  printf("MSE training\n");
-  sd = three_tests(trainvec, testvec, 64, 'vq_search_mse'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec, testvec, 128, 'vq_search_mse'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec, testvec, 256, 'vq_search_mse'); sd_log = [sd_log; sd];
+  for i=1:3, sim_in_vec(i).train_func = 'vq_search_gain'; end;
+  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
+  plot_sd_results("Gain training 150Hz HPF", 3, 9, sd)
 
-  figure(1); clf;  
-  samples = [1 4 7];
-  bits = log2([64 128 256]);
-  errorbar(bits-0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'b+-;MSE train, MSE search;');
-  hold on;
-  samples = [2 5 8];
-  errorbar(bits+0.0, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'g+-;MSE train, Gain search;');
-  samples = [3 6 9];
-  errorbar(bits+0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'r+-;MSE train, Mag search;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title('MSE Training');
+  for i=1:3, sim_in_vec(i).train_func = 'vq_search_mse'; end;
+  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
+  plot_sd_results("Mag training 150Hz HPF", 4, 9, sd)
 
-  % Standard MSE training with 150 Hz HPF
-
-  printf("MSE training, 150Hz HPF on train and test\n");
-
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 64, 'vq_search_mse'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 128, 'vq_search_mse'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 256, 'vq_search_mse'); sd_log = [sd_log; sd];
-
-  figure(2); clf;  
-  samples = 9+[1 4 7];
-  bits = log2([64 128 256]);
-  errorbar(bits-0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'b+-;MSE train, MSE search;');
-  hold on;
-  samples = 9+[2 5 8];
-  errorbar(bits+0.0, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'g+-;MSE train, Gain search;');
-  samples = 9+[3 6 9];
-  errorbar(bits+0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'r+-;MSE train, Mag search;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title('MSE Training, 150Hz HPF on train and test');
-
-  printf("Mag training, 150Hz HPF on train and test\n");
-
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 64, 'vq_search_mag'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 128, 'vq_search_mag'); sd_log = [sd_log; sd];
-  sd = three_tests(trainvec_hpf150, testvec_hpf150, 256, 'vq_search_mag'); sd_log = [sd_log; sd];
-
-  figure(3); clf;  
-  samples = 18+[1 4 7];
-  bits = log2([64 128 256]);
-  errorbar(bits-0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'b+-;Mag train, MSE search;');
-  hold on;
-  samples = 18+[2 5 8];
-  errorbar(bits+0.0, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'g+-;Mag train, Gain search;');
-  samples = 18+[3 6 9];
-  errorbar(bits+0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'r+-;Mag train, Mag search;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title('Mag Training, 150Hz HPF on train and test');
-
-  figure(4); clf;  
-  samples = 9+[3 6 9];
-  bits = log2([64 128 256]);
-  errorbar(bits+0.0, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'bo-;MSE train, Mag search;');
-  hold on;
-  samples = 18+[3 6 9];
-  errorbar(bits+0.1, mean(sd_log(samples,:),2), std(sd_log(samples,:),[],2),'go-;Mag train, Mag search;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title('Mag Search, 150Hz HPF on train and test');
-
+  plot_sd_results2("Mag search 150Hz HPF", 5, sd)
+  
+  figure(6); clf; compare_hist("Mag train Nvec=64", sd(:,3), sd(:,12), sd(:,21));
 endfunction
 
 
@@ -348,9 +335,12 @@ function test_training_mse
   K = 3; NtrainVec = 10; Nvec = 2;  
 
   trainvec = ones(NtrainVec,K);
-  trainvec(NtrainVec/2+1:NtrainVec,:) = -1;
+  trainvec(2:2:NtrainVec,:) = -1;
   
-  [idx vq]  = kmeans2(trainvec, Nvec, "emptyaction", "singleton");
+  [idx vq]  = kmeans2(trainvec, Nvec,
+                      "start", "first", 
+                      "emptyaction", "singleton",
+                      "search_func", "vq_search_mse");
 
   ok = find(vq == [1 1 1]) && (find(vq == [-1 -1 -1]));
   printf("ok: %d\n", ok);
@@ -440,9 +430,9 @@ format; more off;
 rand('seed',1);    % kmeans using rand for initial population,
                    % we want same results on every run
 
+%short_detailed_test('vq_search_mag', 'vq_search_mag');
 sd = long_tests(quick_check=0);
 %test_training_mag
-%short_detailed_test('vq_search_mag', 'vq_search_mag');
 
 
 
