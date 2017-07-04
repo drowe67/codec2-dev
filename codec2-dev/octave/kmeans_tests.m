@@ -19,7 +19,7 @@
 
 function [idx contrib errors test_ g mg] = vq_search_mse(vq, data)
   [nVec nCols] = size(vq);
-  nRows = length(data);
+  nRows = rows(data);
   
   error = zeros(1,nVec);
   errors = zeros(1, nRows);
@@ -48,7 +48,7 @@ endfunction
 function [idx contrib errors test_ g mg] = vq_search_gain(vq, data)
   
   [nVec nCols] = size(vq);
-  nRows = length(data);
+  nRows = rows(data);
 
   error = zeros(1,nVec);
   g = zeros(nRows, nVec);
@@ -88,14 +88,13 @@ endfunction
 
 function [idx contrib errors test_ g mg] = vq_search_mag(vq, data)
   [nVec nCols] = size(vq);
-  nRows = length(data);
+  nRows = rows(data);
   
   g = mg = zeros(nRows, nVec);
   diff  = zeros(nVec, nCols);
   errors = zeros(1, nRows);
   idx = error = zeros(1, nVec);
   contrib = zeros(nRows, nCols);
-  mg_log = [];
   test_ = zeros(nVec, nCols);
 
   weights = ones(1,nCols);
@@ -128,10 +127,58 @@ function [idx contrib errors test_ g mg] = vq_search_mag(vq, data)
     idx(f) = min_ind;
 
     contrib(f,:) = test_(f,:) = mg(f,min_ind) * vq(min_ind,:) + g(f,min_ind);
-    mg_log = [mg_log mg(f,min_ind)];
   end
 
-  %figure(2); clf; hist(mg_log);
+endfunction
+
+
+%----------------------------------------------------------------------
+% abs() search with a linear, ampl scaling, and slope term
+
+function [idx contrib errors test_ g mg sl] = vq_search_slope(vq, data)
+  [nVec nCols] = size(vq);
+  nRows = rows(data);
+  
+  g = mg = sl = zeros(nRows, nVec);
+  diff  = zeros(nVec, nCols);
+  errors = zeros(1, nRows);
+  idx = error = zeros(1, nVec);
+  contrib = zeros(nRows, nCols);
+  test_ = zeros(nVec, nCols);
+
+  weights = ones(1,nCols);
+
+  for f=1:nRows
+    target = data(f,:);
+    %target = 2*vq(1,:)+1;
+
+    for i=1:nVec
+      % work out gain, amp and slope for best match, 3 unknowns, 3 equations
+
+      A = [sum(vq(i,:))      nCols        sum(1:nCols); ...
+          vq(i,:)*vq(i,:)'   sum(vq(i,:)) (1:nCols)*vq(i,:)'; ...
+          (1:nCols)*vq(i,:)' sum(1:nCols) (1:nCols)*(1:nCols)'];
+      c = [sum(target) target*vq(i,:)' target*(1:nCols)']';
+      b = inv(A)*c;
+
+      mg(f,i) = b(1); g(f,i) = b(2); sl(f,i) = b(3);
+      diff(i,:) = target - (mg(f,i)*vq(i,:) + g(f,i) + sl(f,i)*(1:nCols));
+      diff(i,:) .* weights;
+
+      % abs in dB is MSE in linear
+
+      error(i) = mean(abs(diff(i,:)));
+
+      %printf("f: %d i: %d mg: %f g: %f sl: %f error: %f\n", f, i, mg(f,i), g(f,i), sl(f,i), error(i));
+    end
+    
+    [mn min_ind] = min(error);
+    errors(f) = mn; 
+    idx(f) = min_ind;
+
+    contrib(f,:) = test_(f,:) = mg(f,min_ind)*vq(min_ind,:) + g(f,min_ind) + sl(f,min_ind)*(1:nCols);
+  end
+
 endfunction
 
 
@@ -207,59 +254,6 @@ function sd_per_frame = run_test(vq, test, nVec, search_func, gui_en = 0)
 endfunction
 
 
-%----------------------------------------------------------------------
-%
-% Plot histograms of SDs for comparison % % Each col of sd_per_frame
-% has the results of one test, number of cols % is number of tests.  leg
-% is a col vector with one legend string for each test.
-
-function compare_hist(atitle, sdpf, leg)
-  [nRows nCols] = size(sd);
-  for c=1:nCols
-    [yy, xx] = hist(sd(:, c));
-    if c == 2, hold on; end;
-    l = char(cellstr(leg)(c));
-    plot(xx, yy, leg(c));
-  end
-  if nCols > 1, hold off; end;
-  title(atitle)
-end
-
-
-function plot_sd_results(title_str, fg, offset, sd)
-  figure(fg); clf;  
-  samples = offset+[1 4 7];
-  bits = log2([64 128 256]);
-  errorbar(bits-0.1, mean(sd(:,samples)), std(sd(:, samples),[]),'b+-; MSE search;');
-  hold on;
-  samples = offset+[2 5 8];
-  errorbar(bits+0.0, mean(sd(:,samples)), std(sd(:,samples),[]),'g+-;Gain search;');
-  samples = offset+[3 6 9];
-  errorbar(bits+0.1, mean(sd(:,samples)), std(sd(:,samples),[]),'r+-;Mag search;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title(title_str);
-endfunction
-
-
-function plot_sd_results2(title_str, fg, sd)
-  figure(fg); clf;  
-  samples = 9+[3 6 9];
-  bits = log2([64 128 256]);
-  errorbar(bits-0.1, mean(sd(:,samples)), std(sd(:, samples),[]),'b+-; MSE train;');
-  hold on;
-  samples = 18+[3 6 9];
-  errorbar(bits+0.0, mean(sd(:,samples)), std(sd(:,samples),[]),'g+-;Gain train;');
-  samples = 27+[3 6 9];
-  errorbar(bits+0.1, mean(sd(:,samples)), std(sd(:,samples),[]),'r+-;Mag train;');
-  hold off;
-  xlabel('VQ size (bits)')
-  ylabel('mean SD (dB)');
-  title(title_str);
-endfunction
-
-
 function search_func = get_search_func(short_name)
   if strcmp(short_name, "mse")
     search_func = 'vq_search_mse';
@@ -269,6 +263,9 @@ function search_func = get_search_func(short_name)
   end
   if strcmp(short_name, "mag")
     search_func = 'vq_search_mag';
+  end
+  if strcmp(short_name, "slope")
+    search_func = 'vq_search_slope';
   end
 end
 
@@ -291,64 +288,161 @@ function [sd des] = train_vq_and_run_tests(sim_in)
     test_func = get_search_func(test_func_short);
     asd = run_test(vq, sim_in.testvec, Nvec, test_func); 
     sd = [sd asd];
-    ades = sprintf("Nvec: %3d train: %-4s test: %-4s", 
-           Nvec, sim_in.train_func_short, test_func_short); 
-    des = [des; ades];
-    printf("    %s SD: %3.2f\n", ades, mean(asd));
+    ades.Nvec = Nvec; 
+    ades.train_func_short = sim_in.train_func_short;
+    ades.test_func_short  = test_func_short;
+    ades_str = sprintf("Nvec: %3d train: %-5s test: %-5s", 
+                       ades.Nvec, ades.train_func_short, ades.test_func_short); 
+    des = [des ades];
+    printf("    %s SD: %3.2f\n", ades_str, mean(asd));
   end
 
 endfunction
 
-function sd = long_tests(quick_check=0)
+% Search for test that matchs train/test and any Nvec and constructs points for error bar plot
+
+function [y x leg] = search_tests(sd, desc, train, test)
+  nTests = length(desc)
+  x = []; y = []; leg = [];
+  for i=1:nTests
+    if strcmp(desc(i).train_func_short, train) && strcmp(desc(i).test_func_short, test)
+      printf("i: %2d Nvec: %3d train: %5s test: %5s\n", i, desc(i).Nvec, desc(i).train_func_short, desc(i).test_func_short);
+      x = [x; log2(desc(i).Nvec)];
+      y = [y; mean(sd(:,i)) std(sd(:,i))];
+    end
+  end
+endfunction
+
+
+function plot_sd_results(fg, title_str, sd, desc, train_list, test_list)
+  figure(fg); clf;  
+
+  nlines = 0; inc = -0.1;
+  for i=1:length(cellstr(train_list))
+    train_func_short = char(cellstr(train_list)(i));
+    for j=1:length(cellstr(test_list))
+      test_func_short = char(cellstr(test_list)(j));
+      [y x] = search_tests(sd, desc, train_func_short, test_func_short);
+      leg = sprintf("o-%d;train: %5s test: %5s;", nlines, train_func_short, test_func_short)
+      if nlines, hold on; end;
+      x += inc; inc += 0.1;            % separate x coords a bit to make errors bars legible
+      errorbar(x, y(:,1), y(:,2), leg);
+      nlines++;
+    end
+    if nlines>1, hold off; end;
+  end
+
+  xlabel('VQ size (bits)')
+  ylabel('mean SD (dB)');
+  title(title_str);
+endfunction
+
+
+% Search for test that matches all fields for histogram plots
+
+function testNum = search_tests_Nvec(sd, desc, train, test, Nvec)
+  nTests = length(desc);
+  testNum = 0;
+  for i=1:nTests
+    if strcmp(desc(i).train_func_short, train) && strcmp(desc(i).test_func_short, test) && desc(i).Nvec == Nvec
+      printf("i: %2d Nvec: %3d train: %5s test: %5s\n", i, desc(i).Nvec, desc(i).train_func_short, desc(i).test_func_short);
+      testNum = i;
+    end
+  end
+endfunction
+
+%----------------------------------------------------------------------
+%
+% Plot histograms of SDs for comparison. Each col of sd_per_frame
+% has the results of one test, number of cols % is number of tests.  leg
+% is a col vector with one legend string for each test.
+
+function compare_hist(fg, atitle, sd, desc)
+  figure(fg); clf;
+  [nRows nCols] = size(sd);
+  for c=1:nCols
+    [yy, xx] = hist(sd(:, c));
+    if c == 2, hold on; end;
+    leg = sprintf("o-%d;train: %5s test: %5s;", c-1, desc(c).train_func_short, desc(c).test_func_short);
+    plot(xx, yy, leg);
+  end
+  if nCols > 1, hold off; end;
+  title(atitle)
+end
+
+%----------------------------------------------------------------------
+% Run a bunch of long tests in parallel and plot results
+
+function [sd desc] = long_tests(quick_check=0)
   num_cores = 4;
   K = 10;
-  load surf_train_120; load surf_all;
   load surf_train_120_hpf150; load surf_all_hpf150;
 
   if quick_check
     NtrainVec = 1000;
     NtestVec = 100;
   else
-    NtrainVec = length(surf_train_120);
-    NtestVec = length(surf_all);
+    NtrainVec = length(surf_train_120_hpf150);
+    NtestVec = length(surf_all_hpf150);
   end
 
-  trainvec = surf_train_120(1:NtrainVec,1:K);
-  testvec = surf_all(1:NtestVec,1:K);
-  trainvec_hpf150 = surf_train_120_hpf150(1:NtrainVec,1:K);
-  testvec_hpf150 = surf_all_hpf150(1:NtestVec,1:K);
+  trainvec = surf_train_120_hpf150(1:NtrainVec,1:K);
+  testvec = surf_all_hpf150(1:NtestVec,1:K);
+
+  % build up a big array of tests to run ------------------------
 
   sim_in.trainvec = trainvec; sim_in.testvec = testvec; 
   sim_in.Nvec = 64; 
   sim_in.train_func_short = "mse"; 
-  sim_in.tests = ["mse"; "gain"; "mag"];
+  sim_in.tests = ["mse"; "gain"; "mag"; "slope"];
+
+  % Test1: mse training, 64, 128, 256
+
   sim_in_vec(1:3) = sim_in;
   sim_in_vec(2).Nvec = 128; sim_in_vec(3).Nvec = 256;
 
-  [sd desc] = train_vq_and_run_tests(sim_in(1));
-  
-  desc
+  test_list = sim_in_vec;
 
-#{
-  sd =  pararrayfun(num_cores, @three_tests, sim_in_vec);
-  plot_sd_results("MSE Training", 1, 0, sd)
+  % Test2: gain training, 64, 128, 256
 
-  for i=1:3, sim_in_vec(i).trainvec = trainvec_hpf150; sim_in_vec(i).testvec = testvec_hpf150; end;
-  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
-  plot_sd_results("MSE training 150Hz HPF", 2, 9, sd)
+  for i=1:3, sim_in_vec(i).train_func_short = "gain"; end;
+  test_list = [test_list sim_in_vec];
 
-  for i=1:3, sim_in_vec(i).train_func = 'vq_search_gain'; end;
-  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
-  plot_sd_results("Gain training 150Hz HPF", 3, 18, sd)
+  % Test3: mag training, 64, 128, 256
 
-  for i=1:3, sim_in_vec(i).train_func = 'vq_search_mse'; end;
-  sd = [sd pararrayfun(num_cores, @three_tests, sim_in_vec)];
-  plot_sd_results("Mag training 150Hz HPF", 4, 27, sd)
+  for i=1:3, sim_in_vec(i).train_func_short = "mag"; end;
+  test_list = [test_list sim_in_vec];
 
-  plot_sd_results2("Mag search 150Hz HPF", 5, sd)
-  
-  figure(6); clf; compare_hist("Mag search Nvec=64", sd(:,3), sd(:,12), sd(:,21));
-#}
+  % Test4: slope training, 64, 128, 256
+
+  for i=1:3, sim_in_vec(i).train_func_short = "slope"; end;
+  test_list = [test_list sim_in_vec];
+
+  % run test list in parallel
+
+  [sd desc] =  pararrayfun(num_cores, @train_vq_and_run_tests, test_list);
+
+  % Plot results -----------------------------------------------
+
+  fg = 1;
+  plot_sd_results(fg++, "MSE Training", sd, desc, "mse", ["mse"; "gain"; "mag"; "slope"]);
+  plot_sd_results(fg++, "Gain Training", sd, desc, "gain", ["mse"; "gain"; "mag"; "slope"]);
+  plot_sd_results(fg++, "Mag Training", sd, desc, "mag", ["mse"; "gain"; "mag"; "slope"]);
+  plot_sd_results(fg++, "Slope Training", sd, desc, "slope", ["mse"; "gain"; "mag"; "slope"]);
+  plot_sd_results(fg++, "Slope Searching", sd, desc, ["mse"; "gain"; "mag"; "slope"], "slope");
+
+  % histogram of results from Nvec=64, all training methods, slope search
+
+  testnum = search_tests_Nvec(sd, desc, "mse", "slope", 64);
+  hist_sd = sd(:,testnum); hist_desc = desc(testnum);
+  testnum = search_tests_Nvec(sd, desc, "gain", "slope", 64);
+  hist_sd = [hist_sd sd(:,testnum)]; hist_desc = [hist_desc desc(testnum)];
+  testnum = search_tests_Nvec(sd, desc, "mag", "slope", 64);
+  hist_sd = [hist_sd sd(:,testnum)]; hist_desc = [hist_desc desc(testnum)];
+  testnum = search_tests_Nvec(sd, desc, "slope", "slope", 64);
+  hist_sd = [hist_sd sd(:,testnum)]; hist_desc = [hist_desc desc(testnum)];
+  compare_hist(fg, "Histogram of SDs Nvec=64", hist_sd, hist_desc);
+
 endfunction
 
 
@@ -467,6 +561,43 @@ function test_training_mag
 endfunction
 
 
+function test_training_slope
+  K = 40; NtrainVec = 5; Nvec = 1;  
+
+  % Given a vector x, create a set of training data y = m*x + c + sl, where:
+  %  x is a vector
+  %  c is a constant offset
+  %  m is a magnitude multiplier on all elements of x
+  %  sl is a linear slope vector
+
+  load surf_all;
+  prototype = surf_all(73,:);
+  trainvec = zeros(NtrainVec,K);
+  for v=1:NtrainVec
+    trainvec(v,:) = 2*prototype + 1 + v*(1:K);
+   end
+  figure(1); clf; plot(trainvec');
+
+  [idx vq]  = kmeans2(trainvec, Nvec, 
+                      "start", "first", 
+                      "search_func", "vq_search_slope");
+
+  
+  [idx contrib errors test_ g mg sl] = vq_search_slope(prototype, trainvec)
+  
+  % todo: how to auto test?  Need to solve same euqations?
+#{
+  tol = 0.001; ok = 0;
+  for i=1:Nvec
+    diff = vq(i,:) - [1 1 1];
+    if std(diff) < tol, ok++; end;
+    diff = vq(i,:) - [1 0 -1];
+    if std(diff) < tol, ok++; end;
+  end
+  if ok == 2, printf("gain: OK\n"); end;
+#}
+endfunction
+
 % ---------------------------------------------------------
 
 format; more off;
@@ -474,8 +605,8 @@ rand('seed',1);    % kmeans using rand for initial population,
                    % we want same results on every run
 
 %short_detailed_test('vq_search_mag', 'vq_search_mag');
-sd = long_tests(quick_check=1);
-%test_training_mag
+[sd desc] = long_tests(quick_check=0);
+%test_training_slope
 
 
 
