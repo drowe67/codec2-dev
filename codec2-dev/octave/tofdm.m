@@ -34,7 +34,7 @@ end
 % Channel simulation ----------------------------------------------
 
 rx_log = sample_clock_offset(tx_log, sample_clock_offset_ppm);
-rx_log = freq_shift(rx_log, .01f, Fs);
+rx_log = freq_shift(rx_log, .01, Fs);
 
 % Rx ---------------------------------------------------------------
 
