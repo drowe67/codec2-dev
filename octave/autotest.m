@@ -81,4 +81,34 @@ function check(a, b, test_name, tol, its_an_angle = 0)
   end
 endfunction
 
+function check_no_abs(a, b, test_name)
+  global passes;
+  global fails;
+
+  tol = 1E-3;
+
+  [m n] = size(a);
+  if m > n
+    ll = m;
+  else
+    ll = n;
+  end
+
+  printf("%s", test_name);
+  for i=1:(25-length(test_name))
+    printf(".");
+  end
+  printf(": ");  
+  
+  e = sum(sum(a - b)/ll);
+
+  if e < tol
+    printf("OK\n");
+    passes++;
+  else
+    printf("FAIL (%f)\n",e);
+    fails++;
+  end
+endfunction
+
 

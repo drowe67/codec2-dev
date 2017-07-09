@@ -31,6 +31,15 @@ function two_bits = qpsk_demod(symbol)
     two_bits = [bit1 bit0];
 endfunction
 
+function out = freq_shift(in, foff, Fs)
+  foff_rect = exp(j*2*pi*foff/Fs);
+  foff_phase_rect = exp(j*0);
+  
+  for r=1:length(in)
+    foff_phase_rect *= foff_rect;
+    out(r) = in(r)*foff_phase_rect;
+  end
+endfunction
 
 % Correlates the OFDM pilot symbol samples with a window of received
 % samples to determine the most likely timing offset.  Combines two

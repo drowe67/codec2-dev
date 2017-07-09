@@ -39,11 +39,78 @@
 #include "codec2_ofdm.h"
 #include "octave.h"
 #include "test_bits_ofdm.h"
+#include "comp_prim.h"
 
 #define NFRAMES 30
 #define SAMPLE_CLOCK_OFFSET_PPM 100
 
-int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm);
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: fs_offset()
+  AUTHOR......: David Rowe
+  DATE CREATED: May 2015
+
+  Simulates small Fs offset between mod and demod.
+
+\*---------------------------------------------------------------------------*/
+
+static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
+    float f;
+    int   t1, t2;
+
+    float tin = 0.0f;
+    int tout = 0;
+
+    while (tin < n) {
+      t1 = floorf(tin);
+      t2 = ceilf(tin);
+      f = tin - t1;
+
+      out[tout].real = (1.0f - f) * in[t1].real + f * in[t2].real;
+      out[tout].imag = (1.0f - f) * in[t1].imag + f * in[t2].imag;
+
+      tout += 1;
+      tin  += 1.0f + sample_rate_ppm / 1E6f;
+    }
+
+    return tout;
+}
+
+#ifndef ARM_MATH_CM4
+  #define SINF(a) sinf(a)
+  #define COSF(a) cosf(a)
+#else
+  #define SINF(a) arm_sin_f32(a)
+  #define COSF(a) arm_cos_f32(a)
+#endif
+
+/*---------------------------------------------------------------------------*\
+
+  FUNCTION....: freq_shift()
+  AUTHOR......: David Rowe
+  DATE CREATED: 26/4/2012
+
+  Frequency shift modem signal.  The use of complex input and output allows
+  single sided frequency shifting (no images).
+
+\*---------------------------------------------------------------------------*/
+
+static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin) {
+    float temp = (TAU * foff / OFDM_FS);
+    COMP  foff_rect = { COSF(temp), SINF(temp) };
+    int   i;
+
+    for (i = 0; i < nin; i++) {
+	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
+	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
+    }
+
+    /* normalise digital oscillator as the magnitude can drift over time */
+
+    float mag = cabsolute(*foff_phase_rect);
+    foff_phase_rect->real /= mag;
+    foff_phase_rect->imag /= mag;
+}
 
 int main(int argc, char *argv[])
 {
@@ -74,7 +141,8 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f,i,j;
 
-    ofdm = ofdm_create(); assert(ofdm != NULL);
+    ofdm = ofdm_create();
+    assert(ofdm != NULL);
 
     /* Main Loop ---------------------------------------------------------------------*/
 
@@ -99,7 +167,13 @@ int main(int argc, char *argv[])
 	                        Channel
     \*---------------------------------------------------------*/
 
-    cohpsk_fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
+    fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
+
+    float foff = 0.01f;
+    COMP foff_phase_rect = {1.0f, 0.0f};
+
+    freq_shift(rx_log, rx_log, foff, &foff_phase_rect, samples_per_frame * NFRAMES);
+
 
     /* --------------------------------------------------------*\
 	                        Demod
@@ -227,35 +301,5 @@ int main(int argc, char *argv[])
     ofdm_destroy(ofdm);
 
     return 0;
-}
-
-/*---------------------------------------------------------------------------*\
-
-  FUNCTION....: cohpsk_fs_offset()
-  AUTHOR......: David Rowe
-  DATE CREATED: May 2015
-
-  Simulates small Fs offset between mod and demod.
-
-\*---------------------------------------------------------------------------*/
-
-int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
-{
-    double tin, f;
-    int   tout, t1, t2;
-
-    tin = 0.0; tout = 0;
-    while (tin < n) {
-      t1 = floor(tin);
-      t2 = ceil(tin);
-      f = tin - t1;
-      out[tout].real = (1.0-f)*in[t1].real + f*in[t2].real;
-      out[tout].imag = (1.0-f)*in[t1].imag + f*in[t2].imag;
-      tout += 1;
-      tin  += 1.0 + sample_rate_ppm/1E6;
-      //printf("tin: %f tout: %d f: %f\n", tin, tout, f);
-    }
-
-    return tout;
 }
 
