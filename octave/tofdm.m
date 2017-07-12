@@ -6,7 +6,7 @@
 % ------------------------------------------------------------------
 
 Nframes = 30;
-sample_clock_offset_ppm = 100.0;
+sample_clock_offset_ppm = 100;
 
 more off; format;
 ofdm_lib;
@@ -34,7 +34,6 @@ end
 % Channel simulation ----------------------------------------------
 
 rx_log = sample_clock_offset(tx_log, sample_clock_offset_ppm);
-rx_log = freq_shift(rx_log, .01, Fs);
 
 % Rx ---------------------------------------------------------------
 
@@ -65,7 +64,7 @@ for f=1:Nframes
   % insert samples at end of buffer, set to zero if no samples
   % available to disable phase estimation on future pilots on last
   % frame of simulation
-
+ 
   nin = states.nin;
   lnew = min(Nsam-prx+1,nin);
   rxbuf_in = zeros(1,nin);
@@ -99,7 +98,7 @@ end
 % Override default path by setting path_to_tofdm = "/your/path/to/tofdm"
 
 if exist("path_to_tofdm", "var") == 0
-   path_to_tofdm = "/home/ssampson/testing/tofdm";
+   path_to_tofdm = "../build_linux/unittest/tofdm";
 end
 system(path_to_tofdm);
 
