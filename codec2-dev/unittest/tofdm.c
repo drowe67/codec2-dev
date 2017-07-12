@@ -51,26 +51,28 @@
   DATE CREATED: May 2015
 
   Simulates small Fs offset between mod and demod.
+  (Note: Won't work with float, works OK with double)
 
 \*---------------------------------------------------------------------------*/
 
 static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
-    float f;
-    int   t1, t2;
+    double f;
+    int t1, t2;
 
-    float tin = 0.0f;
+    double tin = 0.0;
     int tout = 0;
 
-    while (tin < n) {
-      t1 = floorf(tin);
-      t2 = ceilf(tin);
-      f = tin - t1;
+    while (tin < (double) n) {
+      t1 = (int) floor(tin);
+      t2 = (int) ceil(tin);
 
-      out[tout].real = (1.0f - f) * in[t1].real + f * in[t2].real;
-      out[tout].imag = (1.0f - f) * in[t1].imag + f * in[t2].imag;
+      f = (tin - (double) t1);
+
+      out[tout].real = (1.0 - f) * in[t1].real + f * in[t2].real;
+      out[tout].imag = (1.0 - f) * in[t1].imag + f * in[t2].imag;
 
       tout += 1;
-      tin  += 1.0f + sample_rate_ppm / 1E6f;
+      tin  += 1.0 + sample_rate_ppm / 1E6;
     }
 
     return tout;
@@ -173,7 +175,6 @@ int main(int argc, char *argv[])
     COMP foff_phase_rect = {1.0f, 0.0f};
 
     freq_shift(rx_log, rx_log, foff, &foff_phase_rect, samples_per_frame * NFRAMES);
-
 
     /* --------------------------------------------------------*\
 	                        Demod
