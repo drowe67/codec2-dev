@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: tcohpsk.c
+  FILE........: tofdm.c
   AUTHORS.....: David Rowe & Steve Sampson
   DATE CREATED: June 2017
 
@@ -43,6 +43,7 @@
 
 #define NFRAMES 30
 #define SAMPLE_CLOCK_OFFSET_PPM 100
+#define FOFF_HZ 0.5f
 
 /*---------------------------------------------------------------------------*\
 
@@ -171,10 +172,9 @@ int main(int argc, char *argv[])
 
     fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
 
-    float foff = 0.01f;
     COMP foff_phase_rect = {1.0f, 0.0f};
 
-    freq_shift(rx_log, rx_log, foff, &foff_phase_rect, samples_per_frame * NFRAMES);
+    freq_shift(rx_log, rx_log, FOFF_HZ, &foff_phase_rect, samples_per_frame * NFRAMES);
 
     /* --------------------------------------------------------*\
 	                        Demod

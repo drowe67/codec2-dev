@@ -7,6 +7,7 @@
 
 Nframes = 30;
 sample_clock_offset_ppm = 100;
+foff_hz = 0.5;
 
 more off; format;
 ofdm_lib;
@@ -34,7 +35,7 @@ end
 % Channel simulation ----------------------------------------------
 
 rx_log = sample_clock_offset(tx_log, sample_clock_offset_ppm);
-rx_log = freq_shift(rx_log, .01, Fs);
+rx_log = freq_shift(rx_log, foff_hz, Fs);
 
 % Rx ---------------------------------------------------------------
 
