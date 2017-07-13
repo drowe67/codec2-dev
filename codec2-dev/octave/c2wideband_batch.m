@@ -26,20 +26,13 @@
       $ octave
       octave:1> c2wideband_batch("../build_linux/src/speech", "mode", "generate map")
 
-    Then to run bathc simulation and generate output speech:
+    Then to run batch simulation and generate output speech:
    
        octave:1> c2wideband_batch("../build_linux/src/speech");
 
       ~/codec2-dev/build_linux/src$ ./c2sim ~/Desktop/c2_hd/speech_orig_16k.wav --Fs 16000 --phase0 --postfilter --amread speech_am.out --hmread speech_hm.out -o | play -t raw -r 16000 -s -2 - 
 #}
 
-#{
-  TODO:
-    [ ] how to generate dct coeff readout map for wideband
-        + maybe sep function
-        + save map as disk file for sucessive runs
-        + document process, special mode
-#}
 
 function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
   newamp;
