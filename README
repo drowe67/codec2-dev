@@ -1,14 +1,17 @@
 Codec 2 README
 --------------
 
-Codec 2 is an open source (LGPL licensed) speech codec for 3200 bit/s
-and below.  For more information please see:
+Codec 2 is an open source (LGPL 2.1) low bit rate speech codec:
 
     http://rowetel.com/codec2.html
 
-Also included is a FDMDV modem (README_fdmdv.txt), a coherent PSK
-modem and an API for embedding FreeDV in other programs (see example
-below).  For more information on building Codec 2 see README.cmake
+Also included:
+
+  + FDMDV modem (README_fdmdv.txt) for HF channels
+  + Coherent PSK (cohpsk) for HF channels
+  + FSK modem (README_fsk.txt) for VHF channels
+  + an OFDM modem for HF channels (ofdm)
+  + the FreeDV API - a library for embedding FreeDV in other programs
 
 SVN Repository
 --------------
@@ -17,27 +20,17 @@ Check out the latest (development branch) code using:
 
   $ svn co https://svn.code.sf.net/p/freetel/code/codec2-dev codec2-dev
 
-There are 3rd party GIT mirrors of Codec2 and FreeDV. Use Git at your
-own risk.
+There are unauthorised 3rd party GIT mirrors of Codec 2.
 
   GIT IS NOT SUPPORTED!!!
 
 All patches, support questions etc, need to be against the SVN
 repository above.
 
-Please do not email me (David), or the codec2-dev mailing list
-suggesting we change to Git.  I get these emails every week.  Really,
-I understand the arguments, but am content with SVN for now.
-
 Quickstart
 ----------
 
-Refer to INSTALL for more general building and installing instructions.
-
-NOTE: You may not have the necessary speex libraries installed. Some
-      distributions may have packages available 
-      i.e. sudo apt-get install speex-*
-      alternatively, visit http://www.speex.org and follow the instructions
+Also see INSTALL for more general building and installing instructions. 
 
 1/ Listen to Codec 2:
 
@@ -121,7 +114,10 @@ Debugging
 Building Unit Tests
 -------------------
 
-The unittests are no longer built by default.  To build them:
+The unittests are no longer built by default.  They require
+libsamplerate and Speex.
+
+To build them:
 
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
@@ -129,18 +125,33 @@ The unittests are no longer built by default.  To build them:
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
   $ make
 
-
 Directories
 -----------
 
-  asterisk &  - unmaintained Asterisk support
-  asterisk-11 
   cmake       - cmake support files
   octave      - Octave scripts used to support development
   script      - shell scripts for playing and converting raw files
   src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
   raw         - speech files in raw format (16 bits signed linear 8 kHz)
-  stm32       - Support for the STM32F4 microcontroller and SM1000 FreeDV Adaptor
+  stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor
   unittest    - unit test source code
   wav         - speech files in wave file format
+
+Octave Packages
+---------------
+
+To run the Octave scripts the following libraries are required:
+
+Package Name  | Version | Installation directory
+--------------+---------+-----------------------
+     control *|   2.6.2 | /usr/share/octave/packages/control-2.6.2
+     general *|   1.3.4 | /usr/share/octave/packages/general-1.3.4
+    parallel *|   2.2.0 | /usr/share/octave/packages/parallel-2.2.0
+        plot *|   1.1.0 | /usr/share/octave/packages/plot-1.1.0
+      signal *|   1.2.2 | /usr/share/octave/packages/signal-1.2.2
+     specfun *|   1.1.0 | /usr/share/octave/packages/specfun-1.1.0
+
+These can be installed using your systems package management system or
+the Octave package management system.  The version number of each
+package is not important.
 
