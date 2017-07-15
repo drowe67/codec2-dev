@@ -191,7 +191,6 @@ endfunction
 function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
   newamp;
   c2wideband_const;
-  dist_dB = 2; % use enough coefficients to get this distortion ond DCT coeffs
 
   [frames nc] = size(model);
 
@@ -199,12 +198,6 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
 
   Nblocks = floor(frames/(Nt*dec));
   %printf("frames: %d Nblocks: %d\n", frames, Nblocks);
-
-  % init a bunch of output variables
-
-  rate_K_surface_ = zeros(Nblocks*Nt*dec, K);  
-  sumnz = zeros(1,Nblocks);
-  dct2_sd = zeros(1,Nblocks);
 
   % map that defines order we read out and quantise DCT coeffs
   % TODO: for C port we need an Octave function to write Map to a C
@@ -225,16 +218,64 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
 
   % per-block processing ----------------------------------------------------
 
+  % init a bunch of output variables
+
+  rate_K_surface_ = zeros(Nblocks*Nt*dec, K);  
+  sumnz = zeros(1,Nblocks);
+  dct2_sd = zeros(1,Nblocks);
+  model_ = [];
+
   for n=1:Nblocks
     st = (n-1)*dec*Nt+1; en = st + dec*Nt - 1;
-    printf("st: %d en: %d\n", st, en);
+    %printf("st: %d en: %d\n", st, en);
+
+    [model_block_ adct2_sd qn rate_K_surface_block rate_K_surface_block_] = wideband_enc_dec(model(st:en,:), rmap, cmap);
+
+    model_ = [model_; model_block_];
+
+    % log these for plotting/development
+
+    rate_K_surface(st:en,:) = rate_K_surface_block;
+    rate_K_surface_(st:en,:) = rate_K_surface_block_;
+    dct2_sd(n) = adct2_sd;
+    sumnz(n) = qn;
+  end
+
+  if plots
+    figure(4); clf; plot(sumnz); hold on; 
+    plot([1 length(sumnz)],[mean(sumnz) mean(sumnz)]); hold off; title('Non Zero');
+    figure(5); clf; plot(dct2_sd); title('DCT SD');
+  end
+  printf("average dct spectral distortion: %3.2f dB\n", mean(dct2_sd));
+  printf("mean number of coeffs/DCT: %3.2f/%d\n", mean(sumnz), Nt*K);
+  printf("coeffs/second: %3.2f\n", mean(sumnz)/(Nt*Tf*dec));
+  printf("bits/s: %3.2f\n", 2.9*mean(sumnz)/(Nt*Tf*dec));
+
+  % this measure just works on 20ms frames, not sure if that's correct
+
+  dist = std((rate_K_surface_(1:dec:Nblocks*Nt*dec,:) - rate_K_surface(1:dec:Nblocks*Nt*dec,:))');
+  
+  if plots
+    figure(1); clf; plot(dist); title('Rate K SD');
+    printf("Rate K spectral distortion mean: %3.2f dB var: %3.2f\n", mean(dist), var(dist));
+  end
+endfunction
+
+
+% Encode/decoder a 160ms block of model parameters
+% TODO: (i) quantisation of DCT coeffs (ii) break into separate encoder and decoder functions
+
+function [model_block_ dct2_sd qn rate_K_surface_block rate_K_surface_block_] = wideband_enc_dec(model_block, rmap, cmap)
+    c2wideband_const;
+
+    sim_quant = 1; % used to simulate quantisation, set to 1,2,4, etc
+    dist_dB   = 2; % use enough coefficients to get this distortion ond DCT coeffs
 
     % Resample variable rate L vectors to fixed length rate K.  We have
     % left high end correction out for now, this is less of an issue
     % with a higher K
 
-    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(st:en,:), K, Fs);
-    rate_K_surface(st:en,:) = rate_K_surface_block;
+    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model_block, K, Fs);
 
     % decimate down to 20ms time resolution, and DCT
 
@@ -261,43 +302,15 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
     adct2_sd = mean(std(D-E));
     while adct2_sd > dist_dB
       qn++;
-      E(rmap(qn), cmap(qn)) = 1*round(D(rmap(qn), cmap(qn))/1);
+      E(rmap(qn), cmap(qn)) = sim_quant*round(D(rmap(qn), cmap(qn))/sim_quant);
       adct2_sd = mean(std(D-E));
       %printf("qn %d %f\n", qn, adct2_sd);
     end
-    sumnz(n) = qn;
 
     % note neat trick to interpolate to 10ms frames despite dec to 20ms, this means
     % we don't need a separate decode side interpolator.
 
+    dct2_sd = mean(std(D-E));
     rate_K_surface_block_ = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
-    rate_K_surface_(st:en,:) = rate_K_surface_block_;
-
-    dct2_sd(n) = mean(std(D-E));
-  end
-
-  if plots
-    figure(4); clf; plot(sumnz); hold on; 
-    plot([1 length(sumnz)],[mean(sumnz) mean(sumnz)]); hold off; title('Non Zero');
-    figure(5); clf; plot(dct2_sd); title('DCT SD');
-  end
-  printf("average dct spectral distortion: %3.2f dB\n", mean(dct2_sd));
-  printf("mean number of coeffs/DCT: %3.2f/%d\n", mean(sumnz), Nt*K);
-  printf("coeffs/second: %3.2f\n", mean(sumnz)/(Nt*Tf*dec));
-  printf("bits/s: %3.2f\n", 2.9*mean(sumnz)/(Nt*Tf*dec));
-
-  % prevent /0 errors at end of run
-
-  %rate_K_surface_(Nt*Nblocks+1:frames,:) = rate_K_surface(Nt*Nblocks+1:frames,:); 
-  model_ = resample_rate_L(model(1:Nblocks*Nt*dec,:), rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
-  
-  % this measure just work son 20ms frames, not sure if that's correct
-
-  dist = std((rate_K_surface_(1:dec:Nblocks*Nt*dec,:) - rate_K_surface(1:dec:Nblocks*Nt*dec,:))');
-  
-  if plots
-    figure(1); clf; plot(dist); title('Rate K SD');
-    printf("Rate K spectral distortion mean: %3.2f dB var: %3.2f\n", mean(dist), var(dist));
-  end
+    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs);
 endfunction
-
