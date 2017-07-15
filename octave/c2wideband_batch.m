@@ -87,6 +87,7 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
   end
   if strcmp(mode, "dct2")
     [model_ surface] = experiment_rate_K_dct2(model, 1);
+    frames_out = rows(model_);
   end
 
   % ----------------------------------------------------
@@ -100,7 +101,7 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
       fhm = fopen(Hm_out_name,"wb"); 
     end
 
-    for f=1:frames
+    for f=1:frames_out
       %printf("%d ", f);   
       Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
       if Wo*L > pi
@@ -167,8 +168,7 @@ endfunction
 
 function generate_map(model, K, map_filename)
   newamp; 
-
-  Fs = 16000; dec = 2; Nt = 16;
+  c2wideband_const;
 
   [frames nc] = size(model);
   surface = resample_const_rate_f_mel(model, K, Fs);
@@ -190,34 +190,27 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
   newamp;
-  [frames nc] = size(model);
-  K = 30; Fs = 16000; correct_rate_K_en = 1;
-
-  % Resample variable rate L vectors to fixed length rate K.  We have
-  % left high end correction out for now, this is less of an issue
-  % with a higher K
-
-  [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K, Fs);
-
-  % break into 160ms blocks, 2D DCT, truncate, IDCT
-
-  Tf = 0.01;   % frame period in seconds
-  Nt = 16;     % number of 10ms frames blocks in time
-  dec = 2;     % decimation factor
+  c2wideband_const;
   dist_dB = 2; % use enough coefficients to get this distortion ond DCT coeffs
 
+  [frames nc] = size(model);
+
+  % break into blocks of (Nt time samples) x (K freq samples)
+
   Nblocks = floor(frames/(Nt*dec));
-  printf("frames: %d Nblocks: %d\n", frames, Nblocks);
-
-  % map that defines order we read out and quantise DCT coeffs
-
-  map = load("c2wideband_map");
+  %printf("frames: %d Nblocks: %d\n", frames, Nblocks);
 
   % init a bunch of output variables
 
-  rate_K_surface_ = zeros(frames, K);  
+  rate_K_surface_ = zeros(Nblocks*Nt*dec, K);  
   sumnz = zeros(1,Nblocks);
   dct2_sd = zeros(1,Nblocks);
+
+  % map that defines order we read out and quantise DCT coeffs
+  % TODO: for C port we need an Octave function to write Map to a C
+  % include file
+
+  map = load("c2wideband_map");
 
   % create arrays to reverse map quantiser_num to r,c Luts
 
@@ -230,10 +223,22 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
     end
   end
 
+  % per-block processing ----------------------------------------------------
+
   for n=1:Nblocks
     st = (n-1)*dec*Nt+1; en = st + dec*Nt - 1;
-    %printf("st: %d en: %d\n", st, en);
-    D = dct2(rate_K_surface(st:dec:en,:));
+    printf("st: %d en: %d\n", st, en);
+
+    % Resample variable rate L vectors to fixed length rate K.  We have
+    % left high end correction out for now, this is less of an issue
+    % with a higher K
+
+    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(st:en,:), K, Fs);
+    rate_K_surface(st:en,:) = rate_K_surface_block;
+
+    % decimate down to 20ms time resolution, and DCT
+
+    D = dct2(rate_K_surface_block(1:dec:Nt*dec,:));
 
     % So D is the 2D block of DCT coeffs at the encoder.  We want to
     % create a quantised version at the "decoder" E.  This loop copies
@@ -265,7 +270,8 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
     % note neat trick to interpolate to 10ms frames despite dec to 20ms, this means
     % we don't need a separate decode side interpolator.
 
-    rate_K_surface_(st:en,:) = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
+    rate_K_surface_block_ = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
+    rate_K_surface_(st:en,:) = rate_K_surface_block_;
 
     dct2_sd(n) = mean(std(D-E));
   end
@@ -282,10 +288,12 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
 
   % prevent /0 errors at end of run
 
-  rate_K_surface_(dec*Nt*Nblocks+1:frames,:) = rate_K_surface(dec*Nt*Nblocks+1:frames,:); 
-  model_ = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
+  %rate_K_surface_(Nt*Nblocks+1:frames,:) = rate_K_surface(Nt*Nblocks+1:frames,:); 
+  model_ = resample_rate_L(model(1:Nblocks*Nt*dec,:), rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
   
-  dist = std((rate_K_surface_(1:dec:frames,:) - rate_K_surface(1:dec:frames,:))');
+  % this measure just work son 20ms frames, not sure if that's correct
+
+  dist = std((rate_K_surface_(1:dec:Nblocks*Nt*dec,:) - rate_K_surface(1:dec:Nblocks*Nt*dec,:))');
   
   if plots
     figure(1); clf; plot(dist); title('Rate K SD');
