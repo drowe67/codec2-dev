@@ -231,7 +231,7 @@ endfunction
 % Basic unquantised rate K linear sampling then back to rate L.  Used for generating 
 % training vectors and testing vector quntisers.
 
-function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_filename, vq_search="mse")
+function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_filename, vq_search="mse", mask_en=0)
   melvq;
   [frames nc] = size(model);
   Fs = 8000;
@@ -258,7 +258,11 @@ function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_file
   if strcmp(vq_type, "vqh")
     quant_en = 1;
     x = load(vq_filename); vq = x.vq;
-    [vq_rows vq_cols] = size(vq); vq_st = 11; vq_en = K;
+    [vq_rows vq_cols] = size(vq); vq_st = 30 - vq_cols + 1; vq_en = 30;
+  end
+
+  if quant_en
+    printf("vq_st: %d vq_en: %d\n", vq_st, vq_en);
   end
 
   energy = zeros(1,frames);
@@ -272,6 +276,24 @@ function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_file
   rate_K_surface_fit = zeros(frames,K);
   b = zeros(1,frames);
 
+  #{
+  % optional target modification using masking
+
+  if mask_en
+    for f=1:frames
+      rate_K_vec = rate_K_surface(f,:);
+      maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz, bark_model=1);
+      target = rate_K_vec;
+      mask_thresh = 6;
+      ind = find (maskdB - target > mask_thresh);
+      target(ind) = maskdB(ind) - mask_thresh;
+      rate_K_surface(f,:) = target;
+    end
+  end  
+  #}
+
+  % remove "gain" term
+
   for f=1:frames
     b(f) = mean(rate_K_surface(f,:));
     rate_K_surface_fit(f,:) = rate_K_surface(f,:) - b(f);
@@ -284,6 +306,27 @@ function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_file
     rate_K_surface_fit_ = rate_K_surface_fit;
     res = zeros(frames, vq_cols); ind = [];
 
+    if strcmp(vq_search, "mse")
+      [idx contrib errors test_ g mg sl] = vq_search_mse(vq, rate_K_surface_fit(:,vq_st:vq_en));
+    end
+
+    if strcmp(vq_search, "gain")
+      [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_fit(:,vq_st:vq_en));
+    end
+
+    if strcmp(vq_search, "sg")
+      [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_fit(:,vq_st:vq_en));
+    end
+
+    if strcmp(vq_search, "slope")
+      [idx contrib errors test_ g mg sl] = vq_search_slope(vq, rate_K_surface_fit(:,vq_st:vq_en));
+    end
+
+    rate_K_surface_fit_(:, vq_st:vq_en) = contrib;
+    res(:, vq_st:vq_en) = rate_K_surface_fit(:, vq_st:vq_en) - contrib;
+    ind = idx;
+
+    #{
     for f=1:frames
       target = rate_K_surface_fit(f, vq_st:vq_en);
 
@@ -297,10 +340,20 @@ function [model_ rate_K_surface] = experiment_const_freq(model, vq_type, vq_file
         rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
       end
       
-      res(f, vq_st:vq_en) = target - contrib;
-      ind = [ind idx];
     end
-    
+    #}
+
+    if strcmp(vq_search, "slope")
+
+    hmg = hsl = zeros(1,frames);
+    for f=1:frames
+      hmg(f) = mg(f, idx(f));
+      hsl(f) = sl(f, idx(f));
+    end
+    figure(fg++); clf; hist(hmg, 30);
+    figure(fg++); clf; hist(hsl, 30);
+    end
+
     figure(fg++); clf; mesh(res);
     sd_per_frame = std(res(:,vq_st:vq_en)');
     figure(fg++); subplot(211); plot(energy); subplot(212); plot(sd_per_frame);
