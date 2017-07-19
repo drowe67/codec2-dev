@@ -98,11 +98,13 @@ int main(int argc, char *argv[])
     else if (strcmp(argv[1],"700") == 0)
 	mode = CODEC2_MODE_700;
     else if (strcmp(argv[1],"700B") == 0)
-	mode = CODEC2_MODE_700B;
-     else if (strcmp(argv[1],"700C") == 0)
+	mode = CODEC2_MODE_700B; 
+    else if (strcmp(argv[1],"700C") == 0)
 	mode = CODEC2_MODE_700C;
+    else if (strcmp(argv[1],"WB") == 0)
+	mode = CODEC2_MODE_WB;
    else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B or 700C\n", argv[1]);
+	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C or WB\n", argv[1]);
 	exit(1);
     }
     bit_rate = atoi(argv[1]);
@@ -320,7 +322,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 	int i;
 	char *option_parameters;
 	fprintf(stderr, "\nc2dec - Codec 2 decoder and bit error simulation program\n"
-		"usage: %s 3200|2400|1600|1400|1300|1200|700|700B InputFile OutputRawFile [OPTIONS]\n\n"
+		"usage: %s 3200|2400|1600|1400|1300|1200|700|700B|WB InputFile OutputRawFile [OPTIONS]\n\n"
                 "Options:\n", argv[0]);
         for(i=0; i<num_opts-1; i++) {
 		if(long_options[i].has_arg == no_argument) {
