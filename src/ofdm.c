@@ -40,8 +40,8 @@
 
 /* Static Prototypes */
 
-static void matrix_vector_multiply(struct OFDM *, complex float *, complex float *);
-static void matrix_vector_conjugate_multiply(struct OFDM *, complex float *, complex float *);
+static void dft(struct OFDM *, complex float *, complex float *);
+static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
@@ -96,7 +96,7 @@ static void qpsk_demod(complex float symbol, int *bits) {
 
 /* convert frequency domain into time domain */
 
-static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
+static void idft(struct OFDM *ofdm, complex float *result, complex float *vector) {
     int row, col;
 
     for (row = 0; row < OFDM_M; row++) {
@@ -110,7 +110,7 @@ static void matrix_vector_multiply(struct OFDM *ofdm, complex float *result, com
 
 /* convert time domain into frequency domain */
 
-static void matrix_vector_conjugate_multiply(struct OFDM *ofdm, complex float *result, complex float *vector) {
+static void dft(struct OFDM *ofdm, complex float *result, complex float *vector) {
     int row, col;
 
     for (col = 0; col < (OFDM_NC + 2); col++) {
@@ -215,7 +215,7 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
     /* OFDM up-convert symbol by symbol so we can add CP */
 
     for (i = 0, m = 0; i < OFDM_NS; i++, m += (OFDM_M + OFDM_NCP)) {
-        matrix_vector_multiply(ofdm, asymbol, aframe[i]);
+        idft(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp columns to the front */
 
@@ -302,7 +302,7 @@ struct OFDM *ofdm_create() {
 
     complex float temp[OFDM_M];
 
-    matrix_vector_multiply(ofdm, temp, ofdm->pilots);
+    idft(ofdm, temp, ofdm->pilots);
 
     /*
      * pilot_samples is 160 samples, as we copy the last 16 to the front
@@ -541,7 +541,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      *
      */
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[0], work);
+    dft(ofdm, ofdm->rx_sym[0], work);
 
     /*
      * "This" pilot comes after the extra symbol alloted at the top, and after
@@ -592,7 +592,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
          * |                      |  rx_sym[10]
          */
 
-        matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[rr + 1], work);
+        dft(ofdm, ofdm->rx_sym[rr + 1], work);
     }
 
     /*
@@ -623,11 +623,11 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * +----------------------+
      */
 
-    matrix_vector_conjugate_multiply(ofdm, ofdm->rx_sym[OFDM_NS + 2], work);
+    dft(ofdm, ofdm->rx_sym[OFDM_NS + 2], work);
 
     /*
      * We are finished now with the DFT and down conversion
-     * From here on down we are in baseband frequency domain
+     * From here on down we are in frequency domain
      */
 
     /* est freq err based on all carriers ------------------------------------ */
