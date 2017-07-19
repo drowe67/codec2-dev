@@ -42,6 +42,7 @@
 #define CODEC2_MODE_700  6
 #define CODEC2_MODE_700B 7
 #define CODEC2_MODE_700C 8
+#define CODEC2_MODE_WB 9
 
 struct CODEC2;
 

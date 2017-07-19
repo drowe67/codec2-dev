@@ -48,7 +48,7 @@
 #include "machdep.h"
 #include "bpf.h"
 #include "bpfb.h"
-
+#include "c2wideband.h"
 /*---------------------------------------------------------------------------*\
 
                              FUNCTION HEADERS
@@ -103,7 +103,7 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-    if (!((mode >= 0) && (mode <= CODEC2_MODE_700C))) {
+    if (!((mode >= 0) && (mode <= CODEC2_MODE_WB))) {
         return NULL;
     }  
 
@@ -264,6 +264,9 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 	return 28;
     if  (c2->mode == CODEC2_MODE_700C)
 	return 28;
+    //TODO: verify this
+    if (c2->mode == CODEC2_MODE_WB)
+	return 64;
 
     return 0; /* shouldn't get here */
 }
@@ -298,7 +301,8 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 320;
     if  (c2->mode == CODEC2_MODE_700C)
 	return 320;
-
+    if  (c2->mode == CODEC2_MODE_WB)
+	return 160;
     return 0; /* shouldnt get here */
 }
 
@@ -327,6 +331,9 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
     if (c2->mode == CODEC2_MODE_700C)
 	codec2_encode_700c(c2, bits, speech);
 #endif
+    if (c2->mode == CODEC2_MODE_WB)
+	codec2_encode_wb(c2, bits, speech);
+
 }
 
 void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
@@ -359,6 +366,8 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
     if (c2->mode == CODEC2_MODE_700C)
  	codec2_decode_700c(c2, speech, bits);
 #endif
+    if (c2->mode == CODEC2_MODE_WB)
+ 	codec2_decode_wb(c2, speech, bits);
 }
 
 

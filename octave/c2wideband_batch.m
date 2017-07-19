@@ -197,7 +197,8 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
   % break into blocks of (Nt time samples) x (K freq samples)
 
   Nblocks = floor(frames/(Nt*dec));
-  %printf("frames: %d Nblocks: %d\n", frames, Nblocks);
+  
+  printf("frames: %d Nblocks: %d\n", frames, Nblocks);
 
   % map that defines order we read out and quantise DCT coeffs
   % TODO: for C port we need an Octave function to write Map to a C

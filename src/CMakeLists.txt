@@ -66,6 +66,13 @@ set(CODEBOOKSNEWAMP1_ENERGY
     ${D}/newamp1_energy_q.txt
 )
 
+
+# generated wideband map
+set(C2WB_MAP
+    ${D}/c2wideband_map.txt
+)
+
+
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
     include(ExternalProject)
@@ -146,6 +153,40 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSNEWAMP1_ENERGY}
 )
 
+
+
+# when crosscompiling we need a native executable
+if(CMAKE_CROSSCOMPILING)
+    include(ExternalProject)
+    ExternalProject_Add(codec2_native
+       SOURCE_DIR ${CMAKE_SOURCE_DIR}
+       BUILD_COMMAND $(MAKE) generate_wideband_map
+       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_wideband_map ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    add_executable(generate_wideband_map IMPORTED)
+    set_target_properties(generate_wideband_map PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_wideband_map)
+    add_dependencies(generate_wideband_map codec2_native)
+else(CMAKE_CROSSCOMPILING)
+# Build code generator binaries. These do not get installed.
+    # generate_codebook
+    add_executable(generate_wideband_map generate_wideband_map.c)
+    target_link_libraries(generate_wideband_map ${CMAKE_REQUIRED_LIBRARIES})
+    # Make native builds available for cross-compiling.
+    export(TARGETS generate_wideband_map
+        FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
+endif(CMAKE_CROSSCOMPILING)
+
+
+# c2wideband_map.h
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/c2wideband_map.h
+    COMMAND generate_wideband_map c2wideband_map ${C2WB_MAP} > ${CMAKE_CURRENT_BINARY_DIR}/c2wideband_map.h
+    DEPENDS generate_wideband_map ${C2WB_MAP}
+)
+
+
+
 #
 # codec2 library sources
 #
@@ -188,6 +229,7 @@ set(CODEC2_SRCS
     freedv_data_channel.c
     varicode.c
     modem_stats.c
+    c2wideband.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
