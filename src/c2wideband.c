@@ -60,11 +60,8 @@ void diff_de(int rows, int cols, float D[rows][cols], float E[rows][cols], float
 void array_col_to_row(int rows, int cols, float data[rows][cols], int col, float res[]);
 void std_on_cols(int rows, int cols, float data[rows][cols], float res[]);
 void setup_map(WIDEBAND_MAP * wb_map, int Nt, int K);
+
 #define C2WB_PLOT
-#ifdef C2WB_PLOT
-static int total_frames;
-static int curr_block_pos;
-#endif
 
 
 //TODO: move all this to the standard codec2.c functions
@@ -402,6 +399,8 @@ void idct2(int rows, int cols, float inrks[rows][cols], float rate_K_surface_blo
 void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block_frames], WIDEBAND_MAP * wb_map,
         MODEL model_block_[n_block_frames], float dct2_sd[n_block_frames], int * p_qn, float rate_K_surface_block[n_block_frames][C2WB_K], float rate_K_surface_block_[n_block_frames][C2WB_K]) {
 
+  
+  //printf("starting wideband_enc_dec with model_block[0]->L = %d\n", model_block[0].L);
   //    c2wideband_const;
   //
   //    sim_quant = 1; % used to simulate quantisation, set to 1,2,4, etc
@@ -419,10 +418,10 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
   int rows = Nt;
   int cols = K;
   int dec = C2WB_DEC;
-  printf("starting iteration\n");
+  //printf("starting iteration\n");
   // iterate through the frames in the block
   for (int f = 0; f < n_block_frames; f++) {
-    printf("processing frame %d of %d\n", f, n_block_frames);
+    //printf("processing frame %d of %d\n", f, n_block_frames);
 
     float rate_K_sample_freqs_kHz[C2WB_K];
     //MODEL * model = &model_block[f];
@@ -434,7 +433,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
 
 
     //    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model_block, K, Fs);
-    printf("resample_const_rate_f_mel\n");
+    //printf("resample_const_rate_f_mel\n");
     resample_const_rate_f_mel(c2const, &model_block[f], K, rate_K_surface_block[f], rate_K_sample_freqs_kHz);
 
     //    % decimate down to 20ms time resolution, and DCT
@@ -443,7 +442,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
 
     float D[rows][cols];
     float E[rows][cols];
-    printf("dct2\n");
+    //printf("dct2\n");
     dct2(rows, cols, rate_K_surface_block[f], D);
 
     //    % So D is the 2D block of DCT coeffs at the encoder.  We want to
@@ -476,7 +475,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
 
     adct2_sd = mean_std_diff_de(rows, cols, D, E);
 
-    printf("while adct2_sd > dist_dB (dist_dB=%f)\n", dist_dB);
+    //printf("while adct2_sd > dist_dB (dist_dB=%f)\n", dist_dB);
     //    while adct2_sd > dist_dB
     //TODO : validate the addition of  *p_qn limit check is correct
     while (adct2_sd > dist_dB && *p_qn < C2WB_NT) {
@@ -512,7 +511,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
     //    rate_K_surface_block_ = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
     float inrks[rows * dec][K];
 
-    printf("setting inrks\n");
+    //printf("setting inrks\n");
     for (int r = 0; r < rows; r++) {
       for (int c = 0; c < cols; c++) {
         inrks[r][c] = sqrt(dec) * E[r][c];
@@ -527,11 +526,11 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
 
     //TODO ???
     //= [sqrt(dec)*E; zeros(Nt*(dec-1), K)];
-    printf("idct2\n");
+    //printf("idct2\n");
     idct2(rows, cols, inrks, rate_K_surface_block_[f]);
 
     //    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs);        
-    printf("resample_rate_L\n");
+    //printf("resample_rate_L\n");
     resample_rate_L(c2const, &model_block[f], rate_K_surface_block_[f], rate_K_sample_freqs_kHz, K);
     //endfunction 
   }
@@ -559,7 +558,7 @@ void setup_map(WIDEBAND_MAP * wb_map, int Nt, int K) {
 
    */
 
-
+  //printf("setup_map(wb_map, Nt, K)");
   int quantiser_num;
 
   memset(wb_map->rmap, '\0', Nt * K * sizeof *wb_map->rmap);
@@ -584,55 +583,39 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
 
 //TODO - review and produce a unit test for this
 // this is really just a draft at this point
-void experiment_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], int frames, int vq_en, int plots, int* voicing, float *mean_) {
+void experiment_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], const int total_frames) {
 
-
+  printf("experiment_rate_K_dct2 with frames: %d\n", total_frames);
   //  newamp;
   //  c2wideband_const;
   //  [frames nc] = size(model);
 
-  int n_block_frames = C2WB_NT * C2WB_DEC;
+  const int n_block_frames = C2WB_NT * C2WB_DEC;
 
-  int K = C2WB_K;
-  int Nt = C2WB_NT;
-  //int dec = C2WB_DEC;    
+  const int K = C2WB_K;
+  const int Nt = C2WB_NT;
+  const int dec = C2WB_DEC;    
+  const int Tf = C2WB_TF;
   WIDEBAND_MAP wb_map;
 
-
-
-#ifdef C2WB_PLOT
-  total_frames = frames;
-#endif
 
   //  % break into blocks of (Nt time samples) x (K freq samples)
 
   // Nblocks = floor(frames/(Nt*dec));
-  // %printf("frames: %d Nblocks: %d\n", frames, Nblocks);
-  //int Nblocks = floor(frames/(Nt*dec));
+  
+  const int Nblocks = floor(total_frames/n_block_frames);
 
+  // number of frames that can be processed (if the final block is not a full set of frames)
+  int frames;
+  
+  frames = Nblocks * n_block_frames;
+  
+  printf("total_frames: %d processable frames: %d Nblocks: %d\n", total_frames, frames, Nblocks);
+  
 
   setup_map(&wb_map, Nt, K);
 
-  // Step through the model in blocks of 8 frames
-  for (int f = 0; f < frames; f += n_block_frames) {
-    MODEL * model_block = &model_frames[f];
 
-#ifdef C2WB_PLOT
-    curr_block_pos = f;
-#endif
-    rate_K_dct2(c2const, n_block_frames, model_block, &wb_map);
-
-
-  }
-
-}
-
-
-
-
-//TODO - review and produce a unit test for this
-// this is really just a draft at this point
-void rate_K_dct2(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block_frames], WIDEBAND_MAP * wb_map) {
 
   //% per-block processing ----------------------------------------------------
 
@@ -644,20 +627,13 @@ void rate_K_dct2(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block
   // model_ = [];
 
 
-  int Nblocks = n_block_frames;
-  int dec = C2WB_DEC;
-  int Nt = C2WB_NT;
-  int K = C2WB_K;
-  int Tf = C2WB_TF;
-  int rate_K_surface_size = Nblocks * Nt * dec;
-
-  float rate_K_surface_block[rate_K_surface_size][K]; // rate K vecs for each frame, form a surface that makes pretty graphs   
-  float rate_K_surface_block_[rate_K_surface_size][K];
+  float rate_K_surface_block[total_frames][K]; // rate K vecs for each frame, form a surface that makes pretty graphs   
+  float rate_K_surface_block_[total_frames][K];
 
 #ifdef C2WB_PLOT    
-  float rate_K_surface[total_frames][K];
-  float rate_K_surface_[total_frames][K];
-  MODEL model_[total_frames];
+//  float rate_K_surface[total_frames][K];
+//  float rate_K_surface_[total_frames][K];
+//  MODEL model_[total_frames];
 #endif
 
   float sumnz[Nblocks];
@@ -667,38 +643,45 @@ void rate_K_dct2(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block
   MODEL model_block_[n_block_frames];
 
   //for n=1:Nblocks
-  for (int n = 0; n < Nblocks; n++) {
+  // Step through the model in blocks of 16 frames
+  int n_block = 0;
+  
+  for (int f = 0; f < frames; f += n_block_frames) {
+    MODEL * model_block = &model_frames[f];
+
+  
     //st = (n-1)*dec*Nt+1; en = st + dec*Nt - 1;
-    int st = (n - 1) * dec * Nt + 1;
-    int en = st + dec * Nt - 1;
-    //%printf("st: %d en: %d\n", st, en);
+    //printf("st: %d en: %d\n", st, en);
+    // effectively handled by the iterations through the block in wideband_enc_dec
 
     //[model_block_ adct2_sd qn rate_K_surface_block rate_K_surface_block_] = wideband_enc_dec(model(st:en,:), rmap, cmap);
-    wideband_enc_dec(c2const, n_block_frames, model_block, wb_map,
-            model_block_, &dct2_sd[n], &qn, &rate_K_surface_block[n], &rate_K_surface_block_[n]
-            );
+//    void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block_frames], WIDEBAND_MAP * wb_map,
+//        MODEL model_block_[n_block_frames], float dct2_sd[n_block_frames], int * p_qn, float rate_K_surface_block[n_block_frames][C2WB_K], float rate_K_surface_block_[n_block_frames][C2WB_K]) {
+
+    wideband_enc_dec(c2const, n_block_frames, model_block, &wb_map,
+            model_block_, &dct2_sd[n_block], &qn, &rate_K_surface_block[f], &rate_K_surface_block_[f]);
 
 #ifdef C2WB_PLOT
     //model_ = [model_; model_block_];
-    model_[curr_block_pos + n] = model_block_[n];
-
     //% log these for plotting/development
 
     //rate_K_surface(st:en,:) = rate_K_surface_block;
     //rate_K_surface_(st:en,:) = rate_K_surface_block_;
-    int pst = 0;
-    for (int p = st; p < en; p++) {
-      for (int k = 0; k < K; k++) {
-        rate_K_surface[p][k] = rate_K_surface_block[n + pst][k];
-        rate_K_surface_[p][k] = rate_K_surface_block_[n + pst][k];
-      }
-      pst++;
-    }
+    
+//    for (int p = 0; p < n_block_frames; p++) {
+      
+//      model_[f+p] = model_block_[p];
+      
+//      for (int k = 0; k < K; k++) {
+//        rate_K_surface[f+p][k] = rate_K_surface_block[n_block + p][k];
+//        rate_K_surface_[f+p][k] = rate_K_surface_block_[n_block + p][k];
+//      }
+//    }
     //dct2_sd(n) = adct2_sd;            
-    sumnz[n] = (float) qn;
+    sumnz[n_block] = (float) qn;
     // already handled in call
 #endif
-
+    n_block++;
     //end
   }
 

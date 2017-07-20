@@ -40,11 +40,10 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
 void batch_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], int frames, int vq_en, int plots, int* voicing, float *mean_);
 void rate_K_dct2(C2CONST *c2const, int n_block_frames, MODEL model_block[n_block_frames], WIDEBAND_MAP * wb_map);
 void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[], WIDEBAND_MAP * wb_map,
-        MODEL model_block_[], float * p_dct2_sd,  int * p_qn , float rate_K_surface_block[][C2WB_K], float rate_K_surface_block_[][C2WB_K]
-        );
+        MODEL model_block_[], float * p_dct2_sd,  int * p_qn , float rate_K_surface_block[][C2WB_K], float rate_K_surface_block_[][C2WB_K]);
 void codec2_decode_wb(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_wb(struct CODEC2 *c2, unsigned char * bits, short speech[]);
-
+void experiment_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], int frames);
 
 #ifdef	__cplusplus
 extern "C" {

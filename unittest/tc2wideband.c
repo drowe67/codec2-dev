@@ -23,14 +23,19 @@ void diff_de(int rows, int cols, float D[rows][cols], float E[rows][cols], float
 void array_col_to_row(int rows, int cols, float data[rows][cols], int col, float res[]);
 void std_on_cols(int rows, int cols, float data[rows][cols], float res[]);
 float mean_std_diff_de(int rows, int cols, float D[rows][cols], float E[rows][cols]);
-void test_wideband_enc_dec();
 void setup_map(WIDEBAND_MAP * wb_map, int Nt, int K);
+
+
+void test_wideband_enc_dec();
+void test_experiment_rate_K_dct2();
 
 char *fn;
 
 void test(char * tfn) {
   fn = tfn;
+  printf("========================================\n");
   printf("test function: %s\n", fn);
+  printf("========================================\n");
 }
 
 void test_failed() {
@@ -170,7 +175,13 @@ int main(int argc, char *argv[]) {
     test_failed_f(res_msd, expected_msd);
   }
 
+  
+  
   test_wideband_enc_dec();
+
+  
+  test_experiment_rate_K_dct2();
+  
 
 
   return 1;
@@ -186,7 +197,6 @@ void test_wideband_enc_dec() {
   int nbit;
   int nsam;
   int n_block_frames = C2WB_NT * C2WB_DEC;
-  int test_me = 123;
   int K = C2WB_K;
   int Nt = C2WB_NT;
   int Fs = C2WB_FS;
@@ -237,3 +247,30 @@ void test_wideband_enc_dec() {
   printf("made it to the end\n");
 }
 
+void test_experiment_rate_K_dct2(){
+
+  test("experiment_rate_K_dct2");
+
+  const int frames = 5000;
+  
+
+  int Fs = C2WB_FS;
+  
+  //struct CODEC2 * codec2 = codec2_create(CODEC2_MODE_WB);
+  C2CONST c2const = c2const_create(Fs);
+
+  MODEL model_frames[frames];
+
+  printf("setting up random frames: %d\n", frames);
+  for (int n = 0; n < frames; n++) {
+    model_frames[n].L = 10;
+    model_frames[n].Wo = (float) rand() / RAND_MAX;
+    for (int i = 0; i < MAX_AMP + 1; i++) {
+      model_frames[n].phi[i] = (float) rand() / RAND_MAX;
+      model_frames[n].A[i] = (float) rand() / RAND_MAX;
+    }
+    model_frames[n].voiced = round((float) rand() / RAND_MAX);
+  }
+  printf("starting experiment\n");
+  experiment_rate_K_dct2(&c2const, model_frames, frames);
+}
