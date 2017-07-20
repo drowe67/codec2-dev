@@ -137,8 +137,8 @@ void codec2_decode_wb(struct CODEC2 *c2, short speech[], const unsigned char * b
 
 void calculate_Am_freqs_kHz(float Wo, int L, float Am_freqs_kHz[L]) {
   //(1:L)*Wo*4/pi;
-
-  for (int i = 0; i < L; i++) {
+  int i;
+  for (i = 0; i < L; i++) {
     Am_freqs_kHz[i] = i * Wo * 4 / PI;
   }
 }
@@ -186,14 +186,15 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
   int error_thresh = 3; //% only worry about errors larger than thresh    
 
   int closest_k = 0;
+  int i;
 
   // regenerate the AmdB values from the updated model
-  for (int i = 0; i < MAX_AMP + 1; i++) {
+  for (i = 0; i < MAX_AMP + 1; i++) {
     AmdB_[i] = 20 * log10(model->A[i]);
   }
 
   // calculate error between original AmdB and the new values
-  for (int i = 0; i < MAX_AMP + 1; i++) {
+  for (i = 0; i < MAX_AMP + 1; i++) {
     int a = orig_AmdB[i] - AmdB_[i];
     error[i] = a;
     //  orig_error[i] = a;
@@ -203,7 +204,7 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
 
   //% first 1000Hz is densely sampled so ignore
   int start_m = floor(L * 1000 / (Fs / 2));
-  for (int i = 0; i < start_m; i++) {
+  for (i = 0; i < start_m; i++) {
     error[i] = 0;
   }
   //start_m = floor(L*1000/(Fs/2));
@@ -216,17 +217,18 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
 
   // could probably memcpy this, but I need to think about it...
   // TODO copy??
-  for (int i = 0; i < K; i++) {
+  for (i = 0; i < K; i++) {
     //rate_K_vec_corrected = rate_K_vec
     rate_K_vec_corrected[i] = rate_K_vec[i];
   }
 
-  for (int i = 0; i < Ncorrections; i++) {
+  for (i = 0; i < Ncorrections; i++) {
 
     // [mx mx_m] = max(error);
     int mx_m = 0;
     int mx = 0;
-    for (int m = 0; m < start_m; m++) {
+    int m;
+    for (m = 0; m < start_m; m++) {
       if (error[m] > mx) {
         mx_m = m;
         mx = error[m];
@@ -246,7 +248,8 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
       //[tmp closest_k] = min(abs(rate_K_sample_freqs_kHz - nasty_error_freq));
       closest_k = -1;
       float cka = K;
-      for (int k = 0; k < K; k++) {
+      int k;
+      for (k = 0; k < K; k++) {
         float a = abs(rate_K_sample_freqs_kHz[k] - nasty_error_freq);
 
         if (closest_k == -1 || a < cka) {
@@ -265,7 +268,7 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
       // rather than an Octave 1 based index
       // closest_k is already 0 based in this code
       // TODO - check this
-      int k = (0 > closest_k - 1 ? 0 : closest_k - 1);
+      k = (0 > closest_k - 1 ? 0 : closest_k - 1);
       //k = max(1, closest_k-1); 
 
       rate_K_prev_sample_kHz = rate_K_sample_freqs_kHz[k];
@@ -282,7 +285,7 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
       int st_m = 0;
       int en = -1;
       int en_m = 0;
-      for (int m = 0; m < C2WB_K - 1; m++) {
+      for (m = 0; m < C2WB_K - 1; m++) {
         //[tmp st_m] = min(abs(Am_freqs_kHz - rate_K_prev_sample_kHz));
         //[tmp en_m] = min(abs(Am_freqs_kHz - rate_K_next_sample_kHz));
         int pa = abs(Am_freqs_kHz[m] - rate_K_prev_sample_kHz);
@@ -299,7 +302,7 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
       if (closest_k == K)
         en_m = L;
 
-      for (int m = st_m; m < en_m; m++) {
+      for (m = st_m; m < en_m; m++) {
         error[m] = 0;
       }
       //error(st_m:en_m) = 0;
@@ -312,9 +315,9 @@ void correct_rate_K_vec(MODEL *model, float rate_K_vec[], float rate_K_sample_fr
 
 void diff_de(int rows, int cols, float D[rows][cols], float E[rows][cols], float diff_de[rows][cols]) {
 
-
-  for (int col = 0; col < cols; col++) {
-    for (int row = 0; row < rows; row++) {
+  int col, row;
+  for (col = 0; col < cols; col++) {
+    for (row = 0; row < rows; row++) {
       diff_de[row][col] = D[row][col] - E[row][col];
     }
   }
@@ -323,7 +326,8 @@ void diff_de(int rows, int cols, float D[rows][cols], float E[rows][cols], float
 
 float mean(float data[], int n) {
   float sum = 0.0;
-  for (int i = 0; i < n; ++i) {
+  int i;
+  for (i = 0; i < n; ++i) {
     sum += data[i];
   }
 
@@ -331,15 +335,16 @@ float mean(float data[], int n) {
 }
 
 void array_col_to_row(int rows, int cols, float data[rows][cols], int col, float res[]) {
-  for (int row = 0; row < rows; row++) {
+  int row;
+  for (row = 0; row < rows; row++) {
     res[row] = data[row][col];
   }
 }
 
 float std(float data[], int rows) {
   float standardDeviation = 0.0;
-
-  for (int i = 0; i < rows; ++i) {
+  int i;
+  for (i = 0; i < rows; ++i) {
     standardDeviation += pow(data[i] - mean(data, rows), 2);
   }
   return sqrt(standardDeviation / rows);
@@ -347,7 +352,8 @@ float std(float data[], int rows) {
 
 void std_on_cols(int rows, int cols, float data[rows][cols], float res[]) {
   float row_from_col[cols];
-  for (int col = 0; col < cols; col++) {
+  int col;
+  for (col = 0; col < cols; col++) {
     array_col_to_row(rows, cols, data, col, row_from_col);
     res[col] = std(row_from_col, rows);
   }
@@ -364,9 +370,9 @@ float mean_std_diff_de(int rows, int cols, float D[rows][cols], float E[rows][co
 //TODO : everything
 
 void dct2(int rows, int cols, float matrix[], float res[rows][cols]) {
-
-  for (int r = 0; r < rows; r++) {
-    for (int c = 0; c < cols; c++) {
+  int r,c;
+  for (r = 0; r < rows; r++) {
+    for (c = 0; c < cols; c++) {
       res[r][c] = (float) rand() / RAND_MAX;
     }
   }
@@ -387,7 +393,8 @@ void dct2(int rows, int cols, float matrix[], float res[rows][cols]) {
 
 void idct2(int rows, int cols, float inrks[rows][cols], float rate_K_surface_block[]) {
   int K = C2WB_K;
-  for (int k = 0; k < K; k++) {
+  int k;
+  for (k = 0; k < K; k++) {
     rate_K_surface_block[k] = (float) rand() / RAND_MAX;
   }
 }
@@ -420,7 +427,8 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
   int dec = C2WB_DEC;
   //printf("starting iteration\n");
   // iterate through the frames in the block
-  for (int f = 0; f < n_block_frames; f++) {
+  int f;
+  for (f = 0; f < n_block_frames; f++) {
     //printf("processing frame %d of %d\n", f, n_block_frames);
 
     float rate_K_sample_freqs_kHz[C2WB_K];
@@ -461,7 +469,8 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
     //    % vectors after quantisation.
 
     //    E = mapped = zeros(Nt,K);                
-    for (int r = 0; r < rows; r++) {
+    int r,c;
+    for (r = 0; r < rows; r++) {
       memset(E[r], '\0', cols * sizeof (float));
     }
 
@@ -512,13 +521,13 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
     float inrks[rows * dec][K];
 
     //printf("setting inrks\n");
-    for (int r = 0; r < rows; r++) {
-      for (int c = 0; c < cols; c++) {
+    for (r = 0; r < rows; r++) {
+      for (c = 0; c < cols; c++) {
         inrks[r][c] = sqrt(dec) * E[r][c];
       }
     }
-    for (int r = 0; r < Nt * (dec - 1); r++) {
-      for (int c = 0; c < K; c++) {
+    for (r = 0; r < Nt * (dec - 1); r++) {
+      for (c = 0; c < K; c++) {
         inrks[r + rows][c] = 0;
       }
     }
@@ -559,13 +568,13 @@ void setup_map(WIDEBAND_MAP * wb_map, int Nt, int K) {
    */
 
   //printf("setup_map(wb_map, Nt, K)");
-  int quantiser_num;
+    int quantiser_num, r, c;
 
   memset(wb_map->rmap, '\0', Nt * K * sizeof *wb_map->rmap);
   memset(wb_map->cmap, '\0', Nt * K * sizeof *wb_map->cmap);
 
-  for (int r = 0; r < Nt; r++) {
-    for (int c = 0; c < K; c++) {
+  for (r = 0; r < Nt; r++) {
+    for (c = 0; c < K; c++) {
       quantiser_num = c2wideband_map[r][c];
       wb_map->rmap[quantiser_num] = r;
       wb_map->cmap[quantiser_num] = c;
@@ -645,8 +654,8 @@ void experiment_rate_K_dct2(C2CONST *c2const, MODEL model_frames[], const int to
   //for n=1:Nblocks
   // Step through the model in blocks of 16 frames
   int n_block = 0;
-  
-  for (int f = 0; f < frames; f += n_block_frames) {
+  int f;
+  for (f = 0; f < frames; f += n_block_frames) {
     MODEL * model_block = &model_frames[f];
 
   

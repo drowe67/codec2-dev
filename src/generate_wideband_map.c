@@ -55,9 +55,10 @@ dump_array(float b[Nt][K])
 {
   
   printf("static const float c2wideband_map[%d][%d] = {\n", Nt, K);
-  for (int row = 0; row < Nt; row++ ) {
+  int row, col;
+  for (row = 0; row < Nt; row++ ) {
       printf("{ ");
-      for (int col = 0; col < K; col++ ) {
+      for (col = 0; col < K; col++ ) {
             printf("  %g", b[row][col]);
             if ( col < K - 1 )
                 printf(", ");
@@ -112,10 +113,11 @@ load(FILE * file, const char * name, float b[Nt][K])
   char *		cursor = line;
 
   *cursor = '\0';
+  int row, col;
 
-  for (int row = 0; row < Nt; row++ ) {
+  for (row = 0; row < Nt; row++ ) {
       
-      for (int col = 0; col < K; col++ ) {
+      for (col = 0; col < K; col++ ) {
         
             b[row][col]  = get_float(file, name, &cursor, line, sizeof(line));
       }
