@@ -67,15 +67,6 @@ Also see INSTALL for more general building and installing instructions.
 
    $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
 
-Embedded FreeDV API
--------------------
-
-See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
-freedv_rx.  Quickstart:
-
-  $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
-  $ cat freedv_rx_log.txt
-
 Programs
 --------
  
@@ -154,4 +145,40 @@ Package Name  | Version | Installation directory
 These can be installed using your systems package management system or
 the Octave package management system.  The version number of each
 package is not important.
+
+FreeDV API
+----------
+
+See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
+freedv_rx.  Quickstart demo using FreeDV 1600:
+
+  $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
+  $ cat freedv_rx_log.txt
+
+FreeDV 2400A and 2400B modes
+----------------------------
+
+FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio.
+FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth),
+however FreeDV 2400B is designed to pass through commodity FM radios.
+
+Demos of FreeDV 2400A and 2400B:
+
+  $ ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - - | play -t raw -r 8000 -s -2 -
+  $ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
+
+Note for FreeDV 2400A/2400B the modem signal sample rate is 48kHz.  To
+listen to the modem tones from FreeDV 2400B, or play them into a FM HT
+mic input:
+
+  $ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | play -t raw -r 48000 -s -2 -
+
+Simulate FreeDV 2400B passing through a 300 to 3000 Hz audio path using sox to filter:
+
+  $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t raw - sinc 300-3000 | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
+
+Links:
+
+  FreeDV 2400A blog post ...: http://www.rowetel.com/?p=5119
+  FreeDV 2400A & 2400B demos: http://www.rowetel.com/?p=5219
 
