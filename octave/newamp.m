@@ -518,8 +518,8 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
 
     rate_L_sample_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     
-    rate_K_surface(f,:) = interp1([0 rate_L_sample_freqs_kHz (Fs/2000)], [AmdB(1) AmdB AmdB(L)], rate_K_sample_freqs_kHz, "spline");
-    %rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
+    %rate_K_surface(f,:) = interp1([0 rate_L_sample_freqs_kHz (Fs/2000)], [AmdB(1) AmdB AmdB(L)], rate_K_sample_freqs_kHz, "spline");
+    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
 
     %printf("%d\n", f);
   end
@@ -602,6 +602,9 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
 
     % dealing with end effects is an ongoing issue.....need a better solution
 
+    AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
+
+#{
     if pad_end
       AmdB_(f,1:L) = interp1([0 rate_K_sample_freqs_kHz Fs/2000], 
                              [rate_K_surface(f,1) rate_K_surface(f,:) rate_K_surface(f,K)], 
@@ -613,6 +616,7 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
                              rate_L_sample_freqs_kHz, 
                              "spline");
     end
+#}
 
     %AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);
     %printf("f: %d %f %f %f\n", f, rate_K_sample_freqs_kHz(1), rate_L_sample_freqs_kHz(1), AmdB_(1));

@@ -271,10 +271,14 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
     sumnz(n) = qn;
   end
 
+  fg = 1;
+  
+ figure(fg++); clf;  mesh(rate_K_surface); title('rate K surface block');
+ 
   if plots
-    figure(4); clf; plot(sumnz); hold on; 
+    figure(fg++); clf; plot(sumnz); hold on; 
     plot([1 length(sumnz)],[mean(sumnz) mean(sumnz)]); hold off; title('Non Zero');
-    figure(5); clf; plot(dct2_sd); title('DCT SD');
+    figure(fg++); clf; plot(dct2_sd); title('DCT SD');
   end
   printf("average dct spectral distortion: %3.2f dB\n", mean(dct2_sd));
   printf("mean number of coeffs/DCT: %3.2f/%d\n", mean(sumnz), Nt*K);
@@ -286,7 +290,7 @@ function [model_ rate_K_surface] = experiment_rate_K_dct2(model, plots=1)
   dist = std((rate_K_surface_(1:dec:Nblocks*Nt*dec,:) - rate_K_surface(1:dec:Nblocks*Nt*dec,:))');
   
   if plots
-    figure(1); clf; plot(dist); title('Rate K SD');
+    figure(fg++); clf; plot(dist); title('Rate K SD');
     printf("Rate K spectral distortion mean: %3.2f dB var: %3.2f\n", mean(dist), var(dist));
   end
 endfunction
