@@ -30,12 +30,22 @@
    
        octave:1> c2wideband_batch("../build_linux/src/speech");
 
-      ~/codec2-dev/build_linux/src$ ./c2sim ~/Desktop/c2_hd/speech_orig_16k.wav --Fs 16000 --phase0 --postfilter --amread speech_am.out --hmread speech_hm.out -o | play -t raw -r 16000 -s -2 - 
+      ~/codec2-dev/build_linux/src$ ./c2sim ~/Desktop/c2_hd/speech_orig_16k.wav --Fs 16000 --phase0 --postfilter --amread speech_am.out --hmread speech_hm.out -o | play -t raw -r 16000 -s -2 -
+
+    Testing C Port:
+
+    $ cd codec2-dev/build_linux/unittest/tc2wideband
+    $ ./tc2wideband
+    $ cd ../../octave
+    $ octave
+    c2wideband_batch("../build_linux/src/speech", "verifyc", "../build_linux/unittest/tc2wideband_out.txt");
+
 #}
 
 
 function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
   newamp;
+  autotest;
   more off;
 
   max_amp = 160;
@@ -47,6 +57,13 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
   output_prefix = input_prefix;
   fit_order = 0;
   mode = "dct2";
+  verifyc = 0;
+
+  % load model paraneters
+  
+  model_name = strcat(input_prefix,"_model.txt");
+  model = load(model_name);
+  [frames nc] = size(model);
 
   % parse variable argument list
 
@@ -69,16 +86,18 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
       output = 0;
       synth_phase = 0;
     end
+
+    ind = arg_exists(varargin, "verifyc");
+    if ind
+      verifyc = 1; output = 0; frames = 160;
+      c_filename =  varargin{ind+1}
+    end
   end
 
   if output && !strcmp(mode,"generate map")
     printf("output_prefix: %s\n",  output_prefix);
   end
   
-  model_name = strcat(input_prefix,"_model.txt");
-  model = load(model_name);
-  [frames nc] = size(model);
-
   % Choose experiment to run test here -----------------------
 
   if strcmp(mode, "generate map")
@@ -86,10 +105,20 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
     output = 0;
   end
   if strcmp(mode, "dct2")
-    [model_ surface] = experiment_rate_K_dct2(model, 1);
+    [model_ rate_K_surface] = experiment_rate_K_dct2(model(1:frames,:), 1);
     frames_out = rows(model_);
   end
 
+  % optional verification against C port
+
+  if verifyc
+    load(c_filename);
+    fg = 1;
+    figure(fg++); clf; mesh(rate_K_surface); title('rate K sruface');
+    figure(fg++); clf; mesh(rate_K_surface_c); title('rate K surface C');
+    figure(fg++); clf; mesh(rate_K_surface - rate_K_surface_c); title('difference');
+  end
+  
   % ----------------------------------------------------
 
   if output
@@ -313,5 +342,5 @@ function [model_block_ dct2_sd qn rate_K_surface_block rate_K_surface_block_] = 
 
     dct2_sd = mean(std(D-E));
     rate_K_surface_block_ = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
-    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs);
+    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs, pad_ends=1);
 endfunction
