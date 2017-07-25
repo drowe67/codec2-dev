@@ -96,5 +96,9 @@ target_link_libraries(tsrc samplerate)
 add_executable(tlininterp tlininterp.c)
 add_executable(tdec tdec.c)
 
-add_executable(tc2wideband tc2wideband.c ../src/c2wideband.c ../src/octave.c)
+add_executable(tc2wideband tc2wideband.c t_helpers.c ../src/c2wideband.c ../src/octave.c)
 target_link_libraries(tc2wideband codec2)
+
+add_executable(tdct2 tdct2.c t_helpers.c ../src/dct2.c)
+target_link_libraries(tdct2 codec2)
+

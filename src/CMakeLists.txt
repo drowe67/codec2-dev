@@ -230,6 +230,7 @@ set(CODEC2_SRCS
     varicode.c
     modem_stats.c
     c2wideband.c
+    dct2.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
