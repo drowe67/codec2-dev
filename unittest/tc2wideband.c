@@ -17,7 +17,7 @@
 #include "newamp1.h"
 #include "quantise.h"
 
-#define FRAMES 300
+#define FRAMES 160
 
 float mean(float data[], int n);
 int unit_test();
@@ -253,9 +253,10 @@ void test_with_real_data(int argc, char *argv[])
     int i, m, f;
 
     if (argc != 2) {
-        printf("usage: ./tnewamp1 RawFile\n");
+        printf("test_with_real_data usage: .%s RawFile\n", arv[0]);
         exit(1);
     }
+
     nlp_states = nlp_create(&c2const);
     prev_f0 = 1.0 / P_MAX_S;
     fft_fwd_cfg = codec2_fft_alloc(FFT_ENC, 0, NULL, NULL);
