@@ -253,7 +253,7 @@ void test_with_real_data(int argc, char *argv[])
     int i, m, f;
 
     if (argc != 2) {
-        printf("test_with_real_data usage: .%s RawFile\n", arv[0]);
+        printf("test_with_real_data usage: .%s RawFile\n", argv[0]);
         exit(1);
     }
 
