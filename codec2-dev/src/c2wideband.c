@@ -409,6 +409,14 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
     int rows = Nt;
     int cols = K;
     int dec = C2WB_DEC;
+
+    // one time configuration of DCT & IDCT
+
+    codec2_dct_cfg dct_cfg_n = dct_config(cols);
+    codec2_dct_cfg dct_cfg_m = dct_config(rows);
+    codec2_dct_cfg idct_cfg_n = idct_config(cols);
+    codec2_dct_cfg idct_cfg_m = idct_config(rows);
+
     //printf("starting iteration\n");
     // iterate through the frames in the block
     int f;
@@ -435,7 +443,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
         float D[rows][cols];
         float E[rows][cols];
         //printf("dct2\n");
-        dct2(rows, cols, &rate_K_surface_block[f], D);
+        dct2(dct_cfg_m, dct_cfg_n, rows, cols, &rate_K_surface_block[f], D);
 
         //    % So D is the 2D block of DCT coeffs at the encoder.  We want to
         //    % create a quantised version at the "decoder" E.  This loop copies
@@ -520,7 +528,7 @@ void wideband_enc_dec(C2CONST *c2const, int n_block_frames, MODEL model_block[n_
         //TODO ???
         //= [sqrt(dec)*E; zeros(Nt*(dec-1), K)];
         //printf("idct2\n");
-        idct2(rows, cols, inrks, &rate_K_surface_block_[f]);
+        idct2(idct_cfg_m, idct_cfg_n, rows, cols, inrks, &rate_K_surface_block_[f]);
 
         //    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs);        
         //printf("resample_rate_L\n");

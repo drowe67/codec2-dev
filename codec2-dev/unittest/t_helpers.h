@@ -1,8 +1,29 @@
-/* 
- * File:   t_helpers.h
- * Author: phil
- *
- * Created on 21 July 2017, 14:20
+/*---------------------------------------------------------------------------*\
+
+  FILE........: t_helpers.c
+  AUTHOR......: Phil Ayres
+  DATE CREATED: July 2017
+
+ * Simple helper functions for unit tests
+ * 
+\*---------------------------------------------------------------------------*/
+
+/*
+  Copyright David Rowe 2017
+
+  All rights reserved.
+
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU Lesser General Public License version 2.1, as
+  published by the Free Software Foundation.  This program is
+  distributed in the hope that it will be useful, but WITHOUT ANY
+  WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+  License for more details.
+
+  You should have received a copy of the GNU Lesser General Public License
+  along with this program; if not, see <http://www.gnu.org/licenses/>.
+
  */
 
 #ifndef T_HELPERS_H
