@@ -241,15 +241,17 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
   mask_en = 0;
   vq_search = "gain";   % defaul to gain search method as it's our favourite atm
   nvq = 0;              % number of vector quantisers
-  vq_start = vq_filename = [];
+  vq_start = [];
   
   rate_K_sample_freqs_kHz = [0.1:0.1:4];
   K = length(rate_K_sample_freqs_kHz);
   
   % parse command line options
 
-  % set vq search algorithm, e.g. mse, gain, mag, slope.  We've settle don "gain" for now
+  % set vq search algorithm, e.g. mse, gain, mag, slope.  We've settled on "gain" for now
   % as slope required extra bits to quantise higher order parameters that offset advantages
+
+  weight_en = arg_exists(varargin, "weight");
 
   ind = arg_exists(varargin, "vq_search");
   if ind
@@ -263,8 +265,12 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
     nvq++;
     vq_start = [vq_start varargin{ind+1}];
     avq_filename =  varargin{ind+2};
-    vq_filename = [vq_filename; avq_filename];
-    printf("nvq %d vq_start: %d vq_filename: %s\n", nvq, vq_start(nvq), avq_filename);
+    if nvq < 2
+      vq_filename = avq_filename;
+    else
+      vq_filename = [vqfilname; avq_filename];
+    end
+    printf("nvq %d vq_start: %d vq_filename: %s weight_en: %d\n", nvq, vq_start(nvq), avq_filename, weight_en > 0);
     anind = arg_exists(varargin(ind+1:length(varargin)), "vq");
     if anind
       ind += anind;
@@ -323,20 +329,38 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
       vq_st = vq_start(i); vq_en = vq_st + vq_cols - 1;
       printf("split VQ: %d vq_filename: %s vq_st: %d vq_en: %d nVec: %d\n", i, avq_filename, vq_st, vq_en, vq_rows);
 
+      weights = ones(frames, vq_en - vq_st + 1);
+      if weight_en
+
+        % generate weighting.  if min is 20dB and max 40dB, weight at min
+        %  is 1 and max 2, same for -10 to 10.  So gradient = 0.05, we only
+        % have to calculate y intercept
+
+        for f=1:frames
+          target = rate_K_surface_no_mean(f,vq_st:vq_en);
+          gradient = 0.05; yint = 1 - gradient*min(target);
+          weights(f,:) = gradient*target + yint;
+        end
+      end
+
       if strcmp(vq_search, "mse")
         [idx contrib errors test_ g mg sl] = vq_search_mse(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
       end
 
       if strcmp(vq_search, "gain")
-        [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
       if strcmp(vq_search, "sg")
-        [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        [idx contrib errors test_ g mg sl] = vq_search_sg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
       end
 
       if strcmp(vq_search, "slope")
-        [idx contrib errors test_ g mg sl] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        [idx contrib errors test_ g mg sl] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
+      end
+
+      if strcmp(vq_search, "para")
+        [idx contrib errors test_ g mg sl] = vq_search_para(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
       rate_K_surface_no_mean_(:, vq_st:vq_en) = contrib;
@@ -352,8 +376,8 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
           hmg(f) = mg(f, idx(f));
           hsl(f) = sl(f, idx(f));
         end
-        figure(fg++); clf; hist(hmg, 30);
-        figure(fg++); clf; hist(hsl, 30);
+        figure(fg++); clf; hist(hmg, 30); title('mag')
+        figure(fg++); clf; hist(hsl, 30); title('slope')
       end
 
       sd_per_frame = std(res(:,vq_st:vq_en)');
