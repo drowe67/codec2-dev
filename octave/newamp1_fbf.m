@@ -25,7 +25,7 @@ function newamp1_fbf(samname, f=73, varargin)
   quant_en = 0; vq_search = "gain";
   mask_en = 0;
   nvec = 0;
-  weight_en = 0;
+  weight_en = quant_en = 0;
 
   % optional VQ
 
@@ -79,46 +79,53 @@ function newamp1_fbf(samname, f=73, varargin)
 
     rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs);
     if fit_order == 0
-      slope = 0; b = mean(rate_K_vec); 
-      rate_K_vec_fit = rate_K_vec - b;
+      slope = 0; meanf = mean(rate_K_vec); 
+      rate_K_vec_fit = rate_K_vec - meanf;
     end
 
     % plots ----------------------------------
   
-    figure(2); clf; 
-    plot((1:L)*Wo*4000/pi, AmdB,";AmdB;g+-");
+    figure(2); clf;
+    l = sprintf(";rate %d AmdB;g+-", L);
+    plot((1:L)*Wo*4000/pi, AmdB, l);
     axis([1 4000 -20 80]);
     hold on;
     plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
 
-    if mask_en
+    % default to the ideal
+    
+    rate_K_vec_ = rate_K_vec_fit; 
+
+    if mask_en && nvec
       % experimental masking stuff that I can't seem to get to work
       maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz, bark_model=1);
       plot(rate_K_sample_freqs_kHz*1000, maskdB, ";mask dB;c+-");
     end
 
-    if mask_en
-      target = rate_K_vec;
-      mask_thresh = 3;
-      ind = find (maskdB - target > mask_thresh);
-      target(ind) = maskdB(ind) - mask_thresh;
-      plot(rate_K_sample_freqs_kHz*1000, target, ";target;m+-");
-      target = target(vq_st:vq_en) - b;
-    else
-      target = rate_K_vec_fit(vq_st:vq_en);
+    if nvec
+      if mask_en
+        target = rate_K_vec;
+        mask_thresh = 3;
+        ind = find (maskdB - target > mask_thresh);
+        target(ind) = maskdB(ind) - mask_thresh;
+        plot(rate_K_sample_freqs_kHz*1000, target, ";target;m+-");
+        target = target(vq_st:vq_en) - b;
+      else
+        target = rate_K_vec_fit(vq_st:vq_en);
+      end
+
+      weights = ones(1, vq_en - vq_st + 1);
+      if weight_en
+
+        % generate weighting.  if min is 20dB and max 40dB, weight at min
+        % is 1 and max 2, same for -10 to 10.  So gradient = 0.05, we only
+        % haveto calculate y intercept
+
+        gradient = 0.05; yint = 1 - gradient*min(target);
+        weights = gradient*target + yint;
+      end
     end
-
-    weights = ones(1, vq_en - vq_st + 1);
-    if weight_en
-
-      % generate weighting.  if min is 20dB and max 40dB, weight at min
-      % is 1 and max 2, same for -10 to 10.  So gradient = 0.05, we only
-      % haveto calculate y intercept
-
-      gradient = 0.05; yint = 1 - gradient*min(target);
-      weights = gradient*target + yint;
-    end
-
+    
     if nvec
       
       if strcmp(vq_search, "mse")
@@ -138,23 +145,37 @@ function newamp1_fbf(samname, f=73, varargin)
 
       if strcmp(vq_search, "para")
         printf("\n");
-        [idx contrib errors test_ g mg sl] = vq_search_para(vq, target, weights);
+        [idx contrib errors b] = vq_search_para(vq, target);
+        if quant_en
+          % recalc gain using some index
+          g = (sum(target(1:vq_cols-10)) - sum(mg*vq(idx,1:vq_cols-10)))/length(target);
+          contrib = mg*vq(idx,:) + g;
+          contrib(vq_cols-4:vq_cols) += -3:-6:-30;
+        end
         rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
         % printf("g: %3.2f mg: %3.2f sl: %3.2f\n", g(idx), mg(idx), sl(idx));
       end
 
-      rate_K_vec_ = rate_K_vec_fit; rate_K_vec_(vq_st:vq_en) = contrib;
-      rate_K_vec_ += b;
-      [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
-      AmdB_ = AmdB_(1:L);
+      rate_K_vec_(vq_st:vq_en) = contrib;
 
-      sdL = std(AmdB - AmdB_);
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, contrib, 'm+-');
-      l = sprintf(";diff sd = %3.2f;k+-", sdL);
+      l = sprintf(";diff vq sd = %3.2f;k+-", std(target - contrib));
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, target - contrib, l);
-      plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
-      hold off;
     end
+
+    % And .... back to rate L
+    
+    rate_K_vec_ += meanf;
+    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
+    AmdB_ = AmdB_(1:L);
+    sdL = std(abs(AmdB - AmdB_));
+
+    plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
+    if nvec == 0
+      l = sprintf(";errorx10 sd %3.2f dB;bk+-", sdL);
+      plot((1:L)*Wo*4000/pi, 10*(AmdB - AmdB_), l);
+    end
+    hold off;
 
     if weight_en
       figure(3); clf;
@@ -171,14 +192,14 @@ function newamp1_fbf(samname, f=73, varargin)
 
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit  w-weight[%d]", f, weight_en);
+    printf("\rframe: %d  menu: n-next  b-back  q-quit  w-quant[%d]", f, quant_en);
     fflush(stdout);
     k = kbhit();
 
     if k == 'w'
-      weight_en++;
-      if weight_en == 2
-        weight_en = 0;
+      quant_en++;
+      if quant_en == 2
+        quant_en = 0;
       end
     endif
     if k == 'n'
