@@ -1,11 +1,11 @@
 %----------------------------------------------------------------------
 % abs() search with a linear, ampl scaling, and slope term
 
-function [idx contrib errors test_ g mg sl] = vq_search_para(vq, data)
+function [idx contrib errors b_log2] = vq_search_para(vq, data)
   [nVec nCols] = size(vq);
   nRows = rows(data);
   
-  g = mg = sl = zeros(nRows, nVec);
+  g = mg = sl = zeros(nRows, 1);
   diff  = zeros(nVec, nCols);
   idx = errors = zeros(1, nRows);
   error = zeros(1, nVec);
@@ -19,6 +19,7 @@ function [idx contrib errors test_ g mg sl] = vq_search_para(vq, data)
   
   
   b_log = zeros(nVec, 4);
+  b_log2 = [];
   
   for i=1:nVec
     v = vq(i,:);
@@ -35,7 +36,9 @@ function [idx contrib errors test_ g mg sl] = vq_search_para(vq, data)
     for i=1:nVec
       v = vq(i,:);      
       c = [t*v' t*k2' t*k' sum(t)]';
-      b = inv(A(:,:,i))*c;    
+      b = inv(A(:,:,i))*c;
+      % b(1) = max(b(1),0.5);
+      % b(2) = max(b(2),-0.2); b(2) = min(b(2),0.1);
       diff(i,:) = t - (b(1)*v + b(2)*k2 + b(3)*k + b(4));
       b_log(i,:) = b; 
       error(i) = diff(i,:) * diff(i,:)';
@@ -50,7 +53,8 @@ function [idx contrib errors test_ g mg sl] = vq_search_para(vq, data)
     v = vq(min_ind,:);
     
     printf("f: %d i: %d b(1): %f b(2): %f b(3): %f b(4): %f\n", f, idx(f), b(1), b(2), b(3), b(4));
-    contrib(f,:) = test_(f,:) = b(1)*v + b(2)*k2 + b(3)*k + b(4);
+    contrib(f,:) = b(1)*v + b(2)*k2 + b(3)*k + b(4);
+    b_log2 = [b_log2; b];
   end
 
 endfunction

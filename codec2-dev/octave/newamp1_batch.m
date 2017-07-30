@@ -71,30 +71,7 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     if ind
       mode =  varargin{ind+1};
     end
-#{
-    ind = arg_exists(varargin, "vq_search");
-    if ind
-      vq_search = varargin{ind+1};
-    end
-    ind = arg_exists(varargin, "vq");
-    if ind
-      vq_type = varargin{ind};
-      vq_filename = varargin{ind+1};
-      printf("vq_type: %s vq_filename: %s vq_search: %s\n", vq_type, vq_filename, vq_search);
-    end
-    ind = arg_exists(varargin, "vqh");
-    if ind
-      vq_type = varargin{ind};
-      vq_filename = varargin{ind+1};
-      printf("vq_type: %s vq_filename: %s vq_search: %s\n", vq_type, vq_filename, vq_search);
-    end
-    ind = arg_exists(varargin, "vql");
-    if ind
-      vq_type = varargin{ind};
-      vq_filename = varargin{ind+1};
-      printf("vq_type: %s vq_filename: %s vq_search: %s\n", vq_type, vq_filename, vq_search);
-    end
-#}
+
     ind = arg_exists(varargin, "no_output");
     if ind
       output = 0;
@@ -128,7 +105,12 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
     [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
   end
   if strcmp(mode, 'const')
-    [model_ surface] = experiment_const_freq(model, varargin{:});
+    [model_ surface b_log] = experiment_const_freq(model, varargin{:});
+    ind = arg_exists(varargin, "vq_search");
+    if ind && strcmp(varargin{ind+1},"para")
+      fn = sprintf("%s_b_log.txt", output_prefix);
+      save(fn,"b_log");
+    end
   end
   if strcmp(mode, 'piecewise')
     model_ = experiment_piecewise(model);
@@ -233,7 +215,7 @@ endfunction
 % Basic unquantised rate K linear sampling then back to rate L.  Used for generating 
 % training vectors and testing vector quntisers.
 
-function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
+function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   melvq;
   [frames nc] = size(model);
   Fs = 8000;
@@ -242,6 +224,8 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
   vq_search = "gain";   % defaul to gain search method as it's our favourite atm
   nvq = 0;              % number of vector quantisers
   vq_start = [];
+  quant_en = 0;
+  b_log = [];
   
   rate_K_sample_freqs_kHz = [0.1:0.1:4];
   K = length(rate_K_sample_freqs_kHz);
@@ -268,7 +252,7 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
     if nvq < 2
       vq_filename = avq_filename;
     else
-      vq_filename = [vqfilname; avq_filename];
+      vq_filename = [vq_filename; avq_filename];
     end
     printf("nvq %d vq_start: %d vq_filename: %s weight_en: %d\n", nvq, vq_start(nvq), avq_filename, weight_en > 0);
     anind = arg_exists(varargin(ind+1:length(varargin)), "vq");
@@ -277,6 +261,8 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
     end
   end
   
+  quant_en = arg_exists(varargin, "quant");
+
   % OK start processing .....
 
   energy = zeros(1,frames);
@@ -360,7 +346,19 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
       end
 
       if strcmp(vq_search, "para")
-        [idx contrib errors test_ g mg sl] = vq_search_para(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
+        [idx contrib errors b_log] = vq_search_para(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        b_log = [b_log energy' idx'];
+        
+        if quant_en
+          for f=1:frames
+            target = rate_K_surface_no_mean(f,vq_st:vq_en);
+            % recalc gain using some index
+            v = mg(f)*vq(idx(f),1:vq_cols-10);
+            g = (sum(target(1:vq_cols-10)) - sum(v))/length(target);
+            contrib(f,:) = mg(f)*vq(idx(f),:) + g;
+            contrib(f, vq_cols-4:vq_cols) += -3:-6:-30;
+          end
+        end
       end
 
       rate_K_surface_no_mean_(:, vq_st:vq_en) = contrib;
@@ -419,6 +417,7 @@ function [model_ rate_K_surface] = experiment_const_freq(model, varargin)
   printf("rate K resampling SD: %3.2f\n", mean(sd));
   figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');
   figure(fg++); clf; hist(sd);
+   
 endfunction
 
 
