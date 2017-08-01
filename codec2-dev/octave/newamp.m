@@ -17,6 +17,39 @@ melvq; % mbest VQ functions
 % Functions used by rate K mel work
 % --------------------------------------------------------------------------------
 
+function y = lanczos2(x)
+  y = sinc(x).*sinc(x/2);
+endfunction
+
+function y = interp_lanczos(xp, yp, xp_max, x)
+  
+  y = zeros(1,length(x));
+  k = 1;
+  for i=1:length(x)
+    % find closest sample in xp just greater than xi
+    xi = x(i);
+    while (xp(k) <= xi) && (k < length(xp)-2)
+      k++;
+    end
+    
+    % we'd like to use k-2 .. k+2, but we need to stay inside limits of xp
+
+    k_st = k - 2; k_st = max(1,k_st);
+    k_en = k + 2; k_en = min(length(xp),k_en);
+    % printf("i: %d xi: %f k: %d k_st: %d k_en: %d\n", i, xi, k, k_st, k_en);
+    
+    % map frequencies to x in -2 ... + 2
+
+    delta = xp(2) - xp(1);
+    xl = (xp(k_st:k_en) - xi)/delta;
+
+    y(i) = lanczos2(xl) * yp(k_st:k_en)';
+    
+  end
+  
+endfunction
+
+
 % General 2nd order parabolic interpolator.  Used splines orginally,
 % but this is much simpler and we don't need much accuracy.  Given two
 % vectors of points xp and yp, find interpolated values y at points x
@@ -197,6 +230,14 @@ end
 
 function value = bits_to_index(bits, numbits)
   value = 2.^(numbits-1:-1:0) * bits;
+endfunction
+
+
+% helper function to find polynomial coeffs for a parabola
+
+function b = parabola_coeffs(x, y)
+  A = [(x.^2)' x' [1 1 1]']
+  b = inv(A)*y';    
 endfunction
 
 
@@ -484,16 +525,16 @@ function plot_mel_sample_freqs(K, f_start_hz, f_end_hz)
   plot(rate_K_sample_freqs_kHz,'+');
 endfunction
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K, Fs=8000) 
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model, K, Fs=8000, interp_alg='lanc') 
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, 100, 0.95*Fs/2);
-  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs, interp_alg);
 endfunction
 
 
 % Resample Am from time-varying rate L=floor(pi/Wo) to fixed rate K.  This can be viewed
 % as a 3D surface with time, freq, and ampitude axis.
 
-function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs)
+function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs, interp_alg='lanc')
 
   % convert rate L=pi/Wo amplitude samples to fixed rate K
 
@@ -519,7 +560,12 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
     rate_L_sample_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     
     %rate_K_surface(f,:) = interp1([0 rate_L_sample_freqs_kHz (Fs/2000)], [AmdB(1) AmdB AmdB(L)], rate_K_sample_freqs_kHz, "spline");
-    rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);    
+    if strcmp(interp_alg, 'para')
+      rate_K_surface(f,:)  = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);
+    end
+    if strcmp(interp_alg, 'lanc')
+      rate_K_surface(f,:)  = interp_lanczos(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);
+    end
 
     %printf("%d\n", f);
   end
@@ -602,7 +648,8 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
 
     % dealing with end effects is an ongoing issue.....need a better solution
 
-    AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
+    %AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
+    AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
 
 #{
     if pad_end

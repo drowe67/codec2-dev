@@ -114,7 +114,7 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
   if verifyc
     load(c_filename);
     fg = 1;
-    figure(fg++); clf; mesh(rate_K_surface); title('rate K sruface');
+    figure(fg++); clf; mesh(rate_K_surface); title('rate K surface');
     figure(fg++); clf; mesh(rate_K_surface_c); title('rate K surface C');
     figure(fg++); clf; mesh(rate_K_surface - rate_K_surface_c); title('difference');
   end
@@ -309,7 +309,7 @@ function [model_block_ dct2_sd qn rate_K_surface_block rate_K_surface_block_] = 
     % left high end correction out for now, this is less of an issue
     % with a higher K
 
-    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model_block, K, Fs);
+    [rate_K_surface_block rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model_block, K, Fs, 'para');
 
     % decimate down to 20ms time resolution, and DCT
 
