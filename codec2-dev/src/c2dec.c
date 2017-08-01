@@ -27,6 +27,7 @@
 
 #include "codec2.h"
 #include "dump.h"
+#include "c2file.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -83,32 +84,6 @@ int main(int argc, char *argv[])
     if (argc < 4)
         print_help(long_options, num_opts, argv);
 
-    if (strcmp(argv[1],"3200") == 0)
-	mode = CODEC2_MODE_3200;
-    else if (strcmp(argv[1],"2400") == 0)
-	mode = CODEC2_MODE_2400;
-    else if (strcmp(argv[1],"1600") == 0)
-	mode = CODEC2_MODE_1600;
-    else if (strcmp(argv[1],"1400") == 0)
-	mode = CODEC2_MODE_1400;
-    else if (strcmp(argv[1],"1300") == 0)
-	mode = CODEC2_MODE_1300;
-    else if (strcmp(argv[1],"1200") == 0)
-	mode = CODEC2_MODE_1200;
-    else if (strcmp(argv[1],"700") == 0)
-	mode = CODEC2_MODE_700;
-    else if (strcmp(argv[1],"700B") == 0)
-	mode = CODEC2_MODE_700B; 
-    else if (strcmp(argv[1],"700C") == 0)
-	mode = CODEC2_MODE_700C;
-    else if (strcmp(argv[1],"WB") == 0)
-	mode = CODEC2_MODE_WB;
-   else {
-	fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C or WB\n", argv[1]);
-	exit(1);
-    }
-    bit_rate = atoi(argv[1]);
-
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input bit file: %s: %s.\n",
@@ -122,6 +97,56 @@ int main(int argc, char *argv[])
          argv[3], strerror(errno));
 	exit(1);
     }
+
+    // Attempt to detect a .c2 file with a header
+    struct c2_header in_hdr;
+    char *ext = strrchr(argv[2], '.');
+    if (ext != NULL) {
+        if (strcmp(ext, ".c2") == 0) {
+            fread(&in_hdr,sizeof(in_hdr),1,fin);
+                
+            if (memcmp(in_hdr.magic, c2_file_magic, sizeof(c2_file_magic)) == 0) {
+                fprintf(stderr, "Detected Codec2 file version %d.%d in mode %d\n",
+                        in_hdr.version_major,
+                        in_hdr.version_minor,
+                        in_hdr.mode);
+                            
+                mode = in_hdr.mode;
+            } else {
+                fprintf(stderr, "Codec2 file specified but no header detected\n");
+                // Rewind the input file so we can try to decode
+                // based on command line mode selection
+                fseek(fin,0,SEEK_SET);
+            } /* end if - magic detection */
+        };
+    } else {
+        // If we got here, we need to honor the command line mode
+        if (strcmp(argv[1],"3200") == 0)
+        mode = CODEC2_MODE_3200;
+        else if (strcmp(argv[1],"2400") == 0)
+        mode = CODEC2_MODE_2400;
+        else if (strcmp(argv[1],"1600") == 0)
+        mode = CODEC2_MODE_1600;
+        else if (strcmp(argv[1],"1400") == 0)
+        mode = CODEC2_MODE_1400;
+        else if (strcmp(argv[1],"1300") == 0)
+        mode = CODEC2_MODE_1300;
+        else if (strcmp(argv[1],"1200") == 0)
+        mode = CODEC2_MODE_1200;
+        else if (strcmp(argv[1],"700") == 0)
+        mode = CODEC2_MODE_700;
+        else if (strcmp(argv[1],"700B") == 0)
+        mode = CODEC2_MODE_700B; 
+        else if (strcmp(argv[1],"700C") == 0)
+        mode = CODEC2_MODE_700C;
+        else if (strcmp(argv[1],"WB") == 0)
+        mode = CODEC2_MODE_WB;
+    else {
+        fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C or WB\n", argv[1]);
+        exit(1);
+        }
+        bit_rate = atoi(argv[1]);
+    }; /* end if - extension / header detection */
 
     error_mode = NONE;
     ber = 0.0;
