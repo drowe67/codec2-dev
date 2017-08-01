@@ -27,6 +27,7 @@
 */
 
 #include "codec2.h"
+#include "c2file.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -90,6 +91,22 @@ int main(int argc, char *argv[])
          argv[3], strerror(errno));
 	exit(1);
     }
+    
+    // Write a header if we're writing to a .c2 file
+    char *ext = strrchr(argv[3], '.');
+    if (ext != NULL) {
+        if (strcmp(ext, ".c2") == 0) {
+            struct c2_header out_hdr;
+            memcpy(out_hdr.magic,c2_file_magic,sizeof(c2_file_magic));
+            out_hdr.mode = mode;
+            // TODO: Get these values from somewhere
+            out_hdr.version_major = 0;
+            out_hdr.version_minor = 0;
+            out_hdr.flags = 0;
+                
+            fwrite(&out_hdr,sizeof(out_hdr),1,fout);
+        };
+    };
 
     codec2 = codec2_create(mode);
     nsam = codec2_samples_per_frame(codec2);
