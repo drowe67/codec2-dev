@@ -107,9 +107,11 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
   if strcmp(mode, 'const')
     [model_ surface b_log] = experiment_const_freq(model, varargin{:});
     ind = arg_exists(varargin, "vq_search");
-    if ind && strcmp(varargin{ind+1},"para")
-      fn = sprintf("%s_b_log.txt", output_prefix);
-      save(fn,"b_log");
+    if ind
+      if strcmp(varargin{ind+1},"para") || strcmp(varargin{ind+1},"cubic") || strcmp(varargin{ind+1},"sg")
+        fn = sprintf("%s_b_log.txt", output_prefix);
+        save(fn,"b_log");
+      end
     end
   end
   if strcmp(mode, 'piecewise')
@@ -261,7 +263,12 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
     end
   end
   
-  quant_en = arg_exists(varargin, "quant");
+  ind = arg_exists(varargin, "vq_gain");
+  if ind
+    avq_filename = varargin{ind+1};
+    x = load(avq_filename); vq_gain = x.vq;
+    quant_en = 1;
+  end
 
   % OK start processing .....
 
@@ -337,8 +344,13 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
+      if strcmp(vq_search, "mg")
+        [idx contrib errors b_log] = vq_search_mg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+      end
+
       if strcmp(vq_search, "sg")
-        [idx contrib errors test_ g mg sl] = vq_search_sg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        [idx contrib errors b_log] = vq_search_sg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        b_log = [b_log energy' idx'];
       end
 
       if strcmp(vq_search, "slope")
@@ -351,14 +363,39 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         
         if quant_en
           for f=1:frames
+            v = vq(idx(f),:);
+            k = 1:vq_cols; k2 = k.^2;
+#{
             target = rate_K_surface_no_mean(f,vq_st:vq_en);
-            % recalc gain using some index
-            v = mg(f)*vq(idx(f),1:vq_cols-10);
-            g = (sum(target(1:vq_cols-10)) - sum(v))/length(target);
-            contrib(f,:) = mg(f)*vq(idx(f),:) + g;
-            contrib(f, vq_cols-4:vq_cols) += -3:-6:-30;
+            
+            % search vq_gain for best match to gain coefficients
+
+            [nr nc] = size(vq_gain);
+            d = g = zeros(nr,1);
+            for r=1:nr
+              %con = vq_gain(r,1)*v + vq_gain(r,2)*k2 + vq_gain(r,3)*k;
+              con = v + vq_gain(r,2)*k2 + vq_gain(r,3)*k;
+              g(r) = (sum(target) - sum(con))/vq_cols;
+              con  += g(r);
+              d(r) = (target-con)*(target-con)';
+            end
+            [dmin imin] = min(d);
+            b_ = vq_gain(imin,:);
+            printf("idx(%d): %d imin: %d b(1); %f b(2): %f b3: %f\n", f, idx(f), imin, b_(1), b_(2), b_(3));
+          
+            % recalc contrib
+
+           %contrib(f,:) = b_(1)*v + b_(2)*k2 + b_(3)*k + g(imin);
+#}
+
+           contrib(f,:) = v + (-1/12.5)*b_log(f,3)*k2 + b_log(f,3)*k + b_log(f, 4);
           end
         end
+      end
+
+      if strcmp(vq_search, "cubic")
+        [idx contrib errors b_log] = vq_search_cubic(rate_K_surface_no_mean(:,vq_st:vq_en));
+        b_log = [b_log energy' idx'];
       end
 
       rate_K_surface_no_mean_(:, vq_st:vq_en) = contrib;
