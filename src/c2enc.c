@@ -99,11 +99,10 @@ int main(int argc, char *argv[])
             struct c2_header out_hdr;
             memcpy(out_hdr.magic,c2_file_magic,sizeof(c2_file_magic));
             out_hdr.mode = mode;
-            // TODO: Get these values from somewhere
-            out_hdr.version_major = 0;
-            out_hdr.version_minor = 0;
+            out_hdr.version_major = CODEC2_VERSION_MAJOR;
+            out_hdr.version_minor = CODEC2_VERSION_MINOR;
+            // TODO: Handle flags (this block needs to be moved down)
             out_hdr.flags = 0;
-                
             fwrite(&out_hdr,sizeof(out_hdr),1,fout);
         };
     };
