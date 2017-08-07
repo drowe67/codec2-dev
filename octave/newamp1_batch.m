@@ -40,7 +40,7 @@
 % In general, this function processes a bunch of amplitudes, we then
 % use c2sim to hear the results.  Bunch of different experiments below
 
-function [surface mean_f] = newamp1_batch(input_prefix, varargin)
+function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
   newamp;
   more off;
 
@@ -185,7 +185,7 @@ function [surface mean_f] = newamp1_batch(input_prefix, varargin)
   end
 
   for f=1:frames
-    surface(f,:) -= mean(surface(f,:));
+    surface_no_mean(f,:) = surface(f,:) - mean(surface(f,:));
   end
 
   printf("\n")
@@ -228,6 +228,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   vq_start = [];
   quant_en = 0;
   b_log = [];
+  decimate = 0; decimate_var = 0;
   
   rate_K_sample_freqs_kHz = [0.1:0.1:4];
   K = length(rate_K_sample_freqs_kHz);
@@ -267,10 +268,28 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   if ind
     avq_filename = varargin{ind+1};
     x = load(avq_filename); vq_gain = x.vq;
-    quant_en = 1;
+    quant_en = 1
   end
 
-  % OK start processing .....
+  quant_en = arg_exists(varargin, "quant");
+  
+  ind = arg_exists(varargin, "decimate");
+  if ind
+    decimate = varargin{ind+1};
+  end
+   
+  % read in optional vector that defines sampling points for
+  % decimation, each entry is the frame number of a sample e.g.
+  % [1 8 10 12 ....
+  
+  ind = arg_exists(varargin, "decsamfile");
+  if ind
+    dec_filename = varargin{ind+1};
+    decvec = load(dec_filename); Ndv = length(decvec);
+    decimate_var = 1;
+  end
+
+  % OK start processing ............................................
 
   energy = zeros(1,frames);
   for f=1:frames
@@ -362,34 +381,43 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         b_log = [b_log energy' idx'];
         
         if quant_en
+          k = 1:vq_cols; k2 = k.^2;
+#{
+          [nr nc] = size(vq_gain);
           for f=1:frames
             v = vq(idx(f),:);
-            k = 1:vq_cols; k2 = k.^2;
-#{
-            target = rate_K_surface_no_mean(f,vq_st:vq_en);
+            b = b_log(f,:);
+            
+            para_target = k2*b(2) + k*b(3) + b(4);
             
             % search vq_gain for best match to gain coefficients
 
-            [nr nc] = size(vq_gain);
             d = g = zeros(nr,1);
             for r=1:nr
-              %con = vq_gain(r,1)*v + vq_gain(r,2)*k2 + vq_gain(r,3)*k;
-              con = v + vq_gain(r,2)*k2 + vq_gain(r,3)*k;
-              g(r) = (sum(target) - sum(con))/vq_cols;
-              con  += g(r);
-              d(r) = (target-con)*(target-con)';
+              g(r) = (sum(para_target) - sum(vq_gain(r,:)))/vq_cols;
+              diff = para_target - (vq_gain(r,:) + g(r));
+              d(r) = diff*diff';
             end
             [dmin imin] = min(d);
-            b_ = vq_gain(imin,:);
-            printf("idx(%d): %d imin: %d b(1); %f b(2): %f b3: %f\n", f, idx(f), imin, b_(1), b_(2), b_(3));
-          
+            
             % recalc contrib
 
-           %contrib(f,:) = b_(1)*v + b_(2)*k2 + b_(3)*k + g(imin);
+            printf("f: %d imin: %d g: %f\n", f, imin, g(imin));
+            contrib(f,:) = b(1)*vq(idx(f),:) + vq_gain(imin,:) + g(imin);
 #}
-
-           contrib(f,:) = v + (-1/12.5)*b_log(f,3)*k2 + b_log(f,3)*k + b_log(f, 4);
-          end
+            for f=1:frames
+              target = rate_K_surface_no_mean(f,vq_st:vq_en);
+              b = b_log(f,:);
+              para_target = k2*b(2) + k*b(3) + b(4);
+              para_target(1) = quantise([-20 -10 0 10], para_target(1));
+              para_target(10) = quantise([-3 +3], para_target(10));
+              b_ = polyfit([k(1) k(10) k(25)],
+                           [para_target(1) para_target(10) -10],
+                           2);
+              v = vq(idx(f),:);
+              contrib(f,:) = b(1)*v + b_(1)*k2 + b_(2)*k + b_(3);
+              printf("f: %d pt1: %f pt10: %f b_(1): %f b_(2): %f b_(3): %f \n", f, para_target(1), para_target(10), b_(1), b_(2), b_(3));
+            end
         end
       end
 
@@ -398,7 +426,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         b_log = [b_log energy' idx'];
       end
 
-      rate_K_surface_no_mean_(:, vq_st:vq_en) = contrib;
+      rate_K_surface_no_mean_(:, vq_st:vq_en) = contrib; 
       res(:, vq_st:vq_en) = rate_K_surface_no_mean(:, vq_st:vq_en) - contrib;
       ind(:,i) = idx;
     
@@ -430,6 +458,55 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
 
   for f=1:frames
     rate_K_surface_(f,:) = rate_K_surface_no_mean_(f,:) + meanf(f);
+  end
+
+  % optional decimation
+  
+  if decimate
+    for f=1:frames
+
+      % determine frames that bracket the one we need to interp
+
+      left_f = decimate*floor((f-1)/decimate)+1; 
+      right_f = left_f + decimate;
+      if right_f > frames
+        right_f = left_f;
+      end
+
+      % determine fraction of each frame to use
+
+      left_fraction  = 1 - mod((f-1),decimate)/decimate;
+      right_fraction = 1 - left_fraction;
+
+      rate_K_surface_(f,:) = left_fraction*rate_K_surface_(left_f,:) + right_fraction*rate_K_surface_(right_f,:);
+      printf("f: %d left_f: %d right_f: %d left_fraction: %3.2f right_fraction: %3.2f \n", f, left_f, right_f, left_fraction, right_fraction)
+    end
+  end
+  
+  if decimate_var
+    %decvec = 1:4:frames;
+    d = 1; Ndv = length(decvec); right_f = 1;
+    for f=1:frames
+
+      % determine frames that bracket the one we need to interp
+
+      if f == decvec(d)
+        left_f = right_f;
+        if d < Ndv
+          d++;
+          right_f = decvec(d);
+          decimate = decvec(d) - decvec(d-1);
+        end
+      end
+      
+      % determine fraction of each frame to use
+
+      left_fraction  = 1 - (f - left_f)/decimate;
+      right_fraction = 1 - left_fraction;
+
+      rate_K_surface_(f,:) = left_fraction*rate_K_surface_(left_f,:) + right_fraction*rate_K_surface_(right_f,:);
+      printf("f: %d dec: %d lf: %d rf: %d lfrac: %3.2f rfrac: %3.2f \n", f, decimate, left_f, right_f, left_fraction, right_fraction)
+    end
   end
 
   [model_ AmdB_] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
