@@ -22,9 +22,9 @@ endfunction
 
 % bunch of parabolic curves from traring data
 
-function p = para(np)
+function p = para(np,K=10)
   load ../build_linux/src/all_hpf150_b_log.txt
-
+  
   % scale so MSE contribution is the same in VQ training
   
   x=std(b_log(:,2)); y=std(b_log(:,3));
@@ -32,7 +32,7 @@ function p = para(np)
   [idx cent]=kmeans(vec, np);
   cent1=[cent(:,1)*x cent(:,2)*y];
 
-  K = 10; k = 1:K; k2 = k.^2;
+  k = 1:K; k2 = k.^2;
   p = cent1*[k2; k];
 endfunction
 
@@ -163,3 +163,16 @@ function vq = vqfull
   %figure(1); clf; mesh(vq)
 
 endfunction
+
+function vq = vqhigh
+  vq = zeros(7,10);
+
+  vq(2,:) = [ 0   0   0   0   0  -6 -12 -18 -24 -30];
+  vq(3,:) = [ 12 12   6  -6 -12 -18 -24 -30 -36 -42];
+  vq(4,:) = [ 6  12  12   6  -6 -12 -18 -24 -30 -36];
+  vq(5,:) = [ 0   6  12  12   6  -6 -12 -18 -24 -30];
+  vq(6,:) = [ 0   0   6  12  12   6  -6 -12 -18 -24];
+  vq(7,:) = [ 0   0   0   6  12  12   6  -6 -12 -18];
+  figure(1); clf; plot(vq')
+endfunction
+
