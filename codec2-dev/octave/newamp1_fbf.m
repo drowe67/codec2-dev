@@ -22,12 +22,12 @@ function newamp1_fbf(samname, f=73, varargin)
   melvq;
 
   Fs = 8000; rate_K_sample_freqs_kHz = [0.1:0.1:4]; K = length(rate_K_sample_freqs_kHz);
-  quant_en = 0; vq_search = "gain";
+  quant_en = 0; vq_search = "gain"; 
   mask_en = 0;
   nvec = 0;
-  weight_en = quant_en = 0;
+  quant_en = weight_en = 0;
 
-  % optional VQ
+  % optional (split) VQ of rate K samples
 
   ind = arg_exists(varargin, "vq");
   if ind
@@ -35,6 +35,15 @@ function newamp1_fbf(samname, f=73, varargin)
     vq_filename = varargin{ind+2};
     x = load(vq_filename); vq = x.vq;
     [vq_rows vq_cols] = size(vq); vq_st = varargin{ind+1}; vq_en = vq_st + vq_cols - 1;
+  end
+  
+  % optional VQ of VQ gain coefficients
+
+  ind = arg_exists(varargin, "vq_gain");
+  if ind
+    nvec++;
+    vq_filename = varargin{ind+1};
+    x = load(vq_filename); vq_gain = x.vq;
   end
   
   % different vq search algorithms
@@ -95,7 +104,7 @@ function newamp1_fbf(samname, f=73, varargin)
     % default to the ideal
     
     rate_K_vec_ = rate_K_vec_fit; 
-
+ 
     if mask_en && nvec
       % experimental masking stuff that I can't seem to get to work
       maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz, bark_model=1);
@@ -134,24 +143,81 @@ function newamp1_fbf(samname, f=73, varargin)
       end
 
       if strcmp(vq_search, "gain")
-        [idx contrib errors test_ g mg sl] = vq_search_gain(vq, target, weights);
+        [idx contrib errors b] = vq_search_gain(vq, target, weights);
+      end
+
+      if strcmp(vq_search, "sg")
+        [idx contrib errors b] = vq_search_sg(vq, target);
       end
 
       if strcmp(vq_search, "slope")
-        [idx contrib errors test_ g mg sl] = vq_search_slope1(vq, target, weights);
+        [idx contrib errors b_log] = vq_search_slope(vq, target, "closed_quant_slope");
         rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-        % printf("g: %3.2f mg: %3.2f sl: %3.2f\n", g(idx), mg(idx), sl(idx));
+        printf(" mg: %3.2f sl: %3.2f g: %3.2f \n", b_log(1), b_log(2), b_log(3));
+        if quant_en
+          % set slope to 0
+          contrib1 = contrib;
+          contrib = b_log(1)*vq(idx,:) + b_log(3);
+          rate_K_vec_(vq_en+1:K) -= b_log(2)*vq_cols;
+        end
       end
 
       if strcmp(vq_search, "para")
         printf("\n");
         [idx contrib errors b] = vq_search_para(vq, target);
+
+        k = 1:vq_cols; k2 = k.^2;
+        para_target = k2*b(2) + k*b(3) + b(4);
+        samples = [1 10 25];
         if quant_en
-          % recalc gain using some index
-          g = (sum(target(1:vq_cols-10)) - sum(mg*vq(idx,1:vq_cols-10)))/length(target);
-          contrib = mg*vq(idx,:) + g;
-          contrib(vq_cols-4:vq_cols) += -3:-6:-30;
+
+#{
+          % search vq_gain for best match to gain coefficients
+
+          [nr nc] = size(vq_gain);
+          d = g = zeros(nr,1);
+          for r=1:nr
+            g(r) = (sum(para_target) - sum(vq_gain(r,:)))/vq_cols;
+            diff = para_target - (vq_gain(r,:) + g(r));
+            d(r) = diff*diff';
+          end
+          [dmin imin] = min(d);
+          
+#}
+          v = vq(idx,:);
+#{
+          rng = 1:vq_cols-5;
+          g = (sum(target(rng)) - sum(b(1)*v(rng)))/(vq_cols-5);
+          v(vq_cols-5:vq_cols) += -10*(1:6);
+          printf("g: %f\n", g);
+          % recalc contrib
+#}
+          para_target(1) = quantise([-20 -10 0 10], para_target(1));
+          %para_target(10) = quantise([-6 +6], para_target(10));
+          %para_target(10)
+          b_ = polyfit([k(1) k(10) k(25)],
+                       [para_target(1) para_target(10) -10],
+                       2);
+          
+          contrib1 = contrib;
+          contrib = b(1)*v + b_(1)*k2 + b_(2)*k + b_(3);
+          para = b_(1)*k2 + b_(2)*k + b_(3);
+          %printf("imin: %d\n", imin);
         end
+
+        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
+
+      end
+
+      if strcmp(vq_search, "cubic")
+        printf("\n");
+        [idx contrib errors b] = vq_search_cubic(target);
+        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
+      end
+
+      if strcmp(vq_search, "fourth")
+        printf("\n");
+        [idx contrib errors b] = vq_search_fourth(target);
         rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
         % printf("g: %3.2f mg: %3.2f sl: %3.2f\n", g(idx), mg(idx), sl(idx));
       end
@@ -159,6 +225,12 @@ function newamp1_fbf(samname, f=73, varargin)
       rate_K_vec_(vq_st:vq_en) = contrib;
 
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, contrib, 'm+-');
+      if strcmp(vq_search, "para")
+        plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, para_target, 'c+-');
+        if quant_en
+          plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, para, 'r+-');
+        end
+      end
       l = sprintf(";diff vq sd = %3.2f;k+-", std(target - contrib));
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, target - contrib, l);
     end
@@ -177,6 +249,12 @@ function newamp1_fbf(samname, f=73, varargin)
     end
     hold off;
 
+    if quant_en
+      figure(4); clf;
+      plot(contrib1, 'b+-');
+      hold on; plot(contrib,'r+'); hold off;
+    end
+    
     if weight_en
       figure(3); clf;
       subplot(211);
@@ -198,9 +276,7 @@ function newamp1_fbf(samname, f=73, varargin)
 
     if k == 'w'
       quant_en++;
-      if quant_en == 2
-        quant_en = 0;
-      end
+      if quant_en == 2; quant_en = 0; end
     endif
     if k == 'n'
       f = f + 1;

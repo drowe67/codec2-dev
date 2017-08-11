@@ -56,7 +56,8 @@ function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
   vq_search = "mse";
   mode = "const";
   fit_order = 0;
-
+  mean_remove = 1;
+  
   % parse variable argument list
 
   if (length (varargin) > 0)
@@ -113,6 +114,10 @@ function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
         save(fn,"b_log");
       end
     end
+  end
+  if strcmp(mode, 'pred')
+    [model_ surface b_log] = experiment_const_freq_pred(model, varargin{:});
+    mean_remove = 0;
   end
   if strcmp(mode, 'piecewise')
     model_ = experiment_piecewise(model);
@@ -184,10 +189,14 @@ function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
     end
   end
 
-  for f=1:frames
-    surface_no_mean(f,:) = surface(f,:) - mean(surface(f,:));
+  if mean_remove
+    for f=1:frames
+      surface_no_mean(f,:) = surface(f,:) - mean(surface(f,:));
+    end
+  else
+    surface_no_mean = surface;
   end
-
+  
   printf("\n")
 
 endfunction
@@ -223,7 +232,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   Fs = 8000;
   fg = 1;
   mask_en = 0;
-  vq_search = "gain";   % defaul to gain search method as it's our favourite atm
+  vq_search = "gain";   % default to gain search method as it's our favourite atm
   nvq = 0;              % number of vector quantisers
   vq_start = [];
   quant_en = 0;
@@ -360,7 +369,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
       end
 
       if strcmp(vq_search, "gain")
-        [idx contrib errors test_ g mg sl] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
+        [idx contrib errors b_log] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
       if strcmp(vq_search, "mg")
@@ -373,7 +382,16 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
       end
 
       if strcmp(vq_search, "slope")
-        [idx contrib errors test_ g mg sl] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
+        [idx contrib errors b_log] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en), "closed_quant_slope");
+        b_log = [b_log energy' idx'];
+
+        for f=1:frames
+          target = rate_K_surface_no_mean(f,vq_st:vq_en);
+          b_log(f,2) = quantise([-1 -0.5 0.5 1], b_log(f,2));
+          b_log(f,3) = (sum(target) - sum(b_log(f,1)*vq(idx(f),:)+b_log(f,2)*(1:vq_cols)))/vq_cols;
+          contrib(f,:) = b_log(f,1)*vq(idx(f),:) + b_log(f,2)*(1:vq_cols) + b_log(f,3);
+          %rate_K_surface_no_mean_(f, vq_en+1:K) -= b_log(f,2)*vq_cols + b_log(f,3);
+        end
       end
 
       if strcmp(vq_search, "para")
@@ -430,14 +448,18 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
       res(:, vq_st:vq_en) = rate_K_surface_no_mean(:, vq_st:vq_en) - contrib;
       ind(:,i) = idx;
     
-      % histograms of higher order gain/shape params if we are in slope mode
+      % histograms of higher order gain/shape params
 
+      if strcmp(vq_search, "gain")
+        figure(fg++); clf; hist(b_log, 30); title('gain')
+      end
+      
       if strcmp(vq_search, "slope")
 
         hmg = hsl = zeros(1,frames);
         for f=1:frames
-          hmg(f) = mg(f, idx(f));
-          hsl(f) = sl(f, idx(f));
+          hmg(f) = b_log(f, 1);
+          hsl(f) = b_log(f, 3);
         end
         figure(fg++); clf; hist(hmg, 30); title('mag')
         figure(fg++); clf; hist(hsl, 30); title('slope')
@@ -463,6 +485,11 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   % optional decimation
   
   if decimate
+    %lf = [1.00 0.75 0.50 0.25];
+    %lf = [1.00 1.00 0.50 0.00];
+    %lf = [1.00 1.00 0.00 0.00];
+    lf = [1.00 0.80 0.20 0.00];
+    
     for f=1:frames
 
       % determine frames that bracket the one we need to interp
@@ -475,7 +502,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
 
       % determine fraction of each frame to use
 
-      left_fraction  = 1 - mod((f-1),decimate)/decimate;
+      left_fraction  = lf(mod(f-1,decimate)+1);
       right_fraction = 1 - left_fraction;
 
       rate_K_surface_(f,:) = left_fraction*rate_K_surface_(left_f,:) + right_fraction*rate_K_surface_(right_f,:);
@@ -527,6 +554,212 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
       figure(fg++); clf; plot((1:L)*Wo*4/pi, AmdB(1:L),'b+-'); hold on; plot((1:L)*Wo*4/pi, AmdB_(f,1:L),'r+-');
       plot(rate_K_sample_freqs_kHz, rate_K_surface_(f,:), 'c+-'); hold off;
      end
+  end
+  printf("rate K resampling SD: %3.2f\n", mean(sd));
+  figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');
+  figure(fg++); clf; hist(sd);
+   
+endfunction
+
+function model_ = experiment_dct(model)
+
+  [frames tmp] = size(model); max_amp = 160;
+
+  for f=1:frames
+    printf("%d ", f);   
+    Wo = model(f,1);
+    L = min([model(f,2) max_amp-1]);
+    Am = model(f,3:(L+2));
+    AmdB = 20*log10(Am);
+
+    % fit model
+
+    D = dct(AmdB);
+    E = zeros(1,L);
+    E(1:min(20,L)) = D(1:min(20,L));
+    AmdB_ = idct(D);
+
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(1:L)/20);
+  end
+
+endfunction
+
+
+% Predictive VQ using rate K resampled vectors, and rate 2 decimation
+
+function [model_ rate_K_surface_pred_ b_log] = experiment_const_freq_pred(model, varargin)
+  melvq;
+  [frames nc] = size(model);
+  Fs = 8000;
+  fg = 1;
+  nvq = 0;              % number of vector quantisers
+  vq_start = [];
+  quant_en = 0;
+  b_log = [];
+  decimate = 2;
+  frames2 = floor(frames/decimate);
+  
+  rate_K_sample_freqs_kHz = [0.1:0.1:4];
+  K = length(rate_K_sample_freqs_kHz);
+  
+  % parse command line options
+
+  % set vq search algorithm, e.g. mse, gain, mag, slope.  We've settled on "gain" for now
+  % as slope required extra bits to quantise higher order parameters that offset advantages
+
+  ind = arg_exists(varargin, "vq_search");
+  if ind
+    vq_search = varargin{ind+1};
+  end
+
+  % specify one of more VQs
+
+  ind = anind = arg_exists(varargin, "vq");
+  while anind
+    nvq++;
+    vq_start = [vq_start varargin{ind+1}];
+    avq_filename =  varargin{ind+2};
+    if nvq < 2
+      vq_filename = avq_filename;
+    else
+      vq_filename = [vq_filename; avq_filename];
+    end
+    printf("nvq %d vq_start: %d vq_filename: %s\n", nvq, vq_start(nvq), avq_filename);
+    anind = arg_exists(varargin(ind+1:length(varargin)), "vq");
+    if anind
+      ind += anind;
+    end
+  end
+  
+  ind = arg_exists(varargin, "vq_gain");
+  if ind
+    avq_filename = varargin{ind+1};
+    x = load(avq_filename); vq_gain = x.vq;
+    quant_en = 1
+  end
+
+  ind = arg_exists(varargin, "decimate");
+  if ind
+    decimate = varargin{ind+1};
+  end
+   
+  % OK start processing ............................................
+
+  energy = zeros(1,frames/decimate);
+  for f=1:decimate:frames
+    L = model(f,2);
+    energy(f) = 10*log10(sum( model(f,3:(L+2)) .^ 2 ));
+  end
+
+  rate_K_surface = resample_const_rate_f(model, rate_K_sample_freqs_kHz, Fs);
+
+  % decimate and predict
+  
+  rate_K_surface_pred = zeros(frames2, K);
+  beta = 0.9;
+  g = 1;
+  for f=3:decimate:frames
+    rate_K_surface_pred(g,:) = rate_K_surface(f,:) - beta*rate_K_surface(f-2,:);
+    g++;
+  end
+  
+  rate_K_surface_ = zeros(frames,K);
+  rate_K_surface_(1,:) = rate_K_surface(1,:);
+  g = 1;
+
+  % optional vector quantise
+  
+  if nvq
+ 
+    % note we init with target (ideal) to fill in values not covered by this VQ
+
+    rate_K_surface_pred_ = rate_K_surface_pred;
+    res = zeros(frames2, K); ind = zeros(frames2, nvq);
+
+    % quantise using split VQs
+
+    for i=1:nvq
+      avq_filename = char(cellstr(vq_filename)(i));
+      x = load(avq_filename); vq = x.vq; [vq_rows vq_cols] = size(vq);
+      vq_st = vq_start(i); vq_en = vq_st + vq_cols - 1;
+      printf("split VQ: %d vq_filename: %s vq_st: %d vq_en: %d nVec: %d\n", i, avq_filename, vq_st, vq_en, vq_rows);
+
+      for f=3:decimate:frames
+        rate_K_vec_pred = rate_K_surface(f,:) - beta*rate_K_surface_(f-2,:);
+        
+        if strcmp(vq_search, "mg")
+          [idx contrib errors b_log] = vq_search_mg(vq, rate_K_vec_pred(vq_st:vq_en));
+        end
+        
+        rate_K_vec_pred_ = rate_K_vec_pred;
+        rate_K_vec_pred_(vq_st:vq_en) = contrib; 
+        rate_K_surface_(f,:) = beta*rate_K_surface_(f-2,:) + rate_K_vec_pred_;
+
+        res(:, vq_st:vq_en) = rate_K_surface_pred(:, vq_st:vq_en) - contrib;
+        ind(:,i) = idx;
+      end
+      
+      % histograms of higher order gain/shape params if we are in slope mode
+
+      sd_per_frame = std(res(:,vq_st:vq_en)');
+      t=sprintf("VQ %d", i); 
+      figure(fg++); subplot(211); plot(energy); title(t); subplot(212); plot(sd_per_frame); 
+      figure(fg++); subplot(211); hist(sd_per_frame); title(t); subplot(212); hist(ind(:,i),100);
+      printf("VQ rms SD: %3.2f\n", mean(sd_per_frame));
+    end
+ 
+    figure(fg++); clf; mesh(res);
+
+  else
+    rate_K_surface_pred_ = rate_K_surface_pred;
+    for f=3:decimate:frames
+      rate_K_surface_(f,:) = beta*rate_K_surface_(f-2,:) + rate_K_surface_pred_(g,:);
+      g++;
+    end
+  end
+
+  % re-interpolate back to 10ms rate
+  
+  if decimate
+    for f=1:frames
+
+      % determine frames that bracket the one we need to interp
+
+      left_f = decimate*floor((f-1)/decimate)+1; 
+      right_f = left_f + decimate;
+      if right_f > frames
+        right_f = left_f;
+      end
+
+      % determine fraction of each frame to use
+
+      left_fraction  = 1 - mod((f-1),decimate)/decimate;
+      right_fraction = 1 - left_fraction;
+
+      rate_K_surface_(f,:) = left_fraction*rate_K_surface_(left_f,:) + right_fraction*rate_K_surface_(right_f,:);
+      %printf("f: %d left_f: %d right_f: %d left_fraction: %3.2f right_fraction: %3.2f \n", f, left_f, right_f, left_fraction, right_fraction)
+    end
+  end
+  
+  [model_ AmdB_] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs);
+
+  % Measure distortion between AmdB and AmdB_, ths includes distortion
+  % in the rate K <-> L transition.  Can optionally plot distorted
+  % frames
+
+  plot_sd_thresh = 5;
+  sd = zeros(1,frames2); g = 1;
+  for f=1:decimate:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    AmdB = 20*log10(model(f,3:(L+2)));
+    sd(g) = std(AmdB(1:L) - AmdB_(f,1:L));
+    if (sd(g) > plot_sd_thresh) && (fg < 10)
+      printf("fg: %d f: %d\n", fg, f);
+      figure(fg++); clf; plot((1:L)*Wo*4/pi, AmdB(1:L),'b+-'); hold on; plot((1:L)*Wo*4/pi, AmdB_(f,1:L),'r+-');
+      plot(rate_K_sample_freqs_kHz, rate_K_surface_(f,:), 'c+-'); hold off;
+    end
+    g++;
   end
   printf("rate K resampling SD: %3.2f\n", mean(sd));
   figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');

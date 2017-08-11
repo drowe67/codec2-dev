@@ -1,7 +1,7 @@
 %----------------------------------------------------------------------
 % abs() search with a linear, ampl scaling, and slope term
 
-function [idx contrib errors b_log2] = vq_search_slope(vq, data)
+function [idx contrib errors b_log2] = vq_search_slope(vq, data, closed_quant_fn, open_quant_fn)
   [nVec nCols] = size(vq);
   nRows = rows(data);
   
@@ -23,20 +23,18 @@ function [idx contrib errors b_log2] = vq_search_slope(vq, data)
 
   for f=1:nRows
     target = data(f,:);
-    %target = 2*vq(1,:)+1;
 
     for i=1:nVec
       c = [sum(target) target*(1:nCols)' target*vq(i,:)' ]';
       b = inv(A(:,:,i))*c;
-
-      b(1) = max(0.5,b(1)); b(1) = min(1,b(1));
+      if nargin == 3;
+        b = feval(closed_quant_fn,b);
+      end;  
       b_log(i,:) = b; 
       
       diff(i,:) = target - (b(1)*vq(i,:) + b(2)*(1:nCols) + b(3));
-      %diff(i,nCols-5:nCols) *= 0.25;
 
       error(i) = diff(i,:) * diff(i,:)';
-      b_log(i,:) = b; 
 
       %printf("f: %d i: %d mg: %f g: %f sl: %f error: %f\n", f, i, b(1), b(2), b(3), error(i));
     end
@@ -47,8 +45,8 @@ function [idx contrib errors b_log2] = vq_search_slope(vq, data)
     b = b_log(min_ind,:);
     b_log2(f,:) = b;
     
-    printf("f: %d mg: %f sl: %f g: %f\n", f, b(1), b(2), b(3));
-    contrib(f,:) = test_(f,:) = 0.8*vq(min_ind,:) + b(2)*(1:nCols) + b(3);
+    %printf("f: %d i: %d mg: %f sl: %f g: %f\n", f, idx(f), b(1), b(2), b(3));
+    contrib(f,:) = b(1)*vq(min_ind,:) + b(2)*(1:nCols) + b(3);
   end
 
 endfunction
