@@ -27,9 +27,9 @@ function [idx contrib errors b_log2] = vq_search_slope(vq, data, closed_quant_fn
     for i=1:nVec
       c = [sum(target) target*(1:nCols)' target*vq(i,:)' ]';
       b = inv(A(:,:,i))*c;
-      if nargin == 3;
+      if nargin >= 3;
         b = feval(closed_quant_fn,b);
-      end;  
+      end
       b_log(i,:) = b; 
       
       diff(i,:) = target - (b(1)*vq(i,:) + b(2)*(1:nCols) + b(3));
@@ -43,9 +43,17 @@ function [idx contrib errors b_log2] = vq_search_slope(vq, data, closed_quant_fn
     errors(f) = mn; 
     idx(f) = min_ind(1);
     b = b_log(min_ind,:);
-    b_log2(f,:) = b;
+
+    % optional quantisation performed after error min loop
+    % - note we recalc gain to match energy after quantisation
     
-    %printf("f: %d i: %d mg: %f sl: %f g: %f\n", f, idx(f), b(1), b(2), b(3));
+    if nargin == 4
+      b = feval(open_quant_fn, b);
+      b(3) = (sum(target) - sum(b(1)*vq(min_ind,:) + b(2)*(1:nCols)))/nCols;    
+    end
+
+    printf("f: %d i: %d mg: %f sl: %f g: %f\n", f, idx(f), b(1), b(2), b(3));
+    b_log2(f,:) = b;
     contrib(f,:) = b(1)*vq(min_ind,:) + b(2)*(1:nCols) + b(3);
   end
 
