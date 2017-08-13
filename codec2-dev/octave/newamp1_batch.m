@@ -154,20 +154,20 @@ function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
 
         % synthesis phase spectra from magnitiude spectra using minimum phase techniques
 
-        fft_enc = 256;
+        fft_enc = 512;
         phase = determine_phase(model_, f, fft_enc);
         assert(length(phase) == fft_enc);
 
-        % sample phase at centre of each harmonic, not 1st entry Hm[1] in octave Hm[0] in C
+        % sample phase at centre of each harmonic, not 1st entry Hm(1:2) in octave Hm[0] in C
         % is not used
 
         Hm = zeros(1, 2*max_amp);
         for m=1:L
           b = round(m*Wo*fft_enc/(2*pi));
-          Hm(2*m) = cos(phase(b));
-          Hm(2*m+1) = -sin(phase(b));
+          Hm(2*m+1) = cos(phase(b));
+          Hm(2*m+2) = sin(phase(b));
         end
-        fwrite(fhm, Hm, "float32");    
+        fwrite(fhm, Hm, "float32");
       end
     end
  
@@ -382,16 +382,9 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
       end
 
       if strcmp(vq_search, "slope")
-        [idx contrib errors b_log] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en), "closed_quant_slope");
+        [idx contrib errors b_log] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en),
+                                                     "closed_quant_slope", "open_quant_slope");
         b_log = [b_log energy' idx'];
-
-        for f=1:frames
-          target = rate_K_surface_no_mean(f,vq_st:vq_en);
-          b_log(f,2) = quantise([-1 -0.5 0.5 1], b_log(f,2));
-          b_log(f,3) = (sum(target) - sum(b_log(f,1)*vq(idx(f),:)+b_log(f,2)*(1:vq_cols)))/vq_cols;
-          contrib(f,:) = b_log(f,1)*vq(idx(f),:) + b_log(f,2)*(1:vq_cols) + b_log(f,3);
-          %rate_K_surface_no_mean_(f, vq_en+1:K) -= b_log(f,2)*vq_cols + b_log(f,3);
-        end
       end
 
       if strcmp(vq_search, "para")
@@ -459,7 +452,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         hmg = hsl = zeros(1,frames);
         for f=1:frames
           hmg(f) = b_log(f, 1);
-          hsl(f) = b_log(f, 3);
+          hsl(f) = b_log(f, 2);
         end
         figure(fg++); clf; hist(hmg, 30); title('mag')
         figure(fg++); clf; hist(hsl, 30); title('slope')
