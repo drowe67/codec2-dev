@@ -59,6 +59,14 @@ function newamp1_fbf(samname, f=73, varargin)
     fit_order = 1;
   end
 
+  % optional exploration of phase
+
+  ind = arg_exists(varargin, "phase");
+  phase_en = 0;
+  if ind
+    phase_en = 1;
+  end
+  
   if quant_en
     printf("quant_en: %d vq_filename: %s vq_st: %d vq_en: %d vq_search: %s\n", 
            quant_en, vq_filename, vq_st, vq_en, vq_search);
@@ -74,12 +82,18 @@ function newamp1_fbf(samname, f=73, varargin)
   model = load(model_name);
   [frames tmp] = size(model);
 
+  if phase_en
+    phase_name = strcat(samname,"_phase.txt");
+    phase = load(phase_name);
+  end
+  
   % Keyboard loop --------------------------------------------------------------
 
   k = ' ';
   do 
+    fg = 1;
     s = [ Sn(2*f-1,:) Sn(2*f,:) ];
-    figure(1); clf; plot(s); axis([1 length(s) -20000 20000]);
+    figure(fg++); clf; plot(s); axis([1 length(s) -20000 20000]);
 
     Wo = model(f,1); L = model(f,2); Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*4/pi;
@@ -94,7 +108,7 @@ function newamp1_fbf(samname, f=73, varargin)
 
     % plots ----------------------------------
   
-    figure(2); clf;
+    figure(fg++); clf;
     l = sprintf(";rate %d AmdB;g+-", L);
     plot((1:L)*Wo*4000/pi, AmdB, l);
     axis([1 4000 -20 80]);
@@ -249,14 +263,50 @@ function newamp1_fbf(samname, f=73, varargin)
     end
     hold off;
 
+    if phase_en
+
+      % est phase using HT
+
+      Am_ = model(f,3:(L+2));
+      fft_enc = 512;
+      phase_est = determine_phase(model_, 1, fft_enc);
+      phase0 = zeros(1,L);
+      for m=1:L
+        b = round(m*Wo*fft_enc/(2*pi));
+        phase0(m) = phase_est(b);
+      end
+      
+      % plot amplitudes and phase for first 1kHz
+      
+      figure(fg++); clf;
+      subplot(211);
+      plot((1:L)*Wo*4000/pi, AmdB_(1:L),'+-');
+      subplot(212);
+      plot((1:L)*Wo*4000/pi, phase(f,1:L),'+-');
+      hold on;
+      plot((1:L)*Wo*4000/pi, phase0(1:L),'r+-');
+      hold off;
+      
+      % simple synthesis using sinusoidal parameters
+
+      figure(fg++); clf;
+      N = 320;
+      s = s_phase0 = zeros(1,N);
+      for m=1:L
+        s = s + Am_(m)*cos(m*Wo*(1:N) + phase(f,m));
+        s_phase0 = s_phase0 + Am_(m)*cos(m*Wo*(1:N) + phase0(m));
+      end
+      subplot(211); plot(s); subplot(212); plot(s_phase0,'g');
+    end
+    
     if quant_en
-      figure(4); clf;
+      figure(fg++); clf;
       plot(contrib1, 'b+-');
       hold on; plot(contrib,'r+'); hold off;
     end
     
     if weight_en
-      figure(3); clf;
+      figure(fg++); clf;
       subplot(211);
       plot((1:L)*Wo*4000/pi, AmdB,";AmdB;g+-");
       axis([1 4000 -20 80]);
