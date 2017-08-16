@@ -244,29 +244,17 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   
   % parse command line options
 
-  % set vq search algorithm, e.g. mse, gain, mag, slope.  We've settled on "gain" for now
-  % as slope required extra bits to quantise higher order parameters that offset advantages
-
-  weight_en = arg_exists(varargin, "weight");
-
-  ind = arg_exists(varargin, "vq_search");
-  if ind
-    vq_search = varargin{ind+1};
-  end
-
-  % specify one of more VQs
+  % specify one of more vqs, start index, vq file name, and search method
 
   ind = anind = arg_exists(varargin, "vq");
   while anind
     nvq++;
     vq_start = [vq_start varargin{ind+1}];
     avq_filename =  varargin{ind+2};
-    if nvq < 2
-      vq_filename = avq_filename;
-    else
-      vq_filename = [vq_filename; avq_filename];
-    end
-    printf("nvq %d vq_start: %d vq_filename: %s weight_en: %d\n", nvq, vq_start(nvq), avq_filename, weight_en > 0);
+    if nvq < 2; vq_filename = avq_filename; else; vq_filename = [vq_filename; avq_filename]; end;
+    avq_search =  varargin{ind+3};
+    if nvq < 2; vq_search = avq_search; else; vq_search = [vq_search; avq_search]; end;
+    printf("nvq %d vq_start: %d vq_filename: %s vq_search: %s\n", nvq, vq_start(nvq), avq_filename, avq_search);
     anind = arg_exists(varargin(ind+1:length(varargin)), "vq");
     if anind
       ind += anind;
@@ -342,52 +330,47 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
     rate_K_surface_no_mean_ = rate_K_surface_no_mean;
     res = zeros(frames, K); ind = zeros(frames, nvq);
 
+    gains = zeros(frames, nvq);
+    
     % quantise using split VQs
 
     for i=1:nvq
       avq_filename = char(cellstr(vq_filename)(i));
+      avq_search = char(cellstr(vq_search)(i));
       x = load(avq_filename); vq = x.vq; [vq_rows vq_cols] = size(vq);
       vq_st = vq_start(i); vq_en = vq_st + vq_cols - 1;
-      printf("split VQ: %d vq_filename: %s vq_st: %d vq_en: %d nVec: %d\n", i, avq_filename, vq_st, vq_en, vq_rows);
+      printf("split VQ: %d vq_filename: %s vq_search: %s vq_st: %d vq_en: %d nVec: %d\n", i, avq_filename, avq_search, vq_st, vq_en, vq_rows);
 
-      weights = ones(frames, vq_en - vq_st + 1);
-      if weight_en
-
-        % generate weighting.  if min is 20dB and max 40dB, weight at min
-        %  is 1 and max 2, same for -10 to 10.  So gradient = 0.05, we only
-        % have to calculate y intercept
-
-        for f=1:frames
-          target = rate_K_surface_no_mean(f,vq_st:vq_en);
-          gradient = 0.05; yint = 1 - gradient*min(target);
-          weights(f,:) = gradient*target + yint;
-        end
-      end
-
-      if strcmp(vq_search, "mse")
+      if strcmp(avq_search, "mse")
         [idx contrib errors test_ g mg sl] = vq_search_mse(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
       end
 
-      if strcmp(vq_search, "gain")
+      if strcmp(avq_search, "gain")
         [idx contrib errors b_log] = vq_search_gain(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
-      if strcmp(vq_search, "mg")
-        [idx contrib errors b_log] = vq_search_mg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+      if strcmp(avq_search, "max")
+        [idx contrib errors b_log] = vq_search_max(vq, rate_K_surface_no_mean(:,vq_st:vq_en), weights);
       end
 
-      if strcmp(vq_search, "sg")
+       if strcmp(avq_search, "mg")
+        [idx contrib errors b_log] = vq_search_mg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
+        gains(:, i) = b_log(:, 2);
+      end
+
+      if strcmp(avq_search, "sg")
         [idx contrib errors b_log] = vq_search_sg(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
         b_log = [b_log energy' idx'];
       end
 
-      if strcmp(vq_search, "slope")
+      if strcmp(avq_search, "slope")
         [idx contrib errors b_log] = vq_search_slope(vq, rate_K_surface_no_mean(:,vq_st:vq_en),
                                                      "closed_quant_slope", "open_quant_slope");
         b_log = [b_log energy' idx'];
+        gains(:, i) = b_log(:, 3);
       end
 
-      if strcmp(vq_search, "para")
+      if strcmp(avq_search, "para")
         [idx contrib errors b_log] = vq_search_para(vq, rate_K_surface_no_mean(:,vq_st:vq_en));
         b_log = [b_log energy' idx'];
         
@@ -432,7 +415,7 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
         end
       end
 
-      if strcmp(vq_search, "cubic")
+      if strcmp(avq_search, "cubic")
         [idx contrib errors b_log] = vq_search_cubic(rate_K_surface_no_mean(:,vq_st:vq_en));
         b_log = [b_log energy' idx'];
       end
@@ -443,11 +426,15 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
     
       % histograms of higher order gain/shape params
 
-      if strcmp(vq_search, "gain")
+      if strcmp(avq_search, "gain")
         figure(fg++); clf; hist(b_log, 30); title('gain')
       end
       
-      if strcmp(vq_search, "slope")
+      if strcmp(avq_search, "mg")
+        figure(fg++); clf; hist(b_log(:,1),30); title('mag')
+      end
+      
+      if strcmp(avq_search, "slope")
 
         hmg = hsl = zeros(1,frames);
         for f=1:frames
@@ -551,7 +538,9 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   printf("rate K resampling SD: %3.2f\n", mean(sd));
   figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');
   figure(fg++); clf; hist(sd);
-   
+
+  figure(fg++); clf; plot(gains);
+  figure(fg++); clf; plot(gains(:,1), gains(:,2), '+');
 endfunction
 
 function model_ = experiment_dct(model)
@@ -1257,7 +1246,7 @@ endfunction
 
 function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
-  K = 20; Fs = 16000; correct_rate_K_en = 0;
+  K = 20; Fs = 8000; correct_rate_K_en = 0;
 
   for f=1:frames
     Wo = model(f,1);
@@ -1265,7 +1254,7 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     Am = model(f,3:(L+2));
     AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
-    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'para');
     if correct_rate_K_en
       [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs);
       [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
@@ -1275,7 +1264,11 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
     end
   end
 
-  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs);
+  if plots
+    mesh(rate_K_surface);
+  end
+  
+  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs, 'para');
  
 endfunction
 
