@@ -160,8 +160,16 @@ function newamp1_fbf(samname, f=73, varargin)
         [idx contrib errors b] = vq_search_gain(vq, target, weights);
       end
 
+      if strcmp(vq_search, "max")
+        [idx contrib errors b] = vq_search_max(vq, target);
+      end
+
       if strcmp(vq_search, "sg")
         [idx contrib errors b] = vq_search_sg(vq, target);
+      end
+
+      if strcmp(vq_search, "mg")
+        [idx contrib errors b] = vq_search_mg(vq, target);
       end
 
       if strcmp(vq_search, "slope")
