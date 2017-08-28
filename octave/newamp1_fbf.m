@@ -24,41 +24,31 @@ function newamp1_fbf(samname, f=73, varargin)
   Fs = 8000; rate_K_sample_freqs_kHz = [0.1:0.1:4]; K = length(rate_K_sample_freqs_kHz);
   quant_en = 0; vq_search = "gain"; 
   mask_en = 0;
-  nvec = 0;
+  nvq = 0; vq_start = [];
   quant_en = weight_en = 0;
 
-  % optional (split) VQ of rate K samples
+  % specify one of more vqs, start index, vq file name, and search method
 
-  ind = arg_exists(varargin, "vq");
-  if ind
-    nvec++;
-    vq_filename = varargin{ind+2};
-    x = load(vq_filename); vq = x.vq;
-    [vq_rows vq_cols] = size(vq); vq_st = varargin{ind+1}; vq_en = vq_st + vq_cols - 1;
+  ind = anind = arg_exists(varargin, "vq");
+  while anind
+    nvq++;
+    vq_start = [vq_start varargin{ind+1}];
+    avq_filename =  varargin{ind+2};
+    if nvq < 2; vq_filename = avq_filename; else; vq_filename = [vq_filename; avq_filename]; end;
+    avq_search =  varargin{ind+3};
+    if nvq < 2; vq_search = avq_search; else; vq_search = [vq_search; avq_search]; end;
+    printf("nvq %d vq_start: %d vq_filename: %s vq_search: %s\n", nvq, vq_start(nvq), avq_filename, avq_search);
+    anind = arg_exists(varargin(ind+1:length(varargin)), "vq");
+    if anind
+      ind += anind;
+    end
   end
   
-  % optional VQ of VQ gain coefficients
-
-  ind = arg_exists(varargin, "vq_gain");
-  if ind
-    nvec++;
-    vq_filename = varargin{ind+1};
-    x = load(vq_filename); vq_gain = x.vq;
-  end
-  
-  % different vq search algorithms
-
-  ind = arg_exists(varargin, "vq_search");
-  if ind
-    vq_search = varargin{ind+1};
-  end
-
   fit_order = 0;
-  ind = arg_exists(varargin, "noslope");
-  if ind
-    fit_order = 1;
-  end
 
+  ind = arg_exists(varargin, "construct");
+  vq_search = varargin{ind};
+  
   % optional exploration of phase
 
   ind = arg_exists(varargin, "phase");
@@ -119,133 +109,64 @@ function newamp1_fbf(samname, f=73, varargin)
     
     rate_K_vec_ = rate_K_vec_fit; 
  
-    if mask_en && nvec
+    if mask_en && nvq
       % experimental masking stuff that I can't seem to get to work
       maskdB = determine_mask(rate_K_vec, rate_K_sample_freqs_kHz, rate_K_sample_freqs_kHz, bark_model=1);
       plot(rate_K_sample_freqs_kHz*1000, maskdB, ";mask dB;c+-");
     end
 
-    if nvec
-      if mask_en
-        target = rate_K_vec;
-        mask_thresh = 3;
-        ind = find (maskdB - target > mask_thresh);
-        target(ind) = maskdB(ind) - mask_thresh;
-        plot(rate_K_sample_freqs_kHz*1000, target, ";target;m+-");
-        target = target(vq_st:vq_en) - b;
-      else
-        target = rate_K_vec_fit(vq_st:vq_en);
-      end
-
-      weights = ones(1, vq_en - vq_st + 1);
-      if weight_en
-
-        % generate weighting.  if min is 20dB and max 40dB, weight at min
-        % is 1 and max 2, same for -10 to 10.  So gradient = 0.05, we only
-        % haveto calculate y intercept
-
-        gradient = 0.05; yint = 1 - gradient*min(target);
-        weights = gradient*target + yint;
-      end
+    if strcmp(vq_search, "construct")
+      target = rate_K_vec_fit;
+      [idx contrib errors b] = vq_construct_mg(target);
+      rate_K_vec_ = contrib;
     end
-    
-    if nvec
-      
-      if strcmp(vq_search, "mse")
-        [idx contrib errors test_ g mg sl] = vq_search_mse(vq, target);
-        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-      end
 
-      if strcmp(vq_search, "gain")
-        [idx contrib errors b] = vq_search_gain(vq, target, weights);
-      end
+    if nvq
 
-      if strcmp(vq_search, "max")
-        [idx contrib errors b] = vq_search_max(vq, target);
-      end
+      for i=1:nvq
+        avq_filename = char(cellstr(vq_filename)(i));
+        avq_search = char(cellstr(vq_search)(i));
+        x = load(avq_filename); vq = x.vq; [vq_rows vq_cols] = size(vq);
+        vq_st = vq_start(i); vq_en = vq_st + vq_cols - 1;
+        printf("\nsplit VQ: %d vq_filename: %s vq_search: %s vq_st: %d vq_en: %d nVec: %d\n", i, avq_filename, avq_search, vq_st, vq_en, vq_rows);
+        target = rate_K_vec_fit(vq_st:vq_en);
 
-      if strcmp(vq_search, "sg")
-        [idx contrib errors b] = vq_search_sg(vq, target);
-      end
-
-      if strcmp(vq_search, "mg")
-        [idx contrib errors b] = vq_search_mg(vq, target);
-      end
-
-      if strcmp(vq_search, "slope")
-        [idx contrib errors b_log] = vq_search_slope(vq, target, "closed_quant_slope");
-        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-        printf(" mg: %3.2f sl: %3.2f g: %3.2f \n", b_log(1), b_log(2), b_log(3));
-        if quant_en
-          % set slope to 0
-          contrib1 = contrib;
-          contrib = b_log(1)*vq(idx,:) + b_log(3);
-          rate_K_vec_(vq_en+1:K) -= b_log(2)*vq_cols;
+        if strcmp(avq_search, "mse")
+          [idx contrib errors test_ g mg sl] = vq_search_mse(vq, target);
+          rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
         end
-      end
 
-      if strcmp(vq_search, "para")
-        printf("\n");
-        [idx contrib errors b] = vq_search_para(vq, target);
+        if strcmp(avq_search, "gain")
+          [idx contrib errors b] = vq_search_gain(vq, target, weights);
+        end
 
-        k = 1:vq_cols; k2 = k.^2;
-        para_target = k2*b(2) + k*b(3) + b(4);
-        samples = [1 10 25];
-        if quant_en
+        if strcmp(avq_search, "max")
+          [idx contrib errors b] = vq_search_max(vq, target);
+        end
 
-#{
-          % search vq_gain for best match to gain coefficients
+        if strcmp(avq_search, "sg")
+          [idx contrib errors b] = vq_search_sg(vq, target);
+        end
 
-          [nr nc] = size(vq_gain);
-          d = g = zeros(nr,1);
-          for r=1:nr
-            g(r) = (sum(para_target) - sum(vq_gain(r,:)))/vq_cols;
-            diff = para_target - (vq_gain(r,:) + g(r));
-            d(r) = diff*diff';
+        if strcmp(avq_search, "mg")
+          [idx contrib errors b] = vq_search_mg(vq, target);
+        end
+
+        if strcmp(avq_search, "slope")
+          [idx contrib errors b_log] = vq_search_slope(vq, target, "closed_quant_slope");
+          rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
+          printf(" mg: %3.2f sl: %3.2f g: %3.2f \n", b_log(1), b_log(2), b_log(3));
+          if quant_en
+            % set slope to 0
+            contrib1 = contrib;
+            contrib = b_log(1)*vq(idx,:) + b_log(3);
+            rate_K_vec_(vq_en+1:K) -= b_log(2)*vq_cols;
           end
-          [dmin imin] = min(d);
-          
-#}
-          v = vq(idx,:);
-#{
-          rng = 1:vq_cols-5;
-          g = (sum(target(rng)) - sum(b(1)*v(rng)))/(vq_cols-5);
-          v(vq_cols-5:vq_cols) += -10*(1:6);
-          printf("g: %f\n", g);
-          % recalc contrib
-#}
-          para_target(1) = quantise([-20 -10 0 10], para_target(1));
-          %para_target(10) = quantise([-6 +6], para_target(10));
-          %para_target(10)
-          b_ = polyfit([k(1) k(10) k(25)],
-                       [para_target(1) para_target(10) -10],
-                       2);
-          
-          contrib1 = contrib;
-          contrib = b(1)*v + b_(1)*k2 + b_(2)*k + b_(3);
-          para = b_(1)*k2 + b_(2)*k + b_(3);
-          %printf("imin: %d\n", imin);
         end
 
-        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-
+        rate_K_vec_(vq_st:vq_en) = contrib;
       end
-
-      if strcmp(vq_search, "cubic")
-        printf("\n");
-        [idx contrib errors b] = vq_search_cubic(target);
-        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-      end
-
-      if strcmp(vq_search, "fourth")
-        printf("\n");
-        [idx contrib errors b] = vq_search_fourth(target);
-        rate_K_surface_fit_(f, vq_st:vq_en) = contrib;
-        % printf("g: %3.2f mg: %3.2f sl: %3.2f\n", g(idx), mg(idx), sl(idx));
-      end
-
-      rate_K_vec_(vq_st:vq_en) = contrib;
-
+      
       plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, contrib, 'm+-');
       if strcmp(vq_search, "para")
         plot(rate_K_sample_freqs_kHz(vq_st:vq_en)*1000, para_target, 'c+-');
@@ -265,9 +186,9 @@ function newamp1_fbf(samname, f=73, varargin)
     sdL = std(abs(AmdB - AmdB_));
 
     plot((1:L)*Wo*4000/pi, AmdB_,";AmdB bar;r+-");
-    if nvec == 0
-      l = sprintf(";errorx10 sd %3.2f dB;bk+-", sdL);
-      plot((1:L)*Wo*4000/pi, 10*(AmdB - AmdB_), l);
+    if nvq == 0
+      l = sprintf(";error sd %3.2f dB;bk+-", sdL);
+      plot((1:L)*Wo*4000/pi, (AmdB - AmdB_), l);
     end
     hold off;
 
@@ -357,7 +278,7 @@ endfunction
 function ind = arg_exists(v, str) 
    ind = 0;
    for i=1:length(v)
-      if strcmp(v{i}, str)
+      if !ind && strcmp(v{i}, str)
         ind = i;
       end     
     end
