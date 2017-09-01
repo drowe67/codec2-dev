@@ -30,6 +30,7 @@
 
 #include "fsk.h"
 #include "freedv_vhf_framing.h"
+#include <stdint.h>
 
 //typedef void (*tdma_cb_rx_frame)()
 
@@ -67,19 +68,35 @@ struct TDMA_FRAME {
 struct TDMA_SLOT {
     struct FSK * fsk;               /* The FSK modem for this slot */
     enum slot_state state;          /* Current local slot state */
-    int slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
+    uint32_t slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
     struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
 
 };
+
+/* Structure for tracking basic TDMA modem config */
+struct TDMA_MODE_SETTINGS {
+    uint32_t bit_rate;              /* Modem bitrate */
+    uint32_t samp_rate;             /* Modem samplerate */
+    uint32_t slot_size;             /* Number of bits per slot, including quiet padding time */
+    uint8_t n_slots;                /* Number of TDMA slots */
+    uint8_t frame_type;             /* Frame type number for framer/deframer */
+}
+
+/* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
+struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
 /* TDMA modem */
 struct TDMA_MODEM {
     struct FSK * fsk_pilot;         /* Pilot modem */
     enum tdma_state state;          /* Current state of modem */
     struct TDMA_SLOT * slots;       /* Linked list of slot structs */
-
-    int total_slot_count;
-
+    struct TDMA_MODE_SETTINGS settings; /* Basic TDMA config parameters */
+    float * sample_buffer;          /* Buffer of incoming samples */
+    size_t sample_sync_offset;      /* Offset into the sample buffer where slot 1 starts */
 };
 
+/* Allocate and setup a new TDMA modem */
+struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode);
+
+void tdma_destroy(struct TDMA_MODEM * tdma);
 #endif
