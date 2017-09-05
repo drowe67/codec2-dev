@@ -33,6 +33,14 @@
 #include <stdint.h>
 #include "comp_prim.h"
 
+
+/* TODO: Replace these types with their full names */
+/* I'm just feeling lazy right now */
+typedef uint32_t u32;
+typedef  int32_t i32;
+typedef uint8_t  u8;
+typedef float    f32;
+
 //typedef void (*tdma_cb_rx_frame)()
 
 /* The state for an individual slot */
@@ -105,4 +113,17 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode);
 
 /* Tear down and free a TDMA modem */
 void tdma_destroy(struct TDMA_MODEM * tdma);
+
+/* Get the number of samples expected by RX for the next cycle */
+u32 tdma_get_N(struct TDMA_MODEM * tdma);
+
+/**
+ Put 1 slot's worth of samples into the TDMA modem
+ TODO: I'm still not entirely sure of what I want the semantics of this to look like
+*/
+void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps);
+
+/* Hideous debug function */
+void tdma_print_stuff(struct TDMA_MODEM * tdma);
+
 #endif
