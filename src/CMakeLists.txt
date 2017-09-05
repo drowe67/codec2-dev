@@ -205,6 +205,7 @@ set(CODEC2_SRCS
     fm.c
     fsk.c
     fmfsk.c
+    tdma.c
     kiss_fft.c
     kiss_fftr.c
     linreg.c
