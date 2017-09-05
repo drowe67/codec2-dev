@@ -31,6 +31,7 @@
 #include "fsk.h"
 #include "freedv_vhf_framing.h"
 #include <stdint.h>
+#include "comp_prim.h"
 
 //typedef void (*tdma_cb_rx_frame)()
 
@@ -75,15 +76,19 @@ struct TDMA_SLOT {
 
 /* Structure for tracking basic TDMA modem config */
 struct TDMA_MODE_SETTINGS {
-    uint32_t bit_rate;              /* Modem bitrate */
+    uint32_t sym_rate;              /* Modem symbol rate */
+    uint32_t fsk_m;                 /* Number of modem tones */
     uint32_t samp_rate;             /* Modem samplerate */
-    uint32_t slot_size;             /* Number of bits per slot, including quiet padding time */
-    uint8_t n_slots;                /* Number of TDMA slots */
-    uint8_t frame_type;             /* Frame type number for framer/deframer */
-}
+    uint32_t slot_size;             /* Number of symbols per slot, including quiet padding time */
+    uint32_t frame_size;            /* Number of symbols per frame, not inclduing quiet padding */
+    uint32_t n_slots;                /* Number of TDMA slots */
+    uint32_t frame_type;             /* Frame type number for framer/deframer */
+};
 
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
-struct TDMA_MODE_SETTINGS FREEDV_4800T;
+//struct TDMA_MODE_SETTINGS FREEDV_4800T;
+
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT}
 
 /* TDMA modem */
 struct TDMA_MODEM {
@@ -91,12 +96,13 @@ struct TDMA_MODEM {
     enum tdma_state state;          /* Current state of modem */
     struct TDMA_SLOT * slots;       /* Linked list of slot structs */
     struct TDMA_MODE_SETTINGS settings; /* Basic TDMA config parameters */
-    float * sample_buffer;          /* Buffer of incoming samples */
-    size_t sample_sync_offset;      /* Offset into the sample buffer where slot 1 starts */
+    COMP * sample_buffer;          /* Buffer of incoming samples */
+    size_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
 };
 
 /* Allocate and setup a new TDMA modem */
 struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode);
 
+/* Tear down and free a TDMA modem */
 void tdma_destroy(struct TDMA_MODEM * tdma);
 #endif
