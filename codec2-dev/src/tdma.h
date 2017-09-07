@@ -36,8 +36,9 @@
 
 /* TODO: Replace these types with their full names */
 /* I'm just feeling lazy right now */
+typedef uint64_t u64;
 typedef uint32_t u32;
-typedef  int32_t i32;
+typedef int32_t  i32;
 typedef uint8_t  u8;
 typedef float    f32;
 
