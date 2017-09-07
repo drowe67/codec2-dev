@@ -122,7 +122,7 @@ u32 tdma_get_N(struct TDMA_MODEM * tdma);
  Put 1 slot's worth of samples into the TDMA modem
  TODO: I'm still not entirely sure of what I want the semantics of this to look like
 */
-void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps);
+void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps,u64 timestamp);
 
 /* Hideous debug function */
 void tdma_print_stuff(struct TDMA_MODEM * tdma);
