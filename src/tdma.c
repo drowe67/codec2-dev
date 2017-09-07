@@ -119,7 +119,9 @@ void tdma_rx_no_sync(struct TDMA_MODEM * tdma, COMP * samps, u64 timestamp){
 
     /*
     Pseudocode:
-        copy into samp buffer (? may want to let the downstream stuff do this; We may not even really need a local samp buffer)
+        copy into samp buffer 
+            (? may want to let the downstream stuff do this; We may not even really need a local samp buffer)
+            (could/probably should do this in tdma_rx)
         demod a half slot
         look for UW in slot-wide bit buffer
         if UW found
@@ -127,7 +129,8 @@ void tdma_rx_no_sync(struct TDMA_MODEM * tdma, COMP * samps, u64 timestamp){
           set slot offset to match where a frame should be
           go to slot_sync_rx to try and decode found frame
         else  
-          set up for next half slot, repeat        
+          set up for next half slot, repeat 
+            next half slot overlaps current slot      
    */
 }
 
