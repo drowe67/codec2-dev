@@ -101,6 +101,50 @@ u32 tdma_get_N(struct TDMA_MODEM * tdma){
     return slot_size * (Fs/Rs);
 }
 
-void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps){
+void tdma_rx_no_sync(struct TDMA_MODEM * tdma, COMP * samps, u64 timestamp){
+    mode = tdma->settings;
+    u32 Rs = mode.sym_rate;
+    u32 Fs = mode.samp_rate;
+    u32 slot_size = mode.slot_size;
+    //u32 frame_size = mode.frame_size;
+    u32 n_slots = mode.n_slots;
+    u32 M = mode.fsk_m;
+    u32 Ts = Fs/Rs;
+    u32 bits_per_sym = M==2?1:2;
 
+    //Number of bits per pilot modem chunk (half a slot)
+    u32 n_pilot_bits = (slot_size/2)*bits_per_sym;
+    //We look at a full slot for the UW
+    u8 pilot_bits[n_pilot_bits*2];
+
+    /*
+    Pseudocode:
+        copy into samp buffer (? may want to let the downstream stuff do this; We may not even really need a local samp buffer)
+        demod a half slot
+        look for UW in slot-wide bit buffer
+        if UW found
+          change to pilot sync state
+          set slot offset to match where a frame should be
+          go to slot_sync_rx to try and decode found frame
+        else  
+          set up for next half slot, repeat        
+   */
+}
+
+void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps,u64 timestamp){
+
+    /* Staate machine for TDMA modem */
+    switch(tdma->state){
+        no_sync:
+            tdma_rx_no_sync(tdma,samps,timestamp);
+            break;
+        pilot_sync:
+            break;
+        slot_sync;
+            break;
+        master_sync:
+            break;
+        default:
+            break;
+    }
 }
