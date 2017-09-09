@@ -47,7 +47,13 @@ function newamp1_fbf(samname, f=73, varargin)
   fit_order = 0;
 
   ind = arg_exists(varargin, "construct");
-  vq_search = varargin{ind};
+  if ind
+    vq_search = varargin{ind};
+  end
+  ind = arg_exists(varargin, "construct_indep");
+  if ind
+    vq_search = varargin{ind};
+  end
   
   % optional exploration of phase
 
@@ -116,8 +122,12 @@ function newamp1_fbf(samname, f=73, varargin)
     end
 
     if strcmp(vq_search, "construct")
-      target = rate_K_vec_fit;
-      [idx contrib errors b] = vq_construct_mg(target);
+      [idx contrib errors b] = vq_construct_mg(rate_K_vec);
+      rate_K_vec_ = contrib;
+    end
+
+    if strcmp(vq_search, "construct_indep")
+      [idx contrib errors b] = vq_construct_indep_mg(rate_K_vec);
       rate_K_vec_ = contrib;
     end
 
@@ -180,7 +190,9 @@ function newamp1_fbf(samname, f=73, varargin)
 
     % And .... back to rate L
     
-    rate_K_vec_ += meanf;
+    if (strcmp(vq_search, "construct") == 0) && (strcmp(vq_search, "construct_indep") == 0)
+      rate_K_vec_ += meanf;
+    end
     [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
     AmdB_ = AmdB_(1:L);
     sdL = std(abs(AmdB - AmdB_));
