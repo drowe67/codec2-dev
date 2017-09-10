@@ -152,6 +152,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     fsk->Fs = Fs;
     fsk->Rs = Rs;
     fsk->Ts = Fs/Rs;
+    fsk->burst_mode = 0;
     fsk->N = fsk->Ts*nsyms;
     fsk->P = P;
     fsk->Nsym = nsyms;
@@ -255,6 +256,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     return fsk;
 }
 
+
 #define HORUS_MIN 800
 #define HORUS_MAX 2500
 #define HORUS_MIN_SPACING 100
@@ -300,6 +302,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->Rs = Rs;
     fsk->Ts = Fs/Rs;
     fsk->N = Fs;
+    fsk->burst_mode = 0;
     fsk->P = horus_P;
     fsk->Nsym = fsk->N/fsk->Ts;
     fsk->Ndft = Ndft;
@@ -421,6 +424,17 @@ void fsk_set_nsym(struct FSK *fsk,int nsyms){
     
 }
 
+/* Set the FSK modem into burst demod mode */
+
+void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
+    fsk_set_nsym(fsk,nsyms);
+    //fsk->nstash = 0;
+    //fsk->Nmem = fsk->N;
+    fsk->nin = fsk->N;
+    fsk->burst_mode = 1;
+    //free(fsk->samp_old);
+    //fsk->samp_old = (COMP*) malloc(1);
+}
 
 void fsk_clear_estimators(struct FSK *fsk){
     int i;
@@ -826,12 +840,15 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     }
     
     /* Figure out how many samples are needed the next modem cycle */
-    if(norm_rx_timing > 0.25)
-        fsk->nin = N+Ts/2;
-    else if(norm_rx_timing < -0.25)
-        fsk->nin = N-Ts/2;
-    else
-        fsk->nin = N;
+    /* Unless we're in burst mode */
+    if(!fsk->burst_mode){
+        if(norm_rx_timing > 0.25)
+            fsk->nin = N+Ts/2;
+        else if(norm_rx_timing < -0.25)
+            fsk->nin = N-Ts/2;
+        else
+            fsk->nin = N;
+    }
     
     modem_probe_samp_f("t_norm_rx_timing",&(norm_rx_timing),1);
     modem_probe_samp_i("t_nin",&(fsk->nin),1);
