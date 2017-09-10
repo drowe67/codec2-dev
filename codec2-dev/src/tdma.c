@@ -102,7 +102,7 @@ u32 tdma_get_N(struct TDMA_MODEM * tdma){
 }
 
 void tdma_rx_no_sync(struct TDMA_MODEM * tdma, COMP * samps, u64 timestamp){
-    mode = tdma->settings;
+    struct TDMA_MODE_SETTINGS mode = tdma->settings;
     u32 Rs = mode.sym_rate;
     u32 Fs = mode.samp_rate;
     u32 slot_size = mode.slot_size;
