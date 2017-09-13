@@ -17,7 +17,7 @@
          - end   m - end of search range in 100's of Hz
 #}
 
-function [idx contrib errors b_log2] = vq_construct_indep_mg(data)
+function [idx contrib errors b_log2] = vq_construct_indep_mg(data, w_en = 0)
 
 #{
   ptable = [ 1  4  8;
@@ -26,7 +26,7 @@ function [idx contrib errors b_log2] = vq_construct_indep_mg(data)
              3 30 36];
 #}
 
-  ptable = [ 1  4  8 ];
+  ptable = [ 1  4  5 ];
   
   protos = [-4  12 23  24  18  12 8 5 2;
              12 18 12   0   0   0 0 0 0;
@@ -49,6 +49,16 @@ function [idx contrib errors b_log2] = vq_construct_indep_mg(data)
       
     t = data(r,:);
 
+    % compute weights
+
+    if w_en
+      w = find_weights(t, wmin=0.1, tmin=20);
+    else
+      w = ones(1,K);
+    end
+    
+    figure(10); clf; plot(t); hold on;
+    
     for f=1:nformants
 
       % try formant centre at np points between st and en
@@ -75,33 +85,40 @@ function [idx contrib errors b_log2] = vq_construct_indep_mg(data)
         g = zeros(1,K);
         g(p_st:p_en) = ones(1, protol(shape));
         
-        A = [p*p' sum(p); sum(p) protol(shape) ];
-        d = [t*p' t*g']';
+        A = [(p.*w)*p' sum(p.*w); sum(p.*w) sum(g.*w) ];
+        d = [(t.*w)*p' (t.*w)*g']';
         b = inv(A)*d;
 
         v = b(1)*p + b(2)*g;
         diff = t - v;
+        plot(v,'g'); plot(diff,'r');
         p = c - c_st + 1;
         b_log(p,:) = b; 
-        error(p) = diff * diff';
+        error(p) = (diff.*w) * diff';
 
-        printf("r: %d f: %d c: %d e: %f b(1): %f b(2): %f \n", r, f, c, error(p), b(1), b(2));
+        printf("r: %d f: %d c: %d %d %d e: %f b(1): %f b(2): %f \n", r, f, c, p_st, p_en, error(p), b(1), b(2));
       end
 
+      hold off;
+      xx
       % choose best for this formant
 
       [mn p_min] = min(error);
+      % p_min = 1;
       c_min = p_min + c_st - 1;
       b = b_log(p_min,:);
       printf("f: %d cmin: %d b(1): %f b(2): %f -------------\n", f, c_min, b(1), b(2));
       
       % sum this formats contribution
       
-      v = zeros(1, K);
-      v_st = c_min - protoc(shape) + 1; v_en = c_min - protoc(shape) + protol(shape);
-      v(v_st:v_en) = b(1)*protos(shape, 1:protol(shape)) + b(2);
+      p_st = c_min - protoc(shape) + 1; p_en = c_min - protoc(shape) + protol(shape);
+      p = zeros(1,K);
+      p(p_st:p_en) = protos(shape, 1:protol(shape));
+      g = zeros(1,K);
+      g(p_st:p_en) = ones(1, protol(shape));
+      v = b(1)*p + b(2)*g;
       contrib(r,:) += v;
-
+      
       % update residual target for next formant search
       
       t = data(r,:) - contrib(r,:);
