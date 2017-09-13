@@ -50,14 +50,15 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
 
     /* allocate the modem */
     tdma = (struct TDMA_MODEM *) malloc(sizeof(struct TDMA_MODEM));
-    /* TODO: Malloc NULL checks */
+    if(tdma == NULL) goto cleanup_bad_alloc;
 
     /* Symbols over which pilot modem operates */
     u32 pilot_nsyms = slot_size/2;
 
     /* Set up pilot modem */
     struct FSK * pilot = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
-    fsk_set_nsym(pilot,pilot_nsyms);
+    if(pilot == NULL) goto cleanup_bad_alloc;
+    fsk_enable_burst_mode(pilot,pilot_nsyms);
     tdma->fsk_pilot = pilot;
     
     tdma->settings = mode;
@@ -67,13 +68,55 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     /* Allocate buffer for incoming samples */
     /* TODO: We may only need a single slot's worth of samps -- look into this */
     COMP * samp_buffer = (COMP *) malloc(sizeof(COMP)*slot_size*Ts*n_slots);
+    if(samp_buffer == NULL) goto cleanup_bad_alloc;
 
     tdma->sample_buffer = samp_buffer;
 
+    size_t i;
+    struct TDMA_SLOT * slot;
+    struct TDMA_SLOT * last_slot;
+    struct FSK * slot_fsk;
+    last_slot = NULL;
+    for(i=0; i<n_slots; i++){
+        slot = (struct TDMA_SLOT *) malloc(sizeof(struct TDMA_SLOT));
+        if(slot == NULL) goto cleanup_bad_alloc;
+        slot->fsk = NULL;
+        tdma->slots = slot;
+        slot->next_slot = last_slot;
+        slot->slot_local_frame_offset = 0;
+        slot->state = rx_no_sync;
+        //slot_fsk = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
+        slot_fsk = NULL;
+        if(slot_fsk == NULL) goto cleanup_bad_alloc;
+
+        fsk_enable_burst_mode(slot_fsk, slot_size);
+        
+        slot->fsk = slot_fsk;
+        last_slot = slot;
+    }
+    goto cleanup_bad_alloc;
     /* TODO: Allocate slot modems. Get pilot detection working first */
 
     return tdma;
 
+    /* Clean up after a failed malloc */
+    /* TODO: Run with valgrind/asan, make sure I'm getting everything */
+    cleanup_bad_alloc:
+    fprintf(stderr,"Cleaning up\n");
+    if(tdma == NULL) return NULL;
+
+    struct TDMA_SLOT * cleanup_slot = tdma->slots;
+    struct TDMA_SLOT * cleanup_slot_next;
+    while(cleanup_slot != NULL){
+        cleanup_slot_next = cleanup_slot->next_slot;
+        if(cleanup_slot->fsk != NULL) fsk_destroy(cleanup_slot->fsk);
+        if(cleanup_slot != NULL) free(cleanup_slot);
+        cleanup_slot = cleanup_slot_next;
+    }
+    if(pilot != NULL) fsk_destroy(pilot);
+    if(samp_buffer != NULL) free(samp_buffer);
+    free(tdma);
+    return NULL;
 }
 
 void tdma_print_stuff(struct TDMA_MODEM * tdma){
