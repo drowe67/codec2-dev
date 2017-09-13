@@ -174,6 +174,10 @@ main(int argc, char * * argv)
   }
   printf("  { 0, 0, 0, 0 }\n");
   printf("};\n");
-
+  for( i = 0; i < argc - 2; i++ ){
+    free(cb[i]->cb);
+    free(cb[i]);
+  }
+  free(cb);
   return 0;
 }
