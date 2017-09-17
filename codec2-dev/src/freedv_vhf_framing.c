@@ -398,6 +398,30 @@ int fvhff_synchronized(struct freedv_vhf_deframer * def){
     return (def->state) == ST_SYNC;
 }
 
+/* Search for a complete UW in a buffer of bits */
+size_t fvhff_search_uw(const uint8_t bits[],size_t nbits,
+                     const uint8_t uw[],    size_t uw_len,
+                     size_t * delta_out){
+
+    size_t ibits,iuw;
+    size_t delta_min = uw_len;
+    size_t delta;
+    size_t offset_min = 0;
+    /* Walk through buffer bits */
+    for(ibits = 0; ibits < nbits-uw_len; ibits++){
+        delta = 0;
+        for(iuw = 0; iuw < uw_len; iuw++){
+            if(bits[ibits+iuw] != uw[iuw]) delta++;
+        }
+        if( delta < delta_min ){
+            delta_min = delta;
+            offset_min = ibits;
+        }
+    }
+    if(delta_out != NULL) *delta_out = delta_min;
+    return offset_min;
+}
+
 /* See if the UW is where it should be, to within a tolerance, in a bit buffer */
 static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int tol,int *rdiff, enum frame_payload_type *pt){
     int frame_type  = def->ftype;
@@ -460,7 +484,8 @@ static int fvhff_match_uw(struct freedv_vhf_deframer * def,uint8_t bits[],int to
     return r;
 }
 
-static void fvhff_extract_frame_voice(struct freedv_vhf_deframer * def,uint8_t bits[],uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]){
+static void fvhff_extract_frame_voice(struct freedv_vhf_deframer * def,uint8_t bits[],
+    uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[]){
     int frame_type  = def->ftype;
     int bitptr      = def->bitptr;
     int frame_size  = def->frame_size;
@@ -700,7 +725,8 @@ static void fvhff_extract_frame_data(struct freedv_vhf_deframer * def,uint8_t bi
     }
 }
 
-static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t bits[],uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[],enum frame_payload_type pt){
+static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t bits[],uint8_t codec2_out[],
+    uint8_t proto_out[],uint8_t vc_out[],enum frame_payload_type pt){
     switch (pt) {
         case FRAME_PAYLOAD_TYPE_VOICE:
         fvhff_extract_frame_voice(def, bits, codec2_out, proto_out, vc_out);
@@ -714,7 +740,8 @@ static void fvhff_extract_frame(struct freedv_vhf_deframer * def,uint8_t bits[],
 /*
  * Try to find the UW and extract codec/proto/vc bits in def->frame_size bits 
  */
-int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],uint8_t vc_out[],uint8_t bits_in[]){
+int fvhff_deframe_bits(struct freedv_vhf_deframer * def,uint8_t codec2_out[],uint8_t proto_out[],
+    uint8_t vc_out[],uint8_t bits_in[]){
     uint8_t * strbits  = def->bits;
     uint8_t * invbits  = def->invbits;
     uint8_t * bits;
