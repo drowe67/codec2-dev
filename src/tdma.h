@@ -46,18 +46,18 @@ typedef float    f32;
 
 /* The state for an individual slot */
 enum slot_state {
-    rx_no_sync,         /* Not synched */
-    rx_sync,            /* Sunk */
-    tx_client,          /* TX but timed from a different master */
-    tx_master           /* TX in master mode */
+    rx_no_sync = 0,         /* Not synched */
+    rx_sync = 1,            /* Sunk */
+    tx_client = 2,          /* TX but timed from a different master */
+    tx_master = 3           /* TX in master mode */
 };
 
 /* The state of the entire TDMA modem */
 enum tdma_state {
-    no_sync,            /* No sync */
-    pilot_sync,         /* Pilot modem has gotten sync, but slots haven't*/
-    slot_sync,          /* One or more slots are sunk */
-    master_sync,        /* This modem is the TDMA master */
+    no_sync = 0,            /* No sync */
+    pilot_sync = 1,         /* Pilot modem has gotten sync, but slots haven't*/
+    slot_sync = 2,          /* One or more slots are sunk */
+    master_sync = 3,        /* This modem is the TDMA master */
 };
 
 /* TDMA frame type */
@@ -83,6 +83,8 @@ struct TDMA_SLOT {
 
 };
 
+typedef struct TDMA_SLOT slot_t;
+
 /* Structure for tracking basic TDMA modem config */
 struct TDMA_MODE_SETTINGS {
     uint32_t sym_rate;              /* Modem symbol rate */
@@ -107,24 +109,28 @@ struct TDMA_MODEM {
     struct TDMA_MODE_SETTINGS settings; /* Basic TDMA config parameters */
     COMP * sample_buffer;          /* Buffer of incoming samples */
     size_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
+    uint64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
+    uint32_t slot_cur;              /* Current slot coming in */
 };
 
+typedef struct TDMA_MODEM tdma_t;
+
 /* Allocate and setup a new TDMA modem */
-struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode);
+tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode);
 
 /* Tear down and free a TDMA modem */
-void tdma_destroy(struct TDMA_MODEM * tdma);
+void tdma_destroy(tdma_t * tdma);
 
 /* Get the number of samples expected by RX for the next cycle */
-u32 tdma_get_N(struct TDMA_MODEM * tdma);
+u32 tdma_get_N(tdma_t * tdma);
 
 /**
  Put 1 slot's worth of samples into the TDMA modem
  TODO: I'm still not entirely sure of what I want the semantics of this to look like
 */
-void tdma_rx(struct TDMA_MODEM * tdma, COMP * samps,u64 timestamp);
+void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp);
 
 /* Hideous debug function */
-void tdma_print_stuff(struct TDMA_MODEM * tdma);
+void tdma_print_stuff(tdma_t * tdma);
 
 #endif

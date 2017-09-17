@@ -668,6 +668,10 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     #ifdef MODEMPROBE_ENABLE
     char mp_name_tmp[20]; /* Temporary string for modem probe trace names */
     #endif
+
+    //for(size_t jj = 0; jj<nin; jj++){
+    //    fprintf(stderr,"%f,j%f,",fsk_in[jj].real,fsk_in[jj].imag);
+    //}
     
     /* Load up demod phases from struct */
     for( m=0; m<M; m++)
@@ -709,6 +713,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         /* Back the stored phase off to account for re-integraton of old samples */
         dphi[m] = comp_exp_j(-2*(Nmem-nin-(Ts/P))*M_PI*((fsk->f_est[m])/(float)(Fs)));
         phi_c[m] = cmult(dphi[m],phi_c[m]);
+        //fprintf(stderr,"F%d = %f",m,fsk->f_est[m]);
 
         /* Figure out how much to nudge each sample downmixer for every sample */
         dphi[m] = comp_exp_j(2*M_PI*((fsk->f_est[m])/(float)(Fs)));
@@ -823,6 +828,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
+    //fprintf(stderr,"t_c: %f+%f i\n",t_c.real,t_c.imag);
     /* Get the magic angle */
     norm_rx_timing =  atan2f(t_c.imag,t_c.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
@@ -857,6 +863,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     int low_sample = (int)floorf(rx_timing);
     float fract = rx_timing - (float)low_sample;
     int high_sample = (int)ceilf(rx_timing);
+
+    //fprintf(stderr,"rx_timing: %f %f\n",rx_timing,fract);
  
     /* Vars for finding the max-of-4 for each bit */
     float tmax[M];
@@ -871,6 +879,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     for(i=0; i<nsym; i++){
         int st = (i+1)*P;
         for( m=0; m<M; m++){
+            //fprintf(stderr,"%d %d\n",m,M);
+            //fprintf(stderr,"%d %d %d\n",st,low_sample,high_sample);
             t[m] =           fcmult(1-fract,f_int[m][st+ low_sample]);
             t[m] = cadd(t[m],fcmult(  fract,f_int[m][st+high_sample]));
             /* Figure mag^2 of each resampled fx_int */
