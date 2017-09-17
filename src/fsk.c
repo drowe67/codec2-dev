@@ -828,7 +828,13 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
         /* Spin the oscillator for the magic line shift */
         phi_ft = cmult(phi_ft,dphift);
     }
-    //fprintf(stderr,"t_c: %f+%f i\n",t_c.real,t_c.imag);
+
+    /* Check for NaNs in the fine timing estimate, return if found */
+    /* otherwise segfaults happen */
+    if( isnan(t_c.real) || isnan(t_c.imag)){
+        return;
+    } 
+
     /* Get the magic angle */
     norm_rx_timing =  atan2f(t_c.imag,t_c.real)/(2*M_PI);
     rx_timing = norm_rx_timing*(float)P;
@@ -863,8 +869,6 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     int low_sample = (int)floorf(rx_timing);
     float fract = rx_timing - (float)low_sample;
     int high_sample = (int)ceilf(rx_timing);
-
-    //fprintf(stderr,"rx_timing: %f %f\n",rx_timing,fract);
  
     /* Vars for finding the max-of-4 for each bit */
     float tmax[M];
@@ -879,8 +883,6 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     for(i=0; i<nsym; i++){
         int st = (i+1)*P;
         for( m=0; m<M; m++){
-            //fprintf(stderr,"%d %d\n",m,M);
-            //fprintf(stderr,"%d %d %d\n",st,low_sample,high_sample);
             t[m] =           fcmult(1-fract,f_int[m][st+ low_sample]);
             t[m] = cadd(t[m],fcmult(  fract,f_int[m][st+high_sample]));
             /* Figure mag^2 of each resampled fx_int */
