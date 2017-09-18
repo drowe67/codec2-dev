@@ -71,12 +71,12 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     
     tdma->settings = mode;
     tdma->state = no_sync;
-    tdma->sample_sync_offset = 0;
+    tdma->sample_sync_offset = 960;
     tdma->slot_cur = 0;
 
     /* Allocate buffer for incoming samples */
     /* TODO: We may only need a single slot's worth of samps -- look into this */
-    samp_buffer = (COMP *) malloc(sizeof(COMP)*slot_size*Ts*n_slots);
+    samp_buffer = (COMP *) malloc(sizeof(COMP)*slot_size*Ts*(n_slots+1));
     if(samp_buffer == NULL) goto cleanup_bad_alloc;
 
     tdma->sample_buffer = samp_buffer;
@@ -264,9 +264,10 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
 
     /* Compensate for frame timing offset sliding towards end of buffer */
     /* As in, don't demodulate this slot since we're getting ahead of ourselves */
-    if( (slot_offset+slot_samps) > (slot_samps*n_slots-(slot_samps/4)) ){
+    if( (slot_offset+slot_samps) > (slot_samps*(n_slots+1)-(slot_samps/4)) ){
         /* Move slot offset back by 1 slot and don't increment slot index. We'll just handle this one on the next batch of samps */
         tdma->sample_sync_offset -= slot_samps;
+        fprintf(stderr,"Skipping\n");
         return;
     }
 
@@ -316,6 +317,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* TODO: deal with re-demod for frames just outside of buffer */
     /* Do single slot state machine */
     if( slot->state == rx_sync){
+        fprintf(stderr,"Slot %d: sunk\n",tdma->slot_cur);
         if(!f_valid){   /* on bad UW, increment bad uw count and possibly unsync */
             slot->bad_uw_count++;
             if(slot->bad_uw_count > tdma->settings.frame_sync_baduw_tol){
@@ -328,13 +330,44 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
             do_frame_found_call = 1;
         }
     }else if(slot->state == rx_no_sync){
+        fprintf(stderr,"Slot %d: no sync\n",tdma->slot_cur);
         if(f_valid){
             slot->state = rx_sync;
             do_frame_found_call;
         }
     }
 
-    
+    /* Unicode underline for pretty printing */
+    char underline[] = {0xCC,0xB2,0x00};
+
+    fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",tdma->slot_cur,frame_offset,off,delta,fsk->f_est[0],fsk->EbNodB);
+    for(i=0; i<nbits; i++){
+        fprintf(stderr,"%d",bit_buf[i]);
+        if((i>off && i<=off+16) || i==f_start || i==(f_start+frame_bits-1)){
+            fprintf(stderr,underline);
+        }
+    }
+    fprintf(stderr,"\n");
+
+    /* Update slot offset to compensate for frame centering */
+    u32 offset_total = 0;
+    u32 offset_slots = 0;
+    for( i=0; i<n_slots; i++){
+        /* Only check offset from valid frames */
+        if(tdma_get_slot(tdma,i)->state == rx_sync){
+            i32 local_offset = tdma_get_slot(tdma,i)->slot_local_frame_offset;
+            /* Filter out extreme spurious timing offsets */
+            if(abs(local_offset)<(slot_samps/4)){
+                fprintf(stderr,"Local offset: %d\n",local_offset);
+                offset_total+=local_offset;
+                offset_slots++;
+            }
+        }
+    }
+    offset_total = offset_slots>0 ? offset_total/offset_slots:0;
+    fprintf(stderr,"Total Offset:%d\n",offset_total);
+    fprintf(stderr,"Slot offset: %d of %d\n",tdma->sample_sync_offset,slot_samps*n_slots);
+    //tdma->sample_sync_offset -= (offset_total/4);
 
     tdma->slot_cur++;
     if(tdma->slot_cur >= n_slots)
@@ -343,8 +376,9 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* Compensate for frame timing offset sliding towards the start of buffer */
     /* Do so by running this again, demodulating two slots, and moving the slot offset one slot forward */
     if( slot_offset < (slot_samps/4) ){
-        tdma->sample_sync_offset += slot_samps;
+        tdma->sample_sync_offset = tdma->sample_sync_offset + slot_samps;
         tdma_rx_pilot_sync(tdma);
+        fprintf(stderr,"Recursing\n");
     }
         
 }
@@ -399,14 +433,14 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
 
     /* Copy samples into the local buffer for some reason */
     /* Move the current samps in the buffer back by a slot or so */
-    size_t move_samps = slot_samps*sizeof(COMP);
-    uintptr_t move_from = ((uintptr_t)sample_buffer) + (n_slots-1)*slot_samps*sizeof(COMP);
+    size_t move_samps = slot_samps*n_slots*sizeof(COMP);
+    uintptr_t move_from = ((uintptr_t)sample_buffer) + n_slots*slot_samps*sizeof(COMP);
     uintptr_t move_to = (uintptr_t)sample_buffer; /* Don't really need this, but it's cleaner than doing it all in memmove */
     memmove((void*)move_to,(void*)move_from,move_samps);
 
     move_samps = slot_samps*sizeof(COMP);
     move_from = (uintptr_t)samps;
-    move_to = ((uintptr_t)sample_buffer) + (n_slots-1)*slot_samps*sizeof(COMP);
+    move_to = ((uintptr_t)sample_buffer) + (n_slots)*slot_samps*sizeof(COMP);
     memcpy((void*)move_to,(void*)move_from,move_samps);
 
     /* Set the timestamp. Not sure if this makes sense */

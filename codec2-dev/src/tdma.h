@@ -117,7 +117,7 @@ struct TDMA_MODEM {
     struct TDMA_SLOT * slots;       /* Linked list of slot structs */
     struct TDMA_MODE_SETTINGS settings; /* Basic TDMA config parameters */
     COMP * sample_buffer;          /* Buffer of incoming samples */
-    size_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
+    int64_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
     uint64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
     uint32_t slot_cur;              /* Current slot coming in */
     tdma_cb_rx_frame rx_callback;
