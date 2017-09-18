@@ -42,7 +42,10 @@ typedef int32_t  i32;
 typedef uint8_t  u8;
 typedef float    f32;
 
-//typedef void (*tdma_cb_rx_frame)()
+/* Callback typedef that just returns the bits of the frame */
+/* TODO: write this a bit better */
+typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot);
+
 
 /* The state for an individual slot */
 enum slot_state {
@@ -78,7 +81,8 @@ struct TDMA_FRAME {
 struct TDMA_SLOT {
     struct FSK * fsk;               /* The FSK modem for this slot */
     enum slot_state state;          /* Current local slot state */
-    uint32_t slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
+    i32 slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
+    u32 bad_uw_count;               /* How many bad UWs have we gotten since synchronized */
     struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
 
 };
@@ -87,19 +91,24 @@ typedef struct TDMA_SLOT slot_t;
 
 /* Structure for tracking basic TDMA modem config */
 struct TDMA_MODE_SETTINGS {
-    uint32_t sym_rate;              /* Modem symbol rate */
-    uint32_t fsk_m;                 /* Number of modem tones */
-    uint32_t samp_rate;             /* Modem samplerate */
-    uint32_t slot_size;             /* Number of symbols per slot, including quiet padding time */
-    uint32_t frame_size;            /* Number of symbols per frame, not inclduing quiet padding */
-    uint32_t n_slots;                /* Number of TDMA slots */
-    uint32_t frame_type;             /* Frame type number for framer/deframer */
+    u32 sym_rate;               /* Modem symbol rate */
+    u32 fsk_m;                  /* Number of modem tones */
+    u32 samp_rate;              /* Modem samplerate */
+    u32 slot_size;              /* Number of symbols per slot, including quiet padding time */
+    u32 frame_size;             /* Number of symbols per frame, not inclduing quiet padding */
+    u32 n_slots;                /* Number of TDMA slots */
+    u32 frame_type;             /* Frame type number for framer/deframer */
+    u32 uw_len;                 /* Length of unique word */
+    u32 pilot_sync_tol;         /* UW errors allowed for a valid pilot sync */
+    u32 first_sync_tol;         /* UW errors allowed for a valid first frame sync */
+    u32 frame_sync_tol;         /* UW errors allowed to maintain a frame sync */
+    u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a frame unsynced */
 };
 
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT}
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,4,4}
 
 /* TDMA modem */
 struct TDMA_MODEM {
@@ -111,6 +120,7 @@ struct TDMA_MODEM {
     size_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
     uint64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
     uint32_t slot_cur;              /* Current slot coming in */
+    tdma_cb_rx_frame rx_callback;
 };
 
 typedef struct TDMA_MODEM tdma_t;
@@ -132,5 +142,8 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp);
 
 /* Hideous debug function */
 void tdma_print_stuff(tdma_t * tdma);
+
+/* Set the RX callback function */
+void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback);
 
 #endif
