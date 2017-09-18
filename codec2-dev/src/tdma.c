@@ -97,11 +97,13 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
         slot->next_slot = last_slot;
         slot->slot_local_frame_offset = 0;
         slot->state = rx_no_sync;
+        slot->bad_uw_count = 0;
         slot_fsk = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
         
         if(slot_fsk == NULL) goto cleanup_bad_alloc;
 
-        fsk_enable_burst_mode(slot_fsk, slot_size);
+        /* NOTE/TODO: demod one extra symbol (probably of zeros) off the end of the frame */
+        fsk_enable_burst_mode(slot_fsk, slot_size+1);
         
         slot->fsk = slot_fsk;
         last_slot = slot;
@@ -154,6 +156,7 @@ u32 tdma_get_N(tdma_t * tdma){
     return slot_size * (Fs/Rs);
 }
 
+/* Convience function to look up a slot from it's index number */
 static slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
     /* Don't try and index beyond the end */
     if(slot_idx >= tdma->settings.n_slots) return NULL;
@@ -171,7 +174,7 @@ static slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
-void tdma_demod_end_slot(tdma_t * tdma,u32 slot_idx){
+int tdma_demod_end_slot(tdma_t * tdma,u32 slot_idx, u8 * bit_buf){
 
     struct TDMA_MODE_SETTINGS mode = tdma->settings;
     u32 Rs = mode.sym_rate;
@@ -183,44 +186,60 @@ void tdma_demod_end_slot(tdma_t * tdma,u32 slot_idx){
     u32 Ts = Fs/Rs;
     u32 bits_per_sym = M==2?1:2;
     u32 slot_samps = slot_size*Ts;
-    size_t nbits = slot_size*bits_per_sym;
+    u32 buffer_samps = slot_samps*n_slots;
+    size_t nbits = (slot_size+1)*bits_per_sym;
     u32 frame_bits = frame_size*bits_per_sym;
 
-    u8 bit_buf[nbits];
     /* Samples that belong to this frame */
-    COMP frame_samps[slot_size*Ts];
+    COMP frame_samps[(slot_size+1)*Ts];
     COMP * sample_buffer = tdma->sample_buffer;
     slot_t * slot = tdma_get_slot(tdma,slot_idx);
-    //slot_t * slot = tdma->slots;
     struct FSK * fsk = slot->fsk;
 
-    int nin = fsk_nin(fsk);
+    /* Zero out tail end of bit buffer so we can get last symbol out of demod */
+    /* TODO: This is a hack. Look into better burst mode support in FSK */
+    size_t i;
+    for(i = slot_samps; i< (slot_size+1)*Ts; i++){
+        frame_samps[i].real = 0;
+        frame_samps[i].imag = 0;
+    }
 
     /* Pull out the frame and demod */
-    size_t move_samps = slot_samps*sizeof(COMP);
-    uintptr_t move_from = ((uintptr_t)sample_buffer) + (tdma->sample_sync_offset)*sizeof(COMP);
-    uintptr_t move_to = (uintptr_t)frame_samps; /* Don't really need this, but it's cleaner than doing it all in memmove */
-    memcpy((void*)move_to,(void*)move_from,move_samps);
+    memcpy(&frame_samps[0],&sample_buffer[tdma->sample_sync_offset],slot_samps*sizeof(COMP));
+
     /* Demodulate the frame */
     fsk_demod(fsk,bit_buf,frame_samps);
 
-    size_t delta,off;
+    i32 delta,off;
     off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta);
-    u32 f_start = off- (frame_bits-16)/2;
+    i32 f_start = off- (frame_bits-16)/2;
+    int f_valid = 0; /* Flag indicating wether or not we've found a UW;
+
+    /* Check frame tolerance and sync state*/
+    if(slot->state == rx_sync){
+        f_valid = delta <= tdma->settings.frame_sync_tol;
+    }else if(slot->state == rx_no_sync){
+        f_valid = delta <= tdma->settings.first_sync_tol;
+    }
+
     /* Calculate offset (in samps) from start of frame */
-    /* Note: FSK outputs one bit from the last batch */
-    u32 frame_offset = (f_start-bits_per_sym)*Ts;
+    /* Note: FSK outputs one symbol from the last batch, so we have to account for that */
+    i32 target_frame_offset = ((slot_size-frame_size)/2)*Ts;
+    i32 frame_offset = ((f_start-bits_per_sym)*(Ts/bits_per_sym)) - target_frame_offset;
+    if(f_valid)
+        slot->slot_local_frame_offset = frame_offset;
     
-    fprintf(stderr,"slot: %d offset: %d delta: %d f1:%.3f\n",slot_idx,off,delta,fsk->f_est[0]);
-    for(int i=0; i<nbits; i++){
-        if((i>off && i<=off+16) || i==f_start || i==(f_start+frame_bits)){
+    fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",slot_idx,frame_offset,off,delta,fsk->f_est[0],fsk->EbNodB);
+    for(i=0; i<nbits; i++){
+        if((i>off && i<=off+16) || i==f_start || i==(f_start+frame_bits-1)){
             if(bit_buf[i])  fprintf(stderr,"1̲");
             else            fprintf(stderr,"0̲");
         } else fprintf(stderr,"%d",bit_buf[i]);
     }
     fprintf(stderr,"\n");
-}
+    return f_valid;
 
+}
 /* We got a new slot's worth of samples. Run the slot modem and try to get slot sync */
 /* This will probably also work for the slot_sync state */
 void tdma_rx_pilot_sync(tdma_t * tdma){
@@ -228,16 +247,106 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     u32 Rs = mode.sym_rate;
     u32 Fs = mode.samp_rate;
     u32 slot_size = mode.slot_size;
-    //u32 frame_size = mode.frame_size;
+    u32 frame_size = mode.frame_size;
     u32 n_slots = mode.n_slots;
     u32 M = mode.fsk_m;
     u32 Ts = Fs/Rs;
+    u32 slot_samps = slot_size*Ts;
     u32 bits_per_sym = M==2?1:2;
+    slot_t * slot = tdma_get_slot(tdma,tdma->slot_cur);
+    struct FSK * fsk = slot->fsk;
+    size_t nbits = (slot_size+1)*bits_per_sym;
+    size_t slot_offset = tdma->sample_sync_offset;
+    u8 bit_buf[nbits];
+    COMP * sample_buffer = tdma->sample_buffer;
+    COMP frame_samps[(slot_size+1)*Ts];
+    u32 frame_bits = frame_size*bits_per_sym;
 
-    tdma_demod_end_slot(tdma,tdma->slot_cur);
+    /* Compensate for frame timing offset sliding towards end of buffer */
+    /* As in, don't demodulate this slot since we're getting ahead of ourselves */
+    if( (slot_offset+slot_samps) > (slot_samps*n_slots-(slot_samps/4)) ){
+        /* Move slot offset back by 1 slot and don't increment slot index. We'll just handle this one on the next batch of samps */
+        tdma->sample_sync_offset -= slot_samps;
+        return;
+    }
+
+    /* Demod a slot in the sample buffer */
+    //int f_valid = tdma_demod_end_slot(tdma,tdma->slot_cur,bit_buf);
+
+    /* Samples that belong to this frame */
+
+        /* Zero out tail end of bit buffer so we can get last symbol out of demod */
+    /* TODO: This is a hack. Look into better burst mode support in FSK */
+    size_t i;
+    for(i = slot_samps; i< (slot_size+1)*Ts; i++){
+        frame_samps[i].real = 0;
+        frame_samps[i].imag = 0;
+    }
+
+    /* Pull out the frame and demod */
+    memcpy(&frame_samps[0],&sample_buffer[tdma->sample_sync_offset],slot_samps*sizeof(COMP));
+
+    /* Demodulate the frame */
+    fsk_demod(fsk,bit_buf,frame_samps);
+
+    size_t delta,off;
+    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta);
+    i32 f_start = off- (frame_bits-16)/2;
+    int f_valid = 0; /* Flag indicating wether or not we've found a UW;
+
+    /* Check frame tolerance and sync state*/
+    if(slot->state == rx_sync){
+        f_valid = delta <= tdma->settings.frame_sync_tol;
+    }else if(slot->state == rx_no_sync){
+        f_valid = delta <= tdma->settings.first_sync_tol;
+    }
+
+    /* Calculate offset (in samps) from start of frame */
+    /* Note: FSK outputs one symbol from the last batch, so we have to account for that */
+    i32 target_frame_offset = ((slot_size-frame_size)/2)*Ts;
+    i32 frame_offset = ((f_start-bits_per_sym)*(Ts/bits_per_sym)) - target_frame_offset;
+    if(f_valid)
+        slot->slot_local_frame_offset = frame_offset;
+    
+
+    i32 single_slot_offset = slot->slot_local_frame_offset;
+    /* Flag indicating wether or not we should call the callback */
+    int do_frame_found_call = 0;   
+
+    /* TODO: deal with re-demod for frames just outside of buffer */
+    /* Do single slot state machine */
+    if( slot->state == rx_sync){
+        if(!f_valid){   /* on bad UW, increment bad uw count and possibly unsync */
+            slot->bad_uw_count++;
+            if(slot->bad_uw_count > tdma->settings.frame_sync_baduw_tol){
+                slot->state = rx_no_sync;
+            }else{
+                do_frame_found_call = 1;
+            }
+        }else{ /* Good UW found */
+            slot->bad_uw_count = 0;
+            do_frame_found_call = 1;
+        }
+    }else if(slot->state == rx_no_sync){
+        if(f_valid){
+            slot->state = rx_sync;
+            do_frame_found_call;
+        }
+    }
+
+    
+
     tdma->slot_cur++;
     if(tdma->slot_cur >= n_slots)
         tdma->slot_cur = 0;
+
+    /* Compensate for frame timing offset sliding towards the start of buffer */
+    /* Do so by running this again, demodulating two slots, and moving the slot offset one slot forward */
+    if( slot_offset < (slot_samps/4) ){
+        tdma->sample_sync_offset += slot_samps;
+        tdma_rx_pilot_sync(tdma);
+    }
+        
 }
 
 void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
@@ -319,6 +428,11 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
             break;
     }
     tdma->state = pilot_sync;
+}
+
+
+void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback){
+    tdma->rx_callback = rx_callback;
 }
 
 
