@@ -108,7 +108,7 @@ struct TDMA_MODE_SETTINGS {
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,4,4}
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,1,1,1,0}
 
 /* TDMA modem */
 struct TDMA_MODEM {
