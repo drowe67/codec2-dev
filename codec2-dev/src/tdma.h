@@ -42,11 +42,6 @@ typedef int32_t  i32;
 typedef uint8_t  u8;
 typedef float    f32;
 
-/* Callback typedef that just returns the bits of the frame */
-/* TODO: write this a bit better */
-typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot);
-
-
 /* The state for an individual slot */
 enum slot_state {
     rx_no_sync = 0,         /* Not synched */
@@ -121,6 +116,7 @@ struct TDMA_MODEM {
     uint64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
     uint32_t slot_cur;              /* Current slot coming in */
     tdma_cb_rx_frame rx_callback;
+    void * rx_cb_data;
 };
 
 typedef struct TDMA_MODEM tdma_t;
@@ -144,6 +140,12 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp);
 void tdma_print_stuff(tdma_t * tdma);
 
 /* Set the RX callback function */
-void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback);
+void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data);
+
+
+/* Callback typedef that just returns the bits of the frame */
+/* TODO: write this a bit better */
+typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
+
 
 #endif

@@ -211,7 +211,7 @@ int tdma_demod_end_slot(tdma_t * tdma,u32 slot_idx, u8 * bit_buf){
     fsk_demod(fsk,bit_buf,frame_samps);
 
     i32 delta,off;
-    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta);
+    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta,bits_per_sym);
     i32 f_start = off- (frame_bits-16)/2;
     int f_valid = 0; /* Flag indicating wether or not we've found a UW;
 
@@ -294,7 +294,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     fsk_demod(fsk,bit_buf,frame_samps);
 
     size_t delta,off;
-    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta);
+    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta,bits_per_sym);
     i32 f_start = off- (frame_bits-16)/2;
     int f_valid = 0; /* Flag indicating wether or not we've found a UW */
 
@@ -334,6 +334,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         fprintf(stderr,"Slot %d: sunk\n",tdma->slot_cur);
         if(!f_valid){   /* on bad UW, increment bad uw count and possibly unsync */
             slot->bad_uw_count++;
+            fprintf(stderr,"----BAD UW COUNT %d TOL %d----\n",slot->bad_uw_count,tdma->settings.frame_sync_baduw_tol);
             if(slot->bad_uw_count >= tdma->settings.frame_sync_baduw_tol){
                 slot->state = rx_no_sync;
                 fprintf(stderr,"----DESYNCING----\n");

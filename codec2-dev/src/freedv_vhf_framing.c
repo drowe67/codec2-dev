@@ -401,14 +401,14 @@ int fvhff_synchronized(struct freedv_vhf_deframer * def){
 /* Search for a complete UW in a buffer of bits */
 size_t fvhff_search_uw(const uint8_t bits[],size_t nbits,
                      const uint8_t uw[],    size_t uw_len,
-                     size_t * delta_out){
+                     size_t * delta_out,    size_t bits_per_sym){
 
     size_t ibits,iuw;
     size_t delta_min = uw_len;
     size_t delta;
     size_t offset_min = 0;
     /* Walk through buffer bits */
-    for(ibits = 0; ibits < nbits-uw_len; ibits++){
+    for(ibits = 0; ibits < nbits-uw_len; ibits+=bits_per_sym){
         delta = 0;
         for(iuw = 0; iuw < uw_len; iuw++){
             if(bits[ibits+iuw] != uw[iuw]) delta++;
