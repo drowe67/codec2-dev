@@ -93,6 +93,6 @@ int fvhff_synchronized(struct freedv_vhf_deframer * def);
 /* Search for a complete UW in a buffer of bits */
 size_t fvhff_search_uw(const uint8_t bits[],size_t nbits,
   const uint8_t uw[],    size_t uw_len,
-  size_t * delta_out);
+  size_t * delta_out,    size_t bits_per_sym);
 
 #endif //_FREEDV_VHF_FRAMING_H
