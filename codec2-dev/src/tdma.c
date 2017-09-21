@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 
 static const uint8_t TDMA_UW_V[] =    {0,1,1,0,0,1,1,1,
@@ -240,6 +241,15 @@ int tdma_demod_end_slot(tdma_t * tdma,u32 slot_idx, u8 * bit_buf){
     return f_valid;
 
 }
+
+/* Pull TDMA frame out of bit stream and call RX CB if present */
+void tdma_deframe_cbcall(u8 bits[], u32 slot_i, tdma_t * tdma, slot_t * slot){
+    /* Right now we're not actually deframing the bits */
+    if(tdma->rx_callback != NULL){
+        tdma->rx_callback(bits,slot_i,slot,tdma,tdma->rx_cb_data);
+    }
+}
+
 /* We got a new slot's worth of samples. Run the slot modem and try to get slot sync */
 /* This will probably also work for the slot_sync state */
 void tdma_rx_pilot_sync(tdma_t * tdma){
@@ -286,43 +296,62 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         frame_samps[i].imag = 0;
     }
 
-    /* Pull out the frame and demod */
-    memcpy(&frame_samps[0],&sample_buffer[tdma->sample_sync_offset],slot_samps*sizeof(COMP));
-
-
-    /* Demodulate the frame */
-    fsk_demod(fsk,bit_buf,frame_samps);
-
+    /* Flag to indicate whether or not we should re-do the demodulation */
+    bool repeat_demod = false;
+    bool repeat_demod_2 = false;
+    int rdemod_offset = 0;
     size_t delta,off;
-    off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta,bits_per_sym);
-    i32 f_start = off- (frame_bits-16)/2;
-    int f_valid = 0; /* Flag indicating wether or not we've found a UW */
+    i32 f_start;
+    i32 frame_offset;
+    bool f_valid = false;
+    /* Demod section in do-while loop so we can repeat once if frame is just outside of bit buffer */
+    do{
+        /* Pull out the frame and demod */
+        memcpy(&frame_samps[0],&sample_buffer[tdma->sample_sync_offset+rdemod_offset],slot_samps*sizeof(COMP));
 
-    /* Check frame tolerance and sync state*/
-    if(slot->state == rx_sync){
-        f_valid = delta <= tdma->settings.frame_sync_tol;
-    }else if(slot->state == rx_no_sync){
-        f_valid = delta <= tdma->settings.first_sync_tol;
-    }
+        /* Demodulate the frame */
+        fsk_demod(fsk,bit_buf,frame_samps);
+        off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,16,&delta,bits_per_sym);
+        f_start = off- (frame_bits-16)/2;
 
-    /* Calculate offset (in samps) from start of frame */
-    /* Note: FSK outputs one symbol from the last batch, so we have to account for that */
-    i32 target_frame_offset = ((slot_size-frame_size)/2)*Ts;
-    i32 frame_offset = ((f_start-bits_per_sym)*(Ts/bits_per_sym)) - target_frame_offset;
+        /* Check frame tolerance and sync state*/
+        if(slot->state == rx_sync){
+            f_valid = delta <= tdma->settings.frame_sync_tol;
+        }else if(slot->state == rx_no_sync){
+            f_valid = delta <= tdma->settings.first_sync_tol;
+        }
 
-    /* Flag a large frame offset as a bad UW sync */
-    if( abs(frame_offset) > (slot_samps/8) )
-        f_valid = 0;
-    
-    if(f_valid)
-        slot->slot_local_frame_offset = frame_offset;
+        /* Calculate offset (in samps) from start of frame */
+        /* Note: FSK outputs one symbol from the last batch, so we have to account for that */
+        i32 target_frame_offset = ((slot_size-frame_size)/2)*Ts;
+        frame_offset = ((f_start-bits_per_sym)*(Ts/bits_per_sym)) - target_frame_offset;
 
-    if(f_valid){
-        fprintf(stderr,"Good UW\n");
-    }else{
-        fprintf(stderr,"Bad UW\n");
-    }
-    
+        /* Flag a large frame offset as a bad UW sync */
+        if( abs(frame_offset) > (slot_samps/4) )
+            f_valid = false;
+        
+        if(f_valid)
+            slot->slot_local_frame_offset = frame_offset;
+
+        if(f_valid){
+            fprintf(stderr,"Good UW\n");
+        }else{
+            fprintf(stderr,"Bad UW\n");
+        }
+
+        /* Check to see if the bits are outside of the demod buffer. If so, adjust and re-demod*/
+        /* Disabled for now; will re-enable when worked out better in head */
+        /*if(f_valid && !repeat_demod){
+            if((f_start < bits_per_sym) || ((f_start+(bits_per_sym*frame_size)) > (bits_per_sym*(slot_size+1)))){
+                fprintf(stderr,"f_start: %d, Re-demod-ing\n",f_start);
+                repeat_demod = true;
+                repeat_demod_2 = true;
+            }
+        }else repeat_demod = false;*/
+
+        rdemod_offset = frame_offset;
+        
+    }while(repeat_demod);
 
     i32 single_slot_offset = slot->slot_local_frame_offset;
     /* Flag indicating wether or not we should call the callback */
@@ -356,7 +385,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* Unicode underline for pretty printing */
     char underline[] = {0xCC,0xB2,0x00};
 
-    fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",tdma->slot_cur,frame_offset,off,delta,fsk->f_est[0],fsk->EbNodB);
+    fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",tdma->slot_cur,f_start,off,delta,fsk->f_est[0],fsk->EbNodB);
     for(i=0; i<nbits; i++){
         fprintf(stderr,"%d",bit_buf[i]);
         if((i>off && i<=off+16) || i==f_start || i==(f_start+frame_bits-1)){
@@ -478,9 +507,12 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
 }
 
 
-void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback){
+void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data){
     tdma->rx_callback = rx_callback;
+    tdma->rx_cb_data = cb_data;
 }
+
+
 
 
 #pragma GCC diagnostic pop
