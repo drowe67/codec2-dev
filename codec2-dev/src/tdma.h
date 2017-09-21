@@ -98,16 +98,14 @@ struct TDMA_MODE_SETTINGS {
     u32 first_sync_tol;         /* UW errors allowed for a valid first frame sync */
     u32 frame_sync_tol;         /* UW errors allowed to maintain a frame sync */
     u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a frame unsynced */
-    u32 mastersat_max;          /* Maximum count for master detection counter */
-    u32 mastersat_min;          /* Minimum count before frame considered 'master' */
+    i32 mastersat_max;          /* Maximum count for master detection counter */
+    i32 mastersat_min;          /* Minimum count before frame considered 'master' */
 };
 
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
 #define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,2,2,2,4,2}
-
-
 
 typedef struct TDMA_MODEM tdma_t;
 /* Callback typedef that just returns the bits of the frame */
