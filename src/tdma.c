@@ -214,12 +214,10 @@ void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * sl
         slot->master_count++;
         if(slot->master_count > master_max)
             slot->master_count = master_max;
-        fprintf(stderr,"Found master frame. Slot master count is %d\n",slot->master_count);
     }else{
         slot->master_count--;
         if(slot->master_count < 0)
             slot->master_count = 0;
-        fprintf(stderr,"No    master frame. Slot master count is %d\n",slot->master_count);
     }
 
     /* Right now we're not actually deframing the bits */
@@ -261,12 +259,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         return;
     }
 
-    /* Demod a slot in the sample buffer */
-    //int f_valid = tdma_demod_end_slot(tdma,tdma->slot_cur,bit_buf);
-
-    /* Samples that belong to this frame */
-
-        /* Zero out tail end of bit buffer so we can get last symbol out of demod */
+    /* Zero out tail end of bit buffer so we can get last symbol out of demod */
     /* TODO: This is a hack. Look into better burst mode support in FSK */
     size_t i;
     for(i = slot_samps; i< (slot_size+1)*Ts; i++){
@@ -276,7 +269,6 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
 
     /* Flag to indicate whether or not we should re-do the demodulation */
     bool repeat_demod = false;
-    bool repeat_demod_2 = false;
     int rdemod_offset = 0;
     size_t delta,off;
     i32 f_start;
@@ -308,7 +300,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         if( abs(frame_offset) > (slot_samps/4) )
             f_valid = false;
         
-        if(f_valid)
+        if(f_valid && !repeat_demod)
             slot->slot_local_frame_offset = frame_offset;
 
         if(f_valid){
@@ -319,13 +311,12 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
 
         /* Check to see if the bits are outside of the demod buffer. If so, adjust and re-demod*/
         /* Disabled for now; will re-enable when worked out better in head */
-        /*if(f_valid && !repeat_demod){
+        if(f_valid && !repeat_demod){
             if((f_start < bits_per_sym) || ((f_start+(bits_per_sym*frame_size)) > (bits_per_sym*(slot_size+1)))){
                 fprintf(stderr,"f_start: %d, Re-demod-ing\n",f_start);
                 repeat_demod = true;
-                repeat_demod_2 = true;
             }
-        }else repeat_demod = false;*/
+        }else repeat_demod = false;
 
         rdemod_offset = frame_offset;
         
