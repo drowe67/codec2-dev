@@ -78,8 +78,8 @@ struct TDMA_SLOT {
     enum slot_state state;          /* Current local slot state */
     i32 slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
     u32 bad_uw_count;               /* How many bad UWs have we gotten since synchronized */
+    i32 master_count;               /* How likely is this frame to be a synchronization master */
     struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
-
 };
 
 typedef struct TDMA_SLOT slot_t;
@@ -98,12 +98,21 @@ struct TDMA_MODE_SETTINGS {
     u32 first_sync_tol;         /* UW errors allowed for a valid first frame sync */
     u32 frame_sync_tol;         /* UW errors allowed to maintain a frame sync */
     u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a frame unsynced */
+    u32 mastersat_max;          /* Maximum count for master detection counter */
+    u32 mastersat_min;          /* Minimum count before frame considered 'master' */
 };
 
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,1,1,1,0}
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,2,2,2,4,2}
+
+
+
+typedef struct TDMA_MODEM tdma_t;
+/* Callback typedef that just returns the bits of the frame */
+/* TODO: write this a bit better */
+typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
 
 /* TDMA modem */
 struct TDMA_MODEM {
@@ -119,7 +128,6 @@ struct TDMA_MODEM {
     void * rx_cb_data;
 };
 
-typedef struct TDMA_MODEM tdma_t;
 
 /* Allocate and setup a new TDMA modem */
 tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode);
@@ -143,9 +151,6 @@ void tdma_print_stuff(tdma_t * tdma);
 void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data);
 
 
-/* Callback typedef that just returns the bits of the frame */
-/* TODO: write this a bit better */
-typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
 
 
 #endif
