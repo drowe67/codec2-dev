@@ -31,16 +31,22 @@
 #include "fsk.h"
 #include "freedv_vhf_framing.h"
 #include <stdint.h>
+#include <stdbool.h>
 #include "comp_prim.h"
 
 
 /* TODO: Replace these types with their full names */
 /* I'm just feeling lazy right now */
 typedef uint64_t u64;
+typedef int64_t  i64;
 typedef uint32_t u32;
 typedef int32_t  i32;
 typedef uint8_t  u8;
 typedef float    f32;
+
+typedef struct FSK fsk_t;
+typedef struct TDMA_SLOT slot_t;
+typedef struct TDMA_MODEM tdma_t;
 
 /* The state for an individual slot */
 enum slot_state {
@@ -74,15 +80,14 @@ struct TDMA_FRAME {
 /* TDMA slot struct */
 
 struct TDMA_SLOT {
-    struct FSK * fsk;               /* The FSK modem for this slot */
+    fsk_t * fsk;                    /* The FSK modem for this slot */
     enum slot_state state;          /* Current local slot state */
     i32 slot_local_frame_offset;    /* Where the RX frame starts, in samples, from the perspective of the modem */
     u32 bad_uw_count;               /* How many bad UWs have we gotten since synchronized */
     i32 master_count;               /* How likely is this frame to be a synchronization master */
-    struct TDMA_SLOT * next_slot;   /* Next slot in a linked list of slots */
+    slot_t * next_slot;             /* Next slot in a linked list of slots */
+    bool single_tx;                 /* Are we TXing a single frame? */
 };
-
-typedef struct TDMA_SLOT slot_t;
 
 /* Structure for tracking basic TDMA modem config */
 struct TDMA_MODE_SETTINGS {
@@ -105,25 +110,39 @@ struct TDMA_MODE_SETTINGS {
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,2,2,2,4,2}
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,2,2,2,4,2};
 
-typedef struct TDMA_MODEM tdma_t;
 /* Callback typedef that just returns the bits of the frame */
 /* TODO: write this a bit better */
 typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
 
+/* Callback typedef when TDMA is ready to schedule a new frame */
+/* Returns 1 if a frame is supplied, 0 if not */
+/* If no frame supplied, slot is changed out of TX mode */
+typedef int (*tdma_cb_tx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
+
+/* Callback to the radio front end to schedule a burst of TX samples */
+typedef int (*tdma_cb_tx_burst)(COMP* samples, size_t n_samples,i64 timestamp,void * cb_data);
+
 /* TDMA modem */
 struct TDMA_MODEM {
-    struct FSK * fsk_pilot;         /* Pilot modem */
+    fsk_t * fsk_pilot;              /* Pilot modem */
     enum tdma_state state;          /* Current state of modem */
-    struct TDMA_SLOT * slots;       /* Linked list of slot structs */
+    slot_t * slots;                 /* Linked list of slot structs */
     struct TDMA_MODE_SETTINGS settings; /* Basic TDMA config parameters */
-    COMP * sample_buffer;          /* Buffer of incoming samples */
-    int64_t sample_sync_offset;      /* Offset into the sample buffer where slot 0 starts */
-    uint64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
+    COMP * sample_buffer;           /* Buffer of incoming samples */
+    i32 sample_sync_offset;     /* Offset into the sample buffer where slot 0 starts */
+    int64_t timestamp;             /* Timestamp of oldest sample in samp buffer */
+    int64_t loop_delay;             /* Static offset applied to timestamp when scheduling 
+                                        TX frames to account for delays in DSP and radio hardware */
+    uint32_t tx_multislot_delay;    /* How many full slot periods in the future to delay TX burst scheduling */
     uint32_t slot_cur;              /* Current slot coming in */
     tdma_cb_rx_frame rx_callback;
+    tdma_cb_tx_frame tx_callback;
+    tdma_cb_tx_burst tx_burst_callback;
     void * rx_cb_data;
+    void * tx_cb_data;
+    void * tx_burst_cb_data;
 };
 
 
@@ -148,6 +167,24 @@ void tdma_print_stuff(tdma_t * tdma);
 /* Set the RX callback function */
 void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data);
 
+void tdma_set_tx_cb(tdma_t * tdma,tdma_cb_tx_frame tx_callback,void * cb_data);
+
+void tdma_set_tx_burst_cb(tdma_t * tdma,tdma_cb_tx_burst tx_burst_callback, void * cb_data);
+
+/* Set up TDMA to schedule the transmission of a single frame. The frame itself will be 
+    passed in through the tx_frame callback
+*/
+void tdma_single_frame_tx(tdma_t * tdma, int slot_idx);
+
+/* Start transmission of a bunch of frames on a particular slot
+*/
+void tdma_start_tx(tdma_t * tdma, int slot_idx);
+
+/* Stop ongoing transmission of a bunch of frames for some slot
+*/
+void tdma_stop_tx(tdma_t * tdma, int slot_idx);
+
+size_t tdma_nin(tdma_t * tdma);
 
 
 
