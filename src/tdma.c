@@ -77,6 +77,8 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     tdma->sample_sync_offset = 960;
     tdma->slot_cur = 0;
     tdma->rx_callback = NULL;
+    tdma->tx_callback = NULL;
+    tdma->tx_burst_callback = NULL;
 
     /* Allocate buffer for incoming samples */
     /* TODO: We may only need a single slot's worth of samps -- look into this */
@@ -168,7 +170,7 @@ u32 tdma_get_N(tdma_t * tdma){
 }
 
 /* Convience function to look up a slot from it's index number */
-static slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
+slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
     /* Don't try and index beyond the end */
     if(slot_idx >= tdma->settings.n_slots) return NULL;
 
@@ -247,7 +249,7 @@ void tdma_do_tx_frame(tdma_t * tdma, int slot_idx){
 
     /* Send frame on to radio if callback is setup */
     if(tdma->tx_burst_callback != NULL){
-        tdma->tx_burst_callback(mod_samps,Ts*frame_size,tx_timestamp,tdma->tx_burst_cb_data);
+        tdma->tx_burst_callback(tdma,mod_samps,Ts*frame_size,tx_timestamp,tdma->tx_burst_cb_data);
     }
 }
 
@@ -662,5 +664,13 @@ size_t tdma_nin(tdma_t * tdma){
     return slot_samps;
 }
 
+size_t tdma_nout(tdma_t * tdma){
+    struct TDMA_MODE_SETTINGS mode = tdma->settings;
+    size_t frame_size = mode.frame_size;
+    u32 Rs = mode.sym_rate;
+    u32 Fs = mode.samp_rate;
+    u32 Ts = Fs/Rs;
+    return frame_size*Ts;
+}
 
 #pragma GCC diagnostic pop
