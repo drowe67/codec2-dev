@@ -122,7 +122,7 @@ typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_
 typedef int (*tdma_cb_tx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
 
 /* Callback to the radio front end to schedule a burst of TX samples */
-typedef int (*tdma_cb_tx_burst)(COMP* samples, size_t n_samples,i64 timestamp,void * cb_data);
+typedef int (*tdma_cb_tx_burst)(tdma_t * tdma,COMP* samples, size_t n_samples,i64 timestamp,void * cb_data);
 
 /* TDMA modem */
 struct TDMA_MODEM {
@@ -186,6 +186,10 @@ void tdma_stop_tx(tdma_t * tdma, int slot_idx);
 
 size_t tdma_nin(tdma_t * tdma);
 
+size_t tdma_nout(tdma_t * tdma);
+
+/* Convience function to look up a slot from it's index number */
+slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx);
 
 
 #endif
