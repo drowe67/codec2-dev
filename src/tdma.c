@@ -35,12 +35,14 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+/* Easy handle to enable/disable a whole slew of debug printouts */
+//#define VERY_DEBUG 1
 
 static const uint8_t TDMA_UW_V[] =    {0,1,1,0,0,1,1,1,
                                        1,0,1,0,1,1,0,1};
 
-struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
-    struct TDMA_MODEM * tdma;
+tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
+    tdma_t * tdma;
     
     u32 Rs = mode.sym_rate;
     u32 Fs = mode.samp_rate;
@@ -58,14 +60,14 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     assert( M==2 || M==4);
 
     /* allocate the modem */
-    tdma = (struct TDMA_MODEM *) malloc(sizeof(struct TDMA_MODEM));
+    tdma = (tdma_t *) malloc(sizeof(tdma_t));
     if(tdma == NULL) goto cleanup_bad_alloc;
 
     /* Symbols over which pilot modem operates */
     u32 pilot_nsyms = slot_size/2;
 
     /* Set up pilot modem */
-    struct FSK * pilot = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
+    fsk_t * pilot = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
     if(pilot == NULL) goto cleanup_bad_alloc;
     fsk_enable_burst_mode(pilot,pilot_nsyms);
     tdma->fsk_pilot = pilot;
@@ -74,6 +76,7 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     tdma->state = no_sync;
     tdma->sample_sync_offset = 960;
     tdma->slot_cur = 0;
+    tdma->rx_callback = NULL;
 
     /* Allocate buffer for incoming samples */
     /* TODO: We may only need a single slot's worth of samps -- look into this */
@@ -86,18 +89,19 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
         tdma->sample_buffer[i].imag = 0;
     }
 
-    struct TDMA_SLOT * slot;
-    struct TDMA_SLOT * last_slot;
-    struct FSK * slot_fsk;
+    slot_t * slot;
+    slot_t * last_slot;
+    fsk_t * slot_fsk;
     last_slot = NULL;
     for(i=0; i<n_slots; i++){
-        slot = (struct TDMA_SLOT *) malloc(sizeof(struct TDMA_SLOT));
+        slot = (slot_t *) malloc(sizeof(slot_t));
         if(slot == NULL) goto cleanup_bad_alloc;
         slot->fsk = NULL;
         tdma->slots = slot;
         slot->next_slot = last_slot;
         slot->slot_local_frame_offset = 0;
         slot->state = rx_no_sync;
+        slot->single_tx = true;
         slot->bad_uw_count = 0;
         slot->master_count = 0;
         slot_fsk = fsk_create_hbr(Fs,Rs,P,M,Rs,Rs);
@@ -114,13 +118,11 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     return tdma;
 
     /* Clean up after a failed malloc */
-    /* TODO: Run with valgrind/asan, make sure I'm getting everything */
     cleanup_bad_alloc:
-    fprintf(stderr,"Cleaning up\n");
     if(tdma == NULL) return NULL;
 
-    struct TDMA_SLOT * cleanup_slot = tdma->slots;
-    struct TDMA_SLOT * cleanup_slot_next;
+    slot_t * cleanup_slot = tdma->slots;
+    slot_t * cleanup_slot_next;
     while(cleanup_slot != NULL){
         cleanup_slot_next = cleanup_slot->next_slot;
         if(cleanup_slot->fsk != NULL) fsk_destroy(cleanup_slot->fsk);
@@ -133,7 +135,7 @@ struct TDMA_MODEM * tdma_create(struct TDMA_MODE_SETTINGS mode){
     return NULL;
 }
 
-void tdma_print_stuff(struct TDMA_MODEM * tdma){
+void tdma_print_stuff(tdma_t * tdma){
     printf("symrate: %d\n",tdma->settings.sym_rate);
     printf("fsk_m: %d\n",tdma->settings.fsk_m);
     printf("samprate: %d\n",tdma->settings.samp_rate);
@@ -145,7 +147,14 @@ void tdma_print_stuff(struct TDMA_MODEM * tdma){
 }
 
 void tdma_destroy(tdma_t * tdma){
-    /* TODO: Free slot modems (need to create them first) */
+    slot_t * slot = tdma->slots;
+    slot_t * next_slot;
+    while(slot != NULL){
+        next_slot = slot->next_slot;
+        fsk_destroy(slot->fsk);
+        free(slot);
+        slot = next_slot;
+    }
     fsk_destroy(tdma->fsk_pilot);
     free(tdma->sample_buffer);
     free(tdma);
@@ -177,18 +186,83 @@ static slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 
 
+/* Get a TX frame from the callback, add UW, and schedule for transmission */
+void tdma_do_tx_frame(tdma_t * tdma, int slot_idx){
+    struct TDMA_MODE_SETTINGS mode = tdma->settings;
+    size_t frame_size = mode.frame_size;
+    size_t slot_size = mode.slot_size;
+    size_t bits_per_sym = (mode.fsk_m==2)?1:2;
+    slot_t * slot = tdma_get_slot(tdma,slot_idx);
+    size_t frame_size_bits = bits_per_sym*frame_size;
+    size_t nbits = (slot_size+1)*bits_per_sym;
+    size_t n_slots = mode.n_slots;
+    u32 Rs = mode.sym_rate;
+    u32 Fs = mode.samp_rate;
+    u32 Ts = Fs/Rs;
+
+    COMP mod_samps[(slot_size+1)*Ts];
+    u8 frame_bits[frame_size_bits];
+    u8 mod_bits[nbits];
+    if(slot == NULL) return;
+
+    /* Clear bit buffer */
+    memset(&mod_bits[0],0,nbits*sizeof(u8));
+
+    /* Get a frame, or leave blank if call not setup */
+    if(tdma->tx_callback != NULL){
+        int ret = tdma->tx_callback(frame_bits,slot_idx,slot,tdma,tdma->tx_cb_data);
+        if(!ret){
+            slot->state = rx_no_sync;
+        }
+    }
+
+    /* Copy frame bits to front of mod bit buffer */
+    memcpy(&mod_bits[0],&frame_bits[0],frame_size_bits*sizeof(u8));
+
+    /* Copy UW into frame */
+    size_t uw_offset = (frame_size_bits-mode.uw_len)/2;
+    memcpy(&mod_bits[uw_offset],&TDMA_UW_V[0],mode.uw_len*sizeof(u8));
+
+    /* Modulate frame */
+    fsk_mod_c(slot->fsk,mod_samps,mod_bits);
+
+    /* Calculate TX time and send frame down to radio */
+    /* timestamp of head of slot currently being demod'ed */
+    i64 tx_timestamp = tdma->timestamp + (i64)tdma->sample_sync_offset;
+
+    /* Figure out how far in future the next instance of 'this' slot will be */
+    int delta_slots = 0;
+    u32 slot_cur = tdma->slot_cur;
+    if(slot_idx > slot_cur){
+        delta_slots = slot_idx-slot_cur;
+    }else if(slot_idx < slot_cur){
+        delta_slots = (slot_cur+slot_idx+2)%n_slots;
+    }
+    
+    /* Point timestamp to next available slot */
+    tx_timestamp += delta_slots*slot_size*Ts;
+
+    /* Add multi-slot/frame offset to tx timestamp */
+    tx_timestamp += tdma->tx_multislot_delay*slot_size*Ts;
+
+    /* Send frame on to radio if callback is setup */
+    if(tdma->tx_burst_callback != NULL){
+        tdma->tx_burst_callback(mod_samps,Ts*frame_size,tx_timestamp,tdma->tx_burst_cb_data);
+    }
+}
+
 /* Pull TDMA frame out of bit stream and call RX CB if present */
 void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * slot){
     size_t frame_size = tdma->settings.frame_size;
     size_t slot_size = tdma->settings.slot_size;
     size_t bits_per_sym = (tdma->settings.fsk_m==2)?1:2;
-    size_t frame_size_bits = bits_per_sym*frame_size;
-    u8 frame_bits[frame_size_bits];
     size_t n_demod_bits = (slot_size+1)*bits_per_sym;
+    size_t frame_size_bits = bits_per_sym*frame_size;
     size_t delta,off;
     i32 f_start;
     u32 master_max = tdma->settings.mastersat_max;
 
+    u8 frame_bits[frame_size_bits];
     /* Re-find UW in demod'ed slice */
     /* Should probably just be left to tdma_rx_pilot_sync */
     off = fvhff_search_uw(demod_bits,n_demod_bits,TDMA_UW_V,16,&delta,bits_per_sym);
@@ -222,7 +296,7 @@ void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * sl
 
     /* Right now we're not actually deframing the bits */
     if(tdma->rx_callback != NULL){
-        //tdma->rx_callback(frame_bits,slot_i,slot,tdma,tdma->rx_cb_data);
+        tdma->rx_callback(frame_bits,slot_i,slot,tdma,tdma->rx_cb_data);
     }
 }
 
@@ -240,7 +314,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     u32 slot_samps = slot_size*Ts;
     u32 bits_per_sym = M==2?1:2;
     slot_t * slot = tdma_get_slot(tdma,tdma->slot_cur);
-    struct FSK * fsk = slot->fsk;
+    fsk_t * fsk = slot->fsk;
     size_t nbits = (slot_size+1)*bits_per_sym;
     size_t slot_offset = tdma->sample_sync_offset;
     u8 bit_buf[nbits];
@@ -254,9 +328,15 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     if( (slot_offset+slot_samps) > (slot_samps*(n_slots+1)-(slot_samps/4)) ){
         /* Move slot offset back by 1 slot and don't increment slot index. We'll just handle this one on the next batch of samps */
         tdma->sample_sync_offset -= slot_samps;
-        free(bit_buf);
+        #ifdef VERY_DEBUG
         fprintf(stderr,"Skipping\n");
+        #endif
         return;
+    }
+
+    /* Do TX if this is a TX slot */
+    if(slot->state == tx_client){
+        tdma_do_tx_frame(tdma,tdma->slot_cur);
     }
 
     /* Zero out tail end of bit buffer so we can get last symbol out of demod */
@@ -303,20 +383,26 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         if(f_valid && !repeat_demod)
             slot->slot_local_frame_offset = frame_offset;
 
-        if(f_valid){
-            fprintf(stderr,"Good UW\n");
-        }else{
-            fprintf(stderr,"Bad UW\n");
-        }
 
         /* Check to see if the bits are outside of the demod buffer. If so, adjust and re-demod*/
         /* Disabled for now; will re-enable when worked out better in head */
         if(f_valid && !repeat_demod){
             if((f_start < bits_per_sym) || ((f_start+(bits_per_sym*frame_size)) > (bits_per_sym*(slot_size+1)))){
-                fprintf(stderr,"f_start: %d, Re-demod-ing\n",f_start);
                 repeat_demod = true;
             }
         }else repeat_demod = false;
+
+
+        #ifdef VERY_DEBUG
+        if(repeat_demod){
+            fprintf(stderr,"f_start: %d, Re-demod-ing\n",f_start);
+        }
+        if(f_valid){
+            fprintf(stderr,"Good UW\n");
+        }else{
+            fprintf(stderr,"Bad UW\n");
+        }
+        #endif
 
         rdemod_offset = frame_offset;
         
@@ -326,32 +412,44 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* Flag indicating wether or not we should call the callback */
     bool do_frame_found_call = false;   
 
-    /* TODO: deal with re-demod for frames just outside of buffer */
     /* Do single slot state machine */
     if( slot->state == rx_sync){
-        fprintf(stderr,"Slot %d: sunk\n",tdma->slot_cur);
         do_frame_found_call = true;
         if(!f_valid){   /* on bad UW, increment bad uw count and possibly unsync */
             slot->bad_uw_count++;
             slot->master_count--;
             if(slot->master_count < 0)
                 slot->master_count = 0;
+
+            #ifdef VERY_DEBUG
             fprintf(stderr,"----BAD UW COUNT %d TOL %d----\n",slot->bad_uw_count,tdma->settings.frame_sync_baduw_tol);
+            #endif
             if(slot->bad_uw_count >= tdma->settings.frame_sync_baduw_tol){
                 slot->state = rx_no_sync;
                 slot->master_count = 0;
-                fprintf(stderr,"----DESYNCING----\n");
                 do_frame_found_call = false;
+
+                #ifdef VERY_DEBUG
+                fprintf(stderr,"----DESYNCING----\n");
+                #endif
             }
         }else{ /* Good UW found */
             slot->bad_uw_count = 0;
             do_frame_found_call = true;
         }
+
+        #ifdef VERY_DEBUG
+        fprintf(stderr,"Slot %d: sunk\n",tdma->slot_cur);
+        #endif
     }else if(slot->state == rx_no_sync){
+        #ifdef VERY_DEBUG
         fprintf(stderr,"Slot %d: no sync\n",tdma->slot_cur);
+        #endif
         if(f_valid ){
             slot->state = rx_sync;
             do_frame_found_call = true;
+        }else{
+            fsk_clear_estimators(fsk);
         }
     }
 
@@ -359,6 +457,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         tdma_deframe_cbcall(bit_buf,tdma->slot_cur,tdma,slot);
     }
 
+    #ifdef VERY_DEBUG
     /* Unicode underline for pretty printing */
     char underline[] = {0xCC,0xB2,0x00};
 
@@ -370,6 +469,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         }
     }
     fprintf(stderr,"\n");
+    #endif
 
     /* Update slot offset to compensate for frame centering */
     /* Also check to see if any slots are master. If so, take timing from them */
@@ -384,7 +484,9 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
             i32 local_offset = i_slot->slot_local_frame_offset;
             /* Filter out extreme spurious timing offsets */
             if(abs(local_offset)<(slot_samps/4)){
+                #ifdef VERY_DEBUG
                 fprintf(stderr,"Local offset: %d\n",local_offset);
+                #endif
                 offset_total+=local_offset;
                 offset_slots++;
                 if(i_slot->master_count > master_max){
@@ -398,13 +500,19 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* Use master slot for timing if available, otherwise take average of all frames */
     if(master_max >= mode.mastersat_min){
         tdma->sample_sync_offset +=  (offset_master/4);
+        #ifdef VERY_DEBUG
         fprintf(stderr,"Syncing to master offset %d\n",tdma->sample_sync_offset);
+        #endif
     }else{
         tdma->sample_sync_offset +=  (offset_total/4);
+        #ifdef VERY_DEBUG
         fprintf(stderr,"Total Offset:%d\n",offset_total);
         fprintf(stderr,"Slot offset: %d of %d\n",tdma->sample_sync_offset,slot_samps*n_slots);
+        #endif
     }
+    #ifdef VERY_DEBUG
     fprintf(stderr,"\n");
+    #endif
 
     tdma->slot_cur++;
     if(tdma->slot_cur >= n_slots)
@@ -415,7 +523,9 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     if( slot_offset < (slot_samps/4) ){
         tdma->sample_sync_offset = tdma->sample_sync_offset + slot_samps;
         tdma_rx_pilot_sync(tdma);
+        #ifdef VERY_DEBUG
         fprintf(stderr,"Recursing\n");
+        #endif
     }
 }
 
@@ -454,7 +564,6 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
 }
 
 void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
-
     COMP * sample_buffer = tdma->sample_buffer;
     struct TDMA_MODE_SETTINGS mode = tdma->settings;
     u32 Rs = mode.sym_rate;
@@ -484,13 +593,12 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
             tdma_rx_no_sync(tdma,samps,timestamp);
             break;
         case pilot_sync:
+        case slot_sync:
+        case master_sync:
             tdma_rx_pilot_sync(tdma);
             break;
-        case slot_sync:
-            break;
-        case master_sync:
-            break;
         default:
+            tdma->state = pilot_sync;
             break;
     }
     tdma->state = pilot_sync;
@@ -503,6 +611,56 @@ void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data){
 }
 
 
+void tdma_set_tx_cb(tdma_t * tdma,tdma_cb_tx_frame tx_callback,void * cb_data){
+    tdma->tx_callback = tx_callback;
+    tdma->tx_cb_data = cb_data;
+}
+
+
+void tdma_set_tx_burst_cb(tdma_t * tdma,tdma_cb_tx_burst tx_burst_callback, void * cb_data){
+    tdma->tx_burst_callback = tx_burst_callback;
+    tdma->tx_burst_cb_data = cb_data;
+}
+
+/* Set up TDMA to schedule the transmission of a single frame. The frame itself will be 
+    passed in through the tx_frame callback
+*/
+void tdma_single_frame_tx(tdma_t * tdma, int slot_idx){
+    slot_t * slot = tdma_get_slot(tdma,slot_idx);
+    if(slot == NULL) return;
+    slot->state = tx_client;
+    slot->single_tx = true;
+}
+
+/* Start transmission of a bunch of frames on a particular slot
+*/
+void tdma_start_tx(tdma_t * tdma, int slot_idx){
+    slot_t * slot = tdma_get_slot(tdma,slot_idx);
+    if(slot == NULL) return;
+    slot->state = tx_client;
+    slot->single_tx = false;
+}
+
+
+/* Stop ongoing transmission of a bunch of frames for some slot
+*/
+void tdma_stop_tx(tdma_t * tdma, int slot_idx){
+    slot_t * slot = tdma_get_slot(tdma,slot_idx);
+    if(slot == NULL) return;
+    slot->state = rx_no_sync;
+    slot->single_tx = false;
+}
+
+size_t tdma_nin(tdma_t * tdma){
+    struct TDMA_MODE_SETTINGS mode = tdma->settings;
+    u32 Rs = mode.sym_rate;
+    u32 Fs = mode.samp_rate;
+    u32 slot_size = mode.slot_size;
+    u32 Ts = Fs/Rs;
+    u32 slot_samps = slot_size*Ts;
+
+    return slot_samps;
+}
 
 
 #pragma GCC diagnostic pop
