@@ -59,7 +59,7 @@ enum slot_state {
 /* The state of the entire TDMA modem */
 enum tdma_state {
     no_sync = 0,            /* No sync */
-    pilot_sync = 1,         /* Pilot modem has gotten sync, but slots haven't*/
+    //pilot_sync = 1,         /* Pilot modem has gotten sync, but slots haven't*/
     slot_sync = 2,          /* One or more slots are sunk */
     master_sync = 3,        /* This modem is the TDMA master */
 };
@@ -105,12 +105,13 @@ struct TDMA_MODE_SETTINGS {
     u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a frame unsynced */
     i32 mastersat_max;          /* Maximum count for master detection counter */
     i32 mastersat_min;          /* Minimum count before frame considered 'master' */
+    i32 loss_of_sync_frames;    /* How many bad frames before going from 'sync' to 'no_sync' for entire modem */
 };
 
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,4,2,2,2,4,2};
+#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,2,2,2,2,6,3,5};
 
 /* Callback typedef that just returns the bits of the frame */
 /* TODO: write this a bit better */
@@ -137,12 +138,14 @@ struct TDMA_MODEM {
                                         TX frames to account for delays in DSP and radio hardware */
     uint32_t tx_multislot_delay;    /* How many full slot periods in the future to delay TX burst scheduling */
     uint32_t slot_cur;              /* Current slot coming in */
+    uint32_t sync_misses;           /* How many slots have been missed during this sync period */
     tdma_cb_rx_frame rx_callback;
     tdma_cb_tx_frame tx_callback;
     tdma_cb_tx_burst tx_burst_callback;
     void * rx_cb_data;
     void * tx_cb_data;
     void * tx_burst_cb_data;
+    bool ignore_rx_on_tx;           /* Don't try and demod samples from a frame in a slot marked as TX */
 };
 
 
