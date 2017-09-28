@@ -29,11 +29,12 @@
 #define __CODEC_2_TDMA_H
 
 #include "fsk.h"
-#include "freedv_vhf_framing.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include "comp_prim.h"
 
+
+#define TDMA_FRAME_A 3   /* 4800T Frame */
 
 /* TODO: Replace these types with their full names */
 /* I'm just feeling lazy right now */
@@ -111,11 +112,11 @@ struct TDMA_MODE_SETTINGS {
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,FREEDV_VHF_FRAME_AT,16,2,2,2,2,6,3,5};
+#define FREEDV_4800T {2400,4,48000,48,44,2,TDMA_FRAME_AT,16,2,2,2,2,6,3,5};
 
 /* Callback typedef that just returns the bits of the frame */
 /* TODO: write this a bit better */
-typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
+typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma,u8 uw_type, void * cb_data);
 
 /* Callback typedef when TDMA is ready to schedule a new frame */
 /* Returns 1 if a frame is supplied, 0 if not */
@@ -146,6 +147,12 @@ struct TDMA_MODEM {
     void * tx_cb_data;
     void * tx_burst_cb_data;
     bool ignore_rx_on_tx;           /* Don't try and demod samples from a frame in a slot marked as TX */
+
+    size_t master_bit_pos;          /* Where in the frame can we find the master indicator bit? */
+    uint8_t uw_types;               /* How many different UWs does this framing format use? pulled from frame_type */
+    uint8_t ** uw_list;             /* Pointer to list of valid UWs */
+    
+
 };
 
 
@@ -163,9 +170,6 @@ u32 tdma_get_N(tdma_t * tdma);
  TODO: I'm still not entirely sure of what I want the semantics of this to look like
 */
 void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp);
-
-/* Hideous debug function */
-void tdma_print_stuff(tdma_t * tdma);
 
 /* Set the RX callback function */
 void tdma_set_rx_cb(tdma_t * tdma,tdma_cb_rx_frame rx_callback,void * cb_data);
