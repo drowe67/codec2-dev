@@ -27,7 +27,6 @@
 
 
 #include "fsk.h"
-#include "freedv_vhf_framing.h"
 #include "tdma.h"
 #include <stdint.h>
 #include <assert.h>
@@ -36,10 +35,15 @@
 #include <stdbool.h>
 
 /* Easy handle to enable/disable a whole slew of debug printouts */
-//#define VERY_DEBUG 1
+#define VERY_DEBUG 1
 
 static const uint8_t TDMA_UW_V[] =    {0,1,1,0,0,1,1,1,
                                        1,0,1,0,1,1,0,1};
+
+static const uint8_t TDMA_UW_D[] =    {1,1,1,1,0,0,0,1,
+                                       1,1,1,1,1,1,0,0};         
+                                       
+static const uint8_t * TDMA_UW_LIST_A[] = {&TDMA_UW_V,&TDMA_UW_D};
 
 tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     tdma_t * tdma;
@@ -81,6 +85,12 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     tdma->ignore_rx_on_tx = true;
     tdma->sync_misses = 0;
 
+    /* Set up the UWs we use for this mode. */
+    if(mode.frame_type == TDMA_FRAME_A){
+        tdma->uw_types = 2;
+        tdma->uw_list = TDMA_UW_LIST_A;
+        tdma->master_bit_pos = 35;
+    }
     /* Allocate buffer for incoming samples */
     /* TODO: We may only need a single slot's worth of samps -- look into this */
     samp_buffer = (COMP *) malloc(sizeof(COMP)*slot_size*Ts*(n_slots+1));
@@ -136,17 +146,6 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     return NULL;
 }
 
-void tdma_print_stuff(tdma_t * tdma){
-    printf("symrate: %d\n",tdma->settings.sym_rate);
-    printf("fsk_m: %d\n",tdma->settings.fsk_m);
-    printf("samprate: %d\n",tdma->settings.samp_rate);
-    printf("slotsize: %d\n",tdma->settings.slot_size);
-    printf("framesize: %d\n",tdma->settings.frame_size);
-    printf("nslots: %d\n",tdma->settings.n_slots);
-    printf("frametype: %d\n",tdma->settings.frame_type);
-    printf("sync_offset: %ld\n",tdma->sample_sync_offset);
-}
-
 void tdma_destroy(tdma_t * tdma){
     slot_t * slot = tdma->slots;
     slot_t * next_slot;
@@ -167,6 +166,49 @@ u32 tdma_get_N(tdma_t * tdma){
     u32 Rs = tdma->settings.sym_rate;
     return slot_size * (Fs/Rs);
 }
+
+/* Search for a complete UW in a buffer of bits */
+size_t tdma_search_uw(tdma_t * tdma, u8 bits[], size_t nbits, size_t * delta_out, size_t * uw_type_out){
+/*size_t fvhff_search_uw(const uint8_t bits[],size_t nbits,
+    const uint8_t uw[],    size_t uw_len,
+    size_t * delta_out,    size_t bits_per_sym){*/
+
+    size_t uw_len = tdma->settings.uw_len;
+    size_t bits_per_sym = (tdma->settings.fsk_m==2)?1:2;
+    u8 ** uw_list = tdma->uw_list;
+    size_t ibits,iuw;
+    size_t delta_min = uw_len;
+    size_t delta;
+    size_t j;
+    size_t uw_type_min;
+    size_t uw_delta_min = uw_len;
+    size_t offset_min,uw_offset_min;
+    /* Check each UW */
+    for(j = 0; j < tdma->uw_types; j++){
+        /* Walk through buffer bits */
+        u8 * uw = uw_list[j];
+        size_t offset_min = 0;
+        for(ibits = 0; ibits < nbits-uw_len; ibits+=bits_per_sym){
+            delta = 0;
+            for(iuw = 0; iuw < uw_len; iuw++){
+                if(bits[ibits+iuw] != uw[iuw]) delta++;
+            }
+            if( delta < delta_min ){
+                delta_min = delta;
+                offset_min = ibits;
+            }
+        }
+        if( delta_min < uw_delta_min ){
+            uw_delta_min = delta_min;
+            uw_offset_min = offset_min;
+            uw_type_min = j;
+        } 
+    }
+    if(delta_out != NULL) *delta_out = uw_delta_min;
+    if(uw_type_out != NULL) *uw_type_out = uw_type_min;
+    return uw_offset_min;
+}
+
 
 /* Convience function to look up a slot from it's index number */
 slot_t * tdma_get_slot(tdma_t * tdma, u32 slot_idx){
@@ -267,7 +309,8 @@ void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * sl
     u8 frame_bits[frame_size_bits];
     /* Re-find UW in demod'ed slice */
     /* Should probably just be left to tdma_rx_pilot_sync */
-    off = fvhff_search_uw(demod_bits,n_demod_bits,TDMA_UW_V,uw_len,&delta,bits_per_sym);
+    //off = fvhff_search_uw(demod_bits,n_demod_bits,TDMA_UW_V,uw_len,&delta,bits_per_sym);
+    off = tdma_search_uw(tdma, demod_bits, n_demod_bits, &delta, NULL);
     f_start = off - (frame_size_bits-uw_len)/2;
 
     /* If frame is not fully in demod bit buffer, there's not much we can do */
@@ -280,10 +323,8 @@ void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * sl
 
     /* Check to see if this is a master timing frame. */
     bool master_mode = false;
-    if(tdma->settings.frame_type == FREEDV_VHF_FRAME_AT){
-        if(frame_bits[35])
-            master_mode = true;
-    }
+    if(frame_bits[tdma->master_bit_pos])
+        master_mode = true;
     
     /* Handle counter fiddling for master timing frames */
     if(master_mode){
@@ -355,7 +396,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         /* Flag to indicate whether or not we should re-do the demodulation */
         bool repeat_demod = false;
         int rdemod_offset = 0;
-        size_t delta,off;
+        size_t delta,off,uw_type;
         i32 f_start;
         i32 frame_offset;
         bool f_valid = false;
@@ -366,7 +407,8 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
 
             /* Demodulate the frame */
             fsk_demod(fsk,bit_buf,frame_samps);
-            off = fvhff_search_uw(bit_buf,nbits,TDMA_UW_V,uw_len,&delta,bits_per_sym);
+
+            off = tdma_search_uw(tdma, bit_buf, nbits, &delta, &uw_type);
             f_start = off- (frame_bits-uw_len)/2;
 
             /* Check frame tolerance and sync state*/
@@ -403,7 +445,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
                 fprintf(stderr,"f_start: %d, Re-demod-ing\n",f_start);
             }
             if(f_valid){
-                fprintf(stderr,"Good UW\n");
+                fprintf(stderr,"Good UW, type %d\n",uw_type);
             }else{
                 fprintf(stderr,"Bad UW\n");
             }
@@ -466,7 +508,8 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         /* Unicode underline for pretty printing */
         char underline[] = {0xCC,0xB2,0x00};
 
-        fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",tdma->slot_cur,f_start,off,delta,fsk->f_est[0],fsk->EbNodB);
+        fprintf(stderr,"slot: %d fstart:%d offset: %d delta: %d f1:%.3f EbN0:%f\n",
+            tdma->slot_cur,f_start,off,delta,fsk->f_est[0],fsk->EbNodB);
         for(i=0; i<nbits; i++){
             fprintf(stderr,"%d",bit_buf[i]);
             if((i>off && i<=off+uw_len) || i==f_start || i==(f_start+frame_bits-1)){
@@ -476,49 +519,51 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         fprintf(stderr,"\n");
         #endif
 
-        /* Update slot offset to compensate for frame centering */
-        /* Also check to see if any slots are master. If so, take timing from them */
-        i32 offset_total = 0;
-        i32 offset_slots = 0;
-        i32 offset_master = 0;  /* Offset of master slot */
-        i32 master_max = 0;     /* Highest 'master count' */
-        for( i=0; i<n_slots; i++){
-            /* Only check offset from valid frames */
-            slot_t * i_slot = tdma_get_slot(tdma,i);
-            if(i_slot->state == rx_sync){
-                i32 local_offset = i_slot->slot_local_frame_offset;
-                /* Filter out extreme spurious timing offsets */
-                if(abs(local_offset)<(slot_samps/4)){
-                    #ifdef VERY_DEBUG
-                    fprintf(stderr,"Local offset: %d\n",local_offset);
-                    #endif
-                    offset_total+=local_offset;
-                    offset_slots++;
-                    if(i_slot->master_count > master_max){
-                        master_max = i_slot->master_count;
-                        offset_master = local_offset;
+        /* If we are in master sync mode, don't adjust demod timing. we ARE demod timing */
+        if(tdma->state != master_sync){
+            /* Update slot offset to compensate for frame centering */
+            /* Also check to see if any slots are master. If so, take timing from them */
+            i32 offset_total = 0;
+            i32 offset_slots = 0;
+            i32 offset_master = 0;  /* Offset of master slot */
+            i32 master_max = 0;     /* Highest 'master count' */
+            for( i=0; i<n_slots; i++){
+                /* Only check offset from valid frames */
+                slot_t * i_slot = tdma_get_slot(tdma,i);
+                if(i_slot->state == rx_sync){
+                    i32 local_offset = i_slot->slot_local_frame_offset;
+                    /* Filter out extreme spurious timing offsets */
+                    if(abs(local_offset)<(slot_samps/4)){
+                        #ifdef VERY_DEBUG
+                        fprintf(stderr,"Local offset: %d\n",local_offset);
+                        #endif
+                        offset_total+=local_offset;
+                        offset_slots++;
+                        if(i_slot->master_count > master_max){
+                            master_max = i_slot->master_count;
+                            offset_master = local_offset;
+                        }
                     }
                 }
             }
-        }
-        offset_total = offset_slots>0 ? offset_total/offset_slots:0;
-        /* Use master slot for timing if available, otherwise take average of all frames */
-        if(master_max >= mode.mastersat_min){
-            tdma->sample_sync_offset +=  (offset_master/4);
+            offset_total = offset_slots>0 ? offset_total/offset_slots:0;
+            /* Use master slot for timing if available, otherwise take average of all frames */
+            if(master_max >= mode.mastersat_min){
+                tdma->sample_sync_offset +=  (offset_master/4);
+                #ifdef VERY_DEBUG
+                fprintf(stderr,"Syncing to master offset %d\n",tdma->sample_sync_offset);
+                #endif
+            }else{
+                tdma->sample_sync_offset +=  (offset_total/4);
+                #ifdef VERY_DEBUG
+                fprintf(stderr,"Total Offset:%d\n",offset_total);
+                fprintf(stderr,"Slot offset: %d of %d\n",tdma->sample_sync_offset,slot_samps*n_slots);
+                #endif
+            }
             #ifdef VERY_DEBUG
-            fprintf(stderr,"Syncing to master offset %d\n",tdma->sample_sync_offset);
-            #endif
-        }else{
-            tdma->sample_sync_offset +=  (offset_total/4);
-            #ifdef VERY_DEBUG
-            fprintf(stderr,"Total Offset:%d\n",offset_total);
-            fprintf(stderr,"Slot offset: %d of %d\n",tdma->sample_sync_offset,slot_samps*n_slots);
+            fprintf(stderr,"\n");
             #endif
         }
-        #ifdef VERY_DEBUG
-        fprintf(stderr,"\n");
-        #endif
-
     }
 
     tdma->slot_cur++;
@@ -529,11 +574,11 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     /* Compensate for frame timing offset sliding towards the start of buffer */
     /* Do so by running this again, demodulating two slots, and moving the slot offset one slot forward */
     if( slot_offset < (slot_samps/4) ){
-        tdma->sample_sync_offset = tdma->sample_sync_offset + slot_samps;
-        tdma_rx_pilot_sync(tdma);
         #ifdef VERY_DEBUG
         fprintf(stderr,"Recursing\n");
         #endif
+        tdma->sample_sync_offset = tdma->sample_sync_offset + slot_samps;
+        tdma_rx_pilot_sync(tdma);
     }
 }
 
@@ -571,7 +616,7 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
         fsk_demod(fsk,pilot_bits,&sample_buffer[search_offset_i]);
         fsk_demod(fsk,pilot_bits,&sample_buffer[search_offset_i]);
         
-        offset = fvhff_search_uw(pilot_bits,n_pilot_bits,TDMA_UW_V,uw_len,&delta,bits_per_sym);
+        offset = tdma_search_uw(tdma, pilot_bits, n_pilot_bits, &delta, NULL);
         f_start = offset - (frame_bits-uw_len)/2;
 
         fprintf(stderr,"delta: %d offset %d so:%d\n",delta,offset,search_offset_i);
