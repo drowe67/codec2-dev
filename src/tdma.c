@@ -338,8 +338,9 @@ void tdma_deframe_cbcall(u8 demod_bits[], u32 slot_i, tdma_t * tdma, slot_t * sl
     }
 
     /* Right now we're not actually deframing the bits */
+    /* TODO: actually extract UW type */
     if(tdma->rx_callback != NULL){
-        tdma->rx_callback(frame_bits,slot_i,slot,tdma,tdma->rx_cb_data);
+        tdma->rx_callback(frame_bits,slot_i,slot,tdma,0,tdma->rx_cb_data);
     }
 }
 
