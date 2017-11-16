@@ -1151,6 +1151,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 
     e_index = unpack_natural_or_gray(bits, &nbit, E_BITS, c2->gray);
     e[3] = decode_energy(e_index, E_BITS);
+    fprintf(stderr, "%d %f\n", e_index, e[3]);
 
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	lsp_indexes[i] = unpack_natural_or_gray(bits, &nbit, lsp_bits(i), c2->gray);
