@@ -37,6 +37,7 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 set(CODEC2_VERSION_MAJOR 0)
 set(CODEC2_VERSION_MINOR 8)
 # Set to patch level if needed, otherwise leave FALSE.
+# Must be positive (non-zero) if set, since 0 == FALSE in CMake.
 set(CODEC2_VERSION_PATCH FALSE)
 set(CODEC2_VERSION "${CODEC2_VERSION_MAJOR}.${CODEC2_VERSION_MINOR}")
 # Patch level version bumps should not change API/ABI.
@@ -53,7 +54,7 @@ endif()
 
 # Set default C++ flags.
 include(CheckCCompilerFlag)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3 -D CODEC2_VERSION_MAJOR=${CODEC2_VERSION_MAJOR} -D CODEC2_VERSION_MINOR=${CODEC2_VERSION_MINOR}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3")
 CHECK_C_COMPILER_FLAG("-std=gnu11" COMPILER_SUPPORTS_GNU11)
 if(CMAKE_C_STANDARD_COMPUTED_DEFAULT EQUAL "90")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
@@ -140,6 +141,10 @@ check_function_exists(getopt HAVE_GETOPT)
 
 configure_file ("${PROJECT_SOURCE_DIR}/cmake/config.h.in"
                 "${PROJECT_BINARY_DIR}/config.h" )
+# Output path is such that #include <codec2/version.h> in codec2.h works
+set(CODEC2_VERSION_PATH "${PROJECT_BINARY_DIR}/codec2")
+configure_file ("${PROJECT_SOURCE_DIR}/cmake/version.h.in"
+                "${CODEC2_VERSION_PATH}/version.h" )
 include_directories(${PROJECT_BINARY_DIR})
 
 # CMake Package setup

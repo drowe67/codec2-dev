@@ -249,6 +249,7 @@ set(CODEC2_PUBLIC_HEADERS
     freedv_api.h
     varicode.h
     freedv_api_internal.h
+    ${CODEC2_VERSION_PATH}/version.h
 )
 
 #
