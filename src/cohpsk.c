@@ -432,7 +432,6 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc,const COMP tx_symbols[],
 {
     int     c;
     int     i,j,k;
-    float   acc;
     COMP    gain;
     COMP    tx_baseband;
     COMP  two = {2.0, 0.0};
@@ -460,7 +459,7 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc,const COMP tx_symbols[],
 
 		for(i=0; i<COHPSK_M; i++) {
 
-			const COMP * tx_filter_memory_cn = &tx_filter_memory[c];
+			const COMP * tx_filter_memory_cn = (COMP*) &tx_filter_memory[c];
 			/* filter sample of symbol for carrier c */
 			tx_baseband.real = 0;
 			tx_baseband.imag = 0;
