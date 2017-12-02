@@ -106,11 +106,14 @@ struct COHPSK {
     /* tx amplitude weights for each carrier for test/instrumentation */
 
     float          carrier_ampl[COHPSK_NC*ND];
+
+    /* Flag enabling simple freq est mode */
+    int            freq_est_mode_reduced;
 };
 
 void bits_to_qpsk_symbols(COMP tx_symb[][COHPSK_NC*COHPSK_ND], int tx_bits[], int nbits);
 void qpsk_symbols_to_bits(struct COHPSK *coh, float rx_bits[], COMP ct_symb_buf[][COHPSK_NC*COHPSK_ND]);
-void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, COMP tx_symbols[],
+void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc, const COMP tx_symbols[],
                                  COMP tx_filter_memory[COHPSK_NC][COHPSK_NSYM],
                                  COMP phase_tx[], COMP freq[],
                                  COMP *fbb_phase, COMP fbb_rect);
