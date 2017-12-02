@@ -59,6 +59,8 @@ void cohpsk_set_frame(struct COHPSK *coh, int frame);
 void fdmdv_freq_shift_coh(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, float Fs,
                           COMP *foff_phase_rect, int nin);
 
+void cohpsk_set_freq_est_mode(struct COHPSK *coh, int used_simple_mode);
+
 /* used for accessing upper and lower bits before diversity combination */
 
 float *cohpsk_get_rx_bits_lower(struct COHPSK *coh);

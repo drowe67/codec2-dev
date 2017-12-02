@@ -1090,7 +1090,8 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
     int M = fsk->mode;
     COMP dosc_f[M];                 /* phase shift per sample */
     COMP dph;                       /* phase shift of current bit */
-    size_t i,j,m,bit_i,sym;
+    size_t i,j,bit_i,sym;
+    int m;
     
     /* Init the per sample phase shift complex numbers */
     for( m=0; m<M; m++){
