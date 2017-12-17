@@ -34,6 +34,53 @@ function twod_fbf(samname, f=73, varargin)
   model = load(model_name);
   [frames tmp] = size(model);
   
+  % Variety of tests to exercise new 2D error measure
+  % default test1
+  
+  ind = arg_exists(varargin, "test2");
+  if ind
+    % take hts1a frame 73 and construct two VQ entries
+    % i) HPF version ii) missing format, which means fix to one frame
+    % show 1D and 2D error per vec
+
+    % i) HPF: attenutate first few samples, attn as function of frequency, so 0-500Hz,
+    % straight line, then flat after cut off.
+    % y = mx + c, y = 0 at Xc, y = m(Xc)+c, m = (y - c)Xc = -c/Xc;
+    
+    c = -20; Xc= 500; m = -c/Xc;
+    f = 73; Wo = model(f,1); L = model(f,2); Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
+    x = (1:L)*Fs*Wo/(2*pi);
+    y = m*x + c;
+    y(find(y>=0)) = 0;
+    AmdB += y;
+    
+    % now resample to rate K and add to VQ table
+
+    amodel = model(f,:); amodel(3:(L+2)) = 10 .^ (AmdB/20);
+    rate_K_vec = resample_const_rate_f(amodel, rate_K_sample_freqs_kHz, Fs);
+    vq = rate_K_vec;
+
+    % ii) zero out a formant between 2000 and 2500 Hz
+
+    Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
+    m_st = round(1900*2*pi/(Fs*Wo)); m_en = round(2200*2*pi/(Fs*Wo));
+    AmdB(m_st:m_en) = AmdB(m_st-1);
+    amodel = model(f,:); amodel(3:(L+2)) = 10 .^ (AmdB/20);
+    rate_K_vec = resample_const_rate_f(amodel, rate_K_sample_freqs_kHz, Fs);
+    vq = [vq; rate_K_vec];
+
+    % Now search the two element vq, using the orginal as the target.
+    % We would like vq(1,:) to be chosen, as a little HPF doesn't
+    % affect the speech much, but losing a fomant does.  However we
+    % expect the 1D model to choose vq(2,:), as the HPF distortion
+    % will affect the metric moe than the missing formant.
+
+    % need the 1D and 2D cost funcs in functions  Print chosen vectors, plot
+    % 2D vectors
+    
+  end
+
+  
   % Keyboard loop --------------------------------------------------------------
 
   k = ' ';
@@ -64,51 +111,67 @@ function twod_fbf(samname, f=73, varargin)
     % find closed point in rate K to rate L vector in terms of 2D distance
 
     twod_dist = twod_dist_f = twod_vec_x = twod_vec_y = zeros(1,L);
-    weight_f = 3/100;
+    weight_f = 0.05;
     for m=1:L
-      min_dist = 1E32;
-      for k=1:K
-        dist  = (weight_f*(Am_freqs_Hz(m) - rate_K_sample_freqs_Hz(k))).^ 2;
-        dist += (AmdB(m) - rate_K_vec_(k)).^2;
-        if dist < min_dist
-          min_dist = dist;
-          min_k = k; 
+
+      % OK lets find two closest points to m-th point in rate L target
+
+      dist  = (weight_f*(Am_freqs_Hz(m) - rate_K_sample_freqs_Hz)).^ 2;
+      dist += (AmdB(m) - rate_K_vec_).^2;
+      [tmp ind] = sort(dist);
+
+      ind1 = ind(1)
+      if ind(1) == 1
+        ind2 = 2;
+      elseif ind(1) == K
+        ind1 = K-1; ind2 = K;
+      else
+        if dist(ind1-1) < dist(ind1+1)
+          ind2 = ind1; ind1 = ind1-1;
+        else
+          ind2 = ind1+1;
         end
       end
+
+      % construct x and p vectors
+
+      printf("m: %d ind11: %d ind2: %d\n", m, ind1, ind2);
+      x_freq = weight_f*(rate_K_sample_freqs_Hz(ind2) - rate_K_sample_freqs_Hz(ind1));
+      x_amp = rate_K_vec_(ind2) - rate_K_vec_(ind1);
+      x = [x_freq x_amp];
+      p_freq = weight_f*(Am_freqs_Hz(m) - rate_K_sample_freqs_Hz(ind1));
+      p_amp = AmdB(m) - rate_K_vec_(ind1);
+      p = [p_freq p_amp];
+
+      % find gain g to make x orthogonal to p
+
+      g = x*p'/(x*x'); e = p - g*x;
+      
       twod_dist_f(m) = Am_freqs_Hz(m);
-      twod_dist(m) = min_dist;
-      twod_vec_x(m) = rate_K_sample_freqs_Hz(min_k) - Am_freqs_Hz(m);
-      twod_vec_y(m) = rate_K_vec_(min_k) - AmdB(m);
+      twod_dist(m) = norm(e);
+      twod_vec_x(m) = e(1)/weight_f;
+      twod_vec_y(m) = e(2);
     end
     
     % plots ----------------------------------
   
     subplot(212,"position",[0.1 0.05 0.8 0.7])
-    l = sprintf(";rate %d AmdB;g+-", L);
+    l = sprintf(";rate L=%d AmdB;g+-", L);
     plot(Am_freqs_Hz, AmdB, l);
     axis([1 4000 -20 80]);
     hold on;
-    %plot(rate_K_sample_freqs_Hz, rate_K_vec, ";rate K;b+-");
-
-    % And .... back to rate L
-    
-    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
-    AmdB_ = AmdB_(1:L);
-    sdL = std(abs(AmdB - AmdB_));
-
-    plot(Am_freqs_Hz, AmdB_,";AmdB bar;r+-");
-    l = sprintf(";error sd %3.2f dB;bk+-", sdL);
-    plot(Am_freqs_Hz, (AmdB - AmdB_), l);
+    %plot(rate_K_sample_freqs_Hz, rate_K_vec_, ";rate K v;b+-");
+    plot(rate_K_sample_freqs_Hz, vq(1,:), ";vq1;r+-");
+    plot(rate_K_sample_freqs_Hz, vq(2,:), ";vq2;bk+-");
 
     % 2D error and direction
-    
+#{    
     plot(Am_freqs_Hz, sqrt(twod_dist), ";2D error;c+-");
     for m=1:L
-      plot([Am_freqs_Hz(m) Am_freqs_Hz(m)+twod_vec_x(m)], [AmdB(m) AmdB(m)+twod_vec_y(m)], 'c-');
-      %[Am_freqs_Hz(m) Am_freqs_Hz(m)+twod_vec_x(m)]
+      plot([Am_freqs_Hz(m) Am_freqs_Hz(m) - twod_vec_x(m)], [AmdB(m) AmdB(m) - twod_vec_y(m)], 'm-', 'linewidth', 2);
     end
     hold off;
-
+#}
     % interactive menu ------------------------------------------
 
     printf("\rframe: %d  menu: n-next  b-back  q-quit", f);
