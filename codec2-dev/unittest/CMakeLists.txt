@@ -51,7 +51,7 @@ target_link_libraries(tfmfsk m)
 add_executable(tdeframer tdeframer.c)
 target_link_libraries(tdeframer m codec2)
 
-add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c)
+add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c)
 target_link_libraries(tofdm m)
 
 add_executable(tfreedv_data_channel tfreedv_data_channel.c)

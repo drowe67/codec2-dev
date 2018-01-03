@@ -43,9 +43,14 @@ extern "C" {
 
 struct OFDM;
 
+/* Constant declarations */
+
+/* Default configuration for '700D' mode */
+const struct OFDM_CONFIG * OFDM_CONFIG_700D;
+
 /* Prototypes */
 
-struct OFDM *ofdm_create(void);
+struct OFDM *ofdm_create(const struct OFDM_CONFIG * config);
 void ofdm_destroy(struct OFDM *);
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
