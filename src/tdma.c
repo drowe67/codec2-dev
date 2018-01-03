@@ -35,7 +35,7 @@
 #include <stdbool.h>
 
 /* Easy handle to enable/disable a whole slew of debug printouts */
-#define VERY_DEBUG 1
+//#define VERY_DEBUG 1
 
 static const uint8_t TDMA_UW_V[] =    {0,1,1,0,0,1,1,1,
                                        1,0,1,0,1,1,0,1};
@@ -246,6 +246,7 @@ void tdma_do_tx_frame(tdma_t * tdma, int slot_idx){
     COMP mod_samps[(slot_size+1)*Ts];
     u8 frame_bits[frame_size_bits];
     u8 mod_bits[nbits];
+    u8 uw_type = 0;
     if(slot == NULL) return;
 
     /* Clear bit buffer */
@@ -253,18 +254,22 @@ void tdma_do_tx_frame(tdma_t * tdma, int slot_idx){
 
     /* Get a frame, or leave blank if call not setup */
     if(tdma->tx_callback != NULL){
-        int ret = tdma->tx_callback(frame_bits,slot_idx,slot,tdma,tdma->tx_cb_data);
+        int ret = tdma->tx_callback(frame_bits,slot_idx,slot,tdma,&uw_type,tdma->tx_cb_data);
         if(!ret){
             slot->state = rx_no_sync;
+            return;
         }
+        if(uw_type > 1)
+            uw_type = 0;
     }
 
     /* Copy frame bits to front of mod bit buffer */
     memcpy(&mod_bits[0],&frame_bits[0],frame_size_bits*sizeof(u8));
 
+    const u8 * uw = &(TDMA_UW_LIST_A[uw_type][0]);
     /* Copy UW into frame */
     size_t uw_offset = (frame_size_bits-mode.uw_len)/2;
-    memcpy(&mod_bits[uw_offset],&TDMA_UW_V[0],mode.uw_len*sizeof(u8));
+    memcpy(&mod_bits[uw_offset],uw,mode.uw_len*sizeof(u8));
 
     /* Modulate frame */
     fsk_mod_c(slot->fsk,mod_samps,mod_bits);

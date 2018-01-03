@@ -37,6 +37,14 @@
 #include "comp.h"
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
+#include "kiss_fft.h"
+
+/* Concrete definition of 700D parameters */
+const struct OFDM_CONFIG OFDM_CONFIG_700D_C = 
+{.a = 0};
+
+/* Pointer to 700D config */ 
+const struct OFDM_CONFIG  * OFDM_CONFIG_700D = &OFDM_CONFIG_700D_C;
 
 /* Static Prototypes */
 
@@ -143,6 +151,8 @@ static complex float vector_sum(complex float *a, int num_elements) {
 static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
     complex float csam;
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
+    int Fs = OFDM_FS;
+    int SFrame = OFDM_SAMPLESPERFRAME;
     float corr[Ncorr];
     int i, j;
 
@@ -152,7 +162,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             csam = conjf(ofdm->pilot_samples[j]);
             temp = temp + (rx[i + j] * csam);
-            temp = temp + (rx[i + j + OFDM_SAMPLESPERFRAME] * csam);
+            temp = temp + (rx[i + j + SFrame] * csam);
         }
 
         corr[i] = cabsf(temp);
@@ -169,6 +179,14 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
             t_est = i;
         }
     }
+
+    /* Coarse frequency estimation */
+    /* TODO: Move FFT config to ofdm init and ofdm struct */
+    kiss_fft_cfg fftcfg = kiss_fft_alloc(Fs,0,NULL,NULL);
+    complex float fft_in[Fs];
+    complex float fft_out[Fs];
+    
+    
 
     return t_est;
 }
@@ -246,13 +264,16 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
  * Return NULL on fail
  */
 
-struct OFDM *ofdm_create() {
+struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     struct OFDM *ofdm;
     int i, j;
 
     if ((ofdm = (struct OFDM *) malloc(sizeof (struct OFDM))) == NULL) {
         return NULL;
     }
+
+    /* Copy config structure */
+    memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
 
     /* store complex BPSK pilot symbols */
 

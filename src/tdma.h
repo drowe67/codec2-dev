@@ -112,7 +112,7 @@ struct TDMA_MODE_SETTINGS {
 /* Declaration of basic 4800bps freedv tdma mode, defined in tdma.h */
 //struct TDMA_MODE_SETTINGS FREEDV_4800T;
 
-#define FREEDV_4800T {2400,4,48000,48,44,2,TDMA_FRAME_AT,16,2,2,2,2,6,3,5};
+#define FREEDV_4800T {2400,4,48000,48,44,2,TDMA_FRAME_A,16,2,2,2,2,6,3,5};
 
 /* Callback typedef that just returns the bits of the frame */
 /* TODO: write this a bit better */
@@ -121,7 +121,7 @@ typedef void (*tdma_cb_rx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_
 /* Callback typedef when TDMA is ready to schedule a new frame */
 /* Returns 1 if a frame is supplied, 0 if not */
 /* If no frame supplied, slot is changed out of TX mode */
-typedef int (*tdma_cb_tx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma, void * cb_data);
+typedef int (*tdma_cb_tx_frame)(u8* frame_bits,u32 slot_i, slot_t * slot, tdma_t * tdma,u8 * uw_type, void * cb_data);
 
 /* Callback to the radio front end to schedule a burst of TX samples */
 typedef int (*tdma_cb_tx_burst)(tdma_t * tdma,COMP* samples, size_t n_samples,i64 timestamp,void * cb_data);

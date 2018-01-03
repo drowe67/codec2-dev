@@ -144,7 +144,7 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f,i,j;
 
-    ofdm = ofdm_create();
+    ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
     /* Main Loop ---------------------------------------------------------------------*/
