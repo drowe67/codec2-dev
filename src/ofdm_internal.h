@@ -34,6 +34,7 @@ extern "C" {
 
 #include <complex.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "codec2_ofdm.h"
 
@@ -43,13 +44,13 @@ extern "C" {
 
 #define TAU         (2.0f * M_PI)            /* mathematical constant */
 
-#define OFDM_NC     16                       /* N Carriers */
+#define OFDM_NCX     16                       /* N Carriers */
 #define OFDM_TS     0.018f                   /* Symbol time */
 #define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
 #define OFDM_FS     8000.0f                  /* Sample rate */
 #define OFDM_BPS    2                        /* Bits per symbol */
 #define OFDM_TCP    0.002f                   /* ? */
-#define OFDM_NS     8                        /*  */
+#define OFDM_NS     8                        /* Symbols per frame (number of rows incl pilot) */
 #define OFDM_CENTRE 1500.0f                  /* Center frequency */
 
 /* To prevent C99 warning */
@@ -67,9 +68,9 @@ extern "C" {
 /* ? */
 #define OFDM_FTWINDOWWIDTH       11
 /* Bits per frame (duh) */
-#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
+#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NCX * OFDM_BPS))
 /* Rows per frame */
-#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
+#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NCX * OFDM_BPS))
 /* Samps per frame */
 #define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
 
@@ -79,9 +80,23 @@ extern "C" {
 
 /* Dummy struct for now, will contain constant configuration for OFDM modem */
 struct OFDM_CONFIG{
-  int a;
+    int32_t            Nc;
+    int32_t            Ts;
+    int32_t            Rs;
+    int32_t            Fs;
+    int32_t            bps;
+    int32_t            Tcp;
+    int32_t            Ns;
+    int32_t            Fcenter;
+    int32_t            M;
+    int32_t            Ncp;
+    int32_t            FtWindowWidth;
+    int32_t            BitsPerFrame;
+    int32_t            SampsPerFrame;
+    int32_t            SampsPerFrameMax;
+    int32_t            RxBufSize;
+    int32_t            RowsPerFrame;
 };
-
 
 struct OFDM {
     struct OFDM_CONFIG config;
@@ -97,18 +112,29 @@ struct OFDM {
     bool foff_est_en;
     bool phase_est_en;
 
-    complex float pilot_samples[OFDM_M + OFDM_NCP];
-    complex float W[OFDM_NC + 2][OFDM_M];
-    complex float rxbuf[OFDM_RXBUF];
-    complex float pilots[OFDM_NC + 2];
-    float w[OFDM_NC + 2];
+    //complex float pilot_samples[OFDM_M + OFDM_NCP];
+    //complex float W[OFDM_NCX + 2][OFDM_M];
+    //complex float rxbuf[OFDM_RXBUF];
+    //complex float pilots[OFDM_NC + 2];
+    //float w[OFDM_NC + 2];
+
+    complex float ** W;
+    complex float * pilots;
+    complex float * pilot_samples;
+    complex float * rxbuf;
+    float * w;
     
+
     /* Demodulator data */
 
-    complex float rx_sym[OFDM_NS + 3][OFDM_NC + 2];
-    complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NC];
-    float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
-    float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
+    //complex float rx_sym[OFDM_NS + 3][OFDM_NCX + 2];
+    //complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NCX];
+    //float rx_amp[OFDM_ROWSPERFRAME * OFDM_NCX];
+    //float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NCX];
+
+    complex float ** rx_sym;
+    float * rx_amp;
+    float * aphase_est_pilot_log;
 };
 
 #ifdef __cplusplus
