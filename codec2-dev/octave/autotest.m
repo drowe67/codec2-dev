@@ -44,7 +44,7 @@ function plot_sig_and_error(plotnum, subplotnum, sig, error, titlestr, axisvec)
 endfunction
 
 
-function check(a, b, test_name, tol, its_an_angle = 0)
+function pass = check(a, b, test_name, tol, its_an_angle = 0)
   global passes;
   global fails;
 
@@ -74,14 +74,16 @@ function check(a, b, test_name, tol, its_an_angle = 0)
 
   if e < tol
     printf("OK\n");
+    pass = true;
     passes++;
   else
     printf("FAIL (%f)\n",e);
+    pass = false;
     fails++;
   end
 endfunction
 
-function check_no_abs(a, b, test_name)
+function pass = check_no_abs(a, b, test_name)
   global passes;
   global fails;
 
@@ -103,9 +105,11 @@ function check_no_abs(a, b, test_name)
   e = sum(sum(a - b)/ll);
 
   if e < tol
+    pass = true;
     printf("OK\n");
     passes++;
   else
+    pass = false;
     printf("FAIL (%f)\n",e);
     fails++;
   end
