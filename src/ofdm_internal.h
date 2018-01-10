@@ -37,6 +37,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "codec2_ofdm.h"
+#include "kiss_fft.h"
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846f  /* math constant */
@@ -44,45 +45,45 @@ extern "C" {
 
 #define TAU         (2.0f * M_PI)            /* mathematical constant */
 
-#define OFDM_NCX     16                       /* N Carriers */
-#define OFDM_TS     0.018f                   /* Symbol time */
-#define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
-#define OFDM_FS     8000.0f                  /* Sample rate */
-#define OFDM_BPS    2                        /* Bits per symbol */
-#define OFDM_TCP    0.002f                   /* ? */
-#define OFDM_NS     8                        /* Symbols per frame (number of rows incl pilot) */
-#define OFDM_CENTRE 1500.0f                  /* Center frequency */
+//#define OFDM_NCX     16                       /* N Carriers */
+//#define OFDM_TS     0.018f                   /* Symbol time */
+//#define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
+//#define OFDM_FS     8000.0f                  /* Sample rate */
+//#define OFDM_BPS    2                        /* Bits per symbol */
+//#define OFDM_TCP    0.002f                   /* ? */
+//#define OFDM_NS     8                        /* Symbols per frame (number of rows incl pilot) */
+//#define OFDM_CENTRE 1500.0f                  /* Center frequency */
 
 /* To prevent C99 warning */
 
-#define OFDM_M      144                      /* Samples per bare symbol (?) */
-#define OFDM_NCP    16                       /* Samples per cyclic prefix */
+//#define OFDM_M      144                      /* Samples per bare symbol (?) */
+//#define OFDM_NCP    16                       /* Samples per cyclic prefix */
+//
+//#ifdef OLD_STYLE
+///* This will produce a warning in C99 as (int) makes these variable */
+//
+//#define OFDM_M      ((int)(OFDM_FS / OFDM_RS))
+//#define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
+//#endif
 
-#ifdef OLD_STYLE
-/* This will produce a warning in C99 as (int) makes these variable */
-
-#define OFDM_M      ((int)(OFDM_FS / OFDM_RS))
-#define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
-#endif
-
-/* ? */
-#define OFDM_FTWINDOWWIDTH       11
-/* Bits per frame (duh) */
-#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NCX * OFDM_BPS))
-/* Rows per frame */
-#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NCX * OFDM_BPS))
-/* Samps per frame */
-#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
-
-#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
-#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
+///* ? */
+//#define OFDM_FTWINDOWWIDTH       11
+///* Bits per frame (duh) */
+//#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NCX * OFDM_BPS))
+///* Rows per frame */
+//#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NCX * OFDM_BPS))
+///* Samps per frame */
+//#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
+//
+//#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
+//#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
 
 /* Dummy struct for now, will contain constant configuration for OFDM modem */
 struct OFDM_CONFIG{
     int32_t            Nc;
-    int32_t            Ts;
-    int32_t            Rs;
+    float              Ts;
+    float              Rs;
     int32_t            Fs;
     int32_t            bps;
     int32_t            Tcp;
@@ -123,7 +124,7 @@ struct OFDM {
     complex float * pilot_samples;
     complex float * rxbuf;
     float * w;
-    
+    kiss_fft_cfg sync_fft_cfg;
 
     /* Demodulator data */
 
