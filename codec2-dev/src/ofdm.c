@@ -43,8 +43,8 @@
 /* Concrete definition of 700D parameters */
 const struct OFDM_CONFIG OFDM_CONFIG_700D_C = {
     .Nc = 16,
-    .Ts = -1,
-    .Rs = -1,
+    .Ts = 0.018f,
+    .Rs = (1.0/0.018),
     .Fs = 8000,
     .bps = 2,
     .Tcp = -1,
@@ -69,7 +69,7 @@ static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
-static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
+static void ofdm_txframe(struct OFDM *, complex float [], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int);
 
 /* Defines */
@@ -170,19 +170,12 @@ static complex float vector_sum(complex float *a, int num_elements) {
 
 static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
     complex float csam;
-    int Fs                  = ofdm->config.Fs;
-    int Rs                  = ofdm->config.Rs;
-    int Bps                 = ofdm->config.bps;
-    int Nc                  = ofdm->config.Nc;
-    int M                   = ofdm->config.M;
-    int Ncp                 = ofdm->config.Ncp;
-    int Ns                  = ofdm->config.Ns;
-    int RowsPerFrame        = ofdm->config.RowsPerFrame;
-    int SampsPerFrame       = ofdm->config.SampsPerFrame;
-    int Fcenter             = ofdm->config.Fcenter;
-    int Ncorr = length - (SampsPerFrame + (M + Ncp));
+    const int Fs                  = ofdm->config.Fs;
+    const int M                   = ofdm->config.M;
+    const int Ncp                 = ofdm->config.Ncp;
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int Ncorr = length - (SampsPerFrame + (M + Ncp));
 
-    int SFrame = SampsPerFrame;
     float corr[Ncorr];
     int NPSamp = M + Ncp;
     int i, j;
@@ -193,7 +186,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         for (j = 0; j < (M + Ncp); j++) {
             csam = conjf(ofdm->pilot_samples[j]);
             temp = temp + (rx[i + j] * csam);
-            temp = temp + (rx[i + j + SFrame] * csam);
+            temp = temp + (rx[i + j + SampsPerFrame] * csam);
         }
 
         corr[i] = cabsf(temp);
@@ -213,7 +206,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
 
     /* Coarse frequency estimation */
     /* TODO: Move FFT config to ofdm init and ofdm struct */
-    kiss_fft_cfg fftcfg = kiss_fft_alloc(Fs,0,NULL,NULL);
+    kiss_fft_cfg fftcfg = ofdm->sync_fft_cfg;
     complex float fft_in[Fs];
     complex float fft_out[Fs];
     float C[Fs];
@@ -235,7 +228,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
 
     /* shift and copy in NPsam samples to front of buffer for FFT'ing */
     for(i = 0; i < NPSamp; i++){
-        fft_in[i] = rx[i + t_est + SFrame] * conjf(ofdm->pilot_samples[i]);
+        fft_in[i] = rx[i + t_est + SampsPerFrame] * conjf(ofdm->pilot_samples[i]);
     }
     kiss_fft(fftcfg,(kiss_fft_cpx*)fft_in,(kiss_fft_cpx*)fft_out);
 
@@ -262,7 +255,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         }
     }
     foff_est = (pmax > nmax) ? pmax_i : (nmax_i - fmax); 
-    fprintf(stderr,"foff_est is %f\n",foff_est);
+    //fprintf(stderr,"foff_est is %f\n",foff_est);
 
     return t_est;
 }
@@ -273,19 +266,14 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
  * ----------------------------------------------
  */
 
-static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME],
+static void ofdm_txframe(struct OFDM *ofdm, complex float tx[],
         complex float *tx_sym_lin) {
             
-    int Fs                  = ofdm->config.Fs;
-    int Rs                  = ofdm->config.Rs;
-    int Bps                 = ofdm->config.bps;
-    int Nc                  = ofdm->config.Nc;
-    int M                   = ofdm->config.M;
-    int Ncp                 = ofdm->config.Ncp;
-    int Ns                  = ofdm->config.Ns;
-    int RowsPerFrame        = ofdm->config.RowsPerFrame;
-    int SampsPerFrame       = ofdm->config.SampsPerFrame;
-    int Fcenter             = ofdm->config.Fcenter;
+    const int Nc                  = ofdm->config.Nc;
+    const int M                   = ofdm->config.M;
+    const int Ncp                 = ofdm->config.Ncp;
+    const int Ns                  = ofdm->config.Ns;
+    const int RowsPerFrame        = ofdm->config.RowsPerFrame;
 
     complex float aframe[Ns][Nc + 2];
     complex float asymbol[M];
@@ -364,6 +352,10 @@ void **alloc_doubleary(size_t sx,size_t sy,size_t elem){
     return (void**) ary;
 }
 
+/*
+ * Utility function to free array allocated with alloc_doubleary()
+ * Performs null check before freeing anything
+ */
 void free_doubleary(void ** ary){
     if(ary == NULL){
         return;
@@ -374,8 +366,14 @@ void free_doubleary(void ** ary){
     }
 
     free(*ary);
-
     free(ary);
+}
+
+/* Utility function to null-check before freeing */
+static void free_nc(void * ptr){
+    if(ptr != NULL){
+        free(ptr);
+    }
 }
 
 /*
@@ -397,25 +395,39 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     /* Copy config structure */
     /* TODO: validate config structure */
     memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
-    int Fs                  = ofdm->config.Fs;
-    int Rs                  = ofdm->config.Rs;
-    int Bps                 = ofdm->config.bps;
-    int Nc                  = ofdm->config.Nc;
-    int M                   = ofdm->config.M;
-    int Ncp                 = ofdm->config.Ncp;
-    int Ns                  = ofdm->config.Ns;
-    int RowsPerFrame        = ofdm->config.RowsPerFrame;
-    int SampsPerFrame       = ofdm->config.SampsPerFrame;
-    int Fcenter             = ofdm->config.Fcenter;
+    const int Fs                  = ofdm->config.Fs;
+    const int Rs                  = ofdm->config.Rs;
+    const int Nc                  = ofdm->config.Nc;
+    const int M                   = ofdm->config.M;
+    const int Ncp                 = ofdm->config.Ncp;
+    const int Ns                  = ofdm->config.Ns;
+    const int RowsPerFrame        = ofdm->config.RowsPerFrame;
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int Fcenter             = ofdm->config.Fcenter;
+    complex float temp[M];
 
     /* Allocate various buffers */
     /* TODO: cleanup after failed malloc */
     ofdm->pilot_samples = malloc(sizeof(complex float) * (M + Ncp));
+    if(ofdm->pilot_samples == NULL) goto ofdm_fail_cleanup;
+
     ofdm->pilots = malloc(sizeof(complex float) * (Nc+2));
+    if(ofdm->pilots == NULL) goto ofdm_fail_cleanup;
+
     ofdm->rxbuf = malloc(sizeof(complex float) * ofdm->config.RxBufSize);
+    if(ofdm->rxbuf == NULL) goto ofdm_fail_cleanup;
+
     ofdm->w = malloc(sizeof(float) * (Nc+2));
+    if(ofdm->w == NULL) goto ofdm_fail_cleanup;
+    
     ofdm->rx_amp = malloc(sizeof(float) * RowsPerFrame * Nc);
+    if(ofdm->rx_amp == NULL) goto ofdm_fail_cleanup;
+
     ofdm->aphase_est_pilot_log = malloc(sizeof(float) * RowsPerFrame * Nc);
+    if(ofdm->aphase_est_pilot_log == NULL) goto ofdm_fail_cleanup;
+
+    ofdm->sync_fft_cfg = kiss_fft_alloc(Fs,0,NULL,NULL);
+    if(ofdm->sync_fft_cfg == NULL) goto ofdm_fail_cleanup;
 
     /* store complex BPSK pilot symbols */
 
@@ -425,7 +437,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
 
     /* carrier tables for up and down conversion */
 
-    int Nlower = floorf((OFDM_CENTRE - OFDM_RS * (Nc / 2)) / OFDM_RS);
+    int Nlower = floorf(( (float)(Fcenter) - Rs * ((float)Nc / 2)) / Rs);
 
     for (i = 0, j = Nlower; i < (Nc + 2); i++, j++) {
         /*
@@ -433,11 +445,14 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
          * j = 1 kHz to 2 kHz (1.5 kHz center)
          */
 
-        ofdm->w[i] = TAU * (float) j / (OFDM_FS / OFDM_RS);
+        ofdm->w[i] = TAU * (float) j / ((float)Fs / Rs);
     }
 
     ofdm->W = (complex float **) alloc_doubleary(Nc+2,M,sizeof(complex float));
+    if(ofdm->W == NULL) goto ofdm_fail_cleanup;
+
     ofdm->rx_sym = (complex float **) alloc_doubleary(Ns+3,Nc+2,sizeof(complex float));
+    if(ofdm->rx_sym == NULL) goto ofdm_fail_cleanup;
 
     for (i = 0; i < (Nc + 2); i++) {
         
@@ -467,8 +482,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
 
     /* create the OFDM waveform */
 
-    complex float temp[M];
-
     idft(ofdm, temp, ofdm->pilots);
 
     /*
@@ -488,10 +501,41 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     }
 
     return ofdm; /* Success */
+
+    /* Deal with a failed malloc or something */
+    ofdm_fail_cleanup:
+    /* Make sure ofdm points to a vaild struct */
+    if(ofdm == NULL)
+        return NULL;
+
+    free_nc(ofdm->pilots);
+    free_nc(ofdm->pilot_samples);
+    free_nc(ofdm->rxbuf);
+    free_nc(ofdm->w);
+    free_nc(ofdm->rx_amp);
+    free_nc(ofdm->aphase_est_pilot_log);
+    free_doubleary((void**)ofdm->W);
+    free_doubleary((void**)ofdm->rx_sym);
+    if(ofdm->sync_fft_cfg!=NULL) kiss_fft_free(ofdm->sync_fft_cfg);
+    free_nc(ofdm);
+    
+    return NULL;
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
-    free(ofdm);
+    if(ofdm == NULL)
+        return;
+
+    free_nc(ofdm->pilots);
+    free_nc(ofdm->pilot_samples);
+    free_nc(ofdm->rxbuf);
+    free_nc(ofdm->w);
+    free_nc(ofdm->rx_amp);
+    free_nc(ofdm->aphase_est_pilot_log);
+    free_doubleary((void**)ofdm->W);
+    free_doubleary((void**)ofdm->rx_sym);
+    if(ofdm->sync_fft_cfg!=NULL) kiss_fft_free(ofdm->sync_fft_cfg);
+    free_nc(ofdm);
 }
 
 int ofdm_get_nin(struct OFDM *ofdm) {
@@ -537,19 +581,11 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
  * --------------------------------------
  */
 
-void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *tx_bits) {
+void ofdm_mod(struct OFDM *ofdm, COMP result[], const int *tx_bits) {
     
-    int Fs                  = ofdm->config.Fs;
-    int Rs                  = ofdm->config.Rs;
-    int Bps                 = ofdm->config.bps;
-    int Nc                  = ofdm->config.Nc;
-    int M                   = ofdm->config.M;
-    int Ncp                 = ofdm->config.Ncp;
-    int Ns                  = ofdm->config.Ns;
-    int RowsPerFrame        = ofdm->config.RowsPerFrame;
-    int SampsPerFrame       = ofdm->config.SampsPerFrame;
-    int BitsPerFrame        = ofdm->config.BitsPerFrame;
-    int Fcenter             = ofdm->config.Fcenter;
+    const int Bps                 = ofdm->config.bps;
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int BitsPerFrame        = ofdm->config.BitsPerFrame;
 
     int length = BitsPerFrame / Bps;
     complex float tx[SampsPerFrame];
@@ -592,19 +628,17 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float aphase_est_pilot_rect;
     
-    int Fs                  = ofdm->config.Fs;
-    int Rs                  = ofdm->config.Rs;
-    int Bps                 = ofdm->config.bps;
-    int Nc                  = ofdm->config.Nc;
-    int M                   = ofdm->config.M;
-    int Ncp                 = ofdm->config.Ncp;
-    int Ns                  = ofdm->config.Ns;
-    int RowsPerFrame        = ofdm->config.RowsPerFrame;
-    int SampsPerFrame       = ofdm->config.SampsPerFrame;
-    int FtWindowWidth       = ofdm->config.FtWindowWidth;
-    int BitsPerFrame        = ofdm->config.BitsPerFrame;
-    int Fcenter             = ofdm->config.Fcenter;
-    int RxBufSize           = ofdm->config.RxBufSize;
+    const int Fs                  = ofdm->config.Fs;
+    const float Rs                = ofdm->config.Rs;
+    const int Bps                 = ofdm->config.bps;
+    const int Nc                  = ofdm->config.Nc;
+    const int M                   = ofdm->config.M;
+    const int Ncp                 = ofdm->config.Ncp;
+    const int Ns                  = ofdm->config.Ns;
+    const int RowsPerFrame        = ofdm->config.RowsPerFrame;
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int FtWindowWidth       = ofdm->config.FtWindowWidth;
+    const int RxBufSize           = ofdm->config.RxBufSize;
 
     float aphase_est_pilot[Nc + 2];
     float aamp_est_pilot[Nc + 2];
@@ -843,7 +877,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         freq_err_rect = freq_err_rect + 1E-6f;
 
-        freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * Ns);
+        freq_err_hz = cargf(freq_err_rect) * Rs / (TAU * Ns);
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
     }
 
@@ -942,9 +976,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
             ofdm->aphase_est_pilot_log[(rr * Nc) + (i - 1)] = aphase_est_pilot[i];
 
-            if (OFDM_BPS == 1) {
+            if (Bps == 1) {
                 rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
-            } else if (OFDM_BPS == 2) {
+            } else if (Bps == 2) {
                 /*
                  * Only one final task, decode what quadrant the phase
                  * is in, and return the dibits

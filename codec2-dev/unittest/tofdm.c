@@ -50,6 +50,36 @@
 //#define SAMPLE_CLOCK_OFFSET_PPM 100
 //#define FOFF_HZ 5.0f
 
+
+#define OFDM_NCX     16                       /* N Carriers */
+#define OFDM_TS     0.018f                   /* Symbol time */
+#define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
+#define OFDM_FS     8000.0f                  /* Sample rate */
+#define OFDM_BPS    2                        /* Bits per symbol */
+#define OFDM_TCP    0.002f                   /* ? */
+#define OFDM_NS     8                        /* Symbols per frame (number of rows incl pilot) */
+#define OFDM_CENTRE 1500.0f                  /* Center frequency */
+
+/* ? */
+#define OFDM_FTWINDOWWIDTH       11
+/* Bits per frame (duh) */
+#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NCX * OFDM_BPS))
+/* Rows per frame */
+#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NCX * OFDM_BPS))
+/* Samps per frame */
+#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
+
+#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
+#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
+
+
+
+/* To prevent C99 warning */
+
+#define OFDM_M      144                      /* Samples per bare symbol (?) */
+#define OFDM_NCP    16                       /* Samples per cyclic prefix */
+
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: fs_offset()
@@ -122,10 +152,12 @@ static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *fof
 
 int main(int argc, char *argv[])
 {
-    int            samples_per_frame = ofdm_get_samples_per_frame();
-    int            max_samples_per_frame = ofdm_get_max_samples_per_frame();
 
-    struct OFDM   *ofdm;
+    
+    struct OFDM   *ofdm = ofdm_create(OFDM_CONFIG_700D);
+    int            samples_per_frame = ofdm_get_samples_per_frame(ofdm);
+    int            max_samples_per_frame = ofdm_get_max_samples_per_frame(ofdm);
+
     COMP           tx[samples_per_frame];         /* one frame of tx samples */
 
     int            rx_bits[OFDM_BITSPERFRAME];    /* one frame of rx bits    */
@@ -153,7 +185,6 @@ int main(int argc, char *argv[])
     float foff_hz = 0.1;
     int nframes = 30;
 
-    ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
     /* Main Loop ---------------------------------------------------------------------*/
