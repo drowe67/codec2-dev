@@ -46,7 +46,7 @@
 
 #define OFDM_NC 16
 
-#define NFRAMES 30
+#define NFRAMES 60
 //#define SAMPLE_CLOCK_OFFSET_PPM 100
 //#define FOFF_HZ 5.0f
 
@@ -202,8 +202,8 @@ int main(int argc, char *argv[])
 
         /* tx vector logging */
 
-	memcpy(&tx_bits_log[OFDM_BITSPERFRAME*f], test_bits_ofdm, sizeof(int)*OFDM_BITSPERFRAME);
-	memcpy(&tx_log[samples_per_frame*f], tx, sizeof(COMP)*samples_per_frame);
+	    memcpy(&tx_bits_log[OFDM_BITSPERFRAME*f], test_bits_ofdm, sizeof(int)*OFDM_BITSPERFRAME);
+	    memcpy(&tx_log[samples_per_frame*f], tx, sizeof(COMP)*samples_per_frame);
     }
 
     /* --------------------------------------------------------*\
@@ -215,6 +215,12 @@ int main(int argc, char *argv[])
     COMP foff_phase_rect = {1.0f, 0.0f};
 
     freq_shift(rx_log, rx_log, foff_hz, &foff_phase_rect, samples_per_frame * NFRAMES);
+
+    FILE *cplin = fopen("tofdm_rx_vec","r");
+    size_t s = fread(rx_log,sizeof(COMP),samples_per_frame*NFRAMES,cplin);
+    fclose(cplin);
+    fprintf(stderr,"Read %d\n",s);
+
 
     /* --------------------------------------------------------*\
 	                        Demod
@@ -243,6 +249,7 @@ int main(int argc, char *argv[])
     ofdm_set_timing_enable(ofdm, true);
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
+    //ofdm->foff_est_hz = 10;
 
     for(f=0; f<NFRAMES; f++) {
         /* For initial testng, timing est is off, so nin is always
