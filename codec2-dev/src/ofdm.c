@@ -40,6 +40,18 @@
 #include "kiss_fft.h"
 #include "modem_probe.h"
 
+/*
+ * Optimization TODOs
+ * CPU:
+ *  [ ] Remove cexpf() from loops (can be replaced with single cexpf() and multiplication in loop)
+ *  [ ] Look for/fix potential aliasing slowdowns (ie using array[i] as accumulator)
+ *      [ ] Possibly dd a bunch of const arrays and maybe figure out restrict
+ *  [ ] Run a bit of profiling on ofdm
+ * 
+ * Mem:
+ *  [ ] Make RX debug logs optional or modem probes
+ */
+
 /* Concrete definition of 700D parameters */
 const struct OFDM_CONFIG OFDM_CONFIG_700D_C = {
     .Nc = 16,
@@ -51,6 +63,7 @@ const struct OFDM_CONFIG OFDM_CONFIG_700D_C = {
     .Ns = 8,
     .M = 144,
     .Ncp = 16,
+    .Fcenter = 1500,
     .FtWindowWidth = 11,
     .BitsPerFrame = 224,
     .SampsPerFrame = 1280,
@@ -70,7 +83,8 @@ static complex float vector_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [], complex float *);
-static int coarse_sync(struct OFDM *, complex float *, int);
+//static int coarse_sync(struct OFDM *, complex float *, int);
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out);
 
 /* Defines */
 
@@ -162,13 +176,122 @@ static complex float vector_sum(complex float *a, int num_elements) {
     return sum;
 }
 
+static int coarser_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out, float *ratio_out) {
+    complex float csam;
+    const int Fs                  = ofdm->config.Fs;
+    const int M                   = ofdm->config.M;
+    const int Ncp                 = ofdm->config.Ncp;
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int Ncorr = length - (M + Ncp);
+
+    float corr[Ncorr];
+    float corr_t;
+    int NPSamp = M + Ncp;
+    int i, j;
+    float max_corr = 0;
+    float max_mag = 0;
+    float mag = 0.0f;
+    int t_est = 0;
+    int fmax = 60;
+    int pmax_i,nmax_i;
+    float pmax,nmax;
+    float foff_est;
+
+    for (i = 0; i < Ncorr; i++) {
+        complex float temp = 0.0f + 0.0f * I;
+
+        for (j = 0; j < (M + Ncp); j++) {
+            csam = conjf(ofdm->pilot_samples[j]);
+            temp = temp + (rx[i + j] * csam);
+            //temp = temp + (rx[i + j + SampsPerFrame] * csam);
+        }
+
+        corr_t = cabsf(temp);
+        /* Magnitude of incoming samples */
+        //mag = max( cabsf(rx[i]) , cabsf(rx[i+SampsPerFrame]) );
+        mag = cabsf(rx[i]);
+        max_mag = max(mag, max_mag);
+        
+        /* find the max magnitude and its index */
+        if(corr_t > max_corr){
+            max_corr = corr_t;
+            t_est = i;
+        }
+    }
+    
+    if(ratio_out != NULL)
+        *ratio_out = max_corr/max_mag;
+    //fprintf(stderr,"Ratio is %f; mag is %f corr is %f\n",max_corr/max_mag,max_mag,max_corr);
+
+    /* Skip coarse frequency est if we don't have anywhere to put result */
+    if(foff_out == NULL){
+        return t_est;
+    }
+
+    /* Coarse frequency estimation */
+    kiss_fft_cfg fftcfg = ofdm->sync_fft_cfg;
+    complex float fft_in[Fs];
+    complex float fft_out[Fs];
+    float C[Fs];
+    /* Zero FFT input array */
+    for(i = 0; i < Fs; i++){
+        fft_in[i] = 0;
+    }
+    /* shift and copy in NPsam samples to front of buffer for FFT'ing */
+    for(i = 0; i < NPSamp; i++){
+        fft_in[i] = rx[i + t_est] * conjf(ofdm->pilot_samples[i]);
+    }
+    kiss_fft(fftcfg,(kiss_fft_cpx*)fft_in,(kiss_fft_cpx*)fft_out);
+
+    /* Copy into output corr array, taking magnitude */
+    /* TODO: May be able to skip sqrt() in abs, since we're just looking for a maximum point down the line */
+    for(i = 0; i < Fs; i++){
+        C[i] = cabsf(fft_out[i]);
+    }
+
+    // /* shift and copy in NPsam samples to front of buffer for FFT'ing */
+    // for(i = 0; i < NPSamp; i++){
+    //     fft_in[i] = rx[i + t_est + SampsPerFrame] * conjf(ofdm->pilot_samples[i]);
+    // }
+    // kiss_fft(fftcfg,(kiss_fft_cpx*)fft_in,(kiss_fft_cpx*)fft_out);
+
+    // /* Add into output corr array */
+    // for(i = 0; i < Fs; i++){
+    //     C[i] += cabsf(fft_out[i]);
+    // }
+
+    pmax_i = 0;
+    nmax_i = Fs;
+    pmax = nmax = 0;
+    /* Search the positive and negative sides of the FFT to +/-fmax for peak */
+    for(i = 0; i < fmax; i++){
+        if(C[i] > pmax){
+            pmax = C[i];
+            pmax_i = i;
+        }
+    }
+    for(i = Fs-1; i > Fs-fmax; i--){
+        if(C[i] > nmax){
+            nmax = C[i];
+            nmax_i = i;
+        }
+    }
+    foff_est = (pmax > nmax) ? pmax_i : (nmax_i-Fs+1); 
+
+    fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est,max_mag/max_corr);
+
+    *foff_out = foff_est;
+
+    return t_est;
+}
+
 /*
  * Correlates the OFDM pilot symbol samples with a window of received
  * samples to determine the most likely timing offset.  Combines two
  * frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
  */
 
-static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out) {
     complex float csam;
     const int Fs                  = ofdm->config.Fs;
     const int M                   = ofdm->config.M;
@@ -177,8 +300,17 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
     const int Ncorr = length - (SampsPerFrame + (M + Ncp));
 
     float corr[Ncorr];
+    float corr_t;
     int NPSamp = M + Ncp;
     int i, j;
+    float max_corr = 0;
+    float max_mag = 0;
+    float mag = 0.0f;
+    int t_est = 0;
+    int fmax = 60;
+    int pmax_i,nmax_i;
+    float pmax,nmax;
+    float foff_est;
 
     for (i = 0; i < Ncorr; i++) {
         complex float temp = 0.0f + 0.0f * I;
@@ -189,23 +321,24 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
             temp = temp + (rx[i + j + SampsPerFrame] * csam);
         }
 
-        corr[i] = cabsf(temp);
-    }
-
-    /* find the max magnitude and its index */
-
-    float mag = 0.0f;
-    int t_est = 0;
-
-    for (i = 0; i < Ncorr; i++) {
-        if (corr[i] > mag) {
-            mag = corr[i];
+        corr_t = cabsf(temp);
+        /* Magnitude of incoming samples */
+        mag = max( cabsf(rx[i]) , cabsf(rx[i+SampsPerFrame]) );
+        max_mag = max(mag, max_mag);
+        
+        /* find the max magnitude and its index */
+        if(corr_t > max_corr){
+            max_corr = corr_t;
             t_est = i;
         }
     }
 
+    /* Skip coarse frequency est if we don't have anywhere to put result */
+    if(foff_out == NULL){
+        return t_est;
+    }
+
     /* Coarse frequency estimation */
-    /* TODO: Move FFT config to ofdm init and ofdm struct */
     kiss_fft_cfg fftcfg = ofdm->sync_fft_cfg;
     complex float fft_in[Fs];
     complex float fft_out[Fs];
@@ -237,11 +370,8 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         C[i] += cabsf(fft_out[i]);
     }
 
-    int fmax = 30;
-    int pmax_i,nmax_i;
-    float pmax,nmax;
-    float foff_est;
-    pmax_i = nmax_i = 0;
+    pmax_i = 0;
+    nmax_i = Fs;
     pmax = nmax = 0;
     /* Search the positive and negative sides of the FFT to +/-fmax for peak */
     for(i = 0; i < fmax; i++){
@@ -249,13 +379,18 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
             pmax = C[i];
             pmax_i = i;
         }
-        if(C[Fs-i-1] > nmax){
+    }
+    for(i = Fs-1; i > Fs-fmax; i--){
+        if(C[i] > nmax){
             nmax = C[i];
             nmax_i = i;
         }
     }
-    foff_est = (pmax > nmax) ? pmax_i : (nmax_i - fmax); 
-    //fprintf(stderr,"foff_est is %f\n",foff_est);
+    foff_est = (pmax > nmax) ? pmax_i : (nmax_i-Fs+1); 
+    //foff_est = pmax_i;
+    //`fprintf(stderr,"foff_est is %f, tpos is %d\n",foff_est,t_est);
+
+    *foff_out = foff_est;
 
     return t_est;
 }
@@ -337,15 +472,18 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[],
  */
 void **alloc_doubleary(size_t sx,size_t sy,size_t elem){
     size_t i;
+    /* Allocate pointer array */
     char ** ary = malloc(sizeof(void*) * sx);
     if(ary == NULL){
         return NULL;
     }
+    /* Allocate data array. */
     *ary = malloc(elem * sx * sy);
     if(*ary == NULL){
         free(ary);
         return NULL;
     }
+    /* Fill out pointer array to point to rows of data array */
     for(i=0; i<sx; i++){
         ary[i] = ((*ary) + (sy*i*elem));
     }
@@ -396,7 +534,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     /* TODO: validate config structure */
     memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
     const int Fs                  = ofdm->config.Fs;
-    const int Rs                  = ofdm->config.Rs;
+    const float Rs                = ofdm->config.Rs;
     const int Nc                  = ofdm->config.Nc;
     const int M                   = ofdm->config.M;
     const int Ncp                 = ofdm->config.Ncp;
@@ -417,6 +555,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     ofdm->rxbuf = malloc(sizeof(complex float) * ofdm->config.RxBufSize);
     if(ofdm->rxbuf == NULL) goto ofdm_fail_cleanup;
 
+    ofdm->coarse_rxbuf = malloc(sizeof(complex float) * ofdm->config.RxBufSize);
+    if(ofdm->coarse_rxbuf == NULL) goto ofdm_fail_cleanup;
+
     ofdm->w = malloc(sizeof(float) * (Nc+2));
     if(ofdm->w == NULL) goto ofdm_fail_cleanup;
     
@@ -436,8 +577,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     }
 
     /* carrier tables for up and down conversion */
-
-    int Nlower = floorf(( (float)(Fcenter) - Rs * ((float)Nc / 2)) / Rs);
+    float Fcf = (float)Fcenter;
+    float Ncf = (float)Nc;
+    float Fsf = (float)Fs;
+    int Nlower = floorf(( Fcf - Rs * (Ncf / 2)) / Rs);
 
     for (i = 0, j = Nlower; i < (Nc + 2); i++, j++) {
         /*
@@ -445,7 +588,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
          * j = 1 kHz to 2 kHz (1.5 kHz center)
          */
 
-        ofdm->w[i] = TAU * (float) j / ((float)Fs / Rs);
+        ofdm->w[i] = TAU * (float) j / (Fsf / Rs);
     }
 
     ofdm->W = (complex float **) alloc_doubleary(Nc+2,M,sizeof(complex float));
@@ -466,6 +609,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
         }
     }
+    
+    for(i = 0; i < ofdm->config.RxBufSize; i++){
+        ofdm->rxbuf[i] = 0;
+    }
 
     /* default settings of options and states */
 
@@ -479,6 +626,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;
     ofdm->nin = SampsPerFrame;
+    ofdm->sync_count = 0;
+    ofdm->frame_point = 0;
 
     /* create the OFDM waveform */
 
@@ -511,6 +660,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     free_nc(ofdm->pilots);
     free_nc(ofdm->pilot_samples);
     free_nc(ofdm->rxbuf);
+    free_nc(ofdm->coarse_rxbuf);
     free_nc(ofdm->w);
     free_nc(ofdm->rx_amp);
     free_nc(ofdm->aphase_est_pilot_log);
@@ -588,7 +738,12 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[], const int *tx_bits) {
     const int BitsPerFrame        = ofdm->config.BitsPerFrame;
 
     int length = BitsPerFrame / Bps;
-    complex float tx[SampsPerFrame];
+
+
+    /* Note: COMP and complex float have the same memory layout */
+    /* see iso/iec 9899:1999 sec 6.2.5.13 */
+    complex float * tx = (complex float *)&result[0];
+
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, i;
@@ -612,10 +767,38 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[], const int *tx_bits) {
     ofdm_txframe(ofdm, tx, tx_sym_lin);
 
     /* convert to comp */
-
-    for (i = 0; i < SampsPerFrame; i++) {
+    /* Note: COMP and complex float have the same memory layout */
+    /* see iso/iec 9899:1999 sec 6.2.5.13 */
+    /*for (i = 0; i < SampsPerFrame; i++) {
         result[i].real = crealf(tx[i]);
         result[i].imag = cimagf(tx[i]);
+    }*/
+}
+
+/*
+ * Like ofdm_demod, but handles sync and large frame offset
+ */
+void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
+    const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+    const int RxBufSize       = ofdm->config.RxBufSize;
+    const int Fs = ofdm->config.Fs;
+
+    int sync = ofdm->sync_count;
+    int frame_point = ofdm->frame_point;
+    int nin = ofdm->nin;
+    complex float * coarse_rxbuf = ofdm->coarse_rxbuf;
+    complex float rxbuf_temp[RxBufSize];
+
+    /* NCO for freq. shifting */
+    complex float shift_nco = 1;
+    complex float shift_nco_dph = 0;
+
+    /* Copy in nin samples to end of buffer */
+    memmove(&coarse_rxbuf[0],&coarse_rxbuf[nin],nin);
+    memcpy (&coarse_rxbuf[RxBufSize - nin],rxbuf_in,nin);
+
+    if(!sync) {
+
     }
 }
 
@@ -639,11 +822,18 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     const int SampsPerFrame       = ofdm->config.SampsPerFrame;
     const int FtWindowWidth       = ofdm->config.FtWindowWidth;
     const int RxBufSize           = ofdm->config.RxBufSize;
+    int nin = ofdm->nin;
 
     float aphase_est_pilot[Nc + 2];
     float aamp_est_pilot[Nc + 2];
     float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
+
+    complex float * rxbuf = ofdm->rxbuf;
+
+
+    //memmove(&rxbuf[0],&rxbuf[nin],nin);
+    //memcpy (&rxbuf[RxBufSize - nin],rxbuf_in,nin);
 
     /* shift the buffer left based on nin */
 
@@ -652,16 +842,19 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     }
 
     /* insert latest input samples onto tail of rxbuf */
-
+    /* Note: COMP and complex float have the same memory layout */
+    /* see iso/iec 9899:1999 sec 6.2.5.13 */
     for (i = (RxBufSize - ofdm->nin), j = 0; i < RxBufSize; i++, j++) {
         ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
     }
+
 
     /*
      * get user and calculated freq offset
      */
 
     float woff_est = TAU * ofdm->foff_est_hz / (float)(Fs);
+    float freq_offset = -1;
 
     /* update timing estimate -------------------------------------------------- */
 
@@ -683,12 +876,18 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
-        ft_est = coarse_sync(ofdm, work, (en - st));
+        ft_est = coarse_sync(ofdm, work, (en - st), &freq_offset);
+
+        coarser_sync(ofdm, work, (en - st), &freq_offset, NULL);
+
+        //ofdm->foff_est_hz += (freq_offset/2);
         ofdm->timing_est += (ft_est - ceilf(FtWindowWidth / 2));
 
         if (ofdm->verbose > 1) {
             fprintf(stdout, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
+        
+        //fprintf(stderr," freq_est: %f timing_est: %d sample_pt: %d\n",freq_offset,ofdm->timing_est,ofdm->sample_point);
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
 
@@ -877,7 +1076,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         freq_err_rect = freq_err_rect + 1E-6f;
 
-        freq_err_hz = cargf(freq_err_rect) * Rs / (TAU * Ns);
+        freq_err_hz = cargf(freq_err_rect) * Rs / (TAU * (float)Ns);
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
     }
 

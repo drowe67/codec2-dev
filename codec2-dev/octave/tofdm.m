@@ -6,7 +6,22 @@
 % ------------------------------------------------------------------
 1;
 
-function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
+function rx = ebno_awgn_channel(tx, Fs, Rb, EbNodB)
+  EbNo = 10^(EbNodB/10);
+  variance = Fs / (Rb*EbNo);
+  noise = sqrt(variance)*randn(1,length(tx));
+  avg = sum(abs(tx))/length(tx)
+  rx = noise.*avg + tx;
+end
+
+function nums = im_re_interleave(nim)
+  nums = zeros(1,length(nim)*2);
+  nums(1:2:length(nums)) = real(nim);
+  nums(2:2:length(nums)) = imag(nim);
+
+end
+
+function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz,EbNodB = 100,nheadsamp = 0)
   %Nframes = 30;
   %sample_clock_offset_ppm = 100;
   %foff_hz = 5;
@@ -20,10 +35,11 @@ function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
   % ---------------------------------------------------------------------
 
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
+  Rb_real = 700;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
-  rand('seed',1);
+  rand('seed',2);
   tx_bits = round(rand(1,Nbitsperframe));
 
   % Run tx loop
@@ -38,6 +54,15 @@ function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
 
   rx_log = sample_clock_offset(tx_log, sample_clock_offset_ppm);
   rx_log = freq_shift(rx_log, foff_hz, Fs);
+  #rx_log(1:nheadsamp) = zeros(nheadsamp,1);
+  rx_log_l = length(rx_log)
+  rx_log = [zeros(1,nheadsamp), rx_log];
+  rx_log = rx_log(1:rx_log_l);
+  rx_log = ebno_awgn_channel(rx_log, Fs, Rb_real, EbNodB);
+
+  rx_vec = fopen("tofdm_rx_vec","wb+");
+  fwrite(rx_vec,im_re_interleave(rx_log),"single");
+  fclose(rx_vec);
 
   % Rx ---------------------------------------------------------------
 
@@ -63,6 +88,7 @@ function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
     states.sample_point = Ncp;
   end
 
+  %states.foff_est_hz = 10;
   for f=1:Nframes
 
     % insert samples at end of buffer, set to zero if no samples
@@ -78,7 +104,7 @@ function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
     end
     prx += lnew;
 
-    [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+    [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod2(states, rxbuf_in);
 
     % log some states for comparison to C
 
@@ -161,7 +187,14 @@ function pass = run_ofdm_test(Nframes,sample_clock_offset_ppm,foff_hz)
   pass = check(foff_hz_log, foff_hz_log_c', 'foff_est_hz') && pass;
   pass = check(rx_bits_log, rx_bits_log_c, 'rx_bits') && pass;
   
+  figure(fg++)
+  stem(timing_est_log-timing_est_log_c')
+  figure(fg++)
+  stem(phase_est_pilot_log-phase_est_pilot_log_c)
 
 end
 
-run_ofdm_test(30,100,.1)
+% This works best on my machine -- Brady
+graphics_toolkit('fltk')
+
+run_ofdm_test(60,100,.5,60 ,0)

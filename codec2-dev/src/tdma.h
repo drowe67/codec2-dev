@@ -25,6 +25,15 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+/*
+ TODO: Lock sync point while transmitting in non-master mode and no master
+ slot is detected
+*/
+
+/*
+ TODO: Further testing and refinement with julia test suite
+*/
+
 #ifndef __CODEC_2_TDMA_H
 #define __CODEC_2_TDMA_H
 
@@ -103,7 +112,7 @@ struct TDMA_MODE_SETTINGS {
     u32 pilot_sync_tol;         /* UW errors allowed for a valid pilot sync */
     u32 first_sync_tol;         /* UW errors allowed for a valid first frame sync */
     u32 frame_sync_tol;         /* UW errors allowed to maintain a frame sync */
-    u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a frame unsynced */
+    u32 frame_sync_baduw_tol;   /* How many bad UWs before calling a slot unsynced */
     i32 mastersat_max;          /* Maximum count for master detection counter */
     i32 mastersat_min;          /* Minimum count before frame considered 'master' */
     i32 loss_of_sync_frames;    /* How many bad frames before going from 'sync' to 'no_sync' for entire modem */

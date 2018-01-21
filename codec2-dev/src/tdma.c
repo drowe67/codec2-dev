@@ -439,6 +439,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
 
             /* Check to see if the bits are outside of the demod buffer. If so, adjust and re-demod*/
             /* Disabled for now; will re-enable when worked out better in head */
+            /* No, this is enabled. I have it more or less worked out */
             if(f_valid && !repeat_demod){
                 if((f_start < bits_per_sym) || ((f_start+(bits_per_sym*frame_size)) > (bits_per_sym*(slot_size+1)))){
                     repeat_demod = true;
@@ -462,10 +463,11 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         }while(repeat_demod);
 
         i32 single_slot_offset = slot->slot_local_frame_offset;
-        /* Flag indicating wether or not we should call the callback */
+        /* Flag indicating whether or not we should call the callback */
         bool do_frame_found_call = false;   
 
         /* Do single slot state machine */
+        /* TODO: think about/play around with other fsk_clear_estimators() positions */
         if( slot->state == rx_sync){
             do_frame_found_call = true;
             if(!f_valid){   /* on bad UW, increment bad uw count and possibly unsync */
@@ -526,6 +528,10 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
         #endif
 
         /* If we are in master sync mode, don't adjust demod timing. we ARE demod timing */
+        /* TODO: check if any slots are in TX mode and if any have master sync. If we are
+           TXing and don't have master sync, lock sync offset. Otherwise, TX frames jitter
+           wildly */
+
         if(tdma->state != master_sync){
             /* Update slot offset to compensate for frame centering */
             /* Also check to see if any slots are master. If so, take timing from them */
@@ -552,6 +558,7 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
                     }
                 }
             }
+            /* Check for zero here; otherwise we get div-by-zero errors */
             offset_total = offset_slots>0 ? offset_total/offset_slots:0;
             /* Use master slot for timing if available, otherwise take average of all frames */
             if(master_max >= mode.mastersat_min){
@@ -588,6 +595,9 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
     }
 }
 
+/* Attempt at 'plot modem' search for situations where no synchronization is had */
+/* This currently preforms worse than just running tdma_rx_pilot_sync on every frame */
+/* It may still be needed to acquire first frames -- more testing is needed */
 void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
     fprintf(stderr,"searching for pilot\n");
     struct TDMA_MODE_SETTINGS mode = tdma->settings;
