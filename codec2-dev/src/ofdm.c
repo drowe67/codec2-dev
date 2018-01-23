@@ -192,7 +192,7 @@ static int coarser_sync(struct OFDM *ofdm, complex float *rx, int length, float 
     float max_mag = 0;
     float mag = 0.0f;
     int t_est = 0;
-    int fmax = 60;
+    int fmax = 20;
     int pmax_i,nmax_i;
     float pmax,nmax;
     float foff_est;
@@ -278,7 +278,7 @@ static int coarser_sync(struct OFDM *ofdm, complex float *rx, int length, float 
     }
     foff_est = (pmax > nmax) ? pmax_i : (nmax_i-Fs+1); 
 
-    fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est,max_mag/max_corr);
+    //fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est,max_corr/max_mag);
 
     *foff_out = foff_est;
 
@@ -388,7 +388,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     }
     foff_est = (pmax > nmax) ? pmax_i : (nmax_i-Fs+1); 
     //foff_est = pmax_i;
-    //`fprintf(stderr,"foff_est is %f, tpos is %d\n",foff_est,t_est);
+    fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est%1280,max_corr/max_mag);
 
     *foff_out = foff_est;
 
@@ -778,6 +778,7 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[], const int *tx_bits) {
 /*
  * Like ofdm_demod, but handles sync and large frame offset
  */
+//static int coarser_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out, float *ratio_out)
 void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
     const int SampsPerFrame       = ofdm->config.SampsPerFrame;
     const int RxBufSize       = ofdm->config.RxBufSize;
@@ -789,16 +790,42 @@ void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
     complex float * coarse_rxbuf = ofdm->coarse_rxbuf;
     complex float rxbuf_temp[RxBufSize];
 
+
+    /* Copy in nin samples to end of buffer */
+    memmove(&coarse_rxbuf[0],&coarse_rxbuf[nin], (RxBufSize - nin) * sizeof(coarse_rxbuf[0]));
+    memcpy (&coarse_rxbuf[RxBufSize - nin],rxbuf_in,    nin * sizeof(coarse_rxbuf[0]));
+
+    int frame_pos_est;
+    float fshift;
+    float corr_ratio_max = 0;
+    float corr_ratio;
+    float foff_out;
+    float fshift_max;
+    int frame_pos_max = 0;
     /* NCO for freq. shifting */
     complex float shift_nco = 1;
     complex float shift_nco_dph = 0;
 
-    /* Copy in nin samples to end of buffer */
-    memmove(&coarse_rxbuf[0],&coarse_rxbuf[nin],nin);
-    memcpy (&coarse_rxbuf[RxBufSize - nin],rxbuf_in,nin);
+    if(sync <= 0 ) {
+        /* Do coarse search over frequency range in 20hz slices*/
+        for(fshift = -100; fshift < 100; fshift+=40){
+            /* Shift block of samples by fshift */
+            shift_nco_dph = cexpf(2*M_PI*(fshift/(float)Fs)*I);
+            shift_nco = 1;
+            for(int i=0; i<RxBufSize; i++){
+                rxbuf_temp[i] = coarse_rxbuf[i] * shift_nco;
+                shift_nco = shift_nco * shift_nco_dph;
+            }
 
-    if(!sync) {
-
+            /* Do a coarse search for the pilot */
+            frame_pos_est = coarser_sync(ofdm,rxbuf_temp,RxBufSize,&foff_out,&corr_ratio);
+            if(corr_ratio > corr_ratio_max){
+                corr_ratio_max = corr_ratio;
+                fshift_max = -fshift + foff_out;
+                frame_pos_max = frame_pos_est;          
+            }
+        }
+        fprintf(stderr,"Best ratio %f freq %f offset %d\n",corr_ratio_max,fshift_max,frame_pos_max);
     }
 }
 
@@ -832,21 +859,21 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float * rxbuf = ofdm->rxbuf;
 
 
-    //memmove(&rxbuf[0],&rxbuf[nin],nin);
-    //memcpy (&rxbuf[RxBufSize - nin],rxbuf_in,nin);
+    memmove(&rxbuf[0],&rxbuf[nin], (RxBufSize - nin) * sizeof(rxbuf[0]));
+    memcpy (&rxbuf[RxBufSize - nin],rxbuf_in,    nin * sizeof(rxbuf[0]));
 
     /* shift the buffer left based on nin */
 
-    for (i = 0, j = ofdm->nin; i < (RxBufSize - ofdm->nin); i++, j++) {
-        ofdm->rxbuf[i] = ofdm->rxbuf[j];
-    }
+    // for (i = 0, j = ofdm->nin; i < (RxBufSize - ofdm->nin); i++, j++) {
+    //     ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    // }
 
     /* insert latest input samples onto tail of rxbuf */
     /* Note: COMP and complex float have the same memory layout */
     /* see iso/iec 9899:1999 sec 6.2.5.13 */
-    for (i = (RxBufSize - ofdm->nin), j = 0; i < RxBufSize; i++, j++) {
-        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
-    }
+    // for (i = (RxBufSize - ofdm->nin), j = 0; i < RxBufSize; i++, j++) {
+    //     ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+    // }
 
 
     /*
@@ -876,9 +903,12 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
+        fprintf(stderr,"n>");
         ft_est = coarse_sync(ofdm, work, (en - st), &freq_offset);
-
-        coarser_sync(ofdm, work, (en - st), &freq_offset, NULL);
+        fprintf(stderr,"\nx>");
+        coarse_sync(ofdm,ofdm->rxbuf,RxBufSize,&freq_offset);
+        fprintf(stderr,"\n");
+        //coarser_sync(ofdm, work, (en - st), &freq_offset, NULL);
 
         //ofdm->foff_est_hz += (freq_offset/2);
         ofdm->timing_est += (ft_est - ceilf(FtWindowWidth / 2));

@@ -168,6 +168,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
 
+  states.sync = 0;
   % generate OFDM pilot symbol, used for timing and freq offset est
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
@@ -430,162 +431,19 @@ endfunction
 
 function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod2(states, rxbuf_in)
   ofdm_load_const;
+  [rx_bits states aphase_est_pilot_log rx_np rx_amp] =ofdm_demod(states,rxbuf_in);
 
-  % insert latest input samples into rxbuf
-
-  rxbuf(1:Nrxbuf-states.nin) = rxbuf(states.nin+1:Nrxbuf);
-  rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
-
-  % get latest freq offset estimate
-
-  woff_est = 2*pi*foff_est_hz/Fs;
-
-  % update timing estimate --------------------------------------------------
-
-  delta_t = 0;
-  if timing_en
-    % update timing at start of every frame
-
-    st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
-    en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
-          
-    ft_est = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
-    timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
-
-    if verbose > 1
-      printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
+  %If out of sync, try a coarse sync on RX buffer
+  if states.sync <= 0
+    [t_est foff_est] = coarse_sync(states,states.rxbuf,rate_fs_pilot_samples);
+    %Correct to be within one frame and at head of frame instead of after first symbol
+    t_est = mod(t_est,Nsamperframe) - (M+Ncp);
+    if(t_est > 30)
+      states.nin = t_est;
     end
 
-    % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
-
-    delta_t = ft_est - ceil(ftwindow_width/2);
-    sample_point = max(timing_est+Ncp/4, sample_point);
-    sample_point = min(timing_est+Ncp, sample_point);
+    printf("t_est is %d, foff_est is %d\n",t_est,foff_est)
   end
-
-  % down convert at current timing instant----------------------------------
-
-  % todo: this cld be more efficent, as pilot r becomes r-Ns on next frame
-
-  rx_sym = zeros(1+Ns+1+1, Nc+2);
-
-  % previous pilot
-  
-  st = M+Ncp + Nsamperframe + (-Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
-
-  for c=1:Nc+2
-    acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-    rx_sym(1,c) = sum(acarrier);
-  end
-
-  % pilot - this frame - pilot
-
-  for rr=1:Ns+1 
-    st = M+Ncp + Nsamperframe + (rr-1)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
-    for c=1:Nc+2
-      acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-      rx_sym(rr+1,c) = sum(acarrier);
-    end
-  end
-
-  % next pilot
-
-  st = M+Ncp + Nsamperframe + (2*Ns)*(M+Ncp) + 1 + sample_point; en = st + M - 1;
-  for c=1:Nc+2
-    acarrier = rxbuf(st:en) .* exp(-j*woff_est*(st:en)) .* conj(W(c,:));
-    rx_sym(Ns+3,c) = sum(acarrier);
-  end
-      
-  % est freq err based on all carriers ------------------------------------
-      
-  if foff_est_en
-    freq_err_rect = sum(rx_sym(2,:))' * sum(rx_sym(2+Ns,:));
-
-    % prevent instability in atan(im/re) when real part near 0 
-
-    freq_err_rect += 1E-6;
-
-    %printf("freq_err_rect: %f %f angle: %f\n", real(freq_err_rect), imag(freq_err_rect), angle(freq_err_rect));
-    freq_err_hz = angle(freq_err_rect)*Rs/(2*pi*Ns);
-    foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
-  end
-
-  % OK - now estimate and correct phase  ----------------------------------
-
-  aphase_est_pilot = 10*ones(1,Nc+2);
-  aamp_est_pilot = zeros(1,Nc+2);
-  for c=2:Nc+1
-
-    % estimate phase using average of 6 pilots in a rect 2D window centred
-    % on this carrier
-    % PPP
-    % DDD
-    % DDD
-    % PPP
-          
-    cr = c-1:c+1;
-    aphase_est_pilot_rect = sum(rx_sym(2,cr)*pilots(cr)') + sum(rx_sym(2+Ns,cr)*pilots(cr)');
-
-    % use next step of pilots in past and future
-
-    aphase_est_pilot_rect += sum(rx_sym(1,cr)*pilots(cr)');
-    aphase_est_pilot_rect += sum(rx_sym(2+Ns+1,cr)*pilots(cr)');
-
-    aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
-    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
-  end
- 
-  % correct phase offset using phase estimate, and demodulate
-  % bits, separate loop as it runs across cols (carriers) to get
-  % frame bit ordering correct
-
-  aphase_est_pilot_log = [];
-  rx_bits = []; rx_np = []; rx_amp = [];
-  for rr=1:Ns-1
-    for c=2:Nc+1
-      if phase_est_en
-        rx_corr = rx_sym(rr+2,c) * exp(-j*aphase_est_pilot(c));
-      else
-        rx_corr = rx_sym(rr+2,c);
-      end
-      rx_np = [rx_np rx_corr];
-      rx_amp = [rx_amp aamp_est_pilot(c)];
-      if bps == 1
-        abit = real(rx_corr) > 0;
-      end
-      if bps == 2
-        abit = qpsk_demod(rx_corr);
-      end
-      rx_bits = [rx_bits abit];
-    end % c=2:Nc+1
-    aphase_est_pilot_log = [aphase_est_pilot_log; aphase_est_pilot(2:Nc+1)];
-  end 
-
-  % Adjust nin to take care of sample clock offset
-
-  nin = Nsamperframe;
-  if timing_en
-    thresh = (M+Ncp)/8;
-    tshift = (M+Ncp)/4;
-    if timing_est > thresh
-      nin = Nsamperframe+tshift;
-      timing_est -= tshift;
-      sample_point -= tshift;
-    end
-    if timing_est < -thresh
-      nin = Nsamperframe-tshift;
-      timing_est += tshift;
-      sample_point += tshift;
-    end
-  end
-
-  states.rx_sym = rx_sym;
-  states.rxbuf = rxbuf;
-  states.nin = nin;
-  states.timing_est = timing_est;
-  states.sample_point = sample_point;
-  states.delta_t = delta_t;
-  states.foff_est_hz = foff_est_hz;
 endfunction
 
 
