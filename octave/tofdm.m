@@ -10,8 +10,9 @@ function rx = ebno_awgn_channel(tx, Fs, Rb, EbNodB)
   EbNo = 10^(EbNodB/10);
   variance = Fs / (Rb*EbNo);
   noise = sqrt(variance)*randn(1,length(tx));
-  avg = sum(abs(tx))/length(tx)
+  avg = sum(abs(tx))/length(tx);
   rx = noise.*avg + tx;
+  %rx = rx * .10;
 end
 
 function nums = im_re_interleave(nim)
@@ -197,4 +198,4 @@ end
 % This works best on my machine -- Brady
 graphics_toolkit('fltk')
 
-run_ofdm_test(60,100,.5,60 ,0)
+run_ofdm_test(60,20,0.5,40,100)

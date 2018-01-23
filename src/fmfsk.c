@@ -198,8 +198,8 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     #endif
     
     /* Shift in nin samples */
-    memcpy(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
-    memcpy(&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
+    memmove(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
+    memcpy (&oldsamps[nold], &fmfsk_in[0]        , sizeof(float)*nin );
     
     /* Allocate memory for filtering */
     float *rx_filt = alloca(sizeof(float)*(nsym+1)*Ts);
