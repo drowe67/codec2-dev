@@ -51,23 +51,24 @@ Built as part of codec2-dev, see README for build instructions.
     $ ./fsk_get_test_bits - 5000 | ./fsk_mod 2 9600 1200 1200 1200 - - | ./fsk_demod -p 8 2 9600 1200 - - | ./fsk_put_test_bits -
     FSK BER 0.000000, bits tested 4900, bit errors 0
 
-    In this example, the -l and --lbr options are left out setting the modem
-    up in "high speed" mode. In this mode, the demodulator operates on blocks of
-    24 symbols at a time. In modes with a higher bitrate, this allows the modem
-    to operate with a much lower bit rate. High speed mode is well suited to 
-    applications without much tolerance for latency or with limited processing
-    power and memory, such as PTT digital voice.
+    In this example, the -l and --lbr options are left out setting the
+    modem up in "high speed" mode. In this mode, the demodulator
+    operates on blocks of 24 symbols at a time. This allows the modem
+    to operate with a lower latency. High speed mode is well suited to
+    applications without much tolerance for latency or with limited
+    processing power and memory, such as PTT digital voice.
     
-    In this example, the -p (or --conv) option is used. This specifies the
-    downconverted symbol size. The symbol period (Ts) must be divisible by
-    the supplied P parameter. In this case, Fs is 9600 and Rs is 1200, so Ts
-    is Fs/Rs, which is 8. In this case, 8 is the maximum P value allowed, 
-    though 4 and 2 would also work. If P is not divisible by Ts, a failed
-    assert will fire and fsk_demod will exit. If -p is not supplied, it 
-    will default to match Ts. In general, lower values of P result in less
-    memory use and CPU time spend, but may result in worse modem preformance.
-    P should be left alone unless CPU and memory usage needs to be lowered
-    for the application.
+    In this example, the -p (or --conv) option is used. This specifies
+    the downconverted symbol size. The symbol period (Ts) must be
+    divisible by the supplied P parameter. In this case, Fs is 9600
+    and Rs is 1200, so Ts is Fs/Rs, which is 8. In this case, 8 is the
+    maximum P value allowed, though 4 and 2 would also work. If P is
+    not divisible by Ts, a failed assert will fire and fsk_demod will
+    exit. If -p is not supplied, it will default to match Ts. In
+    general, lower values of P result in less memory use and CPU, but
+    may result in worse modem preformance.  P should be left alone
+    unless CPU and memory usage needs to be lowered for the
+    application.
 
     (TODO, make this easier to understand, perhaps with figure)
 
