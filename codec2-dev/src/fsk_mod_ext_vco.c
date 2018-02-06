@@ -27,13 +27,14 @@
 */
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 
 int main(int argc,char *argv[]){
-    int   os, m, i, bit_i, sym;
+    int   os, m, log2m, i, bit_i, sym;
     float d;
     FILE *fin,*fout;
     
@@ -43,11 +44,12 @@ int main(int argc,char *argv[]){
     }
     
     /* Extract parameters */
-    m = atoi(argv[1]);
+    m = atoi(argv[1]); log2m = log2(m);
+    printf("log2m: %d\n", log2m);
     os = atoi(argv[2]);
     d = atof(argv[3]);
     
-    uint8_t tx_bits[m];
+    uint8_t tx_bits[log2m];
     int16_t rawbuf[os];
 
     if (strcmp(argv[4],"-")==0){
@@ -64,7 +66,7 @@ int main(int argc,char *argv[]){
     
     /* Modulate m bits to levels to drive external VCO */
 
-    while( fread(tx_bits, sizeof(uint8_t), m, fin) == m ){
+    while( fread(tx_bits, sizeof(uint8_t), log2m, fin) == log2m ){
 
         /* generate the symbol number from the bit stream, 
            e.g. 0,1 for 2FSK, 0,1,2,3 for 4FSK */
