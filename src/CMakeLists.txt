@@ -312,7 +312,7 @@ add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fsk_mod_ext_vco fsk_mod_ext_vco.c)
-target_link_libraries(fsk_mod_ext_vco)
+target_link_libraries(fsk_mod_ext_vco ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fsk_demod fsk_demod.c modem_probe.c octave.c)
 target_link_libraries(fsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
