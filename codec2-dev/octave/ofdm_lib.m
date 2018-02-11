@@ -63,7 +63,7 @@ endfunction
         + more suitable for real time implementation
 #}
 
-function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
+function [t_est foff_est ratio] = coarse_sync(states, rx, rate_fs_pilot_samples)
     Nsamperframe = states.Nsamperframe; Fs = states.Fs;
     Npsam = length(rate_fs_pilot_samples);
     verbose  = states.verbose;
@@ -71,12 +71,17 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
     assert(Ncorr > 0);
     corr = zeros(1,Ncorr);
+    mag_max = 0;
     for i=1:Ncorr
       corr(i)   = abs(rx(i:i+Npsam-1) * rate_fs_pilot_samples');
       corr(i)  += abs(rx(i+Nsamperframe:i+Nsamperframe+Npsam-1) * rate_fs_pilot_samples');
+      mag_l = max( abs(rx(i)) , abs(rx(i+Nsamperframe)) );
+      mag_max = max(mag_max, mag_l);
     end
 
     [mx t_est] = max(abs(corr));
+
+    ratio = (mx + 1e-9) / (mag_max + 1e-9);
 
     C  = abs(fft(rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
     C += abs(fft(rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
@@ -433,16 +438,31 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod2(states
   ofdm_load_const;
   [rx_bits states aphase_est_pilot_log rx_np rx_amp] =ofdm_demod(states,rxbuf_in);
 
+
+  [t_est foff_est ratio] = coarse_sync(states,states.rxbuf,rate_fs_pilot_samples);
+  t_est = mod(t_est,Nsamperframe) - (M+Ncp);
+  printf("t_est is %d, foff_est is %d, ofdm_foff_est is %f, ratio %f\n",t_est,foff_est,states.foff_est_hz,ratio)
   %If out of sync, try a coarse sync on RX buffer
   if states.sync <= 0
-    [t_est foff_est] = coarse_sync(states,states.rxbuf,rate_fs_pilot_samples);
+    %[t_est foff_est ratio] = coarse_sync(states,states.rxbuf,rate_fs_pilot_samples);
     %Correct to be within one frame and at head of frame instead of after first symbol
-    t_est = mod(t_est,Nsamperframe) - (M+Ncp);
-    if(t_est > 30)
-      states.nin = t_est;
+    if(ratio > .5)
+      if(t_est > 12)
+        states.nin = t_est;
+      end
+      if(abs(foff_est - states.foff_est_hz) > 3)
+        states.foff_est_hz = foff_est;
+      end
+      printf("Syncing\n")
+      states.sync = 3;
     end
-
-    printf("t_est is %d, foff_est is %d\n",t_est,foff_est)
+  else
+    if(ratio < .5)
+      states.sync = states.sync-1;
+    end
+    if(abs(foff_est - states.foff_est_hz) > 3)
+        states.foff_est_hz = foff_est;
+    end
   end
 endfunction
 
