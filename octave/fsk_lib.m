@@ -212,9 +212,9 @@ function states = est_freq(states, sf, ntones)
   f = []; a = [];
   Sf = states.Sf;
 
-  %figure(8)
-  %clf
-  %plot(Sf(1:Ndft/2));
+  figure(8)
+  clf
+  plot(Sf(1:Ndft/2));
 
   % Search for each tone --------------------------------------------------------
 
@@ -408,6 +408,8 @@ function states = ber_counter(states, test_frame, rx_bits_buf)
 
     nerrs_min = nbit;
     for i=1:nbit
+      size(rx_bits_buf(i:nbit+i-1))
+      size(test_frame)
       error_positions = xor(rx_bits_buf(i:nbit+i-1), test_frame);
       nerrs = sum(error_positions);
       if nerrs < nerrs_min
