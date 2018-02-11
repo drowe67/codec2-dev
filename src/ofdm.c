@@ -84,7 +84,7 @@ static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [], complex float *);
 //static int coarse_sync(struct OFDM *, complex float *, int);
-static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out);
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out, float *ratio_out);
 
 /* Defines */
 
@@ -291,7 +291,7 @@ static int coarser_sync(struct OFDM *ofdm, complex float *rx, int length, float 
  * frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
  */
 
-static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out) {
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_out, float *ratio_out) {
     complex float csam;
     const int Fs                  = ofdm->config.Fs;
     const int M                   = ofdm->config.M;
@@ -388,9 +388,12 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     }
     foff_est = (pmax > nmax) ? pmax_i : (nmax_i-Fs+1); 
     //foff_est = pmax_i;
-    fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est%1280,max_corr/max_mag);
+    //fprintf(stderr,"foff_est is %f, tpos is %d, ratio is %f\n",foff_est,t_est%1280,max_corr/max_mag);
 
     *foff_out = foff_est;
+    if(ratio_out != NULL){
+        *ratio_out = (max_corr + 1e-9)/(max_mag + 1e-9);
+    }
 
     return t_est;
 }
@@ -783,6 +786,8 @@ void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
     const int SampsPerFrame       = ofdm->config.SampsPerFrame;
     const int RxBufSize       = ofdm->config.RxBufSize;
     const int Fs = ofdm->config.Fs;
+    const int M = ofdm->config.M;
+    const int Ncp = ofdm->config.Ncp;
 
     int sync = ofdm->sync_count;
     int frame_point = ofdm->frame_point;
@@ -795,6 +800,8 @@ void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
     memmove(&coarse_rxbuf[0],&coarse_rxbuf[nin], (RxBufSize - nin) * sizeof(coarse_rxbuf[0]));
     memcpy (&coarse_rxbuf[RxBufSize - nin],rxbuf_in,    nin * sizeof(coarse_rxbuf[0]));
 
+    ofdm_demod(ofdm,rx_bits,&coarse_rxbuf[RxBufSize - 2*SampsPerFrame + frame_point]);
+
     int frame_pos_est;
     float fshift;
     float corr_ratio_max = 0;
@@ -806,9 +813,10 @@ void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
     complex float shift_nco = 1;
     complex float shift_nco_dph = 0;
 
-    if(sync <= 0 ) {
+    if(sync <= 0 || 1 ) {
         /* Do coarse search over frequency range in 20hz slices*/
-        for(fshift = -100; fshift < 100; fshift+=40){
+        //for(fshift = -100; fshift < 100; fshift+=40){
+        fshift = 0;{
             /* Shift block of samples by fshift */
             shift_nco_dph = cexpf(2*M_PI*(fshift/(float)Fs)*I);
             shift_nco = 1;
@@ -818,16 +826,73 @@ void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
             }
 
             /* Do a coarse search for the pilot */
-            frame_pos_est = coarser_sync(ofdm,rxbuf_temp,RxBufSize,&foff_out,&corr_ratio);
+            frame_pos_est = coarse_sync(ofdm,rxbuf_temp,RxBufSize,&foff_out,&corr_ratio);
             if(corr_ratio > corr_ratio_max){
                 corr_ratio_max = corr_ratio;
                 fshift_max = -fshift + foff_out;
                 frame_pos_max = frame_pos_est;          
             }
         }
-        fprintf(stderr,"Best ratio %f freq %f offset %d\n",corr_ratio_max,fshift_max,frame_pos_max);
+        frame_pos_est = (frame_pos_max % SampsPerFrame) - (M+Ncp) + 1;
+        if(corr_ratio_max > 0.5 && sync <=0){
+            ofdm->sync_count = 3;
+            ofdm->frame_point = frame_pos_est;
+            ofdm->foff_est_hz = fshift_max;
+            fprintf(stderr,"syncing\n");
+        }
+        fprintf(stderr,"Best ratio %f freq %f offset %d\n",corr_ratio_max,fshift_max,frame_pos_est);
     }
 }
+
+// void ofdm_demod_coarse(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in){
+//     const int SampsPerFrame       = ofdm->config.SampsPerFrame;
+//     const int RxBufSize       = ofdm->config.RxBufSize;
+//     const int Fs = ofdm->config.Fs;
+//     const int M = ofdm->config.M;
+//     const int Ncp = ofdm->config.Ncp;
+
+//     int sync = ofdm->sync_count;
+//     int frame_point = ofdm->frame_point;
+//     int nin = ofdm->nin;
+//     int frame_pos_est;
+//     float fshift;
+//     float corr_ratio_max = 0;
+//     float corr_ratio;
+//     float foff_out;
+//     float fshift_max;
+//     int frame_pos_max = 0;
+
+//     /* NCO for freq. shifting */
+//     complex float shift_nco = 1;
+//     complex float shift_nco_dph = 0;
+
+//     ofdm_demod(ofdm,rx_bits,rxbuf_in);
+//     frame_pos_est = coarse_sync(ofdm,ofdm->rxbuf,RxBufSize,&foff_out,&corr_ratio);
+//     frame_pos_est = (frame_pos_est % SampsPerFrame) - (M+Ncp) + 1;
+//         //fprintf(stderr,"frame_pos_est is %d\n",frame_pos_est);
+//     fprintf(stderr,"t_est is %d, foff_est is %d, ofdm_foff_est is %f\n",frame_pos_est,(int)foff_out,ofdm->foff_est_hz);
+    
+//     if(sync <= 0 ) {
+//         if(corr_ratio > 0.5){
+//             if(frame_pos_est > 12){
+//                 ofdm->nin = frame_pos_est;
+//             }
+//             float delta_f = fabsf((float)foff_out - ofdm->foff_est_hz);
+//             if(delta_f > 3){
+//                 ofdm->foff_est_hz = (float)foff_out;
+//             }
+//             ofdm->sync_count = 3;
+//         }
+//     }else{
+//         if(corr_ratio < 0.5){
+//             ofdm->sync_count--;
+//         }
+//         float delta_f = fabsf((float)foff_out - ofdm->foff_est_hz);
+//         if(delta_f > 3){
+//             ofdm->foff_est_hz = (float)foff_out;
+//        }
+//     }
+// }
 
 /*
  * ------------------------------------------
@@ -882,7 +947,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     float woff_est = TAU * ofdm->foff_est_hz / (float)(Fs);
     float freq_offset = -1;
-
+    float ratio_out;
     /* update timing estimate -------------------------------------------------- */
 
     if (ofdm->timing_en == true) {
@@ -903,12 +968,10 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
-        fprintf(stderr,"n>");
-        ft_est = coarse_sync(ofdm, work, (en - st), &freq_offset);
-        fprintf(stderr,"\nx>");
-        coarse_sync(ofdm,ofdm->rxbuf,RxBufSize,&freq_offset);
-        fprintf(stderr,"\n");
-        //coarser_sync(ofdm, work, (en - st), &freq_offset, NULL);
+        // fprintf(stderr,"n>");
+        ft_est = coarse_sync(ofdm, work, (en - st), &freq_offset,&ratio_out);
+        fprintf(stderr,"good ratio %f\n",ratio_out);
+        // fprintf(stderr,"\nx>");
 
         //ofdm->foff_est_hz += (freq_offset/2);
         ofdm->timing_est += (ft_est - ceilf(FtWindowWidth / 2));
@@ -923,6 +986,16 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         ofdm->sample_point = max(ofdm->timing_est + (Ncp / 4), ofdm->sample_point);
         ofdm->sample_point = min(ofdm->timing_est + Ncp,       ofdm->sample_point);
+
+
+        int ft_est_other = coarse_sync(ofdm,ofdm->rxbuf,RxBufSize,&freq_offset,&ratio_out);
+        ft_est_other = (ft_est_other % SampsPerFrame) - (M+Ncp) + 1;
+        // fprintf(stderr,"\n");
+        //coarser_sync(ofdm, work, (en - st), &freq_offset, NULL);
+        if(ratio_out<.5){
+            ofdm->sync_count--;
+        }
+        fprintf(stderr,"ratio is %f t_offset is %d\n",ratio_out,ft_est_other);
     }
 
     /*
