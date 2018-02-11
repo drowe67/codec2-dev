@@ -75,7 +75,6 @@ int main(int argc, char *argv[]) {
         while(fread(buf, sizeof(short)*channels, dec, fin) == dec) {
             if (freq_shift)            
                 freq_shift_complex_buf(buf, dec*channels, lo_i, lo_q);
-            exit(0);
             fwrite(buf, sizeof(short), channels, fout);
         }
     }
