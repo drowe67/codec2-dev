@@ -1,13 +1,24 @@
 % nf_from_gr.m
 % David Rowe Mar 2016
-%
-% Calculate NF from GNU Radio output samples in 
-% ...IQIQ... (32 bit float) sample files
-%
-% 1/ Take one sample with a -100dBm input carrier
-% 2/ Take another sample with no signal (just rx noise)
-% 3/ Set Fs, adjust st and en to use a chunk of spectrum without too
-%     many birdies.
+
+#{
+  Calculate NF from GNU Radio output samples in 
+  ...IQIQ... (32 bit float) sample files
+ 
+  1/ Take one sample with a -100dBm input carrier
+  2/ Take another sample with no signal (just rx noise)
+  3/ Set Fs, adjust st and en to use a chunk of spectrum without too
+      many birdies.
+ 
+  Gotchas:
+
+  1/ Inspect Figure(1), the time domain plots.
+  2/ Make sure plenty of ADC bits are being used with the noise-only sample,
+     we don't want ADC quantisation noise to dominate.  Aim for about half
+     full scale.
+  3/ Also watch out for clipping on either sample.
+
+#}
 
 1;
 
