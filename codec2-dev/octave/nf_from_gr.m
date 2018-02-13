@@ -27,20 +27,22 @@ function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB, real_file=0)
     pn = load_comp(n_filename);
   end
 
-  P = fft(p(1:Fs));
-  N = fft(pn(1:Fs));
-
-  PdB = 10*log10(abs(P));
-  NdB = 10*log10(abs(N));
-
-  figure;
-  clf;
-
-  subplot(211)
-  plot(st:en, PdB(st:en));
+  % skip any start up transients
   
-  subplot(212)
-  plot(st:en, NdB(st:en));
+  tst = floor(0.1*Fs); ten = st + Fs - 1;
+  P = fft(p(tst:ten));
+  N = fft(pn(tst:ten));
+
+  PdB = 20*log10(abs(P));
+  NdB = 20*log10(abs(N));
+
+  figure(1); clf;
+  subplot(211); plot(real(p(tst:tst+floor(Fs*0.1))));
+  subplot(212); plot(real(pn(tst:tst+floor(Fs*0.1))));
+  
+  figure(2); clf;
+  subplot(211); plot(st:en, PdB(st:en));
+  subplot(212); plot(st:en, NdB(st:en));
 
   #{ 
   ------------------------------------------------------------------------
@@ -86,14 +88,16 @@ function det_nf(p_filename, n_filename, title, Fs, st, en, Pin_dB, real_file=0)
   printf("%10s: Pin: %4.1f  Pout: %4.1f  G: %4.1f  NF: %3.1f dB\n", title, Pin_dB, Pout_dB, G_dB, NF_dB);
 endfunction
 
-close all;
 
 % HackRF --------------------------
 
-p_filename = "~/Desktop/nf/hackrf_100dbm_4MHz.bin";
-n_filename = "~/Desktop/nf/hackrf_nosignal_4MHz.bin";
+%p_filename = "~/Desktop/blogs/nf/hackrf_100dbm_4MHz.bin";
+%n_filename = "~/Desktop/blogs/nf/hackrf_nosignal_4MHz.bin";
+p_filename = "~/codec2-dev/build_linux/unittest/hackrf_100dbm_4MHz.bin";
+n_filename = "~/codec2-dev/build_linux/unittest/hackrf_nosignal_4MHz.bin";
 det_nf(p_filename, n_filename, "HackRF", 4E6, 180E3, 600E3, -100);
 
+#{
 % RTL-SDR --------------------------
 
 p_filename = "~/Desktop/nf/neg100dBm_2MHz.bin";
@@ -111,3 +115,4 @@ det_nf(p_filename, n_filename, "AirSpy", 2.5E6, 100E3, 300E3, -100);
 p_filename = "~/Desktop/nf/fcdpp_100dbm_192khz.bin";
 n_filename = "~/Desktop/nf/fcdpp_nosig_192khz.bin";
 det_nf(p_filename, n_filename, "FunCube PP", 192E3, 25E3, 125E3, -100);
+#}
