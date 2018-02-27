@@ -53,7 +53,8 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
 
   % defaults
 
-  synth_phase = output = 1;
+  synth_phase = 1;
+  output = 1;
   output_prefix = input_prefix;
   fit_order = 0;
   mode = "dct2";
@@ -133,6 +134,7 @@ function [surface mean_f] = c2wideband_batch(input_prefix, varargin)
     for f=1:frames_out
       %printf("%d ", f);   
       Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
+      %Wo = model(f,1); L = min([model(f,2) max_amp-1]); Am = model(f,3:(L+2));
       if Wo*L > pi
         printf("Problem: %d  Wo*L > pi\n", f);   
       end
@@ -346,5 +348,5 @@ function [model_block_ dct2_sd qn rate_K_surface_block rate_K_surface_block_] = 
 
     dct2_sd = mean(std(D-E));
     rate_K_surface_block_ = idct2([sqrt(dec)*E; zeros(Nt*(dec-1), K)]);
-    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs, pad_ends=1);
+    model_block_ = resample_rate_L(model_block, rate_K_surface_block_, rate_K_sample_freqs_kHz, Fs, 'para');
 endfunction
