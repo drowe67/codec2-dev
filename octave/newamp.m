@@ -486,8 +486,8 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Am = model(f,3:(L+2));
   AmdB = 20*log10(Am);
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
-  Gdbfk = interp_para(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), sample_freqs_kHz);    
-
+  Gdbfk = interp_lanczos(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), sample_freqs_kHz);    
+ 
   % Gdbfk = resample_mask(model, f, mask_sample_freqs_kHz);
 
   % optional input of aks for testing
@@ -585,11 +585,11 @@ function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_lo
     % the formant.  As long as we define a formant in that general
     % frequency area it will sound OK.
 
-    Am_freqs_kHz = (1:L)*Wo*4/pi;
+    Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
 
     % Lets see where we have made an error
 
-    error = orig_error = AmdB - AmdB_;
+    error = orig_error = AmdB(1:L) - AmdB_(1:L);
 
     Ncorrections = 3;      % maximum number of rate K samples to correct
     error_thresh = 3;      % only worry about errors larger than thresh
@@ -633,7 +633,7 @@ endfunction
 
 % Take a rate K surface and convert back to time varying rate L
 
-function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs=8000, pad_end=0)
+function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs=8000, interp_alg='lanc')
   max_amp = 160; K = columns(rate_K_surface);
   [frames col] = size(model);
 
@@ -647,10 +647,14 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     % back down to rate L
 
     % dealing with end effects is an ongoing issue.....need a better solution
-
-    %AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
-    AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
-
+   
+    if strcmp(interp_alg, 'para')
+      AmdB_(f,1:L) = interp_para(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
+    end
+    if strcmp(interp_alg, 'lanc')
+      AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
+    end
+    
 #{
     if pad_end
       AmdB_(f,1:L) = interp1([0 rate_K_sample_freqs_kHz Fs/2000], 

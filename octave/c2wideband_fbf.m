@@ -46,17 +46,17 @@ function c2wideband_fbf(samname, f=70, varargin)
     Wo = model(f,1); L = model(f,2); Am = model(f,3:(L+2)); AmdB = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*Fs2/(1000*pi);
 
-    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'para');
 
     % plots ----------------------------------
   
     figure(2); clf; 
-    plot((1:L)*Wo*Fs2/pi, AmdB,";AmdB;g+-");
+    plot((1:L)*Wo*Fs2/pi, AmdB,";rate L;g+-");
     axis([1 Fs2 -20 80]);
     hold on;
-    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
+    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, "b");
 
-    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs);
+    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs, 'para');
     AmdB_ = AmdB_(1:L);
 
     plot((1:L)*Wo*Fs2/pi, AmdB_,";AmdB;r+-");
