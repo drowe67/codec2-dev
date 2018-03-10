@@ -84,7 +84,7 @@ while c
 
   while length(rx) > nin
     states = est_freq(states, rx(1:nin)', states.M);
-    [rx_bits states] = fsk_horus_demod(states, rx(1:nin)');
+    [rx_bits states] = fsk_demod(states, rx(1:nin)');
     rx_bits_buf = [rx_bits_buf rx_bits];
     rx_bits_sd_buf = [rx_bits_sd_buf states.rx_bits_sd];
     rx = rx(nin+1:length(rx));

@@ -122,7 +122,7 @@ function states = fsk_init_hbr(Fs,P,Rs,M=2,nsym=48)
   states.prev_pkt = [];
  
   #{ 
-  TODO: fix me to ressuect fks_horus RTTY stuff, maybe call from 
+  TODO: fix me to resurect fsk_horus RTTY stuff, maybe call from 
   % protocol specific states
 
   states.rtty = fsk_horus_init_rtty_uw(states);
@@ -212,9 +212,9 @@ function states = est_freq(states, sf, ntones)
   f = []; a = [];
   Sf = states.Sf;
 
-  figure(8)
-  clf
-  plot(Sf(1:Ndft/2));
+  %figure(8)
+  %clf
+  %plot(Sf(1:Ndft/2));
 
   % Search for each tone --------------------------------------------------------
 
