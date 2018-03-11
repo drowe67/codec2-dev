@@ -5,11 +5,28 @@
 
   Calculate NF in real time from 16 bit real samples from stdin
 
-  1/ When used with UDP feature of gqrx in USB mode:
+  1/ Using gqrx:
 
-    $ nc -ul 7355 | octave --no-gui -qf nf_from_stdio.m
+    gqrx setup:
+      Configure I/O devices:
+         To switch on LNA bias for HackRF, in Configure I/O devices menu set:
+           Device String: hackrf,bias=1
+         To switch on LNA bias for airspy run for a few seconds this before starting gqrx:
+           $ airspy_rx -r /dev/null -f 435 -b 1
+         I used a sample rate of 250000 for Airspy R2, 3000000 for Airspy Mini
+      Input options...: start with set all gain sliders set to maximum
+      FFT Setting.....: freq Zoom to max
+      Receiver Options: On spectrum display, drag filter width until it's about 12k
+                        Filter Shape Normal
+                        Mode USB
+                        Tune until tone is between 2 and 4 k
+                        Press UDP button
 
-  2/ Using command line tools:
+    Then in a Linux Term:
+    
+      $ nc -ul 7355 | octave --no-gui -qf nf_from_stdio.m 48000
+
+  2/ Using command line tools.  Compile airspy tools and csdr from source:
 
   a) Airspy:
   
@@ -17,6 +34,8 @@
       csdr convert_s16_f | csdr fir_decimate_cc 50 | csdr convert_f_s16 | \
       octave --no-gui -qf ~/codec2-dev/octave/nf_from_stdio.m 120000 complex
 
+      Note: we tuned a few kHz down to put the test tone in the 2000 to 4000 Hz range.
+      
   a) HackRF:
   
     Term 1:
@@ -28,7 +47,10 @@
     $ hackrf_transfer -r - -f 434995000 -s 4000000 -a 1 -p 1 -l 40 -g 32 | \
       csdr convert_s8_f | csdr fir_decimate_cc 50 | csdr convert_f_s16 | \
       nc localhost -u 735
-   
+
+    Note: HackRF needed a bit of tuning to get test tone in 2000 to 4000 Hz range. This
+    can be tricky with the command line method, easier with gqrx.
+    
   TODO:
     [ ] work out why noise power st bounces around so much, signal power seems stable
     [ ] reduce CPU load, in particular of plotting
