@@ -35,50 +35,15 @@
 #include <math.h>
 #include <complex.h>
 
-#define MODEMPROBE_ENABLE
-
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
 #include "octave.h"
 #include "test_bits_ofdm.h"
 #include "comp_prim.h"
-#include "modem_probe.h"
 
-#define OFDM_NC 16
-
-#define NFRAMES 60
-//#define SAMPLE_CLOCK_OFFSET_PPM 100
-//#define FOFF_HZ 5.0f
-
-
-#define OFDM_NCX     16                       /* N Carriers */
-#define OFDM_TS     0.018f                   /* Symbol time */
-#define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
-#define OFDM_FS     8000.0f                  /* Sample rate */
-#define OFDM_BPS    2                        /* Bits per symbol */
-#define OFDM_TCP    0.002f                   /* ? */
-#define OFDM_NS     8                        /* Symbols per frame (number of rows incl pilot) */
-#define OFDM_CENTRE 1500.0f                  /* Center frequency */
-
-/* ? */
-#define OFDM_FTWINDOWWIDTH       11
-/* Bits per frame (duh) */
-#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NCX * OFDM_BPS))
-/* Rows per frame */
-#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NCX * OFDM_BPS))
-/* Samps per frame */
-#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
-
-#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
-#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
-
-
-
-/* To prevent C99 warning */
-
-#define OFDM_M      144                      /* Samples per bare symbol (?) */
-#define OFDM_NCP    16                       /* Samples per cyclic prefix */
-
+#define NFRAMES 30
+#define SAMPLE_CLOCK_OFFSET_PPM 100
+#define FOFF_HZ 0.5f
 
 /*---------------------------------------------------------------------------*\
 
@@ -152,12 +117,10 @@ static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *fof
 
 int main(int argc, char *argv[])
 {
+    int            samples_per_frame = ofdm_get_samples_per_frame();
+    int            max_samples_per_frame = ofdm_get_max_samples_per_frame();
 
-    
-    struct OFDM   *ofdm = ofdm_create(OFDM_CONFIG_700D);
-    int            samples_per_frame = ofdm_get_samples_per_frame(ofdm);
-    int            max_samples_per_frame = ofdm_get_max_samples_per_frame(ofdm);
-
+    struct OFDM   *ofdm;
     COMP           tx[samples_per_frame];         /* one frame of tx samples */
 
     int            rx_bits[OFDM_BITSPERFRAME];    /* one frame of rx bits    */
@@ -166,8 +129,7 @@ int main(int argc, char *argv[])
 
     int            tx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
     COMP           tx_log[samples_per_frame*NFRAMES];
-    //COMP           rx_log[samples_per_frame*NFRAMES];
-    COMP *         rx_log;
+    COMP           rx_log[samples_per_frame*NFRAMES];
     COMP           rxbuf_in_log[max_samples_per_frame*NFRAMES];
     COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
     COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
@@ -182,10 +144,7 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f,i,j;
 
-    int sample_clock_offset_ppm = 100;
-    float foff_hz = 0.1;
-    int nframes = 30;
-
+    ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
     /* Main Loop ---------------------------------------------------------------------*/
@@ -203,30 +162,19 @@ int main(int argc, char *argv[])
 
         /* tx vector logging */
 
-	    memcpy(&tx_bits_log[OFDM_BITSPERFRAME*f], test_bits_ofdm, sizeof(int)*OFDM_BITSPERFRAME);
-	    memcpy(&tx_log[samples_per_frame*f], tx, sizeof(COMP)*samples_per_frame);
+	memcpy(&tx_bits_log[OFDM_BITSPERFRAME*f], test_bits_ofdm, sizeof(int)*OFDM_BITSPERFRAME);
+	memcpy(&tx_log[samples_per_frame*f], tx, sizeof(COMP)*samples_per_frame);
     }
 
     /* --------------------------------------------------------*\
 	                        Channel
     \*---------------------------------------------------------*/
 
-    /*fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, sample_clock_offset_ppm);
+    fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
 
     COMP foff_phase_rect = {1.0f, 0.0f};
 
-    freq_shift(rx_log, rx_log, foff_hz, &foff_phase_rect, samples_per_frame * NFRAMES);*/
-
-    FILE *cplin = fopen("tofdm_rx_vec","r");
-    fseek(cplin,0,SEEK_END);
-    size_t file_len = ftell(cplin);
-    rewind(cplin);
-    size_t rx_samps_in = file_len/sizeof(COMP);
-    rx_log = malloc(rx_samps_in*sizeof(COMP));
-    fread(rx_log,sizeof(COMP),rx_samps_in,cplin);
-    fclose(cplin);
-    //fprintf(stderr,"Read %d\n",s);
-
+    freq_shift(rx_log, rx_log, FOFF_HZ, &foff_phase_rect, samples_per_frame * NFRAMES);
 
     /* --------------------------------------------------------*\
 	                        Demod
@@ -235,20 +183,17 @@ int main(int argc, char *argv[])
     /* Init rx with ideal timing so we can test with timing estimation disabled */
 
     int  Nsam = samples_per_frame*NFRAMES;
-    Nsam = rx_samps_in;
     int  prx = 0;
-    //int  nin = samples_per_frame + 2*(OFDM_M+OFDM_NCP);
-    int nin = ofdm_get_nin(ofdm);
+    int  nin = samples_per_frame + 2*(OFDM_M+OFDM_NCP);
+
     int  lnew;
     COMP rxbuf_in[max_samples_per_frame];
 
-    /*for (i=0; i<nin; i++,prx++) {
+    for (i=0; i<nin; i++,prx++) {
          ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
-    }*/
+    }
 
     int nin_tot = 0;
-
-    modem_probe_init("ofdm","ofdm_test.txt");
 
     /* disable estimators for initial testing */
 
@@ -256,96 +201,84 @@ int main(int argc, char *argv[])
     ofdm_set_timing_enable(ofdm, true);
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
-    //ofdm->foff_est_hz = 10;
 
-    bool cont = true;
-    int ptr = 0;
-    for(f=0; cont; f++) {
-        // /* For initial testng, timing est is off, so nin is always
-        //    fixed.  TODO: we need a constant for rxbuf_in[] size that
-        //    is the maximum possible nin */
+    for(f=0; f<NFRAMES; f++) {
+        /* For initial testng, timing est is off, so nin is always
+           fixed.  TODO: we need a constant for rxbuf_in[] size that
+           is the maximum possible nin */
 
-        // nin = ofdm_get_nin(ofdm);
-        
-        // nin_tot += nin;
-
-        // assert(nin <= max_samples_per_frame);
-
-        // /* Insert samples at end of buffer, set to zero if no samples
-        //    available to disable phase estimation on future pilots on
-        //    last frame of simulation. */
-
-        // if ((Nsam-prx) < nin) {
-        //     lnew = Nsam-prx;
-        // } else {
-        //     lnew = nin;
-        // }
-        // //printf("nin: %d prx: %d lnew: %d\n", nin, prx, lnew);
-        // for(i=0; i<nin; i++) {
-        //     rxbuf_in[i].real = 0.0;
-        //     rxbuf_in[i].imag = 0.0;
-        // }
-
-        // if (lnew) {
-        //     for(i=0; i<lnew; i++, prx++) {
-        //         rxbuf_in[i] = rx_log[prx];
-        //     }
-        // }
-
-        // if(prx > Nsam){
-        //     cont = false;
-        //     break;
-        // }
-        //assert(prx <= max_samples_per_frame*NFRAMES);
-
-        //fprintf(stderr,"NIN:%d\n",nin);
         nin = ofdm_get_nin(ofdm);
-        if(ptr + nin >= Nsam){
-            break;
+        assert(nin <= max_samples_per_frame);
+
+        /* Insert samples at end of buffer, set to zero if no samples
+           available to disable phase estimation on future pilots on
+           last frame of simulation. */
+
+        if ((Nsam-prx) < nin) {
+            lnew = Nsam-prx;
+        } else {
+            lnew = nin;
+        }
+        //printf("nin: %d prx: %d lnew: %d\n", nin, prx, lnew);
+        for(i=0; i<nin; i++) {
+            rxbuf_in[i].real = 0.0;
+            rxbuf_in[i].imag = 0.0;
         }
 
-        memset(rxbuf_in,0,sizeof(COMP) * nin);
-
-        for(i=0; i<nin && ptr < Nsam; i++,ptr++){
-            rxbuf_in[i] = rx_log[ptr];
-        }
-        ofdm_demod_coarse(ofdm, rx_bits, rxbuf_in);
-
-
-        if(ptr >= Nsam){
-            cont = false;
-            //break;
-        }
-
-        modem_probe_samp_cft("rxbuf_in_log_c",rxbuf_in,nin);
-
-        if(f<NFRAMES){
-            for (i = 0; i < (OFDM_NS + 3); i++) {
-                for (j = 0; j < (OFDM_NC + 2); j++) {
-                    rx_sym_log[(OFDM_NS + 3)*f+i][j].real = crealf(ofdm->rx_sym[i][j]);
-                    rx_sym_log[(OFDM_NS + 3)*f+i][j].imag = cimagf(ofdm->rx_sym[i][j]);
-                }
+        if (lnew) {
+            for(i=0; i<lnew; i++, prx++) {
+                rxbuf_in[i] = rx_log[prx];
             }
         }
+        assert(prx <= max_samples_per_frame*NFRAMES);
+
+        ofdm_demod(ofdm, rx_bits, rxbuf_in);
+
+        /* rx vector logging -----------------------------------*/
+
+        assert(nin_tot < samples_per_frame*NFRAMES);
+	memcpy(&rxbuf_in_log[nin_tot], rxbuf_in, sizeof(COMP)*nin);
+        nin_tot += nin;
+
+        for(i=0; i<OFDM_RXBUF; i++) {
+            rxbuf_log[OFDM_RXBUF*f+i].real = crealf(ofdm->rxbuf[i]);
+            rxbuf_log[OFDM_RXBUF*f+i].imag = cimagf(ofdm->rxbuf[i]);
+       }
+
+        for (i = 0; i < (OFDM_NS + 3); i++) {
+            for (j = 0; j < (OFDM_NC + 2); j++) {
+                rx_sym_log[(OFDM_NS + 3)*f+i][j].real = crealf(ofdm->rx_sym[i][j]);
+                rx_sym_log[(OFDM_NS + 3)*f+i][j].imag = cimagf(ofdm->rx_sym[i][j]);
+            }
+        }
+
+        /* note corrected phase (rx no phase) is one big linear array for frame */
+
+        for (i = 0; i < OFDM_ROWSPERFRAME*OFDM_NC; i++) {
+            rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].real = crealf(ofdm->rx_np[i]);
+            rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].imag = cimagf(ofdm->rx_np[i]);
+        }
+
         /* note phase/amp ests the same for each col, but check them all anyway */
-        if(f < NFRAMES){
-            for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
-                for (j = 0; j < OFDM_NC; j++) {
-                    phase_est_pilot_log[OFDM_ROWSPERFRAME*f+i][j] = ofdm->aphase_est_pilot_log[OFDM_NC*i+j];
-                    rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*f+OFDM_NC*i+j] = ofdm->rx_amp[OFDM_NC*i+j];
-                }
+
+        for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
+            for (j = 0; j < OFDM_NC; j++) {
+                phase_est_pilot_log[OFDM_ROWSPERFRAME*f+i][j] = ofdm->aphase_est_pilot_log[OFDM_NC*i+j];
+                rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*f+OFDM_NC*i+j] = ofdm->rx_amp[OFDM_NC*i+j];
             }
         }
-        modem_probe_samp_i("rx_bits_log_c",rx_bits,OFDM_BITSPERFRAME);
+
+        foff_hz_log[f] = ofdm->foff_est_hz;
+        timing_est_log[f] = ofdm->timing_est + 1;      /* offset by 1 to match Octave */
+        sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
+
+        memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
     }
 
     /*---------------------------------------------------------*\
                Dump logs to Octave file for evaluation
                       by tofdm.m Octave script
     \*---------------------------------------------------------*/
-
-    modem_probe_close();
-
 
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
@@ -354,10 +287,16 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
     octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
+    octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
+    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
     octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
     octave_save_float(fout, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, OFDM_ROWSPERFRAME*NFRAMES, OFDM_NC, OFDM_NC);
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
-
+    octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
+    octave_save_int(fout, "timing_est_log_c", timing_est_log, NFRAMES, 1);
+    octave_save_int(fout, "sample_point_log_c", sample_point_log, NFRAMES, 1);
+    octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     fclose(fout);
 
     ofdm_destroy(ofdm);

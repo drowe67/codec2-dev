@@ -34,10 +34,8 @@ extern "C" {
 
 #include <complex.h>
 #include <stdbool.h>
-#include <stdint.h>
 
 #include "codec2_ofdm.h"
-#include "kiss_fft.h"
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846f  /* math constant */
@@ -45,55 +43,72 @@ extern "C" {
 
 #define TAU         (2.0f * M_PI)            /* mathematical constant */
 
+#define OFDM_NC     16                       /* N Carriers */
+#define OFDM_TS     0.018f                   /* Symbol time */
+#define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
+#define OFDM_FS     8000.0f                  /* Sample rate */
+#define OFDM_BPS    2                        /* Bits per symbol */
+#define OFDM_TCP    0.002f                   /* ? */
+#define OFDM_NS     8                        /*  */
+#define OFDM_CENTRE 1500.0f                  /* Center frequency */
+
+/* To prevent C99 warning */
+
+#define OFDM_M      144                      /* Samples per bare symbol (?) */
+#define OFDM_NCP    16                       /* Samples per cyclic prefix */
+
+#ifdef OLD_STYLE
+/* This will produce a warning in C99 as (int) makes these variable */
+
+#define OFDM_M      ((int)(OFDM_FS / OFDM_RS))
+#define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
+#endif
+
+/* ? */
+#define OFDM_FTWINDOWWIDTH       11
+/* Bits per frame (duh) */
+#define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
+/* Rows per frame */
+#define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
+/* Samps per frame */
+#define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
+
+#define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
+#define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
+
+
+/* Dummy struct for now, will contain constant configuration for OFDM modem */
 struct OFDM_CONFIG{
-    int32_t            Nc;                /* N carriers*/
-    float              Ts;                /* Symbol time (S) (no CP) */
-    float              Rs;                /* Symbol rate (S) (no CP) */
-    int32_t            Fs;                /* Sample rate */
-    int32_t            bps;               /* Bits per symbol */
-    int32_t            Tcp;               /* Cyclic Prefix time (S) */
-    int32_t            Ns;                /* Symbols per frame, including pilot */
-    int32_t            Fcenter;           /* Center frequency */
-    int32_t            M;                 /* Samples per symbol (no CP) */
-    int32_t            Ncp;               /* Samples of cyclic prefix */
-    int32_t            FtWindowWidth;     /* ? */
-    int32_t            BitsPerFrame;      /* Bits in a frame */
-    int32_t            SampsPerFrame;     /* Samples in a frame */
-    int32_t            SampsPerFrameMax;  /* Maximum samples per demod cycle */
-    int32_t            RxBufSize;         /* RX buffer size */
-    int32_t            RowsPerFrame;      /* Symbol depth per frame, no prefix */
+  int a;
 };
 
+
 struct OFDM {
-    struct OFDM_CONFIG config;            /* OFDM configuration (see above) */
-    float foff_est_gain;                  /* ? */
-    float foff_est_hz;                    /* Estimated frequency offset */
+    struct OFDM_CONFIG config;
+    float foff_est_gain;
+    float foff_est_hz;
 
-    int verbose;                          /* Printing verbosity level */
-    int sample_point;                     /* Fine timing offset */
-    int timing_est;                       /* Ditto (?) (Coarse timing, maybe?) */
-    int nin;                              /* Samples expected next demod cycle */
-    int frame_point;
-    int sync_count;
+    int verbose;
+    int sample_point;
+    int timing_est;
+    int nin;
 
-    bool timing_en;                       /* Enable fine timing estimation */
-    bool foff_est_en;                     /* Enable frequency offset estimation/tracking */
-    bool phase_est_en;                    /* Enable Phase offset estimation */
+    bool timing_en;
+    bool foff_est_en;
+    bool phase_est_en;
 
-    complex float ** W;
-    complex float * pilots;
-    complex float * pilot_samples;
-    complex float * rxbuf;
-    float * w;
-    kiss_fft_cfg sync_fft_cfg;      
-
-    complex float * coarse_rxbuf;
-
+    complex float pilot_samples[OFDM_M + OFDM_NCP];
+    complex float W[OFDM_NC + 2][OFDM_M];
+    complex float rxbuf[OFDM_RXBUF];
+    complex float pilots[OFDM_NC + 2];
+    float w[OFDM_NC + 2];
+    
     /* Demodulator data */
 
-    complex float ** rx_sym;
-    float * rx_amp;
-    float * aphase_est_pilot_log;
+    complex float rx_sym[OFDM_NS + 3][OFDM_NC + 2];
+    complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NC];
+    float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
+    float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
 };
 
 #ifdef __cplusplus
