@@ -32,8 +32,9 @@
 
 #ifndef __HORUS_API__
 
-#define HORUS_MODE_RTTY        0
+#define HORUS_MODE_RAW         0
 #define HORUS_MODE_BINARY      1
+#define HORUS_MODE_RTTY        2
 
 struct MODEM_STATS;
 
@@ -41,12 +42,15 @@ struct horus *horus_open  (int mode);
 void          horus_close (struct horus *hstates);
 
 int           horus_nin   (struct horus *hstates);
-int           horus_rx    (struct horus *hstates, char telemetry_out[], short demod_in[]);
+int           horus_rx    (struct horus *hstates, char frame_out[], short demod_in[]);
 
 int           horus_get_version              (void);
 int           horus_get_mode                 (struct horus *hstates);
 void          horus_get_modem_stats          (struct horus *hstates, int *sync, float *snr_est);
 void          horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *stats);
+
+int           horus_set_modem (struct horus *hstates, int Rs, int mFSK);
+int           horus_set_raw (struct horus *hstates, int *uw, int nuw_bits, int nbits_per_frame);
 
 #endif
 
