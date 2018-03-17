@@ -138,8 +138,9 @@ int main(int argc, char *argv[])
     float          rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
     float          foff_hz_log[NFRAMES];
     int            rx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
-    int            timing_est_log[OFDM_BITSPERFRAME*NFRAMES];
-    int            sample_point_log[OFDM_BITSPERFRAME*NFRAMES];
+    int            timing_est_log[NFRAMES];
+    float          coarse_foff_est_hz_log[NFRAMES];
+    int            sample_point_log[NFRAMES];
 
     FILE          *fout;
     int            f,i,j;
@@ -270,6 +271,7 @@ int main(int argc, char *argv[])
 
         foff_hz_log[f] = ofdm->foff_est_hz;
         timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
+        coarse_foff_est_hz_log[f] = ofdm->coarse_foff_est_hz;
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
 
         memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
@@ -294,6 +296,7 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
     octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "timing_est_log_c", timing_est_log, NFRAMES, 1);
+    octave_save_float(fout, "coarse_foff_est_hz_log_c", coarse_foff_est_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "sample_point_log_c", sample_point_log, NFRAMES, 1);
     octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);

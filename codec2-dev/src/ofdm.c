@@ -198,14 +198,14 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
         /* pilot at start of frame */
         
         p1 = p1 + (rx[t_est + j] * csam1);
-        p2 = p2 + (rx[t_est + k] * csam1);
+        p2 = p2 + (rx[t_est + k] * csam2);
 
         /* pilot at end of frame */
         
-        p3 = p3 + (rx[t_est + j + SFrame] * csam2);
+        p3 = p3 + (rx[t_est + j + SFrame] * csam1);
         p4 = p4 + (rx[t_est + k + SFrame] * csam2);
     }
-
+    
     /* Calculate sample rate of phase samples, we are sampling phase
        of pilot at half a symbol intervals */
     
@@ -217,7 +217,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
        with 0 inputs. */
     
     *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12)/(2.0*M_PI);
-   
+  
     return t_est;
 }
 
@@ -506,7 +506,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         /* note coarse sync just used for timing est, we dont use coarse_foff_est in this call */
         
-        ft_est = coarse_sync(ofdm, work, (en - st), &coarse_foff_est);
+        ft_est = coarse_sync(ofdm, work, (en - st), &ofdm->coarse_foff_est_hz);
         ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
 
         if (ofdm->verbose > 1) {

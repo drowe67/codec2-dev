@@ -78,7 +78,12 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
 
     corr = abs(corr1) + abs(corr2);
     [mx t_est] = max(corr);
+
     #{
+    % original freq offset est code that never made it into C.  Have some concerns about CPU
+    % load of performing FFT, althout a smaller one could have been used with interpolation
+    % to get the peak
+    
     C  = abs(fft(rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
     C += abs(fft(rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
 
@@ -91,6 +96,7 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     else
       foff_est = foff_est_neg - fmax - 1;
     end
+    
     #}
 
     p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
@@ -306,7 +312,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    ft_est = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+    [ft_est coarse_foff_est_hz] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
     timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
     if verbose > 1
@@ -443,6 +449,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.sample_point = sample_point;
   states.delta_t = delta_t;
   states.foff_est_hz = foff_est_hz;
+  states.coarse_foff_est_hz = coarse_foff_est_hz;
 endfunction
 
 

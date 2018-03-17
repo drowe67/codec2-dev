@@ -1,7 +1,7 @@
 % tofdm.m
 % David Rowe and Steve Sampson June 2017
 %
-% Octave script for comparing Octave and C versions of OFDZM modem
+% Octave script for comparing Octave and C versions of OFDM modem
 
 % ------------------------------------------------------------------
 
@@ -48,7 +48,7 @@ states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx_log(prx:nin);
 prx += nin;
 
 rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; 
-timing_est_log = []; sample_point_log = []; 
+timing_est_log = []; coarse_foff_est_hz_log = []; sample_point_log = []; 
 phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
 
@@ -87,6 +87,7 @@ for f=1:Nframes
   rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
   timing_est_log = [timing_est_log; states.timing_est];
+  coarse_foff_est_hz_log = [coarse_foff_est_hz_log; states.coarse_foff_est_hz];
   sample_point_log = [sample_point_log; states.sample_point];
   rx_np_log = [rx_np_log arx_np];
   rx_bits_log = [rx_bits_log rx_bits];
@@ -99,6 +100,7 @@ end
 
 % Override default path by setting path_to_tofdm = "/your/path/to/tofdm"
 
+printf("\nRunning C version....\n");
 if exist("path_to_tofdm", "var") == 0
    path_to_tofdm = "../build_linux/unittest/tofdm";
 end
@@ -153,6 +155,7 @@ check(rx_sym_log, rx_sym_log_c, 'rx_sym', tol=5E-3);
 check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=2E-3, its_an_angle=1);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp');
 check(timing_est_log, timing_est_log_c, 'timing_est');
+check(coarse_foff_est_hz_log, coarse_foff_est_hz_log_c, 'coarse_foff_est_hz');
 check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
