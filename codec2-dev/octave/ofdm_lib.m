@@ -70,14 +70,15 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
 
     Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
     assert(Ncorr > 0);
-    corr = zeros(1,Ncorr);
+    corr1 = corr2 = zeros(1,Ncorr);
     for i=1:Ncorr
-      corr(i)   = abs(rx(i:i+Npsam-1) * rate_fs_pilot_samples');
-      corr(i)  += abs(rx(i+Nsamperframe:i+Nsamperframe+Npsam-1) * rate_fs_pilot_samples');
+      corr1(i)   = rx(i:i+Npsam-1) * rate_fs_pilot_samples';
+      corr2(i)  += rx(i+Nsamperframe:i+Nsamperframe+Npsam-1) * rate_fs_pilot_samples';
     end
 
-    [mx t_est] = max(abs(corr));
-
+    corr = abs(corr1) + abs(corr2);
+    [mx t_est] = max(corr);
+    #{
     C  = abs(fft(rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
     C += abs(fft(rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
 
@@ -90,14 +91,30 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     else
       foff_est = foff_est_neg - fmax - 1;
     end
+    #}
 
+    p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
+    p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
+    p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
+    p4 = rx(t_est+Nsamperframe+Npsam/2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
+    Fs1 = Fs/(Npsam/2);
+    foff_est = Fs1*angle( (conj(p1)*p2 + conj(p3)*p4))/(2*pi);
+    
     if verbose > 1
       %printf("t_est: %d\n", t_est);
       figure(7); clf;
       plot(abs(corr))
+      #{
       figure(8)
       plot(C)
       axis([0 200 0 0.4])
+      #}
+      figure(9)
+      %rate_fs_pilot_samples
+      plot([p1 p2 p3 p4] ,'b+')
+      %plot(rate_fs_pilot_samples * rate_fs_pilot_samples' ,'b+')
+      axis([-0.2 0.2 -0.2 0.2])
+      %hold on; plot(rx(t_est+Nsamperframe:t_est+Npsam+Nsamperframe-1) .* rate_fs_pilot_samples','g+'); hold off;
     end
 endfunction
 
