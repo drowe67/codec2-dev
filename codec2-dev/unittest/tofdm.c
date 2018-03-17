@@ -269,7 +269,7 @@ int main(int argc, char *argv[])
         }
 
         foff_hz_log[f] = ofdm->foff_est_hz;
-        timing_est_log[f] = ofdm->timing_est + 1;      /* offset by 1 to match Octave */
+        timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
 
         memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));

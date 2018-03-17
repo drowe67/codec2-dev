@@ -54,7 +54,7 @@ static complex float vector_sum(complex float *, int);
 static complex float qpsk_mod(int *);
 static void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
-static int coarse_sync(struct OFDM *, complex float *, int);
+static int coarse_sync(struct OFDM *, complex float *, int, float *foff_est);
 
 /* Defines */
 
@@ -146,15 +146,18 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * Correlates the OFDM pilot symbol samples with a window of received
  * samples to determine the most likely timing offset.  Combines two
  * frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
+ *
+ * Also estimates coarse frequency offset based on sampling the pilots
+ * phase at half symbol intervales.
  */
 
-static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
-    complex float csam;
+static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_est) {
+    complex float csam, csam1, csam2;
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
     int Fs = OFDM_FS;
     int SFrame = OFDM_SAMPLESPERFRAME;
     float corr[Ncorr];
-    int i, j;
+    int i, j, k;
 
     for (i = 0; i < Ncorr; i++) {
         complex float temp = 0.0f + 0.0f * I;
@@ -180,14 +183,41 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length) {
         }
     }
 
-    /* Coarse frequency estimation */
-    /* TODO: Move FFT config to ofdm init and ofdm struct */
-    kiss_fft_cfg fftcfg = kiss_fft_alloc(Fs,0,NULL,NULL);
-    complex float fft_in[Fs];
-    complex float fft_out[Fs];
-    
-    
+    /* Coarse frequency estimation - note this isn't always used, some CPU could be saved
+       buy putting this in another function */
 
+    complex float p1, p2, p3, p4;
+    p1 = p2 = p3 = p4 =  0.0f + 0.0f * I;
+    
+    /* calculate phase of pilots at half symbol intervals */
+    
+    for (j = 0, k = (OFDM_M + OFDM_NCP)/2; j < (OFDM_M + OFDM_NCP)/2; j++,k++) {
+        csam1 = conjf(ofdm->pilot_samples[j]);
+        csam2 = conjf(ofdm->pilot_samples[k]);
+
+        /* pilot at start of frame */
+        
+        p1 = p1 + (rx[t_est + j] * csam1);
+        p2 = p2 + (rx[t_est + k] * csam1);
+
+        /* pilot at end of frame */
+        
+        p3 = p3 + (rx[t_est + j + SFrame] * csam2);
+        p4 = p4 + (rx[t_est + k + SFrame] * csam2);
+    }
+
+    /* Calculate sample rate of phase samples, we are sampling phase
+       of pilot at half a symbol intervals */
+    
+    float Fs1 = Fs/((OFDM_M + OFDM_NCP)/2);
+
+    /* subtract phase of adjacent samples, rate of change of phase is
+       frequency est.  We combine samples from either end of frame to
+       improve estimate.  Small real 1E-12 term to prevent instability
+       with 0 inputs. */
+    
+    *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12)/(2.0*M_PI);
+   
     return t_est;
 }
 
@@ -434,7 +464,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float aphase_est_pilot_rect;
     float aphase_est_pilot[OFDM_NC + 2];
     float aamp_est_pilot[OFDM_NC + 2];
-    float freq_err_hz;
+    float freq_err_hz, coarse_foff_est;
     int i, j, k, rr, st, en, ft_est;
 
     /* shift the buffer left based on nin */
@@ -474,7 +504,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
-        ft_est = coarse_sync(ofdm, work, (en - st));
+        /* note coarse sync just used for timing est, we dont use coarse_foff_est in this call */
+        
+        ft_est = coarse_sync(ofdm, work, (en - st), &coarse_foff_est);
         ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
 
         if (ofdm->verbose > 1) {
