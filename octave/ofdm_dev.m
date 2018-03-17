@@ -534,9 +534,9 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
 
-  sim_in.timing_en = 1;
-  sim_in.foff_est_en = 1;
-  sim_in.phase_est_en = 1;
+  sim_in.timing_en = 0;
+  sim_in.foff_est_en = 0;
+  sim_in.phase_est_en = 0;
 
   load HRA_112_112.txt
   sim_in.ldpc_code = HRA_112_112;
@@ -852,15 +852,18 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   sim_in.Nsec = Ntests*(sim_in.Ns+1)/sim_in.Rs;
 
   sim_in.EbNodB = EbNodB;
-  sim_in.verbose = 2;
+  sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
   sim_in.foff_hz = foff_hz; 
-  sim_in.timing_en = 0;
-  sim_in.foff_est_en = 0;
-  sim_in.phase_est_en = 0;
-
+  sim_in.timing_en = 1;
+  sim_in.foff_est_en = 1;
+  sim_in.phase_est_en = 1;
+  sim_in.ldpc_en = 0;
+  
   [sim_out rx states] = run_sim(sim_in);
 
+  states.verbose = 0;
+  
   % set up acquistion 
 
   Nsamperframe = states.Nsamperframe;
@@ -908,7 +911,7 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
       %[ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
       [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
       if states.verbose
-        printf("ct_est: %4d foff_est: %3.1f\n", ct_est, foff_est);
+        printf("w: %d ct_est: %4d foff_est: %3.1f\n", w, ct_est, foff_est);
       end
 
       % valid coarse timing ests are modulo Nsamperframe
@@ -921,16 +924,29 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
 endfunction
 
 
-% Run some tests for various acquisition conditions. Probability of
-% acquistion is what matters, e.g. if it's 50% we can expect sync
-% within 2 frames
-%                 P(t)/P(f)  P(t)/P(f)
-%          Eb/No  AWGN       HF
-% +/- 25Hz -1/3   1.0/0.3    0.96/0.3 
-% +/-  5Hz -1/3   1.0/0.347  0.96/0.55 
-% +/- 25Hz  10/10 1.00/0.92  0.99/0.77
+#{
+   Run some tests for various acquisition conditions. Probability of
+   acquistion is what matters, e.g. if it's 50% we can expect sync
+   within 2 frames
 
-function acquisition_histograms(fine_en = 0)
+  Results on 17 Mar 2018:
+  
+  foff Hz  Channel Eb/No  P(t)  P(f)
+  -20      AWGN    -1     0.99  0.42
+  -20      HF       3     0.94  0.43
+  +20      AWGN    -1     1.00  0.37
+  +20      HF       3     0.93  0.24
+  -5       AWGN    -1     1.00  0.56
+  -5       HF       3     0.98  0.50
+  +5       AWGN    -1     1.00  0.54
+  +5       HF       3     0.98  0.39
+   0       AWGN    10     1.00  0.98
+   0       HF      10     1.00  0.65
+
+   -> Suggests we will sync up in 2-3 frames which is pretty cool.
+#}
+
+function acquisition_histograms(fine_en = 0, foff)
   Fs = 8000;
   Ntests = 100;
 
@@ -941,7 +957,7 @@ function acquisition_histograms(fine_en = 0)
 
   % AWGN channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, -1, -20, 0, fine_en);
+  [dct dfoff] = acquisition_test(Ntests, -1, foff, 0, fine_en);
 
   % Probability of acquistion is what matters, e.g. if it's 50% we can
   % expect sync within 2 frames
@@ -962,7 +978,7 @@ function acquisition_histograms(fine_en = 0)
 
   % HF channel operating point
 
-  [dct dfoff] = acquisition_test(Ntests, 3, -20, 1, fine_en);
+  [dct dfoff] = acquisition_test(Ntests, -3, foff, 1, fine_en);
 
   printf("HF P(time offset acq) = %3.2f\n", length(find (abs(dct) < ttol_samples))/length(dct));
   if fine_en == 0
@@ -990,8 +1006,8 @@ more off;
 
 init_cml('/home/david/Desktop/cml/');
 
-run_single(6) 
+%run_single 
 %run_curves
 %run_curves_estimators
-%acquisition_histograms
-%acquisition_test
+acquisition_histograms(0, 0)
+%acquisition_test(10, 4, 5)
