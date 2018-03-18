@@ -11,7 +11,7 @@
     [ ] way to fall out of sync
 #}
 
-function ofdm_rx(filename, interleave_frames = 1, error_pattern_filename)
+function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   ofdm_lib;
   ldpc;
   gp_interleaver;

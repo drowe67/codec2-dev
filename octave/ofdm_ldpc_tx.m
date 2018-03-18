@@ -9,11 +9,11 @@
  
   i) 4 frame interleaver, 10 seconds, AWGN channel at Eb/No=3dB
 
-    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw',4, 10,3);
+    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw',4, 10,3);
 
   ii) 4 frame interleaver, 10 seconds, HF channel at Eb/No=6dB
 
-    ofdm_tx('hf_ebno_6dB_700d.raw', 4, 10, 6, 'hf');
+    ofdm_ldpc_tx('hf_ebno_6dB_700d.raw', 4, 10, 6, 'hf');
 #}
 
 
@@ -32,7 +32,7 @@
  
 #}
 
-function ofdm_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
