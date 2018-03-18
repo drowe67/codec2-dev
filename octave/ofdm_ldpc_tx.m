@@ -1,8 +1,8 @@
-% ofdm_tx.m
+% ofdm_ldpc_tx.m
 % David Rowe April 2017
 %
-% File based ofdm tx.  Generate a file of ofdm samples, inclduing
-% optional channel simulation.
+% File based ofdm tx with LDPC encoding and interleaver.  Generates a
+% file of ofdm samples, including optional channel simulation.
 
 #{
   Examples:
