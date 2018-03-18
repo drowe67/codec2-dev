@@ -1,7 +1,7 @@
-% ofdm_rx.m
+% ofdm_ldpc_rx.m
 % David Rowe April 2017
 %
-% OFDM file based rx.
+% OFDM file based rx, with LDPC and interleaver
 
 #{
   TODO: 
