@@ -48,7 +48,7 @@ struct OFDM;
 /* Default configuration for '700D' mode */
 const struct OFDM_CONFIG * OFDM_CONFIG_700D;
 
-/* Prototypes */
+/* getters */
 
 struct OFDM *ofdm_create(const struct OFDM_CONFIG * config);
 void ofdm_destroy(struct OFDM *);
@@ -57,6 +57,7 @@ void ofdm_demod(struct OFDM *, int *, COMP *);
 int ofdm_get_nin(struct OFDM *);
 int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
+int ofdm_get_bits_per_frame(struct OFDM *);
 
 /* option setters */
 
