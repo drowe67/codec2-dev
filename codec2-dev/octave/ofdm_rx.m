@@ -36,7 +36,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   % OK re-generate tx frame for BER calcs
 
-  rand('seed', 100);
+  rand('seed', 1);
   tx_bits = round(rand(1,Nbitsperframe));
 
   % init logs and BER stats
@@ -173,7 +173,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   figure(4); clf;
   plot(foff_est_hz_log)
-  mx = max(abs(foff_est_hz_log));
+  mx = max(abs(foff_est_hz_log))+1;
   axis([1 max(Nframes,2) -mx mx]);
   title('Fine Freq');
   ylabel('Hz')

@@ -48,14 +48,14 @@ extern "C" {
 #define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
 #define OFDM_FS     8000.0f                  /* Sample rate */
 #define OFDM_BPS    2                        /* Bits per symbol */
-#define OFDM_TCP    0.002f                   /* ? */
-#define OFDM_NS     8                        /*  */
+#define OFDM_TCP    0.002f                   /* Cyclic prefix duration */
+#define OFDM_NS     8                        /* NS-1 data symbols between pilots  */
 #define OFDM_CENTRE 1500.0f                  /* Center frequency */
 
 /* To prevent C99 warning */
 
-#define OFDM_M      144                      /* Samples per bare symbol (?) */
-#define OFDM_NCP    16                       /* Samples per cyclic prefix */
+#define OFDM_M      144                      /* duration of each symbol in samples */
+#define OFDM_NCP    16                       /* duration of CP in samples */
 
 #ifdef OLD_STYLE
 /* This will produce a warning in C99 as (int) makes these variable */
@@ -91,6 +91,7 @@ struct OFDM {
     int verbose;
     int sample_point;
     int timing_est;
+    float coarse_foff_est_hz;
     int nin;
 
     bool timing_en;

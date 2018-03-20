@@ -30,7 +30,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
-  rand('seed', 100);
+  rand('seed', 1);
   tx_bits = round(rand(1,Nbitsperframe));
 
   tx = [];
