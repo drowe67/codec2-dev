@@ -6,7 +6,7 @@
 
 #{
   TODO:
-    [ ] single frame based sync state machine
+    [X] single frame based sync state machine
         + that doesn't depend on payload data
     [ ] make robust to fading
         + what are win conditions?
@@ -74,9 +74,14 @@ function ofdm_rx(filename, error_pattern_filename)
     prx += states.nin;
 
     [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+
+    errors = xor(tx_bits, rx_bits);
+    Nerrs = sum(errors);
+    aber = Nerrs/Nbitsperframe;
+    
     frame_count++;
 
-    printf("f: %d state: %s frame_count: %d\n", f, state, frame_count);
+    printf("f: %d state: %s Nerrs: %d aber: %3.2f\n", f, state, Nerrs, aber);
 
     % If looking for sync: check raw BER on frame just received
     % against all possible positions in the interleaver frame.
@@ -89,9 +94,7 @@ function ofdm_rx(filename, error_pattern_filename)
       % If looking for sync: check raw BER on frame just received
       % against all possible positions in the interleaver frame.
 
-      errors = xor(tx_bits, rx_bits);
-      Nerrs = sum(errors); 
-      if Nerrs/Nbitsperframe < 0.1
+      if aber < 0.1
         next_state = 'synced';
         % make sure we get an interleave frame with correct freq offset
         % note this introduces a lot of delay, a better idea would be to
@@ -139,9 +142,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
       % measure uncoded bit errors on modem frame
 
-      errors = xor(tx_bits, rx_bits);
-      Nerrs = sum(errors);
-      if Nerrs/Nbitsperframe < 0.2
+      if aber < 0.2
         Terrs += Nerrs;
         Nerrs_log = [Nerrs_log Nerrs];
         Tbits += Nbitsperframe;

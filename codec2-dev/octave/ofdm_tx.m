@@ -37,7 +37,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   for f=1:Nframes
     tx = [tx ofdm_mod(states, tx_bits)];
   end
-
+  
   Nsam = length(tx);
 
   % channel simulation
@@ -59,7 +59,8 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
     dopplerSpreadHz = 1; path_delay_ms = 1;
 
     path_delay_samples = path_delay_ms*Fs/1000;
-    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
+    printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n",
+           dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
     % generate same fading pattern for every run
 
