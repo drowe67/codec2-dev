@@ -943,7 +943,8 @@ endfunction
    0       AWGN    10     1.00  0.98
    0       HF      10     1.00  0.65
 
-   -> Suggests we will sync up in 2-3 frames which is pretty cool.
+   -> Suggests we will sync up in 2-3 frames which is pretty cool.  Would be good
+      to have freq est about as reliable as timing est.....
 #}
 
 function acquisition_histograms(fine_en = 0, foff)
