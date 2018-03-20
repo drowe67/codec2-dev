@@ -318,7 +318,7 @@ add_executable(fsk_demod fsk_demod.c modem_probe.c octave.c)
 target_link_libraries(fsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fsk_get_test_bits fsk_get_test_bits.c)
-target_link_libraries(fsk_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+target_link_libraries(fsk_get_test_bits)
 
 add_executable(fsk_put_test_bits fsk_put_test_bits.c)
 target_link_libraries(fsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -328,6 +328,9 @@ target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(cohpsk_mod cohpsk_mod.c)
 target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ofdm_mod ofdm_mod.c  ../src/ofdm.c)
+target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fmfsk_mod fmfsk_mod.c)
 target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
