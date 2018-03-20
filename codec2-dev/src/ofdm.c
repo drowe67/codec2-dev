@@ -390,6 +390,10 @@ int ofdm_get_max_samples_per_frame() {
     return OFDM_MAX_SAMPLESPERFRAME;
 }
 
+int ofdm_get_bits_per_frame(struct OFDM *ofdm) {
+    return OFDM_BITSPERFRAME;
+}
+
 void ofdm_set_verbose(struct OFDM *ofdm, int level) {
     ofdm->verbose = level;
 }
