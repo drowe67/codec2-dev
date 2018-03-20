@@ -2,7 +2,7 @@
 % David Rowe March 2018
 %
 % File based ofdm tx.  Generates a file of ofdm samples, including
-% optional channel simulation.  See also ofdm_ldpc_tx.m
+% optional channel simulation.  See also ofdm_ldpc_tx.m, and ofdm_mod.c
 
 #{
   Examples:
