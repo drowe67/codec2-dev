@@ -71,13 +71,16 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
     Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
     assert(Ncorr > 0);
     corr1 = corr2 = zeros(1,Ncorr);
+    av_level = Npsam*sqrt(rx*rx')/Ncorr + 1E-12;
     for i=1:Ncorr
-      corr1(i)   = rx(i:i+Npsam-1) * rate_fs_pilot_samples';
-      corr2(i)  += rx(i+Nsamperframe:i+Nsamperframe+Npsam-1) * rate_fs_pilot_samples';
+      rx1      = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
+      corr1(i) = rx1 * rate_fs_pilot_samples';
+      corr2(i) = rx2 * rate_fs_pilot_samples';
     end
 
-    corr = abs(corr1) + abs(corr2);
+    corr = (abs(corr1) + abs(corr2))/av_level;
     [mx t_est] = max(corr);
+    printf("   max: %f t_est: %d\n", mx, t_est);
 
     #{
     % original freq offset est code that never made it into C.  Have some concerns about CPU
@@ -110,6 +113,7 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
       %printf("t_est: %d\n", t_est);
       figure(7); clf;
       plot(abs(corr))
+      axis([1 Ncorr 0 2])
       #{
       figure(8)
       plot(C)
@@ -305,7 +309,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
   % update timing estimate --------------------------------------------------
 
-  delta_t = 0;
+  delta_t = coarse_foff_est_hz = 0;
   if timing_en
     % update timing at start of every frame
 
