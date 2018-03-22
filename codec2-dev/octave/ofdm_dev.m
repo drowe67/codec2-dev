@@ -849,7 +849,7 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
-  sim_in.Nsec = Ntests*(sim_in.Ns+1)/sim_in.Rs;
+  sim_in.Nsec = (Ntests+1)*(sim_in.Ns+1)/sim_in.Rs;
 
   sim_in.EbNodB = EbNodB;
   sim_in.verbose = 0;
@@ -861,8 +861,8 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   sim_in.ldpc_en = 0;
   
   [sim_out rx states] = run_sim(sim_in);
-
-  states.verbose = 0;
+  
+  states.verbose = 2;
   
   % set up acquistion 
 
@@ -906,7 +906,7 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
     en = 2.5*Nsamperframe - 1;
     ct_target = Nsamperframe/2;
 
-    for w=1:Nsamperframe:length(rx)-3*Nsamperframe
+    for w=1:Nsamperframe:length(rx)-4*Nsamperframe
       %st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
       %[ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
       [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
@@ -1010,5 +1010,5 @@ init_cml('/home/david/Desktop/cml/');
 %run_single 
 %run_curves
 %run_curves_estimators
-acquisition_histograms(0, 0)
-%acquisition_test(10, 4, 5)
+%acquisition_histograms(0, 0)
+acquisition_test(10, -3, 5)
