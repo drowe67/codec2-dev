@@ -63,25 +63,32 @@ endfunction
         + more suitable for real time implementation
 #}
 
-function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
-    Nsamperframe = states.Nsamperframe; Fs = states.Fs;
+function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_fs_pilot_samples)
+    ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
-    verbose  = states.verbose;
 
     Ncorr = length(rx) - (Nsamperframe+Npsam) + 1;
     assert(Ncorr > 0);
-    corr1 = corr2 = zeros(1,Ncorr);
-    av_level = Npsam*sqrt(rx*rx')/Ncorr + 1E-12;
+    corr = zeros(1,Ncorr);
+
+    % normalise correlation so we can compare to a threshold across varying input levels
+
+    av_level = 2*sqrt(states.timing_norm*(rx*rx')/length(rx)) + 1E-12;
+
+    % correlate with pilots at start and end of frame to determine timing offset
+    
     for i=1:Ncorr
       rx1      = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr1(i) = rx1 * rate_fs_pilot_samples';
-      corr2(i) = rx2 * rate_fs_pilot_samples';
+      corr(i)  = abs(rx1 * rate_fs_pilot_samples' + rx2 * rate_fs_pilot_samples')/av_level;
     end
 
-    corr = (abs(corr1) + abs(corr2))/av_level;
-    [mx t_est] = max(corr);
-    printf("   max: %f t_est: %d\n", mx, t_est);
+    [timing_mx t_est] = max(corr);
+    timing_valid = timing_mx > timing_mx_thresh;
 
+    if verbose > 1
+      printf("   max: %f timing_est: %d timing_valid: %d\n", timing_mx, timing_est, timing_valid);
+    end
+    
     #{
     % original freq offset est code that never made it into C.  Have some concerns about CPU
     % load of performing FFT, althout a smaller one could have been used with interpolation
@@ -113,7 +120,7 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
       %printf("t_est: %d\n", t_est);
       figure(7); clf;
       plot(abs(corr))
-      axis([1 Ncorr 0 2])
+      %axis([1 Ncorr 0 2])
       #{
       figure(8)
       plot(C)
@@ -126,6 +133,7 @@ function [t_est foff_est] = coarse_sync(states, rx, rate_fs_pilot_samples)
       axis([-0.2 0.2 -0.2 0.2])
       %hold on; plot(rx(t_est+Nsamperframe:t_est+Npsam+Nsamperframe-1) .* rate_fs_pilot_samples','g+'); hold off;
     end
+
 endfunction
 
 
@@ -199,6 +207,12 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
   states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
+
+  % pre-compute a constant used in coarse_sync()
+
+  Npsam = length(states.rate_fs_pilot_samples);
+  states.timing_norm = Npsam*(states.rate_fs_pilot_samples * states.rate_fs_pilot_samples');
+  % printf("timing_norm: %f\n", states.timing_norm)
   
   % LDPC code is optionally enabled
 
@@ -316,18 +330,22 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est coarse_foff_est_hz] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
-    timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
+    [ft_est coarse_foff_est_hz timing_valid timing_mx] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
 
+    if timing_valid
+      timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
+
+      % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
+
+      delta_t = ft_est - ceil(ftwindow_width/2);
+      sample_point = max(timing_est+Ncp/4, sample_point);
+      sample_point = min(timing_est+Ncp, sample_point);
+    end
+    
     if verbose > 1
-      printf("  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, timing_est, sample_point);
+      printf("  ft_est: %2d timing_est: %2d mx: %3.2f  sample_point: %2d\n", ft_est, timing_est, timing_mx, sample_point);
     end
 
-    % Black magic to keep sample_point inside cyclic prefix.  Or something like that.
-
-    delta_t = ft_est - ceil(ftwindow_width/2);
-    sample_point = max(timing_est+Ncp/4, sample_point);
-    sample_point = min(timing_est+Ncp, sample_point);
   end
 
   % down convert at current timing instant----------------------------------
@@ -431,7 +449,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   % Adjust nin to take care of sample clock offset
 
   nin = Nsamperframe;
-  if timing_en
+  if timing_en && timing_valid
     thresh = (M+Ncp)/8;
     tshift = (M+Ncp)/4;
     if timing_est > thresh
@@ -449,6 +467,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
   states.timing_est = timing_est;
   states.sample_point = sample_point;
   states.delta_t = delta_t;

@@ -19,6 +19,7 @@ autotest;
 
 Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+states.verbose = 0;
 ofdm_load_const;
 
 rand('seed',1);
@@ -48,7 +49,8 @@ states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx_log(prx:nin);
 prx += nin;
 
 rxbuf_log = []; rxbuf_in_log = []; rx_sym_log = []; foff_hz_log = []; 
-timing_est_log = []; coarse_foff_est_hz_log = []; sample_point_log = []; 
+timing_est_log = timing_valid_log = timing_mx_log = [];
+coarse_foff_est_hz_log = []; sample_point_log = [];
 phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
 
@@ -87,6 +89,8 @@ for f=1:Nframes
   rx_amp_log = [rx_amp_log arx_amp];
   foff_hz_log = [foff_hz_log; states.foff_est_hz];
   timing_est_log = [timing_est_log; states.timing_est];
+  timing_valid_log = [timing_valid_log; states.timing_valid];
+  timing_mx_log = [timing_mx_log; states.timing_mx];
   coarse_foff_est_hz_log = [coarse_foff_est_hz_log; states.coarse_foff_est_hz];
   sample_point_log = [sample_point_log; states.sample_point];
   rx_np_log = [rx_np_log arx_np];
@@ -109,6 +113,7 @@ system(path_to_tofdm);
 load tofdm_out.txt;
 
 fg = 1;
+
 figure(fg++); clf; plot(rx_np_log,'+'); title('Octave Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
 figure(fg++); clf; plot(rx_np_log_c,'+'); title('C Scatter Diagram'); axis([-1.5 1.5 -1.5 1.5]);
 
@@ -136,7 +141,9 @@ d = phase_est_pilot_log - phase_est_pilot_log_c; d = angle(exp(j*d));
 stem_sig_and_error(fg, 211, phase_est_pilot_log_c, d, 'phase est pilot', [1 length(phase_est_pilot_log_c) -1.5 1.5])
 stem_sig_and_error(fg++, 212, rx_amp_log_c, rx_amp_log - rx_amp_log_c, 'rx amp', [1 length(rx_amp_log_c) -1.5 1.5])
 
-stem_sig_and_error(fg++, 111, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+stem_sig_and_error(fg  , 211, foff_hz_log_c, (foff_hz_log - foff_hz_log_c), 'foff hz', [1 length(foff_hz_log_c) -1.5 1.5])
+
+stem_sig_and_error(fg++, 212, timing_mx_log_c, (timing_mx_log - timing_mx_log_c), 'timing mx', [1 length(timing_mx_log_c) 0 2])
 
 stem_sig_and_error(fg,   211, timing_est_log_c, (timing_est_log - timing_est_log_c), 'timing est', [1 length(timing_est_log_c) -1.5 1.5])
 stem_sig_and_error(fg++, 212, sample_point_log_c, (sample_point_log - sample_point_log_c), 'sample point', [1 length(sample_point_log_c) -1.5 1.5])
@@ -155,6 +162,8 @@ check(rx_sym_log, rx_sym_log_c, 'rx_sym', tol=5E-3);
 check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=2E-3, its_an_angle=1);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp');
 check(timing_est_log, timing_est_log_c, 'timing_est');
+check(timing_valid_log, timing_valid_log_c, 'timing_valid');
+check(timing_mx_log, timing_mx_log_c, 'timing_mx');
 check(coarse_foff_est_hz_log, coarse_foff_est_hz_log_c, 'coarse_foff_est_hz');
 check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');

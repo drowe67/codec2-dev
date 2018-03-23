@@ -1011,4 +1011,4 @@ init_cml('/home/david/Desktop/cml/');
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
-acquisition_test(10, -3, 5)
+acquisition_test(10, 4, 5)

@@ -76,7 +76,8 @@ extern "C" {
 #define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
 #define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
-
+#define OFDM_TIMING_MX_THRESH 0.3
+    
 /* Dummy struct for now, will contain constant configuration for OFDM modem */
 struct OFDM_CONFIG{
   int a;
@@ -91,6 +92,8 @@ struct OFDM {
     int verbose;
     int sample_point;
     int timing_est;
+    int timing_valid;
+    float timing_mx;
     float coarse_foff_est_hz;
     int nin;
 
@@ -99,6 +102,7 @@ struct OFDM {
     bool phase_est_en;
 
     complex float pilot_samples[OFDM_M + OFDM_NCP];
+    float   timing_norm;
     complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
