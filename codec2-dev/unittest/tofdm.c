@@ -45,6 +45,8 @@
 #define SAMPLE_CLOCK_OFFSET_PPM 100
 #define FOFF_HZ 0.5f
 
+#define ASCALE  (2E5*1.1491/2.0) /* scale from shorts back to floats */
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: fs_offset()
@@ -63,9 +65,10 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
     double tin = 0.0;
     int tout = 0;
 
-    while (tin < (double) n) {
+    while (tin < (double) (n-1)) {
       t1 = (int) floor(tin);
       t2 = (int) ceil(tin);
+      assert(t2 < n);
 
       f = (tin - (double) t1);
 
@@ -75,7 +78,8 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
       tout += 1;
       tin  += 1.0 + sample_rate_ppm / 1E6;
     }
-
+    //printf("n: %d tout: %d tin: %f\n", n, tout, tin);
+    
     return tout;
 }
 
@@ -139,6 +143,8 @@ int main(int argc, char *argv[])
     float          foff_hz_log[NFRAMES];
     int            rx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
     int            timing_est_log[NFRAMES];
+    int            timing_valid_log[NFRAMES];
+    float          timing_mx_log[NFRAMES];
     float          coarse_foff_est_hz_log[NFRAMES];
     int            sample_point_log[NFRAMES];
 
@@ -181,7 +187,7 @@ int main(int argc, char *argv[])
 	                        Demod
     \*---------------------------------------------------------*/
 
-    /* Init rx with ideal timing so we can test with timing estimation disabled */
+    /* Init/pre-load rx with ideal timing so we can test with timing estimation disabled */
 
     int  Nsam = samples_per_frame*NFRAMES;
     int  prx = 0;
@@ -189,20 +195,29 @@ int main(int argc, char *argv[])
 
     int  lnew;
     COMP rxbuf_in[max_samples_per_frame];
-
+    
     for (i=0; i<nin; i++,prx++) {
          ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
     }
-
+    
     int nin_tot = 0;
 
     /* disable estimators for initial testing */
 
-    ofdm_set_verbose(ofdm, true);
+    ofdm_set_verbose(ofdm, false);
     ofdm_set_timing_enable(ofdm, true);
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
+    #ifdef TESTING_FILE
+    FILE *fin=fopen("/home/david/codec2-dev/build_linux/src/ofdm_c_test.raw", "rb");
+    assert(fin != NULL);
+    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    short rx_scaled[Nmaxsamperframe];
+    COMP rx[Nmaxsamperframe];
+    #endif
+    
     for(f=0; f<NFRAMES; f++) {
         /* For initial testng, timing est is off, so nin is always
            fixed.  TODO: we need a constant for rxbuf_in[] size that
@@ -233,8 +248,25 @@ int main(int argc, char *argv[])
         }
         assert(prx <= max_samples_per_frame*NFRAMES);
 
+        #ifdef TESTING_FILE
+        fread(rx_scaled, sizeof(short), nin, fin);
+        for(i=0; i<nin; i++) {
+	    rx[i].real = (float)rx_scaled[i]/ASCALE;
+            rx[i].imag = 0.0;
+        }
+        ofdm_demod(ofdm, rx_bits, rx);
+        #else
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
-
+        #endif
+        
+        int Nerrs = 0;
+        for(i=0; i<OFDM_BITSPERFRAME; i++) {
+            if (test_bits_ofdm[i] != rx_bits[i]) {
+                Nerrs++;
+            }
+        }
+        //printf("f: %d Nerr: %d\n", f, Nerrs);
+        
         /* rx vector logging -----------------------------------*/
 
         assert(nin_tot < samples_per_frame*NFRAMES);
@@ -244,7 +276,7 @@ int main(int argc, char *argv[])
         for(i=0; i<OFDM_RXBUF; i++) {
             rxbuf_log[OFDM_RXBUF*f+i].real = crealf(ofdm->rxbuf[i]);
             rxbuf_log[OFDM_RXBUF*f+i].imag = cimagf(ofdm->rxbuf[i]);
-       }
+        }
 
         for (i = 0; i < (OFDM_NS + 3); i++) {
             for (j = 0; j < (OFDM_NC + 2); j++) {
@@ -271,6 +303,8 @@ int main(int argc, char *argv[])
 
         foff_hz_log[f] = ofdm->foff_est_hz;
         timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
+        timing_valid_log[f] = ofdm->timing_valid;     /* offset by 1 to match Octave */
+        timing_mx_log[f] = ofdm->timing_mx;           /* offset by 1 to match Octave */
         coarse_foff_est_hz_log[f] = ofdm->coarse_foff_est_hz;
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
 
@@ -296,6 +330,8 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
     octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "timing_est_log_c", timing_est_log, NFRAMES, 1);
+    octave_save_int(fout, "timing_valid_log_c", timing_valid_log, NFRAMES, 1);
+    octave_save_float(fout, "timing_mx_log_c", timing_mx_log, NFRAMES, 1, 1);
     octave_save_float(fout, "coarse_foff_est_hz_log_c", coarse_foff_est_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "sample_point_log_c", sample_point_log, NFRAMES, 1);
     octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);

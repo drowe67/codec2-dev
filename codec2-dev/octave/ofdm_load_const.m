@@ -12,6 +12,7 @@ bps = states.bps;
 Nbitsperframe = states.Nbitsperframe;
 Nrowsperframe = states.Nrowsperframe;
 Nsamperframe = states.Nsamperframe;
+timing_mx_thresh = 0.3;
 
 W = states.W;
 w = states.w;

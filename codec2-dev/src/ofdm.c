@@ -149,6 +149,8 @@ static complex float vector_sum(complex float *a, int num_elements) {
  *
  * Also estimates coarse frequency offset based on sampling the pilots
  * phase at half symbol intervales.
+ * 
+ * Unlike Octave version use states to return a few values.
  */
 
 static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_est) {
@@ -156,9 +158,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
     int Fs = OFDM_FS;
     int SFrame = OFDM_SAMPLESPERFRAME;
-    float corr[Ncorr];
+    float corr[Ncorr], av_level;
     int i, j, k;
 
+    complex float acc =  0.0f + 0.0f * I;
+    for (i = 0; i < length; i++) {
+        acc += rx[i] * conjf(rx[i]);
+    }
+            
+    av_level = 2.0*sqrt(ofdm->timing_norm*crealf(acc)/length) + 1E-12;
+    
     for (i = 0; i < Ncorr; i++) {
         complex float temp = 0.0f + 0.0f * I;
 
@@ -168,21 +177,27 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
             temp = temp + (rx[i + j + SFrame] * csam);
         }
 
-        corr[i] = cabsf(temp);
+        corr[i] = cabsf(temp)/av_level;
     }
 
     /* find the max magnitude and its index */
 
-    float mag = 0.0f;
-    int t_est = 0;
+    float timing_mx = 0.0f;
+    int timing_est = 0;
 
     for (i = 0; i < Ncorr; i++) {
-        if (corr[i] > mag) {
-            mag = corr[i];
-            t_est = i;
+        if (corr[i] > timing_mx) {
+            timing_mx = corr[i];
+            timing_est = i;
         }
     }
 
+    ofdm->timing_mx = timing_mx;
+    ofdm->timing_valid = timing_mx > OFDM_TIMING_MX_THRESH;
+    if (ofdm->verbose > 1) {
+        fprintf(stderr, "   max: %f timing_est: %d timing_valid: %d\n", ofdm->timing_mx, timing_est, ofdm->timing_valid);
+    }
+    
     /* Coarse frequency estimation - note this isn't always used, some CPU could be saved
        buy putting this in another function */
 
@@ -197,13 +212,13 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
 
         /* pilot at start of frame */
         
-        p1 = p1 + (rx[t_est + j] * csam1);
-        p2 = p2 + (rx[t_est + k] * csam2);
+        p1 = p1 + (rx[timing_est + j] * csam1);
+        p2 = p2 + (rx[timing_est + k] * csam2);
 
         /* pilot at end of frame */
         
-        p3 = p3 + (rx[t_est + j + SFrame] * csam1);
-        p4 = p4 + (rx[t_est + k + SFrame] * csam2);
+        p3 = p3 + (rx[timing_est + j + SFrame] * csam1);
+        p4 = p4 + (rx[timing_est + k + SFrame] * csam2);
     }
     
     /* Calculate sample rate of phase samples, we are sampling phase
@@ -217,8 +232,8 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
        with 0 inputs. */
     
     *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12)/(2.0*M_PI);
-  
-    return t_est;
+
+    return timing_est;
 }
 
 /*
@@ -330,6 +345,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
         }
     }
 
+    for (i = 0; i < OFDM_RXBUF; i++) {
+        ofdm->rxbuf[i] = 0.0f + 0.0f * I;        
+    }
+
     for (i = 0; i < (OFDM_NS + 3); i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
@@ -347,6 +366,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     ofdm->foff_est_hz = 0.0f;
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;
+    ofdm->timing_valid = 0;
+    ofdm->timing_mx = 0.0f;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
 
     /* create the OFDM waveform */
@@ -364,6 +385,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
         ofdm->pilot_samples[i] = temp[j];
     }
+        
+    // states.timing_norm = Npsam*(rate_fs_pilot_samples*rate_fs_pilot_samples');
 
     /* Now copy the whole thing after the above */
 
@@ -371,6 +394,15 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
         ofdm->pilot_samples[i] = temp[j];
     }
 
+    /* calculate constant used to normalise timing correlation maximum */
+
+    complex float acc =  0.0f + 0.0f * I;
+    for (i = 0; i < OFDM_M+OFDM_NCP; i++) {
+        acc += ofdm->pilot_samples[i] * conjf(ofdm->pilot_samples[i]);
+    }
+    ofdm->timing_norm = (OFDM_M + OFDM_NCP) * crealf(acc);
+    //fprintf(stderr, "timing_norm: %f\n", ofdm->timing_norm);
+    
     return ofdm; /* Success */
 }
 
