@@ -9,7 +9,7 @@ function rx = sample_clock_offset(tx, sample_clock_offset_ppm)
   tin=1;
   tout=1;
   rx = zeros(1,length(tx));
-  while tin < length(tx)
+  while tin <= length(tx)
       t1 = floor(tin);
       t2 = ceil(tin);
       f = tin - t1;
