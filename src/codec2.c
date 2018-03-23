@@ -1151,7 +1151,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 
     e_index = unpack_natural_or_gray(bits, &nbit, E_BITS, c2->gray);
     e[3] = decode_energy(e_index, E_BITS);
-    fprintf(stderr, "%d %f\n", e_index, e[3]);
+    //fprintf(stderr, "%d %f\n", e_index, e[3]);
 
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	lsp_indexes[i] = unpack_natural_or_gray(bits, &nbit, lsp_bits(i), c2->gray);
@@ -1164,7 +1164,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
         model[0].voiced =  model[1].voiced = model[2].voiced = model[3].voiced = 0;
         e[3] = decode_energy(10, E_BITS);
         bw_expand_lsps(&lsps[3][0], LPC_ORD, 200.0, 200.0);
-        fprintf(stderr, "soft mute\n");
+        //fprintf(stderr, "soft mute\n");
     }
 
     /* interpolate ------------------------------------------------*/
