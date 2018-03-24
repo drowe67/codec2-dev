@@ -197,10 +197,13 @@ int main(int argc, char *argv[])
 
     int  lnew;
     COMP rxbuf_in[max_samples_per_frame];
-    
+
+    #define FRONT_LOAD
+    #ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
          ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
     }
+    #endif
     
     int nin_tot = 0;
 
@@ -211,13 +214,13 @@ int main(int argc, char *argv[])
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
+    //#define TESTING_FILE
     #ifdef TESTING_FILE
     FILE *fin=fopen("/home/david/codec2-dev/build_linux/src/ofdm_c_test.raw", "rb");
     assert(fin != NULL);
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
     short rx_scaled[Nmaxsamperframe];
-    COMP rx[Nmaxsamperframe];
     #endif
     
     for(f=0; f<NFRAMES; f++) {
@@ -253,11 +256,11 @@ int main(int argc, char *argv[])
         #ifdef TESTING_FILE
         fread(rx_scaled, sizeof(short), nin, fin);
         for(i=0; i<nin; i++) {
-	    rx[i].real = (float)rx_scaled[i]/ASCALE;
-            rx[i].imag = 0.0;
+	    rxbuf_in[i].real = (float)rx_scaled[i]/ASCALE;
+            rxbuf_in[i].imag = 0.0;
         }
-        ofdm_demod(ofdm, rx_bits, rx);
-        #else
+        #endif
+        
         next_state = state;
         switch(state) {
         case OFDM_SEARCH:
@@ -270,15 +273,16 @@ int main(int argc, char *argv[])
             break;
         }
         state = next_state;
-        #endif
         
+        #ifdef TESTING_FILE
         int Nerrs = 0;
-        for(i=0; i<OFDM_BITSPERFRAME; i++) {
+        for(i=0; i<Nbitsperframe; i++) {
             if (test_bits_ofdm[i] != rx_bits[i]) {
                 Nerrs++;
             }
         }
-        //printf("f: %d Nerr: %d\n", f, Nerrs);
+        printf("f: %d Nerr: %d\n", f, Nerrs);
+        #endif
         
         /* rx vector logging -----------------------------------*/
 

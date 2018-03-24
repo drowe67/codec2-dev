@@ -430,7 +430,7 @@ int ofdm_get_samples_per_frame() {
 }
 
 int ofdm_get_max_samples_per_frame() {
-    return OFDM_MAX_SAMPLESPERFRAME;
+    return 2*OFDM_MAX_SAMPLESPERFRAME;
 }
 
 int ofdm_get_bits_per_frame(struct OFDM *ofdm) {
