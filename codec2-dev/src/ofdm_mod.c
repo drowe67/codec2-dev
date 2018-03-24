@@ -64,18 +64,18 @@ int main(int argc, char *argv[])
 
     if (strcmp(argv[1], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input file: %s: %s.\n",
-         argv[1], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening input file: %s: %s.\n",
+                argv[1], strerror(errno));
+        exit(1);
     }
 
     if (strcmp(argv[2], "-") == 0) fout = stdout;
     else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
-         argv[2], strerror(errno));
-	exit(1);
+        fprintf(stderr, "Error opening output modem sample file: %s: %s.\n",
+                argv[2], strerror(errno));
+        exit(1);
     }
-
+    
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);

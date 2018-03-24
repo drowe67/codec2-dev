@@ -202,7 +202,10 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
-
+  states.timing_valid = 0;
+  states.timing_mx = 0;
+  states.coarse_foff_est_hz = 0;
+  
   % generate OFDM pilot symbol, used for timing and freq offset est
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
@@ -218,6 +221,10 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   states.rate = 1.0;
   states.ldpc_en = 0;
+
+  % init some output states for logging
+  
+  states.rx_sym = zeros(1+Ns+1+1, Nc+2);
 
 endfunction
 
@@ -286,6 +293,46 @@ function tx = ofdm_txframe(states, tx_sym_lin)
     asymbol_cp = [asymbol(M-Ncp+1:M) asymbol];
     tx = [tx asymbol_cp];
   end
+endfunction
+
+
+% ----------------------------------------------------------------------------------
+% ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
+% ----------------------------------------------------------------------------------
+
+function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
+  ofdm_load_const;
+
+  % insert latest input samples into rxbuf so it is primed for when we have to call ofdm_demod()
+
+  states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
+  states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
+
+  % Attempt coarse timing estimate (i.e. detect start of frame)
+
+  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
+  [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+  if states.verbose
+    printf("   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %d\n", ct_est, foff_est, timing_valid, timing_mx);
+  end
+
+  if timing_valid
+    % potential candidate found ....
+
+    % calculate number of samples we need on next buffer to get into sync
+
+    states.nin = Nsamperframe + ct_est - 1;
+
+    % reset modem states
+
+    states.sample_point = states.timing_est = 1;
+    states.foff_est_hz = foff_est;
+  else
+    states.nin = Nsamperframe;
+  end
+  states.timing_valid = timing_valid;
+  states.timing_mx = timing_mx;
+  states.coarse_foff_est_hz = foff_est;
 endfunction
 
 
