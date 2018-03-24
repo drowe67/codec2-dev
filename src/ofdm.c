@@ -163,7 +163,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
 
     complex float acc =  0.0f + 0.0f * I;
     for (i = 0; i < length; i++) {
-        acc += rx[i] * conjf(rx[i]);
+        acc += crealf(rx[i]) * crealf(rx[i]) + cimagf(rx[i]) * cimagf(rx[i]);
     }
             
     av_level = 2.0*sqrt(ofdm->timing_norm*crealf(acc)/length) + 1E-12;
@@ -243,7 +243,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
  */
 
 static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME],
-        complex float *tx_sym_lin) {
+    complex float *tx_sym_lin) {
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
@@ -352,6 +352,17 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
     for (i = 0; i < (OFDM_NS + 3); i++) {
         for (j = 0; j < (OFDM_NC + 2); j++) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
+        }
+    }
+
+    for (i = 0; i < OFDM_ROWSPERFRAME*OFDM_NC; i++) {
+        ofdm->rx_np[i] = 0.0f + 0.0f * I;
+    }
+    
+    for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
+        for (j = 0; j < OFDM_NC; j++) {
+            ofdm->aphase_est_pilot_log[OFDM_NC*i+j] = 0.0f + 0.0f * I;
+            ofdm->rx_amp[OFDM_NC*i+j] = 0.0f + 0.0f * I;
         }
     }
 
@@ -489,6 +500,61 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
         result[i].imag = cimagf(tx[i]);
     }
 }
+
+
+/*
+ * ----------------------------------------------------------------------------------
+ * ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
+ * ----------------------------------------------------------------------------------
+ */
+
+int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
+{
+    int i,j;
+    
+    /* insert latest input samples into rxbuf so it is primed for when
+       we have to call ofdm_demod() */
+
+    for (i = 0, j = ofdm->nin; i < (OFDM_RXBUF - ofdm->nin); i++, j++) {
+        ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    }
+
+    /* insert latest input samples onto tail of rxbuf */
+
+    for (i = (OFDM_RXBUF - ofdm->nin), j = 0; i < OFDM_RXBUF; i++, j++) {
+        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+    }
+
+    /* Attempt coarse timing estimate (i.e. detect start of frame) */
+
+    int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
+    int en = st + 2*OFDM_SAMPLESPERFRAME; 
+    int ct_est = coarse_sync(ofdm,  &ofdm->rxbuf[st], (en - st), &ofdm->coarse_foff_est_hz);
+    if (ofdm->verbose) {
+        fprintf(stderr, "   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %f\n",
+                ct_est, ofdm->coarse_foff_est_hz, ofdm->timing_valid, ofdm->timing_mx);
+    }
+
+    if (ofdm->timing_valid) {
+        /* potential candidate found .... */
+
+        /* calculate number of samples we need on next buffer to get into sync */
+
+       ofdm->nin = OFDM_SAMPLESPERFRAME + ct_est;
+
+       /* reset modem states */
+
+       ofdm->sample_point = ofdm->timing_est = 0;
+       ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
+    }
+    else {
+        ofdm->nin = OFDM_SAMPLESPERFRAME;
+    }
+
+    return ofdm->timing_valid;
+}
+
+
 
 /*
  * ------------------------------------------

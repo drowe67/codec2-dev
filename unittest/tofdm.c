@@ -149,11 +149,13 @@ int main(int argc, char *argv[])
     int            sample_point_log[NFRAMES];
 
     FILE          *fout;
-    int            f,i,j;
+    int            f,i,j, state, next_state;
 
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
+    state = OFDM_SEARCH;
+    
     /* Main Loop ---------------------------------------------------------------------*/
 
     for(f=0; f<NFRAMES; f++) {
@@ -219,7 +221,7 @@ int main(int argc, char *argv[])
     #endif
     
     for(f=0; f<NFRAMES; f++) {
-        /* For initial testng, timing est is off, so nin is always
+        /* For initial testing, timing est is off, so nin is always
            fixed.  TODO: we need a constant for rxbuf_in[] size that
            is the maximum possible nin */
 
@@ -256,7 +258,18 @@ int main(int argc, char *argv[])
         }
         ofdm_demod(ofdm, rx_bits, rx);
         #else
-        ofdm_demod(ofdm, rx_bits, rxbuf_in);
+        next_state = state;
+        switch(state) {
+        case OFDM_SEARCH:
+            if (ofdm_sync_search(ofdm, rxbuf_in)) {
+                next_state = OFDM_SYNCED;
+            }
+            break;
+        case OFDM_SYNCED:
+            ofdm_demod(ofdm, rx_bits, rxbuf_in);
+            break;
+        }
+        state = next_state;
         #endif
         
         int Nerrs = 0;

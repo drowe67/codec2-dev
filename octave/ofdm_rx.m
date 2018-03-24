@@ -74,66 +74,34 @@ function ofdm_rx(filename, error_pattern_filename)
     end
     prx += states.nin;
 
-    printf("  states.nin: %d\n", states.nin);
-    [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-
-    errors = xor(tx_bits, rx_bits);
-    Nerrs = sum(errors);
-    aber = Nerrs/Nbitsperframe;
-    
-    frame_count++;
-
-    printf("f: %d state: %s Nerrs: %d aber: %3.2f\n", f, state, Nerrs, aber);
-
+    printf("f: %d state: %s nin: %d\n", f, state, nin);
+ 
     % If looking for sync: check raw BER on frame just received
     % against all possible positions in the interleaver frame.
 
     % iterate state machine ------------------------------------
 
     next_state = state;
-    if strcmp(state,'searching')  
-
-      % If looking for sync: check raw BER on frame just received
-      % against all possible positions in the interleaver frame.
-
-      if aber < 0.1
-        next_state = 'synced';
-        % make sure we get an interleave frame with correct freq offset
-        % note this introduces a lot of delay, a better idea would be to
-        % run demod again from interleave_frames back with now-known freq offset
-      end
-    end
-
-    if strcmp(state,'synced')  
-      if Nerrs/Nbitsperframe > 0.2
-        %next_state = 'searching';
-      end
-    end
-
-    state = next_state;
 
     if strcmp(state,'searching') 
+      [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
 
-      % still searching? Attempt coarse timing estimate (i.e. detect start of frame)
-
-      st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-      [ct_est foff_est] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
-      if states.verbose
-        printf("   Nerrs: %d ct_est: %4d foff_est: %3.1f\n", Nerrs, ct_est, foff_est);
+      if timing_valid
+        next_state = 'synced';
       end
-
-      % calculate number of samples we need on next buffer to get into sync
-     
-      states.nin = Nsamperframe + ct_est - 1;
-      
-      % reset modem states
-
-      states.sample_point = states.timing_est = 1;
-      states.foff_est_hz = foff_est;
     end
-    
+        
     if strcmp(state,'synced')
 
+      printf("  states.nin: %d\n", states.nin);
+      [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
+
+      errors = xor(tx_bits, rx_bits);
+      Nerrs = sum(errors);
+      aber = Nerrs/Nbitsperframe;
+    
+      frame_count++;
+     
       % we are in sync so log states
 
       rx_np_log = [rx_np_log arx_np];
@@ -150,6 +118,9 @@ function ofdm_rx(filename, error_pattern_filename)
         Tbits += Nbitsperframe;
       end
     end
+
+    state = next_state;
+
   end
 
   printf("BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);

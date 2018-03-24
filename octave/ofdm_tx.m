@@ -9,7 +9,7 @@
  
   i) 10 seconds, AWGN channel at Eb/No=3dB
 
-    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', 10,3);
+    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', 10, 3);
 
   ii) 10 seconds, HF channel at Eb/No=6dB
 
