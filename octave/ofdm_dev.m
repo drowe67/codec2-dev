@@ -862,11 +862,11 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   
   [sim_out rx states] = run_sim(sim_in);
   
-  states.verbose = 2;
+  states.verbose = 0;
   
   % set up acquistion 
 
-  Nsamperframe = states.Nsamperframe;
+  Nsamperframe = states.Nsamperframe; M = states.M; Ncp = states.Ncp;
   rate_fs_pilot_samples = states.rate_fs_pilot_samples;
 
   % test fine or acquisition over test signal
@@ -885,6 +885,9 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
 
   delta_ct = []; delta_foff = [];
 
+  % a fine simulation is a bit like what ofsd_demod() does, just searches a few samples
+  % either side of current coarse est
+  
   if fine_en
 
     window_width = 5;                   % search +/-2 samples from current timing instant
@@ -900,15 +903,14 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
       delta_t = [delta_ft ft_est - ceil(window_width/2)];
     end
   else
-    % for coarse simulation we just use contant window shifts
+    % for coarse simulation we just use constant window shifts
 
     st = 0.5*Nsamperframe; 
-    en = 2.5*Nsamperframe - 1;
-    ct_target = Nsamperframe/2;
+    en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
+    ct_target = Nsamperframe/2;   % actual known position of correct coarse timing
 
     for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-      %st = w+0.5*Nsamperframe; en = st+2*Nsamperframe-1;
-      %[ct_est foff_est] = coarse_sync(states, rx(st:en), rate_fs_pilot_samples);
+    %for w=1:M+Ncp:length(rx)-4*Nsamperframe
       [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
       if states.verbose
         printf("w: %d ct_est: %4d foff_est: %3.1f\n", w, ct_est, foff_est);
@@ -1007,8 +1009,8 @@ more off;
 
 init_cml('/home/david/Desktop/cml/');
 
-%run_single 
+run_single 
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
-acquisition_test(10, 4, 5)
+%acquisition_test(10, 4, 5)

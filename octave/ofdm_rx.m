@@ -29,9 +29,10 @@ function ofdm_rx(filename, error_pattern_filename)
 
   % load real samples from file
 
-  Ascale= 2E5*1.1491;
-  frx=fopen(filename,"rb"); rx = 2*fread(frx, Inf, "short")/4E5; fclose(frx);
+  Ascale= 2E5*1.1491/2;
+  frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
+  Nframes = 5;
   prx = 1;
 
   % OK re-generate tx frame for BER calcs
@@ -52,8 +53,8 @@ function ofdm_rx(filename, error_pattern_filename)
 
   prx = 1;
   nin = Nsamperframe+2*(M+Ncp);
-  states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
-  prx += nin;
+  %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
+  %prx += nin;
 
   state = 'searching'; frame_count = 0;
 
@@ -73,6 +74,7 @@ function ofdm_rx(filename, error_pattern_filename)
     end
     prx += states.nin;
 
+    printf("  states.nin: %d\n", states.nin);
     [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
 
     errors = xor(tx_bits, rx_bits);
@@ -117,13 +119,13 @@ function ofdm_rx(filename, error_pattern_filename)
       st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
       [ct_est foff_est] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
       if states.verbose
-        printf("  Nerrs: %d ct_est: %4d foff_est: %3.1f\n", Nerrs, ct_est, foff_est);
+        printf("   Nerrs: %d ct_est: %4d foff_est: %3.1f\n", Nerrs, ct_est, foff_est);
       end
 
       % calculate number of samples we need on next buffer to get into sync
      
       states.nin = Nsamperframe + ct_est - 1;
-
+      
       % reset modem states
 
       states.sample_point = states.timing_est = 1;
@@ -154,8 +156,8 @@ function ofdm_rx(filename, error_pattern_filename)
 
   figure(1); clf; 
   plot(rx_np_log,'+');
-  mx = max(abs(rx_np_log));
-  %axis([-mx mx -mx mx]);
+  mx = 2*max(abs(rx_np_log));
+  axis([-mx mx -mx mx]);
   title('Scatter');
 
   figure(2); clf;
