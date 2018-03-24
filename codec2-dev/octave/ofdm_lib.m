@@ -323,7 +323,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
   % update timing estimate --------------------------------------------------
 
-  delta_t = coarse_foff_est_hz = 0;
+  delta_t = coarse_foff_est_hz = timing_valid = timing_mx = 0;
   if timing_en
     % update timing at start of every frame
 
