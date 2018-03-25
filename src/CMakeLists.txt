@@ -213,6 +213,7 @@ set(CODEC2_SRCS
     lsp.c
     mbest.c
     newamp1.c
+    ofdm.c
     phase.c
     quantise.c
     pack.c
@@ -240,6 +241,7 @@ set(CODEC2_PUBLIC_HEADERS
     codec2_fdmdv.h
     codec2_cohpsk.h
     codec2_fm.h
+    codec2_ofdm.h
     fsk.h
     codec2_fifo.h
     comp.h
@@ -329,8 +331,17 @@ target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(cohpsk_mod cohpsk_mod.c)
 target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_mod ofdm_mod.c  ../src/ofdm.c)
+add_executable(ofdm_get_test_bits ofdm_get_test_bits.c)
+target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
+target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ofdm_mod ofdm_mod.c)
 target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ofdm_demod ofdm_demod.c octave.c)
+target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fmfsk_mod fmfsk_mod.c)
 target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
