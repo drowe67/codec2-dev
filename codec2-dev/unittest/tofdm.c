@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
-    state = OFDM_SEARCH;
+    state = OFDM_SEARCHING;
     
     /* Main Loop ---------------------------------------------------------------------*/
 
@@ -198,7 +198,7 @@ int main(int argc, char *argv[])
     int  lnew;
     COMP rxbuf_in[max_samples_per_frame];
 
-    #define FRONT_LOAD
+    //#define FRONT_LOAD
     #ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
          ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
@@ -214,9 +214,9 @@ int main(int argc, char *argv[])
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
-    //#define TESTING_FILE
+    #define TESTING_FILE
     #ifdef TESTING_FILE
-    FILE *fin=fopen("/home/david/codec2-dev/build_linux/src/ofdm_c_test.raw", "rb");
+    FILE *fin=fopen("/home/david/codec2-dev/octave/ofdm_test.raw", "rb");
     assert(fin != NULL);
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
@@ -263,7 +263,7 @@ int main(int argc, char *argv[])
         
         next_state = state;
         switch(state) {
-        case OFDM_SEARCH:
+        case OFDM_SEARCHING:
             if (ofdm_sync_search(ofdm, rxbuf_in)) {
                 next_state = OFDM_SYNCED;
             }
