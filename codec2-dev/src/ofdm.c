@@ -37,7 +37,6 @@
 #include "comp.h"
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
-#include "kiss_fft.h"
 
 /* Concrete definition of 700D parameters */
 const struct OFDM_CONFIG OFDM_CONFIG_700D_C = 
@@ -65,11 +64,6 @@ static int coarse_sync(struct OFDM *, complex float *, int, float *foff_est);
 
 /*
  * QPSK Quadrant bit-pair values - Gray Coded
- *
- *   0.0 -  89.9 = 00
- *  90.0 - 179.9 = 01
- * 180.0 - 269.9 = 11
- * 270.0 - 359.9 = 10
  */
 static const complex float constellation[] = {
      1.0f + 0.0f * I,
@@ -111,8 +105,10 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
         result[row] = 0.0f + 0.0f * I;
 
         for (col = 0; col < (OFDM_NC + 2); col++) {
-            result[row] = result[row] + (vector[col] * (ofdm->W[col][row] / (float) OFDM_M)); /* complex result */
+            result[row] = result[row] + (vector[col] * ofdm->W[col][row]);
         }
+
+        result[row] = result[row] * (1.0f / (float) OFDM_M);
     }
 }
 
@@ -125,7 +121,7 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
         result[col] = 0.0f + 0.0f * I;
 
         for (row = 0; row < OFDM_M; row++) {
-            result[col] = result[col] + (vector[row] * conjf(ofdm->W[col][row])); /* complex result */
+            result[col] = result[col] + (vector[row] * conjf(ofdm->W[col][row]));
         }
     }
 }
@@ -158,15 +154,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
     int Fs = OFDM_FS;
     int SFrame = OFDM_SAMPLESPERFRAME;
-    float corr[Ncorr], av_level;
+    float corr[Ncorr];
     int i, j, k;
 
-    complex float acc =  0.0f + 0.0f * I;
+    float acc = 0.0f;
+
     for (i = 0; i < length; i++) {
         acc += crealf(rx[i]) * crealf(rx[i]) + cimagf(rx[i]) * cimagf(rx[i]);
     }
             
-    av_level = 2.0*sqrt(ofdm->timing_norm*crealf(acc)/length) + 1E-12;
+    float av_level = 2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f;
     
     for (i = 0; i < Ncorr; i++) {
         complex float temp = 0.0f + 0.0f * I;
@@ -177,7 +174,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
             temp = temp + (rx[i + j + SFrame] * csam);
         }
 
-        corr[i] = cabsf(temp)/av_level;
+        corr[i] = cabsf(temp) / av_level;
     }
 
     /* find the max magnitude and its index */
@@ -194,6 +191,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
 
     ofdm->timing_mx = timing_mx;
     ofdm->timing_valid = timing_mx > OFDM_TIMING_MX_THRESH;
+
     if (ofdm->verbose > 1) {
         fprintf(stderr, "   max: %f timing_est: %d timing_valid: %d\n", ofdm->timing_mx, timing_est, ofdm->timing_valid);
     }
@@ -231,7 +229,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
        improve estimate.  Small real 1E-12 term to prevent instability
        with 0 inputs. */
     
-    *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12)/(2.0*M_PI);
+    *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12f) / TAU;
 
     return timing_est;
 }
@@ -407,11 +405,15 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
 
     /* calculate constant used to normalise timing correlation maximum */
 
-    complex float acc =  0.0f + 0.0f * I;
+    float acc = 0.0f;
+
     for (i = 0; i < OFDM_M+OFDM_NCP; i++) {
-        acc += ofdm->pilot_samples[i] * conjf(ofdm->pilot_samples[i]);
+        acc += (crealf(ofdm->pilot_samples[i]) * crealf(ofdm->pilot_samples[i]) +
+            cimagf(ofdm->pilot_samples[i]) * cimagf(ofdm->pilot_samples[i]));
     }
-    ofdm->timing_norm = (OFDM_M + OFDM_NCP) * crealf(acc);
+
+    ofdm->timing_norm = (OFDM_M + OFDM_NCP) * acc;
+
     //fprintf(stderr, "timing_norm: %f\n", ofdm->timing_norm);
     
     return ofdm; /* Success */
@@ -530,6 +532,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
     int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
     int en = st + 2*OFDM_SAMPLESPERFRAME; 
     int ct_est = coarse_sync(ofdm,  &ofdm->rxbuf[st], (en - st), &ofdm->coarse_foff_est_hz);
+
     if (ofdm->verbose) {
         fprintf(stderr, "   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %f\n",
                 ct_est, ofdm->coarse_foff_est_hz, ofdm->timing_valid, ofdm->timing_mx);
@@ -546,8 +549,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
 
        ofdm->sample_point = ofdm->timing_est = 0;
        ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
-    }
-    else {
+    } else {
         ofdm->nin = OFDM_SAMPLESPERFRAME;
     }
 
