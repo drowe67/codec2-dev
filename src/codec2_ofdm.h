@@ -45,15 +45,25 @@ struct OFDM;
 
 /* Constant declarations */
 
+#define OFDM_SEARCHING 1
+#define OFDM_SYNCED    2
+    
 /* Default configuration for '700D' mode */
 const struct OFDM_CONFIG * OFDM_CONFIG_700D;
 
-/* getters */
+/* create and destroy modem states */
 
 struct OFDM *ofdm_create(const struct OFDM_CONFIG * config);
 void ofdm_destroy(struct OFDM *);
+
+/* signal processing */
+
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
+int  ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in);
+
+/* getters */
+    
 int ofdm_get_nin(struct OFDM *);
 int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
