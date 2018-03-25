@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
 
         nin_frame = ofdm_get_nin(ofdm);
 
-        if (sd == 0) {
+        if ((sd == 0) && (state == OFDM_SYNCED)) {
             /* simple hard decision output for uncoded testing */
             for(i=0; i<Nbitsperframe; i++) {
                 rx_bits_char[i] = rx_bits[i];

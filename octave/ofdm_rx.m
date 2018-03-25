@@ -32,7 +32,6 @@ function ofdm_rx(filename, error_pattern_filename)
   Ascale= 2E5*1.1491/2;
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
-  Nframes = 5;
   prx = 1;
 
   % OK re-generate tx frame for BER calcs
@@ -117,6 +116,8 @@ function ofdm_rx(filename, error_pattern_filename)
         Nerrs_log = [Nerrs_log Nerrs];
         Tbits += Nbitsperframe;
       end
+
+      printf("  Nerrs: %d\n", Nerrs);
     end
 
     state = next_state;
