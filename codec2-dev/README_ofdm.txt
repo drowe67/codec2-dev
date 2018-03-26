@@ -6,7 +6,7 @@ Created Mar 2018
 Introduction
 ------------
 
-A 1400 bit/s (nominal uncoded payload data rate) Orthogonal Frequency
+A 1600 bit/s (nominal uncoded payload data rate) Orthogonal Frequency
 Division Multiplexed (OFDM) modem.  Used for digital voice over HF
 SSB.  Designed to be used with a rate 0.5 LDPC code with 700 bit/s
 coded voice.
@@ -24,7 +24,7 @@ Refs
 
 [2] Towards FreeDV 700D, https://www.rowetel.com/?p=5573
 
-[3] FreeDV 700D – First Over The Air Tests, https://www.rowetel.com/?p=5630
+[3] FreeDV 700D - First Over The Air Tests, https://www.rowetel.com/?p=5630
 
 [4] Steve Ports an OFDM modem from Octave to C, https://www.rowetel.com/?p=5824
 
@@ -85,3 +85,4 @@ ofdm_dev - used for modem development, run various simulations
 ofdm_tx  - modulate test frames to a file of sample, cam add channel impairments
 ofdm_rx  - demod from a sample file and count errors
 tofdm    - Compares Octave and C ports of modem
+
