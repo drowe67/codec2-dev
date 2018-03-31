@@ -45,25 +45,10 @@ endfunction
 % samples to determine the most likely timing offset.  Combines two
 % frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
 % Also determines frequency offset at maximimum correlation.  Can be
-% used for acquisition (coarse timing a freq offset), and fine timing
+% used for acquisition (coarse timing and freq offset), and fine
+% timing
 
-#{
-  TODO: 
-    [ ] attempt to speed up sync
-        + tis rather stateless, this current demod, which is nice
-        [ ] 0.5Hz grid and measure BER
-            + so run demod a bunch of times at different offsets
-            + Hmm cld also try +/- 20Hz multiples as it's aliased?
-            + might to use 
-            + need metric for sync, could be callback.
-        [ ] or refine freq offset using pilots
-        [ ] different error measure that 10% maybe soft dec
-            + 10% very high BER
-    [ ] simpler CPU/DFT for freq offset estimation
-        + more suitable for real time implementation
-#}
-
-function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_fs_pilot_samples)
+function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rx, rate_fs_pilot_samples)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -79,14 +64,17 @@ function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_
     
     for i=1:Ncorr
       rx1      = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr(i)  = abs(rx1 * rate_fs_pilot_samples' + rx2 * rate_fs_pilot_samples')/av_level;
+      corr_st  = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
+      corr1(i)  = abs(corr_st + corr_en)/av_level;
+      corr2(i)  = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
-    [timing_mx t_est] = max(corr);
-    timing_valid = timing_mx > timing_mx_thresh;
+    [timing_mx1 t_est] = max(corr1);
+    timing_mx2 = max(corr2);
+    timing_valid = timing_mx1 > timing_mx_thresh;
 
     if verbose > 1
-      printf("   max: %f timing_est: %d timing_valid: %d\n", timing_mx, timing_est, timing_valid);
+      printf("   mx1: %f mx2: %f timing_est: %d timing_valid: %d\n", timing_mx1, timing_mx2, timing_est, timing_valid);
     end
     
     #{
@@ -311,9 +299,9 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   % Attempt coarse timing estimate (i.e. detect start of frame)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-  [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+  [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
   if states.verbose
-    printf("   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %d\n", ct_est, foff_est, timing_valid, timing_mx);
+    printf("   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx1: %f timing_mx2: %f\\n", ct_est, foff_est, timing_valid, timing_mx1, timing_mx2);
   end
 
   if timing_valid
@@ -331,7 +319,8 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     states.nin = Nsamperframe;
   end
   states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
+  states.timing_mx1 = timing_mx1;
+  states.timing_mx2 = timing_mx2;
   states.coarse_foff_est_hz = foff_est;
 endfunction
 
@@ -377,7 +366,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est coarse_foff_est_hz timing_valid timing_mx] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+    [ft_est coarse_foff_est_hz timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
 
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -390,7 +379,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
     
     if verbose > 1
-      printf("  ft_est: %2d timing_est: %2d mx: %3.2f  sample_point: %2d\n", ft_est, timing_est, timing_mx, sample_point);
+      printf("  ft_est: %2d timing_est: %2d mx1: %3.2f mx2: %3.2f sample_point: %2d\n", ft_est, timing_est, timing_mx1, timing_mx2, sample_point);
     end
 
   end
