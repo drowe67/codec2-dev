@@ -106,7 +106,6 @@ struct OFDM {
     complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
-    float w[OFDM_NC + 2];
     
     /* Demodulator data */
 

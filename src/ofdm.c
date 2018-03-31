@@ -307,15 +307,20 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
  * Return NULL on fail
  */
 
-struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
+struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     struct OFDM *ofdm;
-    int i, j;
+    int i, j, n;
 
     if ((ofdm = (struct OFDM *) malloc(sizeof (struct OFDM))) == NULL) {
         return NULL;
     }
 
     /* Copy config structure */
+
+    if (config == NULL) { /* prevent segmentation error */
+        return NULL;
+    }
+
     memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
 
     /* store complex BPSK pilot symbols */
@@ -326,20 +331,14 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG * config) {
 
     /* carrier tables for up and down conversion */
 
-    int Nlower = floorf((OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2)) / OFDM_RS);
+    float lower = OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2);
+    int Nlower = floorf(lower / OFDM_RS);
 
-    for (i = 0, j = Nlower; i < (OFDM_NC + 2); i++, j++) {
-        /*
-         * 2 * pi * j/144  j=19..36
-         * j = 1 kHz to 2 kHz (1.5 kHz center)
-         */
+    for (i = 0, n = Nlower; i < (OFDM_NC + 2); i++, n++) {
+        float w = (TAU * (float) n) / (OFDM_FS / OFDM_RS);
 
-        ofdm->w[i] = TAU * (float) j / (OFDM_FS / OFDM_RS);
-    }
-
-    for (i = 0; i < (OFDM_NC + 2); i++) {
         for (j = 0; j < OFDM_M; j++) {
-            ofdm->W[i][j] = cexpf(I * ofdm->w[i] * j);
+            ofdm->W[i][j] = cexpf(I * w * j);
         }
     }
 
