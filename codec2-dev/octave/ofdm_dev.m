@@ -843,7 +843,7 @@ end
 
 % Run an acquisition test, returning vectors of estimation errors
 
-function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
+function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
 
   Ts = 0.018; 
   sim_in.Tcp = 0.002; 
@@ -870,20 +870,8 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
   rate_fs_pilot_samples = states.rate_fs_pilot_samples;
 
   % test fine or acquisition over test signal
-  #{
-    fine: - start with coarse timing instant
-          - on each frame est timing a few samples about that point
-          - update timing instant
 
-    corr: - where is best plcase to sample
-          - just before end of symbol?
-          - how long should sequence be?
-          - add extra?
-          - aim for last possible moment?
-          - man I hope IL isn't too big.....
-  #}
-
-  delta_ct = []; delta_foff = [];
+  delta_ct = []; delta_foff = []; timing_mx_log = [];
 
   % a fine simulation is a bit like what ofsd_demod() does, just searches a few samples
   % either side of current coarse est
@@ -903,15 +891,15 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
       delta_t = [delta_ft ft_est - ceil(window_width/2)];
     end
   else
-    % for coarse simulation we just use constant window shifts
+    % coarse is like initial acquiistion - we have no idea of timing or freq offset
+    % for coarse we just use constant window shifts to simulate a bunch of trials
 
     st = 0.5*Nsamperframe; 
     en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
     ct_target = Nsamperframe/2;   % actual known position of correct coarse timing
 
     for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-    %for w=1:M+Ncp:length(rx)-4*Nsamperframe
-      [ct_est foff_est] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
+      [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
       if states.verbose
         printf("w: %d ct_est: %4d foff_est: %3.1f\n", w, ct_est, foff_est);
       end
@@ -920,6 +908,7 @@ function [delta_ct delta_foff] = acquisition_test(Ntests=10, EbNodB=100, foff_hz
 
       delta_ct = [delta_ct ct_est-ct_target];
       delta_foff = [delta_foff (foff_est-foff_hz)];
+      timing_mx_log = [timing_mx_log; timing_mx1 timing_mx2];
     end
   end
 
@@ -1000,6 +989,40 @@ function acquisition_histograms(fine_en = 0, foff)
 endfunction
 
 
+% Used to develop sync state machine - in particular metric to show we
+% are out of sync of have lost nodem signal
+
+function sync_metrics()
+  Fs      = 8000;
+  Ntests  = 10;
+  f_offHz = [0 0.5 1 2 5 10];
+  EbNodB  = [0 2 4 6 10 20];
+
+  figure(1); clf;
+  
+  for f = 1:length(f_offHz)
+    af_offHz = f_offHz(f);
+    mean_mx1_log = mean_mx2_log = [];
+    for e = 1:length(EbNodB)
+      aEbNodB = EbNodB(e);
+      [dct dfoff timing_mx_log] = acquisition_test(Ntests, aEbNodB, af_offHz);
+      mean_mx1 = mean(timing_mx_log(:,1));
+      mean_mx2 = mean(timing_mx_log(:,2));
+      printf("f_offHz: %3.2f EbNodB: %3.2f mx1: %3.2f mx2: %3.2f\n", af_offHz, aEbNodB, mean_mx1, mean_mx2);
+      mean_mx1_log = [mean_mx1_log mean_mx1]; mean_mx2_log = [mean_mx2_log mean_mx2];
+    end
+    if f == 2, hold on, end;
+    leg1 = sprintf("b+-;mx1 f_offHz %3.2f;", af_offHz);
+    leg2 = sprintf("g*-;mx2 f_offHz %3.2f;", af_offHz);
+    plot(EbNodB, mean_mx1_log, leg1)
+    plot(EbNodB, mean_mx2_log, leg2)
+  end
+  hold off;
+  xlabel('Eb/No (dB');
+  ylabel('Coefficient')
+endfunction
+
+
 % ---------------------------------------------------------
 % choose simulation to run here 
 % ---------------------------------------------------------
@@ -1007,10 +1030,11 @@ endfunction
 format;
 more off;
 
-init_cml('/home/david/Desktop/cml/');
+%init_cml('/home/david/Desktop/cml/');
 
-run_single 
+%run_single 
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
 %acquisition_test(10, 4, 5)
+sync_metrics
