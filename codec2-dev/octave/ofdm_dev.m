@@ -424,26 +424,28 @@ function [sim_out rx states] = run_sim(sim_in)
 
     % print results of this simulation point to the console
 
-    if ldpc_en || diversity_en
-      printf("Coded EbNodB: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
-              EbNodB(nn), Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, 
-              Tpacketerrs_coded/Tpackets_coded, Tpackets_coded, Tpacketerrs_coded);
+    if verbose
+      if ldpc_en || diversity_en
+        printf("Coded EbNodB: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
+                EbNodB(nn), Terrs_coded/(Nbits*rate), Nbits*rate, Terrs_coded, 
+                Tpacketerrs_coded/Tpackets_coded, Tpackets_coded, Tpacketerrs_coded);
+      end
+      EbNodB_raw = EbNodB(nn) + 10*log10(rate);
+      printf("Raw EbNodB..: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
+             EbNodB_raw, Terrs/Nbits, Nbits, Terrs,
+             Tpacketerrs/Tpackets, Tpackets, Tpacketerrs);
+
+      % returns results for plotting curves
+
+      if ldpc_en || diversity_en
+        sim_out.ber(nn) = Terrs_coded/(Nbits*rate); 
+        sim_out.per(nn) = Tpacketerrs_coded/Tpackets_coded; 
+      else
+        sim_out.ber(nn) = Terrs/Nbits; 
+        sim_out.per(nn) = Tpacketerrs/Tpackets; 
+      end
     end
-    EbNodB_raw = EbNodB(nn) + 10*log10(rate);
-    printf("Raw EbNodB..: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
-           EbNodB_raw, Terrs/Nbits, Nbits, Terrs,
-           Tpacketerrs/Tpackets, Tpackets, Tpacketerrs);
-
-    % returns results for plotting curves
-
-    if ldpc_en || diversity_en
-      sim_out.ber(nn) = Terrs_coded/(Nbits*rate); 
-      sim_out.per(nn) = Tpacketerrs_coded/Tpackets_coded; 
-    else
-      sim_out.ber(nn) = Terrs/Nbits; 
-      sim_out.per(nn) = Tpacketerrs/Tpackets; 
-    end
-
+    
     % Optional plots, mostly used with run-single
 
     if verbose
@@ -862,7 +864,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   
   [sim_out rx states] = run_sim(sim_in);
   
-  states.verbose = 0;
+  states.verbose = 2;
   
   % set up acquistion 
 
@@ -899,9 +901,9 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
     ct_target = Nsamperframe/2;   % actual known position of correct coarse timing
 
     for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-      [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rx(w+st:w+en), rate_fs_pilot_samples);
+      [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
       if states.verbose
-        printf("w: %d ct_est: %4d foff_est: %3.1f\n", w, ct_est, foff_est);
+        printf("w: %5d ct_est: %4d foff_est: %5.1f timing_mx1: %3.2f timing_mx2: %3.2f\n", w, ct_est, foff_est, timing_mx1, timing_mx2);
       end
 
       % valid coarse timing ests are modulo Nsamperframe
@@ -989,37 +991,87 @@ function acquisition_histograms(fine_en = 0, foff)
 endfunction
 
 
-% Used to develop sync state machine - in particular metric to show we
-% are out of sync of have lost nodem signal
+% Used to develop sync state machine - in particular a metric to show
+% we are out of sync, or have sync with a bad freq offset est, or have
+% lost nodem signal
 
-function sync_metrics()
+function sync_metrics(x_axis = 'EbNo')
   Fs      = 8000;
-  Ntests  = 10;
-  f_offHz = [0 0.5 1 2 5 10];
-  EbNodB  = [0 2 4 6 10 20];
+  Ntests  = 4;
+  f_offHz = [-25:25];
+  EbNodB  = [-10 4 20];
 
-  figure(1); clf;
-  
+  mean_mx1_log = mean_mx2_log = mean_dfoff_log = [];
   for f = 1:length(f_offHz)
     af_offHz = f_offHz(f);
-    mean_mx1_log = mean_mx2_log = [];
+    mean_mx1_row = mean_mx2_row = mean_dfoff_row = [];
     for e = 1:length(EbNodB)
       aEbNodB = EbNodB(e);
       [dct dfoff timing_mx_log] = acquisition_test(Ntests, aEbNodB, af_offHz);
       mean_mx1 = mean(timing_mx_log(:,1));
       mean_mx2 = mean(timing_mx_log(:,2));
-      printf("f_offHz: %3.2f EbNodB: %3.2f mx1: %3.2f mx2: %3.2f\n", af_offHz, aEbNodB, mean_mx1, mean_mx2);
-      mean_mx1_log = [mean_mx1_log mean_mx1]; mean_mx2_log = [mean_mx2_log mean_mx2];
+      printf("f_offHz: %5.2f EbNodB: % 6.2f mx1: %3.2f mx2: %3.2f\n", af_offHz, aEbNodB, mean_mx1, mean_mx2);
+      mean_mx1_row = [mean_mx1_row mean_mx1]; mean_mx2_row = [mean_mx2_row mean_mx2];
+      mean_dfoff_row = [mean_dfoff_row mean(dfoff)];
     end
-    if f == 2, hold on, end;
-    leg1 = sprintf("b+-;mx1 f_offHz %3.2f;", af_offHz);
-    leg2 = sprintf("g*-;mx2 f_offHz %3.2f;", af_offHz);
-    plot(EbNodB, mean_mx1_log, leg1)
-    plot(EbNodB, mean_mx2_log, leg2)
+    mean_mx1_log = [mean_mx1_log; mean_mx1_row]; mean_mx2_log = [mean_mx2_log; mean_mx2_row];
+    mean_dfoff_log = [mean_dfoff_log; mean_dfoff_row];
   end
-  hold off;
-  xlabel('Eb/No (dB');
-  ylabel('Coefficient')
+
+  figure(1); clf;
+  if strcmp(x_axis,'EbNo')
+    for f = 1:length(f_offHz)
+      if f == 2, hold on, end;
+      leg1 = sprintf("b+-;mx1 %4.1f Hz;", f_offHz(f));
+      plot(EbNodB, mean_mx1_log(f,:), leg1)
+    end
+    for f = 1:length(f_offHz)
+      leg2 = sprintf("g*-;mx2 %4.1f Hz;", f_offHz(f));
+      plot(EbNodB, mean_mx2_log(f,:), leg2)
+    end
+    hold off;
+    xlabel('Eb/No (dB)');
+    ylabel('Coefficient')
+    title('Pilot Correlation Metric 1 and 2 against Eb/No for different Freq Offsets');
+    legend("location", "northwest"); legend("boxoff");
+    axis([min(EbNodB) max(EbNodB) 0 1.2])
+    print('-deps', '-color', "ofdm_dev_pilot_correlation_ebno.eps")
+  end
+
+  if strcmp(x_axis,'freq')
+    % x axis is freq
+    for e = 1:length(EbNodB)
+      if e == 2, hold on, end;
+      leg1 = sprintf("b+-;mx1 %3.0f dB;", EbNodB(e));
+      plot(f_offHz, mean_mx1_log(:,e), leg1)
+    end
+    for e = 1:length(EbNodB)
+      leg2 = sprintf("g*-;mx2 %3.0f dB;", EbNodB(e));
+      plot(f_offHz, mean_mx2_log(:,e), leg2)
+    end
+    hold off;
+    xlabel('freq offset (Hz)');
+    ylabel('Coefficient')
+    title('Pilot Correlation Metric 1 and 2 against Freq Offset for different Eb/No dB');
+    legend("location", "northwest"); legend("boxoff");
+    axis([min(f_offHz) max(f_offHz) 0 1.2])
+    print('-deps', '-color', "ofdm_dev_pilot_correlation_freq.eps")
+
+    mean_dfoff_log
+ 
+    figure(2);
+    for e = 1:length(EbNodB)
+      if e == 2, hold on, end;
+      leg1 = sprintf("+-;mx1 %3.0f dB;", EbNodB(e));
+      plot(f_offHz, mean_dfoff_log(:,e), leg1)
+    end
+    hold off;
+    xlabel('freq offset (Hz)');
+    ylabel('Mean Freq Est Error')
+    title('Freq Est Error against Freq Offset for different Eb/No dB');
+    axis([min(f_offHz) max(f_offHz) -5 5])
+  end
+  
 endfunction
 
 
@@ -1036,5 +1088,5 @@ more off;
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
-%acquisition_test(10, 4, 5)
-sync_metrics
+acquisition_test(Ntests=3, EbNodB=100, foff_hz=0)
+%sync_metrics('freq')

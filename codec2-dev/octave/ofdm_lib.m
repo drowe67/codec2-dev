@@ -70,10 +70,10 @@ function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(state
     end
 
     [timing_mx1 t_est] = max(corr1);
-    timing_mx2 = max(corr2);
-    timing_valid = timing_mx1 > timing_mx_thresh;
-
-    if verbose > 1
+    [timing_mx2 t_est] = max(corr2);
+    timing_valid = timing_mx2 > timing_mx_thresh;
+    
+    if verbose > 2
       printf("   mx1: %f mx2: %f timing_est: %d timing_valid: %d\n", timing_mx1, timing_mx2, timing_est, timing_valid);
     end
     
@@ -93,10 +93,9 @@ function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(state
       foff_est = foff_est_pos - 1;
     else
       foff_est = foff_est_neg - fmax - 1;
-    end
-    
+    end    
     #}
-
+    
     p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
     p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
@@ -104,22 +103,44 @@ function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(state
     Fs1 = Fs/(Npsam/2);
     foff_est = Fs1*angle( (conj(p1)*p2 + conj(p3)*p4))/(2*pi);
     
+    
     if verbose > 1
-      %printf("t_est: %d\n", t_est);
       figure(7); clf;
-      plot(abs(corr))
+      plot(abs(corr2))
+
+      figure(8)
+      subplot(211)
+      plot(real(rate_fs_pilot_samples))
+      hold on; plot(real(rx(t_est:t_est+Npsam-1)),'g'); hold off
+      subplot(212)
+      plot(imag(rate_fs_pilot_samples))
+      hold on; plot(imag(rx(t_est:t_est+Npsam-1)),'g'); hold off
+
+      figure(9)
+      dp = rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples);
+      subplot(211); plot(real(dp));
+      subplot(212); plot(imag(dp));
+
+      figure(10)
+      plot(dp,'+')
+      
+      figure(11)
+      plot([p1 p2; p3 p4], '+')
+      
       %axis([1 Ncorr 0 2])
       #{
       figure(8)
       plot(C)
       axis([0 200 0 0.4])
       #}
+      #{
       figure(9)
       %rate_fs_pilot_samples
       plot([p1 p2 p3 p4] ,'b+')
       %plot(rate_fs_pilot_samples * rate_fs_pilot_samples' ,'b+')
       axis([-0.2 0.2 -0.2 0.2])
       %hold on; plot(rx(t_est+Nsamperframe:t_est+Npsam+Nsamperframe-1) .* rate_fs_pilot_samples','g+'); hold off;
+      #}
     end
 
 endfunction
@@ -186,7 +207,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.foff_est_en = 1;
   states.phase_est_en = 1;
 
-  states.foff_est_gain = 0.01;
+  states.foff_est_gain = 0.05;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -300,8 +321,8 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
   [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
-  if states.verbose
-    printf("   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx1: %f timing_mx2: %f\\n", ct_est, foff_est, timing_valid, timing_mx1, timing_mx2);
+  if verbose
+    printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f\n", timing_mx1, timing_mx2, foff_est);
   end
 
   if timing_valid
@@ -318,6 +339,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   else
     states.nin = Nsamperframe;
   end
+  
   states.timing_valid = timing_valid;
   states.timing_mx1 = timing_mx1;
   states.timing_mx2 = timing_mx2;
@@ -379,7 +401,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
     
     if verbose > 1
-      printf("  ft_est: %2d timing_est: %2d mx1: %3.2f mx2: %3.2f sample_point: %2d\n", ft_est, timing_est, timing_mx1, timing_mx2, sample_point);
+      printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f foff: %4.1f\n", timing_mx1, timing_mx2, coarse_foff_est_hz, foff_est_hz);
     end
 
   end
@@ -504,7 +526,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.rxbuf = rxbuf;
   states.nin = nin;
   states.timing_valid = timing_valid;
-  states.timing_mx = timing_mx;
+  states.timing_mx1 = timing_mx1;
+  states.timing_mx2 = timing_mx2;
   states.timing_est = timing_est;
   states.sample_point = sample_point;
   states.delta_t = delta_t;
