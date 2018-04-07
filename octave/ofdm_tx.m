@@ -93,6 +93,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   % note variance/2 as we are using real() operator, mumble,
   % reflection of -ve freq to +ve, mumble, hand wave
 
+  randn('seed',1);
   noise = sqrt(variance/2)*0.5*randn(1,Nsam);
   rx = real(rx) + noise;
   printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise))+10*log10(4000) - 10*log10(3000));

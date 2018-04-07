@@ -4,17 +4,6 @@
 % OFDM file based rx to unit test core OFDM modem.  See also
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
-#{
-  TODO:
-    [X] single frame based sync state machine
-        + that doesn't depend on payload data
-    [ ] make robust to fading
-        + what are win conditions?
-        + when to resync?
-        + how long to hang on?
-    [ ] bring into line with C version, e.g. how test bits are fed in
-    [ ] audio levels in 16 bit shorts compatable with other modes
-#}
 
 function ofdm_rx(filename, error_pattern_filename)
   ofdm_lib;
@@ -25,7 +14,7 @@ function ofdm_rx(filename, error_pattern_filename)
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-  states.verbose = 1;
+  states.verbose = 2;
 
   % load real samples from file
 
@@ -55,8 +44,9 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
 
-  state = 'searching'; frame_count = 0;
-
+  state = 'searching'; frame_count = 0; Nerrs = 0; sync_counter = 0;
+  states.timing_mx1 = states.timing_mx2 = 1;
+  
   % main loop ----------------------------------------------------------------
 
   for f=1:Nframes
@@ -73,7 +63,8 @@ function ofdm_rx(filename, error_pattern_filename)
     end
     prx += states.nin;
 
-    printf("f: %d state: %s nin: %d\n", f, state, nin);
+    ratio = states.timing_mx1/states.timing_mx2;
+    printf("f: %2d state: %-10s ratio: %3.2f %1d nin: %d Nerrs: %3d", f, state, ratio,  sync_counter, nin, Nerrs);
  
     % If looking for sync: check raw BER on frame just received
     % against all possible positions in the interleaver frame.
@@ -85,22 +76,28 @@ function ofdm_rx(filename, error_pattern_filename)
     if strcmp(state,'searching') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
 
-      if timing_valid
-        next_state = 'synced';
+      if states.timing_valid
+        woff_est = 2*pi*states.foff_est_hz/Fs;
+        st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
+        [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
+        if states.verbose > 1
+          printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f\n", timing_mx1, timing_mx2, foff_est);
+        end
+        %states.foff_est_hz += foff_est;
+        states.foff_est_hz = 0;
+        sync_counter = 0;
+        next_state = 'trial_sync';
       end
     end
         
-    if strcmp(state,'synced')
+    if strcmp(state,'synced') || strcmp(state,'trial_sync')
 
-      printf("  states.nin: %d\n", states.nin);
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
 
       errors = xor(tx_bits, rx_bits);
       Nerrs = sum(errors);
       aber = Nerrs/Nbitsperframe;
     
-      frame_count++;
-     
       % we are in sync so log states
 
       rx_np_log = [rx_np_log arx_np];
@@ -111,21 +108,60 @@ function ofdm_rx(filename, error_pattern_filename)
 
       % measure uncoded bit errors on modem frame
 
-      if aber < 0.2
-        Terrs += Nerrs;
-        Nerrs_log = [Nerrs_log Nerrs];
-        Tbits += Nbitsperframe;
+      Nerrs_log = [Nerrs_log Nerrs];
+      Terrs += Nerrs;
+      Tbits += Nbitsperframe;
+
+      frame_count++;
+
+      % during trial sync we don't tolerate errors so much
+      
+      if frame_count == 3
+        next_state = 'synced';
+      end
+      if strcmp(state,'synced')
+        sync_counter_thresh = 6;
+      else
+        sync_counter_thresh = 2;
       end
 
-      printf("  Nerrs: %d\n", Nerrs);
+      % freq offset est may be too far out, and has aliases every 1/Ts
+      
+      if (states.timing_mx1/states.timing_mx2 < 0.8)  || (abs(states.coarse_foff_est_hz) > 3)
+        sync_counter++;
+        #{
+        if sync_counter == sync_counter_thresh
+          next_state = 'searching';
+          sync_counter = Nerrs = 0;
+
+          % print error stats for this sync period
+          
+          printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
+
+          % reset BER stats
+          
+          Terrs = Tbits = frame_count = 0;
+        end
+        #}
+      else
+        sync_counter = 0;
+      end
     end
-
+    
     state = next_state;
-
   end
 
-  printf("BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
+  printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
 
+  % If we have enough frames, calc BER discarding first few frames where freq
+  % offset is adjusting
+
+  Ndiscard = 20;
+  if frame_count > Ndiscard
+    Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard;
+    printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
+  end
+  
   figure(1); clf; 
   plot(rx_np_log,'+');
   mx = 2*max(abs(rx_np_log));
