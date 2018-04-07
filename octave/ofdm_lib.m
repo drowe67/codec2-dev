@@ -48,7 +48,7 @@ endfunction
 % used for acquisition (coarse timing and freq offset), and fine
 % timing
 
-function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rx, rate_fs_pilot_samples)
+function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_fs_pilot_samples)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -63,47 +63,25 @@ function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(state
     % correlate with pilots at start and end of frame to determine timing offset
     
     for i=1:Ncorr
-      rx1      = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr_st  = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
-      corr1(i)  = abs(corr_st + corr_en)/av_level;
-      corr2(i)  = (abs(corr_st) + abs(corr_en))/av_level;
+      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
+      corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
+      corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
-    [timing_mx1 t_est] = max(corr1);
-    [timing_mx2 t_est] = max(corr2);
-    timing_valid = timing_mx2 > timing_mx_thresh;
+    [timing_mx t_est] = max(corr);
+    timing_valid = timing_mx > timing_mx_thresh;
     
     if verbose > 2
-      printf("   mx1: %f mx2: %f timing_est: %d timing_valid: %d\n", timing_mx1, timing_mx2, timing_est, timing_valid);
+      printf("   mx: %f timing_est: %d timing_valid: %d\n", timing_mx, t_est, timing_valid);
     end
-    
-    #{
-    % original freq offset est code that never made it into C.  Have some concerns about CPU
-    % load of performing FFT, althout a smaller one could have been used with interpolation
-    % to get the peak
-    
-    C  = abs(fft(rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
-    C += abs(fft(rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1) .* conj(rate_fs_pilot_samples), Fs));
-
-    fmax = 30;
-    [mx_pos foff_est_pos] = max(C(1:fmax));
-    [mx_neg foff_est_neg] = max(C(Fs-fmax+1:Fs));
-
-    if mx_pos > mx_neg
-      foff_est = foff_est_pos - 1;
-    else
-      foff_est = foff_est_neg - fmax - 1;
-    end    
-    #}
-    
+        
     p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
     p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p4 = rx(t_est+Nsamperframe+Npsam/2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
     Fs1 = Fs/(Npsam/2);
     foff_est = Fs1*angle( (conj(p1)*p2 + conj(p3)*p4))/(2*pi);
-    
-    
+        
     if verbose > 1
       figure(7); clf;
       plot(abs(corr2))
@@ -127,20 +105,6 @@ function [t_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(state
       figure(11)
       plot([p1 p2; p3 p4], '+')
       
-      %axis([1 Ncorr 0 2])
-      #{
-      figure(8)
-      plot(C)
-      axis([0 200 0 0.4])
-      #}
-      #{
-      figure(9)
-      %rate_fs_pilot_samples
-      plot([p1 p2 p3 p4] ,'b+')
-      %plot(rate_fs_pilot_samples * rate_fs_pilot_samples' ,'b+')
-      axis([-0.2 0.2 -0.2 0.2])
-      %hold on; plot(rx(t_est+Nsamperframe:t_est+Npsam+Nsamperframe-1) .* rate_fs_pilot_samples','g+'); hold off;
-      #}
     end
 
 endfunction
@@ -320,9 +284,9 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   % Attempt coarse timing estimate (i.e. detect start of frame)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-  [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+  [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
   if verbose
-    printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f\n", timing_mx1, timing_mx2, foff_est);
+    printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
 
   if timing_valid
@@ -341,8 +305,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   end
   
   states.timing_valid = timing_valid;
-  states.timing_mx1 = timing_mx1;
-  states.timing_mx2 = timing_mx2;
+  states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
 endfunction
 
@@ -388,7 +351,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est coarse_foff_est_hz timing_valid timing_mx1 timing_mx2] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+    [ft_est coarse_foff_est_hz timing_valid timing_mx] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
 
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -401,7 +364,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
     
     if verbose > 1
-      printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f foff: %4.1f\n", timing_mx1, timing_mx2, coarse_foff_est_hz, foff_est_hz);
+      printf("  ft_est: %2d mx: %3.2f coarse_foff: %4.1f foff: %4.1f\n", ft_est, timing_mx, coarse_foff_est_hz, foff_est_hz);
     end
 
   end
@@ -526,8 +489,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.rxbuf = rxbuf;
   states.nin = nin;
   states.timing_valid = timing_valid;
-  states.timing_mx1 = timing_mx1;
-  states.timing_mx2 = timing_mx2;
+  states.timing_mx = timing_mx;
   states.timing_est = timing_est;
   states.sample_point = sample_point;
   states.delta_t = delta_t;

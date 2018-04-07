@@ -11,10 +11,10 @@ function ofdm_rx(filename, error_pattern_filename)
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
+  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-  states.verbose = 2;
+  states.verbose = 0;
 
   % load real samples from file
 
@@ -44,7 +44,7 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
 
-  state = 'searching'; frame_count = 0; Nerrs = 0; sync_counter = 0;
+  state = 'searching'; frame_count = 0; Nerrs = 0; sync_counter = 0; uw_errors = 0;
   states.timing_mx1 = states.timing_mx2 = 1;
   
   % main loop ----------------------------------------------------------------
@@ -62,13 +62,7 @@ function ofdm_rx(filename, error_pattern_filename)
       rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
     end
     prx += states.nin;
-
-    ratio = states.timing_mx1/states.timing_mx2;
-    printf("f: %2d state: %-10s ratio: %3.2f %1d nin: %d Nerrs: %3d", f, state, ratio,  sync_counter, nin, Nerrs);
  
-    % If looking for sync: check raw BER on frame just received
-    % against all possible positions in the interleaver frame.
-
     % iterate state machine ------------------------------------
 
     next_state = state;
@@ -77,14 +71,8 @@ function ofdm_rx(filename, error_pattern_filename)
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
 
       if states.timing_valid
-        woff_est = 2*pi*states.foff_est_hz/Fs;
-        st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-        [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
-        if states.verbose > 1
-          printf("  mx1: %3.2f mx2: %3.2f coarse_foff: %4.1f\n", timing_mx1, timing_mx2, foff_est);
-        end
-        %states.foff_est_hz += foff_est;
-        states.foff_est_hz = 0;
+        Nerrs_log = [];
+        Terrs = Tbits = frame_count = 0;
         sync_counter = 0;
         next_state = 'trial_sync';
       end
@@ -126,28 +114,21 @@ function ofdm_rx(filename, error_pattern_filename)
       end
 
       % freq offset est may be too far out, and has aliases every 1/Ts
-      
-      if (states.timing_mx1/states.timing_mx2 < 0.8)  || (abs(states.coarse_foff_est_hz) > 3)
+
+      uw_len = (Ns-1)*bps;
+      uw_errors = sum(xor(tx_bits(1:uw_len), rx_bits(1:uw_len)));
+      if (uw_errors > 3)
         sync_counter++;
-        #{
         if sync_counter == sync_counter_thresh
           next_state = 'searching';
           sync_counter = Nerrs = 0;
-
-          % print error stats for this sync period
-          
-          printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
-
-          % reset BER stats
-          
-          Terrs = Tbits = frame_count = 0;
         end
-        #}
       else
         sync_counter = 0;
       end
     end
     
+    printf("f: %2d state: %-10s uw_errors: %2d %1d nin: %d Nerrs: %3d foff: %3.1f\n", f, state, uw_errors, sync_counter, nin, Nerrs,states.foff_est_hz);
     state = next_state;
   end
 
