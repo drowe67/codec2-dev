@@ -22,7 +22,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
+  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
@@ -46,7 +46,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   variance = 1/(M*EsNo/2);
   woffset = 2*pi*freq_offset_Hz/Fs;
 
-  SNRdB = EbNodB + 10*log10(700/3000);
+  SNRdB = EbNodB + 10*log10(Nc*bps*Rs/3000);
   printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
