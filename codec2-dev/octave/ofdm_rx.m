@@ -71,6 +71,12 @@ function ofdm_rx(filename, error_pattern_filename)
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
 
       if states.timing_valid
+        st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
+        woff_est = 2*pi*states.foff_est_hz/Fs;
+        [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
+        printf("  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", states.foff_est_hz, foff_est, states.foff_est_hz+foff_est);
+        states.foff_est_hz += foff_est;
+        
         Nerrs_log = [];
         Terrs = Tbits = frame_count = 0;
         sync_counter = 0;
@@ -110,7 +116,7 @@ function ofdm_rx(filename, error_pattern_filename)
       if strcmp(state,'synced')
         sync_counter_thresh = 6;
       else
-        sync_counter_thresh = 2;
+        sync_counter_thresh = 3;
       end
 
       % freq offset est may be too far out, and has aliases every 1/Ts
