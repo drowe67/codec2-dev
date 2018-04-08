@@ -79,12 +79,13 @@ function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_
     p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
     p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p4 = rx(t_est+Nsamperframe+Npsam/2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
+   
     Fs1 = Fs/(Npsam/2);
-    foff_est = Fs1*angle( (conj(p1)*p2 + conj(p3)*p4))/(2*pi);
+    foff_est = Fs1*angle(conj(p1)*p2 + conj(p3)*p4)/(2*pi);
         
     if verbose > 1
       figure(7); clf;
-      plot(abs(corr2))
+      plot(abs(corr))
 
       figure(8)
       subplot(211)

@@ -901,16 +901,16 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
     ct_target = Nsamperframe/2;   % actual known position of correct coarse timing
 
     for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-      [ct_est foff_est timing_valid timing_mx1 timing_mx2] = coarse_sync(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
+      [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
       if states.verbose
-        printf("w: %5d ct_est: %4d foff_est: %5.1f timing_mx1: %3.2f timing_mx2: %3.2f\n", w, ct_est, foff_est, timing_mx1, timing_mx2);
+        printf("w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f\n", w, ct_est, foff_est, timing_mx);
       end
 
       % valid coarse timing ests are modulo Nsamperframe
 
       delta_ct = [delta_ct ct_est-ct_target];
       delta_foff = [delta_foff (foff_est-foff_hz)];
-      timing_mx_log = [timing_mx_log; timing_mx1 timing_mx2];
+      timing_mx_log = [timing_mx_log; timing_mx];
     end
   end
 
