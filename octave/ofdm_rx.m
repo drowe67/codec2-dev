@@ -27,7 +27,8 @@ function ofdm_rx(filename, error_pattern_filename)
 
   rand('seed', 1);
   tx_bits = round(rand(1,Nbitsperframe));
-
+  tx_bits(1:states.uw_len) = 0;   % insert UW
+ 
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
@@ -44,8 +45,16 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
 
-  state = 'searching'; frame_count = 0; Nerrs = 0; sync_counter = 0; uw_errors = 0;
-  states.timing_mx1 = states.timing_mx2 = 1;
+  states.sync_state = states.last_sync_state = 'searching';
+  states.uw_errors = 0;
+  states.sync_counter = 0;
+  states.sync_frame_count = 0;
+  states.sync_start = 0;
+  states.sync_end = 0;
+  
+  states.verbose = 1;
+
+  Nerrs = 0; rx_uw = zeros(1,states.uw_len);
   
   % main loop ----------------------------------------------------------------
 
@@ -63,31 +72,14 @@ function ofdm_rx(filename, error_pattern_filename)
     end
     prx += states.nin;
  
-    % iterate state machine ------------------------------------
-
-    next_state = state;
-
-    if strcmp(state,'searching') 
+    if strcmp(states.sync_state,'searching') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
-
-      if states.timing_valid
-        st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
-        woff_est = 2*pi*states.foff_est_hz/Fs;
-        [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
-        printf("  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", states.foff_est_hz, foff_est, states.foff_est_hz+foff_est);
-        states.foff_est_hz += foff_est;
-        
-        Nerrs_log = [];
-        Terrs = Tbits = frame_count = 0;
-        sync_counter = 0;
-        next_state = 'trial_sync';
-      end
     end
-        
-    if strcmp(state,'synced') || strcmp(state,'trial_sync')
-
+    
+    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-
+      rx_uw = rx_bits(1:states.uw_len);
+      
       errors = xor(tx_bits, rx_bits);
       Nerrs = sum(errors);
       aber = Nerrs/Nbitsperframe;
@@ -107,35 +99,21 @@ function ofdm_rx(filename, error_pattern_filename)
       Tbits += Nbitsperframe;
 
       frame_count++;
-
-      % during trial sync we don't tolerate errors so much
-      
-      if frame_count == 3
-        next_state = 'synced';
-      end
-      if strcmp(state,'synced')
-        sync_counter_thresh = 6;
-      else
-        sync_counter_thresh = 3;
-      end
-
-      % freq offset est may be too far out, and has aliases every 1/Ts
-
-      uw_len = (Ns-1)*bps;
-      uw_errors = sum(xor(tx_bits(1:uw_len), rx_bits(1:uw_len)));
-      if (uw_errors > 3)
-        sync_counter++;
-        if sync_counter == sync_counter_thresh
-          next_state = 'searching';
-          sync_counter = Nerrs = 0;
-        end
-      else
-        sync_counter = 0;
-      end
     end
     
-    printf("f: %2d state: %-10s uw_errors: %2d %1d nin: %d Nerrs: %3d foff: %3.1f\n", f, state, uw_errors, sync_counter, nin, Nerrs,states.foff_est_hz);
-    state = next_state;
+    states = sync_state_machine(states, rx_uw);
+
+    if states.verbose
+      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %3.1f\n",
+             f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, states.foff_est_hz);
+    end
+
+    % act on any events returned by state machine
+    
+    if states.sync_start
+      Nerrs_log = [];
+      Terrs = Tbits = frame_count = 0;
+    end
   end
 
   printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
