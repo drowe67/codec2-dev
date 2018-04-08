@@ -86,3 +86,23 @@ ofdm_tx  - modulate test frames to a file of sample, cam add channel impairments
 ofdm_rx  - demod from a sample file and count errors
 tofdm    - Compares Octave and C ports of modem
 
+Specifications (Nominal FreeDV 700D configuration)
+--------------------------------------------------
+
+Modem.........: OFDM, pilot assisted coherent QPSK
+Payload bits/s: 700
+Text bits/s...: 25
+Unique Word...: 10 bits
+Carriers......: 17
+Symbol period.: 18ms
+Cyclic Prefix.: 2ms
+Pilot rate....: 1 in every 8 symbols
+Frame Period..: 160ms
+FEC...........: rate 1/2 (224,112) LDPC
+Operating point
+  AWGN........: Eb/No -0.5dB SNR(3000Hz): -2.5dB
+  HF Multipath: Eb/No  4.0dB SNR(3000Hz):  2.0dB
+Frequency offset for acquisition: +/- 20 Hz
+
+Notes:
+  1/ HF Multipath is two path, 1Hz Doppler, 1ms delay
