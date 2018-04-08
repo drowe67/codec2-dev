@@ -136,6 +136,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
+  states.uw_len = (Ns-1)*bps;
 
   % generate same pilots each time
 
@@ -523,4 +524,64 @@ function test_bits_ofdm_file
   fprintf(f,"  %d\n};\n",test_bits_ofdm(length(test_bits_ofdm)));
   fclose(f);
 
+endfunction
+
+
+% iterate state machine ------------------------------------
+
+function states = sync_state_machine(states, rx_uw)
+  ofdm_load_const;
+  next_state = states.sync_state;
+  states.sync_start = states.sync_end = 0;
+  
+  if strcmp(states.sync_state,'searching') 
+
+    if states.timing_valid
+
+      % freq offset est has some bias, but this refinement step fixes bias
+
+      st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
+      woff_est = 2*pi*states.foff_est_hz/Fs;
+      [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
+      if verbose
+        printf("  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", states.foff_est_hz, foff_est, states.foff_est_hz+foff_est);
+      end
+      states.foff_est_hz += foff_est;
+      states.frame_count = 0;
+      states.sync_counter = 0;
+      states.sync_start = 1;
+      next_state = 'trial_sync';
+    end
+  end
+        
+  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
+
+    states.frame_count++;
+      
+    % during trial sync we don't tolerate errors so much
+      
+    if states.frame_count == 3
+      next_state = 'synced';
+    end
+    if strcmp(states.sync_state,'synced')
+      sync_counter_thresh = 6;
+    else
+      sync_counter_thresh = 3;
+    end
+
+    % freq offset est may be too far out, and has aliases every 1/Ts
+
+    states.uw_errors = sum(rx_uw);
+    if (states.uw_errors > 3)
+      states.sync_counter++;
+      if states.sync_counter == sync_counter_thresh
+        next_state = 'searching';
+      end
+    else
+      states.sync_counter = 0;
+    end
+  end
+
+  states.last_sync_state = states.sync_state;
+  states.sync_state = next_state;
 endfunction

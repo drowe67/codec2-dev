@@ -17,7 +17,7 @@
 #}
 
 
-function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0)
   ofdm_lib;
 
   % init modem
@@ -32,7 +32,8 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   Nframes = floor((Nrows-1)/Ns);
   rand('seed', 1);
   tx_bits = round(rand(1,Nbitsperframe));
-
+  tx_bits(1:states.uw_len) = 0; % insert UW
+  
   tx = [];
   for f=1:Nframes
     tx = [tx ofdm_mod(states, tx_bits)];
@@ -45,7 +46,8 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   EsNo = rate * bps * (10 .^ (EbNodB/10));
   variance = 1/(M*EsNo/2);
   woffset = 2*pi*freq_offset_Hz/Fs;
-
+  dwoffset = 2*pi*dfoff_hz_per_sec/(Fs*Fs);
+  
   SNRdB = EbNodB + 10*log10(Nc*bps*Rs/3000);
   printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
 
@@ -88,7 +90,8 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
     rx *= sqrt(nom_rx_pwr/rx_pwr);
   end
 
-  rx = rx .* exp(j*woffset*(1:Nsam));
+  phase_offset = woffset*(1:Nsam) + 0.5*dwoffset*((1:Nsam).^2);
+  rx = rx .* exp(j*phase_offset);
 
   % note variance/2 as we are using real() operator, mumble,
   % reflection of -ve freq to +ve, mumble, hand wave
