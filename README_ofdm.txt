@@ -95,14 +95,22 @@ Text bits/s...: 25
 Unique Word...: 10 bits
 Carriers......: 17
 Symbol period.: 18ms
-Cyclic Prefix.: 2ms
+Cyclic Prefix.: 2ms (note 1)
 Pilot rate....: 1 in every 8 symbols
 Frame Period..: 160ms
 FEC...........: rate 1/2 (224,112) LDPC
 Operating point
-  AWGN........: Eb/No -0.5dB SNR(3000Hz): -2.5dB
-  HF Multipath: Eb/No  4.0dB SNR(3000Hz):  2.0dB
-Frequency offset for acquisition: +/- 20 Hz
+  AWGN........: Eb/No -0.5dB SNR(3000Hz): -2.5dB (note 2)
+  HF Multipath: Eb/No  4.0dB SNR(3000Hz):  2.0dB (note 3)
+  
+Freq offset.......: +/- 20  Hz   (sync range)
+Freq drift........: +/- 0.2 Hz/s (for 0.5 dB loss)
+Sample clock error: 1000 ppm
 
 Notes:
-  1/ HF Multipath is two path, 1Hz Doppler, 1ms delay
+  1/ Modem can cope with 2ms of multipath
+  2/ Ideal SNR(3000) = Eb/No + 10*log10(Rb/B)
+                     = -1 + 10*log10(1400/3000)
+                     = -4.3 dB,
+     So we have about 2dB overhead for synchronisation and implementation loss.
+  3/ HF Multipath channel used for testing is two path, 1Hz Doppler, 1ms delay
