@@ -32,25 +32,36 @@
 
 #ifndef __HORUS_API__
 
-#define HORUS_MODE_RAW         0
-#define HORUS_MODE_BINARY      1
-#define HORUS_MODE_RTTY        2
+#include <stdint.h>
+#include "modem_stats.h"
+      
+#define HORUS_MODE_BINARY            0
+#define HORUS_MODE_RTTY              1
 
+struct horus;
 struct MODEM_STATS;
 
 struct horus *horus_open  (int mode);
 void          horus_close (struct horus *hstates);
 
-int           horus_nin   (struct horus *hstates);
-int           horus_rx    (struct horus *hstates, char frame_out[], short demod_in[]);
+/* call before horus_rx() to determine how many shorts to pass in */
 
+uint32_t      horus_nin   (struct horus *hstates);
+
+/* returns 1 if ascii_out[] is valid */
+      
+int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_in[]);
+
+/* functions to get information from API  */
+      
 int           horus_get_version              (void);
 int           horus_get_mode                 (struct horus *hstates);
 void          horus_get_modem_stats          (struct horus *hstates, int *sync, float *snr_est);
 void          horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *stats);
 
-int           horus_set_modem (struct horus *hstates, int Rs, int mFSK);
-int           horus_set_raw (struct horus *hstates, int *uw, int nuw_bits, int nbits_per_frame);
+/* how much storage you need for ascii_out[] */
+      
+int           horus_get_max_ascii_out_len    (struct horus *hstates);
 
 #endif
 
