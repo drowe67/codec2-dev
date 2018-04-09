@@ -66,6 +66,28 @@ Built as part of codec2-dev, see README for build instructions.
 
      build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw - | ./ofdm_put_test_bits -
      
+Acceptance Tests
+----------------
+
+The rate 1/2 LPDC code can correct up to about 10% raw BER, so a good
+test is to run the modem at Eb/No operating points that produce just
+less that BER=0.1
+
+The BER2 measure truncates the effect of any start up transients,
+e.g. as the frequency offset is tracked out.
+
+1/ HF Multipath:
+
+  octave:580> ofdm_tx("ofdm_test.raw",60,4,'hf',20,-0.1)
+  octave:581> ofdm_rx("ofdm_test.raw")
+  BER2.: 0.0997 Tbits: 93752 Terrs:  9344
+
+2/ AWGN:
+
+  octave:582> ofdm_tx("ofdm_test.raw",60,0,'awgn')
+  octave:583> ofdm_rx("ofdm_test.raw")
+  BER2.: 0.0827 Tbits: 96846 Terrs:  8008
+
 C Code
 ------
 

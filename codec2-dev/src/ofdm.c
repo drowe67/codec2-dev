@@ -4,12 +4,13 @@
   AUTHORS.....: David Rowe & Steve Sampson
   DATE CREATED: June 2017
 
-  A Library of functions that implement a BPSK/QPSK OFDM modem
+  A Library of functions that implement a QPSK OFDM modem, C port of 
+  the Octave functions in ofdm_lib.m
 
 \*---------------------------------------------------------------------------*/
 
 /*
-  Copyright (C) 2017 David Rowe
+  Copyright (C) 2017/2018 David Rowe
 
   All rights reserved.
 
@@ -378,6 +379,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_mx = 0.0f;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
 
+    /* sync state machine */
+    
+    strcpy(ofdm->sync_state,"searching");
+    strcpy(ofdm->last_sync_state,"searching");
+    ofdm->uw_errors = 0;
+    ofdm->sync_counter = 0;
+    ofdm->frame_count = 0;
+    ofdm->sync_start = 0;
+    ofdm->sync_end = 0;
+    
     /* create the OFDM waveform */
 
     complex float temp[OFDM_M];
@@ -613,7 +624,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
 
         if (ofdm->verbose > 1) {
-            fprintf(stdout, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
+            fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
@@ -933,5 +944,82 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             ofdm->sample_point += tshift;
         }
     }
+}
+
+
+/* iterate state machine ------------------------------------*/
+
+void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
+    char next_state[OFDM_STATE_STR];
+    int  i, j, sync_counter_thresh;
+    
+    strcpy(next_state, ofdm->sync_state);    
+    ofdm->sync_start = ofdm->sync_end = 0;
+  
+    if (strcmp(ofdm->sync_state,"searching") == 0) { 
+
+        if (ofdm->timing_valid) {
+
+            /* freq offset est has some bias, but this refinement step fixes bias */
+
+            int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
+            int en = st + 2*OFDM_SAMPLESPERFRAME; 
+            float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+
+            complex float work[(en - st)];
+
+            for (i = st, j = 0; i < en; i++, j++) {
+                work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
+            }
+
+            float foff_est;
+            coarse_sync(ofdm, work, (en - st), &foff_est);
+            if (ofdm->verbose) {
+                fprintf(stderr, "  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", ofdm->foff_est_hz, foff_est, ofdm->foff_est_hz+foff_est);
+            }
+            ofdm->foff_est_hz += foff_est;
+            ofdm->frame_count = 0;
+            ofdm->sync_counter = 0;
+            ofdm->sync_start = 1;
+            strcpy(next_state, "trial_sync");
+        }
+    }
+
+    if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state, "trial_sync") == 0)) {
+        
+        ofdm->frame_count++;
+      
+        /* during trial sync we don't tolerate errors so much, once we have synced up
+           we are willing to wait out a fade */
+      
+        if (ofdm->frame_count == 3) {
+            strcpy(next_state, "synced");
+        }
+
+        if (strcmp(ofdm->sync_state, "synced") == 0) {
+            sync_counter_thresh = 6;
+        } else {
+            sync_counter_thresh = 3;
+        }
+
+        /* freq offset est may be too far out, and has aliases every 1/Ts, so
+           we use a Unique Word to get a really solid indication of sync. */
+
+        ofdm->uw_errors = 0;
+        for (i=0; i<OFDM_UW_LEN; i++) {
+            ofdm->uw_errors += rx_uw[i]; 
+        }
+        if (ofdm->uw_errors > 2) {
+            ofdm->sync_counter++;
+        }
+        if (ofdm->sync_counter == sync_counter_thresh) {
+            strcpy(next_state, "searching");
+        } else {
+            ofdm->sync_counter = 0;
+        }
+    }
+    
+    strcpy(ofdm->last_sync_state, ofdm->sync_state);
+    strcpy(ofdm->sync_state, next_state);
 }
 
