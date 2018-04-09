@@ -94,6 +94,7 @@ Payload bits/s: 700
 Text bits/s...: 25
 Unique Word...: 10 bits
 Carriers......: 17
+RF bandwidth..: 944 Hz
 Symbol period.: 18ms
 Cyclic Prefix.: 2ms (note 1)
 Pilot rate....: 1 in every 8 symbols
@@ -112,5 +113,6 @@ Notes:
   2/ Ideal SNR(3000) = Eb/No + 10*log10(Rb/B)
                      = -1 + 10*log10(1400/3000)
                      = -4.3 dB,
-     So we have about 2dB overhead for synchronisation and implementation loss.
+     So we have about 1.8dB overhead for synchronisation, implementation loss,
+     and the text channel.
   3/ HF Multipath channel used for testing is two path, 1Hz Doppler, 1ms delay
