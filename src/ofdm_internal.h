@@ -43,7 +43,7 @@ extern "C" {
 
 #define TAU         (2.0f * M_PI)            /* mathematical constant */
 
-#define OFDM_NC     16                       /* N Carriers */
+#define OFDM_NC     17                       /* N Carriers */
 #define OFDM_TS     0.018f                   /* Symbol time */
 #define OFDM_RS     (1.0f / OFDM_TS)         /* Symbol rate */
 #define OFDM_FS     8000.0f                  /* Sample rate */
@@ -64,7 +64,7 @@ extern "C" {
 #define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
 #endif
 
-/* ? */
+/* number of symbols we estimate fine timing over */
 #define OFDM_FTWINDOWWIDTH       11
 /* Bits per frame (duh) */
 #define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
@@ -76,7 +76,17 @@ extern "C" {
 #define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
 #define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
-#define OFDM_TIMING_MX_THRESH 0.3
+#define OFDM_TIMING_MX_THRESH    0.3
+
+/* reserve 4 bits/frame for auxillary text information */
+
+#define OFDM_TXT_LEN             4
+
+/* Unique word, used for positive indication of lock */
+
+#define OFDM_UW_LEN              ((OFDM_NS-1)*OFDM_BPS - OFDM_TXT_LEN)
+
+#define OFDM_STATE_STR           16
     
 /* Dummy struct for now, will contain constant configuration for OFDM modem */
 struct OFDM_CONFIG{
@@ -113,6 +123,16 @@ struct OFDM {
     complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NC];
     float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
     float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
+
+    /* sync state machine */
+
+    char sync_state[OFDM_STATE_STR];
+    char last_sync_state[OFDM_STATE_STR];
+    int uw_errors;
+    int sync_counter;
+    int frame_count;
+    int sync_start;
+    int sync_end;
 };
 
 #ifdef __cplusplus
