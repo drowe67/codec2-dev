@@ -70,7 +70,6 @@ static char uw[] = {'$','$'};
 int32_t get_syndrome(int32_t pattern);
 void golay23_init(void);
 int golay23_decode(int received_codeword);
-unsigned short gen_crc16(unsigned char* data_p, unsigned char length);
 void interleave(unsigned char *inout, int nbytes, int dir);
 void scramble(unsigned char *inout, int nbytes);
 
@@ -785,7 +784,7 @@ int main(void) {
     /* all zeros is nastiest sequence for demod before scrambling */
 
     memset(&input_payload, 0, nbytes);
-    input_payload.Checksum = gen_crc16((unsigned char*)&input_payload, nbytes-2);
+    input_payload.Checksum = horus_l2_gen_crc16((unsigned char*)&input_payload, nbytes-2);
 
     horus_l2_encode_tx_packet(tx, (unsigned char*)&input_payload, nbytes);
     
@@ -846,7 +845,7 @@ int main(void) {
     assert(sizeof(h) == nbytes);
     memcpy(&h, output_payload, nbytes);
 
-    uint16_t crc_rx = gen_crc16(output_payload, nbytes-2);
+    uint16_t crc_rx = horus_l2_gen_crc16(output_payload, nbytes-2);
     char crc_str[80];
     
     if (crc_rx == h.Checksum) {
@@ -1163,7 +1162,7 @@ int golay23_count_errors(int recd_codeword, int corrected_codeword)
 
 // from http://stackoverflow.com/questions/10564491/function-to-calculate-a-crc16-checksum
 
-unsigned short gen_crc16(unsigned char* data_p, unsigned char length){
+unsigned short horus_l2_gen_crc16(unsigned char* data_p, unsigned char length) {
     unsigned char x;
     unsigned short crc = 0xFFFF;
 
