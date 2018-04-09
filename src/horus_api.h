@@ -56,11 +56,14 @@ int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_
       
 int           horus_get_version              (void);
 int           horus_get_mode                 (struct horus *hstates);
+int           horus_get_Fs                   (struct horus *hstates);      
+int           horus_get_mFSK                 (struct horus *hstates);      
 void          horus_get_modem_stats          (struct horus *hstates, int *sync, float *snr_est);
 void          horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *stats);
 
-/* how much storage you need for ascii_out[] */
+/* how much storage you need for demod_in[] and  ascii_out[] */
       
+int           horus_get_max_demod_in         (struct horus *hstates);
 int           horus_get_max_ascii_out_len    (struct horus *hstates);
 
 #endif

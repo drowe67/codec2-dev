@@ -128,7 +128,9 @@ void horus_close (struct horus *hstates) {
 
 uint32_t horus_nin(struct horus *hstates) {
     assert(hstates != NULL);
-    return fsk_nin(hstates->fsk);
+    int nin = fsk_nin(hstates->fsk);
+    assert(nin <= horus_get_max_demod_in(hstates));
+    return nin;
 }
 
 int horus_find_uw(struct horus *hstates) {
@@ -327,6 +329,21 @@ int horus_get_mode(struct horus *hstates) {
     return hstates->mode;
 }
 
+int horus_get_Fs(struct horus *hstates) {
+    assert(hstates != NULL);
+    return hstates->Fs;
+}
+
+int horus_get_mFSK(struct horus *hstates) {
+    assert(hstates != NULL);
+    return hstates->mFSK;
+}
+
+int horus_get_max_demod_in(struct horus *hstates) {
+    /* copied from fsk_demod.c, a nicer fsk_max_nin function would be useful */
+    return sizeof(short)*(hstates->fsk->N + hstates->fsk->Ts*2);
+}
+
 int horus_get_max_ascii_out_len(struct horus *hstates) {
     if (hstates->mode == HORUS_MODE_RTTY) {
         return hstates->max_packet_len/10;     /* 7 bit ASCII, plus 3 sync bits */
@@ -345,15 +362,24 @@ void horus_get_modem_stats(struct horus *hstates, int *sync, float *snr_est) {
 
     *sync = 0;
     
-    /* TODO SNR is actually an Eb/No est for FSK - should we scale
-       Eb/No for SNR in 3kHz? */       
+    /* SNR scaled from Eb/No est returned by FSK to SNR in 3000 Hz */
 
     fsk_get_demod_stats(hstates->fsk, &stats);
-    *snr_est = stats.snr_est;
+    *snr_est = stats.snr_est + 10*log10(hstates->Rs/3000);
 }
 
 void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *stats) {
+    int i;
+    
     assert(hstates != NULL);
+
     fsk_get_demod_stats(hstates->fsk, stats);
+
+    stats->snr_est = stats->snr_est + 10*log10(hstates->Rs/3000);
+
+    assert(hstates->mFSK <= MODEM_STATS_MAX_F_EST);
+    for (i=0; i<hstates->mFSK; i++) {
+        stats->f_est[i] = hstates->fsk->f_est[i];
+    }
 }
 
