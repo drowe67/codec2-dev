@@ -136,7 +136,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.uw_len = (Ns-1)*bps;
+  states.txt_len = 4;   % reserve 4 bits/frame for auxillary text information
+  states.uw_len = (Ns-1)*bps - states.txt_len;
 
   % generate same pilots each time
 
@@ -558,7 +559,8 @@ function states = sync_state_machine(states, rx_uw)
 
     states.frame_count++;
       
-    % during trial sync we don't tolerate errors so much
+    % during trial sync we don't tolerate errors so much, once we have synced up
+    % we are willing to wait out a fade
       
     if states.frame_count == 3
       next_state = 'synced';
@@ -569,10 +571,11 @@ function states = sync_state_machine(states, rx_uw)
       sync_counter_thresh = 3;
     end
 
-    % freq offset est may be too far out, and has aliases every 1/Ts
+    % freq offset est may be too far out, and has aliases every 1/Ts, so
+    % we use a Unique Word to get a really solid indication of sync.
 
     states.uw_errors = sum(rx_uw);
-    if (states.uw_errors > 3)
+    if (states.uw_errors > 2)
       states.sync_counter++;
       if states.sync_counter == sync_counter_thresh
         next_state = 'searching';
