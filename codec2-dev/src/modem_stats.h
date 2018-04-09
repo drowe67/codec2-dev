@@ -35,12 +35,13 @@
 #include "comp.h"
 #include "kiss_fft.h"
 
-#define MODEM_STATS_NC_MAX 20
-#define MODEM_STATS_NR_MAX 6
-#define MODEM_STATS_ET_MAX 8
-#define MODEM_STATS_NSPEC            512
-#define MODEM_STATS_MAX_F_HZ         4000
-
+#define MODEM_STATS_NC_MAX    20
+#define MODEM_STATS_NR_MAX    6
+#define MODEM_STATS_ET_MAX    8
+#define MODEM_STATS_NSPEC     512
+#define MODEM_STATS_MAX_F_HZ  4000
+#define MODEM_STATS_MAX_F_EST 4
+      
 struct MODEM_STATS {
     int    Nc;
     float  snr_est;                          /* estimated SNR of rx signal in dB (3 kHz noise BW)  */
@@ -58,6 +59,10 @@ struct MODEM_STATS {
     int    neyetr;                           /* How many eye traces are plotted */
     int    neyesamp;                         /* How many samples in the eye diagram */
 
+    /* optional for FSK modems - est tone freqs */
+
+    float f_est[MODEM_STATS_MAX_F_EST];
+    
     /* Buf for FFT/waterfall */
 
     float        fft_buf[2*MODEM_STATS_NSPEC];
