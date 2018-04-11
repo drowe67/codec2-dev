@@ -39,8 +39,9 @@
 #include "octave.h"
 #include "test_bits_ofdm.h"
 
-#define ASCALE  (2E5*1.1491/2.0) /* scale from shorts back to floats */
-#define NFRAMES 100              /* just log the first 100 frames    */
+#define ASCALE   (2E5*1.1491/2.0) /* scale from shorts back to floats */
+#define NFRAMES  100              /* just log the first 100 frames    */
+#define NDISCARD 20
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -65,12 +66,15 @@ int main(int argc, char *argv[])
     int            timing_est_log[NFRAMES];
 
     int            i, j, f, oct, logframes, arg, sd;
-
+    int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
+    
     if (argc < 3) {
         fprintf(stderr, "\n");
-	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--sd]\n", argv[0]);
+	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--sd] [-v VerboseLevel]\n", argv[0]);
         fprintf(stderr, "\n");
         fprintf(stderr, "              Default output file format is one byte per bit hard decision\n");
+        fprintf(stderr, "  -t          Receive test frames and count errors\n");
+        fprintf(stderr, "  -v          Verbose info the stderr\n");
         fprintf(stderr, "  -o          Octave log file for testing\n");
         fprintf(stderr, "  --sd        soft decision output, four doubles per QPSK symbol\n");
         fprintf(stderr, "\n");
@@ -108,8 +112,17 @@ int main(int argc, char *argv[])
         sd = 1;
     }
 
+    testframes = 0;
+    if (opt_exists(argv, argc, "-t")) {
+        testframes = 1;
+    }
+
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
+
+    if ((arg = opt_exists(argv, argc, "-v")) != 0) {
+        ofdm_set_verbose(ofdm, atoi(argv[arg+1]));
+    }
 
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
@@ -118,10 +131,8 @@ int main(int argc, char *argv[])
     COMP   rxbuf_in[Nmaxsamperframe];
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
-    int    state, next_state;
-
-    state = OFDM_SEARCHING;
-    f = 0;
+    int    rx_uw[OFDM_UW_LEN];
+    f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = frame_count = 0;
 
     nin_frame = ofdm_get_nin(ofdm);
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
@@ -133,29 +144,64 @@ int main(int argc, char *argv[])
             rxbuf_in[i].imag = 0.0;
         }
 
-        next_state = state;
-        switch(state) {
-        case OFDM_SEARCHING:
-            if (ofdm_sync_search(ofdm, rxbuf_in)) {
-                next_state = OFDM_SYNCED;
-            }
-            break;
-        case OFDM_SYNCED:
+        if (strcmp(ofdm->sync_state,"searching") == 0) {
+            ofdm_sync_search(ofdm, rxbuf_in);
+        }
+    
+        if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial_sync") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
-            break;
-        }
-        state = next_state;
-
-        nin_frame = ofdm_get_nin(ofdm);
-
-        if ((sd == 0) && (state == OFDM_SYNCED)) {
-            /* simple hard decision output for uncoded testing */
-            for(i=0; i<Nbitsperframe; i++) {
-                rx_bits_char[i] = rx_bits[i];
+            
+            if (sd == 0) {
+                /* simple hard decision output for uncoded testing */
+                for(i=0; i<Nbitsperframe; i++) {
+                    rx_bits_char[i] = rx_bits[i];
+                }
+                fwrite(rx_bits_char, sizeof(char), Nbitsperframe, fout);
             }
-            fwrite(rx_bits_char, sizeof(char), Nbitsperframe, fout);
+
+            /* extract Unique Word bits */
+
+            for(i=0; i<OFDM_UW_LEN; i++) {
+                rx_uw[i] = rx_bits[i];
+            }
+
+            /* optional error counting in testframe mode */
+            
+            if (testframes) {
+                Nerrs = 0;
+                for(i=0; i<Nbitsperframe; i++) {
+                    if (test_bits_ofdm[i] != rx_bits[i]) {
+                        Nerrs++;
+                    }
+                }
+
+                Terrs += Nerrs;
+                Tbits += Nbitsperframe;
+
+                if (frame_count >= NDISCARD) {
+                    Terrs2 += Nerrs;
+                    Tbits2 += Nbitsperframe;
+                }
+            }
+            frame_count++;
+        }
+        
+        nin_frame = ofdm_get_nin(ofdm);
+        ofdm_sync_state_machine(ofdm, rx_uw);
+
+        /* act on any events returned by state machine */
+    
+        if (ofdm->sync_start) {
+            Terrs = Tbits = Terrs2 = Tbits2 = frame_count = 0;
         }
 
+        if (ofdm->verbose) {
+            fprintf(stderr, "f: %2d state: %-10s uw_errors: %2d %1d  Nerrs: %3d foff: %3.1f\n",
+                    f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, Nerrs, ofdm->foff_est_hz);
+        }
+
+        /* optional logging of states */
+        
         if (oct) {
             /* note corrected phase (rx no phase) is one big linear array for frame */
 
@@ -191,6 +237,11 @@ int main(int argc, char *argv[])
     fclose(fin);
     fclose(fout);
 
+    if (testframes) {
+        fprintf(stderr, "BER..: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs/Tbits, Tbits, Terrs);
+        fprintf(stderr, "BER2.: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+    }
+    
     /* optionally dump Octave files */
 
     if (foct != NULL) {

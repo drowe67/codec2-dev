@@ -78,7 +78,8 @@ static const complex float constellation[] = {
  */
 static const char pilotvalues[] = {
     -1, -1, 1, 1, -1, -1, -1, 1, -1,
-     1, -1, 1, 1,  1,  1,  1, 1,  1
+     1, -1, 1, 1,  1,  1,  1, 1,  1,
+     1
 };
 
 /* Functions */
@@ -167,15 +168,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     float av_level = 2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f;
     
     for (i = 0; i < Ncorr; i++) {
-        complex float temp = 0.0f + 0.0f * I;
+        complex float corr_st = 0.0f + 0.0f * I;
+        complex float corr_en = 0.0f + 0.0f * I;
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             csam = conjf(ofdm->pilot_samples[j]);
-            temp = temp + (rx[i + j] * csam);
-            temp = temp + (rx[i + j + SFrame] * csam);
+            corr_st = corr_st + (rx[i + j] * csam);
+            corr_en = corr_en + (rx[i + j + SFrame] * csam);
         }
 
-        corr[i] = cabsf(temp) / av_level;
+        corr[i] = (cabsf(corr_st) + cabsf(corr_en)) / av_level;
     }
 
     /* find the max magnitude and its index */
@@ -260,8 +262,9 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
         aframe[0][i] = ofdm->pilots[i];
+        //printf("%2d % f % f\n", i, crealf(aframe[0][i]), cimagf(aframe[0][i]));
     }
-
+    
     /* Place symbols in multi-carrier frame with pilots */
     /* This will place boundary values of complex zero around data */
 
@@ -272,26 +275,26 @@ static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAM
         for (j = 1; j < (OFDM_NC + 1); j++) {
             aframe[i][j] = tx_sym_lin[((i - 1) * OFDM_NC) + (j - 1)];
         }
-    }
+     }
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
     for (i = 0, m = 0; i < OFDM_NS; i++, m += (OFDM_M + OFDM_NCP)) {
         idft(ofdm, asymbol, aframe[i]);
 
-        /* Copy the last Ncp columns to the front */
+        /* Copy the last Ncp samples to the front */
 
         for (j = (OFDM_M - OFDM_NCP), k = 0; j < OFDM_M; j++, k++) {
             asymbol_cp[k] = asymbol[j];
         }
 
-        /* Now copy the whole row after it */
+        /* Now copy the all samples for this row after it */
 
         for (j = OFDM_NCP, k = 0; k < OFDM_M; j++, k++) {
             asymbol_cp[j] = asymbol[k];
         }
 
-        /* Now move row to the tx reference */
+        /* Now move row to the tx output */
 
         for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
             tx[m + j] = asymbol_cp[j];
@@ -326,18 +329,18 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* store complex BPSK pilot symbols */
 
+    assert(sizeof(pilotvalues) == (OFDM_NC+2));
     for (i = 0; i < (OFDM_NC + 2); i++) {
         ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
 
-    float lower = OFDM_CENTRE - OFDM_RS * (OFDM_NC / 2);
-    int Nlower = floorf(lower / OFDM_RS);
-
+    float alower = OFDM_CENTRE - OFDM_RS * ((float)OFDM_NC / 2);
+    int Nlower = floorf(alower / OFDM_RS);
+    
     for (i = 0, n = Nlower; i < (OFDM_NC + 2); i++, n++) {
         float w = (TAU * (float) n) / (OFDM_FS / OFDM_RS);
-
         for (j = 0; j < OFDM_M; j++) {
             ofdm->W[i][j] = cexpf(I * w * j);
         }
@@ -371,7 +374,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
 
-    ofdm->foff_est_gain = 0.01f;
+    ofdm->foff_est_gain = 0.05f;
     ofdm->foff_est_hz = 0.0f;
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;
@@ -578,7 +581,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float aphase_est_pilot_rect;
     float aphase_est_pilot[OFDM_NC + 2];
     float aamp_est_pilot[OFDM_NC + 2];
-    float freq_err_hz, coarse_foff_est;
+    float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
 
     /* shift the buffer left based on nin */
@@ -1011,9 +1014,9 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
         }
         if (ofdm->uw_errors > 2) {
             ofdm->sync_counter++;
-        }
-        if (ofdm->sync_counter == sync_counter_thresh) {
-            strcpy(next_state, "searching");
+            if (ofdm->sync_counter == sync_counter_thresh) {
+                strcpy(next_state, "searching");
+            }
         } else {
             ofdm->sync_counter = 0;
         }
