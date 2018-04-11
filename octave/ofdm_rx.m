@@ -44,13 +44,6 @@ function ofdm_rx(filename, error_pattern_filename)
   nin = Nsamperframe+2*(M+Ncp);
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
-
-  states.sync_state = states.last_sync_state = 'searching';
-  states.uw_errors = 0;
-  states.sync_counter = 0;
-  states.sync_frame_count = 0;
-  states.sync_start = 0;
-  states.sync_end = 0;
   
   states.verbose = 1;
 
@@ -123,7 +116,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   Ndiscard = 20;
   if frame_count > Ndiscard
-    Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard;
+    Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard*Nbitsperframe;
     printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
   end
   
