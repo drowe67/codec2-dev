@@ -37,6 +37,7 @@
 #include "test_bits_ofdm.h"
 
 #define LOG_FRAMES 100
+#define NDISCARD   20
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -51,7 +52,7 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 int main(int argc, char *argv[])
 {
     FILE         *fin;
-    int           i, f, Nerrs, Terrs, Tbits, verbose;
+    int           i, f, Nerrs, Terrs, Tbits, Terrs2, Tbits2, verbose;
     float         aber;
     struct OFDM  *ofdm;
 
@@ -79,7 +80,7 @@ int main(int argc, char *argv[])
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     char rx_bits[Nbitsperframe];
   
-    f = Terrs = Tbits = 0;
+    f = Terrs = Tbits = Terrs2 = Tbits2 = 0;
     while (fread(rx_bits, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
         f++;
         
@@ -91,11 +92,14 @@ int main(int argc, char *argv[])
         }
         aber = (float)Nerrs/Nbitsperframe;
 
-        if (aber < 0.2) {
-            Terrs += Nerrs;
-            Tbits += Nbitsperframe;
-        }
+        Terrs += Nerrs;
+        Tbits += Nbitsperframe;
 
+        if (f >= NDISCARD) {
+            Terrs2 += Nerrs;
+            Tbits2 += Nbitsperframe;
+        }
+        
         if (verbose) {
             printf("f: %d Nerrs: %d aber: %3.2f\n", f, Nerrs, aber);
         }
@@ -105,6 +109,7 @@ int main(int argc, char *argv[])
     
     fclose(fin);
     fprintf(stderr, "BER..: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs/Tbits, Tbits, Terrs);
+    fprintf(stderr, "BER2.: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
 
     return 0;
 }
