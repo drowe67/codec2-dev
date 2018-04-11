@@ -43,11 +43,6 @@ extern "C" {
 
 struct OFDM;
 
-/* Constant declarations */
-
-#define OFDM_SEARCHING 1
-#define OFDM_SYNCED    2
-    
 /* Default configuration for '700D' mode */
 const struct OFDM_CONFIG * OFDM_CONFIG_700D;
 
@@ -61,6 +56,7 @@ void ofdm_destroy(struct OFDM *);
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
 int  ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in);
+void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw);
 
 /* getters */
     
