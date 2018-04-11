@@ -41,7 +41,7 @@
 #include "test_bits_ofdm.h"
 #include "comp_prim.h"
 
-#define NFRAMES 30
+#define NFRAMES 3
 #define SAMPLE_CLOCK_OFFSET_PPM 100
 #define FOFF_HZ 0.5f
 
@@ -149,12 +149,10 @@ int main(int argc, char *argv[])
     int            sample_point_log[NFRAMES];
 
     FILE          *fout;
-    int            f,i,j, state, next_state;
+    int            f,i,j;
 
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
-
-    state = OFDM_SEARCHING;
     
     /* Main Loop ---------------------------------------------------------------------*/
 
@@ -198,7 +196,7 @@ int main(int argc, char *argv[])
     int  lnew;
     COMP rxbuf_in[max_samples_per_frame];
 
-    //#define FRONT_LOAD
+    #define FRONT_LOAD
     #ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
          ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
@@ -214,7 +212,7 @@ int main(int argc, char *argv[])
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
-    #define TESTING_FILE
+    //#define TESTING_FILE
     #ifdef TESTING_FILE
     FILE *fin=fopen("/home/david/codec2-dev/octave/ofdm_test.raw", "rb");
     assert(fin != NULL);
@@ -260,19 +258,8 @@ int main(int argc, char *argv[])
             rxbuf_in[i].imag = 0.0;
         }
         #endif
-        
-        next_state = state;
-        switch(state) {
-        case OFDM_SEARCHING:
-            if (ofdm_sync_search(ofdm, rxbuf_in)) {
-                next_state = OFDM_SYNCED;
-            }
-            break;
-        case OFDM_SYNCED:
-            ofdm_demod(ofdm, rx_bits, rxbuf_in);
-            break;
-        }
-        state = next_state;
+
+        ofdm_demod(ofdm, rx_bits, rxbuf_in);
         
         #ifdef TESTING_FILE
         int Nerrs = 0;
@@ -337,6 +324,7 @@ int main(int argc, char *argv[])
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
     octave_save_complex(fout, "W_c", (COMP*)ofdm->W, OFDM_NC + 2, OFDM_M, OFDM_M);
+    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, OFDM_M+OFDM_NCP, OFDM_M+OFDM_NCP);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
     octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
