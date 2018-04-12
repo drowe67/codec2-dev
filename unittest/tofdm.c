@@ -41,7 +41,7 @@
 #include "test_bits_ofdm.h"
 #include "comp_prim.h"
 
-#define NFRAMES 3
+#define NFRAMES 30
 #define SAMPLE_CLOCK_OFFSET_PPM 100
 #define FOFF_HZ 0.5f
 
