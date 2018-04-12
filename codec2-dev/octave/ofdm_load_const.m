@@ -13,6 +13,8 @@ Nbitsperframe = states.Nbitsperframe;
 Nrowsperframe = states.Nrowsperframe;
 Nsamperframe = states.Nsamperframe;
 timing_mx_thresh = 0.3;
+Nuwbits = states.Nuwbits;
+Ntxtbits = states.Ntxtbits;
 
 W = states.W;
 w = states.w;

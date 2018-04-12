@@ -136,8 +136,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.txt_len = 4;   % reserve 4 bits/frame for auxillary text information
-  states.uw_len = (Ns-1)*bps - states.txt_len;
+  states.Ntxtbits = 4;   % reserve 4 bits/frame for auxillary text information
+  states.Nuwbits  = (Ns-1)*bps - states.Ntxtbits;
 
   % generate same pilots each time
 
@@ -524,7 +524,7 @@ function test_bits_ofdm_file
 
   rand('seed',1);
   test_bits_ofdm = round(rand(1,Nbitsperframe));
-  test_bits_ofdm(1:states.uw_len) = 0;  % insert Unique Word
+  test_bits_ofdm(1:states.Ntxtbits) = 0;  % insert Unique Word
   printf("%d test bits\n", Nbitsperframe);
   
   f=fopen("../src/test_bits_ofdm.h","wt");

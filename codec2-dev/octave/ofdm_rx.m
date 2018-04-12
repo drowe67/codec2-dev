@@ -27,7 +27,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   rand('seed', 1);
   tx_bits = round(rand(1,Nbitsperframe));
-  tx_bits(1:states.uw_len) = 0;   % insert UW
+  tx_bits(1:states.Nuwbits) = 0;   % insert UW
  
   % init logs and BER stats
 
@@ -47,7 +47,7 @@ function ofdm_rx(filename, error_pattern_filename)
   
   states.verbose = 1;
 
-  Nerrs = 0; rx_uw = zeros(1,states.uw_len);
+  Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
   
   % main loop ----------------------------------------------------------------
 
@@ -71,7 +71,7 @@ function ofdm_rx(filename, error_pattern_filename)
     
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      rx_uw = rx_bits(1:states.uw_len);
+      rx_uw = rx_bits(1:states.Nuwbits);
       
       errors = xor(tx_bits, rx_bits);
       Nerrs = sum(errors);

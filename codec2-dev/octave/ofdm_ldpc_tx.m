@@ -39,7 +39,7 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
+  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
@@ -50,7 +50,7 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
   init_cml('/home/david/Desktop/cml/');
   load HRA_112_112.txt
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-  assert(Nbitsperframe == code_param.code_bits_per_frame);
+  assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
 
   % Generate fixed test frame of tx bits and run OFDM modulator
 
