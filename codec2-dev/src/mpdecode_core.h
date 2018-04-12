@@ -11,6 +11,8 @@
 #ifndef __MPDECODE_CORE__
 #define __MPDECODE_CORE__
 
+#include "comp.h"
+
 struct LDPC {
     int max_iter;
     int dec_type;
@@ -25,9 +27,12 @@ struct LDPC {
     double *H_cols;
 };
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]);
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount);
 
 void sd_to_llr(double llr[], double sd[], int n);
+
+void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], int number_symbols);
+void SomapDemod2D(float bit_likelihood[], float symbol_likelihood[]);
 
 struct v_node {
   int degree;

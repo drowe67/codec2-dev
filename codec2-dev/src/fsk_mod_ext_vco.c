@@ -86,8 +86,10 @@ int main(int argc,char *argv[]){
         /* 2 FSK -d/2, +d/2                */
         /* 4 FSK -3*d/2, -d/2, +d/2, 3*d/2 */
 
+        /* note: drive is inverted, a higher tone drives VCO voltage lower */
+
         float symf = sym;
-        float level = d*(symf - ((float)m-1)*0.5);
+        float level = d*(((float)m-1)*0.5 - symf);
         assert(level <= 32767.0);
         assert(level >= -32768.0);
         short level_short = (short)level;

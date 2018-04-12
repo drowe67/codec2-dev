@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
     uint8_t     packet[BYTES_PER_PACKET+CRC_BYTES];
     uint8_t     abyte;
     uint16_t    tx_checksum, rx_checksum, packet_errors, packets;
-    int         CodeLength, iter;
+    int         CodeLength, iter, parityCheckCount;
     struct LDPC ldpc;
 
     assert(sizeof(uw) == UW_BITS);
@@ -227,7 +227,7 @@ int main(int argc, char *argv[]) {
                /* now LDPC decode */
 
                sd_to_llr(llr, symbol_buf_no_rs232, CodeLength);
-               iter = run_ldpc_decoder(&ldpc, unpacked_packet, llr);
+               iter = run_ldpc_decoder(&ldpc, unpacked_packet, llr, &parityCheckCount);
 
                /* pack into bytes */
 

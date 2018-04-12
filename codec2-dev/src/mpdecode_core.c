@@ -46,8 +46,7 @@ static float phi0(
   }
 }
 
-static float correction(
-			float xinput )
+static float correction(float xinput )
 {
   if (xinput > 2.625 )
     return( 0 );
@@ -65,6 +64,31 @@ static float LambdaAPPstar(	float mag1,
     return( fabs( mag2 + correction( mag1 + mag2 ) - correction( mag1 - mag2 ) ) );
   else
     return( fabs( mag1 + correction( mag1 + mag2 ) - correction( mag2 - mag1 ) ) );
+}
+
+/* Values for linear approximation (DecoderType=5) */
+
+#define AJIAN -0.24904163195436
+#define TJIAN 2.50681740420944
+
+/* The linear-log-MAP algorithm */
+
+static float max_star0(
+                       float delta1, 
+                       float delta2 )
+{
+    register float diff;
+	
+    diff = delta2 - delta1;
+
+    if ( diff > TJIAN )
+        return( delta2 );
+    else if ( diff < -TJIAN )
+        return( delta1 );
+    else if ( diff > 0 )
+        return( delta2 + AJIAN*(diff-TJIAN) );
+    else
+        return( delta1 - AJIAN*(diff+TJIAN) );
 }
 
 void init_c_v_nodes(struct c_node *c_nodes, 
@@ -562,7 +586,7 @@ void SumProduct(	 int	  BitErrors[],
 
 /* Convenience function to call LDPC decoder from C programs */
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount) {
     int		max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
     int		max_row_weight, max_col_weight;
@@ -635,6 +659,8 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[]) {
 
     int iter = extract_output(out_char, DecodedBits, ParityCheckCount, max_iter, CodeLength, NumberParityBits);
 
+    *parityCheckCount = ParityCheckCount[iter-1];
+
     /* Clean up memory */
 
     free(ParityCheckCount);
@@ -701,6 +727,81 @@ void sd_to_llr(double llr[], double sd[], int n) {
         llr[i] = 4.0 * estEsN0 * sd[i];              
 }
 
+
+/*
+   output[] is symbol likelihood
+
+   Note we assume fading[] is real, it is also possible to compute
+   with complex fading.
+*/
+
+void Demod2D(float  symbol_likelihood[],       /* output, M*number_symbols              */
+             COMP   r[],                       /* received QPSK symbols, number_symbols */
+             COMP   S_matrix[],                /* constellation of size M               */
+             float  EsNo,
+             float  fading[],                  /* real fading values, number_symbols    */
+             int    number_symbols)
+{
+    int     M=4;
+    int     i,j;
+    float   tempsr, tempsi, Er, Ei;
+
+    /* determine output */
+  
+    for (i=0;i<number_symbols;i++) {                /* go through each received symbol */
+        for (j=0;j<M;j++) {                         /* each postulated symbol          */
+            tempsr = fading[i]*S_matrix[j].real;
+            tempsi = fading[i]*S_matrix[j].imag;
+            Er = r[i].real - tempsr;
+            Ei = r[i].imag - tempsi;
+            symbol_likelihood[i*M+j] = -EsNo*(Er*Er+Ei*Ei);
+        }
+    }
+
+}
+
+
+void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
+           float  symbol_likelihood[],   /* M*number_symbols                */
+           int    number_symbols)
+{
+    int   M=2, bps = 2;
+    int   n,i,j,k,mask;
+    float num[bps], den[bps];
+    float metric;
+
+    for (n=0; n<number_symbols; n++) { /* loop over symbols */
+        for (k=0;k<bps;k++) {
+            /* initialize */
+            num[k] = -1000000;			
+            den[k] = -1000000;			
+        }
+ 
+        for (i=0;i<M;i++) {
+            metric =  symbol_likelihood[n*M+i]; /* channel metric for this symbol */
+
+            mask = 1 << bps - 1;
+            for (j=0;j<bps;j++) {	
+                mask = mask >> 1;
+            }
+            mask = 1 << bps - 1;
+            
+            for (k=0;k<bps;k++) {	/* loop over bits */
+                if (mask&i) {
+                    /* this bit is a one */
+                    num[k] = max_star0( num[k], metric );
+                } else {
+                    /* this bit is a zero */
+                    den[k] = max_star0( den[k], metric );
+                }
+                mask = mask >> 1;
+            }
+        }
+        for (k=0;k<bps;k++) {
+            bit_likelihood[bps*n+k] = num[k] - den[k];
+        }
+    }
+}
 
 int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
     int i, j;
