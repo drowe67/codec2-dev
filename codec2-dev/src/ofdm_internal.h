@@ -68,7 +68,7 @@ extern "C" {
 #define OFDM_FTWINDOWWIDTH       11
 /* Bits per frame (duh) */
 #define OFDM_BITSPERFRAME        ((OFDM_NS - 1) * (OFDM_NC * OFDM_BPS))
-/* Rows per frame */
+/* Rows per frame with data symbols */
 #define OFDM_ROWSPERFRAME        (OFDM_BITSPERFRAME / (OFDM_NC * OFDM_BPS))
 /* Samps per frame */
 #define OFDM_SAMPLESPERFRAME     (OFDM_NS * (OFDM_M + OFDM_NCP))
@@ -80,11 +80,11 @@ extern "C" {
 
 /* reserve 4 bits/frame for auxillary text information */
 
-#define OFDM_TXT_LEN             4
+#define OFDM_NTXTBITS             4
 
 /* Unique word, used for positive indication of lock */
 
-#define OFDM_UW_LEN              ((OFDM_NS-1)*OFDM_BPS - OFDM_TXT_LEN)
+#define OFDM_NUWBITS              ((OFDM_NS-1)*OFDM_BPS - OFDM_NTXTBITS)
 
 #define OFDM_STATE_STR           16
     

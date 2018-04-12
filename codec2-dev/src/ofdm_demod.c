@@ -38,11 +38,22 @@
 #include "ofdm_internal.h"
 #include "octave.h"
 #include "test_bits_ofdm.h"
+#include "mpdecode_core.h"
 
-#define ASCALE   (2E5*1.1491/2.0) /* scale from shorts back to floats */
-#define NFRAMES  100              /* just log the first 100 frames    */
-#define NDISCARD 20
+#define ASCALE   (2E5*1.1491/2.0) /* scale from shorts back to floats     */
+#define NFRAMES  100              /* just log the first 100 frames        */
+#define NDISCARD 20               /* BER2measure disctrds first 20 frames */
+#define CODED_BITSPERFRAME 224    /* number of LDPC codeword bits/frame   */
 
+/* QPSK constellation for symbol likelihood calculations */
+
+static COMP S_matrix[] = {
+    { 1.0f,  0.0f},
+    { 0.0f,  1.0f},
+    { 0.0f, -1.0f},
+    {-1.0f,  0.0f}
+};
+         
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {
@@ -65,7 +76,7 @@ int main(int argc, char *argv[])
     float          foff_hz_log[NFRAMES];
     int            timing_est_log[NFRAMES];
 
-    int            i, j, f, oct, logframes, arg, sd;
+    int            i, j, f, oct, logframes, arg, llr_en;
     int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
     
     if (argc < 3) {
@@ -76,7 +87,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "  -t          Receive test frames and count errors\n");
         fprintf(stderr, "  -v          Verbose info the stderr\n");
         fprintf(stderr, "  -o          Octave log file for testing\n");
-        fprintf(stderr, "  --sd        soft decision output, four doubles per QPSK symbol\n");
+        fprintf(stderr, "  --llr       LLR output, one double per bit, %d doubles/frame\n", CODED_BITSPERFRAME);
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -107,9 +118,9 @@ int main(int argc, char *argv[])
         logframes = NFRAMES;
     }
 
-    sd = 0;
-    if (opt_exists(argv, argc, "--sd")) {
-        sd = 1;
+    llr_en = 0;
+    if (opt_exists(argv, argc, "--llr")) {
+        llr_en = 1;
     }
 
     testframes = 0;
@@ -131,8 +142,11 @@ int main(int argc, char *argv[])
     COMP   rxbuf_in[Nmaxsamperframe];
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
-    int    rx_uw[OFDM_UW_LEN];
+    int    rx_uw[OFDM_NUWBITS];
     f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = frame_count = 0;
+
+    float EsNo = 10;
+    fprintf(stderr,"Warning EsNo: %f hard coded", EsNo);
 
     nin_frame = ofdm_get_nin(ofdm);
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
@@ -151,8 +165,28 @@ int main(int argc, char *argv[])
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial_sync") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
             
-            if (sd == 0) {
-                /* simple hard decision output for uncoded testing */
+            if (llr_en) {
+                double symbol_likelihood[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) ];
+                double bit_likelihood[CODED_BITSPERFRAME];
+
+                /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
+
+                assert((OFDM_NUWBITS+OFDM_NTXTBITS+CODED_BITSPERFRAME) == OFDM_BITSPERFRAME);
+
+                COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/OFDM_BPS)];
+                for(i=0, j=(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i<(CODED_BITSPERFRAME/OFDM_BPS); i++,j++) {
+                    ldpc_codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
+                    ldpc_codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
+                }
+                float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
+                
+                Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps,  CODED_BITSPERFRAME/OFDM_BPS);
+                Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/OFDM_BPS);
+                
+                fwrite(bit_likelihood, sizeof(double), CODED_BITSPERFRAME, fout);
+
+            } else {
+                /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
                 for(i=0; i<Nbitsperframe; i++) {
                     rx_bits_char[i] = rx_bits[i];
                 }
@@ -161,7 +195,7 @@ int main(int argc, char *argv[])
 
             /* extract Unique Word bits */
 
-            for(i=0; i<OFDM_UW_LEN; i++) {
+            for(i=0; i<OFDM_NUWBITS; i++) {
                 rx_uw[i] = rx_bits[i];
             }
 
