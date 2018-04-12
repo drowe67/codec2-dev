@@ -11,7 +11,7 @@
 % $ unzip cml.1.10.zip
 % $ patch -p0 < ~/codec2-dev/octave/cml.patch
 % $ cd cml/source
-% $ octave
+% $ octave --no-gui
 % octave:> make
 % (you'll see a few warnings but hopefully no errors)
 
