@@ -24,7 +24,7 @@ ofdm_load_const;
 
 rand('seed',1);
 tx_bits = round(rand(1,Nbitsperframe));
-tx_bits(1:states.uw_len) = 0;
+tx_bits(1:states.Nuwbits) = 0;
 
 % Run tx loop
 
