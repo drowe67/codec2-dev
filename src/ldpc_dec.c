@@ -68,7 +68,7 @@ void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs, codename;
+    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, state, next_state, frame;
     char        out_char[CODELENGTH], *adetected_data;
     struct LDPC ldpc;
     double     *ainput;
@@ -84,13 +84,13 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName]\n\n", argv[0]);
         fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
-        fprintf(stderr, "   --code                  Treat input file samples as Soft Decision\n");
-        fprintf(stderr, "                           demod outputs rather than LLRs\n");
+        fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
         fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
         fprintf(stderr, "                           attempt, only output decoded bits if decoder\n");
         fprintf(stderr, "                           converges.  Form of frame sync.\n");
+        fprintf(stderr, "   --mute                  Only output frames with < 10%% parity check fails\n");
         fprintf(stderr, "\n");
         exit(0);
     }
@@ -157,7 +157,7 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(&ldpc, out_char, ainput);
+            run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
 
             int ok = 0;
             for (i=0; i<CodeLength; i++) {
@@ -198,11 +198,15 @@ int main(int argc, char *argv[])
 
         sdinput = 0;
         readhalfframe = 0;
+        mute = 0; state = 0; frame = 0;
         if (opt_exists(argv, argc, "--sd")) {
             sdinput = 1;
         }
         if (opt_exists(argv, argc, "--half")) {
             readhalfframe = 1;
+        }
+        if (opt_exists(argv, argc, "--mute")) {
+            mute = 1;
         }
 
         double *input_double = calloc(CodeLength, sizeof(double));
@@ -222,13 +226,46 @@ int main(int argc, char *argv[])
                 sd_to_llr(input_double, input_double, CodeLength);
             }
 
-            iter = run_ldpc_decoder(&ldpc, out_char, input_double);
-            fprintf(stderr, "%4d ", iter);
+            iter = run_ldpc_decoder(&ldpc, out_char, input_double, &parityCheckCount);
 
-            // output data bits if decoder converged
+            if (mute) {
 
-            if (iter != MAX_ITER) {
-              fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
+                // Output data bits if decoder converged, or was
+                // within 10% of all parity checks converging (10% est
+                // BER).  usefule for real world operation as it can
+                // resync and won't send crappy packets to the decoder
+                
+                float ber_est = (float)(ldpc.NumberParityBits - parityCheckCount)/ldpc.NumberParityBits;
+                //fprintf(stderr, "iter: %4d parityCheckErrors: %4d ber: %3.2f\n", iter, ldpc.NumberParityBits - parityCheckCount, ber_est);
+                if (ber_est < 0.1) {
+                    fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
+                }
+
+            } else {
+                
+                // Output all data packets, based on initial FEC sync
+                // estimate.  Useful for testing with cohpsk_put_bits,
+                // as it maintains sync with test bits state machine.
+                
+                next_state = state;
+                switch(state) {
+                case 0:
+                    if (iter < MAX_ITER) {
+                        /* OK we've found which frame to sync on */
+                        next_state = 1;
+                        frame = 0;
+                    }
+                    break;
+                case 1:
+                    frame++;
+                    if ((frame % 2) == 0) {
+                        /* write decoded packets every second input frame */
+                        fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
+                    }
+                    break;
+                }
+                state = next_state;
+                //fprintf(stderr, "state: %d iter: %d\n", state, iter);
             }
 
             for(i=0; i<offset; i++) {
