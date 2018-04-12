@@ -17,13 +17,14 @@ autotest;
 % Run Octave version 
 % ---------------------------------------------------------------------
 
-Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 16; Ns = 8;
+Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
 ofdm_load_const;
 
 rand('seed',1);
 tx_bits = round(rand(1,Nbitsperframe));
+tx_bits(1:states.uw_len) = 0;
 
 % Run tx loop
 
@@ -63,6 +64,7 @@ if states.timing_en == 0
   states.sample_point = Ncp;
 end
 
+
 for f=1:Nframes
 
   % insert samples at end of buffer, set to zero if no samples
@@ -79,7 +81,7 @@ for f=1:Nframes
   prx += lnew;
 
   [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-
+  
   % log some states for comparison to C
 
   rxbuf_in_log = [rxbuf_in_log rxbuf_in];
@@ -152,14 +154,15 @@ stem_sig_and_error(fg++, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bi
 
 % Run through checklist -----------------------------
 
-check_no_abs(W, W_c, 'W');
+check(W, W_c, 'W');
+check(states.rate_fs_pilot_samples, pilot_samples_c, 'pilot_samples');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
 check(rx_log, rx_log_c, 'rx');
 check(rxbuf_in_log, rxbuf_in_log_c, 'rxbuf in');
 check(rxbuf_log, rxbuf_log_c, 'rxbuf');
-check(rx_sym_log, rx_sym_log_c, 'rx_sym', tol=5E-3);
-check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=2E-3, its_an_angle=1);
+check(rx_sym_log, rx_sym_log_c, 'rx_sym', tol=10E-3);
+check(phase_est_pilot_log, phase_est_pilot_log_c, 'phase_est_pilot', tol=1E-2, its_an_angle=1);
 check(rx_amp_log, rx_amp_log_c, 'rx_amp');
 check(timing_est_log, timing_est_log_c, 'timing_est');
 check(timing_valid_log, timing_valid_log_c, 'timing_valid');
