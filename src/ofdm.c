@@ -894,8 +894,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             }
 
             /*
-             * For testing, we want to save these complex data values
-             * without the pilots. Thus, the name rx (no pilot) np
+             * Output complex data symbols after phase correction;
+             * rx_np means the pilot symbols have been removed
              */
 
             ofdm->rx_np[(rr * OFDM_NC) + (i - 1)] = rx_corr;
@@ -1009,7 +1009,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            we use a Unique Word to get a really solid indication of sync. */
 
         ofdm->uw_errors = 0;
-        for (i=0; i<OFDM_UW_LEN; i++) {
+        for (i=0; i<OFDM_NUWBITS; i++) {
             ofdm->uw_errors += rx_uw[i]; 
         }
         if (ofdm->uw_errors > 2) {
