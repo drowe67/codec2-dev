@@ -29,7 +29,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
 
-  EsNo = 1; % TODO: fixme
+  EsNo = 10; % TODO: fixme
   printf("EsNo fixed at %f - need to est from channel\n", EsNo);
   
   init_cml('/home/david/Desktop/cml/');
