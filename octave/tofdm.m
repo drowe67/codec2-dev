@@ -5,13 +5,26 @@
 
 % ------------------------------------------------------------------
 
-Nframes = 30;
+Nframes = 3;
 sample_clock_offset_ppm = 100;
 foff_hz = 0.5;
 
 more off; format;
 ofdm_lib;
 autotest;
+ldpc
+
+% attempt to start up CML, path will be different on your machine
+
+path_to_cml = '/home/david/Desktop/cml/mex';
+addpath(path_to_cml);
+cml_support = 0;
+if exist("Somap") == 0
+  printf("Can't find CML mex directory so we won't run those tests for now...\n");
+else
+  printf("OK found CML mex directory so will add those tests...\n");
+  cml_support = 1;
+end
 
 % ---------------------------------------------------------------------
 % Run Octave version 
@@ -64,6 +77,12 @@ if states.timing_en == 0
   states.sample_point = Ncp;
 end
 
+if cml_support
+  Nuwtxtsymbolsperframe = (states.Nuwbits+states.Ntxtbits)/bps;
+  S_matrix = [1, j, -j, -1];
+  EsNo = 10;
+  symbol_likelihood_log = bit_likelihood_log = [];
+end
 
 for f=1:Nframes
 
@@ -97,6 +116,16 @@ for f=1:Nframes
   sample_point_log = [sample_point_log; states.sample_point];
   rx_np_log = [rx_np_log arx_np];
   rx_bits_log = [rx_bits_log rx_bits];
+
+  % Optional testing of LDPC functions
+
+  if cml_support
+    symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end), S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end));
+    bit_likelihood = Somap(symbol_likelihood);
+    [m n] = size(symbol_likelihood);
+    symbol_likelihood_log = [symbol_likelihood_log; reshape(symbol_likelihood,m*n,1)];
+    bit_likelihood_log = [bit_likelihood_log; bit_likelihood'];
+  end
   
 end
 
@@ -171,4 +200,6 @@ check(coarse_foff_est_hz_log, coarse_foff_est_hz_log_c, 'coarse_foff_est_hz');
 check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
+check(symbol_likelihood_log, symbol_likelihood_log_c, 'symbol_likelihood_log');
+check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
 

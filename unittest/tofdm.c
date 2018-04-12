@@ -40,12 +40,15 @@
 #include "octave.h"
 #include "test_bits_ofdm.h"
 #include "comp_prim.h"
+#include "mpdecode_core.h"
 
-#define NFRAMES 30
+#define NFRAMES                   3
 #define SAMPLE_CLOCK_OFFSET_PPM 100
-#define FOFF_HZ 0.5f
+#define FOFF_HZ                 0.5f
 
-#define ASCALE  (2E5*1.1491/2.0) /* scale from shorts back to floats */
+#define ASCALE  (2E5*1.1491/2.0)  /* scale from shorts back to floats */
+
+#define CODED_BITSPERFRAME 224    /* number of LDPC codeword bits/frame   */
 
 /*---------------------------------------------------------------------------*\
 
@@ -147,7 +150,9 @@ int main(int argc, char *argv[])
     float          timing_mx_log[NFRAMES];
     float          coarse_foff_est_hz_log[NFRAMES];
     int            sample_point_log[NFRAMES];
-
+    float          symbol_likelihood_log[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES];
+    float          bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];        
+        
     FILE          *fout;
     int            f,i,j;
 
@@ -259,6 +264,8 @@ int main(int argc, char *argv[])
         }
         #endif
 
+        /* uncoded OFDM modem ---------------------------------------*/
+        
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
         
         #ifdef TESTING_FILE
@@ -271,6 +278,26 @@ int main(int argc, char *argv[])
         printf("f: %d Nerr: %d\n", f, Nerrs);
         #endif
         
+        /* LDPC functions --------------------------------------*/
+
+        double symbol_likelihood[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) ];
+        double bit_likelihood[CODED_BITSPERFRAME];
+        float EsNo = 10;
+        
+        /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
+
+        assert((OFDM_NUWBITS+OFDM_NTXTBITS+CODED_BITSPERFRAME) == OFDM_BITSPERFRAME);
+
+        COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/OFDM_BPS)];
+        for(i=0, j=(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i<(CODED_BITSPERFRAME/OFDM_BPS); i++,j++) {
+            ldpc_codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
+            ldpc_codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
+        }
+        float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
+                
+        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps,  CODED_BITSPERFRAME/OFDM_BPS);
+        Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/OFDM_BPS);
+
         /* rx vector logging -----------------------------------*/
 
         assert(nin_tot < samples_per_frame*NFRAMES);
@@ -313,6 +340,13 @@ int main(int argc, char *argv[])
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
 
         memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
+
+        for(i=0; i<(CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS); i++) {
+            symbol_likelihood_log[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * f + i] = symbol_likelihood[i];
+        }
+        for(i=0; i<CODED_BITSPERFRAME; i++) {
+            bit_likelihood_log[CODED_BITSPERFRAME*f + i] =  bit_likelihood[i];
+        }
     }
 
     /*---------------------------------------------------------*\
@@ -341,6 +375,8 @@ int main(int argc, char *argv[])
     octave_save_int(fout, "sample_point_log_c", sample_point_log, NFRAMES, 1);
     octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
     octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
+    octave_save_float(fout, "symbol_likelihood_log_c", symbol_likelihood_log, (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES, 1, 1);
+    octave_save_float(fout, "bit_likelihood_log_c", bit_likelihood_log, CODED_BITSPERFRAME * NFRAMES, 1, 1);
     fclose(fout);
 
     ofdm_destroy(ofdm);

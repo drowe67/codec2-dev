@@ -135,6 +135,15 @@ struct OFDM {
     int sync_end;
 };
 
+/* QPSK constellation for symbol likelihood calculations */
+
+static COMP S_matrix[] = {
+    { 1.0f,  0.0f},
+    { 0.0f,  1.0f},
+    { 0.0f, -1.0f},
+    {-1.0f,  0.0f}
+};
+         
 #ifdef __cplusplus
 }
 #endif

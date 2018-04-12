@@ -729,22 +729,26 @@ void sd_to_llr(double llr[], double sd[], int n) {
 
 
 /*
-   output[] is symbol likelihood
+   Determine symbol likelihood from received QPSK symbols.
 
-   Note we assume fading[] is real, it is also possible to compute
-   with complex fading.
+   Notes:
+
+   1) We assume fading[] is real, it is also possible to compute
+      with complex fading, see CML library Demod2D.c source code.
+   2) Using doubles, as experience with FSK in drs232_ldpc.c showed
+      doubles were required to obtain the same answers as Octave.
 */
 
-void Demod2D(float  symbol_likelihood[],       /* output, M*number_symbols              */
-             COMP   r[],                       /* received QPSK symbols, number_symbols */
-             COMP   S_matrix[],                /* constellation of size M               */
-             float  EsNo,
-             float  fading[],                  /* real fading values, number_symbols    */
-             int    number_symbols)
+void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols              */
+             COMP    r[],                       /* received QPSK symbols, number_symbols */
+             COMP    S_matrix[],                /* constellation of size M               */
+             float   EsNo,
+             float   fading[],                  /* real fading values, number_symbols    */
+             int     number_symbols)
 {
     int     M=4;
     int     i,j;
-    float   tempsr, tempsi, Er, Ei;
+    double  tempsr, tempsi, Er, Ei;
 
     /* determine output */
   
@@ -755,20 +759,22 @@ void Demod2D(float  symbol_likelihood[],       /* output, M*number_symbols      
             Er = r[i].real - tempsr;
             Ei = r[i].imag - tempsi;
             symbol_likelihood[i*M+j] = -EsNo*(Er*Er+Ei*Ei);
+            //printf("symbol_likelihood[%d][%d] = %f\n", i,j,symbol_likelihood[i*M+j]);
         }
+        //exit(0);
     }
 
 }
 
 
-void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
-           float  symbol_likelihood[],   /* M*number_symbols                */
-           int    number_symbols)
+void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
+           double  symbol_likelihood[],   /* M*number_symbols                */
+           int     number_symbols)
 {
-    int   M=2, bps = 2;
-    int   n,i,j,k,mask;
-    float num[bps], den[bps];
-    float metric;
+    int    M=4, bps = 2;
+    int    n,i,j,k,mask;
+    double num[bps], den[bps];
+    double metric;
 
     for (n=0; n<number_symbols; n++) { /* loop over symbols */
         for (k=0;k<bps;k++) {
@@ -802,6 +808,7 @@ void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
         }
     }
 }
+
 
 int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
     int i, j;
