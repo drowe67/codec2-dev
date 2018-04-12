@@ -45,15 +45,6 @@
 #define NDISCARD 20               /* BER2measure disctrds first 20 frames */
 #define CODED_BITSPERFRAME 224    /* number of LDPC codeword bits/frame   */
 
-/* QPSK constellation for symbol likelihood calculations */
-
-static COMP S_matrix[] = {
-    { 1.0f,  0.0f},
-    { 0.0f,  1.0f},
-    { 0.0f, -1.0f},
-    {-1.0f,  0.0f}
-};
-         
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {

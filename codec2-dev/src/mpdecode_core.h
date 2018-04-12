@@ -31,8 +31,8 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
 
 void sd_to_llr(double llr[], double sd[], int n);
 
-void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], int number_symbols);
-void SomapDemod2D(float bit_likelihood[], float symbol_likelihood[]);
+void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], int number_symbols);
+void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
 
 struct v_node {
   int degree;
