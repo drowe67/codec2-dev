@@ -7,11 +7,11 @@
 #{
   Examples:
  
-  i) 4 frame interleaver, 10 seconds, AWGN channel at Eb/No=3dB
+  i) 4 frame interleaver, 10 seconds, AWGN channel at (coded) Eb/No=3dB
 
     octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw',4, 10,3);
 
-  ii) 4 frame interleaver, 10 seconds, HF channel at Eb/No=6dB
+  ii) 4 frame interleaver, 10 seconds, HF channel at (coded) Eb/No=6dB
 
     ofdm_ldpc_tx('hf_ebno_6dB_700d.raw', 4, 10, 6, 'hf');
 #}
@@ -70,17 +70,25 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
     atx_bits = round(rand(1,code_param.data_bits_per_frame));
     tx_bits = [tx_bits atx_bits];
     codeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
-    for b=1:2:Nbitsperframe
+    for b=1:2:code_param.code_bits_per_frame
       tx_symbols = [tx_symbols qpsk_mod(codeword(b:b+1))];
     end
   end
  
   tx_symbols = gp_interleave(tx_symbols);
+
+  % generate UW and txt symbols to prepend to every frame after LDPC encoding and interleaving
+  
+  tx_uw_tx_bits = [zeros(1,Nuwbits) zeros(1,Ntxtbits)];
+  tx_uw_tx_symbols = [];
+  for b=1:2:length(tx_uw_tx_bits)
+    tx_uw_tx_symbols = [tx_uw_tx_symbols qpsk_mod(tx_uw_tx_bits(b:b+1))];
+  end
   
   atx = [];
   for f=1:interleave_frames
-    st = (f-1)*Nbitsperframe/bps+1; en = st + Nbitsperframe/bps-1;
-    atx = [atx ofdm_txframe(states, tx_symbols(st:en))];
+    st = (f-1)*code_param.code_bits_per_frame/bps+1; en = st + code_param.code_bits_per_frame/bps-1;
+    atx = [atx ofdm_txframe( states, [tx_uw_tx_symbols tx_symbols(st:en)] ) ];
   end
  
   tx = [];
@@ -126,7 +134,7 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
   variance = 1/(M*EsNo/2);
   woffset = 2*pi*freq_offset_Hz/Fs;
 
-  SNRdB = EbNodB + 10*log10(700/3000);
+  SNRdB = EbNodB + 10*log10(Nc*bps*Rs*rate/3000);
   printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
 
   % set up HF model ---------------------------------------------------------------
@@ -174,7 +182,7 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
 
   noise = sqrt(variance/2)*0.5*randn(1,Nsam);
   rx = real(rx) + noise;
-  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise))+10*log10(4000) - 10*log10(3000));
+  printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)) + 10*log10(4000) - 10*log10(3000));
 
   if rx_filter
     % ssb rx filter

@@ -73,7 +73,7 @@ function [codeword s] = ldpc_enc(data, code_param)
 endfunction
 
 
-function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fading)
+function [detected_data errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, EsNo, fading)
     if nargin == 6
       fading = ones(1, length(r));
     end
@@ -87,8 +87,8 @@ function detected_data = ldpc_dec(code_param, max_iterations, demod_type, decode
         
     input_decoder_c = bit_likelihood(1:code_param.code_bits_per_frame);
         
-    x_hat= MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
-                     max_iterations, decoder_type, 1, 1);
+    [x_hat errors] = MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
+                              max_iterations, decoder_type, 1, 1);
     detected_data = x_hat(max_iterations,:);
 endfunction
 
