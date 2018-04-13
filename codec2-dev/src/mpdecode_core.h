@@ -27,6 +27,8 @@ struct LDPC {
     double *H_cols;
 };
 
+void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
+
 int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount);
 
 void sd_to_llr(double llr[], double sd[], int n);

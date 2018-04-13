@@ -31,27 +31,6 @@ int opt_exists(char *argv[], int argc, char opt[]) {
     return 0;
 }
 
-void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
-    unsigned int p, i, tmp, par, prev=0;
-    int          ind;
-    double      *H_rows = ldpc->H_rows;
-
-    for (p=0; p<ldpc->NumberParityBits; p++) {
-        par = 0; 
-
-        for (i=0; i<ldpc->max_row_weight; i++) {
-            ind = (int)H_rows[p + i*ldpc->NumberParityBits];
-            par = par + ibits[ind-1];
-        }
-
-        tmp = par + prev;
-
-        tmp &= 1;    // only retain the lsb 
-        prev = tmp; 
-        pbits[p] = tmp; 
-    }
-}
-
 int main(int argc, char *argv[])
 {
     unsigned char ibits[NUMBERROWSHCOLS];
