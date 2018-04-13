@@ -379,6 +379,10 @@ target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(drs232_ldpc drs232_ldpc.c mpdecode_core.c)
 target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES})
 
+add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER)
+add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c fsk.c kiss_fft.c)
+target_link_libraries(horus_demod ${CMAKE_REQUIRED_LIBRARIES})
+
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}

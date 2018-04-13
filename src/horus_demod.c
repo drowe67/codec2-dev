@@ -49,7 +49,8 @@ int main(int argc, char *argv[]) {
 
     stats_loop = 0;
     stats_rate = 8;
-    
+    mode = -1;
+
     int o = 0;
     int opt_idx = 0;
     while ( o != -1 ) {
@@ -64,14 +65,13 @@ int main(int argc, char *argv[]) {
         
         switch(o) {
             case 'm':
-                mode = -1;
                 if ((strcmp(optarg, "RTTY") == 0) || (strcmp(optarg, "rtty") == 0)) {
                     mode = HORUS_MODE_RTTY;
                 }
                 if ((strcmp(optarg, "BINARY") == 0) || (strcmp(optarg, "binary") == 0)) {
                     mode = HORUS_MODE_BINARY;
                 }
-                if (mode = -1) {
+                if (mode == -1) {
                     fprintf(stderr, "use --mode RTTY or --mode binary\n");
                     exit(1);
                 }
