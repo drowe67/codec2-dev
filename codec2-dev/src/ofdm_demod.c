@@ -204,28 +204,35 @@ int main(int argc, char *argv[])
                 int    iter;
                 char   out_char[CODED_BITSPERFRAME];
                 int    parityCheckCount;
-        
-        
-                fprintf(stderr, "\n");
+                
                 for(i=0; i<CODED_BITSPERFRAME; i++) {
                     llr[i] = -bit_likelihood[i];
-                    if (i <5) {
-                        fprintf(stderr, "%d symb: %f %f a: %f llr %f\n", i,
-                                ldpc_codeword_symbols[i].real, ldpc_codeword_symbols[i].imag,
-                                ldpc_codeword_symbol_amps[i], llr[i]);
+                }
+
+                int ldpc_en = 1;
+                if (ldpc_en) {
+                    /* run LDPC decoder and output decoded bits */
+                    /* TODO
+                       [ ] how to test uncoded modem, maybe use LDPC encoded frame?
+                       [ ] log unsucessfully decoded frames, outout them anyway?
+                     */
+                    
+                    iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+                    #ifdef TODO
+                    if (testframes) {
+                        /* measure raw and coded BER */
+                        Terrs += Nerrs;
+                        Tbits += Nbitsperframe;
                     }
+                    
+                    if (frame_count >= NDISCARD) {
+                        Terrs2 += Nerrs;
+                        Tbits2 += Nbitsperframe;
+                    }
+                    #endif
                 }
                 
-                fprintf(stderr, "\n");
-        
-                iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                
                 fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
-                  /*
-                  for(i=0; i<CODED_BITSPERFRAME; i++) {
-                  fprintf(stderr, "%d ", out_char[i]);
-                  }
-                  */
 
                 fwrite(llr, sizeof(double), CODED_BITSPERFRAME, fout);
 
