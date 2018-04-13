@@ -17,9 +17,9 @@ function states = fsk_horus_init(Fs,Rs,M=2)
 
   % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
 
-  states.fest_fmin = 800;
-  states.fest_fmax = 2500;
-  states.fest_min_spacing = 200;
+  states.fest_fmin = 300;
+  states.fest_fmax = 2200;
+  states.fest_min_spacing = 100;
 
 endfunction
 
@@ -184,20 +184,23 @@ endfunction
 
 % Extract as many ASCII packets as we can from a great big buffer of bits
 
-function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
+function extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
 
   % use UWs to delimit start and end of data packets
 
   bit = 1;
   nbits = length(rx_bits_log);
-  nfield = states.rtty.nfield;
-  npad = states.rtty.npad;
+  nfield = rtty.nfield;
+  npad = rtty.npad;
 
-  uw_loc = find_uw(states.rtty, bit, rx_bits_log, states.verbose);
+  uw_loc = find_uw(rtty, bit, rx_bits_log, states.verbose);
   
   while (uw_loc != -1)
-
-    if (uw_loc + states.rtty.max_packet_len) < nbits
+    if bitand(states.verbose,0x8)
+      printf("nbits: %d max_packet_len: %d uw_loc: %d\n", nbits, rtty.max_packet_len, uw_loc);
+    end
+    
+    if (uw_loc + rtty.max_packet_len) < nbits
       % Now start picking out 7 bit ascii chars from frame.  It has some
       % structure so we can guess where fields are.  I hope we don't get
       % RS232 idle bits stuck into it anywhere, ie "bit fields" don't
@@ -211,15 +214,15 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
       %rx_bits_log(st+200) = xor(rx_bits_log(st+100),1);
       %rx_bits_sd_log(st+100) = 0;
       
-      [str crc_ok] = extract_ascii(states.rtty, rx_bits_log, uw_loc);
+      [str crc_ok] = extract_ascii(rtty, rx_bits_log, uw_loc);
 
       if crc_ok == 0
-        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(states.rtty, rx_bits_log, rx_bits_sd_log, uw_loc, uw_loc+states.rtty.max_packet_len); 
+        [str_flipped crc_flipped_ok rx_bits_log] = sd_bit_flipping(rtty, rx_bits_log, rx_bits_sd_log, uw_loc, uw_loc+rtty.max_packet_len); 
       end
 
       % update memory of previous packet, we use this to guess where errors may be
       if crc_ok || crc_flipped_ok
-        states.prev_pkt = rx_bits_log(uw_loc+length(states.rtty.uw):uw_loc+states.rtty.max_packet_len);
+        states.prev_pkt = rx_bits_log(uw_loc+length(rtty.uw):uw_loc+rtty.max_packet_len);
       end
 
       if crc_ok
@@ -236,8 +239,8 @@ function extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
 
     % look for next packet
 
-    bit = uw_loc + length(states.rtty.uw);
-    uw_loc = find_uw(states.rtty, bit, rx_bits_log, states.verbose);
+    bit = uw_loc + length(rtty.uw);
+    uw_loc = find_uw(rtty, bit, rx_bits_log, states.verbose);
 
   endwhile
 endfunction
@@ -309,7 +312,7 @@ endfunction
 %                     which is the same as Fs=921600 Rs=115200
 %                     Uses packet based BER counter
 
-function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
+function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_horus.raw")
   timing_offset = 0.0; % see resample() for clock offset below
   fading = 0;          % modulates tx power at 2Hz with 20dB fade depth, 
                        % to simulate balloon rotating at end of mission
@@ -337,8 +340,8 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100, 2);
     states.tx_bits_file = "horus_payload_rtty.txt"; % Octave file of bits we FSK modulate
-    uwstates = fsk_horus_init_rtty_uw(states);
-    states.ntestframebits = states.nbits;
+    rtty = fsk_horus_init_rtty;
+    states.ntestframebits = rtty.max_packet_len;
   end
                                
   if test_frame_mode == 5
@@ -428,10 +431,21 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
     test_frame = load(states.tx_bits_file);
     ltf = length(test_frame);
     ntest_frames = ceil((frames+1)*nbit/ltf);
-    tx_bits = [];
+    printf("Generating %d test frames\n", ntest_frames);
+
+    % 1 second of random bits to let estimators lock on
+
+    preamble = round(rand(1,states.Rs));
+
+    tx_bits = preamble;    
     for i=1:ntest_frames
       tx_bits = [tx_bits test_frame];
     end
+
+    % a packet len of random bits at end fill buffers to deocode final packet
+
+    postamble = round(rand(1,rtty.max_packet_len));
+    tx_bits = [tx_bits postamble];
   end
 
   if test_frame_mode == 6
@@ -462,7 +476,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
 
   % dump simulated rx file
 
-  ftx=fopen("fsk_horus.raw","wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
+  ftx=fopen(filename,"wb"); rxg = rx*1000; fwrite(ftx, rxg, "short"); fclose(ftx);
 
   timing_offset_samples = round(timing_offset*states.Ts);
   st = 1 + timing_offset_samples;
@@ -493,7 +507,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
       % demodulate to stream of bits
 
       states = est_freq(states, sf, states.M);
-      states.f = 900 + 2*states.Rs*(1:states.M);
+      %states.f = 900 + 2*states.Rs*(1:states.M);
       %states.f = [1200 1400 1600 1800];
       [rx_bits states] = fsk_demod(states, sf);
 
@@ -528,7 +542,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
   end
 
   if test_frame_mode == 4
-    extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
+    extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
   end
 
   if test_frame_mode == 5
@@ -599,8 +613,8 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=10
   if test_frame_mode == 4
     % horus rtty config ---------------------
     states = fsk_horus_init(8000, 100, 2);
-    uwstates = fsk_horus_init_rtty_uw(states);
-    states.ntestframebits = states.nbits;
+    rtty = fsk_horus_init_rtty;
+    states.ntestframebits = rtty.max_packet_len;
   end
                                
   if test_frame_mode == 5
@@ -809,7 +823,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(4, 2, 10, 100);
+  run_sim(4, 2, 30, 10);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
