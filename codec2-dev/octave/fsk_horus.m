@@ -9,11 +9,11 @@
 fsk_lib;
 
 
+% Basic modem set up for Horus
+
 function states = fsk_horus_init(Fs,Rs,M=2)
 
   states = fsk_init(Fs,Rs,M);
-  states.rtty = fsk_horus_init_rtty_uw(states);
-  states.binary = fsk_horus_init_binary_uw;
 
   % Freq. estimator limits - keep these narrow to stop errors with low SNR 4FSK
 
@@ -24,9 +24,9 @@ function states = fsk_horus_init(Fs,Rs,M=2)
 endfunction
 
 
-% init rtty protocol specifc states
+% init rtty protocol specific states
 
-function rtty = fsk_horus_init_rtty_uw(states)
+function rtty = fsk_horus_init_rtty
   % Generate unque word that correlates against the ASCII "$$$$$" that
   % is at the start of each frame.
   % $ -> 36 decimal -> 0 1 0 0 1 0 0 binary 
@@ -35,11 +35,10 @@ function rtty = fsk_horus_init_rtty_uw(states)
   mapped_db = 2*dollar_bits - 1;
   sync_bits = [1 1 0];
   mapped_sb = 2*sync_bits - 1;
-  %mapped_sb = [ 0 0 0 ];
 
   mapped = [mapped_db mapped_sb];
-  npad = rtty.npad = 3;     % one start and two stop bits between 7 bit ascii chars
-  nfield = rtty.nfield = 7; % length of ascii character field
+  npad   = rtty.npad   = 3;     % one start and two stop bits between 7 bit ascii chars
+  nfield = rtty.nfield = 7;     % length of ascii character field
 
   rtty.uw = [mapped mapped mapped mapped mapped];
   rtty.uw_thresh = length(rtty.uw) - 2; % allow a few bit errors when looking for UW
@@ -95,7 +94,7 @@ function [str crc_ok] = extract_ascii(states, rx_bits_buf, uw_loc)
   nfield = states.nfield;
   npad = states.npad;
 
-  str = []; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
+  str = ""; str_dec = []; nstr = 0; ptx_crc = 1; rx_crc = "";
   endpacket = 0;
 
   st = uw_loc + length(states.uw);  % first bit of first char
@@ -336,8 +335,10 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100)
 
   if test_frame_mode == 4
     % horus rtty config ---------------------
-    states = fsk_horus_init(8000, 100);
-    states.tx_bits_file = "horus_tx_bits_rtty.txt"; % Octave file of bits we FSK modulate
+    states = fsk_horus_init(8000, 100, 2);
+    states.tx_bits_file = "horus_payload_rtty.txt"; % Octave file of bits we FSK modulate
+    uwstates = fsk_horus_init_rtty_uw(states);
+    states.ntestframebits = states.nbits;
   end
                                
   if test_frame_mode == 5
@@ -808,7 +809,7 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  %run_sim(1, 2, 100, 9);
+  run_sim(4, 2, 10, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
@@ -826,5 +827,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
   %rx_bits = demod_file("~/Desktop/bench_test_003.wav",7);
-  rx_bits = demod_file("../build_linux/unittest/fskrx2.raw",8);
+  %rx_bits = demod_file("../build_linux/unittest/fskrx2.raw",8);
 end
