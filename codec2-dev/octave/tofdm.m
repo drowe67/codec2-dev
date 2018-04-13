@@ -35,9 +35,30 @@ states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
 ofdm_load_const;
 
+if cml_support
+  Nuwtxtsymbolsperframe = (states.Nuwbits+states.Ntxtbits)/bps;
+  S_matrix = [1, j, -j, -1];
+  EsNo = 10;
+  symbol_likelihood_log = bit_likelihood_log = detected_data_log = [];
+
+  % Set up LDPC code
+
+  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+  demod_type = 0; decoder_type = 0; max_iterations = 100;
+
+  load HRA_112_112.txt
+  [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+  assert(Nbitsperframe == (code_param.code_bits_per_frame + states.Nuwbits + states.Ntxtbits));
+end
+
 rand('seed',1);
 tx_bits = round(rand(1,Nbitsperframe));
-tx_bits(1:states.Nuwbits) = 0;
+if cml_support
+  ibits = tx_bits(Nuwbits+Ntxtbits+1:Nuwbits+Ntxtbits+code_param.data_bits_per_frame);
+  codeword = LdpcEncode(ibits, code_param.H_rows, code_param.P_matrix);
+  tx_bits(Nuwbits+Ntxtbits+1:end) = codeword;
+end
+tx_bits(1:Nuwbits+Ntxtbits) = 0;
 
 % Run tx loop
 
@@ -77,12 +98,6 @@ if states.timing_en == 0
   states.sample_point = Ncp;
 end
 
-if cml_support
-  Nuwtxtsymbolsperframe = (states.Nuwbits+states.Ntxtbits)/bps;
-  S_matrix = [1, j, -j, -1];
-  EsNo = 10;
-  symbol_likelihood_log = bit_likelihood_log = [];
-end
 
 for f=1:Nframes
 
@@ -122,9 +137,18 @@ for f=1:Nframes
   if cml_support
     symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end), S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end));
     bit_likelihood = Somap(symbol_likelihood);
+
+    [x_hat errors] = MpDecode(-bit_likelihood(1:code_param.code_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
+    detected_data = x_hat(max_iterations,:);
+
+    % make sure LDPC decoding is working OK
+    
+    assert(codeword == detected_data);
+    
     [m n] = size(symbol_likelihood);
     symbol_likelihood_log = [symbol_likelihood_log; reshape(symbol_likelihood,m*n,1)];
     bit_likelihood_log = [bit_likelihood_log; bit_likelihood'];
+    detected_data_log = [detected_data_log detected_data];
   end
   
 end
@@ -202,4 +226,5 @@ check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
 check(symbol_likelihood_log, symbol_likelihood_log_c, 'symbol_likelihood_log');
 check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
+check(detected_data_log, detected_data_log_c, 'detected_data');
 

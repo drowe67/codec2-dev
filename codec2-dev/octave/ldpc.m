@@ -84,9 +84,9 @@ function [detected_data errors] = ldpc_dec(code_param, max_iterations, demod_typ
 
     input_somap_c = zeros(1, code_param.code_bits_per_frame );
     bit_likelihood = Somap( symbol_likelihood, demod_type, input_somap_c );
-        
+    
     input_decoder_c = bit_likelihood(1:code_param.code_bits_per_frame);
-        
+
     [x_hat errors] = MpDecode( -input_decoder_c, code_param.H_rows, code_param.H_cols, ...
                               max_iterations, decoder_type, 1, 1);
     detected_data = x_hat(max_iterations,:);
