@@ -184,7 +184,7 @@ endfunction
 
 % Extract as many ASCII packets as we can from a great big buffer of bits
 
-function extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
+function npackets = extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
 
   % use UWs to delimit start and end of data packets
 
@@ -192,7 +192,8 @@ function extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_lo
   nbits = length(rx_bits_log);
   nfield = rtty.nfield;
   npad = rtty.npad;
-
+  npackets = 0;
+  
   uw_loc = find_uw(rtty, bit, rx_bits_log, states.verbose);
   
   while (uw_loc != -1)
@@ -227,6 +228,7 @@ function extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_lo
 
       if crc_ok
         str = sprintf("%s CRC OK", str);
+        npackets++;
       else
         if crc_flipped_ok
           str = sprintf("%s fixed", str_flipped);
@@ -252,7 +254,7 @@ endfunction
 % compile with:
 %   codec2-dev/src$ gcc horus_l2.c -o horus_l2 -Wall -DDEC_RX_BITS -DHORUS_L2_RX
 
-function corr_log = extract_and_decode_binary_packets(states, rx_bits_log)
+function corr_log = extract_and_decode_binary_packets(states, binary, rx_bits_log)
   corr_log = [];
 
   % use UWs to delimit start and end of data packets
@@ -260,12 +262,12 @@ function corr_log = extract_and_decode_binary_packets(states, rx_bits_log)
   bit = 1;
   nbits = length(rx_bits_log);
 
-  [uw_loc best_corr corr] = find_uw(states.binary, bit, rx_bits_log, states.verbose);
+  [uw_loc best_corr corr] = find_uw(binary, bit, rx_bits_log, states.verbose);
   corr_log = [corr_log corr];
 
   while (uw_loc != -1)
 
-    if (uw_loc+states.binary.max_packet_len) < nbits
+    if (uw_loc+binary.max_packet_len) < nbits
       % printf("uw_loc: %d best_corr: %d\n", uw_loc, best_corr);
 
       % OK we have a packet delimited by two UWs.  Lets convert the bit
@@ -292,8 +294,8 @@ function corr_log = extract_and_decode_binary_packets(states, rx_bits_log)
       system("../src/horus_l2");  % compile instructions above
     end
 
-    bit = uw_loc + length(states.binary.uw);
-    [uw_loc best_corr corr] = find_uw(states.binary, bit, rx_bits_log, states.verbose);
+    bit = uw_loc + length(binary.uw);
+    [uw_loc best_corr corr] = find_uw(binary, bit, rx_bits_log, states.verbose);
     corr_log = [corr_log corr];
    
   endwhile
@@ -431,7 +433,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
     test_frame = load(states.tx_bits_file);
     ltf = length(test_frame);
     ntest_frames = ceil((frames+1)*nbit/ltf);
-    printf("Generating %d test frames\n", ntest_frames);
+    printf("Generating %d test packets\n", ntest_frames);
 
     % 1 second of random bits to let estimators lock on
 
@@ -542,7 +544,8 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
   end
 
   if test_frame_mode == 4
-    extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
+    npackets = extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log);
+    printf("Received %d packets\n", npackets);
   end
 
   if test_frame_mode == 5
@@ -603,7 +606,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 
 % demodulate a file of 8kHz 16bit short samples --------------------------------
 
-function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=100)
+function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100)
   fin = fopen(filename,"rb"); 
   more off;
   read_complex = 0;
@@ -805,8 +808,12 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=10
   % we can decode both protocols at the same time
 
   if (test_frame_mode == 4) || (test_frame_mode == 5)
-    extract_and_print_rtty_packets(states, rx_bits_log, rx_bits_sd_log)
-    corr_log = extract_and_decode_binary_packets(states, rx_bits_log);
+    npackets = extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
+    printf("Received %d packets\n", npackets);
+
+    % mixed binary/rtty disabled for now
+    #{
+    corr_log = extract_and_decode_binary_packets(states, binary, rx_bits_log);
 
     figure(8);
     clf
@@ -815,6 +822,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode, noplot=0, EbNodB=10
     plot([1 length(corr_log)],[states.binary.uw_thresh states.binary.uw_thresh],'g');
     hold off;
     title('UW correlation');
+    #}
   end
 
 endfunction
@@ -825,7 +833,7 @@ endfunction
 if exist("fsk_horus_as_a_lib") == 0
   run_sim(4, 2, 30, 10);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
-  %rx_bits = demod_file("fsk_horus.raw",5);
+  %rx_bits = demod_file("fsk_horus.raw",4);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
