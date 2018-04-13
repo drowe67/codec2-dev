@@ -152,7 +152,7 @@ int horus_find_uw(struct horus *hstates) {
         
         corr = 0;
         for(j=0; j<hstates->uw_len; j++) {
-            corr += hstates->rx_bits[i+j]*hstates->uw[j];
+            corr += rx_bits_mapped[i+j]*hstates->uw[j];
         }
 
         /* peak pick maximum */
@@ -208,7 +208,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
 
         if (!endpacket && (char_dec == 42)) {
             endpacket = 1;
-            rx_crc = horus_l2_gen_crc16(ascii_out, nout);
+            rx_crc = horus_l2_gen_crc16((uint8_t*)ascii_out, nout);
             ptx_crc = pout + 2; /* start of tx CRC */
         }
 
@@ -284,7 +284,8 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     int i, j, uw_loc, valid_packet;
     
     assert(hstates != NULL);
-
+    valid_packet = 0;
+    
     /* shift buffer of bits to make room for new bits */
 
     int Nbits = hstates->fsk->Nbits;
@@ -345,12 +346,15 @@ int horus_get_max_demod_in(struct horus *hstates) {
 }
 
 int horus_get_max_ascii_out_len(struct horus *hstates) {
+    assert(hstates != NULL);
     if (hstates->mode == HORUS_MODE_RTTY) {
         return hstates->max_packet_len/10;     /* 7 bit ASCII, plus 3 sync bits */
     }
     if (hstates->mode == HORUS_MODE_BINARY) {
         return HORUS_BINARY_NUM_PAYLOAD_BYTES;
     }
+    assert(0); /* should never get here */
+    return 0;
 }
 
 void horus_get_modem_stats(struct horus *hstates, int *sync, float *snr_est) {
