@@ -85,6 +85,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
         fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
+        fprintf(stderr, "   --listcodes             List available LDPC codes\n");
         fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
@@ -220,6 +221,7 @@ int main(int argc, char *argv[])
                 input_double[i] = 0.0;
             }
         }
+        fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
 
         while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
             if (sdinput) {
@@ -232,7 +234,7 @@ int main(int argc, char *argv[])
 
                 // Output data bits if decoder converged, or was
                 // within 10% of all parity checks converging (10% est
-                // BER).  usefule for real world operation as it can
+                // BER).  useful for real world operation as it can
                 // resync and won't send crappy packets to the decoder
                 
                 float ber_est = (float)(ldpc.NumberParityBits - parityCheckCount)/ldpc.NumberParityBits;
@@ -265,7 +267,7 @@ int main(int argc, char *argv[])
                     break;
                 }
                 state = next_state;
-                //fprintf(stderr, "state: %d iter: %d\n", state, iter);
+                fprintf(stderr, "state: %d iter: %d\n", state, iter);
             }
 
             for(i=0; i<offset; i++) {
