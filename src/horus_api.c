@@ -43,16 +43,17 @@
 struct horus {
     int         mode;
     int         verbose;
-    struct FSK *fsk;                 /* states for FSK modem              */
-    int         Fs;                  /* sample rate in Hz                 */
-    int         mFSK;                /* number of FSK tones               */
-    int         Rs;                  /* symbol rate in Hz                 */
-    int8_t      uw[MAX_UW_LENGTH];   /* unique word bits mapped to +/-1   */
-    int         uw_thresh;           /* threshold for UW detection        */
-    int         uw_len;              /* length of unique word             */
-    int         max_packet_len;      /* max length of a telemetry packet  */
-    uint8_t    *rx_bits;             /* buffer of received bits           */
-    int         rx_bits_len;         /* length of rx_bits buffer          */
+    struct FSK *fsk;                 /* states for FSK modem                */
+    int         Fs;                  /* sample rate in Hz                   */
+    int         mFSK;                /* number of FSK tones                 */
+    int         Rs;                  /* symbol rate in Hz                   */
+    int8_t      uw[MAX_UW_LENGTH];   /* unique word bits mapped to +/-1     */
+    int         uw_thresh;           /* threshold for UW detection          */
+    int         uw_len;              /* length of unique word               */
+    int         max_packet_len;      /* max length of a telemetry packet    */
+    uint8_t    *rx_bits;             /* buffer of received bits             */
+    int         rx_bits_len;         /* length of rx_bits buffer            */
+    int         crc_ok;              /* most recent packet checksum results */
 };
 
 /* Unique word for Horus RTTY 7 bit '$' character, 3 sync bits,
@@ -119,6 +120,8 @@ struct horus *horus_open (int mode) {
     for(i=0; i<hstates->rx_bits_len; i++) {
         hstates->rx_bits[i] = 0;
     }
+
+    hstates->crc_ok = 0;
     
     return hstates;
 }
@@ -188,7 +191,7 @@ int hex2int(char ch) {
 int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
     const int nfield = 7;                               /* 7 bit ASCII                    */
     const int npad   = 3;                               /* 3 sync bits between characters */
-    int st = uw_loc + hstates->uw_len;                  /* first bit of first char        */
+    int st = uw_loc;                                    /* first bit of first char        */
     int en = hstates->max_packet_len - nfield;          /* last bit of max length packet  */
 
     int      i, j, endpacket, nout, crc_ok;
@@ -218,7 +221,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
 
         if (!endpacket && (char_dec == 42)) {
             endpacket = 1;
-            rx_crc = horus_l2_gen_crc16((uint8_t*)ascii_out, nout);
+            rx_crc = horus_l2_gen_crc16((uint8_t*)&ascii_out[5], nout-5);
             ptx_crc = pout + 1; /* start of tx CRC */
         }
 
@@ -241,7 +244,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
             //fprintf(stderr, "ptx_crc[%d] %c 0x%02X tx_crc: 0x%04X\n", i, ptx_crc[i], hex2int(ptx_crc[i]), tx_crc);
         }
         crc_ok = (tx_crc == rx_crc);
-        *(ptx_crc-1) = 0;  /* terminate ASCII string */
+        *(ptx_crc+4) = 0;  /* terminate ASCII string */
     }
     else {
         *ascii_out = 0;
@@ -255,6 +258,8 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
     /* make sure we don't overrun storage */
     
     assert(nout <= horus_get_max_ascii_out_len(hstates));
+
+    hstates->crc_ok = crc_ok;
     
     return crc_ok;
 }
@@ -301,6 +306,14 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     uint8_t payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES];
     horus_l2_decode_rx_packet(payload_bytes, rxpacket, HORUS_BINARY_NUM_PAYLOAD_BYTES);
 
+    uint16_t crc_tx, crc_rx;
+    crc_rx = horus_l2_gen_crc16(payload_bytes, HORUS_BINARY_NUM_PAYLOAD_BYTES-2);
+    crc_tx = *(uint16_t*)&payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES-2];
+    
+    if (hstates->verbose) {
+        fprintf(stderr, "crc_tx: %04X crc_rx: %04X\n", crc_tx, crc_rx);
+    }
+    
     /* convert to ASCII string of hex characters */
 
     hex_out[0] = 0;
@@ -313,16 +326,20 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     if (hstates->verbose) {
         fprintf(stderr, "nout: %d\nDecoded Payload bytes:\n%s", nout, hex_out);
     }
+
+    hstates->crc_ok = (crc_tx == crc_rx);
+
+    /* binary packets always marked as OK, as next layer determines validity */
     
     return 1;
 }
 
 
 int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
-    int i, j, uw_loc, valid_packet;
+    int i, j, uw_loc, packet_detected;
     
     assert(hstates != NULL);
-    valid_packet = 0;
+    packet_detected = 0;
 
     int Nbits = hstates->fsk->Nbits;
     int rx_bits_len = hstates->rx_bits_len;
@@ -359,10 +376,10 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
            a packet, so lets try to extract valid packets */
 
         if (hstates->mode == HORUS_MODE_RTTY) {
-            valid_packet = extract_horus_rtty(hstates, ascii_out, uw_loc);
+            packet_detected = extract_horus_rtty(hstates, ascii_out, uw_loc);
         }
         if (hstates->mode == HORUS_MODE_BINARY) {
-            valid_packet = extract_horus_binary(hstates, ascii_out, uw_loc);
+            packet_detected = extract_horus_binary(hstates, ascii_out, uw_loc);
             //#define DUMP_BINARY_PACKET
             #ifdef DUMP_BINARY_PACKET
             FILE *f = fopen("packetbits.txt", "wt"); assert(f != NULL);
@@ -375,7 +392,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
         }
     }
      
-    return valid_packet;
+    return packet_detected;
 }
 
 int horus_get_version(void) {
@@ -447,5 +464,10 @@ void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *
 void horus_set_verbose(struct horus *hstates, int verbose) {
     assert(hstates != NULL);
     hstates->verbose = verbose;
+}
+
+int horus_crc_ok(struct horus *hstates) {
+    assert(hstates != NULL);
+    return hstates->crc_ok;
 }
 

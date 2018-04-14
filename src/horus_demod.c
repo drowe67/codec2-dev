@@ -49,14 +49,14 @@ int main(int argc, char *argv[]) {
     struct   MODEM_STATS stats;
     FILE    *fin,*fout;
     int      i,j,Ndft,mode;
-    int      stats_ctr,stats_loop, stats_rate, verbose;
+    int      stats_ctr,stats_loop, stats_rate, verbose, crc_results;
     float    loop_time;
     int      enable_stats = 0;
 
     stats_loop = 0;
     stats_rate = 8;
     mode = -1;
-    verbose = 0;
+    verbose = crc_results = 0;
     
     int o = 0;
     int opt_idx = 0;
@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hvm:t::",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hvcm:t::",long_opts,&opt_idx);
         
         switch(o) {
             case 'm':
@@ -95,6 +95,9 @@ int main(int argc, char *argv[]) {
             case 'v':
                 verbose = 1;
             break;    
+            case 'c':
+                crc_results = 1;
+            break;    
             case 'h':
             case '?':
                 goto helpmsg;
@@ -112,15 +115,16 @@ int main(int argc, char *argv[]) {
     if( (argc - dx) > 5){
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
-        fprintf(stderr,"usage: %s -m RTTY|binary [-v] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
+        fprintf(stderr,"usage: %s -m RTTY|binary [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
         fprintf(stderr,"\n");
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
         fprintf(stderr,"--mode=RTTY|binary[r]  RTTY or binary Horus protcols\n");
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
-                "                       between statistic printouts\n");
+                       "                       between statistic printouts\n");
         fprintf(stderr," -v                    verbose debug info\n");
+        fprintf(stderr," -c                    display CRC results for each packet\n");
         exit(1);
     }
         
@@ -175,7 +179,15 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "read nin %d\n", horus_nin(hstates));
         }
         if (horus_rx(hstates, ascii_out, demod_in)) {
-            fprintf(stdout, "%s\n", ascii_out);
+            fprintf(stdout, "%s", ascii_out);
+            if (crc_results) {
+                if (horus_crc_ok(hstates)) {
+                    fprintf(stdout, "  CRC OK");
+                } else {
+                    fprintf(stdout, "  CRC BAD");
+                }
+            }
+            fprintf(stdout, "\n");
         }
         
         if (enable_stats && stats_ctr <= 0) {
