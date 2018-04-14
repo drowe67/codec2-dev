@@ -61,7 +61,7 @@ telem_upload_command = "python telem_upload.py -c vk5dgr_Octave";
 more off;
 states = fsk_horus_init(8000, Rs, mFSK);
 rtty = fsk_horus_init_rtty;
-binary = fsk_horus_init_binary_uw;
+binary = fsk_horus_init_binary;
 N = states.N;
 Rs = states.Rs;
 nsym = states.nsym;
