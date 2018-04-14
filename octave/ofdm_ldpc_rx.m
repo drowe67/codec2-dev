@@ -56,10 +56,10 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   
   % OK generate tx frame for BER calcs
 
-  rand('seed', 100);
+  rand('seed', 1);
+  atx_bits = round(rand(1,code_param.data_bits_per_frame));
   tx_bits = []; tx_codewords = [];
   for f=1:interleave_frames
-    atx_bits = round(rand(1,code_param.data_bits_per_frame));
     tx_bits = [tx_bits atx_bits];
     acodeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
     tx_codewords = [tx_codewords acodeword];

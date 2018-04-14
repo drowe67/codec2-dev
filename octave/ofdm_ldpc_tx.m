@@ -64,10 +64,15 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
 
   % OK generate an interleaver frame of codewords from random data bits
 
-  rand('seed', 100);
+  % use single frame of test bits with seed of 1
+  % to keep compatable with ofdm_test_bits.c and friends
+  % as per create_ldpc_test_frame
+  
+  rand('seed', 1);
+  atx_bits = round(rand(1,code_param.data_bits_per_frame));
+  
   tx_bits = tx_symbols = [];
   for f=1:interleave_frames
-    atx_bits = round(rand(1,code_param.data_bits_per_frame));
     tx_bits = [tx_bits atx_bits];
     codeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
     for b=1:2:code_param.code_bits_per_frame

@@ -25,10 +25,8 @@ function ofdm_rx(filename, error_pattern_filename)
 
   % OK re-generate tx frame for BER calcs
 
-  rand('seed', 1);
-  tx_bits = round(rand(1,Nbitsperframe));
-  tx_bits(1:states.Nuwbits) = 0;   % insert UW
- 
+  tx_bits = create_ldpc_test_frame;
+
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
