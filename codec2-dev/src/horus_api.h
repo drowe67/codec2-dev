@@ -52,6 +52,10 @@ uint32_t      horus_nin   (struct horus *hstates);
       
 int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_in[]);
 
+/* set verbose level */
+      
+void horus_set_verbose(struct horus *hstates, int verbose);
+      
 /* functions to get information from API  */
       
 int           horus_get_version              (void);
