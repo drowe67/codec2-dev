@@ -103,6 +103,7 @@ struct horus *horus_open (int mode) {
         }
         hstates->uw_len = sizeof(uw_horus_binary);
         hstates->uw_thresh = sizeof(uw_horus_binary) - 2; /* allow a few bit errors in UW detection */
+        horus_l2_init();
     }
    
     hstates->fsk = fsk_create(hstates->Fs, hstates->Rs, hstates->mFSK, 1000, 2*hstates->Rs);
@@ -258,9 +259,9 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
 
 
 int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
-    const int nfield = 8;                               /* 8 bit binary                   */
-    int st = uw_loc + hstates->uw_len;                  /* first bit of first char        */
-    int en = uw_loc + hstates->max_packet_len - nfield; /* last bit of max length packet  */
+    const int nfield = 8;                      /* 8 bit binary                   */
+    int st = uw_loc;                           /* first bit of first char        */
+    int en = uw_loc + hstates->max_packet_len; /* last bit of max length packet  */
 
     int      j, b, nout;
     uint8_t  rxpacket[hstates->max_packet_len];
@@ -287,9 +288,30 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
         nout++;
     }
 
+    if (hstates->verbose) {
+        fprintf(stderr, "nout: %d\nReceived Packet before decoding:\n", nout);
+        for (b=0; b<nout; b++) {
+            fprintf(stderr, "%02X", rxpacket[b]);
+        }
+        fprintf(stderr, "\n");
+    }
+    
     uint8_t payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES];
     horus_l2_decode_rx_packet(payload_bytes, rxpacket, HORUS_BINARY_NUM_PAYLOAD_BYTES);
 
+    /* convert to ASCII string of hex characters */
+
+    hex_out[0] = 0;
+    char hex[3];
+    for (b=0; b<HORUS_BINARY_NUM_PAYLOAD_BYTES; b++) {
+        sprintf(hex, "%02X", payload_bytes[b]);
+        strcat(hex_out, hex);
+    }
+   
+    if (hstates->verbose) {
+        fprintf(stderr, "nout: %d\nDecoded Payload bytes:\n%s", nout, hex_out);
+    }
+    
     return 1;
 }
 

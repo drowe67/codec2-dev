@@ -14,6 +14,8 @@
 
     $ sox ~/Desktop/horus.wav -r 48000 -t raw - | ./horus_demod -m RTTY -v - /dev/nul/
 
+    $ sox ~/Desktop/4FSK_binary_100Rb_8khzfs.wav -r 48000 -t raw - | ./horus_demod -m binary  - -
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -167,7 +169,7 @@ int main(int argc, char *argv[]) {
     
     /* Main loop ----------------------------------------------------------------------- */
 
-    while( fread(demod_in, sizeof(short), horus_nin(hstates), fin) == horus_nin(hstates) ) {
+    while(fread(demod_in, sizeof(short), horus_nin(hstates), fin) ==  horus_nin(hstates)) {
 
         if (verbose) {
             fprintf(stderr, "read nin %d\n", horus_nin(hstates));

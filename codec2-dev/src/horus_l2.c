@@ -109,6 +109,9 @@ int horus_l2_get_num_tx_data_bytes(int num_payload_data_bytes) {
     return num_tx_data_bytes;
 }
 
+void horus_l2_init(void) {
+    golay23_init();
+}
 
 /*
   Takes an array of payload data bytes, prepends a unique word and appends
