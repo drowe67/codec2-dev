@@ -10,6 +10,10 @@
  
   Can operate in Horus RTTY or Binary mode.
 
+  Testing with a 8000Hz sample rate wave file:
+
+    $ sox ~/Desktop/horus.wav -r 48000 -t raw - | ./horus_demod -m RTTY -v - /dev/nul/
+
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -43,14 +47,15 @@ int main(int argc, char *argv[]) {
     struct   MODEM_STATS stats;
     FILE    *fin,*fout;
     int      i,j,Ndft,mode;
-    int      stats_ctr,stats_loop, stats_rate;
+    int      stats_ctr,stats_loop, stats_rate, verbose;
     float    loop_time;
     int      enable_stats = 0;
 
     stats_loop = 0;
     stats_rate = 8;
     mode = -1;
-
+    verbose = 0;
+    
     int o = 0;
     int opt_idx = 0;
     while ( o != -1 ) {
@@ -61,7 +66,7 @@ int main(int argc, char *argv[]) {
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hm:t::",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hvm:t::",long_opts,&opt_idx);
         
         switch(o) {
             case 'm':
@@ -85,56 +90,65 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 break;
+            case 'v':
+                verbose = 1;
+            break;    
             case 'h':
             case '?':
                 goto helpmsg;
                 break;
         }
-
-        int dx = optind;
+    }
     
-        if( (argc - dx) < 1) {
-            fprintf(stderr, "Too few arguments\n");
-            goto helpmsg;
-        }
+    int dx = optind;
     
-        if( (argc - dx) > 5){
-            fprintf(stderr, "Too many arguments\n");
-        helpmsg:
-            fprintf(stderr,"usage: %s -m RTTY|binary [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
-            fprintf(stderr,"\n");
-            fprintf(stderr,"InputModemRawFile      -  48 kHz 16 bit shorts real modem signal from radio\n");
-            fprintf(stderr," -m RTTY|binary\n"); 
-            fprintf(stderr,"--mode=RTTY|binary[r]  -  RTTY or binary Horus protcols\n");
-            fprintf(stderr," -t[r] --stats=[r]     -  Print out modem statistics to stderr in JSON.\n");
-            fprintf(stderr,"                          r, if provided, sets the number of modem frames"
-                                                 "between statistic printouts\n");
-            exit(1);
-        }
+    if( (argc - dx) < 1) {
+        fprintf(stderr, "Too few arguments\n");
+        goto helpmsg;
+    }
+    
+    if( (argc - dx) > 5){
+        fprintf(stderr, "Too many arguments\n");
+    helpmsg:
+        fprintf(stderr,"usage: %s -m RTTY|binary [-v] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
+        fprintf(stderr,"\n");
+        fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
+        fprintf(stderr," -m RTTY|binary\n"); 
+        fprintf(stderr,"--mode=RTTY|binary[r]  RTTY or binary Horus protcols\n");
+        fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
+        fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
+                "                       between statistic printouts\n");
+        fprintf(stderr," -v                    verbose debug info\n");
+        exit(1);
+    }
         
-        /* Open files */
+    /* Open files */
 
-        if (strcmp(argv[dx + 1],"-")==0) {
-            fin = stdin;
-        } else {
-            fin = fopen(argv[dx + 1],"rb");
-        }
+    if (verbose) {
+         fprintf(stderr, "mode: %d verbose: %d stats_loop: %d stats_rate: %d\n",mode, verbose, stats_loop, stats_rate);
+    }
+    if (strcmp(argv[dx],"-")==0) {
+        fin = stdin;
+    } else {
+        fin = fopen(argv[dx],"rb");
+    }
     
-        if (strcmp(argv[dx + 2],"-")==0) {
-            fout = stdout;
-        } else {
-            fout = fopen(argv[dx + 4],"w");
-        }
+    if (strcmp(argv[dx + 1],"-")==0) {
+        fout = stdout;
+    } else {
+        fout = fopen(argv[dx + 1],"w");
+    }
         
-        if ((fin==NULL) || (fout==NULL)) {
-            fprintf(stderr,"Couldn't open test vector files\n");
-            exit(1);
-        }
+    if ((fin==NULL) || (fout==NULL)) {
+        fprintf(stderr,"Couldn't open test vector files\n");
+        exit(1);
     }
 
     /* end command line processing */
 
     hstates = horus_open(mode);
+    horus_set_verbose(hstates, verbose);
+    
     if (hstates == NULL) {
         fprintf(stderr, "Couldn't open Horus API\n");
         exit(1);
@@ -154,7 +168,10 @@ int main(int argc, char *argv[]) {
     /* Main loop ----------------------------------------------------------------------- */
 
     while( fread(demod_in, sizeof(short), horus_nin(hstates), fin) == horus_nin(hstates) ) {
- 
+
+        if (verbose) {
+            fprintf(stderr, "read nin %d\n", horus_nin(hstates));
+        }
         if (horus_rx(hstates, ascii_out, demod_in)) {
             fprintf(stdout, "%s\n", ascii_out);
         }
