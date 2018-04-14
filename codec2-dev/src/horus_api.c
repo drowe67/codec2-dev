@@ -93,6 +93,7 @@ struct horus *horus_open (int mode) {
         }        
         hstates->uw_len = sizeof(uw_horus_rtty);
         hstates->uw_thresh = sizeof(uw_horus_rtty) - 2;  /* allow a few bit errors in UW detection */
+        hstates->rx_bits_len = hstates->max_packet_len;
     }
 
     if (mode == HORUS_MODE_BINARY) {
@@ -104,6 +105,7 @@ struct horus *horus_open (int mode) {
         hstates->uw_len = sizeof(uw_horus_binary);
         hstates->uw_thresh = sizeof(uw_horus_binary) - 2; /* allow a few bit errors in UW detection */
         horus_l2_init();
+        hstates->rx_bits_len = hstates->max_packet_len;
     }
    
     hstates->fsk = fsk_create(hstates->Fs, hstates->Rs, hstates->mFSK, 1000, 2*hstates->Rs);
@@ -111,7 +113,7 @@ struct horus *horus_open (int mode) {
     /* allocate enough room for two packets so we know there will be
        one complete packet if we find a UW at start */
     
-    hstates->rx_bits_len = 2*hstates->max_packet_len;
+    hstates->rx_bits_len += hstates->fsk->Nbits;
     hstates->rx_bits = (uint8_t*)malloc(hstates->rx_bits_len);
     assert(hstates->rx_bits != NULL);
     for(i=0; i<hstates->rx_bits_len; i++) {
@@ -187,7 +189,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
     const int nfield = 7;                               /* 7 bit ASCII                    */
     const int npad   = 3;                               /* 3 sync bits between characters */
     int st = uw_loc + hstates->uw_len;                  /* first bit of first char        */
-    int en = uw_loc + hstates->max_packet_len - nfield; /* last bit of max length packet  */
+    int en = hstates->max_packet_len - nfield;          /* last bit of max length packet  */
 
     int      i, j, endpacket, nout, crc_ok;
     uint8_t  char_dec;
