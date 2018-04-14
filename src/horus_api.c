@@ -361,6 +361,15 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
         }
         if (hstates->mode == HORUS_MODE_BINARY) {
             valid_packet = extract_horus_binary(hstates, ascii_out, uw_loc);
+            //#define DUMP_BINARY_PACKET
+            #ifdef DUMP_BINARY_PACKET
+            FILE *f = fopen("packetbits.txt", "wt"); assert(f != NULL);
+            for(i=0; i<hstates->max_packet_len; i++) {
+                fprintf(f,"%d ", hstates->rx_bits[uw_loc+i]);
+            }
+            fclose(f);
+            exit(0);
+            #endif
         }
     }
      
