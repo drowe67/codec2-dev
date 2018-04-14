@@ -11,6 +11,10 @@
 
 int horus_l2_get_num_tx_data_bytes(int num_payload_data_bytes);
 
+/* call this first */
+
+void horus_l2_init(void);
+
 /* returns number of output bytes in output_tx_data */
 
 int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
