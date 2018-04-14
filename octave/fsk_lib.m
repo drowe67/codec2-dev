@@ -31,7 +31,7 @@ function states = fsk_init(Fs, Rs, M=2)
 
   Nmem = states.Nmem  = N+2*Ts;                   % two symbol memory in down converted signals to allow for timing adj
 
-  states.Sf = zeros(states.Ndft/2,1); % current memory of dft mag samples
+  states.Sf = zeros(states.Ndft/2,1);             % current memory of dft mag samples
   states.f_dc = zeros(M,Nmem);
   states.P = 8;                                   % oversample rate out of filter
   assert(Ts/states.P == floor(Ts/states.P), "Ts/P must be an integer");
