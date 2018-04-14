@@ -174,12 +174,6 @@ while c
       pin = uw_loc; 
       nbytes = binary.max_packet_len/8;
       for i=1:nbytes
-        if (pin+7) > nbits
-          pin
-          nbits
-          uw_loc
-          binary.max_packet_len
-        end
         rx_bytes(i) = rx_bits_buf(pin:pin+7) * (2.^(7:-1:0))';
         pin += 8;
         %printf("%d 0x%02x\n", i, rx_bytes(i));

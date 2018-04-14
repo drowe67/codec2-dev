@@ -48,7 +48,7 @@ endfunction
 
 % I think this is the binary protocol work from Jan 2016
 
-function binary = fsk_horus_init_binary_uw
+function binary = fsk_horus_init_binary
   % Generate 16 bit "$$" unique word that is at the front of every horus binary
   % packet
 
@@ -264,7 +264,7 @@ function corr_log = extract_and_decode_binary_packets(states, binary, rx_bits_lo
 
   [uw_loc best_corr corr] = find_uw(binary, bit, rx_bits_log, states.verbose);
   corr_log = [corr_log corr];
-
+  
   while (uw_loc != -1)
 
     if (uw_loc+binary.max_packet_len) < nbits
@@ -299,6 +299,7 @@ function corr_log = extract_and_decode_binary_packets(states, binary, rx_bits_lo
     corr_log = [corr_log corr];
    
   endwhile
+  
 endfunction
  
 
@@ -348,8 +349,10 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 50, 4);
+    states = fsk_horus_init(8000, 100, 4);
+    binary = fsk_horus_init_binary;
     states.tx_bits_file = "horus_tx_bits_binary.txt"; % Octave file of bits we FSK modulate
+    states.ntestframebits = binary.max_packet_len;
   end
 
   if test_frame_mode == 6
@@ -446,7 +449,11 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 
     % a packet len of random bits at end fill buffers to deocode final packet
 
-    postamble = round(rand(1,rtty.max_packet_len));
+    if test_frame_mode == 4
+      postamble = round(rand(1,rtty.max_packet_len));
+    else
+      postamble = round(rand(1,binary.max_packet_len));
+    end
     tx_bits = [tx_bits postamble];
   end
 
@@ -549,7 +556,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
   end
 
   if test_frame_mode == 5
-    extract_and_decode_binary_packets(states, rx_bits_log);
+    extract_and_decode_binary_packets(states, binary, rx_bits_log);
   end
 
   figure(1);
@@ -622,9 +629,9 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
                                
   if test_frame_mode == 5
     % horus binary config ---------------------
-    states = fsk_horus_init(8000, 50, 4);
-    uwstates = fsk_horus_init_binary_uw;
-    states.ntestframebits = states.nbits;
+    states = fsk_horus_init(8000, 100, 4);
+    binary = fsk_horus_init_binary;
+    states.ntestframebits = binary.max_packet_len;
   end
 
   states.verbose = 0x1 + 0x8;
@@ -807,22 +814,21 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   % we can decode both protocols at the same time
 
-  if (test_frame_mode == 4) || (test_frame_mode == 5)
+  if (test_frame_mode == 4)
     npackets = extract_and_print_rtty_packets(states, rtty, rx_bits_log, rx_bits_sd_log)
     printf("Received %d packets\n", npackets);
-
-    % mixed binary/rtty disabled for now
-    #{
+  end
+  
+  if (test_frame_mode == 5)
     corr_log = extract_and_decode_binary_packets(states, binary, rx_bits_log);
-
+    
     figure(8);
     clf
     plot(corr_log);
     hold on;
-    plot([1 length(corr_log)],[states.binary.uw_thresh states.binary.uw_thresh],'g');
+    plot([1 length(corr_log)],[binary.uw_thresh binary.uw_thresh],'g');
     hold off;
     title('UW correlation');
-    #}
   end
 
 endfunction
@@ -831,9 +837,10 @@ endfunction
 % run test functions from here during development
 
 if exist("fsk_horus_as_a_lib") == 0
-  run_sim(4, 2, 30, 10);
+  %run_sim(4, 2, 30, 10);
+  run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
-  %rx_bits = demod_file("fsk_horus.raw",4);
+  %rx_bits = demod_file("fsk_horus.raw",5);
   %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
