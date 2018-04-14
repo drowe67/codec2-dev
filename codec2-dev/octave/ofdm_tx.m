@@ -30,9 +30,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
-  rand('seed', 1);
-  tx_bits = round(rand(1,Nbitsperframe));
-  tx_bits(1:states.Nuwbits) = 0; % insert UW
+  tx_bits = create_ldpc_test_frame;
   
   tx = [];
   for f=1:Nframes
