@@ -9,7 +9,7 @@
  
   i) 4 frame interleaver, 10 seconds, AWGN channel at (coded) Eb/No=3dB
 
-    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw',4, 10,3);
+    octave:4> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw', 4, 10,3);
 
   ii) 4 frame interleaver, 10 seconds, HF channel at (coded) Eb/No=6dB
 
@@ -32,7 +32,7 @@
  
 #}
 
-function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -69,9 +69,9 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
   % as per create_ldpc_test_frame
   
   rand('seed', 1);
-  atx_bits = round(rand(1,code_param.data_bits_per_frame));
   
   tx_bits = tx_symbols = [];
+  atx_bits = round(rand(1,code_param.data_bits_per_frame));
   for f=1:interleave_frames
     tx_bits = [tx_bits atx_bits];
     codeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
@@ -79,9 +79,8 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
       tx_symbols = [tx_symbols qpsk_mod(codeword(b:b+1))];
     end
   end
- 
   tx_symbols = gp_interleave(tx_symbols);
-
+  
   % generate UW and txt symbols to prepend to every frame after LDPC encoding and interleaving
   
   tx_uw_tx_bits = [zeros(1,Nuwbits) zeros(1,Ntxtbits)];
@@ -140,7 +139,8 @@ function ofdm_ldpc_tx(filename, Nsec, interleave_frames = 1, EbNodB=100, channel
   woffset = 2*pi*freq_offset_Hz/Fs;
 
   SNRdB = EbNodB + 10*log10(Nc*bps*Rs*rate/3000);
-  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz ", EbNodB, SNRdB, freq_offset_Hz);
+  printf("EbNo: %3.1f dB  SNR(3k) est: %3.1f dB  foff: %3.1fHz inter_frms: %d ",
+         EbNodB, SNRdB, freq_offset_Hz, interleave_frames);
 
   % set up HF model ---------------------------------------------------------------
 

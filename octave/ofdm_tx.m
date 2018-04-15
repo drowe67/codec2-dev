@@ -16,6 +16,8 @@
     ofdm_tx('hf_ebno_6dB_700d.raw', 10, 6, 'hf');
 #}
 
+% Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
+% raw EbNodB used in ofdm_tx() at uncoded bit rate
 
 function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0)
   ofdm_lib;
