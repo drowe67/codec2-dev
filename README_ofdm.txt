@@ -38,9 +38,9 @@ Built as part of codec2-dev, see README for build instructions.
 
     build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | play -t raw -r 8000 -s -2 -
 
-2. Generate 10 seconds of test frame bits, modulate, and play audio:
+2. Generate 10 seconds of test frame bits, modulate, demodulate, count errors:
 
-    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod - - | ./ofdm_put_test_bits -
+    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod -t - /dev/null
 
     (TODO write ofdm_demod_c.m)
     Use Octave to look at plots of C modem operation:
@@ -58,14 +58,23 @@ Built as part of codec2-dev, see README for build instructions.
      octave:1> ofdm_rx("ofdm_test.raw")
 
    The Octave modulator ofdm_tx can simulate channel impairments, for
-   example AWGN noise at an Eb/No of 4dB:
+   example AWGN noise at an Eb/No of 4dB measured on 1400 bit/s raw
+   uncoded bits:
 
      octave:1> ofdm_tx("ofdm_test.raw",10, 4)
 
    The Octave versions use the same test frames as C so can interoperate.
 
-     build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw - | ./ofdm_put_test_bits -
-     
+     build_linux/src$ ./ofdm_demod -t ../../octave/ofdm_test.raw /dev/null 
+
+5. Run mod/demod with LDPC FEC; 4 frame interleaver, 60 seconds, 3dB
+   Eb/No, Eb/No measured on 700 bit/s payload data bits.  For rate 1/2
+   code this is equivalent to 0dB on 1400 bit/s uncoded bits (0dB
+   Eb/No argument for ofdm_tx())
+
+     octave:6> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw',4,60,3)
+     octave:7> ofdm_ldpc_rx('awgn_ebno_3dB_700d.raw',4)
+  
 Acceptance Tests
 ----------------
 
@@ -95,18 +104,23 @@ ofdm.c             - OFDM library
 codec2_ofdm.h      - API header file for OFDM library 
 ofdm_get_test_bits - generate OFDM test frames
 ofdm_mod           - OFDM modulator command line program
-ofdm_demod         - OFDM demodulator command line program
+ofdm_demod         - OFDM demodulator command line program, supports uncoded
+                     (raw) and LDPC coded test frames, LDPC decoding
+                     of codec data, interleaving, and can output LLRs to external
+                     LDPC decoder                    
 ofdm_put_test_bits - measure BER in OFDM test frames
 unittest/tofdm     - Run C port of modem to compare with octave version (see octave/tofdm)
 
 Octave Scripts
 --------------
 
-ofdm_lib - OFDM library 
-ofdm_dev - used for modem development, run various simulations
-ofdm_tx  - modulate test frames to a file of sample, cam add channel impairments
-ofdm_rx  - demod from a sample file and count errors
-tofdm    - Compares Octave and C ports of modem
+ofdm_lib     - OFDM library 
+ofdm_dev     - used for modem development, run various simulations
+ofdm_tx      - modulate test frames to a file of sample, cam add channel impairments
+ofdm_rx      - demod from a sample file and count errors
+tofdm        - Compares Octave and C ports of modem
+ofdm_ldpc_tx - OFDM modulator with interleaver and (224,112) LDPC code
+ofdm_ldpc_rx - OFDM demodulator with interleaver and (224,112) LDPC code, interleaver sync
 
 Specifications (Nominal FreeDV 700D configuration)
 --------------------------------------------------
@@ -122,6 +136,7 @@ Cyclic Prefix.: 2ms (note 1)
 Pilot rate....: 1 in every 8 symbols
 Frame Period..: 160ms
 FEC...........: rate 1/2 (224,112) LDPC
+Interleaving..: adjustable, suggest 1,4,8 or 16 frames
 Operating point
   AWGN........: Eb/No -0.5dB SNR(3000Hz): -2.5dB (note 2)
   HF Multipath: Eb/No  4.0dB SNR(3000Hz):  2.0dB (note 3)
