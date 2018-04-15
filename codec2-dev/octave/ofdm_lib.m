@@ -198,10 +198,12 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.sync_state = states.last_sync_state = 'searching';
   states.uw_errors = 0;
   states.sync_counter = 0;
-  states.sync_frame_count = 0;
+  states.frame_count = 0;
   states.sync_start = 0;
   states.sync_end = 0;
-
+  states.sync_state_interleaver = 'searching';
+  states.frame_count_interleaver = 0;
+   
   % LDPC code is optionally enabled
 
   states.rate = 1.0;
@@ -614,6 +616,7 @@ function states = sync_state_machine(states, rx_uw)
   if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
 
     states.frame_count++;
+    states.frame_count_interleaver++;
       
     % during trial sync we don't tolerate errors so much, once we have synced up
     % we are willing to wait out a fade
@@ -623,18 +626,21 @@ function states = sync_state_machine(states, rx_uw)
     end
     if strcmp(states.sync_state,'synced')
       sync_counter_thresh = 6;
+      uw_thresh = 2;
     else
-      sync_counter_thresh = 3;
+      sync_counter_thresh = 2;
+      uw_thresh = 1;
     end
 
     % freq offset est may be too far out, and has aliases every 1/Ts, so
     % we use a Unique Word to get a really solid indication of sync.
 
     states.uw_errors = sum(rx_uw);
-    if (states.uw_errors > 2)
+    if (states.uw_errors > uw_thresh)
       states.sync_counter++;
       if states.sync_counter == sync_counter_thresh
         next_state = 'searching';
+        states.sync_state_interleaver = 'searching';
       end
     else
       states.sync_counter = 0;
@@ -642,5 +648,6 @@ function states = sync_state_machine(states, rx_uw)
   end
 
   states.last_sync_state = states.sync_state;
+  states.last_sync_state_interleaver = states.sync_state_interleaver;
   states.sync_state = next_state;
 endfunction

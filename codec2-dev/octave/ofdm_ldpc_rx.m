@@ -55,7 +55,10 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   rx_uw = [];
   
   % OK generate tx frame for BER calcs
-
+  %   We just use a single test frame of bits as it makes interleaver sync
+  %   easier than using a test fram eof bits that spans the entire interleaver
+  %   frame.  Doesn't affect operation with the speech codec operation.
+  
   rand('seed', 1);
   atx_bits = round(rand(1,code_param.data_bits_per_frame));
   tx_bits = []; tx_codewords = [];
@@ -88,7 +91,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
-  Nerrs = Nerrs_coded = 0;
+  Nerrs_raw = Nerrs_coded = 0;
   
   % 'prime' rx buf to get correct coarse timing (for now)
 
@@ -96,8 +99,6 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   nin = Nsamperframe+2*(M+Ncp);
   states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   prx += nin;
-
-  state = 'searching'; frame_count = 0;
 
   % main loop ----------------------------------------------------------------
 
@@ -114,9 +115,6 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
     end
     prx += states.nin;
-
-    [rx_bits_raw states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-    frame_count++;
 
     % If looking for sync: check raw BER on frame just received
     % against all possible positions in the interleaver frame.
@@ -147,10 +145,31 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
       rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_amp(Nuwtxtsymbolsperframe+1:end);
 
-      % just single frame for now, so trival interlave sync
-      % TODO: work out a way to get interleaver sync
-      
-      if (mod(frame_count,interleave_frames) == 0)
+      % Interleaver Sync:
+      %   Needs to work on any data
+      %   Use indication of LDPC convergence, may need to patch CML code for that
+      %   Attempt a decode on every frame, when it converges we have sync
+
+      next_sync_state_interleaver = states.sync_state_interleaver;
+
+      if strcmp(states.sync_state_interleaver,'searching')      
+        arx_np = gp_deinterleave(rx_np);
+        arx_amp = gp_deinterleave(rx_amp);
+        st = 1; en = Ncodedbitsperframe/bps;
+        [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, arx_np(st:en), min(EsNo,30), arx_amp(st:en));
+        if find(parity_checks == code_param.data_bits_per_frame)
+          % sucessful decode!
+          next_sync_state_interleaver = 'synced';
+          states.frame_count_interleaver = interleave_frames;
+        end
+      end
+
+      states.sync_state_interleaver = next_sync_state_interleaver;
+            
+      Nerrs_raw = Nerrs_coded = 0;
+      if strcmp(states.sync_state_interleaver,'synced') && (states.frame_count_interleaver == interleave_frames)
+        states.frame_count_interleaver = 0;
+        printf("decode!\n");
         
         % de-interleave QPSK symbols and symbol amplitudes
 
@@ -167,10 +186,11 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
           st = (ff-1)*Ncodedbitsperframe+1; en = st+Ncodedbitsperframe-1;
           errors = xor(tx_bits_raw(st:en), rx_bits_raw(st:en));
           Nerrs = sum(errors);
-          Terrs += Nerrs;
           Nerrs_log = [Nerrs_log Nerrs];
-          Tbits += Ncodedbitsperframe;
+          Nerrs_raw += Nerrs;
         end
+        Tbits += Ncodedbitsperframe*interleave_frames;
+        Terrs += Nerrs_raw;
         
         % LDPC decode
         %  note: ldpc_errors can be used to measure raw BER
@@ -180,12 +200,12 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
         for ff=1:interleave_frames
           st = (ff-1)*Ncodedbitsperframe/bps+1; en = st + Ncodedbitsperframe/bps - 1;
           [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, arx_np(st:en), min(EsNo,30), arx_amp(st:en));
-          rx_bits = [rx_bits rx_codeword(1:code_param.data_bits_per_frame)];          
+          rx_bits = [rx_bits rx_codeword(1:code_param.data_bits_per_frame)];
         end
 
         errors_coded = xor(tx_bits, rx_bits);
         Nerrs_coded = sum(errors_coded);
-        if Nerrs_coded < 0.2
+        if Nerrs_coded/(code_param.data_bits_per_frame*interleave_frames) < 0.2
           Terrs_coded += Nerrs_coded;
           Tbits_coded += code_param.data_bits_per_frame*interleave_frames;
           error_positions = [error_positions errors_coded];
@@ -211,15 +231,16 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d Nerrs_coded: %3d foff: %3.1f\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, Nerrs_coded, states.foff_est_hz);
+      printf("f: %2d st: %-10s uw_errs: %2d  inter_st: %-10s inter_fr: %d %1d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
+             f, states.last_sync_state, states.uw_errors, states.last_sync_state_interleaver, states.frame_count_interleaver,
+             states.sync_counter, Nerrs_raw, Nerrs_coded, states.foff_est_hz);
     end
 
     % act on any events returned by modem sync state machine
     
     if states.sync_start
       Nerrs_log = [];
-      Terrs = Tbits = frame_count = 0;
+      Terrs = Tbits = 0;
       Tpacketerrs = Tpackets = 0;
       Terrs_coded = Tbits_coded = 0;
       error_positions = Nerrs_coded_log = [];
@@ -227,9 +248,9 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
   end
 
-  printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpacketerrs: %5d Tpackets: %5d\n", 
-         Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded, Tpacketerrs/Tpackets, Tpacketerrs, Tpackets);
-  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
+  printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
+  printf("Codec PER: %5.4f Tpkts: %5d Terrs: %5d\n", Tpacketerrs/(Tpackets+1E-12), Tpackets, Tpacketerrs);
+  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
 
   figure(1); clf; 
   plot(rx_np_log,'+');
@@ -257,16 +278,20 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   title('Fine Freq');
   ylabel('Hz')
 
-  figure(5); clf;
-  subplot(211)
-  stem(Nerrs_log);
-  title('Uncoded errrors/modem frame')
-  axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
-  subplot(212)
-  stem(Nerrs_coded_log);
-  title('Coded errrors/vocoder frame')
-  axis([1 length(Nerrs_coded_log) 0 Nbitspervocframe/2]);
-
+  if length(Nerrs_log)
+    figure(5); clf;
+    subplot(211)
+    stem(Nerrs_log);
+    title('Uncoded errrors/modem frame')
+    axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+    if length(Nerrs_coded_log)
+      subplot(212)
+      stem(Nerrs_coded_log);
+      title('Coded errrors/vocoder frame')
+      axis([1 length(Nerrs_coded_log) 0 Nbitspervocframe/2]);
+    end
+  end
+  
   if nargin == 3
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");
