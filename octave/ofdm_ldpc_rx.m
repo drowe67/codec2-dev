@@ -39,8 +39,8 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
   % load real samples from file
 
-  Ascale= 2E5*1.1491;
-  frx=fopen(filename,"rb"); rx = 2*fread(frx, Inf, "short")/4E5; fclose(frx);
+  Ascale= 2E5*1.1491/2.0;
+  frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
 
@@ -144,6 +144,11 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_np(Nuwtxtsymbolsperframe+1:end);
       rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
       rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_amp(Nuwtxtsymbolsperframe+1:end);
+      
+      % de-interleave QPSK symbols and symbol amplitudes
+
+      rx_np_de = gp_deinterleave(rx_np);
+      rx_amp_de = gp_deinterleave(rx_amp);
 
       % Interleaver Sync:
       %   Needs to work on any data
@@ -151,14 +156,15 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       %   Attempt a decode on every frame, when it converges we have sync
 
       next_sync_state_interleaver = states.sync_state_interleaver;
+      Nerrs_raw = Nerrs_coded = 0;
 
-      if strcmp(states.sync_state_interleaver,'searching')      
-        arx_np = gp_deinterleave(rx_np);
-        arx_amp = gp_deinterleave(rx_amp);
+      if strcmp(states.sync_state_interleaver,'searching')
         st = 1; en = Ncodedbitsperframe/bps;
-        [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, arx_np(st:en), min(EsNo,30), arx_amp(st:en));
-        if find(parity_checks == code_param.data_bits_per_frame)
-          % sucessful decode!
+        [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
+        Nerrs = code_param.data_bits_per_frame - max(parity_checks);
+        %printf("Nerrs: %d\n", Nerrs);
+        if Nerrs < 10
+          % sucessful(ish) decode!
           next_sync_state_interleaver = 'synced';
           states.frame_count_interleaver = interleave_frames;
         end
@@ -166,21 +172,15 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
       states.sync_state_interleaver = next_sync_state_interleaver;
             
-      Nerrs_raw = Nerrs_coded = 0;
       if strcmp(states.sync_state_interleaver,'synced') && (states.frame_count_interleaver == interleave_frames)
         states.frame_count_interleaver = 0;
-        printf("decode!\n");
+        %printf("decode!\n");
         
-        % de-interleave QPSK symbols and symbol amplitudes
-
-        arx_np = gp_deinterleave(rx_np);
-        arx_amp = gp_deinterleave(rx_amp);
-
         % measure uncoded bit errors over interleaver frame
 
         rx_bits_raw = [];
         for s=1:Nsymbolsperinterleavedframe
-          rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np(s))];
+          rx_bits_raw = [rx_bits_raw qpsk_demod(rx_np_de(s))];
         end
         for ff=1:interleave_frames
           st = (ff-1)*Ncodedbitsperframe+1; en = st+Ncodedbitsperframe-1;
@@ -199,7 +199,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
         rx_bits = [];
         for ff=1:interleave_frames
           st = (ff-1)*Ncodedbitsperframe/bps+1; en = st + Ncodedbitsperframe/bps - 1;
-          [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, arx_np(st:en), min(EsNo,30), arx_amp(st:en));
+          [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
           rx_bits = [rx_bits rx_codeword(1:code_param.data_bits_per_frame)];
         end
 

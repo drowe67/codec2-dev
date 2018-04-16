@@ -52,7 +52,7 @@ static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
 static complex float qpsk_mod(int *);
-static void qpsk_demod(complex float, int *);
+void qpsk_demod(complex float, int *);
 static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int, float *foff_est);
 
@@ -92,7 +92,7 @@ static complex float qpsk_mod(int *bits) {
 
 /* Gray coded QPSK demodulation function */
 
-static void qpsk_demod(complex float symbol, int *bits) {
+void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cexpf(I * (M_PI / 4.0f));
     bits[0] = crealf(rotate) < 0.0f;
     bits[1] = cimagf(rotate) < 0.0f;
@@ -391,6 +391,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->frame_count = 0;
     ofdm->sync_start = 0;
     ofdm->sync_end = 0;
+    
+    strcpy(ofdm->sync_state_interleaver,"searching");
+    strcpy(ofdm->last_sync_state_interleaver,"searching");
+    ofdm->frame_count_interleaver = 0;
     
     /* create the OFDM waveform */
 
@@ -954,7 +958,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
     char next_state[OFDM_STATE_STR];
-    int  i, j, sync_counter_thresh;
+    int  i, j, sync_counter_thresh, uw_thresh;
     
     strcpy(next_state, ofdm->sync_state);    
     ofdm->sync_start = ofdm->sync_end = 0;
@@ -988,23 +992,11 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
         }
     }
 
-    if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state, "trial_sync") == 0)) {
+    if (!strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state, "trial_sync")) {
         
         ofdm->frame_count++;
-      
-        /* during trial sync we don't tolerate errors so much, once we have synced up
-           we are willing to wait out a fade */
-      
-        if (ofdm->frame_count == 3) {
-            strcpy(next_state, "synced");
-        }
-
-        if (strcmp(ofdm->sync_state, "synced") == 0) {
-            sync_counter_thresh = 6;
-        } else {
-            sync_counter_thresh = 3;
-        }
-
+        ofdm->frame_count_interleaver++;
+       
         /* freq offset est may be too far out, and has aliases every 1/Ts, so
            we use a Unique Word to get a really solid indication of sync. */
 
@@ -1012,17 +1004,50 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
         for (i=0; i<OFDM_NUWBITS; i++) {
             ofdm->uw_errors += rx_uw[i]; 
         }
-        if (ofdm->uw_errors > 2) {
-            ofdm->sync_counter++;
-            if (ofdm->sync_counter == sync_counter_thresh) {
-                strcpy(next_state, "searching");
+
+        /* during trial sync we don't tolerate errors so much, we look
+           for 3 consecutive frames with low error rate to confirm
+           sync */
+      
+        if (!strcmp(ofdm->sync_state, "trial_sync")) {
+            if (ofdm->uw_errors > 1) {
+                /* if we exceed thresh stay in trial sync */
+                ofdm->sync_counter++;
+                ofdm->frame_count = 0; 
             }
-        } else {
-            ofdm->sync_counter = 0;
+            if (ofdm->sync_counter == 2) {
+                /* if we get two bad frames drop sync and start again */
+                strcpy(next_state, "searching");
+                strcpy(ofdm->sync_state_interleaver, "searching");                
+            }
+           
+            if (ofdm->frame_count == 3) {
+                /* three good frames, sync is OK! */
+                strcpy(next_state, "synced");
+            }
+        }
+
+        /* once we have synced up we tolerate a higher error rate to wait out fades */
+
+        if (!strcmp(ofdm->sync_state, "synced")) {
+            if (ofdm->uw_errors > 2) {
+                ofdm->sync_counter++;
+            } else {
+                if (ofdm->sync_counter) {
+                    ofdm->sync_counter--;
+                }
+            }
+                
+            if (ofdm->sync_counter == 6) {
+                /* run of consective bad frames ... drop sync */
+                strcpy(next_state, "searching");
+                strcpy(ofdm->sync_state_interleaver, "searching");
+            }           
         }
     }
     
     strcpy(ofdm->last_sync_state, ofdm->sync_state);
+    strcpy(ofdm->last_sync_state_interleaver, ofdm->sync_state_interleaver);
     strcpy(ofdm->sync_state, next_state);
 }
 

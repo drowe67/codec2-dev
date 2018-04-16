@@ -519,7 +519,9 @@ function [tx_bits payload_data_bits] = create_ldpc_test_frame
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-
+  ldpc;
+  gp_interleaver;
+  
   % Set up LDPC code
 
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
@@ -574,13 +576,13 @@ function test_bits_ofdm_file
   for m=1:length(test_bits_ofdm)-1
     fprintf(f,"  %d,\n",test_bits_ofdm(m));
   endfor
-  fprintf(f,"  %d\n};\n",test_bits_ofdm(length(payload_data_bits)));
+  fprintf(f,"  %d\n};\n",test_bits_ofdm(end));
 
   fprintf(f,"\nconst int payload_data_bits[]={\n");
   for m=1:length(payload_data_bits)-1
     fprintf(f,"  %d,\n",payload_data_bits(m));
   endfor
-  fprintf(f,"  %d\n};\n",payload_data_bits(length(payload_data_bits)));
+  fprintf(f,"  %d\n};\n",payload_data_bits(end));
   fclose(f);
 
 endfunction
@@ -651,3 +653,17 @@ function states = sync_state_machine(states, rx_uw)
   states.last_sync_state_interleaver = states.sync_state_interleaver;
   states.sync_state = next_state;
 endfunction
+
+
+% test function, kind of like a CRC for QPSK symbols, to compare two vectors
+
+function acc = test_acc(v)
+  sre = 0; sim = 0;
+  for i=1:length(v)
+    x = v(i);
+    re = round(real(x)); im = round(imag(x));
+    sre += re; sim += im;
+    %printf("%d %10f %10f %10f %10f\n", i, re, im, sre, sim);
+  end
+  acc = sre + j*sim;
+end

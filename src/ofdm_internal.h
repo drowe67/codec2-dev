@@ -124,7 +124,7 @@ struct OFDM {
     float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
     float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
 
-    /* sync state machine */
+    /* modem sync state machine */
 
     char sync_state[OFDM_STATE_STR];
     char last_sync_state[OFDM_STATE_STR];
@@ -133,17 +133,14 @@ struct OFDM {
     int frame_count;
     int sync_start;
     int sync_end;
+
+    /* interleaver sync state machine */
+    
+    char sync_state_interleaver[OFDM_STATE_STR];
+    char last_sync_state_interleaver[OFDM_STATE_STR];
+    int  frame_count_interleaver;
 };
 
-/* QPSK constellation for symbol likelihood calculations */
-
-static COMP S_matrix[] = {
-    { 1.0f,  0.0f},
-    { 0.0f,  1.0f},
-    { 0.0f, -1.0f},
-    {-1.0f,  0.0f}
-};
-         
 #ifdef __cplusplus
 }
 #endif

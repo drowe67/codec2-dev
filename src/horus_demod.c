@@ -119,7 +119,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr,"\n");
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
-        fprintf(stderr,"--mode=RTTY|binary[r]  RTTY or binary Horus protcols\n");
+        fprintf(stderr,"--mode=RTTY|binary     RTTY or binary Horus protcols\n");
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
                        "                       between statistic printouts\n");

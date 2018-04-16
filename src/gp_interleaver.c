@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2018
 
-  Golden Prime Interleaver. My interprestation of "On the Analysis and
+  Golden Prime Interleaver. My interpretation of "On the Analysis and
   Design of Good Algebraic Interleavers", Xie et al,eq (5).
 
   See also octvae/gp_interleaver.m
@@ -29,6 +29,7 @@
 */
 
 #include <assert.h>
+#include <stdio.h>
 #include "gp_interleaver.h"
 
 /*
@@ -41,7 +42,7 @@
 */
 
 int b_table[] = {
-    112,71,
+  112,71,
   224,139,
   448,277,
   672,419,
@@ -79,10 +80,18 @@ int choose_interleaver_b(int Nbits)
 void gp_interleave_comp(COMP interleaved_frame[], COMP frame[], int Nbits) {
   int b = choose_interleaver_b(Nbits);
   int i,j;
-   
   for (i=0; i<Nbits; i++) {
-    j = b*i % Nbits;
+    j = (b*i) % Nbits;
     interleaved_frame[j] = frame[i];
+  }
+}
+
+void gp_deinterleave_comp(COMP frame[], COMP interleaved_frame[], int Nbits) {
+  int b = choose_interleaver_b(Nbits);
+  int i,j;
+  for (i=0; i<Nbits; i++) {
+    j = (b*i) % Nbits;
+    frame[i] =  interleaved_frame[j];
   }
 }
 
@@ -91,8 +100,18 @@ void gp_interleave_float(float interleaved_frame[], float frame[], int Nbits) {
   int i,j;
    
   for (i=0; i<Nbits; i++) {
-    j = b*i % Nbits;
+    j = (b*i) % Nbits;
     interleaved_frame[j] = frame[i];
+  }
+}
+
+void gp_deinterleave_float(float frame[], float interleaved_frame[], int Nbits) {
+  int b = choose_interleaver_b(Nbits);
+  int i,j;
+   
+  for (i=0; i<Nbits; i++) {
+    j = (b*i) % Nbits;
+    frame[i] = interleaved_frame[j];
   }
 }
 

@@ -34,6 +34,8 @@
 #include "comp.h"
 
 void gp_interleave_comp(COMP interleaved_frame[], COMP frame[], int Nbits);
+void gp_deinterleave_comp(COMP frame[], COMP interleaved_frame[], int Nbits);
 void gp_interleave_float(float frame[], float interleaved_frame[], int Nbits);
+void gp_deinterleave_float(float interleaved_frame[], float frame[], int Nbits);
 
 #endif
