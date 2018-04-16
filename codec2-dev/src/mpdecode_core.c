@@ -12,6 +12,19 @@
 #include <stdio.h>
 #include "mpdecode_core.h"
 
+#define QPSK_CONSTELLATION_SIZE 4
+#define QPSK_BITS_PER_SYMBOL    2
+
+/* QPSK constellation for symbol likelihood calculations */
+
+static COMP S_matrix[] = {
+    { 1.0f,  0.0f},
+    { 0.0f,  1.0f},
+    { 0.0f, -1.0f},
+    {-1.0f,  0.0f}
+};
+         
+
 int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
                     int max_iter, int CodeLength, int NumberParityBits);
 
@@ -767,7 +780,7 @@ void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols     
              float   fading[],                  /* real fading values, number_symbols    */
              int     number_symbols)
 {
-    int     M=4;
+    int     M=QPSK_CONSTELLATION_SIZE;
     int     i,j;
     double  tempsr, tempsi, Er, Ei;
 
@@ -792,7 +805,7 @@ void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
            double  symbol_likelihood[],   /* M*number_symbols                */
            int     number_symbols)
 {
-    int    M=4, bps = 2;
+    int    M=QPSK_CONSTELLATION_SIZE, bps = QPSK_BITS_PER_SYMBOL;
     int    n,i,j,k,mask;
     double num[bps], den[bps];
     double metric;
@@ -858,3 +871,15 @@ int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], i
     return iter;
 }
 
+int symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, int nsyms) {
+    int i;
+    
+    double symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
+    double bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
+
+    Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps,  nsyms);
+    Somap(bit_likelihood, symbol_likelihood, nsyms);
+    for(i=0; i<nsyms*QPSK_BITS_PER_SYMBOL; i++) {
+        llr[i] = -bit_likelihood[i];
+    }
+}
