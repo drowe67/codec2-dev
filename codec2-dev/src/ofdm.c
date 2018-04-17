@@ -231,7 +231,7 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
        frequency est.  We combine samples from either end of frame to
        improve estimate.  Small real 1E-12 term to prevent instability
        with 0 inputs. */
-    
+
     *foff_est = Fs1 * cargf(conjf(p1)*p2 + conjf(p3)*p4 + 1E-12f) / TAU;
 
     return timing_est;
@@ -381,7 +381,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_valid = 0;
     ofdm->timing_mx = 0.0f;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
-
+    ofdm->foff_running = 0.0 + I*0.0;
+    
     /* sync state machine */
     
     strcpy(ofdm->sync_state,"searching");
@@ -1001,8 +1002,9 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            we use a Unique Word to get a really solid indication of sync. */
 
         ofdm->uw_errors = 0;
+        int tx_uw[] = {1,0,0,1,0,1,0,0,1,0};
         for (i=0; i<OFDM_NUWBITS; i++) {
-            ofdm->uw_errors += rx_uw[i]; 
+            ofdm->uw_errors += tx_uw[i] ^ rx_uw[i]; 
         }
 
         /* during trial sync we don't tolerate errors so much, we look
@@ -1021,7 +1023,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
                 strcpy(ofdm->sync_state_interleaver, "searching");                
             }
            
-            if (ofdm->frame_count == 3) {
+            if (ofdm->frame_count == 4) {
                 /* three good frames, sync is OK! */
                 strcpy(next_state, "synced");
             }
@@ -1033,9 +1035,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             if (ofdm->uw_errors > 2) {
                 ofdm->sync_counter++;
             } else {
-                if (ofdm->sync_counter) {
-                    ofdm->sync_counter--;
-                }
+                ofdm->sync_counter = 0;
             }
                 
             if (ofdm->sync_counter == 6) {
