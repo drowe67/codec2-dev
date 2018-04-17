@@ -121,11 +121,11 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
     % state machine(s) for modem and interleaver sync ------------------------------------
 
-    if strcmp(states.sync_state,'searching') 
+    if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
     
-    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
+    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
       rx_uw = rx_bits(1:states.Nuwbits);
       
@@ -157,7 +157,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
       next_sync_state_interleaver = states.sync_state_interleaver;
 
-      if strcmp(states.sync_state_interleaver,'searching')
+      if strcmp(states.sync_state_interleaver,'search')
         st = 1; en = Ncodedbitsperframe/bps;
         [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
         Nerrs = code_param.data_bits_per_frame - max(parity_checks);
@@ -238,7 +238,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
     if states.verbose
       r = mod(states.frame_count_interleaver,  interleave_frames)+1;
-      printf("f: %2d st: %-10s uw_errs: %2d %1d inter_st: %-10s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
+      printf("f: %3d st: %-6s uw_errs: %2d %1d inter_st: %-6s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
              f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver, states.frame_count_interleaver,
              Nerrs_raw(r), Nerrs_coded(r), states.foff_est_hz);
     end

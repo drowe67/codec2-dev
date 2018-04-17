@@ -385,16 +385,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     
     /* sync state machine */
     
-    strcpy(ofdm->sync_state,"searching");
-    strcpy(ofdm->last_sync_state,"searching");
+    strcpy(ofdm->sync_state,"search");
+    strcpy(ofdm->last_sync_state,"search");
     ofdm->uw_errors = 0;
     ofdm->sync_counter = 0;
     ofdm->frame_count = 0;
     ofdm->sync_start = 0;
     ofdm->sync_end = 0;
     
-    strcpy(ofdm->sync_state_interleaver,"searching");
-    strcpy(ofdm->last_sync_state_interleaver,"searching");
+    strcpy(ofdm->sync_state_interleaver,"search");
+    strcpy(ofdm->last_sync_state_interleaver,"search");
     ofdm->frame_count_interleaver = 0;
     
     /* create the OFDM waveform */
@@ -964,7 +964,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
     strcpy(next_state, ofdm->sync_state);    
     ofdm->sync_start = ofdm->sync_end = 0;
   
-    if (strcmp(ofdm->sync_state,"searching") == 0) { 
+    if (strcmp(ofdm->sync_state,"search") == 0) { 
 
         if (ofdm->timing_valid) {
 
@@ -989,11 +989,11 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = 1;
-            strcpy(next_state, "trial_sync");
+            strcpy(next_state, "trial");
         }
     }
 
-    if (!strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state, "trial_sync")) {
+    if (!strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state, "trial")) {
         
         ofdm->frame_count++;
         ofdm->frame_count_interleaver++;
@@ -1011,7 +1011,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            for 3 consecutive frames with low error rate to confirm
            sync */
       
-        if (!strcmp(ofdm->sync_state, "trial_sync")) {
+        if (!strcmp(ofdm->sync_state, "trial")) {
             if (ofdm->uw_errors > 1) {
                 /* if we exceed thresh stay in trial sync */
                 ofdm->sync_counter++;
@@ -1019,8 +1019,8 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             }
             if (ofdm->sync_counter == 2) {
                 /* if we get two bad frames drop sync and start again */
-                strcpy(next_state, "searching");
-                strcpy(ofdm->sync_state_interleaver, "searching");                
+                strcpy(next_state, "search");
+                strcpy(ofdm->sync_state_interleaver, "search");                
             }
            
             if (ofdm->frame_count == 4) {
@@ -1040,8 +1040,8 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
                 
             if (ofdm->sync_counter == 6) {
                 /* run of consective bad frames ... drop sync */
-                strcpy(next_state, "searching");
-                strcpy(ofdm->sync_state_interleaver, "searching");
+                strcpy(next_state, "search");
+                strcpy(ofdm->sync_state_interleaver, "search");
             }           
         }
     }
