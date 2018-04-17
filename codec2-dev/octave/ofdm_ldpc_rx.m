@@ -91,7 +91,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
-  Nerrs_raw = Nerrs_coded = 0;
+  Nerrs_coded = Nerrs_raw = zeros(1, interleave_frames);
   
   % 'prime' rx buf to get correct coarse timing (for now)
 
@@ -156,7 +156,6 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       %   Attempt a decode on every frame, when it converges we have sync
 
       next_sync_state_interleaver = states.sync_state_interleaver;
-      Nerrs_raw = Nerrs_coded = 0;
 
       if strcmp(states.sync_state_interleaver,'searching')
         st = 1; en = Ncodedbitsperframe/bps;
@@ -174,6 +173,8 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
             
       if strcmp(states.sync_state_interleaver,'synced') && (states.frame_count_interleaver == interleave_frames)
         states.frame_count_interleaver = 0;
+        Nerrs_raw = Nerrs_coded = zeros(1, interleave_frames);
+
         %printf("decode!\n");
         
         % measure uncoded bit errors over interleaver frame
@@ -187,10 +188,10 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
           errors = xor(acodeword, rx_bits_raw(st:en));
           Nerrs = sum(errors);
           Nerrs_log = [Nerrs_log Nerrs];
-          Nerrs_raw += Nerrs;
+          Nerrs_raw(ff) += Nerrs;
+          Tbits += Ncodedbitsperframe;
+          Terrs += Nerrs;
         end
-        Tbits += Ncodedbitsperframe*interleave_frames;
-        Terrs += Nerrs_raw;
         
         % LDPC decode
         %  note: ldpc_errors can be used to measure raw BER
@@ -201,13 +202,18 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
           st = (ff-1)*Ncodedbitsperframe/bps+1; en = st + Ncodedbitsperframe/bps - 1;
           [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
           rx_bits = [rx_bits rx_codeword(1:code_param.data_bits_per_frame)];
+          errors = xor(atx_bits, rx_codeword(1:code_param.data_bits_per_frame));
+          Nerrs  = sum(errors);
+          Nerrs_coded(ff) = Nerrs;
+          Terrs_coded += Nerrs;
+          Tbits_coded += code_param.data_bits_per_frame;       
         end
 
+        % additional measure - PER on vocoder frames
+
         errors_coded = xor(tx_bits, rx_bits);
-        Nerrs_coded = sum(errors_coded);
-        if Nerrs_coded/(code_param.data_bits_per_frame*interleave_frames) < 0.2
-          Terrs_coded += Nerrs_coded;
-          Tbits_coded += code_param.data_bits_per_frame*interleave_frames;
+        Nerrs = sum(errors_coded);
+        if Nerrs/(code_param.data_bits_per_frame*interleave_frames) < 0.2
           error_positions = [error_positions errors_coded];
         
           % measure packet errors based on Codec 2 packet size
@@ -231,14 +237,16 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d st: %-10s uw_errs: %2d  inter_st: %-10s inter_fr: %d %1d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
-             f, states.last_sync_state, states.uw_errors, states.last_sync_state_interleaver, states.frame_count_interleaver,
-             states.sync_counter, Nerrs_raw, Nerrs_coded, states.foff_est_hz);
+      r = mod(states.frame_count_interleaver,  interleave_frames)+1;
+      printf("f: %2d st: %-10s uw_errs: %2d %1d inter_st: %-10s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
+             f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver, states.frame_count_interleaver,
+             Nerrs_raw(r), Nerrs_coded(r), states.foff_est_hz);
     end
 
     % act on any events returned by modem sync state machine
     
     if states.sync_start
+      Nerrs_raw = Nerrs_coded = zeros(1, interleave_frames);
       Nerrs_log = [];
       Terrs = Tbits = 0;
       Tpacketerrs = Tpackets = 0;
