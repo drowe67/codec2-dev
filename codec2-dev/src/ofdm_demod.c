@@ -226,11 +226,11 @@ int main(int argc, char *argv[])
             rxbuf_in[i].imag = 0.0;
         }
 
-        if (strcmp(ofdm->sync_state,"searching") == 0) {
+        if (strcmp(ofdm->sync_state,"search") == 0) {
             ofdm_sync_search(ofdm, rxbuf_in);
         }
     
-        if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial_sync") == 0) ) {
+        if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
             
             if (llr_en) {
@@ -277,7 +277,7 @@ int main(int argc, char *argv[])
                     
                     char next_sync_state_interleaver[OFDM_STATE_STR];
                     strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
-                    if (strcmp(ofdm->sync_state_interleaver,"searching") == 0) {
+                    if (strcmp(ofdm->sync_state_interleaver,"search") == 0) {
                         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, CODED_SYMSPERFRAME);               
                         iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
                         Nerrs = DATA_BITSPERFRAME - parityCheckCount;
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
 
         if (ofdm->verbose) {
            int  r = ofdm->frame_count_interleaver % interleave_frames;
-            fprintf(stderr, "f: %2d st: %-10s uw_errs: %2d %1d inter_st: %-10s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f",
+            fprintf(stderr, "f: %3d st: %-6s uw_errs: %2d %1d inter_st: %-6s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f",
                     f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], ofdm->foff_est_hz);

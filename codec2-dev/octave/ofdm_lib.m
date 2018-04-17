@@ -195,13 +195,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % sync state machine
   
-  states.sync_state = states.last_sync_state = 'searching';
+  states.sync_state = states.last_sync_state = 'search';
   states.uw_errors = 0;
   states.sync_counter = 0;
   states.frame_count = 0;
   states.sync_start = 0;
   states.sync_end = 0;
-  states.sync_state_interleaver = 'searching';
+  states.sync_state_interleaver = 'search';
   states.frame_count_interleaver = 0;
    
   % LDPC code is optionally enabled
@@ -602,7 +602,7 @@ function states = sync_state_machine(states, rx_uw)
   next_state = states.sync_state;
   states.sync_start = states.sync_end = 0;
   
-  if strcmp(states.sync_state,'searching') 
+  if strcmp(states.sync_state,'search') 
 
     if states.timing_valid
 
@@ -618,11 +618,11 @@ function states = sync_state_machine(states, rx_uw)
       states.frame_count = 0;
       states.sync_counter = 0;
       states.sync_start = 1;
-      next_state = 'trial_sync';
+      next_state = 'trial';
     end
   end
         
-  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
+  if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
 
     states.frame_count++;
     states.frame_count_interleaver++;
@@ -650,8 +650,8 @@ function states = sync_state_machine(states, rx_uw)
     if (states.uw_errors > uw_thresh)
       states.sync_counter++;
       if states.sync_counter == sync_counter_thresh
-        next_state = 'searching';
-        states.sync_state_interleaver = 'searching';
+        next_state = 'search';
+        states.sync_state_interleaver = 'search';
       end
     else
       states.sync_counter = 0;
