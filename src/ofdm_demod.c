@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 
     int            i, j, f, oct, logframes, arg, llr_en, interleave_frames;
     int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
-    int            ldpc_en, Nerrs_coded, Tbits_coded, Terrs_coded, Nerrs_raw;
+    int            ldpc_en, Tbits_coded, Terrs_coded;
     
     struct LDPC   ldpc;
     ldpc.max_iter = HRA_112_112_MAX_ITER;
@@ -184,7 +184,12 @@ int main(int argc, char *argv[])
         ldpc_en = 1;
         llr_en = 1;
     }
-
+    int Nerrs_raw[interleave_frames];
+    int Nerrs_coded[interleave_frames];
+    for(i=0; i<interleave_frames; i++) {
+        Nerrs_raw[i] = Nerrs_coded[i] = 0;
+    }
+    
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
@@ -285,11 +290,10 @@ int main(int argc, char *argv[])
                     }
                     strcpy(ofdm->sync_state_interleaver, next_sync_state_interleaver);
                      
-                    Nerrs_raw = Nerrs_coded = 0;
                     if (!strcmp(ofdm->sync_state_interleaver,"synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
                         // printf("decode!\n");
-        
+
                         if (testframes) {
                             
                             /* measure uncoded (raw) bit errors over interleaver frame */
@@ -312,10 +316,10 @@ int main(int argc, char *argv[])
                                     }
                                 }
                                 
-                                Nerrs_raw += Nerrs;
+                                Nerrs_raw[j] = Nerrs;
+                                Terrs += Nerrs;
+                                Tbits += Nbitsperframe;
                             }
-                            Terrs += Nerrs_raw;
-                            Tbits += Nbitsperframe*interleave_frames;
                         }
 
                         for (j=0; j<interleave_frames; j++) {
@@ -325,13 +329,14 @@ int main(int argc, char *argv[])
                             iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
 
                             if (testframes) {
-                                Nerrs_coded = 0;
+                                Nerrs = 0;
                                 for(i=0; i<DATA_BITSPERFRAME; i++) {
                                     if (payload_data_bits[i] != out_char[i]) {
-                                        Nerrs_coded++;
+                                        Nerrs++;
                                     }
                                 }
-                                Terrs_coded += Nerrs_coded;
+                                Nerrs_coded[j] = Nerrs;
+                                Terrs_coded += Nerrs;
                                 Tbits_coded += DATA_BITSPERFRAME;
                             }
                             fwrite(out_char, sizeof(char), CODED_BITSPERFRAME, fout);
@@ -385,13 +390,18 @@ int main(int argc, char *argv[])
     
         if (ofdm->sync_start) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
+            for(i=0; i<interleave_frames; i++) {
+                Nerrs_raw[i] = Nerrs_coded[i] = 0;
+            }
+
         }
 
         if (ofdm->verbose) {
-            fprintf(stderr, "f: %2d st: %-10s uw_errs: %2d %1d inter_st: %-10s inter_fr: %d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f",
+           int  r = ofdm->frame_count_interleaver % interleave_frames;
+            fprintf(stderr, "f: %2d st: %-10s uw_errs: %2d %1d inter_st: %-10s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f",
                     f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
-                    Nerrs_raw, Nerrs_coded, ofdm->foff_est_hz);
+                    Nerrs_raw[r], Nerrs_coded[r], ofdm->foff_est_hz);
             fprintf(stderr, "\n");    
         }
 
