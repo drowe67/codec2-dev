@@ -105,6 +105,7 @@ struct OFDM {
     int timing_valid;
     float timing_mx;
     float coarse_foff_est_hz;
+    complex float foff_running;
     int nin;
 
     bool timing_en;

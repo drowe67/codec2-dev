@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
                         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, CODED_SYMSPERFRAME);               
                         iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
                         Nerrs = DATA_BITSPERFRAME - parityCheckCount;
-                        fprintf(stderr, "iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
+                        //fprintf(stderr, "iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
                         if (Nerrs < 10) {
                             /* sucessful decode! */
                             strcpy(next_sync_state_interleaver, "synced");
@@ -297,20 +297,25 @@ int main(int argc, char *argv[])
                             int rx_bits_raw[CODED_BITSPERFRAME];
                             for (j=0; j<interleave_frames; j++) {
                                 for(i=0; i<CODED_SYMSPERFRAME; i++) {
-                                    complex float s = codeword_symbols_de[j*CODED_SYMSPERFRAME+i].real + I*codeword_symbols_de[j*CODED_SYMSPERFRAME+i].imag;                                  
-                                    qpsk_demod(s, &rx_bits_raw[OFDM_BPS*i]);
+                                    int bits[2];
+                                    complex float s = codeword_symbols_de[j*CODED_SYMSPERFRAME+i].real + I*codeword_symbols_de[j*CODED_SYMSPERFRAME+i].imag;
+                                    qpsk_demod(s, bits);
+                                    rx_bits_raw[OFDM_BPS*i]   = bits[1];
+                                    rx_bits_raw[OFDM_BPS*i+1] = bits[0];
                                 }
                                 Nerrs = 0;
+                                assert(sizeof(test_codeword)/sizeof(int) == CODED_BITSPERFRAME);
                                 for(i=0; i<CODED_BITSPERFRAME; i++) {
-                                    //fprintf(stderr, "%d %d %d\n", i, test_bits_ofdm[i], rx_bits_raw[i]);
-                                    if (test_bits_ofdm[i] != rx_bits_raw[i]) {
+                                    //fprintf(stderr, "%d %d %d\n", i, test_codeword[i], rx_bits_raw[i]);
+                                    if (test_codeword[i] != rx_bits_raw[i]) {
                                         Nerrs++;
                                     }
                                 }
+                                
                                 Nerrs_raw += Nerrs;
                             }
                             Terrs += Nerrs_raw;
-                            Tbits += Nbitsperframe;
+                            Tbits += Nbitsperframe*interleave_frames;
                         }
 
                         for (j=0; j<interleave_frames; j++) {
