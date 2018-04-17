@@ -515,7 +515,7 @@ endfunction
 % generate a test frame of ldpc encoded bits, used for raw and
 % coded BER testing.  Includes UW and txt files
 
-function [tx_bits payload_data_bits] = create_ldpc_test_frame
+function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
@@ -567,7 +567,7 @@ endfunction
 %
 
 function test_bits_ofdm_file
-  [test_bits_ofdm payload_data_bits] = create_ldpc_test_frame;
+  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame;
   printf("%d test bits\n", length(test_bits_ofdm));
   
   f=fopen("../src/test_bits_ofdm.h","wt");
@@ -583,6 +583,13 @@ function test_bits_ofdm_file
     fprintf(f,"  %d,\n",payload_data_bits(m));
   endfor
   fprintf(f,"  %d\n};\n",payload_data_bits(end));
+
+  fprintf(f,"\nconst int test_codeword[]={\n");
+  for m=1:length(codeword)-1
+    fprintf(f,"  %d,\n",codeword(m));
+  endfor
+  fprintf(f,"  %d\n};\n",codeword(end));
+
   fclose(f);
 
 endfunction
@@ -637,7 +644,9 @@ function states = sync_state_machine(states, rx_uw)
     % freq offset est may be too far out, and has aliases every 1/Ts, so
     % we use a Unique Word to get a really solid indication of sync.
 
-    states.uw_errors = sum(rx_uw);
+    tx_uw = [1 0 0 1 0 1 0 0 1 0];
+
+    states.uw_errors = sum(xor(tx_uw,rx_uw));
     if (states.uw_errors > uw_thresh)
       states.sync_counter++;
       if states.sync_counter == sync_counter_thresh

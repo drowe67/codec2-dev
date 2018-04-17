@@ -184,7 +184,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
         end
         for ff=1:interleave_frames
           st = (ff-1)*Ncodedbitsperframe+1; en = st+Ncodedbitsperframe-1;
-          errors = xor(tx_bits_raw(st:en), rx_bits_raw(st:en));
+          errors = xor(acodeword, rx_bits_raw(st:en));
           Nerrs = sum(errors);
           Nerrs_log = [Nerrs_log Nerrs];
           Nerrs_raw += Nerrs;

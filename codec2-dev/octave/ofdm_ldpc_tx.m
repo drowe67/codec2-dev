@@ -82,8 +82,8 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
   tx_symbols = gp_interleave(tx_symbols);
   
   % generate UW and txt symbols to prepend to every frame after LDPC encoding and interleaving
-  
-  tx_uw_tx_bits = [zeros(1,Nuwbits) zeros(1,Ntxtbits)];
+ 
+  tx_uw_tx_bits = [1 0 0 1 0 1 0 0 1 0 zeros(1,Ntxtbits)];
   tx_uw_tx_symbols = [];
   for b=1:2:length(tx_uw_tx_bits)
     tx_uw_tx_symbols = [tx_uw_tx_symbols qpsk_mod(tx_uw_tx_bits(b:b+1))];
