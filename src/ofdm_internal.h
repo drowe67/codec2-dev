@@ -135,13 +135,20 @@ struct OFDM {
     int frame_count;
     int sync_start;
     int sync_end;
-
+    
     /* interleaver sync state machine */
     
     char sync_state_interleaver[OFDM_STATE_STR];
     char last_sync_state_interleaver[OFDM_STATE_STR];
     int  frame_count_interleaver;
 };
+    
+    
+/* function headers exposed for LDPC work */
+    
+complex float qpsk_mod(int *);
+void qpsk_demod(complex float, int *);
+void ofdm_txframe(struct OFDM *, complex float tx_samples[OFDM_SAMPLESPERFRAME], complex float tx_symbols_lin[]);
 
 #ifdef __cplusplus
 }

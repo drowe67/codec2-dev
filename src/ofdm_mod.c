@@ -35,6 +35,10 @@
 #include <errno.h>
 
 #include "codec2_ofdm.h"
+#include "ofdm_internal.h"
+#include "interldpc.h"
+#include "gp_interleaver.h"
+#include "test_bits_ofdm.h"
 
 #define ASCALE (2E5*1.1491)
 
@@ -53,11 +57,25 @@ int main(int argc, char *argv[])
     FILE          *fin, *fout;
     struct OFDM   *ofdm;
     int           frames;
-    int           i;
-
+    int           i, j, arg;
+    int           testframes, ldpc_en, interleaver_frames;
+   
+    /* Set up default LPDC code.  We could add other codes here if we like */
+    
+    struct LDPC   ldpc;
+    set_up_hra_112_112(&ldpc);
+    int data_bits_per_frame = ldpc.data_bits_per_frame;
+    int coded_bits_per_frame = ldpc.coded_bits_per_frame;
+    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
+    
     if (argc < 3) {
         fprintf(stderr, "\n");
-	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile\n", argv[0]);
+	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--lpdc] [--interleaver depth]\n\n", argv[0]);
+        fprintf(stderr, "  -t            Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+        fprintf(stderr, "  --ldpc        Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
+                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
+                                         coded_bits_per_frame, data_bits_per_frame);
+        fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -78,30 +96,114 @@ int main(int argc, char *argv[])
     
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
-    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+
+    testframes = 0;
+    if (opt_exists(argv, argc, "-t")) {
+        testframes = 1;
+    }
+
+    /* set for LDPC coded or uncoded frames */
+    
+    ldpc_en = 0; interleaver_frames = 1;
+    int Nbitsperframe;
+    if (opt_exists(argv, argc, "--ldpc")) {
+
+        assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME); /* sanity check */
+
+        ldpc_en = 1;
+        if ((arg = opt_exists(argv, argc, "--interleaver"))) {
+            interleaver_frames = atoi(argv[arg]);
+        }
+        Nbitsperframe = interleaver_frames*data_bits_per_frame;
+        
+    } else {
+        /* vanilla uncoded input bits mode */
+        Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    }
+    
     int Nsamperframe = ofdm_get_samples_per_frame();
 
-    char  tx_bits_char[Nbitsperframe];
-    int   tx_bits[Nbitsperframe];
-    COMP  tx_sams[Nsamperframe];
-    short tx_scaled[Nsamperframe];
+    unsigned char tx_bits_char[Nbitsperframe];
+    int           tx_bits[Nbitsperframe];
+    short         tx_scaled[Nsamperframe];
+    
+    /* build modulated UW and txt bits */
+
+    int  uw_txt_bits[OFDM_NUWBITS+OFDM_NTXTBITS];
+    COMP uw_txt_syms[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
+    complex float tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS + coded_syms_per_frame];
+    for(i=0; i<OFDM_NUWBITS; i++) {
+        uw_txt_bits[i] = ofdm->tx_uw[i];
+    }
+    for(j=0; j<OFDM_NTXTBITS; j++,i++) {
+        uw_txt_bits[i] = 0;
+    }    
+    qpsk_modulate_frame(uw_txt_syms, uw_txt_bits, (OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS);
+    for(i=0; i<(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i++) {
+        tx_symbols[i] = uw_txt_syms[i].real + I * uw_txt_syms[i].imag;
+    }
+    
+    /* main loop ----------------------------------------------------------------*/
     
     frames = 0;
 
     while(fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
 	frames++;
+
+        if (ldpc_en) {
+            /* fancy interleaved LDPC encoded frames ----------------------------------------*/
+            
+            /* optionally overwrite input data with test frame nown to demodulator */
+            
+            if (testframes) {
+                for (j=0; j<interleaver_frames; j++) {
+                    for(i=0; i<data_bits_per_frame; i++) {
+                        tx_bits_char[j*data_bits_per_frame + i] = payload_data_bits[i];
+                    }
+                }
+            }
+            
+            int codeword[coded_bits_per_frame];
+            COMP coded_symbols[interleaver_frames*coded_syms_per_frame];
+            COMP coded_symbols_inter[interleaver_frames*coded_syms_per_frame];
+            complex float tx_sams[Nsamperframe];
+
+            for (j=0; j<interleaver_frames; j++) {
+                ldpc_encode_frame(&ldpc, codeword, &tx_bits_char[j*data_bits_per_frame]);
+                qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
+                gp_interleave_comp(coded_symbols_inter, coded_symbols, interleaver_frames*coded_syms_per_frame);
+                for(i=0; i<coded_syms_per_frame; i++) {
+                    tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
+                                                                        + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
+                }
+                ofdm_txframe(ofdm, tx_sams, tx_symbols);
+                for(i=0; i<Nsamperframe; i++) {
+                    tx_scaled[i] = ASCALE * crealf(tx_sams[i]);
+                }
+                fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
+            }
         
-        for(i=0; i<Nbitsperframe; i++)
-            tx_bits[i] = tx_bits_char[i];
-	ofdm_mod(ofdm, tx_sams, tx_bits);
+        } else {
+            /* just modulate uncoded raw bits ----------------------------------------------*/
+            
+            if (testframes) {
+                for(i=0; i<Nbitsperframe; i++) {
+                    tx_bits_char[i] = test_bits_ofdm[i];
+                }
+            }
+            for(i=0; i<Nbitsperframe; i++)
+                tx_bits[i] = tx_bits_char[i];
+            COMP tx_sams[Nsamperframe];
+            ofdm_mod(ofdm, tx_sams, tx_bits);
 
-	/* scale and save to disk as shorts */
+            /* scale and save to disk as shorts */
 
-	for(i=0; i<Nsamperframe; i++)
-	    tx_scaled[i] = ASCALE * tx_sams[i].real;
+            for(i=0; i<Nsamperframe; i++)
+                tx_scaled[i] = ASCALE * tx_sams[i].real;
 
- 	fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
-
+            fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
+        }
+        
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
 

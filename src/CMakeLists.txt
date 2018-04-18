@@ -337,10 +337,10 @@ target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
 target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_mod ofdm_mod.c)
+add_executable(ofdm_mod ofdm_mod.c interldpc.c mpdecode_core.c gp_interleaver.c)
 target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_demod ofdm_demod.c octave.c mpdecode_core.c gp_interleaver.c)
+add_executable(ofdm_demod ofdm_demod.c octave.c mpdecode_core.c gp_interleaver.c interldpc.c)
 target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fmfsk_mod fmfsk_mod.c)

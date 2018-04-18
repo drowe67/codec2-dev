@@ -51,9 +51,6 @@ const struct OFDM_CONFIG  * OFDM_CONFIG_700D = &OFDM_CONFIG_700D_C;
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
-static complex float qpsk_mod(int *);
-void qpsk_demod(complex float, int *);
-static void ofdm_txframe(struct OFDM *, complex float [OFDM_SAMPLESPERFRAME], complex float *);
 static int coarse_sync(struct OFDM *, complex float *, int, float *foff_est);
 
 /* Defines */
@@ -88,7 +85,7 @@ static const int tx_uw[] = {1,0,0,1,0,1,0,0,1,0};
 
 /* Gray coded QPSK modulation function */
 
-static complex float qpsk_mod(int *bits) {
+complex float qpsk_mod(int *bits) {
     return constellation[(bits[1] << 1) | bits[0]];
 }
 
@@ -245,8 +242,11 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
  * ----------------------------------------------
  */
 
-static void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME],
-    complex float *tx_sym_lin) {
+void ofdm_txframe(
+    struct OFDM *ofdm,
+    complex float tx[OFDM_SAMPLESPERFRAME],
+    complex float *tx_sym_lin)
+{
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
