@@ -127,6 +127,7 @@ struct OFDM {
 
     /* modem sync state machine */
 
+    int  tx_uw[OFDM_NUWBITS];
     char sync_state[OFDM_STATE_STR];
     char last_sync_state[OFDM_STATE_STR];
     int uw_errors;

@@ -82,6 +82,8 @@ static const char pilotvalues[] = {
      1
 };
 
+static const int tx_uw[] = {1,0,0,1,0,1,0,0,1,0};
+
 /* Functions */
 
 /* Gray coded QPSK modulation function */
@@ -384,7 +386,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_running = 0.0 + I*0.0;
     
     /* sync state machine */
-    
+
+    for(i=0; i<OFDM_NUWBITS; i++) {
+        ofdm->tx_uw[i] = tx_uw[i];
+    }
     strcpy(ofdm->sync_state,"search");
     strcpy(ofdm->last_sync_state,"search");
     ofdm->uw_errors = 0;
@@ -1002,9 +1007,8 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            we use a Unique Word to get a really solid indication of sync. */
 
         ofdm->uw_errors = 0;
-        int tx_uw[] = {1,0,0,1,0,1,0,0,1,0};
         for (i=0; i<OFDM_NUWBITS; i++) {
-            ofdm->uw_errors += tx_uw[i] ^ rx_uw[i]; 
+            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i]; 
         }
 
         /* during trial sync we don't tolerate errors so much, we look
