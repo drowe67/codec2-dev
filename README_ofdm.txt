@@ -6,10 +6,9 @@ Created Mar 2018
 Introduction
 ------------
 
-A 1600 bit/s (nominal uncoded payload data rate) Orthogonal Frequency
-Division Multiplexed (OFDM) modem.  Used for digital voice over HF
-SSB.  Designed to be used with a rate 0.5 LDPC code with 700 bit/s
-coded voice.
+A 1400 bit/s (uncoded data rate) Orthogonal Frequency Division
+Multiplexed (OFDM) modem.  Used for digital voice over HF SSB.
+Designed to be used with a rate 0.5 LDPC code with 700 bit/s voice.
 
 The OFDM modem was first implemented in GNU Octave, then ported to C.
 Algorithm development is generally easier in Octave, but for real time
@@ -72,9 +71,13 @@ Built as part of codec2-dev, see README for build instructions.
    code this is equivalent to 0dB on 1400 bit/s uncoded bits (0dB
    Eb/No argument for ofdm_tx())
 
-     octave:6> ofdm_ldpc_tx('awgn_ebno_3dB_700d.raw',4,60,3)
-     octave:7> ofdm_ldpc_rx('awgn_ebno_3dB_700d.raw',4)
-  
+     octave:6> ofdm_ldpc_tx('ofdm_test.raw',4,60,3)
+     octave:7> ofdm_ldpc_rx('ofdm_test.raw',4)
+
+   C demodulator/LDCP decoder:
+   
+     build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw /dev/null -v -t --ldpc --interleave 4
+     
 Acceptance Tests
 ----------------
 
