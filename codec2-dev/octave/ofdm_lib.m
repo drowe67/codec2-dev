@@ -138,6 +138,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
   states.Ntxtbits = 4;   % reserve 4 bits/frame for auxillary text information
   states.Nuwbits  = (Ns-1)*bps - states.Ntxtbits;
+  states.tx_uw = [1 0 0 1 0 1 0 0 1 0];
+  assert(length(states.tx_uw) == states.Nuwbits);
 
   % generate same pilots each time
 
@@ -194,7 +196,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   % printf("timing_norm: %f\n", states.timing_norm)
 
   % sync state machine
-  
+
   states.sync_state = states.last_sync_state = 'search';
   states.uw_errors = 0;
   states.sync_counter = 0;
@@ -554,7 +556,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame
 
   % insert UW and txt bits
   
-  tx_bits = [zeros(1,Nuwbits) zeros(1,Ntxtbits) codeword_raw];
+  tx_bits = [tx_uw zeros(1,Ntxtbits) codeword_raw];
   assert(Nbitsperframe == length(tx_bits));
 
 endfunction
@@ -643,8 +645,6 @@ function states = sync_state_machine(states, rx_uw)
 
     % freq offset est may be too far out, and has aliases every 1/Ts, so
     % we use a Unique Word to get a really solid indication of sync.
-
-    tx_uw = [1 0 0 1 0 1 0 0 1 0];
 
     states.uw_errors = sum(xor(tx_uw,rx_uw));
     if (states.uw_errors > uw_thresh)
