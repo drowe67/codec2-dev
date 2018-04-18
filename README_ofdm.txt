@@ -37,9 +37,9 @@ Built as part of codec2-dev, see README for build instructions.
 
     build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | play -t raw -r 8000 -s -2 -
 
-2. Generate 10 seconds of test frame bits, modulate, demodulate, count errors:
+2. Generate 10 seconds of uncoded test frame bits, modulate, demodulate, count errors:
 
-    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod -t - /dev/null
+    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod - /dev/null -t
 
     (TODO write ofdm_demod_c.m)
     Use Octave to look at plots of C modem operation:
@@ -74,14 +74,14 @@ Built as part of codec2-dev, see README for build instructions.
      octave:6> ofdm_ldpc_tx('ofdm_test.raw',4,60,3)
      octave:7> ofdm_ldpc_rx('ofdm_test.raw',4)
 
-   C demodulator/LDCP decoder:
+   C demodulator/LDPC decoder:
    
      build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw /dev/null -v -t --ldpc --interleave 4
      
 Acceptance Tests
 ----------------
 
-The rate 1/2 LPDC code can correct up to about 10% raw BER, so a good
+The rate 1/2 LDPC code can correct up to about 10% raw BER, so a good
 test is to run the modem at Eb/No operating points that produce just
 less that BER=0.1
 

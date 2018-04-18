@@ -121,15 +121,16 @@ int main(int argc, char *argv[])
 
     if (argc < 3) {
         fprintf(stderr, "\n");
-	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--llr] [-v VerboseLevel]\n", argv[0]);
+	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--llr] [--ldpc] [--interleave depth] [-v]\n", argv[0]);
         fprintf(stderr, "\n");
-        fprintf(stderr, "              Default output file format is one byte per bit hard decision\n");
-        fprintf(stderr, "  --llr       LLR output, one double per bit, %d doubles/frame\n", CODED_BITSPERFRAME);
-        fprintf(stderr, "  -t          Receive test frames and count errors\n");
-        fprintf(stderr, "  --ldpc      Run (224,112) LDPC decoder.  This forces 112, one char/bit output values\n"
-                        "              per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
-        fprintf(stderr, "  -v          Verbose info the stderr\n");
-        fprintf(stderr, "  -o          Octave log file for testing\n");
+        fprintf(stderr, "                Default output file format is one byte per bit hard decision\n");
+        fprintf(stderr, "  --llr         LLR output, one double per bit, %d doubles/frame\n", CODED_BITSPERFRAME);
+        fprintf(stderr, "  -t            Receive test frames and count errors\n");
+        fprintf(stderr, "  --ldpc        Run (224,112) LDPC decoder.  This forces 112, one char/bit output values\n"
+                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
+        fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
+        fprintf(stderr, "  -v            Verbose info the stderr\n");
+        fprintf(stderr, "  -o            Octave log file for testing\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
