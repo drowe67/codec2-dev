@@ -871,7 +871,7 @@ int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], i
     return iter;
 }
 
-int symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, int nsyms) {
+void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, int nsyms) {
     int i;
     
     double symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
