@@ -53,12 +53,13 @@ int main(int argc, char *argv[])
     short         *buf;
     unsigned char *bits;
     float         *softdec_bits;
+    char          *bitperchar_bits;
     int            nsam, nbit, nbyte, i, byte, frames, bits_proc, bit_errors, error_mode;
     int            nstart_bit, nend_bit, bit_rate;
     int            state, next_state;
     float          ber, r, burst_length, burst_period, burst_timer, ber_est;
     unsigned char  mask;
-    int            natural, softdec, bit, ret;
+    int            natural, softdec, bit, ret, bitperchar;
 #ifdef DUMP
     int dump;
 #endif
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
         { "berfile", required_argument, NULL, 0 },
         { "natural", no_argument, &natural, 1 },
         { "softdec", no_argument, &softdec, 1 },
+        { "bitperchar", no_argument, &bitperchar, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -98,6 +100,8 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
+    mode = -1;
+    
     // Attempt to detect a .c2 file with a header
     struct c2_header in_hdr;
     char *ext = strrchr(argv[2], '.');
@@ -152,19 +156,21 @@ int main(int argc, char *argv[])
     ber = 0.0;
     burst_length = burst_period = 0.0;
     burst_timer = 0.0;
-    natural = softdec = 0;
+    natural = softdec = bitperchar = 0;
     report_energy = 0;
 #ifdef DUMP
     dump = 0;
 #endif
 
     codec2 = codec2_create(mode);
+    assert(codec2 != NULL);
     nsam = codec2_samples_per_frame(codec2);
     nbit = codec2_bits_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
     softdec_bits = (float*)malloc(nbit*sizeof(float));
+    bitperchar_bits = (char*)malloc(nbit*sizeof(char));
     frames = bit_errors = bits_proc = 0;
     nstart_bit = 0;
     nend_bit = nbit-1;
@@ -218,10 +224,15 @@ int main(int argc, char *argv[])
     //printf("%d %d\n", nstart_bit, nend_bit);
 
     //fprintf(stderr, "softdec: %d natural: %d\n", softdec, natural);
-    if (softdec)
+    if (softdec) {
         ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);
-    else
+    }
+    if (bitperchar) {
+        ret = (fread(bitperchar_bits, sizeof(char), nbit, fin) == (size_t)nbit);
+    }
+    if (!softdec && !bitperchar) {
         ret = (fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte);
+    }
 
     while(ret) {
 	frames++;
@@ -310,6 +321,21 @@ int main(int argc, char *argv[])
             codec2_set_softdec(codec2, softdec_bits);
         }
 
+        if (bitperchar) {
+            /* pack bits, MSB received first  */
+
+            bit = 7; byte = 0;
+            memset(bits, 0, nbyte);
+            for(i=0; i<nbit; i++) {
+                bits[byte] |= bitperchar_bits[i] << bit;
+                bit--;
+                if (bit < 0) {
+                    bit = 7;
+                    byte++;
+                }
+            }
+        }
+
         if (report_energy)
            fprintf(stderr, "Energy: %1.3f\n", codec2_get_energy(codec2, bits));
 
@@ -322,10 +348,15 @@ int main(int argc, char *argv[])
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
 
-        if (softdec)
+        if (softdec) {
             ret = (fread(softdec_bits, sizeof(float), nbit, fin) == (size_t)nbit);
-        else
+        }
+        if (bitperchar) {
+            ret = (fread(bitperchar_bits, sizeof(char), nbit, fin) == (size_t)nbit);
+        }
+        if (!softdec && !bitperchar) {
             ret = (fread(bits, sizeof(char), nbyte, fin) == (size_t)nbyte);
+        }
     }
 
     if (error_mode)
@@ -336,6 +367,7 @@ int main(int argc, char *argv[])
     free(buf);
     free(bits);
     free(softdec_bits);
+    free(bitperchar_bits);
     fclose(fin);
     fclose(fout);
 
@@ -347,7 +379,7 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 	int i;
 	char *option_parameters;
 	fprintf(stderr, "\nc2dec - Codec 2 decoder and bit error simulation program\n"
-		"usage: %s 3200|2400|1600|1400|1300|1200|700|700B|WB InputFile OutputRawFile [OPTIONS]\n\n"
+		"usage: %s 3200|2400|1600|1400|1300|1200|700|700B|700C InputFile OutputRawFile [OPTIONS]\n\n"
                 "Options:\n", argv[0]);
         for(i=0; i<num_opts-1; i++) {
 		if(long_options[i].has_arg == no_argument) {
