@@ -79,7 +79,7 @@ void set_up_hra_112_112(struct LDPC *ldpc) {
 }
 
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {
-    unsigned char pbits[ldpc->coded_bits_per_frame];
+    unsigned char pbits[ldpc->NumberParityBits];
     int           i,j;
     
     encode(ldpc, tx_bits_char, pbits);
@@ -87,7 +87,7 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
         codeword[i] = tx_bits_char[i];
     }
     for(j=0; i<ldpc->coded_bits_per_frame; i++,j++) {
-        codeword[i] = pbits[i];
+        codeword[i] = pbits[j];
     }
 }
 

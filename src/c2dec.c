@@ -100,29 +100,25 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    mode = -1;
-    
     // Attempt to detect a .c2 file with a header
     struct c2_header in_hdr;
     char *ext = strrchr(argv[2], '.');
-    if (ext != NULL) {
-        if (strcmp(ext, ".c2") == 0) {
-            fread(&in_hdr,sizeof(in_hdr),1,fin);
+    if ((ext != NULL) && (strcmp(ext, ".c2") == 0)) {
+        fread(&in_hdr,sizeof(in_hdr),1,fin);
                 
-            if (memcmp(in_hdr.magic, c2_file_magic, sizeof(c2_file_magic)) == 0) {
-                fprintf(stderr, "Detected Codec2 file version %d.%d in mode %d\n",
-                        in_hdr.version_major,
-                        in_hdr.version_minor,
-                        in_hdr.mode);
+        if (memcmp(in_hdr.magic, c2_file_magic, sizeof(c2_file_magic)) == 0) {
+            fprintf(stderr, "Detected Codec2 file version %d.%d in mode %d\n",
+                    in_hdr.version_major,
+                    in_hdr.version_minor,
+                    in_hdr.mode);
                             
-                mode = in_hdr.mode;
-            } else {
-                fprintf(stderr, "Codec2 file specified but no header detected\n");
-                // Rewind the input file so we can try to decode
-                // based on command line mode selection
-                fseek(fin,0,SEEK_SET);
-            } /* end if - magic detection */
-        };
+            mode = in_hdr.mode;
+        } else {
+            fprintf(stderr, "Codec2 file specified but no header detected\n");
+            // Rewind the input file so we can try to decode
+            // based on command line mode selection
+            fseek(fin,0,SEEK_SET);
+        } /* end if - magic detection */
     } else {
         // If we got here, we need to honor the command line mode
         if (strcmp(argv[1],"3200") == 0)

@@ -250,8 +250,11 @@ int main(int argc, char *argv[])
                         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);               
                         iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
                         Nerrs = data_bits_per_frame - parityCheckCount;
-                        //fprintf(stderr, "iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
-                        if (Nerrs < 10) {
+                        for(i=0; i<20; i++)
+                            fprintf(stderr,"%d ", out_char[i]);
+                        fprintf(stderr,"\n");
+                        fprintf(stderr, "iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
+                        if ((Nerrs < 10)) {
                             /* sucessful decode! */
                             strcpy(next_sync_state_interleaver, "synced");
                             ofdm->frame_count_interleaver = interleave_frames;
@@ -296,7 +299,7 @@ int main(int argc, char *argv[])
                                                  &codeword_amps_de[j*coded_syms_per_frame],
                                                  EsNo, coded_syms_per_frame);               
                             iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-
+                            fprintf(stderr,"j: %d iter: %d parityCheckCount: %d\n", j, iter, parityCheckCount);
                             if (testframes) {
                                 Nerrs = 0;
                                 for(i=0; i<data_bits_per_frame; i++) {
@@ -308,7 +311,7 @@ int main(int argc, char *argv[])
                                 Terrs_coded += Nerrs;
                                 Tbits_coded += data_bits_per_frame;
                             }
-                            fwrite(out_char, sizeof(char), coded_bits_per_frame, fout);
+                            fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
                         }
                     } /* if interleaver synced ..... */
                          
