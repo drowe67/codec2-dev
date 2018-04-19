@@ -32,7 +32,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   EsNo = 10; % TODO: fixme
   printf("EsNo fixed at %f - need to est from channel\n", EsNo);
   
-  init_cml('/home/david/Desktop/cml/');
+  init_cml('~/cml/');
   load HRA_112_112.txt
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   assert(Nbitsperframe == (code_param.code_bits_per_frame + states.Nuwbits + states.Ntxtbits));

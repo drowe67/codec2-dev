@@ -1082,7 +1082,7 @@ endfunction
 format;
 more off;
 
-%init_cml('/home/david/Desktop/cml/');
+init_cml('~/cml/');
 
 %run_single 
 %run_curves

@@ -47,7 +47,7 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
 
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
-  init_cml('/home/david/Desktop/cml/');
+  init_cml('~/cml/');
   load HRA_112_112.txt
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
