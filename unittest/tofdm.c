@@ -52,6 +52,15 @@
 
 #define CODED_BITSPERFRAME 224    /* number of LDPC codeword bits/frame   */
 
+/* QPSK constellation for symbol likelihood calculations */
+
+static COMP S_matrix[] = {
+    { 1.0f,  0.0f},
+    { 0.0f,  1.0f},
+    { 0.0f, -1.0f},
+    {-1.0f,  0.0f}
+};
+         
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: fs_offset()
@@ -196,6 +205,13 @@ int main(int argc, char *argv[])
 
         /* See CML startup code in tofdm.m */
 
+        for(i=0; i<OFDM_NUWBITS; i++) {
+            tx_bits[i] = ofdm->tx_uw[i];
+        }
+        for(i=OFDM_NUWBITS; i<OFDM_NUWBITS+OFDM_NTXTBITS; i++) {
+            tx_bits[i] = 0;
+        }       
+
         #define LDPC_ENABLE
         #ifdef LDPC_ENABLE
         unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
@@ -203,13 +219,10 @@ int main(int argc, char *argv[])
 
         assert(HRA_112_112_NUMBERROWSHCOLS == ldpc.CodeLength/2);
         for(i=0; i<ldpc.CodeLength/2; i++) {
-            ibits[i] = test_bits_ofdm[i+OFDM_NUWBITS+OFDM_NTXTBITS];
+            ibits[i] = payload_data_bits[i];
         }
         encode(&ldpc, ibits, pbits);
-        for(i=0; i<OFDM_NUWBITS+OFDM_NTXTBITS; i++) {
-            tx_bits[i] = 0;
-        }
-        for(j=0; j<ldpc.CodeLength/2; i++,j++) {
+        for(j=0, i=OFDM_NUWBITS+OFDM_NTXTBITS; j<ldpc.CodeLength/2; i++,j++) {
             tx_bits[i] = ibits[j];
         }
         for(j=0; j<ldpc.CodeLength/2; i++,j++) {
@@ -217,8 +230,11 @@ int main(int argc, char *argv[])
         }
         assert(i == OFDM_BITSPERFRAME);
         #else
-        for(i=0; i<OFDM_BITSPERFRAME; i++) {
-            tx_bits = test_bits_ofdm[i];
+        for(i=OFDM_NUWBITS+OFDM_NTXTBITS,j=0; j<ldpc.CodeLength/2; i++,j++) {
+            tx_bits[i] = payload_data_bits[j];
+        }
+        for(j=0; j<ldpc.CodeLength/2; i++,j++) {
+            tx_bits[i] = payload_data_bits[j];
         }
         #endif
 

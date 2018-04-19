@@ -16,8 +16,8 @@ ldpc
 
 % attempt to start up CML, path will be different on your machine
 
-path_to_cml = '/home/david/Desktop/cml/mex';
-addpath(path_to_cml);
+path_to_cml = '~/cml';
+addpath(strcat(path_to_cml, "/mex"), strcat(path_to_cml, "/mat"));
 cml_support = 0;
 if exist("Somap") == 0
   printf("Can't find CML mex directory so we won't run those tests for now...\n");
@@ -51,14 +51,18 @@ if cml_support
   assert(Nbitsperframe == (code_param.code_bits_per_frame + states.Nuwbits + states.Ntxtbits));
 end
 
+tx_bits = zeros(1,Nbitsperframe);
 rand('seed',1);
-tx_bits = round(rand(1,Nbitsperframe));
+
+payload_data_bits = round(rand(1,(Nbitsperframe-Nuwbits-Ntxtbits)/2));
 if cml_support
-  ibits = tx_bits(Nuwbits+Ntxtbits+1:Nuwbits+Ntxtbits+code_param.data_bits_per_frame);
+  ibits = payload_data_bits;
   codeword = LdpcEncode(ibits, code_param.H_rows, code_param.P_matrix);
   tx_bits(Nuwbits+Ntxtbits+1:end) = codeword;
+else
+  tx_bits(Nuwbits+Ntxtbits+1:end) = [payload_data_bits payload_data_bits];
 end
-tx_bits(1:Nuwbits+Ntxtbits) = 0;
+tx_bits(1:Nuwbits+Ntxtbits) = [states.tx_uw zeros(1,Ntxtbits)];
 
 % Run tx loop
 
@@ -138,9 +142,10 @@ for f=1:Nframes
     symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end), S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end));
     bit_likelihood = Somap(symbol_likelihood);
 
-    [x_hat errors] = MpDecode(-bit_likelihood(1:code_param.code_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
-    detected_data = x_hat(max_iterations,:);
-
+    [x_hat paritychecks] = MpDecode(-bit_likelihood(1:code_param.code_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
+    [mx mx_ind] = max(paritychecks);
+    detected_data = x_hat(mx_ind,:);
+    
     % make sure LDPC decoding is working OK
     
     assert(codeword == detected_data);
@@ -224,7 +229,9 @@ check(coarse_foff_est_hz_log, coarse_foff_est_hz_log_c, 'coarse_foff_est_hz');
 check(sample_point_log, sample_point_log_c, 'sample_point');
 check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
-check(symbol_likelihood_log, symbol_likelihood_log_c, 'symbol_likelihood_log');
-check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
-check(detected_data_log, detected_data_log_c, 'detected_data');
+if cml_support
+  check(symbol_likelihood_log, symbol_likelihood_log_c, 'symbol_likelihood_log');
+  check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
+  check(detected_data_log, detected_data_log_c, 'detected_data');
+end
 
