@@ -42,12 +42,13 @@ int main(int argc, char *argv[])
     FILE          *fout;
     short         *buf;
     unsigned char *bits;
-    int            nsam, nbit, nbyte, gray, softdec;
-    float         *unpacked_bits;
+    int            nsam, nbit, nbyte, gray, softdec, bitperchar;
+    float         *unpacked_bits_float;
+    char          *unpacked_bits_char;
     int            bit, byte,i;
 
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|WB InputRawspeechFile OutputBitFile [--natural] [--softdec]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|WB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar]\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
@@ -114,16 +115,19 @@ int main(int argc, char *argv[])
     nbyte = (nbit + 7) / 8;
 
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
-    unpacked_bits = (float*)malloc(nbit*sizeof(float));
+    unpacked_bits_float = (float*)malloc(nbit*sizeof(float));
+    unpacked_bits_char = (char*)malloc(nbit*sizeof(char));
 
-    gray = 1;
-    softdec = 0;
+    gray = 1; softdec = 0; bitperchar = 0;
     for (i=4; i<argc; i++) {
         if (strcmp(argv[i], "--natural") == 0) {
             gray = 0;
         }
         if (strcmp(argv[i], "--softdec") == 0) {
             softdec = 1;
+        }
+        if (strcmp(argv[i], "--bitperchar") == 0) {
+            bitperchar = 1;
         }
     }
     codec2_set_natural_or_gray(codec2, gray);
@@ -133,19 +137,25 @@ int main(int argc, char *argv[])
 
 	codec2_encode(codec2, bits, buf);
 
-	if (softdec) {
+	if (softdec || bitperchar) {
             /* unpack bits, MSB first, send as soft decision float */
 
             bit = 7; byte = 0;
             for(i=0; i<nbit; i++) {
-                unpacked_bits[i] = 1.0 - 2.0*((bits[byte] >> bit) & 0x1);
+                unpacked_bits_float[i] = 1.0 - 2.0*((bits[byte] >> bit) & 0x1);
+                unpacked_bits_char[i] = (bits[byte] >> bit) & 0x1;
                 bit--;
                 if (bit < 0) {
                     bit = 7;
                     byte++;
                 }
             }
-            fwrite(unpacked_bits, sizeof(float), nbit, fout);
+            if (softdec) {
+                fwrite(unpacked_bits_float, sizeof(float), nbit, fout);
+            }
+            if (bitperchar) {
+                fwrite(unpacked_bits_char, sizeof(char), nbit, fout);
+            }
         }
         else
             fwrite(bits, sizeof(char), nbyte, fout);
@@ -161,7 +171,8 @@ int main(int argc, char *argv[])
 
     free(buf);
     free(bits);
-    free(unpacked_bits);
+    free(unpacked_bits_float);
+    free(unpacked_bits_char);
     fclose(fin);
     fclose(fout);
 
