@@ -35,18 +35,17 @@ Built as part of codec2-dev, see README for build instructions.
 1. Generate 10 seconds of test frame bits, modulate, and play audio
    out of sound device:
 
-    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | play -t raw -r 8000 -s -2 -
+     build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | play -t raw -r 8000 -s -2 -
 
 2. Generate 10 seconds of uncoded test frame bits, modulate, demodulate, count errors:
 
-    build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod - /dev/null -t
+     build_linux/src$ ./ofdm_get_test_bits - 10 | ./ofdm_mod - - | ./ofdm_demod - /dev/null -t
 
-    (TODO write ofdm_demod_c.m)
-    Use Octave to look at plots of C modem operation:
+   Use Octave to look at plots of C modem operation:
 
-    $ cd ../octave
-    $ octave
-    octave:1> ofdm_demod_c("../src/demod_dump.txt")
+     $ cd ../octave
+     $ octave
+     octave:1> ofdm_demod_c("../src/demod_dump.txt")
 
 4. Run Octave versions of mod and demod (called tx and rx to avoid
    namespace clashes in Octave):
@@ -77,7 +76,16 @@ Built as part of codec2-dev, see README for build instructions.
    C demodulator/LDPC decoder:
    
      build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw /dev/null -v -t --ldpc --interleave 4
-     
+
+6.  Run C mod/demod with LDPC and 2 frames interleaving:
+
+      build_linux/src$ ./ofdm_mod /dev/zero - --ldpc -t 2 --interleave 2 | ./ofdm_demod - /dev/null -t --ldpc -v --interleave 2
+
+7. Pass Codec 2 700C through modem:
+
+      build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 2 | ./ofdm_demod - - --ldpc --interleave 2 | ./c2dec 700C - - --bitperchar | play -t raw -r 8000 -s -2 -
+
+
 Acceptance Tests
 ----------------
 

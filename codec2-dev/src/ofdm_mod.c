@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     struct OFDM   *ofdm;
     int           frames;
     int           i, j, arg;
-    int           testframes, ldpc_en, interleaver_frames;
+    int           testframes, ldpc_en, interleave_frames;
    
     /* Set up default LPDC code.  We could add other codes here if we like */
     
@@ -71,11 +71,11 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr, "\n");
 	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--lpdc] [--interleaver depth]\n\n", argv[0]);
-        fprintf(stderr, "  -t            Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+        fprintf(stderr, "  -t Nsecs      Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
         fprintf(stderr, "  --ldpc        Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
                         "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
                                          coded_bits_per_frame, data_bits_per_frame);
-        fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
+        fprintf(stderr, "  --interleave  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -97,24 +97,19 @@ int main(int argc, char *argv[])
     ofdm = ofdm_create(OFDM_CONFIG_700D);
     assert(ofdm != NULL);
 
-    testframes = 0;
-    if (opt_exists(argv, argc, "-t")) {
-        testframes = 1;
-    }
-
     /* set for LDPC coded or uncoded frames */
     
-    ldpc_en = 0; interleaver_frames = 1;
+    ldpc_en = 0; interleave_frames = 1;
     int Nbitsperframe;
     if (opt_exists(argv, argc, "--ldpc")) {
 
         assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME); /* sanity check */
 
         ldpc_en = 1;
-        if ((arg = opt_exists(argv, argc, "--interleaver"))) {
-            interleaver_frames = atoi(argv[arg]);
+        if ((arg = opt_exists(argv, argc, "--interleave"))) {
+            interleave_frames = atoi(argv[arg+1]);
         }
-        Nbitsperframe = interleaver_frames*data_bits_per_frame;
+        Nbitsperframe = interleave_frames*data_bits_per_frame;
         
     } else {
         /* vanilla uncoded input bits mode */
@@ -122,6 +117,7 @@ int main(int argc, char *argv[])
     }
     
     int Nsamperframe = ofdm_get_samples_per_frame();
+    fprintf(stderr, "Nbitsperframe: %d interleave_frames: %d\n", Nbitsperframe, interleave_frames);
 
     unsigned char tx_bits_char[Nbitsperframe];
     int           tx_bits[Nbitsperframe];
@@ -143,20 +139,29 @@ int main(int argc, char *argv[])
         tx_symbols[i] = uw_txt_syms[i].real + I * uw_txt_syms[i].imag;
     }
     
+    testframes = 0;
+    int Nframes = 0;
+    if ((arg = (opt_exists(argv, argc, "-t")))) {
+        testframes = 1;
+        int Nsec, Nrows;
+        Nsec = atoi(argv[arg+1]);
+        Nrows = Nsec*OFDM_RS;
+        Nframes = floor((Nrows-1)/OFDM_NS);
+        fprintf(stderr, "Nframes: %d\n", Nframes);
+    }
+
     /* main loop ----------------------------------------------------------------*/
     
     frames = 0;
 
     while(fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
-	frames++;
-
         if (ldpc_en) {
             /* fancy interleaved LDPC encoded frames ----------------------------------------*/
             
             /* optionally overwrite input data with test frame nown to demodulator */
             
             if (testframes) {
-                for (j=0; j<interleaver_frames; j++) {
+                for (j=0; j<interleave_frames; j++) {
                     for(i=0; i<data_bits_per_frame; i++) {
                         tx_bits_char[j*data_bits_per_frame + i] = payload_data_bits[i];
                     }
@@ -164,14 +169,16 @@ int main(int argc, char *argv[])
             }
             
             int codeword[coded_bits_per_frame];
-            COMP coded_symbols[interleaver_frames*coded_syms_per_frame];
-            COMP coded_symbols_inter[interleaver_frames*coded_syms_per_frame];
+            COMP coded_symbols[interleave_frames*coded_syms_per_frame];
+            COMP coded_symbols_inter[interleave_frames*coded_syms_per_frame];
             complex float tx_sams[Nsamperframe];
 
-            for (j=0; j<interleaver_frames; j++) {
+            for (j=0; j<interleave_frames; j++) {
                 ldpc_encode_frame(&ldpc, codeword, &tx_bits_char[j*data_bits_per_frame]);
                 qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
-                gp_interleave_comp(coded_symbols_inter, coded_symbols, interleaver_frames*coded_syms_per_frame);
+            }
+            gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
+            for (j=0; j<interleave_frames; j++) {            
                 for(i=0; i<coded_syms_per_frame; i++) {
                     tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
                                                                         + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
@@ -181,9 +188,9 @@ int main(int argc, char *argv[])
                     tx_scaled[i] = ASCALE * crealf(tx_sams[i]);
                 }
                 fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
+                frames++;
             }
-        
-        } else {
+         } else {
             /* just modulate uncoded raw bits ----------------------------------------------*/
             
             if (testframes) {
@@ -202,6 +209,7 @@ int main(int argc, char *argv[])
                 tx_scaled[i] = ASCALE * tx_sams[i].real;
 
             fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
+            frames++;
         }
         
 	/* if this is in a pipeline, we probably don't want the usual
@@ -209,8 +217,13 @@ int main(int argc, char *argv[])
 
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
+
+        if (testframes && (frames >= Nframes)) {
+            goto finished;
+        }
     }
 
+ finished:
     fclose(fin);
     fclose(fout);
     ofdm_destroy(ofdm);
