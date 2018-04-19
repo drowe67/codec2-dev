@@ -64,8 +64,8 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-test = 'compare to c';
-%test = 'awgn';
+%test = 'compare to c';
+test = 'awgn';
 %test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
@@ -734,9 +734,11 @@ endfunction
 
 % function to write float fading samples for use by C programs
 
-function write_noise_file(raw_file_name, Fs, len_samples)
-  [spread spread_2ms hf_gain] = init_hf_model(Fs, len_samples);
- hf_gain
+function write_noise_file(raw_file_name, Fs, dopplerSpreadHz, len_samples)
+  spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+  spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
+  hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));
+
   % interleave real imag samples
 
   inter = zeros(1,len_samples*4);
