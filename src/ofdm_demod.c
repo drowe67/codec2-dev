@@ -155,8 +155,11 @@ int main(int argc, char *argv[])
     }
     int Nerrs_raw[interleave_frames];
     int Nerrs_coded[interleave_frames];
+    int iter[interleave_frames];
+    int parityCheckCount[interleave_frames];
+    
     for(i=0; i<interleave_frames; i++) {
-        Nerrs_raw[i] = Nerrs_coded[i] = 0;
+        Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
     }
     
     ofdm = ofdm_create(OFDM_CONFIG_700D);
@@ -175,7 +178,6 @@ int main(int argc, char *argv[])
     char   rx_bits_char[Nbitsperframe];
     int    rx_uw[OFDM_NUWBITS];
     f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
-    int    parityCheckCount, iter;
 
     float EsNo = 10;
     fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
@@ -246,15 +248,15 @@ int main(int argc, char *argv[])
                     
                     char next_sync_state_interleaver[OFDM_STATE_STR];
                     strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
-                    if (strcmp(ofdm->sync_state_interleaver,"search") == 0) {
+                    if ((strcmp(ofdm->sync_state_interleaver,"search") == 0) && (ofdm->frame_count >= (interleave_frames-1))) {
                         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);               
-                        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                        Nerrs = data_bits_per_frame - parityCheckCount;
-                        for(i=0; i<20; i++)
-                            fprintf(stderr,"%d ", out_char[i]);
-                        fprintf(stderr,"\n");
-                        fprintf(stderr, "iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
-                        if ((Nerrs < 10)) {
+                        iter[0] =  run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[0]);
+                        Nerrs_coded[0] = data_bits_per_frame - parityCheckCount[0];
+                        //for(i=0; i<20; i++)
+                        //    fprintf(stderr,"%d ", out_char[i]);
+                        //fprintf(stderr,"\n");
+                        //fprintf(stderr, "     iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
+                        if ((Nerrs_coded[0] == 0) && (iter[0] <= 5)) {
                             /* sucessful decode! */
                             strcpy(next_sync_state_interleaver, "synced");
                             ofdm->frame_count_interleaver = interleave_frames;
@@ -298,8 +300,8 @@ int main(int argc, char *argv[])
                             symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
                                                  &codeword_amps_de[j*coded_syms_per_frame],
                                                  EsNo, coded_syms_per_frame);               
-                            iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-                            fprintf(stderr,"j: %d iter: %d parityCheckCount: %d\n", j, iter, parityCheckCount);
+                            iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
+                            //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
                             if (testframes) {
                                 Nerrs = 0;
                                 for(i=0; i<data_bits_per_frame; i++) {
@@ -369,11 +371,14 @@ int main(int argc, char *argv[])
         }
 
         if (ofdm->verbose) {
-           int  r = ofdm->frame_count_interleaver % interleave_frames;
-            fprintf(stderr, "f: %3d st: %-6s uw_errs: %2d %1d inter_st: %-6s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f",
-                    f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter,
+            int  r=0;
+            if (testframes) {
+                r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
+            }
+            fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
+                    f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
-                    Nerrs_raw[r], Nerrs_coded[r], ofdm->foff_est_hz);
+                    Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
             fprintf(stderr, "\n");    
         }
 

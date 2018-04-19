@@ -56,14 +56,27 @@
 #define PAPR_TARGET           7.0
 
 /* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
-   tcohpsk first (any variant) to load the function into Octave, e.g.:
+   tcohpsk first (any variant) to load the function into Octave, e.g. for Fs=7500Hz:
 
-  octave:17> tcohpsk
-  octave:18> write_noise_file("../raw/fading_samples.float", 7500, 7500*60)
+     octave:26> cohpsk_ch_fading("../raw/fast_fading_samples.float", 8000, 1.0, 8000*60)
+     octave:27> cohpsk_ch_fading("../raw/slow_fading_samples.float", 8000, 0.1, 8000*60)
+
+   Note: for Fs=8000Hz operation 7500 Hz is OK - these are just the two path fading complex numbers,
+   a few % different in fading bandwidth won't matter.
 */
 
 #define FAST_FADING_FILE_NAME "../../raw/fast_fading_samples.float"
 #define SLOW_FADING_FILE_NAME "../../raw/slow_fading_samples.float"
+
+int opt_exists(char *argv[], int argc, char opt[]) {
+    int i;
+    for (i=0; i<argc; i++) {
+        if (strcmp(argv[i], opt) == 0) {
+            return i;
+        }
+    }
+    return 0;
+}
 
 int main(int argc, char *argv[])
 {
@@ -85,10 +98,10 @@ int main(int argc, char *argv[])
     float          hf_gain;
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
-    int            frames, i, j, k, ret, clipped;
+    int            frames, i, j, k, arg, Fs, ret, clipped, ssbfilt_en;
     float          sam, peak, inclip, papr, CNo, snr3k, EbNo700;
-
-    if (argc == 7) {
+  
+    if (argc > 3) {
         if (strcmp(argv[1], "-")  == 0) fin = stdin;
         else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
             fprintf(stderr, "Error opening input modem raw file: %s: %s.\n",
@@ -104,15 +117,41 @@ int main(int argc, char *argv[])
         }
 
         NodB = atof(argv[3]);
-        foff_hz = atof(argv[4]);
-        fading_en = atoi(argv[5]);
-        inclip = atof(argv[6]);
+
+        Fs = COHPSK_FS;
+        if ((arg = opt_exists(argv, argc, "--Fs"))) {
+            Fs = atoi(argv[arg+1]);
+        }
+        
+        foff_hz = 0.0;
+        if ((arg = opt_exists(argv, argc, "-f"))) {
+            foff_hz = atoi(argv[arg+1]);
+        }
+        fading_en = 0;
+        if (opt_exists(argv, argc, "--fast")) {
+            fading_en = 1;
+        }
+        if (opt_exists(argv, argc, "--slow")) {
+            fading_en = 2;
+        }
+        inclip = 1.0;
+        if ((arg = opt_exists(argv, argc, "--clip"))) {
+            inclip = atof(argv[arg+1]);
+        }
+        ssbfilt_en = 1;
+        if ((arg = opt_exists(argv, argc, "--ssbfilt"))) {
+            ssbfilt_en = atof(argv[arg+1]);
+        }
     }
     else {
-        fprintf(stderr, "usage: %s InputRealModemRawFileFs7500Hz OutputRealModemRawFileFs7500Hz No(dB/Hz) FoffHz Fading[0-none 1-fast 2-slow] InputClip0to1\n", argv[0]);
+        fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
+                        " [-f FoffHz] [--slow] [--fast] [--clip 0to1] [--ssbfilt 0|1]\n", argv[0]);
         exit(1);
     }
-    fprintf(stderr, "NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f\n", NodB, foff_hz, fading_en, inclip);
+    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
+    fprintf(stderr, "Fs: %d NodB: %4.2f foff: %4.2f Hz fading: %d inclip: %4.2f ssbfilt: %d\n",
+            Fs, NodB, foff_hz, fading_en, inclip, ssbfilt_en);
+    fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");
 
     phase_ch.real = 1.0; phase_ch.imag = 0.0;
     noise_r = 0;
@@ -121,7 +160,7 @@ int main(int argc, char *argv[])
     /*  N = var = NoFs */
 
     No = pow(10.0, NodB/10.0);
-    variance = COHPSK_FS*No;
+    variance = Fs*No;
 
     tx_pwr = tx_pwr_fade = noise_pwr = 0.0;
     clipped = 0;
@@ -135,19 +174,21 @@ int main(int argc, char *argv[])
         if (fading_en == 1) {
             ffading = fopen(FAST_FADING_FILE_NAME, "rb");
             if (ffading == NULL) {
-                printf("Can't find fast fading file: %s\n", FAST_FADING_FILE_NAME);
+                fprintf(stderr, "-----------------------------------------------------\n");
+                fprintf(stderr, "cohpsk_ch ERROR: Can't find fast fading file: %s\n", FAST_FADING_FILE_NAME);
+                fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
-            nhfdelay = floor(FAST_FADING_DELAY_MS*COHPSK_FS/1000);
+            nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 2) {
             ffading = fopen(SLOW_FADING_FILE_NAME, "rb");
             if (ffading == NULL) {
-                printf("Can't find slow fading file: %s\n", SLOW_FADING_FILE_NAME);
+                fprintf(stderr, "Can't find slow fading file: %s\n", SLOW_FADING_FILE_NAME);
                 exit(1);
             }
-            nhfdelay = floor(SLOW_FADING_DELAY_MS*COHPSK_FS/1000);
+            nhfdelay = floor(SLOW_FADING_DELAY_MS*Fs/1000);
         }
 
         ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
@@ -161,7 +202,7 @@ int main(int argc, char *argv[])
 
         for (i=0; i<4; i++)
             ret = fread(&hf_gain, sizeof(float), 1, ffading);
-        fprintf(stderr, "hf_gain: %f\n", hf_gain);
+        //fprintf(stderr, "hf_gain: %f\n", hf_gain);
     }
 
     for(i=0; i<HT_N; i++) {
@@ -240,9 +281,9 @@ int main(int argc, char *argv[])
 
             for(i=0; i<BUF_N; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
-                assert(ret == 1);
+                if (ret == 0) goto finish;
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
-                assert(ret == 1);
+                if (ret == 0) goto finish;
                 //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
 
                 direct    = cmult(aspread, ch_fdm[i]);
@@ -279,9 +320,14 @@ int main(int argc, char *argv[])
 
         for(i=0, j=SSBFILT_N; i<BUF_N; i++,j++) {
             ssbfiltbuf[j] = ch_fdm[i].real;
-            ssbfiltout[i] = 0.0;
-            for(k=0; k<SSBFILT_N; k++) {
-                ssbfiltout[i] += ssbfiltbuf[j-k]*ssbfilt_coeff[k];
+            if (ssbfilt_en) {
+                ssbfiltout[i] = 0.0;
+                for(k=0; k<SSBFILT_N; k++) {
+                    ssbfiltout[i] += ssbfiltbuf[j-k]*ssbfilt_coeff[k];
+                }
+            }
+            else {
+                ssbfiltout[i] = ch_fdm[i].real;
             }
         }
 
@@ -314,27 +360,26 @@ int main(int argc, char *argv[])
         if (fin == stdin) fflush(stdin);
     }
 
+ finish:
     fclose(fin);
     fclose(fout);
 
-    fprintf(stderr, "peak pwr.....: %7.2f\nav input pwr.: %7.2f\nav pwr fading: %7.2f\nnoise pwr....: %7.2f\nclipping.....: %7.2f %%\n",
+    fprintf(stderr, "cohpsk_ch -----------------------------------------------------------------------------\n");
+    /*
+    fprintf(stderr, "peak pwr: %7.2f av input pwr.: %7.2f av fading pwr: %7.2f noise pwr....: %7.2f\n",
             peak*peak,
             tx_pwr/(frames*BUF_N),
             tx_pwr_fade/(frames*BUF_N),
-            noise_pwr/(frames*BUF_N),
-            100.0*clipped/frames
+            noise_pwr/(frames*BUF_N)
            );
+    */
     papr = 10*log10(peak*peak/(tx_pwr/(frames*BUF_N)));
-    CNo = 10*log10(tx_pwr/(noise_pwr/(COHPSK_FS/2))); // single sided spctrum magic IDFK!
+    CNo = 10*log10(tx_pwr/(noise_pwr/(Fs/2))); // single sided spectrum magic IDFK!
     snr3k = CNo - 10*log10(3000);
-    EbNo700 = CNo - 10*log10(700) - 10*log10(6.0/4.0); // divide by bit rate and pilot overhead
-    fprintf(stderr, "PAPR (dB)....: %7.2f (target %3.2f)\nC/No (dB)....: %7.2f\nSNR3k........: %7.2f\nEb/No(Rb=700): %7.2f\n",
-            papr,
-            PAPR_TARGET,
-            CNo,
-            snr3k,
-            EbNo700
-            );
+    EbNo700 = CNo - 10*log10(700);             // divide by coded data bit rate 
+    fprintf(stderr, "PAPR (dB) : %4.1f C/No (dB): %4.1f SNR3k: %5.2f Eb/No(Rb=700): %5.2f\n",
+            papr, CNo, snr3k,EbNo700);
+    fprintf(stderr, "cohpsk_ch -----------------------------------------------------------------------------\n");
 
     return 0;
 }
