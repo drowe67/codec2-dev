@@ -528,7 +528,7 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame
 
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
-  init_cml('/home/david/Desktop/cml/'); % TODO: make this path sensible and portable
+  init_cml('~/cml/'); % TODO: make this path sensible and portable
   load HRA_112_112.txt
   [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
   assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));

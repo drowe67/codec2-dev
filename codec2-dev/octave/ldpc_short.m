@@ -532,7 +532,7 @@ endfunction
 
 % change this path for your CML installation
 
-init_cml('/home/david/Desktop/cml');
+init_cml('~/cml');
 
 more off;
 format;

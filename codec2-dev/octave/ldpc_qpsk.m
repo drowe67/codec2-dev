@@ -449,7 +449,7 @@ end
 more off;
 format;
 
-init_cml('/home/david/Desktop/cml/');
+init_cml('~/cml/');
 
 %run_single(Nbits=700*5, EbNo=6, hf_en=1, ldpc_code=3, framesize=576*4, 1)
 plot_curves(700*60);
