@@ -505,7 +505,6 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     int Fs = fsk->Fs;
     int nin = fsk->nin;
     size_t i,j;
-    int fft_samps;
     float hann;
     float max;
     float tc;
@@ -528,8 +527,6 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     COMP rphi = {.5,0};
     rphi = cmult(cconj(dphi),rphi);
     #endif
-
-    fft_samps = Ndft;
     
     f_min  = (fsk->est_min*Ndft)/Fs;
     f_max  = (fsk->est_max*Ndft)/Fs;
@@ -538,9 +535,18 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
     /* scale averaging time constant based on number of samples */
     tc = 0.95*Ndft/Fs;
     
-    int fft_loops = nin/Ndft;
+    int samps;
+    int fft_samps;
+    int fft_loops = nin / Ndft;
+
     for(j=0; j<fft_loops; j++){
-    /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
+        /* 48000 sample rate (for example) will have a spare */
+        /* 896 samples besides the 46 "Ndft" samples, so adjust */
+
+        samps = (nin - ((j + 1) * Ndft));
+        fft_samps = (samps >= Ndft) ? Ndft : samps;
+
+        /* Copy FSK buffer into reals of FFT buffer and apply a hann window */
         for(i=0; i<fft_samps; i++){
             #ifdef USE_HANN_TABLE
             hann = fsk->hann_table[i];
@@ -552,7 +558,8 @@ void fsk_demod_freq_est(struct FSK *fsk, COMP fsk_in[],float *freqs,int M){
             fftin[i].r = hann*fsk_in[i+Ndft*j].real;
             fftin[i].i = hann*fsk_in[i+Ndft*j].imag;
         }
-        /* Zero out the remaining slots */
+
+        /* Zero out the remaining slots on spare samples */
         for(; i<Ndft;i++){
             fftin[i].r = 0;
             fftin[i].i = 0;
