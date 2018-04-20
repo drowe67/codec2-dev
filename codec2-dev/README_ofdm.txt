@@ -95,8 +95,11 @@ Built as part of codec2-dev, see README for build instructions.
 
 10. Run codec voice through simulated fast fading channel, just where it starts to fall over: 
 
-   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 16 | ./cohpsk_ch - - -22 --Fs 8000 -f -10 --fast | ./ofdm_demod - - --ldpc -v --interleave 16 | ./c2dec 700C - - --bitperchar | aplay -f S16
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 16 | ./cohpsk_ch - - -20 --Fs 8000 -f -10 --fast | ./ofdm_demod - - --ldpc -v --interleave 16 | ./c2dec 700C - - --bitperchar | aplay -f S16
 
+11. FreeDV 1600 on the same channel conditions, roughly same quality at 10dB higher SNR:
+
+   build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - - | ./cohpsk_ch - - -30 --Fs 8000 -f -10 --fast | ./freedv_rx 1600 - -  | aplay -f S16
 
 Acceptance Tests
 ----------------
