@@ -77,17 +77,31 @@ Built as part of codec2-dev, see README for build instructions.
    
      build_linux/src$ ./ofdm_demod ../../octave/ofdm_test.raw /dev/null -v -t --ldpc --interleave 4
 
-6.  Run C mod/demod with LDPC and 2 frames interleaving:
+6. Run C mod/demod with LDPC and 2 frames interleaving:
 
-      build_linux/src$ ./ofdm_mod /dev/zero - --ldpc -t 2 --interleave 2 | ./ofdm_demod - /dev/null -t --ldpc -v --interleave 2
+     build_linux/src$ ./ofdm_mod /dev/zero - --ldpc -t 2 --interleave 2 | ./ofdm_demod - /dev/null -t --ldpc -v --interleave 2
 
-7. Pass Codec 2 700C through modem:
+7. Pass Codec 2 700C compressed speech through OFDM modem:
 
-      build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 2 | ./ofdm_demod - - --ldpc --interleave 2 | ./c2dec 700C - - --bitperchar | play -t raw -r 8000 -s -2 -
+     build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 2 | ./ofdm_demod - - --ldpc --interleave 2 | ./c2dec 700C - - --bitperchar | play -t raw -r 8000 -s -2 -
+
+8. Listen to signal through simulated fading channel in C:
+
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 4 | ./cohpsk_ch - - -20 -Fs 8000 --slow -f -5 | aplay -f S16
+
+9. Run test frames through simulated chanel in C:
+
+   build_linux/src$ ./ofdm_mod /dev/zero - --interleave 16 --ldpc -t 60 | ./cohpsk_ch - - -19 --Fs 8000 | ./ofdm_demod - /dev/null -t --interleave 16
+
+10. Run codec voice through simulated fast fading channel, just where it starts to fall over: 
+
+   build_linux/src$ ./c2enc 700C ../../raw/ve9qrp.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 16 | ./cohpsk_ch - - -22 --Fs 8000 -f -10 --fast | ./ofdm_demod - - --ldpc -v --interleave 16 | ./c2dec 700C - - --bitperchar | aplay -f S16
 
 
 Acceptance Tests
 ----------------
+
+Run these if you modify anything.
 
 The rate 1/2 LDPC code can correct up to about 10% raw BER, so a good
 test is to run the modem at Eb/No operating points that produce just
@@ -121,6 +135,7 @@ ofdm_demod         - OFDM demodulator command line program, supports uncoded
                      LDPC decoder                    
 ofdm_put_test_bits - measure BER in OFDM test frames
 unittest/tofdm     - Run C port of modem to compare with octave version (see octave/tofdm)
+cohpsk_ch          - From COHPSK modem development, useful C channel simulator
 
 Octave Scripts
 --------------
