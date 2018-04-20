@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
     COMP          *ch_fdm_delay = NULL, aspread, aspread_2ms, delayed, direct;
     float          tx_pwr, tx_pwr_fade, noise_pwr;
     int            frames, i, j, k, arg, Fs, ret, clipped, ssbfilt_en;
-    float          sam, peak, inclip, papr, CNo, snr3k, EbNo700;
+    float          sam, peak, inclip, papr, CNo, snr3k;
   
     if (argc > 3) {
         if (strcmp(argv[1], "-")  == 0) fin = stdin;
@@ -176,6 +176,7 @@ int main(int argc, char *argv[])
             if (ffading == NULL) {
                 fprintf(stderr, "-----------------------------------------------------\n");
                 fprintf(stderr, "cohpsk_ch ERROR: Can't find fast fading file: %s\n", FAST_FADING_FILE_NAME);
+                fprintf(stderr, "->See cohpsk_ch.c source for instructions on how to generate this file.\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
@@ -376,9 +377,7 @@ int main(int argc, char *argv[])
     papr = 10*log10(peak*peak/(tx_pwr/(frames*BUF_N)));
     CNo = 10*log10(tx_pwr/(noise_pwr/(Fs/2))); // single sided spectrum magic IDFK!
     snr3k = CNo - 10*log10(3000);
-    EbNo700 = CNo - 10*log10(700);             // divide by coded data bit rate 
-    fprintf(stderr, "PAPR (dB) : %4.1f C/No (dB): %4.1f SNR3k: %5.2f Eb/No(Rb=700): %5.2f\n",
-            papr, CNo, snr3k,EbNo700);
+    fprintf(stderr, "SNR3k(dB): %5.2f C/No: %4.1f PAPR: %4.1f \n", snr3k, CNo, papr);
     fprintf(stderr, "cohpsk_ch -----------------------------------------------------------------------------\n");
 
     return 0;
