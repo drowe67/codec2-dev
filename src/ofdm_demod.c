@@ -42,7 +42,6 @@
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "octave.h"
-#include "test_bits_ofdm.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "interldpc.h"
@@ -51,6 +50,9 @@
 #define NFRAMES  100               /* just log the first 100 frames          */
 #define NDISCARD 20                /* BER2measure disctrds first 20 frames   */
 
+extern int payload_data_bits[];
+extern int test_bits_ofdm[];
+               
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {
@@ -184,8 +186,6 @@ int main(int argc, char *argv[])
 
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
-    COMP  codeword_symbols_de[interleave_frames*coded_syms_per_frame];
-    float codeword_amps_de[interleave_frames*coded_syms_per_frame];
 
     nin_frame = ofdm_get_nin(ofdm);
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
@@ -231,6 +231,8 @@ int main(int argc, char *argv[])
                
                 /* run de-interleaver */
                 
+                COMP  codeword_symbols_de[interleave_frames*coded_syms_per_frame];
+                float codeword_amps_de[interleave_frames*coded_syms_per_frame];
                 gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
                 gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
@@ -239,61 +241,16 @@ int main(int argc, char *argv[])
                 if (ldpc_en) {
                     char out_char[coded_bits_per_frame];
 
-                    /* 
-                       Interleaver Sync:
-                         Needs to work on any data
-                         Use indication of LDPC convergence, may need to patch CML code for that
-                         Attempt a decode on every frame, when it converges we have sync
-                    */
-                    
-                    char next_sync_state_interleaver[OFDM_STATE_STR];
-                    strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
-                    if ((strcmp(ofdm->sync_state_interleaver,"search") == 0) && (ofdm->frame_count >= (interleave_frames-1))) {
-                        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);               
-                        iter[0] =  run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[0]);
-                        Nerrs_coded[0] = data_bits_per_frame - parityCheckCount[0];
-                        //for(i=0; i<20; i++)
-                        //    fprintf(stderr,"%d ", out_char[i]);
-                        //fprintf(stderr,"\n");
-                        //fprintf(stderr, "     iter: %d pcc: %d Nerrs: %d\n", iter, parityCheckCount, Nerrs);
-                        if ((Nerrs_coded[0] == 0) && (iter[0] <= 5)) {
-                            /* sucessful decode! */
-                            strcpy(next_sync_state_interleaver, "synced");
-                            ofdm->frame_count_interleaver = interleave_frames;
-                        }
-                    }
-                    strcpy(ofdm->sync_state_interleaver, next_sync_state_interleaver);
-                     
+                    interleaver_sync_state_machine(ofdm, &ldpc, codeword_symbols_de, codeword_amps_de, EsNo,
+                                                   interleave_frames, iter, parityCheckCount, Nerrs_coded);
+                                         
                     if (!strcmp(ofdm->sync_state_interleaver,"synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
                         // printf("decode!\n");
 
                         if (testframes) {
-                            
-                            /* measure uncoded (raw) bit errors over interleaver frame */
-
-                            int rx_bits_raw[coded_bits_per_frame];
-                            for (j=0; j<interleave_frames; j++) {
-                                for(i=0; i<coded_syms_per_frame; i++) {
-                                    int bits[2];
-                                    complex float s = codeword_symbols_de[j*coded_syms_per_frame+i].real + I*codeword_symbols_de[j*coded_syms_per_frame+i].imag;
-                                    qpsk_demod(s, bits);
-                                    rx_bits_raw[OFDM_BPS*i]   = bits[1];
-                                    rx_bits_raw[OFDM_BPS*i+1] = bits[0];
-                                }
-                                Nerrs = 0;
-                                assert(sizeof(test_codeword)/sizeof(int) == coded_bits_per_frame);
-                                for(i=0; i<coded_bits_per_frame; i++) {
-                                    //fprintf(stderr, "%d %d %d\n", i, test_codeword[i], rx_bits_raw[i]);
-                                    if (test_codeword[i] != rx_bits_raw[i]) {
-                                        Nerrs++;
-                                    }
-                                }
-                                
-                                Nerrs_raw[j] = Nerrs;
-                                Terrs += Nerrs;
-                                Tbits += Nbitsperframe;
-                            }
+                            Terrs += count_uncoded_errors(&ldpc, Nerrs_raw, interleave_frames, codeword_symbols_de);
+                            Tbits += Nbitsperframe*interleave_frames;
                         }
 
                         for (j=0; j<interleave_frames; j++) {
@@ -320,7 +277,7 @@ int main(int argc, char *argv[])
                 } else {
                     /* lpdc_en == 0,  external LDPC decoder, so output LLRs */
                     symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);
-                        fwrite(llr, sizeof(double), coded_bits_per_frame, fout);
+                    fwrite(llr, sizeof(double), coded_bits_per_frame, fout);
                 }
             } else {
                 /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */

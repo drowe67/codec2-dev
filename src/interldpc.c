@@ -33,10 +33,10 @@
 
 #include "interldpc.h"
 #include "codec2_ofdm.h"
-#include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "HRA_112_112.h"
+#include "test_bits_ofdm.h"
 
 /* CRC type function, used to compare QPSK vectors when debugging */
 
@@ -103,4 +103,73 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
         tx_symbols[i].real = crealf(qpsk_symb);
         tx_symbols[i].imag = cimagf(qpsk_symb);
     }    
+}
+
+void interleaver_sync_state_machine(struct OFDM *ofdm,
+                                    struct LDPC *ldpc,
+                                    COMP codeword_symbols_de[],
+                                    float codeword_amps_de[],
+                                    float EsNo, int interleave_frames,
+                                    int *iter, int *parityCheckCount, int *Nerrs_coded)
+{
+    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int coded_bits_per_frame = ldpc->coded_bits_per_frame;
+    int data_bits_per_frame = ldpc->data_bits_per_frame;
+    double llr[coded_bits_per_frame];
+    char out_char[coded_bits_per_frame];                    
+    char next_sync_state_interleaver[OFDM_STATE_STR];
+    
+    strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
+    if ((strcmp(ofdm->sync_state_interleaver,"search") == 0) && (ofdm->frame_count >= (interleave_frames-1))) {
+        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);               
+        iter[0] =  run_ldpc_decoder(ldpc, out_char, llr, parityCheckCount);
+        Nerrs_coded[0] = data_bits_per_frame - parityCheckCount[0];
+        //for(i=0; i<20; i++)
+        //    fprintf(stderr,"%d ", out_char[i]);
+        //fprintf(stderr,"\n");
+        //fprintf(stderr, "     iter: %d pcc: %d Nerrs: %d\n", iter[0], parityCheckCount[0], Nerrs_coded[0]);
+        if ((Nerrs_coded[0] == 0) && (iter[0] <= 5)) {
+            /* sucessful decode! */
+            strcpy(next_sync_state_interleaver, "synced");
+            ofdm->frame_count_interleaver = interleave_frames;
+        }
+    }
+    strcpy(ofdm->sync_state_interleaver, next_sync_state_interleaver);
+}
+
+
+/* measure uncoded (raw) bit errors over interleaver frame */
+
+int count_uncoded_errors(struct LDPC *ldpc, int Nerrs_raw[], int interleave_frames, COMP codeword_symbols_de[])
+{
+    int i,j,Nerrs,Terrs;
+
+    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int coded_bits_per_frame = ldpc->coded_bits_per_frame;
+    int rx_bits_raw[coded_bits_per_frame];
+
+    assert(sizeof(test_codeword)/sizeof(int) == coded_bits_per_frame);
+
+    Terrs = 0;
+    for (j=0; j<interleave_frames; j++) {
+        for(i=0; i<coded_syms_per_frame; i++) {
+            int bits[2];
+            complex float s = codeword_symbols_de[j*coded_syms_per_frame+i].real + I*codeword_symbols_de[j*coded_syms_per_frame+i].imag;
+            qpsk_demod(s, bits);
+            rx_bits_raw[OFDM_BPS*i]   = bits[1];
+            rx_bits_raw[OFDM_BPS*i+1] = bits[0];
+        }
+        Nerrs = 0;
+        for(i=0; i<coded_bits_per_frame; i++) {
+            //fprintf(stderr, "%d %d %d\n", i, test_codeword[i], rx_bits_raw[i]);
+            if (test_codeword[i] != rx_bits_raw[i]) {
+                Nerrs++;
+            }
+        }
+                                
+        Nerrs_raw[j] = Nerrs;
+        Terrs += Nerrs;
+    }
+
+    return Terrs;
 }

@@ -30,6 +30,7 @@
 
 #include "comp.h"
 #include "mpdecode_core.h"
+#include "ofdm_internal.h"
 
 /* CRC type function, used to compare QPSK vectors when debugging */
 
@@ -38,5 +39,12 @@ void printf_n(COMP v[], int n);
 void set_up_hra_112_112(struct LDPC *ldpc);
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]);
 void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n);
+void interleaver_sync_state_machine(struct OFDM *ofdm,
+                                    struct LDPC *ldpc,
+                                    COMP codeword_symbols_de[],
+                                    float codeword_amps_de[],
+                                    float EsNo, int interleave_frames,
+                                    int *inter, int *parityCheckCount, int *Nerrs_coded);
+int count_uncoded_errors(struct LDPC *ldpc, int Nerrs_raw[], int interleave_frames, COMP codeword_symbols_de[]);
 
 #endif
