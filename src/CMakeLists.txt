@@ -233,6 +233,10 @@ set(CODEC2_SRCS
     modem_stats.c
     c2wideband.c
     dct2.c
+    ofdm.c
+    mpdecode_core.c
+    gp_interleaver.c
+    interldpc.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
@@ -337,10 +341,10 @@ target_link_libraries(ofdm_get_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ofdm_put_test_bits ofdm_put_test_bits.c)
 target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_mod ofdm_mod.c interldpc.c mpdecode_core.c gp_interleaver.c)
+add_executable(ofdm_mod ofdm_mod.c)
 target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_demod ofdm_demod.c octave.c mpdecode_core.c gp_interleaver.c interldpc.c)
+add_executable(ofdm_demod ofdm_demod.c octave.c)
 target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fmfsk_mod fmfsk_mod.c)
@@ -367,17 +371,17 @@ target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(cohpsk_ch cohpsk_ch.c)
 target_link_libraries(cohpsk_ch ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ldpc_enc ldpc_enc.c mpdecode_core.c)
-target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(ldpc_enc ldpc_enc.c)
+target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ldpc_dec ldpc_dec.c mpdecode_core.c)
-target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(ldpc_dec ldpc_dec.c)
+target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(drs232 drs232.c)
 target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
 
-add_executable(drs232_ldpc drs232_ldpc.c mpdecode_core.c)
-target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES})
+add_executable(drs232_ldpc drs232_ldpc.c)
+target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER)
 add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c fsk.c kiss_fft.c)

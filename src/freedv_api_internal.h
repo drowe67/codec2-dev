@@ -61,16 +61,20 @@ static float quiskFilt120t480[480];
 struct freedv {
     int                  mode;
 
+    /* states for various modems we support */
+    
     struct CODEC2       *codec2;
     struct FDMDV        *fdmdv;
-    struct MODEM_STATS   stats;
     struct COHPSK       *cohpsk;
     struct FSK          *fsk;
     struct FMFSK        *fmfsk;
+    struct OFDM         *ofdm;
+    struct LDPC         *ldpc;
+    struct MODEM_STATS   stats;
     
-    struct freedv_vhf_deframer * deframer;      //Extracts frames from VHF stream
+    struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 
-    struct quisk_cfFilter * ptFilter7500to8000;     // Filters to change to/from 7500 and 8000 sps
+    struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps
     struct quisk_cfFilter * ptFilter8000to7500;
 
     int                  n_speech_samples;
@@ -88,7 +92,6 @@ struct freedv {
     int                 *rx_bits;
     int                  tx_sync_bit;
     int                  smooth_symbols;
-    float               *prev_rx_bits;
     int                  n_codec_bits;           // amount of codec bits in a frame
 
     int                 *ptest_bits_coh;

@@ -51,6 +51,12 @@
 #include "freedv_vhf_framing.h"
 #include "comp_prim.h"
 
+#include "codec2_ofdm.h"
+#include "ofdm_internal.h"
+#include "mpdecode_core.h"
+#include "gp_interleaver.h"
+#include "interldpc.h"
+
 #define VERSION     11    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
@@ -83,7 +89,7 @@ struct freedv *freedv_open(int mode) {
     if ((mode != FREEDV_MODE_1600) && (mode != FREEDV_MODE_700) && 
         (mode != FREEDV_MODE_700B) && (mode != FREEDV_MODE_2400A) &&
         (mode != FREEDV_MODE_2400B) && (mode != FREEDV_MODE_800XA) &&
-        (mode != FREEDV_MODE_700C))
+        (mode != FREEDV_MODE_700C) && (mode != FREEDV_MODE_700D) )
         return NULL;
 
     f = (struct freedv*)malloc(sizeof(struct freedv));
@@ -96,6 +102,8 @@ struct freedv *freedv_open(int mode) {
     f->error_pattern_callback_state = NULL;
     f->n_protocol_bits = 0;
 
+    /* Init states for this mode, and set up samples in/out -----------------------------------------*/
+    
     if (mode == FREEDV_MODE_1600) {
         f->snr_squelch_thresh = 2.0;
         f->squelch_en = 1;
@@ -155,7 +163,38 @@ struct freedv *freedv_open(int mode) {
             return NULL;
         f->sz_error_pattern = cohpsk_error_pattern_size();
     }
+
+    if (mode == FREEDV_MODE_700D) {
+        /*
+          TODO:
+            [ ] how to set up interleaver, prob init time option best, as many arrays depend on it
+            [ ] clip option?  Haven't tried clipping OFDM waveform yet
+            [ ] support for uncoded and coded error patterns
+        */
+        
+        f->snr_squelch_thresh = 0.0;
+        f->squelch_en = 0;
+        codec2_mode = CODEC2_MODE_700C;
+        f->ofdm = ofdm_create(OFDM_CONFIG_700D);
+
+        f->nin = ofdm_get_samples_per_frame();
+        f->n_nat_modem_samples = ofdm_get_samples_per_frame();
+        f->n_nom_modem_samples = ofdm_get_samples_per_frame();
+        f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+        f->modem_sample_rate = OFDM_FS;
+        f->clip = 0;
+        nbit = OFDM_BITSPERFRAME;
+        f->tx_bits = (int*)malloc(nbit*sizeof(int));
+        if (f->tx_bits == NULL)
+            return NULL;
+        f->sz_error_pattern = OFDM_BITSPERFRAME; /* uncoded errors */
+
+        f->ldpc = (struct LDPC*)malloc(sizeof(struct LDPC));
+        if (f->ldpc == NULL) { return NULL; }
+        set_up_hra_112_112(f->ldpc);
+    }
 #endif  
+
     if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
       
         /* Set up the C2 mode */
@@ -245,16 +284,23 @@ struct freedv *freedv_open(int mode) {
         f->sz_error_pattern = 0;
     }
     
-
     f->test_frames_diversity = 1;
     f->test_frame_sync_state = 0;
     f->test_frame_sync_state_upper = 0;
     f->total_bits = 0;
     f->total_bit_errors = 0;
 
+    /* Init Codec 2 for this FreeDV mode ----------------------------------------------------*/
+    
     f->codec2 = codec2_create(codec2_mode);
     if (f->codec2 == NULL)
         return NULL;
+    
+    /* work out how many codec 2 frames per mode frame, and number of
+       bytes of storage for packed and unpacket bits.  TODO: do we really
+       need to work in packed bits at all?  It's messy, chars would probably
+       be OK.... */
+    
     if ((mode == FREEDV_MODE_1600) || (mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
         f->n_speech_samples = codec2_samples_per_frame(f->codec2);
         f->n_codec_bits = codec2_bits_per_frame(f->codec2);
@@ -268,17 +314,25 @@ struct freedv *freedv_open(int mode) {
         nbyte = nbyte*2;
         nbit = 8*nbyte;
         f->n_codec_bits = nbit;
-    } else { /* ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C)) */
+    } else if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C)) {
         f->n_speech_samples = 2*codec2_samples_per_frame(f->codec2);
         f->n_codec_bits = 2*codec2_bits_per_frame(f->codec2);
         nbit = f->n_codec_bits;
         nbyte = 2*((codec2_bits_per_frame(f->codec2) + 7) / 8);
+    } else /* mode == FREEDV_MODE_700D */ {
+
+        /* should be exactly an integer number ofCodec 2 frames in a OFDM modem frame */
+
+        assert((f->ldpc->data_bits_per_frame % codec2_bits_per_frame(f->codec2)) == 0);
+
+        int Ncodec2frames = f->ldpc->data_bits_per_frame/codec2_bits_per_frame(f->codec2);
+
+        f->n_speech_samples = Ncodec2frames*codec2_samples_per_frame(f->codec2);
+        f->n_codec_bits = Ncodec2frames*codec2_bits_per_frame(f->codec2);
+        nbit = f->n_codec_bits;
+        nbyte = (nbit + 7) / 8;
     }
     
-    f->prev_rx_bits = (float*)malloc(sizeof(float)*2*codec2_bits_per_frame(f->codec2));
-    if (f->prev_rx_bits == NULL)
-        return NULL;
-
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
     if (mode == FREEDV_MODE_1600)
         f->codec_bits = (int*)malloc(nbit*sizeof(int));
@@ -286,10 +340,13 @@ struct freedv *freedv_open(int mode) {
         f->codec_bits = (int*)malloc(COHPSK_BITS_PER_FRAME*sizeof(int));
     
     /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
+
     if ((f->packed_codec_bits == NULL) || (f->codec_bits == NULL))
         return NULL;
 
-    if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C) ) {        // change modem rates to 8000 sps
+    /* Sample rate conversion for modes using COHPSK */
+    
+    if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C) ) { 
         f->ptFilter7500to8000 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
         f->ptFilter8000to7500 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
         quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
@@ -300,6 +357,8 @@ struct freedv *freedv_open(int mode) {
         f->ptFilter8000to7500 = NULL;
     }
 
+    /* Varicode low bit rate text states */
+    
     varicode_decode_init(&f->varicode_dec_states, 1);
     f->nvaricode_bits = 0;
     f->varicode_bit_index = 0;
@@ -325,7 +384,6 @@ struct freedv *freedv_open(int mode) {
 void freedv_close(struct freedv *freedv) {
     assert(freedv != NULL);
 
-    free(freedv->prev_rx_bits);
     free(freedv->packed_codec_bits);
     free(freedv->codec_bits);
     free(freedv->tx_bits);
@@ -334,6 +392,10 @@ void freedv_close(struct freedv *freedv) {
 #ifndef CORTEX_M4
     if ((freedv->mode == FREEDV_MODE_700) || (freedv->mode == FREEDV_MODE_700B) || (freedv->mode == FREEDV_MODE_700C))
         cohpsk_destroy(freedv->cohpsk);
+    if (freedv->mode == FREEDV_MODE_700D) {
+        free(freedv->ldpc);
+        ofdm_destroy(freedv->ofdm);
+    }
 #endif
     if ((freedv->mode == FREEDV_MODE_2400A) || (freedv->mode == FREEDV_MODE_800XA)){
         fsk_destroy(freedv->fsk);

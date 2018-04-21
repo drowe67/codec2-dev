@@ -4,7 +4,7 @@
   AUTHOR......: David Rowe
   DATE CREATED: April 2018
 
-  Helper functions for interleaved LDPC modems.
+  Helper functions for interleaved LDPC waveforms.
 
 \*---------------------------------------------------------------------------*/
 
