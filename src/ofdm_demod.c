@@ -260,14 +260,8 @@ int main(int argc, char *argv[])
                             iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
                             //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
                             if (testframes) {
-                                Nerrs = 0;
-                                for(i=0; i<data_bits_per_frame; i++) {
-                                    if (payload_data_bits[i] != out_char[i]) {
-                                        Nerrs++;
-                                    }
-                                }
-                                Nerrs_coded[j] = Nerrs;
-                                Terrs_coded += Nerrs;
+                                Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
+                                Terrs_coded += Nerrs_coded[j];
                                 Tbits_coded += data_bits_per_frame;
                             }
                             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
