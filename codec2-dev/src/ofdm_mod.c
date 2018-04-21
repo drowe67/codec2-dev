@@ -38,9 +38,11 @@
 #include "ofdm_internal.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
-#include "test_bits_ofdm.h"
 
 #define ASCALE (2E5*1.1491)
+
+extern int payload_data_bits[];
+extern int test_bits_ofdm[];
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -125,20 +127,9 @@ int main(int argc, char *argv[])
     
     /* build modulated UW and txt bits */
 
-    int  uw_txt_bits[OFDM_NUWBITS+OFDM_NTXTBITS];
-    COMP uw_txt_syms[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
     complex float tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS + coded_syms_per_frame];
-    for(i=0; i<OFDM_NUWBITS; i++) {
-        uw_txt_bits[i] = ofdm->tx_uw[i];
-    }
-    for(j=0; j<OFDM_NTXTBITS; j++,i++) {
-        uw_txt_bits[i] = 0;
-    }    
-    qpsk_modulate_frame(uw_txt_syms, uw_txt_bits, (OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS);
-    for(i=0; i<(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i++) {
-        tx_symbols[i] = uw_txt_syms[i].real + I * uw_txt_syms[i].imag;
-    }
-    
+    build_modulated_uw(ofdm, tx_symbols);
+     
     testframes = 0;
     int Nframes = 0;
     if ((arg = (opt_exists(argv, argc, "-t")))) {
@@ -158,7 +149,8 @@ int main(int argc, char *argv[])
         if (ldpc_en) {
             /* fancy interleaved LDPC encoded frames ----------------------------------------*/
             
-            /* optionally overwrite input data with test frame nown to demodulator */
+            /* optionally overwrite input data with test frame of
+               payload data bits known to demodulator */
             
             if (testframes) {
                 for (j=0; j<interleave_frames; j++) {
@@ -167,29 +159,18 @@ int main(int argc, char *argv[])
                     }
                 }
             }
-            
-            int codeword[coded_bits_per_frame];
-            COMP coded_symbols[interleave_frames*coded_syms_per_frame];
-            COMP coded_symbols_inter[interleave_frames*coded_syms_per_frame];
-            complex float tx_sams[Nsamperframe];
 
-            for (j=0; j<interleave_frames; j++) {
-                ldpc_encode_frame(&ldpc, codeword, &tx_bits_char[j*data_bits_per_frame]);
-                qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
-            }
-            gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
+            complex float tx_sams[interleave_frames*Nsamperframe];
+            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, tx_symbols, interleave_frames);
+
             for (j=0; j<interleave_frames; j++) {            
-                for(i=0; i<coded_syms_per_frame; i++) {
-                    tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
-                                                                        + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
-                }
-                ofdm_txframe(ofdm, tx_sams, tx_symbols);
                 for(i=0; i<Nsamperframe; i++) {
-                    tx_scaled[i] = ASCALE * crealf(tx_sams[i]);
+                    tx_scaled[i] = ASCALE * crealf(tx_sams[j*Nsamperframe+i]);
                 }
                 fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
                 frames++;
             }
+
          } else {
             /* just modulate uncoded raw bits ----------------------------------------------*/
             
@@ -198,6 +179,7 @@ int main(int argc, char *argv[])
                     tx_bits_char[i] = test_bits_ofdm[i];
                 }
             }
+
             for(i=0; i<Nbitsperframe; i++)
                 tx_bits[i] = tx_bits_char[i];
             COMP tx_sams[Nsamperframe];
