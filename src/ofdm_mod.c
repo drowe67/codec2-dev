@@ -68,7 +68,6 @@ int main(int argc, char *argv[])
     set_up_hra_112_112(&ldpc);
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
     
     if (argc < 3) {
         fprintf(stderr, "\n");
@@ -121,15 +120,12 @@ int main(int argc, char *argv[])
     int Nsamperframe = ofdm_get_samples_per_frame();
     fprintf(stderr, "Nbitsperframe: %d interleave_frames: %d\n", Nbitsperframe, interleave_frames);
 
-    unsigned char tx_bits_char[Nbitsperframe];
-    int           tx_bits[Nbitsperframe];
-    short         tx_scaled[Nsamperframe];
-    
-    /* build modulated UW and txt bits */
+    uint8_t tx_bits_char[Nbitsperframe];
+    short   tx_scaled[Nsamperframe];
+    uint8_t txt_bits_char[OFDM_NTXTBITS*interleave_frames];
 
-    complex float tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS + coded_syms_per_frame];
-    build_modulated_uw(ofdm, tx_symbols);
-     
+    for(i=0; i<OFDM_NTXTBITS*interleave_frames; i++) { txt_bits_char[i] = 0; }
+   
     testframes = 0;
     int Nframes = 0;
     if ((arg = (opt_exists(argv, argc, "-t")))) {
@@ -161,7 +157,7 @@ int main(int argc, char *argv[])
             }
 
             complex float tx_sams[interleave_frames*Nsamperframe];
-            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, tx_symbols, interleave_frames);
+            ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char, txt_bits_char, interleave_frames);
 
             for (j=0; j<interleave_frames; j++) {            
                 for(i=0; i<Nsamperframe; i++) {
@@ -180,7 +176,8 @@ int main(int argc, char *argv[])
                 }
             }
 
-            for(i=0; i<Nbitsperframe; i++)
+           int tx_bits[Nbitsperframe];
+           for(i=0; i<Nbitsperframe; i++)
                 tx_bits[i] = tx_bits_char[i];
             COMP tx_sams[Nsamperframe];
             ofdm_mod(ofdm, tx_sams, tx_bits);
