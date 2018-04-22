@@ -77,12 +77,12 @@ struct freedv {
     struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps
     struct quisk_cfFilter * ptFilter8000to7500;
 
-    int                  n_speech_samples;
+    int                  n_speech_samples;       // number of speech samples we need for each freedv_tx() call
     int                  n_nom_modem_samples;    // size of tx and most rx modem sample buffers
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
     int                  n_nat_modem_samples;    // tx modem sample block length as used by the modem before interpolation to output
-
-    int                  modem_sample_rate;      // ATM caller is responsible for meeting this (TBC)
+                                                 // usually the same as n_nom_modem_samples, except for 700..700C
+    int                  modem_sample_rate;      // ATM caller is responsible for meeting this
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;
@@ -92,7 +92,7 @@ struct freedv {
     int                 *rx_bits;
     int                  tx_sync_bit;
     int                  smooth_symbols;
-    int                  n_codec_bits;           // amount of codec bits in a frame
+    int                  n_codec_bits;           // number of codec bits in a frame
 
     int                 *ptest_bits_coh;
     int                 *ptest_bits_coh_end;
@@ -123,6 +123,10 @@ struct freedv {
     int                  nvaricode_bits;
     int                  varicode_bit_index;
 
+    /* interleaved LDPC OFDM states */
+
+    int                  interleave_frames;          // number of OFDM modem frames in interleaver, e.g. 1,2,4,8,16
+    
     /* user defined function ptrs to produce and consume ASCII
       characters using aux txt channel */
 
