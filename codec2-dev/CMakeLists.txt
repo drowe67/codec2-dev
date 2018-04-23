@@ -169,7 +169,7 @@ if(UNITTEST)
     # Find speex library
     #
     message(STATUS "Looking for Speex DSP library.")
-    find_path(SPEEXDSP_INCLUDE_DIR speex/speex.h)
+    find_path(SPEEXDSP_INCLUDE_DIR speex/speex_preprocess.h)
     find_library(SPEEXDSP_LIBRARY speexdsp)
     message(STATUS "  Speex DSP headers: ${SPEEXDSP_INCLUDE_DIR}")
     message(STATUS "  Speex DSP library: ${SPEEXDSP_LIBRARY}")
