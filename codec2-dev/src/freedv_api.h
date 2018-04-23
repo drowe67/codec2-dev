@@ -112,7 +112,7 @@ void freedv_set_total_bits              (struct freedv *freedv, int val);
 void freedv_set_callback_error_pattern  (struct freedv *freedv, freedv_calback_error_pattern cb, void *state);
 void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
-int freedv_set_alt_modem_samp_rate      (struct freedv *freedv, int samp_rate);
+int  freedv_set_alt_modem_samp_rate     (struct freedv *freedv, int samp_rate);
 void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
 
 // Get parameters -------------------------------------------------------------------------
@@ -129,7 +129,10 @@ int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_total_bits	    (struct freedv *freedv);
 int freedv_get_total_bit_errors	    (struct freedv *freedv);
+int freedv_get_total_bits_coded     (struct freedv *freedv);
+int freedv_get_total_bit_errors_coded(struct freedv *freedv);
 int freedv_get_sync		    (struct freedv *freedv);
+int freedv_get_sync_interleaver	    (struct freedv *freedv);
 struct FSK * freedv_get_fsk         (struct freedv *f);
 struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
 int freedv_get_n_codec_bits         (struct freedv *freedv);

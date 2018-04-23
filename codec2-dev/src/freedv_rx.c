@@ -85,19 +85,13 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
 
 int main(int argc, char *argv[]) {
     FILE                      *fin, *fout, *ftxt;
-    short                     *speech_out;
-    short                     *demod_in;
     struct freedv             *freedv;
     int                        nin, nout, frame = 0;
     struct my_callback_state   my_cb_state;
     struct MODEM_STATS         stats;
     int                        mode;
     int                        sync;
-    int                        total_bits;
-    int                        total_bit_errors;
     float                      snr_est;
-    int                        n_speech_samples;
-    int                        n_max_modem_samples;
     float                      clock_offset;
     int                        use_codecrx;
     struct CODEC2             *c2 = NULL;
@@ -105,7 +99,7 @@ int main(int argc, char *argv[]) {
 
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|700C|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--test_frames] [--codecrx]\n", argv[0]);
+	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--testframes] [--codecrx]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -119,6 +113,8 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_700B;
     if (!strcmp(argv[1],"700C"))
         mode = FREEDV_MODE_700C;
+    if (!strcmp(argv[1],"700D"))
+        mode = FREEDV_MODE_700D;
     if (!strcmp(argv[1],"2400A"))
         mode = FREEDV_MODE_2400A;
     if (!strcmp(argv[1],"2400B"))
@@ -171,12 +167,8 @@ int main(int argc, char *argv[]) {
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);
 
-    n_speech_samples = freedv_get_n_speech_samples(freedv);
-    n_max_modem_samples = freedv_get_n_max_modem_samples(freedv);
-    speech_out = (short*)malloc(sizeof(short)*n_speech_samples);
-    assert(speech_out != NULL);
-    demod_in = (short*)malloc(sizeof(short)*n_max_modem_samples);
-    assert(demod_in != NULL);
+    short speech_out[freedv_get_n_speech_samples(freedv)];
+    short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     ftxt = fopen("freedv_rx_log.txt","wt");
     assert(ftxt != NULL);
@@ -193,7 +185,7 @@ int main(int argc, char *argv[]) {
     nin = freedv_nin(freedv);
     while(fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
-
+        
         if (use_codecrx == 0) {
             /* Use the freedv_api to do everything: speech decoding, demodulating */
             nout = freedv_rx(freedv, speech_out, demod_in);
@@ -227,7 +219,7 @@ int main(int argc, char *argv[]) {
         fwrite(speech_out, sizeof(short), nout, fout);
         freedv_get_modem_stats(freedv, &sync, &snr_est);
         freedv_get_modem_extended_stats(freedv,&stats);
-        total_bit_errors = freedv_get_total_bit_errors(freedv);
+        int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
 
         /* log some side info to the txt file */
@@ -245,17 +237,21 @@ int main(int argc, char *argv[]) {
     }
 
     if (freedv_get_test_frames(freedv)) {
-        total_bits = freedv_get_total_bits(freedv);
-        total_bit_errors = freedv_get_total_bit_errors(freedv);
-        fprintf(stderr, "bits: %d errors: %d BER: %4.3f\n", total_bits, total_bit_errors, (float)total_bit_errors/total_bits);
+        int Tbits = freedv_get_total_bits(freedv);
+        int Terrs = freedv_get_total_bit_errors(freedv);
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n",  (float)Terrs/Tbits, Tbits, Terrs);
+        if (mode == FREEDV_MODE_700D) {
+            int Tbits_coded = freedv_get_total_bits_coded(freedv);
+            int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
+            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
+                    (float)Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded);
+        }
     }
 
-    free(speech_out);
-    free(demod_in);
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
-
+    
     return 0;
 }
 
