@@ -74,7 +74,7 @@ struct freedv {
     
     struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 
-    struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps
+    struct quisk_cfFilter * ptFilter7500to8000; // Filters to change to/from 7500 and 8000 sps for 700 .... 700C
     struct quisk_cfFilter * ptFilter8000to7500;
 
     int                  n_speech_samples;       // number of speech samples we need for each freedv_tx() call
@@ -90,10 +90,13 @@ struct freedv {
     int                 *tx_bits;
     int                 *fdmdv_bits;
     int                 *rx_bits;
-    int                  tx_sync_bit;
-    int                  smooth_symbols;
     int                  n_codec_bits;           // number of codec bits in a frame
 
+    int                  tx_sync_bit;
+    int                  smooth_symbols;
+
+    /* test frame states -------------------------------------------------------------------------*/
+    
     int                 *ptest_bits_coh;
     int                 *ptest_bits_coh_end;
 
@@ -104,6 +107,8 @@ struct freedv {
     int                  test_frame_count;
     int                  total_bits;
     int                  total_bit_errors;
+    int                  total_bits_coded;
+    int                  total_bit_errors_coded;
     int                  sz_error_pattern;
 
     /* optional user defined function to pass error pattern when a test frame is received */
@@ -118,14 +123,18 @@ struct freedv {
     int                  squelch_en;
     int                  nin;
 
+    /* Varicode txt channel states ----------------------------------------------------------------------*/
+    
     struct VARICODE_DEC  varicode_dec_states;
     short                tx_varicode_bits[VARICODE_MAX_BITS];
     int                  nvaricode_bits;
     int                  varicode_bit_index;
 
-    /* interleaved LDPC OFDM states */
+    /* interleaved LDPC OFDM states ---------------------------------------------------------------------*/
 
     int                  interleave_frames;          // number of OFDM modem frames in interleaver, e.g. 1,2,4,8,16
+    COMP                *codeword_symbols;
+    float               *codeword_amps;
     
     /* user defined function ptrs to produce and consume ASCII
       characters using aux txt channel */

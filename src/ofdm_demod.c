@@ -186,7 +186,12 @@ int main(int argc, char *argv[])
 
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
-
+    for (i=0; i<interleave_frames*coded_syms_per_frame; i++) {
+        codeword_symbols[i].real = 0.0;
+        codeword_symbols[i].imag = 0.0;
+        codeword_amps[i] = 0.0;
+    }
+    
     nin_frame = ofdm_get_nin(ofdm);
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
 
