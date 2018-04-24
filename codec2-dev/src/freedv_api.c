@@ -68,9 +68,11 @@
  *              Changed all input and output sample rates to 8000 sps.  Rates for FREEDV_MODE_700 and 700B were 7500.
  */
 
-#define NORM_PWR_COHPSK  1.74   /* experimentally derived fudge factor to normalise power for cohpsk modes */
-#define NORM_PWR_FSK     0.193  /* experimentally derived fudge factor to normalise power for fsk modes    */
-#define NORM_PWR_OFDM    10.00  /* todo: experimentally derived fudge factor to normalise power for OFDM modes */
+/* experimentally derived fudge factors to normalise power across modes */
+
+#define NORM_PWR_COHPSK  1.74   
+#define NORM_PWR_FSK     0.193 
+#define NORM_PWR_OFDM    1.00
 
 /* OFDM payload data test frame for 700D */
 
@@ -927,7 +929,7 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     for(i=0; i<f->n_nat_modem_samples; i++) {
         asam.real = crealf(tx_sams[i]);
         asam.imag = cimagf(tx_sams[i]);
-        mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_OFDM, asam);
+        mod_out[i] = fcmult(OFDM_AMP_SCALE*NORM_PWR_OFDM, asam);
     }
 
     assert(f->clip == 0); /* todo: support clipping, requires some simulations and testing */
@@ -1110,10 +1112,16 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     
     if ( (f->mode == FREEDV_MODE_1600) || (f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) ||
         (f->mode == FREEDV_MODE_700C) || (f->mode == FREEDV_MODE_700D)) {
+
+        float gain = 1.0;
+        if (f->mode == FREEDV_MODE_700D) {
+            gain = 2.0; /* keep levels the same as Octave simulations and C unit tests for real signals */
+        }
+        
         /* FDM RX happens with complex samps, so do that */
         COMP rx_fdm[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
-            rx_fdm[i].real = (float)demod_in[i];
+            rx_fdm[i].real = gain*(float)demod_in[i];
             rx_fdm[i].imag = 0.0;
         }
         return freedv_comprx(f, speech_out, rx_fdm);
@@ -1556,15 +1564,13 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
   TODO: 
     [X] in testframe mode count coded and uncoded errors
     [X] freedv getter for modem and interleaver sync
+    [X] rms level the same as fdmdv
     [ ] way to stay in sync and not resync automatically 
     [ ] SNR est, maybe from pilots, cohpsk have an example?
     [ ] error pattern support?
     [ ] work out how to handle return of multiple interleaved frames over time
     [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
-    [ ] level issues
 */
-
-#define ASCALE   (2E5*1.1491/2.0)  /* scale from shorts back to floats       */
 
 static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid) {
     int   bits_per_codec_frame, bytes_per_codec_frame;
@@ -1597,8 +1603,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     COMP rxbuf_in[f->nin];
 
     for(i=0; i<f->nin; i++) {
-        rxbuf_in[i].real = demod_in_8kHz[i].real/ASCALE;
-        rxbuf_in[i].imag = demod_in_8kHz[i].imag/ASCALE;
+        rxbuf_in[i].real = demod_in_8kHz[i].real/OFDM_AMP_SCALE;
+        rxbuf_in[i].imag = demod_in_8kHz[i].imag/OFDM_AMP_SCALE;
     }
     
     /* echo samples back out as default (say if sync not found) */
@@ -1607,7 +1613,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
 
     /* TODO estimate this properly from signal */
     
-    float EsNo = 10.0;
+    float EsNo = 3.0;
     
     /* looking for modem sync */
     
@@ -1621,7 +1627,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
           
         assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME);
-
+t
         /* now we need to buffer for de-interleaving -------------------------------------*/
                 
         /* shift interleaved symbol buffers to make room for new symbols */

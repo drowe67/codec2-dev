@@ -41,6 +41,8 @@ extern "C" {
 
 /* Defines */
 
+#define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
+    
 struct OFDM;
 
 /* Default configuration for '700D' mode */
