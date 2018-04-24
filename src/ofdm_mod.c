@@ -39,8 +39,6 @@
 #include "interldpc.h"
 #include "gp_interleaver.h"
 
-#define ASCALE (2E5*1.1491)
-
 extern int payload_data_bits[];
 extern int test_bits_ofdm[];
 
@@ -161,7 +159,7 @@ int main(int argc, char *argv[])
 
             for (j=0; j<interleave_frames; j++) {            
                 for(i=0; i<Nsamperframe; i++) {
-                    tx_scaled[i] = ASCALE * crealf(tx_sams[j*Nsamperframe+i]);
+                    tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j*Nsamperframe+i]);
                 }
                 fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
                 frames++;
@@ -185,7 +183,7 @@ int main(int argc, char *argv[])
             /* scale and save to disk as shorts */
 
             for(i=0; i<Nsamperframe; i++)
-                tx_scaled[i] = ASCALE * tx_sams[i].real;
+                tx_scaled[i] = OFDM_AMP_SCALE * tx_sams[i].real;
 
             fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
             frames++;

@@ -46,7 +46,6 @@
 #include "gp_interleaver.h"
 #include "interldpc.h"
 
-#define ASCALE   (2E5*1.1491/2.0)  /* scale from shorts back to floats       */
 #define NFRAMES  100               /* just log the first 100 frames          */
 #define NDISCARD 20                /* BER2measure disctrds first 20 frames   */
 
@@ -198,7 +197,7 @@ int main(int argc, char *argv[])
 	/* scale and demod */
 
 	for(i=0; i<nin_frame; i++) {
-	    rxbuf_in[i].real = (float)rx_scaled[i]/ASCALE;
+	    rxbuf_in[i].real = (float)rx_scaled[i]/(OFDM_AMP_SCALE/2);
             rxbuf_in[i].imag = 0.0;
         }
 
