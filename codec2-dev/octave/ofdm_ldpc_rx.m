@@ -29,7 +29,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
 
-  EsNo = 10; % TODO: fixme
+  EsNo = 3; % TODO: fixme
   printf("EsNo fixed at %f - need to est from channel\n", EsNo);
   
   init_cml('~/cml/');
@@ -149,7 +149,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
       rx_np_de = gp_deinterleave(rx_np);
       rx_amp_de = gp_deinterleave(rx_amp);
-
+      
       % Interleaver Sync:
       %   Needs to work on any data
       %   Use indication of LDPC convergence, may need to patch CML code for that

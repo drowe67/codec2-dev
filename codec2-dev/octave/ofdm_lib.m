@@ -454,7 +454,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     aphase_est_pilot_rect += sum(rx_sym(2+Ns+1,cr)*pilots(cr)');
 
     aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
-    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
+    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/6);   % amplitude is estimated over 6 rows of pilots
   end
  
   % correct phase offset using phase estimate, and demodulate
