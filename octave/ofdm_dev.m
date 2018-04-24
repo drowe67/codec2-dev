@@ -309,7 +309,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
       lnew = min(Nsam-prx,states.nin);
       rxbuf_in = zeros(1,states.nin);
-
+      
       if lnew
         rxbuf_in(1:lnew) = rx(prx:prx+lnew-1);
       end
@@ -370,7 +370,7 @@ function [sim_out rx states] = run_sim(sim_in)
       st = (f-1)*Nbitsperframe/bps + 1;
       en = st + Nbitsperframe/bps - 1;
       r = rx_np(st:en); fade = rx_amp(st:en);
-
+      fade
       % optional LDPC decode
      
       if ldpc_en
@@ -1084,9 +1084,9 @@ more off;
 
 init_cml('~/cml/');
 
-%run_single 
+run_single 
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
-acquisition_test(Ntests=3, EbNodB=100, foff_hz=0)
+%acquisition_test(Ntests=3, EbNodB=100, foff_hz=0)
 %sync_metrics('freq')
