@@ -874,9 +874,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
-        /* TODO David: WTF 12.0 constant?  Something to do with LDPC input scaling? */
+        /* amplitude is estimated over 6 rows of pilots */
 
-        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
+        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 6.0f);
     }
 
     /*

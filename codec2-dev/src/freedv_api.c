@@ -1561,6 +1561,7 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     [ ] error pattern support?
     [ ] work out how to handle return of multiple interleaved frames over time
     [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
+    [ ] level issues
 */
 
 #define ASCALE   (2E5*1.1491/2.0)  /* scale from shorts back to floats       */

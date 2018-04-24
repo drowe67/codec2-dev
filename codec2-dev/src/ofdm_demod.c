@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
     int    rx_uw[OFDM_NUWBITS];
     f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
-    float EsNo = 10;
+    float EsNo = 3;
     fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
 
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
