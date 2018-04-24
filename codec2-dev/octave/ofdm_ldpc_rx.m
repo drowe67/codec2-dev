@@ -39,8 +39,8 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
   % load real samples from file
 
-  Ascale= 2E5*1.1491/2.0;
-  frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
+  Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
+  frx=fopen(filename,"rb"); rx = 0.1*fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
 
@@ -56,7 +56,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   
   % OK generate tx frame for BER calcs
   %   We just use a single test frame of bits as it makes interleaver sync
-  %   easier than using a test fram eof bits that spans the entire interleaver
+  %   easier than using a test frame of bits that spans the entire interleaver
   %   frame.  Doesn't affect operation with the speech codec operation.
   
   rand('seed', 1);
