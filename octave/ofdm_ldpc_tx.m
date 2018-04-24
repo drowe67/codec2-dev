@@ -196,7 +196,5 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
 
   % adjusted by experiment to match rms power of early test signals
 
-  Ascale = 2E5*1.1491;
-
-  frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
+  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction

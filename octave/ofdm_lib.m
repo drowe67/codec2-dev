@@ -141,6 +141,11 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.tx_uw = [1 0 0 1 0 1 0 0 1 0];
   assert(length(states.tx_uw) == states.Nuwbits);
 
+  % use this to scale tx output to 16 bit short.  Adjusted by experiment
+  % to have same RMS power as FDMDV waveform
+  
+  states.amp_scale = 2E5*1.1491/1.06;
+ 
   % generate same pilots each time
 
   rand('seed',1);

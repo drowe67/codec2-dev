@@ -18,7 +18,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   % load real samples from file
 
-  Ascale= 2E5*1.1491/2;
+  Ascale = states.amp_scale/2; % as input is a real valued signal
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
@@ -31,7 +31,7 @@ function ofdm_rx(filename, error_pattern_filename)
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = [];
-  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
+  Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = frame_count = 0;
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
@@ -63,11 +63,11 @@ function ofdm_rx(filename, error_pattern_filename)
     end
     prx += states.nin;
  
-    if strcmp(states.sync_state,'searching') 
+    if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
     
-    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial_sync')
+    if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
       rx_uw = rx_bits(1:states.Nuwbits);
       
@@ -107,7 +107,7 @@ function ofdm_rx(filename, error_pattern_filename)
     end
   end
 
-  printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
+  printf("\nBER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
 
   % If we have enough frames, calc BER discarding first few frames where freq
   % offset is adjusting
@@ -149,7 +149,7 @@ function ofdm_rx(filename, error_pattern_filename)
   title('Errors/modem frame')
   axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
 
-  if nargin == 3
+  if nargin == 2
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");
     fclose(fep);

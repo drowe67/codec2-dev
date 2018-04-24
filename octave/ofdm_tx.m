@@ -103,7 +103,5 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
 
   % adjusted by experiment to match rms power of early test signals
 
-  Ascale = 2E5*1.1491;
-
-  frx=fopen(filename,"wb"); fwrite(frx, Ascale*rx, "short"); fclose(frx);
+  frx=fopen(filename,"wb"); fwrite(frx, states.amp_scale*rx, "short"); fclose(frx);
 endfunction
