@@ -1627,7 +1627,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
           
         assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME);
-t
+
         /* now we need to buffer for de-interleaving -------------------------------------*/
                 
         /* shift interleaved symbol buffers to make room for new symbols */
