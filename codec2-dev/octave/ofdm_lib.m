@@ -145,7 +145,11 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   % to have same RMS power as FDMDV waveform
   
   states.amp_scale = 2E5*1.1491/1.06;
- 
+
+  % this is used to scale input sto LDPC decoder to make it amplitude indep
+  
+  states.mean_amp = 0;
+
   % generate same pilots each time
 
   rand('seed',1);
@@ -519,9 +523,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   % we just measure noise power on imag axis, as it isn't affected by fading
   % using all symbols in frame worked better than just pilots
   
-  x = sum(abs(rx_np) .^ 2)/length(rx_np);
-  sig_var = x;
-  sig_rms = sqrt(x);
+  sig_var = sum(abs(rx_np) .^ 2)/length(rx_np);
+  sig_rms = sqrt(sig_var);
   
   sum_x = 0;
   sum_xx = 0;
@@ -546,6 +549,10 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   
   states.noise_var = 2*noise_var; 
   states.sig_var = sig_var;
+
+  % maintain mean amp estimate for LDPC decoder
+
+  states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
   
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
@@ -682,7 +689,7 @@ function states = sync_state_machine(states, rx_uw)
       next_state = 'synced';
     end
     if strcmp(states.sync_state,'synced')
-      sync_counter_thresh = 6;
+      sync_counter_thresh = 12;
       uw_thresh = 2;
     else
       sync_counter_thresh = 2;

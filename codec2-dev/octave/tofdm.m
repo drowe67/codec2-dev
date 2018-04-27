@@ -92,6 +92,7 @@ timing_est_log = timing_valid_log = timing_mx_log = [];
 coarse_foff_est_hz_log = []; sample_point_log = [];
 phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
+sig_var_log = noise_var_log = [];
 
 states.timing_en = 1;
 states.foff_est_en = 1;
@@ -135,7 +136,9 @@ for f=1:Nframes
   sample_point_log = [sample_point_log; states.sample_point];
   rx_np_log = [rx_np_log arx_np];
   rx_bits_log = [rx_bits_log rx_bits];
-
+  sig_var_log = [sig_var_log; states.sig_var];
+  noise_var_log = [noise_var_log; states.noise_var];
+  
   % Optional testing of LDPC functions
 
   if cml_support
@@ -234,4 +237,6 @@ if cml_support
   check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
   check(detected_data_log, detected_data_log_c, 'detected_data');
 end
+check(sig_var_log, sig_var_log_c, 'sig_var_log');
+check(noise_var_log, noise_var_log_c, 'noise_var_log');
 

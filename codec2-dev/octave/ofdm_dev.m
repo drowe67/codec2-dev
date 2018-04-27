@@ -319,12 +319,7 @@ function [sim_out rx states] = run_sim(sim_in)
       prx += states.nin;
 
       [arx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-
-      %mean_amp = mean(mean(arx_amp));
-      %mean_amp = 1/1000;
-      %printf("mean amp: %f\n", mean_amp);
-      %arx_np /= mean_amp; arx_amp /= mean_amp;
-      
+     
       rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np]; rx_amp = [rx_amp arx_amp];
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
@@ -332,7 +327,6 @@ function [sim_out rx states] = run_sim(sim_in)
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
       sig_var_log = [sig_var_log states.sig_var];
       noise_var_log = [noise_var_log states.noise_var];
-      %printf("sig_var: %f noise_var: %f\n", states.sig_var, states.noise_var);
     end
     assert(length(rx_bits) == Nbits);
 
@@ -373,6 +367,7 @@ function [sim_out rx states] = run_sim(sim_in)
     % Per-modem frame error log and optional LDPC/diversity error stats
 
     Terrs_coded = 0; Tpackets_coded = 0; Tpacketerrs_coded = 0; sim_out.error_positions = [];
+    
     for f=1:Nframes
       st = (f-1)*Nbitsperframe+1; en = st + Nbitsperframe - 1;
       Nerrs_log(f) = sum(xor(tx_bits(st:en), rx_bits(st:en)));
@@ -384,9 +379,11 @@ function [sim_out rx states] = run_sim(sim_in)
       % optional LDPC decode
      
       if ldpc_en
-        % note we put ceiling on EsNo as decoder misbehaives with high EsNo
 
-        rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r, min(EsNo,30), fade);
+        % scale based on amplitude ests
+
+        mean_amp = states. mean_amp;
+        rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r/mean_amp, min(EsNo,30), fade/mean_amp);
       end
 
       % optional diversity demod
@@ -550,11 +547,11 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 20;
+  sim_in.Nsec = 60;
 
-  sim_in.EbNodB = EbNodB;
+  sim_in.EbNodB = 10;
   sim_in.verbose = 1;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
