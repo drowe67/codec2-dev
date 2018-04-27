@@ -273,6 +273,8 @@ function [sim_out rx states] = run_sim(sim_in)
     snrdB = 10*log10(var(rx)/var(noise)) + 10*log10(8000) - 10*log10(3000);
     rx += noise;
 
+    rx *= sim_in.gain;
+    
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
 
     rx = [rx zeros(1,Nsamperframe)];
@@ -285,6 +287,7 @@ function [sim_out rx states] = run_sim(sim_in)
     foff_est_hz_log = [];
     Nerrs_log = []; Nerrs_coded_log = [];
     rx_bits = []; rx_np = []; rx_amp = [];
+    sig_var_log = []; noise_var_log = [];
 
     % reset some states for each EbNo simulation point
 
@@ -317,13 +320,20 @@ function [sim_out rx states] = run_sim(sim_in)
 
       [arx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
 
+      %mean_amp = mean(mean(arx_amp));
+      %mean_amp = 1/1000;
+      %printf("mean amp: %f\n", mean_amp);
+      %arx_np /= mean_amp; arx_amp /= mean_amp;
+      
       rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np]; rx_amp = [rx_amp arx_amp];
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+      sig_var_log = [sig_var_log states.sig_var];
+      noise_var_log = [noise_var_log states.noise_var];
+      %printf("sig_var: %f noise_var: %f\n", states.sig_var, states.noise_var);
     end
-
     assert(length(rx_bits) == Nbits);
 
     % Optional de-interleave on rx QPSK symbols
@@ -370,7 +380,7 @@ function [sim_out rx states] = run_sim(sim_in)
       st = (f-1)*Nbitsperframe/bps + 1;
       en = st + Nbitsperframe/bps - 1;
       r = rx_np(st:en); fade = rx_amp(st:en);
-      fade
+      
       % optional LDPC decode
      
       if ldpc_en
@@ -434,7 +444,11 @@ function [sim_out rx states] = run_sim(sim_in)
       printf("Raw EbNodB..: % -4.1f BER: %5.4f Tbits: %5d Terrs: %5d PER: %5.4f Tpackets: %5d Tpacket_errs: %5d\n", 
              EbNodB_raw, Terrs/Nbits, Nbits, Terrs,
              Tpacketerrs/Tpackets, Tpackets, Tpacketerrs);
-
+      EsNo = mean(sig_var_log)/mean(noise_var_log);
+      %printf("Es/No est dB: % -4.1f\n", 10*log10(EsNo));
+      sim_out.snrdB(nn) = snrdB;
+      sim_out.snr_estdB(nn) = 10*log10(EsNo) + 10*log10(Nc*Rs/3000);
+      
       % returns results for plotting curves
 
       if ldpc_en || diversity_en
@@ -481,7 +495,7 @@ function [sim_out rx states] = run_sim(sim_in)
         subplot(212)
         stem(Nerrs_coded_log/(Nbitsperframe*rate));
         title("Coded BER/frame");
-     else
+      else
         title("BER/frame");
         stem(Nerrs_log/Nbitsperframe);
       end
@@ -494,7 +508,18 @@ function [sim_out rx states] = run_sim(sim_in)
       mx = max(Tx_dB);
       axis([0 Fs/2 mx-60 mx])
 
-     
+      figure(7); clf;
+      plot(10*log10(sig_var_log),'b;Es;');
+      hold on;
+      plot(10*log10(noise_var_log),'r;No;');
+      snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
+      snr_est_smoothed_dB = filter(0.1,[1 -0.9],snr_estdB);
+      plot(snr_estdB,'g;SNR3k;');
+      plot(snr_est_smoothed_dB,'c;SNR3k smooth;');
+      
+      hold off;
+      title('Signal and Noise Power estimates');
+      
 #{
       if hf_en
         figure(4); clf; 
@@ -513,8 +538,6 @@ function [sim_out rx states] = run_sim(sim_in)
         plot(angle(hf_model(:,2:Nc+1)));
       end
 #}
-
-
     end
 
   end
@@ -527,18 +550,19 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  %sim_in.Nsec = 1;
+  sim_in.Nsec = 20;
 
   sim_in.EbNodB = EbNodB;
-  sim_in.verbose = 2;
+  sim_in.verbose = 1;
   sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
-
+  sim_in.gain = 1;
+  
   sim_in.timing_en = 0;
   sim_in.foff_est_en = 0;
-  sim_in.phase_est_en = 0;
+  sim_in.phase_est_en = 1;
 
   load HRA_112_112.txt
   sim_in.ldpc_code = HRA_112_112;
@@ -580,6 +604,8 @@ function run_curves
 
   sim_in.verbose = 0;
   sim_in.foff_hz = 0;
+  sim_in.gain = 1;
+  
   sim_in.timing_en = 1;
   sim_in.foff_est_en = 1;
   sim_in.phase_est_en = 1;
@@ -843,6 +869,58 @@ function run_curves_estimators
 end
 
 
+% Plot SNR actual and estimated for various channels
+%   Note no acquistion, as this can upset results, e.g. if
+%   sync is lost.  We average SNR over entire run, in practice
+%   there will be some sort of IIR averager.
+
+function run_curves_snr
+
+  Nsec_awgn = 30;
+  Nsec_hf = 60;
+
+  % waveform
+
+  Ts = 0.018; sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+
+  % simulation parameters
+
+  sim_in.verbose = 1; sim_in.foff_hz = 0; sim_in.ldpc_en = 0; sim_in.gain = 1;
+  sim_in.phase_est_en = sim_in.timing_en = sim_in.foff_est_en = 1;
+
+  % AWGN simulation
+
+  sim_in.EbNodB = 0:3:12;
+  sim_in.hf_en = 0; sim_in.Nsec = Nsec_awgn;
+
+  awgn = run_sim(sim_in);
+  
+  % HF simulations
+
+  sim_in.hf_en = 1; sim_in.Nsec = Nsec_hf; sim_in.dopplerSpreadHz = 1; hf_fast = run_sim(sim_in);
+  sim_in.dopplerSpreadHz = 0.5; hf_mid = run_sim(sim_in);
+  sim_in.dopplerSpreadHz = 0.2; hf_slow = run_sim(sim_in);
+  
+  figure(1); clf;
+  plot(sim_in.EbNodB, awgn.snrdB,'b+-;AWGN SNR;');
+  hold on;
+  plot(sim_in.EbNodB, awgn.snr_estdB   ,'g+-;AWGN SNR est;');
+  plot(sim_in.EbNodB, hf_slow.snr_estdB,'k+-;HF 0.2 Hz SNR est;');
+  plot(sim_in.EbNodB, hf_mid.snr_estdB ,'r+-;HF 0.5 Hz SNR est;');
+  plot(sim_in.EbNodB, hf_fast.snr_estdB,'c+-;HF 1.0 Hz SNR est;');
+  hold off;
+  xlabel('Eb/No (dB)');
+  ylabel('SNR (dB)');
+  grid;
+  legend('boxoff');
+  title('SNR Actual and Estimated');
+  legend("location", "northwest");
+  print('-deps', '-color', "ofdm_dev_snr.eps")
+
+end
+
+
 % Run an acquisition test, returning vectors of estimation errors
 
 function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNodB=100, foff_hz=0, hf_en=0, fine_en=0)
@@ -1084,9 +1162,10 @@ more off;
 
 init_cml('~/cml/');
 
-run_single 
+run_single(10);
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(0, 0)
 %acquisition_test(Ntests=3, EbNodB=100, foff_hz=0)
 %sync_metrics('freq')
+%run_curves_snr

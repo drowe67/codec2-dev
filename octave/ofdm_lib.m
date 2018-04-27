@@ -220,6 +220,11 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   
   states.rx_sym = zeros(1+Ns+1+1, Nc+2);
 
+  % Es/No (SNR) est states
+  
+  states.noise_var = 0;
+  states.sig_var = 0;
+  
 endfunction
 
 
@@ -457,9 +462,12 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
     aphase_est_pilot_rect += sum(rx_sym(1,cr)*pilots(cr)');
     aphase_est_pilot_rect += sum(rx_sym(2+Ns+1,cr)*pilots(cr)');
-
+    
     aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
-    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/6);   % amplitude is estimated over 6 rows of pilots
+
+    % amplitude is estimated over 12 pilot symbols, so find average
+
+    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
   end
  
   % correct phase offset using phase estimate, and demodulate
@@ -506,6 +514,39 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
   end
 
+  % estimates of signal and noise power (see cohpsk.m for further explanation)
+  % signal power is distance from axis on complex plane
+  % we just measure noise power on imag axis, as it isn't affected by fading
+  % using all symbols in frame worked better than just pilots
+  
+  x = sum(abs(rx_np) .^ 2)/length(rx_np);
+  sig_var = x;
+  sig_rms = sqrt(x);
+  
+  sum_x = 0;
+  sum_xx = 0;
+  n = 0;
+  for i=1:length(rx_np)
+    s = rx_np(i);
+    if abs(real(s)) > sig_rms 
+      % select two constellation points on real axis
+      sum_x  += imag(s);
+      sum_xx += imag(s)*imag(s);
+      n++;
+    end
+  end
+   
+  noise_var = 0;
+  if n > 1
+    noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+  end
+
+  % Total noise power is twice estimate of imaginary-axis noise.  This
+  % effectively gives us the an estimate of Es/No
+  
+  states.noise_var = 2*noise_var; 
+  states.sig_var = sig_var;
+  
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;

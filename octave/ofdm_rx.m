@@ -30,7 +30,7 @@ function ofdm_rx(filename, error_pattern_filename)
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
-  phase_est_pilot_log = [];
+  phase_est_pilot_log = []; sig_var_log = []; noise_var_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = frame_count = 0;
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
@@ -43,7 +43,7 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
   
-  states.verbose = 1;
+  states.verbose = 0;
 
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
   
@@ -82,6 +82,8 @@ function ofdm_rx(filename, error_pattern_filename)
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
+      sig_var_log = [sig_var_log states.sig_var];
+      noise_var_log = [noise_var_log states.noise_var];
 
       % measure uncoded bit errors on modem frame
 
@@ -104,6 +106,8 @@ function ofdm_rx(filename, error_pattern_filename)
     if states.sync_start
       Nerrs_log = [];
       Terrs = Tbits = frame_count = 0;
+      rx_np_log = [];
+      sig_var_log = []; noise_var_log = [];
     end
   end
 
@@ -117,6 +121,12 @@ function ofdm_rx(filename, error_pattern_filename)
     Terrs -= sum(Nerrs_log(1:Ndiscard)); Tbits -= Ndiscard*Nbitsperframe;
     printf("BER2.: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/Tbits, Tbits, Terrs);
   end
+
+  %EsNo_est = mean(sig_var_log(floor(end/2):end))/mean(noise_var_log(floor(end/2):end));
+  EsNo_est = mean(sig_var_log)/mean(noise_var_log);
+  EsNo_estdB = 10*log10(EsNo_est);
+  SNR_estdB = EsNo_estdB + 10*log10(Nc*Rs/3000);
+  printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
   plot(rx_np_log,'+');
@@ -148,6 +158,16 @@ function ofdm_rx(filename, error_pattern_filename)
   stem(Nerrs_log);
   title('Errors/modem frame')
   axis([1 length(Nerrs_log) 0 Nbitsperframe*rate/2]);
+
+  figure(6); clf;
+  plot(10*log10(sig_var_log),'b;Es;');
+  hold on;
+  plot(10*log10(noise_var_log),'r;No;');
+  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
+  snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
+  plot(snr_smoothed_estdB,'g;SNR3k;');
+  hold off;
+  title('Signal and Noise Power estimates');
 
   if nargin == 2
     fep = fopen(error_pattern_filename, "wb");
