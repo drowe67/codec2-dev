@@ -22,7 +22,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-  states.verbose = 1;
+  states.verbose = 0;
 
   % Set up LDPC code
 
@@ -40,7 +40,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   % load real samples from file
 
   Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
-  frx=fopen(filename,"rb"); rx = 0.1*fread(frx, Inf, "short")/Ascale; fclose(frx);
+  frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
 
@@ -144,7 +144,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_np(Nuwtxtsymbolsperframe+1:end);
       rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
       rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_amp(Nuwtxtsymbolsperframe+1:end);
-      
+           
       % de-interleave QPSK symbols and symbol amplitudes
 
       rx_np_de = gp_deinterleave(rx_np);
@@ -159,7 +159,8 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
       if strcmp(states.sync_state_interleaver,'search')
         st = 1; en = Ncodedbitsperframe/bps;
-        [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
+        mean_amp = states.mean_amp;
+        [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
         Nerrs = code_param.data_bits_per_frame - max(parity_checks);
         %printf("Nerrs: %d\n", Nerrs);
         if Nerrs < 10
@@ -200,7 +201,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
         rx_bits = [];
         for ff=1:interleave_frames
           st = (ff-1)*Ncodedbitsperframe/bps+1; en = st + Ncodedbitsperframe/bps - 1;
-          [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en), min(EsNo,30), rx_amp_de(st:en));
+          [rx_codeword ldpc_errors] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
           rx_bits = [rx_bits rx_codeword(1:code_param.data_bits_per_frame)];
           errors = xor(atx_bits, rx_codeword(1:code_param.data_bits_per_frame));
           Nerrs  = sum(errors);
