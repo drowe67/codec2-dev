@@ -42,14 +42,19 @@
 int varicode_encode1(short varicode_out[], char ascii_in[], int max_out, int n_in) {
     int            n_out, index, n_zeros, v_len;
     unsigned short byte1, byte2, packed;
-
+    char           c;
+    
     n_out = 0;
 
     while(n_in && (n_out < max_out)) {
 
-        assert((unsigned int)(*ascii_in) < 128);
+        c = *ascii_in;
+        if ((unsigned int)c >= 128) {
+            c = ' ';
+        }
 
-        index = 2*(unsigned int)(*ascii_in);
+        index = 2*(unsigned int)(c);
+        assert(index <= 254);
         byte1 = varicode_table1[index];
         byte2 = varicode_table1[index+1];
         packed = (byte1 << 8) + byte2;
