@@ -242,7 +242,7 @@ function [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms cohpsk] = q
     % Note: correlation (averging) method was used initially, but was
     % poor at tracking fast phase changes that we experience on fading
     % channels.  Linear regression (fitting a straight line) works
-    % better on fading channels, but increases BER slighlty for AWGN
+    % better on fading channels, but increases BER slightly for AWGN
     % channels.
 
     sampling_points = [1 2 cohpsk.Nsymbrow+3 cohpsk.Nsymbrow+4];
