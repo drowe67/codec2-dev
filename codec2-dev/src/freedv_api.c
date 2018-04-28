@@ -1672,7 +1672,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
             for (j=0; j<interleave_frames; j++) {
                 symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
                                 &codeword_amps_de[j*coded_syms_per_frame],
-                                EsNo, coded_syms_per_frame);               
+                                EsNo, ofdm->mean_amp, coded_syms_per_frame);               
                 run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
                 if (f->test_frames) {

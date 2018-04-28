@@ -121,7 +121,7 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
     
     strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
     if ((strcmp(ofdm->sync_state_interleaver,"search") == 0) && (ofdm->frame_count >= (interleave_frames-1))) {
-        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);               
+        symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);               
         iter[0] =  run_ldpc_decoder(ldpc, out_char, llr, parityCheckCount);
         Nerrs_coded[0] = data_bits_per_frame - parityCheckCount[0];
         //for(i=0; i<20; i++)
