@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     float          phase_est_pilot_log[OFDM_ROWSPERFRAME*NFRAMES][OFDM_NC];
     COMP           rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
     float          rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
-    float          foff_hz_log[NFRAMES];
+    float          foff_hz_log[NFRAMES], snr_est_log[NFRAMES];
     int            timing_est_log[NFRAMES];
 
     int            i, j, f, oct, logframes, arg, llr_en, interleave_frames;
@@ -183,6 +183,8 @@ int main(int argc, char *argv[])
     float EsNo = 3;
     fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
 
+    float snr_est_smoothed_dB = 0.0;
+
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
     for (i=0; i<interleave_frames*coded_syms_per_frame; i++) {
@@ -260,7 +262,7 @@ int main(int argc, char *argv[])
                         for (j=0; j<interleave_frames; j++) {
                             symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
                                                  &codeword_amps_de[j*coded_syms_per_frame],
-                                                 EsNo, coded_syms_per_frame);               
+                                                 EsNo, ofdm->mean_amp, coded_syms_per_frame);               
                             iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
                             //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
                             if (testframes) {
@@ -271,10 +273,15 @@ int main(int argc, char *argv[])
                             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
                         }
                     } /* if interleaver synced ..... */
-                         
+
+                    /* SNR estimation and smoothing */
+
+                    float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
+                    snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
+                    
                 } else {
                     /* lpdc_en == 0,  external LDPC decoder, so output LLRs */
-                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, coded_syms_per_frame);
+                    symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
                     fwrite(llr, sizeof(double), coded_bits_per_frame, fout);
                 }
             } else {
@@ -358,6 +365,8 @@ int main(int argc, char *argv[])
 
             foff_hz_log[f] = ofdm->foff_est_hz;
             timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
+            
+            snr_est_log[f] = snr_est_smoothed_dB;
             if (f == (logframes-1))
                 oct = 0;
         }
@@ -393,6 +402,7 @@ int main(int argc, char *argv[])
         octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
         octave_save_float(foct, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
         octave_save_int(foct, "timing_est_log_c", timing_est_log, NFRAMES, 1);
+        octave_save_float(foct, "snr_est_log_c", snr_est_log, NFRAMES, 1, 1);
         fclose(foct);
     }
 

@@ -87,6 +87,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
   phase_est_pilot_log = [];
+  sig_var_log = []; noise_var_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = 0;
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
@@ -136,7 +137,9 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
-
+      sig_var_log = [sig_var_log states.sig_var];
+      noise_var_log = [noise_var_log states.noise_var];
+      
       % update sliding windows of rx-ed symbols and symbol amplitudes,
       % discarding UW and txt symbols at start of each modem frame
 
@@ -302,6 +305,12 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
     end
   end
   
+  figure(6); clf;
+  snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
+  snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
+  plot(snr_smoothed_estdB,'SNR3k;');
+  title('Signal and Noise Power estimates');
+
   if nargin == 3
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");
