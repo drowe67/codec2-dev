@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
     float          symbol_likelihood_log[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES];
     float          bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];        
     int            detected_data_log[CODED_BITSPERFRAME * NFRAMES];
+    float          sig_var_log[NFRAMES], noise_var_log[NFRAMES];        
+    float          mean_amp_log[NFRAMES];        
     
     FILE          *fout;
     int            f,i,j;
@@ -293,7 +295,11 @@ int main(int argc, char *argv[])
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
     short rx_scaled[Nmaxsamperframe];
     #endif
-    
+
+    /* start this with something sensible otherwise LDPC decode fails in tofdm.m */
+
+    ofdm->mean_amp = 1.0;
+       
     for(f=0; f<NFRAMES; f++) {
         /* For initial testing, timing est is off, so nin is always
            fixed.  TODO: we need a constant for rxbuf_in[] size that
@@ -363,7 +369,7 @@ int main(int argc, char *argv[])
         }
         float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
                 
-        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps,  CODED_BITSPERFRAME/OFDM_BPS);
+        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/OFDM_BPS);
         Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/OFDM_BPS);
 
         int    iter;
@@ -424,10 +430,13 @@ int main(int argc, char *argv[])
 
         foff_hz_log[f] = ofdm->foff_est_hz;
         timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
-        timing_valid_log[f] = ofdm->timing_valid;     /* offset by 1 to match Octave */
-        timing_mx_log[f] = ofdm->timing_mx;           /* offset by 1 to match Octave */
+        timing_valid_log[f] = ofdm->timing_valid;     
+        timing_mx_log[f] = ofdm->timing_mx;           
         coarse_foff_est_hz_log[f] = ofdm->coarse_foff_est_hz;
         sample_point_log[f] = ofdm->sample_point + 1; /* offset by 1 to match Octave */
+        sig_var_log[f] = ofdm->sig_var;
+        noise_var_log[f] = ofdm->noise_var;
+        mean_amp_log[f] = ofdm->mean_amp;
 
         memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
 
@@ -469,6 +478,9 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "symbol_likelihood_log_c", symbol_likelihood_log, (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES, 1, 1);
     octave_save_float(fout, "bit_likelihood_log_c", bit_likelihood_log, CODED_BITSPERFRAME * NFRAMES, 1, 1);
     octave_save_int(fout, "detected_data_log_c", detected_data_log, 1, CODED_BITSPERFRAME*NFRAMES);
+    octave_save_float(fout, "sig_var_log_c", sig_var_log, NFRAMES, 1, 1);
+    octave_save_float(fout, "noise_var_log_c", noise_var_log, NFRAMES, 1, 1);
+    octave_save_float(fout, "mean_amp_log_c", mean_amp_log, NFRAMES, 1, 1);
     fclose(fout);
 
     ofdm_destroy(ofdm);

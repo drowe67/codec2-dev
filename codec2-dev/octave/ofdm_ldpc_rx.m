@@ -145,6 +145,8 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
       rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_amp(Nuwtxtsymbolsperframe+1:end);
            
+      mean_amp = states.mean_amp;
+      
       % de-interleave QPSK symbols and symbol amplitudes
 
       rx_np_de = gp_deinterleave(rx_np);
@@ -159,7 +161,6 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
       if strcmp(states.sync_state_interleaver,'search')
         st = 1; en = Ncodedbitsperframe/bps;
-        mean_amp = states.mean_amp;
         [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
         Nerrs = code_param.data_bits_per_frame - max(parity_checks);
         %printf("Nerrs: %d\n", Nerrs);

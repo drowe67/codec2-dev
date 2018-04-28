@@ -778,6 +778,7 @@ void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols     
              COMP    S_matrix[],                /* constellation of size M               */
              float   EsNo,
              float   fading[],                  /* real fading values, number_symbols    */
+             float   mean_amp,                  
              int     number_symbols)
 {
     int     M=QPSK_CONSTELLATION_SIZE;
@@ -788,10 +789,10 @@ void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols     
   
     for (i=0;i<number_symbols;i++) {                /* go through each received symbol */
         for (j=0;j<M;j++) {                         /* each postulated symbol          */
-            tempsr = fading[i]*S_matrix[j].real;
-            tempsi = fading[i]*S_matrix[j].imag;
-            Er = r[i].real - tempsr;
-            Ei = r[i].imag - tempsi;
+            tempsr = fading[i]*S_matrix[j].real/mean_amp;
+            tempsi = fading[i]*S_matrix[j].imag/mean_amp;
+            Er = r[i].real/mean_amp - tempsr;
+            Ei = r[i].imag/mean_amp - tempsi;
             symbol_likelihood[i*M+j] = -EsNo*(Er*Er+Ei*Ei);
             //printf("symbol_likelihood[%d][%d] = %f\n", i,j,symbol_likelihood[i*M+j]);
         }
@@ -871,13 +872,13 @@ int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], i
     return iter;
 }
 
-void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, int nsyms) {
+void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms) {
     int i;
     
     double symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
     double bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
 
-    Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps,  nsyms);
+    Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps, mean_amp, nsyms);
     Somap(bit_likelihood, symbol_likelihood, nsyms);
     for(i=0; i<nsyms*QPSK_BITS_PER_SYMBOL; i++) {
         llr[i] = -bit_likelihood[i];

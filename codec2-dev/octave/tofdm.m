@@ -59,6 +59,7 @@ if cml_support
   ibits = payload_data_bits;
   codeword = LdpcEncode(ibits, code_param.H_rows, code_param.P_matrix);
   tx_bits(Nuwbits+Ntxtbits+1:end) = codeword;
+  states.mean_amp = 1;  % start this with something sensible otherwise LDPC decode fails
 else
   tx_bits(Nuwbits+Ntxtbits+1:end) = [payload_data_bits payload_data_bits];
 end
@@ -92,7 +93,7 @@ timing_est_log = timing_valid_log = timing_mx_log = [];
 coarse_foff_est_hz_log = []; sample_point_log = [];
 phase_est_pilot_log = []; rx_amp_log = [];
 rx_np_log = []; rx_bits_log = [];
-sig_var_log = noise_var_log = [];
+sig_var_log = noise_var_log = mean_amp_log = [];
 
 states.timing_en = 1;
 states.foff_est_en = 1;
@@ -138,11 +139,14 @@ for f=1:Nframes
   rx_bits_log = [rx_bits_log rx_bits];
   sig_var_log = [sig_var_log; states.sig_var];
   noise_var_log = [noise_var_log; states.noise_var];
+  mean_amp_log = [mean_amp_log; states.mean_amp];
   
   % Optional testing of LDPC functions
 
   if cml_support
-    symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end), S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end));
+    mean_amp = states.mean_amp;
+    %mean_amp = 1;
+    symbol_likelihood = Demod2D(arx_np(Nuwtxtsymbolsperframe+1:end)/mean_amp, S_matrix, EsNo, arx_amp(Nuwtxtsymbolsperframe+1:end)/mean_amp);
     bit_likelihood = Somap(symbol_likelihood);
 
     [x_hat paritychecks] = MpDecode(-bit_likelihood(1:code_param.code_bits_per_frame), code_param.H_rows, code_param.H_cols, max_iterations, decoder_type, 1, 1);
@@ -239,4 +243,5 @@ if cml_support
 end
 check(sig_var_log, sig_var_log_c, 'sig_var_log');
 check(noise_var_log, noise_var_log_c, 'noise_var_log');
+check(mean_amp_log, mean_amp_log_c, 'mean_amp_log');
 

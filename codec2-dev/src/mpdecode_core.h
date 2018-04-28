@@ -36,9 +36,9 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
 
 void sd_to_llr(double llr[], double sd[], int n);
 
-void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], int number_symbols);
+void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
 void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
-void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, int nsyms);
+void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
 
 struct v_node {
   int degree;
