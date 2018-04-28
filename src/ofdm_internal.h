@@ -124,7 +124,10 @@ struct OFDM {
     complex float rx_np[OFDM_ROWSPERFRAME * OFDM_NC];
     float rx_amp[OFDM_ROWSPERFRAME * OFDM_NC];
     float aphase_est_pilot_log[OFDM_ROWSPERFRAME * OFDM_NC];
-
+    float sig_var;
+    float noise_var;
+    float mean_amp;
+    
     /* modem sync state machine */
 
     int  tx_uw[OFDM_NUWBITS];

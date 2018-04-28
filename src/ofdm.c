@@ -874,9 +874,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
         aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
-        /* amplitude is estimated over 6 rows of pilots */
+        /* amplitude is estimated over 12 pilots */
 
-        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 6.0f);
+        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
     }
 
     /*
@@ -888,7 +888,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float rx_corr;
     int abit[2];
     int bit_index = 0;
-
+    float sum_amp = 0.0;
+    
     for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
         /*
          * Note the i has an index of 1 to 16, so we ignore carriers 0 and 17.
@@ -917,7 +918,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
              */
 
             ofdm->rx_amp[(rr * OFDM_NC) + (i - 1)] = aamp_est_pilot[i];
-
+            sum_amp += aamp_est_pilot[i];
+            
             /*
              * Note like amps in this implementation phase ests are the
              * same for each col, but we log them for each symbol anyway
@@ -939,6 +941,10 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         }
     }
 
+    /* update mean amplitude estimate for LDPC decoder scaling */
+    
+    ofdm->mean_amp = 0.9*ofdm->mean_amp + 0.1*sum_amp/(OFDM_ROWSPERFRAME * OFDM_NC);
+    
     /* Adjust nin to take care of sample clock offset */
 
     ofdm->nin = OFDM_SAMPLESPERFRAME;
@@ -957,6 +963,37 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             ofdm->sample_point += tshift;
         }
     }
+
+    /* estimate signal and noise power, see ofdm_lib.m, cohpsk.m for
+       more info */
+
+    float sig_var = 0.0;
+    complex float *rx_np = ofdm->rx_np;
+    for(i=0; i<OFDM_ROWSPERFRAME * OFDM_NC; i++) {
+        sig_var += crealf(rx_np[i])*crealf(rx_np[i]) + cimagf(rx_np[i])*cimagf(rx_np[i]);
+    }
+    sig_var /= (OFDM_ROWSPERFRAME * OFDM_NC);
+    float sig_rms = sqrtf(sig_var);
+
+    complex float s;
+    float sum_x = 0;
+    float sum_xx = 0;
+    int n = 0;
+    for (i=0; i<OFDM_ROWSPERFRAME * OFDM_NC; i++) {
+      s = rx_np[i];
+      if (fabs(crealf(s)) > sig_rms) {
+          sum_x  += cimagf(s);
+          sum_xx += cimagf(s) * cimagf(s);
+          n++;
+      }
+    }
+
+    float noise_var = 0;
+    if (n > 1) {
+      noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
+    }
+    ofdm->sig_var = sig_var;
+    ofdm->noise_var = 2*noise_var;
 }
 
 
