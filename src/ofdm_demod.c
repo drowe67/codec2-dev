@@ -93,7 +93,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "\n");
         fprintf(stderr, "                Default output file format is one byte per bit hard decision\n");
         fprintf(stderr, "  --llr         LLR output, one double per bit, %d doubles/frame\n", coded_bits_per_frame);
-        fprintf(stderr, "  -t            Receive test frames and count errors\n");
+        fprintf(stderr, "  --testframes  Receive test frames and count errors\n");
         fprintf(stderr, "  --ldpc        Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
                         "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
                                          coded_bits_per_frame, data_bits_per_frame);
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
     }
 
     testframes = 0;
-    if (opt_exists(argv, argc, "-t")) {
+    if (opt_exists(argv, argc, "--testframes")) {
         testframes = 1;
     }
 

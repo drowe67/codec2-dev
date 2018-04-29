@@ -78,6 +78,7 @@ struct freedv {
     struct quisk_cfFilter * ptFilter8000to7500;
 
     int                  n_speech_samples;       // number of speech samples we need for each freedv_tx() call
+                                                 // num of speech samples output by freedv_rx() call
     int                  n_nom_modem_samples;    // size of tx and most rx modem sample buffers
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
     int                  n_nat_modem_samples;    // tx modem sample block length as used by the modem before interpolation to output
@@ -135,6 +136,8 @@ struct freedv {
     int                  interleave_frames;          // number of OFDM modem frames in interleaver, e.g. 1,2,4,8,16
     COMP                *codeword_symbols;
     float               *codeword_amps;
+    int                  modem_frame_count_tx;       // counter for tx side
+    COMP                *mod_out;                    // output buffer of intereaved frames
     
     /* user defined function ptrs to produce and consume ASCII
       characters using aux txt channel */
