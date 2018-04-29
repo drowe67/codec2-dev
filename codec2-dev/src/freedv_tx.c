@@ -92,13 +92,13 @@ int main(int argc, char *argv[]) {
     int                       mode;
     int                       n_speech_samples;
     int                       n_nom_modem_samples;
-    int                       use_codectx;
-    int                       use_datatx;
+    int                       use_codectx, use_datatx, use_testframes, interleave_frames;
     struct CODEC2             *c2;
     int                       i;
 
     if (argc < 4) {
-        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile [--testframes] [--codectx] [--datatx]\n", argv[0]);
+        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
+               " [--testframes] [--interleave depth] [--codectx] [--datatx]\n", argv[0]);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -135,16 +135,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    freedv = freedv_open(mode);
-    assert(freedv != NULL);
-
-    use_codectx = 0;
-    use_datatx = 0;
-
+    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1;
+   
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) {
-                freedv_set_test_frames(freedv, 1);
+                use_testframes = 1;
             }
             if (strcmp(argv[i], "--codectx") == 0) {
                 int c2_mode;
@@ -161,12 +157,30 @@ int main(int argc, char *argv[]) {
                 assert(c2 != NULL);
             }
             if (strcmp(argv[i], "--datatx") == 0) {
-                unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
-                freedv_set_data_header(freedv, header);
                 use_datatx = 1;
+            }
+            if (strcmp(argv[i], "--interleave") == 0) {
+                interleave_frames = atoi(argv[i+1]);
             }
         }
     }
+
+    if (mode == FREEDV_MODE_700D) {
+        struct freedv_advanced adv;
+        adv.interleave_frames = interleave_frames;
+        freedv = freedv_open_advanced(mode, &adv);
+    }
+    else {
+        freedv = freedv_open(mode);
+    }
+    assert(freedv != NULL);
+
+    if (use_datatx) {
+        unsigned char header[6] = { 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc };
+        freedv_set_data_header(freedv, header);
+    }
+    freedv_set_test_frames(freedv, use_testframes);
+
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
 
@@ -176,7 +190,8 @@ int main(int argc, char *argv[]) {
     assert(speech_in != NULL);
     mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
-
+    fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
+            
     /* set up callback for txt msg chars */
 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");

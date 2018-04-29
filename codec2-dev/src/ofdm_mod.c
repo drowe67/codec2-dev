@@ -70,11 +70,11 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr, "\n");
 	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--lpdc] [--interleaver depth]\n\n", argv[0]);
-        fprintf(stderr, "  -t Nsecs      Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
-        fprintf(stderr, "  --ldpc        Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
-                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
-                                         coded_bits_per_frame, data_bits_per_frame);
-        fprintf(stderr, "  --interleave  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
+        fprintf(stderr, "  --testframe Nsecs   Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+        fprintf(stderr, "  --ldpc              Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
+                        "                      per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
+                                               coded_bits_per_frame, data_bits_per_frame);
+        fprintf(stderr, "  --interleave depth  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "\n");
 	exit(1);
     }

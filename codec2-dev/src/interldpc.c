@@ -218,7 +218,7 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
     for (j=0; j<interleave_frames; j++) {            
         for(i=0; i<coded_syms_per_frame; i++) {
-            /* todo: we don't need to build modulated UW every tinme, just txt bits */
+            /* todo: we don't need to build modulated UW every time, just txt bits */
             build_modulated_uw(ofdm, tx_symbols, &txt_bits[OFDM_NTXTBITS*j]);
             tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
                 + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
