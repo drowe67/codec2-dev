@@ -308,9 +308,10 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   figure(6); clf;
   snr_estdB = 10*log10(sig_var_log) - 10*log10(noise_var_log) + 10*log10(Nc*Rs/3000);
   snr_smoothed_estdB = filter(0.1,[1 -0.9],snr_estdB);
-  plot(snr_smoothed_estdB,'SNR3k;');
+  plot(snr_smoothed_estdB);
   title('Signal and Noise Power estimates');
-
+  ylabel('SNR (dB)')
+  
   if nargin == 3
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");
