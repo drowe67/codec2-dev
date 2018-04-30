@@ -2159,6 +2159,33 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 	return -1;
 }
 
+
+/*---------------------------------------------------------------------------* \
+
+  FUNCTIONS...: freedv_set_sync
+  AUTHOR......: David Rowe
+  DATE CREATED: May 2018
+
+  Extended control of sync state machines, especially for FreeDV 700D.
+  This mode is required to acquire sync up at very low SNRS.  This is
+  difficult to implement, for example we may get a false sync, or the
+  state machine may fall out of sync by mistake during a long fade.
+
+  So with this API call we allow some operator assistance.
+
+  Ensure this is called inthe same thread as freedv_rx().
+
+\*---------------------------------------------------------------------------*/
+
+void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
+    assert (freedv != NULL);
+
+    if (freedv->mode != FREEDV_MODE_700D) {
+        ofdm_set_sync(freedv->ofdm, sync_cmd);        
+    }
+    
+}
+
 struct FSK * freedv_get_fsk(struct freedv *f){
 	return f->fsk;
 }
