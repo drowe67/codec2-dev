@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);
 
-    short speech_out[freedv_get_n_speech_samples(freedv)*interleave_frames];
+    short speech_out[freedv_get_n_speech_samples(freedv)];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     ftxt = fopen("freedv_rx_log.txt","wt");

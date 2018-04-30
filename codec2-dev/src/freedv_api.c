@@ -1857,18 +1857,42 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #endif
 
     if (valid == 0) {
+        /* squelch */
+        
         for (i = 0; i < nout; i++)
             speech_out[i] = 0;
     }
     else if (valid < 0) {
+        /* we havent gor sync so play audio from radio.  This might
+           not work for all modes due to nin bouncing about */
         for (i = 0; i < nout; i++)
             speech_out[i] = demod_in[i].real;
     }
     else {
-        int frames = f->n_codec_bits / bits_per_codec_frame;
-        for (i = 0; i < frames; i++) {
-            codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-            speech_out += codec2_samples_per_frame(f->codec2);
+        /* decoded audio to play */
+        
+        if (f->mode == FREEDV_MODE_700D) {
+            int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+            int frames = data_bits_per_frame/bits_per_codec_frame;
+            
+            nout = 0;
+            if (f->modem_frame_count_rx < f->interleave_frames) {
+                nout = f->n_speech_samples;
+                //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
+                for (i = 0; i < frames; i++) {
+                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                    speech_out += codec2_samples_per_frame(f->codec2);
+                }
+                f->modem_frame_count_rx++;
+            }
+           
+        } else {
+            int frames = f->n_codec_bits / bits_per_codec_frame;
+            //fprintf(stderr, "frames: %d\n", frames);
+            for (i = 0; i < frames; i++) {
+                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
+                speech_out += codec2_samples_per_frame(f->codec2);
+            }
         }
     }
 
