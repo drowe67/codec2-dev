@@ -1776,19 +1776,11 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         /* If modem is synced we can demodulate txt bits, these are
            uninterleaved, uncoded QPSK symbols near the start of each
            modem frame */
-
-        short txt_bits[OFDM_NTXTBITS];
-        int   bits[2];
-        int   uw_offset = OFDM_NUWBITS/OFDM_BPS;
-        for(i=0; i<OFDM_NTXTBITS/OFDM_BPS; i++) {
-            complex float s = codeword_symbols[uw_offset+i].real + I*codeword_symbols[uw_offset+i].imag;
-            qpsk_demod(s, bits);
-            txt_bits[OFDM_BPS*i]   = bits[1];
-            txt_bits[OFDM_BPS*i+1] = bits[0];
-        }
         
-        for(k=0; k<OFDM_NTXTBITS; k++)  { 
-            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
+        for(k=0, i=OFDM_NUWBITS; k<OFDM_NTXTBITS; k++,i++)  { 
+            //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
+            short arx_bit = rx_bits[i];
+            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &arx_bit, 1, 1);
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }

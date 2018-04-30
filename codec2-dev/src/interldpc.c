@@ -217,9 +217,9 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     }
     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
     for (j=0; j<interleave_frames; j++) {            
+        /* todo: we don't need to build modulated UW every time, just txt bits */
+        build_modulated_uw(ofdm, tx_symbols, &txt_bits[OFDM_NTXTBITS*j]);
         for(i=0; i<coded_syms_per_frame; i++) {
-            /* todo: we don't need to build modulated UW every time, just txt bits */
-            build_modulated_uw(ofdm, tx_symbols, &txt_bits[OFDM_NTXTBITS*j]);
             tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
                 + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
         }
@@ -241,6 +241,7 @@ void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t t
     /* clear txt bits for now, they can be added in later */
     for(j=0; j<OFDM_NTXTBITS; j++,i++) {
         uw_txt_bits[i] = txt_bits[j];
+        //fprintf(stderr, "txt_bits[%d] = %d\n", j, txt_bits[j]);
     }    
     qpsk_modulate_frame(uw_txt_syms, uw_txt_bits, (OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS);
     for(i=0; i<(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i++) {
