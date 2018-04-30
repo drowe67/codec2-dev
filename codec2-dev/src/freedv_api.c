@@ -198,7 +198,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             assert((adv->interleave_frames >= 0) && (adv->interleave_frames < 32));
             f->interleave_frames = adv->interleave_frames;
         }
-        f->modem_frame_count_tx = 0;
+        f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
         
         f->codeword_symbols = (COMP*)malloc(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
         if (f->codeword_symbols == NULL) {return NULL;}
@@ -371,6 +371,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbyte = nbyte*Ncodec2frames*f->interleave_frames;
         //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
         //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
+        f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
     }
     
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
@@ -433,6 +434,7 @@ void freedv_close(struct freedv *freedv) {
     if ((freedv->mode == FREEDV_MODE_700) || (freedv->mode == FREEDV_MODE_700B) || (freedv->mode == FREEDV_MODE_700C))
         cohpsk_destroy(freedv->cohpsk);
     if (freedv->mode == FREEDV_MODE_700D) {
+        free(freedv->packed_codec_bits_tx);
         free(freedv->mod_out);
         free(freedv->codeword_symbols);
         free(freedv->codeword_amps);
@@ -906,7 +908,7 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
 
         bit = 7;
         for(i=0; i<bits_per_codec_frame; i++) {
-            tx_bits[j+i] = (f->packed_codec_bits[byte] >> bit) & 0x1;
+            tx_bits[j+i] = (f->packed_codec_bits_tx[byte] >> bit) & 0x1;
             bit--;
             if (bit < 0) {
                 bit = 7;
@@ -1012,7 +1014,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         /* buffer up bits until we get enough encoded bits for interleaver */
         
         for (j=0; j<codec_frames; j++) {
-            codec2_encode(f->codec2, f->packed_codec_bits + (f->modem_frame_count_tx*codec_frames+j)*bytes_per_codec_frame, speech_in);
+            codec2_encode(f->codec2, f->packed_codec_bits_tx + (f->modem_frame_count_tx*codec_frames+j)*bytes_per_codec_frame, speech_in);
             speech_in += codec2_samples_per_frame(f->codec2);
         }
 
