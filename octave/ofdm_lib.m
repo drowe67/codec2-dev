@@ -682,34 +682,35 @@ function states = sync_state_machine(states, rx_uw)
     states.frame_count++;
     states.frame_count_interleaver++;
       
-    % during trial sync we don't tolerate errors so much, once we have synced up
-    % we are willing to wait out a fade
-      
-    if states.frame_count == 3
-      next_state = 'synced';
-    end
-    if strcmp(states.sync_state,'synced')
-      sync_counter_thresh = 12;
-      uw_thresh = 2;
-    else
-      sync_counter_thresh = 2;
-      uw_thresh = 1;
-    end
-
-    % freq offset est may be too far out, and has aliases every 1/Ts, so
-    % we use a Unique Word to get a really solid indication of sync.
-
     states.uw_errors = sum(xor(tx_uw,rx_uw));
-    if (states.uw_errors > uw_thresh)
-      states.sync_counter++;
-      if states.sync_counter == sync_counter_thresh
-        next_state = 'search';
-        states.sync_state_interleaver = 'search';
+
+    if strcmp(states.sync_state,'trial')
+      if states.uw_errors > 1
+        states.sync_counter++;
+        states.frame_count = 0;
       end
-    else
-      states.sync_counter = 0;
+      if states.sync_counter == 2
+        next_state = "search";
+        states.sync_state_interleaver = "search";
+      end
+      if states.frame_count == 4
+        next_state = "synced";
+      end
     end
-  end
+
+    if strcmp(states.sync_state,'synced')
+      if states.uw_errors > 2
+        states.sync_counter++;
+      else
+        states.sync_counter = 0;
+      end
+
+      if states.sync_counter == 6
+        next_state = "search";
+        states.sync_state_interleaver = "search";
+      end
+    end
+  end    
 
   states.last_sync_state = states.sync_state;
   states.last_sync_state_interleaver = states.sync_state_interleaver;

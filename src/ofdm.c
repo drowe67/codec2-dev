@@ -1001,7 +1001,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
     char next_state[OFDM_STATE_STR];
-    int  i, j, sync_counter_thresh, uw_thresh;
+    int  i, j;
     
     strcpy(next_state, ofdm->sync_state);    
     ofdm->sync_start = ofdm->sync_end = 0;

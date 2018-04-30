@@ -22,7 +22,7 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
-  states.verbose = 0;
+  states.verbose = 1;
 
   % Set up LDPC code
 
