@@ -87,6 +87,7 @@ struct freedv {
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;
+    unsigned char       *packed_codec_bits_tx;   // for 700D we separate packed bits to maintain state due to interleaving
     int                 *codec_bits;
     int                 *tx_bits;
     int                 *fdmdv_bits;
