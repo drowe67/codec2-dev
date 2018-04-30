@@ -397,6 +397,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->frame_count = 0;
     ofdm->sync_start = 0;
     ofdm->sync_end = 0;
+    ofdm->sync_mode = OFDM_SYNC_AUTO;
     
     strcpy(ofdm->sync_state_interleaver,"search");
     strcpy(ofdm->last_sync_state_interleaver,"search");
@@ -1079,7 +1080,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
                 ofdm->sync_counter = 0;
             }
                 
-            if (ofdm->sync_counter == 6) {
+            if ((ofdm->sync_mode == OFDM_SYNC_AUTO) && (ofdm->sync_counter == 6)) {
                 /* run of consective bad frames ... drop sync */
                 strcpy(next_state, "search");
                 strcpy(ofdm->sync_state_interleaver, "search");
@@ -1090,5 +1091,48 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
     strcpy(ofdm->last_sync_state, ofdm->sync_state);
     strcpy(ofdm->last_sync_state_interleaver, ofdm->sync_state_interleaver);
     strcpy(ofdm->sync_state, next_state);
+}
+
+
+/*---------------------------------------------------------------------------* \
+
+  FUNCTIONS...: ofdm_set_sync
+  AUTHOR......: David Rowe
+  DATE CREATED: May 2018
+
+  Operator control of sync state machine.  This mode is required to
+  acquire sync up at very low SNRS.  This is difficult to implement,
+  for example we may get a false sync, or the state machine may fall
+  out of sync by mistake during a long fade.
+
+  So with this API call we allow some operator assistance.
+
+  Ensure this is called in the same thread as ofdm_sync_state_machine().
+
+\*---------------------------------------------------------------------------*/
+
+void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
+    assert (ofdm != NULL);
+
+    switch(sync_cmd) {
+    case OFDM_SYNC_UNSYNC:
+        /* force manual unsync, in case operator detects false sync,
+           which will cuase sync state machine to have another go at
+           sync */
+        strcpy(ofdm->sync_state, "search");
+        strcpy(ofdm->sync_state_interleaver, "search");                
+        break;
+    case OFDM_SYNC_AUTO:
+        /* normal operating mode - sync state machine decides when to unsync */
+        ofdm->sync_mode = OFDM_SYNC_AUTO;
+        break;
+    case OFDM_SYNC_MANUAL:
+        /* allow sync state machine to sync, but not to unsync, the
+           operator will decide that manually */
+        ofdm->sync_mode = OFDM_SYNC_MANUAL;
+        break;
+    default:
+        assert(0);
+    }            
 }
 

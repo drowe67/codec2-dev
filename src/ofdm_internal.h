@@ -138,6 +138,7 @@ struct OFDM {
     int frame_count;
     int sync_start;
     int sync_end;
+    int sync_mode;
     
     /* interleaver sync state machine */
     

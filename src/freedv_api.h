@@ -47,6 +47,12 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 
+/* operator control of 700D state machine */
+      
+#define FREEDV_SYNC_UNSYNC 0                 /* force sync state machine to lose sync, and search for new sync */
+#define FREEDV_SYNC_AUTO   1                 /* falls out of sync automatically */
+#define FREEDV_SYNC_MANUAL 2                 /* fall out of sync only under operator control */
+
 struct freedv;
 
 /* advanced freedv open options rqd by some modes */
@@ -121,6 +127,7 @@ void freedv_set_varicode_code_num       (struct freedv *freedv, int val);
 void freedv_set_data_header             (struct freedv *freedv, unsigned char *header);
 int  freedv_set_alt_modem_samp_rate     (struct freedv *freedv, int samp_rate);
 void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
+void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 
 // Get parameters -------------------------------------------------------------------------
 
