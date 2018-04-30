@@ -38,7 +38,6 @@
 #define COHPSK_NFILTER    (COHPSK_NSYM*COHPSK_M)
 #define COHPSK_EXCESS_BW  0.5                         /* excess BW factor of root nyq filter */
 #define COHPSK_NT         5                           /* number of symbols we estimate timing over */
-#define COHPSK_CLIP       6.5                         /* hard clipping for Nc*Nc=14 to reduce PAPR */
 
 #include "fdmdv_internal.h"
 #include "kiss_fft.h"

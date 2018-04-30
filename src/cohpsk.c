@@ -441,8 +441,8 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc,const COMP tx_symbols[],
     gain.imag = 0.0;
 
     for(i=0; i<COHPSK_M; i++) {
-		tx_fdm[i].real = 0.0;
-		tx_fdm[i].imag = 0.0;
+        tx_fdm[i].real = 0.0;
+        tx_fdm[i].imag = 0.0;
     }
 
     for(c=0; c<Nc; c++)
@@ -506,14 +506,17 @@ void tx_filter_and_upconvert_coh(COMP tx_fdm[], int Nc,const COMP tx_symbols[],
 
     /* shift memory, inserting zeros at end */
 
-    for(i=0; i<COHPSK_NSYM-1; i++)
-	for(c=0; c<Nc; c++)
-	    tx_filter_memory[c][i] = tx_filter_memory[c][i+1];
-
+    for(i=0; i<COHPSK_NSYM-1; i++) {
 	for(c=0; c<Nc; c++) {
-		tx_filter_memory[c][COHPSK_NSYM-1].real = 0.0;
-		tx_filter_memory[c][COHPSK_NSYM-1].imag = 0.0;
+	    tx_filter_memory[c][i] = tx_filter_memory[c][i+1];
+        }
     }
+    
+    for(c=0; c<Nc; c++) {
+        tx_filter_memory[c][COHPSK_NSYM-1].real = 0.0;
+        tx_filter_memory[c][COHPSK_NSYM-1].imag = 0.0;
+    }
+   
 }
 
 void corr_with_pilots_comp(float *corr_out, float *mag_out, struct COHPSK *coh, int t, COMP dp_f_fine)
@@ -737,17 +740,17 @@ void cohpsk_mod(struct COHPSK *coh, COMP tx_fdm[], int tx_bits[], int nbits)
 
 \*---------------------------------------------------------------------------*/
 
-void cohpsk_clip(COMP tx_fdm[])
+void cohpsk_clip(COMP tx_fdm[], float clip_thresh, int n)
 {
     COMP  sam;
     float mag;
     int   i;
 
-    for(i=0; i<COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
+    for(i=0; i<n; i++) {
         sam = tx_fdm[i];
         mag = cabsolute(sam);
-        if (mag >  COHPSK_CLIP)  {
-            sam = fcmult( COHPSK_CLIP/mag, sam);
+        if (mag > clip_thresh)  {
+            sam = fcmult(clip_thresh/mag, sam);
         }
         tx_fdm[i] = sam;
     }

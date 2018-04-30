@@ -99,7 +99,7 @@ int main(int argc, char *argv[])
         for(i=0; i<COHPSK_BITS_PER_FRAME*diversity; i++)
             tx_bits[i] = tx_bits_char[i];
 	cohpsk_mod(cohpsk, tx_fdm, tx_bits, COHPSK_BITS_PER_FRAME*diversity);
-        cohpsk_clip(tx_fdm);
+        cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
 
 	/* scale and save to disk as shorts */
 
