@@ -858,8 +858,8 @@ static void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
     /* cohpsk modulator */
 
     cohpsk_mod(f->cohpsk, tx_fdm, f->codec_bits, COHPSK_BITS_PER_FRAME);
-    if (f->clip)
-        cohpsk_clip(tx_fdm);
+    if (f->clip) 
+        cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
     for(i=0; i<f->n_nat_modem_samples; i++)
         mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
     i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
@@ -965,7 +965,10 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
         mod_out[i] = fcmult(OFDM_AMP_SCALE*NORM_PWR_OFDM, asam);
     }
 
-    assert(f->clip == 0); /* todo: support clipping, requires some simulations and testing */
+    if (f->clip) {
+        //fprintf(stderr, "clip ");
+        cohpsk_clip(mod_out, OFDM_CLIP, f->interleave_frames*f->n_nat_modem_samples);
+    }
 }
 
 #endif

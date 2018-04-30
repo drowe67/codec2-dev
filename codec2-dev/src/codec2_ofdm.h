@@ -42,6 +42,7 @@ extern "C" {
 /* Defines */
 
 #define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
+#define OFDM_CLIP (32767*0.35)             /* experimentally derived constant to reduce PAPR to about 8dB */
     
 struct OFDM;
 

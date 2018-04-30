@@ -36,6 +36,7 @@
 #define COHPSK_FS                   7500              /* note this is a wierd
                                                          value to get an integer
                                                          oversampling rate */
+#define COHPSK_CLIP       6.5                         /* hard clipping for Nc*Nc=14 to reduce PAPR */
 
 #include "comp.h"
 #include "modem_stats.h"
@@ -47,7 +48,7 @@ extern const int test_bits_coh[];
 struct COHPSK *cohpsk_create(void);
 void cohpsk_destroy(struct COHPSK *coh);
 void cohpsk_mod(struct COHPSK *cohpsk, COMP tx_fdm[], int tx_bits[], int nbits);
-void cohpsk_clip(COMP tx_fdm[]);
+void cohpsk_clip(COMP tx_fdm[], float clip_thresh, int n);
 void cohpsk_demod(struct COHPSK *cohpsk, float rx_bits[], int *sync, COMP rx_fdm[], int *nin_frame);
 void cohpsk_get_demod_stats(struct COHPSK *cohpsk, struct MODEM_STATS *stats);
 void cohpsk_set_verbose(struct COHPSK *coh, int verbose);

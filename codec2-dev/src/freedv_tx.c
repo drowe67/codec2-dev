@@ -94,13 +94,13 @@ int main(int argc, char *argv[]) {
     int                       mode;
     int                       n_speech_samples;
     int                       n_nom_modem_samples;
-    int                       use_codectx, use_datatx, use_testframes, interleave_frames;
+    int                       use_codectx, use_datatx, use_testframes, interleave_frames, use_clip;
     struct CODEC2             *c2;
     int                       i;
 
     if (argc < 4) {
         printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx]\n", argv[0]);
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1]\n", argv[0]);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -137,7 +137,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1;
+    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0;
    
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -164,6 +164,9 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--interleave") == 0) {
                 interleave_frames = atoi(argv[i+1]);
             }
+            if (strcmp(argv[i], "--clip") == 0) {
+                use_clip = atoi(argv[i+1]);
+            }
         }
     }
 
@@ -185,6 +188,7 @@ int main(int argc, char *argv[]) {
 
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
+    freedv_set_clip(freedv, use_clip);
 
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
