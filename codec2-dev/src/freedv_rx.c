@@ -93,13 +93,14 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_codecrx;
+    int                        use_codecrx, use_testframes, interleave_frames;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
 
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile [--testframes] [--codecrx]\n", argv[0]);
+	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
+               " [--testframes] [--interleaver depth] [--codecrx]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -137,15 +138,12 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    freedv = freedv_open(mode);
-    assert(freedv != NULL);
-
-    use_codecrx = 0;
+    use_codecrx = 0; use_testframes = 0; interleave_frames = 1;
 
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) {
-                freedv_set_test_frames(freedv, 1);
+                use_testframes = 1;
             }
             if (strcmp(argv[i], "--codecrx") == 0) {
                 int c2_mode;
@@ -162,12 +160,29 @@ int main(int argc, char *argv[]) {
                 c2 = codec2_create(c2_mode);
                 assert(c2 != NULL);
             }
+
+            if (strcmp(argv[i], "--interleave") == 0) {
+                interleave_frames = atoi(argv[i+1]);
+            }
         }
     }
+
+    if (mode == FREEDV_MODE_700D) {
+        struct freedv_advanced adv;
+        adv.interleave_frames = interleave_frames;
+        freedv = freedv_open_advanced(mode, &adv);
+    }
+    else {
+        freedv = freedv_open(mode);
+    }
+    assert(freedv != NULL);
+
+    freedv_set_test_frames(freedv, use_testframes);
+
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);
 
-    short speech_out[freedv_get_n_speech_samples(freedv)];
+    short speech_out[freedv_get_n_speech_samples(freedv)*interleave_frames];
     short demod_in[freedv_get_n_max_modem_samples(freedv)];
 
     ftxt = fopen("freedv_rx_log.txt","wt");

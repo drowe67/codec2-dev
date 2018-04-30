@@ -369,8 +369,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbit = codec2_bits_per_frame(f->codec2);
         nbyte = (nbit + 7) / 8;
         nbyte = nbyte*Ncodec2frames*f->interleave_frames;
-        fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
-                Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
+        //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
+        //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
     }
     
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
@@ -1006,8 +1006,8 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         int data_bits_per_frame = f->ldpc->data_bits_per_frame;
 	int codec_frames = data_bits_per_frame / bits_per_codec_frame;
 
-        fprintf(stderr, "modem_frame_count_tx: %d dec_frames: %d bytes offset: %d\n",
-                f->modem_frame_count_tx, codec_frames, (f->modem_frame_count_tx*codec_frames)*bytes_per_codec_frame);
+        //fprintf(stderr, "modem_frame_count_tx: %d dec_frames: %d bytes offset: %d\n",
+        //        f->modem_frame_count_tx, codec_frames, (f->modem_frame_count_tx*codec_frames)*bytes_per_codec_frame);
        
         /* buffer up bits until we get enough encoded bits for interleaver */
         
@@ -1022,7 +1022,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         f->modem_frame_count_tx++;
         if (f->modem_frame_count_tx == f->interleave_frames) {
             freedv_comptx_700d(f, f->mod_out);
-            fprintf(stderr, "  calling freedv_comptx_700d()\n");
+            //fprintf(stderr, "  calling freedv_comptx_700d()\n");
             f->modem_frame_count_tx = 0;
         }
 
@@ -1650,7 +1650,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     frames = f->n_codec_bits / bits_per_codec_frame;
-    nout = f->n_speech_samples;
+    nout = 0;
 
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
@@ -1666,7 +1666,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     /* echo samples back out as default (say if sync not found) */
     
-    *valid = -1;
+    *valid = 1;
 
     /* TODO estimate this properly from signal */
     
@@ -1726,6 +1726,9 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                 f->total_bits       += Nbitsperframe*interleave_frames;
             }
 
+            memset(f->packed_codec_bits, 0, bytes_per_codec_frame * frames);
+            byte = 0; f->modem_frame_count_rx = 0;
+            
             for (j=0; j<interleave_frames; j++) {
                 symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
                                 &codeword_amps_de[j*coded_syms_per_frame],
@@ -1740,8 +1743,6 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
 
                     /* a frame of valid Codec 2 bits, pack into Codec 2 frame  */
 
-                    memset(f->packed_codec_bits, 0, bytes_per_codec_frame * frames);
-                    byte = 0;
                     for (i=0; i<data_bits_per_frame; i+=bits_per_codec_frame) {
 
                         /* pack bits, MSB received first */
@@ -1759,13 +1760,14 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                             byte++;
                     }
                     
-                    *valid = 1; nout = f->n_speech_samples;                  
-
-                    if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
-                        *valid = 0;
-                    }
                 }
             } /* for interleave frames ... */
+            
+            nout = f->n_speech_samples*interleave_frames;                  
+
+            if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
+                *valid = 0;
+            }
 
         } /* if interleaver synced ..... */
 
@@ -1796,19 +1798,23 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
             rx_uw[i] = rx_bits[i];
         }
 
-    } /* if modem synced .... */
+    } /* if modem synced .... */ else {
+        *valid = -1;
+    }
 
     /* iterate state machine and update nin for next call */
     
     f->nin = ofdm_get_nin(ofdm);
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
-    
+
+    /*
     fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                     0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
             Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
-
+    */
+    
     /* no valid FreeDV signal - squelch output */
 
     if (strcmp(ofdm->sync_state_interleaver,"synced")) {
