@@ -35,7 +35,8 @@
   extern "C" {
 #endif
 
-#ifndef __FREEDV__
+#ifndef __FREEDV_API_INTERNAL__
+#define __FREEDV_API_INTERNAL__
 
 #include "varicode.h"
 #include "fsk.h"
