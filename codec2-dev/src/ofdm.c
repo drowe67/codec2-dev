@@ -1170,6 +1170,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
             complex float rot = ofdm->rx_np[r*c] *  (cosf(M_PI/4.0) + I*sinf(M_PI/4.0));
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
+            //fprintf(stderr, "%f %f\n", stats->rx_symbols[r][c].real, stats->rx_symbols[r][c].imag);
         }
     }
 }
