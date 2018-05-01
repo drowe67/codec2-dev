@@ -372,6 +372,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
         //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
         f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
+        f->codec_bits = NULL;
     }
     
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
@@ -1629,8 +1630,8 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     [X] rms level the same as fdmdv
     [X] way to stay in sync and not resync automatically 
     [X] SNR est, maybe from pilots, cohpsk have an example?
-    [ ] error pattern support?
     [X] work out how to handle return of multiple interleaved frames over time
+    [ ] error pattern support?
     [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
 */
 
@@ -1672,7 +1673,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     /* echo samples back out as default (say if sync not found) */
     
     *valid = 1;
-
+    f->sync = f->stats.sync = 0;
+    
     /* TODO estimate this properly from signal */
     
     float EsNo = 3.0;
@@ -1808,12 +1810,12 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    
+    /*
     fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                     0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
             Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
-    
+    */
     
     /* no valid FreeDV signal - squelch output */
     
@@ -1822,7 +1824,6 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
          if (f->squelch_en) {
  	    *valid = 0;
          }
-        f->snr_est = 0.0;
         f->snr_est = 0.0;
     }
     
@@ -2079,6 +2080,9 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 #ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)  || (f->mode == FREEDV_MODE_700C))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
+    if (f->mode == FREEDV_MODE_700D) {
+        ofdm_get_demod_stats(f->ofdm, &f->stats);
+    }
 #endif
     if (sync) *sync = f->stats.sync;
     if (snr_est) *snr_est = f->stats.snr_est;
