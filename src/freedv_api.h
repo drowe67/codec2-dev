@@ -32,7 +32,8 @@
   extern "C" {
 #endif
 
-#ifndef __FREEDV__
+#ifndef __FREEDV_API__
+#define __FREEDV_API__
 
 // This declares a single-precision (float) complex number
 #include <sys/types.h>
