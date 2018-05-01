@@ -1808,12 +1808,12 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    /*
+    
     fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                     0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
             Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
-    */
+    
     
     /* no valid FreeDV signal - squelch output */
 
@@ -1824,7 +1824,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         }
         f->snr_est = 0.0;
     }
-
+    fprintf(stderr, "sync: %d valid: %d SNR: %3.2f\n", sync, *valid, f->snr_est);
+    
     return nout;
 }
 
