@@ -36,7 +36,7 @@
 #include "kiss_fft.h"
 
 #define MODEM_STATS_NC_MAX    20
-#define MODEM_STATS_NR_MAX    10
+#define MODEM_STATS_NR_MAX    8
 #define MODEM_STATS_ET_MAX    8
 #define MODEM_STATS_NSPEC     512
 #define MODEM_STATS_MAX_F_HZ  4000
