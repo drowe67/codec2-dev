@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
            tx_filter_and_upconvert_coh(&tx_fdm_frame[r*COHPSK_M], COHPSK_NC*ND , tx_onesym, fdmdv->tx_filter_memory,
                                         fdmdv->phase_tx, fdmdv->freq, &fdmdv->fbb_phase_tx, fdmdv->fbb_rect);
         }
-        cohpsk_clip(tx_fdm_frame);
+        cohpsk_clip(tx_fdm_frame, COHPSK_CLIP, NSYMROWPILOT*COHPSK_M);
 
 	/* --------------------------------------------------------*\
 	                          Channel
