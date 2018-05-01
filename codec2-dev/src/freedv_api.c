@@ -1687,10 +1687,10 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
-        fdmdv_get_demod_stats(f->fdmdv, &f->stats);
         f->sync = 1;
+        ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
-          
+
         assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME);
 
         /* now we need to buffer for de-interleaving -------------------------------------*/
@@ -1816,15 +1816,17 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     
     /* no valid FreeDV signal - squelch output */
-
-    int sync = !strcmp(ofdm->sync_state_interleaver,"synced") || !strcmp(ofdm->sync_state_interleaver,"synced");
+    
+    int sync = !strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state,"trial");
     if (!sync) {
-        if (f->squelch_en) {
-	    *valid = 0;
-        }
+         if (f->squelch_en) {
+ 	    *valid = 0;
+         }
+        f->snr_est = 0.0;
         f->snr_est = 0.0;
     }
-    fprintf(stderr, "sync: %d valid: %d SNR: %3.2f\n", sync, *valid, f->snr_est);
+    
+    //fprintf(stderr, "sync: %d valid: %d snr: %3.2f\n", f->sync, *valid, f->snr_est);
     
     return nout;
 }
@@ -2262,9 +2264,11 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         cohpsk_get_demod_stats(f->cohpsk, stats);
     }
+    
     if (f->mode == FREEDV_MODE_700D) {
         ofdm_get_demod_stats(f->ofdm, stats);
     }
+    
 #endif
 }
 

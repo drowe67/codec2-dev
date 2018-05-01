@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
 
         fwrite(speech_out, sizeof(short), nout, fout);
         freedv_get_modem_stats(freedv, &sync, &snr_est);
-        freedv_get_modem_extended_stats(freedv,&stats);
+        freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
 

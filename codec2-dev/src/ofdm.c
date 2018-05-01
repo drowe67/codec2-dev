@@ -1157,13 +1157,13 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
 
     float snr_est = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
     stats->snr_est = 0.9*stats->snr_est + 0.1*snr_est;
-
-    stats->sync = !strcpy(ofdm->sync_state, "synced") || !strcpy(ofdm->sync_state, "trial");
+    stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");
+    //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
     stats->clock_offset = 0.0;               /* TODO: work out sample clock offset */
 
-    assert(OFDM_ROWSPERFRAME <= MODEM_STATS_NR_MAX);
+    assert(OFDM_ROWSPERFRAME < MODEM_STATS_NR_MAX);
     stats->nr = OFDM_ROWSPERFRAME;
     for(c=0; c<OFDM_NC; c++) {
         for (r=0; r<OFDM_ROWSPERFRAME; r++) {
