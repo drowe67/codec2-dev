@@ -821,11 +821,11 @@ void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
         for (i=0;i<M;i++) {
             metric =  symbol_likelihood[n*M+i]; /* channel metric for this symbol */
 
-            mask = 1 << bps - 1;
+            mask = 1 << (bps - 1);
             for (j=0;j<bps;j++) {	
                 mask = mask >> 1;
             }
-            mask = 1 << bps - 1;
+            mask = 1 << (bps - 1);
             
             for (k=0;k<bps;k++) {	/* loop over bits */
                 if (mask&i) {

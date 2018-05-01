@@ -95,7 +95,7 @@ struct freedv *freedv_open(int mode) {
 
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
-    int            Nc, codec2_mode, nbit, nbyte,i;
+    int            Nc, codec2_mode, nbit, nbyte;
 
     if ((mode != FREEDV_MODE_1600) && (mode != FREEDV_MODE_700) && 
         (mode != FREEDV_MODE_700B) && (mode != FREEDV_MODE_2400A) &&
@@ -204,7 +204,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         if (f->codeword_symbols == NULL) {return NULL;}
         f->codeword_amps = (float*)malloc(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
         if (f->codeword_amps == NULL) {return NULL;}
-        for (i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
+        for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
             f->codeword_symbols[i].real = 0.0;
             f->codeword_symbols[i].imag = 0.0;
             f->codeword_amps[i] = 0.0;
@@ -222,7 +222,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->mod_out = (COMP*)malloc(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
         if (f->mod_out == NULL) { return NULL; }
-        for (i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+        for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
             f->mod_out[i].real = 0.0;
             f->mod_out[i].imag = 0.0;
         }
