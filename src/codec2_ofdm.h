@@ -38,6 +38,7 @@ extern "C" {
 #include <stdbool.h>
     
 #include "comp.h"
+#include "modem_stats.h"
 
 /* Defines */
 
@@ -70,6 +71,7 @@ int ofdm_get_nin(struct OFDM *);
 int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
 int ofdm_get_bits_per_frame(struct OFDM *);
+void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats);
 
 /* option setters */
 

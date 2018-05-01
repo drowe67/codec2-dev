@@ -1627,10 +1627,10 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     [X] in testframe mode count coded and uncoded errors
     [X] freedv getter for modem and interleaver sync
     [X] rms level the same as fdmdv
-    [ ] way to stay in sync and not resync automatically 
-    [ ] SNR est, maybe from pilots, cohpsk have an example?
+    [X] way to stay in sync and not resync automatically 
+    [X] SNR est, maybe from pilots, cohpsk have an example?
     [ ] error pattern support?
-    [ ] work out how to handle return of multiple interleaved frames over time
+    [X] work out how to handle return of multiple interleaved frames over time
     [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
 */
 
@@ -1687,6 +1687,9 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
+        fdmdv_get_demod_stats(f->fdmdv, &f->stats);
+        f->sync = 1;
+        f->snr_est = f->stats.snr_est;
           
         assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME);
 
@@ -1814,11 +1817,12 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     /* no valid FreeDV signal - squelch output */
 
-    if (strcmp(ofdm->sync_state_interleaver,"synced")) {
-        //nout = freedv_nin(f);
+    int sync = !strcmp(ofdm->sync_state_interleaver,"synced") || !strcmp(ofdm->sync_state_interleaver,"synced");
+    if (!sync) {
         if (f->squelch_en) {
 	    *valid = 0;
         }
+        f->snr_est = 0.0;
     }
 
     return nout;
@@ -2254,8 +2258,12 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     }
     
 #ifndef CORTEX_M4
-    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C))
+    if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         cohpsk_get_demod_stats(f->cohpsk, stats);
+    }
+    if (f->mode == FREEDV_MODE_700D) {
+        ofdm_get_demod_stats(f->ofdm, stats);
+    }
 #endif
 }
 
