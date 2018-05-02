@@ -261,9 +261,9 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
 
   end
 
+  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
   printf("Codec PER: %5.4f Tpkts: %5d Terrs: %5d\n", Tpacketerrs/(Tpackets+1E-12), Tpackets, Tpacketerrs);
-  printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
 
   figure(1); clf; 
   plot(rx_np_log,'+');

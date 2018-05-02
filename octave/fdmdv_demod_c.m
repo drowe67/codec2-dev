@@ -9,10 +9,13 @@
 % Version 2
 %
 
-function fdmdv_demod_c(dumpfilename, bits, NumCarriers)
+function fdmdv_demod_c(dumpfilename, bits)
  
   fdmdv; % include modem code
-
+  f = fdmdv_init;
+  Nc = f.Nc; Nb = f.Nb; Rs = f.Rs; M = f.M; Fs = f.Fs;
+  test_bits = f.test_bits;
+  
   frames = bits/(Nc*Nb);
 
   load(dumpfilename);
@@ -30,17 +33,17 @@ function fdmdv_demod_c(dumpfilename, bits, NumCarriers)
 
   bits_per_frame = Nc*Nb;
 
-  for f=1:frames
+  for fr=1:frames
 
-    rx_bits = rx_bits_log_c((f-1)*bits_per_frame+1:f*bits_per_frame);
+    rx_bits = rx_bits_log_c((fr-1)*bits_per_frame+1:fr*bits_per_frame);
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors] = put_test_bits(test_bits, rx_bits);
+    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits);
     if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
-      total_bits = total_bits + Ntest_bits;
-      bit_errors_log = [bit_errors_log bit_errors/Ntest_bits];
+      total_bits = total_bits + f.Ntest_bits;
+      bit_errors_log = [bit_errors_log bit_errors/f.Ntest_bits];
     else
       bit_errors_log = [bit_errors_log 0];
     end
@@ -106,8 +109,8 @@ function fdmdv_demod_c(dumpfilename, bits, NumCarriers)
   xt1 = (1:b)/Fs;
   plot(xt1, rx_fdm_log_c(1:b));
   title('Rx FDM Signal');
-  subplot(212)
-  spec(rx_fdm_log_c(1:b),8000);
+  subplot(212);
+  plot_specgram(rx_fdm_log_c(1:b), 8000);
   title('FDM Rx Spectrogram');
 
   figure(4)

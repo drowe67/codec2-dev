@@ -840,7 +840,7 @@ function [sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits
   % Append to our memory
 
   [m n] = size(rx_bits);
-  f.rx_test_bits_mem(1:f.Ntest_bits-n) = freedv.rx_test_bits_mem(n+1:f.Ntest_bits);
+  f.rx_test_bits_mem(1:f.Ntest_bits-n) = f.rx_test_bits_mem(n+1:f.Ntest_bits);
   f.rx_test_bits_mem(f.Ntest_bits-n+1:f.Ntest_bits) = rx_bits;
 
   % see how many bit errors we get when checked against test sequence

@@ -3,9 +3,7 @@
 %
 % As the name suggests.....
 
-function S = plot_specgram(x)
-
-  Fs = 8000;
+function S = plot_specgram(x, Fs = 8000)
   
   step = fix(20*Fs/1000);     # one spectral slice every 5 ms
   window = fix(160*Fs/1000);  # 40 ms data window
