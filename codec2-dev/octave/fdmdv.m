@@ -21,11 +21,11 @@ randn('state',1);
 % Functions ----------------------------------------------------
 
 
-function f = fdmdv_init
+function f = fdmdv_init(Nc=14)
     Fs   = f.Fs = 8000;      % sample rate in Hz
     T    = f.T  = 1/Fs;      % sample period in seconds
     Rs   = f.Rs = 50;        % symbol rate in Hz
-    Nc   = f.Nc = 14;
+           f.Nc = Nc;
     Nb   = f.Nb = 2;         % Bits/symbol for PSK modulation
     Rb   = f.Rb = Nc*Rs*Nb;  % bit rate
     M    = f.M  = Fs/Rs;     % oversampling factor
