@@ -60,6 +60,13 @@ Built as part of codec2-dev, see README for build instructions.
 
    $ ./fdmdv_get_test_bits - 20000 20 | ./fdmdv_mod - - 20 | ./fdmdv_demod - - 20 | ./fdmdv_put_test_bits - 20
 
+7. Test with timing slips due to sample clock offset of 1000ppm:
+
+   $ ./fdmdv_get_test_bits - 30000 | ./fdmdv_mod - - | sox -t raw -r 8000 -s -2 - -t raw -r 7990 - | ./fdmdv_demod - - 14 demod_dump.txt | ./fdmdv_put_test_bits -
+
+   octave:98> fdmdv_demod_c("../build_linux/src/demod_dump.txt",28000)
+   27552 bits  0 errors  BER: 0.0000
+
 References
 ----------
 
