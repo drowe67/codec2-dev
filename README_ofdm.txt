@@ -106,6 +106,11 @@ Built as part of codec2-dev, see README for build instructions.
   build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - --testframes | ./freedv_rx 700D - /dev/null --testframes
   build_linux/src$ ./freedv_tx 700D ../../raw/hts1a.raw - | ./freedv_rx 700D - - | aplay -f S16
 
+  With long interleaver times use a longer source file to allow interleaver time to sync, especially on poor
+  channels:
+  
+  build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - - --interleave 8 | ./cohpsk_ch - - -26 --Fs 8000 -f -10 --fast | ./freedv_rx 700D - - --interleave 8 | aplay -f S16
+  
 Acceptance Tests
 ----------------
 

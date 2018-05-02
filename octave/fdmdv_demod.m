@@ -8,10 +8,13 @@
 % Version 2
 %
 
-function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symbolfilename)
+function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, symbolfilename)
 
   fdmdv; % include modem code
-  
+  f = fdmdv_init(NumCarriers);
+  Nc = f.Nc; Nb = f.Nb; Rs = f.Rs; M = f.M; Fs = f.Fs; Nsync_mem = f.Nsync_mem;
+  test_bits = f.test_bits; Q = f.Q; P = f.P;
+
   modulation = 'dqpsk';
 
   fin = fopen(rawfilename, "rb");
@@ -72,7 +75,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
   % Main loop ----------------------------------------------------
 
-  for f=1:frames
+  for fr=1:frames
     
     % obtain nin samples of the test input signal
     
@@ -93,16 +96,16 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     % shift down to complex baseband
 
     for i=1:nin
-      fbb_phase_rx = fbb_phase_rx*fbb_rect';
-      rx_fdm(i) = rx_fdm(i)*fbb_phase_rx;
+      f.fbb_phase_rx = f.fbb_phase_rx*f.fbb_rect';
+      rx_fdm(i) = rx_fdm(i)*f.fbb_phase_rx;
     end
-    mag = abs(fbb_phase_rx);
-    fbb_phase_rx /= mag;
+    mag = abs(f.fbb_phase_rx);
+    f.fbb_phase_rx /= mag;
 
     % frequency offset estimation and correction
 
-    [pilot prev_pilot pilot_lut_index prev_pilot_lut_index] = get_pilot(pilot_lut_index, prev_pilot_lut_index, nin);
-    [foff_coarse S1 S2] = rx_est_freq_offset(rx_fdm, pilot, prev_pilot, nin, !sync );
+    [pilot prev_pilot f.pilot_lut_index f.prev_pilot_lut_index] = get_pilot(f, f.pilot_lut_index, f.prev_pilot_lut_index, nin);
+    [foff_coarse S1 S2 f] = rx_est_freq_offset(f, rx_fdm, pilot, prev_pilot, nin, !sync );
     
     if sync == 0
       foff  = foff_coarse;
@@ -118,9 +121,9 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
     % baseband processing
 
-    rx_fdm_filter = rxdec_filter(rx_fdm_fcorr, nin);
-    rx_filt = down_convert_and_rx_filter(rx_fdm_filter, nin, M/Q);
-    [rx_symbols rx_timing] = rx_est_timing(rx_filt, nin);
+    [rx_fdm_filter f] = rxdec_filter(f, rx_fdm_fcorr, nin);
+    [rx_filt f] = down_convert_and_rx_filter(f, rx_fdm_filter, nin, M/Q);
+    [rx_symbols rx_timing env f] = rx_est_timing(f, rx_filt, nin);
     rx_timing_log = [rx_timing_log rx_timing];
 
     nin = M;
@@ -132,7 +135,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     end
 
     rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols./abs(prev_rx_symbols))*exp(j*pi/4)];
-    [rx_bits sync_bit f_err pd] = psk_to_bits(prev_rx_symbols, rx_symbols, modulation);
+    [rx_bits sync_bit f_err pd] = psk_to_bits(f, prev_rx_symbols, rx_symbols, modulation);
 
     % optionally save output symbols 
 
@@ -165,24 +168,24 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
     % update some states
 
     prev_rx_symbols = rx_symbols;
-    [sig_est noise_est] = snr_update(sig_est, noise_est, pd);
-    snr_est = calc_snr(sig_est, noise_est);
+    [sig_est noise_est] = snr_update(f, sig_est, noise_est, pd);
+    snr_est = calc_snr(f, sig_est, noise_est);
     snr_est_log = [snr_est_log snr_est];
     foff -= 0.5*f_err;
     foff_log = [foff_log foff];
 
     % freq est state machine
 
-    [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(sync_bit, fest_state, fest_timer, sync_mem);
+    [sync reliable_sync_bit fest_state fest_timer sync_mem] = freq_state(f, sync_bit, fest_state, fest_timer, sync_mem);
     sync_log = [sync_log sync];
 
     % count bit errors if we find a test frame
 
-    [test_frame_sync bit_errors error_pattern] = put_test_bits(test_bits, rx_bits);
+    [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits);
     if (test_frame_sync == 1)
       total_bit_errors = total_bit_errors + bit_errors;
-      total_bits = total_bits + Ntest_bits;
-      bit_errors_log = [bit_errors_log bit_errors/Ntest_bits];
+      total_bits = total_bits + f.Ntest_bits;
+      bit_errors_log = [bit_errors_log bit_errors/f.Ntest_bits];
     else
       bit_errors_log = [bit_errors_log 0];
     end
@@ -263,7 +266,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers, errorpatternfilename, symb
 
   figure(3)
   clf;
-  spec(rx_fdm_log,8000);
+  plot_specgram(rx_fdm_log, Fs);
 
   figure(4)
   clf;
