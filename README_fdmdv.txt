@@ -37,7 +37,7 @@ Built as part of codec2-dev, see README for build instructions.
 
     $ cd ../octave
     $ octave
-    octave:1> fdmdv_demod_c("../src/demod_dump.txt",1400)
+    octave:1> fdmdv_demod_c("../src/demod_dump.txt",14000)
 
 4. Run Octave simulation of entire modem and AWGN channel:
 

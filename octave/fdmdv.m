@@ -11,6 +11,7 @@
 %   [X] refactor with states
 %   [X] remove commented out globals
 %   [X] tfdmdv works
+%   [X] fdmdv_demod works
 %   [ ] fdmdv_ut works
  
 % reqd to make sure we get same random bits at mod and demod
@@ -50,7 +51,8 @@ function f = fdmdv_init(Nc=14)
 
     f.tx_filter_memory = zeros(Nc+1, Nfilter);
     f.rx_filter_memory = zeros(Nc+1, Nfilter);
-    f.rx_fdm_mem = zeros(1,Nfilter+M);
+    f.Nrx_fdm_mem = Nfilter+M+M/P;
+    f.rx_fdm_mem = zeros(1,f.Nrx_fdm_mem);
 
     f.snr_coeff = 0.9;        % SNR est averaging filter coeff
 
@@ -98,7 +100,10 @@ function f = fdmdv_init(Nc=14)
                       0.0096718   0.00986375    0.00490937 0.000163906 -0.0019897 -0.00204605  ...
                       -0.00125472];
 
-    f.rxdec_lpf_mem = zeros(1,f.Nrxdec-1+M);
+    % we need room for Nrdec + the max nin, as we may need to filter max_min samples
+    
+    f.Nrxdecmem = f.Nrxdec+M+M/P;
+    f.rxdec_lpf_mem = zeros(1,f.Nrxdecmem);
     f.Q=M/4;
 
     % freq offset estimation
@@ -330,6 +335,7 @@ function [rx_filt fdmdv] = rx_filter(fdmdv, rx_baseband, nin)
   % rx filter each symbol, generate P filtered output samples for each symbol.
   % Note we keep memory at rate M, it's just the filter output at rate P
 
+  assert(mod(M,P)==0);
   N=M/P;
   j=1;
   for i=1:N:nin
@@ -343,20 +349,32 @@ function [rx_filt fdmdv] = rx_filter(fdmdv, rx_baseband, nin)
 endfunction
 
 
-% LP filter +/- 1000 Hz, allows us to perfrom rx filtering at a lower rate saving CPU
+% LP filter +/- 1000 Hz, allows us to perform rx filtering at a lower rate saving CPU
 
 function [rx_fdm_filter fdmdv] = rxdec_filter(fdmdv, rx_fdm, nin)
   M = fdmdv.M;
+  Nrxdecmem = fdmdv.Nrxdecmem;
   Nrxdec = fdmdv.Nrxdec;
   rxdec_coeff = fdmdv.rxdec_coeff;
   rxdec_lpf_mem = fdmdv.rxdec_lpf_mem;
- 
-  rxdec_lpf_mem(1:Nrxdec-1+M-nin) = rxdec_lpf_mem(nin+1:Nrxdec-1+M);
-  rxdec_lpf_mem(Nrxdec-1+M-nin+1:Nrxdec-1+M) = rx_fdm(1:nin);
 
+  % place latest nin samples at end of buffer
+  
+  rxdec_lpf_mem(1:Nrxdecmem-nin) = rxdec_lpf_mem(nin+1:Nrxdecmem);
+  rxdec_lpf_mem(Nrxdecmem-nin+1:Nrxdecmem) = rx_fdm(1:nin);
+  
+  % init room for nin output samples
+  
   rx_fdm_filter = zeros(1,nin);
+
+  % Move starting point for filter dot product to filter newest samples
+  % in buffer.  This stuff makes my head hurt.
+  
+  st = Nrxdecmem - nin - Nrxdec + 1;
   for i=1:nin
-    rx_fdm_filter(i) = rxdec_lpf_mem(i:Nrxdec-1+i) * rxdec_coeff';
+    a = st+1; b = st+i+Nrxdec-1;
+    %printf("nin: %d i: %d a: %d b: %d\n", nin, i, a, b);
+    rx_fdm_filter(i) = rxdec_lpf_mem(st+i:st+i+Nrxdec-1) * rxdec_coeff';
   end
 
   fdmdv.rxdec_lpf_mem = rxdec_lpf_mem;
@@ -372,6 +390,7 @@ function [rx_filt fdmdv] = down_convert_and_rx_filter(fdmdv, rx_fdm, nin, dec_ra
   M = fdmdv.M;
   P = fdmdv.P;
   rx_fdm_mem = fdmdv.rx_fdm_mem;
+  Nrx_fdm_mem = fdmdv.Nrx_fdm_mem;
   phase_rx = fdmdv.phase_rx;
   freq = fdmdv.freq;
   freq_pol = fdmdv.freq_pol;
@@ -379,42 +398,55 @@ function [rx_filt fdmdv] = down_convert_and_rx_filter(fdmdv, rx_fdm, nin, dec_ra
   gt_alpha5_root = fdmdv.gt_alpha5_root;
   Q = fdmdv.Q;
 
-  % update memory of rx_fdm
+  % update memory of rx_fdm_mem, newest nin sample ast end of buffer
 
-  rx_fdm_mem(1:Nfilter+M-nin) = rx_fdm_mem(nin+1:Nfilter+M);
-  rx_fdm_mem(Nfilter+M-nin+1:Nfilter+M) = rx_fdm(1:nin);
+  rx_fdm_mem(1:Nrx_fdm_mem-nin) = rx_fdm_mem(nin+1:Nrx_fdm_mem);
+  rx_fdm_mem(Nrx_fdm_mem-nin+1:Nrx_fdm_mem) = rx_fdm(1:nin);
 
   for c=1:Nc+1
 
-     % now downconvert using current freq offset to get Nfilter+nin
-     % baseband samples.
-     % 
-     %           Nfilter              nin
-     % |--------------------------|---------|
-     %                             |
-     %                         phase_rx(c)
-     %
-     % This means winding phase(c) back from this point
-     % to ensure phase continuity
+     #{
+     So we have rx_fdm_mem, a baseband array of samples at
+     rate Fs Hz, including the last nin samples at the end.  To
+     filter each symbol we require the baseband samples for all Nsym
+     symbols that we filter over.  So we need to downconvert the
+     entire rx_fdm_mem array.  To downconvert these we need the LO
+     phase referenced to the start of the rx_fdm_mem array.
 
-     wind_back_phase = -freq_pol(c)*Nfilter;
+      
+      <--------------- Nrx_filt_mem ------->
+                                     nin
+      |--------------------------|---------|
+       1                          |
+                              phase_rx(c)
+     
+      This means winding phase(c) back from this point
+      to ensure phase continuity.
+     #}
+
+     wind_back_phase = -freq_pol(c)*(Nfilter);
      phase_rx(c)     =  phase_rx(c)*exp(j*wind_back_phase);
     
      % down convert all samples in buffer
 
-     rx_baseband = zeros(1,Nfilter+M);
-     st  = Nfilter+M;      % end of buffer
+     rx_baseband = zeros(1,Nrx_fdm_mem);
+     
+     st  = Nrx_fdm_mem;    % end of buffer
      st -= nin-1;          % first new sample
      st -= Nfilter;        % first sample used in filtering
-     
+
+     %printf("Nfilter: %d Nrx_fdm_mem: %d dec_rate: %d nin: %d st: %d\n",
+     %        Nfilter, Nrx_fdm_mem, dec_rate, nin,  st);
+             
      f_rect = freq(c) .^ dec_rate;
 
-     for i=st:dec_rate:Nfilter+M
+     for i=st:dec_rate:Nrx_fdm_mem
         phase_rx(c) = phase_rx(c) * f_rect;
 	rx_baseband(i) = rx_fdm_mem(i)*phase_rx(c)';
      end
  
-     % now we can filter this carrier's P symbols.  Due to filtering of rx_fdm we can filter at rate at rate M/Q
+     % now we can filter this carrier's P (+/-1) symbols.  Due to
+     % filtering of rx_fdm we can filter at rate at rate M/Q
 
      N=M/P; k = 1;
      for i=1:N:nin
@@ -575,6 +607,9 @@ function [rx_symbols rx_timing_M env fdmdv] = rx_est_timing(fdmdv, rx_filt, nin)
   
   rx_symbols = rx_filter_mem_timing(:,low_sample)*(1-fract) + rx_filter_mem_timing(:,high_sample)*fract;
   % rx_symbols = rx_filter_mem_timing(:,high_sample+1);
+
+  % This value will be +/- half a symbol so will wrap around at +/-
+  % M/2 or +/- 80 samples with M=160
 
   rx_timing_M = norm_rx_timing*M;
 

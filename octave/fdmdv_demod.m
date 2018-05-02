@@ -73,6 +73,8 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
     dual_rx_bits = zeros(1,2*Nc*Nb);
   end
 
+  atimer = 0;
+  
   % Main loop ----------------------------------------------------
 
   for fr=1:frames
@@ -108,7 +110,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
     [foff_coarse S1 S2 f] = rx_est_freq_offset(f, rx_fdm, pilot, prev_pilot, nin, !sync );
     
     if sync == 0
-      foff  = foff_coarse;
+      foff = foff_coarse;
     end
     foff_coarse_log = [foff_coarse_log foff_coarse];
 
@@ -121,19 +123,30 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
 
     % baseband processing
 
-    [rx_fdm_filter f] = rxdec_filter(f, rx_fdm_fcorr, nin);
-    [rx_filt f] = down_convert_and_rx_filter(f, rx_fdm_filter, nin, M/Q);
+    if 0
+      % easier to understand, but more memory and CPU hungry filtering and down conversion
+
+      [rx_baseband f] = fdm_downconvert(f, rx_fdm_fcorr, nin);
+      [rx_filt f] = rx_filter(f, rx_baseband, nin);
+    else
+      % more efficient filtering and down conversion
+    
+      [rx_fdm_filter f] = rxdec_filter(f, rx_fdm_fcorr, nin);
+      [rx_filt f] = down_convert_and_rx_filter(f, rx_fdm_filter, nin, M/Q);
+    end
+
     [rx_symbols rx_timing env f] = rx_est_timing(f, rx_filt, nin);
     rx_timing_log = [rx_timing_log rx_timing];
 
-    nin = M;
-    if rx_timing > 2*M/P
-       nin += M/P;
+    nin = M;    
+    if rx_timing > M/P
+      nin += M/P;
     end
-    if rx_timing < 0;
-       nin -= M/P;
+    if rx_timing < -M/P;
+      nin -= M/P;
     end
-
+    %printf("fr: %d rx_timing: %d nin = %d\n", fr, rx_timing, nin);
+    
     rx_symbols_log = [rx_symbols_log rx_symbols.*conj(prev_rx_symbols./abs(prev_rx_symbols))*exp(j*pi/4)];
     [rx_bits sync_bit f_err pd] = psk_to_bits(f, prev_rx_symbols, rx_symbols, modulation);
 
@@ -183,6 +196,9 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
 
     [test_frame_sync bit_errors error_pattern f] = put_test_bits(f, test_bits, rx_bits);
     if (test_frame_sync == 1)
+      if (bit_errors)
+        printf("fr: %d bit_errors: %d\n", fr, bit_errors);
+      end
       total_bit_errors = total_bit_errors + bit_errors;
       total_bits = total_bits + f.Ntest_bits;
       bit_errors_log = [bit_errors_log bit_errors/f.Ntest_bits];
@@ -244,32 +260,28 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
   xt = (1:frames)/Rs;
   secs = frames/Rs;
 
-  figure(1)
-  clf;
+  figure(1); clf;
   [n m] = size(rx_symbols_log);
   plot(real(rx_symbols_log(1:Nc+1,15:m)),imag(rx_symbols_log(1:Nc+1,15:m)),'+')
   axis([-2 2 -2 2]);
   title('Scatter Diagram');
 
-  figure(2)
-  clf;
-  subplot(211)
+  figure(2); clf;
   plot(xt, rx_timing_log)
   title('timing offset (samples)');
-  subplot(212)
+  
+  figure(3);
   plot(xt, foff_log, '-;freq offset;')
-  hold on;
-  plot(xt, sync_log*75, 'r;course-fine;');
-  hold off;
+  %hold on;
+  %plot(xt, sync_log*75, 'r;course-fine;');
+  %hold off;
   title('Freq offset (Hz)');
-  grid
+  grid;
 
-  figure(3)
-  clf;
+  figure(4); clf;
   plot_specgram(rx_fdm_log, Fs);
 
-  figure(4)
-  clf;
+  figure(5); clf;
   subplot(311)
   stem(xt, sync_log)
   axis([0 secs 0 1.5]);
@@ -282,8 +294,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
   axis([0 secs 0 1.5]);
   title('Test Frame Sync')
 
-  figure(5)
-  clf;
+  figure(6); clf;
   subplot(211);
   plot(xt, snr_est_log);
   title('SNR Estimates')
@@ -292,8 +303,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
   bar(snrdB_pc(1:Nc) - mean(snrdB_pc(1:Nc)))
   axis([0 Nc+1 -3 3]);
 
-  figure(6)
-  clf;
+  figure(7); clf;
   hold on;
   lep = length(error_pattern_log);
   if lep != 0 
@@ -305,8 +315,7 @@ function fdmdv_demod(rawfilename, nbits, NumCarriers=14, errorpatternfilename, s
     axis([1 lep/(Nc*Nb) 0 Nc])
   end
 
-  figure(7)
-  clf;
+  figure(8); clf;
   subplot(211)
   [a b] = size(rx_fdm_log);
   xt1 = (1:b)/Fs;

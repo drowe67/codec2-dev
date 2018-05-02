@@ -67,6 +67,9 @@
 
 #define NSYNC_MEM                6
 
+#define NRX_FDM_MEM (NFILTER+M_FAC+M_FAC/P)           /* size of rx filter memory            */
+#define NRXDECMEM   (NRXDEC+M_FAC+M_FAC/P)            /* size of rx decimation filter memory */
+
 /* averaging filter coeffs */
 
 #define TRACK_COEFF              0.5
@@ -130,8 +133,8 @@ struct FDMDV {
 
     /* Demodulator */
 
-    COMP  rxdec_lpf_mem[NRXDEC-1+M_FAC];
-    COMP  rx_fdm_mem[NFILTER+M_FAC];
+    COMP  rxdec_lpf_mem[NRXDECMEM];
+    COMP  rx_fdm_mem[NRX_FDM_MEM];
     COMP  phase_rx[NC+1];
     COMP  rx_filter_mem_timing[NC+1][NT*P];
     float rx_timing;

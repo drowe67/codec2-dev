@@ -163,8 +163,7 @@ int main(int argc, char *argv[])
 
 	/* baseband processing */
 
-        rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, nin);
-        
+        rxdec_filter(rx_fdm_filter, rx_fdm_fcorr, fdmdv->rxdec_lpf_mem, nin);      
         down_convert_and_rx_filter(rx_filt, fdmdv->Nc, rx_fdm_filter, fdmdv->rx_fdm_mem, fdmdv->phase_rx, fdmdv->freq,
                                    fdmdv->freq_pol, nin, M_FAC/Q);
 	rx_timing = rx_est_timing(rx_symbols, FDMDV_NC, rx_filt, fdmdv->rx_filter_mem_timing, env, nin, M_FAC);

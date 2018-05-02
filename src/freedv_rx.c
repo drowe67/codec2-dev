@@ -9,8 +9,8 @@
 
   Example usage (all one line):
 
-     codec2-dev/build_linux/src$ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - |
-                                 ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -
+    $ cd codec2-dev/build_linux/src
+    $ ./freedv_tx 1600 ../../raw/ve9qrp_10s.raw - | ./freedv_rx 1600 - - | aplay -f S16
 
 \*---------------------------------------------------------------------------*/
 
