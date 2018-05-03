@@ -991,12 +991,16 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
       }
     }
 
-    float noise_var = 0;
+    /* with large interfering carriers this alg can break down - in
+       that case set a benign value for noise_var that will produce a
+       sensible (probably low) SNR est */
+    
+    float noise_var = 1.0;
     if (n > 1) {
       noise_var = (n*sum_xx - sum_x*sum_x)/(n*(n-1));
     }
-    ofdm->sig_var = sig_var;
     ofdm->noise_var = 2*noise_var;
+    ofdm->sig_var = sig_var;
 }
 
 
@@ -1156,6 +1160,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
     float snr_est = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
+    //fprintf(stderr, "sig: %f var: %f snr: %f\n", ofdm->sig_var, ofdm->noise_var, snr_est);
     stats->snr_est = 0.9*stats->snr_est + 0.1*snr_est;
     stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");
     //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
