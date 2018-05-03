@@ -157,12 +157,7 @@ add_custom_command(
 
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
-    include(ExternalProject)
-    ExternalProject_Add(codec2_native
-       SOURCE_DIR ${CMAKE_SOURCE_DIR}
-       BUILD_COMMAND $(MAKE) generate_wideband_map
-       INSTALL_COMMAND ${CMAKE_COMMAND} -E copy src/generate_wideband_map ${CMAKE_CURRENT_BINARY_DIR}
-    )
+    # Native executable already built above.
     add_executable(generate_wideband_map IMPORTED)
     set_target_properties(generate_wideband_map PROPERTIES
         IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_wideband_map)
