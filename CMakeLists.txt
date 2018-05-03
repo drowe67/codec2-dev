@@ -86,8 +86,6 @@ endif(MINGW)
 
 #
 # Find the svn revision if this is a working copy.
-# WORK IN PROGRESS
-# Works ok if it is a working copy but errors out if not.
 #
 get_filename_component(_src_dir "${CMAKE_SOURCE_DIR}" NAME)
 if("${_src_dir}" STREQUAL "codec2-dev")
