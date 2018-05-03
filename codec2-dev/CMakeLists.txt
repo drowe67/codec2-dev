@@ -89,13 +89,16 @@ endif(MINGW)
 # WORK IN PROGRESS
 # Works ok if it is a working copy but errors out if not.
 #
-#find_package(Subversion)
-#if(Subversion_FOUND)
-#   Subversion_WC_INFO(${CMAKE_CURRENT_SOURCE_DIR} CODEC2)
-#   message(STATUS "codec2 svn revision: ${CODEC2_WC_REVISION}")
-#else(SUBVERSION_FOUND)
-#   message(WARNING "Subversion not found. Can not determine svn revision.")
-#endif(SUBVERSION_FOUND)
+get_filename_component(_src_dir "${CMAKE_SOURCE_DIR}" NAME)
+if("${_src_dir}" STREQUAL "codec2-dev")
+    find_package(Subversion QUIET)
+    if(Subversion_FOUND)
+        Subversion_WC_INFO(${CMAKE_CURRENT_SOURCE_DIR} CODEC2)
+        message(STATUS "Codec2 svn revision: ${CODEC2_WC_REVISION}")
+    else(Subversion_FOUND)
+        message(WARNING "Subversion not found. Can not determine svn revision.")
+    endif(Subversion_FOUND)
+endif()
 
 
 #
