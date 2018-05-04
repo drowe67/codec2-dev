@@ -1773,7 +1773,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                 }
             } /* for interleave frames ... */
             
-            nout = f->n_speech_samples*interleave_frames;                  
+            nout = f->n_speech_samples;                  
 
             if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
                 *valid = 0;
@@ -1862,13 +1862,15 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 #endif
 
     if (valid == 0) {
+        //fprintf(stderr, "squelch nout: %d\n", nout);
+        
         /* squelch */
         
         for (i = 0; i < nout; i++)
             speech_out[i] = 0;
     }
     else if (valid < 0) {
-        /* we havent gor sync so play audio from radio.  This might
+        /* we havent got sync so play audio from radio.  This might
            not work for all modes due to nin bouncing about */
         for (i = 0; i < nout; i++)
             speech_out[i] = demod_in[i].real;
