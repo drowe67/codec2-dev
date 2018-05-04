@@ -856,7 +856,7 @@ int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], i
     for (i=0;i<max_iter;i++) {
         if (converged == 0)
             iter++;
-        if ((ParityCheckCount[i] == NumberParityBits)) {
+        if (ParityCheckCount[i] == NumberParityBits) {
             for (j=0; j<CodeLength; j++) {
                 out_char[j] = DecodedBits[i+j*max_iter];
             }
