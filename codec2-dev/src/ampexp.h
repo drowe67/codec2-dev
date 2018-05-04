@@ -25,7 +25,7 @@
   along with this program; if not,see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __AMPEX__
+#ifndef __AMPEXP__
 #define __AMPEXP__
 
 #include "defines.h"
