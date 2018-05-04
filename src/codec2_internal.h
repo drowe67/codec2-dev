@@ -82,5 +82,5 @@ struct CODEC2 {
 // test and debug
 void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]);
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model,
-			  COMP Aw[]);
+			  COMP Aw[], float gain);
 #endif

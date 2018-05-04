@@ -57,7 +57,7 @@
 
 void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[]);
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model,
-			  COMP Aw[]);
+			  COMP Aw[], float gain);
 void codec2_encode_3200(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_encode_2400(struct CODEC2 *c2, unsigned char * bits, short speech[]);
@@ -505,7 +505,7 @@ void codec2_decode_3200(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     /* update memories for next frame ----------------------------*/
@@ -648,7 +648,7 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     /* update memories for next frame ----------------------------*/
@@ -832,7 +832,7 @@ void codec2_decode_1600(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     /* update memories for next frame ----------------------------*/
@@ -1002,7 +1002,7 @@ void codec2_decode_1400(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     /* update memories for next frame ----------------------------*/
@@ -1186,7 +1186,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
     /*
     for(i=0; i<4; i++) {
@@ -1373,7 +1373,7 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     /* update memories for next frame ----------------------------*/
@@ -1571,7 +1571,7 @@ void codec2_decode_700(struct CODEC2 *c2, short speech[], const unsigned char * 
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD_LOW, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     #ifdef DUMP
@@ -1775,7 +1775,7 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
 	aks_to_M2(c2->fftr_fwd_cfg, &ak[i][0], LPC_ORD_LOW, &model[i], e[i], &snr, 0, 0,
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw);
+	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
     }
 
     #ifdef DUMP
@@ -1909,7 +1909,8 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
 
 
    for(i=0; i<M; i++) {
-	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0]);
+       /* 700C is a little quiter so lets apply some experimentally derived audio gain */
+       synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], &HH[i][0], 1.5);
    }
 }
 
@@ -2035,7 +2036,7 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 
 \*---------------------------------------------------------------------------*/
 
-void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP Aw[])
+void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP Aw[], float gain)
 {
     int     i;
     PROFILE_VAR(phase_start, pf_start, synth_start);
@@ -2065,6 +2066,10 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
     synthesise(c2->n_samp, c2->fftr_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
+    for(i=0; i<c2->n_samp; i++) {
+        c2->Sn_[i] *= gain;
+    }
+    
     PROFILE_SAMPLE_AND_LOG2(synth_start, "    synth");
 
     ear_protection(c2->Sn_, c2->n_samp);
