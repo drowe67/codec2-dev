@@ -64,6 +64,8 @@ extern "C" {
 #define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
 #endif
 
+#define OFDM_INVERSE_M           (1.0f / (float) OFDM_M)
+
 /* number of symbols we estimate fine timing over */
 #define OFDM_FTWINDOWWIDTH       11
 /* Bits per frame (duh) */
