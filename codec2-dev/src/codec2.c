@@ -330,9 +330,9 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 	codec2_encode_700b(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_700C)
 	codec2_encode_700c(c2, bits, speech);
-#endif
     if (c2->mode == CODEC2_MODE_WB)
 	codec2_encode_wb(c2, bits, speech);
+#endif
 
 }
 
@@ -365,9 +365,9 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
  	codec2_decode_700b(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_700C)
  	codec2_decode_700c(c2, speech, bits);
-#endif
     if (c2->mode == CODEC2_MODE_WB)
  	codec2_decode_wb(c2, speech, bits);
+#endif
 }
 
 
