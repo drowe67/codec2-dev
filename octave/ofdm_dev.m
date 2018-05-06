@@ -273,6 +273,12 @@ function [sim_out rx states] = run_sim(sim_in)
     snrdB = 10*log10(var(rx)/var(noise)) + 10*log10(8000) - 10*log10(3000);
     rx += noise;
 
+    % interfering carrier
+
+    % rx += 0.04*cos((1:length(rx))*states.w(10));
+    
+    % gain
+    
     rx *= sim_in.gain;
     
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
@@ -321,6 +327,7 @@ function [sim_out rx states] = run_sim(sim_in)
       [arx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
      
       rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np]; rx_amp = [rx_amp arx_amp];
+
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
@@ -382,7 +389,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
         % scale based on amplitude ests
 
-        mean_amp = states. mean_amp;
+        mean_amp = states.mean_amp;
         rx_codeword = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, r/mean_amp, min(EsNo,30), fade/mean_amp);
       end
 
@@ -498,7 +505,7 @@ function [sim_out rx states] = run_sim(sim_in)
       end
 
       figure(6)
-      Tx = abs(fft(tx(1:Nsam).*hanning(Nsam)'));
+      Tx = abs(fft(rx(1:Nsam).*hanning(Nsam)'));
       Tx_dB = 20*log10(Tx);
       dF = Fs/Nsam;
       plot((1:Nsam)*dF, Tx_dB);
@@ -547,11 +554,11 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 60;
+  sim_in.Nsec = 10;
 
-  sim_in.EbNodB = 10;
+  sim_in.EbNodB = 40;
   sim_in.verbose = 1;
-  sim_in.hf_en = 1;
+  sim_in.hf_en = 0;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;

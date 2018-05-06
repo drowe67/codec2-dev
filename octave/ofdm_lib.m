@@ -473,7 +473,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
     aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
   end
- 
+  
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
