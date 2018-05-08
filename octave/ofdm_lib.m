@@ -74,7 +74,7 @@ function [t_est timing_valid timing_mx] = est_timing(states, rx, rate_fs_pilot_s
     timing_valid = timing_mx > timing_mx_thresh;
     
     if verbose > 1
-      printf("   mx: %f timing_est: %d timing_valid: %d\n", timing_mx, t_est, timing_valid);
+      printf("  av_level: %f mx: %f timing_est: %d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
 
 endfunction
@@ -108,7 +108,12 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     % averaging metric was found to be really important for reliable acquisition at low SNRs
 
     states.foff_metric = 0.9*states.foff_metric + 0.1*(conj(p1)*p2 + conj(p3)*p4);
-    foff_est = Fs1*angle(states.foff_metric)/(2*pi);    
+    foff_est = Fs1*angle(states.foff_metric)/(2*pi);
+
+    if states.verbose > 1
+        printf("  foff_metric: %f %f foff_est: %f\n", real(states.foff_metric), imag(states.foff_metric), foff_est);
+    end
+ 
 endfunction
 
 
@@ -137,17 +142,34 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nbitsperframe = (Ns-1)*Nc*bps;
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
-  states.Ntxtbits = 4;   % reserve 4 bits/frame for auxillary text information
+  states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
   states.Nuwbits  = (Ns-1)*bps - states.Ntxtbits;
-  states.tx_uw = [1 0 0 1 0 1 0 0 1 0];
-  assert(length(states.tx_uw) == states.Nuwbits);
 
+  % UW symbol placement, designed to get no false syncs and any freq
+  % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
+  % to pair the UW bits so the fit into symbols.  The LDPC decoder
+  % work on symbols so we can't break up any symbols into UW/LDPC
+  % bits.
+  
+  states.uw_ind = states.uw_ind_sym = [];
+  for i=1:states.Nuwbits/2
+    states.uw_ind = [states.uw_ind 1+i*(Nc+1) 2+i*(Nc+1)];
+    states.uw_ind_sym = [states.uw_ind_sym i*(Nc+1)/2+1];
+  end
+  states.tx_uw = [0 0 0 0 0 0 0 0 0 0];       
+  assert(length(states.tx_uw) == states.Nuwbits);
+  tx_uw_syms = [];
+  for b=1:2:states.Nuwbits
+    tx_uw_syms = [tx_uw_syms qpsk_mod(states.tx_uw(b:b+1))];
+  end
+  states.tx_uw_syms = tx_uw_syms;
+  
   % use this to scale tx output to 16 bit short.  Adjusted by experiment
   % to have same RMS power as FDMDV waveform
   
   states.amp_scale = 2E5*1.1491/1.06;
 
-  % this is used to scale input sto LDPC decoder to make it amplitude indep
+  % this is used to scale inputs to LDPC decoder to make it amplitude indep
   
   states.mean_amp = 0;
 
@@ -392,10 +414,11 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
 
-    % keep the freq est statistic updated in case we lose sync, not we supply it with uncorrected rxbuf
+    % keep the freq est statistic updated in case we lose sync, note
+    % we supply it with uncorrected rxbuf
     
-    [unused_foff_est states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
-
+    [coarse_foff_est_hz states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
+    
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
 
@@ -576,7 +599,102 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   states.sample_point = sample_point;
   states.delta_t = delta_t;
   states.foff_est_hz = foff_est_hz;
-  states.coarse_foff_est_hz = coarse_foff_est_hz;
+  states.coarse_foff_est_hz = coarse_foff_est_hz; % just used for tofdm
+endfunction
+
+
+% assemble modem frame from UW, payload, and txt bits
+
+function modem_frame = assemble_modem_frame(states, payload_bits, txt_bits)
+  ofdm_load_const;
+
+  modem_frame = zeros(1,Nbitsperframe);
+  p = 1; u = 1;
+
+  for b=1:Nbitsperframe-Ntxtbits;
+    if (u <= Nuwbits) && (b == uw_ind(u))
+      modem_frame(b) = tx_uw(u++);
+    else
+      modem_frame(b) = payload_bits(p++);
+    end  
+  end
+  t = 1;
+  for b=Nbitsperframe-Ntxtbits+1:Nbitsperframe
+    modem_frame(b) = txt_bits(t++);
+  end
+  assert(u == (Nuwbits+1));
+  assert(p = (length(payload_bits)+1));
+endfunction
+
+
+% assemble modem frame from UW, payload, and txt symbols
+
+function modem_frame = assemble_modem_frame_symbols(states, payload_syms, txt_syms)
+  ofdm_load_const;
+
+  Nsymsperframe = Nbitsperframe/bps;
+  Nuwsyms = Nuwbits/bps;
+  Ntxtsyms = Ntxtbits/bps;
+  modem_frame = zeros(1,Nsymsperframe);
+  p = 1; u = 1;
+
+  for s=1:Nsymsperframe-Ntxtsyms;
+    if (u <= Nuwsyms) && (s == uw_ind_sym(u))
+      modem_frame(s) = states.tx_uw_syms(u++);
+    else
+      modem_frame(s) = payload_syms(p++);
+    end
+  end
+  t = 1;
+  for s=Nsymsperframe-Ntxtsyms+1:Nsymsperframe
+    modem_frame(s) = txt_syms(t++);
+  end
+  assert(u == (Nuwsyms+1));
+  assert(p = (length(payload_syms)+1));
+endfunction
+
+
+% extract UW and txt bits, and payload symbols from a frame of modem symbols
+
+function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, modem_frame_syms, modem_frame_amps)
+  ofdm_load_const;
+
+  Nsymsperframe = Nbitsperframe/bps;
+  Nuwsyms = Nuwbits/bps;
+  Ntxtsyms = Ntxtbits/bps;
+  payload_syms = zeros(1,Nsymsperframe-Nuwsyms-Ntxtsyms);
+  payload_amps = zeros(1,Nsymsperframe-Nuwsyms-Ntxtsyms);
+  rx_uw_syms = zeros(1,Nuwsyms);
+  txt_syms = zeros(1,Ntxtsyms);
+  p = 1; u = 1;
+
+  for s=1:Nsymsperframe-Ntxtsyms;
+    if (u <= Nuwsyms) && (s == uw_ind_sym(u))
+      rx_uw_syms(u++) = modem_frame_syms(s);
+    else
+      payload_syms(p) = modem_frame_syms(s);
+      payload_amps(p++) = modem_frame_amps(s);
+    end
+  end
+  t = 1;
+  for s=Nsymsperframe-Ntxtsyms+1:Nsymsperframe
+    txt_syms(t++) = modem_frame_syms(s);
+  end
+  assert(u == (Nuwsyms+1));
+  assert(p = (Nsymsperframe+1));
+
+  % now demodulate UW and txt bits
+  
+  rx_uw = zeros(1,Nuwbits);
+  txt_bits = zeros(1,Ntxtbits);
+  
+  for s=1:Nuwsyms
+    rx_uw(2*s-1:2*s) = qpsk_demod(rx_uw_syms(s));
+  end
+  for s=1:Ntxtsyms
+    txt_bits(2*s-1:2*s) = qpsk_demod(txt_syms(s));
+  end
+
 endfunction
 
 
@@ -622,7 +740,8 @@ function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame
 
   % insert UW and txt bits
   
-  tx_bits = [tx_uw zeros(1,Ntxtbits) codeword_raw];
+  %tx_bits = [tx_uw zeros(1,Ntxtbits) codeword_raw];
+  tx_bits = assemble_modem_frame(states, codeword_raw, zeros(1,Ntxtbits));
   assert(Nbitsperframe == length(tx_bits));
 
 endfunction

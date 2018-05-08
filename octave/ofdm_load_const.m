@@ -16,6 +16,8 @@ timing_mx_thresh = 0.25;
 Nuwbits = states.Nuwbits;
 Ntxtbits = states.Ntxtbits;
 tx_uw =  states.tx_uw;
+uw_ind = states.uw_ind;
+uw_ind_sym = states.uw_ind_sym;
 
 W = states.W;
 w = states.w;

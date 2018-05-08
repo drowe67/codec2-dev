@@ -43,7 +43,7 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
   
-  states.verbose = 0;
+  states.verbose = 1;
 
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
   
@@ -69,7 +69,7 @@ function ofdm_rx(filename, error_pattern_filename)
     
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      rx_uw = rx_bits(1:states.Nuwbits);
+      [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
       
       errors = xor(tx_bits, rx_bits);
       Nerrs = sum(errors);

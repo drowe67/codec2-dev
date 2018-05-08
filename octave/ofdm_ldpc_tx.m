@@ -83,18 +83,19 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
   
   % generate UW and txt symbols to prepend to every frame after LDPC encoding and interleaving
  
-  tx_uw_tx_bits = [tx_uw zeros(1,Ntxtbits)];
-  tx_uw_tx_symbols = [];
-  for b=1:2:length(tx_uw_tx_bits)
-    tx_uw_tx_symbols = [tx_uw_tx_symbols qpsk_mod(tx_uw_tx_bits(b:b+1))];
+  txt_bits = zeros(1,Ntxtbits);
+  txt_symbols = [];
+  for b=1:2:length(txt_bits)
+    txt_symbols = [txt_symbols qpsk_mod(txt_bits(b:b+1))];
   end
   
   atx = [];
   for f=1:interleave_frames
     st = (f-1)*code_param.code_bits_per_frame/bps+1; en = st + code_param.code_bits_per_frame/bps-1;
-    atx = [atx ofdm_txframe( states, [tx_uw_tx_symbols tx_symbols(st:en)] ) ];
+    modem_frame = assemble_modem_frame_symbols(states, tx_symbols(st:en), txt_symbols);
+    atx = [atx ofdm_txframe(states, modem_frame) ];
   end
- 
+  
   tx = [];
   for f=1:Nframes/interleave_frames
     tx = [tx atx];

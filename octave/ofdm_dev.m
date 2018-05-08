@@ -112,14 +112,15 @@ function [sim_out rx states] = run_sim(sim_in)
     HRA = sim_in.ldpc_code;
     [aNr aNc] = size(HRA);
     rate = states.rate = (aNc-aNr)/aNc;
-    assert(aNc == Nbitsperframe, "Dude: Num cols of LDPC HRA must == Nbitsperframe");
+    Ndatabitsperframe = Nbitsperframe;
+    assert(aNc == Ndatabitsperframe, "Dude: Num cols of LDPC HRA must == Nbitsperframe");
     [H_rows, H_cols] = Mat2Hrows(HRA); 
     code_param.H_rows = H_rows; 
     code_param.H_cols = H_cols;
     code_param.P_matrix = [];
     code_param.data_bits_per_frame = length(code_param.H_cols) - length( code_param.P_matrix ); 
     code_param.code_bits_per_frame = aNc;
-    assert(aNr == Nbitsperframe*rate);
+    assert(aNr == Ndatabitsperframe*rate);
 
     modulation = states.ldpc_modulation = 'QPSK';
     mapping = states.ldpc_mapping = 'gray';
@@ -200,6 +201,9 @@ function [sim_out rx states] = run_sim(sim_in)
       else
         % uncoded mode
         codeword = tx_data_bits(st:en);
+        if isfield(sim_in, "uw_debug")
+          codeword(states.uw_ind) = states.tx_uw;
+        end
       end
       tx_bits = [tx_bits codeword];
       for b=1:2:Nbitsperframe
@@ -294,7 +298,8 @@ function [sim_out rx states] = run_sim(sim_in)
     Nerrs_log = []; Nerrs_coded_log = [];
     rx_bits = []; rx_np = []; rx_amp = [];
     sig_var_log = []; noise_var_log = [];
-
+    uw_errors_log = [];
+    
     % reset some states for each EbNo simulation point
 
     states.sample_point = states.timing_est = 1;
@@ -328,6 +333,17 @@ function [sim_out rx states] = run_sim(sim_in)
      
       rx_bits = [rx_bits arx_bits]; rx_np = [rx_np arx_np]; rx_amp = [rx_amp arx_amp];
 
+      % note: only supported in ldpc_en = 0 Nc=17 atm, see debug_false_sync()
+      
+      if isfield(sim_in, "uw_debug") 
+        rx_uw = arx_bits(states.uw_ind);
+        uw_errors = sum(xor(states.tx_uw,rx_uw));
+        if verbose
+          printf("f: %d uw_errors: %d\n", f, uw_errors);
+        end
+        uw_errors_log = [uw_errors_log uw_errors];
+      end
+      
       timing_est_log = [timing_est_log states.timing_est];
       delta_t_log = [delta_t_log states.delta_t];
       foff_est_hz_log = [foff_est_hz_log states.foff_est_hz];
@@ -463,6 +479,8 @@ function [sim_out rx states] = run_sim(sim_in)
         sim_out.per(nn) = Tpacketerrs/Tpackets; 
       end
     end
+
+    sim_out.uw_errors_log = uw_errors_log;
     
     % Optional plots, mostly used with run-single
 
@@ -573,7 +591,6 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.ldpc_en = 1;
 
   sim_in.interleave_frames = 1;
-
   %sim_in.diversity_en = 1;
 
   sim_out = run_sim(sim_in);
@@ -1199,6 +1216,51 @@ function sync_metrics(x_axis = 'EbNo')
 endfunction
 
 
+% during development it was discovered demod could obtain a flase sync with no UW
+% errors at +/- 7Hz, approx the frame rate.  This function is used to explore that
+
+function debug_false_sync(EbNodB = 100)
+  Ts = 0.018; 
+  sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 17; sim_in.Ns = 8;
+
+  sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
+  sim_in.Nsec = 1;
+
+  sim_in.EbNodB = 40;
+  sim_in.verbose = 0;
+  sim_in.hf_en = 0;
+  sim_in.foff_hz = 0;
+  sim_in.dfoff_hz_per_sec = 0.00;
+  sim_in.sample_clock_offset_ppm = 0;
+  sim_in.gain = 1;
+  
+  sim_in.timing_en = 0;
+  sim_in.foff_est_en = 0;
+  sim_in.phase_est_en = 1;
+
+  load HRA_112_112.txt
+  sim_in.ldpc_code = HRA_112_112;
+  sim_in.ldpc_en = 0;
+
+  %sim_in.interleave_frames = 1;
+  %sim_in.diversity_en = 1;
+
+  sim_in.uw_debug = 1;
+
+  foff = -25:0.5:25;
+  for f=1:length(foff)
+    sim_in.foff_hz = foff(f);
+    sim_out = run_sim(sim_in);
+    min_uw_errors(f) = min(sim_out.uw_errors_log(2:end-1));
+    printf("f: %4.2f %2d\n", foff(f), min_uw_errors(f));
+  end
+  figure(1); clf;
+  plot(foff, min_uw_errors);
+  title('UW errors versus freq offset');
+  xlabel('Freq Offset (Hz)');
+end
+
 
 % ---------------------------------------------------------
 % choose simulation to run here 
@@ -1214,7 +1276,9 @@ init_cml('~/cml/');
 %run_curves_estimators
 %acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %acquisition_test(Ntests=100, EbNodB=-1, foff_hz=-10, hf_en=0)
-sync_metrics('freq')
+%sync_metrics('freq')
 %run_curves_snr
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
 %acquistion_curves
+
+debug_false_sync
