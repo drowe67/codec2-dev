@@ -51,7 +51,6 @@ const struct OFDM_CONFIG  * OFDM_CONFIG_700D = &OFDM_CONFIG_700D_C;
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
-static int coarse_sync(struct OFDM *, complex float *, int, float *);
 
 /* Defines */
 
@@ -169,6 +168,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_mx = 0.0f;
     ofdm->nin = OFDM_SAMPLESPERFRAME;
     ofdm->mean_amp = 0.0f;
+    ofdm->foff_metric = 0.0f + 0.0f * I;
     
     /* sync state machine */
 
@@ -196,13 +196,15 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     idft(ofdm, temp, ofdm->pilots);
 
     /*
-     * pilot_samples is 160 samples, as we copy the last 16 to the front
+     * pilot_samples is 160 samples, but timing and freq offset est
+     * were found by experiment to work better without a cyclic
+     * prefix, so we uses zeroes instead.
      */
 
-    /* first copy the last Cyclic Prefix (CP) values */
+    /* zero out Cyclic Prefix (CP) values */
 
     for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
-        ofdm->pilot_samples[i] = temp[j];
+        ofdm->pilot_samples[i] = 0.0f + 0.0f * I;;
     }
         
     // From Octave: states.timing_norm = Npsam*(rate_fs_pilot_samples*rate_fs_pilot_samples');
@@ -218,8 +220,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     float acc = 0.0f;
 
     for (i = 0; i < (OFDM_M + OFDM_NCP); i++) {
-        acc += (crealf(ofdm->pilot_samples[i]) * crealf(ofdm->pilot_samples[i]) +
-            cimagf(ofdm->pilot_samples[i]) * cimagf(ofdm->pilot_samples[i]));
+        acc += crealf(ofdm->pilot_samples[i]) * crealf(ofdm->pilot_samples[i]) +
+               cimagf(ofdm->pilot_samples[i]) * cimagf(ofdm->pilot_samples[i]);
     }
 
     ofdm->timing_norm = (OFDM_M + OFDM_NCP) * acc;
@@ -298,19 +300,17 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * samples to determine the most likely timing offset.  Combines two
  * frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
  *
- * Also estimates coarse frequency offset based on sampling the pilots
- * phase at half symbol intervales.
- * 
+ * Can be used for acquisition (coarse timing), and fine timing.
+ *
  * Unlike Octave version use states to return a few values.
  */
 
-static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *foff_est) {
-    complex float csam, csam1, csam2;
+static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
+    complex float csam;
     int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
-    int Fs = OFDM_FS;
     int SFrame = OFDM_SAMPLESPERFRAME;
     float corr[Ncorr];
-    int i, j, k;
+    int i, j;
 
     float acc = 0.0f;
 
@@ -349,11 +349,36 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
     ofdm->timing_valid = timing_mx > OFDM_TIMING_MX_THRESH;
 
     if (ofdm->verbose > 1) {
-        fprintf(stderr, "   max: %f timing_est: %d timing_valid: %d\n", ofdm->timing_mx, timing_est, ofdm->timing_valid);
+        fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", av_level, ofdm->timing_mx, timing_est, ofdm->timing_valid);
     }
     
-    /* Coarse frequency estimation - note this isn't always used, some CPU could be saved
-       buy putting this in another function */
+    return timing_est;
+}
+
+
+/*
+ * Determines frequency offset at current timing estimate, used for
+ * coarse freq offset estimation during acquisition.
+ *
+ * Freq offset is based on an averaged statistic that was found to be
+ * necessary to generate good quality estimates.
+ *
+ * Keep calling it when in trial or actual sync to keep statistic
+ * updated, in case we lose sync.
+ */
+
+ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int length, int timing_est) {
+    complex float csam1, csam2;
+    int Fs = OFDM_FS;
+    int SFrame = OFDM_SAMPLESPERFRAME;
+    int j, k;
+    float foff_est;
+    
+    /*
+      Freq offset can be considered as change in phase over two halves
+      of pilot symbols.  We average this statistic over this and next
+      frames pilots.
+    */
 
     complex float p1, p2, p3, p4;
     p1 = p2 = p3 = p4 =  0.0f + 0.0f * I;
@@ -385,10 +410,16 @@ static int coarse_sync(struct OFDM *ofdm, complex float *rx, int length, float *
        improve estimate.  Small real 1E-12 term to prevent instability
        with 0 inputs. */
 
-    *foff_est = Fs1 * cargf(conjf(p1) * p2 + conjf(p3) * p4 + 1E-12f) / TAU;
+    ofdm->foff_metric = 0.9*ofdm->foff_metric + 0.1*(conjf(p1) * p2 + conjf(p3) * p4);
+    foff_est = Fs1 * cargf( ofdm->foff_metric + 1E-12f) / TAU;
 
-    return timing_est;
+    if (ofdm->verbose > 1) {
+        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", crealf(ofdm->foff_metric), cimagf(ofdm->foff_metric), foff_est);
+    }
+    
+    return foff_est;
 }
+
 
 /*
  * ----------------------------------------------
@@ -562,8 +593,9 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
 
     int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
     int en = st + 2*OFDM_SAMPLESPERFRAME; 
-    int ct_est = coarse_sync(ofdm,  &ofdm->rxbuf[st], (en - st), &ofdm->coarse_foff_est_hz);
-
+    int ct_est = est_timing(ofdm,  &ofdm->rxbuf[st], (en - st));
+    ofdm->coarse_foff_est_hz = est_freq_offset(ofdm,  &ofdm->rxbuf[st], (en - st), ct_est);
+   
     if (ofdm->verbose) {
         fprintf(stderr, "   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %f\n",
                 ct_est, ofdm->coarse_foff_est_hz, ofdm->timing_valid, ofdm->timing_mx);
@@ -641,9 +673,16 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
         /* note coarse sync just used for timing est, we dont use coarse_foff_est in this call */
         
-        ft_est = coarse_sync(ofdm, work, (en - st), &ofdm->coarse_foff_est_hz);
+        ft_est = est_timing(ofdm, work, (en - st));
         ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
 
+        /* keep the freq est statistic updated in case we lose sync,
+           note we supply it with uncorrected rxbuf, note
+           ofdm->coarse_fest_off_hz is unused in normal operation,
+           but stored for use in tofdm.c */
+    
+        ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], (en-st), ft_est);
+        
         if (ofdm->verbose > 1) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
@@ -1020,34 +1059,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
     char next_state[OFDM_STATE_STR];
-    int  i, j;
+    int  i;
     
     strcpy(next_state, ofdm->sync_state);    
     ofdm->sync_start = ofdm->sync_end = 0;
   
     if (strcmp(ofdm->sync_state,"search") == 0) { 
         if (ofdm->timing_valid) {
-
-            /* freq offset est has some bias, but this refinement step fixes bias */
-
-            int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
-            int en = st + 2 * OFDM_SAMPLESPERFRAME; 
-            float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
-
-            complex float work[(en - st)];
-
-            for (i = st, j = 0; i < en; i++, j++) {
-                work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
-            }
-
-            float foff_est;
-            coarse_sync(ofdm, work, (en - st), &foff_est);
-
-            if (ofdm->verbose) {
-                fprintf(stderr, "  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", ofdm->foff_est_hz, foff_est, ofdm->foff_est_hz+foff_est);
-            }
-
-            ofdm->foff_est_hz += foff_est;
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = 1;
@@ -1100,7 +1118,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
                 ofdm->sync_counter = 0;
             }
                 
-            if ((ofdm->sync_mode == OFDM_SYNC_AUTO) && (ofdm->sync_counter == 6)) {
+            if ((ofdm->sync_mode == OFDM_SYNC_AUTO) && (ofdm->sync_counter == 12)) {
                 /* run of consective bad frames ... drop sync */
                 strcpy(next_state, "search");
                 strcpy(ofdm->sync_state_interleaver, "search");

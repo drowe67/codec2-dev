@@ -125,7 +125,8 @@ struct freedv {
     float                snr_squelch_thresh;
     int                  squelch_en;
     int                  nin;
-
+    int                  verbose;
+    
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     
     struct VARICODE_DEC  varicode_dec_states;

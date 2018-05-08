@@ -128,7 +128,7 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
         //    fprintf(stderr,"%d ", out_char[i]);
         //fprintf(stderr,"\n");
         //fprintf(stderr, "     iter: %d pcc: %d Nerrs: %d\n", iter[0], parityCheckCount[0], Nerrs_coded[0]);
-        if ((Nerrs_coded[0] == 0) && (iter[0] <= 5)) {
+        if ((Nerrs_coded[0] < 10) || (interleave_frames == 1)) {
             /* sucessful decode! */
             strcpy(next_sync_state_interleaver, "synced");
             ofdm->frame_count_interleaver = interleave_frames;

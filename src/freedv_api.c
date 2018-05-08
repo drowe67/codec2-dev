@@ -108,6 +108,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         return NULL;
 
     f->mode = mode;
+    f->verbose = 0;
     f->test_frames = f->smooth_symbols = 0;
     f->freedv_put_error_pattern = NULL;
     f->error_pattern_callback_state = NULL;
@@ -1810,12 +1811,12 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    /*
-    fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                    0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
-                    ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
-            Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
-    */
+    if (f->verbose) {
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+                0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
+                ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
+    }
     
     /* no valid FreeDV signal - squelch output */
     
@@ -2111,6 +2112,13 @@ void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_
 void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_bits_coded = val;}
 void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
+
+void freedv_set_verbose(struct freedv *f, int verbosity) {
+    f->verbose = verbosity;
+    if (f->mode == FREEDV_MODE_700D) {
+        ofdm_set_verbose(f->ofdm, f->verbose);
+    }
+}
 
 // Set floats
 void freedv_set_snr_squelch_thresh        (struct freedv *f, float val) {f->snr_squelch_thresh = val;}
