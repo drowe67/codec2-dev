@@ -167,7 +167,10 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
         [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
         Nerrs = code_param.data_bits_per_frame - max(parity_checks);
         %printf("Nerrs: %d\n", Nerrs);
-        if Nerrs < 10
+
+        % note we just go straight into sync if interleave_frames == 1
+        
+        if (Nerrs < 10) || (interleave_frames == 1)
           % sucessful(ish) decode!
           next_sync_state_interleaver = 'synced';
           states.frame_count_interleaver = interleave_frames;
