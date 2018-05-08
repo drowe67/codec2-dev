@@ -41,14 +41,16 @@ function out = freq_shift(in, foff, Fs)
   end
 endfunction
 
-% Correlates the OFDM pilot symbol samples with a window of received
-% samples to determine the most likely timing offset.  Combines two
-% frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
-% Also determines frequency offset at maximimum correlation.  Can be
-% used for acquisition (coarse timing and freq offset), and fine
-% timing
 
-function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_fs_pilot_samples)
+#{
+  Correlates the OFDM pilot symbol samples with a window of received
+  samples to determine the most likely timing offset.  Combines two
+  frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
+
+  Can be used for acquisition (coarse timing), and fine timing.
+#}
+
+function [t_est timing_valid timing_mx] = est_timing(states, rx, rate_fs_pilot_samples)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -71,43 +73,42 @@ function [t_est foff_est timing_valid timing_mx] = coarse_sync(states, rx, rate_
     [timing_mx t_est] = max(corr);
     timing_valid = timing_mx > timing_mx_thresh;
     
-    if verbose > 2
+    if verbose > 1
       printf("   mx: %f timing_est: %d timing_valid: %d\n", timing_mx, t_est, timing_valid);
     end
-        
+
+endfunction
+
+#{
+  Determines frequency offset at current timing estimate, used for
+  coarse freq offset estimation during acquisition.
+
+  Freq offset is based on an averaged statistic that was found to be
+  necessary to generate good quality estimates.
+
+  Keep calling it when in trial or actual sync to keep statistic
+  updated, in case we lose sync.
+#}
+
+function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, t_est)
+    ofdm_load_const;
+    Npsam = length(rate_fs_pilot_samples);
+
+    % Freq offset can be considered as change in phase over two halves
+    % of pilot symbols.  We average this statistic over this and next
+    % frames pilots.
+
     p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
     p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
     p4 = rx(t_est+Nsamperframe+Npsam/2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
    
     Fs1 = Fs/(Npsam/2);
-    foff_est = Fs1*angle(conj(p1)*p2 + conj(p3)*p4)/(2*pi);
-        
-    if verbose > 1
-      figure(7); clf;
-      plot(abs(corr))
 
-      figure(8)
-      subplot(211)
-      plot(real(rate_fs_pilot_samples))
-      hold on; plot(real(rx(t_est:t_est+Npsam-1)),'g'); hold off
-      subplot(212)
-      plot(imag(rate_fs_pilot_samples))
-      hold on; plot(imag(rx(t_est:t_est+Npsam-1)),'g'); hold off
+    % averaging metric was found to be really important for reliable acquisition at low SNRs
 
-      figure(9)
-      dp = rx(t_est:t_est+Npsam-1) .* conj(rate_fs_pilot_samples);
-      subplot(211); plot(real(dp));
-      subplot(212); plot(imag(dp));
-
-      figure(10)
-      plot(dp,'+')
-      
-      figure(11)
-      plot([p1 p2; p3 p4], '+')
-      
-    end
-
+    states.foff_metric = 0.9*states.foff_metric + 0.1*(conj(p1)*p2 + conj(p3)*p4);
+    foff_est = Fs1*angle(states.foff_metric)/(2*pi);    
 endfunction
 
 
@@ -192,13 +193,20 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.timing_valid = 0;
   states.timing_mx = 0;
   states.coarse_foff_est_hz = 0;
+
+  states.foff_metric = 0;
   
   % generate OFDM pilot symbol, used for timing and freq offset est
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
-  states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
 
-  % pre-compute a constant used in coarse_sync()
+  % During tuning it was found that not inclduing the cyc prefix in
+  % rate_fs_pilot_samples produced better fest results
+  
+  %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];
+  states.rate_fs_pilot_samples = [zeros(1,states.Ncp) rate_fs_pilot_samples];
+
+  % pre-compute a constant used to detect valid modem frames
 
   Npsam = length(states.rate_fs_pilot_samples);
   states.timing_norm = Npsam*(states.rate_fs_pilot_samples * states.rate_fs_pilot_samples');
@@ -314,7 +322,8 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   % Attempt coarse timing estimate (i.e. detect start of frame)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-  [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+  [ct_est timing_valid timing_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+  [foff_est states] = est_freq_offset(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
   if verbose
     printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
@@ -381,7 +390,11 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est coarse_foff_est_hz timing_valid timing_mx] = coarse_sync(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+    [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+
+    % keep the freq est statistic updated in case we lose sync, not we supply it with uncorrected rxbuf
+    
+    [unused_foff_est states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
 
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -660,16 +673,6 @@ function states = sync_state_machine(states, rx_uw)
   if strcmp(states.sync_state,'search') 
 
     if states.timing_valid
-
-      % freq offset est has some bias, but this refinement step fixes bias
-
-      st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
-      woff_est = 2*pi*states.foff_est_hz/Fs;
-      [ct_est foff_est timing_valid timing_mx] = coarse_sync(states, states.rxbuf(st:en) .* exp(-j*woff_est*(st:en)), states.rate_fs_pilot_samples);
-      if verbose
-        printf("  coarse_foff: %4.1f refine: %4.1f combined: %4.1f\n", states.foff_est_hz, foff_est, states.foff_est_hz+foff_est);
-      end
-      states.foff_est_hz += foff_est;
       states.frame_count = 0;
       states.sync_counter = 0;
       states.sync_start = 1;
@@ -705,7 +708,7 @@ function states = sync_state_machine(states, rx_uw)
         states.sync_counter = 0;
       end
 
-      if states.sync_counter == 6
+      if states.sync_counter == 12
         next_state = "search";
         states.sync_state_interleaver = "search";
       end
