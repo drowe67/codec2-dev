@@ -181,6 +181,7 @@ int main(int argc, char *argv[])
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
     int    rx_uw[OFDM_NUWBITS];
+    int    txt_bits[OFDM_NTXTBITS];
     f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
     float EsNo = 3;
@@ -188,6 +189,8 @@ int main(int argc, char *argv[])
 
     float snr_est_smoothed_dB = 0.0;
 
+    COMP  payload_syms[coded_syms_per_frame];
+    float payload_amps[coded_syms_per_frame];
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
     for (i=0; i<interleave_frames*coded_syms_per_frame; i++) {
@@ -212,6 +215,7 @@ int main(int argc, char *argv[])
         
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
+            ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             
             if (llr_en) {
                 
@@ -229,13 +233,11 @@ int main(int argc, char *argv[])
                     codeword_amps[i] = codeword_amps[j];
                 }
 
-                /* newest symbols at end of buffer (uses final i from last loop), note we 
-                   change COMP formats from what modem uses internally */
+                /* newest symbols at end of buffer (uses final i from last loop) */
                 
-                for(i=(interleave_frames-1)*coded_syms_per_frame,j=(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i<interleave_frames*coded_syms_per_frame; i++,j++) {
-                    codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
-                    codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
-                    codeword_amps[i] = ofdm->rx_amp[j];
+                for(i=(interleave_frames-1)*coded_syms_per_frame,j=0; i<interleave_frames*coded_syms_per_frame; i++,j++) {
+                    codeword_symbols[i] = payload_syms[j];
+                    codeword_amps[i]    = payload_amps[j];
                 }
                
                 /* run de-interleaver */
@@ -293,12 +295,6 @@ int main(int argc, char *argv[])
                     rx_bits_char[i] = rx_bits[i];
                 }
                 fwrite(rx_bits_char, sizeof(char), Nbitsperframe, fout);
-            }
-
-            /* extract Unique Word bits */
-
-            for(i=0; i<OFDM_NUWBITS; i++) {
-                rx_uw[i] = rx_bits[i];
             }
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
