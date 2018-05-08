@@ -78,7 +78,7 @@ extern "C" {
 #define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
 #define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
-#define OFDM_TIMING_MX_THRESH    0.3
+#define OFDM_TIMING_MX_THRESH    0.25
 
 /* reserve 4 bits/frame for auxillary text information */
 
@@ -128,6 +128,7 @@ struct OFDM {
     float sig_var;
     float noise_var;
     float mean_amp;
+    complex float foff_metric;
     
     /* modem sync state machine */
 

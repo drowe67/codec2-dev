@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr, "\n");
 	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--lpdc] [--interleaver depth]\n\n", argv[0]);
-        fprintf(stderr, "  --testframe Nsecs   Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+        fprintf(stderr, "  --testframes Nsecs  Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
         fprintf(stderr, "  --ldpc              Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
                         "                      per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
                                                coded_bits_per_frame, data_bits_per_frame);
@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
    
     testframes = 0;
     int Nframes = 0;
-    if ((arg = (opt_exists(argv, argc, "-t")))) {
+    if ((arg = (opt_exists(argv, argc, "--testframes")))) {
         testframes = 1;
         int Nsec, Nrows;
         Nsec = atoi(argv[arg+1]);

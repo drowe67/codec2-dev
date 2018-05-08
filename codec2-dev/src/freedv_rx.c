@@ -93,14 +93,14 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_codecrx, use_testframes, interleave_frames;
+    int                        use_codecrx, use_testframes, interleave_frames, verbose;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
 
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx]\n", argv[0]);
+               " [--testframes] [--interleaver depth] [--codecrx] [-v]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
 	exit(1);
     }
@@ -138,7 +138,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_codecrx = 0; use_testframes = 0; interleave_frames = 1;
+    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0;
 
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -164,6 +164,9 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--interleave") == 0) {
                 interleave_frames = atoi(argv[i+1]);
             }
+            if (strcmp(argv[i], "-v") == 0) {
+                verbose = 1;
+            }
         }
     }
 
@@ -178,6 +181,7 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     freedv_set_test_frames(freedv, use_testframes);
+    freedv_set_verbose(freedv, verbose);
 
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 0);

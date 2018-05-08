@@ -169,6 +169,9 @@ int main(int argc, char *argv[])
     if ((arg = opt_exists(argv, argc, "-v")) != 0) {
         ofdm_set_verbose(ofdm, 1);
     }
+    if ((arg = opt_exists(argv, argc, "-vv")) != 0) {
+        ofdm_set_verbose(ofdm, 2);
+    }
 
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
@@ -206,7 +209,7 @@ int main(int argc, char *argv[])
         if (strcmp(ofdm->sync_state,"search") == 0) {
             ofdm_sync_search(ofdm, rxbuf_in);
         }
-    
+        
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
             
