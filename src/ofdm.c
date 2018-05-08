@@ -1259,7 +1259,7 @@ void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
                                   int            rx_uw[],
                                   COMP           codeword_syms[],
                                   float          codeword_amps[],
-                                  int            txt_bits[])
+                                  short          txt_bits[])
 {
   int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
   int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;

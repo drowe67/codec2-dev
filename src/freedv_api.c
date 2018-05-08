@@ -1653,7 +1653,10 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     float *codeword_amps = f->codeword_amps;
     int    Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     int    rx_bits[Nbitsperframe];
-
+    short txt_bits[OFDM_NTXTBITS];
+    COMP  payload_syms[coded_syms_per_frame];
+    float payload_amps[coded_syms_per_frame];
+   
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     frames = f->n_codec_bits / bits_per_codec_frame;
@@ -1690,6 +1693,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
+        ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
@@ -1708,11 +1713,10 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         /* newest symbols at end of buffer (uses final i from last loop), note we 
            change COMP formats from what modem uses internally */
                 
-        for(i=(interleave_frames-1)*coded_syms_per_frame,j=(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i<interleave_frames*coded_syms_per_frame; i++,j++) {
-            codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
-            codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
-            codeword_amps[i] = ofdm->rx_amp[j];
-        }
+        for(i=(interleave_frames-1)*coded_syms_per_frame,j=0; i<interleave_frames*coded_syms_per_frame; i++,j++) {
+            codeword_symbols[i] = payload_syms[j];
+            codeword_amps[i]    = payload_amps[j];
+         }
                
         /* run de-interleaver */
                 
@@ -1782,23 +1786,14 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
 
         } /* if interleaver synced ..... */
 
-        /* If modem is synced we can demodulate txt bits, these are
-           uninterleaved, uncoded QPSK symbols near the start of each
-           modem frame */
+        /* If modem is synced we can decode txt bits */
         
-        for(k=0, i=OFDM_NUWBITS; k<OFDM_NTXTBITS; k++,i++)  { 
+        for(k=0; k<OFDM_NTXTBITS; k++)  { 
             //fprintf(stderr, "txt_bits[%d] = %d\n", k, rx_bits[i]);
-            short arx_bit = rx_bits[i];
-            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &arx_bit, 1, 1);
+            n_ascii = varicode_decode(&f->varicode_dec_states, &ascii_out, &txt_bits[k], 1, 1);
             if (n_ascii && (f->freedv_put_next_rx_char != NULL)) {
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }
-        }
-
-        /* extract Unique Word bits */
-        
-        for(i=0; i<OFDM_NUWBITS; i++) {
-            rx_uw[i] = rx_bits[i];
         }
 
     } /* if modem synced .... */ else {
