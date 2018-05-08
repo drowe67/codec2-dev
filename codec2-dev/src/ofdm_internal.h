@@ -34,6 +34,7 @@ extern "C" {
 
 #include <complex.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #include "codec2_ofdm.h"
 
@@ -155,7 +156,12 @@ struct OFDM {
 complex float qpsk_mod(int *);
 void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float tx_samples[OFDM_SAMPLESPERFRAME], complex float tx_symbols_lin[]);
-
+void ofdm_assemble_modem_frame(complex float modem_frame[], COMP payload_syms[], uint8_t txt_bits[]);
+void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
+                                  int            rx_uw[],
+                                  COMP           codeword_syms[],
+                                  float          codeword_amps[],
+                                  int            txt_bits[]);
 #ifdef __cplusplus
 }
 #endif

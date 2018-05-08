@@ -188,45 +188,7 @@ int count_errors(int tx_bits[], char rx_bits[], int n) {
 }
 
 
-/* 
-   Given an array of tx_bits, LDPC encodes, interleaves, and OFDM
-   modulates.
-
-   Note this could be refactored to save memory, e.g. for embedded
-   applications we could call ofdm_txframe on a frame by frame
-   basis 
-*/
-
-void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], int interleave_frames)
-{
-    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
-    int coded_bits_per_frame = ldpc->coded_bits_per_frame;
-    int data_bits_per_frame = ldpc->data_bits_per_frame;
-
-    int codeword[coded_bits_per_frame];
-    COMP coded_symbols[interleave_frames*coded_syms_per_frame];
-    COMP coded_symbols_inter[interleave_frames*coded_syms_per_frame];
-    int Nsamperframe = ofdm_get_samples_per_frame();
-    complex float tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS + coded_syms_per_frame];
- 
-    int i,j;
-    
-    for (j=0; j<interleave_frames; j++) {
-        ldpc_encode_frame(ldpc, codeword, &tx_bits[j*data_bits_per_frame]);
-        qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
-    }
-    gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
-    for (j=0; j<interleave_frames; j++) {            
-        /* todo: we don't need to build modulated UW every time, just txt bits */
-        build_modulated_uw(ofdm, tx_symbols, &txt_bits[OFDM_NTXTBITS*j]);
-        for(i=0; i<coded_syms_per_frame; i++) {
-            tx_symbols[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS+i] = coded_symbols_inter[j*coded_syms_per_frame+i].real
-                + I * coded_symbols_inter[j*coded_syms_per_frame+i].imag;
-        }
-        ofdm_txframe(ofdm, &tx_sams[j*Nsamperframe], tx_symbols);
-    }
-}
-
+#ifdef NOT_USED
 /* UW never changes so we can pre-load tx_symbols with modulated UW */
 
 void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t txt_bits[])
@@ -248,3 +210,39 @@ void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t t
         tx_symbols[i] = uw_txt_syms[i].real + I * uw_txt_syms[i].imag;
     }
 }
+#endif
+
+/* 
+   Given an array of tx_bits, LDPC encodes, interleaves, and OFDM
+   modulates.
+
+   Note this could be refactored to save memory, e.g. for embedded
+   applications we could call ofdm_txframe on a frame by frame
+   basis 
+*/
+
+void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], int interleave_frames)
+{
+    int coded_syms_per_frame = ldpc->coded_syms_per_frame;
+    int coded_bits_per_frame = ldpc->coded_bits_per_frame;
+    int data_bits_per_frame = ldpc->data_bits_per_frame;
+
+    int codeword[coded_bits_per_frame];
+    COMP coded_symbols[interleave_frames*coded_syms_per_frame];
+    COMP coded_symbols_inter[interleave_frames*coded_syms_per_frame];
+    int Nsamperframe = ofdm_get_samples_per_frame();
+    complex float tx_symbols[OFDM_BITSPERFRAME/OFDM_BPS];
+    int j;
+    
+    for (j=0; j<interleave_frames; j++) {
+        ldpc_encode_frame(ldpc, codeword, &tx_bits[j*data_bits_per_frame]);
+        qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
+    }
+    gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
+    for (j=0; j<interleave_frames; j++) {            
+        ofdm_assemble_modem_frame(tx_symbols, &coded_symbols_inter[j*coded_syms_per_frame], &txt_bits[OFDM_NTXTBITS*j]);
+        ofdm_txframe(ofdm, &tx_sams[j*Nsamperframe], tx_symbols);
+    }
+}
+
+

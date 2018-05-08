@@ -79,10 +79,17 @@ static const char pilotvalues[] = {
 };
 
 /*
- * Unique word used to verify we have modem frame sync
+ * A Unique Word (UW) used to verify we have modem frame sync when we
+ * try a candidate coarse timing and freq offset.  The UW bits/symbols
+ * are distributed through the modem frame using the index (ind)
+ * tables below.  The indexes in uw_nd_sym [] and uw_ind are Octave
+ * start from 1 format, subtract 1 to index C arrays.
  */
 
-static const int tx_uw[] = {1,0,0,1,0,1,0,0,1,0};
+static const int tx_uw[]          = {0,0,0,0,0,0,0,0,0,0};            /* UW bits    */
+static complex float tx_uw_syms[] = {1.0f,1.0f,1.0f,1.0f,1.0f};       /* UW QPSK symbols */
+static const int uw_ind[]         = {19,20,37,38,55,56,73,74,91,92};  /* index in modem frame of UW bits */
+static const int uw_ind_sym[]     = {10,19,28,37,46};                 /* index into modem frame of UW symbols */
 
 /* Functions -------------------------------------------------------------------*/
 
@@ -1211,5 +1218,79 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
             //fprintf(stderr, "%f %f\n", stats->rx_symbols[r][c].real, stats->rx_symbols[r][c].imag);
         }
     }
+}
+
+
+/* Assemble modem frame from UW, payload symbols, and txt bits */
+
+void ofdm_assemble_modem_frame(complex float modem_frame[],
+                               COMP    payload_syms[],
+                               uint8_t txt_bits[])
+{
+  int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
+  int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;
+  int Ntxtsyms = OFDM_NTXTBITS/OFDM_BPS;
+
+  int s,p=0,u=0;
+
+  for (s=0; s<Nsymsperframe-Ntxtsyms; s++) {
+      if ((u < Nuwsyms) && (s == (uw_ind_sym[u]-1))) {
+          modem_frame[s] = tx_uw_syms[u++];
+      } else {
+          modem_frame[s] = payload_syms[p].real + payload_syms[p].imag * I;
+          p++;
+      }
+  }
+  assert(u == Nuwsyms);
+  assert(p == (Nsymsperframe-Nuwsyms-Ntxtsyms));
+
+  int t; int dibit[2];
+
+  for (t=0; s<Nsymsperframe; s++,t+=OFDM_BPS) {
+      dibit[0] = txt_bits[t+1] & 0x1;
+      dibit[1] = txt_bits[t] & 0x1;
+      modem_frame[s] = qpsk_mod(dibit);
+  }
+  assert(t == OFDM_NTXTBITS);
+}
+
+
+void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
+                                  int            rx_uw[],
+                                  COMP           codeword_syms[],
+                                  float          codeword_amps[],
+                                  int            txt_bits[])
+{
+  int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
+  int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;
+  int Ntxtsyms = OFDM_NTXTBITS/OFDM_BPS;
+  int dibit[2];
+  
+  int s,p=0,u=0;
+
+  for (s=0; s<Nsymsperframe-Ntxtsyms; s++) {
+      if ((u < Nuwsyms) && (s == (uw_ind_sym[u]-1))) {
+          qpsk_demod(ofdm->rx_np[s], dibit);
+          rx_uw[OFDM_BPS*u]   = dibit[1];
+          rx_uw[OFDM_BPS*u+1] = dibit[0];
+          u++;
+      } else {
+          codeword_syms[p].real = crealf(ofdm->rx_np[s]);
+          codeword_syms[p].imag = cimagf(ofdm->rx_np[s]);
+          codeword_amps[p] = ofdm->rx_amp[s];
+          p++;
+      }
+  }
+  assert(u == Nuwsyms);
+  assert(p == (Nsymsperframe-Nuwsyms-Ntxtsyms));
+
+  int t;
+
+  for (t=0; s<Nsymsperframe; s++,t+=OFDM_BPS) {
+      qpsk_demod(ofdm->rx_np[s], dibit);
+      txt_bits[t]   = dibit[1];
+      txt_bits[t+1] = dibit[0];
+  }
+  assert(t == OFDM_NTXTBITS);
 }
 
