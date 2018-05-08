@@ -93,14 +93,16 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
   Nerrs_coded = Nerrs_raw = zeros(1, interleave_frames);
-  
-  % 'prime' rx buf to get correct coarse timing (for now)
 
+  #{
+  % 'prime' rx buf to get correct coarse timing (for now)
+  
   prx = 1;
   nin = Nsamperframe+2*(M+Ncp);
   states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   prx += nin;
-
+  #}
+  
   % main loop ----------------------------------------------------------------
 
   for f=1:Nframes
@@ -125,11 +127,11 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
     if strcmp(states.sync_state,'search') 
       [timing_valid states] = ofdm_sync_search(states, rxbuf_in);
     end
-    
+
     if strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial')
       [rx_bits states aphase_est_pilot_log arx_np arx_amp] = ofdm_demod(states, rxbuf_in);
-      rx_uw = rx_bits(1:states.Nuwbits);
-      
+      [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(states, arx_np, arx_amp);
+           
       % we are in sync so log modem states
 
       rx_np_log = [rx_np_log arx_np];
@@ -144,9 +146,9 @@ function ofdm_ldpc_rx(filename, interleave_frames = 1, error_pattern_filename)
       % discarding UW and txt symbols at start of each modem frame
 
       rx_np(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_np(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_np(Nuwtxtsymbolsperframe+1:end);
+      rx_np(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_syms;
       rx_amp(1:Nsymbolsperinterleavedframe-Nsymbolsperframe) = rx_amp(Nsymbolsperframe+1:Nsymbolsperinterleavedframe);
-      rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = arx_amp(Nuwtxtsymbolsperframe+1:end);
+      rx_amp(Nsymbolsperinterleavedframe-Nsymbolsperframe+1:Nsymbolsperinterleavedframe) = payload_amps;
            
       mean_amp = states.mean_amp;
       
