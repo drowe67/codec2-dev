@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
     int    rx_uw[OFDM_NUWBITS];
-    int    txt_bits[OFDM_NTXTBITS];
+    short  txt_bits[OFDM_NTXTBITS];
     f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
     float EsNo = 3;

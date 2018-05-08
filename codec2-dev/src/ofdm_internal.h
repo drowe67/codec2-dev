@@ -161,7 +161,7 @@ void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
                                   int            rx_uw[],
                                   COMP           codeword_syms[],
                                   float          codeword_amps[],
-                                  int            txt_bits[]);
+                                  short          txt_bits[]);
 #ifdef __cplusplus
 }
 #endif
