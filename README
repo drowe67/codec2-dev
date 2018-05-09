@@ -116,10 +116,19 @@ To build them:
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
   $ make
 
+Building for Windows on a Linuxmachine
+--------------------------------------
+
+On Ubuntu 17:
+
+  $ sudo apt-get install mingw-w64
+  $ mkdir build_windows && cd build_windows
+  $ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2-dev/build_linux/src/generate_codebook 
+  $ make
+  
 Building for Windows on a Windows machine
 -----------------------------------------
 
- Install minGW
  mkdir build_windows (Or what ever you want to call your build dir)
  cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
  Or if you use ninja for building cmake -G "Ninja" ..
