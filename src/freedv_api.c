@@ -196,7 +196,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         if (adv == NULL) {
             f->interleave_frames = 1;
         } else {
-            assert((adv->interleave_frames >= 0) && (adv->interleave_frames < 32));
+            assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
             f->interleave_frames = adv->interleave_frames;
         }
         f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
@@ -370,8 +370,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbit = codec2_bits_per_frame(f->codec2);
         nbyte = (nbit + 7) / 8;
         nbyte = nbyte*Ncodec2frames*f->interleave_frames;
-        //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
-        //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
+        f->nbyte_packed_codec_bits = nbyte;
+        fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
+                Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
         f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
         f->codec_bits = NULL;
     }
@@ -920,6 +921,8 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
 	if (bit != 7)
 	    byte++;
     }
+
+    assert(byte <= f->nbyte_packed_codec_bits);
     
     // Generate Varicode txt bits. Txt bits in OFDM frame come just
     // after Unique Word (UW).  Txt bits aren't protected by FEC, and need to be
@@ -1777,7 +1780,11 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                     
                 }
             } /* for interleave frames ... */
-            
+
+            /* make sure we don't overrun packed byte array */
+
+            assert(byte <= f->nbyte_packed_codec_bits);
+                   
             nout = f->n_speech_samples;                  
 
             if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
@@ -1795,6 +1802,17 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                 (*f->freedv_put_next_rx_char)(f->callback_state, ascii_out);
             }
         }
+
+        /* estimate uncoded BER from UW.  Coded bit errors could
+           probably be estimated as half of all failed LDPC parity
+           checks */
+
+        for(i=0; i<OFDM_NUWBITS; i++) {         
+            if (rx_uw[i] != ofdm->tx_uw[i]) {
+                f->total_bit_errors++;
+            }
+        }
+        f->total_bits += OFDM_NUWBITS;          
 
     } /* if modem synced .... */ else {
         *valid = -1;
