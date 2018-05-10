@@ -209,6 +209,9 @@ int main(int argc, char *argv[])
     for(i=0; i<HT_N; i++) {
         htbuf[i] = 0.0;
     }
+    for(i=0; i<SSBFILT_N; i++) {
+        ssbfiltbuf[i] = 0.0;
+    }
 
     /* --------------------------------------------------------*\
 	                          Main Loop
