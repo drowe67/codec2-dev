@@ -43,7 +43,7 @@ function tnewamp1(input_prefix)
   autotest;
   more off;
 
-  max_amp = 80;
+  max_amp = 160;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
 
@@ -53,7 +53,7 @@ function tnewamp1(input_prefix)
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
-
+  
   voicing_name = strcat(input_prefix,"_pitche.txt");
   voicing = zeros(1,frames);
   
@@ -71,7 +71,8 @@ function tnewamp1(input_prefix)
   [rate_K_surface sample_freqs_kHz] = resample_const_rate_f_mel(model(1:frames,:), K);
 
   melvq;
-  load train_120_vq; m=5;
+  load train_120_1.txt; load train_120_2.txt;
+  train_120_vq(:,:,1)= train_120_1; train_120_vq(:,:,2)= train_120_2; m=5;
        
   for f=1:frames
     mean_f(f) = mean(rate_K_surface(f,:));
