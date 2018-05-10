@@ -1663,8 +1663,11 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     frames = f->n_codec_bits / bits_per_codec_frame;
-    nout = 0;
 
+    // pass through is too noisey ....
+    //nout = f->n_speech_samples;
+    nout = 0;
+    
     int Nerrs_raw = 0;
     int Nerrs_coded = 0;
     int iter = 0;
@@ -1838,7 +1841,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
          if (f->squelch_en) {
  	    *valid = 0;
          }
-        f->snr_est = 0.0;
+         //f->snr_est = 0.0;
     }
     
     //fprintf(stderr, "sync: %d valid: %d snr: %3.2f\n", f->sync, *valid, f->snr_est);

@@ -1198,7 +1198,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     stats->Nc = OFDM_NC;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
-    float snr_est = 10.0f * log10f((ofdm->sig_var / ofdm->noise_var) * OFDM_NC*OFDM_RS / 3000.0f);
+    float snr_est = 10.0f * log10f((0.1+ (ofdm->sig_var/ofdm->noise_var)) * OFDM_NC*OFDM_RS / 3000.0f);
     //fprintf(stderr, "sig: %f var: %f snr: %f\n", ofdm->sig_var, ofdm->noise_var, snr_est);
     stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
     stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");

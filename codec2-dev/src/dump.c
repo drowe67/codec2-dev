@@ -268,7 +268,7 @@ void dump_model(MODEL *model) {
 void dump_quantised_model(MODEL *model) {
     int l;
     char s[MAX_STR];
-    char line[2048];
+    char line[4096];
 
     if (!dumpon) return;
 
@@ -282,10 +282,12 @@ void dump_quantised_model(MODEL *model) {
     for(l=1; l<=model->L; l++) {
 	sprintf(s,"%12f ",model->A[l]);
         strcat(line, s);
+        assert(strlen(line) < 4096);
     }
     for(l=model->L+1; l<=MAX_AMP; l++) {
 	sprintf(s,"%12f ", 0.0);
         strcat(line, s);
+        assert(strlen(line) < 4096);
     }
 
     sprintf(s,"%d\n",model->voiced);
