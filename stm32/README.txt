@@ -12,6 +12,11 @@ the STM32F4, including sm1000.bin, the firmware for the SM1000.
 
    $ sudo apt-get install gcc-arm-none-eabi
 
+   On Fedora:
+
+   $ sudo dnf install stlink gcc-arm-linux-gnu
+
+
 2. $ make (and cross your fingers)
 
 Not quite so Quickstart
