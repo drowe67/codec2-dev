@@ -8,10 +8,16 @@ NOTES:
     rely on 'make install' as the packages (RPM & DEB) created by CPack are
     questionable.
 
-To compile codec2, the packages build-essential and cmake are required.
+To compile codec2 a basic development environment and cmake are required.
 If they are not installed, at a command prompt, type
 
+Debian/Ubuntu distros:
 $ sudo apt-get install build-essential cmake 
+
+Fedora/RH distros:
+$ sudo dnf groupinstall "Development Tools" \
+  "C Development Tools and Libraries"
+$ sudo dnf install cmake samplerate-devel speexdsp-devel
 
 To test the cmake build make a directory anywhere underneath (or outside of)
 the source directory.
@@ -37,8 +43,8 @@ $ make install
 Unlike FreeDV (fdmdv2), codec2 is not currently provided as a separate
 installer, instead the windows version uses a static build of codec2.
 
-Additionally, while MSYS2+MinGW should work, windows builds are produces by 
-cross compiling from linux.
+Additionally, while MSYS2+MinGW should work, windows builds are currently
+produced by cross compiling from linux.
 
 Install MinGW & the mysys shell
    + pwd -W prints true Win32 directory
