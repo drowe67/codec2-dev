@@ -19,7 +19,7 @@
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
 % raw EbNodB used in ofdm_tx() at uncoded bit rate
 
-function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0)
+function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0)
   ofdm_lib;
 
   % init modem
@@ -93,6 +93,9 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
   phase_offset = woffset*(1:Nsam) + 0.5*dwoffset*((1:Nsam).^2);
   rx = rx .* exp(j*phase_offset);
 
+  rx = [zeros(1,initial_noise_sams) rx];
+  Nsam = length(rx);
+  
   % note variance/2 as we are using real() operator, mumble,
   % reflection of -ve freq to +ve, mumble, hand wave
 
