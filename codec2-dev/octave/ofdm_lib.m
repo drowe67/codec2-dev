@@ -418,6 +418,11 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % we supply it with uncorrected rxbuf
     
     [coarse_foff_est_hz states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
+    if states.frame_count == 0
+       % first frame in trial sync will have a better freq offset est - lets use it
+       foff_est_hz = states.foff_est_hz = coarse_foff_est_hz;
+       woff_est = 2*pi*foff_est_hz/Fs;
+    end
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -807,7 +812,7 @@ function states = sync_state_machine(states, rx_uw)
     states.uw_errors = sum(xor(tx_uw,rx_uw));
 
     if strcmp(states.sync_state,'trial')
-      if states.uw_errors > 1
+      if states.uw_errors > 2
         states.sync_counter++;
         states.frame_count = 0;
       end

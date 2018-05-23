@@ -15,7 +15,7 @@
   All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
-  it under the terms of the GNU Lesser General Public License version 2, as
+  it under the terms of the GNU Lesser General Public License version 2.1, as
   published by the Free Software Foundation.  This program is
   distributed in the hope that it will be useful, but WITHOUT ANY
   WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -678,8 +678,6 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
             work[j] = ofdm->rxbuf[i] * cexpf(-I * woff_est * i);
         }
 
-        /* note coarse sync just used for timing est, we dont use coarse_foff_est in this call */
-        
         ft_est = est_timing(ofdm, work, (en - st));
         ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
 
@@ -689,6 +687,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
            but stored for use in tofdm.c */
     
         ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], (en-st), ft_est);
+
+        /* first frame in trial sync will have a better freq offset est - lets use it */
+
+        if (ofdm->frame_count == 0) {
+            ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
+            woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+        }
         
         if (ofdm->verbose > 1) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
@@ -1098,7 +1103,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            sync */
       
         if (!strcmp(ofdm->sync_state, "trial")) {
-            if (ofdm->uw_errors > 1) {
+            if (ofdm->uw_errors > 2) {
                 /* if we exceed thresh stay in trial sync */
                 ofdm->sync_counter++;
                 ofdm->frame_count = 0; 
