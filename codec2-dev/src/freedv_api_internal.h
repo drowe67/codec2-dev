@@ -98,7 +98,8 @@ struct freedv {
 
     int                  tx_sync_bit;
     int                  smooth_symbols;
-
+    int                  frames;
+    
     /* test frame states -------------------------------------------------------------------------*/
     
     int                 *ptest_bits_coh;
