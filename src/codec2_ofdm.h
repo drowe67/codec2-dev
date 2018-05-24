@@ -81,6 +81,7 @@ void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd);
+void ofdm_set_tx_bpf(struct OFDM *ofdm, bool);
 
 #ifdef __cplusplus
 }

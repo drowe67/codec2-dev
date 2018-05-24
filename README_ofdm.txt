@@ -91,7 +91,7 @@ Built as part of codec2-dev, see README for build instructions.
 
 9. Run test frames through simulated chanel in C:
 
-   build_linux/src$ /ofdm_mod /dev/zero - --ldpc --testframes 20 | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod - /dev/null --testframes -v --ldp
+   build_linux/src$ ./ofdm_mod /dev/zero - --ldpc --testframes 20 | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod - /dev/null --testframes -v --ldpc
 
 10. Run codec voice through simulated fast fading channel, just where it starts to fall over: 
 

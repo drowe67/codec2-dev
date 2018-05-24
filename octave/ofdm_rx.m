@@ -43,7 +43,7 @@ function ofdm_rx(filename, error_pattern_filename)
   %states.rxbuf(Nrxbuf-nin+1:Nrxbuf) = rx(prx:nin);
   %prx += nin;
   
-  states.verbose = 1;
+  states.verbose = 0;
 
   Nerrs = 0; rx_uw = zeros(1,states.Nuwbits);
   

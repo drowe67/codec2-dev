@@ -113,12 +113,14 @@ struct OFDM {
     bool timing_en;
     bool foff_est_en;
     bool phase_est_en;
-
+    bool tx_bpf_en;
+    
     complex float pilot_samples[OFDM_M + OFDM_NCP];
     float   timing_norm;
     complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
+    complex float *tx_bpf_buf;
     
     /* Demodulator data */
 

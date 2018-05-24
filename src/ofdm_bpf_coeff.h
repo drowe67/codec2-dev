@@ -3,7 +3,7 @@
 
 #define OFDM_BPF_N 100
 
-float bpf_coeff[]={
+float ofdm_bpf_coeff[]={
   0.000065,
   -0.000030,
   0.000041,
