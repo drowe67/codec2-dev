@@ -113,7 +113,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->freedv_put_error_pattern = NULL;
     f->error_pattern_callback_state = NULL;
     f->n_protocol_bits = 0;
-
+    f->frames = 0;
+    
     /* Init states for this mode, and set up samples in/out -----------------------------------------*/
     
     if (mode == FREEDV_MODE_1600) {
@@ -1758,7 +1759,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                 symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
                                 &codeword_amps_de[j*coded_syms_per_frame],
                                 EsNo, ofdm->mean_amp, coded_syms_per_frame);               
-                run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
+                iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
                 if (f->test_frames) {
                     Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
@@ -1831,9 +1832,9 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (f->verbose) {
+    if (f->verbose  && strcmp(ofdm->last_sync_state, "search")) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                0, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
+                f->frames++, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                 ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }

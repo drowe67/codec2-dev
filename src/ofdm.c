@@ -648,7 +648,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
     ofdm->coarse_foff_est_hz = est_freq_offset(ofdm,  &ofdm->rxbuf[st], (en - st), ct_est);
    
     if (ofdm->verbose) {
-        fprintf(stderr, "   ct_est: %4d foff_est: %3.1f timing_valid: %d timing_mx: %f\n",
+        fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
                 ct_est, ofdm->coarse_foff_est_hz, ofdm->timing_valid, ofdm->timing_mx);
     }
 
