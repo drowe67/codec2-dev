@@ -9,18 +9,8 @@ gp_interleaver;
 ldpc;
 
 #{
-  TODO: 
-    [ ] compute SNR and PAPR
-    [ ] SSB bandpass filtering
-    [ ] way to simulate aquisition and demod
-    [ ] testframe based, maybe repeat every 10 seconds
-        + work out which pattern we match to sync up
-    [ ] acquisition curves
-        + plot error versus freq and timing offset
-        + plot pro acquisition versus freq offset, timing and freq sep and together
-        + plot total acquist prob at various SNRs ... maybe mean number of frames to sync?
-    [ ] replace genie EsNo est used for ldpc dec
-    [ ] clean up text 
+  TODO:
+    [ ] run_sim neeeds to be refactored for coded operation at Nc=17 with UW
 #}
 
 function [sim_out rx states] = run_sim(sim_in)
@@ -183,8 +173,12 @@ function [sim_out rx states] = run_sim(sim_in)
     % generate tx bits, optionaly LDPC encode, and modulate as QPSK symbols
     % note for reasons unknown LdpcEncode() returns garbage if we use > 0.5 rather than round()
 
-    tx_data_bits = round(rand(1,Nbits*rate));
+    %tx_data_bits = round(rand(1,Nbits*rate));
 
+    % std test frame so we can x-check
+    
+    tx_data_bits = create_ldpc_test_frame;
+    
     tx_bits = []; tx_symbols = [];
     for f=1:Nframes
       st = (f-1)*Nbitsperframe*rate+1; en = st + Nbitsperframe*rate - 1;
@@ -200,7 +194,7 @@ function [sim_out rx states] = run_sim(sim_in)
         assert(length(codeword) == Nbitsperframe);
       else
         % uncoded mode
-        codeword = tx_data_bits(st:en);
+        codeword = tx_data_bits;
         if isfield(sim_in, "uw_debug")
           codeword(states.uw_ind) = states.tx_uw;
         end
@@ -957,11 +951,21 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
 
   Ts = 0.018; 
   sim_in.Tcp = 0.002; 
-  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 17; sim_in.Ns = 8;
 
   sim_in.Nsec = (Ntests+1)*(sim_in.Ns+1)/sim_in.Rs;
 
-  sim_in.EbNodB = EbNodB;  % note uncoded modem operationg point, e.g -1dB for AWGN
+  #{
+    Notes:
+      1) uncoded modem operating point, e.g -1dB for AWGN
+      2) run_sim adds complex noise, when we take the real() below, this relects
+         the -ve noise over to the +ve side, increasing the noise by 3dB.  In
+         ofdm_tx.m and friends, we add real nosie that is correctly scaled so
+         no problemo.  This means we need to increase the Eb/No below by 3dB
+         to ensure the correct level of nosie ta the input of the timing_est.         
+  #}
+  
+  sim_in.EbNodB = EbNodB + 3;
   sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
   sim_in.foff_hz = foff_hz;
@@ -971,9 +975,9 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   sim_in.phase_est_en = 1;
   sim_in.ldpc_en = 0;
 
-  % stick a bunch of noise in front of signal to confuse things
+  % optionally stick a bunch of noise in front of signal to confuse things
   
-  sim_in.initial_noise_sams = 16000;
+  sim_in.initial_noise_sams = 0;
   
   [sim_out rx states] = run_sim(sim_in);
 
@@ -1018,7 +1022,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
       foff_metric_log = [foff_metric_log states.foff_metric];
     end
 
-  if states.verbose
+  if states.verbose > 1
     %printf("mean: %f std: %f\n", mean(delta_foff), std(delta_foff));
     figure(1); clf; plot(timing_mx_log,'+-');
     figure(2); clf; plot(delta_ct,'+-');
@@ -1147,6 +1151,8 @@ function sync_metrics(x_axis = 'EbNo')
   Ntests  = 4;
   f_offHz = [-25:25];
   EbNodB  = [-10 0 3 6 10 20];
+  %f_offHz = [-5:5:5];
+  %EbNodB  = [-10 0 10];
   cc = ['b' 'g' 'k' 'c' 'm' 'b'];
   pt = ['+' '+' '+' '+' '+' 'o'];
   
@@ -1166,7 +1172,7 @@ function sync_metrics(x_axis = 'EbNo')
     mean_dfoff_log = [mean_dfoff_log; mean_dfoff_row];
   end
 
-  figure(1); clf; hold on;
+  figure(1); clf; hold on; grid;
   if strcmp(x_axis,'EbNo')
     for f = 1:length(f_offHz)
       if f == 2, hold on, end;
@@ -1194,12 +1200,12 @@ function sync_metrics(x_axis = 'EbNo')
     ylabel('Coefficient')
     title('Pilot Correlation Metric against Freq Offset for different Eb/No dB');
     legend("location", "northwest"); legend("boxoff");
-    axis([min(f_offHz) max(f_offHz) 0 1.2])
+    axis([min(f_offHz) max(f_offHz) 0 1])
     print('-deps', '-color', "ofdm_dev_pilot_correlation_freq.eps")
 
     mean_dfoff_log
  
-    figure(2);
+    figure(2); clf;
     for e = 1:length(EbNodB)
       if e == 2, hold on, end;
       leg1 = sprintf("+-;mx1 %3.0f dB;", EbNodB(e));
@@ -1261,6 +1267,55 @@ function debug_false_sync(EbNodB = 100)
 end
 
 
+% Using an input raw file, plot frame by frame metric information,
+% used to debug false syncs
+
+function metric_fbf(fn, Nsec)
+  Ts = 0.018; 
+  states = ofdm_init(bps=2, Rs=1/Ts, Tcp=0.002, Ns=8, Nc=17);
+  ofdm_load_const;
+  states.verbose = 2;
+
+  % factor of 2 as input is a real valued signal
+
+  Ascale = states.amp_scale/2; 
+  f = fopen(fn,"rb"); rx = fread(f,Inf,"short")'/Ascale; fclose(f);
+  if (nargin == 2) && (length(rx) > Nsec*Fs)
+    rx = rx(1:Nsec*Fs);
+  end
+  Nsam = length(rx);
+  %bpf_coeff = make_ofdm_bpf(write_c_header_file=0);
+  %rx = filter(bpf_coeff,1,rx);
+  
+  st = 0.5*Nsamperframe; 
+  en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
+
+  i = 1; w_log = timing_mx_log = av_level_log = [];
+  states.foff_metric = 0;
+  for w=1:Nsamperframe:length(rx)-4*Nsamperframe
+    printf("%3d %5d", i,w);
+    if i == 30
+      states.verbose = 3;
+    else
+      states.verbose = 2;
+    end  
+    [ct_est timing_valid timing_mx av_level] = est_timing(states, real(rx(w+st:w+en)), states.rate_fs_pilot_samples);
+    i++;
+    w_log = [w_log w];
+    timing_mx_log = [timing_mx_log timing_mx];
+    av_level_log = [av_level_log av_level];
+  end
+
+  figure(2); clf;
+  mx = max(abs(rx)); 
+  subplot(211); plot(rx); axis([0 Nsam -mx mx]);
+  subplot(212); hold on;
+  plot(w_log,timing_mx_log,'b+-;timing mx;');
+  plot(w_log,av_level_log,'g+-;av level;');
+  hold off;
+endfunction
+
+
 % ---------------------------------------------------------
 % choose simulation to run here 
 % ---------------------------------------------------------
@@ -1274,9 +1329,10 @@ init_cml('~/cml/');
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
-acquisition_test(Ntests=20, EbNodB=5, foff_hz=10, hf_en=0, verbose=1);
+%acquisition_test(Ntests=10, EbNodB=-1, foff_hz=0, hf_en=0, verbose=1);
 %sync_metrics('freq')
 %run_curves_snr
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
 %acquistion_curves
 %debug_false_sync
+metric_fbf("~/Desktop/false_sync.wav")
