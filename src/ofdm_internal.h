@@ -79,7 +79,9 @@ extern "C" {
 #define OFDM_MAX_SAMPLESPERFRAME (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP)/4)
 #define OFDM_RXBUF               (3 * OFDM_SAMPLESPERFRAME + 3 * (OFDM_M + OFDM_NCP))
 
-#define OFDM_TIMING_MX_THRESH    0.25
+/* See 700D Part 4 Acquisition blog post and ofdm_dev.m routinesfor how this was set */ 
+
+#define OFDM_TIMING_MX_THRESH    0.35
 
 /* reserve 4 bits/frame for auxillary text information */
 

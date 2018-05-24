@@ -50,7 +50,7 @@ endfunction
   Can be used for acquisition (coarse timing), and fine timing.
 #}
 
-function [t_est timing_valid timing_mx] = est_timing(states, rx, rate_fs_pilot_samples)
+function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -74,8 +74,15 @@ function [t_est timing_valid timing_mx] = est_timing(states, rx, rate_fs_pilot_s
     timing_valid = timing_mx > timing_mx_thresh;
     
     if verbose > 1
-      printf("  av_level: %f mx: %f timing_est: %d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
+      printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
     end
+    if verbose > 2
+      figure(3); clf;
+      subplot(211); plot(rx)
+      subplot(212); plot(corr)
+      figure(4); clf; plot(real(rate_fs_pilot_samples));
+    end
+
 
 endfunction
 
