@@ -130,6 +130,7 @@ int  freedv_set_alt_modem_samp_rate     (struct freedv *freedv, int samp_rate);
 void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float ampl);
 void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
+void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
 
 // Get parameters -------------------------------------------------------------------------
 

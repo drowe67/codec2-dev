@@ -227,6 +227,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             f->mod_out[i].real = 0.0;
             f->mod_out[i].imag = 0.0;
         }
+
+        /* tx BPF on by default, can't see any reason we'd want this off */
+        
+        ofdm_set_tx_bpf(f->ofdm, 1);
     }
 #endif  
 
@@ -2128,6 +2132,16 @@ void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_
 void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_bits_coded = val;}
 void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
+
+
+/* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D */
+
+void freedv_set_tx_bpf(struct freedv *f, int val) {
+    if (f->mode == FREEDV_MODE_700D) {
+        ofdm_set_tx_bpf(f->ofdm, val);
+    }
+}
+
 
 void freedv_set_verbose(struct freedv *f, int verbosity) {
     f->verbose = verbosity;
