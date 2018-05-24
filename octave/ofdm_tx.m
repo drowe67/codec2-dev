@@ -19,7 +19,7 @@
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
 % raw EbNodB used in ofdm_tx() at uncoded bit rate
 
-function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0)
+function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
   ofdm_lib;
 
   % init modem
@@ -78,7 +78,18 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
   end
 
   rx = tx;
-
+  if tx_filter
+    bpf_coeff = make_ofdm_bpf(write_c_header_file=0);
+    rx = filter(bpf_coeff,1,tx);
+    figure(1); clf;
+    subplot(211);
+    plot((1:length(tx))*8000/length(tx), 20*log10(abs(fft(tx))))
+    axis([1 4000 0 60])
+    subplot(212);
+    plot((1:length(tx))*8000/length(tx), 20*log10(abs(fft(rx))))
+    axis([1 4000 0 60])
+  end
+  
   if strcmp(channel, 'hf')
     rx  = tx(1:Nsam) .* spread1(1:Nsam);
     rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
