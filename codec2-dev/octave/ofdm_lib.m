@@ -886,7 +886,7 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
 
     fprintf(f,"\n#define OFDM_BPF_N %d\n\n", filt_n);
 
-    fprintf(f,"float bpf_coeff[]={\n");
+    fprintf(f,"float ofdm_bpf_coeff[]={\n");
     for r=1:filt_n
       if r < filt_n
         fprintf(f, "  %f,\n",  bpf_coeff(r));

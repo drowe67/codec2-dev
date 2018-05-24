@@ -38,6 +38,7 @@
 #include "comp.h"
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
+#include "ofdm_bpf_coeff.h"
 
 /* Concrete definition of 700D parameters */
 const struct OFDM_CONFIG OFDM_CONFIG_700D_C = 
@@ -211,7 +212,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* zero out Cyclic Prefix (CP) values */
 
     for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
-        ofdm->pilot_samples[i] = 0.0f + 0.0f * I;;
+        ofdm->pilot_samples[i] = 0.0f + 0.0f * I;
     }
         
     // From Octave: states.timing_norm = Npsam*(rate_fs_pilot_samples*rate_fs_pilot_samples');
@@ -236,12 +237,24 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     //fprintf(stderr, "timing_norm: %f\n", ofdm->timing_norm);
 
     ofdm->sig_var = ofdm->noise_var = 1.0f;
+
+    ofdm->tx_bpf_en = 0;
+    ofdm->tx_bpf_buf = (complex float*)malloc(sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME));
+    if (ofdm->tx_bpf_buf == NULL) {
+        free(ofdm);
+        return NULL;
+    }
+    
+    for (i=0; i<OFDM_BPF_N; i++) {
+        ofdm->tx_bpf_buf[i] = 0.0f + 0.0f * I;
+    }
     
     return ofdm; /* Success */
 }
 
 
 void ofdm_destroy(struct OFDM *ofdm) {
+    free(ofdm->tx_bpf_buf);
     free(ofdm);
 }
 
@@ -434,10 +447,11 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
  * ----------------------------------------------
  */
 
-void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME], complex float *tx_sym_lin) {
+void ofdm_txframe(struct OFDM *ofdm, complex float tx_filt[OFDM_SAMPLESPERFRAME], complex float *tx_sym_lin) {
     complex float aframe[OFDM_NS][OFDM_NC + 2];
     complex float asymbol[OFDM_M];
     complex float asymbol_cp[OFDM_M + OFDM_NCP];
+    complex float tx[OFDM_SAMPLESPERFRAME];
     int i, j, k, m;
 
     /* initialize aframe to complex zero */
@@ -490,6 +504,32 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx[OFDM_SAMPLESPERFRAME], com
             tx[m + j] = asymbol_cp[j];
         }
     }
+
+    /* optional Tx Band Pass Filter */
+
+    if (ofdm->tx_bpf_en) {
+        complex float *buf = ofdm->tx_bpf_buf;
+        for(i=0, j=OFDM_BPF_N; i<OFDM_SAMPLESPERFRAME; i++,j++) {
+            buf[j] = tx[i];
+            tx_filt[i] = 0.0;
+            for(k=0; k<OFDM_BPF_N; k++) {
+                tx_filt[i] += buf[j-k]*ofdm_bpf_coeff[k];
+            }
+        }
+
+        assert(j <= (OFDM_BPF_N+OFDM_SAMPLESPERFRAME));
+        
+        /* update filter memory */
+
+        for(i=0; i<OFDM_BPF_N; i++) {
+           buf[i] = buf[i+OFDM_SAMPLESPERFRAME];
+        }
+    } else {
+        for(i=0; i<OFDM_SAMPLESPERFRAME; i++) {
+            tx_filt[i] = tx[i];
+        }
+    }
+
 }
 
 int ofdm_get_nin(struct OFDM *ofdm) {
@@ -531,6 +571,10 @@ void ofdm_set_phase_est_enable(struct OFDM *ofdm, bool val) {
 
 void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
     ofdm->foff_est_hz = val;
+}
+
+void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
+    ofdm->tx_bpf_en = val;
 }
 
 /*
