@@ -869,7 +869,7 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
   filt_n = 100;
   Fs = 8000;
 
-  bpf_coeff  = fir2(filt_n,[0 400 600 2200 2600 4000]/(Fs/2),[0.001 0.001 1 1 0.001 0.001]);
+  bpf_coeff  = fir2(filt_n,[0 900 1000 2000 2100 4000]/(Fs/2),[0.001 0.001 1 1 0.001 0.001]);
 
   if write_c_header_file
     figure(1)
