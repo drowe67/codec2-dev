@@ -494,34 +494,39 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     foff_est_hz = foff_est_hz + foff_est_gain*freq_err_hz;
   end
 
-  % OK - now estimate and correct phase  ----------------------------------
+  % OK - now channel for each carrier and correct phase  ----------------------------------
 
-  aphase_est_pilot = 10*ones(1,Nc+2);
-  aamp_est_pilot = zeros(1,Nc+2);
+  achannel_est_rect = zeros(1,Nc+2);
   for c=2:Nc+1
 
-    % estimate phase using average of 6 pilots in a rect 2D window centred
-    % on this carrier
-    % PPP
+    % estimate channel for this carrier using an average of 12 pilots
+    % in a rect 2D window centred on this carrier
+    
+    % PPP  <-- frame-1
+    % ---
+    % PPP  <-- you are here
     % DDD
     % DDD
-    % PPP
-          
+    % PPP  <-- frame+1
+    % ---
+    % PPP  <-- frame+2
+    
     cr = c-1:c+1;
-    aphase_est_pilot_rect = sum(rx_sym(2,cr)*pilots(cr)') + sum(rx_sym(2+Ns,cr)*pilots(cr)');
+    achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame
+    achannel_est_rect(c) =+ sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
 
     % use next step of pilots in past and future
 
-    aphase_est_pilot_rect += sum(rx_sym(1,cr)*pilots(cr)');
-    aphase_est_pilot_rect += sum(rx_sym(2+Ns+1,cr)*pilots(cr)');
-    
-    aphase_est_pilot(c) = angle(aphase_est_pilot_rect);
-
-    % amplitude is estimated over 12 pilot symbols, so find average
-
-    aamp_est_pilot(c) = abs(aphase_est_pilot_rect/12);
+    achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
+    achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
   end
-  
+
+  % pilots are estimated over 12 pilot symbols, so find average
+
+  achannel_est_rect /= 12;
+  aphase_est_pilot = angle(achannel_est_rect);
+  aamp_est_pilot = abs(achannel_est_rect);
+
   % correct phase offset using phase estimate, and demodulate
   % bits, separate loop as it runs across cols (carriers) to get
   % frame bit ordering correct
@@ -601,7 +606,8 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
   % maintain mean amp estimate for LDPC decoder
 
   states.mean_amp = 0.9*states.mean_amp + 0.1*mean(rx_amp);
-  
+
+  states.achannel_est_rect = achannel_est_rect;
   states.rx_sym = rx_sym;
   states.rxbuf = rxbuf;
   states.nin = nin;
