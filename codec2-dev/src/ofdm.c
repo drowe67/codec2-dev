@@ -684,6 +684,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     float aamp_est_pilot[OFDM_NC + 2];
     float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
+    float prev_timing_est = ofdm->timing_est;
 
     /* shift the buffer left based on nin */
 
@@ -1054,6 +1055,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     ofdm->nin = OFDM_SAMPLESPERFRAME;
 
     if (ofdm->timing_en == true) {
+        ofdm->clock_offset_est = 0.95*ofdm->clock_offset_est + 0.05*(prev_timing_est - ofdm->timing_est)/OFDM_SAMPLESPERFRAME;
         int thresh = (OFDM_M + OFDM_NCP) / 8;
         int tshift = (OFDM_M + OFDM_NCP) / 4;
 
@@ -1125,6 +1127,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = 1;
+            ofdm->clock_offset_est = 0;
             strcpy(next_state, "trial");
         }
     }
@@ -1254,7 +1257,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
-    stats->clock_offset = 0.0f;               /* TODO: work out sample clock offset */
+    stats->clock_offset = ofdm->clock_offset_est; 
 
     assert(OFDM_ROWSPERFRAME < MODEM_STATS_NR_MAX);
     stats->nr = OFDM_ROWSPERFRAME;
