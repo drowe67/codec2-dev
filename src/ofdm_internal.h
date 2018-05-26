@@ -134,6 +134,7 @@ struct OFDM {
     float noise_var;
     float mean_amp;
     complex float foff_metric;
+    float clock_offset_est;
     
     /* modem sync state machine */
 
