@@ -265,7 +265,8 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   
   states.noise_var = 0;
   states.sig_var = 0;
-  
+
+  states.clock_offset_est = 0;
 endfunction
 
 
@@ -557,6 +558,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
 
   nin = Nsamperframe;
   if timing_en && timing_valid
+    states.clock_offset_est = 0.9*states.clock_offset_est + 0.1*abs(states.timing_est - timing_est)/Nsamperframe;
     thresh = (M+Ncp)/8;
     tshift = (M+Ncp)/4;
     if timing_est > thresh

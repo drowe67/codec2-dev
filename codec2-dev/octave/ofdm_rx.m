@@ -5,7 +5,7 @@
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
-function ofdm_rx(filename, error_pattern_filename)
+function channel_est_log = ofdm_rx(filename, error_pattern_filename)
   ofdm_lib;
   more off;
 
@@ -30,7 +30,7 @@ function ofdm_rx(filename, error_pattern_filename)
   % init logs and BER stats
 
   rx_bits = []; rx_np_log = []; timing_est_log = []; delta_t_log = []; foff_est_hz_log = [];
-  phase_est_pilot_log = []; sig_var_log = []; noise_var_log = [];
+  phase_est_pilot_log = []; sig_var_log = []; noise_var_log = []; channel_est_log = [];
   Terrs = Tbits = Terrs_coded = Tbits_coded = Tpackets = Tpacketerrs = frame_count = 0;
   Nbitspervocframe = 28;
   Nerrs_coded_log = Nerrs_log = [];
@@ -84,7 +84,8 @@ function ofdm_rx(filename, error_pattern_filename)
       phase_est_pilot_log = [phase_est_pilot_log; aphase_est_pilot_log];
       sig_var_log = [sig_var_log states.sig_var];
       noise_var_log = [noise_var_log states.noise_var];
-
+      channel_est_log = [channel_est_log; states.achannel_est_rect];
+      
       % measure uncoded bit errors on modem frame
 
       Nerrs_log = [Nerrs_log Nerrs];
@@ -97,8 +98,9 @@ function ofdm_rx(filename, error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %3.1f\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, states.foff_est_hz);
+      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %3.1f clkOff: %4.0f\n",
+             f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, states.foff_est_hz,
+             states.clock_offset_est*1E6);
     end
 
     % act on any events returned by state machine
