@@ -35,10 +35,7 @@
 #}
 
 
-% In general, this function processes a bunch of amplitudes, we then
-% use c2sim to hear the results.  Bunch of different experiments below
-
-function tnewamp1(input_prefix)
+function [H H_c] = tnewamp1(input_prefix)
   newamp_700c;
   autotest;
   more off;
@@ -129,6 +126,15 @@ function tnewamp1(input_prefix)
     voicing_right = voicing(f);
     [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
 
+    for i=1:4
+      fprintf(stderr, "  Wo: %4.3f L: %d v: %d\n", Wo_(i), floor(pi/Wo_(i)), avoicing_(i));
+    end
+    fprintf(stderr,"  rate_K_vec: ");
+    for i=1:5
+      fprintf(stderr,"%5.3f  ", rate_K_surface_(f,i));
+    end
+    fprintf(stderr,"\n");
+    
     if f > M
       model_(f-M:f-1,1) = Wo_;
       voicing_(f-M:f-1) = avoicing_;
@@ -152,6 +158,21 @@ function tnewamp1(input_prefix)
           H(k,m) = exp(j*Aw(k, b+1));          
         end     
       end
+
+      fprintf(stderr,"  Am H:\n");
+      for k=f-M:f-1
+        fprintf(stderr,"    ");  
+        for i=1:5
+          fprintf(stderr, " %5.1f (%5.3f %5.3f)  ", model_(k,2+i), real(H(k,i)), imag(H(k,i)));
+        end
+        fprintf(stderr,"\n");
+      end
+
+   end
+
+   printf("\n");
+   if f == 8
+     %return
    end
    
    % update for next time
@@ -165,10 +186,9 @@ function tnewamp1(input_prefix)
   figure(1); clf;
   mesh(angle(H));
   figure(2); clf;
-  size(H_c)
   mesh(angle(H_c(:,1:max_amp)));
   figure(3); clf;
-  mesh(abs(H - H_c(1:max_amp)));
+  mesh(abs(H - H_c(:,1:max_amp)));
 
   check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
   check(mean_f, mean_c, 'mean', 0.01);
@@ -177,7 +197,7 @@ function tnewamp1(input_prefix)
   check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
   check(voicing_, voicing__c, 'interpolated voicing');
   check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
-  check(H, H_c(1:max_amp), 'phase surface');
+  check(H, H_c(:,1:max_amp), 'phase surface');
 
   % Save to disk to check synthesis is OK with c2sim  
 

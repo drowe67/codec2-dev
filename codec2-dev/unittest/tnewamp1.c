@@ -219,20 +219,20 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"%5.3f  ", prev_rate_K_vec_[i]);
         }
         fprintf(stderr,"\n");
-        fprintf(stderr,"  H:\n");
+        fprintf(stderr,"  Am H:\n");
 
         for(m=0; m<M; m++) {
             fprintf(stderr,"    ");  
             for(i=1; i<=5; i++) {
-                fprintf(stderr,"(%5.3f %5.3f)  ", HH[m][i].real, HH[m][i].imag);
+                fprintf(stderr,"%5.1f (%5.3f %5.3f)  ", model__[m].A[i], HH[m][i].real, HH[m][i].imag);
             }
             fprintf(stderr,"\n");
         }
 
         fprintf(stderr,"\n\n");
 
-        //if (f == 80)
-        //    exit(0);
+        //if (f == 7)
+        //  exit(0);
 
         /* with f == 0, we don't store ouput, but memories are updated, helps to match
            what happens in Codec 2 mode */
@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
                }
            }
           
-             /* store test vectors */
+           /* store test vectors */
 
             for(i=f-M, m=0; i<f; i++,m++) {
                 model_octave_[i][0] = model__[m].Wo;

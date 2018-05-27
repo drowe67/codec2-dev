@@ -375,10 +375,16 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
     float Gdbfk[Ns], sample_freqs_kHz[Ns], phase[Ns];
     float AmdB[MAX_AMP+1], rate_L_sample_freqs_kHz[MAX_AMP+1];
 
+    printf("  m*F0 Am AmdB:\n    ");
     for(m=1; m<=model->L; m++) {
-        AmdB[m] = 20.0*log10f(model->A[m]+1);
+        AmdB[m] = 20.0*log10f(model->A[m]);
         rate_L_sample_freqs_kHz[m] = (float)m*model->Wo*(c2const->Fs/2000.0)/M_PI;
+        
+        if (m < 6) {
+            printf("%3.2f %4.2f %4.2f  ",  rate_L_sample_freqs_kHz[m], model->A[m], AmdB[m]);
+        }        
     }
+    printf("\n");
     
     for(i=0; i<Ns; i++) {
         sample_freqs_kHz[i] = (c2const->Fs/1000.0)*(float)i/Nfft;
@@ -386,6 +392,12 @@ void determine_phase(C2CONST *c2const, COMP H[], MODEL *model, int Nfft, codec2_
 
     interp_para(Gdbfk, &rate_L_sample_freqs_kHz[1], &AmdB[1], model->L, sample_freqs_kHz, Ns);
 
+    printf("  Gdbfk:\n    ");
+    for(i=0; i<5; i++) {
+        printf("%4.1f ", Gdbfk[i]);
+    }
+    printf("\n");
+    
     mag_to_phase(phase, Gdbfk, Nfft, fwd_cfg, inv_cfg);
 
     for(m=1; m<=model->L; m++) {
