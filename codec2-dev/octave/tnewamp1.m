@@ -35,7 +35,7 @@
 #}
 
 
-function [H H_c] = tnewamp1(input_prefix)
+function tnewamp1(input_prefix)
   newamp_700c;
   autotest;
   more off;
@@ -159,20 +159,6 @@ function [H H_c] = tnewamp1(input_prefix)
         end     
       end
 
-      fprintf(stderr,"  Am H:\n");
-      for k=f-M:f-1
-        fprintf(stderr,"    ");  
-        for i=1:5
-          fprintf(stderr, " %5.1f (%5.3f %5.3f)  ", model_(k,2+i), real(H(k,i)), imag(H(k,i)));
-        end
-        fprintf(stderr,"\n");
-      end
-
-   end
-
-   printf("\n");
-   if f == 8
-     %return
    end
    
    % update for next time
