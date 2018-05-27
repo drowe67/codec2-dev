@@ -233,7 +233,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     }
 
     ofdm->timing_norm = (OFDM_M + OFDM_NCP) * acc;
-
+    ofdm->clock_offset_counter = 0;
+    
     //fprintf(stderr, "timing_norm: %f\n", ofdm->timing_norm);
 
     ofdm->sig_var = ofdm->noise_var = 1.0f;
@@ -684,7 +685,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     float aamp_est_pilot[OFDM_NC + 2];
     float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
-    float prev_timing_est = ofdm->timing_est;
+    int prev_timing_est = ofdm->timing_est;
 
     /* shift the buffer left based on nin */
 
@@ -1055,7 +1056,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     ofdm->nin = OFDM_SAMPLESPERFRAME;
 
     if (ofdm->timing_en == true) {
-        ofdm->clock_offset_est = 0.95*ofdm->clock_offset_est + 0.05*(prev_timing_est - ofdm->timing_est)/OFDM_SAMPLESPERFRAME;
+        ofdm->clock_offset_counter += prev_timing_est - ofdm->timing_est;
+        //fprintf(stderr, "prev_timing_est: %d timing_est: %d clock_offset_counter: %d\n", ofdm->timing_est, prev_timing_est, ofdm->clock_offset_counter);
         int thresh = (OFDM_M + OFDM_NCP) / 8;
         int tshift = (OFDM_M + OFDM_NCP) / 4;
 
@@ -1127,7 +1129,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = 1;
-            ofdm->clock_offset_est = 0;
+            ofdm->clock_offset_counter = 0;
             strcpy(next_state, "trial");
         }
     }
@@ -1257,8 +1259,13 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
-    stats->clock_offset = ofdm->clock_offset_est; 
-
+    float total = ofdm->frame_count*OFDM_SAMPLESPERFRAME;
+    stats->clock_offset = 0;
+    if (total) {
+        stats->clock_offset = ofdm->clock_offset_counter/total;
+    }
+    //fprintf(stderr, "clock_offset_counter: %d frame_count: %d total: %f clock_offset: %f\n",
+    //        ofdm->clock_offset_counter, ofdm->frame_count, total, stats->clock_offset);
     assert(OFDM_ROWSPERFRAME < MODEM_STATS_NR_MAX);
     stats->nr = OFDM_ROWSPERFRAME;
 

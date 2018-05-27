@@ -191,4 +191,5 @@ Notes:
                      = -4.3 dB,
      So we have about 1.8dB overhead for synchronisation, implementation loss,
      and the text channel.
-  3/ HF Multipath channel used for testing is two path, 1Hz Doppler, 1ms delay
+  3/ "CCIR Poor" HF Multipath channel used for testing is two path, 1Hz Doppler,
+     1ms delay.

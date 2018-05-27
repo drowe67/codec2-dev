@@ -98,7 +98,7 @@ function channel_est_log = ofdm_rx(filename, error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %3.1f clkOff: %4.0f\n",
+      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
              f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, states.foff_est_hz,
              states.clock_offset_est*1E6);
     end

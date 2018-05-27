@@ -1294,11 +1294,13 @@ function metric_fbf(fn, Nsec)
   states.foff_metric = 0;
   for w=1:Nsamperframe:length(rx)-4*Nsamperframe
     printf("%3d %5d", i,w);
+    #{
     if i == 30
       states.verbose = 3;
     else
       states.verbose = 2;
-    end  
+    end
+    #}
     [ct_est timing_valid timing_mx av_level] = est_timing(states, real(rx(w+st:w+en)), states.rate_fs_pilot_samples);
     i++;
     w_log = [w_log w];
@@ -1335,4 +1337,4 @@ init_cml('~/cml/');
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
 %acquistion_curves
 %debug_false_sync
-metric_fbf("~/Desktop/false_sync.wav")
+metric_fbf("ofdm_test.raw")
