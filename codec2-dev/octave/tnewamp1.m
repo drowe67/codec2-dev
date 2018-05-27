@@ -39,11 +39,11 @@
 % use c2sim to hear the results.  Bunch of different experiments below
 
 function tnewamp1(input_prefix)
-  newamp;
+  newamp_700c;
   autotest;
   more off;
 
-  max_amp = 160;
+  max_amp = 80;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
 
@@ -53,7 +53,7 @@ function tnewamp1(input_prefix)
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
-  
+
   voicing_name = strcat(input_prefix,"_pitche.txt");
   voicing = zeros(1,frames);
   
@@ -73,6 +73,7 @@ function tnewamp1(input_prefix)
   melvq;
   load train_120_1.txt; load train_120_2.txt;
   train_120_vq(:,:,1)= train_120_1; train_120_vq(:,:,2)= train_120_2; m=5;
+  m=5;
        
   for f=1:frames
     mean_f(f) = mean(rate_K_surface(f,:));
@@ -164,9 +165,10 @@ function tnewamp1(input_prefix)
   figure(1); clf;
   mesh(angle(H));
   figure(2); clf;
-  mesh(angle(H_c));
+  size(H_c)
+  mesh(angle(H_c(:,1:max_amp)));
   figure(3); clf;
-  mesh(abs(H - H_c));
+  mesh(abs(H - H_c(1:max_amp)));
 
   check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
   check(mean_f, mean_c, 'mean', 0.01);
@@ -175,7 +177,7 @@ function tnewamp1(input_prefix)
   check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
   check(voicing_, voicing__c, 'interpolated voicing');
   check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
-  check(H, H_c, 'phase surface');
+  check(H, H_c(1:max_amp), 'phase surface');
 
   % Save to disk to check synthesis is OK with c2sim  
 
@@ -216,8 +218,8 @@ function tnewamp1(input_prefix)
 
     Hm = zeros(1, 2*max_amp);
     for m=1:L
-        Hm(2*m+1) = real(H(f,m));
-        Hm(2*m+2) = imag(H(f,m));
+        Hm(2*m) = real(H(f,m));
+        Hm(2*m+1) = -imag(H(f,m));
     end    
     fwrite(fhm, Hm, "float32");    
   end
