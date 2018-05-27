@@ -81,7 +81,7 @@ extern "C" {
 
 /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routinesfor how this was set */ 
 
-#define OFDM_TIMING_MX_THRESH    0.35
+#define OFDM_TIMING_MX_THRESH    0.30
 
 /* reserve 4 bits/frame for auxillary text information */
 
@@ -134,7 +134,7 @@ struct OFDM {
     float noise_var;
     float mean_amp;
     complex float foff_metric;
-    float clock_offset_est;
+    int clock_offset_counter;
     
     /* modem sync state machine */
 
