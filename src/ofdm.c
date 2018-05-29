@@ -1264,6 +1264,8 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     if (total) {
         stats->clock_offset = ofdm->clock_offset_counter/total;
     }
+    stats->sync_metric = ofdm->timing_mx;
+    
     //fprintf(stderr, "clock_offset_counter: %d frame_count: %d total: %f clock_offset: %f\n",
     //        ofdm->clock_offset_counter, ofdm->frame_count, total, stats->clock_offset);
     assert(OFDM_ROWSPERFRAME < MODEM_STATS_NR_MAX);
