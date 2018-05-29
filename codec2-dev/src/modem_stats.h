@@ -52,7 +52,8 @@ struct MODEM_STATS {
     float  foff;                             /* estimated freq offset in Hz                        */
     float  rx_timing;                        /* estimated optimum timing offset in samples         */
     float  clock_offset;                     /* Estimated tx/rx sample clock offset in ppm         */
-
+    float  sync_metric;                      /* number between 0 and 1 indicating quality of sync  */
+    
     /* eye diagram traces */
     /* Eye diagram plot -- first dim is trace number, second is the trace idx */
     float  rx_eye[MODEM_STATS_ET_MAX][80];

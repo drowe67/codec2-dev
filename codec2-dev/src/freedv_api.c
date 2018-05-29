@@ -1798,7 +1798,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
             if (f->squelch_en && (f->stats.snr_est < f->snr_squelch_thresh)) {
                 *valid = 0;
             }
-
+            
         } /* if interleaver synced ..... */
 
         /* If modem is synced we can decode txt bits */
