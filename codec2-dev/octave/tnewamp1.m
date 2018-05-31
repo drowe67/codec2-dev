@@ -207,7 +207,7 @@ function tnewamp1(input_prefix)
     L = min([model_(f,2) max_amp-1]);
     Am = model_(f,3:(L+2));
 
-    Am_ = zeros(1,max_amp);
+    Am_ = zeros(1,2*max_amp);
     Am_(2:L) = Am(1:L-1);
 
     fwrite(fam, Am_, "float32");
@@ -222,10 +222,10 @@ function tnewamp1(input_prefix)
     Aw1(2:2:Nfft_phase*2) = -sin(Aw(f,:));
     fwrite(faw, Aw1, "float32");    
 
-    Hm = zeros(1, 2*max_amp);
+    Hm = zeros(1, 2*2*max_amp);
     for m=1:L
-        Hm(2*m) = real(H(f,m));
-        Hm(2*m+1) = -imag(H(f,m));
+        Hm(2*m+1) = real(H(f,m));
+        Hm(2*m+2) = imag(H(f,m));
     end    
     fwrite(fhm, Hm, "float32");    
   end

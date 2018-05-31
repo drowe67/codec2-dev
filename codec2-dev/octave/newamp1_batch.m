@@ -539,8 +539,8 @@ function [model_ rate_K_surface b_log] = experiment_const_freq(model, varargin)
   figure(fg++); clf; subplot(211); plot(energy); subplot(212); plot(sd); title('sdL');
   figure(fg++); clf; hist(sd);
 
-  figure(fg++); clf; plot(gains);
-  figure(fg++); clf; plot(gains(:,1), gains(:,2), '+');
+  %figure(fg++); clf; plot(gains);
+  %figure(fg++); clf; plot(gains(:,1), gains(:,2), '+');
 endfunction
 
 function model_ = experiment_dct(model)
