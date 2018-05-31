@@ -55,9 +55,16 @@ endif()
 # Set default C++ flags.
 include(CheckCCompilerFlag)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3")
+
 CHECK_C_COMPILER_FLAG("-std=gnu11" COMPILER_SUPPORTS_GNU11)
-if(CMAKE_C_STANDARD_COMPUTED_DEFAULT EQUAL "90")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
+CHECK_C_COMPILER_FLAG("-std=gnu99" COMPILER_SUPPORTS_GNU99)
+
+if(COMPILER_SUPPORTS_GNU11)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu11")
+elseif(COMPILER_SUPPORTS_GNU99)
+   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
+else()
+   message( SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
 endif()
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")
 
