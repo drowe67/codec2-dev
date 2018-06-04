@@ -95,11 +95,11 @@ include_directories(../src ../unittest inc)
 
 set(FFT_TEST_SRCS 
 ${DSPLIB}/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c
-fft_test.c
+#fft_test.c
 src/startup_stm32f4xx.s
 src/system_stm32f4xx.c
-stm32f4_machdep.c
-gdb_stdio.c
+#stm32f4_machdep.c
+#gdb_stdio.c
 ../src/kiss_fft.c
 )
 
@@ -238,7 +238,7 @@ target_compile_options(adcdac_ut PRIVATE "-O0")
 set(DAC_PLAY_SRCS
 src/dac_play.c
 ../src/fifo.c
-gdb_stdio.c
+#gdb_stdio.c
 src/stm32f4_dac.c
 src/debugblinky.c
 src/system_stm32f4xx.c
@@ -252,7 +252,7 @@ target_compile_options(dac_play PRIVATE "-O0")
 set(ADC_REC_SRCS
 src/adc_rec.c
 ../src/fifo.c
-gdb_stdio.c
+#gdb_stdio.c
 src/stm32f4_adc.c
 src/debugblinky.c
 src/system_stm32f4xx.c
@@ -265,7 +265,7 @@ target_link_libraries(adc_rec libstm32f4)
 set(ADC_SD_SRCS
 src/adc_sd.c
 ../src/fifo.c
-gdb_stdio.c
+#gdb_stdio.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
 src/debugblinky.c
@@ -277,7 +277,7 @@ add_executable(adc_sd ${ADC_SD_SRCS})
 target_link_libraries(adc_sd libstm32f4)
 
 set(PWM_UT_SRCS
-gdb_stdio.c
+#gdb_stdio.c
 src/stm32f4_pwm.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
@@ -288,7 +288,7 @@ target_link_libraries(pwm_ut libstm32f4)
 
 set(POWER_UT_SRCS
 src/power_ut.c
-gdb_stdio.c
+#gdb_stdio.c
 ../src/fifo.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
@@ -329,6 +329,7 @@ list(APPEND USB_VCP_UT ${USB_VCP})
 set(CFLAGS "${CFLAGS} -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg")
 
 add_executable(usb_vcp_ut ${USB_VCP_UT})
+target_include_directories(usb_vcp_ut INTERFACE usb_lib/cdc)
 target_link_libraries(usb_vcp_ut libstm32f4)
 
 set(ADC_REC_USB_SRCS
@@ -345,12 +346,13 @@ src/init.c)
 list(APPEND ADC_REC_USB_SRCS ${USB_VCP})
 
 add_executable(adc_rec_usb ${ADC_REC_USB_SRCS})
+target_include_directories(adc_rec_usb INTERFACE usb_lib/cdc)
 target_link_libraries(adc_rec_usb libstm32f4)
 
 
 set(FDMDV_PROFILE_SRCS
 src/fdmdv_profile.c
-gdb_stdio.c
+#gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c
@@ -360,7 +362,7 @@ list(APPEND FDMDV_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
 target_link_libraries(fdmdv_profile libstm32f4)
-target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
+target_compile_definitions(fdmdv_profile INTERFACE PROFILE)
 
 set(SM1000_LEDS_SWITCHES_UT_SRCS
 src/sm1000_leds_switches_ut.c
@@ -401,7 +403,7 @@ target_compile_options(sm1000 PRIVATE "-O3")
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
 src/stm32f4_machdep.c
-gdb_stdio.c
+#gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -415,7 +417,7 @@ target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
 set(FREEDV_RX_PROFILE_SRCS
 src/freedv_rx_profile.c
 src/stm32f4_machdep.c
-gdb_stdio.c
+#gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -430,7 +432,7 @@ src/fdmdv_dump_rt.c
 src/sm1000_leds_switches.c
 ../src/fifo.c
 src/debugblinky.c
-gdb_stdio.c
+#gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -445,7 +447,7 @@ target_compile_options(fdmdv_dump_rt PRIVATE "-O3")
 
 set(TUNER_UT_SRCS
 src/tuner_ut.c
-gdb_stdio.c
+#gdb_stdio.c
 ../src/fifo.c
 src/stm32f4_dac.c
 src/iir_tuner.c
@@ -468,7 +470,7 @@ target_link_libraries(tuner_ut stm32f4_adc_tuner libstm32f4)
 
 set(ADC_SFDR_UT_SRCS
 src/adc_sfdr_ut.c
-gdb_stdio.c
+#gdb_stdio.c
 ../src/fifo.c
 src/iir_tuner.c
 src/sm1000_leds_switches.c
