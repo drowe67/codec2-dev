@@ -103,7 +103,8 @@ function [surface_no_mean surface] = newamp1_batch(input_prefix, varargin)
     [model_ surface] = experiment_rate_K_dct2(model, 0, 1, voicing);
   end
   if strcmp(mode, 'mel')
-    [model_ surface] = experiment_mel_freq(model, 0, 1, voicing);
+    [model_ surface sd_log] = experiment_mel_freq(model, 0, 1, voicing);
+    
   end
   if strcmp(mode, 'const')
     [model_ surface b_log] = experiment_const_freq(model, varargin{:});
@@ -1244,17 +1245,18 @@ endfunction
 
 % Basic unquantised rate K mel-sampling then back to rate L.  Now with "high end correction"
 
-function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
+function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
   [frames nc] = size(model);
   K = 20; Fs = 8000; correct_rate_K_en = 0;
-
+  AmdB = zeros(frames, 160);
+  
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
-    AmdB = 20*log10(Am);
+    AmdB(f,1:L) = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
-    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'para');
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'lanc');
     if correct_rate_K_en
       [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs);
       [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
@@ -1267,9 +1269,29 @@ function [model_ rate_K_surface] = experiment_mel_freq(model, vq_en=0, plots=1, 
   if plots
     mesh(rate_K_surface);
   end
-  
-  model_ = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs, 'para');
- 
+
+  [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs, 'lancmel');
+
+  % calculate SD
+
+  sd_log = [];
+  for f=1:frames
+    L = model(f,2);
+    asd = std(AmdB(f,1:L) - AmdB_(f,1:L));
+
+    % this code useful to explore outliers, adjust threshold based on plo(sd_log) below
+    plot_outliers = 0;
+    if plot_outliers && (asd > 7)
+      figure; plot(AmdB(f,1:L), 'b+-'); hold on; plot(AmdB_(f,1:L), 'r+-'); hold off;      
+    end
+    sd_log = [sd_log asd];
+  end
+
+  if plots
+    figure; plot(sd_log); title('SD againstframe');
+    figure; plot(hist(sd_log));
+  end
+  printf("mean SD %4.2f\n", mean(sd_log));
 endfunction
 
 
