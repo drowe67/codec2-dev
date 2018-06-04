@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
     FILE *flspmel = 0;
     int dec;
     int decimate = 1;
-    int   amread, Woread;
+    int   amread, Woread, pahw;
     int   awread;
     int   hmread;
     int   phase0 = 0;
@@ -149,6 +149,7 @@ int main(int argc, char *argv[])
         { "hmread", required_argument, &hmread, 1 },
         { "awread", required_argument, &awread, 1 },
         { "Woread", required_argument, &Woread, 1 },
+        { "pahw", required_argument, &pahw, 1 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -264,6 +265,33 @@ int main(int argc, char *argv[])
 		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
 		gain = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "pahw") == 0) {
+
+                /* set up a bunch of arguments instead of having to enter them on cmd line every time */
+
+                phase0 = postfilt = amread = hmread = Woread = 1;
+                char file_name[MAX_STR];
+                sprintf(file_name, "%s_am.out", optarg);
+                fprintf(stderr, "reading %s", file_name);
+	        if ((fam = fopen(file_name,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float Am file: %s: %s.\n",
+		        file_name, strerror(errno));
+                    exit(1);
+                }
+                sprintf(file_name, "%s_hm.out", optarg);
+                fprintf(stderr, " %s", file_name);
+	        if ((fhm = fopen(file_name,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float Hm file: %s: %s.\n",
+		        file_name, strerror(errno));
+                    exit(1);
+                }
+                sprintf(file_name, "%s_Wo.out", optarg);
+                fprintf(stderr, " %s\n", file_name);
+ 	        if ((fWo = fopen(file_name,"rb")) == NULL) {
+	            fprintf(stderr, "Error opening float Wo file: %s: %s.\n",
+		        file_name, strerror(errno));
+                    exit(1);
+                }
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1;
