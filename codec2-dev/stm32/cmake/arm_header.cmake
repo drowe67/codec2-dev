@@ -59,6 +59,6 @@ message(STATUS "${CSPATH} is where CodeSourcery is installed")
 #setup directories for  appropriate  C, C++, mbed libraries and includes
 include_directories(${MBED_INCLUDE})
 include_directories(mbed)
-include_directories(${CSPATH}../arm-none-eabi/include)
-include_directories(${CSPATH}../arm-none-eabi/include/c++/4.6.1)
+include_directories(${CSPATH}/../arm-none-eabi/include)
+include_directories(${CSPATH}/../arm-none-eabi/include/c++/4.6.1)
 link_directories(${MBED_INCLUDE})
