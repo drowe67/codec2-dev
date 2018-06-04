@@ -654,7 +654,12 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
     if strcmp(interp_alg, 'lanc')
       AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_kHz, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_kHz);    
     end
-    
+    if strcmp(interp_alg, 'lancmel')
+      rate_K_sample_freqs_mel = ftomel(rate_K_sample_freqs_kHz*1000);
+      rate_L_sample_freqs_mel = ftomel(rate_L_sample_freqs_kHz*1000);
+      AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_mel, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_mel);
+    end
+
 #{
     if pad_end
       AmdB_(f,1:L) = interp1([0 rate_K_sample_freqs_kHz Fs/2000], 

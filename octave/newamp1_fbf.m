@@ -21,11 +21,12 @@ function newamp1_fbf(samname, f=73, varargin)
   newamp;
   melvq;
 
-  Fs = 8000; rate_K_sample_freqs_kHz = [0.1:0.1:4]; K = length(rate_K_sample_freqs_kHz);
+  Fs = 8000; 
   quant_en = 0; vq_search = "gain"; 
   mask_en = 0;
   nvq = 0; vq_start = [];
   quant_en = weight_en = 0;
+  mode = "const";
 
   % specify one of more vqs, start index, vq file name, and search method
 
@@ -53,6 +54,11 @@ function newamp1_fbf(samname, f=73, varargin)
   ind = arg_exists(varargin, "construct_indep");
   if ind
     vq_search = varargin{ind};
+  end
+
+  ind = arg_exists(varargin, "mode");
+  if ind
+    mode = varargin{ind+1};
   end
   
   % optional exploration of phase
@@ -96,7 +102,14 @@ function newamp1_fbf(samname, f=73, varargin)
 
     % remove constant gain term
 
-    rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs);
+    if strcmp(mode, 'const')
+      rate_K_sample_freqs_kHz = [0.1:0.1:4]; K = length(rate_K_sample_freqs_kHz);
+      rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs);
+    end
+    if strcmp(mode, 'mel')
+      K = 20;
+      [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'lanc');
+    end
     if fit_order == 0
       slope = 0; meanf = mean(rate_K_vec); 
       rate_K_vec_fit = rate_K_vec - meanf;
@@ -109,7 +122,7 @@ function newamp1_fbf(samname, f=73, varargin)
     plot((1:L)*Wo*4000/pi, AmdB, l);
     axis([1 4000 -20 80]);
     hold on;
-    plot(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
+    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
 
     % default to the ideal
     
@@ -193,7 +206,12 @@ function newamp1_fbf(samname, f=73, varargin)
     if (strcmp(vq_search, "construct") == 0) && (strcmp(vq_search, "construct_indep") == 0)
       rate_K_vec_ += meanf;
     end
-    [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
+    if strcmp(mode, "const")
+      [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs);
+    end
+    if strcmp(mode, "mel")
+      [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs, "lancmel");
+    end
     AmdB_ = AmdB_(1:L);
     sdL = std(abs(AmdB - AmdB_));
 
