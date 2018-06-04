@@ -296,7 +296,7 @@ int main(int argc, char *argv[])
             }
         }
 
-        /* Measure power after fading model to make sure aaverage pwr
+        /* Measure power after fading model to make sure average pwr
            is the same as AWGN channels. We only output the real
            signal, which is half the power. */
 
