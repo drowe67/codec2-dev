@@ -410,3 +410,60 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
     #}
 endfunction
 
+
+function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs)
+
+    % aliasing correction --------------------------------------
+
+    % The mel sample rate decreases as frequency increases. Look for
+    % any regions above 1000Hz where we have missed definition of a
+    % spectral peak (formant) due to aliasing.  Adjust the rate K
+    % sample levels to restore peaks.  Theory is that correct
+    % definition of a formant is less important than the frequency of
+    % the formant.  As long as we define a formant in that general
+    % frequency area it will sound OK.
+
+    Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
+
+    % Lets see where we have made an error
+
+    error = orig_error = AmdB(1:L) - AmdB_(1:L);
+
+    Ncorrections = 3;      % maximum number of rate K samples to correct
+    error_thresh = 3;      % only worry about errors larger than thresh
+
+    start_m = floor(L*1000/(Fs/2));
+    error(1:start_m) = 0;  % first 1000Hz is densly sampled so ignore
+    nasty_error_m_log = []; nasty_error_log = [];
+
+
+    rate_K_vec_corrected = rate_K_vec;
+    for i=1:Ncorrections
+      [mx mx_m] = max(error);
+
+      if mx > error_thresh
+        nasty_error_log = [nasty_error_log mx];
+        nasty_error_m_log = [nasty_error_m_log mx_m];
+
+        % find closest rate K sample to nasty error
+
+        nasty_error_freq = mx_m*Wo*Fs/(2*pi*1000);
+        [tmp closest_k] = min(abs(rate_K_sample_freqs_kHz - nasty_error_freq));
+        rate_K_vec_corrected(closest_k) = AmdB(mx_m);
+
+        % zero out error in this region and look for another large error region
+
+        k = max(1, closest_k-1); 
+        rate_K_prev_sample_kHz = rate_K_sample_freqs_kHz(k);
+        k = min(K, closest_k+1); 
+        rate_K_next_sample_kHz = rate_K_sample_freqs_kHz(k);
+
+        [tmp st_m] = min(abs(Am_freqs_kHz - rate_K_prev_sample_kHz));
+        [tmp en_m] = min(abs(Am_freqs_kHz - rate_K_next_sample_kHz));
+        if closest_k == K
+         en_m = L;
+        end 
+        error(st_m:en_m) = 0;
+      end
+    end
+endfunction
