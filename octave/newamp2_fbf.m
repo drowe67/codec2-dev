@@ -19,7 +19,15 @@ function newamp2_fbf(samname, f=73, varargin)
   more off;
   newamp;
   Fs = 8000; 
-  mode = "mel"; K = 20;
+  mode = "mel"; K = 20; correct_rate_K_en = 0;
+
+  % command line arguments
+  
+  ind = arg_exists(varargin, "phase");
+  phase_en = 0;
+  if ind
+    phase_en = 1;
+  end
 
   % load up text files dumped from c2sim ---------------------------------------
 
@@ -30,9 +38,16 @@ function newamp2_fbf(samname, f=73, varargin)
   model_name = strcat(samname,"_model.txt");
   model = load(model_name);
   [frames tmp] = size(model);
+
+  if phase_en
+    phase_name = strcat(samname,"_phase.txt");
+    phase = load(phase_name);
+    phase_source = 'Am';
+  end
   
   % Keyboard loop --------------------------------------------------------------
 
+  quant = 0;
   k = ' ';
   do 
     fg = 1;
@@ -44,6 +59,11 @@ function newamp2_fbf(samname, f=73, varargin)
 
     K = 20;
     [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'lanc');
+    if correct_rate_K_en
+      [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs, "lancmel");
+      [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
+      rate_K_vec = rate_K_vec_corrected;
+    end
 
     % plots ----------------------------------
   
@@ -55,10 +75,14 @@ function newamp2_fbf(samname, f=73, varargin)
     stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
 
     rate_K_vec_ = rate_K_vec; 
- 
+    if quant
+       rate_K_vec_ = 6*round(rate_K_vec/6);    
+    end
+    
     % And .... back to rate L
     
     [model_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec_, rate_K_sample_freqs_kHz, Fs, "lancmel");
+    
     AmdB_ = AmdB_(1:L);
     sdL = std(abs(AmdB - AmdB_));
 
@@ -66,9 +90,53 @@ function newamp2_fbf(samname, f=73, varargin)
     l = sprintf(";error sd %3.2f dB;bk+-", sdL);
     plot((1:L)*Wo*4000/pi, (AmdB - AmdB_), l);
     hold off;
+    
+    if phase_en
+
+      % est phase using HT
+
+      fft_enc = 512;
+      if strcmp(phase_source,'Am')
+        Am_phase = model(f,3:(L+2));
+        phase_est = determine_phase(model(f,:), 1, fft_enc);
+      else
+        Am_phase = model_(3:(L+2));
+        phase_est = determine_phase(model_, 1, fft_enc);
+      end
+      Am_phase_dB = 20*log10(Am_phase);
+      phase0 = zeros(1,L);
+      for m=1:L
+        b = round(m*Wo*fft_enc/(2*pi));
+        phase0(m) = phase_est(b);
+      end
+      
+      % plot amplitudes and phase for first 1kHz
+      
+      figure(fg++); clf;
+      subplot(211);
+      l = sprintf("+-;%s;",phase_source);
+      plot((1:L)*Wo*4000/pi, Am_phase_dB(1:L),l);
+      subplot(212);
+      plot((1:L)*Wo*4000/pi, phase(f,1:L),'+-;orig;');
+      hold on;
+      plot((1:L)*Wo*4000/pi, phase0(1:L),'r+-;synth;');
+      hold off;
+      
+      % simple synthesis using sinusoidal parameters
+
+      figure(fg++); clf;
+      N = 320;
+      s = s_phase0 = zeros(1,N);
+      for m=1:L
+        s = s + Am_phase(m)*cos(m*Wo*(1:N) + phase(f,m));
+        s_phase0 = s_phase0 + Am_phase(m)*cos(m*Wo*(1:N) + phase0(m));
+      end
+      subplot(211); plot(s); subplot(212); plot(s_phase0,'g');
+    end
+
     % interactive menu ------------------------------------------
 
-    printf("\rframe: %d  menu: n-next  b-back  q-quit", f);
+    printf("\rframe: %d  menu: n-next  b-back  u-qUant  c-Correct s-phSrc q-quit", f);
     fflush(stdout);
     k = kbhit();
 
@@ -82,6 +150,19 @@ function newamp2_fbf(samname, f=73, varargin)
     if k == 'b'
       f = f - 1;
     endif
+    if k == 'u'
+      if quant==0, quant=1;, else quant=0;,end;
+    end
+    if k == 's'
+      if strcmp(phase_source, 'Am')
+        phase_source = 'Am bar'
+      else
+        phase_source = 'Am';
+      end
+    end
+    if k == 'c'
+      if correct_rate_K_en==0, correct_rate_K_en=1;, else correct_rate_K_en=0;,end;
+    end
   until (k == 'q')
   printf("\n");
 

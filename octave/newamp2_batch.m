@@ -21,8 +21,7 @@
     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
     $ cd ~/codec2-dev/octave
     octave:14> newamp2_batch("../build_linux/src/hts1a")
-    ~/codec2-dev/build_linux/src$ /c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16
- 
+    ~/codec2-dev/build_linux/src$ /c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16 
 #}
 
 
@@ -37,6 +36,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   synth_phase = output = 1;
   output_prefix = input_prefix;
   mode = "mel";
+  correct_rate_K_en = 0;
   
   % parse variable argument list
 
@@ -48,6 +48,7 @@ function surface = newamp2_batch(input_prefix, varargin)
     if ind
       output_prefix =  varargin{ind+1};
     end
+
     ind = arg_exists(varargin, "mode");
     if ind
       mode =  varargin{ind+1};
@@ -58,13 +59,16 @@ function surface = newamp2_batch(input_prefix, varargin)
       output = 0;
       synth_phase = 0;
     end
+
+    correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
   end
 
-  printf("output: %d\n", output);
+  printf("output: %d", output);
   if (output)
-    printf("output_prefix: %s\n",  output_prefix);
+    printf(" output_prefix: %s",  output_prefix);
   end
-  printf("mode: %s\n", mode);
+  printf(" mode: %s", mode);
+  printf(" correct_rate_K: %d\n", correct_rate_K_en);
   
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
@@ -81,7 +85,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   % Choose experiment to run test here -----------------------
 
   if strcmp(mode, 'mel')
-    [model_ surface sd_log] = experiment_mel_freq(model, 0, 1, voicing);    
+    [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, 1);    
   end
 
   % ----------------------------------------------------
@@ -164,7 +168,7 @@ endfunction
 
 % Basic unquantised rate K mel-sampling then back to rate L
 
-function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, vq_en=0, plots=1, voicing)
+function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1)
   [frames nc] = size(model);
   K = 20; Fs = 8000;
   AmdB = zeros(frames, 160);
@@ -176,33 +180,62 @@ function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, vq_en=0, pl
     AmdB(f,1:L) = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'lanc');
-    rate_K_surface(f,:) = rate_K_vec;
+    if correct_rate_K_en
+      [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs, 'lancmel');
+      [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
+      rate_K_surface(f,:) = rate_K_vec_corrected;
+    else
+      rate_K_surface(f,:) = rate_K_vec;
+    end
   end
 
+  %rate_K_surface = 6*round(rate_K_surface/6);
+  #{
+  M = 16;
+  Nsf = floor(frames/M);
+  rate_K_surface_ = zeros(frames, K);
+  for sf=1:Nsf
+    st = (sf-1)*M+1; en = st + M -1;
+    printf("sf: %d st: %d en: %d\n", sf, st, en);
+    D = dct2(rate_K_surface(st:en, :));
+    D_ = round(D/4)
+    rate_K_surface_(st:en,:) = idct2(4*D_);
+  end
+  #}
+  rate_K_surface_ = rate_K_surface;
   if plots
-    mesh(rate_K_surface);
+    figure(1); clf; mesh(rate_K_surface_);
   end
 
-  [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface, rate_K_sample_freqs_kHz, Fs, 'lancmel');
+  [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lancmel');
 
   % calculate SD
 
-  sd_log = [];
+  sd_log = []; energy_log = [];
   for f=1:frames
     L = model(f,2);
     asd = std(AmdB(f,1:L) - AmdB_(f,1:L));
-
-    % this code useful to explore outliers, adjust threshold based on plo(sd_log) below
-    plot_outliers = 0;
-    if plot_outliers && (asd > 7)
-      figure; plot(AmdB(f,1:L), 'b+-'); hold on; plot(AmdB_(f,1:L), 'r+-'); hold off;      
-    end
+    energy_log = [energy_log mean(AmdB(f,1:L))];
     sd_log = [sd_log asd];
   end
 
   if plots
-    figure; plot(sd_log); title('SD againstframe');
-    figure; plot(hist(sd_log));
+    figure(2); clf; l = length(sd_log); ax=plotyy((1:l),sd_log,(1:l),energy_log);
+    title('SD againstframe'); xlabel('Frame'); ylabel (ax(1), "SD"); ylabel (ax(2), "Energy");
+
+    figure(3); clf; plot(hist(sd_log)); title('SD histogram');
+    figure(4); clf; plot(energy_log, sd_log, '+'); title('Scatter of SD against energy');
+    xlabel('Energy'); ylabel('SD'); axis([-10 60 0 7]);
+  end
+  
+  % this code useful to explore outliers, adjust threshold based on plot(sd_log)
+
+  plot_outliers = 0;
+  if plot_outliers && (asd > 7)
+    for f=1:frames
+      L = model(f,2);
+      figure; plot(AmdB(f,1:L), 'b+-'); hold on; plot(AmdB_(f,1:L), 'r+-'); hold off;
+    end
   end
   printf("mean SD %4.2f\n", mean(sd_log));
 endfunction
