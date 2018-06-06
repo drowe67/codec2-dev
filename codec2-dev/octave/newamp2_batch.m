@@ -29,14 +29,14 @@ function surface = newamp2_batch(input_prefix, varargin)
   newamp2;
   more off;
 
-  max_amp = 160;
+  max_amp = 160; Fs = 8000;
 
   % defaults
 
   synth_phase = output = 1;
   output_prefix = input_prefix;
   mode = "mel";
-  correct_rate_K_en = 0;
+  correct_rate_K_en = 0; huffman_q = 0;
   
   % parse variable argument list
 
@@ -60,6 +60,8 @@ function surface = newamp2_batch(input_prefix, varargin)
       synth_phase = 0;
     end
 
+    huffman_q = arg_exists(varargin, "huffman_q");
+
     correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
   end
 
@@ -68,7 +70,7 @@ function surface = newamp2_batch(input_prefix, varargin)
     printf(" output_prefix: %s",  output_prefix);
   end
   printf(" mode: %s", mode);
-  printf(" correct_rate_K: %d\n", correct_rate_K_en);
+  printf(" correct_rate_K: %d huffman_q: %d\n", correct_rate_K_en, huffman_q);
   
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
@@ -85,7 +87,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   % Choose experiment to run test here -----------------------
 
   if strcmp(mode, 'mel')
-    [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, 1);    
+    [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, plots=1, huffman_q);    
   end
 
   % ----------------------------------------------------
@@ -106,7 +108,7 @@ function surface = newamp2_batch(input_prefix, varargin)
       %printf("%d ", f);   
       Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
       if Wo*L > pi
-        printf("Problem: %d  Wo*L > pi\n", f);   
+        printf("Problem: %d  Wo*L > pi Wo: %f F0: %f L: %d Wo*L: %f\n", f, Wo, Wo*Fs/(2*pi), L, Wo*L);   
       end
 
       Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
@@ -168,7 +170,7 @@ endfunction
 
 % Basic unquantised rate K mel-sampling then back to rate L
 
-function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1)
+function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1, huffman_q=0)
   [frames nc] = size(model);
   K = 20; Fs = 8000;
   AmdB = zeros(frames, 160);
@@ -202,7 +204,15 @@ function [model_ rate_K_surface sd_log] = experiment_mel_freq(model, correct_rat
     rate_K_surface_(st:en,:) = idct2(4*D_);
   end
   #}
-  rate_K_surface_ = rate_K_surface;
+
+  if huffman_q
+    for f=1:frames
+      rate_K_surface_(f,:) = huffman_quantise_rate_K(rate_K_surface(f,:));
+    end
+  else
+    rate_K_surface_ = rate_K_surface;
+  end
+
   if plots
     figure(1); clf; mesh(rate_K_surface_);
   end
