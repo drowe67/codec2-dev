@@ -7,7 +7,7 @@
 #
 include(cmake/arm_toolchain.cmake)
 set(CMAKE_C_FLAGS "--specs=nosys.specs")
-project(codec2 C)
+project(codec2 C ASM)
 
 cmake_minimum_required(VERSION 2.8)
 
@@ -18,7 +18,7 @@ mark_as_advanced(CLEAR
     CMAKE_INSTALL_LIBDIR
 )
 
-include(cmake/arm_header.cmake)
+#include(cmake/arm_header.cmake)
 
 # Include local definitions if they exist.
 #-include local.mak
@@ -30,7 +30,7 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 ###################################################
 
 # Set default C++ flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -std=gnu11 -Tstm32_flash.ld -DSTM32F40_41xxx -DCORTEX_M4 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -std=gnu11 -DSTM32F40_41xxx -DCORTEX_M4 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
 
 if(FLOAT_TYPE STREQUAL "hard")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsingle-precision-constant -Wdouble-promotion -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1")
@@ -53,6 +53,12 @@ include(cmake/STM32_Lib.cmake)
 ###################################################
 
 # Codec 2
+
+# Output path is such that #include <codec2/version.h> in codec2.h works
+set(CODEC2_VERSION_PATH "${PROJECT_BINARY_DIR}/codec2")
+configure_file ("${PROJECT_SOURCE_DIR}/../cmake/version.h.in"
+                "${CODEC2_VERSION_PATH}/version.h" )
+include_directories(${PROJECT_BINARY_DIR})
 
 set(CODEC2_SRC ../src)
 set(CODEC2_SRCS
@@ -127,44 +133,6 @@ if(SEMIHOSTING)
     link_libraries(rdimon)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
 endif()
-
-# startup file
-
-set(SRCS src/startup_stm32f4xx.s src/init.c)
-
-# cmake does not allow sharing of objects with multiple targets. Make it a statis library and include it where needed.
-add_library(OBJS STATIC ${SRCS})
-
-# Rule for making directories automatically.
-# Note we don't use -p as it's a GNU extension.
-#%/.md:
-#	parent=$(shell dirname $(@D) );
-#		[ -d $${parent} ] || $(MAKE) $${parent}/.md
-#	[ -d $(@D) ] || mkdir $(@D)
-#	touch $@
-
-#dl/$(PERIPHLIBZIP): dl/.md
-#	wget -O$@.part -c $(PERIPHLIBURL)/$(PERIPHLIBZIP)
-#	mv $@.part $@
-#	touch $@
-
-#$(PERIPHLIBDIR)/.unpack: dl/$(PERIPHLIBZIP)
-#	test ! -d $(PERIPHLIBDIR)_$(PERIPHLIBVER) ||
-#		rm -fr $(PERIPHLIBDIR)_$(PERIPHLIBVER)
-#	unzip dl/$(PERIPHLIBZIP)
-#	test ! -d $(PERIPHLIBDIR) || rm -fr $(PERIPHLIBDIR)
-#	mv $(PERIPHLIBDIR)_$(PERIPHLIBVER) $(PERIPHLIBDIR)
-#	touch $@
-
-#$(CMSIS_OBJS) $(STM32F4LIB_OBJS): $(PERIPHLIBDIR)/.unpack
-
-#libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
-#	find $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
-
-
-# Rule for building .bin files from a .elf
-#%.bin: %.elf
-#	$(OBJCOPY) -O binary $< $@
 
 # Rule for programming the SM1000
 #%.pgm: %.bin
@@ -326,10 +294,10 @@ src/init.c)
 
 list(APPEND USB_VCP_UT ${USB_VCP})
 
-set(CFLAGS "${CFLAGS} -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg")
+add_definitions(-DUSE_USB_OTG_FS -DUSE_ULPI_PHY)
+include_directories(usb_conf usb_lib/cdc usb_lib/core usb_lib/otg)
 
 add_executable(usb_vcp_ut ${USB_VCP_UT})
-target_include_directories(usb_vcp_ut INTERFACE usb_lib/cdc)
 target_link_libraries(usb_vcp_ut libstm32f4)
 
 set(ADC_REC_USB_SRCS
@@ -346,7 +314,6 @@ src/init.c)
 list(APPEND ADC_REC_USB_SRCS ${USB_VCP})
 
 add_executable(adc_rec_usb ${ADC_REC_USB_SRCS})
-target_include_directories(adc_rec_usb INTERFACE usb_lib/cdc)
 target_link_libraries(adc_rec_usb libstm32f4)
 
 
@@ -362,7 +329,7 @@ list(APPEND FDMDV_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
 target_link_libraries(fdmdv_profile libstm32f4)
-target_compile_definitions(fdmdv_profile INTERFACE PROFILE)
+target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
 
 set(SM1000_LEDS_SWITCHES_UT_SRCS
 src/sm1000_leds_switches_ut.c
@@ -543,12 +510,15 @@ src/stm32f4_adc.c
 ../src/fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
-src/init.c)
+src/init.c
+${CODEC2_SRC}/ofdm.c)
 
 list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
-set_target_properties(sm2000_rxdemo PROPERTIES OUTPUT_NAME sm2000_rxdemo.elf)
-target_link_libraries(sm2000_rxdemo stm32f4)
+set_target_properties(sm2000_rxdemo PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
+    OUTPUT_NAME sm2000_rxdemo.elf)
+target_link_libraries(sm2000_rxdemo stm32f4 CMSIS)
 
 # ---------------------------------------------------------------------------------
 
@@ -568,7 +538,7 @@ src/init.c)
 list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
 set_target_properties(sm2000_stw PROPERTIES OUTPUT_NAME sm2000_stw.elf)
-target_link_libraries(sm2000_stw libstm32f4)
+target_link_libraries(sm2000_stw stm32f4)
 
 # -----------------------------------------------------------------------------
 
@@ -584,12 +554,15 @@ src/stm32f4_adc.c
 ../src/fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
-src/init.c)
+src/init.c
+${CODEC2_SRC}/ofdm.c)
 
 list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
-set_target_properties(sm2000_adcdump PROPERTIES OUTPUT_NAME sm2000_adcdump.elf)
-target_link_libraries(sm2000_adcdump stm32f4)
+set_target_properties(sm2000_adcdump PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
+    OUTPUT_NAME sm2000_adcdump.elf)
+target_link_libraries(sm2000_adcdump stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
 
