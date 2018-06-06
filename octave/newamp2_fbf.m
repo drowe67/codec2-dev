@@ -17,7 +17,7 @@
 
 function newamp2_fbf(samname, f=73, varargin)
   more off;
-  newamp;
+  newamp2;
   Fs = 8000; 
   mode = "mel"; K = 20; correct_rate_K_en = 0;
 
@@ -72,12 +72,12 @@ function newamp2_fbf(samname, f=73, varargin)
     plot((1:L)*Wo*4000/pi, AmdB, l);
     axis([1 4000 -20 80]);
     hold on;
-    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec, ";rate K;b+-");
 
     rate_K_vec_ = rate_K_vec; 
     if quant
-       rate_K_vec_ = 6*round(rate_K_vec/6);    
+       rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec);  
     end
+    stem(rate_K_sample_freqs_kHz*1000, rate_K_vec_);
     
     % And .... back to rate L
     

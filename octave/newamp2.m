@@ -467,3 +467,64 @@ function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_lo
       end
     end
 endfunction
+
+
+% Given a vector of rate K samples, huffman encodes/decodes delta
+% amplitude, returning quantised samples
+
+function rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec)
+  K = length(rate_K_vec);
+
+  % whole thing is quantised to 6dB steps, as that doesn't seem to
+  % introduce much distortion
+  
+  rate_K_vec = 6*round(rate_K_vec/6);
+
+  % start with k=3, around 250Hz, we assume that's quantised as the
+  % mean frame energy, as samples before that might be stuck in the
+  % HPF.
+
+  rate_K_vec_no_mean = rate_K_vec - rate_K_vec(3);
+  target = target_ = rate_K_vec_no_mean_ = zeros(1,K);
+
+  % move backwards to get target for first two samples
+  
+  target(2) = rate_K_vec_no_mean(2);
+  target(1) = rate_K_vec_no_mean(1) - rate_K_vec_no_mean(2); 
+
+  % then forwards for rest of the target samples
+  
+  for m=4:K
+    target(m) = rate_K_vec_no_mean(m) - rate_K_vec_no_mean(m-1);
+  end
+
+  % Now we can huffman encode them, ignoring m=3, using the following table
+  %
+  % 00    0
+  % 10   +6
+  % 11   -6
+  % 010 -12
+  % 011 +12
+  %
+  % Anything outside of that is overload distortion
+
+  levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
+  bits = [];
+  for m=1:K
+    if m != 3
+      [quant_out best_i] = quantise([0 6 -6 -12 12], target(m));
+      bits = [bits symbols{best_i}];
+      target_(m) = quant_out;
+    end
+  end
+  printf("%d bits\n", length(bits));
+  
+  rate_K_vec_no_mean_(2) = target_(2);
+  rate_K_vec_no_mean_(1) = rate_K_vec_no_mean_(2) + target_(1);
+  for m=4:K
+    rate_K_vec_no_mean_(m) = target_(m) + rate_K_vec_no_mean_(m-1);
+  end
+  rate_K_vec_ = rate_K_vec_no_mean_ + rate_K_vec(3);
+  %target
+  %target_
+endfunction
