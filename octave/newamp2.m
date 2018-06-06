@@ -485,46 +485,38 @@ function rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec)
   % HPF.
 
   rate_K_vec_no_mean = rate_K_vec - rate_K_vec(3);
-  target = target_ = rate_K_vec_no_mean_ = zeros(1,K);
+  rate_K_vec_no_mean_ = zeros(1,K);
 
-  % move backwards to get target for first two samples
-  
-  target(2) = rate_K_vec_no_mean(2);
-  target(1) = rate_K_vec_no_mean(1) - rate_K_vec_no_mean(2); 
-
-  % then forwards for rest of the target samples
-  
-  for m=4:K
-    target(m) = rate_K_vec_no_mean(m) - rate_K_vec_no_mean(m-1);
-  end
-
-  % Now we can huffman encode them, ignoring m=3, using the following table
+  % huffman encoding od differences, ignoring m=3, using the following table
   %
   % 00    0
   % 10   +6
   % 11   -6
   % 010 -12
   % 011 +12
-  %
-  % Anything outside of that is overload distortion
 
   levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
-  bits = [];
-  for m=1:K
-    if m != 3
-      [quant_out best_i] = quantise([0 6 -6 -12 12], target(m));
-      bits = [bits symbols{best_i}];
-      target_(m) = quant_out;
-    end
-  end
-  printf("%d bits\n", length(bits));
+
+  % move backwards to get target for first two samples
   
-  rate_K_vec_no_mean_(2) = target_(2);
-  rate_K_vec_no_mean_(1) = rate_K_vec_no_mean_(2) + target_(1);
+  bits = [];
+  [quant_out best_i] = quantise(levels, rate_K_vec_no_mean(2));
+  bits = [bits symbols{best_i}];
+  rate_K_vec_no_mean_(2) = quant_out;
+  
+  [quant_out best_i] = quantise(levels, rate_K_vec_no_mean(1) - rate_K_vec_no_mean(2));
+  bits = [bits symbols{best_i}];
+  rate_K_vec_no_mean_(1) = quant_out + rate_K_vec_no_mean_(2);
+
+  % then forwards for rest of the target samples
+  
   for m=4:K
-    rate_K_vec_no_mean_(m) = target_(m) + rate_K_vec_no_mean_(m-1);
+    target = rate_K_vec_no_mean(m) - rate_K_vec_no_mean_(m-1);
+    [quant_out best_i] = quantise(levels, target);
+    bits = [bits symbols{best_i}];
+    rate_K_vec_no_mean_(m) = quant_out + rate_K_vec_no_mean_(m-1);    
   end
+
+  printf("%d bits\n", length(bits));
   rate_K_vec_ = rate_K_vec_no_mean_ + rate_K_vec(3);
-  %target
-  %target_
 endfunction
