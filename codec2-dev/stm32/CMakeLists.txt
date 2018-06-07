@@ -5,11 +5,10 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
-include(cmake/arm_toolchain.cmake)
-set(CMAKE_C_FLAGS "--specs=nosys.specs")
+cmake_minimum_required(VERSION 2.8)
+include(cmake/STM32_Toolchain.cmake)
 project(codec2 C ASM)
 
-cmake_minimum_required(VERSION 2.8)
 
 include(GNUInstallDirs)
 mark_as_advanced(CLEAR
@@ -30,7 +29,9 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 ###################################################
 
 # Set default C++ flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -std=gnu11 -DSTM32F40_41xxx -DCORTEX_M4 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "--specs=nosys.specs -Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+
+add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
 if(FLOAT_TYPE STREQUAL "hard")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fsingle-precision-constant -Wdouble-promotion -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1")
@@ -42,6 +43,24 @@ endif()
 # Sync up build flags if other build types are specified.
 set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS}")
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS}")
+
+
+option(VERIFY_OPT "Enable this for dump files to help verify optimization" OFF)
+if(VERIFY_OPT)
+    add_definitions(-DDUMP)
+endif()
+
+option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
+if(SEMIHOSTING)
+    link_libraries(rdimon)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
+endif()
+
+include_directories(../src ../unittest inc)
+
+# Libraries to link for all targets
+link_libraries(g;nosys;m)
+
 
 ###################################################
 
@@ -91,17 +110,6 @@ ${CODEC2_SRC}/freedv_vhf_framing.c
 ${CODEC2_SRC}/freedv_data_channel.c
 )
 
-add_definitions(-D__EMBEDDED__)
-
-option(VERIFY_OPT "Enable this for dump files to help verify optimization" OFF)
-if(VERIFY_OPT)
-    add_definitions(-DDUMP)
-endif()
-
-include_directories(../src ../unittest inc)
-
-# Libraries to link for all targets
-link_libraries(g;nosys;m)
 
 set(FFT_TEST_SRCS 
 ${DSPLIB}/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c
@@ -118,13 +126,6 @@ set_target_properties(fft_test PROPERTIES
     LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(fft_test stm32f4 CMSIS)
 
-
-#For standard arm semihosting
-option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
-if(SEMIHOSTING)
-    link_libraries(rdimon)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
-endif()
 
 # Rule for programming the SM1000
 #%.pgm: %.bin
@@ -148,8 +149,6 @@ src/system_stm32f4xx.c
 list(APPEND CODEC2_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(codec2_profile ${CODEC2_PROFILE_SRCS})
-set_target_properties(codec2_profile PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(codec2_profile stm32f4 CMSIS)
 target_compile_definitions(codec2_profile PRIVATE PROFILE)
 
@@ -164,8 +163,6 @@ src/init.c
 )
 
 add_executable(dac_ut ${DAC_UT_SRCS})
-set_target_properties(dac_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(dac_ut stm32f4)
 
 
@@ -181,8 +178,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(fast_dac_ut ${FAST_DAC_UT_SRCS})
-set_target_properties(fast_dac_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(fast_dac_ut stm32f4)
 target_compile_options(fast_dac_ut PRIVATE "-O3")
 
@@ -198,8 +193,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adcdac_ut ${ADCDAC_UT_SRCS})
-set_target_properties(adcdac_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(adcdac_ut stm32f4)
 target_compile_options(adcdac_ut PRIVATE "-O0")
 
@@ -214,8 +207,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(dac_play ${DAC_PLAY_SRCS})
-set_target_properties(dac_play PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(dac_play stm32f4)
 target_compile_options(dac_play PRIVATE "-O0")
 
@@ -230,8 +221,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_rec ${ADC_REC_SRCS})
-set_target_properties(adc_rec PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(adc_rec stm32f4)
 
 set(ADC_SD_SRCS
@@ -246,8 +235,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_sd ${ADC_SD_SRCS})
-set_target_properties(adc_sd PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(adc_sd stm32f4)
 
 set(PWM_UT_SRCS
@@ -258,8 +245,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(pwm_ut ${PWM_UT_SRCS})
-set_target_properties(pwm_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(pwm_ut stm32f4)
 
 set(POWER_UT_SRCS
@@ -308,8 +293,6 @@ add_definitions(-DUSE_USB_OTG_FS -DUSE_ULPI_PHY)
 include_directories(usb_conf usb_lib/cdc usb_lib/core usb_lib/otg)
 
 add_executable(usb_vcp_ut ${USB_VCP_UT})
-set_target_properties(usb_vcp_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(usb_vcp_ut stm32f4)
 
 set(ADC_REC_USB_SRCS
@@ -326,8 +309,6 @@ src/init.c)
 list(APPEND ADC_REC_USB_SRCS ${USB_VCP})
 
 add_executable(adc_rec_usb ${ADC_REC_USB_SRCS})
-set_target_properties(adc_rec_usb PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(adc_rec_usb stm32f4)
 
 
@@ -354,8 +335,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
-set_target_properties(sm1000_leds_switches_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(sm1000_leds_switches_ut stm32f4)
 
 set(SM1000_SRCS
@@ -381,8 +360,6 @@ add_library(stm32f4_dac STATIC src/stm32f4_dac.c)
 add_library(stm32f4_adc STATIC src/stm32f4_adc.c)
 
 add_executable(sm1000 ${SM1000_SRCS})
-set_target_properties(sm1000 PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(sm1000 stm32f4_dac stm32f4_adc stm32f4 CMSIS)
 target_compile_options(sm1000 PRIVATE "-O3")
 
@@ -397,8 +374,6 @@ src/init.c)
 list(APPEND FREEDV_TX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS})
-set_target_properties(freedv_tx_profile PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(freedv_tx_profile stm32f4 CMSIS)
 target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
 
@@ -413,8 +388,6 @@ src/init.c)
 list(APPEND FREEDV_RX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS})
-set_target_properties(freedv_rx_profile PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(freedv_rx_profile stm32f4 CMSIS)
 
 set(FDMDV_DUMP_RT_SRCS
@@ -454,8 +427,6 @@ src/init.c
 
 add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
 add_executable(tuner_ut ${TUNER_UT_SRCS})
-set_target_properties(tuner_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_compile_options(tuner_ut PRIVATE "-O3")
 target_link_libraries(tuner_ut stm32f4_adc_tuner stm32f4)
 
@@ -473,8 +444,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
-set_target_properties(adc_sfdr_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(adc_sfdr_ut stm32f4_adc_tuner stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
@@ -506,7 +475,6 @@ src/init.c)
 
 add_executable(si5351_ut ${SI5351_UT_SRCS})
 set_target_properties(si5351_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
     OUTPUT_NAME si5351_ut.elf)
 target_link_libraries(si5351_ut stm32f4)
 
@@ -521,8 +489,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(mco_ut ${MCO_UT_SRCS})
-set_target_properties(mco_ut PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 set_target_properties(mco_ut PROPERTIES OUTPUT_NAME mco_ut.elf)
 target_link_libraries(mco_ut stm32f4)
 
@@ -546,7 +512,6 @@ src/init.c)
 list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
 set_target_properties(sm2000_rxdemo PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
     OUTPUT_NAME sm2000_rxdemo.elf)
 target_link_libraries(sm2000_rxdemo stm32f4 CMSIS)
 
@@ -568,7 +533,6 @@ src/init.c)
 list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
 set_target_properties(sm2000_stw PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
     OUTPUT_NAME sm2000_stw.elf)
 target_link_libraries(sm2000_stw stm32f4 CMSIS)
 
@@ -591,7 +555,6 @@ src/init.c)
 list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
 set_target_properties(sm2000_adcdump PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
     OUTPUT_NAME sm2000_adcdump.elf)
 target_link_libraries(sm2000_adcdump stm32f4 CMSIS)
 
