@@ -72,6 +72,7 @@ ${CODEC2_SRC}/kiss_fft.c
 ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
 ${CODEC2_SRC}/lsp.c
+${CODEC2_SRC}/ofdm.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
 ${CODEC2_SRC}/pack.c
@@ -99,33 +100,24 @@ endif()
 
 include_directories(../src ../unittest inc)
 
+# Libraries to link for all targets
+link_libraries(g;nosys;m)
+
 set(FFT_TEST_SRCS 
 ${DSPLIB}/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c
-#fft_test.c
+src/fft_test.c
 src/startup_stm32f4xx.s
 src/system_stm32f4xx.c
-#stm32f4_machdep.c
-#gdb_stdio.c
+src/stm32f4_machdep.c
+src/gdb_stdio.c
 ../src/kiss_fft.c
 )
 
 add_executable(fft_test ${FFT_TEST_SRCS})
-target_link_libraries(fft_test libstm32f4)
+set_target_properties(fft_test PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(fft_test stm32f4 CMSIS)
 
-###################################################
-
-#vpath %.c src
-#vpath %.a lib
-
-#ROOT=$(shell pwd)
-
-# Library paths
-
-#LIBPATHS =
-
-# Libraries to link
-
-link_libraries(g;nosys;m)
 
 #For standard arm semihosting
 option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
@@ -156,7 +148,9 @@ src/system_stm32f4xx.c
 list(APPEND CODEC2_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(codec2_profile ${CODEC2_PROFILE_SRCS})
-target_link_libraries(codec2_profile libstm32f4)
+set_target_properties(codec2_profile PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(codec2_profile stm32f4 CMSIS)
 target_compile_definitions(codec2_profile PRIVATE PROFILE)
 
 set(DAC_UT_SRCS
@@ -170,7 +164,9 @@ src/init.c
 )
 
 add_executable(dac_ut ${DAC_UT_SRCS})
-target_link_libraries(dac_ut libstm32f4)
+set_target_properties(dac_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(dac_ut stm32f4)
 
 
 set(FAST_DAC_UT_SRCS
@@ -185,7 +181,9 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(fast_dac_ut ${FAST_DAC_UT_SRCS})
-target_link_libraries(fast_dac_ut libstm32f4)
+set_target_properties(fast_dac_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(fast_dac_ut stm32f4)
 target_compile_options(fast_dac_ut PRIVATE "-O3")
 
 set(ADCDAC_UT_SRCS
@@ -200,13 +198,15 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adcdac_ut ${ADCDAC_UT_SRCS})
-target_link_libraries(adcdac_ut libstm32f4)
+set_target_properties(adcdac_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(adcdac_ut stm32f4)
 target_compile_options(adcdac_ut PRIVATE "-O0")
 
 set(DAC_PLAY_SRCS
 src/dac_play.c
 ../src/fifo.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/stm32f4_dac.c
 src/debugblinky.c
 src/system_stm32f4xx.c
@@ -214,13 +214,15 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(dac_play ${DAC_PLAY_SRCS})
-target_link_libraries(dac_play libstm32f4)
+set_target_properties(dac_play PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(dac_play stm32f4)
 target_compile_options(dac_play PRIVATE "-O0")
 
 set(ADC_REC_SRCS
 src/adc_rec.c
 ../src/fifo.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/stm32f4_adc.c
 src/debugblinky.c
 src/system_stm32f4xx.c
@@ -228,12 +230,14 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_rec ${ADC_REC_SRCS})
-target_link_libraries(adc_rec libstm32f4)
+set_target_properties(adc_rec PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(adc_rec stm32f4)
 
 set(ADC_SD_SRCS
 src/adc_sd.c
 ../src/fifo.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
 src/debugblinky.c
@@ -242,21 +246,25 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_sd ${ADC_SD_SRCS})
-target_link_libraries(adc_sd libstm32f4)
+set_target_properties(adc_sd PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(adc_sd stm32f4)
 
 set(PWM_UT_SRCS
-#gdb_stdio.c
+src/gdb_stdio.c
 src/stm32f4_pwm.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(pwm_ut ${PWM_UT_SRCS})
-target_link_libraries(pwm_ut libstm32f4)
+set_target_properties(pwm_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(pwm_ut stm32f4)
 
 set(POWER_UT_SRCS
 src/power_ut.c
-#gdb_stdio.c
+src/gdb_stdio.c
 ../src/fifo.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
@@ -268,8 +276,10 @@ src/stm32f4_machdep.c)
 
 list(APPEND POWER_UT_SRCS ${CODEC2_SRCS})
 
-add_executable(power_ut ${POWER_UT_SRCS})
-target_link_libraries(power_ut libstm32f4)
+# stm32/src/power_ut.c:124:5: error: too few arguments to function 'adc_open'
+# stm32/src/power_ut.c:125:5: error: too few arguments to function 'dac_open'
+#add_executable(power_ut ${POWER_UT_SRCS})
+#target_link_libraries(power_ut stm32f4)
 
 set(USB_VCP
 usb_conf/usb_bsp.c
@@ -298,7 +308,9 @@ add_definitions(-DUSE_USB_OTG_FS -DUSE_ULPI_PHY)
 include_directories(usb_conf usb_lib/cdc usb_lib/core usb_lib/otg)
 
 add_executable(usb_vcp_ut ${USB_VCP_UT})
-target_link_libraries(usb_vcp_ut libstm32f4)
+set_target_properties(usb_vcp_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(usb_vcp_ut stm32f4)
 
 set(ADC_REC_USB_SRCS
 src/adc_rec_usb.c
@@ -314,12 +326,14 @@ src/init.c)
 list(APPEND ADC_REC_USB_SRCS ${USB_VCP})
 
 add_executable(adc_rec_usb ${ADC_REC_USB_SRCS})
-target_link_libraries(adc_rec_usb libstm32f4)
+set_target_properties(adc_rec_usb PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(adc_rec_usb stm32f4)
 
 
 set(FDMDV_PROFILE_SRCS
 src/fdmdv_profile.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c
@@ -327,9 +341,10 @@ src/stm32f4_machdep.c)
 
 list(APPEND FDMDV_PROFILE_SRCS ${CODEC2_SRCS})
 
-add_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
-target_link_libraries(fdmdv_profile libstm32f4)
-target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
+# Doesn't compile because M_PITCH is not defined but M_PITCH_S is.
+#add_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
+#target_link_libraries(fdmdv_profile stm32f4)
+#target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
 
 set(SM1000_LEDS_SWITCHES_UT_SRCS
 src/sm1000_leds_switches_ut.c
@@ -339,7 +354,9 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
-target_link_libraries(sm1000_leds_switches_ut libstm32f4)
+set_target_properties(sm1000_leds_switches_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(sm1000_leds_switches_ut stm32f4)
 
 set(SM1000_SRCS
 src/sm1000_main.c
@@ -364,13 +381,15 @@ add_library(stm32f4_dac STATIC src/stm32f4_dac.c)
 add_library(stm32f4_adc STATIC src/stm32f4_adc.c)
 
 add_executable(sm1000 ${SM1000_SRCS})
-target_link_libraries(sm1000 stm32f4_dac stm32f4_adc libstm32f4)
+set_target_properties(sm1000 PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(sm1000 stm32f4_dac stm32f4_adc stm32f4 CMSIS)
 target_compile_options(sm1000 PRIVATE "-O3")
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
 src/stm32f4_machdep.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -378,13 +397,15 @@ src/init.c)
 list(APPEND FREEDV_TX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS})
-target_link_libraries(freedv_tx_profile libstm32f4)
+set_target_properties(freedv_tx_profile PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(freedv_tx_profile stm32f4 CMSIS)
 target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
 
 set(FREEDV_RX_PROFILE_SRCS
 src/freedv_rx_profile.c
 src/stm32f4_machdep.c
-#gdb_stdio.c
+src/gdb_stdio.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -392,7 +413,9 @@ src/init.c)
 list(APPEND FREEDV_RX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS})
-target_link_libraries(freedv_rx_profile libstm32f4)
+set_target_properties(freedv_rx_profile PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(freedv_rx_profile stm32f4 CMSIS)
 
 set(FDMDV_DUMP_RT_SRCS
 src/fdmdv_dump_rt.c
@@ -406,15 +429,16 @@ src/init.c)
 
 list(APPEND FDMDV_DUMP_RT_SRCS ${CODEC2_SRCS})
 
-add_executable(fdmdv_dump_rt ${FDMDV_DUMP_RT_SRCS})
-target_link_libraries(fdmdv_dump_rt stm32f4_dac src/stm32f4_adc libstm32f4)
-target_compile_options(fdmdv_dump_rt PRIVATE "-O3")
+# Doesn't build due to FREEDV_NSAMPLES not being defined.
+#add_executable(fdmdv_dump_rt ${FDMDV_DUMP_RT_SRCS})
+#target_link_libraries(fdmdv_dump_rt stm32f4_dac src/stm32f4_adc stm32f4)
+#target_compile_options(fdmdv_dump_rt PRIVATE "-O3")
 
 # ---------------------------------------------------------------------------
 
 set(TUNER_UT_SRCS
 src/tuner_ut.c
-#gdb_stdio.c
+src/gdb_stdio.c
 ../src/fifo.c
 src/stm32f4_dac.c
 src/iir_tuner.c
@@ -430,14 +454,16 @@ src/init.c
 
 add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
 add_executable(tuner_ut ${TUNER_UT_SRCS})
+set_target_properties(tuner_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_compile_options(tuner_ut PRIVATE "-O3")
-target_link_libraries(tuner_ut stm32f4_adc_tuner libstm32f4)
+target_link_libraries(tuner_ut stm32f4_adc_tuner stm32f4)
 
 # -----------------------------------------------------------------------------
 
 set(ADC_SFDR_UT_SRCS
 src/adc_sfdr_ut.c
-#gdb_stdio.c
+src/gdb_stdio.c
 ../src/fifo.c
 src/iir_tuner.c
 src/sm1000_leds_switches.c
@@ -447,8 +473,9 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
-#add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
-target_link_libraries(adc_sfdr_ut stm32f4 stm32f4_adc_tuner)
+set_target_properties(adc_sfdr_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
+target_link_libraries(adc_sfdr_ut stm32f4_adc_tuner stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
 
@@ -478,7 +505,9 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(si5351_ut ${SI5351_UT_SRCS})
-set_target_properties(si5351_ut PROPERTIES OUTPUT_NAME si5351_ut.elf)
+set_target_properties(si5351_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
+    OUTPUT_NAME si5351_ut.elf)
 target_link_libraries(si5351_ut stm32f4)
 
 # -----------------------------------------------------------------------------
@@ -492,6 +521,8 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(mco_ut ${MCO_UT_SRCS})
+set_target_properties(mco_ut PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 set_target_properties(mco_ut PROPERTIES OUTPUT_NAME mco_ut.elf)
 target_link_libraries(mco_ut stm32f4)
 
@@ -510,8 +541,7 @@ src/stm32f4_adc.c
 ../src/fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
-src/init.c
-${CODEC2_SRC}/ofdm.c)
+src/init.c)
 
 list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
@@ -537,8 +567,10 @@ src/init.c)
 
 list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
-set_target_properties(sm2000_stw PROPERTIES OUTPUT_NAME sm2000_stw.elf)
-target_link_libraries(sm2000_stw stm32f4)
+set_target_properties(sm2000_stw PROPERTIES
+    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld
+    OUTPUT_NAME sm2000_stw.elf)
+target_link_libraries(sm2000_stw stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
 
@@ -554,8 +586,7 @@ src/stm32f4_adc.c
 ../src/fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
-src/init.c
-${CODEC2_SRC}/ofdm.c)
+src/init.c)
 
 list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
