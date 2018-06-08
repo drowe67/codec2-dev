@@ -47,7 +47,7 @@ function newamp2_fbf(samname, f=73, varargin)
   
   % Keyboard loop --------------------------------------------------------------
 
-  quant = 0;
+  quant_en = 0;
   k = ' ';
   do 
     fg = 1;
@@ -74,8 +74,13 @@ function newamp2_fbf(samname, f=73, varargin)
     hold on;
 
     rate_K_vec_ = rate_K_vec; 
-    if quant
-       rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec);  
+    D = dct(rate_K_vec);
+    if quant_en
+       %rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec);
+       D_ = 16*round(D/16);
+       rate_K_vec_ = idct(D_);
+    else
+       D_ = D;       
     end
     stem(rate_K_sample_freqs_kHz*1000, rate_K_vec_);
     
@@ -90,7 +95,7 @@ function newamp2_fbf(samname, f=73, varargin)
     l = sprintf(";error sd %3.2f dB;bk+-", sdL);
     plot((1:L)*Wo*4000/pi, (AmdB - AmdB_), l);
     hold off;
-    
+
     if phase_en
 
       % est phase using HT
@@ -134,16 +139,16 @@ function newamp2_fbf(samname, f=73, varargin)
       subplot(211); plot(s); subplot(212); plot(s_phase0,'g');
     end
 
+      figure(fg++);
+      stem(D_)
+      axis([0 K -50 50])
+    
     % interactive menu ------------------------------------------
 
     printf("\rframe: %d  menu: n-next  b-back  u-qUant  c-Correct s-phSrc q-quit", f);
     fflush(stdout);
     k = kbhit();
 
-    if k == 'w'
-      quant_en++;
-      if quant_en == 2; quant_en = 0; end
-    endif
     if k == 'n'
       f = f + 1;
     endif
@@ -151,7 +156,7 @@ function newamp2_fbf(samname, f=73, varargin)
       f = f - 1;
     endif
     if k == 'u'
-      if quant==0, quant=1;, else quant=0;,end;
+      if quant_en==0, quant_en=1, else quant_en=0;,end;
     end
     if k == 's'
       if strcmp(phase_source, 'Am')
