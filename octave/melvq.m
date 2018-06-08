@@ -1,13 +1,7 @@
 % melvq.m
 % David Rowe Aug 2015
 %
-% Experimenting with VQ design for mel LSPs
-
-% todo:
-% [ ] Sorting inside search what happens if we get a order issue, fix and calc SD
-% [ ] Search to avoid a worst case error rather than average?  This could be included
-%     in training.
-% [ ] nested/staged search
+% Experimenting with VQ design for mel LSPs, also handy VQ searching routines
 
 1;
 
@@ -18,11 +12,15 @@
 % octave:> melvq; vq = trainvq(all_mel, 64, 3);
 % octave:> save vq
 
-function vq = trainvq(training_data, Nvec, stages)
+function vq = trainvq(training_data, Nvec, stages, city_en=0)
 
   vq = [];
   for i=1:stages
-    [idx centers] = kmeans(training_data, Nvec);
+    if city_en
+      [idx centers] = kmeans(training_data, Nvec, 'DISTANCE', 'cityblock');
+    else
+      [idx centers] = kmeans(training_data, Nvec);
+    end
     quant_error = centers(idx,:) - training_data;
     printf("mse stage %d: %f\n", i, mean(std(quant_error)));
     training_data = quant_error;
@@ -30,7 +28,6 @@ function vq = trainvq(training_data, Nvec, stages)
   end
 
 end
-
 
 function [mse_list index_list] = search_vq(vq, target, m)
 

@@ -487,7 +487,7 @@ function rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec)
   rate_K_vec_no_mean = rate_K_vec - rate_K_vec(3);
   rate_K_vec_no_mean_ = zeros(1,K);
 
-  % huffman encoding od differences, ignoring m=3, using the following table
+  % huffman encoding of differences, ignoring m=3, using the following table
   %
   % 00    0
   % 10   +6
@@ -517,6 +517,32 @@ function rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec)
     rate_K_vec_no_mean_(m) = quant_out + rate_K_vec_no_mean_(m-1);    
   end
 
-  printf("%d bits\n", length(bits));
+  %printf("%d bits\n", length(bits));
   rate_K_vec_ = rate_K_vec_no_mean_ + rate_K_vec(3);
 endfunction
+
+
+function rate_K_vec_ = dct_quantise_rate_K(rate_K_vec)
+    K = length(rate_K_vec);
+    D = dct(rate_K_vec);
+    printf("\n");
+    D_ = 8*round(D/8);
+    D_(1) = D(1);
+    for d=1:K
+      printf("%4d",round(D(d)/8));
+    end
+    rate_K_vec_ = idct(D_);
+endfunction
+
+
+function un(sl)
+  U = unique(sl,"rows")
+  cnt = [];
+  for v=1:length(U)
+    sm = sum(ismember(sl,U(v,:),"rows"));
+    cnt = [cnt sm];
+  end
+  s = sort(cnt, "descend");
+  figure(1); clf; subplot(211); plot(s); subplot(212); plot(cumsum(s));  
+endfunction
+
