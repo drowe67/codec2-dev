@@ -6,6 +6,8 @@
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
 cmake_minimum_required(VERSION 2.8)
+# This flag must be set here for compiler detection to work properly.
+set(CMAKE_C_FLAGS "--specs=nosys.specs")
 include(cmake/STM32_Toolchain.cmake)
 project(codec2 C ASM)
 
@@ -29,7 +31,7 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 ###################################################
 
 # Set default C++ flags.
-set(CMAKE_C_FLAGS "--specs=nosys.specs -Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "-Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
@@ -87,10 +89,13 @@ ${CODEC2_SRC}/postfilter.c
 ${CODEC2_SRC}/sine.c
 ${CODEC2_SRC}/codec2.c
 ${CODEC2_SRC}/codec2_fft.c
+${CODEC2_SRC}/gp_interleaver.c
+${CODEC2_SRC}/interldpc.c
 ${CODEC2_SRC}/kiss_fft.c
 ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
 ${CODEC2_SRC}/lsp.c
+${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/ofdm.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
@@ -474,8 +479,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(si5351_ut ${SI5351_UT_SRCS})
-set_target_properties(si5351_ut PROPERTIES
-    OUTPUT_NAME si5351_ut.elf)
 target_link_libraries(si5351_ut stm32f4)
 
 # -----------------------------------------------------------------------------
@@ -489,7 +492,6 @@ src/startup_stm32f4xx.s
 src/init.c)
 
 add_executable(mco_ut ${MCO_UT_SRCS})
-set_target_properties(mco_ut PROPERTIES OUTPUT_NAME mco_ut.elf)
 target_link_libraries(mco_ut stm32f4)
 
 # -----------------------------------------------------------------------------
@@ -511,8 +513,6 @@ src/init.c)
 
 list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
-set_target_properties(sm2000_rxdemo PROPERTIES
-    OUTPUT_NAME sm2000_rxdemo.elf)
 target_link_libraries(sm2000_rxdemo stm32f4 CMSIS)
 
 # ---------------------------------------------------------------------------------
@@ -532,8 +532,6 @@ src/init.c)
 
 list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
-set_target_properties(sm2000_stw PROPERTIES
-    OUTPUT_NAME sm2000_stw.elf)
 target_link_libraries(sm2000_stw stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
@@ -554,8 +552,6 @@ src/init.c)
 
 list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
-set_target_properties(sm2000_adcdump PROPERTIES
-    OUTPUT_NAME sm2000_adcdump.elf)
 target_link_libraries(sm2000_adcdump stm32f4 CMSIS)
 
 # -----------------------------------------------------------------------------
