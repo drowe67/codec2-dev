@@ -6,23 +6,6 @@
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
 cmake_minimum_required(VERSION 2.8)
-# This flag must be set here for compiler detection to work properly.
-set(CMAKE_C_FLAGS "--specs=nosys.specs")
-include(cmake/STM32_Toolchain.cmake)
-project(codec2 C ASM)
-
-
-include(GNUInstallDirs)
-mark_as_advanced(CLEAR
-    CMAKE_INSTALL_BINDIR
-    CMAKE_INSTALL_INCLUDEDIR
-    CMAKE_INSTALL_LIBDIR
-)
-
-#include(cmake/arm_header.cmake)
-
-# Include local definitions if they exist.
-#-include local.mak
 
 ###################################################
 
@@ -31,7 +14,7 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 ###################################################
 
 # Set default C++ flags.
-set(CMAKE_C_FLAGS "-Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
@@ -42,11 +25,6 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msoft-float")
 endif()
 
-# Sync up build flags if other build types are specified.
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS}")
-
-
 option(VERIFY_OPT "Enable this for dump files to help verify optimization" OFF)
 if(VERIFY_OPT)
     add_definitions(-DDUMP)
@@ -56,12 +34,18 @@ option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
 if(SEMIHOSTING)
     link_libraries(rdimon)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
+else()
+    link_libraries(nosys)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=nosys.specs")
 endif()
+
+include(cmake/STM32_Toolchain.cmake)
+project(stm32f4 C ASM)
 
 include_directories(../src ../unittest inc)
 
 # Libraries to link for all targets
-link_libraries(g;nosys;m)
+link_libraries(g;m)
 
 
 ###################################################
@@ -127,8 +111,6 @@ src/gdb_stdio.c
 )
 
 add_executable(fft_test ${FFT_TEST_SRCS})
-set_target_properties(fft_test PROPERTIES
-    LINK_FLAGS -T${CMAKE_SOURCE_DIR}/stm32_flash.ld)
 target_link_libraries(fft_test stm32f4 CMSIS)
 
 
