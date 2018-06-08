@@ -14,7 +14,7 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 ###################################################
 
 # Set default C++ flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
@@ -39,13 +39,20 @@ else()
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=nosys.specs")
 endif()
 
+# Set default build type
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+endif()
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    link_libraries(g m)
+else()
+    link_libraries(c m)
+endif()
+
 include(cmake/STM32_Toolchain.cmake)
 project(stm32f4 C ASM)
 
 include_directories(../src ../unittest inc)
-
-# Libraries to link for all targets
-link_libraries(g;m)
 
 
 ###################################################
