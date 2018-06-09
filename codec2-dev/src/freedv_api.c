@@ -376,8 +376,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbyte = (nbit + 7) / 8;
         nbyte = nbyte*Ncodec2frames*f->interleave_frames;
         f->nbyte_packed_codec_bits = nbyte;
-        fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
-                Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
+        //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
+        //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
         f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
         f->codec_bits = NULL;
     }
