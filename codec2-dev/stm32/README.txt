@@ -8,13 +8,16 @@ Quickstart
 The Makefile generates several programs used in Codec 2 development on
 the STM32F4, including sm1000.bin, the firmware for the SM1000.
 
+For CMake specific instructions see README.cmake after performing step 1
+below.
+
 1. Install the toolchain, on Ubuntu 14 this is:
 
    $ sudo apt-get install gcc-arm-none-eabi
 
    On Fedora:
 
-   $ sudo dnf install stlink gcc-arm-linux-gnu
+   $ sudo dnf install stlink arm-none-eabi-gcc
 
 
 2. $ make (and cross your fingers)
