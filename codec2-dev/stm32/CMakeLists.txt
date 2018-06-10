@@ -119,6 +119,7 @@ src/gdb_stdio.c
 
 add_executable(fft_test ${FFT_TEST_SRCS})
 target_link_libraries(fft_test stm32f4 CMSIS)
+elf2bin(fft_test)
 
 
 # Rule for programming the SM1000
@@ -145,6 +146,7 @@ list(APPEND CODEC2_PROFILE_SRCS ${CODEC2_SRCS})
 add_executable(codec2_profile ${CODEC2_PROFILE_SRCS})
 target_link_libraries(codec2_profile stm32f4 CMSIS)
 target_compile_definitions(codec2_profile PRIVATE PROFILE)
+elf2bin(codec2_profile)
 
 set(DAC_UT_SRCS
 src/dac_ut.c
@@ -158,7 +160,7 @@ src/init.c
 
 add_executable(dac_ut ${DAC_UT_SRCS})
 target_link_libraries(dac_ut stm32f4)
-
+elf2bin(dac_ut)
 
 set(FAST_DAC_UT_SRCS
 src/fast_dac_ut.c
@@ -174,6 +176,7 @@ src/init.c)
 add_executable(fast_dac_ut ${FAST_DAC_UT_SRCS})
 target_link_libraries(fast_dac_ut stm32f4)
 target_compile_options(fast_dac_ut PRIVATE "-O3")
+elf2bin(fast_dac_ut)
 
 set(ADCDAC_UT_SRCS
 src/adcdac_ut.c
@@ -189,6 +192,8 @@ src/init.c)
 add_executable(adcdac_ut ${ADCDAC_UT_SRCS})
 target_link_libraries(adcdac_ut stm32f4)
 target_compile_options(adcdac_ut PRIVATE "-O0")
+elf2bin(adcdac_ut)
+
 
 set(DAC_PLAY_SRCS
 src/dac_play.c
@@ -203,6 +208,7 @@ src/init.c)
 add_executable(dac_play ${DAC_PLAY_SRCS})
 target_link_libraries(dac_play stm32f4)
 target_compile_options(dac_play PRIVATE "-O0")
+elf2bin(dac_play)
 
 set(ADC_REC_SRCS
 src/adc_rec.c
@@ -216,6 +222,7 @@ src/init.c)
 
 add_executable(adc_rec ${ADC_REC_SRCS})
 target_link_libraries(adc_rec stm32f4)
+elf2bin(adc_rec)
 
 set(ADC_SD_SRCS
 src/adc_sd.c
@@ -230,6 +237,7 @@ src/init.c)
 
 add_executable(adc_sd ${ADC_SD_SRCS})
 target_link_libraries(adc_sd stm32f4)
+elf2bin(adc_sd)
 
 set(PWM_UT_SRCS
 src/gdb_stdio.c
@@ -240,6 +248,7 @@ src/init.c)
 
 add_executable(pwm_ut ${PWM_UT_SRCS})
 target_link_libraries(pwm_ut stm32f4)
+elf2bin(pwm_ut)
 
 set(POWER_UT_SRCS
 src/power_ut.c
@@ -288,6 +297,7 @@ include_directories(usb_conf usb_lib/cdc usb_lib/core usb_lib/otg)
 
 add_executable(usb_vcp_ut ${USB_VCP_UT})
 target_link_libraries(usb_vcp_ut stm32f4)
+elf2bin(usb_vcp_ut)
 
 set(ADC_REC_USB_SRCS
 src/adc_rec_usb.c
@@ -304,6 +314,7 @@ list(APPEND ADC_REC_USB_SRCS ${USB_VCP})
 
 add_executable(adc_rec_usb ${ADC_REC_USB_SRCS})
 target_link_libraries(adc_rec_usb stm32f4)
+elf2bin(adc_rec_usb)
 
 
 set(FDMDV_PROFILE_SRCS
@@ -330,6 +341,8 @@ src/init.c)
 
 add_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
 target_link_libraries(sm1000_leds_switches_ut stm32f4)
+elf2bin(sm1000_leds_switches_ut)
+
 
 set(SM1000_SRCS
 src/sm1000_main.c
@@ -371,6 +384,8 @@ list(APPEND FREEDV_TX_PROFILE_SRCS ${CODEC2_SRCS})
 add_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS})
 target_link_libraries(freedv_tx_profile stm32f4 CMSIS)
 target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
+elf2bin(freedv_tx_profile)
+
 
 set(FREEDV_RX_PROFILE_SRCS
 src/freedv_rx_profile.c
@@ -384,6 +399,7 @@ list(APPEND FREEDV_RX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS})
 target_link_libraries(freedv_rx_profile stm32f4 CMSIS)
+elf2bin(freedv_rx_profile)
 
 set(FDMDV_DUMP_RT_SRCS
 src/fdmdv_dump_rt.c
@@ -424,6 +440,7 @@ add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
 add_executable(tuner_ut ${TUNER_UT_SRCS})
 target_compile_options(tuner_ut PRIVATE "-O3")
 target_link_libraries(tuner_ut stm32f4_adc_tuner stm32f4)
+elf2bin(tuner_ut)
 
 # -----------------------------------------------------------------------------
 
@@ -440,6 +457,7 @@ src/init.c)
 
 add_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
 target_link_libraries(adc_sfdr_ut stm32f4_adc_tuner stm32f4 CMSIS)
+elf2bin(adc_sfdr_ut)
 
 # -----------------------------------------------------------------------------
 
@@ -470,6 +488,7 @@ src/init.c)
 
 add_executable(si5351_ut ${SI5351_UT_SRCS})
 target_link_libraries(si5351_ut stm32f4)
+elf2bin(si5351_ut)
 
 # -----------------------------------------------------------------------------
 
@@ -483,6 +502,7 @@ src/init.c)
 
 add_executable(mco_ut ${MCO_UT_SRCS})
 target_link_libraries(mco_ut stm32f4)
+elf2bin(mco_ut)
 
 # -----------------------------------------------------------------------------
 
@@ -504,6 +524,7 @@ src/init.c)
 list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
 target_link_libraries(sm2000_rxdemo stm32f4 CMSIS)
+elf2bin(sm2000_rxdemo)
 
 # ---------------------------------------------------------------------------------
 
@@ -523,6 +544,7 @@ src/init.c)
 list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
 target_link_libraries(sm2000_stw stm32f4 CMSIS)
+elf2bin(sm2000_stw)
 
 # -----------------------------------------------------------------------------
 
@@ -543,6 +565,7 @@ src/init.c)
 list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
 target_link_libraries(sm2000_adcdump stm32f4 CMSIS)
+elf2bin(sm2000_adcdump)
 
 # -----------------------------------------------------------------------------
 
