@@ -34,6 +34,3 @@ To see all the details during compilation:
   $ make VERBOSE=1
 
 
-TODO:
-
-  1. Most targets should build but elf->bin is not yet implemented.

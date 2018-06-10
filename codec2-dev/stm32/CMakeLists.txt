@@ -356,6 +356,7 @@ add_library(stm32f4_adc STATIC src/stm32f4_adc.c)
 add_executable(sm1000 ${SM1000_SRCS})
 target_link_libraries(sm1000 stm32f4_dac stm32f4_adc stm32f4 CMSIS)
 target_compile_options(sm1000 PRIVATE "-O3")
+elf2bin(sm1000)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
