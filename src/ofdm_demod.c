@@ -79,6 +79,23 @@ int main(int argc, char *argv[])
     int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
     int            ldpc_en, Tbits_coded, Terrs_coded;
     
+    /* zero out the log arrays incase we don't run for NFRAMES and fill them with data */
+    
+    for(i=0; i<OFDM_ROWSPERFRAME*NFRAMES; i++) {
+        for(j=0; j<OFDM_NC; j++) {
+            phase_est_pilot_log[i][j] = 0.0;
+        }
+    }
+    for(i=0; i<OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES; i++) {
+        rx_np_log[i].real = 0.0; rx_np_log[i].imag = 0.0; 
+        rx_amp_log[i] = 0.0;
+    }
+    for(i=0; i<NFRAMES; i++) {
+        foff_hz_log[i] = 0.0;
+        snr_est_log[i] = 0.0;
+        timing_est_log[i] = 0.0;
+    }
+    
     /* Set up default LPDC code.  We could add other codes here if we like */
     
     struct LDPC ldpc;
@@ -217,6 +234,11 @@ int main(int argc, char *argv[])
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             
+            /* SNR estimation and smoothing */
+
+            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
+            snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
+            
             if (llr_en) {
                 
                 /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword 
@@ -278,12 +300,7 @@ int main(int argc, char *argv[])
                             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
                         }
                     } /* if interleaver synced ..... */
-
-                    /* SNR estimation and smoothing */
-
-                    float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
-                    snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
-                    
+                   
                 } else {
                     /* lpdc_en == 0,  external LDPC decoder, so output LLRs */
                     symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
