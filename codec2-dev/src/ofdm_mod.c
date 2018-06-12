@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
     
-    ofdm = ofdm_create(OFDM_CONFIG_700D);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
     /* set for LDPC coded or uncoded frames */

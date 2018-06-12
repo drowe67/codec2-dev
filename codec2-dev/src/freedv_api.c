@@ -188,7 +188,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700C;
-        f->ofdm = ofdm_create(OFDM_CONFIG_700D);
+        f->ofdm = ofdm_create(NULL);
         f->ldpc = (struct LDPC*)malloc(sizeof(struct LDPC));
         if (f->ldpc == NULL) { return NULL; }
         set_up_hra_112_112(f->ldpc);

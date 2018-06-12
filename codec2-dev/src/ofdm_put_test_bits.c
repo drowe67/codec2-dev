@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
         verbose = 1;
     }
 
-    ofdm = ofdm_create(OFDM_CONFIG_700D);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     char rx_bits[Nbitsperframe];
