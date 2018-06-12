@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
     FILE          *fout;
     int            f,i,j;
 
-    ofdm = ofdm_create(OFDM_CONFIG_700D);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
     /* set up LDPC code */

@@ -93,8 +93,10 @@ extern "C" {
 
 #define OFDM_STATE_STR           16
     
-/* Dummy struct for now, will contain constant configuration for OFDM modem */
-struct OFDM_CONFIG{
+/* Dummy struct for now, will contain constant configuration for OFDM
+   modem, not used by ofdm_create() at present */
+
+struct OFDM_CONFIG {
   int a;
 };
 

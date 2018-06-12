@@ -101,6 +101,9 @@ static const int uw_ind_sym[]     = {10,19,28,37,46};                 /* index i
  *
  * Returns OFDM data structure on success
  * Return NULL on fail
+ *
+ * Note OFDM_CONFIG *config not used at present, will be used
+ * in later versions for init-time configuration.
  */
 
 struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
@@ -111,13 +114,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         return NULL;
     }
 
-    /* Copy config structure */
-
-    if (config == NULL) { /* prevent segmentation error */
-        return NULL;
+    if (config != NULL) {
+        memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
     }
-
-    memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
 
     /* store complex BPSK pilot symbols */
 

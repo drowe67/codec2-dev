@@ -48,10 +48,8 @@ extern "C" {
 #define OFDM_SYNC_AUTO   1                 /* falls out of sync automatically */
 #define OFDM_SYNC_MANUAL 2                 /* fall out of sync only under operator control */
     
+struct OFDM_CONFIG;
 struct OFDM;
-
-/* Default configuration for '700D' mode */
-const struct OFDM_CONFIG * OFDM_CONFIG_700D;
 
 /* create and destroy modem states */
 

@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
         Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
     }
     
-    ofdm = ofdm_create(OFDM_CONFIG_700D);
+    ofdm = ofdm_create(NULL);
     assert(ofdm != NULL);
 
     if ((arg = opt_exists(argv, argc, "-v")) != 0) {
