@@ -40,13 +40,6 @@
 #include "codec2_ofdm.h"
 #include "ofdm_bpf_coeff.h"
 
-/* Concrete definition of 700D parameters */
-const struct OFDM_CONFIG OFDM_CONFIG_700D_C = 
-{.a = 0};
-
-/* Pointer to 700D config */ 
-const struct OFDM_CONFIG  * OFDM_CONFIG_700D = &OFDM_CONFIG_700D_C;
-
 /* Static Prototypes */
 
 static void dft(struct OFDM *, complex float *, complex float *);
