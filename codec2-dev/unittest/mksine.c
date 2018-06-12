@@ -9,7 +9,9 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <math.h>
+#include <errno.h>
 
 #define TWO_PI     6.283185307
 #define FS         8000.0
@@ -26,7 +28,12 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    f = fopen(argv[1] ,"wb");
+    if (strcmp(argv[1], "-") == 0) {
+        f = stdout;
+    } else if ( (f = fopen(argv[1],"wb")) == NULL ) {
+	fprintf(stderr, "Error opening output file: %s: %s.\n", argv[3], strerror(errno));
+	exit(1);
+    }
     freq = atof(argv[2]);
     length = atof(argv[3]);
     n = length*FS;
@@ -38,5 +45,7 @@ int main(int argc, char *argv[]) {
 
     fwrite(buf, sizeof(short), n, f);
 
+    fclose(f);
+    
     return 0;
 }
