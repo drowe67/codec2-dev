@@ -1,6 +1,9 @@
 add_definitions(-DFLOATING_POINT -DVAR_ARRAYS)
 include_directories(../src)
 
+add_executable(mksine mksine.c)
+target_link_libraries(mksine m)
+
 add_executable(genres genres.c ../src/lpc.c)
 target_link_libraries(genres codec2)
 
@@ -80,6 +83,8 @@ set_target_properties(speexnoisesup
 )
 
 add_executable(fdmdv_mem fdmdv_mem.c)
+
+add_executable(ofdm_mem ofdm_mem.c)
 
 add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
