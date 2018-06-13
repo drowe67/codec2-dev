@@ -5,7 +5,7 @@
   DATE CREATED: Feb 2018
 
   Converts a stream of bits to mFSK raw file of "levels" suitable for
-  driving an external VCO, e.g. legacy FM tranmsitter in data mode.
+  driving an external VCO, e.g. legacy FM transmitter in data mode.
    
 \*---------------------------------------------------------------------------*/
 

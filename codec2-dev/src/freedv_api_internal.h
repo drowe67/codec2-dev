@@ -84,7 +84,8 @@ struct freedv {
     int                  n_max_modem_samples;    // make your rx modem sample buffers this big
     int                  n_nat_modem_samples;    // tx modem sample block length as used by the modem before interpolation to output
                                                  // usually the same as n_nom_modem_samples, except for 700..700C
-    int                  modem_sample_rate;      // ATM caller is responsible for meeting this
+    int                  modem_sample_rate;      // Caller is responsible for meeting this
+    int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;
@@ -121,6 +122,8 @@ struct freedv {
     void                *error_pattern_callback_state;
     void (*freedv_put_error_pattern)(void *error_pattern_callback_state, short error_pattern[], int sz_error_pattern);
 
+    /* Misc ---------------------------------------------------------------------------------------------*/
+
     int                  sync;
     int                  evenframe;
     float                snr_est;
@@ -128,7 +131,8 @@ struct freedv {
     int                  squelch_en;
     int                  nin;
     int                  verbose;
-    
+    int                  ext_vco;                            /* 2400A/800XA use external VCO flag */
+
     /* Varicode txt channel states ----------------------------------------------------------------------*/
     
     struct VARICODE_DEC  varicode_dec_states;

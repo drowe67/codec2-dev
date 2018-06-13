@@ -131,6 +131,7 @@ void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float amp
 void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
 void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
+void freedv_set_ext_vco                 (struct freedv *f, int val);
 
 // Get parameters -------------------------------------------------------------------------
 
@@ -142,6 +143,7 @@ void freedv_get_modem_extended_stats(struct freedv *freedv, struct MODEM_STATS *
 int freedv_get_test_frames	    (struct freedv *freedv);
 int freedv_get_n_speech_samples	    (struct freedv *freedv);
 int freedv_get_modem_sample_rate    (struct freedv *freedv);
+int freedv_get_modem_symbol_rate    (struct freedv *freedv);
 int freedv_get_n_max_modem_samples  (struct freedv *freedv);
 int freedv_get_n_nom_modem_samples  (struct freedv *freedv);
 int freedv_get_total_bits	    (struct freedv *freedv);
