@@ -146,6 +146,15 @@ void fsk_destroy(struct FSK *fsk);
 void fsk_mod(struct FSK *fsk, float fsk_out[], uint8_t tx_bits[]);
 
 /*
+ * Modulates Nsym bits into N samples
+ * 
+ * struct FSK *fsk - FSK config/state struct, set up by fsk_create
+ * float fsk_out[] - Buffer for N samples of "voltage" used to modulate an external VCO
+ * uint8_t tx_bits[] - Buffer containing Nbits unpacked bits
+ */
+void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]);
+
+/*
  * Modulates Nsym bits into N complex samples
  * 
  * struct FSK *fsk - FSK config/state struct, set up by fsk_create

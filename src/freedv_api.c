@@ -242,6 +242,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         /* Set the number of protocol bits */
         f->n_protocol_bits = 20;
         f->sz_error_pattern = 0;
+        f->ext_vco = 0;
     }
     
     if (mode == FREEDV_MODE_2400A) {
@@ -265,6 +266,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_nat_modem_samples = f->fsk->N;
         f->nin = fsk_nin(f->fsk);
         f->modem_sample_rate = 48000;
+        f->modem_symbol_rate = 1200;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
     }
@@ -315,6 +317,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_nat_modem_samples = f->fsk->N;
         f->nin = fsk_nin(f->fsk);
         f->modem_sample_rate = 8000;
+        f->modem_symbol_rate = 400;
         /* Malloc something to appease freedv_init and freedv_destroy */
         f->codec_bits = malloc(1);
         
@@ -561,10 +564,18 @@ static void freedv_tx_fsk_voice(struct freedv *f, short mod_out[]) {
 
     /* do 4fsk mod */
     if(f->mode == FREEDV_MODE_2400A || f->mode == FREEDV_MODE_800XA){
-        fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
-        /* Convert float samps to short */
-        for(i=0; i<f->n_nom_modem_samples; i++){
-            mod_out[i] = (short)(tx_float[i]*FSK_SCALE*NORM_PWR_FSK);
+        if (f->ext_vco) {
+            fsk_mod_ext_vco(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+            for(i=0; i<f->n_nom_modem_samples; i++){
+                mod_out[i] = (short)tx_float[i];
+            }
+        }
+        else {
+            fsk_mod(f->fsk,tx_float,(uint8_t*)(f->tx_bits));
+            /* Convert float samps to short */
+            for(i=0; i<f->n_nom_modem_samples; i++){
+                mod_out[i] = (short)(tx_float[i]*FSK_SCALE*NORM_PWR_FSK);
+            }
         }
     /* do me-fsk mod */
     }else if(f->mode == FREEDV_MODE_2400B){
@@ -2133,6 +2144,7 @@ void freedv_set_total_bit_errors_coded    (struct freedv *f, int val) {f->total_
 void freedv_set_total_bits_coded          (struct freedv *f, int val) {f->total_bits_coded = val;}
 void freedv_set_clip                      (struct freedv *f, int val) {f->clip = val;}
 void freedv_set_varicode_code_num         (struct freedv *f, int val) {varicode_set_code_num(&f->varicode_dec_states, val);}
+void freedv_set_ext_vco                   (struct freedv *f, int val) {f->ext_vco = val;}
 
 
 /* Band Pass Filter to cleanup OFDM tx waveform, only supported by FreeDV 700D */
@@ -2259,6 +2271,7 @@ int freedv_get_mode                       (struct freedv *f) {return f->mode;}
 int freedv_get_test_frames                (struct freedv *f) {return f->test_frames;}
 int freedv_get_n_speech_samples           (struct freedv *f) {return f->n_speech_samples;}
 int freedv_get_modem_sample_rate          (struct freedv *f) {return f->modem_sample_rate;}
+int freedv_get_modem_symbol_rate          (struct freedv *f) {return f->modem_symbol_rate;}
 int freedv_get_n_max_modem_samples        (struct freedv *f) {return f->n_max_modem_samples;}
 int freedv_get_n_nom_modem_samples        (struct freedv *f) {return f->n_nom_modem_samples;}
 int freedv_get_total_bits                 (struct freedv *f) {return f->total_bits;}

@@ -95,12 +95,13 @@ int main(int argc, char *argv[]) {
     int                       n_speech_samples;
     int                       n_nom_modem_samples;
     int                       use_codectx, use_datatx, use_testframes, interleave_frames, use_clip, use_txbpf;
+    int                       use_ext_vco;
     struct CODEC2             *c2;
     int                       i;
 
     if (argc < 4) {
         printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1]\n", argv[0]);
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0]);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -123,7 +124,10 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
-    assert(mode != -1);
+    if (mode == -1) {
+        fprintf(stderr, "Error in mode: %s\n", argv[1]);
+        exit(0);
+    }
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
@@ -138,7 +142,8 @@ int main(int argc, char *argv[]) {
     }
 
     use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 0;
-   
+    use_ext_vco = 0;
+    
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
             if (strcmp(argv[i], "--testframes") == 0) {
@@ -170,6 +175,9 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--txbpf") == 0) {
                 use_txbpf = atoi(argv[i+1]);
             }
+            if (strcmp(argv[i], "--extvco") == 0) {
+                use_ext_vco = 1;
+            }
         }
     }
 
@@ -193,6 +201,7 @@ int main(int argc, char *argv[]) {
     freedv_set_squelch_en(freedv, 1);
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
+    freedv_set_ext_vco(freedv, use_ext_vco);
 
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
@@ -250,8 +259,21 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
-
+        if (use_ext_vco) {
+            /* decimate sample rate down to symbol rate when driving an external VCO */
+            int Fs = freedv_get_modem_sample_rate(freedv);
+            int Rs = freedv_get_modem_symbol_rate(freedv);
+            int M = Fs/Rs;
+            assert((Fs % Rs) == 0);
+            for(i=0; i<n_nom_modem_samples; i+=M) {
+                fwrite(&mod_out[i], sizeof(short), 1, fout);
+                //fprintf(stderr, "%d\n",mod_out[i]);
+            }
+        }
+        else {
+            fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
+        }
+        
         /* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
 

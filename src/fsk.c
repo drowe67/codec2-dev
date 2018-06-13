@@ -1132,6 +1132,45 @@ void fsk_mod_c(struct FSK *fsk,COMP fsk_out[],uint8_t tx_bits[]){
     
 }
 
+
+/* Modulator that assume an external VCO.  The output is a voltage
+   that changes for each symbol */
+
+void fsk_mod_ext_vco(struct FSK *fsk, float vco_out[], uint8_t tx_bits[]) {
+    int f1_tx = fsk->f1_tx;         /* '0' frequency */
+    int fs_tx = fsk->fs_tx;         /* space between frequencies */
+    int Ts = fsk->Ts;               /* samples-per-symbol */
+    int M = fsk->mode;
+    int i, j, m, sym, bit_i;
+    
+    bit_i = 0;
+    for(i=0; i<fsk->Nsym; i++) {
+        /* generate the symbol number from the bit stream, 
+           e.g. 0,1 for 2FSK, 0,1,2,3 for 4FSK */
+
+        sym = 0;
+
+        /* unpack the symbol number from the bit stream */
+
+        for( m=M; m>>=1; ){
+            uint8_t bit = tx_bits[bit_i];
+            bit = (bit==1)?1:0;
+            sym = (sym<<1)|bit;
+            bit_i++;
+        }
+
+        /* 
+           Map 'sym' to VCO frequency
+           Note: drive is inverted, a higher tone drives VCO voltage lower
+         */
+
+        //fprintf(stderr, "i: %d sym: %d freq: %f\n", i, sym, f1_tx + fs_tx*(float)sym);
+        for(j=0; j<Ts; j++) {
+            vco_out[i*Ts+j] = f1_tx + fs_tx*(float)sym;
+        }
+    }
+}
+
 void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable) {
     fsk->normalise_eye = normalise_enable;
 }
