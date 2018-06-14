@@ -66,8 +66,14 @@ function surface = newamp2_batch(input_prefix, varargin)
     if arg_exists(varargin, "dct")
       quant = "dct";
     end
+    if arg_exists(varargin, "dtlimit")
+      quant = "dtlimit";
+    end
      
-    vq_en = (arg_exists(varargin, "vq") != 0);
+    ind = arg_exists(varargin, "vq");
+    if ind
+      vq_en = 1; vq_name = varargin{ind+1}; vq_st = varargin{ind+2}; vq_en = varargin{ind+3};
+    end
     
     correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
   end
@@ -78,6 +84,9 @@ function surface = newamp2_batch(input_prefix, varargin)
   end
   printf(" mode: %s", mode);
   printf(" correct_rate_K: %d quant: %s vq_en: %d\n", correct_rate_K_en, quant, vq_en);
+  if vq_en
+    printf("vq_name: %s vq_st: %d vq_en: %d\n", vq_name, vq_st, vq_en);
+  end
   
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
@@ -95,9 +104,10 @@ function surface = newamp2_batch(input_prefix, varargin)
 
   if strcmp(mode, 'mel')
     if vq_en
-      load avq;
-      vqs.st=4; vqs.en=10; vqs.m=5;
-      vqs.table = avq(:,:,1);
+      load(vq_name);
+      size(avq)
+      vqs.st=vq_st; vqs.en=vq_en; vqs.m=5;
+      vqs.table = avq;
       [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, plots=1, quant, vqs);
     else
       [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, plots=1, quant);
@@ -184,7 +194,7 @@ endfunction
 
 % Basic unquantised rate K mel-sampling then back to rate L
 
-function [model_ rate_K_surface_ sd_log] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1, quant="", vq)
+function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1, quant="", vq)
   [frames nc] = size(model);
   K = 20; Fs = 8000;
   AmdB = zeros(frames, 160);
@@ -206,12 +216,51 @@ function [model_ rate_K_surface_ sd_log] = experiment_mel_freq(model, correct_ra
     end
   end
 
+  % expriment to limit frame by frame changes, this will make quantisation easier
+
+  if strcmp(quant,"dtlimit");
+    rate_K_surface_prev_ = zeros(1,K);
+    delta_K_log = zeros(frames,K);
+
+    for f=1:frames
+
+      % find delta
+
+      delta_K = rate_K_surface(f,:) - rate_K_surface_prev_;
+
+      % limit to -6,0,+6 dB 
+
+      delta_K = 6*round(delta_K/6);
+      delta_K = min(delta_K, +12);
+      delta_K = max(delta_K, -12);
+
+      % optional VQ
+
+      if nargin == 5
+        [res output_vec ind] = mbest(vq.table, delta_K(:,vq.st:vq.en), vq.m);
+        delta_K(:,vq.st:vq.en) = output_vec;
+      end
+      
+      rate_K_surface_prev_ += delta_K;
+      rate_K_surface_(f,:) = rate_K_surface_prev_;
+      delta_K_log(f,:) = delta_K;
+    end
+  end
+
+  % huffman encoding of delata_f, also limits delta_f changes, (hopefully) making quantisation easier
 
   if strcmp(quant,"huffman");
     for f=1:frames
       rate_K_surface_(f,:) = huffman_quantise_rate_K(rate_K_surface(f,:));
     end
+    if nargin == 5
+      size(vq.table)
+      target = (rate_K_surface_(:,vq.st:vq.en) - rate_K_surface_(:,3))/6;
+      [res output_vecs ind] = mbest(vq.table, target, vq.m);
+      rate_K_surface_(:,vq.st:vq.en) = 6*output_vecs + rate_K_surface_(:,3);
+    end
   end
+
   if strcmp(quant,"dct");
     for f=1:frames
       rate_K_surface_(f,:) = dct_quantise_rate_K(rate_K_surface(f,:));
@@ -219,12 +268,6 @@ function [model_ rate_K_surface_ sd_log] = experiment_mel_freq(model, correct_ra
   end 
   if strcmp(quant,"");
     rate_K_surface_ = rate_K_surface;
-  end
-  if nargin == 5
-    size(vq.table)
-    target = (rate_K_surface_(:,vq.st:vq.en) - rate_K_surface_(:,3))/6;
-    [res output_vecs ind] = mbest(vq.table, target, vq.m);
-    rate_K_surface_(:,vq.st:vq.en) = 6*output_vecs + rate_K_surface_(:,3);
   end
   
   if plots
@@ -253,6 +296,14 @@ function [model_ rate_K_surface_ sd_log] = experiment_mel_freq(model, correct_ra
     xlabel('Energy'); ylabel('SD'); axis([-10 60 0 7]);
   end
   
+  % return delta_K for training
+  
+  if strcmp(quant,"dtlimit")
+    rate_K_surface_ = delta_K_log;
+    l = min(100, length(rate_K_surface_));
+    figure(5); clf; mesh(rate_K_surface_(1:l,:));
+  end
+
   % this code useful to explore outliers, adjust threshold based on plot(sd_log)
 
   plot_outliers = 0;
@@ -263,6 +314,7 @@ function [model_ rate_K_surface_ sd_log] = experiment_mel_freq(model, correct_ra
     end
   end
   printf("mean SD %4.2f\n", mean(sd_log));
+
 endfunction
 
 
