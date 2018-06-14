@@ -43,7 +43,7 @@ static const uint8_t TDMA_UW_V[] =    {0,1,1,0,0,1,1,1,
 static const uint8_t TDMA_UW_D[] =    {1,1,1,1,0,0,0,1,
                                        1,1,1,1,1,1,0,0};         
                                        
-static const uint8_t * TDMA_UW_LIST_A[] = {&TDMA_UW_V,&TDMA_UW_D};
+static const uint8_t * TDMA_UW_LIST_A[] = {&TDMA_UW_V[0],&TDMA_UW_D[0]};
 
 tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     tdma_t * tdma;
@@ -74,7 +74,6 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     if(pilot == NULL) goto cleanup_bad_alloc;
     fsk_enable_burst_mode(pilot,pilot_nsyms);
     tdma->fsk_pilot = pilot;
-    
     tdma->settings = mode;
     tdma->state = no_sync;
     tdma->sample_sync_offset = 960;
@@ -88,7 +87,7 @@ tdma_t * tdma_create(struct TDMA_MODE_SETTINGS mode){
     /* Set up the UWs we use for this mode. */
     if(mode.frame_type == TDMA_FRAME_A){
         tdma->uw_types = 2;
-        tdma->uw_list = TDMA_UW_LIST_A;
+        tdma->uw_list = (uint8_t**)TDMA_UW_LIST_A;
         tdma->master_bit_pos = 35;
     }
     /* Allocate buffer for incoming samples */
@@ -180,9 +179,9 @@ size_t tdma_search_uw(tdma_t * tdma, u8 bits[], size_t nbits, size_t * delta_out
     size_t delta_min = uw_len;
     size_t delta;
     size_t j;
-    size_t uw_type_min;
+    size_t uw_type_min = 0;
     size_t uw_delta_min = uw_len;
-    size_t offset_min,uw_offset_min;
+    size_t uw_offset_min = 0;
     /* Check each UW */
     for(j = 0; j < tdma->uw_types; j++){
         /* Walk through buffer bits */
@@ -462,7 +461,6 @@ void tdma_rx_pilot_sync(tdma_t * tdma){
             
         }while(repeat_demod);
 
-        i32 single_slot_offset = slot->slot_local_frame_offset;
         /* Flag indicating whether or not we should call the callback */
         bool do_frame_found_call = false;   
 
@@ -606,7 +604,6 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
     u32 Fs = mode.samp_rate;
     u32 slot_size = mode.slot_size;
     u32 frame_size = mode.frame_size;
-    u32 n_slots = mode.n_slots;
     u32 M = mode.fsk_m;
     u32 Ts = Fs/Rs;
     u32 bits_per_sym = M==2?1:2;
@@ -624,7 +621,7 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
 
     /* Start search at the last quarter of the previously rx'ed slot's worth of samples */
     size_t search_offset_i = (3*samps_per_slot)/4;
-    size_t best_match_offset;
+    size_t best_match_offset = 0;
     u32 best_delta = uw_len;
     /* Search every half slot at quarter slot offsets */
     for(i = 0; i < 4; i++){
@@ -635,7 +632,7 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
         offset = tdma_search_uw(tdma, pilot_bits, n_pilot_bits, &delta, NULL);
         f_start = offset - (frame_bits-uw_len)/2;
 
-        fprintf(stderr,"delta: %d offset %d so:%d\n",delta,offset,search_offset_i);
+        fprintf(stderr,"delta: %zd offset %zd so:%zd\n",delta,offset,search_offset_i);
         if(delta <= mode.pilot_sync_tol){
         }
         search_offset_i += samps_per_slot/4;
@@ -645,7 +642,7 @@ void tdma_rx_no_sync(tdma_t * tdma, COMP * samps, u64 timestamp){
         }
     }
     if(best_delta <= mode.pilot_sync_tol){
-        fprintf(stderr,"Pilot got UW delta %d search offset %d\n",best_delta,best_match_offset);
+        fprintf(stderr,"Pilot got UW delta %u search offset %zd\n",best_delta,best_match_offset);
         tdma->sample_sync_offset = best_match_offset;
         tdma_rx_pilot_sync(tdma);
     }
@@ -673,11 +670,8 @@ void tdma_rx(tdma_t * tdma, COMP * samps,u64 timestamp){
     u32 Rs = mode.sym_rate;
     u32 Fs = mode.samp_rate;
     u32 slot_size = mode.slot_size;
-    //u32 frame_size = mode.frame_size;
     u32 n_slots = mode.n_slots;
-    u32 M = mode.fsk_m;
     u32 Ts = Fs/Rs;
-    u32 bits_per_sym = M==2?1:2;
     u32 slot_samps = slot_size*Ts;
 
     /* Copy samples into the local buffer for some reason */

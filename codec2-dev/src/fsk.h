@@ -197,4 +197,8 @@ void fsk_demod_sd(struct FSK *fsk, float rx_bits[],COMP fsk_in[]);
   
 void fsk_stats_normalise_eye(struct FSK *fsk, int normalise_enable);
 
+/* Set the FSK modem into burst demod mode */
+
+void fsk_enable_burst_mode(struct FSK *fsk,int nsyms);
+
 #endif
