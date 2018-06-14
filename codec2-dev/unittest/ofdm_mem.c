@@ -85,10 +85,11 @@ int main(int argc, char *argv[])
 
     printf("alignment...................: %ld\n", (sizeof(struct OFDM) - used));
 
-
+    /* TODO: est memory usage of quisk BPF */
+    /*
     printf("--allocated separately--\n");
     printf("tx_bpf_buf..................: %ld\n", (sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME)));
-
+    */
 
     return 0;
 }

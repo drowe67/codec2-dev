@@ -55,7 +55,7 @@ add_executable(tdeframer tdeframer.c)
 target_link_libraries(tdeframer m codec2)
 
 add_definitions(-DMODEMPROBE_ENABLE -DXXXXX)
-add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c)
+add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
 target_link_libraries(tofdm m)
 
 add_executable(tfreedv_data_channel tfreedv_data_channel.c)
