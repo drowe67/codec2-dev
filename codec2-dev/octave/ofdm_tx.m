@@ -77,6 +77,20 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
     assert(length(spread2) >= Nsam, "not enough doppler spreading samples");
   end
 
+  % experimental coarse amplitude quantisation
+
+  quant_tx = 1;
+  if quant_tx
+    tx_re = real(tx); tx_im = imag(tx);
+    tx_re = min(tx_re,0.5); tx_re = max(tx_re,-0.5);
+    tx_im = min(tx_im,0.5); tx_im = max(tx_im,-0.5);
+    step = 0.05/4;
+    tx_re = step*round(tx_re/step);
+    tx_im = step*round(tx_im/step);
+    tx = tx_re + j*tx_im;
+    figure(1); clf; subplot(211); plot(real(tx(1:100)),'+-'); subplot(212); plot(imag(tx(1:100)),'+-'); 
+  end
+  
   rx = tx;
   if tx_filter
     bpf_coeff = make_ofdm_bpf(write_c_header_file=0);
