@@ -37,6 +37,7 @@ extern "C" {
 #include <stdint.h>
 
 #include "codec2_ofdm.h"
+#include "filter.h"
 
 #ifndef M_PI
 #define M_PI        3.14159265358979323846f  /* math constant */
@@ -124,7 +125,7 @@ struct OFDM {
     complex float W[OFDM_NC + 2][OFDM_M];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
-    complex float *tx_bpf_buf;
+    struct quisk_cfFilter ofdm_tx_bpf;
     
     /* Demodulator data */
 
