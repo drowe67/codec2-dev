@@ -428,12 +428,8 @@ void fsk_set_nsym(struct FSK *fsk,int nsyms){
 
 void fsk_enable_burst_mode(struct FSK *fsk,int nsyms){
     fsk_set_nsym(fsk,nsyms);
-    //fsk->nstash = 0;
-    //fsk->Nmem = fsk->N;
     fsk->nin = fsk->N;
     fsk->burst_mode = 1;
-    //free(fsk->samp_old);
-    //fsk->samp_old = (COMP*) malloc(1);
 }
 
 void fsk_clear_estimators(struct FSK *fsk){
