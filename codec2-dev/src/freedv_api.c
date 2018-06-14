@@ -50,6 +50,7 @@
 #include "freedv_api_internal.h"
 #include "freedv_vhf_framing.h"
 #include "comp_prim.h"
+#include "filter.h"
 
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
@@ -881,7 +882,7 @@ static void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
         cohpsk_clip(tx_fdm, COHPSK_CLIP, COHPSK_NOM_SAMPLES_PER_FRAME);
     for(i=0; i<f->n_nat_modem_samples; i++)
         mod_out[i] = fcmult(FDMDV_SCALE*NORM_PWR_COHPSK, tx_fdm[i]);
-    i = quisk_cfInterpDecim(mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
+    i = quisk_cfInterpDecim((complex float *)mod_out, f->n_nat_modem_samples, f->ptFilter7500to8000, 16, 15);
     //assert(i == f->n_nom_modem_samples);
     // Caution: assert fails if f->n_nat_modem_samples * 16.0 / 15.0 is not an integer
 
@@ -1486,7 +1487,7 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     for(i=0; i<freedv_nin(f); i++)
         demod_in[i] = demod_in_8kHz[i];
 
-    i = quisk_cfInterpDecim(demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
+    i = quisk_cfInterpDecim((complex float *)demod_in, freedv_nin(f), f->ptFilter8000to7500, 15, 16);
     //if (i != f->nin)
     //    printf("freedv_comprx decimation: input %d output %d\n", freedv_nin(f), i);
 
@@ -2328,106 +2329,5 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
     }
     
 #endif
-}
-
-/*--  Functions below this line are private, and not meant for public use  --*/
-/*---------------------------------------------------------------------------*\
-
-  FUNCTIONS...: quisk_filt_cfInit
-  AUTHOR......: Jim Ahlstrom
-  DATE CREATED: 27 August 2015
-
-  Initialize a FIR filter that will be used to change sample rates.  These rate
-  changing filters were copied from Quisk and modified for float samples.
-
-\*---------------------------------------------------------------------------*/
-
-static void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps)
-{    // Prepare a new filter using coefs and taps.  Samples are complex.
-    filter->dCoefs = coefs;
-    filter->cSamples = (COMP *)malloc(taps * sizeof(COMP));
-    memset(filter->cSamples, 0, taps * sizeof(COMP));
-    filter->ptcSamp = filter->cSamples;
-    filter->nTaps = taps;
-    filter->cBuf = NULL;
-    filter->nBuf = 0;
-    filter->decim_index = 0;
-}
-
-/*---------------------------------------------------------------------------*\
-
-  FUNCTIONS...: quisk_filt_destroy
-  AUTHOR......: Jim Ahlstrom
-  DATE CREATED: 27 August 2015
-
-  Destroy the FIR filter and free all resources.
-
-\*---------------------------------------------------------------------------*/
-
-static void quisk_filt_destroy(struct quisk_cfFilter * filter)
-{
-    if (filter->cSamples) {
-        free(filter->cSamples);
-        filter->cSamples = NULL;
-    }
-    if (filter->cBuf) {
-        free(filter->cBuf);
-        filter->cBuf = NULL;
-    }
-}
-
-/*---------------------------------------------------------------------------*\
-
-  FUNCTIONS...: quisk_cfInterpDecim
-  AUTHOR......: Jim Ahlstrom
-  DATE CREATED: 27 August 2015
-
-  Take an array of samples cSamples of length count, multiply the sample rate
-  by interp, and then divide the sample rate by decim.  Return the new number
-  of samples.  Each specific interp and decim will require its own custom
-  FIR filter.
-
-\*---------------------------------------------------------------------------*/
-
-static int quisk_cfInterpDecim(COMP * cSamples, int count, struct quisk_cfFilter * filter, int interp, int decim)
-{   // Interpolate by interp, and then decimate by decim.
-    // This uses the float coefficients of filter (not the complex).  Samples are complex.
-    int i, k, nOut;
-    float * ptCoef;
-    COMP * ptSample;
-    COMP csample;
-
-    if (count > filter->nBuf) {    // increase size of sample buffer
-        filter->nBuf = count * 2;
-        if (filter->cBuf)
-            free(filter->cBuf);
-        filter->cBuf = (COMP *)malloc(filter->nBuf * sizeof(COMP));
-    }
-    memcpy(filter->cBuf, cSamples, count * sizeof(COMP));
-    nOut = 0;
-    for (i = 0; i < count; i++) {
-        // Put samples into buffer left to right.  Use samples right to left.
-        *filter->ptcSamp = filter->cBuf[i];
-        while (filter->decim_index < interp) {
-            ptSample = filter->ptcSamp;
-            ptCoef = filter->dCoefs + filter->decim_index;
-            csample.real = 0;
-            csample.imag = 0;
-            for (k = 0; k < filter->nTaps / interp; k++, ptCoef += interp) {
-                csample.real += (*ptSample).real * *ptCoef;
-                csample.imag += (*ptSample).imag * *ptCoef;
-                if (--ptSample < filter->cSamples)
-                    ptSample = filter->cSamples + filter->nTaps - 1;
-            }
-            cSamples[nOut].real = csample.real * interp;
-            cSamples[nOut].imag = csample.imag * interp;
-            nOut++;
-            filter->decim_index += decim;
-        }
-        if (++filter->ptcSamp >= filter->cSamples + filter->nTaps)
-            filter->ptcSamp = filter->cSamples;
-        filter->decim_index = filter->decim_index - interp;
-    }
-    return nOut;
 }
 

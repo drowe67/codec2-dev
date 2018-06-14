@@ -232,6 +232,7 @@ set(CODEC2_SRCS
     mpdecode_core.c
     gp_interleaver.c
     interldpc.c
+    filter.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
@@ -250,6 +251,7 @@ set(CODEC2_PUBLIC_HEADERS
     freedv_api.h
     varicode.h
     freedv_api_internal.h
+    filter.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 

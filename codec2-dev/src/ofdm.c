@@ -38,7 +38,7 @@
 #include "comp.h"
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
-#include "ofdm_bpf_coeff.h"
+#include "filter.h"
 
 /* Static Prototypes */
 
@@ -232,22 +232,17 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
 
     ofdm->tx_bpf_en = 0;
-    ofdm->tx_bpf_buf = (complex float*)malloc(sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME));
-    if (ofdm->tx_bpf_buf == NULL) {
-        free(ofdm);
-        return NULL;
-    }
-    
-    for (i=0; i<OFDM_BPF_N; i++) {
-        ofdm->tx_bpf_buf[i] = 0.0f + 0.0f * I;
-    }
+    // Transmit bandpass filter; complex coefficients, center frequency 1500 hz
+    //quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP750S1040, sizeof(filtP750S1040) / sizeof(float));
+    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof(filtP550S750) / sizeof(float));
+    quisk_cfTune(&ofdm->ofdm_tx_bpf, OFDM_CENTRE / OFDM_FS);
     
     return ofdm; /* Success */
 }
 
 
 void ofdm_destroy(struct OFDM *ofdm) {
-    free(ofdm->tx_bpf_buf);
+    quisk_filt_destroy(&ofdm->ofdm_tx_bpf);
     free(ofdm);
 }
 
@@ -501,22 +496,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx_filt[OFDM_SAMPLESPERFRAME]
     /* optional Tx Band Pass Filter */
 
     if (ofdm->tx_bpf_en) {
-        complex float *buf = ofdm->tx_bpf_buf;
-        for(i=0, j=OFDM_BPF_N; i<OFDM_SAMPLESPERFRAME; i++,j++) {
-            buf[j] = tx[i];
-            tx_filt[i] = 0.0;
-            for(k=0; k<OFDM_BPF_N; k++) {
-                tx_filt[i] += buf[j-k]*ofdm_bpf_coeff[k];
-            }
-        }
-
-        assert(j <= (OFDM_BPF_N+OFDM_SAMPLESPERFRAME));
-        
-        /* update filter memory */
-
-        for(i=0; i<OFDM_BPF_N; i++) {
-           buf[i] = buf[i+OFDM_SAMPLESPERFRAME];
-        }
+        quisk_ccfFilter(tx, tx_filt, OFDM_SAMPLESPERFRAME, &ofdm->ofdm_tx_bpf);
     } else {
         for(i=0; i<OFDM_SAMPLESPERFRAME; i++) {
             tx_filt[i] = tx[i];
