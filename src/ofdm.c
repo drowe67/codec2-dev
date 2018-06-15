@@ -66,7 +66,7 @@ static const complex float constellation[] = {
 /*
  * These pilots are compatible with Octave version
  */
-static const char pilotvalues[] = {
+static const float pilotvalues[] = {
     -1, -1, 1, 1, -1, -1, -1, 1, -1,
      1, -1, 1, 1,  1,  1,  1, 1,  1,
      1
@@ -113,10 +113,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* store complex BPSK pilot symbols */
 
-    assert(sizeof(pilotvalues) == (OFDM_NC+2));
+    assert(sizeof(pilotvalues) == (OFDM_NC+2)*sizeof(float));
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
-        ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
+        ofdm->pilots[i] = pilotvalues[i] + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
@@ -454,7 +454,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx_filt[OFDM_SAMPLESPERFRAME]
 
     for (i = 0; i < (OFDM_NC + 2); i++) {
         aframe[0][i] = ofdm->pilots[i];
-        //printf("%2d % f % f\n", i, crealf(aframe[0][i]), cimagf(aframe[0][i]));
+        //fprintf(stderr, "%2d % f % f\n", i, crealf(aframe[0][i]), cimagf(aframe[0][i]));
     }
     
     /* Place symbols in multi-carrier frame with pilots */
