@@ -233,6 +233,8 @@ set(CODEC2_SRCS
     gp_interleaver.c
     interldpc.c
     filter.c
+    horus_api.c
+    horus_l2.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
@@ -252,6 +254,7 @@ set(CODEC2_PUBLIC_HEADERS
     varicode.h
     freedv_api_internal.h
     filter.h
+    horus_api.h
     ${CODEC2_VERSION_PATH}/version.h
 )
 
