@@ -67,11 +67,11 @@ static char uw[] = {'$','$'};
 
 /* Function Prototypes ------------------------------------------------*/
 
-int32_t get_syndrome(int32_t pattern);
-void golay23_init(void);
-int golay23_decode(int received_codeword);
-void interleave(unsigned char *inout, int nbytes, int dir);
-void scramble(unsigned char *inout, int nbytes);
+static int32_t get_syndrome(int32_t pattern);
+static void golay23_init(void);
+static int golay23_decode(int received_codeword);
+static void interleave(unsigned char *inout, int nbytes, int dir);
+static void scramble(unsigned char *inout, int nbytes);
 
 /* Functions ----------------------------------------------------------*/
 
@@ -987,7 +987,7 @@ static int arr2int(int a[], int r)
 #endif
 
 #ifdef HORUS_L2_RX
-void nextcomb(int n, int r, int a[])
+static void nextcomb(int n, int r, int a[])
 /*
  * Calculate next r-combination of an n-set.
  */
@@ -1006,7 +1006,7 @@ void nextcomb(int n, int r, int a[])
 }
 #endif
 
-int32_t get_syndrome(int32_t pattern)
+static int32_t get_syndrome(int32_t pattern)
 /*
  * Compute the syndrome corresponding to the given pattern, i.e., the
  * remainder after dividing the pattern (when considering it as the vector
@@ -1040,7 +1040,7 @@ int32_t get_syndrome(int32_t pattern)
 
 \*---------------------------------------------------------------------------*/
 
-void golay23_init(void) {
+static void golay23_init(void) {
 #ifdef RUN_TIME_TABLES
    int  i;
    long temp;
@@ -1111,6 +1111,26 @@ void golay23_init(void) {
 
 /*---------------------------------------------------------------------------*\
 
+  FUNCTION....: golay23_decode()
+  AUTHOR......: David Rowe
+  DATE CREATED: 3 March 2013
+
+  Given a 23 bit received codeword, returns the 12 bit corrected data.
+
+\*---------------------------------------------------------------------------*/
+
+static int golay23_decode(int received_codeword) {
+    assert(inited);
+    assert((received_codeword < (1<<23)) && (received_codeword >= 0));
+
+    //printf("syndrome: 0x%x\n", get_syndrome(received_codeword));
+    return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
+}
+
+#else
+
+/*---------------------------------------------------------------------------* \
+
   FUNCTION....: golay23_encode()
   AUTHOR......: David Rowe
   DATE CREATED: 3 March 2013
@@ -1120,45 +1140,12 @@ void golay23_init(void) {
 
 \*---------------------------------------------------------------------------*/
 
-int golay23_encode(int data) {
+static int golay23_encode(int data) {
     assert(inited);
     assert(data <= 0xfff);
 
     //printf("data: 0x%x\n", data);
     return encoding_table[data];
-}
-
-/*---------------------------------------------------------------------------*\
-
-  FUNCTION....: golay23_decode()
-  AUTHOR......: David Rowe
-  DATE CREATED: 3 March 2013
-
-  Given a 23 bit received codeword, returns the 12 bit corrected data.
-
-\*---------------------------------------------------------------------------*/
-
-int golay23_decode(int received_codeword) {
-    assert(inited);
-    assert((received_codeword < (1<<23)) && (received_codeword >= 0));
-
-    //printf("syndrome: 0x%x\n", get_syndrome(received_codeword));
-    return received_codeword ^= decoding_table[get_syndrome(received_codeword)];
-}
-
-int golay23_count_errors(int recd_codeword, int corrected_codeword)
-{
-    int errors = 0;
-    int diff, i;
-
-    diff = recd_codeword ^ corrected_codeword;
-    for(i=0; i<23; i++) {
-        if (diff & 0x1)
-            errors++;
-        diff >>= 1;
-    }
-
-    return errors;
 }
 
 #endif

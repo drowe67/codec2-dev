@@ -452,7 +452,9 @@ void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *
     assert(hstates != NULL);
 
     fsk_get_demod_stats(hstates->fsk, stats);
-
+    if (hstates->verbose) {
+        fprintf(stderr, "stats->snr_est: %f\n", stats->snr_est);
+    }
     stats->snr_est = stats->snr_est + 10*log10(hstates->Rs/3000);
 
     assert(hstates->mFSK <= MODEM_STATS_MAX_F_EST);
