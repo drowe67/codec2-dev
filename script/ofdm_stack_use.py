@@ -102,7 +102,7 @@ def walk_stack():
 # Open trace
 with open(args.trace_file, "r") as tf:
     for line in tf.readlines():
-        print('Line: "{}"'.format(line.strip()))
+        #print('Line: "{}"'.format(line.strip()))
         words = line.split()
         # Note addr2line needs addr in hex!
         addr = words[1]
@@ -125,7 +125,7 @@ with open(args.trace_file, "r") as tf:
 
                 # Update
                 cur_stack_depth += su_data[func]
-                print('func: "{}" = {}'.format(func, cur_stack_depth))
+                #print('func: "{}" = {}'.format(func, cur_stack_depth))
                 if (cur_stack_depth > max_stack_depth):
                     max_stack_depth = cur_stack_depth
                     max_stack_trace = walk_stack()
