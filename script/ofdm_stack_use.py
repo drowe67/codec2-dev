@@ -66,6 +66,7 @@ assert(pathlib.Path(args.trace_file).exists())
 ##########################
 # Data Structures
 su_data = {} # <function> : <stack_size>
+funcs_used = {} # <function> : count
 
 ##########################
 # Read compiler generated tables of stack use per function, *.c.su
@@ -105,18 +106,18 @@ with open(args.trace_file, "r") as tf:
         words = line.split()
         # Note addr2line needs addr in hex!
         addr = words[1]
-        # ignore system calls
-        if (int(addr, 0) < 0x7f00000000):
-            if (words[0] == 'e'):
-                # Note: This could be run once with a pipe if needed for faster operation.
-                result = subprocess.run(['addr2line', '-f', addr, '-e', EXE_FILE],
-                                    stdout=subprocess.PIPE)
-                result.check_returncode()
-                # function name is first line of stdout
-                if (result.stdout):
-                    lines = result.stdout.decode().split('\n')
-                    func = lines[0].strip()
-                else: sys.error('unknown function at address {}'.format(addr))
+        if (words[0] == 'e'):
+            # Note: This could be run once with a pipe if needed for faster operation.
+            result = subprocess.run(['addr2line', '-f', addr, '-e', EXE_FILE],
+                                stdout=subprocess.PIPE)
+            result.check_returncode()
+            # function name is first line of stdout
+            if (result.stdout):
+                lines = result.stdout.decode().split('\n')
+                func = lines[0].strip()
+            else: sys.error('unknown function at address {}'.format(addr))
+
+            if (func != "??"):
 
                 # Push last info
                 stack.append((last_func, cur_stack_depth))
@@ -129,8 +130,18 @@ with open(args.trace_file, "r") as tf:
                     max_stack_depth = cur_stack_depth
                     max_stack_trace = walk_stack()
 
-                # end if ('e')
-            elif (words[0] == 'x'):
+                # Save info
+                if (func in funcs_used):
+                    funcs_used[func] += 1
+                else:
+                    funcs_used[func] = 1
+
+                # end if (func != "??")
+
+            # end if ('e')
+        elif (words[0] == 'x'):
+            # Only pop functions we pushed
+            if (func in funcs_used):
                 # Pop
                 (last_func, cur_stack_depth) = stack.pop()
                 #print('pop:  "{}" = {}'.format(last_func, cur_stack_depth))
