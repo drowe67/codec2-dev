@@ -2,17 +2,66 @@
 
 """ Find stack usage using
  - compiler generated tables of stack use per function, *.c.su
- - run time trace output (function_trace.out) from compiler added enter/exit calls.
+ - run time trace output from compiler added enter/exit calls.
 
 Just for ofdm_stack at this point
+
+This script expects to be run in the .../build_linux/unittest directory!
 """
 
-COMP_DIR = 'unittest/CMakeFiles/ofdm_stack.dir'
-EXE_FILE = 'unittest/ofdm_stack'
+COMP_DIR   = 'CMakeFiles/ofdm_stack.dir'
+EXE_FILE   = './ofdm_stack'
 
 import sys
+import os
+import argparse
 import pathlib
 import subprocess
+
+##########################
+# Options
+
+## Trace file (name) or default
+## Use existing trace file or run command
+argparser = argparse.ArgumentParser()
+argparser.add_argument('-f', '--trace_file', action='store', default='function_trace.out',
+                    help='Name of trace file, (default is "function_trace.out"')
+argparser.add_argument('-x', '--exec', action='store_true', default=False,
+                    help='Execute program')
+
+args = argparser.parse_args()
+
+
+##########################
+# Checking
+cwd_path = pathlib.Path.cwd()
+# One simple thing we can handle is running from above unittest (in build_linux)
+if ((cwd_path.name != 'unittest') and
+    (pathlib.Path('unittest').exists())):
+    os.chdir('unittest')
+
+# Required files
+assert(pathlib.Path(COMP_DIR).exists())
+assert(pathlib.Path(COMP_DIR + '/ofdm_stack.c.su').exists())
+assert(pathlib.Path(COMP_DIR + '/__/src/ofdm.c.su').exists())
+
+
+##########################
+# If trace file not found, or option set, run command
+if ( not (pathlib.Path(args.trace_file).exists())):
+    print('Trace file "{}" not found, running program'.format(args.trace_file))
+    args.exec = True
+
+if (args.exec):
+    print('Running program: "{}"'.format(EXE_FILE))
+    assert(pathlib.Path(EXE_FILE))
+    result = subprocess.run([EXE_FILE],
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT)
+    if (result.returncode != 0):
+        print('Error: traced program failed! Output:\n{}'.format(result.stdout))
+assert(pathlib.Path(args.trace_file).exists())
+
 
 ##########################
 # Data Structures
@@ -25,7 +74,7 @@ su_data = {} # <function> : <stack_size>
 #
 
 p = pathlib.Path(COMP_DIR)
-for fpath in p.glob('**/*.c.su'):
+for fpath in p.rglob('*.c.su'):
     with fpath.open() as f:
         for line in f.readlines():
             try:
@@ -50,15 +99,16 @@ def walk_stack():
     return(trace)
 
 # Open trace
-with open("function_trace.out", "r") as f:
-    for line in f.readlines():
-        #print('Line: "{}"'.format(line.strip()))
+with open(args.trace_file, "r") as tf:
+    for line in tf.readlines():
+        print('Line: "{}"'.format(line.strip()))
         words = line.split()
         # Note addr2line needs addr in hex!
         addr = words[1]
         # ignore system calls
         if (int(addr, 0) < 0x7f00000000):
             if (words[0] == 'e'):
+                # Note: This could be run once with a pipe if needed for faster operation.
                 result = subprocess.run(['addr2line', '-f', addr, '-e', EXE_FILE],
                                     stdout=subprocess.PIPE)
                 result.check_returncode()
@@ -74,7 +124,7 @@ with open("function_trace.out", "r") as f:
 
                 # Update
                 cur_stack_depth += su_data[func]
-                #print('func: "{}" = {}'.format(func, cur_stack_depth))
+                print('func: "{}" = {}'.format(func, cur_stack_depth))
                 if (cur_stack_depth > max_stack_depth):
                     max_stack_depth = cur_stack_depth
                     max_stack_trace = walk_stack()
