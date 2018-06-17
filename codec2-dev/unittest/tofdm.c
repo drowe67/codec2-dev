@@ -372,7 +372,6 @@ int main(int argc, char *argv[])
         Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/OFDM_BPS);
         Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/OFDM_BPS);
 
-        int    iter;
         double llr[CODED_BITSPERFRAME];
         char   out_char[CODED_BITSPERFRAME];
         int    parityCheckCount;
@@ -386,7 +385,7 @@ int main(int argc, char *argv[])
         
         //fprintf(stderr, "\n");
         
-        iter = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+        run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
         /*
           fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
         for(i=0; i<CODED_BITSPERFRAME; i++) {
