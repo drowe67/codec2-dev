@@ -89,7 +89,7 @@ add_executable(ofdm_mem ofdm_mem.c)
 add_library(function_trace STATIC ../unittest/function_trace.c)
 add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
 target_compile_options(ofdm_stack PUBLIC -fstack-usage -finstrument-functions)
-target_link_libraries(ofdm_stack function_trace m "-Wl,-Map=ofdm_stack.map")
+target_link_libraries(ofdm_stack function_trace m "-Wl,-Map=ofdm_stack.map" "-Wl,--verbose")
 
 add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
