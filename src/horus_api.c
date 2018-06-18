@@ -47,7 +47,7 @@ struct horus {
     int         Fs;                  /* sample rate in Hz                   */
     int         mFSK;                /* number of FSK tones                 */
     int         Rs;                  /* symbol rate in Hz                   */
-    int8_t      uw[MAX_UW_LENGTH];   /* unique word bits mapped to +/-1     */
+    int         uw[MAX_UW_LENGTH];   /* unique word bits mapped to +/-1     */
     int         uw_thresh;           /* threshold for UW detection          */
     int         uw_len;              /* length of unique word               */
     int         max_packet_len;      /* max length of a telemetry packet    */
@@ -71,7 +71,7 @@ int8_t uw_horus_rtty[] = {
 
 int8_t uw_horus_binary[] = {
     0,0,1,0,0,1,0,0,
-    0,0,1,0,0,1,0,0    
+    0,0,1,0,0,1,0,0 
 };
 
 struct horus *horus_open (int mode) {
@@ -161,7 +161,7 @@ int horus_find_uw(struct horus *hstates, int n) {
         for(j=0; j<hstates->uw_len; j++) {
             corr += rx_bits_mapped[i+j]*hstates->uw[j];
         }
-
+        
         /* peak pick maximum */
         
         if (corr > mx) {
@@ -170,6 +170,10 @@ int horus_find_uw(struct horus *hstates, int n) {
         }
     }
 
+    if (hstates->verbose) {
+        fprintf(stderr, "  horus_find_uw: mx_ind: %d mx: %d uw_thresh: %d n: %d\n",  mx_ind, mx, hstates->uw_thresh, n);
+    }
+    
     if (mx >= hstates->uw_thresh) {
         return mx_ind;
     } else {
@@ -327,11 +331,12 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
         fprintf(stderr, "nout: %d\nDecoded Payload bytes:\n%s", nout, hex_out);
     }
 
+    /* With noise input to FSK demod we can get occasinal UW matches,
+       so a good idea to only pass on any packets that pass CRC */
+    
     hstates->crc_ok = (crc_tx == crc_rx);
 
-    /* binary packets always marked as OK, as next layer determines validity */
-    
-    return 1;
+    return hstates->crc_ok;
 }
 
 
