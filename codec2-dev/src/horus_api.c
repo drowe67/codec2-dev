@@ -350,8 +350,8 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     int rx_bits_len = hstates->rx_bits_len;
     
     if (hstates->verbose) {
-        fprintf(stderr, "max_packet_len: %d rx_bits_len: %d Nbits: %d\n",
-                hstates->max_packet_len, rx_bits_len, Nbits);
+        fprintf(stderr, "max_packet_len: %d rx_bits_len: %d Nbits: %d nin: %d\n",
+                hstates->max_packet_len, rx_bits_len, Nbits, hstates->fsk->nin);
     }
     
     /* shift buffer of bits to make room for new bits */
