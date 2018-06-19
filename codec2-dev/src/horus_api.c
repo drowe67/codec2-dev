@@ -448,7 +448,7 @@ void horus_get_modem_stats(struct horus *hstates, int *sync, float *snr_est) {
     /* SNR scaled from Eb/No est returned by FSK to SNR in 3000 Hz */
 
     fsk_get_demod_stats(hstates->fsk, &stats);
-    *snr_est = stats.snr_est + 10*log10(hstates->Rs/3000);
+    *snr_est = stats.snr_est + 10*log10((float)hstates->Rs*log2(hstates->mFSK)/3000);
 }
 
 void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *stats) {
@@ -460,7 +460,7 @@ void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *
     if (hstates->verbose) {
         fprintf(stderr, "stats->snr_est: %f\n", stats->snr_est);
     }
-    stats->snr_est = stats->snr_est + 10*log10(hstates->Rs/3000);
+    stats->snr_est = stats->snr_est + 10*log10((float)hstates->Rs*log2(hstates->mFSK)/3000);
 
     assert(hstates->mFSK <= MODEM_STATS_MAX_F_EST);
     for (i=0; i<hstates->mFSK; i++) {
