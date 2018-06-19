@@ -34,10 +34,17 @@ void modem_stats_open(struct MODEM_STATS *f)
 {
     int i;
 
+    /* zero out all the stats */
+
+    memset(f, 0, sizeof(struct MODEM_STATS));
+
+    /* init the FFT */
+    
     for(i=0; i<2*MODEM_STATS_NSPEC; i++)
 	f->fft_buf[i] = 0.0;
     f->fft_cfg = kiss_fft_alloc (2*MODEM_STATS_NSPEC, 0, NULL, NULL);
     assert(f->fft_cfg != NULL);
+
 }
 
 void modem_stats_close(struct MODEM_STATS *f)
