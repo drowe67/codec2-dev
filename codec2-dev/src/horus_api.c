@@ -362,12 +362,14 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
                    
     /* demodulate latest bits */
 
-    COMP demod_in_comp[hstates->fsk->nin];
+    COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
+    
     for (i=0; i<hstates->fsk->nin; i++) {
         demod_in_comp[i].real = demod_in[i];
         demod_in_comp[i].imag = 0;
     }
     fsk_demod(hstates->fsk, &hstates->rx_bits[rx_bits_len-Nbits], demod_in_comp);
+    free(demod_in_comp);
     
     /* UW search to see if we can find the start of a packet in the buffer */
     
