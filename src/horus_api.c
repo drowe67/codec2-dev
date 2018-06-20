@@ -217,7 +217,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
             char_dec |= hstates->rx_bits[i+j] * (1<<j);
         }
         if (hstates->verbose) {
-            fprintf(stderr, "i: %4d 0x%02x %c ", i, char_dec, char_dec);
+            fprintf(stderr, "  extract_horus_rtty i: %4d 0x%02x %c ", i, char_dec, char_dec);
             if ((nout % 6) == 0) {
                 fprintf(stderr, "\n");
             }
@@ -261,7 +261,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
     }
 
     if (hstates->verbose) {
-        fprintf(stderr, "\n endpacket: %d nout: %d tx_crc: 0x%04x rx_crc: 0x%04x\n",
+        fprintf(stderr, "\n  endpacket: %d nout: %d tx_crc: 0x%04x rx_crc: 0x%04x\n",
                 endpacket, nout, tx_crc, rx_crc);
     }
             
@@ -306,7 +306,7 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     }
 
     if (hstates->verbose) {
-        fprintf(stderr, "nout: %d\nReceived Packet before decoding:\n", nout);
+        fprintf(stderr, "  extract_horus_binary nout: %d\n  Received Packet before decoding:\n  ", nout);
         for (b=0; b<nout; b++) {
             fprintf(stderr, "%02X", rxpacket[b]);
         }
@@ -321,7 +321,7 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     crc_tx = *(uint16_t*)&payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES-2];
     
     if (hstates->verbose) {
-        fprintf(stderr, "crc_tx: %04X crc_rx: %04X\n", crc_tx, crc_rx);
+        fprintf(stderr, "  extract_horus_binary crc_tx: %04X crc_rx: %04X\n", crc_tx, crc_rx);
     }
     
     /* convert to ASCII string of hex characters */
@@ -334,7 +334,7 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     }
    
     if (hstates->verbose) {
-        fprintf(stderr, "nout: %d\nDecoded Payload bytes:\n%s", nout, hex_out);
+        fprintf(stderr, "  nout: %d Decoded Payload bytes:\n  %s", nout, hex_out);
     }
 
     /* With noise input to FSK demod we can get occasinal UW matches,
@@ -358,7 +358,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     int rx_bits_len = hstates->rx_bits_len;
     
     if (hstates->verbose) {
-        fprintf(stderr, "max_packet_len: %d rx_bits_len: %d Nbits: %d nin: %d\n",
+        fprintf(stderr, "  horus_rx max_packet_len: %d rx_bits_len: %d Nbits: %d nin: %d\n",
                 hstates->max_packet_len, rx_bits_len, Nbits, hstates->fsk->nin);
     }
     
@@ -388,7 +388,7 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     if ((uw_loc = horus_find_uw(hstates, Nbits)) != -1) {
 
         if (hstates->verbose) {
-            fprintf(stderr, "uw_loc: %d mode: %d\n", uw_loc, hstates->mode);
+            fprintf(stderr, "  horus_rx uw_loc: %d mode: %d\n", uw_loc, hstates->mode);
         }
         
         /* OK we have found a unique word, and therefore the start of
@@ -472,7 +472,7 @@ void horus_get_modem_extended_stats (struct horus *hstates, struct MODEM_STATS *
 
     fsk_get_demod_stats(hstates->fsk, stats);
     if (hstates->verbose) {
-        fprintf(stderr, "stats->snr_est: %f\n", stats->snr_est);
+        fprintf(stderr, "  horus_get_modem_extended_stats stats->snr_est: %f\n", stats->snr_est);
     }
     stats->snr_est = stats->snr_est + 10*log10((float)hstates->Rs*log2(hstates->mFSK)/3000);
 
