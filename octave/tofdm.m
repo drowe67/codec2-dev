@@ -219,7 +219,7 @@ stem_sig_and_error(fg++, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bi
 
 % Run through checklist -----------------------------
 
-check(W, W_c, 'W');
+check(w, w_c, 'w');
 check(states.rate_fs_pilot_samples, pilot_samples_c, 'pilot_samples');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
