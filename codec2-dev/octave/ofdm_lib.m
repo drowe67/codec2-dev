@@ -188,8 +188,9 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   % carrier tables for up and down conversion
 
   fcentre = 1500;
-  Nlower = floor((fcentre - Rs*Nc/2)/Rs);
-  w = (Nlower:Nlower+Nc+1)*2*pi*Rs/states.Fs;
+  alower = fcentre - Rs * (Nc/2);
+  Nlower = floor(alower / Rs);
+  w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
   W = zeros(Nc+2,states.M);
   for c=1:Nc+2
     W(c,:) = exp(j*w(c)*(0:states.M-1));

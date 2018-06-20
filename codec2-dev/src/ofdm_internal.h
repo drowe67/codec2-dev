@@ -66,8 +66,6 @@ extern "C" {
 #define OFDM_NCP    ((int)(OFDM_TCP * OFDM_FS))
 #endif
 
-#define OFDM_INVERSE_M           (1.0f / (float) OFDM_M)
-
 /* number of symbols we estimate fine timing over */
 #define OFDM_FTWINDOWWIDTH       11
 /* Bits per frame (duh) */
@@ -122,7 +120,7 @@ struct OFDM {
     
     complex float pilot_samples[OFDM_M + OFDM_NCP];
     float   timing_norm;
-    complex float W[OFDM_NC + 2][OFDM_M];
+    float   w[OFDM_NC + 2];
     complex float rxbuf[OFDM_RXBUF];
     complex float pilots[OFDM_NC + 2];
     struct quisk_cfFilter ofdm_tx_bpf;

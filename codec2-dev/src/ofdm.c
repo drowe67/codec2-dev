@@ -67,9 +67,9 @@ static const complex float constellation[] = {
  * These pilots are compatible with Octave version
  */
 static const float pilotvalues[] = {
-    -1, -1, 1, 1, -1, -1, -1, 1, -1,
-     1, -1, 1, 1,  1,  1,  1, 1,  1,
-     1
+    -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f,
+     1.0f, -1.0f, 1.0f, 1.0f,  1.0f,  1.0f,  1.0f, 1.0f,  1.0f,
+     1.0f
 };
 
 /*
@@ -123,13 +123,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     float alower = OFDM_CENTRE - OFDM_RS * ((float)OFDM_NC / 2);
     int Nlower = floorf(alower / OFDM_RS);
-    
-    for (i = 0, n = Nlower; i < (OFDM_NC + 2); i++, n++) {
-        float w = (TAU * (float) n) / (OFDM_FS / OFDM_RS);
 
-        for (j = 0; j < OFDM_M; j++) {
-            ofdm->W[i][j] = cexpf(I * w * j);
-        }
+    for (i = 0, n = Nlower; i < (OFDM_NC + 2); i++, n++) {
+        ofdm->w[i] = (TAU * (float) n) / (OFDM_FS / OFDM_RS);
     }
 
     for (i = 0; i < OFDM_RXBUF; i++) {
@@ -264,16 +260,17 @@ void qpsk_demod(complex float symbol, int *bits) {
 /* convert frequency domain into time domain */
 
 static void idft(struct OFDM *ofdm, complex float *result, complex float *vector) {
+    float inv_m = (1.0f / (float) OFDM_M);
     int row, col;
 
     for (row = 0; row < OFDM_M; row++) {
         result[row] = 0.0f + 0.0f * I;
 
         for (col = 0; col < (OFDM_NC + 2); col++) {
-            result[row] = result[row] + (vector[col] * ofdm->W[col][row]);
+            result[row] = result[row] + (vector[col] * cexpf(I * ofdm->w[col] * row));
         }
 
-        result[row] = result[row] * OFDM_INVERSE_M;
+        result[row] = result[row] * inv_m;
     }
 }
 
@@ -286,7 +283,7 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
         result[col] = 0.0f + 0.0f * I;
 
         for (row = 0; row < OFDM_M; row++) {
-            result[col] = result[col] + (vector[row] * conjf(ofdm->W[col][row]));
+            result[col] = result[col] + (vector[row] * conjf(cexpf(I * ofdm->w[col] * row)));
         }
     }
 }
@@ -418,7 +415,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
        improve estimate.  Small real 1E-12 term to prevent instability
        with 0 inputs. */
 
-    ofdm->foff_metric = 0.9*ofdm->foff_metric + 0.1*(conjf(p1) * p2 + conjf(p3) * p4);
+    ofdm->foff_metric = 0.9f * ofdm->foff_metric + 0.1f * (conjf(p1) * p2 + conjf(p3) * p4);
     foff_est = Fs1 * cargf( ofdm->foff_metric + 1E-12f) / TAU;
 
     if (ofdm->verbose > 1) {
@@ -1224,18 +1221,21 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
     stats->Nc = OFDM_NC;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
-    float snr_est = 10.0f * log10f((0.1+ (ofdm->sig_var/ofdm->noise_var)) * OFDM_NC*OFDM_RS / 3000.0f);
+    float snr_est = 10.0f * log10f((0.1f + (ofdm->sig_var/ofdm->noise_var)) * OFDM_NC*OFDM_RS / 3000.0f);
     //fprintf(stderr, "sig: %f var: %f snr: %f\n", ofdm->sig_var, ofdm->noise_var, snr_est);
     stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
     stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");
     //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
+
     float total = ofdm->frame_count*OFDM_SAMPLESPERFRAME;
     stats->clock_offset = 0;
+
     if (total) {
         stats->clock_offset = ofdm->clock_offset_counter/total;
     }
+
     stats->sync_metric = ofdm->timing_mx;
     
     //fprintf(stderr, "clock_offset_counter: %d frame_count: %d total: %f clock_offset: %f\n",

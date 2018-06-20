@@ -48,8 +48,8 @@ int main(int argc, char *argv[])
     used +=                                       sizeof(ofdm->config);
     printf("pilot_samples...............: %zd\n", sizeof(ofdm->pilot_samples));
     used +=                                       sizeof(ofdm->pilot_samples);
-    printf("W...........................: %zd\n", sizeof(ofdm->W));
-    used +=                                       sizeof(ofdm->W);
+    printf("w...........................: %zd\n", sizeof(ofdm->w));
+    used +=                                       sizeof(ofdm->w);
     printf("rxbuf.......................: %zd\n", sizeof(ofdm->rxbuf));
     used +=                                       sizeof(ofdm->rxbuf);
     printf("pilots......................: %zd\n", sizeof(ofdm->pilots));
@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     /* TODO: est memory usage of quisk BPF */
     /*
     printf("--allocated separately--\n");
-    printf("tx_bpf_buf..................: %ld\n", (sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME)));
+    printf("tx_bpf_buf..................: %zd\n", (sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME)));
     */
 
     return 0;

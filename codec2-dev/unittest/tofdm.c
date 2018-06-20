@@ -48,7 +48,7 @@
 #define SAMPLE_CLOCK_OFFSET_PPM 100
 #define FOFF_HZ                 0.5f
 
-#define ASCALE  (2E5*1.1491/2.0)  /* scale from shorts back to floats */
+#define ASCALE  (2E5f * 1.1491f / 2.0f)  /* scale from shorts back to floats */
 
 #define CODED_BITSPERFRAME 224    /* number of LDPC codeword bits/frame   */
 
@@ -456,7 +456,7 @@ int main(int argc, char *argv[])
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
-    octave_save_complex(fout, "W_c", (COMP*)ofdm->W, OFDM_NC + 2, OFDM_M, OFDM_M);
+    octave_save_float(fout, "w_c", (float*)ofdm->w, 1, OFDM_NC + 2, OFDM_NC + 2);
     octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, OFDM_M+OFDM_NCP, OFDM_M+OFDM_NCP);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
