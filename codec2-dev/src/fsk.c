@@ -467,7 +467,8 @@ void fsk_get_demod_stats(struct FSK *fsk, struct MODEM_STATS *stats){
     stats->neyesamp = fsk->stats->neyesamp;
     stats->neyetr = fsk->stats->neyetr;
     memcpy(stats->rx_eye, fsk->stats->rx_eye, sizeof(stats->rx_eye));
-
+    memcpy(stats->f_est, fsk->stats->f_est, fsk->mode*sizeof(float));
+    
     /* these fields not used for FSK so set to something sensible */
 
     stats->sync = 0;
@@ -1009,6 +1010,10 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
 
     fsk->stats->nr = 0;
     fsk->stats->Nc = 0;
+
+    for(i=0; i<M; i++) {
+        fsk->stats->f_est[i] = f_est[i];
+    }
     
     /* Dump some internal samples */
     modem_probe_samp_f("t_EbNodB",&(fsk->EbNodB),1);
