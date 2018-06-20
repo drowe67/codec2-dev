@@ -54,6 +54,7 @@ struct horus {
     uint8_t    *rx_bits;             /* buffer of received bits             */
     int         rx_bits_len;         /* length of rx_bits buffer            */
     int         crc_ok;              /* most recent packet checksum results */
+    int         total_payload_bits;  /* num bits rx-ed in last RTTY packet  */
 };
 
 /* Unique word for Horus RTTY 7 bit '$' character, 3 sync bits,
@@ -122,6 +123,7 @@ struct horus *horus_open (int mode) {
     }
 
     hstates->crc_ok = 0;
+    hstates->total_payload_bits = 0;
     
     return hstates;
 }
@@ -249,6 +251,10 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
         }
         crc_ok = (tx_crc == rx_crc);
         *(ptx_crc+4) = 0;  /* terminate ASCII string */
+
+        if (crc_ok) {
+            hstates->total_payload_bits = strlen(ascii_out)*7;
+        }
     }
     else {
         *ascii_out = 0;
@@ -258,7 +264,7 @@ int extract_horus_rtty(struct horus *hstates, char ascii_out[], int uw_loc) {
         fprintf(stderr, "\n endpacket: %d nout: %d tx_crc: 0x%04x rx_crc: 0x%04x\n",
                 endpacket, nout, tx_crc, rx_crc);
     }
-    
+            
     /* make sure we don't overrun storage */
     
     assert(nout <= horus_get_max_ascii_out_len(hstates));
@@ -335,7 +341,9 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
        so a good idea to only pass on any packets that pass CRC */
     
     hstates->crc_ok = (crc_tx == crc_rx);
-
+    if ( hstates->crc_ok) {
+        hstates->total_payload_bits += HORUS_BINARY_NUM_PAYLOAD_BYTES;
+    }
     return hstates->crc_ok;
 }
 
@@ -362,6 +370,10 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
                    
     /* demodulate latest bits */
 
+    /* Note: allocating this array as an automatic variable caused OSX to
+       "Bus Error 10" (segfault), so lets malloc() it.  TODO: A real
+       short sample option for fsk_demod() would be useful */
+    
     COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
     
     for (i=0; i<hstates->fsk->nin; i++) {
@@ -480,3 +492,12 @@ int horus_crc_ok(struct horus *hstates) {
     return hstates->crc_ok;
 }
 
+int horus_get_total_payload_bits(struct horus *hstates) {
+    assert(hstates != NULL);
+    return hstates->total_payload_bits;
+}
+
+void horus_set_total_payload_bits(struct horus *hstates, int val) {
+    assert(hstates != NULL);
+    hstates->total_payload_bits = val;
+}
