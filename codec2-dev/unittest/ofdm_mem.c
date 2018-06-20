@@ -43,34 +43,34 @@ int main(int argc, char *argv[])
 
     int used = 0;
 
-    printf("struct OFDM.................: %ld\n", sizeof(struct OFDM));
-    printf("config......................: %ld\n", sizeof(ofdm->config));
+    printf("struct OFDM.................: %zd\n", sizeof(struct OFDM));
+    printf("config......................: %zd\n", sizeof(ofdm->config));
     used +=                                       sizeof(ofdm->config);
-    printf("pilot_samples...............: %ld\n", sizeof(ofdm->pilot_samples));
+    printf("pilot_samples...............: %zd\n", sizeof(ofdm->pilot_samples));
     used +=                                       sizeof(ofdm->pilot_samples);
-    printf("W...........................: %ld\n", sizeof(ofdm->W));
+    printf("W...........................: %zd\n", sizeof(ofdm->W));
     used +=                                       sizeof(ofdm->W);
-    printf("rxbuf.......................: %ld\n", sizeof(ofdm->rxbuf));
+    printf("rxbuf.......................: %zd\n", sizeof(ofdm->rxbuf));
     used +=                                       sizeof(ofdm->rxbuf);
-    printf("pilots......................: %ld\n", sizeof(ofdm->pilots));
+    printf("pilots......................: %zd\n", sizeof(ofdm->pilots));
     used +=                                       sizeof(ofdm->pilots);
-    printf("rx_sym......................: %ld\n", sizeof(ofdm->rx_sym));
+    printf("rx_sym......................: %zd\n", sizeof(ofdm->rx_sym));
     used +=                                       sizeof(ofdm->rx_sym);
-    printf("rx_np.......................: %ld\n", sizeof(ofdm->rx_np));
+    printf("rx_np.......................: %zd\n", sizeof(ofdm->rx_np));
     used +=                                       sizeof(ofdm->rx_np);
-    printf("rx_amp......................: %ld\n", sizeof(ofdm->rx_amp));
+    printf("rx_amp......................: %zd\n", sizeof(ofdm->rx_amp));
     used +=                                       sizeof(ofdm->rx_amp);
-    printf("aphase_est_pilot_log........: %ld\n", sizeof(ofdm->aphase_est_pilot_log));
+    printf("aphase_est_pilot_log........: %zd\n", sizeof(ofdm->aphase_est_pilot_log));
     used +=                                       sizeof(ofdm->aphase_est_pilot_log);
-    printf("tx_uw.......................: %ld\n", sizeof(ofdm->tx_uw));
+    printf("tx_uw.......................: %zd\n", sizeof(ofdm->tx_uw));
     used +=                                       sizeof(ofdm->tx_uw);
-    printf("sync_state..................: %ld\n", sizeof(ofdm->sync_state));
+    printf("sync_state..................: %zd\n", sizeof(ofdm->sync_state));
     used +=                                       sizeof(ofdm->sync_state);
-    printf("last_sync_state.............: %ld\n", sizeof(ofdm->last_sync_state));
+    printf("last_sync_state.............: %zd\n", sizeof(ofdm->last_sync_state));
     used +=                                       sizeof(ofdm->last_sync_state);
-    printf("sync_state_interleaver......: %ld\n", sizeof(ofdm->sync_state_interleaver));
+    printf("sync_state_interleaver......: %zd\n", sizeof(ofdm->sync_state_interleaver));
     used +=                                       sizeof(ofdm->sync_state_interleaver);
-    printf("last_sync_state_interleaver.: %ld\n", sizeof(ofdm->last_sync_state_interleaver));
+    printf("last_sync_state_interleaver.: %zd\n", sizeof(ofdm->last_sync_state_interleaver));
     used +=                                       sizeof(ofdm->last_sync_state_interleaver);
 
     // add in non-array sizes
@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
     printf("single values...............: %d\n",  single);
     used +=                                       single;
 
-    printf("alignment...................: %ld\n", (sizeof(struct OFDM) - used));
+    printf("alignment...................: %zd\n", (sizeof(struct OFDM) - used));
 
     /* TODO: est memory usage of quisk BPF */
     /*
