@@ -40,10 +40,10 @@ int main(int argc, char *argv[])
 {
     struct OFDM  *ofdm;
     FILE         *fout;
-    int           Nsec, Nrows, Nframes, i,n;
+    int           Nframes, i, n;
 
     if (argc < 2) {
-	printf("usage: %s OutputOneCharPerBitFile numSecs\n", argv[0]);
+	printf("usage: %s OutputOneCharPerBitFile [-f] numSecsorFrames\n", argv[0]);
 	exit(1);
     }
 
@@ -63,10 +63,16 @@ int main(int argc, char *argv[])
     for(i=0; i<Nbitsperframe; i++) {
         tx_bits_char[i] = test_bits_ofdm[i];
     }
-    
-    Nsec = atoi(argv[2]);
-    Nrows = Nsec*OFDM_RS;
-    Nframes = floor((Nrows-1)/OFDM_NS);
+
+    if (strcmp(argv[2], "-f") == 0) {
+        Nframes = atoi(argv[3]);
+    } else {
+        int Nsec, Nrows;
+        Nsec = atoi(argv[2]);
+        Nrows = (int)(Nsec*OFDM_RS);
+        Nframes = floor((Nrows-1)/OFDM_NS);
+    }
+
 
     for(n=0; n<Nframes; n++) {
 
