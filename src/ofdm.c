@@ -354,7 +354,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
     ofdm->timing_valid = timing_mx > OFDM_TIMING_MX_THRESH;
 
     if (ofdm->verbose > 1) {
-        fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", av_level, ofdm->timing_mx, timing_est, ofdm->timing_valid);
+        fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", (double) av_level, (double) ofdm->timing_mx, timing_est, ofdm->timing_valid);
     }
     
     return timing_est;
@@ -419,7 +419,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
     foff_est = Fs1 * cargf( ofdm->foff_metric + 1E-12f) / TAU;
 
     if (ofdm->verbose > 1) {
-        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", crealf(ofdm->foff_metric), cimagf(ofdm->foff_metric), foff_est);
+        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double) foff_est);
     }
     
     return foff_est;
@@ -619,7 +619,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
    
     if (ofdm->verbose) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
-                ct_est, ofdm->coarse_foff_est_hz, ofdm->timing_valid, ofdm->timing_mx);
+                ct_est, (double) ofdm->coarse_foff_est_hz, ofdm->timing_valid, (double) ofdm->timing_mx);
     }
 
     if (ofdm->timing_valid) {
