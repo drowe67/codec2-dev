@@ -40,10 +40,6 @@
 
 #define STD_PROC_BITS 96
 
-/* Define this to enable EbNodB estimate */
-/* This needs square roots, may take more cpu time than it's worth */
-#define EST_EBNO
-
 /*
  * Create a new fmfsk modem instance.
  * 
@@ -193,9 +189,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     int neyeoffset;
     float eye_max;
     uint8_t mbit;
-    #ifdef EST_EBNO
-    float amp_even = 0, amp_odd = 0, amp_bit, amp_noise;
-    #endif
+    float var_signal = 0, var_noise = 0, lastFabsV;
     
     /* Shift in nin samples */
     memmove(&oldsamps[0]   , &oldsamps[nmem-nold], sizeof(float)*nold);
@@ -275,6 +269,7 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Make first diff of this round the last sample of the last round, 
      * for the odd stream */
     lastv = fmfsk->lodd;
+    lastFabsV = fabs(lastv);
     apeven = 0;
     apodd = 0;
     for(i=0; i<nsym; i++){
@@ -284,6 +279,17 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
         mdiff = lastv - currv;
         mbit = mdiff>0 ? 1 : 0;
         lastv = currv;
+
+        // Calculate the signal variance.  Note that the mean is zero
+        var_signal += currv * currv;
+
+        /* Calculate the variance of the noise between samples (symbols).  A quick variance estimate
+         * without calculating mean can be done by differentiating (remove mean) and then
+         * dividing by 2.  Fabs the samples as we are looking at how close the samples are to each
+         * other as if they were all the same polarity/symbol.  */
+        currv = fabs(currv);
+        var_noise += (currv - lastFabsV) * (currv - lastFabsV);
+        lastFabsV = currv;
         
         mdiff = mdiff>0 ? mdiff : 0-mdiff;
         
@@ -292,38 +298,24 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
             apeven += mdiff;
             /* Even stream goes in LSB */
             rx_bits[i>>1] |= mbit ? 0x1 : 0x0;
-            #ifdef EST_EBNO
-            amp_even += currv * currv;
-            #endif
         }else{
             apodd += mdiff;
             /* Odd in second-to-LSB */
             rx_bits[i>>1]  = mbit ? 0x2 : 0x0;
-            #ifdef EST_EBNO
-            amp_odd += currv * currv;
-            #endif
         }
     }
-    #ifdef EST_EBNO
-    amp_even = sqrt(amp_even);
-    amp_odd = sqrt(amp_odd);
-    #endif
+
+    /* Div by 2 to correct variance when doing via differentiation.*/
+    var_noise *= 0.5;
+
     if(apeven>apodd){
         /* Zero out odd bits from output bitstream */
         for(i=0;i<nbit;i++)
             rx_bits[i] &= 0x1;
-        #ifdef EST_EBNO
-        amp_bit = amp_even;
-        amp_noise = amp_odd;
-        #endif
     }else{
         /* Shift odd bits into LSB and even bits out of existence */
         for(i=0;i<nbit;i++)
             rx_bits[i] = (rx_bits[i]&0x2)>>1;
-        #ifdef EST_EBNO
-        amp_bit = amp_odd;
-        amp_noise = amp_even;
-        #endif
     }
     
     /* Save last sample of int stream for next demod round */
@@ -340,14 +332,12 @@ void fmfsk_demod(struct FMFSK *fmfsk, uint8_t rx_bits[],float fmfsk_in[]){
     /* Zero out all of the other things */
     fmfsk->stats->foff = 0;
 
-#ifdef EST_EBNO
-    amp_bit = fabsf(amp_bit - amp_noise);
-    fmfsk->snr_mean *= .9;
-    fmfsk->snr_mean += (amp_bit+1e-6)/(amp_noise+1e-6);
-    fmfsk->stats->snr_est = 20+20*log10f(fmfsk->snr_mean); 
-#else
-    fmfsk->stats->snr_est = 0;
-#endif
+    /* Use moving average to smooth SNR display */
+    if(fmfsk->snr_mean < 0.1)
+        fmfsk->snr_mean = (10.0 * log10f(var_signal / var_noise));
+    else
+        fmfsk->snr_mean = 0.9 * fmfsk->snr_mean + 0.1 * (10.0 * log10f(var_signal / var_noise));
+    fmfsk->stats->snr_est = fmfsk->snr_mean;
         
     /* Collect an eye diagram */
     /* Take a sample for the eye diagrams */
