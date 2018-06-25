@@ -755,6 +755,22 @@ fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS:.c=.O3.o) \
 
 # ---------------------------------------------------------------------------
 
+TST_OFDM_MOD_SRCS=\
+src/tst_ofdm_mod.c \
+../src/ofdm.c \
+src/stm32f4_machdep.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+TST_OFDM_MOD_SRCS += $(CODEC2_SRCS)
+
+tst_ofdm_mod.elf: $(TST_OFDM_MOD_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# ---------------------------------------------------------------------------
+
 TUNER_UT_SRCS=\
 src/tuner_ut.c \
 gdb_stdio.c \
