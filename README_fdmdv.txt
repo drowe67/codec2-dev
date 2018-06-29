@@ -87,8 +87,8 @@ src/fdmdv_demod.c - C version of demodulator that takes a raw file of
                     can be plotted using the Octave script
                     fdmdv_demod_c.m
 
-src/fdmdv.h - Header file that exposes FDMDV C API functions.  Include
-              this file in your application program.
+src/codec2_fdmdv.h - Header file that exposes FDMDV C API functions.  Include
+                    this file in your application program.
 
 src/fdmdv.c - C functions that implement the FDMDV modem.
 
