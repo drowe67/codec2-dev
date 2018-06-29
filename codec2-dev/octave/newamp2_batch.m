@@ -21,7 +21,7 @@
     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
     $ cd ~/codec2-dev/octave
     octave:14> newamp2_batch("../build_linux/src/hts1a")
-    ~/codec2-dev/build_linux/src$ /c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16 
+    ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16 
 #}
 
 
@@ -36,7 +36,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   synth_phase = output = 1;
   output_prefix = input_prefix;
   mode = "mel";
-  correct_rate_K_en = 0; quant = ""; vq_en = 0;
+  correct_rate_K_en = 0; quant = ""; vq_en = 0; M = 1;
   
   % parse variable argument list
 
@@ -72,7 +72,13 @@ function surface = newamp2_batch(input_prefix, varargin)
      
     ind = arg_exists(varargin, "vq");
     if ind
+      quant = "vq";
       vq_en = 1; vq_name = varargin{ind+1}; vq_st = varargin{ind+2}; vq_en = varargin{ind+3};
+    end
+
+    ind = arg_exists(varargin, "M");
+    if ind
+      M = varargin{ind+1};
     end
     
     correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
@@ -83,7 +89,7 @@ function surface = newamp2_batch(input_prefix, varargin)
     printf(" output_prefix: %s",  output_prefix);
   end
   printf(" mode: %s", mode);
-  printf(" correct_rate_K: %d quant: %s vq_en: %d\n", correct_rate_K_en, quant, vq_en);
+  printf(" correct_rate_K: %d quant: %s vq_en: %d M: %d\n", correct_rate_K_en, quant, vq_en, M);
   if vq_en
     printf("vq_name: %s vq_st: %d vq_en: %d\n", vq_name, vq_st, vq_en);
   end
@@ -103,15 +109,18 @@ function surface = newamp2_batch(input_prefix, varargin)
   % Choose experiment to run test here -----------------------
 
   if strcmp(mode, 'mel')
+    vqs.en=vq_en; 
     if vq_en
       load(vq_name);
-      size(avq)
-      vqs.st=vq_st; vqs.en=vq_en; vqs.m=5;
+      vqs.st=vq_st;vqs.m=5;
       vqs.table = avq;
-      [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, plots=1, quant, vqs);
-    else
-      [model_ surface sd_log] = experiment_mel_freq(model, correct_rate_K_en, plots=1, quant);
     end
+    args.vq = vqs;
+    args.quant = quant;
+    args.correct_rate_K_en = correct_rate_K_en;
+    args.M = M;
+    args.plots = 1;
+    [model_ surface sd_log] = experiment_mel_freq(model, args);
   end
 
   % ----------------------------------------------------
@@ -129,7 +138,7 @@ function surface = newamp2_batch(input_prefix, varargin)
     end
 
     for f=1:frames
-      %printf("%d ", f);   
+      printf("%d ", f);   
       Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
       if Wo*L > pi
         printf("Problem: %d  Wo*L > pi Wo: %f F0: %f L: %d Wo*L: %f\n", f, Wo, Wo*Fs/(2*pi), L, Wo*L);   
@@ -194,11 +203,19 @@ endfunction
 
 % Basic unquantised rate K mel-sampling then back to rate L
 
-function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, correct_rate_K_en=0, plots=1, quant="", vq)
+function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, args)
   [frames nc] = size(model);
   K = 20; Fs = 8000;
   AmdB = zeros(frames, 160);
   melvq;
+
+  quant = args.quant;
+  vq    = args.vq;
+  plots = args.plots;
+  correct_rate_K_en = args.correct_rate_K_en;
+  M = args.M;
+  
+  rate_K_surface = rate_K_surface_ = zeros(frames, K);
   
   for f=1:frames
     Wo = model(f,1);
@@ -216,13 +233,13 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, co
     end
   end
 
-  % expriment to limit frame by frame changes, this will make quantisation easier
+  % experiment to limit frame by frame changes, this will make quantisation easier
 
   if strcmp(quant,"dtlimit");
     rate_K_surface_prev_ = zeros(1,K);
     delta_K_log = zeros(frames,K);
 
-    for f=1:frames
+    for f=1:M:frames
 
       % find delta
 
@@ -250,7 +267,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, co
   % huffman encoding of delata_f, also limits delta_f changes, (hopefully) making quantisation easier
 
   if strcmp(quant,"huffman");
-    for f=1:frames
+    for f=1:M:frames
       rate_K_surface_(f,:) = huffman_quantise_rate_K(rate_K_surface(f,:));
     end
     if nargin == 5
@@ -262,7 +279,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, co
   end
 
   if strcmp(quant,"dct");
-    for f=1:frames
+    for f=1:M:frames
       rate_K_surface_(f,:) = dct_quantise_rate_K(rate_K_surface(f,:));
     end
   end 
@@ -270,13 +287,41 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_mel_freq(model, co
     rate_K_surface_ = rate_K_surface;
   end
   
+  if strcmp(quant,"vq")
+    % use orig for samples we don't quantise
+    rate_K_surface_ = rate_K_surface;
+
+    size(vq.table)
+    target = rate_K_surface(:,vq.st:vq.en);
+    [res output_vecs ind] = mbest(vq.table, target, vq.m);
+    rate_K_surface_(:,vq.st:vq.en) = output_vecs;
+  end
+
+  % optional interpolation, if decimation M > 1
+
+  if M > 1
+    for f=1:M:frames-M
+      left_f = f; right_f = f+M;
+      %printf("%d %d\n", left_f, right_f);
+      left_vec = rate_K_surface_(left_f, :); right_vec = rate_K_surface_(right_f, :);
+      sample_points = [left_f right_f];
+      resample_points = left_f+1:right_f-1;
+      for k=1:K
+        rate_K_surface_(resample_points, k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_points);
+      end
+    end
+    rate_K_surface_(frames-M+1:frames,:) = rate_K_surface_(frames-M,1);    
+  end
+
   if plots
     l = min(100, length(rate_K_surface_));
     figure(1); clf; mesh(rate_K_surface_(1:l,:));
   end
 
+  % back to rate L
+  
   [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lancmel');
-
+  
   % calculate SD
 
   sd_log = []; energy_log = [];

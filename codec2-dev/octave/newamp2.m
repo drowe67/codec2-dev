@@ -147,6 +147,7 @@ function y = interp_largest(f0_Hz, AmdB, x_kHz)
   end
 
 endfunction
+#}
 
 % simple linear interpolator
 
@@ -161,19 +162,24 @@ function y = interp_linear(xp, yp, x)
     y(i) = m*x(i) + c;
   end
 endfunction
-#}
 
 % quantise input sample to nearest value in table, optionally return binary code
+% should work with vectors and weights too
 
-function [quant_out best_i bits] = quantise(levels, quant_in)
+function [quant_out best_i bits] = quantise(levels, quant_in, weights=1)
 
+  % if a scaler quantiser make it a col vector
+  if rows(levels) == 1
+    levels = levels';
+  end
+ 
   % find closest quantiser level
 
   best_se = 1E32;
   for i=1:length(levels)
-    se = (levels(i) - quant_in)^2;
+    se = sum( ((levels(i,:) - quant_in).^2) .* weights );
     if se < best_se
-      quant_out = levels(i);
+      quant_out = levels(i,:);
       best_se = se;
       best_i = i;
     end
@@ -469,56 +475,52 @@ function [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_lo
 endfunction
 
 
-% Given a vector of rate K samples, huffman encodes/decodes delta
+% Given a vector of rate K samples, deltaf encodes/decodes delta
 % amplitude, returning quantised samples
 
-function rate_K_vec_ = huffman_quantise_rate_K(rate_K_vec)
+function rate_K_vec_ = deltaf_quantise_rate_K(rate_K_vec, E)
   K = length(rate_K_vec);
 
-  % whole thing is quantised to 6dB steps, as that doesn't seem to
-  % introduce much distortion
+  #{
+    % Whole thing is quantised to 6dB steps, as that doesn't seem to
+    % introduce much distortion
   
-  rate_K_vec = 6*round(rate_K_vec/6);
-
+    rate_K_vec = 6*round(rate_K_vec/6);
+  #}
+  
   % start with k=3, around 250Hz, we assume that's quantised as the
   % mean frame energy, as samples before that might be stuck in the
   % HPF.
 
-  rate_K_vec_no_mean = rate_K_vec - rate_K_vec(3);
-  rate_K_vec_no_mean_ = zeros(1,K);
+  rate_K_vec_ = zeros(1,K);
+  rate_K_vec_(3) = E;
+  
+  % encoding of differences
+  
+  %levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
 
-  % huffman encoding of differences, ignoring m=3, using the following table
-  %
-  % 00    0
-  % 10   +6
-  % 11   -6
-  % 010 -12
-  % 011 +12
-
-  levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
+  % this is pretty coarse (note no 0dB level) but sounds OK
+  
+  levels = [-6 +6 -12 +12]; symbols = {[0 0],[1 0],[1 1],[0 1]};
 
   % move backwards to get target for first two samples
   
   bits = [];
-  [quant_out best_i] = quantise(levels, rate_K_vec_no_mean(2));
-  bits = [bits symbols{best_i}];
-  rate_K_vec_no_mean_(2) = quant_out;
+  for m=2:-1:1
+    target = rate_K_vec(m) - rate_K_vec_(m+1);
+    [target_ best_i] = quantise(levels, target);
+    bits = [bits symbols{best_i}];
+    rate_K_vec_(m) = rate_K_vec_(m+1) + target_;
+  end
   
-  [quant_out best_i] = quantise(levels, rate_K_vec_no_mean(1) - rate_K_vec_no_mean(2));
-  bits = [bits symbols{best_i}];
-  rate_K_vec_no_mean_(1) = quant_out + rate_K_vec_no_mean_(2);
-
   % then forwards for rest of the target samples
   
   for m=4:K
-    target = rate_K_vec_no_mean(m) - rate_K_vec_no_mean_(m-1);
-    [quant_out best_i] = quantise(levels, target);
+    target = rate_K_vec(m) - rate_K_vec_(m-1);
+    [target_ best_i] = quantise(levels, target);
     bits = [bits symbols{best_i}];
-    rate_K_vec_no_mean_(m) = quant_out + rate_K_vec_no_mean_(m-1);    
+    rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
   end
-
-  %printf("%d bits\n", length(bits));
-  rate_K_vec_ = rate_K_vec_no_mean_ + rate_K_vec(3);
 endfunction
 
 
@@ -544,5 +546,85 @@ function un(sl)
   end
   s = sort(cnt, "descend");
   figure(1); clf; subplot(211); plot(s); subplot(212); plot(cumsum(s));  
+endfunction
+
+
+% Joint Wo and LPC energy vector quantiser developed by Jean-Marc Valin.
+% Octave port of functions in quantise.c
+
+function w = compute_weights2(x, xp)
+  w(1) = 30;
+  w(2) = 1;
+  if x(2) < 0
+     w(1) *= 0.6;
+     w(2) *= 0.3;
+  end
+  if x(2) < -10
+     w(1) *= 0.3;
+     w(2) *= 0.3;
+  end
+
+  % Higher weight if pitch is stable
+
+  if abs(x(1)-xp(1)) < 0.2
+     w(1) *= 2;
+     w(2) *= 1.5;
+  elseif abs(x(1)-xp(1)) > 0.5
+     % Lower if not stable
+     w(1) *= 0.5;
+  end
+  
+  % Lower weight for low energy
+  
+  if x(2) < xp(2) - 10
+     w(2) *= 0.5;
+  end
+  if x(2) < xp(2) - 20
+     w(2) *= .5;
+  end
+
+  % Square the weights because it's applied on the squared error
+  
+  w(1) *= w(1);
+  w(2) *= w(2);
+endfunction
+
+
+function [Wo_ E_ xq] = quantise_WoE(Wo, E, xq, vq)
+  ge_coeff = [0.8 0.9];
+
+  % VQ is only trained for Fs = 8000 Hz
+
+  Fs = 8000;            
+  Fo_min = 50; Fo_max = 400;
+  P_min = Fs/Fo_max; P_max = Fs/Fo_min;
+  Wo_min = 2*pi/P_max;
+  Wo_max = 2*pi/P_min;
+
+  E = max(1,E);
+  
+  x(1) = log10(Wo/Wo_min)/log10(2);
+  x(2) = 10.0*log10(1e-4 + E);
+
+  w = compute_weights2(x, xq);
+  w = [30 1];
+  err  = x - ge_coeff .* xq;
+  err_ = quantise(vq, err, w);
+  %err_ =  err;
+  xq = ge_coeff .* xq + err_;
+
+  #{
+    x = log2(4000*Wo/(PI*50));
+    2^x = 4000*Wo/(PI*50)
+    Wo = (2^x)*(PI*50)/4000;
+  #}
+
+  Wo_ = (2 ^ xq(1))*Wo_min;
+
+  Wo_ = min(Wo_max,Wo_);
+  Wo_ = max(Wo_min,Wo_);
+
+  E_ = 10.0 ^ (xq(2)/10.0);
+  E_ = max(1,E_);
 endfunction
 
