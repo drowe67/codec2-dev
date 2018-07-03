@@ -115,7 +115,7 @@ struct CODEC2 * codec2_create(int mode)
 
     /* store constants in a few places for convenience */
 
-    c2->c2const = c2const_create(8000);
+    c2->c2const = c2const_create(8000, N_S);
     c2->Fs = c2->c2const.Fs;
     int n_samp = c2->n_samp = c2->c2const.n_samp;
     int m_pitch = c2->m_pitch = c2->c2const.m_pitch;
