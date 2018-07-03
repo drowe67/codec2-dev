@@ -1,8 +1,9 @@
 #INCLUDE(CMakeForceCompiler)
  
-set(CMAKE_SYSTEM_NAME GNU)
-set(CMAKE_SYSTEM_VERSION 1)
-set(CMAKE_CROSSCOMPILING TRUE)
+set(CMAKE_SYSTEM_NAME Generic)
+set(CMAKE_SYSTEM_PROCESSOR arm)
+#set(CMAKE_SYSTEM_VERSION 1)
+#set(CMAKE_CROSSCOMPILING TRUE)
  
 # specify the cross compiler
 set(CMAKE_C_COMPILER arm-none-eabi-gcc)

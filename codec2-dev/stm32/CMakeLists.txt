@@ -105,6 +105,7 @@ ${CODEC2_SRC}/fsk.c
 ${CODEC2_SRC}/fmfsk.c
 ${CODEC2_SRC}/freedv_vhf_framing.c
 ${CODEC2_SRC}/freedv_data_channel.c
+${CODEC2_SRC}/filter.c
 )
 
 
