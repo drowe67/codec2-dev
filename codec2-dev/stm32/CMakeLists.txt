@@ -13,7 +13,7 @@ set(FLOAT_TYPE "hard" CACHE STRING "")
 
 ###################################################
 
-# Set default C++ flags.
+# Set default C flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
@@ -50,6 +50,7 @@ else()
 endif()
 
 include(cmake/STM32_Toolchain.cmake)
+set(CMAKE_REQUIRED_DEFINITIONS "--specs=nosys.specs")
 project(stm32f4 C ASM)
 
 include_directories(../src ../unittest inc)
