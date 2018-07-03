@@ -109,7 +109,8 @@ int main(int argc, char *argv[])
     FILE *fout = NULL;	/* output speech file */
     int   mel_resampling = 0;
     int   K = 20;
-
+    float framelength_s = N_S;
+    
     char* opt_string = "ho:";
     struct option long_options[] = {
         { "Fs", required_argument, &set_fs, 1 },
@@ -150,6 +151,7 @@ int main(int argc, char *argv[])
         { "awread", required_argument, &awread, 1 },
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
+        { "framelength_s", required_argument, NULL, 0 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
         #endif
@@ -265,6 +267,8 @@ int main(int argc, char *argv[])
 		strcpy(ampexp_arg, optarg);
 	    } else if(strcmp(long_options[option_index].name, "gain") == 0) {
 		gain = atof(optarg);
+	    } else if(strcmp(long_options[option_index].name, "framelength_s") == 0) {
+		framelength_s = atof(optarg);
 	    } else if(strcmp(long_options[option_index].name, "pahw") == 0) {
 
                 /* set up a bunch of arguments instead of having to enter them on cmd line every time */
@@ -370,7 +374,7 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    C2CONST c2const = c2const_create(Fs);
+    C2CONST c2const = c2const_create(Fs, framelength_s);
     int   n_samp = c2const.n_samp;
     int   m_pitch = c2const.m_pitch;
 
