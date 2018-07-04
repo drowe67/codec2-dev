@@ -476,17 +476,11 @@ endfunction
 
 
 % Given a vector of rate K samples, deltaf encodes/decodes delta
-% amplitude, returning quantised samples
+% amplitude, returning quantised samples and bit stream
 
-function rate_K_vec_ = deltaf_quantise_rate_K(rate_K_vec, E)
+function [rate_K_vec_ bits] = deltaf_quantise_rate_K(rate_K_vec, E, nbits_max)
   K = length(rate_K_vec);
-
-  #{
-    % Whole thing is quantised to 6dB steps, as that doesn't seem to
-    % introduce much distortion
-  
-    rate_K_vec = 6*round(rate_K_vec/6);
-  #}
+  nbits_remaining = nbits_max;
   
   % start with k=3, around 250Hz, we assume that's quantised as the
   % mean frame energy, as samples before that might be stuck in the
@@ -497,11 +491,11 @@ function rate_K_vec_ = deltaf_quantise_rate_K(rate_K_vec, E)
   
   % encoding of differences
   
-  %levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
+  levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
 
   % this is pretty coarse (note no 0dB level) but sounds OK
   
-  levels = [-6 +6 -12 +12]; symbols = {[0 0],[1 0],[1 1],[0 1]};
+  %levels = [-6 +6 -12 +12]; symbols = {[0 0],[1 0],[1 1],[0 1]};
 
   % move backwards to get target for first two samples
   
@@ -510,6 +504,7 @@ function rate_K_vec_ = deltaf_quantise_rate_K(rate_K_vec, E)
     target = rate_K_vec(m) - rate_K_vec_(m+1);
     [target_ best_i] = quantise(levels, target);
     bits = [bits symbols{best_i}];
+    nbits_remaining -= length(symbols{best_i});
     rate_K_vec_(m) = rate_K_vec_(m+1) + target_;
   end
   
@@ -517,9 +512,82 @@ function rate_K_vec_ = deltaf_quantise_rate_K(rate_K_vec, E)
   
   for m=4:K
     target = rate_K_vec(m) - rate_K_vec_(m-1);
-    [target_ best_i] = quantise(levels, target);
-    bits = [bits symbols{best_i}];
+    if nbits_remaining >= 3 
+      [target_ best_i] = quantise(levels, target);
+      bits = [bits symbols{best_i}];
+      nbits_remaining -= length(symbols{best_i});
+    elseif nbits_remaining == 2
+      [target_ best_i] = quantise(levels(1:3), target);
+      bits = [bits symbols{best_i}];
+      nbits_remaining = 0;
+    elseif nbits_remaining < 2
+      target_ = -6; % if we've run out of bits just tail off
+    end
     rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
+    %printf("m: %d length: %d nbits_remaining: %d\n", m, length(bits), nbits_remaining);
+  end
+endfunction
+
+
+% Given a vector of bits, and the k=3 frame amplitude sample E, decode to a
+% rate K vector of quantised spectral amplitude samples
+
+function rate_K_vec_ = deltaf_decode_rate_K(bits, E, K)
+  
+  % start with k=3, around 250Hz, we assume that's quantised as the
+  % mean frame energy, as samples before that might be stuck in the
+  % HPF.
+
+  rate_K_vec_ = zeros(1,K);
+  rate_K_vec_(3) = E;
+  
+  % move backwards to get target for first two samples
+  
+  for m=2:-1:1
+    [target_ bits] = deltaf_dec_one_symbol(bits);
+    rate_K_vec_(m) = rate_K_vec_(m+1) + target_;
+  end
+  
+  % then forwards for rest of the target samples
+  
+  for m=4:K
+    if length(bits) >= 2
+      [target_ bits] = deltaf_dec_one_symbol(bits);
+    else
+      target_ = -6; % if we've run out of bits just tail off
+    end
+    rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
+    %printf("m: %d nbits_remaining: %d\n", m, length(bits));
+  end
+endfunction
+
+
+% decode one symbol and truncate bits array
+
+function [target_ bits] = deltaf_dec_one_symbol(bits)
+  levels = [0 6 -6 -12 12]; symbols = {[0 0],[1 0],[1 1],[0 1 0;],[0 1 1]};
+
+  two_bits = bits(1:2);
+
+  if two_bits == [0 1]
+    % OK a three bit code
+    if bits(3) == 0
+      target_ = levels(4);
+    else
+      target_ = levels(5);
+    end
+    bits = bits(4:end);
+  else
+    if two_bits == [0 0]
+      target_ = levels(1);
+    end
+    if two_bits == [1 0]
+      target_ = levels(2);
+    end
+    if two_bits == [1 1]
+      target_ = levels(3);
+    end      
+    bits = bits(3:end);
   end
 endfunction
 
@@ -628,3 +696,45 @@ function [Wo_ E_ xq] = quantise_WoE(Wo, E, xq, vq)
   E_ = max(1,E_);
 endfunction
 
+
+% Find distance of each vector in codebook using gain shape search
+% Uses discrete values, in unit range
+
+function dist_gain_shape(codebook, target)
+  [entries K] = size(codebook);
+  dist = zeros(entries,1);
+  best = zeros(entries,K);
+  for i=1:entries
+    min_dist = 1000;
+    for g=-10:20
+       adist = sum(abs(target - (codebook(i,:) + g)));
+       if adist < min_dist
+         min_dist = adist;
+         min_g    = g;
+       end
+    end
+    dist(i) = min_dist;
+    best(i,:) = codebook(i,:) + min_g;
+  end
+  figure(1); clf; plot(dist);
+  axis([1 entries 0 K])
+  target
+  [tmp min_i] = min(dist);
+  target - best(min_i,:)
+endfunction
+
+
+% As above but without the gain
+
+function dist_shape(codebook, target)
+  [entries K] = size(codebook);
+  dist = zeros(entries,1);
+  for i=1:entries
+    dist(i) = sum(abs(target - (codebook(i,:))));
+  end
+  figure(1); clf; plot(dist);
+  axis([1 entries 0 K])
+  target
+  [tmp min_i] = min(dist);
+  target - codebook(min_i,:)
+endfunction
