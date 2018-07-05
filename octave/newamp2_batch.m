@@ -100,7 +100,8 @@ function surface = newamp2_batch(input_prefix, varargin)
   model_name = strcat(input_prefix,"_model.txt");
   model = load(model_name);
   [frames nc] = size(model);
-
+  printf("frames: %d\n", frames);
+  
   voicing_name = strcat(input_prefix,"_pitche.txt");
   voicing = zeros(1,frames);
   
@@ -125,7 +126,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   args.M = M;
   args.plots = 1;
   [model_ surface sd_log] = experiment_resample(model, args);
-
+  
   % ----------------------------------------------------
 
   if output
@@ -142,12 +143,12 @@ function surface = newamp2_batch(input_prefix, varargin)
 
     for f=1:frames
       printf("%d\r", f);   
-      Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+2));
+      Wo = model_(f,1); L = min([model_(f,2) max_amp-1]); Am = model_(f,3:(L+3));
       if Wo*L > pi
         printf("Problem: %d  Wo*L > pi Wo: %f F0: %f L: %d Wo*L: %f\n", f, Wo, Wo*Fs/(2*pi), L, Wo*L);   
       end
 
-      Am_ = zeros(1,max_amp); Am_(2:L) = Am(1:L-1); fwrite(fam, Am_, "float32");
+      Am_ = zeros(1,max_amp); Am_(2:L+1) = Am(1:L); fwrite(fam, Am_, "float32");
       fwrite(fWo, Wo, "float32");
 
       if synth_phase
@@ -228,7 +229,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
   end
   
   rate_K_surface = rate_K_surface_ = zeros(frames, K);
-  
+    
   for f=1:frames
     Wo = model(f,1);
     L = model(f,2);
@@ -290,19 +291,47 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
 
   % encoding of delata_f, also limits delta_f changes, (hopefully) making quantisation easier
 
+  E_log = [];
   if strcmp(quant,"deltaf");
     for f=1:M:frames
+
+      % used to gather stats for frame energy
+      
       E = 6*round(rate_K_surface(f,3)/6);
-      [rate_K_surface_(f,:) bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E, 45);
+      E_log = [E_log E/6];
+
+      % Determine frame energy as k=3 sample and quantise From looking
+      % at values from all.wav it looks like 4 bits is enough
+
+      levels = (0:15)*6;
+      [E_ E_index] = quantise(levels, rate_K_surface(f,3));
+
+      [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 45);
 
       # test of decoder
       
-      dec_rate_K_surface_ = deltaf_decode_rate_K(bits, E, K, 45);
+      dec_rate_K_surface_ = deltaf_decode_rate_K(spec_mag_bits, E_, K, 45);
       assert (rate_K_surface_(f,:) == dec_rate_K_surface_);
-      printf("length: %d\n", length(bits));
+
+      # quantise pitch
+
+      Wo = model(f,1);
+      Wo_index = encode_log_Wo(Wo, 7);
+
+      #{
+        TODO:
+             [ ] save to bits file
+             [ ] reconsruct frame here from indexes
+             [ ] compare results
+             [ ] then refactor into sep enc and dec functions,make sure identical results
+      #}
+      
+      % printf("length: %d\n", length(bits));
+
       #{
       % add some experimental random noise of +/- one entry to simulate discrete gain-shape
-      % VQ errors.  Make sure we choose a different position for each error
+      % VQ errors.  Make sure we choose a different position for each error.  used during VQ
+      % development that didn't quite make it ....
 
       kmax=20;
       krecord = zeros(1,kmax);
@@ -369,7 +398,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
   if strcmp(resampler, "linear")
     [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lanc');
   end
-  
+
   % calculate SD
 
   sd_log = []; energy_log = [];
@@ -407,7 +436,16 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     end
   end
   printf("mean SD %4.2f\n", mean(sd_log));
+  printf("Emin: %f Emax: %f\n", min(E_log), max(E_log));
 
+  % Plot E stats, by viewing these decided on 4 bit/frame for energy
+  
+  if length(E_log)
+    figure(5);
+    plot(E_log)
+    figure(6);
+    hist(E_log);
+  end
 endfunction
 
 

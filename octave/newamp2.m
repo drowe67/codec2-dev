@@ -251,7 +251,7 @@ function [phase Gdbfk s Aw] = determine_phase(model, f, Nfft=512, ak)
   Wo      = model(f,1);
 
   sample_freqs_kHz = (Fs/1000)*[0:Nfft/2]/Nfft;           % fft frequency grid (nonneg freqs)
-  Am = model(f,3:(L+2));
+  Am = model(f,3:(L+3));
   AmdB = 20*log10(Am);
   rate_L_sample_freqs_kHz = (1:L)*Wo*4/pi;
   Gdbfk = interp_lanczos(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), sample_freqs_kHz);    
