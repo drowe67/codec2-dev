@@ -187,12 +187,8 @@ function [quant_out best_i bits] = quantise(levels, quant_in, weights=1)
 
   % convert index to binary bits
 
-  numbits = ceil(log2(length(levels)));
-  bits = zeros(1, numbits);
-  for b=1:numbits
-    bits(b) = bitand(best_i-1,2^(numbits-b)) != 0;
-  end
-
+  bits = index_to_bits(best_i-1, ceil(log2(length(levels))));
+  
 endfunction
 
 
@@ -208,7 +204,6 @@ function index = encode_log_Wo(Wo, bits)
     index = max(index, 0);
     index = min(index, Wo_levels-1);
 endfunction
-
 
 function Wo = decode_log_Wo(index, bits)
     Wo_levels = 2.^bits;
@@ -232,9 +227,8 @@ function bits = index_to_bits(value, numbits)
   end
 end
 
-
 function value = bits_to_index(bits, numbits)
-  value = 2.^(numbits-1:-1:0) * bits;
+  value = sum(2.^(numbits-1:-1:0) .* bits);
 endfunction
 
 
@@ -526,6 +520,8 @@ function [rate_K_vec_ bits] = deltaf_quantise_rate_K(rate_K_vec, E, nbits_max)
     rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
     %printf("m: %d length: %d nbits_remaining: %d\n", m, length(bits), nbits_remaining);
   end
+
+  bits = [bits zeros(1,nbits_remaining)];
 endfunction
 
 

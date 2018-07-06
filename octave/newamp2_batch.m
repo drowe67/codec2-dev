@@ -112,21 +112,32 @@ function surface = newamp2_batch(input_prefix, varargin)
 
   % Choose experiment to run test here -----------------------
 
-  args.resampler = mode;
+  if strcmp(mode,"linear") || strcmp(mode,"mel")
+    args.resampler = mode;
 
-  vqs.en=vq_en; 
-  if vq_en
-    load(vq_name);
-    vqs.st=vq_st;vqs.m=5;
-    vqs.table = avq;
+    vqs.en=vq_en; 
+    if vq_en
+      load(vq_name);
+      vqs.st=vq_st;vqs.m=5;
+      vqs.table = avq;
+    end
+    args.vq = vqs;
+    args.quant = quant;
+    args.correct_rate_K_en = correct_rate_K_en;
+    args.M = M;
+    args.plots = 1;
+    [model_ surface sd_log] = experiment_resample(model, args);
   end
-  args.vq = vqs;
-  args.quant = quant;
-  args.correct_rate_K_en = correct_rate_K_en;
-  args.M = M;
-  args.plots = 1;
-  [model_ surface sd_log] = experiment_resample(model, args);
-  
+
+  if strcmp(mode,"enc")
+    [bits rate_K_surface_] = candc_encoder(model, voicing);
+    [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
+    % sanity check - should be a flast surface
+    figure(7);
+    X = rate_K_surface_ - rate_K_surface_dec_;
+    mesh(X(1:2:100,:))    
+  end
+
   % ----------------------------------------------------
 
   if output
@@ -306,11 +317,11 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
       levels = (0:15)*6;
       [E_ E_index] = quantise(levels, rate_K_surface(f,3));
 
-      [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 45);
+      [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 44);
 
       # test of decoder
       
-      dec_rate_K_surface_ = deltaf_decode_rate_K(spec_mag_bits, E_, K, 45);
+      dec_rate_K_surface_ = deltaf_decode_rate_K(spec_mag_bits, E_, K, 44);
       assert (rate_K_surface_(f,:) == dec_rate_K_surface_);
 
       # quantise pitch
@@ -447,5 +458,132 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     hist(E_log);
   end
 endfunction
+
+
+% Candidate C, model to bit-stream encoder
+
+function [bits rate_K_surface_] = candc_encoder(model, voicing)
+  [frames nc] = size(model);
+  K = 20; Fs = 8000;
+  AmdB = zeros(frames, 160);
+  M = 2;
+  bits = [];
+  
+  rate_K_surface = rate_K_surface_ = zeros(frames, K);
+    
+  for f=1:M:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    AmdB(f,1:L) = 20*log10(Am);
+    Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f_mel(model(f,:), K, Fs, 'lanc');
+    rate_K_surface(f,:) = rate_K_vec;
+  end
+
+  for f=1:M:frames
+
+    % Determine frame energy as k=3 sample and quantise From looking
+    % at values from all.wav it looks like 4 bits is enough
+
+    levels = (0:15)*6;
+    [E_ E_index] = quantise(levels, rate_K_surface(f,3));
+    E_bits = index_to_bits(E_index-1, 4);
+    [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 44);
+
+    # quantise pitch
+
+    Wo = model(f,1);
+    Wo_index = encode_log_Wo(Wo, 7);
+    Wo_bits = index_to_bits(Wo_index, 7);
+
+    # pack bits
+
+    bits_frame = [spec_mag_bits Wo_bits E_bits voicing(f)];
+    bits = [bits; bits_frame];
+
+    if f < 10
+      printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
+    end
+  end
+
+endfunction
+
+
+% Candidate C, bit stream to model decoder
+
+function [model_ voicing rate_K_surface_] = candc_decoder(bits)
+  [rows tmp] = size(bits);
+  K = 20; Fs = 8000;
+  M = 2; max_amp = 160; 
+  frames = rows*M;
+  
+  rate_K_surface_ = zeros(frames, K);
+  model_ = zeros(frames, max_amp+2);
+  voicing = zeros(1,frames);
+  rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, 100, 0.95*Fs/2);
+  b = 1;  
+
+  for f=1:M:frames
+
+    % extract information from bit stream
+
+    spec_mag_bits = bits(b,1:44);
+    Wo_bits = bits(b,44+(1:7));
+    Wo_index = bits_to_index(Wo_bits, 7);
+    Wo_ = decode_log_Wo(Wo_index, 7); L_ = floor(pi/Wo_);
+    E_bits = bits(b,44+7+(1:4));
+    E_index = bits_to_index(E_bits, 4);
+    E_ = E_index*6;
+    voicing(f) = bits(b,56);
+    b++;
+   
+    if f < 10
+      printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
+    end
+
+    % decode into rate K vec
+    
+    rate_K_surface_(f,:) = deltaf_decode_rate_K(spec_mag_bits, E_, K, 44);
+
+    model_(f,1) = Wo_; model_(f,2) = L_;
+  end
+
+  % interpolation in time
+    
+  for f=1:M:frames-M
+
+    % interpolate rate K ampl samples
+    
+    left_f = f; right_f = f+M;
+    left_vec = rate_K_surface_(left_f, :); right_vec = rate_K_surface_(right_f, :);
+    sample_points = [left_f right_f];
+    assert(M==2);
+    resample_point = left_f+1;
+    for k=1:K
+      rate_K_surface_(resample_point, k) = interp_linear(sample_points, [left_vec(k) right_vec(k)], resample_point);
+    end
+
+    % interpolate Wo and voicing
+
+    Wo_ = 2*pi/160; v = 0;
+    if voicing(left_f) && voicing(right_f)
+      Wo_ = (model_(left_f,1) + model_(right_f,1))/2;
+      v = 1;
+    end
+    L_ = floor(pi/Wo_);
+    model_(resample_point,1) = Wo_; model_(resample_point,2) = L_;
+    voicing(f) = v;
+  end
+  rate_K_surface_(frames-M+1:frames,:) = rate_K_surface_(frames-M,1);    
+  model_(frames-M+1:frames,1) = model_(frames-M,1);    
+  model_(frames-M+1:frames,2) = model_(frames-M,2);    
+
+  % back to rate L amplitude samples
+  
+  model_ = resample_rate_L(model_, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lancmel');
+
+endfunction
+
 
 
