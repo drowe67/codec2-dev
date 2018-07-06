@@ -21,7 +21,13 @@
     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --dump hts1a
     $ cd ~/codec2-dev/octave
     octave:14> newamp2_batch("../build_linux/src/hts1a")
-    ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16 
+    ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16
+
+    Bit stream testing:
+
+    $ ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --dump vk5qi_l --phase0 --lpc 10 --dump_pitch_e vk5qi_l_pitche.txt
+    octave:526> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_dec", "mode", "enc");
+    $ /c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_dec --handvoicing vk5qi_l_dec_v.txt -o - |  play -t raw -r 8000 -s -2 -
 #}
 
 
@@ -573,7 +579,7 @@ function [model_ voicing rate_K_surface_] = candc_decoder(bits)
     end
     L_ = floor(pi/Wo_);
     model_(resample_point,1) = Wo_; model_(resample_point,2) = L_;
-    voicing(f) = v;
+    voicing(resample_point) = v;
   end
   rate_K_surface_(frames-M+1:frames,:) = rate_K_surface_(frames-M,1);    
   model_(frames-M+1:frames,1) = model_(frames-M,1);    
