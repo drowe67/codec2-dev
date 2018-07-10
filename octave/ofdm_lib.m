@@ -719,49 +719,64 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(st
 endfunction
 
 
-% generate a test frame of ldpc encoded bits, used for raw and
-% coded BER testing.  Includes UW and txt files
+% a psuedo-random number generator that we can implement in C with
+% identical results to Octave.  Returns an unsigned int between 0
+% and 32767
 
-function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame
+function r = ofdm_rand(n)
+  r = zeros(1,n); seed = 1;
+  for i=1:n
+    seed = mod(1103515245 * seed + 12345, 32768);
+    r(i) = seed;
+  end
+endfunction
+
+
+% generate a test frame of bits.  Works differently for coded and
+% uncoded mods.
+
+function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(coded_frame=1)
   Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   ldpc;
   gp_interleaver;
   
-  % Set up LDPC code
+  if coded_frame
+    % Set up LDPC code
 
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+    mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
 
-  init_cml('~/cml/'); % TODO: make this path sensible and portable
-  load HRA_112_112.txt
-  [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-  assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    init_cml('~/cml/'); % TODO: make this path sensible and portable
+    load HRA_112_112.txt
+    [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
 
-  rand('seed',1);
-  payload_data_bits = round(rand(1,code_param.data_bits_per_frame));
-  codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
-  Nsymbolsperframe = length(codeword)/bps;
+    payload_data_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+    codeword = LdpcEncode(payload_data_bits, code_param.H_rows, code_param.P_matrix);
+    Nsymbolsperframe = length(codeword)/bps;
   
-  % need all these steps to get actual raw codeword bits at demod
-  % note this will only work for single interleaver frame case,
-  % but that's enough for initial quick tests
+    % need all these steps to get actual raw codeword bits at demod
+    % note this will only work for single interleaver frame case,
+    % but that's enough for initial quick tests
   
-  tx_symbols = [];
-  for s=1:Nsymbolsperframe
-    tx_symbols = [tx_symbols qpsk_mod( codeword(2*(s-1)+1:2*s) )];
+    tx_symbols = [];
+    for s=1:Nsymbolsperframe
+      tx_symbols = [tx_symbols qpsk_mod( codeword(2*(s-1)+1:2*s) )];
+    end
+
+    tx_symbols = gp_interleave(tx_symbols);
+
+    codeword_raw = [];
+    for s=1:Nsymbolsperframe
+      codeword_raw = [codeword_raw qpsk_demod(tx_symbols(s))];
+    end
+  else
+    codeword_raw = round(ofdm_rand(Nbitsperframe-(Nuwbits+Ntxtbits))/32767);
   end
-
-  tx_symbols = gp_interleave(tx_symbols);
-
-  codeword_raw = [];
-  for s=1:Nsymbolsperframe
-    codeword_raw = [codeword_raw qpsk_demod(tx_symbols(s))];
-  end
-
+  
   % insert UW and txt bits
   
-  %tx_bits = [tx_uw zeros(1,Ntxtbits) codeword_raw];
   tx_bits = assemble_modem_frame(states, codeword_raw, zeros(1,Ntxtbits));
   assert(Nbitsperframe == length(tx_bits));
 

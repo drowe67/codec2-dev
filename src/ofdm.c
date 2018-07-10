@@ -76,7 +76,7 @@ static const float pilotvalues[] = {
  * A Unique Word (UW) used to verify we have modem frame sync when we
  * try a candidate coarse timing and freq offset.  The UW bits/symbols
  * are distributed through the modem frame using the index (ind)
- * tables below.  The indexes in uw_nd_sym [] and uw_ind are Octave
+ * tables below.  The indexes in uw_ind_sym [] and uw_ind are Octave
  * start from 1 format, subtract 1 to index C arrays.
  */
 
@@ -1254,11 +1254,39 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
 }
 
 
+/* Assemble modem frame of bits from UW, payload bits, and txt bits */
+
+void ofdm_assemble_modem_frame(uint8_t modem_frame[],
+                               uint8_t payload_bits[],
+                               uint8_t txt_bits[])
+{
+  int b,p=0,u=0;
+
+  for (b=0; b<OFDM_BITSPERFRAME-OFDM_NTXTBITS; b++) {
+      if ((u < OFDM_NUWBITS) && (b == (uw_ind[u]-1))) {
+          modem_frame[b] = tx_uw[u++];
+      } else {
+          modem_frame[b] = payload_bits[p];
+          p++;
+      }
+  }
+  assert(u == OFDM_NUWBITS);
+  assert(p == (OFDM_BITSPERFRAME-OFDM_NUWBITS-OFDM_NTXTBITS));
+
+  int t;
+
+  for (t=0; b<OFDM_BITSPERFRAME; b++,t++) {
+      modem_frame[b] = txt_bits[t];
+  }
+  assert(t == OFDM_NTXTBITS);
+}
+
+
 /* Assemble modem frame from UW, payload symbols, and txt bits */
 
-void ofdm_assemble_modem_frame(complex float modem_frame[],
-                               COMP    payload_syms[],
-                               uint8_t txt_bits[])
+void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
+                                       COMP    payload_syms[],
+                                       uint8_t txt_bits[])
 {
   int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
   int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;
@@ -1325,5 +1353,20 @@ void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
       txt_bits[t+1] = dibit[0];
   }
   assert(t == OFDM_NTXTBITS);
+}
+
+/*
+  Psuedo-random number generator that we can implement in C with
+  identical results to Octave.  Returns an unsigned int between 0
+  and 32767.  Used for generting test frames of various lengths.
+*/
+
+void ofdm_rand(uint16_t r[], int n) {
+  uint64_t seed = 1;
+  int i;
+  for (i=0; i<n; i++) {
+      seed = (1103515245l * seed + 12345) % 32768;
+    r[i] = seed;
+  }
 }
 

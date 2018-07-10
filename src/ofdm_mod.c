@@ -152,9 +152,12 @@ int main(int argc, char *argv[])
                payload data bits known to demodulator */
             
             if (testframes) {
+                uint16_t r[data_bits_per_frame];
+                ofdm_rand(r, data_bits_per_frame);
                 for (j=0; j<interleave_frames; j++) {
                     for(i=0; i<data_bits_per_frame; i++) {
-                        tx_bits_char[j*data_bits_per_frame + i] = payload_data_bits[i];
+                        //tx_bits_char[j*data_bits_per_frame + i] = payload_data_bits[i];
+                        tx_bits_char[j*data_bits_per_frame + i] = r[i]>16384;
                     }
                 }
             }
@@ -174,13 +177,26 @@ int main(int argc, char *argv[])
             /* just modulate uncoded raw bits ----------------------------------------------*/
             
             if (testframes) {
-                for(i=0; i<Nbitsperframe; i++) {
-                    tx_bits_char[i] = test_bits_ofdm[i];
+                /* build up a test frame consisting of unique word, txt bits, and psuedo-random
+                   uncoded payload bits.  The psuedo-random generator is the same as Octave so
+                   it can interoperate with ofdm_tx.m/ofdm_rx.m */
+                int Npayloadbits = Nbitsperframe-(OFDM_NUWBITS+OFDM_NTXTBITS);
+                uint16_t r[Npayloadbits];
+                uint8_t  payload_bits[Npayloadbits];
+                ofdm_rand(r, Npayloadbits);
+                for(i=0; i<Npayloadbits; i++) {
+                    payload_bits[i] = r[i] > 16384;
+                    //fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
                 }
+                uint8_t txt_bits[OFDM_NTXTBITS];
+                for(i=0; i<OFDM_NTXTBITS; i++) {
+                    txt_bits[i] = 0;
+                }
+                ofdm_assemble_modem_frame(tx_bits_char, payload_bits, txt_bits);
             }
 
-           int tx_bits[Nbitsperframe];
-           for(i=0; i<Nbitsperframe; i++)
+            int tx_bits[Nbitsperframe];
+            for(i=0; i<Nbitsperframe; i++)
                 tx_bits[i] = tx_bits_char[i];
             COMP tx_sams[Nsamperframe];
             ofdm_mod(ofdm, tx_sams, tx_bits);

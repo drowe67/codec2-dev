@@ -32,7 +32,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
-  tx_bits = create_ldpc_test_frame;
+  tx_bits = create_ldpc_test_frame(coded_frame=0);
   
   tx = [];
   for f=1:Nframes
@@ -79,7 +79,7 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
 
   % experimental coarse amplitude quantisation
 
-  quant_tx = 1;
+  quant_tx = 0;
   if quant_tx
     tx_re = real(tx); tx_im = imag(tx);
     tx_re = min(tx_re,0.5); tx_re = max(tx_re,-0.5);
