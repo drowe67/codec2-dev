@@ -25,7 +25,7 @@ function [channel_est_log timing_est_log] = ofdm_rx(filename, error_pattern_file
 
   % OK re-generate tx frame for BER calcs
 
-  tx_bits = create_ldpc_test_frame;
+  tx_bits = create_ldpc_test_frame(coded_frame=0);
 
   % init logs and BER stats
 
@@ -135,7 +135,7 @@ function [channel_est_log timing_est_log] = ofdm_rx(filename, error_pattern_file
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);
   title('Scatter');
-
+  
   figure(2); clf;
   plot(phase_est_pilot_log(:,2:Nc),'g+', 'markersize', 5); 
   title('Phase est');

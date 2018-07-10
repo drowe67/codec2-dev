@@ -155,19 +155,21 @@ struct OFDM {
     char last_sync_state_interleaver[OFDM_STATE_STR];
     int  frame_count_interleaver;
 };
-    
-    
+        
 /* function headers exposed for LDPC work */
     
 complex float qpsk_mod(int *);
 void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float tx_samples[OFDM_SAMPLESPERFRAME], complex float tx_symbols_lin[]);
-void ofdm_assemble_modem_frame(complex float modem_frame[], COMP payload_syms[], uint8_t txt_bits[]);
+void ofdm_assemble_modem_frame(uint8_t modem_frame[], uint8_t payload_bits[], uint8_t txt_bits[]);
+void ofdm_assemble_modem_frame_symbols(complex float modem_frame[], COMP payload_syms[], uint8_t txt_bits[]);
 void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
                                   int            rx_uw[],
                                   COMP           codeword_syms[],
                                   float          codeword_amps[],
                                   short          txt_bits[]);
+void ofdm_rand(uint16_t r[], int n);
+    
 #ifdef __cplusplus
 }
 #endif
