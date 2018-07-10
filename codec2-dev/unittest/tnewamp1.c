@@ -41,7 +41,7 @@
 
 int main(int argc, char *argv[]) {
     int Fs = 8000;
-    C2CONST c2const = c2const_create(Fs);
+    C2CONST c2const = c2const_create(Fs, N_S);
     int   n_samp = c2const.n_samp;
     int   m_pitch = c2const.m_pitch;
     short buf[n_samp];	        /* input/output buffer                   */

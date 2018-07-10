@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
         Fs = atoi(argv[argc+1]);
     }
 
-    C2CONST c2const = c2const_create(Fs);
+    C2CONST c2const = c2const_create(Fs, N_S);
     int   n = c2const.n_samp;
     int   m = c2const.m_pitch;
     FILE *fin,*fout;

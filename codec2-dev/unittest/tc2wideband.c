@@ -176,7 +176,7 @@ void test_wideband_enc_dec()
 
     struct CODEC2 * codec2 = codec2_create(CODEC2_MODE_WB);
 
-    C2CONST c2const = c2const_create(Fs);
+    C2CONST c2const = c2const_create(Fs, N_S);
     nsam = C2WB_SPERF; //codec2_samples_per_frame(codec2);
     nbit = C2WB_BPERF; //codec2_bits_per_frame(codec2);
 
@@ -238,7 +238,7 @@ void test_with_real_data(int argc, char *argv[])
     int Fs = C2WB_FS;
     int K = C2WB_K;
 
-    C2CONST c2const = c2const_create(Fs);
+    C2CONST c2const = c2const_create(Fs, N_S);
     int n_samp = c2const.n_samp;
     int m_pitch = c2const.m_pitch;
     short buf[n_samp]; /* input/output buffer                   */
