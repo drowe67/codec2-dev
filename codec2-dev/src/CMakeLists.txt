@@ -66,6 +66,14 @@ set(CODEBOOKSNEWAMP1_ENERGY
     ${D}/newamp1_energy_q.txt
 )
 
+set(CODEBOOKSNEWAMP2
+    ${D}/codes_450.txt
+)
+
+set(CODEBOOKSNEWAMP2_ENERGY
+    ${D}/newamp2_energy_q.txt
+)
+
 
 # generated wideband map
 set(C2WB_MAP
@@ -153,6 +161,20 @@ add_custom_command(
     DEPENDS generate_codebook ${CODEBOOKSNEWAMP1_ENERGY}
 )
 
+# codebooknewamp2.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp2.c
+    COMMAND generate_codebook newamp2vq_cb ${CODEBOOKSNEWAMP2} > ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp2.c
+    DEPENDS generate_codebook ${CODEBOOKSNEWAMP2}
+)
+
+# codebooknewamp2_energy.c
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp2_energy.c
+    COMMAND generate_codebook newamp2_energy_cb ${CODEBOOKSNEWAMP2_ENERGY} > ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp2_energy.c
+    DEPENDS generate_codebook ${CODEBOOKSNEWAMP2_ENERGY}
+)
+
 
 
 # when crosscompiling we need a native executable
@@ -208,6 +230,7 @@ set(CODEC2_SRCS
     lsp.c
     mbest.c
     newamp1.c
+    newamp2.c
     ofdm.c
     phase.c
     quantise.c
@@ -220,6 +243,8 @@ set(CODEC2_SRCS
     codebookge.c
     codebooknewamp1.c
     codebooknewamp1_energy.c
+    codebooknewamp2.c
+    codebooknewamp2_energy.c
     golay23.c
     freedv_api.c
     freedv_vhf_framing.c

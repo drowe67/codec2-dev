@@ -31,6 +31,7 @@
 
 #include "codec2_fft.h"
 #include "newamp1.h"
+#include "newamp2.h"
 
 struct CODEC2 {
     int           mode;
@@ -77,6 +78,13 @@ struct CODEC2 {
     int            voicing_left;
     codec2_fft_cfg phase_fft_fwd_cfg;
     codec2_fft_cfg phase_fft_inv_cfg;      
+    
+    /*newamp2 states (also uses newamp1 states )*/
+    float 			energy_prev ;
+    float          n2_rate_K_sample_freqs_kHz[NEWAMP2_K];
+    float          n2_prev_rate_K_vec_[NEWAMP2_K];
+    float          n2_pwb_rate_K_sample_freqs_kHz[NEWAMP2_16K_K];
+    float          n2_pwb_prev_rate_K_vec_[NEWAMP2_16K_K];
 };
 
 // test and debug
