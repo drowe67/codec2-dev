@@ -140,3 +140,34 @@ void mbest_search(
    }
 }
 
+
+/*---------------------------------------------------------------------------*\
+
+  mbest_search450
+
+  Searches vec[] to a codebbook of vectors, and maintains a list of the mbest
+  closest matches. Only searches the first NewAmp2_K Vectors
+
+\*---------------------------------------------------------------------------*/
+
+void mbest_search450(const float  *cb, float vec[], float w[], int k,int shorterK, int m, struct MBEST *mbest, int index[])
+
+{
+   float   e;
+   int     i,j;
+   float   diff;
+
+   for(j=0; j<m; j++) {
+	e = 0.0;
+	for(i=0; i<k; i++) {
+		//Only search first NEWAMP2_K Vectors
+		if(i<shorterK){
+			diff = cb[j*k+i]-vec[i];
+			e += powf(diff*w[i],2.0);
+		}
+	}
+	index[0] = j;
+	mbest_insert(mbest, index, e);
+	}
+}
+   
