@@ -65,8 +65,9 @@
    a few % different in fading bandwidth won't matter.
 */
 
-#define FAST_FADING_FILE_NAME "../../raw/fast_fading_samples.float"
-#define SLOW_FADING_FILE_NAME "../../raw/slow_fading_samples.float"
+#define DEFAULT_RAW_DIR "../../raw"
+#define FAST_FADING_FILE_NAME "fast_fading_samples.float"
+#define SLOW_FADING_FILE_NAME "slow_fading_samples.float"
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -81,6 +82,8 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 int main(int argc, char *argv[])
 {
     FILE          *fin, *ffading, *fout;
+    char	   *raw_dir;
+    char	   *fname;
     float          NodB, foff_hz;
     int            fading_en, nhfdelay;
 
@@ -142,6 +145,11 @@ int main(int argc, char *argv[])
         if ((arg = opt_exists(argv, argc, "--ssbfilt"))) {
             ssbfilt_en = atof(argv[arg+1]);
         }
+        raw_dir = strdup(DEFAULT_RAW_DIR);
+        if ((arg = opt_exists(argv, argc, "--raw_dir"))) {
+	    free(raw_dir);
+            raw_dir = strdup(argv[arg+1]);
+        }
     }
     else {
         fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
@@ -172,23 +180,29 @@ int main(int argc, char *argv[])
     nhfdelay = 0;
     if (fading_en) {
         if (fading_en == 1) {
-            ffading = fopen(FAST_FADING_FILE_NAME, "rb");
+	    fname = malloc(strlen(raw_dir) + 1 + strlen(FAST_FADING_FILE_NAME));
+	    sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
+            ffading = fopen(fname, "rb");
             if (ffading == NULL) {
                 fprintf(stderr, "-----------------------------------------------------\n");
-                fprintf(stderr, "cohpsk_ch ERROR: Can't find fast fading file: %s\n", FAST_FADING_FILE_NAME);
+                fprintf(stderr, "cohpsk_ch ERROR: Can't find fast fading file: %s\n", fname);
                 fprintf(stderr, "->See cohpsk_ch.c source for instructions on how to generate this file.\n");
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
+	    free(fname);
             nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 2) {
-            ffading = fopen(SLOW_FADING_FILE_NAME, "rb");
+	    fname = malloc(strlen(raw_dir) + 1 + strlen(SLOW_FADING_FILE_NAME));
+	    sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
+            ffading = fopen(fname, "rb");
             if (ffading == NULL) {
-                fprintf(stderr, "Can't find slow fading file: %s\n", SLOW_FADING_FILE_NAME);
+                fprintf(stderr, "Can't find slow fading file: %s\n", fname);
                 exit(1);
             }
+	    free(fname);
             nhfdelay = floor(SLOW_FADING_DELAY_MS*Fs/1000);
         }
 
