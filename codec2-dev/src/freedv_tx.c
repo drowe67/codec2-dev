@@ -141,7 +141,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 0;
+    use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1;
     use_ext_vco = 0;
     
     if (argc > 4) {
