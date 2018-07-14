@@ -105,10 +105,11 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     % of pilot symbols.  We average this statistic over this and next
     % frames pilots.
 
-    p1 = rx(t_est:t_est+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
-    p2 = rx(t_est+Npsam/2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
-    p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam/2-1) * rate_fs_pilot_samples(1:Npsam/2)';
-    p4 = rx(t_est+Nsamperframe+Npsam/2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam/2+1:Npsam)';
+    Npsam2 = floor(Npsam/2);
+    p1 = rx(t_est:t_est+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
+    p2 = rx(t_est+Npsam2:t_est+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
+    p3 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam2-1) * rate_fs_pilot_samples(1:Npsam2)';
+    p4 = rx(t_est+Nsamperframe+Npsam2:t_est+Nsamperframe+Npsam-1) * rate_fs_pilot_samples(Npsam2+1:Npsam)';
    
     Fs1 = Fs/(Npsam/2);
 
@@ -122,6 +123,18 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     end
  
 endfunction
+
+%
+%  Helper function to set up modems for various FreeDV modes
+%
+
+function [Ts Nc] = ofdm_init_mode(mode="700D", Ns=8)
+  if strcmp(mode,"700D")
+    Ts = 0.018; Nc = 17;
+  else
+    Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
+  end
+end
 
 
 %-------------------------------------------------------------
@@ -735,9 +748,7 @@ endfunction
 % generate a test frame of bits.  Works differently for coded and
 % uncoded mods.
 
-function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(coded_frame=1)
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+function [tx_bits payload_data_bits codeword] = create_ldpc_test_frame(states, coded_frame=1)
   ofdm_load_const;
   ldpc;
   gp_interleaver;
@@ -790,7 +801,9 @@ endfunction
 %
 
 function test_bits_ofdm_file
-  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame;
+  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  [test_bits_ofdm payload_data_bits codeword] = create_ldpc_test_frame(states);
   printf("%d test bits\n", length(test_bits_ofdm));
   
   f=fopen("../src/test_bits_ofdm.h","wt");
@@ -928,4 +941,78 @@ function bpf_coeff = make_ofdm_bpf(write_c_header_file)
     fclose(f);
   end
 
+endfunction
+
+
+% Set up a bunch of constants to support modem frame construction from LDPC codewords and codec source bits
+
+function [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode)
+  ofdm_load_const;
+  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
+
+  init_cml('~/cml/');
+  if strcmp(mode, "700D")
+    load HRA_112_112.txt
+    code_param = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
+    assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+    % unused for this mode
+    Nbitspercodecframe = Ncodecframespermodemframe = Nunprotect = 0;
+  else
+    % mode == "2200", partial protection of codec frames
+    load HRA_112_56.txt
+    code_param = ldpc_init_user(HRA_112_56, modulation, mod_order, mapping);
+    printf("2200 mode\n");
+    printf("  Nbitsperframe: %d\n", Nbitsperframe);
+    printf("  total bits per LDPC codeword: %d\n", code_param.code_bits_per_frame);
+    printf("  data bits per LDPC codeword: %d\n", code_param.data_bits_per_frame);
+    printf("  LDPC frames: %d\n", 2);
+    printf("  total LDPC codeword bits: %d\n", 2*code_param.code_bits_per_frame);
+    Nbitspercodecframe = 56; Ncodecframespermodemframe = 7;
+    Nunprotect = Ncodecframespermodemframe*Nbitspercodecframe - 2*code_param.data_bits_per_frame;
+    printf("  unprotected codec bits: %d\n", Nunprotect);
+    printf("  Nuwbits: %d  Ntxtbits: %d\n", Nuwbits, Ntxtbits);
+    totalbitsperframe = 2*code_param.code_bits_per_frame + Nunprotect + Nuwbits + Ntxtbits;
+    printf("Total bits per frame: %d\n", totalbitsperframe);
+    assert(totalbitsperframe == Nbitsperframe);
+  end
+endfunction
+
+
+% Assemble a modem frame from input codec bits based on the current FreeDV "mode".  For 700D the modem
+% frame is one LDPC codeword, for "2200" it consists of two LDPC codewords and some unprotected bits.  Note
+% we don't insert UW and txt bits at this stage, that is handled as a second stage of modem frame
+% construction a little later.
+
+function [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, ...
+                                                      Ncodecframespermodemframe, Nbitspercodecframe)
+  ofdm_load_const;
+
+  if strcmp(mode, "700D")
+    frame_bits = LdpcEncode(codec_bits, code_param.H_rows, code_param.P_matrix);
+    bits_per_frame = length(frame_bits);
+  else
+
+    # extract first part of codec frames into data bits for LDPC encoding
+    
+    Nprotectedbitspercodecframe = 2*code_param.data_bits_per_frame/Ncodecframespermodemframe;
+    protected_bits = unprotected_bits = [];
+    for i=1:Ncodecframespermodemframe
+      a  = (i-1)*Nbitspercodecframe + 1;
+      b  = a + Nprotectedbitspercodecframe-1;
+      c = i*Nbitspercodecframe;
+      protected_bits = [protected_bits codec_bits(a:b)];
+      unprotected_bits = [unprotected_bits codec_bits(b+1:c)];
+    end
+    
+    # LDPC encode protected bits into two codewords
+
+    data_bits_per_frame = code_param.data_bits_per_frame;
+    codeword1 = LdpcEncode(protected_bits(1:data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
+    codeword2 = LdpcEncode(protected_bits(data_bits_per_frame+1:2*data_bits_per_frame), code_param.H_rows, code_param.P_matrix);
+    
+    # add unprotected parts of codec frames
+
+    frame_bits = [codeword1 codeword2 unprotected_bits];
+    bits_per_frame = length(frame_bits);
+  end
 endfunction

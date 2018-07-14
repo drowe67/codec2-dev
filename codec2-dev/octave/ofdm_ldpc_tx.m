@@ -32,25 +32,25 @@
  
 #}
 
-function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
+% Set up LDPC code and voice codec to "codeword" packing
+
+
+function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0)
   ofdm_lib;
   ldpc;
   gp_interleaver;
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+  bps = 2; Ns = 8; Tcp = 0.002;
+  [Ts Nc] = ofdm_init_mode(mode, Ns);
+  Rs = 1/Ts;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
-  % Set up LDPC code
-
-  mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
-
-  init_cml('~/cml/');
-  load HRA_112_112.txt
-  [code_param framesize rate] = ldpc_init_user(HRA_112_112, modulation, mod_order, mapping);
-  assert(Nbitsperframe == (code_param.code_bits_per_frame + Nuwbits + Ntxtbits));
+  % some constants used for assembling modem frames
+  
+  [code_param Nbitspercodecframe Ncodecframespermodemframe Nunprotect] = codec_to_frame_packing(states, mode);
 
   % Generate fixed test frame of tx bits and run OFDM modulator
 
@@ -62,36 +62,39 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
 
   Nframes = interleave_frames*round(Nframes/interleave_frames);
 
-  % OK generate an interleaver frame of codewords from random data bits
+  % OK generate a modem frame using random payload bits
 
-  % use single frame of test bits with seed of 1
-  % to keep compatable with ofdm_test_bits.c and friends
-  % as per create_ldpc_test_frame
-  
-  rand('seed', 1);
+  if strcmp(mode, "700D")
+    codec_bits = round(ofdm_rand(code_param.data_bits_per_frame)/32767);
+  else
+    codec_bits = round(ofdm_rand(Ncodecframespermodemframe*Nbitspercodecframe)/32767);
+  end
+  [frame_bits bits_per_frame] = assemble_frame(states, code_param, mode, codec_bits, Ncodecframespermodemframe, Nbitspercodecframe);
+   
+  % modulate to create symbols and interleave
   
   tx_bits = tx_symbols = [];
-  atx_bits = round(rand(1,code_param.data_bits_per_frame));
   for f=1:interleave_frames
-    tx_bits = [tx_bits atx_bits];
-    codeword = LdpcEncode(atx_bits, code_param.H_rows, code_param.P_matrix);
-    for b=1:2:code_param.code_bits_per_frame
-      tx_symbols = [tx_symbols qpsk_mod(codeword(b:b+1))];
+    tx_bits = [tx_bits codec_bits];
+    for b=1:2:bits_per_frame
+      tx_symbols = [tx_symbols qpsk_mod(frame_bits(b:b+1))];
     end
   end
   tx_symbols = gp_interleave(tx_symbols);
   
-  % generate UW and txt symbols to prepend to every frame after LDPC encoding and interleaving
+  % generate txt symbols
  
   txt_bits = zeros(1,Ntxtbits);
   txt_symbols = [];
   for b=1:2:length(txt_bits)
     txt_symbols = [txt_symbols qpsk_mod(txt_bits(b:b+1))];
   end
+
+  % assemble interleaved modem frames that include UW and txt symbols
   
   atx = [];
   for f=1:interleave_frames
-    st = (f-1)*code_param.code_bits_per_frame/bps+1; en = st + code_param.code_bits_per_frame/bps-1;
+    st = (f-1)*bits_per_frame/bps+1; en = st + bits_per_frame/bps-1;
     modem_frame = assemble_modem_frame_symbols(states, tx_symbols(st:en), txt_symbols);
     atx = [atx ofdm_txframe(states, modem_frame) ];
   end
@@ -99,36 +102,6 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
   tx = [];
   for f=1:Nframes/interleave_frames
     tx = [tx atx];
-  end
-
-  % not very pretty way to process analog signals with exactly the same channel
-  % todo: work out a cleaner way
-
-  analog_hack = 0; rx_filter = 0;
-  if analog_hack || rx_filter
-
-    % simulated SSB tx filter
-
-    [b, a] = cheby1(4, 3, [600, 2600]/(Fs/2));
-    h = freqz(b,a,(600:2600)/(Fs/(2*pi)));
-    filt_gain = (2600-600)/sum(abs(h) .^ 2);   % ensures power after filter == before filter
-  end
-
-  if analog_hack
-    % load analog signal and convert to complex
-
-    s = load_raw('../raw/ve9qrp_10s.raw')';
-    tx = hilbert(s);
-
-    % ssb tx filter
-
-    tx = filter(b,a,sqrt(filt_gain)*tx);
-
-    % normalise power to same as ofdm tx
-
-    nom_tx_pwr = 2/(Ns*(M*M)) + Nc/(M*M);
-    tx_pwr = var(tx);
-    tx *= sqrt(nom_tx_pwr/tx_pwr);
   end
 
   Nsam = length(tx);
@@ -189,11 +162,6 @@ function ofdm_ldpc_tx(filename, interleave_frames = 1, Nsec, EbNodB=100, channel
   noise = sqrt(variance/2)*0.5*randn(1,Nsam);
   rx = real(rx) + noise;
   printf("measured SNR: %3.2f dB\n", 10*log10(var(real(tx))/var(noise)) + 10*log10(4000) - 10*log10(3000));
-
-  if rx_filter
-    % ssb rx filter
-    rx = filter(b,a,sqrt(filt_gain)*rx);
-  end
 
   % adjusted by experiment to match rms power of early test signals
 

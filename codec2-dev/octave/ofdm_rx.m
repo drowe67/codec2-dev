@@ -5,13 +5,15 @@
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
-function [channel_est_log timing_est_log] = ofdm_rx(filename, error_pattern_filename)
+function [channel_est_log timing_est_log] = ofdm_rx(filename, mode="700D", error_pattern_filename)
   ofdm_lib;
   more off;
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+  bps = 2; Ns = 8; Tcp = 0.002;
+  [Ts Nc] = ofdm_init_mode(mode, Ns);
+  Rs = 1/Ts;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 0;
@@ -25,7 +27,7 @@ function [channel_est_log timing_est_log] = ofdm_rx(filename, error_pattern_file
 
   % OK re-generate tx frame for BER calcs
 
-  tx_bits = create_ldpc_test_frame(coded_frame=0);
+  tx_bits = create_ldpc_test_frame(states, coded_frame=0);
 
   % init logs and BER stats
 
@@ -131,7 +133,7 @@ function [channel_est_log timing_est_log] = ofdm_rx(filename, error_pattern_file
   printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
-  plot(rx_np_log,'+');
+  plot(rx_np_log(end/2:end),'+');
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);
   title('Scatter');
