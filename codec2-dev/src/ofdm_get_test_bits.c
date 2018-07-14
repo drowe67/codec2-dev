@@ -71,6 +71,7 @@ int main(int argc, char *argv[])
         Nsec = atoi(argv[2]);
         Nrows = (int)(Nsec*OFDM_RS);
         Nframes = floor((Nrows-1)/OFDM_NS);
+        fprintf(stderr, "Nbitsperframe: %d Nsec: %d Nrows: %d Nframes: %d\n", Nbitsperframe, Nsec, Nrows, Nframes);
     }
 
 
