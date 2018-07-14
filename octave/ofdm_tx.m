@@ -19,12 +19,14 @@
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than
 % raw EbNodB used in ofdm_tx() at uncoded bit rate
 
-function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
+function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, dfoff_hz_per_sec = 0, initial_noise_sams=0, tx_filter=0)
   ofdm_lib;
 
   % init modem
 
-  Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+  bps = 2; Ns = 8; Tcp = 0.002;
+  [Ts Nc] = ofdm_init_mode(mode, Ns)
+  Rs = 1/Ts;
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 
@@ -32,8 +34,8 @@ function ofdm_tx(filename, Nsec, EbNodB=100, channel='awgn', freq_offset_Hz=0, d
 
   Nrows = Nsec*Rs;
   Nframes = floor((Nrows-1)/Ns);
-  tx_bits = create_ldpc_test_frame(coded_frame=0);
-  
+  tx_bits = create_ldpc_test_frame(states, coded_frame=0);
+
   tx = [];
   for f=1:Nframes
     tx = [tx ofdm_mod(states, tx_bits)];
