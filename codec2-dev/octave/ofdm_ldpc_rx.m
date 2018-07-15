@@ -234,6 +234,8 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
             errors = xor(codec_bits, arx_bits);
             Nerrs  = sum(errors);
           else
+            % "2200" mode, run LDPC decoder twice, re-assemble codec bit stream
+            
             assert(interleave_frames == 1);
             Ncodewordsymbolsperframe = code_param.code_bits_per_frame/bps;
             data_bits_per_frame = code_param.data_bits_per_frame;
@@ -262,11 +264,16 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
               % note we are just counting errors in coded part
               
               e  = (i-1)*Nbitspercodecframe + 1;
-              f  = e + Nprotectedbitspercodecframe-1;
-              Nerrs += sum(xor(codec_bits(e:f), protected_bits(a:b)));
+              g  = e + Nprotectedbitspercodecframe-1;
+              Nerrs += sum(xor(codec_bits(e:g), protected_bits(a:b)));
               Tbits_coded += Nprotectedbitspercodecframe;
             end
             arx_bits = rx_codec_bits;
+
+            % to generate codec error bit stream compare reconstructed rx codec frames to original
+            
+            codec_errors = xor(codec_bits, rx_codec_bits);
+            error_positions = [error_positions codec_errors]; 
           end
 
           rx_bits = [rx_bits arx_bits];
