@@ -23,11 +23,21 @@
     octave:14> newamp2_batch("../build_linux/src/hts1a")
     ~/codec2-dev/build_linux/src$ ./c2sim ../../raw/hts1a.raw --pahw hts1a -o - | aplay -f S16
 
-    Bit stream testing:
+    1/ Bit stream development:
 
     $ ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --dump vk5qi_l --phase0 --lpc 10 --dump_pitch_e vk5qi_l_pitche.txt
-    octave:526> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_dec", "mode", "enc");
-    $ /c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_dec --handvoicing vk5qi_l_dec_v.txt -o - |  play -t raw -r 8000 -s -2 -
+    octave:526> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_dec", "mode", "encdec");
+    $ /c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_dec --hand_voicing vk5qi_l_dec_v.txt -o - |  play -t raw -r 8000 -s -2 -
+
+    2/ Generate a bit stream file:
+
+    octave:101> newamp2_batch("../build_linux/src/vk5qi_l","no_output","mode", "enc", "bitstream", "vk5qi_2200_enc.c2");
+
+    3/ Decode a bit stream file:
+
+    octave:101> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_decbs", "mode", "dec", "bitstream", "vk5qi_2200_enc.c2");
+    ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_decbs --hand_voicing vk5qi_l_decbs_v.txt -o - |  play -t raw -r 8000 -s -2 -
+    
 #}
 
 
@@ -58,6 +68,11 @@ function surface = newamp2_batch(input_prefix, varargin)
     ind = arg_exists(varargin, "mode");
     if ind
       mode =  varargin{ind+1};
+    end
+
+    ind = arg_exists(varargin, "bitstream");
+    if ind
+      bitsream_filename =  varargin{ind+1};
     end
 
     ind = arg_exists(varargin, "no_output");
@@ -135,13 +150,35 @@ function surface = newamp2_batch(input_prefix, varargin)
     [model_ surface sd_log] = experiment_resample(model, args);
   end
 
-  if strcmp(mode,"enc")
+  # combined bitstream encoded and decoder for development
+  
+  if strcmp(mode,"encdec")
     [bits rate_K_surface_] = candc_encoder(model, voicing);
     [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
     % sanity check - should be a flast surface
     figure(7);
     X = rate_K_surface_ - rate_K_surface_dec_;
     mesh(X(1:2:100,:))    
+  end
+
+  # stand alone model file -> bit stream file encoder
+
+  if strcmp(mode,"enc")
+    [bits rate_K_surface_] = candc_encoder(model, voicing);
+    size(bits)
+    fbit = fopen(bitsream_filename,"wb"); 
+    fwrite(fbit, bits, "uchar");
+    fclose(fbit);
+  end
+
+  # stand alone bit stream file -> model file decoder
+
+  if strcmp(mode,"dec")
+    fbit = fopen(bitsream_filename,"rb"); 
+    bits = fread(fbit, "uchar")';
+    size(bits)
+    fclose(fbit);
+    [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
   end
 
   % ----------------------------------------------------
@@ -506,7 +543,7 @@ function [bits rate_K_surface_] = candc_encoder(model, voicing)
     # pack bits
 
     bits_frame = [spec_mag_bits Wo_bits E_bits voicing(f)];
-    bits = [bits; bits_frame];
+    bits = [bits bits_frame];
 
     if f < 10
       printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
@@ -519,7 +556,7 @@ endfunction
 % Candidate C, bit stream to model decoder
 
 function [model_ voicing rate_K_surface_] = candc_decoder(bits)
-  [rows tmp] = size(bits);
+  rows = floor(length(bits)/56);
   K = 20; Fs = 8000;
   M = 2; max_amp = 160; 
   frames = rows*M;
@@ -528,21 +565,20 @@ function [model_ voicing rate_K_surface_] = candc_decoder(bits)
   model_ = zeros(frames, max_amp+2);
   voicing = zeros(1,frames);
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, 100, 0.95*Fs/2);
-  b = 1;  
 
   for f=1:M:frames
-
+    abits = bits(1:56); bits = bits(57:end);
+    
     % extract information from bit stream
 
-    spec_mag_bits = bits(b,1:44);
-    Wo_bits = bits(b,44+(1:7));
+    spec_mag_bits = abits(1:44);
+    Wo_bits = abits(44+(1:7));
     Wo_index = bits_to_index(Wo_bits, 7);
     Wo_ = decode_log_Wo(Wo_index, 7); L_ = floor(pi/Wo_);
-    E_bits = bits(b,44+7+(1:4));
+    E_bits = abits(44+7+(1:4));
     E_index = bits_to_index(E_bits, 4);
     E_ = E_index*6;
-    voicing(f) = bits(b,56);
-    b++;
+    voicing(f) = abits(56);
    
     if f < 10
       printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
