@@ -359,7 +359,7 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
   
   if nargin == 4
     fep = fopen(error_pattern_filename, "wb");
-    fwrite(fep, error_positions, "short");
+    fwrite(fep, error_positions, "uchar");
     fclose(fep);
   end
 endfunction
