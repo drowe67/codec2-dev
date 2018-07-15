@@ -216,8 +216,20 @@ int main(int argc, char *argv[])
         codeword_amps[i] = 0.0;
     }
 
+    /* More logging */
+    COMP  payload_syms_log[NFRAMES][coded_syms_per_frame];
+    float payload_amps_log[NFRAMES][coded_syms_per_frame];
+    for (i=0; i<NFRAMES; i++) {
+      for (j=0; j<coded_syms_per_frame; j++) {
+        payload_syms_log[i][j].real = 0.0; payload_syms_log[i][j].imag = 0.0;
+        payload_amps_log[i][j] = 0.0;
+      }
+    }
+
     nin_frame = ofdm_get_nin(ofdm);
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
+
+        int log_payload_syms = 0;
 
         /* scale and demod */
 
@@ -233,6 +245,7 @@ int main(int argc, char *argv[])
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
+            log_payload_syms = 1;
 
             /* SNR estimation and smoothing */
 
@@ -383,6 +396,15 @@ int main(int argc, char *argv[])
             timing_est_log[f] = ofdm->timing_est + 1;     /* offset by 1 to match Octave */
 
             snr_est_log[f] = snr_est_smoothed_dB;
+
+            if (log_payload_syms) {
+                for (i=0; i<coded_syms_per_frame; i++) {
+                    payload_syms_log[f][i].real = payload_syms[i].real;
+                    payload_syms_log[f][i].imag = payload_syms[i].imag;
+                    payload_amps_log[f][i] = payload_amps[i];
+                }
+            }
+
             if (f == (logframes-1))
                 oct = 0;
         }
@@ -419,6 +441,8 @@ int main(int argc, char *argv[])
         octave_save_float(foct, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
         octave_save_int(foct, "timing_est_log_c", timing_est_log, NFRAMES, 1);
         octave_save_float(foct, "snr_est_log_c", snr_est_log, NFRAMES, 1, 1);
+        octave_save_complex(foct, "payload_syms_log_c", (COMP*)payload_syms_log, NFRAMES, coded_syms_per_frame, coded_syms_per_frame);
+        octave_save_float(foct, "payload_amps_log_c", (float*)payload_amps_log, NFRAMES, coded_syms_per_frame, coded_syms_per_frame);
         fclose(foct);
     }
 
@@ -426,3 +450,4 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+/* vi:set ts=4 et sts=4: */
