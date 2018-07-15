@@ -118,13 +118,18 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   % set up HF model ---------------------------------------------------------------
 
-  if strcmp(channel, 'hf')
+  if strcmp(channel, 'hf') || strcmp(channel, 'hfgood')
     randn('seed',1);
 
-    % some typical values, or replace with user supplied
+    % ITUT "poor" or "moderate" channels
 
-    dopplerSpreadHz = 1; path_delay_ms = 1;
-
+    if strcmp(channel, 'hf')
+      dopplerSpreadHz = 1; path_delay_ms = 1;
+    else
+      % "hfgood"
+      dopplerSpreadHz = 0.1; path_delay_ms = 0.5;
+    end
+    
     path_delay_samples = path_delay_ms*Fs/1000;
     printf("Doppler Spread: %3.2f Hz Path Delay: %3.2f ms %d samples\n", dopplerSpreadHz, path_delay_ms, path_delay_samples);
 
@@ -134,7 +139,7 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
     spread1 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
     spread2 = doppler_spread(dopplerSpreadHz, Fs, (Nsec*(M+Ncp)/M)*Fs*1.1);
-
+   
     % sometimes doppler_spread() doesn't return exactly the number of samples we need
  
     assert(length(spread1) >= Nsam, "not enough doppler spreading samples");
@@ -143,7 +148,7 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
 
   rx = tx;
 
-  if strcmp(channel, 'hf')
+  if strcmp(channel, 'hf') || strcmp(channel, 'hfgood')
     rx  = tx(1:Nsam) .* spread1(1:Nsam);
     rx += [zeros(1,path_delay_samples) tx(1:Nsam-path_delay_samples)] .* spread2(1:Nsam);
 
