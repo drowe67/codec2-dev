@@ -566,13 +566,19 @@ function [target_ bits] = deltaf_dec_one_symbol(bits)
   two_bits = bits(1:2);
 
   if two_bits == [0 1]
-    % OK a three bit code
-    if bits(3) == 0
-      target_ = levels(4);
+    if length(bits) > 2
+      % OK a three bit code
+      if bits(3) == 0
+        target_ = levels(4);
+      else
+        target_ = levels(5);
+      end
+      bits = bits(4:end);
     else
+      # we must have a bit error
       target_ = levels(5);
-    end
-    bits = bits(4:end);
+      bits = [];
+    end  
   else
     if two_bits == [0 0]
       target_ = levels(1);

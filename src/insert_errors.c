@@ -4,10 +4,8 @@
   AUTHOR......: David Rowe
   DATE CREATED: 20/2/2013
 
-  Inserts errors into a Codec 2 bit stream using error files.  The
-  error files have one 16 bit short per bit, the short is set to 1 if
-  there is an error, or zero otherwise.  The Codec 2 bit stream files
-  are in packed format, i.e. c2enc/c2dec format.
+  Inserts errors into a Codec 2 bit stream using error files.  All files are
+  in one bit per char format.
 
 \*---------------------------------------------------------------------------*/
 
@@ -41,15 +39,11 @@ int main(int argc, char *argv[])
     FILE          *fin;
     FILE          *fout;
     FILE          *ferror;
-    int            i, start_bit, end_bit, bit;
-    unsigned char  byte;
-    short          error;
+    unsigned char  abit, error_bit;
     int            errors, bits;
-    int            bits_per_frame;
 
-    if (argc < 4) {
-	printf("%s InputBitFile OutputBitFile ErrorFile bitsPerFrame [startBit endBit]\n", argv[0]);
-	printf("%s InputBitFile OutputBitFile BER\n", argv[0]);
+    if (argc < 3) {
+	printf("%s InputBitFile OutputBitFile ErrorFile\n", argv[0]);
 	exit(1);
     }
 
@@ -73,48 +67,24 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    bits_per_frame = atoi(argv[4]);
-
-    start_bit = 0; end_bit = bits_per_frame;
-    if (argc == 7) {
- 	start_bit = atoi(argv[5]);
-	end_bit = atoi(argv[6]);
-    }
-
-    bit = 0;
     bits = errors = 0;
 
-    while(fread(&byte, sizeof(char), 1, fin) == 1) {
-
-        for(i=0; i<8; i++, bits++) {
-            if (bits != bits_per_frame) {
-                if (fread(&error, sizeof(short), 1, ferror)) {
-                    if ((bit >= start_bit) && (bit <= end_bit))
-                        byte ^= error << (7-i);
-                    if (error)
-                        errors++;
-                }
-                else {
-                    fprintf(stderr,"bits: %d ber: %4.3f\n", bits, (float)errors/bits);
-                    fclose (fin); fclose(fout); fclose(ferror);
-                    exit(0);
-                }
-            }
+    while(fread(&abit, sizeof(char), 1, fin) == 1) {
+        bits++;
+        if (fread(&error_bit, sizeof(char), 1, ferror)) {
+            abit ^= error_bit;
+            errors += error_bit;
         }
-
-        fwrite(&byte, sizeof(char), 1, fout);
-        if (bits == bits_per_frame)
-            bits = 0;
+        fwrite(&abit, sizeof(char), 1, fout);
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
-
     }
 
     fclose(fin);
     fclose(fout);
     fclose(ferror);
 
-    fprintf(stderr,"bits: %d ber: %4.3f\n", bits, (float)errors/bits);
+    fprintf(stderr,"bits: %d errors: %d ber: %4.3f\n", bits, errors, (float)errors/bits);
 
     return 0;
 }
