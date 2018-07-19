@@ -42,13 +42,13 @@
 #include "gdb_stdio.h"
 #include "machdep.h"
 
-//#ifdef __EMBEDDED__
+#ifdef __EMBEDDED__
 #define printf gdb_stdio_printf
 #define fopen gdb_stdio_fopen
 #define fclose gdb_stdio_fclose
 #define fread gdb_stdio_fread
 #define fwrite gdb_stdio_fwrite
-//#endif
+#endif
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
