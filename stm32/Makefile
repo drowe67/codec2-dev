@@ -33,11 +33,11 @@ endif
 
 # Definitions for the STM32F4 Standard Peripheral Library
 
-PERIPHLIBURL    = http://www.st.com/resource/en/firmware
-PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
-PERIPHLIBVER	= V1.8.0
+#PERIPHLIBURL    = http://www.st.com/resource/en/firmware
+#PERIPHLIBZIP    = stm32f4_dsp_stdperiph_lib.zip
+#PERIPHLIBVER	= V1.8.0
 PERIPHLIBNAME	= STM32F4xx_DSP_StdPeriph_Lib
-PERIPHLIBDIR	= $(PERIPHLIBNAME)
+PERIPHLIBDIR	:= $(PERIPHLIBNAME)
 CMSIS		= $(PERIPHLIBDIR)/Libraries/CMSIS
 STM32F4LIB	= $(PERIPHLIBDIR)/Libraries/STM32F4xx_StdPeriph_Driver
 STM32F4TEMPLATE	= $(PERIPHLIBDIR)/Project/STM32F4xx_StdPeriph_Templates
@@ -398,6 +398,7 @@ $(CODEC2_SRC)/codebookge.c \
 $(CODEC2_SRC)/dump.c \
 $(CODEC2_SRC)/fdmdv.c \
 $(CODEC2_SRC)/freedv_api.c \
+$(CODEC2_SRC)/filter.c \
 $(CODEC2_SRC)/varicode.c \
 $(CODEC2_SRC)/golay23.c \
 $(CODEC2_SRC)/fsk.c \
@@ -446,33 +447,36 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin sm2000_rxdemo.bin
+all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin tst_ofdm_mod.bin tst_ofdm_demod.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin sm2000_rxdemo.bin
 
-# Rule for making directories automatically.
-# Note we don't use -p as it's a GNU extension.
-%/.md:
-	parent=$(shell dirname $(@D) ); \
-		[ -d $${parent} ] || $(MAKE) $${parent}/.md
-	[ -d $(@D) ] || mkdir $(@D)
-	touch $@
-
-dl/$(PERIPHLIBZIP): dl/.md
-	wget -O$@.part -c $(PERIPHLIBURL)/$(PERIPHLIBZIP)
-	mv $@.part $@
-	touch $@
-
-$(PERIPHLIBDIR)/.unpack: dl/$(PERIPHLIBZIP)
-	test ! -d $(PERIPHLIBDIR)_$(PERIPHLIBVER) || \
-		rm -fr $(PERIPHLIBDIR)_$(PERIPHLIBVER)
-	unzip dl/$(PERIPHLIBZIP)
-	test ! -d $(PERIPHLIBDIR) || rm -fr $(PERIPHLIBDIR)
-	mv $(PERIPHLIBDIR)_$(PERIPHLIBVER) $(PERIPHLIBDIR)
-	touch $@
-
-$(CMSIS_OBJS) $(STM32F4LIB_OBJS): $(PERIPHLIBDIR)/.unpack
+##########################
+### Commented out to use manually downloaded library
+### 
+### # Rule for making directories automatically.
+### # Note we don't use -p as it's a GNU extension.
+### %/.md:
+### 	parent=$(shell dirname $(@D) ); \
+### 		[ -d $${parent} ] || $(MAKE) $${parent}/.md
+### 	[ -d $(@D) ] || mkdir $(@D)
+### 	touch $@
+### 
+### dl/$(PERIPHLIBZIP): dl/.md
+### 	wget -O$@.part -c $(PERIPHLIBURL)/$(PERIPHLIBZIP)
+### 	mv $@.part $@
+### 	touch $@
+### 
+### $(PERIPHLIBDIR)/.unpack: dl/$(PERIPHLIBZIP)
+### 	test ! -d $(PERIPHLIBDIR)_$(PERIPHLIBVER) || \
+### 		rm -fr $(PERIPHLIBDIR)_$(PERIPHLIBVER)
+### 	unzip dl/$(PERIPHLIBZIP)
+### 	test ! -d $(PERIPHLIBDIR) || rm -fr $(PERIPHLIBDIR)
+### 	mv $(PERIPHLIBDIR)_$(PERIPHLIBVER) $(PERIPHLIBDIR)
+### 	touch $@
+### 
+### $(CMSIS_OBJS) $(STM32F4LIB_OBJS): $(PERIPHLIBDIR)/.unpack
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
-	find $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
+	find -L $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
 
 # Kludgy target to build a file with CFLAGS -O3
 %.O3.o: %.c
@@ -637,7 +641,7 @@ src/init.c
 
 USB_VCP_UT+=$(USB_VCP)
 
-CFLAGS += -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg
+CFLAGS += -DUSE_USB_OTG_FS -DUSE_ULPI_PHY -Iusb_conf -Iusb_lib/cdc -Iusb_lib/core -Iusb_lib/otg -I ../build_linux
 
 usb_vcp_ut.elf: $(USB_VCP_UT:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
@@ -757,7 +761,7 @@ fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS:.c=.O3.o) \
 
 TST_OFDM_MOD_SRCS=\
 src/tst_ofdm_mod.c \
-../src/ofdm.c \
+$(CODEC2_SRC)/ofdm.c \
 src/stm32f4_machdep.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
@@ -767,6 +771,23 @@ src/init.c
 TST_OFDM_MOD_SRCS += $(CODEC2_SRCS)
 
 tst_ofdm_mod.elf: $(TST_OFDM_MOD_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+
+# ---------------------------------------------------------------------------
+
+TST_OFDM_DEMOD_SRCS=\
+src/tst_ofdm_demod.c \
+$(CODEC2_SRC)/ofdm.c \
+src/stm32f4_machdep.c \
+gdb_stdio.c \
+src/system_stm32f4xx.c \
+src/startup_stm32f4xx.s \
+src/init.c
+
+TST_OFDM_DEMOD_SRCS += $(CODEC2_SRCS)
+
+tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------
