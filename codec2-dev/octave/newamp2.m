@@ -470,9 +470,10 @@ endfunction
 
 
 % Given a vector of rate K samples, deltaf encodes/decodes delta
-% amplitude, returning quantised samples and bit stream
+% amplitude using a huffman encoder, returning quantised samples and
+% bit stream
 
-function [rate_K_vec_ bits] = deltaf_quantise_rate_K(rate_K_vec, E, nbits_max)
+function [rate_K_vec_ bits] = deltaf_quantise_rate_K_huff(rate_K_vec, E, nbits_max)
   K = length(rate_K_vec);
   nbits_remaining = nbits_max;
   
@@ -526,9 +527,9 @@ endfunction
 
 
 % Given a vector of bits, and the k=3 frame amplitude sample E, decode to a
-% rate K vector of quantised spectral amplitude samples
+% rate K vector of huffman encoded quantised spectral amplitude samples
 
-function rate_K_vec_ = deltaf_decode_rate_K(bits, E, K)
+function rate_K_vec_ = deltaf_decode_rate_K_huff(bits, E, K)
   
   % start with k=3, around 250Hz, we assume that's quantised as the
   % mean frame energy, as samples before that might be stuck in the
@@ -739,4 +740,97 @@ function dist_shape(codebook, target)
   target
   [tmp min_i] = min(dist);
   target - codebook(min_i,:)
+endfunction
+
+
+% Given a vector of rate K samples, deltaf encodes/decodes delta
+% amplitude using a fixed bit/sample allocation, returning quantised
+% samples and bit stream
+
+function [rate_K_vec_ bits] = deltaf_quantise_rate_K_fixed(rate_K_vec, E, nbits_max)
+  K = length(rate_K_vec);
+  
+  % start with k=3, around 250Hz, we assume that's quantised as the
+  % mean frame energy, as samples before that might be stuck in the
+  % HPF.
+
+  rate_K_vec_ = zeros(1,K);
+  rate_K_vec_(3) = E;
+  
+  % encoding of differences
+  
+  levels_2bit =  [-3 +3 -9 9];
+  levels_3bit =  [0 -6 +6 -12 +12 -18 +18 -24];
+
+  % move backwards to get target for first two samples
+  
+  bits = [];
+  for m=2:-1:1
+    target = rate_K_vec(m) - rate_K_vec_(m+1);
+    [target_ best_i] = quantise(levels_2bit, target);
+    % printf("m: %d target_ %f best_i: %d\n", m, target_, best_i);
+    bits = [bits index_to_bits(best_i-1, 2)];
+    rate_K_vec_(m) = rate_K_vec_(m+1) + target_;
+  end
+  
+  % then forwards for rest of the target samples
+  
+  for m=4:9
+    target = rate_K_vec(m) - rate_K_vec_(m-1);
+    [target_ best_i] = quantise(levels_3bit, target);
+    bits = [bits index_to_bits(best_i-1, 3)];
+    rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
+  end
+  for m=10:K
+    target = rate_K_vec(m) - rate_K_vec_(m-1);
+    [target_ best_i] = quantise(levels_2bit, target);
+    bits = [bits index_to_bits(best_i-1, 2)];
+    rate_K_vec_(m) = target_ + rate_K_vec_(m-1);    
+  end
+  assert(length(bits) == nbits_max);
+endfunction
+
+
+% Given a vector of bits, and the k=3 frame amplitude sample E, decode
+% to a rate K vector of encoded quantised spectral amplitude samples
+% with fixed bit allocation
+
+function rate_K_vec_ = deltaf_decode_rate_K_fixed(bits, E, K)
+  
+  % start with k=3, around 250Hz, we assume that's quantised as the
+  % mean frame energy, as samples before that might be stuck in the
+  % HPF.
+
+  rate_K_vec_ = zeros(1,K);
+  rate_K_vec_(3) = E;
+  
+  levels_2bit = [-3 +3 -9 9];
+  levels_3bit =  [0 -6 +6 -12 +12 -18 +18 -24];
+
+  % move backwards to get target for first two samples
+  
+  for m=2:-1:1
+    index = bits_to_index(bits(1:2),2) + 1;
+    target_ = levels_2bit(index);
+    rate_K_vec_(m) = rate_K_vec_(m+1) + target_;
+    bits = bits(3:end);
+  end
+  
+  % then forwards for rest of the target samples
+  
+  for m=4:9
+    index = bits_to_index(bits(1:3), 3) + 1;
+    target_ = levels_3bit(index);
+    rate_K_vec_(m) = rate_K_vec_(m-1) + target_;
+    bits = bits(4:end);
+  end
+  for m=10:K
+    index = bits_to_index(bits(1:2), 2) + 1;
+    target_ = levels_2bit(index);
+    rate_K_vec_(m) = rate_K_vec_(m-1) + target_;
+    if m != K
+      bits = bits(3:end);
+    end
+  end
+  
 endfunction
