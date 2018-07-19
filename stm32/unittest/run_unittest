@@ -1,0 +1,222 @@
+#!/usr/bin/env python3
+""" run_unittest
+    See README_unittest.txt
+    """
+
+import argparse
+import yaml
+import pathlib
+import string
+import subprocess
+import shutil
+import os
+import sys
+
+### Standard settings, overridable by arguments (some day)
+# These are relative to the inital directory (codec2-dev/stm32/unittest)
+RUN_DIR = 'test_run'    # a directory.  Each test will run in a subdir here
+CODEC2_BIN = '../../build_linux/src'
+CODEC2_UTST = '../../build_linux/unittest'
+UTST_BIN = 'bin'
+#
+base_dir = pathlib.Path.cwd() # collect the initial directory
+codec2_bin_dir = pathlib.Path(base_dir, CODEC2_BIN) # Where codec2 binaries are
+codec2_utst_dir = pathlib.Path(base_dir, CODEC2_UTST) # Where codec2 unittest binaries are
+utst_bin_dir  = pathlib.Path(base_dir, UTST_BIN)  # Unittest binaries and scripts
+
+##############################################################################
+# Run a command, after macro substitution
+##############################################################################
+def run_command(cmd, log_out, log_err):
+    # Returns False for success, True for error
+    subs = dict(
+        CODEC2_BIN=codec2_bin_dir,
+        CODEC2_UTST=codec2_utst_dir,
+        UTST_BIN=utst_bin_dir,
+        )
+    cmd = string.Template(cmd).substitute(subs)
+    result = subprocess.run(cmd, shell=True, stdout=log_out, stderr=log_err)
+    # TODO, return flag and mark as FAIL, don't stop
+    if (result.returncode != 0):
+        log_err.write('command "{}" returned {}\n'.format(cmd, result.returncode))
+        return(False)
+    else: return(True)
+    # end run_command()
+
+
+##############################################################################
+# Prepare Input
+##############################################################################
+def prepare_input(testname, input_def):
+    # Log files
+    log_out = open('prepare_input_out.log', 'w')
+    log_err = open('prepare_input_err.log', 'w')
+    result = True
+    if (type(input_def) is str):
+        result = run_command(input_def, log_out, log_err)
+    elif (type(input_def) is list):
+        for cmd in input_def:
+            result |= run_command(cmd, log_out, log_err)
+            if (not result): break
+    else: sys.exit('undefined type in prepare_input')
+    if (not result): sys.exit('Error in prepare_input')
+    log_out.close()
+    log_err.close()
+    # end prepare_input()
+
+
+##############################################################################
+# Reference
+##############################################################################
+def prepare_reference(testname, ref_def):
+    # Log files
+    log_out = open('prepare_reference_out.log', 'w')
+    log_err = open('prepare_reference_err.log', 'w')
+    result = True
+    if (type(ref_def) is str):
+        result = run_command(ref_def, log_out, log_err)
+    elif (type(ref_def) is list):
+        for cmd in ref_def:
+            result |= run_command(cmd, log_out, log_err)
+            if (not result): break
+    else: sys.exit('undefined type in prepare_reference')
+    if (not result): sys.exit('Error in prepare_reference')
+    log_out.close()
+    log_err.close()
+    # end prepare_refernce()
+
+
+##############################################################################
+# Unit Under Test
+##############################################################################
+def test_UUT(testname, uut_def, binary):
+    # Log files
+    log_out = open('uut_out.log', 'w')
+    log_err = open('uut_err.log', 'w')
+    result = True
+    if (type(uut_def) is str):
+        result = run_command(uut_def, log_out, log_err)
+    elif (type(uut_def) is list):
+        for cmd in uut_def:
+            result |= run_command(cmd, log_out, log_err)
+    elif (type(uut_def) is dict):
+        assert('type' in uut_def)
+        if (uut_def['type'] == 'stm32_prog'):
+            binary = stm32_bin_dir + Path(binary)
+            cmd = 'run_stm32_prog binary'
+            result = run_command(cmd, log_out, log_err)
+        elif (uut_def['type'] == 'manual'):
+            sys.stderr.write('Run test {} manually, press return when done: '.format
+                            (testname))
+            sys.stderr.flush()
+            sys.stdin.readline()
+        else: sys.exit('undefined test type in test_UUT')
+    else: sys.exit('undefined type in test_UUT')
+    if (not result): sys.exit('Error in test_UUT')
+    log_out.close()
+    log_err.close()
+    # end prepare_refernce()
+
+
+##############################################################################
+# Check
+##############################################################################
+def check(testname, ref_def):
+    # Log files
+    log_out = open('check_out.log', 'w')
+    log_err = open('check_err.log', 'w')
+    result = True
+    if (type(ref_def) is str):
+        result = run_command(ref_def, log_out, log_err)
+    elif (type(ref_def) is list):
+        for cmd in ref_def:
+            result |= run_command(cmd, log_out, log_err)
+    else: sys.exit('undefined type in check')
+    if (not result): print('Failed\n')
+    else: print('Passed\n')
+    log_out.close()
+    log_err.close()
+    # end prepare_refernce()
+
+
+##############################################################################
+# run_test
+##############################################################################
+
+def run_test(testname, test_def):
+    print('Running test {}'.format(testname))
+
+    # 1) Make run directory
+    run_dir = os.path.join(RUN_DIR, testname)
+    if (all_steps or args.clean):
+        shutil.rmtree(run_dir)
+    run_dir = pathlib.Path(RUN_DIR, testname)
+    if (not run_dir.exists()):
+        run_dir.mkdir(parents=True)
+
+    # cd down to test run dir
+    os.chdir(str(run_dir))
+
+    # 2) Build
+    ### ?? Do we want this??
+
+    # 3) Input
+    if (all_steps or args.prep):
+        if ('input' in test_def):
+            prepare_input(testname, test_def['input'])
+
+    # 4) Reference
+    if (all_steps or args.ref):
+        if ('reference' in test_def):
+            prepare_reference(testname, test_def['reference'])
+
+    # 5) Run test on UUT
+    if (all_steps or args.run):
+        if ('test' in test_def):
+            test_UUT(testname, test_def['test'], test_def['binary'])
+
+    # 6) Check
+    if (all_steps or args.check):
+        if ('check' in test_def):
+            check(testname, test_def['check'])
+
+    # cd back to base dir
+    os.chdir(str(base_dir))
+
+
+    # end run_test()
+
+
+##############################################################################
+# Main
+##############################################################################
+
+parser = argparse.ArgumentParser()
+parser.add_argument('testname')
+parser.add_argument('--clean', action='store_true', help='clean run directory')
+parser.add_argument('--build', action='store_true', help='build binary')
+parser.add_argument('--prep',  action='store_true', help='prepare input')
+parser.add_argument('--ref',   action='store_true', help='prepare reference data')
+parser.add_argument('--run',   action='store_true', help='run test on UUT')
+parser.add_argument('--check', action='store_true', help='check results')
+args = parser.parse_args()
+
+testname = args.testname
+
+# If no steps specified then do them all
+if (args.clean or args.build or args.prep or args.ref or args.run or args.check): 
+    all_steps = False
+else: all_steps = True
+
+with open('unittest_defenitions.yaml') as yf:
+    test_defs = yaml.load(yf)
+
+if (testname == 'all'):
+    print('Running all tests:\n')
+    for testname in iter(test_defs):
+        run_test(testname, test_defs[testname])
+else:
+    if (testname in test_defs):
+        run_test(testname, test_defs[testname])
+    else:
+        print('Error test {} not defined'.format(testname))

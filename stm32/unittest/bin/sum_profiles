@@ -1,0 +1,29 @@
+#!/usr/bin/env python3
+""" sum_profiles
+    """
+
+import fileinput
+import os
+import sys
+
+data = {}
+
+##############################################################################
+# Main
+##############################################################################
+
+for line in fileinput.input():
+    words = line.strip().split()
+    if (len(words) == 3):
+        part = words[0]
+        time_str = words[1]
+        time = float(time_str)
+        if (not part in data): data[part] = 0.0
+        data[part] += time
+
+data_sorted = [(p, data[p]) for p in sorted(data, key=data.get, reverse=True)]
+
+for part, time in data_sorted:
+    print('{:6.3f} - {}'.format(time, part))
+
+
