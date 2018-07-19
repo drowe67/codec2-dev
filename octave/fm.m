@@ -291,7 +291,7 @@ function run_fm_single
 end
 
 
-function fm_mod_file(file_name_out)
+function fm_mod_file(file_name_out, file_name_in, CNdB)
   fm_states.Fs = 48000;  
   fm_states.fm_max = 3E3;
   fm_states.fd = 5E3;
@@ -302,12 +302,27 @@ function fm_mod_file(file_name_out)
   fm_states.output_filter = 1;
   fm_states = analog_fm_init(fm_states);
 
-  nsam = fm_states.Fs * 10;
-  t = 0:(nsam-1);
-  fm = 1000; wm = 2*pi*fm/fm_states.Fs;
-  mod = sin(wm*t);
+  if nargin == 1
+    nsam = fm_states.Fs * 10;
+    t = 0:(nsam-1);
+    fm = 1000; wm = 2*pi*fm/fm_states.Fs;
+    mod = sin(wm*t);
+  else
+    fin = fopen(file_name_in,"rb");
+    mod = fread(fin,"short")';
+    mod /= 32767;
+    fclose(fin);
+  end
   tx = analog_fm_mod(fm_states, mod);
+  
+  if (nargin == 3)
+    % Optionally add some noise
 
+   CN = 10^(CNdB/10);
+    variance = fm_states.Fs/(CN*fm_states.Bfm);
+    tx += sqrt(variance)*randn(1,length(tx));
+  end
+  
   tx_out = tx*16384;
   fout = fopen(file_name_out,"wb");
   fwrite(fout, tx_out, "short");
@@ -320,7 +335,7 @@ function fm_demod_file(file_name_out, file_name_in)
   rx = fread(fin,"short")'; 
   rx = rx(100000:length(rx)); % strip of wave header
   fclose(fin);
-
+ 
   Fs = fm_states.Fs = 48000;  
   fm_max = fm_states.fm_max = 3E3;
   fd = fm_states.fd = 5E3;
@@ -331,7 +346,7 @@ function fm_demod_file(file_name_out, file_name_in)
   fm_states.Ts = 1;
   fm_states.output_filter = 1;
   fm_states = analog_fm_init(fm_states);
-
+ 
   [rx_out rx_bb] = analog_fm_demod(fm_states, rx);
 
   rx_out *= 20000;

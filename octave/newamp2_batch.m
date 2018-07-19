@@ -27,7 +27,7 @@
 
     $ ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --dump vk5qi_l --phase0 --lpc 10 --dump_pitch_e vk5qi_l_pitche.txt
     octave:526> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_dec", "mode", "encdec");
-    $ /c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_dec --hand_voicing vk5qi_l_dec_v.txt -o - |  play -t raw -r 8000 -s -2 -
+    $ ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_dec --hand_voicing vk5qi_l_dec_v.txt -o - |  play -t raw -r 8000 -s -2 -
 
     2/ Generate a bit stream file:
 
@@ -52,7 +52,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   synth_phase = output = 1;
   output_prefix = input_prefix;
   mode = "linear";
-  correct_rate_K_en = 0; quant = ""; vq_en = 0; M = 1;
+  correct_rate_K_en = 0; quant = ""; vq_en = 0; M = 1; mask_en = 0;
   
   % parse variable argument list
 
@@ -105,6 +105,12 @@ function surface = newamp2_batch(input_prefix, varargin)
       M = varargin{ind+1};
     end
     
+    ind = arg_exists(varargin, "mask");
+    if ind
+      mask_en = 1;
+      error_filename = varargin{ind+1};
+    end
+
     correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
   end
 
@@ -155,7 +161,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   if strcmp(mode,"encdec")
     [bits rate_K_surface_] = candc_encoder(model, voicing);
     [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
-    % sanity check - should be a flast surface
+    % sanity check - should be a flat surface
     figure(7);
     X = rate_K_surface_ - rate_K_surface_dec_;
     mesh(X(1:2:100,:))    
@@ -165,7 +171,6 @@ function surface = newamp2_batch(input_prefix, varargin)
 
   if strcmp(mode,"enc")
     [bits rate_K_surface_] = candc_encoder(model, voicing);
-    size(bits)
     fbit = fopen(bitsream_filename,"wb"); 
     fwrite(fbit, bits, "uchar");
     fclose(fbit);
@@ -176,9 +181,14 @@ function surface = newamp2_batch(input_prefix, varargin)
   if strcmp(mode,"dec")
     fbit = fopen(bitsream_filename,"rb"); 
     bits = fread(fbit, "uchar")';
-    size(bits)
     fclose(fbit);
-    [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
+    errors_per_codec_frame = [];
+    if mask_en
+      % optional error masking, read in error file, count errors/frame
+       errors_per_codec_frame = count_errors(error_filename);
+    end
+    [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits, errors_per_codec_frame);
+    figure(1); mesh(rate_K_surface_dec_(1:240,:))
   end
 
   % ----------------------------------------------------
@@ -506,10 +516,9 @@ endfunction
 % Candidate C, model to bit-stream encoder
 
 function [bits rate_K_surface_] = candc_encoder(model, voicing)
+  newamp2_const;
   [frames nc] = size(model);
-  K = 20; Fs = 8000;
-  AmdB = zeros(frames, 160);
-  M = 2;
+  AmdB = zeros(frames, max_amp);
   bits = [];
   
   rate_K_surface = rate_K_surface_ = zeros(frames, K);
@@ -532,7 +541,7 @@ function [bits rate_K_surface_] = candc_encoder(model, voicing)
     levels = (0:15)*6;
     [E_ E_index] = quantise(levels, rate_K_surface(f,3));
     E_bits = index_to_bits(E_index-1, 4);
-    [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 44);
+    [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K_fixed(rate_K_surface(f,:), E_, 44);
 
     # quantise pitch
 
@@ -542,11 +551,11 @@ function [bits rate_K_surface_] = candc_encoder(model, voicing)
 
     # pack bits
 
-    bits_frame = [spec_mag_bits Wo_bits E_bits voicing(f)];
+    bits_frame = [Wo_bits E_bits voicing(f) spec_mag_bits ];
     bits = [bits bits_frame];
 
     if f < 10
-      printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
+      printf("f: %d Wo: %2d E: %d %2.0f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
     end
   end
 
@@ -555,42 +564,100 @@ endfunction
 
 % Candidate C, bit stream to model decoder
 
-function [model_ voicing rate_K_surface_] = candc_decoder(bits)
-  rows = floor(length(bits)/56);
-  K = 20; Fs = 8000;
-  M = 2; max_amp = 160; 
+function [model_ voicing rate_K_surface_] = candc_decoder(bits, errors_per_codec_frame, ber = 0.0)
+  newamp2_const;
+  rows = floor(length(bits)/Nbitspercodecframe);
   frames = rows*M;
   
   rate_K_surface_ = zeros(frames, K);
   model_ = zeros(frames, max_amp+2);
   voicing = zeros(1,frames);
   rate_K_sample_freqs_kHz = mel_sample_freqs_kHz(K, 100, 0.95*Fs/2);
+  Tbits = Terrs = 0;
+  abits = zeros(1, Nbitspercodecframe);
+  Nerrs = 0; av_level = 1;
 
+  level_log = level_adj_log = [];
+  
+  error_thresh = 0;
+  
+  r = 1;
   for f=1:M:frames
-    abits = bits(1:56); bits = bits(57:end);
+    abits = bits(1:Nbitspercodecframe);
+    bits = bits(Nbitspercodecframe+1:end);
+
+    % optional insertion of bit errors for testing
+    
+    if ber > 0.0
+      [abits(13:56) nerr] = insert_bit_error(abits(13:56), 0.00);
+      Terrs += nerr;
+      Tbits += 45;
+    end
     
     % extract information from bit stream
 
-    spec_mag_bits = abits(1:44);
-    Wo_bits = abits(44+(1:7));
+    spec_mag_bits = abits(13:Nbitspercodecframe);
+    E_bits = abits(8:11);
+    Wo_bits = abits((1:7));
+    voicing(f) = abits(12);
     Wo_index = bits_to_index(Wo_bits, 7);
     Wo_ = decode_log_Wo(Wo_index, 7); L_ = floor(pi/Wo_);
-    E_bits = abits(44+7+(1:4));
     E_index = bits_to_index(E_bits, 4);
     E_ = E_index*6;
-    voicing(f) = abits(56);
-   
-    if f < 10
-      printf("f: %d Wo: %d E: %d %f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
-    end
 
+    #{
+    if f < 10
+      printf("f: %d Wo: %2d E: %d %2.0f v: %d\n", f, Wo_index, E_index+1, E_, voicing(f));
+    end
+    #}
+    
     % decode into rate K vec
     
-    rate_K_surface_(f,:) = deltaf_decode_rate_K(spec_mag_bits, E_, K, 44);
+    rate_K_surface_(f,:) = deltaf_decode_rate_K_fixed(spec_mag_bits, E_, K, 44);
 
+    level = max(rate_K_surface_(f,:));
+    level_log = [level_log level];
+    
+    if length(errors_per_codec_frame) >= r
+      Nerrs = errors_per_codec_frame(r);
+    end
+
+    if Nerrs > error_thresh
+      % if errors, want to avoid loud cracks, but we also don't want to simply mute.  So
+      % adjust level to match recent average, and let that decay if long stream of error
+      % frames to gradually mute.
+
+      adjustment = av_level/level;
+      if adjustment < 1
+        rate_K_surface_(f,:) *= adjustment;
+        printf("f: %3d r: %3d e: %2d level: %3.1f av_level: %3.1f adjust: %3.2f\n", f,r,Nerrs, level, av_level, adjustment);
+      end
+      av_level = av_level*0.9;      
+    else
+      % update average level
+      av_level = av_level*0.9 + level*0.1;
+      printf("f: %3d r: %3d e: %2d level: %3.1f av_level: %3.1f\n", f,r,Nerrs, level, av_level);
+    end
+       
+    level = max(rate_K_surface_(f,:));
+    level_adj_log = [level_adj_log level];
+    
     model_(f,1) = Wo_; model_(f,2) = L_;
+    r++;
   end
 
+  if length(errors_per_codec_frame)
+    figure(3); clf; nplot = 80*3;
+    subplot(211,"position",[0.1 0.8 0.8 0.15]);
+    plot(errors_per_codec_frame(1:nplot))
+    subplot(212,"position",[0.1 0.05 0.8 0.7]);
+    plot(level_log(1:nplot),'b'); hold on; plot(level_adj_log(1:nplot),'g+'); hold off;
+  end
+  
+  if ber > 0.0
+    printf("Tbits: %d Terrs: %d BER: %4.3f\n", Tbits, Terrs, Terrs/Tbits);
+  end
+  
   % interpolation in time
     
   for f=1:M:frames-M
@@ -628,4 +695,30 @@ function [model_ voicing rate_K_surface_] = candc_decoder(bits)
 endfunction
 
 
+function [bits nerrs] = insert_bit_error(bits, ber)
+  newamp2_const;
+  p = rand(1,length(bits));
+  error_mask = p < ber;
+  bits = xor(bits, error_mask);
+  nerrs = sum(error_mask);
+endfunction
+
+
+% Xounts errors in protected bits.  Simulates failure of FEC to decode, which
+% we can detect
+
+function errors_per_codec_frame = count_errors(error_filename)
+  newamp2_const;
+  ferr = fopen(error_filename,"rb"); 
+  errors = fread(ferr, "uchar")';
+  fclose(ferr);
+  frames = floor(length(errors)/Nbitspercodecframe)
+  errors_per_codec_frame = zeros(1,frames);
+  for f=1:frames
+    st = (f-1)*Nbitspercodecframe + 1; en = st + Nprotectedbitspercodecframe - 1;
+    errors_per_codec_frame(f) = sum(errors(st:en));
+  end
+  figure(2);
+  plot(errors_per_codec_frame);
+endfunction
 
