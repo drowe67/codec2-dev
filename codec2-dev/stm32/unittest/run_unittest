@@ -149,7 +149,7 @@ def run_test(testname, test_def):
     # 1) Make run directory
     run_dir = os.path.join(RUN_DIR, testname)
     if (all_steps or args.clean):
-        shutil.rmtree(run_dir)
+        shutil.rmtree(run_dir, ignore_errors=True)
     run_dir = pathlib.Path(RUN_DIR, testname)
     if (not run_dir.exists()):
         run_dir.mkdir(parents=True)
