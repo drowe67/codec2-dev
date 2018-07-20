@@ -113,6 +113,8 @@ struct freedv_data_channel *freedv_data_channel_create(void)
         return NULL;
 
     fdc->cb_rx = NULL;
+    fdc->cb_tx = NULL;
+    fdc->packet_tx_size = 0;
 
     freedv_data_set_header(fdc, fdc_header_bcast);
 

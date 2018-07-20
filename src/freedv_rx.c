@@ -152,6 +152,8 @@ int main(int argc, char *argv[]) {
 		    c2_mode = CODEC2_MODE_700;
 		} else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
                     c2_mode = CODEC2_MODE_700B;
+                } else if ((mode == FREEDV_MODE_700C)|| (mode == FREEDV_MODE_700D)) {
+                    c2_mode = CODEC2_MODE_700C;
                 } else {
                     c2_mode = CODEC2_MODE_1300;
                 }
