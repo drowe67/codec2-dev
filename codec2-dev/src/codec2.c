@@ -2008,6 +2008,27 @@ float codec2_energy_700c(struct CODEC2 *c2, const unsigned char * bits)
     return powf(10.0, mean/10.0);
 }
 
+float codec2_energy_450(struct CODEC2 *c2, const unsigned char * bits)
+{
+    int     indexes[4];
+    unsigned int nbit = 0;
+
+    assert(c2 != NULL);
+
+    /* unpack bits from channel ------------------------------------*/
+
+    indexes[0] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    //indexes[1] = unpack_natural_or_gray(bits, &nbit, 9, 0);
+    indexes[2] = unpack_natural_or_gray(bits, &nbit, 3, 0);
+    indexes[3] = unpack_natural_or_gray(bits, &nbit, 6, 0);
+    
+    float mean = newamp2_energy_cb[0].cb[indexes[2]];
+    mean -= 10;
+    if (indexes[3] == 0)
+    	mean -= 10;
+
+    return powf(10.0, mean/10.0);
+}
 
 /*---------------------------------------------------------------------------*\
 
@@ -2031,7 +2052,9 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 	   (c2->mode == CODEC2_MODE_1200) ||
 	   (c2->mode == CODEC2_MODE_700) ||
 	   (c2->mode == CODEC2_MODE_700B) ||
-	   (c2->mode == CODEC2_MODE_700C)
+	   (c2->mode == CODEC2_MODE_700C) ||
+	   (c2->mode == CODEC2_MODE_450) ||
+	   (c2->mode == CODEC2_MODE_450PWB)
 	   );
     MODEL model;
     float xq_dec[2] = {};
@@ -2081,6 +2104,9 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
     }
     if (c2->mode == CODEC2_MODE_700C) {
         e = codec2_energy_700c(c2, bits);
+    }
+    if (c2->mode == CODEC2_MODE_450 || c2->mode == CODEC2_MODE_450PWB) {
+        e = codec2_energy_450(c2, bits);
     }
     
     return e;

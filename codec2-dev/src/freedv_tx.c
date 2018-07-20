@@ -156,6 +156,8 @@ int main(int argc, char *argv[]) {
                     c2_mode = CODEC2_MODE_700;
                 } else if ((mode == FREEDV_MODE_700B)|| (mode == FREEDV_MODE_800XA)) {
                     c2_mode = CODEC2_MODE_700B;
+                } else if ((mode == FREEDV_MODE_700C)|| (mode == FREEDV_MODE_700D)) {
+                    c2_mode = CODEC2_MODE_700C;
                 } else {
                     c2_mode = CODEC2_MODE_1300;
                 }
@@ -248,7 +250,7 @@ int main(int argc, char *argv[]) {
                 speech_frame += samples_per_frame;
             }
             energy /= codec_frames;
-            fprintf(stderr,"energy:%f\n",energy);
+            
             /* Is the audio fragment quiet? */
             if (use_datatx && energy < 1.0) {
                 /* Insert a frame with data instead of speech */

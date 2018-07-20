@@ -1090,6 +1090,35 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         case FREEDV_MODE_700C:
             freedv_comptx_700(f, tx_fdm);
             break;
+        case FREEDV_MODE_700D: {
+            /* special treatment due to interleaver */
+            int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+	    int codec_frames = data_bits_per_frame / bits_per_codec_frame;
+	    int j;
+
+            /* buffer up bits until we get enough encoded bits for interleaver */
+        
+            for (j=0; j<codec_frames; j++) {
+                memcpy(f->packed_codec_bits_tx + (f->modem_frame_count_tx*codec_frames+j)*bytes_per_codec_frame, packed_codec_bits, bytes_per_codec_frame);
+	        packed_codec_bits += bytes_per_codec_frame;
+            }
+
+            /* call modulate function when we have enough frames to run interleaver */
+
+            assert((f->modem_frame_count_tx >= 0) && (f->modem_frame_count_tx < f->interleave_frames));
+            f->modem_frame_count_tx++;
+            if (f->modem_frame_count_tx == f->interleave_frames) {
+                freedv_comptx_700d(f, f->mod_out);
+                f->modem_frame_count_tx = 0;
+            }
+
+            /* output n_nom_modem_samples at a time from modulated buffer */
+            for(i=0; i<f->n_nat_modem_samples; i++) {
+                mod_out[i] = f->mod_out[f->modem_frame_count_tx*f->n_nat_modem_samples+i].real;
+            }
+
+	    return; /* output is already real */
+	}
         case FREEDV_MODE_2400A:
         case FREEDV_MODE_2400B:
         case FREEDV_MODE_800XA:
@@ -1949,6 +1978,8 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     int nin = freedv_nin(f);
     int valid;
     int ret = 0;
+    int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+    int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     assert(nin <= f->n_max_modem_samples);
     
@@ -1965,6 +1996,23 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         freedv_comprx_700(f, rx_fdm, &valid);
     }
+
+    if (f->mode == FREEDV_MODE_700D) {
+        freedv_comprx_700d(f, rx_fdm, &valid);
+
+        int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+        int frames = data_bits_per_frame/bits_per_codec_frame;
+            
+        if (valid == 1 && f->modem_frame_count_rx < f->interleave_frames) {
+             for (i = 0; i < frames; i++) {
+                 memcpy(packed_codec_bits, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame, bytes_per_codec_frame);
+                 packed_codec_bits += bytes_per_codec_frame;
+                 ret += bytes_per_codec_frame;
+             }
+             f->modem_frame_count_rx++;
+        }
+	return ret;
+    }
 #endif
     
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
@@ -1972,7 +2020,6 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     }
 
     if (valid == 1) {
-        int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
         int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
         int codec_frames = f->n_codec_bits / bits_per_codec_frame;
 
@@ -2119,8 +2166,11 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
     if (f->mode == FREEDV_MODE_700D) {
         ofdm_get_demod_stats(f->ofdm, &f->stats);
     }
+    if (f->mode == FREEDV_MODE_2400B) {
+        fmfsk_get_demod_stats(f->fmfsk, &f->stats);
+    }
 #endif
-    if (sync) *sync = f->stats.sync;
+    if (sync) *sync = f->sync;
     if (snr_est) *snr_est = f->stats.snr_est;
 }
 
