@@ -53,7 +53,7 @@ static int inited = 0;
 //since we want to avoid bit-reversing inside syndrome() we bit-reverse the polynomial instead
 #define GOLAY_POLYNOMIAL    0xC75   //AE3 reversed
 
-static int syndrome(int c) {
+int golay23_syndrome(int c) {
     //could probably be done slightly smarter, but works
     int x;
     for (x = 11; x >= 0; x--) {
@@ -85,7 +85,7 @@ static int popcount(unsigned int c) {
 #if defined(NO_TABLES) || defined(RUN_TIME_TABLES)
 static int golay23_encode_no_tables(int c) {
     c <<= 11;
-    return syndrome(c) | c;
+    return golay23_syndrome(c) | c;
 }
 #endif
 
@@ -101,7 +101,7 @@ static int golay23_decode_no_tables(int c) {
 
     for (x = 0; x < 23; x++) {
         int t;
-        int s = syndrome(c);
+        int s = golay23_syndrome(c);
 
         if (popcount(s) <= 3) {
             return unrotate(c ^ s, x) & 0xFFF;
@@ -109,7 +109,7 @@ static int golay23_decode_no_tables(int c) {
 
         for (t = 0; t < 23; t++) {
             int c2 = c ^ (1 << t);
-            int s = syndrome(c2);
+            int s = golay23_syndrome(c2);
 
             if (popcount(s) <= 2) {
                 return unrotate(c2 ^ s, x) & 0xFFF;
@@ -138,13 +138,13 @@ void golay23_init(void) {
     //1-bit errors
     for (x = 0; x < 23; x++) {
         int d = 1<<x;
-        decoding_table[syndrome(d)] = d;
+        decoding_table[golay23_syndrome(d)] = d;
     }
     //2-bit errors
     for (x = 0; x < 22; x++) {
         for (y = x+1; y < 23; y++) {
             int d = (1<<x) | (1<<y);
-            decoding_table[syndrome(d)] = d;
+            decoding_table[golay23_syndrome(d)] = d;
         }
     }
     //3-bit errors
@@ -152,7 +152,7 @@ void golay23_init(void) {
         for (y = x+1; y < 22; y++) {
             for (z = y+1; z < 23; z++) {
                 int d = (1<<x) | (1<<y) | (1<<z);
-                decoding_table[syndrome(d)] = d;
+                decoding_table[golay23_syndrome(d)] = d;
             }
         }
     }
@@ -183,7 +183,7 @@ int  golay23_decode(int c) {
     return unrotate(golay23_decode_no_tables(c), 11);
 #else
     //message is shifted 11 places left in the return value
-    return c ^ decoding_table[syndrome(c)];
+    return c ^ decoding_table[golay23_syndrome(c)];
 #endif
 }
 
