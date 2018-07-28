@@ -34,36 +34,56 @@
 #include <string.h>
 
 int main(int argc,char *argv[]){
-    int   os, m, log2m, i, bit_i, sym;
+    int   os, m, log2m, i, bit_i, sym, legacy_mode, rpitx_mode;
     float d;
+    double shiftHz, symbolRateHz, freq_sample;
+    uint32_t time_sample;
     FILE *fin,*fout;
     
     if(argc<5){
-        fprintf(stderr,"usage: %s MbitsPerFSKsymbol OutputSamplesPerSymbol deviationPerlevel InputOneBitPerCharFile OutputVcoRawFile\n",argv[0]);
+        fprintf(stderr, "usage: %s InputOneBitPerCharFile OutputVcoRawFile MbitsPerFSKsymbol\n",argv[0]);
+        fprintf(stderr, "[--legacy OutputSamplesPerSymbol deviationPerlevel]\n");
+        fprintf(stderr, "[--rpitx ShiftHz SymbolRateHz\n]");
         exit(1);
     }
     
     /* Extract parameters */
-    m = atoi(argv[1]); log2m = log2(m);
+    
+    if (strcmp(argv[1],"-")==0){
+        fin = stdin;
+    } else {
+        fin = fopen(argv[1],"r");
+    }
+	
+    if (strcmp(argv[2],"-")==0){
+        fout = stdout;
+    } else {
+        fout = fopen(argv[2],"w");
+    }
+    
+    m = atoi(argv[3]); log2m = log2(m);
     printf("log2m: %d\n", log2m);
-    os = atoi(argv[2]);
-    d = atof(argv[3]);
+
+    legacy_mode = rpitx_mode = os = 0;
+    if (!strcmp(argv[4],"--legacy")) {
+        os = atoi(argv[5]);
+        d = atof(argv[6]);
+        legacy_mode = 1;
+    }
+    if (!strcmp(argv[4],"--rpitx")) {
+        shiftHz = atof(argv[5]);
+        symbolRateHz = atof(argv[6]);
+        rpitx_mode = 1;
+        time_sample = 1E9/symbolRateHz;
+        fprintf(stderr, "time_sample: %d\n", time_sample);
+    }
+
+    assert(legacy_mode || rpitx_mode);
+    fprintf(stderr, "legacy_mode: %d rpitx_mode: %d\n", legacy_mode, rpitx_mode);
     
     uint8_t tx_bits[log2m];
     int16_t rawbuf[os];
 
-    if (strcmp(argv[4],"-")==0){
-        fin = stdin;
-    } else {
-        fin = fopen(argv[4],"r");
-    }
-	
-    if(strcmp(argv[5],"-")==0){
-        fout = stdout;
-    } else {
-        fout = fopen(argv[5],"w");
-    }
-    
     /* Modulate m bits to levels to drive external VCO */
 
     while( fread(tx_bits, sizeof(uint8_t), log2m, fin) == log2m ){
@@ -81,25 +101,39 @@ int main(int argc,char *argv[]){
         }
         //fprintf(stderr, "sym = %d\n", sym);
 
-        /* map 'sym' to VCO drive signal symmetrically about 0,
-           separate tones by constant "d"  */
-        /* 2 FSK -d/2, +d/2                */
-        /* 4 FSK -3*d/2, -d/2, +d/2, 3*d/2 */
+        if (legacy_mode) {
+            /* map 'sym' to VCO drive signal symmetrically about 0,
+               separate tones by constant "d"  */
+            /* 2 FSK -d/2, +d/2                */
+            /* 4 FSK -3*d/2, -d/2, +d/2, 3*d/2 */
 
-        /* note: drive is inverted, a higher tone drives VCO voltage lower */
+            /* note: drive is inverted, a higher tone drives VCO voltage lower */
 
-        float symf = sym;
-        float level = d*(((float)m-1)*0.5 - symf);
-        assert(level <= 32767.0);
-        assert(level >= -32768.0);
-        short level_short = (short)level;
-        //fprintf(stderr, "level = %f level_short = %d\n\n", level, level_short);
-        for(i=0; i<os; i++) {
-            rawbuf[i] = level_short;
+            float symf = sym;
+            float level = d*(((float)m-1)*0.5 - symf);
+            assert(level <= 32767.0);
+            assert(level >= -32768.0);
+            short level_short = (short)level;
+            //fprintf(stderr, "level = %f level_short = %d\n\n", level, level_short);
+            for(i=0; i<os; i++) {
+                rawbuf[i] = level_short;
+            }
+            fwrite(rawbuf, sizeof(int16_t), os, fout);
         }
-        fwrite(rawbuf, sizeof(int16_t), os, fout);
-        
-        if(fin == stdin || fout == stdin){
+
+        if (rpitx_mode) {
+            typedef struct {
+                double Frequency;
+                uint32_t WaitForThisSample;
+            } samplerf_t;
+            samplerf_t RfSample;
+            RfSample.Frequency = shiftHz*(sym+1);
+            RfSample.WaitForThisSample = time_sample;
+            fwrite(&RfSample, sizeof(samplerf_t), 1, fout);
+            //fprintf(stderr, "%d\n", sizeof(samplerf_t));
+        }
+
+        if(fin == stdin || fout == stdout){
             fflush(fin);
             fflush(fout);
         }
@@ -110,3 +144,5 @@ int main(int argc,char *argv[]){
 
     exit(0);
 }
+
+
