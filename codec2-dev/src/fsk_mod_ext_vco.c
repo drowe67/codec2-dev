@@ -36,7 +36,7 @@
 int main(int argc,char *argv[]){
     int   os, m, log2m, i, bit_i, sym, legacy_mode, rpitx_mode;
     float d;
-    double shiftHz, symbolRateHz, freq_sample;
+    double shiftHz, symbolRateHz;
     uint32_t time_sample;
     FILE *fin,*fout;
     
@@ -122,15 +122,9 @@ int main(int argc,char *argv[]){
         }
 
         if (rpitx_mode) {
-            typedef struct {
-                double Frequency;
-                uint32_t WaitForThisSample;
-            } samplerf_t;
-            samplerf_t RfSample;
-            RfSample.Frequency = shiftHz*(sym+1);
-            RfSample.WaitForThisSample = time_sample;
-            fwrite(&RfSample, sizeof(samplerf_t), 1, fout);
-            //fprintf(stderr, "%d\n", sizeof(samplerf_t));
+	    short frequencyHz;
+            frequencyHz = shiftHz*(sym+1);
+            fwrite(&frequencyHz, sizeof(short), 1, fout);
         }
 
         if(fin == stdin || fout == stdout){
