@@ -29,7 +29,13 @@
 
 #include <string.h>
 #include "machdep.h"
+
+#ifdef SEMIHOST_USE_STDIO
+#include "stdio.h"
+#else
 #include "gdb_stdio.h"
+#define printf gdb_stdio_printf
+#endif
 
 volatile unsigned int *DWT_CYCCNT   = (volatile unsigned int *)0xE0001004;
 volatile unsigned int *DWT_CONTROL  = (volatile unsigned int *)0xE0001000;
@@ -80,7 +86,7 @@ unsigned int machdep_profile_sample_and_log(unsigned int start, char s[])
 
 void machdep_profile_print_logged_samples(void)
 {
-    gdb_stdio_printf("%s", buf);
+    printf("%s", buf);
     *buf = 0;
 }
 
