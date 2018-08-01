@@ -2,7 +2,7 @@
 %
 % Load results from reference and stm32 run and compare
 
-addpath("../../octave")
+addpath("../../lib/octave")
 
 % Constants (would prefer paramters)
 err_limit = 0.001;

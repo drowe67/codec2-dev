@@ -25,6 +25,33 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+
+/* This is a unit test implementation of the OFDM Demod function.
+ * It is used for several tests:
+ *
+ *  tst_ofdm_demod_ideal
+ *  tst_ofdm_demod_AWGN
+ *  tst_ofdm_demod_fade
+ *
+ * See tst_ofdm_demod_setup and tst_ofdm_demod_check scripts for details.
+ *
+ * This program reads a file "stm_cfg.txt" at startup to configure its options.
+ *
+ * This program is intended to be run using input data, typically
+ * Codec2 frames, which may have had simulated RF degredation applied.
+ * For example:
+ *
+ *    ofdm_get_test_bits - 10 | * ofdm_mod - - | cohpsk_ch - stm_in.raw -20 -Fs 8000 -f -5
+ *
+ * Reference data can be created by running the same input through the x86 ofdm_demod tool.
+ *
+ *    ofdm_demod stm_in.raw ref_demod_out.raw -o ofdm_demod_ref_log.txt --testframes
+ *
+ * Comparison of the results to the reference will depend on the test conditions.
+ *
+ */
+
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +59,7 @@
 #include <math.h>
 #include <errno.h>
 
+#include "semihosting.h"
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "mpdecode_core.h"
@@ -41,16 +69,7 @@
 
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
-#include "gdb_stdio.h"
 #include "machdep.h"
-
-#ifdef __EMBEDDED__
-#define printf gdb_stdio_printf
-#define fopen gdb_stdio_fopen
-#define fclose gdb_stdio_fclose
-#define fread gdb_stdio_fread
-#define fwrite gdb_stdio_fwrite
-#endif
 
 #define NDISCARD 20
 
@@ -59,17 +78,37 @@ extern const int test_bits_ofdm[];
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
-    FILE        *fin, *fout, *fdiag;
+    FILE        *fcfg, *fin, *fout, *fdiag;
     int          nin_frame;
 
-    int          i, f, interleave_frames;
-    int          Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
+    int          i, f;
+    int          interleave_frames, testframes, verbose, log_payload_syms;
+    int          Nerrs, Terrs, Tbits, Terrs2, Tbits2, frame_count;
     int          ldpc_en, Tbits_coded, Terrs_coded;
 
-    // For now;
+    semihosting_init();
+
+    fprintf(stdout, "OFDM Demod test\n");
+    fprintf(stderr, "OFDM Demod test\n");
+
+    // Read configuration - a file of '0' or '1' characters
+    char config[8];
+    fcfg = fopen("stm_cfg.txt", "r");
+    if (fcfg == NULL) {
+        fprintf(stderr, "Error opening config file\n");
+        exit(1);
+    }
+    if (fread(&config[0], 1, 8, fcfg) != 8) {
+        fprintf(stderr, "Error reading config file\n");
+        exit(1);
+    }
+    verbose = config[0] - '0';
+    testframes = config[1] - '0';
+    ldpc_en = config[2] - '0';
+    log_payload_syms = config[3] - '0';
+    fclose(fcfg);
+    //
     interleave_frames = 1;
-    ldpc_en = 0;
-    testframes = 1;
 
     int Nerrs_raw[interleave_frames];
     int Nerrs_coded[interleave_frames];
@@ -80,15 +119,13 @@ int main(int argc, char *argv[]) {
         Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
     }
 
-    printf("OFDM_demod test and profile\n");
+    //PROFILE_VAR(ofdm_demod_start, ofdm_demod_sync_search,
+    //            ofdm_demod_demod, ofdm_demod_diss, ofdm_demod_snr);
 
-    PROFILE_VAR(ofdm_demod_start, ofdm_demod_sync_search,
-                ofdm_demod_demod, ofdm_demod_diss, ofdm_demod_snr);
-
-    machdep_profile_init();
+    //machdep_profile_init();
 
     ofdm = ofdm_create(NULL);
-    ofdm_set_verbose(ofdm, 1);
+    ofdm_set_verbose(ofdm, verbose);
 
     int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
     //int Nsamperframe = ofdm_get_samples_per_frame();
@@ -107,44 +144,36 @@ int main(int argc, char *argv[]) {
     f = 0;
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
-    float EsNo = 3;
-    printf("Warning EsNo: %f hard coded\n", (double)EsNo);
-
     float snr_est_smoothed_dB = 0.0;
 
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
 
-printf("coded_syms_per_frame = %d\n", coded_syms_per_frame);
-printf("sizeof(COMP) = %d\n", sizeof(COMP));
-printf("payload_syms = %d\n", sizeof(COMP)*coded_syms_per_frame);
-printf("sizeof(float) = %d\n", sizeof(float));
-printf("payload_amps = %d\n", sizeof(float)*coded_syms_per_frame);
-
     fin = fopen("stm_in.raw", "rb");
     if (fin == NULL) {
-        printf("Error opening input file\n");
+        fprintf(stderr, "Error opening input file\n");
         exit(1);
     }
 
     fout = fopen("stm_out.raw", "wb");
     if (fout == NULL) {
-        printf("Error opening output file\n");
+        fprintf(stderr, "Error opening output file\n");
         exit(1);
     }
 
     fdiag = fopen("stm_diag.raw", "wb");
     if (fdiag == NULL) {
-        printf("Error opening diag file\n");
+        fprintf(stderr, "Error opening diag file\n");
         exit(1);
     }
 
     nin_frame = ofdm_get_nin(ofdm);
-    while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
+    int num_read;
+    while((num_read = fread(rx_scaled, sizeof(short), nin_frame, fin)) == nin_frame) {
 
-        int log_payload_syms = 0;
+        int log_payload_syms_flag = 0;
 
-        PROFILE_SAMPLE(ofdm_demod_start);
+        //PROFILE_SAMPLE(ofdm_demod_start);
 
 	    /* scale and demod */
 	    for(i=0; i<nin_frame; i++) {
@@ -152,30 +181,30 @@ printf("payload_amps = %d\n", sizeof(float)*coded_syms_per_frame);
                 rxbuf_in[i].imag = 0.0;
             }
 
-        PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
+        //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
 
         if (strcmp(ofdm->sync_state,"search") == 0) {
-            PROFILE_SAMPLE(ofdm_demod_sync_search);
+            //PROFILE_SAMPLE(ofdm_demod_sync_search);
             ofdm_sync_search(ofdm, rxbuf_in);
-            PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
+            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
         }
 
         if ((strcmp(ofdm->sync_state,"synced") == 0) ||
             (strcmp(ofdm->sync_state,"trial") == 0) ) {
-            PROFILE_SAMPLE(ofdm_demod_demod);
+            //PROFILE_SAMPLE(ofdm_demod_demod);
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
-            PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
-            PROFILE_SAMPLE(ofdm_demod_diss);
+            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
+            //PROFILE_SAMPLE(ofdm_demod_diss);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
-            PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
-            log_payload_syms = 1;
+            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
+            log_payload_syms_flag = 1;
 
             /* SNR estimation and smoothing */
-            PROFILE_SAMPLE(ofdm_demod_snr);
+            //PROFILE_SAMPLE(ofdm_demod_snr);
 
             float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
             snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
-            PROFILE_SAMPLE_AND_LOG2(ofdm_demod_snr, "  ofdm_demod_snr");
+            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_snr, "  ofdm_demod_snr");
 
             /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
             for(i=0; i<Nbitsperframe; i++) {
@@ -218,30 +247,33 @@ printf("payload_amps = %d\n", sizeof(float)*coded_syms_per_frame);
 
         }
 
-        int  r=0;
-        if (testframes) {
+        int r = 0;
+        if (testframes && verbose) {
             r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
-        }
-        printf("%3d st: %-6s", f, ofdm->last_sync_state);
-        printf(" euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
+            fprintf(stderr, "%3d st: %-6s", f, ofdm->last_sync_state);
+            fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
                 ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
                 Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
-        printf("\n");
+            fprintf(stderr, "\n");
+        }
 
-        if (! log_payload_syms) {
-            memset(payload_syms, 0, (sizeof(COMP)*coded_syms_per_frame));
-            memset(payload_amps, 0, (sizeof(float)*coded_syms_per_frame));
+        if (log_payload_syms) {
+            if (! log_payload_syms_flag) {
+                memset(payload_syms, 0, (sizeof(COMP)*coded_syms_per_frame));
+                memset(payload_amps, 0, (sizeof(float)*coded_syms_per_frame));
+                }
+            fwrite(payload_syms, sizeof(COMP), coded_syms_per_frame, fdiag);
+            fwrite(payload_amps, sizeof(float), coded_syms_per_frame, fdiag);
             }
-        fwrite(payload_syms, sizeof(COMP), coded_syms_per_frame, fdiag);
-        fwrite(payload_amps, sizeof(float), coded_syms_per_frame, fdiag);
 
         f++;
     } // while(fread(.., fin))
 
     fclose(fin);
     fclose(fout);
+    fclose(fdiag);
 
     if (testframes) {
         printf("BER......: %5.4f Tbits: %5d Terrs: %5d\n", (double)Terrs/Tbits, Tbits, Terrs);
@@ -251,12 +283,14 @@ printf("payload_amps = %d\n", sizeof(float)*coded_syms_per_frame);
         if (ldpc_en) {
             printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
                     (double)Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded);
-        }        
+        }
     }
 
     printf("End of test\n");
-    
-    machdep_profile_print_logged_samples();
+    fflush(stdout);
+    fflush(stderr);
+
+    //machdep_profile_print_logged_samples();
 
     return 0;
 }
