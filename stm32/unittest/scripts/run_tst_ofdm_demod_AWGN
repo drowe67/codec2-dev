@@ -1,0 +1,57 @@
+#!/bin/bash
+#
+# run_tst_ofdm_demod_AWGN
+#
+# This is a short test with 10 sec of data and AWGN.
+# The BER results should match, and 
+# there should be only 1 bit different in the output
+
+TEST="tst_ofdm_demod_AWGN"
+
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
+# CD to test run dir
+cd "${RUN_DIR}"
+
+#######################################
+# Test specific code:
+
+# Setup:
+if [ ${OPT_SETUP} == true ] ; then
+    { ofdm_get_test_bits - 10 | \
+      ofdm_mod - - | \
+      cohpsk_ch - stm_in.raw -20 -Fs 8000 -f -5 --raw_dir ${CODEC2_BASE}/raw 
+    } > setup.log 2>&1
+fi
+
+# Run:
+if [ ${OPT_RUN} == true ] ; then
+    echo "stm32 code must be run mannually at this time"
+    read -p "Press enter when the test has been run"
+fi
+
+# Check:
+if [ ${OPT_CHECK} == true ] ; then
+
+    ofdm_demod stm_in.raw ref_demod_out.raw \
+        -o ofdm_demod_ref_log.txt \
+        --testframes \
+        > ref_gen_log.txt 2>&1
+
+    # BER:
+    grep "^BER" ref_gen_log.txt > ref_ber.txt
+    grep "^BER" stm_stdout.txt  > stm_ber.txt
+    diff -b -B ref_ber.txt stm_ber.txt > check.log
+
+    # Output Differences
+    cmp -l ref_demod_out.raw stm_out.raw 2>&1 | tee -a check.log | \
+        wc -l | grep -q "^1$"
+    if [ $? != 0 ] ; then echo "Failed" ; exit 1 ; fi
+
+    echo "Passed"
+
+fi
