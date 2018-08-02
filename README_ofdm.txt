@@ -111,10 +111,10 @@ Built as part of codec2-dev, see README for build instructions.
   
   build_linux/src$ ./freedv_tx 700D ../../raw/ve9qrp.raw - - --interleave 8 | ./cohpsk_ch - - -26 --Fs 8000 -f -10 --fast | ./freedv_rx 700D - - --interleave 8 | aplay -f S16
   
-Acceptance Tests
-----------------
+Octave Acceptance Tests
+-----------------------
 
-Run these if you modify anything.
+Here are some useful tests for the Octave, uncoded modem.
 
 The rate 1/2 LDPC code can correct up to about 10% raw BER, so a good
 test is to run the modem at Eb/No operating points that produce just
@@ -135,6 +135,29 @@ e.g. as the frequency offset is tracked out.
   octave:583> ofdm_rx("ofdm_test.raw")
   BER2.: 0.0827 Tbits: 96846 Terrs:  8008
 
+C Acceptance Tests
+------------------
+
+Here are some useful tests for the LDPC coded C version of the modem, useful to versify any changes.
+
+1/ AWGN channel, -2dB:
+
+./ofdm_mod /dev/zero - --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod - /dev/null --testframes --ldpc
+
+SVN Rev 3671:
+  SNR3k(dB): -1.85 C/No: 32.9 PAPR:  9.8
+  BER......: 0.0815 Tbits: 98532 Terrs:  8031
+  Coded BER: 0.0034 Tbits: 46368 Terrs:   157
+
+2/ Fading HF channel:
+
+./ofdm_mod /dev/zero - --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod - /dev/null --testframes --ldpc
+
+SVN Rev 3671:
+  SNR3k(dB):  2.15 C/No: 36.9 PAPR:  9.8
+  BER......: 0.1015 Tbits: 88774 Terrs:  9012
+  Coded BER: 0.0445 Tbits: 41776 Terrs:  1860
+  
 C Code
 ------
 
