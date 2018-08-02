@@ -84,12 +84,13 @@ set_target_properties(speexnoisesup
 
 add_executable(fdmdv_mem fdmdv_mem.c)
 
-add_executable(ofdm_mem ofdm_mem.c)
+add_executable(ofdm_mem ofdm_mem.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
+target_link_libraries(ofdm_mem m)
 
 add_library(function_trace STATIC ../unittest/function_trace.c)
 add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
 target_compile_options(ofdm_stack PUBLIC -fstack-usage -finstrument-functions -no-pie)
-target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map" "-Wl,--verbose")
+target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
 
 add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
@@ -113,3 +114,4 @@ target_link_libraries(tc2wideband codec2)
 add_executable(tdct2 tdct2.c t_helpers.c ../src/dct2.c)
 target_link_libraries(tdct2 codec2)
 
+add_executable(compare_ints compare_ints.c)
