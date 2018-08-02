@@ -4,7 +4,7 @@
   AUTHORS.....: David Rowe & Steve Sampson
   DATE CREATED: June 2017
 
-  A Library of functions that implement a QPSK OFDM modem, C port of 
+  A Library of functions that implement a QPSK OFDM modem, C port of
   the Octave functions in ofdm_lib.m
 
 \*---------------------------------------------------------------------------*/
@@ -24,7 +24,7 @@
 
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,9 +57,9 @@ static complex float vector_sum(complex float *, int);
  * QPSK Quadrant bit-pair values - Gray Coded
  */
 static const complex float constellation[] = {
-     1.0f + 0.0f * I,
-     0.0f + 1.0f * I,
-     0.0f - 1.0f * I,
+    1.0f + 0.0f * I,
+    0.0f + 1.0f * I,
+    0.0f - 1.0f * I,
     -1.0f + 0.0f * I
 };
 
@@ -68,8 +68,8 @@ static const complex float constellation[] = {
  */
 static const float pilotvalues[] = {
     -1.0f, -1.0f, 1.0f, 1.0f, -1.0f, -1.0f, -1.0f, 1.0f, -1.0f,
-     1.0f, -1.0f, 1.0f, 1.0f,  1.0f,  1.0f,  1.0f, 1.0f,  1.0f,
-     1.0f
+    1.0f, -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
+    1.0f
 };
 
 /*
@@ -80,12 +80,46 @@ static const float pilotvalues[] = {
  * start from 1 format, subtract 1 to index C arrays.
  */
 
-static const int tx_uw[]          = {0,0,0,0,0,0,0,0,0,0};            /* UW bits    */
-static complex float tx_uw_syms[] = {1.0f,1.0f,1.0f,1.0f,1.0f};       /* UW QPSK symbols */
-static const int uw_ind[]         = {19,20,37,38,55,56,73,74,91,92};  /* index in modem frame of UW bits */
-static const int uw_ind_sym[]     = {10,19,28,37,46};                 /* index into modem frame of UW symbols */
+static const int tx_uw[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; /* UW bits    */
+static complex float tx_uw_syms[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f}; /* UW QPSK symbols */
+static const int uw_ind[] = {19, 20, 37, 38, 55, 56, 73, 74, 91, 92}; /* index in modem frame of UW bits */
+static const int uw_ind_sym[] = {10, 19, 28, 37, 46}; /* index into modem frame of UW symbols */
+
+/* static variables */
+
+static struct OFDM_CONFIG ofdm_config;
+
+static float ofdm_centre; /* Center frequency */
+static float ofdm_fs; /* Sample rate */
+static float ofdm_ts; /* Symbol cycle time */
+static float ofdm_rs; /* Symbol rate */
+static float ofdm_tcp; /* Cyclic prefix duration */
+static float ofdm_timing_mx_thresh; /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routines for how this was set */
+
+static int ofdm_nc; /* NS-1 data symbols between pilots  */
+static int ofdm_ns;
+static int ofdm_bps; /* Bits per symbol */
+static int ofdm_m; /* duration of each symbol in samples */
+static int ofdm_ncp; /* duration of CP in samples */
+
+static int ofdm_ftwindowwidth;
+static int ofdm_bitsperframe;
+static int ofdm_rowsperframe;
+static int ofdm_samplesperframe;
+static int ofdm_max_samplesperframe;
+static int ofdm_rxbuf;
+static int ofdm_ntxtbits; /* reserve bits/frame for auxillary text information */
+static int ofdm_nuwbits; /* Unique word, used for positive indication of lock */
+static int ofdm_state_str;
 
 /* Functions -------------------------------------------------------------------*/
+
+static float cnormf(complex float val) {
+    float realf = crealf(val);
+    float imagf = cimagf(val);
+
+    return realf * realf + imagf * imagf;
+}
 
 /*
  * ------------
@@ -95,57 +129,152 @@ static const int uw_ind_sym[]     = {10,19,28,37,46};                 /* index i
  * Returns OFDM data structure on success
  * Return NULL on fail
  *
- * Note OFDM_CONFIG *config not used at present, will be used
- * in later versions for init-time configuration.
+ * If you want the defaults, call this with config structure
+ * and the NC setting to 0. This will fill the structure with
+ * default values of the original OFDM modem.
  */
 
 struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     struct OFDM *ofdm;
     int i, j, n;
 
+    /* Check if called correctly */
+
+    if (config == NULL) {
+        return NULL;
+    }
+
+    if (config->nc == 0) {
+        /* Fill in default values */
+
+        ofdm_nc = 17; /* Number of carriers */
+        ofdm_ns = 8; /* Number of Symbol frames */
+        ofdm_bps = 2; /* Bits per Symbol */
+        ofdm_ts = 0.018f;
+        ofdm_rs = 1.0f / ofdm_ts; /* Symbol Rate */
+        ofdm_tcp = .002f; /* Cyclic Prefix duration */
+        ofdm_centre = 1500.0f; /* Centre Audio Frequency */
+        ofdm_fs = 8000.0f; /* Sample Frequency */
+        ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
+        ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
+        ofdm_ntxtbits = 4;
+        ofdm_state_str = 16;
+        ofdm_ftwindowwidth = 11;
+        ofdm_timing_mx_thresh = 0.30f;
+     } else {
+        /* Use the users values */
+
+        ofdm_nc = config->nc; /* Number of carriers */
+        ofdm_ns = config->ns; /* Number of Symbol frames */
+        ofdm_bps = config->bps; /* Bits per Symbol */
+        ofdm_ts = config->ts;
+        ofdm_rs = (1.0f / ofdm_ts); /* Symbol Rate */
+        ofdm_tcp = config->tcp; /* Cyclic Prefix duration */
+        ofdm_centre = config->centre; /* Centre Audio Frequency */
+        ofdm_fs = config->fs; /* Sample Frequency */
+        ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
+        ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
+        ofdm_ntxtbits = config->txtbits;
+        ofdm_state_str = config->state_str;
+        ofdm_ftwindowwidth = config->ftwindowwidth;
+        ofdm_timing_mx_thresh = config->ofdm_timing_mx_thresh;
+    }
+
+    /* Copy structure into global */
+
+    ofdm_config.centre = ofdm_centre;
+    ofdm_config.fs = ofdm_fs;
+    ofdm_config.rs = ofdm_rs;
+    ofdm_config.ts = ofdm_ts;
+    ofdm_config.tcp = ofdm_tcp;
+    ofdm_config.ofdm_timing_mx_thresh = ofdm_timing_mx_thresh;
+    ofdm_config.nc = ofdm_nc;
+    ofdm_config.ns = ofdm_ns;
+    ofdm_config.bps = ofdm_bps;
+    ofdm_config.txtbits = ofdm_ntxtbits;
+    ofdm_config.state_str = ofdm_state_str;
+    ofdm_config.ftwindowwidth = ofdm_ftwindowwidth;
+
+    /* Calculate sizes from config param */
+
+    ofdm_bitsperframe = (ofdm_ns - 1) * (ofdm_nc * ofdm_bps);
+    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_nc * ofdm_bps);
+    ofdm_samplesperframe = ofdm_ns * (ofdm_m + ofdm_ncp);
+    ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
+    ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
+    ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;
+
+    /* Were ready to start filling in the OFDM structure now */
+
     if ((ofdm = (struct OFDM *) malloc(sizeof (struct OFDM))) == NULL) {
         return NULL;
     }
 
-    if (config != NULL) {
-        memcpy((void*)&ofdm->config,(void*)config,sizeof(struct OFDM_CONFIG));
+    ofdm->pilot_samples = malloc(sizeof (complex float) * (ofdm_m + ofdm_ncp));
+    ofdm->rxbuf = malloc(sizeof (complex float) * ofdm_rxbuf);
+    ofdm->pilots = malloc(sizeof (complex float) * (ofdm_nc + 2));
+
+    /*
+     * rx_sym is a 2D array of variable size
+     *
+     * allocate rx_sym row storage. It is a pointer to a pointer
+     */
+
+    ofdm->rx_sym = malloc(sizeof (complex float) * (ofdm_ns + 3));
+
+    /* allocate rx_sym column storage */ 
+
+    for (i = 0; i <  (ofdm_ns + 3); i++) {
+        ofdm->rx_sym[i] = (complex float *) malloc(sizeof(complex float) * (ofdm_nc + 2));
     }
+
+    /* The rest of these are 1D arrays of variable size */
+
+    ofdm->rx_np = malloc(sizeof (complex float) * (ofdm_rowsperframe * ofdm_nc));
+    ofdm->w = malloc(sizeof (float) * (ofdm_nc + 2));
+    ofdm->rx_amp = malloc(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
+    ofdm->aphase_est_pilot_log = malloc(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
+    ofdm->tx_uw = malloc(sizeof (int) * ofdm_nuwbits);
+    ofdm->sync_state = malloc(sizeof (char) * ofdm_state_str);
+    ofdm->last_sync_state = malloc(sizeof (char) * ofdm_state_str);
+    ofdm->sync_state_interleaver = malloc(sizeof (char) * ofdm_state_str);
+    ofdm->last_sync_state_interleaver = malloc(sizeof (char) * ofdm_state_str);
 
     /* store complex BPSK pilot symbols */
 
-    assert(sizeof(pilotvalues) == (OFDM_NC+2)*sizeof(float));
+    assert(sizeof (pilotvalues) == (ofdm_nc + 2) * sizeof (float));
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
+    for (i = 0; i < (ofdm_nc + 2); i++) {
         ofdm->pilots[i] = pilotvalues[i] + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
 
-    float alower = OFDM_CENTRE - OFDM_RS * ((float)OFDM_NC / 2);
-    int Nlower = floorf(alower / OFDM_RS);
+    float alower = ofdm_centre - ofdm_rs * ((float) ofdm_nc / 2);
+    int Nlower = floorf(alower / ofdm_rs);
 
-    for (i = 0, n = Nlower; i < (OFDM_NC + 2); i++, n++) {
-        ofdm->w[i] = (TAU * (float) n) / (OFDM_FS / OFDM_RS);
+    for (i = 0, n = Nlower; i < (ofdm_nc + 2); i++, n++) {
+        ofdm->w[i] = (TAU * (float) n) / (ofdm_fs / ofdm_rs);
     }
 
-    for (i = 0; i < OFDM_RXBUF; i++) {
-        ofdm->rxbuf[i] = 0.0f + 0.0f * I;        
+    for (i = 0; i < ofdm_rxbuf; i++) {
+        ofdm->rxbuf[i] = 0.0f + 0.0f * I;
     }
 
-    for (i = 0; i < (OFDM_NS + 3); i++) {
-        for (j = 0; j < (OFDM_NC + 2); j++) {
+    for (i = 0; i < (ofdm_ns + 3); i++) {
+        for (j = 0; j < (ofdm_nc + 2); j++) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
         }
     }
 
-    for (i = 0; i < OFDM_ROWSPERFRAME*OFDM_NC; i++) {
+    for (i = 0; i < ofdm_rowsperframe * ofdm_nc; i++) {
         ofdm->rx_np[i] = 0.0f + 0.0f * I;
     }
-    
-    for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
-        for (j = 0; j < OFDM_NC; j++) {
-            ofdm->aphase_est_pilot_log[OFDM_NC*i+j] = 0.0f + 0.0f * I;
-            ofdm->rx_amp[OFDM_NC*i+j] = 0.0f + 0.0f * I;
+
+    for (i = 0; i < ofdm_rowsperframe; i++) {
+        for (j = 0; j < ofdm_nc; j++) {
+            ofdm->aphase_est_pilot_log[ofdm_nc * i + j] = 0.0f + 0.0f * I;
+            ofdm->rx_amp[ofdm_nc * i + j] = 0.0f + 0.0f * I;
         }
     }
 
@@ -162,32 +291,32 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_est = 0;
     ofdm->timing_valid = 0;
     ofdm->timing_mx = 0.0f;
-    ofdm->nin = OFDM_SAMPLESPERFRAME;
+    ofdm->nin = ofdm_samplesperframe;
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f + 0.0f * I;
-    
+
     /* sync state machine */
 
-    for (i = 0; i < OFDM_NUWBITS; i++) {
+    for (i = 0; i < ofdm_nuwbits; i++) {
         ofdm->tx_uw[i] = tx_uw[i];
     }
 
-    strcpy(ofdm->sync_state,"search");
-    strcpy(ofdm->last_sync_state,"search");
+    strncpy(ofdm->sync_state, "search", ofdm_state_str);
+    strncpy(ofdm->last_sync_state, "search", ofdm_state_str);
     ofdm->uw_errors = 0;
     ofdm->sync_counter = 0;
     ofdm->frame_count = 0;
     ofdm->sync_start = 0;
     ofdm->sync_end = 0;
     ofdm->sync_mode = OFDM_SYNC_AUTO;
-    
-    strcpy(ofdm->sync_state_interleaver,"search");
-    strcpy(ofdm->last_sync_state_interleaver,"search");
+
+    strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+    strncpy(ofdm->last_sync_state_interleaver, "search", ofdm_state_str);
     ofdm->frame_count_interleaver = 0;
-    
+
     /* create the OFDM waveform */
 
-    complex float temp[OFDM_M];
+    complex float temp[ofdm_m];
 
     idft(ofdm, temp, ofdm->pilots);
 
@@ -199,15 +328,15 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* zero out Cyclic Prefix (CP) values */
 
-    for (i = 0, j = (OFDM_M - OFDM_NCP); i < OFDM_NCP; i++, j++) {
+    for (i = 0, j = (ofdm_m - ofdm_ncp); i < ofdm_ncp; i++, j++) {
         ofdm->pilot_samples[i] = 0.0f + 0.0f * I;
     }
-        
+
     // From Octave: states.timing_norm = Npsam*(rate_fs_pilot_samples*rate_fs_pilot_samples');
 
     /* Now copy the whole thing after the above */
 
-    for (i = OFDM_NCP, j = 0; j < OFDM_M; i++, j++) {
+    for (i = ofdm_ncp, j = 0; j < ofdm_m; i++, j++) {
         ofdm->pilot_samples[i] = temp[j];
     }
 
@@ -215,33 +344,50 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     float acc = 0.0f;
 
-    for (i = 0; i < (OFDM_M + OFDM_NCP); i++) {
-        acc += crealf(ofdm->pilot_samples[i]) * crealf(ofdm->pilot_samples[i]) +
-               cimagf(ofdm->pilot_samples[i]) * cimagf(ofdm->pilot_samples[i]);
+    for (i = 0; i < (ofdm_m + ofdm_ncp); i++) {
+        acc += cnormf(ofdm->pilot_samples[i]);
     }
 
-    ofdm->timing_norm = (OFDM_M + OFDM_NCP) * acc;
+    ofdm->timing_norm = (ofdm_m + ofdm_ncp) * acc;
     ofdm->clock_offset_counter = 0;
-    
-    //fprintf(stderr, "timing_norm: %f\n", ofdm->timing_norm);
-
     ofdm->sig_var = ofdm->noise_var = 1.0f;
-
     ofdm->tx_bpf_en = 0;
+
     // Transmit bandpass filter; complex coefficients, center frequency 1500 hz
+
     //quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP750S1040, sizeof(filtP750S1040) / sizeof(float));
-    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof(filtP550S750) / sizeof(float));
-    quisk_cfTune(&ofdm->ofdm_tx_bpf, OFDM_CENTRE / OFDM_FS);
-    
+
+    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
+    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_centre / ofdm_fs);
+
     return ofdm; /* Success */
 }
 
-
 void ofdm_destroy(struct OFDM *ofdm) {
+    int i;
+
     quisk_filt_destroy(&ofdm->ofdm_tx_bpf);
+    free(ofdm->pilot_samples);
+    free(ofdm->rxbuf);
+    free(ofdm->pilots);
+
+    for (i = 0; i < (ofdm_ns + 3); i++) { /* 2D array */
+        free(ofdm->rx_sym[i]);
+    }
+
+    free(ofdm->rx_sym);
+
+    free(ofdm->rx_np);
+    free(ofdm->w);
+    free(ofdm->rx_amp);
+    free(ofdm->aphase_est_pilot_log);
+    free(ofdm->tx_uw);
+    free(ofdm->sync_state);
+    free(ofdm->last_sync_state);
+    free(ofdm->sync_state_interleaver);
+    free(ofdm->last_sync_state_interleaver);
     free(ofdm);
 }
-
 
 /* Gray coded QPSK modulation function */
 
@@ -253,6 +399,7 @@ complex float qpsk_mod(int *bits) {
 
 void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cexpf(I * (M_PI / 4.0f));
+
     bits[0] = crealf(rotate) < 0.0f;
     bits[1] = cimagf(rotate) < 0.0f;
 }
@@ -260,13 +407,13 @@ void qpsk_demod(complex float symbol, int *bits) {
 /* convert frequency domain into time domain */
 
 static void idft(struct OFDM *ofdm, complex float *result, complex float *vector) {
-    float inv_m = (1.0f / (float) OFDM_M);
+    float inv_m = (1.0f / (float) ofdm_m);
     int row, col;
 
-    for (row = 0; row < OFDM_M; row++) {
+    for (row = 0; row < ofdm_m; row++) {
         result[row] = 0.0f + 0.0f * I;
 
-        for (col = 0; col < (OFDM_NC + 2); col++) {
+        for (col = 0; col < (ofdm_nc + 2); col++) {
             result[row] = result[row] + (vector[col] * cexpf(I * ofdm->w[col] * row));
         }
 
@@ -279,10 +426,10 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 static void dft(struct OFDM *ofdm, complex float *result, complex float *vector) {
     int row, col;
 
-    for (col = 0; col < (OFDM_NC + 2); col++) {
+    for (col = 0; col < (ofdm_nc + 2); col++) {
         result[col] = 0.0f + 0.0f * I;
 
-        for (row = 0; row < OFDM_M; row++) {
+        for (row = 0; row < ofdm_m; row++) {
             result[col] = result[col] + (vector[row] * conjf(cexpf(I * ofdm->w[col] * row)));
         }
     }
@@ -312,26 +459,27 @@ static complex float vector_sum(complex float *a, int num_elements) {
 
 static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
     complex float csam;
-    int Ncorr = length - (OFDM_SAMPLESPERFRAME + (OFDM_M + OFDM_NCP));
-    int SFrame = OFDM_SAMPLESPERFRAME;
+    int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
+    int SFrame = ofdm_samplesperframe;
     float corr[Ncorr];
     int i, j;
 
     float acc = 0.0f;
 
     for (i = 0; i < length; i++) {
-        acc += crealf(rx[i]) * crealf(rx[i]) + cimagf(rx[i]) * cimagf(rx[i]);
+        acc += cnormf(rx[i]);
     }
-            
+
     float av_level = 2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f;
-    
+
     for (i = 0; i < Ncorr; i++) {
         complex float corr_st = 0.0f + 0.0f * I;
         complex float corr_en = 0.0f + 0.0f * I;
 
-        for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
+        for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
             csam = conjf(ofdm->pilot_samples[j]);
-            corr_st = corr_st + (rx[i + j] * csam);
+
+            corr_st = corr_st + (rx[i + j         ] * csam);
             corr_en = corr_en + (rx[i + j + SFrame] * csam);
         }
 
@@ -351,15 +499,14 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
     }
 
     ofdm->timing_mx = timing_mx;
-    ofdm->timing_valid = timing_mx > OFDM_TIMING_MX_THRESH;
+    ofdm->timing_valid = timing_mx > ofdm_timing_mx_thresh;
 
     if (ofdm->verbose > 1) {
         fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", (double) av_level, (double) ofdm->timing_mx, timing_est, ofdm->timing_valid);
     }
-    
+
     return timing_est;
 }
-
 
 /*
  * Determines frequency offset at current timing estimate, used for
@@ -372,43 +519,41 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
  * updated, in case we lose sync.
  */
 
- static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int length, int timing_est) {
+static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_est) {
     complex float csam1, csam2;
-    int Fs = OFDM_FS;
-    int SFrame = OFDM_SAMPLESPERFRAME;
     int j, k;
     float foff_est;
-    
+
     /*
       Freq offset can be considered as change in phase over two halves
       of pilot symbols.  We average this statistic over this and next
       frames pilots.
-    */
+     */
 
     complex float p1, p2, p3, p4;
-    p1 = p2 = p3 = p4 =  0.0f + 0.0f * I;
-    
+    p1 = p2 = p3 = p4 = 0.0f + 0.0f * I;
+
     /* calculate phase of pilots at half symbol intervals */
-    
-    for (j = 0, k = (OFDM_M + OFDM_NCP)/2; j < (OFDM_M + OFDM_NCP)/2; j++,k++) {
+
+    for (j = 0, k = (ofdm_m + ofdm_ncp) / 2; j < (ofdm_m + ofdm_ncp) / 2; j++, k++) {
         csam1 = conjf(ofdm->pilot_samples[j]);
         csam2 = conjf(ofdm->pilot_samples[k]);
 
         /* pilot at start of frame */
-        
+
         p1 = p1 + (rx[timing_est + j] * csam1);
         p2 = p2 + (rx[timing_est + k] * csam2);
 
         /* pilot at end of frame */
-        
-        p3 = p3 + (rx[timing_est + j + SFrame] * csam1);
-        p4 = p4 + (rx[timing_est + k + SFrame] * csam2);
+
+        p3 = p3 + (rx[timing_est + j + ofdm_samplesperframe] * csam1);
+        p4 = p4 + (rx[timing_est + k + ofdm_samplesperframe] * csam2);
     }
-    
+
     /* Calculate sample rate of phase samples, we are sampling phase
        of pilot at half a symbol intervals */
-    
-    float Fs1 = Fs / ((OFDM_M + OFDM_NCP)/2);
+
+    float Fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
 
     /* subtract phase of adjacent samples, rate of change of phase is
        frequency est.  We combine samples from either end of frame to
@@ -416,15 +561,14 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
        with 0 inputs. */
 
     ofdm->foff_metric = 0.9f * ofdm->foff_metric + 0.1f * (conjf(p1) * p2 + conjf(p3) * p4);
-    foff_est = Fs1 * cargf( ofdm->foff_metric + 1E-12f) / TAU;
+    foff_est = Fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
 
     if (ofdm->verbose > 1) {
         fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double) foff_est);
     }
-    
+
     return foff_est;
 }
-
 
 /*
  * ----------------------------------------------
@@ -432,60 +576,59 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
  * ----------------------------------------------
  */
 
-void ofdm_txframe(struct OFDM *ofdm, complex float tx_filt[OFDM_SAMPLESPERFRAME], complex float *tx_sym_lin) {
-    complex float aframe[OFDM_NS][OFDM_NC + 2];
-    complex float asymbol[OFDM_M];
-    complex float asymbol_cp[OFDM_M + OFDM_NCP];
-    complex float tx[OFDM_SAMPLESPERFRAME];
+void ofdm_txframe(struct OFDM *ofdm, complex float *tx_filt, complex float *tx_sym_lin) {
+    complex float aframe[ofdm_ns][ofdm_nc + 2];
+    complex float asymbol[ofdm_m];
+    complex float asymbol_cp[ofdm_m + ofdm_ncp];
+    complex float tx[ofdm_samplesperframe];
     int i, j, k, m;
 
     /* initialize aframe to complex zero */
 
-    for (i = 0; i < OFDM_NS; i++) {
-        for (j = 0; j < (OFDM_NC + 2); j++) {
+    for (i = 0; i < ofdm_ns; i++) {
+        for (j = 0; j < (ofdm_nc + 2); j++) {
             aframe[i][j] = 0.0f + 0.0f * I;
         }
     }
 
     /* copy in a row of complex pilots to first row */
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
+    for (i = 0; i < (ofdm_nc + 2); i++) {
         aframe[0][i] = ofdm->pilots[i];
-        //fprintf(stderr, "%2d % f % f\n", i, crealf(aframe[0][i]), cimagf(aframe[0][i]));
     }
-    
+
     /* Place symbols in multi-carrier frame with pilots */
     /* This will place boundary values of complex zero around data */
 
-    for (i = 1; i <= OFDM_ROWSPERFRAME; i++) {
+    for (i = 1; i <= ofdm_rowsperframe; i++) {
 
         /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
 
-        for (j = 1; j < (OFDM_NC + 1); j++) {
-            aframe[i][j] = tx_sym_lin[((i - 1) * OFDM_NC) + (j - 1)];
+        for (j = 1; j < (ofdm_nc + 1); j++) {
+            aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
         }
-     }
+    }
 
     /* OFDM up-convert symbol by symbol so we can add CP */
 
-    for (i = 0, m = 0; i < OFDM_NS; i++, m += (OFDM_M + OFDM_NCP)) {
+    for (i = 0, m = 0; i < ofdm_ns; i++, m += (ofdm_m + ofdm_ncp)) {
         idft(ofdm, asymbol, aframe[i]);
 
         /* Copy the last Ncp samples to the front */
 
-        for (j = (OFDM_M - OFDM_NCP), k = 0; j < OFDM_M; j++, k++) {
+        for (j = (ofdm_m - ofdm_ncp), k = 0; j < ofdm_m; j++, k++) {
             asymbol_cp[k] = asymbol[j];
         }
 
         /* Now copy the all samples for this row after it */
 
-        for (j = OFDM_NCP, k = 0; k < OFDM_M; j++, k++) {
+        for (j = ofdm_ncp, k = 0; k < ofdm_m; j++, k++) {
             asymbol_cp[j] = asymbol[k];
         }
 
         /* Now move row to the tx output */
 
-        for (j = 0; j < (OFDM_M + OFDM_NCP); j++) {
+        for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
             tx[m + j] = asymbol_cp[j];
         }
     }
@@ -493,13 +636,16 @@ void ofdm_txframe(struct OFDM *ofdm, complex float tx_filt[OFDM_SAMPLESPERFRAME]
     /* optional Tx Band Pass Filter */
 
     if (ofdm->tx_bpf_en) {
-        quisk_ccfFilter(tx, tx_filt, OFDM_SAMPLESPERFRAME, &ofdm->ofdm_tx_bpf);
+        quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, &ofdm->ofdm_tx_bpf);
     } else {
-        for(i=0; i<OFDM_SAMPLESPERFRAME; i++) {
+        for (i = 0; i < ofdm_samplesperframe; i++) {
             tx_filt[i] = tx[i];
         }
     }
+}
 
+struct OFDM_CONFIG *ofdm_get_config_param() {
+    return &ofdm_config;
 }
 
 int ofdm_get_nin(struct OFDM *ofdm) {
@@ -507,15 +653,15 @@ int ofdm_get_nin(struct OFDM *ofdm) {
 }
 
 int ofdm_get_samples_per_frame() {
-    return OFDM_SAMPLESPERFRAME;
+    return ofdm_samplesperframe;
 }
 
 int ofdm_get_max_samples_per_frame() {
-    return 2*OFDM_MAX_SAMPLESPERFRAME;
+    return 2 * ofdm_max_samplesperframe;
 }
 
-int ofdm_get_bits_per_frame(struct OFDM *ofdm) {
-    return OFDM_BITSPERFRAME;
+int ofdm_get_bits_per_frame() {
+    return ofdm_bitsperframe;
 }
 
 void ofdm_set_verbose(struct OFDM *ofdm, int level) {
@@ -527,7 +673,7 @@ void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
 
     if (ofdm->timing_en == false) {
         /* manually set ideal timing instant */
-        ofdm->sample_point = (OFDM_NCP - 1);
+        ofdm->sample_point = (ofdm_ncp - 1);
     }
 }
 
@@ -553,25 +699,25 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
  * --------------------------------------
  */
 
-void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *tx_bits) {
-    int length = OFDM_BITSPERFRAME / OFDM_BPS;
-    complex float tx[OFDM_SAMPLESPERFRAME];
+void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
+    int length = ofdm_bitsperframe / ofdm_bps;
+    complex float tx[ofdm_samplesperframe];
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, i;
 
-    if (OFDM_BPS == 1) {
+    if (ofdm_bps == 1) {
         /* Here we will have Nbitsperframe / 1 */
 
         for (s = 0; s < length; s++) {
             tx_sym_lin[s] = (float) (2 * tx_bits[s] - 1) + 0.0f * I;
         }
-    } else if (OFDM_BPS == 2) {
+    } else if (ofdm_bps == 2) {
         /* Here we will have Nbitsperframe / 2 */
 
         for (s = 0, i = 0; i < length; s += 2, i++) {
             dibit[0] = tx_bits[s + 1] & 0x1;
-            dibit[1] = tx_bits[s] & 0x1;
+            dibit[1] = tx_bits[s    ] & 0x1;
             tx_sym_lin[i] = qpsk_mod(dibit);
         }
     }
@@ -580,12 +726,11 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
 
     /* convert to comp */
 
-    for (i = 0; i < OFDM_SAMPLESPERFRAME; i++) {
+    for (i = 0; i < ofdm_samplesperframe; i++) {
         result[i].real = crealf(tx[i]);
         result[i].imag = cimagf(tx[i]);
     }
 }
-
 
 /*
  * ----------------------------------------------------------------------------------
@@ -593,30 +738,30 @@ void ofdm_mod(struct OFDM *ofdm, COMP result[OFDM_SAMPLESPERFRAME], const int *t
  * ----------------------------------------------------------------------------------
  */
 
-int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
-{
-    int i,j;
-    
+int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
+    int i, j;
+
     /* insert latest input samples into rxbuf so it is primed for when
        we have to call ofdm_demod() */
 
-    for (i = 0, j = ofdm->nin; i < (OFDM_RXBUF - ofdm->nin); i++, j++) {
+    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
     /* insert latest input samples onto tail of rxbuf */
 
-    for (i = (OFDM_RXBUF - ofdm->nin), j = 0; i < OFDM_RXBUF; i++, j++) {
+    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
         ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
     }
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) */
 
-    int st = OFDM_M + OFDM_NCP + OFDM_SAMPLESPERFRAME;
-    int en = st + 2*OFDM_SAMPLESPERFRAME; 
-    int ct_est = est_timing(ofdm,  &ofdm->rxbuf[st], (en - st));
-    ofdm->coarse_foff_est_hz = est_freq_offset(ofdm,  &ofdm->rxbuf[st], (en - st), ct_est);
-   
+    int st = ofdm_m + ofdm_ncp + ofdm_samplesperframe;
+    int en = st + 2 * ofdm_samplesperframe;
+    int ct_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st));
+
+    ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], ct_est);
+
     if (ofdm->verbose) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
                 ct_est, (double) ofdm->coarse_foff_est_hz, ofdm->timing_valid, (double) ofdm->timing_mx);
@@ -627,20 +772,18 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
 
         /* calculate number of samples we need on next buffer to get into sync */
 
-       ofdm->nin = OFDM_SAMPLESPERFRAME + ct_est;
+        ofdm->nin = ofdm_samplesperframe + ct_est;
 
-       /* reset modem states */
+        /* reset modem states */
 
-       ofdm->sample_point = ofdm->timing_est = 0;
-       ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
+        ofdm->sample_point = ofdm->timing_est = 0;
+        ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
     } else {
-        ofdm->nin = OFDM_SAMPLESPERFRAME;
+        ofdm->nin = ofdm_samplesperframe;
     }
 
     return ofdm->timing_valid;
 }
-
-
 
 /*
  * ------------------------------------------
@@ -650,21 +793,21 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in)
 
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     complex float aphase_est_pilot_rect;
-    float aphase_est_pilot[OFDM_NC + 2];
-    float aamp_est_pilot[OFDM_NC + 2];
+    float aphase_est_pilot[ofdm_nc + 2];
+    float aamp_est_pilot[ofdm_nc + 2];
     float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
     int prev_timing_est = ofdm->timing_est;
 
     /* shift the buffer left based on nin */
 
-    for (i = 0, j = ofdm->nin; i < (OFDM_RXBUF - ofdm->nin); i++, j++) {
+    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
     /* insert latest input samples onto tail of rxbuf */
 
-    for (i = (OFDM_RXBUF - ofdm->nin), j = 0; i < OFDM_RXBUF; i++, j++) {
+    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
         ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
     }
 
@@ -672,15 +815,15 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * get user and calculated freq offset
      */
 
-    float woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+    float woff_est = TAU * ofdm->foff_est_hz / ofdm_fs;
 
     /* update timing estimate -------------------------------------------------- */
 
     if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
-        st = ((OFDM_M + OFDM_NCP) + OFDM_SAMPLESPERFRAME) - floorf(OFDM_FTWINDOWWIDTH / 2) + ofdm->timing_est;
-        en = st + OFDM_SAMPLESPERFRAME - 1 + (OFDM_M + OFDM_NCP) + OFDM_FTWINDOWWIDTH;
+        st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
+        en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
 
         complex float work[(en - st)];
 
@@ -694,30 +837,30 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         }
 
         ft_est = est_timing(ofdm, work, (en - st));
-        ofdm->timing_est += (ft_est - ceilf(OFDM_FTWINDOWWIDTH / 2));
+        ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
 
         /* keep the freq est statistic updated in case we lose sync,
            note we supply it with uncorrected rxbuf, note
            ofdm->coarse_fest_off_hz is unused in normal operation,
            but stored for use in tofdm.c */
-    
-        ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], (en-st), ft_est);
+
+        ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], ft_est);
 
         /* first frame in trial sync will have a better freq offset est - lets use it */
 
         if (ofdm->frame_count == 0) {
             ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
-            woff_est = TAU * ofdm->foff_est_hz / OFDM_FS;
+            woff_est = TAU * ofdm->foff_est_hz / ofdm_fs;
         }
-        
+
         if (ofdm->verbose > 1) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
 
-        ofdm->sample_point = max(ofdm->timing_est + (OFDM_NCP / 4), ofdm->sample_point);
-        ofdm->sample_point = min(ofdm->timing_est + OFDM_NCP, ofdm->sample_point);
+        ofdm->sample_point = max(ofdm->timing_est + (ofdm_ncp / 4), ofdm->sample_point);
+        ofdm->sample_point = min(ofdm->timing_est + ofdm_ncp, ofdm->sample_point);
     }
 
     /*
@@ -759,8 +902,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * The average of the four pilot symbols is our phase estimation.
      */
 
-    for (i = 0; i < (OFDM_NS + 3); i++) {
-        for (j = 0; j < (OFDM_NC + 2); j++) {
+    for (i = 0; i < (ofdm_ns + 3); i++) {
+        for (j = 0; j < (ofdm_nc + 2); j++) {
             ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
         }
     }
@@ -769,10 +912,10 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * "Previous" pilot symbol is one modem frame above.
      */
 
-    st = (OFDM_M + OFDM_NCP) + 1 + ofdm->sample_point;
-    en = st + OFDM_M;
+    st = (ofdm_m + ofdm_ncp) + 1 + ofdm->sample_point;
+    en = st + ofdm_m;
 
-    complex float work[OFDM_M];
+    complex float work[ofdm_m];
 
     /* down-convert at current timing instant---------------------------------- */
 
@@ -781,7 +924,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     }
 
     /*
-     * Each symbol is of course (OFDM_M + OFDM_NCP) samples long and
+     * Each symbol is of course (ofdm_m + ofdm_ncp) samples long and
      * becomes Nc+2 carriers after DFT.
      *
      * We put this carrier pilot symbol at the top of our matrix:
@@ -798,7 +941,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     dft(ofdm, ofdm->rx_sym[0], work);
 
     /*
-     * "This" pilot comes after the extra symbol alloted at the top, and after
+     * "This" pilot comes after the extra symbol allotted at the top, and after
      * the "previous" pilot and previous data symbols (let's call it, the previous
      * modem frame).
      *
@@ -808,9 +951,9 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * In this routine we also process the current data symbols.
      */
 
-    for (rr = 0; rr < (OFDM_NS + 1); rr++) {
-        st = (OFDM_M + OFDM_NCP) + OFDM_SAMPLESPERFRAME + (rr * (OFDM_M + OFDM_NCP)) + 1 + ofdm->sample_point;
-        en = st + OFDM_M;
+    for (rr = 0; rr < (ofdm_ns + 1); rr++) {
+        st = (ofdm_m + ofdm_ncp) + ofdm_samplesperframe + (rr * (ofdm_m + ofdm_ncp)) + 1 + ofdm->sample_point;
+        en = st + ofdm_m;
 
         /* down-convert at current timing instant---------------------------------- */
 
@@ -857,8 +1000,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * We only want the "future" pilot symbol, to perform the averaging of all pilots.
      */
 
-    st = (OFDM_M + OFDM_NCP) + (3 * OFDM_SAMPLESPERFRAME) + 1 + ofdm->sample_point;
-    en = st + OFDM_M;
+    st = (ofdm_m + ofdm_ncp) + (3 * ofdm_samplesperframe) + 1 + ofdm->sample_point;
+    en = st + ofdm_m;
 
     /* down-convert at current timing instant---------------------------------- */
 
@@ -877,7 +1020,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * +----------------------+
      */
 
-    dft(ofdm, ofdm->rx_sym[OFDM_NS + 2], work);
+    dft(ofdm, ofdm->rx_sym[ofdm_ns + 2], work);
 
     /*
      * We are finished now with the DFT and down conversion
@@ -894,20 +1037,21 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
          * by the change in phase over time.
          */
 
-        complex float freq_err_rect = conjf(vector_sum(ofdm->rx_sym[1],
-                OFDM_NC + 2)) * vector_sum(ofdm->rx_sym[OFDM_NS + 1], OFDM_NC + 2);
+        complex float freq_err_rect =
+                conjf(vector_sum(ofdm->rx_sym[1], ofdm_nc + 2)) *
+                vector_sum(ofdm->rx_sym[ofdm_ns + 1], ofdm_nc + 2);
 
         /* prevent instability in atan(im/re) when real part near 0 */
 
         freq_err_rect = freq_err_rect + 1E-6f;
 
-        freq_err_hz = cargf(freq_err_rect) * OFDM_RS / (TAU * OFDM_NS);
+        freq_err_hz = cargf(freq_err_rect) * ofdm_rs / (TAU * ofdm_ns);
         ofdm->foff_est_hz += (ofdm->foff_est_gain * freq_err_hz);
     }
 
     /* OK - now estimate and correct pilot phase  ---------------------------------- */
 
-    for (i = 0; i < (OFDM_NC + 2); i++) {
+    for (i = 0; i < (ofdm_nc + 2); i++) {
         aphase_est_pilot[i] = 10.0f;
         aamp_est_pilot[i] = 0.0f;
     }
@@ -918,7 +1062,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      * Then average the phase surrounding each of the data symbols.
      */
 
-    for (i = 1; i < (OFDM_NC + 1); i++) {
+    for (i = 1; i < (ofdm_nc + 1); i++) {
         complex float symbol[3];
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
@@ -928,7 +1072,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect = vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[OFDM_NS + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
+            symbol[k] = ofdm->rx_sym[ofdm_ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
         }
 
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
@@ -942,7 +1086,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[OFDM_NS + 2][j] * ofdm->pilots[j]; /* last pilot */
+            symbol[k] = ofdm->rx_sym[ofdm_ns + 2][j] * ofdm->pilots[j]; /* last pilot */
         }
 
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
@@ -963,8 +1107,8 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     int abit[2];
     int bit_index = 0;
     float sum_amp = 0.0f;
-    
-    for (rr = 0; rr < OFDM_ROWSPERFRAME; rr++) {
+
+    for (rr = 0; rr < ofdm_rowsperframe; rr++) {
         /*
          * Note the i starts with the second carrier, ends with Nc+1.
          * so we ignore the first and last carriers.
@@ -972,7 +1116,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
          * Also note we are using sym[2..8] or the seven data symbols.
          */
 
-        for (i = 1; i < (OFDM_NC + 1); i++) {
+        for (i = 1; i < (ofdm_nc + 1); i++) {
             if (ofdm->phase_est_en == true) {
                 rx_corr = ofdm->rx_sym[rr + 2][i] * cexpf(-I * aphase_est_pilot[i]);
             } else {
@@ -984,7 +1128,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
              * rx_np means the pilot symbols have been removed
              */
 
-            ofdm->rx_np[(rr * OFDM_NC) + (i - 1)] = rx_corr;
+            ofdm->rx_np[(rr * ofdm_nc) + (i - 1)] = rx_corr;
 
             /*
              * Note even though amp ests are the same for each col,
@@ -992,19 +1136,19 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
              * so convenient to log them all
              */
 
-            ofdm->rx_amp[(rr * OFDM_NC) + (i - 1)] = aamp_est_pilot[i];
+            ofdm->rx_amp[(rr * ofdm_nc) + (i - 1)] = aamp_est_pilot[i];
             sum_amp += aamp_est_pilot[i];
-            
+
             /*
              * Note like amps in this implementation phase ests are the
              * same for each col, but we log them for each symbol anyway
              */
 
-            ofdm->aphase_est_pilot_log[(rr * OFDM_NC) + (i - 1)] = aphase_est_pilot[i];
+            ofdm->aphase_est_pilot_log[(rr * ofdm_nc) + (i - 1)] = aphase_est_pilot[i];
 
-            if (OFDM_BPS == 1) {
+            if (ofdm_bps == 1) {
                 rx_bits[bit_index++] = crealf(rx_corr) > 0.0f;
-            } else if (OFDM_BPS == 2) {
+            } else if (ofdm_bps == 2) {
                 /*
                  * Only one final task, decode what quadrant the phase
                  * is in, and return the dibits
@@ -1017,25 +1161,25 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     }
 
     /* update mean amplitude estimate for LDPC decoder scaling */
-    
-    ofdm->mean_amp = 0.9f * ofdm->mean_amp + 0.1f * sum_amp/(OFDM_ROWSPERFRAME * OFDM_NC);
-    
+
+    ofdm->mean_amp = 0.9f * ofdm->mean_amp + 0.1f * sum_amp / (ofdm_rowsperframe * ofdm_nc);
+
     /* Adjust nin to take care of sample clock offset */
 
-    ofdm->nin = OFDM_SAMPLESPERFRAME;
+    ofdm->nin = ofdm_samplesperframe;
 
     if (ofdm->timing_en == true) {
         ofdm->clock_offset_counter += prev_timing_est - ofdm->timing_est;
-        //fprintf(stderr, "prev_timing_est: %d timing_est: %d clock_offset_counter: %d\n", ofdm->timing_est, prev_timing_est, ofdm->clock_offset_counter);
-        int thresh = (OFDM_M + OFDM_NCP) / 8;
-        int tshift = (OFDM_M + OFDM_NCP) / 4;
+
+        int thresh = (ofdm_m + ofdm_ncp) / 8;
+        int tshift = (ofdm_m + ofdm_ncp) / 4;
 
         if (ofdm->timing_est > thresh) {
-            ofdm->nin = OFDM_SAMPLESPERFRAME + tshift;
+            ofdm->nin = ofdm_samplesperframe + tshift;
             ofdm->timing_est -= tshift;
             ofdm->sample_point -= tshift;
         } else if (ofdm->timing_est < -thresh) {
-            ofdm->nin = OFDM_SAMPLESPERFRAME - tshift;
+            ofdm->nin = ofdm_samplesperframe - tshift;
             ofdm->timing_est += tshift;
             ofdm->sample_point += tshift;
         }
@@ -1044,35 +1188,35 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     /* estimate signal and noise power, see ofdm_lib.m, cohpsk.m for
        more info */
 
-    float sig_var = 0.0f;
     complex float *rx_np = ofdm->rx_np;
 
-    for (i = 0; i < (OFDM_ROWSPERFRAME * OFDM_NC); i++) {
-        sig_var += crealf(rx_np[i]) * crealf(rx_np[i]) + cimagf(rx_np[i]) * cimagf(rx_np[i]);
+    float sig_var = 0.0f;
+
+    for (i = 0; i < (ofdm_rowsperframe * ofdm_nc); i++) {
+        sig_var += cnormf(rx_np[i]);
     }
 
-    sig_var /= (OFDM_ROWSPERFRAME * OFDM_NC);
+    sig_var /= (ofdm_rowsperframe * ofdm_nc);
     float sig_rms = sqrtf(sig_var);
 
-    complex float s;
     float sum_x = 0.0f;
     float sum_xx = 0.0f;
     int n = 0;
 
-    for (i=0; i<OFDM_ROWSPERFRAME * OFDM_NC; i++) {
-      s = rx_np[i];
+    for (i = 0; i < ofdm_rowsperframe * ofdm_nc; i++) {
+        complex float s = rx_np[i];
 
-      if (fabsf(crealf(s)) > sig_rms) {
-          sum_x  += cimagf(s);
-          sum_xx += cimagf(s) * cimagf(s);
-          n++;
-      }
+        if (fabsf(crealf(s)) > sig_rms) {
+            sum_x += cimagf(s);
+            sum_xx += cimagf(s) * cimagf(s);
+            n++;
+        }
     }
 
     /* with large interfering carriers this alg can break down - in
        that case set a benign value for noise_var that will produce a
        sensible (probably low) SNR est */
-    
+
     float noise_var = 1.0f;
 
     if (n > 1) {
@@ -1083,59 +1227,58 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
     ofdm->sig_var = sig_var;
 }
 
-
 /* iterate state machine ------------------------------------*/
 
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
-    char next_state[OFDM_STATE_STR];
-    int  i;
-    
-    strcpy(next_state, ofdm->sync_state);    
+    char next_state[ofdm_state_str];
+    int i;
+
+    strncpy(next_state, ofdm->sync_state, ofdm_state_str);
     ofdm->sync_start = ofdm->sync_end = 0;
-  
-    if (strcmp(ofdm->sync_state,"search") == 0) { 
+
+    if (strcmp(ofdm->sync_state, "search") == 0) {
         if (ofdm->timing_valid) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
             ofdm->sync_start = 1;
             ofdm->clock_offset_counter = 0;
-            strcpy(next_state, "trial");
+            strncpy(next_state, "trial", ofdm_state_str);
         }
     }
 
-    if (!strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state, "trial")) {
+    if (!strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial")) {
         ofdm->frame_count++;
         ofdm->frame_count_interleaver++;
-       
+
         /* freq offset est may be too far out, and has aliases every 1/Ts, so
            we use a Unique Word to get a really solid indication of sync. */
 
         ofdm->uw_errors = 0;
 
-        for (i=0; i<OFDM_NUWBITS; i++) {
-            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i]; 
+        for (i = 0; i < ofdm_nuwbits; i++) {
+            ofdm->uw_errors += ofdm->tx_uw[i] ^ rx_uw[i];
         }
 
         /* during trial sync we don't tolerate errors so much, we look
            for 3 consecutive frames with low error rate to confirm
            sync */
-      
+
         if (!strcmp(ofdm->sync_state, "trial")) {
             if (ofdm->uw_errors > 2) {
                 /* if we exceed thresh stay in trial sync */
                 ofdm->sync_counter++;
-                ofdm->frame_count = 0; 
+                ofdm->frame_count = 0;
             }
 
             if (ofdm->sync_counter == 2) {
                 /* if we get two bad frames drop sync and start again */
-                strcpy(next_state, "search");
-                strcpy(ofdm->sync_state_interleaver, "search");                
+                strncpy(next_state, "search", ofdm_state_str);
+                strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
             }
-           
+
             if (ofdm->frame_count == 4) {
                 /* three good frames, sync is OK! */
-                strcpy(next_state, "synced");
+                strncpy(next_state, "synced", ofdm_state_str);
             }
         }
 
@@ -1147,20 +1290,19 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
             } else {
                 ofdm->sync_counter = 0;
             }
-                
+
             if ((ofdm->sync_mode == OFDM_SYNC_AUTO) && (ofdm->sync_counter == 12)) {
-                /* run of consective bad frames ... drop sync */
-                strcpy(next_state, "search");
-                strcpy(ofdm->sync_state_interleaver, "search");
-            }           
+                /* run of consecutive bad frames ... drop sync */
+                strncpy(next_state, "search", ofdm_state_str);
+                strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+            }
         }
     }
-    
-    strcpy(ofdm->last_sync_state, ofdm->sync_state);
-    strcpy(ofdm->last_sync_state_interleaver, ofdm->sync_state_interleaver);
-    strcpy(ofdm->sync_state, next_state);
-}
 
+    strncpy(ofdm->last_sync_state, ofdm->sync_state, ofdm_state_str);
+    strncpy(ofdm->last_sync_state_interleaver, ofdm->sync_state_interleaver, ofdm_state_str);
+    strncpy(ofdm->sync_state, next_state, ofdm_state_str);
+}
 
 /*---------------------------------------------------------------------------* \
 
@@ -1180,28 +1322,28 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
 \*---------------------------------------------------------------------------*/
 
 void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
-    assert (ofdm != NULL);
+    assert(ofdm != NULL);
 
-    switch(sync_cmd) {
-    case OFDM_SYNC_UNSYNC:
-        /* force manual unsync, in case operator detects false sync,
-           which will cuase sync state machine to have another go at
-           sync */
-        strcpy(ofdm->sync_state, "search");
-        strcpy(ofdm->sync_state_interleaver, "search");                
-        break;
-    case OFDM_SYNC_AUTO:
-        /* normal operating mode - sync state machine decides when to unsync */
-        ofdm->sync_mode = OFDM_SYNC_AUTO;
-        break;
-    case OFDM_SYNC_MANUAL:
-        /* allow sync state machine to sync, but not to unsync, the
-           operator will decide that manually */
-        ofdm->sync_mode = OFDM_SYNC_MANUAL;
-        break;
-    default:
-        assert(0);
-    }            
+    switch (sync_cmd) {
+        case OFDM_SYNC_UNSYNC:
+            /* force manual unsync, in case operator detects false sync,
+               which will cause sync state machine to have another go at
+               sync */
+            strncpy(ofdm->sync_state, "search", ofdm_state_str);
+            strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+            break;
+        case OFDM_SYNC_AUTO:
+            /* normal operating mode - sync state machine decides when to unsync */
+            ofdm->sync_mode = OFDM_SYNC_AUTO;
+            break;
+        case OFDM_SYNC_MANUAL:
+            /* allow sync state machine to sync, but not to unsync, the
+               operator will decide that manually */
+            ofdm->sync_mode = OFDM_SYNC_MANUAL;
+            break;
+        default:
+            assert(0);
+    }
 }
 
 /*---------------------------------------------------------------------------*\
@@ -1214,159 +1356,162 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
 
 \*---------------------------------------------------------------------------*/
 
-void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats)
-{
-    int   c, r;
+void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
+    int c, r;
 
-    stats->Nc = OFDM_NC;
+    stats->Nc = ofdm_nc;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
-    float snr_est = 10.0f * log10f((0.1f + (ofdm->sig_var/ofdm->noise_var)) * OFDM_NC*OFDM_RS / 3000.0f);
-    //fprintf(stderr, "sig: %f var: %f snr: %f\n", ofdm->sig_var, ofdm->noise_var, snr_est);
+    float snr_est = 10.0f * log10f((0.1f + (ofdm->sig_var / ofdm->noise_var)) * ofdm_nc * ofdm_rs / 3000.0f);
+    float total = ofdm->frame_count * ofdm_samplesperframe;
+
     stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
     stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");
-    //fprintf(stderr, "sync: %d %s\n", stats->sync, ofdm->sync_state);
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
-
-    float total = ofdm->frame_count*OFDM_SAMPLESPERFRAME;
     stats->clock_offset = 0;
 
-    if (total) {
-        stats->clock_offset = ofdm->clock_offset_counter/total;
+    if (total != 0.0f) {
+        stats->clock_offset = ofdm->clock_offset_counter / total;
     }
 
     stats->sync_metric = ofdm->timing_mx;
-    
-    //fprintf(stderr, "clock_offset_counter: %d frame_count: %d total: %f clock_offset: %f\n",
-    //        ofdm->clock_offset_counter, ofdm->frame_count, total, stats->clock_offset);
-    assert(OFDM_ROWSPERFRAME < MODEM_STATS_NR_MAX);
-    stats->nr = OFDM_ROWSPERFRAME;
 
-    for (c = 0; c < OFDM_NC; c++) {
-        for (r = 0; r < OFDM_ROWSPERFRAME; r++) {
+    assert(ofdm_rowsperframe < MODEM_STATS_NR_MAX);
+    stats->nr = ofdm_rowsperframe;
+
+    for (c = 0; c < ofdm_nc; c++) {
+        for (r = 0; r < ofdm_rowsperframe; r++) {
             complex float rot = ofdm->rx_np[r * c] * cexpf(I * (M_PI / 4.0f));
+
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
-            //fprintf(stderr, "%f %f\n", stats->rx_symbols[r][c].real, stats->rx_symbols[r][c].imag);
         }
     }
 }
 
-
 /* Assemble modem frame of bits from UW, payload bits, and txt bits */
 
 void ofdm_assemble_modem_frame(uint8_t modem_frame[],
-                               uint8_t payload_bits[],
-                               uint8_t txt_bits[])
-{
-  int b,p=0,u=0;
+        uint8_t payload_bits[],
+        uint8_t txt_bits[]) {
+    int b, t;
 
-  for (b=0; b<OFDM_BITSPERFRAME-OFDM_NTXTBITS; b++) {
-      if ((u < OFDM_NUWBITS) && (b == (uw_ind[u]-1))) {
-          modem_frame[b] = tx_uw[u++];
-      } else {
-          modem_frame[b] = payload_bits[p];
-          p++;
-      }
-  }
-  assert(u == OFDM_NUWBITS);
-  assert(p == (OFDM_BITSPERFRAME-OFDM_NUWBITS-OFDM_NTXTBITS));
+    int p = 0;
+    int u = 0;
 
-  int t;
+    for (b = 0; b < ofdm_bitsperframe - ofdm_ntxtbits; b++) {
+        if ((u < ofdm_nuwbits) && (b == (uw_ind[u] - 1))) {
+            modem_frame[b] = tx_uw[u++];
+        } else {
+            modem_frame[b] = payload_bits[p];
+            p++;
+        }
+    }
 
-  for (t=0; b<OFDM_BITSPERFRAME; b++,t++) {
-      modem_frame[b] = txt_bits[t];
-  }
-  assert(t == OFDM_NTXTBITS);
+    assert(u == ofdm_nuwbits);
+    assert(p == (ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits));
+
+    for (t = 0; b < ofdm_bitsperframe; b++, t++) {
+        modem_frame[b] = txt_bits[t];
+    }
+
+    assert(t == ofdm_ntxtbits);
 }
-
 
 /* Assemble modem frame from UW, payload symbols, and txt bits */
 
 void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
-                                       COMP    payload_syms[],
-                                       uint8_t txt_bits[])
-{
-  int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
-  int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;
-  int Ntxtsyms = OFDM_NTXTBITS/OFDM_BPS;
+        COMP payload_syms[],
+        uint8_t txt_bits[]) {
+    int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
+    int Nuwsyms = ofdm_nuwbits / ofdm_bps;
+    int Ntxtsyms = ofdm_ntxtbits / ofdm_bps;
 
-  int s,p=0,u=0;
+    int s, t;
 
-  for (s=0; s<Nsymsperframe-Ntxtsyms; s++) {
-      if ((u < Nuwsyms) && (s == (uw_ind_sym[u]-1))) {
-          modem_frame[s] = tx_uw_syms[u++];
-      } else {
-          modem_frame[s] = payload_syms[p].real + payload_syms[p].imag * I;
-          p++;
-      }
-  }
-  assert(u == Nuwsyms);
-  assert(p == (Nsymsperframe-Nuwsyms-Ntxtsyms));
+    int p = 0;
+    int u = 0;
 
-  int t; int dibit[2];
+    for (s = 0; s < Nsymsperframe - Ntxtsyms; s++) {
+        if ((u < Nuwsyms) && (s == (uw_ind_sym[u] - 1))) {
+            modem_frame[s] = tx_uw_syms[u++];
+        } else {
+            modem_frame[s] = payload_syms[p].real + payload_syms[p].imag * I;
+            p++;
+        }
+    }
 
-  for (t=0; s<Nsymsperframe; s++,t+=OFDM_BPS) {
-      dibit[0] = txt_bits[t+1] & 0x1;
-      dibit[1] = txt_bits[t] & 0x1;
-      modem_frame[s] = qpsk_mod(dibit);
-  }
-  assert(t == OFDM_NTXTBITS);
+    assert(u == Nuwsyms);
+    assert(p == (Nsymsperframe - Nuwsyms - Ntxtsyms));
+
+    int dibit[2];
+
+    for (t = 0; s < Nsymsperframe; s++, t += ofdm_bps) {
+        dibit[0] = txt_bits[t + 1] & 0x1;
+        dibit[1] = txt_bits[t] & 0x1;
+        modem_frame[s] = qpsk_mod(dibit);
+    }
+
+    assert(t == ofdm_ntxtbits);
 }
 
+void ofdm_disassemble_modem_frame(struct OFDM *ofdm,
+        int rx_uw[],
+        COMP codeword_syms[],
+        float codeword_amps[],
+        short txt_bits[]) {
+    int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
+    int Nuwsyms = ofdm_nuwbits / ofdm_bps;
+    int Ntxtsyms = ofdm_ntxtbits / ofdm_bps;
 
-void ofdm_disassemble_modem_frame(struct OFDM   *ofdm,
-                                  int            rx_uw[],
-                                  COMP           codeword_syms[],
-                                  float          codeword_amps[],
-                                  short          txt_bits[])
-{
-  int Nsymsperframe = OFDM_BITSPERFRAME/OFDM_BPS;
-  int Nuwsyms = OFDM_NUWBITS/OFDM_BPS;
-  int Ntxtsyms = OFDM_NTXTBITS/OFDM_BPS;
-  int dibit[2];
-  
-  int s,p=0,u=0;
+    int s, t;
 
-  for (s=0; s<Nsymsperframe-Ntxtsyms; s++) {
-      if ((u < Nuwsyms) && (s == (uw_ind_sym[u]-1))) {
-          qpsk_demod(ofdm->rx_np[s], dibit);
-          rx_uw[OFDM_BPS*u]   = dibit[1];
-          rx_uw[OFDM_BPS*u+1] = dibit[0];
-          u++;
-      } else {
-          codeword_syms[p].real = crealf(ofdm->rx_np[s]);
-          codeword_syms[p].imag = cimagf(ofdm->rx_np[s]);
-          codeword_amps[p] = ofdm->rx_amp[s];
-          p++;
-      }
-  }
-  assert(u == Nuwsyms);
-  assert(p == (Nsymsperframe-Nuwsyms-Ntxtsyms));
+    int p = 0;
+    int u = 0;
 
-  int t;
+    int dibit[2];
 
-  for (t=0; s<Nsymsperframe; s++,t+=OFDM_BPS) {
-      qpsk_demod(ofdm->rx_np[s], dibit);
-      txt_bits[t]   = dibit[1];
-      txt_bits[t+1] = dibit[0];
-  }
-  assert(t == OFDM_NTXTBITS);
+    for (s = 0; s < Nsymsperframe - Ntxtsyms; s++) {
+        if ((u < Nuwsyms) && (s == (uw_ind_sym[u] - 1))) {
+            qpsk_demod(ofdm->rx_np[s], dibit);
+            rx_uw[ofdm_bps * u    ] = dibit[1];
+            rx_uw[ofdm_bps * u + 1] = dibit[0];
+            u++;
+        } else {
+            codeword_syms[p].real = crealf(ofdm->rx_np[s]);
+            codeword_syms[p].imag = cimagf(ofdm->rx_np[s]);
+            codeword_amps[p] = ofdm->rx_amp[s];
+            p++;
+        }
+    }
+
+    assert(u == Nuwsyms);
+    assert(p == (Nsymsperframe - Nuwsyms - Ntxtsyms));
+
+    for (t = 0; s < Nsymsperframe; s++, t += ofdm_bps) {
+        qpsk_demod(ofdm->rx_np[s], dibit);
+
+        txt_bits[t    ] = dibit[1];
+        txt_bits[t + 1] = dibit[0];
+    }
+
+    assert(t == ofdm_ntxtbits);
 }
 
 /*
-  Psuedo-random number generator that we can implement in C with
-  identical results to Octave.  Returns an unsigned int between 0
-  and 32767.  Used for generting test frames of various lengths.
-*/
+ * Pseudo-random number generator that we can implement in C with
+ * identical results to Octave.  Returns an unsigned int between 0
+ * and 32767.  Used for generating test frames of various lengths.
+ */
 
 void ofdm_rand(uint16_t r[], int n) {
-  uint64_t seed = 1;
-  int i;
-  for (i=0; i<n; i++) {
-      seed = (1103515245l * seed + 12345) % 32768;
-    r[i] = seed;
-  }
+    uint64_t seed = 1;
+    int i;
+
+    for (i = 0; i < n; i++) {
+        seed = (1103515245l * seed + 12345) % 32768;
+        r[i] = seed;
+    }
 }
 

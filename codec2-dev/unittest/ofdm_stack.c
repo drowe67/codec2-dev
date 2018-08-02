@@ -3,24 +3,30 @@
 #include <string.h>
 #include <complex.h>
 #include <unistd.h>
+#include <assert.h>
 
+#include "comp.h"
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
-#include "test_bits_ofdm.h"
+#include "test_bits_ofdm.h" /* payload_data_bits */
 #include "mpdecode_core.h"
 
-#define DATA_BITSPERFRAME  (OFDM_BITSPERFRAME - (OFDM_NUWBITS + OFDM_NTXTBITS))
-#define RX_OFFSET (OFDM_NUWBITS+OFDM_NTXTBITS)
+#define MAX_ERRORS        32
 
-#define MAX_ERRORS            32
+static struct OFDM        *ofdm;
+static struct OFDM_CONFIG *ofdm_config;
 
-struct OFDM    *ofdm;
-
-// Top level data that is not really part of modem.
-// Putting these here keeps them off the stack of the run_modem function.
-int             tx_bits [DATA_BITSPERFRAME];        // Input to modulator
-COMP            tx_rx   [OFDM_SAMPLESPERFRAME];     // Modulator to Demodulator
-int             rx_bits [OFDM_BITSPERFRAME];        // Output of demodulator
+static int ofdm_bitsperframe;
+static int ofdm_rowsperframe;
+static int ofdm_nuwbits;
+static int ofdm_ntxtbits;
+static int ofdm_rx_offset;
+static int ofdm_data_bitsperframe;
+static int ofdm_samplesperframe;
+static int ofdm_max_samplesperframe;
+static int ofdm_rxbuf;
+static int ofdm_m;
+static int ofdm_ncp;
 
 // Forwards
 void run_modem();
@@ -29,119 +35,157 @@ void dummy_code();
 /////////////////////////////////////////////////////////////
 ///  MAIN()
 int main(int argc, char *argv[]) {
-
     // Options
-    int opt;
+    int f, i, opt;
     int dummy = 0;  // flag to use dummy code
     int frames = 1; // how many frames
     int print = 0;  // flag to print all bits
+
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
+
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
+
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+
+    ofdm_config = ofdm_get_config_param();
+
+    ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs);
+    ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs);
+    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    ofdm_samplesperframe = ofdm_get_samples_per_frame();
+    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame();
+    ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
+    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    ofdm_ntxtbits = ofdm_config->txtbits;
+    ofdm_rx_offset = (ofdm_nuwbits + ofdm_ntxtbits);
+    ofdm_data_bitsperframe = (ofdm_bitsperframe - ofdm_rx_offset);
+
+    int tx_bits[ofdm_data_bitsperframe];
+    int rx_bits[ofdm_data_bitsperframe];
+    COMP tx_rx[ofdm_samplesperframe];
+
     while ((opt = getopt(argc, argv, "df:p")) != -1) {
         switch (opt) {
-            case 'd':
-                dummy = 1;
-                break;
-            case 'f':
-                frames = atoi(optarg);
-                break;
-            case 'p':
-                print = 1;
-                break;
-            default:
-                fprintf(stderr, "Usage: %s [-e] [-f <frames>] [-p]\n", argv[0]);
-            }
+        case 'd':
+            dummy = 1;
+            break;
+        case 'f':
+            frames = atoi(optarg);
+            break;
+        case 'p':
+            print = 1;
+            break;
+        default:
+            fprintf(stderr, "Usage: %s [-e] [-f <frames>] [-p]\n", argv[0]);
         }
+    }
 
-    int f,i; 
-
-    for (f=0; f<frames; f++) {
-
+    for (f = 0; f < frames; f++) {
         ////////
         // Prep inputs
-        for(i=0; i<DATA_BITSPERFRAME; i++) {
+
+        for(i=0; i<ofdm_data_bitsperframe; i++) {
             tx_bits[i] = payload_data_bits[(i % (sizeof(payload_data_bits)/sizeof(payload_data_bits[0])))];
         }
 
         ////////
         // Modem (or dummy)
-        if (dummy) { dummy_code(); }
-        else { run_modem(); }
+
+        if (dummy) {
+            dummy_code(tx_bits, rx_bits);
+        } else {
+            run_modem(tx_bits, rx_bits, tx_rx);
+        }
 
         ////////
         // Compare results (or print)
         int errors = 0;
+
         if (print) {
-            for(i=0; i<DATA_BITSPERFRAME; i++) {
+            for(i=0; i<ofdm_data_bitsperframe; i++) {
                 fprintf(stderr, "bit %3d: tx = %1d, rx = %1d",
-                    i, tx_bits[i], rx_bits[i+RX_OFFSET]);
-                if (tx_bits[i] != rx_bits[i+RX_OFFSET]) {
+                    i, tx_bits[i], rx_bits[i + ofdm_rx_offset]);
+
+                if (tx_bits[i] != rx_bits[i + ofdm_rx_offset]) {
                     fprintf(stderr, " Error");
                     errors ++;
                 }
+
                 fprintf(stderr, "\n");
-        }
+            }
         } else {
-            for(i=0; i<DATA_BITSPERFRAME; i++) {
-                if (tx_bits[i] != rx_bits[i+RX_OFFSET]) {
+            for(i=0; i<ofdm_data_bitsperframe; i++) {
+                if (tx_bits[i] != rx_bits[i + ofdm_rx_offset]) {
                     if (errors < MAX_ERRORS) {
                         fprintf(stderr, "Error in bit %3d: tx = %1d, rx = %1d\n",
-                            i, tx_bits[i], rx_bits[i+RX_OFFSET]);
+                            i, tx_bits[i], rx_bits[i + ofdm_rx_offset]);
                     }
-                    errors ++;
+
+                    errors++;
                 }
             }
         }
+
         fprintf(stderr, "%d Errors\n", errors);
 
     } // for (f<frames
+
+    ofdm_destroy(ofdm);
 
 }   // end main()
 
 
 //////////////////////////////////
-void run_modem() {
-
-    int             mod_bits[OFDM_SAMPLESPERFRAME];
-
+void run_modem(int tx_bits[], int rx_bits[], COMP tx_rx[]) {
+    int mod_bits[ofdm_samplesperframe];
     int i, j;
-
-    ofdm = ofdm_create(NULL);
 
     ///////////
     // Mod
     ///////////
 
-    for(i=0; i<OFDM_NUWBITS; i++) {
+    for(i=0; i<ofdm_nuwbits; i++) {
         mod_bits[i] = ofdm->tx_uw[i];
     }
-    for(i=OFDM_NUWBITS; i<OFDM_NUWBITS+OFDM_NTXTBITS; i++) {
+
+    for(i=ofdm_nuwbits; i<ofdm_nuwbits+ofdm_ntxtbits; i++) {
         mod_bits[i] = 0;
     }       
 
-    for(j=0, i=OFDM_NUWBITS+OFDM_NTXTBITS; j<DATA_BITSPERFRAME; i++,j++) {
-        mod_bits[i] = tx_bits[j];
-    }
-    for(j=0; j<DATA_BITSPERFRAME; i++,j++) {
+    for(j=0, i=ofdm_nuwbits+ofdm_ntxtbits; j<ofdm_data_bitsperframe; i++,j++) {
         mod_bits[i] = tx_bits[j];
     }
 
-    ofdm_mod(ofdm, (COMP*)tx_rx, mod_bits);
+    for(j=0; j<ofdm_data_bitsperframe; i++,j++) {
+        mod_bits[i] = tx_bits[j];
+    }
+
+    ofdm_mod(ofdm, tx_rx, mod_bits);
 
     ///////////
     // DeMod
     ///////////
 
-    int  Nsam = OFDM_SAMPLESPERFRAME;
+    int  Nsam = ofdm_samplesperframe;
     int  prx = 0;
-    int  nin =  OFDM_SAMPLESPERFRAME + 2*(OFDM_M+OFDM_NCP);
+    int  nin =  ofdm_samplesperframe + 2 * (ofdm_m + ofdm_ncp);
 
     int  lnew;
-    COMP rxbuf_in[OFDM_MAX_SAMPLESPERFRAME];
+    COMP rxbuf_in[ofdm_max_samplesperframe];
 
-    for (i=0; i<OFDM_SAMPLESPERFRAME ; i++,prx++) {
-        ofdm->rxbuf[OFDM_RXBUF-nin+i] = tx_rx[prx].real + I*tx_rx[prx].imag;
+    for (i=0; i<ofdm_samplesperframe ; i++,prx++) {
+        ofdm->rxbuf[ofdm_rxbuf-nin+i] = tx_rx[prx].real + tx_rx[prx].imag * I;
     }
-    for (i=OFDM_SAMPLESPERFRAME ; i<nin; i++) {
-        ofdm->rxbuf[OFDM_RXBUF-nin+i] = 0 + I*0;
+
+    for (i=ofdm_samplesperframe ; i<nin; i++) {
+        ofdm->rxbuf[ofdm_rxbuf-nin+i] = 0.0 + 0.0 * I;
     }
     
     /* disable estimators for initial testing */
@@ -181,11 +225,10 @@ void run_modem() {
 
 
 //////////////////////////////////
-void dummy_code() {
-
+void dummy_code(int tx_bits[], int rx_bits[]) {
     int i;
 
-    for(i=0; i<DATA_BITSPERFRAME; i++) {
+    for(i=0; i<ofdm_data_bitsperframe; i++) {
         rx_bits[i] = tx_bits[i];
     }
 

@@ -52,6 +52,13 @@
 extern int payload_data_bits[];
 extern int test_bits_ofdm[];
 
+static struct OFDM_CONFIG *ofdm_config;
+
+static int ofdm_bitsperframe;
+static int ofdm_rowsperframe;
+static int ofdm_nuwbits;
+static int ofdm_ntxtbits;
+
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
     for (i=0; i<argc; i++) {
@@ -68,28 +75,47 @@ int main(int argc, char *argv[])
     FILE          *fin, *fout, *foct;
     struct OFDM   *ofdm;
     int            nin_frame;
-
-    float          phase_est_pilot_log[OFDM_ROWSPERFRAME*NFRAMES][OFDM_NC];
-    COMP           rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
-    float          rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
-    float          foff_hz_log[NFRAMES], snr_est_log[NFRAMES];
-    int            timing_est_log[NFRAMES];
-
-    int            i, j, f, oct, logframes, arg, llr_en, interleave_frames;
+    int            i, j, oct, logframes, arg, llr_en, interleave_frames;
     int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
     int            ldpc_en, Tbits_coded, Terrs_coded;
 
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
+
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
+
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+    ofdm_config = ofdm_get_config_param();
+
+    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    ofdm_ntxtbits = ofdm_config->txtbits;
+
+    float          phase_est_pilot_log[ofdm_rowsperframe * NFRAMES][ofdm_config->nc];
+    COMP           rx_np_log[ofdm_rowsperframe * ofdm_config->nc * NFRAMES];
+    float          rx_amp_log[ofdm_rowsperframe * ofdm_config->nc * NFRAMES];
+    float          foff_hz_log[NFRAMES], snr_est_log[NFRAMES];
+    int            timing_est_log[NFRAMES];
+
     /* zero out the log arrays incase we don't run for NFRAMES and fill them with data */
 
-    for(i=0; i<OFDM_ROWSPERFRAME*NFRAMES; i++) {
-        for(j=0; j<OFDM_NC; j++) {
+    for(i=0; i< ofdm_rowsperframe * NFRAMES; i++) {
+        for(j=0; j< ofdm_config->nc; j++) {
             phase_est_pilot_log[i][j] = 0.0;
         }
     }
-    for(i=0; i<OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES; i++) {
-        rx_np_log[i].real = 0.0; rx_np_log[i].imag = 0.0;
+    for(i=0; i<ofdm_rowsperframe*ofdm_config->nc*NFRAMES; i++) {
+        rx_np_log[i].real = 0.0;
+        rx_np_log[i].imag = 0.0;
         rx_amp_log[i] = 0.0;
     }
+
     for(i=0; i<NFRAMES; i++) {
         foff_hz_log[i] = 0.0;
         snr_est_log[i] = 0.0;
@@ -99,7 +125,7 @@ int main(int argc, char *argv[])
     /* Set up default LPDC code.  We could add other codes here if we like */
 
     struct LDPC ldpc;
-    set_up_hra_112_112(&ldpc);
+    set_up_hra_112_112(&ldpc, ofdm_config);
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
@@ -111,9 +137,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "                Default output file format is one byte per bit hard decision\n");
         fprintf(stderr, "  --llr         LLR output, one double per bit, %d doubles/frame\n", coded_bits_per_frame);
         fprintf(stderr, "  --testframes  Receive test frames and count errors\n");
-        fprintf(stderr, "  --ldpc        Run (%d,%d) LDPC decoder.  This forces 112, one char/bit output values\n"
-                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n",
-                                         coded_bits_per_frame, data_bits_per_frame);
+        fprintf(stderr, "  --ldpc        Run LDPC decoder.  This forces 112, one char/bit output values\n"
+                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
         fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "  -v            Verbose info the stderr\n");
         fprintf(stderr, "  -o            Octave log file for testing\n");
@@ -137,12 +162,13 @@ int main(int argc, char *argv[])
 
     foct = NULL;
     oct = 0;
+
     if ((arg = opt_exists(argv, argc, "-o")) != 0) {
         if ( (foct = fopen(argv[arg+1],"wt")) == NULL ) {
-            fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
-                    argv[4], strerror(errno));
-        exit(1);
+            fprintf(stderr, "Error opening output Octave file: %s: %s.\n", argv[4], strerror(errno));
+            exit(1);
         }
+
         oct = 1;
         logframes = NFRAMES;
     }
@@ -171,6 +197,7 @@ int main(int argc, char *argv[])
         ldpc_en = 1;
         llr_en = 1;
     }
+
     int Nerrs_raw[interleave_frames];
     int Nerrs_coded[interleave_frames];
     int iter[interleave_frames];
@@ -180,26 +207,25 @@ int main(int argc, char *argv[])
         Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
     }
 
-    ofdm = ofdm_create(NULL);
-    assert(ofdm != NULL);
-
     if ((arg = opt_exists(argv, argc, "-v")) != 0) {
         ofdm_set_verbose(ofdm, 1);
     }
+
     if ((arg = opt_exists(argv, argc, "-vv")) != 0) {
         ofdm_set_verbose(ofdm, 2);
     }
 
-    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+    int Nbitsperframe = ofdm_bitsperframe;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
 
     short  rx_scaled[Nmaxsamperframe];
     COMP   rxbuf_in[Nmaxsamperframe];
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
-    int    rx_uw[OFDM_NUWBITS];
-    short  txt_bits[OFDM_NTXTBITS];
-    f = 0; Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
+    int    rx_uw[ofdm_nuwbits];
+    short  txt_bits[ofdm_ntxtbits];
+
+    Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
     float EsNo = 3;
     fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
@@ -210,6 +236,7 @@ int main(int argc, char *argv[])
     float payload_amps[coded_syms_per_frame];
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
+
     for (i=0; i<interleave_frames*coded_syms_per_frame; i++) {
         codeword_symbols[i].real = 0.0;
         codeword_symbols[i].imag = 0.0;
@@ -219,14 +246,19 @@ int main(int argc, char *argv[])
     /* More logging */
     COMP  payload_syms_log[NFRAMES][coded_syms_per_frame];
     float payload_amps_log[NFRAMES][coded_syms_per_frame];
+
     for (i=0; i<NFRAMES; i++) {
       for (j=0; j<coded_syms_per_frame; j++) {
-        payload_syms_log[i][j].real = 0.0; payload_syms_log[i][j].imag = 0.0;
+        payload_syms_log[i][j].real = 0.0;
+        payload_syms_log[i][j].imag = 0.0;
         payload_amps_log[i][j] = 0.0;
       }
     }
 
     nin_frame = ofdm_get_nin(ofdm);
+
+    int f = 0;
+
     while(fread(rx_scaled, sizeof(short), nin_frame, fin) == nin_frame) {
 
         int log_payload_syms = 0;
@@ -249,7 +281,7 @@ int main(int argc, char *argv[])
 
             /* SNR estimation and smoothing */
 
-            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
+            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000);
             snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
 
             if (llr_en) {
@@ -257,7 +289,7 @@ int main(int argc, char *argv[])
                 /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
                    and extract QPSK symbols and amplitude estimates */
 
-                assert((OFDM_NUWBITS+OFDM_NTXTBITS+coded_bits_per_frame) == OFDM_BITSPERFRAME);
+                assert((ofdm_nuwbits+ofdm_ntxtbits+coded_bits_per_frame) == ofdm_bitsperframe);
 
                 /* now we need to buffer for de-interleaving -------------------------------------*/
 
@@ -279,6 +311,7 @@ int main(int argc, char *argv[])
 
                 COMP  codeword_symbols_de[interleave_frames*coded_syms_per_frame];
                 float codeword_amps_de[interleave_frames*coded_syms_per_frame];
+
                 gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
                 gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
@@ -287,7 +320,7 @@ int main(int argc, char *argv[])
                 if (ldpc_en) {
                     char out_char[coded_bits_per_frame];
 
-                    interleaver_sync_state_machine(ofdm, &ldpc, codeword_symbols_de, codeword_amps_de, EsNo,
+                    interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                                                    interleave_frames, iter, parityCheckCount, Nerrs_coded);
 
                     if (!strcmp(ofdm->sync_state_interleaver,"synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
@@ -295,7 +328,7 @@ int main(int argc, char *argv[])
                         // printf("decode!\n");
 
                         if (testframes) {
-                            Terrs += count_uncoded_errors(&ldpc, Nerrs_raw, interleave_frames, codeword_symbols_de);
+                            Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, interleave_frames, codeword_symbols_de);
                             Tbits += Nbitsperframe*interleave_frames;
                         }
 
@@ -304,12 +337,15 @@ int main(int argc, char *argv[])
                                                  &codeword_amps_de[j*coded_syms_per_frame],
                                                  EsNo, ofdm->mean_amp, coded_syms_per_frame);
                             iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
+
                             //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
+
                             if (testframes) {
                                 Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
                                 Terrs_coded += Nerrs_coded[j];
                                 Tbits_coded += data_bits_per_frame;
                             }
+
                             fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
                         }
                     } /* if interleaver synced ..... */
@@ -324,6 +360,7 @@ int main(int argc, char *argv[])
                 for(i=0; i<Nbitsperframe; i++) {
                     rx_bits_char[i] = rx_bits[i];
                 }
+
                 fwrite(rx_bits_char, sizeof(char), Nbitsperframe, fout);
             }
 
@@ -355,6 +392,7 @@ int main(int argc, char *argv[])
 
         if (ofdm->sync_start) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
+
             for(i=0; i<interleave_frames; i++) {
                 Nerrs_raw[i] = Nerrs_coded[i] = 0;
             }
@@ -363,9 +401,11 @@ int main(int argc, char *argv[])
 
         if (ofdm->verbose) {
             int  r=0;
+
             if (testframes) {
                 r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
             }
+
             fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                     f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
                     ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
@@ -378,17 +418,17 @@ int main(int argc, char *argv[])
         if (oct) {
             /* note corrected phase (rx no phase) is one big linear array for frame */
 
-            for (i = 0; i < OFDM_ROWSPERFRAME*OFDM_NC; i++) {
-                rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].real = crealf(ofdm->rx_np[i]);
-                rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].imag = cimagf(ofdm->rx_np[i]);
+            for (i = 0; i < ofdm_rowsperframe*ofdm_config->nc; i++) {
+                rx_np_log[ofdm_rowsperframe*ofdm_config->nc * f + i].real = crealf(ofdm->rx_np[i]);
+                rx_np_log[ofdm_rowsperframe*ofdm_config->nc * f + i].imag = cimagf(ofdm->rx_np[i]);
             }
 
             /* note phase/amp ests the same for each col, but check them all anyway */
 
-            for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
-                for (j = 0; j < OFDM_NC; j++) {
-                    phase_est_pilot_log[OFDM_ROWSPERFRAME*f+i][j] = ofdm->aphase_est_pilot_log[OFDM_NC*i+j];
-                    rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*f+OFDM_NC*i+j] = ofdm->rx_amp[OFDM_NC*i+j];
+            for (i = 0; i < ofdm_rowsperframe; i++) {
+                for (j = 0; j < ofdm_config->nc; j++) {
+                    phase_est_pilot_log[ofdm_rowsperframe*f+i][j] = ofdm->aphase_est_pilot_log[ofdm_config->nc*i+j];
+                    rx_amp_log[ofdm_rowsperframe*ofdm_config->nc*f+ofdm_config->nc*i+j] = ofdm->rx_amp[ofdm_config->nc*i+j];
                 }
             }
 
@@ -435,9 +475,9 @@ int main(int argc, char *argv[])
     /* optionally dump Octave files */
 
     if (foct != NULL) {
-        octave_save_float(foct, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, OFDM_ROWSPERFRAME*NFRAMES, OFDM_NC, OFDM_NC);
-        octave_save_complex(foct, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
-        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
+        octave_save_float(foct, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, ofdm_rowsperframe*NFRAMES, ofdm_config->nc, ofdm_config->nc);
+        octave_save_complex(foct, "rx_np_log_c", (COMP*)rx_np_log, 1, ofdm_rowsperframe*ofdm_config->nc*NFRAMES, ofdm_rowsperframe*ofdm_config->nc*NFRAMES);
+        octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, 1, ofdm_rowsperframe*ofdm_config->nc*NFRAMES, ofdm_rowsperframe*ofdm_config->nc*NFRAMES);
         octave_save_float(foct, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
         octave_save_int(foct, "timing_est_log_c", timing_est_log, NFRAMES, 1);
         octave_save_float(foct, "snr_est_log_c", snr_est_log, NFRAMES, 1, 1);
@@ -451,3 +491,4 @@ int main(int argc, char *argv[])
     return 0;
 }
 /* vi:set ts=4 et sts=4: */
+

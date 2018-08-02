@@ -31,47 +31,76 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <complex.h>
 
+#include "codec2_ofdm.h"
 #include "ofdm_internal.h"
-#include "ofdm_bpf_coeff.h"
 
-extern float pilot_coeff[];
+static struct OFDM_CONFIG *ofdm_config;
+static struct OFDM *ofdm;
 
-int main(int argc, char *argv[])
+int main()
 {
-    struct OFDM *ofdm;
+    /*
+     * This should create a config of defaults
+     */
+
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
+
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
+
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+    ofdm_config = ofdm_get_config_param();
+
+    int ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs); /* 144 */
+    int ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs); /* 16 */
+    int ofdm_bitsperframe = (ofdm_config->ns - 1) * (ofdm_config->nc * ofdm_config->bps);
+    int ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    int ofdm_samplesperframe = ofdm_config->ns * (ofdm_m + ofdm_ncp);
+    int ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
+    int ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
+    int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
 
     int used = 0;
 
     printf("struct OFDM.................: %zd\n", sizeof(struct OFDM));
-    printf("config......................: %zd\n", sizeof(ofdm->config));
-    used +=                                       sizeof(ofdm->config);
-    printf("pilot_samples...............: %zd\n", sizeof(ofdm->pilot_samples));
-    used +=                                       sizeof(ofdm->pilot_samples);
-    printf("w...........................: %zd\n", sizeof(ofdm->w));
-    used +=                                       sizeof(ofdm->w);
-    printf("rxbuf.......................: %zd\n", sizeof(ofdm->rxbuf));
-    used +=                                       sizeof(ofdm->rxbuf);
-    printf("pilots......................: %zd\n", sizeof(ofdm->pilots));
-    used +=                                       sizeof(ofdm->pilots);
-    printf("rx_sym......................: %zd\n", sizeof(ofdm->rx_sym));
-    used +=                                       sizeof(ofdm->rx_sym);
-    printf("rx_np.......................: %zd\n", sizeof(ofdm->rx_np));
-    used +=                                       sizeof(ofdm->rx_np);
-    printf("rx_amp......................: %zd\n", sizeof(ofdm->rx_amp));
-    used +=                                       sizeof(ofdm->rx_amp);
-    printf("aphase_est_pilot_log........: %zd\n", sizeof(ofdm->aphase_est_pilot_log));
-    used +=                                       sizeof(ofdm->aphase_est_pilot_log);
-    printf("tx_uw.......................: %zd\n", sizeof(ofdm->tx_uw));
-    used +=                                       sizeof(ofdm->tx_uw);
-    printf("sync_state..................: %zd\n", sizeof(ofdm->sync_state));
-    used +=                                       sizeof(ofdm->sync_state);
-    printf("last_sync_state.............: %zd\n", sizeof(ofdm->last_sync_state));
-    used +=                                       sizeof(ofdm->last_sync_state);
-    printf("sync_state_interleaver......: %zd\n", sizeof(ofdm->sync_state_interleaver));
-    used +=                                       sizeof(ofdm->sync_state_interleaver);
-    printf("last_sync_state_interleaver.: %zd\n", sizeof(ofdm->last_sync_state_interleaver));
-    used +=                                       sizeof(ofdm->last_sync_state_interleaver);
+    printf("config......................: %zd\n", sizeof(struct OFDM_CONFIG));
+    used +=                                       sizeof(struct OFDM_CONFIG);
+    printf("pilot_samples...............: %zd\n", sizeof (complex float) * (ofdm_m + ofdm_ncp));
+    used +=                                       sizeof (complex float) * (ofdm_m + ofdm_ncp);
+    printf("w...........................: %zd\n", sizeof (float) * (ofdm_config->nc + 2));
+    used +=                                       sizeof (float) * (ofdm_config->nc + 2);
+    printf("rxbuf.......................: %zd\n", sizeof (complex float) * ofdm_rxbuf);
+    used +=                                       sizeof (complex float) * ofdm_rxbuf;
+    printf("pilots......................: %zd\n", sizeof (complex float) * (ofdm_config->nc + 2));
+    used +=                                       sizeof (complex float) * (ofdm_config->nc + 2);
+
+    size_t rxsym_size = sizeof (complex float) * (ofdm_config->ns + 3) * (ofdm_config->nc + 2);
+
+    printf("rx_sym......................: %zd\n", rxsym_size);
+    used +=                                       rxsym_size;
+    printf("rx_np.......................: %zd\n", sizeof (complex float) * (ofdm_rowsperframe * ofdm_config->nc));
+    used +=                                       sizeof (complex float) * (ofdm_rowsperframe * ofdm_config->nc);
+    printf("rx_amp......................: %zd\n", sizeof (float) * (ofdm_rowsperframe * ofdm_config->nc));
+    used +=                                       sizeof (float) * (ofdm_rowsperframe * ofdm_config->nc);
+    printf("aphase_est_pilot_log........: %zd\n", sizeof (float) * (ofdm_rowsperframe * ofdm_config->nc));
+    used +=                                       sizeof (float) * (ofdm_rowsperframe * ofdm_config->nc);
+    printf("tx_uw.......................: %zd\n", sizeof (int) * ofdm_nuwbits);
+    used +=                                       sizeof (int) * ofdm_nuwbits;
+    printf("sync_state..................: %zd\n", sizeof (char) * ofdm_config->state_str);
+    used +=                                       sizeof (char) * ofdm_config->state_str;
+    printf("last_sync_state.............: %zd\n", sizeof (char) * ofdm_config->state_str);
+    used +=                                       sizeof (char) * ofdm_config->state_str;
+    printf("sync_state_interleaver......: %zd\n", sizeof (char) * ofdm_config->state_str);
+    used +=                                       sizeof (char) * ofdm_config->state_str;
+    printf("last_sync_state_interleaver.: %zd\n", sizeof (char) * ofdm_config->state_str);
+    used +=                                       sizeof (char) * ofdm_config->state_str;
 
     // add in non-array sizes
     int single = 0;
@@ -83,13 +112,9 @@ int main(int argc, char *argv[])
     printf("single values...............: %d\n",  single);
     used +=                                       single;
 
-    printf("alignment...................: %zd\n", (sizeof(struct OFDM) - used));
+    printf("Total used .................: %zd\n", (size_t) used);
 
-    /* TODO: est memory usage of quisk BPF */
-    /*
-    printf("--allocated separately--\n");
-    printf("tx_bpf_buf..................: %zd\n", (sizeof(complex float)*(OFDM_BPF_N+OFDM_SAMPLESPERFRAME)));
-    */
+    ofdm_destroy(ofdm);
 
     return 0;
 }

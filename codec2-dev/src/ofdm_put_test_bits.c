@@ -34,10 +34,14 @@
 #include <errno.h>
 
 #include "codec2_ofdm.h"
+#include "ofdm_internal.h"
 #include "test_bits_ofdm.h"
 
 #define LOG_FRAMES 100
 #define NDISCARD   20
+
+static struct OFDM *ofdm;
+static struct OFDM_CONFIG *ofdm_config;
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -54,7 +58,6 @@ int main(int argc, char *argv[])
     FILE         *fin;
     int           i, f, Nerrs, Terrs, Tbits, Terrs2, Tbits2, verbose;
     float         aber;
-    struct OFDM  *ofdm;
 
     if (argc < 2) {
 	fprintf(stderr, "\n");
@@ -63,7 +66,8 @@ int main(int argc, char *argv[])
 	exit(1);
     }
 
-    if (strcmp(argv[1], "-") == 0) fin = stdin;
+    if (strcmp(argv[1], "-") == 0)
+        fin = stdin;
     else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input file: %s: %s.\n",
          argv[1], strerror(errno));
@@ -75,9 +79,20 @@ int main(int argc, char *argv[])
         verbose = 1;
     }
 
-    ofdm = ofdm_create(NULL);
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+	printf("Out of Memory");
+	exit(1);
+    }
+
+    ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
-    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
+
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+    ofdm_config = ofdm_get_config_param();
+
+    int Nbitsperframe = ofdm_get_bits_per_frame();
     char rx_bits[Nbitsperframe];
   
     f = Terrs = Tbits = Terrs2 = Tbits2 = 0;
@@ -105,11 +120,17 @@ int main(int argc, char *argv[])
         }
         
         if (fin == stdin) fflush(stdin);
-     }
-    
+    }
+
     fclose(fin);
+
     fprintf(stderr, "BER..: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs/Tbits, Tbits, Terrs);
-    fprintf(stderr, "BER2.: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+
+    if (Tbits2 != 0) {
+        fprintf(stderr, "BER2.: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+    }
+
+    ofdm_destroy(ofdm);
 
     return 0;
 }
