@@ -43,4 +43,34 @@ Test Run Scripts:
    run, in order.
 
 
+Debug and semihosting:
+
+   These tests use a newer version of the st-util program.
+   This one supports the newer boards but also does semihosting differently.
+   It needs a command line option to turn on semihosting.
+
+   The source can be downloaded from"
+
+       https://github.com/texane/stlink
+
+   After compiling it can be installed anywhere.  The program is in
+   build/Release/src/gdbserver/st-util.
+
+   This program needs to be run from the active test directory.
+
+       cd tests_run/tst_ofdm_demod_ideal
+       st-util --semihosting
+
+   The target program can then access files in this directory.
+
+   These tests will read "stm_in.raw", and write "stm_out.raw".
+   Their stdout and stderr streams will go to "stm_stdout.txt" and "stm_stderr.txt".
+
+   A file ":tt" will get created by the default initialzation but should be empty.
+
+   The newlib stdio functions (open, fread, fwrite, flush, fclose, etc.) send
+   some requests that this tool does not recognize and those messages will appear
+   in the output of st-util.  They can be ignored.
+
+
 # vi:set ts=3 et sts=3:
