@@ -58,7 +58,7 @@ void printf_n(COMP v[], int n) {
     }
 }
 
-void set_up_hra_112_112(struct LDPC *ldpc) {
+void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
     ldpc->max_iter = HRA_112_112_MAX_ITER;
     ldpc->dec_type = 0;
     ldpc->q_scale_factor = 1;
@@ -75,7 +75,7 @@ void set_up_hra_112_112(struct LDPC *ldpc) {
     
     ldpc->data_bits_per_frame = HRA_112_112_CODELENGTH - HRA_112_112_NUMBERPARITYBITS;
     ldpc->coded_bits_per_frame = HRA_112_112_CODELENGTH;
-    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame/OFDM_BPS;
+    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame/config->bps;
 }
 
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]) {
@@ -107,6 +107,7 @@ void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n) {
 
 void interleaver_sync_state_machine(struct OFDM *ofdm,
                                     struct LDPC *ldpc,
+                                    struct OFDM_CONFIG *config,
                                     COMP codeword_symbols_de[],
                                     float codeword_amps_de[],
                                     float EsNo, int interleave_frames,
@@ -117,30 +118,34 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
     int data_bits_per_frame = ldpc->data_bits_per_frame;
     double llr[coded_bits_per_frame];
     char out_char[coded_bits_per_frame];                    
-    char next_sync_state_interleaver[OFDM_STATE_STR];
+    char next_sync_state_interleaver[config->state_str];
     
-    strcpy(next_sync_state_interleaver, ofdm->sync_state_interleaver);
+    strncpy(next_sync_state_interleaver, ofdm->sync_state_interleaver, config->state_str);
+
     if ((strcmp(ofdm->sync_state_interleaver,"search") == 0) && (ofdm->frame_count >= (interleave_frames-1))) {
         symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);               
         iter[0] =  run_ldpc_decoder(ldpc, out_char, llr, parityCheckCount);
         Nerrs_coded[0] = data_bits_per_frame - parityCheckCount[0];
+
         //for(i=0; i<20; i++)
         //    fprintf(stderr,"%d ", out_char[i]);
         //fprintf(stderr,"\n");
         //fprintf(stderr, "     iter: %d pcc: %d Nerrs: %d\n", iter[0], parityCheckCount[0], Nerrs_coded[0]);
+
         if ((Nerrs_coded[0] == 0) || (interleave_frames == 1)) {
             /* sucessful decode! */
-            strcpy(next_sync_state_interleaver, "synced");
+            strncpy(next_sync_state_interleaver, "synced", config->state_str);
             ofdm->frame_count_interleaver = interleave_frames;
         }
     }
-    strcpy(ofdm->sync_state_interleaver, next_sync_state_interleaver);
+
+    strncpy(ofdm->sync_state_interleaver, next_sync_state_interleaver, config->state_str);
 }
 
 
 /* measure uncoded (raw) bit errors over interleaver frame */
 
-int count_uncoded_errors(struct LDPC *ldpc, int Nerrs_raw[], int interleave_frames, COMP codeword_symbols_de[])
+int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int Nerrs_raw[], int interleave_frames, COMP codeword_symbols_de[])
 {
     int i,j,Nerrs,Terrs;
 
@@ -156,8 +161,8 @@ int count_uncoded_errors(struct LDPC *ldpc, int Nerrs_raw[], int interleave_fram
             int bits[2];
             complex float s = codeword_symbols_de[j*coded_syms_per_frame+i].real + I*codeword_symbols_de[j*coded_syms_per_frame+i].imag;
             qpsk_demod(s, bits);
-            rx_bits_raw[OFDM_BPS*i]   = bits[1];
-            rx_bits_raw[OFDM_BPS*i+1] = bits[0];
+            rx_bits_raw[config->bps * i]   = bits[1];
+            rx_bits_raw[config->bps * i+1] = bits[0];
         }
         Nerrs = 0;
         for(i=0; i<coded_bits_per_frame; i++) {
@@ -191,22 +196,26 @@ int count_errors(int tx_bits[], char rx_bits[], int n) {
 #ifdef NOT_USED
 /* UW never changes so we can pre-load tx_symbols with modulated UW */
 
-void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t txt_bits[])
+void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t txt_bits[], struct OFDM_CONFIG *config)
 {
-    int  uw_txt_bits[OFDM_NUWBITS+OFDM_NTXTBITS];
-    COMP uw_txt_syms[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
+    int ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    int ofdm_nuwbits = (config->ns - 1) * config->bps - config->txtbits;
+    int ofdm_ntxtbits = config->txtbits;
+
+    int  uw_txt_bits[ofdm_nuwbits+ofdm_ntxtbits];
+    COMP uw_txt_syms[(ofdm_nuwbits+ofdm_ntxtbits)/config->bps];
     int i,j;
 
-    for(i=0; i<OFDM_NUWBITS; i++) {
+    for(i=0; i<ofdm_nuwbits; i++) {
         uw_txt_bits[i] = ofdm->tx_uw[i];
     }
     /* clear txt bits for now, they can be added in later */
-    for(j=0; j<OFDM_NTXTBITS; j++,i++) {
+    for(j=0; j<ofdm_ntxtbits; j++,i++) {
         uw_txt_bits[i] = txt_bits[j];
         //fprintf(stderr, "txt_bits[%d] = %d\n", j, txt_bits[j]);
     }    
-    qpsk_modulate_frame(uw_txt_syms, uw_txt_bits, (OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS);
-    for(i=0; i<(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i++) {
+    qpsk_modulate_frame(uw_txt_syms, uw_txt_bits, (ofdm_nuwbits+ofdm_ntxtbits)/config->bps);
+    for(i=0; i<(ofdm_nuwbits+ofdm_ntxtbits)/config->bps; i++) {
         tx_symbols[i] = uw_txt_syms[i].real + I * uw_txt_syms[i].imag;
     }
 }
@@ -221,17 +230,18 @@ void build_modulated_uw(struct OFDM *ofdm, complex float tx_symbols[], uint8_t t
    basis 
 */
 
-void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], int interleave_frames)
+void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float tx_sams[], uint8_t tx_bits[], uint8_t txt_bits[], int interleave_frames, struct OFDM_CONFIG *config)
 {
     int coded_syms_per_frame = ldpc->coded_syms_per_frame;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int data_bits_per_frame = ldpc->data_bits_per_frame;
+    int ofdm_bitsperframe = ofdm_get_bits_per_frame();
 
     int codeword[coded_bits_per_frame];
     COMP coded_symbols[interleave_frames*coded_syms_per_frame];
     COMP coded_symbols_inter[interleave_frames*coded_syms_per_frame];
     int Nsamperframe = ofdm_get_samples_per_frame();
-    complex float tx_symbols[OFDM_BITSPERFRAME/OFDM_BPS];
+    complex float tx_symbols[ofdm_bitsperframe/config->bps];
     int j;
     
     for (j=0; j<interleave_frames; j++) {
@@ -240,7 +250,7 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     }
     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
     for (j=0; j<interleave_frames; j++) {            
-        ofdm_assemble_modem_frame_symbols(tx_symbols, &coded_symbols_inter[j*coded_syms_per_frame], &txt_bits[OFDM_NTXTBITS*j]);
+        ofdm_assemble_modem_frame_symbols(tx_symbols, &coded_symbols_inter[j*coded_syms_per_frame], &txt_bits[config->txtbits * j]);
         ofdm_txframe(ofdm, &tx_sams[j*Nsamperframe], tx_symbols);
     }
 }

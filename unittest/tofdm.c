@@ -61,6 +61,34 @@ static COMP S_matrix[] = {
     {-1.0f,  0.0f}
 };
          
+/* static variables */
+
+static struct OFDM *ofdm;
+static struct OFDM_CONFIG *ofdm_config;
+
+static float ofdm_centre;           /* Center frequency */
+static float ofdm_fs;               /* Sample rate */
+static float ofdm_ts;               /* Symbol cycle time */
+static float ofdm_rs;               /* Symbol rate */
+static float ofdm_tcp;              /* Cyclic prefix duration */
+static float ofdm_timing_mx_thresh; /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routines for how this was set */
+
+static int ofdm_nc;                 /* NS-1 data symbols between pilots  */
+static int ofdm_ns;
+static int ofdm_bps;                /* Bits per symbol */
+static int ofdm_m;                  /* duration of each symbol in samples */
+static int ofdm_ncp;                /* duration of CP in samples */
+
+static int ofdm_ftwindowwidth;
+static int ofdm_bitsperframe;
+static int ofdm_rowsperframe;
+static int ofdm_samplesperframe;
+static int ofdm_max_samplesperframe;
+static int ofdm_rxbuf;
+static int ofdm_ntxtbits;           /* reserve bits/frame for auxillary text information */
+static int ofdm_nuwbits;            /* Unique word, used for positive indication of lock */
+static int ofdm_state_str;
+
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: fs_offset()
@@ -74,9 +102,8 @@ static COMP S_matrix[] = {
 
 static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
     double f;
-    int t1, t2;
-
     double tin = 0.0;
+    int t1, t2;
     int tout = 0;
 
     while (tin < (double) (n-1)) {
@@ -117,7 +144,7 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
 \*---------------------------------------------------------------------------*/
 
 static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin) {
-    float temp = (TAU * foff / OFDM_FS);
+    float temp = (TAU * foff / ofdm_fs);
     COMP  foff_rect = { COSF(temp), SINF(temp) };
     int   i;
 
@@ -135,44 +162,71 @@ static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *fof
 
 int main(int argc, char *argv[])
 {
-    int            samples_per_frame = ofdm_get_samples_per_frame();
-    int            max_samples_per_frame = ofdm_get_max_samples_per_frame();
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
 
-    struct OFDM   *ofdm;
-    int            tx_bits[samples_per_frame];
-    COMP           tx[samples_per_frame];         /* one frame of tx samples */
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
 
-    int            rx_bits[OFDM_BITSPERFRAME];    /* one frame of rx bits    */
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+    ofdm_config = ofdm_get_config_param();
+
+    ofdm_centre = ofdm_config->centre;
+    ofdm_fs = ofdm_config->fs;
+    ofdm_ts = ofdm_config->ts;
+    ofdm_rs = ofdm_config->rs;
+    ofdm_tcp = ofdm_config->tcp;
+    ofdm_timing_mx_thresh = ofdm_config->ofdm_timing_mx_thresh;
+    ofdm_nc = ofdm_config->nc;
+    ofdm_ns = ofdm_config->ns;
+    ofdm_bps = ofdm_config->bps;
+    ofdm_m = (int) (ofdm_config->fs / ofdm_config->rs);
+    ofdm_ncp = (int) (ofdm_config->tcp * ofdm_config->fs);
+    ofdm_ftwindowwidth = ofdm_config->ftwindowwidth;
+    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    ofdm_samplesperframe = ofdm_get_samples_per_frame();
+    ofdm_max_samplesperframe = ofdm_get_max_samples_per_frame();
+    ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
+    ofdm_ntxtbits = ofdm_config->txtbits;
+    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    ofdm_state_str = ofdm_config->state_str;
+
+    int tx_bits[ofdm_samplesperframe];
+    COMP tx[ofdm_samplesperframe];         /* one frame of tx samples */
+
+    int rx_bits[ofdm_bitsperframe];    /* one frame of rx bits    */
 
     /* log arrays */
 
-    int            tx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
-    COMP           tx_log[samples_per_frame*NFRAMES];
-    COMP           rx_log[samples_per_frame*NFRAMES];
-    COMP           rxbuf_in_log[max_samples_per_frame*NFRAMES];
-    COMP           rxbuf_log[OFDM_RXBUF*NFRAMES];
-    COMP           rx_sym_log[(OFDM_NS + 3)*NFRAMES][OFDM_NC + 2];
-    float          phase_est_pilot_log[OFDM_ROWSPERFRAME*NFRAMES][OFDM_NC];
-    COMP           rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
-    float          rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES];
-    float          foff_hz_log[NFRAMES];
-    int            rx_bits_log[OFDM_BITSPERFRAME*NFRAMES];
-    int            timing_est_log[NFRAMES];
-    int            timing_valid_log[NFRAMES];
-    float          timing_mx_log[NFRAMES];
-    float          coarse_foff_est_hz_log[NFRAMES];
-    int            sample_point_log[NFRAMES];
-    float          symbol_likelihood_log[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES];
-    float          bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];        
-    int            detected_data_log[CODED_BITSPERFRAME * NFRAMES];
-    float          sig_var_log[NFRAMES], noise_var_log[NFRAMES];        
-    float          mean_amp_log[NFRAMES];        
+    int tx_bits_log[ofdm_bitsperframe*NFRAMES];
+    COMP tx_log[ofdm_samplesperframe*NFRAMES];
+    COMP rx_log[ofdm_samplesperframe*NFRAMES];
+    COMP rxbuf_in_log[ofdm_max_samplesperframe*NFRAMES];
+    COMP rxbuf_log[ofdm_rxbuf*NFRAMES];
+    COMP rx_sym_log[(ofdm_ns + 3)*NFRAMES][ofdm_nc + 2];
+    float phase_est_pilot_log[ofdm_rowsperframe*NFRAMES][ofdm_nc];
+    COMP rx_np_log[ofdm_rowsperframe*ofdm_nc*NFRAMES];
+    float rx_amp_log[ofdm_rowsperframe*ofdm_nc*NFRAMES];
+    float foff_hz_log[NFRAMES];
+    int rx_bits_log[ofdm_bitsperframe*NFRAMES];
+    int timing_est_log[NFRAMES];
+    int timing_valid_log[NFRAMES];
+    float timing_mx_log[NFRAMES];
+    float coarse_foff_est_hz_log[NFRAMES];
+    int sample_point_log[NFRAMES];
+    float symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * NFRAMES];
+    float bit_likelihood_log[CODED_BITSPERFRAME * NFRAMES];        
+    int detected_data_log[CODED_BITSPERFRAME * NFRAMES];
+    float sig_var_log[NFRAMES], noise_var_log[NFRAMES];        
+    float mean_amp_log[NFRAMES];        
     
-    FILE          *fout;
-    int            f,i,j;
-
-    ofdm = ofdm_create(NULL);
-    assert(ofdm != NULL);
+    FILE *fout;
+    int f,i,j;
 
     /* set up LDPC code */
     
@@ -207,15 +261,15 @@ int main(int argc, char *argv[])
 
         /* See CML startup code in tofdm.m */
 
-        for(i=0; i<OFDM_NUWBITS; i++) {
+        for(i=0; i<ofdm_nuwbits; i++) {
             tx_bits[i] = ofdm->tx_uw[i];
         }
-        for(i=OFDM_NUWBITS; i<OFDM_NUWBITS+OFDM_NTXTBITS; i++) {
+        for(i=ofdm_nuwbits; i<ofdm_nuwbits+ofdm_ntxtbits; i++) {
             tx_bits[i] = 0;
         }       
 
-        #define LDPC_ENABLE
-        #ifdef LDPC_ENABLE
+#define LDPC_ENABLE
+#ifdef LDPC_ENABLE
         unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
         unsigned char pbits[HRA_112_112_NUMBERPARITYBITS];
 
@@ -224,39 +278,39 @@ int main(int argc, char *argv[])
             ibits[i] = payload_data_bits[i];
         }
         encode(&ldpc, ibits, pbits);
-        for(j=0, i=OFDM_NUWBITS+OFDM_NTXTBITS; j<ldpc.CodeLength/2; i++,j++) {
+        for(j=0, i=ofdm_nuwbits+ofdm_ntxtbits; j<ldpc.CodeLength/2; i++,j++) {
             tx_bits[i] = ibits[j];
         }
         for(j=0; j<ldpc.CodeLength/2; i++,j++) {
             tx_bits[i] = pbits[j];
         }
-        assert(i == OFDM_BITSPERFRAME);
-        #else
-        for(i=OFDM_NUWBITS+OFDM_NTXTBITS,j=0; j<ldpc.CodeLength/2; i++,j++) {
+        assert(i == ofdm_bitsperframe);
+#else
+        for(i=ofdm_nuwbits+ofdm_ntxtbits,j=0; j<ldpc.CodeLength/2; i++,j++) {
             tx_bits[i] = payload_data_bits[j];
         }
         for(j=0; j<ldpc.CodeLength/2; i++,j++) {
             tx_bits[i] = payload_data_bits[j];
         }
-        #endif
+#endif
 
         ofdm_mod(ofdm, (COMP*)tx, tx_bits);
         
         /* tx vector logging */
 
-	memcpy(&tx_bits_log[OFDM_BITSPERFRAME*f], tx_bits, sizeof(int)*OFDM_BITSPERFRAME);
-	memcpy(&tx_log[samples_per_frame*f], tx, sizeof(COMP)*samples_per_frame);
+	memcpy(&tx_bits_log[ofdm_bitsperframe*f], tx_bits, sizeof(int)*ofdm_bitsperframe);
+	memcpy(&tx_log[ofdm_samplesperframe*f], tx, sizeof(COMP)*ofdm_samplesperframe);
     }
 
     /* --------------------------------------------------------*\
 	                        Channel
     \*---------------------------------------------------------*/
 
-    fs_offset(rx_log, tx_log, samples_per_frame*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
+    fs_offset(rx_log, tx_log, ofdm_samplesperframe*NFRAMES, SAMPLE_CLOCK_OFFSET_PPM);
 
     COMP foff_phase_rect = {1.0f, 0.0f};
 
-    freq_shift(rx_log, rx_log, FOFF_HZ, &foff_phase_rect, samples_per_frame * NFRAMES);
+    freq_shift(rx_log, rx_log, FOFF_HZ, &foff_phase_rect, ofdm_samplesperframe * NFRAMES);
 
     /* --------------------------------------------------------*\
 	                        Demod
@@ -264,19 +318,19 @@ int main(int argc, char *argv[])
 
     /* Init/pre-load rx with ideal timing so we can test with timing estimation disabled */
 
-    int  Nsam = samples_per_frame*NFRAMES;
-    int  prx = 0;
-    int  nin = samples_per_frame + 2*(OFDM_M+OFDM_NCP);
+    int Nsam = ofdm_samplesperframe*NFRAMES;
+    int prx = 0;
+    int nin = ofdm_samplesperframe + 2*(ofdm_m+ofdm_ncp);
 
     int  lnew;
-    COMP rxbuf_in[max_samples_per_frame];
+    COMP rxbuf_in[ofdm_max_samplesperframe];
 
-    #define FRONT_LOAD
-    #ifdef FRONT_LOAD
+#define FRONT_LOAD
+#ifdef FRONT_LOAD
     for (i=0; i<nin; i++,prx++) {
-         ofdm->rxbuf[OFDM_RXBUF-nin+i] = rx_log[prx].real + I*rx_log[prx].imag;
+         ofdm->rxbuf[ofdm_rxbuf-nin+i] = rx_log[prx].real + rx_log[prx].imag * I;
     }
-    #endif
+#endif
     
     int nin_tot = 0;
 
@@ -287,14 +341,14 @@ int main(int argc, char *argv[])
     ofdm_set_foff_est_enable(ofdm, true);
     ofdm_set_phase_est_enable(ofdm, true);
 
-    //#define TESTING_FILE
-    #ifdef TESTING_FILE
-    FILE *fin=fopen("/home/david/codec2-dev/octave/ofdm_test.raw", "rb");
+//#define TESTING_FILE
+#ifdef TESTING_FILE
+    FILE *fin=fopen("~/codec2-dev/octave/ofdm_test.raw", "rb");
     assert(fin != NULL);
-    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
-    int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    int Nbitsperframe = ofdm_bitsperframe;
+    int Nmaxsamperframe = ofdm_max_samplesperframe;
     short rx_scaled[Nmaxsamperframe];
-    #endif
+#endif
 
     /* start this with something sensible otherwise LDPC decode fails in tofdm.m */
 
@@ -306,7 +360,7 @@ int main(int argc, char *argv[])
            is the maximum possible nin */
 
         nin = ofdm_get_nin(ofdm);
-        assert(nin <= max_samples_per_frame);
+        assert(nin <= ofdm_max_samplesperframe);
 
         /* Insert samples at end of buffer, set to zero if no samples
            available to disable phase estimation on future pilots on
@@ -328,21 +382,22 @@ int main(int argc, char *argv[])
                 rxbuf_in[i] = rx_log[prx];
             }
         }
-        assert(prx <= max_samples_per_frame*NFRAMES);
+        assert(prx <= ofdm_max_samplesperframe*NFRAMES);
 
-        #ifdef TESTING_FILE
+#ifdef TESTING_FILE
         fread(rx_scaled, sizeof(short), nin, fin);
+
         for(i=0; i<nin; i++) {
 	    rxbuf_in[i].real = (float)rx_scaled[i]/ASCALE;
             rxbuf_in[i].imag = 0.0;
         }
-        #endif
+#endif
 
         /* uncoded OFDM modem ---------------------------------------*/
         
         ofdm_demod(ofdm, rx_bits, rxbuf_in);
         
-        #ifdef TESTING_FILE
+#ifdef TESTING_FILE
         int Nerrs = 0;
         for(i=0; i<Nbitsperframe; i++) {
             if (test_bits_ofdm[i] != rx_bits[i]) {
@@ -350,27 +405,29 @@ int main(int argc, char *argv[])
             }
         }
         printf("f: %d Nerr: %d\n", f, Nerrs);
-        #endif
+#endif
         
         /* LDPC functions --------------------------------------*/
 
-        double symbol_likelihood[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) ];
+        double symbol_likelihood[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) ];
         double bit_likelihood[CODED_BITSPERFRAME];
         float EsNo = 10;
         
         /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
 
-        assert((OFDM_NUWBITS+OFDM_NTXTBITS+CODED_BITSPERFRAME) == OFDM_BITSPERFRAME);
+        assert((ofdm_nuwbits+ofdm_ntxtbits+CODED_BITSPERFRAME) == ofdm_bitsperframe);
 
-        COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/OFDM_BPS)];
-        for(i=0, j=(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS; i<(CODED_BITSPERFRAME/OFDM_BPS); i++,j++) {
+        COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/ofdm_bps)];
+
+        for(i=0, j=(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps; i<(CODED_BITSPERFRAME/ofdm_bps); i++,j++) {
             ldpc_codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
             ldpc_codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
         }
-        float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(OFDM_NUWBITS+OFDM_NTXTBITS)/OFDM_BPS];
+
+        float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps];
                 
-        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/OFDM_BPS);
-        Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/OFDM_BPS);
+        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
+        Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
 
         double llr[CODED_BITSPERFRAME];
         char   out_char[CODED_BITSPERFRAME];
@@ -395,35 +452,35 @@ int main(int argc, char *argv[])
         
         /* rx vector logging -----------------------------------*/
 
-        assert(nin_tot < samples_per_frame*NFRAMES);
+        assert(nin_tot < ofdm_samplesperframe*NFRAMES);
 	memcpy(&rxbuf_in_log[nin_tot], rxbuf_in, sizeof(COMP)*nin);
         nin_tot += nin;
 
-        for(i=0; i<OFDM_RXBUF; i++) {
-            rxbuf_log[OFDM_RXBUF*f+i].real = crealf(ofdm->rxbuf[i]);
-            rxbuf_log[OFDM_RXBUF*f+i].imag = cimagf(ofdm->rxbuf[i]);
+        for(i=0; i<ofdm_rxbuf; i++) {
+            rxbuf_log[ofdm_rxbuf*f+i].real = crealf(ofdm->rxbuf[i]);
+            rxbuf_log[ofdm_rxbuf*f+i].imag = cimagf(ofdm->rxbuf[i]);
         }
 
-        for (i = 0; i < (OFDM_NS + 3); i++) {
-            for (j = 0; j < (OFDM_NC + 2); j++) {
-                rx_sym_log[(OFDM_NS + 3)*f+i][j].real = crealf(ofdm->rx_sym[i][j]);
-                rx_sym_log[(OFDM_NS + 3)*f+i][j].imag = cimagf(ofdm->rx_sym[i][j]);
+        for (i = 0; i < (ofdm_ns + 3); i++) {
+            for (j = 0; j < (ofdm_nc + 2); j++) {
+                rx_sym_log[(ofdm_ns + 3)*f+i][j].real = crealf(ofdm->rx_sym[i][j]);
+                rx_sym_log[(ofdm_ns + 3)*f+i][j].imag = cimagf(ofdm->rx_sym[i][j]);
             }
         }
 
         /* note corrected phase (rx no phase) is one big linear array for frame */
 
-        for (i = 0; i < OFDM_ROWSPERFRAME*OFDM_NC; i++) {
-            rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].real = crealf(ofdm->rx_np[i]);
-            rx_np_log[OFDM_ROWSPERFRAME*OFDM_NC*f + i].imag = cimagf(ofdm->rx_np[i]);
+        for (i = 0; i < ofdm_rowsperframe*ofdm_nc; i++) {
+            rx_np_log[ofdm_rowsperframe*ofdm_nc*f + i].real = crealf(ofdm->rx_np[i]);
+            rx_np_log[ofdm_rowsperframe*ofdm_nc*f + i].imag = cimagf(ofdm->rx_np[i]);
         }
 
         /* note phase/amp ests the same for each col, but check them all anyway */
 
-        for (i = 0; i < OFDM_ROWSPERFRAME; i++) {
-            for (j = 0; j < OFDM_NC; j++) {
-                phase_est_pilot_log[OFDM_ROWSPERFRAME*f+i][j] = ofdm->aphase_est_pilot_log[OFDM_NC*i+j];
-                rx_amp_log[OFDM_ROWSPERFRAME*OFDM_NC*f+OFDM_NC*i+j] = ofdm->rx_amp[OFDM_NC*i+j];
+        for (i = 0; i < ofdm_rowsperframe; i++) {
+            for (j = 0; j < ofdm_nc; j++) {
+                phase_est_pilot_log[ofdm_rowsperframe*f+i][j] = ofdm->aphase_est_pilot_log[ofdm_nc*i+j];
+                rx_amp_log[ofdm_rowsperframe*ofdm_nc*f+ofdm_nc*i+j] = ofdm->rx_amp[ofdm_nc*i+j];
             }
         }
 
@@ -437,10 +494,10 @@ int main(int argc, char *argv[])
         noise_var_log[f] = ofdm->noise_var;
         mean_amp_log[f] = ofdm->mean_amp;
 
-        memcpy(&rx_bits_log[OFDM_BITSPERFRAME*f], rx_bits, sizeof(rx_bits));
+        memcpy(&rx_bits_log[ofdm_bitsperframe*f], rx_bits, sizeof(rx_bits));
 
-        for(i=0; i<(CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS); i++) {
-            symbol_likelihood_log[ (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * f + i] = symbol_likelihood[i];
+        for(i=0; i<(CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps); i++) {
+            symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * f + i] = symbol_likelihood[i];
         }
         for(i=0; i<CODED_BITSPERFRAME; i++) {
             bit_likelihood_log[CODED_BITSPERFRAME*f + i] =  bit_likelihood[i];
@@ -456,25 +513,25 @@ int main(int argc, char *argv[])
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
-    octave_save_float(fout, "w_c", (float*)ofdm->w, 1, OFDM_NC + 2, OFDM_NC + 2);
-    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, OFDM_M+OFDM_NCP, OFDM_M+OFDM_NCP);
-    octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
-    octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
-    octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, samples_per_frame*NFRAMES,  samples_per_frame*NFRAMES);
+    octave_save_float(fout, "w_c", (float*)ofdm->w, 1, ofdm_nc + 2, ofdm_nc + 2);
+    octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, ofdm_m+ofdm_ncp, ofdm_m+ofdm_ncp);
+    octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, ofdm_bitsperframe*NFRAMES);
+    octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
+    octave_save_complex(fout, "rx_log_c", (COMP*)rx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
     octave_save_complex(fout, "rxbuf_in_log_c", (COMP*)rxbuf_in_log, 1, nin_tot, nin_tot);
-    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, OFDM_RXBUF*NFRAMES,  OFDM_RXBUF*NFRAMES);
-    octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (OFDM_NS + 3)*NFRAMES, OFDM_NC + 2, OFDM_NC + 2);
-    octave_save_float(fout, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, OFDM_ROWSPERFRAME*NFRAMES, OFDM_NC, OFDM_NC);
-    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
+    octave_save_complex(fout, "rxbuf_log_c", (COMP*)rxbuf_log, 1, ofdm_rxbuf*NFRAMES,  ofdm_rxbuf*NFRAMES);
+    octave_save_complex(fout, "rx_sym_log_c", (COMP*)rx_sym_log, (ofdm_ns + 3)*NFRAMES, ofdm_nc + 2, ofdm_nc + 2);
+    octave_save_float(fout, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, ofdm_rowsperframe*NFRAMES, ofdm_nc, ofdm_nc);
+    octave_save_float(fout, "rx_amp_log_c", (float*)rx_amp_log, 1, ofdm_rowsperframe*ofdm_nc*NFRAMES, ofdm_rowsperframe*ofdm_nc*NFRAMES);
     octave_save_float(fout, "foff_hz_log_c", foff_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "timing_est_log_c", timing_est_log, NFRAMES, 1);
     octave_save_int(fout, "timing_valid_log_c", timing_valid_log, NFRAMES, 1);
     octave_save_float(fout, "timing_mx_log_c", timing_mx_log, NFRAMES, 1, 1);
     octave_save_float(fout, "coarse_foff_est_hz_log_c", coarse_foff_est_hz_log, NFRAMES, 1, 1);
     octave_save_int(fout, "sample_point_log_c", sample_point_log, NFRAMES, 1);
-    octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES, OFDM_ROWSPERFRAME*OFDM_NC*NFRAMES);
-    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, OFDM_BITSPERFRAME*NFRAMES);
-    octave_save_float(fout, "symbol_likelihood_log_c", symbol_likelihood_log, (CODED_BITSPERFRAME/OFDM_BPS) * (1<<OFDM_BPS) * NFRAMES, 1, 1);
+    octave_save_complex(fout, "rx_np_log_c", (COMP*)rx_np_log, 1, ofdm_rowsperframe*ofdm_nc*NFRAMES, ofdm_rowsperframe*ofdm_nc*NFRAMES);
+    octave_save_int(fout, "rx_bits_log_c", rx_bits_log, 1, ofdm_bitsperframe*NFRAMES);
+    octave_save_float(fout, "symbol_likelihood_log_c", symbol_likelihood_log, (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * NFRAMES, 1, 1);
     octave_save_float(fout, "bit_likelihood_log_c", bit_likelihood_log, CODED_BITSPERFRAME * NFRAMES, 1, 1);
     octave_save_int(fout, "detected_data_log_c", detected_data_log, 1, CODED_BITSPERFRAME*NFRAMES);
     octave_save_float(fout, "sig_var_log_c", sig_var_log, NFRAMES, 1, 1);
