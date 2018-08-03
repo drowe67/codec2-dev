@@ -103,8 +103,21 @@ QuickStart (TODO: David & Don work together to complete this section)
      $ (TODO: commands to start and run test in gdb)
      $ ./scripts/tst_ofdm_demod_check ideal
 
-     (TODO: does this print pass/fail, ie how do we know we have passed)
-     (TODO: command lines to plot results, what we would expect to see for pass)
-     
-  
+   The check script will print information on each check.
+   The final line should be "Test PASSED".  If any of the checks fail
+   then it will be "Test FAILED".
+
+   The checks are:
+
+     * BER - Do the reported bit error numbers and rates match?
+     * Output - Do the output bits match (as well as expected for each test)?
+     * Symbols - Do the Symbols and such match closely (from debug outputs)?
+
+   The check script also translates the target data into octave
+   format in the file "ofdm_demod_log.txt" which goes with the
+   reference file "ofdm_demod_ref_log.txt".  These files can be
+   loaded into octave for debugging and analisys.  There is a file in
+   unittest/lib/octave/ofdm_demod_check.m which may be useful.
+
+
 # vi:set ts=3 et sts=3:
