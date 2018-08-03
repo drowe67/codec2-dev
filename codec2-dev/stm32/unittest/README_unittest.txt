@@ -73,4 +73,38 @@ Debug and semihosting:
    in the output of st-util.  They can be ignored.
 
 
+QuickStart (TODO: David & Don work together to complete this section)
+---------------------------------------------------------------------
+
+1/ Build stlink:
+
+  $ cd ~
+  $ git clone https://github.com/texane/stlink
+  $ cd stlink
+  $ make
+
+2/ Build unittests:
+
+  $ cd codec2-dev/stm32/unittest
+  $ unzip ~/Downloads/en.stm32f4_dsp_stdperiph_lib.zip
+  (TODO: how to handle different STM32F4xx_DSP_StdPeriph_Lib versions)
+  $ make
+  
+3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
+   terminals.  In the first terminal start st-util:
+
+     $ cd tests_run/tst_ofdm_demod_ideal
+     $ sudo ~/stlink/build/Release/src/gdbserver/st-util --semihosting
+
+   In the second terminal configure and run the unittest:
+   
+     $ cd codec2-dev/stm32/unittest
+     $ ./scripts/tst_ofdm_demod_setup ideal
+     $ (TODO: commands to start and run test in gdb)
+     $ ./scripts/tst_ofdm_demod_check ideal
+
+     (TODO: does this print pass/fail, ie how do we know we have passed)
+     (TODO: command lines to plot results, what we would expect to see for pass)
+     
+  
 # vi:set ts=3 et sts=3:
