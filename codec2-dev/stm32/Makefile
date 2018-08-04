@@ -447,7 +447,7 @@ SRCS += src/startup_stm32f4xx.s src/init.c
 
 OBJS = $(SRCS:.c=.o)
 
-all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin tst_ofdm_mod.bin tst_ofdm_demod.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin sm2000_rxdemo.bin
+all: libstm32f4.a codec2_profile.bin fft_test.bin dac_ut.bin dac_play.bin adc_rec.bin pwm_ut.bin fdmdv_profile.bin sm1000_leds_switches_ut.bin sm1000.bin adcdac_ut.bin freedv_tx_profile.bin freedv_rx_profile.bin adc_sd.bin usb_vcp_ut.bin tuner_ut.bin fast_dac_ut.bin adc_sfdr_ut.bin adc_rec_usb.bin si5351_ut.bin mco_ut.bin sm2000_stw.bin sm2000_adcdump.bin sm2000_rxdemo.bin
 
 ##########################
 ### Commented out to use manually downloaded library
@@ -756,39 +756,6 @@ FDMDV_DUMP_RT_SRCS += $(CODEC2_SRCS)
 fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS:.c=.O3.o) \
 		src/stm32f4_dac.O3.o src/stm32f4_adc.o libstm32f4.a
 	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
-
-# ---------------------------------------------------------------------------
-
-TST_OFDM_MOD_SRCS=\
-src/tst_ofdm_mod.c \
-$(CODEC2_SRC)/ofdm.c \
-src/stm32f4_machdep.c \
-gdb_stdio.c \
-src/system_stm32f4xx.c \
-src/startup_stm32f4xx.s \
-src/init.c
-
-TST_OFDM_MOD_SRCS += $(CODEC2_SRCS)
-
-tst_ofdm_mod.elf: $(TST_OFDM_MOD_SRCS:.c=.profile.o) libstm32f4.a
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
-
-
-# ---------------------------------------------------------------------------
-
-TST_OFDM_DEMOD_SRCS=\
-src/tst_ofdm_demod.c \
-$(CODEC2_SRC)/ofdm.c \
-src/stm32f4_machdep.c \
-gdb_stdio.c \
-src/system_stm32f4xx.c \
-src/startup_stm32f4xx.s \
-src/init.c
-
-TST_OFDM_DEMOD_SRCS += $(CODEC2_SRCS)
-
-tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # ---------------------------------------------------------------------------
 
