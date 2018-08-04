@@ -70,6 +70,9 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr, "\n");
 	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--ldpc] [--interleaver depth]\n\n", argv[0]);
+        fprintf(stderr, "  --nc         Nsecs  Number of Carriers (17 default)\n");
+        fprintf(stderr, "  --tcp        Nsecs  Cyclic Prefix Duration (.002 default)\n");
+        fprintf(stderr, "  --ts         Nsecs  Symbol Duration (.018 default)\n");
         fprintf(stderr, "  --testframes Nsecs  Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
         fprintf(stderr, "  --ldpc              Run LDPC decoder.  This forces 112, one char/bit output values\n"
                         "                      per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
@@ -97,6 +100,35 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Out of Memory\n");
         exit(1);
     }
+
+    ofdm_config->centre = 1500.0;
+    ofdm_config->fs = 8000.0;			/* Sample Frequency */
+    ofdm_config->ofdm_timing_mx_thresh = 0.30;
+    ofdm_config->ftwindowwidth = 11;
+    ofdm_config->state_str = 16; 		/* state string length */
+    ofdm_config->bps = 2;   			/* Bits per Symbol */
+    ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
+    ofdm_config->ns = 8;  			/* Number of Symbol frames */
+
+    if ((arg = opt_exists(argv, argc, "--nc"))) {
+        ofdm_config->nc = atoi(argv[arg+1]);	/* Number of carriers */
+    } else {
+        ofdm_config->nc = 17;
+    }
+
+    if ((arg = opt_exists(argv, argc, "--tcp"))) {
+        ofdm_config->tcp = atoi(argv[arg+1]);	/* Cyclic Prefix duration */
+    } else {
+        ofdm_config->tcp = 0.0020;
+    }
+
+    if ((arg = opt_exists(argv, argc, "--ts"))) {
+        ofdm_config->ts = atoi(argv[arg+1]);	/* Symbol duration */
+    } else {
+        ofdm_config->ts = 0.0180;
+    }
+
+    ofdm_config->rs = (1.0f / ofdm_config->ts); 	/* Symbol Rate */
 
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
