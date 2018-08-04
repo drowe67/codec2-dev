@@ -83,12 +83,23 @@ QuickStart (TODO: David & Don work together to complete this section)
   $ cd stlink
   $ make
 
-2/ Build unittests:
+2/ The STM32 Standard Preipheral Library is required and requires
+   registration to download. Save the zip file somewhere safe, then
+   extract to a directory of your choice, for example:
 
-  $ cd codec2-dev/stm32/unittest
-  $ unzip ~/Downloads/en.stm32f4_dsp_stdperiph_lib.zip
-  (TODO: how to handle different STM32F4xx_DSP_StdPeriph_Lib versions)
-  $ make
+   $ cd /periph/lib/path
+   $ unzip /path/to/en.stm32f4_dsp_stdperiph_lib.zip
+
+   The unittest Makefile requires a path to the unzipped Standard
+   Preipheral Library, this can be set by adding a local.mak file in
+   the codec2-dev/stm32/unittest directory:
+
+   $ cd ~/codec2-dev/stm32/unittest
+   $ echo 'PERIPHLIBDIR = /periph/lib/path/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0' > local.mak
+
+   Now we can build the unittests:
+
+   $ make
   
 3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
    terminals.  In the first terminal start st-util:
