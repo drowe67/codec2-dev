@@ -76,15 +76,26 @@
 extern const int payload_data_bits[];
 extern const int test_bits_ofdm[];
 
+static struct OFDM_CONFIG *ofdm_config;
+
+static int ofdm_bitsperframe;
+static int ofdm_rowsperframe;
+static int ofdm_nuwbits;
+static int ofdm_ntxtbits;
+static int ofdm_nin;
+
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
     FILE        *fcfg, *fin, *fout, *fdiag;
     int          nin_frame;
 
+    int          config_verbose, config_testframes, config_ldpc_en, config_log_payload_syms,
+                 config_profile;
+
     int          i, f;
-    int          interleave_frames, testframes, verbose, log_payload_syms;
+    int          interleave_frames;
     int          Nerrs, Terrs, Tbits, Terrs2, Tbits2, frame_count;
-    int          ldpc_en, Tbits_coded, Terrs_coded;
+    int          Tbits_coded, Terrs_coded;
 
     semihosting_init();
 
@@ -102,10 +113,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error reading config file\n");
         exit(1);
     }
-    verbose = config[0] - '0';
-    testframes = config[1] - '0';
-    ldpc_en = config[2] - '0';
-    log_payload_syms = config[3] - '0';
+    config_verbose = config[0] - '0';
+    config_testframes = config[1] - '0';
+    config_ldpc_en = config[2] - '0';
+    config_log_payload_syms = config[3] - '0';
+    config_profile = config[4] - '0';
     fclose(fcfg);
     //
     interleave_frames = 1;
@@ -119,28 +131,42 @@ int main(int argc, char *argv[]) {
         Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
     }
 
-    //PROFILE_VAR(ofdm_demod_start, ofdm_demod_sync_search,
-    //            ofdm_demod_demod, ofdm_demod_diss, ofdm_demod_snr);
+    PROFILE_VAR(ofdm_demod_start, ofdm_demod_sync_search,
+                ofdm_demod_demod, ofdm_demod_diss, ofdm_demod_snr);
+    if (config_profile) machdep_profile_init();
 
-    //machdep_profile_init();
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
 
-    ofdm = ofdm_create(NULL);
-    ofdm_set_verbose(ofdm, verbose);
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
 
-    int Nbitsperframe = ofdm_get_bits_per_frame(ofdm);
-    //int Nsamperframe = ofdm_get_samples_per_frame();
+    free(ofdm_config);
+
+    /* Get a copy of the actual modem config */
+    ofdm_config = ofdm_get_config_param();
+
+    ofdm_bitsperframe = ofdm_get_bits_per_frame();
+    ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
+    ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+    ofdm_ntxtbits = ofdm_config->txtbits;
+    ofdm_nin = ofdm_get_nin(ofdm);
+
+    ofdm_set_verbose(ofdm, config_verbose);
+
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
-    int coded_syms_per_frame = ((OFDM_BITSPERFRAME/OFDM_BPS) -
-                                (OFDM_NUWBITS/OFDM_BPS) -
-                                (OFDM_NTXTBITS/OFDM_BPS));
-
+    int coded_syms_per_frame = ((ofdm_bitsperframe/ofdm_config->bps) -
+                               (ofdm_nuwbits/ofdm_config->bps) -
+                               (ofdm_ntxtbits/ofdm_config->bps));
 
     short  rx_scaled[Nmaxsamperframe];
     COMP   rxbuf_in[Nmaxsamperframe];
-    int    rx_bits[Nbitsperframe];
-    char   rx_bits_char[Nbitsperframe];
-    int    rx_uw[OFDM_NUWBITS];
-    short  txt_bits[OFDM_NTXTBITS];
+    int    rx_bits[ofdm_bitsperframe];
+    char   rx_bits_char[ofdm_bitsperframe];
+    int    rx_uw[ofdm_nuwbits];
+    short  txt_bits[ofdm_ntxtbits];
     f = 0;
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
@@ -173,7 +199,7 @@ int main(int argc, char *argv[]) {
 
         int log_payload_syms_flag = 0;
 
-        //PROFILE_SAMPLE(ofdm_demod_start);
+        if (config_profile) PROFILE_SAMPLE(ofdm_demod_start);
 
 	    /* scale and demod */
 	    for(i=0; i<nin_frame; i++) {
@@ -181,55 +207,55 @@ int main(int argc, char *argv[]) {
                 rxbuf_in[i].imag = 0.0;
             }
 
-        //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
+        if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
 
         if (strcmp(ofdm->sync_state,"search") == 0) {
-            //PROFILE_SAMPLE(ofdm_demod_sync_search);
+            if (config_profile) PROFILE_SAMPLE(ofdm_demod_sync_search);
             ofdm_sync_search(ofdm, rxbuf_in);
-            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
+            if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
         }
 
         if ((strcmp(ofdm->sync_state,"synced") == 0) ||
             (strcmp(ofdm->sync_state,"trial") == 0) ) {
-            //PROFILE_SAMPLE(ofdm_demod_demod);
+            if (config_profile) PROFILE_SAMPLE(ofdm_demod_demod);
             ofdm_demod(ofdm, rx_bits, rxbuf_in);
-            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
-            //PROFILE_SAMPLE(ofdm_demod_diss);
+            if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
+            if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
-            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
+            if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_diss, "  ofdm_demod_diss");
             log_payload_syms_flag = 1;
 
             /* SNR estimation and smoothing */
-            //PROFILE_SAMPLE(ofdm_demod_snr);
+            if (config_profile) PROFILE_SAMPLE(ofdm_demod_snr);
 
-            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var)*OFDM_NC*OFDM_RS/3000);
+            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000);
             snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
-            //PROFILE_SAMPLE_AND_LOG2(ofdm_demod_snr, "  ofdm_demod_snr");
+            if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_snr, "  ofdm_demod_snr");
 
             /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
-            for(i=0; i<Nbitsperframe; i++) {
+            for(i=0; i<ofdm_bitsperframe; i++) {
                 rx_bits_char[i] = rx_bits[i];
             }
-            fwrite(rx_bits_char, sizeof(char), Nbitsperframe, fout);
+            fwrite(rx_bits_char, sizeof(char), ofdm_bitsperframe, fout);
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
 
-            if (testframes && (ldpc_en == 0)) {
+            if (config_testframes && (config_ldpc_en == 0)) {
                 Nerrs = 0;
-                for(i=0; i<Nbitsperframe; i++) {
+                for(i=0; i<ofdm_bitsperframe; i++) {
                     if (test_bits_ofdm[i] != rx_bits[i]) {
                         Nerrs++;
                     }
                 }
 
                 Terrs += Nerrs;
-                Tbits += Nbitsperframe;
+                Tbits += ofdm_bitsperframe;
 
                 if (frame_count >= NDISCARD) {
                     Terrs2 += Nerrs;
-                    Tbits2 += Nbitsperframe;
+                    Tbits2 += ofdm_bitsperframe;
                 }
-            } // testframes ...
+            } // config_testframes ...
 
             frame_count++;
         } // state "synced" or "trial"
@@ -248,7 +274,7 @@ int main(int argc, char *argv[]) {
         }
 
         int r = 0;
-        if (testframes && verbose) {
+        if (config_testframes && config_verbose) {
             r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
             fprintf(stderr, "%3d st: %-6s", f, ofdm->last_sync_state);
             fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
@@ -259,7 +285,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "\n");
         }
 
-        if (log_payload_syms) {
+        if (config_log_payload_syms) {
             if (! log_payload_syms_flag) {
                 memset(payload_syms, 0, (sizeof(COMP)*coded_syms_per_frame));
                 memset(payload_amps, 0, (sizeof(float)*coded_syms_per_frame));
@@ -275,22 +301,25 @@ int main(int argc, char *argv[]) {
     fclose(fout);
     fclose(fdiag);
 
-    if (testframes) {
+    if (config_testframes) {
         printf("BER......: %5.4f Tbits: %5d Terrs: %5d\n", (double)Terrs/Tbits, Tbits, Terrs);
-        if (!ldpc_en) {
+        if (!config_ldpc_en) {
             printf("BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (double)Terrs2/Tbits2, Tbits2, Terrs2);
         }
-        if (ldpc_en) {
+        if (config_ldpc_en) {
             printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
                     (double)Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded);
         }
     }
 
-    printf("End of test\n");
+    if (config_profile) {
+        fflush(stdout);
+        stdout = freopen("stm_profile", "w", stdout);
+        machdep_profile_print_logged_samples();
+        }
+
     fflush(stdout);
     fflush(stderr);
-
-    //machdep_profile_print_logged_samples();
 
     return 0;
 }
