@@ -430,7 +430,7 @@ LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 
 # startup file
 
-SRCS += $(CODEC2_STM32_SRC)/startup_stm32f4xx.s 
+SRCS += startup_stm32f4xx.s 
 SRCS += init.c 
 SRCS += $(CODEC2_STM32_SRC)/stm32f4_machdep.c
 SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
@@ -500,8 +500,8 @@ $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 TST_OFDM_DEMOD_SRCS += $(CODEC2_SRCS)
 TST_OFDM_DEMOD_SRCS += $(SRCS)
 
-tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.o) libstm32f4.a
-	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
 

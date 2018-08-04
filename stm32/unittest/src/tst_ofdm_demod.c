@@ -84,6 +84,10 @@ static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
 
+// Some constants from the linker.
+extern uint32_t _ebss;
+extern uint32_t _estack;
+
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
     FILE        *fcfg, *fin, *fout, *fdiag;
@@ -313,6 +317,11 @@ int main(int argc, char *argv[]) {
     }
 
     if (config_profile) {
+        // Find max stack use
+        uint32_t *p = (uint32_t *)(&_ebss);
+        while (*p != 0x55555555) p++;
+        printf("\nMax stack use was %d bytes\n", (int)(&_estack - p - 1));
+
         fflush(stdout);
         stdout = freopen("stm_profile", "w", stdout);
         machdep_profile_print_logged_samples();
