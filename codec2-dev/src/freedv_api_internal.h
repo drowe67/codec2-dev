@@ -110,7 +110,6 @@ struct freedv {
     /* Misc ---------------------------------------------------------------------------------------------*/
 
     int                  sync;
-    int                  validf;
     int                  evenframe;
     float                snr_est;
     float                snr_squelch_thresh;
