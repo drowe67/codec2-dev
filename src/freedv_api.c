@@ -2394,28 +2394,6 @@ int freedv_get_sz_error_pattern(struct freedv *f)
 struct CODEC2 *freedv_get_codec2	(struct freedv *f){return  f->codec2;}
 int freedv_get_n_codec_bits             (struct freedv *f){return f->n_codec_bits;}
 
-// Get bits
-
-int freedv_get_rx_codec_bits(struct freedv *f, unsigned char *bits_rx) { 
-    memcpy(bits_rx,  f->packed_codec_bits, f->nbyte_packed_codec_bits); 
-
-    if (f->validf) {
-        return f->nbyte_packed_codec_bits;
-    } else {
-        return 0; 
-    } 
-}
-
-int freedv_get_rx_codec_bits700D(struct freedv *f, unsigned char *bits_tx) { 
-    memcpy(bits_tx,  f->packed_codec_bits_tx, f->nbyte_packed_codec_bits); 
-
-    if (f->validf) {
-        return f->nbyte_packed_codec_bits;
-    } else {
-        return 0; 
-    } 
-}
-
 // Get modem status
 
 void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats)
