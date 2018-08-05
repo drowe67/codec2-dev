@@ -435,7 +435,7 @@ SRCS += init.c
 SRCS += $(CODEC2_STM32_SRC)/stm32f4_machdep.c
 SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
-all: libstm32f4.a tst_ofdm_demod.bin tst_semihost.bin
+all: libstm32f4.a tst_ofdm_mod.bin tst_ofdm_demod.bin tst_semihost.bin
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 	find -L $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
