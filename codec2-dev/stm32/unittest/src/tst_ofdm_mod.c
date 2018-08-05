@@ -25,6 +25,20 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+/* This is a unit test implementation of the OFDM Mod function.
+ *
+ * Typical run:
+
+    ofdm_get_test_bits stm_in.raw -f 10
+
+    ofdm_mod stm_in.raw ref_mod_out.raw
+
+    <Load stm32 and run>
+
+    compare_ints -s 2 ref_mod_out.raw mod.raw
+
+ */
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,6 +46,7 @@
 #include <math.h>
 #include <errno.h>
 
+#include "semihosting.h"
 #include "codec2_ofdm.h"
 #include "ofdm_internal.h"
 #include "interldpc.h"
@@ -39,22 +54,16 @@
 
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
-#include "gdb_stdio.h"
 #include "machdep.h"
 
-#ifdef __EMBEDDED__
-#define printf gdb_stdio_printf
-#define fopen gdb_stdio_fopen
-#define fclose gdb_stdio_fclose
-#define fread gdb_stdio_fread
-#define fwrite gdb_stdio_fwrite
-#endif
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
     FILE        *fin, *fout;
-    int          frame, n_bpf, n_spf;
+    int          n_bpf, n_spf;
     int          i;
+
+    semihosting_init();
 
     printf("OFDM_mod test and profile\n");
 
@@ -62,7 +71,16 @@ int main(int argc, char *argv[]) {
 
     machdep_profile_init();
 
-    ofdm = ofdm_create(NULL);
+    struct OFDM_CONFIG *ofdm_config;
+    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        fprintf(stderr, "Out of Memory\n");
+        exit(1);
+    }
+    ofdm = ofdm_create(ofdm_config);
+    assert(ofdm != NULL);
+
+    free(ofdm_config);
+
     n_bpf = ofdm_get_bits_per_frame(ofdm);
     n_spf = ofdm_get_samples_per_frame();
     uint8_t tx_bits_char[n_bpf];
@@ -80,8 +98,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    frame = 0;
-
     while (fread(tx_bits_char, sizeof(char), n_bpf, fin) == n_bpf) {
         PROFILE_SAMPLE(ofdm_mod_start);
 
@@ -97,12 +113,16 @@ int main(int argc, char *argv[]) {
         PROFILE_SAMPLE_AND_LOG2(ofdm_mod_start, "  ofdm_mod");
 
         fwrite(tx_scaled, sizeof(short), n_spf, fout);
-        printf("frame: %d\n", ++frame);
-        machdep_profile_print_logged_samples();
-   }
-
+    }
     fclose(fin);
     fclose(fout);
+    
+    fflush(stdout);
+    stdout = freopen("stm_profile", "w", stdout);
+    machdep_profile_print_logged_samples();
+
+    fclose(stdout);
+    fclose(stderr);
 
     return 0;
 }
