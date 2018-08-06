@@ -101,7 +101,7 @@ QuickStart (TODO: David & Don work together to complete this section)
 
    $ make
   
-3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
+3/ Plug in a Discovery (or other suitable stm32 board).  You need three open
    terminals.  In the first terminal set up the test and start st-util running:
 
      $ cd codec2-dev/stm32/unittest
@@ -120,12 +120,12 @@ QuickStart (TODO: David & Don work together to complete this section)
 
     In a third terminal:
   
-       $ cd ~/codec2-dev/stm32/unittest/
-       $ ./scripts/tst_ofdm_demod_check ideal
+       $ cd ~/codec2-dev/stm32/unittest/test_run/tst_ofdm_demod_ideal
+       $ ../../scripts/tst_ofdm_demod_check ideal
 
-   The check script will print information on each check.
-   The final line should be "Test PASSED".  If any of the checks fail
-   then it will be "Test FAILED".
+   The check script will print information on each check.  The final
+   line should be "Test PASSED".  If any of the checks fail then it
+   will be "Test FAILED".
 
    The checks are:
 
@@ -133,11 +133,11 @@ QuickStart (TODO: David & Don work together to complete this section)
      * Output - Do the output bits match (as well as expected for each test)?
      * Symbols - Do the Symbols and such match closely (from debug outputs)?
 
-   The check script also translates the target data into octave
-   format in the file "ofdm_demod_log.txt" which goes with the
-   reference file "ofdm_demod_ref_log.txt".  These files can be
-   loaded into octave for debugging and analisys.  There is a file in
-   unittest/lib/octave/ofdm_demod_check.m which may be useful.
+   The check script also translates the target data into octave format
+   in the file "ofdm_demod_log.txt" which goes with the reference file
+   "ofdm_demod_ref_log.txt".  These files can be loaded into Octave
+   for debugging and analysis (TODO: How?).  There is a file in
+   unittest/lib/octave/ofdm_demod_check.m which may be useful (TODO: How?).
 
 TODO:
 
