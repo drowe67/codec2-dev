@@ -3,7 +3,7 @@
 
     Testing for tst_ofdm_demod_* tests
 
-    Usage tst_ofdm_demod_check ideal|AWGN|fade
+    Usage tst_ofdm_demod_check ideal|AWGN|fade|profile
 
     Checks are different for each test, but similar
 
@@ -20,6 +20,9 @@ import argparse
 import struct
 import os
 import sys
+
+sys.path.append("../../lib/python")
+import sum_profiles
 
 Nbitsperframe = 238
 
@@ -138,7 +141,7 @@ def write_syms_as_octave(syms, amps):
 #### Options (test name)
 argparser = argparse.ArgumentParser()
 argparser.add_argument("test", action="store",
-                        choices=["ideal", "AWGN", "fade"])
+                        choices=["ideal", "AWGN", "fade", "profile"])
 args = argparser.parse_args()
 
 #### Settings
@@ -157,69 +160,87 @@ elif (args.test == "AWGN"):
     tolerance_syms = 0.005
 elif (args.test == "fade"):
     pass
+elif (args.test == "profile"):
+    tolerance_output_differences = 1
+    tolerance_syms = 0.005
+    pass
 else:
     print("Error: Test {} not recognized".format(args.test))
     sys.exit(1)
 
+
+#### Read test configuration - a file of '0' or '1' characters
+with open("stm_cfg.txt", "r") as f:
+    config = f.read(8)
+    config_verbose = config[0] == '1'
+    config_testframes = config[1] == '1'
+    config_ldpc_en = config[2] == '1'
+    config_log_payload_syms = config[3] == '1'
+    config_profile = config[4] == '1'
+
+
+####
 fail = False
 
-#### BER checks - log output looks like this:
-# BER......: 0.1951 Tbits: 14994 Terrs:  2926
-# BER2.....: 0.2001 Tbits: 10234 Terrs:  2048
 
-print("\nBER checks")
-
-# Read ref log
-print("Reference")
-with open("ref_gen_log.txt", "r") as f:
-    for line in f:
-        if (line[0:4] == "BER2"):
-            print(line, end="")
-            _, ref_ber2, _, ref_tbits2, _, ref_terrs2 = line.split()
-        elif (line[0:3] == "BER"):
-            print(line, end="")
-            _, ref_ber, _, ref_tbits, _, ref_terrs = line.split()
-# Strings to integers
-ref_ber = float(ref_ber)
-ref_tbits = int(ref_tbits)
-ref_terrs = int(ref_terrs)
-ref_ber2 = float(ref_ber2)
-ref_tbits2 = int(ref_tbits2)
-ref_terrs2 = int(ref_terrs2)
-
-# Read stm log
-print("Target")
-with open("stm_stdout.txt", "r") as f:
-    for line in f:
-        if (line[0:4] == "BER2"):
-            print(line, end="")
-            _, tgt_ber2, _, tgt_tbits2, _, tgt_terrs2 = line.split()
-        elif (line[0:3] == "BER"):
-            print(line, end="")
-            _, tgt_ber, _, tgt_tbits, _, tgt_terrs = line.split()
-# Strings to integers
-tgt_ber = float(tgt_ber)
-tgt_tbits = int(tgt_tbits)
-tgt_terrs = int(tgt_terrs)
-tgt_ber2 = float(tgt_ber2)
-tgt_tbits2 = int(tgt_tbits2)
-tgt_terrs2 = int(tgt_terrs2)
-
-# Compare BER values
-if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
-    (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
-    (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
-    ( (ref_tbits2 == 0) or
-      (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
-      (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
-      (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
-      )
-    ):
-    print("PASS: BER")
-else:
-    fail = True
-    print("FAIL: BER")
-
+if (config_testframes):
+    #### BER checks - log output looks like this:
+    # BER......: 0.1951 Tbits: 14994 Terrs:  2926
+    # BER2.....: 0.2001 Tbits: 10234 Terrs:  2048
+    
+    print("\nBER checks")
+    
+    # Read ref log
+    print("Reference")
+    with open("ref_gen_log.txt", "r") as f:
+        for line in f:
+            if (line[0:4] == "BER2"):
+                print(line, end="")
+                _, ref_ber2, _, ref_tbits2, _, ref_terrs2 = line.split()
+            elif (line[0:3] == "BER"):
+                print(line, end="")
+                _, ref_ber, _, ref_tbits, _, ref_terrs = line.split()
+    # Strings to integers
+    ref_ber = float(ref_ber)
+    ref_tbits = int(ref_tbits)
+    ref_terrs = int(ref_terrs)
+    ref_ber2 = float(ref_ber2)
+    ref_tbits2 = int(ref_tbits2)
+    ref_terrs2 = int(ref_terrs2)
+    
+    # Read stm log
+    print("Target")
+    with open("stm_stdout.txt", "r") as f:
+        for line in f:
+            if (line[0:4] == "BER2"):
+                print(line, end="")
+                _, tgt_ber2, _, tgt_tbits2, _, tgt_terrs2 = line.split()
+            elif (line[0:3] == "BER"):
+                print(line, end="")
+                _, tgt_ber, _, tgt_tbits, _, tgt_terrs = line.split()
+    # Strings to integers
+    tgt_ber = float(tgt_ber)
+    tgt_tbits = int(tgt_tbits)
+    tgt_terrs = int(tgt_terrs)
+    tgt_ber2 = float(tgt_ber2)
+    tgt_tbits2 = int(tgt_tbits2)
+    tgt_terrs2 = int(tgt_terrs2)
+    
+    # Compare BER values
+    if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
+        (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
+        (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
+        ( (ref_tbits2 == 0) or
+          (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
+          (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
+          (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
+          )
+        ):
+        print("PASS: BER")
+    else:
+        fail = True
+        print("FAIL: BER")
+    # end BER checks
 
 #### Output differences
 
@@ -256,15 +277,11 @@ else:
     # end not length mismatch
 
 
-#### Syms data (only if configured ie files exist
-do_syms = True
-try:
+#### Syms data 
+if (config_log_payload_syms):
     fref  = open("ofdm_demod_ref_log.txt", "r")
     fdiag = open("stm_diag.raw", "rb")
-except IOError:
-    do_syms = False
 
-if (do_syms):
     ref_data = read_octave_text(fref)
     (tgt_syms, tgt_amps) = read_tgt_syms(fdiag)
     fdiag.close()
@@ -320,6 +337,13 @@ if (do_syms):
     num_error_rows_amps = np.count_nonzero(error_rows_amps)
     print("")
     print("{} Amplitude errors on {} rows".format(num_errors_amps, num_error_rows_amps))
+
+
+#### Profile
+if (config_profile): 
+    print("")
+    fprof = open("stm_profile", "r")
+    sum_profiles.sum_profiles(fprof, 100)
 
 
 #### Print final status message
