@@ -104,7 +104,6 @@ int main(int argc, char *argv[]) {
     semihosting_init();
 
     fprintf(stdout, "OFDM Demod test\n");
-    fprintf(stderr, "OFDM Demod test\n");
 
     // Read configuration - a file of '0' or '1' characters
     char config[8];
@@ -327,8 +326,8 @@ int main(int argc, char *argv[]) {
         machdep_profile_print_logged_samples();
         }
 
-    fflush(stdout);
-    fflush(stderr);
+    fclose(stdout);
+    fclose(stderr);
 
     return 0;
 }
