@@ -49,7 +49,7 @@ Debug and semihosting:
    This one supports the newer boards but also does semihosting differently.
    It needs a command line option to turn on semihosting.
 
-   The source can be downloaded from"
+   The source can be downloaded from:
 
        https://github.com/texane/stlink
 
@@ -102,17 +102,26 @@ QuickStart (TODO: David & Don work together to complete this section)
    $ make
   
 3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
-   terminals.  In the first terminal start st-util:
+   terminals.  In the first terminal set up the test and start st-util running:
 
-     $ cd tests_run/tst_ofdm_demod_ideal
-     $ sudo ~/stlink/build/Release/src/gdbserver/st-util --semihosting
-
-   In the second terminal configure and run the unittest:
-   
      $ cd codec2-dev/stm32/unittest
      $ ./scripts/tst_ofdm_demod_setup ideal
-     $ (TODO: commands to start and run test in gdb)
-     $ ./scripts/tst_ofdm_demod_check ideal
+     $ cd test_run/tst_ofdm_demod_ideal
+     $ sudo ~/stlink/build/Release/src/gdbserver/st-util --semihosting
+     
+   In the second terminal run the unittest:
+
+     $ cd ~/codec2-dev/stm32/unittest/test_run/tst_ofdm_demod_ideal
+     $ arm-none-eabi-gdb ../../src/tst_ofdm_demod.elf
+     (gdb) tar ext :4242
+     (gdb) load
+     (gdb) r
+     TODO: appears stuck at this point?  How do we know when it's finished?
+
+    In a third terminal:
+  
+       $ cd ~/codec2-dev/stm32/unittest/
+       $ ./scripts/tst_ofdm_demod_check ideal
 
    The check script will print information on each check.
    The final line should be "Test PASSED".  If any of the checks fail
@@ -130,5 +139,9 @@ QuickStart (TODO: David & Don work together to complete this section)
    loaded into octave for debugging and analisys.  There is a file in
    unittest/lib/octave/ofdm_demod_check.m which may be useful.
 
+TODO:
+
+Document steps to repeat a test once the initial set up is done.  Work
+to mimimise the number of steps.
 
 # vi:set ts=3 et sts=3:
