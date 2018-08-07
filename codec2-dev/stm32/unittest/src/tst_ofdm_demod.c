@@ -29,9 +29,10 @@
 /* This is a unit test implementation of the OFDM Demod function.
  * It is used for several tests:
  *
- *  tst_ofdm_demod_ideal
- *  tst_ofdm_demod_AWGN
- *  tst_ofdm_demod_fade
+ *  tst_ofdm_demod_ideal    Simple 10 frames with no degradation.
+ *  tst_ofdm_demod_AWGN     Just AWGN in channel.
+ *  tst_ofdm_demod_fade     AWGN and fading in channel.
+ *  tst_ofdm_demod_profile  Profile and stack use, disable verbose logging.
  *
  * See tst_ofdm_demod_setup and tst_ofdm_demod_check scripts for details.
  *
@@ -41,13 +42,16 @@
  * Codec2 frames, which may have had simulated RF degredation applied.
  * For example:
  *
- *    ofdm_get_test_bits - 10 | * ofdm_mod - - | cohpsk_ch - stm_in.raw -20 -Fs 8000 -f -5
+ *    ofdm_get_test_bits - 10 | * ofdm_mod - - | \
+ *        cohpsk_ch - stm_in.raw -20 -Fs 8000 -f -5
  *
- * Reference data can be created by running the same input through the x86 ofdm_demod tool.
+ * Reference data can be created by running the same input through the x86 
+ * ofdm_demod tool.
  *
  *    ofdm_demod stm_in.raw ref_demod_out.raw -o ofdm_demod_ref_log.txt --testframes
  *
  * Comparison of the results to the reference will depend on the test conditions.
+ * Some small differences are expected due to differences in implementation.
  *
  */
 
@@ -85,7 +89,7 @@ static int ofdm_ntxtbits;
 static int ofdm_nin;
 
 // Some constants from the linker.
-extern uint32_t _ebss;
+extern uint32_t _end;
 extern uint32_t _estack;
 
 int main(int argc, char *argv[]) {
@@ -316,16 +320,28 @@ int main(int argc, char *argv[]) {
     }
 
     if (config_profile) {
-        // Find max stack use
-        uint32_t *p = (uint32_t *)(&_ebss);
-        while (*p != 0x55555555) p++;
-        printf("\nMax stack use was %d bytes\n", (int)(&_estack - p - 1));
+        printf("\n");
+        // Scan heap, stack area.
+        // I can't fully understand the structure of this area,
+        // there are many small used blocks with 4 or 8 byte unused blocks
+        // between them.  Alignment may be part of this.  What is heap, what
+        // is stack, ????
+        //
+        // For now just count all used words
+        uint32_t *p = &_end;
+        uint32_t words_used = 0;
+        while (p < &_estack) {
+            if (*p++ != 0x55555555) words_used ++;
+            }
+        printf("Heap/Stack used = %ld bytes\n", (words_used * 4));
 
-        fflush(stdout);
-        stdout = freopen("stm_profile", "w", stdout);
+        printf("\nStart Profile Data\n");
         machdep_profile_print_logged_samples();
+        printf("End Profile Data\n");
+
         }
 
+    printf("\nEnd of Test\n");
     fclose(stdout);
     fclose(stderr);
 

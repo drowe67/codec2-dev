@@ -96,7 +96,7 @@ LoopFillZerobss:
 
 
 /* Fill stack area with a fix pattern for observince max stack use */
-  add  r2, r3, #4
+  mov  r2, r3
   ldr  r3, = _estack
   ldr  r4, =0x55555555
   b  LoopFillStack
