@@ -1915,7 +1915,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
 
     if (f->verbose  && strcmp(ofdm->last_sync_state, "search")) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
+                f->frames++, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, 
+		(double)ofdm->foff_est_hz,
                 ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
@@ -2019,7 +2020,6 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     int valid;
     int ret = 0;
     int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
-    int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     assert(nin <= f->n_max_modem_samples);
     
@@ -2033,6 +2033,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     }
 
 #ifndef CORTEX_M4
+    int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         freedv_comprx_700(f, rx_fdm, &valid);
     }
