@@ -172,11 +172,11 @@ else:
 #### Read test configuration - a file of '0' or '1' characters
 with open("stm_cfg.txt", "r") as f:
     config = f.read(8)
-    config_verbose = config[0] == '1'
-    config_testframes = config[1] == '1'
-    config_ldpc_en = config[2] == '1'
-    config_log_payload_syms = config[3] == '1'
-    config_profile = config[4] == '1'
+    config_verbose = (config[0] == '1')
+    config_testframes = (config[1] == '1')
+    config_ldpc_en = (config[2] == '1')
+    config_log_payload_syms = (config[3] == '1')
+    config_profile = (config[4] == '1')
 
 
 ####
@@ -279,6 +279,8 @@ else:
 
 #### Syms data 
 if (config_log_payload_syms):
+    print("\nSyms and Amps checks")
+
     fref  = open("ofdm_demod_ref_log.txt", "r")
     fdiag = open("stm_diag.raw", "rb")
 
@@ -287,7 +289,6 @@ if (config_log_payload_syms):
     fdiag.close()
     write_syms_as_octave(tgt_syms, tgt_amps) # for manual debug...
 
-    print("\nSyms and Amps checks")
     # Find smallest common subset
     hgt = min(tgt_syms.shape[0], ref_data["payload_syms_log_c"].shape[0])
     wid = min(tgt_syms.shape[1], ref_data["payload_syms_log_c"].shape[1])
@@ -341,9 +342,15 @@ if (config_log_payload_syms):
 
 #### Profile
 if (config_profile): 
-    print("")
-    fprof = open("stm_profile", "r")
-    sum_profiles.sum_profiles(fprof, 100)
+    print("\nProfile:")
+    with open("stm_stdout.txt", "r") as f:
+        sum_profiles.sum_profiles(f, 100)
+
+    print("\nStack:")
+    with open("stm_stdout.txt", "r") as f:
+        for line in f:
+            if (line.startswith("Max stack")): 
+                print(line)
 
 
 #### Print final status message
