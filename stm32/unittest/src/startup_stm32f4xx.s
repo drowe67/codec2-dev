@@ -37,6 +37,7 @@
 
 .global  g_pfnVectors
 .global  Default_Handler
+.global  EndofMain
 
 /* start address for the initialization values of the .data section.
 defined in linker script */
@@ -114,7 +115,8 @@ LoopFillStack:
     bl __libc_init_array
 /* Call the application's entry point.*/
   bl  main
-  bx  lr
+EndofMain:
+  bl  .
 .size  Reset_Handler, .-Reset_Handler
 
 /**
