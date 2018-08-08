@@ -32,7 +32,7 @@
  *  tst_ofdm_demod_ideal    Simple 10 frames with no degradation.
  *  tst_ofdm_demod_AWGN     Just AWGN in channel.
  *  tst_ofdm_demod_fade     AWGN and fading in channel.
- *  tst_ofdm_demod_profile  Profile and stack use, disable verbose logging.
+ *  tst_ofdm_demod_profile  Profile, disable verbose logging.
  *
  * See tst_ofdm_demod_setup and tst_ofdm_demod_check scripts for details.
  *
@@ -87,10 +87,6 @@ static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
-
-// Some constants from the linker.
-extern uint32_t _end;
-extern uint32_t _estack;
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
@@ -320,25 +316,9 @@ int main(int argc, char *argv[]) {
     }
 
     if (config_profile) {
-        printf("\n");
-        // Scan heap, stack area.
-        // I can't fully understand the structure of this area,
-        // there are many small used blocks with 4 or 8 byte unused blocks
-        // between them.  Alignment may be part of this.  What is heap, what
-        // is stack, ????
-        //
-        // For now just count all used words
-        uint32_t *p = &_end;
-        uint32_t words_used = 0;
-        while (p < &_estack) {
-            if (*p++ != 0x55555555) words_used ++;
-            }
-        printf("Heap/Stack used = %ld bytes\n", (words_used * 4));
-
         printf("\nStart Profile Data\n");
         machdep_profile_print_logged_samples();
         printf("End Profile Data\n");
-
         }
 
     printf("\nEnd of Test\n");
