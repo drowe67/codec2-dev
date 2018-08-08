@@ -101,7 +101,7 @@ QuickStart (TODO: David & Don work together to complete this section)
 
    $ make
   
-3/ Plug in a Discovery (or other suitable stm32 board).  You need three open
+3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
    terminals.  In the first terminal set up the test and start st-util running:
 
      $ cd codec2-dev/stm32/unittest
@@ -115,13 +115,17 @@ QuickStart (TODO: David & Don work together to complete this section)
      $ arm-none-eabi-gdb ../../src/tst_ofdm_demod.elf
      (gdb) tar ext :4242
      (gdb) load
-     (gdb) r
-     TODO: appears stuck at this point?  How do we know when it's finished?
+     (gdb) mon reset
+     (gdb) break EndofMain
+     (gdb) break Infinite_Loop
+     (gdb) cont
 
-    In a third terminal:
+   Gdb should stop at either the EndofMain if all went well, or Infinite_Loop
+   if there was a run time error.  In either case kill it with ^C and "quit".
+
+   Check the results with:
   
-       $ cd ~/codec2-dev/stm32/unittest/test_run/tst_ofdm_demod_ideal
-       $ ../../scripts/tst_ofdm_demod_check ideal
+     $ ../../scripts/tst_ofdm_demod_check ideal
 
    The check script will print information on each check.  The final
    line should be "Test PASSED".  If any of the checks fail then it
@@ -139,9 +143,7 @@ QuickStart (TODO: David & Don work together to complete this section)
    for debugging and analysis (TODO: How?).  There is a file in
    unittest/lib/octave/ofdm_demod_check.m which may be useful (TODO: How?).
 
-TODO:
-
-Document steps to repeat a test once the initial set up is done.  Work
-to mimimise the number of steps.
+   To repeat a test you can just run gdb again and skip the "load" and "mon reset"
+   steps.
 
 # vi:set ts=3 et sts=3:
