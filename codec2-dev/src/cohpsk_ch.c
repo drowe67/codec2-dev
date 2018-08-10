@@ -397,6 +397,8 @@ int main(int argc, char *argv[])
     fprintf(stderr, "SNR3k(dB): %5.2f C/No: %4.1f PAPR: %4.1f \n", snr3k, CNo, papr);
     fprintf(stderr, "cohpsk_ch -----------------------------------------------------------------------------\n");
 
+    if (ffading != NULL) fclose(ffading);
+    if (ch_fdm_delay != NULL) free(ch_fdm_delay);
     return 0;
 }
 

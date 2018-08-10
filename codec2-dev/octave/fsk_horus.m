@@ -648,7 +648,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   if test_frame_mode == 7
     % 800XA 4FSK modem --------------
-    states = fsk_horus_init_hbr(8000, 10, 400, 4, 256);
+    states = fsk_init_hbr(8000, 10, 400, 4, 256);
     states.tx_bits_file = "horus_high_speed.bin";
     states.verbose += 0x4;
     ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
@@ -838,10 +838,10 @@ endfunction
 
 if exist("fsk_horus_as_a_lib") == 0
   %run_sim(4, 2, 30, 10);
-  run_sim(5, 4, 30, 100);
+  %run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
-  %rx_bits = demod_file("fsk_horus.raw",5);
-  %rx_bits = demod_file("~/Desktop/4FSK_Binary_NoLock.wav",4);
+  %rx_bits = demod_file("~/Desktop/fsk_800xa_rx_hackrf.wav",7);
+  rx_bits = demod_file("~/Desktop/2fsk_100_rx_rpi_rtlsdr_002_ledger.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
@@ -855,6 +855,6 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("fsk_horus_rx_1200_96k.raw",1);
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
-  %rx_bits = demod_file("~/Desktop/bench_test_003.wav",7);
+  %rx_bits = demod_file("~/Desktop/fsk_800xa.wav",7);
   %rx_bits = demod_file("../build_linux/unittest/fskrx2.raw",8);
 end

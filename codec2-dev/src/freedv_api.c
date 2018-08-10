@@ -148,8 +148,17 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbit = 2*fdmdv_bits_per_frame(f->fdmdv);
         f->tx_bits = (int*)malloc(nbit*sizeof(int));
         f->rx_bits = (int*)malloc(nbit*sizeof(int));
-        if ((f->tx_bits == NULL) || (f->rx_bits == NULL))
+        if ((f->tx_bits == NULL) || (f->rx_bits == NULL)) {
+            if (f->tx_bits != NULL) {
+              free(f->tx_bits);
+              f->tx_bits = NULL;
+            }
+            if (f->rx_bits != NULL) {
+              free(f->rx_bits);
+              f->rx_bits = NULL;
+            }
             return NULL;
+        }
         f->evenframe = 0;
         f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
     }
@@ -199,6 +208,14 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         codec2_mode = CODEC2_MODE_700C;
 
         if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+            if (f->tx_bits != NULL) {
+              free(f->tx_bits);
+              f->tx_bits = NULL;
+            }
+            if (f->rx_bits != NULL) {
+              free(f->rx_bits);
+              f->rx_bits = NULL;
+            }
             return NULL;
         }
 
@@ -236,7 +253,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->codeword_amps = (float*)malloc(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
 
-        if (f->codeword_amps == NULL) {return NULL;}
+        if (f->codeword_amps == NULL) {free(f->codeword_symbols); return NULL;}
 
         for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
             f->codeword_symbols[i].real = 0.0;
@@ -258,6 +275,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->mod_out = (COMP*)malloc(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
 
         if (f->mod_out == NULL) {
+            if (f->codeword_symbols != NULL) { free (f->codeword_symbols); }
             return NULL;
         }
 
@@ -312,6 +330,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         /* Create the framer|deframer */
         f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
         if(f->deframer == NULL)
+            if (f->codec_bits != NULL) { free(f->codec_bits); }
             return NULL;
         
         f->fmfsk = fmfsk_create(48000,2400);
@@ -437,6 +456,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
 
     if (f->packed_codec_bits == NULL)
+        if (f->packed_codec_bits_tx != NULL) {free(f->packed_codec_bits_tx); }
+        if (f->packed_codec_bits    != NULL) {free(f->packed_codec_bits   ); }
         return NULL;
 
     /* Sample rate conversion for modes using COHPSK */
@@ -1941,7 +1962,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, nout = 0;
-    int valid;
+    int valid = 0;
     
     assert(f->nin <= f->n_max_modem_samples);
 
