@@ -133,7 +133,6 @@ int horus_l2_encode_tx_packet(unsigned char *output_tx_data,
     int            ninbyte, shift, golayparitybit, i;
 
     num_tx_data_bytes = horus_l2_get_num_tx_data_bytes(num_payload_data_bytes);
-    #warning is the data block at pout really large enough to hold 2 bytes more than the data bytes ?
     memcpy(pout, uw, sizeof(uw)); pout += sizeof(uw);
     memcpy(pout, input_payload_data, num_payload_data_bytes); pout += num_payload_data_bytes;
 

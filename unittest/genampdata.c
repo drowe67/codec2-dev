@@ -100,6 +100,5 @@ int main(void) {
 
     #endif
 
-    fclose(f);
     return 0;
 }

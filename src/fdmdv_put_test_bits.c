@@ -164,9 +164,6 @@ int main(int argc, char *argv[])
     fdmdv_destroy(fdmdv);
 
     printf("\nbits %d  errors %d  BER %1.4f\n", total_bits, total_bit_errors, (float)total_bit_errors/(1E-6+total_bits) );
-
-    if (packed_bits != NULL) free(packed_bits);
-
     return 0;
 }
 

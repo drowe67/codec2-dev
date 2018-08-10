@@ -68,7 +68,6 @@ float spectral_dist(float ak1[], float ak2[], int p, int n)
 	A2[i].real = ak2[i];
     }
 
-    #warn Array index -1 is out of bounds
     four1(&A1[-1].imag,n,-1);
     four1(&A2[-1].imag,n,-1);
 

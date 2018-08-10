@@ -538,9 +538,6 @@ int main(int argc, char *argv[])
     octave_save_float(fout, "noise_var_log_c", noise_var_log, NFRAMES, 1, 1);
     octave_save_float(fout, "mean_amp_log_c", mean_amp_log, NFRAMES, 1, 1);
     fclose(fout);
-#ifdef TESTING_FILE
-    fclose(fin);
-#endif
 
     ofdm_destroy(ofdm);
 
