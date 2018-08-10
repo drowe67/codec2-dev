@@ -133,6 +133,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   voicing = zeros(1,frames);
   
   if exist(voicing_name, "file") == 2
+    printf("loading: %s\n", voicing_name);
     pitche = load(voicing_name);
     voicing = pitche(:, 3);
   end
@@ -161,10 +162,14 @@ function surface = newamp2_batch(input_prefix, varargin)
   if strcmp(mode,"encdec")
     [bits rate_K_surface_] = candc_encoder(model, voicing);
     [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits);
+    if exist("voicing_", "var")
+      printf("voicing_ exists!\n");
+    end
     % sanity check - should be a flat surface
     figure(7);
-    X = rate_K_surface_ - rate_K_surface_dec_;
-    mesh(X(1:2:100,:))    
+    en = 100;
+    X = rate_K_surface_(1:en,:) - rate_K_surface_dec_(1:en,:);
+    mesh(X(1:2:en,:))    
   end
 
   # stand alone model file -> bit stream file encoder
@@ -182,7 +187,6 @@ function surface = newamp2_batch(input_prefix, varargin)
     fbit = fopen(bitsream_filename,"rb"); 
     bits = fread(fbit, "uchar")';
     fclose(fbit);
-    errors_per_codec_frame = [];
     if mask_en
       % optional error masking, read in error file, count errors/frame
        errors_per_codec_frame = count_errors(error_filename);
@@ -244,8 +248,9 @@ function surface = newamp2_batch(input_prefix, varargin)
 
    % save voicing file
   
-   if exist("voicing_", "var")
+   if exist("voicing_", "var") && output
      v_out_name = sprintf("%s_v.txt", output_prefix);
+     printf("writing: %s\n", v_out_name);
      fv  = fopen(v_out_name,"wt"); 
      for f=1:length(voicing_)
        fprintf(fv,"%d\n", voicing_(f));
@@ -370,11 +375,11 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
       levels = (0:15)*6;
       [E_ E_index] = quantise(levels, rate_K_surface(f,3));
 
-      [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K(rate_K_surface(f,:), E_, 44);
+      [rate_K_surface_(f,:) spec_mag_bits] = deltaf_quantise_rate_K_huff(rate_K_surface(f,:), E_, 44);
 
       # test of decoder
       
-      dec_rate_K_surface_ = deltaf_decode_rate_K(spec_mag_bits, E_, K, 44);
+      dec_rate_K_surface_ = deltaf_decode_rate_K_huff(spec_mag_bits, E_, K, 44);
       assert (rate_K_surface_(f,:) == dec_rate_K_surface_);
 
       # quantise pitch
@@ -450,8 +455,9 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
   end
 
   if plots
-    l = min(100, length(rate_K_surface_));
-    figure(1); clf; mesh(rate_K_surface_(1:l,:));
+    en = min(100, length(rate_K_surface_));
+    st = en-49;
+    figure(1); clf; mesh(rate_K_surface_(st:en,:)); ylabel('time'); xlabel('Mel freq');
   end
 
   % back to rate L
@@ -564,7 +570,7 @@ endfunction
 
 % Candidate C, bit stream to model decoder
 
-function [model_ voicing rate_K_surface_] = candc_decoder(bits, errors_per_codec_frame, ber = 0.0)
+function [model_ voicing rate_K_surface_] = candc_decoder(bits, errors_per_codec_frame=[], ber = 0.0)
   newamp2_const;
   rows = floor(length(bits)/Nbitspercodecframe);
   frames = rows*M;

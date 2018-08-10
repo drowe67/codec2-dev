@@ -241,6 +241,8 @@ int main(int argc, char *argv[])
     free(rx_spec_log);
     fdmdv_destroy(fdmdv);
 
+    if (packed_bits != NULL) free(packed_bits);
+
     return 0;
 }
 

@@ -33,6 +33,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#define OVERSAMPLE 100
+
 int main(int argc,char *argv[]){
     int   os, m, log2m, i, bit_i, sym, legacy_mode, rpitx_mode;
     float d;

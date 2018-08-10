@@ -207,8 +207,8 @@ struct COHPSK *cohpsk_create(void)
 
 void cohpsk_destroy(struct COHPSK *coh)
 {
-    fdmdv_destroy(coh->fdmdv);
     assert(coh != NULL);
+    fdmdv_destroy(coh->fdmdv);
     free(coh);
 }
 
