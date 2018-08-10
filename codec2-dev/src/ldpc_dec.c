@@ -276,8 +276,6 @@ int main(int argc, char *argv[])
         }
 
         free(input_double);
-        if (fin  != NULL) fclose(fin);
-        if (fout != NULL) fclose(fout);
     }
 
     return 0;

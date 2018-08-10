@@ -482,14 +482,6 @@ int main(int argc, char **argv)
     fprintf(fcb, "\n");
   }
   fclose(fcb);
-  fclose(ftrain);
-
-  free(codebook);
-  free(codebook2);
-  free(codebook3);
-  free(weight);
-  free(weight2);
-  free(weight3);
 
   return 0;
 }

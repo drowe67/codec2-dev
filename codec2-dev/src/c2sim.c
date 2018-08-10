@@ -721,7 +721,7 @@ int main(int argc, char *argv[])
 		lspjvm_quantise(lsps, lsps_, LPC_ORD);
 		{
 		    float lsps_bw[LPC_ORD];
-		    memcpy(lsps_bw, lsps_, sizeof(float)*order);
+		    memcpy(lsps_bw, lsps_, sizeof(float)*LPC_ORD);
 		    bw_expand_lsps(lsps_bw, LPC_ORD, 50.0, 100.0);
 		    lsp_to_lpc(lsps_bw, ak, LPC_ORD);
 		}
@@ -974,13 +974,6 @@ int main(int argc, char *argv[])
 	fclose(fvoicing);
 
     nlp_destroy(nlp_states);
-
-    if (flspmel != NULL) fclose(flspmel);
-    if (fam     != NULL) fclose(fam);
-    if (fWo     != NULL) fclose(fWo);
-    if (faw     != NULL) fclose(faw);
-    if (fhm     != NULL) fclose(fhm);
-    if (fjvm    != NULL) fclose(fjvm);
 
     return 0;
 }

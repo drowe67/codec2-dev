@@ -45,7 +45,7 @@ void print_help(const struct option *long_options, int num_opts, char* argv[]);
 
 int main(int argc, char *argv[])
 {
-    int            mode=0;
+    int            mode;
     void          *codec2;
     FILE          *fin;
     FILE          *fout;
@@ -370,9 +370,6 @@ int main(int argc, char *argv[])
     free(bitperchar_bits);
     fclose(fin);
     fclose(fout);
-    if (fber != NULL) {
-      fclose(fber);
-    }
 
     return 0;
 }

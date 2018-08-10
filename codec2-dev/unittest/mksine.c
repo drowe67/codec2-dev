@@ -46,7 +46,6 @@ int main(int argc, char *argv[]) {
     fwrite(buf, sizeof(short), n, f);
 
     fclose(f);
-    free(buf);
     
     return 0;
 }

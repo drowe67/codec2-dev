@@ -136,20 +136,14 @@ struct CODEC2 * codec2_create(int mode)
     }
     c2->Sn_ = (float*)malloc(2*n_samp*sizeof(float));
     if (c2->Sn_ == NULL) {
-        free(c2->Pn);
 	return NULL;
     }
     c2->w = (float*)malloc(m_pitch*sizeof(float));
     if (c2->w == NULL) {
-        free(c2->Pn);
-        free(c2->Sn_);
 	return NULL;
     }
     c2->Sn = (float*)malloc(m_pitch*sizeof(float));
     if (c2->Sn == NULL) {
-        free(c2->Pn);
-        free(c2->Sn_);
-        free(c2->w);
 	return NULL;
     }
 

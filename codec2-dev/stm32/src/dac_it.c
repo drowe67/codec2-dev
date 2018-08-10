@@ -165,7 +165,7 @@ void DMA1_Stream6_IRQHandler(void)
 
   /* Transfer half empty interrupt */
 
-  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET)
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET))
   {
       /* fill first half from fifo */
 
@@ -180,7 +180,7 @@ void DMA1_Stream6_IRQHandler(void)
 
   /* Transfer complete interrupt */
 
-  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET)
+  if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET))
   {
       /* fill second half from fifo */
 
