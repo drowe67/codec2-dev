@@ -329,9 +329,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     if (mode == FREEDV_MODE_2400B) {
         /* Create the framer|deframer */
         f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
-        if(f->deframer == NULL)
+        if(f->deframer == NULL) {
             if (f->codec_bits != NULL) { free(f->codec_bits); }
             return NULL;
+        }
         
         f->fmfsk = fmfsk_create(48000,2400);
          
@@ -2220,6 +2221,7 @@ void freedv_set_data_header(struct freedv *f, unsigned char *header)
 
 void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 {
+    f->stats.snr_est = 0.0; f->sync = 0;
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
 #ifndef CORTEX_M4
