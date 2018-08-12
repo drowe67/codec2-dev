@@ -318,16 +318,20 @@ struct freedv_vhf_deframer * fvhff_create_deframer(uint8_t frame_type, int enabl
     /* Allocate the not-bit buffer */
     if(enable_bit_flip){
         invbits = malloc(sizeof(uint8_t)*frame_size);
-        if(invbits == NULL)
+        if(invbits == NULL) {
+            free(deframer);
             return NULL;
+        }
     }else{
         invbits = NULL;
     }
     
     /* Allocate the bit buffer */
     bits = malloc(sizeof(uint8_t)*frame_size);
-    if(bits == NULL)
+    if(bits == NULL) {
+        free(deframer);
         return NULL;
+    }
     
     deframer->bits = bits;
     deframer->invbits = invbits;
