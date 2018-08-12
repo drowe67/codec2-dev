@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
     struct CODEC2             *c2 = NULL;
     int                        i;
 
-
+    
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
                " [--testframes] [--interleaver depth] [--codecrx] [-v]\n", argv[0]);
@@ -246,9 +246,9 @@ int main(int argc, char *argv[]) {
         /* log some side info to the txt file */
 
         if (ftxt != NULL) {
-            fprintf(ftxt, "frame: %d  demod sync: %d  nin:%d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
+            fprintf(ftxt, "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
                     frame, sync, nin, snr_est, total_bit_errors, clock_offset);
-        }
+       }
 
 	/* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
@@ -269,6 +269,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    fclose(ftxt);
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
