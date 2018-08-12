@@ -44,5 +44,6 @@ int main(int argc, char * argv[]) {
     }
 
     fclose(f);
+    free(interleaver);
     return 0;
 }

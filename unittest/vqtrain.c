@@ -181,6 +181,9 @@ int main(int argc, char *argv[]) {
 	fprintf(fvq,"\n");
     }
     fclose(fvq);
+    fclose(ftrain);
+    free(vec);
+    free(n);
 
     return 0;
 }

@@ -295,5 +295,12 @@ int main(int argc, char **argv)
   fprintf(stderr, "GE RMS error: %f %f\n", sqrt(err[0]/nb_vectors), sqrt(err[1]/nb_vectors));
   fprintf(stderr, "Weighted GE error: %f %f\n", sqrt(werr[0]/wsum[0]), sqrt(werr[1]/wsum[1]));
 
+  free(codebook);
+  free(codebook2);
+  free(codebook3);
+  free(weight);
+  free(weight2);
+  free(weight3);
+  free(delta);
   return 0;
 }
