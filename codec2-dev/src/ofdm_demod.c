@@ -341,6 +341,15 @@ int main(int argc, char *argv[])
                             //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
 
                             if (testframes) {
+                                /* construct payload data bits */
+                                
+                                uint16_t r[data_bits_per_frame];
+                                ofdm_rand(r, data_bits_per_frame);
+                                int payload_data_bits[data_bits_per_frame];
+                                for(i=0; i<data_bits_per_frame; i++) {
+                                    payload_data_bits[i] = r[i]>16384;
+                                }
+                                
                                 Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
                                 Terrs_coded += Nerrs_coded[j];
                                 Tbits_coded += data_bits_per_frame;
