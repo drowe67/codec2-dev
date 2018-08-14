@@ -5,7 +5,7 @@
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
-function [channel_est_log timing_est_log] = ofdm_rx(filename, mode="700D", error_pattern_filename)
+function ofdm_rx(filename, mode="700D", error_pattern_filename)
   ofdm_lib;
   more off;
 
