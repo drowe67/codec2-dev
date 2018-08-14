@@ -151,9 +151,22 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int Nerr
 
     int coded_syms_per_frame = ldpc->coded_syms_per_frame;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
+    int data_bits_per_frame = ldpc->data_bits_per_frame;
     int rx_bits_raw[coded_bits_per_frame];
 
     assert(sizeof(test_codeword)/sizeof(int) == coded_bits_per_frame);
+
+    /* generate test codeword from known payload data bits */
+    
+    int test_codeword[coded_bits_per_frame];                                
+    uint16_t r[data_bits_per_frame];
+    uint8_t tx_bits[data_bits_per_frame];
+    
+    ofdm_rand(r, data_bits_per_frame);
+    for(i=0; i<data_bits_per_frame; i++) {
+        tx_bits[i] = r[i]>16384;
+    }
+    ldpc_encode_frame(ldpc, test_codeword, tx_bits);
 
     Terrs = 0;
     for (j=0; j<interleave_frames; j++) {
