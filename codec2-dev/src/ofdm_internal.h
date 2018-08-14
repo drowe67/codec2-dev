@@ -126,6 +126,7 @@ void ofdm_assemble_modem_frame(uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, int [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
+void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame);
 
 #ifdef __cplusplus
 }

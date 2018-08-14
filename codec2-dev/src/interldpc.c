@@ -36,7 +36,7 @@
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "HRA_112_112.h"
-#include "test_bits_ofdm.h"
+//#include "test_bits_ofdm.h"
 
 /* CRC type function, used to compare QPSK vectors when debugging */
 
@@ -143,7 +143,9 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
 }
 
 
-/* measure uncoded (raw) bit errors over interleaver frame */
+/* measure uncoded (raw) bit errors over interleaver frame, note we
+   don't include txt bits as this is done after we dissassemmble the
+   frame */
 
 int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int Nerrs_raw[], int interleave_frames, COMP codeword_symbols_de[])
 {
@@ -153,8 +155,6 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int Nerr
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int data_bits_per_frame = ldpc->data_bits_per_frame;
     int rx_bits_raw[coded_bits_per_frame];
-
-    assert(sizeof(test_codeword)/sizeof(int) == coded_bits_per_frame);
 
     /* generate test codeword from known payload data bits */
     
