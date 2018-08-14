@@ -75,7 +75,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "  --ts         Nsecs  Symbol Duration (.018 default)\n");
         fprintf(stderr, "  --testframes Nsecs  Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
         fprintf(stderr, "  --ldpc              Run LDPC decoder.  This forces 112, one char/bit output values\n"
-                        "                      per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
+                        "                      per frame.  In testframe mode (--testframes) raw and coded errors\n"
+                        "                      will be counted\n");
         fprintf(stderr, "  --interleave depth  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "  --txbpf             Transmit band pass filter\n");
         fprintf(stderr, "\n");
@@ -128,7 +129,7 @@ int main(int argc, char *argv[])
         ofdm_config->ts = 0.0180;
     }
 
-    ofdm_config->rs = (1.0f / ofdm_config->ts); 	/* Symbol Rate */
+    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Symbol Rate */
 
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);

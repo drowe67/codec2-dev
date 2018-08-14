@@ -233,6 +233,7 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
             arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
             errors = xor(codec_bits, arx_bits);
             Nerrs  = sum(errors);
+            Tbits_coded += code_param.data_bits_per_frame;
           else
             % "2200" mode, run LDPC decoder twice, re-assemble codec bit stream
             
