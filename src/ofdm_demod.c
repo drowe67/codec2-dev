@@ -49,9 +49,6 @@
 #define NFRAMES  100               /* just log the first 100 frames          */
 #define NDISCARD 20                /* BER2measure disctrds first 20 frames   */
 
-extern int payload_data_bits[];
-extern int test_bits_ofdm[];
-
 static struct OFDM_CONFIG *ofdm_config;
 
 static int ofdm_bitsperframe;
@@ -329,7 +326,7 @@ int main(int argc, char *argv[])
 
                         if (testframes) {
                             Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, interleave_frames, codeword_symbols_de);
-                            Tbits += Nbitsperframe*interleave_frames;
+                            Tbits += coded_bits_per_frame*interleave_frames; /* not counting errors in txt bits */
                         }
 
                         for (j=0; j<interleave_frames; j++) {
@@ -343,12 +340,8 @@ int main(int argc, char *argv[])
                             if (testframes) {
                                 /* construct payload data bits */
                                 
-                                uint16_t r[data_bits_per_frame];
-                                ofdm_rand(r, data_bits_per_frame);
                                 int payload_data_bits[data_bits_per_frame];
-                                for(i=0; i<data_bits_per_frame; i++) {
-                                    payload_data_bits[i] = r[i]>16384;
-                                }
+                                ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
                                 
                                 Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
                                 Terrs_coded += Nerrs_coded[j];
@@ -376,9 +369,33 @@ int main(int argc, char *argv[])
             /* optional error counting on uncoded data in non-LDPC testframe mode */
 
             if (testframes && (ldpc_en == 0)) {
+                /* build up a test frame consisting of unique word, txt bits, and psuedo-random
+                   uncoded payload bits.  The psuedo-random generator is the same as Octave so
+                   it can interoperate with ofdm_tx.m/ofdm_rx.m */
+
+                int Npayloadbits = Nbitsperframe-(ofdm_nuwbits+ofdm_ntxtbits);
+                uint16_t r[Npayloadbits];
+                uint8_t  payload_bits[Npayloadbits];
+                uint8_t  tx_bits[Npayloadbits];
+                
+                ofdm_rand(r, Npayloadbits);
+
+                for(i=0; i<Npayloadbits; i++) {
+                    payload_bits[i] = r[i] > 16384;
+                    //fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
+                }
+
+                uint8_t txt_bits[ofdm_ntxtbits];
+
+                for(i=0; i<ofdm_ntxtbits; i++) {
+                    txt_bits[i] = 0;
+                }
+
+                ofdm_assemble_modem_frame(tx_bits, payload_bits, txt_bits);
+
                 Nerrs = 0;
                 for(i=0; i<Nbitsperframe; i++) {
-                    if (test_bits_ofdm[i] != rx_bits[i]) {
+                    if (tx_bits[i] != rx_bits[i]) {
                         Nerrs++;
                     }
                 }

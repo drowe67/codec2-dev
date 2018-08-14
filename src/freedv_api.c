@@ -77,10 +77,6 @@
 #define NORM_PWR_FSK     0.193 
 #define NORM_PWR_OFDM    1.00
 
-/* OFDM payload data test frame for 700D */
-
-extern int payload_data_bits[];
-
 static struct OFDM_CONFIG *ofdm_config;
 
 static int ofdm_bitsperframe;
@@ -1030,6 +1026,9 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     /* optionally replace codec payload bits with test frames known to rx */
 
     if (f->test_frames) {
+        int payload_data_bits[data_bits_per_frame];
+        ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+
         for (j=0; j<f->interleave_frames; j++) {
             for(i=0; i<data_bits_per_frame; i++) {
                 tx_bits[j*data_bits_per_frame + i] = payload_data_bits[i];
@@ -1865,6 +1864,8 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
                 iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
                 if (f->test_frames) {
+                    int payload_data_bits[data_bits_per_frame];
+                    ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
                     Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
                     f->total_bit_errors_coded += Nerrs_coded;
                     f->total_bits_coded       += data_bits_per_frame;

@@ -1506,6 +1506,7 @@ void ofdm_disassemble_modem_frame(struct OFDM *ofdm,
     assert(t == ofdm_ntxtbits);
 }
 
+
 /*
  * Pseudo-random number generator that we can implement in C with
  * identical results to Octave.  Returns an unsigned int between 0
@@ -1522,3 +1523,15 @@ void ofdm_rand(uint16_t r[], int n) {
     }
 }
 
+
+void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame) {
+    int i;
+    
+    /* construct payload data bits */
+                                
+    uint16_t r[data_bits_per_frame];
+    ofdm_rand(r, data_bits_per_frame);
+    for(i=0; i<data_bits_per_frame; i++) {
+        payload_data_bits[i] = r[i]>16384;
+    }
+}
