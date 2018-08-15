@@ -39,9 +39,6 @@
 #include "interldpc.h"
 #include "gp_interleaver.h"
 
-extern int payload_data_bits[];
-extern int test_bits_ofdm[];
-
 static struct OFDM_CONFIG *ofdm_config;
 
 static int ofdm_bitsperframe;
@@ -220,7 +217,6 @@ int main(int argc, char *argv[])
 
                 for (j=0; j<interleave_frames; j++) {
                     for(i=0; i<data_bits_per_frame; i++) {
-                        //tx_bits_char[j*data_bits_per_frame + i] = payload_data_bits[i];
                         tx_bits_char[j*data_bits_per_frame + i] = r[i]>16384;
                     }
                 }
