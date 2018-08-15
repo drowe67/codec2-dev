@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
     if (argc < 3) {
         fprintf(stderr, "\n");
 	fprintf(stderr, "usage: %s InputOneCharPerBitFile OutputModemRawFile [--ldpc] [--interleaver depth]\n\n", argv[0]);
-        fprintf(stderr, "  --nc         Nsecs  Number of Carriers (17 default)\n");
+        fprintf(stderr, "  --nc      [17..64]  Number of Carriers (17 default, 64 max)\n");
         fprintf(stderr, "  --tcp        Nsecs  Cyclic Prefix Duration (.002 default)\n");
         fprintf(stderr, "  --ts         Nsecs  Symbol Duration (.018 default)\n");
         fprintf(stderr, "  --testframes Nsecs  Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
@@ -113,18 +113,21 @@ int main(int argc, char *argv[])
 
     if ((arg = opt_exists(argv, argc, "--nc"))) {
         ofdm_config->nc = atoi(argv[arg+1]);	/* Number of carriers */
+
+        if (ofdm_config->nc > 64 || ofdm_config->nc < 17)
+            ofdm_config->nc = 17;
     } else {
         ofdm_config->nc = 17;
     }
 
     if ((arg = opt_exists(argv, argc, "--tcp"))) {
-        ofdm_config->tcp = atoi(argv[arg+1]);	/* Cyclic Prefix duration */
+        ofdm_config->tcp = atof(argv[arg+1]);	/* Cyclic Prefix duration */
     } else {
         ofdm_config->tcp = 0.0020;
     }
 
     if ((arg = opt_exists(argv, argc, "--ts"))) {
-        ofdm_config->ts = atoi(argv[arg+1]);	/* Symbol duration */
+        ofdm_config->ts = atof(argv[arg+1]);	/* Symbol duration */
     } else {
         ofdm_config->ts = 0.0180;
     }
