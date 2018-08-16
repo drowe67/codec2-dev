@@ -21,20 +21,6 @@
   between C and Octave was different, especially when the code did
   not converge and hit max_iters.
 
-  TODO:
-  [ ] C cmd line encoder
-      [ ] SD output option
-      [ ] Es/No option for testing
-  [ ] decoder
-      [X] test mode or file I/O (incl stdin/stdout)
-      [X] Octave code to generate include file
-          + MAX_ITER as well
-      [X] check into SVN
-      [ ] enc/dec running on cmd line
-      [ ] fsk_demod modified for soft decisions
-      [ ] drs232 modified for SD
-          + use UW syn cin this program to check BER with coding
-      [ ] revisit CML support, maybe blog post
 */
 
 #include <assert.h>
@@ -44,6 +30,7 @@
 #include <string.h>
 #include <stdio.h>
 #include "mpdecode_core.h"
+#include "ofdm_internal.h"
 
 /* Machine generated consts, H_rows, H_cols, test input/output data to
    change LDPC code regenerate this file. */
@@ -68,11 +55,13 @@ void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], 
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, state, next_state, frame;
-    char        out_char[CODELENGTH], *adetected_data;
+    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, state, next_state, frame, testframes;
+    int         data_bits_per_frame;
+    char        *adetected_data;
     struct LDPC ldpc;
     double     *ainput;
-	
+    int         Tbits, Terrs;
+    
     if (argc < 2) {
         fprintf(stderr, "\n");
         fprintf(stderr, "usage: %s --test [--code CodeName]\n\n", argv[0]);
@@ -81,7 +70,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: %s --listcodes\n\n", argv[0]);
         fprintf(stderr, "  List supported codes (more can be added via using Octave ldpc scripts)\n");
         fprintf(stderr, "\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName]\n\n", argv[0]);
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName] [--testframes]\n\n", argv[0]);
         fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
         fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
@@ -89,10 +78,15 @@ int main(int argc, char *argv[])
         fprintf(stderr, "   --sd                    Treat input file samples as Soft Decision\n");
         fprintf(stderr, "                           demod outputs rather than LLRs\n");
         fprintf(stderr, "   --half                  Load framesize/2 input samples for each decode\n");
-        fprintf(stderr, "                           attempt, only output decoded bits if decoder\n");
+        fprintf(stderr, "                           attempt, only output decoded bits\n");
         fprintf(stderr, "                           converges.  Form of frame sync.\n");
         fprintf(stderr, "   --mute                  Only output frames with < 10%% parity check fails\n");
+        fprintf(stderr, "   --testframes            built in test frame modem, requires --testframes at encoder\n");
         fprintf(stderr, "\n");
+
+        fprintf(stderr, "Example in testframe mode:\n\n");
+        fprintf(stderr, " $ ./ldpc_enc /dev/zero - --sd --code HRA_112_112 --testframes 10 |\n");
+        fprintf(stderr, "   ./ldpc_dec - /dev/null --code HRA_112_112 --sd --testframes\n");
         exit(0);
     }
 
@@ -145,7 +139,11 @@ int main(int argc, char *argv[])
 
     CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc.NumberParityBits;
+    data_bits_per_frame = ldpc.NumberRowsHcols;
+    char ibits[data_bits_per_frame], out_char[CodeLength];
 
+    testframes = 0;
+    
     if (!strcmp(argv[1],"--test")) {
 
         /* test mode --------------------------------------------------------*/
@@ -199,7 +197,7 @@ int main(int argc, char *argv[])
 
         sdinput = 0;
         readhalfframe = 0;
-        mute = 0; state = 0; frame = 0;
+        mute = 0; state = 0; frame = 0; testframes = 0;
         if (opt_exists(argv, argc, "--sd")) {
             sdinput = 1;
         }
@@ -209,6 +207,16 @@ int main(int argc, char *argv[])
         if (opt_exists(argv, argc, "--mute")) {
             mute = 1;
         }
+        if (opt_exists(argv, argc, "--testframes")) {
+            testframes = 1;
+            uint16_t r[data_bits_per_frame];
+            ofdm_rand(r, data_bits_per_frame);
+
+            for(i=0; i<data_bits_per_frame; i++) {
+                ibits[i] = r[i] > 16384;
+            }
+            Tbits = Terrs = 0;
+       }
 
         double *input_double = calloc(CodeLength, sizeof(double));
 
@@ -229,7 +237,8 @@ int main(int argc, char *argv[])
             }
 
             iter = run_ldpc_decoder(&ldpc, out_char, input_double, &parityCheckCount);
-
+            //fprintf(stderr, "iter: %d\n", iter);
+            
             if (mute) {
 
                 // Output data bits if decoder converged, or was
@@ -245,33 +254,47 @@ int main(int argc, char *argv[])
 
             } else {
                 
-                // Output all data packets, based on initial FEC sync
-                // estimate.  Useful for testing with cohpsk_put_bits,
-                // as it maintains sync with test bits state machine.
+                if (readhalfframe) {
+                    // Establish which half frame we want to sync on,
+                    // used for testing with cohpsk_put_bits, as it
+                    // maintains sync with test bits state machine.
                 
-                next_state = state;
-                switch(state) {
-                case 0:
-                    if (iter < MAX_ITER) {
-                        /* OK we've found which frame to sync on */
-                        next_state = 1;
-                        frame = 0;
+                    next_state = state;
+                    switch(state) {
+                    case 0:
+                        if (iter < MAX_ITER) {
+                            /* OK we've found which frame to sync on */
+                            next_state = 1;
+                            frame = 0;
+                        }
+                        break;
+                    case 1:
+                        frame++;
+                        if ((frame % 2) == 0) {
+                            /* write decoded packets every second input frame */
+                            fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
+                        }
+                        break;
                     }
-                    break;
-                case 1:
-                    frame++;
-                    if ((frame % 2) == 0) {
-                        /* write decoded packets every second input frame */
-                        fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
-                    }
-                    break;
+                    state = next_state;
+                    fprintf(stderr, "state: %d iter: %d\n", state, iter);
                 }
-                state = next_state;
-                fprintf(stderr, "state: %d iter: %d\n", state, iter);
+
+                for(i=0; i<offset; i++) {
+                    input_double[i] = input_double[i+offset];
+                }
             }
 
-            for(i=0; i<offset; i++) {
-                input_double[i] = input_double[i+offset];
+            fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
+
+            if (testframes) {
+                for (i=0; i<data_bits_per_frame; i++) {
+                    //fprintf(stderr, "%d %d\n", out_char[i], ibits[i]);
+                    if (out_char[i] != ibits[i]) {
+                        Terrs++;
+                    }
+                    Tbits++;
+                }
             }
         }
 
@@ -280,6 +303,10 @@ int main(int argc, char *argv[])
         if (fout != NULL) fclose(fout);
     }
 
+    if (testframes) {
+        fprintf(stderr, "Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
+    }
+    
     return 0;
 }
 
