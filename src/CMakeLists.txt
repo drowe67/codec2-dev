@@ -396,11 +396,20 @@ target_link_libraries(cohpsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(cohpsk_ch cohpsk_ch.c)
 target_link_libraries(cohpsk_ch ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(ldpc_noise ldpc_noise.c)
+target_link_libraries(ldpc_noise m)
+
 add_executable(ldpc_enc ldpc_enc.c)
 target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+add_executable(ldpc_enc_test ldpc_enc_test.c mpdecode_core_test.c ofdm.c filter.c)
+target_link_libraries(ldpc_enc_test ${CMAKE_REQUIRED_LIBRARIES} )
+
 add_executable(ldpc_dec ldpc_dec.c)
 target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ldpc_dec_test ldpc_dec_test.c mpdecode_core_test.c ofdm.c filter.c)
+target_link_libraries(ldpc_dec_test ${CMAKE_REQUIRED_LIBRARIES} )
 
 add_executable(drs232 drs232.c)
 target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
