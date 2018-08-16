@@ -50,8 +50,6 @@ int opt_exists(char *argv[], int argc, char opt[]) {
     return 0;
 }
 
-void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits);
-
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
