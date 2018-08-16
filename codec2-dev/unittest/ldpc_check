@@ -1,0 +1,84 @@
+#! /bin/bash
+
+# ldpc_check
+#
+# A series of checks of the ldpc functions, mostly decode.
+# 
+# This uses ldpc_enc to supply test data to ldpc_dec and mosty
+# assumes that the encode function is correct.
+
+# Define macros to (later) allow testing alternate versions.
+if [[ $1 == "--test" ]]; then
+    alias LDPC_ENC=ldpc_enc_test
+    alias LDPC_DEC=ldpc_dec_test
+else
+    alias LDPC_ENC=ldpc_enc
+    alias LDPC_DEC=ldpc_dec
+fi
+shopt -s expand_aliases
+
+# PATH
+PATH=$PATH:../src
+
+###############################
+echo
+echo "Simple test, HRA_112_112, ideal"
+LDPC_ENC /dev/zero - --sd --code HRA_112_112 --testframes 10 |
+    LDPC_DEC - /dev/null --code HRA_112_112 --sd --testframes
+
+###############################
+echo
+echo "Simple test, HRA_112_112, 0dB"
+LDPC_ENC /dev/zero - --sd --code HRA_112_112 --testframes 10 |
+    ldpc_noise - - 0 |
+    LDPC_DEC - /dev/null --code HRA_112_112 --sd --testframes
+
+
+###############################
+echo
+echo "Simple test, default, ideal"
+LDPC_ENC /dev/zero - --sd --testframes 10 |
+    LDPC_DEC - /dev/null --sd --testframes
+
+###############################
+echo
+echo "Simple test, default, 0db"
+LDPC_ENC /dev/zero - --sd --testframes 10 |
+    ldpc_noise - - 0 |
+    LDPC_DEC - /dev/null --sd --testframes
+
+##############################################################
+# Compare original to test versions
+if [[ $1 == "--test" ]]; then
+    echo
+    echo "Compare Versions:"
+
+    ###############################
+    echo
+    echo "enc, HRA_112_112, plain"
+    ldpc_enc      /dev/zero - --code HRA_112_112 --testframes 10 > tmp1
+    ldpc_enc_test /dev/zero - --code HRA_112_112 --testframes 10 > tmp2
+    if cmp tmp1 tmp2; then echo PASS; else echo FAIL; fi
+
+    ###############################
+    echo
+    echo "enc, HRA_112_112, sd"
+    ldpc_enc      /dev/zero - --sd --code HRA_112_112 --testframes 10 > tmp1
+    ldpc_enc_test /dev/zero - --sd --code HRA_112_112 --testframes 10 > tmp2
+    if cmp tmp1 tmp2; then echo PASS; else echo FAIL; fi
+
+    ###############################
+    echo
+    echo "enc, default, plain"
+    ldpc_enc      /dev/zero - --testframes 10 > tmp1
+    ldpc_enc_test /dev/zero - --testframes 10 > tmp2
+    if cmp tmp1 tmp2; then echo PASS; else echo FAIL; fi
+
+    ###############################
+    echo
+    echo "enc, default, sd"
+    ldpc_enc      /dev/zero - --sd --testframes 10 > tmp1
+    ldpc_enc_test /dev/zero - --sd --testframes 10 > tmp2
+    if cmp tmp1 tmp2; then echo PASS; else echo FAIL; fi
+
+fi
