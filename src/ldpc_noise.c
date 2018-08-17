@@ -60,7 +60,11 @@ int main(int argc, char *argv[]) {
     
     while (fread(&datain, sizeof(double), 1, fin) == 1) {
 
-	double noise = No * ((double)random() / (double)RAND_MAX);
+	// Gaussian from uniform:
+	double x = (double)random() / RAND_MAX;
+        double y = (double)random() / RAND_MAX;
+        double noise = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
+	
 	dataout = datain + noise;
 
         fwrite(&dataout, sizeof(double), 1, fout); 
