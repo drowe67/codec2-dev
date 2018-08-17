@@ -166,6 +166,7 @@ int main(int argc, char *argv[])
 
             if (ok == CodeLength)
                 num_ok++;            
+fprintf(stderr, "OK %d\n", ok);
         }
 
         fprintf(stderr, "test runs......: %d\n",  num_runs);
@@ -230,7 +231,9 @@ int main(int argc, char *argv[])
                 input_double[i] = 0.0;
             }
         }
-        fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
+
+        fprintf(stderr, "Codeword length: %d\n",  CodeLength);
+        fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
 
         while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
             if (sdinput) {
