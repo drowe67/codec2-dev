@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     char        *adetected_data;
     struct LDPC ldpc;
     double     *ainput;
-    int         Tbits, Terrs;
+    int         Tbits, Terrs, Tbits_raw, Terrs_raw;
     
     if (argc < 2) {
         fprintf(stderr, "\n");
@@ -140,7 +140,9 @@ int main(int argc, char *argv[])
     CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc.NumberParityBits;
     data_bits_per_frame = ldpc.NumberRowsHcols;
-    char ibits[data_bits_per_frame], out_char[CodeLength];
+    unsigned char ibits[data_bits_per_frame];
+    unsigned char pbits[NumberParityBits];
+    char out_char[CodeLength];
 
     testframes = 0;
     
@@ -215,7 +217,8 @@ int main(int argc, char *argv[])
             for(i=0; i<data_bits_per_frame; i++) {
                 ibits[i] = r[i] > 16384;
             }
-            Tbits = Terrs = 0;
+            encode(&ldpc, ibits, pbits);  
+            Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
        }
 
         double *input_double = calloc(CodeLength, sizeof(double));
@@ -233,6 +236,24 @@ int main(int argc, char *argv[])
 
         while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
             if (sdinput) {
+                if (testframes) {
+                    char in_char;
+                    for (i=0; i<data_bits_per_frame; i++) {
+                        in_char = input_double[i] < 0;
+                        if (in_char != ibits[i]) {
+                            Terrs_raw++;
+                        }
+                        Tbits_raw++;
+                    }
+                    for (i=0; i<NumberParityBits; i++) {
+                        in_char = input_double[i+data_bits_per_frame] < 0;
+                        if (in_char != pbits[i]) {
+                            Terrs_raw++;
+                        }
+                        Tbits_raw++;
+                    }
+                }
+
                 sd_to_llr(input_double, input_double, CodeLength);
             }
 
@@ -262,7 +283,7 @@ int main(int argc, char *argv[])
                     next_state = state;
                     switch(state) {
                     case 0:
-                        if (iter < MAX_ITER) {
+                        if (iter < ldpc.max_iter) {
                             /* OK we've found which frame to sync on */
                             next_state = 1;
                             frame = 0;
@@ -304,7 +325,9 @@ int main(int argc, char *argv[])
     }
 
     if (testframes) {
-        fprintf(stderr, "Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
+        fprintf(stderr, "Raw Tbits..: %d Terr: %d BER: %4.3f\n", Tbits_raw, Terrs_raw,
+                (float)Terrs_raw/(Tbits_raw+1E-12));
+        fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
     }
     
     return 0;

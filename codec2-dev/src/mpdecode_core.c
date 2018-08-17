@@ -738,23 +738,17 @@ void sd_to_llr(double llr[], double sd[], int n) {
         sum += fabs(sd[i]);
     mean = sum/n;
                 
-    /* scale by mean to map onto +/- 1 symbol position */
-
-    for(i=0; i<n; i++) {
-        sd[i] /= mean;
-    }
-
     /* find variance from +/-1 symbol position */
 
     sum = sumsq = 0.0; 
     for(i=0; i<n; i++) {
         sign = (sd[i] > 0.0) - (sd[i] < 0.0);
-        x = (sd[i] - sign);
+        x = (sd[i]/mean - sign);
         sum += x;
         sumsq += x*x;
     }
-    mean = sum/n;
-    estvar = sumsq/n - mean*mean;
+    estvar = (n * sumsq - sum * sum) / (n * (n - 1));
+    //fprintf(stderr, "mean: %f var: %f\n", mean, estvar);
 
     estEsN0 = 1.0/(2.0 * estvar + 1E-3); 
     for(i=0; i<n; i++)
