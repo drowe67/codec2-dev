@@ -55,7 +55,8 @@ int main(int argc, char *argv[]) {
 
     double NodB = atof(argv[3]);
     double No = pow(10.0, NodB/10.0);
-
+    double sum_xx = 0; double sum_x = 0.0; int n = 0;
+    
     fprintf(stderr, "NodB = %f, No = %f\n", NodB, No);
     
     while (fread(&datain, sizeof(double), 1, fin) == 1) {
@@ -66,15 +67,22 @@ int main(int argc, char *argv[]) {
         double z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
 
 	double noise = No * z;
-	
 	dataout = datain + noise;
 
-        fwrite(&dataout, sizeof(double), 1, fout); 
+        fwrite(&dataout, sizeof(double), 1, fout);        
+
+        // keep running stats to calulateactual noise variance (power)
         
+        sum_xx += noise*noise;
+        sum_x  += noise;
+        n++;
     }
 
     fclose(fin);  
     fclose(fout); 
 
+    double noise_var = (n * sum_xx - sum_x * sum_x) / (n * (n - 1));
+    fprintf(stderr, "measured noise power: %f\n", noise_var);
+ 
     return 0;
 }
