@@ -24,8 +24,24 @@ static COMP S_matrix[] = {
     {-1.0f,  0.0f}
 };
 
+struct v_node {
+  int degree;
+  float initial_value;
+  int *index;  /* the index of a c_node it is connected to */
+  int *socket; /* socket number at the c_node */
+  float *message;     
+  int *sign;
+};
 
-int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[],
+struct c_node {
+  int degree;
+  int *index;                     
+  float *message;     
+  int *socket; /* socket number at the v_node */
+};
+
+
+void extract_output(char out_char[], char DecodedBits[], int ParityCheckCount,
                     int max_iter, int CodeLength, int NumberParityBits);
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
@@ -80,30 +96,7 @@ static float phi0(
   }
 }
 
-#ifdef NOT_USED
-static float correction(float xinput )
-{
-  if (xinput > 2.625 )
-    return( 0 );
-  else if (xinput < 1 )
-    return( -0.375*xinput + 0.6825 );
-  else
-    return( -0.1875*xinput + 0.5 );
-
-}
-
-static float LambdaAPPstar(	float mag1,
-				float mag2 )
-{
-  if (mag1 > mag2)
-    return( fabs( mag2 + correction( mag1 + mag2 ) - correction( mag1 - mag2 ) ) );
-  else
-    return( fabs( mag1 + correction( mag1 + mag2 ) - correction( mag2 - mag1 ) ) );
-}
-#endif
-
 /* Values for linear approximation (DecoderType=5) */
-
 #define AJIAN -0.24904163195436
 #define TJIAN 2.50681740420944
 
@@ -191,6 +184,11 @@ void init_c_v_nodes(struct c_node *c_nodes,
         if (shift ==0){
             for (i=0;i<NumberParityBits;i++) {
                 /* now that we know the size, we can dynamically allocate memory */
+if (i<4) fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
+                c_nodes[i].degree * sizeof(int),
+                c_nodes[i].degree * sizeof(float),
+                c_nodes[i].degree * sizeof(int));
+if (i==4) fprintf(stderr, "...\n");
                 c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
                 c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
                 c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
@@ -217,6 +215,10 @@ void init_c_v_nodes(struct c_node *c_nodes,
             for (i=0;i<(NumberParityBits/shift);i++){
 
                 for (k =0;k<shift;k++){
+fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", cnt,
+                c_nodes[cnt].degree * sizeof(int),
+                c_nodes[cnt].degree * sizeof(float),
+                c_nodes[cnt].degree * sizeof(int));
                     c_nodes[cnt].index =  calloc( c_nodes[cnt].degree, sizeof( int ) );
                     c_nodes[cnt].message =calloc( c_nodes[cnt].degree, sizeof( float ) );
                     c_nodes[cnt].socket = calloc( c_nodes[cnt].degree, sizeof( int ) );
@@ -245,8 +247,12 @@ void init_c_v_nodes(struct c_node *c_nodes,
     } else {
         for (i=0;i<NumberParityBits;i++) {
             /* now that we know the size, we can dynamically allocate memory */
+fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
+                c_nodes[i].degree * sizeof(int),
+                c_nodes[i].degree * sizeof(float),
+                c_nodes[i].degree * sizeof(int));
             c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
-            c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
+            c_nodes[i].message = calloc( c_nodes[i].degree, sizeof( float ) );
             c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
             for (j=0;j<c_nodes[i].degree;j++){
                 c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
@@ -295,6 +301,12 @@ void init_c_v_nodes(struct c_node *c_nodes,
 
     for (i=0;i<CodeLength;i++) {
         /* allocate memory according to the degree of the v-node */
+if (i<4) fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
+                v_nodes[i].degree * sizeof(int),
+                v_nodes[i].degree * sizeof(float),
+                v_nodes[i].degree * sizeof(int),
+                v_nodes[i].degree * sizeof(int));
+if (i==4) fprintf(stderr, "...\n");
         v_nodes[i].index = calloc( v_nodes[i].degree, sizeof( int ) );
         v_nodes[i].message = calloc( v_nodes[i].degree, sizeof( float ) );
         v_nodes[i].sign = calloc( v_nodes[i].degree, sizeof( int ) );
@@ -352,191 +364,11 @@ void init_c_v_nodes(struct c_node *c_nodes,
 
 }
 
-#ifdef NOT_USED
-/* function for doing the MP decoding */
-void ApproximateMinStar(	 int	  BitErrors[],
-				 int      DecodedBits[],
-				 struct c_node c_nodes[],
-				 struct v_node v_nodes[],
-				 int	  CodeLength,
-				 int	  NumberParityBits,
-				 int	  max_iter )
-{
-  int i,j, iter;
-  int sign;
-  float temp_sum;
-  float Qi;
-
-  float delta, minval, deltaAPP;
-  int mink;
-
-  for (iter=0;iter<max_iter;iter++) {
-    /* update r */
-    for (j=0;j<NumberParityBits;j++) {
-      /* start new code for approximate-min-star */
-      mink = 0;
-      sign = v_nodes[ c_nodes[j].index[0] ].sign[ c_nodes[j].socket[0] ];
-      minval = v_nodes[ c_nodes[j].index[0] ].message[ c_nodes[j].socket[0] ];
-
-      for (i=1;i<c_nodes[j].degree;i++) {
-	/* first find the minimum magnitude input message */
-	if ( v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ] < minval ) {
-	  mink = i;
-	  minval = v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ];
-	}
-	/* update the aggregate sign */
-	sign ^= v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ];
-      }
-
-      /* find the magnitude to send out the minimum input magnitude branch */
-      if ( mink == 0 ) {
-	delta = v_nodes[ c_nodes[j].index[1] ].message[ c_nodes[j].socket[1] ];
-	for (i=2;i<c_nodes[j].degree;i++) {
-	  delta = LambdaAPPstar( delta, v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ] );
-	}
-      } else {
-	delta = v_nodes[ c_nodes[j].index[0] ].message[ c_nodes[j].socket[0] ];
-	for (i=1;i<c_nodes[j].degree;i++) {
-	  if ( i != mink )
-	    delta = LambdaAPPstar( delta, v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ] );
-	}
-      }
-
-      deltaAPP = LambdaAPPstar( delta, v_nodes[ c_nodes[j].index[mink] ].message[ c_nodes[j].socket[mink] ] );
-
-      /* compute outgoing messages */
-      for (i=0;i<c_nodes[j].degree;i++) {
-	if ( i == mink ) {
-	  if ( sign^v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ] )
-	    c_nodes[j].message[i] = - delta;
-	  else
-	    c_nodes[j].message[i] = delta;
-	} else {
-	  if ( sign^v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ] )
-	    c_nodes[j].message[i] = - deltaAPP;
-	  else
-	    c_nodes[j].message[i] = deltaAPP;
-	}
-      }
-    }
-
-    /* update q */
-    for (i=0;i<CodeLength;i++) {
-
-      /* first compute the LLR */
-      Qi = v_nodes[i].initial_value;
-      for (j=0;j<v_nodes[i].degree;j++) {
-	Qi += c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
-      }
-
-      /* make hard decision */
-      if (Qi < 0) {
-	DecodedBits[iter+max_iter*i] = 1;
-	BitErrors[iter]++;
-      }
-
-      /* now subtract to get the extrinsic information */
-      for (j=0;j<v_nodes[i].degree;j++) {
-	temp_sum = Qi - c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
-
-	v_nodes[i].message[j] = fabs( temp_sum );
-	if (temp_sum > 0)
-	  v_nodes[i].sign[j] = 0;
-	else
-	  v_nodes[i].sign[j] = 1;
-      }
-    }
-
-    /* detect errors */
-    if (BitErrors[iter] == 0)
-      break;
-  }
-}
-#endif
-
-#ifdef NOT_USED
-/* function for doing the MP decoding */
-void MinSum(		 int	  BitErrors[],
-				 int      DecodedBits[],
-				 struct c_node c_nodes[],
-				 struct v_node v_nodes[],
-				 int	  CodeLength,
-				 int	  NumberParityBits,
-				 int	  max_iter,
-				 float    r_scale_factor,
-				 float    q_scale_factor,
-				 int      data[] )
-{
-  int i,j, iter, i_prime;
-  float min_beta;
-  int sign;
-  float temp_sum;
-  float Qi;
-
-  for (iter=0;iter<max_iter;iter++) {
-
-    /* update r */
-    for (j=0;j<NumberParityBits;j++) {
-      sign = 0;
-      for (i=0;i<c_nodes[j].degree;i++)
-	sign ^= v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ];
-
-      for (i=0;i<c_nodes[j].degree;i++) {
-	min_beta = 1000;
-
-	for (i_prime=0;i_prime<c_nodes[j].degree;i_prime++)
-	  if ( ( v_nodes[ c_nodes[j].index[i_prime] ].message[c_nodes[j].socket[i_prime]] < min_beta )&&(i_prime != i) )
-	    min_beta = v_nodes[ c_nodes[j].index[i_prime] ].message[c_nodes[j].socket[i_prime]];
-
-	if ( sign^v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ] )
-	  c_nodes[j].message[i] = -min_beta*r_scale_factor;
-	else
-	  c_nodes[j].message[i] = min_beta*r_scale_factor;
-      }
-    }
-
-    /* update q */
-    for (i=0;i<CodeLength;i++) {
-
-      /* first compute the LLR */
-      Qi = v_nodes[i].initial_value;
-      for (j=0;j<v_nodes[i].degree;j++) {
-	Qi += c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
-      }
-
-      /* make hard decision */
-      if (Qi < 0) {
-	DecodedBits[iter+max_iter*i] = 1;
-      }
-
-      /* now subtract to get the extrinsic information */
-      for (j=0;j<v_nodes[i].degree;j++) {
-	temp_sum = Qi - c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
-
-	v_nodes[i].message[j] = fabs( temp_sum )*q_scale_factor;
-	if (temp_sum > 0)
-	  v_nodes[i].sign[j] = 0;
-	else
-	  v_nodes[i].sign[j] = 1;
-      }
-    }
-
-    /* count data bit errors, assuming that it is systematic */
-    for (i=0;i<CodeLength-NumberParityBits;i++)
-      if ( DecodedBits[iter+max_iter*i] != data[i] )
-	BitErrors[iter]++;
-
-    /* detect errors */
-    if (BitErrors[iter] == 0)
-      break;
-  }
-}
-#endif
-
 
 /* function for doing the MP decoding */
-void SumProduct(	 int	  BitErrors[],
-			 int      DecodedBits[],
+// Returns the iteration count
+int SumProduct(int	  *parityCheckCount,
+			 char     DecodedBits[],
 			 struct c_node c_nodes[],
 			 struct v_node v_nodes[],
 			 int	  CodeLength,
@@ -546,6 +378,8 @@ void SumProduct(	 int	  BitErrors[],
 			 float    q_scale_factor,
 			 int      data[] )
 {
+  int result;
+  int bitErrors;
   int i,j, iter;
   float phi_sum;
   int sign;
@@ -553,7 +387,13 @@ void SumProduct(	 int	  BitErrors[],
   float Qi;
   int   ssum;
 
+//fprintf(stderr, "SumProduct\n");
+
+  result = max_iter;
   for (iter=0;iter<max_iter;iter++) {
+//fprintf(stderr, "  iter %d\n", iter);
+    for(i=0; i<CodeLength; i++) DecodedBits[i] = 0; // Clear each pass!
+    bitErrors = 0;
     /* update r */
     ssum = 0;
     for (j=0;j<NumberParityBits;j++) {
@@ -586,7 +426,7 @@ void SumProduct(	 int	  BitErrors[],
 
       /* make hard decision */
       if (Qi < 0) {
-	    DecodedBits[iter+max_iter*i] = 1;
+	    DecodedBits[i] = 1;
       }
 
       /* now subtract to get the extrinsic information */
@@ -603,21 +443,31 @@ void SumProduct(	 int	  BitErrors[],
 
     /* count data bit errors, assuming that it is systematic */
     for (i=0;i<CodeLength-NumberParityBits;i++)
-      if ( DecodedBits[iter+max_iter*i] != data[i] )
-	    BitErrors[iter]++;
+      if ( DecodedBits[i] != data[i] )
+	    bitErrors++;
+
+//fprintf(stderr, "    bitErrors is %d \n", bitErrors);
 
     /* Halt if zero errors */
-    if (BitErrors[iter] == 0)
+    if (bitErrors == 0) {
+//fprintf(stderr, "    SumProducts: 0 errors at iter = %d\n", iter);
+      result = iter;
       break;
+    }
 
-    // added by Bill -- reuse the BitErrors array to count PCs
     // count the number of PC satisfied and exit if all OK
-    BitErrors[iter] = ssum;
-    if (ssum==NumberParityBits) break;
+//fprintf(stderr, "    ssum is %d \n", ssum);
+    *parityCheckCount = ssum;
+    if (ssum==NumberParityBits)  {
+//fprintf(stderr, "    SumProducts: ssum == NumParityBits at iter = %d\n", iter);
+      result = iter;
+      break;
+    }
 
   }
 
-  // printf(" ssum is %d \n",   ssum);
+//fprintf(stderr, "  returning %d\n", result);
+return(result);
 }
 
 
@@ -643,8 +493,8 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
     NumberParityBits = ldpc->NumberParityBits;
     NumberRowsHcols = ldpc->NumberRowsHcols;
 
-    int *DecodedBits = calloc( max_iter*CodeLength, sizeof( int ) );
-    int *ParityCheckCount = calloc( max_iter, sizeof(int) );
+fprintf(stderr, "DecodedBits = calloc(%zd)\n",  CodeLength * sizeof(char));
+    char *DecodedBits = calloc( CodeLength, sizeof( char ) );
 
     /* derive some parameters */
 
@@ -658,55 +508,41 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
 
     max_row_weight = ldpc->max_row_weight;
     max_col_weight = ldpc->max_col_weight;
-    /*
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
-    */
-    /* initialize c-node and v-node structures */
 
+    /* initialize c-node and v-node structures */
+fprintf(stderr, "c_nodes = calloc(%zd)\n", NumberParityBits * sizeof(struct c_node));
     c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
+fprintf(stderr, "v_nodes = calloc(%zd)\n", CodeLength * sizeof(struct v_node));
     v_nodes = calloc( CodeLength, sizeof( struct v_node));
 
     init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, ldpc->H_rows, H1, CodeLength,
                    v_nodes, NumberRowsHcols, ldpc->H_cols, max_col_weight, dec_type, input);
 
     int DataLength = CodeLength - NumberParityBits;
+fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
     int *data_int = calloc( DataLength, sizeof(int) );
 
     /* need to clear these on each call */
-
-    for(i=0; i<max_iter; i++)
-        ParityCheckCount[i] = 0;
-     for(i=0; i<max_iter*CodeLength; i++)
-         DecodedBits[i] = 0;
+     *parityCheckCount = 0;
+     for(i=0; i<CodeLength; i++)
+         DecodedBits[i] = 0;    // TODO I don't think we need this
 
     /* Call function to do the actual decoding */
 
-#ifdef NOT_USED
-    if ( dec_type == 1) {
-        MinSum( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength,
-                NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int );
-    } else if ( dec_type == 2) {
-        fprintf(stderr, "dec_type = 2 not currently supported");
-        /* ApproximateMinStar( BitErrors, DecodedBits, c_nodes, v_nodes,
-           CodeLength, NumberParityBits, max_iter, r_scale_factor, q_scale_factor );*/
-    } else {
-#endif
-        SumProduct( ParityCheckCount, DecodedBits, c_nodes, v_nodes, CodeLength,
-                    NumberParityBits, max_iter, r_scale_factor, q_scale_factor, data_int );
-#ifdef NOT_USED
-    }
-#endif
+    int iter = SumProduct(parityCheckCount, DecodedBits, c_nodes, v_nodes, 
+                CodeLength, NumberParityBits, max_iter, 
+                r_scale_factor, q_scale_factor, data_int);
 
-    int iter = extract_output(out_char, DecodedBits, ParityCheckCount, max_iter, CodeLength, NumberParityBits);
+    extract_output(out_char, DecodedBits, *parityCheckCount, 
+                max_iter, CodeLength, NumberParityBits);
 
-    *parityCheckCount = ParityCheckCount[iter-1];
+//fprintf(stderr, "parityCheckCount = %d\n", *parityCheckCount);
+//fprintf(stderr, "iter = %d\n", iter);
 
     /* Clean up memory */
 
-    free(ParityCheckCount);
     free(DecodedBits);
-    free( data_int );
+    free(data_int);
 
     /*  Cleaning c-node elements */
 
@@ -846,31 +682,17 @@ void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
 }
 
 
-int extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits) {
-    int i, j;
+void extract_output(char out_char[], char DecodedBits[], int ParityCheckCount, int max_iter, int CodeLength, int NumberParityBits) {
+    int i;
 
     /* extract output bits from iteration that solved all parity
        equations, or failing that the last iteration. */
 
-    int converged = 0;
-    int iter = 0;
-    for (i=0;i<max_iter;i++) {
-        if (converged == 0)
-            iter++;
-        if (ParityCheckCount[i] == NumberParityBits) {
-            for (j=0; j<CodeLength; j++) {
-                out_char[j] = DecodedBits[i+j*max_iter];
-            }
-            converged = 1;
-        }
+//fprintf(stderr, "extract_output:\n");
+
+    for (i=0; i<CodeLength; i++) {
+        out_char[i] = DecodedBits[i];
     }
-    if (converged == 0) {
-        for (j=0; j<CodeLength; j++) {
-            out_char[j] = DecodedBits[max_iter-1+j*max_iter];
-        }
-    }
-    //fprintf(stderr, "iter: %d\n", iter);
-    return iter;
 }
 
 void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms) {
