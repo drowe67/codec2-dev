@@ -63,7 +63,9 @@ int main(int argc, char *argv[]) {
 	// Gaussian from uniform:
 	double x = (double)random() / RAND_MAX;
         double y = (double)random() / RAND_MAX;
-        double noise = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
+        double z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
+
+	double noise = No * z;
 	
 	dataout = datain + noise;
 
