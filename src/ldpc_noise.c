@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
 
     double NodB = atof(argv[3]);
     double No = pow(10.0, NodB/10.0);
-    double sum_xx = 0; double sum_x = 0.0; int n = 0;
+    double sum_xx = 0; double sum_x = 0.0; long n = 0;
     
     fprintf(stderr, "NodB = %f, No = %f\n", NodB, No);
     
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
         double y = (double)random() / RAND_MAX;
         double z = sqrt(-2 * log(x)) * cos(2 * M_PI * y);
 
-	double noise = No * z;
+	double noise = sqrt(No) * z;
 	dataout = datain + noise;
 
         fwrite(&dataout, sizeof(double), 1, fout);        
