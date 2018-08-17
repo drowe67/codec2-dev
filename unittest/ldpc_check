@@ -28,9 +28,9 @@ LDPC_ENC /dev/zero - --sd --code HRA_112_112 --testframes 10 |
 
 ###############################
 echo
-echo "Simple test, HRA_112_112, 0dB"
+echo "Simple test, HRA_112_112, -10dB"
 LDPC_ENC /dev/zero - --sd --code HRA_112_112 --testframes 10 |
-    ldpc_noise - - 0 |
+    ldpc_noise - - -10 |
     LDPC_DEC - /dev/null --code HRA_112_112 --sd --testframes
 
 
@@ -42,9 +42,9 @@ LDPC_ENC /dev/zero - --sd --testframes 10 |
 
 ###############################
 echo
-echo "Simple test, default, 0db"
+echo "Simple test, default, -10db"
 LDPC_ENC /dev/zero - --sd --testframes 10 |
-    ldpc_noise - - 0 |
+    ldpc_noise - - -10 |
     LDPC_DEC - /dev/null --sd --testframes
 
 ##############################################################
