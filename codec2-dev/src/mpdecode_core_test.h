@@ -12,6 +12,7 @@
 #define __MPDECODE_CORE__
 
 #include "comp.h"
+#include <stdint.h>
 
 struct LDPC {
     int max_iter;
@@ -26,8 +27,8 @@ struct LDPC {
     int data_bits_per_frame;
     int coded_bits_per_frame;
     int coded_syms_per_frame;
-    double *H_rows;
-    double *H_cols;
+    uint16_t *H_rows;
+    uint16_t *H_cols;
 };
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);

@@ -9,11 +9,15 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include "mpdecode_core_test.h"
 
 #define QPSK_CONSTELLATION_SIZE 4
 #define QPSK_BITS_PER_SYMBOL    2
+
+#undef PRINT_PROGRESS
+#undef PRINT_ALLOCS
 
 /* QPSK constellation for symbol likelihood calculations */
 
@@ -24,36 +28,45 @@ static COMP S_matrix[] = {
     {-1.0f,  0.0f}
 };
 
-struct v_node {
-  int degree;
-  float initial_value;
-  int *index;  /* the index of a c_node it is connected to */
-  int *socket; /* socket number at the c_node */
-  float *message;     
-  int *sign;
-};
-
+// c_nodes will be an array of NumberParityBits of struct c_node
 struct c_node {
-  int degree;
-  int *index;                     
-  float *message;     
-  int *socket; /* socket number at the v_node */
+  int degree;       // A count of ???
+  uint16_t *index;  // -> array of degree ints
+                    //    Filled with values from H_rows (except last 2 entries)
+  float *message;   // -> array of degree floats
+                    //    modified during operation!
+  uint16_t *socket; // -> array of degree ints
+                    //    The socket number at the v_node
 };
 
+// v_nodes will be an array of CodeLength of struct v_node
+struct v_node {
+  int degree;       // A count of ???
+  float initial_value;
+  uint16_t *index;  // -> arrays of degree ints
+                    //    the index of a c_node it is connected to
+                    //    Filled with values from H_cols (except last 2 entries)
+  uint16_t *socket; // -> array of degree ints
+                    //    socket number at the c_node
+  float *message;   // -> array of degree floats
+                    //    Loaded with input data
+                    //    modified during operation!
+  uint8_t *sign;    // -> array of degree ints
+                    //    1 if input is negative
+                    //    modified during operation!
+};
 
-void extract_output(char out_char[], char DecodedBits[], int ParityCheckCount,
-                    int max_iter, int CodeLength, int NumberParityBits);
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
     unsigned int p, i, tmp, par, prev=0;
     int          ind;
-    double      *H_rows = ldpc->H_rows;
+    uint16_t     *H_rows = ldpc->H_rows;
 
     for (p=0; p<ldpc->NumberParityBits; p++) {
         par = 0;
 
         for (i=0; i<ldpc->max_row_weight; i++) {
-            ind = (int)H_rows[p + i*ldpc->NumberParityBits];
+            ind = H_rows[p + i*ldpc->NumberParityBits];
             par = par + ibits[ind-1];
         }
 
@@ -124,12 +137,12 @@ void init_c_v_nodes(struct c_node *c_nodes,
                     int     shift,
                     int     NumberParityBits,
                     int     max_row_weight,
-                    double *H_rows,
+                    uint16_t *H_rows,
                     int     H1,
                     int     CodeLength,
                     struct v_node *v_nodes,
                     int     NumberRowsHcols,
-                    double *H_cols,
+                    uint16_t *H_cols,
                     int     max_col_weight,
                     int     dec_type,
                     double *input)
@@ -184,22 +197,24 @@ void init_c_v_nodes(struct c_node *c_nodes,
         if (shift ==0){
             for (i=0;i<NumberParityBits;i++) {
                 /* now that we know the size, we can dynamically allocate memory */
+#ifdef PRINT_ALLOCS
 if (i<4) fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
-                c_nodes[i].degree * sizeof(int),
+                c_nodes[i].degree * sizeof(uint16_t),
                 c_nodes[i].degree * sizeof(float),
-                c_nodes[i].degree * sizeof(int));
+                c_nodes[i].degree * sizeof(uint16_t));
 if (i==4) fprintf(stderr, "...\n");
-                c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
+#endif
+                c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( uint16_t ) );
                 c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
-                c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
+                c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( uint16_t ) );
 
                 for (j=0;j<c_nodes[i].degree-2;j++) {
-                    c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                    c_nodes[i].index[j] = (H_rows[i+j*NumberParityBits] - 1);
                 }
                 j=c_nodes[i].degree-2;
 
                 if (i==0){
-                    c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                    c_nodes[i].index[j] = (H_rows[i+j*NumberParityBits] - 1);
                 }
                 else {
                     c_nodes[i].index[j] = (CodeLength-NumberParityBits)+i-1;
@@ -215,20 +230,22 @@ if (i==4) fprintf(stderr, "...\n");
             for (i=0;i<(NumberParityBits/shift);i++){
 
                 for (k =0;k<shift;k++){
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", cnt,
-                c_nodes[cnt].degree * sizeof(int),
+                c_nodes[cnt].degree * sizeof(uint16_t),
                 c_nodes[cnt].degree * sizeof(float),
-                c_nodes[cnt].degree * sizeof(int));
-                    c_nodes[cnt].index =  calloc( c_nodes[cnt].degree, sizeof( int ) );
+                c_nodes[cnt].degree * sizeof(uint16_t));
+#endif
+                    c_nodes[cnt].index =  calloc( c_nodes[cnt].degree, sizeof( uint16_t ) );
                     c_nodes[cnt].message =calloc( c_nodes[cnt].degree, sizeof( float ) );
-                    c_nodes[cnt].socket = calloc( c_nodes[cnt].degree, sizeof( int ) );
+                    c_nodes[cnt].socket = calloc( c_nodes[cnt].degree, sizeof( uint16_t ) );
 
                     for (j=0;j<c_nodes[cnt].degree-2;j++) {
-                        c_nodes[cnt].index[j] = (int) (H_rows[cnt+j*NumberParityBits] - 1);
+                        c_nodes[cnt].index[j] = (H_rows[cnt+j*NumberParityBits] - 1);
                     }
                     j=c_nodes[cnt].degree-2;
                     if ((i ==0)||(i==(NumberParityBits/shift-1))){
-                        c_nodes[cnt].index[j] = (int) (H_rows[cnt+j*NumberParityBits] - 1);
+                        c_nodes[cnt].index[j] = (H_rows[cnt+j*NumberParityBits] - 1);
                     }
                     else{
                         c_nodes[cnt].index[j] = (CodeLength-NumberParityBits)+k+shift*(i);
@@ -247,15 +264,17 @@ fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", cnt,
     } else {
         for (i=0;i<NumberParityBits;i++) {
             /* now that we know the size, we can dynamically allocate memory */
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
-                c_nodes[i].degree * sizeof(int),
+                c_nodes[i].degree * sizeof(uint16_t),
                 c_nodes[i].degree * sizeof(float),
-                c_nodes[i].degree * sizeof(int));
-            c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
+                c_nodes[i].degree * sizeof(uint16_t));
+#endif
+            c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( uint16_t ) );
             c_nodes[i].message = calloc( c_nodes[i].degree, sizeof( float ) );
-            c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
+            c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( uint16_t ) );
             for (j=0;j<c_nodes[i].degree;j++){
-                c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                c_nodes[i].index[j] = (H_rows[i+j*NumberParityBits] - 1);
             }
         }
     }
@@ -301,16 +320,18 @@ fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
 
     for (i=0;i<CodeLength;i++) {
         /* allocate memory according to the degree of the v-node */
+#ifdef PRINT_ALLOCS
 if (i<4) fprintf(stderr, "cnodes[%d].* = calloc(%zd), calloc(%zd), calloc(%zd), calloc(%zd)\n", i,
-                v_nodes[i].degree * sizeof(int),
+                v_nodes[i].degree * sizeof(uint16_t),
                 v_nodes[i].degree * sizeof(float),
-                v_nodes[i].degree * sizeof(int),
-                v_nodes[i].degree * sizeof(int));
+                v_nodes[i].degree * sizeof(uint16_t),
+                v_nodes[i].degree * sizeof(uint8_t));
 if (i==4) fprintf(stderr, "...\n");
-        v_nodes[i].index = calloc( v_nodes[i].degree, sizeof( int ) );
+#endif
+        v_nodes[i].index = calloc( v_nodes[i].degree, sizeof( uint16_t ) );
         v_nodes[i].message = calloc( v_nodes[i].degree, sizeof( float ) );
-        v_nodes[i].sign = calloc( v_nodes[i].degree, sizeof( int ) );
-        v_nodes[i].socket = calloc( v_nodes[i].degree, sizeof( int ) );
+        v_nodes[i].sign = calloc( v_nodes[i].degree, sizeof( uint16_t ) );
+        v_nodes[i].socket = calloc( v_nodes[i].degree, sizeof( uint8_t ) );
 
         /* index tells which c-nodes this v-node is connected to */
         v_nodes[i].initial_value = input[i];
@@ -326,7 +347,7 @@ if (i==4) fprintf(stderr, "...\n");
                     count=count+shift;
                 }
             } else  {
-                v_nodes[i].index[j] = (int) (H_cols[i+j*NumberRowsHcols] - 1);
+                v_nodes[i].index[j] = (H_cols[i+j*NumberRowsHcols] - 1);
             }
 
             /* search the connected c-node for the proper message value */
@@ -387,11 +408,15 @@ int SumProduct(int	  *parityCheckCount,
   float Qi;
   int   ssum;
 
-//fprintf(stderr, "SumProduct\n");
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "SumProduct\n");
+#endif
 
   result = max_iter;
   for (iter=0;iter<max_iter;iter++) {
-//fprintf(stderr, "  iter %d\n", iter);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "  iter %d\n", iter);
+#endif
     for(i=0; i<CodeLength; i++) DecodedBits[i] = 0; // Clear each pass!
     bitErrors = 0;
     /* update r */
@@ -446,27 +471,37 @@ int SumProduct(int	  *parityCheckCount,
       if ( DecodedBits[i] != data[i] )
 	    bitErrors++;
 
-//fprintf(stderr, "    bitErrors is %d \n", bitErrors);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "    bitErrors is %d \n", bitErrors);
+#endif
 
     /* Halt if zero errors */
     if (bitErrors == 0) {
-//fprintf(stderr, "    SumProducts: 0 errors at iter = %d\n", iter);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "    SumProducts: 0 errors at iter = %d\n", iter);
+#endif
       result = iter;
       break;
     }
 
     // count the number of PC satisfied and exit if all OK
-//fprintf(stderr, "    ssum is %d \n", ssum);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "    ssum is %d \n", ssum);
+#endif
     *parityCheckCount = ssum;
     if (ssum==NumberParityBits)  {
-//fprintf(stderr, "    SumProducts: ssum == NumParityBits at iter = %d\n", iter);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "    SumProducts: ssum == NumParityBits at iter = %d\n", iter);
+#endif
       result = iter;
       break;
     }
 
   }
 
-//fprintf(stderr, "  returning %d\n", result);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "SumProducts %d iterations\n", result);
+#endif
 return(result);
 }
 
@@ -493,7 +528,9 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
     NumberParityBits = ldpc->NumberParityBits;
     NumberRowsHcols = ldpc->NumberRowsHcols;
 
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "DecodedBits = calloc(%zd)\n",  CodeLength * sizeof(char));
+#endif
     char *DecodedBits = calloc( CodeLength, sizeof( char ) );
 
     /* derive some parameters */
@@ -510,16 +547,22 @@ fprintf(stderr, "DecodedBits = calloc(%zd)\n",  CodeLength * sizeof(char));
     max_col_weight = ldpc->max_col_weight;
 
     /* initialize c-node and v-node structures */
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "c_nodes = calloc(%zd)\n", NumberParityBits * sizeof(struct c_node));
+#endif
     c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "v_nodes = calloc(%zd)\n", CodeLength * sizeof(struct v_node));
+#endif
     v_nodes = calloc( CodeLength, sizeof( struct v_node));
 
     init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, ldpc->H_rows, H1, CodeLength,
                    v_nodes, NumberRowsHcols, ldpc->H_cols, max_col_weight, dec_type, input);
 
     int DataLength = CodeLength - NumberParityBits;
+#ifdef PRINT_ALLOCS
 fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
+#endif
     int *data_int = calloc( DataLength, sizeof(int) );
 
     /* need to clear these on each call */
@@ -533,11 +576,12 @@ fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
                 CodeLength, NumberParityBits, max_iter, 
                 r_scale_factor, q_scale_factor, data_int);
 
-    extract_output(out_char, DecodedBits, *parityCheckCount, 
-                max_iter, CodeLength, NumberParityBits);
+    for (i=0; i<CodeLength; i++) out_char[i] = DecodedBits[i];
 
-//fprintf(stderr, "parityCheckCount = %d\n", *parityCheckCount);
-//fprintf(stderr, "iter = %d\n", iter);
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "parityCheckCount = %d\n", *parityCheckCount);
+fprintf(stderr, "iter = %d\n", iter);
+#endif
 
     /* Clean up memory */
 
@@ -678,20 +722,6 @@ void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
         for (k=0;k<bps;k++) {
             bit_likelihood[bps*n+k] = num[k] - den[k];
         }
-    }
-}
-
-
-void extract_output(char out_char[], char DecodedBits[], int ParityCheckCount, int max_iter, int CodeLength, int NumberParityBits) {
-    int i;
-
-    /* extract output bits from iteration that solved all parity
-       equations, or failing that the last iteration. */
-
-//fprintf(stderr, "extract_output:\n");
-
-    for (i=0; i<CodeLength; i++) {
-        out_char[i] = DecodedBits[i];
     }
 }
 
