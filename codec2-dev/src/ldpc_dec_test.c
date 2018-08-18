@@ -53,7 +53,9 @@ int opt_exists(char *argv[], int argc, char opt[]) {
 int main(int argc, char *argv[])
 {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute, state, next_state, frame, testframes;
+    int         i, r, num_ok, num_runs, codename, parityCheckCount, mute;
+    int         state, next_state, hframe, testframes;
+    // int        frame;
     int         data_bits_per_frame;
     char        *adetected_data;
     struct LDPC ldpc;
@@ -135,6 +137,8 @@ int main(int argc, char *argv[])
         }
     }
 
+    ldpc_alloc_mem(&ldpc);
+
     CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc.NumberParityBits;
     data_bits_per_frame = ldpc.NumberRowsHcols;
@@ -143,7 +147,8 @@ int main(int argc, char *argv[])
     char out_char[CodeLength];
 
     testframes = 0;
-    
+    Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
+
     if (!strcmp(argv[1],"--test")) {
 
         /* test mode --------------------------------------------------------*/
@@ -198,7 +203,7 @@ fprintf(stderr, "OK %d\n", ok);
 
         sdinput = 0;
         readhalfframe = 0;
-        mute = 0; state = 0; frame = 0; testframes = 0;
+        mute = 0; state = 0; hframe = 0;
         if (opt_exists(argv, argc, "--sd")) {
             sdinput = 1;
         }
@@ -217,25 +222,26 @@ fprintf(stderr, "OK %d\n", ok);
                 ibits[i] = r[i] > 16384;
             }
             encode(&ldpc, ibits, pbits);  
-            Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
        }
 
-        double *input_double = calloc(CodeLength, sizeof(double));
+       double *input_double = calloc(CodeLength, sizeof(double));
 
-        nread = CodeLength;
-        offset = 0;
-        if (readhalfframe) {
-            nread = CodeLength/2;
-            offset = CodeLength/2;
-            for(i=0; i<offset; i++) {
-                input_double[i] = 0.0;
-            }
-        }
+       nread = CodeLength;
+       offset = 0;
+       if (readhalfframe) {
+           nread = CodeLength/2;
+           offset = CodeLength/2;
+           for(i=0; i<offset; i++) {
+               input_double[i] = 0.0;
+           }
+       }
 
-        fprintf(stderr, "Codeword length: %d\n",  CodeLength);
-        fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
+       fprintf(stderr, "Codeword length: %d\n",  CodeLength);
+       fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
 
-        while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
+       //frame = 0;
+       while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
+            //fprintf(stderr, "Frame %d\n", frame);
             if (sdinput) {
                 if (testframes) {
                     char in_char;
@@ -276,7 +282,7 @@ fprintf(stderr, "OK %d\n", ok);
             } else {
                 
                 if (readhalfframe) {
-                    // Establish which half frame we want to sync on,
+                    // Establish which half hframe we want to sync on,
                     // used for testing with cohpsk_put_bits, as it
                     // maintains sync with test bits state machine.
                 
@@ -284,21 +290,21 @@ fprintf(stderr, "OK %d\n", ok);
                     switch(state) {
                     case 0:
                         if (iter < ldpc.max_iter) {
-                            /* OK we've found which frame to sync on */
+                            /* OK we've found which hframe to sync on */
                             next_state = 1;
-                            frame = 0;
+                            hframe = 0;
                         }
                         break;
                     case 1:
-                        frame++;
-                        if ((frame % 2) == 0) {
-                            /* write decoded packets every second input frame */
+                        hframe++;
+                        if ((hframe % 2) == 0) {
+                            /* write decoded packets every second input hframe */
                             fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
                         }
                         break;
                     }
                     state = next_state;
-                    fprintf(stderr, "state: %d iter: %d\n", state, iter);
+                    //fprintf(stderr, "state: %d iter: %d\n", state, iter);
                 }
 
                 for(i=0; i<offset; i++) {
@@ -317,6 +323,7 @@ fprintf(stderr, "OK %d\n", ok);
                     Tbits++;
                 }
             }
+        //frame ++;
         }
 
         free(input_double);
@@ -329,6 +336,8 @@ fprintf(stderr, "OK %d\n", ok);
                 (float)Terrs_raw/(Tbits_raw+1E-12));
         fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
     }
+
+    ldpc_free_mem(&ldpc);
     
     return 0;
 }
