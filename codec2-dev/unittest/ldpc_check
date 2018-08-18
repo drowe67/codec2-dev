@@ -104,4 +104,4 @@ if [[ $1 == "--test" ]]; then
 fi
 
 echo
-if [[ $PASS ]]; then echo "PASSED"; else echo "FAILED"; fi
+if [[ $PASS == 1 ]]; then echo "PASSED"; else echo "FAILED"; fi
