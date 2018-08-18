@@ -17,7 +17,7 @@
 #define QPSK_BITS_PER_SYMBOL    2
 
 #undef PRINT_PROGRESS
-#undef PRINT_ALLOCS
+#define PRINT_ALLOCS
 
 /* QPSK constellation for symbol likelihood calculations */
 
@@ -56,6 +56,15 @@ struct v_node {
                     //    modified during operation!
 };
 
+// pointers to allocated memory
+static struct c_node *c_nodes;
+static struct v_node *v_nodes;
+static char *DecodedBits;
+static int *data_int;
+
+// Variables common to several routines (there are better ways but this works).
+static int shift;
+static int H1;
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
     unsigned int p, i, tmp, par, prev=0;
@@ -133,7 +142,7 @@ static float max_star0(
         return( delta1 - AJIAN*(diff+TJIAN) );
 }
 
-void init_c_v_nodes(struct c_node *c_nodes,
+void alloc_c_v_nodes(struct c_node *c_nodes,
                     int     shift,
                     int     NumberParityBits,
                     int     max_row_weight,
@@ -144,10 +153,20 @@ void init_c_v_nodes(struct c_node *c_nodes,
                     int     NumberRowsHcols,
                     uint16_t *H_cols,
                     int     max_col_weight,
-                    int     dec_type,
-                    double *input)
-{
+                    int     dec_type) {
     int i, j, k, count, cnt, c_index, v_index;
+
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "alloc_c_v_nodes(*, %d, %d, %d, *, %d, %d, *, %d, *, %d, %d)\n",
+                    shift,
+                    NumberParityBits,
+                    max_row_weight,
+                    H1,
+                    CodeLength,
+                    NumberRowsHcols,
+                    max_col_weight,
+                    dec_type);
+#endif
 
     /* first determine the degree of each c-node */
 
@@ -191,6 +210,10 @@ void init_c_v_nodes(struct c_node *c_nodes,
             }
         }
     }
+
+#ifdef PRINT_PROGRESS
+printf("count = %d, cnt = %d\n", count, cnt);
+#endif
 
     if (H1){
 
@@ -334,7 +357,6 @@ if (i==4) fprintf(stderr, "...\n");
         v_nodes[i].socket = calloc( v_nodes[i].degree, sizeof( uint8_t ) );
 
         /* index tells which c-nodes this v-node is connected to */
-        v_nodes[i].initial_value = input[i];
         count=0;
 
         for (j=0;j<v_nodes[i].degree;j++) {
@@ -356,19 +378,8 @@ if (i==4) fprintf(stderr, "...\n");
                     v_nodes[i].socket[j] = c_index;
                     break;
                 }
-            /* initialize v-node with received LLR */
-            if ( dec_type == 1)
-                v_nodes[i].message[j] = fabs(input[i]);
-            else
-                v_nodes[i].message[j] = phi0( fabs(input[i]) );
-
-            if (input[i] < 0)
-                v_nodes[i].sign[j] = 1;
         }
-
     }
-
-
 
     /* now finish setting up the c_nodes */
     for (i=0;i<NumberParityBits;i++) {
@@ -383,6 +394,33 @@ if (i==4) fprintf(stderr, "...\n");
         }
     }
 
+}
+
+
+void init_v_nodes(int    CodeLength,
+                  struct v_node *v_nodes,
+                  int    dec_type,
+                  double *input) {
+
+    int i, j;
+
+    /* set up v_nodes */
+    for (i=0;i<CodeLength;i++) {
+
+        v_nodes[i].initial_value = input[i];
+
+        for (j=0;j<v_nodes[i].degree;j++) {
+            /* initialize v-node with received LLR */
+            if ( dec_type == 1)
+                v_nodes[i].message[j] = fabs(input[i]);
+            else
+                v_nodes[i].message[j] = phi0( fabs(input[i]) );
+
+            if (input[i] < 0)
+                v_nodes[i].sign[j] = 1;
+        }
+
+    }
 }
 
 
@@ -505,20 +543,81 @@ fprintf(stderr, "SumProducts %d iterations\n", result);
 return(result);
 }
 
+// Memory initialization, call when modem is setup
+void ldpc_alloc_mem(struct LDPC *ldpc) {
+
+    shift = (ldpc->NumberParityBits + ldpc->NumberRowsHcols) - ldpc->CodeLength;
+    if (ldpc->NumberRowsHcols == ldpc->CodeLength) {
+        H1=0;
+        shift=0;
+    } else {
+        H1=1;
+    }
+
+#ifdef PRINT_ALLOCS
+fprintf(stderr, "c_nodes = calloc(%zd)\n", ldpc->NumberParityBits * sizeof(struct c_node));
+#endif
+    c_nodes = calloc(ldpc->NumberParityBits, sizeof( struct c_node ) );
+#ifdef PRINT_ALLOCS
+fprintf(stderr, "v_nodes = calloc(%zd)\n", ldpc->CodeLength * sizeof(struct v_node));
+#endif
+    v_nodes = calloc(ldpc->CodeLength, sizeof( struct v_node));
+
+#ifdef PRINT_ALLOCS
+fprintf(stderr, "DecodedBits = calloc(%zd)\n",  ldpc->CodeLength * sizeof(char));
+#endif
+    DecodedBits = calloc(ldpc->CodeLength, sizeof( char ) );
+
+    int DataLength = ldpc->CodeLength - ldpc->NumberParityBits;
+#ifdef PRINT_ALLOCS
+fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
+#endif
+    data_int = calloc(DataLength, sizeof(int) );
+
+    alloc_c_v_nodes(c_nodes, shift,
+        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
+        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, 
+        ldpc->dec_type);
+}
+
+void ldpc_free_mem(struct LDPC *ldpc) {
+    int i;
+
+    /*  Cleaning c-node elements */
+    for (i=0;i<ldpc->NumberParityBits;i++) {
+        free( c_nodes[i].index );
+        free( c_nodes[i].message );
+        free( c_nodes[i].socket );
+    }
+    free(c_nodes);
+
+    /* Cleaning v-node elements */
+    for (i=0;i<ldpc->CodeLength;i++) {
+        free( v_nodes[i].index);
+        free( v_nodes[i].sign );
+        free( v_nodes[i].message );
+        free( v_nodes[i].socket );
+    }
+    free(v_nodes);
+
+    free(DecodedBits);
+    free(data_int);
+}
+
 
 /* Convenience function to call LDPC decoder from C programs */
 
 int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount) {
     int		max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
-    int		max_row_weight, max_col_weight;
-    int         CodeLength, NumberParityBits, NumberRowsHcols, shift, H1;
+    int         CodeLength, NumberParityBits;
     int         i;
-    struct c_node *c_nodes;
-    struct v_node *v_nodes;
+
+#ifdef PRINT_PROGRESS
+fprintf(stderr, "run_ldpc_decoder()\n");
+#endif
 
     /* default values */
-
     max_iter  = ldpc->max_iter;
     dec_type  = ldpc->dec_type;
     q_scale_factor = ldpc->q_scale_factor;
@@ -526,49 +625,9 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
 
     CodeLength = ldpc->CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc->NumberParityBits;
-    NumberRowsHcols = ldpc->NumberRowsHcols;
-
-#ifdef PRINT_ALLOCS
-fprintf(stderr, "DecodedBits = calloc(%zd)\n",  CodeLength * sizeof(char));
-#endif
-    char *DecodedBits = calloc( CodeLength, sizeof( char ) );
-
-    /* derive some parameters */
-
-    shift = (NumberParityBits + NumberRowsHcols) - CodeLength;
-    if (NumberRowsHcols == CodeLength) {
-        H1=0;
-        shift=0;
-    } else {
-        H1=1;
-    }
-
-    max_row_weight = ldpc->max_row_weight;
-    max_col_weight = ldpc->max_col_weight;
 
     /* initialize c-node and v-node structures */
-#ifdef PRINT_ALLOCS
-fprintf(stderr, "c_nodes = calloc(%zd)\n", NumberParityBits * sizeof(struct c_node));
-#endif
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-#ifdef PRINT_ALLOCS
-fprintf(stderr, "v_nodes = calloc(%zd)\n", CodeLength * sizeof(struct v_node));
-#endif
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
-
-    init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, ldpc->H_rows, H1, CodeLength,
-                   v_nodes, NumberRowsHcols, ldpc->H_cols, max_col_weight, dec_type, input);
-
-    int DataLength = CodeLength - NumberParityBits;
-#ifdef PRINT_ALLOCS
-fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
-#endif
-    int *data_int = calloc( DataLength, sizeof(int) );
-
-    /* need to clear these on each call */
-     *parityCheckCount = 0;
-     for(i=0; i<CodeLength; i++)
-         DecodedBits[i] = 0;    // TODO I don't think we need this
+    init_v_nodes(CodeLength, v_nodes, dec_type, input);
 
     /* Call function to do the actual decoding */
 
@@ -582,33 +641,6 @@ fprintf(stderr, "data_int = calloc(%zd)\n", DataLength * sizeof(int));
 fprintf(stderr, "parityCheckCount = %d\n", *parityCheckCount);
 fprintf(stderr, "iter = %d\n", iter);
 #endif
-
-    /* Clean up memory */
-
-    free(DecodedBits);
-    free(data_int);
-
-    /*  Cleaning c-node elements */
-
-    for (i=0;i<NumberParityBits;i++) {
-        free( c_nodes[i].index );
-        free( c_nodes[i].message );
-        free( c_nodes[i].socket );
-    }
-
-    /* printf( "Cleaning c-nodes \n" ); */
-    free( c_nodes );
-
-    /* printf( "Cleaning v-node elements\n" ); */
-    for (i=0;i<CodeLength;i++) {
-        free( v_nodes[i].index);
-        free( v_nodes[i].sign );
-        free( v_nodes[i].message );
-        free( v_nodes[i].socket );
-    }
-
-    /* printf( "Cleaning v-nodes \n" ); */
-    free( v_nodes );
 
     return iter;
 }

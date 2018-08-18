@@ -33,6 +33,8 @@ struct LDPC {
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
+void ldpc_alloc_mem(struct LDPC *ldpc);
+void ldpc_free_mem(struct LDPC *ldpc);
 int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount);
 
 void sd_to_llr(double llr[], double sd[], int n);
