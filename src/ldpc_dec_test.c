@@ -59,7 +59,7 @@ int main(int argc, char *argv[])
     int         data_bits_per_frame;
     char        *adetected_data;
     struct LDPC ldpc;
-    double     *ainput;
+    float     *ainput;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
     
     if (argc < 2) {
@@ -171,7 +171,6 @@ int main(int argc, char *argv[])
 
             if (ok == CodeLength)
                 num_ok++;            
-fprintf(stderr, "OK %d\n", ok);
         }
 
         fprintf(stderr, "test runs......: %d\n",  num_runs);
@@ -225,6 +224,7 @@ fprintf(stderr, "OK %d\n", ok);
        }
 
        double *input_double = calloc(CodeLength, sizeof(double));
+       float  *input_float  = calloc(CodeLength, sizeof(float));
 
        nread = CodeLength;
        offset = 0;
@@ -260,10 +260,10 @@ fprintf(stderr, "OK %d\n", ok);
                         Tbits_raw++;
                     }
                 }
-                sd_to_llr(input_double, input_double, CodeLength);
+                sd_to_llr(input_float, input_double, CodeLength);
             }
 
-            iter = run_ldpc_decoder(&ldpc, out_char, input_double, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
             
             if (mute) {
