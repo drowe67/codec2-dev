@@ -9,7 +9,7 @@ cmake_minimum_required(VERSION 2.8)
 
 ###################################################
 
-set(FLOAT_TYPE "hard" CACHE STRING "")
+set(FLOAT_TYPE "hard" CACHE STRING "Floating point: defaults to hard.")
 
 ###################################################
 
@@ -30,14 +30,14 @@ if(VERIFY_OPT)
     add_definitions(-DDUMP)
 endif()
 
-option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
-if(SEMIHOSTING)
-    link_libraries(rdimon)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
-else()
-    link_libraries(nosys)
+#option(SEMIHOSTING "Enable for standard arm semihosting." OFF)
+#if(SEMIHOSTING)
+#    link_libraries(rdimon)
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
+#else()
+#    link_libraries(nosys)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=nosys.specs")
-endif()
+#endif()
 
 # Set default build type
 if(NOT CMAKE_BUILD_TYPE)
@@ -49,8 +49,7 @@ else()
     link_libraries(c m)
 endif()
 
-include(cmake/STM32_Toolchain.cmake)
-set(CMAKE_REQUIRED_DEFINITIONS "--specs=nosys.specs")
+#include(cmake/STM32_Toolchain.cmake)
 project(stm32f4 C ASM)
 
 include_directories(../src ../unittest inc)
