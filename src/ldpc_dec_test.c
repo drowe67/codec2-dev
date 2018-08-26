@@ -57,9 +57,10 @@ int main(int argc, char *argv[])
     int         state, next_state, hframe, testframes;
     // int        frame;
     int         data_bits_per_frame;
-    char        *adetected_data;
+    char       *adetected_data;
     struct LDPC ldpc;
-    float     *ainput;
+    float      *ainput;
+    int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
     
     if (argc < 2) {
@@ -137,7 +138,11 @@ int main(int argc, char *argv[])
         }
     }
 
+    ldpc_init();
     ldpc_alloc_mem(&ldpc);
+
+    // Optional dump for development and debugging
+    //ldpc_dump_nodes(&ldpc);
 
     CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc.NumberParityBits;
@@ -147,6 +152,7 @@ int main(int argc, char *argv[])
     char out_char[CodeLength];
 
     testframes = 0;
+    total_iters = 0;
     Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
 
     if (!strcmp(argv[1],"--test")) {
@@ -157,11 +163,13 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Codeword length: %d\n",  CodeLength);
         fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
 
-        num_runs = 100; num_ok = 0;
+        num_runs = 1; num_ok = 0;
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
+            //fprintf(stderr, "iter: %d\n", iter);
+            total_iters += iter;
 
             int ok = 0;
             for (i=0; i<CodeLength; i++) {
@@ -182,7 +190,7 @@ int main(int argc, char *argv[])
     }
     else {
         FILE *fin, *fout;
-        int   sdinput, readhalfframe, nread, offset, iter;
+        int   sdinput, readhalfframe, nread, offset;
 
         /* File I/O mode ------------------------------------------------*/
 
@@ -265,6 +273,7 @@ int main(int argc, char *argv[])
 
             iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
+            total_iters += iter;
             
             if (mute) {
 
@@ -331,13 +340,15 @@ int main(int argc, char *argv[])
         if (fout != NULL) fclose(fout);
     }
 
+    fprintf(stderr, "total iters %d\n", total_iters);
+
     if (testframes) {
         fprintf(stderr, "Raw Tbits..: %d Terr: %d BER: %4.3f\n", Tbits_raw, Terrs_raw,
                 (float)Terrs_raw/(Tbits_raw+1E-12));
         fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
     }
 
-    ldpc_free_mem(&ldpc);
+    //ldpc_free_mem(&ldpc);
     
     return 0;
 }

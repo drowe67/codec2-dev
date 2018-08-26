@@ -31,16 +31,19 @@ struct LDPC {
     uint16_t *H_cols;
 };
 
-void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
+extern void ldpc_init(void);
 
-void ldpc_alloc_mem(struct LDPC *ldpc);
-void ldpc_free_mem(struct LDPC *ldpc);
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount);
+extern void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-void sd_to_llr(float llr[], double sd[], int n);
+extern void ldpc_alloc_mem(struct LDPC *ldpc);
+extern void ldpc_free_mem(struct LDPC *ldpc);
+extern int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount);
+extern void ldpc_dump_nodes(struct LDPC *ldpc);
 
-void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
-void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
-void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
+extern void sd_to_llr(float llr[], double sd[], int n);
+
+extern void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
+extern void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
+extern void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
 
 #endif

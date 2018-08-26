@@ -60,6 +60,7 @@ int main(int argc, char *argv[])
     char        *adetected_data;
     struct LDPC ldpc;
     double     *ainput;
+    int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
     
     if (argc < 2) {
@@ -145,6 +146,7 @@ int main(int argc, char *argv[])
     char out_char[CodeLength];
 
     testframes = 0;
+    total_iters = 0;
     
     if (!strcmp(argv[1],"--test")) {
 
@@ -158,7 +160,9 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
+            //fprintf(stderr, "iter: %d\n", iter);
+	    total_iters += iter;
 
             int ok = 0;
             for (i=0; i<CodeLength; i++) {
@@ -179,7 +183,7 @@ int main(int argc, char *argv[])
     }
     else {
         FILE *fin, *fout;
-        int   sdinput, readhalfframe, nread, offset, iter;
+        int   sdinput, readhalfframe, nread, offset;
 
         /* File I/O mode ------------------------------------------------*/
 
@@ -259,6 +263,7 @@ int main(int argc, char *argv[])
 
             iter = run_ldpc_decoder(&ldpc, out_char, input_double, &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
+	    total_iters += iter;
             
             if (mute) {
 
@@ -323,6 +328,8 @@ int main(int argc, char *argv[])
         if (fin  != NULL) fclose(fin);
         if (fout != NULL) fclose(fout);
     }
+
+    fprintf(stderr, "total iters %d\n", total_iters);
 
     if (testframes) {
         fprintf(stderr, "Raw Tbits..: %d Terr: %d BER: %4.3f\n", Tbits_raw, Terrs_raw,
