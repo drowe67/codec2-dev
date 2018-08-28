@@ -1,6 +1,6 @@
 % rtlsdr_bpf.m
 %
-% David Rowe 24 August 2005
+% David Rowe 24 August 2018
 %
 % Calculate component values for cascaded HP-LP 2-8 MHz Chebychev filter
 %
