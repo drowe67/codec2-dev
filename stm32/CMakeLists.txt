@@ -52,6 +52,12 @@ endif()
 #include(cmake/STM32_Toolchain.cmake)
 project(stm32f4 C ASM)
 
+# Setup defaults that can't be set in the toolchain file
+set(CMAKE_EXE_LINKER_FLAGS "-T${CMAKE_SOURCE_DIR}/stm32_flash.ld")
+set(CMAKE_EXECUTABLE_SUFFIX_C ".elf")
+set(CMAKE_EXECUTABLE_SUFFIX_CXX ".elf")
+set(CMAKE_EXECUTABLE_SUFFIX_ASM ".elf")
+
 include_directories(../src ../unittest inc)
 
 
