@@ -1,0 +1,71 @@
+#!/usr/bin/python3
+
+import math
+
+# Save the list of points to output in a balanced order
+points = []  # A list of tuples (x, r)
+
+adj = 0.38  # Offset ratio for step of 1, estimate
+
+def loop_even(upper, lower, step):
+  for i in range((int)(upper * step), (int)(lower * step), -1):
+    x = i / step
+    z = math.exp(x + (adj / step))
+    r = math.log((z+1)/(z-1))
+    points.append( (x, r) )
+
+#####
+# Create initial list which will be sorted desending
+
+# 9:5 step 1
+loop_even(9, 5, 1)
+
+# 5:1 step 1/16
+loop_even(5, 1/16, 16)
+
+# 1/16, .., 1/4096 , (2^4, .., 2^14)
+for i in range(4, 14):
+    x = 1.0 / (2 ** i)
+    z = math.exp(x+ (.38 / (2 ** i)))
+    r = math.log((z+1)/(z-1))
+    points.append( (x, r) )
+
+####
+# Output list as a balanced search
+
+# use for testing
+#points = [ (x,x) for x in range(8, 0, -1) ]
+
+def prnt_cmp(x, ind):
+    print("{}if (x > {:.6f}f) {{".format((" "*ind), x))
+
+def prnt_rtn(r, ind):
+    print("{}return({:.6f}f);".format((" "*ind), r))
+
+def one_level(pts, ind, dft):
+    #print("# One_Level({})".format(pts))
+    mid = (int)(len(pts)/2)
+    lft = pts[:mid]
+    rgt = pts[mid+1:]
+    x = pts[mid][0]
+    r = pts[mid][1]
+    #print("## {}, {}, {}".format(lft, x, rgt))
+    prnt_cmp(x, ind)
+    if (len(lft)): 
+        one_level(lft, ind+2, r)
+    else:
+        prnt_rtn(r, (ind+2))
+    print("{}}} else {{".format((" "*(ind))))
+    if (len(rgt)): 
+        one_level(rgt, ind+2, dft)
+    else:
+        prnt_rtn(dft, (ind+2))
+    print("{}}}".format((" "*(ind))))
+    
+
+# Start recursive process
+print("  if (x > 10.0f) return( 0.0f ); else {")
+indent = 4
+one_level(points, indent, 10)
+print(" }")
+
