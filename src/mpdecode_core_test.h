@@ -31,13 +31,13 @@ struct LDPC {
     uint16_t *H_cols;
 };
 
-extern void ldpc_init(void);
+extern void ldpc_init(struct LDPC *ldpc, int *size_common);
+extern void ldpc_free_mem(struct LDPC *ldpc);
 
 extern void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-extern void ldpc_alloc_mem(struct LDPC *ldpc);
-extern void ldpc_free_mem(struct LDPC *ldpc);
-extern int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount);
+int run_ldpc_decoder(struct LDPC *ldpc, void *ldoc_common, char out_char[], 
+			float input[], int *parityCheckCount);
 extern void ldpc_dump_nodes(struct LDPC *ldpc);
 
 extern void sd_to_llr(float llr[], double sd[], int n);

@@ -36,10 +36,10 @@ static COMP S_matrix[] = {
 // Each c_node contains an array of <degree> c_sub_node elements
 // This structure reduces the indexing caluclations in SumProduct()
 
-struct c_sub_node {
+struct c_sub_node { // Order is important here to keep total size small.
   uint16_t index;   // Values from H_rows (except last 2 entries)
-  float    message; // modified during operation!
   uint16_t socket;  // The socket number at the v_node
+  float    message; // modified during operation!
 };
 
 struct c_node {
@@ -95,9 +95,6 @@ void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
         pbits[p] = tmp;
     }
 }
-
-extern void ldpc_init(void) {
-    }
 
 /*******************************************************
  * Macros for a signed scaled integer 
@@ -511,7 +508,10 @@ static float max_star0(
         return( delta1 - AJIAN*(diff+TJIAN) );
 }
 
-void alloc_c_v_nodes(struct c_node *c_nodes,
+
+///////////////////////////////////////
+void count_c_v_nodes(
+                    struct c_node *c_nodes,
                     int     shift,
                     int     NumberParityBits,
                     int     max_row_weight,
@@ -522,11 +522,15 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
                     int     NumberRowsHcols,
                     uint16_t *H_cols,
                     int     max_col_weight,
-                    int     dec_type) {
-    int i, j, k, count, cnt, c_index, v_index;
+                    int     dec_type,
+                    // Outputs   
+                    int     *count_cnodes,
+                    int     *count_vnodes) {
+
+    int i, j, k, cnt, count;
 
     #ifdef PRINT_PROGRESS
-    fprintf(stderr, "alloc_c_v_nodes(*, %d, %d, %d, *, %d, %d, *, %d, *, %d, %d)\n",
+    fprintf(stderr, "count_c_v_nodes(*, %d, %d, %d, *, %d, %d, *, %d, *, %d, %d)\n",
                     shift,
                     NumberParityBits,
                     max_row_weight,
@@ -538,6 +542,8 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
     #endif
 
     /* first determine the degree of each c-node */
+
+    *count_cnodes = 0;
 
     if (shift ==0){
         for (i=0;i<NumberParityBits;i++) {
@@ -556,6 +562,7 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
                     c_nodes[i].degree=count+2;
                 }
             }
+        *count_cnodes += c_nodes[i].degree;
         }
     }
     else{
@@ -577,22 +584,138 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
                 }
                 cnt++;
             }
+        *count_cnodes += c_nodes[i].degree;
         }
     }
+
+    /* determine degree of each v-node */
+
+    *count_vnodes = 0;
+
+    for(i=0;i<(CodeLength-NumberParityBits+shift);i++) {
+        count=0;
+        for (j=0;j<max_col_weight;j++) {
+            if ( H_cols[i+j*NumberRowsHcols] > 0 ) {
+                count++;
+            }
+        }
+        v_nodes[i].degree = count;
+        *count_vnodes += v_nodes[i].degree;
+    }
+
+    for(i=CodeLength-NumberParityBits+shift;i<CodeLength;i++) {
+        count=0;
+        if (H1){
+            if(i!=CodeLength-1){
+                v_nodes[i].degree=2;
+            }  else{
+                v_nodes[i].degree=1;
+            }
+
+        } else{
+            for (j=0;j<max_col_weight;j++) {
+                if ( H_cols[i+j*NumberRowsHcols] > 0 ) {
+                    count++;
+                }
+            }
+            v_nodes[i].degree = count;
+        }
+        *count_vnodes += v_nodes[i].degree;
+    }
+
+    if (shift>0) {
+        v_nodes[CodeLength-1].degree =v_nodes[CodeLength-1].degree+1;
+        *count_vnodes += 1;
+    }
+}
+
+
+///////////////////////////////////////
+extern void ldpc_init(struct LDPC *ldpc, int *size_common) {
+
+    int count_cnodes, count_vnodes;
+
+    shift = (ldpc->NumberParityBits + ldpc->NumberRowsHcols) - ldpc->CodeLength;
+    if (ldpc->NumberRowsHcols == ldpc->CodeLength) {
+        H1=0;
+        shift=0;
+    } else {
+        H1=1;
+    }
+
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "c_nodes = calloc(%d)\n", 
+        (int)(ldpc->NumberParityBits * sizeof(struct c_node)));
+    #endif
+    c_nodes = calloc(ldpc->NumberParityBits, sizeof( struct c_node ) );
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "v_nodes = calloc(%d)\n", 
+        (int)(ldpc->CodeLength * sizeof(struct v_node)));
+    #endif
+    v_nodes = calloc(ldpc->CodeLength, sizeof( struct v_node));
+
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "DecodedBits = calloc(%d)\n",  
+        (int)(ldpc->CodeLength * sizeof(char)));
+    #endif
+    DecodedBits = calloc(ldpc->CodeLength, sizeof( char ) );
+
+    int DataLength = ldpc->CodeLength - ldpc->NumberParityBits;
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "data_int = calloc(%d)\n", 
+        (int)(DataLength * sizeof(int)));
+    #endif
+    data_int = calloc(DataLength, sizeof(int) );
+
+    count_c_v_nodes(c_nodes, shift,
+        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
+        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, 
+        ldpc->dec_type,
+        &count_cnodes, &count_vnodes);
+
+    int bytes_c_sub_nodes = 4 * ceil((sizeof(struct c_sub_node) / 4.0));
+    int bytes_v_sub_nodes = 4 * ceil((sizeof(struct v_sub_node) / 4.0));
+
+    *size_common = count_cnodes * bytes_c_sub_nodes +
+                   count_vnodes * bytes_v_sub_nodes;
+
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "common memory = %d\n", *size_common);
+    #endif
+    }
+
+
+///////////////////////////////////////
+void init_c_v_nodes(
+                    struct c_node *c_nodes,
+                    int     shift,
+                    int     NumberParityBits,
+                    int     max_row_weight,
+                    uint16_t *H_rows,
+                    int     H1,
+                    int     CodeLength,
+                    struct  v_node *v_nodes,
+                    int     NumberRowsHcols,
+                    uint16_t *H_cols,
+                    int     max_col_weight,
+                    int     dec_type,
+                    void    *mem_common,
+                    float   *input) {
+
+    int cnt, count, c_index, v_index;
+    int i, j, k;
+
+    struct c_sub_node *cur_c_sub_node = mem_common;
+    // TODO: align to word boundary!  Ideally align each one!
 
     if (H1){
 
         if (shift ==0){
             for (i=0;i<NumberParityBits;i++) {
-                /* now that we know the size, we can dynamically allocate memory */
-                #ifdef PRINT_ALLOCS
-                if (i<4) fprintf(stderr, 
-                  "c_node.subs[%d].* = calloc(%d)\n", i,
-                  (int)(c_nodes[i].degree * sizeof(struct c_sub_node)));
-                if (i==4) fprintf(stderr, "...\n");
-                #endif
-                c_nodes[i].subs = calloc(c_nodes[i].degree, 
-                                         sizeof(struct c_sub_node));
+
+                // Assign space from common array
+                c_nodes[i].subs = cur_c_sub_node;
+                cur_c_sub_node += c_nodes[i].degree;
 
                 for (j=0;j<c_nodes[i].degree-2;j++) {
                     c_nodes[i].subs[j].index = (H_rows[i+j*NumberParityBits] - 1);
@@ -615,13 +738,11 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
             cnt=0;
             for (i=0;i<(NumberParityBits/shift);i++){
 
+                // Assign space from common array
+                c_nodes[i].subs = cur_c_sub_node;
+                cur_c_sub_node += c_nodes[i].degree;
+
                 for (k =0;k<shift;k++){
-                #ifdef PRINT_ALLOCS
-                fprintf(stderr, 
-                  "cnodes[%d].* = calloc(%d)\n", cnt,
-                  (int)(c_nodes[cnt].degree * sizeof(struct c_sub_node)));
-                #endif
-                    c_nodes[cnt].subs =  calloc( c_nodes[cnt].degree, sizeof( struct c_sub_node ) );
 
                     for (j=0;j<c_nodes[cnt].degree-2;j++) {
                         c_nodes[cnt].subs[j].index = (H_rows[cnt+j*NumberParityBits] - 1);
@@ -646,14 +767,11 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
 
     } else {
         for (i=0;i<NumberParityBits;i++) {
-            /* now that we know the size, we can dynamically allocate memory */
-            #ifdef PRINT_ALLOCS
-            fprintf(stderr, 
-              "cnodes[%d].* = calloc(%d)\n", cnt,
-              (int)(c_nodes[cnt].degree * sizeof(struct c_sub_node)));
-            #endif
-            c_nodes[i].subs = calloc(c_nodes[i].degree, 
-                                     sizeof( struct c_sub_node ) );
+
+            // Assign space from common array
+            c_nodes[i].subs = cur_c_sub_node;
+            cur_c_sub_node += c_nodes[i].degree;
+
             for (j=0;j<c_nodes[i].degree;j++){
                 c_nodes[i].subs[j].index = (H_rows[i+j*NumberParityBits] - 1);
             }
@@ -661,59 +779,22 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
     }
 
 
-    /* determine degree of each v-node */
-
-    for(i=0;i<(CodeLength-NumberParityBits+shift);i++){
-        count=0;
-        for (j=0;j<max_col_weight;j++) {
-            if ( H_cols[i+j*NumberRowsHcols] > 0 ) {
-                count++;
-            }
-        }
-        v_nodes[i].degree = count;
-    }
-
-    for(i=CodeLength-NumberParityBits+shift;i<CodeLength;i++){
-        count=0;
-        if (H1){
-            if(i!=CodeLength-1){
-                v_nodes[i].degree=2;
-            }  else{
-                v_nodes[i].degree=1;
-            }
-
-        } else{
-            for (j=0;j<max_col_weight;j++) {
-                if ( H_cols[i+j*NumberRowsHcols] > 0 ) {
-                    count++;
-                }
-            }
-            v_nodes[i].degree = count;
-        }
-    }
-
-    if (shift>0){
-        v_nodes[CodeLength-1].degree =v_nodes[CodeLength-1].degree+1;
-    }
-
-
     /* set up v_nodes */
+    struct v_sub_node *cur_v_sub_node = (struct v_sub_node *)cur_c_sub_node;
+    // TODO: align to word boundary!  Ideally align each one!
 
     for (i=0;i<CodeLength;i++) {
-        /* allocate memory according to the degree of the v-node */
-        #ifdef PRINT_ALLOCS
-        if (i<4) fprintf(stderr, 
-          "cnodes[%d].* = calloc(%d)\n", i,
-          (int)(v_nodes[i].degree * sizeof(struct v_sub_node)));
-        if (i==4) fprintf(stderr, "...\n");
-        #endif
-        v_nodes[i].subs = calloc( v_nodes[i].degree, sizeof( struct v_sub_node ) );
 
-        /* index tells which c-nodes this v-node is connected to */
+        // Assign space from common array
+        v_nodes[i].subs = cur_v_sub_node;
+        cur_v_sub_node += v_nodes[i].degree;
+
+        v_nodes[i].initial_value = input[i];
+
         count=0;
 
         for (j=0;j<v_nodes[i].degree;j++) {
-            if ((H1)&& (i>=CodeLength-NumberParityBits+shift)){
+            if ((H1) && (i>=CodeLength-NumberParityBits+shift)) {
                 v_nodes[i].subs[j].index=i-(CodeLength-NumberParityBits+shift)+count;
                 if (shift ==0){
                     count=count+1;
@@ -731,6 +812,15 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
                     v_nodes[i].subs[j].socket = c_index;
                     break;
                 }
+
+            /* initialize v-node with received LLR */
+            if ( dec_type == 1)
+                v_nodes[i].subs[j].message = fabs(input[i]);
+            else
+                v_nodes[i].subs[j].message = phi0( fabs(input[i]) );
+
+            if (input[i] < 0)
+                v_nodes[i].subs[j].sign = 1;
         }
     }
 
@@ -747,76 +837,6 @@ void alloc_c_v_nodes(struct c_node *c_nodes,
         }
     }
 
-}
-
-/*
-//  Optional dump for development and debugging
-void ldpc_dump_nodes(struct LDPC *ldpc) {
-
-    int i, j;
-
-    int NumberParityBits = ldpc->NumberParityBits;
-    int CodeLength = ldpc->CodeLength;
-
-    FILE *f = fopen("ldpc_node_dump.txt", "w");
-
-    fprintf(f, "Cnodes:\n");
-    fprintf(f, "  size: %d\n", NumberParityBits);
-    fprintf(f, "  array:\n");
-    for (i=0;i<NumberParityBits;i++) {
-        fprintf(f, "    -\n");
-        fprintf(f, "      degree: %d\n", c_nodes[i].degree);
-        fprintf(f, "      index:\n");
-        for (j=0;j<c_nodes[i].degree;j++)
-            fprintf(f, "        - %d\n", c_nodes[i].index[j]);
-        fprintf(f, "      socket:\n");
-        for (j=0;j<c_nodes[i].degree;j++)
-            fprintf(f, "        - %d\n", c_nodes[i].socket[j]);
-    }
-
-    fprintf(f, "\n");
-    fprintf(f, "Vnodes:\n");
-    fprintf(f, "  size: %d\n", CodeLength);
-    fprintf(f, "  array:\n");
-    for (i=0;i<CodeLength;i++) {
-        fprintf(f, "    -\n");
-        fprintf(f, "      degree: %d\n", v_nodes[i].degree);
-        fprintf(f, "      index:\n");
-        for (j=0;j<v_nodes[i].degree;j++)
-            fprintf(f, "        - %d\n", v_nodes[i].index[j]);
-        fprintf(f, "      socket:\n");
-        for (j=0;j<v_nodes[i].degree;j++)
-            fprintf(f, "        - %d\n", v_nodes[i].socket[j]);
-    }
-
-    fclose(f);
-}
-*/
-
-void init_v_nodes(int    CodeLength,
-                  struct v_node *v_nodes,
-                  int    dec_type,
-                  float  *input) {
-
-    int i, j;
-
-    /* set up v_nodes */
-    for (i=0;i<CodeLength;i++) {
-
-        v_nodes[i].initial_value = input[i];
-
-        for (j=0;j<v_nodes[i].degree;j++) {
-            /* initialize v-node with received LLR */
-            if ( dec_type == 1)
-                v_nodes[i].subs[j].message = fabs(input[i]);
-            else
-                v_nodes[i].subs[j].message = phi0( fabs(input[i]) );
-
-            if (input[i] < 0)
-                v_nodes[i].subs[j].sign = 1;
-        }
-
-    }
 }
 
 
@@ -968,62 +988,10 @@ fprintf(stderr, "SumProducts %d iterations\n", result);
 return(result);
 }
 
-// Memory initialization, call when modem is setup
-void ldpc_alloc_mem(struct LDPC *ldpc) {
-
-    shift = (ldpc->NumberParityBits + ldpc->NumberRowsHcols) - ldpc->CodeLength;
-    if (ldpc->NumberRowsHcols == ldpc->CodeLength) {
-        H1=0;
-        shift=0;
-    } else {
-        H1=1;
-    }
-
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "c_nodes = calloc(%d)\n", 
-        (int)(ldpc->NumberParityBits * sizeof(struct c_node)));
-    #endif
-    c_nodes = calloc(ldpc->NumberParityBits, sizeof( struct c_node ) );
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "v_nodes = calloc(%d)\n", 
-        (int)(ldpc->CodeLength * sizeof(struct v_node)));
-    #endif
-    v_nodes = calloc(ldpc->CodeLength, sizeof( struct v_node));
-
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "DecodedBits = calloc(%d)\n",  
-        (int)(ldpc->CodeLength * sizeof(char)));
-    #endif
-    DecodedBits = calloc(ldpc->CodeLength, sizeof( char ) );
-
-    int DataLength = ldpc->CodeLength - ldpc->NumberParityBits;
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "data_int = calloc(%d)\n", 
-        (int)(DataLength * sizeof(int)));
-    #endif
-    data_int = calloc(DataLength, sizeof(int) );
-
-    alloc_c_v_nodes(c_nodes, shift,
-        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
-        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, 
-        ldpc->dec_type);
-}
 
 void ldpc_free_mem(struct LDPC *ldpc) {
-    int i;
-
-    /*  Cleaning c-node elements */
-    for (i=0;i<ldpc->NumberParityBits;i++) {
-        free( c_nodes[i].subs );
-    }
     free(c_nodes);
-
-    /* Cleaning v-node elements */
-    for (i=0;i<ldpc->CodeLength;i++) {
-        free( v_nodes[i].subs);
-    }
     free(v_nodes);
-
     free(DecodedBits);
     free(data_int);
 }
@@ -1031,8 +999,10 @@ void ldpc_free_mem(struct LDPC *ldpc) {
 
 /* Convenience function to call LDPC decoder from C programs */
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount) {
-    int		max_iter, dec_type;
+int run_ldpc_decoder(struct LDPC *ldpc, void *mem_common, char out_char[], 
+                       float input[], int *parityCheckCount) {
+
+    int		    max_iter;
     float       q_scale_factor, r_scale_factor;
     int         CodeLength, NumberParityBits;
     int         i;
@@ -1041,29 +1011,28 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *par
     fprintf(stderr, "run_ldpc_decoder()\n");
     #endif
 
-#ifdef __EMBEDDED__
-PROFILE_VAR(ldpc_init, ldpc_SP);
-#endif
+    #ifdef __EMBEDDED__
+    PROFILE_VAR(ldpc_init, ldpc_SP);
+    PROFILE_SAMPLE(ldpc_init);
+    #endif
 
     /* default values */
     max_iter  = ldpc->max_iter;
-    dec_type  = ldpc->dec_type;
     q_scale_factor = ldpc->q_scale_factor;
     r_scale_factor = ldpc->r_scale_factor;
 
     CodeLength = ldpc->CodeLength;         /* length of entire codeword */
     NumberParityBits = ldpc->NumberParityBits;
 
-#ifdef __EMBEDDED__
-PROFILE_SAMPLE(ldpc_init);
-#endif
-
     /* initialize c-node and v-node structures */
-    init_v_nodes(CodeLength, v_nodes, dec_type, input);
+    init_c_v_nodes( c_nodes, shift,
+        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
+        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, ldpc->dec_type,
+        mem_common, input);
 
-#ifdef __EMBEDDED__
-PROFILE_SAMPLE_AND_LOG(ldpc_SP, ldpc_init, "ldpc_init");
-#endif
+    #ifdef __EMBEDDED__
+    PROFILE_SAMPLE_AND_LOG(ldpc_SP, ldpc_init, "ldpc_init");
+    #endif
 
     /* Call function to do the actual decoding */
 
@@ -1073,14 +1042,14 @@ PROFILE_SAMPLE_AND_LOG(ldpc_SP, ldpc_init, "ldpc_init");
 
     for (i=0; i<CodeLength; i++) out_char[i] = DecodedBits[i];
 
+    #ifdef __EMBEDDED__
+    PROFILE_SAMPLE_AND_LOG2(ldpc_SP, "ldpc_SP");
+    #endif
+
     #ifdef PRINT_PROGRESS
     fprintf(stderr, "parityCheckCount = %d\n", *parityCheckCount);
     fprintf(stderr, "iter = %d\n", iter);
     #endif
-
-#ifdef __EMBEDDED__
-PROFILE_SAMPLE_AND_LOG2(ldpc_SP, "ldpc_SP");
-#endif
 
     return iter;
 }
