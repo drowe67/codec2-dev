@@ -138,11 +138,17 @@ int main(int argc, char *argv[])
         }
     }
 
-    ldpc_init();
-    ldpc_alloc_mem(&ldpc);
+    if ((i = opt_exists(argv, argc, "--max_iter")) > 0) {
+        ldpc.max_iter = atoi(argv[i+1]);
+        fprintf(stderr, "max_iter: %d\n", ldpc.max_iter);
+    }
 
-    // Optional dump for development and debugging
-    //ldpc_dump_nodes(&ldpc);
+    // Allocate common space which can be shared with other functions.
+    int         bytes_ldpc_nodes;
+    uint8_t     *ldpc_common;
+
+    ldpc_init(&ldpc, &bytes_ldpc_nodes);
+    ldpc_common = malloc(bytes_ldpc_nodes);
 
     CodeLength = ldpc.CodeLength;                    /* length of entire codeword */
     NumberParityBits = ldpc.NumberParityBits;
@@ -167,7 +173,7 @@ int main(int argc, char *argv[])
 
         for(r=0; r<num_runs; r++) {
 
-            iter = run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, ldpc_common, out_char, ainput, &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
             total_iters += iter;
 
@@ -271,7 +277,8 @@ int main(int argc, char *argv[])
                 sd_to_llr(input_float, input_double, CodeLength);
             }
 
-            iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, ldpc_common, out_char, input_float,
+                                    &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
             total_iters += iter;
             
