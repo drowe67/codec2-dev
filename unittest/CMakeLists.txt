@@ -115,3 +115,6 @@ add_executable(tdct2 tdct2.c t_helpers.c ../src/dct2.c)
 target_link_libraries(tdct2 codec2)
 
 add_executable(compare_ints compare_ints.c)
+
+add_executable(test_phi0 test_phi0.c ../src/phi0.c)
+target_link_libraries(test_phi0 m)
