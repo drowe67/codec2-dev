@@ -2235,7 +2235,7 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         fmfsk_get_demod_stats(f->fmfsk, &f->stats);
     }
 #endif
-    if (sync) *sync = f->sync;
+    if (sync) *sync = f->stats.sync;
     if (snr_est) *snr_est = f->stats.snr_est;
 }
 
