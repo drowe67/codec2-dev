@@ -36,7 +36,7 @@ endif()
 #    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
 #else()
 #    link_libraries(nosys)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=nosys.specs")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
 #endif()
 
 # Set default build type
@@ -57,6 +57,13 @@ set(CMAKE_EXE_LINKER_FLAGS "-T${CMAKE_SOURCE_DIR}/stm32_flash.ld")
 set(CMAKE_EXECUTABLE_SUFFIX_C ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_CXX ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_ASM ".elf")
+
+# Macro for elf->bin
+macro(elf2bin target)
+    add_custom_command(TARGET ${target}
+    POST_BUILD COMMAND ${CMAKE_OBJCOPY} -O binary ${target}.elf ${target}.bin
+    COMMENT "Creating binary for ${target}")
+endmacro()
 
 include_directories(../src ../unittest inc)
 
@@ -565,6 +572,9 @@ src/stm32f4_dac.c
 src/stm32f4_usb_vcp.c
 src/stm32f4_adc.c
 ../src/fifo.c
+../src/mbest.c
+../src/newamp1.c
+../src/newamp2.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
