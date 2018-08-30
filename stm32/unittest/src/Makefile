@@ -18,7 +18,7 @@ SUDO ?= sudo
 
 ###################################################
 
-CFLAGS  = -std=gnu11 -O0 -g -Wall -DSTM32F40_41xxx -DCORTEX_M4
+CFLAGS  = -std=gnu11 -O2 -g -Wall -DSTM32F40_41xxx -DCORTEX_M4
 CFLAGS += -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4 -Wno-unused-function
 
 ifeq ($(FLOAT_TYPE), hard)
@@ -28,6 +28,7 @@ CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1
 else
 CFLAGS += -msoft-float
 endif
+CFLAGS += -Wl,-Map=ld.map
 
 ###################################################
 # STM32F4 Standard Peripheral Library
@@ -409,7 +410,8 @@ CFLAGS += -I$(CODEC2_BLD)
 
 CODEC2_STM32_DIR := ../..
 CODEC2_STM32_SRC = $(CODEC2_STM32_DIR)/src
-CFLAGS += -I$(CODEC2_STM32_DIR)/inc
+CODEC2_STM32_HDR = $(CODEC2_STM32_DIR)/inc
+CFLAGS += -I$(CODEC2_STM32_HDR)
 CFLAGS += -T$(CODEC2_STM32_DIR)/stm32_flash.ld 
 
 #enable this for dump files to help verify optimisation
@@ -432,10 +434,13 @@ LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 
 SRCS += startup_stm32f4xx.s 
 SRCS += init.c 
-SRCS += $(CODEC2_STM32_SRC)/stm32f4_machdep.c
+SRCS += stm32f4_machdep.c
 SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
-all: libstm32f4.a tst_ofdm_mod.bin tst_ofdm_demod.bin tst_semihost.bin
+all: libstm32f4.a \
+     tst_ofdm_mod.bin tst_ofdm_demod.bin \
+     tst_ldpc_enc.bin tst_ldpc_dec.bin \
+     tst_semihost.bin
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 	find -L $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
@@ -479,7 +484,6 @@ TST_OFDM_MOD_SRCS=\
 tst_ofdm_mod.c \
 semihosting.c \
 $(CODEC2_SRC)/ofdm.c \
-$(CODEC2_STM32_SRC)/stm32f4_machdep.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
 TST_OFDM_MOD_SRCS += $(CODEC2_SRCS)
@@ -489,31 +493,90 @@ tst_ofdm_mod.elf: $(TST_OFDM_MOD_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
-
 TST_OFDM_DEMOD_SRCS=\
 tst_ofdm_demod.c \
 semihosting.c \
 $(CODEC2_SRC)/ofdm.c \
-$(CODEC2_STM32_SRC)/stm32f4_machdep.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
-
+#
 TST_OFDM_DEMOD_SRCS += $(CODEC2_SRCS)
 TST_OFDM_DEMOD_SRCS += $(SRCS)
-
+#
 tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
+# TST_OFDM_DEMOD_STACK
+ofdm_demod_in_10f:
+	$(CODEC2_BLD)/src/ofdm_get_test_bits - -f 10 | \
+	$(CODEC2_BLD)/src/ofdm_mod - ofdm_demod_in_10f
+#
+ofdm_demod_in_10f.c: ofdm_demod_in_10f
+	xxd -i ofdm_demod_in_10f > ofdm_demod_in_10f.c
+#
+ofdm_demod_ref_10f: ofdm_demod_in_10f
+	$(CODEC2_BLD)/src/ofdm_demod ofdm_demod_in_10f ofdm_demod_ref_10f
+#
+ofdm_demod_ref_10f.c: ofdm_demod_ref_10f
+	xxd -i ofdm_demod_ref_10f > ofdm_demod_ref_10f.c
+#
+tst_ofdm_demod_stack.o: ofdm_demod_in_10f.c ofdm_demod_ref_10f.c
+#
+TST_OFDM_DEMOD_STACK_SRCS=\
+tst_ofdm_demod_stack.c \
+$(CODEC2_SRC)/ofdm.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+TST_OFDM_DEMOD_STACK_SRCS += $(CODEC2_SRCS)
+TST_OFDM_DEMOD_STACK_SRCS += $(SRCS)
+#
+tst_ofdm_demod_stack.elf: $(TST_OFDM_DEMOD_STACK_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_ofdm_demod_stack.map
 
+# -----------------------------------------------
+TST_LDPC_ENC_SRCS= \
+tst_ldpc_enc.c \
+semihosting.c \
+$(CODEC2_SRC)/mpdecode_core_test.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+#TST_LDPC_ENC_SRCS += $(CODEC2_SRCS)
+TST_LDPC_ENC_SRCS += $(SRCS)
+#
+TST_LDPC_ENC_HDR= \
+$(CODEC2_INC)/mpdecode_code_test.h
+#
+tst_ldpc_enc.elf: $(TST_LDPC_ENC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_ENC_HRDS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+TST_LDPC_DEC_SRCS= \
+tst_ldpc_dec.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/debug_sbrk.c \
+$(CODEC2_SRC)/mpdecode_core_test.c \
+$(CODEC2_SRC)/phi0.c \
+$(CODEC2_SRC)/ofdm.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+#TST_LDPC_DEC_SRCS += $(CODEC2_SRCS)
+TST_LDPC_DEC_SRCS += $(SRCS)
+#
+TST_LDPC_DEC_HDR= \
+$(CODEC2_INC)/mpdecode_code_test.h
+#
+tst_ldpc_dec.elf: $(TST_LDPC_DEC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_DEC_HRDS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
 TST_SEMIHOST_SRCS=\
 tst_semihost.c \
 semihosting.c \
-$(CODEC2_STM32_SRC)/stm32f4_machdep.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
-
+#
 TST_SEMIHOST_SRCS += $(CODEC2_SRCS)
 TST_SEMIHOST_SRCS += $(SRCS)
-
+#
 tst_semihost.elf: $(TST_SEMIHOST_SRCS:.c=.o) libstm32f4.a #$(TMP_NEWLIB_OBJS) 
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
