@@ -402,7 +402,7 @@ target_link_libraries(ldpc_noise m)
 add_executable(ldpc_enc ldpc_enc.c)
 target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ldpc_enc_test ldpc_enc_test.c mpdecode_core_test.c ofdm.c filter.c)
+add_executable(ldpc_enc_test ldpc_enc_test.c mpdecode_core_test.c phi0.c ofdm.c filter.c)
 target_link_libraries(ldpc_enc_test ${CMAKE_REQUIRED_LIBRARIES} )
 
 add_executable(ldpc_dec ldpc_dec.c)
