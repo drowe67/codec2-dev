@@ -553,7 +553,6 @@ tst_ldpc_enc.elf: $(TST_LDPC_ENC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_ENC
 TST_LDPC_DEC_SRCS= \
 tst_ldpc_dec.c \
 semihosting.c \
-$(CODEC2_STM32_SRC)/debug_sbrk.c \
 $(CODEC2_SRC)/mpdecode_core_test.c \
 $(CODEC2_SRC)/phi0.c \
 $(CODEC2_SRC)/ofdm.c \
