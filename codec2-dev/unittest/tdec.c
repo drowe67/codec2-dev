@@ -18,6 +18,7 @@
 
 #define SIGNED_16BIT   0
 #define SIGNED_8BIT    1
+#define UNSIGNED_8BIT  2
 
 void freq_shift_complex_buf(short buf[], int n, int lo_i[], int lo_q[]);
 
@@ -25,7 +26,8 @@ void display_help(void) {
     fprintf(stderr, "\nusage: tdec inputRawFile OutputRawFile DecimationRatio [-c]\n");
     fprintf(stderr, "\nUse - for stdin/stdout\n\n");
     fprintf(stderr, "-c complex signed 16 bit input and output\n");
-    fprintf(stderr, "-d complex signed 8 bit input, complex signed 16 bit output\n");
+    fprintf(stderr, "-d complex signed 8 bit input (e.g. HackRF), complex signed 16 bit output\n");
+    fprintf(stderr, "-e complex unsigned 8 bit input (e.g. RTL-SDR), complex signed 16 bit output\n");
     fprintf(stderr, "-f -Fs/4 freq shift\n\n");
 }
 
@@ -59,10 +61,11 @@ int main(int argc, char *argv[]) {
     lo_q[0] =  0; lo_q[1] = -1;
     int opt;
     int format = SIGNED_16BIT;
-    while ((opt = getopt(argc, argv, "cdf")) != -1) {
+    while ((opt = getopt(argc, argv, "cdef")) != -1) {
         switch (opt) {
         case 'c': channels = 2; break;
         case 'd': channels = 2; format = SIGNED_8BIT; break;
+        case 'e': channels = 2; format = UNSIGNED_8BIT; break;
         case 'f': freq_shift = 1; break;
         default:
             display_help();
@@ -85,8 +88,14 @@ int main(int argc, char *argv[]) {
         
         while(fread(inbuf, sizeof(uint8_t)*channels, dec, fin) == dec) {
             for (i=0; i<dec*channels; i++) {
-                sam = (short)inbuf[i];
-                sam <<= 8;
+                assert((format == SIGNED_8BIT) || (format == UNSIGNED_8BIT));
+                if (format == SIGNED_8BIT) {
+                    sam = (short)inbuf[i];
+                    sam <<= 8;
+                } else {
+                    sam = (short)inbuf[i] - 127;
+                    sam <<= 8;
+                }
                 outbuf[i] = sam;
             }
             if (freq_shift)
