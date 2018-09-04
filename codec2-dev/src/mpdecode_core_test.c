@@ -69,7 +69,9 @@ struct v_node {
 // pointers to allocated memory
 static struct c_node *c_nodes;
 static struct v_node *v_nodes;
+static int sizeof_DecodedBits;
 static char *DecodedBits;
+static int sizeof_data_int;
 static int *data_int;
 
 // Variables common to several routines (there are better ways but this works).
@@ -242,6 +244,19 @@ void count_c_v_nodes(
     }
 }
 
+int sizeAlign4(int size) {
+    return(4 * ceil(size / 4.0f));
+}
+
+void *addressAlign4(void *ptr) {
+    // Can't use floats or ceil here because x86 pointers are BIG.
+    void *r;
+    uintptr_t p4 = (uintptr_t)ptr >> 2;
+    if ((uintptr_t)ptr & 0x3) p4++;
+    r = (void *)(p4 << 2);
+    return(r);
+}
+
 
 ///////////////////////////////////////
 extern void ldpc_init(struct LDPC *ldpc, int *size_common) {
@@ -256,6 +271,9 @@ extern void ldpc_init(struct LDPC *ldpc, int *size_common) {
         H1=1;
     }
 
+    ////
+    // Static allocations, done at initialization and kept across frames
+
     #ifdef PRINT_ALLOCS
     fprintf(stderr, "c_nodes = calloc(%d)\n", 
         (int)(ldpc->NumberParityBits * sizeof(struct c_node)));
@@ -267,18 +285,18 @@ extern void ldpc_init(struct LDPC *ldpc, int *size_common) {
     #endif
     v_nodes = calloc(ldpc->CodeLength, sizeof( struct v_node));
 
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "DecodedBits = calloc(%d)\n",  
-        (int)(ldpc->CodeLength * sizeof(char)));
-    #endif
-    DecodedBits = calloc(ldpc->CodeLength, sizeof( char ) );
+
+    ////
+    // Shared allocations, these structures go into a common memory space
+    // that can be shared across functions as long as only one function is
+    // active at a time.  ldpc_init computes the size needed and passes that
+    // back to the caller.  The caller then allocates space and passes a pointer
+    // to each frame decode call.
+
+    sizeof_DecodedBits = sizeAlign4(ldpc->CodeLength * sizeof(char));
 
     int DataLength = ldpc->CodeLength - ldpc->NumberParityBits;
-    #ifdef PRINT_ALLOCS
-    fprintf(stderr, "data_int = calloc(%d)\n", 
-        (int)(DataLength * sizeof(int)));
-    #endif
-    data_int = calloc(DataLength, sizeof(int) );
+    sizeof_data_int =  sizeAlign4(DataLength * sizeof(int));
 
     count_c_v_nodes(c_nodes, shift,
         ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
@@ -286,16 +304,27 @@ extern void ldpc_init(struct LDPC *ldpc, int *size_common) {
         ldpc->dec_type,
         &count_cnodes, &count_vnodes);
 
-    int bytes_c_sub_nodes = 4 * ceil((sizeof(struct c_sub_node) / 4.0));
-    int bytes_v_sub_nodes = 4 * ceil((sizeof(struct v_sub_node) / 4.0));
+    int bytes_c_sub_nodes = count_cnodes * sizeAlign4(sizeof(struct c_sub_node));
+    int bytes_v_sub_nodes = count_vnodes * sizeAlign4(sizeof(struct v_sub_node));
 
-    *size_common = count_cnodes * bytes_c_sub_nodes +
-                   count_vnodes * bytes_v_sub_nodes;
+    *size_common = sizeof_DecodedBits +
+    		   sizeof_data_int +
+    		   bytes_c_sub_nodes +
+                   bytes_v_sub_nodes;
 
     #ifdef PRINT_ALLOCS
-    fprintf(stderr, "common memory = %d\n", *size_common);
+    fprintf(stderr, "sizeof_DecodedBits = %d\n", sizeof_DecodedBits);
+    fprintf(stderr, "sizeof_data_int = %d\n",    sizeof_data_int);
+    fprintf(stderr, "bytes_c_sub_nodes = %d\n",  bytes_c_sub_nodes);
+    fprintf(stderr, "bytes_v_sub_nodes = %d\n",  bytes_v_sub_nodes);
+    fprintf(stderr, "common memory = %d\n",     *size_common);
     #endif
     }
+
+void ldpc_free_mem(struct LDPC *ldpc) {
+    free(c_nodes);
+    free(v_nodes);
+}
 
 
 ///////////////////////////////////////
@@ -319,7 +348,9 @@ void init_c_v_nodes(
     int i, j, k;
 
     struct c_sub_node *cur_c_sub_node = mem_common;
-    // TODO: align to word boundary!  Ideally align each one!
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "c_sub_nodes starting at %p\n", cur_c_sub_node);
+    #endif
 
     if (H1){
 
@@ -394,7 +425,9 @@ void init_c_v_nodes(
 
     /* set up v_nodes */
     struct v_sub_node *cur_v_sub_node = (struct v_sub_node *)cur_c_sub_node;
-    // TODO: align to word boundary!  Ideally align each one!
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "v_sub_nodes starting at %p\n", cur_v_sub_node);
+    #endif
 
     for (i=0;i<CodeLength;i++) {
 
@@ -449,6 +482,32 @@ void init_c_v_nodes(
                 }
         }
     }
+
+}
+
+
+// Setup pointers into common (shared) memory space, and initialize contents
+void setupSharedMemory(struct LDPC *ldpc, void *mem_common, float input[]) {
+
+    void *mem_left = addressAlign4(mem_common);
+
+    DecodedBits = mem_left;
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "DecodedBits %d bytes at %p\n", sizeof_DecodedBits, DecodedBits);
+    #endif
+    mem_left = addressAlign4(mem_left + sizeof_DecodedBits);
+
+    data_int = mem_left;
+    #ifdef PRINT_ALLOCS
+    fprintf(stderr, "data_int %d bytes at %p\n", sizeof_data_int, data_int);
+    #endif
+    mem_left = addressAlign4(mem_left + sizeof_data_int);
+
+    /* initialize c-node and v-node structures */
+    init_c_v_nodes( c_nodes, shift,
+        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
+        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, ldpc->dec_type,
+        mem_left, input);
 
 }
 
@@ -601,21 +660,12 @@ fprintf(stderr, "SumProducts %d iterations\n", result);
 return(result);
 }
 
-
-void ldpc_free_mem(struct LDPC *ldpc) {
-    free(c_nodes);
-    free(v_nodes);
-    free(DecodedBits);
-    free(data_int);
-}
-
-
 /* Convenience function to call LDPC decoder from C programs */
 
 int run_ldpc_decoder(struct LDPC *ldpc, void *mem_common, char out_char[], 
                        float input[], int *parityCheckCount) {
 
-    int		    max_iter;
+    int		max_iter;
     float       q_scale_factor, r_scale_factor;
     int         CodeLength, NumberParityBits;
     int         i;
@@ -637,11 +687,7 @@ int run_ldpc_decoder(struct LDPC *ldpc, void *mem_common, char out_char[],
     CodeLength = ldpc->CodeLength;         /* length of entire codeword */
     NumberParityBits = ldpc->NumberParityBits;
 
-    /* initialize c-node and v-node structures */
-    init_c_v_nodes( c_nodes, shift,
-        ldpc->NumberParityBits, ldpc->max_row_weight, ldpc->H_rows, H1, ldpc->CodeLength,
-        v_nodes, ldpc->NumberRowsHcols, ldpc->H_cols, ldpc->max_col_weight, ldpc->dec_type,
-        mem_common, input);
+    setupSharedMemory(ldpc, mem_common, input);
 
     #ifdef __EMBEDDED__
     PROFILE_SAMPLE_AND_LOG(ldpc_SP, ldpc_init, "ldpc_init");
