@@ -11,6 +11,17 @@ the STM32F4, including sm1000.bin, the firmware for the SM1000.
 For CMake specific instructions see README.cmake after performing step 1
 below.
 
+************** 
+***** Using Arm packages:
+Note there are some issues between gcc and newlib in recent (Aug 2018) 
+versions of Debian and derived distros.  The Arm maintained 
+"GNU Arm Embedded Toolchain" is recommended to solve these and 
+as a better maintained toolchain.  See
+https://launchpad.net/~team-gcc-arm-embedded/+archive/ubuntu/ppa
+************** 
+
+************** 
+***** Using Debian/Ubuntu packages:
 1. Install the toolchain, on Ubuntu 14 this is:
 
    $ sudo apt-get install gcc-arm-none-eabi
@@ -18,6 +29,7 @@ below.
    On Fedora:
 
    $ sudo dnf install stlink arm-none-eabi-gcc
+************** 
 
 
 2. $ make (and cross your fingers)
