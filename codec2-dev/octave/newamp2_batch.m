@@ -53,6 +53,7 @@ function surface = newamp2_batch(input_prefix, varargin)
   output_prefix = input_prefix;
   mode = "linear";
   correct_rate_K_en = 0; quant = ""; vq_en = 0; M = 1; mask_en = 0;
+  surface_in_en = 0;
   
   % parse variable argument list
 
@@ -112,6 +113,13 @@ function surface = newamp2_batch(input_prefix, varargin)
     end
 
     correct_rate_K_en = arg_exists(varargin, "correct_rate_K");
+
+    ind = arg_exists(varargin, "surf_in");
+    if ind
+      surface_in_en = 1;
+      surface_in = varargin{ind+1};
+    end
+    
   end
 
   printf("output: %d", output);
@@ -122,6 +130,9 @@ function surface = newamp2_batch(input_prefix, varargin)
   printf(" correct_rate_K: %d quant: %s vq_en: %d M: %d\n", correct_rate_K_en, quant, vq_en, M);
   if vq_en
     printf("vq_name: %s vq_st: %d vq_en: %d\n", vq_name, vq_st, vq_en);
+  end
+  if surface_in_en
+    printf("surface_in_en: %d\n", surface_in_en);
   end
   
   model_name = strcat(input_prefix,"_model.txt");
@@ -140,7 +151,7 @@ function surface = newamp2_batch(input_prefix, varargin)
 
   % Choose experiment to run test here -----------------------
 
-  if strcmp(mode,"linear") || strcmp(mode,"mel")
+  if (strcmp(mode,"linear") || strcmp(mode,"mel")) && !surface_in_en
     args.resampler = mode;
 
     vqs.en=vq_en; 
@@ -157,6 +168,12 @@ function surface = newamp2_batch(input_prefix, varargin)
     [model_ surface sd_log] = experiment_resample(model, args);
   end
 
+  # resample a linear surface, used to test deep learning ideas
+  
+  if strcmp(mode,"linear") && surface_in_en
+    [model_ surface] = resample_surf(model, surface_in);
+  end
+  
   # combined bitstream encoded and decoder for development
   
   if strcmp(mode,"encdec")
@@ -519,6 +536,20 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
 endfunction
 
 
+% Takes surface as input, back to model_, for deep learning experiments
+
+function [model_ rate_K_surface_ sd_log delta_K] = resample_surf(model, rate_K_surface_)
+  Fs = 8000;
+
+  rate_K_sample_freqs_kHz = [0.1:0.1:4];
+  K = length(rate_K_sample_freqs_kHz);
+  
+  % back to rate L
+  
+  [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lanc');
+endfunction
+
+
 % Candidate C, model to bit-stream encoder
 
 function [bits rate_K_surface_] = candc_encoder(model, voicing)
@@ -727,4 +758,6 @@ function errors_per_codec_frame = count_errors(error_filename)
   figure(2);
   plot(errors_per_codec_frame);
 endfunction
+
+
 
