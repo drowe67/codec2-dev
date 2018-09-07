@@ -851,10 +851,10 @@ function quantiser_levels = build_dct_quantiser(train_surf, qstepdB=1)
 
   m = mean(train_surf');
   figure(4); plot(m);
-  %ind = find(m>10);
-  %train_surf = train_surf(ind,:);
-  %nr2 = length(ind);
-  nr2 = nr;
+  ind = find(m>10);
+  train_surf = train_surf(ind,:);
+  nr2 = length(ind);
+  %nr2 = nr;
   printf("K: %d nr: %d nr2: %d\n", K, nr, nr2);
 
   D = dct(train_surf')';
@@ -904,49 +904,126 @@ function quantiser_levels = build_dct_quantiser(train_surf, qstepdB=1)
 endfunction
 
 
-function surf_ = dct_quantiser(surf, quantiser_levels, qstepdB=1)
+function [surf_ D E] = dct_quantiser(surf, quantiser_levels, method=1, qstepdB=1, limit=0)
   [nr K] = size(surf);
 
   printf("K: %d nr: %d\n", K, nr);
 
+  % clamp lower limit of mean to 10dB
+  #{
+  m = mean(surf')';
+  surf -= m;
+  m = min(10,m);
+  surf += m;
+  #}
+  
   D = dct(surf')';
 
   Tbits = 0;
    
-  for k=1:K
-    q_min = quantiser_levels(k,1); q_max = quantiser_levels(k,2);
-    levels = q_min:qstepdB:q_max;
-    nlevels = length(levels);
-    if nlevels == 1
-      levels = (q_max + q_min)/2;
-    end
-    if nlevels == 2
-      m = (q_max + q_min)/2;
-      levels = [(m - qstepdB/2) (m + qstepdB/2)];
-    end
-    if nlevels == 3
-      m = (q_max + q_min)/2;
-      levels = [q_min m q_max];
-    end
-    Tbits += log2(nlevels);
-    printf("    quantiser: min: %4.2f max: %4.2f nlevels: %d bits: %2.1f\n", q_min, q_max, nlevels, log2(nlevels));
+  if method == 1
+    for k=1:K
+      q_min = quantiser_levels(k,1); q_max = quantiser_levels(k,2);
+      levels = q_min:qstepdB:q_max;
+      nlevels = length(levels);
+      if nlevels == 1
+        levels = (q_max + q_min)/2;
+      end
+      if nlevels == 2
+        m = (q_max + q_min)/2;
+        levels = [(m - qstepdB/2) (m + qstepdB/2)];
+      end
+      if nlevels == 3
+        m = (q_max + q_min)/2;
+        levels = [q_min m q_max];
+      end
+      Tbits += log2(nlevels);
+      printf("    quantiser: min: %4.2f max: %4.2f nlevels: %d bits: %2.1f\n", q_min, q_max, nlevels, log2(nlevels));
 
-    v_ = zeros(nr,1);
-    v = D(:,k);
-    for r=1:nr
-      v_(r) = quantise(levels, v(r));
-    end
+      v_ = zeros(nr,1);
+      v = D(:,k);
+      for r=1:nr
+        v_(r) = quantise(levels, v(r));
+      end
     
-    E(:,k) = v_;
+      E(:,k) = v_;
+    end
+  end
+  
+  if method == 2
+    % quantise
+    E = round(D/qstepdB);
+    % count symbols
+    symbols = []; count = [];
+    [nr nc]= size(E);
+    if limit
+      nc = limit-1;
+    end
+    for r=1:nr
+      for c=2:nc
+        s = E(r,c);
+        ind = find(symbols == s);
+        if length(ind)
+          count(ind)++;
+        else
+          symbols = [symbols s];
+          count(length(symbols)) = 1;
+        end
+      end
+    end
+
+    % sort into order
+
+    [count ind] = sort(count, "descend");
+    symbols = symbols(ind);
+
+    % estimate bits/symbol
+
+    % bits/sym for top 5, assume rest 5 bits
+    %      11 10 00 010 0110 0111
+    bps = [ 2  2  2   3    4    4]; 
+  
+    Tbits = 0; Nsyms = 0;
+    bits_per_row = zeros(1,nr);
+   
+    for r=1:nr
+      for c=2:nc
+        s = E(r,c);
+        ind = find(symbols == s);
+        if ind <= length(bps)
+          Tbits += bps(ind);
+          bits_per_row(r) += bps(ind);
+        else
+          Tbits += 6;
+          bits_per_row(r) += 5;
+        end
+        Nsyms++;
+      end
+    end
+    figure(5); clf; plot(bits_per_row);
+
+    ent = 0;
+    for i=1:length(symbols)
+      wi = count(i)/sum(count);
+      printf("%2d %4d %6d %4.3f %4.3f\n", i, symbols(i), count(i), wi, -wi*log2(wi));
+      ent += -wi*log2(wi);
+    end
+    printf("mean bits/frame: %3.1f mean bits/sym: %3.2f entropy: %3.2f bits\n",  mean(bits_per_row), Tbits/Nsyms, ent);
+    if limit
+      E(:, limit:end) = 0;
+    end
+    E *= qstepdB;
   end
 
   surf_ = idct(E')';
   error = surf_ - surf;
   mse = mean(mean(error .^ 2));
   figure(3)
-  [nr nc]=size(error);
-  nr = min(nr,600);
+  [nr nc] = size(error);
+  nr = min(nr,100);
   mesh(error(1:nr,:))
+  figure(4)
+  mesh(D(25:50,1:10))
   printf("mse: %4.2f Tbits: %d\n", mse, Tbits);
 endfunction
 
