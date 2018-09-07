@@ -834,3 +834,119 @@ function rate_K_vec_ = deltaf_decode_rate_K_fixed(bits, E, K)
   end
   
 endfunction
+
+
+#{
+  DCT coeff scalar quantiser, analysis stage.  Plots PDFs, returns a
+  vector of quantiser levels.
+
+  Input is matrix of K columns row-vectors that represent one frame of
+  spectrum at rate K.
+#}
+
+function quantiser_levels = build_dct_quantiser(train_surf, qstepdB=1)
+  [nr K] = size(train_surf);
+
+  % remove low energy rows
+
+  m = mean(train_surf');
+  figure(4); plot(m);
+  %ind = find(m>10);
+  %train_surf = train_surf(ind,:);
+  %nr2 = length(ind);
+  nr2 = nr;
+  printf("K: %d nr: %d nr2: %d\n", K, nr, nr2);
+
+  D = dct(train_surf')';
+
+  figure(1); clf;
+  plot(std(D));
+  title('Std Dev of each DCT coeff');
+
+  figure(2); clf;
+  nr = ceil(sqrt(K)); nc = ceil(K/nr);
+
+  Tbits = 0; quantiser_levels = [];
+   
+  for k=1:K
+    subplot(nr, nc, k)
+    v = D(:,k);
+    printf("k: %d mean %5.2f std: %5.2f min: %5.2f max: %5.2f\n", k, mean(v), std(v), min(v), max(v));
+    q_max = mean(v)+2*std(v); q_min = mean(v)-2*std(v);
+    levels = q_min:qstepdB:q_max;
+    nlevels = length(levels);
+    Tbits += log2(nlevels);
+    printf("    quantiser: min: %4.2f max: %4.2f nlevels: %d bits: %2.1f\n", q_min, q_max, nlevels, log2(nlevels));
+
+    % limit for histogram
+    
+    v = min(v, q_max);
+    v = max(v, q_min);
+    [nn xx] = hist(v,50);
+    bar (xx, nn)
+
+    v_ = zeros(nr2,1);
+    for r=1:nr2
+      v_(r) = quantise(levels, v(r));
+    end
+    
+    E(:,k) = v_;
+
+    quantiser_levels = [quantiser_levels; q_min q_max]; 
+  end
+
+  train_surf_ = idct(E')';
+  error = train_surf_ - train_surf;
+  mse = mean(mean(error .^ 2));
+  figure(3)
+  mesh(error(1:1000,:))
+  printf("mse: %4.2f Tbits: %d\n", mse, Tbits);
+endfunction
+
+
+function surf_ = dct_quantiser(surf, quantiser_levels, qstepdB=1)
+  [nr K] = size(surf);
+
+  printf("K: %d nr: %d\n", K, nr);
+
+  D = dct(surf')';
+
+  Tbits = 0;
+   
+  for k=1:K
+    q_min = quantiser_levels(k,1); q_max = quantiser_levels(k,2);
+    levels = q_min:qstepdB:q_max;
+    nlevels = length(levels);
+    if nlevels == 1
+      levels = (q_max + q_min)/2;
+    end
+    if nlevels == 2
+      m = (q_max + q_min)/2;
+      levels = [(m - qstepdB/2) (m + qstepdB/2)];
+    end
+    if nlevels == 3
+      m = (q_max + q_min)/2;
+      levels = [q_min m q_max];
+    end
+    Tbits += log2(nlevels);
+    printf("    quantiser: min: %4.2f max: %4.2f nlevels: %d bits: %2.1f\n", q_min, q_max, nlevels, log2(nlevels));
+
+    v_ = zeros(nr,1);
+    v = D(:,k);
+    for r=1:nr
+      v_(r) = quantise(levels, v(r));
+    end
+    
+    E(:,k) = v_;
+  end
+
+  surf_ = idct(E')';
+  error = surf_ - surf;
+  mse = mean(mean(error .^ 2));
+  figure(3)
+  [nr nc]=size(error);
+  nr = min(nr,600);
+  mesh(error(1:nr,:))
+  printf("mse: %4.2f Tbits: %d\n", mse, Tbits);
+endfunction
+
