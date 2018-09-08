@@ -1044,3 +1044,78 @@ function [surf_ D E] = dct_quantiser(surf, quantiser_levels, method=1, qstepdB=1
   printf("mse: %4.2f Tbits: %d\n", mse, Tbits);
 endfunction
 
+
+# Generate a huffman code from a matrix (surface) of spectral
+# magnitudes.  The Huffman code can be used for encoding the DCT of the
+# rows of the surface (mag samples of each frame).
+#
+#   Set qstepdB to the quanisation step size, e.g. 3 or 6dB is about where we can
+#   notice the effect of quantisation of the DCTs (and spectral magnitides)
+#
+#   Set "max_dcts" to max number of dcts coeffs you will quantise, as this affects
+#   probabilities (we get many zeros in high order coeffs)
+#
+#   octave:49> newamp2; p_table = surface_to_huffman(all_surf(:,2:35), 6, 18);
+
+function [symbols huff] = surface_to_huffman(surf, qstepdB=1, max_dcts=0)
+  [nr K] = size(surf);
+
+  printf("K: %d nr: %d qstepdB: %3.2f\n", K, nr, qstepdB);
+
+  D = dct(surf')';
+
+  % quantise to step size in dB
+    
+  E = round(D/qstepdB);
+
+  % count symbols, ignoring first (DC) coeff which we will scalar quantise
+
+  symbols = []; count = [];
+  [nr nc]= size(E);
+  if max_dcts
+    nc = max_dcts+1;
+    printf("cols 2 to %d (%d total)\n", nc, nc-2+1);
+  end
+  for r=1:nr
+    for c=2:nc
+      s = E(r,c);
+      ind = find(symbols == s);
+      if length(ind)
+        count(ind)++;
+      else
+        symbols = [symbols s];
+        count(length(symbols)) = 1;
+      end
+    end
+  end
+
+  % sort into order
+
+  [count ind] = sort(count, "descend");
+  symbols = symbols(ind);
+
+  Nsymbols = sum(count);
+  printf("Nsymbols = %d\n", Nsymbols);
+  
+  % estimate entropy
+    
+  H = 0;
+  p_table = [];
+  printf(" i symb  count  prob    wi\n");
+  for i=1:length(symbols)
+    wi = count(i)/Nsymbols; p_table = [p_table wi];
+    printf("%2d %4d %6d %4.3f %4.3f\n", i, symbols(i), count(i), wi, -wi*log2(wi));
+    H += -wi*log2(wi);
+  end
+
+  % design Huffman code
+
+  huff = huffmandict (1, p_table, 1);
+  L = 0;
+  for i=1:length(huff)
+    L += p_table(i)*length(huff{i});
+  end
+
+  printf("Entropy: %3.2f bits/symbol  Huffman code: %3.2f bits/symbol\n",  H, L);
+endfunction
+
