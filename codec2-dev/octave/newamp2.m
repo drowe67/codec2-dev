@@ -904,6 +904,20 @@ function quantiser_levels = build_dct_quantiser(train_surf, qstepdB=1)
 endfunction
 
 
+function bits = bits_for_this_symbol(symbols, s)
+  % bits/sym for top 5, assume rest 5 bits
+  %      11 10 00 010 0110 0111
+  bps = [ 2  2  2   3    4    4]; 
+  
+  ind = find(symbols == s);
+  if ind <= length(bps)
+    bits = bps(ind);
+  else
+    bits = 5;
+  end
+endfunction
+
+
 function [surf_ D E] = dct_quantiser(surf, quantiser_levels, method=1, qstepdB=1, limit=0)
   [nr K] = size(surf);
 
@@ -977,38 +991,41 @@ function [surf_ D E] = dct_quantiser(surf, quantiser_levels, method=1, qstepdB=1
     [count ind] = sort(count, "descend");
     symbols = symbols(ind);
 
-    % estimate bits/symbol
+    % estimate bits/symbol by huffman coding direct and differences.  Clever part is we
+    % choose method based on min bits, which I guess costs an extra bit.  It's clever
+    % because we need direct for quick transitions, but during steady voiced parts the
+    % changes are small so coding differences does a good job.
 
-    % bits/sym for top 5, assume rest 5 bits
-    %      11 10 00 010 0110 0111
-    bps = [ 2  2  2   3    4    4]; 
-  
     Tbits = 0; Nsyms = 0;
-    bits_per_row = zeros(1,nr);
+    Nbits_direct_log = Nbits_diff_log = Nbits_log = zeros(1,nr);
    
-    for r=1:nr
+    for r=3:nr
+      Nbits_direct = 0; Nbits_diff = 0;
       for c=2:nc
-        s = E(r,c);
-        ind = find(symbols == s);
-        if ind <= length(bps)
-          Tbits += bps(ind);
-          bits_per_row(r) += bps(ind);
-        else
-          Tbits += 6;
-          bits_per_row(r) += 5;
-        end
+        s_direct = E(r,c);
+        s_diff = E(r,c) - E(r-2,c);
+        Nbits_direct += bits_for_this_symbol(symbols, s_direct);
+        Nbits_diff   += bits_for_this_symbol(symbols, s_diff);
         Nsyms++;
       end
-    end
-    figure(5); clf; plot(bits_per_row);
+      Nbits_direct_log(r) += Nbits_direct;
+      Nbits_diff_log(r) += Nbits_diff;
+      Nbits_log(r) += min(Nbits_direct, Nbits_diff);
 
+      Tbits += min(Nbits_direct, Nbits_diff);
+    end
+    figure(5); clf; plot(Nbits_direct_log(3:end),'b');
+    smooth4 = conv(Nbits_log(3:end),[1 0 1 0 1 0 1 0])/4;
+    hold on; plot(Nbits_diff_log(3:end),'g'); plot(Nbits_log(3:end),'r'); hold off;
+    figure(6); clf; plot(smooth4,'m');
+    
     ent = 0;
     for i=1:length(symbols)
       wi = count(i)/sum(count);
       printf("%2d %4d %6d %4.3f %4.3f\n", i, symbols(i), count(i), wi, -wi*log2(wi));
       ent += -wi*log2(wi);
     end
-    printf("mean bits/frame: %3.1f mean bits/sym: %3.2f entropy: %3.2f bits\n",  mean(bits_per_row), Tbits/Nsyms, ent);
+    printf("mean bits/frame: %3.1f mean bits/sym: %3.2f entropy: %3.2f bits\n",  mean(Nbits_log), Tbits/Nsyms, ent);
     if limit
       E(:, limit:end) = 0;
     end
