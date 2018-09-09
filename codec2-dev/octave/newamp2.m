@@ -1055,9 +1055,9 @@ endfunction
 #   Set "max_dcts" to max number of dcts coeffs you will quantise, as this affects
 #   probabilities (we get many zeros in high order coeffs)
 #
-#   octave:49> newamp2; p_table = surface_to_huffman(all_surf(:,2:35), 6, 18);
+#   octave:49> newamp2; p_table = design_huffman_enc(all_surf(:,2:35), 6, 18);
 
-function [symbols huff] = surface_to_huffman(surf, qstepdB=1, max_dcts=0)
+function [symbols huff] = design_huffman_enc(surf, qstepdB=6, max_dcts=18)
   [nr K] = size(surf);
 
   printf("K: %d nr: %d qstepdB: %3.2f\n", K, nr, qstepdB);
@@ -1117,5 +1117,136 @@ function [symbols huff] = surface_to_huffman(surf, qstepdB=1, max_dcts=0)
   end
 
   printf("Entropy: %3.2f bits/symbol  Huffman code: %3.2f bits/symbol\n",  H, L);
+endfunction
+
+
+# Huffman encodes (and decodes) a symbol, if input symbols is out of
+# range of quantiser we choose nearest symbol
+
+function [s_ bits] = huffman_enc_symb(symbols, huff, s)
+  min_dist = 1E32; ind = 1;
+  for i=1:length(symbols)
+    dist = (symbols(i) - s) .^ 2;
+    if dist < min_dist
+      ind = i;
+      min_dist = dist;
+    end
+  end
+
+  s_ = symbols(ind);
+  bits = huff{ind};
+endfunction
+
+
+# Huffman encodes (and decodes) the DCTS of a surface, except first (DCT) coeff
+#{
+  TODO:
+    [ ] row-row quant
+    [ ] budget for row
+    [ ] group rows and apply budget
+    [ ] decimate in time
+    [ ] actual encode and decode of bit stream
+    [ ] include dull/diff bit
+#}
+
+function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, symbols, huff)
+  [nr K] = size(surf);
+
+  printf("K: %d nr: %d qstepdB: %3.2f max_dcts: %d\n", K, nr, qstepdB, max_dcts);
+
+  % limit num DCTs we encode (nc) to less than K to save bits, high
+  % order DCTs tend to be small
+
+  nc = K;
+  if max_dcts
+    nc = max_dcts+1;
+    printf("cols 2 to %d (%d total)\n", nc, nc-2+1);
+  end
+
+  % DCT and initial quantisation to step size
+  
+  D = dct(surf')';
+  E = round(D/qstepdB);
+
+  % bit stream for each row (frame) is stored in a cell array
+  
+  bits_surf = cell(nr,1);
+  Nbits_log = Nbits_direct_log = Nbits_diff_log = zeros(1,nr);
+  E_ = zeros(nr,K); prev_row = direct_row_ = diff_row_ = diff_flag = zeros(1,nc);
+  Tbits = Nsyms = 0;
+   
+  % encode each row
+
+  for r=1:nr
+    bits_direct_row = [];  bits_diff_row = []; Nbits_direct = 0; Nbits_diff = 0;
+
+    % DC just copied directly, quantised externally
+    
+    E_(r,1) = E(r,1);
+
+    for c=2:nc
+      s_direct = E(r,c);
+      [s_direct_ bits_direct] = huffman_enc_symb(symbols, huff, s_direct);
+      bits_direct_row = [bits_direct_row bits_direct];
+      direct_row_(c) = s_direct_;
+      
+      s_diff = E(r,c) - prev_row(c);
+      [s_diff_ bits_diff] = huffman_enc_symb(symbols, huff, s_diff);
+      bits_diff_row = [bits_diff_row bits_diff];
+      diff_row_(c) = s_diff_;
+
+      Nsyms++;
+    end
+
+    % choose quant method with the least number of bits
+
+    Nbits_direct = length(bits_direct_row); Nbits_diff = length(bits_diff_row);
+    Nbits_direct_log(r) = Nbits_direct; Nbits_diff_log(r) = Nbits_diff;
+
+    if Nbits_direct < Nbits_diff
+      bits_surf{r} = [0 bits_direct_row];
+      Tbits += Nbits_direct;
+      E_(r,2:nc) = direct_row_(2:nc);
+      Nbits_log(r) = Nbits_direct; diff_flag(r) = 0;
+    else
+      bits_surf{r} = [1 bits_diff_row];
+      Tbits += Nbits_diff;
+      E_(r,2:nc) = diff_row_(2:nc) + prev_row(2:nc);
+      Nbits_log(r) = Nbits_diff; diff_flag(r) = 1;
+    end
+
+    % update memory - note we use quantised symbols as that's what we have at decoder
+    
+    if r >=3
+      prev_row = E_(r,1:nc);
+    end
+  end
+
+  % transform back to surface and calculate MSE
+
+  E_ *= qstepdB;
+  surf_ = idct(E_')';  
+  error = surf_ - surf;
+  mse = mean(mean(error .^ 2));
+
+  figure(1); clf;
+  [nr nc] = size(error);
+  nr = min(nr,300);
+  mesh(error(1:nr,:))
+
+  figure(2);
+  subplot(122,"position",[0.7 0.05 0.25 0.85])
+  hist(mean(error.^2,2));
+  subplot(121,"position",[0.1 0.05 0.5 0.85])
+  plot(mean(error.^2,2));
+  title('Mean squared error per frame');
+  
+  figure(3);
+  subplot(122,"position",[0.7 0.05 0.25 0.9])
+  hist(Nbits_log);
+  subplot(121,"position",[0.1 0.05 0.5 0.9])
+  plot(diff_flag*10,'b;diff flag;'); hold on; plot(Nbits_log,'g;Nbits/fr;'); hold off;
+  
+  printf("mse: %4.2f dB^2 mean bits/frame: %3.1f mean bits/sym: %3.1f\n", mse, mean(Nbits_log), Tbits/Nsyms);
 endfunction
 
