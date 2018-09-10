@@ -527,15 +527,16 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % PPP  <-- frame+2
     
     cr = c-1:c+1;
-    achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame
-    achannel_est_rect(c) =+ sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
+
+    achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
+    achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
 
     % use next step of pilots in past and future
 
     achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
     achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
   end
-
+  
   % pilots are estimated over 12 pilot symbols, so find average
 
   achannel_est_rect /= 12;
