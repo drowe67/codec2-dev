@@ -869,7 +869,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         ofdm->sample_point = max(ofdm->timing_est + (ofdm_ncp / 4), ofdm->sample_point);
         ofdm->sample_point = min(ofdm->timing_est + ofdm_ncp, ofdm->sample_point);
     }
-
+    
     /*
      * Convert the time-domain samples to the frequency-domain using the rx_sym
      * data matrix. This will be  Nc+2 carriers of 11 symbols.
@@ -957,7 +957,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
      *
      * In this routine we also process the current data symbols.
      */
-
+    
     for (rr = 0; rr < (ofdm_ns + 1); rr++) {
         st = (ofdm_m + ofdm_ncp) + ofdm_samplesperframe + (rr * (ofdm_m + ofdm_ncp)) + 1 + ofdm->sample_point;
         en = st + ofdm_m;
@@ -1075,7 +1075,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
             symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
         }
-
+        
         aphase_est_pilot_rect = vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
@@ -1087,13 +1087,13 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
         /* use next step of pilots in past and future */
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[0][j] * ofdm->pilots[j]; /* previous pilot */
+            symbol[k] = ofdm->rx_sym[0][j] * conjf(ofdm->pilots[j]); /* previous pilot */
         }
 
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
 
         for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-            symbol[k] = ofdm->rx_sym[ofdm_ns + 2][j] * ofdm->pilots[j]; /* last pilot */
+            symbol[k] = ofdm->rx_sym[ofdm_ns + 2][j] * conjf(ofdm->pilots[j]); /* last pilot */
         }
 
         aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
