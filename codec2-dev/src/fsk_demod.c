@@ -27,6 +27,9 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define TEST_FRAME_SIZE 100  /* must match fsk_get_test_bits.c */
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
@@ -52,6 +55,7 @@ int main(int argc,char *argv[]){
     stats_loop = 0;
     int complex_input = 1, bytes_per_sample = 2;
     int stats_rate = 8;
+    int testframe_mode = 0;
     P = 0;
     M = 0;
     
@@ -78,10 +82,11 @@ int main(int argc,char *argv[]){
             {"cu8",       no_argument,        0, 'd'},
             {"stats",     optional_argument,  0, 't'},
             {"soft-dec",  no_argument,        0, 's'},
+            {"testframes",no_argument,        0, 'f'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hlp:cdt::s",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"fhlp:cdt::s",long_opts,&opt_idx);
         
         switch(o){
             case 'l':
@@ -94,6 +99,9 @@ int main(int argc,char *argv[]){
             case 'd':
                 complex_input = 2;
                 bytes_per_sample = 1;
+                break;
+            case 'f':
+                testframe_mode = 1;
                 break;
             case 't':
                 enable_stats = 1;
@@ -126,7 +134,7 @@ int main(int argc,char *argv[]){
     if( (argc - dx) > 5){
         fprintf(stderr, "Too many arguments\n");
         helpmsg:
-        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t [r]] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
+        fprintf(stderr,"usage: %s [-l] [-p P]  [-s] [(-c|-d)] [-t [r]] [-f] (2|4) SampleRate SymbolRate InputModemRawFile OutputFile\n",argv[0]);
         fprintf(stderr," -lP --conv=P      -  P specifies the rate at which symbols are down-converted before further processing\n");
         fprintf(stderr,"                        P must be divisible by the symbol size. Smaller P values will result in faster\n");
         fprintf(stderr,"                        processing but lower demodulation preformance. If no P value is specified,\n");
@@ -134,8 +142,10 @@ int main(int argc,char *argv[]){
         fprintf(stderr," -c --cs16         -  The raw input file will be in complex signed 16 bit format.\n");
         fprintf(stderr," -d --cu8          -  The raw input file will be in complex unsigned 8 bit format.\n");
         fprintf(stderr,"                        If neither -c nor -d are used, the input should be in signed 16 bit format.\n");
+        fprintf(stderr," -f --testframes   -  Testframe mode, prints stats to stderr when a testframe is detected, if -t (JSON) \n");
+        fprintf(stderr,"                        is enabled stats will be in JSON format\n");
         fprintf(stderr," -t[r] --stats=[r] -  Print out modem statistics to stderr in JSON.\n");
-        fprintf(stderr,"                         r, if provided, sets the number of modem frames between statistic printouts\n");
+        fprintf(stderr,"                         r, if provided, sets the number of modem frames between statistic printouts.\n");
         fprintf(stderr," -s --soft-dec     -  The output file will be in a soft-decision format, with one 32-bit float per bit.\n");
         fprintf(stderr,"                        If -s is not used, the output will be in a 1 byte-per-bit format.\n");
         exit(1);
@@ -176,8 +186,29 @@ int main(int argc,char *argv[]){
     fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
     
     if(fin==NULL || fout==NULL || fsk==NULL){
-        fprintf(stderr,"Couldn't open test vector files\n");
+        fprintf(stderr,"Couldn't open files\n");
         exit(1);
+    }
+
+    /* set up testframe mode */
+         
+    int      testframecnt, bitcnt, biterr, testframe_detected;
+    uint8_t *bitbuf_tx, *bitbuf_rx;
+    if (testframe_mode) {
+        bitbuf_tx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_tx != NULL);
+        bitbuf_rx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_rx != NULL);
+    
+        /* Generate known tx frame from known seed */
+        
+        srand(158324);
+        for(i=0; i<TEST_FRAME_SIZE; i++){
+            bitbuf_tx[i] = rand()&0x1;
+            bitbuf_rx[i] = 0;
+        }
+
+        testframecnt = 0;
+        bitcnt = 0;
+        biterr = 0;
     }
     
     if(enable_stats){
@@ -188,9 +219,9 @@ int main(int argc,char *argv[]){
     
     /* allocate buffers for processing */
     if(soft_dec_mode){
-        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits);
+        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits); assert(sdbuf != NULL);
     }else{
-        bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+        bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
     }
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
     modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
@@ -229,53 +260,117 @@ int main(int argc,char *argv[]){
         }else{
             fsk_demod(fsk,bitbuf,modbuf);
         }
-        
-        if(enable_stats && stats_ctr <= 0){
-            fsk_get_demod_stats(fsk,&stats);
-	    /* Print standard 2FSK stats */
-            fprintf(stderr,"{\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
-            fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
-	    /* Print 4FSK stats if in 4FSK mode */
-            if(fsk->mode == 4){
-                fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
+
+        testframe_detected = 0;
+        if (testframe_mode) {
+            /* attempt to find a testframe and update stats */
+                    /* update silding window of input bits */
+
+            int errs;
+            for(j=0; j<fsk->Nbits; j++) {
+                for(i=0; i<TEST_FRAME_SIZE-1; i++) {
+                    bitbuf_rx[i] = bitbuf_rx[i+1];
+                }
+                if (soft_dec_mode == 1) {
+                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0;
+                }
+                else {
+                    bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
+                }
+
+                /* compare to know tx frame.  If they are time aligned, there
+                   will be a fairly low bit error rate */
+
+                errs = 0;
+                for(i=0; i<TEST_FRAME_SIZE; i++) {
+                    if (bitbuf_rx[i] != bitbuf_tx[i]) {
+                        errs++;
+                    }
+                }
+                
+                if (errs < 0.1*TEST_FRAME_SIZE) {
+                    /* OK, we have a valid test frame sync, so lets count errors */
+                    testframe_detected = 1;
+                    testframecnt++;
+                    bitcnt += TEST_FRAME_SIZE;
+                    biterr += errs;
+                    if (enable_stats == 0) {
+                        fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
+                            errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
+                    }
+                }
             }
+        } /* if (testframe_mode) ... */
+        
+        if (enable_stats) {
+            if ((stats_ctr <= 0) || testframe_detected) {
+                fsk_get_demod_stats(fsk,&stats);
+
+                /* Print standard 2FSK stats */
+
+                fprintf(stderr,"{");                
+                fprintf(stderr,"\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
+                fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
+
+                /* Print 4FSK stats if in 4FSK mode */
+
+                if(fsk->mode == 4){
+                    fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
+                }
 	    
-	    /* Print the eye diagram */
-            fprintf(stderr,",\t\"eye_diagram\":[");
-            for(i=0;i<stats.neyetr;i++){
-                fprintf(stderr,"[");
-                for(j=0;j<stats.neyesamp;j++){
-                    fprintf(stderr,"%f ",stats.rx_eye[i][j]);
-                    if(j<stats.neyesamp-1) fprintf(stderr,",");
+                /* Print the eye diagram */
+
+                fprintf(stderr,",\t\"eye_diagram\":[");
+                for(i=0;i<stats.neyetr;i++){
+                    fprintf(stderr,"[");
+                    for(j=0;j<stats.neyesamp;j++){
+                        fprintf(stderr,"%f ",stats.rx_eye[i][j]);
+                        if(j<stats.neyesamp-1) fprintf(stderr,",");
+                    }
+                    fprintf(stderr,"]");
+                    if(i<stats.neyetr-1) fprintf(stderr,",");
+                }
+                fprintf(stderr,"],");
+	    
+                /* Print a sample of the FFT from the freq estimator */
+                fprintf(stderr,"\"samp_fft\":[");
+                Ndft = fsk->Ndft/2;
+                for(i=0; i<Ndft; i++){
+                    fprintf(stderr,"%f ",(fsk->fft_est)[i]);
+                    if(i<Ndft-1) fprintf(stderr,",");
                 }
                 fprintf(stderr,"]");
-                if(i<stats.neyetr-1) fprintf(stderr,",");
+
+                if (testframe_mode) {
+                    fprintf(stderr,",\t\"testframecnt\":%d,\t\"bitcnt\":%d,\t\"biterr\":%d",testframecnt,bitcnt,biterr);
+                }
+                
+                fprintf(stderr,"}\n");                
+
+                if (stats_ctr < 0) {
+                    stats_ctr = stats_loop;
+                }
             }
-            fprintf(stderr,"],");
-	    
-	    /* Print a sample of the FFT from the freq estimator */
-	    fprintf(stderr,"\"samp_fft\":[");
-	    Ndft = fsk->Ndft/2;
-	    for(i=0; i<Ndft; i++){
-		fprintf(stderr,"%f ",(fsk->fft_est)[i]);
-		if(i<Ndft-1) fprintf(stderr,",");
-	    }
-	    fprintf(stderr,"]}\n");
-            stats_ctr = stats_loop;
+            if (testframe_mode == 0) {
+                stats_ctr--;
+            }
         }
-        stats_ctr--;
-            /*for(i=0;i<fsk->Nbits;i++){
-            t = (int)bitbuf[i];
-        }*/
+
         if(soft_dec_mode){
             fwrite(sdbuf,sizeof(float),fsk->Nbits,fout);
         }else{
             fwrite(bitbuf,sizeof(uint8_t),fsk->Nbits,fout);
         }
-            if(fin == stdin || fout == stdin){
+
+        if(fin == stdin || fout == stdin){
             fflush(fin);
             fflush(fout);
         }
+    } /* while(fread ...... */
+
+    if (testframe_mode) {
+        free(bitbuf_tx);
+        free(bitbuf_rx);
     }
     
     if(soft_dec_mode){
