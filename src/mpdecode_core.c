@@ -9,11 +9,22 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <stdio.h>
 #include "mpdecode_core.h"
+#ifndef USE_ORIGINAL_PHI0
+#include "phi0.h"
+#endif
+
+#ifdef __EMBEDDED__
+#include "machdep.h"
+#endif
 
 #define QPSK_CONSTELLATION_SIZE 4
 #define QPSK_BITS_PER_SYMBOL    2
+
+#undef PRINT_PROGRESS
+#define PRINT_ALLOCS
 
 /* QPSK constellation for symbol likelihood calculations */
 
@@ -49,6 +60,7 @@ void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
     }
 }
 
+#ifdef USE_ORIGINAL_PHI0
 /* Phi function */
 static float phi0(
 		  float x )
@@ -79,6 +91,7 @@ static float phi0(
     return( (float) log( (z+1)/(z-1) ) ); 
   }
 }
+#endif
 
 static float correction(float xinput )
 {

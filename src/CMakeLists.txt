@@ -255,6 +255,7 @@ set(CODEC2_SRCS
     dct2.c
     ofdm.c
     mpdecode_core.c
+    phi0.c
     gp_interleaver.c
     interldpc.c
     filter.c
