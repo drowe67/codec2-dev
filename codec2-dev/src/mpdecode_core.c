@@ -39,13 +39,13 @@ static COMP S_matrix[] = {
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
     unsigned int p, i, tmp, par, prev=0;
     int          ind;
-    double      *H_rows = ldpc->H_rows;
+    uint16_t     *H_rows = ldpc->H_rows;
 
     for (p=0; p<ldpc->NumberParityBits; p++) {
         par = 0;
 
         for (i=0; i<ldpc->max_row_weight; i++) {
-            ind = (int)H_rows[p + i*ldpc->NumberParityBits];
+            ind = H_rows[p + i*ldpc->NumberParityBits];
             par = par + ibits[ind-1];
         }
 
@@ -120,15 +120,15 @@ void init_c_v_nodes(struct c_node *c_nodes,
                     int     shift,
                     int     NumberParityBits,
                     int     max_row_weight,
-                    double *H_rows,
+                    uint16_t *H_rows,
                     int     H1,
                     int     CodeLength,
                     struct v_node *v_nodes,
                     int     NumberRowsHcols,
-                    double *H_cols,
+                    uint16_t *H_cols,
                     int     max_col_weight,
                     int     dec_type,
-                    double *input)
+                    float  *input)
 {
     int i, j, k, count, cnt, c_index, v_index;
 
@@ -471,7 +471,7 @@ return(result);
 
 /* Convenience function to call LDPC decoder from C programs */
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount) {
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount) {
     int         max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
     int         max_row_weight, max_col_weight;
@@ -562,7 +562,7 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *pa
 }
 
 
-void sd_to_llr(double llr[], double sd[], int n) {
+void sd_to_llr(float llr[], double sd[], int n) {
     double sum, mean, sign, sumsq, estvar, estEsN0, x;
     int i;
 
@@ -577,7 +577,7 @@ void sd_to_llr(double llr[], double sd[], int n) {
 
     sum = sumsq = 0.0;
     for(i=0; i<n; i++) {
-        sign = (sd[i] > 0.0) - (sd[i] < 0.0);
+        sign = (sd[i] > 0.0L) - (sd[i] < 0.0L);
         x = (sd[i]/mean - sign);
         sum += x;
         sumsq += x*x;
@@ -585,9 +585,9 @@ void sd_to_llr(double llr[], double sd[], int n) {
     estvar = (n * sumsq - sum * sum) / (n * (n - 1));
     //fprintf(stderr, "mean: %f var: %f\n", mean, estvar);
 
-    estEsN0 = 1.0/(2.0 * estvar + 1E-3);
+    estEsN0 = 1.0/(2.0L * estvar + 1E-3);
     for(i=0; i<n; i++)
-        llr[i] = 4.0 * estEsN0 * sd[i];
+        llr[i] = 4.0L * estEsN0 * sd[i];
 }
 
 
@@ -598,8 +598,8 @@ void sd_to_llr(double llr[], double sd[], int n) {
 
    1) We assume fading[] is real, it is also possible to compute
       with complex fading, see CML library Demod2D.c source code.
-   2) Using doubles, as experience with FSK in drs232_ldpc.c showed
-      doubles were required to obtain the same answers as Octave.
+   2) Using floats instead of doubles, for stm32.
+      Testing shows good BERs with floats.
 */
 
 void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols              */
@@ -612,7 +612,7 @@ void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols     
 {
     int     M=QPSK_CONSTELLATION_SIZE;
     int     i,j;
-    double  tempsr, tempsi, Er, Ei;
+    float  tempsr, tempsi, Er, Ei;
 
     /* determine output */
 

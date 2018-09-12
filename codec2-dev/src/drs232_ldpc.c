@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
     uint8_t     bit, bit_buffer[UW_BITS];
     double      symbol_buf[SYMBOLS_PER_PACKET];
     double      symbol_buf_no_rs232[SYMBOLS_PER_PACKET];
-    double      llr[SYMBOLS_PER_PACKET];
+    float       llr[SYMBOLS_PER_PACKET];
     char        unpacked_packet[CODELENGTH];
     uint8_t     packet[BYTES_PER_PACKET+CRC_BYTES];
     uint8_t     abyte;
