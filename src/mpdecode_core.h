@@ -11,6 +11,8 @@
 #ifndef __MPDECODE_CORE__
 #define __MPDECODE_CORE__
 
+#include <stdint.h>
+
 #include "comp.h"
 
 struct LDPC {
@@ -26,16 +28,16 @@ struct LDPC {
     int data_bits_per_frame;
     int coded_bits_per_frame;
     int coded_syms_per_frame;
-    double *H_rows;
-    double *H_cols;
+    uint16_t *H_rows;
+    uint16_t *H_cols;
 };
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], double input[], int *parityCheckCount);
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount);
 
 // Used for test programs.
-void sd_to_llr(double llr[], double sd[], int n);
+void sd_to_llr(float llr[], double sd[], int n);
 void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
 void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
 void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);

@@ -50,7 +50,6 @@ int opt_exists(char *argv[], int argc, char opt[]) {
     return 0;
 }
 
-void extract_output(char out_char[], int DecodedBits[], int ParityCheckCount[], int max_iter, int CodeLength, int NumberParityBits);
 
 int main(int argc, char *argv[])
 {    
@@ -59,7 +58,7 @@ int main(int argc, char *argv[])
     int         data_bits_per_frame;
     char        *adetected_data;
     struct LDPC ldpc;
-    double     *ainput;
+    float      *ainput;
     int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
     
@@ -147,6 +146,7 @@ int main(int argc, char *argv[])
 
     testframes = 0;
     total_iters = 0;
+    Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
     
     if (!strcmp(argv[1],"--test")) {
 
@@ -222,10 +222,10 @@ int main(int argc, char *argv[])
                 ibits[i] = r[i] > 16384;
             }
             encode(&ldpc, ibits, pbits);  
-            Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
        }
 
         double *input_double = calloc(CodeLength, sizeof(double));
+        float  *input_float  = calloc(CodeLength, sizeof(float));
 
         nread = CodeLength;
         offset = 0;
@@ -258,10 +258,10 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                sd_to_llr(input_double, input_double, CodeLength);
+                sd_to_llr(input_float, input_double, CodeLength);
             }
 
-            iter = run_ldpc_decoder(&ldpc, out_char, input_double, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
             //fprintf(stderr, "iter: %d\n", iter);
 	    total_iters += iter;
             
