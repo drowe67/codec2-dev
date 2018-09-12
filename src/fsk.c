@@ -84,6 +84,7 @@
 
 \*---------------------------------------------------------------------------*/
 
+static void stats_init(struct FSK *fsk);
 
 #ifdef USE_HANN_TABLE
 /*
@@ -251,6 +252,7 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    stats_init(fsk);
     fsk->normalise_eye = 1;
 
     return fsk;
@@ -381,6 +383,7 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
     fsk->ppm = 0;
     
     fsk->stats = (struct MODEM_STATS*)malloc(sizeof(struct MODEM_STATS));
+    
     if(fsk->stats == NULL){
         free(fsk->fft_est);
         free(fsk->samp_old);
@@ -388,9 +391,33 @@ struct FSK * fsk_create(int Fs, int Rs,int M, int tx_f1, int tx_fs)
         free(fsk);
         return NULL;
     }
+    stats_init(fsk);
     fsk->normalise_eye = 1;
-
+    
     return fsk;
+}
+
+/* make sure stats have known values in case monitoring process reads stats before they are set */
+
+static void stats_init(struct FSK *fsk) {
+    /* Take a sample for the eye diagrams */
+    int i,j,m;
+    int P = fsk->P;
+    int M = fsk->mode;
+    int neyesamp = fsk->stats->neyesamp = P*2;
+    assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
+    int eye_traces = MODEM_STATS_ET_MAX/M;
+   
+    fsk->stats->neyetr = fsk->mode*eye_traces;
+    for( i=0; i<eye_traces; i++){
+        for ( m=0; m<M; m++){
+            for(j=0; j<neyesamp; j++)
+                fsk->stats->rx_eye[i*M+m][j] = 0;
+        }
+    }
+
+    fsk->stats->rx_timing = fsk->stats->snr_est = 0;
+    
 }
 
 
@@ -953,13 +980,19 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     }
     
     #ifdef EST_EBNO
+    
     /* Calculate mean for EbNodB estimation */
     meanebno = meanebno/(float)nsym;
     
     /* Calculate the std. dev for EbNodB estimate */
     stdebno = (stdebno/(float)nsym) - (meanebno*meanebno);
-    stdebno = sqrt(stdebno);
-    
+    /* trap any negative numbers to avoid NANs flowing through */
+    if (stdebno > 0.0) {
+        stdebno = sqrt(stdebno);
+    } else {
+        stdebno = 0.0;
+    }
+        
     fsk->EbNodB = -6+(20*log10f((1e-6+meanebno)/(1e-6+stdebno)));
     #else
     fsk->EbNodB = 1;
@@ -971,6 +1004,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     fsk->stats->clock_offset = fsk->ppm;
         
     /* Calculate and save SNR from EbNodB estimate */
+
     fsk->stats->snr_est = .5*fsk->stats->snr_est + .5*fsk->EbNodB;//+ 10*log10f(((float)Rs)/((float)Rs*M));
         
     /* Save rx timing */
@@ -994,6 +1028,8 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
                 fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][neyesamp*i+neyeoffset+j]);
         }
     }
+    assert(i <= MODEM_STATS_ET_MAX);
+    assert(j <= MODEM_STATS_EYE_IND_MAX);
         
     if (fsk->normalise_eye) {
         eye_max = 0;

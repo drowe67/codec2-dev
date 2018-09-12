@@ -35,12 +35,13 @@
 #include "comp.h"
 #include "kiss_fft.h"
 
-#define MODEM_STATS_NC_MAX    20
-#define MODEM_STATS_NR_MAX    8
-#define MODEM_STATS_ET_MAX    8
-#define MODEM_STATS_NSPEC     512
-#define MODEM_STATS_MAX_F_HZ  4000
-#define MODEM_STATS_MAX_F_EST 4
+#define MODEM_STATS_NC_MAX      20
+#define MODEM_STATS_NR_MAX      8
+#define MODEM_STATS_ET_MAX      8
+#define MODEM_STATS_EYE_IND_MAX 160     
+#define MODEM_STATS_NSPEC       512
+#define MODEM_STATS_MAX_F_HZ    4000
+#define MODEM_STATS_MAX_F_EST   4
       
 struct MODEM_STATS {
     int    Nc;
@@ -56,7 +57,7 @@ struct MODEM_STATS {
     
     /* eye diagram traces */
     /* Eye diagram plot -- first dim is trace number, second is the trace idx */
-    float  rx_eye[MODEM_STATS_ET_MAX][80];
+    float  rx_eye[MODEM_STATS_ET_MAX][MODEM_STATS_EYE_IND_MAX];
     int    neyetr;                           /* How many eye traces are plotted */
     int    neyesamp;                         /* How many samples in the eye diagram */
 
