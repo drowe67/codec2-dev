@@ -24,7 +24,7 @@
 #define QPSK_BITS_PER_SYMBOL    2
 
 #undef PRINT_PROGRESS
-#define PRINT_ALLOCS
+#undef PRINT_ALLOCS
 
 /* QPSK constellation for symbol likelihood calculations */
 
