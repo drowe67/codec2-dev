@@ -602,7 +602,7 @@ void sd_to_llr(float llr[], double sd[], int n) {
       Testing shows good BERs with floats.
 */
 
-void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols              */
+void Demod2D(float   symbol_likelihood[],       /* output, M*number_symbols              */
              COMP    r[],                       /* received QPSK symbols, number_symbols */
              COMP    S_matrix[],                /* constellation of size M               */
              float   EsNo,
@@ -631,14 +631,14 @@ void Demod2D(double  symbol_likelihood[],       /* output, M*number_symbols     
 }
 
 
-void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
-           double  symbol_likelihood[],   /* M*number_symbols                */
+void Somap(float  bit_likelihood[],      /* number_bits, bps*number_symbols */
+           float  symbol_likelihood[],   /* M*number_symbols                */
            int     number_symbols)
 {
     int    M=QPSK_CONSTELLATION_SIZE, bps = QPSK_BITS_PER_SYMBOL;
     int    n,i,j,k,mask;
-    double num[bps], den[bps];
-    double metric;
+    float num[bps], den[bps];
+    float metric;
 
     for (n=0; n<number_symbols; n++) { /* loop over symbols */
         for (k=0;k<bps;k++) {
@@ -674,11 +674,11 @@ void Somap(double  bit_likelihood[],      /* number_bits, bps*number_symbols */
 }
 
 
-void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms) {
+void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms) {
     int i;
 
-    double symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
-    double bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
+    float symbol_likelihood[nsyms*QPSK_CONSTELLATION_SIZE];
+    float bit_likelihood[nsyms*QPSK_BITS_PER_SYMBOL];
 
     Demod2D(symbol_likelihood, rx_qpsk_symbols, S_matrix, EsNo, rx_amps, mean_amp, nsyms);
     Somap(bit_likelihood, symbol_likelihood, nsyms);

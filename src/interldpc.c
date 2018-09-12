@@ -116,7 +116,7 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
     int coded_syms_per_frame = ldpc->coded_syms_per_frame;
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int data_bits_per_frame = ldpc->data_bits_per_frame;
-    double llr[coded_bits_per_frame];
+    float llr[coded_bits_per_frame];
     char out_char[coded_bits_per_frame];                    
     char next_sync_state_interleaver[config->state_str];
     

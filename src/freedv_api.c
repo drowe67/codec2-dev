@@ -1838,7 +1838,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
         gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
         gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
-        double llr[coded_bits_per_frame];
+        float llr[coded_bits_per_frame];
         char out_char[coded_bits_per_frame];
 
         interleaver_sync_state_machine(ofdm, ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
