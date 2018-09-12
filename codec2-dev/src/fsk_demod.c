@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <time.h>
 
 #include "fsk.h"
 #include "codec2_fdmdv.h"
@@ -180,11 +181,13 @@ int main(int argc,char *argv[]){
     
     
     /* set up FSK */
-    if(!hbr)
-    fsk = fsk_create(Fs,Rs,M,1200,400);
-    else
-    fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
-    
+    if(!hbr) {
+        fsk = fsk_create(Fs,Rs,M,1200,400);
+    }
+    else {
+        fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+    }
+
     if(fin==NULL || fout==NULL || fsk==NULL){
         fprintf(stderr,"Couldn't open files\n");
         exit(1);
@@ -225,10 +228,9 @@ int main(int argc,char *argv[]){
     }
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
     modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
-    
+
     /* Demodulate! */
     while( fread(rawbuf,bytes_per_sample*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
- 
         /* convert input to a buffer of floats.  Note scaling isn't really necessary for FSK */
 
        if (complex_input == 1) {
@@ -255,12 +257,13 @@ int main(int argc,char *argv[]){
                 }
             }            
         }
+
         if(soft_dec_mode){
             fsk_demod_sd(fsk,sdbuf,modbuf);
         }else{
             fsk_demod(fsk,bitbuf,modbuf);
         }
-
+        
         testframe_detected = 0;
         if (testframe_mode) {
             /* attempt to find a testframe and update stats */
@@ -303,13 +306,15 @@ int main(int argc,char *argv[]){
         } /* if (testframe_mode) ... */
         
         if (enable_stats) {
-            if ((stats_ctr <= 0) || testframe_detected) {
+            if ((stats_ctr < 0) || testframe_detected) {
                 fsk_get_demod_stats(fsk,&stats);
 
                 /* Print standard 2FSK stats */
 
-                fprintf(stderr,"{");                
-                fprintf(stderr,"\"EbNodB\": %2.2f,\t\"ppm\": %d,",stats.snr_est,(int)fsk->ppm);
+                fprintf(stderr,"{");
+                time_t seconds  = time(NULL);
+
+                fprintf(stderr,"\"seconds\": %ld, \"EbNodB\": %2.2f,\t\"ppm\": %d,",seconds, stats.snr_est, (int)fsk->ppm);
                 fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
 
                 /* Print 4FSK stats if in 4FSK mode */
@@ -320,7 +325,7 @@ int main(int argc,char *argv[]){
 	    
                 /* Print the eye diagram */
 
-                fprintf(stderr,",\t\"eye_diagram\":[");
+                fprintf(stderr,",\t\"eye_diagram\":[");                 
                 for(i=0;i<stats.neyetr;i++){
                     fprintf(stderr,"[");
                     for(j=0;j<stats.neyesamp;j++){
