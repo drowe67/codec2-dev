@@ -55,7 +55,7 @@ add_executable(tdeframer tdeframer.c)
 target_link_libraries(tdeframer m codec2)
 
 add_definitions(-DMODEMPROBE_ENABLE -DXXXXX)
-add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
+add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
 target_link_libraries(tofdm m)
 
 add_executable(tfreedv_data_channel tfreedv_data_channel.c)
@@ -84,11 +84,11 @@ set_target_properties(speexnoisesup
 
 add_executable(fdmdv_mem fdmdv_mem.c)
 
-add_executable(ofdm_mem ofdm_mem.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
+add_executable(ofdm_mem ofdm_mem.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
 target_link_libraries(ofdm_mem m)
 
 add_library(function_trace STATIC ../unittest/function_trace.c)
-add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/filter.c)
+add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
 target_compile_options(ofdm_stack PUBLIC -fstack-usage -finstrument-functions -no-pie)
 target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
 
