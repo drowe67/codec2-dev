@@ -312,7 +312,7 @@ int main(int argc, char *argv[])
                 gp_deinterleave_comp (codeword_symbols_de, codeword_symbols, interleave_frames*coded_syms_per_frame);
                 gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
-                double llr[coded_bits_per_frame];
+                float llr[coded_bits_per_frame];
 
                 if (ldpc_en) {
                     char out_char[coded_bits_per_frame];
