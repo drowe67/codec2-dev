@@ -404,15 +404,28 @@ static void stats_init(struct FSK *fsk) {
     int i,j,m;
     int P = fsk->P;
     int M = fsk->mode;
-    int neyesamp = fsk->stats->neyesamp = P*2;
+
+    /* due to oversample rate P, we have too many samples for eye
+       trace.  So lets output a decimated version */
+
+    /* asserts below as we found some problems over-running eye matrix */
+    
+    /* TODO: refactor eye tracing code here and in fsk_demod */
+    
+    int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
+    int neyesamp = (P*2)/neyesamp_dec;
     assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
+    fsk->stats->neyesamp = neyesamp;
+    
     int eye_traces = MODEM_STATS_ET_MAX/M;
    
     fsk->stats->neyetr = fsk->mode*eye_traces;
-    for( i=0; i<eye_traces; i++){
-        for ( m=0; m<M; m++){
-            for(j=0; j<neyesamp; j++)
+    for(i=0; i<eye_traces; i++) {
+        for (m=0; m<M; m++){
+            for(j=0; j<neyesamp; j++) {
+                assert((i*M+m) < MODEM_STATS_ET_MAX);
                 fsk->stats->rx_eye[i*M+m][j] = 0;
+           }
         }
     }
 
@@ -1015,21 +1028,42 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     fc_tx = (fsk->f1_tx+fsk->f1_tx+fsk->fs_tx)/2;
     fsk->stats->foff = fc_tx-fc_avg;
     
-    /* Take a sample for the eye diagrams */
-    neyesamp = fsk->stats->neyesamp = P*2;
-    neyeoffset = high_sample+1+(P*28);
-        
+    /* Take a sample for the eye diagrams ---------------------------------- */
+
+    /* due to oversample rate P, we have too many samples for eye
+       trace.  So lets output a decimated version.  We use 2P
+       as we want two symbols worth of samples in trace  */
+
+    int neyesamp_dec = ceil(((float)P*2)/MODEM_STATS_EYE_IND_MAX);
+    neyesamp = (P*2)/neyesamp_dec;
+    assert(neyesamp <= MODEM_STATS_EYE_IND_MAX);
+    fsk->stats->neyesamp = neyesamp;
+
+    #ifdef I_DONT_UNDERSTAND
+    neyeoffset = high_sample+1+(P*28); /* WTF this line? Where does "28" come from ?                           */
+    #endif                             /* ifdef-ed out as I am afraid it will index out of memory as P changes */
+    neyeoffset = high_sample+1;
+    
     int eye_traces = MODEM_STATS_ET_MAX/M;
-        
+    int ind;
+    
     fsk->stats->neyetr = fsk->mode*eye_traces;
     for( i=0; i<eye_traces; i++){
         for ( m=0; m<M; m++){
-            for(j=0; j<neyesamp; j++)
-                fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][neyesamp*i+neyeoffset+j]);
+            for(j=0; j<neyesamp; j++) {
+               /*
+                  2*P*i...........: advance two symbols for next trace
+                  neyeoffset......: centre trace on ideal timing offset, peak eye opening
+                  j*neweyesamp_dec: For 2*P>MODEM_STATS_EYE_IND_MAX advance through integrated 
+                                    samples newamp_dec at a time so we dont overflow rx_eye[][]
+               */
+               ind = 2*P*i + neyeoffset + j*neyesamp_dec;
+               assert((i*M+m) < MODEM_STATS_ET_MAX);
+               assert(ind < (nsym+1)*P);
+               fsk->stats->rx_eye[i*M+m][j] = cabsolute(f_int[m][ind]);
+            }
         }
     }
-    assert(i <= MODEM_STATS_ET_MAX);
-    assert(j <= MODEM_STATS_EYE_IND_MAX);
         
     if (fsk->normalise_eye) {
         eye_max = 0;
