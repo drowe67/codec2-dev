@@ -14,7 +14,8 @@ set(FLOAT_TYPE "hard" CACHE STRING "Floating point: defaults to hard.")
 ###################################################
 
 # Set default C flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4"
+    CACHE STRING "Mandentory build flags." FORCE)
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
@@ -49,7 +50,6 @@ else()
     link_libraries(c m)
 endif()
 
-#include(cmake/STM32_Toolchain.cmake)
 project(stm32f4 C ASM)
 
 # Setup defaults that can't be set in the toolchain file
