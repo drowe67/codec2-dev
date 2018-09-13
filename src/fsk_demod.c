@@ -34,10 +34,22 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <time.h>
+#include <signal.h>
+#include <unistd.h>
+
 
 #include "fsk.h"
 #include "codec2_fdmdv.h"
 #include "modem_stats.h"
+
+/* cleanly exit when we get a SIGTERM */
+
+void sig_handler(int signo)
+{
+    if (signo == SIGTERM) {
+        exit(0);
+    }
+}
 
 int main(int argc,char *argv[]){
     struct FSK *fsk;
@@ -229,7 +241,14 @@ int main(int argc,char *argv[]){
     rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
     modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
 
+    /* set up signal handler so we can terminate gracefully */
+    
+    if (signal(SIGTERM, sig_handler) == SIG_ERR) {
+        printf("\ncan't catch SIGTERM\n");
+    }
+    
     /* Demodulate! */
+    
     while( fread(rawbuf,bytes_per_sample*complex_input,fsk_nin(fsk),fin) == fsk_nin(fsk) ){
         /* convert input to a buffer of floats.  Note scaling isn't really necessary for FSK */
 
