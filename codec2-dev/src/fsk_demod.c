@@ -333,7 +333,7 @@ int main(int argc,char *argv[]){
                 fprintf(stderr,"{");
                 time_t seconds  = time(NULL);
 
-                fprintf(stderr,"\"seconds\": %ld, \"EbNodB\": %2.2f, \"ppm\": %d,",seconds, stats.snr_est, (int)fsk->ppm);
+                fprintf(stderr,"\"secs\": %ld, \"EbNodB\": %5.1f, \"ppm\": %4d,",seconds, stats.snr_est, (int)fsk->ppm);
                 fprintf(stderr," \"f1_est\":%.1f, \"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
 
                 /* Print 4FSK stats if in 4FSK mode */
@@ -368,7 +368,7 @@ int main(int argc,char *argv[]){
                 }
                 
                 if (testframe_mode) {
-                    fprintf(stderr,", \"testframecnt\":%d, \"bitcnt\":%d, \"biterr\":%d",testframecnt,bitcnt,biterr);
+                    fprintf(stderr,", \"frames\":%d, \"bits\":%d, \"errs\":%d",testframecnt,bitcnt,biterr);
                 }
                 
                 fprintf(stderr,"}\n");                
