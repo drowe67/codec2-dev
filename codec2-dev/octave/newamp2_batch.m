@@ -37,7 +37,22 @@
 
     octave:101> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_decbs", "mode", "dec", "bitstream", "vk5qi_2200_enc.c2");
     ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_decbs --hand_voicing vk5qi_l_decbs_v.txt -o - |  play -t raw -r 8000 -s -2 -
-    
+
+   DCT based HQ/200 Candidate (Sep 2018):
+
+     1/ (h and s) trained:
+     
+       load train120_surf.mat
+       newamp2; [s h] = design_huffman_enc(train120_surf, qstepdB=6, max_dcts=18);
+
+     2/ Quantise all:
+
+       all_surf_l = newamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l", "mode", "linear");
+       newamp2; s_ = huffman_encode_surf(all_surf_l(:,2:35), qstepdB=6, max_dcts=20, max_bits=45, s, h);
+       all_surf_l_ = all_surf_l; all_surf_l(:,:) = 0; all_surf_l_(:,2:35)=s_;
+       n ewamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l_45a", "mode", "linear", "surf_in", all_surf_l_);
+       $ ./c2sim ../../wav/all.wav --framelength_s 0.0125 --pahw all_surf_l_45a -o - | aplay -f S16_LE
+
 #}
 
 
@@ -310,7 +325,8 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     K = 20;
   end
   if strcmp(resampler, "linear")
-    rate_K_sample_freqs_kHz = [0.1:0.1:4];
+    K = 40; step = (Fs/2000)/K
+    rate_K_sample_freqs_kHz = [0.1:step:4];
     K = length(rate_K_sample_freqs_kHz);
   end
   
@@ -541,7 +557,8 @@ endfunction
 function [model_ rate_K_surface_ sd_log delta_K] = resample_surf(model, rate_K_surface_)
   Fs = 8000;
 
-  rate_K_sample_freqs_kHz = [0.1:0.1:4];
+  K = 40; step = (Fs/2000)/K
+  rate_K_sample_freqs_kHz = [0.1:step:4];
   K = length(rate_K_sample_freqs_kHz);
   
   % back to rate L

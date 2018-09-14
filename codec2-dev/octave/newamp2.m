@@ -1149,9 +1149,10 @@ endfunction
     [ ] include dull/diff bit
 #}
 
-function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, symbols, huff)
+function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, max_bits=100, symbols, huff)
+  dec = 2;
   [nr K] = size(surf);
-
+ 
   printf("K: %d nr: %d qstepdB: %3.2f max_dcts: %d\n", K, nr, qstepdB, max_dcts);
 
   % limit num DCTs we encode (nc) to less than K to save bits, high
@@ -1166,7 +1167,7 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, s
   % DCT and initial quantisation to step size
   
   D = dct(surf')';
-  E = round(D/qstepdB);
+  E = D/qstepdB;
 
   % bit stream for each row (frame) is stored in a cell array
   
@@ -1177,24 +1178,29 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, s
    
   % encode each row
 
-  for r=1:nr
+  for r=1:dec:nr
     bits_direct_row = [];  bits_diff_row = []; Nbits_direct = 0; Nbits_diff = 0;
 
     % DC just copied directly, quantised externally
     
     E_(r,1) = E(r,1);
-
+    direct_row_ = diff_row_ = zeros(1,nc);
+    
     for c=2:nc
-      s_direct = E(r,c);
-      [s_direct_ bits_direct] = huffman_enc_symb(symbols, huff, s_direct);
-      bits_direct_row = [bits_direct_row bits_direct];
-      direct_row_(c) = s_direct_;
+      if length(bits_direct_row) < max_bits
+        s_direct = E(r,c);
+        [s_direct_ bits_direct] = huffman_enc_symb(symbols, huff, s_direct);
+        bits_direct_row = [bits_direct_row bits_direct];
+        direct_row_(c) = s_direct_;
+      end
       
-      s_diff = E(r,c) - prev_row(c);
-      [s_diff_ bits_diff] = huffman_enc_symb(symbols, huff, s_diff);
-      bits_diff_row = [bits_diff_row bits_diff];
-      diff_row_(c) = s_diff_;
-
+      if length(bits_diff_row) < max_bits
+        s_diff = E(r,c) - prev_row(c);
+        [s_diff_ bits_diff] = huffman_enc_symb(symbols, huff, s_diff);
+        bits_diff_row = [bits_diff_row bits_diff];
+        diff_row_(c) = s_diff_;
+      end
+      
       Nsyms++;
     end
 
@@ -1202,8 +1208,11 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, s
 
     Nbits_direct = length(bits_direct_row); Nbits_diff = length(bits_diff_row);
     Nbits_direct_log(r) = Nbits_direct; Nbits_diff_log(r) = Nbits_diff;
-
-    if Nbits_direct < Nbits_diff
+    e_direct = sum((direct_row_(2:nc) - E(r,2:nc)) .^ 2);
+    e_diff = sum((diff_row_(2:nc) + prev_row(2:nc) - E(r,2:nc)) .^ 2);
+    
+    %if Nbits_direct < Nbits_diff
+    if e_direct < e_diff
       bits_surf{r} = [0 bits_direct_row];
       Tbits += Nbits_direct;
       E_(r,2:nc) = direct_row_(2:nc);
@@ -1219,7 +1228,14 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, s
     
     if r >=3
       prev_row = E_(r,1:nc);
+
+      % if we are decimating, interpolate DCTs to get original frame rate
+      
+      if dec == 2
+        E_(r-1,:) = 0.5*E_(r-2,:) + 0.5*E_(r,:);
+      end
     end
+
   end
 
   % transform back to surface and calculate MSE
@@ -1227,26 +1243,26 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, s
   E_ *= qstepdB;
   surf_ = idct(E_')';  
   error = surf_ - surf;
-  mse = mean(mean(error .^ 2));
+  mse = mean(mean(error(1:dec:end,:) .^ 2));
 
   figure(1); clf;
   [nr nc] = size(error);
   nr = min(nr,300);
-  mesh(error(1:nr,:))
+  mesh(error(1:dec:nr,:))
 
   figure(2);
   subplot(122,"position",[0.7 0.05 0.25 0.85])
-  hist(mean(error.^2,2));
+  hist(mean(error(1:dec:end,:).^2,2));
   subplot(121,"position",[0.1 0.05 0.5 0.85])
-  plot(mean(error.^2,2));
+  plot(mean(error(1:dec:end,:).^2,2));
   title('Mean squared error per frame');
   
   figure(3);
   subplot(122,"position",[0.7 0.05 0.25 0.9])
-  hist(Nbits_log);
+  hist(Nbits_log(1:dec:end));
   subplot(121,"position",[0.1 0.05 0.5 0.9])
-  plot(diff_flag*10,'b;diff flag;'); hold on; plot(Nbits_log,'g;Nbits/fr;'); hold off;
+  plot(diff_flag(1:dec:end)*10,'b;diff flag;'); hold on; plot(Nbits_log(1:dec:end),'g;Nbits/fr;'); hold off;
   
-  printf("mse: %4.2f dB^2 mean bits/frame: %3.1f mean bits/sym: %3.1f\n", mse, mean(Nbits_log), Tbits/Nsyms);
+  printf("mse: %4.2f dB^2 mean bits/frame: %3.1f mean bits/sym: %3.1f\n", mse, mean(Nbits_log(1:dec:end)), Tbits/Nsyms);
 endfunction
 
