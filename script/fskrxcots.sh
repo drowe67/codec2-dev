@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # fskrxcots.sh
 # David Rowe Sep 2018
 #
@@ -13,4 +13,5 @@
 
 CODEC2_BIN=/home/david/codec2-dev/build_linux/src
 
-arecord -D hw:1,0 -f S16_LE -r 48000 - | $CODEC2_BIN/fsk_demod -f -t 2 48000 100 - /dev/null 2>$1 
+arecord -D hw:1,0 -f S16_LE -r 48000 - | $CODEC2_BIN/fsk_demod -f -t 2 48000 100 - /dev/null 2> >(tee -a $1)
+
