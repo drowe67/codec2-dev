@@ -333,40 +333,42 @@ int main(int argc,char *argv[]){
                 fprintf(stderr,"{");
                 time_t seconds  = time(NULL);
 
-                fprintf(stderr,"\"seconds\": %ld, \"EbNodB\": %2.2f,\t\"ppm\": %d,",seconds, stats.snr_est, (int)fsk->ppm);
-                fprintf(stderr,"\t\"f1_est\":%.1f,\t\"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
+                fprintf(stderr,"\"seconds\": %ld, \"EbNodB\": %2.2f, \"ppm\": %d,",seconds, stats.snr_est, (int)fsk->ppm);
+                fprintf(stderr," \"f1_est\":%.1f, \"f2_est\":%.1f",fsk->f_est[0],fsk->f_est[1]);
 
                 /* Print 4FSK stats if in 4FSK mode */
 
                 if(fsk->mode == 4){
-                    fprintf(stderr,",\t\"f3_est\":%.1f,\t\"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
+                    fprintf(stderr,", \"f3_est\":%.1f, \"f4_est\":%.1f",fsk->f_est[2],fsk->f_est[3]);
                 }
 	    
-                /* Print the eye diagram */
+                if (testframe_mode == 0) {
+                    /* Print the eye diagram */
 
-                fprintf(stderr,",\t\"eye_diagram\":[");                 
-                for(i=0;i<stats.neyetr;i++){
-                    fprintf(stderr,"[");
-                    for(j=0;j<stats.neyesamp;j++){
-                        fprintf(stderr,"%f ",stats.rx_eye[i][j]);
-                        if(j<stats.neyesamp-1) fprintf(stderr,",");
+                    fprintf(stderr,",\t\"eye_diagram\":[");                 
+                    for(i=0;i<stats.neyetr;i++){
+                        fprintf(stderr,"[");
+                        for(j=0;j<stats.neyesamp;j++){
+                            fprintf(stderr,"%f ",stats.rx_eye[i][j]);
+                            if(j<stats.neyesamp-1) fprintf(stderr,",");
+                        }
+                        fprintf(stderr,"]");
+                        if(i<stats.neyetr-1) fprintf(stderr,",");
+                    }
+                    fprintf(stderr,"],");
+	    
+                    /* Print a sample of the FFT from the freq estimator */
+                    fprintf(stderr,"\"samp_fft\":[");
+                    Ndft = fsk->Ndft/2;
+                    for(i=0; i<Ndft; i++){
+                        fprintf(stderr,"%f ",(fsk->fft_est)[i]);
+                        if(i<Ndft-1) fprintf(stderr,",");
                     }
                     fprintf(stderr,"]");
-                    if(i<stats.neyetr-1) fprintf(stderr,",");
                 }
-                fprintf(stderr,"],");
-	    
-                /* Print a sample of the FFT from the freq estimator */
-                fprintf(stderr,"\"samp_fft\":[");
-                Ndft = fsk->Ndft/2;
-                for(i=0; i<Ndft; i++){
-                    fprintf(stderr,"%f ",(fsk->fft_est)[i]);
-                    if(i<Ndft-1) fprintf(stderr,",");
-                }
-                fprintf(stderr,"]");
-
+                
                 if (testframe_mode) {
-                    fprintf(stderr,",\t\"testframecnt\":%d,\t\"bitcnt\":%d,\t\"biterr\":%d",testframecnt,bitcnt,biterr);
+                    fprintf(stderr,", \"testframecnt\":%d, \"bitcnt\":%d, \"biterr\":%d",testframecnt,bitcnt,biterr);
                 }
                 
                 fprintf(stderr,"}\n");                
