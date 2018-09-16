@@ -49,8 +49,8 @@
 
        all_surf_l = newamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l", "mode", "linear");
        newamp2; s_ = huffman_encode_surf(all_surf_l(:,2:35), qstepdB=6, max_dcts=20, max_bits=45, s, h);
-       all_surf_l_ = all_surf_l; all_surf_l(:,:) = 0; all_surf_l_(:,2:35)=s_;
-       n ewamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l_45a", "mode", "linear", "surf_in", all_surf_l_);
+       all_surf_l_ = all_surf_l; all_surf_l_(:,:) = 0; all_surf_l_(:,2:35)=s_;
+        ewamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l_45a", "mode", "linear", "surf_in", all_surf_l_);
        $ ./c2sim ../../wav/all.wav --framelength_s 0.0125 --pahw all_surf_l_45a -o - | aplay -f S16_LE
 
 #}
@@ -325,7 +325,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     K = 20;
   end
   if strcmp(resampler, "linear")
-    K = 40; step = (Fs/2000)/K
+    K = 40; step = (Fs/2000)/K;
     rate_K_sample_freqs_kHz = [0.1:step:4];
     K = length(rate_K_sample_freqs_kHz);
   end
@@ -336,6 +336,7 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     Wo = model(f,1);
     L = model(f,2);
     Am = model(f,3:(L+2));
+    energy_L(f) = sum(Am.^2);
     AmdB(f,1:L) = 20*log10(Am);
     Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
     if strcmp(resampler, "mel")
@@ -344,7 +345,13 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     if strcmp(resampler, "linear")
       rate_K_vec = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs, 'lanc');
     end
-     if correct_rate_K_en
+    rate_K_vec_lin = 10 .^ (rate_K_vec/20);
+    energy_K(f) = sum(rate_K_vec_lin .^ 2);
+    #g =  sqrt(energy_L(f)./energy_K(f));
+    #rate_K_vec_lin *= g;
+    energy_K(f) = sum(rate_K_vec_lin .^ 2);
+    
+    if correct_rate_K_en
       [tmp_ AmdB_] = resample_rate_L(model(f,:), rate_K_vec, rate_K_sample_freqs_kHz, Fs, 'lancmel');
       [rate_K_vec_corrected orig_error error nasty_error_log nasty_error_m_log] = correct_rate_K_vec(rate_K_vec, rate_K_sample_freqs_kHz, AmdB, AmdB_, K, Wo, L, Fs);
       rate_K_surface(f,:) = rate_K_vec_corrected;
@@ -501,7 +508,13 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
   if strcmp(resampler, "linear")
     [model_ AmdB_ ] = resample_rate_L(model, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lanc');
   end
-
+  for f=1:frames
+    Wo = model_(f,1);
+    L = model_(f,2);
+    Am_ = model_(f,3:(L+2));
+    energy_L_(f) = sum(Am_.^2);
+  end
+  
   % calculate SD
 
   sd_log = []; energy_log = [];
@@ -519,6 +532,10 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
     figure(3); clf; plot(hist(sd_log)); title('SD histogram');
     figure(4); clf; plot(energy_log, sd_log, '+'); title('Scatter of SD against energy');
     xlabel('Energy'); ylabel('SD'); axis([-10 60 0 7]);
+
+    figure(5);
+    plot(10*log10(energy_L)); hold on;
+    plot(10*log10(energy_K),"g"); plot(10*log10(energy_L_),"r+"); hold off;
   end
   
   % return delta_K for training
@@ -541,14 +558,16 @@ function [model_ rate_K_surface_ sd_log delta_K] = experiment_resample(model, ar
   printf("mean SD %4.2f\n", mean(sd_log));
   printf("Emin: %f Emax: %f\n", min(E_log), max(E_log));
 
+  #{
   % Plot E stats, by viewing these decided on 4 bit/frame for energy
-  
+
   if length(E_log)
     figure(5);
     plot(E_log)
     figure(6);
     hist(E_log);
   end
+  #}
 endfunction
 
 
@@ -557,7 +576,7 @@ endfunction
 function [model_ rate_K_surface_ sd_log delta_K] = resample_surf(model, rate_K_surface_)
   Fs = 8000;
 
-  K = 40; step = (Fs/2000)/K
+  K = 40; step = (Fs/2000)/K;
   rate_K_sample_freqs_kHz = [0.1:step:4];
   K = length(rate_K_sample_freqs_kHz);
   

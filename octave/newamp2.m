@@ -330,6 +330,14 @@ function [rate_K_surface rate_K_sample_freqs_kHz] = resample_const_rate_f(model,
       rate_K_surface(f,:)  = interp_lanczos(rate_L_sample_freqs_kHz, AmdB, Fs/(2*1000), rate_K_sample_freqs_kHz);
     end
 
+    % equalise energy betweerate L and rate K samples.  This was required for interframe decimation/interpolation
+    % when Wo is jumping about, e.g. UV frames
+
+    energy_L = sum(Am.^2);
+    rate_K_vec_lin = 10 .^ (rate_K_surface(f,:)/20);
+    energy_K = sum(rate_K_vec_lin .^ 2);
+    g = sqrt(energy_L/energy_K);
+    rate_K_surface(f,:) += 20*log10(g);
     %printf("%d\n", f);
   end
   %printf("\n");
@@ -365,7 +373,16 @@ function [model_ AmdB_] = resample_rate_L(model, rate_K_surface, rate_K_sample_f
       AmdB_(f,1:L) = interp_lanczos(rate_K_sample_freqs_mel, rate_K_surface(f,:), Fs/(2*1000), rate_L_sample_freqs_mel);
     end
 
-    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = 10 .^ (AmdB_(f, 1:L)/20);
+    % equalise energy
+    
+    Am_ = 10 .^ (AmdB_(f, 1:L)/20);
+    energy_L = sum(Am_.^2);
+    rate_K_vec_lin = 10 .^ (rate_K_surface(f,:)/20);
+    energy_K = sum(rate_K_vec_lin .^ 2);
+    g = sqrt(energy_K/energy_L);
+    Am_ *= g;
+    
+    model_(f,1) = Wo; model_(f,2) = L; model_(f,3:(L+2)) = Am_;
    end
 endfunction
 
@@ -1234,6 +1251,7 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
       if dec == 2
         E_(r-1,:) = 0.5*E_(r-2,:) + 0.5*E_(r,:);
       end
+      
     end
 
   end
@@ -1242,9 +1260,10 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
 
   E_ *= qstepdB;
   surf_ = idct(E_')';  
+  
   error = surf_ - surf;
   mse = mean(mean(error(1:dec:end,:) .^ 2));
-
+  
   figure(1); clf;
   [nr nc] = size(error);
   nr = min(nr,300);
