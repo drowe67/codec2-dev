@@ -1155,6 +1155,41 @@ function [s_ bits] = huffman_enc_symb(symbols, huff, s)
 endfunction
 
 
+% Huffman decode a bit stream of symbols.  Terminates list if we get a
+% bit error in decode
+
+function [s_ error_flag] = huffman_decode_bitstream(symbols, huff, bits)
+  error_flag = 0;
+  min_cw_length = length(huff{1});
+  match = 1;
+  s_ = [];
+  
+  while ((length(bits) >= min_cw_length) && match)
+
+    % search through list of codes to find a match
+
+    match = 0;
+    for i=1:length(symbols)
+      cw = huff{i}; lcw = length(cw);
+      if (length(bits) >= lcw) & !match
+        match = isequal(cw, bits(1:lcw));
+        if match
+          s_ = [s_ symbols(i)];
+          bits = bits(lcw+1:end);
+        end
+      end
+    end
+
+    % if no match found, say due to bit error, we drop out of loop
+  end
+
+  if (length(bits) > min_cw_length) && !match
+    error_flag = 1;
+  end
+endfunction
+
+
+
 # Huffman encodes (and decodes) the DCTS of a surface, except first (DCT) coeff
 #{
   TODO:
@@ -1163,7 +1198,7 @@ endfunction
     [ ] group rows and apply budget
     [ ] decimate in time
     [ ] actual encode and decode of bit stream
-    [ ] include dull/diff bit
+    [ ] include dir/diff bit
 #}
 
 function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, max_bits=100, symbols, huff)
@@ -1190,9 +1225,10 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
   
   bits_surf = cell(nr,1);
   Nbits_log = Nbits_direct_log = Nbits_diff_log = zeros(1,nr);
-  E_ = zeros(nr,K); prev_row = direct_row_ = diff_row_ = diff_flag = zeros(1,nc);
+  E_ = zeros(nr,K); prev_row = zeros(1,nc);
   Tbits = Nsyms = 0;
-   
+  E_dec = zeros(nr,K);
+  
   % encode each row
 
   for r=1:dec:nr
@@ -1200,8 +1236,10 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
 
     % DC just copied directly, quantised externally
     
-    E_(r,1) = E(r,1);
+    E_(r,1) = E(r,1); E_dec(r,1) = E(r,1);
+    
     direct_row_ = diff_row_ = zeros(1,nc);
+    ndir_row = ndiff_row = 0;
     
     for c=2:nc
       if length(bits_direct_row) < max_bits
@@ -1209,6 +1247,7 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
         [s_direct_ bits_direct] = huffman_enc_symb(symbols, huff, s_direct);
         bits_direct_row = [bits_direct_row bits_direct];
         direct_row_(c) = s_direct_;
+        ndir_row++;
       end
       
       if length(bits_diff_row) < max_bits
@@ -1216,6 +1255,7 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
         [s_diff_ bits_diff] = huffman_enc_symb(symbols, huff, s_diff);
         bits_diff_row = [bits_diff_row bits_diff];
         diff_row_(c) = s_diff_;
+        ndiff_row++;
       end
       
       Nsyms++;
@@ -1229,18 +1269,36 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
     e_diff = sum((diff_row_(2:nc) + prev_row(2:nc) - E(r,2:nc)) .^ 2);
     
     %if Nbits_direct < Nbits_diff
-    if e_direct < e_diff
-      bits_surf{r} = [0 bits_direct_row];
+    if e_direct <= e_diff
+      bits_surf{r} = [1 bits_direct_row];
       Tbits += Nbits_direct;
       E_(r,2:nc) = direct_row_(2:nc);
       Nbits_log(r) = Nbits_direct; diff_flag(r) = 0;
     else
-      bits_surf{r} = [1 bits_diff_row];
+      bits_surf{r} = [0 bits_diff_row];
       Tbits += Nbits_diff;
       E_(r,2:nc) = diff_row_(2:nc) + prev_row(2:nc);
       Nbits_log(r) = Nbits_diff; diff_flag(r) = 1;
     end
 
+    % test huffman bitstream decoder
+
+    bits_dec = bits_surf{r};
+    [s_dec error_flag] = huffman_decode_bitstream(symbols, huff, bits_dec(2:end));
+    printf("r: %d bits_dec(1): %d l: %d error_flag: %d\n", r, bits_dec(1), length(s_dec), error_flag);
+    row_dec = zeros(1,nc);
+    row_dec(2:length(s_dec)+1) = s_dec;
+    row_dec(2:nc)
+    if bits_dec(1)
+      E_dec(r,2:nc) = row_dec(2:nc);
+      direct_row_(2:nc)
+    else      
+      E_dec(r,2:nc) = row_dec(2:nc) + prev_row(2:nc);
+      diff_row_(2:nc)
+      printf("ndiff_row: %d\n", ndiff_row);
+    end
+    assert(E_dec(r,2:nc) == E_(r,2:nc));
+    
     % update memory - note we use quantised symbols as that's what we have at decoder
     
     if r >=3
