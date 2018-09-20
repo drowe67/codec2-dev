@@ -1,5 +1,5 @@
 % newamp2_const.m
-% Constants for newamp2 prototype codec
+% Constants for newamp2 candidate C prototype codec
 
 Fs      = 8000;   % sample rate
 max_amp = 160;    % maximum number of rate L samples (time varying basedon Wo)
