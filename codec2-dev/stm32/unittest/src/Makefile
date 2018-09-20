@@ -399,7 +399,12 @@ $(CODEC2_SRC)/golay23.c \
 $(CODEC2_SRC)/fsk.c \
 $(CODEC2_SRC)/fmfsk.c \
 $(CODEC2_SRC)/freedv_vhf_framing.c \
-$(CODEC2_SRC)/freedv_data_channel.c
+$(CODEC2_SRC)/freedv_data_channel.c \
+$(CODEC2_SRC)/ofdm.c \
+$(CODEC2_SRC)/phi0.c \
+$(CODEC2_SRC)/mpdecode_core.c \
+$(CODEC2_SRC)/gp_interleaver.c \
+$(CODEC2_SRC)/interldpc.c \
 
 CFLAGS += -D__EMBEDDED__
 CFLAGS += -I$(CODEC2_SRC)
@@ -537,10 +542,9 @@ tst_ofdm_demod_stack.elf: $(TST_OFDM_DEMOD_STACK_SRCS:.c=.o) libstm32f4.a
 TST_LDPC_ENC_SRCS= \
 tst_ldpc_enc.c \
 semihosting.c \
-$(CODEC2_SRC)/mpdecode_core_test.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 #
-#TST_LDPC_ENC_SRCS += $(CODEC2_SRCS)
+TST_LDPC_ENC_SRCS += $(CODEC2_SRCS)
 TST_LDPC_ENC_SRCS += $(SRCS)
 #
 TST_LDPC_ENC_HDR= \
@@ -553,16 +557,13 @@ tst_ldpc_enc.elf: $(TST_LDPC_ENC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_ENC
 TST_LDPC_DEC_SRCS= \
 tst_ldpc_dec.c \
 semihosting.c \
-$(CODEC2_SRC)/mpdecode_core_test.c \
-$(CODEC2_SRC)/phi0.c \
-$(CODEC2_SRC)/ofdm.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 #
-#TST_LDPC_DEC_SRCS += $(CODEC2_SRCS)
+TST_LDPC_DEC_SRCS += $(CODEC2_SRCS)
 TST_LDPC_DEC_SRCS += $(SRCS)
 #
 TST_LDPC_DEC_HDR= \
-$(CODEC2_INC)/mpdecode_code_test.h
+$(CODEC2_INC)/mpdecode_code.h
 #
 tst_ldpc_dec.elf: $(TST_LDPC_DEC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_DEC_HRDS)
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
