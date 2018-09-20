@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# tst_ofdm_mod_check
+#
+# Setup input and reference data for one of several versions of this test.
+
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
+# Prepend the common test name to the extension from the command line
+FULL_TEST_NAME="tst_ofdm_mod_${TEST}"
+
+# RUN_DIR - Directory where test will be run
+RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
+
+# Call common setup function to make the directory
+setup_common "${FULL_TEST_NAME}"
+
+# Change to test directory
+cd "${RUN_DIR}"
+
+
+#####################################################################
+## Test SETUP actions:
+
+case "${TEST}" in
+
+    plain | ldpc )
+        compare_ints -s -b2 ref_mod_out.raw mod.raw
+	;;
+
+    esac

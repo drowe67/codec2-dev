@@ -32,7 +32,7 @@ CODEC2_UTST="${CODEC2_BASE}/build_linux/unittest"
 
 #######################################
 # Add directories to PATH
-export PATH=${PATH}:${SCRIPTS}:${CODEC2_BIN}
+export PATH=${PATH}:${SCRIPTS}:${CODEC2_BIN}:${CODEC2_UTST}
 
 
 #######################################
