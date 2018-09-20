@@ -11,12 +11,45 @@
 /* Globals */
 
 /* Functions */
-int get_data(FILE *f, uint32_t *d, int bytes) {
+int get_data(FILE *f, int64_t *dd, int signed_flag, int bytes) {
+    int res;
+    int8_t   d_8;
+    int16_t  d_16;
+    uint8_t  d_u8;
+    uint16_t d_u16;
     // TODO Loop on reads until, but catch EOF!!
-    int read = fread(d, bytes, 1, f);
-    if (read != 1) {
-        return(0);
+    if (signed_flag) {
+        switch (bytes) {
+            case 1: 
+                res = fread(&d_8, bytes, 1, f);
+                *dd = d_8;
+                break;
+            case 2: 
+                res = fread(&d_16, bytes, 1, f);
+                *dd = d_16;
+                break;
+            default: 
+                fprintf(stderr, "Error: unsupported size %d bytes\n", bytes);
+                exit(1);
+            }
+        } 
+    else {  // unsigned
+        switch (bytes) {
+            case 1: 
+                res = fread(&d_u8, bytes, 1, f);
+                *dd = d_u8;
+                break;
+            case 2: 
+                res = fread(&d_u16, bytes, 1, f);
+                *dd = d_u16;
+                break;
+            default: 
+                fprintf(stderr, "Error: unsupported size %d bytes\n", bytes);
+                exit(1);
+            }
         }
+
+    if (res != 1) return(0);
     else return(1);
     }
 
@@ -25,16 +58,20 @@ int get_data(FILE *f, uint32_t *d, int bytes) {
 
 int main(int argc, char *argv[]) {
 
-    char usage[] = "Usage: %s [-s size_in_bytes] [-t tolerance] file1 file2\n";
+    char usage[] = "Usage: %s [-b size_in_bytes] [-s] [-t tolerance] file1 file2\n";
 
     int bytes = 1;
+    int signed_flag = 0;
     int tol = 1;
 
     int opt;
-    while ((opt = getopt(argc, argv, "s:t:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:st:")) != -1) {
         switch (opt) {
-            case 's':
+            case 'b':
                 bytes = atoi(optarg);
+                break;
+            case 's':
+                signed_flag = 1;
                 break;
             case 't':
                 tol = atof(optarg);
@@ -66,40 +103,25 @@ int main(int argc, char *argv[]) {
         exit(1);
         }
 
-    uint32_t data1, data2;
+    // Convert inputs to SIGNED long values 
+    int64_t data1, data2;
 
     int count = 0;
     int errors = 0;
     int rms_sum = 0;
 
-    while (get_data(f1, &data1, bytes)) {
-        if (!get_data(f2, &data2, bytes)) {
+    while (get_data(f1, &data1, signed_flag, bytes)) {
+        if (!get_data(f2, &data2, signed_flag, bytes)) {
             fprintf(stderr, "Error: file2 is shorter!");
             exit(1);
             }
-        switch (bytes) {
-            case 1: {
-                uint8_t err = abs((uint8_t)data1 - (uint8_t)data2);
-                if (err > tol) {
-                    errors ++;
-                    printf("%d %2d %2d\n", count, data1, data2);
-                    }
-                rms_sum += (err * err);
-                count ++;
-                } break;
-            case 2: {
-                uint16_t err = abs((uint16_t)data1 - (uint16_t)data2);
-                if (err > tol) {
-                    errors ++;
-                    printf("%d %2d %2d\n", count, data1, data2);
-                    }
-                rms_sum += (err * err);
-                count ++;
-                } break;
-            default: 
-                fprintf(stderr, "Error: unsupported size %d bytes\n", bytes);
-                exit(1);
+        uint64_t err = llabs(data1 - data2);
+        if (err > tol) {
+            errors ++;
+            printf("%d %ld %ld\n", count, data1, data2);
             }
+        rms_sum += (err * err);
+        count ++;
         }
 
     if (errors) {
