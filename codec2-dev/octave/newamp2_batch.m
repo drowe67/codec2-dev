@@ -38,7 +38,7 @@
     octave:101> newamp2_batch("../build_linux/src/vk5qi_l","output_prefix","../build_linux/src/vk5qi_l_decbs", "mode", "dec", "bitstream", "vk5qi_2200_enc.c2");
     ./c2sim ../../raw/vk5qi.raw --framelength_s 0.0125 --pahw vk5qi_l_decbs --hand_voicing vk5qi_l_decbs_v.txt -o - |  play -t raw -r 8000 -s -2 -
 
-   DCT based HQ/200 Candidate (Sep 2018):
+   DCT based HQ/200 Candidate D (Sep 2018):
 
      1/ (h and s) trained:
      
@@ -52,6 +52,11 @@
        all_surf_l_ = all_surf_l; all_surf_l_(:,:) = 0; all_surf_l_(:,2:35)=s_;
         ewamp2_batch("../build_linux/src/all_l", "output_prefix", "../build_linux/src/all_surf_l_45a", "mode", "linear", "surf_in", all_surf_l_);
        $ ./c2sim ../../wav/all.wav --framelength_s 0.0125 --pahw all_surf_l_45a -o - | aplay -f S16_LE
+
+     3/ Testing huffman encoder and decoder:
+     
+     newamp2; [s_ dc bits] = huffman_encode_surf(hts2a_surf_l(:,2:35), qstepdB=6, max_dcts=20, max_bits=45, s, h);
+     newamp2; s_dec  = huffman_decode_surf(34, qstepdB=6, max_dcts=20, s, h, bits, dc);
 
 #}
 
@@ -204,10 +209,19 @@ function surface = newamp2_batch(input_prefix, varargin)
     mesh(X(1:2:en,:))    
   end
 
-  # stand alone model file -> bit stream file encoder
+  # stand alone model file -> bit stream file cand C encoder
 
   if strcmp(mode,"enc")
     [bits rate_K_surface_] = candc_encoder(model, voicing);
+    fbit = fopen(bitsream_filename,"wb"); 
+    fwrite(fbit, bits, "uchar");
+    fclose(fbit);
+  end
+
+  # stand alone model file -> bit stream file cand D encoder
+
+  if strcmp(mode,"encd")
+    [bits rate_K_surface_] = candd_encoder(model, voicing);
     fbit = fopen(bitsream_filename,"wb"); 
     fwrite(fbit, bits, "uchar");
     fclose(fbit);
@@ -224,6 +238,19 @@ function surface = newamp2_batch(input_prefix, varargin)
        errors_per_codec_frame = count_errors(error_filename);
     end
     [model_ voicing_ rate_K_surface_dec_] = candc_decoder(bits, errors_per_codec_frame);
+    figure(1); mesh(rate_K_surface_dec_(1:240,:))
+  end
+
+  if strcmp(mode,"decd")
+    fbit = fopen(bitsream_filename,"rb"); 
+    bits = fread(fbit, "uchar")';
+    fclose(fbit);
+    errors_per_codec_frame = [];
+    if mask_en
+      % optional error masking, read in error file, count errors/frame
+       errors_per_codec_frame = count_errors(error_filename);
+    end
+    [model_ voicing_ rate_K_surface_dec_] = candd_decoder(bits, errors_per_codec_frame);
     figure(1); mesh(rate_K_surface_dec_(1:240,:))
   end
 
@@ -777,7 +804,7 @@ function [bits nerrs] = insert_bit_error(bits, ber)
 endfunction
 
 
-% Xounts errors in protected bits.  Simulates failure of FEC to decode, which
+% Counts errors in protected bits.  Simulates failure of FEC to decode, which
 % we can detect
 
 function errors_per_codec_frame = count_errors(error_filename)
@@ -796,4 +823,168 @@ function errors_per_codec_frame = count_errors(error_filename)
 endfunction
 
 
+% Candidate D (Huffman encoded DCTs), model to bit-stream encoder.  Note rate_K_surface
+% is returned without energy being quantised, so not quite the same as decoder output.
 
+function [bits rate_K_surface_] = candd_encoder(model, voicing)
+  newamp2_candd_const;
+  [frames nc] = size(model);
+  AmdB = zeros(frames, max_amp);
+  bits = [];
+  load huffman.mat;
+  
+  rate_K_surface = rate_K_surface_ = zeros(frames, K);
+
+  % extract vectors from model file and convert rate L amplitude samples to fixed rate K
+  
+  step = (Fs/2000)/K;
+  rate_K_sample_freqs_kHz = [0.1:step:4];
+
+  for f=1:frames
+    Wo = model(f,1);
+    L = model(f,2);
+    Am = model(f,3:(L+2));
+    AmdB(f,1:L) = 20*log10(Am);
+    Am_freqs_kHz = (1:L)*Wo*Fs/(2000*pi);
+    [rate_K_vec rate_K_sample_freqs_kHz] = resample_const_rate_f(model(f,:), rate_K_sample_freqs_kHz, Fs, 'lanc');
+    rate_K_surface(f,:) = rate_K_vec;
+  end
+
+  % huffman encode rate K amplitude samples
+
+  [s_ dc spec_mag_bits] = huffman_encode_surf(rate_K_surface(:,2:35), qstepdB=6, max_dcts=20, max_bits=44, s, h);
+  rate_K_surface_(:, 2:35) = s_;
+  
+  for f=1:dec:frames
+
+    % Determine frame energy from DCT DC value. Looking at values from
+    % all.wav it looks like 4 bits over 0 to 60dB is enough
+
+    levels = (0:15)*4;
+    [E_ E_index] = quantise(levels, dc(f));
+    E_bits = index_to_bits(E_index-1, 4);
+
+    # quantise pitch
+
+    Wo = model(f,1);
+    Wo_index = encode_log_Wo(Wo, 7);
+    Wo_bits = index_to_bits(Wo_index, 7);
+
+    # pack bits
+
+    bits_frame = [Wo_bits E_bits voicing(f) spec_mag_bits{f}];
+    bits = [bits bits_frame];
+
+    if (f > 20) && (f < 30)
+      printf("f: %3d Wo: %2d E: %2d %2.0f v: %d\n", f, Wo_index, E_index, E_, voicing(f));
+    end
+  end
+
+  figure(1); clf; mesh(rate_K_surface_);
+endfunction
+
+
+% Candidate D, bit stream to model decoder
+
+function [model_ voicing rate_K_surface_] = candd_decoder(bits, errors_per_codec_frame=[], ber = 0.0)
+  newamp2_candd_const;
+  load huffman.mat;
+  rows = floor(length(bits)/Nbitspercodecframe);
+  frames = rows*dec;
+  
+  rate_K_surface_ = zeros(frames, K);
+  model_ = zeros(frames, max_amp+2);
+  voicing = zeros(1,frames);
+  step = (Fs/2000)/K;
+  rate_K_sample_freqs_kHz = [0.1:step:4];
+  Tbits = Terrs = 0;
+  abits = zeros(1, Nbitspercodecframe);
+  Nerrs = 0; av_level = 1;
+  spec_mag_bits  = cell(frames,1);
+  level_log = level_adj_log = [];
+  E = zeros(1,frames);
+  
+  error_thresh = 0;
+  
+  r = 1;
+  for f=1:dec:frames
+    abits = bits(1:Nbitspercodecframe);
+    bits = bits(Nbitspercodecframe+1:end);
+
+    % optional insertion of bit errors for testing
+    
+    if ber > 0.0
+      [abits(13:56) nerr] = insert_bit_error(abits(13:56), 0.00);
+      Terrs += nerr;
+      Tbits += 45;
+    end
+    
+    % extract information from bit stream
+
+    spec_mag_bits{f} = abits(13:Nbitspercodecframe);
+    E_bits = abits(8:11);
+    Wo_bits = abits((1:7));
+    voicing(f) = abits(12);
+    Wo_index = bits_to_index(Wo_bits, 7);
+    Wo_ = decode_log_Wo(Wo_index, 7); L_ = floor(pi/Wo_);
+    E_index = bits_to_index(E_bits, 4);
+    E_(f) = E_index*4;
+
+    if (f > 20) && (f < 30)
+      printf("f: %d Wo: %2d E: %d %2.0f v: %d\n", f, Wo_index, E_index+1, E_(f), voicing(f));
+    end
+    
+    model_(f,1) = Wo_; model_(f,2) = L_;
+    r++;
+  end
+
+  % decode into rate K vec
+  % TODO: make this frame by frame and run in loop above
+
+  s_ = huffman_decode_surf(K=34, qstepdB=6, max_dcts=20, s, h, spec_mag_bits, E_);
+  rate_K_surface_(:,2:35) = s_;
+
+  if length(errors_per_codec_frame)
+    figure(3); clf; nplot = 80*3;
+    subplot(211,"position",[0.1 0.8 0.8 0.15]);
+    plot(errors_per_codec_frame(1:nplot))
+    subplot(212,"position",[0.1 0.05 0.8 0.7]);
+    plot(level_log(1:nplot),'b'); hold on; plot(level_adj_log(1:nplot),'g+'); hold off;
+  end
+  
+  if ber > 0.0
+    printf("Tbits: %d Terrs: %d BER: %4.3f\n", Tbits, Terrs, Terrs/Tbits);
+  end
+  
+  % interpolation in time
+    
+  for f=1:dec:frames-dec
+
+    % interpolate rate K ampl samples
+    
+    left_f = f; right_f = f+dec;
+    sample_points = [left_f right_f];
+    assert(dec==2);
+    resample_point = left_f+1;
+
+    % interpolate Wo and voicing
+
+    Wo_ = 2*pi/160; v = 0;
+    if voicing(left_f) && voicing(right_f)
+      Wo_ = (model_(left_f,1) + model_(right_f,1))/2;
+      v = 1;
+    end
+    L_ = floor(pi/Wo_);
+    model_(resample_point,1) = Wo_; model_(resample_point,2) = L_;
+    voicing(resample_point) = v;
+  end
+  rate_K_surface_(frames-dec+1:frames,:) = rate_K_surface_(frames-dec,1);    
+  model_(frames-dec+1:frames,1) = model_(frames-dec,1);    
+  model_(frames-dec+1:frames,2) = model_(frames-dec,2);    
+
+  % back to rate L amplitude samples
+  
+  model_ = resample_rate_L(model_, rate_K_surface_, rate_K_sample_freqs_kHz, Fs, 'lanc');
+
+  figure(2); clf; mesh(rate_K_surface_);
+endfunction

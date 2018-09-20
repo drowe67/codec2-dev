@@ -1188,23 +1188,17 @@ function [s_ error_flag] = huffman_decode_bitstream(symbols, huff, bits)
   end
 endfunction
 
+ 
+% Huffman encodes (and decodes) the DCTS of a surface, except first (DCT) coeff
 
-
-# Huffman encodes (and decodes) the DCTS of a surface, except first (DCT) coeff
-#{
-  TODO:
-    [ ] row-row quant
-    [ ] budget for row
-    [ ] group rows and apply budget
-    [ ] decimate in time
-    [ ] actual encode and decode of bit stream
-    [ ] include dir/diff bit
-#}
-
-function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, max_bits=100, symbols, huff)
+function [surf_ dc bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, max_bits=100, symbols, huff)
   dec = 2;
   [nr K] = size(surf);
- 
+
+  % allow room for direct/diff bit
+  
+  max_bits_huff = max_bits - 1;
+  
   printf("K: %d nr: %d qstepdB: %3.2f max_dcts: %d\n", K, nr, qstepdB, max_dcts);
 
   % limit num DCTs we encode (nc) to less than K to save bits, high
@@ -1220,7 +1214,8 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
   
   D = dct(surf')';
   E = D/qstepdB;
-
+  dc = E(:,1);
+  
   % bit stream for each row (frame) is stored in a cell array
   
   bits_surf = cell(nr,1);
@@ -1239,23 +1234,40 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
     E_(r,1) = E(r,1); E_dec(r,1) = E(r,1);
     
     direct_row_ = diff_row_ = zeros(1,nc);
-    ndir_row = ndiff_row = 0;
+    ndir_row = ndiff_row = 0; len_bits_direct_row = len_bits_diff_row = 0;
     
     for c=2:nc
-      if length(bits_direct_row) < max_bits
+
+      % try direct quantisation
+
+      if len_bits_direct_row < max_bits_huff
         s_direct = E(r,c);
         [s_direct_ bits_direct] = huffman_enc_symb(symbols, huff, s_direct);
-        bits_direct_row = [bits_direct_row bits_direct];
-        direct_row_(c) = s_direct_;
-        ndir_row++;
+        if len_bits_direct_row + length(bits_direct) <= max_bits_huff
+          % can we squeeze in bits for latest symbol?
+          bits_direct_row = [bits_direct_row bits_direct];
+          direct_row_(c) = s_direct_;
+          ndir_row++;
+          len_bits_direct_row = len_bits_direct_row + length(bits_direct);
+        else
+          % can't fit any more symbols? Then signal we are finished
+          len_bits_direct_row = max_bits_huff;
+        end
       end
+
+      % try differential quantisation
       
-      if length(bits_diff_row) < max_bits
+      if len_bits_diff_row < max_bits
         s_diff = E(r,c) - prev_row(c);
         [s_diff_ bits_diff] = huffman_enc_symb(symbols, huff, s_diff);
-        bits_diff_row = [bits_diff_row bits_diff];
-        diff_row_(c) = s_diff_;
-        ndiff_row++;
+        if len_bits_diff_row + length(bits_diff) <= max_bits_huff
+          bits_diff_row = [bits_diff_row bits_diff];
+          diff_row_(c) = s_diff_;
+          ndiff_row++;
+          len_bits_diff_row = len_bits_diff_row + length(bits_diff);
+        else
+          len_bits_diff_row = max_bits_huff;
+        end
       end
       
       Nsyms++;
@@ -1281,21 +1293,21 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
       Nbits_log(r) = Nbits_diff; diff_flag(r) = 1;
     end
 
+    % pad out to max_bits
+    
+    bits_surf{r} = [bits_surf{r} zeros(1,max_bits - length(bits_surf{r}))];
+
     % test huffman bitstream decoder
 
     bits_dec = bits_surf{r};
     [s_dec error_flag] = huffman_decode_bitstream(symbols, huff, bits_dec(2:end));
-    printf("r: %d bits_dec(1): %d l: %d error_flag: %d\n", r, bits_dec(1), length(s_dec), error_flag);
+    % printf("r: %d bits_dec(1): %d l: %d error_flag: %d\n", r, bits_dec(1), length(s_dec), error_flag);
     row_dec = zeros(1,nc);
     row_dec(2:length(s_dec)+1) = s_dec;
-    row_dec(2:nc)
     if bits_dec(1)
       E_dec(r,2:nc) = row_dec(2:nc);
-      direct_row_(2:nc)
     else      
       E_dec(r,2:nc) = row_dec(2:nc) + prev_row(2:nc);
-      diff_row_(2:nc)
-      printf("ndiff_row: %d\n", ndiff_row);
     end
     assert(E_dec(r,2:nc) == E_(r,2:nc));
     
@@ -1341,5 +1353,68 @@ function [surf_ bits_surf] = huffman_encode_surf(surf, qstepdB=6, max_dcts=18, m
   plot(diff_flag(1:dec:end)*10,'b;diff flag;'); hold on; plot(Nbits_log(1:dec:end),'g;Nbits/fr;'); hold off;
   
   printf("mse: %4.2f dB^2 mean bits/frame: %3.1f mean bits/sym: %3.1f\n", mse, mean(Nbits_log(1:dec:end)), Tbits/Nsyms);
+endfunction
+
+
+% Returns a quantised surface from matrix of bist streams for each frame
+
+function surf_ = huffman_decode_surf(K=34, qstepdB=6, max_dcts=18, symbols, huff, bits_surf, dc)
+  dec = 2;
+  [nr tmp] = size(bits_surf);
+ 
+  printf("K: %d nr: %d qstepdB: %3.2f max_dcts: %d\n", K, nr, qstepdB, max_dcts);
+
+  % limit num DCTs we encode (nc) to less than K to save bits, high
+  % order DCTs tend to be small
+
+  nc = K;
+  if max_dcts
+    nc = max_dcts+1;
+    printf("cols 2 to %d (%d total)\n", nc, nc-2+1);
+  end
+  
+  prev_row = zeros(1,nc);
+  Tbits = Nsyms = 0;
+  E_dec = zeros(nr,K);
+  
+  % decode each row
+
+  for r=1:dec:nr
+    bits_direct_row = [];  bits_diff_row = []; Nbits_direct = 0; Nbits_diff = 0;
+
+    % DC is quantised externally
+    
+    E_dec(r,1) = dc(r);
+    
+    % huffman bitstream decoder
+
+    bits_dec = bits_surf{r};
+    [s_dec error_flag] = huffman_decode_bitstream(symbols, huff, bits_dec(2:end));
+    row_dec = zeros(1,nc);
+    row_dec(2:length(s_dec)+1) = s_dec;
+    if bits_dec(1)
+      E_dec(r,2:nc) = row_dec(2:nc);
+    else      
+      E_dec(r,2:nc) = row_dec(2:nc) + prev_row(2:nc);
+    end
+    
+    % update memory for diff decoder
+    
+    if r >=3
+      prev_row = E_dec(r,1:nc);
+
+      % if we are decimating, interpolate DCTs to get original frame rate
+      
+      if dec == 2
+        E_dec(r-1,:) = 0.5*E_dec(r-2,:) + 0.5*E_dec(r,:);
+      end      
+    end
+
+  end
+
+  % transform back to surface and calculate MSE
+
+  E_dec *= qstepdB;
+  surf_ = idct(E_dec')';    
 endfunction
 
