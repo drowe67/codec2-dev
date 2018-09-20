@@ -31,7 +31,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "mpdecode_core_test.h"
+#include "mpdecode_core.h"
 #include "ofdm_internal.h"
 
 #include "semihosting.h"
@@ -43,7 +43,7 @@
 /* Machine generated consts, H_rows, H_cols, test input/output data to
    change LDPC code regenerate this file. */
 
-#include "HRA_112_112_test.h"  
+#include "HRA_112_112.h"  
 
 int testframes = 1;
 
@@ -85,13 +85,13 @@ int main(int argc, char *argv[]) {
     unsigned char ibits[data_bits_per_frame];
     unsigned char pbits[NumberParityBits];
 
-    // Allocate common space which can be shared with other functions.
-    int         size_common;
-    uint8_t     *common_array;
+//    // Allocate common space which can be shared with other functions.
+//    int         size_common;
+//    uint8_t     *common_array;
 
-    ldpc_init(&ldpc, &size_common);
-    fprintf(stderr, "ldpc needs %d bytes of shared memory\n", size_common);
-    common_array = malloc(size_common);
+//    ldpc_init(&ldpc, &size_common);
+//    fprintf(stderr, "ldpc needs %d bytes of shared memory\n", size_common);
+//    common_array = malloc(size_common);
 
     testframes = 1;
     total_iters = 0;
@@ -122,8 +122,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Run %d\n", r);
 
             PROFILE_SAMPLE(ldpc_decode);
-            run_ldpc_decoder(&ldpc, common_array, out_char, 
-                              ainput, &parityCheckCount);
+            run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
             PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
             //fprintf(stderr, "iter: %d\n", iter);
             total_iters += iter;
@@ -187,8 +186,7 @@ int main(int argc, char *argv[]) {
             sd_to_llr(input_float, input_double, CodeLength);
 
             PROFILE_SAMPLE(ldpc_decode);
-            iter = run_ldpc_decoder(&ldpc, common_array, out_char, 
-                                     input_float, &parityCheckCount);
+            iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
             PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
             //fprintf(stderr, "iter: %d\n", iter);
             total_iters += iter;
@@ -235,7 +233,7 @@ int main(int argc, char *argv[]) {
         fclose(fout);
     }  
 
-    ldpc_free_mem(&ldpc);
+//    ldpc_free_mem(&ldpc);
 
     if (fin  != NULL) fclose(fin);
 
