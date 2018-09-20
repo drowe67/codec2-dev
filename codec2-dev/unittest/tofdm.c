@@ -429,7 +429,7 @@ int main(int argc, char *argv[])
         Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
         Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
 
-        double llr[CODED_BITSPERFRAME];
+        float  llr[CODED_BITSPERFRAME];
         char   out_char[CODED_BITSPERFRAME];
         int    parityCheckCount;
         
