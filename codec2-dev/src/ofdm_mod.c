@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     FILE          *fin, *fout;
     struct OFDM   *ofdm;
     struct LDPC   ldpc;
-    int           frames;
+    int           frame;
     int           i, j, arg;
     int           testframes, ldpc_en, interleave_frames;
    
@@ -172,7 +172,8 @@ int main(int argc, char *argv[])
     }
     
     int Nsamperframe = ofdm_get_samples_per_frame();
-    fprintf(stderr, "Nbitsperframe: %d interleave_frames: %d\n", Nbitsperframe, interleave_frames);
+    fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n", 
+        Nsamperframe, interleave_frames, Nbitsperframe);
 
     uint8_t tx_bits_char[Nbitsperframe];
     short   tx_scaled[Nsamperframe];
@@ -201,7 +202,7 @@ int main(int argc, char *argv[])
 
     /* main loop ----------------------------------------------------------------*/
     
-    frames = 0;
+    frame = 0;
 
     while(fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
         if (ldpc_en) {
@@ -231,7 +232,6 @@ int main(int argc, char *argv[])
                 }
 
                 fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
-                frames++;
             }
          } else {
             /* just modulate uncoded raw bits ----------------------------------------------*/
@@ -275,7 +275,6 @@ int main(int argc, char *argv[])
                 tx_scaled[i] = OFDM_AMP_SCALE * tx_sams[i].real;
 
             fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
-            frames++;
         }
         
 	/* if this is in a pipeline, we probably don't want the usual
@@ -284,7 +283,9 @@ int main(int argc, char *argv[])
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
 
-        if (testframes && (frames >= Nframes)) {
+        frame++;
+
+        if (testframes && (frame >= Nframes)) {
             goto finished;
         }
     }
@@ -292,6 +293,8 @@ int main(int argc, char *argv[])
  finished:
     fclose(fin);
     fclose(fout);
+
+    fprintf(stderr, "%d frames processed\n", frame);
 
     ofdm_destroy(ofdm);
 
