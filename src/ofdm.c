@@ -335,7 +335,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* zero out Cyclic Prefix (CP) values */
 
-    for (i = 0, i < ofdm_ncp; i++) {
+    for (i = 0; i < ofdm_ncp; i++) {
         ofdm->pilot_samples[i] = 0.0f + 0.0f * I;
     }
 
