@@ -358,7 +358,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_norm = (ofdm_m + ofdm_ncp) * acc;
     ofdm->clock_offset_counter = 0;
     ofdm->sig_var = ofdm->noise_var = 1.0f;
-    ofdm->tx_bpf_en = 0;
+    ofdm->tx_bpf_en = false;
 
     // Transmit bandpass filter; complex coefficients, center frequency 1500 hz
 
@@ -642,7 +642,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx_filt, complex float *tx_s
 
     /* optional Tx Band Pass Filter */
 
-    if (ofdm->tx_bpf_en) {
+    if (ofdm->tx_bpf_en == true) {
         quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, &ofdm->ofdm_tx_bpf);
     } else {
         for (i = 0; i < ofdm_samplesperframe; i++) {
