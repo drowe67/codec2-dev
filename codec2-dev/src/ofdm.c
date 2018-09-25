@@ -365,7 +365,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     //quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP750S1040, sizeof(filtP750S1040) / sizeof(float));
 
     quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_centre / ofdm_fs);
+    quisk_cfTune(&ofdm->ofdm_tx_bpf, 1500.0f / ofdm_fs); // fixed value
 
     return ofdm; /* Success */
 }
@@ -583,11 +583,10 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
  * ----------------------------------------------
  */
 
-void ofdm_txframe(struct OFDM *ofdm, complex float *tx_filt, complex float *tx_sym_lin) {
+void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_lin) {
     complex float aframe[ofdm_ns][ofdm_nc + 2];
     complex float asymbol[ofdm_m];
     complex float asymbol_cp[ofdm_m + ofdm_ncp];
-    complex float tx[ofdm_samplesperframe];
     int i, j, k, m;
 
     /* initialize aframe to complex zero */
@@ -643,11 +642,10 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx_filt, complex float *tx_s
     /* optional Tx Band Pass Filter */
 
     if (ofdm->tx_bpf_en == true) {
+        complex float tx_filt[ofdm_samplesperframe];
+
         quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, &ofdm->ofdm_tx_bpf);
-    } else {
-        for (i = 0; i < ofdm_samplesperframe; i++) {
-            tx_filt[i] = tx[i];
-        }
+        memcpy(tx, tx_filt, ofdm_samplesperframe * sizeof (complex float));
     }
 }
 
