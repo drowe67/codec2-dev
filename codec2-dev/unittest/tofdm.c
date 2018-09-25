@@ -409,8 +409,8 @@ int main(int argc, char *argv[])
         
         /* LDPC functions --------------------------------------*/
 
-        double symbol_likelihood[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) ];
-        double bit_likelihood[CODED_BITSPERFRAME];
+        float symbol_likelihood[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) ];
+        float bit_likelihood[CODED_BITSPERFRAME];
         float EsNo = 10;
         
         /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
