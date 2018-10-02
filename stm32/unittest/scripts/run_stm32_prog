@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#######################################
+# Parse command line options
+# Options (starting with "--") are stored in $ARGS.
+# Non-options are taken as the test name (last one sticks).
+declare -A ARGS
+for arg in "$@"; do
+    if [[ ${arg} == --* ]] ; then ARGS[${arg}]=true
+    else ELF=${arg}
+    fi
+    done
+
+cat <<-EEOOFF > gdb_cmds
+	shell st-util --semihosting & 
+	target remote :4242
+	EEOOFF
+
+if [ ${ARGS[--load]+_} ] ; then
+    cat <<-EEOOFF >> gdb_cmds
+	load
+	monitor reset
+	EEOOFF
+    fi
+
+cat <<-EEOOFF >> gdb_cmds
+	break EndofMain
+	break Infinite_Loop
+	EEOOFF
+
+if [ -z ${ARGS[--debug]+_} ] ; then
+    cat <<-EEOOFF >> gdb_cmds
+	continue
+	set confirm off
+	quit
+	EEOOFF
+    fi
+
+arm-none-eabi-gdb -x gdb_cmds ${ELF}

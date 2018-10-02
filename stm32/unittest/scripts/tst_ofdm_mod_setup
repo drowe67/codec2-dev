@@ -17,7 +17,7 @@ FULL_TEST_NAME="tst_ofdm_mod_${TEST}"
 RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
 
 # Call common setup function to make the directory
-setup_common "${FULL_TEST_NAME}"
+setup_common "${RUN_DIR}"
 
 # Change to test directory
 cd "${RUN_DIR}"

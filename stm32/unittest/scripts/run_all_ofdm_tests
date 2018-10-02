@@ -1,0 +1,40 @@
+#!/bin/bash
+#
+# run_all_ofdm_tests
+
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
+# Save directory
+ORIG_DIR=${PWD}
+
+#####################################################################
+function run_a_test() {
+    local TEST_NAME=$1
+    local TEST_OPT=$2
+    local LOAD=$3
+    local FULL_TEST_NAME="${TEST_NAME}_${TEST_OPT}"
+    local RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
+    setup_common "${RUN_DIR}"
+    ${TEST_NAME}_setup ${TEST_OPT} --clean
+    cd "${RUN_DIR}" 
+    run_stm32_prog ${UNITTEST_BIN}/${TEST_NAME}.elf ${LOAD} |& tee gdb.log
+    ${TEST_NAME}_check ${TEST_OPT} |& tee check.log
+    cd "${ORIG_DIR}" 
+    }
+
+#####################################################################
+TEST_NAME="tst_ofdm_demod"
+run_a_test ${TEST_NAME} "quick" "--load"
+for TEST_OPT in "ideal" "AWGN" "fade" "ldpc" "ldpc_AWGN" "ldpc_fade" ; do
+    run_a_test ${TEST_NAME} ${TEST_OPT}
+    # Delay for st-util to close
+    sleep 5
+    done
+
+
+
+# vi:set ts=4 et sts=4:
