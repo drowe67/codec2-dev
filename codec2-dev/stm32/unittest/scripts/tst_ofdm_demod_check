@@ -3,7 +3,7 @@
 
     Testing for tst_ofdm_demod_* tests
 
-    Usage tst_ofdm_demod_check ideal|AWGN|fade|profile
+    Usage tst_ofdm_demod_check quick|ideal|AWGN|fade|profile|ldpc|ldpc_AWGN|ldpc_fade
 
     Checks are different for each test, but similar
 
@@ -21,7 +21,11 @@ import struct
 import os
 import sys
 
-sys.path.append("../../lib/python")
+if ("UNITTEST_BASE" in os.environ):
+    sys.path.append(os.environ["UNITTEST_BASE"] + "/lib/python")
+else:
+    sys.path.append("../../lib/python")	# assume in test run dir
+
 import sum_profiles
 
 Nbitsperframe = 238
@@ -141,7 +145,8 @@ def write_syms_as_octave(syms, amps):
 #### Options (test name)
 argparser = argparse.ArgumentParser()
 argparser.add_argument("test", action="store",
-                        choices=["ideal", "AWGN", "fade", "profile"])
+                        choices=["quick", "ideal", "AWGN", "fade", "profile",
+                                 "ldpc", "ldpc_AWGN", "ldpc_fade" ])
 args = argparser.parse_args()
 
 #### Settings
@@ -153,7 +158,9 @@ tolerance_output_differences = 0
 tolerance_syms = 0.001
 tolerance_amps = 0.001
 # Per test settings
-if (args.test == "ideal"):
+if (args.test == "quick"):
+    pass
+elif (args.test == "ideal"):
     pass
 elif (args.test == "AWGN"):
     tolerance_output_differences = 1
@@ -164,9 +171,19 @@ elif (args.test == "profile"):
     tolerance_output_differences = 1
     tolerance_syms = 0.005
     pass
+elif (args.test == "ldpc"):
+    pass
+elif (args.test == "ldpc_AWGN"):
+    tolerance_output_differences = 10
+elif (args.test == "ldpc_fade"):
+    tolerance_output_differences = 1
+    pass
 else:
     print("Error: Test {} not recognized".format(args.test))
     sys.exit(1)
+
+#### Check that we are in the test directory:
+#### TODO:::
 
 
 #### Read test configuration - a file of '0' or '1' characters
@@ -184,9 +201,15 @@ fail = False
 
 
 if (config_testframes):
-    #### BER checks - log output looks like this:
+    #### BER checks - log output looks like this, for non-ldpc:
     # BER......: 0.1951 Tbits: 14994 Terrs:  2926
     # BER2.....: 0.2001 Tbits: 10234 Terrs:  2048
+    #
+    # Or this, for ldpc:
+    # BER......: 0.0000 Tbits: 15008 Terrs:     0
+    # Coded BER: 0.0000 Tbits:  7504 Terrs:     0
+    #
+    # HACK: store "Coded BER" info as BER2.
     
     print("\nBER checks")
     
@@ -200,6 +223,10 @@ if (config_testframes):
             elif (line[0:3] == "BER"):
                 print(line, end="")
                 _, ref_ber, _, ref_tbits, _, ref_terrs = line.split()
+            elif (line[0:9] == "Coded BER"):
+                print(line, end="")
+                _, _, ref_ber2, _, ref_tbits2, _, ref_terrs2 = line.split()
+
     # Strings to integers
     ref_ber = float(ref_ber)
     ref_tbits = int(ref_tbits)
@@ -218,6 +245,9 @@ if (config_testframes):
             elif (line[0:3] == "BER"):
                 print(line, end="")
                 _, tgt_ber, _, tgt_tbits, _, tgt_terrs = line.split()
+            elif (line[0:9] == "Coded BER"):
+                print(line, end="")
+                _, _, tgt_ber2, _, tgt_tbits2, _, tgt_terrs2 = line.split()
     # Strings to integers
     tgt_ber = float(tgt_ber)
     tgt_tbits = int(tgt_tbits)
@@ -225,16 +255,20 @@ if (config_testframes):
     tgt_ber2 = float(tgt_ber2)
     tgt_tbits2 = int(tgt_tbits2)
     tgt_terrs2 = int(tgt_terrs2)
-    
+   
+    # simple hack to tolerate zero bits > NAN
+    if (math.isnan(ref_ber2)): ref_ber2 = 0
+    if (math.isnan(tgt_ber2)): tgt_ber2 = 0
+
     # Compare BER values
     if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
         (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
         (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
         ( (ref_tbits2 == 0) or
-          (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
-          (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
-          (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
-          )
+              (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
+      (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
+              (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
+      )
         ):
         print("PASS: BER")
     else:
@@ -266,7 +300,8 @@ else:
             fail = True
         # Match??
         if (ref_out_bytes[i] != tgt_out_bytes[i]):
-            print("Output frame {} byte {} mismatch".format(fnum, bnum))
+            print("Output frame {} byte {} mismatch: ref={} tgt={}".format(
+                fnum, bnum, ref_out_bytes[i], tgt_out_bytes[i]))
             output_diffs += 1
         # end for i
     if (output_diffs > tolerance_output_differences):
