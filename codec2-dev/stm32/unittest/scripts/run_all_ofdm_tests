@@ -31,8 +31,7 @@ TEST_NAME="tst_ofdm_demod"
 run_a_test ${TEST_NAME} "quick" "--load"
 for TEST_OPT in "ideal" "AWGN" "fade" "ldpc" "ldpc_AWGN" "ldpc_fade" ; do
     run_a_test ${TEST_NAME} ${TEST_OPT}
-    # Delay for st-util to close
-    sleep 5
+    sleep 5 # Delay for st-util to close
     done
 
 
