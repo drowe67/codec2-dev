@@ -2118,7 +2118,6 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
     return e;
 }
 
-#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -2340,7 +2339,9 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
    }
 }
 
-/*---------------------------------------------------------------------------*\
+#endif
+
+/*---------------------------------------------------------------------------* \
 
   FUNCTION....: synthesise_one_frame()
   AUTHOR......: David Rowe

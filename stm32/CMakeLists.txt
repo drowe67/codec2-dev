@@ -93,13 +93,10 @@ ${CODEC2_SRC}/postfilter.c
 ${CODEC2_SRC}/sine.c
 ${CODEC2_SRC}/codec2.c
 ${CODEC2_SRC}/codec2_fft.c
-${CODEC2_SRC}/gp_interleaver.c
-${CODEC2_SRC}/interldpc.c
 ${CODEC2_SRC}/kiss_fft.c
 ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
 ${CODEC2_SRC}/lsp.c
-${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/ofdm.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
@@ -573,8 +570,6 @@ src/stm32f4_usb_vcp.c
 src/stm32f4_adc.c
 ../src/fifo.c
 ../src/mbest.c
-../src/newamp1.c
-../src/newamp2.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)

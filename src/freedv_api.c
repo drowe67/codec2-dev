@@ -1733,7 +1733,6 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     }
     return nout;
 }
-#endif
 
 /*
   TODO: 
@@ -1958,6 +1957,7 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     return nout;
 }
+#endif
 
 
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
