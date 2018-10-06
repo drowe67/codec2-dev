@@ -37,7 +37,7 @@ endif()
 #    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
 #else()
 #    link_libraries(nosys)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
 #endif()
 
 # Set default build type
@@ -93,6 +93,8 @@ ${CODEC2_SRC}/postfilter.c
 ${CODEC2_SRC}/sine.c
 ${CODEC2_SRC}/codec2.c
 ${CODEC2_SRC}/codec2_fft.c
+#${CODEC2_SRC}/gp_interleaver.c
+#${CODEC2_SRC}/interldpc.c
 ${CODEC2_SRC}/kiss_fft.c
 ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
@@ -108,13 +110,13 @@ ${CODEC2_SRC}/codebookge.c
 ${CODEC2_SRC}/dump.c
 ${CODEC2_SRC}/fdmdv.c
 ${CODEC2_SRC}/freedv_api.c
+${CODEC2_SRC}/filter.c
 ${CODEC2_SRC}/varicode.c
 ${CODEC2_SRC}/golay23.c
 ${CODEC2_SRC}/fsk.c
 ${CODEC2_SRC}/fmfsk.c
 ${CODEC2_SRC}/freedv_vhf_framing.c
 ${CODEC2_SRC}/freedv_data_channel.c
-${CODEC2_SRC}/filter.c
 )
 
 

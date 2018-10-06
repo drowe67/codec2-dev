@@ -902,7 +902,7 @@ src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
 
-SM2000_ADCDUMP_SRCS_SRCS+=$(CODEC2_SRCS)
+SM2000_ADCDUMP_SRCS+=$(CODEC2_SRCS)
 
 SM2000_ADCDUMP_SRCS+=$(USB_VCP)
 
