@@ -37,7 +37,7 @@ endif()
 #    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
 #else()
 #    link_libraries(nosys)
-#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
 #endif()
 
 # Set default build type
