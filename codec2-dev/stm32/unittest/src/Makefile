@@ -485,6 +485,31 @@ libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 ####################################################
 # Test Programs
 
+# -----------------------------------------------
+TST_API_TX_SRCS=\
+tst_api_tx.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+
+TST_API_TX_SRCS += $(CODEC2_SRCS)
+TST_API_TX_SRCS += $(SRCS)
+
+tst_api_tx.elf: $(TST_API_TX_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+TST_CODEC2_ENC_SRCS=\
+tst_codec2_enc.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+
+TST_CODEC2_ENC_SRCS += $(CODEC2_SRCS)
+TST_CODEC2_ENC_SRCS += $(SRCS)
+
+tst_codec2_enc.elf: $(TST_CODEC2_ENC_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
 TST_OFDM_MOD_SRCS=\
 tst_ofdm_mod.c \
 semihosting.c \
