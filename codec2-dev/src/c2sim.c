@@ -100,6 +100,7 @@ int main(int argc, char *argv[])
     FILE *faw = NULL;
     FILE *fhm = NULL;
     FILE *fjvm = NULL;
+    FILE *flspEWov = NULL;
     #ifdef DUMP
     int   dump;
     #endif
@@ -110,6 +111,7 @@ int main(int argc, char *argv[])
     int   mel_resampling = 0;
     int   K = 20;
     float framelength_s = N_S;
+    int   lspEWov;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -151,6 +153,7 @@ int main(int argc, char *argv[])
         { "awread", required_argument, &awread, 1 },
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
+        { "lspEWov", required_argument, &lspEWov, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
@@ -296,6 +299,13 @@ int main(int argc, char *argv[])
 		        file_name, strerror(errno));
                     exit(1);
                 }
+	    } else if(strcmp(long_options[option_index].name, "lspEWov") == 0) {
+                lpc_model = 1;
+	        if ((flspEWov = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening lspEWov float file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
 	    } else if(strcmp(long_options[option_index].name, "rate") == 0) {
                 if(strcmp(optarg,"3200") == 0) {
 	            lpc_model = 1;
@@ -665,7 +675,7 @@ int main(int argc, char *argv[])
             e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
             for(i=0; i<LPC_ORD; i++)
                 lsps_[i] = lsps[i];
-
+            
             #ifdef DUMP
 	    dump_ak(ak, order);
             dump_E(e);
@@ -689,6 +699,14 @@ int main(int argc, char *argv[])
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f\n", e);
 
+            if (lspEWov) {
+                fwrite(lsps, order, sizeof(float), flspEWov);
+                fwrite(&e, 1, sizeof(float), flspEWov);
+                fwrite(&model.Wo, 1, sizeof(float), flspEWov); 
+                float voiced_float = model.voiced;
+                fwrite(&voiced_float, 1, sizeof(float), flspEWov);
+            }
+            
             #ifdef DUMP
             dump_lsp(lsps);
             #endif
@@ -981,7 +999,8 @@ int main(int argc, char *argv[])
     if (faw     != NULL) fclose(faw);
     if (fhm     != NULL) fclose(fhm);
     if (fjvm    != NULL) fclose(fjvm);
-
+    if (flspEWov != NULL) fclose(flspEWov);
+    
     return 0;
 }
 
