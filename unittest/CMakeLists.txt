@@ -45,6 +45,9 @@ target_link_libraries(t16_8 codec2)
 add_executable(t16_8_short t16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(t16_8_short codec2)
 
+add_executable(16_8_short 16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
+target_link_libraries(16_8_short codec2)
+
 add_executable(tfsk tfsk.c ../src/kiss_fft.c ../src/kiss_fftr.c ../src/octave.c ../src/modem_probe.c)
 target_link_libraries(tfsk m)
 
