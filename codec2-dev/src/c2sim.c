@@ -713,11 +713,14 @@ int main(int argc, char *argv[])
 		fprintf(fjvm, "%f\n", e);
 
             if (lspEWov) {
+                /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
                 fwrite(lsps, order, sizeof(float), flspEWov);
                 fwrite(&e, 1, sizeof(float), flspEWov);
                 fwrite(&model.Wo, 1, sizeof(float), flspEWov); 
                 float voiced_float = model.voiced;
                 fwrite(&voiced_float, 1, sizeof(float), flspEWov);
+                /* order aks, exlcuding leading 1 */
+                fwrite(&ak[1], order, sizeof(float), flspEWov);
             }
             
             if (ten_ms_centre) {
