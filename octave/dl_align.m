@@ -13,10 +13,9 @@ t8 = 0:1/8000:length(s8)/8000;
 
 st_t = 1.12; en_t = 1.16;
 d_16 = floor(47/2 + 0.015*16000)
+printf("delay 16kHz by %d samples\n", d_16)
 st_16 = st_t*16000; en_16 = en_t*16000;
-en_16 - st_16
 st_8 = st_t*8000; en_8 = en_t*8000;
-en_8 - st_8
 
 figure(1); clf;
 plot(t16(st_16:en_16), s16(st_16-d_16:en_16-d_16));
