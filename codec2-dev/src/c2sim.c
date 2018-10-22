@@ -101,6 +101,7 @@ int main(int argc, char *argv[])
     FILE *fhm = NULL;
     FILE *fjvm = NULL;
     FILE *flspEWov = NULL;
+    FILE *ften_ms_centre = NULL;
     #ifdef DUMP
     int   dump;
     #endif
@@ -111,7 +112,8 @@ int main(int argc, char *argv[])
     int   mel_resampling = 0;
     int   K = 20;
     float framelength_s = N_S;
-    int   lspEWov;
+    int   lspEWov = 0;
+    int   ten_ms_centre = 0;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -154,6 +156,7 @@ int main(int argc, char *argv[])
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
+        { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         #ifdef DUMP
         { "dump", required_argument, &dump, 1 },
@@ -300,9 +303,19 @@ int main(int argc, char *argv[])
                     exit(1);
                 }
 	    } else if(strcmp(long_options[option_index].name, "lspEWov") == 0) {
+                /* feature file for deep learning experiments */
                 lpc_model = 1;
 	        if ((flspEWov = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening lspEWov float file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }                 
+	    } else if(strcmp(long_options[option_index].name, "ten_ms_centre") == 0) {
+                /* dump 10ms of audio centred on analysis frame to check time alignment with 
+                   16 kHz source audio */
+                ten_ms_centre = 1;
+	        if ((ften_ms_centre = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening ten_ms_centre short file: %s: %s\n",
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
@@ -707,6 +720,16 @@ int main(int argc, char *argv[])
                 fwrite(&voiced_float, 1, sizeof(float), flspEWov);
             }
             
+            if (ten_ms_centre) {
+                int n_10_ms = Fs*0.01;
+                int n_5_ms = Fs*0.005;
+                short buf[n_10_ms];
+                for(i=0; i<n_10_ms; i++) {
+                    buf[i] = Sn[m_pitch/2-n_5_ms+i];
+                }
+                fwrite(buf, n_10_ms, sizeof(short), ften_ms_centre);                  
+            }
+            
             #ifdef DUMP
             dump_lsp(lsps);
             #endif
@@ -1000,6 +1023,7 @@ int main(int argc, char *argv[])
     if (fhm     != NULL) fclose(fhm);
     if (fjvm    != NULL) fclose(fjvm);
     if (flspEWov != NULL) fclose(flspEWov);
+    if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     
     return 0;
 }
