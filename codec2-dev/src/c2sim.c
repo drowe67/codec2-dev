@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
                 }
 	    } else if(strcmp(long_options[option_index].name, "lspEWov") == 0) {
                 /* feature file for deep learning experiments */
-                lpc_model = 1;
+                lpc_model = 1; phase0 = 1;
 	        if ((flspEWov = fopen(optarg,"wb")) == NULL) {
 	            fprintf(stderr, "Error opening lspEWov float file: %s: %s\n",
 		        optarg, strerror(errno));
@@ -719,7 +719,6 @@ int main(int argc, char *argv[])
                 fwrite(&model.Wo, 1, sizeof(float), flspEWov); 
                 float voiced_float = model.voiced;
                 fwrite(&voiced_float, 1, sizeof(float), flspEWov);
-                /* order aks, exlcuding leading 1 */
                 fwrite(&ak[1], order, sizeof(float), flspEWov);
             }
             
