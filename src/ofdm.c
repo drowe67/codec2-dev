@@ -1533,3 +1533,32 @@ void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_
         payload_data_bits[i] = r[i]>16384;
     }
 }
+
+void ofdm_print_info(struct OFDM *ofdm) {
+
+    fprintf(stderr, "ofdm->foff_est_gain = %g\n", ofdm->foff_est_gain);
+    fprintf(stderr, "ofdm->foff_est_hz = %g\n", ofdm->foff_est_hz);
+    fprintf(stderr, "ofdm->timing_mx = %g\n", ofdm->timing_mx);
+    fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", ofdm->coarse_foff_est_hz);
+    fprintf(stderr, "ofdm->timing_norm = %g\n", ofdm->timing_norm);
+    fprintf(stderr, "ofdm->sig_var = %g\n", ofdm->sig_var);
+    fprintf(stderr, "ofdm->noise_var = %g\n", ofdm->noise_var);
+    fprintf(stderr, "ofdm->mean_amp = %g\n", ofdm->mean_amp);
+    fprintf(stderr, "ofdm->clock_offset_counter = %d\n", ofdm->clock_offset_counter);
+    fprintf(stderr, "ofdm->verbose = %d\n", ofdm->verbose);
+    fprintf(stderr, "ofdm->sample_point = %d\n", ofdm->sample_point);
+    fprintf(stderr, "ofdm->timing_est = %d\n", ofdm->timing_est);
+    fprintf(stderr, "ofdm->timing_valid = %d\n", ofdm->timing_valid);
+    fprintf(stderr, "ofdm->nin = %d\n", ofdm->nin);
+    fprintf(stderr, "ofdm->uw_errors = %d\n", ofdm->uw_errors);
+    fprintf(stderr, "ofdm->sync_counter = %d\n", ofdm->sync_counter);
+    fprintf(stderr, "ofdm->frame_count = %d\n", ofdm->frame_count);
+    fprintf(stderr, "ofdm->sync_start = %d\n", ofdm->sync_start);
+    fprintf(stderr, "ofdm->sync_end = %d\n", ofdm->sync_end);
+    fprintf(stderr, "ofdm->sync_mode = %d\n", ofdm->sync_mode);
+    fprintf(stderr, "ofdm->frame_count_interleaver = %d\n", ofdm->frame_count_interleaver);
+    fprintf(stderr, "ofdm->timing_en = %d\n", ofdm->timing_en);
+    fprintf(stderr, "ofdm->foff_est_en = %d\n", ofdm->foff_est_en);
+    fprintf(stderr, "ofdm->phase_est_en = %d\n", ofdm->phase_est_en);
+    fprintf(stderr, "ofdm->tx_bpf_en = %d\n", ofdm->tx_bpf_en);
+};

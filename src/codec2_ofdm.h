@@ -82,6 +82,8 @@ void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd);
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool);
 
+void ofdm_print_info(struct OFDM *ofdm);
+
 #ifdef __cplusplus
 }
 #endif
