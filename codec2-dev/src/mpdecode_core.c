@@ -687,4 +687,19 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
     }
 }
 
+void ldpc_print_info(struct LDPC *ldpc) {
+fprintf(stderr, "ldpc->max_iter = %d\n", ldpc->max_iter);
+fprintf(stderr, "ldpc->dec_type = %d\n", ldpc->dec_type);
+fprintf(stderr, "ldpc->q_scale_factor = %d\n", ldpc->q_scale_factor);
+fprintf(stderr, "ldpc->r_scale_factor = %d\n", ldpc->r_scale_factor);
+fprintf(stderr, "ldpc->CodeLength = %d\n", ldpc->CodeLength);
+fprintf(stderr, "ldpc->NumberParityBits = %d\n", ldpc->NumberParityBits);
+fprintf(stderr, "ldpc->NumberRowsHcols = %d\n", ldpc->NumberRowsHcols);
+fprintf(stderr, "ldpc->max_row_weight = %d\n", ldpc->max_row_weight);
+fprintf(stderr, "ldpc->max_col_weight = %d\n", ldpc->max_col_weight);
+fprintf(stderr, "ldpc->data_bits_per_frame = %d\n", ldpc->data_bits_per_frame);
+fprintf(stderr, "ldpc->coded_bits_per_frame = %d\n", ldpc->coded_bits_per_frame);
+fprintf(stderr, "ldpc->coded_syms_per_frame = %d\n", ldpc->coded_syms_per_frame);
+}
+
 /* vi:set ts=4 et sts=4: */

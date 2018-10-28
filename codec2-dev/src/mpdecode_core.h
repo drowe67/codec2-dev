@@ -41,6 +41,8 @@ void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, f
 void Somap(float bit_likelihood[], float symbol_likelihood[], int number_symbols);
 void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
 
+void ldpc_print_info(struct LDPC *ldpc);
+
 struct v_node {
   int degree;
   float initial_value;
