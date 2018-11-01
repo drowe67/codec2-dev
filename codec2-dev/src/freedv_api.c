@@ -1006,12 +1006,8 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
 
     nspare = ofdm_ntxtbits*f->interleave_frames;
     uint8_t txt_bits[nspare];
-    
+
     for(k=0; k<nspare; k++) {
-        if (f->nvaricode_bits) {
-            txt_bits[k] = f->tx_varicode_bits[f->varicode_bit_index++];
-            f->nvaricode_bits--;
-        }
         if (f->nvaricode_bits == 0) {
             /* get new char and encode */
             char s[2];
@@ -1020,6 +1016,10 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
                 f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
                 f->varicode_bit_index = 0;
             }
+        }
+        if (f->nvaricode_bits) {
+            txt_bits[k] = f->tx_varicode_bits[f->varicode_bit_index++];
+            f->nvaricode_bits--;
         }
     }
 
