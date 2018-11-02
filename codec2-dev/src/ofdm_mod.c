@@ -38,6 +38,7 @@
 #include "ofdm_internal.h"
 #include "interldpc.h"
 #include "gp_interleaver.h"
+#include "varicode.h"
 
 static struct OFDM_CONFIG *ofdm_config;
 
@@ -62,7 +63,7 @@ int main(int argc, char *argv[])
     struct LDPC   ldpc;
     int           frame;
     int           i, j, arg;
-    int           testframes, ldpc_en, interleave_frames;
+    int           testframes, ldpc_en, interleave_frames, use_text;
    
     if (argc < 3) {
         fprintf(stderr, "\n");
@@ -76,6 +77,7 @@ int main(int argc, char *argv[])
                         "                      will be counted\n");
         fprintf(stderr, "  --interleave depth  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "  --txbpf             Transmit band pass filter\n");
+        fprintf(stderr, "  --text              Include a standard text message\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -172,6 +174,9 @@ int main(int argc, char *argv[])
     }
     
     int Nsamperframe = ofdm_get_samples_per_frame();
+
+    fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+    fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame );
     fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n", 
         Nsamperframe, interleave_frames, Nbitsperframe);
 
@@ -184,6 +189,7 @@ int main(int argc, char *argv[])
     }
    
     testframes = 0;
+    use_text = 0;
     int Nframes = 0;
 
     if ((arg = (opt_exists(argv, argc, "--testframes")))) {
@@ -200,6 +206,17 @@ int main(int argc, char *argv[])
         ofdm_set_tx_bpf(ofdm, 1);
     }
 
+    if (opt_exists(argv, argc, "--text")) {
+        use_text = 1;
+    }
+
+// Add text bits to match other tests
+char text_str[] = "cq cq cq hello world\r";
+char *ptr_text = &text_str[0];
+short                tx_varicode_bits[VARICODE_MAX_BITS];
+int                  nvaricode_bits = 0;
+int                  varicode_bit_index = 0;
+
     /* main loop ----------------------------------------------------------------*/
     
     frame = 0;
@@ -207,6 +224,27 @@ int main(int argc, char *argv[])
     while(fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
         if (ldpc_en) {
             /* fancy interleaved LDPC encoded frames ----------------------------------------*/
+
+	    if (use_text) {
+	        // Get text bits
+                int nspare = ofdm_ntxtbits*interleave_frames;
+	        int k;
+
+                for(k=0; k<nspare; k++) {
+                    if (nvaricode_bits) {
+                        txt_bits_char[k] = tx_varicode_bits[varicode_bit_index++];
+                        nvaricode_bits--;
+                    }
+                    if (nvaricode_bits == 0) {
+                        /* get new char and encode */
+                        char s[2];
+                        s[0] = *ptr_text++;
+                        if (*ptr_text == 0) ptr_text = &text_str[0];
+                        nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                        varicode_bit_index = 0;
+                    }
+                }
+            }
             
             /* optionally overwrite input data with test frame of
                payload data bits known to demodulator */
@@ -288,6 +326,7 @@ int main(int argc, char *argv[])
         if (testframes && (frame >= Nframes)) {
             goto finished;
         }
+
     }
 
  finished:
