@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
                " [--testframes] [--interleaver depth] [--codecrx] [-v]\n", argv[0]);
-	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw txtLogFile\n", argv[0]);
+	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
 

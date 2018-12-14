@@ -2222,7 +2222,6 @@ void freedv_set_data_header(struct freedv *f, unsigned char *header)
 
 void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 {
-    f->stats.snr_est = 0.0; f->sync = 0;
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
 #ifndef CORTEX_M4
