@@ -34,6 +34,7 @@
 #include "freedv_api.h"
 #include "codec2.h"
 
+
 struct my_callback_state {
     char  tx_str[80];
     char *ptx_str;
@@ -212,9 +213,8 @@ int main(int argc, char *argv[]) {
     mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
     //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
-            
-    /* set up callback for txt msg chars */
 
+    /* set up callback for txt msg chars */
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
     my_cb_state.ptx_str = my_cb_state.tx_str;
     my_cb_state.calls = 0;
@@ -275,12 +275,13 @@ int main(int argc, char *argv[]) {
         else {
             fwrite(mod_out, sizeof(short), n_nom_modem_samples, fout);
         }
+
         
         /* if this is in a pipeline, we probably don't want the usual
            buffering to occur */
-
         if (fout == stdout) fflush(stdout);
         if (fin == stdin) fflush(stdin);
+
     }
 
     free(speech_in);
@@ -288,6 +289,9 @@ int main(int argc, char *argv[]) {
     freedv_close(freedv);
     fclose(fin);
     fclose(fout);
+
+    fclose(stdin);
+    fclose(stderr);
 
     return 0;
 }
