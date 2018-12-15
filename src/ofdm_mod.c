@@ -222,34 +222,36 @@ int                  varicode_bit_index = 0;
     frame = 0;
 
     while(fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
+
         if (ldpc_en) {
-            /* fancy interleaved LDPC encoded frames ----------------------------------------*/
+            /* fancy interleaved LDPC encoded frames ----------------------------*/
 
-	    if (use_text) {
-	        // Get text bits
-                int nspare = ofdm_ntxtbits*interleave_frames;
-	        int k;
-
-                for(k=0; k<nspare; k++) {
-                    if (nvaricode_bits) {
-                        txt_bits_char[k] = tx_varicode_bits[varicode_bit_index++];
-                        nvaricode_bits--;
-                    }
-                    if (nvaricode_bits == 0) {
-                        /* get new char and encode */
-                        char s[2];
-                        s[0] = *ptr_text++;
-                        if (*ptr_text == 0) ptr_text = &text_str[0];
-                        nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
-                        varicode_bit_index = 0;
-                    }
-                }
-            }
-            
             /* optionally overwrite input data with test frame of
                payload data bits known to demodulator */
             
             if (testframes) {
+
+	        if (use_text) {
+	            // Get text bits
+                    int nspare = ofdm_ntxtbits*interleave_frames;
+	            int k;
+
+                    for(k=0; k<nspare; k++) {
+                        if (nvaricode_bits) {
+                            txt_bits_char[k] = tx_varicode_bits[varicode_bit_index++];
+                            nvaricode_bits--;
+                        }
+                        if (nvaricode_bits == 0) {
+                            /* get new char and encode */
+                            char s[2];
+                            s[0] = *ptr_text++;
+                            if (*ptr_text == 0) ptr_text = &text_str[0];
+                            nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                            varicode_bit_index = 0;
+                        }
+                    }
+                }
+            
                 uint16_t r[data_bits_per_frame];
 
                 ofdm_rand(r, data_bits_per_frame);
@@ -272,7 +274,7 @@ int                  varicode_bit_index = 0;
                 fwrite(tx_scaled, sizeof(short), Nsamperframe, fout);
             }
          } else {
-            /* just modulate uncoded raw bits ----------------------------------------------*/
+            /* just modulate uncoded raw bits ------------------------------------*/
             
             if (testframes) {
                 /* build up a test frame consisting of unique word, txt bits, and psuedo-random
@@ -287,7 +289,6 @@ int                  varicode_bit_index = 0;
 
                 for(i=0; i<Npayloadbits; i++) {
                     payload_bits[i] = r[i] > 16384;
-                    //fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
                 }
 
                 uint8_t txt_bits[ofdm_ntxtbits];
@@ -301,8 +302,9 @@ int                  varicode_bit_index = 0;
 
             int tx_bits[Nbitsperframe];
 
-            for(i=0; i<Nbitsperframe; i++)
+            for(i=0; i<Nbitsperframe; i++) {
                 tx_bits[i] = tx_bits_char[i];
+	    }
 
             COMP tx_sams[Nsamperframe];
             ofdm_mod(ofdm, tx_sams, tx_bits);
