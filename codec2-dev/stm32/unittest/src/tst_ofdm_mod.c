@@ -29,13 +29,31 @@
  *
  * Typical run:
 
-    ofdm_get_test_bits stm_in.raw -f 10
+    ofdm_gen_test_bits stm_in.raw 6 --rand 
 
     ofdm_mod stm_in.raw ref_mod_out.raw
+
+    echo "00000000" > stm_cfg.txt
 
     <Load stm32 and run>
 
     compare_ints -s -b2 ref_mod_out.raw mod.raw
+
+    ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --testframes
+    ofdm_demod mod.raw stm_demod.raw --testframes
+
+ * For LDPC use:
+
+    ofdm_gen_test_bits stm_in.raw 6 --rand --ldpc
+
+    ofdm_mod stm_in.raw ref_mod_out.raw --ldpc
+
+    echo "00100000" > stm_cfg.txt
+
+    <Load stm32 and run>
+
+    ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --ldpc --testframes
+    ofdm_demod mod.raw stm_demod.raw --ldpc --testframes
 
  */
 
@@ -176,7 +194,7 @@ int main(int argc, char *argv[]) {
 
                 }
 
-             } else { // config_ldpc_en
+             } else { // !config_ldpc_en
                 int tx_bits[n_bpf];
 
                 for(i=0; i<n_bpf; i++) {
