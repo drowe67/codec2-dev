@@ -1536,14 +1536,14 @@ void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_
 
 void ofdm_print_info(struct OFDM *ofdm) {
 
-    fprintf(stderr, "ofdm->foff_est_gain = %g\n", ofdm->foff_est_gain);
-    fprintf(stderr, "ofdm->foff_est_hz = %g\n", ofdm->foff_est_hz);
-    fprintf(stderr, "ofdm->timing_mx = %g\n", ofdm->timing_mx);
-    fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", ofdm->coarse_foff_est_hz);
-    fprintf(stderr, "ofdm->timing_norm = %g\n", ofdm->timing_norm);
-    fprintf(stderr, "ofdm->sig_var = %g\n", ofdm->sig_var);
-    fprintf(stderr, "ofdm->noise_var = %g\n", ofdm->noise_var);
-    fprintf(stderr, "ofdm->mean_amp = %g\n", ofdm->mean_amp);
+    fprintf(stderr, "ofdm->foff_est_gain = %g\n", (double)ofdm->foff_est_gain);
+    fprintf(stderr, "ofdm->foff_est_hz = %g\n", (double)ofdm->foff_est_hz);
+    fprintf(stderr, "ofdm->timing_mx = %g\n", (double)ofdm->timing_mx);
+    fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", (double)ofdm->coarse_foff_est_hz);
+    fprintf(stderr, "ofdm->timing_norm = %g\n", (double)ofdm->timing_norm);
+    fprintf(stderr, "ofdm->sig_var = %g\n", (double)ofdm->sig_var);
+    fprintf(stderr, "ofdm->noise_var = %g\n", (double)ofdm->noise_var);
+    fprintf(stderr, "ofdm->mean_amp = %g\n", (double)ofdm->mean_amp);
     fprintf(stderr, "ofdm->clock_offset_counter = %d\n", ofdm->clock_offset_counter);
     fprintf(stderr, "ofdm->verbose = %d\n", ofdm->verbose);
     fprintf(stderr, "ofdm->sample_point = %d\n", ofdm->sample_point);
