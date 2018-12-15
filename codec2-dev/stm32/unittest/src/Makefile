@@ -28,7 +28,6 @@ CFLAGS += -mfpu=fpv4-sp-d16 -mfloat-abi=hard -D__FPU_PRESENT=1 -D__FPU_USED=1
 else
 CFLAGS += -msoft-float
 endif
-CFLAGS += -Wl,-Map=ld.map
 
 ###################################################
 # STM32F4 Standard Peripheral Library
@@ -379,6 +378,7 @@ $(CODEC2_SRC)/postfilter.c \
 $(CODEC2_SRC)/sine.c \
 $(CODEC2_SRC)/codec2.c \
 $(CODEC2_SRC)/codec2_fft.c \
+$(CODEC2_SRC)/cohpsk.c \
 $(CODEC2_SRC)/kiss_fft.c \
 $(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
@@ -463,7 +463,7 @@ libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 ##
 ## TMP_NEWLIB_INCS = -INewlib
 ## TMP_NEWLIB_DEFS = -DARM_RDI_MONITOR
-## TMP_NEWLIB_OBJS = Newlib/fread.o Newlib/refill.o Newlib/syscalls.o Newlib/stdio.o Newlib/readr.o
+## TMP_NEWLIB_OBJS = Newlib/fread.o Newlib/refill.o Newlib/syscalls.o Newlib/stdio.o Newlib/readr.o Newlib/fclose.o Newlib/fflush.o
 ## 
 ## Newlib/fread.o: Newlib/fread.c
 ## 	$(CC) -c $(CFLAGS) $^ -o Newlib/fread.o $(TMP_NEWLIB_INCS) $(TMP_NEWLIB_DEFS)
@@ -507,6 +507,18 @@ TST_CODEC2_ENC_SRCS += $(CODEC2_SRCS)
 TST_CODEC2_ENC_SRCS += $(SRCS)
 
 tst_codec2_enc.elf: $(TST_CODEC2_ENC_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+TST_API_MOD_SRCS=\
+tst_api_mod.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+
+TST_API_MOD_SRCS += $(CODEC2_SRCS)
+TST_API_MOD_SRCS += $(SRCS)
+
+tst_api_mod.elf: $(TST_API_MOD_SRCS:.c=.profile.o) libstm32f4.a # $(TMP_NEWLIB_OBJS) 
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
@@ -611,4 +623,5 @@ tst_semihost.elf: $(TST_SEMIHOST_SRCS:.c=.o) libstm32f4.a #$(TMP_NEWLIB_OBJS)
 clean:
 	rm -f *.elf *.bin
 	rm -f libstm32f4.a
+	rm -f $(CMSIS_OBJS) $(STM32F4LIB_OBJS) $(CODEC2_SRC)/*.profile.o
 	find . ../src -type f -name '*.o' | xargs rm -f
