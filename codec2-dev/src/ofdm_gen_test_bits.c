@@ -130,7 +130,6 @@ int main(int argc, char *argv[])
 
 
     for(n=0; n<Nframes; n++) {
-        fprintf(stderr, "Frame %d\n", n);
 
         if (ldpc_en) { /* fancy interleaved LDPC encoded frames */
 
@@ -183,10 +182,6 @@ int main(int argc, char *argv[])
 	}
 
 	fwrite(tx_bits, sizeof(char), Nbitsperframe, fout);
-
-        for(i=0; i<Nbitsperframe; i++) {
-            fprintf(stderr,"tx_bits[%d] = %d\n", i, tx_bits[i]);
-	}
 
 	/* if this is in a pipeline, we probably don't want the usual
 	   buffering to occur */
