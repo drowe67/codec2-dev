@@ -24,12 +24,35 @@ cd "${RUN_DIR}"
 
 
 #####################################################################
-## Test SETUP actions:
+## Test CHECK actions:
+
+declare -i Fails=0
 
 case "${TEST}" in
 
-    plain | ldpc )
+    plain)
+	echo -e "\nReference check"
+	ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --testframes || \
+	    let Fails=($Fails + 1)
+	echo -e "\nTarget check"
+    	ofdm_demod mod.raw stm_demod.raw --testframes || \
+	    let Fails=($Fails + 1)
+	#
+        compare_ints -s -b2 ref_mod_out.raw mod.raw > compare.log|| \
+	    let Fails=($Fails + 1)
+
+	;;
+
+    ldpc)
         compare_ints -s -b2 ref_mod_out.raw mod.raw
 	;;
 
     esac
+
+if (( $Fails == 0 )); then
+    echo -e "\nTest PASSED"
+else
+    echo -e "\nTest FAILED!"
+fi
+
+return $Fails

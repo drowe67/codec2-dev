@@ -31,14 +31,14 @@ case "${TEST}" in
     plain )
     	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
     	echo "00000000" > stm_cfg.txt
-	ofdm_get_test_bits stm_in.raw -f 10 > setup.log 2>&1
+	ofdm_gen_test_bits stm_in.raw 10 --rand > setup.log 2>&1
         ofdm_mod stm_in.raw ref_mod_out.raw > ref_gen_log.txt 2>&1
 	;;
 
     ldpc )
     	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>
     	echo "00100000" > stm_cfg.txt
-	ofdm_get_test_bits stm_in.raw -f 10 > setup.log 2>&1
+	ofdm_gen_test_bits stm_in.raw 10 --rand > setup.log 2>&1
         ofdm_mod stm_in.raw ref_mod_out.raw --ldpc > ref_gen_log.txt 2>&1
 	;;
 
