@@ -1849,7 +1849,7 @@ void fdmdv_8_to_16_short(short out16k[], short in8k[], int n)
   Changes the sample rate of a signal from 16 to 8 kHz.
 
   n is the number of samples at the 8 kHz rate, there are FDMDV_OS*n
-  samples at the 48 kHz rate.  As above however a memory of
+  samples at the 16 kHz rate.  As above however a memory of
   FDMDV_OS_TAPS samples is reqd for in16k[] (see t16_8.c unit test as example).
 
   Low pass filter the 16 kHz signal at 4 kHz using the same filter as
