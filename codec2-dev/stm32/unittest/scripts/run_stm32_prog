@@ -25,7 +25,6 @@ if [ ${ARGS[--load]+_} ] ; then
 
 cat <<-EEOOFF >> gdb_cmds
 	break EndofMain
-	break Infinite_Loop
 	EEOOFF
 
 if [ -z ${ARGS[--debug]+_} ] ; then
