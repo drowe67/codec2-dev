@@ -99,6 +99,7 @@ static float ofdm_fs; /* Sample rate */
 static float ofdm_ts; /* Symbol cycle time */
 static float ofdm_rs; /* Symbol rate */
 static float ofdm_tcp; /* Cyclic prefix duration */
+static float ofdm_doc; /* division of omega circle */
 static float ofdm_timing_mx_thresh; /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routines for how this was set */
 
 static int ofdm_nc; /* NS-1 data symbols between pilots  */
@@ -202,6 +203,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Calculate sizes from config param */
 
+    ofdm_doc = TAU / (ofdm_fs / ofdm_rs);
     ofdm_bitsperframe = (ofdm_ns - 1) * (ofdm_nc * ofdm_bps);
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_nc * ofdm_bps);
     ofdm_samplesperframe = ofdm_ns * (ofdm_m + ofdm_ncp);
@@ -233,6 +235,20 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->rx_sym[i] = (complex float *) malloc(sizeof(complex float) * (ofdm_nc + 2));
     }
 
+    /*
+     * wcol is a 2D array of variable size
+     *
+     * allocate wcol row storage. It is a pointer to a pointer
+     */
+
+    ofdm->wcol = malloc(sizeof (complex float) * ofdm_m);
+
+    /* allocate wcol column storage */ 
+
+    for (i = 0; i < ofdm_m; i++) {
+        ofdm->wcol[i] = (complex float *) malloc(sizeof(complex float) * (ofdm_nc + 2));
+    }
+
     /* The rest of these are 1D arrays of variable size */
 
     ofdm->rx_np = malloc(sizeof (complex float) * (ofdm_rowsperframe * ofdm_nc));
@@ -261,7 +277,13 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     int Nlower = floorf(alower / ofdm_rs);
 
     for (i = 0, n = Nlower; i < (ofdm_nc + 2); i++, n++) {
-        ofdm->w[i] = (TAU * (float) n) / (ofdm_fs / ofdm_rs);
+        ofdm->w[i] = (i + Nlower) * ofdm_doc;
+    }
+
+    for (i = 0; i < ofdm_m; i++) {
+        for (j = 0; j < (ofdm_nc + 2); j++) {
+            ofdm->wcol[i][j] = conjf(cexpf(I * ofdm->w[j] * i));
+        }
     }
 
     for (i = 0; i < ofdm_rxbuf; i++) {
@@ -384,6 +406,12 @@ void ofdm_destroy(struct OFDM *ofdm) {
 
     free(ofdm->rx_sym);
 
+    for (i = 0; i < ofdm_m; i++) { /* 2D array */
+        free(ofdm->wcol[i]);
+    }
+
+    free(ofdm->wcol);
+
     free(ofdm->rx_np);
     free(ofdm->w);
     free(ofdm->rx_amp);
@@ -417,11 +445,22 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
     float inv_m = (1.0f / (float) ofdm_m);
     int row, col;
 
-    for (row = 0; row < ofdm_m; row++) {
+    result[0] = 0.0f + 0.0f * I;
+
+    for (col = 0; col < (ofdm_nc + 2); col++) {
+        result[0] = result[0] + vector[col];    // cexp(0j) == 1
+    }
+
+    result[0] = result[0] * inv_m;
+
+    for (row = 1; row < ofdm_m; row++) {
         result[row] = 0.0f + 0.0f * I;
+        complex float x = cexpf(I * ofdm->w[0] * row);
+        complex float delta = cexpf(I * ofdm_doc * row);
 
         for (col = 0; col < (ofdm_nc + 2); col++) {
-            result[row] = result[row] + (vector[col] * cexpf(I * ofdm->w[col] * row));
+            result[row] = result[row] + (vector[col] * x);
+            x = x * delta;
         }
 
         result[row] = result[row] * inv_m;
@@ -434,10 +473,12 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
     int row, col;
 
     for (col = 0; col < (ofdm_nc + 2); col++) {
-        result[col] = 0.0f + 0.0f * I;
+        result[col] = vector[0];                 // conj(cexp(0j)) == 1
+    }
 
-        for (row = 0; row < ofdm_m; row++) {
-            result[col] = result[col] + (vector[row] * conjf(cexpf(I * ofdm->w[col] * row)));
+    for (col = 0; col < (ofdm_nc + 2); col++) {
+        for (row = 1; row < ofdm_m; row++) {
+            result[col] = result[col] + (vector[row] * ofdm->wcol[row][col]);
         }
     }
 }
@@ -1536,14 +1577,14 @@ void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_
 
 void ofdm_print_info(struct OFDM *ofdm) {
 
-    fprintf(stderr, "ofdm->foff_est_gain = %g\n", (double)ofdm->foff_est_gain);
-    fprintf(stderr, "ofdm->foff_est_hz = %g\n", (double)ofdm->foff_est_hz);
-    fprintf(stderr, "ofdm->timing_mx = %g\n", (double)ofdm->timing_mx);
-    fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", (double)ofdm->coarse_foff_est_hz);
-    fprintf(stderr, "ofdm->timing_norm = %g\n", (double)ofdm->timing_norm);
-    fprintf(stderr, "ofdm->sig_var = %g\n", (double)ofdm->sig_var);
-    fprintf(stderr, "ofdm->noise_var = %g\n", (double)ofdm->noise_var);
-    fprintf(stderr, "ofdm->mean_amp = %g\n", (double)ofdm->mean_amp);
+    fprintf(stderr, "ofdm->foff_est_gain = %g\n", ofdm->foff_est_gain);
+    fprintf(stderr, "ofdm->foff_est_hz = %g\n", ofdm->foff_est_hz);
+    fprintf(stderr, "ofdm->timing_mx = %g\n", ofdm->timing_mx);
+    fprintf(stderr, "ofdm->coarse_foff_est_hz = %g\n", ofdm->coarse_foff_est_hz);
+    fprintf(stderr, "ofdm->timing_norm = %g\n", ofdm->timing_norm);
+    fprintf(stderr, "ofdm->sig_var = %g\n", ofdm->sig_var);
+    fprintf(stderr, "ofdm->noise_var = %g\n", ofdm->noise_var);
+    fprintf(stderr, "ofdm->mean_amp = %g\n", ofdm->mean_amp);
     fprintf(stderr, "ofdm->clock_offset_counter = %d\n", ofdm->clock_offset_counter);
     fprintf(stderr, "ofdm->verbose = %d\n", ofdm->verbose);
     fprintf(stderr, "ofdm->sample_point = %d\n", ofdm->sample_point);
