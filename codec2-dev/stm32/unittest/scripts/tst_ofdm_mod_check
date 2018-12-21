@@ -30,24 +30,34 @@ declare -i Fails=0
 
 case "${TEST}" in
 
-    plain)
-	echo -e "\nReference check"
-	ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --testframes || \
-	    let Fails=($Fails + 1)
-	echo -e "\nTarget check"
-    	ofdm_demod mod.raw stm_demod.raw --testframes || \
-	    let Fails=($Fails + 1)
-	#
-        compare_ints -s -b2 ref_mod_out.raw mod.raw > compare.log|| \
-	    let Fails=($Fails + 1)
-
-	;;
-
-    ldpc)
-        compare_ints -s -b2 ref_mod_out.raw mod.raw
-	;;
-
+    plain) LDPC="";;
+    ldpc) LDPC="--ldpc";;
     esac
+
+echo -e "\nReference check"
+if ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --testframes ${LDPC}; then
+    echo "Passed"
+else
+    echo "Failed"
+    let Fails=($Fails + 1)
+fi
+#
+echo -e "\nTarget check"
+if ofdm_demod mod.raw stm_demod.raw --testframes ${LDPC}; then
+    echo "Passed"
+else
+    echo "Failed"
+    let Fails=($Fails + 1)
+fi
+#
+echo -e "\nCompare output binary data"
+if compare_ints -s -b2 ref_mod_out.raw mod.raw; then 
+    echo "Passed"
+else
+    echo "Failed"
+    let Fails=($Fails + 1)
+fi
+#
 
 if (( $Fails == 0 )); then
     echo -e "\nTest PASSED"
@@ -55,4 +65,4 @@ else
     echo -e "\nTest FAILED!"
 fi
 
-return $Fails
+exit $Fails

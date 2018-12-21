@@ -197,7 +197,7 @@ with open("stm_cfg.txt", "r") as f:
 
 
 ####
-fail = False
+fails = 0
 
 
 if (config_testframes):
@@ -272,7 +272,7 @@ if (config_testframes):
         ):
         print("PASS: BER")
     else:
-        fail = True
+        fails += 1
         print("FAIL: BER")
     # end BER checks
 
@@ -284,7 +284,7 @@ print("\nOutput checks")
 with open("ref_demod_out.raw", "rb") as f: ref_out_bytes = f.read()
 with open("stm_out.raw", "rb") as f:       tgt_out_bytes = f.read()
 if (len(ref_out_bytes) != len(tgt_out_bytes)):
-    fail = True
+    fails += 1
     print("FAIL Output, length mismatch")
 else:
     output_diffs = 0
@@ -294,10 +294,10 @@ else:
         # Both legal values??
         if (ref_out_bytes[i] > 1):
             print("Error: Output frame {} byte {} not 0 or 1 in reference data".format(fnum, bnum))
-            fail = True
+            fails += 1
         if (tgt_out_bytes[i] > 1):
             print("Error: Output frame {} byte {} not 0 or 1 in target data".format(fnum, bnum))
-            fail = True
+            fails += 1
         # Match??
         if (ref_out_bytes[i] != tgt_out_bytes[i]):
             print("Output frame {} byte {} mismatch: ref={} tgt={}".format(
@@ -306,7 +306,7 @@ else:
         # end for i
     if (output_diffs > tolerance_output_differences):
         print("FAIL: Output Differences = {}".format(output_diffs))
-        fail = True
+        fails += 1
     else:
         print("PASS: Output Differences = {}".format(output_diffs))
     # end not length mismatch
@@ -389,5 +389,7 @@ if (config_profile):
 
 
 #### Print final status message
-if (fail): print("\nTest FAILED!")
+if (fails): print("\nTest FAILED!")
 else: print("\nTest PASSED")
+
+sys.exit(fails)

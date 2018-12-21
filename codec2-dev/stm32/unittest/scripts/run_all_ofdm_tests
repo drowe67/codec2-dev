@@ -2,56 +2,25 @@
 #
 # run_all_ofdm_tests
 
-# Find the scripts directory
-SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
-
-# Setup common variables
-source $SCRIPTS/run_tests_common.sh
-
-# Save directory
-ORIG_DIR=${PWD}
-
 declare -i Fails=0
 
-#####################################################################
-function run_a_test() {
-    local TEST_NAME=$1
-    local TEST_OPT=$2
-    local LOAD=$3
-    local FULL_TEST_NAME="${TEST_NAME}_${TEST_OPT}"
-    local RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
-    echo ""
-    echo ""
-    echo "${TEST_NAME}"
-    setup_common "${RUN_DIR}"
-    ${TEST_NAME}_setup ${TEST_OPT} --clean
-    cd "${RUN_DIR}" 
-    run_stm32_prog ${UNITTEST_BIN}/${TEST_NAME}.elf ${LOAD} |& tee gdb.log
-    ${TEST_NAME}_check ${TEST_OPT} |& tee check.log ||
-	    let Fails=($Fails + 1)
-    cd "${ORIG_DIR}" 
-    }
+run_tst_ofdm_mod plain --load || Fails+=1
+run_tst_ofdm_mod ldpc || Fails+=1
 
-#####################################################################
-TEST_NAME="tst_ofdm_mod"
-run_a_test ${TEST_NAME} "plain" "--load"
-for TEST_OPT in "ldpc" ; do
-    run_a_test ${TEST_NAME} ${TEST_OPT}
-    sleep 5 # Delay for st-util to close
-    done
-
-#####################################################################
-TEST_NAME="tst_ofdm_demod"
-run_a_test ${TEST_NAME} "quick" "--load"
-for TEST_OPT in "ideal" "AWGN" "fade" "ldpc" "ldpc_AWGN" "ldpc_fade" ; do
-    run_a_test ${TEST_NAME} ${TEST_OPT}
-    sleep 5 # Delay for st-util to close
-    done
+run_tst_ofdm_demod quick --load || Fails+=1
+run_tst_ofdm_demod ideal || Fails+=1
+run_tst_ofdm_demod AWGN || Fails+=1
+run_tst_ofdm_demod fade || Fails+=1
+run_tst_ofdm_demod ldpc || Fails+=1
+run_tst_ofdm_demod ldpc_AWGN || Fails+=1
+run_tst_ofdm_demod ldpc_fade || Fails+=1
 
 if (( $Fails == 0 )); then
     echo -e "\nAll Tests PASSED"
 else
     echo -e "\n$Fails Tests FAILED!"
 fi
+
+exit $Fails
 
 # vi:set ts=4 et sts=4:
