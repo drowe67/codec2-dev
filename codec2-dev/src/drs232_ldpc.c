@@ -253,6 +253,7 @@ int main(int argc, char *argv[]) {
                packets++;
                if (rx_checksum == tx_checksum) {
                    fwrite(packet, sizeof(char), BYTES_PER_PACKET, fout);
+                   fflush(fout);
                }
                else
                    packet_errors++;
