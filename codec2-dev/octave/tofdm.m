@@ -13,6 +13,8 @@ more off; format;
 ofdm_lib;
 autotest;
 ldpc
+global passes = 0;
+global fails = 0;
 
 % attempt to start up CML, path will be different on your machine
 
@@ -55,11 +57,11 @@ tx_bits = zeros(1,Nbitsperframe);
 rand('seed',1);
 
 payload_data_bits = round(rand(1,(Nbitsperframe-Nuwbits-Ntxtbits)/2));
+states.mean_amp = 1;  % start this with something sensible otherwise LDPC decode fails
 if cml_support
   ibits = payload_data_bits;
   codeword = LdpcEncode(ibits, code_param.H_rows, code_param.P_matrix);
   tx_bits(Nuwbits+Ntxtbits+1:end) = codeword;
-  states.mean_amp = 1;  % start this with something sensible otherwise LDPC decode fails
 else
   tx_bits(Nuwbits+Ntxtbits+1:end) = [payload_data_bits payload_data_bits];
 end
@@ -173,7 +175,12 @@ end
 
 printf("\nRunning C version....\n");
 if exist("path_to_tofdm", "var") == 0
-   path_to_tofdm = "../build_linux/unittest/tofdm";
+   cml_support
+   if (cml_support)
+     path_to_tofdm = "../build_linux/unittest/tofdm"
+   else
+     path_to_tofdm = "../build_linux/unittest/tofdm --noldpc"
+   end
 end
 system(path_to_tofdm);
 
@@ -244,4 +251,5 @@ end
 check(sig_var_log, sig_var_log_c, 'sig_var_log');
 check(noise_var_log, noise_var_log_c, 'noise_var_log');
 check(mean_amp_log, mean_amp_log_c, 'mean_amp_log');
+printf("\npasses: %d fails: %d\n", passes, fails);
 

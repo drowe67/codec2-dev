@@ -167,6 +167,13 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    int ldpc_enable = 1;
+    if (argc == 2)
+        if (!strcmp(argv[1],"--noldpc")) {
+            ldpc_enable = 0;
+            fprintf(stderr, "LDPC disabled\n");
+        }
+    
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
@@ -268,32 +275,31 @@ int main(int argc, char *argv[])
             tx_bits[i] = 0;
         }       
 
-#define LDPC_ENABLE
-#ifdef LDPC_ENABLE
-        unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
-        unsigned char pbits[HRA_112_112_NUMBERPARITYBITS];
+        if (ldpc_enable) {
+            unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
+            unsigned char pbits[HRA_112_112_NUMBERPARITYBITS];
 
-        assert(HRA_112_112_NUMBERROWSHCOLS == ldpc.CodeLength/2);
-        for(i=0; i<ldpc.CodeLength/2; i++) {
-            ibits[i] = payload_data_bits[i];
+            assert(HRA_112_112_NUMBERROWSHCOLS == ldpc.CodeLength/2);
+            for(i=0; i<ldpc.CodeLength/2; i++) {
+                ibits[i] = payload_data_bits[i];
+            }
+            encode(&ldpc, ibits, pbits);
+            for(j=0, i=ofdm_nuwbits+ofdm_ntxtbits; j<ldpc.CodeLength/2; i++,j++) {
+                tx_bits[i] = ibits[j];
+            }
+            for(j=0; j<ldpc.CodeLength/2; i++,j++) {
+                tx_bits[i] = pbits[j];
+            }
+            assert(i == ofdm_bitsperframe);
+        } else {
+            for(i=ofdm_nuwbits+ofdm_ntxtbits,j=0; j<ldpc.CodeLength/2; i++,j++) {
+                tx_bits[i] = payload_data_bits[j];
+            }
+            for(j=0; j<ldpc.CodeLength/2; i++,j++) {
+                tx_bits[i] = payload_data_bits[j];
+            }
         }
-        encode(&ldpc, ibits, pbits);
-        for(j=0, i=ofdm_nuwbits+ofdm_ntxtbits; j<ldpc.CodeLength/2; i++,j++) {
-            tx_bits[i] = ibits[j];
-        }
-        for(j=0; j<ldpc.CodeLength/2; i++,j++) {
-            tx_bits[i] = pbits[j];
-        }
-        assert(i == ofdm_bitsperframe);
-#else
-        for(i=ofdm_nuwbits+ofdm_ntxtbits,j=0; j<ldpc.CodeLength/2; i++,j++) {
-            tx_bits[i] = payload_data_bits[j];
-        }
-        for(j=0; j<ldpc.CodeLength/2; i++,j++) {
-            tx_bits[i] = payload_data_bits[j];
-        }
-#endif
-
+        
         ofdm_mod(ofdm, (COMP*)tx, tx_bits);
         
         /* tx vector logging */

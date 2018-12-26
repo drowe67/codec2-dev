@@ -269,3 +269,9 @@ add_test(NAME Test_FDMDV_Modem_Octave_Port
          DEPENDS tfdmdv        
          PASS_REGULAR_EXPRESSION "fails: 0")
   
+add_test(NAME Test_OFDM_Modem_Octave_Port
+         COMMAND sh -c "octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+       set_tests_properties(Test_OFDM_Modem_Octave_Port PROPERTIES
+         PASS_REGULAR_EXPRESSION "fails: 0")
+  

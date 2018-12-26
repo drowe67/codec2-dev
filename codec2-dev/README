@@ -111,6 +111,7 @@ CTest is used to run the unittests. To build and run them:
   $ rm -Rf build_linux && mkdir build_linux
   $ cd build_linux
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
+  $ make
   $ make test
 
 Building for Windows on a Linux machine
