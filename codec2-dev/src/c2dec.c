@@ -104,8 +104,9 @@ int main(int argc, char *argv[])
     struct c2_header in_hdr;
     char *ext = strrchr(argv[2], '.');
     if ((ext != NULL) && (strcmp(ext, ".c2") == 0)) {
-        fread(&in_hdr,sizeof(in_hdr),1,fin);
-                
+        int nread = fread(&in_hdr,sizeof(in_hdr),1,fin);
+        assert (nread == sizeof(in_hdr));
+        
         if (memcmp(in_hdr.magic, c2_file_magic, sizeof(c2_file_magic)) == 0) {
             fprintf(stderr, "Detected Codec2 file version %d.%d in mode %d\n",
                     in_hdr.version_major,
