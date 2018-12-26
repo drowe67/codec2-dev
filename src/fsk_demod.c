@@ -59,10 +59,10 @@ int main(int argc,char *argv[]){
     int enable_stats = 0;
     int hbr = 1;
     FILE *fin,*fout;
-    uint8_t *bitbuf;
+    uint8_t *bitbuf = NULL;
     int16_t *rawbuf;
     COMP *modbuf;
-    float *sdbuf;
+    float *sdbuf = NULL;
     int i,j,Ndft;
     int soft_dec_mode = 0;
     stats_loop = 0;
@@ -208,7 +208,7 @@ int main(int argc,char *argv[]){
     /* set up testframe mode */
          
     int      testframecnt, bitcnt, biterr, testframe_detected;
-    uint8_t *bitbuf_tx, *bitbuf_rx;
+    uint8_t *bitbuf_tx = NULL, *bitbuf_rx = NULL;
     if (testframe_mode) {
         bitbuf_tx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_tx != NULL);
         bitbuf_rx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_rx != NULL);
