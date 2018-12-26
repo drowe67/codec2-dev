@@ -139,12 +139,14 @@ Directories
 -----------
 
   cmake       - cmake support files
+  misc        - misc C programs that have been useful in development,
+                not reqd for Codec 2 release
   octave      - Octave scripts used to support development
   script      - shell scripts for playing and converting raw files
   src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
   raw         - speech files in raw format (16 bits signed linear 8 kHz)
   stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor support
-  unittest    - unit test source code
+  unittest    - Code to perform and support testing
   wav         - speech files in wave file format
 
 Octave Packages
