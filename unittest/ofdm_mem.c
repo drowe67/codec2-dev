@@ -63,7 +63,6 @@ int main()
     int ofdm_bitsperframe = (ofdm_config->ns - 1) * (ofdm_config->nc * ofdm_config->bps);
     int ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
     int ofdm_samplesperframe = ofdm_config->ns * (ofdm_m + ofdm_ncp);
-    int ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     int ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
 
