@@ -46,7 +46,8 @@ Q  = f.Q;
 
 % Generate reference vectors using Octave implementation of FDMDV modem
 
-global passes = fails = 0;
+global passes = 0;
+global fails = 0;
 frames = 35;
 prev_tx_symbols = ones(Nc+1,1); prev_tx_symbols(Nc+1) = 2;
 prev_rx_symbols = ones(Nc+1,1);
