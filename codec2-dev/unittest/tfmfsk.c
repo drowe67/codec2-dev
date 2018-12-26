@@ -28,7 +28,7 @@
 */
 
 
-#define MODEMPROBE_ENABLE
+//#define MODEMPROBE_ENABLE
 
 #include "modem_probe.h"
 #include <stdio.h>
