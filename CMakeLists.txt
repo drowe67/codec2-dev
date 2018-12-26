@@ -29,7 +29,6 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
    "separate build directory and run cmake from there.")
 endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 
-
 #
 # Set project version information. This should probably be done via external
 # file at some point.
@@ -255,3 +254,18 @@ install(
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig
     COMPONENT "codec2_devel"
 )
+
+##################################################################
+# Tests
+##################################################################
+
+include(CTest)
+enable_testing()
+
+add_test(NAME Test_FDMDV_Modem_Octave_Port
+         COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+       set_tests_properties(Test_FDMDV_Modem_Octave_Port PROPERTIES
+         DEPENDS tfdmdv        
+         PASS_REGULAR_EXPRESSION "fails: 0")
+  
