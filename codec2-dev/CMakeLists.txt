@@ -54,7 +54,7 @@ endif()
 
 # Set default C++ flags.
 include(CheckCCompilerFlag)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3 -Wno-strict-overflow")
 
 CHECK_C_COMPILER_FLAG("-std=gnu11" COMPILER_SUPPORTS_GNU11)
 CHECK_C_COMPILER_FLAG("-std=gnu99" COMPILER_SUPPORTS_GNU99)
