@@ -115,7 +115,7 @@ option(BUILD_SHARED_LIBS
 if(CMAKE_BUILD_TYPE MATCHES "Release")
     option(UNITTEST "Build unittest binaries." OFF)
 else()
-    option(UNITTEST "Build unittest binaries." ON)
+    option(UNITTEST "Build unittest binaries." OFF)
 endif()
 option(INSTALL_EXAMPLES "Install example code." OFF)
 if(INSTALL_EXAMPLES)
