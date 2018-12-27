@@ -90,7 +90,7 @@ Built as part of codec2-dev, see README for build instructions.
 
    build_linux/src$ ./c2enc 700C ../../raw/ve9qrp_10s.raw - --bitperchar | ./ofdm_mod - - --ldpc --interleave 4 | ./cohpsk_ch - - -20 -Fs 8000 --slow -f -5 | aplay -f S16
 
-9. Run test frames through simulated chanel in C:
+9. Run test frames through simulated channel in C:
 
    build_linux/src$ ./ofdm_mod /dev/zero - --ldpc --testframes 20 | ./cohpsk_ch - - -24 --Fs 8000 -f -10 --fast | ./ofdm_demod - /dev/null --testframes -v --ldpc
 
@@ -158,7 +158,12 @@ SVN Rev 3671:
   SNR3k(dB):  2.15 C/No: 36.9 PAPR:  9.8
   BER......: 0.1015 Tbits: 88774 Terrs:  9012
   Coded BER: 0.0445 Tbits: 41776 Terrs:  1860
-  
+
+Note: 10% Raw BER operating point on both channels, as per design.  To
+get a coded BER of around 1% on fading channels we need an interleaver
+of about 2x the fade duration (e.g. --interleaver 16), above examples
+are with interleaver == 1, so coded performance is not that great.
+
 C Code
 ------
 

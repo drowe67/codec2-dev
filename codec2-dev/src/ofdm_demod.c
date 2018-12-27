@@ -487,17 +487,6 @@ int main(int argc, char *argv[])
     fclose(fin);
     fclose(fout);
 
-    if (testframes) {
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs/Tbits, Tbits, Terrs);
-        if (!ldpc_en) {
-            fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
-        }
-        if (ldpc_en) {
-            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
-                    (float)Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded);
-        }
-    }
-
     /* optionally dump Octave files */
 
     if (foct != NULL) {
@@ -514,6 +503,25 @@ int main(int argc, char *argv[])
 
     ofdm_destroy(ofdm);
 
+    if (testframes) {
+        float uncoded_ber = (float)Terrs/Tbits;
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
+        if (!ldpc_en) {
+            fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+        }
+        if (ldpc_en) {
+            float coded_ber = (float)Terrs_coded/Tbits_coded;
+            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
+                    coded_ber, Tbits_coded, Terrs_coded);
+
+            /* set return code for Ctest */
+            if ((uncoded_ber < 0.1) && (coded_ber < 0.01))
+                return 0;
+            else
+                return 1;
+        }
+    }
+    
     return 0;
 }
 /* vi:set ts=4 et sts=4: */

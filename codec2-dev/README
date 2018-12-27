@@ -43,7 +43,7 @@ Also see INSTALL for more general building and installing instructions.
    $ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
    $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
 
-2/ Compress, Decompress and then play a file:
+2/ Compress, decompress and then play a file:
 
    using 2400 bps bit rate encoding
 
@@ -102,8 +102,8 @@ Debugging
   $ CFLAGS=-DDUMP cmake ..
   $ make
 
-Building Unit Tests
--------------------
+Building and Running Unit Tests
+-------------------------------
 
 CTest is used to run the unittests. To build and run them:
 
@@ -111,9 +111,20 @@ CTest is used to run the unittests. To build and run them:
   $ rm -Rf build_linux && mkdir build_linux
   $ cd build_linux
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
-  $ make
+  $ make all test
+
+To just run tests without rebuilding:
+
   $ make test
 
+To get a verbose run (e.g. for test deugging):
+
+  $ ctest -V
+
+To just run a single test:
+
+  $ ctest -R Test_OFDM_Modem_Octave_Port
+ 
 Building for Windows on a Linux machine
 ---------------------------------------
 
