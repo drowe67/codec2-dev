@@ -203,6 +203,7 @@ On Linux systems try installing:
     endif(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
 
     add_subdirectory(unittest)
+    add_subdirectory(misc)
 endif(UNITTEST)
 
 #
