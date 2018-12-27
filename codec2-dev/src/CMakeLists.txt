@@ -74,13 +74,6 @@ set(CODEBOOKSNEWAMP2_ENERGY
     ${D}/newamp2_energy_q.txt
 )
 
-
-# generated wideband map
-set(C2WB_MAP
-    ${D}/c2wideband_map.txt
-)
-
-
 # when crosscompiling we need a native executable
 if(CMAKE_CROSSCOMPILING)
     include(ExternalProject)
@@ -174,35 +167,6 @@ add_custom_command(
     COMMAND generate_codebook newamp2_energy_cb ${CODEBOOKSNEWAMP2_ENERGY} > ${CMAKE_CURRENT_BINARY_DIR}/codebooknewamp2_energy.c
     DEPENDS generate_codebook ${CODEBOOKSNEWAMP2_ENERGY}
 )
-
-
-
-# when crosscompiling we need a native executable
-if(CMAKE_CROSSCOMPILING)
-    # Native executable already built above.
-    add_executable(generate_wideband_map IMPORTED)
-    set_target_properties(generate_wideband_map PROPERTIES
-        IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/generate_wideband_map)
-    add_dependencies(generate_wideband_map codec2_native)
-else(CMAKE_CROSSCOMPILING)
-# Build code generator binaries. These do not get installed.
-    # generate_codebook
-    add_executable(generate_wideband_map generate_wideband_map.c)
-    target_link_libraries(generate_wideband_map ${CMAKE_REQUIRED_LIBRARIES})
-    # Make native builds available for cross-compiling.
-    export(TARGETS generate_wideband_map
-        FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
-endif(CMAKE_CROSSCOMPILING)
-
-
-# c2wideband_map.h
-add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/c2wideband_map.h
-    COMMAND generate_wideband_map c2wideband_map ${C2WB_MAP} > ${CMAKE_CURRENT_BINARY_DIR}/c2wideband_map.h
-    DEPENDS generate_wideband_map ${C2WB_MAP}
-)
-
-
 
 #
 # codec2 library sources
@@ -322,17 +286,8 @@ target_link_libraries(fdmdv_put_test_bits ${CMAKE_REQUIRED_LIBRARIES})
 add_executable(fdmdv_channel fdmdv_channel.c)
 target_link_libraries(fdmdv_channel ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(fdmdv_interleave fdmdv_interleave.c)
-target_link_libraries(fdmdv_interleave ${CMAKE_REQUIRED_LIBRARIES})
-
 add_executable(insert_errors insert_errors.c)
 target_link_libraries(insert_errors ${CMAKE_REQUIRED_LIBRARIES})
-
-add_executable(fec_enc fec_enc.c golay23.c)
-target_link_libraries(fec_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(fec_dec fec_dec.c golay23.c)
-target_link_libraries(fec_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(freedv_tx freedv_tx.c)
 target_link_libraries(freedv_tx ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -437,20 +392,14 @@ install(TARGETS codec2 EXPORT codec2-config
 #)
 
 install(TARGETS
-    c2demo
-    c2demo
     c2enc
     c2dec
-    c2sim
     fdmdv_get_test_bits
     fdmdv_mod fdmdv_demod
     fm_demod
     fsk_mod
     fdmdv_put_test_bits
-    fdmdv_interleave
     insert_errors
-    fec_enc
-    fec_dec
     drs232
     drs232_ldpc
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
