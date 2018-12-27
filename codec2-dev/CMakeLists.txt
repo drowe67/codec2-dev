@@ -260,21 +260,23 @@ install(
 # Tests
 ##################################################################
 
-include(CTest)
-enable_testing()
+if(UNITTEST)
+    include(CTest)
+    enable_testing()
 
-add_test(NAME Test_FDMDV_Modem_Octave_Port
-         COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-       set_tests_properties(Test_FDMDV_Modem_Octave_Port PROPERTIES
-         PASS_REGULAR_EXPRESSION "fails: 0")
-  
-add_test(NAME Test_OFDM_Modem_Octave_Port
-         COMMAND sh -c "octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
-         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-       set_tests_properties(Test_OFDM_Modem_Octave_Port PROPERTIES
-         PASS_REGULAR_EXPRESSION "fails: 0")
-  
-add_test(NAME Test_OFDM_Modem_AWGN_BER
-  COMMAND sh -c "$<TARGET_FILE:ofdm_mod> /dev/zero - --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> - /dev/null --testframes --ldpc"
- )
+    add_test(NAME Test_FDMDV_Modem_Octave_Port
+             COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+           set_tests_properties(Test_FDMDV_Modem_Octave_Port PROPERTIES
+             PASS_REGULAR_EXPRESSION "fails: 0")
+
+    add_test(NAME Test_OFDM_Modem_Octave_Port
+             COMMAND sh -c "octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+           set_tests_properties(Test_OFDM_Modem_Octave_Port PROPERTIES
+             PASS_REGULAR_EXPRESSION "fails: 0")
+
+    add_test(NAME Test_OFDM_Modem_AWGN_BER
+      COMMAND sh -c "$<TARGET_FILE:ofdm_mod> /dev/zero - --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> - /dev/null --testframes --ldpc"
+     )
+endif(UNITTEST)
