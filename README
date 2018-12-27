@@ -83,25 +83,6 @@ samples.
 selective use of the various Codec 2 algorithms.  For example
 switching phase modelling or LSP quantisation on and off.
 
-Debugging
----------
-
-1/ To compile with debug symbols for using gdb:
-
-  $ cd ~/codec2
-  $ rm -Rf build_linux && mkdir build_linux
-  $ cd build_linux
-  $ CFLAGS=-g cmake ..
-  $ make
-
-2/ For dump file support:
-
-  $ cd ~/codec2
-  $ rm -Rf build_linux && mkdir build_linux
-  $ cd build_linux
-  $ CFLAGS=-DDUMP cmake ..
-  $ make
-
 Building and Running Unit Tests
 -------------------------------
 
@@ -125,6 +106,40 @@ To just run a single test:
 
   $ ctest -R Test_OFDM_Modem_Octave_Port
  
+Directories
+-----------
+
+  cmake       - cmake support files
+  misc        - misc C programs that have been useful in development,
+                not reqd for Codec 2 release. Part of Debug build.
+  octave      - Octave scripts used to support development
+  script      - shell scripts for playing and converting raw files
+  src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
+  raw         - speech files in raw format (16 bits signed linear 8 kHz)
+  stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor support
+  unittest    - Code to perform and support testing. Part of Debug build.
+  wav         - speech files in wave file format
+
+GDB and Dump Files
+------------------
+
+1/ To compile with debug symbols for using gdb:
+
+  $ cd ~/codec2
+  $ rm -Rf build_linux && mkdir build_linux
+  $ cd build_linux
+  $ CFLAGS=-g cmake ..
+  $ make
+
+2/ For dump file support (dump data from c2sim for input to Octave
+development scripts):
+
+  $ cd ~/codec2
+  $ rm -Rf build_linux && mkdir build_linux
+  $ cd build_linux
+  $ CFLAGS=-DDUMP cmake ..
+  $ make
+
 Building for Windows on a Linux machine
 ---------------------------------------
 
@@ -143,20 +158,6 @@ Building for Windows on a Windows machine
  Or if you use ninja for building cmake -G "Ninja" ..
  mingw32-make or ninja  depends on what you used in the last command
  wait for it to build.
-
-Directories
------------
-
-  cmake       - cmake support files
-  misc        - misc C programs that have been useful in development,
-                not reqd for Codec 2 release
-  octave      - Octave scripts used to support development
-  script      - shell scripts for playing and converting raw files
-  src         - C source code for Codec 2, FDMDV modem, COHPSK modem, FreeDV API
-  raw         - speech files in raw format (16 bits signed linear 8 kHz)
-  stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor support
-  unittest    - Code to perform and support testing
-  wav         - speech files in wave file format
 
 Octave Packages
 ---------------
