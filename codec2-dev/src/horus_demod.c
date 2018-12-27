@@ -12,7 +12,7 @@
 
   Testing with a 8000Hz sample rate wave file:
 
-    $ sox ~/Desktop/horus.wav -r 48000 -t raw - | ./horus_demod -m RTTY -v - /dev/nul/
+    $ sox ~/Desktop/horus.wav -r 48000 -t raw - | ./horus_demod -m RTTY -v - /dev/null
 
     $ sox ~/Desktop/4FSK_binary_100Rb_8khzfs.wav -r 48000 -t raw - | ./horus_demod -m binary  - -
 
