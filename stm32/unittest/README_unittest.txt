@@ -82,7 +82,7 @@ QuickStart (TODO: David & Don work together to complete this section)
   $ git clone https://github.com/texane/stlink
   $ cd stlink
   $ make
-
+  
 2/ The STM32 Standard Preipheral Library is required and requires
    registration to download. Save the zip file somewhere safe, then
    extract to a directory of your choice, for example:
@@ -94,7 +94,7 @@ QuickStart (TODO: David & Don work together to complete this section)
    Preipheral Library, this can be set by adding a local.mak file in
    the codec2-dev/stm32/unittest directory:
 
-   $ cd ~/codec2-dev/stm32/unittest
+   $ cd ~/codec2-dev/stm32/unittest/src
    $ echo 'PERIPHLIBDIR = /periph/lib/path/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0' > local.mak
 
    Now we can build the unittests:
