@@ -712,15 +712,7 @@ int main(int argc, char *argv[])
 	    if (dump_pitch_e)
 		fprintf(fjvm, "%f\n", e);
 
-            if (lspEWov) {
-                /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
-                fwrite(lsps, order, sizeof(float), flspEWov);
-                fwrite(&e, 1, sizeof(float), flspEWov);
-                fwrite(&model.Wo, 1, sizeof(float), flspEWov); 
-                float voiced_float = model.voiced;
-                fwrite(&voiced_float, 1, sizeof(float), flspEWov);
-                fwrite(&ak[1], order, sizeof(float), flspEWov);
-            }
+            /* speech centred on analysis frame for Deep Learning work */
             
             if (ten_ms_centre) {
                 int n_10_ms = Fs*0.01;
@@ -897,6 +889,22 @@ int main(int argc, char *argv[])
             assert(ret == 1);
         }
 
+        /* dump features for Deep learning, placed here so we can get quantised features */
+        
+        if (lspEWov) {
+            /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
+            if (lsp)
+                fwrite(lsps_, order, sizeof(float), flspEWov);
+            else
+                fwrite(lsps, order, sizeof(float), flspEWov);
+                    
+            fwrite(&e, 1, sizeof(float), flspEWov);
+            fwrite(&model.Wo, 1, sizeof(float), flspEWov); 
+            float voiced_float = model.voiced;
+            fwrite(&voiced_float, 1, sizeof(float), flspEWov);
+            fwrite(&ak[1], order, sizeof(float), flspEWov);
+        }
+            
 	/*------------------------------------------------------------*\
 
           Synthesise and optional decimation to 20 or 40ms frame rate
