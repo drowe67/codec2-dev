@@ -318,7 +318,8 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
 
     uint16_t crc_tx, crc_rx;
     crc_rx = horus_l2_gen_crc16(payload_bytes, HORUS_BINARY_NUM_PAYLOAD_BYTES-2);
-    crc_tx = *(uint16_t*)&payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES-2];
+    crc_tx = ((uint16_t)payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES-2]<<8) +
+	(uint16_t)payload_bytes[HORUS_BINARY_NUM_PAYLOAD_BYTES-1];
     
     if (hstates->verbose) {
         fprintf(stderr, "  extract_horus_binary crc_tx: %04X crc_rx: %04X\n", crc_tx, crc_rx);
