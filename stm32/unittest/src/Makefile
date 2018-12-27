@@ -379,6 +379,7 @@ $(CODEC2_SRC)/sine.c \
 $(CODEC2_SRC)/codec2.c \
 $(CODEC2_SRC)/codec2_fft.c \
 $(CODEC2_SRC)/cohpsk.c \
+$(CODEC2_SRC)/linreg.c \
 $(CODEC2_SRC)/kiss_fft.c \
 $(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
@@ -444,7 +445,6 @@ SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
 all: libstm32f4.a \
      tst_ofdm_mod.bin tst_ofdm_demod.bin \
-     tst_ldpc_enc.bin tst_ldpc_dec.bin \
      tst_semihost.bin
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
@@ -522,6 +522,20 @@ tst_api_mod.elf: $(TST_API_MOD_SRCS:.c=.profile.o) libstm32f4.a # $(TMP_NEWLIB_O
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
+# Not working yet!
+TST_API_DEMOD_SRCS=\
+tst_api_demod.c \
+semihosting.c \
+sbrk_dbg.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+
+TST_API_DEMOD_SRCS += $(CODEC2_SRCS)
+TST_API_DEMOD_SRCS += $(SRCS)
+
+tst_api_demod.elf: $(TST_API_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
 TST_OFDM_MOD_SRCS=\
 tst_ofdm_mod.c \
 semihosting.c \
@@ -546,6 +560,30 @@ TST_OFDM_DEMOD_SRCS += $(SRCS)
 #
 tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+# TST_OFDM_MOD_STACK
+#
+ofdm_mod_ref_10f: 
+	$(CODEC2_BLD)/src/ofdm_mod /dev/zero ofdm_mod_ref_10f --testframes 1 --ldpc
+#
+ofdm_mod_ref_10f.c: ofdm_mod_ref_10f
+	xxd -g2 -e -i ofdm_mod_ref_10f > ofdm_mod_ref_10f.c
+#
+tst_ofdm_mod_stack.profile.o: tst_ofdm_mod_stack.c ofdm_mod_ref_10f.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DPROFILE -c -o $@ $<
+#
+TST_OFDM_MOD_STACK_SRCS=\
+tst_ofdm_mod_stack.c \
+function_trace.c \
+$(CODEC2_SRC)/ofdm.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+TST_OFDM_MOD_STACK_SRCS += $(CODEC2_SRCS)
+TST_OFDM_MOD_STACK_SRCS += $(SRCS)
+#
+tst_ofdm_mod_stack.elf: $(TST_OFDM_MOD_STACK_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_ofdm_mod_stack.map
 
 # -----------------------------------------------
 # TST_OFDM_DEMOD_STACK
@@ -576,6 +614,7 @@ tst_ofdm_demod_stack.elf: $(TST_OFDM_DEMOD_STACK_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_ofdm_demod_stack.map
 
 # -----------------------------------------------
+# Not working yet!
 TST_LDPC_ENC_SRCS= \
 tst_ldpc_enc.c \
 semihosting.c \
@@ -591,6 +630,7 @@ tst_ldpc_enc.elf: $(TST_LDPC_ENC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_ENC
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
+# Not working yet!
 TST_LDPC_DEC_SRCS= \
 tst_ldpc_dec.c \
 semihosting.c \
