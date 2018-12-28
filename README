@@ -103,7 +103,16 @@ Programs
 Building and Running Unit Tests
 -------------------------------
 
-CTest is used to run the unittests. To build and run them:
+CTest is used as a test frame work, with support from GNU Octave
+scripts.
+
+1/ Install GNU Octave on Ubuntu with:
+
+  $ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
+
+  (see also Octave section below)
+  
+2/ To build and run the tests:
 
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
@@ -111,15 +120,15 @@ CTest is used to run the unittests. To build and run them:
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
   $ make all test
 
-To just run tests without rebuilding:
+3/ To just run tests without rebuilding:
 
   $ make test
 
-To get a verbose run (e.g. for test debugging):
+4/ To get a verbose run (e.g. for test debugging):
 
   $ ctest -V
 
-To just run a single test:
+5/ To just run a single test:
 
   $ ctest -R Test_OFDM_Modem_Octave_Port
  
@@ -193,6 +202,10 @@ Package Name  | Version | Installation directory
 These can be installed using your systems package management system or
 the Octave package management system.  The version number of each
 package is not important.
+
+On Ubuntu install with:
+
+  $ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
 
 FreeDV API
 ----------
