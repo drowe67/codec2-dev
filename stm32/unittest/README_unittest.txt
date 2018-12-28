@@ -82,7 +82,23 @@ QuickStart (TODO: David & Don work together to complete this section)
   $ git clone https://github.com/texane/stlink
   $ cd stlink
   $ make
-  
+  $ sudo cp ./etc/udev/rules.d/49-stlinkv2.rules /etc/udev/rules.d/
+  $ sudo udevadm control --reload-rules
+
+1a/ Add the st-util util to your $PATH
+
+1b/ Plug in a stm32 development board and test:
+
+  $ st-util
+
+  st-util 1.4.0-47-gae717b9
+  2018-12-29T06:52:16 INFO usb.c: -- exit_dfu_mode
+  2018-12-29T06:52:16 INFO common.c: Loading device parameters....
+  2018-12-29T06:52:16 INFO common.c: Device connected is: F4 device, id 0x10016413
+  2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
+  2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
+  2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
+
 2/ The STM32 Standard Preipheral Library is required and requires
    registration to download. Save the zip file somewhere safe, then
    extract to a directory of your choice, for example:
