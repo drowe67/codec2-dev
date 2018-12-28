@@ -279,4 +279,11 @@ if(UNITTEST)
     add_test(NAME Test_OFDM_Modem_AWGN_BER
       COMMAND sh -c "$<TARGET_FILE:ofdm_mod> /dev/zero - --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> - /dev/null --testframes --ldpc"
      )
+
+   add_test(NAME Test_horus_binary
+      COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
+     )
+   set_tests_properties(Test_horus_binary PROPERTIES
+     PASS_REGULAR_EXPRESSION "1C9A9545")
+   
 endif(UNITTEST)
