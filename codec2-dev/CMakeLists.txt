@@ -264,26 +264,30 @@ if(UNITTEST)
     include(CTest)
     enable_testing()
 
-    add_test(NAME Test_FDMDV_Modem_Octave_Port
+    add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-           set_tests_properties(Test_FDMDV_Modem_Octave_Port PROPERTIES
+             set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    add_test(NAME Test_OFDM_Modem_Octave_Port
+    add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-           set_tests_properties(Test_OFDM_Modem_Octave_Port PROPERTIES
+             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    add_test(NAME Test_OFDM_Modem_AWGN_BER
-      COMMAND sh -c "$<TARGET_FILE:ofdm_mod> /dev/zero - --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> - /dev/null --testframes --ldpc"
-     )
+    add_test(NAME test_OFDM_modem_AWGN_BER
+             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> /dev/zero - --ldpc --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> - /dev/null --testframes --ldpc"
+             )
 
-   add_test(NAME Test_horus_binary
-      COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
-     )
-   set_tests_properties(Test_horus_binary PROPERTIES
-     PASS_REGULAR_EXPRESSION "1C9A9545")
+    add_test(NAME test_horus_binary
+             COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
+             )
+             set_tests_properties(test_horus_binary PROPERTIES
+             PASS_REGULAR_EXPRESSION "1C9A9545")
+
+    add_test(NAME test_ldpc_enc_dec
+             COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"
+             )
    
 endif(UNITTEST)

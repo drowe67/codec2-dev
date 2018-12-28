@@ -334,7 +334,14 @@ int main(int argc, char *argv[])
     if (testframes) {
         fprintf(stderr, "Raw Tbits..: %d Terr: %d BER: %4.3f\n", Tbits_raw, Terrs_raw,
                 (float)Terrs_raw/(Tbits_raw+1E-12));
-        fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, (float)Terrs/(Tbits+1E-12));
+        float coded_ber = (float)Terrs/(Tbits+1E-12);
+        fprintf(stderr, "Coded Tbits: %d Terr: %d BER: %4.3f\n", Tbits, Terrs, coded_ber);
+
+        /* set return code for Ctest */
+        if (coded_ber < 0.01)
+            return 0;
+        else
+            return 1;
     }
     
     return 0;
