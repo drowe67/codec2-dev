@@ -107,12 +107,12 @@ int main(int argc, char *argv[]) {
     
     int dx = optind;
     
-    if( (argc - dx) < 1) {
+    if( (argc - dx) < 2) {
         fprintf(stderr, "Too few arguments\n");
         goto helpmsg;
     }
     
-    if( (argc - dx) > 5){
+    if( (argc - dx) > 5) {
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
         fprintf(stderr,"usage: %s -m RTTY|binary [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
