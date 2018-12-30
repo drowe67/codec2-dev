@@ -2,6 +2,12 @@
 #
 # run_all_ofdm_tests
 
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
 declare -i Fails=0
 
 run_tst_ofdm_mod plain --load || Fails+=1
