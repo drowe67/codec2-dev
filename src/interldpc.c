@@ -38,14 +38,15 @@
 #include "HRA_112_112.h"
 //#include "test_bits_ofdm.h"
 
+
 /* CRC type function, used to compare QPSK vectors when debugging */
 
 COMP test_acc(COMP v[], int n) {
     COMP acc = {0.0,0.0};
     int i;
     for(i=0; i<n; i++) {
-        acc.real += round(v[i].real);
-        acc.imag += round(v[i].imag);
+        acc.real += roundf(v[i].real);
+        acc.imag += roundf(v[i].imag);
         //fprintf(stderr, "%d %10f %10f %10f %10f\n", i, round(v[i].real), round(v[i].imag), acc.real, acc.imag);
     }
     return acc;
@@ -256,16 +257,16 @@ void ofdm_ldpc_interleave_tx(struct OFDM *ofdm, struct LDPC *ldpc, complex float
     int Nsamperframe = ofdm_get_samples_per_frame();
     complex float tx_symbols[ofdm_bitsperframe/config->bps];
     int j;
-    
+
     for (j=0; j<interleave_frames; j++) {
         ldpc_encode_frame(ldpc, codeword, &tx_bits[j*data_bits_per_frame]);
         qpsk_modulate_frame(&coded_symbols[j*coded_syms_per_frame], codeword, coded_syms_per_frame);
     }
+
     gp_interleave_comp(coded_symbols_inter, coded_symbols, interleave_frames*coded_syms_per_frame);
+
     for (j=0; j<interleave_frames; j++) {            
         ofdm_assemble_modem_frame_symbols(tx_symbols, &coded_symbols_inter[j*coded_syms_per_frame], &txt_bits[config->txtbits * j]);
         ofdm_txframe(ofdm, &tx_sams[j*Nsamperframe], tx_symbols);
     }
 }
-
-
