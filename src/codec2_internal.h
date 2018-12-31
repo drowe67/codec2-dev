@@ -85,6 +85,9 @@ struct CODEC2 {
     float          n2_prev_rate_K_vec_[NEWAMP2_K];
     float          n2_pwb_rate_K_sample_freqs_kHz[NEWAMP2_16K_K];
     float          n2_pwb_prev_rate_K_vec_[NEWAMP2_16K_K];
+
+    /* used to dump features for deep learning experiments */
+    FILE *flspEWov;
 };
 
 // test and debug

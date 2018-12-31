@@ -50,7 +50,8 @@
 #include "bpf.h"
 #include "bpfb.h"
 #include "c2wideband.h"
-/*---------------------------------------------------------------------------*\
+
+/*---------------------------------------------------------------------------* \
 
                              FUNCTION HEADERS
 
@@ -245,6 +246,8 @@ struct CODEC2 * codec2_create(int mode)
     }
 #endif
 
+    c2->flspEWov = NULL;
+    
     return c2;
 }
 
@@ -717,6 +720,18 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
 	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
+
+	/* dump parameters for deep learning experiments */
+	
+	if (c2->flspEWov != NULL) {
+	    /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
+	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->flspEWov);
+	    fwrite(&e[i], 1, sizeof(float), c2->flspEWov);
+	    fwrite(&model[i].Wo, 1, sizeof(float), c2->flspEWov); 
+	    float voiced_float = model[i].voiced;
+	    fwrite(&voiced_float, 1, sizeof(float), c2->flspEWov);
+	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->flspEWov);
+	}
     }
 
     /* update memories for next frame ----------------------------*/
@@ -1255,6 +1270,18 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
                   c2->lpc_pf, c2->bass_boost, c2->beta, c2->gamma, Aw);
 	apply_lpc_correction(&model[i]);
 	synthesise_one_frame(c2, &speech[c2->n_samp*i], &model[i], Aw, 1.0);
+
+	/* dump parameters for deep learning experiments */
+	
+	if (c2->flspEWov != NULL) {
+	    /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
+	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->flspEWov);
+	    fwrite(&e[i], 1, sizeof(float), c2->flspEWov);
+	    fwrite(&model[i].Wo, 1, sizeof(float), c2->flspEWov); 
+	    float voiced_float = model[i].voiced;
+	    fwrite(&voiced_float, 1, sizeof(float), c2->flspEWov);
+	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->flspEWov);
+	}
     }
     /*
     for(i=0; i<4; i++) {
@@ -2595,5 +2622,12 @@ void codec2_set_softdec(struct CODEC2 *c2, float *softdec)
 {
     assert(c2 != NULL);
     c2->softdec = softdec;
+}
+
+void codec2_open_lspEWov(struct CODEC2 *codec2_state, char *filename) {
+    if ((codec2_state->flspEWov = fopen(filename, "wb")) == NULL) {
+	fprintf(stderr, "error opening feature file: %s\n", filename);
+	exit(1);
+    }    
 }
 

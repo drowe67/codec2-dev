@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
         { "dump", required_argument, &dump, 1 },
         #endif
 	{ "energy", no_argument, NULL, 0 },
+        { "lspEWov", required_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -208,6 +209,9 @@ int main(int argc, char *argv[])
             #endif
 	    else if (strcmp(long_options[option_index].name, "energy") == 0) {
 	        report_energy = 1;
+	    }
+	    else if (strcmp(long_options[option_index].name, "lspEWov") == 0) {
+	        codec2_open_lspEWov(codec2, optarg);
 	    }
             break;
 
@@ -398,6 +402,8 @@ void print_help(const struct option* long_options, int num_opts, char* argv[])
 			option_parameters = " berFileName";
 		} else if (strcmp("dump", long_options[i].name) == 0) {
 			option_parameters = " dumpFilePrefix";
+		} else if (strcmp("lspEWov", long_options[i].name) == 0) {
+			option_parameters = " featureFileName";
 		} else {
 			option_parameters = " <UNDOCUMENTED parameter>";
 		}
