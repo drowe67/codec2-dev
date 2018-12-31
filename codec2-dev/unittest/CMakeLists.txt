@@ -18,7 +18,7 @@ target_link_libraries(tdeframer m codec2)
 
 add_definitions(-DMODEMPROBE_ENABLE -DXXXXX)
 
-add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
+add_executable(tofdm tofdm.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c ../src/HRA_112_112.c)
 target_link_libraries(tofdm m)
 
 add_executable(tfifo tfifo.c ../src/fifo.c)
