@@ -286,8 +286,16 @@ if(UNITTEST)
              set_tests_properties(test_horus_binary PROPERTIES
              PASS_REGULAR_EXPRESSION "1C9A9545")
 
+    # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"
              )
-   
+
+    # some more LDPC tests, placed in a script for convenience
+    add_test(NAME test_ldpc_check
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ldpc_check
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/unittest
+             )
+             set_tests_properties(test_ldpc_check PROPERTIES PASS_REGULAR_EXPRESSION "PASSED")
+  
 endif(UNITTEST)
