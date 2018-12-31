@@ -439,10 +439,12 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
 
         f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
+        if (f->packed_codec_bits_tx == NULL) return(NULL);
         f->codec_bits = NULL;
     }
     
     f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
+    if (f->packed_codec_bits == NULL) return(NULL);
 
     if (mode == FREEDV_MODE_1600)
         f->codec_bits = (int*)malloc(nbit*sizeof(int));
