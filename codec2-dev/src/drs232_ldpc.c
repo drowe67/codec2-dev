@@ -6,7 +6,7 @@
 
   Looks for a unique word in series of soft decision symbols.  When
   found, deframes a RS232 encoded frame of soft decision bit, LDPC
-  decodes, and outputs a frame of packed bytes.  Used for high biit
+  decodes, and outputs a frame of packed bytes.  Used for high bit
   rate Horus SSTV reception.
 
   Frame format:

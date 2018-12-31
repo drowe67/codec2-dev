@@ -5,7 +5,7 @@
   DATE CREATED: March 2016
 
   Looks for a unique word in series of bits.  When found, deframes a RS232
-  encoded frame of bytes.  Used for high biit rate Horus SSTV reception.
+  encoded frame of bytes.  Used for high bit rate Horus SSTV reception.
 
   Frame format:
 
