@@ -225,6 +225,7 @@ set(CODEC2_SRCS
     filter.c
     horus_api.c
     horus_l2.c
+    HRA_112_112.c
 )
 
 set(CODEC2_PUBLIC_HEADERS

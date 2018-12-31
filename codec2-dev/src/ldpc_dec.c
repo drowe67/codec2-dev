@@ -130,10 +130,10 @@ int main(int argc, char *argv[])
             ldpc.NumberRowsHcols = HRA_112_112_NUMBERROWSHCOLS;
             ldpc.max_row_weight = HRA_112_112_MAX_ROW_WEIGHT;
             ldpc.max_col_weight = HRA_112_112_MAX_COL_WEIGHT;
-            ldpc.H_rows = HRA_112_112_H_rows;
-            ldpc.H_cols = HRA_112_112_H_cols;
-            ainput = HRA_112_112_input;
-            adetected_data = HRA_112_112_detected_data;
+            ldpc.H_rows = (uint16_t *)HRA_112_112_H_rows;
+            ldpc.H_cols = (uint16_t *)HRA_112_112_H_cols;
+            ainput = (float *)HRA_112_112_input;
+            adetected_data = (char *)HRA_112_112_detected_data;
         }
     }
 
