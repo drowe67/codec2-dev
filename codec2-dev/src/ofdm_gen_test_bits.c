@@ -154,7 +154,7 @@ int main(int argc, char *argv[])
                     nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
                     varicode_bit_index = 0;
                 }
-	        fprintf(stderr, "txt_bits[%d] = %d\n", k, txt_bits[k]);
+	        //fprintf(stderr, "txt_bits[%d] = %d\n", k, txt_bits[k]);
             }
 
             uint16_t r[data_bits_per_frame];
