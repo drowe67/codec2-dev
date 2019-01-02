@@ -43,13 +43,23 @@ export PATH=${PATH}:${SCRIPTS}:${CODEC2_BIN}:${CODEC2_UTST}
 #######################################
 # Parse command line options
 # Options (starting with "--") are stored in $ARGS.
-# Non-options are taken as the test name (last one sticks).
+# Non-options are taken as the test name, then as a test option (optional)
 declare -A ARGS
+unset TEST
+unset TEST_OPT
 for arg in "$@"; do
     if [[ ${arg} == --* ]] ; then ARGS[${arg}]=true
-    else TEST=${arg}
+    else 
+	if [ -z ${TEST+x} ]; then TEST=${arg}
+	else TEST_OPT=${arg}
+	fi
     fi
     done
+
+# Prepend the common test name to the option if given
+if [ -n "$TEST_OPT" ] ; then FULL_TEST_NAME="${TEST}_${TEST_OPT}"
+else FULL_TEST_NAME="${TEST}"
+fi
 
 #######################################
 # A function for setup
