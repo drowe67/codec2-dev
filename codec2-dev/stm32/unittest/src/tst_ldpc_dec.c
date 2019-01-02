@@ -16,13 +16,14 @@
   If there is an input is should be encoded data from the x86 ldpc_enc
   program.  Here is the suggested way to run:
 
-    ldpc_enc /dev/zero stm_in.raw --sd --code HRA_112_112 --testframes 10
+    ldpc_enc /dev/zero stm_in.raw --sd --code HRA_112_112 --testframes 6
 
-    ldpc_dec stm_in.raw ref_out.raw --code HRA_112_112
+    ldpc_dec stm_in.raw ref_out.raw --sd --code HRA_112_112 --testframes 
 
     <Load stm32 and run>
 
     cmp -l ref_out.raw stm_out.raw
+    << Check BER values in logs >>
 */
 
 #include <assert.h>
@@ -49,14 +50,15 @@ int testframes = 1;
 
 int main(int argc, char *argv[]) {    
     int         CodeLength, NumberParityBits;
-    int         i, r, num_ok, num_runs, parityCheckCount, state, next_state;
-    char        out_char[HRA_112_112_CODELENGTH], *adetected_data;
+    int         i, parityCheckCount;
+    char        out_char[HRA_112_112_CODELENGTH];
     struct LDPC ldpc;
-    float       *ainput;
     int         data_bits_per_frame;
     FILE        *fin, *fout;
     int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
+
+    int   nread, offset, frame;
 
     semihosting_init();
 
@@ -74,10 +76,8 @@ int main(int argc, char *argv[]) {
     ldpc.NumberRowsHcols = HRA_112_112_NUMBERROWSHCOLS;
     ldpc.max_row_weight = HRA_112_112_MAX_ROW_WEIGHT;
     ldpc.max_col_weight = HRA_112_112_MAX_COL_WEIGHT;
-    ldpc.H_rows = HRA_112_112_H_rows;
-    ldpc.H_cols = HRA_112_112_H_cols;
-    ainput = HRA_112_112_input;
-    adetected_data = HRA_112_112_detected_data;
+    ldpc.H_rows = (uint16_t *)HRA_112_112_H_rows;
+    ldpc.H_cols = (uint16_t *)HRA_112_112_H_cols;
 
     CodeLength = ldpc.CodeLength;
     NumberParityBits = ldpc.NumberParityBits;
@@ -109,133 +109,76 @@ int main(int argc, char *argv[]) {
 
     fin = fopen("stm_in.raw", "rb");
     if (fin == NULL) {
-        /* test mode --------------------------------------------------------*/
-
-        fprintf(stderr, "Starting test using pre-compiled test data .....\n");
-        fprintf(stderr, "Codeword length: %d\n",  CodeLength);
-        fprintf(stderr, "Parity Bits....: %d\n",  NumberParityBits);
-
-        num_runs = 1; num_ok = 0;
-
-        for(r=0; r<num_runs; r++) {
-
-            fprintf(stderr, "Run %d\n", r);
-
-            PROFILE_SAMPLE(ldpc_decode);
-            run_ldpc_decoder(&ldpc, out_char, ainput, &parityCheckCount);
-            PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
-            //fprintf(stderr, "iter: %d\n", iter);
-            total_iters += iter;
-
-            int ok = 0;
-            for (i=0; i<CodeLength; i++) {
-                if (out_char[i] == adetected_data[i])                    
-                    ok++;
-            }
-
-            if (ok == CodeLength)
-                num_ok++;            
-        }
-
-        fprintf(stderr, "test runs......: %d\n",  num_runs);
-        fprintf(stderr, "test runs OK...: %d\n",  num_ok);
-        if (num_runs == num_ok)
-            fprintf(stderr, "test runs OK...: PASS\n");
-        else
-            fprintf(stderr, "test runs OK...: FAIL\n");
+        fprintf(stderr, "Error opening input file\n");
+        fflush(stderr);
+        exit(1);
     }
-    else {
-        /* File I/O mode ------------------------------------------------*/
 
-        int   nread, offset, frame;
+    fout = fopen("stm_out.raw", "wb");
+    if (fout == NULL) {
+        fprintf(stderr, "Error opening output file\n");
+        fflush(stderr);
+        exit(1);
+    }
 
-        fout = fopen("stm_out.raw", "wb");
-        if (fout == NULL) {
-            fprintf(stderr, "Error opening output file\n");
-            exit(1);
+
+    double *input_double = calloc(CodeLength, sizeof(double));
+    float  *input_float  = calloc(CodeLength, sizeof(float));
+
+    nread = CodeLength;
+    offset = 0;
+    fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
+
+    frame = 0;
+    while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
+       fprintf(stderr, "frame %d\n", frame);
+
+       if (testframes) {
+            char in_char;
+            for (i=0; i<data_bits_per_frame; i++) {
+                in_char = input_double[i] < 0;
+                if (in_char != ibits[i]) {
+                    Terrs_raw++;
+                }
+                Tbits_raw++;
+            }
+            for (i=0; i<NumberParityBits; i++) {
+                in_char = input_double[i+data_bits_per_frame] < 0;
+                if (in_char != pbits[i]) {
+                    Terrs_raw++;
+                }
+                Tbits_raw++;
+            }
+        }
+        sd_to_llr(input_float, input_double, CodeLength);
+
+        PROFILE_SAMPLE(ldpc_decode);
+        iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
+        PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
+        //fprintf(stderr, "iter: %d\n", iter);
+        total_iters += iter;
+
+        for(i=0; i<offset; i++) {
+            input_float[i] = input_float[i+offset];
         }
 
-        state = 0; 
-        frame = 0;
+        fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
 
-        double *input_double = calloc(CodeLength, sizeof(double));
-        float  *input_float  = calloc(CodeLength, sizeof(float));
-
-        nread = CodeLength;
-        offset = 0;
-        fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
-
-        while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
-           if (testframes) {
-                char in_char;
-                for (i=0; i<data_bits_per_frame; i++) {
-                    in_char = input_double[i] < 0;
-                    if (in_char != ibits[i]) {
-                        Terrs_raw++;
-                    }
-                    Tbits_raw++;
+        if (testframes) {
+            for (i=0; i<data_bits_per_frame; i++) {
+                if (out_char[i] != ibits[i]) {
+                    Terrs++;
+                    //fprintf(stderr, "%d %d %d\n", i, out_char[i], ibits[i]);
                 }
-                for (i=0; i<NumberParityBits; i++) {
-                    in_char = input_double[i+data_bits_per_frame] < 0;
-                    if (in_char != pbits[i]) {
-                        Terrs_raw++;
-                    }
-                    Tbits_raw++;
-                }
-            }
-            sd_to_llr(input_float, input_double, CodeLength);
-
-            PROFILE_SAMPLE(ldpc_decode);
-            iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
-            PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
-            //fprintf(stderr, "iter: %d\n", iter);
-            total_iters += iter;
-
-            // Output all data packets, based on initial FEC sync
-            // estimate.  Useful for testing with cohpsk_put_bits,
-            // as it maintains sync with test bits state machine.
-                
-            next_state = state;
-            switch(state) {
-            case 0:
-                if (iter < ldpc.max_iter) {
-                    /* OK we've found which frame to sync on */
-                    next_state = 1;
-                    frame = 0;
-                }
-                break;
-            case 1:
-                frame++;
-                if ((frame % 2) == 0) {
-                    /* write decoded packets every second input frame */
-                    fwrite(out_char, sizeof(char), ldpc.NumberRowsHcols, fout);
-                }
-                break;
-            }
-            state = next_state;
-            //fprintf(stderr, "state: %d iter: %d\n", state, iter);
-
-            for(i=0; i<offset; i++) {
-                input_float[i] = input_float[i+offset];
-            }
-
-            if (testframes) {
-                for (i=0; i<data_bits_per_frame; i++) {
-                    if (out_char[i] != ibits[i]) {
-                        Terrs++;
-                        //fprintf(stderr, "%d %d %d\n", i, out_char[i], ibits[i]);
-                    }
-                    Tbits++;
-                }
+                Tbits++;
             }
         }
 
-        fclose(fout);
-    }  
+        frame++;
+    }
 
-//    ldpc_free_mem(&ldpc);
-
-    if (fin  != NULL) fclose(fin);
+    fclose(fin);
+    fclose(fout);
 
     fprintf(stderr, "total iters %d\n", total_iters);
     

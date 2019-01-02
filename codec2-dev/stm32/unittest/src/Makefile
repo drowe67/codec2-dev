@@ -406,6 +406,7 @@ $(CODEC2_SRC)/phi0.c \
 $(CODEC2_SRC)/mpdecode_core.c \
 $(CODEC2_SRC)/gp_interleaver.c \
 $(CODEC2_SRC)/interldpc.c \
+$(CODEC2_SRC)/HRA_112_112.c \
 
 CFLAGS += -D__EMBEDDED__
 CFLAGS += -I$(CODEC2_SRC)
@@ -643,7 +644,7 @@ TST_LDPC_DEC_HDR= \
 $(CODEC2_INC)/mpdecode_code.h
 #
 tst_ldpc_dec.elf: $(TST_LDPC_DEC_SRCS:.c=.profile.o) libstm32f4.a $(TST_LDPC_DEC_HRDS)
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_ldpc_dec.map
 
 # -----------------------------------------------
 TST_SEMIHOST_SRCS=\
