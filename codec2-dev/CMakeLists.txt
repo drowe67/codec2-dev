@@ -125,9 +125,10 @@ endif()
 
 
 # Math library is automatic on windows
-cmake_policy(SET CMP0075 NEW)
+if(POLICY CMP0075)
+    cmake_policy(SET CMP0075 NEW)
+endif()
 if(UNIX)
-    #set(CMAKE_REQUIRED_INCLUDES math.h)
     set(CMAKE_REQUIRED_LIBRARIES m)
 endif(UNIX)
 
