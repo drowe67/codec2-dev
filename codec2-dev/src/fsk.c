@@ -172,10 +172,10 @@ struct FSK * fsk_create_hbr(int Fs, int Rs,int P,int M, int tx_f1, int tx_fs)
     
     fsk->Ndft = Ndft;
     
-    fsk->est_min = Rs/2;
+    fsk->est_min = Rs/4;
     if(fsk->est_min<0) fsk->est_min = 0;
     
-    fsk->est_max = (Fs/2)-Rs;
+    fsk->est_max = (Fs/2)-Rs/4;
     
     fsk->est_space = Rs-(Rs/5);
     
