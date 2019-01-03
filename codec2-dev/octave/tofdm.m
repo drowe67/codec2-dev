@@ -171,17 +171,25 @@ end
 % Run C version and plot Octave and C states and differences 
 % ---------------------------------------------------------------------
 
-% Override default path by setting path_to_tofdm = "/your/path/to/tofdm"
-
 printf("\nRunning C version....\n");
+
+% Override default path by:
+%   1. if running from octave CLI: setting path_to_tofdm = "/your/path/to/tofdm"
+%   2. If running from shell....." set PATH_TO_OFDM = "/your/path/to/tofdm"
+
 if exist("path_to_tofdm", "var") == 0
-   cml_support
-   if (cml_support)
-     path_to_tofdm = "../build_linux/unittest/tofdm"
-   else
-     path_to_tofdm = "../build_linux/unittest/tofdm --noldpc"
-   end
+  path_to_tofdm = "../build_linux/unittest/tofdm"
 end
+
+if getenv("PATH_TO_TOFDM")
+  path_to_tofdm = getenv("PATH_TO_TOFDM")
+  printf("setting path from env var\n");
+end
+
+if cml_support == 0
+  path_to_tofdm = sprintf("%s --noldpc", path_to_tofdm);
+end
+
 system(path_to_tofdm);
 
 load tofdm_out.txt;
