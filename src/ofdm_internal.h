@@ -72,9 +72,11 @@ struct OFDM {
     complex float *pilots;
     complex float **rx_sym;
     complex float *rx_np;
-    complex float **wcol;
 
+#ifndef CORTEX_M4
     float *w;
+#endif
+
     float *rx_amp;
     float *aphase_est_pilot_log;
 
