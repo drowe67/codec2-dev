@@ -38,8 +38,6 @@ extern void quisk_cfTune(struct quisk_cfFilter *, float);
 extern void quisk_ccfFilter(complex float *, complex float *, int, struct quisk_cfFilter *);
 
 extern float quiskFilt120t480[480];
-extern float filtP750S1040[106];
 extern float filtP550S750[160];
-extern float filtP550S840[110];
 
 #endif

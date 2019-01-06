@@ -512,7 +512,9 @@ int main(int argc, char *argv[])
     fout = fopen("tofdm_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tofdm.c\n");
+#ifndef CORTEX_M4
     octave_save_float(fout, "w_c", (float*)ofdm->w, 1, ofdm_nc + 2, ofdm_nc + 2);
+#endif
     octave_save_complex(fout, "pilot_samples_c", (COMP*)ofdm->pilot_samples, 1, ofdm_m+ofdm_ncp, ofdm_m+ofdm_ncp);
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, ofdm_bitsperframe*NFRAMES);
     octave_save_complex(fout, "tx_log_c", (COMP*)tx_log, 1, ofdm_samplesperframe*NFRAMES,  ofdm_samplesperframe*NFRAMES);
