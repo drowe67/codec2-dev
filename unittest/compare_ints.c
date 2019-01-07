@@ -112,7 +112,7 @@ int main(int argc, char *argv[]) {
 
     while (get_data(f1, &data1, signed_flag, bytes)) {
         if (!get_data(f2, &data2, signed_flag, bytes)) {
-            fprintf(stderr, "Error: file2 is shorter!");
+            fprintf(stderr, "Error: file2 is shorter\n");
             exit(1);
             }
         uint64_t err = llabs(data1 - data2);
@@ -122,6 +122,10 @@ int main(int argc, char *argv[]) {
             }
         rms_sum += (err * err);
         count ++;
+        }
+    if (get_data(f2, &data2, signed_flag, bytes)) {
+        fprintf(stderr, "Error: file1 is shorter\n");
+        exit(1);
         }
 
     if (errors) {
