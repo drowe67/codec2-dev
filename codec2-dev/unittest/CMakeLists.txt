@@ -41,5 +41,7 @@ target_link_libraries(tnewamp1 codec2)
 
 add_executable(compare_ints compare_ints.c)
 
+add_executable(compare_floats compare_floats.c)
+
 add_executable(test_phi0 test_phi0.c ../src/phi0.c)
 target_link_libraries(test_phi0 m)
