@@ -11,10 +11,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <assert.h>
 #include "mpdecode_core.h"
 #ifndef USE_ORIGINAL_PHI0
 #include "phi0.h"
 #endif
+
+#include "debug_alloc.h"
 
 #ifdef __EMBEDDED__
 #include "machdep.h"
@@ -23,8 +26,6 @@
 #define QPSK_CONSTELLATION_SIZE 4
 #define QPSK_BITS_PER_SYMBOL    2
 
-#undef PRINT_PROGRESS
-#undef PRINT_ALLOCS
 
 /* QPSK constellation for symbol likelihood calculations */
 
@@ -35,6 +36,38 @@ static COMP S_matrix[] = {
     {-1.0f,  0.0f}
 };
 
+// c_nodes will be an array of NumberParityBits of struct c_node
+// Each c_node contains an array of <degree> c_sub_node elements
+// This structure reduces the indexing caluclations in SumProduct()
+
+struct c_sub_node { // Order is important here to keep total size small.
+  uint16_t index;   // Values from H_rows (except last 2 entries)
+  uint16_t socket;  // The socket number at the v_node
+  float    message; // modified during operation!
+};
+
+struct c_node {
+  int degree;       // A count of elements in the following arrays
+  struct c_sub_node *subs;
+};
+
+// v_nodes will be an array of CodeLength of struct v_node
+
+struct v_sub_node {
+  uint16_t index;  //    the index of a c_node it is connected to
+                   //    Filled with values from H_cols (except last 2 entries)
+  uint16_t socket; //    socket number at the c_node
+  float message;   //    Loaded with input data
+                   //    modified during operation!
+  uint8_t sign;    //    1 if input is negative
+                   //    modified during operation!
+};
+
+struct v_node {
+  int degree;       // A count of ???
+  float initial_value;
+  struct v_sub_node *subs;
+};
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]) {
     unsigned int p, i, tmp, par, prev=0;
@@ -179,25 +212,26 @@ void init_c_v_nodes(struct c_node *c_nodes,
 
         if (shift ==0){
             for (i=0;i<NumberParityBits;i++) {
-                /* now that we know the size, we can dynamically allocate memory */
-                c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
-                c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
-                c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
 
+                // Allocate sub nodes
+                c_nodes[i].subs = CALLOC(c_nodes[i].degree, sizeof(struct c_sub_node));
+                assert(c_nodes[i].subs);
+
+	        // Populate sub nodes
                 for (j=0;j<c_nodes[i].degree-2;j++) {
-                    c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                    c_nodes[i].subs[j].index = (H_rows[i+j*NumberParityBits] - 1);
                 }
                 j=c_nodes[i].degree-2;
 
                 if (i==0){
-                    c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                    c_nodes[i].subs[j].index = (H_rows[i+j*NumberParityBits] - 1);
                 }
                 else {
-                    c_nodes[i].index[j] = (CodeLength-NumberParityBits)+i-1;
+                    c_nodes[i].subs[j].index = (CodeLength-NumberParityBits)+i-1;
                 }
 
                 j=c_nodes[i].degree-1;
-                c_nodes[i].index[j] = (CodeLength-NumberParityBits)+i;
+                c_nodes[i].subs[j].index = (CodeLength-NumberParityBits)+i;
 
             }
         }
@@ -206,25 +240,27 @@ void init_c_v_nodes(struct c_node *c_nodes,
             for (i=0;i<(NumberParityBits/shift);i++){
 
                 for (k =0;k<shift;k++){
-                    c_nodes[cnt].index =  calloc( c_nodes[cnt].degree, sizeof( int ) );
-                    c_nodes[cnt].message =calloc( c_nodes[cnt].degree, sizeof( float ) );
-                    c_nodes[cnt].socket = calloc( c_nodes[cnt].degree, sizeof( int ) );
 
+                    // Allocate sub nodes
+                    c_nodes[cnt].subs = CALLOC(c_nodes[cnt].degree, sizeof(struct c_sub_node));
+                    assert(c_nodes[cnt].subs);
+
+	            // Populate sub nodes
                     for (j=0;j<c_nodes[cnt].degree-2;j++) {
-                        c_nodes[cnt].index[j] = (int) (H_rows[cnt+j*NumberParityBits] - 1);
+                        c_nodes[cnt].subs[j].index = (H_rows[cnt+j*NumberParityBits] - 1);
                     }
                     j=c_nodes[cnt].degree-2;
                     if ((i ==0)||(i==(NumberParityBits/shift-1))){
-                        c_nodes[cnt].index[j] = (int) (H_rows[cnt+j*NumberParityBits] - 1);
+                        c_nodes[cnt].subs[j].index = (H_rows[cnt+j*NumberParityBits] - 1);
                     }
                     else{
-                        c_nodes[cnt].index[j] = (CodeLength-NumberParityBits)+k+shift*(i);
+                        c_nodes[cnt].subs[j].index = (CodeLength-NumberParityBits)+k+shift*(i);
                     }
                     j=c_nodes[cnt].degree-1;
-                    c_nodes[cnt].index[j] = (CodeLength-NumberParityBits)+k+shift*(i+1);
+                    c_nodes[cnt].subs[j].index = (CodeLength-NumberParityBits)+k+shift*(i+1);
                     if (i== (NumberParityBits/shift-1))
                         {
-                            c_nodes[cnt].index[j] = (CodeLength-NumberParityBits)+k+shift*(i);
+                            c_nodes[cnt].subs[j].index = (CodeLength-NumberParityBits)+k+shift*(i);
                         }
                     cnt++;
                 }
@@ -233,12 +269,13 @@ void init_c_v_nodes(struct c_node *c_nodes,
 
     } else {
         for (i=0;i<NumberParityBits;i++) {
-            /* now that we know the size, we can dynamically allocate memory */
-            c_nodes[i].index =  calloc( c_nodes[i].degree, sizeof( int ) );
-            c_nodes[i].message =calloc( c_nodes[i].degree, sizeof( float ) );
-            c_nodes[i].socket = calloc( c_nodes[i].degree, sizeof( int ) );
+            // Allocate sub nodes
+            c_nodes[i].subs = CALLOC(c_nodes[i].degree, sizeof(struct c_sub_node));
+            assert(c_nodes[i].subs);
+
+	    // Populate sub nodes
             for (j=0;j<c_nodes[i].degree;j++){
-                c_nodes[i].index[j] = (int) (H_rows[i+j*NumberParityBits] - 1);
+                c_nodes[i].subs[j].index = (H_rows[i+j*NumberParityBits] - 1);
             }
         }
     }
@@ -283,11 +320,11 @@ void init_c_v_nodes(struct c_node *c_nodes,
     /* set up v_nodes */
 
     for (i=0;i<CodeLength;i++) {
-        /* allocate memory according to the degree of the v-node */
-        v_nodes[i].index = calloc( v_nodes[i].degree, sizeof( int ) );
-        v_nodes[i].message = calloc( v_nodes[i].degree, sizeof( float ) );
-        v_nodes[i].sign = calloc( v_nodes[i].degree, sizeof( int ) );
-        v_nodes[i].socket = calloc( v_nodes[i].degree, sizeof( int ) );
+        // Allocate sub nodes
+        v_nodes[i].subs = CALLOC(v_nodes[i].degree, sizeof(struct v_sub_node));
+        assert(v_nodes[i].subs);
+
+	// Populate sub nodes
 
         /* index tells which c-nodes this v-node is connected to */
         v_nodes[i].initial_value = input[i];
@@ -295,7 +332,7 @@ void init_c_v_nodes(struct c_node *c_nodes,
 
         for (j=0;j<v_nodes[i].degree;j++) {
             if ((H1)&& (i>=CodeLength-NumberParityBits+shift)){
-                v_nodes[i].index[j]=i-(CodeLength-NumberParityBits+shift)+count;
+                v_nodes[i].subs[j].index=i-(CodeLength-NumberParityBits+shift)+count;
                 if (shift ==0){
                     count=count+1;
                 }
@@ -303,23 +340,23 @@ void init_c_v_nodes(struct c_node *c_nodes,
                     count=count+shift;
                 }
             } else  {
-                v_nodes[i].index[j] = (int) (H_cols[i+j*NumberRowsHcols] - 1);
+                v_nodes[i].subs[j].index = (H_cols[i+j*NumberRowsHcols] - 1);
             }
 
             /* search the connected c-node for the proper message value */
-            for (c_index=0;c_index<c_nodes[ v_nodes[i].index[j] ].degree;c_index++)
-                if ( c_nodes[ v_nodes[i].index[j] ].index[c_index] == i ) {
-                    v_nodes[i].socket[j] = c_index;
+            for (c_index=0;c_index<c_nodes[ v_nodes[i].subs[j].index ].degree;c_index++)
+                if ( c_nodes[ v_nodes[i].subs[j].index ].subs[c_index].index == i ) {
+                    v_nodes[i].subs[j].socket = c_index;
                     break;
                 }
             /* initialize v-node with received LLR */
             if ( dec_type == 1)
-                v_nodes[i].message[j] = fabs(input[i]);
+                v_nodes[i].subs[j].message = fabs(input[i]);
             else
-                v_nodes[i].message[j] = phi0( fabs(input[i]) );
+                v_nodes[i].subs[j].message = phi0( fabs(input[i]) );
 
             if (input[i] < 0)
-                v_nodes[i].sign[j] = 1;
+                v_nodes[i].subs[j].sign = 1;
         }
 
     }
@@ -331,9 +368,9 @@ void init_c_v_nodes(struct c_node *c_nodes,
         /* index tells which v-nodes this c-node is connected to */
         for (j=0;j<c_nodes[i].degree;j++) {
             /* search the connected v-node for the proper message value */
-            for (v_index=0;v_index<v_nodes[ c_nodes[i].index[j] ].degree;v_index++)
-                if (v_nodes[ c_nodes[i].index[j] ].index[v_index] == i ) {
-                    c_nodes[i].socket[j] = v_index;
+            for (v_index=0;v_index<v_nodes[ c_nodes[i].subs[j].index ].degree;v_index++)
+                if (v_nodes[ c_nodes[i].subs[j].index ].subs[v_index].index == i ) {
+                    c_nodes[i].subs[j].socket = v_index;
                     break;
                 }
         }
@@ -342,6 +379,7 @@ void init_c_v_nodes(struct c_node *c_nodes,
 }
 
 
+///////////////////////////////////////
 /* function for doing the MP decoding */
 // Returns the iteration count
 int SumProduct( int       *parityCheckCount,
@@ -364,19 +402,9 @@ int SumProduct( int       *parityCheckCount,
   float Qi;
   int   ssum;
 
-  #ifdef PRINT_PROGRESS
-  fprintf(stderr, "SumProduct\n");
-  #endif
-
-//#ifdef __EMBEDDED__
-//PROFILE_VAR(ldpc_SP_iter, ldpc_SP_upr, ldpc_SP_upq, ldpc_SP_misc);
-//#endif
 
   result = max_iter;
   for (iter=0;iter<max_iter;iter++) {
-    #ifdef PRINT_PROGRESS
-    fprintf(stderr, "  iter %d\n", iter);
-    #endif
 
     for(i=0; i<CodeLength; i++) DecodedBits[i] = 0; // Clear each pass!
     bitErrors = 0;
@@ -384,21 +412,26 @@ int SumProduct( int       *parityCheckCount,
     /* update r */
     ssum = 0;
     for (j=0;j<NumberParityBits;j++) {
-      sign = v_nodes[ c_nodes[j].index[0] ].sign[ c_nodes[j].socket[0] ];
-      phi_sum = v_nodes[ c_nodes[j].index[0] ].message[ c_nodes[j].socket[0] ];
+      sign = v_nodes[ c_nodes[j].subs[0].index ].subs[ c_nodes[j].subs[0].socket ].sign;
+      phi_sum = v_nodes[ c_nodes[j].subs[0].index ].subs[ c_nodes[j].subs[0].socket ].message;
 
       for (i=1;i<c_nodes[j].degree;i++) {
-        phi_sum += v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ];
-        sign ^= v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ];
+        // Compiler should optomize this but write the best we can to start from.
+        struct c_sub_node *cp = &c_nodes[j].subs[i];
+        struct v_sub_node *vp = &v_nodes[ cp->index ].subs[ cp->socket ];
+	    phi_sum += vp->message;
+	    sign ^= vp->sign;
       }
 
       if (sign==0) ssum++;
 
       for (i=0;i<c_nodes[j].degree;i++) {
-        if ( sign^v_nodes[ c_nodes[j].index[i] ].sign[ c_nodes[j].socket[i] ] ) {
-          c_nodes[j].message[i] = -phi0( phi_sum - v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ] )*r_scale_factor;
+        struct c_sub_node *cp = &c_nodes[j].subs[i];
+        struct v_sub_node *vp = &v_nodes[ cp->index ].subs[ cp->socket ];
+	    if ( sign ^ vp->sign ) {
+	      cp->message = -phi0( phi_sum - vp->message ); // *r_scale_factor;
         } else
-          c_nodes[j].message[i] = phi0( phi_sum - v_nodes[ c_nodes[j].index[i] ].message[ c_nodes[j].socket[i] ] )*r_scale_factor;
+	      cp->message =  phi0( phi_sum - vp->message ); // *r_scale_factor;
       }
     }
 
@@ -408,7 +441,8 @@ int SumProduct( int       *parityCheckCount,
       /* first compute the LLR */
       Qi = v_nodes[i].initial_value;
       for (j=0;j<v_nodes[i].degree;j++) {
-        Qi += c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
+        struct v_sub_node *vp = &v_nodes[i].subs[j];
+	    Qi += c_nodes[ vp->index ].subs[ vp->socket ].message;
       }
 
       /* make hard decision */
@@ -418,13 +452,14 @@ int SumProduct( int       *parityCheckCount,
 
       /* now subtract to get the extrinsic information */
       for (j=0;j<v_nodes[i].degree;j++) {
-        temp_sum = Qi - c_nodes[ v_nodes[i].index[j] ].message[ v_nodes[i].socket[j] ];
+        struct v_sub_node *vp = &v_nodes[i].subs[j];
+	    temp_sum = Qi - c_nodes[ vp->index ].subs[ vp->socket ].message;
 
-        v_nodes[i].message[j] = phi0( fabs( temp_sum ) )*q_scale_factor;
+	    vp->message = phi0( fabs( temp_sum ) ); // *q_scale_factor;
         if (temp_sum > 0)
-          v_nodes[i].sign[j] = 0;
+	      vp->sign = 0;
         else
-          v_nodes[i].sign[j] = 1;
+	      vp->sign = 1;
       }
     }
 
@@ -433,28 +468,16 @@ int SumProduct( int       *parityCheckCount,
       if ( DecodedBits[i] != data[i] )
             bitErrors++;
 
-    #ifdef PRINT_PROGRESS
-    fprintf(stderr, "    bitErrors is %d \n", bitErrors);
-    #endif
 
     /* Halt if zero errors */
     if (bitErrors == 0) {
-      #ifdef PRINT_PROGRESS
-      fprintf(stderr, "    SumProducts: 0 errors\n");
-      #endif
       result = iter + 1;
       break;
     }
 
     // count the number of PC satisfied and exit if all OK
-    #ifdef PRINT_PROGRESS
-    fprintf(stderr, "    ssum is %d \n", ssum);
-    #endif
     *parityCheckCount = ssum;
     if (ssum==NumberParityBits)  {
-      #ifdef PRINT_PROGRESS
-      fprintf(stderr, "    SumProducts: ssum == NumParityBits\n");
-      #endif
       result = iter + 1;
       break;
     }
@@ -462,9 +485,6 @@ int SumProduct( int       *parityCheckCount,
 
   }
 
-#ifdef PRINT_PROGRESS
-fprintf(stderr, "SumProducts %d iterations\n", result);
-#endif
 return(result);
 }
 
@@ -491,7 +511,8 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *par
     NumberParityBits = ldpc->NumberParityBits;
     NumberRowsHcols = ldpc->NumberRowsHcols;
 
-    char *DecodedBits = calloc( CodeLength, sizeof( char ) );
+    char *DecodedBits = CALLOC( CodeLength, sizeof( char ) );
+    assert(DecodedBits);
 
     /* derive some parameters */
 
@@ -505,20 +526,19 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *par
 
     max_row_weight = ldpc->max_row_weight;
     max_col_weight = ldpc->max_col_weight;
-    /*
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
-    */
+
     /* initialize c-node and v-node structures */
 
-    c_nodes = calloc( NumberParityBits, sizeof( struct c_node ) );
-    v_nodes = calloc( CodeLength, sizeof( struct v_node));
+    c_nodes = CALLOC( NumberParityBits, sizeof( struct c_node ) );
+    assert(c_nodes);
+    v_nodes = CALLOC( CodeLength, sizeof( struct v_node));
+    assert(v_nodes);
 
     init_c_v_nodes(c_nodes, shift, NumberParityBits, max_row_weight, ldpc->H_rows, H1, CodeLength,
                    v_nodes, NumberRowsHcols, ldpc->H_cols, max_col_weight, dec_type, input);
 
     int DataLength = CodeLength - NumberParityBits;
-    int *data_int = calloc( DataLength, sizeof(int) );
+    int *data_int = CALLOC( DataLength, sizeof(int) );
 
     /* need to clear these on each call */
 
@@ -533,30 +553,14 @@ int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *par
 
     /* Clean up memory */
 
-    free(DecodedBits);
-    free( data_int );
+    FREE(DecodedBits);
+    FREE( data_int );
 
-    /*  Cleaning c-node elements */
+    for (i=0;i<NumberParityBits;i++) FREE( c_nodes[i].subs );
+    FREE( c_nodes );
 
-    for (i=0;i<NumberParityBits;i++) {
-        free( c_nodes[i].index );
-        free( c_nodes[i].message );
-        free( c_nodes[i].socket );
-    }
-
-    /* printf( "Cleaning c-nodes \n" ); */
-    free( c_nodes );
-
-    /* printf( "Cleaning v-node elements\n" ); */
-    for (i=0;i<CodeLength;i++) {
-        free( v_nodes[i].index);
-        free( v_nodes[i].sign );
-        free( v_nodes[i].message );
-        free( v_nodes[i].socket );
-    }
-
-    /* printf( "Cleaning v-nodes \n" ); */
-    free( v_nodes );
+    for (i=0;i<CodeLength;i++) FREE( v_nodes[i].subs);
+    FREE( v_nodes );
 
     return iter;
 }

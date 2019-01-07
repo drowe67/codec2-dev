@@ -11,8 +11,9 @@
 #ifndef __MPDECODE_CORE__
 #define __MPDECODE_CORE__
 
-#include "comp.h"
 #include <stdint.h>
+
+#include "comp.h"
 
 struct LDPC {
     int max_iter;
@@ -36,14 +37,14 @@ extern void ldpc_free_mem(struct LDPC *ldpc);
 
 extern void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-int run_ldpc_decoder(struct LDPC *ldpc, void *ldoc_common, char out_char[], 
-			float input[], int *parityCheckCount);
+int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], 
+		     float input[], int *parityCheckCount);
 extern void ldpc_dump_nodes(struct LDPC *ldpc);
 
 extern void sd_to_llr(float llr[], double sd[], int n);
 
-extern void Demod2D(double symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
-extern void Somap(double bit_likelihood[], double symbol_likelihood[], int number_symbols);
-extern void symbols_to_llrs(double llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
+extern void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);
+extern void Somap(float bit_likelihood[], float symbol_likelihood[], int number_symbols);
+extern void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float EsNo, float mean_amp, int nsyms);
 
 #endif

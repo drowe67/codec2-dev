@@ -329,8 +329,12 @@ target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ofdm_mod ofdm_mod.c)
 target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
+#add_definitions(-DDEBUG_ALLOC)
 add_executable(ofdm_demod ofdm_demod.c octave.c)
 target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
+
+add_executable(ofdm_demod_test ofdm_demod_test.c octave.c mpdecode_core_test.c)
+target_link_libraries(ofdm_demod_test ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fmfsk_mod fmfsk_mod.c)
 target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)

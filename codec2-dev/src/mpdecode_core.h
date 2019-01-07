@@ -43,21 +43,5 @@ void symbols_to_llrs(float llr[], COMP rx_qpsk_symbols[], float rx_amps[], float
 
 void ldpc_print_info(struct LDPC *ldpc);
 
-struct v_node {
-  int degree;
-  float initial_value;
-  int *index;  /* the index of a c_node it is connected to */
-  int *socket; /* socket number at the c_node */
-  float *message;     
-  int *sign;
-};
-
-struct c_node {
-  int degree;
-  int *index;                     
-  float *message;     
-  int *socket; /* socket number at the v_node */
-};
-
 
 #endif

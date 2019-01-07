@@ -40,6 +40,8 @@
 #include "codec2_ofdm.h"
 #include "filter.h"
 
+#include "debug_alloc.h"
+
 /* Static Prototypes */
 
 static void dft(struct OFDM *, complex float *, complex float *);
@@ -214,13 +216,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Were ready to start filling in the OFDM structure now */
 
-    if ((ofdm = (struct OFDM *) malloc(sizeof (struct OFDM))) == NULL) {
+    if ((ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM))) == NULL) {
         return NULL;
     }
 
-    ofdm->pilot_samples = malloc(sizeof (complex float) * (ofdm_m + ofdm_ncp));
-    ofdm->rxbuf = malloc(sizeof (complex float) * ofdm_rxbuf);
-    ofdm->pilots = malloc(sizeof (complex float) * (ofdm_nc + 2));
+    ofdm->pilot_samples = MALLOC(sizeof (complex float) * (ofdm_m + ofdm_ncp));
+    if (ofdm->pilot_samples == NULL) goto error_pilot_samples;
+    ofdm->rxbuf = MALLOC(sizeof (complex float) * ofdm_rxbuf);
+    if (ofdm->rxbuf == NULL) goto error_rxbuf;
+    ofdm->pilots = MALLOC(sizeof (complex float) * (ofdm_nc + 2));
+    if (ofdm->pilots == NULL) goto error_pilots;
 
     /*
      * rx_sym is a 2D array of variable size
@@ -228,27 +233,43 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * allocate rx_sym row storage. It is a pointer to a pointer
      */
 
-    ofdm->rx_sym = malloc(sizeof (complex float) * (ofdm_ns + 3));
+    ofdm->rx_sym = MALLOC(sizeof (complex float) * (ofdm_ns + 3));
+    if (ofdm->rx_sym == NULL) goto error_rx_sym;
 
     /* allocate rx_sym column storage */ 
 
-    for (i = 0; i <  (ofdm_ns + 3); i++) {
-        ofdm->rx_sym[i] = (complex float *) malloc(sizeof(complex float) * (ofdm_nc + 2));
+    int free_last_rx_sym = 0;
+    for (i = 0; i < (ofdm_ns + 3); i++) {
+        ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * (ofdm_nc + 2));
+	if (ofdm->rx_sym[i] == NULL) {
+    	    free_last_rx_sym = i;
+	    goto error_rx_sym2;
+        }
+    	free_last_rx_sym = (ofdm_ns + 3);
     }
 
     /* The rest of these are 1D arrays of variable size */
 
 #ifndef CORTEX_M4
-    ofdm->w = malloc(sizeof (float) * (ofdm_nc + 2));
+    ofdm->w = MALLOC(sizeof (float) * (ofdm_nc + 2));
+    if (ofdm->w == NULL) goto error_w ;
 #endif
-    ofdm->rx_np = malloc(sizeof (complex float) * (ofdm_rowsperframe * ofdm_nc));
-    ofdm->rx_amp = malloc(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
-    ofdm->aphase_est_pilot_log = malloc(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
-    ofdm->tx_uw = malloc(sizeof (int) * ofdm_nuwbits);
-    ofdm->sync_state = malloc(sizeof (char) * ofdm_state_str);
-    ofdm->last_sync_state = malloc(sizeof (char) * ofdm_state_str);
-    ofdm->sync_state_interleaver = malloc(sizeof (char) * ofdm_state_str);
-    ofdm->last_sync_state_interleaver = malloc(sizeof (char) * ofdm_state_str);
+    ofdm->rx_np = MALLOC(sizeof (complex float) * (ofdm_rowsperframe * ofdm_nc));
+    if (ofdm->rx_np == NULL) goto error_rx_np ;
+    ofdm->rx_amp = MALLOC(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
+    if (ofdm->rx_amp == NULL) goto error_rx_amp ;
+    ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
+    if (ofdm->aphase_est_pilot_log == NULL) goto error_aphase_est_pilot_log ;
+    ofdm->tx_uw = MALLOC(sizeof (int) * ofdm_nuwbits);
+    if (ofdm->tx_uw == NULL) goto error_tx_uw ;
+    ofdm->sync_state = MALLOC(sizeof (char) * ofdm_state_str);
+    if (ofdm->sync_state == NULL) goto error_sync_state ;
+    ofdm->last_sync_state = MALLOC(sizeof (char) * ofdm_state_str);
+    if (ofdm->last_sync_state == NULL) goto error_last_sync_state ;
+    ofdm->sync_state_interleaver = MALLOC(sizeof (char) * ofdm_state_str);
+    if (ofdm->sync_state_interleaver == NULL) goto error_sync_state_interleaver ;
+    ofdm->last_sync_state_interleaver = MALLOC(sizeof (char) * ofdm_state_str);
+    if (ofdm->last_sync_state_interleaver == NULL) goto error_last_sync_state_interleaver ;
 
     /* store complex BPSK pilot symbols */
 
@@ -329,7 +350,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* create the OFDM waveform */
 
-    complex float temp[ofdm_m];
+    complex float *temp;
+    temp = MALLOC(sizeof (complex float) * ofdm_m);
+    if (temp == NULL) goto error_temp;
 
     idft(ofdm, temp, ofdm->pilots);
 
@@ -372,33 +395,71 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     quisk_cfTune(&ofdm->ofdm_tx_bpf, 1500.0f / ofdm_fs); // fixed value
 
     return ofdm; /* Success */
+
+    //// Error return points with free call in the reverse order of allocation:
+
+
+  error_temp:
+    FREE(temp);
+  error_last_sync_state_interleaver:
+    FREE(ofdm->last_sync_state_interleaver);
+  error_sync_state_interleaver:
+    FREE(ofdm->sync_state_interleaver);
+  error_last_sync_state:
+    FREE(ofdm->last_sync_state);
+  error_sync_state:
+    FREE(ofdm->sync_state);
+  error_aphase_est_pilot_log:
+    FREE(ofdm->aphase_est_pilot_log);
+  error_tx_uw:
+    FREE(ofdm->tx_uw);
+  error_rx_amp:
+    FREE(ofdm->rx_amp);
+#ifndef CORTEX_M4
+  error_w:
+    FREE(ofdm->w);
+#endif
+  error_rx_np:
+    FREE(ofdm->rx_np);
+  error_rx_sym2:
+    for (i = 0; i < free_last_rx_sym; i++) FREE(ofdm->rx_sym[i]);
+  error_rx_sym:
+    FREE(ofdm->rx_sym);
+  error_pilots:
+    FREE(ofdm->pilots);
+  error_rxbuf:
+    FREE(ofdm->rxbuf);
+  error_pilot_samples:
+    FREE(ofdm->pilot_samples);
+    FREE(ofdm);
+    return(NULL);
 }
 
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
     quisk_filt_destroy(&ofdm->ofdm_tx_bpf);
-    free(ofdm->pilot_samples);
-    free(ofdm->rxbuf);
-    free(ofdm->pilots);
+    FREE(ofdm->pilot_samples);
+    FREE(ofdm->rxbuf);
+    FREE(ofdm->pilots);
 
     for (i = 0; i < (ofdm_ns + 3); i++) { /* 2D array */
-        free(ofdm->rx_sym[i]);
+        FREE(ofdm->rx_sym[i]);
     }
 
-    free(ofdm->rx_sym);
-    free(ofdm->rx_np);
+    FREE(ofdm->rx_sym);
+    FREE(ofdm->rx_np);
 #ifndef CORTEX_M4
-    free(ofdm->w);
+    FREE(ofdm->w);
 #endif
-    free(ofdm->rx_amp);
-    free(ofdm->aphase_est_pilot_log);
-    free(ofdm->tx_uw);
-    free(ofdm->sync_state);
-    free(ofdm->last_sync_state);
-    free(ofdm->sync_state_interleaver);
-    free(ofdm->last_sync_state_interleaver);
-    free(ofdm);
+    FREE(ofdm->rx_amp);
+    FREE(ofdm->aphase_est_pilot_log);
+    FREE(ofdm->tx_uw);
+    FREE(ofdm->sync_state);
+    FREE(ofdm->last_sync_state);
+    FREE(ofdm->sync_state_interleaver);
+    FREE(ofdm->last_sync_state_interleaver);
+    FREE(ofdm);
 }
 
 /* Gray coded QPSK modulation function */
