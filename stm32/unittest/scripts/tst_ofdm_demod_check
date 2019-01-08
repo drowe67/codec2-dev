@@ -3,9 +3,9 @@
 
     Testing for tst_ofdm_demod_* tests
 
-    Usage tst_ofdm_demod_check quick|ideal|AWGN|fade|profile|ldpc|ldpc_AWGN|ldpc_fade
+    Usage tst_ofdm_demod_check <dummy_test_name> quick|ideal|AWGN|fade|profile|ldpc|ldpc_AWGN|ldpc_fade
 
-    Checks are different for each test, but similar
+    Checks are different for each option, but similar
 
     - Convert stm32 output to octave text foramt
       (stm32 does not have memory for this)
@@ -142,12 +142,20 @@ def write_syms_as_octave(syms, amps):
 # Main
 ##############################################################################
 
-#### Options (test name)
+#### Options
 argparser = argparse.ArgumentParser()
-argparser.add_argument("test", action="store",
+argparser.add_argument("test", action="store")
+argparser.add_argument("test_opt", action="store",
                         choices=["quick", "ideal", "AWGN", "fade", "profile",
                                  "ldpc", "ldpc_AWGN", "ldpc_fade" ])
 args = argparser.parse_args()
+
+# Use ENV value of UNITTEST_BASE from upper level shell script (default to .)
+if ('UNITTEST_BASE' in os.environ):
+    run_dir = os.environ['UNITTEST_BASE'] + "/test_run/"
+    run_dir += args.test + "_" + args.test_opt
+    print(run_dir)
+    os.chdir(run_dir)
 
 #### Settings
 # Defaults
@@ -158,28 +166,28 @@ tolerance_output_differences = 0
 tolerance_syms = 0.001
 tolerance_amps = 0.001
 # Per test settings
-if (args.test == "quick"):
+if (args.test_opt == "quick"):
     pass
-elif (args.test == "ideal"):
+elif (args.test_opt == "ideal"):
     pass
-elif (args.test == "AWGN"):
+elif (args.test_opt == "AWGN"):
     tolerance_output_differences = 1
     tolerance_syms = 0.005
-elif (args.test == "fade"):
+elif (args.test_opt == "fade"):
     pass
-elif (args.test == "profile"):
+elif (args.test_opt == "profile"):
     tolerance_output_differences = 1
     tolerance_syms = 0.005
     pass
-elif (args.test == "ldpc"):
+elif (args.test_opt == "ldpc"):
     pass
-elif (args.test == "ldpc_AWGN"):
+elif (args.test_opt == "ldpc_AWGN"):
     tolerance_output_differences = 10
-elif (args.test == "ldpc_fade"):
+elif (args.test_opt == "ldpc_fade"):
     tolerance_output_differences = 1
     pass
 else:
-    print("Error: Test {} not recognized".format(args.test))
+    print("Error: Test {} not recognized".format(args.test_opt))
     sys.exit(1)
 
 #### Check that we are in the test directory:

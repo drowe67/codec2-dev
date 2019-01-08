@@ -28,7 +28,7 @@ cd "${RUN_DIR}"
 
 declare -i Fails=0
 
-case "${TEST}" in
+case "${TEST_OPT}" in
 
     plain) LDPC="";;
     ldpc) LDPC="--ldpc";;
