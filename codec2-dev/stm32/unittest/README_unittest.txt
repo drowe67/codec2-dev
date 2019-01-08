@@ -16,6 +16,8 @@ Directory Structure:
 
    scripts     Where scripts for this unittest system are found
 
+   src         Where the stm32 sources and binaries are.
+
    lib         Where includable files for this unittest system are found
       /python     python library files
       /octave     octave library files
@@ -23,8 +25,14 @@ Directory Structure:
    test_run    Each test is run in a subdirectory here.
 
 
+Compiling:
+
+   cd to the src directory and run "make clean all".
+
+
 Test Run Scripts:
 
+XXXXX
    The basics of running each test are included as comments in the test's
    source code.  However some test code is used be multiple tests and 
    some tests have several actions to setup their data or check their
@@ -41,6 +49,7 @@ Test Run Scripts:
 
    If none of these options are given, then all of the steps will be 
    run, in order.
+XXXXX
 
 
 Debug and semihosting:
@@ -56,14 +65,15 @@ Debug and semihosting:
    After compiling it can be installed anywhere.  The program is in
    build/Release/src/gdbserver/st-util.
 
-   This program needs to be run from the active test directory.
+   The run_stm32_prog script will run this program along with gdb.
+   To run st-util by itself, it needs to be run from the active test directory.
 
        cd tests_run/tst_ofdm_demod_ideal
        st-util --semihosting
 
-   The target program can then access files in this directory.
+   The target program can access files from the directory st-util is run from.
 
-   These tests will read "stm_in.raw", and write "stm_out.raw".
+   These tests typically read "stm_in.raw", and write "stm_out.raw".
    Their stdout and stderr streams will go to "stm_stdout.txt" and "stm_stderr.txt".
 
    A file ":tt" will get created by the default initialzation but should be empty.
@@ -120,6 +130,7 @@ QuickStart (TODO: David & Don work together to complete this section)
 3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
    terminals.  In the first terminal set up the test and start st-util running:
 
+XXXXX
      $ cd codec2-dev/stm32/unittest
      $ ./scripts/tst_ofdm_demod_setup ideal
      $ cd test_run/tst_ofdm_demod_ideal
@@ -161,5 +172,8 @@ QuickStart (TODO: David & Don work together to complete this section)
 
    To repeat a test you can just run gdb again and skip the "load" and "mon reset"
    steps.
+XXXXX
+
+
 
 # vi:set ts=3 et sts=3:

@@ -43,8 +43,8 @@
     # Check output
     freedv_rx 700D ref_mod.raw ref_rx.raw --testframes
     freedv_rx 700D stm_out.raw stm_rx.raw --testframes
-    ofdm_demod ref_mod.raw ref_demod.raw --ldpc --testframes
-    ofdm_demod stm_out.raw stm_demod.raw --ldpc --testframes
+    #optional: ofdm_demod ref_mod.raw ref_demod.raw --ldpc --testframes
+    #optional: ofdm_demod stm_out.raw stm_demod.raw --ldpc --testframes
 
     compare_ints -s -b 2 ref_mod.raw stm_out.raw
 */

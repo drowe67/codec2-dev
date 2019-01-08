@@ -71,6 +71,8 @@
 #include "gp_interleaver.h"
 #include "test_bits_ofdm.h"
 
+#include "debug_alloc.h"
+
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
 #include "machdep.h"
@@ -88,9 +90,18 @@ static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
 
+
+static FILE *fout, *fdiag;
+void flush_all(void) {
+    fflush(fout);
+    fflush(fdiag);
+    fflush(stdout);
+    fflush(stderr);
+    }
+
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
-    FILE        *fcfg, *fin, *fout, *fdiag;
+    FILE        *fcfg, *fin;
     int          nin_frame;
     struct LDPC  ldpc;
 
@@ -148,7 +159,7 @@ int main(int argc, char *argv[]) {
     ofdm_demod_snr = 0;
     if (config_profile) machdep_profile_init();
 
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+    if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
         exit(1);
     }
@@ -169,7 +180,7 @@ int main(int argc, char *argv[]) {
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
-    free(ofdm_config);
+    FREE(ofdm_config);
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
@@ -439,6 +450,8 @@ int main(int argc, char *argv[]) {
 
         f++;
     } // while(fread(.., fin))
+
+    flush_all();    // To make sure this function is included in binary.
 
     fclose(fin);
     fclose(fout);

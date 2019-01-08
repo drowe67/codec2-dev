@@ -10,9 +10,6 @@ SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 # Setup common variables
 source $SCRIPTS/run_tests_common.sh
 
-# Prepend the common test name to the extension from the command line
-FULL_TEST_NAME="tst_ofdm_mod_${TEST}"
-
 # RUN_DIR - Directory where test will be run
 RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
 
@@ -26,7 +23,7 @@ cd "${RUN_DIR}"
 #####################################################################
 ## Test SETUP actions:
 
-case "${TEST}" in
+case "${TEST_OPT}" in
 
     plain )
     	# Config is <unused>, <unused>, <ldpc_en>, <unused> <profile>

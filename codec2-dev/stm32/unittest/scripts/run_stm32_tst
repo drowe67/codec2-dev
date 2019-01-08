@@ -8,9 +8,6 @@ SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 # Setup common variables
 source $SCRIPTS/run_tests_common.sh
 
-# Save directory
-ORIG_DIR=${PWD}
-
 declare -i Fails=0
 
 #####################################################################
@@ -23,7 +20,6 @@ cd "${RUN_DIR}"
 run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} |& tee gdb.log
 ${TEST}_check ${TEST} ${TEST_OPT} |& tee check.log ||
 let Fails=($Fails + 1)
-cd "${ORIG_DIR}" 
 
 sleep 5 # Delay for st-util to close
 
