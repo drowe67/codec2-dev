@@ -333,9 +333,6 @@ target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ofdm_demod ofdm_demod.c octave.c)
 target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ofdm_demod_test ofdm_demod_test.c octave.c mpdecode_core_test.c)
-target_link_libraries(ofdm_demod_test ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
 add_executable(fmfsk_mod fmfsk_mod.c)
 target_link_libraries(fmfsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
@@ -366,14 +363,8 @@ target_link_libraries(ldpc_noise m)
 add_executable(ldpc_enc ldpc_enc.c)
 target_link_libraries(ldpc_enc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-add_executable(ldpc_enc_test ldpc_enc_test.c mpdecode_core_test.c phi0.c ofdm.c filter.c)
-target_link_libraries(ldpc_enc_test ${CMAKE_REQUIRED_LIBRARIES} )
-
 add_executable(ldpc_dec ldpc_dec.c)
 target_link_libraries(ldpc_dec ${CMAKE_REQUIRED_LIBRARIES} codec2)
-
-add_executable(ldpc_dec_test ldpc_dec_test.c mpdecode_core_test.c phi0.c ofdm.c filter.c)
-target_link_libraries(ldpc_dec_test ${CMAKE_REQUIRED_LIBRARIES} )
 
 add_executable(drs232 drs232.c)
 target_link_libraries(drs232 ${CMAKE_REQUIRED_LIBRARIES})
