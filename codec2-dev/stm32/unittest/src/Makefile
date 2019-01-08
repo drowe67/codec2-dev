@@ -29,7 +29,7 @@ else
 CFLAGS += -msoft-float
 endif
 
-#CFLAGS += -DDEBUG_ALLOC
+CFLAGS += -DDEBUG_ALLOC
 
 ###################################################
 # STM32F4 Standard Peripheral Library
@@ -562,7 +562,7 @@ $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 TST_OFDM_DEMOD_SRCS += $(CODEC2_SRCS)
 TST_OFDM_DEMOD_SRCS += $(SRCS)
 #
-tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.o) libstm32f4.a
+tst_ofdm_demod.elf: $(TST_OFDM_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_ofdm_demod.map
 
 # -----------------------------------------------
