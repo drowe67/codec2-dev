@@ -40,9 +40,7 @@
 #include "codec2_ofdm.h"
 #include "filter.h"
 
-#ifdef DEBUG_ALLOC
 #include "debug_alloc.h"
-#endif
 
 /* Static Prototypes */
 
