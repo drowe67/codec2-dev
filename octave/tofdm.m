@@ -5,10 +5,6 @@
 
 % ------------------------------------------------------------------
 
-% if using a fast processor then define omega_table = 1
-% and define CORTEX_M4 when compiling ofdm.c
-omega_table = 0;
-
 Nframes = 10;
 sample_clock_offset_ppm = 100;
 foff_hz = 0.5;
@@ -238,9 +234,6 @@ stem_sig_and_error(fg++, 111, rx_bits_log_c, rx_bits_log - rx_bits_log_c, 'rx bi
 
 % Run through checklist -----------------------------
 
-if omega_table
-  check(w, w_c, 'w');
-end
 check(states.rate_fs_pilot_samples, pilot_samples_c, 'pilot_samples');
 check(tx_bits_log, tx_bits_log_c, 'tx_bits');
 check(tx_log, tx_log_c, 'tx');
