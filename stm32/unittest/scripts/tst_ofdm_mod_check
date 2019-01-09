@@ -51,7 +51,7 @@ else
 fi
 #
 echo -e "\nCompare output binary data"
-if compare_ints -s -b2 ref_mod_out.raw mod.raw; then 
+if compare_ints -s -b2 -t3 ref_mod_out.raw mod.raw; then 
     echo "Passed"
 else
     echo "Failed"
