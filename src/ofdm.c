@@ -57,6 +57,7 @@ static complex float vector_sum(complex float *, int);
   #define SINF(a) sinf(a)
   #define COSF(a) cosf(a)
 #else
+  #include <arm_math.h>
   #define SINF(a) arm_sin_f32(a)
   #define COSF(a) arm_cos_f32(a)
 #endif
@@ -395,6 +396,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     for (i = ofdm_ncp, j = 0; j < ofdm_m; i++, j++) {
         ofdm->pilot_samples[i] = temp[j];
     }
+    FREE(temp);
 
     /* calculate constant used to normalise timing correlation maximum */
 
@@ -420,34 +422,33 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
 
   error_temp:
-    FREE(temp);
-  error_last_sync_state_interleaver:
     FREE(ofdm->last_sync_state_interleaver);
-  error_sync_state_interleaver:
+  error_last_sync_state_interleaver:
     FREE(ofdm->sync_state_interleaver);
-  error_last_sync_state:
+  error_sync_state_interleaver:
     FREE(ofdm->last_sync_state);
-  error_sync_state:
+  error_last_sync_state:
     FREE(ofdm->sync_state);
-  error_tx_uw:
+  error_sync_state:
     FREE(ofdm->tx_uw);
-  error_aphase_est_pilot_log:
+  error_tx_uw:
     FREE(ofdm->aphase_est_pilot_log);
-  error_rx_amp:
+  error_aphase_est_pilot_log:
     FREE(ofdm->rx_amp);
-  error_rx_np:
+  error_rx_amp:
     FREE(ofdm->rx_np);
-  error_rx_sym2:
+  error_rx_np:
     for (i = 0; i < free_last_rx_sym; i++)
         FREE(ofdm->rx_sym[i]);
-  error_rx_sym:
+  error_rx_sym2:
     FREE(ofdm->rx_sym);
-  error_pilots:
+  error_rx_sym:
     FREE(ofdm->pilots);
-  error_rxbuf:
+  error_pilots:
     FREE(ofdm->rxbuf);
-  error_pilot_samples:
+  error_rxbuf:
     FREE(ofdm->pilot_samples);
+  error_pilot_samples:
     FREE(ofdm);
     return(NULL);
 }
