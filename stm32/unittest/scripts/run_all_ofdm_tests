@@ -10,8 +10,8 @@ source $SCRIPTS/run_tests_common.sh
 
 declare -i Fails=0
 
-run_tst_ofdm_mod plain --load || Fails+=1
-run_tst_ofdm_mod ldpc || Fails+=1
+run_stm32_tst tst_ofdm_mod plain --load || Fails+=1
+run_stm32_tst tst_ofdm_mod ldpc || Fails+=1
 
 run_stm32_tst tst_ofdm_demod quick --load || Fails+=1
 run_stm32_tst tst_ofdm_demod ideal || Fails+=1
