@@ -51,7 +51,8 @@ extern "C"
  */
 
 struct OFDM_CONFIG {
-    float centre; /* Centre Audio Frequency */
+    float tx_centre; /* TX Centre Audio Frequency */
+    float rx_centre; /* RX Centre Audio Frequency */
     float fs;  /* Sample Frequency */
     float rs;  /* Baud Rate */
     float ts;  /* symbol duration */

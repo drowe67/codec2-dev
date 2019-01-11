@@ -66,7 +66,8 @@ static COMP S_matrix[] = {
 static struct OFDM *ofdm;
 static struct OFDM_CONFIG *ofdm_config;
 
-static float ofdm_centre;           /* Center frequency */
+static float ofdm_tx_centre;        /* TX Center frequency */
+static float ofdm_rx_centre;        /* RX Center frequency */
 static float ofdm_fs;               /* Sample rate */
 static float ofdm_ts;               /* Symbol cycle time */
 static float ofdm_rs;               /* Symbol rate */
@@ -182,7 +183,8 @@ int main(int argc, char *argv[])
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
 
-    ofdm_centre = ofdm_config->centre;
+    ofdm_tx_centre = ofdm_config->tx_centre;
+    ofdm_rx_centre = ofdm_config->rx_centre;
     ofdm_fs = ofdm_config->fs;
     ofdm_ts = ofdm_config->ts;
     ofdm_rs = ofdm_config->rs;
