@@ -13,6 +13,10 @@ target_link_libraries(t16_8_short codec2)
 add_executable(16_8_short 16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
 target_link_libraries(16_8_short codec2)
 
+add_executable(extract extract.c)
+
+add_executable(vqtrain vqtrain.c)
+
 add_executable(speexnoisesup speexnoisesup.c)
 target_link_libraries(speexnoisesup ${SPEEXDSP_LIBRARY})
 set_target_properties(speexnoisesup
