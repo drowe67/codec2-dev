@@ -16,6 +16,7 @@ target_link_libraries(16_8_short codec2)
 add_executable(extract extract.c)
 
 add_executable(vqtrain vqtrain.c)
+target_link_libraries(vqtrain m)
 
 add_executable(speexnoisesup speexnoisesup.c)
 target_link_libraries(speexnoisesup ${SPEEXDSP_LIBRARY})

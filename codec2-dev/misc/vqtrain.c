@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
     long   i,j;
     long   ind;	     	/* index of current vector			*/
     float  se;		/* squared error for this iteration		*/
-    float  Dn,Dn_1;	/* current and previous iterations distortion	*/
+    float  var,var_1;	/* current and previous iterations distortion	*/
     float  delta;	/* improvement in distortion 			*/
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
@@ -83,8 +83,8 @@ int main(int argc, char *argv[]) {
 
     /* Interpret command line arguments */
 
-    if (argc != 5)	{
-	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile\n", argv[0]);
+    if (argc < 5)	{
+	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile [residual.f32]\n", argv[0]);
 	exit(1);
     }
 
@@ -125,10 +125,10 @@ int main(int argc, char *argv[]) {
 
     /* main loop */
 
-    Dn = 1E32;
+    var = 1E32;
     j = 1;
     do {
-	Dn_1 = Dn;
+	var_1 = var;
 
 	/* zero centroids */
 
@@ -148,10 +148,10 @@ int main(int argc, char *argv[]) {
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);
 	}
-	Dn = se/J;
-	delta = (Dn_1-Dn)/Dn;
+	var = se/(J*k);
+	delta = (var_1-var)/var;
 
-	printf("\r  Iteration %ld, Dn = %f, Delta = %e\n", j, Dn, delta);
+	printf("\r  Iteration %ld, var = %f, sd = %f Delta = %e\n", j, var, sqrt(var), delta);
 	j++;
 
 	/* determine new codebook from centroids */
@@ -180,6 +180,26 @@ int main(int argc, char *argv[]) {
 	    fprintf(fvq,"%f  ",cb[j*k+i]);
 	fprintf(fvq,"\n");
     }
+
+    /* optionally output for next stage VQ */
+    
+    if (argc == 6) {
+        FILE *fres = fopen(argv[5],"wb"); assert(fres != NULL);
+        float res[k];
+	rewind(ftrain);
+	for(j=0; j<J; j++) {
+	    ret = fread(vec, sizeof(float), k, ftrain);
+	    ind = quantise(cb, vec, k, m, &se);
+            for(i=0; i<k; i++) {
+                res[i] = vec[i] - cb[k*ind+i];
+                if (j<2) printf("%3.2f ", res[i]);
+            }
+            if (j<2) printf("\n");
+            fwrite(res, sizeof(float), k, fres);
+	}
+        fclose(fres);
+    }
+    
     fclose(fvq);
     fclose(ftrain);
     free(vec);
@@ -255,6 +275,7 @@ void norm(float v[], int k, long n)
 {
     int	   i;
 
+    assert(n != 0);
     for(i=0; i<k; i++)
 	v[i] /= n;
 }
@@ -292,7 +313,7 @@ long quantise(float cb[], float vec[], int k, int m, float *se)
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
-	    e += pow(diff,2.0);
+	    e += diff*diff;
 	}
 	if (e < beste) {
 	    beste = e;
