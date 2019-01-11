@@ -78,6 +78,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "  --interleave depth  Interleave depth for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
         fprintf(stderr, "  --txbpf             Transmit band pass filter\n");
         fprintf(stderr, "  --text              Include a standard text message\n");
+        fprintf(stderr, "  --tx_freq           Set an optional modulation TX centre frequency\n");
+        fprintf(stderr, "  --rx_freq           Set an optional modulation RX centre frequency\n");
         fprintf(stderr, "\n");
 	exit(1);
     }
@@ -101,7 +103,6 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    ofdm_config->centre = 1500.0;
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
@@ -109,6 +110,18 @@ int main(int argc, char *argv[])
     ofdm_config->bps = 2;   			/* Bits per Symbol */
     ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
     ofdm_config->ns = 8;  			/* Number of Symbol frames */
+
+    if ((arg = opt_exists(argv, argc, "--tx_freq"))) {
+        ofdm_config->tx_centre = atof(argv[arg+1]);	/* TX Centre Frequency */
+    } else {
+        ofdm_config->tx_centre = 1500.0;
+    }
+
+    if ((arg = opt_exists(argv, argc, "--rx_freq"))) {
+        ofdm_config->rx_centre = atof(argv[arg+1]);	/* RX Centre Frequency */
+    } else {
+        ofdm_config->rx_centre = 1500.0;
+    }
 
     if ((arg = opt_exists(argv, argc, "--nc"))) {
         ofdm_config->nc = atoi(argv[arg+1]);	/* Number of carriers */

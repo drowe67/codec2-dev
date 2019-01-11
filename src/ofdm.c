@@ -105,12 +105,14 @@ static const int uw_ind_sym[] = {10, 19, 28, 37, 46}; /* index into modem frame 
 
 static struct OFDM_CONFIG ofdm_config;
 
-static float ofdm_centre; /* Center frequency */
+static float ofdm_tx_centre; /* TX Center frequency */
+static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
 static float ofdm_ts; /* Symbol cycle time */
 static float ofdm_rs; /* Symbol rate */
 static float ofdm_tcp; /* Cyclic prefix duration */
-static float ofdm_nlower; /* lowest carrier freq */
+static float ofdm_tx_nlower; /* TX lowest carrier freq */
+static float ofdm_rx_nlower; /* RX lowest carrier freq */
 static float ofdm_doc; /* division of radian circle */
 static float ofdm_timing_mx_thresh; /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routines for how this was set */
 
@@ -171,7 +173,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ts = 0.018f;
         ofdm_rs = 1.0f / ofdm_ts; /* Symbol Rate */
         ofdm_tcp = .002f; /* Cyclic Prefix duration */
-        ofdm_centre = 1500.0f; /* Centre Audio Frequency */
+        ofdm_tx_centre = 1500.0f; /* TX Centre Audio Frequency */
+        ofdm_rx_centre = 1500.0f; /* RX Centre Audio Frequency */
         ofdm_fs = 8000.0f; /* Sample Frequency */
         ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
         ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
@@ -188,7 +191,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ts = config->ts;
         ofdm_rs = (1.0f / ofdm_ts); /* Symbol Rate */
         ofdm_tcp = config->tcp; /* Cyclic Prefix duration */
-        ofdm_centre = config->centre; /* Centre Audio Frequency */
+        ofdm_tx_centre = config->tx_centre; /* TX Centre Audio Frequency */
+        ofdm_rx_centre = config->rx_centre; /* RX Centre Audio Frequency */
         ofdm_fs = config->fs; /* Sample Frequency */
         ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
         ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
@@ -200,7 +204,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* Copy structure into global */
 
-    ofdm_config.centre = ofdm_centre;
+    ofdm_config.tx_centre = ofdm_tx_centre;
+    ofdm_config.rx_centre = ofdm_rx_centre;
     ofdm_config.fs = ofdm_fs;
     ofdm_config.rs = ofdm_rs;
     ofdm_config.ts = ofdm_ts;
@@ -311,7 +316,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* carrier tables for up and down conversion */
 
     ofdm_doc = (TAU / (ofdm_fs / ofdm_rs));
-    ofdm_nlower = floorf((ofdm_centre - ofdm_rs * ((float) ofdm_nc / 2)) / ofdm_rs);
+    ofdm_tx_nlower = floorf((ofdm_tx_centre - ofdm_rs * ((float) ofdm_nc / 2)) / ofdm_rs);
+    ofdm_rx_nlower = floorf((ofdm_rx_centre - ofdm_rs * ((float) ofdm_nc / 2)) / ofdm_rs);
 
     for (i = 0; i < ofdm_rxbuf; i++) {
         ofdm->rxbuf[i] = 0.0f + 0.0f * I;
@@ -411,10 +417,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->tx_bpf_en = false;
 
-    // Transmit bandpass filter; complex coefficients, center frequency 1500 hz
+    // Transmit bandpass filter; complex coefficients, center frequency
 
     quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(&ofdm->ofdm_tx_bpf, 1500.0f / ofdm_fs); // fixed value
+    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
 
     return ofdm; /* Success */
 
@@ -508,7 +514,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
     result[0] *= inv_m;
 
     for (row = 1; row < ofdm_m; row++) {
-        float tval1 = ofdm_nlower * ofdm_doc *row;
+        float tval1 = ofdm_tx_nlower * ofdm_doc *row;
         float tval2 = ofdm_doc * row;
 
         complex float x = COSF(tval1) + SINF(tval1) * I;
@@ -534,7 +540,7 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
         result[col] = vector[0];                 // conj(cexp(0j)) == 1
     }
 
-    for (col = 0, nlower = ofdm_nlower; col < (ofdm_nc + 2); col++, nlower++) {
+    for (col = 0, nlower = ofdm_rx_nlower; col < (ofdm_nc + 2); col++, nlower++) {
         for (row = 1; row < ofdm_m; row++) {
             float tval = nlower * ofdm_doc * row;
             result[col] += (vector[row] * (COSF(tval) + SINF(tval) * -I));

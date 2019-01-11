@@ -137,6 +137,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "  --ldpc        Run LDPC decoder.  This forces 112, one char/bit output values\n"
                         "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
         fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
+        fprintf(stderr, "  --tx_freq     Set an optional modulation TX centre Frequency\n");
+        fprintf(stderr, "  --rx_freq     Set an optional modulation RX centre Frequency\n");
         fprintf(stderr, "  -v            Verbose info the stderr\n");
         fprintf(stderr, "  -o            Octave log file for testing\n");
         fprintf(stderr, "\n");
@@ -159,6 +161,18 @@ int main(int argc, char *argv[])
 
     foct = NULL;
     oct = 0;
+
+    if ((arg = opt_exists(argv, argc, "--tx_freq"))) {
+        ofdm_config->tx_centre = atof(argv[arg+1]);	/* TX Centre Frequency */
+    } else {
+        ofdm_config->tx_centre = 1500.0;
+    }
+
+    if ((arg = opt_exists(argv, argc, "--rx_freq"))) {
+        ofdm_config->rx_centre = atof(argv[arg+1]);	/* RX Centre Frequency */
+    } else {
+        ofdm_config->rx_centre = 1500.0;
+    }
 
     if ((arg = opt_exists(argv, argc, "-o")) != 0) {
         if ( (foct = fopen(argv[arg+1],"wt")) == NULL ) {
