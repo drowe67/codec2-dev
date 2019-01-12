@@ -505,7 +505,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
     float inv_m = (1.0f / (float) ofdm_m);
     int row, col;
 
-    result[0] = 0.0f + 0.0f * I;
+    result[0] = 0.0f;
 
     for (col = 0; col < (ofdm_nc + 2); col++) {
         result[0] += vector[col];    // cexp(0j) == 1
@@ -517,14 +517,14 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
         float tval1 = ofdm_tx_nlower * ofdm_doc *row;
         float tval2 = ofdm_doc * row;
 
-        complex float x = COSF(tval1) + SINF(tval1) * I;
+        complex float c = COSF(tval1) + SINF(tval1) * I;
         complex float delta = COSF(tval2) + SINF(tval2) * I;
 
-        result[row] = 0.0f + 0.0f * I;
+        result[row] = 0.0f;
 
         for (col = 0; col < (ofdm_nc + 2); col++) {
-            result[row] += (vector[col] * x);
-            x = x * delta;
+            result[row] += (vector[col] * c);
+            c *= delta;
         }
 
         result[row] *= inv_m;
@@ -541,9 +541,13 @@ static void dft(struct OFDM *ofdm, complex float *result, complex float *vector)
     }
 
     for (col = 0, nlower = ofdm_rx_nlower; col < (ofdm_nc + 2); col++, nlower++) {
+        float tval = nlower * ofdm_doc;
+        complex float c = (COSF(tval) + SINF(tval) * -I);
+        complex float delta = c;
+
         for (row = 1; row < ofdm_m; row++) {
-            float tval = nlower * ofdm_doc * row;
-            result[col] += (vector[row] * (COSF(tval) + SINF(tval) * -I));
+            result[col] += (vector[row] * c);
+            c *= delta;
         }
     }
 }
