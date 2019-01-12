@@ -58,6 +58,7 @@
 #include "gp_interleaver.h"
 #include "interldpc.h"
 
+#include "debug_alloc.h"
 #define VERSION     12    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
@@ -108,7 +109,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         (mode != FREEDV_MODE_700C) && (mode != FREEDV_MODE_700D) )
         return NULL;
 
-    f = (struct freedv*)malloc(sizeof(struct freedv));
+    f = (struct freedv*)MALLOC(sizeof(struct freedv));
     if (f == NULL)
         return NULL;
 
@@ -138,19 +139,19 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_max_modem_samples = FDMDV_NOM_SAMPLES_PER_FRAME+FDMDV_MAX_SAMPLES_PER_FRAME;
         f->modem_sample_rate = FS;
         nbit = fdmdv_bits_per_frame(f->fdmdv);
-        f->fdmdv_bits = (int*)malloc(nbit*sizeof(int));
+        f->fdmdv_bits = (int*)MALLOC(nbit*sizeof(int));
         if (f->fdmdv_bits == NULL)
             return NULL;
         nbit = 2*fdmdv_bits_per_frame(f->fdmdv);
-        f->tx_bits = (int*)malloc(nbit*sizeof(int));
-        f->rx_bits = (int*)malloc(nbit*sizeof(int));
+        f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
+        f->rx_bits = (int*)MALLOC(nbit*sizeof(int));
         if ((f->tx_bits == NULL) || (f->rx_bits == NULL)) {
             if (f->tx_bits != NULL) {
-              free(f->tx_bits);
+              FREE(f->tx_bits);
               f->tx_bits = NULL;
             }
             if (f->rx_bits != NULL) {
-              free(f->rx_bits);
+              FREE(f->rx_bits);
               f->rx_bits = NULL;
             }
             return NULL;
@@ -185,7 +186,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->modem_sample_rate = FS;                                         /* note wierd sample rate tamed by interpolator */
         f->clip = 1;
         nbit = COHPSK_BITS_PER_FRAME;
-        f->tx_bits = (int*)malloc(nbit*sizeof(int));
+        f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
         if (f->tx_bits == NULL)
             return NULL;
         f->sz_error_pattern = cohpsk_error_pattern_size();
@@ -203,20 +204,20 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700C;
 
-        if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+        if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
             if (f->tx_bits != NULL) {
-              free(f->tx_bits);
+              FREE(f->tx_bits);
               f->tx_bits = NULL;
             }
             if (f->rx_bits != NULL) {
-              free(f->rx_bits);
+              FREE(f->rx_bits);
               f->rx_bits = NULL;
             }
             return NULL;
         }
 
         f->ofdm = ofdm_create(ofdm_config);
-        free(ofdm_config);
+        FREE(ofdm_config);
 
         /* Get a copy of the actual modem config */
         ofdm_config = ofdm_get_config_param();
@@ -225,7 +226,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
         ofdm_ntxtbits = ofdm_config->txtbits;
 
-        f->ldpc = (struct LDPC*)malloc(sizeof(struct LDPC));
+        f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
 
         if (f->ldpc == NULL) {
             return NULL;
@@ -243,13 +244,13 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
         
-        f->codeword_symbols = (COMP*)malloc(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
+        f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
 
         if (f->codeword_symbols == NULL) {return NULL;}
 
-        f->codeword_amps = (float*)malloc(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
+        f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
 
-        if (f->codeword_amps == NULL) {free(f->codeword_symbols); return NULL;}
+        if (f->codeword_amps == NULL) {FREE(f->codeword_symbols); return NULL;}
 
         for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
             f->codeword_symbols[i].real = 0.0;
@@ -268,10 +269,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->tx_bits = NULL; /* not used for 700D */
 
-        f->mod_out = (COMP*)malloc(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+        f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
 
         if (f->mod_out == NULL) {
-            if (f->codeword_symbols != NULL) { free (f->codeword_symbols); }
+            if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
             return NULL;
         }
 
@@ -305,7 +306,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->fsk = fsk_create_hbr(48000,1200,10,4,1200,1200);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
-        f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
+        f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
         
         if(f->fsk == NULL){
             fvhff_destroy_deframer(f->deframer);
@@ -319,14 +320,14 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->modem_sample_rate = 48000;
         f->modem_symbol_rate = 1200;
         /* Malloc something to appease freedv_init and freedv_destroy */
-        f->codec_bits = malloc(1);
+        f->codec_bits = MALLOC(1);
     }
     
     if (mode == FREEDV_MODE_2400B) {
         /* Create the framer|deframer */
         f->deframer = fvhff_create_deframer(FREEDV_VHF_FRAME_A,1);
         if(f->deframer == NULL) {
-            if (f->codec_bits != NULL) { free(f->codec_bits); }
+            if (f->codec_bits != NULL) { FREE(f->codec_bits); }
             return NULL;
         }
         
@@ -337,7 +338,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             return NULL;
         }
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
-        f->tx_bits = (int*)malloc(f->fmfsk->nbit*sizeof(uint8_t));
+        f->tx_bits = (int*)MALLOC(f->fmfsk->nbit*sizeof(uint8_t));
         
         f->n_nom_modem_samples = f->fmfsk->N;
         f->n_max_modem_samples = f->fmfsk->N + (f->fmfsk->Ts);
@@ -345,7 +346,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->nin = fmfsk_nin(f->fmfsk);
         f->modem_sample_rate = 48000;
         /* Malloc something to appease freedv_init and freedv_destroy */
-        f->codec_bits = malloc(1);
+        f->codec_bits = MALLOC(1);
     }
     
     if (mode == FREEDV_MODE_800XA) {
@@ -358,7 +359,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         fsk_set_nsym(f->fsk,32);
         
         /* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
-        f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
+        f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
         
         if(f->fsk == NULL){
             fvhff_destroy_deframer(f->deframer);
@@ -373,7 +374,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->modem_symbol_rate = 400;
 
         /* Malloc something to appease freedv_init and freedv_destroy */
-        f->codec_bits = malloc(1);
+        f->codec_bits = MALLOC(1);
         
         f->n_protocol_bits = 0;
         codec2_mode = CODEC2_MODE_700C;
@@ -438,32 +439,32 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         //fprintf(stderr, "Ncodec2frames: %d n_speech_samples: %d n_codec_bits: %d nbit: %d  nbyte: %d\n",
         //        Ncodec2frames, f->n_speech_samples, f->n_codec_bits, nbit, nbyte);
 
-        f->packed_codec_bits_tx = (unsigned char*)malloc(nbyte*sizeof(char));
+        f->packed_codec_bits_tx = (unsigned char*)MALLOC(nbyte*sizeof(char));
         if (f->packed_codec_bits_tx == NULL) return(NULL);
         f->codec_bits = NULL;
     }
     
-    f->packed_codec_bits = (unsigned char*)malloc(nbyte*sizeof(char));
+    f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
     if (f->packed_codec_bits == NULL) return(NULL);
 
     if (mode == FREEDV_MODE_1600)
-        f->codec_bits = (int*)malloc(nbit*sizeof(int));
+        f->codec_bits = (int*)MALLOC(nbit*sizeof(int));
 
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C))
-        f->codec_bits = (int*)malloc(COHPSK_BITS_PER_FRAME*sizeof(int));
+        f->codec_bits = (int*)MALLOC(COHPSK_BITS_PER_FRAME*sizeof(int));
     
     /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
 
     if (f->packed_codec_bits == NULL) {
-        if (f->codec_bits != NULL) {free(f->codec_bits); f->codec_bits = NULL; }
+        if (f->codec_bits != NULL) {FREE(f->codec_bits); f->codec_bits = NULL; }
         return NULL;
     }
 
     /* Sample rate conversion for modes using COHPSK */
     
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C) ) { 
-        f->ptFilter7500to8000 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
-        f->ptFilter8000to7500 = (struct quisk_cfFilter *)malloc(sizeof(struct quisk_cfFilter));
+        f->ptFilter7500to8000 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
+        f->ptFilter8000to7500 = (struct quisk_cfFilter *)MALLOC(sizeof(struct quisk_cfFilter));
         quisk_filt_cfInit(f->ptFilter8000to7500, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
         quisk_filt_cfInit(f->ptFilter7500to8000, quiskFilt120t480, sizeof(quiskFilt120t480)/sizeof(float));
     } else {
@@ -498,20 +499,20 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 void freedv_close(struct freedv *freedv) {
     assert(freedv != NULL);
 
-    free(freedv->packed_codec_bits);
-    free(freedv->codec_bits);
-    free(freedv->tx_bits);
+    FREE(freedv->packed_codec_bits);
+    FREE(freedv->codec_bits);
+    FREE(freedv->tx_bits);
     if (freedv->mode == FREEDV_MODE_1600)
         fdmdv_destroy(freedv->fdmdv);
 #ifndef CORTEX_M4
     if ((freedv->mode == FREEDV_MODE_700) || (freedv->mode == FREEDV_MODE_700B) || (freedv->mode == FREEDV_MODE_700C))
         cohpsk_destroy(freedv->cohpsk);
     if (freedv->mode == FREEDV_MODE_700D) {
-        free(freedv->packed_codec_bits_tx);
-        free(freedv->mod_out);
-        free(freedv->codeword_symbols);
-        free(freedv->codeword_amps);
-        free(freedv->ldpc);
+        FREE(freedv->packed_codec_bits_tx);
+        FREE(freedv->mod_out);
+        FREE(freedv->codeword_symbols);
+        FREE(freedv->codeword_amps);
+        FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
     }
 #endif
@@ -528,15 +529,15 @@ void freedv_close(struct freedv *freedv) {
     codec2_destroy(freedv->codec2);
     if (freedv->ptFilter8000to7500) {
         quisk_filt_destroy(freedv->ptFilter8000to7500);
-        free(freedv->ptFilter8000to7500);
+        FREE(freedv->ptFilter8000to7500);
         freedv->ptFilter8000to7500 = NULL;
     }
     if (freedv->ptFilter7500to8000) {
         quisk_filt_destroy(freedv->ptFilter7500to8000);
-        free(freedv->ptFilter7500to8000);
+        FREE(freedv->ptFilter7500to8000);
         freedv->ptFilter7500to8000 = NULL;
     }
-    free(freedv);
+    FREE(freedv);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -2319,9 +2320,9 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 			fsk_destroy(f->fsk);
 			f->fsk = fsk_create_hbr(samp_rate,1200,10,4,1200,1200);
         
-			free(f->tx_bits);
+			FREE(f->tx_bits);
 			/* Note: fsk expects tx/rx bits as an array of uint8_ts, not ints */
-			f->tx_bits = (int*)malloc(f->fsk->Nbits*sizeof(uint8_t));
+			f->tx_bits = (int*)MALLOC(f->fsk->Nbits*sizeof(uint8_t));
         
 			f->n_nom_modem_samples = f->fsk->N;
 			f->n_max_modem_samples = f->fsk->N + (f->fsk->Ts);
