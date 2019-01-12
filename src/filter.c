@@ -6,6 +6,8 @@
 #include "filter.h"
 #include "filter_coef.h"
 
+#include "debug_alloc.h"
+
 #ifndef ARM_MATH_CM4
   #define SINF(a) sinf(a)
   #define COSF(a) cosf(a)
@@ -52,7 +54,7 @@ void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps) 
     // be real or complex.
     filter->dCoefs = coefs;
     filter->cpxCoefs = NULL;
-    filter->cSamples = (complex float *)malloc(taps * sizeof(complex float));
+    filter->cSamples = (complex float *)MALLOC(taps * sizeof(complex float));
     memset(filter->cSamples, 0, taps * sizeof(complex float));
     filter->ptcSamp = filter->cSamples;
     filter->nTaps = taps;
@@ -74,17 +76,17 @@ void quisk_filt_cfInit(struct quisk_cfFilter * filter, float * coefs, int taps) 
 
 void quisk_filt_destroy(struct quisk_cfFilter * filter) {
     if (filter->cSamples) {
-        free(filter->cSamples);
+        FREE(filter->cSamples);
         filter->cSamples = NULL;
     }
 
     if (filter->cBuf) {
-        free(filter->cBuf);
+        FREE(filter->cBuf);
         filter->cBuf = NULL;
     }
 
     if (filter->cpxCoefs) {
-        free(filter->cpxCoefs);
+        FREE(filter->cpxCoefs);
         filter->cpxCoefs = NULL;
     }
 }
@@ -115,9 +117,9 @@ int quisk_cfInterpDecim(complex float * cSamples, int count, struct quisk_cfFilt
         filter->nBuf = count * 2;
 
         if (filter->cBuf)
-            free(filter->cBuf);
+            FREE(filter->cBuf);
 
-        filter->cBuf = (complex float *)malloc(filter->nBuf * sizeof(complex float));
+        filter->cBuf = (complex float *)MALLOC(filter->nBuf * sizeof(complex float));
     }
 
     memcpy(filter->cBuf, cSamples, count * sizeof(complex float));
@@ -179,8 +181,8 @@ int quisk_ccfInterpDecim(complex float * cSamples, int count, struct quisk_cfFil
     if (count > filter->nBuf) {    // increase size of sample buffer
         filter->nBuf = count * 2;
         if (filter->cBuf)
-            free(filter->cBuf);
-        filter->cBuf = (complex float *)malloc(filter->nBuf * sizeof(complex float));
+            FREE(filter->cBuf);
+        filter->cBuf = (complex float *)MALLOC(filter->nBuf * sizeof(complex float));
     }
 
     memcpy(filter->cBuf, cSamples, count * sizeof(complex float));
@@ -235,7 +237,7 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
     int i;
 
     if ( ! filter->cpxCoefs)
-        filter->cpxCoefs = (complex float *)malloc(filter->nTaps * sizeof(complex float));
+        filter->cpxCoefs = (complex float *)MALLOC(filter->nTaps * sizeof(complex float));
 
     tune = 2.0 * M_PI * freq;
     D = (filter->nTaps - 1.0) / 2.0;

@@ -84,7 +84,7 @@ struct OFDM {
     char *sync_state_interleaver;
     char *last_sync_state_interleaver;
 
-    struct quisk_cfFilter ofdm_tx_bpf;
+    struct quisk_cfFilter * ofdm_tx_bpf;
     
     complex float foff_metric;
     

@@ -160,7 +160,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->sz_error_pattern = fdmdv_error_pattern_size(f->fdmdv);
     }
 
-#ifndef CORTEX_M4
     if ((mode == FREEDV_MODE_700) || (mode == FREEDV_MODE_700B) || (mode == FREEDV_MODE_700C)) {
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
@@ -285,7 +284,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         
         ofdm_set_tx_bpf(f->ofdm, 1);
     }
-#endif  
 
     if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
       
@@ -504,7 +502,6 @@ void freedv_close(struct freedv *freedv) {
     FREE(freedv->tx_bits);
     if (freedv->mode == FREEDV_MODE_1600)
         fdmdv_destroy(freedv->fdmdv);
-#ifndef CORTEX_M4
     if ((freedv->mode == FREEDV_MODE_700) || (freedv->mode == FREEDV_MODE_700B) || (freedv->mode == FREEDV_MODE_700C))
         cohpsk_destroy(freedv->cohpsk);
     if (freedv->mode == FREEDV_MODE_700D) {
@@ -515,7 +512,6 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
     }
-#endif
     if ((freedv->mode == FREEDV_MODE_2400A) || (freedv->mode == FREEDV_MODE_800XA)){
         fsk_destroy(freedv->fsk);
         fvhff_destroy_deframer(freedv->deframer);
@@ -868,7 +864,6 @@ static void freedv_comptx_fdmdv_1600(struct freedv *f, COMP mod_out[]) {
         mod_out[i] = fcmult(FDMDV_SCALE, tx_fdm[i]);
 }
 
-#ifndef CORTEX_M4
 static void freedv_comptx_700(struct freedv *f, COMP mod_out[]) {
     int    bit, byte, i, j, k;
     int    bits_per_codec_frame, bits_per_modem_frame;
@@ -1058,7 +1053,6 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     }
 }
 
-#endif
 
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
@@ -1074,7 +1068,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         freedv_comptx_fdmdv_1600(f, mod_out);
     }
 
-#ifndef CORTEX_M4
 
     int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
     int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
@@ -1124,7 +1117,6 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         }
     }
     
-#endif
     /* 2400 A and B are handled by the real-mode TX */
     if((f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B)){
     	codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
@@ -1149,7 +1141,6 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         case FREEDV_MODE_1600:
             freedv_comptx_fdmdv_1600(f, tx_fdm);
             break;
-    #ifndef CORTEX_M4
         case FREEDV_MODE_700:
         case FREEDV_MODE_700B:
         case FREEDV_MODE_700C:
@@ -1189,7 +1180,6 @@ void freedv_codectx(struct freedv *f, short mod_out[], unsigned char *packed_cod
         case FREEDV_MODE_800XA:
             freedv_tx_fsk_voice(f, mod_out);
             return; /* output is already real */
-    #endif
     }
     /* convert complex to real */
     for(i=0; i<f->n_nom_modem_samples; i++)
@@ -1555,7 +1545,6 @@ static int freedv_comprx_fdmdv_1600(struct freedv *f, COMP demod_in[], int *vali
     return nout;
 }
 
-#ifndef CORTEX_M4
 static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid) {
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, j, bit, byte, nout, k;
@@ -1960,7 +1949,6 @@ static int freedv_comprx_700d(struct freedv *f, COMP demod_in_8kHz[], int *valid
     
     return nout;
 }
-#endif
 
 
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
@@ -1977,7 +1965,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     if (f->mode == FREEDV_MODE_1600) {
         nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
     }
-#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         nout = freedv_comprx_700(f, demod_in, &valid);
     }
@@ -1989,7 +1976,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         nout = freedv_comprx_fsk(f, demod_in, &valid);
     }
-#endif
 
     if (valid == 0) {
         //fprintf(stderr, "squelch nout: %d\n", nout);
@@ -2058,7 +2044,6 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
         freedv_comprx_fdmdv_1600(f, rx_fdm, &valid);
     }
 
-#ifndef CORTEX_M4
     int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         freedv_comprx_700(f, rx_fdm, &valid);
@@ -2080,7 +2065,6 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
         }
 	return ret;
     }
-#endif
     
     if( (f->mode == FREEDV_MODE_2400A) || (f->mode == FREEDV_MODE_2400B) || (f->mode == FREEDV_MODE_800XA)){
         freedv_comprx_fsk(f, rx_fdm, &valid);
@@ -2227,7 +2211,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
 {
     if (f->mode == FREEDV_MODE_1600)
         fdmdv_get_demod_stats(f->fdmdv, &f->stats);
-#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B)  || (f->mode == FREEDV_MODE_700C))
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     if (f->mode == FREEDV_MODE_700D) {
@@ -2236,7 +2219,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
     if (f->mode == FREEDV_MODE_2400B) {
         fmfsk_get_demod_stats(f->fmfsk, &f->stats);
     }
-#endif
     if (sync) *sync = f->stats.sync;
     if (snr_est) *snr_est = f->stats.snr_est;
 }
@@ -2290,12 +2272,10 @@ void freedv_set_callback_error_pattern    (struct freedv *f, freedv_calback_erro
     f->error_pattern_callback_state = state;
 }
 
-#ifndef CORTEX_M4
 void freedv_set_carrier_ampl(struct freedv *freedv, int c, float ampl) {
     assert(freedv->mode == FREEDV_MODE_700C);
     cohpsk_set_carrier_ampl(freedv->cohpsk, c, ampl);
 }
-#endif
 
 /*---------------------------------------------------------------------------*\
 
@@ -2438,7 +2418,6 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         fmfsk_get_demod_stats(f->fmfsk, stats);
     }
     
-#ifndef CORTEX_M4
     if ((f->mode == FREEDV_MODE_700) || (f->mode == FREEDV_MODE_700B) || (f->mode == FREEDV_MODE_700C)) {
         cohpsk_get_demod_stats(f->cohpsk, stats);
     }
@@ -2447,6 +2426,5 @@ void freedv_get_modem_extended_stats(struct freedv *f, struct MODEM_STATS *stats
         ofdm_get_demod_stats(f->ofdm, stats);
     }
     
-#endif
 }
 
