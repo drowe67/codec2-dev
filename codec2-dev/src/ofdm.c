@@ -417,15 +417,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->tx_bpf_en = false;
 
-    // Transmit bandpass filter; complex coefficients, center frequency
-
-    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
-
     return ofdm; /* Success */
 
-    //// Error return points with free call in the reverse order of allocation:
 
+  //// Error return points with free call in the reverse order of allocation:
 
   error_temp:
     FREE(ofdm->last_sync_state_interleaver);
@@ -459,10 +454,23 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     return(NULL);
 }
 
+void allocate_tx_bpf(struct OFDM *ofdm) {
+    ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
+    // Transmit bandpass filter; complex coefficients, center frequency
+    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
+    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
+}
+
+void deallocate_tx_bpf(struct OFDM *ofdm) {
+    quisk_filt_destroy(ofdm->ofdm_tx_bpf);
+    FREE(ofdm->ofdm_tx_bpf);
+    ofdm->ofdm_tx_bpf = NULL;
+}
+
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
-    quisk_filt_destroy(&ofdm->ofdm_tx_bpf);
+    if (ofdm->ofdm_tx_bpf) deallocate_tx_bpf(ofdm);
     FREE(ofdm->pilot_samples);
     FREE(ofdm->rxbuf);
     FREE(ofdm->pilots);
@@ -754,7 +762,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     if (ofdm->tx_bpf_en == true) {
         complex float tx_filt[ofdm_samplesperframe];
 
-        quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, &ofdm->ofdm_tx_bpf);
+        quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, ofdm->ofdm_tx_bpf);
         memcpy(tx, tx_filt, ofdm_samplesperframe * sizeof (complex float));
     }
 }
@@ -805,7 +813,13 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 }
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
-    ofdm->tx_bpf_en = val;
+    if (val) {
+    	allocate_tx_bpf(ofdm);
+    	ofdm->tx_bpf_en = true;
+    } else {
+    	deallocate_tx_bpf(ofdm);
+    	ofdm->tx_bpf_en = false;
+    }
 }
 
 /*
