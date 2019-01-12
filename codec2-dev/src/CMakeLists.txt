@@ -250,6 +250,11 @@ set(CODEC2_PUBLIC_HEADERS
 )
 
 #
+# Debug options
+#
+#add_definitions(-DDEBUG_ALLOC)
+
+#
 # Setup the codec2 library
 #
 add_library(codec2 ${CODEC2_SRCS})
@@ -329,7 +334,6 @@ target_link_libraries(ofdm_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 add_executable(ofdm_mod ofdm_mod.c)
 target_link_libraries(ofdm_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
-#add_definitions(-DDEBUG_ALLOC)
 add_executable(ofdm_demod ofdm_demod.c octave.c)
 target_link_libraries(ofdm_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
