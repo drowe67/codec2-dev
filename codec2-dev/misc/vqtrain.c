@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 
     k = atol(argv[2]);
     m = atol(argv[3]);
-    printf("dimension K=%ld  number of entries M=%ld\n", k, m);
+    printf("vector dimension K=%ld  codebook size M=%ld ", k, m);
     vec = (float*)malloc(sizeof(float)*k);
     cb = (float*)malloc(sizeof(float)*k*m);
     cent = (float*)malloc(sizeof(float)*k*m);
@@ -112,20 +112,38 @@ int main(int argc, char *argv[]) {
 
     /* determine size of training set */
 
-    J = 0;
-    while(fread(vec, sizeof(float), k, ftrain) == (size_t)k)
-    J++;
-    printf("J=%ld entries in training set\n", J);
+    J = 0; zero(cent, k);
+    while(fread(vec, sizeof(float), k, ftrain) == (size_t)k) {
+        J++;
+        acc(cent, vec, k);
+    }
+    printf("J=%ld vectors in training set\n", J);
+
+    /* Interation is a 0 bit VQ (i.e. mean of training set) as starting point */
+    
+    norm(cent, k, J);
+    memcpy(cb, cent, k*sizeof(float));
+    se = 0.0;
+    rewind(ftrain);
+    for(i=0; i<J; i++) {
+        ret = fread(vec, sizeof(float), k, ftrain);
+        assert(ret == k);
+        quantise(cb, vec, k, 1, &se);
+    }
+    var = se/(J*k);
+    printf("\r  Iteration 0, var = %f, sd = %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
 
-    rewind(ftrain);
-    ret = fread(cb, sizeof(float), k*m, ftrain);
-    assert(ret == k*m);
+    for(i=0; i<m; i++) {
+        j = i*(J/m);
+        fseek(ftrain, j*k*sizeof(float), SEEK_SET);
+        ret = fread(&cb[i*k], sizeof(float), k, ftrain);
+        assert(ret == k);
+    }
 
     /* main loop */
 
-    var = 1E32;
     j = 1;
     do {
 	var_1 = var;
