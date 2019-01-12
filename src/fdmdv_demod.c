@@ -44,6 +44,8 @@
 #include "octave.h"
 #include "freedv_api.h"
 
+#include "debug_alloc.h"
+
 /* lof of information we want to dump to Octave */
 
 #define MAX_FRAMES 50*60 /* 1 minute at 50 symbols/s */
@@ -120,17 +122,17 @@ int main(int argc, char *argv[])
 
     /* malloc some buffers that are dependant on Nc */
 
-    packed_bits = (char*)malloc(bytes_per_codec_frame); assert(packed_bits != NULL);
-    rx_bits = (int*)malloc(sizeof(int)*bits_per_codec_frame); assert(rx_bits != NULL);
-    codec_bits = (int*)malloc(2*sizeof(int)*bits_per_fdmdv_frame); assert(codec_bits != NULL);
+    packed_bits = (char*)MALLOC(bytes_per_codec_frame); assert(packed_bits != NULL);
+    rx_bits = (int*)MALLOC(sizeof(int)*bits_per_codec_frame); assert(rx_bits != NULL);
+    codec_bits = (int*)MALLOC(2*sizeof(int)*bits_per_fdmdv_frame); assert(codec_bits != NULL);
 
     /* malloc some of the larger variables to prevent out of stack problems */
 
-    rx_fdm_log = (COMP*)malloc(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
+    rx_fdm_log = (COMP*)MALLOC(sizeof(COMP)*FDMDV_MAX_SAMPLES_PER_FRAME*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
-    rx_spec_log = (float*)malloc(sizeof(float)*MODEM_STATS_NSPEC*MAX_FRAMES);
+    rx_spec_log = (float*)MALLOC(sizeof(float)*MODEM_STATS_NSPEC*MAX_FRAMES);
     assert(rx_spec_log != NULL);
-    rx_symbols_log = (COMP*)malloc(sizeof(COMP)*(Nc+1)*MAX_FRAMES);
+    rx_symbols_log = (COMP*)MALLOC(sizeof(COMP)*(Nc+1)*MAX_FRAMES);
     assert(rx_fdm_log != NULL);
 
     f = 0;
@@ -237,11 +239,11 @@ int main(int argc, char *argv[])
 
     fclose(fin);
     fclose(fout);
-    free(rx_fdm_log);
-    free(rx_spec_log);
+    FREE(rx_fdm_log);
+    FREE(rx_spec_log);
     fdmdv_destroy(fdmdv);
 
-    if (packed_bits != NULL) free(packed_bits);
+    if (packed_bits != NULL) FREE(packed_bits);
 
     return 0;
 }

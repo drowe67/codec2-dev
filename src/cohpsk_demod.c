@@ -39,6 +39,8 @@
 #include "codec2_fdmdv.h"
 #include "octave.h"
 
+#include "debug_alloc.h"
+
 #define LOG_FRAMES 100
 #define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 
@@ -120,13 +122,13 @@ int main(int argc, char *argv[])
 
     if (oct) {
         logframes = LOG_FRAMES;
-        rx_amp_log = (float *)malloc(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_amp_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
         assert(rx_amp_log != NULL);
-        rx_phi_log = (float *)malloc(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_phi_log = (float *)MALLOC(sizeof(float)*logframes*NSYMROW*COHPSK_NC*ND);
         assert(rx_phi_log != NULL);
-        rx_symb_log = (COMP *)malloc(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*ND);
+        rx_symb_log = (COMP *)MALLOC(sizeof(COMP)*logframes*NSYMROW*COHPSK_NC*ND);
         assert(rx_symb_log != NULL);
-        cohpsk->rx_timing_log = (float*)malloc(sizeof(float)*SYNC_FRAMES*logframes*NSYMROWPILOT);
+        cohpsk->rx_timing_log = (float*)MALLOC(sizeof(float)*SYNC_FRAMES*logframes*NSYMROWPILOT);
         assert(cohpsk->rx_timing_log != NULL);
     }
 

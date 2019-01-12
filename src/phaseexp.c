@@ -36,6 +36,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include "debug_alloc.h"
+
 /* Bruce Perens' funcs to load codebook files */
 
 struct codebook {
@@ -85,7 +87,7 @@ static struct codebook *load(const char * name)
     FILE               *file;
     char		line[2048];
     char               *cursor = line;
-    struct codebook    *b = malloc(sizeof(struct codebook));
+    struct codebook    *b = MALLOC(sizeof(struct codebook));
     int			i;
     int			size;
     float               angle;
@@ -99,7 +101,7 @@ static struct codebook *load(const char * name)
     b->m = (int)get_float(file, name ,&cursor, line, sizeof(line));
     size = b->k * b->m;
 
-    b->cb = (COMP *)malloc(size * sizeof(COMP));
+    b->cb = (COMP *)MALLOC(size * sizeof(COMP));
 
     for ( i = 0; i < size; i++ ) {
 	angle = get_float(file, name, &cursor, line, sizeof(line));
@@ -143,7 +145,7 @@ struct PEXP * phase_experiment_create() {
     struct PEXP *pexp;
     int i;
 
-    pexp = (struct PEXP *)malloc(sizeof(struct PEXP));
+    pexp = (struct PEXP *)MALLOC(sizeof(struct PEXP));
     assert (pexp != NULL);
 
     pexp->phi1 = 0;
@@ -199,7 +201,7 @@ void phase_experiment_destroy(struct PEXP *pexp) {
     if (pexp->vq_var != 0.0)
 	printf("vq var: %4.3f  vq std dev: %4.3f (%d non zero phases)\n",
 	       pexp->vq_var/pexp->vq_var_n, sqrt(pexp->vq_var/pexp->vq_var_n), pexp->vq_var_n);
-    free(pexp);
+    FREE(pexp);
 }
 
 
