@@ -457,8 +457,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 void allocate_tx_bpf(struct OFDM *ofdm) {
     ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
     // Transmit bandpass filter; complex coefficients, center frequency
-    quisk_filt_cfInit(&ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
-    quisk_cfTune(&ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
+    quisk_filt_cfInit(ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
+    quisk_cfTune(ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
 }
 
 void deallocate_tx_bpf(struct OFDM *ofdm) {
