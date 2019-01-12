@@ -50,6 +50,8 @@
 #include "ssbfilt_coeff.h"
 #include "codec2_fdmdv.h"
 
+#include "debug_alloc.h"
+
 #define BUF_N                 160
 #define FAST_FADING_DELAY_MS  2.0
 #define SLOW_FADING_DELAY_MS  0.5
@@ -147,7 +149,7 @@ int main(int argc, char *argv[])
         }
         raw_dir = strdup(DEFAULT_RAW_DIR);
         if ((arg = opt_exists(argv, argc, "--raw_dir"))) {
-	    free(raw_dir);
+	    FREE(raw_dir);
             raw_dir = strdup(argv[arg+1]);
         }
     }
@@ -180,7 +182,7 @@ int main(int argc, char *argv[])
     nhfdelay = 0;
     if (fading_en) {
         if (fading_en == 1) {
-	    fname = malloc(strlen(raw_dir) + 1 + strlen(FAST_FADING_FILE_NAME));
+	    fname = MALLOC(strlen(raw_dir) + 1 + strlen(FAST_FADING_FILE_NAME));
 	    sprintf(fname, "%s/%s", raw_dir, FAST_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
@@ -190,23 +192,23 @@ int main(int argc, char *argv[])
                 fprintf(stderr, "-----------------------------------------------------\n");
                 exit(1);
             }
-	    free(fname);
+	    FREE(fname);
             nhfdelay = floor(FAST_FADING_DELAY_MS*Fs/1000);
         }
 
         if (fading_en == 2) {
-	    fname = malloc(strlen(raw_dir) + 1 + strlen(SLOW_FADING_FILE_NAME));
+	    fname = MALLOC(strlen(raw_dir) + 1 + strlen(SLOW_FADING_FILE_NAME));
 	    sprintf(fname, "%s/%s", raw_dir, SLOW_FADING_FILE_NAME);
             ffading = fopen(fname, "rb");
             if (ffading == NULL) {
                 fprintf(stderr, "Can't find slow fading file: %s\n", fname);
                 exit(1);
             }
-	    free(fname);
+	    FREE(fname);
             nhfdelay = floor(SLOW_FADING_DELAY_MS*Fs/1000);
         }
 
-        ch_fdm_delay = (COMP*)malloc((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
+        ch_fdm_delay = (COMP*)MALLOC((nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME)*sizeof(COMP));
         assert(ch_fdm_delay != NULL);
         for(i=0; i<nhfdelay+COHPSK_NOM_SAMPLES_PER_FRAME; i++) {
             ch_fdm_delay[i].real = 0.0;
@@ -398,7 +400,7 @@ int main(int argc, char *argv[])
     fprintf(stderr, "cohpsk_ch -----------------------------------------------------------------------------\n");
 
     if (ffading != NULL) fclose(ffading);
-    if (ch_fdm_delay != NULL) free(ch_fdm_delay);
+    if (ch_fdm_delay != NULL) FREE(ch_fdm_delay);
     return 0;
 }
 

@@ -31,6 +31,8 @@
 #include "varicode.h"
 #include "varicode_table.h"
 
+#include "debug_alloc.h"
+
 
 /*
   output is an unpacked array of bits of maximum size max_out.  Note
@@ -379,9 +381,9 @@ void test_varicode(int code_num) {
         length = sizeof(varicode_table2)/2;
     }
     //length = 10;
-    ascii_in = (char*)malloc(length);
-    varicode = (short*)malloc(VARICODE_MAX_BITS*sizeof(short)*length);
-    ascii_out = (char*)malloc(length);
+    ascii_in = (char*)MALLOC(length);
+    varicode = (short*)MALLOC(VARICODE_MAX_BITS*sizeof(short)*length);
+    ascii_out = (char*)MALLOC(length);
 
     // 1. test all Varicode codes -------------------------------------------------------------
 
@@ -478,9 +480,9 @@ void test_varicode(int code_num) {
             printf("  Test 3 Fail\n");
     }
 
-    free(ascii_in);
-    free(ascii_out);
-    free(varicode);
+    FREE(ascii_in);
+    FREE(ascii_out);
+    FREE(varicode);
 }
 
 int main(void) {

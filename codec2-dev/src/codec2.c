@@ -51,6 +51,8 @@
 #include "bpfb.h"
 #include "c2wideband.h"
 
+#include "debug_alloc.h"
+
 /*---------------------------------------------------------------------------* \
 
                              FUNCTION HEADERS
@@ -113,8 +115,15 @@ struct CODEC2 * codec2_create(int mode)
     if (!((mode >= 0) && (mode <= CODEC2_MODE_WB))) {
         return NULL;
     }  
+#ifndef CORTEX_M4
+    if ((mode == CODEC2_MODE_450) || 
+        (mode == CODEC2_MODE_450PWB) || 
+	(mode == CODEC2_MODE_WB)   ) {
+        return NULL;
+    }  
+#endif
 
-    c2 = (struct CODEC2*)malloc(sizeof(struct CODEC2));
+    c2 = (struct CODEC2*)MALLOC(sizeof(struct CODEC2));
     if (c2 == NULL)
 	return NULL;
 
@@ -131,26 +140,26 @@ struct CODEC2 * codec2_create(int mode)
 	int n_samp = c2->n_samp = c2->c2const.n_samp;
 	int m_pitch = c2->m_pitch = c2->c2const.m_pitch;
 	
-    c2->Pn = (float*)malloc(2*n_samp*sizeof(float));
+    c2->Pn = (float*)MALLOC(2*n_samp*sizeof(float));
     if (c2->Pn == NULL) {
 	return NULL;
     }
-    c2->Sn_ = (float*)malloc(2*n_samp*sizeof(float));
+    c2->Sn_ = (float*)MALLOC(2*n_samp*sizeof(float));
     if (c2->Sn_ == NULL) {
-        free(c2->Pn);
+        FREE(c2->Pn);
 	return NULL;
     }
-    c2->w = (float*)malloc(m_pitch*sizeof(float));
+    c2->w = (float*)MALLOC(m_pitch*sizeof(float));
     if (c2->w == NULL) {
-        free(c2->Pn);
-        free(c2->Sn_);
+        FREE(c2->Pn);
+        FREE(c2->Sn_);
 	return NULL;
     }
-    c2->Sn = (float*)malloc(m_pitch*sizeof(float));
+    c2->Sn = (float*)MALLOC(m_pitch*sizeof(float));
     if (c2->Sn == NULL) {
-        free(c2->Pn);
-        free(c2->Sn_);
-        free(c2->w);
+        FREE(c2->Pn);
+        FREE(c2->Sn_);
+        FREE(c2->w);
 	return NULL;
     }
 
@@ -197,14 +206,13 @@ struct CODEC2 * codec2_create(int mode)
 
     c2->smoothing = 0;
 
-    c2->bpf_buf = (float*)malloc(sizeof(float)*(BPF_N+4*c2->n_samp));
+    c2->bpf_buf = (float*)MALLOC(sizeof(float)*(BPF_N+4*c2->n_samp));
     assert(c2->bpf_buf != NULL);
     for(i=0; i<BPF_N+4*c2->n_samp; i++)
         c2->bpf_buf[i] = 0.0;
 
     c2->softdec = NULL;
 
-#ifndef CORTEX_M4
     /* newamp1 initialisation */
 
     if (c2->mode == CODEC2_MODE_700C) {
@@ -218,6 +226,8 @@ struct CODEC2 * codec2_create(int mode)
         c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
         c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
     }
+
+#ifndef CORTEX_M4
     /* newamp2 initialisation */
 
     if (c2->mode == CODEC2_MODE_450) {
@@ -264,7 +274,7 @@ struct CODEC2 * codec2_create(int mode)
 void codec2_destroy(struct CODEC2 *c2)
 {
     assert(c2 != NULL);
-    free(c2->bpf_buf);
+    FREE(c2->bpf_buf);
     nlp_destroy(c2->nlp);
     codec2_fft_free(c2->fft_fwd_cfg);
     codec2_fftr_free(c2->fftr_fwd_cfg);
@@ -281,11 +291,11 @@ void codec2_destroy(struct CODEC2 *c2)
         codec2_fft_free(c2->phase_fft_fwd_cfg);
         codec2_fft_free(c2->phase_fft_inv_cfg);
     }
-    free(c2->Pn);
-    free(c2->Sn);
-    free(c2->w);
-    free(c2->Sn_);
-    free(c2);
+    FREE(c2->Pn);
+    FREE(c2->Sn);
+    FREE(c2->w);
+    FREE(c2->Sn_);
+    FREE(c2);
 }
 
 /*---------------------------------------------------------------------------*\

@@ -48,6 +48,8 @@
 #include "rn_coh.h"
 #include "test_bits_coh.h"
 
+#include "debug_alloc.h"
+
 static COMP qpsk_mod[] = {
     { 1.0, 0.0},
     { 0.0, 1.0},
@@ -93,7 +95,7 @@ struct COHPSK *cohpsk_create(void)
     assert(COHPSK_NSYM == NSYM);  /* as we want to use the tx sym mem on fdmdv */
     assert(COHPSK_NT == NT);
 
-    coh = (struct COHPSK*)malloc(sizeof(struct COHPSK));
+    coh = (struct COHPSK*)MALLOC(sizeof(struct COHPSK));
     if (coh == NULL)
         return NULL;
 
@@ -209,7 +211,7 @@ void cohpsk_destroy(struct COHPSK *coh)
 {
     assert(coh != NULL);
     fdmdv_destroy(coh->fdmdv);
-    free(coh);
+    FREE(coh);
 }
 
 
