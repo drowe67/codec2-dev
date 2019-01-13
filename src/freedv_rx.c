@@ -271,7 +271,7 @@ int main(int argc, char *argv[]) {
                     (double)coded_ber, Tbits_coded, Terrs_coded);
 
             /* set return code for Ctest */
-            if ((uncoded_ber < 0.1) && (coded_ber < 0.02))
+            if ((uncoded_ber < 0.1) && (coded_ber < 0.01))
                 return 0;
             else
                 return 1;
