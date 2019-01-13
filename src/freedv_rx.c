@@ -260,12 +260,21 @@ int main(int argc, char *argv[]) {
     if (freedv_get_test_frames(freedv)) {
         int Tbits = freedv_get_total_bits(freedv);
         int Terrs = freedv_get_total_bit_errors(freedv);
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n",  (float)Terrs/Tbits, Tbits, Terrs);
+        float uncoded_ber = (float)Terrs/Tbits;
+        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", 
+		(double)uncoded_ber, Tbits, Terrs);
         if (mode == FREEDV_MODE_700D) {
             int Tbits_coded = freedv_get_total_bits_coded(freedv);
             int Terrs_coded = freedv_get_total_bit_errors_coded(freedv);
+            float coded_ber = (float)Terrs_coded/Tbits_coded;
             fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
-                    (float)Terrs_coded/Tbits_coded, Tbits_coded, Terrs_coded);
+                    (double)coded_ber, Tbits_coded, Terrs_coded);
+
+            /* set return code for Ctest */
+            if ((uncoded_ber < 0.1) && (coded_ber < 0.02))
+                return 0;
+            else
+                return 1;
         }
     }
 
