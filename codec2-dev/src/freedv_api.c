@@ -280,9 +280,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             f->mod_out[i].imag = 0.0;
         }
 
+#ifndef __EMBEDDED__
         /* tx BPF on by default, can't see any reason we'd want this off */
-        
         ofdm_set_tx_bpf(f->ofdm, 1);
+#endif
     }
 
     if ((mode == FREEDV_MODE_2400A) || (mode == FREEDV_MODE_2400B)) {
