@@ -193,12 +193,7 @@ int main(int argc, char *argv[])
             } else if(strcmp(long_options[option_index].name, "mel") == 0) {
                 K = atoi(optarg);
             } else if(strcmp(long_options[option_index].name, "lpc") == 0) {
-                orderi = atoi(optarg);
-                if((orderi < 4) || (orderi > order)) {
-                    fprintf(stderr, "Error in LPC order (4 to %d): %s\n", order, optarg);
-                    exit(1);
-                }
-                order = orderi;
+                order = atoi(optarg);
             #ifdef DUMP
             } else if(strcmp(long_options[option_index].name, "dump") == 0) {
                 if (dump)
@@ -422,7 +417,7 @@ int main(int argc, char *argv[])
     float sum_snr;
 
     float pre_mem = 0.0, de_mem = 0.0;
-    float ak[order];
+    float ak[1+order];
     // COMP  Sw_[FFT_ENC];
     // COMP  Ew[FFT_ENC];
 
@@ -438,7 +433,7 @@ int main(int argc, char *argv[])
     float lsps_[order];
     float Woe_[2];
 
-    float lsps_dec[4][LPC_ORD], e_dec[4], weight, weight_inc, ak_dec[4][LPC_ORD];
+    float lsps_dec[4][order], e_dec[4], weight, weight_inc, ak_dec[4][order];
     MODEL model_dec[4], prev_model_dec;
     float prev_lsps_dec[order], prev_e_dec;
 
@@ -686,7 +681,7 @@ int main(int argc, char *argv[])
 	if (lpc_model) {
 
             e = speech_to_uq_lsps(lsps, ak, Sn, w, m_pitch, order);
-            for(i=0; i<LPC_ORD; i++)
+            for(i=0; i<order; i++)
                 lsps_[i] = lsps[i];
             
             #ifdef DUMP
@@ -892,7 +887,7 @@ int main(int argc, char *argv[])
         /* dump features for Deep learning, placed here so we can get quantised features */
         
         if (lspEWov) {
-            /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
+            /* order LSPs - energy - Wo - voicing flag - order LPCs */                
             if (lsp)
                 fwrite(lsps_, order, sizeof(float), flspEWov);
             else
