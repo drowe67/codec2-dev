@@ -272,18 +272,20 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->tx_bits = NULL; /* not used for 700D */
 
-        f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+	if (f->interleave_frames > 1) {
+            f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+            if (f->mod_out == NULL) {
+                if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
+                return NULL;
+            }
 
-        if (f->mod_out == NULL) {
-            if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
-            return NULL;
-        }
+            for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+                f->mod_out[i].real = 0.0;
+                f->mod_out[i].imag = 0.0;
+            }
+	}
 
-        for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
-            f->mod_out[i].real = 0.0;
-            f->mod_out[i].imag = 0.0;
-        }
-
+#ifndef __EMBEDDED__ 
 #ifndef __EMBEDDED__
         /* tx BPF on by default, can't see any reason we'd want this off */
         ofdm_set_tx_bpf(f->ofdm, 1);
@@ -1106,20 +1108,27 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
             speech_in += codec2_samples_per_frame(f->codec2);
         }
 
-        /* call modulate function when we have enough frames to run interleaver */
 
-        assert((f->modem_frame_count_tx >= 0) && (f->modem_frame_count_tx < f->interleave_frames));
-        f->modem_frame_count_tx++;
-        if (f->modem_frame_count_tx == f->interleave_frames) {
-            freedv_comptx_700d(f, f->mod_out);
-            //fprintf(stderr, "  calling freedv_comptx_700d()\n");
-            f->modem_frame_count_tx = 0;
-        }
+	/* Only use extra local buffer if needed for interleave > 1 */
+	if (f->interleave_frames == 1) {
+            freedv_comptx_700d(f, mod_out);
+	} else {
+            /* call modulate function when we have enough frames to run interleaver */
+            assert((f->modem_frame_count_tx >= 0) && 
+	    		(f->modem_frame_count_tx < f->interleave_frames));
+            f->modem_frame_count_tx++;
+            if (f->modem_frame_count_tx == f->interleave_frames) {
+                freedv_comptx_700d(f, f->mod_out);
+                //fprintf(stderr, "  calling freedv_comptx_700d()\n");
+                f->modem_frame_count_tx = 0;
+            }
+            /* output n_nom_modem_samples at a time from modulated buffer */
+            for(i=0; i<f->n_nat_modem_samples; i++) {
+                mod_out[i] = 
+		    f->mod_out[f->modem_frame_count_tx * f->n_nat_modem_samples+i];
+            }
+	}
 
-        /* output n_nom_modem_samples at a time from modulated buffer */
-        for(i=0; i<f->n_nat_modem_samples; i++) {
-            mod_out[i] = f->mod_out[f->modem_frame_count_tx*f->n_nat_modem_samples+i];
-        }
     }
     
     /* 2400 A and B are handled by the real-mode TX */
