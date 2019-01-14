@@ -60,7 +60,7 @@ cat tmp
 n=$(grep '^BER\.*:' tmp | cut -d ' ' -f 2)
 p1=$(echo $n '<=' 0.10 | bc)
 n=$(grep '^Coded.*BER\.*:' tmp | cut -d ' ' -f 3)
-p2=$(echo $n '<=' 0.002 | bc)
+p2=$(echo $n '<=' 0.01 | bc)
 if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 
 
