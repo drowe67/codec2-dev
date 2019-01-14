@@ -33,11 +33,15 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef __APPLE__
+#ifdef TT
+#if defined(__APPLE__)
 #include <malloc/malloc.h>
+#elif defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
+#include <sys/malloc.h>
 #else
 #include <malloc.h>
 #endif /* __APPLE__ */
+#endif
 
 #include "fsk.h"
 #include "fmfsk.h"
