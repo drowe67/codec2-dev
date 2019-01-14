@@ -285,7 +285,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             }
 	}
 
-#ifndef __EMBEDDED__ 
 #ifndef __EMBEDDED__
         /* tx BPF on by default, can't see any reason we'd want this off */
         ofdm_set_tx_bpf(f->ofdm, 1);
