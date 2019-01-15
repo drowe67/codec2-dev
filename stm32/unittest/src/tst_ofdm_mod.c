@@ -74,6 +74,8 @@
 #include "stm32f4xx.h"
 #include "machdep.h"
 
+#include "debug_alloc.h"
+
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
     FILE        *fcfg, *fin, *fout;
@@ -118,12 +120,11 @@ int main(int argc, char *argv[]) {
     if (config_profile) machdep_profile_init();
 
     struct OFDM_CONFIG *ofdm_config;
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+    if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
         exit(1);
     }
 
-    ofdm_config->centre = 1500.0;
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
@@ -139,7 +140,7 @@ int main(int argc, char *argv[]) {
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
-    free(ofdm_config);
+    FREE(ofdm_config);
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
@@ -178,6 +179,7 @@ int main(int argc, char *argv[]) {
     }
 
     while (fread(tx_bits_char, sizeof(char), n_bpf, fin) == n_bpf) {
+        fprintf(stderr, "Frame %d\n", frame);
 
         if (config_profile) PROFILE_SAMPLE(ofdm_mod_start);
 
