@@ -152,7 +152,7 @@ int main(int argc, char *argv[]) {
     //int use_testframes = 0; 
     int interleave_frames = 1; 
     int use_clip = 0; 
-    int use_txbpf = 1;
+    int use_txbpf = 0;
     int use_ext_vco = 0;
 
     ////////
