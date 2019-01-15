@@ -866,23 +866,48 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
  * ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
  * ----------------------------------------------------------------------------------
  */
+static int ofdm_sync_search_core(struct OFDM *ofdm);
 
+/* This is a wrapper to maintain the older functionality with an
+ * array of COMPs as input */
 int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
     int i, j;
 
     /* insert latest input samples into rxbuf so it is primed for when
        we have to call ofdm_demod() */
-
     for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
         ofdm->rxbuf[i] = ofdm->rxbuf[j];
     }
 
     /* insert latest input samples onto tail of rxbuf */
-
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
         ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
     }
 
+    return(ofdm_sync_search_core(ofdm));
+}
+
+/* This is a wrapper with a new interface to reduce memory allocated.
+ * This works with ofdm_demod and freedv_api. */
+int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
+    int i, j;
+
+    /* shift the buffer left based on nin */
+    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
+        ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    }
+
+    /* insert latest input samples onto tail of rxbuf */
+    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
+        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain) + 0.0 * I;
+    }
+
+    return(ofdm_sync_search_core(ofdm));
+}
+
+/* This is the rest of the function which expects that the data is
+ * already in ofdm->rxbuf */
+static int ofdm_sync_search_core(struct OFDM *ofdm) {
     /* Attempt coarse timing estimate (i.e. detect start of frame) */
 
     int st = ofdm_m + ofdm_ncp + ofdm_samplesperframe;
@@ -919,26 +944,53 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
  * ofdm_demod - Demodulates one frame of bits
  * ------------------------------------------
  */
+static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits);
 
+/* This is a wrapper to maintain the older functionality with an
+ * array of COMPs as input */
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
+    int i, j;
+
+    /* shift the buffer left based on nin */
+    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
+        ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    }
+
+    /* insert latest input samples onto tail of rxbuf */
+    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
+        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+    }
+
+    ofdm_demod_core(ofdm, rx_bits);
+}
+
+/* This is a wrapper with a new interface to reduce memory allocated.
+ * This works with ofdm_demod and freedv_api. */
+void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float gain) {
+    int i, j;
+
+    /* shift the buffer left based on nin */
+    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
+        ofdm->rxbuf[i] = ofdm->rxbuf[j];
+    }
+
+    /* insert latest input samples onto tail of rxbuf */
+    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
+        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain) + 0.0 * I;
+    }
+
+    ofdm_demod_core(ofdm, rx_bits);
+}
+
+/* This is the rest of the function which expects that the data is
+ * already in ofdm->rxbuf */
+static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     complex float aphase_est_pilot_rect;
     float aphase_est_pilot[ofdm_nc + 2];
     float aamp_est_pilot[ofdm_nc + 2];
     float freq_err_hz;
     int i, j, k, rr, st, en, ft_est;
     int prev_timing_est = ofdm->timing_est;
-
-    /* shift the buffer left based on nin */
-
-    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
-        ofdm->rxbuf[i] = ofdm->rxbuf[j];
-    }
-
-    /* insert latest input samples onto tail of rxbuf */
-
-    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
-    }
 
     /*
      * get user and calculated freq offset
