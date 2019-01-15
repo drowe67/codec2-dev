@@ -13,9 +13,18 @@
 #ifdef DEBUG_ALLOC
 // Debug calls
 
+#ifdef CORTEX_M4
+extern char * __heap_end;
+register char * sp asm ("sp");
+#endif
+
   static inline void * DEBUG_MALLOC(const char *func, size_t size) {
     void *ptr = malloc(size);
     fprintf(stderr, "MALLOC: %s %p %zd", func, ptr, size);
+#ifdef CORTEX_M4
+
+    fprintf(stderr, " : sp %p  heap_end %p", sp, __heap_end);
+#endif
     if (!ptr) fprintf(stderr, " ** FAILED **");
     fprintf(stderr, "\n");
     return(ptr);
@@ -25,6 +34,9 @@
   static inline void * DEBUG_CALLOC(const char *func, size_t nmemb, size_t size) {
     void *ptr = calloc(nmemb, size);
     fprintf(stderr, "CALLOC: %s %p %zd %zd", func, ptr, nmemb, size);
+#ifdef CORTEX_M4
+    fprintf(stderr, " : sp %p  heap_end %p", sp, __heap_end);
+#endif
     if (!ptr) fprintf(stderr, " ** FAILED **");
     fprintf(stderr, "\n");
     return(ptr);
