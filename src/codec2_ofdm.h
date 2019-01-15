@@ -60,7 +60,9 @@ void ofdm_destroy(struct OFDM *);
 
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
+void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float gain);
 int  ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in);
+int  ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain);
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw);
 
 /* getters */

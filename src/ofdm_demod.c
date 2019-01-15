@@ -230,7 +230,6 @@ int main(int argc, char *argv[])
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
 
     short  rx_scaled[Nmaxsamperframe];
-    COMP   rxbuf_in[Nmaxsamperframe];
     int    rx_bits[Nbitsperframe];
     char   rx_bits_char[Nbitsperframe];
     int    rx_uw[ofdm_nuwbits];
@@ -274,19 +273,14 @@ int main(int argc, char *argv[])
 
         int log_payload_syms = 0;
 
-        /* scale and demod */
-
-        for(i=0; i<nin_frame; i++) {
-            rxbuf_in[i].real = (float)rx_scaled[i]/(OFDM_AMP_SCALE/2);
-            rxbuf_in[i].imag = 0.0;
-        }
+        /* demod */
 
         if (strcmp(ofdm->sync_state,"search") == 0) {
-            ofdm_sync_search(ofdm, rxbuf_in);
+            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE/2));
         }
 
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
-            ofdm_demod(ofdm, rx_bits, rxbuf_in);
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = 1;
 
