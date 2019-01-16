@@ -502,7 +502,7 @@ int main(int argc, char *argv[])
 
         }
 
-        if (verbose) {
+        if (verbose == 2) {
             int r = 0;
 
             if (testframes) {
