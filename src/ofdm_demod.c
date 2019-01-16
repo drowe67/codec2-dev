@@ -32,6 +32,10 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define OPTPARSE_IMPLEMENTATION
+#define OPTPARSE_API static
+#include "optparse.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,8 +50,10 @@
 #include "gp_interleaver.h"
 #include "interldpc.h"
 
+#define IS_DIR_SEPARATOR(c)     ((c) == '/')
+
 #define NFRAMES  100               /* just log the first 100 frames          */
-#define NDISCARD 20                /* BER2measure disctrds first 20 frames   */
+#define NDISCARD 20                /* BER2 measure discards first 20 frames   */
 
 static struct OFDM_CONFIG *ofdm_config;
 
@@ -56,38 +62,169 @@ static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 
-int opt_exists(char *argv[], int argc, char opt[]) {
-    int i;
-    for (i=0; i<argc; i++) {
-        if (strcmp(argv[i], opt) == 0) {
-            return i;
-        }
-    }
-    return 0;
-}
+static const char *progname;
 
+void opt_help() {
+    fprintf(stderr, "\nusage: %s [options]\n\n", progname);
+    fprintf(stderr, "  Default output file format is one byte per bit hard decision\n\n");
+    fprintf(stderr, "  --in          filename  Name of InputModemRawFile\n");
+    fprintf(stderr, "  --out         filename  Name of OutputOneCharPerBitFile\n");
+    fprintf(stderr, "  --log         filename  Octave log file for testing\n");
+    fprintf(stderr, "  --interleave  depth     Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
+    fprintf(stderr, "  --tx_freq     freq      Set modulation TX centre Frequency (1500.0 default)\n");
+    fprintf(stderr, "  --rx_freq     freq      Set modulation RX centre Frequency (1500.0 default)\n");
+    fprintf(stderr, "  --verbose     [1|2]     Verbose output level to stderr (default off)\n");
+    fprintf(stderr, "  --testframes            Receive test frames and count errors\n");
+    fprintf(stderr, "  --llr                   LLR output boolean, one double per bit\n");
+    fprintf(stderr, "  --ldpc                  Run LDPC decoder boolean. This forces 112, one char/bit output values\n");
+    fprintf(stderr, "                          per frame.  In testframe mode raw and coded errors will be counted\n\n");
+
+    exit(-1);
+}
 
 int main(int argc, char *argv[])
 {
-    FILE          *fin, *fout, *foct;
-    struct OFDM   *ofdm;
-    int            nin_frame;
-    int            i, j, oct, logframes, arg, llr_en, interleave_frames;
-    int            Nerrs, Terrs, Tbits, Terrs2, Tbits2, testframes, frame_count;
-    int            ldpc_en, Tbits_coded, Terrs_coded;
+    struct OFDM *ofdm;
+    int  i, j, opt;
+    char *fin_name, *fout_name, *log_name;
+
+    char *pn = argv[0] + strlen (argv[0]);
+
+    while (pn != argv[0] && !IS_DIR_SEPARATOR (pn[-1]))
+        --pn;
+    
+    progname = pn;
+
+    /* See if they want help */
+
+    if (argc == 1) {
+        opt_help();
+    }
+
+    /* Turn off stream buffering */
+
+    setvbuf(stdin, NULL, _IONBF, BUFSIZ);
+    setvbuf(stdout, NULL, _IONBF, BUFSIZ);
+
+    FILE *fin = stdin;
+    FILE *fout = stdout;
+    FILE *foct = NULL;
+
+    int input_specified = 0;
+    int output_specified = 0;
+    int log_specified = 0;
+    int logframes = NFRAMES;
+    int ldpc_en = 0;
+    int llr_en = 0;
+    int testframes = 0;
+    int interleave_frames = 1;
+    int verbose = 0;
+
+    float rx_centre = 1500.0f;
+    float tx_centre = 1500.0f;
+
+    struct optparse options;
+
+    struct optparse_long longopts[] = {
+        {"in",         'a', OPTPARSE_REQUIRED},
+        {"out",        'b', OPTPARSE_REQUIRED},
+        {"log",        'c', OPTPARSE_REQUIRED},
+        {"interleave", 'e', OPTPARSE_REQUIRED},
+        {"tx_freq",    'f', OPTPARSE_REQUIRED},
+        {"rx_freq",    'g', OPTPARSE_REQUIRED},
+        {"verbose",    'v', OPTPARSE_REQUIRED},
+        {"testframes", 'd', OPTPARSE_NONE},
+        {"llr",        'h', OPTPARSE_NONE},
+        {"ldpc",       'i', OPTPARSE_NONE},
+        {0, 0, 0}
+    };
+
+    optparse_init(&options, argv);
+
+    while ((opt = optparse_long(&options, longopts, NULL)) != -1) {
+        switch (opt) {
+            case '?':
+                opt_help();
+            case 'a':
+                fin_name = options.optarg;
+                input_specified = 1;
+                break;
+            case 'b':
+                fout_name = options.optarg;
+                output_specified = 1;
+                break;
+            case 'c':
+                log_name = options.optarg;
+                log_specified = 1;
+                break;
+            case 'd':
+                testframes = 1;
+                break;
+            case 'e':
+                interleave_frames = atoi(options.optarg);
+            case 'i':                                       /* fall through */
+                ldpc_en = 1;
+                llr_en = 1;
+                break;
+            case 'f':
+                tx_centre = atof(options.optarg);
+                break;
+            case 'g':
+                rx_centre = atof(options.optarg);
+                break;
+            case 'h':
+                llr_en = 1;
+                break;
+            case 'v':
+                verbose = atoi(options.optarg);
+                if (verbose < 0 || verbose > 2)
+                    verbose = 0;
+        }
+    }
+
+    /* Print remaining arguments to give user a hint */
+
+    char *arg;
+
+    while ((arg = optparse_arg(&options)))
+        fprintf(stderr, "%s\n", arg);
+
+    if (input_specified) {
+        if ((fin = fopen(fin_name, "rb")) == NULL) {
+            fprintf(stderr, "Error opening input modem sample file: %s\n", fin_name);
+            exit(-1);
+        }
+    }
+
+    if (output_specified) {
+        if ((fout = fopen(fout_name, "wb")) == NULL) {
+            fprintf(stderr, "Error opening output file: %s\n", fout_name);
+            exit(-1);
+        }
+    }
+
+    if (log_specified) {
+        if ((foct = fopen(log_name, "wt")) == NULL) {
+            fprintf(stderr, "Error opening Octave output file: %s\n", log_name);
+            exit(-1);
+        }
+    }
 
     if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
-        exit(1);
+        exit(-1);
     }
 
-    ofdm = ofdm_create(ofdm_config);
+    ofdm = ofdm_create(ofdm_config);    /* get defaults */
     assert(ofdm != NULL);
 
     free(ofdm_config);
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
+
+    ofdm_config->tx_centre = tx_centre;
+    ofdm_config->rx_centre = rx_centre;
 
     ofdm_bitsperframe = ofdm_get_bits_per_frame();
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
@@ -104,109 +241,35 @@ int main(int argc, char *argv[])
 
     for(i=0; i< ofdm_rowsperframe * NFRAMES; i++) {
         for(j=0; j< ofdm_config->nc; j++) {
-            phase_est_pilot_log[i][j] = 0.0;
+            phase_est_pilot_log[i][j] = 0.0f;
         }
     }
+
     for(i=0; i<ofdm_rowsperframe*ofdm_config->nc*NFRAMES; i++) {
-        rx_np_log[i].real = 0.0;
-        rx_np_log[i].imag = 0.0;
-        rx_amp_log[i] = 0.0;
+        rx_np_log[i].real = 0.0f;
+        rx_np_log[i].imag = 0.0f;
+        rx_amp_log[i] = 0.0f;
     }
 
     for(i=0; i<NFRAMES; i++) {
-        foff_hz_log[i] = 0.0;
-        snr_est_log[i] = 0.0;
-        timing_est_log[i] = 0.0;
+        foff_hz_log[i] = 0.0f;
+        snr_est_log[i] = 0.0f;
+        timing_est_log[i] = 0.0f;
     }
 
     /* Set up default LPDC code.  We could add other codes here if we like */
 
     struct LDPC ldpc;
+
     set_up_hra_112_112(&ldpc, ofdm_config);
+
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
 
-    if (argc < 3) {
-        fprintf(stderr, "\n");
-        printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--llr] [--ldpc] [--interleave depth] [-v]\n", argv[0]);
-        fprintf(stderr, "\n");
-        fprintf(stderr, "                Default output file format is one byte per bit hard decision\n");
-        fprintf(stderr, "  --llr         LLR output, one double per bit, %d doubles/frame\n", coded_bits_per_frame);
-        fprintf(stderr, "  --testframes  Receive test frames and count errors\n");
-        fprintf(stderr, "  --ldpc        Run LDPC decoder.  This forces 112, one char/bit output values\n"
-                        "                per frame.  In testframe mode (-t) raw and coded errors will be counted\n");
-        fprintf(stderr, "  --interleave  Interleaver for LDPC frames, e.g. 1,2,4,8,16, default is 1\n");
-        fprintf(stderr, "  --tx_freq     Set an optional modulation TX centre Frequency\n");
-        fprintf(stderr, "  --rx_freq     Set an optional modulation RX centre Frequency\n");
-        fprintf(stderr, "  -v            Verbose info the stderr\n");
-        fprintf(stderr, "  -o            Octave log file for testing\n");
-        fprintf(stderr, "\n");
-        exit(1);
-    }
-
-    if (strcmp(argv[1], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
-        fprintf(stderr, "Error opening input modem sample file: %s: %s.\n",
-         argv[1], strerror(errno));
-        exit(1);
-    }
-
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
-        fprintf(stderr, "Error opening output file: %s: %s.\n",
-         argv[2], strerror(errno));
-        exit(1);
-    }
-
-    foct = NULL;
-    oct = 0;
-
-    if ((arg = opt_exists(argv, argc, "--tx_freq"))) {
-        ofdm_config->tx_centre = atof(argv[arg+1]);	/* TX Centre Frequency */
-    } else {
-        ofdm_config->tx_centre = 1500.0;
-    }
-
-    if ((arg = opt_exists(argv, argc, "--rx_freq"))) {
-        ofdm_config->rx_centre = atof(argv[arg+1]);	/* RX Centre Frequency */
-    } else {
-        ofdm_config->rx_centre = 1500.0;
-    }
-
-    if ((arg = opt_exists(argv, argc, "-o")) != 0) {
-        if ( (foct = fopen(argv[arg+1],"wt")) == NULL ) {
-            fprintf(stderr, "Error opening output Octave file: %s: %s.\n", argv[4], strerror(errno));
-            exit(1);
-        }
-
-        oct = 1;
-        logframes = NFRAMES;
-    }
-
-    llr_en = 0;
-    if (opt_exists(argv, argc, "--llr")) {
-        llr_en = 1;
-    }
-
-    testframes = 0;
-    if (opt_exists(argv, argc, "--testframes")) {
-        testframes = 1;
-    }
-
-    ldpc_en = 0;
-    if (opt_exists(argv, argc, "--ldpc")) {
-        ldpc_en = 1;
-        llr_en = 1;
-    }
-
-    interleave_frames = 1;
-    if ((arg = opt_exists(argv, argc, "--interleave"))) {
-        interleave_frames = atoi(argv[arg+1]);
+    if (verbose) {
         fprintf(stderr, "interleave_frames: %d\n",  interleave_frames);
-        /* we can't de-interleave without LDPC for sync, so switch that on */
-        ldpc_en = 1;
-        llr_en = 1;
+        ofdm_set_verbose(ofdm, verbose);
     }
 
     int Nerrs_raw[interleave_frames];
@@ -215,15 +278,10 @@ int main(int argc, char *argv[])
     int parityCheckCount[interleave_frames];
 
     for(i=0; i<interleave_frames; i++) {
-        Nerrs_raw[i] = Nerrs_coded[i] = iter[i] = parityCheckCount[i] = 0;
-    }
-
-    if ((arg = opt_exists(argv, argc, "-v")) != 0) {
-        ofdm_set_verbose(ofdm, 1);
-    }
-
-    if ((arg = opt_exists(argv, argc, "-vv")) != 0) {
-        ofdm_set_verbose(ofdm, 2);
+        Nerrs_raw[i] = 0;
+        Nerrs_coded[i] = 0;
+        iter[i] = 0;
+        parityCheckCount[i] = 0;
     }
 
     int Nbitsperframe = ofdm_bitsperframe;
@@ -234,13 +292,16 @@ int main(int argc, char *argv[])
     char   rx_bits_char[Nbitsperframe];
     int    rx_uw[ofdm_nuwbits];
     short  txt_bits[ofdm_ntxtbits];
+    int    Nerrs, Terrs, Tbits, Terrs2, Tbits2, Terrs_coded, Tbits_coded, frame_count;
 
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
-    float EsNo = 3;
-    fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
+    float EsNo = 3.0f;
 
-    float snr_est_smoothed_dB = 0.0;
+    if (verbose)
+        fprintf(stderr,"Warning EsNo: %f hard coded\n", EsNo);
+
+    float snr_est_smoothed_dB = 0.0f;
 
     COMP  payload_syms[coded_syms_per_frame];
     float payload_amps[coded_syms_per_frame];
@@ -248,9 +309,9 @@ int main(int argc, char *argv[])
     float codeword_amps[interleave_frames*coded_syms_per_frame];
 
     for (i=0; i<interleave_frames*coded_syms_per_frame; i++) {
-        codeword_symbols[i].real = 0.0;
-        codeword_symbols[i].imag = 0.0;
-        codeword_amps[i] = 0.0;
+        codeword_symbols[i].real = 0.0f;
+        codeword_symbols[i].imag = 0.0f;
+        codeword_amps[i] = 0.0f;
     }
 
     /* More logging */
@@ -259,13 +320,13 @@ int main(int argc, char *argv[])
 
     for (i=0; i<NFRAMES; i++) {
       for (j=0; j<coded_syms_per_frame; j++) {
-        payload_syms_log[i][j].real = 0.0;
-        payload_syms_log[i][j].imag = 0.0;
-        payload_amps_log[i][j] = 0.0;
+        payload_syms_log[i][j].real = 0.0f;
+        payload_syms_log[i][j].imag = 0.0f;
+        payload_amps_log[i][j] = 0.0f;
       }
     }
 
-    nin_frame = ofdm_get_nin(ofdm);
+    int nin_frame = ofdm_get_nin(ofdm);
 
     int f = 0;
 
@@ -276,18 +337,20 @@ int main(int argc, char *argv[])
         /* demod */
 
         if (strcmp(ofdm->sync_state,"search") == 0) {
-            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE/2));
+            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
         }
 
         if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
-            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = 1;
 
             /* SNR estimation and smoothing */
 
-            float snr_est_dB = 10*log10((ofdm->sig_var/ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000);
-            snr_est_smoothed_dB = 0.9*snr_est_smoothed_dB + 0.1*snr_est_dB;
+            float snr_est_dB = 10.0f * 
+                   log10f((ofdm->sig_var/ofdm->noise_var) * ofdm_config->nc * ofdm_config->rs / 3000.0f);
+
+            snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
             if (llr_en) {
 
@@ -330,7 +393,8 @@ int main(int argc, char *argv[])
 
                     if (!strcmp(ofdm->sync_state_interleaver,"synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
-                        // printf("decode!\n");
+                        // if (verbose)
+                        //     printf("decode!\n");
 
                         if (testframes) {
                             Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, interleave_frames, codeword_symbols_de);
@@ -343,7 +407,8 @@ int main(int argc, char *argv[])
                                                  EsNo, ofdm->mean_amp, coded_syms_per_frame);
                             iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
 
-                            //fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
+                            //if (verbose)
+                            //    fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
 
                             if (testframes) {
                                 /* construct payload data bits */
@@ -367,6 +432,7 @@ int main(int argc, char *argv[])
                 }
             } else {
                 /* simple hard decision output for uncoded testing, all bits in frame dumped inlcuding UW and txt */
+
                 for(i=0; i<Nbitsperframe; i++) {
                     rx_bits_char[i] = rx_bits[i];
                 }
@@ -390,7 +456,8 @@ int main(int argc, char *argv[])
 
                 for(i=0; i<Npayloadbits; i++) {
                     payload_bits[i] = r[i] > 16384;
-                    //fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
+                    //if (verbose)
+                    //    fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
                 }
 
                 uint8_t txt_bits[ofdm_ntxtbits];
@@ -402,6 +469,7 @@ int main(int argc, char *argv[])
                 ofdm_assemble_modem_frame(tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
+
                 for(i=0; i<Nbitsperframe; i++) {
                     if (tx_bits[i] != rx_bits[i]) {
                         Nerrs++;
@@ -416,6 +484,7 @@ int main(int argc, char *argv[])
                     Tbits2 += Nbitsperframe;
                 }
             }
+
             frame_count++;
         }
 
@@ -433,23 +502,22 @@ int main(int argc, char *argv[])
 
         }
 
-        if (ofdm->verbose) {
-            int  r=0;
+        if (verbose) {
+            int r = 0;
 
             if (testframes) {
                 r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
             }
 
-            fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
-                    f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
-                    ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
-                    Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
-            fprintf(stderr, "\n");
+            fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+                f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
+                ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
+                Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
         }
 
         /* optional logging of states */
 
-        if (oct) {
+        if (log_specified) {
             /* note corrected phase (rx no phase) is one big linear array for frame */
 
             for (i = 0; i < ofdm_rowsperframe*ofdm_config->nc; i++) {
@@ -480,24 +548,21 @@ int main(int argc, char *argv[])
             }
 
             if (f == (logframes-1))
-                oct = 0;
+                log_specified = 0;
         }
-
-        /* if this is in a pipeline, we probably don't want the usual
-           buffering to occur */
-
-        if (fout == stdout) fflush(stdout);
-        if (fin == stdin) fflush(stdin);
 
         f++;
     }
 
-    fclose(fin);
-    fclose(fout);
+    if (input_specified)
+        fclose(fin);
+
+    if (output_specified)
+        fclose(fout);
 
     /* optionally dump Octave files */
 
-    if (foct != NULL) {
+    if (log_specified) {
         octave_save_float(foct, "phase_est_pilot_log_c", (float*)phase_est_pilot_log, ofdm_rowsperframe*NFRAMES, ofdm_config->nc, ofdm_config->nc);
         octave_save_complex(foct, "rx_np_log_c", (COMP*)rx_np_log, 1, ofdm_rowsperframe*ofdm_config->nc*NFRAMES, ofdm_rowsperframe*ofdm_config->nc*NFRAMES);
         octave_save_float(foct, "rx_amp_log_c", (float*)rx_amp_log, 1, ofdm_rowsperframe*ofdm_config->nc*NFRAMES, ofdm_rowsperframe*ofdm_config->nc*NFRAMES);
@@ -506,6 +571,7 @@ int main(int argc, char *argv[])
         octave_save_float(foct, "snr_est_log_c", snr_est_log, NFRAMES, 1, 1);
         octave_save_complex(foct, "payload_syms_log_c", (COMP*)payload_syms_log, NFRAMES, coded_syms_per_frame, coded_syms_per_frame);
         octave_save_float(foct, "payload_amps_log_c", (float*)payload_amps_log, NFRAMES, coded_syms_per_frame, coded_syms_per_frame);
+
         fclose(foct);
     }
 
@@ -513,24 +579,29 @@ int main(int argc, char *argv[])
 
     if (testframes) {
         float uncoded_ber = (float)Terrs/Tbits;
-        fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
-        if (!ldpc_en) {
-            fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+
+        if (verbose) {
+            fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
+
+            if (!ldpc_en) {
+                fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float)Terrs2/Tbits2, Tbits2, Terrs2);
+            }
         }
+
         if (ldpc_en) {
             float coded_ber = (float)Terrs_coded/Tbits_coded;
-            fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n",
-                    coded_ber, Tbits_coded, Terrs_coded);
+
+            if (verbose)
+                fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
 
             /* set return code for Ctest */
-            if ((uncoded_ber < 0.1) && (coded_ber < 0.01))
-                return 0;
-            else
+
+            if ((uncoded_ber >= 0.1f) && (coded_ber >= 0.01f))
                 return 1;
         }
     }
     
     return 0;
 }
-/* vi:set ts=4 et sts=4: */
+
 
