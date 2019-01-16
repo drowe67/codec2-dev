@@ -28,6 +28,10 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
+#define OPTPARSE_IMPLEMENTATION
+#define OPTPARSE_API static
+#include "optparse.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,55 +44,113 @@
 #include "interldpc.h"
 #include "varicode.h"
 
+#define IS_DIR_SEPARATOR(c)     ((c) == '/')
+
 static struct OFDM_CONFIG *ofdm_config;
 
 static int ofdm_bitsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 
-int opt_exists(char *argv[], int argc, char opt[]) {
-    int i;
-    for (i=0; i<argc; i++) {
-        if (strcmp(argv[i], opt) == 0) {
-            return i;
-        }
-    }
-    return 0;
+static const char *progname;
+
+void opt_help() {
+    fprintf(stderr, "\nUsage: %s [options]\n\n", progname);
+    fprintf(stderr, "  --out     filename  Name of OutputOneCharPerBitFile\n");
+    fprintf(stderr, "  --frames  n         Number of frames to output (default 10)\n");
+    fprintf(stderr, "  --ldpc              Frame length (112) for LDPC (else 238) for Plain (default Plain)\n");
+    fprintf(stderr, "  --verbose           Output variable assigned values to stderr\n\n");
+
+    exit(-1);
 }
 
 int main(int argc, char *argv[])
 {
     struct OFDM  *ofdm;
-    struct LDPC   ldpc;
+    struct LDPC  ldpc;
     FILE         *fout;
-    int           Nframes, i, n;
-    int           ldpc_en;
+    char         *fout_name;
+    int          opt, verbose, Nframes, i, n;
+    int          ldpc_en, frames, output_specified;
 
-    if (argc < 3) {
-	fprintf(stderr, "usage: %s OutputOneCharPerBitFile numFrames [--ldpc]\n", argv[0]);
-	fprintf(stderr, " --ldpc         Length (238) for LDPC (else plain, 224)\n");
-	exit(1);
+    char *pn = argv[0] + strlen (argv[0]);
+
+    while (pn != argv[0] && !IS_DIR_SEPARATOR (pn[-1]))
+        --pn;
+    
+    progname = pn;
+
+    /* See if they want help */
+
+    if (argc == 1) {
+        opt_help();
     }
 
-    if (strcmp(argv[1], "-") == 0)
-        fout = stdout;
-    else if ( (fout = fopen(argv[1],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output file: %s: %s.\n",
-         argv[1], strerror(errno));
-	exit(1);
-    }
+    /* Turn off stream buffering */
 
-    Nframes = atoi(argv[2]);
-    fprintf(stderr, "Nframes: %d\n", Nframes);
+    setvbuf(stdout, NULL, _IONBF, BUFSIZ);
 
+    fout = stdout;
+    output_specified = 0;
+    frames = 10;
     ldpc_en = 0;
-    if (opt_exists(argv, argc, "--ldpc")) ldpc_en = 1;
+    verbose = 0;
 
+    struct optparse options;
 
-    // Build OFDM and LDPC to get sizes
+    struct optparse_long longopts[] = {
+        {"out",        'o', OPTPARSE_REQUIRED},
+        {"frames",     'n', OPTPARSE_REQUIRED},
+        {"ldpc",       'l', OPTPARSE_NONE},
+        {"verbose",    'v', OPTPARSE_NONE},
+        {0, 0, 0}
+    };
+
+    optparse_init(&options, argv);
+
+    while ((opt = optparse_long(&options, longopts, NULL)) != -1) {
+        switch (opt) {
+            case '?':
+                opt_help();
+            case 'o':
+                fout_name = options.optarg;
+                output_specified = 1;
+                break;
+            case 'n':
+                frames = atoi(options.optarg);
+                break;
+            case 'l':
+                ldpc_en = 1;
+                break;
+            case 'v':
+                verbose = 1;
+        }
+    }
+
+    /* Print remaining arguments to give user a hint */
+
+    char *arg;
+
+    while ((arg = optparse_arg(&options)))
+        fprintf(stderr, "%s\n", arg);
+
+    if (output_specified) {
+        if ((fout = fopen(fout_name, "wb")) == NULL) {
+            fprintf(stderr, "Error opening output bit file: %s\n", fout_name);
+            exit(-1);
+        }
+    }
+
+    Nframes = frames;
+
+    if (verbose)
+        fprintf(stderr, "Nframes: %d\n", Nframes);
+
+    // Build Default OFDM and LDPC to get sizes
+
     if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
 	printf("Out of Memory");
-	exit(1);
+	exit(-1);
     }
 
     ofdm = ofdm_create(ofdm_config);
@@ -109,27 +171,32 @@ int main(int argc, char *argv[])
     int data_bits_per_frame = ldpc.data_bits_per_frame;
 
     int Nbitsperframe;
-    if (ldpc_en) { Nbitsperframe = data_bits_per_frame; }
-    else { Nbitsperframe = ofdm_bitsperframe; }
-    fprintf(stderr, "Nbitsperframe: %d\n", Nbitsperframe);
+
+    if (ldpc_en) {
+        Nbitsperframe = data_bits_per_frame;
+    } else {
+        Nbitsperframe = ofdm_bitsperframe;
+    }
+
+    if (verbose)
+        fprintf(stderr, "Nbitsperframe: %d\n", Nbitsperframe);
 
     uint8_t tx_bits[Nbitsperframe];
     uint8_t txt_bits[ofdm_ntxtbits];
 
-    for(i=0; i< ofdm_ntxtbits; i++) {
+    for (i = 0; i< ofdm_ntxtbits; i++) {
         txt_bits[i] = 0;
     }
-
 
     // Add text bits to match other tests
     char   text_str[] = "cq cq cq hello world\r";
     char  *ptr_text = &text_str[0];
+
     short  tx_varicode_bits[VARICODE_MAX_BITS];
     int    nvaricode_bits = 0;
     int    varicode_bit_index = 0;
 
-
-    for(n=0; n<Nframes; n++) {
+    for (n = 0; n<Nframes; n++) {
 
         if (ldpc_en) { /* fancy interleaved LDPC encoded frames */
 
@@ -141,7 +208,7 @@ int main(int argc, char *argv[])
             int nspare = ofdm_ntxtbits;
 	    int k;
 
-            for(k=0; k<nspare; k++) {
+            for (k = 0; k<nspare; k++) {
                 if (nvaricode_bits) {
                     txt_bits[k] = tx_varicode_bits[varicode_bit_index++];
                     nvaricode_bits--;
@@ -150,10 +217,14 @@ int main(int argc, char *argv[])
                     /* get new char and encode */
                     char s[2];
                     s[0] = *ptr_text++;
-                    if (*ptr_text == 0) ptr_text = &text_str[0];
+
+                    if (*ptr_text == 0)
+                        ptr_text = &text_str[0];
+
                     nvaricode_bits = varicode_encode(tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
                     varicode_bit_index = 0;
                 }
+                //if (verbose)
 	        //fprintf(stderr, "txt_bits[%d] = %d\n", k, txt_bits[k]);
             }
 
@@ -164,8 +235,6 @@ int main(int argc, char *argv[])
             for(i=0; i<data_bits_per_frame; i++) {
                 tx_bits[i] = r[i]>16384;
             }
-
-
         } else { // (!ldpc_en)
 
             int Npayloadbits = Nbitsperframe-(ofdm_nuwbits+ofdm_ntxtbits);
@@ -182,15 +251,10 @@ int main(int argc, char *argv[])
 	}
 
 	fwrite(tx_bits, sizeof(char), Nbitsperframe, fout);
-
-	/* if this is in a pipeline, we probably don't want the usual
-	   buffering to occur */
-
-        if (fout == stdout)
-            fflush(stdout);
     }
 
-    fclose(fout);
+    if (output_specified)
+        fclose(fout);
 
     ofdm_destroy(ofdm);
 
