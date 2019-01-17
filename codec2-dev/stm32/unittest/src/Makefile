@@ -29,7 +29,7 @@ else
 CFLAGS += -msoft-float
 endif
 
-CFLAGS += -DDEBUG_ALLOC
+#CFLAGS += -DDEBUG_ALLOC
 
 ###################################################
 # STM32F4 Standard Peripheral Library
@@ -409,6 +409,7 @@ $(CODEC2_SRC)/mpdecode_core.c \
 $(CODEC2_SRC)/gp_interleaver.c \
 $(CODEC2_SRC)/interldpc.c \
 $(CODEC2_SRC)/HRA_112_112.c \
+$(CODEC2_SRC)/newamp1.c \
 
 CFLAGS += -D__EMBEDDED__
 CFLAGS += -I$(CODEC2_SRC)
@@ -449,6 +450,7 @@ SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 all: libstm32f4.a \
      tst_ldpc_enc.bin tst_ldpc_dec.bin \
      tst_ofdm_mod.bin tst_ofdm_demod.bin \
+     tst_api_mod.bin tst_api_demod.bin \
      tst_semihost.bin
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
@@ -530,14 +532,14 @@ tst_api_mod.elf: $(TST_API_MOD_SRCS:.c=.profile.o) libstm32f4.a # $(TMP_NEWLIB_O
 TST_API_DEMOD_SRCS=\
 tst_api_demod.c \
 semihosting.c \
-sbrk_dbg.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
+## (for debug use) sbrk_dbg.c \
 
 TST_API_DEMOD_SRCS += $(CODEC2_SRCS)
 TST_API_DEMOD_SRCS += $(SRCS)
 
-tst_api_demod.elf: $(TST_API_DEMOD_SRCS:.c=.profile.o) libstm32f4.a
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+tst_api_demod.elf: $(TST_API_DEMOD_SRCS:.c=.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_api_demod.map
 
 # -----------------------------------------------
 TST_OFDM_MOD_SRCS=\

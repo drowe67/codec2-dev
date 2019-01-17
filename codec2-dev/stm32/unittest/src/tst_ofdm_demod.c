@@ -164,7 +164,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    ofdm_config->centre = 1500.0;
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
@@ -202,7 +201,6 @@ int main(int argc, char *argv[]) {
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
 
     short  rx_scaled[Nmaxsamperframe];
-    COMP   rxbuf_in[Nmaxsamperframe];
     int    rx_bits[ofdm_bitsperframe];
     char   rx_bits_char[ofdm_bitsperframe];
     int    rx_uw[ofdm_nuwbits];
@@ -245,24 +243,20 @@ int main(int argc, char *argv[]) {
 
         if (config_profile) PROFILE_SAMPLE(ofdm_demod_start);
 
-	    /* scale and demod */
-	    for(i=0; i<nin_frame; i++) {
-	        rxbuf_in[i].real = (float)rx_scaled[i]/(OFDM_AMP_SCALE/2);
-                rxbuf_in[i].imag = 0.0;
-            }
+	    /* demod */
 
         if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
 
         if (strcmp(ofdm->sync_state,"search") == 0) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_sync_search);
-            ofdm_sync_search(ofdm, rxbuf_in);
+            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
         }
 
         if ((strcmp(ofdm->sync_state,"synced") == 0) ||
             (strcmp(ofdm->sync_state,"trial") == 0) ) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_demod);
-            ofdm_demod(ofdm, rx_bits, rxbuf_in);
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_diss);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);

@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# tst_api_demod_check
+#
+# Setup input and reference data for one of several versions of this test.
+
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
+# RUN_DIR - Directory where test will be run
+RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
+
+# Call common setup function to make the directory
+setup_common "${RUN_DIR}"
+
+# Change to test directory
+cd "${RUN_DIR}"
+
+
+#####################################################################
+## Test CHECK actions:
+
+declare -i Fails=0
+
+#case "${TEST_OPT}" in
+#
+#    700D)
+#	;;
+#
+#    esac
+
+echo "Check reference decode"
+p1=$(grep '^BER\.*: 0.000' ref_gen.log | wc -l)
+p2=$(grep '^Coded BER: 0.000' ref_gen.log | wc -l)
+if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
+else echo "BAD"; 
+     let Fails=($Fails + 1)
+     fi
+
+echo "Check target decode"
+p1=$(grep '^BER\.*: 0.000' stm_stderr.txt | wc -l)
+p2=$(grep '^Coded BER: 0.000' stm_stderr.txt | wc -l)
+if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
+else echo "BAD"; 
+     let Fails=($Fails + 1)
+     fi
+
+if (( $Fails == 0 )); then
+    echo -e "\nTest PASSED"
+else
+    echo -e "\nTest FAILED!"
+fi
+
+
+exit $Fails
