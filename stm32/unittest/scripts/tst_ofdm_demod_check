@@ -171,7 +171,7 @@ if (args.test_opt == "quick"):
 elif (args.test_opt == "ideal"):
     pass
 elif (args.test_opt == "AWGN"):
-    tolerance_output_differences = 1
+    tolerance_output_differences = 2
     tolerance_syms = 0.005
 elif (args.test_opt == "fade"):
     pass
@@ -182,7 +182,9 @@ elif (args.test_opt == "profile"):
 elif (args.test_opt == "ldpc"):
     pass
 elif (args.test_opt == "ldpc_AWGN"):
-    tolerance_output_differences = 10
+    tolerance_tbits = 2
+    tolerance_terrs = 3
+    tolerance_output_differences = 15
 elif (args.test_opt == "ldpc_fade"):
     tolerance_output_differences = 1
     pass

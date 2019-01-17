@@ -18,8 +18,7 @@ setup_common "${RUN_DIR}"
 ${TEST}_setup ${TEST} ${TEST_OPT} --clean
 cd "${RUN_DIR}" 
 run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} |& tee gdb.log
-${TEST}_check ${TEST} ${TEST_OPT} |& tee check.log ||
-let Fails=($Fails + 1)
+${TEST}_check ${TEST} ${TEST_OPT} > check.log 2>&1 || let Fails=($Fails + 1)
 
 sleep 5 # Delay for st-util to close
 

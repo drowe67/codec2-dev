@@ -1,0 +1,58 @@
+#!/bin/bash
+#
+# tst_api_demod_setup
+#
+# Setup input and reference data for one of several versions of this test.
+
+# Find the scripts directory
+SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
+
+# Setup common variables
+source $SCRIPTS/run_tests_common.sh
+
+# RUN_DIR - Directory where test will be run
+RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
+
+# Call common setup function to make the directory
+setup_common "${RUN_DIR}"
+
+# Change to test directory
+cd "${RUN_DIR}"
+
+
+#####################################################################
+## Test SETUP actions:
+
+case "${TEST_OPT}" in
+
+    700D_plain )
+    	# Config is <mode>, <teswtframes> 
+    	echo "71000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700D spch_in.raw stm_in.raw --testframes --txbpf 0 \
+		>> setup.log 2>&1
+	#
+        # Reference
+        freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes \
+		> ref_gen.log 2>&1
+	;;
+
+    700D_AWGN )
+    	# Config is <mode>, <teswtframes> 
+    	echo "71000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700D spch_in.raw stm_in.raw --testframes --txbpf 0 \
+		>> setup.log 2>&1
+	#
+        # Reference
+        freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes \
+		> ref_gen.log 2>&1
+	;;
+
+    esac
