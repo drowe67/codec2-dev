@@ -5,7 +5,6 @@
 
 #include "filter.h"
 #include "filter_coef.h"
-
 #include "debug_alloc.h"
 
 #ifndef ARM_MATH_CM4
@@ -16,6 +15,8 @@
   #define SINF(a) arm_sin_f32(a)
   #define COSF(a) arm_cos_f32(a)
 #endif
+
+#define cmplx(value) (COSF(value) + SINF(value) * I)
 
 /*
  * This is a library of filter functions. They were copied from Quisk and converted to single precision.
@@ -244,7 +245,7 @@ void quisk_cfTune(struct quisk_cfFilter * filter, float freq) {
 
     for (i = 0; i < filter->nTaps; i++) {
         float tval = tune * (i - D);
-        filter->cpxCoefs[i] = (COSF(tval) + SINF(tval) * I) * filter->dCoefs[i];
+        filter->cpxCoefs[i] = cmplx(tval) * filter->dCoefs[i];
     }
 }
 

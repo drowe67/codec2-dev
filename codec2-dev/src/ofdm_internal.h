@@ -41,10 +41,22 @@ extern "C"
 #include "filter.h"
 
 #ifndef M_PI
-#define M_PI        3.14159265358979323846f  /* math constant */
+#define M_PI        3.14159265358979323846f
 #endif
 
-#define TAU         (2.0f * M_PI)            /* mathematical constant */
+#define TAU         (2.0f * M_PI)
+
+#ifndef ARM_MATH_CM4
+  #define SINF(a) sinf(a)
+  #define COSF(a) cosf(a)
+#else
+  #include <arm_math.h>
+  #define SINF(a) arm_sin_f32(a)
+  #define COSF(a) arm_cos_f32(a)
+#endif
+
+#define cmplx(value) (COSF(value) + SINF(value) * I)
+#define cmplxconj(value) (COSF(value) + SINF(value) * -I)
 
 /*
  * Contains user configuration for OFDM modem
