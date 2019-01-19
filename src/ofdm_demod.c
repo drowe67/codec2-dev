@@ -70,6 +70,9 @@ void opt_help() {
     fprintf(stderr, "  --in          filename  Name of InputModemRawFile\n");
     fprintf(stderr, "  --out         filename  Name of OutputOneCharPerBitFile\n");
     fprintf(stderr, "  --log         filename  Octave log file for testing\n");
+    fprintf(stderr, "  --nc          [17..64]  Number of Carriers (17 default, 64 max)\n");
+    fprintf(stderr, "  --tcp         Nsecs     Cyclic Prefix Duration (.002 default)\n");
+    fprintf(stderr, "  --ts          Nsecs     Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --interleave  depth     Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq     freq      Set modulation TX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq     freq      Set modulation RX centre Frequency (1500.0 default)\n");
@@ -119,6 +122,9 @@ int main(int argc, char *argv[])
     int testframes = 0;
     int interleave_frames = 1;
     int verbose = 0;
+    int nc = 17;
+    int tcp = 0.0020f;
+    int ts = 0.0180f;
 
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
@@ -136,6 +142,9 @@ int main(int argc, char *argv[])
         {"testframes", 'd', OPTPARSE_NONE},
         {"llr",        'h', OPTPARSE_NONE},
         {"ldpc",       'i', OPTPARSE_NONE},
+        {"nc",         'j', OPTPARSE_REQUIRED},
+        {"tcp",        'k', OPTPARSE_REQUIRED},
+        {"ts",         'l', OPTPARSE_REQUIRED},
         {0, 0, 0}
     };
 
@@ -174,6 +183,15 @@ int main(int argc, char *argv[])
                 break;
             case 'h':
                 llr_en = 1;
+                break;
+            case 'j':
+                nc = atoi(options.optarg);
+                break;
+            case 'k':
+                tcp = atof(options.optarg);
+                break;
+            case 'l':
+                ts = atof(options.optarg);
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -215,6 +233,20 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
+    ofdm_config->fs = 8000.0f;                  /* Sample Frequency */
+    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+    ofdm_config->ftwindowwidth = 11;
+    ofdm_config->state_str = 16;                /* state string length */
+    ofdm_config->bps = 2;                       /* Bits per Symbol */
+    ofdm_config->txtbits = 4;                   /* number of auxiliary data bits */
+    ofdm_config->ns = 8;                        /* Number of Symbol frames */
+    ofdm_config->tx_centre = tx_centre;
+    ofdm_config->rx_centre = rx_centre;
+    ofdm_config->nc = nc;
+    ofdm_config->tcp = tcp;
+    ofdm_config->ts = ts;
+    ofdm_config->rs = (1.0f / ts);              /* Modulating Symbol Rate */
+    
     ofdm = ofdm_create(ofdm_config);    /* get defaults */
     assert(ofdm != NULL);
 
@@ -222,9 +254,6 @@ int main(int argc, char *argv[])
 
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
-
-    ofdm_config->tx_centre = tx_centre;
-    ofdm_config->rx_centre = rx_centre;
 
     ofdm_bitsperframe = ofdm_get_bits_per_frame();
     ofdm_rowsperframe = ofdm_bitsperframe / (ofdm_config->nc * ofdm_config->bps);
