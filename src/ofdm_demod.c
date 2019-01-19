@@ -87,7 +87,6 @@ void opt_help() {
 
 int main(int argc, char *argv[])
 {
-    struct OFDM *ofdm;
     int  i, j, opt;
     char *fin_name, *fout_name, *log_name;
 
@@ -123,9 +122,9 @@ int main(int argc, char *argv[])
     int interleave_frames = 1;
     int verbose = 0;
     int nc = 17;
-    int tcp = 0.0020f;
-    int ts = 0.0180f;
 
+    float tcp = 0.002f;
+    float ts = 0.018f;
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
 
@@ -233,21 +232,20 @@ int main(int argc, char *argv[])
         exit(-1);
     }
 
-    ofdm_config->fs = 8000.0f;                  /* Sample Frequency */
-    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
-    ofdm_config->ftwindowwidth = 11;
-    ofdm_config->state_str = 16;                /* state string length */
-    ofdm_config->bps = 2;                       /* Bits per Symbol */
-    ofdm_config->txtbits = 4;                   /* number of auxiliary data bits */
+    ofdm_config->nc = nc;
     ofdm_config->ns = 8;                        /* Number of Symbol frames */
+    ofdm_config->bps = 2;                       /* Bits per Symbol */
+    ofdm_config->ts = ts;
+    ofdm_config->tcp = tcp;
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
-    ofdm_config->nc = nc;
-    ofdm_config->tcp = tcp;
-    ofdm_config->ts = ts;
-    ofdm_config->rs = (1.0f / ts);              /* Modulating Symbol Rate */
-    
-    ofdm = ofdm_create(ofdm_config);    /* get defaults */
+    ofdm_config->fs = 8000.0f;                  /* Sample Frequency */
+    ofdm_config->txtbits = 4;                   /* number of auxiliary data bits */
+    ofdm_config->state_str = 16;                /* state string length */
+    ofdm_config->ftwindowwidth = 11;
+    ofdm_config->ofdm_timing_mx_thresh = 0.30f;
+
+    struct OFDM *ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
 
     free(ofdm_config);

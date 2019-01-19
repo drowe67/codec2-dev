@@ -66,7 +66,7 @@ struct OFDM_CONFIG {
     float tx_centre; /* TX Centre Audio Frequency */
     float rx_centre; /* RX Centre Audio Frequency */
     float fs;  /* Sample Frequency */
-    float rs;  /* Baud Rate */
+    float rs;  /* Modulation Symbol Rate */
     float ts;  /* symbol duration */
     float tcp; /* Cyclic Prefix duration */
     float ofdm_timing_mx_thresh;
