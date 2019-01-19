@@ -1,7 +1,10 @@
+README_unittest.txt
+Don Reid 2018/2019
 
 This is the unittest system for the stm32 implementation of codec2/FreeDV
 
-Objectives:
+Objectives
+==========
 
    It is important to have a robust set of tests for the functionality
    of any software project, especially when there are multiple developers.
@@ -12,11 +15,12 @@ Objectives:
    the more likely people are to run it.
 
 
-Directory Structure:
+Directory Structure
+===================
 
-   scripts     Where scripts for this unittest system are found
+   scripts     Where scripts for this unittest system are found and run
 
-   src         Where the stm32 sources and binaries are.
+   src         Where the stm32 sources and binaries are, Makefile to build tests
 
    lib         Where includable files for this unittest system are found
       /python     python library files
@@ -25,38 +29,10 @@ Directory Structure:
    test_run    Each test is run in a subdirectory here.
 
 
-Compiling:
+Debug and semihosting
+=====================
 
-   cd to the src directory and run "make clean all".
-
-
-Test Run Scripts:
-
-XXXXX
-   The basics of running each test are included as comments in the test's
-   source code.  However some test code is used be multiple tests and 
-   some tests have several actions to setup their data or check their
-   output.  So there are scripts to run these tests.
-
-   For example "run_tst_ofdm_demod_ideal" (in the scripts directory).
-
-   These scripts use some common options:
-
-       --clean     Clean out the test run directory (delete it and re-create)
-       --setup     Create input files.
-       --run       Run the test
-       --check     Create reference data and check test output.
-
-   If none of these options are given, then all of the steps will be 
-   run, in order.
-XXXXX
-
-
-Debug and semihosting:
-
-   These tests use a newer version of the st-util program.
-   This one supports the newer boards but also does semihosting differently.
-   It needs a command line option to turn on semihosting.
+   These tests use a recent version of the st-util program.
 
    The source can be downloaded from:
 
@@ -65,26 +41,13 @@ Debug and semihosting:
    After compiling it can be installed anywhere.  The program is in
    build/Release/src/gdbserver/st-util.
 
-   The run_stm32_prog script will run this program along with gdb.
-   To run st-util by itself, it needs to be run from the active test directory.
-
-       cd tests_run/tst_ofdm_demod_ideal
-       st-util --semihosting
-
-   The target program can access files from the directory st-util is run from.
-
-   These tests typically read "stm_in.raw", and write "stm_out.raw".
-   Their stdout and stderr streams will go to "stm_stdout.txt" and "stm_stderr.txt".
-
-   A file ":tt" will get created by the default initialzation but should be empty.
-
    The newlib stdio functions (open, fread, fwrite, flush, fclose, etc.) send
    some requests that this tool does not recognize and those messages will appear
    in the output of st-util.  They can be ignored.
 
 
-QuickStart (TODO: David & Don work together to complete this section)
----------------------------------------------------------------------
+Building and Running the stm32 Unit Tests
+=========================================
 
 1/ Build stlink:
 
@@ -123,57 +86,18 @@ QuickStart (TODO: David & Don work together to complete this section)
    $ cd ~/codec2-dev/stm32/unittest/src
    $ echo 'PERIPHLIBDIR = /periph/lib/path/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0' > local.mak
 
-   Now we can build the unittests:
+3/ Now we can build the unittests:
 
+   $ cd codec2-dev/stm32/unittest/src
    $ make
   
-3/ Plug in a Discovery (or other suitable stm32 board).  You need two open
-   terminals.  In the first terminal set up the test and start st-util running:
+3/ To run a single test:
 
-XXXXX
-     $ cd codec2-dev/stm32/unittest
-     $ ./scripts/tst_ofdm_demod_setup ideal
-     $ cd test_run/tst_ofdm_demod_ideal
-     $ sudo ~/stlink/build/Release/src/gdbserver/st-util --semihosting
-     
-   In the second terminal run the unittest:
+   $ cd codec2-dev/stm32/unittest/scripts
+   $ ./run_all_ldpc_tests
 
-     $ cd ~/codec2-dev/stm32/unittest/test_run/tst_ofdm_demod_ideal
-     $ arm-none-eabi-gdb ../../src/tst_ofdm_demod.elf
-     (gdb) tar ext :4242
-     (gdb) load
-     (gdb) mon reset
-     (gdb) break EndofMain
-     (gdb) break Infinite_Loop
-     (gdb) cont
+4/ To run ALL tests:
 
-   Gdb should stop at either the EndofMain if all went well, or Infinite_Loop
-   if there was a run time error.  In either case kill it with ^C and "quit".
-
-   Check the results with:
-  
-     $ ../../scripts/tst_ofdm_demod_check ideal
-
-   The check script will print information on each check.  The final
-   line should be "Test PASSED".  If any of the checks fail then it
-   will be "Test FAILED".
-
-   The checks are:
-
-     * BER - Do the reported bit error numbers and rates match?
-     * Output - Do the output bits match (as well as expected for each test)?
-     * Symbols - Do the Symbols and such match closely (from debug outputs)?
-
-   The check script also translates the target data into octave format
-   in the file "ofdm_demod_log.txt" which goes with the reference file
-   "ofdm_demod_ref_log.txt".  These files can be loaded into Octave
-   for debugging and analysis (TODO: How?).  There is a file in
-   unittest/lib/octave/ofdm_demod_check.m which may be useful (TODO: How?).
-
-   To repeat a test you can just run gdb again and skip the "load" and "mon reset"
-   steps.
-XXXXX
-
-
-
+   (TODO Don - pls add command to run all tests)
+   
 # vi:set ts=3 et sts=3:
