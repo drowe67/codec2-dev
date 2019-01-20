@@ -20,8 +20,8 @@ PASS=1
 ###############################
 echo
 echo "Simple test, plain, ideal"
-OFDM_MOD /dev/zero - --testframes 100 |
-    OFDM_DEMOD - /dev/null --testframes 2> tmp
+OFDM_MOD --in /dev/zero --testframes 100 |
+    OFDM_DEMOD --out /dev/null --testframes --verbose 1 2> tmp
 cat tmp
 p1=$(grep '^BER\.*: 0.000' tmp | wc -l)
 p2=$(grep '^BER2\.*: 0.000' tmp | wc -l)
@@ -30,9 +30,9 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 ###############################
 echo
 echo "Simple test, plain, AWGN"
-OFDM_MOD /dev/zero - --testframes 100 |
+OFDM_MOD --in /dev/zero --testframes 100 |
     cohpsk_ch - - -20 -Fs 8000 -f -5 --raw_dir ../../raw |
-    OFDM_DEMOD - /dev/null --testframes 2>tmp
+    OFDM_DEMOD --out /dev/null --testframes --verbose 1 2>tmp
 cat tmp
 n=$(grep '^BER\.*:' tmp | cut -d ' ' -f 2)
 p1=$(echo $n '<=' 0.10 | bc)
@@ -43,8 +43,8 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 ###############################
 echo
 echo "Simple test, LDPC, ideal"
-OFDM_MOD /dev/zero - --ldpc --testframes 100 |
-    OFDM_DEMOD - /dev/null --ldpc --testframes 2> tmp
+OFDM_MOD --in /dev/zero --ldpc --testframes 100 |
+    OFDM_DEMOD --out /dev/null --ldpc --testframes --verbose 1 2>tmp
 cat tmp
 p1=$(grep '^BER\.*: 0.000' tmp | wc -l)
 p2=$(grep '^Coded BER: 0.000' tmp | wc -l)
@@ -53,9 +53,9 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; else echo "BAD"; PASS=0; fi
 ###############################
 echo
 echo "Simple test, LDPC, AWGN"
-OFDM_MOD /dev/zero - --ldpc --testframes 100 |
+OFDM_MOD --in /dev/zero --ldpc --testframes 100 |
     cohpsk_ch - - -20 -Fs 8000 -f -5 --raw_dir ../../raw |
-    OFDM_DEMOD - /dev/null --ldpc --testframes 2>tmp
+    OFDM_DEMOD --out /dev/null --ldpc --testframes --verbose 1 2>tmp
 cat tmp
 n=$(grep '^BER\.*:' tmp | cut -d ' ' -f 2)
 p1=$(echo $n '<=' 0.10 | bc)

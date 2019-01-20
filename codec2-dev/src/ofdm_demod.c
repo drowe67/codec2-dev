@@ -115,6 +115,7 @@ int main(int argc, char *argv[])
     int input_specified = 0;
     int output_specified = 0;
     int log_specified = 0;
+    int log_active = 0;
     int logframes = NFRAMES;
     int ldpc_en = 0;
     int llr_en = 0;
@@ -164,6 +165,7 @@ int main(int argc, char *argv[])
             case 'c':
                 log_name = options.optarg;
                 log_specified = 1;
+                log_active = 1;
                 break;
             case 'd':
                 testframes = 1;
@@ -544,7 +546,7 @@ int main(int argc, char *argv[])
 
         /* optional logging of states */
 
-        if (log_specified) {
+        if (log_active) {
             /* note corrected phase (rx no phase) is one big linear array for frame */
 
             for (i = 0; i < ofdm_rowsperframe*ofdm_config->nc; i++) {
@@ -575,7 +577,7 @@ int main(int argc, char *argv[])
             }
 
             if (f == (logframes-1))
-                log_specified = 0;
+                log_active = 0;
         }
 
         f++;
