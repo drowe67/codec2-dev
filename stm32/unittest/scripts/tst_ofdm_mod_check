@@ -35,7 +35,7 @@ case "${TEST_OPT}" in
     esac
 
 echo -e "\nReference check"
-if ofdm_demod ref_mod_out.raw ref_ofdm_demod.raw --testframes ${LDPC}; then
+if ofdm_demod --in ref_mod_out.raw --out ref_ofdm_demod.raw --testframes ${LDPC}; then
     echo "Passed"
 else
     echo "Failed"
@@ -43,7 +43,7 @@ else
 fi
 #
 echo -e "\nTarget check"
-if ofdm_demod mod.raw stm_demod.raw --testframes ${LDPC}; then
+if ofdm_demod --in mod.raw --out stm_demod.raw --testframes ${LDPC}; then
     echo "Passed"
 else
     echo "Failed"
