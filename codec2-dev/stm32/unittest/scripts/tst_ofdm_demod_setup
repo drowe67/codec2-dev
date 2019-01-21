@@ -28,7 +28,7 @@ case "${TEST_OPT}" in
     quick )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01010000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 10 > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 10 --verbose > setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --verbose 1 > ref_gen_log.txt 2>&1
 	;;
@@ -36,7 +36,7 @@ case "${TEST_OPT}" in
     ideal )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01010000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 10 > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 10 --verbose > setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --verbose 1 > ref_gen_log.txt 2>&1
 	;;
@@ -44,7 +44,7 @@ case "${TEST_OPT}" in
     AWGN )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01010000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 10 > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 10 --verbose > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -5 \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
@@ -54,7 +54,7 @@ case "${TEST_OPT}" in
     fade )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01010000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 60 > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 60 --verbose > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -24 -Fs 8000 -f -10 -fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
@@ -64,7 +64,7 @@ case "${TEST_OPT}" in
     profile )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "00001000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 100 > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 100 --verbose > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -10 -fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
@@ -74,7 +74,7 @@ case "${TEST_OPT}" in
     ldpc )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01110000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 1 --ldpc > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out stm_in.raw --testframes 1 --ldpc --verbose > setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
         	--testframes --ldpc --verbose 1 > ref_gen_log.txt 2>&1
 	;;
@@ -82,7 +82,7 @@ case "${TEST_OPT}" in
     ldpc_AWGN )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01110000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 30 --ldpc > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 30 --ldpc --verbose > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -10 \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
@@ -92,7 +92,7 @@ case "${TEST_OPT}" in
     ldpc_fade )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
     	echo "01110000" > stm_cfg.txt
-	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 120 --ldpc > setup.log 2>&1
+	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 120 --ldpc --verbose > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -24 -Fs 8000 -f -10 -fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
         ofdm_demod --in stm_in.raw --out ref_demod_out.raw --log ofdm_demod_ref_log.txt \
