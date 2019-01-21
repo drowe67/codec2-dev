@@ -45,7 +45,7 @@
 
 \*-----------------------------------------------------------------------*/
 
-#define	DELTAQ 	0.01		/* quiting distortion			*/
+#define	DELTAQ 	0.005		/* quiting distortion			*/
 #define	MAX_STR	80		/* maximum string length		*/
 
 /*-----------------------------------------------------------------------*\
@@ -57,7 +57,7 @@
 void zero(float v[], int k);
 void acc(float v1[], float v2[], int k);
 void norm(float v[], int k, long n);
-long quantise(float cb[], float vec[], int k, int m, float *se);
+long quantise(float cb[], float vec[], int k, int m, float *beste, float *se);
 
 /*-----------------------------------------------------------------------* \
 
@@ -74,9 +74,12 @@ int main(int argc, char *argv[]) {
     long   J;		/* number of vectors in training set		*/
     long   i,j;
     long   ind;	     	/* index of current vector			*/
+    float  e;           /* sqaured error for current vector             */
     float  se;		/* squared error for this iteration		*/
     float  var,var_1;	/* current and previous iterations distortion	*/
+    float  sd;          /* std deviation of quant error                 */
     float  delta;	/* improvement in distortion 			*/
+    long   noutliers[3];/* number of vectors quantisers with > 3*sd     */
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
     int     ret;
@@ -128,9 +131,9 @@ int main(int argc, char *argv[]) {
     for(i=0; i<J; i++) {
         ret = fread(vec, sizeof(float), k, ftrain);
         assert(ret == k);
-        quantise(cb, vec, k, 1, &se);
+        quantise(cb, vec, k, 1, &e, &se);
     }
-    var = se/(J*k);
+    var = se/(J*k); sd = sqrt(var);
     printf("\r  Iteration 0, var = %f, sd = %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
@@ -157,19 +160,25 @@ int main(int argc, char *argv[]) {
 
 	/* quantise training set */
 
-	se = 0.0;
+	se = 0.0; noutliers[0] = noutliers[1] = noutliers[2] = 0;
 	rewind(ftrain);
 	for(i=0; i<J; i++) {
 	    ret = fread(vec, sizeof(float), k, ftrain);
             assert(ret == k);
-	    ind = quantise(cb, vec, k, m, &se);
+	    ind = quantise(cb, vec, k, m, &e, &se);
 	    n[ind]++;
 	    acc(&cent[ind*k], vec, k);
+            //if (i < 100)
+            //    printf("e: %f sqrt(e/k): %f sd: %f noutliers: %ld\n", e, sqrt(e/k), sd, noutliers[0]);
+            if (sqrt(e/k) > sd) noutliers[0]++;
+            if (sqrt(e/k) > 2*sd) noutliers[1]++;
+            if (sqrt(e/k) > 3*sd) noutliers[2]++;
 	}
-	var = se/(J*k);
+	var = se/(J*k); sd = sqrt(var);
 	delta = (var_1-var)/var;
 
-	printf("\r  Iteration %ld, var = %f, sd = %f Delta = %e\n", j, var, sqrt(var), delta);
+	printf("\r  Iteration %ld, var = %f, sd = %f outliers > 1/2/3 *sd = %f/%f/%f Delta = %e\n", j, var, sqrt(var),
+               (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta);
 	j++;
 
 	/* determine new codebook from centroids */
@@ -184,7 +193,7 @@ int main(int argc, char *argv[]) {
 
     } while (delta > DELTAQ);
 
-    /* save codebook to disk */
+    /* save VQ to disk */
 
     fvq = fopen(argv[4],"wt");
     if (fvq == NULL) {
@@ -192,27 +201,20 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    fprintf(fvq,"%ld %ld\n",k,m);
-    for(j=0; j<m; j++) {
-	for(i=0; i<k; i++)
-	    fprintf(fvq,"%f  ",cb[j*k+i]);
-	fprintf(fvq,"\n");
-    }
-
-    /* optionally output for next stage VQ */
+    fwrite(cb, sizeof(float), m*k, fvq);
     
+    /* optionally output residual error for next stage VQ */
+
     if (argc == 6) {
         FILE *fres = fopen(argv[5],"wb"); assert(fres != NULL);
         float res[k];
 	rewind(ftrain);
 	for(j=0; j<J; j++) {
 	    ret = fread(vec, sizeof(float), k, ftrain);
-	    ind = quantise(cb, vec, k, m, &se);
+	    ind = quantise(cb, vec, k, m, &e, &se);
             for(i=0; i<k; i++) {
                 res[i] = vec[i] - cb[k*ind+i];
-                if (j<2) printf("%3.2f ", res[i]);
             }
-            if (j<2) printf("\n");
             fwrite(res, sizeof(float), k, fres);
 	}
         fclose(fres);
@@ -311,36 +313,35 @@ void norm(float v[], int k, long n)
 
 \*---------------------------------------------------------------------------*/
 
-long quantise(float cb[], float vec[], int k, int m, float *se)
+long quantise(float cb[], float vec[], int k, int m, float *beste, float *se)
 /* float   cb[][K];	current VQ codebook		*/
 /* float   vec[];	vector to quantise		*/
 /* int	   k;		dimension of vectors		*/
 /* int     m;		size of codebook		*/
+/* float   beste;	current squared error		*/
 /* float   *se;		accumulated squared error 	*/
 {
-   float   e;		/* current error		*/
    long	   besti;	/* best index so far		*/
-   float   beste;	/* best error so far		*/
    long	   j;
    int     i;
-   float   diff;
+   float   diff,e;
 
    besti = 0;
-   beste = 1E32;
+   *beste = 1E32;
    for(j=0; j<m; j++) {
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
 	    e += diff*diff;
 	}
-	if (e < beste) {
-	    beste = e;
+	if (e < *beste) {
+	    *beste = e;
 	    besti = j;
 	}
    }
 
-   *se += beste;
-
+   *se += *beste;
+   
    return(besti);
 }
 
