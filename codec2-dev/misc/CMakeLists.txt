@@ -28,7 +28,7 @@ add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
 
 add_executable(tsrc tsrc.c)
-target_link_libraries(tsrc samplerate)
+target_link_libraries(tsrc ${LIBSAMPLERATE})
 
 add_executable(tlininterp tlininterp.c)
 add_executable(tdec tdec.c)
