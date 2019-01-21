@@ -273,6 +273,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->tx_bits = NULL; /* not used for 700D */
 
 	if (f->interleave_frames > 1) {
+            /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
             f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
             if (f->mod_out == NULL) {
                 if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
@@ -512,7 +513,8 @@ void freedv_close(struct freedv *freedv) {
         cohpsk_destroy(freedv->cohpsk);
     if (freedv->mode == FREEDV_MODE_700D) {
         FREE(freedv->packed_codec_bits_tx);
-        FREE(freedv->mod_out);
+        if (freedv->interleave_frames > 1)
+            FREE(freedv->mod_out);
         FREE(freedv->codeword_symbols);
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
