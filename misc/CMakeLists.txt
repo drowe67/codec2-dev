@@ -27,6 +27,9 @@ set_target_properties(speexnoisesup
 add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
 
+add_executable(tnlp tnlp.c)
+target_link_libraries(tnlp codec2)
+
 add_executable(tsrc tsrc.c)
 target_link_libraries(tsrc ${LIBSAMPLERATE})
 

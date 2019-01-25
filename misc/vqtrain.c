@@ -83,11 +83,12 @@ int main(int argc, char *argv[]) {
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
     int     ret;
-
+    float   deltaq_stop;
+    
     /* Interpret command line arguments */
 
     if (argc < 5)	{
-	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile [residual.f32]\n", argv[0]);
+	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile [residual.f32] [stopDelta]\n", argv[0]);
 	exit(1);
     }
 
@@ -99,6 +100,13 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
+    if (argc == 7) {
+        deltaq_stop = atof(argv[6]);
+        printf("deltaq_stop :%f\n", deltaq_stop);
+    }
+    else
+        deltaq_stop = DELTAQ;
+            
     /* determine k and m, and allocate arrays */
 
     k = atol(argv[2]);
@@ -183,7 +191,7 @@ int main(int argc, char *argv[]) {
 
 	/* determine new codebook from centroids */
 
-	if (delta > DELTAQ)
+	if (delta > deltaq_stop)
 	    for(i=0; i<m; i++) {
 		if (n[i] != 0) {
 		    norm(&cent[i*k], k, n[i]);
@@ -191,7 +199,7 @@ int main(int argc, char *argv[]) {
 		}
 	    }
 
-    } while (delta > DELTAQ);
+    } while (delta > deltaq_stop);
 
     /* save VQ to disk */
 
