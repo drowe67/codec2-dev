@@ -69,7 +69,7 @@ void mbest_destroy(struct MBEST *mbest) {
   mbest_insert
 
   Insert the results of a vector to codebook entry comparison. The
-  list is ordered in order or error, so those entries with the
+  list is ordered in order of error, so those entries with the
   smallest error will be first on the list.
 
 \*---------------------------------------------------------------------------*/
@@ -148,26 +148,26 @@ void mbest_search(
   Searches vec[] to a codebbook of vectors, and maintains a list of the mbest
   closest matches. Only searches the first NewAmp2_K Vectors
 
-\*---------------------------------------------------------------------------*/
+  \*---------------------------------------------------------------------------*/
 
 void mbest_search450(const float  *cb, float vec[], float w[], int k,int shorterK, int m, struct MBEST *mbest, int index[])
 
 {
-   float   e;
-   int     i,j;
-   float   diff;
+    float   e;
+    int     i,j;
+    float   diff;
 
-   for(j=0; j<m; j++) {
+    for(j=0; j<m; j++) {
 	e = 0.0;
 	for(i=0; i<k; i++) {
-		//Only search first NEWAMP2_K Vectors
-		if(i<shorterK){
-			diff = cb[j*k+i]-vec[i];
-			e += powf(diff*w[i],2.0);
-		}
+            //Only search first NEWAMP2_K Vectors
+            if(i<shorterK){
+                diff = cb[j*k+i]-vec[i];
+                e += powf(diff*w[i],2.0);
+            }
 	}
 	index[0] = j;
 	mbest_insert(mbest, index, e);
-	}
+    }
 }
    
