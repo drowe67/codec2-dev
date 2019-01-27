@@ -617,7 +617,6 @@ float lspmelvq_mbest_encode(int *indexes, float *x, float *xq, int ndim, int mbe
   mbest_search(codebook1, x, w, ndim, lspmelvq_cb[0].m, mbest_stage1, index);
   MBEST_PRINT("Stage 1:", mbest_stage1);
 
-
   /* Stage 2 */
 
   for (j=0; j<mbest_entries; j++) {
