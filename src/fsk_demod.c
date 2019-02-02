@@ -71,6 +71,8 @@ int main(int argc,char *argv[]){
     int testframe_mode = 0;
     P = 0;
     M = 0;
+    int fsk_lower = -1;
+    int fsk_upper = -1;
     
     /* -m 2/4 --mode 2/4  - FSK mode
      * -l --lbr      - Low bit rate mode
@@ -93,13 +95,15 @@ int main(int argc,char *argv[]){
             {"conv",      required_argument,  0, 'p'},
             {"cs16",      no_argument,        0, 'c'},
             {"cu8",       no_argument,        0, 'd'},
+            {"fsk_lower", optional_argument,  0, 'b'},
+            {"fsk_upper", optional_argument,  0, 'u'},
             {"stats",     optional_argument,  0, 't'},
             {"soft-dec",  no_argument,        0, 's'},
             {"testframes",no_argument,        0, 'f'},
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"fhlp:cdt::s",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"fhlp:cdt::sb:u:",long_opts,&opt_idx);
         
         switch(o){
             case 'l':
@@ -130,6 +134,16 @@ int main(int argc,char *argv[]){
                 break;
             case 'p':
                 P = atoi(optarg);
+                break;
+            case 'b':
+                if (optarg != NULL){
+                    fsk_lower = atoi(optarg);
+                }
+                break;
+            case 'u':
+                if (optarg != NULL){
+                    fsk_upper = atoi(optarg);
+                }
                 break;
             case 'h':
             case '?':
@@ -198,6 +212,10 @@ int main(int argc,char *argv[]){
     }
     else {
         fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+        if(fsk_lower> 0 && fsk_upper > fsk_lower){
+            fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
+            fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n",fsk_lower, fsk_upper);
+        }
     }
 
     if(fin==NULL || fout==NULL || fsk==NULL){
