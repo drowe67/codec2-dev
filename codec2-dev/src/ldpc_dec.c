@@ -39,6 +39,7 @@
 
 #include "H2064_516_sparse.h"  
 #include "HRA_112_112.h"  
+#include "HRAb_396_504.h"
 
 int opt_exists(char *argv[], int argc, char opt[]) {
     int i;
@@ -95,6 +96,7 @@ int main(int argc, char *argv[])
         fprintf(stderr,"\n");
         fprintf(stderr,"H2064_516_sparse\n");
         fprintf(stderr,"HRA_112_112\n");
+        fprintf(stderr,"HRAb_396_504\n");
         fprintf(stderr,"\n");
         exit(0);
     }
@@ -134,6 +136,25 @@ int main(int argc, char *argv[])
             ldpc.H_cols = (uint16_t *)HRA_112_112_H_cols;
             ainput = (float *)HRA_112_112_input;
             adetected_data = (char *)HRA_112_112_detected_data;
+        }
+        else if (strcmp(argv[codename+1], "HRAb_396_504") == 0) {
+            fprintf(stderr, "code: %s\n", argv[codename+1]);
+            ldpc.max_iter = HRAb_396_504_MAX_ITER;
+            ldpc.dec_type = 0;
+            ldpc.q_scale_factor = 1;
+            ldpc.r_scale_factor = 1;
+            ldpc.CodeLength = HRAb_396_504_CODELENGTH;
+            ldpc.NumberParityBits = HRAb_396_504_NUMBERPARITYBITS;
+            ldpc.NumberRowsHcols = HRAb_396_504_NUMBERROWSHCOLS;
+            ldpc.max_row_weight = HRAb_396_504_MAX_ROW_WEIGHT;
+            ldpc.max_col_weight = HRAb_396_504_MAX_COL_WEIGHT;
+            ldpc.H_rows = (uint16_t *)HRAb_396_504_H_rows;
+            ldpc.H_cols = (uint16_t *)HRAb_396_504_H_cols;
+            ainput = (float *)HRAb_396_504_input;
+            adetected_data = (char *)HRAb_396_504_detected_data;
+        }
+        else {
+            fprintf(stderr, "Unknown code: %s, defaulting to H2064_516_sparse\n", argv[codename+1]);
         }
     }
 

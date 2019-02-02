@@ -226,6 +226,7 @@ set(CODEC2_SRCS
     horus_api.c
     horus_l2.c
     HRA_112_112.c
+    HRAb_396_504.c
 )
 
 set(CODEC2_PUBLIC_HEADERS
