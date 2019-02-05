@@ -1,19 +1,24 @@
 % ofdm_tx.m
 % David Rowe March 2018
 %
-% File based ofdm tx.  Generates a file of ofdm samples, including
-% optional channel simulation.  See also ofdm_ldpc_tx.m, and ofdm_mod.c
+% File based, uncoded OFDM tx.  Generates a file of ofdm samples,
+% including optional channel simulation.  See also ofdm_ldpc_tx.m, and
+% ofdm_mod.c
 
 #{
   Examples:
  
   i) 10 seconds, AWGN channel at Eb/No=3dB
 
-    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', 10, 3);
+    octave:4> ofdm_tx('awgn_ebno_3dB_700d.raw', "700D", 10, 3);
 
   ii) 10 seconds, HF channel at Eb/No=6dB
 
-    ofdm_tx('hf_ebno_6dB_700d.raw', 10, 6, 'hf');
+    ofdm_tx('hf_ebno_6dB_700d.raw',  "700D", 10, 6, 'hf');
+    
+  iii) 10 seconds, 2200 waveform, AWGN channel, Eb/No=100dB (effectively noise free)
+
+    ofdm_tx('hf_ebno_6dB_700d.raw',  "2200", 10);
 #}
 
 % Note EbNodB is for payload data bits, so will be 10log10(rate) higher than

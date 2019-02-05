@@ -1,7 +1,7 @@
 % ofdm_rx.m
 % David Rowe May 2018
 %
-% OFDM file based rx to unit test core OFDM modem.  See also
+% OFDM file based , uncoded rx to unit test core OFDM modem.  See also
 % ofdm_ldpc_rx which includes LDPC and interleaving, and ofdm_demod.c
 
 
