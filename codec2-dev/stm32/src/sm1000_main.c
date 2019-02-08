@@ -113,6 +113,18 @@
  *    STATE_MENU:   Menu operation state.  Operation is dictated by
  *                  the menu state machine, when we exit that state
  *                  machine, we return to STATE_RX.
+ *
+ *             On SELECT.HOLD:      select the current menu entry,
+ *                                  if it is a submenu then make that the currnet level
+ *             On SELECT.PRESS:     next entry in the current menu level
+ *             On BACK.PRESS:       prev mode in the current menu level
+ *             On BACK.HOLD:        go up to the previous menu 
+ *             			    save any changes to NV memory
+ *                                  This may exit the menu system
+ *             On PTT.DOWN:         Exit menu system, do not save to NVM
+ *
+ *             See the "Menu data" section of this file for the menu structure
+ *
  */
 uint8_t core_state = STATE_RX;
 
@@ -709,7 +721,36 @@ void SysTick_Handler(void)
     tot_tick(&tot);
 }
 
-/* ---------------------------- Menu data --------------------------- */
+/* ---------------------------- Menu data ---------------------------
+ *
+ * MENU -
+ * 	|- "MODE"       Select operating mode
+ * 	|   |- "ANA"    - Analog
+ * 	|   |- "1600"   - DV - 1600
+ * 	|   |- "TONE"   - A test mode, sends a tone on PTT
+ *      |
+ * 	|- "TOT"        Timer Out Timer options
+ * 	|   |- "TIME"   - Set timeout time (a sub menu)
+ * 	|   |   |-        - SELECT.PRESS add 5 sec
+ * 	|   |   |-        - BACK.PRESS subtracts 5 sec
+ *      |   |
+ * 	|   |- "WARN"   - Set warning time (a sub menu)
+ * 	|   |   |-        - SELECT.PRESS add 5 sec
+ * 	|   |   |-        - BACK.PRESS subtracts 5 sec
+ *      | 
+ * 	|- "UI"         UI (morse code announcments) parameters
+ * 	|   |- "FREQ"   - Set tone
+ * 	|   |   |-        - SELECT.PRESS add 50 Hz
+ * 	|   |   |-        - BACK.PRESS subtracts 50 Hz
+ *      |   |
+ * 	|   |- "WPMQ"   - Set speed
+ * 	|   |   |-        - SELECT.PRESS add 5 WPM
+ * 	|   |   |-        - BACK.PRESS subtracts 5 WPM
+ *      |   |
+ * 	|   |- "VOL"    - Set volume
+ * 	|   |   |-        - SELECT.PRESS -> quieter
+ * 	|   |   |-        - BACK.PRESS -> louder
+ */
 
 /*!
  * Default handler for menu callback.
