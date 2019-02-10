@@ -32,12 +32,13 @@
 
 \*-----------------------------------------------------------------------*/
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include <assert.h>
+#include <getopt.h>
 
 /*-----------------------------------------------------------------------*\
 
@@ -83,34 +84,60 @@ int main(int argc, char *argv[]) {
     FILE   *ftrain;	/* file containing training set			*/
     FILE   *fvq;	/* file containing vector quantiser		*/
     int     ret;
-    float   deltaq_stop;
+    float   deltaq_stop = DELTAQ;
+    FILE   *fres = NULL;
     
-    /* Interpret command line arguments */
+    int o = 0;
+    int opt_idx = 0;
+    while( o != -1 ) {
+        static struct option long_opts[] = {
+            {"help",     no_argument,       0, 'h'},
+            {"residual", required_argument, 0, 'r'},
+            {"stop",     required_argument, 0, 's'},
+            {0, 0, 0, 0}
+        };
+        
+        o = getopt_long(argc,argv,"hr:s:",long_opts,&opt_idx);
+        
+        switch(o) {
+        case 'r':
+            fres = fopen(optarg,"wb"); assert(fres != NULL);
+            //fprintf(stderr, "writing res to : %s \n", optarg);
+            break;
+        case 's':
+            deltaq_stop = atof(optarg);
+            //fprintf(stderr, "deltaq_stop :%f\n", deltaq_stop);
+            break;
+        case 'h':
+        case '?':
+            goto helpmsg;
+            break;
+        }
+    }
+    int dx = optind;
 
-    if (argc < 5)	{
-	printf("usage: %s TrainFile K(dimension) M(codebook size) VQFile [residual.f32] [stopDelta]\n", argv[0]);
-	exit(1);
+    //fprintf(stderr, "argc: %d dx: %d\n", argc, dx);
+    if ((argc - dx) < 4) {
+        fprintf(stderr, "Too few arguments\n");
+    helpmsg:
+        fprintf(stderr, "usage: %s [Options] TrainFile.f32 K(dimension) M(codebook size) VQFile.f32\n", argv[0]);
+        fprintf(stderr, "  -r --residual VQResidualErrorFile.f32usage\n");
+        fprintf(stderr, "  -s --stop StopDelta\n");
+        exit(1);
     }
 
     /* Open training file */
 
-    ftrain = fopen(argv[1],"rb");
+    ftrain = fopen(argv[dx],"rb");
     if (ftrain == NULL) {
-	printf("Error opening training database file: %s\n",argv[1]);
+	printf("Error opening training database file: %s\n",argv[dx]);
 	exit(1);
     }
 
-    if (argc == 7) {
-        deltaq_stop = atof(argv[6]);
-        printf("deltaq_stop :%f\n", deltaq_stop);
-    }
-    else
-        deltaq_stop = DELTAQ;
-            
     /* determine k and m, and allocate arrays */
 
-    k = atol(argv[2]);
-    m = atol(argv[3]);
+    k = atol(argv[dx+1]);
+    m = atol(argv[dx+2]);
     printf("vector dimension K=%ld  codebook size M=%ld ", k, m);
     vec = (float*)malloc(sizeof(float)*k);
     cb = (float*)malloc(sizeof(float)*k*m);
@@ -203,9 +230,9 @@ int main(int argc, char *argv[]) {
 
     /* save VQ to disk */
 
-    fvq = fopen(argv[4],"wt");
+    fvq = fopen(argv[dx+3],"wt");
     if (fvq == NULL) {
-	printf("Error opening VQ file: %s\n",argv[4]);
+	printf("Error opening VQ file: %s\n",argv[dx+3]);
 	exit(1);
     }
 
@@ -213,8 +240,7 @@ int main(int argc, char *argv[]) {
     
     /* optionally output residual error for next stage VQ */
 
-    if (argc == 6) {
-        FILE *fres = fopen(argv[5],"wb"); assert(fres != NULL);
+    if (fres != NULL) {
         float res[k];
 	rewind(ftrain);
 	for(j=0; j<J; j++) {
