@@ -45,6 +45,7 @@ extern "C"
 #endif
 
 #define TAU         (2.0f * M_PI)
+#define ROT45       (M_PI / 4.0f)
 
 #ifndef ARM_MATH_CM4
   #define SINF(a) sinf(a)
@@ -138,7 +139,7 @@ void ofdm_assemble_modem_frame(uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, int [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame);
+void ofdm_generate_payload_data_bits(int [], int);
 
 #ifdef __cplusplus
 }

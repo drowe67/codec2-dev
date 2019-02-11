@@ -461,7 +461,9 @@ void deallocate_tx_bpf(struct OFDM *ofdm) {
 void ofdm_destroy(struct OFDM *ofdm) {
     int i;
 
-    if (ofdm->ofdm_tx_bpf) deallocate_tx_bpf(ofdm);
+    if (ofdm->ofdm_tx_bpf)
+        deallocate_tx_bpf(ofdm);
+    
     FREE(ofdm->pilot_samples);
     FREE(ofdm->rxbuf);
     FREE(ofdm->pilots);
@@ -491,8 +493,7 @@ complex float qpsk_mod(int *bits) {
 /* Gray coded QPSK demodulation function */
 
 void qpsk_demod(complex float symbol, int *bits) {
-    float tval = M_PI / 4.0f;
-    complex float rotate = symbol * cmplx(tval);
+    complex float rotate = symbol * cmplx(ROT45);
 
     bits[0] = crealf(rotate) < 0.0f;
     bits[1] = cimagf(rotate) < 0.0f;
@@ -1534,7 +1535,6 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
 \*---------------------------------------------------------------------------*/
 
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
-    float tval = M_PI / 4.0f;
     int c, r;
 
     stats->Nc = ofdm_nc;
@@ -1560,7 +1560,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
 
     for (c = 0; c < ofdm_nc; c++) {
         for (r = 0; r < ofdm_rowsperframe; r++) {
-            complex float rot = ofdm->rx_np[r * c] * cmplx(tval);
+            complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
 
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
