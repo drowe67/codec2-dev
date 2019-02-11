@@ -618,8 +618,7 @@ int main(int argc, char *argv[]) {
 
         fclose(foct);
     }
-    
-    ofdm_print_info(ofdm);
+
     ofdm_destroy(ofdm);
 
     if (testframes) {
