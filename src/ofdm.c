@@ -293,6 +293,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (ofdm->last_sync_state_interleaver == NULL)
         goto error_last_sync_state_interleaver;
 
+    /* Null pointers to unallocated buffers */
+    ofdm->ofdm_tx_bpf = NULL;
+
     /* store complex BPSK pilot symbols */
 
     assert(sizeof (pilotvalues) >= (ofdm_nc + 2) * sizeof (float));
@@ -809,7 +812,7 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
     	allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;
     } else {
-    	deallocate_tx_bpf(ofdm);
+        if (ofdm->ofdm_tx_bpf) deallocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = false;
     }
 }
