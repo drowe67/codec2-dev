@@ -400,8 +400,10 @@ void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 	codec2_encode_700(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_700B)
 	codec2_encode_700b(c2, bits, speech);
+#endif
     if (c2->mode == CODEC2_MODE_700C)
 	codec2_encode_700c(c2, bits, speech);
+#ifndef CORTEX_M4
     if (c2->mode == CODEC2_MODE_450)
 	codec2_encode_450(c2, bits, speech);
     if (c2->mode == CODEC2_MODE_450PWB)
@@ -440,8 +442,10 @@ void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *b
  	codec2_decode_700(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_700B)
  	codec2_decode_700b(c2, speech, bits);
+#endif
     if (c2->mode == CODEC2_MODE_700C)
  	codec2_decode_700c(c2, speech, bits);
+#ifndef CORTEX_M4
     if (c2->mode == CODEC2_MODE_450)
  	codec2_decode_450(c2, speech, bits);
     if (c2->mode == CODEC2_MODE_450PWB)
@@ -1145,9 +1149,9 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     int     Wo_index, e_index;
     int     i;
     unsigned int nbit = 0;
-    #ifdef PROFILE
-    unsigned int quant_start;
-    #endif
+    //#ifdef PROFILE
+    //unsigned int quant_start;
+    //#endif
 
     assert(c2 != NULL);
 
@@ -1176,9 +1180,9 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     Wo_index = encode_Wo(&c2->c2const, model.Wo, WO_BITS);
     pack_natural_or_gray(bits, &nbit, Wo_index, WO_BITS, c2->gray);
 
-    #ifdef PROFILE
-    quant_start = machdep_profile_sample();
-    #endif
+    //#ifdef PROFILE
+    //quant_start = machdep_profile_sample();
+    //#endif
     e = speech_to_uq_lsps(lsps, ak, c2->Sn, c2->w, c2->m_pitch, LPC_ORD);
     e_index = encode_energy(e, E_BITS);
     pack_natural_or_gray(bits, &nbit, e_index, E_BITS, c2->gray);
@@ -1187,9 +1191,9 @@ void codec2_encode_1300(struct CODEC2 *c2, unsigned char * bits, short speech[])
     for(i=0; i<LSP_SCALAR_INDEXES; i++) {
 	pack_natural_or_gray(bits, &nbit, lsp_indexes[i], lsp_bits(i), c2->gray);
     }
-    #ifdef PROFILE
-    machdep_profile_sample_and_log(quant_start, "    quant/packing");
-    #endif
+    //#ifdef PROFILE
+    //machdep_profile_sample_and_log(quant_start, "    quant/packing");
+    //#endif
 
     assert(nbit == (unsigned)codec2_bits_per_frame(c2));
 }
@@ -1218,7 +1222,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     unsigned int nbit = 0;
     float   weight;
     COMP    Aw[FFT_ENC];
-    PROFILE_VAR(recover_start);
+    //PROFILE_VAR(recover_start);
 
     assert(c2 != NULL);
     frames+= 4;
@@ -1265,7 +1269,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     /* Wo, energy, and LSPs are sampled every 40ms so we interpolate
        the 3 frames in between */
 
-    PROFILE_SAMPLE(recover_start);
+    //PROFILE_SAMPLE(recover_start);
     for(i=0, weight=0.25; i<3; i++, weight += 0.25) {
 	interpolate_lsp_ver2(&lsps[i][0], c2->prev_lsps_dec, &lsps[3][0], weight, LPC_ORD);
         interp_Wo2(&model[i], &c2->prev_model_dec, &model[3], weight, c2->c2const.Wo_min);
@@ -1300,7 +1304,7 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
     if (frames == 4*50)
         exit(0);
     */
-    PROFILE_SAMPLE_AND_LOG2(recover_start, "    recover");
+    //PROFILE_SAMPLE_AND_LOG2(recover_start, "    recover");
     #ifdef DUMP
     dump_lsp_(&lsps[3][0]);
     dump_ak_(&ak[3][0], LPC_ORD);
@@ -1898,6 +1902,7 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<LPC_ORD_LOW; i++)
 	c2->prev_lsps_dec[i] = lsps[3][i];
 }
+#endif
 
 
 /*---------------------------------------------------------------------------*\
@@ -2051,6 +2056,7 @@ float codec2_energy_700c(struct CODEC2 *c2, const unsigned char * bits)
     return powf(10.0, mean/10.0);
 }
 
+#ifndef CORTEX_M4
 float codec2_energy_450(struct CODEC2 *c2, const unsigned char * bits)
 {
     int     indexes[4];
@@ -2391,13 +2397,13 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
 void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP Aw[], float gain)
 {
     int     i;
-    PROFILE_VAR(phase_start, pf_start, synth_start);
+    //PROFILE_VAR(phase_start, pf_start, synth_start);
 
-    #ifdef DUMP
-    dump_quantised_model(model);
-    #endif
+    //#ifdef DUMP
+    //dump_quantised_model(model);
+    //#endif
 
-    PROFILE_SAMPLE(phase_start);
+    //PROFILE_SAMPLE(phase_start);
 
     if (c2->mode == CODEC2_MODE_700C ||c2->mode == CODEC2_MODE_450 ||c2->mode == CODEC2_MODE_450PWB  ) {
         /* newamp1/2, we've already worked out rate L phase */
@@ -2410,11 +2416,11 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
         phase_synth_zero_order(c2->n_samp, model, &c2->ex_phase, H);
     }
 
-    PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth");
+    //PROFILE_SAMPLE_AND_LOG(pf_start, phase_start, "    phase_synth");
 
     postfilter(model, &c2->bg_est);
 
-    PROFILE_SAMPLE_AND_LOG(synth_start, pf_start, "    postfilter");
+    //PROFILE_SAMPLE_AND_LOG(synth_start, pf_start, "    postfilter");
 
     synthesise(c2->n_samp, c2->fftr_inv_cfg, c2->Sn_, model, c2->Pn, 1);
 
@@ -2422,7 +2428,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
         c2->Sn_[i] *= gain;
     }
     
-    PROFILE_SAMPLE_AND_LOG2(synth_start, "    synth");
+    //PROFILE_SAMPLE_AND_LOG2(synth_start, "    synth");
 
     ear_protection(c2->Sn_, c2->n_samp);
 
@@ -2453,7 +2459,7 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     COMP    Sw[FFT_ENC];
     float   pitch;
     int     i;
-    PROFILE_VAR(dft_start, nlp_start, model_start, two_stage, estamps);
+    //PROFILE_VAR(dft_start, nlp_start, model_start, two_stage, estamps);
     int     n_samp = c2->n_samp;
     int     m_pitch = c2->m_pitch;
 
@@ -2464,14 +2470,14 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     for(i=0; i<n_samp; i++)
       c2->Sn[i+m_pitch-n_samp] = speech[i];
 
-    PROFILE_SAMPLE(dft_start);
+    //PROFILE_SAMPLE(dft_start);
     dft_speech(&c2->c2const, c2->fft_fwd_cfg, Sw, c2->Sn, c2->w);
-    PROFILE_SAMPLE_AND_LOG(nlp_start, dft_start, "    dft_speech");
+    //PROFILE_SAMPLE_AND_LOG(nlp_start, dft_start, "    dft_speech");
 
     /* Estimate pitch */
 
     nlp(c2->nlp, c2->Sn, n_samp, &pitch, Sw, c2->W, &c2->prev_f0_enc);
-    PROFILE_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp");
+    //PROFILE_SAMPLE_AND_LOG(model_start, nlp_start, "    nlp");
 
     model->Wo = TWO_PI/pitch;
     model->L = PI/model->Wo;
@@ -2479,11 +2485,11 @@ void analyse_one_frame(struct CODEC2 *c2, MODEL *model, short speech[])
     /* estimate model parameters */
 
     two_stage_pitch_refinement(&c2->c2const, model, Sw);
-    PROFILE_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage");
+    //PROFILE_SAMPLE_AND_LOG(two_stage, model_start, "    two_stage");
     estimate_amplitudes(model, Sw, c2->W, 0);
-    PROFILE_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps");
+    //PROFILE_SAMPLE_AND_LOG(estamps, two_stage, "    est_amps");
     est_voicing_mbe(&c2->c2const, model, Sw, c2->W);
-    PROFILE_SAMPLE_AND_LOG2(estamps, "    est_voicing");
+    //PROFILE_SAMPLE_AND_LOG2(estamps, "    est_voicing");
     #ifdef DUMP
     dump_model(model);
     #endif
