@@ -825,7 +825,7 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
 
 void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
     int length = ofdm_bitsperframe / ofdm_bps;
-    complex float tx[ofdm_samplesperframe];
+    complex float *tx = (complex float *) &result[0]; // complex has same memory layout
     complex float tx_sym_lin[length];
     int dibit[2];
     int s, i;
@@ -847,13 +847,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
     }
 
     ofdm_txframe(ofdm, tx, tx_sym_lin);
-
-    /* convert to comp */
-
-    for (i = 0; i < ofdm_samplesperframe; i++) {
-        result[i].real = crealf(tx[i]);
-        result[i].imag = cimagf(tx[i]);
-    }
 }
 
 /*
