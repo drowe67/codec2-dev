@@ -8,7 +8,7 @@
   samples.  Optionally:
 
     1/ outputs one char per bit (hard decision)
-    2/ bit LLRS, one double per bir, for external LDPC decoder like ldpc_dec
+    2/ bit LLRS, one double per bit, for external LDPC decoder like ldpc_dec
     3/ LDPC decoded bits, one char per bit
 
   Also has test frame modes for uncoded and coded operation.
@@ -39,6 +39,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 #include <errno.h>
@@ -112,18 +113,19 @@ int main(int argc, char *argv[]) {
     FILE *fout = stdout;
     FILE *foct = NULL;
 
-    int input_specified = 0;
-    int output_specified = 0;
-    int log_specified = 0;
-    int log_active = 0;
     int logframes = NFRAMES;
-    int ldpc_en = 0;
-    int llr_en = 0;
-    int testframes = 0;
     int interleave_frames = 1;
-    int verbose = 0;
     int nc = 17;
     int ns = 8;
+    int verbose = 0;
+
+    bool testframes = false;
+    bool input_specified = false;
+    bool output_specified = false;
+    bool log_specified = false;
+    bool log_active = false;
+    bool ldpc_en = false;
+    bool llr_en = false;
 
     float tcp = 0.002f;
     float ts = 0.018f;
@@ -158,25 +160,25 @@ int main(int argc, char *argv[]) {
                 opt_help();
             case 'a':
                 fin_name = options.optarg;
-                input_specified = 1;
+                input_specified = true;
                 break;
             case 'b':
                 fout_name = options.optarg;
-                output_specified = 1;
+                output_specified = true;
                 break;
             case 'c':
                 log_name = options.optarg;
-                log_specified = 1;
-                log_active = 1;
+                log_specified = true;
+                log_active = true;
                 break;
             case 'd':
-                testframes = 1;
+                testframes = true;
                 break;
             case 'e':
                 interleave_frames = atoi(options.optarg);
             case 'i': /* fall through */
-                ldpc_en = 1;
-                llr_en = 1;
+                ldpc_en = true;
+                llr_en = true;
                 break;
             case 'f':
                 tx_centre = atof(options.optarg);
@@ -185,7 +187,7 @@ int main(int argc, char *argv[]) {
                 rx_centre = atof(options.optarg);
                 break;
             case 'h':
-                llr_en = 1;
+                llr_en = true;
                 break;
             case 'j':
                 val = atoi(options.optarg);
@@ -219,21 +221,21 @@ int main(int argc, char *argv[]) {
     while ((arg = optparse_arg(&options)))
         fprintf(stderr, "%s\n", arg);
 
-    if (input_specified) {
+    if (input_specified == true) {
         if ((fin = fopen(fin_name, "rb")) == NULL) {
             fprintf(stderr, "Error opening input modem sample file: %s\n", fin_name);
             exit(-1);
         }
     }
 
-    if (output_specified) {
+    if (output_specified == true) {
         if ((fout = fopen(fout_name, "wb")) == NULL) {
             fprintf(stderr, "Error opening output file: %s\n", fout_name);
             exit(-1);
         }
     }
 
-    if (log_specified) {
+    if (log_specified == true) {
         if ((foct = fopen(log_name, "wt")) == NULL) {
             fprintf(stderr, "Error opening Octave output file: %s\n", log_name);
             exit(-1);
@@ -279,13 +281,13 @@ int main(int argc, char *argv[]) {
 
     /* zero out the log arrays in case we don't run for NFRAMES and fill them with data */
 
-    for (i = 0; i < ofdm_rowsperframe * NFRAMES; i++) {
+    for (i = 0; i < (ofdm_rowsperframe * NFRAMES); i++) {
         for (j = 0; j < ofdm_config->nc; j++) {
             phase_est_pilot_log[i][j] = 0.0f;
         }
     }
 
-    for (i = 0; i < ofdm_rowsperframe * ofdm_config->nc * NFRAMES; i++) {
+    for (i = 0; i < (ofdm_rowsperframe * ofdm_config->nc * NFRAMES); i++) {
         rx_np_log[i].real = 0.0f;
         rx_np_log[i].imag = 0.0f;
         rx_amp_log[i] = 0.0f;
@@ -307,7 +309,7 @@ int main(int argc, char *argv[]) {
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
 
-    if (verbose) {
+    if (verbose != 0) {
         fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         ofdm_set_verbose(ofdm, verbose);
     }
@@ -337,18 +339,18 @@ int main(int argc, char *argv[]) {
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
     float EsNo = 3.0f;
-
-    if (verbose)
+    float snr_est_smoothed_dB = 0.0f;
+    
+    if (verbose != 0)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
-    float snr_est_smoothed_dB = 0.0f;
-
     COMP payload_syms[coded_syms_per_frame];
-    float payload_amps[coded_syms_per_frame];
     COMP codeword_symbols[interleave_frames * coded_syms_per_frame];
+
+    float payload_amps[coded_syms_per_frame];
     float codeword_amps[interleave_frames * coded_syms_per_frame];
 
-    for (i = 0; i < interleave_frames * coded_syms_per_frame; i++) {
+    for (i = 0; i < (interleave_frames * coded_syms_per_frame); i++) {
         codeword_symbols[i].real = 0.0f;
         codeword_symbols[i].imag = 0.0f;
         codeword_amps[i] = 0.0f;
@@ -372,7 +374,7 @@ int main(int argc, char *argv[]) {
 
     while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
 
-        int log_payload_syms = 0;
+        bool log_payload_syms = false;
 
         /* demod */
 
@@ -383,7 +385,7 @@ int main(int argc, char *argv[]) {
         if ((strcmp(ofdm->sync_state, "synced") == 0) || (strcmp(ofdm->sync_state, "trial") == 0)) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
-            log_payload_syms = 1;
+            log_payload_syms = true;
 
             /* SNR estimation and smoothing */
 
@@ -395,7 +397,7 @@ int main(int argc, char *argv[]) {
 
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
-            if (llr_en) {
+            if (llr_en == true) {
 
                 /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
                    and extract QPSK symbols and amplitude estimates */
@@ -428,7 +430,7 @@ int main(int argc, char *argv[]) {
 
                 float llr[coded_bits_per_frame];
 
-                if (ldpc_en) {
+                if (ldpc_en == true) {
                     char out_char[coded_bits_per_frame];
 
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
@@ -436,10 +438,8 @@ int main(int argc, char *argv[]) {
 
                     if (!strcmp(ofdm->sync_state_interleaver, "synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
-                        // if (verbose)
-                        //     printf("decode!\n");
 
-                        if (testframes) {
+                        if (testframes == true) {
                             Terrs += count_uncoded_errors(&ldpc, ofdm_config, Nerrs_raw, interleave_frames, codeword_symbols_de);
                             Tbits += coded_bits_per_frame*interleave_frames; /* not counting errors in txt bits */
                         }
@@ -450,10 +450,7 @@ int main(int argc, char *argv[]) {
                                     EsNo, ofdm->mean_amp, coded_syms_per_frame);
                             iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
 
-                            //if (verbose)
-                            //    fprintf(stderr,"j: %d iter: %d pcc: %d\n", j, iter[j], parityCheckCount[j]);
-
-                            if (testframes) {
+                            if (testframes == true) {
                                 /* construct payload data bits */
 
                                 int payload_data_bits[data_bits_per_frame];
@@ -467,9 +464,8 @@ int main(int argc, char *argv[]) {
                             fwrite(out_char, sizeof (char), data_bits_per_frame, fout);
                         }
                     } /* if interleaver synced ..... */
-
                 } else {
-                    /* lpdc_en == 0,  external LDPC decoder, so output LLRs */
+                    /* lpdc_en == false,  external LDPC decoder, so output LLRs */
                     symbols_to_llrs(llr, codeword_symbols_de, codeword_amps_de, EsNo, ofdm->mean_amp, coded_syms_per_frame);
                     fwrite(llr, sizeof (double), coded_bits_per_frame, fout);
                 }
@@ -485,7 +481,7 @@ int main(int argc, char *argv[]) {
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
 
-            if (testframes && (ldpc_en == 0)) {
+            if ((testframes == true) && (ldpc_en == false)) {
                 /* build up a test frame consisting of unique word, txt bits, and psuedo-random
                    uncoded payload bits.  The psuedo-random generator is the same as Octave so
                    it can interoperate with ofdm_tx.m/ofdm_rx.m */
@@ -499,8 +495,6 @@ int main(int argc, char *argv[]) {
 
                 for (i = 0; i < Npayloadbits; i++) {
                     payload_bits[i] = r[i] > 16384;
-                    //if (verbose)
-                    //    fprintf(stderr,"%d %d ", r[j], tx_bits_char[i]);
                 }
 
                 uint8_t txt_bits[ofdm_ntxtbits];
@@ -536,20 +530,19 @@ int main(int argc, char *argv[]) {
 
         /* act on any events returned by state machine */
 
-        if (ofdm->sync_start) {
+        if (ofdm->sync_start == true) {
             Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
             for (i = 0; i < interleave_frames; i++) {
                 Nerrs_raw[i] = 0;
                 Nerrs_coded[i] = 0;
             }
-
         }
 
         if (verbose == 2) {
             int r = 0;
 
-            if (testframes) {
+            if (testframes == true) {
                 r = (ofdm->frame_count_interleaver - 1) % interleave_frames;
             }
 
@@ -561,7 +554,7 @@ int main(int argc, char *argv[]) {
 
         /* optional logging of states */
 
-        if (log_active) {
+        if (log_active == true) {
             /* note corrected phase (rx no phase) is one big linear array for frame */
 
             for (i = 0; i < ofdm_rowsperframe * ofdm_config->nc; i++) {
@@ -583,7 +576,7 @@ int main(int argc, char *argv[]) {
 
             snr_est_log[f] = snr_est_smoothed_dB;
 
-            if (log_payload_syms) {
+            if (log_payload_syms == true) {
                 for (i = 0; i < coded_syms_per_frame; i++) {
                     payload_syms_log[f][i].real = payload_syms[i].real;
                     payload_syms_log[f][i].imag = payload_syms[i].imag;
@@ -592,21 +585,21 @@ int main(int argc, char *argv[]) {
             }
 
             if (f == (logframes - 1))
-                log_active = 0;
+                log_active = false;
         }
 
         f++;
     }
 
-    if (input_specified)
+    if (input_specified == true)
         fclose(fin);
 
-    if (output_specified)
+    if (output_specified == true)
         fclose(fout);
 
     /* optionally dump Octave files */
 
-    if (log_specified) {
+    if (log_specified == true) {
         octave_save_float(foct, "phase_est_pilot_log_c", (float*) phase_est_pilot_log, ofdm_rowsperframe*NFRAMES, ofdm_config->nc, ofdm_config->nc);
         octave_save_complex(foct, "rx_np_log_c", (COMP*) rx_np_log, 1, ofdm_rowsperframe * ofdm_config->nc*NFRAMES, ofdm_rowsperframe * ofdm_config->nc * NFRAMES);
         octave_save_float(foct, "rx_amp_log_c", (float*) rx_amp_log, 1, ofdm_rowsperframe * ofdm_config->nc*NFRAMES, ofdm_rowsperframe * ofdm_config->nc * NFRAMES);
@@ -619,23 +612,21 @@ int main(int argc, char *argv[]) {
         fclose(foct);
     }
 
-    ofdm_destroy(ofdm);
-
-    if (testframes) {
+    if (testframes == true) {
         float uncoded_ber = (float) Terrs / Tbits;
 
-        if (verbose) {
+        if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
 
-            if (!ldpc_en) {
+            if (ldpc_en == false) {
                 fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float) Terrs2 / Tbits2, Tbits2, Terrs2);
             }
         }
 
-        if (ldpc_en) {
+        if (ldpc_en == true) {
             float coded_ber = (float) Terrs_coded / Tbits_coded;
 
-            if (verbose)
+            if (verbose != 0)
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
 
             /* set return code for Ctest */
@@ -644,6 +635,8 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
+
+    ofdm_destroy(ofdm);
 
     return 0;
 }
