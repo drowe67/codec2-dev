@@ -520,26 +520,67 @@ TST_API_MOD_SRCS=\
 tst_api_mod.c \
 semihosting.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
-
+#
 TST_API_MOD_SRCS += $(CODEC2_SRCS)
 TST_API_MOD_SRCS += $(SRCS)
-
+#
 tst_api_mod.elf: $(TST_API_MOD_SRCS:.c=.profile.o) libstm32f4.a # $(TMP_NEWLIB_OBJS) 
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
-# Not working yet!
+# TST_API_MOD_700D_PROFILE
+#
+TST_API_MOD_700D_PROFILE_SRCS=\
+tst_api_mod_700d_profile.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+TST_API_MOD_700D_PROFILE_SRCS += $(CODEC2_SRCS)
+TST_API_MOD_700D_PROFILE_SRCS += $(SRCS)
+#
+tst_api_mod_700d_profile.elf: $(TST_API_MOD_700D_PROFILE_SRCS:.c=.profile.o) libstm32f4.a 
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+# TST_API_DEMOD
 TST_API_DEMOD_SRCS=\
 tst_api_demod.c \
 semihosting.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 ## (for debug use) sbrk_dbg.c \
-
+#
 TST_API_DEMOD_SRCS += $(CODEC2_SRCS)
 TST_API_DEMOD_SRCS += $(SRCS)
-
+#
 tst_api_demod.elf: $(TST_API_DEMOD_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_api_demod.map
+
+# -----------------------------------------------
+# TST_API_DEMOD_700D_PROFILE
+api_demod_700d_in_10f:
+	# Each frame of OFDM is 160ms which is 1280 speech samples of 2 bytes each.
+	#
+	dd bs=2560 count=100 if=../../../raw/hts1.raw of=tmp_spch_in.raw
+	cohpsk_ch tmp_spch_in.raw tmp_modout.raw -20 -Fs 8000 -f -5 --raw_dir ../../../raw 
+	freedv_tx 700D tmp_modout.raw api_demod_700d_in_10f --txbpf 0
+#
+api_demod_700d_in_10f.c: api_demod_700d_in_10f
+	xxd -i api_demod_700d_in_10f > api_demod_700d_in_10f.c
+#
+TST_API_DEMOD_700D_PROFILE_SRCS=\
+tst_api_demod_700d_profile.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+## (for debug use) sbrk_dbg.c \
+#
+tst_api_demod_700d_profile.profile.o: tst_api_demod_700d_profile.c api_demod_700d_in_10f.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -DPROFILE -c -o $@ $<
+#
+TST_API_DEMOD_700D_PROFILE_SRCS += $(CODEC2_SRCS)
+TST_API_DEMOD_700D_PROFILE_SRCS += $(SRCS)
+#
+tst_api_demod_700d_profile.elf: $(TST_API_DEMOD_700D_PROFILE_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------
 TST_OFDM_MOD_SRCS=\
