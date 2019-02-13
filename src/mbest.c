@@ -133,7 +133,7 @@ void mbest_search(
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
-	    e += powf(diff*w[i],2.0);
+	    e += diff*w[i]*diff*w[i];
 	}
 	index[0] = j;
 	mbest_insert(mbest, index, e);
