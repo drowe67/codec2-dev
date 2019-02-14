@@ -1,20 +1,3 @@
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include <complex.h>
-
-#include "filter.h"
-#include "filter_coef.h"
-#include "debug_alloc.h"
-
-#include "fdv_arm_math.h"
-
-#define cmplx(value) (COSF(value) + SINF(value) * I)
-
-/*
- * This is a library of filter functions. They were copied from Quisk and converted to single precision.
- */
-
 /*
   Copyright (C) 2018 James C. Ahlstrom
 
@@ -31,6 +14,23 @@
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
+
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <complex.h>
+
+#include "filter.h"
+#include "filter_coef.h"
+#include "debug_alloc.h"
+
+#include "fdv_arm_math.h"
+
+#define cmplx(value) (COSF(value) + SINF(value) * I)
+
+/*
+ * This is a library of filter functions. They were copied from Quisk and converted to single precision.
+ */
 
 /*---------------------------------------------------------------------------*\
 
