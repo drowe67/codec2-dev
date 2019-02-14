@@ -1,8 +1,3 @@
-#ifndef __FILTER__
-#define __FILTER__
-
-#include <complex.h>
-
 /*
   Copyright (C) 2018 James C. Ahlstrom
 
@@ -19,6 +14,11 @@
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
+
+#ifndef __FILTER__
+#define __FILTER__
+
+#include <complex.h>
 
 struct quisk_cfFilter {        // Structure to hold the static data for FIR filters
     float * dCoefs;    // real filter coefficients
