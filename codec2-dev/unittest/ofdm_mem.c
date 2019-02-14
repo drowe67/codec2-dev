@@ -73,8 +73,6 @@ int main()
     used +=                                       sizeof(struct OFDM_CONFIG);
     printf("pilot_samples...............: %zd\n", sizeof (complex float) * (ofdm_m + ofdm_ncp));
     used +=                                       sizeof (complex float) * (ofdm_m + ofdm_ncp);
-    printf("w...........................: %zd\n", sizeof (float) * (ofdm_config->nc + 2));
-    used +=                                       sizeof (float) * (ofdm_config->nc + 2);
     printf("rxbuf.......................: %zd\n", sizeof (complex float) * ofdm_rxbuf);
     used +=                                       sizeof (complex float) * ofdm_rxbuf;
     printf("pilots......................: %zd\n", sizeof (complex float) * (ofdm_config->nc + 2));
