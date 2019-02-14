@@ -101,6 +101,7 @@ static float ofdm_fs; /* Sample rate */
 static float ofdm_ts; /* Symbol cycle time */
 static float ofdm_rs; /* Symbol rate */
 static float ofdm_tcp; /* Cyclic prefix duration */
+static float ofdm_inv_m; /* 1/m */
 static float ofdm_tx_nlower; /* TX lowest carrier freq */
 static float ofdm_rx_nlower; /* RX lowest carrier freq */
 static float ofdm_doc; /* division of radian circle */
@@ -161,13 +162,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ns = 8; /* Number of Symbol frames */
         ofdm_bps = 2; /* Bits per Symbol */
         ofdm_ts = 0.018f;
-        ofdm_rs = 1.0f / ofdm_ts; /* Symbol Rate */
         ofdm_tcp = .002f; /* Cyclic Prefix duration */
         ofdm_tx_centre = 1500.0f; /* TX Centre Audio Frequency */
         ofdm_rx_centre = 1500.0f; /* RX Centre Audio Frequency */
         ofdm_fs = 8000.0f; /* Sample Frequency */
-        ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
-        ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
         ofdm_ntxtbits = 4;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
@@ -178,17 +176,19 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ns = config->ns; /* Number of Symbol frames */
         ofdm_bps = config->bps; /* Bits per Symbol */
         ofdm_ts = config->ts;
-        ofdm_rs = (1.0f / ofdm_ts); /* Symbol Rate */
         ofdm_tcp = config->tcp; /* Cyclic Prefix duration */
         ofdm_tx_centre = config->tx_centre; /* TX Centre Audio Frequency */
         ofdm_rx_centre = config->rx_centre; /* RX Centre Audio Frequency */
         ofdm_fs = config->fs; /* Sample Frequency */
-        ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
-        ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
         ofdm_ntxtbits = config->txtbits;
         ofdm_ftwindowwidth = config->ftwindowwidth;
         ofdm_timing_mx_thresh = config->ofdm_timing_mx_thresh;
     }
+
+    ofdm_rs = (1.0f / ofdm_ts); /* Modulation Symbol Rate */
+    ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
+    ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
+    ofdm_inv_m = (1.0f / (float) ofdm_m);
 
     /* Copy structure into global */
 
@@ -474,7 +474,6 @@ void qpsk_demod(complex float symbol, int *bits) {
 /* convert frequency domain into time domain */
 
 static void idft(struct OFDM *ofdm, complex float *result, complex float *vector) {
-    float inv_m = (1.0f / (float) ofdm_m);
     int row, col;
 
     result[0] = 0.0f;
@@ -483,7 +482,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
         result[0] += vector[col];    // cexp(0j) == 1
     }
 
-    result[0] *= inv_m;
+    result[0] *= ofdm_inv_m;
 
     for (row = 1; row < ofdm_m; row++) {
         float tval1 = ofdm_tx_nlower * ofdm_doc *row;
@@ -499,7 +498,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
             c *= delta;
         }
 
-        result[row] *= inv_m;
+        result[row] *= ofdm_inv_m;
     }
 }
 
