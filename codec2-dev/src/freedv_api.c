@@ -28,6 +28,7 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -63,6 +64,7 @@
 #include "interldpc.h"
 
 #include "debug_alloc.h"
+
 #define VERSION     12    /* The API version number.  The first version
                            is 10.  Increment if the API changes in a
                            way that would require changes by the API
@@ -87,6 +89,12 @@ static struct OFDM_CONFIG *ofdm_config;
 static int ofdm_bitsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
+
+static char *statemode[] = {
+    "search",
+    "trial",
+    "synced"
+};
 
 /*---------------------------------------------------------------------------*\
 
@@ -1802,13 +1810,13 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     
     /* looking for modem sync */
     
-    if (strcmp(ofdm->sync_state,"search") == 0) {
+    if (ofdm->sync_state == search) {
         ofdm_sync_search_shorts(f->ofdm, demod_in_8kHz, new_gain);
     }
 
      /* OK modem is in sync */
     
-    if ((strcmp(ofdm->sync_state,"synced") == 0) || (strcmp(ofdm->sync_state,"trial") == 0) ) {
+    if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         ofdm_demod_shorts(ofdm, rx_bits, demod_in_8kHz, new_gain);
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
@@ -1848,7 +1856,7 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
         interleaver_sync_state_machine(ofdm, ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
                                          
-        if (!strcmp(ofdm->sync_state_interleaver,"synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
+        if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
             ofdm->frame_count_interleaver = 0;
 
             if (f->test_frames) {
@@ -1940,19 +1948,19 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (f->verbose  && strcmp(ofdm->last_sync_state, "search")) {
+    if (f->verbose && (ofdm->last_sync_state == search)) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, 
+                f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz,
-                ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
+                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
     
     /* no valid FreeDV signal - squelch output */
     
-    int sync = !strcmp(ofdm->sync_state,"synced") || !strcmp(ofdm->sync_state,"trial");
-    if (!sync) {
-         if (f->squelch_en) {
+    bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
+    if (sync == false) {
+         if (f->squelch_en == true) {
  	    *valid = 0;
          }
          //f->snr_est = 0.0;
@@ -2386,7 +2394,7 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 
 \*---------------------------------------------------------------------------*/
 
-void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
+void freedv_set_sync(struct freedv *freedv, Sync sync_cmd) {
     assert (freedv != NULL);
 
     if (freedv->mode == FREEDV_MODE_700D) {
@@ -2427,8 +2435,9 @@ int freedv_get_sync                       (struct freedv *f) {return f->stats.sy
 
 int freedv_get_sync_interleaver(struct freedv *f) {
     if (f->mode == FREEDV_MODE_700D) {
-        return !strcmp(f->ofdm->sync_state_interleaver,"synced");
+        return f->ofdm->sync_state_interleaver == synced;
     }
+
     return 0;
 }
 

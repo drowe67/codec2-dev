@@ -65,6 +65,12 @@ static int ofdm_ntxtbits;
 
 static const char *progname;
 
+static char *statemode[] = {
+    "search",
+    "trial",
+    "synced"
+};
+
 void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  Default output file format is one byte per bit hard decision\n\n");
@@ -256,7 +262,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    ofdm_config->state_str = 16; /* state string length */
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
 
@@ -378,11 +383,11 @@ int main(int argc, char *argv[]) {
 
         /* demod */
 
-        if (strcmp(ofdm->sync_state, "search") == 0) {
+        if (ofdm->sync_state == search) {
             ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
         }
 
-        if ((strcmp(ofdm->sync_state, "synced") == 0) || (strcmp(ofdm->sync_state, "trial") == 0)) {
+        if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = true;
@@ -436,7 +441,7 @@ int main(int argc, char *argv[]) {
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                             interleave_frames, iter, parityCheckCount, Nerrs_coded);
 
-                    if (!strcmp(ofdm->sync_state_interleaver, "synced") && (ofdm->frame_count_interleaver == interleave_frames)) {
+                    if ((ofdm->sync_state_interleaver != synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
 
                         if (testframes == true) {
@@ -547,8 +552,13 @@ int main(int argc, char *argv[]) {
             }
 
             fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
-                    f, ofdm->last_sync_state, ofdm->uw_errors, ofdm->sync_counter, ofdm->foff_est_hz,
-                    ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
+                    f,
+                    statemode[ofdm->last_sync_state],
+                    ofdm->uw_errors,
+                    ofdm->sync_counter,
+                    ofdm->foff_est_hz,
+                    statemode[ofdm->last_sync_state_interleaver],
+                    ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
         }
 

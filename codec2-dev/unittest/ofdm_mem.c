@@ -92,14 +92,14 @@ int main()
     used +=                                       sizeof (float) * (ofdm_rowsperframe * ofdm_config->nc);
     printf("tx_uw.......................: %zd\n", sizeof (int) * ofdm_nuwbits);
     used +=                                       sizeof (int) * ofdm_nuwbits;
-    printf("sync_state..................: %zd\n", sizeof (char) * ofdm_config->state_str);
-    used +=                                       sizeof (char) * ofdm_config->state_str;
-    printf("last_sync_state.............: %zd\n", sizeof (char) * ofdm_config->state_str);
-    used +=                                       sizeof (char) * ofdm_config->state_str;
-    printf("sync_state_interleaver......: %zd\n", sizeof (char) * ofdm_config->state_str);
-    used +=                                       sizeof (char) * ofdm_config->state_str;
-    printf("last_sync_state_interleaver.: %zd\n", sizeof (char) * ofdm_config->state_str);
-    used +=                                       sizeof (char) * ofdm_config->state_str;
+    printf("sync_state..................: %zd\n", sizeof (State));
+    used +=                                       sizeof (State);
+    printf("last_sync_state.............: %zd\n", sizeof (State));
+    used +=                                       sizeof (State);
+    printf("sync_state_interleaver......: %zd\n", sizeof (State));
+    used +=                                       sizeof (State);
+    printf("last_sync_state_interleaver.: %zd\n", sizeof (State));
+    used +=                                       sizeof (State);
 
     // add in non-array sizes
     int single = 0;

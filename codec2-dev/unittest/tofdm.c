@@ -88,7 +88,6 @@ static int ofdm_max_samplesperframe;
 static int ofdm_rxbuf;
 static int ofdm_ntxtbits;           /* reserve bits/frame for auxillary text information */
 static int ofdm_nuwbits;            /* Unique word, used for positive indication of lock */
-static int ofdm_state_str;
 
 /*---------------------------------------------------------------------------*\
 
@@ -195,7 +194,6 @@ int main(int argc, char *argv[])
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_ntxtbits = ofdm_config->txtbits;
     ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
-    ofdm_state_str = ofdm_config->state_str;
 
     int tx_bits[ofdm_samplesperframe];
     COMP tx[ofdm_samplesperframe];         /* one frame of tx samples */

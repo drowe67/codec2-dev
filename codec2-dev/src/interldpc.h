@@ -29,6 +29,7 @@
 #define __INTERLDPC__
 
 #include <stdint.h>
+
 #include "comp.h"
 #include "mpdecode_core.h"
 #include "ofdm_internal.h"
