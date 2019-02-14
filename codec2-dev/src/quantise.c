@@ -887,7 +887,7 @@ void aks_to_M2(
 
   float Pw[FFT_ENC/2];
 
-#ifndef ARM_MATH_CM4
+#ifndef FDV_ARM_MATH
   for(i=0; i<FFT_ENC/2; i++) {
     Pw[i] = 1.0/(Aw[i].real*Aw[i].real + Aw[i].imag*Aw[i].imag + 1E-6);
   }
@@ -1281,8 +1281,6 @@ void decode_lsps_scalar(float lsp[], int indexes[], int order)
 }
 
 
-#ifndef CORTEX_M4
-
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: encode_mels_scalar()
@@ -1350,7 +1348,6 @@ void decode_mels_scalar(float mels[], int indexes[], int order)
 
 }
 
-#endif
 
 #ifdef __EXPERIMENTAL__
 

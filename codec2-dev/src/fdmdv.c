@@ -37,12 +37,7 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef ARM_MATH_CM4
-  #include "stm32f4xx.h"
-  #include "core_cm4.h"
-  #include "arm_math.h"
-#endif
-
+#include "fdv_arm_math.h"
 
 #include "fdmdv_internal.h"
 #include "codec2_fdmdv.h"
@@ -61,14 +56,6 @@
 static int sync_uw[] = {1,-1,1,-1,1,-1};
 #ifdef __EMBEDDED__
 #define printf gdb_stdio_printf
-#endif
-
-#ifndef ARM_MATH_CM4
-  #define SINF(a) sinf(a)
-  #define COSF(a) cosf(a)
-#else
-  #define SINF(a) arm_sin_f32(a)
-  #define COSF(a) arm_cos_f32(a)
 #endif
 
 static const COMP  pi_on_4 = { .70710678118654752439, .70710678118654752439 }; // COSF(PI/4) , SINF(PI/4)
@@ -816,7 +803,7 @@ void lpf_peak_pick(float *foff, float *max, COMP pilot_baseband[],
 float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 {
     int  i;
-#ifndef ARM_MATH_CM4
+#ifndef FDV_ARM_MATH
     int j;
 #endif
     COMP pilot[M_FAC+M_FAC/P];
@@ -853,7 +840,7 @@ float rx_est_freq_offset(struct FDMDV *f, COMP rx_fdm[], int nin, int do_fft)
 	f->pilot_baseband2[i] = f->pilot_baseband2[i+nin];
     }
 
-#ifndef ARM_MATH_CM4
+#ifndef FDV_ARM_MATH
     for(i=0,j=NPILOTBASEBAND-nin; i<nin; i++,j++) {
        	f->pilot_baseband1[j] = cmult(rx_fdm[i], pilot[i]);
 	f->pilot_baseband2[j] = cmult(rx_fdm[i], prev_pilot[i]);

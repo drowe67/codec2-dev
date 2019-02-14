@@ -47,14 +47,7 @@ extern "C"
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
 
-#ifndef ARM_MATH_CM4
-  #define SINF(a) sinf(a)
-  #define COSF(a) cosf(a)
-#else
-  #include <arm_math.h>
-  #define SINF(a) arm_sin_f32(a)
-  #define COSF(a) arm_cos_f32(a)
-#endif
+#include "fdv_arm_math.h"
 
 #define cmplx(value) (COSF(value) + SINF(value) * I)
 #define cmplxconj(value) (COSF(value) + SINF(value) * -I)
@@ -139,7 +132,7 @@ void ofdm_assemble_modem_frame(uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, int [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(int [], int);
+void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame);
 
 #ifdef __cplusplus
 }
