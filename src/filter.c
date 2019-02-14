@@ -7,14 +7,7 @@
 #include "filter_coef.h"
 #include "debug_alloc.h"
 
-#ifndef ARM_MATH_CM4
-  #define SINF(a) sinf(a)
-  #define COSF(a) cosf(a)
-#else
-  #include <arm_math.h>
-  #define SINF(a) arm_sin_f32(a)
-  #define COSF(a) arm_cos_f32(a)
-#endif
+#include "fdv_arm_math.h"
 
 #define cmplx(value) (COSF(value) + SINF(value) * I)
 

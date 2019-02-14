@@ -14,20 +14,14 @@
 #include <string.h>
 #include <math.h>
 
-#ifdef ARM_MATH_CM4
-  #include "stm32f4xx.h"
-  #include "core_cm4.h"
-  #include "arm_math.h"
-  #include "arm_const_structs.h"
+#ifdef FDV_ARM_MATH
+  #include "fdv_arm_math.h"
+#else
+    #define USE_KISS_FFT
 #endif
 
 #include "defines.h"
 #include "comp.h"
-
-#ifndef ARM_MATH_CM4
-    #define USE_KISS_FFT
-#endif
-// #define USE_KISS_FFT
 
 
 typedef COMP    codec2_fft_cpx;

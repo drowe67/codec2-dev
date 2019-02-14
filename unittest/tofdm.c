@@ -125,14 +125,6 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
     return tout;
 }
 
-#ifndef ARM_MATH_CM4
-  #define SINF(a) sinf(a)
-  #define COSF(a) cosf(a)
-#else
-  #define SINF(a) arm_sin_f32(a)
-  #define COSF(a) arm_cos_f32(a)
-#endif
-
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: freq_shift()
