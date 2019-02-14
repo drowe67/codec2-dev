@@ -441,7 +441,7 @@ int main(int argc, char *argv[]) {
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                             interleave_frames, iter, parityCheckCount, Nerrs_coded);
 
-                    if ((ofdm->sync_state_interleaver != synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
+                    if ((ofdm->sync_state_interleaver == synced) && (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
 
                         if (testframes == true) {
