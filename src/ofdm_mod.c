@@ -229,7 +229,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
     ofdm_config->ftwindowwidth = 11;
-    ofdm_config->state_str = 16; /* state string length */
     ofdm_config->bps = 2; /* Bits per Symbol */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
     ofdm_config->ns = ns; /* Number of Symbol frames */
@@ -353,7 +352,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                uint16_t r[data_bits_per_frame];
+                uint16_t r[data_bits_per_frame]; /* may produce warning but ignore */
 
                 ofdm_rand(r, data_bits_per_frame);
 

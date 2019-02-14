@@ -44,12 +44,21 @@ extern "C" {
 
 #define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
 #define OFDM_CLIP (32767*0.35)             /* experimentally derived constant to reduce PAPR to about 8dB */
-#define OFDM_SYNC_UNSYNC 0                 /* force sync state machine to lose sync, and search for new sync */
-#define OFDM_SYNC_AUTO   1                 /* falls out of sync automatically */
-#define OFDM_SYNC_MANUAL 2                 /* fall out of sync only under operator control */
     
 struct OFDM_CONFIG;
 struct OFDM;
+
+typedef enum {
+    search,
+    trial,
+    synced
+} State;
+
+typedef enum {
+    unsync,             /* force sync state machine to lose sync, and search for new sync */
+    autosync,           /* falls out of sync automatically */
+    manualsync          /* fall out of sync only under operator control */
+} Sync;
 
 /* create and destroy modem states */
 
@@ -60,10 +69,10 @@ void ofdm_destroy(struct OFDM *);
 
 void ofdm_mod(struct OFDM *, COMP *, const int *);
 void ofdm_demod(struct OFDM *, int *, COMP *);
-void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float gain);
-int  ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in);
-int  ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain);
-void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw);
+void ofdm_demod_shorts(struct OFDM *, int *, short *, float);
+int  ofdm_sync_search(struct OFDM *, COMP *);
+int  ofdm_sync_search_shorts(struct OFDM *, short *, float);
+void ofdm_sync_state_machine(struct OFDM *, int *);
 
 /* getters */
     
@@ -71,7 +80,7 @@ struct OFDM_CONFIG *ofdm_get_config_param(void);
 int ofdm_get_nin(struct OFDM *);
 int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
-int ofdm_get_bits_per_frame();
+int ofdm_get_bits_per_frame(void);
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats);
 
 /* option setters */
@@ -81,10 +90,10 @@ void ofdm_set_timing_enable(struct OFDM *, bool);
 void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
 void ofdm_set_off_est_hz(struct OFDM *, float);
-void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd);
-void ofdm_set_tx_bpf(struct OFDM *ofdm, bool);
+void ofdm_set_sync(struct OFDM *, Sync);
+void ofdm_set_tx_bpf(struct OFDM *, bool);
 
-void ofdm_print_info(struct OFDM *ofdm);
+void ofdm_print_info(struct OFDM *);
 
 #ifdef __cplusplus
 }

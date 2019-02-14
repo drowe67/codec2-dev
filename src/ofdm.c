@@ -8,7 +8,6 @@
   the Octave functions in ofdm_lib.m
 
 \*---------------------------------------------------------------------------*/
-
 /*
   Copyright (C) 2017/2018 David Rowe
 
@@ -44,9 +43,11 @@
 
 /* Static Prototypes */
 
+static complex float vector_sum(complex float *, int);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
-static complex float vector_sum(complex float *, int);
+static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits);
+static int ofdm_sync_search_core(struct OFDM *ofdm);
 
 /* Defines */
 
@@ -119,7 +120,6 @@ static int ofdm_max_samplesperframe;
 static int ofdm_rxbuf;
 static int ofdm_ntxtbits; /* reserve bits/frame for auxillary text information */
 static int ofdm_nuwbits; /* Unique word, used for positive indication of lock */
-static int ofdm_state_str;
 
 /* Functions -------------------------------------------------------------------*/
 
@@ -169,7 +169,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
         ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
         ofdm_ntxtbits = 4;
-        ofdm_state_str = 16;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
      } else {
@@ -187,7 +186,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_m = (int) (ofdm_fs / ofdm_rs); /* 144 */
         ofdm_ncp = (int) (ofdm_tcp * ofdm_fs); /* 16 */
         ofdm_ntxtbits = config->txtbits;
-        ofdm_state_str = config->state_str;
         ofdm_ftwindowwidth = config->ftwindowwidth;
         ofdm_timing_mx_thresh = config->ofdm_timing_mx_thresh;
     }
@@ -205,7 +203,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_config.ns = ofdm_ns;
     ofdm_config.bps = ofdm_bps;
     ofdm_config.txtbits = ofdm_ntxtbits;
-    ofdm_config.state_str = ofdm_state_str;
     ofdm_config.ftwindowwidth = ofdm_ftwindowwidth;
 
     /* Calculate sizes from config param */
@@ -277,22 +274,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (ofdm->tx_uw == NULL)
         goto error_tx_uw;
 
-    ofdm->sync_state = MALLOC(sizeof (char) * ofdm_state_str);
-    if (ofdm->sync_state == NULL)
-        goto error_sync_state;
-
-    ofdm->last_sync_state = MALLOC(sizeof (char) * ofdm_state_str);
-    if (ofdm->last_sync_state == NULL)
-        goto error_last_sync_state;
-
-    ofdm->sync_state_interleaver = MALLOC(sizeof (char) * ofdm_state_str);
-    if (ofdm->sync_state_interleaver == NULL)
-        goto error_sync_state_interleaver;
-
-    ofdm->last_sync_state_interleaver = MALLOC(sizeof (char) * ofdm_state_str);
-    if (ofdm->last_sync_state_interleaver == NULL)
-        goto error_last_sync_state_interleaver;
-
     /* Null pointers to unallocated buffers */
     ofdm->ofdm_tx_bpf = NULL;
 
@@ -351,23 +332,23 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f + 0.0f * I;
 
-    /* sync state machine */
-
     for (i = 0; i < ofdm_nuwbits; i++) {
         ofdm->tx_uw[i] = tx_uw[i];
     }
+    
+    /* sync state machine */
+    
+    ofdm->sync_state = search;
+    ofdm->last_sync_state = search;
+    ofdm->sync_state_interleaver = search;
+    ofdm->last_sync_state_interleaver = search;
 
-    strncpy(ofdm->sync_state, "search", ofdm_state_str);
-    strncpy(ofdm->last_sync_state, "search", ofdm_state_str);
     ofdm->uw_errors = 0;
     ofdm->sync_counter = 0;
     ofdm->frame_count = 0;
-    ofdm->sync_start = 0;
-    ofdm->sync_end = 0;
-    ofdm->sync_mode = OFDM_SYNC_AUTO;
-
-    strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
-    strncpy(ofdm->last_sync_state_interleaver, "search", ofdm_state_str);
+    ofdm->sync_start = false;
+    ofdm->sync_end = false;
+    ofdm->sync_mode = autosync;
     ofdm->frame_count_interleaver = 0;
 
     /* create the OFDM waveform */
@@ -417,14 +398,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
   //// Error return points with free call in the reverse order of allocation:
 
   error_temp:
-    FREE(ofdm->last_sync_state_interleaver);
-  error_last_sync_state_interleaver:
-    FREE(ofdm->sync_state_interleaver);
-  error_sync_state_interleaver:
-    FREE(ofdm->last_sync_state);
-  error_last_sync_state:
-    FREE(ofdm->sync_state);
-  error_sync_state:
     FREE(ofdm->tx_uw);
   error_tx_uw:
     FREE(ofdm->aphase_est_pilot_log);
@@ -480,10 +453,6 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
     FREE(ofdm->tx_uw);
-    FREE(ofdm->sync_state);
-    FREE(ofdm->last_sync_state);
-    FREE(ofdm->sync_state_interleaver);
-    FREE(ofdm->last_sync_state_interleaver);
     FREE(ofdm);
 }
 
@@ -812,7 +781,8 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
     	allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;
     } else {
-        if (ofdm->ofdm_tx_bpf) deallocate_tx_bpf(ofdm);
+    	if (ofdm->ofdm_tx_bpf)
+            deallocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = false;
     }
 }
@@ -854,11 +824,11 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
  * ofdm_sync_search - attempts to find coarse sync parameters for modem initial sync
  * ----------------------------------------------------------------------------------
  */
-static int ofdm_sync_search_core(struct OFDM *ofdm);
 
 /* This is a wrapper to maintain the older functionality with an
  * array of COMPs as input */
 int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
+    complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
     int i, j;
 
     /* insert latest input samples into rxbuf so it is primed for when
@@ -869,7 +839,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
 
     /* insert latest input samples onto tail of rxbuf */
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+        ofdm->rxbuf[i] = rx[j];
     }
 
     return(ofdm_sync_search_core(ofdm));
@@ -932,11 +902,11 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
  * ofdm_demod - Demodulates one frame of bits
  * ------------------------------------------
  */
-static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits);
 
 /* This is a wrapper to maintain the older functionality with an
  * array of COMPs as input */
 void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
+    complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
     int i, j;
 
     /* shift the buffer left based on nin */
@@ -946,7 +916,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
 
     /* insert latest input samples onto tail of rxbuf */
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = rxbuf_in[j].real + rxbuf_in[j].imag * I;
+        ofdm->rxbuf[i] = rx[j];
     }
 
     ofdm_demod_core(ofdm, rx_bits);
@@ -1403,24 +1373,24 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 /* iterate state machine ------------------------------------*/
 
 void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
-    char next_state[ofdm_state_str];
     int i;
 
-    strncpy(next_state, ofdm->sync_state, ofdm_state_str);
-    ofdm->sync_start = 0;
-    ofdm->sync_end = 0;
+    State next_state = ofdm->sync_state;
+    
+    ofdm->sync_start = false;
+    ofdm->sync_end = false;
 
-    if (strcmp(ofdm->sync_state, "search") == 0) {
+    if (ofdm->sync_state == search) {
         if (ofdm->timing_valid) {
             ofdm->frame_count = 0;
             ofdm->sync_counter = 0;
-            ofdm->sync_start = 1;
+            ofdm->sync_start = true;
             ofdm->clock_offset_counter = 0;
-            strncpy(next_state, "trial", ofdm_state_str);
+            next_state = trial;
         }
     }
 
-    if (!strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial")) {
+    if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         ofdm->frame_count++;
         ofdm->frame_count_interleaver++;
 
@@ -1437,7 +1407,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
            for 3 consecutive frames with low error rate to confirm
            sync */
 
-        if (!strcmp(ofdm->sync_state, "trial")) {
+        if (ofdm->sync_state == trial) {
             if (ofdm->uw_errors > 2) {
                 /* if we exceed thresh stay in trial sync */
                 ofdm->sync_counter++;
@@ -1446,36 +1416,36 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
 
             if (ofdm->sync_counter == 2) {
                 /* if we get two bad frames drop sync and start again */
-                strncpy(next_state, "search", ofdm_state_str);
-                strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+                next_state = search;
+                ofdm->sync_state_interleaver = search;
             }
 
             if (ofdm->frame_count == 4) {
                 /* three good frames, sync is OK! */
-                strncpy(next_state, "synced", ofdm_state_str);
+                next_state = synced;
             }
         }
 
         /* once we have synced up we tolerate a higher error rate to wait out fades */
 
-        if (!strcmp(ofdm->sync_state, "synced")) {
+        if (ofdm->sync_state == synced) {
             if (ofdm->uw_errors > 2) {
                 ofdm->sync_counter++;
             } else {
                 ofdm->sync_counter = 0;
             }
 
-            if ((ofdm->sync_mode == OFDM_SYNC_AUTO) && (ofdm->sync_counter == 12)) {
+            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter == 12)) {
                 /* run of consecutive bad frames ... drop sync */
-                strncpy(next_state, "search", ofdm_state_str);
-                strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+                next_state = search;
+                ofdm->sync_state_interleaver = search;
             }
         }
     }
 
-    strncpy(ofdm->last_sync_state, ofdm->sync_state, ofdm_state_str);
-    strncpy(ofdm->last_sync_state_interleaver, ofdm->sync_state_interleaver, ofdm_state_str);
-    strncpy(ofdm->sync_state, next_state, ofdm_state_str);
+    ofdm->last_sync_state = ofdm->sync_state;
+    ofdm->last_sync_state_interleaver = ofdm->sync_state_interleaver;
+    ofdm->sync_state = next_state;
 }
 
 /*---------------------------------------------------------------------------* \
@@ -1495,25 +1465,25 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
 
 \*---------------------------------------------------------------------------*/
 
-void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
+void ofdm_set_sync(struct OFDM *ofdm, Sync sync_cmd) {
     assert(ofdm != NULL);
 
     switch (sync_cmd) {
-        case OFDM_SYNC_UNSYNC:
+        case unsync:
             /* force manual unsync, in case operator detects false sync,
                which will cause sync state machine to have another go at
                sync */
-            strncpy(ofdm->sync_state, "search", ofdm_state_str);
-            strncpy(ofdm->sync_state_interleaver, "search", ofdm_state_str);
+            ofdm->sync_state = search;
+            ofdm->sync_state_interleaver = search;
             break;
-        case OFDM_SYNC_AUTO:
+        case autosync:
             /* normal operating mode - sync state machine decides when to unsync */
-            ofdm->sync_mode = OFDM_SYNC_AUTO;
+            ofdm->sync_mode = autosync;
             break;
-        case OFDM_SYNC_MANUAL:
+        case manualsync:
             /* allow sync state machine to sync, but not to unsync, the
                operator will decide that manually */
-            ofdm->sync_mode = OFDM_SYNC_MANUAL;
+            ofdm->sync_mode = manualsync;
             break;
         default:
             assert(0);
@@ -1540,7 +1510,7 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
     float total = ofdm->frame_count * ofdm_samplesperframe;
 
     stats->snr_est = 0.9f * stats->snr_est + 0.1f * snr_est;
-    stats->sync = !strcmp(ofdm->sync_state, "synced") || !strcmp(ofdm->sync_state, "trial");
+    stats->sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
     stats->foff = ofdm->foff_est_hz;
     stats->rx_timing = ofdm->timing_est;
     stats->clock_offset = 0;
@@ -1697,6 +1667,12 @@ void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_
 }
 
 void ofdm_print_info(struct OFDM *ofdm) {
+    char *syncmode[] = {
+        "unsync",
+        "autosync"
+        "manualsync",
+    };
+
     fprintf(stderr, "ofdm->foff_est_gain = %g\n", (double)ofdm->foff_est_gain);
     fprintf(stderr, "ofdm->foff_est_hz = %g\n", (double)ofdm->foff_est_hz);
     fprintf(stderr, "ofdm->timing_mx = %g\n", (double)ofdm->timing_mx);
@@ -1714,12 +1690,12 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->uw_errors = %d\n", ofdm->uw_errors);
     fprintf(stderr, "ofdm->sync_counter = %d\n", ofdm->sync_counter);
     fprintf(stderr, "ofdm->frame_count = %d\n", ofdm->frame_count);
-    fprintf(stderr, "ofdm->sync_start = %d\n", ofdm->sync_start);
-    fprintf(stderr, "ofdm->sync_end = %d\n", ofdm->sync_end);
-    fprintf(stderr, "ofdm->sync_mode = %d\n", ofdm->sync_mode);
+    fprintf(stderr, "ofdm->sync_start = %s\n", ofdm->sync_start ? "true" : "false");
+    fprintf(stderr, "ofdm->sync_end = %s\n", ofdm->sync_end ? "true" : "false");
+    fprintf(stderr, "ofdm->sync_mode = %s\n", syncmode[ofdm->sync_mode]);
     fprintf(stderr, "ofdm->frame_count_interleaver = %d\n", ofdm->frame_count_interleaver);
-    fprintf(stderr, "ofdm->timing_en = %d\n", ofdm->timing_en);
-    fprintf(stderr, "ofdm->foff_est_en = %d\n", ofdm->foff_est_en);
-    fprintf(stderr, "ofdm->phase_est_en = %d\n", ofdm->phase_est_en);
-    fprintf(stderr, "ofdm->tx_bpf_en = %d\n", ofdm->tx_bpf_en);
+    fprintf(stderr, "ofdm->timing_en = %s\n", ofdm->timing_en ? "true" : "false");
+    fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
+    fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
+    fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
 };

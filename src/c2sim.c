@@ -69,7 +69,6 @@ int main(int argc, char *argv[])
     int Fs = 8000;
     int set_fs;
 
-    int orderi;
     int lpc_model = 0, order = LPC_ORD;
     int lsp = 0, lspd = 0, lspvq = 0;
     int lspres = 0;
