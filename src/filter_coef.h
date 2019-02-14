@@ -1,12 +1,4 @@
 /*
-  These are the coefficients for various FIR filters.  A declaration of these filter coefficients is in filter.h.
-  Multiple filters can use these coefficients because they are read-only.
-
-  Although a sample rate is specified, the filters may be used at other sample rates. For example, if
-  filtP750S1040 is used at 48000 sps, the pass and stop frequencies are 4500 and 6240 hz.
-*/
-
-/*
   Copyright (C) 2018 James C. Ahlstrom
 
   All rights reserved.
@@ -21,6 +13,14 @@
 
   You should have received a copy of the GNU Lesser General Public License
   along with this program; if not, see <http://www.gnu.org/licenses/>.
+*/
+
+/*
+  These are the coefficients for various FIR filters.  A declaration of these filter coefficients is in filter.h.
+  Multiple filters can use these coefficients because they are read-only.
+
+  Although a sample rate is specified, the filters may be used at other sample rates. For example, if
+  filtP750S1040 is used at 48000 sps, the pass and stop frequencies are 4500 and 6240 hz.
 */
 
 // Low pass filter, sample rate 8000 hz, 0.2 dB ripple, 100 dB atten, pass 550 hz, stop 750 hz.
