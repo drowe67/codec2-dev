@@ -11,10 +11,9 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
 
   % init modem
 
-  bps = 2; Ns = 8; Tcp = 0.002;
-  [Ts Nc] = ofdm_init_mode(mode, Ns);
-  Rs = 1/Ts;
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  print_config(states);
   ofdm_load_const;
   states.verbose = 0;
 
@@ -133,7 +132,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
-  plot(rx_np_log(end/2:end),'+');
+  plot(rx_np_log(floor(end/2):end),'+');
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);
   title('Scatter');
@@ -173,7 +172,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   hold off;
   title('Signal and Noise Power estimates');
 
-  if nargin == 2
+  if nargin == 3
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");
     fclose(fep);
