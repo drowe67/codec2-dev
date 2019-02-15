@@ -180,7 +180,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
   states.Nsamperframe =  (states.Nrowsperframe+1)*(states.M+states.Ncp);
   states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
-  states.Nuwbits  = (Ns-1)*bps - states.Ntxtbits;
+  states.Nuwbits  = 10;  % fix UW at 10 bits
 
   % some basic sanity checks
   assert(floor(states.M) == states.M);
@@ -193,9 +193,14 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   
   states.uw_ind = states.uw_ind_sym = [];
   for i=1:states.Nuwbits/2
-    states.uw_ind = [states.uw_ind 1+i*(Nc+1) 2+i*(Nc+1)];
-    states.uw_ind_sym = [states.uw_ind_sym i*(Nc+1)/2+1];
+    ind_sym = floor(i*(Nc+1)/2+1);
+    states.uw_ind_sym = [states.uw_ind_sym ind_sym];        % symbol index
+    states.uw_ind = [states.uw_ind 2*ind_sym-1 2*ind_sym];  % bit index
+    % states.uw_ind = [states.uw_ind 1+i*(Nc+1) 2+i*(Nc+1)];
+    % states.uw_ind_sym = [states.uw_ind_sym i*(Nc+1)/2+1];
   end
+  states.uw_ind
+  states.uw_ind_sym
   states.tx_uw = [0 0 0 0 0 0 0 0 0 0];       
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];
@@ -722,7 +727,7 @@ function [rx_uw payload_syms payload_amps txt_bits] = disassemble_modem_frame(st
   rx_uw_syms = zeros(1,Nuwsyms);
   txt_syms = zeros(1,Ntxtsyms);
   p = 1; u = 1;
-
+ 
   for s=1:Nsymsperframe-Ntxtsyms;
     if (u <= Nuwsyms) && (s == uw_ind_sym(u))
       rx_uw_syms(u++) = modem_frame_syms(s);

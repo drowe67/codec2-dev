@@ -616,7 +616,7 @@ function run_sim(test_frame_mode, M=2, frames = 10, EbNodB = 100, filename="fsk_
 function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=100)
   fin = fopen(filename,"rb"); 
   more off;
-  read_complex = 0;
+  read_complex = 0; shift_fs_on_4 = 0;
   
   %states = fsk_horus_init(96000, 1200);
 
@@ -657,17 +657,19 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
   end
 
   if test_frame_mode == 8
-    % test FSK modem using COTS tx --------------
-    states = fsk_init_hbr(96000, 8, 1200, 4, 16);
+    % test RS41 type balllon telemetry --------------
+    states = fsk_init_hbr(96000, 10, 4800, 2, 16);
     states.fest_fmin = 1000;
-    states.fest_fmax = 20000;
+    states.fest_fmax = 40000;
     states.fest_min_spacing = 1000;
     states.tx_bits_file = "../build_linux/src/tx_bit.bin";
     states.verbose += 0x4;
-    ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
-    states.ntestframebits = length(test_frame);
-    printf("length test frame: %d\n", states.ntestframebits);
+    #ftmp = fopen(states.tx_bits_file, "rb"); test_frame = fread(ftmp,Inf,"char")'; fclose(ftmp);
+    #states.ntestframebits = length(test_frame);
+    #printf("length test frame: %d\n", states.ntestframebits);
+    states.ntestframebits = 1000;
     read_complex = 1;
+    shift_fs_on_4 = 1; % get samples into range of current freq estimator
   end
 
   N = states.N;
@@ -701,7 +703,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 
   printf("demod of raw bits....\n");
 
-  finished = 0;
+  finished = 0; ph = 1;
   while (finished == 0)
 
     % extract nin samples from input stream
@@ -711,6 +713,13 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
       [sf count] = fread(fin, 2*nin, "short");
       sf = sf(1:2:end) + j*sf(2:2:end);
       count /= 2;
+      if shift_fs_on_4
+        % optional shift up in freq by Fs/4 to get into freq est range
+        for i=1:count
+          ph = ph*exp(j*pi/4);
+          sf(i) *= ph;
+        end
+      end
     else
       [sf count] = fread(fin, nin, "short");
     end
@@ -749,7 +758,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
           states.verbose = 0;
         end
       end
-      if (test_frame_mode == 6)  || (test_frame_mode == 8)
+      if (test_frame_mode == 6)  % || (test_frame_mode == 8)
         states = ber_counter_packet(states, test_frame, rx_bits_buf);
       end
      else      
@@ -789,10 +798,10 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     clf
     rx_nowave = rx(1000:length(rx));
     subplot(211)
-    plot(real(rx_nowave(1:states.Fs)));
+    plot(real(rx_nowave));
     title('input signal to demod (1 sec)')
     xlabel('Time (samples)');
-    axis([1 states.Fs -35000 35000])
+    %axis([1 states.Fs -35000 35000])
 
     % normalise spectrum to 0dB full scale with a 32767 sine wave input
 
@@ -808,7 +817,7 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
     title('Sample clock (baud rate) offset in PPM');
   end
 
-  if (test_frame_mode == 1) || (test_frame_mode == 6) || (test_frame_mode == 8)
+  if (test_frame_mode == 1) || (test_frame_mode == 6)
     printf("frames: %d Tbits: %d Terrs: %d BER %4.3f EbNo: %3.2f\n", frames, states.Tbits,states. Terrs, states.Terrs/states.Tbits, mean(EbNodB_log));
   end
 
@@ -834,14 +843,14 @@ function rx_bits_log = demod_file(filename, test_frame_mode=4, noplot=0, EbNodB=
 endfunction
 
 
-% run test functions from here during development
+% Over the years this modem has been used for many different FSK signals ...
 
 if exist("fsk_horus_as_a_lib") == 0
   %run_sim(4, 2, 30, 10);
   %run_sim(5, 4, 30, 100);
   %rx_bits = demod_file("~/Desktop/115.wav",6,0,90);
   %rx_bits = demod_file("~/Desktop/fsk_800xa_rx_hackrf.wav",7);
-  rx_bits = demod_file("~/Desktop/2fsk_100_rx_rpi_rtlsdr_002_ledger.wav",4);
+  %rx_bits = demod_file("~/Desktop/2fsk_100_rx_rpi_rtlsdr_002_ledger.wav",4);
   %rx_bits = demod_file("~/Desktop/phorus_binary_ascii.wav",4);
   %rx_bits = demod_file("~/Desktop/binary/horus_160102_binary_rtty_2.wav",4);
   %rx_bits = demod_file("~/Desktop/horus_160102_vk5ei_capture2.wav",4);
@@ -856,5 +865,5 @@ if exist("fsk_horus_as_a_lib") == 0
   %rx_bits = demod_file("mp.raw",4);
   %rx_bits = demod_file("~/Desktop/launchbox_v2_landing_8KHz_final.wav",4);
   %rx_bits = demod_file("~/Desktop/fsk_800xa.wav",7);
-  %rx_bits = demod_file("../build_linux/unittest/fskrx2.raw",8);
+  rx_bits = demod_file("~/Desktop/rs41_96k_10s.iq16",8);
 end
