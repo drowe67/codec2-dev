@@ -28,11 +28,10 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
   ofdm_lib;
 
   % init modem
-
-  bps = 2; Ns = 8; Tcp = 0.002;
-  [Ts Nc] = ofdm_init_mode(mode, Ns)
-  Rs = 1/Ts;
+  
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+  print_config(states);
   ofdm_load_const;
 
   % Generate fixed test frame of tx bits and run OFDM modulator

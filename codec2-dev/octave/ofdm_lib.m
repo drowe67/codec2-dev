@@ -125,15 +125,24 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
 endfunction
 
 %
-%  Helper function to set up modems for various FreeDV modes
+%  Helper function to set up modems for various FreeDV modes, and parse mode string
 %
+% usage: ofdm_init_mode("Ts=0.018 Nc=17 Ncp=0.002")
 
-function [Ts Nc] = ofdm_init_mode(mode="700D", Ns=8)
+function [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode="700D")
+  bps = 2; Tcp = 0.002; Ns=8;
+
+  % some "canned" modes
   if strcmp(mode,"700D")
     Ts = 0.018; Nc = 17;
-  else
+  elseif strcmp(mode,"2200")
     Tframe = 0.175; Ts = Tframe/Ns; Nc = 37;
+  else
+    % try to parse mode string for user defined mode
+    vec = sscanf(mode, "Ts=%f Nc=%d Ncp=%f");
+    Ts=vec(1); Nc=vec(2); Ncp=vec(3);
   end
+  Rs=1/Ts;
 end
 
 
@@ -150,6 +159,14 @@ end
     PPP
 #}
 
+function print_config(states)
+  ofdm_load_const;
+  printf("Rs=%5.2f Nc=%d Tcp=%4.3f ", Rs, Nc, Tcp);
+  printf("Nbitsperframe: %d Nrowsperframe: %d Ntxtbits: %d Nuwbits: %d ",
+          Nbitsperframe, Nrowsperframe, Ntxtbits, Nuwbits);
+  printf("bits/s: %4.1f\n",  Nbitsperframe*Rs/Ns);
+end
+
 function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Fs = 8000;
   states.bps = bps;
@@ -157,7 +174,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Tcp = Tcp;
   states.Ns = Ns;       % step size for pilots
   states.Nc = Nc;       % Number of cols, aka number of carriers
-  states.M  = states.Fs/Rs;
+  states.M  = states.Fs/Rs; 
   states.Ncp = Tcp*states.Fs;
   states.Nbitsperframe = (Ns-1)*Nc*bps;
   states.Nrowsperframe = states.Nbitsperframe/(Nc*bps);
@@ -165,10 +182,13 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Ntxtbits = 4;   % reserved bits/frame for auxillary text information
   states.Nuwbits  = (Ns-1)*bps - states.Ntxtbits;
 
-  % UW symbol placement, designed to get no false syncs and any freq
+  % some basic sanity checks
+  assert(floor(states.M) == states.M);
+
+  % UW symbol placement, designed to get no false syncs at any freq
   % offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
   % to pair the UW bits so the fit into symbols.  The LDPC decoder
-  % work on symbols so we can't break up any symbols into UW/LDPC
+  % works on symbols so we can't break up any symbols into UW/LDPC
   % bits.
   
   states.uw_ind = states.uw_ind_sym = [];
