@@ -1,12 +1,12 @@
-/*---------------------------------------------------------------------------*\
+/*------------------------------------------------------
 
-  FILE........: tst_codec2_enc.c, (derived from codec2_profile.c)
+  FILE........: tst_codec2_dec.c
   AUTHOR......: David Rowe, Don Reid
   DATE CREATED: 30 May 2013, Oct 2018
 
-  Test Codec 2 encoding on the STM32F4.
+  Test Codec 2 decoding on the STM32F4.
 
-\*---------------------------------------------------------------------------*/
+-------------------------------------------------------*/
 
 /*
   Copyright (C) 2014 David Rowe
@@ -25,31 +25,30 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-/* This is a unit test implementation of the Codec2_encode function.
- *
- * Typical run:
+/* Typical run, using internal testframes:
 
+    # Input
     # Copy N frames of a raw audio file to stm_in.raw. 
-    dd bs=2560 count=30 if=../../../../raw/hts1.raw of=stm_in.raw
+    dd bs=2560 count=30 if=../../../../raw/hts1.raw of=spch_in.raw
+    c2enc 700C spch_in.raw stm_in.raw
 
-    # Run x86 command for reference output
-    c2enc 700C stm_in.raw ref_enc.raw 
-
+    # Reference
+    c2dec 700C stm_in.raw ref_dec.raw
+    
     # Create config
-    echo "80000000" > stm_cfg.txt
+    echo "81000000" > stm_cfg.txt
 
     # Run stm32
-    run_stm32_prog ../../src/tst_codec2_enc.elf --load
+    run_stm32_prog ../../src/tst_codec2_dec.elf --load
 
     # Compare outputs
-    comare_ints -b 1 ref_enc.raw stm_out.raw
+    compare_ints -s -b 2 ref_dec.raw stm_out.raw
 
     # Manual play (and listen)
-    c2dec 700C ref_enc.raw ref_dec.raw
-    aplay -f S16_LE  ref_out.raw
+    aplay -f S16_LE  ref_dec.raw
     #
-    c2dec 700C stm_out.raw stm_dec.raw
-    aplay -f S16_LE stm_dec.raw
+    aplay -f S16_LE stm_out.raw
+
 
  */
 
@@ -61,34 +60,34 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <math.h>
+#include <errno.h>
+#include <assert.h>
 
 #include "codec2.h"
 
+#include "semihosting.h"
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
-#include "semihosting.h"
 #include "machdep.h"
-
+    
 
 int main(int argc, char *argv[]) {
     int            f_cfg, f_in, f_out;
+    int            frame;
+    void          *codec2;
+    short         *buf;
+    unsigned char *bits;
 
-    struct CODEC2  *codec2;
-    short          *buf;
-    unsigned char  *bits;
-    int             nsam, nbit, nbyte;
-    int             gray;
-    int             frame;
+    int            nsam, nbit, nbyte;
 
-    ////////
-    // Semihosting
     semihosting_init();
 
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
-    //int     config_verbose;     // 6
-    //int     config_profile;     // 7
+    int     config_gray;        // 1
+    //int     config_verbose;   // 6
+    //int     config_profile;   // 7
     char config[8];
     f_cfg = open("stm_cfg.txt", O_RDONLY);
     if (f_cfg == -1) {
@@ -100,27 +99,24 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     config_mode = config[0] - '0';
+    config_gray = config[1] - '0';
     //config_verbose = config[6] - '0';
     //config_profile = config[7] - '0';
     close(f_cfg);
 
-    ////////
-    //PROFILE_VAR(freedv_start);
-    //machdep_profile_init();
 
     ////////
+    // Setup
     codec2 = codec2_create(config_mode);
+    assert(codec2 != NULL);
+    codec2_set_natural_or_gray(codec2, config_gray);
+
     nsam = codec2_samples_per_frame(codec2);
     nbit = codec2_bits_per_frame(codec2);
     buf = (short*)malloc(nsam*sizeof(short));
     nbyte = (nbit + 7) / 8;
     bits = (unsigned char*)malloc(nbyte*sizeof(char));
 
-    gray = 1; 
-    //softdec = 0; 
-    //bitperchar = 0;
-
-    codec2_set_natural_or_gray(codec2, gray);
 
     ////////
     // Streams
@@ -135,32 +131,29 @@ int main(int argc, char *argv[]) {
         perror("Error opening output file\n");
         exit(1);
     }
-   
+
     frame = 0;
 
-    int bytes_per_frame = (sizeof(short) * nsam);
-    while (read(f_in, buf, bytes_per_frame) == bytes_per_frame) {
+    ////////
+    // Main loop
+    int bytes_per_frame = (sizeof(char) * nbyte);
+    while (read(f_in, bits, bytes_per_frame) == (size_t)bytes_per_frame) {
 
-        //PROFILE_SAMPLE(enc_start);
-        codec2_encode(codec2, bits, buf);
-        //PROFILE_SAMPLE_AND_LOG2(, enc_start, "  enc");
+        codec2_decode_ber(codec2, buf, bits, 0.0);
+ 	
+        write(f_out, buf, (sizeof(short) * nsam));
 
-        write(f_out, bits, (sizeof(char) * nbyte));
-        printf("frame: %d\n", ++frame);
+        frame ++;
+        }
 
-        //machdep_profile_print_logged_samples();
-    }
 
-    codec2_destroy(codec2);
-
-    free(buf);
-    free(bits);
+    close(f_in);
+    close(f_out);
 
     printf("\nEnd of Test\n");
     fclose(stdout);
     fclose(stderr);
 
-    return(0);
 }
 
 /* vi:set ts=4 et sts=4: */

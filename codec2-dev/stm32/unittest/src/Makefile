@@ -43,6 +43,7 @@ DSPLIB          = $(PERIPHLIBDIR)/Libraries/CMSIS/DSP_Lib
 CFLAGS		+= -DUSE_STDPERIPH_DRIVER -I$(STM32F4LIB)/inc -I$(STM32F4TEMPLATE)
 CFLAGS		+= -I$(CMSIS)/Include -I$(CMSIS)/Device/ST/STM32F4xx/Include
 CFLAGS		+= -DARM_MATH_CM4
+CFLAGS		+= -DFDV_ARM_MATH
 CFLAGS		+= -DSEMIHOST_USE_STDIO
 
 # Precious files that should be preserved at all cost!
@@ -386,6 +387,8 @@ $(CODEC2_SRC)/kiss_fft.c \
 $(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
 $(CODEC2_SRC)/lsp.c \
+$(CODEC2_SRC)/mbest.c \
+$(CODEC2_SRC)/newamp1.c \
 $(CODEC2_SRC)/phase.c \
 $(CODEC2_SRC)/quantise.c \
 $(CODEC2_SRC)/pack.c \
@@ -393,6 +396,8 @@ $(CODEC2_SRC)/codebook.c \
 $(CODEC2_SRC)/codebookd.c \
 $(CODEC2_SRC)/codebookjvm.c \
 $(CODEC2_SRC)/codebookge.c \
+$(CODEC2_SRC)/codebooknewamp1.c \
+$(CODEC2_SRC)/codebooknewamp1_energy.c \
 $(CODEC2_SRC)/dump.c \
 $(CODEC2_SRC)/fdmdv.c \
 $(CODEC2_SRC)/freedv_api.c \
@@ -409,7 +414,6 @@ $(CODEC2_SRC)/mpdecode_core.c \
 $(CODEC2_SRC)/gp_interleaver.c \
 $(CODEC2_SRC)/interldpc.c \
 $(CODEC2_SRC)/HRA_112_112.c \
-$(CODEC2_SRC)/newamp1.c \
 
 CFLAGS += -D__EMBEDDED__
 CFLAGS += -I$(CODEC2_SRC)
@@ -508,11 +512,23 @@ TST_CODEC2_ENC_SRCS=\
 tst_codec2_enc.c \
 semihosting.c \
 $(CODEC2_STM32_SRC)/system_stm32f4xx.c
-
+#
 TST_CODEC2_ENC_SRCS += $(CODEC2_SRCS)
 TST_CODEC2_ENC_SRCS += $(SRCS)
-
+#
 tst_codec2_enc.elf: $(TST_CODEC2_ENC_SRCS:.c=.profile.o) libstm32f4.a
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+TST_CODEC2_DEC_SRCS=\
+tst_codec2_dec.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+TST_CODEC2_DEC_SRCS += $(CODEC2_SRCS)
+TST_CODEC2_DEC_SRCS += $(SRCS)
+#
+tst_codec2_dec.elf: $(TST_CODEC2_DEC_SRCS:.c=.profile.o) libstm32f4.a
 	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
 
 # -----------------------------------------------

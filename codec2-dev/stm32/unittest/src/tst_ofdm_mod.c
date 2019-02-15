@@ -128,7 +128,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
-    ofdm_config->state_str = 16; 		/* state string length */
     ofdm_config->bps = 2;   			/* Bits per Symbol */
     ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
     ofdm_config->ns = 8;  			/* Number of Symbol frames */
@@ -150,7 +149,7 @@ int main(int argc, char *argv[]) {
     if (config_ldpc_en) {
         n_bpf =  interleave_frames * ldpc.data_bits_per_frame;
     } else {
-        n_bpf = ofdm_get_bits_per_frame(ofdm);
+        n_bpf = ofdm_get_bits_per_frame();
     }
 
     n_spf = ofdm_get_samples_per_frame();

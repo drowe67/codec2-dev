@@ -29,8 +29,7 @@
 
     # Input
     # Copy N frames of a raw audio file to stm_in.raw. 
-    # N=6, count = 6 * 1280 * 2 = 15360
-    dd bs=1 count=15360 if=../../../../raw/hts1.raw of=spch_in.raw
+    dd bs=2560 count=30 if=../../../../raw/hts1.raw of=spch_in.raw
     freedv_tx 700D spch_in.raw stm_in.raw --testframes
 
     # Reference

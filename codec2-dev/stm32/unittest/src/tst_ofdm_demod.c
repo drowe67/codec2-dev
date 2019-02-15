@@ -90,6 +90,11 @@ static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
 
+static char *statemode[] = {
+    "search",
+    "trial",
+    "synced"
+};
 
 static FILE *fout, *fdiag;
 void flush_all(void) {
@@ -167,7 +172,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = 8000.0;			/* Sample Frequency */
     ofdm_config->ofdm_timing_mx_thresh = 0.30;
     ofdm_config->ftwindowwidth = 11;
-    ofdm_config->state_str = 16; 		/* state string length */
     ofdm_config->bps = 2;   			/* Bits per Symbol */
     ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
     ofdm_config->ns = 8;  			/* Number of Symbol frames */
@@ -247,14 +251,13 @@ int main(int argc, char *argv[]) {
 
         if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_start, "  ofdm_demod_start");
 
-        if (strcmp(ofdm->sync_state,"search") == 0) {
+        if (ofdm->sync_state == search) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_sync_search);
             ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_sync_search, "  ofdm_demod_sync_search");
         }
 
-        if ((strcmp(ofdm->sync_state,"synced") == 0) ||
-            (strcmp(ofdm->sync_state,"trial") == 0) ) {
+        if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial) ) {
             if (config_profile) PROFILE_SAMPLE(ofdm_demod_demod);
             ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE/2));
             if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_demod_demod, "  ofdm_demod_demod");
@@ -317,7 +320,7 @@ int main(int argc, char *argv[]) {
                                 codeword_symbols_de, codeword_amps_de, EsNo,
                                 interleave_frames, iter, parityCheckCount, Nerrs_coded);
 
-                    if (!strcmp(ofdm->sync_state_interleaver,"synced") && 
+                    if ((ofdm->sync_state_interleaver == synced) && 
                             (ofdm->frame_count_interleaver == interleave_frames)) {
                         ofdm->frame_count_interleaver = 0;
 
@@ -424,7 +427,7 @@ int main(int argc, char *argv[]) {
         int r = 0;
         if (config_testframes && config_verbose) {
             r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
-            fprintf(stderr, "%3d st: %-6s", f, ofdm->last_sync_state);
+            fprintf(stderr, "%3d st: %d", f, ofdm->last_sync_state);
             fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
