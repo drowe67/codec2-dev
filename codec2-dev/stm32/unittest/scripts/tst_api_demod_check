@@ -25,28 +25,37 @@ cd "${RUN_DIR}"
 
 declare -i Fails=0
 
-#case "${TEST_OPT}" in
-#
-#    700D)
-#	;;
-#
-#    esac
+case "${TEST_OPT}" in
 
-echo "Check reference decode"
-p1=$(grep '^BER\.*: 0.000' ref_gen.log | wc -l)
-p2=$(grep '^Coded BER: 0.000' ref_gen.log | wc -l)
-if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
-else echo "BAD"; 
-     let Fails=($Fails + 1)
-     fi
+    700D_*_test)
+	echo "Check reference decode"
+	p1=$(grep '^BER\.*: 0.000' ref_gen.log | wc -l)
+	p2=$(grep '^Coded BER: 0.000' ref_gen.log | wc -l)
+	if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
+	else echo "BAD"; 
+     	    let Fails=($Fails + 1)
+     	fi
+	#
+	echo "Check target decode"
+	p1=$(grep '^BER\.*: 0.000' stm_stderr.txt | wc -l)
+	p2=$(grep '^Coded BER: 0.000' stm_stderr.txt | wc -l)
+	if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
+	else echo "BAD"; 
+     	    let Fails=($Fails + 1)
+     	fi
+	;;
 
-echo "Check target decode"
-p1=$(grep '^BER\.*: 0.000' stm_stderr.txt | wc -l)
-p2=$(grep '^Coded BER: 0.000' stm_stderr.txt | wc -l)
-if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
-else echo "BAD"; 
-     let Fails=($Fails + 1)
-     fi
+    700D_plain_codec)
+        echo -e "\nCompare output binary data"
+        if compare_ints -s -b2 ref_mod.raw stm_out.raw; then 
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+     	fi
+	;;
+
+    esac
 
 if (( $Fails == 0 )); then
     echo -e "\nTest PASSED"

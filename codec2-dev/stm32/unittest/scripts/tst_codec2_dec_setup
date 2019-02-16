@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# tst_api_mod_setup
+# tst_codec2_dec_setup
 #
 # Setup input and reference data for one of several versions of this test.
 
@@ -25,30 +25,30 @@ cd "${RUN_DIR}"
 
 case "${TEST_OPT}" in
 
-    700D_TEST )
+    1600 )
     	# Config is <mode>, <teswtframes> 
-    	echo "71000000" > stm_cfg.txt
+    	echo "21000000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
-        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
+        dd bs=2560 count=30 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
+	c2enc 1600 spch_in.raw stm_in.raw >> setup.log 2>&1
 	#
         # Reference
-        freedv_tx 700D stm_in.raw ref_mod.raw --testframes --txbpf 0 \
-		> ref_gen.log 2>&1
+        c2dec 1600 stm_in.raw ref_dec.raw > ref_gen.log 2>&1
 	;;
 
-    700D_CODEC )
+    700C )
     	# Config is <mode>, <teswtframes> 
-    	echo "70000000" > stm_cfg.txt
+    	echo "81000000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
-        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=stm_in.raw \
+        dd bs=2560 count=30 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
+	c2enc 700C spch_in.raw stm_in.raw >> setup.log 2>&1
 	#
         # Reference
-        freedv_tx 700D stm_in.raw ref_mod.raw --txbpf 0 \
-		> ref_gen.log 2>&1
+        c2dec 700C stm_in.raw ref_dec.raw > ref_gen.log 2>&1
 	;;
 
     esac
