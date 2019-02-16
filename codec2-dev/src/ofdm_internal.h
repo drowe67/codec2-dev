@@ -82,7 +82,7 @@ struct OFDM {
     float *aphase_est_pilot_log;
 
     int *tx_uw;
-    
+
     State sync_state;
     State last_sync_state;
     State sync_state_interleaver;
@@ -90,7 +90,7 @@ struct OFDM {
 
     Sync sync_mode;
 
-    struct quisk_cfFilter * ofdm_tx_bpf;
+    struct quisk_cfFilter *ofdm_tx_bpf;
     
     complex float foff_metric;
     
@@ -128,7 +128,7 @@ struct OFDM {
 complex float qpsk_mod(int *);
 void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float *, complex float []);
-void ofdm_assemble_modem_frame(uint8_t [], uint8_t [], uint8_t []);
+void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, int [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);

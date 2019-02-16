@@ -78,18 +78,9 @@ static const float pilotvalues[] = {
    1.0f, 1.0f, 1.0f, 1.0f,-1.0f, 1.0f,-1.0f, 1.0f
 };
 
-/*
- * A Unique Word (UW) used to verify we have modem frame sync when we
- * try a candidate coarse timing and freq offset.  The UW bits/symbols
- * are distributed through the modem frame using the index (ind)
- * tables below.  The indexes in uw_ind_sym [] and uw_ind are Octave
- * start from 1 format, subtract 1 to index C arrays.
- */
-
-static const int tx_uw[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}; /* UW bits    */
-static complex float tx_uw_syms[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f}; /* UW QPSK symbols */
-static const int uw_ind[] = {19, 20, 37, 38, 55, 56, 73, 74, 91, 92}; /* index in modem frame of UW bits */
-static const int uw_ind_sym[] = {10, 19, 28, 37, 46}; /* index into modem frame of UW symbols */
+static complex float *tx_uw_syms;
+static int *uw_ind; 
+static int *uw_ind_sym;
 
 /* static variables */
 
@@ -129,6 +120,21 @@ static float cnormf(complex float val) {
     float imagf = cimagf(val);
 
     return realf * realf + imagf * imagf;
+}
+
+/* Gray coded QPSK modulation function */
+
+complex float qpsk_mod(int *bits) {
+    return constellation[(bits[1] << 1) | bits[0]];
+}
+
+/* Gray coded QPSK demodulation function */
+
+void qpsk_demod(complex float symbol, int *bits) {
+    complex float rotate = symbol * cmplx(ROT45);
+
+    bits[0] = crealf(rotate) < 0.0f;
+    bits[1] = cimagf(rotate) < 0.0f;
 }
 
 /*
@@ -212,7 +218,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_samplesperframe = ofdm_ns * (ofdm_m + ofdm_ncp);
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
-    ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;
+    ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
 
     /* Were ready to start filling in the OFDM structure now */
 
@@ -274,6 +280,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (ofdm->tx_uw == NULL)
         goto error_tx_uw;
 
+    for (i = 0; i < ofdm_nuwbits; i++) {
+        ofdm->tx_uw[i] = 0;
+    }
+
     /* Null pointers to unallocated buffers */
     ofdm->ofdm_tx_bpf = NULL;
 
@@ -284,7 +294,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* There are only 64 pilot values available */
 
     for (i = 0; i < (ofdm_nc + 2); i++) {
-        ofdm->pilots[i] = pilotvalues[i] + 0.0f * I;
+        ofdm->pilots[i] = pilotvalues[i];
     }
 
     /* carrier tables for up and down conversion */
@@ -295,23 +305,23 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_rx_nlower = floorf((ofdm_rx_centre - tval) / ofdm_rs);
 
     for (i = 0; i < ofdm_rxbuf; i++) {
-        ofdm->rxbuf[i] = 0.0f + 0.0f * I;
+        ofdm->rxbuf[i] = 0.0f;
     }
 
     for (i = 0; i < (ofdm_ns + 3); i++) {
         for (j = 0; j < (ofdm_nc + 2); j++) {
-            ofdm->rx_sym[i][j] = 0.0f + 0.0f * I;
+            ofdm->rx_sym[i][j] = 0.0f;
         }
     }
 
     for (i = 0; i < ofdm_rowsperframe * ofdm_nc; i++) {
-        ofdm->rx_np[i] = 0.0f + 0.0f * I;
+        ofdm->rx_np[i] = 0.0f;
     }
 
     for (i = 0; i < ofdm_rowsperframe; i++) {
         for (j = 0; j < ofdm_nc; j++) {
-            ofdm->aphase_est_pilot_log[ofdm_nc * i + j] = 0.0f + 0.0f * I;
-            ofdm->rx_amp[ofdm_nc * i + j] = 0.0f + 0.0f * I;
+            ofdm->aphase_est_pilot_log[ofdm_nc * i + j] = 0.0f;
+            ofdm->rx_amp[ofdm_nc * i + j] = 0.0f;
         }
     }
 
@@ -330,12 +340,38 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_mx = 0.0f;
     ofdm->nin = ofdm_samplesperframe;
     ofdm->mean_amp = 0.0f;
-    ofdm->foff_metric = 0.0f + 0.0f * I;
+    ofdm->foff_metric = 0.0f;
 
-    for (i = 0; i < ofdm_nuwbits; i++) {
-        ofdm->tx_uw[i] = tx_uw[i];
+    /*
+     * UW symbol placement, designed to get no false syncs at any freq
+     * offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
+     * to pair the UW bits so they fit into symbols.  The LDPC decoder
+     * works on symbols so we can't break up any symbols into UW/LDPC bits.
+     */
+
+    uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
+    if (uw_ind == NULL)
+        goto error_uw_ind;
+
+    uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
+    if (uw_ind_sym == NULL)
+        goto error_uw_ind_sym;
+
+    for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
+        int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
+        uw_ind_sym[i] = val;             // symbol index
+        uw_ind[j]     = (val * 2);       // bit index 1
+        uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
     }
-    
+
+    tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
+    if (tx_uw_syms == NULL)
+        goto error_tx_uw_syms;
+
+    for (i = 0; i < (ofdm_nuwbits / 2); i++) {
+        tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+    }
+
     /* sync state machine */
     
     ofdm->sync_state = search;
@@ -353,8 +389,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* create the OFDM waveform */
 
-    complex float *temp;
-    temp = MALLOC(sizeof (complex float) * ofdm_m);
+    complex float *temp = MALLOC(sizeof (complex float) * ofdm_m);
     if (temp == NULL)
         goto error_temp;
 
@@ -369,7 +404,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* zero out Cyclic Prefix (CP) values */
 
     for (i = 0; i < ofdm_ncp; i++) {
-        ofdm->pilot_samples[i] = 0.0f + 0.0f * I;
+        ofdm->pilot_samples[i] = 0.0f;
     }
 
     /* Now copy the whole thing after the above */
@@ -394,30 +429,36 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     return ofdm; /* Success */
 
+    //// Error return points with free call in the reverse order of allocation:
 
-  //// Error return points with free call in the reverse order of allocation:
-
-  error_temp:
-    FREE(ofdm->tx_uw);
-  error_tx_uw:
-    FREE(ofdm->aphase_est_pilot_log);
-  error_aphase_est_pilot_log:
-    FREE(ofdm->rx_amp);
-  error_rx_amp:
-    FREE(ofdm->rx_np);
-  error_rx_np:
-    for (i = 0; i < free_last_rx_sym; i++)
+    error_temp:
+      FREE(tx_uw_syms);
+    error_uw_ind_sym:
+      FREE(uw_ind);
+    error_tx_uw_syms:
+      FREE(uw_ind_sym);
+    error_uw_ind:
+      FREE(ofdm->tx_uw);
+    error_tx_uw:
+      FREE(ofdm->aphase_est_pilot_log);
+    error_aphase_est_pilot_log:
+      FREE(ofdm->rx_amp);
+    error_rx_amp:
+      FREE(ofdm->rx_np);
+    error_rx_np:
+      for (i = 0; i < free_last_rx_sym; i++)
         FREE(ofdm->rx_sym[i]);
-  error_rx_sym2:
-    FREE(ofdm->rx_sym);
-  error_rx_sym:
-    FREE(ofdm->pilots);
-  error_pilots:
-    FREE(ofdm->rxbuf);
-  error_rxbuf:
-    FREE(ofdm->pilot_samples);
-  error_pilot_samples:
-    FREE(ofdm);
+    error_rx_sym2:
+      FREE(ofdm->rx_sym);
+    error_rx_sym:
+      FREE(ofdm->pilots);
+    error_pilots:
+      FREE(ofdm->rxbuf);
+    error_rxbuf:
+      FREE(ofdm->pilot_samples);
+    error_pilot_samples:
+      FREE(ofdm);
+
     return(NULL);
 }
 
@@ -456,21 +497,6 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->aphase_est_pilot_log);
     FREE(ofdm->tx_uw);
     FREE(ofdm);
-}
-
-/* Gray coded QPSK modulation function */
-
-complex float qpsk_mod(int *bits) {
-    return constellation[(bits[1] << 1) | bits[0]];
-}
-
-/* Gray coded QPSK demodulation function */
-
-void qpsk_demod(complex float symbol, int *bits) {
-    complex float rotate = symbol * cmplx(ROT45);
-
-    bits[0] = crealf(rotate) < 0.0f;
-    bits[1] = cimagf(rotate) < 0.0f;
 }
 
 /* convert frequency domain into time domain */
@@ -810,7 +836,7 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
         /* Here we will have Nbitsperframe / 1 */
 
         for (s = 0; s < length; s++) {
-            tx_sym_lin[s] = (float) (2 * tx_bits[s] - 1) + 0.0f * I;
+            tx_sym_lin[s] = (float) (2 * tx_bits[s] - 1);
         }
     } else if (ofdm_bps == 2) {
         /* Here we will have Nbitsperframe / 2 */
@@ -873,7 +899,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
     /* insert latest input samples onto tail of rxbuf */
 
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain) + 0.0 * I;
+        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain);
     }
 
     return(ofdm_sync_search_core(ofdm));
@@ -952,7 +978,7 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
 
     /* insert latest input samples onto tail of rxbuf */
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain) + 0.0 * I;
+        ofdm->rxbuf[i] = ((float)rxbuf_in[j] * gain);
     }
 
     ofdm_demod_core(ofdm, rx_bits);
@@ -1573,15 +1599,15 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
 
 /* Assemble modem frame of bits from UW, payload bits, and txt bits */
 
-void ofdm_assemble_modem_frame(uint8_t modem_frame[], uint8_t payload_bits[], uint8_t txt_bits[]) {
+void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[], uint8_t payload_bits[], uint8_t txt_bits[]) {
     int b, t;
 
     int p = 0;
     int u = 0;
 
     for (b = 0; b < ofdm_bitsperframe - ofdm_ntxtbits; b++) {
-        if ((u < ofdm_nuwbits) && (b == (uw_ind[u] - 1))) {
-            modem_frame[b] = tx_uw[u++];
+        if ((u < ofdm_nuwbits) && (b == uw_ind[u])) {
+            modem_frame[b] = ofdm->tx_uw[u++];
         } else {
             modem_frame[b] = payload_bits[p++];
         }
@@ -1611,7 +1637,7 @@ void ofdm_assemble_modem_frame_symbols(complex float modem_frame[], COMP payload
     int u = 0;
 
     for (s = 0; s < Nsymsperframe - Ntxtsyms; s++) {
-        if ((u < Nuwsyms) && (s == (uw_ind_sym[u] - 1))) {
+        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
             modem_frame[s] = tx_uw_syms[u++];
         } else {
             modem_frame[s] = payload[p++];
@@ -1645,7 +1671,7 @@ void ofdm_disassemble_modem_frame(struct OFDM *ofdm, int rx_uw[],
     int u = 0;
 
     for (s = 0; s < (Nsymsperframe - Ntxtsyms); s++) {
-        if ((u < Nuwsyms) && (s == (uw_ind_sym[u] - 1))) {
+        if ((u < Nuwsyms) && (s == uw_ind_sym[u])) {
             qpsk_demod(ofdm->rx_np[s], dibit);
 
             rx_uw[ofdm_bps * u    ] = dibit[1];
