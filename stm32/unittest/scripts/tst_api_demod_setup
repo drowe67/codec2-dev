@@ -25,7 +25,7 @@ cd "${RUN_DIR}"
 
 case "${TEST_OPT}" in
 
-    700D_plain )
+    700D_plain_test )
     	# Config is <mode>, <teswtframes> 
     	echo "71000010" > stm_cfg.txt
 	#
@@ -40,7 +40,7 @@ case "${TEST_OPT}" in
 		> ref_gen.log 2>&1
 	;;
 
-    700D_AWGN )
+    700D_AWGN_test )
     	# Config is <mode>, <teswtframes> 
     	echo "71000010" > stm_cfg.txt
 	#
@@ -52,6 +52,21 @@ case "${TEST_OPT}" in
 	#
         # Reference
         freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes \
+		> ref_gen.log 2>&1
+	;;
+
+    700D_plain_codec )
+    	# Config is <mode>, <teswtframes> 
+    	echo "70000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+		> setup.log 2>&1
+	freedv_tx 700D spch_in.raw stm_in.raw --txbpf 0 \
+		>> setup.log 2>&1
+	#
+        # Reference
+        freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
 
