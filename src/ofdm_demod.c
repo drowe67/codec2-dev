@@ -508,7 +508,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
 
