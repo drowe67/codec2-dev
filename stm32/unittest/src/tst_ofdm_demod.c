@@ -427,11 +427,11 @@ int main(int argc, char *argv[]) {
         int r = 0;
         if (config_testframes && config_verbose) {
             r = (ofdm->frame_count_interleaver - 1 ) % interleave_frames;
-            fprintf(stderr, "%3d st: %d", f, ofdm->last_sync_state);
+            fprintf(stderr, "%3d st: %-6s", f, statemode[ofdm->last_sync_state]);
             fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
-                ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
+                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
                 Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
             fprintf(stderr, "\n");
         }
