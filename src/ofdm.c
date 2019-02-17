@@ -1705,7 +1705,7 @@ void ofdm_disassemble_modem_frame(struct OFDM *ofdm, int rx_uw[],
  */
 
 void ofdm_rand(uint16_t r[], int n) {
-    uint64_t seed = 1;
+    uint16_t seed = 1;
     int i;
 
     for (i = 0; i < n; i++) {
