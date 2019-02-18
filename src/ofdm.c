@@ -1731,8 +1731,8 @@ void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_
 void ofdm_print_info(struct OFDM *ofdm) {
     char *syncmode[] = {
         "unsync",
-        "autosync"
-        "manualsync",
+        "autosync",
+        "manualsync"
     };
 
     fprintf(stderr, "ofdm->foff_est_gain = %g\n", (double)ofdm->foff_est_gain);
