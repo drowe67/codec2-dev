@@ -65,7 +65,7 @@ static int ofdm_ntxtbits;
 
 static const char *progname;
 
-static char *statemode[] = {
+static const char *statemode[] = {
     "search",
     "trial",
     "synced"
@@ -221,7 +221,6 @@ int main(int argc, char *argv[]) {
     }
 
     /* Print remaining arguments to give user a hint */
-
     char *arg;
 
     while ((arg = optparse_arg(&options)))
@@ -336,7 +335,7 @@ int main(int argc, char *argv[]) {
 
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
-    char rx_bits_char[Nbitsperframe];
+    uint8_t rx_bits_char[Nbitsperframe];
     int rx_uw[ofdm_nuwbits];
     short txt_bits[ofdm_ntxtbits];
     int Nerrs, Terrs, Tbits, Terrs2, Tbits2, Terrs_coded, Tbits_coded, frame_count;
@@ -396,9 +395,7 @@ int main(int argc, char *argv[]) {
 
             float snr_est_dB = 10.0f *
                     log10f((ofdm->sig_var / ofdm->noise_var) *
-                    ofdm_config->nc *
-                    ofdm_config->rs /
-                    3000.0f);
+                    ofdm_config->nc * ofdm_config->rs / 3000.0f);
 
             snr_est_smoothed_dB = 0.9f * snr_est_smoothed_dB + 0.1f * snr_est_dB;
 
@@ -481,7 +478,7 @@ int main(int argc, char *argv[]) {
                     rx_bits_char[i] = rx_bits[i];
                 }
 
-                fwrite(rx_bits_char, sizeof (char), Nbitsperframe, fout);
+                fwrite(rx_bits_char, sizeof (uint8_t), Nbitsperframe, fout);
             }
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
@@ -601,6 +598,8 @@ int main(int argc, char *argv[]) {
         f++;
     }
 
+    ofdm_destroy(ofdm);
+
     if (input_specified == true)
         fclose(fin);
 
@@ -645,8 +644,6 @@ int main(int argc, char *argv[]) {
                 return 1;
         }
     }
-
-    ofdm_destroy(ofdm);
 
     return 0;
 }
