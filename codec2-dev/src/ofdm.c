@@ -67,15 +67,15 @@ static const complex float constellation[] = {
 /*
  * These pilots are compatible with Octave version
  */
-static const float pilotvalues[] = {
-  -1.0f,-1.0f, 1.0f, 1.0f,-1.0f,-1.0f,-1.0f, 1.0f,
-  -1.0f, 1.0f,-1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-   1.0f, 1.0f, 1.0f,-1.0f,-1.0f, 1.0f,-1.0f, 1.0f,
-  -1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-   1.0f, 1.0f, 1.0f,-1.0f, 1.0f, 1.0f, 1.0f, 1.0f,
-   1.0f,-1.0f,-1.0f,-1.0f,-1.0f,-1.0f,-1.0f, 1.0f,
-  -1.0f, 1.0f,-1.0f, 1.0f,-1.0f,-1.0f, 1.0f,-1.0f,
-   1.0f, 1.0f, 1.0f, 1.0f,-1.0f, 1.0f,-1.0f, 1.0f
+static const int8_t pilotvalues[] = {
+  -1,-1, 1, 1,-1,-1,-1, 1,
+  -1, 1,-1, 1, 1, 1, 1, 1,
+   1, 1, 1,-1,-1, 1,-1, 1,
+  -1, 1, 1, 1, 1, 1, 1, 1,
+   1, 1, 1,-1, 1, 1, 1, 1,
+   1,-1,-1,-1,-1,-1,-1, 1,
+  -1, 1,-1, 1,-1,-1, 1,-1,
+   1, 1, 1, 1,-1, 1,-1, 1
 };
 
 static complex float *tx_uw_syms;
@@ -289,12 +289,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* store complex BPSK pilot symbols */
 
-    assert(sizeof (pilotvalues) >= (ofdm_nc + 2) * sizeof (float));
+    assert(sizeof (pilotvalues) >= (ofdm_nc + 2) * sizeof (int8_t));
 
     /* There are only 64 pilot values available */
 
     for (i = 0; i < (ofdm_nc + 2); i++) {
-        ofdm->pilots[i] = pilotvalues[i];
+        ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
 
     /* carrier tables for up and down conversion */
