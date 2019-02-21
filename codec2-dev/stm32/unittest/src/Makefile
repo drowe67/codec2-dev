@@ -517,7 +517,7 @@ TST_CODEC2_ENC_SRCS += $(CODEC2_SRCS)
 TST_CODEC2_ENC_SRCS += $(SRCS)
 #
 tst_codec2_enc.elf: $(TST_CODEC2_ENC_SRCS:.c=.profile.o) libstm32f4.a
-	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -DPROFILE $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=tst_codec2_enc.map
 
 # -----------------------------------------------
 TST_CODEC2_DEC_SRCS=\
@@ -718,6 +718,18 @@ TST_SEMIHOST_SRCS += $(CODEC2_SRCS)
 TST_SEMIHOST_SRCS += $(SRCS)
 #
 tst_semihost.elf: $(TST_SEMIHOST_SRCS:.c=.o) libstm32f4.a #$(TMP_NEWLIB_OBJS) 
+	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+
+# -----------------------------------------------
+TST_CODEC2_FFT_INIT_SRCS=\
+tst_codec2_fft_init.c \
+semihosting.c \
+$(CODEC2_STM32_SRC)/system_stm32f4xx.c
+#
+TST_CODEC2_FFT_INIT_SRCS += $(CODEC2_SRCS)
+TST_CODEC2_FFT_INIT_SRCS += $(SRCS)
+#
+tst_codec2_fft_init.elf: $(TST_CODEC2_FFT_INIT_SRCS:.c=.o) libstm32f4.a
 	$(CC) $(CFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
 
 
