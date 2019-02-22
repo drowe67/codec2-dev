@@ -36,7 +36,8 @@ extern "C" {
     
 #include <complex.h>
 #include <stdbool.h>
-    
+#include <stdint.h>
+  
 #include "comp.h"
 #include "modem_stats.h"
 
@@ -72,7 +73,7 @@ void ofdm_demod(struct OFDM *, int *, COMP *);
 void ofdm_demod_shorts(struct OFDM *, int *, short *, float);
 int  ofdm_sync_search(struct OFDM *, COMP *);
 int  ofdm_sync_search_shorts(struct OFDM *, short *, float);
-void ofdm_sync_state_machine(struct OFDM *, int *);
+void ofdm_sync_state_machine(struct OFDM *, uint8_t *);
 
 /* getters */
     

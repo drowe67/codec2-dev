@@ -276,7 +276,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     if (ofdm->aphase_est_pilot_log == NULL)
         goto error_aphase_est_pilot_log;
 
-    ofdm->tx_uw = MALLOC(sizeof (int) * ofdm_nuwbits);
+    ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm_nuwbits);
     if (ofdm->tx_uw == NULL)
         goto error_tx_uw;
 
@@ -356,6 +356,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
     if (uw_ind_sym == NULL)
         goto error_uw_ind_sym;
+
+    /*
+     * The Unique Word is placed in different indexes based on
+     * the number of carriers requested.
+     */
 
     for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
         int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
@@ -1424,7 +1429,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
 /* iterate state machine ------------------------------------*/
 
-void ofdm_sync_state_machine(struct OFDM *ofdm, int *rx_uw) {
+void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
     int i;
 
     State next_state = ofdm->sync_state;
@@ -1605,7 +1610,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[], uint8_t
     int p = 0;
     int u = 0;
 
-    for (b = 0; b < ofdm_bitsperframe - ofdm_ntxtbits; b++) {
+    for (b = 0; b < (ofdm_bitsperframe - ofdm_ntxtbits); b++) {
         if ((u < ofdm_nuwbits) && (b == uw_ind[u])) {
             modem_frame[b] = ofdm->tx_uw[u++];
         } else {
@@ -1656,7 +1661,7 @@ void ofdm_assemble_modem_frame_symbols(complex float modem_frame[], COMP payload
     assert(t == ofdm_ntxtbits);
 }
 
-void ofdm_disassemble_modem_frame(struct OFDM *ofdm, int rx_uw[],
+void ofdm_disassemble_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
         COMP codeword_syms[],
         float codeword_amps[],
         short txt_bits[]) {
@@ -1715,7 +1720,7 @@ void ofdm_rand(uint16_t r[], int n) {
 }
 
 
-void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame) {
+void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int data_bits_per_frame) {
     uint16_t r[data_bits_per_frame];
     int i;
     

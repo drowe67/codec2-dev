@@ -1040,7 +1040,7 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
     /* optionally replace codec payload bits with test frames known to rx */
 
     if (f->test_frames) {
-        int payload_data_bits[data_bits_per_frame];
+        uint8_t payload_data_bits[data_bits_per_frame];
         ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
 
         for (j=0; j<f->interleave_frames; j++) {
@@ -1795,7 +1795,7 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     int Nerrs_coded = 0;
     int iter = 0;
     int parityCheckCount = 0;
-    int rx_uw[ofdm_nuwbits];
+    uint8_t rx_uw[ofdm_nuwbits];
 
     float new_gain = gain / OFDM_AMP_SCALE;
     
@@ -1851,7 +1851,7 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
         gp_deinterleave_float(codeword_amps_de   , codeword_amps   , interleave_frames*coded_syms_per_frame);
 
         float llr[coded_bits_per_frame];
-        char out_char[coded_bits_per_frame];
+        uint8_t out_char[coded_bits_per_frame];
 
         interleaver_sync_state_machine(ofdm, ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                                        interleave_frames, &iter, &parityCheckCount, &Nerrs_coded);
@@ -1876,7 +1876,7 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
                 iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
 
                 if (f->test_frames) {
-                    int payload_data_bits[data_bits_per_frame];
+                    uint8_t payload_data_bits[data_bits_per_frame];
                     ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
                     Nerrs_coded = count_errors(payload_data_bits, out_char, data_bits_per_frame);
                     f->total_bit_errors_coded += Nerrs_coded;

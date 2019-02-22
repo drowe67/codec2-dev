@@ -34,7 +34,7 @@ struct LDPC {
 
 void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount);
+int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *parityCheckCount);
 
 void sd_to_llr(float llr[], double sd[], int n);
 void Demod2D(float symbol_likelihood[], COMP r[], COMP S_matrix[], float EsNo, float fading[], float mean_amp, int number_symbols);

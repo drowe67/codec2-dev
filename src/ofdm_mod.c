@@ -318,7 +318,7 @@ int main(int argc, char *argv[]) {
 
     int frame = 0;
 
-    while (fread(tx_bits_char, sizeof (char), Nbitsperframe, fin) == Nbitsperframe) {
+    while (fread(tx_bits_char, sizeof (uint8_t), Nbitsperframe, fin) == Nbitsperframe) {
 
         if (ldpc_en) {
             /* fancy interleaved LDPC encoded frames ----------------------------*/
@@ -338,6 +338,7 @@ int main(int argc, char *argv[]) {
                             txt_bits_char[k] = tx_varicode_bits[varicode_bit_index++];
                             nvaricode_bits--;
                         }
+
                         if (nvaricode_bits == 0) {
                             /* get new char and encode */
                             char s[2];
@@ -412,7 +413,7 @@ int main(int argc, char *argv[]) {
             /* scale and save to disk as shorts */
 
             for (i = 0; i < Nsamperframe; i++)
-                tx_scaled[i] = OFDM_AMP_SCALE * tx_sams[i].real;
+                tx_scaled[i] = tx_sams[i].real * OFDM_AMP_SCALE;
 
             fwrite(tx_scaled, sizeof (short), Nsamperframe, fout);
         }

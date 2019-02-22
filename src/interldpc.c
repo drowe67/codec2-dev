@@ -190,7 +190,7 @@ int count_uncoded_errors(struct LDPC *ldpc, struct OFDM_CONFIG *config, int Nerr
     return Terrs;
 }
 
-int count_errors(int tx_bits[], char rx_bits[], int n) {
+int count_errors(uint8_t tx_bits[], uint8_t rx_bits[], int n) {
     int i;
     int Nerrs = 0;
 

@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <assert.h>
+
 #include "mpdecode_core_test.h"
 #ifndef USE_ORIGINAL_PHI0
 #include "phi0.h"
@@ -498,9 +499,7 @@ return(result);
 
 /* Convenience function to call LDPC decoder from C programs */
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], 
-                     float input[], int *parityCheckCount) {
-
+int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *parityCheckCount)
     int		max_iter;
     float       q_scale_factor, r_scale_factor;
     int         CodeLength, NumberParityBits, NumberRowsHcols, shift, H1;
