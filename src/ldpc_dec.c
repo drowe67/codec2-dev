@@ -27,8 +27,10 @@
 #include <errno.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+
 #include "mpdecode_core.h"
 #include "ofdm_internal.h"
 
@@ -163,7 +165,7 @@ int main(int argc, char *argv[])
     data_bits_per_frame = ldpc.NumberRowsHcols;
     unsigned char ibits[data_bits_per_frame];
     unsigned char pbits[NumberParityBits];
-    char out_char[CodeLength];
+    uint8_t out_char[CodeLength];
 
     testframes = 0;
     total_iters = 0;

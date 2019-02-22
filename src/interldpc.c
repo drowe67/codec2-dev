@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <math.h>
 
@@ -119,7 +120,7 @@ void interleaver_sync_state_machine(struct OFDM *ofdm,
     int coded_bits_per_frame = ldpc->coded_bits_per_frame;
     int data_bits_per_frame = ldpc->data_bits_per_frame;
     float llr[coded_bits_per_frame];
-    char out_char[coded_bits_per_frame];
+    uint8_t out_char[coded_bits_per_frame];
     State next_sync_state_interleaver;
 
     next_sync_state_interleaver = ofdm->sync_state_interleaver;

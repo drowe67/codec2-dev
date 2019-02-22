@@ -31,6 +31,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <math.h>
 #include <complex.h>
@@ -421,7 +422,7 @@ int main(int argc, char *argv[])
         Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
 
         float  llr[CODED_BITSPERFRAME];
-        char   out_char[CODED_BITSPERFRAME];
+        uint8_t out_char[CODED_BITSPERFRAME];
         int    parityCheckCount;
         
         

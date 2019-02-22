@@ -491,7 +491,7 @@ return(result);
 
 /* Convenience function to call LDPC decoder from C programs */
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], float input[], int *parityCheckCount) {
+int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *parityCheckCount) {
     int         max_iter, dec_type;
     float       q_scale_factor, r_scale_factor;
     int         max_row_weight, max_col_weight;
