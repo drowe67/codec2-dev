@@ -390,7 +390,7 @@ int main(int argc, char *argv[]) {
                     txt_bits[i] = 0;
                 }
 
-                ofdm_assemble_modem_frame(tx_bits, payload_bits, txt_bits);
+                ofdm_assemble_modem_frame(ofdm, tx_bits, payload_bits, txt_bits);
 
                 Nerrs = 0;
                 for(i=0; i<ofdm_bitsperframe; i++) {
@@ -431,8 +431,8 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, " euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d",
                 ofdm->uw_errors, ofdm->sync_counter,
                 (double)ofdm->foff_est_hz,
-                ofdm->last_sync_state_interleaver, ofdm->frame_count_interleaver,
-                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
+                statemode[ofdm->last_sync_state_interleaver], 
+                ofdm->frame_count_interleaver,
                 Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
             fprintf(stderr, "\n");
         }
