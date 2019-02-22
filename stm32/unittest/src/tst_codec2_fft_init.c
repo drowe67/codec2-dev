@@ -47,10 +47,11 @@ static const float expect_w[] = {
 
 
 static const float expect_W[] = {
-   0.601647,  0.495616,  0.262390,  0.065359,
-  -0.012196, -0.008645,  0.004429,  0.002195,
-  -0.002176, -0.000597,  0.001208,  0.000079,
-  -0.000708,  0.000102,  0.000421, -0.000158};
+ -0.002176,  0.002195,  0.004429, -0.008645,
+ -0.012196,  0.065359,  0.262390,  0.495616, 
+  0.601647,  0.495616,  0.262390,  0.065359, 
+ -0.012196, -0.008645,  0.004429,  0.002195};
+
 
 int float_cmp(float a, float b) {
     if ( fabsf(a - b) < 1e-6f ) return 1;
@@ -60,7 +61,7 @@ int float_cmp(float a, float b) {
 int main(int argc, char *argv[]) {
 
     struct CODEC2 *codec2;
-    int i;
+    int i, j;
 
     ////////
     // Semihosting
@@ -69,19 +70,26 @@ int main(int argc, char *argv[]) {
     ////////
     codec2 = codec2_create(CODEC2_MODE_700C);
 
-    int j = (codec2->c2const.m_pitch / 2) - 8;
+    j = (codec2->c2const.m_pitch / 2) - 8;
     for (i=0; i<16; i++) {
+        printf("w[%d] = %f", j+i, 
+                (double)codec2->w[j+i]);
         if (!float_cmp(codec2->w[j+i], expect_w[i])) {
-            printf("Error w[%d] = %f, not %f\n", i, 
-                (double)codec2->w[j+i], (double)expect_w[i]);
+            printf(" Error, expected %f", (double)expect_w[i]);
             }
+        printf("\n");
         }
 
+    printf("\n");
+
+    j = (FFT_ENC / 2) - 8;
     for (i=0; i<16; i++) {
-        if (!float_cmp(codec2->W[i].real, expect_W[i])) {
-            printf("Error W[%d] = %f, not %f\n", i, 
-                (double)codec2->W[i].real, (double)expect_W[i]);
+        printf("W[%d] = %f", j+i, 
+                (double)codec2->W[j+i].real);
+        if (!float_cmp(codec2->W[j+i].real, expect_W[i])) {
+            printf(" Error, expected %f", (double)expect_W[i]);
             }
+        printf("\n");
         }
 
     codec2_destroy(codec2);
