@@ -37,8 +37,7 @@ extern void ldpc_free_mem(struct LDPC *ldpc);
 
 extern void encode(struct LDPC *ldpc, unsigned char ibits[], unsigned char pbits[]);
 
-int run_ldpc_decoder(struct LDPC *ldpc, char out_char[], 
-		     float input[], int *parityCheckCount);
+int run_ldpc_decoder(struct LDPC *ldpc, uint8_t out_char[], float input[], int *parityCheckCount);
 extern void ldpc_dump_nodes(struct LDPC *ldpc);
 
 extern void sd_to_llr(float llr[], double sd[], int n);
