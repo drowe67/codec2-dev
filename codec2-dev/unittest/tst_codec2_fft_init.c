@@ -65,18 +65,24 @@ int main(int argc, char *argv[]) {
 
     j = (codec2->c2const.m_pitch / 2) - 8;
     for (i=0; i<16; i++) {
+        printf("w[%d] = %f", j+i, 
+                (double)codec2->w[j+i]);
         if (!float_cmp(codec2->w[j+i], expect_w[i])) {
-            printf("Error w[%d] = %f, not %f\n", i, 
-                (double)codec2->w[j+i], (double)expect_w[i]);
+            printf(" Error, expected %f", (double)expect_w[i]);
             }
+        printf("\n");
         }
+
+    printf("\n");
 
     j = (FFT_ENC / 2) - 8;
     for (i=0; i<16; i++) {
+        printf("W[%d] = %f", j+i, 
+                (double)codec2->W[j+i].real);
         if (!float_cmp(codec2->W[j+i].real, expect_W[i])) {
-            printf("Error W[%d] = %f, not %f\n", i, 
-                (double)codec2->W[j+i].real, (double)expect_W[i]);
+            printf(" Error, expected %f", (double)expect_W[i]);
             }
+        printf("\n");
         }
 
     codec2_destroy(codec2);
