@@ -452,10 +452,12 @@ SRCS += stm32f4_machdep.c
 SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
 all: libstm32f4.a \
-     tst_ldpc_enc.bin tst_ldpc_dec.bin \
+     tst_codec2_enc.bin tst_codec2_dec.bin \
      tst_ofdm_mod.bin tst_ofdm_demod.bin \
+     tst_ldpc_enc.bin tst_ldpc_dec.bin \
      tst_api_mod.bin tst_api_demod.bin \
-     tst_semihost.bin
+     tst_semihost.bin \
+     tst_codec2_fft_init.bin
 
 libstm32f4.a: $(CMSIS_OBJS) $(STM32F4LIB_OBJS)
 	find -L $(PERIPHLIBDIR) -type f -name '*.o' -exec $(AR) crs libstm32f4.a {} ";"
