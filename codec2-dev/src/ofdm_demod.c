@@ -40,6 +40,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <math.h>
 #include <errno.h>
@@ -336,7 +337,7 @@ int main(int argc, char *argv[]) {
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
     uint8_t rx_bits_char[Nbitsperframe];
-    int rx_uw[ofdm_nuwbits];
+    uint8_t rx_uw[ofdm_nuwbits];
     short txt_bits[ofdm_ntxtbits];
     int Nerrs, Terrs, Tbits, Terrs2, Tbits2, Terrs_coded, Tbits_coded, frame_count;
 
@@ -433,7 +434,7 @@ int main(int argc, char *argv[]) {
                 float llr[coded_bits_per_frame];
 
                 if (ldpc_en == true) {
-                    char out_char[coded_bits_per_frame];
+                    uint8_t out_char[coded_bits_per_frame];
 
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
                             interleave_frames, iter, parityCheckCount, Nerrs_coded);
@@ -455,7 +456,7 @@ int main(int argc, char *argv[]) {
                             if (testframes == true) {
                                 /* construct payload data bits */
 
-                                int payload_data_bits[data_bits_per_frame];
+                                uint8_t payload_data_bits[data_bits_per_frame];
                                 ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
 
                                 Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);

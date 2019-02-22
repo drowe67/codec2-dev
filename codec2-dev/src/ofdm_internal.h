@@ -81,7 +81,7 @@ struct OFDM {
     float *rx_amp;
     float *aphase_est_pilot_log;
 
-    int *tx_uw;
+    uint8_t *tx_uw;
 
     State sync_state;
     State last_sync_state;
@@ -130,9 +130,9 @@ void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float *, complex float []);
 void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
-void ofdm_disassemble_modem_frame(struct OFDM *, int [], COMP [], float [], short []);
+void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(int payload_data_bits[], int data_bits_per_frame);
+void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int data_bits_per_frame);
 
 #ifdef __cplusplus
 }
