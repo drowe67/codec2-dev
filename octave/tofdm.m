@@ -39,7 +39,7 @@ cml_support = 0
 % ---------------------------------------------------------------------
 
 Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
-Nc = 22
+Nc = 17
 Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;

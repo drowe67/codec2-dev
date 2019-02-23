@@ -130,7 +130,7 @@ scripts.
 
 5/ To just run a single test:
 
-  $ ctest -R Test_OFDM_Modem_Octave_Port
+  $ ctest -R test_OFDM_modem_octave_port
  
 Directories
 -----------
