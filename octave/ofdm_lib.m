@@ -199,8 +199,6 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
     % states.uw_ind = [states.uw_ind 1+i*(Nc+1) 2+i*(Nc+1)];
     % states.uw_ind_sym = [states.uw_ind_sym i*(Nc+1)/2+1];
   end
-  states.uw_ind
-  states.uw_ind_sym
   states.tx_uw = [0 0 0 0 0 0 0 0 0 0];       
   assert(length(states.tx_uw) == states.Nuwbits);
   tx_uw_syms = [];

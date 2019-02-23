@@ -346,7 +346,7 @@ int main(int argc, char *argv[]) {
     float EsNo = 3.0f;
     float snr_est_smoothed_dB = 0.0f;
     
-    if (verbose != 0)
+    if (verbose == 2)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
     COMP payload_syms[coded_syms_per_frame];
@@ -628,7 +628,7 @@ int main(int argc, char *argv[]) {
         if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
 
-            if (ldpc_en == false) {
+            if ((ldpc_en == false) && (frame_count > NDISCARD)) {
                 fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float) Terrs2 / Tbits2, Tbits2, Terrs2);
             }
         }

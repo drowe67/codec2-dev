@@ -2,6 +2,11 @@
 % David Rowe and Steve Sampson June 2017
 %
 % Octave script for comparing Octave and C versions of OFDM modem
+%
+% If running from the Octave command line a good idea to clear globals before
+% each run:
+%
+%   octave> clear; tofdm;
 
 % ------------------------------------------------------------------
 
@@ -27,16 +32,19 @@ else
   printf("OK found CML mex directory so will add those tests...\n");
   cml_support = 1;
 end
+cml_support = 0
 
 % ---------------------------------------------------------------------
 % Run Octave version 
 % ---------------------------------------------------------------------
 
-Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2; Nc = 17; Ns = 8;
+Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
+Nc = 22
+Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
 ofdm_load_const;
-
+printf("Nbitsperframe: %d\n", Nbitsperframe);
 if cml_support
   Nuwtxtsymbolsperframe = (states.Nuwbits+states.Ntxtbits)/bps;
   S_matrix = [1, j, -j, -1];
@@ -62,10 +70,10 @@ if cml_support
   ibits = payload_data_bits;
   codeword = LdpcEncode(ibits, code_param.H_rows, code_param.P_matrix);
   tx_bits(Nuwbits+Ntxtbits+1:end) = codeword;
+  tx_bits(1:Nuwbits+Ntxtbits) = [states.tx_uw zeros(1,Ntxtbits)];
 else
-  tx_bits(Nuwbits+Ntxtbits+1:end) = [payload_data_bits payload_data_bits];
+  tx_bits = create_ldpc_test_frame(states, coded_frame=0);
 end
-tx_bits(1:Nuwbits+Ntxtbits) = [states.tx_uw zeros(1,Ntxtbits)];
 
 % Run tx loop
 
@@ -185,6 +193,8 @@ if getenv("PATH_TO_TOFDM")
   path_to_tofdm = getenv("PATH_TO_TOFDM")
   printf("setting path from env var\n");
 end
+
+path_to_tofdm = sprintf("%s --nc %d", path_to_tofdm, Nc); % append Nc for variable Nc tests
 
 if cml_support == 0
   path_to_tofdm = sprintf("%s --noldpc", path_to_tofdm);

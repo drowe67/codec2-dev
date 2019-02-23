@@ -4,10 +4,9 @@
   AUTHORS.....: David Rowe & Steve Sampson
   DATE CREATED: June 2017
 
-  Tests for the C version of the OFDM modem.  This program
-  outputs a file of Octave vectors that are loaded and automatically
-  tested against the Octave version of the modem by the Octave script
-  tofdm.m
+  Tests for the C version of the OFDM modem.  This program outputs a
+  file of Octave vectors that are loaded and automatically tested
+  against the Octave version of the modem by the Octave script tofdm.m
 
 \*---------------------------------------------------------------------------*/
 
@@ -35,6 +34,7 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <getopt.h>
 
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
@@ -155,26 +155,60 @@ static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *fof
 
 int main(int argc, char *argv[])
 {
-    if ((ofdm_config = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+    int opt_Nc = 0;
+    int ldpc_enable = 1;
+   
+    static struct option long_options[] = {
+        {"nc",       required_argument, 0, 'n'},
+        {"noldpc",   no_argument, 0, 'l'},
+        {0, 0, 0, 0}
+    };
+
+    int opt_index = 0; char c;
+
+    while ((c = getopt_long (argc, argv, "n:l", long_options, &opt_index)) != -1) {
+        switch (c) {
+        case 'n':
+            opt_Nc = atoi(optarg);
+            fprintf(stderr, "Nc = %d\n", opt_Nc);
+            break;
+        case 'l':
+            ldpc_enable = 0;
+            fprintf(stderr, "LDPC disabled\n");
+            break;
+        default:
+            fprintf(stderr,"usage: %s [Options]:\n  [-l --noldpc]\n  [-n --nc NumberoFCarriers]\n", argv[0]);
+            exit(1);
+        }
+    }
+    
+    // init once to get a copy of default config params
+
+    // start off with NULL config
+    struct OFDM_CONFIG *ofdm_config_default;
+    if ((ofdm_config_default = (struct OFDM_CONFIG *) calloc(1, sizeof (struct OFDM_CONFIG))) == NULL) {
         fprintf(stderr, "Out of Memory\n");
         exit(1);
     }
-
-    int ldpc_enable = 1;
-    if (argc == 2)
-        if (!strcmp(argv[1],"--noldpc")) {
-            ldpc_enable = 0;
-            fprintf(stderr, "LDPC disabled\n");
-        }
     
-    ofdm = ofdm_create(ofdm_config);
+    ofdm_config_default->nc = 0;                  // signal ofdm_create we want defaults
+    ofdm = ofdm_create(ofdm_config_default);
     assert(ofdm != NULL);
+    
+    /* Get a copy of the default modem config */
+    memcpy(ofdm_config_default, ofdm_get_config_param(), sizeof(struct OFDM_CONFIG));
+    printf("Nc: %d Fs: %f\n", ofdm_config_default->nc, ofdm_config_default->fs);
+    ofdm_destroy(ofdm);
 
-    free(ofdm_config);
-
-    /* Get a copy of the actual modem config */
+    // now do a little customisation on default config, and re-create modem instance
+           
+    if (opt_Nc)
+       ofdm_config_default->nc = opt_Nc;
+    ofdm = ofdm_create(ofdm_config_default);
+    assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param();
-
+    
+    // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;
     ofdm_fs = ofdm_config->fs;
@@ -200,7 +234,8 @@ int main(int argc, char *argv[])
     COMP tx[ofdm_samplesperframe];         /* one frame of tx samples */
 
     int rx_bits[ofdm_bitsperframe];    /* one frame of rx bits    */
-
+    printf("Nc = %d ofdm_bitsperframe: %d\n", ofdm_nc, ofdm_bitsperframe);
+    
     /* log arrays */
 
     int tx_bits_log[ofdm_bitsperframe*NFRAMES];
@@ -278,12 +313,21 @@ int main(int argc, char *argv[])
             }
             assert(i == ofdm_bitsperframe);
         } else {
-            for(i=ofdm_nuwbits+ofdm_ntxtbits,j=0; j<ldpc.CodeLength/2; i++,j++) {
-                tx_bits[i] = payload_data_bits[j];
-            }
-            for(j=0; j<ldpc.CodeLength/2; i++,j++) {
-                tx_bits[i] = payload_data_bits[j];
-            }
+            int Npayloadbits = ofdm_bitsperframe - (ofdm_nuwbits + ofdm_ntxtbits);
+            uint16_t r[Npayloadbits];
+            uint8_t payload_bits[Npayloadbits];
+
+            ofdm_rand(r, Npayloadbits);
+            for (i = 0; i < Npayloadbits; i++)
+                payload_bits[i] = r[i] > 16384;
+            uint8_t txt_bits[ofdm_ntxtbits];
+            for (i = 0; i < ofdm_ntxtbits; i++)
+                txt_bits[i] = 0;
+
+            uint8_t tx_bits_char[ofdm_bitsperframe];
+            ofdm_assemble_modem_frame(ofdm, tx_bits_char, payload_bits, txt_bits);
+            for(i=0; i<ofdm_bitsperframe; i++)
+                tx_bits[i] = tx_bits_char[i];
         }
         
         ofdm_mod(ofdm, (COMP*)tx, tx_bits);
@@ -399,48 +443,51 @@ int main(int argc, char *argv[])
         printf("f: %d Nerr: %d\n", f, Nerrs);
 #endif
         
-        /* LDPC functions --------------------------------------*/
-
         float symbol_likelihood[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) ];
         float bit_likelihood[CODED_BITSPERFRAME];
-        float EsNo = 10;
-        
-        /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
-
-        assert((ofdm_nuwbits+ofdm_ntxtbits+CODED_BITSPERFRAME) == ofdm_bitsperframe);
-
-        COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/ofdm_bps)];
-
-        for(i=0, j=(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps; i<(CODED_BITSPERFRAME/ofdm_bps); i++,j++) {
-            ldpc_codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
-            ldpc_codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
-        }
-
-        float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps];
-                
-        Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
-        Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
-
-        float  llr[CODED_BITSPERFRAME];
         uint8_t out_char[CODED_BITSPERFRAME];
-        int    parityCheckCount;
+
+        if (ldpc_enable) {
+            /* LDPC functions --------------------------------------*/
+
+            float EsNo = 10;
+        
+            /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword */
+
+            assert((ofdm_nuwbits+ofdm_ntxtbits+CODED_BITSPERFRAME) == ofdm_bitsperframe);
+
+            COMP ldpc_codeword_symbols[(CODED_BITSPERFRAME/ofdm_bps)];
+
+            for(i=0, j=(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps; i<(CODED_BITSPERFRAME/ofdm_bps); i++,j++) {
+                ldpc_codeword_symbols[i].real = crealf(ofdm->rx_np[j]);
+                ldpc_codeword_symbols[i].imag = cimagf(ofdm->rx_np[j]);
+            }
+
+            float *ldpc_codeword_symbol_amps = &ofdm->rx_amp[(ofdm_nuwbits+ofdm_ntxtbits)/ofdm_bps];
+                
+            Demod2D(symbol_likelihood, ldpc_codeword_symbols, S_matrix, EsNo, ldpc_codeword_symbol_amps, ofdm->mean_amp, CODED_BITSPERFRAME/ofdm_bps);
+            Somap(bit_likelihood, symbol_likelihood, CODED_BITSPERFRAME/ofdm_bps);
+
+            float  llr[CODED_BITSPERFRAME];
+            int    parityCheckCount;
         
         
-        // fprintf(stderr, "\n");
-        for(i=0; i<CODED_BITSPERFRAME; i++) {
-            llr[i] = -bit_likelihood[i];
-            // fprintf(stderr, "%f ", llr[i]);
+            // fprintf(stderr, "\n");
+            for(i=0; i<CODED_BITSPERFRAME; i++) {
+                llr[i] = -bit_likelihood[i];
+                // fprintf(stderr, "%f ", llr[i]);
+            }
+        
+            //fprintf(stderr, "\n");
+        
+            run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
+            /*
+              fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
+              for(i=0; i<CODED_BITSPERFRAME; i++) {
+              fprintf(stderr, "%d ", out_char[i]);
+              }
+            */
         }
-        
-        //fprintf(stderr, "\n");
-        
-        run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount);
-        /*
-          fprintf(stderr, "iter: %d parityCheckCount: %d\n", iter, parityCheckCount);
-        for(i=0; i<CODED_BITSPERFRAME; i++) {
-            fprintf(stderr, "%d ", out_char[i]);
-        }
-        */
         
         /* rx vector logging -----------------------------------*/
 
@@ -488,12 +535,14 @@ int main(int argc, char *argv[])
 
         memcpy(&rx_bits_log[ofdm_bitsperframe*f], rx_bits, sizeof(rx_bits));
 
-        for(i=0; i<(CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps); i++) {
-            symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * f + i] = symbol_likelihood[i];
-        }
-        for(i=0; i<CODED_BITSPERFRAME; i++) {
-            bit_likelihood_log[CODED_BITSPERFRAME*f + i] =  bit_likelihood[i];
-            detected_data_log[CODED_BITSPERFRAME*f + i] = out_char[i];
+        if (ldpc_enable) {
+            for(i=0; i<(CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps); i++) {
+                symbol_likelihood_log[ (CODED_BITSPERFRAME/ofdm_bps) * (1<<ofdm_bps) * f + i] = symbol_likelihood[i];
+            }
+            for(i=0; i<CODED_BITSPERFRAME; i++) {
+                bit_likelihood_log[CODED_BITSPERFRAME*f + i] =  bit_likelihood[i];
+                detected_data_log[CODED_BITSPERFRAME*f + i] = out_char[i];
+            }
         }
     }
 

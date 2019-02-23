@@ -296,7 +296,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     for (i = 0; i < (ofdm_nc + 2); i++) {
         ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
-
+    
     /* carrier tables for up and down conversion */
 
     ofdm_doc = (TAU / (ofdm_fs / ofdm_rs));
