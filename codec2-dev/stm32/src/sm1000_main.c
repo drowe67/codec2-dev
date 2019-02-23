@@ -801,7 +801,7 @@ static void menu_default_cb(struct menu_t* const menu, uint32_t event)
 }
 
 /* Root menu item forward declarations */
-static const struct menu_item_t const* menu_root_children[];
+static const struct menu_item_t* menu_root_children[];
 /* Root item definition */
 static const struct menu_item_t menu_root = {
     .label          = "MENU",
@@ -814,7 +814,7 @@ static const struct menu_item_t menu_root = {
 static const struct menu_item_t menu_op_mode;
 static const struct menu_item_t menu_tot;
 static const struct menu_item_t menu_ui;
-static const struct menu_item_t const* menu_root_children[] = {
+static const struct menu_item_t * menu_root_children[] = {
     &menu_op_mode,
     &menu_tot,
     &menu_ui,
@@ -1007,8 +1007,8 @@ static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event)
 
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
-        static char period[5];
-        snprintf(period, 4, "%d", prefs.tot_period);
+        static char period[6];
+        snprintf(period, 6, "%d", prefs.tot_period);
         /* Announce the period */
         morse_play(&morse_player, period);
     }
@@ -1073,8 +1073,8 @@ static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
 
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
-        static char period[5];
-        snprintf(period, 4, "%d", prefs.tot_warn_period);
+        static char period[6];
+        snprintf(period, 6, "%d", prefs.tot_warn_period);
         /* Announce the period */
         morse_play(&morse_player, period);
     }
@@ -1154,8 +1154,8 @@ static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event)
 
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
-        static char freq[5];
-        snprintf(freq, 4, "%d", morse_player.freq);
+        static char freq[6];
+        snprintf(freq, 6, "%d", morse_player.freq);
         /* Announce the frequency */
         morse_play(&morse_player, freq);
     }
@@ -1220,7 +1220,7 @@ static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event)
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
         static char wpm[5];
-        snprintf(wpm, 4, "%d", curr_wpm);
+        snprintf(wpm, 5, "%d", curr_wpm);
         /* Set the new parameter */
         morse_player.dit_time = 1200 / curr_wpm;
         /* Announce the words per minute */
@@ -1282,8 +1282,8 @@ static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
 
     if (announce) {
         /* Render the text, thankfully we don't need re-entrancy */
-        static char vol[3];
-        snprintf(vol, 3, "%d", 15 - prefs.menu_vol);
+        static char vol[5];
+        snprintf(vol, 5, "%d", 15 - prefs.menu_vol);
         /* Announce the volume level */
         morse_play(&morse_player, vol);
     }

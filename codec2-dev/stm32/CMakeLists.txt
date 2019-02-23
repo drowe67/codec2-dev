@@ -5,7 +5,33 @@
 # Please report questions, comments, problems, or patches to the freetel
 # mailing list: https://lists.sourceforge.net/lists/listinfo/freetel-codec2
 #
+set(ARM_GCC_BIN "" CACHE STRING "Path to the bin directory of your arm-eabi-none-gcc (optional)")
+project(stm32f4 C ASM)
+
+if(CMAKE_CROSSCOMPILING)
+    message(STATUS "We are cross compiling...")
+else()
+    message(STATUS "Performing standard host build...")
+endif()
+
 cmake_minimum_required(VERSION 2.8)
+
+include(cmake/gencodebooks.cmake)
+
+#
+# Prevent in-source builds
+# If an in-source build is attempted, you will still need to clean up a few
+# files manually.
+#
+set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
+  message(FATAL_ERROR "In-source builds in ${CMAKE_BINARY_DIR} are not "
+   "allowed, please remove ./CMakeCache.txt and ./CMakeFiles/, create a "
+   "separate build directory and run cmake from there.")
+endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
+
+#include(cmake/STM32_Toolchain.cmake)
 
 ###################################################
 
@@ -37,7 +63,7 @@ endif()
 #    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --specs=rdimon.specs")
 #else()
 #    link_libraries(nosys)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
+#    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -specs=nosys.specs")
 #endif()
 
 # Set default build type
@@ -50,13 +76,20 @@ else()
     link_libraries(c m)
 endif()
 
-project(stm32f4 C ASM)
-
 # Setup defaults that can't be set in the toolchain file
 set(CMAKE_EXE_LINKER_FLAGS "-T${CMAKE_SOURCE_DIR}/stm32_flash.ld")
 set(CMAKE_EXECUTABLE_SUFFIX_C ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_CXX ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_ASM ".elf")
+set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")
+
+###################################################
+
+# STM32F4 Standard Peripheral Library
+
+include(cmake/STM32_Lib.cmake)
+
+###################################################
 
 # Macro for elf->bin
 macro(elf2bin target)
@@ -68,14 +101,6 @@ endmacro()
 include_directories(../src ../unittest inc)
 
 
-###################################################
-
-# STM32F4 Standard Peripheral Library
-
-include(cmake/STM32_Lib.cmake)
-
-
-###################################################
 
 # Codec 2
 
@@ -86,6 +111,7 @@ configure_file ("${PROJECT_SOURCE_DIR}/../cmake/version.h.in"
 include_directories(${PROJECT_BINARY_DIR})
 
 set(CODEC2_SRC ../src)
+set(CODEC2_GEN_CODEBOOK_SRC ../build/src)
 set(CODEC2_SRCS
 ${CODEC2_SRC}/lpc.c
 ${CODEC2_SRC}/nlp.c
@@ -93,8 +119,8 @@ ${CODEC2_SRC}/postfilter.c
 ${CODEC2_SRC}/sine.c
 ${CODEC2_SRC}/codec2.c
 ${CODEC2_SRC}/codec2_fft.c
-#${CODEC2_SRC}/gp_interleaver.c
-#${CODEC2_SRC}/interldpc.c
+${CODEC2_SRC}/gp_interleaver.c
+${CODEC2_SRC}/interldpc.c
 ${CODEC2_SRC}/kiss_fft.c
 ${CODEC2_SRC}/kiss_fftr.c
 ${CODEC2_SRC}/interp.c
@@ -103,10 +129,6 @@ ${CODEC2_SRC}/ofdm.c
 ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
 ${CODEC2_SRC}/pack.c
-${CODEC2_SRC}/codebook.c
-${CODEC2_SRC}/codebookd.c
-${CODEC2_SRC}/codebookjvm.c
-${CODEC2_SRC}/codebookge.c
 ${CODEC2_SRC}/dump.c
 ${CODEC2_SRC}/fdmdv.c
 ${CODEC2_SRC}/freedv_api.c
@@ -117,8 +139,25 @@ ${CODEC2_SRC}/fsk.c
 ${CODEC2_SRC}/fmfsk.c
 ${CODEC2_SRC}/freedv_vhf_framing.c
 ${CODEC2_SRC}/freedv_data_channel.c
+${CODEC2_SRC}/newamp1.c
+${CODEC2_SRC}/mbest.c
+${CODEC2_SRC}/cohpsk.c
+${CODEC2_SRC}/HRA_112_112.c
+${CODEC2_SRC}/linreg.c
+${CODEC2_SRC}/mpdecode_core.c
+${CODEC2_SRC}/phi0.c
+codebook.c
+codebookd.c
+codebookjvm.c
+codebookge.c
+codebookmel.c
+codebooknewamp1_energy.c
+codebooknewamp1.c
 )
 
+add_library(codec2 STATIC ${CODEC2_SRCS})
+add_library(codec2_prof STATIC ${CODEC2_SRCS})
+target_compile_definitions(codec2_prof PRIVATE PROFILE)
 
 set(FFT_TEST_SRCS 
 ${DSPLIB}/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c
@@ -154,10 +193,10 @@ src/init.c
 src/system_stm32f4xx.c
 )
 
-list(APPEND CODEC2_PROFILE_SRCS ${CODEC2_SRCS})
+#list(APPEND CODEC2_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(codec2_profile ${CODEC2_PROFILE_SRCS})
-target_link_libraries(codec2_profile stm32f4 CMSIS)
+target_link_libraries(codec2_profile codec2_prof stm32f4 CMSIS)
 target_compile_definitions(codec2_profile PRIVATE PROFILE)
 elf2bin(codec2_profile)
 
@@ -392,10 +431,10 @@ src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
-list(APPEND FREEDV_TX_PROFILE_SRCS ${CODEC2_SRCS})
+#list(APPEND FREEDV_TX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS})
-target_link_libraries(freedv_tx_profile stm32f4 CMSIS)
+target_link_libraries(freedv_tx_profile codec2_prof stm32f4 CMSIS)
 target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
 elf2bin(freedv_tx_profile)
 
@@ -408,10 +447,10 @@ src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
-list(APPEND FREEDV_RX_PROFILE_SRCS ${CODEC2_SRCS})
+#list(APPEND FREEDV_RX_PROFILE_SRCS ${CODEC2_SRCS})
 
 add_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS})
-target_link_libraries(freedv_rx_profile stm32f4 CMSIS)
+target_link_libraries(freedv_rx_profile codec2_prof stm32f4 CMSIS)
 elf2bin(freedv_rx_profile)
 
 set(FDMDV_DUMP_RT_SRCS
@@ -534,9 +573,8 @@ src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
-list(APPEND SM2000_RXDEMO_SRCS ${CODEC2_SRCS})
 add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
-target_link_libraries(sm2000_rxdemo stm32f4 CMSIS)
+target_link_libraries(sm2000_rxdemo codec2 stm32f4 CMSIS)
 elf2bin(sm2000_rxdemo)
 
 # ---------------------------------------------------------------------------------
@@ -554,9 +592,9 @@ src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
-list(APPEND SM2000_STW_SRCS ${CODEC2_SRCS} ${USB_VCP})
+list(APPEND SM2000_STW_SRCS ${USB_VCP})
 add_executable(sm2000_stw ${SM2000_STW_SRCS})
-target_link_libraries(sm2000_stw stm32f4 CMSIS)
+target_link_libraries(sm2000_stw codec2 stm32f4 CMSIS)
 elf2bin(sm2000_stw)
 
 # -----------------------------------------------------------------------------
@@ -576,9 +614,9 @@ src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
 
-list(APPEND SM2000_ADCDUMP_SRCS ${CODEC2_SRCS} ${USB_VCP})
+list(APPEND SM2000_ADCDUMP_SRCS ${USB_VCP})
 add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS})
-target_link_libraries(sm2000_adcdump stm32f4 CMSIS)
+target_link_libraries(sm2000_adcdump codec2 stm32f4 CMSIS)
 elf2bin(sm2000_adcdump)
 
 # -----------------------------------------------------------------------------
