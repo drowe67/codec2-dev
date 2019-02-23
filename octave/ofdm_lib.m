@@ -170,7 +170,7 @@ end
 function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.Fs = 8000;
   states.bps = bps;
-  states.Rs = Rs;
+  states.Rs = single(Rs);  # double precision gives different values than in C
   states.Tcp = Tcp;
   states.Ns = Ns;       % step size for pilots
   states.Nc = Nc;       % Number of cols, aka number of carriers
@@ -229,7 +229,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
   W = zeros(Nc+2,states.M);
   for c=1:Nc+2
-    W(c,:) = exp(j*w(c)*(0:states.M-1));
+    W(c,:) = single(exp(j*w(c)*(0:states.M-1)));   # double precision is different than C single
   end
   states.w = w;
   states.W = W;
