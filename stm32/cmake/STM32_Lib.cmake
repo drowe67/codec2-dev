@@ -6,7 +6,7 @@
 #set(PERIPHLIBZIP  stm32f4_dsp_stdperiph_lib.zip)
 set(PERIPHLIBVER    1.8.0)
 set(PERIPHLIBNAME   STM32F4xx_DSP_StdPeriph_Lib_V)
-set(PERIPHLIBDIR    ${CMAKE_BINARY_DIR}/${PERIPHLIBNAME}${PERIPHLIBVER})
+set(PERIPHLIBDIR    ${CMAKE_SOURCE_DIR}/${PERIPHLIBNAME}${PERIPHLIBVER})
 set(CMSIS           ${PERIPHLIBDIR}/Libraries/CMSIS)
 set(STM32F4LIB      ${PERIPHLIBDIR}/Libraries/STM32F4xx_StdPeriph_Driver)
 set(STM32F4TEMPLATE ${PERIPHLIBDIR}/Project/STM32F4xx_StdPeriph_Templates)
@@ -15,6 +15,7 @@ set(DSPLIB          ${PERIPHLIBDIR}/Libraries/CMSIS/DSP_Lib)
 add_definitions(-DUSE_STDPERIPH_DRIVER -DARM_MATH_CM4)
 include_directories(${STM32F4LIB}/inc ${STM32F4TEMPLATE}
     ${CMSIS}/Include ${CMSIS}/Device/ST/STM32F4xx/Include)
+
 
 set(STM32F4LIB_SRCS
 ${STM32F4LIB}/src/misc.c

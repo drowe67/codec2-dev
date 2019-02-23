@@ -15,14 +15,14 @@ below.
 ***** Using Arm packages:
 Note there are some issues between gcc and newlib in recent (Aug 2018) 
 versions of Debian and derived distros.  The Arm maintained 
-"GNU Arm Embedded Toolchain" is recommended to solve these and 
+"GNU Arm Embedded Toolchain" is strongly recommended to solve these and 
 as a better maintained toolchain.  See
 https://launchpad.net/~team-gcc-arm-embedded/+archive/ubuntu/ppa
 ************** 
 
 ************** 
 ***** Using Debian/Ubuntu packages:
-1. Install the toolchain, on Ubuntu 14 this is:
+1. Install the toolchain, on Debian or Ubuntu 14 and newer this is:
 
    $ sudo apt-get install gcc-arm-none-eabi
 
@@ -56,7 +56,7 @@ run from.
 Getting Started
 ---------------
 
-. Install arm toolchain binary
+. Install arm toolchain binary 
 
    $ cd ~
    $ wget https://launchpad.net/gcc-arm-embedded/4.7/4.7-2013-q1-update/+download/gcc-arm-none-eabi-4_7-2013q1-20130313-linux.tar.bz2
@@ -67,14 +67,8 @@ Getting Started
    $ cd codec2_dev/stm32
    In Makefile: edit the BINPATH variable for your toolchain location
                 edit PERIPHLIBVER for the current version of the peripheral
-                 library, currently V1.3.0
+                 library, currently V1.8.0
                 delete power_ut.elf target from the all: target
-   $ make
-   after make downloads the peripheral library, you will get a compile error:
-   #error "Please select first the target STM32F4xx device used in your application (in stm32f4xx.h file)"
-   edit STM32F4xx_DSP_StdPeriph_Lib_V1.3.0/Libraries/CMSIS/Device/ST/STM32F4xx/Include/stm32f4xx.h
-   and at the top of that file, uncomment the appropriate line for your target
-   processor.
    $ make
 
 . Build stlink:

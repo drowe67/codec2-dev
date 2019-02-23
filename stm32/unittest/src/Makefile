@@ -430,6 +430,7 @@ CFLAGS += -T$(CODEC2_STM32_DIR)/stm32_flash.ld
 
 #enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
+ASFLAGS += $(CFLAGS)
 
 ###################################################
 
