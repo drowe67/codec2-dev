@@ -83,6 +83,13 @@ set(CMAKE_EXECUTABLE_SUFFIX_CXX ".elf")
 set(CMAKE_EXECUTABLE_SUFFIX_ASM ".elf")
 set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp")
 
+
+# Check build flags
+
+message(STATUS "CMAKE_C_FLAGS: " ${CMAKE_C_FLAGS})
+message(STATUS "CMAKE_ASM_FLAGS: " ${CMAKE_ASM_FLAGS})
+
+
 ###################################################
 
 # STM32F4 Standard Peripheral Library
