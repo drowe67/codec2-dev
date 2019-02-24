@@ -71,7 +71,7 @@ void dac_open(int fifo_size) {
 
     /* Create fifo */
 
-    dac1_fifo = fifo_create(fifo_size);
+    dac1_fifo = codec2_fifo_create(fifo_size);
     assert(dac1_fifo != NULL);
 
     /* Turn on the clocks we need -----------------------------------------------*/
@@ -103,7 +103,7 @@ void dac_open(int fifo_size) {
    convenience they accept signed 16 bit samples. */
 
 int dac1_write(short buf[], int n) {   
-    return fifo_write(dac1_fifo, buf, n);
+    return codec2_fifo_write(dac1_fifo, buf, n);
 }
 
 static void tim6_config(void)
@@ -235,7 +235,7 @@ void DMA1_Stream5_IRQHandler(void) {
 
         /* fill first half from fifo */
 
-        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -256,7 +256,7 @@ void DMA1_Stream5_IRQHandler(void) {
 
         /* fill second half from fifo */
 
-        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }

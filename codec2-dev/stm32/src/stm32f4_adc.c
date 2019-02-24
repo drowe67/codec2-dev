@@ -54,9 +54,9 @@ void adc_configure();
 static void tim2_config(int fs_divisor);
 
 void adc_open(int fs_divisor, int fifo_sz) {
-    adc1_fifo = fifo_create(fifo_sz);
+    adc1_fifo = codec2_fifo_create(fifo_sz);
     assert(adc1_fifo != NULL);
-    adc2_fifo = fifo_create(fifo_sz);
+    adc2_fifo = codec2_fifo_create(fifo_sz);
     assert(adc2_fifo != NULL);
 
     tim2_config(fs_divisor);
@@ -67,23 +67,23 @@ void adc_open(int fs_divisor, int fifo_sz) {
 /* n signed 16 bit samples in buf[] if return != -1 */
 
 int adc1_read(short buf[], int n) {
-    return fifo_read(adc1_fifo, buf, n);
+    return codec2_fifo_read(adc1_fifo, buf, n);
 }
 
 /* n signed 16 bit samples in buf[] if return != -1 */
 
 int adc2_read(short buf[], int n) {
-    return fifo_read(adc2_fifo, buf, n);
+    return codec2_fifo_read(adc2_fifo, buf, n);
 }
 
 /* Returns number of signed 16 bit samples in the FIFO currently */
 int adc1_samps(){
-	return fifo_used(adc1_fifo);
+	return codec2_fifo_used(adc1_fifo);
 }
 
 /* Returns number of signed 16 bit samples in the FIFO currently */
 int adc2_samps(){
-	return fifo_used(adc2_fifo);
+	return codec2_fifo_used(adc2_fifo);
 }
 
 static void tim2_config(int fs_divisor)
@@ -236,10 +236,10 @@ void DMA2_Stream0_IRQHandler(void) {
         }
         /* write first half to fifo */
 
-        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
+        if (codec2_fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
             adc_overflow1++;
         }
-        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+        if (codec2_fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
             adc_overflow2++;
         }
 
@@ -264,10 +264,10 @@ void DMA2_Stream0_IRQHandler(void) {
 
         /* write second half to fifo */
 
-        if (fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
+        if (codec2_fifo_write(adc1_fifo, signed_buf1, ADC_BUF_SZ/4) == -1) {
             adc_overflow1++;
         }
-        if (fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
+        if (codec2_fifo_write(adc2_fifo, signed_buf2, ADC_BUF_SZ/4) == -1) {
             adc_overflow2++;
         }
 
