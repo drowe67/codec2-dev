@@ -39,7 +39,8 @@ cml_support = 0
 % ---------------------------------------------------------------------
 
 Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
-Nc = 17
+Nc = 17;
+printf("Nc = %d\n", Nc);
 Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
@@ -201,7 +202,6 @@ if cml_support == 0
 end
 
 system(path_to_tofdm);
-
 load tofdm_out.txt;
 
 fg = 1;
