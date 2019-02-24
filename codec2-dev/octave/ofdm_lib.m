@@ -220,12 +220,14 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
+  printf("number of pilots total: %d\n", length(states.pilots));
   
   % carrier tables for up and down conversion
 
   fcentre = 1500;
-  alower = fcentre - Rs * (Nc/2);
-  Nlower = floor(alower / Rs);
+  alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
+  Nlower = round(alower / Rs);     % round this to nearest integer multiple from 0Hz to keep DFT happy
+  %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
   w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
   W = zeros(Nc+2,states.M);
   for c=1:Nc+2
@@ -266,7 +268,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rate_fs_pilot_samples = states.pilots * W/states.M;
 
-  % During tuning it was found that not inclduing the cyc prefix in
+  % During tuning it was found that not including the cyc prefix in
   % rate_fs_pilot_samples produced better fest results
   
   %states.rate_fs_pilot_samples = [rate_fs_pilot_samples(states.M-states.Ncp+1:states.M) rate_fs_pilot_samples];

@@ -190,20 +190,21 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Out of Memory\n");
         exit(1);
     }
-    
+
+    //printf("ofdm_create() 1\n");
     ofdm_config_default->nc = 0;                  // signal ofdm_create we want defaults
     ofdm = ofdm_create(ofdm_config_default);
     assert(ofdm != NULL);
     
     /* Get a copy of the default modem config */
     memcpy(ofdm_config_default, ofdm_get_config_param(), sizeof(struct OFDM_CONFIG));
-    printf("Nc: %d Fs: %f\n", ofdm_config_default->nc, ofdm_config_default->fs);
     ofdm_destroy(ofdm);
 
     // now do a little customisation on default config, and re-create modem instance
            
     if (opt_Nc)
        ofdm_config_default->nc = opt_Nc;
+    //printf("ofdm_create() 2\n");
     ofdm = ofdm_create(ofdm_config_default);
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param();
