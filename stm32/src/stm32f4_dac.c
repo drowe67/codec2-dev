@@ -70,8 +70,8 @@ void dac_open(int fs_divisor, int fifo_size) {
 
     /* Create fifos */
 
-    dac1_fifo = fifo_create(fifo_size);
-    dac2_fifo = fifo_create(fifo_size);
+    dac1_fifo = codec2_fifo_create(fifo_size);
+    dac2_fifo = codec2_fifo_create(fifo_size);
     assert(dac1_fifo != NULL);
     assert(dac2_fifo != NULL);
 
@@ -105,19 +105,19 @@ void dac_open(int fs_divisor, int fifo_size) {
    convenience they accept signed 16 bit samples. */
 
 int dac1_write(short buf[], int n) {
-    return fifo_write(dac1_fifo, buf, n);
+    return codec2_fifo_write(dac1_fifo, buf, n);
 }
 
 int dac2_write(short buf[], int n) {
-    return fifo_write(dac2_fifo, buf, n);
+    return codec2_fifo_write(dac2_fifo, buf, n);
 }
 
 int dac1_free() {
-    return fifo_free(dac1_fifo);
+    return codec2_fifo_free(dac1_fifo);
 }
 
 int dac2_free() {
-    return fifo_free(dac2_fifo);
+    return codec2_fifo_free(dac2_fifo);
 }
 
 static void tim6_config(int fs_divisor)
@@ -306,7 +306,7 @@ void DMA1_Stream5_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_HTIF5) != RESET) {
         /* fill first half from fifo */
 
-        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -328,7 +328,7 @@ void DMA1_Stream5_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream5, DMA_IT_TCIF5) != RESET) {
         /* fill second half from fifo */
 
-        if (fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac1_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -363,7 +363,7 @@ void DMA1_Stream6_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_HTIF6) != RESET) {
         /* fill first half from fifo */
 
-        if (fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }
@@ -385,7 +385,7 @@ void DMA1_Stream6_IRQHandler(void) {
     if(DMA_GetITStatus(DMA1_Stream6, DMA_IT_TCIF6) != RESET) {
         /* fill second half from fifo */
 
-        if (fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
+        if (codec2_fifo_read(dac2_fifo, signed_buf, DAC_BUF_SZ/2) == -1) {
             memset(signed_buf, 0, sizeof(short)*DAC_BUF_SZ/2);
             dac_underflow++;
         }

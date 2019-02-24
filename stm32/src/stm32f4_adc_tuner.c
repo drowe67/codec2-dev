@@ -62,7 +62,7 @@ unsigned short sine[ADC_TUNER_BUF_SZ];
 #endif
 
 void adc_open(int fifo_sz) {
-    adc1_fifo = fifo_create(fifo_sz);
+    adc1_fifo = codec2_fifo_create(fifo_sz);
     assert(adc1_fifo != NULL);
 
     tim2_config();
@@ -74,7 +74,7 @@ void adc_open(int fifo_sz) {
 /* n signed 16 bit samples in buf[] if return != -1 */
 
 int adc1_read(short buf[], int n) {
-    return fifo_read(adc1_fifo, buf, n);
+    return codec2_fifo_read(adc1_fifo, buf, n);
 }
 
 
@@ -250,12 +250,12 @@ void DMA2_Stream0_IRQHandler(void) {
             /* write first half to fifo.  Note we are writing ADC_TUNER_N/2 floats,
                which is equivalent to ADC_TUNER_N shorts.  */
 
-           if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
+           if (codec2_fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
                 adc_overflow1++;
             }
         }
         else // note: we dump signed shorts when tuner off
-            fifo_write(adc1_fifo, (short*)padc_buf, ADC_TUNER_BUF_SZ/2); 
+            codec2_fifo_write(adc1_fifo, (short*)padc_buf, ADC_TUNER_BUF_SZ/2); 
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
@@ -272,12 +272,12 @@ void DMA2_Stream0_IRQHandler(void) {
 
             /* write second half to fifo */
 
-            if (fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
+            if (codec2_fifo_write(adc1_fifo, (short*)dec_buf, ADC_TUNER_N) == -1) {
               adc_overflow1++;
             }
         }
         else
-            fifo_write(adc1_fifo, (short*)&padc_buf[ADC_TUNER_BUF_SZ/2], ADC_TUNER_BUF_SZ/2);
+            codec2_fifo_write(adc1_fifo, (short*)&padc_buf[ADC_TUNER_BUF_SZ/2], ADC_TUNER_BUF_SZ/2);
 
         /* Clear DMA Stream Transfer Complete interrupt pending bit */
 
