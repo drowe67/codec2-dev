@@ -3,60 +3,95 @@
 #include <stdint.h>
 #include <math.h>
 
-#include "codec2.h"
-#include "codec2_internal.h"
-#include "defines.h"
+#include "comp.h"
+#include "codec2_fft.h"
+#include "kiss_fft.h"
 
-static const float expect_w[] = {
-  0.004293, 0.004301, 0.004309, 0.004315,
-  0.004320, 0.004323, 0.004326, 0.004328,
-  0.004328, 0.004328, 0.004326, 0.004323,
-  0.004320, 0.004315, 0.004309, 0.004301};
-
-
-static const float expect_W[] = {
- -0.002176,  0.002195,  0.004429, -0.008645,
- -0.012196,  0.065359,  0.262390,  0.495616, 
-  0.601647,  0.495616,  0.262390,  0.065359, 
- -0.012196, -0.008645,  0.004429,  0.002195};
-
-
-int float_cmp(float a, float b) {
-    if ( fabsf(a - b) < 1e-6f ) return 1;
-    else return 0;
-    }
+#define FFT_ENC  512
+#define M_PITCH_S  0.0400 
 
 int main(int argc, char *argv[]) {
 
-    struct CODEC2 *codec2;
+    int           m_pitch;
+    int           nw;
+    float        *w;
+    COMP          W[FFT_ENC];
+    codec2_fft_cfg  fft_fwd_cfg;
     int i, j;
 
-    ////////
-    codec2 = codec2_create(CODEC2_MODE_700C);
+    m_pitch = floor(8000*M_PITCH_S);
+    nw = 279;
 
-    j = (codec2->c2const.m_pitch / 2) - 8;
-    for (i=0; i<16; i++) {
-        printf("w[%d] = %f", j+i, 
-                (double)codec2->w[j+i]);
-        if (!float_cmp(codec2->w[j+i], expect_w[i])) {
-            printf(" Error, expected %f", (double)expect_w[i]);
+    w = (float*)malloc(m_pitch*sizeof(float));
+
+#ifdef USE_KISS_FFT
+    fft_fwd_cfg  = kiss_fft_alloc(FFT_ENC, 0, NULL, NULL);
+#else
+    fft_fwd_cfg  = malloc(sizeof(codec2_fft_struct));
+    fft_fwd_cfg ->inverse  = 0;
+    fft_fwd_cfg ->instance = &arm_cfft_sR_f32_len512;
+#endif
+
+    COMP  wshift[FFT_ENC];
+
+    float m;
+    m = 0.0;
+    for(i=0; i<m_pitch/2-nw/2; i++)
+      w[i] = 0.0;
+    for(i=m_pitch/2-nw/2,j=0; i<m_pitch/2+nw/2; i++,j++) {
+      w[i] = 0.5 - 0.5*cosf(TWO_PI*j/(nw-1));
+      m += w[i]*w[i];
+    }
+    for(i=m_pitch/2+nw/2; i<m_pitch; i++)
+      w[i] = 0.0;
+
+    m = 1.0/sqrtf(m*FFT_ENC);
+    for(i=0; i<m_pitch; i++) {
+      w[i] *= m;
+    }
+
+
+    for(i=0; i<FFT_ENC; i++) {
+      wshift[i].real = 0.0;
+      wshift[i].imag = 0.0;
+    }
+    for(i=0; i<nw/2; i++)
+      wshift[i].real = w[i+m_pitch/2];
+    for(i=FFT_ENC-nw/2,j=m_pitch/2-nw/2; i<FFT_ENC; i++,j++)
+     wshift[i].real = w[j];
+
+
+    printf("static const COMP wshift[] = {\n    ");
+    j = 0;
+    for (i=0; i<FFT_ENC; i++) {
+        if (j>0) printf(" ");
+        printf("{%f,%f}", (double)wshift[i].real, (double)wshift[i].imag);
+        if (i<(FFT_ENC-1)) printf(",");
+        if (++j >=4) {
+            printf("\n    ");
+            j = 0;
             }
-        printf("\n");
         }
+    printf("};\n\n");
 
-    printf("\n");
+    /////////////////
+    kiss_fft(fft_fwd_cfg, (kiss_fft_cpx*)wshift, (kiss_fft_cpx*)W);
+    /////////////////
 
-    j = (FFT_ENC / 2) - 8;
-    for (i=0; i<16; i++) {
-        printf("W[%d] = %f", j+i, 
-                (double)codec2->W[j+i].real);
-        if (!float_cmp(codec2->W[j+i].real, expect_W[i])) {
-            printf(" Error, expected %f", (double)expect_W[i]);
+
+    printf("static const float W_expect[] = {\n    ");
+    j = 0;
+    for (i=0; i<FFT_ENC; i++) {
+        if (j>0) printf(" ");
+        printf("%f", (double)W[i].real);
+        if (i<(FFT_ENC-1)) printf(",");
+        if (++j >=8) {
+            printf("\n    ");
+            j = 0;
             }
-        printf("\n");
         }
+    printf("};\n\n");
 
-    printf("\nEnd of Test\n");
     fclose(stdout);
     fclose(stderr);
 
