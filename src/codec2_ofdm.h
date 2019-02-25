@@ -45,21 +45,13 @@ extern "C" {
 
 #define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
 #define OFDM_CLIP (32767*0.35)             /* experimentally derived constant to reduce PAPR to about 8dB */
+
+#define UN_SYNC      0  /* Used with the ofdm_set_sync() */
+#define AUTO_SYNC    1
+#define MANUAL_SYNC  2
     
 struct OFDM_CONFIG;
 struct OFDM;
-
-typedef enum {
-    search,
-    trial,
-    synced
-} State;
-
-typedef enum {
-    unsync,             /* force sync state machine to lose sync, and search for new sync */
-    autosync,           /* falls out of sync automatically */
-    manualsync          /* fall out of sync only under operator control */
-} Sync;
 
 /* create and destroy modem states */
 
@@ -91,7 +83,7 @@ void ofdm_set_timing_enable(struct OFDM *, bool);
 void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
 void ofdm_set_off_est_hz(struct OFDM *, float);
-void ofdm_set_sync(struct OFDM *, Sync);
+void ofdm_set_sync(struct OFDM *, int);
 void ofdm_set_tx_bpf(struct OFDM *, bool);
 
 void ofdm_print_info(struct OFDM *);
