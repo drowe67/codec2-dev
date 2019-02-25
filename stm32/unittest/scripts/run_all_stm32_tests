@@ -15,9 +15,9 @@ run_all_ofdm_tests || Fails+=1
 run_all_ldpc_tests || Fails+=1
 
 if (( $Fails == 0 )); then
-    echo -e "\nAll Tests PASSED"
+    echo -e "\nAll STM32 Tests PASSED"
 else
-    echo -e "\n$Fails Tests FAILED!"
+    echo -e "\n$Fails STM32 Tests FAILED!"
 fi
 
 exit $Fails

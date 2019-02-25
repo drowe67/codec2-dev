@@ -17,9 +17,9 @@ run_stm32_tst tst_codec2_dec 1600 --load || Fails+=1
 run_stm32_tst tst_codec2_dec 700C        || Fails+=1
 
 if (( $Fails == 0 )); then
-    echo -e "\nAll Tests PASSED"
+    echo -e "\nAll Codec2 Tests PASSED"
 else
-    echo -e "\n$Fails Tests FAILED!"
+    echo -e "\n$Fails Codec2 Tests FAILED!"
 fi
 
 exit $Fails

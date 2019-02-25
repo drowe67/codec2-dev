@@ -16,9 +16,9 @@ run_stm32_tst tst_ldpc_dec ideal --load || Fails+=1
 run_stm32_tst tst_ldpc_dec noise || Fails+=1
 
 if (( $Fails == 0 )); then
-    echo -e "\nAll Tests PASSED"
+    echo -e "\nAll LDPC Tests PASSED"
 else
-    echo -e "\n$Fails Tests FAILED!"
+    echo -e "\n$Fails LDPC Tests FAILED!"
 fi
 
 exit $Fails

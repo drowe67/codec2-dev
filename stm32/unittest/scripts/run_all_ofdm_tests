@@ -22,9 +22,9 @@ run_stm32_tst tst_ofdm_demod ldpc_AWGN || Fails+=1
 run_stm32_tst tst_ofdm_demod ldpc_fade || Fails+=1
 
 if (( $Fails == 0 )); then
-    echo -e "\nAll Tests PASSED"
+    echo -e "\nAll ODFM Tests PASSED"
 else
-    echo -e "\n$Fails Tests FAILED!"
+    echo -e "\n$Fails ODFM Tests FAILED!"
 fi
 
 exit $Fails
