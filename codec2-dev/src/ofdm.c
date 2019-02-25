@@ -1532,11 +1532,11 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
 \*---------------------------------------------------------------------------*/
 
-void ofdm_set_sync(struct OFDM *ofdm, Sync sync_cmd) {
+void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
     assert(ofdm != NULL);
 
     switch (sync_cmd) {
-        case unsync:
+        case UN_SYNC:
             /*
              * force manual unsync, in case operator detects false sync,
              * which will cause sync state machine to have another go at sync
@@ -1544,12 +1544,12 @@ void ofdm_set_sync(struct OFDM *ofdm, Sync sync_cmd) {
             ofdm->sync_state = search;
             ofdm->sync_state_interleaver = search;
             break;
-        case autosync:
+        case AUTO_SYNC:
             /* normal operating mode - sync state machine decides when to unsync */
 
             ofdm->sync_mode = autosync;
             break;
-        case manualsync:
+        case MANUAL_SYNC:
             /*
              * allow sync state machine to sync, but not to unsync, the
              * operator will decide that manually
