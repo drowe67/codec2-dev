@@ -2,7 +2,7 @@
 # Include local definitions if they exist.
 -include local.mak
 
-all: tst_codec2_fft_init.elf
+all: tst_codec2_fft_init.elf arm_fft_bin_example_f32.elf fft_bin_example_512.elf
 
 ###################################################
 
@@ -95,8 +95,11 @@ $(CMSIS)/DSP_Lib/Source/BasicMathFunctions/arm_scale_f32.c\
 $(CMSIS)/DSP_Lib/Source/BasicMathFunctions/arm_sub_f32.c\
 $(CMSIS)/DSP_Lib/Source/CommonTables/arm_common_tables.c\
 $(CMSIS)/DSP_Lib/Source/CommonTables/arm_const_structs.c\
+$(CMSIS)/DSP_Lib/Source/CommonTables/arm_const_structs.c\
+$(CMSIS)/DSP_Lib/Source/ComplexMathFunctions/arm_cmplx_mag_f32.c\
 $(CMSIS)/DSP_Lib/Source/SupportFunctions/arm_copy_f32.c\
 $(CMSIS)/DSP_Lib/Source/SupportFunctions/arm_fill_f32.c\
+$(CMSIS)/DSP_Lib/Source/StatisticsFunctions/arm_max_f32.c\
 $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_bitreversal.c\
 $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_cfft_f32.c\
 $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_cfft_radix2_f32.c\
@@ -119,9 +122,25 @@ LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 OBJS =  semihosting.o \
 	startup_stm32f4xx.o init.o stm32f4_machdep.o system_stm32f4xx.o
 
-tst_codec2_fft_init.elf: tst_codec2_fft_init.o $(OBJS) libstm32f4.a
+#################
+tst_codec2_fft_init.elf: tst_codec2_fft_init.o  \
+	$(OBJS) libstm32f4.a
 	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
-
+#
 tst_codec2_fft_init.o: tst_codec2_fft_init.c
 
+#################
+arm_fft_bin_example_f32.elf: arm_fft_bin_example_f32.o arm_fft_bin_data.o \
+	$(OBJS) libstm32f4.a
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+#
+arm_fft_bin_example_f32.o: arm_fft_bin_example_f32.c 
+#
+arm_fft_bin_data.o: arm_fft_bin_data.c
 
+#################
+fft_bin_example_512.elf: fft_bin_example_512.o arm_fft_bin_data.o \
+	$(OBJS) libstm32f4.a
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ -o $@ $(LIBPATHS) $(LIBS)
+#
+fft_bin_example_512.o: fft_bin_example_512.c 
