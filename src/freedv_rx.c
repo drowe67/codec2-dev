@@ -44,6 +44,8 @@
 
 #include "codec2.h"
 
+#define NDISCARD 5                /* BER measure optionally discards first few frames after sync */
+
 struct my_callback_state {
     FILE *ftxt;
 };
@@ -93,14 +95,14 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_codecrx, use_testframes, interleave_frames, verbose;
+    int                        use_codecrx, use_testframes, interleave_frames, verbose, discard;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
     
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx] [-v]\n", argv[0]);
+               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -138,7 +140,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0;
+    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0;
 
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -168,6 +170,9 @@ int main(int argc, char *argv[]) {
             }
             if (strcmp(argv[i], "-v") == 0) {
                 verbose = 1;
+            }
+            if (strcmp(argv[i], "--discard") == 0) {
+                discard = 1;
             }
         }
     }
@@ -208,9 +213,10 @@ int main(int argc, char *argv[]) {
         frame++;
         
         if (use_codecrx == 0) {
-            /* Use the freedv_api to do everything: speech decoding, demodulating */
+            /* usual case: use the freedv_api to do everything: speech decoding, demodulating */
             nout = freedv_rx(freedv, speech_out, demod_in);
         } else {
+            /* demo of codecrx mode - separate demodulation and speech decoding */
             int bits_per_codec_frame = codec2_bits_per_frame(c2);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
             int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
@@ -220,7 +226,7 @@ int main(int argc, char *argv[]) {
             /* Use the freedv_api to demodulate only */
             nout = freedv_codecrx(freedv, encoded, demod_in);
 
-            /* deccode the speech ourself (or send it to elsewhere, e.g. network) */
+            /* decode the speech ourself (or send it to elsewhere, e.g. network) */
             if (nout) {
                 unsigned char *enc_frame = encoded;
                 short *speech_frame = speech_out;
@@ -242,6 +248,13 @@ int main(int argc, char *argv[]) {
         freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
+
+        if (discard && (frame == NDISCARD)) {
+            // discard BER results after the first few frames as these
+            // often dominate average results due to partial sync
+            freedv_set_total_bits(freedv, 0); freedv_set_total_bit_errors(freedv, 0);
+            freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
+        }
 
         /* log some side info to the txt file */
 
