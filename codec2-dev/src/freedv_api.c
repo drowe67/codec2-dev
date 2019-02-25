@@ -2394,13 +2394,12 @@ int freedv_set_alt_modem_samp_rate(struct freedv *f, int samp_rate){
 
 \*---------------------------------------------------------------------------*/
 
-void freedv_set_sync(struct freedv *freedv, Sync sync_cmd) {
+void freedv_set_sync(struct freedv *freedv, int sync_cmd) {
     assert (freedv != NULL);
 
     if (freedv->mode == FREEDV_MODE_700D) {
         ofdm_set_sync(freedv->ofdm, sync_cmd);        
     }
-    
 }
 
 struct FSK * freedv_get_fsk(struct freedv *f){

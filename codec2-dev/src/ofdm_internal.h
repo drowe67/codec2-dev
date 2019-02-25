@@ -51,6 +51,18 @@ extern "C"
 #define cmplx(value) (COSF(value) + SINF(value) * I)
 #define cmplxconj(value) (COSF(value) + SINF(value) * -I)
 
+typedef enum {
+    search,
+    trial,
+    synced
+} State;
+
+typedef enum {
+    unsync,             /* force sync state machine to lose sync, and search for new sync */
+    autosync,           /* falls out of sync automatically */
+    manualsync          /* fall out of sync only under operator control */
+} Sync;
+
 /*
  * Contains user configuration for OFDM modem
  */
