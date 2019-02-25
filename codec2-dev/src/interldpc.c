@@ -33,7 +33,7 @@
 #include <math.h>
 
 #include "interldpc.h"
-#include "codec2_ofdm.h"
+#include "ofdm_internal.h"
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "HRA_112_112.h"
