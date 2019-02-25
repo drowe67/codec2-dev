@@ -85,7 +85,7 @@ static inline void codec2_fft(codec2_fft_cfg cfg, codec2_fft_cpx* in, codec2_fft
       kiss_fft(cfg, (kiss_fft_cpx*)in, (kiss_fft_cpx*)out);
 #else
     memcpy(out,in,cfg->instance->fftLen*2*sizeof(float));
-    arm_cfft_f32(cfg->instance,(float*)out,cfg->inverse,0);
+    arm_cfft_f32(cfg->instance,(float*)out,cfg->inverse, 1);
     // TODO: this is not nice, but for now required to keep changes minimal
     // however, since main goal is to reduce the memory usage
     // we should convert to an in place interface

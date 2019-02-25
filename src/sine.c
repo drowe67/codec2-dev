@@ -507,7 +507,7 @@ float est_voicing_mbe(
 
         /* Determine error between estimated harmonic and original */
 
-        offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
+// Redundant!        offset = FFT_ENC/2 - l*Wo*FFT_ENC/TWO_PI + 0.5;
         for(m=al; m<bl; m++) {
 	    Ew.real = Sw[m].real - Am.real*W[offset+m].real;
 	    Ew.imag = Sw[m].imag - Am.imag*W[offset+m].real;
