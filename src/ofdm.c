@@ -98,11 +98,11 @@ static float ofdm_rx_nlower; /* RX lowest carrier freq */
 static float ofdm_doc; /* division of radian circle */
 static float ofdm_timing_mx_thresh; /* See 700D Part 4 Acquisition blog post and ofdm_dev.m routines for how this was set */
 
-static int ofdm_nc; /* NS-1 data symbols between pilots  */
-static int ofdm_ns;
-static int ofdm_bps; /* Bits per symbol */
-static int ofdm_m; /* duration of each symbol in samples */
-static int ofdm_ncp; /* duration of CP in samples */
+static int ofdm_nc; 
+static int ofdm_ns;	/* NS-1 = data symbols between pilots  */
+static int ofdm_bps; 	/* Bits per symbol */
+static int ofdm_m; 	/* duration of each symbol in samples */
+static int ofdm_ncp; 	/* duration of CP in samples */
 
 static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
@@ -871,22 +871,15 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
  */
 int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
     complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
-    int i, j;
 
     /*
      * insert latest input samples into rxbuf
      * so it is primed for when we have to
      * call ofdm_demod()
      */
-    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
-        ofdm->rxbuf[i] = ofdm->rxbuf[j];
-    }
 
-    /* insert latest input samples onto tail of rxbuf */
-
-    for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = rx[j];
-    }
+    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin));
+    memcpy(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)], rx, (ofdm_rxbuf - ofdm->nin));
 
     return(ofdm_sync_search_core(ofdm));
 }
@@ -900,9 +893,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
     /* shift the buffer left based on nin */
 
-    for (i = 0, j = ofdm->nin; i < (ofdm_rxbuf - ofdm->nin); i++, j++) {
-        ofdm->rxbuf[i] = ofdm->rxbuf[j];
-    }
+    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin));
 
     /* insert latest input samples onto tail of rxbuf */
 
