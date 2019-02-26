@@ -625,7 +625,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
     ofdm->timing_mx = timing_mx;
     ofdm->timing_valid = (timing_mx > ofdm_timing_mx_thresh); /* bool but used as external int */
 
-    if (ofdm->verbose > 1) {
+    if (ofdm->verbose > 2) {
         fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", (double) av_level, (double) ofdm->timing_mx, timing_est, ofdm->timing_valid);
     }
 
@@ -689,7 +689,7 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
     ofdm->foff_metric = 0.9f * ofdm->foff_metric + 0.1f * (conjf(p1) * p2 + conjf(p3) * p4);
     foff_est = Fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
 
-    if (ofdm->verbose > 1) {
+    if (ofdm->verbose > 2) {
         fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double) foff_est);
     }
 
@@ -1040,7 +1040,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             woff_est = TAU * ofdm->foff_est_hz / ofdm_fs;
         }
 
-        if (ofdm->verbose > 1) {
+        if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
 
