@@ -878,8 +878,8 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
      * call ofdm_demod()
      */
 
-    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin));
-    memcpy(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)], rx, (ofdm_rxbuf - ofdm->nin));
+    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
+    memcpy(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)], rx, (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
 
     return(ofdm_sync_search_core(ofdm));
 }
@@ -893,7 +893,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
     /* shift the buffer left based on nin */
 
-    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin));
+    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
 
     /* insert latest input samples onto tail of rxbuf */
 
