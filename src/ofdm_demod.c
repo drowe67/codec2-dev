@@ -333,7 +333,13 @@ int main(int argc, char *argv[]) {
 
     int Nbitsperframe = ofdm_bitsperframe;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
+    // TODO: these constants come up a lot so might be bets placed in ofdm_create()
+    int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
+    int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
 
+    if (ldpc_en == true)
+        assert(Npayloadsymsperframe == coded_syms_per_frame);
+    
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
     uint8_t rx_bits_char[Nbitsperframe];
@@ -349,24 +355,24 @@ int main(int argc, char *argv[]) {
     if (verbose == 2)
         fprintf(stderr, "Warning EsNo: %f hard coded\n", EsNo);
 
-    COMP payload_syms[coded_syms_per_frame];
-    COMP codeword_symbols[interleave_frames * coded_syms_per_frame];
+    COMP payload_syms[Npayloadsymsperframe];
+    COMP codeword_symbols[interleave_frames * Npayloadsymsperframe];
 
-    float payload_amps[coded_syms_per_frame];
-    float codeword_amps[interleave_frames * coded_syms_per_frame];
+    float payload_amps[Npayloadsymsperframe];
+    float codeword_amps[interleave_frames * Npayloadsymsperframe];
 
-    for (i = 0; i < (interleave_frames * coded_syms_per_frame); i++) {
+    for (i = 0; i < (interleave_frames * Npayloadsymsperframe); i++) {
         codeword_symbols[i].real = 0.0f;
         codeword_symbols[i].imag = 0.0f;
         codeword_amps[i] = 0.0f;
     }
 
     /* More logging */
-    COMP payload_syms_log[NFRAMES][coded_syms_per_frame];
-    float payload_amps_log[NFRAMES][coded_syms_per_frame];
+    COMP payload_syms_log[NFRAMES][Npayloadsymsperframe];
+    float payload_amps_log[NFRAMES][Npayloadsymsperframe];
 
     for (i = 0; i < NFRAMES; i++) {
-        for (j = 0; j < coded_syms_per_frame; j++) {
+        for (j = 0; j < Npayloadsymsperframe; j++) {
             payload_syms_log[i][j].real = 0.0f;
             payload_syms_log[i][j].imag = 0.0f;
             payload_amps_log[i][j] = 0.0f;
