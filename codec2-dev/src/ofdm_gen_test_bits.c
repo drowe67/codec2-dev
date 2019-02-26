@@ -80,12 +80,6 @@ int main(int argc, char *argv[])
     
     progname = pn;
 
-    /* See if they want help */
-
-    if (argc == 1) {
-        opt_help();
-    }
-
     /* Turn off stream buffering */
 
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
