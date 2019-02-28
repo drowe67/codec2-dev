@@ -541,14 +541,14 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 /* convert time domain into frequency domain */
 
 static void dft(struct OFDM *ofdm, complex float *result, complex float *vector) {
-    int row, col, nlower;
+    int row, col;
 
     for (col = 0; col < (ofdm_nc + 2); col++) {
         result[col] = vector[0];                 // conj(cexp(0j)) == 1
     }
 
-    for (col = 0, nlower = ofdm_rx_nlower; col < (ofdm_nc + 2); col++, nlower++) {
-        float tval = nlower * ofdm_doc;
+    for (col = 0; col < (ofdm_nc + 2); col++) {
+        float tval = (ofdm_rx_nlower + col) * ofdm_doc;
         complex float c = cmplxconj(tval);
         complex float delta = c;
 
