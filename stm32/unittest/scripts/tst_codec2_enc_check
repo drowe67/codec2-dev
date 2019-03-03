@@ -27,14 +27,24 @@ declare -i Fails=0
 
 case "${TEST_OPT}" in
     1600)
-	echo -e "\nMust manually listen to this!"
-	c2dec 1600 stm_out.raw stm_dec.raw
-	aplay -f S16_LE stm_dec.raw
+    	echo -e "\nCompare output binary data"
+        compare_ints -b1 -c ref_enc.raw stm_out.raw
+	error_count=$?
+        if [[ $error_count -le 1 ]]; then 
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
     	;;
     700C)
-	echo -e "\nMust manually listen to this!"
-	c2dec 700C stm_out.raw stm_dec.raw
-	aplay -f S16_LE stm_dec.raw
+    	echo -e "\nCompare output binary data"
+        if compare_ints -b1 ref_enc.raw stm_out.raw; then
+            echo "Passed"
+        else
+            echo "Failed"
+            let Fails=($Fails + 1)
+        fi
     	;;
     esac
 
