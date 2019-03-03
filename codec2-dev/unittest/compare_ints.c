@@ -58,17 +58,21 @@ int get_data(FILE *f, int64_t *dd, int signed_flag, int bytes) {
 
 int main(int argc, char *argv[]) {
 
-    char usage[] = "Usage: %s [-b size_in_bytes] [-s] [-t tolerance] file1 file2\n";
+    char usage[] = "Usage: %s [-b size_in_bytes] [-c] [-s] [-t tolerance] file1 file2\n";
 
     int bytes = 1;
+    int count_errors = 0;
     int signed_flag = 0;
     int tol = 1;
 
     int opt;
-    while ((opt = getopt(argc, argv, "b:st:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:cst:")) != -1) {
         switch (opt) {
             case 'b':
                 bytes = atoi(optarg);
+                break;
+            case 'c':
+                count_errors = 1;
                 break;
             case 's':
                 signed_flag = 1;
@@ -128,13 +132,16 @@ int main(int argc, char *argv[]) {
         exit(1);
         }
 
-    if (errors) {
-        printf("Fail: %d errors\n", errors);
-        printf("      rms error = %f\n", ((double)rms_sum/count));
-        exit(1);
+    if (count_errors) exit(errors);
+    else {
+        if (errors) {
+            printf("Fail: %d errors\n", errors);
+            printf("      rms error = %f\n", ((double)rms_sum/count));
+            exit(1);
+            }
+        else printf("Pass\n");
+        exit(0);
         }
-    else printf("Pass\n");
-    exit(0);
 
     } // main
 
