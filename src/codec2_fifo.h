@@ -38,20 +38,20 @@ extern "C" {
 
 struct FIFO;
 
-struct FIFO *fifo_create(int nshort);
-void fifo_destroy(struct FIFO *fifo);
-int fifo_write(struct FIFO *fifo, short data[], int n);
-int fifo_read(struct FIFO *fifo, short data[], int n);
+struct FIFO *codec2_fifo_create(int nshort);
+void codec2_fifo_destroy(struct FIFO *fifo);
+int codec2_fifo_write(struct FIFO *fifo, short data[], int n);
+int codec2_fifo_read(struct FIFO *fifo, short data[], int n);
 
 /*!
  * Return the number of bytes stored in the FIFO.
  */
-int fifo_used(const struct FIFO * const fifo);
+int codec2_fifo_used(const struct FIFO * const fifo);
 
 /*!
  * Return the space available in the FIFO.
  */
-int fifo_free(const struct FIFO * const fifo);
+int codec2_fifo_free(const struct FIFO * const fifo);
 
 #ifdef __cplusplus
 }

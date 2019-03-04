@@ -34,7 +34,7 @@ int main() {
     int    n_out = 0;
     int    sucess;
 
-    f = fifo_create(FIFO_SZ);
+    f = codec2_fifo_create(FIFO_SZ);
     #ifdef USE_THREADS
     pthread_create(&awriter_thread, NULL, writer_thread, NULL);
     #endif
@@ -47,7 +47,7 @@ int main() {
         #ifdef USE_MUTEX
         pthread_mutex_lock(&mutex);
         #endif
-        sucess = (fifo_read(f, read_buf, READ_SZ) == 0);
+        sucess = (codec2_fifo_read(f, read_buf, READ_SZ) == 0);
         #ifdef USE_MUTEX
         pthread_mutex_unlock(&mutex);
         #endif
@@ -79,7 +79,7 @@ void writer(void) {
     short  write_buf[WRITE_SZ];
     int    i;
 
-    if ((FIFO_SZ - fifo_used(f)) > WRITE_SZ) {
+    if ((FIFO_SZ - codec2_fifo_used(f)) > WRITE_SZ) {
         for(i=0; i<WRITE_SZ; i++) {
             write_buf[i] = n_in++;
             if (n_in == N_MAX)
@@ -88,7 +88,7 @@ void writer(void) {
         #ifdef USE_MUTEX
         pthread_mutex_lock(&mutex);
         #endif
-        fifo_write(f, write_buf, WRITE_SZ);
+        codec2_fifo_write(f, write_buf, WRITE_SZ);
         pthread_mutex_unlock(&mutex);
     }
 }

@@ -36,6 +36,7 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 ###################################################
 
 set(FLOAT_TYPE "hard" CACHE STRING "Floating point: defaults to hard.")
+set(CMAKE_TOOLCHAIN_FILE "../stm32/cmake/STM32_Toolchain.cmake" CACHE STRING "Toolchain defs")
 
 ###################################################
 
@@ -209,7 +210,7 @@ elf2bin(codec2_profile)
 
 set(DAC_UT_SRCS
 src/dac_ut.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/stm32f4_dac.c
 src/debugblinky.c
 src/system_stm32f4xx.c
@@ -223,7 +224,7 @@ elf2bin(dac_ut)
 
 set(FAST_DAC_UT_SRCS
 src/fast_dac_ut.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/iir_duc.c
 src/gdb_stdio.c
 src/stm32f4_dacduc.c
@@ -239,7 +240,7 @@ elf2bin(fast_dac_ut)
 
 set(ADCDAC_UT_SRCS
 src/adcdac_ut.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/stm32f4_dac.c
 src/stm32f4_adc.c
 src/sm1000_leds_switches.c
@@ -256,7 +257,7 @@ elf2bin(adcdac_ut)
 
 set(DAC_PLAY_SRCS
 src/dac_play.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/gdb_stdio.c
 src/stm32f4_dac.c
 src/debugblinky.c
@@ -271,7 +272,7 @@ elf2bin(dac_play)
 
 set(ADC_REC_SRCS
 src/adc_rec.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/gdb_stdio.c
 src/stm32f4_adc.c
 src/debugblinky.c
@@ -285,7 +286,7 @@ elf2bin(adc_rec)
 
 set(ADC_SD_SRCS
 src/adc_sd.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/gdb_stdio.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
@@ -312,7 +313,7 @@ elf2bin(pwm_ut)
 set(POWER_UT_SRCS
 src/power_ut.c
 src/gdb_stdio.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/stm32f4_adc.c
 src/stm32f4_dac.c
 src/debugblinky.c
@@ -360,7 +361,7 @@ elf2bin(usb_vcp_ut)
 
 set(ADC_REC_USB_SRCS
 src/adc_rec_usb.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/stm32f4_adc.c
 src/stm32f4_usb_vcp.c
 src/sm1000_leds_switches.c
@@ -412,7 +413,7 @@ src/morse.c
 src/menu.c
 src/tot.c
 src/sm1000_leds_switches.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/debugblinky.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
@@ -463,7 +464,7 @@ elf2bin(freedv_rx_profile)
 set(FDMDV_DUMP_RT_SRCS
 src/fdmdv_dump_rt.c
 src/sm1000_leds_switches.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/debugblinky.c
 #gdb_stdio.c
 src/system_stm32f4xx.c
@@ -482,7 +483,7 @@ list(APPEND FDMDV_DUMP_RT_SRCS ${CODEC2_SRCS})
 set(TUNER_UT_SRCS
 src/tuner_ut.c
 src/gdb_stdio.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/stm32f4_dac.c
 src/iir_tuner.c
 src/sm1000_leds_switches.c
@@ -506,7 +507,7 @@ elf2bin(tuner_ut)
 set(ADC_SFDR_UT_SRCS
 src/adc_sfdr_ut.c
 src/gdb_stdio.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/iir_tuner.c
 src/sm1000_leds_switches.c
 src/debugblinky.c
@@ -523,7 +524,7 @@ elf2bin(adc_sfdr_ut)
 #set(FM_LODUC_PLAY_SRCS
 #src/fm_loduc_play.c
 #gdb_stdio.c
-#../src/fifo.c
+#../src/codec2_fifo.c
 #../src/fm.c
 #src/debugblinky.c
 #src/system_stm32f4xx.c
@@ -575,7 +576,7 @@ src/new_i2c.c
 src/si53xx.c
 src/stm32f4_dac.c
 src/stm32f4_adc.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -594,7 +595,7 @@ src/new_i2c.c
 src/si53xx.c
 src/stm32f4_dac.c
 src/stm32f4_adc.c
-../src/fifo.c
+../src/codec2_fifo.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
 src/init.c)
@@ -615,7 +616,7 @@ src/si53xx.c
 src/stm32f4_dac.c
 src/stm32f4_usb_vcp.c
 src/stm32f4_adc.c
-../src/fifo.c
+../src/codec2_fifo.c
 ../src/mbest.c
 src/system_stm32f4xx.c
 src/startup_stm32f4xx.s
