@@ -181,7 +181,7 @@ set(CODEC2_SRCS
     codec2.c
     codec2_fft.c
     cohpsk.c
-    fifo.c
+    codec2_fifo.c
     fdmdv.c
     fm.c
     fsk.c

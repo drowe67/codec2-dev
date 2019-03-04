@@ -46,6 +46,8 @@ DSPLIB          = $(PERIPHLIBDIR)/Libraries/CMSIS/DSP_Lib
 CFLAGS		+= -DUSE_STDPERIPH_DRIVER -I$(STM32F4LIB)/inc -I$(STM32F4TEMPLATE)
 CFLAGS		+= -I$(CMSIS)/Include -I$(CMSIS)/Device/ST/STM32F4xx/Include
 CFLAGS		+= -DARM_MATH_CM4
+CFLAGS		+= -DFDV_ARM_MATH
+CFLAGS		+= -DSEMIHOST_USE_STDIO
 
 # Precious files that should be preserved at all cost!
 .PRECIOUS: dl/$(PERIPHLIBZIP)
@@ -376,7 +378,9 @@ CMSIS_OBJS = $(CMSIS_SRCS:.c=.o) $(CMSIS)/DSP_Lib/Source/TransformFunctions/arm_
 
 # Codec 2
 
-CODEC2_SRC=../src
+CODEC2_DIR = ../
+CODEC2_SRC = $(CODEC2_DIR)/src
+CODEC2_BLD = $(CODEC2_DIR)/build_linux
 CODEC2_SRCS=\
 $(CODEC2_SRC)/lpc.c \
 $(CODEC2_SRC)/nlp.c \
@@ -384,10 +388,14 @@ $(CODEC2_SRC)/postfilter.c \
 $(CODEC2_SRC)/sine.c \
 $(CODEC2_SRC)/codec2.c \
 $(CODEC2_SRC)/codec2_fft.c \
+$(CODEC2_SRC)/cohpsk.c \
+$(CODEC2_SRC)/linreg.c \
 $(CODEC2_SRC)/kiss_fft.c \
 $(CODEC2_SRC)/kiss_fftr.c \
 $(CODEC2_SRC)/interp.c \
 $(CODEC2_SRC)/lsp.c \
+$(CODEC2_SRC)/mbest.c \
+$(CODEC2_SRC)/newamp1.c \
 $(CODEC2_SRC)/phase.c \
 $(CODEC2_SRC)/quantise.c \
 $(CODEC2_SRC)/pack.c \
@@ -395,6 +403,8 @@ $(CODEC2_SRC)/codebook.c \
 $(CODEC2_SRC)/codebookd.c \
 $(CODEC2_SRC)/codebookjvm.c \
 $(CODEC2_SRC)/codebookge.c \
+$(CODEC2_SRC)/codebooknewamp1.c \
+$(CODEC2_SRC)/codebooknewamp1_energy.c \
 $(CODEC2_SRC)/dump.c \
 $(CODEC2_SRC)/fdmdv.c \
 $(CODEC2_SRC)/freedv_api.c \
@@ -404,12 +414,30 @@ $(CODEC2_SRC)/golay23.c \
 $(CODEC2_SRC)/fsk.c \
 $(CODEC2_SRC)/fmfsk.c \
 $(CODEC2_SRC)/freedv_vhf_framing.c \
-$(CODEC2_SRC)/freedv_data_channel.c
+$(CODEC2_SRC)/freedv_data_channel.c \
+$(CODEC2_SRC)/ofdm.c \
+$(CODEC2_SRC)/phi0.c \
+$(CODEC2_SRC)/mpdecode_core.c \
+$(CODEC2_SRC)/gp_interleaver.c \
+$(CODEC2_SRC)/interldpc.c \
+$(CODEC2_SRC)/HRA_112_112.c \
 
 CFLAGS += -D__EMBEDDED__
+CFLAGS += -I$(CODEC2_SRC)
+CFLAGS += -I$(CODEC2_BLD)
+
+###################################################
+# Codec2/STM32
+
+CODEC2_STM32_DIR := .
+CODEC2_STM32_SRC = $(CODEC2_STM32_DIR)/src
+CODEC2_STM32_HDR = $(CODEC2_STM32_DIR)/inc
+CFLAGS += -I$(CODEC2_STM32_HDR)
 
 #enable this for dump files to help verify optimisation
 #CFLAGS += -DDUMP
+
+###################################################
 
 CFLAGS += -I../src
 CFLAGS += -I../unittest
@@ -437,13 +465,16 @@ LIBPATHS =
 
 # Libraries to link
 
-LIBS = -lg -lnosys -lm 
+#LIBS = -lg -lnosys -lm 
 #Uncomment for standard arm semihosting
-#LIBS = -lg -lrdimon -lm --specs=rdimon.specs
+LIBS = -lg -lrdimon -lm --specs=rdimon.specs
 
 # startup file
 
-SRCS += src/startup_stm32f4xx.s src/init.c
+SRCS += startup_stm32f4xx.s 
+SRCS += init.c 
+SRCS += stm32f4_machdep.c
+SRCS += $(CODEC2_STM32_SRC)/system_stm32f4xx.c
 
 OBJS = $(SRCS:.c=.o)
 
@@ -513,7 +544,7 @@ fft_test.elf: $(FFT_TEST_SRCS:.c=.o) libstm32f4.a
 
 DAC_UT_SRCS=\
 src/dac_ut.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/stm32f4_dac.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
@@ -525,7 +556,7 @@ dac_ut.elf: $(DAC_UT_SRCS:.c=.o) libstm32f4.a
 
 FAST_DAC_UT_SRCS=\
 src/fast_dac_ut.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/iir_duc.c \
 src/gdb_stdio.c \
 src/stm32f4_dacduc.c \
@@ -539,7 +570,7 @@ fast_dac_ut.elf: $(FAST_DAC_UT_SRCS:.c=.O3.o) libstm32f4.a
 
 ADCDAC_UT_SRCS=\
 src/adcdac_ut.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/stm32f4_dac.c \
 src/stm32f4_adc.c \
 src/sm1000_leds_switches.c \
@@ -553,7 +584,7 @@ adcdac_ut.elf: $(ADCDAC_UT_SRCS:.c=.o) libstm32f4.a
 
 DAC_PLAY_SRCS=\
 src/dac_play.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 gdb_stdio.c \
 src/stm32f4_dac.c \
 src/debugblinky.c \
@@ -566,7 +597,7 @@ dac_play.elf: $(DAC_PLAY_SRCS:.c=.o) libstm32f4.a
 
 ADC_REC_SRCS=\
 src/adc_rec.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 gdb_stdio.c \
 src/stm32f4_adc.c \
 src/debugblinky.c \
@@ -579,7 +610,7 @@ adc_rec.elf: $(ADC_REC_SRCS:.c=.o) libstm32f4.a
 
 ADC_SD_SRCS=\
 src/adc_sd.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 gdb_stdio.c \
 src/stm32f4_adc.c \
 src/stm32f4_dac.c \
@@ -604,7 +635,7 @@ pwm_ut.elf: $(PWM_UT_SRCS:.c=.o) libstm32f4.a
 POWER_UT_SRCS=\
 src/power_ut.c \
 gdb_stdio.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/stm32f4_adc.c \
 src/stm32f4_dac.c \
 src/debugblinky.c \
@@ -648,7 +679,7 @@ usb_vcp_ut.elf: $(USB_VCP_UT:.c=.o) libstm32f4.a
 
 ADC_REC_USB_SRCS=\
 src/adc_rec_usb.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/stm32f4_adc.c \
 src/stm32f4_usb_vcp.c \
 src/sm1000_leds_switches.c \
@@ -696,7 +727,7 @@ src/morse.c \
 src/menu.c \
 src/tot.c \
 src/sm1000_leds_switches.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
@@ -713,7 +744,7 @@ src/stm32f4_adc.o: src/stm32f4_adc.c
 
 sm1000.elf: $(SM1000_SRCS:.c=.O3.o) src/stm32f4_dac.O3.o \
 		src/stm32f4_adc.O3.o libstm32f4.a
-	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS)
+	$(CC) $(CFLAGS) -O3 $^ -o $@ $(LIBPATHS) $(LIBS) -Wl,-Map=sm1000.map
 
 FREEDV_TX_PROFILE_SRCS=\
 src/freedv_tx_profile.c \
@@ -744,7 +775,7 @@ freedv_rx_profile.elf: $(FREEDV_RX_PROFILE_SRCS:.c=.o) libstm32f4.a
 FDMDV_DUMP_RT_SRCS=\
 src/fdmdv_dump_rt.c \
 src/sm1000_leds_switches.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/debugblinky.c \
 gdb_stdio.c \
 src/system_stm32f4xx.c \
@@ -762,7 +793,7 @@ fdmdv_dump_rt.elf: $(FDMDV_DUMP_RT_SRCS:.c=.O3.o) \
 TUNER_UT_SRCS=\
 src/tuner_ut.c \
 gdb_stdio.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/stm32f4_dac.c \
 src/iir_tuner.c \
 src/sm1000_leds_switches.c \
@@ -787,7 +818,7 @@ tuner_ut.elf: $(TUNER_UT_SRCS:.c=.O3.o) \
 ADC_SFDR_UT_SRCS=\
 src/adc_sfdr_ut.c \
 gdb_stdio.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/iir_tuner.c \
 src/sm1000_leds_switches.c \
 src/debugblinky.c \
@@ -803,7 +834,7 @@ adc_sfdr_ut.elf: $(ADC_SFDR_UT_SRCS:.c=.O3.o) src/stm32f4_adc_tuner.o \
 FM_LODUC_PLAY_SRCS=\
 src/fm_loduc_play.c \
 gdb_stdio.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 ../src/fm.c \
 src/debugblinky.c \
 src/system_stm32f4xx.c \
@@ -854,7 +885,7 @@ src/new_i2c.c \
 src/si53xx.c \
 src/stm32f4_dac.c \
 src/stm32f4_adc.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
@@ -874,7 +905,7 @@ src/new_i2c.c \
 src/si53xx.c \
 src/stm32f4_dac.c \
 src/stm32f4_adc.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
@@ -897,7 +928,7 @@ src/si53xx.c \
 src/stm32f4_dac.c \
 src/stm32f4_usb_vcp.c \
 src/stm32f4_adc.c \
-../src/fifo.c \
+../src/codec2_fifo.c \
 src/system_stm32f4xx.c \
 src/startup_stm32f4xx.s \
 src/init.c 
