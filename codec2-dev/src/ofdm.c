@@ -307,6 +307,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     //printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %f\n", ofdm_tx_centre,
     //       ofdm_tx_centre - tval, (ofdm_rx_centre - tval) / ofdm_rs, ofdm_tx_nlower);
 
+    //fprintf(stderr, "  fcentre: %f alower: %f alower/Rs: %f Nlower: %f\n", ofdm_tx_centre,
+    //       ofdm_tx_centre - tval, (ofdm_rx_centre - tval) / ofdm_rs, ofdm_tx_nlower);
+
     for (i = 0; i < ofdm_rxbuf; i++) {
         ofdm->rxbuf[i] = 0.0f;
     }

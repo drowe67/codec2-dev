@@ -85,6 +85,8 @@ void codec2_decode_450(struct CODEC2 *c2, short speech[], const unsigned char * 
 void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
 
+
+
 /*---------------------------------------------------------------------------*\
 
                                 FUNCTIONS
@@ -116,9 +118,9 @@ struct CODEC2 * codec2_create(int mode)
         return NULL;
     }  
 #ifndef CORTEX_M4
-    if ((mode == CODEC2_MODE_450) || 
-        (mode == CODEC2_MODE_450PWB) || 
-	(mode == CODEC2_MODE_WB)   ) {
+    if (( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, mode)) || 
+        ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)) || 
+	( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, mode))   ) {
         return NULL;
     }  
 #endif
@@ -131,7 +133,7 @@ struct CODEC2 * codec2_create(int mode)
 
     /* store constants in a few places for convenience */
     
-    if(mode != CODEC2_MODE_450PWB){
+    if( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode) == 0){
 		c2->c2const = c2const_create(8000, N_S);
 	}else{
 		c2->c2const = c2const_create(16000, N_S);
@@ -194,7 +196,7 @@ struct CODEC2 * codec2_create(int mode)
 	return NULL;
     }
 
-    if (mode == CODEC2_MODE_700B)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, mode))
         c2->gray = 0;             // natural binary better for trellis decoding (hopefully added later)
     else
         c2->gray = 1;
@@ -215,7 +217,7 @@ struct CODEC2 * codec2_create(int mode)
 
     /* newamp1 initialisation */
 
-    if (c2->mode == CODEC2_MODE_700C) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) {
         mel_sample_freqs_kHz(c2->rate_K_sample_freqs_kHz, NEWAMP1_K, ftomel(200.0), ftomel(3700.0) );
         int k;
         for(k=0; k<NEWAMP1_K; k++) {
@@ -230,7 +232,7 @@ struct CODEC2 * codec2_create(int mode)
 #ifndef CORTEX_M4
     /* newamp2 initialisation */
 
-    if (c2->mode == CODEC2_MODE_450) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode)) {
         n2_mel_sample_freqs_kHz(c2->n2_rate_K_sample_freqs_kHz, NEWAMP2_K);
         int k;
         for(k=0; k<NEWAMP2_K; k++) {
@@ -243,7 +245,7 @@ struct CODEC2 * codec2_create(int mode)
     }
     /* newamp2 PWB initialisation */
 
-    if (c2->mode == CODEC2_MODE_450PWB) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode)) {
         n2_mel_sample_freqs_kHz(c2->n2_pwb_rate_K_sample_freqs_kHz, NEWAMP2_16K_K);
         int k;
         for(k=0; k<NEWAMP2_16K_K; k++) {
@@ -257,6 +259,89 @@ struct CODEC2 * codec2_create(int mode)
 #endif
 
     c2->flspEWov = NULL;
+
+    // make sure that one of the two decode function pointers is empty
+    // for the encode function pointer this is not required since we always set it
+    // to a meaningful value
+  
+    c2->decode = NULL;
+    c2->decode_ber = NULL;
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
+    {
+	c2->encode = codec2_encode_3200;
+	c2->decode = codec2_decode_3200;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
+    {
+	c2->encode = codec2_encode_2400;
+	c2->decode = codec2_decode_2400;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
+    {
+	c2->encode = codec2_encode_1600;
+	c2->decode = codec2_decode_1600;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
+    {
+	c2->encode = codec2_encode_1400;
+	c2->decode = codec2_decode_1400;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
+    {
+	c2->encode = codec2_encode_1300;
+	c2->decode_ber = codec2_decode_1300;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
+    {
+	c2->encode = codec2_encode_1200;
+	c2->decode = codec2_decode_1200;
+    }
+
+#ifndef CORTEX_M4
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
+    {
+	c2->encode = codec2_encode_700;
+	c2->decode = codec2_decode_700;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
+    {
+	c2->encode = codec2_encode_700b;
+	c2->decode = codec2_decode_700b;
+    }
+#endif
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
+    {
+	c2->encode = codec2_encode_700c;
+	c2->decode = codec2_decode_700c;
+    }
+#ifndef CORTEX_M4
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
+    {
+	c2->encode = codec2_encode_450;
+	c2->decode = codec2_decode_450;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
+    {
+    	//Encode PWB doesnt make sense
+	c2->encode = codec2_encode_450;
+	c2->decode = codec2_decode_450pwb;
+    }
+
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
+    {
+    	//Encode PWB doesnt make sense
+	c2->encode = codec2_encode_wb;
+	c2->decode = codec2_decode_wb;
+    }
+#endif
     
     return c2;
 }
@@ -279,15 +364,15 @@ void codec2_destroy(struct CODEC2 *c2)
     codec2_fft_free(c2->fft_fwd_cfg);
     codec2_fftr_free(c2->fftr_fwd_cfg);
     codec2_fftr_free(c2->fftr_inv_cfg);
-    if (c2->mode == CODEC2_MODE_700C) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) {
         codec2_fft_free(c2->phase_fft_fwd_cfg);
         codec2_fft_free(c2->phase_fft_inv_cfg);
     }
-    if (c2->mode == CODEC2_MODE_450) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode)) {
         codec2_fft_free(c2->phase_fft_fwd_cfg);
         codec2_fft_free(c2->phase_fft_inv_cfg);
     }
-    if (c2->mode == CODEC2_MODE_450PWB) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode)) {
         codec2_fft_free(c2->phase_fft_fwd_cfg);
         codec2_fft_free(c2->phase_fft_inv_cfg);
     }
@@ -309,31 +394,31 @@ void codec2_destroy(struct CODEC2 *c2)
 \*---------------------------------------------------------------------------*/
 
 int codec2_bits_per_frame(struct CODEC2 *c2) {
-    if (c2->mode == CODEC2_MODE_3200)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
 	return 64;
-    if (c2->mode == CODEC2_MODE_2400)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
 	return 48;
-    if  (c2->mode == CODEC2_MODE_1600)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
 	return 64;
-    if  (c2->mode == CODEC2_MODE_1400)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
 	return 56;
-    if  (c2->mode == CODEC2_MODE_1300)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
 	return 52;
-    if  (c2->mode == CODEC2_MODE_1200)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
 	return 48;
-    if  (c2->mode == CODEC2_MODE_700)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
 	return 28;
-    if  (c2->mode == CODEC2_MODE_700B)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
 	return 28;
-    if  (c2->mode == CODEC2_MODE_700C)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
 	return 28;
-    if  (c2->mode == CODEC2_MODE_450)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
 	return 18;
-    if  (c2->mode == CODEC2_MODE_450PWB)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	return 18;
 
     //TODO: verify this
-    if (c2->mode == CODEC2_MODE_WB)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
 	return 64;
 
     return 0; /* shouldn't get here */   
@@ -351,29 +436,29 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 \*---------------------------------------------------------------------------*/
 
 int codec2_samples_per_frame(struct CODEC2 *c2) {
-    if (c2->mode == CODEC2_MODE_3200)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
 	return 160;
-    if (c2->mode == CODEC2_MODE_2400)
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
 	return 160;
-    if  (c2->mode == CODEC2_MODE_1600)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_1400)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_1300)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_1200)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_700)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_700B)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_700C)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_450)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
 	return 320;
-    if  (c2->mode == CODEC2_MODE_450PWB)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	return 640;
-    if  (c2->mode == CODEC2_MODE_WB)
+    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
 	return 160;
     return 0; /* shouldnt get here */
 }
@@ -381,37 +466,9 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
 {
     assert(c2 != NULL);
-    assert((c2->mode >= CODEC2_MODE_3200) && (c2->mode <= CODEC2_MODE_450PWB));
+    assert(c2->encode != NULL);
 
-    if (c2->mode == CODEC2_MODE_3200)
-	codec2_encode_3200(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_2400)
-	codec2_encode_2400(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_1600)
-	codec2_encode_1600(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_1400)
-	codec2_encode_1400(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_1300)
-	codec2_encode_1300(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_1200)
-	codec2_encode_1200(c2, bits, speech);
-#ifndef CORTEX_M4
-    if (c2->mode == CODEC2_MODE_700)
-	codec2_encode_700(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_700B)
-	codec2_encode_700b(c2, bits, speech);
-#endif
-    if (c2->mode == CODEC2_MODE_700C)
-	codec2_encode_700c(c2, bits, speech);
-#ifndef CORTEX_M4
-    if (c2->mode == CODEC2_MODE_450)
-	codec2_encode_450(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_450PWB)
-    //Encode PWB doesnt make sense
-	codec2_encode_450(c2, bits, speech);
-    if (c2->mode == CODEC2_MODE_WB)
-	codec2_encode_wb(c2, bits, speech);
-#endif
+    c2->encode(c2, bits, speech);
 
 }
 
@@ -423,36 +480,16 @@ void codec2_decode(struct CODEC2 *c2, short speech[], const unsigned char *bits)
 void codec2_decode_ber(struct CODEC2 *c2, short speech[], const unsigned char *bits, float ber_est)
 {
     assert(c2 != NULL);
-    assert((c2->mode >= CODEC2_MODE_3200) && (c2->mode <= CODEC2_MODE_450PWB));
+    assert(c2->decode != NULL || c2->decode_ber != NULL);
 
-    if (c2->mode == CODEC2_MODE_3200)
-	codec2_decode_3200(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_2400)
-	codec2_decode_2400(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_1600)
- 	codec2_decode_1600(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_1400)
- 	codec2_decode_1400(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_1300)
- 	codec2_decode_1300(c2, speech, bits, ber_est);
-    if (c2->mode == CODEC2_MODE_1200)
- 	codec2_decode_1200(c2, speech, bits);
-#ifndef CORTEX_M4
-    if (c2->mode == CODEC2_MODE_700)
- 	codec2_decode_700(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_700B)
- 	codec2_decode_700b(c2, speech, bits);
-#endif
-    if (c2->mode == CODEC2_MODE_700C)
- 	codec2_decode_700c(c2, speech, bits);
-#ifndef CORTEX_M4
-    if (c2->mode == CODEC2_MODE_450)
- 	codec2_decode_450(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_450PWB)
- 	codec2_decode_450pwb(c2, speech, bits);
-    if (c2->mode == CODEC2_MODE_WB)
- 	codec2_decode_wb(c2, speech, bits);
-#endif
+    if (c2->decode != NULL)
+    {
+	c2->decode(c2, speech, bits);
+    }
+    else
+    {
+	c2->decode_ber(c2, speech, bits, ber_est);
+    }
 }
 
 
@@ -2093,17 +2130,17 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
 {
     assert(c2 != NULL);
     assert(
-	   (c2->mode == CODEC2_MODE_3200) ||
-	   (c2->mode == CODEC2_MODE_2400) ||
-	   (c2->mode == CODEC2_MODE_1600) ||
-	   (c2->mode == CODEC2_MODE_1400) ||
-	   (c2->mode == CODEC2_MODE_1300) ||
-	   (c2->mode == CODEC2_MODE_1200) ||
-	   (c2->mode == CODEC2_MODE_700) ||
-	   (c2->mode == CODEC2_MODE_700B) ||
-	   (c2->mode == CODEC2_MODE_700C) ||
-	   (c2->mode == CODEC2_MODE_450) ||
-	   (c2->mode == CODEC2_MODE_450PWB)
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode)) ||
+	   ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	   );
     MODEL model;
     float xq_dec[2] = {};
@@ -2111,50 +2148,50 @@ float codec2_get_energy(struct CODEC2 *c2, const unsigned char *bits)
     float e;
     unsigned int nbit;
 
-    if (c2->mode == CODEC2_MODE_3200) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode)) {
         nbit = 1 + 1 + WO_BITS;
 	e_index = unpack(bits, &nbit, E_BITS);
         e = decode_energy(e_index, E_BITS);
     }
-    if (c2->mode == CODEC2_MODE_2400) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode)) {
         nbit = 1 + 1;
         WoE_index = unpack(bits, &nbit, WO_E_BITS);
         decode_WoE(&c2->c2const, &model, &e, xq_dec, WoE_index);
     }
-    if (c2->mode == CODEC2_MODE_1600) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode)) {
         nbit = 1 + 1 + WO_BITS;
         e_index = unpack(bits, &nbit, E_BITS);
         e = decode_energy(e_index, E_BITS);
     }
-    if (c2->mode == CODEC2_MODE_1400) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode)) {
         nbit = 1 + 1;
         WoE_index = unpack(bits, &nbit, WO_E_BITS);
         decode_WoE(&c2->c2const, &model, &e, xq_dec, WoE_index);
     }
-    if (c2->mode == CODEC2_MODE_1300) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode)) {
         nbit = 1 + 1 + 1 + 1 + WO_BITS;
         e_index = unpack_natural_or_gray(bits, &nbit, E_BITS, c2->gray);
         e = decode_energy(e_index, E_BITS);
     }
-    if (c2->mode == CODEC2_MODE_1200) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode)) {
         nbit = 1 + 1;
         WoE_index = unpack(bits, &nbit, WO_E_BITS);
         decode_WoE(&c2->c2const, &model, &e, xq_dec, WoE_index);
     }
-    if (c2->mode == CODEC2_MODE_700) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode)) {
         nbit = 1 + 5;
         e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
         e = decode_energy(e_index, 3);
     }
-    if (c2->mode == CODEC2_MODE_700B) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode)) {
         nbit = 1 + 5;
         e_index = unpack_natural_or_gray(bits, &nbit, 3, c2->gray);
         e = decode_energy(e_index, 3);
     }
-    if (c2->mode == CODEC2_MODE_700C) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode)) {
         e = codec2_energy_700c(c2, bits);
     }
-    if (c2->mode == CODEC2_MODE_450 || c2->mode == CODEC2_MODE_450PWB) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode) ||  CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode)) {
         e = codec2_energy_450(c2, bits);
     }
     
@@ -2405,7 +2442,7 @@ void synthesise_one_frame(struct CODEC2 *c2, short speech[], MODEL *model, COMP 
 
     //PROFILE_SAMPLE(phase_start);
 
-    if (c2->mode == CODEC2_MODE_700C ||c2->mode == CODEC2_MODE_450 ||c2->mode == CODEC2_MODE_450PWB  ) {
+    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode) || CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode) || CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode)  ) {
         /* newamp1/2, we've already worked out rate L phase */
         COMP *H = Aw;
         phase_synth_zero_order(c2->n_samp, model, &c2->ex_phase, H);       

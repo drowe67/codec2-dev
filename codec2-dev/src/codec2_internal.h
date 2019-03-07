@@ -88,6 +88,11 @@ struct CODEC2 {
 
     /* used to dump features for deep learning experiments */
     FILE *flspEWov;
+
+    /* encode/decode function pointers for the selected mode */
+    void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+    void (*decode)(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+    void (*decode_ber)(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
 };
 
 // test and debug
