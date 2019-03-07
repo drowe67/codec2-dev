@@ -50,6 +50,48 @@
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
 
+
+#ifndef FREEDV_MODE_EN_DEFAULT
+#define FREEDV_MODE_EN_DEFAULT 1
+#endif
+
+// by default we enable all modes
+// disable during compile time with -DFREEDV_MODE_1600_EN=0
+// all butFreeDV 1600
+
+//or the other way round
+// -DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1
+// only FreeDV 1600
+
+#if !defined(FREEDV_MODE_1600_EN)
+        #define FREEDV_MODE_1600_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700_EN)
+        #define FREEDV_MODE_700_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700B_EN)
+        #define FREEDV_MODE_700B_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700C_EN)
+        #define FREEDV_MODE_700C_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_700D_EN)
+        #define FREEDV_MODE_700D_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_2400A_EN)
+        #define FREEDV_MODE_2400A_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_2400B_EN)
+        #define FREEDV_MODE_2400B_EN FREEDV_MODE_EN_DEFAULT
+#endif
+#if !defined(FREEDV_MODE_800XA_EN)
+        #define FREEDV_MODE_800XA_EN FREEDV_MODE_EN_DEFAULT
+#endif
+
+
+
+#define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
+
 /* operator control of 700D state machine */
       
 #define FREEDV_SYNC_UNSYNC 0                 /* force sync state machine to lose sync, and search for new sync */

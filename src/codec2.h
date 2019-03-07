@@ -48,6 +48,57 @@
 #define CODEC2_MODE_450 	10
 #define CODEC2_MODE_450PWB 	11
 
+#ifndef CODEC2_MODE_EN_DEFAULT
+#define CODEC2_MODE_EN_DEFAULT 1
+#endif
+
+// by default we enable all modes
+// disable during compile time with -DCODEC2_MODE_1600_EN=0
+// all but CODEC2 1600 are enabled then
+
+//or the other way round
+// -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1600_EN=1
+// only CODEC2 Mode 1600
+
+#if !defined(CODEC2_MODE_3200_EN)
+        #define CODEC2_MODE_3200_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_2400_EN)
+        #define CODEC2_MODE_2400_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_1600_EN)
+        #define CODEC2_MODE_1600_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_1400_EN)
+        #define CODEC2_MODE_1400_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_1300_EN)
+        #define CODEC2_MODE_1300_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_1200_EN)
+        #define CODEC2_MODE_1200_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_700_EN)
+        #define CODEC2_MODE_700_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_700B_EN)
+        #define CODEC2_MODE_700B_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_700C_EN)
+        #define CODEC2_MODE_700C_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_WB_EN)
+        #define CODEC2_MODE_WB_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_450_EN)
+        #define CODEC2_MODE_450_EN CODEC2_MODE_EN_DEFAULT
+#endif
+#if !defined(CODEC2_MODE_450PWB_EN)
+        #define CODEC2_MODE_450PWB_EN CODEC2_MODE_EN_DEFAULT
+#endif
+
+#define CODEC2_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
+
 struct CODEC2;
 
 struct CODEC2 *  codec2_create(int mode);
