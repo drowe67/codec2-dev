@@ -42,10 +42,11 @@ int main(int argc, char *argv[])
     int           arg, sd, i, frames, codename, testframes, Nframes, data_bits_per_frame;
     double        sdout[NUMBERROWSHCOLS+NUMBERPARITYBITS];
     struct LDPC   ldpc;
-
+    int unused_data_bits;
+    
     if (argc < 2) {
         fprintf(stderr, "\n");
-        fprintf(stderr, "usage: %s InputOneBytePerBit OutputFile [--sd] [--code CodeName] [--testframes Nframes]\n", argv[0]);
+        fprintf(stderr, "usage: %s InputOneBytePerBit OutputFile [--sd] [--code CodeName] [--testframes Nframes] [--unused numUnusedDataBits]\n", argv[0]);
         fprintf(stderr, "\n");
         fprintf(stderr, "usage: %s --listcodes\n\n", argv[0]);
         fprintf(stderr, "  List supported codes (more can be added via using Octave ldpc scripts)\n");
@@ -127,6 +128,11 @@ int main(int argc, char *argv[])
         sd = 1;
     }
 
+    unused_data_bits = 0;
+    if ((arg = opt_exists(argv, argc, "--unused"))) {
+        unused_data_bits = atoi(argv[arg+1]);
+    }
+    
     testframes = Nframes = 0;
 
     if ((arg = (opt_exists(argv, argc, "--testframes")))) {
@@ -136,26 +142,31 @@ int main(int argc, char *argv[])
     }
 
     frames = 0;
+    int written = 0;
     
     while (fread(ibits, sizeof(char), data_bits_per_frame, fin) == data_bits_per_frame) {
         if (testframes) {
             uint16_t r[data_bits_per_frame];
             ofdm_rand(r, data_bits_per_frame);
 
-            for(i=0; i<data_bits_per_frame; i++) {
+            for(i=0; i<data_bits_per_frame-unused_data_bits; i++) {
                 ibits[i] = r[i] > 16384;
             }
+            for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++) {
+                ibits[i] = 1;
+            }
+           
         }
         
         encode(&ldpc, ibits, pbits);  
         
         if (sd) {
             /* map to BPSK symbols */
-            for (i=0; i<data_bits_per_frame; i++)
+            for (i=0; i<data_bits_per_frame-unused_data_bits; i++)
                 sdout[i] = 1.0 - 2.0 * ibits[i];
             for (i=0; i<ldpc.NumberParityBits; i++)
-                sdout[i+data_bits_per_frame] = 1.0 - 2.0 * pbits[i];
-            fwrite(sdout, sizeof(double), data_bits_per_frame+ldpc.NumberParityBits, fout); 
+                sdout[i+data_bits_per_frame-unused_data_bits] = 1.0 - 2.0 * pbits[i];
+            written += fwrite(sdout, sizeof(double), data_bits_per_frame-unused_data_bits+ldpc.NumberParityBits, fout); 
         }
         else {
             fwrite(ibits, sizeof(char), data_bits_per_frame, fout); 
@@ -169,7 +180,8 @@ int main(int argc, char *argv[])
     }
 
  finished:
-    
+
+    fprintf(stderr, "written: %d\n", written);
     fclose(fin);  
     fclose(fout); 
 
