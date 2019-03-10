@@ -68,8 +68,8 @@ void opt_help() {
     fprintf(stderr, "  --verbose           Output variable assigned values to stderr (default off)\n");
     fprintf(stderr, "  --txbpf             Transmit band pass filter boolean (default off)\n");
     fprintf(stderr, "  --text              Include a standard text message boolean (default off)\n");
-    fprintf(stderr, "  --ldpc              Run LDPC decoder boolean. This forces 112, one char/bit output values\n"
-            "                      per frame.  In testframe mode raw and coded errors will be counted\n");
+    fprintf(stderr, "  --ldpc    1 | 2     Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
+                    "                      In testframe mode raw and coded errors will be counted.\n");
     exit(-1);
 }
 
@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
         {"interleave", 'g', OPTPARSE_REQUIRED},
         {"tx_freq", 'h', OPTPARSE_REQUIRED},
         {"rx_freq", 'i', OPTPARSE_REQUIRED},
-        {"ldpc", 'j', OPTPARSE_NONE},
+        {"ldpc", 'j', OPTPARSE_REQUIRED},
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_NONE},
@@ -187,7 +187,12 @@ int main(int argc, char *argv[]) {
                 rx_centre = atof(options.optarg);
                 break;
             case 'j':
-                ldpc_en = 1;
+                ldpc_en = atoi(options.optarg);
+                if ((ldpc_en != 1) && (ldpc_en !=2)) {
+                    fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
+                    fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
+                    exit(1);
+                }
                 break;
             case 'k':
                 txbpf_en = 1;
@@ -262,17 +267,21 @@ int main(int argc, char *argv[]) {
     int coded_bits_per_frame;
 
     if (ldpc_en) {
-        set_up_hra_112_112(&ldpc, ofdm_config);
-
+        if (ldpc_en == 1)
+            set_up_hra_112_112(&ldpc, ofdm_config);
+        else
+            set_up_hra_504_396(&ldpc, ofdm_config);
+           
         data_bits_per_frame = ldpc.data_bits_per_frame;
         coded_bits_per_frame = ldpc.coded_bits_per_frame;
     
         if (verbose) {
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
             fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
+            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
         }
         
-        assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) == ofdm_bitsperframe); /* sanity check */
+        assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe); /* sanity check */
         
         Nbitsperframe = interleave_frames*data_bits_per_frame;
     } else {

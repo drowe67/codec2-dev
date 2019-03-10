@@ -37,6 +37,7 @@
 #include "mpdecode_core.h"
 #include "gp_interleaver.h"
 #include "HRA_112_112.h"
+#include "HRAb_396_504.h"
 
 /* CRC type function, used to compare QPSK vectors when debugging */
 
@@ -60,6 +61,8 @@ void printf_n(COMP v[], int n) {
     }
 }
 
+// TODO: this should be in (n,k) = (224,112) format, fix some time
+
 void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
     ldpc->max_iter = HRA_112_112_MAX_ITER;
     ldpc->dec_type = 0;
@@ -77,6 +80,28 @@ void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
 
     ldpc->data_bits_per_frame = HRA_112_112_CODELENGTH - HRA_112_112_NUMBERPARITYBITS;
     ldpc->coded_bits_per_frame = HRA_112_112_CODELENGTH;
+    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / config->bps;
+}
+
+// Note code #defines below should be in (n,k) = (504,396)
+// TODO : fix this some time
+void set_up_hra_504_396(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
+    ldpc->max_iter = HRAb_396_504_MAX_ITER;
+    ldpc->dec_type = 0;
+    ldpc->q_scale_factor = 1;
+    ldpc->r_scale_factor = 1;
+    ldpc->CodeLength = HRAb_396_504_CODELENGTH;
+    ldpc->NumberParityBits = HRAb_396_504_NUMBERPARITYBITS;
+    ldpc->NumberRowsHcols = HRAb_396_504_NUMBERROWSHCOLS;
+    ldpc->max_row_weight = HRAb_396_504_MAX_ROW_WEIGHT;
+    ldpc->max_col_weight = HRAb_396_504_MAX_COL_WEIGHT;
+    ldpc->H_rows = (uint16_t *) HRAb_396_504_H_rows;
+    ldpc->H_cols = (uint16_t *) HRAb_396_504_H_cols;
+
+    /* provided for convenience and to match Octave vaiable names */
+
+    ldpc->data_bits_per_frame = HRAb_396_504_CODELENGTH - HRAb_396_504_NUMBERPARITYBITS;
+    ldpc->coded_bits_per_frame = HRAb_396_504_CODELENGTH;
     ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / config->bps;
 }
 

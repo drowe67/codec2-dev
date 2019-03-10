@@ -88,8 +88,7 @@ void opt_help() {
     fprintf(stderr, "  --verbose        [1|2]  Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes            Receive test frames and count errors\n");
     fprintf(stderr, "  --llr                   LLR output boolean, one double per bit\n");
-    fprintf(stderr, "  --ldpc                  Run LDPC decoder boolean. This forces 112, one char/bit output values\n");
-    fprintf(stderr, "                          per frame.  In testframe mode raw and coded errors will be counted\n\n");
+    fprintf(stderr, "  --ldpc           [1|2]  Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n\n");
 
     exit(-1);
 }
@@ -125,7 +124,7 @@ int main(int argc, char *argv[]) {
     bool output_specified = false;
     bool log_specified = false;
     bool log_active = false;
-    bool ldpc_en = false;
+    int ldpc_en = 0;
     bool llr_en = false;
 
     float tcp = 0.002f;
@@ -145,7 +144,7 @@ int main(int argc, char *argv[]) {
         {"verbose", 'v', OPTPARSE_REQUIRED},
         {"testframes", 'd', OPTPARSE_NONE},
         {"llr", 'h', OPTPARSE_NONE},
-        {"ldpc", 'i', OPTPARSE_NONE},
+        {"ldpc", 'i', OPTPARSE_REQUIRED},
         {"nc", 'j', OPTPARSE_REQUIRED},
         {"tcp", 'k', OPTPARSE_REQUIRED},
         {"ts", 'l', OPTPARSE_REQUIRED},
@@ -177,8 +176,13 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 interleave_frames = atoi(options.optarg);
-            case 'i': /* fall through */
-                ldpc_en = true;
+            case 'i':
+                ldpc_en = atoi(options.optarg);
+                if ((ldpc_en != 1) && (ldpc_en !=2)) {
+                    fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
+                    fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
+                    exit(1);
+                }
                 llr_en = true;
                 break;
             case 'f':
@@ -302,7 +306,10 @@ int main(int argc, char *argv[]) {
 
     struct LDPC ldpc;
 
-    set_up_hra_112_112(&ldpc, ofdm_config);
+    if (ldpc_en == 1)
+        set_up_hra_112_112(&ldpc, ofdm_config);
+    else
+        set_up_hra_504_396(&ldpc, ofdm_config);
 
     int data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
@@ -327,12 +334,12 @@ int main(int argc, char *argv[]) {
 
     int Nbitsperframe = ofdm_bitsperframe;
     int Nmaxsamperframe = ofdm_get_max_samples_per_frame();
-    // TODO: these constants come up a lot so might be bets placed in ofdm_create()
+    // TODO: these constants come up a lot so might be best placed in ofdm_create()
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
 
-    if (ldpc_en == true)
-        assert(Npayloadsymsperframe == coded_syms_per_frame);
+    if (ldpc_en)
+        assert(Npayloadsymsperframe >= coded_syms_per_frame);
     
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
@@ -405,7 +412,7 @@ int main(int argc, char *argv[]) {
                 /* first few symbols are used for UW and txt bits, find start of (224,112) LDPC codeword
                    and extract QPSK symbols and amplitude estimates */
 
-                assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) == ofdm_bitsperframe);
+                assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe);
 
                 /* now we need to buffer for de-interleaving -------------------------------------*/
 
@@ -433,7 +440,7 @@ int main(int argc, char *argv[]) {
 
                 float llr[coded_bits_per_frame];
 
-                if (ldpc_en == true) {
+                if (ldpc_en) {
                     uint8_t out_char[coded_bits_per_frame];
 
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, codeword_symbols_de, codeword_amps_de, EsNo,
@@ -484,7 +491,7 @@ int main(int argc, char *argv[]) {
 
             /* optional error counting on uncoded data in non-LDPC testframe mode */
 
-            if ((testframes == true) && (ldpc_en == false)) {
+            if ((testframes == true) && (ldpc_en ==0)) {
                 /* build up a test frame consisting of unique word, txt bits, and psuedo-random
                    uncoded payload bits.  The psuedo-random generator is the same as Octave so
                    it can interoperate with ofdm_tx.m/ofdm_rx.m */
@@ -628,12 +635,12 @@ int main(int argc, char *argv[]) {
         if (verbose != 0) {
             fprintf(stderr, "BER......: %5.4f Tbits: %5d Terrs: %5d\n", uncoded_ber, Tbits, Terrs);
 
-            if ((ldpc_en == false) && (frame_count > NDISCARD)) {
+            if ((ldpc_en == 0) && (frame_count > NDISCARD)) {
                 fprintf(stderr, "BER2.....: %5.4f Tbits: %5d Terrs: %5d\n", (float) Terrs2 / Tbits2, Tbits2, Terrs2);
             }
         }
 
-        if (ldpc_en == true) {
+        if (ldpc_en) {
             float coded_ber = (float) Terrs_coded / Tbits_coded;
 
             if (verbose != 0)
