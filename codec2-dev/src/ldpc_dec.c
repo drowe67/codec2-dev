@@ -64,7 +64,9 @@ int main(int argc, char *argv[])
     float      *ainput;
     int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
-    
+
+    int unused_data_bits = 84;
+
     if (argc < 2) {
         fprintf(stderr, "\n");
         fprintf(stderr, "usage: %s --test [--code CodeName]\n\n", argv[0]);
@@ -73,7 +75,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "usage: %s --listcodes\n\n", argv[0]);
         fprintf(stderr, "  List supported codes (more can be added via using Octave ldpc scripts)\n");
         fprintf(stderr, "\n");
-        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName] [--testframes]\n\n", argv[0]);
+        fprintf(stderr, "usage: %s InOneSymbolPerDouble OutOneBitPerByte [--sd] [--half] [--code CodeName] [--testframes]", argv[0]);
+        fprintf(stderr, " [--unused numUnusedDataBits]\n\n");
         fprintf(stderr, "   InOneSymbolPerDouble    Input file of double LLRs, use - for the \n");        
         fprintf(stderr, "                           file names to use stdin/stdout\n");
         fprintf(stderr, "   --code                  Use LDPC code CodeName\n");
@@ -85,6 +88,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "                           converges.  Form of frame sync.\n");
         fprintf(stderr, "   --mute                  Only output frames with < 10%% parity check fails\n");
         fprintf(stderr, "   --testframes            built in test frame modem, requires --testframes at encoder\n");
+        fprintf(stderr, "    --unused               number of unused data bits, which are set to 1's at enc and dec\n");
         fprintf(stderr, "\n");
 
         fprintf(stderr, "Example in testframe mode:\n\n");
@@ -236,13 +240,20 @@ int main(int argc, char *argv[])
         if (opt_exists(argv, argc, "--mute")) {
             mute = 1;
         }
+        unused_data_bits = 0; int arg;
+        if ((arg = opt_exists(argv, argc, "--unused"))) {
+            unused_data_bits = atoi(argv[arg+1]);
+        }
         if (opt_exists(argv, argc, "--testframes")) {
             testframes = 1;
             uint16_t r[data_bits_per_frame];
             ofdm_rand(r, data_bits_per_frame);
 
-            for(i=0; i<data_bits_per_frame; i++) {
+            for(i=0; i<data_bits_per_frame-unused_data_bits; i++) {
                 ibits[i] = r[i] > 16384;
+            }
+            for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++) {
+                ibits[i] = 1;
             }
             encode(&ldpc, ibits, pbits);  
        }
@@ -250,7 +261,7 @@ int main(int argc, char *argv[])
         double *input_double = calloc(CodeLength, sizeof(double));
         float  *input_float  = calloc(CodeLength, sizeof(float));
 
-        nread = CodeLength;
+        nread = CodeLength - unused_data_bits;
         offset = 0;
         if (readhalfframe) {
             nread = CodeLength/2;
@@ -265,7 +276,7 @@ int main(int argc, char *argv[])
             if (sdinput) {
                 if (testframes) {
                     char in_char;
-                    for (i=0; i<data_bits_per_frame; i++) {
+                    for (i=0; i<data_bits_per_frame-unused_data_bits; i++) {
                         in_char = input_double[i] < 0;
                         if (in_char != ibits[i]) {
                             Terrs_raw++;
@@ -273,7 +284,7 @@ int main(int argc, char *argv[])
                         Tbits_raw++;
                     }
                     for (i=0; i<NumberParityBits; i++) {
-                        in_char = input_double[i+data_bits_per_frame] < 0;
+                        in_char = input_double[i+data_bits_per_frame-unused_data_bits] < 0;
                         if (in_char != pbits[i]) {
                             Terrs_raw++;
                         }
@@ -281,7 +292,18 @@ int main(int argc, char *argv[])
                     }
                 }
 
-                sd_to_llr(input_float, input_double, CodeLength);
+                sd_to_llr(input_float, input_double, CodeLength-unused_data_bits);
+
+                /* insert unused data LLRs */
+
+                float llr_tmp[CodeLength];
+                for(i=0; i<data_bits_per_frame-unused_data_bits; i++)
+                    llr_tmp[i] = input_float[i];  // rx data bits
+                for(i=data_bits_per_frame-unused_data_bits; i<data_bits_per_frame; i++)
+                    llr_tmp[i] = -10.0;           // known data bits high likelhood
+                for(i=data_bits_per_frame; i<CodeLength; i++)
+                    llr_tmp[i] = input_float[i-unused_data_bits];  // rx parity bits
+                memcpy(input_float, llr_tmp, sizeof(float)*CodeLength);                
             }
 
             iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
