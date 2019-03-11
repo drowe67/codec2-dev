@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
     struct LDPC ldpc;
     
     int Nbitsperframe;
-    int data_bits_per_frame;
+    int data_bits_per_frame = 0;
     int coded_bits_per_frame;
 
     if (ldpc_en) {
@@ -362,7 +362,7 @@ int main(int argc, char *argv[]) {
                     }
                 }
 
-                uint16_t r[data_bits_per_frame]; /* may produce warning but ignore */
+                uint16_t r[data_bits_per_frame];
 
                 ofdm_rand(r, data_bits_per_frame);
 

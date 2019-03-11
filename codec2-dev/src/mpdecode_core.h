@@ -25,9 +25,16 @@ struct LDPC {
     int NumberRowsHcols;
     int max_row_weight;
     int max_col_weight;
+
+    /* these two are fixed to code params */
+    int ldpc_data_bits_per_frame;
+    int ldpc_coded_bits_per_frame;
+
+    /* these three may vary if we don't use all data bits in code */
     int data_bits_per_frame;
     int coded_bits_per_frame;
     int coded_syms_per_frame;
+
     uint16_t *H_rows;
     uint16_t *H_cols;
 };

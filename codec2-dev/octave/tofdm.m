@@ -32,7 +32,7 @@ else
   printf("OK found CML mex directory so will add those tests...\n");
   cml_support = 1;
 end
-cml_support = 0
+%cml_support = 0
 
 % ---------------------------------------------------------------------
 % Run Octave version 
