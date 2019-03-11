@@ -75,21 +75,23 @@ static const char *statemode[] = {
 void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  Default output file format is one byte per bit hard decision\n\n");
-    fprintf(stderr, "  --in          filename  Name of InputModemRawFile\n");
-    fprintf(stderr, "  --out         filename  Name of OutputOneCharPerBitFile\n");
-    fprintf(stderr, "  --log         filename  Octave log file for testing\n");
-    fprintf(stderr, "  --nc          [17..62]  Number of Carriers (17 default, 62 max)\n");
-    fprintf(stderr, "  --ns           Nframes  Number of Symbol Frames (8 default)\n");
-    fprintf(stderr, "  --tcp            Nsecs  Cyclic Prefix Duration (.002 default)\n");
-    fprintf(stderr, "  --ts             Nsecs  Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --interleave     depth  Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
-    fprintf(stderr, "  --tx_freq         freq  Set modulation TX centre Frequency (1500.0 default)\n");
-    fprintf(stderr, "  --rx_freq         freq  Set modulation RX centre Frequency (1500.0 default)\n");
-    fprintf(stderr, "  --verbose        [1|2]  Verbose output level to stderr (default off)\n");
-    fprintf(stderr, "  --testframes            Receive test frames and count errors\n");
-    fprintf(stderr, "  --llr                   LLR output boolean, one double per bit\n");
-    fprintf(stderr, "  --ldpc           [1|2]  Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n\n");
-
+    fprintf(stderr, "  --in          filename   Name of InputModemRawFile\n");
+    fprintf(stderr, "  --out         filename   Name of OutputOneCharPerBitFile\n");
+    fprintf(stderr, "  --log         filename   Octave log file for testing\n");
+    fprintf(stderr, "  --nc          [17..62]   Number of Carriers (17 default, 62 max)\n");
+    fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
+    fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
+    fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
+    fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
+    fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
+    fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
+    fprintf(stderr, "  --verbose        [1|2]   Verbose output level to stderr (default off)\n");
+    fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
+    fprintf(stderr, "  --llr                    LLR output boolean, one double per bit\n");
+    fprintf(stderr, "  -i --ldpc        [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
+    fprintf(stderr, "  -p --databits    numBits Number of data bits used in LDPC codeword.\n");
+    fprintf(stderr, "\n");
+    
     exit(-1);
 }
 
@@ -132,23 +134,26 @@ int main(int argc, char *argv[]) {
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
 
+    int   data_bits_per_frame = 0;
+    
     struct optparse options;
 
     struct optparse_long longopts[] = {
         {"in", 'a', OPTPARSE_REQUIRED},
         {"out", 'b', OPTPARSE_REQUIRED},
         {"log", 'c', OPTPARSE_REQUIRED},
+        {"testframes", 'd', OPTPARSE_NONE},
         {"interleave", 'e', OPTPARSE_REQUIRED},
         {"tx_freq", 'f', OPTPARSE_REQUIRED},
         {"rx_freq", 'g', OPTPARSE_REQUIRED},
         {"verbose", 'v', OPTPARSE_REQUIRED},
-        {"testframes", 'd', OPTPARSE_NONE},
         {"llr", 'h', OPTPARSE_NONE},
         {"ldpc", 'i', OPTPARSE_REQUIRED},
         {"nc", 'j', OPTPARSE_REQUIRED},
         {"tcp", 'k', OPTPARSE_REQUIRED},
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
+        {"databits", 'p', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -211,6 +216,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'm':
                 ns = atoi(options.optarg);
+                break;
+            case 'p':
+                data_bits_per_frame = atoi(options.optarg);
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -311,9 +319,25 @@ int main(int argc, char *argv[]) {
     else
         set_up_hra_504_396(&ldpc, ofdm_config);
 
-    int data_bits_per_frame = ldpc.data_bits_per_frame;
+    /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
+    if (data_bits_per_frame) {
+        set_data_bits_per_frame(&ldpc, data_bits_per_frame, ofdm_config->bps);
+    }
+    
+    data_bits_per_frame = ldpc.data_bits_per_frame;
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
+ 
+    assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
+    assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
+        
+    if (verbose) {
+        fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
+        fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
+        fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+        fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
+        fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+    }
 
     if (verbose != 0) {
         fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
@@ -457,8 +481,26 @@ int main(int argc, char *argv[]) {
                         for (j = 0; j < interleave_frames; j++) {
                             symbols_to_llrs(llr, &codeword_symbols_de[j * coded_syms_per_frame],
                                     &codeword_amps_de[j * coded_syms_per_frame],
-                                    EsNo, ofdm->mean_amp, coded_syms_per_frame);
-                            iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
+                                    EsNo, ofdm->mean_amp, coded_syms_per_frame);                           
+                            if (ldpc.data_bits_per_frame == ldpc.ldpc_data_bits_per_frame) {
+                                /* all data bits in code word used */
+                               iter[j] = run_ldpc_decoder(&ldpc, out_char, llr, &parityCheckCount[j]);
+                            } else {
+                                /* some unused data bits, set these to known values to strengthen code */
+                                float llr_full_codeword[ldpc.ldpc_coded_bits_per_frame];
+                                int unused_data_bits = ldpc.ldpc_data_bits_per_frame - ldpc.data_bits_per_frame;
+                                
+                                // received data bits
+                                for (i = 0; i < ldpc.data_bits_per_frame; i++)
+                                    llr_full_codeword[i] = llr[i]; 
+                                // known bits ... so really likely
+                                for (i = ldpc.data_bits_per_frame; i < ldpc.ldpc_data_bits_per_frame; i++)
+                                    llr_full_codeword[i] = -100.0;
+                                // parity bits at end
+                                for (i = ldpc.ldpc_data_bits_per_frame; i < ldpc.ldpc_coded_bits_per_frame; i++)
+                                    llr_full_codeword[i] = llr[i-unused_data_bits]; 
+                                iter[j] = run_ldpc_decoder(&ldpc, out_char, llr_full_codeword, &parityCheckCount[j]);
+                            }
 
                             if (testframes == true) {
                                 /* construct payload data bits */
