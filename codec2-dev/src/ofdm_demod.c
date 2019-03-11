@@ -85,7 +85,7 @@ void opt_help() {
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
-    fprintf(stderr, "  --verbose        [1|2]   Verbose output level to stderr (default off)\n");
+    fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
     fprintf(stderr, "  --llr                    LLR output boolean, one double per bit\n");
     fprintf(stderr, "  -i --ldpc        [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
@@ -222,7 +222,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
-                if (verbose < 0 || verbose > 2)
+                if (verbose < 0 || verbose > 3)
                     verbose = 0;
         }
     }
