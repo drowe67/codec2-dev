@@ -83,13 +83,14 @@ void opt_help() {
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
+    fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq         freq   Set modulation RX centre Frequency (1500.0 default)\n");
     fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --testframes             Receive test frames and count errors\n");
     fprintf(stderr, "  --llr                    LLR output boolean, one double per bit\n");
-    fprintf(stderr, "  -i --ldpc        [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
-    fprintf(stderr, "  -p --databits    numBits Number of data bits used in LDPC codeword.\n");
+    fprintf(stderr, "  --ldpc           [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
+    fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
     
     exit(-1);
@@ -97,7 +98,6 @@ void opt_help() {
 
 int main(int argc, char *argv[]) {
     int i, j, opt, val;
-    char *fin_name, *fout_name, *log_name;
 
     char *pn = argv[0] + strlen(argv[0]);
 
@@ -115,26 +115,30 @@ int main(int argc, char *argv[]) {
     FILE *fout = stdout;
     FILE *foct = NULL;
 
+    char *fin_name = NULL;
+    char *fout_name = NULL;
+    char *log_name = NULL;
+
     int logframes = NFRAMES;
     int interleave_frames = 1;
     int nc = 17;
     int ns = 8;
     int verbose = 0;
+    int ldpc_en = 0;
+    int data_bits_per_frame = 0;
 
     bool testframes = false;
     bool input_specified = false;
     bool output_specified = false;
     bool log_specified = false;
     bool log_active = false;
-    int ldpc_en = 0;
+    bool ldpc_check = false;
     bool llr_en = false;
 
     float tcp = 0.002f;
     float ts = 0.018f;
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
-
-    int   data_bits_per_frame = 0;
     
     struct optparse options;
 
@@ -181,13 +185,17 @@ int main(int argc, char *argv[]) {
                 break;
             case 'e':
                 interleave_frames = atoi(options.optarg);
+                ldpc_check = true;
+                llr_en = true;
+                break;
             case 'i':
                 ldpc_en = atoi(options.optarg);
                 if ((ldpc_en != 1) && (ldpc_en !=2)) {
                     fprintf(stderr, "--ldpc 1  (224,112) code used for 700D\n");
                     fprintf(stderr, "--ldpc 2  (504,396) code used for 2020\n");
-                    exit(1);
+                    opt_help();
                 }
+            case 'h': /* fall through */
                 llr_en = true;
                 break;
             case 'f':
@@ -195,9 +203,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'g':
                 rx_centre = atof(options.optarg);
-                break;
-            case 'h':
-                llr_en = true;
                 break;
             case 'j':
                 val = atoi(options.optarg);
@@ -232,6 +237,13 @@ int main(int argc, char *argv[]) {
 
     while ((arg = optparse_arg(&options)))
         fprintf(stderr, "%s\n", arg);
+
+    if (ldpc_check == true) {
+        if ((interleave_frames != 1) && (ldpc_en == 0)) {
+            fprintf(stderr, "You must also specify an ldpc option with interleave\n");
+            exit(-1);
+        }
+    }
 
     if (input_specified == true) {
         if ((fin = fopen(fin_name, "rb")) == NULL) {
