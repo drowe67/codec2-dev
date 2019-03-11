@@ -40,6 +40,7 @@ COMP test_acc(COMP v[], int n);
 void printf_n(COMP v[], int n);
 void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *);
 void set_up_hra_504_396(struct LDPC *ldpc, struct OFDM_CONFIG *c);
+void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame, int bps);
 void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_char[]);
 void qpsk_modulate_frame(COMP tx_symbols[], int codeword[], int n);
 void interleaver_sync_state_machine(struct OFDM *ofdm, struct LDPC *ldpc, struct OFDM_CONFIG *config,

@@ -44,8 +44,10 @@
 
 int b_table[] = {
   112,71,
+  210,131,
   224,139,
   252,157,
+  420,263,
   448,277,
   504,313,
   672,419,
@@ -76,6 +78,7 @@ int choose_interleaver_b(int Nbits)
 
     /* if we get to here it means a Nbits we don't have in our table so choke */
     
+    fprintf(stderr, "Nbits: %d, b not found!\n", Nbits);
     assert(0);
 }
 

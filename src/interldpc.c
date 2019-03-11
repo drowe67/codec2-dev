@@ -79,6 +79,12 @@ void set_up_ldpc_constants(struct LDPC *ldpc, int code_length, int parity_bits, 
     ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / bps;
 }
 
+void set_data_bits_per_frame(struct LDPC *ldpc, int new_data_bits_per_frame, int bps) {
+    ldpc->data_bits_per_frame = new_data_bits_per_frame;
+    ldpc->coded_bits_per_frame = ldpc->data_bits_per_frame + ldpc->NumberParityBits;
+    ldpc->coded_syms_per_frame = ldpc->coded_bits_per_frame / bps;
+}
+    
 // TODO: this should be in (n,k) = (224,112) format, fix some time
 
 void set_up_hra_112_112(struct LDPC *ldpc, struct OFDM_CONFIG *config) {
@@ -133,7 +139,8 @@ void ldpc_encode_frame(struct LDPC *ldpc, int codeword[], unsigned char tx_bits_
         encode(ldpc, tx_bits_char_padded, pbits);
     }
           
-    /* output codeword is concatenation of (used) data bits and parity bits */
+    /* output codeword is concatenation of (used) data bits and parity
+       bits, we don't bother sending unused (known) data bits */
     for (i = 0; i < ldpc->data_bits_per_frame; i++) {
         codeword[i] = tx_bits_char[i];
     }

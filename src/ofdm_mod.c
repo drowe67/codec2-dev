@@ -55,21 +55,23 @@ static const char *progname;
 
 void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
-    fprintf(stderr, "  --in      filename  Name of InputOneCharPerBitFile\n");
-    fprintf(stderr, "  --out     filename  Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --nc      [17..62]  Number of Carriers (17 default, 62 max)\n");
-    fprintf(stderr, "  --ns       Nframes  Number of Symbol Frames (8 default)\n");
-    fprintf(stderr, "  --tcp        Nsecs  Cyclic Prefix Duration (.002 default)\n");
-    fprintf(stderr, "  --ts         Nsecs  Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --testframes Nsecs  Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
-    fprintf(stderr, "  --interleave depth  Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
-    fprintf(stderr, "  --tx_freq    freq   Set an optional modulation TX centre frequency (1500.0 default)\n");
-    fprintf(stderr, "  --rx_freq    freq   Set an optional modulation RX centre frequency (1500.0 default)\n\n");
-    fprintf(stderr, "  --verbose           Output variable assigned values to stderr (default off)\n");
-    fprintf(stderr, "  --txbpf             Transmit band pass filter boolean (default off)\n");
-    fprintf(stderr, "  --text              Include a standard text message boolean (default off)\n");
-    fprintf(stderr, "  --ldpc    1 | 2     Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
-                    "                      In testframe mode raw and coded errors will be counted.\n");
+    fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
+    fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
+    fprintf(stderr, "  --nc      [17..62]    Number of Carriers (17 default, 62 max)\n");
+    fprintf(stderr, "  --ns       Nframes    Number of Symbol Frames (8 default)\n");
+    fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
+    fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
+    fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
+    fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
+    fprintf(stderr, "  --tx_freq    freq     Set an optional modulation TX centre frequency (1500.0 default)\n");
+    fprintf(stderr, "  --rx_freq    freq     Set an optional modulation RX centre frequency (1500.0 default)\n\n");
+    fprintf(stderr, "  --verbose             Output variable assigned values to stderr (default off)\n");
+    fprintf(stderr, "  --txbpf               Transmit band pass filter boolean (default off)\n");
+    fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
+    fprintf(stderr, "  -i --ldpc    1 | 2    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
+                    "                        In testframe mode raw and coded errors will be counted.\n");
+    fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
+    fprintf(stderr, "\n");
     exit(-1);
 }
 
@@ -121,6 +123,7 @@ int main(int argc, char *argv[]) {
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
 
+    int   data_bits_per_frame = 0;
     struct optparse options;
 
     struct optparse_long longopts[] = {
@@ -138,6 +141,7 @@ int main(int argc, char *argv[]) {
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_NONE},
+        {"databits", 'p', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -199,6 +203,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'l':
                 use_text = 1;
+                break;
+            case 'p':
+                data_bits_per_frame = atoi(options.optarg);
                 break;
             case 'v':
                 verbose = 1;
@@ -263,7 +270,6 @@ int main(int argc, char *argv[]) {
     struct LDPC ldpc;
     
     int Nbitsperframe;
-    int data_bits_per_frame = 0;
     int coded_bits_per_frame;
 
     if (ldpc_en) {
@@ -271,11 +277,21 @@ int main(int argc, char *argv[]) {
             set_up_hra_112_112(&ldpc, ofdm_config);
         else
             set_up_hra_504_396(&ldpc, ofdm_config);
-           
+
+        /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
+
+        if (data_bits_per_frame)
+            set_data_bits_per_frame(&ldpc, data_bits_per_frame, ofdm_config->bps);
+        
         data_bits_per_frame = ldpc.data_bits_per_frame;
         coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    
+ 
+        assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
+        assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
+        
         if (verbose) {
+            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
+            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
             fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
             fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
