@@ -65,7 +65,7 @@ void opt_help() {
     fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "  --tx_freq    freq     Set an optional modulation TX centre frequency (1500.0 default)\n");
     fprintf(stderr, "  --rx_freq    freq     Set an optional modulation RX centre frequency (1500.0 default)\n\n");
-    fprintf(stderr, "  --verbose             Output variable assigned values to stderr (default off)\n");
+    fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --txbpf               Transmit band pass filter boolean (default off)\n");
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
     fprintf(stderr, "  -i --ldpc    1 | 2    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
         {"ldpc", 'j', OPTPARSE_REQUIRED},
         {"txbpf", 'k', OPTPARSE_NONE},
         {"text", 'l', OPTPARSE_NONE},
-        {"verbose", 'v', OPTPARSE_NONE},
+        {"verbose", 'v', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
@@ -208,7 +208,9 @@ int main(int argc, char *argv[]) {
                 data_bits_per_frame = atoi(options.optarg);
                 break;
             case 'v':
-                verbose = 1;
+                verbose = atoi(options.optarg);
+                if (verbose < 0 || verbose > 3)
+                    verbose = 0;
         }
     }
 
@@ -295,8 +297,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
             fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
             fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+            fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         }
-        
+
         assert((ofdm_nuwbits + ofdm_ntxtbits + coded_bits_per_frame) <= ofdm_bitsperframe); /* sanity check */
         
         Nbitsperframe = interleave_frames*data_bits_per_frame;
@@ -308,6 +311,7 @@ int main(int argc, char *argv[]) {
     int Nsamperframe = ofdm_get_samples_per_frame();
 
     if (verbose) {
+        ofdm_set_verbose(ofdm, verbose);
         fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n",
                 Nsamperframe, interleave_frames, Nbitsperframe);
     }
@@ -338,6 +342,10 @@ int main(int argc, char *argv[]) {
     short tx_varicode_bits[VARICODE_MAX_BITS];
     int nvaricode_bits = 0;
     int varicode_bit_index = 0;
+
+    if (verbose) {
+	ofdm_print_info(ofdm);
+    }
 
     /* main loop ----------------------------------------------------------------*/
 
@@ -432,8 +440,22 @@ int main(int argc, char *argv[]) {
                 tx_bits[i] = tx_bits_char[i];
             }
 
+	    if (verbose >=3) {
+                fprintf(stderr, "\ntx_bits:\n");
+                for (i = 0; i < Nbitsperframe; i++) {
+                    fprintf(stderr, "  %3d %8d\n", i, tx_bits[i]);
+                }
+            }
+
             COMP tx_sams[Nsamperframe];
             ofdm_mod(ofdm, tx_sams, tx_bits);
+
+	    if (verbose >=3) {
+                fprintf(stderr, "\ntx_sams:\n");
+                for (i = 0; i < Nsamperframe; i++) {
+                    fprintf(stderr, "  %3d % f\n", i, (double)tx_sams[i].real);
+                }
+            }
 
             /* scale and save to disk as shorts */
 
