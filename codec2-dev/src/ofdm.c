@@ -300,10 +300,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* carrier tables for up and down conversion */
 
     ofdm_doc = (TAU / (ofdm_fs / ofdm_rs));
-    tval = ofdm_rs * ((float) ofdm_nc / 2);
-    ofdm_tx_nlower = roundf((ofdm_tx_centre - tval) / ofdm_rs);
-    ofdm_rx_nlower = roundf((ofdm_rx_centre - tval) / ofdm_rs);
-    
+    tval = ((float) ofdm_nc / 2);
+    ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval);
+    ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval);
+
     //printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %f\n", ofdm_tx_centre,
     //       ofdm_tx_centre - tval, (ofdm_rx_centre - tval) / ofdm_rs, ofdm_tx_nlower);
 
@@ -1736,6 +1736,32 @@ void ofdm_print_info(struct OFDM *ofdm) {
         "autosync",
         "manualsync"
     };
+
+
+    fprintf(stderr, "ofdm_tx_centre = %g\n", (double)ofdm_tx_centre);
+    fprintf(stderr, "ofdm_rx_centre = %g\n", (double)ofdm_rx_centre);
+    fprintf(stderr, "ofdm_fs = %g\n", (double)ofdm_fs);
+    fprintf(stderr, "ofdm_ts = %g\n", (double)ofdm_ts);
+    fprintf(stderr, "ofdm_rs = %g\n", (double)ofdm_rs);
+    fprintf(stderr, "ofdm_tcp = %g\n", (double)ofdm_tcp);
+    fprintf(stderr, "ofdm_inv_m = %g\n", (double)ofdm_inv_m);
+    fprintf(stderr, "ofdm_tx_nlower = %g\n", (double)ofdm_tx_nlower);
+    fprintf(stderr, "ofdm_rx_nlower = %g\n", (double)ofdm_rx_nlower);
+    fprintf(stderr, "ofdm_doc = %g\n", (double)ofdm_doc);
+    fprintf(stderr, "ofdm_timing_mx_thresh = %g\n", (double)ofdm_timing_mx_thresh);
+    fprintf(stderr, "ofdm_nc = %d\n", ofdm_nc);
+    fprintf(stderr, "ofdm_ns = %d\n", ofdm_ns);
+    fprintf(stderr, "ofdm_bps = %d\n", ofdm_bps);
+    fprintf(stderr, "ofdm_m = %d\n", ofdm_m);
+    fprintf(stderr, "ofdm_ncp = %d\n", ofdm_ncp);
+    fprintf(stderr, "ofdm_ftwindowwidth = %d\n", ofdm_ftwindowwidth);
+    fprintf(stderr, "ofdm_bitsperframe = %d\n", ofdm_bitsperframe);
+    fprintf(stderr, "ofdm_rowsperframe = %d\n", ofdm_rowsperframe);
+    fprintf(stderr, "ofdm_samplesperframe = %d\n", ofdm_samplesperframe);
+    fprintf(stderr, "ofdm_max_samplesperframe = %d\n", ofdm_max_samplesperframe);
+    fprintf(stderr, "ofdm_rxbuf = %d\n", ofdm_rxbuf);
+    fprintf(stderr, "ofdm_ntxtbits = %d\n", ofdm_ntxtbits);
+    fprintf(stderr, "ofdm_nuwbits = %d\n", ofdm_nuwbits);
 
     fprintf(stderr, "ofdm->foff_est_gain = %g\n", (double)ofdm->foff_est_gain);
     fprintf(stderr, "ofdm->foff_est_hz = %g\n", (double)ofdm->foff_est_hz);
