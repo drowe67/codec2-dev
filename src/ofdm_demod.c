@@ -326,31 +326,36 @@ int main(int argc, char *argv[]) {
 
     struct LDPC ldpc;
 
-    if (ldpc_en == 1)
-        set_up_hra_112_112(&ldpc, ofdm_config);
-    else
-        set_up_hra_504_396(&ldpc, ofdm_config);
+    int coded_bits_per_frame = 0;
+    int coded_syms_per_frame = 0;
+    if (ldpc_en) {
+        if (ldpc_en == 1)
+            set_up_hra_112_112(&ldpc, ofdm_config);
+        else
+            set_up_hra_504_396(&ldpc, ofdm_config);
 
-    /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
-    if (data_bits_per_frame) {
-        set_data_bits_per_frame(&ldpc, data_bits_per_frame, ofdm_config->bps);
+        /* here is where we can change data bits per frame to a number smaller than LDPC code input data bits_per_frame */
+        if (data_bits_per_frame) {
+            set_data_bits_per_frame(&ldpc, data_bits_per_frame, ofdm_config->bps);
+        }
+    
+        data_bits_per_frame = ldpc.data_bits_per_frame;
+        coded_bits_per_frame = ldpc.coded_bits_per_frame;
+        coded_syms_per_frame = ldpc.coded_syms_per_frame;
+ 
+        assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
+        assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
+        
+        if (verbose) {
+            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
+            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
+            fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+            fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
+            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+        }
+
     }
     
-    data_bits_per_frame = ldpc.data_bits_per_frame;
-    int coded_bits_per_frame = ldpc.coded_bits_per_frame;
-    int coded_syms_per_frame = ldpc.coded_syms_per_frame;
- 
-    assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
-    assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
-        
-    if (verbose) {
-        fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
-        fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
-        fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
-        fprintf(stderr, "coded_bits_per_frame  = %d\n", coded_bits_per_frame);
-        fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
-    }
-
     if (verbose != 0) {
         fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         ofdm_set_verbose(ofdm, verbose);
@@ -374,9 +379,8 @@ int main(int argc, char *argv[]) {
     int Npayloadbitsperframe = ofdm_bitsperframe - ofdm_nuwbits - ofdm_ntxtbits;
     int Npayloadsymsperframe = Npayloadbitsperframe/ofdm_config->bps;
 
-    if (ldpc_en)
-        assert(Npayloadsymsperframe >= coded_syms_per_frame);
-    
+    if (ldpc_en) assert(Npayloadsymsperframe >= coded_syms_per_frame);
+
     short rx_scaled[Nmaxsamperframe];
     int rx_bits[Nbitsperframe];
     uint8_t rx_bits_char[Nbitsperframe];
