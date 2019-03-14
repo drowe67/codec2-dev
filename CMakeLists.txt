@@ -278,7 +278,13 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-    add_test(NAME test_OFDM_modem_AWGN_BER
+    add_test(NAME test_OFDM_modem_octave_port_Nc_31
+             COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
+             PASS_REGULAR_EXPRESSION "fails: 0")
+
+   add_test(NAME test_OFDM_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
 
