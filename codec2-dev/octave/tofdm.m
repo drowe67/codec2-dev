@@ -32,15 +32,23 @@ else
   printf("OK found CML mex directory so will add those tests...\n");
   cml_support = 1;
 end
-%cml_support = 0
 
 % ---------------------------------------------------------------------
 % Run Octave version 
 % ---------------------------------------------------------------------
 
 Ts = 0.018; Tcp = 0.002; Rs = 1/Ts; bps = 2;
-Nc = 17;
-printf("Nc = %d\n", Nc);
+
+% useful to test the modem at other Nc's, but if Nc != 17 we aren't set up for
+% LDPC testing so disable
+if getenv("NC")
+  Nc = str2num(getenv("NC"));
+  cml_support = 0;
+else
+  Nc = 17;
+end
+printf("Nc = %d LDPC testing: %d\n", Nc, cml_support);
+
 Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
