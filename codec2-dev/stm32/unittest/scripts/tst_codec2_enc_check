@@ -30,7 +30,7 @@ case "${TEST_OPT}" in
     	echo -e "\nCompare output binary data"
         compare_ints -b1 -c ref_enc.raw stm_out.raw
 	error_count=$?
-        if [[ $error_count -le 1 ]]; then 
+        if [[ $error_count -le 2 ]]; then 
             echo "Passed"
         else
             echo "Failed"
