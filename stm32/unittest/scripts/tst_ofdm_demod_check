@@ -35,38 +35,50 @@ Nbitsperframe = 238
 ##############################################################################
 
 def read_octave_text(f):
+    if (args.verbose): print('read_octave_text()')
     data = {}
     for line in f:
         if (line[0:8] == "# name: "):
           var = line.split()[2]
+          if (args.verbose): print('  var "{}"'.format(var))
           line = next(f)
           if (line.startswith("# type: matrix")):
             line = next(f)
             rows = int(line.split()[2])
             line = next(f)
             cols = int(line.split()[2])
-            data[var] = np.empty((rows, cols), np.float32)
-            # Read rows one at a time
-            for row in range(rows):
-              line = next(f)
-              data[var][row] = np.fromstring(line, np.float32, cols, " ")
+            if (cols > 0):
+              data[var] = np.empty((rows, cols), np.float32)
+              # Read rows one at a time
+              for row in range(rows):
+                try:
+                  line = next(f)
+                  data[var][row] = np.fromstring(line, np.float32, cols, " ")
+                except:
+                  print("Error reading row {} of var {}".format(row, var))
+                  raise
 
           elif (line.startswith("# type: complex matrix")):
             line = next(f)
             rows = int(line.split()[2])
             line = next(f)
             cols = int(line.split()[2])
-            data[var] = np.empty((rows, cols), np.complex64)
-            # Read rows one at a time
-            for row in range(rows):
-              line = next(f)
-              # " (r,i) (r,i) ..."
-              col = 0
-              for tpl in line.split():
-                 real, imag = tpl.strip("(,)").split(",")
-                 data[var][row][col] = float(real) + (1j * float(imag))
-                 col += 1
-        # end for
+            if (cols > 0):
+              data[var] = np.empty((rows, cols), np.complex64)
+              # Read rows one at a time
+              for row in range(rows):
+                try:
+                  line = next(f)
+                  # " (r,i) (r,i) ..."
+                  col = 0
+                  for tpl in line.split():
+                    real, imag = tpl.strip("(,)").split(",")
+                    data[var][row][col] = float(real) + (1j * float(imag))
+                    col += 1
+                except:
+                  print("Error reading row {} of var {}".format(row, var))
+                  raise
+        # end for line in f
     return(data)
 
 
@@ -144,6 +156,7 @@ def write_syms_as_octave(syms, amps):
 
 #### Options
 argparser = argparse.ArgumentParser()
+argparser.add_argument("-v", "--verbose", action="store_true")
 argparser.add_argument("test", action="store")
 argparser.add_argument("test_opt", action="store",
                         choices=["quick", "ideal", "AWGN", "fade", "profile",
@@ -163,31 +176,34 @@ tolerance_ber = 0.001
 tolerance_tbits = 0
 tolerance_terrs = 1
 tolerance_output_differences = 0
-tolerance_syms = 0.001
-tolerance_amps = 0.001
+tolerance_syms = 0.01
+tolerance_amps = 0.01
 # Per test settings
 if (args.test_opt == "quick"):
     pass
 elif (args.test_opt == "ideal"):
     pass
 elif (args.test_opt == "AWGN"):
+    tolerance_terrs = 2
     tolerance_output_differences = 2
-    tolerance_syms = 0.005
 elif (args.test_opt == "fade"):
-    tolerance_output_differences = 2
+    tolerance_output_differences = 5
     pass
 elif (args.test_opt == "profile"):
     tolerance_output_differences = 1
-    tolerance_syms = 0.005
     pass
 elif (args.test_opt == "ldpc"):
     pass
 elif (args.test_opt == "ldpc_AWGN"):
-    tolerance_tbits = 2
     tolerance_terrs = 3
-    tolerance_output_differences = 15
+    tolerance_output_differences = 45
+    tolerance_syms = 0.025
+    tolerance_amps = 0.032
 elif (args.test_opt == "ldpc_fade"):
-    tolerance_output_differences = 1
+    tolerance_terrs = 3
+    tolerance_output_differences = 9
+    tolerance_syms = 0.010
+    tolerance_amps = 0.015
     pass
 else:
     print("Error: Test {} not recognized".format(args.test_opt))
@@ -349,25 +365,29 @@ if (config_log_payload_syms):
     row_sums = ref_syms.sum(axis=1) + tgt_syms.sum(axis=1)
     nonzeros = row_sums.nonzero()
     last_nonzero = nonzeros[0][-1]
-    ref_syms = ref_syms[:last_nonzero+1]    # stop index is 1 past the last!!
-    ref_amps = ref_amps[:last_nonzero+1]
-    tgt_syms = tgt_syms[:last_nonzero+1]
-    tgt_amps = tgt_amps[:last_nonzero+1]
+    # stop index is 1 past the last!!
+    # and use the Magnitude of the complex values
+    ref_syms = np.abs(ref_syms[:last_nonzero+1])
+    ref_amps = np.abs(ref_amps[:last_nonzero+1])
+    tgt_syms = np.abs(tgt_syms[:last_nonzero+1])
+    tgt_amps = np.abs(tgt_amps[:last_nonzero+1])
 
-    # Print some info
-    print("comparing {} rows of {} cols of syms and amps".format(
-                ref_syms.shape[0], ref_syms.shape[1]))
-
-    # Differences
-    diffs_syms = np.abs(ref_syms - tgt_syms)    # This is the mag of complex
+    # Differences - Syms
+    #diffs_syms = np.abs(ref_syms - tgt_syms)    # This is the mag of complex
+    diffs_syms = np.abs(np.divide((ref_syms - tgt_syms), ref_syms, 
+                                  where=(ref_syms!=0)))
     print("Minimum syms difference = {:.6f}".format(np.amin(diffs_syms)))
     print("Maximum syms difference = {:.6f}".format(np.amax(diffs_syms)))
     print("Average syms difference = {:.6f}".format(np.average(diffs_syms)))
-    diffs_amps = np.abs(ref_amps - tgt_amps)
-    print("Minimum amps difference = {:.6f}".format(np.amin(diffs_amps)))
-    print("Maximum amps difference = {:.6f}".format(np.amax(diffs_amps)))
-    print("Average amps difference = {:.6f}".format(np.average(diffs_amps)))
-
+    if (args.verbose):  # Print top 10 differences
+        diffs_syms_sorted_indexes = (diffs_syms).argsort(axis=None)[::-1]
+        print(" Top 10 differences")
+        for i in range(10):
+          j = diffs_syms_sorted_indexes[i]
+          print("  #{} @{}: {} <?> {} = {:.6f}".format(
+            i, j, 
+            ref_syms.flatten()[j], tgt_syms.flatten()[j], diffs_syms.flatten()[j])
+            )
     # Errors are differences > tolerance_syms
     errors_syms = diffs_syms - tolerance_syms
     errors_syms[errors_syms < 0.0] = 0.0
@@ -377,6 +397,23 @@ if (config_log_payload_syms):
     print("")
     print("{} symbol errors on {} rows".format(num_errors_syms, num_error_rows_syms))
 
+    # Differences - Amps
+    diffs_amps = np.abs(np.divide((ref_amps - tgt_amps), ref_amps, 
+                                  where=(ref_amps!=0)))
+    print("Minimum amps difference = {:.6f}".format(np.amin(diffs_amps)))
+    print("Maximum amps difference = {:.6f}".format(np.amax(diffs_amps)))
+    print("Average amps difference = {:.6f}".format(np.average(diffs_amps)))
+    if (args.verbose):  # Print top 10 differences
+        diffs_amps_sorted_indexes = (diffs_amps).argsort(axis=None)[::-1]
+        print(" Top 10 differences")
+        for i in range(10):
+          j = diffs_amps_sorted_indexes[i]
+          print("  #{} @{}: {} <?> {} = {:.6f}".format(
+            i, j, 
+            ref_amps.flatten()[j], tgt_amps.flatten()[j], diffs_amps.flatten()[j])
+            )
+
+    # Errors are differences > tolerance_syms
     errors_amps = diffs_amps - tolerance_amps
     errors_amps[errors_amps < 0.0] = 0.0
     num_errors_amps = np.count_nonzero(errors_amps)

@@ -741,5 +741,5 @@ tst_codec2_fft_init.elf: $(TST_CODEC2_FFT_INIT_SRCS:.c=.o) libstm32f4.a
 clean:
 	rm -f *.elf *.bin
 	rm -f libstm32f4.a
-	rm -f $(CMSIS_OBJS) $(STM32F4LIB_OBJS) $(CODEC2_SRC)/*.profile.o
-	find . ../src -type f -name '*.o' | xargs rm -f
+	rm -f $(CMSIS_OBJS) $(STM32F4LIB_OBJS) $(CODEC2_SRC)/*.o
+	find . -type f -name '*.o' | xargs rm -f
