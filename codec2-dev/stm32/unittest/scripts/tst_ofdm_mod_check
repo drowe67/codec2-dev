@@ -10,14 +10,11 @@ SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 # Setup common variables
 source $SCRIPTS/run_tests_common.sh
 
-# Prepend the common test name to the extension from the command line
-FULL_TEST_NAME="tst_ofdm_mod_${TEST}"
-
 # RUN_DIR - Directory where test will be run
 RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
 
 # Call common setup function to make the directory
-setup_common "${FULL_TEST_NAME}"
+setup_common "${RUN_DIR}"
 
 # Change to test directory
 cd "${RUN_DIR}"
@@ -31,7 +28,7 @@ declare -i Fails=0
 case "${TEST_OPT}" in
 
     plain) LDPC="";;
-    ldpc) LDPC="--ldpc";;
+    ldpc) LDPC="--ldpc 1";;
     esac
 
 echo -e "\nReference check"

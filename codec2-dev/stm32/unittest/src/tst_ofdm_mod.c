@@ -82,13 +82,13 @@ int main(int argc, char *argv[]) {
     struct LDPC  ldpc;
 
     // Test configuration, read from stm_cfg.txt
-//    int          config_verbose;
+    int          config_verbose;
 //    int          config_testframes;
     int          config_ldpc_en;
 //    int          config_log_payload_syms;
     int          config_profile;
 
-    int          n_bpf, n_spf;
+    int          Nbitsperframe, Nsamperframe;
     int          frame = 0;
     int          i, j;
 
@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Error reading config file\n");
         exit(1);
     }
-//    config_verbose = config[0] - '0';
+    config_verbose = config[0] - '0';
 //    config_testframes = config[1] - '0';
     config_ldpc_en = config[2] - '0';
 //    config_log_payload_syms = config[3] - '0';
@@ -131,10 +131,12 @@ int main(int argc, char *argv[]) {
     ofdm_config->bps = 2;   			/* Bits per Symbol */
     ofdm_config->txtbits = 4; 			/* number of auxiliary data bits */
     ofdm_config->ns = 8;  			/* Number of Symbol frames */
-
-    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Symbol Rate */
-
-    /* config options can change here, non yet */
+    ofdm_config->tx_centre = 1500.0f;
+    ofdm_config->rx_centre = 1500.0f;
+    ofdm_config->nc = 17;
+    ofdm_config->tcp = 0.0020f;
+    ofdm_config->ts = 0.0180f;
+    ofdm_config->rs = (1.0f / ofdm_config->ts); /* Modulating Symbol Rate */
 
     ofdm = ofdm_create(ofdm_config);
     assert(ofdm != NULL);
@@ -147,24 +149,36 @@ int main(int argc, char *argv[]) {
     set_up_hra_112_112(&ldpc, ofdm_config);
 
     if (config_ldpc_en) {
-        n_bpf =  interleave_frames * ldpc.data_bits_per_frame;
+        Nbitsperframe =  interleave_frames * ldpc.data_bits_per_frame;
     } else {
-        n_bpf = ofdm_get_bits_per_frame();
+        Nbitsperframe = ofdm_get_bits_per_frame();
     }
 
-    n_spf = ofdm_get_samples_per_frame();
+    Nsamperframe = ofdm_get_samples_per_frame();
 //    int ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps -
 //                                                    ofdm_config->txtbits;
+
+    if (config_verbose) {
+        ofdm_set_verbose(ofdm, config_verbose);
+        fprintf(stderr, "Nsamperframe: %d, interleave_frames: %d, Nbitsperframe: %d \n",
+            Nsamperframe, interleave_frames, Nbitsperframe);
+    }
+
+
     int ofdm_ntxtbits =  ofdm_config->txtbits;
 
-    uint8_t tx_bits_char[n_bpf];
-    int16_t tx_scaled[n_spf];
+    uint8_t tx_bits_char[Nbitsperframe];
+    int16_t tx_scaled[Nsamperframe];
     uint8_t txt_bits_char[ofdm_ntxtbits*interleave_frames];
 
     for(i=0; i< ofdm_ntxtbits*interleave_frames; i++) {
         txt_bits_char[i] = 0;
+    }    
+    
+    if (config_verbose) {
+	    ofdm_print_info(ofdm);
     }
-   
+
     fin = fopen("stm_in.raw", "rb");
     if (fin == NULL) {
         printf("Error opening input file\n");
@@ -177,42 +191,56 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    while (fread(tx_bits_char, sizeof(char), n_bpf, fin) == n_bpf) {
+    while (fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
         fprintf(stderr, "Frame %d\n", frame);
 
         if (config_profile) PROFILE_SAMPLE(ofdm_mod_start);
 
             if (config_ldpc_en) {
 
-                complex float tx_sams[interleave_frames * n_spf];
+                complex float tx_sams[interleave_frames * Nsamperframe];
                 ofdm_ldpc_interleave_tx(ofdm, &ldpc, tx_sams, tx_bits_char,
                                 txt_bits_char, interleave_frames, ofdm_config);
 
                 for (j=0; j<interleave_frames; j++) {
-                    for(i=0; i<n_spf; i++) {
-                        tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j * n_spf + i]);
+                    for(i=0; i<Nsamperframe; i++) {
+                        tx_scaled[i] = OFDM_AMP_SCALE * crealf(tx_sams[j * Nsamperframe + i]);
                     }
 
                 }
 
              } else { // !config_ldpc_en
-                int tx_bits[n_bpf];
+                int tx_bits[Nbitsperframe];
 
-                for(i=0; i<n_bpf; i++) {
+                for(i=0; i<Nbitsperframe; i++) {
                     tx_bits[i] = tx_bits_char[i];
                 }
 
-                COMP tx_sams[n_spf];
+	            if (config_verbose >=3) {
+                    fprintf(stderr, "\ntx_bits:\n");
+                    for (i = 0; i < Nbitsperframe; i++) {
+                        fprintf(stderr, "  %3d %8d\n", i, tx_bits[i]);
+                    }
+                }
+
+                COMP tx_sams[Nsamperframe];
                 ofdm_mod(ofdm, tx_sams, tx_bits);
 
-                for(i=0; i<n_spf; i++) {
+	            if (config_verbose >=3) {
+                    fprintf(stderr, "\ntx_sams:\n");
+                    for (i = 0; i < Nsamperframe; i++) {
+                        fprintf(stderr, "  %3d % f\n", i, (double)tx_sams[i].real);
+                    }
+                }
+
+                for(i=0; i<Nsamperframe; i++) {
                     tx_scaled[i] = OFDM_AMP_SCALE * tx_sams[i].real;
                 }
             }
 
         if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_mod_start, "  ofdm_mod");
 
-        fwrite(tx_scaled, sizeof(int16_t), n_spf, fout);
+        fwrite(tx_scaled, sizeof(int16_t), Nsamperframe, fout);
 
         frame ++;
 
@@ -221,7 +249,8 @@ int main(int argc, char *argv[]) {
     fclose(fin);
     fclose(fout);
 
-    printf("%d frames processed\n", frame);
+    if (config_verbose)
+        printf("%d frames processed\n", frame);
 
     if (config_profile) {
         printf("\nStart Profile Data\n");
