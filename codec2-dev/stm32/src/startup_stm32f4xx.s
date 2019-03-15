@@ -37,6 +37,7 @@
 
 .global  g_pfnVectors
 .global  Default_Handler
+.global  EndofMain
 
 /* start address for the initialization values of the .data section.
 defined in linker script */
@@ -83,6 +84,7 @@ LoopCopyDataInit:
   bcc  CopyDataInit
   ldr  r2, =_sbss
   b  LoopFillZerobss
+
 /* Zero fill the bss segment. */
 FillZerobss:
   movs  r3, #0
@@ -99,7 +101,8 @@ LoopFillZerobss:
     bl __libc_init_array
 /* Call the application's entry point.*/
   bl  main
-  bx  lr
+EndofMain:
+  bl  .
 .size  Reset_Handler, .-Reset_Handler
 
 /**
