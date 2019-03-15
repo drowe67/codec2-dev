@@ -51,7 +51,7 @@ int testframes = 1;
 int main(int argc, char *argv[]) {    
     int         CodeLength, NumberParityBits;
     int         i, parityCheckCount;
-    char        out_char[HRA_112_112_CODELENGTH];
+    uint8_t     out_data[HRA_112_112_CODELENGTH];
     struct LDPC ldpc;
     int         data_bits_per_frame;
     FILE        *fin, *fout;
@@ -153,7 +153,7 @@ int main(int argc, char *argv[]) {
         sd_to_llr(input_float, input_double, CodeLength);
 
         PROFILE_SAMPLE(ldpc_decode);
-        iter = run_ldpc_decoder(&ldpc, out_char, input_float, &parityCheckCount);
+        iter = run_ldpc_decoder(&ldpc, out_data, input_float, &parityCheckCount);
         PROFILE_SAMPLE_AND_LOG2(ldpc_decode, "ldpc_decode");
         //fprintf(stderr, "iter: %d\n", iter);
         total_iters += iter;
@@ -162,13 +162,13 @@ int main(int argc, char *argv[]) {
             input_float[i] = input_float[i+offset];
         }
 
-        fwrite(out_char, sizeof(char), data_bits_per_frame, fout);
+        fwrite(out_data, sizeof(char), data_bits_per_frame, fout);
 
         if (testframes) {
             for (i=0; i<data_bits_per_frame; i++) {
-                if (out_char[i] != ibits[i]) {
+                if (out_data[i] != ibits[i]) {
                     Terrs++;
-                    //fprintf(stderr, "%d %d %d\n", i, out_char[i], ibits[i]);
+                    //fprintf(stderr, "%d %d %d\n", i, out_data[i], ibits[i]);
                 }
                 Tbits++;
             }
