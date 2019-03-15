@@ -177,7 +177,7 @@ function [sim_out rx states] = run_sim(sim_in)
 
     % std test frame so we can x-check
     
-    tx_data_bits = create_ldpc_test_frame;
+    tx_data_bits = create_ldpc_test_frame(states, ldpc_en);
     
     tx_bits = []; tx_symbols = [];
     for f=1:Nframes
@@ -571,11 +571,11 @@ function run_single(EbNodB = 100, error_pattern_filename);
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
 
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 10;
+  sim_in.Nsec = 1;
 
   sim_in.EbNodB = 40;
   sim_in.verbose = 1;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
@@ -587,7 +587,7 @@ function run_single(EbNodB = 100, error_pattern_filename);
 
   load HRA_112_112.txt
   sim_in.ldpc_code = HRA_112_112;
-  sim_in.ldpc_en = 1;
+  sim_in.ldpc_en = 0;
 
   sim_in.interleave_frames = 1;
   %sim_in.diversity_en = 1;
@@ -1327,7 +1327,7 @@ more off;
 
 init_cml('~/cml/');
 
-%run_single(10);
+run_single(100);
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
@@ -1337,4 +1337,4 @@ init_cml('~/cml/');
 %acquisition_dev(Ntests=10, EbNodB=100, foff_hz=0)
 %acquistion_curves
 %debug_false_sync
-metric_fbf("ofdm_test.raw")
+%metric_fbf("ofdm_test.raw")
