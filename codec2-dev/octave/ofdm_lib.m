@@ -551,15 +551,24 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % ---
     % PPP  <-- frame+2
     
-    cr = c-1:c+1;
+    if isfield(states, "high_doppler")
+      % Only use pilots at start and end of this frame to track quickly changes in phase
+      % present in high Doppler channels.  As less pilots are averaged, low SNR performance
+      % will be poorer.
+      achannel_est_rect(c) =  sum(rx_sym(2,c)*pilots(c)');      % frame    
+      achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
+    else
+      % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
+      % low SNR performance, but will fall over with high Doppler.
+      cr = c-1:c+1;
+      achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
+      achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
 
-    achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
-    achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
+      % use next step of pilots in past and future
 
-    % use next step of pilots in past and future
-
-    achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
-    achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
+      achannel_est_rect(c) += sum(rx_sym(1,cr)*pilots(cr)');      % frame-1
+      achannel_est_rect(c) += sum(rx_sym(2+Ns+1,cr)*pilots(cr)'); % frame+2
+    end
   end
   
   % pilots are estimated over 12 pilot symbols, so find average
