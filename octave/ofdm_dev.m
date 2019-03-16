@@ -38,6 +38,9 @@ function [sim_out rx states] = run_sim(sim_in)
   if hf_en
     assert(phase_est_en == 1, "\nNo point running HF simulation without phase est!!\n");
   end
+  if isfield(sim_in, "high_doppler")
+    states.high_doppler = 1;
+  end
   if isfield(sim_in, "diversity_en")
     diversity_en = sim_in.diversity_en;
   else
@@ -287,6 +290,14 @@ function [sim_out rx states] = run_sim(sim_in)
     % some spare samples at end to avoid overflow as est windows may poke into the future a bit
 
     rx = [rx zeros(1,Nsamperframe)];
+    
+    % optional save raw file
+    if 1
+      sraw = real(rx*5000);
+      fraw = fopen("ofdm_dev.raw", "wb");
+      fwrite(fraw, sraw, "short");
+      fclose(fraw);
+    end
     
     % bunch of logs
 
@@ -566,15 +577,18 @@ endfunction
 
 
 function run_single(EbNodB = 100, error_pattern_filename);
-  Ts = 0.018; 
-  sim_in.Tcp = 0.002; 
-  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
-
+  Ts = 0.010; 
+  sim_in.Tcp = 0.004; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 4;
+  sim_in.high_doppler = 1;
+  
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 1;
+  sim_in.Nsec = 10;
 
-  sim_in.EbNodB = 40;
+  sim_in.EbNodB = 20;
   sim_in.verbose = 1;
+  sim_in.dopplerSpreadHz = 6;
+  sim_in.path_delay_ms = 3;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
@@ -1325,7 +1339,14 @@ endfunction
 format;
 more off;
 
-init_cml('~/cml/');
+path_to_cml = '~/cml';
+addpath(strcat(path_to_cml, "/mex"), strcat(path_to_cml, "/mat"));
+if exist("Somap") == 0
+  printf("Can't find CML mex directory so we wont init CML...\n");
+else
+  printf("OK found CML mex directory so will init CML...\n");
+  init_cml('~/cml/');
+end
 
 run_single(100);
 %run_curves

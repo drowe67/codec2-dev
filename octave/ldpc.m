@@ -31,7 +31,7 @@ function init_cml(path_to_cml)
   else
     printf("\n---------------------------------------------------\n");
     printf("Can't start CML in path: %s\n", path_to_cml);
-    printf("See CML path instructions at top of this script\n");
+    printf("See CML path instructions at top of this script (ldpc.m)\n");
     printf("-----------------------------------------------------\n\n");
     assert(0);
   end
