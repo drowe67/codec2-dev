@@ -127,11 +127,11 @@ void postfilter(
   */
 
   uv = 0;
-  thresh = powf(10.0, (*bg_est + BG_MARGIN)/20.0);
+  thresh = POW10F((*bg_est + BG_MARGIN)/20.0);
   if (model->voiced)
       for(m=1; m<=model->L; m++)
 	  if (model->A[m] < thresh) {
-	      model->phi[m] = TWO_PI*(float)codec2_rand()/CODEC2_RAND_MAX;
+	      model->phi[m] = (TWO_PI/CODEC2_RAND_MAX)*(float)codec2_rand();
 	      uv++;
 	  }
 

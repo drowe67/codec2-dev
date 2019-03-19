@@ -132,7 +132,7 @@ long quantise(const float * cb, float vec[], float w[], int k, int m, float *se)
 	e = 0.0;
 	for(i=0; i<k; i++) {
 	    diff = cb[j*k+i]-vec[i];
-	    e += powf(diff*w[i],2.0);
+	    e += (diff*w[i] * diff*w[i]);
 	}
 	if (e < beste) {
 	    beste = e;
@@ -1068,7 +1068,7 @@ float decode_log_Wo(C2CONST *c2const, int index, int bits)
     step = (log10f(Wo_max) - log10f(Wo_min))/Wo_levels;
     Wo   = log10f(Wo_min) + step*(index);
 
-    return powf(10,Wo);
+    return POW10F(Wo);
 }
 
 #if 0
@@ -1810,7 +1810,7 @@ float decode_energy(int index, int bits)
 
     step = (e_max - e_min)/e_levels;
     e    = e_min + step*(index);
-    e    = powf(10.0,e/10.0);
+    e    = POW10F(e/10.0);
 
     return e;
 }
@@ -1963,7 +1963,7 @@ void quantise_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[])
 
   model->L  = PI/model->Wo; /* if we quantise Wo re-compute L */
 
-  *e = powf(10.0, xq[1]/10.0);
+  *e = POW10F(xq[1]/10.0);
 }
 
 /*---------------------------------------------------------------------------*\
@@ -2046,6 +2046,6 @@ void decode_WoE(C2CONST *c2const, MODEL *model, float *e, float xq[], int n1)
 
   model->L  = PI/model->Wo; /* if we quantise Wo re-compute L */
 
-  *e = powf(10.0, xq[1]/10.0);
+  *e = POW10F(xq[1]/10.0);
 }
 

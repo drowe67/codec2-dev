@@ -67,8 +67,8 @@ else()
 endif()
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")
 
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS}")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS}")
+set(CMAKE_C_FLAGS_DEBUG "")
+set(CMAKE_C_FLAGS_RELEASE "")
 
 # -fPIC is implied on MinGW...
 if(NOT WIN32)
@@ -80,7 +80,7 @@ string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
 if(NOT _FLAGS STREQUAL "NONE")
     set(BUILD_FLAGS "${CMAKE_C_FLAGS_${_FLAGS}}")
 endif()
-message(STATUS "Compiler Flags: " ${BUILD_FLAGS})
+message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${BUILD_FLAGS})
 
 #
 # Setup Windows/MinGW specifics here.
@@ -137,6 +137,20 @@ check_include_files("stdlib.h" HAVE_STDLIB_H)
 check_include_files("string.h" HAVE_STRING_H)
 
 include(CheckSymbolExists)
+# Check if _GNU_SOURCE is available.
+if (NOT DEFINED _GNU_SOURCE)
+  check_symbol_exists(__GNU_LIBRARY__ "features.h" _GNU_SOURCE)
+
+  if (NOT _GNU_SOURCE)
+    unset(_GNU_SOURCE CACHE)
+    check_symbol_exists(_GNU_SOURCE "features.h" _GNU_SOURCE)
+  endif()
+endif()
+
+if (_GNU_SOURCE)
+    add_definitions(-D_GNU_SOURCE=1)
+endif()
+
 check_symbol_exists(floor  math.h HAVE_FLOOR)
 check_symbol_exists(ceil   math.h HAVE_CEIL)
 check_symbol_exists(pow    math.h HAVE_POW)
