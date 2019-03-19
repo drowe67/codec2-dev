@@ -7,7 +7,7 @@
 #
 project(codec2 C)
 
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.0)
 
 include(GNUInstallDirs)
 mark_as_advanced(CLEAR
@@ -51,10 +51,11 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-# Set default C++ flags.
-include(CheckCCompilerFlag)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -g -O3 -Wno-strict-overflow")
+# Set default C flags.
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wno-strict-overflow")
 
+# Check for what C standard is supported.
+include(CheckCCompilerFlag)
 CHECK_C_COMPILER_FLAG("-std=gnu11" COMPILER_SUPPORTS_GNU11)
 CHECK_C_COMPILER_FLAG("-std=gnu99" COMPILER_SUPPORTS_GNU99)
 
@@ -63,24 +64,25 @@ if(COMPILER_SUPPORTS_GNU11)
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 else()
-   message( SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
+   message(SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
 endif()
-# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unused-function")
-
-set(CMAKE_C_FLAGS_DEBUG "")
-set(CMAKE_C_FLAGS_RELEASE "")
 
 # -fPIC is implied on MinGW...
 if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
+set(CMAKE_C_FLAGS_DEBUG "-g -O2")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
+
+
 message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
 string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
-if(NOT _FLAGS STREQUAL "NONE")
-    set(BUILD_FLAGS "${CMAKE_C_FLAGS_${_FLAGS}}")
+if(_FLAGS STREQUAL "NONE")
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS})
+else()
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${_FLAGS}})
 endif()
-message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${BUILD_FLAGS})
 
 #
 # Setup Windows/MinGW specifics here.
