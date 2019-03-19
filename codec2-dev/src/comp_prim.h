@@ -86,7 +86,7 @@ inline static COMP cadd(COMP a, COMP b)
 
 inline static float cabsolute(COMP a)
 {
-    return sqrtf(powf(a.real, 2.0) + powf(a.imag, 2.0));
+    return sqrtf((a.real * a.real) + (a.imag * a.imag) );
 }
 
 /*

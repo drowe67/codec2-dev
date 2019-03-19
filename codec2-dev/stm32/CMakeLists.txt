@@ -154,6 +154,7 @@ ${CODEC2_SRC}/HRA_112_112.c
 ${CODEC2_SRC}/linreg.c
 ${CODEC2_SRC}/mpdecode_core.c
 ${CODEC2_SRC}/phi0.c
+${CODEC2_SRC}/HRAb_396_504.c
 codebook.c
 codebookd.c
 codebookjvm.c

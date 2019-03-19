@@ -163,7 +163,7 @@ void mbest_search450(const float  *cb, float vec[], float w[], int k,int shorter
             //Only search first NEWAMP2_K Vectors
             if(i<shorterK){
                 diff = cb[j*k+i]-vec[i];
-                e += powf(diff*w[i],2.0);
+                e += diff*w[i] * diff*w[i];
             }
 	}
 	index[0] = j;

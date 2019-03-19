@@ -2090,7 +2090,7 @@ float codec2_energy_700c(struct CODEC2 *c2, const unsigned char * bits)
     if (indexes[3] == 0)
     	mean -= 10;
 
-    return powf(10.0, mean/10.0);
+    return POW10F(mean/10.0);
 }
 
 #ifndef CORTEX_M4
@@ -2113,7 +2113,7 @@ float codec2_energy_450(struct CODEC2 *c2, const unsigned char * bits)
     if (indexes[3] == 0)
     	mean -= 10;
 
-    return powf(10.0, mean/10.0);
+    return POW10F(mean/10.0);
 }
 
 /*---------------------------------------------------------------------------*\

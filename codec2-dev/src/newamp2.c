@@ -230,9 +230,9 @@ void n2_post_filter_newamp2(float vec[], float sample_freq_kHz[], int K, float p
     for(k=0; k<K; k++) {
         pre[k] = 20.0*log10f(sample_freq_kHz[k]/0.3);
         vec[k] += pre[k];
-        e_before += powf(10.0, 2.0*vec[k]/20.0);
+        e_before += POW10F(vec[k]/10.0);
         vec[k] *= pf_gain;
-        e_after += powf(10.0, 2.0*vec[k]/20.0);        
+        e_after += POW10F(vec[k]/10.0);
     }
 
     float gain = e_after/e_before;
