@@ -78,7 +78,6 @@ int main(int argc, char *argv[]) {
     float  e;           /* sqaured error for current vector             */
     float  se;		/* squared error for this iteration		*/
     float  var,var_1;	/* current and previous iterations distortion	*/
-    float  sd;          /* std deviation of quant error                 */
     float  delta;	/* improvement in distortion 			*/
     long   noutliers[3];/* number of vectors quantisers with > 3*sd     */
     FILE   *ftrain;	/* file containing training set			*/
@@ -168,7 +167,7 @@ int main(int argc, char *argv[]) {
         assert(ret == k);
         quantise(cb, vec, k, 1, &e, &se);
     }
-    var = se/(J*k); sd = sqrt(var);
+    var = se/(J*k);
     printf("\r  Iteration 0, var = %f, sd = %f\n", var, sqrt(var));
 
     /* set up initial codebook state from samples of training set */
@@ -205,14 +204,14 @@ int main(int argc, char *argv[]) {
 	    acc(&cent[ind*k], vec, k);
             //if (i < 100)
             //    printf("e: %f sqrt(e/k): %f sd: %f noutliers: %ld\n", e, sqrt(e/k), sd, noutliers[0]);
-            if (sqrt(e/k) > sd) noutliers[0]++;
-            if (sqrt(e/k) > 2*sd) noutliers[1]++;
-            if (sqrt(e/k) > 3*sd) noutliers[2]++;
+            if (sqrt(e/k) > 1.0) noutliers[0]++;
+            if (sqrt(e/k) > 2.0) noutliers[1]++;
+            if (sqrt(e/k) > 3.0) noutliers[2]++;
 	}
-	var = se/(J*k); sd = sqrt(var);
+	var = se/(J*k);
 	delta = (var_1-var)/var;
 
-	printf("\r  Iteration %ld, var = %f, sd = %f outliers > 1/2/3 *sd = %f/%f/%f Delta = %e\n", j, var, sqrt(var),
+	printf("\r  Iteration %ld, var = %4.2f, sd = %4.2f outliers > 1/2/3 dB = %3.2f/%f3.2/%3.2f Delta = %5.4f\n", j, var, sqrt(var),
                (float)noutliers[0]/J, (float)noutliers[1]/J, (float)noutliers[2]/J, delta);
 	j++;
 
