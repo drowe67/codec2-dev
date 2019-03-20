@@ -1,5 +1,4 @@
 /*
-
   extract.c
   david Rowe Jan 2019
 
@@ -9,43 +8,84 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <getopt.h>
 
 #define NB_FEATURES 55 /* number of cols per row */
 
 int main(int argc, char *argv[]) {
     FILE *fin, *fout;
+    int st = 0;
+    int en = 17;
+    int stride = NB_FEATURES;
+    float gain = 1.0;
+    int frame_delay = 1;
+    float pred = 0.0;
+    
+    static struct option long_options[] = {
+        {"startcol",   required_argument, 0, 's'},
+        {"endcol",     required_argument, 0, 'e'},
+        {"stride",     required_argument, 0, 't'},
+        {"gain",       required_argument, 0, 'g'},
+        {"pred",       required_argument, 0, 'p'},
+        {"delay",      required_argument, 0, 'd'},
+        {0, 0, 0, 0}
+    };
 
-    if (argc < 7) {
-        fprintf(stderr, "usage: %s input.f32 output.f32 startCol endCol scaleFactor predCoeff [framesDelay]\n", argv[0]);
-        exit(1);
+    int opt_index = 0;
+    int c;
+    
+    while ((c = getopt_long (argc, argv, "s:e:t:g:p:d:", long_options, &opt_index)) != -1) {
+        switch (c) {
+        case 's':
+            st = atoi(optarg);
+            break;
+        case 'e':
+            en = atoi(optarg);
+            break;
+        case 't':
+            stride = atoi(optarg);
+            break;
+        case 'g':
+            gain = atof(optarg);
+            break;
+        case 'p':
+            pred = atof(optarg);
+            break;
+        case 'd':
+            frame_delay = atoi(optarg);
+            break;
+        default:
+        helpmsg:
+            fprintf(stderr, "usage: %s  -s startCol -e endCol [-t strideCol -g gain -p predCoeff -d framesDelay] input.f32 output.f32\n", argv[0]);
+            exit(1);
+        }
     }
-    fin = fopen(argv[1],"rb"); assert(fin != NULL);
-    fout = fopen(argv[2],"wb"); assert(fout != NULL);
-    int st = atoi(argv[3]); int en = atoi(argv[4]); float scale = atof(argv[5]);
-    float pred = atof(argv[6]);
-    int frame_delay;
-    if (argc == 8)
-        frame_delay = atoi(argv[7]);
-    else
-        frame_delay = 1;
-    printf("extracting from %d to %d inclusive... scale factor = %f pred = %f frame_delay = %d\n", st, en, scale, pred, frame_delay);
+    if ( (argc - optind) < 2) {
+        fprintf(stderr, "Too few arguments\n");
+        goto helpmsg;
+    }
+ 
+    fin = fopen(argv[optind],"rb"); assert(fin != NULL);
+    fout = fopen(argv[optind+1],"wb"); assert(fout != NULL);
+    printf("extracting from %d to %d inclusive (stride %d) ... gain = %f pred = %f frame_delay = %d\n",
+           st, en, stride, gain, pred, frame_delay);
    
-    float features[NB_FEATURES], features_prev[frame_delay][NB_FEATURES], delta[NB_FEATURES];
+    float features[stride], features_prev[frame_delay][stride], delta[stride];
     int i,f;
     
     for (f=0; f<frame_delay; f++)
-        for(i=0; i<NB_FEATURES; i++)
+        for(i=0; i<stride; i++)
             features_prev[f][i] = 0.0;
 
-    while((fread(features, sizeof(float), NB_FEATURES, fin) == NB_FEATURES)) {
+    while((fread(features, sizeof(float), stride, fin) == stride)) {
         for(i=st; i<=en; i++) {
-            delta[i] = scale*(features[i] - pred*features_prev[frame_delay-1][i]);
+            delta[i] = gain*(features[i] - pred*features_prev[frame_delay-1][i]);
         }
         fwrite(&delta[st], sizeof(float), en-st+1, fout);
         for (f=frame_delay-1; f>0; f--)
-            for(i=0; i<NB_FEATURES; i++)
+            for(i=0; i<stride; i++)
                 features_prev[f][i] = features_prev[f-1][i];
-        for(i=0; i<NB_FEATURES; i++)
+        for(i=0; i<stride; i++)
             features_prev[0][i] = features[i];        
     }
 
