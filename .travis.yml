@@ -1,0 +1,46 @@
+env:
+   global:
+   - GCC_BASE=gcc-arm-none-eabi-8-2018-q4-major
+   - GCC_SHORT=8-2018q4
+
+sudo: required
+language: generic
+dist: xenial 
+
+addons:
+  apt:
+    packages:
+      libc6-i386
+      libspeexdsp-dev
+      libsamplerate0-dev
+      octave-common
+      octave
+      gnuplot
+      sox
+
+cache:
+  directories:
+    - $HOME/$GCC_BASE
+
+install:
+    - export GCC_DIR=$HOME/$GCC_BASE
+    - export GCC_ARCHIVE=$HOME/$GCC_BASE-linux.tar.bz2
+    - export GCC_URL=https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/$GCC_SHORT/$GCC_BASE-linux.tar.bz2
+    - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget $GCC_URL -O $GCC_ARCHIVE; tar xfj $GCC_ARCHIVE -C $HOME; fi
+    - export CODEC2DEV=${PWD}
+    - export MAKEFLAGS=-j2 
+    - export BUILDDIR=${PWD}/build
+    - export BUILDSTD=${BUILDDIR}/normal
+    - export BUILDSTM=${BUILDDIR}/stm32
+script:
+    - mkdir -p $BUILDSTD
+    - cd $BUILDSTD 
+    - cmake $CODEC2DEV
+    - make -j4 all test
+    - #mkdir -p $BUILDSTM
+    - #cd $BUILDSTM 
+    - #cmake $CODEC2DEV/stm32 -DCMAKE_TOOLCHAIN_FILE=$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake -DARM_GCC_BIN:STRING=$GCC_DIR/bin/ 
+    - #make -j4
+    - #cd ${CODEC2DEV}/stm32/unittest/src 
+    - #make clean 
+    - #PATH=${PATH}:$GCC_DIR/bin/ make -j4
