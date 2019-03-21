@@ -1,5 +1,4 @@
-Codec 2 README
---------------
+# Codec 2 README
 
 Codec 2 is an open source (LGPL 2.1) low bit rate speech codec:
 
@@ -14,8 +13,8 @@ Also included:
   + Coherent OFDM modem for HF channels (ofdm)
   + software for High Altitude Balloon image and telemetry reception
 
-Quickstart
-----------
+## Quickstart
+
 
 Also see INSTALL for more general building and installing instructions. 
 
@@ -54,9 +53,8 @@ Also see INSTALL for more general building and installing instructions.
 
    $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
 
-Programs
---------
- 
+## Programs
+
 + c2demo encodes a file of speech samples, then decodes them and
   saves the result.
 
@@ -86,8 +84,7 @@ Programs
 
 + ofdm_* are OFDM PSK HF modem command line programs (README_ofdm).
 
-Building and Running Unit Tests
--------------------------------
+## Building and Running Unit Tests
 
 CTest is used as a test frame work, with support from GNU Octave
 scripts.
@@ -118,8 +115,7 @@ scripts.
 
   $ ctest -R test_OFDM_modem_octave_port
  
-Directories
------------
+## Directories
 
   cmake       - cmake support files
   misc        - misc C programs that have been useful in development,
@@ -132,8 +128,7 @@ Directories
   unittest    - Code to perform and support testing. Part of Debug build.
   wav         - speech files in wave file format
 
-GDB and Dump Files
-------------------
+## GDB and Dump Files
 
 1/ To compile with debug symbols for using gdb:
 
@@ -152,8 +147,7 @@ development scripts):
   $ CFLAGS=-DDUMP cmake ..
   $ make
 
-Building for Windows on a Linux machine
----------------------------------------
+## Building for Windows on a Linux machine
 
 On Ubuntu 17:
 
@@ -162,8 +156,7 @@ On Ubuntu 17:
   $ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2-dev/build_linux/src/generate_codebook 
   $ make
   
-Building for Windows on a Windows machine
------------------------------------------
+## Building for Windows on a Windows machine
 
  mkdir build_windows (Or what ever you want to call your build dir)
  cmake -G "MinGW Makefiles" -D CMAKE_MAKE_PROGRAM=mingw32-make.exe
@@ -171,8 +164,7 @@ Building for Windows on a Windows machine
  mingw32-make or ninja  depends on what you used in the last command
  wait for it to build.
 
-Octave Packages
----------------
+## Octave Packages
 
 To run the Octave scripts the following libraries are required:
 
@@ -193,8 +185,7 @@ On Ubuntu install with:
 
   $ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
 
-FreeDV API
-----------
+## FreeDV API
 
 See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
 freedv_rx.  Quickstart demo using FreeDV 1600:
@@ -202,8 +193,7 @@ freedv_rx.  Quickstart demo using FreeDV 1600:
   $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
   $ cat freedv_rx_log.txt
 
-FreeDV 2400A and 2400B modes
-----------------------------
+## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio.
 FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth),
