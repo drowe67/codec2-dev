@@ -14,20 +14,6 @@ Also included:
   + Coherent OFDM modem for HF channels (ofdm)
   + software for High Altitude Balloon image and telemetry reception
 
-SVN Repository
---------------
-
-Check out the latest (development branch) code using:
-
-  $ svn co https://svn.code.sf.net/p/freetel/code/codec2-dev codec2-dev
-
-There are unauthorised 3rd party GIT mirrors of Codec 2.
-
-  GIT IS NOT SUPPORTED!!!
-
-All patches, support questions etc, need to be against the SVN
-repository above.
-
 Quickstart
 ----------
 
