@@ -169,7 +169,6 @@ add_library(codec2_prof STATIC ${CODEC2_SRCS})
 target_compile_definitions(codec2_prof PRIVATE PROFILE)
 
 set(FFT_TEST_SRCS 
-${DSPLIB}/Examples/arm_fft_bin_example/GCC/arm_fft_bin_data.c
 src/fft_test.c
 src/startup_stm32f4xx.s
 src/system_stm32f4xx.c
