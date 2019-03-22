@@ -17,6 +17,7 @@ addons:
       octave
       gnuplot
       sox
+      p7zip-full
 
 cache:
   directories:
@@ -26,21 +27,25 @@ install:
     - export GCC_DIR=$HOME/$GCC_BASE
     - export GCC_ARCHIVE=$HOME/$GCC_BASE-linux.tar.bz2
     - export GCC_URL=https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/$GCC_SHORT/$GCC_BASE-linux.tar.bz2
-    - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget $GCC_URL -O $GCC_ARCHIVE; tar xfj $GCC_ARCHIVE -C $HOME; fi
+    - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget -q $GCC_URL -O $GCC_ARCHIVE; tar xfj $GCC_ARCHIVE -C $HOME; fi
     - export CODEC2DEV=${PWD}
     - export MAKEFLAGS=-j2 
     - export BUILDDIR=${PWD}/build
     - export BUILDSTD=${BUILDDIR}/normal
     - export BUILDSTM=${BUILDDIR}/stm32
+    - export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
+    - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME stdperiph_lib.zip; fi
 script:
     - mkdir -p $BUILDSTD
     - cd $BUILDSTD 
     - cmake $CODEC2DEV
     - make -j4 all test
-    - #mkdir -p $BUILDSTM
-    - #cd $BUILDSTM 
-    - #cmake $CODEC2DEV/stm32 -DCMAKE_TOOLCHAIN_FILE=$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake -DARM_GCC_BIN:STRING=$GCC_DIR/bin/ 
-    - #make -j4
-    - #cd ${CODEC2DEV}/stm32/unittest/src 
-    - #make clean 
-    - #PATH=${PATH}:$GCC_DIR/bin/ make -j4
+    - cd $CODEC2DEV/stm32 ; ln -s $STDLIBDIR .; 
+    - mkdir -p $CODEC2DEV/src/codec2 ; cp $BUILDSTD/codec2/version.h $CODEC2DEV/src/codec2/
+    - mkdir -p $BUILDSTM
+    - cd $BUILDSTM 
+    - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DCMAKE_TOOLCHAIN_FILE=$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake -DARM_GCC_BIN:STRING=$GCC_DIR/bin/ && make -j4 ) ; fi
+    - cd ${CODEC2DEV}/stm32/unittest/src 
+    - echo PERIPHLIBDIR = ../../STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 >local.mak
+    - make clean 
+    - if [ -e $STDLIBDIR ]; then (ln -s $STDLIBDIR . && PATH=${PATH}:$GCC_DIR/bin/ make -j4) ; fi
