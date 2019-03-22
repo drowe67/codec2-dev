@@ -170,12 +170,12 @@ To run the Octave scripts the following libraries are required:
 
 Package Name  | Version | Installation directory
 --------------|---------|-----------------------
-     control * |   2.6.2 | /usr/share/octave/packages/control-2.6.2
-     general * |   1.3.4 | /usr/share/octave/packages/general-1.3.4
-    parallel * |   2.2.0 | /usr/share/octave/packages/parallel-2.2.0
-        plot * |   1.1.0 | /usr/share/octave/packages/plot-1.1.0
-      signal * |   1.2.2 | /usr/share/octave/packages/signal-1.2.2
-     specfun * |   1.1.0 | /usr/share/octave/packages/specfun-1.1.0
+control *     |   2.6.2 | /usr/share/octave/packages/control-2.6.2
+general *     |   1.3.4 | /usr/share/octave/packages/general-1.3.4
+parallel *    |   2.2.0 | /usr/share/octave/packages/parallel-2.2.0
+plot *        |   1.1.0 | /usr/share/octave/packages/plot-1.1.0
+signal *      |   1.2.2 | /usr/share/octave/packages/signal-1.2.2
+specfun *     |   1.1.0 | /usr/share/octave/packages/specfun-1.1.0
 
 These can be installed using your systems package management system or
 the Octave package management system.  The version number of each
@@ -214,8 +214,9 @@ Simulate FreeDV 2400B passing through a 300 to 3000 Hz audio path using sox to f
 ```
 $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t raw - sinc 300-3000 | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
 ```
-Links:
 
-  FreeDV 2400A blog post ...: http://www.rowetel.com/?p=5119
-  FreeDV 2400A & 2400B demos: http://www.rowetel.com/?p=5219
+## Links:
+
++ FreeDV 2400A blog post ...: http://www.rowetel.com/?p=5119
++ FreeDV 2400A & 2400B demos: http://www.rowetel.com/?p=5219
 
