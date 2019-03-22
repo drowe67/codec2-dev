@@ -19,7 +19,7 @@ Also included:
 Also see INSTALL for more general building and installing instructions. 
 
 1/ Listen to Codec 2:
-
+```
    $ cd codec2-dev
    $ mkdir build_linux
    $ cd build_linux
@@ -28,31 +28,31 @@ Also see INSTALL for more general building and installing instructions.
    $ ./src/c2demo ../raw/hts1a.raw hts1a_c2.raw
    $ play -t raw -r 8000 -e signed-integer -b 16 ../raw/hts1a.raw
    $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2.raw
-
+```
 2/ Compress, decompress and then play a file:
 
    using 2400 bps bit rate encoding
-
+```
    $ ./src/c2enc 2400 ../raw/hts1a.raw hts1a_c2.bit
    $ ./src/c2dec 2400 hts1a_c2.bit hts1a_c2_2400.raw 
-
+```
    which can be played with
-
+```
    $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_2400.raw
-
+```
    using 700C bps bit rate encoding
-
+```
    $ ./src/c2enc 700C ../raw/hts1a.raw hts1a_c2.bit
    $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
-
+```
    which can be played with
-
+```
    $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
-
+```
 3/ Same thing with pipes:
-
+```
    $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
-
+```
 ## Programs
 
 + c2demo encodes a file of speech samples, then decodes them and
@@ -90,33 +90,33 @@ CTest is used as a test frame work, with support from GNU Octave
 scripts.
 
 1/ Install GNU Octave on Ubuntu with:
-
+```
   $ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
-
+```
   (see also Octave section below)
   
 2/ To build and run the tests:
-
+```
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
   $ cd build_linux
   $ cmake -DCMAKE_BUILD_TYPE=Debug ..
   $ make all test
-
+```
 3/ To just run tests without rebuilding:
-
+```
   $ make test
-
+```
 4/ To get a verbose run (e.g. for test debugging):
-
+```
   $ ctest -V
-
+```
 5/ To just run a single test:
-
+```
   $ ctest -R test_OFDM_modem_octave_port
- 
+```
 ## Directories
-
+```
   cmake       - cmake support files
   misc        - misc C programs that have been useful in development,
                 not reqd for Codec 2 release. Part of Debug build.
@@ -127,35 +127,35 @@ scripts.
   stm32       - STM32F4 microcontroller and SM1000 FreeDV Adaptor support
   unittest    - Code to perform and support testing. Part of Debug build.
   wav         - speech files in wave file format
-
+```
 ## GDB and Dump Files
 
 1/ To compile with debug symbols for using gdb:
-
+```
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
   $ cd build_linux
   $ CFLAGS=-g cmake ..
   $ make
-
+```
 2/ For dump file support (dump data from c2sim for input to Octave
 development scripts):
-
+```
   $ cd ~/codec2
   $ rm -Rf build_linux && mkdir build_linux
   $ cd build_linux
   $ CFLAGS=-DDUMP cmake ..
   $ make
-
+```
 ## Building for Windows on a Linux machine
 
 On Ubuntu 17:
-
+```
   $ sudo apt-get install mingw-w64
   $ mkdir build_windows && cd build_windows
   $ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2-dev/build_linux/src/generate_codebook 
   $ make
-  
+  ```
 ## Building for Windows on a Windows machine
 
  mkdir build_windows (Or what ever you want to call your build dir)
@@ -169,7 +169,7 @@ On Ubuntu 17:
 To run the Octave scripts the following libraries are required:
 
 Package Name  | Version | Installation directory
---------------+---------+-----------------------
+--------------|---------|-----------------------
      control *|   2.6.2 | /usr/share/octave/packages/control-2.6.2
      general *|   1.3.4 | /usr/share/octave/packages/general-1.3.4
     parallel *|   2.2.0 | /usr/share/octave/packages/parallel-2.2.0
@@ -182,17 +182,17 @@ the Octave package management system.  The version number of each
 package is not important.
 
 On Ubuntu install with:
-
+```
   $ sudo apt install octave octave-control octave-parallel octave-signal octave-specfun
-
+```
 ## FreeDV API
 
 See freedv_api.h and freedv_api.c, and the demo programs freedv_tx &
 freedv_rx.  Quickstart demo using FreeDV 1600:
-
+```
   $ ./freedv_tx 1600 ../../raw/hts1.raw - | ./freedv_rx 1600 - - | play -t raw -r 8000 -s -2 -q -
   $ cat freedv_rx_log.txt
-
+```
 ## FreeDV 2400A and 2400B modes
 
 FreeDV 2400A and FreeDV 2400B are modes designed for VHF radio.
@@ -200,20 +200,20 @@ FreeDV 2400A is designed for SDR radios (it has a 5 kHz RF bandwidth),
 however FreeDV 2400B is designed to pass through commodity FM radios.
 
 Demos of FreeDV 2400A and 2400B:
-
+```
   $ ./freedv_tx 2400A ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400A - - | play -t raw -r 8000 -s -2 -
   $ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
-
+```
 Note for FreeDV 2400A/2400B the modem signal sample rate is 48kHz.  To
 listen to the modem tones from FreeDV 2400B, or play them into a FM HT
 mic input:
-
+```
   $ ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | play -t raw -r 48000 -s -2 -
-
+```
 Simulate FreeDV 2400B passing through a 300 to 3000 Hz audio path using sox to filter:
-
+```
   $  ./freedv_tx 2400B ../../raw/ve9qrp_10s.raw - | sox -t raw -r 48000 -s -2 - -t raw - sinc 300-3000 | ./freedv_rx 2400B - - | play -t raw -r 8000 -s -2 -
-
+```
 Links:
 
   FreeDV 2400A blog post ...: http://www.rowetel.com/?p=5119
