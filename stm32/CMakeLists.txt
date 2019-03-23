@@ -108,6 +108,8 @@ endmacro()
 
 include_directories(../src ../unittest inc)
 
+add_subdirectory(unittest/src)
+
 
 
 # Codec 2
