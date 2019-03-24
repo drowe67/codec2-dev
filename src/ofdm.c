@@ -1275,16 +1275,17 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         aamp_est_pilot[i] = 0.0f;
     }
 
-    if (ofdm_high_doppler == 0) {
-        /*
-         * Use all pilots normally, results in low SNR performance,
-         * but will fall over in high Doppler propagation
-         *
-         * Basically we divide the Nc+2 pilots into groups of 3
-         * Then average the phase surrounding each of the data symbols.
-         */
-        for (i = 1; i < (ofdm_nc + 1); i++) {
-            complex float symbol[3];
+    complex float symbol[3];
+
+    for (i = 1; i < (ofdm_nc + 1); i++) {   /* ignore first and last carrier for count */
+        if (ofdm_high_doppler == 0) {
+            /*
+             * Use all pilots normally, results in low SNR performance,
+             * but will fall over in high Doppler propagation
+             *
+             * Basically we divide the Nc+2 pilots into groups of 3
+             * Then average the phase surrounding each of the data symbols.
+             */
 
             for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
                 symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
@@ -1296,7 +1297,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
                 symbol[k] = ofdm->rx_sym[ofdm_ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
             }
 
-            aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
+            aphase_est_pilot_rect += vector_sum(symbol, 3);
 
             /* use pilots in past and future */
 
@@ -1304,43 +1305,42 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
                 symbol[k] = ofdm->rx_sym[0][j] * conjf(ofdm->pilots[j]); /* previous pilot */
             }
 
-            aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
+            aphase_est_pilot_rect += vector_sum(symbol, 3);
 
             for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
                 symbol[k] = ofdm->rx_sym[ofdm_ns + 2][j] * conjf(ofdm->pilots[j]); /* future pilot */
             }
 
-            aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, 3);
+            aphase_est_pilot_rect += vector_sum(symbol, 3);
             aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
             /* amplitude is estimated over 12 pilots */
 
             aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
+        } else {
+            /*
+             * Use only symbols at 'this' and 'next' to quickly track changes
+             * in phase due to high Doppler spread in propagation.
+             * 
+             * As less pilots are averaged, low SNR performance will be poorer
+             */
+            for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+                symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
+            }
+
+            aphase_est_pilot_rect = vector_sum(symbol, 3);
+
+            for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
+                symbol[k] = ofdm->rx_sym[ofdm_ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
+            }
+
+            aphase_est_pilot_rect += vector_sum(symbol, 3);
+            aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
+
+            /* amplitude is estimated over 6 pilots */
+
+            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 6.0f);
         }
-    } else {
-        /*
-         * Use only symbols at 'this' and 'next' to quickly track changes
-         * in phase due to high Doppler spread in propagation.
-         * 
-         * As less pilots are averaged, low SNR performance will be poorer
-         */
-        complex float symbol[ofdm_nc];
-
-        for (j = 1, k = 0; j <= ofdm_nc; j++, k++) {
-            symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
-        }
-
-        aphase_est_pilot_rect = vector_sum(symbol, ofdm_nc);
-
-        for (j = 1, k = 0; j <= ofdm_nc; j++, k++) {
-            symbol[k] = ofdm->rx_sym[ofdm_ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
-        }
-
-        aphase_est_pilot_rect = aphase_est_pilot_rect + vector_sum(symbol, ofdm_nc);
-
-        /* amplitude is estimated over (ofdm_nc * 2) pilots */
-
-        aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / (float) (ofdm_nc * 2));
     }
 
     /*
@@ -1842,3 +1842,4 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
 };
+
