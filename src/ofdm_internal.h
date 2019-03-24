@@ -80,10 +80,15 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
+    int high_doppler; /* boolean for high Doppler mode */
     int ftwindowwidth;
 };
 
 struct OFDM {
+    // Pointers
+
+    struct quisk_cfFilter *ofdm_tx_bpf;
+    
     complex float *pilot_samples;
     complex float *rxbuf;
     complex float *pilots;
@@ -95,17 +100,19 @@ struct OFDM {
 
     uint8_t *tx_uw;
 
+    // State enums
     State sync_state;
     State last_sync_state;
     State sync_state_interleaver;
     State last_sync_state_interleaver;
 
+    // Sync enums
     Sync sync_mode;
 
-    struct quisk_cfFilter *ofdm_tx_bpf;
-    
+    // Complex
     complex float foff_metric;
     
+    // Float
     float foff_est_gain;
     float foff_est_hz;
     float timing_mx;
@@ -115,6 +122,7 @@ struct OFDM {
     float noise_var;
     float mean_amp;
 
+    // Integer
     int clock_offset_counter;
     int verbose;
     int sample_point;
@@ -124,9 +132,9 @@ struct OFDM {
     int uw_errors;
     int sync_counter;
     int frame_count;
-
     int frame_count_interleaver;
 
+    // Boolean
     bool sync_start;
     bool sync_end;
     bool timing_en;
@@ -135,7 +143,7 @@ struct OFDM {
     bool tx_bpf_en;
 };
 
-/* function headers exposed for LDPC work */
+/* Prototypes */
 
 complex float qpsk_mod(int *);
 void qpsk_demod(complex float, int *);
@@ -144,7 +152,7 @@ void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
-void ofdm_generate_payload_data_bits(uint8_t payload_data_bits[], int data_bits_per_frame);
+void ofdm_generate_payload_data_bits(uint8_t [], int);
 
 #ifdef __cplusplus
 }
