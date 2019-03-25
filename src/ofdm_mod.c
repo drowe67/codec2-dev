@@ -63,12 +63,12 @@ void opt_help() {
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");
     fprintf(stderr, "  --testframes Nsecs    Transmit test frames (adjusts test frames for raw and LDPC modes)\n");
     fprintf(stderr, "  --interleave depth    Interleave depth for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
-    fprintf(stderr, "  --tx_freq    freq     Set an optional modulation TX centre frequency (1500.0 default)\n");
-    fprintf(stderr, "  --rx_freq    freq     Set an optional modulation RX centre frequency (1500.0 default)\n\n");
-    fprintf(stderr, "  --verbose      [1|2|3]   Verbose output level to stderr (default off)\n");
+    fprintf(stderr, "  --tx_freq     freq    Set an optional modulation TX centre frequency (1500.0 default)\n");
+    fprintf(stderr, "  --rx_freq     freq    Set an optional modulation RX centre frequency (1500.0 default)\n\n");
+    fprintf(stderr, "  --verbose  [1|2|3]    Verbose output level to stderr (default off)\n");
     fprintf(stderr, "  --txbpf               Transmit band pass filter boolean (default off)\n");
     fprintf(stderr, "  --text                Include a standard text message boolean (default off)\n");
-    fprintf(stderr, "  -i --ldpc    1 | 2    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
+    fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
     fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
