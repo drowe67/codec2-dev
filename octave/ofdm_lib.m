@@ -552,6 +552,12 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % PPP  <-- frame+2
     
     if isfield(states, "high_doppler")
+      high_doppler = states.high_doppler;
+    else
+      high_doppler = 0;
+    end
+    
+    if (high_doppler)
       % Only use pilots at start and end of this frame to track quickly changes in phase
       % present in high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
