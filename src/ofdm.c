@@ -1320,26 +1320,17 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         } else {
             /*
              * Use only symbols at 'this' and 'next' to quickly track changes
-             * in phase due to high Doppler spread in propagation.
+             * in phase due to high Doppler spread in propagation (no neighbor averaging).
              * 
              * As less pilots are averaged, low SNR performance will be poorer
              */
-            for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-                symbol[k] = ofdm->rx_sym[1][j] * conjf(ofdm->pilots[j]); /* this pilot conjugate */
-            }
-
-            aphase_est_pilot_rect = vector_sum(symbol, 3);
-
-            for (j = (i - 1), k = 0; j < (i + 2); j++, k++) {
-                symbol[k] = ofdm->rx_sym[ofdm_ns + 1][j] * conjf(ofdm->pilots[j]); /* next pilot conjugate */
-            }
-
-            aphase_est_pilot_rect += vector_sum(symbol, 3);
+            aphase_est_pilot_rect = ofdm->rx_sym[1][i] * conjf(ofdm->pilots[i]);            /* "this" pilot conjugate */
+            aphase_est_pilot_rect += ofdm->rx_sym[ofdm_ns + 1][i] * conjf(ofdm->pilots[i]); /* "next" pilot conjugate */
             aphase_est_pilot[i] = cargf(aphase_est_pilot_rect);
 
-            /* amplitude is estimated over 6 pilots */
+            /* amplitude is estimated over 2 pilots */
 
-            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 6.0f);
+            aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 2.0f);
         }
     }
 
