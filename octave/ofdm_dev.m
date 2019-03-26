@@ -39,7 +39,7 @@ function [sim_out rx states] = run_sim(sim_in)
     assert(phase_est_en == 1, "\nNo point running HF simulation without phase est!!\n");
   end
   if isfield(sim_in, "high_doppler")
-    states.high_doppler = 1;
+    states.high_doppler = sim_in.high_doppler;
   end
   if isfield(sim_in, "diversity_en")
     diversity_en = sim_in.diversity_en;
@@ -577,18 +577,17 @@ endfunction
 
 
 function run_single(EbNodB = 100, error_pattern_filename);
-  Ts = 0.010; 
-  sim_in.Tcp = 0.004; 
-  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 4;
-  sim_in.high_doppler = 1;
+  Ts = 0.018; sim_in.Tcp = 0.002; 
+  sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
+  sim_in.high_doppler = 0;
   
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 10;
+  sim_in.Nsec = 120;
 
   sim_in.EbNodB = 20;
   sim_in.verbose = 1;
-  sim_in.dopplerSpreadHz = 6;
-  sim_in.path_delay_ms = 3;
+  sim_in.dopplerSpreadHz = 1;
+  sim_in.path_delay_ms = 1;
   sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;

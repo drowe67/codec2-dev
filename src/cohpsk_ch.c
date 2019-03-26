@@ -301,9 +301,17 @@ int main(int argc, char *argv[])
 
             for(i=0; i<BUF_N; i++) {
                 ret = fread(&aspread, sizeof(COMP), 1, ffading);
-                if (ret == 0) goto finish;
+                if (ret == 0) {
+                    fprintf(stderr, "Fading file finished - simulation stopping.  You may need more samples, see "
+                            "top of src/cohpsk_ch.c for instructions.\n");
+                    goto finish;
+                    }
                 ret = fread(&aspread_2ms, sizeof(COMP), 1, ffading);
-                if (ret == 0) goto finish;
+                if (ret == 0) {
+                    fprintf(stderr, "Fading file finished - simulation stopping.  You may need more samples, see "
+                            "top of src/cohpsk_ch.c for instructions.\n");
+                goto finish;
+                }
                 //printf("%f %f %f %f\n", aspread.real, aspread.imag, aspread_2ms.real, aspread_2ms.imag);
 
                 direct    = cmult(aspread, ch_fdm[i]);
