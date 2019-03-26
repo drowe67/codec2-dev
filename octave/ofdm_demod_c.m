@@ -41,7 +41,7 @@ function ofdm_demod_c(filename)
   title('Fine Freq');
   ylabel('Hz')
 
-  figure(4); clf;
+  figure(5); clf;
   plot(snr_est_log_c);
   ylabel('SNR (dB)')
   title('SNR Estimates')
