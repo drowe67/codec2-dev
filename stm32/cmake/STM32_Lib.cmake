@@ -6,7 +6,12 @@
 #set(PERIPHLIBZIP  stm32f4_dsp_stdperiph_lib.zip)
 set(PERIPHLIBVER    1.8.0)
 set(PERIPHLIBNAME   STM32F4xx_DSP_StdPeriph_Lib_V)
-set(PERIPHLIBDIR    ${CMAKE_SOURCE_DIR}/${PERIPHLIBNAME}${PERIPHLIBVER})
+
+if(NOT PERIPHLIBDIR)
+    set(PERIPHLIBDIR    ${CMAKE_SOURCE_DIR}/${PERIPHLIBNAME}${PERIPHLIBVER})
+    message(STATUS "Using default path for StdPeriph Lib: ${PERIPHLIBDIR}")
+endif()
+
 set(CMSIS           ${PERIPHLIBDIR}/Libraries/CMSIS)
 set(STM32F4LIB      ${PERIPHLIBDIR}/Libraries/STM32F4xx_StdPeriph_Driver)
 set(STM32F4TEMPLATE ${PERIPHLIBDIR}/Project/STM32F4xx_StdPeriph_Templates)
