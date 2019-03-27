@@ -42,7 +42,7 @@ set(CMAKE_TOOLCHAIN_FILE "../stm32/cmake/STM32_Toolchain.cmake" CACHE STRING "To
 
 # Set default C flags.
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork -nostartfiles -mcpu=cortex-m4"
-    CACHE STRING "Mandentory build flags." FORCE)
+    CACHE STRING "Mandatory build flags." FORCE)
 
 add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 
@@ -106,7 +106,9 @@ macro(elf2bin target)
     COMMENT "Creating binary for ${target}")
 endmacro()
 
-include_directories(../src ../unittest inc)
+include_directories(../src ../unittest inc ${PROJECT_BINARY_DIR})
+
+add_subdirectory(unittest/src)
 
 
 
@@ -116,7 +118,7 @@ include_directories(../src ../unittest inc)
 set(CODEC2_VERSION_PATH "${PROJECT_BINARY_DIR}/codec2")
 configure_file ("${PROJECT_SOURCE_DIR}/../cmake/version.h.in"
                 "${CODEC2_VERSION_PATH}/version.h" )
-include_directories(${PROJECT_BINARY_DIR})
+
 
 set(CODEC2_SRC ../src)
 set(CODEC2_GEN_CODEBOOK_SRC ../build/src)

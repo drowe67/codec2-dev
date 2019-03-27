@@ -18,11 +18,14 @@ set -a
 #UNITTEST_BASE - Location of STM32 Unittests and files
 UNITTEST_BASE="$( cd "$( dirname "${SCRIPTS}" )" >/dev/null && pwd )"
 
-# UNITTEST_BIN - Location of STM32 unittest binaries
-UNITTEST_BIN="${UNITTEST_BASE}/src"
-
-# STM32_BASE - Base directory of Codec2
+# STM32_BASE - Base directory of Stm32 files
 STM32_BASE="$( cd "$( dirname "${UNITTEST_BASE}" )" >/dev/null && pwd )"
+
+# STM32_BUILD - Build directory of Stm32 files
+STM32_BUILD="${STM32_BASE}/build_stm32"
+
+# UNITTEST_BIN - Location of STM32 unittest binaries
+UNITTEST_BIN="${STM32_BUILD}/unittest/src"
 
 # CODEC2_BASE - Base directory of Codec2
 CODEC2_BASE="$( cd "$( dirname "${STM32_BASE}" )" >/dev/null && pwd )"
