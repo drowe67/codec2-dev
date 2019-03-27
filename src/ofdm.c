@@ -950,7 +950,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
  * This is a wrapper with a new interface to reduce memory allocated.
  * This works with ofdm_demod and freedv_api.
  */
-int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
+int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in) {
     int i, j;
 
     /* shift the buffer left based on nin */
@@ -960,7 +960,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
     /* insert latest input samples onto tail of rxbuf */
 
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = (((float) rxbuf_in[j] / 32767.0f) * gain) + 0.0f * I;
+        ofdm->rxbuf[i] = ((float) rxbuf_in[j] / 32767.0f) + 0.0f * I;
     }
 
     return ofdm_sync_search_core(ofdm);
@@ -1034,7 +1034,7 @@ void ofdm_demod(struct OFDM *ofdm, int *rx_bits, COMP *rxbuf_in) {
  * This is a wrapper with a new interface to reduce memory allocated.
  * This works with ofdm_demod and freedv_api
  */
-void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float gain) {
+void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in) {
     int i, j;
 
     /* shift the buffer left based on nin */
@@ -1046,7 +1046,7 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
     /* insert latest input samples onto tail of rxbuf */
     
     for (i = (ofdm_rxbuf - ofdm->nin), j = 0; i < ofdm_rxbuf; i++, j++) {
-        ofdm->rxbuf[i] = (((float) rxbuf_in[j] / 32767.0f) * gain) + 0.0f * I;
+        ofdm->rxbuf[i] = ((float) rxbuf_in[j] / 32767.0f) + 0.0f * I;
     }
 
     ofdm_demod_core(ofdm, rx_bits);

@@ -441,11 +441,11 @@ int main(int argc, char *argv[]) {
         /* demod */
 
         if (ofdm->sync_state == search) {
-            ofdm_sync_search_shorts(ofdm, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
+            ofdm_sync_search_shorts(ofdm, rx_scaled);
         }
 
         if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled, (OFDM_AMP_SCALE / 2.0f));
+            ofdm_demod_shorts(ofdm, rx_bits, rx_scaled);
             ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
             log_payload_syms = true;
 

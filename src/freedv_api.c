@@ -1799,8 +1799,6 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     int parityCheckCount = 0;
     uint8_t rx_uw[ofdm_nuwbits];
 
-    float new_gain = gain / OFDM_AMP_SCALE;
-    
     /* echo samples back out as default (say if sync not found) */
     
     *valid = 1;
@@ -1813,13 +1811,13 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     /* looking for modem sync */
     
     if (ofdm->sync_state == search) {
-        ofdm_sync_search_shorts(f->ofdm, demod_in_8kHz, new_gain);
+        ofdm_sync_search_shorts(f->ofdm, demod_in_8kHz);
     }
 
      /* OK modem is in sync */
     
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        ofdm_demod_shorts(ofdm, rx_bits, demod_in_8kHz, new_gain);
+        ofdm_demod_shorts(ofdm, rx_bits, demod_in_8kHz);
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
