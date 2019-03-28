@@ -88,7 +88,8 @@ int main(int argc,char *argv[]){
      
      int o = 0;
      int opt_idx = 0;
-     while( o != -1 ){
+
+     while (o != -1 ){
         static struct option long_opts[] = {
             {"help",      no_argument,        0, 'h'},
             {"lbr",       no_argument,        0, 'l'},
@@ -122,9 +123,11 @@ int main(int argc,char *argv[]){
                 break;
             case 't':
                 enable_stats = 1;
-                if(optarg != NULL){
+
+                if (optarg != NULL) {
                     stats_rate = atoi(optarg);
-                    if(stats_rate == 0){
+
+                    if (stats_rate == 0) {
                         stats_rate = 8;
                     }
                 }
@@ -141,7 +144,7 @@ int main(int argc,char *argv[]){
                 }
                 break;
             case 'u':
-                if (optarg != NULL){
+                if (optarg != NULL) {
                     fsk_upper = atoi(optarg);
                 }
                 break;
@@ -193,15 +196,15 @@ int main(int argc,char *argv[]){
     }
     
     /* Open files */
-    if(strcmp(argv[dx + 3],"-")==0){
+    if (strcmp(argv[dx + 3],"-")==0){
         fin = stdin;
-    }else{
+    } else {
         fin = fopen(argv[dx + 3],"r");
     }
     
-    if(strcmp(argv[dx + 4],"-")==0){
+    if (strcmp(argv[dx + 4],"-")==0){
         fout = stdout;
-    }else{
+    } else {
         fout = fopen(argv[dx + 4],"w");
     }
     
@@ -209,9 +212,9 @@ int main(int argc,char *argv[]){
     /* set up FSK */
     if(!hbr) {
         fsk = fsk_create(Fs,Rs,M,1200,400);
-    }
-    else {
+    } else {
         fsk = fsk_create_hbr(Fs,Rs,P,M,1200,400);
+
         if(fsk_lower> 0 && fsk_upper > fsk_lower){
             fsk_set_est_limits(fsk,fsk_lower,fsk_upper);
             fprintf(stderr,"Setting estimator limits to %d to %d Hz.\n",fsk_lower, fsk_upper);
@@ -227,6 +230,7 @@ int main(int argc,char *argv[]){
          
     int      testframecnt, bitcnt, biterr, testframe_detected;
     uint8_t *bitbuf_tx = NULL, *bitbuf_rx = NULL;
+
     if (testframe_mode) {
         bitbuf_tx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_tx != NULL);
         bitbuf_rx = (uint8_t*)malloc(sizeof(uint8_t)*TEST_FRAME_SIZE); assert(bitbuf_rx != NULL);
@@ -234,6 +238,7 @@ int main(int argc,char *argv[]){
         /* Generate known tx frame from known seed */
         
         srand(158324);
+
         for(i=0; i<TEST_FRAME_SIZE; i++){
             bitbuf_tx[i] = rand()&0x1;
             bitbuf_rx[i] = 0;
@@ -252,12 +257,15 @@ int main(int argc,char *argv[]){
     
     /* allocate buffers for processing */
     if(soft_dec_mode){
-        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits); assert(sdbuf != NULL);
+        sdbuf = (float*)malloc(sizeof(float)*fsk->Nbits);
+        assert(sdbuf != NULL);
     }else{
-        bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits); assert(bitbuf != NULL);
+        bitbuf = (uint8_t*)malloc(sizeof(uint8_t)*fsk->Nbits);
+        assert(bitbuf != NULL);
     }
-    rawbuf = (int16_t*)malloc(bytes_per_sample*(fsk->N+fsk->Ts*2)*complex_input);
-    modbuf = (COMP*)malloc(sizeof(COMP)*(fsk->N+fsk->Ts*2));
+
+    rawbuf = (int16_t *) malloc(bytes_per_sample * (fsk->N+fsk->Ts*2) * complex_input);
+    modbuf = (COMP *) malloc(sizeof(COMP) * (fsk->N+fsk->Ts*2));
 
     /* set up signal handler so we can terminate gracefully */
     
@@ -273,24 +281,23 @@ int main(int argc,char *argv[]){
        if (complex_input == 1) {
             /* S16 real input */
             for(i=0;i<fsk_nin(fsk);i++){
-                modbuf[i].real = ((float)rawbuf[i])/FDMDV_SCALE;
-                modbuf[i].imag = 0.0;
+                modbuf[i].real = (float) rawbuf[i] / 32767.0f;
+                modbuf[i].imag = 0.0f;
             }
-        }
-        else {
+       } else {
             if (bytes_per_sample == 1) {
-                /* U8 complex */
-                uint8_t *rawbuf_u8 = (uint8_t*)rawbuf;
-                for(i=0;i<fsk_nin(fsk);i++){
-                    modbuf[i].real = ((float)rawbuf_u8[2*i]-127.0)/128.0;
-                    modbuf[i].imag = ((float)rawbuf_u8[2*i+1]-127.0)/128.0;
+                /* U8 complex we cheat and convert to signed +/- 127 */
+                int8_t *rawbuf_s8 = (int8_t *) rawbuf;
+
+                for (i = 0; i < fsk_nin(fsk); i++) {
+                    modbuf[i].real = (float) rawbuf_s8[2 * i    ] / 127.0; // 255 =  1.0
+                    modbuf[i].imag = (float) rawbuf_s8[2 * i + 1] / 127.0; //   0 = -1.0
                 }
-            }
-            else {
+            } else {
                 /* S16 complex */
-                for(i=0;i<fsk_nin(fsk);i++){
-                    modbuf[i].real = ((float)rawbuf[2*i])/FDMDV_SCALE;
-                    modbuf[i].imag = ((float)rawbuf[2*i+1]/FDMDV_SCALE);
+                for (i = 0; i < fsk_nin(fsk); i++) {
+                    modbuf[i].real = (float) rawbuf[2 * i    ] / 32767.0f;
+                    modbuf[i].imag = (float) rawbuf[2 * i + 1] / 32767.0f;
                 }
             }            
         }
@@ -312,7 +319,7 @@ int main(int argc,char *argv[]){
                     bitbuf_rx[i] = bitbuf_rx[i+1];
                 }
                 if (soft_dec_mode == 1) {
-                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0;
+                    bitbuf_rx[TEST_FRAME_SIZE-1] = sdbuf[j] < 0.0f;
                 }
                 else {
                     bitbuf_rx[TEST_FRAME_SIZE-1] = bitbuf[j];
@@ -334,6 +341,7 @@ int main(int argc,char *argv[]){
                     testframecnt++;
                     bitcnt += TEST_FRAME_SIZE;
                     biterr += errs;
+
                     if (enable_stats == 0) {
                         fprintf(stderr,"errs: %d FSK BER %f, bits tested %d, bit errors %d\n",
                             errs, ((float)biterr/(float)bitcnt),bitcnt,biterr);
@@ -366,21 +374,30 @@ int main(int argc,char *argv[]){
                     fprintf(stderr,",\t\"eye_diagram\":[");                 
                     for(i=0;i<stats.neyetr;i++){
                         fprintf(stderr,"[");
+
                         for(j=0;j<stats.neyesamp;j++){
                             fprintf(stderr,"%f ",stats.rx_eye[i][j]);
                             if(j<stats.neyesamp-1) fprintf(stderr,",");
                         }
+
                         fprintf(stderr,"]");
-                        if(i<stats.neyetr-1) fprintf(stderr,",");
+
+                        if(i<stats.neyetr-1)
+                            fprintf(stderr,",");
                     }
+
                     fprintf(stderr,"],");
 	    
                     /* Print a sample of the FFT from the freq estimator */
                     fprintf(stderr,"\"samp_fft\":[");
+
                     Ndft = fsk->Ndft/2;
+
                     for(i=0; i<Ndft; i++){
                         fprintf(stderr,"%f ",(fsk->fft_est)[i]);
-                        if(i<Ndft-1) fprintf(stderr,",");
+                        
+                        if (i<Ndft-1)
+                            fprintf(stderr,",");
                     }
                     fprintf(stderr,"]");
                 }

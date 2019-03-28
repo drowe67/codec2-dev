@@ -178,8 +178,10 @@ int main(int argc, char *argv[]) {
         if (verbose) {
             fprintf(stderr, "read nin %d\n", horus_nin(hstates));
         }
+
         if (horus_rx(hstates, ascii_out, demod_in)) {
             fprintf(stdout, "%s", ascii_out);
+
             if (crc_results) {
                 if (horus_crc_ok(hstates)) {
                     fprintf(stdout, "  CRC OK");
@@ -187,6 +189,7 @@ int main(int argc, char *argv[]) {
                     fprintf(stdout, "  CRC BAD");
                 }
             }
+
             fprintf(stdout, "\n");
         }
         
@@ -208,15 +211,23 @@ int main(int argc, char *argv[]) {
 	    /* Print the eye diagram */
 
             fprintf(stderr,",\t\"eye_diagram\":[");
-            for(i=0;i<stats.neyetr;i++){
+
+            for (i = 0; i < stats.neyetr; i++) {
                 fprintf(stderr,"[");
-                for(j=0;j<stats.neyesamp;j++){
+
+                for (j = 0; j < stats.neyesamp; j++) {
                     fprintf(stderr,"%f ",stats.rx_eye[i][j]);
-                    if(j<stats.neyesamp-1) fprintf(stderr,",");
+
+                    if (j < stats.neyesamp-1)
+                        fprintf(stderr,",");
                 }
+
                 fprintf(stderr,"]");
-                if(i<stats.neyetr-1) fprintf(stderr,",");
+
+                if (i < stats.neyetr-1)
+                    fprintf(stderr,",");
             }
+
             fprintf(stderr,"],");
 	    
 	    fprintf(stderr,"\"samp_fft\":[");
@@ -227,18 +238,24 @@ int main(int argc, char *argv[]) {
 	    /* Print a sample of the FFT from the freq estimator */
 
 	    Ndft = hstates->fsk->Ndft/2;
-	    for(i=0; i<Ndft; i++){
+
+	    for (i = 0; i < Ndft; i++){
 		fprintf(stderr,"%f ",(hstates->fsk->fft_est)[i]);
-		if(i<Ndft-1) fprintf(stderr,",");
+		
+                if(i<Ndft-1)
+                    fprintf(stderr, ",");
 	    }
             #else
 
             /* All zero dummy data for now */
 
  	    Ndft = 128;
-	    for(i=0; i<Ndft; i++) {
+
+	    for (i = 0; i < Ndft; i++) {
 		fprintf(stderr,"%f ", 0.0);
-		if(i<Ndft-1) fprintf(stderr,",");
+		
+                if (i < Ndft-1)
+                    fprintf(stderr, ",");
 	    }
             
             #endif
@@ -246,9 +263,10 @@ int main(int argc, char *argv[]) {
 	    fprintf(stderr,"]}\n");
             stats_ctr = stats_loop;
         }
+
         stats_ctr--;
 
-        if (fin == stdin || fout == stdin){
+        if (fin == stdin || fout == stdin) {
             fflush(fin);
             fflush(fout);
         }

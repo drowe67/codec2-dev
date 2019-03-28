@@ -41,7 +41,6 @@
 
 #include "freedv_api.h"
 #include "modem_stats.h"
-
 #include "codec2.h"
 
 #define NDISCARD 5                /* BER measure optionally discards first few frames after sync */
@@ -52,6 +51,7 @@ struct my_callback_state {
 
 void my_put_next_rx_char(void *callback_state, char c) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+
     if (pstate->ftxt != NULL) {
         fprintf(pstate->ftxt, "text msg: %c\n", c);
     }
@@ -59,21 +59,26 @@ void my_put_next_rx_char(void *callback_state, char c) {
 
 void my_put_next_rx_proto(void *callback_state,char *proto_bits){
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+
     if (pstate->ftxt != NULL) {
         fprintf(pstate->ftxt, "proto chars: %.*s\n",2, proto_bits);
     }
 }
 
 /* Called when a packet has been received */
+
 void my_datarx(void *callback_state, unsigned char *packet, size_t size) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
+
     if (pstate->ftxt != NULL) {
         size_t i;
 	
 	fprintf(pstate->ftxt, "data (%zd bytes): ", size);
+
 	for (i = 0; i < size; i++) {
 	    fprintf(pstate->ftxt, "0x%02x ", packet[i]);
 	}
+
 	fprintf(pstate->ftxt, "\n");
     }
 }
@@ -81,6 +86,7 @@ void my_datarx(void *callback_state, unsigned char *packet, size_t size) {
 /* Called when a new packet can be send */
 void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
     /* This should not happen while receiving.. */
+
     fprintf(stderr, "datarx callback called, this should not happen!\n");    
     *size = 0;
 }
@@ -99,7 +105,6 @@ int main(int argc, char *argv[]) {
     struct CODEC2             *c2 = NULL;
     int                        i;
 
-    
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
                " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard]\n", argv[0]);
@@ -108,35 +113,44 @@ int main(int argc, char *argv[]) {
     }
 
     mode = -1;
+
     if (!strcmp(argv[1],"1600"))
         mode = FREEDV_MODE_1600;
-    if (!strcmp(argv[1],"700"))
+
+    else if (!strcmp(argv[1],"700"))
         mode = FREEDV_MODE_700;
-    if (!strcmp(argv[1],"700B"))
+
+    else if (!strcmp(argv[1],"700B"))
         mode = FREEDV_MODE_700B;
-    if (!strcmp(argv[1],"700C"))
+
+    else if (!strcmp(argv[1],"700C"))
         mode = FREEDV_MODE_700C;
-    if (!strcmp(argv[1],"700D"))
+
+    else if (!strcmp(argv[1],"700D"))
         mode = FREEDV_MODE_700D;
-    if (!strcmp(argv[1],"2400A"))
+
+    else if (!strcmp(argv[1],"2400A"))
         mode = FREEDV_MODE_2400A;
-    if (!strcmp(argv[1],"2400B"))
+
+    else if (!strcmp(argv[1],"2400B"))
         mode = FREEDV_MODE_2400B;
-    if (!strcmp(argv[1],"800XA"))
+
+    else if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+
     assert(mode != -1);
 
-    if (strcmp(argv[2], "-")  == 0) fin = stdin;
+    if (strcmp(argv[2], "-")  == 0)
+        fin = stdin;
     else if ( (fin = fopen(argv[2],"rb")) == NULL ) {
-	fprintf(stderr, "Error opening input raw modem sample file: %s: %s.\n",
-         argv[2], strerror(errno));
+	fprintf(stderr, "Error opening input raw modem sample file: %s: %s.\n", argv[2], strerror(errno));
 	exit(1);
     }
 
-    if (strcmp(argv[3], "-") == 0) fout = stdout;
+    if (strcmp(argv[3], "-") == 0)
+        fout = stdout;
     else if ( (fout = fopen(argv[3],"wb")) == NULL ) {
-	fprintf(stderr, "Error opening output speech sample file: %s: %s.\n",
-         argv[3], strerror(errno));
+	fprintf(stderr, "Error opening output speech sample file: %s: %s.\n", argv[3], strerror(errno));
 	exit(1);
     }
 
@@ -147,6 +161,7 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--testframes") == 0) {
                 use_testframes = 1;
             }
+
             if (strcmp(argv[i], "--codecrx") == 0) {
                 int c2_mode;
 
@@ -159,6 +174,7 @@ int main(int argc, char *argv[]) {
                 } else {
                     c2_mode = CODEC2_MODE_1300;
                 }
+
                 use_codecrx = 1;
 
                 c2 = codec2_create(c2_mode);
@@ -168,9 +184,11 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--interleave") == 0) {
                 interleave_frames = atoi(argv[i+1]);
             }
+
             if (strcmp(argv[i], "-v") == 0) {
                 verbose = 1;
             }
+
             if (strcmp(argv[i], "--discard") == 0) {
                 discard = 1;
             }
@@ -181,10 +199,10 @@ int main(int argc, char *argv[]) {
         struct freedv_advanced adv;
         adv.interleave_frames = interleave_frames;
         freedv = freedv_open_advanced(mode, &adv);
-    }
-    else {
+    } else {
         freedv = freedv_open(mode);
     }
+
     assert(freedv != NULL);
 
     freedv_set_test_frames(freedv, use_testframes);
@@ -209,14 +227,20 @@ int main(int argc, char *argv[]) {
        speech samples is time varying (nout). */
 
     nin = freedv_nin(freedv);
-    while(fread(demod_in, sizeof(short), nin, fin) == nin) {
+
+    /*
+     * Read in S+16 bit PCM to demod_in
+     */
+    while (fread(demod_in, sizeof(short), nin, fin) == nin) {
         frame++;
         
         if (use_codecrx == 0) {
             /* usual case: use the freedv_api to do everything: speech decoding, demodulating */
+
             nout = freedv_rx(freedv, speech_out, demod_in);
         } else {
             /* demo of codecrx mode - separate demodulation and speech decoding */
+
             int bits_per_codec_frame = codec2_bits_per_frame(c2);
             int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
             int codec_frames = freedv_get_n_codec_bits(freedv) / bits_per_codec_frame;
@@ -227,11 +251,13 @@ int main(int argc, char *argv[]) {
             nout = freedv_codecrx(freedv, encoded, demod_in);
 
             /* decode the speech ourself (or send it to elsewhere, e.g. network) */
+
             if (nout) {
                 unsigned char *enc_frame = encoded;
                 short *speech_frame = speech_out;
                 
                 nout = 0;
+
                 for (i = 0; i < codec_frames; i++) {
                     codec2_decode(c2, speech_frame, enc_frame);
                     enc_frame += bytes_per_codec_frame;

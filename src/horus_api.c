@@ -378,9 +378,10 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
     
     for (i=0; i<hstates->fsk->nin; i++) {
-        demod_in_comp[i].real = demod_in[i];
-        demod_in_comp[i].imag = 0;
+        demod_in_comp[i].real = (float) demod_in[i] / 32767.0f;
+        demod_in_comp[i].imag = 0.0f;
     }
+
     fsk_demod(hstates->fsk, &hstates->rx_bits[rx_bits_len-Nbits], demod_in_comp);
     free(demod_in_comp);
     
@@ -398,14 +399,18 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
         if (hstates->mode == HORUS_MODE_RTTY) {
             packet_detected = extract_horus_rtty(hstates, ascii_out, uw_loc);
         }
+
         if (hstates->mode == HORUS_MODE_BINARY) {
             packet_detected = extract_horus_binary(hstates, ascii_out, uw_loc);
             //#define DUMP_BINARY_PACKET
             #ifdef DUMP_BINARY_PACKET
-            FILE *f = fopen("packetbits.txt", "wt"); assert(f != NULL);
+            FILE *f = fopen("packetbits.txt", "wt");
+            assert(f != NULL);
+
             for(i=0; i<hstates->max_packet_len; i++) {
                 fprintf(f,"%d ", hstates->rx_bits[uw_loc+i]);
             }
+
             fclose(f);
             exit(0);
             #endif
@@ -502,3 +507,4 @@ void horus_set_total_payload_bits(struct horus *hstates, int val) {
     assert(hstates != NULL);
     hstates->total_payload_bits = val;
 }
+
