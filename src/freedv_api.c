@@ -134,6 +134,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->error_pattern_callback_state = NULL;
     f->n_protocol_bits = 0;
     f->frames = 0;
+    f->speech_sample_rate = FS_VOICE_8K;
     
     /* Init states for this mode, and set up samples in/out -----------------------------------------*/
     
@@ -2433,6 +2434,7 @@ int freedv_get_total_bit_errors           (struct freedv *f) {return f->total_bi
 int freedv_get_total_bits_coded           (struct freedv *f) {return f->total_bits_coded;}
 int freedv_get_total_bit_errors_coded     (struct freedv *f) {return f->total_bit_errors_coded;}
 int freedv_get_sync                       (struct freedv *f) {return f->stats.sync;}
+int freedv_get_speech_sample_rate         (struct freedv *f) {return f->speech_sample_rate;}
 
 int freedv_get_sync_interleaver(struct freedv *f) {
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {

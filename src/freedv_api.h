@@ -49,6 +49,7 @@
 #define FREEDV_MODE_800XA       5
 #define FREEDV_MODE_700C        6
 #define FREEDV_MODE_700D        7
+#define FREEDV_MODE_2020        8
 
 
 #ifndef FREEDV_MODE_EN_DEFAULT
@@ -204,6 +205,8 @@ struct CODEC2 *freedv_get_codec2    (struct freedv *freedv);
 int freedv_get_n_codec_bits         (struct freedv *freedv);
 int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
+int freedv_get_speech_sample_rate   (struct freedv *freedv);
+
 
 #endif
 

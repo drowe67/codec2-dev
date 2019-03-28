@@ -71,6 +71,7 @@ struct freedv {
                                                  // usually the same as n_nom_modem_samples, except for 700..700C
     int                  modem_sample_rate;      // Caller is responsible for meeting this
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
+    int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;

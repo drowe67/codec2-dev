@@ -43,6 +43,8 @@
 #define PI             3.141592654
 #endif
 #define FS                    8000  /* sample rate in Hz                                                    */
+#define FS_VOICE_8K           8000  /* speech sample rate, 8000 Hz                                          */
+#define FS_VOICE_16K          16000 /* speech sample rate, 16000 Hz                                          */
 #define T                 (1.0/FS)  /* sample period in seconds                                             */
 #define RS                      50  /* symbol rate in Hz                                                    */
 #define NC                      20  /* max number of data carriers (plus one pilot in the centre)           */
