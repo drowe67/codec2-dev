@@ -95,15 +95,20 @@ endif(MINGW)
 #
 # Find the svn revision if this is a working copy.
 #
-get_filename_component(_src_dir "${CMAKE_SOURCE_DIR}" NAME)
-if("${_src_dir}" STREQUAL "codec2-dev")
-    find_package(Subversion QUIET)
-    if(Subversion_FOUND)
-        Subversion_WC_INFO(${CMAKE_CURRENT_SOURCE_DIR} CODEC2)
-        message(STATUS "Codec2 svn revision: ${CODEC2_WC_REVISION}")
-    else(Subversion_FOUND)
-        message(WARNING "Subversion not found. Can not determine svn revision.")
-    endif(Subversion_FOUND)
+if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
+    find_package(Git)
+    if(Git_FOUND)
+        execute_process(
+            COMMAND "${GIT_EXECUTABLE}" describe --always HEAD
+            WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+            RESULT_VARIABLE res
+            OUTPUT_VARIABLE CODEC2_HASH
+            ERROR_QUIET
+            OUTPUT_STRIP_TRAILING_WHITESPACE)
+        message(STATUS "Codec2 current git hash: ${CODEC2_HASH}")
+    else()
+        message(WARNING "Git not found. Can not determine current commit hash.")
+    endif()
 endif()
 
 
