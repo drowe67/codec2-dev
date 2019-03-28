@@ -743,7 +743,7 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
     float foff_est = ofdm_fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
 
     if (ofdm->verbose > 2) {
-        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), foff_est);
+        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double)foff_est);
     }
 
     return foff_est;
@@ -1058,7 +1058,8 @@ void ofdm_demod_shorts(struct OFDM *ofdm, int *rx_bits, short *rxbuf_in, float g
  */
 static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     int prev_timing_est = ofdm->timing_est;
-    int i, j, k, rr, st, en;
+    int rr, st, en;
+    unsigned int i, j, k;
 
     /*
      * get user and calculated freq offset
@@ -1301,6 +1302,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     }
 
     complex float symbol[3];
+    for (i=0; i<3; i++) symbol[i] = 0.0f + 0.0f * I;
 
     for (i = 1; i < (ofdm_nc + 1); i++) { /* ignore first and last carrier for count */
         if (ofdm_high_doppler == 0) {
