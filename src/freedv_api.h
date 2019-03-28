@@ -150,7 +150,7 @@ int  freedv_data_ntxframes (struct freedv *freedv);
 
 int freedv_nin      (struct freedv *freedv);
 int freedv_rx       (struct freedv *freedv, short speech_out[], short demod_in[]);
-int freedv_shortrx  (struct freedv *freedv, short speech_out[], short demod_in[], float gain);
+int freedv_shortrx  (struct freedv *freedv, short speech_out[], short demod_in[]);
 int freedv_floatrx  (struct freedv *freedv, short speech_out[], float demod_in[]);
 int freedv_comprx   (struct freedv *freedv, short speech_out[], COMP  demod_in[]);
 int freedv_codecrx  (struct freedv *freedv, unsigned char *packed_codec_bits, short demod_in[]);

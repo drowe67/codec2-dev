@@ -1305,21 +1305,20 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     
     if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || 
          (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))) {
-
-        float gain = 1.0;
         
         /* FDM RX happens with complex samps, so do that */
         COMP rx_fdm[f->n_max_modem_samples];
+
         for(i=0; i<nin; i++) {
-            rx_fdm[i].real = gain*(float)demod_in[i];
-            rx_fdm[i].imag = 0.0;
+            rx_fdm[i].real = ((float) demod_in[i] / 32767.0f);
+            rx_fdm[i].imag = 0.0f;
         }
+
         return freedv_comprx(f, speech_out, rx_fdm);
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        float gain = 2.0; /* keep levels the same as Octave simulations and C unit tests for real signals */
-        return freedv_shortrx(f, speech_out, demod_in, gain);
+        return freedv_shortrx(f, speech_out, demod_in);
     }
     
     return 0; /* should never get here */
@@ -1346,9 +1345,11 @@ int freedv_comprx_fsk(struct freedv *f, COMP demod_in[], int *valid) {
         /* 2400B needs real input samples */
         int n = fmfsk_nin(f->fmfsk);
         float demod_in_float[n];
+
         for(i=0; i<n; i++) {
             demod_in_float[i] = demod_in[i].real;
         }
+
         fmfsk_demod(f->fmfsk,(uint8_t*)f->tx_bits,demod_in_float);
         f->nin = fmfsk_nin(f->fmfsk);
     }
@@ -1394,9 +1395,10 @@ int freedv_floatrx(struct freedv *f, short speech_out[], float demod_in[]) {
     assert(nin <= f->n_max_modem_samples);
     
     COMP rx_fdm[f->n_max_modem_samples];
+
     for(i=0; i<nin; i++) {
         rx_fdm[i].real = demod_in[i];
-        rx_fdm[i].imag = 0;
+        rx_fdm[i].imag = 0.0f;
     }
 
     return freedv_comprx(f, speech_out, rx_fdm);
@@ -1765,7 +1767,7 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
     [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
 */
 
-static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gain, int *valid) {
+static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], int *valid) {
     int   bits_per_codec_frame, bytes_per_codec_frame;
     int   i, j, bit, byte, nout, k;
     int   n_ascii;
@@ -2024,7 +2026,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
 }
 
 /* 700D version */
-int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
+int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[]) {
     assert(f != NULL);
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, nout = 0;
@@ -2036,7 +2038,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        nout = freedv_comprx_700d(f, demod_in, gain, &valid);
+        nout = freedv_comprx_700d(f, demod_in, &valid);
     }
     
     if (valid == 0) {
@@ -2110,7 +2112,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        freedv_comprx_700d(f, demod_in, 1.0, &valid);
+        freedv_comprx_700d(f, demod_in, &valid);
 
         int data_bits_per_frame = f->ldpc->data_bits_per_frame;
         int frames = data_bits_per_frame/bits_per_codec_frame;
