@@ -20,7 +20,7 @@ Also see INSTALL for more general building and installing instructions.
 
 1/ Listen to Codec 2:
 ```
-$ cd codec2-dev
+$ cd codec2
 $ mkdir build_linux
 $ cd build_linux
 $ cmake ..
@@ -153,7 +153,7 @@ On Ubuntu 17:
 ```
 $ sudo apt-get install mingw-w64
 $ mkdir build_windows && cd build_windows
-$ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2-dev/build_linux/src/generate_codebook 
+$ cmake .. -DCMAKE_TOOLCHAIN_FILE=/home/david/freedv-dev/cmake/Toolchain-Ubuntu-mingw32.cmake -DUNITTEST=FALSE -DGENERATE_CODEBOOK=/home/david/codec2/build_linux/src/generate_codebook 
 $ make
 ```
 ## Building for Windows on a Windows machine
