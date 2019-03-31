@@ -743,7 +743,7 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
     float foff_est = ofdm_fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
 
     if (ofdm->verbose > 2) {
-        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), foff_est);
+        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double) foff_est);
     }
 
     return foff_est;
