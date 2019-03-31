@@ -106,7 +106,7 @@ void mel_sample_freqs_kHz(float rate_K_sample_freqs_kHz[], int K, float mel_star
 
     mel = mel_start;
     for (k=0; k<K; k++) {
-        rate_K_sample_freqs_kHz[k] = 0.7*(pow(10.0, (mel/2595.0)) - 1.0);
+        rate_K_sample_freqs_kHz[k] = 0.7*(POW10F(mel/2595.0) - 1.0);
         mel += step;
     }
 }
@@ -131,7 +131,7 @@ void resample_const_rate_f(C2CONST *c2const, MODEL *model, float rate_K_vec[], f
 
     AmdB_peak = -100.0;
     for(m=1; m<=model->L; m++) {
-        AmdB[m] = 20.0*log10(model->A[m]+1E-16);
+        AmdB[m] = 20.0*log10f(model->A[m]+1E-16);
         if (AmdB[m] > AmdB_peak) {
             AmdB_peak = AmdB[m];
         }
@@ -351,7 +351,7 @@ void resample_rate_L(C2CONST *c2const, MODEL *model, float rate_K_vec[], float r
 
    interp_para(&AmdB[1], rate_K_sample_freqs_kHz_term, rate_K_vec_term, K+2, &rate_L_sample_freqs_kHz[1], model->L);    
    for(m=1; m<=model->L; m++) {
-       model->A[m] = pow(10.0,  AmdB[m]/20.0);
+       model->A[m] = POW10F(AmdB[m]/20.0);
        // printf("m: %d f: %f AdB: %f A: %f\n", m, rate_L_sample_freqs_kHz[m], AmdB[m], model->A[m]);
    }
 }

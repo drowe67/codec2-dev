@@ -79,7 +79,7 @@
 
 #define NDISCARD 20
 
-extern const int payload_data_bits[];
+extern const uint8_t payload_data_bits[];
 extern const int test_bits_ofdm[];
 
 static struct OFDM_CONFIG *ofdm_config;

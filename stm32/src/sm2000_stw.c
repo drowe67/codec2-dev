@@ -70,7 +70,7 @@ int main(void) {
     uint64_t freq_in_Hz_times_100;
     struct FSK * fsk;
     struct freedv_vhf_deframer * deframer;
-    float * mod_buf;
+    float* mod_buf;
     
     sm1000_leds_switches_init();
     led_pwr(1);
@@ -82,7 +82,7 @@ int main(void) {
 		led_err(1);
 		while(1);
 	}
-    mod_buf = malloc(sizeof(float)*fsk->Nmem);
+    mod_buf = malloc(sizeof(*mod_buf)*fsk->Nmem);
     init_debug_blinky();
     txrx_12V(0);
 
@@ -146,7 +146,7 @@ int main(void) {
 				}
 				if(mbptr>=nin){
 					led_rt(1);
-					fsk_demod(fsk,bit_buf,mod_buf);
+					fsk_demod(fsk,bit_buf,(COMP*)mod_buf);
 					led_rt(0);
 					if(fvhff_deframe_bits(deframer,c2_buffer,NULL,NULL,bit_buf)){
 						led_err(1);		

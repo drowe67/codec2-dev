@@ -141,7 +141,7 @@ struct COHPSK *cohpsk_create(void)
 
         /* note non-linear carrier spacing to help PAPR, works v well in conjunction with CLIP */
 
-        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + pow(c + 1.0, 0.98) );
+        freq_hz = fdmdv->fsep*( -(COHPSK_NC*ND)/2 - 0.5 + powf(c + 1.0, 0.98) );
 
 	fdmdv->freq[c].real = cosf(2.0*M_PI*freq_hz/COHPSK_FS);
  	fdmdv->freq[c].imag = sinf(2.0*M_PI*freq_hz/COHPSK_FS);
@@ -943,8 +943,8 @@ void rate_Fs_rx_processing(struct COHPSK *coh, COMP ch_symb[][COHPSK_NC*ND], COM
             /* loop filter made up of 1st order IIR plus integrator.  Integerator
                was found to be reqd  */
 
-            fdmdv->foff_filt = (1.0-beta)*fdmdv->foff_filt + beta*atan2(mod_strip.imag, mod_strip.real);
-            //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2(mod_strip.imag, mod_strip.real));
+            fdmdv->foff_filt = (1.0-beta)*fdmdv->foff_filt + beta*atan2f(mod_strip.imag, mod_strip.real);
+            //printf("foff_filt: %f angle: %f\n", fdmdv->foff_filt, atan2f(mod_strip.imag, mod_strip.real));
             *f_est += g*fdmdv->foff_filt;
         }
 
@@ -1127,7 +1127,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
             */
              frame_sync_fine_freq_est(coh, &ch_symb[(NSW-1)*NSYMROWPILOT], sync, &next_sync);
 
-            if (fabs(coh->f_fine_est) > 2.0) {
+            if (fabsf(coh->f_fine_est) > 2.0) {
                 if (coh->verbose)
                     fprintf(stderr, "  [%d] Hmm %f is a bit big :(\n", coh->frame, (double)coh->f_fine_est);
                 next_sync = 0;
@@ -1200,7 +1200,7 @@ void cohpsk_demod(struct COHPSK *coh, float rx_bits[], int *sync_good, COMP rx_f
 
 int cohpsk_fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm)
 {
-    double tin, f;
+    float tin, f;
     int   tout, t1, t2;
 
     tin = 0.0; tout = 0;
