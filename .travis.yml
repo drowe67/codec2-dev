@@ -30,9 +30,8 @@ install:
     - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget -q $GCC_URL -O $GCC_ARCHIVE; tar xfj $GCC_ARCHIVE -C $HOME; fi
     - export CODEC2DEV=${PWD}
     - export MAKEFLAGS=-j2 
-    - export BUILDDIR=${PWD}/build
-    - export BUILDSTD=${BUILDDIR}/normal
-    - export BUILDSTM=${BUILDDIR}/stm32
+    - export BUILDSTD=${CODEC2DEV}/build_linux
+    - export BUILDSTM=${CODEC2DEV}/stm32/build_stm32
     - export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
     - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME stdperiph_lib.zip; fi
 script:

@@ -2,6 +2,9 @@ README_unittest.txt
 Don Reid 2018/2019
 
 This is the unittest system for the stm32 implementation of codec2/FreeDV
+It is currently only working on linux systems. It requires a STM32F4xx processor 
+development board connected to/having a ST-LINK , e.g. 
+a STM32F4 Discovery board. 
 
 Objectives
 ==========
@@ -49,6 +52,14 @@ Debug and semihosting
 Building and Running the stm32 Unit Tests
 =========================================
 
+0/ Build codec2 for linux and stm32 
+
+   Run the linux cmake build using /path/to/codec2/build_linux 
+   as build directory, see instructions in the codec2 top level directory.
+
+   Run the stm32 cmake build using /path/to/codec2/stm32/build_stm32 
+   as build directory, see instructions in the stm32 directory.
+   
 1/ Build stlink:
 
   $ cd ~
@@ -71,32 +82,13 @@ Building and Running the stm32 Unit Tests
   2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
-
-2/ The STM32 Standard Preipheral Library is required and requires
-   registration to download. Save the zip file somewhere safe, then
-   extract to a directory of your choice, for example:
-
-   $ cd /periph/lib/path
-   $ unzip /path/to/en.stm32f4_dsp_stdperiph_lib.zip
-
-   The unittest Makefile requires a path to the unzipped Standard
-   Preipheral Library, this can be set by adding a local.mak file in
-   the codec2-dev/stm32/unittest directory:
-
-   $ cd ~/codec2-dev/stm32/unittest/src
-   $ echo 'PERIPHLIBDIR = /periph/lib/path/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0' > local.mak
-
-3/ Now we can build the unittests:
-
-   $ cd codec2-dev/stm32/unittest/src
-   $ make
   
-3/ To run a single test:
+2/ To run a single test set:
 
    $ cd codec2-dev/stm32/unittest/scripts
    $ ./run_all_ldpc_tests
 
-4/ To run ALL tests:
+3/ To run ALL tests:
 
    (TODO Don - pls add command to run all tests)
    

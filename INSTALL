@@ -12,7 +12,8 @@ To compile codec2 a basic development environment and cmake are required.
 If they are not installed, at a command prompt, type
 
 Debian/Ubuntu distros:
-$ sudo apt-get install build-essential cmake 
+$ sudo apt-get install build-essential cmake libspeexdsp-dev libsamplerate0-dev
+ 
 
 Fedora/RH distros:
 $ sudo dnf groupinstall "Development Tools" \
@@ -20,7 +21,10 @@ $ sudo dnf groupinstall "Development Tools" \
 $ sudo dnf install cmake samplerate-devel speexdsp-devel
 
 To test the cmake build make a directory anywhere underneath (or outside of)
-the source directory.
+the source directory. 
+
+However, it is recommended to use the 'build_linux' inside the 
+codec2 source tree as shown below, some test scripts depend on this.
 
 Linux command line example:
 
