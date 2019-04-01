@@ -43,7 +43,13 @@
 #include "fmfsk.h"
 #include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
+#ifdef __LPCNET__
+#include "lpcnet.h"
+#endif
 
+// identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes
+#define CODEC_MODE_LPCNET_1733 100
+      
 struct freedv {
     int                  mode;
 
@@ -57,6 +63,9 @@ struct freedv {
     struct OFDM         *ofdm;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
+#ifdef __LPCNET__
+    struct LPCNetFreeDV *lpcnet;
+#endif
     
     struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 

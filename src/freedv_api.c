@@ -114,15 +114,16 @@ struct freedv *freedv_open(int mode) {
 struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     struct freedv *f;
     int            Nc, codec2_mode, nbit, nbyte = 0;
-
+    
     if (false == (FDV_MODE_ACTIVE( FREEDV_MODE_1600,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_700B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400A,mode) || 
 		FDV_MODE_ACTIVE( FREEDV_MODE_2400B,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA,mode) || 
-		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode) ))
+		FDV_MODE_ACTIVE( FREEDV_MODE_700C,mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D,mode)  ||
+                  FDV_MODE_ACTIVE( FREEDV_MODE_2020,mode)) )
     {
         return NULL;
     }
-
+    
     f = (struct freedv*)MALLOC(sizeof(struct freedv));
     if (f == NULL)
         return NULL;
@@ -302,7 +303,107 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_set_tx_bpf(f->ofdm, 1);
 #endif
     }
+        
+#ifdef __LPCNET__
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode) ) {
+        f->snr_squelch_thresh = 4.0;
+        f->squelch_en = 0;
+        codec2_mode = CODEC_MODE_LPCNET_1733;
+        
+        if ((ofdm_config = (struct OFDM_CONFIG *) CALLOC(1, sizeof (struct OFDM_CONFIG))) == NULL) {
+            // TODO: do we need this code? Can these actually be allocated before now?
+            if (f->tx_bits != NULL) {
+              FREE(f->tx_bits);
+              f->tx_bits = NULL;
+            }
+            if (f->rx_bits != NULL) {
+              FREE(f->rx_bits);
+              f->rx_bits = NULL;
+            }
+            return NULL;
+        }
+        
+        f->ofdm = ofdm_create(ofdm_config);
+        FREE(ofdm_config);
 
+        /* Get a copy of the 700D modem config as template then modify for 2020 */
+        ofdm_config = ofdm_get_config_param();
+        ofdm_destroy(f->ofdm);
+        ofdm_config->nc = 31; int data_bits_per_frame = 312;
+        f->ofdm = ofdm_create(ofdm_config);
+            
+        f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
+        if (f->ldpc == NULL) {
+            return NULL;
+        }
+        
+        set_up_hra_504_396(f->ldpc, ofdm_config);
+        set_data_bits_per_frame(f->ldpc, data_bits_per_frame, ofdm_config->bps);
+        int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
+        
+        // TODO: not sure if these are set up correctly, in Octave we
+        // hard code num UW and txt bits, have added asserts to check
+        ofdm_bitsperframe = ofdm_get_bits_per_frame();
+        ofdm_nuwbits = (ofdm_config->ns - 1) * ofdm_config->bps - ofdm_config->txtbits;
+        ofdm_ntxtbits = ofdm_config->txtbits;
+        assert(ofdm_nuwbits == 10);
+        assert(ofdm_ntxtbits == 4);
+        
+        if (adv == NULL) {
+            f->interleave_frames = 1;
+        } else {
+            assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
+            f->interleave_frames = adv->interleave_frames;
+        }
+        
+        f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
+        
+        f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
+
+        if (f->codeword_symbols == NULL) {return NULL;}
+
+        f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
+
+        if (f->codeword_amps == NULL) {FREE(f->codeword_symbols); return NULL;}
+
+        for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
+            f->codeword_symbols[i].real = 0.0;
+            f->codeword_symbols[i].imag = 0.0;
+            f->codeword_amps[i] = 0.0;
+        }
+
+        f->nin = ofdm_get_samples_per_frame();
+        f->n_nat_modem_samples = ofdm_get_samples_per_frame();
+        f->n_nom_modem_samples = ofdm_get_samples_per_frame();
+        f->n_max_modem_samples = ofdm_get_max_samples_per_frame();
+        f->modem_sample_rate = ofdm_config->fs;
+        f->clip = 0;
+
+        nbit = f->sz_error_pattern = ofdm_bitsperframe;
+
+        f->tx_bits = NULL; /* not used for 2020 */
+
+	if (f->interleave_frames > 1) {
+            /* only allocate this array for interleaver sizes > 1 to save memory on SM1000 port */
+            f->mod_out = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*f->n_nat_modem_samples);
+            if (f->mod_out == NULL) {
+                if (f->codeword_symbols != NULL) { FREE (f->codeword_symbols); }
+                return NULL;
+            }
+
+            for (int i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+                f->mod_out[i].real = 0.0;
+                f->mod_out[i].imag = 0.0;
+            }
+	}
+        
+        /* TODO: tx BPF off by default, as we need new filter coeffs for FreeDV 2020 waveform */
+        ofdm_set_tx_bpf(f->ofdm, 0);
+        
+        codec2_mode = CODEC_MODE_LPCNET_1733; // not really codec 2 but got to call it something        
+    }
+#endif
+    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) {
       
         /* Set up the C2 mode */
@@ -407,15 +508,22 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->total_bit_errors = 0;
     f->total_bits_coded = 0;
     f->total_bit_errors_coded = 0;
+        
+    /* Init Codec for this FreeDV mode ----------------------------------------------------*/
 
-    /* Init Codec 2 for this FreeDV mode ----------------------------------------------------*/
+    if (codec2_mode == CODEC_MODE_LPCNET_1733) {
+#ifdef __LPC_NET__
+        f->lpcnet = lpcnet_open();
+#endif
+    }
+    else {
+        f->codec2 = codec2_create(codec2_mode);
+        if (f->codec2 == NULL)
+            return NULL;
+    }
     
-    f->codec2 = codec2_create(codec2_mode);
-    if (f->codec2 == NULL)
-        return NULL;
-
     /* work out how many codec 2 frames per mode frame, and number of
-       bytes of storage for packed and unpacket bits.  TODO: do we really
+       bytes of storage for packed and unpacked bits.  TODO: do we really
        need to work in packed bits at all?  It's messy, chars would probably
        be OK.... */
     
@@ -439,7 +547,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         nbyte = 2*((codec2_bits_per_frame(f->codec2) + 7) / 8);
     } else if (FDV_MODE_ACTIVE(FREEDV_MODE_700D, mode)) /* mode == FREEDV_MODE_700D */ {
 
-        /* should be exactly an integer number ofCodec 2 frames in a OFDM modem frame */
+        /* should be exactly an integer number of Codec 2 frames in a OFDM modem frame */
 
         assert((f->ldpc->data_bits_per_frame % codec2_bits_per_frame(f->codec2)) == 0);
 
@@ -458,6 +566,22 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->packed_codec_bits_tx = (unsigned char*)MALLOC(nbyte*sizeof(char));
         if (f->packed_codec_bits_tx == NULL) return(NULL);
         f->codec_bits = NULL;
+    } else if (FDV_MODE_ACTIVE(FREEDV_MODE_2020, mode)) {
+#ifdef __LPCNET__
+        /* should be exactly an integer number of Codec frames in a OFDM modem frame */
+
+        assert((f->ldpc->data_bits_per_frame % lpcnet_bits_per_frame(f->lpcnet)) == 0);
+
+        int Ncodecframes = f->ldpc->data_bits_per_frame/lpcnet_bits_per_frame(f->lpcnet);
+
+        f->n_speech_samples = Ncodecframes*lpcnet_samples_per_frame(f->lpcnet);
+        f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
+        nbit = lpcnet_bits_per_frame(f->lpcnet);
+
+        // we don't actually used packed codec bits, so just set this
+        // to an arbtrary number to keep following functions happy
+        nbyte = 1;
+#endif
     }
     
     f->packed_codec_bits = (unsigned char*)MALLOC(nbyte*sizeof(char));
@@ -524,6 +648,14 @@ void freedv_close(struct freedv *freedv) {
         cohpsk_destroy(freedv->cohpsk);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
         FREE(freedv->packed_codec_bits_tx);
+        if (freedv->interleave_frames > 1)
+            FREE(freedv->mod_out);
+        FREE(freedv->codeword_symbols);
+        FREE(freedv->codeword_amps);
+        FREE(freedv->ldpc);
+        ofdm_destroy(freedv->ofdm);
+    }
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, freedv->mode)) {
         if (freedv->interleave_frames > 1)
             FREE(freedv->mod_out);
         FREE(freedv->codeword_symbols);
@@ -766,7 +898,7 @@ void freedv_tx(struct freedv *f, short mod_out[], short speech_in[]) {
            (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))  ||
            (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) || 
-           (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)));
+           (FDV_MODE_ACTIVE( FREEDV_MODE_800XA, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
     
     /* FSK and MEFSK/FMFSK modems work only on real samples. It's simpler to just 
      * stick them in the real sample tx/rx functions than to add a comp->real converter
@@ -1080,7 +1212,7 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert((FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode)) || 
            (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) ||
-           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)));
+           (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode))  || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)));
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
