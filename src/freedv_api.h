@@ -91,8 +91,9 @@
 #if !defined(FREEDV_MODE_800XA_EN)
         #define FREEDV_MODE_800XA_EN FREEDV_MODE_EN_DEFAULT
 #endif
-
-
+#if !defined(FREEDV_MODE_2020_EN)
+        #define FREEDV_MODE_2020_EN FREEDV_MODE_EN_DEFAULT
+#endif
 
 #define FDV_MODE_ACTIVE(mode_name, var)  ((mode_name##_EN) == 0 ? 0: (var) == mode_name)
 
