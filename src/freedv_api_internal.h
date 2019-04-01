@@ -43,7 +43,13 @@
 #include "fmfsk.h"
 #include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
+#ifdef __LPCNET__
+#include "lpcnet.h"
+#endif
 
+// identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes
+#define CODEC_MODE_LPCNET_1733 100
+      
 struct freedv {
     int                  mode;
 
@@ -57,6 +63,9 @@ struct freedv {
     struct OFDM         *ofdm;
     struct LDPC         *ldpc;
     struct MODEM_STATS   stats;
+#ifdef __LPCNET__
+    struct LPCNetFreeDV *lpcnet;
+#endif
     
     struct freedv_vhf_deframer * deframer;      // Extracts frames from VHF stream
 
@@ -71,6 +80,7 @@ struct freedv {
                                                  // usually the same as n_nom_modem_samples, except for 700..700C
     int                  modem_sample_rate;      // Caller is responsible for meeting this
     int                  modem_symbol_rate;      // Useful for ext_vco operation on 2400A and 800XA
+    int                  speech_sample_rate;     // 8 kHz or 16 kHz (high fidelity)
     int                  clip;                   // non-zero for cohpsk modem output clipping for low PAPR
 
     unsigned char       *packed_codec_bits;

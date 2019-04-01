@@ -84,6 +84,18 @@ $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 80
 
 + ofdm_* are OFDM PSK HF modem command line programs (README_ofdm).
 
+## FreeDV 2020 support (building with LPCNet)
+
+```
+$ cd ~
+$ git clone https://github.com/drowe67/LPCNet
+$ cd LPCNet && mkdir build_linux && cd build_linux && cmake ../ && make
+$ cd ~/codec2
+$ rm -Rf build_linux/ && mkdir build_linux && cd build_linux
+$ CFLAGS="-D__LPCNET__ -I /your/home/LPCNet/src" cmake ..
+$ make
+```
+
 ## Building and Running Unit Tests
 
 CTest is used as a test frame work, with support from GNU Octave
