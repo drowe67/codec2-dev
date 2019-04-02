@@ -1677,9 +1677,11 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
     assert(ofdm_rowsperframe < MODEM_STATS_NR_MAX);
     stats->nr = ofdm_rowsperframe;
 
-    /* Just copy data frames */
-
-    for (c = 1; c < (ofdm_nc + 1); c++) {
+    /*
+     * Just copy data frames
+     * Note: rx_np[] does not contain edge pilots
+     */
+    for (c = 0; c < ofdm_nc; c++) {
         for (r = 0; r < ofdm_rowsperframe; r++) {
             complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
 
@@ -1689,6 +1691,8 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
     }
 
 #if defined(PILOT_STATS)
+    /* This includes edge pilots */
+
     for (c = 0; c < (ofdm_nc + 2); c++) {
         stats->rx_pilots[0][c] = rx_pilots[0][c];  // previous
         stats->rx_pilots[1][c] = rx_pilots[1][c];  // this
