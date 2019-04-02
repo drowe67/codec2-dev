@@ -33,6 +33,8 @@ extern "C"
 {
 #endif
 
+#undef PILOT_STATS /* Define for pilot modem stats */
+
 #include <complex.h>
 #include <stdbool.h>
 #include <stdint.h>

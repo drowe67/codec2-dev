@@ -86,6 +86,10 @@ static complex float *tx_uw_syms;
 static int *uw_ind; 
 static int *uw_ind_sym;
 
+#if defined(PILOT_STATS)
+static float rx_pilots[4][MODEM_STATS_NC_MAX];
+#endif
+
 static float ofdm_tx_centre; /* TX Center frequency */
 static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
@@ -282,7 +286,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /*
      * rx_sym is a 2D array of variable size
      *
-     * allocate rx_sym row storage. It is a pointer to a pointer
+     * allocate rx_sym row storage. It is a pointers to pointers
      */
     ofdm->rx_sym = MALLOC(sizeof (complex float) * (ofdm_ns + 3));
     
@@ -1274,6 +1278,19 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
      * From here on down we are in the frequency domain
      */
 
+#if defined(PILOT_STATS)
+    /*
+     * Copy pilots to the stats storage
+     */
+ 
+    for (j = 0; j < (ofdm_nc + 2); j++) {
+        rx_pilots[0][j] = ofdm->rx_sym[0][j];  // previous
+        rx_pilots[1][j] = ofdm->rx_sym[1][j];  // this
+        rx_pilots[2][j] = ofdm->rx_sym[9][j];  // next
+        rx_pilots[3][j] = ofdm->rx_sym[10][j]; // future
+    }
+#endif
+
     /* est freq err based on all carriers ---------------------------------- */
 
     if (ofdm->foff_est_en == true) {
@@ -1660,7 +1677,9 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
     assert(ofdm_rowsperframe < MODEM_STATS_NR_MAX);
     stats->nr = ofdm_rowsperframe;
 
-    for (c = 0; c < ofdm_nc; c++) {
+    /* Just copy data frames */
+
+    for (c = 1; c < (ofdm_nc + 1); c++) {
         for (r = 0; r < ofdm_rowsperframe; r++) {
             complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
 
@@ -1668,6 +1687,15 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
             stats->rx_symbols[r][c].imag = cimagf(rot);
         }
     }
+
+#if defined(PILOT_STATS)
+    for (c = 0; c < (ofdm_nc + 2); c++) {
+        stats->rx_pilots[0][c] = rx_pilots[0][c];  // previous
+        stats->rx_pilots[1][c] = rx_pilots[1][c];  // this
+        stats->rx_pilots[2][c] = rx_pilots[2][c];  // next
+        stats->rx_pilots[3][c] = rx_pilots[3][c];  // future
+    }
+#endif
 }
 
 /* Assemble modem frame of bits from UW, payload bits, and txt bits */

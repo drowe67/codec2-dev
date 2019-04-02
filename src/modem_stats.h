@@ -35,7 +35,12 @@
 #include "comp.h"
 #include "kiss_fft.h"
 
+#if defined(PILOT_STATS)
+#define MODEM_STATS_NC_MAX      64
+#else
 #define MODEM_STATS_NC_MAX      20
+#endif
+
 #define MODEM_STATS_NR_MAX      8
 #define MODEM_STATS_ET_MAX      8
 #define MODEM_STATS_EYE_IND_MAX 160     
@@ -69,6 +74,10 @@ struct MODEM_STATS {
 
     float        fft_buf[2*MODEM_STATS_NSPEC];
     kiss_fft_cfg fft_cfg;
+
+#if defined(PILOT_STATS)
+    float  rx_pilots[4][MODEM_STATS_NC_MAX];
+#endif
 };
 
 void modem_stats_open(struct MODEM_STATS *f);
