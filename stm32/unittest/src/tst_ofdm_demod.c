@@ -204,11 +204,11 @@ int main(int argc, char *argv[]) {
     int coded_bits_per_frame = ldpc.coded_bits_per_frame;
     int coded_syms_per_frame = ldpc.coded_syms_per_frame;
 
-    short  rx_scaled[Nmaxsamperframe];
-    int    rx_bits[ofdm_bitsperframe];
-    char   rx_bits_char[ofdm_bitsperframe];
-    int    rx_uw[ofdm_nuwbits];
-    short  txt_bits[ofdm_ntxtbits];
+    short   rx_scaled[Nmaxsamperframe];
+    int     rx_bits[ofdm_bitsperframe];
+    char    rx_bits_char[ofdm_bitsperframe];
+    uint8_t rx_uw[ofdm_nuwbits];
+    short   txt_bits[ofdm_ntxtbits];
     f = 0;
     Nerrs = Terrs = Tbits = Terrs2 = Tbits2 = Terrs_coded = Tbits_coded = frame_count = 0;
 
@@ -314,7 +314,7 @@ int main(int argc, char *argv[]) {
                 float llr[coded_bits_per_frame];
 
                 if (config_ldpc_en) {
-                    char out_char[coded_bits_per_frame];
+                    uint8_t out_char[coded_bits_per_frame];
 
                     interleaver_sync_state_machine(ofdm, &ldpc, ofdm_config, 
                                 codeword_symbols_de, codeword_amps_de, EsNo,
@@ -340,7 +340,7 @@ int main(int argc, char *argv[]) {
 
                             if (config_testframes) {
                                 /* construct payload data bits */
-                                int payload_data_bits[data_bits_per_frame];
+                                uint8_t payload_data_bits[data_bits_per_frame];
                                 ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
                                 
                                 Nerrs_coded[j] = count_errors(payload_data_bits, out_char, data_bits_per_frame);
