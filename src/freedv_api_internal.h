@@ -44,7 +44,7 @@
 #include "codec2_fdmdv.h"
 #include "codec2_cohpsk.h"
 #ifdef __LPCNET__
-#include "lpcnet.h"
+#include "lpcnet_freedv.h"
 #endif
 
 // identifiers for no- Codec2 Speech codecs, make sure no overlpa with CODEC2_XXX modes

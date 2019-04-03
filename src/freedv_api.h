@@ -79,9 +79,6 @@
 #if !defined(FREEDV_MODE_700D_EN)
         #define FREEDV_MODE_700D_EN FREEDV_MODE_EN_DEFAULT
 #endif
-#if !defined(FREEDV_MODE_2020_EN)
-        #define FREEDV_MODE_2020_EN FREEDV_MODE_EN_DEFAULT
-#endif
 #if !defined(FREEDV_MODE_2400A_EN)
         #define FREEDV_MODE_2400A_EN FREEDV_MODE_EN_DEFAULT
 #endif

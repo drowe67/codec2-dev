@@ -137,7 +137,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->frames = 0;
     f->speech_sample_rate = FS_VOICE_8K;
     
-    /* Init states for this mode, and set up samples in/out -----------------------------------------*/
+    /* -----------------------------------------------------------------------------------------------*\
+    |                     Init states for this mode, and set up samples in/out                         |
+    \*------------------------------------------------------------------------------------------------*/
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         f->snr_squelch_thresh = 2.0;
@@ -508,12 +510,14 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->total_bit_errors = 0;
     f->total_bits_coded = 0;
     f->total_bit_errors_coded = 0;
-        
-    /* Init Codec for this FreeDV mode ----------------------------------------------------*/
+
+    /* -----------------------------------------------------------------------------------------------*\
+    |                         Init Codec for this FreeDV mode                                          |
+    \*------------------------------------------------------------------------------------------------*/
 
     if (codec2_mode == CODEC_MODE_LPCNET_1733) {
-#ifdef __LPC_NET__
-        f->lpcnet = lpcnet_open();
+#ifdef __LPCNET__
+        f->lpcnet = lpcnet_freedv_create(1);
 #endif
     }
     else {
@@ -578,9 +582,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
         nbit = lpcnet_bits_per_frame(f->lpcnet);
 
-        // we don't actually used packed codec bits, so just set this
-        // to an arbtrary number to keep following functions happy
-        nbyte = 1;
+        // we actually have unpacked data but uses this as it's convenient
+        nbyte = nbit;
 #endif
     }
     
@@ -592,7 +595,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, mode))
         f->codec_bits = (int*)MALLOC(COHPSK_BITS_PER_FRAME*sizeof(int));
-    
+        
     /* Note: VHF Framer/deframer goes directly from packed codec/vc/proto bits to filled frame */
 
     if (f->packed_codec_bits == NULL) {
@@ -662,6 +665,7 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
+        lpcnet_freedv_destroy(freedv->lpcnet);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, freedv->mode)){
         fsk_destroy(freedv->fsk);
@@ -1205,6 +1209,70 @@ static void freedv_comptx_700d(struct freedv *f, COMP mod_out[]) {
 }
 
 
+static void freedv_comptx_2020(struct freedv *f, COMP mod_out[]) {
+    int    i, j, k;
+    int    nspare;
+ 
+    int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+    int bits_per_interleaved_frame = f->interleave_frames*data_bits_per_frame;
+    uint8_t tx_bits[bits_per_interleaved_frame];
+
+    memcpy(tx_bits, f->packed_codec_bits, bits_per_interleaved_frame);
+    
+    // Generate Varicode txt bits. Txt bits in OFDM frame come just
+    // after Unique Word (UW).  Txt bits aren't protected by FEC, and need to be
+    // added to each frame after interleaver as done it's thing
+
+    nspare = ofdm_ntxtbits*f->interleave_frames;
+    uint8_t txt_bits[nspare];
+
+    for(k=0; k<nspare; k++) {
+        if (f->nvaricode_bits == 0) {
+            /* get new char and encode */
+            char s[2];
+            if (f->freedv_get_next_tx_char != NULL) {
+                s[0] = (*f->freedv_get_next_tx_char)(f->callback_state);
+                f->nvaricode_bits = varicode_encode(f->tx_varicode_bits, s, VARICODE_MAX_BITS, 1, 1);
+                f->varicode_bit_index = 0;
+            }
+        }
+        if (f->nvaricode_bits) {
+            txt_bits[k] = f->tx_varicode_bits[f->varicode_bit_index++];
+            f->nvaricode_bits--;
+        }
+    }
+
+    /* optionally replace codec payload bits with test frames known to rx */
+
+    if (f->test_frames) {
+        uint8_t payload_data_bits[data_bits_per_frame];
+        ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
+
+        for (j=0; j<f->interleave_frames; j++) {
+            for(i=0; i<data_bits_per_frame; i++) {
+                tx_bits[j*data_bits_per_frame + i] = payload_data_bits[i];
+            }
+        }
+    }
+
+    /* OK now ready to LDPC encode, interleave, and OFDM modulate */
+    
+    complex float tx_sams[f->interleave_frames*f->n_nat_modem_samples];
+    COMP asam;
+    
+    ofdm_ldpc_interleave_tx(f->ofdm, f->ldpc, tx_sams, tx_bits, txt_bits, f->interleave_frames, ofdm_config);
+
+    for(i=0; i<f->interleave_frames*f->n_nat_modem_samples; i++) {
+        asam.real = crealf(tx_sams[i]);
+        asam.imag = cimagf(tx_sams[i]);
+        mod_out[i] = fcmult(OFDM_AMP_SCALE*NORM_PWR_OFDM, asam);
+    }
+
+    if (f->clip) {
+        cohpsk_clip(mod_out, OFDM_CLIP, f->interleave_frames*f->n_nat_modem_samples);
+    }
+}
+
 
 void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     assert(f != NULL);
@@ -1272,9 +1340,46 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
 		    f->mod_out[f->modem_frame_count_tx * f->n_nat_modem_samples+i];
             }
 	}
-
     }
     
+    /* special treatment due to interleaver */
+    
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+	int codec_frames = data_bits_per_frame / bits_per_codec_frame;
+        int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
+        
+        //fprintf(stderr, "modem_frame_count_tx: %d dec_frames: %d bytes offset: %d\n",
+        //        f->modem_frame_count_tx, codec_frames, (f->modem_frame_count_tx*codec_frames)*bytes_per_codec_frame);
+       
+        /* buffer up bits until we get enough encoded bits for interleaver */
+        
+        for (j=0; j<codec_frames; j++) {
+            lpcnet_enc(f->lpcnet, speech_in, (char*)f->packed_codec_bits + (f->modem_frame_count_tx*codec_frames+j)*bits_per_codec_frame);
+            speech_in += lpcnet_samples_per_frame(f->lpcnet);
+        }
+
+	/* Only use extra local buffer if needed for interleave > 1 */
+	if (f->interleave_frames == 1) {
+            freedv_comptx_2020(f, mod_out);
+	} else {
+            /* call modulate function when we have enough frames to run interleaver */
+            assert((f->modem_frame_count_tx >= 0) && 
+	    		(f->modem_frame_count_tx < f->interleave_frames));
+            f->modem_frame_count_tx++;
+            if (f->modem_frame_count_tx == f->interleave_frames) {
+                freedv_comptx_2020(f, f->mod_out);
+                //fprintf(stderr, "  calling freedv_comptx_700d()\n");
+                f->modem_frame_count_tx = 0;
+            }
+            /* output n_nom_modem_samples at a time from modulated buffer */
+            for(i=0; i<f->n_nat_modem_samples; i++) {
+                mod_out[i] = 
+		    f->mod_out[f->modem_frame_count_tx * f->n_nat_modem_samples+i];
+            }
+	}
+    }
+
     /* 2400 A and B are handled by the real-mode TX */
     if(FDV_MODE_ACTIVE( FREEDV_MODE_2400A, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)){
     	codec2_encode(f->codec2, f->packed_codec_bits, speech_in);
