@@ -1754,18 +1754,12 @@ static int freedv_comprx_700(struct freedv *f, COMP demod_in_8kHz[], int *valid)
 }
 
 /*
-  TODO: 
-    [X] in testframe mode count coded and uncoded errors
-    [X] freedv getter for modem and interleaver sync
-    [X] rms level the same as fdmdv
-    [X] way to stay in sync and not resync automatically 
-    [X] SNR est, maybe from pilots, cohpsk have an example?
-    [X] work out how to handle return of multiple interleaved frames over time
-    [ ] error pattern support?
-    [ ] deal with out of sync returning nin samples, listening to analog audio when out of sync
+  700D demod function that can support complex (float) or real (short)
+  samples.  The real short samples are useful for low memory overhead,
+  such at the SM1000.
 */
 
-static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gain, int *valid) {
+static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int demod_in_is_short, float gain, int *valid) {
     int   bits_per_codec_frame, bytes_per_codec_frame;
     int   i, j, bit, byte, nout, k;
     int   n_ascii;
@@ -1813,13 +1807,15 @@ static int freedv_comprx_700d(struct freedv *f, short demod_in_8kHz[], float gai
     /* looking for modem sync */
     
     if (ofdm->sync_state == search) {
-        ofdm_sync_search_shorts(f->ofdm, demod_in_8kHz, new_gain);
+        if (demod_in_is_short)
+            ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
     }
 
      /* OK modem is in sync */
     
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        ofdm_demod_shorts(ofdm, rx_bits, demod_in_8kHz, new_gain);
+        if (demod_in_is_short)
+            ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
@@ -2038,7 +2034,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
     bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        nout = freedv_comprx_700d(f, demod_in, gain, &valid);
+        nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 1, gain, &valid);
     }
     
     if (valid == 0) {
@@ -2112,7 +2108,7 @@ int freedv_codecrx(struct freedv *f, unsigned char *packed_codec_bits, short dem
     int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        freedv_comprx_700d(f, demod_in, 1.0, &valid);
+        freedv_comp_short_rx_700d(f, (void*)demod_in, 1, 1.0, &valid);
 
         int data_bits_per_frame = f->ldpc->data_bits_per_frame;
         int frames = data_bits_per_frame/bits_per_codec_frame;
