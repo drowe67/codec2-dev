@@ -665,7 +665,9 @@ void freedv_close(struct freedv *freedv) {
         FREE(freedv->codeword_amps);
         FREE(freedv->ldpc);
         ofdm_destroy(freedv->ofdm);
+#ifdef __LPCNET__
         lpcnet_freedv_destroy(freedv->lpcnet);
+#endif        
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_800XA, freedv->mode)){
         fsk_destroy(freedv->fsk);
