@@ -1317,6 +1317,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
         return freedv_comprx(f, speech_out, rx_fdm);
     }
 
+    /* special low memory version for 700D, to help with stm32 port */
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
         float gain = 2.0; /* keep levels the same as Octave simulations and C unit tests for real signals */
         return freedv_shortrx(f, speech_out, demod_in, gain);
@@ -1795,6 +1796,8 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
 
     float new_gain = gain / OFDM_AMP_SCALE;
     
+    assert((demod_in_is_short == 0) || (demod_in_is_short == 1));
+
     /* echo samples back out as default (say if sync not found) */
     
     *valid = 1;
@@ -1809,6 +1812,8 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     if (ofdm->sync_state == search) {
         if (demod_in_is_short)
             ofdm_sync_search_shorts(f->ofdm, (short*)demod_in_8kHz, new_gain);
+        else
+            ofdm_sync_search(f->ofdm, (COMP*)demod_in_8kHz);
     }
 
      /* OK modem is in sync */
@@ -1816,6 +1821,9 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
         if (demod_in_is_short)
             ofdm_demod_shorts(ofdm, rx_bits, (short*)demod_in_8kHz, new_gain);
+        else
+            ofdm_demod(ofdm, rx_bits, (COMP*)demod_in_8kHz);
+            
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
@@ -1969,11 +1977,11 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     return nout;
 }
 
-/* Original version for all but 700D */
+/* complex input rx API function */
 int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     assert(f != NULL);
-    int                 bits_per_codec_frame, bytes_per_codec_frame;
-    int                 i, nout = 0;
+    int bits_per_codec_frame, bytes_per_codec_frame;
+    int i, nout = 0;
     int valid = 0;
     
     assert(f->nin <= f->n_max_modem_samples);
@@ -1992,28 +2000,46 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         nout = freedv_comprx_fsk(f, demod_in, &valid);
     }
 
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+        short x[f->nin];
+        for(int i=0; i<f->nin; i++) x[i] = demod_in[i].real;
+        nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0, &valid);
+    }
+    
     if (valid == 0) {
-        //fprintf(stderr, "squelch nout: %d\n", nout);
-        
         /* squelch */
-        
         for (i = 0; i < nout; i++)
             speech_out[i] = 0;
     }
     else if (valid < 0) {
-        /* we havent got sync so play audio from radio.  This might
+        /* we havent got sync so play undemodulated audio from radio.  This might
            not work for all modes due to nin bouncing about */
         for (i = 0; i < nout; i++)
             speech_out[i] = demod_in[i].real;
     }
     else {
-        /* decoded audio to play */
-        
-        int frames = f->n_codec_bits / bits_per_codec_frame;
-        //fprintf(stderr, "frames: %d\n", frames);
-        for (i = 0; i < frames; i++) {
-            codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-            speech_out += codec2_samples_per_frame(f->codec2);
+        /* decode audio  -----------------------------------------------*/
+        if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+            /* 700D a bit special due to interleaving */
+            if (f->modem_frame_count_rx < f->interleave_frames) {
+                int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+                int frames = data_bits_per_frame/bits_per_codec_frame;            
+                nout = f->n_speech_samples;
+                //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
+                for (i = 0; i < frames; i++) {
+                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                    speech_out += codec2_samples_per_frame(f->codec2);
+                }
+                f->modem_frame_count_rx++;
+            }
+        } else { 
+       
+            int frames = f->n_codec_bits / bits_per_codec_frame;
+            //fprintf(stderr, "frames: %d\n", frames);
+            for (i = 0; i < frames; i++) {
+                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
+                speech_out += codec2_samples_per_frame(f->codec2);
+            }
         }
     }
 
@@ -2021,12 +2047,16 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     return nout;
 }
 
-/* 700D version */
+/* memory efficient real short version - just for 700D  */
 int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float gain) {
     assert(f != NULL);
     int                 bits_per_codec_frame, bytes_per_codec_frame;
     int                 i, nout = 0;
     int valid = 0;
+
+    // At this stage short interface only supported for 700D, to help
+    // memory requirements on stm32
+    assert(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode));
     
     assert(f->nin <= f->n_max_modem_samples);
 
