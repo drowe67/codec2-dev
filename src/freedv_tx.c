@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
-    if (!strcmp(argv[1],"800XA"))
+    if (!strcmp(argv[1],"2020"))
         mode = FREEDV_MODE_2020;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (mode == FREEDV_MODE_700D) {
+    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
         struct freedv_advanced adv;
         adv.interleave_frames = interleave_frames;
         freedv = freedv_open_advanced(mode, &adv);
@@ -207,14 +207,15 @@ int main(int argc, char *argv[]) {
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
-
+    freedv_set_verbose(freedv, 1);
+    
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
     speech_in = (short*)malloc(sizeof(short)*n_speech_samples);
     assert(speech_in != NULL);
     mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
-    //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
+    fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
 
     /* set up callback for txt msg chars */
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");

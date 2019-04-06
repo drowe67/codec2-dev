@@ -325,6 +325,13 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
             return NULL;
         }
         
+        if (adv == NULL) {
+            f->interleave_frames = 1;
+        } else {
+            assert((adv->interleave_frames >= 0) && (adv->interleave_frames <= 16));
+            f->interleave_frames = adv->interleave_frames;
+        }
+
         f->ofdm = ofdm_create(ofdm_config);
         FREE(ofdm_config);
 
@@ -350,6 +357,17 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_ntxtbits = ofdm_config->txtbits;
         assert(ofdm_nuwbits == 10);
         assert(ofdm_ntxtbits == 4);
+        f->verbose = 1;
+        fprintf(stderr, "verbose: %d\n", f->verbose);
+        if (f->verbose) {
+            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
+            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
+            fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+            fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
+            fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
+            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+            fprintf(stderr, "interleave_frames: %d\n", f->interleave_frames);
+        }
         
         if (adv == NULL) {
             f->interleave_frames = 1;
@@ -361,11 +379,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->modem_frame_count_tx = f->modem_frame_count_rx = 0;
         
         f->codeword_symbols = (COMP*)MALLOC(sizeof(COMP)*f->interleave_frames*coded_syms_per_frame);
-
         if (f->codeword_symbols == NULL) {return NULL;}
 
         f->codeword_amps = (float*)MALLOC(sizeof(float)*f->interleave_frames*coded_syms_per_frame);
-
         if (f->codeword_amps == NULL) {FREE(f->codeword_symbols); return NULL;}
 
         for (int i=0; i<f->interleave_frames*coded_syms_per_frame; i++) {
@@ -519,6 +535,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 #ifdef __LPCNET__
         f->lpcnet = lpcnet_freedv_create(1);
 #endif
+        f->codec2 = NULL;
     }
     else {
         f->codec2 = codec2_create(codec2_mode);
@@ -580,7 +597,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 
         f->n_speech_samples = Ncodecframes*lpcnet_samples_per_frame(f->lpcnet);
         f->n_codec_bits = f->interleave_frames*Ncodecframes*lpcnet_bits_per_frame(f->lpcnet);
-        nbit = lpcnet_bits_per_frame(f->lpcnet);
+        nbit = f->n_codec_bits;
 
         // we actually have unpacked data but uses this as it's convenient
         nbyte = nbit;
@@ -679,7 +696,8 @@ void freedv_close(struct freedv *freedv) {
 		fvhff_destroy_deframer(freedv->deframer);
     }
     
-    codec2_destroy(freedv->codec2);
+    if (freedv->codec2)
+        codec2_destroy(freedv->codec2);
     if (freedv->ptFilter8000to7500) {
         quisk_filt_destroy(freedv->ptFilter8000to7500);
         FREE(freedv->ptFilter8000to7500);
@@ -1291,9 +1309,11 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
         freedv_comptx_fdmdv_1600(f, mod_out);
     }
 
-
-    int bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
-    int bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+    int bits_per_codec_frame=0; int bytes_per_codec_frame=0;
+    if (f->codec2) {
+        bits_per_codec_frame = codec2_bits_per_frame(f->codec2);
+        bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+    }
     int i,j;
     
     /* all these modes need to pack a bunch of codec frames into one modem frame */
@@ -1350,9 +1370,9 @@ void freedv_comptx(struct freedv *f, COMP mod_out[], short speech_in[]) {
     /* special treatment due to interleaver */
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
         int data_bits_per_frame = f->ldpc->data_bits_per_frame;
 	int codec_frames = data_bits_per_frame / bits_per_codec_frame;
-        int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
         
         //fprintf(stderr, "modem_frame_count_tx: %d dec_frames: %d bytes offset: %d\n",
         //        f->modem_frame_count_tx, codec_frames, (f->modem_frame_count_tx*codec_frames)*bytes_per_codec_frame);
