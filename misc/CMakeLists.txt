@@ -5,13 +5,13 @@ add_executable(mksine mksine.c)
 target_link_libraries(mksine m)
 
 add_executable(t16_8 t16_8.c ../src/fdmdv.c ../src/kiss_fft.c)
-target_link_libraries(t16_8 codec2)
+target_link_libraries(t16_8 codec2 lpcnetfreedv)
 
 add_executable(t16_8_short t16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
-target_link_libraries(t16_8_short codec2)
+target_link_libraries(t16_8_short codec2 lpcnetfreedv)
 
 add_executable(16_8_short 16_8_short.c ../src/fdmdv.c ../src/kiss_fft.c)
-target_link_libraries(16_8_short codec2)
+target_link_libraries(16_8_short codec2 lpcnetfreedv)
 
 add_executable(extract extract.c)
 
@@ -25,10 +25,10 @@ set_target_properties(speexnoisesup
 )
 
 add_executable(raw2h raw2h.c)
-target_link_libraries(raw2h codec2)
+target_link_libraries(raw2h codec2 lpcnetfreedv)
 
 add_executable(tnlp tnlp.c)
-target_link_libraries(tnlp codec2)
+target_link_libraries(tnlp codec2 lpcnetfreedv)
 
 add_executable(tsrc tsrc.c)
 target_link_libraries(tsrc ${LIBSAMPLERATE})

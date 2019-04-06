@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     int                       i;
 
     if (argc < 4) {
-        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
+        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA|2020 InputRawSpeechFile OutputModemRawFile\n"
                " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0]);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
@@ -125,6 +125,8 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    if (!strcmp(argv[1],"800XA"))
+        mode = FREEDV_MODE_2020;
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(0);

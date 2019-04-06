@@ -86,15 +86,23 @@ $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 80
 
 ## FreeDV 2020 support (building with LPCNet)
 
-```
-$ cd ~
-$ git clone https://github.com/drowe67/LPCNet
-$ cd LPCNet && mkdir build_linux && cd build_linux && cmake ../ && make
-$ cd ~/codec2
-$ rm -Rf build_linux/ && mkdir build_linux && cd build_linux
-$ CFLAGS="-D__LPCNET__ -I /your/home/LPCNet/src" cmake ..
-$ make
-```
+1. As a pre-requisite you need libcodec2.so installed on your machine,
+as building LPCNet requires some Codec 2 functions.
+
+2. Build LPCNet:
+   ```
+   $ cd ~
+   $ git clone https://github.com/drowe67/LPCNet
+   $ cd LPCNet && mkdir build_linux && cd build_linux && cmake ../ && make
+   ```
+
+2. (re)build Codec 2 with LPCNet support:
+   ```
+   $ cd ~/codec2
+   $ rm -Rf build_linux/ && mkdir build_linux && cd build_linux
+   $ CFLAGS="-D__LPCNET__ -I/path/to/LPCNet/src" LDFLAGS=-L/path/to/LPCNet/build_linux/src cmake ..
+   $ make
+   ```
 
 ## Building and Running Unit Tests
 
