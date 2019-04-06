@@ -95,14 +95,14 @@ int main(int argc, char *argv[]) {
     int                        sync;
     float                      snr_est;
     float                      clock_offset;
-    int                        use_codecrx, use_testframes, interleave_frames, verbose, discard;
+    int                        use_codecrx, use_testframes, interleave_frames, verbose, discard, use_complex;
     struct CODEC2             *c2 = NULL;
     int                        i;
 
     
     if (argc < 4) {
 	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard]\n", argv[0]);
+               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex]\n", argv[0]);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -140,7 +140,7 @@ int main(int argc, char *argv[]) {
 	exit(1);
     }
 
-    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0;
+    use_codecrx = 0; use_testframes = 0; interleave_frames = 1; verbose = 0; discard = 0; use_complex = 0;
 
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -173,6 +173,10 @@ int main(int argc, char *argv[]) {
             }
             if (strcmp(argv[i], "--discard") == 0) {
                 discard = 1;
+            }
+            if (strcmp(argv[i], "--usecomplex") == 0) {
+                fprintf(stderr, "using complex!\n");
+                use_complex = 1;
             }
         }
     }
@@ -214,7 +218,21 @@ int main(int argc, char *argv[]) {
         
         if (use_codecrx == 0) {
             /* usual case: use the freedv_api to do everything: speech decoding, demodulating */
-            nout = freedv_rx(freedv, speech_out, demod_in);
+            if (use_complex) {
+                /* exercise the complex version of the API (useful
+                   for testing 700D which has a different code path for
+                   short samples) */
+                COMP demod_in_complex[nin];
+                for(int i=0; i<nin; i++) {
+                    demod_in_complex[i].real = (float)demod_in[i];
+                    demod_in_complex[i].imag = 0.0;
+                }
+                nout = freedv_comprx(freedv, speech_out, demod_in_complex);
+           }
+            else {
+                // most common interface - real shorts on, real shorts out
+                nout = freedv_rx(freedv, speech_out, demod_in);
+            }
         } else {
             /* demo of codecrx mode - separate demodulation and speech decoding */
             int bits_per_codec_frame = codec2_bits_per_frame(c2);
