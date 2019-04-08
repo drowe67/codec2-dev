@@ -2001,9 +2001,7 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        short x[f->nin];
-        for(int i=0; i<f->nin; i++) x[i] = demod_in[i].real;
-        nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0, &valid);
+        nout = freedv_comp_short_rx_700d(f, demod_in, 0, 1.0, &valid);
     }
     
     if (valid == 0) {
@@ -2056,7 +2054,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
 
     // At this stage short interface only supported for 700D, to help
     // memory requirements on stm32
-    assert(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode));
+    assert(f->mode == FREEDV_MODE_700D);
     
     assert(f->nin <= f->n_max_modem_samples);
 
