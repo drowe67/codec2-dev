@@ -9,10 +9,13 @@ In addition, you must have a working gcc-arm-none-eabi toolchain installed (see 
 Out-of-source builds is enforced which prevents
 accidental pollution of the source repository.
 
-Make a build directory somewhere, ~/build/stm32 will be used in this example:
+Make a build directory somewhere, however, it
+is recommended to use the directory build_stm32 inside the stm32 
+directory as shown below
 
-  $ mkdir -p ~/build/stm32
-  $ cd ~/build/stm32
+  $ cd /path/to/codec2-dev/stm32
+  $ mkdir build_stm32
+  $ cd build_stm32
 
 
 The STM32 Standard Peripheral Library is required. The download`requires a registration on the STM website.
