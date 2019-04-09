@@ -345,3 +345,4 @@ ${CMSIS}/DSP_Lib/Source/TransformFunctions/arm_rfft_q31.c
 )
 
 add_library(CMSIS STATIC ${CMSIS_SRCS})
+target_compile_options(CMSIS PRIVATE "-Wno-double-promotion")

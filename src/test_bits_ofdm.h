@@ -241,7 +241,7 @@ const int test_bits_ofdm[]={
   0
 };
 
-const int payload_data_bits[]={
+const uint8_t payload_data_bits[]={
   1,
   1,
   0,
