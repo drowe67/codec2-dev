@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
     while (fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
         fprintf(stderr, "Frame %d\n", frame);
 
-        if (config_profile) PROFILE_SAMPLE(ofdm_mod_start);
+        if (config_profile) { PROFILE_SAMPLE(ofdm_mod_start); }
 
             if (config_ldpc_en) {
 

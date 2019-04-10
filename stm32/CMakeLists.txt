@@ -104,6 +104,20 @@ macro(elf2bin target)
     add_custom_command(TARGET ${target}
     POST_BUILD COMMAND ${CMAKE_OBJCOPY} -O binary ${target}.elf ${target}.bin
     COMMENT "Creating binary for ${target}")
+    set_source_files_properties(${target}.bin PROPERTIES GENERATED TRUE)
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
+    ADDITIONAL_MAKE_CLEAN_FILES ${target}.bin)
+endmacro()
+
+# This macro just adds generation of a map file with the same name as the executable and .map suffix
+# to the linker command line. This works in older Cmake version (versions >= 3.13 have target_link_options)
+# it should be a one to one replacement for add_executable
+macro(add_mapped_executable target)
+    add_executable(${target} ${ARGN})
+    target_link_libraries(${target} "-Wl,-Map=$<TARGET_PROPERTY:NAME>.map")
+    set_source_files_properties(${target}.map PROPERTIES GENERATED TRUE)
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
+    ADDITIONAL_MAKE_CLEAN_FILES ${target}.map)
 endmacro()
 
 include_directories(../src ../unittest inc ${PROJECT_BINARY_DIR})
@@ -196,7 +210,7 @@ src/fft_test.c
 ../src/kiss_fft.c
 )
 
-add_executable(fft_test ${FFT_TEST_SRCS} ${PROFILE_SYSTEM_SRCS})
+add_mapped_executable(fft_test ${FFT_TEST_SRCS} ${PROFILE_SYSTEM_SRCS})
 target_link_libraries(fft_test stm32f4 CMSIS)
 elf2bin(fft_test)
 
@@ -210,7 +224,7 @@ set(CODEC2_PROFILE_SRCS
 src/codec2_profile.c
 )
 
-add_executable(codec2_profile ${CODEC2_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
+add_mapped_executable(codec2_profile ${CODEC2_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
 target_link_libraries(codec2_profile codec2_prof stm32f4 CMSIS)
 target_compile_definitions(codec2_profile PRIVATE PROFILE)
 elf2bin(codec2_profile)
@@ -219,7 +233,7 @@ set(DAC_UT_SRCS
 src/dac_ut.c
 )
 
-add_executable(dac_ut ${DAC_UT_SRCS})
+add_mapped_executable(dac_ut ${DAC_UT_SRCS})
 target_link_libraries(dac_ut stm32f4_adac stm32f4 sm1000base)
 elf2bin(dac_ut)
 
@@ -231,7 +245,7 @@ src/stm32f4_dacduc.c
 src/debugblinky.c
 )
 
-add_executable(fast_dac_ut ${FAST_DAC_UT_SRCS} ${SYSTEM_SRCS})
+add_mapped_executable(fast_dac_ut ${FAST_DAC_UT_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(fast_dac_ut stm32f4)
 target_compile_options(fast_dac_ut PRIVATE "-O3")
 elf2bin(fast_dac_ut)
@@ -240,7 +254,7 @@ set(ADCDAC_UT_SRCS
 src/adcdac_ut.c
 )
 
-add_executable(adcdac_ut ${ADCDAC_UT_SRCS} ${STM32F4_ADAC_SRCS} ${SYSTEM_SRCS})
+add_mapped_executable(adcdac_ut ${ADCDAC_UT_SRCS} ${STM32F4_ADAC_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(adcdac_ut stm32f4 sm1000base)
 target_compile_options(adcdac_ut PRIVATE "-O0")
 elf2bin(adcdac_ut)
@@ -252,7 +266,7 @@ src/dac_play.c
 src/stm32f4_dac.c
 )
 
-add_executable(dac_play ${DAC_PLAY_SRCS} ${SYSTEM_SRCS})
+add_mapped_executable(dac_play ${DAC_PLAY_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(dac_play stm32f4 sm1000base)
 target_compile_options(dac_play PRIVATE "-O0")
 elf2bin(dac_play)
@@ -261,7 +275,7 @@ set(ADC_REC_SRCS
 src/adc_rec.c
 )
 
-add_executable(adc_rec ${ADC_REC_SRCS})
+add_mapped_executable(adc_rec ${ADC_REC_SRCS})
 target_link_libraries(adc_rec stm32f4_adac stm32f4 sm1000base)
 elf2bin(adc_rec)
 
@@ -269,7 +283,7 @@ set(ADC_SD_SRCS
 src/adc_sd.c
 )
 
-add_executable(adc_sd ${ADC_SD_SRCS})
+add_mapped_executable(adc_sd ${ADC_SD_SRCS})
 target_link_libraries(adc_sd stm32f4_adac stm32f4 sm1000base)
 elf2bin(adc_sd)
 
@@ -277,7 +291,7 @@ set(PWM_UT_SRCS
 src/stm32f4_pwm.c
 )
 
-add_executable(pwm_ut ${PWM_UT_SRCS})
+add_mapped_executable(pwm_ut ${PWM_UT_SRCS})
 target_link_libraries(pwm_ut stm32f4 sm1000base)
 elf2bin(pwm_ut)
 
@@ -289,7 +303,7 @@ list(APPEND POWER_UT_SRCS ${CODEC2_SRCS})
 
 # stm32/src/power_ut.c:124:5: error: too few arguments to function 'adc_open'
 # stm32/src/power_ut.c:125:5: error: too few arguments to function 'dac_open'
-#add_executable(power_ut ${POWER_UT_SRCS})
+#add_mapped_executable(power_ut ${POWER_UT_SRCS})
 #target_link_libraries(power_ut stm32f4_adac stm32f4 sm1000base)
 
 set(USB_VCP
@@ -315,7 +329,7 @@ list(APPEND USB_VCP_UT ${USB_VCP})
 add_definitions(-DUSE_USB_OTG_FS -DUSE_ULPI_PHY)
 include_directories(usb_conf usb_lib/cdc usb_lib/core usb_lib/otg)
 
-add_executable(usb_vcp_ut ${USB_VCP_UT})
+add_mapped_executable(usb_vcp_ut ${USB_VCP_UT})
 target_link_libraries(usb_vcp_ut stm32f4 sm1000base)
 elf2bin(usb_vcp_ut)
 
@@ -324,7 +338,7 @@ src/adc_rec_usb.c
 src/stm32f4_usb_vcp.c
 )
 
-add_executable(adc_rec_usb ${ADC_REC_USB_SRCS} ${USB_VCP})
+add_mapped_executable(adc_rec_usb ${ADC_REC_USB_SRCS} ${USB_VCP})
 target_link_libraries(adc_rec_usb stm32f4_adac stm32f4 sm1000base)
 elf2bin(adc_rec_usb)
 
@@ -336,7 +350,7 @@ src/fdmdv_profile.c
 list(APPEND FDMDV_PROFILE_SRCS ${CODEC2_SRCS} ${SYSTEM_SRCS})
 
 # Doesn't compile because M_PITCH is not defined but M_PITCH_S is.
-#add_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
+#add_mapped_executable(fdmdv_profile ${FDMDV_PROFILE_SRCS})
 #target_link_libraries(fdmdv_profile stm32f4)
 #target_compile_definitions(fdmdv_profile PRIVATE PROFILE)
 
@@ -345,7 +359,7 @@ src/sm1000_leds_switches_ut.c
 src/sm1000_leds_switches.c
 )
 
-add_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
+add_mapped_executable(sm1000_leds_switches_ut ${SM1000_LEDS_SWITCHES_UT_SRCS})
 target_link_libraries(sm1000_leds_switches_ut stm32f4 sm1000base)
 elf2bin(sm1000_leds_switches_ut)
 
@@ -367,7 +381,7 @@ src/stm32f4_vrom.c
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
 
-add_executable(sm1000 ${SM1000_SRCS} ${SYSTEM_SRCS})
+add_mapped_executable(sm1000 ${SM1000_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(sm1000 stm32f4_adac stm32f4 CMSIS)
 target_compile_options(sm1000 PRIVATE "-O3")
 elf2bin(sm1000)
@@ -376,7 +390,7 @@ set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
 )
 
-add_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
+add_mapped_executable(freedv_tx_profile ${FREEDV_TX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
 target_link_libraries(freedv_tx_profile codec2_prof stm32f4 CMSIS)
 target_compile_definitions(freedv_tx_profile PRIVATE PROFILE)
 elf2bin(freedv_tx_profile)
@@ -386,8 +400,9 @@ set(FREEDV_RX_PROFILE_SRCS
 src/freedv_rx_profile.c
 )
 
-add_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
+add_mapped_executable(freedv_rx_profile ${FREEDV_RX_PROFILE_SRCS} ${PROFILE_SYSTEM_SRCS})
 target_link_libraries(freedv_rx_profile codec2_prof stm32f4 CMSIS)
+#target_link_libraries(freedv_rx_base "-Wl,-Map=$<TARGET_PROPERTY:NAME>.map")
 elf2bin(freedv_rx_profile)
 
 set(FDMDV_DUMP_RT_SRCS
@@ -397,7 +412,7 @@ src/fdmdv_dump_rt.c
 list(APPEND FDMDV_DUMP_RT_SRCS ${CODEC2_SRCS} ${SYSTEM_SRCS})
 
 # Doesn't build due to FREEDV_NSAMPLES not being defined.
-#add_executable(fdmdv_dump_rt ${FDMDV_DUMP_RT_SRCS})
+#add_mapped_executable(fdmdv_dump_rt ${FDMDV_DUMP_RT_SRCS})
 #target_link_libraries(fdmdv_dump_rt stm32f4_adac stm32f4 sm1000base)
 #target_compile_options(fdmdv_dump_rt PRIVATE "-O3")
 
@@ -412,7 +427,7 @@ src/iir_tuner.c
 # would be nice to work out why as ISRs need to run fast
 
 add_library(stm32f4_adc_tuner STATIC src/stm32f4_adc_tuner.c)
-add_executable(tuner_ut ${TUNER_UT_SRCS} ${SYSTEM_SRCS})
+add_mapped_executable(tuner_ut ${TUNER_UT_SRCS} ${SYSTEM_SRCS})
 target_compile_options(tuner_ut PRIVATE "-O3")
 target_link_libraries(tuner_ut stm32f4_adc_tuner stm32f4_adac stm32f4 sm1000base)
 elf2bin(tuner_ut)
@@ -424,7 +439,7 @@ src/adc_sfdr_ut.c
 src/iir_tuner.c
 )
 
-add_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
+add_mapped_executable(adc_sfdr_ut ${ADC_SFDR_UT_SRCS})
 target_link_libraries(adc_sfdr_ut stm32f4_adc_tuner stm32f4_adac stm32f4 sm1000base CMSIS)
 elf2bin(adc_sfdr_ut)
 
@@ -442,7 +457,7 @@ elf2bin(adc_sfdr_ut)
 
 #add_library(stm32f4_dacloduc STATIC src/stm32f4_dacloduc.c)
 
-#add_executable(fm_loduc_play ${FM_LODUC_PLAY_SRCS})
+#add_mapped_executable(fm_loduc_play ${FM_LODUC_PLAY_SRCS})
 #target_link_libraries(fm_loduc_play stm32f4_dacloduc)
 
 # -----------------------------------------------------------------------------
@@ -453,7 +468,7 @@ src/new_i2c.c
 src/si53xx.c
 )
 
-add_executable(si5351_ut ${SI5351_UT_SRCS})
+add_mapped_executable(si5351_ut ${SI5351_UT_SRCS})
 target_link_libraries(si5351_ut stm32f4 sm1000base)
 elf2bin(si5351_ut)
 
@@ -465,7 +480,7 @@ src/tm_stm32f4_mco_output.c
 src/tm_stm32f4_gpio.c
 )
 
-add_executable(mco_ut ${MCO_UT_SRCS})
+add_mapped_executable(mco_ut ${MCO_UT_SRCS})
 target_link_libraries(mco_ut stm32f4 sm1000base)
 elf2bin(mco_ut)
 
@@ -479,7 +494,7 @@ src/new_i2c.c
 src/si53xx.c
 )
 
-add_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
+add_mapped_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
 target_link_libraries(sm2000_rxdemo codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
 elf2bin(sm2000_rxdemo)
 
@@ -491,7 +506,7 @@ src/new_i2c.c
 src/si53xx.c
 )
 
-add_executable(sm2000_stw ${SM2000_STW_SRCS} ${USB_VCP})
+add_mapped_executable(sm2000_stw ${SM2000_STW_SRCS} ${USB_VCP})
 target_link_libraries(sm2000_stw codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
 elf2bin(sm2000_stw)
 
@@ -505,7 +520,7 @@ src/stm32f4_usb_vcp.c
 #../src/mbest.c
 )
 
-add_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS} ${USB_VCP})
+add_mapped_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS} ${USB_VCP})
 target_link_libraries(sm2000_adcdump codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
 elf2bin(sm2000_adcdump)
 
