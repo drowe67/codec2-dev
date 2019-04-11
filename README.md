@@ -127,6 +127,12 @@ FreeDV API tx, with reference rx from above:
 $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
+FreeDV API tx and rx:
+```
+$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
+```
+
 ## Building and Running Unit Tests
 
 CTest is used as a test frame work, with support from GNU Octave

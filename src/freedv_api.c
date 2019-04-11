@@ -357,8 +357,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_ntxtbits = ofdm_config->txtbits;
         assert(ofdm_nuwbits == 10);
         assert(ofdm_ntxtbits == 4);
-        f->verbose = 1;
-        fprintf(stderr, "verbose: %d\n", f->verbose);
         if (f->verbose) {
             fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
             fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
@@ -1573,7 +1571,7 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
 
         float gain = 1.0;
         
-        /* FDM RX happens with complex samps, so do that */
+        assert(nin <= f->n_max_modem_samples);
         COMP rx_fdm[f->n_max_modem_samples];
         for(i=0; i<nin; i++) {
             rx_fdm[i].real = gain*(float)demod_in[i];
@@ -2296,7 +2294,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
         f->sync = 1;
         ofdm_get_demod_stats(f->ofdm, &f->stats);
         f->snr_est = f->stats.snr_est;
-
+        
         assert((ofdm_nuwbits+ofdm_ntxtbits+coded_bits_per_frame) == ofdm_bitsperframe);
 
         /* now we need to buffer for de-interleaving -------------------------------------*/
@@ -2342,11 +2340,30 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
             f->modem_frame_count_rx = 0;
             
             for (j=0; j<interleave_frames; j++) {
-                symbols_to_llrs(llr, &codeword_symbols_de[j*coded_syms_per_frame],
-                                &codeword_amps_de[j*coded_syms_per_frame],
-                                EsNo, ofdm->mean_amp, coded_syms_per_frame);               
-                iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
-
+                symbols_to_llrs(llr, &codeword_symbols_de[j * coded_syms_per_frame],
+                                &codeword_amps_de[j * coded_syms_per_frame],
+                                EsNo, ofdm->mean_amp, coded_syms_per_frame);                           
+               if (ldpc->data_bits_per_frame == ldpc->ldpc_data_bits_per_frame) {
+                    /* all data bits in code word used */
+                    iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
+                } else {
+                    /* all data bits in code word used */
+                    /* some unused data bits, set these to known values to strengthen code */
+                    float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
+                    int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
+                                
+                    // received data bits
+                    for (i = 0; i < ldpc->data_bits_per_frame; i++)
+                        llr_full_codeword[i] = llr[i]; 
+                    // known bits ... so really likely
+                    for (i = ldpc->data_bits_per_frame; i < ldpc->ldpc_data_bits_per_frame; i++)
+                        llr_full_codeword[i] = -100.0;
+                    // parity bits at end
+                    for (i = ldpc->ldpc_data_bits_per_frame; i < ldpc->ldpc_coded_bits_per_frame; i++)
+                        llr_full_codeword[i] = llr[i-unused_data_bits]; 
+                    iter = run_ldpc_decoder(ldpc, out_char, llr_full_codeword, &parityCheckCount);
+                }
+                            
                 if (f->test_frames) {
                     uint8_t payload_data_bits[data_bits_per_frame];
                     ofdm_generate_payload_data_bits(payload_data_bits, data_bits_per_frame);
@@ -2397,7 +2414,7 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (f->verbose && (ofdm->last_sync_state == search)) {
+    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz,
@@ -2464,8 +2481,25 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
         /* decode audio  -----------------------------------------------*/
 
         if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+#ifdef __LPCNET__
             /* LPCNet decoder */
-            
+            int bits_per_codec_frame = lpcnet_bits_per_frame(f->lpcnet);
+            int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+            int frames = data_bits_per_frame/bits_per_codec_frame;            
+        
+            /*
+              fprintf(stderr, "  modem_frame_count_rx: %d nout: %d frames: %d data_bits_per_frame: %d interleave_frames: %d\n",
+                    f->modem_frame_count_rx, nout, frames, data_bits_per_frame, f->interleave_frames);
+            */
+            if (f->modem_frame_count_rx < f->interleave_frames) {
+                nout = f->n_speech_samples;
+                for (i = 0; i < frames; i++) {
+                    lpcnet_dec(f->lpcnet, (char*)f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bits_per_codec_frame, speech_out);
+                    speech_out += lpcnet_samples_per_frame(f->lpcnet);
+                }
+                f->modem_frame_count_rx++;
+            }
+ #endif          
         }
         else {
             bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);

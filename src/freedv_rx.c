@@ -179,6 +179,9 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "-v") == 0) {
                 verbose = 1;
             }
+            if (strcmp(argv[i], "-vv") == 0) {
+                verbose = 2;
+            }
             if (strcmp(argv[i], "--discard") == 0) {
                 discard = 1;
             }

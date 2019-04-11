@@ -221,7 +221,7 @@ int main(int argc, char *argv[]) {
     assert(speech_in != NULL);
     mod_out = (short*)malloc(sizeof(short)*n_nom_modem_samples);
     assert(mod_out != NULL);
-    fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
+    //fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", n_speech_samples, n_nom_modem_samples);
 
     /* set up callback for txt msg chars */
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
