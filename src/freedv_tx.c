@@ -101,8 +101,12 @@ int main(int argc, char *argv[]) {
     int                       i;
 
     if (argc < 4) {
-        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA|2020 InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0]);
+        char f2020[80] = {0};
+        #ifdef __LPCNET__
+        sprintf(f2020,"|2020");
+        #endif     
+        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }

@@ -64,7 +64,7 @@ if(COMPILER_SUPPORTS_GNU11)
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 else()
-   message(SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
+   message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
 endif()
 
 # -fPIC is implied on MinGW...
@@ -74,15 +74,6 @@ endif()
 
 set(CMAKE_C_FLAGS_DEBUG "-g -O2")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
-
-
-message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
-string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
-if(_FLAGS STREQUAL "NONE")
-    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS})
-else()
-    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${_FLAGS}})
-endif()
 
 #
 # Setup Windows/MinGW specifics here.
@@ -185,6 +176,34 @@ include_directories(${PROJECT_BINARY_DIR})
 #    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
 #)
 
+if(LPCNET_DIR)
+    #
+    # Find lpcnet library
+    #
+    message(STATUS "Using LPCNet from build directory...")
+    get_filename_component(LPCNET_DIR ${LPCNET_DIR} 
+        ABSOLUTE BASE_DIR ${CMAKE_BINARY_DIR})
+    message(STATUS "  LPCNet dir: ${LPCNET_DIR}")
+    find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
+        PATHS ${LPCNET_DIR}
+        PATH_SUFFIXES src
+        NO_DEFAULT_PATH)
+    message(STATUS "  Source include dir: ${LPCNET_SOURCE_INCLUDE_DIR}")
+    find_library(LPCNET_LIBRARY NAME lpcnetfreedv
+        PATHS ${LPCNET_DIR}
+        PATH_SUFFIXES src
+        NO_DEFAULT_PATH)
+    message(STATUS "  Library: ${LPCNET_LIBRARY}")
+    if(LPCNET_INCLUDE_DIR AND LPCNET_LIBRARY)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__LPCNET__")
+        include_directories(${LPCNET_INCLUDE_DIR})
+        set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LPCNET_LIBRARY}")
+    else()
+        message(FATAL_ERROR "LPCNet library not found.")
+    endif()
+     
+endif()
+
 #
 # codec2 library
 #
@@ -216,7 +235,7 @@ if(UNITTEST)
     message(STATUS "  samplerate headers: ${LIBSAMPLERATE_INCLUDE_DIR}")
     message(STATUS "  samplerate library: ${LIBSAMPLERATE}")
     if(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
-        list(APPEND FREEDV_LINK_LIBS ${CMAKE_REQUIRED_LIBRARIES})
+        set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LIBSAMPLERATE}")
         include_directories(${LIBSAMPLERATE_INCLUDE_DIR})
     else(LIBSTAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
         message(FATAL_ERROR "samplerate library not found.
@@ -228,6 +247,15 @@ On Linux systems try installing:
     add_subdirectory(unittest)
     add_subdirectory(misc)
 endif(UNITTEST)
+
+message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
+string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
+if(_FLAGS STREQUAL "NONE")
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS})
+else()
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${_FLAGS}})
+endif()
+message(STATUS "Libraries linked: " ${CMAKE_REQUIRED_LIBRARIES})
 
 #
 # Cpack NSIS installer configuration for Windows.
