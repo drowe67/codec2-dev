@@ -1,4 +1,5 @@
 build_linux
+stm32/build_stm32
 stm32/libstm32f4.a
 stm32/unittest/lib/python/__pycache__/
 stm32/unittest/src/libstm32f4.a

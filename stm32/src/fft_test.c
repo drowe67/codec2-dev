@@ -167,13 +167,6 @@ int main(void)
  /** \endlink */
 
 
-/*
- * Dummy function to avoid compiler error
- */
-void _init() { }
-
-
-
 /* ----------------------------------------------------------------------
 Test Input signal contains 10KHz signal + Uniformly distributed white noise
 ** ------------------------------------------------------------------- */
