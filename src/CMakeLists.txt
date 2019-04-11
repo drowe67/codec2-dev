@@ -215,8 +215,6 @@ set(CODEC2_SRCS
     freedv_data_channel.c
     varicode.c
     modem_stats.c
-    c2wideband.c
-    dct2.c
     ofdm.c
     mpdecode_core.c
     phi0.c

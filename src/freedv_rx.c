@@ -101,8 +101,12 @@ int main(int argc, char *argv[]) {
 
     
     if (argc < 4) {
-	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputModemSpeechFile OutputSpeechRawFile\n"
-               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex]\n", argv[0]);
+        char f2020[80] = {0};
+        #ifdef __LPCNET__
+        sprintf(f2020,"|2020");
+        #endif     
+	printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputModemSpeechFile OutputSpeechRawFile\n"
+               " [--testframes] [--interleaver depth] [--codecrx] [-v] [--discard] [--usecomplex]\n", argv[0],f2020);
 	printf("e.g    %s 1600 hts1a_fdmdv.raw hts1a_out.raw\n", argv[0]);
 	exit(1);
     }
@@ -124,6 +128,10 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    #ifdef __LPCNET__
+    if (!strcmp(argv[1],"2020"))
+        mode = FREEDV_MODE_2020;
+    #endif
     assert(mode != -1);
 
     if (strcmp(argv[2], "-")  == 0) fin = stdin;
@@ -181,7 +189,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (mode == FREEDV_MODE_700D) {
+    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
         struct freedv_advanced adv;
         adv.interleave_frames = interleave_frames;
         freedv = freedv_open_advanced(mode, &adv);

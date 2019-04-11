@@ -1568,7 +1568,8 @@ int freedv_rx(struct freedv *f, short speech_out[], short demod_in[]) {
     }
     
     if ( (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700, f->mode)) || 
-         (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))) {
+         (FDV_MODE_ACTIVE( FREEDV_MODE_700B, f->mode)) || (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode))
+         || (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode))) {
 
         float gain = 1.0;
         
@@ -2242,7 +2243,7 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
 }
 
 #ifdef __LPCNET__
-static int freedv_comprx_2020(struct freedv *f, short demod_in_8kHz[], float gain, int *valid) {
+static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     int   i, j, nout, k;
     int   n_ascii;
     char  ascii_out;
@@ -2270,29 +2271,26 @@ static int freedv_comprx_2020(struct freedv *f, short demod_in_8kHz[], float gai
     int parityCheckCount = 0;
     uint8_t rx_uw[ofdm_nuwbits];
 
-    // TODO: might need different scaling for 2020
-    float new_gain = gain / OFDM_AMP_SCALE;
-    
     /* echo samples back out as default (say if sync not found) */
     
     *valid = 1;
     f->sync = f->stats.sync = 0;
     
     /* TODO estimate this properly from signal */
-    
+
+    // TODO: should be higher for 2020?
     float EsNo = 3.0;
     
     /* looking for modem sync */
     
     if (ofdm->sync_state == search) {
-        ofdm_sync_search_shorts(f->ofdm, demod_in_8kHz, new_gain);
+        ofdm_sync_search(f->ofdm, demod_in);
     }
 
     /* OK modem is in sync */
     
     if ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)) {
-        // TODO: be good to make this work for complex rx signals
-        ofdm_demod_shorts(ofdm, rx_bits, demod_in_8kHz, new_gain);
+        ofdm_demod(ofdm, rx_bits, demod_in);
         ofdm_disassemble_modem_frame(ofdm, rx_uw, payload_syms, payload_amps, txt_bits);
 
         f->sync = 1;
@@ -2432,9 +2430,6 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     
     assert(f->nin <= f->n_max_modem_samples);
 
-    bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
-    bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
-
     if (FDV_MODE_ACTIVE( FREEDV_MODE_1600, f->mode)) {
         nout = freedv_comprx_fdmdv_1600(f, demod_in, &valid);
     }
@@ -2447,9 +2442,11 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
 
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-        short x[f->nin];
-        for(int i=0; i<f->nin; i++) x[i] = demod_in[i].real;
         nout = freedv_comp_short_rx_700d(f, (void*)demod_in, 0, 1.0, &valid);
+    }
+    
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        freedv_comprx_2020(f, demod_in, &valid);
     }
     
     if (valid == 0) {
@@ -2465,26 +2462,39 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
     else {
         /* decode audio  -----------------------------------------------*/
-        if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
-            /* 700D a bit special due to interleaving */
-            if (f->modem_frame_count_rx < f->interleave_frames) {
-                int data_bits_per_frame = f->ldpc->data_bits_per_frame;
-                int frames = data_bits_per_frame/bits_per_codec_frame;            
-                nout = f->n_speech_samples;
-                //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
+
+        if(FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+            /* LPCNet decoder */
+            
+        }
+        else {
+            bits_per_codec_frame  = codec2_bits_per_frame(f->codec2);
+            bytes_per_codec_frame = (bits_per_codec_frame + 7) / 8;
+
+            if(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+
+                /* 700D a bit special due to interleaving */
+
+                if (f->modem_frame_count_rx < f->interleave_frames) {
+                    int data_bits_per_frame = f->ldpc->data_bits_per_frame;
+                    int frames = data_bits_per_frame/bits_per_codec_frame;            
+                    nout = f->n_speech_samples;
+                    //fprintf(stderr, "modem_frame_count_rx: %d nout: %d\n", f->modem_frame_count_rx, nout);
+                    for (i = 0; i < frames; i++) {
+                        codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                        speech_out += codec2_samples_per_frame(f->codec2);
+                    }
+                    f->modem_frame_count_rx++;
+                }
+            } else { 
+                /* non-interleaved Codec 2 modes */
+                
+                int frames = f->n_codec_bits / bits_per_codec_frame;
+                //fprintf(stderr, "frames: %d\n", frames);
                 for (i = 0; i < frames; i++) {
-                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits + (i + frames*f->modem_frame_count_rx)* bytes_per_codec_frame);
+                    codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
                     speech_out += codec2_samples_per_frame(f->codec2);
                 }
-                f->modem_frame_count_rx++;
-            }
-        } else { 
-       
-            int frames = f->n_codec_bits / bits_per_codec_frame;
-            //fprintf(stderr, "frames: %d\n", frames);
-            for (i = 0; i < frames; i++) {
-                codec2_decode(f->codec2, speech_out, f->packed_codec_bits + i * bytes_per_codec_frame);
-                speech_out += codec2_samples_per_frame(f->codec2);
             }
         }
     }

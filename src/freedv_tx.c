@@ -129,8 +129,10 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    #ifdef __LPCNET__
     if (!strcmp(argv[1],"2020"))
         mode = FREEDV_MODE_2020;
+    #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(0);
