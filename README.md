@@ -100,7 +100,7 @@ as building LPCNet requires some Codec 2 functions.
    ```
    $ cd ~/codec2
    $ rm -Rf build_linux/ && mkdir build_linux && cd build_linux
-   $ CFLAGS="-D__LPCNET__ -I/path/to/LPCNet/src" LDFLAGS=-L/path/to/LPCNet/build_linux/src cmake ..
+   $ cmake -DLPCNET_BUILD_DIR=/path/to/LPCNet/build_linux ..
    $ make
    ```
 

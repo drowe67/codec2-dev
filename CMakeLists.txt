@@ -176,21 +176,20 @@ include_directories(${PROJECT_BINARY_DIR})
 #    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
 #)
 
-if(LPCNET_DIR)
+if(LPCNET_BUILD_DIR)
     #
     # Find lpcnet library
     #
     message(STATUS "Using LPCNet from build directory...")
-    get_filename_component(LPCNET_DIR ${LPCNET_DIR} 
-        ABSOLUTE BASE_DIR ${CMAKE_BINARY_DIR})
-    message(STATUS "  LPCNet dir: ${LPCNET_DIR}")
+    message(STATUS "  LPCNet Build dir: ${LPCNET_BUILD_DIR}")
+    load_cache(${LPCNET_BUILD_DIR} LPCNet_SOURCE_DIR)
     find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
-        PATHS ${LPCNET_DIR}
+        PATHS ${LPCNet_SOURCE_DIR}
         PATH_SUFFIXES src
         NO_DEFAULT_PATH)
-    message(STATUS "  Source include dir: ${LPCNET_SOURCE_INCLUDE_DIR}")
+    message(STATUS "  Source include dir: ${LPCNET_INCLUDE_DIR}")
     find_library(LPCNET_LIBRARY NAME lpcnetfreedv
-        PATHS ${LPCNET_DIR}
+        PATHS ${LPCNET_BUILD_DIR}
         PATH_SUFFIXES src
         NO_DEFAULT_PATH)
     message(STATUS "  Library: ${LPCNET_LIBRARY}")
@@ -199,7 +198,7 @@ if(LPCNET_DIR)
         include_directories(${LPCNET_INCLUDE_DIR})
         set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LPCNET_LIBRARY}")
     else()
-        message(FATAL_ERROR "LPCNet library not found.")
+        message(FATAL_ERROR "LPCNet include/library not found.")
     endif()
      
 endif()
