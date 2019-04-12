@@ -133,6 +133,17 @@ $ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - | ./freedv_rx 2020 - - |
 $ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
 ```
 
+Simulated HF slow fading channel, 10.8dB SNR:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -30 --Fs 8000 --slow | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+```
+It falls down quite a bit with fast fading (--fast).  We'll work on that.
+
+AWGN (noise but no fading) channel, 2.8dB SNR:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+```
+
 ## Building and Running Unit Tests
 
 CTest is used as a test frame work, with support from GNU Octave
