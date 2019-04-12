@@ -29,7 +29,7 @@ function ofdm_tx(filename, mode="700D", Nsec, EbNodB=100, channel='awgn', freq_o
 
   % init modem
   
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode)
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   print_config(states);
   ofdm_load_const;
