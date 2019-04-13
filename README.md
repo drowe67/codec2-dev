@@ -84,6 +84,66 @@ $ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 80
 
 + ofdm_* are OFDM PSK HF modem command line programs (README_ofdm).
 
+## FreeDV 2020 support (building with LPCNet)
+
+1. As a pre-requisite you need libcodec2.so installed on your machine,
+as building LPCNet requires some Codec 2 functions.
+
+1. Build LPCNet:
+   ```
+   $ cd ~
+   $ git clone https://github.com/drowe67/LPCNet
+   $ cd LPCNet && mkdir build_linux && cd build_linux && cmake ../ && make
+   ```
+
+1. (re)build Codec 2 with LPCNet support:
+   ```
+   $ cd ~/codec2
+   $ rm -Rf build_linux/ && mkdir build_linux && cd build_linux
+   $ cmake -DLPCNET_BUILD_DIR=/path/to/LPCNet/build_linux ..
+   $ make
+   ```
+
+### FreeDV 2020 tests with FreeDV API
+
+Reference: Plugging together lpcnet_enc -> ofdm_mod -> ofdm_demod -> lpcnet_dec:
+```
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+```
+We are trying to integrate all of the above into FreeDV API.
+
+Listen the reference tx:
+```
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
+```
+
+Listen the freedv_tx:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
+```
+
+FreeDV API tx, with reference rx from above:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+```
+
+FreeDV API tx and rx:
+```
+$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
+```
+
+Simulated HF slow fading channel, 10.8dB SNR:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -30 --Fs 8000 --slow | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+```
+It falls down quite a bit with fast fading (--fast).  We'll work on that.
+
+AWGN (noise but no fading) channel, 2.8dB SNR:
+```
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./cohpsk_ch - - -22 --Fs 8000 | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+```
+
 ## Building and Running Unit Tests
 
 CTest is used as a test frame work, with support from GNU Octave

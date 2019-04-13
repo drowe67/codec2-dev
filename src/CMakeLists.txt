@@ -215,8 +215,6 @@ set(CODEC2_SRCS
     freedv_data_channel.c
     varicode.c
     modem_stats.c
-    c2wideband.c
-    dct2.c
     ofdm.c
     mpdecode_core.c
     phi0.c
@@ -261,6 +259,9 @@ set(CODEC2_PUBLIC_HEADERS
 add_library(codec2 ${CODEC2_SRCS})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(codec2 ${CMAKE_REQUIRED_LIBRARIES})
+if(lpcnet_FOUND)
+    target_link_libraries(codec2 lpcnetfreedv)
+endif()
 set_target_properties(codec2 PROPERTIES
     SOVERSION ${SOVERSION}
     PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"

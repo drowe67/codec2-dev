@@ -101,8 +101,12 @@ int main(int argc, char *argv[]) {
     int                       i;
 
     if (argc < 4) {
-        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0]);
+        char f2020[80] = {0};
+        #ifdef __LPCNET__
+        sprintf(f2020,"|2020");
+        #endif     
+        printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -125,6 +129,10 @@ int main(int argc, char *argv[]) {
         mode = FREEDV_MODE_2400B;
     if (!strcmp(argv[1],"800XA"))
         mode = FREEDV_MODE_800XA;
+    #ifdef __LPCNET__
+    if (!strcmp(argv[1],"2020"))
+        mode = FREEDV_MODE_2020;
+    #endif
     if (mode == -1) {
         fprintf(stderr, "Error in mode: %s\n", argv[1]);
         exit(0);
@@ -184,7 +192,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (mode == FREEDV_MODE_700D) {
+    if ((mode == FREEDV_MODE_700D) || (mode == FREEDV_MODE_2020)) {
         struct freedv_advanced adv;
         adv.interleave_frames = interleave_frames;
         freedv = freedv_open_advanced(mode, &adv);
@@ -205,7 +213,8 @@ int main(int argc, char *argv[]) {
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
-
+    freedv_set_verbose(freedv, 1);
+    
     n_speech_samples = freedv_get_n_speech_samples(freedv);
     n_nom_modem_samples = freedv_get_n_nom_modem_samples(freedv);
     speech_in = (short*)malloc(sizeof(short)*n_speech_samples);

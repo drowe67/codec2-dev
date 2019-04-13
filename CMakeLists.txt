@@ -64,7 +64,7 @@ if(COMPILER_SUPPORTS_GNU11)
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 else()
-   message(SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
+   message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
 endif()
 
 # -fPIC is implied on MinGW...
@@ -74,15 +74,6 @@ endif()
 
 set(CMAKE_C_FLAGS_DEBUG "-g -O2")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
-
-
-message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
-string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
-if(_FLAGS STREQUAL "NONE")
-    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS})
-else()
-    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${_FLAGS}})
-endif()
 
 #
 # Setup Windows/MinGW specifics here.
@@ -128,6 +119,14 @@ if(INSTALL_EXAMPLES)
     install(DIRECTORY octave raw script wav
         USE_SOURCE_PERMISSIONS
         DESTINATION ${CMAKE_INSTALL_DATADIR}/codec2)
+endif()
+
+# LPCNet needs to be bootstraped because codec2 and freedvlpcnet are 
+# cross dependent.
+option(LPCNET "Build codec2 with LPCNet support." OFF)
+# Setting LPCNET_BUILD_DIR implies LPCNET=ON
+if(LPCNET_BUILD_DIR)
+    set(LPCNET ON)
 endif()
 
 
@@ -186,6 +185,41 @@ include_directories(${PROJECT_BINARY_DIR})
 #)
 
 #
+# Find lpcnet library
+#
+if(LPCNET)
+    if(LPCNET_BUILD_DIR)
+        message(STATUS "Using LPCNet from build directory...")
+        message(STATUS "  LPCNet Build dir: ${LPCNET_BUILD_DIR}")
+        load_cache(${LPCNET_BUILD_DIR} LPCNet_SOURCE_DIR)
+        find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
+            PATHS ${LPCNet_SOURCE_DIR}
+            PATH_SUFFIXES src
+            NO_DEFAULT_PATH)
+        message(STATUS "  Source include dir: ${LPCNET_INCLUDE_DIR}")
+        find_library(LPCNET_LIBRARY NAME lpcnetfreedv
+            PATHS ${LPCNET_BUILD_DIR}
+            PATH_SUFFIXES src
+            NO_DEFAULT_PATH)
+        message(STATUS "  Library: ${LPCNET_LIBRARY}")
+        if(LPCNET_INCLUDE_DIR AND LPCNET_LIBRARY)
+            add_definitions("-D__LPCNET__")
+            include_directories(${LPCNET_INCLUDE_DIR})
+            set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LPCNET_LIBRARY}")
+        else()
+            message(FATAL_ERROR "LPCNet include/library not found.")
+        endif()
+    else()
+        find_package(lpcnet REQUIRED)
+        if(lpcnet_FOUND)
+            add_definitions("-D__LPCNET__")
+        else()
+            message(FATAL_ERROR "lpcnetfreedv library not found.")
+        endif()
+    endif()
+endif()
+
+#
 # codec2 library
 #
 add_subdirectory(src)
@@ -216,7 +250,7 @@ if(UNITTEST)
     message(STATUS "  samplerate headers: ${LIBSAMPLERATE_INCLUDE_DIR}")
     message(STATUS "  samplerate library: ${LIBSAMPLERATE}")
     if(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
-        list(APPEND FREEDV_LINK_LIBS ${CMAKE_REQUIRED_LIBRARIES})
+        set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LIBSAMPLERATE}")
         include_directories(${LIBSAMPLERATE_INCLUDE_DIR})
     else(LIBSTAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
         message(FATAL_ERROR "samplerate library not found.
@@ -228,6 +262,15 @@ On Linux systems try installing:
     add_subdirectory(unittest)
     add_subdirectory(misc)
 endif(UNITTEST)
+
+message(STATUS "Build type is: " ${CMAKE_BUILD_TYPE})
+string(TOUPPER ${CMAKE_BUILD_TYPE} _FLAGS)
+if(_FLAGS STREQUAL "NONE")
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS})
+else()
+    message(STATUS "Compiler Flags: " ${CMAKE_C_FLAGS} ${CMAKE_C_FLAGS_${_FLAGS}})
+endif()
+message(STATUS "Libraries linked: " ${CMAKE_REQUIRED_LIBRARIES})
 
 #
 # Cpack NSIS installer configuration for Windows.
@@ -341,6 +384,10 @@ if(UNITTEST)
              COMMAND sh -c "dd bs=1280 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
 
+    add_test(NAME test_FreeDV_API_700D_AWGN_BER_USECOMPLEX
+             COMMAND sh -c "dd bs=1280 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard --usecomplex"
+             )
+           
     add_test(NAME test_FreeDV_API_700D_AWGN_BER_Interleave
              COMMAND sh -c "dd bs=1280 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )

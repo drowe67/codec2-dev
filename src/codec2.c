@@ -114,13 +114,9 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-    if (!((mode >= 0) && (mode <= CODEC2_MODE_WB))) {
-        return NULL;
-    }  
 #ifndef CORTEX_M4
     if (( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, mode)) || 
-        ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)) || 
-	( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, mode))   ) {
+        ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)) ) {
         return NULL;
     }  
 #endif
@@ -335,12 +331,6 @@ struct CODEC2 * codec2_create(int mode)
 	c2->decode = codec2_decode_450pwb;
     }
 
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
-    {
-    	//Encode PWB doesnt make sense
-	c2->encode = codec2_encode_wb;
-	c2->decode = codec2_decode_wb;
-    }
 #endif
     
     return c2;
@@ -417,10 +407,6 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
     if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	return 18;
 
-    //TODO: verify this
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
-	return 64;
-
     return 0; /* shouldn't get here */   
 }
 
@@ -458,8 +444,6 @@ int codec2_samples_per_frame(struct CODEC2 *c2) {
 	return 320;
     if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
 	return 640;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_WB, c2->mode))
-	return 160;
     return 0; /* shouldnt get here */
 }
 
