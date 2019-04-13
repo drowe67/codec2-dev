@@ -44,17 +44,18 @@
    ```
    
 6. To see all the details during compilation:
-
-  $ make VERBOSE=1
-
+   ```
+   $ make VERBOSE=1
+   ```
+   
 ## Directories
 
-| Directory | Notes |
----------------------
-| cmake | cmake support files for the stm32 |
-| inc | top level sm1000 source, drivers, and some legacy test code |
-| src | top level sm1000 source, drivers, and some legacy test code |
-| unitest | comprehensive set of automated unit tests for the stm32 700D port |
-| usb_lib | TBC |
-| stlink | TBC |
-| usb_conf | TBC |
+Directory | Notes 
+---|---
+cmake | cmake support files for the stm32
+inc | top level sm1000 source, drivers, and some legacy test code
+src | top level sm1000 source, drivers, and some legacy test code
+unitest | comprehensive set of automated unit tests for the stm32 700D port
+usb_lib | TBC 
+stlink | TBC
+usb_conf | TBC
