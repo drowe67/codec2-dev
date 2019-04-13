@@ -2463,7 +2463,9 @@ int freedv_comprx(struct freedv *f, short speech_out[], COMP demod_in[]) {
     }
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+#ifdef __LPCNET__
         freedv_comprx_2020(f, demod_in, &valid);
+#endif
     }
     
     if (valid == 0) {
