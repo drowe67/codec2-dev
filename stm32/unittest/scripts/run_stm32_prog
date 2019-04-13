@@ -11,19 +11,35 @@ for arg in "$@"; do
     fi
     done
 
-cat <<-EEOOFF > gdb_cmds
-	shell st-util --semihosting & 
+if [ ${ARGS[--openocd]+_} ] ; then
+    cat <<-EEOOFF >> gdb_cmds
+        shell killall -q openocd 
+        shell openocd -d0 -f board/stm32f4discovery.cfg 2>ocd_stderr.log >ocd_stdout.log & 
+        shell sleep 1
+	target remote :3333
+        monitor arm semihosting enable
+        monitor arm semihosting_fileio enable
+	EEOOFF
+    
+       SHUTDOWN="monitor shutdown"
+else
+    cat <<-EEOOFF >> gdb_cmds
+        shell st-util --verbose=0 --semihosting 2>stutil_stderr.log >stutil_stdout.log &
+        shell sleep 1
 	target remote :4242
 	EEOOFF
+
+       SHUTDOWN=""
+fi
 
 if [ ${ARGS[--load]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
 	load
-	monitor reset
 	EEOOFF
     fi
 
 cat <<-EEOOFF >> gdb_cmds
+        monitor reset halt
 	break EndofMain
 	break abort
 	EEOOFF
@@ -32,8 +48,9 @@ if [ -z ${ARGS[--debug]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
 	continue
 	set confirm off
+        $SHUTDOWN 
 	quit
 	EEOOFF
     fi
 
-arm-none-eabi-gdb -x gdb_cmds ${ELF}
+arm-none-eabi-gdb -batch -x gdb_cmds ${ELF}

@@ -42,8 +42,3 @@ script:
     - mkdir -p $BUILDSTM
     - cd $BUILDSTM 
     - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" -DCMAKE_TOOLCHAIN_FILE="$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" && make -j4 ) ; fi
-    - cd ${CODEC2DEV}/stm32/unittest/src 
-    - echo PERIPHLIBDIR = $STDLIBDIR >local.mak
-    - make clean 
-    - mkdir -p $CODEC2DEV/src/codec2 ; cp $BUILDSTD/codec2/version.h $CODEC2DEV/src/codec2/
-    - if [ -e $STDLIBDIR ]; then (ln -s $STDLIBDIR . && PATH=${PATH}:$GCC_DIR/bin/ make -j4) ; fi

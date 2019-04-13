@@ -26,7 +26,7 @@ cd "${RUN_DIR}"
 declare -i Fails=0
 
 case "${TEST_OPT}" in
-    1600)
+    1300)
     	echo -e "\nCompare output binary data"
         compare_ints -b1 -c ref_enc.raw stm_out.raw
 	error_count=$?

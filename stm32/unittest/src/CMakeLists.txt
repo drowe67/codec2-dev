@@ -1,7 +1,7 @@
 set(STM32F4_SYSTEM_SRCS
 ../../src/system_stm32f4xx.c
+../../src/stm32f4_machdep.c
 startup_stm32f4xx.s
-stm32f4_machdep.c
 )
 
 list(APPEND SEMIHOSTING_SRCS semihosting.c ${STM32F4_SYSTEM_SRCS})

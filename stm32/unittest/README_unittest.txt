@@ -56,6 +56,17 @@ Debug and semihosting
    in the output of st-util.  They can be ignored.
 
 
+   Optionally you may use openocd instead of stlink. 
+
+   Most linux distributions use too old packages for openocd, so you in general
+   should build it from the git source. If your testi runs fail with error 
+   messages rearding SYS_FLEN not support (see openocd_stderr.log in the test_run 
+   directories), your openocd is too old. Make sure to have the right openocd
+   first in the PATH if you have multiple openocd installed!
+
+
+
+
 Building and Running the stm32 Unit Tests
 =========================================
 
@@ -90,6 +101,42 @@ Building and Running the stm32 Unit Tests
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 
+1c/ Build openocd (replaces stlink):
+    The executable is placed in /usr/local/bin ! Make sure to have no
+    other openocd installed (check output of `which openocd` to be 
+    /usr/local/bin)
+
+      git clone https://git.code.sf.net/p/openocd/code openocd-code
+      cd openocd-code
+      ./bootstrap
+      ./configure
+      sudo make install
+      which openocd
+
+1d/ Plug in a stm32 development board and test:
+
+   $ openocd -f board/stm32f4discovery.cfg
+
+   Open On-Chip Debugger 0.10.0+dev-00796-ga4ac5615 (2019-04-12-21:58)
+   Licensed under GNU GPL v2
+   For bug reports, read
+   http://openocd.org/doc/doxygen/bugs.html
+   Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+   adapter speed: 2000 kHz
+   adapter_nsrst_delay: 100
+   none separate
+   srst_only separate srst_nogate srst_open_drain connect_deassert_srst
+   Info : Listening on port 6666 for tcl connections
+   Info : Listening on port 4444 for telnet connections
+   Info : clock speed 2000 kHz
+   Info : STLINK V2J33S0 (API v2) VID:PID 0483:3748
+   Info : Target voltage: 2.871855
+   Info : stm32f4x.cpu: hardware has 6 breakpoints, 4 watchpoints
+   Info : Listening on port 3333 for gdb connections
+
+
+   To run the tests with openocd instead of the default st-util, add `--openocd` to the command lines shown below.
+  
 2/ To run a single test:
 
    $ cd codec2-dev/stm32/unittest
