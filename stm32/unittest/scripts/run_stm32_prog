@@ -4,6 +4,7 @@
 # Parse command line options
 # Options (starting with "--") are stored in $ARGS.
 # Non-options are taken as the test name (last one sticks).
+
 declare -A ARGS
 for arg in "$@"; do
     if [[ ${arg} == --* ]] ; then ARGS[${arg}]=true
@@ -11,12 +12,26 @@ for arg in "$@"; do
     fi
     done
 
+# Add the parameters for connecting via ssh to
+# your machine with an stm32 connected to
+# UT_SSH_PARAMS
+# e.g.
+# UT_SSH_PARAMS="-p 22 user@host_with_stm32"
+
+if [ -z "$UT_SSH_PARAMS" ]; then
+  GDB_SHELL_BG="&"
+  UT_SSH=""
+else
+  GDB_SHELL_BG=""
+  UT_SSH="ssh -f -L 3334:localhost:3333 $UT_SSH_PARAMS"
+fi
+
+
 if [ ${ARGS[--openocd]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
-        shell killall -q openocd 
-        shell openocd -d0 -f board/stm32f4discovery.cfg 2>ocd_stderr.log >ocd_stdout.log & 
+        shell ${UT_SSH} killall -q openocd\; openocd -f board/stm32f4discovery.cfg >ocd_stdout.log 2>ocd_stderr.log $GDB_SHELL_BG
         shell sleep 1
-	target remote :3333
+	target remote :3334
         monitor arm semihosting enable
         monitor arm semihosting_fileio enable
 	EEOOFF
