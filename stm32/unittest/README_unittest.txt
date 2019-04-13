@@ -97,7 +97,7 @@ Building and Running the stm32 Unit Tests
 
 for example 
 
-   $ ./scripts/run_stm32_test tst_ofdm_demod quick
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick
 
 3/ To run a test set (codec2, ofdm, ldpc):
 
