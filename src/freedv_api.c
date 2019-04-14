@@ -308,6 +308,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         
 #ifdef __LPCNET__
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2020, mode) ) {
+        f->speech_sample_rate = FS_VOICE_16K;
         f->snr_squelch_thresh = 4.0;
         f->squelch_en = 0;
         codec2_mode = CODEC_MODE_LPCNET_1733;
