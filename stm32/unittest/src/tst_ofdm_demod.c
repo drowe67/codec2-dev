@@ -62,6 +62,8 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "semihosting.h"
 #include "codec2_ofdm.h"
@@ -89,6 +91,8 @@ static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
+static char fout_buffer[4096];
+static char fdiag_buffer[8192];
 
 static char *statemode[] = {
     "search",
@@ -106,7 +110,7 @@ void flush_all(void) {
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
-    FILE        *fcfg, *fin;
+    FILE        *fcfg;
     int          nin_frame;
     struct LDPC  ldpc;
 
@@ -221,27 +225,31 @@ int main(int argc, char *argv[]) {
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
 
-    fin = fopen("stm_in.raw", "rb");
-    if (fin == NULL) {
+    int sin = open("stm_in.raw", O_RDONLY);
+    if (sin < 0) {
         fprintf(stderr, "Error opening input file\n");
         exit(1);
     }
+
 
     fout = fopen("stm_out.raw", "wb");
     if (fout == NULL) {
         fprintf(stderr, "Error opening output file\n");
         exit(1);
     }
+    setvbuf(fout, fout_buffer,_IOFBF,sizeof(fout_buffer));
 
     fdiag = fopen("stm_diag.raw", "wb");
     if (fdiag == NULL) {
         fprintf(stderr, "Error opening diag file\n");
         exit(1);
     }
+    setvbuf(fdiag, fdiag_buffer,_IOFBF,sizeof(fdiag_buffer));
 
     nin_frame = ofdm_get_nin(ofdm);
     int num_read;
-    while((num_read = fread(rx_scaled, sizeof(short), nin_frame, fin)) == nin_frame) {
+
+    while((num_read = read(sin, rx_scaled, sizeof(short) * nin_frame)) == sizeof(short)*nin_frame) {
 
         int log_payload_syms_flag = 0;
 
@@ -450,8 +458,7 @@ int main(int argc, char *argv[]) {
     } // while(fread(.., fin))
 
     flush_all();    // To make sure this function is included in binary.
-
-    fclose(fin);
+    close(sin);
     fclose(fout);
     fclose(fdiag);
 

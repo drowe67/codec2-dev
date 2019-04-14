@@ -71,8 +71,10 @@
 #include "machdep.h"
     
 
+static char fout_buffer[4096];
+
 int main(int argc, char *argv[]) {
-    int            f_cfg, f_in, f_out;
+    int            f_cfg, f_in;
     int            frame;
     void          *codec2;
     short         *buf;
@@ -126,11 +128,12 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    f_out = open("stm_out.raw", (O_CREAT | O_WRONLY), 0644);
-    if (f_out == -1) {
+    FILE *fout = fopen("stm_out.raw", "wb" );
+    if (fout == NULL) {
         perror("Error opening output file\n");
         exit(1);
     }
+    setvbuf(fout, fout_buffer,_IOFBF,sizeof(fout_buffer));
 
     frame = 0;
 
@@ -141,14 +144,14 @@ int main(int argc, char *argv[]) {
 
         codec2_decode_ber(codec2, buf, bits, 0.0);
  	
-        write(f_out, buf, (sizeof(short) * nsam));
+        fwrite(buf, sizeof(short) , nsam, fout);
 
         frame ++;
         }
 
 
     close(f_in);
-    close(f_out);
+    fclose(fout);
 
     printf("\nEnd of Test\n");
     fclose(stdout);

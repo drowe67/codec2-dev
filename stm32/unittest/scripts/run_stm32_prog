@@ -21,17 +21,18 @@ for arg in "$@"; do
 if [ -z "$UT_SSH_PARAMS" ]; then
   GDB_SHELL_BG="&"
   UT_SSH=""
+  UT_SLEEP=1
 else
   GDB_SHELL_BG=""
-  UT_SSH="ssh -f -L 3334:localhost:3333 $UT_SSH_PARAMS"
+  UT_SSH="ssh -f -L 3333:localhost:3333 $UT_SSH_PARAMS"
+  UT_SLEEP=4
 fi
-
 
 if [ ${ARGS[--openocd]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
         shell ${UT_SSH} killall -q openocd\; openocd -f board/stm32f4discovery.cfg >ocd_stdout.log 2>ocd_stderr.log $GDB_SHELL_BG
-        shell sleep 1
-	target remote :3334
+        shell sleep ${UT_SLEEP}
+	target remote :3333
         monitor arm semihosting enable
         monitor arm semihosting_fileio enable
 	EEOOFF
@@ -40,7 +41,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
 else
     cat <<-EEOOFF >> gdb_cmds
         shell st-util --verbose=0 --semihosting 2>stutil_stderr.log >stutil_stdout.log &
-        shell sleep 1
+        shell sleep ${UT_SLEEP} 
 	target remote :4242
 	EEOOFF
 
