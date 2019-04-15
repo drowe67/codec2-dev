@@ -260,6 +260,9 @@ add_library(codec2 ${CODEC2_SRCS})
 if(UNIX)
     target_link_libraries(codec2 m)
 endif(UNIX)
+if(LPCNET AND lpcnet_FOUND)
+    target_link_libraries(codec2 lpcnetfreedv)
+endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(codec2 PROPERTIES
     SOVERSION ${SOVERSION}
