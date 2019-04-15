@@ -2549,7 +2549,7 @@ int freedv_shortrx(struct freedv *f, short speech_out[], short demod_in[], float
 
     // At this stage short interface only supported for 700D, to help
     // memory requirements on stm32
-    assert(FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode));
+    assert(f->mode == FREEDV_MODE_700D);
     
     assert(f->nin <= f->n_max_modem_samples);
 
