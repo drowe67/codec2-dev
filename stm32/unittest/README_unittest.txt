@@ -93,11 +93,14 @@ Building and Running the stm32 Unit Tests
 2/ To run a single test:
 
    $ cd codec2-dev/stm32/unittest
-   $ ./scripts/run_stm32_test <name_of_test> <test_option>
+   $ ./scripts/run_stm32_test <name_of_test> <test_option> --load
 
 for example 
 
-   $ ./scripts/run_stm32_tst tst_ofdm_demod quick
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick --load
+
+(Note when running a single test you can choose not to reload the flash every
+time if using the same bits.  The *_all_* scripts manage this themselves.)
 
 3/ To run a test set (codec2, ofdm, ldpc):
 
