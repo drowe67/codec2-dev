@@ -257,6 +257,9 @@ set(CODEC2_PUBLIC_HEADERS
 # Setup the codec2 library
 #
 add_library(codec2 ${CODEC2_SRCS})
+if(UNIX)
+    target_link_libraries(codec2 m)
+endif(UNIX)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 set_target_properties(codec2 PROPERTIES
     SOVERSION ${SOVERSION}

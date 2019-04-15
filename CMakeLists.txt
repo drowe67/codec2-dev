@@ -192,11 +192,6 @@ include_directories(${PROJECT_BINARY_DIR})
 add_subdirectory(src)
 
 
-if(UNIX)
-    target_link_libraries(codec2 m)
-endif(UNIX)
-
-
 #
 # Find lpcnet library
 #
