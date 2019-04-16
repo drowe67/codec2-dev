@@ -6,6 +6,13 @@ It is currently only working on linux systems. It requires a STM32F4xx processor
 development board connected to/having a ST-LINK , e.g. 
 a STM32F4 Discovery board. 
 
+Quickstart
+==========
+
+   $ cd <path_to_codec2>/stm32/unittest
+   $ ./scripts/run_all_stm32_tests
+
+
 Objectives
 ==========
 
@@ -82,14 +89,29 @@ Building and Running the stm32 Unit Tests
   2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
-  
-2/ To run a single test set:
 
-   $ cd codec2-dev/stm32/unittest/scripts
-   $ ./run_all_ldpc_tests
+2/ To run a single test:
 
-3/ To run ALL tests:
+   $ cd codec2-dev/stm32/unittest
+   $ ./scripts/run_stm32_test <name_of_test> <test_option> --load
 
-   (TODO Don - pls add command to run all tests)
-   
+for example 
+
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick --load
+
+(Note when running a single test you can choose not to reload the flash every
+time if using the same bits.  The *_all_* scripts manage this themselves.)
+
+3/ To run a test set (codec2, ofdm, ldpc):
+
+   $ cd codec2-dev/stm32/unittest
+   $ ./scripts/run_all_<set_name>_tests
+
+for example 
+
+   $ ./scripts/run_all_ldpc_tests
+
+4/ To run ALL tests, see "Quickstart" above
+
+
 # vi:set ts=3 et sts=3:
