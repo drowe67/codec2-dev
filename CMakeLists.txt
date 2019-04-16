@@ -9,6 +9,14 @@ project(codec2 C)
 
 cmake_minimum_required(VERSION 3.0)
 
+# Set policies here, probably should move to cmake dir.
+if(POLICY CMP0075)
+    cmake_policy(SET CMP0075 NEW)
+endif()
+if(POLICY CMP0079)
+    cmake_policy(SET CMP0079 NEW)
+endif()
+
 include(GNUInstallDirs)
 mark_as_advanced(CLEAR
     CMAKE_INSTALL_BINDIR
@@ -124,19 +132,13 @@ endif()
 # LPCNet needs to be bootstraped because codec2 and freedvlpcnet are 
 # cross dependent.
 option(LPCNET "Build codec2 with LPCNet support." OFF)
+set(LPCNET_BUILD_DIR FALSE CACHE PATH "Location of lpcnet build tree.")
 # Setting LPCNET_BUILD_DIR implies LPCNET=ON
 if(LPCNET_BUILD_DIR)
     set(LPCNET ON)
 endif()
 
 
-# Math library is automatic on windows
-if(POLICY CMP0075)
-    cmake_policy(SET CMP0075 NEW)
-endif()
-if(UNIX)
-    set(CMAKE_REQUIRED_LIBRARIES m)
-endif(UNIX)
 
 include(CheckIncludeFiles)
 check_include_files("stdlib.h" HAVE_STDLIB_H)
@@ -184,30 +186,42 @@ include_directories(${PROJECT_BINARY_DIR})
 #    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
 #)
 
+
+#
+# codec2 library
+#
+add_subdirectory(src)
+
+
 #
 # Find lpcnet library
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
-        message(STATUS "Using LPCNet from build directory...")
-        message(STATUS "  LPCNet Build dir: ${LPCNET_BUILD_DIR}")
-        load_cache(${LPCNET_BUILD_DIR} LPCNet_SOURCE_DIR)
-        find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
-            PATHS ${LPCNet_SOURCE_DIR}
-            PATH_SUFFIXES src
-            NO_DEFAULT_PATH)
-        message(STATUS "  Source include dir: ${LPCNET_INCLUDE_DIR}")
-        find_library(LPCNET_LIBRARY NAME lpcnetfreedv
+#        message(STATUS "Using LPCNet from build directory...")
+#        message(STATUS "  LPCNet Build dir: ${LPCNET_BUILD_DIR}")
+#        load_cache(${LPCNET_BUILD_DIR} LPCNet_SOURCE_DIR)
+#        find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
+#            PATHS ${LPCNet_SOURCE_DIR}
+#            PATH_SUFFIXES src
+#            NO_DEFAULT_PATH)
+#        message(STATUS "  Source include dir: ${LPCNET_INCLUDE_DIR}")
+#        find_library(LPCNET_LIBRARY NAME lpcnetfreedv
+#            PATHS ${LPCNET_BUILD_DIR}
+#            PATH_SUFFIXES src
+#            NO_DEFAULT_PATH)
+#        message(STATUS "  Library: ${LPCNET_LIBRARY}")
+#        if(LPCNET_INCLUDE_DIR AND LPCNET_LIBRARY)
+        find_package(lpcnet REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
-            PATH_SUFFIXES src
-            NO_DEFAULT_PATH)
-        message(STATUS "  Library: ${LPCNET_LIBRARY}")
-        if(LPCNET_INCLUDE_DIR AND LPCNET_LIBRARY)
+            NO_DEFAULT_PATH
+            CONFIGS lpcnetfreedv.cmake
+        )
+        if(lpcnet_FOUND)
+            message(STATUS "liblpcnetfreedv found in build tree.")
             add_definitions("-D__LPCNET__")
-            include_directories(${LPCNET_INCLUDE_DIR})
-            set(CMAKE_REQUIRED_LIBRARIES "${CMAKE_REQUIRED_LIBRARIES} ${LPCNET_LIBRARY}")
         else()
-            message(FATAL_ERROR "LPCNet include/library not found.")
+            message(FATAL_ERROR "LPCNet include/library not found in build tree.")
         endif()
     else()
         find_package(lpcnet REQUIRED)
@@ -219,10 +233,6 @@ if(LPCNET)
     endif()
 endif()
 
-#
-# codec2 library
-#
-add_subdirectory(src)
 
 if(UNITTEST)
     # Pthread Library
