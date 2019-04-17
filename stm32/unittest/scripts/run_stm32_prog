@@ -20,10 +20,10 @@ for arg in "$@"; do
 
 if [ -z "$UT_SSH_PARAMS" ]; then
   UT_SSH=""
-  UT_SLEEP=1
+  UT_SLEEP=${UT_SLEEP:=1}
 else
   UT_SSH="ssh -f -L 3333:localhost:3333 $UT_SSH_PARAMS"
-  UT_SLEEP=4
+  UT_SLEEP=${UT_SLEEP:=4}
 fi
 
 if [ ${ARGS[--openocd]+_} ] ; then
