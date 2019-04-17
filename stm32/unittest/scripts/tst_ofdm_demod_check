@@ -172,7 +172,7 @@ if ('UNITTEST_BASE' in os.environ):
 
 #### Settings
 # Defaults
-tolerance_ber = 0.001
+tolerance_ber = 0.01    # A ratio of difference to reference
 tolerance_tbits = 0
 tolerance_terrs = 1
 tolerance_output_differences = 0
@@ -288,11 +288,11 @@ if (config_testframes):
     if (math.isnan(tgt_ber2)): tgt_ber2 = 0
 
     # Compare BER values
-    if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
+    if (((abs(ref_ber - tgt_ber) / ref_ber) <= tolerance_ber) and
         (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
         (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
         ( (ref_tbits2 == 0) or
-              (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
+              ((abs(ref_ber2 - tgt_ber2) / ref_ber2) <= tolerance_ber) and
       (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
               (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
       )
