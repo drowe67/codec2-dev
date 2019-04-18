@@ -175,7 +175,7 @@ if ('UNITTEST_BASE' in os.environ):
 tolerance_ber = 0.01    # A ratio of difference to reference
 tolerance_tbits = 0
 tolerance_terrs = 1
-tolerance_output_differences = 0
+#tolerance_output_differences = 0
 tolerance_syms = 0.01
 tolerance_amps = 0.01
 # Per test settings
@@ -184,18 +184,26 @@ if (args.test_opt == "quick"):
 elif (args.test_opt == "ideal"):
     pass
 elif (args.test_opt == "AWGN"):
+    tolerance_terrs = 2
+    #tolerance_output_differences = 2
     pass
 elif (args.test_opt == "fade"):
+    #tolerance_output_differences = 5
     pass
 elif (args.test_opt == "profile"):
+    #tolerance_output_differences = 1
     pass
 elif (args.test_opt == "ldpc"):
     pass
 elif (args.test_opt == "ldpc_AWGN"):
+    tolerance_terrs = 3
+    #tolerance_output_differences = 45
     tolerance_syms = 0.025
     tolerance_amps = 0.032
     pass
 elif (args.test_opt == "ldpc_fade"):
+    tolerance_terrs = 3
+    #tolerance_output_differences = 9
     tolerance_syms = 0.010
     tolerance_amps = 0.015
     pass
@@ -282,15 +290,6 @@ if (config_testframes):
     if (math.isnan(tgt_ber2)): tgt_ber2 = 0
 
     # Compare BER values
-<<<<<<< b2823590a55481d3e0f68f29cf137a8833c474f8
-    if (( ((ref_ber == 0) and (tgt_ber == 0)) or
-          ((ref_ber > 0) and ((abs(ref_ber - tgt_ber) / ref_ber) <= tolerance_ber))
-          ) and
-        ( (ref_tbits2 == 0) or
-          ((ref_ber2 == 0) and (tgt_ber2 == 0)) or
-          ((ref_ber2 > 0) and ((abs(ref_ber2 - tgt_ber2) / ref_ber2) <= tolerance_ber))
-          )
-=======
     if (((abs(ref_ber - tgt_ber) / ref_ber) <= tolerance_ber) and
         (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
         (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
@@ -299,7 +298,6 @@ if (config_testframes):
       (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
               (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
       )
->>>>>>> Change BER checks to a ratio of error/reference.
         ):
         print("PASS: BER")
     else:
@@ -424,6 +422,40 @@ if (config_log_payload_syms):
     errors_amps = diffs_amps - tolerance_amps
     errors_amps[errors_amps < 0.0] = 0.0
     num_errors_amps = np.count_nonzero(errors_amps)
+    error_rows_amps = np.amax(errors_amps, axis=1)
+    num_error_rows_amps = np.count_nonzero(error_rows_amps)
+    print("")
+    print("{} Amplitude errors on {} rows".format(num_errors_amps, num_error_rows_amps))
+
+
+#### Profile
+if (config_profile): 
+    print("\nProfile:")
+    with open("stm_stdout.txt", "r") as f:
+        sum_profiles.sum_profiles(f, 100)
+
+    print("\nStack:")
+    with open("stm_stdout.txt", "r") as f:
+        for line in f:
+            if (line.startswith("Max stack")): 
+                print(line)
+
+
+#### Print final status message
+if (fails): print("\nTest FAILED!")
+else: print("\nTest PASSED")
+
+sys.exit(fails)
+ne.startswith("Max stack")): 
+                print(line)
+
+
+#### Print final status message
+if (fails): print("\nTest FAILED!")
+else: print("\nTest PASSED")
+
+sys.exit(fails)
+num_errors_amps = np.count_nonzero(errors_amps)
     error_rows_amps = np.amax(errors_amps, axis=1)
     num_error_rows_amps = np.count_nonzero(error_rows_amps)
     print("")
