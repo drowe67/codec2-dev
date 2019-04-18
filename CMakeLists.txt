@@ -306,7 +306,7 @@ if(UNITTEST)
              PASS_REGULAR_EXPRESSION "fails: 0")
 
      add_test(NAME test_COHPSK_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - --nd | $<TARGET_FILE:cohpsk_ch> - - -30 0 0 1 | $<TARGET_FILE:cohpsk_demod> - - --nd | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30 0 0 1 | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
              )
            
    add_test(NAME test_OFDM_modem_AWGN_BER
