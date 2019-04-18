@@ -198,20 +198,6 @@ add_subdirectory(src)
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
-#        message(STATUS "Using LPCNet from build directory...")
-#        message(STATUS "  LPCNet Build dir: ${LPCNET_BUILD_DIR}")
-#        load_cache(${LPCNET_BUILD_DIR} LPCNet_SOURCE_DIR)
-#        find_path(LPCNET_INCLUDE_DIR lpcnet_freedv.h
-#            PATHS ${LPCNet_SOURCE_DIR}
-#            PATH_SUFFIXES src
-#            NO_DEFAULT_PATH)
-#        message(STATUS "  Source include dir: ${LPCNET_INCLUDE_DIR}")
-#        find_library(LPCNET_LIBRARY NAME lpcnetfreedv
-#            PATHS ${LPCNET_BUILD_DIR}
-#            PATH_SUFFIXES src
-#            NO_DEFAULT_PATH)
-#        message(STATUS "  Library: ${LPCNET_LIBRARY}")
-#        if(LPCNET_INCLUDE_DIR AND LPCNET_LIBRARY)
         find_package(lpcnet REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
