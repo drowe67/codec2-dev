@@ -172,7 +172,7 @@ if ('UNITTEST_BASE' in os.environ):
 
 #### Settings
 # Defaults
-tolerance_ber = 0.01    # A ratio of difference to reference
+tolerance_ber = 0.1    # A ratio of difference to reference
 tolerance_syms = 0.01
 tolerance_amps = 0.01
 # Per test settings
