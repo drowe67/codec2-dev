@@ -36,14 +36,14 @@ int semihosting_init(void) {
             fprintf(stderr, "Error %d reopening stdout\n", errno);
             return(errno);
         }
-    setbuf(stdout, NULL);
+    // setbuf(stdout, NULL); // not disabling buffers speeds up testing 
 
     stderr = freopen("stm_stderr.txt", "w", stderr);
         if (!stderr) {
             fprintf(stdout, "Error %d reopening stderr\n", errno);
             return(errno);
         }
-    setbuf(stderr, NULL);
+    // setbuf(stderr, NULL);
 
     return(0);
 

@@ -10,10 +10,10 @@ source $SCRIPTS/run_tests_common.sh
 
 declare -i Fails=0
 
-run_stm32_tst tst_ldpc_enc --load || Fails+=1
+run_stm32_tst tst_ldpc_enc --load "$@" || Fails+=1
 
-run_stm32_tst tst_ldpc_dec ideal --load || Fails+=1
-run_stm32_tst tst_ldpc_dec noise || Fails+=1
+run_stm32_tst tst_ldpc_dec ideal --load "$@" || Fails+=1
+run_stm32_tst tst_ldpc_dec noise "$@" || Fails+=1
 
 if (( $Fails == 0 )); then
     echo -e "\nAll LDPC Tests PASSED"

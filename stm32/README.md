@@ -9,7 +9,7 @@
    $ cd ~
    $ wget https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/8-2018q4/gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2
    $ tar xvjf gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2
-   $ export $PATH=$PATH:$HOME/gcc-arm-none-eabi-8-2018-q4-major/bin
+   $ export $PATH=$HOME/gcc-arm-none-eabi-8-2018-q4-major/bin:$PATH
    ```
 
    NOTE: We do not recommend toolchains provided by popular
@@ -41,12 +41,19 @@
    ```
    $ cmake /path/to/codec2-dev/stm32 -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x ..
    ```
-   Then:
+   If using OpenOCD for unittesting, add `-DUT_PARAMS=--openocd`
+   ```
+   $ cmake /path/to/codec2-dev/stm32 -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x  ..
+   ```
+   
+   
+6. Build binairies
+
+   Finally:
    ```
    $ make
    ```
-   
-6. To see all the details during compilation:
+   To see all the details during compilation:
    ```
    $ make VERBOSE=1
    ```

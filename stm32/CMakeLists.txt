@@ -120,6 +120,7 @@ macro(add_mapped_executable target)
     ADDITIONAL_MAKE_CLEAN_FILES ${target}.map)
 endmacro()
 
+include(CTest)
 include_directories(../src ../unittest inc ${PROJECT_BINARY_DIR})
 
 add_subdirectory(unittest/src)

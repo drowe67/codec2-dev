@@ -25,6 +25,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "mpdecode_core.h"
 
@@ -51,7 +53,6 @@ int main(int argc, char *argv[])
 {
     unsigned char ibits[HRA_112_112_NUMBERROWSHCOLS];
     unsigned char pbits[HRA_112_112_NUMBERPARITYBITS];
-    FILE         *fin, *fout;
     struct LDPC   ldpc;
 
     semihosting_init();
@@ -72,31 +73,31 @@ int main(int argc, char *argv[])
     ldpc.H_rows = (uint16_t *)HRA_112_112_H_rows;
     ldpc.H_cols = (uint16_t *)HRA_112_112_H_cols;
 
-    fin = fopen("stm_in.raw", "rb");
-    if (fin == NULL) {
+    int sin = open("stm_in.raw", O_RDONLY);
+    if (sin < 0) {
         printf("Error opening input file\n");
         exit(1);
     }
 
-    fout = fopen("stm_out.raw", "wb");
-    if (fout == NULL) {
+    int sout = open("stm_out.raw", O_WRONLY|O_TRUNC|O_CREAT);
+    if (sout < 0) {
         printf("Error opening output file\n");
         exit(1);
     }
 
-    while (fread(ibits, sizeof(char), ldpc.NumberParityBits, fin) == 
+    while (read(sin, ibits, sizeof(char) * ldpc.NumberParityBits) == 
     		ldpc.NumberParityBits) {
 
         PROFILE_SAMPLE(ldpc_encode);
         encode(&ldpc, ibits, pbits);
         PROFILE_SAMPLE_AND_LOG2(ldpc_encode, "  ldpc_encode");
 
-        fwrite(ibits, sizeof(char), ldpc.NumberRowsHcols, fout);
-        fwrite(pbits, sizeof(char), ldpc.NumberParityBits, fout);
+        write(sout, ibits, sizeof(char) * ldpc.NumberRowsHcols);
+        write(sout, pbits, sizeof(char) * ldpc.NumberParityBits);
     }
 
-    fclose(fin);
-    fclose(fout);
+    close(sin);
+    close(sout);
     
     fflush(stdout);
     stdout = freopen("stm_profile", "w", stdout);
