@@ -41,12 +41,19 @@
    ```
    $ cmake /path/to/codec2-dev/stm32 -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x ..
    ```
-   Then:
+   If using OpenOCD for unittesting, add `-DUT_PARAMS=--openocd`
+   ```
+   $ cmake /path/to/codec2-dev/stm32 -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x  ..
+   ```
+   
+   
+6. Build binairies
+
+   Finally:
    ```
    $ make
    ```
-   
-6. To see all the details during compilation:
+   To see all the details during compilation:
    ```
    $ make VERBOSE=1
    ```
