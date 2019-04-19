@@ -1,44 +1,44 @@
 env:
-   global:
-   - GCC_BASE=gcc-arm-none-eabi-8-2018-q4-major
-   - GCC_SHORT=8-2018q4
-
+  global:
+  - GCC_BASE=gcc-arm-none-eabi-8-2018-q4-major
+  - GCC_SHORT=8-2018q4
 sudo: required
 language: generic
-dist: xenial 
-
+dist: xenial
 addons:
   apt:
-    packages:
-      libc6-i386
-      libspeexdsp-dev
-      libsamplerate0-dev
-      octave-common
-      octave
-      gnuplot
-      sox
-      p7zip-full
-
+    packages: libc6-i386 libspeexdsp-dev libsamplerate0-dev octave-common octave gnuplot
+      sox p7zip-full python3-numpy
 cache:
   directories:
-    - $HOME/$GCC_BASE
-
+  - "$HOME/$GCC_BASE"
 install:
-    - export GCC_DIR=$HOME/$GCC_BASE
-    - export GCC_ARCHIVE=$HOME/$GCC_BASE-linux.tar.bz2
-    - export GCC_URL=https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/$GCC_SHORT/$GCC_BASE-linux.tar.bz2
-    - if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget -q $GCC_URL -O $GCC_ARCHIVE; tar xfj $GCC_ARCHIVE -C $HOME; fi
-    - export CODEC2DEV=${PWD}
-    - export MAKEFLAGS=-j2 
-    - export BUILDSTD=${CODEC2DEV}/build_linux
-    - export BUILDSTM=${CODEC2DEV}/stm32/build_stm32
-    - export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
-    - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME stdperiph_lib.zip; fi
+- export GCC_DIR=$HOME/$GCC_BASE
+- export GCC_ARCHIVE=$HOME/$GCC_BASE-linux.tar.bz2
+- export GCC_URL=https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/$GCC_SHORT/$GCC_BASE-linux.tar.bz2
+- if [ ! -e $GCC_DIR/bin/arm-none-eabi-g++ ]; then wget -q $GCC_URL -O $GCC_ARCHIVE;
+  tar xfj $GCC_ARCHIVE -C $HOME; fi
+- export CODEC2DEV=${PWD}
+- export MAKEFLAGS=-j2
+- export BUILDSTD=${CODEC2DEV}/build_linux
+- export BUILDSTM=${CODEC2DEV}/stm32/build_stm32
+- export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
+- if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME
+  stdperiph_lib.zip; fi
 script:
-    - mkdir -p $BUILDSTD
-    - cd $BUILDSTD 
-    - cmake $CODEC2DEV
-    - make -j4 all test
-    - mkdir -p $BUILDSTM
-    - cd $BUILDSTM 
-    - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" -DCMAKE_TOOLCHAIN_FILE="$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" && make -j4 ) ; fi
+- mkdir -p $BUILDSTD
+- cd $BUILDSTD
+- cmake $CODEC2DEV
+- make -j4 all test
+- mkdir -p $BUILDSTM
+- cd $BUILDSTM
+- if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 
+  -DCMAKE_TOOLCHAIN_FILE="$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" 
+  -DUT_PARAMS="--openocd" && make -j4 ) ; fi
+- if [ -n "$UT_SSH_PARAMS" ]; then  PATH="$GCC_DIR/bin/":${PATH} ctest -V -E ofdm_demod_ldpc_fade; fi
+before_install:
+- if [ -n "$UT_SSH_PARAMS" ]; then openssl aes-256-cbc -K $KEY_K -iv $KEY_IV
+  -in stm32/unittest/lib/ut_travis.enc -out /tmp/ut_travis -d 
+  && eval "$(ssh-agent -s)"
+  && chmod 600 /tmp/ut_travis
+  && ssh-add /tmp/ut_travis >/dev/null 2>&1 && ssh -q $UT_SSH_PARAMS  uname -a ; fi
