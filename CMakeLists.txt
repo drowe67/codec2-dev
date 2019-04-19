@@ -125,8 +125,10 @@ endif()
 # cross dependent.
 option(LPCNET "Build codec2 with LPCNet support." OFF)
 # Setting LPCNET_BUILD_DIR implies LPCNET=ON
+message(STATUS "LPCNET_BUILD_DIR:" ${LPCNET_BUILD_DIR})
 if(LPCNET_BUILD_DIR)
     set(LPCNET ON)
+    message(STATUS "LPCNET:" ${LPCNET})
 endif()
 
 
