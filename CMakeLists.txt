@@ -188,12 +188,6 @@ include_directories(${PROJECT_BINARY_DIR})
 
 
 #
-# codec2 library
-#
-add_subdirectory(src)
-
-
-#
 # Find lpcnet library
 #
 if(LPCNET)
@@ -218,6 +212,12 @@ if(LPCNET)
         endif()
     endif()
 endif()
+
+
+#
+# codec2 library
+#
+add_subdirectory(src)
 
 
 if(UNITTEST)
