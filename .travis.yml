@@ -25,6 +25,7 @@ install:
 - export STDLIBDIR=$HOME/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0
 - if [ ! "$STDLIBURL" == "" ]; then pwd; wget -q $STDLIBURL; 7z  x -p$STDLIBKEY -o$HOME
   stdperiph_lib.zip; fi
+- unset STDLIBURL STDLIBKEY # DO NOT TOUCH  
 script:
 - mkdir -p $BUILDSTD
 - cd $BUILDSTD
@@ -37,8 +38,13 @@ script:
   -DUT_PARAMS="--openocd" && make -j4 ) ; fi
 - if [ -n "$UT_SSH_PARAMS" ]; then  PATH="$GCC_DIR/bin/":${PATH} ctest -V -E ofdm_demod_ldpc_fade; fi
 before_install:
+# DO NOT TOUCH START
 - if [ -n "$UT_SSH_PARAMS" ]; then openssl aes-256-cbc -K $KEY_K -iv $KEY_IV
   -in stm32/unittest/lib/ut_travis.enc -out /tmp/ut_travis -d 
   && eval "$(ssh-agent -s)"
   && chmod 600 /tmp/ut_travis
-  && ssh-add /tmp/ut_travis >/dev/null 2>&1 && ssh -q $UT_SSH_PARAMS  uname -a ; fi
+  && ssh-add /tmp/ut_travis >/dev/null 2>&1 
+  && rm -f /tmp/ut_travis; 
+  fi
+- unset KEY_K KEY_IV 
+# DO NOT TOUCH END
