@@ -32,6 +32,7 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <getopt.h>
 
 #include "codec2_cohpsk.h"
 #include "cohpsk_defs.h"
@@ -68,57 +69,85 @@ int main(int argc, char *argv[])
     float        *rx_phi_log = NULL;
     COMP         *rx_symb_log = NULL;
     float         f_est_log[LOG_FRAMES], ratio_log[LOG_FRAMES];
-    int           i, r, c, log_data_r, oct, logframes, arg, diversity, sd;
+    int           i, r, c, log_data_r, oct, logframes, diversity, sd;
 
-    if (argc < 3) {
+    foct = NULL;
+    oct = 0;
+    diversity = 1;
+    sd = 0;
+    int verbose = 0;
+    
+    int o = 0;
+    int opt_idx = 0;
+    while ( o != -1 ) {
+        static struct option long_opts[] = {
+            {"help",      no_argument,        0, 'h'},
+            {"octave",    required_argument,  0, 'o'},
+            {"nd",        no_argument,        0, 'n'},
+            {"sd",        no_argument,        0, 's'},
+            {"verbose",   no_argument,        0, 'v'},
+            {0, 0, 0, 0}
+        };
+        
+        o = getopt_long(argc,argv,"ho:nsv",long_opts,&opt_idx);
+        
+        switch(o) {
+            case 'o':
+                if ( (foct = fopen(argv[optind],"wt")) == NULL ) {
+                    fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
+                            argv[optind], strerror(errno));
+                    exit(1);
+                }
+                oct = 1;
+                break;
+            case 'n':
+                diversity = 2;
+                break;
+            case 's':
+                sd = 1;
+                break;
+            case 'v':
+                verbose = 1;
+            break;    
+            case 'h':
+            case '?':
+                goto helpmsg;
+                break;
+        }
+    }
+    
+    int dx = optind;
+    
+    if( (argc - dx) < 2) {
+        fprintf(stderr, "Too few arguments\n");
+    helpmsg:
+	printf("usage: %s [options] InputModemRawFile OutputFile \n", argv[0]);
         fprintf(stderr, "\n");
-	printf("usage: %s InputModemRawFile OutputFile [-o OctaveLogFile] [--nd]\n", argv[0]);
+        fprintf(stderr, "                    Default output file format is one byte per bit\n");
+        fprintf(stderr, "  -o OctaveLogFile  Octave log file for testing\n");
+        fprintf(stderr, "  --nd              non-diversity mode, output frames of %d bits\n", ND*COHPSK_BITS_PER_FRAME);
+        fprintf(stderr, "  --sd              soft decision output, one double per symbol\n");
+        fprintf(stderr, "  -v                verbose mode\n");
         fprintf(stderr, "\n");
-        fprintf(stderr, "              Default output file format is one byte per bit\n");
-        fprintf(stderr, "  -o          Octave log file for testing\n");
-        fprintf(stderr, "  --nd        non-diversity mode, output frames of %d bits\n", ND*COHPSK_BITS_PER_FRAME);
-        fprintf(stderr, "  --sd        soft decision output, one double per symbol\n");
-        fprintf(stderr, "\n");
-	exit(1);
+        exit(1);
     }
 
-    if (strcmp(argv[1], "-")  == 0) fin = stdin;
-    else if ( (fin = fopen(argv[1],"rb")) == NULL ) {
+   if (strcmp(argv[dx], "-")  == 0) fin = stdin;
+    else if ( (fin = fopen(argv[dx],"rb")) == NULL ) {
 	fprintf(stderr, "Error opening input modem sample file: %s: %s.\n",
          argv[1], strerror(errno));
 	exit(1);
     }
 
-    if (strcmp(argv[2], "-") == 0) fout = stdout;
-    else if ( (fout = fopen(argv[2],"wb")) == NULL ) {
+    if (strcmp(argv[dx+1], "-") == 0) fout = stdout;
+    else if ( (fout = fopen(argv[dx+1],"wb")) == NULL ) {
 	fprintf(stderr, "Error opening output file: %s: %s.\n",
          argv[2], strerror(errno));
 	exit(1);
     }
 
-    foct = NULL;
-    oct = 0;
-    if ((arg = opt_exists(argv, argc, "-o")) != 0) {
-        if ( (foct = fopen(argv[arg+1],"wt")) == NULL ) {
-            fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
-                    argv[4], strerror(errno));
-	exit(1);
-        }
-        oct = 1;
-    }
-
-    if (opt_exists(argv, argc, "--nd")) {
-        diversity = 2;
-    } else {
-        diversity = 1;
-    }
-    sd = 0;
-    if (opt_exists(argv, argc, "--sd")) {
-        sd = 1;
-    }
-
     cohpsk = cohpsk_create();
-    cohpsk_set_verbose(cohpsk, 0);
+    cohpsk_set_verbose(cohpsk, verbose);
 
     if (oct) {
         logframes = LOG_FRAMES;

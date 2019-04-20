@@ -7,12 +7,22 @@
 1. BER test in AWGN channel with just less that 2% average bit error rate:
 
    ```
-    $ ./cohpsk_get_test_bits - 5600 | ./cohpsk_mod - - --nd | ./cohpsk_ch - - -30 0 0 1 | ./cohpsk_demod - - --nd | ./cohpsk_put_test_bits -
+    $ ./cohpsk_get_test_bits - 5600 | ./cohpsk_mod - - | ./cohpsk_ch - - -30 | ./cohpsk_demod - - | ./cohpsk_put_test_bits -
     <snip>
     SNR3k(dB):  3.41 C/No: 38.2 PAPR:  8.1 
     BER: 0.017 Nbits: 5264 Nerrors: 92
 
   ```
+
+2. Plot some of the demod internal states, used to chase down freq offset problemL
+
+   ```
+    $ cd build_linux/src
+    $ ./cohpsk_get_test_bits - 5600 | ./cohpsk_mod - -  | ./cohpsk_ch - - -40 -f -20 | ./cohpsk_demod -o cohpsk_demod.txt - - | ./cohpsk_put_test_bits -
+    $ cd ../../octave
+    $ octave --no-gui
+    $ cohpsk_demod_plot("../build_linux/src/cohpsk_demod.txt")    
+   ```
   
 ## References
 
