@@ -93,11 +93,12 @@ int main(int argc, char *argv[])
         
         switch(o) {
             case 'o':
-                if ( (foct = fopen(argv[optind],"wt")) == NULL ) {
+                if ( (foct = fopen(optarg,"wt")) == NULL ) {
                     fprintf(stderr, "Error opening output Octave file: %s: %s.\n",
-                            argv[optind], strerror(errno));
+                            optarg, strerror(errno));
                     exit(1);
                 }
+                fprintf(stderr, "opened: %s\n", optarg);
                 oct = 1;
                 break;
             case 'n':

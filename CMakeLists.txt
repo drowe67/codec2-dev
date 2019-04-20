@@ -64,7 +64,7 @@ if(COMPILER_SUPPORTS_GNU11)
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 else()
-   message(SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
+   message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
 endif()
 
 # -fPIC is implied on MinGW...
@@ -306,7 +306,11 @@ if(UNITTEST)
              PASS_REGULAR_EXPRESSION "fails: 0")
 
      add_test(NAME test_COHPSK_modem_AWGN_BER
-             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30 0 0 1 | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             )
+           
+     add_test(NAME test_COHPSK_modem_freq_offset
+             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
              )
            
    add_test(NAME test_OFDM_modem_AWGN_BER
