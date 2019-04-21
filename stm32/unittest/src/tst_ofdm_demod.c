@@ -91,8 +91,9 @@ static int ofdm_rowsperframe;
 static int ofdm_nuwbits;
 static int ofdm_ntxtbits;
 static int ofdm_nin;
-static char fout_buffer[4096];
-static char fdiag_buffer[8192];
+static char fout_buffer[4*4096];
+static __attribute__ ((section (".ccm"))) char fdiag_buffer[4*8192];
+static __attribute__ ((section (".ccm"))) char fin_buffer[4096*8];
 
 static char *statemode[] = {
     "search",
@@ -225,11 +226,12 @@ int main(int argc, char *argv[]) {
     COMP  codeword_symbols[interleave_frames*coded_syms_per_frame];
     float codeword_amps[interleave_frames*coded_syms_per_frame];
 
-    int sin = open("stm_in.raw", O_RDONLY);
-    if (sin < 0) {
+    FILE* fin = fopen("stm_in.raw", "rb");
+    if (fin == NULL) {
         fprintf(stderr, "Error opening input file\n");
         exit(1);
     }
+    setvbuf(fin, fin_buffer,_IOFBF,sizeof(fin_buffer));
 
 
     fout = fopen("stm_out.raw", "wb");
@@ -249,7 +251,7 @@ int main(int argc, char *argv[]) {
     nin_frame = ofdm_get_nin(ofdm);
     int num_read;
 
-    while((num_read = read(sin, rx_scaled, sizeof(short) * nin_frame)) == sizeof(short)*nin_frame) {
+    while((num_read = fread(rx_scaled, sizeof(short) , nin_frame, fin)) == nin_frame) {
 
         int log_payload_syms_flag = 0;
 
@@ -458,7 +460,7 @@ int main(int argc, char *argv[]) {
     } // while(fread(.., fin))
 
     flush_all();    // To make sure this function is included in binary.
-    close(sin);
+    fclose(fin);
     fclose(fout);
     fclose(fdiag);
 

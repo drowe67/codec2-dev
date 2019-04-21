@@ -21,9 +21,11 @@ for arg in "$@"; do
 if [ -z "$UT_SSH_PARAMS" ]; then
   UT_SSH=""
   UT_SLEEP=${UT_SLEEP:=1}
+  UI_SH_FIO="disable"
 else
   UT_SSH="ssh -f -L 3333:localhost:3333 $UT_SSH_PARAMS"
   UT_SLEEP=${UT_SLEEP:=4}
+  UT_SH_FIO="enable"
 fi
 
 if [ ${ARGS[--openocd]+_} ] ; then
@@ -42,7 +44,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
         shell sleep ${UT_SLEEP}
 	target remote :3333
         monitor arm semihosting enable
-        monitor arm semihosting_fileio enable
+        monitor arm semihosting_fileio $UT_SH_FIO 
 	EEOOFF
     
        SHUTDOWN="monitor shutdown"
@@ -64,6 +66,7 @@ if [ ${ARGS[--load]+_} ] ; then
 
 cat <<-EEOOFF >> gdb_cmds
         monitor reset halt
+        monitor adapter_khz 4000
 	break EndofMain
 	break abort
 	EEOOFF
