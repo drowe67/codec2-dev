@@ -340,6 +340,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_config = ofdm_get_config_param();
         ofdm_destroy(f->ofdm);
         ofdm_config->nc = 31; int data_bits_per_frame = 312;
+        ofdm_config->ts = 0.0205;
         f->ofdm = ofdm_create(ofdm_config);
             
         f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
@@ -358,15 +359,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_ntxtbits = ofdm_config->txtbits;
         assert(ofdm_nuwbits == 10);
         assert(ofdm_ntxtbits == 4);
-        if (f->verbose) {
-            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
-            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
-            fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
-            fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
-            fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
-            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
-            fprintf(stderr, "interleave_frames: %d\n", f->interleave_frames);
-        }
         
         if (adv == NULL) {
             f->interleave_frames = 1;
@@ -397,6 +389,18 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         f->clip = 0;
 
         nbit = f->sz_error_pattern = ofdm_bitsperframe;
+
+        if (f->verbose) {
+            fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", f->ldpc->ldpc_data_bits_per_frame);
+            fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", f->ldpc->ldpc_coded_bits_per_frame);
+            fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
+            fprintf(stderr, "coded_bits_per_frame  = %d\n", f->ldpc->coded_bits_per_frame);
+            fprintf(stderr, "coded_syms_per_frame  = %d\n", f->ldpc->coded_syms_per_frame);
+            fprintf(stderr, "ofdm_bits_per_frame  = %d\n", ofdm_bitsperframe);
+            fprintf(stderr, "interleave_frames: %d\n", f->interleave_frames);
+            fprintf(stderr, "speech samples per frame: %d\n", freedv_get_n_speech_samples(f));
+            fprintf(stderr, "modem samples per frame: %d\n", freedv_get_n_nom_modem_samples(f));
+        }
 
         f->tx_bits = NULL; /* not used for 2020 */
 
