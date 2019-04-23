@@ -71,10 +71,11 @@
 #include "machdep.h"
     
 
-static char fout_buffer[4096];
+static char fin_buffer[1024];
+static __attribute__ ((section (".ccm"))) char fout_buffer[4*8192];
 
 int main(int argc, char *argv[]) {
-    int            f_cfg, f_in;
+    int            f_cfg;
     int            frame;
     void          *codec2;
     short         *buf;
@@ -122,11 +123,12 @@ int main(int argc, char *argv[]) {
 
     ////////
     // Streams
-    f_in = open("stm_in.raw", O_RDONLY);
-    if (f_in == -1) {
+    FILE* fin = fopen("stm_in.raw", "rb");
+    if (fin == NULL) {
         perror("Error opening input file\n");
         exit(1);
     }
+    setvbuf(fin, fin_buffer,_IOFBF,sizeof(fin_buffer));
 
     FILE *fout = fopen("stm_out.raw", "wb" );
     if (fout == NULL) {
@@ -140,7 +142,7 @@ int main(int argc, char *argv[]) {
     ////////
     // Main loop
     int bytes_per_frame = (sizeof(char) * nbyte);
-    while (read(f_in, bits, bytes_per_frame) == (size_t)bytes_per_frame) {
+    while (fread(bits, 1, bytes_per_frame, fin) == (size_t)bytes_per_frame) {
 
         codec2_decode_ber(codec2, buf, bits, 0.0);
  	
@@ -150,7 +152,7 @@ int main(int argc, char *argv[]) {
         }
 
 
-    close(f_in);
+    fclose(fin);
     fclose(fout);
 
     printf("\nEnd of Test\n");

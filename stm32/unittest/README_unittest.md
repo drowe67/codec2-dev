@@ -59,6 +59,8 @@ the more likely people are to run it.
 These tests required a connection from the arm-none-eabi-gdb debugger to the
 stm32 hardware. For this we use a recent version of OpenOCD or alternatively 
 the st-util program.
+Running tests with the stm32 hardware  connected to a separate machine via ssh
+is possible. This works only with a patched (fixed) OpenOCD, see below.
 
 ### OpenOCD
 We recommend to use openocd instead of stlink. 
@@ -69,7 +71,7 @@ messages rearding SYS_FLEN not support (see openocd_stderr.log in the test_run
 directories), your openocd is too old. Make sure to have the right openocd
 first in the PATH if you have multiple openocd installed!
 
-It is recommended to build OpenOCD from sources, see below.
+It is strongly recommended to build OpenOCD from sources, see below.
 
 ### st-util
 Most distributions don't have stutil included. Easiest way is to build it from
@@ -123,13 +125,16 @@ as build directory, see instructions in the stm32 directory.
   2018-12-29T06:52:16 INFO common.c: Loading device parameters....
   2018-12-29T06:52:16 INFO common.c: Device connected is: F4 device, id 0x10016413
   2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
-  2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
+  2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.G
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 ```
 
 ### Build OpenOCD (recommended over stlink):
 OpenOCD needs to be built from the source. If you have successfully build
 the linux codec2 binaries, everything required to build OpenOCD is already installed.
+
+If you want to use openocd remotely via SSH, you have to use currently the patched
+source from (https://github.com/db4ple/openocd.git) instead of the official repository.
 
 1.
     The executable is placed in /usr/local/bin ! Make sure to have no
@@ -232,6 +237,25 @@ On Ubuntu:
    ```
    
 6. To run ALL tests, see "Quickstart" above
+
+### Running the tests remotely
+If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
+Test will run slower, roughly 3 times.
+
+1. You have to build OpenOCD on the remote machine with the STM32 board. It must be built from 
+   (https://github.com/db4ple/openocd.git). 
+2. You don't need OpenOCD installed on your build pc.
+3. You have to be able to run ssh with public key authentication using ssh-agent so that
+   you can ssh into the remote machine without entering a password. 
+4. You have to add UT_PARAMS=--openocd to the stm32 cmake call
+5. You have to call ctest with the proper UT_SSH_PARAMS settings, e.g.
+```
+UT_SSH_PARAMS="-p 22 -q remoteuser@remotemachine" ctest -V
+```
+
+
+
+
 
 
 # vi:set ts=3 et sts=3:

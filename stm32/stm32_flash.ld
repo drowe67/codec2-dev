@@ -139,4 +139,13 @@ SECTIONS
     . = . + _Min_Stack_Size;
     . = ALIGN(4);
   } >RAM
+
+  .ccm (NOLOAD) : 
+  {
+ . = ALIGN(4);
+ _sccmram = .;
+ *(.ccm)
+ . = ALIGN(4);      
+	_eccmram = .;
+  } >CCM
 }

@@ -51,7 +51,8 @@
 
 int testframes = 1;
 
-static char fout_buffer[4096];
+static char fin_buffer[1024];
+static __attribute__ ((section (".ccm"))) char fout_buffer[8*8192];
 
 int main(int argc, char *argv[]) {    
     int         CodeLength, NumberParityBits;
@@ -112,12 +113,13 @@ int main(int argc, char *argv[]) {
         Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
     }
 
-    int sin = open("stm_in.raw", O_RDONLY);
-    if (sin < 0) {
+    FILE* fin = fopen("stm_in.raw", "rb");
+    if (fin == NULL) {
         fprintf(stderr, "Error opening input file\n");
         fflush(stderr);
         exit(1);
     }
+    setvbuf(fin, fin_buffer,_IOFBF,sizeof(fin_buffer));
 
     fout = fopen("stm_out.raw", "wb");
     if (fout == NULL) {
@@ -136,7 +138,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
 
     frame = 0;
-    while(read(sin, &input_double[offset], sizeof(double) * nread) == sizeof(double) * nread) {
+    while(fread(&input_double[offset], sizeof(double) , nread, fin) == nread) {
        fprintf(stderr, "frame %d\n", frame);
 
        if (testframes) {
@@ -183,7 +185,7 @@ int main(int argc, char *argv[]) {
         frame++;
     }
 
-    close(sin);
+    fclose(fin);
     fclose(fout);
 
     fprintf(stderr, "total iters %d\n", total_iters);
