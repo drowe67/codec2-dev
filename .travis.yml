@@ -8,7 +8,7 @@ dist: xenial
 addons:
   apt:
     packages: libc6-i386 libspeexdsp-dev libsamplerate0-dev octave-common octave gnuplot
-      sox p7zip-full python3-numpy
+      sox p7zip-full python3-numpy octave-signal
 cache:
   directories:
   - "$HOME/$GCC_BASE"
