@@ -195,36 +195,6 @@ if(UNITTEST)
     find_package(Threads REQUIRED)
     message(STATUS "Threads library flags: ${CMAKE_THREAD_LIBS_INIT}")
 
-    #
-    # Find speex library
-    #
-    message(STATUS "Looking for Speex DSP library.")
-    find_path(SPEEXDSP_INCLUDE_DIR speex/speex_preprocess.h)
-    find_library(SPEEXDSP_LIBRARY speexdsp)
-    message(STATUS "  Speex DSP headers: ${SPEEXDSP_INCLUDE_DIR}")
-    message(STATUS "  Speex DSP library: ${SPEEXDSP_LIBRARY}")
-    if(NOT SPEEXDSP_INCLUDE_DIR AND NOT SPEEXDSP_LIBRARY)
-        message(FATAL_ERROR "Speex DSP library not found!")
-    endif()
-
-    #
-    # Samplerate Library
-    #
-    message(STATUS "Looking for samplerate...")
-    find_library(LIBSAMPLERATE samplerate)
-    find_path(LIBSAMPLERATE_INCLUDE_DIR samplerate.h)
-    message(STATUS "  samplerate headers: ${LIBSAMPLERATE_INCLUDE_DIR}")
-    message(STATUS "  samplerate library: ${LIBSAMPLERATE}")
-    if(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
-        list(APPEND FREEDV_LINK_LIBS ${CMAKE_REQUIRED_LIBRARIES})
-        include_directories(${LIBSAMPLERATE_INCLUDE_DIR})
-    else(LIBSTAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
-        message(FATAL_ERROR "samplerate library not found.
-On Linux systems try installing:
-    samplerate-devel  (RPM based systems)
-    libsamplerate-dev (DEB based systems)")
-    endif(LIBSAMPLERATE AND LIBSAMPLERATE_INCLUDE_DIR)
-
     add_subdirectory(unittest)
     add_subdirectory(misc)
 endif(UNITTEST)

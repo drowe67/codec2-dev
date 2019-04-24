@@ -12,8 +12,7 @@ To compile codec2 a basic development environment and cmake are required.
 If they are not installed, at a command prompt, type
 
 Debian/Ubuntu distros:
-$ sudo apt-get install build-essential cmake libspeexdsp-dev libsamplerate0-dev
- 
+$ sudo apt-get install build-essential cmake
 
 Fedora/RH distros:
 $ sudo dnf groupinstall "Development Tools" \
@@ -57,6 +56,6 @@ Install MinGW & the mysys shell
 $ cd codec2-dev
 $ mkdir build_win32
 $ cd build_win32
-$ cmake -DSPEEXDSP_INCLUDE_DIR=/usr/local/include/ -G "MSYS Makefiles" ..
+$ cmake -G "MSYS Makefiles" ..
 $ make
 $ make package

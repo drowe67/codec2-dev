@@ -6,15 +6,15 @@ http://rowetel.com/codec2.html
 
 Also included:
 
-  + the FreeDV API - a library for embedding FreeDV in other programs
-  + FDMDV DPSK modem (README_fdmdv.txt) for HF channels
-  + Coherent PSK (cohpsk) for HF channels
-  + Non-coherent FSK modem (README_fsk.txt)
-  + Coherent OFDM modem for HF channels (ofdm)
+  + FreeDV API source code.  FreeDV is an open source digital voice
+    protocol that integrates the modems, codecs, and FEC
+  + FDMDV DPSK modem (README_fdmdv) for HF channels
+  + Coherent PSK ((README_cohpsk) for HF channels
+  + Non-coherent FSK modem (README_fsk)
+  + Coherent OFDM modem for HF channels (README_ofdm)
   + software for High Altitude Balloon image and telemetry reception
 
 ## Quickstart
-
 
 Also see INSTALL for more general building and installing instructions. 
 
