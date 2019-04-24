@@ -69,7 +69,7 @@ int main(int argc, char *argv[])
     struct OFDM  *ofdm;
     struct LDPC  ldpc;
     FILE         *fout;
-    char         *fout_name;
+    char         *fout_name = NULL;
     int          opt, verbose, Nframes, i, n;
     int          ldpc_en, frames, output_specified;
 
