@@ -52,7 +52,6 @@
 %      + compression
 %      + make sure it's flat with many errors
 
-graphics_toolkit ("gnuplot");
 pkg load signal;
 more off;
 
