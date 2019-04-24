@@ -23,7 +23,17 @@
     $ octave --no-gui
     $ cohpsk_demod_plot("../build_linux/src/cohpsk_demod.txt")    
    ```
-  
+
+3. Run Octave<-> tests
+
+   ```
+   $ cd ~/codec2/build_linux/unittest
+   $ ./tochpsk
+   $ cd ~/codec2/octave
+   $ octave --no-gui
+   octave> tcohpsk
+   ```
+   
 ## References
 
 ## C Code

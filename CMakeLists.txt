@@ -293,6 +293,12 @@ if(UNITTEST)
              set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+    add_test(NAME test_COHPSK_modem_octave_port
+             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
+             PASS_REGULAR_EXPRESSION "fails: 0")
+
     add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)

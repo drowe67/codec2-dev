@@ -53,7 +53,11 @@
 %      + make sure it's flat with many errors
 
 graphics_toolkit ("gnuplot");
+pkg load signal;
 more off;
+
+global passes = 0;
+global fails = 0;
 
 cohpsk;
 fdmdv;
@@ -64,8 +68,8 @@ randn('state',1);
 
 % select which test  ----------------------------------------------------------
 
-%test = 'compare to c';
-test = 'awgn';
+test = 'compare to c';
+%test = 'awgn';
 %test = 'fading';
 
 % some parameters that can be over ridden, e.g. to disable parts of modem
@@ -78,7 +82,7 @@ Fs           = 7500;
 % predefined tests ....
 
 if strcmp(test, 'compare to c')
-  frames = 100;
+  frames = 30;
   foff =  58.7;
   dfoff = -0.5/Fs;
   EsNodB = 8;
@@ -153,7 +157,7 @@ Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
 % non linear carrier spacing, combined with clip, helps PAPR a lot!
-freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 )
+freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 );
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
 afdmdv.Fcentre = 1500;
@@ -612,6 +616,7 @@ if compare_with_c
   check(sig_rms_log, sig_rms_log_c, 'sig_rms');
   check(noise_rms_log, noise_rms_log_c, 'noise_rms');
   
+  printf("\npasses: %d fails: %d\n", passes, fails);
 
 else
   
