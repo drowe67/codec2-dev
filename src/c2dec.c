@@ -145,10 +145,8 @@ int main(int argc, char *argv[])
         mode = CODEC2_MODE_450;
         else if (strcmp(argv[1],"450PWB") == 0)
         mode = CODEC2_MODE_450PWB;
-        else if (strcmp(argv[1],"WB") == 0)
-        mode = CODEC2_MODE_WB;
         else {
-        fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C, 450, 450PWB or WB\n", argv[1]);
+        fprintf(stderr, "Error in mode: %s.  Must be 3200, 2400, 1600, 1400, 1300, 1200, 700, 700B, 700C, 450, or 450PWB\n", argv[1]);
         exit(1);
         }
         bit_rate = atoi(argv[1]);

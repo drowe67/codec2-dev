@@ -35,7 +35,7 @@
 #include "comp.h"
 #include "kiss_fft.h"
 
-#define MODEM_STATS_NC_MAX      20
+#define MODEM_STATS_NC_MAX      50
 #define MODEM_STATS_NR_MAX      8
 #define MODEM_STATS_ET_MAX      8
 #define MODEM_STATS_EYE_IND_MAX 160     
