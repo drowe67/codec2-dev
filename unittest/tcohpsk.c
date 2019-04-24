@@ -43,7 +43,7 @@
 #include "comp_prim.h"
 #include "noise_samples.h"
 
-#define FRAMES      100                   /* LOG_FRAMES is #defined in cohpsk_internal.h                        */
+#define FRAMES      30                   /* LOG_FRAMES is #defined in cohpsk_internal.h                        */
 #define SYNC_FRAMES 12                    /* sync state uses up extra log storage as we reprocess several times */
 #define FRAMESL     (SYNC_FRAMES*FRAMES)  /* worst case is every frame is out of sync                           */
 

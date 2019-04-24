@@ -744,7 +744,6 @@ function sim_out = ber_test(sim_in)
             end
 
             if strcmp(modulation,'qpsk')
-
               [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param);
 
               % one frame delay on bits for qpsk
@@ -818,7 +817,7 @@ function sim_out = ber_test(sim_in)
             ct_symb_buf(Nsymbrowpilot+1:2*Nsymbrowpilot,:) = s_ch;
 
             if strcmp(modulation,'qpsk')
-              [rx_symb rx_bits rx_symb_linear amp_ phi_ EsNo_ sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(1:Nsymbrowpilot+Npilotsframe,:));                                 
+              [rx_symb rx_bits rx_symb_linear amp_ phi_ sig_rms noise_rms sim_in] = qpsk_symbols_to_bits(sim_in, ct_symb_buf(1:Nsymbrowpilot+Npilotsframe,:));                                 
               phi_log = [phi_log; phi_];
               amp_log = [amp_log; amp_];
             end

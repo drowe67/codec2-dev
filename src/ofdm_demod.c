@@ -714,9 +714,9 @@ int main(int argc, char *argv[]) {
             if (verbose != 0)
                 fprintf(stderr, "Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", coded_ber, Tbits_coded, Terrs_coded);
 
-            /* set return code for Ctest */
+            /* set return code for Ctest, 1 for fail */
 
-            if ((uncoded_ber >= 0.1f) && (coded_ber >= 0.01f))
+            if ((uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
                 return 1;
         }
     }

@@ -64,7 +64,7 @@ if(COMPILER_SUPPORTS_GNU11)
 elseif(COMPILER_SUPPORTS_GNU99)
    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 else()
-   message(SEND_ERROR "Compiler doesm't seem to support at least gnu99, might cause problems" )
+   message(SEND_ERROR "Compiler doesn't seem to support at least gnu99, might cause problems" )
 endif()
 
 # -fPIC is implied on MinGW...
@@ -293,6 +293,12 @@ if(UNITTEST)
              set_tests_properties(test_FDMDV_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+    add_test(NAME test_COHPSK_modem_octave_port
+             COMMAND sh -c "$<TARGET_FILE:tcohpsk> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tcohpsk.m"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
+             set_tests_properties(test_COHPSK_modem_octave_port PROPERTIES
+             PASS_REGULAR_EXPRESSION "fails: 0")
+
     add_test(NAME test_OFDM_modem_octave_port
              COMMAND sh -c "PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
@@ -305,6 +311,14 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
+     add_test(NAME test_COHPSK_modem_AWGN_BER
+             COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
+             )
+           
+     add_test(NAME test_COHPSK_modem_freq_offset
+             COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
+             )
+           
    add_test(NAME test_OFDM_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
