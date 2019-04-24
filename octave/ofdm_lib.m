@@ -226,7 +226,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   fcentre = 1500;
   alower = fcentre - Rs * (Nc/2);  % approx frequency of lowest carrier
-  Nlower = round(alower / Rs);     % round this to nearest integer multiple from 0Hz to keep DFT happy
+  Nlower = round(alower / Rs) - 1; % round this to nearest integer multiple from 0Hz to keep DFT happy
   %printf("  fcentre: %f alower: %f alower/Rs: %f Nlower: %d\n", fcentre, alower, alower/Rs, Nlower);
   w = (Nlower:Nlower+Nc+1)*2*pi/(states.Fs/Rs);
   W = zeros(Nc+2,states.M);

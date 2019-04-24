@@ -63,6 +63,8 @@
 #include <string.h>
 #include <math.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "semihosting.h"
 #include "codec2_ofdm.h"
@@ -78,7 +80,7 @@
 
 int main(int argc, char *argv[]) {
     struct OFDM *ofdm;
-    FILE        *fcfg, *fin, *fout;
+    FILE        *fcfg;
     struct LDPC  ldpc;
 
     // Test configuration, read from stm_cfg.txt
@@ -179,19 +181,19 @@ int main(int argc, char *argv[]) {
 	    ofdm_print_info(ofdm);
     }
 
-    fin = fopen("stm_in.raw", "rb");
-    if (fin == NULL) {
+    int sin = open("stm_in.raw", O_RDONLY);
+    if (sin < 0) {
         printf("Error opening input file\n");
         exit(1);
     }
 
-    fout = fopen("mod.raw", "wb");
-    if (fout == NULL) {
+    int sout = open("mod.raw", O_WRONLY|O_TRUNC|O_CREAT, 0666);
+    if (sout < 0) {
         printf("Error opening output file\n");
         exit(1);
     }
 
-    while (fread(tx_bits_char, sizeof(char), Nbitsperframe, fin) == Nbitsperframe) {
+    while (read(sin, tx_bits_char, sizeof(char) * Nbitsperframe) == Nbitsperframe) {
         fprintf(stderr, "Frame %d\n", frame);
 
         if (config_profile) { PROFILE_SAMPLE(ofdm_mod_start); }
@@ -240,14 +242,14 @@ int main(int argc, char *argv[]) {
 
         if (config_profile) PROFILE_SAMPLE_AND_LOG2(ofdm_mod_start, "  ofdm_mod");
 
-        fwrite(tx_scaled, sizeof(int16_t), Nsamperframe, fout);
+        write(sout, tx_scaled, sizeof(int16_t) * Nsamperframe);
 
         frame ++;
 
     }  // while (fread(...
 
-    fclose(fin);
-    fclose(fout);
+    close(sin);
+    close(sout);
 
     if (config_verbose)
         printf("%d frames processed\n", frame);

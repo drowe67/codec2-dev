@@ -352,8 +352,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm_doc = (TAU / (ofdm_fs / ofdm_rs));
     tval = ((float) ofdm_nc / 2);
-    ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval);
-    ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval);
+    ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval) - 1;
+    ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval) - 1;
 
     for (i = 0; i < ofdm_rxbuf; i++) {
         ofdm->rxbuf[i] = 0.0f;
