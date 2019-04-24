@@ -340,6 +340,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         ofdm_config = ofdm_get_config_param();
         ofdm_destroy(f->ofdm);
         ofdm_config->nc = 31; int data_bits_per_frame = 312;
+        ofdm_config->ts = 0.0205;
         f->ofdm = ofdm_create(ofdm_config);
             
         f->ldpc = (struct LDPC*)MALLOC(sizeof(struct LDPC));
