@@ -69,9 +69,12 @@
 #include "semihosting.h"
 #include "machdep.h"
 
+static __attribute__ ((section (".ccm"))) char fin_buffer[8*8192];
+char fout_buffer[1024];
+
 
 int main(int argc, char *argv[]) {
-    int            f_cfg, f_in, f_out;
+    int            f_cfg;
 
     struct CODEC2  *codec2;
     short          *buf;
@@ -124,14 +127,15 @@ int main(int argc, char *argv[]) {
 
     ////////
     // Streams
-    f_in = open("stm_in.raw", O_RDONLY);
-    if (f_in == -1) {
+    FILE* fin = fopen("stm_in.raw", "rb");
+    if (fin == NULL) {
         perror("Error opening input file\n");
         exit(1);
     }
+    setvbuf(fin, fin_buffer,_IOFBF,sizeof(fin_buffer));
 
-    f_out = open("stm_out.raw", (O_CREAT | O_WRONLY), 0644);
-    if (f_out == -1) {
+    FILE* fout = fopen("stm_out.raw", "wb");
+    if (fout == NULL) {
         perror("Error opening output file\n");
         exit(1);
     }
@@ -139,13 +143,13 @@ int main(int argc, char *argv[]) {
     frame = 0;
 
     int bytes_per_frame = (sizeof(short) * nsam);
-    while (read(f_in, buf, bytes_per_frame) == bytes_per_frame) {
+    while (fread(buf,1, bytes_per_frame, fin) == bytes_per_frame) {
 
         //PROFILE_SAMPLE(enc_start);
         codec2_encode(codec2, bits, buf);
         //PROFILE_SAMPLE_AND_LOG2(, enc_start, "  enc");
 
-        write(f_out, bits, (sizeof(char) * nbyte));
+        fwrite(bits, 1, (sizeof(char) * nbyte), fout);
         printf("frame: %d\n", ++frame);
 
         //machdep_profile_print_logged_samples();
@@ -155,6 +159,8 @@ int main(int argc, char *argv[]) {
 
     free(buf);
     free(bits);
+    fclose(fin);
+    fclose(fout);
 
     printf("\nEnd of Test\n");
     fclose(stdout);

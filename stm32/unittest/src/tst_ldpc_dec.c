@@ -32,6 +32,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "mpdecode_core.h"
 #include "ofdm_internal.h"
 
@@ -48,13 +51,16 @@
 
 int testframes = 1;
 
+static char fin_buffer[1024];
+static __attribute__ ((section (".ccm"))) char fout_buffer[8*8192];
+
 int main(int argc, char *argv[]) {    
     int         CodeLength, NumberParityBits;
     int         i, parityCheckCount;
     uint8_t     out_data[HRA_112_112_CODELENGTH];
     struct LDPC ldpc;
     int         data_bits_per_frame;
-    FILE        *fin, *fout;
+    FILE        *fout;
     int         iter, total_iters;
     int         Tbits, Terrs, Tbits_raw, Terrs_raw;
 
@@ -107,12 +113,13 @@ int main(int argc, char *argv[]) {
         Tbits = Terrs = Tbits_raw = Terrs_raw = 0;
     }
 
-    fin = fopen("stm_in.raw", "rb");
+    FILE* fin = fopen("stm_in.raw", "rb");
     if (fin == NULL) {
         fprintf(stderr, "Error opening input file\n");
         fflush(stderr);
         exit(1);
     }
+    setvbuf(fin, fin_buffer,_IOFBF,sizeof(fin_buffer));
 
     fout = fopen("stm_out.raw", "wb");
     if (fout == NULL) {
@@ -120,6 +127,7 @@ int main(int argc, char *argv[]) {
         fflush(stderr);
         exit(1);
     }
+    setvbuf(fout, fout_buffer,_IOFBF,sizeof(fout_buffer));
 
 
     double *input_double = calloc(CodeLength, sizeof(double));
@@ -130,7 +138,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "CodeLength: %d offset: %d\n", CodeLength, offset);
 
     frame = 0;
-    while(fread(&input_double[offset], sizeof(double), nread, fin) == nread) {
+    while(fread(&input_double[offset], sizeof(double) , nread, fin) == nread) {
        fprintf(stderr, "frame %d\n", frame);
 
        if (testframes) {

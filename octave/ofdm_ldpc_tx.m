@@ -43,8 +43,7 @@ function ofdm_ldpc_tx(filename, mode="700D", interleave_frames = 1, Nsec, EbNodB
   % init modem
 
   bps = 2; Ns = 8; Tcp = 0.002;
-  [Ts Nc] = ofdm_init_mode(mode, Ns);
-  Rs = 1/Ts;
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode, Ns);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
 

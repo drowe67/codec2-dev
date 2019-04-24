@@ -25,17 +25,17 @@ cd "${RUN_DIR}"
 
 case "${TEST_OPT}" in
 
-    1600 )
+    1300 )
     	# Config is <mode>, <teswtframes> 
-    	echo "21000000" > stm_cfg.txt
+    	echo "41000000" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
         dd bs=2560 count=30 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
-	c2enc 1600 spch_in.raw stm_in.raw >> setup.log 2>&1
+	c2enc 1300 spch_in.raw stm_in.raw >> setup.log 2>&1
 	#
         # Reference
-        c2dec 1600 stm_in.raw ref_dec.raw > ref_gen.log 2>&1
+        c2dec 1300 stm_in.raw ref_dec.raw > ref_gen.log 2>&1
 	;;
 
     700C )

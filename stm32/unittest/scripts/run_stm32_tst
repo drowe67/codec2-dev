@@ -12,12 +12,13 @@ declare -i Fails=0
 
 #####################################################################
 LOAD=${ARGS[--load]:+--load}
+OPENOCD=${ARGS[--openocd]:+--openocd}
 RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
 echo -e "\n\n${FULL_TEST_NAME}"
 setup_common "${RUN_DIR}"
 ${TEST}_setup ${TEST} ${TEST_OPT} --clean
 cd "${RUN_DIR}" 
-run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} |& tee gdb.log
+run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} |& tee gdb.log
 ${TEST}_check ${TEST} ${TEST_OPT} > check.log 2>&1 || let Fails=($Fails + 1)
 
 sleep 5 # Delay for st-util to close
