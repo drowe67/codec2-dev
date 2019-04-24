@@ -555,7 +555,7 @@ if compare_with_c
 
   % Output vectors from C port ---------------------------------------------------
 
-  load ../build_linux/unittest/tcohpsk_out.txt
+  load tcohpsk_out.txt
 
   % Determine bit error rate
 
