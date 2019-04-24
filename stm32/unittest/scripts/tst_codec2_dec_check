@@ -26,7 +26,7 @@ cd "${RUN_DIR}"
 declare -i Fails=0
 
 #case "${TEST_OPT}" in
-#    1600)
+#    1300)
 #    700C)
 #    esac
 

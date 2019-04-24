@@ -2,6 +2,31 @@ README_unittest.txt
 Don Reid 2018/2019
 
 This is the unittest system for the stm32 implementation of codec2/FreeDV
+It is currently only working on linux systems. It requires a STM32F4xx processor 
+development board connected to/having a ST-LINK , e.g. 
+a STM32F4 Discovery board. 
+
+Quickstart
+==========
+
+You need to build both build_linux and stm32/build according to the instructions
+You must have numpy for Python3, and either st-util or openocd installed and in you PATH. You must have
+an arm-none-eabi-gdb install and in the path.
+
+
+   $ cd <path_to_codec2>/stm32/build_stm32
+   $ make test 
+   or
+   $ ctest
+
+ctest / make test will run all tests. `ctest -V`  will provide more output.
+
+You should see a couple of tests executing (and passing). 
+
+Please note that the tests tst_ofdm_demod_AWGN, tst_ofdm_demod_fade, 
+tst_ofdm_demod_ldpc_AWGN, tst_ofdm_demod_ldpc_fade fail on certain OS such 
+as Ubuntu 18.04.  All other tests MUST pass.
+
 
 Objectives
 ==========
@@ -46,10 +71,29 @@ Debug and semihosting
    in the output of st-util.  They can be ignored.
 
 
-Building and Running the stm32 Unit Tests
+   Optionally you may use openocd instead of stlink. 
+
+   Most linux distributions use too old packages for openocd, so you in general
+   should build it from the git source. If your testi runs fail with error 
+   messages rearding SYS_FLEN not support (see openocd_stderr.log in the test_run 
+   directories), your openocd is too old. Make sure to have the right openocd
+   first in the PATH if you have multiple openocd installed!
+
+
+
+
+Preparing the Unittest environment
 =========================================
 
-1/ Build stlink:
+0/ Build codec2 for linux and stm32 
+
+   Run the linux cmake build using /path/to/codec2/build_linux 
+   as build directory, see instructions in the codec2 top level directory.
+
+   Run the stm32 cmake build using /path/to/codec2/stm32/build_stm32 
+   as build directory, see instructions in the stm32 directory.
+   
+1/ Build stlink (alternative to the recommended OpenOCD, see below):
 
   $ cd ~
   $ git clone https://github.com/texane/stlink
@@ -72,32 +116,103 @@ Building and Running the stm32 Unit Tests
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 
-2/ The STM32 Standard Preipheral Library is required and requires
-   registration to download. Save the zip file somewhere safe, then
-   extract to a directory of your choice, for example:
+2/ Build OpenOCD (recommended over stlink):
+OpenOCD needs to be built from the source. If you have successfully build
+the linux codec2 binaries, everything required to build OpenOCD is already installed
 
-   $ cd /periph/lib/path
-   $ unzip /path/to/en.stm32f4_dsp_stdperiph_lib.zip
+2a/
+    The executable is placed in /usr/local/bin ! Make sure to have no
+    other openocd installed (check output of `which openocd` to be 
+    /usr/local/bin)
 
-   The unittest Makefile requires a path to the unzipped Standard
-   Preipheral Library, this can be set by adding a local.mak file in
-   the codec2-dev/stm32/unittest directory:
+      git clone https://git.code.sf.net/p/openocd/code openocd-code
+      cd openocd-code
+      ./bootstrap
+      ./configure
+      sudo make install
+      which openocd
 
-   $ cd ~/codec2-dev/stm32/unittest/src
-   $ echo 'PERIPHLIBDIR = /periph/lib/path/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0' > local.mak
+2b/ Plug in a stm32 development board and test:
 
-3/ Now we can build the unittests:
+   $ openocd -f board/stm32f4discovery.cfg
 
-   $ cd codec2-dev/stm32/unittest/src
-   $ make
+   Open On-Chip Debugger 0.10.0+dev-00796-ga4ac5615 (2019-04-12-21:58)
+   Licensed under GNU GPL v2
+   For bug reports, read
+   http://openocd.org/doc/doxygen/bugs.html
+   Info : The selected transport took over low-level target control. The results might differ compared to plain JTAG/SWD
+   adapter speed: 2000 kHz
+   adapter_nsrst_delay: 100
+   none separate
+   srst_only separate srst_nogate srst_open_drain connect_deassert_srst
+   Info : Listening on port 6666 for tcl connections
+   Info : Listening on port 4444 for telnet connections
+   Info : clock speed 2000 kHz
+   Info : STLINK V2J33S0 (API v2) VID:PID 0483:3748
+   Info : Target voltage: 2.871855
+   Info : stm32f4x.cpu: hardware has 6 breakpoints, 4 watchpoints
+   Info : Listening on port 3333 for gdb connections
+
+
+   To run the tests with openocd instead of the default st-util, add `--openocd` to the command lines shown below.
+
+3/ Install numpy for Python3
+Some test are in fact python3 scripts and require the numpy package to be installed,
+otherwise some tests will fail.
+
+On Ubuntu:
+
+   $ sudo apt-get install python3-numpy 
+
+ 
+
+Running the stm32 Unit Tests
+=========================================
+1/ Tests can be run using the ctest utility (part  of cmake)
+
+   $ cd /path/to/codec2/stm32/build_stm32
+   $ ctest 
   
-3/ To run a single test:
+   You can pass -V to see more output:
 
-   $ cd codec2-dev/stm32/unittest/scripts
-   $ ./run_all_ldpc_tests
+   $ cd /path/to/codec2/stm32/build_stm32
+   $ ctest -V
+  
 
-4/ To run ALL tests:
+   You can pass -R <pattern> to run test matching <pattern>. Please note,
+   that some test have dependencies and will have to run other tests before
+   being executed
 
-   (TODO Don - pls add command to run all tests)
-   
+   $ cd /path/to/codec2/stm32/build_stm32
+   $ ctest -R ofdm
+
+2/ To simply run all tests the `make test` target exists (part  of cmake)
+
+   $ cd /path/to/codec2/stm32/build_stm32
+   $ make test 
+  
+3/ To run a single test directly:
+
+   $ cd codec2/stm32/unittest
+   $ ./scripts/run_stm32_test <name_of_test> <test_option> --load
+
+for example 
+
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick --load
+
+(Note when running a single test you can choose not to reload the flash every
+time if using the same bits.  The *_all_* scripts manage this themselves.)
+
+4/ To run a test set (codec2, ofdm, ldpc):
+
+   $ cd codec2/stm32/unittest
+   $ ./scripts/run_all_<set_name>_tests
+
+for example 
+
+   $ ./scripts/run_all_ldpc_tests
+
+5/ To run ALL tests, see "Quickstart" above
+
+
 # vi:set ts=3 et sts=3:

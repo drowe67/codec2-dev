@@ -20,8 +20,7 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
   % init modem
 
   bps = 2; Ns = 8; Tcp = 0.002;
-  [Ts Nc] = ofdm_init_mode(mode, Ns);
-  Rs = 1/Ts;
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode, Ns);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 1;

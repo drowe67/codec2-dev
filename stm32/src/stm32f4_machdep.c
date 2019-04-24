@@ -78,9 +78,9 @@ unsigned int machdep_profile_sample_and_log(unsigned int start, char s[])
 
     unsigned int dwt = *DWT_CYCCNT - start;
     msec = 1000.0*(float)dwt/CORE_CLOCK;
-    sprintf(tmp, "%s %5.2f msecs\n",s,(double)msec);
+    snprintf(tmp, sizeof(tmp), "%s %5.2f msecs\n",s,(double)msec);
     if ((strlen(buf) + strlen(tmp)) < BUF_SZ)
-        strcat(buf, tmp);
+        strncat(buf, tmp, sizeof(buf));
     return *DWT_CYCCNT;
 }
 

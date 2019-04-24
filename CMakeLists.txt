@@ -351,6 +351,10 @@ if(UNITTEST)
              )
              set_tests_properties(test_FSK_modem_mod_demod  PROPERTIES PASS_REGULAR_EXPRESSION "bits tested 9800, bit errors 0")
 
+    add_test(NAME test_FreeDV_API_700D_backwards_compatability
+             COMMAND sh -c "$<TARGET_FILE:freedv_rx> 700D ${CMAKE_CURRENT_SOURCE_DIR}/raw/testframes_700d.raw /dev/null --testframes --discard"
+             )
+           
     add_test(NAME test_FreeDV_API_700D_AWGN_BER
              COMMAND sh -c "dd bs=1280 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --testframes --discard"
              )
