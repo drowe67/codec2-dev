@@ -90,7 +90,7 @@ else(CMAKE_CROSSCOMPILING)
 # Build code generator binaries. These do not get installed.
     # generate_codebook
     add_executable(generate_codebook generate_codebook.c)
-    target_link_libraries(generate_codebook ${CMAKE_REQUIRED_LIBRARIES})
+    target_link_libraries(generate_codebook m ${CMAKE_REQUIRED_LIBRARIES})
     # Make native builds available for cross-compiling.
     export(TARGETS generate_codebook
         FILE ${CMAKE_BINARY_DIR}/ImportExecutables.cmake)
@@ -215,8 +215,6 @@ set(CODEC2_SRCS
     freedv_data_channel.c
     varicode.c
     modem_stats.c
-    c2wideband.c
-    dct2.c
     ofdm.c
     mpdecode_core.c
     phi0.c
@@ -259,11 +257,27 @@ set(CODEC2_PUBLIC_HEADERS
 # Setup the codec2 library
 #
 add_library(codec2 ${CODEC2_SRCS})
+if(UNIX)
+    target_link_libraries(codec2 m)
+endif(UNIX)
+if(LPCNET AND lpcnet_FOUND)
+    target_link_libraries(codec2 lpcnetfreedv)
+endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(codec2 ${CMAKE_REQUIRED_LIBRARIES})
 set_target_properties(codec2 PROPERTIES
     SOVERSION ${SOVERSION}
     PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"
+)
+target_include_directories(codec2 INTERFACE
+    $<INSTALL_INTERFACE:include/codec2>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+)
+install(EXPORT codec2-config
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
+)
+# Export target for import into lpcnet from build tree.
+export(TARGETS codec2
+    FILE ${CMAKE_BINARY_DIR}/codec2.cmake
 )
 
 add_executable(c2demo c2demo.c)
@@ -279,16 +293,16 @@ add_executable(c2sim c2sim.c)
 target_link_libraries(c2sim ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fdmdv_get_test_bits fdmdv_get_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_get_test_bits ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_get_test_bits m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_mod fdmdv_mod.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_mod ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_mod m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_demod fdmdv_demod.c fdmdv.c kiss_fft.c octave.c modem_stats.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_demod ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_put_test_bits fdmdv_put_test_bits.c fdmdv.c kiss_fft.c codec2_fft.c kiss_fftr.c)
-target_link_libraries(fdmdv_put_test_bits ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fdmdv_put_test_bits m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fdmdv_channel fdmdv_channel.c)
 target_link_libraries(fdmdv_channel ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -306,7 +320,7 @@ add_executable(fsk_mod fsk_mod.c)
 target_link_libraries(fsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fsk_mod_ext_vco fsk_mod_ext_vco.c)
-target_link_libraries(fsk_mod_ext_vco ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fsk_mod_ext_vco m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(fsk_demod fsk_demod.c modem_probe.c octave.c)
 target_link_libraries(fsk_demod ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -318,7 +332,7 @@ add_executable(fsk_put_test_bits fsk_put_test_bits.c)
 target_link_libraries(fsk_put_test_bits ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_executable(fm_demod fm_demod.c fm.c)
-target_link_libraries(fm_demod ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(fm_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
 add_executable(cohpsk_mod cohpsk_mod.c)
 target_link_libraries(cohpsk_mod ${CMAKE_REQUIRED_LIBRARIES} codec2)
@@ -379,7 +393,7 @@ target_link_libraries(drs232_ldpc ${CMAKE_REQUIRED_LIBRARIES} codec2)
 
 add_definitions(-DHORUS_L2_RX -DINTERLEAVER -DSCRAMBLER -DRUN_TIME_TABLES)
 add_executable(horus_demod horus_demod.c horus_api.c horus_l2.c golay23.c fsk.c kiss_fft.c)
-target_link_libraries(horus_demod ${CMAKE_REQUIRED_LIBRARIES})
+target_link_libraries(horus_demod m ${CMAKE_REQUIRED_LIBRARIES})
 
 install(TARGETS codec2 EXPORT codec2-config
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
