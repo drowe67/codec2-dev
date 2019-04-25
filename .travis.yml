@@ -7,7 +7,7 @@ language: generic
 dist: xenial
 addons:
   apt:
-    packages: libc6-i386 libspeexdsp-dev libsamplerate0-dev octave-common octave gnuplot
+    packages: libc6-i386 octave-common octave gnuplot
       sox p7zip-full python3-numpy octave-signal
 cache:
   directories:

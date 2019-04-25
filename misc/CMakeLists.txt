@@ -18,20 +18,11 @@ add_executable(extract extract.c)
 add_executable(vqtrain vqtrain.c)
 target_link_libraries(vqtrain m)
 
-add_executable(speexnoisesup speexnoisesup.c)
-target_link_libraries(speexnoisesup ${SPEEXDSP_LIBRARY})
-set_target_properties(speexnoisesup
-    PROPERTIES INCLUDE_DIRECTORIES ${SPEEXDSP_INCLUDE_DIR}
-)
-
 add_executable(raw2h raw2h.c)
 target_link_libraries(raw2h codec2)
 
 add_executable(tnlp tnlp.c)
 target_link_libraries(tnlp codec2)
-
-add_executable(tsrc tsrc.c)
-target_link_libraries(tsrc ${LIBSAMPLERATE})
 
 add_executable(tlininterp tlininterp.c)
 add_executable(tdec tdec.c)
