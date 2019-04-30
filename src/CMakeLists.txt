@@ -271,6 +271,7 @@ set_target_properties(codec2 PROPERTIES
 target_include_directories(codec2 INTERFACE
     $<INSTALL_INTERFACE:include/codec2>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
 )
 install(EXPORT codec2-config
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
