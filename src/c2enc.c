@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     int            bit, byte,i;
 
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB|WB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB|WB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat]\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
@@ -130,6 +130,10 @@ int main(int argc, char *argv[])
         }
         if (strcmp(argv[i], "--bitperchar") == 0) {
             bitperchar = 1;
+        }
+        if (strcmp(argv[i], "--mlfeat") == 0) {
+            /* dump machine learning features (700C encoder) */
+            codec2_open_mlfeat(codec2, argv[i]);
         }
     }
     codec2_set_natural_or_gray(codec2, gray);

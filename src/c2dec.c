@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
         { "dump", required_argument, &dump, 1 },
         #endif
 	{ "energy", no_argument, NULL, 0 },
-        { "lspEWov", required_argument, NULL, 0 },
+        { "mlfeat", required_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -208,8 +208,8 @@ int main(int argc, char *argv[])
 	    else if (strcmp(long_options[option_index].name, "energy") == 0) {
 	        report_energy = 1;
 	    }
-	    else if (strcmp(long_options[option_index].name, "lspEWov") == 0) {
-	        codec2_open_lspEWov(codec2, optarg);
+	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
+	        codec2_open_mlfeat(codec2, optarg);
 	    }
             break;
 

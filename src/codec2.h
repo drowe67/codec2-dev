@@ -112,7 +112,7 @@ void codec2_set_natural_or_gray(struct CODEC2 *codec2_state, int gray);
 void codec2_set_softdec(struct CODEC2 *c2, float *softdec);
 float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
 
-void codec2_open_lspEWov(struct CODEC2 *codec2_state, char *filename);
+void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename);
 
 #endif
 
