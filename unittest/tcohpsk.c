@@ -255,7 +255,7 @@ int main(int argc, char *argv[])
                       by tcohpsk.m Octave script
     \*---------------------------------------------------------*/
 
-    fout = fopen("/tmp/tcohpsk_out.txt","wt");
+    fout = fopen("tcohpsk_out.txt","wt");
     assert(fout != NULL);
     fprintf(fout, "# Created by tcohpsk.c\n");
     octave_save_int(fout, "tx_bits_log_c", tx_bits_log, 1, COHPSK_BITS_PER_FRAME*FRAMES);
