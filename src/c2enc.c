@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
         }
         if (strcmp(argv[i], "--mlfeat") == 0) {
             /* dump machine learning features (700C encoder) */
-            codec2_open_mlfeat(codec2, argv[i]);
+            codec2_open_mlfeat(codec2, argv[i+1]);
         }
     }
     codec2_set_natural_or_gray(codec2, gray);
