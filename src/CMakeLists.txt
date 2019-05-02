@@ -268,15 +268,20 @@ set_target_properties(codec2 PROPERTIES
     SOVERSION ${SOVERSION}
     PUBLIC_HEADER "${CODEC2_PUBLIC_HEADERS}"
 )
+
+# Required include directories for export
 target_include_directories(codec2 INTERFACE
     $<INSTALL_INTERFACE:include/codec2>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_BINARY_DIR}>
 )
+
+# Export config for import from full install
 install(EXPORT codec2-config
     DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/codec2
 )
-# Export target for import into lpcnet from build tree.
+
+# Export config for import from build tree.
 export(TARGETS codec2
     FILE ${CMAKE_BINARY_DIR}/codec2.cmake
 )

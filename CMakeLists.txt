@@ -92,7 +92,7 @@ endif(MINGW)
 
 
 #
-# Find the svn revision if this is a working copy.
+# Find the git hash if this is a working copy.
 #
 if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
     find_package(Git)
