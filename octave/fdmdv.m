@@ -16,7 +16,7 @@
  
 % reqd to make sure we get same random bits at mod and demod
 
-fdmdv_io;
+fdmdv_common;
 
 rand('state',1); 
 randn('state',1);

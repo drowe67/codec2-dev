@@ -59,7 +59,7 @@ global passes = 0;
 global fails = 0;
 
 cohpsk;
-fdmdv;
+fdmdv_common;
 autotest;
 
 rand('state',1); 
@@ -554,7 +554,7 @@ if compare_with_c
 
   % Output vectors from C port ---------------------------------------------------
 
-  load tcohpsk_out.txt
+  load /tmp/tcohpsk_out.txt
 
   % Determine bit error rate
 

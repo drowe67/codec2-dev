@@ -1,4 +1,4 @@
-% fdmdv_io.m
+% fdmdv_common.m
 %
 % Functions that implement a Frequency Divison Multiplexed Modem functions
 %
