@@ -59,7 +59,7 @@ global passes = 0;
 global fails = 0;
 
 cohpsk;
-fdmdv;
+fdmdv_common;
 autotest;
 
 rand('state',1); 

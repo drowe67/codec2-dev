@@ -220,7 +220,7 @@ function [tx_symb tx_bits] = bits_to_qpsk_symbols(sim_in, tx_bits, code_param)
     % ensures energy/symbol is normalised with diversity
 
     tx_symb = tx_symb/sqrt(Nd);
-end
+endfunction
 
 
 % Symbol rate processing for rx side (demodulator) -------------------------------------------------------
