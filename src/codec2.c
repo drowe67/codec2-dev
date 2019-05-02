@@ -2677,3 +2677,21 @@ void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename) {
     }    
 }
 
+void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) {
+    FILE *f;
+    
+    if ((f = fopen(filename, "rb")) == NULL) {
+	fprintf(stderr, "error opening codebook file: %s\n", filename);
+	exit(1);
+    }
+    fprintf(stderr, "reading newamp1vq_cb[%d] k=%d m=%d\n", num, newamp1vq_cb[num].k, newamp1vq_cb[num].m);
+    float tmp[newamp1vq_cb[num].k*newamp1vq_cb[num].m];
+    int nread = fread(tmp, sizeof(float), newamp1vq_cb[num].k*newamp1vq_cb[num].m, f);
+    float *p = (float*)newamp1vq_cb[num].cb;
+    for(int i=0; i<newamp1vq_cb[num].k*newamp1vq_cb[num].m; i++)
+       p[i] = tmp[i];
+    fprintf(stderr, "nread = %d %f %f\n", nread, newamp1vq_cb[num].cb[0], newamp1vq_cb[num].cb[1]);
+    assert(nread == newamp1vq_cb[num].k*newamp1vq_cb[num].m);
+    fclose(f);
+}
+

@@ -79,6 +79,7 @@ int main(int argc, char *argv[])
         #endif
 	{ "energy", no_argument, NULL, 0 },
         { "mlfeat", required_argument, NULL, 0 },
+        { "loadcb", required_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -210,6 +211,11 @@ int main(int argc, char *argv[])
 	    }
 	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
 	        codec2_open_mlfeat(codec2, optarg);
+	    }
+	    else if (strcmp(long_options[option_index].name, "loadcb") == 0) {
+                /* load VQ stage (700C only) */
+                fprintf(stderr, "%s\n", optarg+1);
+                codec2_load_codebook(codec2, atoi(optarg)-1, argv[optind]);
 	    }
             break;
 
