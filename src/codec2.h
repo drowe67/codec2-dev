@@ -116,8 +116,9 @@ float codec2_get_energy(struct CODEC2 *codec2_state, const unsigned char *bits);
 void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename);
 void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename);
 float codec2_get_var(struct CODEC2 *codec2_state);
-      float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
-
+float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K);
+void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en);
+      
 #endif
 
 #ifdef __cplusplus

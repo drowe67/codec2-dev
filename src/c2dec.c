@@ -84,6 +84,7 @@ int main(int argc, char *argv[])
         { "mlfeat", required_argument, NULL, 0 },
         { "loadcb", required_argument, NULL, 0 },
         { "loadratek", required_argument, NULL, 0 },
+        { "nopf", no_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -227,6 +228,9 @@ int main(int argc, char *argv[])
                 f_ratek = fopen(optarg, "rb");
                 assert(f_ratek != NULL);
                 user_ratek = codec2_enable_user_ratek(codec2, &K);
+	    }
+	    else if (strcmp(long_options[option_index].name, "nopf") == 0) {
+	        codec2_700c_post_filter(codec2, 0);
 	    }
             break;
 

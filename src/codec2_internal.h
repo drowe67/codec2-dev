@@ -81,6 +81,7 @@ struct CODEC2 {
     float          se;                       /* running sum of squared error */
     unsigned int   nse;                      /* number of terms in sum       */
     float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
+    int            post_filter_en;
     
     /*newamp2 states (also uses newamp1 states )*/
     float 	   energy_prev;

@@ -157,7 +157,7 @@ int main(int argc, char *argv[]) {
                                       rate_K_sample_freqs_kHz,
                                       K,
                                       &mean_[f],
-                                      &indexes[f][0], NULL);
+                                      &indexes[f][0], NULL, 1);
 
         fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
         if ((f % M) == 0) {
@@ -210,7 +210,7 @@ int main(int argc, char *argv[]) {
                                  phase_fft_fwd_cfg, 
                                  phase_fft_inv_cfg,
                                  &indexes[f][0],
-                                 NULL);
+                                 NULL, 1);
 
         fprintf(stderr,"f: %d\n", f);
         fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);

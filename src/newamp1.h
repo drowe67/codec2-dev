@@ -62,7 +62,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
                                    int    K,
                                    float *mean_,
                                    int    indexes[],
-                                   float user_rate_K_vec_no_mean_[]);
+                                   float user_rate_K_vec_no_mean_[],
+                                   int post_filter_en);
 void newamp1_interpolate(float interpolated_surface_[], float left_vec[], float right_vec[], int K);
 
 void newamp1_indexes_to_model(C2CONST *c2const,
@@ -77,6 +78,7 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                               codec2_fft_cfg fwd_cfg, 
                               codec2_fft_cfg inv_cfg,
                               int    indexes[],
-                              float user_rate_K_vec_no_mean_[]);
+                              float user_rate_K_vec_no_mean_[],
+                              int post_filter_en);
 
 #endif

@@ -507,7 +507,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
                                    int    K,
                                    float *mean_,
                                    int    indexes[],
-                                   float user_rate_K_vec_no_mean_[])
+                                   float user_rate_K_vec_no_mean_[],
+                                   int post_filter_en)
 {
     int   k;
     const float *codebook1 = newamp1vq_cb[0].cb;
@@ -526,8 +527,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
             rate_K_vec_no_mean_[k] = user_rate_K_vec_no_mean_[k];
     }
         
-
-    post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
+    if (post_filter_en)
+        post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
 
     *mean_ = newamp1_energy_cb[0].cb[indexes[2]];
 
@@ -559,7 +560,8 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                               codec2_fft_cfg fwd_cfg, 
                               codec2_fft_cfg inv_cfg,
                               int    indexes[],
-                              float user_rate_K_vec_no_mean_[])
+                              float  user_rate_K_vec_no_mean_[],
+                              int    post_filter_en)
 {
     float rate_K_vec_[K], rate_K_vec_no_mean_[K], mean_, Wo_right;
     int   voicing_right, k;
@@ -573,7 +575,8 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                                   K,
                                   &mean_,
                                   indexes,
-                                  user_rate_K_vec_no_mean_);
+                                  user_rate_K_vec_no_mean_,
+                                  post_filter_en);
 
     /* decode latest Wo and voicing */
 
