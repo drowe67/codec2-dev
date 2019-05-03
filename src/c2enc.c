@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 int main(int argc, char *argv[])
 {
@@ -46,9 +47,10 @@ int main(int argc, char *argv[])
     float         *unpacked_bits_float;
     char          *unpacked_bits_char;
     int            bit, byte,i;
-
+    int            report_var = 0;
+    
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename] [--var]\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
@@ -139,6 +141,9 @@ int main(int argc, char *argv[])
             /* load VQ stage (700C only) */
             codec2_load_codebook(codec2, atoi(argv[i+1])-1, argv[i+2]);
         }
+        if (strcmp(argv[i], "--var") == 0) {
+            report_var = 1;
+        }
 
         
     }
@@ -179,6 +184,10 @@ int main(int argc, char *argv[])
         if (fin == stdin) fflush(stdin);
     }
 
+    if (report_var) {
+        float var = codec2_get_var(codec2);
+        fprintf(stderr, "%s var: %f std: %f\n", argv[2], var, sqrt(var));
+    }
     codec2_destroy(codec2);
 
     free(buf);

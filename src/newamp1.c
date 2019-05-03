@@ -414,7 +414,8 @@ void newamp1_model_to_indexes(C2CONST *c2const,
                               int    K,
                               float *mean,
                               float  rate_K_vec_no_mean[], 
-                              float  rate_K_vec_no_mean_[]
+                              float  rate_K_vec_no_mean_[],
+                              float *se
                               )
 {
     int k;
@@ -427,22 +428,26 @@ void newamp1_model_to_indexes(C2CONST *c2const,
 
     float sum = 0.0;
     for(k=0; k<K; k++)
-        sum += rate_K_vec[k];
-    *mean = sum/K;
+        sum += rate_K_vec[k];   
+    *mean = sum/K;;
     for(k=0; k<K; k++)
         rate_K_vec_no_mean[k] = rate_K_vec[k] - *mean;
     rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
 
+    /* running sum of squared error for variance calculation */
+    for(k=0; k<K; k++)
+        *se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
+
     /* scalar quantise mean (effectively the frame energy) */
 
     float w[1] = {1.0};
-    float se;
+    float se_mean;
     indexes[2] = quantise(newamp1_energy_cb[0].cb, 
                           mean, 
                           w, 
                           newamp1_energy_cb[0].k, 
                           newamp1_energy_cb[0].m, 
-                          &se);
+                          &se_mean);
 
     /* scalar quantise Wo.  We steal the smallest Wo index to signal
        an unvoiced frame */
@@ -501,7 +506,8 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
                                    float  rate_K_sample_freqs_kHz[], 
                                    int    K,
                                    float *mean_,
-                                   int    indexes[])
+                                   int    indexes[],
+                                   float user_rate_K_vec_no_mean_[])
 {
     int   k;
     const float *codebook1 = newamp1vq_cb[0].cb;
@@ -509,9 +515,17 @@ void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],
     int n1 = indexes[0];
     int n2 = indexes[1];
     
-    for(k=0; k<K; k++) {
-      rate_K_vec_no_mean_[k] = codebook1[K*n1+k] + codebook2[K*n2+k];
+    if (user_rate_K_vec_no_mean_ == NULL) {
+        /* normal operation */
+        for(k=0; k<K; k++) {
+            rate_K_vec_no_mean_[k] = codebook1[K*n1+k] + codebook2[K*n2+k];
+        }
+    } else {
+        /* for development we can optionally inject the quantised rate K vector here */
+        for(k=0; k<K; k++)
+            rate_K_vec_no_mean_[k] = user_rate_K_vec_no_mean_[k];
     }
+        
 
     post_filter_newamp1(rate_K_vec_no_mean_, rate_K_sample_freqs_kHz, K, 1.5);
 
@@ -544,7 +558,8 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                               int    K,
                               codec2_fft_cfg fwd_cfg, 
                               codec2_fft_cfg inv_cfg,
-                              int    indexes[])
+                              int    indexes[],
+                              float user_rate_K_vec_no_mean_[])
 {
     float rate_K_vec_[K], rate_K_vec_no_mean_[K], mean_, Wo_right;
     int   voicing_right, k;
@@ -557,8 +572,8 @@ void newamp1_indexes_to_model(C2CONST *c2const,
                                   rate_K_sample_freqs_kHz, 
                                   K,
                                   &mean_,
-                                  indexes);
-
+                                  indexes,
+                                  user_rate_K_vec_no_mean_);
 
     /* decode latest Wo and voicing */
 

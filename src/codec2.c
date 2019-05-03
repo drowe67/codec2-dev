@@ -203,7 +203,9 @@ struct CODEC2 * codec2_create(int mode)
     c2->xq_dec[0] = c2->xq_dec[1] = 0.0;
 
     c2->smoothing = 0;
-
+    c2->se = 0.0; c2->nse = 0;
+    c2->user_rate_K_vec_no_mean_ = NULL;
+    
     c2->bpf_buf = (float*)MALLOC(sizeof(float)*(BPF_N+4*c2->n_samp));
     assert(c2->bpf_buf != NULL);
     for(i=0; i<BPF_N+4*c2->n_samp; i++)
@@ -1984,7 +1986,8 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              K,
                              &mean,
                              rate_K_vec_no_mean,
-                             rate_K_vec_no_mean_);
+                             rate_K_vec_no_mean_, &c2->se);
+    c2->nse += K;
 
 #ifndef CORTEX_M4
     /* dump features for deep learning experiments */
@@ -2045,7 +2048,8 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
                              NEWAMP1_K,
                              c2->phase_fft_fwd_cfg, 
                              c2->phase_fft_inv_cfg,
-                             indexes);
+                             indexes,
+                             c2->user_rate_K_vec_no_mean_);
 
 
    for(i=0; i<M; i++) {
@@ -2684,14 +2688,26 @@ void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) 
 	fprintf(stderr, "error opening codebook file: %s\n", filename);
 	exit(1);
     }
-    fprintf(stderr, "reading newamp1vq_cb[%d] k=%d m=%d\n", num, newamp1vq_cb[num].k, newamp1vq_cb[num].m);
+    //fprintf(stderr, "reading newamp1vq_cb[%d] k=%d m=%d\n", num, newamp1vq_cb[num].k, newamp1vq_cb[num].m);
     float tmp[newamp1vq_cb[num].k*newamp1vq_cb[num].m];
     int nread = fread(tmp, sizeof(float), newamp1vq_cb[num].k*newamp1vq_cb[num].m, f);
     float *p = (float*)newamp1vq_cb[num].cb;
     for(int i=0; i<newamp1vq_cb[num].k*newamp1vq_cb[num].m; i++)
        p[i] = tmp[i];
-    fprintf(stderr, "nread = %d %f %f\n", nread, newamp1vq_cb[num].cb[0], newamp1vq_cb[num].cb[1]);
+    // fprintf(stderr, "nread = %d %f %f\n", nread, newamp1vq_cb[num].cb[0], newamp1vq_cb[num].cb[1]);
     assert(nread == newamp1vq_cb[num].k*newamp1vq_cb[num].m);
     fclose(f);
 }
 
+float codec2_get_var(struct CODEC2 *codec2_state) {
+    if (codec2_state->nse)
+        return codec2_state->se/codec2_state->nse;
+    else
+        return 0;
+}
+
+float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
+    codec2_state->user_rate_K_vec_no_mean_ = (float*)malloc(sizeof(float)*NEWAMP1_K);
+    *K = NEWAMP1_K;
+    return codec2_state->user_rate_K_vec_no_mean_;
+}
