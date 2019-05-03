@@ -1234,7 +1234,7 @@ function sync_metrics(x_axis = 'EbNo')
 endfunction
 
 
-% during development it was discovered demod could obtain a flase sync with no UW
+% during development it was discovered demod could obtain a false sync with no UW
 % errors at +/- 7Hz, approx the frame rate.  This function is used to explore that
 
 function debug_false_sync(EbNodB = 100)
