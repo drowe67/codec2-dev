@@ -42,7 +42,7 @@ endif("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_BINARY_DIR}")
 # file at some point.
 #
 set(CODEC2_VERSION_MAJOR 0)
-set(CODEC2_VERSION_MINOR 8)
+set(CODEC2_VERSION_MINOR 9)
 # Set to patch level if needed, otherwise leave FALSE.
 # Must be positive (non-zero) if set, since 0 == FALSE in CMake.
 set(CODEC2_VERSION_PATCH FALSE)
