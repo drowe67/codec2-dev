@@ -11,24 +11,23 @@ void init_usart(void){
  GPIO_InitTypeDef GPIO_InitStructure;
  USART_InitTypeDef USART_InitStructure;
 
- /* enable peripheral clock for USART2 */
- RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
+ /* enable peripheral clock for USART3 */
+ RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART3, ENABLE);
 
+ /* GPIOB clock enable */
+ RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
- /* GPIOA clock enable */
- RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
-
- /* GPIOA Configuration:  USART2 TX on PA2 */
- GPIO_InitStructure.GPIO_Pin = GPIO_Pin_2;
+ /* GPIOA Configuration:  USART2 TX on PB10 */
+ GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
  GPIO_InitStructure.GPIO_OType = GPIO_OType_PP;
  GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP ;
- GPIO_Init(GPIOA, &GPIO_InitStructure);
+ GPIO_Init(GPIOB, &GPIO_InitStructure);
 
- /* Connect USART2 pins to AF2 */
- // TX = PA2
- GPIO_PinAFConfig(GPIOA, GPIO_PinSource2, GPIO_AF_USART2);
+ /* Connect USART3 pins to AF2 */
+ // TX = PB10
+ GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
 
  USART_InitStructure.USART_BaudRate = 9600;
  USART_InitStructure.USART_WordLength = USART_WordLength_8b;
@@ -36,9 +35,9 @@ void init_usart(void){
  USART_InitStructure.USART_Parity = USART_Parity_No;
  USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
  USART_InitStructure.USART_Mode = USART_Mode_Tx;
- USART_Init(USART2, &USART_InitStructure);
+ USART_Init(USART3, &USART_InitStructure);
 
- USART_Cmd(USART2, ENABLE); // enable USART2
+ USART_Cmd(USART3, ENABLE); // enable USART2
 
 }
 
