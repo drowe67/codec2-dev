@@ -296,6 +296,19 @@ add_mapped_executable(pwm_ut ${PWM_UT_SRCS})
 target_link_libraries(pwm_ut stm32f4 sm1000base)
 elf2bin(pwm_ut)
 
+# ------------------------------------------------
+
+set(USART_UT_SRCS
+src/usart_ut.c
+)
+
+add_mapped_executable(usart_ut ${USART_UT_SRCS})
+target_link_libraries(usart_ut stm32f4 sm1000base)
+elf2bin(usart_ut)
+
+# ------------------------------------------------
+
+
 set(POWER_UT_SRCS
 src/power_ut.c
 )
