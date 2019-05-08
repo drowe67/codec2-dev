@@ -385,7 +385,14 @@ list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 add_mapped_executable(sm1000 ${SM1000_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(sm1000 stm32f4_adac stm32f4 CMSIS)
 target_compile_options(sm1000 PRIVATE "-O3")
+target_compile_definitions(sm1000 PRIVATE -UFREEDV_MODE_700D_EN -UCODEC2_MODE_700C_EN)
 elf2bin(sm1000)
+
+add_mapped_executable(sm1000_700D ${SM1000_SRCS} ${SYSTEM_SRCS})
+target_link_libraries(sm1000_700D stm32f4_adac stm32f4 CMSIS)
+target_compile_options(sm1000_700D PRIVATE "-O3")
+target_compile_definitions(sm1000_700D PRIVATE -UFREEDV_MODE_1600_EN -UCODEC2_MODE_1300_EN)
+elf2bin(sm1000_700D)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
