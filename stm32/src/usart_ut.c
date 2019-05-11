@@ -17,7 +17,7 @@ void init_usart(void){
  /* GPIOB clock enable */
  RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
- /* GPIOA Configuration:  USART2 TX on PB10 */
+ /* GPIOA Configuration:  USART3 TX on PB10 */
  GPIO_InitStructure.GPIO_Pin = GPIO_Pin_10;
  GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;
  GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
@@ -37,7 +37,7 @@ void init_usart(void){
  USART_InitStructure.USART_Mode = USART_Mode_Tx;
  USART_Init(USART3, &USART_InitStructure);
 
- USART_Cmd(USART3, ENABLE); // enable USART2
+ USART_Cmd(USART3, ENABLE); // enable USART3
 
 }
 
@@ -53,7 +53,7 @@ int main(void){
  init_usart();
 
  while(1){
-  USART_SendData(USART2, 'h'); // defined in stm32f4xx_usart.h
+  USART_SendData(USART3, 'h'); // defined in stm32f4xx_usart.h
   Delay(0x3FFFFF);
  }
 }
