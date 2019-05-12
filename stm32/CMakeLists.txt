@@ -299,6 +299,7 @@ elf2bin(pwm_ut)
 # ------------------------------------------------
 
 set(USART_UT_SRCS
+src/stm32f4_usart.c
 src/usart_ut.c
 )
 
