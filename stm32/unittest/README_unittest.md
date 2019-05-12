@@ -88,8 +88,6 @@ The newlib stdio functions (open, fread, fwrite, flush, fclose, etc.) send
 some requests that this tool does not recognize and those messages will appear
 in the output of st-util.  They can be ignored.
 
-
-
 ## Preparing the Unittest environment
 
 ### Build codec2 for linux and stm32 

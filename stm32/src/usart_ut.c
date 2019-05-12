@@ -1,6 +1,16 @@
 /*
+  usart_ut.c
+  David Rowe May 2019
+
+  Unit test for stm32 USART support.
+
   From:
     http://stm32projectconsulting.blogspot.com/2013/04/stm32f4-discovery-usart-example.html
+
+  tio is useful to receive the serial strings:
+
+    $ tio -b 9600 /dev/ttyUSB0 
+
 */
 
 #include <stm32f4xx.h>
@@ -53,7 +63,7 @@ int main(void){
  init_usart();
 
  while(1){
-  USART_SendData(USART3, 'h'); // defined in stm32f4xx_usart.h
+  USART_SendData(USART3, "Hello World\n"); // defined in stm32f4xx_usart.h
   Delay(0x3FFFFF);
  }
 }
