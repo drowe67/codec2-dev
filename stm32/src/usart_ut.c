@@ -9,14 +9,16 @@
 
   tio is useful to receive the serial strings:
 
-    $ tio -b 9600 /dev/ttyUSB0 
+    $ tio -m INLCRNL /dev/ttyUSB0 
 
 */
 
 #include <stm32f4xx.h>
 #include <stm32f4xx_usart.h>
+#include <stdio.h>
+#include <string.h>
 
-void init_usart(void){
+void usart_init(void){
 
  GPIO_InitTypeDef GPIO_InitStructure;
  USART_InitTypeDef USART_InitStructure;
@@ -39,7 +41,7 @@ void init_usart(void){
  // TX = PB10
  GPIO_PinAFConfig(GPIOB, GPIO_PinSource10, GPIO_AF_USART3);
 
- USART_InitStructure.USART_BaudRate = 9600;
+ USART_InitStructure.USART_BaudRate = 115200;
  USART_InitStructure.USART_WordLength = USART_WordLength_8b;
  USART_InitStructure.USART_StopBits = USART_StopBits_1;
  USART_InitStructure.USART_Parity = USART_Parity_No;
@@ -58,12 +60,19 @@ void Delay(__IO uint32_t nCount)
   }
 }
 
+void usart_puts(char s[]) {
+  for (int i=0; i<strlen(s); i++) {
+    USART_SendData(USART3, s[i]);
+    while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET);
+  } 
+}
+
 int main(void){
 
  init_usart();
 
  while(1){
-  USART_SendData(USART3, "Hello World\n"); // defined in stm32f4xx_usart.h
-  Delay(0x3FFFFF);
+   usart_puts("Hello, World\n");
+   Delay(0x3FFFFF);
  }
 }
