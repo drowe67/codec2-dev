@@ -171,23 +171,43 @@ if ('UNITTEST_BASE' in os.environ):
     os.chdir(run_dir)
 
 #### Settings
-# Defaults
-tolerance_ber = 0.001
+# Defaults, (for tests without channel degradation, results should be close to ideal)
+max_ber         = 0.001  # Max BER value in Target
+max_ber2        = 0.001  # Max Coded BER value in Target
+compare_ber     = 1      # Compare Target to Reference?
+# Used if compare_ber:
+tolerance_ber   = 0.001  # Difference from reference for BER
+tolerance_ber2  = 0.001  # Difference from reference for Coded BER
 tolerance_tbits = 0
 tolerance_terrs = 1
+#
+compare_output  = 1        # Compare Target to Reference?
+# Used if compare_output:
 tolerance_output_differences = 0
 tolerance_syms = 0.01
 tolerance_amps = 0.01
+#
 # Per test settings
 if (args.test_opt == "quick"):
     pass
 elif (args.test_opt == "ideal"):
     pass
-elif (args.test_opt == "AWGN"):
+elif (args.test_opt == "AWGN"):     # Still close enough to compare BERs loosely
+    max_ber         = 0.1
+    max_ber2        = 0.01
+    tolerance_ber   = 0.01
+    tolerance_ber2  = 0.005
     tolerance_terrs = 2
     tolerance_output_differences = 2
+    compare_output  = 0
 elif (args.test_opt == "fade"):
+    max_ber         = 0.1
+    max_ber2        = 0.01
+    tolerance_ber   = 0.01
+    tolerance_ber2  = 0.005
+    tolerance_terrs = 2
     tolerance_output_differences = 5
+    compare_output  = 0
     pass
 elif (args.test_opt == "profile"):
     tolerance_output_differences = 1
@@ -195,15 +215,15 @@ elif (args.test_opt == "profile"):
 elif (args.test_opt == "ldpc"):
     pass
 elif (args.test_opt == "ldpc_AWGN"):
-    tolerance_terrs = 3
-    tolerance_output_differences = 45
-    tolerance_syms = 0.025
-    tolerance_amps = 0.032
+    max_ber         = 0.1
+    max_ber2        = 0.01
+    compare_ber     = 0
+    compare_output  = 0
 elif (args.test_opt == "ldpc_fade"):
-    tolerance_terrs = 3
-    tolerance_output_differences = 9
-    tolerance_syms = 0.010
-    tolerance_amps = 0.015
+    max_ber         = 0.1
+    max_ber2        = 0.01
+    compare_ber     = 0
+    compare_output  = 0
     pass
 else:
     print("Error: Test {} not recognized".format(args.test_opt))
@@ -237,9 +257,9 @@ if (config_testframes):
     # Coded BER: 0.0000 Tbits:  7504 Terrs:     0
     #
     # HACK: store "Coded BER" info as BER2.
-    
+
     print("\nBER checks")
-    
+
     # Read ref log
     print("Reference")
     with open("ref_gen_log.txt", "r") as f:
@@ -261,7 +281,7 @@ if (config_testframes):
     ref_ber2 = float(ref_ber2)
     ref_tbits2 = int(ref_tbits2)
     ref_terrs2 = int(ref_terrs2)
-    
+
     # Read stm log
     print("Target")
     with open("stm_stdout.txt", "r") as f:
@@ -282,141 +302,186 @@ if (config_testframes):
     tgt_ber2 = float(tgt_ber2)
     tgt_tbits2 = int(tgt_tbits2)
     tgt_terrs2 = int(tgt_terrs2)
-   
+
     # simple hack to tolerate zero bits > NAN
     if (math.isnan(ref_ber2)): ref_ber2 = 0
     if (math.isnan(tgt_ber2)): tgt_ber2 = 0
 
-    # Compare BER values
-    if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
-        (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
-        (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
-        ( (ref_tbits2 == 0) or
-              (abs(ref_ber2 - tgt_ber2) <= tolerance_ber) and
-      (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
-              (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
-      )
-        ):
-        print("PASS: BER")
-    else:
+    ## Max BER values
+    if ((tgt_ber > max_ber) or (tgt_ber2 > max_ber2)):
         fails += 1
-        print("FAIL: BER")
+        print("FAIL: max BER")
+    else:
+        print("PASS: max BER")
+
+    ## Compare BER values
+    if (compare_ber):
+        if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
+            (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
+            (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
+            ( (ref_tbits2 == 0) or
+                  (abs(ref_ber2 - tgt_ber2) <= tolerance_ber2) and
+          (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
+                  (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
+          )
+            ):
+            print("PASS: BER compare")
+        else:
+            fails += 1
+            print("FAIL: BER compare")
+        # end Compare BER
     # end BER checks
 
 #### Output differences
+if (compare_output):
 
-print("\nOutput checks")
+    print("\nOutput checks")
 
-# Output is a binary file of bytes whose values are 0x00 or 0x01.
-with open("ref_demod_out.raw", "rb") as f: ref_out_bytes = f.read()
-with open("stm_out.raw", "rb") as f:       tgt_out_bytes = f.read()
-if (len(ref_out_bytes) != len(tgt_out_bytes)):
-    fails += 1
-    print("FAIL Output, length mismatch")
-else:
-    output_diffs = 0
-    for i in range(len(ref_out_bytes)):
-        fnum = math.floor(i/Nbitsperframe)
-        bnum = i - (fnum * Nbitsperframe)
-        # Both legal values??
-        if (ref_out_bytes[i] > 1):
-            print("Error: Output frame {} byte {} not 0 or 1 in reference data".format(fnum, bnum))
-            fails += 1
-        if (tgt_out_bytes[i] > 1):
-            print("Error: Output frame {} byte {} not 0 or 1 in target data".format(fnum, bnum))
-            fails += 1
-        # Match??
-        if (ref_out_bytes[i] != tgt_out_bytes[i]):
-            print("Output frame {} byte {} mismatch: ref={} tgt={}".format(
-                fnum, bnum, ref_out_bytes[i], tgt_out_bytes[i]))
-            output_diffs += 1
-        # end for i
-    if (output_diffs > tolerance_output_differences):
-        print("FAIL: Output Differences = {}".format(output_diffs))
+    # Output is a binary file of bytes whose values are 0x00 or 0x01.
+    with open("ref_demod_out.raw", "rb") as f: ref_out_bytes = f.read()
+    with open("stm_out.raw", "rb") as f:       tgt_out_bytes = f.read()
+    if (len(ref_out_bytes) != len(tgt_out_bytes)):
         fails += 1
+        print("FAIL Output, length mismatch")
     else:
-        print("PASS: Output Differences = {}".format(output_diffs))
-    # end not length mismatch
+        output_diffs = 0
+        for i in range(len(ref_out_bytes)):
+            fnum = math.floor(i/Nbitsperframe)
+            bnum = i - (fnum * Nbitsperframe)
+            # Both legal values??
+            if (ref_out_bytes[i] > 1):
+                print("Error: Output frame {} byte {} not 0 or 1 in reference data".format(fnum, bnum))
+                fails += 1
+            if (tgt_out_bytes[i] > 1):
+                print("Error: Output frame {} byte {} not 0 or 1 in target data".format(fnum, bnum))
+                fails += 1
+            # Match??
+            if (ref_out_bytes[i] != tgt_out_bytes[i]):
+                print("Output frame {} byte {} mismatch: ref={} tgt={}".format(
+                    fnum, bnum, ref_out_bytes[i], tgt_out_bytes[i]))
+                output_diffs += 1
+            # end for i
+        if (output_diffs > tolerance_output_differences):
+            print("FAIL: Output Differences = {}".format(output_diffs))
+            fails += 1
+        else:
+            print("PASS: Output Differences = {}".format(output_diffs))
+        # end not length mismatch
 
 
-#### Syms data 
-if (config_log_payload_syms):
-    print("\nSyms and Amps checks")
+    #### Syms data 
+    if (config_log_payload_syms):
+        print("\nSyms and Amps checks")
 
-    fref  = open("ofdm_demod_ref_log.txt", "r")
-    fdiag = open("stm_diag.raw", "rb")
+        fref  = open("ofdm_demod_ref_log.txt", "r")
+        fdiag = open("stm_diag.raw", "rb")
 
-    ref_data = read_octave_text(fref)
-    (tgt_syms, tgt_amps) = read_tgt_syms(fdiag)
-    fdiag.close()
-    write_syms_as_octave(tgt_syms, tgt_amps) # for manual debug...
+        ref_data = read_octave_text(fref)
+        (tgt_syms, tgt_amps) = read_tgt_syms(fdiag)
+        fdiag.close()
+        write_syms_as_octave(tgt_syms, tgt_amps) # for manual debug...
 
-    # Find smallest common subset
-    hgt = min(tgt_syms.shape[0], ref_data["payload_syms_log_c"].shape[0])
-    wid = min(tgt_syms.shape[1], ref_data["payload_syms_log_c"].shape[1])
+        # Find smallest common subset
+        hgt = min(tgt_syms.shape[0], ref_data["payload_syms_log_c"].shape[0])
+        wid = min(tgt_syms.shape[1], ref_data["payload_syms_log_c"].shape[1])
 
-    ref_syms =  ref_data["payload_syms_log_c"][:hgt][:wid]
-    ref_amps =  ref_data["payload_amps_log_c"][:hgt][:wid]
-    tgt_syms=  tgt_syms[:hgt][:wid]
-    tgt_amps=  tgt_amps[:hgt][:wid]
+        ref_syms =  ref_data["payload_syms_log_c"][:hgt][:wid]
+        ref_amps =  ref_data["payload_amps_log_c"][:hgt][:wid]
+        tgt_syms=  tgt_syms[:hgt][:wid]
+        tgt_amps=  tgt_amps[:hgt][:wid]
 
-    # Eliminate trailing rows of all zeros
-    # Sum the rows to find rows of all zeros
-    row_sums = ref_syms.sum(axis=1) + tgt_syms.sum(axis=1)
-    nonzeros = row_sums.nonzero()
-    last_nonzero = nonzeros[0][-1]
-    # stop index is 1 past the last!!
-    # and use the Magnitude of the complex values
-    ref_syms = np.abs(ref_syms[:last_nonzero+1])
-    ref_amps = np.abs(ref_amps[:last_nonzero+1])
-    tgt_syms = np.abs(tgt_syms[:last_nonzero+1])
-    tgt_amps = np.abs(tgt_amps[:last_nonzero+1])
+        # Eliminate trailing rows of all zeros
+        # Sum the rows to find rows of all zeros
+        row_sums = ref_syms.sum(axis=1) + tgt_syms.sum(axis=1)
+        nonzeros = row_sums.nonzero()
+        last_nonzero = nonzeros[0][-1]
+        # stop index is 1 past the last!!
+        # and use the Magnitude of the complex values
+        ref_syms = np.abs(ref_syms[:last_nonzero+1])
+        ref_amps = np.abs(ref_amps[:last_nonzero+1])
+        tgt_syms = np.abs(tgt_syms[:last_nonzero+1])
+        tgt_amps = np.abs(tgt_amps[:last_nonzero+1])
 
-    # Differences - Syms
-    #diffs_syms = np.abs(ref_syms - tgt_syms)    # This is the mag of complex
-    diffs_syms = np.abs(np.divide((ref_syms - tgt_syms), ref_syms, 
-                                  where=(ref_syms!=0)))
-    print("Minimum syms difference = {:.6f}".format(np.amin(diffs_syms)))
-    print("Maximum syms difference = {:.6f}".format(np.amax(diffs_syms)))
-    print("Average syms difference = {:.6f}".format(np.average(diffs_syms)))
-    if (args.verbose):  # Print top 10 differences
-        diffs_syms_sorted_indexes = (diffs_syms).argsort(axis=None)[::-1]
-        print(" Top 10 differences")
-        for i in range(10):
-          j = diffs_syms_sorted_indexes[i]
-          print("  #{} @{}: {} <?> {} = {:.6f}".format(
-            i, j, 
-            ref_syms.flatten()[j], tgt_syms.flatten()[j], diffs_syms.flatten()[j])
-            )
-    # Errors are differences > tolerance_syms
-    errors_syms = diffs_syms - tolerance_syms
-    errors_syms[errors_syms < 0.0] = 0.0
-    num_errors_syms = np.count_nonzero(errors_syms)
-    error_rows_syms = np.amax(errors_syms, axis=1)
-    num_error_rows_syms = np.count_nonzero(error_rows_syms)
-    print("")
-    print("{} symbol errors on {} rows".format(num_errors_syms, num_error_rows_syms))
+        # Differences - Syms
+        #diffs_syms = np.abs(ref_syms - tgt_syms)    # This is the mag of complex
+        diffs_syms = np.abs(np.divide((ref_syms - tgt_syms), ref_syms, 
+                                      where=(ref_syms!=0)))
+        print("Minimum syms difference = {:.6f}".format(np.amin(diffs_syms)))
+        print("Maximum syms difference = {:.6f}".format(np.amax(diffs_syms)))
+        print("Average syms difference = {:.6f}".format(np.average(diffs_syms)))
+        if (args.verbose):  # Print top 10 differences
+            diffs_syms_sorted_indexes = (diffs_syms).argsort(axis=None)[::-1]
+            print(" Top 10 differences")
+            for i in range(10):
+              j = diffs_syms_sorted_indexes[i]
+              print("  #{} @{}: {} <?> {} = {:.6f}".format(
+                i, j, 
+                ref_syms.flatten()[j], tgt_syms.flatten()[j], diffs_syms.flatten()[j])
+                )
+        # Errors are differences > tolerance_syms
+        errors_syms = diffs_syms - tolerance_syms
+        errors_syms[errors_syms < 0.0] = 0.0
+        num_errors_syms = np.count_nonzero(errors_syms)
+        error_rows_syms = np.amax(errors_syms, axis=1)
+        num_error_rows_syms = np.count_nonzero(error_rows_syms)
+        print("")
+        print("{} symbol errors on {} rows".format(num_errors_syms, num_error_rows_syms))
 
-    # Differences - Amps
-    diffs_amps = np.abs(np.divide((ref_amps - tgt_amps), ref_amps, 
-                                  where=(ref_amps!=0)))
-    print("Minimum amps difference = {:.6f}".format(np.amin(diffs_amps)))
-    print("Maximum amps difference = {:.6f}".format(np.amax(diffs_amps)))
-    print("Average amps difference = {:.6f}".format(np.average(diffs_amps)))
-    if (args.verbose):  # Print top 10 differences
-        diffs_amps_sorted_indexes = (diffs_amps).argsort(axis=None)[::-1]
-        print(" Top 10 differences")
-        for i in range(10):
-          j = diffs_amps_sorted_indexes[i]
-          print("  #{} @{}: {} <?> {} = {:.6f}".format(
-            i, j, 
-            ref_amps.flatten()[j], tgt_amps.flatten()[j], diffs_amps.flatten()[j])
-            )
+        # Differences - Amps
+        diffs_amps = np.abs(np.divide((ref_amps - tgt_amps), ref_amps, 
+                                      where=(ref_amps!=0)))
+        print("Minimum amps difference = {:.6f}".format(np.amin(diffs_amps)))
+        print("Maximum amps difference = {:.6f}".format(np.amax(diffs_amps)))
+        print("Average amps difference = {:.6f}".format(np.average(diffs_amps)))
+        if (args.verbose):  # Print top 10 differences
+            diffs_amps_sorted_indexes = (diffs_amps).argsort(axis=None)[::-1]
+            print(" Top 10 differences")
+            for i in range(10):
+              j = diffs_amps_sorted_indexes[i]
+              print("  #{} @{}: {} <?> {} = {:.6f}".format(
+                i, j, 
+                ref_amps.flatten()[j], tgt_amps.flatten()[j], diffs_amps.flatten()[j])
+                )
 
-    # Errors are differences > tolerance_syms
-    errors_amps = diffs_amps - tolerance_amps
-    errors_amps[errors_amps < 0.0] = 0.0
-    num_errors_amps = np.count_nonzero(errors_amps)
+        # Errors are differences > tolerance_syms
+        errors_amps = diffs_amps - tolerance_amps
+        errors_amps[errors_amps < 0.0] = 0.0
+        num_errors_amps = np.count_nonzero(errors_amps)
+        error_rows_amps = np.amax(errors_amps, axis=1)
+        num_error_rows_amps = np.count_nonzero(error_rows_amps)
+        print("")
+        print("{} Amplitude errors on {} rows".format(num_errors_amps, num_error_rows_amps))
+    # End compare_output
+
+
+#### Profile
+if (config_profile): 
+    print("\nProfile:")
+    with open("stm_stdout.txt", "r") as f:
+        sum_profiles.sum_profiles(f, 100)
+
+    print("\nStack:")
+    with open("stm_stdout.txt", "r") as f:
+        for line in f:
+            if (line.startswith("Max stack")): 
+                print(line)
+
+
+#### Print final status message
+if (fails): print("\nTest FAILED!")
+else: print("\nTest PASSED")
+
+sys.exit(fails)
+ne.startswith("Max stack")): 
+                print(line)
+
+
+#### Print final status message
+if (fails): print("\nTest FAILED!")
+else: print("\nTest PASSED")
+
+sys.exit(fails)
+num_errors_amps = np.count_nonzero(errors_amps)
     error_rows_amps = np.amax(errors_amps, axis=1)
     num_error_rows_amps = np.count_nonzero(error_rows_amps)
     print("")
@@ -433,6 +498,15 @@ if (config_profile):
     with open("stm_stdout.txt", "r") as f:
         for line in f:
             if (line.startswith("Max stack")): 
+                print(line)
+
+
+#### Print final status message
+if (fails): print("\nTest FAILED!")
+else: print("\nTest PASSED")
+
+sys.exit(fails)
+ne.startswith("Max stack")): 
                 print(line)
 
 
