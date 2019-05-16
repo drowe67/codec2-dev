@@ -348,11 +348,45 @@ int extract_horus_binary(struct horus *hstates, char hex_out[], int uw_loc) {
     return hstates->crc_ok;
 }
 
-
 int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
+    int i, result;
+
+    assert(hstates != NULL);
+
+    /* Note: allocating this array as an automatic variable caused OSX to
+        "Bus Error 10" (segfault), so lets malloc() it.
+        ( Maximum nin based on horus_get_max_demod_in() is N + 2*Ts ) */
+
+    COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
+    for (i=0; i<hstates->fsk->nin; i++) {
+        demod_in_comp[i].real = demod_in[i];
+        demod_in_comp[i].imag = 0;
+    }
+    result = horus_demod_comp(hstates, ascii_out, demod_in_comp);
+    free(demod_in_comp);
+
+    return result;
+}
+
+int horus_rx_comp(struct horus *hstates, char ascii_out[], short demod_in_iq[]) {
+    int i, result;
+
+    assert(hstates != NULL);
+
+    COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
+    for (i=0; i<hstates->fsk->nin; i++) {
+        demod_in_comp[i].real = demod_in_iq[i * 2];     // cast shorts to floats
+        demod_in_comp[i].imag = demod_in_iq[i * 2 + 1]; //  range not normalised
+    }
+    result = horus_demod_comp(hstates, ascii_out, demod_in_comp);
+    free(demod_in_comp);
+
+    return result;
+}
+
+int horus_demod_comp(struct horus *hstates, char ascii_out[], COMP demod_in_comp[]) {
     int i, j, uw_loc, packet_detected;
     
-    assert(hstates != NULL);
     packet_detected = 0;
 
     int Nbits = hstates->fsk->Nbits;
@@ -368,24 +402,12 @@ int horus_rx(struct horus *hstates, char ascii_out[], short demod_in[]) {
     for(i=0,j=Nbits; j<rx_bits_len; i++,j++) {
         hstates->rx_bits[i] = hstates->rx_bits[j];
     }
-                   
+
     /* demodulate latest bits */
 
-    /* Note: allocating this array as an automatic variable caused OSX to
-       "Bus Error 10" (segfault), so lets malloc() it.  TODO: A real
-       short sample option for fsk_demod() would be useful */
-    
-    COMP *demod_in_comp = (COMP*)malloc(sizeof(COMP)*hstates->fsk->nin);
-    
-    for (i=0; i<hstates->fsk->nin; i++) {
-        demod_in_comp[i].real = demod_in[i];
-        demod_in_comp[i].imag = 0;
-    }
     fsk_demod(hstates->fsk, &hstates->rx_bits[rx_bits_len-Nbits], demod_in_comp);
-    free(demod_in_comp);
-    
+
     /* UW search to see if we can find the start of a packet in the buffer */
-    
     if ((uw_loc = horus_find_uw(hstates, Nbits)) != -1) {
 
         if (hstates->verbose) {

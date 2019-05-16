@@ -338,6 +338,13 @@ if(UNITTEST)
              set_tests_properties(test_horus_binary PROPERTIES
              PASS_REGULAR_EXPRESSION "1C9A9545")
 
+     # same, but with audio as stereo
+     add_test(NAME test_horus_binary_mode_q
+             COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -c 2 -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -q -m binary - -"
+             )
+             set_tests_properties(test_horus_binary_mode_q PROPERTIES
+             PASS_REGULAR_EXPRESSION "1C9A9545")
+
     # tests ldpc_enc/ldpc_noise/ldpc_dec
     add_test(NAME test_ldpc_enc_dec
              COMMAND sh -c "$<TARGET_FILE:ldpc_enc> /dev/zero - --sd --code HRA_112_112 --testframes 200 | $<TARGET_FILE:ldpc_noise> - - 0.5 | $<TARGET_FILE:ldpc_dec> - /dev/null --code HRA_112_112 --sd --testframes"

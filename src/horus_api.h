@@ -33,6 +33,7 @@
 #ifndef __HORUS_API__
 
 #include <stdint.h>
+#include "comp.h"
 #include "modem_stats.h"
       
 #define HORUS_MODE_BINARY            0
@@ -49,8 +50,10 @@ void          horus_close (struct horus *hstates);
 uint32_t      horus_nin   (struct horus *hstates);
 
 /* returns 1 if ascii_out[] is valid */
-      
-int           horus_rx    (struct horus *hstates, char ascii_out[], short demod_in[]);
+
+int           horus_rx         (struct horus *hstates, char ascii_out[], short demod_in[]);
+int           horus_rx_comp    (struct horus *hstates, char ascii_out[], short demod_in_iq[]);
+int           horus_demod_comp (struct horus *hstates, char ascii_out[], COMP demod_in_comp[]);
 
 /* set verbose level */
       

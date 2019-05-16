@@ -52,6 +52,7 @@ int main(int argc, char *argv[]) {
     int      stats_ctr,stats_loop, stats_rate, verbose, crc_results;
     float    loop_time;
     int      enable_stats = 0;
+    int      quadrature = 0;
 
     stats_loop = 0;
     stats_rate = 8;
@@ -68,7 +69,7 @@ int main(int argc, char *argv[]) {
             {0, 0, 0, 0}
         };
         
-        o = getopt_long(argc,argv,"hvcm:t::",long_opts,&opt_idx);
+        o = getopt_long(argc,argv,"hvcqm:t::",long_opts,&opt_idx);
         
         switch(o) {
             case 'm':
@@ -102,6 +103,9 @@ int main(int argc, char *argv[]) {
             case '?':
                 goto helpmsg;
                 break;
+            case 'q':
+                quadrature = 1;
+            break;
         }
     }
     
@@ -115,7 +119,7 @@ int main(int argc, char *argv[]) {
     if( (argc - dx) > 5) {
         fprintf(stderr, "Too many arguments\n");
     helpmsg:
-        fprintf(stderr,"usage: %s -m RTTY|binary [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
+        fprintf(stderr,"usage: %s -m RTTY|binary [-q] [-v] [-c] [-t [r]] InputModemRawFile OutputAsciiFile\n",argv[0]);
         fprintf(stderr,"\n");
         fprintf(stderr,"InputModemRawFile      48 kHz 16 bit shorts real modem signal from radio\n");
         fprintf(stderr," -m RTTY|binary\n"); 
@@ -123,6 +127,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr," -t[r] --stats=[r]     Print out modem statistics to stderr in JSON.\n");
         fprintf(stderr,"                       r, if provided, sets the number of modem frames\n"
                        "                       between statistic printouts\n");
+        fprintf(stderr," -q                    use stereo (IQ) input\n");
         fprintf(stderr," -v                    verbose debug info\n");
         fprintf(stderr," -c                    display CRC results for each packet\n");
         exit(1);
@@ -167,18 +172,26 @@ int main(int argc, char *argv[]) {
     }
     
     int   max_demod_in = horus_get_max_demod_in(hstates);
-    short demod_in[max_demod_in];
+    int   audiosize = sizeof(short) * (quadrature ? 2 : 1);
+    short demod_in[max_demod_in * (quadrature ? 2: 1)];
     int   max_ascii_out = horus_get_max_ascii_out_len(hstates);
     char  ascii_out[max_ascii_out];
     
     /* Main loop ----------------------------------------------------------------------- */
 
-    while(fread(demod_in, sizeof(short), horus_nin(hstates), fin) ==  horus_nin(hstates)) {
+    while(fread(demod_in, audiosize, horus_nin(hstates), fin) ==  horus_nin(hstates)) {
+        int result;
 
         if (verbose) {
             fprintf(stderr, "read nin %d\n", horus_nin(hstates));
         }
-        if (horus_rx(hstates, ascii_out, demod_in)) {
+
+        if (quadrature)
+            result = horus_rx_comp(hstates, ascii_out, demod_in);
+        else
+            result = horus_rx(hstates, ascii_out, demod_in);
+
+        if (result) {
             fprintf(stdout, "%s", ascii_out);
             if (crc_results) {
                 if (horus_crc_ok(hstates)) {
@@ -248,7 +261,7 @@ int main(int argc, char *argv[]) {
         }
         stats_ctr--;
 
-        if (fin == stdin || fout == stdin){
+        if (fin == stdin || fout == stdout){
             fflush(fin);
             fflush(fout);
         }
