@@ -898,6 +898,7 @@ void fsk2_demod(struct FSK *fsk, uint8_t rx_bits[], float rx_sd[], COMP fsk_in[]
     /* Figure out how many samples are needed the next modem cycle */
     /* Unless we're in burst mode */
     if(!fsk->burst_mode){
+        /* Used to define HORUS_BINARY_MAX_NIN, change with caution */
         if(norm_rx_timing > 0.25)
             fsk->nin = N+Ts/2;
         else if(norm_rx_timing < -0.25)
