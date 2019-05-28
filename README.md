@@ -109,8 +109,8 @@ NOTE: Instructions assume you are creating a build_linux directory from within
 
 1. (Re)build Codec 2 with LPCNet support:
    ```
-   $ cd ~/codec2
-   $ cmake .
+   $ cd ~/codec2/build_linux && rm -Rf *
+   $ cmake -DLPCNET_BUILD_DIR=~/LPCNet/build_linux ..
    $ make
    ```
 
