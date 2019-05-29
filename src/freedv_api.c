@@ -2352,7 +2352,6 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
                     /* all data bits in code word used */
                     iter = run_ldpc_decoder(ldpc, out_char, llr, &parityCheckCount);
                 } else {
-                    /* all data bits in code word used */
                     /* some unused data bits, set these to known values to strengthen code */
                     float llr_full_codeword[ldpc->ldpc_coded_bits_per_frame];
                     int unused_data_bits = ldpc->ldpc_data_bits_per_frame - ldpc->data_bits_per_frame;
@@ -2427,10 +2426,14 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
     
-    /* no valid FreeDV signal - squelch output */
-    
+    /* check if OFDM modem has sync */    
     bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
-    if (sync == false) {
+
+    /* if LDPC code has too many errors it may be the end of an over or a very deep fade */
+    bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc->NumberParityBits;
+
+    /* squelch if out of sync or too many LDPC decode errors */
+    if ((sync == false) || (ldpc_decode_ok == false)) {
          if (f->squelch_en == true) {
  	    *valid = 0;
          }
