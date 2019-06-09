@@ -1,5 +1,13 @@
-% vq_700c_plots
+% vq_700c.m
 % David Rowe May 2019
+%
+% Researching Codec 2 700C VQ equaliser ideas
+
+melvq;
+
+% general purpose plot function for looking at averages of K-band
+% sequences in scripts dir and VQs:
+%   vq_700c_plots({"hts2a.f32" "vk5qi.f32" "train_120_1.txt"})
 
 function vq_700c_plots(fn_array)
   nb_features = 41
@@ -23,3 +31,144 @@ function vq_700c_plots(fn_array)
   figure(1); legend(fn_array);
   figure(2); legend(fn_array);
 endfunction
+
+
+% vq a target matrix
+
+function errors = vq_targets(vq, targets)
+  errors = [];
+  for i=1:length(targets)
+    [mse_list index_list] = search_vq(vq, targets(i,:), 1);
+
+    % eq metric 1: average of error for best VQ entry
+    error = targets(i,:) - vq(index_list(1),:);
+    errors = [errors; error];
+  end
+endfunction
+
+
+% given target and vq matrices, estimate eq via two metrics
+
+function [eq1 eq2] = est_eq(vq, targets)
+  [ntargets K] = size(targets);
+  [nvq K] = size(vq);
+  
+  eq1 = zeros(1,K);  eq2 = zeros(1,K);
+  for i=1:length(targets)
+    [mse_list index_list] = search_vq(vq, targets(i,:), 1);
+
+    % eq metric 1: average of error for best VQ entry
+    eq1 += targets(i,:) - vq(index_list(1),:);
+    
+    % eq metric 2: average of error across all VQ entries
+    for j=1:nvq
+      eq2 += targets(i,:) - vq(j,:);
+    end
+  end
+
+  eq1 /= ntargets;
+  eq2 /= (ntargets*nvq);
+endfunction
+
+
+function [targets e] = load_targets(fn_target_f32)
+  nb_features = 41;
+  K = 20;
+
+  % .f32 files are in scripts directory, first K values rate_K_no_mean vectors
+  [dir name ext] = fileparts(fn_target_f32);
+  fn = sprintf("../script/%s_feat.f32", name);
+  feat = load_f32(fn, nb_features);
+  e = feat(:,1);
+  targets = feat(:,2:K+1);
+endfunction
+
+
+function table_across_samples
+  K = 20;
+
+  % VQ is in .txt file in this directory
+  vq = load("train_120_1.txt");
+
+  printf("--------------------------------------------------\n");
+  printf("Sample            Initial  vq      vq_eq1  vq_eq2\n");
+  printf("--------------------------------------------------\n");
+            
+  fn_targets = {"hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
+  %fn_targets = {"hts1a" "hts2a" };
+  for i=1:length(fn_targets)
+
+    % work out equaliser values for high energy frames, averaging over
+    % the entire sample
+
+    [targets e] = load_targets(fn_targets{i});
+    [eq1 eq2] = est_eq(vq, targets);
+
+    % VQ original, then with equaliser candidates
+    errors = vq_targets(vq, targets);
+    errors_eq1 = vq_sample(vq, targets-eq1);
+    errors_eq2 = vq_sample(vq, targets-eq2);
+  
+    printf("%-17s %6.2f  %6.2f  %6.2f  %6.2f\n", fn_targets{i},
+            var(targets(:)), var(errors(:)), var(errors_eq1(:)), var(errors_eq2(:)));
+   end
+endfunction
+
+
+% interactve, menu driven frame by frame plots
+
+function interactive(fn_vq_txt, fn_target_f32)
+  K = 20;
+  vq = load("train_120_1.txt");
+  [targets e] = load_targets(fn_target_f32);
+  hi_energy_frames = find(e>20);
+  [eq1 eq2] = est_eq(vq, targets);
+  [eq1_hi eq2_hi] = est_eq(vq, targets(hi_energy_frames,:));
+  
+  figure(1); clf;
+  mesh(e+targets)
+  figure(2); clf;
+  plot(eq1,'b;eq1;')
+  hold on;
+  plot(eq2,'g;eq2;');
+  plot(eq1_hi,'r;eq1 hi;');
+  plot(eq2_hi,'c;eq2 hi;');
+  hold off;
+  figure(3); clf; plot(e(:,1))
+
+  % enter single step loop
+  f = 20; neq = 0; eq=zeros(1,K);
+  do 
+    figure(4); clf;
+    t = targets(f,:) - eq;
+    [mse_list index_list] = search_vq(vq, t, 1);
+    error = t - vq(index_list(1),:);
+    plot(e(f)+t,'b;target;');
+    hold on;
+    plot(e(f)+vq(index_list,:),'g;vq;');
+    plot(error,'r;error;');
+    plot([1 K],[e(f) e(f)],'--')
+    hold off;
+    axis([1 K -20 80])
+    % interactive menu 
+
+    printf("\r f: %2d eq: %d ind: %3d var: %3.1f menu: n-next  b-back  e-eq q-quit", f, neq, index_list(1), var(error));
+    fflush(stdout);
+    k = kbhit();
+
+    if k == 'n' f+=1; end
+    if k == 'e'
+      neq++;
+      if neq == 3 neq = 0; end
+      if neq == 0 eq = zeros(1,K); end
+      if neq == 1 eq = eq1; end
+      if neq == 2 eq = eq2; end
+    end
+    if k == 'b' f-=1; end
+  until (k == 'q')
+  printf("\n");
+endfunction
+
+%interactive("train_120_1.txt", "ve9qrp_10s.f32")
+table_across_samples;
+%vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
