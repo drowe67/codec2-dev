@@ -100,16 +100,19 @@ endfunction
 function table_across_samples
   K = 20;
 
-  % VQ is in .txt file in this directory
-  vq1 = load("train_120_1.txt");
-  vq2 = load("train_120_2.txt");
-
+  % VQ is in .txt file in this directory, we have two to choose from.  train_120 is the Codec 2 700C VQ,
+  % train_all_speech was trained up from a different, longer database, as a later exercise
+  #vq_name = "train_120";
+  vq_name = "train_all_speech";  
+  vq1 = load(sprintf("%s_1.txt", vq_name));
+  vq2 = load(sprintf("%s_2.txt", vq_name));
+  
   printf("-------------------------------------------------------------------\n");
   printf("Sample            Initial  vqstg1  vqstg1_eq   vqsgt2  vq2stg_eq\n");
   printf("-------------------------------------------------------------------\n");
             
   fn_targets = {"hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01" "cq_freedv_8k"};
-  %fn_targets = {"cq_ref"};
+  %fn_targets = {"hts1a"};
   for i=1:length(fn_targets)
 
     % load target and estimate eq
@@ -124,9 +127,13 @@ function table_across_samples
     [errors2_eq targets_eq_] = vq_targets2(vq1, vq2, targets-eq);
 
     % save to .f32 files for listening tests
-    save_f32(sprintf("../script/%s_vq2.f32", fn_targets{i}), targets_);
-    save_f32(sprintf("../script/%s_vq2_eq.f32", fn_targets{i}), targets_eq_);
-    
+    if strcmp(vq_name,"train_120")
+      save_f32(sprintf("../script/%s_vq2.f32", fn_targets{i}), targets_);
+      save_f32(sprintf("../script/%s_vq2_eq.f32", fn_targets{i}), targets_eq_);
+    else
+      save_f32(sprintf("../script/%s_vq2_as.f32", fn_targets{i}), targets_);
+      save_f32(sprintf("../script/%s_vq2_as_eq.f32", fn_targets{i}), targets_eq_);
+    end 
     printf("%-17s %6.2f  %6.2f  %6.2f     %6.2f  %6.2f\n", fn_targets{i},
             var(targets(:)), var(errors1(:)), var(errors1_eq(:)),
             var(errors2(:)), var(errors2_eq(:)));

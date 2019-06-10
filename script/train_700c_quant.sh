@@ -4,7 +4,8 @@
 #
 # Training a Vector Quantiser (VQ) for Codec 2 700C
 # This is a two stage VQ with 512 entries (9 bits) per stage
-# Also used to support other VQ experiments, see octave/vq_700c_eq.m
+# Also used to support other VQ experiments, such as the effect of the
+# post filter and an experimental equaliser, see octave/vq_700c_eq.m
 
 SRC=~/Downloads/all_speech_8k.sw
 CODEC2_BUILD=/home/david/codec2/build_linux
@@ -15,7 +16,7 @@ SAMPLES=~/tmp/c2vec_pass
 function train() {
   # c2enc can dump "feature vectors" that contain the current VQ input
   $CODEC2_BUILD/src/c2enc 700C $SRC /dev/null --mlfeat feat.f32
-  # extract VQ input as trarining data, then train two stage VQ
+  # extract VQ input as training data, then train two stage VQ
   $CODEC2_BUILD/misc/extract -s 1 -e $K -t 41 feat.f32 stage0_in.f32
   $CODEC2_BUILD/misc/vqtrain stage0_in.f32 $K 512 vq_stage1.f32 -s 1e-3 -r stage1_in.f32
   $CODEC2_BUILD/misc/vqtrain stage1_in.f32 $K 512 vq_stage2.f32 -s 1e-3
@@ -80,17 +81,19 @@ function listen() {
 function listen_vq_eq() {
   FILES="hts1a hts2a vk5qi cq_ref ve9qrp_10s ma01_01 c01_01_8k cq_freedv_8k"
   for f in $FILES
-  do     
+  do
+    # try equaliser wth train_120 VQ
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2.wav'
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq.wav'
+    # try equaliser wth train_all_speech VQ
+    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as.wav'
+    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as_eq.wav'
   done
 }
 
 mkdir -p $SAMPLES
+
 #train
 #listen
 listen_vq_eq
-
-
-
 
