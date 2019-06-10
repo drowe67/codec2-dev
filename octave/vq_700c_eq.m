@@ -33,17 +33,23 @@ function vq_700c_plots(fn_array)
 endfunction
 
 
-% vq a target matrix
+% single stage vq a target matrix
 
 function errors = vq_targets(vq, targets)
   errors = [];
   for i=1:length(targets)
     [mse_list index_list] = search_vq(vq, targets(i,:), 1);
-
-    % eq metric 1: average of error for best VQ entry
     error = targets(i,:) - vq(index_list(1),:);
     errors = [errors; error];
   end
+endfunction
+
+
+% two stage mbest vq a target matrix
+
+function [errors targets_] = vq_targets2(vq1, vq2, targets)
+  vqset(:,:,1)= vq1; vqset(:,:,2)=vq2; m=5;
+  [errors targets_] = mbest(vqset, targets, m);
 endfunction
 
 
@@ -70,6 +76,13 @@ function [eq1 eq2] = est_eq(vq, targets)
   eq2 /= (ntargets*nvq);
 endfunction
 
+function save_f32(fn, m)
+  f=fopen(fn,"wb");
+  [r c] = size(m);
+  mlinear = reshape(m', 1, r*c);
+  fwrite(f, mlinear, 'float32');
+  fclose(f);
+endfunction
 
 function [targets e] = load_targets(fn_target_f32)
   nb_features = 41;
@@ -88,29 +101,35 @@ function table_across_samples
   K = 20;
 
   % VQ is in .txt file in this directory
-  vq = load("train_120_1.txt");
+  vq1 = load("train_120_1.txt");
+  vq2 = load("train_120_2.txt");
 
-  printf("--------------------------------------------------\n");
-  printf("Sample            Initial  vq      vq_eq1  vq_eq2\n");
-  printf("--------------------------------------------------\n");
+  printf("-------------------------------------------------------------------\n");
+  printf("Sample            Initial  vqstg1  vqstg1_eq   vqsgt2  vq2stg_eq\n");
+  printf("-------------------------------------------------------------------\n");
             
-  fn_targets = {"hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
-  %fn_targets = {"hts1a" "hts2a" };
+  fn_targets = {"hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01" "cq_freedv_8k"};
+  %fn_targets = {"cq_ref"};
   for i=1:length(fn_targets)
 
-    % work out equaliser values for high energy frames, averaging over
-    % the entire sample
-
+    % load target and estimate eq
     [targets e] = load_targets(fn_targets{i});
-    [eq1 eq2] = est_eq(vq, targets);
+    eq = est_eq(vq1, targets);
 
-    % VQ original, then with equaliser candidates
-    errors = vq_targets(vq, targets);
-    errors_eq1 = vq_sample(vq, targets-eq1);
-    errors_eq2 = vq_sample(vq, targets-eq2);
-  
-    printf("%-17s %6.2f  %6.2f  %6.2f  %6.2f\n", fn_targets{i},
-            var(targets(:)), var(errors(:)), var(errors_eq1(:)), var(errors_eq2(:)));
+    % first stage VQ
+    errors1 = vq_targets(vq1, targets);
+    errors1_eq = vq_targets(vq1, targets-eq);
+    % two stage mbest VQ
+    [errors2 targets_] = vq_targets2(vq1, vq2, targets);
+    [errors2_eq targets_eq_] = vq_targets2(vq1, vq2, targets-eq);
+
+    % save to .f32 files for listening tests
+    save_f32(sprintf("../script/%s_vq2.f32", fn_targets{i}), targets_);
+    save_f32(sprintf("../script/%s_vq2_eq.f32", fn_targets{i}), targets_eq_);
+    
+    printf("%-17s %6.2f  %6.2f  %6.2f     %6.2f  %6.2f\n", fn_targets{i},
+            var(targets(:)), var(errors1(:)), var(errors1_eq(:)),
+            var(errors2(:)), var(errors2_eq(:)));
    end
 endfunction
 
@@ -169,6 +188,7 @@ function interactive(fn_vq_txt, fn_target_f32)
   printf("\n");
 endfunction
 
+more off
 %interactive("train_120_1.txt", "ve9qrp_10s.f32")
 table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
