@@ -93,6 +93,7 @@ function listen_vq_eq() {
 
 mkdir -p $SAMPLES
 
+# choose which function to run here
 #train
 #listen
 listen_vq_eq

@@ -2,6 +2,7 @@
 % David Rowe May 2019
 %
 % Researching Codec 2 700C VQ equaliser ideas
+% See also scripts/train_700c_quant.sh
 
 melvq;
 
@@ -156,9 +157,9 @@ function interactive(fn_vq_txt, fn_target_f32)
   figure(2); clf;
   plot(eq1,'b;eq1;')
   hold on;
-  plot(eq2,'g;eq2;');
+  %plot(eq2,'g;eq2;');
   plot(eq1_hi,'r;eq1 hi;');
-  plot(eq2_hi,'c;eq2 hi;');
+  %plot(eq2_hi,'c;eq2 hi;');
   hold off;
   figure(3); clf; plot(e(:,1))
 
@@ -196,6 +197,10 @@ function interactive(fn_vq_txt, fn_target_f32)
 endfunction
 
 more off
-%interactive("train_120_1.txt", "ve9qrp_10s.f32")
-table_across_samples;
+
+% choose one of these to run first
+% You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
+
+interactive("train_120_1.txt", "cq_ref.f32")
+%table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
