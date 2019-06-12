@@ -971,11 +971,11 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   #{
     Notes:
       1) uncoded modem operating point, e.g -1dB for AWGN
-      2) run_sim adds complex noise, when we take the real() below, this relects
+      2) run_sim adds complex noise, when we take the real() below, this reflects
          the -ve noise over to the +ve side, increasing the noise by 3dB.  In
-         ofdm_tx.m and friends, we add real nosie that is correctly scaled so
-         no problemo.  This means we need to increase the Eb/No below by 3dB
-         to ensure the correct level of nosie ta the input of the timing_est.         
+         ofdm_tx.m and friends, we add real noise that is correctly scaled so
+         no problem.  This means we need to increase the Eb/No below by 3dB
+         to ensure the correct level of noise at the input of the timing_est.         
   #}
   
   sim_in.EbNodB = EbNodB + 3;
@@ -1004,36 +1004,35 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   % test fine or acquisition over test signal
 
   delta_ct = []; delta_foff = []; timing_mx_log = []; foff_metric_log = [];
-
   
-    % coarse acquiistion test.  We have no idea of timing or freq
-    % offset for coarse we just use constant window shifts to simulate
-    % a bunch of trials, this allows averaging of freq est
-    % metric over time as we receive more and more frames
+  % coarse acquiistion test.  We have no idea of timing or freq
+  % offset for coarse we just use constant window shifts to simulate
+  % a bunch of trials, this allows averaging of freq est
+  % metric over time as we receive more and more frames
 
-    st = 0.5*Nsamperframe; 
-    en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
+  st = 0.5*Nsamperframe; 
+  en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
 
-    % actual known position of correct coarse timing
+  % actual known position of correct coarse timing
 
-    ct_target = mod(sim_in.initial_noise_sams + Nsamperframe/2, Nsamperframe);
+  ct_target = mod(sim_in.initial_noise_sams + Nsamperframe/2, Nsamperframe);
 
-    i = 1;
-    states.foff_metric = 0;
-    for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-      [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
-      [foff_est states] = est_freq_offset(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
-      if states.verbose
-        printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
-      end
-
-      % valid coarse timing ests are modulo Nsamperframe
-
-      delta_ct = [delta_ct ct_est-ct_target];
-      delta_foff = [delta_foff (foff_est-foff_hz)];
-      timing_mx_log = [timing_mx_log; timing_mx];
-      foff_metric_log = [foff_metric_log states.foff_metric];
+  i = 1;
+  states.foff_metric = 0;
+  for w=1:Nsamperframe:length(rx)-4*Nsamperframe
+    [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
+    [foff_est states] = est_freq_offset(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
+    if states.verbose
+      printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
     end
+
+    % valid coarse timing ests are modulo Nsamperframe
+
+    delta_ct = [delta_ct ct_est-ct_target];
+    delta_foff = [delta_foff (foff_est-foff_hz)];
+    timing_mx_log = [timing_mx_log; timing_mx];
+    foff_metric_log = [foff_metric_log states.foff_metric];
+  end
 
   if states.verbose > 1
     %printf("mean: %f std: %f\n", mean(delta_foff), std(delta_foff));
@@ -1234,7 +1233,7 @@ function sync_metrics(x_axis = 'EbNo')
 endfunction
 
 
-% during development it was discovered demod could obtain a flase sync with no UW
+% during development it was discovered demod could obtain a false sync with no UW
 % errors at +/- 7Hz, approx the frame rate.  This function is used to explore that
 
 function debug_false_sync(EbNodB = 100)
@@ -1284,8 +1283,8 @@ end
 % used to debug false syncs
 
 function metric_fbf(fn, Nsec)
-  Ts = 0.018; 
-  states = ofdm_init(bps=2, Rs=1/Ts, Tcp=0.002, Ns=8, Nc=17);
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode("700D");
+  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 2;
 
@@ -1303,7 +1302,7 @@ function metric_fbf(fn, Nsec)
   st = 0.5*Nsamperframe; 
   en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
 
-  i = 1; w_log = timing_mx_log = av_level_log = [];
+  i = 1; w_log = timing_mx_log = av_level_log = []; foff_metric_log = [];
   states.foff_metric = 0;
   for w=1:Nsamperframe:length(rx)-4*Nsamperframe
     printf("%3d %5d", i,w);
@@ -1315,10 +1314,12 @@ function metric_fbf(fn, Nsec)
     end
     #}
     [ct_est timing_valid timing_mx av_level] = est_timing(states, real(rx(w+st:w+en)), states.rate_fs_pilot_samples);
+    %[foff_est states] = est_freq_offset(states, real(rx(w+st:w+en)), states.rate_fs_pilot_samples, ct_est);
     i++;
     w_log = [w_log w];
     timing_mx_log = [timing_mx_log timing_mx];
     av_level_log = [av_level_log av_level];
+    foff_metric_log = [foff_metric_log states.foff_metric];
   end
 
   figure(2); clf;
@@ -1328,6 +1329,7 @@ function metric_fbf(fn, Nsec)
   plot(w_log,timing_mx_log,'b+-;timing mx;');
   plot(w_log,av_level_log,'g+-;av level;');
   hold off;
+  figure(3); clf; plot(foff_metric_log,'+');
 endfunction
 
 
@@ -1347,7 +1349,7 @@ else
   init_cml('~/cml/');
 end
 
-run_single(100);
+%run_single(100);
 %run_curves
 %run_curves_estimators
 %acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)

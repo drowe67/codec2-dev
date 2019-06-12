@@ -116,6 +116,7 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     % averaging metric was found to be really important for reliable acquisition at low SNRs
 
     states.foff_metric = 0.9*states.foff_metric + 0.1*(conj(p1)*p2 + conj(p3)*p4);
+    %states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
     foff_est = Fs1*angle(states.foff_metric)/(2*pi);
 
     if states.verbose > 1
@@ -282,13 +283,14 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % sync state machine
 
-  states.sync_state = states.last_sync_state = 'search';
+  states.sync_state = states.last_sync_state = 'search'; 
   states.uw_errors = 0;
   states.sync_counter = 0;
   states.frame_count = 0;
   states.sync_start = 0;
   states.sync_end = 0;
   states.sync_state_interleaver = 'search';
+  states.last_sync_state_interleaver = 'search';
   states.frame_count_interleaver = 0;
    
   % LDPC code is optionally enabled
