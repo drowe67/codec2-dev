@@ -475,8 +475,9 @@ float est_voicing_mbe(
     Ew.real = 0;
     Ew.imag = 0;
 
+    int l_1000hz = model->L*1000.0/(c2const->Fs/2);
     sig = 1E-4;
-    for(l=1; l<=model->L/4; l++) {
+    for(l=1; l<=l_1000hz; l++) {
 	sig += model->A[l]*model->A[l];
     }
 
@@ -485,7 +486,6 @@ float est_voicing_mbe(
 
     /* Just test across the harmonics in the first 1000 Hz */
 
-    int l_1000hz = model->L*1000.0/(c2const->Fs/2);
     for(l=1; l<=l_1000hz; l++) {
 	Am.real = 0.0;
 	Am.imag = 0.0;

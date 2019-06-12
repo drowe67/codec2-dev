@@ -17,7 +17,7 @@ set(STM32F4LIB      ${PERIPHLIBDIR}/Libraries/STM32F4xx_StdPeriph_Driver)
 set(STM32F4TEMPLATE ${PERIPHLIBDIR}/Project/STM32F4xx_StdPeriph_Templates)
 set(DSPLIB          ${PERIPHLIBDIR}/Libraries/CMSIS/DSP_Lib)
 
-add_definitions(-DUSE_STDPERIPH_DRIVER -DARM_MATH_CM4)
+add_definitions(-DUSE_STDPERIPH_DRIVER -DARM_MATH_CM4 -DHSE_VALUE=\(\(uint32_t\)8000000\))
 include_directories(${STM32F4LIB}/inc ${STM32F4TEMPLATE}
     ${CMSIS}/Include ${CMSIS}/Device/ST/STM32F4xx/Include)
 

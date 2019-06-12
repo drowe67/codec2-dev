@@ -94,7 +94,7 @@ struct lsp_codebook {
     int			k;        /* dimension of vector	*/
     int			log2m;    /* number of bits in m	*/
     int			m;        /* elements in codebook	*/
-    const float	*	cb;	  /* The elements		*/
+    float              *cb;	  /* The elements		*/
 };
 
 extern const struct lsp_codebook lsp_cb[];

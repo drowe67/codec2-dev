@@ -87,6 +87,7 @@ int main(int argc, char *argv[]) {
     float model_octave_[FRAMES][MAX_AMP+2];
     COMP  H[FRAMES][MAX_AMP];
     int indexes[FRAMES][NEWAMP1_N_INDEXES];
+    float se = 0.0;
 
     for(f=0; f<FRAMES; f++) {
         for(m=0; m<MAX_AMP+2; m++) {
@@ -148,14 +149,15 @@ int main(int argc, char *argv[]) {
                                  K,
                                  &mean[f],
                                  &rate_K_surface_no_mean[f][0],
-                                 &rate_K_surface_no_mean_[f][0]);
+                                 &rate_K_surface_no_mean_[f][0],
+                                 &se);
 
         newamp1_indexes_to_rate_K_vec(&rate_K_surface_[f][0],
                                       &rate_K_surface_no_mean_[f][0],
                                       rate_K_sample_freqs_kHz,
                                       K,
                                       &mean_[f],
-                                      &indexes[f][0]);
+                                      &indexes[f][0], NULL, 1);
 
         fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
         if ((f % M) == 0) {
@@ -207,7 +209,8 @@ int main(int argc, char *argv[]) {
                                  K,
                                  phase_fft_fwd_cfg, 
                                  phase_fft_inv_cfg,
-                                 &indexes[f][0]);
+                                 &indexes[f][0],
+                                 NULL, 1);
 
         fprintf(stderr,"f: %d\n", f);
         fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);

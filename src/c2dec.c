@@ -64,7 +64,10 @@ int main(int argc, char *argv[])
     int dump;
 #endif
     int            report_energy;
-
+    FILE          *f_ratek = NULL;
+    float         *user_ratek;
+    int            K;
+    
     char* opt_string = "h:";
     struct option long_options[] = {
         { "ber", required_argument, NULL, 0 },
@@ -78,7 +81,10 @@ int main(int argc, char *argv[])
         { "dump", required_argument, &dump, 1 },
         #endif
 	{ "energy", no_argument, NULL, 0 },
-        { "lspEWov", required_argument, NULL, 0 },
+        { "mlfeat", required_argument, NULL, 0 },
+        { "loadcb", required_argument, NULL, 0 },
+        { "loadratek", required_argument, NULL, 0 },
+        { "nopf", no_argument, NULL, 0 },
         { "help", no_argument, NULL, 'h' },
         { NULL, no_argument, NULL, 0 }
     };
@@ -208,8 +214,23 @@ int main(int argc, char *argv[])
 	    else if (strcmp(long_options[option_index].name, "energy") == 0) {
 	        report_energy = 1;
 	    }
-	    else if (strcmp(long_options[option_index].name, "lspEWov") == 0) {
-	        codec2_open_lspEWov(codec2, optarg);
+	    else if (strcmp(long_options[option_index].name, "mlfeat") == 0) {
+	        codec2_open_mlfeat(codec2, optarg);
+	    }
+	    else if (strcmp(long_options[option_index].name, "loadcb") == 0) {
+                /* load VQ stage (700C only) */
+                //fprintf(stderr, "%s\n", optarg+1);
+                codec2_load_codebook(codec2, atoi(optarg)-1, argv[optind]);
+	    }
+	    else if (strcmp(long_options[option_index].name, "loadratek") == 0) {
+                /* load rate K vectors (by passing quantisation) for 700C VQ tests */
+                fprintf(stderr, "%s\n", optarg);
+                f_ratek = fopen(optarg, "rb");
+                assert(f_ratek != NULL);
+                user_ratek = codec2_enable_user_ratek(codec2, &K);
+	    }
+	    else if (strcmp(long_options[option_index].name, "nopf") == 0) {
+	        codec2_700c_post_filter(codec2, 0);
 	    }
             break;
 
@@ -342,6 +363,9 @@ int main(int argc, char *argv[])
         if (report_energy)
            fprintf(stderr, "Energy: %1.3f\n", codec2_get_energy(codec2, bits));
 
+        if (f_ratek != NULL)
+            ret = fread(user_ratek, sizeof(float), K, f_ratek);
+        
 	codec2_decode_ber(codec2, buf, bits, ber_est);
  	fwrite(buf, sizeof(short), nsam, fout);
 
