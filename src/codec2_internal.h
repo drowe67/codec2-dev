@@ -78,16 +78,20 @@ struct CODEC2 {
     int            voicing_left;
     codec2_fft_cfg phase_fft_fwd_cfg;
     codec2_fft_cfg phase_fft_inv_cfg;      
+    float          se;                       /* running sum of squared error */
+    unsigned int   nse;                      /* number of terms in sum       */
+    float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
+    int            post_filter_en;
     
     /*newamp2 states (also uses newamp1 states )*/
-    float 			energy_prev ;
+    float 	   energy_prev;
     float          n2_rate_K_sample_freqs_kHz[NEWAMP2_K];
     float          n2_prev_rate_K_vec_[NEWAMP2_K];
     float          n2_pwb_rate_K_sample_freqs_kHz[NEWAMP2_16K_K];
     float          n2_pwb_prev_rate_K_vec_[NEWAMP2_16K_K];
 
     /* used to dump features for deep learning experiments */
-    FILE *flspEWov;
+    FILE *fmlfeat;
 
     /* encode/decode function pointers for the selected mode */
     void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);

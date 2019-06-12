@@ -203,7 +203,10 @@ struct CODEC2 * codec2_create(int mode)
     c2->xq_dec[0] = c2->xq_dec[1] = 0.0;
 
     c2->smoothing = 0;
-
+    c2->se = 0.0; c2->nse = 0;
+    c2->user_rate_K_vec_no_mean_ = NULL;
+    c2->post_filter_en = 1;
+    
     c2->bpf_buf = (float*)MALLOC(sizeof(float)*(BPF_N+4*c2->n_samp));
     assert(c2->bpf_buf != NULL);
     for(i=0; i<BPF_N+4*c2->n_samp; i++)
@@ -254,7 +257,7 @@ struct CODEC2 * codec2_create(int mode)
     }
 #endif
 
-    c2->flspEWov = NULL;
+    c2->fmlfeat = NULL;
 
     // make sure that one of the two decode function pointers is empty
     // for the encode function pointer this is not required since we always set it
@@ -758,14 +761,14 @@ void codec2_decode_2400(struct CODEC2 *c2, short speech[], const unsigned char *
 
 	/* dump parameters for deep learning experiments */
 	
-	if (c2->flspEWov != NULL) {
+	if (c2->fmlfeat != NULL) {
 	    /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
-	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->flspEWov);
-	    fwrite(&e[i], 1, sizeof(float), c2->flspEWov);
-	    fwrite(&model[i].Wo, 1, sizeof(float), c2->flspEWov); 
+	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->fmlfeat);
+	    fwrite(&e[i], 1, sizeof(float), c2->fmlfeat);
+	    fwrite(&model[i].Wo, 1, sizeof(float), c2->fmlfeat); 
 	    float voiced_float = model[i].voiced;
-	    fwrite(&voiced_float, 1, sizeof(float), c2->flspEWov);
-	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->flspEWov);
+	    fwrite(&voiced_float, 1, sizeof(float), c2->fmlfeat);
+	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->fmlfeat);
 	}
     }
 
@@ -1308,14 +1311,14 @@ void codec2_decode_1300(struct CODEC2 *c2, short speech[], const unsigned char *
 
 	/* dump parameters for deep learning experiments */
 	
-	if (c2->flspEWov != NULL) {
+	if (c2->fmlfeat != NULL) {
 	    /* 10 LSPs - energy - Wo - voicing flag - 10 LPCs */                
-	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->flspEWov);
-	    fwrite(&e[i], 1, sizeof(float), c2->flspEWov);
-	    fwrite(&model[i].Wo, 1, sizeof(float), c2->flspEWov); 
+	    fwrite(&lsps[i][0], LPC_ORD, sizeof(float), c2->fmlfeat);
+	    fwrite(&e[i], 1, sizeof(float), c2->fmlfeat);
+	    fwrite(&model[i].Wo, 1, sizeof(float), c2->fmlfeat); 
 	    float voiced_float = model[i].voiced;
-	    fwrite(&voiced_float, 1, sizeof(float), c2->flspEWov);
-	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->flspEWov);
+	    fwrite(&voiced_float, 1, sizeof(float), c2->fmlfeat);
+	    fwrite(&ak[i][1], LPC_ORD, sizeof(float), c2->fmlfeat);
 	}
     }
     /*
@@ -1984,8 +1987,18 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              K,
                              &mean,
                              rate_K_vec_no_mean,
-                             rate_K_vec_no_mean_);
+                             rate_K_vec_no_mean_, &c2->se);
+    c2->nse += K;
 
+#ifndef CORTEX_M4
+    /* dump features for deep learning experiments */
+    if (c2->fmlfeat != NULL) {
+        fwrite(&mean, 1, sizeof(float), c2->fmlfeat);
+        fwrite(rate_K_vec_no_mean, K, sizeof(float), c2->fmlfeat);
+        fwrite(rate_K_vec_no_mean_, K, sizeof(float), c2->fmlfeat);
+    }
+#endif
+    
     pack_natural_or_gray(bits, &nbit, indexes[0], 9, 0);
     pack_natural_or_gray(bits, &nbit, indexes[1], 9, 0);
     pack_natural_or_gray(bits, &nbit, indexes[2], 4, 0);
@@ -2036,7 +2049,9 @@ void codec2_decode_700c(struct CODEC2 *c2, short speech[], const unsigned char *
                              NEWAMP1_K,
                              c2->phase_fft_fwd_cfg, 
                              c2->phase_fft_inv_cfg,
-                             indexes);
+                             indexes,
+                             c2->user_rate_K_vec_no_mean_,
+                             c2->post_filter_en);
 
 
    for(i=0; i<M; i++) {
@@ -2661,10 +2676,44 @@ void codec2_set_softdec(struct CODEC2 *c2, float *softdec)
     c2->softdec = softdec;
 }
 
-void codec2_open_lspEWov(struct CODEC2 *codec2_state, char *filename) {
-    if ((codec2_state->flspEWov = fopen(filename, "wb")) == NULL) {
-	fprintf(stderr, "error opening feature file: %s\n", filename);
+void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename) {
+    if ((codec2_state->fmlfeat = fopen(filename, "wb")) == NULL) {
+	fprintf(stderr, "error opening machine learning feature file: %s\n", filename);
 	exit(1);
     }    
 }
 
+void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) {
+    FILE *f;
+    
+    if ((f = fopen(filename, "rb")) == NULL) {
+	fprintf(stderr, "error opening codebook file: %s\n", filename);
+	exit(1);
+    }
+    //fprintf(stderr, "reading newamp1vq_cb[%d] k=%d m=%d\n", num, newamp1vq_cb[num].k, newamp1vq_cb[num].m);
+    float tmp[newamp1vq_cb[num].k*newamp1vq_cb[num].m];
+    int nread = fread(tmp, sizeof(float), newamp1vq_cb[num].k*newamp1vq_cb[num].m, f);
+    float *p = (float*)newamp1vq_cb[num].cb;
+    for(int i=0; i<newamp1vq_cb[num].k*newamp1vq_cb[num].m; i++)
+       p[i] = tmp[i];
+    // fprintf(stderr, "nread = %d %f %f\n", nread, newamp1vq_cb[num].cb[0], newamp1vq_cb[num].cb[1]);
+    assert(nread == newamp1vq_cb[num].k*newamp1vq_cb[num].m);
+    fclose(f);
+}
+
+float codec2_get_var(struct CODEC2 *codec2_state) {
+    if (codec2_state->nse)
+        return codec2_state->se/codec2_state->nse;
+    else
+        return 0;
+}
+
+float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
+    codec2_state->user_rate_K_vec_no_mean_ = (float*)malloc(sizeof(float)*NEWAMP1_K);
+    *K = NEWAMP1_K;
+    return codec2_state->user_rate_K_vec_no_mean_;
+}
+
+void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
+    codec2_state->post_filter_en = en;
+}

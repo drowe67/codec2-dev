@@ -58,7 +58,7 @@ dump_array(const struct codebook * b, int index)
   int	limit = b->k * b->m;
   int	i;
 
-  printf("static const float codes%d[] = {\n", index);
+  printf("static float codes%d[] = {\n", index);
   for ( i = 0; i < limit; i++ ) {
     printf("  %g", b->cb[i]);
     if ( i < limit - 1 )
