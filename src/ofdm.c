@@ -942,8 +942,9 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
      * so it is primed for when we have to call ofdm_demod()
      */
 
-    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
-        (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
+    /* note can't use memcpy when src and dest overlap */
+    memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
+           (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
     memcpy(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)],
         rx, ofdm->nin * sizeof (complex float));
     
@@ -959,8 +960,8 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 
     /* shift the buffer left based on nin */
 
-    memcpy(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
-        (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
+    memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
+            (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
 
     /* insert latest input samples onto tail of rxbuf */
 

@@ -46,8 +46,7 @@
    $ cmake /path/to/codec2-dev/stm32 -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x  ..
    ```
    
-   
-6. Build binairies
+6. Build binaries
 
    Finally:
    ```
@@ -57,7 +56,29 @@
    ```
    $ make VERBOSE=1
    ```
+
+## Loading and Debugging stm32 programs
+
+1. See unitest/README.md for information on how to set up openocd.
+
+2. In one console Start openocd:
+   ```
+   $ openocd -f board/stm32f4discovery.cfg
+
+   ```
+
+3. In another start gdb:
+   ```
+   $ cd ~/codec2/stm32/build_stm32
+   $ arm-none-eabi-gdb usart_ut.elf
+   (gdb) target remote :3333
+   <snip>
+   (gdb) load
+   <snip>
+   (gdb) c
    
+   ```
+
 ## Directories
 
 Directory | Notes 
