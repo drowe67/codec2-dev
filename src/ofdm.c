@@ -738,7 +738,7 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
      * improve estimate.  Small real 1E-12 term to prevent instability
      * with 0 inputs.
      */
-    ofdm->foff_metric = 0.9f * ofdm->foff_metric + 0.1f * (conjf(p1) * p2 + conjf(p3) * p4);
+    ofdm->foff_metric = conjf(p1) * p2 + conjf(p3) * p4;
 
     float foff_est = ofdm_fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
 

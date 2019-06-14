@@ -44,8 +44,6 @@
 
 #include "codec2.h"
 
-#define NDISCARD 5                /* BER measure optionally discards first few frames after sync */
-
 struct my_callback_state {
     FILE *ftxt;
 };
@@ -278,9 +276,8 @@ int main(int argc, char *argv[]) {
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
         clock_offset = stats.clock_offset;
 
-        if (discard && (frame == NDISCARD)) {
-            // discard BER results after the first few frames as these
-            // often dominate average results due to partial sync
+        if (discard && (sync == 0)) {
+            // discard BER results if we get out of sync, helps us get sensible BER results
             freedv_set_total_bits(freedv, 0); freedv_set_total_bit_errors(freedv, 0);
             freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
         }

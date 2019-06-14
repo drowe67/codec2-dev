@@ -113,10 +113,7 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
    
     Fs1 = Fs/(Npsam/2);
 
-    % averaging metric was found to be really important for reliable acquisition at low SNRs
-
-    states.foff_metric = 0.9*states.foff_metric + 0.1*(conj(p1)*p2 + conj(p3)*p4);
-    %states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
+    states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
     foff_est = Fs1*angle(states.foff_metric)/(2*pi);
 
     if states.verbose > 1
@@ -221,7 +218,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
-  printf("number of pilots total: %d\n", length(states.pilots));
+  %printf("number of pilots total: %d\n", length(states.pilots));
   
   % carrier tables for up and down conversion
 
