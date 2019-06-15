@@ -762,14 +762,15 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
     }
 
     // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
-    int st = -20; int en = 20; float foff_est = 0; float Cabs_max = 0;
+    int st = -20; int en = 20; float foff_est = 0.0f; float Cabs_max = 0.0f;
 
     for(int f = st; f < en; f++) {
         complex float C_st = 0.0f;
         complex float C_en = 0.0f;
+	float tmp = TAU * f / ofdm_fs;	/* move calc out of loop */
 
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
-            complex float w = cosf(2.0*M_PI*f*i/ofdm_fs) + I*sinf(2.0*M_PI*f*i/ofdm_fs);
+            complex float w = cmplx(temp * i);
             C_st = C_st + corr_st[i] * conjf(w);
             C_en = C_en + corr_en[i] * conjf(w);
             float Cabs = cabs(C_st) + cabs(C_en);
@@ -780,7 +781,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
         }
     }
 
-    ofdm->foff_metric = 0.0; // not used in this version of freq est algorithm
+    ofdm->foff_metric = 0.0f; // not used in this version of freq est algorithm
 
     if (ofdm->verbose > 2) {
         fprintf(stderr, "  foff_est: %f\n", (double) foff_est);
