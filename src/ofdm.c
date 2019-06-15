@@ -749,6 +749,47 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
     return foff_est;
 }
 
+
+static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est) {
+    complex float corr_st[ofdm_m + ofdm_ncp], corr_en[ofdm_m + ofdm_ncp];
+    int SFrame = ofdm_samplesperframe;
+
+    // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
+    for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
+        complex float csam = conjf(ofdm->pilot_samples[i]);
+        corr_st[i] = rx[timing_est + i         ] * csam;
+        corr_en[i] = rx[timing_est + i + SFrame] * csam;
+    }
+
+    // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
+    int st = -20; int en = 20; float foff_est = 0; float Cabs_max = 0;
+
+    for(int f = st; f < en; f++) {
+        complex float C_st = 0.0f;
+        complex float C_en = 0.0f;
+
+        for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
+            complex float w = cosf(2.0*M_PI*f*i/ofdm_fs) + I*sinf(2.0*M_PI*f*i/ofdm_fs);
+            C_st = C_st + corr_st[i] * conjf(w);
+            C_en = C_en + corr_en[i] * conjf(w);
+            float Cabs = cabs(C_st) + cabs(C_en);
+            if (Cabs > Cabs_max) {
+                Cabs_max = Cabs;
+                foff_est = f;
+            }
+        }
+    }
+
+    ofdm->foff_metric = 0.0; // not used in this version of freq est algorithm
+
+    if (ofdm->verbose > 2) {
+        fprintf(stderr, "  foff_est: %f\n", (double) foff_est);
+    }
+
+    return foff_est;
+}
+
+
 /*
  * ----------------------------------------------
  * ofdm_txframe - modulates one frame of symbols
@@ -983,7 +1024,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     int en = st + 2 * ofdm_samplesperframe;
     int ct_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st));
 
-    ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], ct_est);
+    ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est);
 
     if (ofdm->verbose != 0) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
@@ -1099,7 +1140,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          * ofdm->coarse_foff_est_hz is unused in normal operation,
          * but stored for use in tofdm.c
          */
-        ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], ft_est);
+        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ft_est);
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
