@@ -606,7 +606,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
       achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
     else
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
-      % low SNR performance, but will fall over with high Doppler.
+      % low SNR performance, but will fall over with high Doppler of freq offset.
       cr = c-1:c+1;
       achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
       achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
@@ -618,9 +618,14 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
   end
   
+  if strcmp(phase_est_bandwidth, "high")
+    achannel_est_rect /= 2;
+  else
+    achannel_est_rect /= 12;
+  end
+  
   % pilots are estimated over 12 pilot symbols, so find average
 
-  achannel_est_rect /= 12;
   aphase_est_pilot = angle(achannel_est_rect);
   aamp_est_pilot = abs(achannel_est_rect);
 

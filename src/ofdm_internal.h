@@ -51,6 +51,7 @@ extern "C"
 #define cmplx(value) (COSF(value) + SINF(value) * I)
 #define cmplxconj(value) (COSF(value) + SINF(value) * -I)
 
+/* modem state machine states */
 typedef enum {
     search,
     trial,
@@ -62,6 +63,13 @@ typedef enum {
     autosync,           /* falls out of sync automatically */
     manualsync          /* fall out of sync only under operator control */
 } Sync;
+
+/* phase estimator bandwidth options */
+
+typedef enum {
+    low,                /* can only track a narrow freq offset, but accurate         */
+    high                /* can track wider freq offset, but less accurate at low SNR */
+} PhaseEstBandwidth;
 
 /*
  * Contains user configuration for OFDM modem
@@ -80,7 +88,7 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
-    int high_doppler; /* boolean for high Doppler mode */
+    int phase_est_bandwidth; /* force low of high phase est bandwidth, rather than letting state machine decide */
     int ftwindowwidth;
 };
 
@@ -109,6 +117,9 @@ struct OFDM {
     // Sync enums
     Sync sync_mode;
 
+    // Phase enums
+    PhaseEstBandwidth phase_est_bandwidth;
+    
     // Complex
     complex float foff_metric;
     
