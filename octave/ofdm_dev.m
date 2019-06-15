@@ -976,6 +976,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   sim_in.EbNodB = EbNodB + 3;
   sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
+  if hf_en == 2 sim_in.dopplerSpreadHz = 0.1; endif
   sim_in.foff_hz = foff_hz;
   sim_in.gain = 1;
   sim_in.timing_en = 1;
@@ -1034,7 +1035,8 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
     figure(3); clf; plot(delta_foff,'+-'); title('delta foff'); 
     figure(4); clf; hist(delta_foff); title('delta foff');
     figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
-    figure(6); clf; plot(real(rx))
+    figure(6); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
+    figure(7); clf; plot_specgram(real(rx)); axis([0 round(length(rx)/states.Fs) 500 2500])
   end
   
 endfunction
@@ -1310,8 +1312,8 @@ function acquisition_test_file(filename, Nsec)
   figure(3); clf; plot(foff_est_log,'+-'); title('foff est');
   figure(4); clf; hist(foff_est_log); title('foff est');
   figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
-  figure(6); clf; plot(real(rx))
-  figure(6); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
+  figure(6); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
+  figure(7); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
 
 endfunction
 

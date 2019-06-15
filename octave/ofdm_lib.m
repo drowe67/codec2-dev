@@ -133,17 +133,26 @@ function [foff_est states] = est_freq_offset_pilot_corr(states, rx, rate_fs_pilo
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
-    % extract pilot samples
+    % extract pilot samples from either end of frame
     rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
+
     % "mix" these down (correlate) with 0 Hz offset pilot samples
     corr_st = rx1 .* conj(rate_fs_pilot_samples);
     corr_en = rx2 .* conj(rate_fs_pilot_samples);
-    % this will have a line at 0 Hz if freq offset is 0
-    C = fftshift(abs(fft(corr_st, Fs)) + abs(fft(corr_en, Fs)));
-    zero_bin = Fs/2 + 1;   
-    st = -30; en = 30;
-    [mx ind] = max(C(zero_bin+st:zero_bin+en));
-    foff_est = ind + (st - 1);
+
+    // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
+    st = -20; en = 20; foff_est = 0; Cabs_max = 0;
+
+    for f=st:en
+       w = 2*pi*f/Fs;
+       C_st = corr_st * exp(j*w*(0:Npsam-1))';
+       C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       Cabs = abs(C_st) + abs(C_en);
+       if Cabs > Cabs_max
+         Cabs_max = Cabs;
+         foff_est = f;
+       end
+    end
     
     if states.verbose > 1
       printf("  foff_est: %f\n", foff_est);

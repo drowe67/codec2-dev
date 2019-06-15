@@ -38,10 +38,8 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
 
   Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
-  length(rx)
   if (nargin >= 5) printf("start_secs: %d\n", start_secs); rx = rx(start_secs*Fs+1:end); end
   if (nargin >= 6) printf("len_secs: %d\n", len_secs); rx = rx(1:len_secs*Fs); end
-  length(rx)
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
 
@@ -372,7 +370,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   plot(snr_smoothed_estdB);
   title('Signal and Noise Power estimates');
   ylabel('SNR (dB)')
-  
+
+  figure(7); clf; plot_specgram(rx); axis([0 len_secs 500 2500])
+
   if (nargin == 4) && strlen(error_pattern_filename)
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "uchar");
