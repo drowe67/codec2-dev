@@ -1267,7 +1267,7 @@ end
 % Reads an off air file, and dumps sync metrics.  Similar ouput to
 % acquisition_test() but from real, off air signals
 
-function ofdm_sync_file_test(filename, Nsec)
+function acquisition_test_file(filename, Nsec)
   ofdm_lib;
   more off;
 
@@ -1311,6 +1311,8 @@ function ofdm_sync_file_test(filename, Nsec)
   figure(4); clf; hist(foff_est_log); title('foff est');
   figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
   figure(6); clf; plot(real(rx))
+  figure(6); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
+
 endfunction
 
 
