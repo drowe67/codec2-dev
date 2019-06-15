@@ -140,7 +140,7 @@ function [foff_est states] = est_freq_offset_pilot_corr(states, rx, rate_fs_pilo
     corr_st = rx1 .* conj(rate_fs_pilot_samples);
     corr_en = rx2 .* conj(rate_fs_pilot_samples);
 
-    // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
+    % sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
     st = -20; en = 20; foff_est = 0; Cabs_max = 0;
 
     for f=st:en
