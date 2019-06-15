@@ -1,15 +1,7 @@
 % ofdm_ldpc_rx.m
 % David Rowe April 2017
 %
-% OFDM file based rx, with LDPC and interleaver
-
-#{
-  TODO: 
-    [ ] proper EsNo estimation
-    [ ] some sort of real time GUI display to watch signal evolving
-    [ ] est SNR or Eb/No of recieved signal
-    [ ] way to fall out of sync
-#}
+% OFDM file based rx, with LDPC and interleaver, Octave version of src/ofdm_demod.c
 
 function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename, start_secs, len_secs)
   ofdm_lib;
@@ -23,7 +15,7 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 1;
-
+  
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
 
@@ -324,33 +316,35 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
   printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
 
-  figure(1); clf; 
-  plot(rx_np_log,'+');
-  mx = max(abs(rx_np_log));
-  axis([-mx mx -mx mx]);
-  title('Scatter');
+  if length(rx_np_log)
+      figure(1); clf; 
+      plot(rx_np_log,'+');
+      mx = max(abs(rx_np_log));
+      axis([-mx mx -mx mx]);
+      title('Scatter');
 
-  figure(2); clf;
-  plot(phase_est_pilot_log,'g+', 'markersize', 5); 
-  title('Phase est');
-  axis([1 length(phase_est_pilot_log) -pi pi]);  
+      figure(2); clf;
+      plot(phase_est_pilot_log,'g+', 'markersize', 5); 
+      title('Phase est');
+      axis([1 length(phase_est_pilot_log) -pi pi]);
 
-  figure(3); clf;
-  subplot(211)
-  stem(delta_t_log)
-  title('delta t');
-  subplot(212)
-  plot(timing_est_log);
-  title('timing est');
+      figure(3); clf;
+      subplot(211)
+      stem(delta_t_log)
+      title('delta t');
+      subplot(212)
+      plot(timing_est_log);
+      title('timing est');
 
-  figure(4); clf;
-  plot(foff_est_hz_log)
-  mx = max(abs(foff_est_hz_log));
-  axis([1 max(Nframes,2) -mx mx]);
-  title('Fine Freq');
-  ylabel('Hz')
-
-  if length(Nerrs_log)
+      figure(4); clf;
+      plot(foff_est_hz_log)
+      mx = max(abs(foff_est_hz_log));
+      axis([1 max(Nframes,2) -mx mx]);
+      title('Fine Freq');
+      ylabel('Hz')
+  end
+   
+  if length(Nerrs_log) > 1
     figure(5); clf;
     subplot(211)
     stem(Nerrs_log);
