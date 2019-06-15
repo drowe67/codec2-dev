@@ -700,62 +700,10 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
 }
 
 /*
- * Determines frequency offset at current timing estimate, used for
- * coarse freq offset estimation during acquisition.
- *
- * Freq offset is based on an averaged statistic that was found to be
- * necessary to generate good quality estimates.
- *
- * Keep calling it when in trial or actual sync to keep statistic
- * updated, in case we lose sync.
- */
-
-static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_est) {
-    int j, k;
-
-    /*
-     * Freq offset can be considered as change in phase over two halves
-     * of pilot symbols.  We average this statistic over this and next
-     * frames pilots.
-     */
-    complex float csam1, csam2;
-    complex float p1, p2, p3, p4;
-    p1 = p2 = p3 = p4 = 0.0f;
-
-    /* calculate phase of pilots at half symbol intervals */
-
-    for (j = 0, k = (ofdm_m + ofdm_ncp) / 2; j < (ofdm_m + ofdm_ncp) / 2; j++, k++) {
-        csam1 = conjf(ofdm->pilot_samples[j]);
-        csam2 = conjf(ofdm->pilot_samples[k]);
-
-        /* pilot at start of frame */
-
-        p1 = p1 + (rx[timing_est + j] * csam1);
-        p2 = p2 + (rx[timing_est + k] * csam2);
-
-        /* pilot at end of frame */
-
-        p3 = p3 + (rx[timing_est + j + ofdm_samplesperframe] * csam1);
-        p4 = p4 + (rx[timing_est + k + ofdm_samplesperframe] * csam2);
-    }
-
-    /*
-     * subtract phase of adjacent samples, rate of change of phase is
-     * frequency est.  We combine samples from either end of frame to
-     * improve estimate.  Small real 1E-12 term to prevent instability
-     * with 0 inputs.
-     */
-    ofdm->foff_metric = conjf(p1) * p2 + conjf(p3) * p4;
-
-    float foff_est = ofdm_fs1 * cargf(ofdm->foff_metric + 1E-12f) / TAU;
-
-    if (ofdm->verbose > 2) {
-        fprintf(stderr, "  foff_metric: %f %f foff_est: %f\n", creal(ofdm->foff_metric), cimag(ofdm->foff_metric), (double) foff_est);
-    }
-
-    return foff_est;
-}
-
+  Determines frequency offset at current timing estimate, used for
+  coarse freq offset estimation during acquisition.  Works up to +/-
+  the symbol rate, e.g. +/- 25Hz for the FreeDV 700D configuration.
+*/
 
 static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est) {
     complex float corr_st, corr_en;
@@ -1147,14 +1095,6 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
         int ft_est = est_timing(ofdm, work, (en - st));
         
         ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
-
-        /*
-         * keep the freq est statistic updated in case we lose sync,
-         * note we supply it with uncorrected rxbuf, note
-         * ofdm->coarse_foff_est_hz is unused in normal operation,
-         * but stored for use in tofdm.c
-         */
-        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ft_est);
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);

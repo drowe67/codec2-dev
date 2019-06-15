@@ -129,10 +129,10 @@ endfunction
   coarse freq offset estimation during acquisition.
 
   This is an alternative algorithm to est_freq_offset() above that is less noisey
-  and perfoms better on HF channels using the acquisting tests in ofdm_dev.m
+  and performs better on HF channels using the acquistion tests in ofdm_dev.m
 #}
 
-function [foff_est states] = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
+function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -437,7 +437,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
   [ct_est timing_valid timing_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
-  [foff_est states] = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+  foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
   if verbose
     printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
@@ -505,11 +505,6 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
     [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
-
-    % keep the freq est statistic updated in case we lose sync, note
-    % we supply it with uncorrected rxbuf
-    
-    [coarse_foff_est_hz states] = est_freq_offset_pilot_corr(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
