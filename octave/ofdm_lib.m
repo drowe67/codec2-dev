@@ -83,7 +83,14 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
       figure(4); clf; plot(real(rate_fs_pilot_samples));
     end
 
-
+    figure(10); clf;
+    rx1     = rx(t_est:t_est+Npsam-1);
+    corr_st = rx1 .* conj(rate_fs_pilot_samples);
+    C = fftshift(abs(fft(corr_st, Fs)));
+    st = -50; en = 50;
+    plot(st:en,C(Fs/2+st-1:Fs/2+en-1)); grid;
+    [mx ind] = max(C(Fs/2+st-1:Fs/2+en-1));
+    printf("mx: %3d \n", st-3+ind);
 endfunction
 
 #{
