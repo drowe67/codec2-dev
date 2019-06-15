@@ -770,7 +770,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 	float tmp = TAU * f / ofdm_fs;	/* move calc out of loop */
 
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
-            complex float w = cmplx(temp * i);
+            complex float w = cmplx(tmp * i);
             C_st = C_st + corr_st[i] * conjf(w);
             C_en = C_en + corr_en[i] * conjf(w);
             float Cabs = cabs(C_st) + cabs(C_en);
