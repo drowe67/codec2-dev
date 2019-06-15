@@ -1101,13 +1101,6 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          */
         ofdm->coarse_foff_est_hz = est_freq_offset(ofdm, &ofdm->rxbuf[st], ft_est);
 
-        /* first frame in trial sync will have a better freq offset est - lets use it */
-
-        if (ofdm->frame_count == 0) {
-            ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
-            woff_est = TAU * ofdm->foff_est_hz / ofdm_fs;
-        }
-
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est, ofdm->sample_point);
         }
