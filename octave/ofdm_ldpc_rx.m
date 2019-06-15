@@ -299,9 +299,9 @@ function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 
       for i=1:length(paritychecks)
         if paritychecks(i) iter=i; end
       end
-      printf("f: %3d st: %-6s euw: %2d %1d ist: %-6s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f\n",
+      printf("f: %3d st: %-6s euw: %2d %1d ist: %-6s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
              f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver,
-             Nerrs_raw(r), Nerrs_coded(r), iter, pcc, states.foff_est_hz);
+             Nerrs_raw(r), Nerrs_coded(r), iter, pcc, states.foff_est_hz, states.nin);
       % detect a sucessful sync
       if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
         if (pcc > 80) && (iter != 100)

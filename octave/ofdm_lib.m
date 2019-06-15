@@ -83,25 +83,17 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
       figure(4); clf; plot(real(rate_fs_pilot_samples));
     end
 
-    figure(10); clf;
-    rx1     = rx(t_est:t_est+Npsam-1);
-    corr_st = rx1 .* conj(rate_fs_pilot_samples);
-    C = fftshift(abs(fft(corr_st, Fs)));
-    st = -50; en = 50;
-    plot(st:en,C(Fs/2+st-1:Fs/2+en-1)); grid;
-    [mx ind] = max(C(Fs/2+st-1:Fs/2+en-1));
-    printf("mx: %3d \n", st-3+ind);
 endfunction
+
 
 #{
   Determines frequency offset at current timing estimate, used for
   coarse freq offset estimation during acquisition.
 
-  Freq offset is based on an averaged statistic that was found to be
-  necessary to generate good quality estimates.
-
-  Keep calling it when in trial or actual sync to keep statistic
-  updated, in case we lose sync.
+  This estimator works well for AWGN channels but has problems with
+  fading channels.  With stationary/slow fading channels (say a notch
+  in the spectrum), ot exhibits bias which can delay sync for 10's of
+  seconds.
 #}
 
 function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, t_est)
@@ -128,6 +120,40 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     end
  
 endfunction
+
+
+#{
+  Determines frequency offset at current timing estimate, used for
+  coarse freq offset estimation during acquisition.
+
+  This is an alternative algorithm to est_freq_offset() above.
+#}
+
+function [foff_est states] = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
+    ofdm_load_const;
+    Npsam = length(rate_fs_pilot_samples);
+
+    % extract pilot samples
+    rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
+    % "mix" these down (correlate) with 0 Hz offset pilot samples
+    corr_st = rx1 .* conj(rate_fs_pilot_samples);
+    corr_en = rx2 .* conj(rate_fs_pilot_samples);
+    % this will have a line at 0 Hz if freq offset is 0
+    C = fftshift(abs(fft(corr_st, Fs)) + abs(fft(corr_en, Fs)));
+    zero_bin = Fs/2 + 1;   
+    st = -30; en = 30;
+    [mx ind] = max(C(zero_bin+st:zero_bin+en));
+    foff_est = ind + (st - 1);
+    
+    if states.verbose > 1
+      printf("  foff_est: %f\n", foff_est);
+    end
+    if verbose > 2
+      figure(10); clf;
+      plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
+    end 
+endfunction
+
 
 %
 %  Helper function to set up modems for various FreeDV modes, and parse mode string
@@ -398,7 +424,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
   st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
   [ct_est timing_valid timing_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
-  [foff_est states] = est_freq_offset(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+  [foff_est states] = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
   if verbose
     printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
@@ -470,7 +496,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % keep the freq est statistic updated in case we lose sync, note
     % we supply it with uncorrected rxbuf
     
-    [coarse_foff_est_hz states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
+    [coarse_foff_est_hz states] = est_freq_offset_pilot_corr(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
