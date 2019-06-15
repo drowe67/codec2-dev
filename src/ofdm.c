@@ -751,17 +751,10 @@ static float est_freq_offset(struct OFDM *ofdm, complex float *rx, int timing_es
 
 
 static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est) {
-    complex float corr_st[ofdm_m + ofdm_ncp], corr_en[ofdm_m + ofdm_ncp];
-    int SFrame = ofdm_samplesperframe;
-
-    // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
-    for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
-        complex float csam = conjf(ofdm->pilot_samples[i]);
-        corr_st[i] = rx[timing_est + i         ] * csam;
-        corr_en[i] = rx[timing_est + i + SFrame] * csam;
-    }
+    complex float corr_st, corr_en;
 
     // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
+
     int st = -20; int en = 20; float foff_est = 0.0f; float Cabs_max = 0.0f;
 
     for(int f = st; f < en; f++) {
@@ -770,10 +763,19 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 	float tmp = TAU * f / ofdm_fs;	/* move calc out of loop */
 
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
-            complex float w = cmplx(tmp * i);
-            C_st = C_st + corr_st[i] * conjf(w);
-            C_en = C_en + corr_en[i] * conjf(w);
+            complex float w = cmplxconj(tmp * i);
+            complex float csam = conjf(ofdm->pilot_samples[i]);
+
+            // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
+
+            corr_st = rx[timing_est + i                       ] * csam * w;
+            corr_en = rx[timing_est + i + ofdm_samplesperframe] * csam * w;
+
+            C_st += corr_st;
+            C_en += corr_en;
+
             float Cabs = cabs(C_st) + cabs(C_en);
+
             if (Cabs > Cabs_max) {
                 Cabs_max = Cabs;
                 foff_est = f;
