@@ -172,6 +172,8 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   hold off;
   title('Signal and Noise Power estimates');
 
+  figure(7); clf; plot_specgram(rx); axis([0 floor(Nsam/Fs) 500 2500])
+  
   if nargin == 3
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "short");

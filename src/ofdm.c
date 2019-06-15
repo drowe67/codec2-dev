@@ -383,7 +383,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
 
-    ofdm->foff_est_gain = 0.05f;
+    ofdm->foff_est_gain = 0.1f;
     ofdm->foff_est_hz = 0.0f;
     ofdm->sample_point = 0;
     ofdm->timing_est = 0;

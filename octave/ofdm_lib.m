@@ -47,7 +47,9 @@ endfunction
   samples to determine the most likely timing offset.  Combines two
   frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
 
-  Can be used for acquisition (coarse timing), and fine timing.
+  Can be used for acquisition (coarse timing), and fine timing.  Tends
+  to break down when freq offset approaches +/- symbol rate (e.g +/-
+  25 Hz for 700D).
 #}
 
 function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples)
@@ -126,7 +128,8 @@ endfunction
   Determines frequency offset at current timing estimate, used for
   coarse freq offset estimation during acquisition.
 
-  This is an alternative algorithm to est_freq_offset() above.
+  This is an alternative algorithm to est_freq_offset() above that is less noisey
+  and perfoms better on HF channels using the acquisting tests in ofdm_dev.m
 #}
 
 function [foff_est states] = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
@@ -293,8 +296,9 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.timing_en = 1;
   states.foff_est_en = 1;
   states.phase_est_en = 1;
+  states.phase_est_bandwidth = "high";
 
-  states.foff_est_gain = 0.05;
+  states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -587,15 +591,16 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % ---
     % PPP  <-- frame+2
     
-    if isfield(states, "high_doppler")
-      high_doppler = states.high_doppler;
+    if isfield(states, "phase_est_bandwidth")
+      phase_est_bandwidth = states.phase_est_bandwidth;
     else
-      high_doppler = 0;
+      phase_est_bandwidth = "low";
     end
     
-    if (high_doppler)
+    if strcmp(phase_est_bandwidth, "high")
       % Only use pilots at start and end of this frame to track quickly changes in phase
-      % present in high Doppler channels.  As less pilots are averaged, low SNR performance
+      % present.  Useful for initial sync where freq offset est may be a bit off, and
+      % for high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
       achannel_est_rect(c) =  sum(rx_sym(2,c)*pilots(c)');      % frame    
       achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
@@ -940,9 +945,12 @@ function states = sync_state_machine(states, rx_uw)
       if states.sync_counter == 2
         next_state = "search";
         states.sync_state_interleaver = "search";
+        states.phase_est_bandwidth = "high";
       end
       if states.frame_count == 4
         next_state = "synced";
+        % change to low bandwidth, but more accurate phase estimation
+        states.phase_est_bandwidth = "low";
       end
     end
 
@@ -956,6 +964,7 @@ function states = sync_state_machine(states, rx_uw)
       if states.sync_counter == 12
         next_state = "search";
         states.sync_state_interleaver = "search";
+        states.phase_est_bandwidth = "high";
       end
     end
   end    
