@@ -32,6 +32,7 @@
 #include "stm32f4_adc.h"
 #include "stm32f4_dac.h"
 #include "stm32f4_vrom.h"
+#include "stm32f4_usart.h"
 #include "freedv_api.h"
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
@@ -270,6 +271,9 @@ int main(void) {
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
+    usart_init();
+    usart_puts("SM1000 main()...\n");
+    
     /* Menu data */
     struct menu_t   menu;
 
