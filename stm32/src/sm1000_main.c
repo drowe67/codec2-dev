@@ -266,13 +266,39 @@ int load_prefs()
     return 0;
 }
 
+/* startup_stm32f4xx.s has been modified to fill all memory from bss up with 0x2001ef30 */
+void find_unused_memory(void) {
+    int32_t *p, *start;
+    int found = 0;
+    
+    /* count down from top of memory through stack, empty memory, then to heap */
+    for (p =(int32_t*)0x20000000; p<(int32_t*)0x20020000; p++) {
+        //usart_printf("0x%08x 0x%08x found: %d test: %d stack_end 0x%x\n", p, *p, found,  (*p == 0x2001ef30), stack_end);
+        if (found == 0) {
+            if (*p == 0x2001ef30) {
+                start = p;
+                found = 1;
+            }
+        }
+    
+        if (found == 1) {
+            if (*p != 0x2001ef30) {
+                found = 0;
+                int bytes = (void*)p - (void*)start;
+                usart_printf("start: 0x%x  end: 0x%x  bytes: %d\n", (int) start, (int)p, bytes);
+            }
+        }
+    }
+
+}
+
 int main(void) {
     struct freedv *f;
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
     usart_init();
-    usart_puts("SM1000 main()...\n");
+    usart_printf("SM1000 main()... stack 0x%x\n", &n_samples_16k);
     
     /* Menu data */
     struct menu_t   menu;
@@ -305,6 +331,10 @@ int main(void) {
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
+    int diff = (void*)&dac8k - (void*)f;
+    usart_printf("drivers and FreeDV 1600 initialised...stack: 0x%x f: 0x%x diff: %d\n", (int)&dac8k, (int)f, diff);
+    find_unused_memory();
+    
     /* put outputs into a known state */
 
     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
@@ -343,6 +373,8 @@ int main(void) {
     tone_reset(&tone_gen, 0, 0);
     tot_reset(&tot);
 
+    usart_printf("loading preferences from flash....\n");
+
     /* Try to load preferences from flash */
     if (load_prefs() < 0) {
         /* Fail!  Load defaults. */
@@ -375,6 +407,8 @@ int main(void) {
     /* play a start-up tune. */
     sfx_play(&sfx_player, sound_startup);
 
+    usart_printf("entering main loop...\n");
+    
     while(1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
