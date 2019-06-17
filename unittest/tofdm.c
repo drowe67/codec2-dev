@@ -209,10 +209,6 @@ int main(int argc, char *argv[])
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param();
 
-    /////////////// needs option added above
-    ofdm_set_phase_est_bandwidth_mode(ofdm, HIGH_PHASE_EST);
-    ///////////////
-    
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;

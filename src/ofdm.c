@@ -188,7 +188,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ntxtbits = 4;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
-        ofdm_phase_est_bandwidth = LOW_PHASE_EST;
+        ofdm_phase_est_bandwidth = HIGH_PHASE_EST;
      } else {
         /* Use the users values */
 
@@ -209,7 +209,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ntxtbits = config->txtbits;
        
         if ((config->phase_est_bandwidth != LOW_PHASE_EST) && (config->phase_est_bandwidth != HIGH_PHASE_EST)) {
-            ofdm_phase_est_bandwidth = LOW_PHASE_EST;   /* pick low */
+            ofdm_phase_est_bandwidth = HIGH_PHASE_EST;   /* pick high */
         } else {
             ofdm_phase_est_bandwidth = config->phase_est_bandwidth;   /* low or high */
         }
