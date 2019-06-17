@@ -382,7 +382,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
 
-    if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST)
+    if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST) {
         ofdm->phase_est_bandwidth = auto_bw;
     } else if (ofdm_phase_est_bandwidth == LOW_PHASE_EST) {
         ofdm->phase_est_bandwidth = low_bw;
