@@ -165,6 +165,8 @@ void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
 void ofdm_generate_payload_data_bits(uint8_t [], int);
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 
 #ifdef __cplusplus
 }
