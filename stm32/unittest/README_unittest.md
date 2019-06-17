@@ -8,7 +8,6 @@ a STM32F4 Discovery board.
 
 ## Quickstart
 
-Required:
 * You must have numpy for Python3 installed
 * You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
@@ -79,6 +78,65 @@ All other tests MUST pass.
 If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
 Test will run slower, roughly 3 times.
 
+=======
+``
+
+You should see tests executing (and mostly passing). 
+
+## Expected Fails
+
+Please note that tests tst_ofdm_demod_AWGN, tst_ofdm_demod_fade,
+tst_ofdm_demod_ldpc_AWGN, tst_ofdm_demod_ldpc_fade fail on certain OS
+such as Ubuntu 18.04.
+
+All other tests MUST pass.
+
+## Running the stm32 Unit Tests
+
+1. Tests can be run using the ctest utility (part of cmake)
+   ```
+   $ cd ~/codec2/stm32/build_stm32
+   $ ctest 
+   ```  
+   You can pass -V to see more output:
+   ```
+   $ ctest -V
+   ```` 
+   You can pass -R <pattern> to run test matching <pattern>. Please note,
+   that some test have dependencies and will have to run other tests before
+   being executed
+   ```
+   $ ctest -R ofdm
+   ```
+   
+1. To run a single test (example): 
+   ```
+   $ cd ~/codec2/stm32/unittest
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick --load --openocd
+   ```
+   In general:
+   ```
+   $ ./scripts/run_stm32_test <name_of_test> <test_option> --load --openocd
+   ```
+   (Note when running a single test you can choose not to reload the flash every
+   time if using the same bits.  The *_all_* scripts manage this themselves.)
+
+1. To run a test set (example):
+   ```
+   $ cd ~/codec2/stm32/unittest
+   $ ./scripts/run_all_ldpc_tests 
+   ```
+   In general: (codec2, ofdm, ldpc):
+   ```
+   $ ./scripts/run_all_<set_name>_tests
+   ```
+   
+### Running the tests remotely
+
+If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
+Test will run slower, roughly 3 times.
+
+>>>>>>> re-org of README to (i) emphasise openocd (ii) have complete command lines for each step as examples to get started
 1. You have to build OpenOCD on the remote machine with the STM32 board. It must be built from 
    (https://github.com/db4ple/openocd.git). 
 2. You don't need OpenOCD installed on your build pc.
@@ -121,7 +179,7 @@ OpenOCD. Running tests with the stm32 hardware connected to a remote
 machine via ssh is possible. This works only with a patched (fixed)
 OpenOCD, see below.
 
-## OpenOCD
+### OpenOCD
 
 We recommend OpenOCD instead of stlink. 
 
@@ -178,7 +236,7 @@ source from (https://github.com/db4ple/openocd.git) instead of the official repo
    Info : Listening on port 3333 for gdb connections
 ```
 
-## st-util (deprecated)
+### st-util (deprecated)
 
 Most distributions don't have stutil included. Easiest way is to build it from
 the github sources.
@@ -217,9 +275,11 @@ in the output of st-util.  They can be ignored.
   2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
   2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.G
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
+>>>>>>> re-org of README to (i) emphasise openocd (ii) have complete command lines for each step as examples to get started
 ```
+  $ st-util
 
-## Install numpy for Python3
+### Install numpy for Python3
 Some test are in fact python3 scripts and require the numpy package to be installed,
 otherwise some tests will fail.
 
@@ -227,9 +287,5 @@ On Ubuntu:
    ```Bash
    sudo apt-get install python3-numpy 
    ```
- 
-
-
-
 
 # vi:set ts=3 et sts=3:
