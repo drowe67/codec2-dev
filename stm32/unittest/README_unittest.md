@@ -8,6 +8,7 @@ a STM32F4 Discovery board.
 
 ## Quickstart
 
+Required:
 * You must have numpy for Python3 installed
 * You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
@@ -21,7 +22,7 @@ $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
 $ cmake -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
 $ ctest -V
-``
+```
 
 You should see tests executing (and mostly passing). 
 
@@ -66,11 +67,11 @@ All other tests MUST pass.
 1. To run a test set (example):
    ```
    $ cd ~/codec2/stm32/unittest
-   $ ./scripts/run_all_ldpc_tests 
+   $ ./scripts/run_all_ldpc_tests --openocd
    ```
    In general: (codec2, ofdm, ldpc):
    ```
-   $ ./scripts/run_all_<set_name>_tests
+   $ ./scripts/run_all_<set_name>_tests --openocd
    ```
    
 ### Running the tests remotely
@@ -120,7 +121,7 @@ OpenOCD. Running tests with the stm32 hardware connected to a remote
 machine via ssh is possible. This works only with a patched (fixed)
 OpenOCD, see below.
 
-### OpenOCD
+## OpenOCD
 
 We recommend OpenOCD instead of stlink. 
 
@@ -177,7 +178,7 @@ source from (https://github.com/db4ple/openocd.git) instead of the official repo
    Info : Listening on port 3333 for gdb connections
 ```
 
-### st-util (deprecated)
+## st-util (deprecated)
 
 Most distributions don't have stutil included. Easiest way is to build it from
 the github sources.
@@ -218,7 +219,7 @@ in the output of st-util.  They can be ignored.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 ```
 
-### Install numpy for Python3
+## Install numpy for Python3
 Some test are in fact python3 scripts and require the numpy package to be installed,
 otherwise some tests will fail.
 
