@@ -14,6 +14,6 @@ source $SCRIPTS/run_tests_common.sh
 
 #######################################
 # Add directories to PATH(s)
-export PATH=${PATH}:${SCRIPTS}
-export PATH=${PATH}:${CODEC2_BIN}:${CODEC2_UTST}:${CODEC2_UTST_BIN}:${CODEC2_SCRIPT}
+export PATH=${SCRIPTS}:${PATH}
+export PATH=${CODEC2_BIN}:${CODEC2_UTST}:${CODEC2_UTST_BIN}:${CODEC2_SCRIPT}:${PATH}
 export LD_LIBRARY_PATH=${CODEC2_BIN}:${LD_LIBRARY_PATH}
