@@ -121,7 +121,7 @@ OpenOCD. Running tests with the stm32 hardware connected to a remote
 machine via ssh is possible. This works only with a patched (fixed)
 OpenOCD, see below.
 
-### OpenOCD
+## OpenOCD
 
 We recommend OpenOCD instead of stlink. 
 
@@ -178,7 +178,7 @@ source from (https://github.com/db4ple/openocd.git) instead of the official repo
    Info : Listening on port 3333 for gdb connections
 ```
 
-### st-util (deprecated)
+## st-util (deprecated)
 
 Most distributions don't have stutil included. Easiest way is to build it from
 the github sources.
@@ -219,7 +219,7 @@ in the output of st-util.  They can be ignored.
   2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
 ```
 
-### Install numpy for Python3
+## Install numpy for Python3
 Some test are in fact python3 scripts and require the numpy package to be installed,
 otherwise some tests will fail.
 
