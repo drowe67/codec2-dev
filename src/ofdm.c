@@ -825,11 +825,9 @@ struct OFDM_CONFIG *ofdm_get_config_param() {
     return &ofdm_config;
 }
 
-/*
 int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
-    return phase_est_bandwidth_mode;
+    return ofdm->phase_est_bandwidth;
 }
-*/
 
 int ofdm_get_nin(struct OFDM *ofdm) {
     return ofdm->nin;
@@ -847,15 +845,13 @@ int ofdm_get_bits_per_frame() {
     return ofdm_bitsperframe;
 }
 
-#ifdef __HELP_PLS__
 void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
     /* No change on bad data */
-    if ((val != 0) && (val != 1))
+    if ((val != LOW_PHASE_EST) && (val != HIGH_PHASE_EST))
         return;
 
     ofdm->phase_est_bandwidth_mode = val;
 }
-#endif
 
 void ofdm_set_verbose(struct OFDM *ofdm, int level) {
     ofdm->verbose = level;

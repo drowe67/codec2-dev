@@ -67,8 +67,9 @@ typedef enum {
 /* phase estimator bandwidth options */
 
 typedef enum {
-    low,                /* can only track a narrow freq offset, but accurate         */
-    high                /* can track wider freq offset, but less accurate at low SNR */
+    auto_bw,            /* future mode */
+    low_bw,             /* can only track a narrow freq offset, but accurate         */
+    high_bw             /* can track wider freq offset, but less accurate at low SNR */
 } PhaseEstBandwidth;
 
 /*
