@@ -8,6 +8,7 @@ a STM32F4 Discovery board.
 
 ## Quickstart
 
+Required:
 * You must have numpy for Python3 installed
 * You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
@@ -21,7 +22,7 @@ $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
 $ cmake -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
 $ ctest -V
-``
+```
 
 You should see tests executing (and mostly passing). 
 
