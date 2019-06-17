@@ -66,11 +66,11 @@ All other tests MUST pass.
 1. To run a test set (example):
    ```
    $ cd ~/codec2/stm32/unittest
-   $ ./scripts/run_all_ldpc_tests 
+   $ ./scripts/run_all_ldpc_tests --openocd
    ```
    In general: (codec2, ofdm, ldpc):
    ```
-   $ ./scripts/run_all_<set_name>_tests
+   $ ./scripts/run_all_<set_name>_tests --openocd
    ```
    
 ### Running the tests remotely
