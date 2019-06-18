@@ -28,6 +28,8 @@ else
   UT_SH_FIO="enable"
 fi
 
+rm gdb_cmds
+
 if [ ${ARGS[--openocd]+_} ] ; then
    if [ -n "$UT_SSH" ]; then
         cat <<-EEOOFF >> gdb_cmds
@@ -78,6 +80,8 @@ if [ -z ${ARGS[--debug]+_} ] ; then
         $SHUTDOWN 
 	quit
 	EEOOFF
+    arm-none-eabi-gdb -batch -x gdb_cmds ${ELF}
+    else 
+    arm-none-eabi-gdb -x gdb_cmds ${ELF}
     fi
 
-arm-none-eabi-gdb -batch -x gdb_cmds ${ELF}

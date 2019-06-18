@@ -202,11 +202,11 @@ int main(int argc, char *argv[]) {
     unsigned char inbuf[inbuf_size];
 */
 
-    freedv_set_snr_squelch_thresh(freedv, -100.0);
-    freedv_set_squelch_en(freedv, 1);
-    freedv_set_clip(freedv, use_clip);
-    freedv_set_tx_bpf(freedv, use_txbpf);
-    freedv_set_ext_vco(freedv, use_ext_vco);
+//    freedv_set_snr_squelch_thresh(freedv, -100.0);
+//    freedv_set_squelch_en(freedv, 1);
+//    freedv_set_clip(freedv, use_clip);
+//    freedv_set_tx_bpf(freedv, use_txbpf);
+//    freedv_set_ext_vco(freedv, use_ext_vco);
 
     // set up callback for txt msg chars 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
