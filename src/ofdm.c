@@ -261,7 +261,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->pilot_samples = MALLOC(sizeof (complex float) * (ofdm_m + ofdm_ncp));
     assert(ofdm->pilot_samples != NULL);
 
-    printf("sizeof (complex float) * ofdm_rxbuf: %d\n", sizeof (complex float) * ofdm_rxbuf);
     ofdm->rxbuf = MALLOC(sizeof (complex float) * ofdm_rxbuf);
     assert(ofdm->rxbuf != NULL);
 
@@ -456,13 +455,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->tx_bpf_en = false;
 
-    printf("ofdm_create OK ofdm->ofdm_tx_bpf: 0x%x\n", (uint32_t)ofdm->ofdm_tx_bpf);
-
     return ofdm; /* Success */
 }
 
 void allocate_tx_bpf(struct OFDM *ofdm) {
-    printf("allocate_tx_bpf\n");
     ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
     assert(ofdm->ofdm_tx_bpf != NULL);
     
@@ -473,11 +469,8 @@ void allocate_tx_bpf(struct OFDM *ofdm) {
 }
 
 void deallocate_tx_bpf(struct OFDM *ofdm) {
-    printf("deallocate_tx_bpf\n");
     assert(ofdm->ofdm_tx_bpf != NULL);
-    printf("2\n");
     quisk_filt_destroy(ofdm->ofdm_tx_bpf);
-    printf("3\n");
     FREE(ofdm->ofdm_tx_bpf);
     ofdm->ofdm_tx_bpf = NULL;
 }
@@ -818,7 +811,6 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 }
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
-  printf("ofdm_set_tx_bpf: ofdm->ofdm_tx_bpf: 0x%x val: %d\n", (uint32_t)ofdm->ofdm_tx_bpf, val);
     if (val == true) {
     	allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;

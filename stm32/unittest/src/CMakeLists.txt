@@ -1,6 +1,7 @@
 set(STM32F4_SYSTEM_SRCS
 ../../src/system_stm32f4xx.c
 ../../src/stm32f4_machdep.c
+../../src/find_unused_mem.c
 startup_stm32f4xx.s
 )
 
