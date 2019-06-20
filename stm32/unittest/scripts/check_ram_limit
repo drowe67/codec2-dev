@@ -9,14 +9,17 @@
 #
 # usage:
 #   cd ~/codec2/stm32/build_stm32
-#  ./check_ram_limit
+#  ./check_ram_limit [threshold]
 
-ram_used=mktmp
-find . -name '*.map' | xargs grep bss_end | sed 's/^.*\(0x[a-f0-9]*\).*/\1/' > $ram_used
-thresh=0x20008000
-while read line; do
-    echo $line
-    [[ $line -gt $thresh ]] && exit 1
-    #if [ $line -gt 0x1000 ]; then exit 1; fi
-done < $ram_used
+echo  "Checking end of used RAM in all stm32 programs......."
+thresh=0x20006000
+[[ $# -gt 0 ]] && thresh=$1
+map_files=`find . -name '*.map'`
+for f in $map_files
+do
+    ram_used=`cat $f | grep bss_end | sed 's/^.*\(0x[a-f0-9]*\).*/\1/'`
+    printf "%-40s 0x%x\n" $f $ram_used
+    [[ $ram_used -gt $thresh ]] && echo "FAIL" && exit 1
+done
+echo "PASS"
 exit 0
