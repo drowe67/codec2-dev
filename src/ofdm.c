@@ -255,28 +255,18 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
 
     /* Were ready to start filling in the OFDM structure now */
-
-    if ((ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM))) == NULL) {
-        return NULL;
-    }
+    ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
+    assert(ofdm != NULL);
 
     ofdm->pilot_samples = MALLOC(sizeof (complex float) * (ofdm_m + ofdm_ncp));
+    assert(ofdm->pilot_samples != NULL);
 
-    if (ofdm->pilot_samples == NULL) {
-        goto error_pilot_samples;
-    }
-
+    printf("sizeof (complex float) * ofdm_rxbuf: %d\n", sizeof (complex float) * ofdm_rxbuf);
     ofdm->rxbuf = MALLOC(sizeof (complex float) * ofdm_rxbuf);
-    
-    if (ofdm->rxbuf == NULL) {
-        goto error_rxbuf;
-    }
+    assert(ofdm->rxbuf != NULL);
 
     ofdm->pilots = MALLOC(sizeof (complex float) * (ofdm_nc + 2));
-    
-    if (ofdm->pilots == NULL) {
-        goto error_pilots;
-    }
+    assert(ofdm->pilots !=  NULL);
 
     /*
      * rx_sym is a 2D array of variable size
@@ -284,10 +274,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * allocate rx_sym row storage. It is a pointer to a pointer
      */
     ofdm->rx_sym = MALLOC(sizeof (complex float) * (ofdm_ns + 3));
-    
-    if (ofdm->rx_sym == NULL) {
-        goto error_rx_sym;
-    }
+    assert(ofdm->rx_sym != NULL);
 
     /* allocate rx_sym column storage */ 
 
@@ -295,40 +282,23 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     
     for (i = 0; i < (ofdm_ns + 3); i++) {
         ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * (ofdm_nc + 2));
-
-	if (ofdm->rx_sym[i] == NULL) {
-    	    free_last_rx_sym = i;
-	    goto error_rx_sym2;
-        }
-
+	assert(ofdm->rx_sym[i] != NULL);
     	free_last_rx_sym = (ofdm_ns + 3);
     }
 
     /* The rest of these are 1D arrays of variable size */
 
     ofdm->rx_np = MALLOC(sizeof (complex float) * (ofdm_rowsperframe * ofdm_nc));
-    
-    if (ofdm->rx_np == NULL) {
-        goto error_rx_np;
-    }
+    assert(ofdm->rx_np != NULL);
 
     ofdm->rx_amp = MALLOC(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
-    
-    if (ofdm->rx_amp == NULL) {
-        goto error_rx_amp;
-    }
+    assert(ofdm->rx_amp != NULL);
 
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
-    
-    if (ofdm->aphase_est_pilot_log == NULL) {
-        goto error_aphase_est_pilot_log;
-    }
+    assert(ofdm->aphase_est_pilot_log != NULL);
 
     ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm_nuwbits);
-    
-    if (ofdm->tx_uw == NULL) {
-        goto error_tx_uw;
-    }
+    assert(ofdm->tx_uw != NULL);
 
     for (i = 0; i < ofdm_nuwbits; i++) {
         ofdm->tx_uw[i] = 0;
@@ -407,16 +377,10 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * works on symbols so we can't break up any symbols into UW/LDPC bits.
      */
     uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
-    
-    if (uw_ind == NULL) {
-        goto error_uw_ind;
-    }
+    assert(uw_ind != NULL);
 
     uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
-    
-    if (uw_ind_sym == NULL) {
-        goto error_uw_ind_sym;
-    }
+    assert(uw_ind_sym != NULL);
 
     /*
      * The Unique Word is placed in different indexes based on
@@ -431,10 +395,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     }
 
     tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
-    
-    if (tx_uw_syms == NULL) {
-        goto error_tx_uw_syms;
-    }
+    assert(tx_uw_syms != NULL);
 
     for (i = 0; i < (ofdm_nuwbits / 2); i++) {
         tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
@@ -458,10 +419,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* create the OFDM waveform */
 
     complex float *temp = MALLOC(sizeof (complex float) * ofdm_m);
-    
-    if (temp == NULL) {
-        goto error_temp;
-    }
+    assert(temp != NULL);
 
     idft(ofdm, temp, ofdm->pilots);
 
@@ -498,44 +456,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->tx_bpf_en = false;
 
+    printf("ofdm_create OK ofdm->ofdm_tx_bpf: 0x%x\n", (uint32_t)ofdm->ofdm_tx_bpf);
+
     return ofdm; /* Success */
-
-    //// Error return points with free call in the reverse order of allocation:
-
-    error_temp:
-      FREE(tx_uw_syms);
-    error_uw_ind_sym:
-      FREE(uw_ind);
-    error_tx_uw_syms:
-      FREE(uw_ind_sym);
-    error_uw_ind:
-      FREE(ofdm->tx_uw);
-    error_tx_uw:
-      FREE(ofdm->aphase_est_pilot_log);
-    error_aphase_est_pilot_log:
-      FREE(ofdm->rx_amp);
-    error_rx_amp:
-      FREE(ofdm->rx_np);
-    error_rx_np:
-      for (i = 0; i < free_last_rx_sym; i++)
-        FREE(ofdm->rx_sym[i]);
-    error_rx_sym2:
-      FREE(ofdm->rx_sym);
-    error_rx_sym:
-      FREE(ofdm->pilots);
-    error_pilots:
-      FREE(ofdm->rxbuf);
-    error_rxbuf:
-      FREE(ofdm->pilot_samples);
-    error_pilot_samples:
-      FREE(ofdm);
-
-    return(NULL);
 }
 
 void allocate_tx_bpf(struct OFDM *ofdm) {
+    printf("allocate_tx_bpf\n");
     ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
-
+    assert(ofdm->ofdm_tx_bpf != NULL);
+    
     /* Transmit bandpass filter; complex coefficients, center frequency */
 
     quisk_filt_cfInit(ofdm->ofdm_tx_bpf, filtP550S750, sizeof (filtP550S750) / sizeof (float));
@@ -543,7 +473,11 @@ void allocate_tx_bpf(struct OFDM *ofdm) {
 }
 
 void deallocate_tx_bpf(struct OFDM *ofdm) {
+    printf("deallocate_tx_bpf\n");
+    assert(ofdm->ofdm_tx_bpf != NULL);
+    printf("2\n");
     quisk_filt_destroy(ofdm->ofdm_tx_bpf);
+    printf("3\n");
     FREE(ofdm->ofdm_tx_bpf);
     ofdm->ofdm_tx_bpf = NULL;
 }
@@ -884,6 +818,7 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 }
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
+  printf("ofdm_set_tx_bpf: ofdm->ofdm_tx_bpf: 0x%x val: %d\n", (uint32_t)ofdm->ofdm_tx_bpf, val);
     if (val == true) {
     	allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;

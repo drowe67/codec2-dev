@@ -1,0 +1,22 @@
+#!/bin/bash
+#
+# Compare the amount of RAM used in all stm32 programs to a
+# threshold.  The idea is trap changes to x86 code that will
+# cause out of memory issues on the stm32
+#
+# This can  be run from the command line or via a ctest, it doesn't
+# require stm32 hardware.
+#
+# usage:
+#   cd ~/codec2/stm32/build_stm32
+#  ./check_ram_limit
+
+ram_used=mktmp
+find . -name '*.map' | xargs grep bss_end | sed 's/^.*\(0x[a-f0-9]*\).*/\1/' > $ram_used
+thresh=0x20008000
+while read line; do
+    echo $line
+    [[ $line -gt $thresh ]] && exit 1
+    #if [ $line -gt 0x1000 ]; then exit 1; fi
+done < $ram_used
+exit 0
