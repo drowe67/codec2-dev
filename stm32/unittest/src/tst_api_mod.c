@@ -50,6 +50,7 @@
 */
 
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -73,6 +74,34 @@ struct my_callback_state {
     char *ptx_str;
     int calls;
 };
+
+/* startup_stm32f4xx.s has been modified to fill RAM segment from bss up with 0x2001ef30 */
+void find_unused_memory(void) {
+    int32_t *p, *start;
+    int found = 0;
+    
+    printf("chunks of RAM segment > 256 bytes containing start up pattern:\n");
+
+    /* count down from top of memory through stack, empty memory, then to heap */
+    for (p =(int32_t*)0x20000000; p<(int32_t*)0x20020000; p++) {
+        if (found == 0) {
+            if (*p == 0x55555555) {
+                start = p;
+                found = 1;
+            }
+        }
+    
+        if (found == 1) {
+            if (*p != 0x55555555) {
+                found = 0;
+                int bytes = (void*)p - (void*)start;
+                if (bytes >= 0x100)
+                    printf("  start: 0x%x  end: 0x%x  bytes: %d\n", (int) start, (int)p, bytes);
+            }
+        }
+    }
+
+}
 
 char my_get_next_tx_char(void *callback_state) {
     struct my_callback_state* pstate = (struct my_callback_state*)callback_state;
@@ -123,8 +152,15 @@ int main(int argc, char *argv[]) {
     //struct CODEC2 *c2;
     struct my_callback_state  my_cb_state;
 
+    find_unused_memory();
     semihosting_init();
-
+    fprintf(stderr, "testing fprintf stderr...\n");
+    printf("testing printf\n");
+    //assert(0);
+    printf("-----------------------------------------\n");
+    printf("              STARTED                    \n");
+    printf("-----------------------------------------\n");
+    
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
@@ -155,6 +191,7 @@ int main(int argc, char *argv[]) {
     int use_txbpf = 0;
     int use_ext_vco = 0;
 
+    fprintf(stderr, "started\n");
     ////////
     //PROFILE_VAR(freedv_start);
     //machdep_profile_init();
@@ -168,6 +205,9 @@ int main(int argc, char *argv[]) {
     else {
         freedv = freedv_open(config_mode);
     }
+    assert(freedv != NULL);
+    
+    fprintf(stderr, "freedv opened 0x%x\n", (uint32_t)freedv);
 
     freedv_set_test_frames(freedv, config_testframes);
 
@@ -179,7 +219,10 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", 
     			n_speech_samples, n_nom_modem_samples);
 
-/*
+    find_unused_memory() ;
+    fprintf(stderr, "mod_out: 0x%x\n", (uint32_t)mod_out);
+ 
+   /*
     // This is "codectx" operation:
     int c2_mode;
     if (config_mode == FREEDV_MODE_700)  {
@@ -205,8 +248,12 @@ int main(int argc, char *argv[]) {
     freedv_set_snr_squelch_thresh(freedv, -100.0);
     freedv_set_squelch_en(freedv, 1);
     freedv_set_clip(freedv, use_clip);
+    //#ifdef TT
     freedv_set_tx_bpf(freedv, use_txbpf);
+    //#endif
     freedv_set_ext_vco(freedv, use_ext_vco);
+    
+    find_unused_memory() ;
 
     // set up callback for txt msg chars 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
@@ -219,6 +266,7 @@ int main(int argc, char *argv[]) {
 
     // set up callback for data packets
     freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
+        fprintf(stderr, "about to open files\n");
 
     ////////
     // Streams
@@ -235,6 +283,8 @@ int main(int argc, char *argv[]) {
     }
 
     frame = 0;
+
+    fprintf(stderr, "just before main loop\n");
 
     ////////
     // Main loop
@@ -254,10 +304,7 @@ int main(int argc, char *argv[]) {
 
     close(f_in);
     close(f_out);
-
     printf("\nEnd of Test\n");
-    fclose(stdout);
-    fclose(stderr);
 
     return(0);
 }

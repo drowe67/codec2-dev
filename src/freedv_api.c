@@ -234,6 +234,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         }
 
         f->ofdm = ofdm_create(ofdm_config);
+	assert(f->ofdm != NULL);
         FREE(ofdm_config);
 
         /* Get a copy of the actual modem config */
@@ -301,9 +302,10 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 	}
 
 #ifndef __EMBEDDED__
-        /* tx BPF on by default, can't see any reason we'd want this off */
+        /* tx BPF off on embedded platforms, as it consumes significant CPU */
         ofdm_set_tx_bpf(f->ofdm, 1);
 #endif
+
     }
         
 #ifdef __LPCNET__
