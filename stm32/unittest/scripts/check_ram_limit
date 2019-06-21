@@ -19,7 +19,7 @@ for f in $map_files
 do
     ram_used=`cat $f | grep bss_end | sed 's/^.*\(0x[a-f0-9]*\).*/\1/'`
     printf "%-40s 0x%x\n" $f $ram_used
-    [[ $ram_used -gt $thresh ]] && echo "FAIL" && exit 1
+    [[ $ram_used -gt $thresh ]] && echo -e "\n ***** FAIL - LIMIT is $thresh !!! *****\n" && exit 1
 done
 echo "PASS"
 exit 0
