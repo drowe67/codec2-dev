@@ -463,11 +463,17 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   end
   
   % refine freq est within -/+ 20 Hz window  
-  w = 2*pi*fcoarse/Fs;
-  wvec = exp(-j*w*(0:2*Nsamperframe));
-  foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
-  foff_est += fcoarse;
-  
+
+  if fcourse != 0
+    w = 2*pi*fcoarse/Fs;
+    wvec = exp(-j*w*(0:2*Nsamperframe));
+    foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    foff_est += fcoarse;
+  else
+    % exp(-j*0) is just 1 when fcoarse is 0
+    foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+  end
+ 
   if verbose
     printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
