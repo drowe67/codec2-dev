@@ -80,6 +80,7 @@ All other tests MUST pass.
 If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
 Test will run slower, roughly 3 times.
 
+>>>>>>> 83c06bddf278fabb9e4fac52ad1f9754110d9e5f
 1. You have to build OpenOCD on the remote machine with the STM32 board. It must be built from 
    (https://github.com/db4ple/openocd.git). 
 2. You don't need OpenOCD installed on your build pc.
@@ -137,6 +138,7 @@ It is strongly recommended to build OpenOCD from sources, see below.
 
 ## Building OpenOCD
 
+>>>>>>> 83c06bddf278fabb9e4fac52ad1f9754110d9e5f
 OpenOCD needs to be built from the source.
 
 If you want to use openocd remotely via SSH, you have to use currently the patched
@@ -229,8 +231,24 @@ On Ubuntu:
    sudo apt-get install python3-numpy 
    ```
  
+>>>>>>> 83c06bddf278fabb9e4fac52ad1f9754110d9e5f
 
+  st-util 1.4.0-47-gae717b9
+  2018-12-29T06:52:16 INFO usb.c: -- exit_dfu_mode
+  2018-12-29T06:52:16 INFO common.c: Loading device parameters....
+  2018-12-29T06:52:16 INFO common.c: Device connected is: F4 device, id 0x10016413
+  2018-12-29T06:52:16 INFO common.c: SRAM size: 0x30000 bytes (192 KiB), Flash: 0x100000 bytes (1024 KiB) in pages of 16384 bytes
+  2018-12-29T06:52:16 INFO gdb-server.c: Chip ID is 00000413, Core ID is  2ba01477.G
+  2018-12-29T06:52:16 INFO gdb-server.c: Listening at *:4242...
+```
 
+## Install numpy for Python3
+Some test are in fact python3 scripts and require the numpy package to be installed,
+otherwise some tests will fail.
 
+On Ubuntu:
+   ```Bash
+   sudo apt-get install python3-numpy 
+   ```
 
 # vi:set ts=3 et sts=3:
