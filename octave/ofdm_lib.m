@@ -440,11 +440,18 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
     % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
-    w = 2*pi*afcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe));
 
-    % choose best timing offset metric at this freq offset
-    [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    if afcourse != 0
+      w = 2*pi*afcoarse/Fs;
+      wvec = exp(-j*w*(0:2*Nsamperframe));
+
+      % choose best timing offset metric at this freq offset
+      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    else
+      % exp(-j*0) is just 1 when afcoarse is 0
+      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    end
+    
     %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
     
     if atiming_mx > timing_mx
@@ -484,7 +491,6 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
 endfunction
-
 
 % ------------------------------------------
 % ofdm_demod - Demodulates one frame of bits
