@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 #######################################
 # Parse command line options
@@ -28,10 +28,8 @@ else
   UT_SH_FIO="enable"
 fi
 
-if [ ${ARGS[--openocd]+_} ] ; then
-   echo "-----------------------------"
-   echo "    STARTING gdb/OpenOCD     "
-   echo "-----------------------------"
+if [ ! ${ARGS[--st-util]+_} ] ; then
+   echo "----------------------- STARTING gdb/OpenOCD ----------------------------"
    if [ -n "$UT_SSH" ]; then
         cat <<-EEOOFF >> gdb_cmds
         shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -f board/stm32f4discovery.cfg 2> >(tee stderr.log >&2) | tee stdout.log & 
@@ -52,9 +50,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
     
        SHUTDOWN="monitor shutdown"
 else
-    echo "-----------------------------"
-    echo "     STARTING gdb/st-util    "
-    echo "-----------------------------"
+    echo "---------------------- STARTING gdb/st-util ------------------------------"
     cat <<-EEOOFF >> gdb_cmds
         shell st-util --verbose=0 --semihosting 2>stutil_stderr.log >stutil_stdout.log &
         shell sleep ${UT_SLEEP} 
@@ -64,7 +60,7 @@ else
        SHUTDOWN=""
 fi
 
-if [ ${ARGS[--load]+_} ] ; then
+if [ ! ${ARGS[--noload]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
 	load
 	EEOOFF

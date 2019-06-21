@@ -51,4 +51,7 @@ case "${TEST_OPT}" in
 		> ref_gen.log 2>&1
 	;;
 
+    *)
+	printf "ERROR invalid option, valid options are:\n  700D_TEST\n  700D_CODEC\n"
+      	;;
     esac

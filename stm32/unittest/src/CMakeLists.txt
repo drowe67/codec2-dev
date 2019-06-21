@@ -41,11 +41,11 @@ add_test(NAME check_ram_limit
          WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_test(NAME tst_ldpc_enc
-         COMMAND sh -c "./run_stm32_tst tst_ldpc_enc --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_ldpc_enc ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_ldpc_dec_ideal
-         COMMAND sh -c "./run_stm32_tst tst_ldpc_dec ideal --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_ldpc_dec ideal ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_ldpc_dec_noise
@@ -54,7 +54,7 @@ add_test(NAME tst_ldpc_dec_noise
 set_tests_properties(tst_ldpc_dec_noise PROPERTIES DEPENDS tst_ldpc_dec_ideal)
 
 add_test(NAME tst_ofdm_mod_plain
-         COMMAND sh -c "./run_stm32_tst tst_ofdm_mod plain --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_ofdm_mod plain ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_ofdm_mod_ldpc
@@ -63,7 +63,7 @@ add_test(NAME tst_ofdm_mod_ldpc
 set_tests_properties(tst_ofdm_mod_ldpc PROPERTIES DEPENDS tst_ofdm_mod_plain)
 
 add_test(NAME tst_ofdm_demod_quick
-         COMMAND sh -c "./run_stm32_tst tst_ofdm_demod quick --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_ofdm_demod quick ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_ofdm_demod_ideal
@@ -97,7 +97,7 @@ add_test(NAME tst_ofdm_demod_ldpc_fade
 set_tests_properties(tst_ofdm_demod_ldpc_fade PROPERTIES DEPENDS tst_ofdm_demod_quick)
 
 add_test(NAME tst_codec2_enc_1300
-         COMMAND sh -c "./run_stm32_tst tst_codec2_enc 1300 --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_codec2_enc 1300 ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_codec2_enc_700C
@@ -107,7 +107,7 @@ set_tests_properties(tst_codec2_enc_700C PROPERTIES DEPENDS tst_codec2_enc_1300)
 
 
 add_test(NAME tst_codec2_dec_1300
-         COMMAND sh -c "./run_stm32_tst tst_codec2_dec 1300 --load ${UT_PARAMS}"
+         COMMAND sh -c "./run_stm32_tst tst_codec2_dec 1300 ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
 add_test(NAME tst_codec2_dec_700C

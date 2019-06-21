@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin/bash +x
 #
-# run_stm32_tst <test> <test_sub_type> [--load]
+# run_stm32_tst <test> <test_sub_type> [--noload] [--st-util]
 
 # Find the scripts directory
 SCRIPTS="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
@@ -11,11 +11,20 @@ source $SCRIPTS/run_tests_common.sh
 declare -i Fails=0
 
 #####################################################################
-LOAD=${ARGS[--load]:+--load}
-OPENOCD=${ARGS[--openocd]:+--openocd}
+LOAD=${ARGS[--noload]:+--noload}
+STUTIL=${ARGS[--st-util]:+--st-util}
 RUN_DIR="${UNITTEST_BASE}/test_run/${FULL_TEST_NAME}"
-echo -e "\n\n${FULL_TEST_NAME}"
+echo -e "test full name: ${FULL_TEST_NAME}"
 setup_common "${RUN_DIR}"
+
+if [ ! -f "${SCRIPTS}/${TEST}_setup" ]; then
+    echo -e "\nERROR: scripts/${TEST}_setup not found!"
+    echo "Test name correct?"
+    echo "valid test names:"
+    cd scripts; ls tst*setup | sed 's/_setup//'
+    exit 1
+fi
+
 ${TEST}_setup ${TEST} ${TEST_OPT} --clean
 cd "${RUN_DIR}" 
 run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} |& tee gdb.log
@@ -27,6 +36,7 @@ if (( $Fails == 0 )); then
     echo -e "\nTest ${FULL_TEST_NAME} PASSED"
 else
     echo -e "\nTest ${FULL_TEST_NAME} FAILED!"
+    echo -e "\n  -> look in test_run/${FULL_TEST_NAME} ......"
 fi
 
 exit $Fails
