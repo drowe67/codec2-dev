@@ -53,6 +53,7 @@ endfunction
 #}
 
 function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples)
+    save myfilecol.mat rx;
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -67,8 +68,10 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     % correlate with pilots at start and end of frame to determine timing offset
     
     for i=1:Ncorr
-      rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
-      corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
+      rx1     = rx(i:i+Npsam-1);
+      rx2     = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
+      corr_st = rx1 * rate_fs_pilot_samples';
+      corr_en = rx2 * rate_fs_pilot_samples';
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
     end
 
@@ -440,11 +443,18 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   for afcoarse=-40:40:40
     % vector of local oscillator samples to shift input vector
     % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
-    w = 2*pi*afcoarse/Fs;
-    wvec = exp(-j*w*(0:2*Nsamperframe));
 
-    % choose best timing offset metric at this freq offset
-    [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    if (afcourse != 0)
+      w = 2*pi*afcoarse/Fs;
+      wvec = exp(-j*w*(0:2*Nsamperframe));
+
+      % choose best timing offset metric at this freq offset
+      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    else
+      % exp(-j*0) is just 1 when afcoarse is 0
+      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+    end
+    
     %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
     
     if atiming_mx > timing_mx
