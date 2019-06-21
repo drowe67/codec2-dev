@@ -34,7 +34,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
    echo "-----------------------------"
    if [ -n "$UT_SSH" ]; then
         cat <<-EEOOFF >> gdb_cmds
-        shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -f board/stm32f4discovery.cfg >ocd_stdout.log 2>ocd_stderr.log
+        shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -f board/stm32f4discovery.cfg 2> >(tee stderr.log >&2) | tee stdout.log & 
 	EEOOFF
    else
         cat <<-EEOOFF >> gdb_cmds

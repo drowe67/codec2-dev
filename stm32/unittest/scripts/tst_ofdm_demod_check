@@ -284,7 +284,7 @@ if (config_testframes):
 
     # Read stm log
     print("Target")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.log", "r") as f:
         for line in f:
             if (line[0:4] == "BER2"):
                 print(line, end="")
@@ -457,11 +457,11 @@ if (compare_output):
 #### Profile
 if (config_profile): 
     print("\nProfile:")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.log", "r") as f:
         sum_profiles.sum_profiles(f, 100)
 
     print("\nStack:")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.txt", "r") as f:
         for line in f:
             if (line.startswith("Max stack")): 
                 print(line)
