@@ -286,7 +286,7 @@ int main(int argc, char *argv[]) {
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    //ofdm_config->high_doppler = high_doppler;
+    ofdm_config->high_doppler = high_doppler;
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
 
@@ -624,13 +624,12 @@ int main(int argc, char *argv[]) {
                 r = (ofdm->frame_count_interleaver - 1) % interleave_frames;
             }
 
-            fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+            fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                     f,
                     statemode[ofdm->last_sync_state],
                     ofdm->uw_errors,
                     ofdm->sync_counter,
                     ofdm->foff_est_hz,
-                    ofdm->phase_est_bandwidth,
                     statemode[ofdm->last_sync_state_interleaver],
                     ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);

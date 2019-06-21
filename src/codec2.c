@@ -2683,7 +2683,6 @@ void codec2_open_mlfeat(struct CODEC2 *codec2_state, char *filename) {
     }    
 }
 
-#ifndef __EMBEDDED__
 void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) {
     FILE *f;
     
@@ -2701,7 +2700,6 @@ void codec2_load_codebook(struct CODEC2 *codec2_state, int num, char *filename) 
     assert(nread == newamp1vq_cb[num].k*newamp1vq_cb[num].m);
     fclose(f);
 }
-#endif
 
 float codec2_get_var(struct CODEC2 *codec2_state) {
     if (codec2_state->nse)

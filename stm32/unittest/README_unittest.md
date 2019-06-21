@@ -10,8 +10,7 @@ a STM32F4 Discovery board.
 
 Required:
 * You must have numpy for Python3 installed
-* You must have an arm-none-eabi-gdb install and in your path (codec2/stm32/README.md)
-* You must have STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 (codec2/stm32/README.md)
+* You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
 
 Build codec2 for Linux, then the stm32, and run tests on stm32 Discovery:

@@ -37,8 +37,8 @@ case "${TEST_OPT}" in
      	fi
 	#
 	echo "Check target decode"
-	p1=$(grep '^BER\.*: 0.000' stderr.log | wc -l)
-	p2=$(grep '^Coded BER: 0.000' stderr.log | wc -l)
+	p1=$(grep '^BER\.*: 0.000' stm_stderr.txt | wc -l)
+	p2=$(grep '^Coded BER: 0.000' stm_stderr.txt | wc -l)
 	if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
      	    let Fails=($Fails + 1)

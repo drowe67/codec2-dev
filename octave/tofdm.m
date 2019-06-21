@@ -270,7 +270,7 @@ check(foff_hz_log, foff_hz_log_c, 'foff_est_hz');
 check(rx_bits_log, rx_bits_log_c, 'rx_bits');
 if cml_support
   check(symbol_likelihood_log, symbol_likelihood_log_c, 'symbol_likelihood_log', tol=1E-2);
-  check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log', tol=1E-2);
+  check(bit_likelihood_log, bit_likelihood_log_c, 'bit_likelihood_log');
   check(detected_data_log, detected_data_log_c, 'detected_data');
 end
 check(sig_var_log, sig_var_log_c, 'sig_var_log');

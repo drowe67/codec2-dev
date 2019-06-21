@@ -234,7 +234,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         }
 
         f->ofdm = ofdm_create(ofdm_config);
-	assert(f->ofdm != NULL);
         FREE(ofdm_config);
 
         /* Get a copy of the actual modem config */
@@ -302,10 +301,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
 	}
 
 #ifndef __EMBEDDED__
-        /* tx BPF off on embedded platforms, as it consumes significant CPU */
+        /* tx BPF on by default, can't see any reason we'd want this off */
         ofdm_set_tx_bpf(f->ofdm, 1);
 #endif
-
     }
         
 #ifdef __LPCNET__
@@ -2224,7 +2222,7 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (((f->verbose == 1) && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
+    if (f->verbose && (ofdm->last_sync_state == search)) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz,

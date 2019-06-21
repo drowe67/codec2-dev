@@ -32,7 +32,6 @@
 #include "stm32f4_adc.h"
 #include "stm32f4_dac.h"
 #include "stm32f4_vrom.h"
-#include "stm32f4_usart.h"
 #include "freedv_api.h"
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
@@ -144,8 +143,6 @@ unsigned int announceTicker = 0;
 unsigned int menuLEDTicker = 0;
 unsigned int menuTicker = 0;
 unsigned int menuExit = 0;
-
-uint32_t ms = 0;           /* increments once per ms */
 
 /*!
  * User preferences
@@ -268,43 +265,11 @@ int load_prefs()
     return 0;
 }
 
-/* startup_stm32f4xx.s has been modified to fill RAM segment from bss up with 0x2001ef30 */
-void find_unused_memory(void) {
-    int32_t *p, *start;
-    int found = 0;
-    
-    usart_printf("chunks of RAM segment > 256 bytes containing start up pattern:\n");
-
-    /* count down from top of memory through stack, empty memory, then to heap */
-    for (p =(int32_t*)0x20000000; p<(int32_t*)0x20020000; p++) {
-        if (found == 0) {
-            if (*p == 0x2001ef30) {
-                start = p;
-                found = 1;
-            }
-        }
-    
-        if (found == 1) {
-            if (*p != 0x2001ef30) {
-                found = 0;
-                int bytes = (void*)p - (void*)start;
-                if (bytes >= 0x100)
-                    usart_printf("  start: 0x%x  end: 0x%x  bytes: %d\n", (int) start, (int)p, bytes);
-            }
-        }
-    }
-
-}
-
 int main(void) {
     struct freedv *f;
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
-    usart_init();
-    usart_printf("SM1000 main()... stack 0x%x (%d)\n", &n_samples_16k, (uint32_t)0x2001ffff - (uint32_t)&n_samples_16k);
-    find_unused_memory();
-   
     /* Menu data */
     struct menu_t   menu;
 
@@ -328,7 +293,6 @@ int main(void) {
 
     /* Set up FreeDV modem */
     f = freedv_open(FREEDV_MODE_1600);
-    usart_printf("FreeDV f = 0x%x\n", (int)f);
     n_samples = freedv_get_n_speech_samples(f);
     n_samples_16k = 2*n_samples;
 
@@ -337,10 +301,6 @@ int main(void) {
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
-    usart_printf("drivers and FreeDV 1600 initialised...stack: 0x%x (%d)\n",
-                 (int)dac8k, (uint32_t)0x20001ffff - (uint32_t)dac8k);
-    find_unused_memory();
-    
     /* put outputs into a known state */
 
     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
@@ -379,8 +339,6 @@ int main(void) {
     tone_reset(&tone_gen, 0, 0);
     tot_reset(&tot);
 
-    usart_printf("loading preferences from flash....\n");
-
     /* Try to load preferences from flash */
     if (load_prefs() < 0) {
         /* Fail!  Load defaults. */
@@ -413,10 +371,6 @@ int main(void) {
     /* play a start-up tune. */
     sfx_play(&sfx_player, sound_startup);
 
-    usart_printf("entering main loop...\n");
-
-    uint32_t lastms = ms;
-    
     while(1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
@@ -668,12 +622,7 @@ int main(void) {
                    }
                 }
                 else {
-                    if (ms > lastms+5000) {
-                        usart_printf("1600 Rx\n");
-                        find_unused_memory();
-                        lastms = ms;
-                    }
-                    
+
                     /* regular DV mode */
 
                     nin = freedv_nin(f);
@@ -757,7 +706,6 @@ int main(void) {
 
 void SysTick_Handler(void)
 {
-    ms++;
     switch_tick(&sw_select);
     switch_tick(&sw_back);
     switch_tick(&sw_ptt);

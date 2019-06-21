@@ -10,12 +10,9 @@
 
 #include <stm32f4xx.h>
 #include <stm32f4xx_usart.h>
-#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 #include "stm32f4_usart.h"
-
-#define MAX_FMT_SIZE 256
 
 void usart_init(void){
 
@@ -52,19 +49,10 @@ void usart_init(void){
 
 }
 
-void usart_puts(const char s[]) {
+void usart_puts(char s[]) {
   for (int i=0; i<strlen(s); i++) {
     USART_SendData(USART3, s[i]);
     while (USART_GetFlagStatus(USART3, USART_FLAG_TC) == RESET);
   } 
 }
 
-void usart_printf(const char *fmt, ...) 
-{
-  char s[MAX_FMT_SIZE];
-  va_list ap;
-  va_start(ap, fmt);
-  vsnprintf(s, MAX_FMT_SIZE, fmt, ap);
-  va_end(ap);
-  usart_puts(s);
-}

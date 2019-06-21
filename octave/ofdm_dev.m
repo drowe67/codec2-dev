@@ -8,6 +8,11 @@ ofdm_lib;
 gp_interleaver;
 ldpc;
 
+#{
+  TODO:
+    [ ] run_sim neeeds to be refactored for coded operation at Nc=17 with UW
+#}
+
 function [sim_out rx states] = run_sim(sim_in)
 
   % set up core modem constants
@@ -33,8 +38,8 @@ function [sim_out rx states] = run_sim(sim_in)
   if hf_en
     assert(phase_est_en == 1, "\nNo point running HF simulation without phase est!!\n");
   end
-  if isfield(sim_in, "phase_est_bandwidth")
-    states.phase_est_bandwidth = sim_in.phase_est_bandwidth;
+  if isfield(sim_in, "high_doppler")
+    states.high_doppler = sim_in.high_doppler;
   end
   if isfield(sim_in, "diversity_en")
     diversity_en = sim_in.diversity_en;
@@ -574,16 +579,16 @@ endfunction
 function run_single(EbNodB = 100, error_pattern_filename);
   Ts = 0.018; sim_in.Tcp = 0.002; 
   sim_in.Rs = 1/Ts; sim_in.bps = 2; sim_in.Nc = 16; sim_in.Ns = 8;
-  sim_in.phase_est_bandwidth = "low";
+  sim_in.high_doppler = 0;
   
   sim_in.Nsec = (sim_in.Ns+1)/sim_in.Rs;  % one frame, make sure sim_in.interleave_frames = 1
-  sim_in.Nsec = 10;
+  sim_in.Nsec = 120;
 
-  sim_in.EbNodB = EbNodB;
+  sim_in.EbNodB = 20;
   sim_in.verbose = 1;
   sim_in.dopplerSpreadHz = 1;
   sim_in.path_delay_ms = 1;
-  sim_in.hf_en = 0;
+  sim_in.hf_en = 1;
   sim_in.foff_hz = 0;
   sim_in.dfoff_hz_per_sec = 0.00;
   sim_in.sample_clock_offset_ppm = 0;
@@ -966,17 +971,16 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   #{
     Notes:
       1) uncoded modem operating point, e.g -1dB for AWGN
-      2) run_sim adds complex noise, when we take the real() below, this reflects
+      2) run_sim adds complex noise, when we take the real() below, this relects
          the -ve noise over to the +ve side, increasing the noise by 3dB.  In
-         ofdm_tx.m and friends, we add real noise that is correctly scaled so
-         no problem.  This means we need to increase the Eb/No below by 3dB
-         to ensure the correct level of noise at the input of the timing_est.         
+         ofdm_tx.m and friends, we add real nosie that is correctly scaled so
+         no problemo.  This means we need to increase the Eb/No below by 3dB
+         to ensure the correct level of nosie ta the input of the timing_est.         
   #}
   
   sim_in.EbNodB = EbNodB + 3;
   sim_in.verbose = 0;
   sim_in.hf_en = hf_en;
-  if hf_en == 2 sim_in.dopplerSpreadHz = 0.1; endif
   sim_in.foff_hz = foff_hz;
   sim_in.gain = 1;
   sim_in.timing_en = 1;
@@ -997,46 +1001,47 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   Nsamperframe = states.Nsamperframe; M = states.M; Ncp = states.Ncp;
   rate_fs_pilot_samples = states.rate_fs_pilot_samples;
 
+  % test fine or acquisition over test signal
+
   delta_ct = []; delta_foff = []; timing_mx_log = []; foff_metric_log = [];
+
   
-  % coarse acquiistion test.  We have no idea of timing or freq
-  % offset for coarse we just use constant window shifts to simulate
-  % a bunch of trials, this allows averaging of freq est
-  % metric over time as we receive more and more frames
+    % coarse acquiistion test.  We have no idea of timing or freq
+    % offset for coarse we just use constant window shifts to simulate
+    % a bunch of trials, this allows averaging of freq est
+    % metric over time as we receive more and more frames
 
-  st = 0.5*Nsamperframe; 
-  en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
+    st = 0.5*Nsamperframe; 
+    en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
 
-  % actual known position of correct coarse timing
+    % actual known position of correct coarse timing
 
-  ct_target = mod(sim_in.initial_noise_sams + Nsamperframe/2, Nsamperframe);
+    ct_target = mod(sim_in.initial_noise_sams + Nsamperframe/2, Nsamperframe);
 
-  i = 1;
-  states.foff_metric = 0;
-  for w=1:Nsamperframe:length(rx)-4*Nsamperframe
-    [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
-    [foff_est states] = est_freq_offset_pilot_corr(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
-    if states.verbose
-      printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
+    i = 1;
+    states.foff_metric = 0;
+    for w=1:Nsamperframe:length(rx)-4*Nsamperframe
+      [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
+      [foff_est states] = est_freq_offset(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
+      if states.verbose
+        printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
+      end
+
+      % valid coarse timing ests are modulo Nsamperframe
+
+      delta_ct = [delta_ct ct_est-ct_target];
+      delta_foff = [delta_foff (foff_est-foff_hz)];
+      timing_mx_log = [timing_mx_log; timing_mx];
+      foff_metric_log = [foff_metric_log states.foff_metric];
     end
 
-    % valid coarse timing ests are modulo Nsamperframe
-
-    delta_ct = [delta_ct ct_est-ct_target];
-    delta_foff = [delta_foff (foff_est-foff_hz)];
-    timing_mx_log = [timing_mx_log; timing_mx];
-    foff_metric_log = [foff_metric_log states.foff_metric];
-  end
-
-  if states.verbose
-    printf("mean: %f std: %f\n", mean(delta_foff), std(delta_foff));
-    figure(1); clf; plot(timing_mx_log,'+-'); title('mx');
-    figure(2); clf; plot(delta_ct,'+-'); title('delta ct');
-    figure(3); clf; plot(delta_foff,'+-'); title('delta foff'); 
-    figure(4); clf; hist(delta_foff); title('delta foff');
-    figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
-    figure(6); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
-    figure(7); clf; plot_specgram(real(rx)); axis([0 round(length(rx)/states.Fs) 500 2500])
+  if states.verbose > 1
+    %printf("mean: %f std: %f\n", mean(delta_foff), std(delta_foff));
+    figure(1); clf; plot(timing_mx_log,'+-');
+    figure(2); clf; plot(delta_ct,'+-');
+    figure(3); clf; plot(delta_foff,'+-');
+    figure(4); clf; plot(foff_metric_log,'+');
+    figure(5); clf; plot(real(rx))
   end
   
 endfunction
@@ -1050,9 +1055,9 @@ endfunction
 
 #}
 
-function res = acquisition_histograms(foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
+function res = acquisition_histograms(fine_en = 0, foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
   Fs = 8000;
-  Ntests = 200;
+  Ntests = 100;
 
   % allowable tolerance for acquistion
 
@@ -1061,45 +1066,53 @@ function res = acquisition_histograms(foff, EbNoAWGN=-1, EbNoHF=3, verbose=1)
 
   % AWGN channel at uncoded Eb/No operating point
 
-  [dct dfoff] = acquisition_test(Ntests, EbNoAWGN, foff, 0);
+  [dct dfoff] = acquisition_test(Ntests, EbNoAWGN, foff, 0, fine_en);
 
   % Probability of acquistion is what matters, e.g. if it's 50% we can
   % expect sync within 2 frames
 
   PtAWGN = length(find (abs(dct) < ttol_samples))/length(dct);
   printf("AWGN P(time offset acq) = %3.2f\n", PtAWGN);
-  PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("AWGN P(freq offset acq) = %3.2f\n", PfAWGN);
- 
+  if fine_en == 0
+    PfAWGN = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
+    printf("AWGN P(freq offset acq) = %3.2f\n", PfAWGN);
+  end
+
   if verbose
     figure(1); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
     t = sprintf("Coarse Timing Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
     title(t)
-    figure(2)
-    hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-    t = sprintf("Coarse Freq Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
-    title(t);
-  end
+    if fine_en == 0
+      figure(2)
+      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
+      t = sprintf("Coarse Freq Error AWGN EbNo = %3.2f foff = %3.1f", EbNoAWGN, foff);
+      title(t);
+    end
+ end
 
   % HF channel at uncoded operating point
 
-  [dct dfoff] = acquisition_test(Ntests, EbNoHF, foff, hf_en=1, 0);
+  [dct dfoff] = acquisition_test(Ntests, EbNoHF, foff, 1, fine_en);
 
   PtHF = length(find (abs(dct) < ttol_samples))/length(dct);
   printf("HF P(time offset acq) = %3.2f\n", PtHF);
-  PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff);
-  printf("HF P(freq offset acq) = %3.2f\n", PfHF);
+  if fine_en == 0
+    PfHF = length(find (abs(dfoff) < ftol_hz))/length(dfoff)
+    printf("HF P(freq offset acq) = %3.2f\n", PfHF);
+  end
 
   if verbose
     figure(3); clf;
     hist(dct(find (abs(dct) < ttol_samples)))
     t = sprintf("Coarse Timing Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
     title(t)
-    figure(4)
-    hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
-    t = sprintf("Coarse Freq Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
-    title(t);
+    if fine_en == 0
+      figure(4)
+      hist(dfoff(find(abs(dfoff) < 2*ftol_hz)))
+      t = sprintf("Coarse Freq Error HF EbNo = %3.2f foff = %3.1f", EbNoHF, foff);
+      title(t);
+    end
   end
   
   res = [PtAWGN PfAWGN PtHF PfHF];
@@ -1110,7 +1123,8 @@ endfunction
 
 function acquistion_curves
 
-  EbNo = [-1 2 8 20];
+  EbNo = [-1 2 5 8];
+  %foff = [-20 -15 -10 -5 0 5 10 15 20];
   foff = [-15 -5 0 5 15];
   cc = ['b' 'g' 'k' 'c' 'm'];
   
@@ -1125,13 +1139,13 @@ function acquistion_curves
     for e = 1:length(EbNo)
       aEbNo = EbNo(e);
       res = zeros(1,4);
-      res = acquisition_histograms(afoff, aEbNo, aEbNo+4, verbose = 0);
+      res = acquisition_histograms(fine_en = 0, afoff, aEbNo, aEbNo+4, verbose = 0);
       res_log = [res_log; res];
     end
-    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,1), l); axis([min(EbNo) max(EbNo ) 0 1]);
-    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,3), l); axis([min(EbNo) max(EbNo ) 0 1]);
-    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,2), l); axis([min(EbNo) max(EbNo ) 0 1]);
-    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,4), l); axis([min(EbNo) max(EbNo ) 0 1]);
+    figure(1); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,1), l);
+    figure(2); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo, res_log(:,3), l);
+    figure(3); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,2), l);
+    figure(4); l = sprintf('%c+-;%3.1f Hz;', cc(f), afoff); plot(EbNo+4, res_log(:,4), l);
   end
 
   figure(1); print('-deps', '-color', "ofdm_dev_acq_curves_time_awgn.eps")
@@ -1220,7 +1234,7 @@ function sync_metrics(x_axis = 'EbNo')
 endfunction
 
 
-% during development it was discovered demod could obtain a false sync with no UW
+% during development it was discovered demod could obtain a flase sync with no UW
 % errors at +/- 7Hz, approx the frame rate.  This function is used to explore that
 
 function debug_false_sync(EbNodB = 100)
@@ -1266,55 +1280,54 @@ function debug_false_sync(EbNodB = 100)
 end
 
 
-% Reads an off air file, and dumps sync metrics.  Similar ouput to
-% acquisition_test() but from real, off air signals
+% Using an input raw file, plot frame by frame metric information,
+% used to debug false syncs
 
-function acquisition_test_file(filename, Nsec)
-  ofdm_lib;
-  more off;
-
-  % init modem
-
-  mode="700D";
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
-  states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
+function metric_fbf(fn, Nsec)
+  Ts = 0.018; 
+  states = ofdm_init(bps=2, Rs=1/Ts, Tcp=0.002, Ns=8, Nc=17);
   ofdm_load_const;
-  states.verbose = 1;
+  states.verbose = 2;
 
-  % load real samples from file
+  % factor of 2 as input is a real valued signal
 
-  Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
-  frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
+  Ascale = states.amp_scale/2; 
+  f = fopen(fn,"rb"); rx = fread(f,Inf,"short")'/Ascale; fclose(f);
   if (nargin == 2) && (length(rx) > Nsec*Fs)
     rx = rx(1:Nsec*Fs);
   end
-  Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe) - 2;
-
-  % main loop ----------------------------------------------------------------
-
-  ct_est_log = timing_mx_log = st_log = foff_est_log = foff_metric_log = [];
-  for f=1:Nframes
-    st = (f-1)*Nsamperframe+1; en = st + 2*Nsamperframe;
-    [ct_est timing_valid timing_mx] = est_timing(states, rx(st:en)', states.rate_fs_pilot_samples);
-    [foff_est states] = est_freq_offset_pilot_corr(states, rx(st:en)', states.rate_fs_pilot_samples, ct_est);
-    
-    printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", f, st, ct_est, foff_est, timing_mx, timing_valid);
-
-    st_log = [st_log st];
-    ct_est_log = [ct_est_log ct_est];
-    timing_mx_log = [timing_mx_log timing_mx];
-    foff_est_log = [foff_est_log foff_est];
-    foff_metric_log = [foff_metric_log states.foff_metric];
-  end
+  Nsam = length(rx);
+  %bpf_coeff = make_ofdm_bpf(write_c_header_file=0);
+  %rx = filter(bpf_coeff,1,rx);
   
-  figure(1); clf; plot(timing_mx_log,'+-'); title('mx');
-  figure(2); clf; plot(ct_est_log,'+-'); title('ct');
-  figure(3); clf; plot(foff_est_log,'+-'); title('foff est');
-  figure(4); clf; hist(foff_est_log); title('foff est');
-  figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
-  figure(6); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
-  figure(7); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
+  st = 0.5*Nsamperframe; 
+  en = 2.5*Nsamperframe - 1;    % note this gives Nsamperframe possibilities for coarse timing
 
+  i = 1; w_log = timing_mx_log = av_level_log = [];
+  states.foff_metric = 0;
+  for w=1:Nsamperframe:length(rx)-4*Nsamperframe
+    printf("%3d %5d", i,w);
+    #{
+    if i == 30
+      states.verbose = 3;
+    else
+      states.verbose = 2;
+    end
+    #}
+    [ct_est timing_valid timing_mx av_level] = est_timing(states, real(rx(w+st:w+en)), states.rate_fs_pilot_samples);
+    i++;
+    w_log = [w_log w];
+    timing_mx_log = [timing_mx_log timing_mx];
+    av_level_log = [av_level_log av_level];
+  end
+
+  figure(2); clf;
+  mx = max(abs(rx)); 
+  subplot(211); plot(rx); axis([0 Nsam -mx mx]);
+  subplot(212); hold on;
+  plot(w_log,timing_mx_log,'b+-;timing mx;');
+  plot(w_log,av_level_log,'g+-;av level;');
+  hold off;
 endfunction
 
 
@@ -1334,10 +1347,10 @@ else
   init_cml('~/cml/');
 end
 
-%run_single(100);
+run_single(100);
 %run_curves
 %run_curves_estimators
-%acquisition_histograms(foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
+%acquisition_histograms(fin_en=0, foff_hz=-15, EbNoAWGN=-1, EbNoHF=3)
 %acquisition_test(Ntests=10, EbNodB=-1, foff_hz=0, hf_en=0, verbose=1);
 %sync_metrics('freq')
 %run_curves_snr

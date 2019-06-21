@@ -29,7 +29,6 @@
 #define __STM32F4_USART__
 
 void usart_init();
-void usart_puts(const char s[]);
-void usart_printf(const char *fmt, ...);
+void usart_puts(char s[]);
 
 #endif

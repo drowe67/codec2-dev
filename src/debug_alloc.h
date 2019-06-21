@@ -2,7 +2,7 @@
  *
  * Some macros which can report on malloc results.
  *
- * Enable with "-D DEBUG_ALLOC"
+ * Enable with "-D DEBUG_MALLOC"
  */
 
 #ifndef DEBUG_ALLOC_H
@@ -20,10 +20,10 @@ register char * sp asm ("sp");
 
   static inline void * DEBUG_MALLOC(const char *func, size_t size) {
     void *ptr = malloc(size);
-    fprintf(stderr, "MALLOC: %s %p %d", func, ptr, size);
+    fprintf(stderr, "MALLOC: %s %p %zd", func, ptr, size);
 #ifdef CORTEX_M4
 
-    fprintf(stderr, " : sp %p ", sp);
+    fprintf(stderr, " : sp %p  heap_end %p", sp, __heap_end);
 #endif
     if (!ptr) fprintf(stderr, " ** FAILED **");
     fprintf(stderr, "\n");
@@ -33,9 +33,9 @@ register char * sp asm ("sp");
 
   static inline void * DEBUG_CALLOC(const char *func, size_t nmemb, size_t size) {
     void *ptr = calloc(nmemb, size);
-    fprintf(stderr, "CALLOC: %s %p %d %d", func, ptr, nmemb, size);
+    fprintf(stderr, "CALLOC: %s %p %zd %zd", func, ptr, nmemb, size);
 #ifdef CORTEX_M4
-    fprintf(stderr, " : sp %p ", sp);
+    fprintf(stderr, " : sp %p  heap_end %p", sp, __heap_end);
 #endif
     if (!ptr) fprintf(stderr, " ** FAILED **");
     fprintf(stderr, "\n");

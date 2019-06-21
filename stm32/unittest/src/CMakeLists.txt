@@ -1,7 +1,6 @@
 set(STM32F4_SYSTEM_SRCS
 ../../src/system_stm32f4xx.c
 ../../src/stm32f4_machdep.c
-../../src/find_unused_mem.c
 startup_stm32f4xx.s
 )
 
@@ -36,9 +35,6 @@ semihostedBin(tst_semihost)
 semihostedBin(tst_codec2_fft_init)
 
 
-add_test(NAME check_ram_limit
-         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/../scripts/check_ram_limit
-         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
 
 add_test(NAME tst_ldpc_enc
          COMMAND sh -c "./run_stm32_tst tst_ldpc_enc --load ${UT_PARAMS}"

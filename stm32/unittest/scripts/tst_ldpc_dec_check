@@ -55,9 +55,9 @@ if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "Pass";
 else echo "Fail"; let Fails=($Fails + 1); fi
 #
 echo -e "\nTarget BER values"
-n=$(grep 'Raw.*BER:' stderr.log | cut -d ' ' -f 7)
+n=$(grep 'Raw.*BER:' stm_stderr.txt | cut -d ' ' -f 7)
 p1=$(echo $n '<=' ${BER_LIMIT_RAW} | bc)
-n=$(grep 'Coded.*BER:' stderr.log | cut -d ' ' -f 7)
+n=$(grep 'Coded.*BER:' stm_stderr.txt | cut -d ' ' -f 7)
 p2=$(echo $n '<=' ${BER_LIMIT_CODED} | bc)
 if [[ $p1 -eq 1 && $p2 -eq 1 ]]; then echo "Pass"; 
 else echo "Fail"; let Fails=($Fails + 1); fi

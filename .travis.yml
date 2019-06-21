@@ -35,7 +35,7 @@ script:
 - cd $BUILDSTM
 - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 
   -DCMAKE_TOOLCHAIN_FILE="$CODEC2DEV/stm32/cmake/STM32_Toolchain.cmake" -DARM_GCC_BIN:STRING="$GCC_DIR/bin/" 
-  -DUT_PARAMS="--openocd" && make -j4 && ctest -V -E check_ram_limit) ; fi
+  -DUT_PARAMS="--openocd" && make -j4 ) ; fi
 - if [ -n "$UT_SSH_PARAMS" ]; then  PATH="$GCC_DIR/bin/":${PATH} ctest -V -E ofdm_demod_ldpc_fade; fi
 before_install:
 # DO NOT TOUCH START
