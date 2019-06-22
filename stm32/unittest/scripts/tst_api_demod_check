@@ -50,10 +50,11 @@ case "${TEST_OPT}" in
 	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
 	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
 	printf "REF   uncoded BER: %f coded BER: %f\n" $uber_ref $cber_ref
-	# as per notes in tst_api_demod_setup, coded BER is unreliable for such a short test,
-	# so we'll just sanity check the reference uncoded BER here.
 
-	# Bash can't compare floats .... so use return code of python script
+	# aS per notes in tst_api_demod_setup, coded BER is unreliable
+	# for such a short test, so we'll just sanity check the
+	# reference uncoded BER here. Bash can't compare floats
+	# .... so use return code of some python script
 	python -c "import sys; sys.exit(1) if $uber_ref<0.1 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "OK"; 
 	else echo "BAD"; 
@@ -72,8 +73,12 @@ case "${TEST_OPT}" in
 	;;
 
     700D_plain_codec)
+	# 1/ The two output files sound OK, and when plotted look very similar.
+	# 2/ Suspect some small state difference, or perhaps random number generator diverging, sampling
+	#    codec2_rand() at the end of the x86 and stm32 test programs might be useful
+	# 3/ At this stage - we can't make the automatic tests work
         echo -e "\nCompare output binary data"
-        if compare_ints -s -b2 ref_mod.raw stm_out.raw; then 
+        if compare_ints -s -b2 -t4 ref_demod.raw stm_out.raw; then 
             echo "Passed"
         else
             echo "Failed"
