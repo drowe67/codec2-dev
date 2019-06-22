@@ -943,7 +943,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
     memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
            (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
     memmove(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)],
-        &ofdm->rxbuf[0], ofdm->nin * sizeof (complex float));
+        rxbuf_in, ofdm->nin * sizeof (complex float));
     
     return(ofdm_sync_search_core(ofdm));
 }
