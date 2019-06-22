@@ -82,7 +82,7 @@ void opt_help() {
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --high_doppler   [0|1]   Enable/Disable High Doppler RX mode (default off)\n");
+    fprintf(stderr, "  --bandwidth    [0|1|2]   Select Auto Phase Estimate (0) Low (1) High (2) RX mode (default 2)\n");
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     int nc = 17;
     int ns = 8;
     int verbose = 0;
-    int high_doppler = 0;
+    int phase_est_bandwidth = HIGH_PHASE_EST;
     int ldpc_en = 0;
     int data_bits_per_frame = 0;
 
@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
         {"log", 'c', OPTPARSE_REQUIRED},
         {"testframes", 'd', OPTPARSE_NONE},
         {"interleave", 'e', OPTPARSE_REQUIRED},
-        {"high_doppler", 'o', OPTPARSE_REQUIRED},
+        {"bandwidth", 'o', OPTPARSE_REQUIRED},
         {"tx_freq", 'f', OPTPARSE_REQUIRED},
         {"rx_freq", 'g', OPTPARSE_REQUIRED},
         {"verbose", 'v', OPTPARSE_REQUIRED},
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
                 ns = atoi(options.optarg);
                 break;
             case 'o':
-                high_doppler = atoi(options.optarg);
+                phase_est_bandwidth = atoi(options.optarg);
                 break;
             case 'p':
                 data_bits_per_frame = atoi(options.optarg);
@@ -286,7 +286,13 @@ int main(int argc, char *argv[]) {
     ofdm_config->rx_centre = rx_centre;
     ofdm_config->fs = 8000.0f; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
-    //ofdm_config->high_doppler = high_doppler;
+
+    if ((phase_est_bandwidth <= 2) && (phase_est_bandwidth >= 0)) {
+        ofdm_config->phase_est_bandwidth = phase_est_bandwidth;
+    } else {
+        ofdm_config->phase_est_bandwidth = HIGH_PHASE_EST;
+    }
+
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
 
@@ -368,7 +374,15 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "interleave_frames: %d\n", interleave_frames);
         ofdm_set_verbose(ofdm, verbose);
         
-        fprintf(stderr, "high doppler mode: %s\n", (high_doppler == 1)? "enabled" : "disabled");
+        fprintf(stderr, "Phase Estimate Mode: ");
+
+        switch (phase_est_bandwidth) {
+        case 0: fprintf(stderr, "Auto\n");
+                break;
+        case 1: fprintf(stderr, "Low\n");
+                break;
+        case 2: fprintf(stderr, "High\n");
+        }
     }
 
     int Nerrs_raw[interleave_frames];
@@ -630,7 +644,7 @@ int main(int argc, char *argv[]) {
                     ofdm->uw_errors,
                     ofdm->sync_counter,
                     ofdm->foff_est_hz,
-                    ofdm->phase_est_bandwidth,
+                    phase_est_bandwidth,
                     statemode[ofdm->last_sync_state_interleaver],
                     ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);

@@ -813,7 +813,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
         complex float tx_filt[ofdm_samplesperframe];
 
         quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, ofdm->ofdm_tx_bpf);
-        memcpy(tx, tx_filt, ofdm_samplesperframe * sizeof (complex float));
+        memmove(tx, tx_filt, ofdm_samplesperframe * sizeof (complex float));
     }
 }
 
@@ -944,7 +944,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
     /* note can't use memcpy when src and dest overlap */
     memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
            (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
-    memcpy(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)],
+    memmove(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)],
         rx, ofdm->nin * sizeof (complex float));
     
     return(ofdm_sync_search_core(ofdm));
@@ -983,7 +983,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     /* note can't use memcpy when src and dest overlap */
 
     memmove(rx, &rx[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
-    memcpy(&rx[(ofdm_rxbuf - ofdm->nin)], rx, ofdm->nin * sizeof (complex float));
+    memmove(&rx[(ofdm_rxbuf - ofdm->nin)], rx, ofdm->nin * sizeof (complex float));
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
@@ -1003,12 +1003,13 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
             float w = TAU * (float) afcoarse / ofdm_fs;
 
             for (i = 0, ref = st; i < (2 * ofdm_samplesperframe); i++, ref++) {
-                wvec[n++][i] = cmplxconj(w * i) * rx[ref];
+                wvec[n][i] = cmplxconj(w * i) * rx[ref];
             }
 
             /* choose best timing offset metric at this freq offset */
 
             act_est = est_timing(ofdm, wvec[n], (en - st));
+            n++;
         } else {
             /* exp(-j*0) is just 1 when afcoarse is 0 */
             act_est = est_timing(ofdm, &rx[st], (en - st));
