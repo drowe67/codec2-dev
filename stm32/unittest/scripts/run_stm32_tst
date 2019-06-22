@@ -25,9 +25,12 @@ if [ ! -f "${SCRIPTS}/${TEST}_setup" ]; then
     exit 1
 fi
 
+# Call setup - run - check scripts
 ${TEST}_setup ${TEST} ${TEST_OPT} --clean || { echo "ERROR in ${TEST}_setup! Exiting..."; exit 1; }
 cd "${RUN_DIR}" 
 run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} |& tee gdb.log
+# stop now if we see an assert() fire, no point running check phase
+grep -q assertion gdb.log && exit 1
 ${TEST}_check ${TEST} ${TEST_OPT} 2>&1 | tee check.log
 # fancy bash way of testing fail code of first command in pipe
 if [ ! "${PIPESTATUS[0]}" -eq 0 ]; then
@@ -41,7 +44,8 @@ if (( $Fails == 0 )); then
 else
     echo -e "\nTest ${FULL_TEST_NAME} FAILED!"
     cat ${RUN_DIR}/check.log
-    echo -e "\n  -> look at log files in: ${RUN_DIR} "
+    echo -e "\n  -> look at log files in: ${RUN_DIR}:"
+    ls  ${RUN_DIR}
 fi
 
 exit $Fails

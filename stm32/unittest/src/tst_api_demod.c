@@ -61,6 +61,7 @@
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
 #include "machdep.h"
+#include "memtools.h"
     
 
 struct my_callback_state {

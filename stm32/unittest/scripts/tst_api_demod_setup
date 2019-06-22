@@ -83,8 +83,22 @@ case "${TEST_OPT}" in
         freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
+
+    1600_plain_codec )
+    	# Config is <mode>, <teswtframes> 
+    	echo "00000010" > stm_cfg.txt
+	#
+        # Copy N frames of a raw audio file to stm_in.raw. 
+        cp ../../../../raw/hts1.raw spch_in.raw > setup.log 2>&1
+	freedv_tx 1600 spch_in.raw stm_in.raw >> setup.log 2>&1
+	#
+        # Reference
+        freedv_rx 1600 stm_in.raw ref_demod.raw -v \
+		> ref_gen.log 2>&1
+	;;
+    
     *)
-	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n\n  1600_plain_codec\n"
 	exit 1
       	;;
 

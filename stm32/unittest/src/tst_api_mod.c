@@ -68,7 +68,7 @@
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
 #include "machdep.h"
-#include "find_unused_mem.h"
+#include "memtools.h"
 
 struct my_callback_state {
     char  tx_str[80];
@@ -125,7 +125,7 @@ int main(int argc, char *argv[]) {
     //struct CODEC2 *c2;
     struct my_callback_state  my_cb_state;
 
-    find_unused_mem(printf);
+    memtools_find_unused(printf);
     semihosting_init();
     
     ////////
@@ -216,7 +216,7 @@ int main(int argc, char *argv[]) {
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
     
-    find_unused_mem(printf);
+    memtools_find_unused(printf);
 
     // set up callback for txt msg chars 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
