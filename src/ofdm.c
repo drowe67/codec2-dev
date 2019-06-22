@@ -934,8 +934,6 @@ void ofdm_mod(struct OFDM *ofdm, COMP *result, const int *tx_bits) {
  * with an array of COMPs as input
  */
 int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
-    complex float *rx = (complex float *) &rxbuf_in[0]; // complex has same memory layout
-
     /*
      * insert latest input samples into rxbuf
      * so it is primed for when we have to call ofdm_demod()
@@ -945,7 +943,7 @@ int ofdm_sync_search(struct OFDM *ofdm, COMP *rxbuf_in) {
     memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin],
            (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
     memmove(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)],
-        rx, ofdm->nin * sizeof (complex float));
+        &ofdm->rxbuf[0], ofdm->nin * sizeof (complex float));
     
     return(ofdm_sync_search_core(ofdm));
 }
@@ -975,15 +973,14 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
  * Attempts to find coarse sync parameters for modem initial sync
  */
 static int ofdm_sync_search_core(struct OFDM *ofdm) {
-    complex float *rx = (complex float *) &ofdm->rxbuf[0]; // complex has same memory layout
     complex float wvec[2][2 * ofdm_samplesperframe];
     int i, ref, act_est, afcoarse;
 
     /* insert latest input samples into rxbuf so it is primed for when we have to call ofdm_demod() */
     /* note can't use memcpy when src and dest overlap */
 
-    memmove(rx, &rx[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
-    memmove(&rx[(ofdm_rxbuf - ofdm->nin)], rx, ofdm->nin * sizeof (complex float));
+    memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
+    memmove(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)], &ofdm->rxbuf[0], ofdm->nin * sizeof (complex float));
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
@@ -993,7 +990,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     int fcoarse = 0;
     int n = 0;
     int timing_mx = 0;
-    int ct_est = 0;       /* this could be dangerous default [srsampson] */
+    int ct_est = 0;       /* this could be bad default [srsampson] */
 
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
         /* vector of local oscillator samples to shift input vector */
@@ -1002,8 +999,10 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
         if (afcoarse != 0) {
             float w = TAU * (float) afcoarse / ofdm_fs;
 
+            // double array is used so we only have to complex multiply once
+
             for (i = 0, ref = st; i < (2 * ofdm_samplesperframe); i++, ref++) {
-                wvec[n][i] = cmplxconj(w * i) * rx[ref];
+                wvec[n][i] = cmplxconj(w * i) * ofdm->rxbuf[ref];
             }
 
             /* choose best timing offset metric at this freq offset */
@@ -1012,7 +1011,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
             n++;
         } else {
             /* exp(-j*0) is just 1 when afcoarse is 0 */
-            act_est = est_timing(ofdm, &rx[st], (en - st));
+            act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st));
         }
     
         if (ofdm->timing_mx > timing_mx) {
@@ -1030,7 +1029,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
         ofdm->coarse_foff_est_hz += fcoarse;
     } else {
         /* exp(-j*0) is just 1 when fcoarse is 0 */
-        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &rx[st], ct_est);
+        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est);
     }
 
     if (ofdm->verbose != 0) {
