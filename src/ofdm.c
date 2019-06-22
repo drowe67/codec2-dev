@@ -976,12 +976,6 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     complex float wvec[2][2 * ofdm_samplesperframe];
     int i, ref, act_est, afcoarse;
 
-    /* insert latest input samples into rxbuf so it is primed for when we have to call ofdm_demod() */
-    /* note can't use memcpy when src and dest overlap */
-
-    memmove(&ofdm->rxbuf[0], &ofdm->rxbuf[ofdm->nin], (ofdm_rxbuf - ofdm->nin) * sizeof (complex float));
-    memmove(&ofdm->rxbuf[(ofdm_rxbuf - ofdm->nin)], &ofdm->rxbuf[0], ofdm->nin * sizeof (complex float));
-
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
     int st = ofdm_m + ofdm_ncp + ofdm_samplesperframe;
