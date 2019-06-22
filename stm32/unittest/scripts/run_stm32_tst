@@ -25,10 +25,10 @@ if [ ! -f "${SCRIPTS}/${TEST}_setup" ]; then
     exit 1
 fi
 
-${TEST}_setup ${TEST} ${TEST_OPT} --clean
+${TEST}_setup ${TEST} ${TEST_OPT} --clean || { echo "ERROR in ${TEST}_setup! Exiting..."; exit 1; }
 cd "${RUN_DIR}" 
 run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} |& tee gdb.log
-${TEST}_check ${TEST} ${TEST_OPT} > check.log 2>&1 || let Fails=($Fails + 1)
+${TEST}_check ${TEST} ${TEST_OPT} 2>&1 | tee check.log || let Fails=($Fails + 1)
 
 sleep 5 # Delay for st-util to close
 
@@ -36,7 +36,8 @@ if (( $Fails == 0 )); then
     echo -e "\nTest ${FULL_TEST_NAME} PASSED"
 else
     echo -e "\nTest ${FULL_TEST_NAME} FAILED!"
-    echo -e "\n  -> look in test_run/${FULL_TEST_NAME} ......"
+    cat ${RUN_DIR}/check.log
+    echo -e "\n  -> look in: ${RUN_DIR} ......"
 fi
 
 exit $Fails

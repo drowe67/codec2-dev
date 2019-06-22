@@ -47,12 +47,26 @@ case "${TEST_OPT}" in
         # Copy N frames of a raw audio file to stm_in.raw. 
         dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
-	freedv_tx 700D spch_in.raw stm_in.raw --testframes --txbpf 0 \
-		>> setup.log 2>&1
-	#
-        # Reference
-        freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes \
-		> ref_gen.log 2>&1
+	freedv_tx 700D spch_in.raw mod_bits.raw --testframes --txbpf 0 \
+		  >> setup.log 2>&1
+	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
+	
+        # Reference: - When the OFDM modem initially syncs, it often
+	#              has residual freq offset that causes abnormally
+	#              high LDPC decoder bit errors forthe first few
+	#              seconds.  This leads to a high coded BER being
+	#              reported for short duration tests.  This
+	#              settles down after a few seconds, and we get
+	#              the expected coded BER when averaging over
+	#              longer periods (e.g. 60s). However this
+	#              particular test is necessarily short due to the
+	#              slow speed of the semihosting system.  It is
+	#              therefore sufficient to check that the
+	#              performance is similar to the x86 C verison,
+	#              rather than expecting a low coded BER for a
+	#              short run.
+	
+        freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes  2>&1 --discard | tee ref_gen.log
 	;;
 
     700D_plain_codec )
@@ -69,5 +83,9 @@ case "${TEST_OPT}" in
         freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
+    *)
+	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n"
+	exit 1
+      	;;
 
     esac

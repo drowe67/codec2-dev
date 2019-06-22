@@ -27,7 +27,7 @@ declare -i Fails=0
 
 case "${TEST_OPT}" in
 
-    700D_*_test)
+    700D_plain_test)
 	echo "Check reference decode"
 	p1=$(grep '^BER\.*: 0.000' ref_gen.log | wc -l)
 	p2=$(grep '^Coded BER: 0.000' ref_gen.log | wc -l)
@@ -45,6 +45,32 @@ case "${TEST_OPT}" in
      	fi
 	;;
 
+    700D_AWGN_test)
+	echo "Check reference decode"
+	uber_ref=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
+	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	printf "REF   uncoded BER: %f coded BER: %f\n" $uber_ref $cber_ref
+	# as per notes in tst_api_demod_setup, coded BER is unreliable for such a short test,
+	# so we'll just sanity check the reference uncoded BER here.
+
+	# Bash can't compare floats .... so use return code of python script
+	python -c "import sys; sys.exit(1) if $uber_ref<0.1 else sys.exit(0)"
+	if [[ $? -eq 1 ]]; then echo "OK"; 
+	else echo "BAD"; 
+     	    let Fails=($Fails + 1)
+     	fi
+
+	echo "Check target decode"
+	uber_target=$(cat ref_gen.log | sed -n "s/^BER.* \([0-9..]*\) Tbits.*/\1/p")
+	cber_target=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
+	printf "TARGET uncoded BER: %f coded BER: %f\n" $uber_target $cber_target
+	python -c "import sys; sys.exit(1) if $uber_target<0.1 and abs($cber_ref-$cber_target)<0.01 else sys.exit(0)"
+	if [[ $? -eq 1 ]]; then echo "OK"; 
+	else echo "BAD"; 
+     	    let Fails=($Fails + 1)
+     	fi
+	;;
+
     700D_plain_codec)
         echo -e "\nCompare output binary data"
         if compare_ints -s -b2 ref_mod.raw stm_out.raw; then 
@@ -54,6 +80,10 @@ case "${TEST_OPT}" in
             let Fails=($Fails + 1)
      	fi
 	;;
+
+    *) 
+       	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n"
+	exit 1
 
     esac
 

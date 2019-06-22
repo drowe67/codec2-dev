@@ -46,7 +46,7 @@ case "${TEST_OPT}" in
         fi
         #
         echo -e "\nCompare output binary data"
-        if compare_ints -s -b2 ref_mod.raw stm_out.raw; then 
+        if compare_ints -s -b2 -t4 ref_mod.raw stm_out.raw; then 
             echo "Passed"
         else
             echo "Failed"

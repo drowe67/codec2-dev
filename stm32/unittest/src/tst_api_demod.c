@@ -186,6 +186,11 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "  %d short speech values returned\n", nout);
         if (nout) write(f_out, speech_out, (sizeof(short) * nout));
 
+       if (sync == 0) {
+            // discard BER results if we get out of sync, helps us get sensible BER results
+            freedv_set_total_bits(freedv, 0); freedv_set_total_bit_errors(freedv, 0);
+            freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
+        }
         freedv_get_modem_stats(freedv, &sync, &snr_est);
         freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);

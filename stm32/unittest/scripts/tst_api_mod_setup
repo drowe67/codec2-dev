@@ -52,6 +52,9 @@ case "${TEST_OPT}" in
 	;;
 
     *)
-	printf "ERROR invalid option, valid options are:\n  700D_TEST\n  700D_CODEC\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700D_TEST\n  700D_CODEC\n"
+	exit 1
       	;;
     esac
+
+exit 0

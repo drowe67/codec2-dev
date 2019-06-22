@@ -252,7 +252,7 @@ int main(int argc, char *argv[]) {
     // Main loop
     while ((num_read = read(f_in, speech_in, (sizeof(short) * n_speech_samples))) ==
                                              (sizeof(short) * n_speech_samples)) {
-        fprintf(stderr, "frame: %d\n", frame);
+        fprintf(stderr, "frame: %d\r", frame);
 
         freedv_tx(freedv, mod_out, speech_in);
 
