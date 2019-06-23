@@ -89,7 +89,7 @@ case "${TEST_OPT}" in
     	echo "00000010" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
-        cp ../../../../raw/hts1.raw spch_in.raw > setup.log 2>&1
+        dd bs=320 count=150 if=../../../../raw/hts1.raw of=spch_in.raw > setup.log 2>&1
 	freedv_tx 1600 spch_in.raw stm_in.raw >> setup.log 2>&1
 	#
         # Reference

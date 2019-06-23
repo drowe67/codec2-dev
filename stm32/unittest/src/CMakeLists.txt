@@ -131,3 +131,11 @@ add_test(NAME tst_api_demod_700D_AWGN_test
          COMMAND sh -c "./run_stm32_tst tst_api_demod 700D_AWGN_test ${UT_PARAMS}"
          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
 
+add_test(NAME tst_api_demod_700D_plain_codec
+         COMMAND sh -c "./run_stm32_tst tst_api_demod 700D_plain_codec ${UT_PARAMS}"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
+
+add_test(NAME tst_api_demod_1600_plain_codec
+         COMMAND sh -c "./run_stm32_tst tst_api_demod 1600_plain_codec ${UT_PARAMS}"
+         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../scripts)
+
