@@ -19,6 +19,19 @@ setup_common "${RUN_DIR}"
 # Change to test directory
 cd "${RUN_DIR}"
 
+# way of performing a rough comparsion of two output speech files that are not exactly the same
+
+function compare_energy() {
+    energy_ref=$(python -c "import numpy as np; x=np.fromfile(\"ref_demod.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
+    energy_target=$(python -c "import numpy as np; x=np.fromfile(\"stm_out.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
+    printf "ref: %f target: %f\n" $energy_ref $energy_target
+	
+    python -c "import sys; sys.exit(1) if abs($energy_ref-$energy_target) < 1 else sys.exit(0)"
+    if [[ $? -eq 1 ]]; then echo "OK"; 
+    else echo "BAD"; 
+     	 let Fails=($Fails + 1)
+    fi
+}
 
 #####################################################################
 ## Test CHECK actions:
@@ -51,7 +64,7 @@ case "${TEST_OPT}" in
 	cber_ref=$(cat ref_gen.log | sed -n "s/^Coded BER.* \([0-9..]*\) Tbits.*/\1/p")
 	printf "REF   uncoded BER: %f coded BER: %f\n" $uber_ref $cber_ref
 
-	# aS per notes in tst_api_demod_setup, coded BER is unreliable
+	# As per notes in tst_api_demod_setup, coded BER is unreliable
 	# for such a short test, so we'll just sanity check the
 	# reference uncoded BER here. Bash can't compare floats
 	# .... so use return code of some python script
@@ -73,20 +86,29 @@ case "${TEST_OPT}" in
 	;;
 
     700D_plain_codec)
-	# 1/ The two output files sound OK, and when plotted look very similar.
-	# 2/ Suspect some small state difference, or perhaps random number generator diverging, sampling
-	#    codec2_rand() at the end of the x86 and stm32 test programs might be useful
-	# 3/ At this stage - we can't make the automatic tests work.  However there is value in running the test
-	#    to ensure no asserts are hit and teh code doesn't crash (e.g. due to an out f memory issue). It
-	#    can be manually tested by listening to the output speech files
+	# 1/ The two output files sound OK, and when plotted look very
+	#    similar, but they don't match on a sample-sample basis.
+	
+	# 2/ Suspect some small state difference, or perhaps random
+	#    number generator diverging, sampling codec2_rand() at the
+	#    end of the x86 and stm32 test programs might show up any
+	#    differences.
 
-	echo "not compared - see comments above"
-        echo "Passed"
+	# 3/ At this stage - we can't make sample by sample automatic
+	#    tests work.  However there is value in running the test
+	#    to ensure no asserts are hit and the code doesn't crash
+	#    (e.g. due to an out of memory issues). A simple energy
+	#    comparison is used on the output speech files , which
+	#    will trap any large errors.
+
+	# 4/ We can also manually evaulate the ouput decoded speech by
+	#    listening to the output speech files.
+
+	compare_energy;
 	;;
 
     1600_plain_codec)
-        echo "not compared - see comments above"
-        echo "Passed"
+	compare_energy;
 	;;
 
     *) 
