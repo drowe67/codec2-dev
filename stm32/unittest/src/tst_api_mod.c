@@ -125,8 +125,8 @@ int main(int argc, char *argv[]) {
     //struct CODEC2 *c2;
     struct my_callback_state  my_cb_state;
 
-    memtools_find_unused(printf);
     semihosting_init();
+    memtools_find_unused(printf);
     
     ////////
     // Test configuration, read from stm_cfg.txt
@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
     }
     assert(freedv != NULL);
     
-    fprintf(stderr, "freedv opened 0x%x\n", (uint32_t)freedv);
+    fprintf(stderr, "freedv opened %p\n", freedv);
 
     freedv_set_test_frames(freedv, config_testframes);
 
@@ -185,7 +185,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", 
     			n_speech_samples, n_nom_modem_samples);
 
-    fprintf(stderr, "mod_out: 0x%x\n", (uint32_t)mod_out);
+    fprintf(stderr, "mod_out: %p\n", mod_out);
  
    /*
     // This is "codectx" operation:
