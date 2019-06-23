@@ -85,15 +85,26 @@ LoopCopyDataInit:
   ldr  r2, =_sbss
   b  LoopFillZerobss
 
-/* Zero fill the bss segment. */
+/* Zero fill all memory from bss up */
 FillZerobss:
   movs  r3, #0
   str  r3, [r2], #4
 
 LoopFillZerobss:
-  ldr  r3, = _ebss
+  ldr  r3, = _ebss     
   cmp  r2, r3
   bcc  FillZerobss
+
+/* Zero memory from bss up with a sentinal value */
+  b  LoopFillsentinel
+Fillsentinel:
+  ldr  r3, = 0x55555555 /* sentinel value we put in memory */ 
+  str  r3, [r2], #4
+
+LoopFillsentinel:
+  ldr  r3, = 0x2001fffc /* end of ram */    
+  cmp  r2, r3
+  bcc  Fillsentinel
 
 /* Call the clock system intitialization function.*/
   bl  SystemInit
