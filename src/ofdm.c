@@ -532,7 +532,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     return(NULL);
 }
 
-void allocate_tx_bpf(struct OFDM *ofdm) {
+static void allocate_tx_bpf(struct OFDM *ofdm) {
     ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
 
     /* Transmit bandpass filter; complex coefficients, center frequency */
@@ -541,7 +541,7 @@ void allocate_tx_bpf(struct OFDM *ofdm) {
     quisk_cfTune(ofdm->ofdm_tx_bpf, ofdm_tx_centre / ofdm_fs);
 }
 
-void deallocate_tx_bpf(struct OFDM *ofdm) {
+static void deallocate_tx_bpf(struct OFDM *ofdm) {
     quisk_filt_destroy(ofdm->ofdm_tx_bpf);
     FREE(ofdm->ofdm_tx_bpf);
     ofdm->ofdm_tx_bpf = NULL;
@@ -1897,5 +1897,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth]);
-};
+}
+
 
