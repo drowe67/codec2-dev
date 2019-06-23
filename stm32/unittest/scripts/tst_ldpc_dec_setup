@@ -46,3 +46,5 @@ case "${TEST_OPT}" in
 	;;
 
     esac
+
+exit 0

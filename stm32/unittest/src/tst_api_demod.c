@@ -43,6 +43,7 @@
 
  */
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -101,10 +102,8 @@ int main(int argc, char *argv[]) {
     struct my_callback_state my_cb_state;
     int            frame;
     int            nread, nin, nout;
-    struct MODEM_STATS stats;
     int            sync;
     float          snr_est;
-    float          clock_offset;
 
     semihosting_init();
 
@@ -143,7 +142,10 @@ int main(int argc, char *argv[]) {
     else {
         freedv = freedv_open(config_mode);
     }
+    assert(freedv != NULL);
 
+    memtools_find_unused(printf);
+    
     freedv_set_test_frames(freedv, config_testframes);
     freedv_set_verbose(freedv, config_verbose);
 
@@ -193,12 +195,10 @@ int main(int argc, char *argv[]) {
             freedv_set_total_bits_coded(freedv, 0); freedv_set_total_bit_errors_coded(freedv, 0);
         }
         freedv_get_modem_stats(freedv, &sync, &snr_est);
-        freedv_get_modem_extended_stats(freedv, &stats);
         int total_bit_errors = freedv_get_total_bit_errors(freedv);
-        clock_offset = stats.clock_offset;
         fprintf(stderr, 
-            "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d clock_offset: %f\n",
-            frame, sync, nin, (double)snr_est, total_bit_errors, (double)clock_offset);
+            "frame: %d  demod sync: %d  nin: %d demod snr: %3.2f dB  bit errors: %d\n",
+            frame, sync, nin, (double)snr_est, total_bit_errors);
 
         frame++;
         nin = freedv_nin(freedv);
