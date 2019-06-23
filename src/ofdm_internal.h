@@ -39,7 +39,6 @@ extern "C"
 
 #include "codec2_ofdm.h"
 #include "filter.h"
-#include "fdv_arm_math.h"
     
 #ifndef M_PI
 #define M_PI        3.14159265358979323846f
@@ -48,8 +47,8 @@ extern "C"
 #define TAU         (2.0f * M_PI)
 #define ROT45       (M_PI / 4.0f)
 
-#define cmplx(value) (COSF(value) + SINF(value) * I)
-#define cmplxconj(value) (COSF(value) + SINF(value) * -I)
+#define cmplx(value) (cosf(value) + sinf(value) * I)
+#define cmplxconj(value) (cosf(value) + sinf(value) * -I)
 
 typedef enum {
     search,

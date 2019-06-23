@@ -37,8 +37,6 @@
 #include <string.h>
 #include <math.h>
 
-#include "fdv_arm_math.h"
-
 #include "fdmdv_internal.h"
 #include "codec2_fdmdv.h"
 #include "comp_prim.h"
@@ -54,11 +52,8 @@
 #include "debug_alloc.h"
 
 static int sync_uw[] = {1,-1,1,-1,1,-1};
-#ifdef __EMBEDDED__
-#define printf gdb_stdio_printf
-#endif
 
-static const COMP  pi_on_4 = { .70710678118654752439, .70710678118654752439 }; // COSF(PI/4) , SINF(PI/4)
+static const COMP  pi_on_4 = { .70710678118654752439, .70710678118654752439 }; // cosf(PI/4) , sinf(PI/4)
 
 
 /*--------------------------------------------------------------------------* \
@@ -116,8 +111,8 @@ struct FDMDV * fdmdv_create(int Nc)
            This helped PAPR for a few dB.  We don't need to adjust rx
            phase as DQPSK takes care of that. */
 
-	f->phase_tx[c].real = COSF(2.0*PI*c/(Nc+1));
- 	f->phase_tx[c].imag = SINF(2.0*PI*c/(Nc+1));
+	f->phase_tx[c].real = cosf(2.0*PI*c/(Nc+1));
+ 	f->phase_tx[c].imag = sinf(2.0*PI*c/(Nc+1));
 
 	f->phase_rx[c].real = 1.0;
  	f->phase_rx[c].imag = 0.0;
@@ -130,12 +125,12 @@ struct FDMDV * fdmdv_create(int Nc)
     f->prev_tx_symbols[Nc].real = 2.0;
 
     fdmdv_set_fsep(f, FSEP);
-    f->freq[Nc].real = COSF(2.0*PI*0.0/FS);
-    f->freq[Nc].imag = SINF(2.0*PI*0.0/FS);
+    f->freq[Nc].real = cosf(2.0*PI*0.0/FS);
+    f->freq[Nc].imag = sinf(2.0*PI*0.0/FS);
     f->freq_pol[Nc]  = 2.0*PI*0.0/FS;
 
-    f->fbb_rect.real     = COSF(2.0*PI*FDMDV_FCENTRE/FS);
-    f->fbb_rect.imag     = SINF(2.0*PI*FDMDV_FCENTRE/FS);
+    f->fbb_rect.real     = cosf(2.0*PI*FDMDV_FCENTRE/FS);
+    f->fbb_rect.imag     = sinf(2.0*PI*FDMDV_FCENTRE/FS);
     f->fbb_pol           = 2.0*PI*FDMDV_FCENTRE/FS;
     f->fbb_phase_tx.real = 1.0;
     f->fbb_phase_tx.imag = 0.0;
@@ -263,15 +258,15 @@ void fdmdv_set_fsep(struct FDMDV *f, float fsep) {
 
     for(c=0; c<f->Nc/2; c++) {
 	carrier_freq = (-f->Nc/2 + c)*f->fsep;
-	f->freq[c].real = COSF(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = SINF(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 
     for(c=f->Nc/2; c<f->Nc; c++) {
 	carrier_freq = (-f->Nc/2 + c + 1)*f->fsep;
-	f->freq[c].real = COSF(2.0*PI*carrier_freq/FS);
- 	f->freq[c].imag = SINF(2.0*PI*carrier_freq/FS);
+	f->freq[c].real = cosf(2.0*PI*carrier_freq/FS);
+ 	f->freq[c].imag = sinf(2.0*PI*carrier_freq/FS);
  	f->freq_pol[c]  = 2.0*PI*carrier_freq/FS;
     }
 }
@@ -882,8 +877,8 @@ void fdmdv_freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff,
     float mag;
     int   i;
 
-    foff_rect.real = COSF(2.0*PI*foff/FS);
-    foff_rect.imag = SINF(2.0*PI*foff/FS);
+    foff_rect.real = cosf(2.0*PI*foff/FS);
+    foff_rect.imag = sinf(2.0*PI*foff/FS);
     for(i=0; i<nin; i++) {
 	*foff_phase_rect = cmult(*foff_phase_rect, foff_rect);
 	rx_fdm_fcorr[i] = cmult(rx_fdm[i], *foff_phase_rect);
@@ -1176,8 +1171,8 @@ void down_convert_and_rx_filter(COMP rx_filt[NC+1][P+1], int Nc, COMP rx_fdm[],
 
         //PROFILE_SAMPLE(windback_start);
         windback_phase           = -freq_pol[c]*NFILTER;
-        windback_phase_rect.real = COSF(windback_phase);
-        windback_phase_rect.imag = SINF(windback_phase);
+        windback_phase_rect.real = cosf(windback_phase);
+        windback_phase_rect.imag = sinf(windback_phase);
         phase_rx[c]              = cmult(phase_rx[c],windback_phase_rect);
         //PROFILE_SAMPLE_AND_LOG(downconvert_start, windback_start, "        windback");
 
@@ -1262,7 +1257,7 @@ float rx_est_timing(COMP rx_symbols[],
     adjust = P - nin*P/m;
 
     /* update buffer of NT rate P filtered symbols */
-
+ 
     for(c=0; c<Nc+1; c++)
 	for(i=0,j=P-adjust; i<(NT-1)*P+adjust; i++,j++)
 	    rx_filter_mem_timing[c][i] = rx_filter_mem_timing[c][j];
@@ -1283,8 +1278,8 @@ float rx_est_timing(COMP rx_symbols[],
        out single DFT at frequency 2*pi/P */
 
     x.real = 0.0; x.imag = 0.0;
-    freq.real = COSF(2*PI/P);
-    freq.imag = SINF(2*PI/P);
+    freq.real = cosf(2*PI/P);
+    freq.imag = sinf(2*PI/P);
     phase.real = 1.0;
     phase.imag = 0.0;
 
@@ -1298,7 +1293,6 @@ float rx_est_timing(COMP rx_symbols[],
 
     norm_rx_timing = atan2f(x.imag, x.real)/(2*PI);
     assert(fabsf(norm_rx_timing) < 1.0);
-    //fprintf(stderr,"%f %f norm_rx_timing: %f\n", x.real, x.imag, norm_rx_timing);
     rx_timing      = norm_rx_timing*P + P/4;
 
     if (rx_timing > P)
@@ -1617,6 +1611,7 @@ int freq_state(int *reliable_sync_bit, int sync_bit, int *state, int *timer, int
 
 \*---------------------------------------------------------------------------*/
 
+
 void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
 		 int *reliable_sync_bit, COMP rx_fdm[], int *nin)
 {
@@ -1640,7 +1635,7 @@ void fdmdv_demod(struct FDMDV *fdmdv, int rx_bits[],
     PROFILE_SAMPLE(demod_start);
     foff_coarse = rx_est_freq_offset(fdmdv, rx_fdm_bb, *nin, !fdmdv->sync);
     PROFILE_SAMPLE_AND_LOG(fdmdv_freq_shift_start, demod_start, "    rx_est_freq_offset");
-
+    
     if (fdmdv->sync == 0)
 	fdmdv->foff = foff_coarse;
     fdmdv_freq_shift(rx_fdm_fcorr, rx_fdm_bb, -fdmdv->foff, &fdmdv->foff_phase_rect, *nin);
