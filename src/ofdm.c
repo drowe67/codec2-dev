@@ -983,7 +983,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     int fcoarse = 0;
     int n = 0;
-    int timing_mx = 0;
+    float timing_mx = 0;
     int ct_est = 0;       /* this could be bad default [srsampson] */
 
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
