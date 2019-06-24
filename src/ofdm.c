@@ -1010,7 +1010,7 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
 static int ofdm_sync_search_core(struct OFDM *ofdm) {
 #ifdef _NO_WVEC
     complex float wvec[2][2 * ofdm_samplesperframe];
-    int n = 0, i, ref;
+    int n = 0, i, nval, ref;
 #endif
     int act_est, afcoarse;
 
@@ -1029,14 +1029,19 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
         /* these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static */
 
         if (afcoarse != 0) {
+            nval = 0;
 
             // double array is used so we only have to complex multiply once
             // ofdm_nval used to limit float multiplications (200 versus oodles)
             for (i = 0, ref = st; ref < en; i++, ref++) {
                 if (afcoarse == -40) {
-                    wvec[n][i] = conjf(ofdm_wval[i % ofdm_nval]) * ofdm->rxbuf[ref];
+                    wvec[n][i] = conjf(ofdm_wval[nval]) * ofdm->rxbuf[ref];
                 } else {
-                    wvec[n][i] = ofdm_wval[i % ofdm_nval] * ofdm->rxbuf[ref];
+                    wvec[n][i] = ofdm_wval[nval] * ofdm->rxbuf[ref];
+                }
+
+                if (nval++ == ofdm_nval) {
+                    nval = 0;
                 }
             }
             /* choose best timing offset metric at this freq offset */
