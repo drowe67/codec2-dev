@@ -1563,8 +1563,6 @@ void ofdm_set_sync(struct OFDM *ofdm, int sync_cmd) {
 \*---------------------------------------------------------------------------*/
 
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
-    int c, r;
-
     stats->Nc = ofdm_nc;
     assert(stats->Nc <= MODEM_STATS_NC_MAX);
 
@@ -1584,17 +1582,19 @@ void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats) {
 
     stats->sync_metric = ofdm->timing_mx;
 
+#ifndef __EMBEDDED__
     assert(ofdm_rowsperframe < MODEM_STATS_NR_MAX);
     stats->nr = ofdm_rowsperframe;
 
-    for (c = 0; c < ofdm_nc; c++) {
-        for (r = 0; r < ofdm_rowsperframe; r++) {
+    for (int c = 0; c < ofdm_nc; c++) {
+        for (int r = 0; r < ofdm_rowsperframe; r++) {
             complex float rot = ofdm->rx_np[r * c] * cmplx(ROT45);
 
             stats->rx_symbols[r][c].real = crealf(rot);
             stats->rx_symbols[r][c].imag = cimagf(rot);
         }
     }
+#endif    
 }
 
 /* Assemble modem frame of bits from UW, payload bits, and txt bits */

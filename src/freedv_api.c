@@ -2800,6 +2800,8 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_get_demod_stats(f->ofdm, &f->stats);
+	printf("sizeof(struct freedv): %d\n", sizeof(struct freedv));
+	printf("f->stats.snr_est: %f\n", f->stats.snr_est);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, &f->stats);

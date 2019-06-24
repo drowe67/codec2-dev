@@ -98,7 +98,7 @@ case "${TEST_OPT}" in
 	;;
     
     *)
-	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n\n  1600_plain_codec\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n  1600_plain_codec\n"
 	exit 1
       	;;
 

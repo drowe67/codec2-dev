@@ -95,7 +95,6 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
     *size = 0;
 }
 
-
 int main(int argc, char *argv[]) {
     int            f_cfg, f_in, f_out;
     struct freedv *freedv;
@@ -106,7 +105,7 @@ int main(int argc, char *argv[]) {
     float          snr_est;
 
     semihosting_init();
-
+    
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
@@ -223,10 +222,8 @@ int main(int argc, char *argv[]) {
     close(f_in);
     close(f_out);
 
+    memtools_find_unused(printf);
     printf("\nEnd of Test\n");
-    fclose(stdout);
-    fclose(stderr);
-
 }
 
 /* vi:set ts=4 et sts=4: */
