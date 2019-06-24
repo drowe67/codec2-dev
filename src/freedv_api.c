@@ -136,6 +136,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->n_protocol_bits = 0;
     f->frames = 0;
     f->speech_sample_rate = FS_VOICE_8K;
+    f->stats.snr_est = 0.0;
     
     /* -----------------------------------------------------------------------------------------------*\
     |                     Init states for this mode, and set up samples in/out                         |
@@ -251,6 +252,9 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         }
 
         set_up_hra_112_112(f->ldpc, ofdm_config);
+#ifdef __EMBEDDED__
+	f->ldpc->max_iter = 10;
+#endif	
         int coded_syms_per_frame = f->ldpc->coded_syms_per_frame;
         
         if (adv == NULL) {
@@ -2224,7 +2228,7 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if (f->verbose && (ofdm->last_sync_state == search)) {
+    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
         fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
 		(double)ofdm->foff_est_hz,
@@ -2800,8 +2804,6 @@ void freedv_get_modem_stats(struct freedv *f, int *sync, float *snr_est)
         cohpsk_get_demod_stats(f->cohpsk, &f->stats);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
         ofdm_get_demod_stats(f->ofdm, &f->stats);
-	printf("sizeof(struct freedv): %d\n", sizeof(struct freedv));
-	printf("f->stats.snr_est: %f\n", f->stats.snr_est);
     }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400B, f->mode)) {
         fmfsk_get_demod_stats(f->fmfsk, &f->stats);

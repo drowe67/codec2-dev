@@ -54,6 +54,8 @@
 #include <math.h>
 #include <errno.h>
 
+#define PROFILE
+
 #include "freedv_api.h"
 #include "modem_stats.h"
 #include "codec2.h"
@@ -105,7 +107,9 @@ int main(int argc, char *argv[]) {
     float          snr_est;
 
     semihosting_init();
-    
+    PROFILE_VAR(freedv_rx_start);
+    machdep_profile_init();
+
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
@@ -127,7 +131,8 @@ int main(int argc, char *argv[]) {
     config_verbose = config[6] - '0';
     //config_profile = config[7] - '0';
     close(f_cfg);
-
+    printf("config_mode: %d config_verbose: %d\n", config_mode, config_verbose);
+    
     ////////
     // Static config
     int interleave_frames = 1; 
@@ -183,7 +188,10 @@ int main(int argc, char *argv[]) {
         
         fprintf(stderr, "frame: %d, %d bytes read\n", frame, nread);
 
-        nout = freedv_rx(freedv, speech_out, demod_in);
+	PROFILE_SAMPLE(freedv_rx_start);
+	nout = freedv_rx(freedv, speech_out, demod_in);
+	PROFILE_SAMPLE_AND_LOG2(freedv_rx_start, "  freedv_rx");
+	machdep_profile_print_logged_samples();
 
         fprintf(stderr, "  %d short speech values returned\n", nout);
         if (nout) write(f_out, speech_out, (sizeof(short) * nout));

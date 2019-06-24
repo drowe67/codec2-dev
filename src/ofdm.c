@@ -278,12 +278,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     /* allocate rx_sym column storage */ 
 
-    int free_last_rx_sym = 0;
-    
     for (i = 0; i < (ofdm_ns + 3); i++) {
         ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * (ofdm_nc + 2));
 	assert(ofdm->rx_sym[i] != NULL);
-    	free_last_rx_sym = (ofdm_ns + 3);
     }
 
     /* The rest of these are 1D arrays of variable size */
