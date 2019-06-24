@@ -38,7 +38,7 @@
 #include "ofdm_internal.h"
 #include "codec2_ofdm.h"
 #include "filter.h"
-
+#include "wval.h"
 #include "debug_alloc.h"
 
 /* Static Prototypes */
@@ -53,6 +53,8 @@ static int ofdm_sync_search_core(struct OFDM *);
 
 #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
+
+#define OFDM_WFREQ 40.0f
 
 /*
  * QPSK Quadrant bit-pair values - Gray Coded
@@ -119,6 +121,9 @@ static int ofdm_max_samplesperframe;
 static int ofdm_rxbuf;
 static int ofdm_ntxtbits; /* reserve bits/frame for aux text information */
 static int ofdm_nuwbits; /* Unique word used for positive indication of lock */
+
+static float ofdm_w;
+static int ofdm_nval;
 
 /* Local Functions ----------------------------------------------------------*/
 
@@ -252,6 +257,11 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * half a symbol intervals
      */
     ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
+
+    /* Sync Vector Table Constants, ofdm_wval in wval.h */
+
+    ofdm_nval = (int)(ofdm_fs / OFDM_WFREQ);
+    ofdm_w = TAU * OFDM_WFREQ / ofdm_fs;
 
     /* Were ready to start filling in the OFDM structure now */
 
@@ -991,12 +1001,15 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
         /* these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static */
 
         if (afcoarse != 0) {
-            float w = TAU * (float) afcoarse / ofdm_fs;
 
             // double array is used so we only have to complex multiply once
-
-            for (i = 0, ref = st; i < (2 * ofdm_samplesperframe); i++, ref++) {
-                wvec[n][i] = cmplxconj(w * i) * ofdm->rxbuf[ref];
+            // ofdm_nval used to limit float multiplications (200 versus oodles)
+            for (i = 0, ref = st; ref < en; i++, ref++) {
+                if (afcoarse == -40) {
+                    wvec[n][i] = conjf(ofdm_wval[i % ofdm_nval]) * ofdm->rxbuf[ref];
+                } else {
+                    wvec[n][i] = ofdm_wval[i % ofdm_nval] * ofdm->rxbuf[ref];
+                }
             }
 
             /* choose best timing offset metric at this freq offset */
