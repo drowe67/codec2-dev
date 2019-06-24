@@ -657,7 +657,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * to break down when freq offset approaches +/- symbol rate (e.g
  * +/- 25 Hz for 700D).
  */
-static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
+static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse) {
     complex float csam, corr_st, corr_en;
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
@@ -676,8 +676,20 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
         corr_en = 0.0f;
 
         for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-            csam = conjf(ofdm->pilot_samples[j]);
-
+            /* roll frequency shift into inner loop to save memory */
+            switch(fcoarse) {
+            case -40:
+                csam = conjf(ofdm_wval[j % ofdm_nval]*ofdm->pilot_samples[j]);
+                break;
+            case 0:
+                csam = conjf(ofdm->pilot_samples[j]);
+                break;
+            case 40:
+                csam = ofdm_wval[j % ofdm_nval]*conjf(ofdm->pilot_samples[j]);
+                break;
+            default:
+                assert(0);
+            }
             corr_st = corr_st + (rx[i + j                       ] * csam);
             corr_en = corr_en + (rx[i + j + ofdm_samplesperframe] * csam);
         }
@@ -713,7 +725,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length) {
  * coarse freq offset estimation during acquisition.  Works up to +/-
  * the symbol rate, e.g. +/- 25Hz for the FreeDV 700D configuration.
  */
-static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est) {
+static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est, int fcoarse) {
     complex float corr_st, corr_en;
 
     // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
@@ -727,7 +739,20 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
             complex float w = cmplxconj(tmp * i);
-            complex float csam = conjf(ofdm->pilot_samples[i]);
+            complex float csam;
+            switch(fcoarse) {
+            case -40:
+                csam = conjf(ofdm_wval[i % ofdm_nval]*ofdm->pilot_samples[i]);
+                break;
+            case 0:
+                csam = conjf(ofdm->pilot_samples[i]);
+                break;
+            case 40:
+                csam = ofdm_wval[i % ofdm_nval]*conjf(ofdm->pilot_samples[i]);
+                break;
+            default:
+                assert(0);
+            }
 
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
 
@@ -983,8 +1008,11 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
  * Attempts to find coarse sync parameters for modem initial sync
  */
 static int ofdm_sync_search_core(struct OFDM *ofdm) {
+#ifdef _NO_WVEC
     complex float wvec[2][2 * ofdm_samplesperframe];
-    int i, ref, act_est, afcoarse;
+    int n = 0, i, ref;
+#endif
+    int act_est, afcoarse;
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
 
@@ -992,10 +1020,10 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     int en = st + 2 * ofdm_samplesperframe;
 
     int fcoarse = 0;
-    int n = 0;
     float timing_mx = 0.0f;
     int ct_est = 0;       /* this could be bad default [srsampson] */
 
+#ifdef _NO_WVEC
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
         /* vector of local oscillator samples to shift input vector */
         /* these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static */
@@ -1011,7 +1039,6 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
                     wvec[n][i] = ofdm_wval[i % ofdm_nval] * ofdm->rxbuf[ref];
                 }
             }
-
             /* choose best timing offset metric at this freq offset */
 
             act_est = est_timing(ofdm, wvec[n], (en - st));
@@ -1027,7 +1054,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
             fcoarse = afcoarse;
         }
     }
-  
+
     /* refine freq est within -/+ 20 Hz window */
 
     if ((fcoarse == -40) || (fcoarse == 40)) {
@@ -1038,6 +1065,20 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
         /* exp(-j*0) is just 1 when fcoarse is 0 */
         ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est);
     }
+#endif
+    for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
+        act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse);
+        if (ofdm->timing_mx > timing_mx) {
+            ct_est = act_est;
+            timing_mx = ofdm->timing_mx;
+            fcoarse = afcoarse;
+        }
+    }
+    
+    /* refine freq est within -/+ 20 Hz window */
+
+    ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est, fcoarse);
+    ofdm->coarse_foff_est_hz += fcoarse;
 
     if (ofdm->verbose != 0) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
@@ -1145,7 +1186,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             work[j] = ofdm->rxbuf[i] * cmplxconj(woff_est * i);
         }
 
-        int ft_est = est_timing(ofdm, work, (en - st));
+        int ft_est = est_timing(ofdm, work, (en - st), 0.0f);
         
         ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
 
