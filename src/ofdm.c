@@ -43,11 +43,18 @@
 
 /* Static Prototypes */
 
-static complex float vector_sum(complex float *, int);
+static float cnormf(complex float);
+static complex float qpsk_mod(int *);
+static void qpsk_demod(complex float, int *);
+static void allocate_tx_bpf(struct OFDM *);
+static void deallocate_tx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
-static void ofdm_demod_core(struct OFDM *, int *);
+static complex float vector_sum(complex float *, int);
+static int est_timing(struct OFDM *, complex float *, int, int);
+static float est_freq_offset_pilot_corr(struct OFDM *, complex float *, int, int);
 static int ofdm_sync_search_core(struct OFDM *);
+static void ofdm_demod_core(struct OFDM *, int *);
 
 /* Defines */
 
@@ -137,7 +144,7 @@ static float cnormf(complex float val) {
 /*
  * Gray coded QPSK modulation function
  */
-complex float qpsk_mod(int *bits) {
+static complex float qpsk_mod(int *bits) {
     return constellation[(bits[1] << 1) | bits[0]];
 }
 
@@ -148,7 +155,7 @@ complex float qpsk_mod(int *bits) {
  * ---+---
  * 11 | 10
  */
-void qpsk_demod(complex float symbol, int *bits) {
+static void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cmplx(ROT45);
 
     bits[0] = crealf(rotate) < 0.0f;
