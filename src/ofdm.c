@@ -44,8 +44,6 @@
 /* Static Prototypes */
 
 static float cnormf(complex float);
-static complex float qpsk_mod(int *);
-static void qpsk_demod(complex float, int *);
 static void allocate_tx_bpf(struct OFDM *);
 static void deallocate_tx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
@@ -144,7 +142,7 @@ static float cnormf(complex float val) {
 /*
  * Gray coded QPSK modulation function
  */
-static complex float qpsk_mod(int *bits) {
+complex float qpsk_mod(int *bits) {
     return constellation[(bits[1] << 1) | bits[0]];
 }
 
@@ -155,7 +153,7 @@ static complex float qpsk_mod(int *bits) {
  * ---+---
  * 11 | 10
  */
-static void qpsk_demod(complex float symbol, int *bits) {
+void qpsk_demod(complex float symbol, int *bits) {
     complex float rotate = symbol * cmplx(ROT45);
 
     bits[0] = crealf(rotate) < 0.0f;
