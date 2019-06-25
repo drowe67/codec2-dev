@@ -157,8 +157,6 @@ struct OFDM {
 
 /* Prototypes */
 
-complex float qpsk_mod(int *);
-void qpsk_demod(complex float, int *);
 void ofdm_txframe(struct OFDM *, complex float *, complex float []);
 void ofdm_assemble_modem_frame(struct OFDM *, uint8_t [], uint8_t [], uint8_t []);
 void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
