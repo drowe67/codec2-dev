@@ -59,8 +59,6 @@ static void ofdm_demod_core(struct OFDM *, int *);
 #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
-#define OFDM_WFREQ 40.0f
-
 /*
  * QPSK Quadrant bit-pair values - Gray Coded
  */
@@ -126,9 +124,6 @@ static int ofdm_max_samplesperframe;
 static int ofdm_rxbuf;
 static int ofdm_ntxtbits; /* reserve bits/frame for aux text information */
 static int ofdm_nuwbits; /* Unique word used for positive indication of lock */
-
-static float ofdm_w;
-static int ofdm_nval;
 
 /* Local Functions ----------------------------------------------------------*/
 
@@ -262,11 +257,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * half a symbol intervals
      */
     ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
-
-    /* Sync Vector Table Constants, ofdm_wval in wval.h */
-
-    ofdm_nval = (int)(ofdm_fs / OFDM_WFREQ);
-    ofdm_w = TAU * OFDM_WFREQ / ofdm_fs;
 
     /* Were ready to start filling in the OFDM structure now */
 
@@ -684,13 +674,13 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
             /* roll frequency shift into inner loop to save memory */
             switch(fcoarse) {
             case -40:
-                csam = conjf(ofdm_wval[j % ofdm_nval]*ofdm->pilot_samples[j]);
+                csam = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
                 break;
             case 0:
                 csam = conjf(ofdm->pilot_samples[j]);
                 break;
             case 40:
-                csam = ofdm_wval[j % ofdm_nval]*conjf(ofdm->pilot_samples[j]);
+                csam = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
                 break;
             default:
                 assert(0);
@@ -747,13 +737,13 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
             complex float csam;
             switch(fcoarse) {
             case -40:
-                csam = conjf(ofdm_wval[i % ofdm_nval]*ofdm->pilot_samples[i]);
+                csam = conjf(ofdm_wval[i]*ofdm->pilot_samples[i]);
                 break;
             case 0:
                 csam = conjf(ofdm->pilot_samples[i]);
                 break;
             case 40:
-                csam = ofdm_wval[i % ofdm_nval]*conjf(ofdm->pilot_samples[i]);
+                csam = ofdm_wval[i]*conjf(ofdm->pilot_samples[i]);
                 break;
             default:
                 assert(0);
@@ -1013,10 +1003,6 @@ int ofdm_sync_search_shorts(struct OFDM *ofdm, short *rxbuf_in, float gain) {
  * Attempts to find coarse sync parameters for modem initial sync
  */
 static int ofdm_sync_search_core(struct OFDM *ofdm) {
-#ifdef _NO_WVEC
-    complex float wvec[2][2 * ofdm_samplesperframe];
-    int n = 0, i, nval, ref;
-#endif
     int act_est, afcoarse;
 
     /* Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets */
@@ -1028,54 +1014,6 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     float timing_mx = 0.0f;
     int ct_est = 0;       /* this could be bad default [srsampson] */
 
-#ifdef _NO_WVEC
-    for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
-        /* vector of local oscillator samples to shift input vector */
-        /* these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static */
-
-        if (afcoarse != 0) {
-            nval = 0;
-
-            // double array is used so we only have to complex multiply once
-            // ofdm_nval used to limit float multiplications (200 versus oodles)
-            for (i = 0, ref = st; ref < en; i++, ref++) {
-                if (afcoarse == -40) {
-                    wvec[n][i] = conjf(ofdm_wval[nval]) * ofdm->rxbuf[ref];
-                } else {
-                    wvec[n][i] = ofdm_wval[nval] * ofdm->rxbuf[ref];
-                }
-
-                if (nval++ == ofdm_nval) {
-                    nval = 0;
-                }
-            }
-            /* choose best timing offset metric at this freq offset */
-
-            act_est = est_timing(ofdm, wvec[n], (en - st));
-            n++;
-        } else {
-            /* exp(-j*0) is just 1 when afcoarse is 0 */
-            act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st));
-        }
-    
-        if (ofdm->timing_mx > timing_mx) {
-            ct_est = act_est;
-            timing_mx = ofdm->timing_mx;
-            fcoarse = afcoarse;
-        }
-    }
-
-    /* refine freq est within -/+ 20 Hz window */
-
-    if ((fcoarse == -40) || (fcoarse == 40)) {
-        n = (fcoarse == 40);
-        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, wvec[n], ct_est);
-        ofdm->coarse_foff_est_hz += fcoarse;
-    } else {
-        /* exp(-j*0) is just 1 when fcoarse is 0 */
-        ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est);
-    }
-#endif
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
         act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse);
         if (ofdm->timing_mx > timing_mx) {
