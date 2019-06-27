@@ -109,7 +109,7 @@ case "${TEST_OPT}" in
 	# make sure execution time stays within bounds
 	execution_time=mktmp
 	cat stdout.log | sed  -n "s/.*freedv_rx \([0-9..]*\) msecs/\1/p" > $execution_time
-	python -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"max execution time: %5.2f ms\" % (np.max(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
+	python -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
 	if [[ $? -eq 1 ]]; then echo "execution time OK"; 
         else echo "BAD"; 
      	   let Fails=($Fails + 1)

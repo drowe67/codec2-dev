@@ -97,7 +97,14 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
     *size = 0;
 }
 
+#define SPARE_RAM 10000
+
+//extern void *heap_end;
+extern uint32_t __heap_limit;
+void **heap_end = (void*)0x20001418;
+
 int main(int argc, char *argv[]) {
+    char           dummy[SPARE_RAM];
     int            f_cfg, f_in, f_out;
     struct freedv *freedv;
     struct my_callback_state my_cb_state;
@@ -106,10 +113,14 @@ int main(int argc, char *argv[]) {
     int            sync;
     float          snr_est;
 
+    // Force test to fail unless we have this much spare RAM (adjusted by experiment)
+    memset(dummy, 0, SPARE_RAM);
+    
     semihosting_init();
     PROFILE_VAR(freedv_rx_start);
     machdep_profile_init();
-
+    printf("heap_end: %p  __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
+    
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
@@ -149,6 +160,7 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     memtools_find_unused(printf);
+    printf("heap_end: %p __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
     
     freedv_set_test_frames(freedv, config_testframes);
     freedv_set_verbose(freedv, config_verbose);
@@ -162,7 +174,6 @@ int main(int argc, char *argv[]) {
     freedv_set_callback_txt(freedv, &my_put_next_rx_char, NULL, &my_cb_state);
     freedv_set_callback_protocol(freedv, &my_put_next_rx_proto, NULL, &my_cb_state);
     freedv_set_callback_data(freedv, my_datarx, my_datatx, &my_cb_state);
-
 
     ////////
     // Streams
@@ -231,6 +242,7 @@ int main(int argc, char *argv[]) {
     close(f_out);
 
     memtools_find_unused(printf);
+    printf("heap_end: %p __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
     printf("\nEnd of Test\n");
 }
 
