@@ -10,7 +10,6 @@
 
 #include <stdio.h>
 
-#ifdef DEBUG_ALLOC
 // Debug calls
 
 #ifdef CORTEX_M4
@@ -29,7 +28,6 @@ register char * sp asm ("sp");
     fprintf(stderr, "\n");
     return(ptr);
     }
-  #define MALLOC(size) DEBUG_MALLOC(__func__, size)
 
   static inline void * DEBUG_CALLOC(const char *func, size_t nmemb, size_t size) {
     void *ptr = calloc(nmemb, size);
@@ -41,15 +39,15 @@ register char * sp asm ("sp");
     fprintf(stderr, "\n");
     return(ptr);
     }
-  #define CALLOC(nmemb, size) DEBUG_CALLOC(__func__, nmemb, size)
-
   static inline void DEBUG_FREE(const char *func, void *ptr) {
     free(ptr);
     fprintf(stderr, "FREE: %s %p\n", func, ptr);
     }
+
+#ifdef DEBUG_ALLOC
+  #define MALLOC(size) DEBUG_MALLOC(__func__, size
+  #define CALLOC(nmemb, size) DEBUG_CALLOC(__func__, nmemb, size)
   #define FREE(ptr) DEBUG_FREE(__func__, ptr)
-
-
 #else //DEBUG_ALLOC
 // Default to normal calls
   #define MALLOC(size) malloc(size)
