@@ -28,11 +28,11 @@ fi
 # Call setup - run - check scripts
 ${TEST}_setup ${TEST} ${TEST_OPT} --clean || { echo "ERROR in ${TEST}_setup! Exiting..."; exit 1; }
 cd "${RUN_DIR}" 
-run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} |& tee gdb.log
+run_stm32_prog ${UNITTEST_BIN}/${TEST}.elf ${LOAD} ${OPENOCD} | tee gdb.log
+[ ! ${PIPESTATUS[0]} -eq 0 ] && { echo "ERROR in run_stm32_prog! Exiting..."; exit 1; }
 # stop now if we see an assert() fire, no point running check phase
 grep -q assertion gdb.log && exit 1
 ${TEST}_check ${TEST} ${TEST_OPT} 2>&1 | tee check.log
-# fancy bash way of testing fail code of first command in pipe
 if [ ! "${PIPESTATUS[0]}" -eq 0 ]; then
     let Fails=($Fails + 1)
 fi
