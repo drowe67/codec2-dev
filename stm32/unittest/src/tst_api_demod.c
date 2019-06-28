@@ -99,10 +99,6 @@ void my_datatx(void *callback_state, unsigned char *packet, size_t *size) {
 
 #define SPARE_RAM 10000
 
-//extern void *heap_end;
-extern uint32_t __heap_limit;
-void **heap_end = (void*)0x20001418;
-
 int main(int argc, char *argv[]) {
     char           dummy[SPARE_RAM];
     int            f_cfg, f_in, f_out;
@@ -119,7 +115,6 @@ int main(int argc, char *argv[]) {
     semihosting_init();
     PROFILE_VAR(freedv_rx_start);
     machdep_profile_init();
-    printf("heap_end: %p  __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
     
     ////////
     // Test configuration, read from stm_cfg.txt
@@ -160,7 +155,6 @@ int main(int argc, char *argv[]) {
     assert(freedv != NULL);
 
     memtools_find_unused(printf);
-    printf("heap_end: %p __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
     
     freedv_set_test_frames(freedv, config_testframes);
     freedv_set_verbose(freedv, config_verbose);
@@ -242,7 +236,6 @@ int main(int argc, char *argv[]) {
     close(f_out);
 
     memtools_find_unused(printf);
-    printf("heap_end: %p __heap_limit: 0x%lx\n", *heap_end,  __heap_limit);
     printf("\nEnd of Test\n");
 }
 
