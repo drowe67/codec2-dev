@@ -49,7 +49,7 @@ static void deallocate_tx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
-static int est_timing(struct OFDM *, complex float *, int, int);
+static int est_timing(struct OFDM *, complex float *, int, int, float *, int *);
 static float est_freq_offset_pilot_corr(struct OFDM *, complex float *, int, int);
 static int ofdm_sync_search_core(struct OFDM *);
 static void ofdm_demod_core(struct OFDM *, int *);
@@ -652,7 +652,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * to break down when freq offset approaches +/- symbol rate (e.g
  * +/- 25 Hz for 700D).
  */
-static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse) {
+static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid) {
     complex float csam, corr_st, corr_en;
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
@@ -694,22 +694,21 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
 
     /* find the max magnitude and its index */
 
-    float timing_mx = 0.0f;
     int timing_est = 0;
-
+    *timing_mx = 0.0f;
+    
     for (i = 0; i < Ncorr; i++) {
-        if (corr[i] > timing_mx) {
-            timing_mx = corr[i];
+        if (corr[i] > *timing_mx) {
+            *timing_mx = corr[i];
             timing_est = i;
         }
     }
 
-    ofdm->timing_mx = timing_mx;
-    ofdm->timing_valid = (timing_mx > ofdm_timing_mx_thresh); /* bool but used as external int */
+    *timing_valid = (*timing_mx > ofdm_timing_mx_thresh); /* bool but used as external int */
 
     if (ofdm->verbose > 2) {
         fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", (double) av_level,
-             (double) ofdm->timing_mx, timing_est, ofdm->timing_valid);
+             (double) *timing_mx, timing_est, *timing_valid);
     }
 
     return timing_est;
@@ -1011,15 +1010,17 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     int en = st + 2 * ofdm_samplesperframe;
 
     int fcoarse = 0;
-    float timing_mx = 0.0f;
-    int ct_est = 0;       /* this could be bad default [srsampson] */
-
+    float atiming_mx, timing_mx = 0.0f;
+    int ct_est = 0;     
+    int atiming_valid, timing_valid = 0;
+    
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
-        act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse);
-        if (ofdm->timing_mx > timing_mx) {
+        act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse, &atiming_mx, &atiming_valid);
+        if (atiming_mx > timing_mx) {
             ct_est = act_est;
-            timing_mx = ofdm->timing_mx;
+            timing_mx = atiming_mx;
             fcoarse = afcoarse;
+            timing_valid = atiming_valid;
         }
     }
     
@@ -1030,11 +1031,11 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     if (ofdm->verbose != 0) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
-                ct_est, (double) ofdm->coarse_foff_est_hz, ofdm->timing_valid,
-                (double) ofdm->timing_mx);
+                ct_est, (double) ofdm->coarse_foff_est_hz, timing_valid,
+                (double)timing_mx);
     }
 
-    if (ofdm->timing_valid != 0) {
+    if (timing_valid != 0) {
         /* potential candidate found .... */
 
         /* calculate number of samples we need on next buffer to get into sync */
@@ -1045,6 +1046,8 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
         ofdm->sample_point = ofdm->timing_est = 0;
         ofdm->foff_est_hz = ofdm->coarse_foff_est_hz;
+        ofdm->timing_valid = timing_valid;
+        ofdm->timing_mx = timing_mx;
     } else {
         ofdm->nin = ofdm_samplesperframe;
     }
@@ -1134,7 +1137,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             work[j] = ofdm->rxbuf[i] * cmplxconj(woff_est * i);
         }
 
-        int ft_est = est_timing(ofdm, work, (en - st), 0.0f);
+        int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid);
         
         ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
 
