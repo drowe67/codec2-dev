@@ -56,6 +56,7 @@
 
 #define NFRAMES  100               /* just log the first 100 frames          */
 #define NDISCARD 20                /* BER2 measure discards first 20 frames   */
+#define FS       8000.0f
 
 static struct OFDM_CONFIG *ofdm_config;
 
@@ -141,7 +142,10 @@ int main(int argc, char *argv[]) {
     float ts = 0.018f;
     float rx_centre = 1500.0f;
     float tx_centre = 1500.0f;
-    
+
+    float time_to_sync = -1;
+    float start_secs = 0.0;
+    float len_secs = 0.0;
     struct optparse options;
 
     struct optparse_long longopts[] = {
@@ -161,6 +165,8 @@ int main(int argc, char *argv[]) {
         {"ts", 'l', OPTPARSE_REQUIRED},
         {"ns", 'm', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
+        {"start_secs", 'x', OPTPARSE_REQUIRED},        
+        {"len_secs", 'y', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -235,7 +241,15 @@ int main(int argc, char *argv[]) {
                 verbose = atoi(options.optarg);
                 if (verbose < 0 || verbose > 3)
                     verbose = 0;
-        }
+                break;
+            case 'x':
+                 start_secs = atoi(options.optarg);
+                 break;
+            case 'y':
+                 len_secs = atoi(options.optarg);
+                 break;
+                 
+       }
     }
 
     /* Print remaining arguments to give user a hint */
@@ -284,7 +298,7 @@ int main(int argc, char *argv[]) {
     ofdm_config->tcp = tcp;
     ofdm_config->tx_centre = tx_centre;
     ofdm_config->rx_centre = rx_centre;
-    ofdm_config->fs = 8000.0f; /* Sample Frequency */
+    ofdm_config->fs = FS; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
     if ((phase_est_bandwidth <= 2) && (phase_est_bandwidth >= 0)) {
@@ -447,8 +461,14 @@ int main(int argc, char *argv[]) {
     int nin_frame = ofdm_get_nin(ofdm);
 
     int f = 0;
+    int finish = 0;
 
-    while (fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) {
+    if (start_secs != 0.0) {
+        int offset = start_secs*FS*sizeof(short);
+        fseek(fin, offset, SEEK_SET);
+    }
+    
+    while ((fread(rx_scaled, sizeof (short), nin_frame, fin) == nin_frame) && !finish) {
 
         bool log_payload_syms = false;
 
@@ -648,6 +668,12 @@ int main(int argc, char *argv[]) {
                     statemode[ofdm->last_sync_state_interleaver],
                     ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
+
+            /* detect a sucessful sync for time to sync tests */
+            if ((time_to_sync < 0) && ((ofdm->sync_state == synced) || (ofdm->sync_state == trial)))          
+                if ((parityCheckCount[r] > 80) && (iter[r] != 100))
+                    time_to_sync = (float)(f+1)*ofdm_get_samples_per_frame()/FS;
+
         }
 
         /* optional logging of states */
@@ -686,6 +712,11 @@ int main(int argc, char *argv[]) {
                 log_active = false;
         }
 
+        if (len_secs != 0.0) {
+            float secs = (float)f*ofdm_get_samples_per_frame()/FS;
+            if (secs >= len_secs) finish = 1;
+        }
+        
         f++;
     }
 
@@ -712,6 +743,9 @@ int main(int argc, char *argv[]) {
         fclose(foct);
     }
 
+    if (verbose == 2)
+        printf("time_to_sync: %f\n", time_to_sync);
+    
     if (testframes == true) {
         float uncoded_ber = (float) Terrs / Tbits;
 
