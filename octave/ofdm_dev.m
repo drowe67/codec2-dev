@@ -1015,7 +1015,7 @@ function [delta_ct delta_foff timing_mx_log] = acquisition_test(Ntests=10, EbNod
   states.foff_metric = 0;
   for w=1:Nsamperframe:length(rx)-4*Nsamperframe
     [ct_est timing_valid timing_mx] = est_timing(states, real(rx(w+st:w+en)), rate_fs_pilot_samples);
-    [foff_est states] = est_freq_offset_pilot_corr(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
+    foff_est = est_freq_offset_pilot_corr(states, real(rx(w+st:w+en)), rate_fs_pilot_samples, ct_est);
     if states.verbose
       printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", i++, w, ct_est, foff_est, timing_mx, timing_valid);
     end
@@ -1296,7 +1296,7 @@ function acquisition_test_file(filename, Nsec)
   for f=1:Nframes
     st = (f-1)*Nsamperframe+1; en = st + 2*Nsamperframe;
     [ct_est timing_valid timing_mx] = est_timing(states, rx(st:en)', states.rate_fs_pilot_samples);
-    [foff_est states] = est_freq_offset_pilot_corr(states, rx(st:en)', states.rate_fs_pilot_samples, ct_est);
+    foff_est = est_freq_offset_pilot_corr(states, rx(st:en)', states.rate_fs_pilot_samples, ct_est);
     
     printf("i: %2d w: %5d ct_est: %4d foff_est: %5.1f timing_mx: %3.2f timing_vld: %d\n", f, st, ct_est, foff_est, timing_mx, timing_valid);
 
@@ -1311,9 +1311,8 @@ function acquisition_test_file(filename, Nsec)
   figure(2); clf; plot(ct_est_log,'+-'); title('ct');
   figure(3); clf; plot(foff_est_log,'+-'); title('foff est');
   figure(4); clf; hist(foff_est_log); title('foff est');
-  figure(5); clf; plot(foff_metric_log,'+'); title('foff metric');
-  figure(6); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
-  figure(7); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
+  figure(5); clf; plot(real(rx)); axis([1 length(rx) -max(abs(rx)) max(abs(rx))]);
+  figure(6); clf; plot_specgram(rx); axis([0 Nsec 500 2500])
 
 endfunction
 

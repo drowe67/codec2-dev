@@ -441,7 +441,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
     % vector of local oscillator samples to shift input vector
     % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
 
-    if afcourse != 0
+    if afcoarse != 0
       w = 2*pi*afcoarse/Fs;
       wvec = exp(-j*w*(0:2*Nsamperframe));
 
@@ -464,7 +464,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   
   % refine freq est within -/+ 20 Hz window  
 
-  if fcourse != 0
+  if fcoarse != 0
     w = 2*pi*fcoarse/Fs;
     wvec = exp(-j*w*(0:2*Nsamperframe));
     foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
