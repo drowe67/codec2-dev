@@ -1,16 +1,17 @@
 # README Codec2 STM32 Unit Test
 Don Reid 2018/2019
 
-This is the unittest system for the stm32 implementation of codec2/FreeDV
-It is currently only working on linux systems. It requires a STM32F4xx processor 
-development board connected to/having a ST-LINK , e.g. 
-a STM32F4 Discovery board. 
+This is the unittest system for the stm32 implementation of
+codec2/FreeDV which runs on Linux systems. It requires a STM32F4xx
+processor development board connected to/having a ST-LINK, e.g. a
+STM32F4 Discovery board.
 
 ## Quickstart
 
 Required:
 * You must have numpy for Python3 installed
 * You must have an arm-none-eabi-gdb install and in your path (see codec2/stm32/README.md)
+* You must have STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 (see codec2/stm32/README.md)
 * You must build openocd from source and have it in your path (see below)
 
 Build codec2 for Linux, then the stm32, and run tests on stm32 Discovery:
@@ -19,20 +20,20 @@ Build codec2 for Linux, then the stm32, and run tests on stm32 Discovery:
 $ cd ~/codec2
 $ mkdir build_linux && cd build_linux && cmake .. && make
 $ cd ~/codec2/stm32 && mkdir build_stm32 && cd build_stm32
-$ cmake -DUT_PARAMS=--openocd -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
+$ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
 $ make
 $ ctest -V
 ```
 
-You should see tests executing (and mostly passing). 
+You should see tests executing (and mostly passing). They are slow to
+execute (30 to 180 seconds each), due to the speed of the semihosting
+system.
 
-## Expected Fails
+## If a Test fails
 
-Please note that tests tst_ofdm_demod_AWGN, tst_ofdm_demod_fade,
-tst_ofdm_demod_ldpc_AWGN, tst_ofdm_demod_ldpc_fade fail on certain OS
-such as Ubuntu 18.04.
+Explore the files in ```codec2/stm32/unittest/test_run/name_of_test```
 
-All other tests MUST pass.
+When each test runs, a directory is created, and several log files generated.
 
 ## Running the stm32 Unit Tests
 
@@ -55,11 +56,11 @@ All other tests MUST pass.
 1. To run a single test (example): 
    ```
    $ cd ~/codec2/stm32/unittest
-   $ ./scripts/run_stm32_tst tst_ofdm_demod quick --load --openocd
+   $ ./scripts/run_stm32_tst tst_ofdm_demod quick
    ```
    In general:
    ```
-   $ ./scripts/run_stm32_test <name_of_test> <test_option> --load --openocd
+   $ ./scripts/run_stm32_test <name_of_test> <test_option>
    ```
    (Note when running a single test you can choose not to reload the flash every
    time if using the same bits.  The *_all_* scripts manage this themselves.)
@@ -67,13 +68,15 @@ All other tests MUST pass.
 1. To run a test set (example):
    ```
    $ cd ~/codec2/stm32/unittest
-   $ ./scripts/run_all_ldpc_tests --openocd
+   $ ./scripts/run_all_ldpc_tests
    ```
    In general: (codec2, ofdm, ldpc):
    ```
-   $ ./scripts/run_all_<set_name>_tests --openocd
+   $ ./scripts/run_all_<set_name>_tests
    ```
-   
+
+1. If a test fails, explore the files in the ```test_run``` directory for that test.
+
 ### Running the tests remotely
 
 If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
@@ -81,11 +84,10 @@ Test will run slower, roughly 3 times.
 
 1. You have to build OpenOCD on the remote machine with the STM32 board. It must be built from 
    (https://github.com/db4ple/openocd.git). 
-2. You don't need OpenOCD installed on your build pc.
-3. You have to be able to run ssh with public key authentication using ssh-agent so that
+1. You don't need OpenOCD installed on your build pc.
+1. You have to be able to run ssh with public key authentication using ssh-agent so that
    you can ssh into the remote machine without entering a password. 
-4. You have to add UT_PARAMS=--openocd to the stm32 cmake call
-5. You have to call ctest with the proper UT_SSH_PARAMS settings, e.g.
+1. You have to call ctest with the proper UT_SSH_PARAMS settings, e.g.
 ```
 UT_SSH_PARAMS="-p 22 -q remoteuser@remotemachine" ctest -V
 ```

@@ -28,15 +28,16 @@ else
   UT_SH_FIO="enable"
 fi
 
-if [ ${ARGS[--openocd]+_} ] ; then
+if [ ! ${ARGS[--st-util]+_} ] ; then
+   echo "----------------------- STARTING gdb/OpenOCD ----------------------------"
    if [ -n "$UT_SSH" ]; then
         cat <<-EEOOFF >> gdb_cmds
-        shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -f board/stm32f4discovery.cfg >ocd_stdout.log 2>ocd_stderr.log
+        shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -d0 -f board/stm32f4discovery.cfg 2> >(tee stderr.log >&2) | tee stdout.log & 
 	EEOOFF
    else
         cat <<-EEOOFF >> gdb_cmds
              shell killall -q openocd
-             shell openocd -f board/stm32f4discovery.cfg >ocd_stdout.log 2>ocd_stderr.log & 
+             shell openocd -d0 -f board/stm32f4discovery.cfg 2> >(tee stderr.log >&2) | tee stdout.log & 
 	EEOOFF
    fi
 
@@ -49,6 +50,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
     
        SHUTDOWN="monitor shutdown"
 else
+    echo "---------------------- STARTING gdb/st-util ------------------------------"
     cat <<-EEOOFF >> gdb_cmds
         shell st-util --verbose=0 --semihosting 2>stutil_stderr.log >stutil_stdout.log &
         shell sleep ${UT_SLEEP} 
@@ -58,7 +60,7 @@ else
        SHUTDOWN=""
 fi
 
-if [ ${ARGS[--load]+_} ] ; then
+if [ ! ${ARGS[--noload]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
 	load
 	EEOOFF
@@ -73,6 +75,7 @@ cat <<-EEOOFF >> gdb_cmds
 
 if [ -z ${ARGS[--debug]+_} ] ; then
     cat <<-EEOOFF >> gdb_cmds
+        shell printf "\n----------------------------STARTING PROGRAM-------------------------\n\n"
 	continue
 	set confirm off
         $SHUTDOWN 

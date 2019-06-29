@@ -50,6 +50,7 @@
 */
 
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -67,6 +68,7 @@
 #include "stm32f4xx_conf.h"
 #include "stm32f4xx.h"
 #include "machdep.h"
+#include "memtools.h"
 
 struct my_callback_state {
     char  tx_str[80];
@@ -124,7 +126,8 @@ int main(int argc, char *argv[]) {
     struct my_callback_state  my_cb_state;
 
     semihosting_init();
-
+    memtools_find_unused(printf);
+    
     ////////
     // Test configuration, read from stm_cfg.txt
     int     config_mode;        // 0
@@ -168,6 +171,9 @@ int main(int argc, char *argv[]) {
     else {
         freedv = freedv_open(config_mode);
     }
+    assert(freedv != NULL);
+    
+    fprintf(stderr, "freedv opened %p\n", freedv);
 
     freedv_set_test_frames(freedv, config_testframes);
 
@@ -179,7 +185,9 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "n_speech_samples: %d n_nom_modem_samples: %d\n", 
     			n_speech_samples, n_nom_modem_samples);
 
-/*
+    fprintf(stderr, "mod_out: %p\n", mod_out);
+ 
+   /*
     // This is "codectx" operation:
     int c2_mode;
     if (config_mode == FREEDV_MODE_700)  {
@@ -207,6 +215,8 @@ int main(int argc, char *argv[]) {
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
     freedv_set_ext_vco(freedv, use_ext_vco);
+    
+    memtools_find_unused(printf);
 
     // set up callback for txt msg chars 
     sprintf(my_cb_state.tx_str, "cq cq cq hello world\r");
@@ -236,11 +246,13 @@ int main(int argc, char *argv[]) {
 
     frame = 0;
 
+    fprintf(stderr, "starting main loop\n");
+
     ////////
     // Main loop
     while ((num_read = read(f_in, speech_in, (sizeof(short) * n_speech_samples))) ==
                                              (sizeof(short) * n_speech_samples)) {
-        fprintf(stderr, "frame: %d\n", frame);
+        fprintf(stderr, "frame: %d\r", frame);
 
         freedv_tx(freedv, mod_out, speech_in);
 
@@ -254,10 +266,7 @@ int main(int argc, char *argv[]) {
 
     close(f_in);
     close(f_out);
-
     printf("\nEnd of Test\n");
-    fclose(stdout);
-    fclose(stderr);
 
     return(0);
 }

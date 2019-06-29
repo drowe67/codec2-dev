@@ -35,3 +35,5 @@ cd "${RUN_DIR}"
 #	;;
 #
 #    esac
+
+exit 0
