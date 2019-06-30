@@ -40,6 +40,10 @@
 #include "filter.h"
 #include "wval.h"
 #include "debug_alloc.h"
+#ifdef __EMBEDDED__
+#define PROFILE
+#endif
+#include "machdep.h"
 
 /* Static Prototypes */
 
@@ -586,7 +590,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * +/- 25 Hz for 700D).
  */
 static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid) {
-    complex float csam, corr_st, corr_en;
+    complex float corr_st, corr_en;
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
     int i, j;
@@ -599,31 +603,48 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
 
     float av_level = 2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f;
 
+    /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
+    PROFILE_VAR(wvecpilot);
+    PROFILE_SAMPLE(wvecpilot);
+    complex float wvec_pilot[ofdm_m + ofdm_ncp];
+    switch(fcoarse) {
+    case -40:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
+      break;
+    case 0:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = conjf(ofdm->pilot_samples[j]);
+      break;
+    case 40:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
+      break;
+    default:
+      assert(0);
+    }
+    PROFILE_SAMPLE_AND_LOG2(wvecpilot, "  wvecpilot");
+	
+    PROFILE_VAR(corr_start);
+    PROFILE_SAMPLE(corr_start);
     for (i = 0; i < Ncorr; i++) {
         corr_st = 0.0f;
         corr_en = 0.0f;
 
-        for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-            /* roll frequency shift into inner loop to save memory */
-            switch(fcoarse) {
-            case -40:
-                csam = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
-                break;
-            case 0:
-                csam = conjf(ofdm->pilot_samples[j]);
-                break;
-            case 40:
-                csam = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
-                break;
-            default:
-                assert(0);
-            }
-            corr_st = corr_st + (rx[i + j                       ] * csam);
-            corr_en = corr_en + (rx[i + j + ofdm_samplesperframe] * csam);
+	float re,im;
+	arm_cmplx_dot_prod_f32(&rx[i], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
+	corr_st = re + I*im;
+	arm_cmplx_dot_prod_f32(&rx[i+ ofdm_samplesperframe], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
+	corr_en = re + I*im;
+	/*
+	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
+	  //corr_st = corr_st + (rx[i + j                       ] * wvec_pilot[j]);
+            corr_en = corr_en + (rx[i + j + ofdm_samplesperframe] * wvec_pilot[j]);
         }
-
+	*/
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) / av_level;
     }
+    PROFILE_SAMPLE_AND_LOG2(corr_start, "  corr");
 
     /* find the max magnitude and its index */
 
@@ -944,7 +965,9 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     float atiming_mx, timing_mx = 0.0f;
     int ct_est = 0;     
     int atiming_valid, timing_valid = 0;
-    
+
+    PROFILE_VAR(timing_start);
+    PROFILE_SAMPLE(timing_start);
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
         act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse, &atiming_mx, &atiming_valid);
         if (atiming_mx > timing_mx) {
@@ -954,11 +977,15 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
             timing_valid = atiming_valid;
         }
     }
+    PROFILE_SAMPLE_AND_LOG2(timing_start, "  timing");
 
     /* refine freq est within -/+ 20 Hz window */
 
+    PROFILE_VAR(freq_start);
+    PROFILE_SAMPLE(freq_start);
     ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est, fcoarse);
     ofdm->coarse_foff_est_hz += fcoarse;
+    PROFILE_SAMPLE_AND_LOG2(freq_start, "  freq");
 
     if (ofdm->verbose != 0) {
         fprintf(stderr, "   ct_est: %4d foff_est: %4.1f timing_valid: %d timing_mx: %5.4f\n",
