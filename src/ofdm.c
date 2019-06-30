@@ -585,8 +585,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
  *
  * Can be used for acquisition (coarse timing), and fine timing.
  *
- * Unlike Octave version use states to return a few values.  Tends
- * to break down when freq offset approaches +/- symbol rate (e.g
+ * Breaks when freq offset approaches +/- symbol rate (e.g
  * +/- 25 Hz for 700D).
  */
 static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid) {
@@ -601,7 +600,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
         acc += cnormf(rx[i]);
     }
 
-    float av_level = 2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f;
+    float av_level = 1.0/(2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f);
 
     /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
     PROFILE_VAR(wvecpilot);
@@ -631,18 +630,20 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
         corr_st = 0.0f;
         corr_en = 0.0f;
 
+#ifdef __EMBEDDED__
 	float re,im;
 	arm_cmplx_dot_prod_f32(&rx[i], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
 	corr_st = re + I*im;
 	arm_cmplx_dot_prod_f32(&rx[i+ ofdm_samplesperframe], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
 	corr_en = re + I*im;
-	/*
+#else	
 	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-	  //corr_st = corr_st + (rx[i + j                       ] * wvec_pilot[j]);
+	    corr_st = corr_st + (rx[i + j                       ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[i + j + ofdm_samplesperframe] * wvec_pilot[j]);
         }
-	*/
-        corr[i] = (cabsf(corr_st) + cabsf(corr_en)) / av_level;
+#endif	
+        corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
+        //corr[i] = (corr_st*conjf(corr_st) + corr_en*conjf(corr_en)) * av_level;
     }
     PROFILE_SAMPLE_AND_LOG2(corr_start, "  corr");
 
@@ -674,49 +675,49 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
  * the symbol rate, e.g. +/- 25Hz for the FreeDV 700D configuration.
  */
 static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, int timing_est, int fcoarse) {
-    complex float corr_st, corr_en;
-
     int st = -20; int en = 20; float foff_est = 0.0f; float Cabs_max = 0.0f;
+
+    /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
+    complex float wvec_pilot[ofdm_m + ofdm_ncp];
+    int j;
+    switch(fcoarse) {
+    case -40:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = conjf(ofdm_wval[j]*ofdm->pilot_samples[j]);
+      break;
+    case 0:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = conjf(ofdm->pilot_samples[j]);
+      break;
+    case 40:
+      for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
+	wvec_pilot[j] = ofdm_wval[j]*conjf(ofdm->pilot_samples[j]);
+      break;
+    default:
+      assert(0);
+    }
 
     // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
     for(int f = st; f < en; f++) {
-        complex float C_st = 0.0f;
-        complex float C_en = 0.0f;
-        float tmp = TAU * f / ofdm_fs;	/* move calc out of loop */
-
+        complex float corr_st = 0.0f;
+        complex float corr_en = 0.0f;
+        float tmp = TAU * f / ofdm_fs;
+	complex float delta = cmplxconj(tmp);
+	complex float w = cmplxconj(0.0f);
+	  
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
-            complex float w = cmplxconj(tmp * i);
-            complex float csam;
-
-            switch(fcoarse) {
-            case -40:
-                csam = conjf(ofdm_wval[i]*ofdm->pilot_samples[i]) * w;
-                break;
-            case 0:
-                csam = conjf(ofdm->pilot_samples[i]) * w;
-                break;
-            case 40:
-                csam = ofdm_wval[i]*conjf(ofdm->pilot_samples[i]) * w;
-                break;
-            default:
-                assert(0);
-            }
-
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
+            corr_st += rx[timing_est + i                       ] * wvec_pilot[i] * w;
+            corr_en += rx[timing_est + i + ofdm_samplesperframe] * wvec_pilot[i] * w;
+	    w = w*delta;
+	}
+	float Cabs = cabs(corr_st) + cabs(corr_en);
 
-            corr_st = rx[timing_est + i                       ] * csam;
-            corr_en = rx[timing_est + i + ofdm_samplesperframe] * csam;
+	if (Cabs > Cabs_max) {
+	  Cabs_max = Cabs;
+	  foff_est = f;
+	}
 
-            C_st += corr_st;
-            C_en += corr_en;
-
-            float Cabs = cabs(C_st) + cabs(C_en);
-
-            if (Cabs > Cabs_max) {
-                Cabs_max = Cabs;
-                foff_est = f;
-            }
-        }
     }
 
     ofdm->foff_metric = 0.0f; // not used in this version of freq est algorithm
