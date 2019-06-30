@@ -765,7 +765,7 @@ int main(int argc, char *argv[]) {
 
             /* set return code for Ctest, 1 for fail */
 
-            if ((uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
+            if ((Tbits == 0) || (Tbits_coded == 0) || (uncoded_ber >= 0.1f) || (coded_ber >= 0.01f))
                 return 1;
         }
     }
