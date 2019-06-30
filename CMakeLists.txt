@@ -332,6 +332,11 @@ if(UNITTEST)
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
 
+   add_test(NAME test_OFDM_modem_time_sync
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
     add_test(NAME test_horus_binary
              COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
              )
