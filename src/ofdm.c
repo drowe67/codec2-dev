@@ -600,7 +600,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
         acc += cnormf(rx[i]);
     }
 
-    float av_level = 1.0/(2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f);
+    float av_level = 1.0f/(2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f);
 
     /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
     PROFILE_VAR(wvecpilot);
@@ -638,8 +638,9 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
 	corr_en = re + I*im;
 #else	
 	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-	    corr_st = corr_st + (rx[i + j                       ] * wvec_pilot[j]);
-            corr_en = corr_en + (rx[i + j + ofdm_samplesperframe] * wvec_pilot[j]);
+            int ind = i + j;
+	    corr_st = corr_st + (rx[ind                       ] * wvec_pilot[j]);
+            corr_en = corr_en + (rx[ind + ofdm_samplesperframe] * wvec_pilot[j]);
         }
 #endif	
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
@@ -707,8 +708,11 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 	  
         for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
-            corr_st += rx[timing_est + i                       ] * wvec_pilot[i] * w;
-            corr_en += rx[timing_est + i + ofdm_samplesperframe] * wvec_pilot[i] * w;
+            complex float csam = wvec_pilot[i] * w;
+            int est = timing_est + i;
+
+            corr_st += rx[est                       ] * csam;
+            corr_en += rx[est + ofdm_samplesperframe] * csam;
 	    w = w*delta;
 	}
 	float Cabs = cabs(corr_st) + cabs(corr_en);
