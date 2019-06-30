@@ -664,7 +664,7 @@ int main(int argc, char *argv[]) {
                     ofdm->uw_errors,
                     ofdm->sync_counter,
                     ofdm->foff_est_hz,
-                    phase_est_bandwidth,
+                    ofdm->phase_est_bandwidth,
                     statemode[ofdm->last_sync_state_interleaver],
                     ofdm->frame_count_interleaver,
                     Nerrs_raw[r], Nerrs_coded[r], iter[r], parityCheckCount[r]);
