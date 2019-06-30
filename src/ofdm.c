@@ -683,8 +683,8 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
 
-            corr_st = rx[timing_est + i                       ] * csam * w;
-            corr_en = rx[timing_est + i + ofdm_samplesperframe] * csam * w;
+            corr_st = rx[timing_est + i                       ] * csam;
+            corr_en = rx[timing_est + i + ofdm_samplesperframe] * csam;
 
             C_st += corr_st;
             C_en += corr_en;
