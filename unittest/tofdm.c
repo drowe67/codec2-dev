@@ -138,7 +138,7 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
 
 static void freq_shift(COMP rx_fdm_fcorr[], COMP rx_fdm[], float foff, COMP *foff_phase_rect, int nin) {
     float temp = (TAU * foff / ofdm_fs);
-    COMP  foff_rect = { COSF(temp), SINF(temp) };
+    COMP  foff_rect = { cosf(temp), sinf(temp) };
     int   i;
 
     for (i = 0; i < nin; i++) {
@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
     ofdm = ofdm_create(ofdm_config_default);
     assert(ofdm != NULL);
     ofdm_config = ofdm_get_config_param();
-
+    
     // make local copies for convenience
     ofdm_tx_centre = ofdm_config->tx_centre;
     ofdm_rx_centre = ofdm_config->rx_centre;

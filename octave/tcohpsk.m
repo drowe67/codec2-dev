@@ -58,7 +58,7 @@ more off;
 global passes = 0;
 global fails = 0;
 
-cohpsk;
+cohpsk_dev;
 fdmdv_common;
 autotest;
 
@@ -141,6 +141,7 @@ clip = 6.5;            % Clipping of tx signal to reduce PAPR. Adjust by
 afdmdv.Fs = Fs;
 afdmdv.Nc = Nd*Nc-1;
 afdmdv.Rs = Rs;
+
 if Fs/afdmdv.Rs != floor(Fs/afdmdv.Rs)
   printf("\n  Oops, Fs/Rs must be an integer!\n\n");
   return
@@ -155,7 +156,9 @@ afdmdv.gt_alpha5_root = gen_rn_coeffs(excess_bw, 1/Fs, Rs, afdmdv.Nsym, afdmdv.M
 Fcentre = afdmdv.Fcentre = 1500;
 afdmdv.Fsep = afdmdv.Rs*(1+excess_bw);
 afdmdv.phase_tx = ones(afdmdv.Nc+1,1);
+
 % non linear carrier spacing, combined with clip, helps PAPR a lot!
+
 freq_hz = afdmdv.Fsep*( -Nc*Nd/2 - 0.5 + (1:Nc*Nd).^0.98 );
 afdmdv.freq_pol = 2*pi*freq_hz/Fs;
 afdmdv.freq = exp(j*afdmdv.freq_pol);
@@ -320,7 +323,6 @@ for f=1:frames
   end
   foff_log = [foff_log foff];
   phase_ch /= abs(phase_ch);
-  % printf("foff: %f  ", foff);
 
   % optional fading
 
@@ -350,8 +352,6 @@ end
 
 % simulate difference in sample clocks
 
-%ch_fdm_frame_log = resample(ch_fdm_frame_log, (1E6 + sample_rate_ppm), 1E6);
-
 tin=1;
 tout=1;
 ch_fdm_frame_log_out = zeros(1,length(ch_fdm_frame_log));
@@ -362,20 +362,10 @@ while tin < length(ch_fdm_frame_log)
       ch_fdm_frame_log_out(tout) = (1-f)*ch_fdm_frame_log(t1) + f*ch_fdm_frame_log(t2);
       tout += 1;
       tin  += 1+sample_rate_ppm/1E6;
-      %printf("tin: %f tout: %f f: %f\n", tin, tout, f);
 end
 ch_fdm_frame_log = ch_fdm_frame_log_out(1:tout-1);
-%ch_fdm_frame_log *= 5000;
-
-%ch_fdm_frame_log = real(ch_fdm_frame_log);
 
 % Now run demod ----------------------------------------------------------------
-
-%ch_fdm_frame_log = load_raw("~/fdmdv2-dev/build_linux/tmp.raw");
-%ch_fdm_frame_log = ch_fdm_frame_log(M:length(ch_fdm_frame_log));
-%ch_fdm_frame_log /= 5000;
-
-%frames = floor(acohpsk.Nsymbrowpilot*M);
 
 ch_fdm_frame_log_index = 1;
 nin = M;
@@ -408,8 +398,7 @@ for f=1:frames;
 
     max_ratio = 0;
     for acohpsk.f_est = Fcentre-40:40:Fcentre+40
-%    for acohpsk.f_est = Fcentre
-        
+       
       printf("  [%d] acohpsk.f_est: %f +/- 20\n", f, acohpsk.f_est);
 
       % we are out of sync so reset f_est and process two frames to clean out memories
@@ -487,7 +476,6 @@ for f=1:frames;
     ch_symb_log = [ch_symb_log; ch_symb];     
     rx_timing_log = [rx_timing_log rx_timing];
     f_est_log = [f_est_log acohpsk.f_est];
-    %printf("%f\n", acohpsk.f_est);
   end
 
   % if we are in sync complete demodulation with symbol rate processing
@@ -540,7 +528,6 @@ for f=1:frames;
     end
   end
   nin_frame = (acohpsk.Nsymbrowpilot-1)*M + nin;
-  %printf("%f %d %d\n", rx_timing(length(rx_timing)), nin, nin_frame);
 
   prev_tx_bits2 = prev_tx_bits;
   prev_tx_bits = tx_bits;
@@ -602,10 +589,7 @@ if compare_with_c
   check(tx_symb_log, tx_symb_log_c, 'tx_symb');
   check(tx_fdm_frame_log, tx_fdm_frame_log_c, 'tx_fdm_frame',0.01);
   check(ch_fdm_frame_log, ch_fdm_frame_log_c, 'ch_fdm_frame',0.01);
-  %check(rx_fdm_frame_bb_log, rx_fdm_frame_bb_log_c, 'rx_fdm_frame_bb', 0.01);
-
   check(ch_symb_log, ch_symb_log_c, 'ch_symb',0.05);
-  %check(ct_symb_ff_log, ct_symb_ff_log_c, 'ct_symb_ff',0.01);
   check(rx_amp_log, rx_amp_log_c, 'rx_amp_log',0.01);
   check(phi_log_diff, zeros(length(phi_log_diff), Nc*Nd), 'rx_phi_log',0.1);
   check(rx_symb_log, rx_symb_log_c, 'rx_symb',0.01);

@@ -10,11 +10,11 @@ source $SCRIPTS/run_tests_common.sh
 
 declare -i Fails=0
 
-run_stm32_tst tst_codec2_enc 1300 --load "$@"  || Fails+=1
-run_stm32_tst tst_codec2_enc 700C  "$@"        || Fails+=1
+run_stm32_tst tst_codec2_enc 1300 "$@"  || Fails+=1
+run_stm32_tst tst_codec2_enc 700C "$@"        || Fails+=1
 
-run_stm32_tst tst_codec2_dec 1300 --load  "$@" || Fails+=1
-run_stm32_tst tst_codec2_dec 700C  "$@"        || Fails+=1
+run_stm32_tst tst_codec2_dec 1300 "$@" || Fails+=1
+run_stm32_tst tst_codec2_dec 700C "$@"        || Fails+=1
 
 if (( $Fails == 0 )); then
     echo -e "\nAll Codec2 Tests PASSED"

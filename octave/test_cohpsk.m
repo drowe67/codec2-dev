@@ -22,9 +22,8 @@
 
 rand('state',1); 
 randn('state',1);
-graphics_toolkit ("gnuplot");
 
-cohpsk;
+cohpsk_dev;
 
 function test_curves
      
@@ -159,10 +158,7 @@ function test_single
   %sim_in.modulation      = 'dqpsk';
 
   sim_qpsk_hf             = ber_test(sim_in);
-
-  %fep=fopen("errors_450.bin","wb"); fwrite(fep, sim_qpsk_hf.ldpc_errors_log, "short"); fclose(fep);
 endfunction
-
 
 % Rate Fs test funcs -----------------------------------------------------------
 
@@ -251,11 +247,6 @@ function rate_Fs_tx(tx_filename)
   end
 
   tx_fdm = real(tx_fdm);
-
-  %tx_fdm = compress(tx_fdm, 0.4);
-  %tx_fdm = sign(tx_fdm) .* (abs(tx_fdm) .^ 0.4); 
-  %hpa_clip = max(abs(tx_fdm))*0.8
-  %tx_fdm(find(abs(tx_fdm) > hpa_clip)) = hpa_clip;
 
   papr = max(tx_fdm.*conj(tx_fdm)) / mean(tx_fdm.*conj(tx_fdm));
   papr_dB = 10*log10(papr);
@@ -374,11 +365,6 @@ function rate_Fs_rx(rx_filename)
   for c=1:Nc
     rx_filt(:,c) = filter(rn_coeff, 1, rx_bb(:,c));
   end
-
-  %subplot(211);
-  %plot(real(rx_filt(1:10*M,9)));
-  %subplot(212);
-  %plot(imag(rx_filt(1:10*M,9)));
 
   % Fine timing estimation and decimation to symbol rate Rs. Break rx
   % signal into ft sample blocks.  If clock offset is 1000ppm,

@@ -194,18 +194,20 @@ elif (args.test_opt == "ideal"):
     pass
 elif (args.test_opt == "AWGN"):     # Still close enough to compare BERs loosely
     max_ber         = 0.1
-    max_ber2        = 0.01
+    max_ber2        = 0.1
     tolerance_ber   = 0.01
     tolerance_ber2  = 0.005
-    tolerance_terrs = 2
+    tolerance_tbits = 1000
+    tolerance_terrs = 50
     tolerance_output_differences = 2
     compare_output  = 0
 elif (args.test_opt == "fade"):
     max_ber         = 0.1
-    max_ber2        = 0.01
+    max_ber2        = 0.1
     tolerance_ber   = 0.01
     tolerance_ber2  = 0.005
-    tolerance_terrs = 2
+    tolerance_tbits = 1000
+    tolerance_terrs = 200
     tolerance_output_differences = 5
     compare_output  = 0
     pass
@@ -284,7 +286,7 @@ if (config_testframes):
 
     # Read stm log
     print("Target")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.log", "r") as f:
         for line in f:
             if (line[0:4] == "BER2"):
                 print(line, end="")
@@ -316,19 +318,46 @@ if (config_testframes):
 
     ## Compare BER values
     if (compare_ber):
-        if ((abs(ref_ber - tgt_ber) <= tolerance_ber) and
-            (abs(ref_tbits - tgt_tbits) <= tolerance_tbits) and
-            (abs(ref_terrs - tgt_terrs) <= tolerance_terrs) and
-            ( (ref_tbits2 == 0) or
-                  (abs(ref_ber2 - tgt_ber2) <= tolerance_ber2) and
-          (abs(ref_tbits2 - tgt_tbits2) <= tolerance_tbits) and
-                  (abs(ref_terrs2 - tgt_terrs2) <= tolerance_terrs)
-          )
-            ):
+        chk_tolerance_ber    = abs(ref_ber - tgt_ber)
+        chk_tolerance_tbits  = abs(ref_tbits - tgt_tbits)
+        chk_tolerance_terrs  = abs(ref_terrs - tgt_terrs)
+        chk_tolerance_ber2   = abs(ref_ber2 - tgt_ber2)
+        chk_tolerance_tbits2 = abs(ref_tbits2 - tgt_tbits2)
+        chk_tolerance_terrs2 = abs(ref_terrs2 - tgt_terrs2)
+        passes = True
+
+        if (chk_tolerance_ber > tolerance_ber):
+            print("fail tolerance_ber {} > {}".
+                format(chk_tolerance_ber, tolerance_ber))
+            passes = False
+        if (chk_tolerance_tbits > tolerance_tbits):
+            print("fail tolerance_tbits {} > {}".
+                format(chk_tolerance_tbits, tolerance_tbits))
+            passes = False
+        if (chk_tolerance_terrs > tolerance_terrs):
+            print("fail tolerance_terrs {} > {}".
+                format(chk_tolerance_terrs, tolerance_terrs))
+            passes = False
+        if (ref_tbits2 == 0):
+           if (chk_tolerance_ber2   > tolerance_ber2):
+                print("fail tolerance_ber2 {} > {}".
+                    format(chk_tolerance_ber2, tolerance_ber2))
+                passes = False
+           if (chk_tolerance_tbits2 > tolerance_tbits):
+                print("fail tolerance_tbits2 {} > {}".
+                    format(chk_tolerance_tbits2, tolerance_tbits))
+                passes = False
+           if (chk_tolerance_terrs2 > tolerance_terrs):
+                print("fail tolerance_terrs2 {} > {}".
+                    format(chk_tolerance_terrs2, tolerance_terrs))
+                passes = False
+          
+        if (passes): 
             print("PASS: BER compare")
         else:
             fails += 1
             print("FAIL: BER compare")
+
         # end Compare BER
     # end BER checks
 
@@ -457,56 +486,13 @@ if (compare_output):
 #### Profile
 if (config_profile): 
     print("\nProfile:")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.log", "r") as f:
         sum_profiles.sum_profiles(f, 100)
 
     print("\nStack:")
-    with open("stm_stdout.txt", "r") as f:
+    with open("stdout.txt", "r") as f:
         for line in f:
             if (line.startswith("Max stack")): 
-                print(line)
-
-
-#### Print final status message
-if (fails): print("\nTest FAILED!")
-else: print("\nTest PASSED")
-
-sys.exit(fails)
-ne.startswith("Max stack")): 
-                print(line)
-
-
-#### Print final status message
-if (fails): print("\nTest FAILED!")
-else: print("\nTest PASSED")
-
-sys.exit(fails)
-num_errors_amps = np.count_nonzero(errors_amps)
-    error_rows_amps = np.amax(errors_amps, axis=1)
-    num_error_rows_amps = np.count_nonzero(error_rows_amps)
-    print("")
-    print("{} Amplitude errors on {} rows".format(num_errors_amps, num_error_rows_amps))
-
-
-#### Profile
-if (config_profile): 
-    print("\nProfile:")
-    with open("stm_stdout.txt", "r") as f:
-        sum_profiles.sum_profiles(f, 100)
-
-    print("\nStack:")
-    with open("stm_stdout.txt", "r") as f:
-        for line in f:
-            if (line.startswith("Max stack")): 
-                print(line)
-
-
-#### Print final status message
-if (fails): print("\nTest FAILED!")
-else: print("\nTest PASSED")
-
-sys.exit(fails)
-ne.startswith("Max stack")): 
                 print(line)
 
 

@@ -43,7 +43,7 @@ case "${TEST_OPT}" in
 
     AWGN )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
-    	echo "01000000" > stm_cfg.txt
+    	echo "11000000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 10 > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -20 -Fs 8000 -f -5 \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1
@@ -53,7 +53,7 @@ case "${TEST_OPT}" in
 
     fade )
     	# Config is <verbose>, <testframes>, <ldpc_en>, <log_payload_syms> <profile>
-    	echo "01000000" > stm_cfg.txt
+    	echo "11000000" > stm_cfg.txt
 	ofdm_mod --in /dev/zero --out mod_bits.raw --testframes 60 > setup.log 2>&1
         cohpsk_ch mod_bits.raw stm_in.raw -24 -Fs 8000 -f -10 -fast \
 	    --raw_dir ${CODEC2_BASE}/raw >> setup.log 2>&1

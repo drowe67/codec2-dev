@@ -49,7 +49,7 @@ extern "C" {
 #define UN_SYNC      0  /* Used with the ofdm_set_sync() */
 #define AUTO_SYNC    1
 #define MANUAL_SYNC  2
-
+    
 #define AUTO_PHASE_EST 0
 #define LOW_PHASE_EST  1
 #define HIGH_PHASE_EST 2

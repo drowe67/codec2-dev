@@ -58,15 +58,16 @@ int get_data(FILE *f, int64_t *dd, int signed_flag, int bytes) {
 
 int main(int argc, char *argv[]) {
 
-    char usage[] = "Usage: %s [-b size_in_bytes] [-c] [-s] [-t tolerance] file1 file2\n";
+    char usage[] = "Usage: %s [-b size_in_bytes] [-c] [-s] [-t tolerance] [-n numerrorstoexit] file1 file2\n";
 
     int bytes = 1;
     int count_errors = 0;
     int signed_flag = 0;
     int tol = 1;
-
+    int numerrorstoexit = -1;
+    
     int opt;
-    while ((opt = getopt(argc, argv, "b:cst:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:cst:n:")) != -1) {
         switch (opt) {
             case 'b':
                 bytes = atoi(optarg);
@@ -76,6 +77,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 's':
                 signed_flag = 1;
+                break;
+            case 'n':
+                numerrorstoexit = atoi(optarg);
                 break;
             case 't':
                 tol = atof(optarg);
@@ -118,19 +122,24 @@ int main(int argc, char *argv[]) {
         if (!get_data(f2, &data2, signed_flag, bytes)) {
             fprintf(stderr, "Error: file2 is shorter\n");
             exit(1);
-            }
+        }
         uint64_t err = llabs(data1 - data2);
         if (err > tol) {
             errors ++;
             printf("%d %ld %ld\n", count, data1, data2);
-            }
+	    if (numerrorstoexit != -1)
+	        if (errors > numerrorstoexit) {
+		    printf("reached errors: %d, bailing!", numerrorstoexit);
+		    exit(1);
+		}
+        }
         rms_sum += (err * err);
         count ++;
-        }
+    }
     if (get_data(f2, &data2, signed_flag, bytes)) {
         fprintf(stderr, "Error: file1 is shorter\n");
         exit(1);
-        }
+    }
 
     if (count_errors) exit(errors);
     else {

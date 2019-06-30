@@ -41,9 +41,9 @@ set(CMAKE_TOOLCHAIN_FILE "../stm32/cmake/STM32_Toolchain.cmake" CACHE STRING "To
 ###################################################
 
 # Set default C flags.
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork --specs=nano.specs -u_printf_float -mcpu=cortex-m4 -ffunction-sections -fdata-sections")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -std=gnu11 -mlittle-endian -mthumb -mthumb-interwork --specs=nano.specs -u_printf_float -mcpu=cortex-m4 -ffunction-sections -fdata-sections -O3")
 
-add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__ -DFDV_ARM_MATH)
+add_definitions(-DSTM32F40_41xxx -DCORTEX_M4 -D__EMBEDDED__)
 add_definitions(-DFREEDV_MODE_EN_DEFAULT=0 -DFREEDV_MODE_1600_EN=1 -DFREEDV_MODE_700D_EN=1 -DCODEC2_MODE_EN_DEFAULT=0 -DCODEC2_MODE_1300_EN=1 -DCODEC2_MODE_700C_EN=1)
 
 if(FLOAT_TYPE STREQUAL "hard")
@@ -155,18 +155,15 @@ ${CODEC2_SRC}/phase.c
 ${CODEC2_SRC}/quantise.c
 ${CODEC2_SRC}/pack.c
 ${CODEC2_SRC}/dump.c
+${CODEC2_SRC}/cohpsk.c
 ${CODEC2_SRC}/fdmdv.c
 ${CODEC2_SRC}/freedv_api.c
 ${CODEC2_SRC}/filter.c
 ${CODEC2_SRC}/varicode.c
 ${CODEC2_SRC}/golay23.c
-${CODEC2_SRC}/fsk.c
-${CODEC2_SRC}/fmfsk.c
-${CODEC2_SRC}/freedv_vhf_framing.c
 ${CODEC2_SRC}/freedv_data_channel.c
 ${CODEC2_SRC}/newamp1.c
 ${CODEC2_SRC}/mbest.c
-${CODEC2_SRC}/cohpsk.c
 ${CODEC2_SRC}/HRA_112_112.c
 ${CODEC2_SRC}/linreg.c
 ${CODEC2_SRC}/mpdecode_core.c
@@ -501,48 +498,3 @@ elf2bin(mco_ut)
 
 # -----------------------------------------------------------------------------
 
-# -----------------------------------------------------------------------------
-
-set(SM2000_RXDEMO_SRCS
-src/sm2000_rxdemo.c
-src/new_i2c.c
-src/si53xx.c
-)
-
-add_mapped_executable(sm2000_rxdemo ${SM2000_RXDEMO_SRCS})
-target_link_libraries(sm2000_rxdemo codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
-elf2bin(sm2000_rxdemo)
-
-# ---------------------------------------------------------------------------------
-
-set(SM2000_STW_SRCS
-src/sm2000_stw.c
-src/new_i2c.c
-src/si53xx.c
-)
-
-add_mapped_executable(sm2000_stw ${SM2000_STW_SRCS} ${USB_VCP})
-target_link_libraries(sm2000_stw codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
-elf2bin(sm2000_stw)
-
-# -----------------------------------------------------------------------------
-
-set(SM2000_ADCDUMP_SRCS
-src/sm2000_adc_dump.c
-src/new_i2c.c
-src/si53xx.c
-src/stm32f4_usb_vcp.c
-#../src/mbest.c
-)
-
-add_mapped_executable(sm2000_adcdump ${SM2000_ADCDUMP_SRCS} ${USB_VCP})
-target_link_libraries(sm2000_adcdump codec2 stm32f4_adac stm32f4 sm1000base CMSIS)
-elf2bin(sm2000_adcdump)
-
-# -----------------------------------------------------------------------------
-
-# Objects that require the peripheral library
-#src/sm1000_main.o: $(PERIPHLIBDIR)/.unpack
-#src/codec2_profile.o: $(PERIPHLIBDIR)/.unpack
-
-# -----------------------------------------------------------------------------
