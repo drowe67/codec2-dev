@@ -53,7 +53,7 @@ static void deallocate_tx_bpf(struct OFDM *);
 static void dft(struct OFDM *, complex float *, complex float *);
 static void idft(struct OFDM *, complex float *, complex float *);
 static complex float vector_sum(complex float *, int);
-static int est_timing(struct OFDM *, complex float *, int, int, float *, int *);
+static int est_timing(struct OFDM *, complex float *, int, int, float *, int *, int);
 static float est_freq_offset_pilot_corr(struct OFDM *, complex float *, int, int);
 static int ofdm_sync_search_core(struct OFDM *);
 static void ofdm_demod_core(struct OFDM *, int *);
@@ -589,7 +589,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * Breaks when freq offset approaches +/- symbol rate (e.g
  * +/- 25 Hz for 700D).
  */
-static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid) {
+static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid, int step) {
     complex float corr_st, corr_en;
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
@@ -624,7 +624,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
       assert(0);
     }
 #define __REAL__
-#ifdef __REAL__
+#if defined(__EMEBDDED__) && defined(__REAL__)
     float rx_real[length];
     float wvec_pilot_real[ofdm_m + ofdm_ncp];
     float wvec_pilot_imag[ofdm_m + ofdm_ncp];
@@ -640,7 +640,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
 	
     PROFILE_VAR(corr_start);
     PROFILE_SAMPLE(corr_start);
-    for (i = 0; i < Ncorr; i++) {
+    for (i = 0; i < Ncorr; i+=step) {
         corr_st = 0.0f;
         corr_en = 0.0f;
 
@@ -684,7 +684,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
     int timing_est = 0;
     *timing_mx = 0.0f;
     
-    for (i = 0; i < Ncorr; i++) {
+    for (i = 0; i < Ncorr; i+=step) {
         if (corr[i] > *timing_mx) {
             *timing_mx = corr[i];
             timing_est = i;
@@ -1005,7 +1005,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
     PROFILE_VAR(timing_start);
     PROFILE_SAMPLE(timing_start);
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
-        act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse, &atiming_mx, &atiming_valid);
+        act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse, &atiming_mx, &atiming_valid, 2);
         if (atiming_mx > timing_mx) {
             ct_est = act_est;
             timing_mx = atiming_mx;
@@ -1131,7 +1131,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             work[j] = ofdm->rxbuf[i] * cmplxconj(woff_est * i);
         }
 
-        int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid);
+        int ft_est = est_timing(ofdm, work, (en - st), 0.0f, &ofdm->timing_mx, &ofdm->timing_valid, 1);
         
         ofdm->timing_est += (ft_est - ceilf(ofdm_ftwindowwidth / 2));
 
