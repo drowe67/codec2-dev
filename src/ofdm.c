@@ -715,7 +715,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
             corr_en += rx[est + ofdm_samplesperframe] * csam;
 	    w = w*delta;
 	}
-	float Cabs = cabs(corr_st) + cabs(corr_en);
+	float Cabs = cabsf(corr_st) + cabsf(corr_en);
 
 	if (Cabs > Cabs_max) {
 	  Cabs_max = Cabs;
