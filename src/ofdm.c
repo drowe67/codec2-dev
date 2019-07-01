@@ -578,6 +578,7 @@ static complex float vector_sum(complex float *a, int num_elements) {
     return sum;
 }
 
+
 /*
  * Correlates the OFDM pilot symbol samples with a window of received
  * samples to determine the most likely timing offset.  Combines two
@@ -622,15 +623,18 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
     default:
       assert(0);
     }
-#define __FIXED__
-#if defined(__EMBEDDED__) && defined( __FIXED__)
-   /* convert to fixed point */
-    int16_t rx_int16[length];
-    int16_t wvec_pilot_int16[ofdm_m + ofdm_ncp];
+#define __REAL__
+#ifdef __REAL__
+    float rx_real[length];
+    float wvec_pilot_real[ofdm_m + ofdm_ncp];
+    float wvec_pilot_imag[ofdm_m + ofdm_ncp];
     for(i=0; i<length; i++)
-        rx_int16[i] = rx[i];
-    for(i=0; i<ofdm_m + ofdm_ncp; i++)
-        wvec_pilot_int16[i] = wvec_pilot[i];        
+        rx_real[i] = crealf(rx[i]);
+    for(i=0; i<ofdm_m + ofdm_ncp; i++) {
+        wvec_pilot_real[i] = crealf(wvec_pilot[i]);
+        wvec_pilot_imag[i] = cimagf(wvec_pilot[i]);
+    }
+    
 #endif
     PROFILE_SAMPLE_AND_LOG2(wvecpilot, "  wvecpilot");
 	
@@ -641,12 +645,21 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
         corr_en = 0.0f;
 
 #ifdef __EMBEDDED__
-#ifdef __FIXED__
-	int32_t re,im;
-	arm_cmplx_dot_prod_q15(&rx_int16[i], wvec_pilot_int16, ofdm_m + ofdm_ncp, &re, &im);
+#ifdef __REAL__
+	float re,im;
+	arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm_m + ofdm_ncp, &re);
+	arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm_m + ofdm_ncp, &im);
 	corr_st = re + I*im;
-	arm_cmplx_dot_prod_q15(&rx_int16[i+ ofdm_samplesperframe], wvec_pilot_int16, ofdm_m + ofdm_ncp, &re, &im);
+	arm_dot_prod_f32(&rx_real[i+ ofdm_samplesperframe], wvec_pilot_real, ofdm_m + ofdm_ncp, &re);
+	arm_dot_prod_f32(&rx_real[i+ ofdm_samplesperframe], wvec_pilot_imag, ofdm_m + ofdm_ncp, &im);
 	corr_en = re + I*im;
+        /*
+	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
+            int ind = i + j;
+	    corr_st += rx_real[ind] * wvec_pilot[j];
+            corr_en += rx_real[ind + ofdm_samplesperframe] * wvec_pilot[j];
+        }
+        */
 #else
 	float re,im;
 	arm_cmplx_dot_prod_f32(&rx[i], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
