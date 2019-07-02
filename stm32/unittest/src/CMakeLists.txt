@@ -1,7 +1,7 @@
 set(STM32F4_SYSTEM_SRCS
 ../../src/system_stm32f4xx.c
-../../src/stm32f4_machdep.c
 ../../src/memtools.c
+../../src/stm32f4_machdep.c
 startup_stm32f4xx.s
 )
 
@@ -31,7 +31,7 @@ profiledSemihostedBin(tst_ofdm_demod)
 semihostedBin(tst_ldpc_enc)
 semihostedBin(tst_ldpc_dec)
 semihostedBin(tst_api_mod)
-semihostedBin(tst_api_demod)
+profiledsemihostedBin(tst_api_demod)
 semihostedBin(tst_semihost) 
 semihostedBin(tst_codec2_fft_init)
 
