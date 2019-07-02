@@ -375,9 +375,9 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_metric = 0.0f;
 
     /*
-     * UW symbol placement, designed to get no false syncs at any freq
-     * offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we need
-     * to pair the UW bits so they fit into symbols.  The LDPC decoder
+     * Unique Word symbol placement, designed to get no false syncs at any
+     * freq offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we
+     * need to pair the UW bits so they fit into symbols.  The LDPC decoder
      * works on symbols so we can't break up any symbols into UW/LDPC bits.
      */
     uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
@@ -420,7 +420,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->sync_end = false;
     ofdm->sync_mode = autosync;
 
-    /* create the OFDM waveform */
+    /* create the OFDM pilot time-domain waveform */
 
     complex float *temp = MALLOC(sizeof (complex float) * ofdm_m);
     assert(temp != NULL);
@@ -433,7 +433,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * prefix, so we uses zeroes instead.
      */
 
-    /* zero out Cyclic Prefix (CP) values */
+    /* zero out Cyclic Prefix (CP) time-domain values */
 
     for (i = 0; i < ofdm_ncp; i++) {
         ofdm->pilot_samples[i] = 0.0f;
@@ -445,7 +445,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm->pilot_samples[i] = temp[j];
     }
 
-    FREE(temp);
+    FREE(temp);    /* finished with temp */
 
     /* calculate constant used to normalise timing correlation maximum */
 
@@ -580,7 +580,8 @@ static complex float vector_sum(complex float *a, int num_elements) {
  * Breaks when freq offset approaches +/- symbol rate (e.g
  * +/- 25 Hz for 700D).
  */
-static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoarse, float *timing_mx, int *timing_valid, int step) {
+static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
+  int fcoarse, float *timing_mx, int *timing_valid, int step) {
     complex float corr_st, corr_en;
     int Ncorr = length - (ofdm_samplesperframe + (ofdm_m + ofdm_ncp));
     float corr[Ncorr];
@@ -595,9 +596,12 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
     float av_level = 1.0f/(2.0f * sqrtf(ofdm->timing_norm * acc / length) + 1E-12f);
 
     /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
+
     PROFILE_VAR(wvecpilot);
     PROFILE_SAMPLE(wvecpilot);
+
     complex float wvec_pilot[ofdm_m + ofdm_ncp];
+
     switch(fcoarse) {
     case -40:
       for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
@@ -614,60 +618,62 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length, int fcoa
     default:
       assert(0);
     }
+
 #define __REAL__
 #if defined(__EMEBDDED__) && defined(__REAL__)
     float rx_real[length];
     float wvec_pilot_real[ofdm_m + ofdm_ncp];
     float wvec_pilot_imag[ofdm_m + ofdm_ncp];
-    for(i=0; i<length; i++)
+
+    for (i = 0; i < length; i++) {
         rx_real[i] = crealf(rx[i]);
-    for(i=0; i<ofdm_m + ofdm_ncp; i++) {
+    }
+
+    for (i = 0; i < (ofdm_m + ofdm_ncp); i++) {
         wvec_pilot_real[i] = crealf(wvec_pilot[i]);
         wvec_pilot_imag[i] = cimagf(wvec_pilot[i]);
     }
     
 #endif
     PROFILE_SAMPLE_AND_LOG2(wvecpilot, "  wvecpilot");
-	
     PROFILE_VAR(corr_start);
     PROFILE_SAMPLE(corr_start);
-    for (i = 0; i < Ncorr; i+=step) {
+
+    for (i = 0; i < Ncorr; i += step) {
         corr_st = 0.0f;
         corr_en = 0.0f;
 
 #ifdef __EMBEDDED__
 #ifdef __REAL__
 	float re,im;
+
 	arm_dot_prod_f32(&rx_real[i], wvec_pilot_real, ofdm_m + ofdm_ncp, &re);
 	arm_dot_prod_f32(&rx_real[i], wvec_pilot_imag, ofdm_m + ofdm_ncp, &im);
-	corr_st = re + I*im;
+	corr_st = re + im * I;
+
 	arm_dot_prod_f32(&rx_real[i+ ofdm_samplesperframe], wvec_pilot_real, ofdm_m + ofdm_ncp, &re);
 	arm_dot_prod_f32(&rx_real[i+ ofdm_samplesperframe], wvec_pilot_imag, ofdm_m + ofdm_ncp, &im);
-	corr_en = re + I*im;
-        /*
-	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-            int ind = i + j;
-	    corr_st += rx_real[ind] * wvec_pilot[j];
-            corr_en += rx_real[ind + ofdm_samplesperframe] * wvec_pilot[j];
-        }
-        */
+	corr_en = re + im * I;
 #else
 	float re,im;
+
 	arm_cmplx_dot_prod_f32(&rx[i], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
-	corr_st = re + I*im;
+	corr_st = re + im * I;
+
 	arm_cmplx_dot_prod_f32(&rx[i+ ofdm_samplesperframe], wvec_pilot, ofdm_m + ofdm_ncp, &re, &im);
-	corr_en = re + I*im;
+	corr_en = re + im * I;
 #endif        
 #else	
 	for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
             int ind = i + j;
+
 	    corr_st = corr_st + (rx[ind                       ] * wvec_pilot[j]);
             corr_en = corr_en + (rx[ind + ofdm_samplesperframe] * wvec_pilot[j]);
         }
 #endif	
         corr[i] = (cabsf(corr_st) + cabsf(corr_en)) * av_level;
-        //corr[i] = (corr_st*conjf(corr_st) + corr_en*conjf(corr_en)) * av_level;
     }
+
     PROFILE_SAMPLE_AND_LOG2(corr_start, "  corr");
 
     /* find the max magnitude and its index */
@@ -701,8 +707,10 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
     int st = -20; int en = 20; float foff_est = 0.0f; float Cabs_max = 0.0f;
 
     /* precompute the freq shift mulyiplied by pilot samples ouside of main loop */
+
     complex float wvec_pilot[ofdm_m + ofdm_ncp];
     int j;
+
     switch(fcoarse) {
     case -40:
       for (j = 0; j < (ofdm_m + ofdm_ncp); j++)
@@ -721,29 +729,30 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
     }
 
     // sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
-    for(int f = st; f < en; f++) {
+    for (int f = st; f < en; f++) {
         complex float corr_st = 0.0f;
         complex float corr_en = 0.0f;
         float tmp = TAU * f / ofdm_fs;
 	complex float delta = cmplxconj(tmp);
 	complex float w = cmplxconj(0.0f);
-	  
-        for (int i = 0; i < (ofdm_m + ofdm_ncp); i++) {
+	int i;
+
+        for (i = 0; i < (ofdm_m + ofdm_ncp); i++) {
             // "mix" down (correlate) the pilot sequences from frame with 0 Hz offset pilot samples
             complex float csam = wvec_pilot[i] * w;
             int est = timing_est + i;
 
             corr_st += rx[est                       ] * csam;
             corr_en += rx[est + ofdm_samplesperframe] * csam;
-	    w = w*delta;
+	    w *= delta;
 	}
+
 	float Cabs = cabsf(corr_st) + cabsf(corr_en);
 
 	if (Cabs > Cabs_max) {
 	  Cabs_max = Cabs;
 	  foff_est = f;
 	}
-
     }
 
     ofdm->foff_metric = 0.0f; // not used in this version of freq est algorithm
@@ -875,7 +884,7 @@ void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
     }
 }
  
-    void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
+void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
 
@@ -995,8 +1004,10 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
     PROFILE_VAR(timing_start);
     PROFILE_SAMPLE(timing_start);
+
     for (afcoarse = -40; afcoarse <= 40; afcoarse += 40) {
         act_est = est_timing(ofdm, &ofdm->rxbuf[st], (en - st), afcoarse, &atiming_mx, &atiming_valid, 2);
+
         if (atiming_mx > timing_mx) {
             ct_est = act_est;
             timing_mx = atiming_mx;
@@ -1004,14 +1015,17 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
             timing_valid = atiming_valid;
         }
     }
+
     PROFILE_SAMPLE_AND_LOG2(timing_start, "  timing");
 
     /* refine freq est within -/+ 20 Hz window */
 
     PROFILE_VAR(freq_start);
     PROFILE_SAMPLE(freq_start);
+
     ofdm->coarse_foff_est_hz = est_freq_offset_pilot_corr(ofdm, &ofdm->rxbuf[st], ct_est, fcoarse);
     ofdm->coarse_foff_est_hz += fcoarse;
+
     PROFILE_SAMPLE_AND_LOG2(freq_start, "  freq");
 
     if (ofdm->verbose != 0) {
@@ -1728,7 +1742,7 @@ void ofdm_assemble_modem_frame(struct OFDM *ofdm, uint8_t modem_frame[],
  * Assemble modem frame from UW, payload symbols, and txt bits
  */
 void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
-        COMP payload_syms[], uint8_t txt_bits[]) {
+  COMP payload_syms[], uint8_t txt_bits[]) {
     complex float *payload = (complex float *) &payload_syms[0]; // complex has same memory layout
     int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
     int Nuwsyms = ofdm_nuwbits / ofdm_bps;
@@ -1760,7 +1774,7 @@ void ofdm_assemble_modem_frame_symbols(complex float modem_frame[],
 }
 
 void ofdm_disassemble_modem_frame(struct OFDM *ofdm, uint8_t rx_uw[],
-        COMP codeword_syms[], float codeword_amps[], short txt_bits[]) {
+  COMP codeword_syms[], float codeword_amps[], short txt_bits[]) {
     complex float *codeword = (complex float *) &codeword_syms[0]; // complex has same memory layout
     int Nsymsperframe = ofdm_bitsperframe / ofdm_bps;
     int Nuwsyms = ofdm_nuwbits / ofdm_bps;
