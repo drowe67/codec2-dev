@@ -52,7 +52,7 @@ endfunction
   25 Hz for 700D).
 #}
 
-function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples)
+function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -66,7 +66,7 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
 
     % correlate with pilots at start and end of frame to determine timing offset
     
-    for i=1:Ncorr
+    for i=1:step:Ncorr
       rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
       corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
@@ -446,10 +446,10 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
       wvec = exp(-j*w*(0:2*Nsamperframe));
 
       % choose best timing offset metric at this freq offset
-      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples);
+      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
     else
       % exp(-j*0) is just 1 when afcoarse is 0
-      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
+      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
     end
     
     %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
@@ -539,7 +539,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
+    [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
