@@ -9,7 +9,7 @@
    $ cd ~
    $ wget https://armkeil.blob.core.windows.net/developer/Files/downloads/gnu-rm/8-2018q4/gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2
    $ tar xvjf gcc-arm-none-eabi-8-2018-q4-major-linux.tar.bz2
-   $ export $PATH=$HOME/gcc-arm-none-eabi-8-2018-q4-major/bin:$PATH
+   $ export PATH=$HOME/gcc-arm-none-eabi-8-2018-q4-major/bin:$PATH
    ```
 
    NOTE: We do not recommend toolchains provided by popular
