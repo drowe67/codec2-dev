@@ -63,8 +63,6 @@ static void ofdm_demod_core(struct OFDM *, int *);
 #define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
 #define min( a, b ) ( ((a) < (b)) ? (a) : (b) )
 
-#define OFDM_WFREQ 40.0f
-
 /*
  * QPSK Quadrant bit-pair values - Gray Coded
  */
@@ -130,8 +128,6 @@ static int ofdm_max_samplesperframe;
 static int ofdm_rxbuf;
 static int ofdm_ntxtbits; /* reserve bits/frame for aux text information */
 static int ofdm_nuwbits; /* Unique word used for positive indication of lock */
-static float ofdm_w;
-static int ofdm_nval;
 
 /* Local Functions ----------------------------------------------------------*/
 
@@ -265,11 +261,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
      * half a symbol intervals
      */
     ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
-
-   /* Sync Vector Table Constants, ofdm_wval in wval.h */
-
-    ofdm_nval = (int)(ofdm_fs / OFDM_WFREQ);
-    ofdm_w = TAU * OFDM_WFREQ / ofdm_fs;
 
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
