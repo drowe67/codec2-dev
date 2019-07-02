@@ -616,7 +616,9 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
       assert(0);
     }
 
-#define __REAL__
+    /* use of __REAL__ provides a speed in increase of 10ms/frame during acquisition, however complex
+       is fast enough for real time opration */
+    
 #if defined(__EMBEDDED__) && defined(__REAL__)
     float rx_real[length];
     float wvec_pilot_real[ofdm_m + ofdm_ncp];
