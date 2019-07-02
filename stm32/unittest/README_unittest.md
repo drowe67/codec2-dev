@@ -53,7 +53,7 @@ When each test runs, a directory is created, and several log files generated.
    ```
    To list the available ctests:
    ```
-   $ ctest -n
+   $ ctest -N
    ```
 1. To run a single test.  This test exercises the entire 700D receive side,
    and measures CPU load and memory:
