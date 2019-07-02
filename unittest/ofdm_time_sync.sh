@@ -1,5 +1,5 @@
 #!/bin/bash
-# Shell script veserion of ofdm_time_sync()
+# Shell script version of ofdm_time_sync()
 # David June 2019
 # Tests ofdm modem sync time, using real, off air files
 

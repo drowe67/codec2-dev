@@ -320,19 +320,24 @@ if(UNITTEST)
              set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
-     add_test(NAME test_COHPSK_modem_AWGN_BER
+    add_test(NAME test_COHPSK_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -30  | $<TARGET_FILE:cohpsk_demod> - - | $<TARGET_FILE:cohpsk_put_test_bits> -"
              )
            
-     add_test(NAME test_COHPSK_modem_freq_offset
+    add_test(NAME test_COHPSK_modem_freq_offset
              COMMAND sh -c "set -x; $<TARGET_FILE:cohpsk_get_test_bits> - 5600 | $<TARGET_FILE:cohpsk_mod> - - | $<TARGET_FILE:cohpsk_ch> - - -40 -f -20 | $<TARGET_FILE:cohpsk_demod> -v - - 2>log.txt | $<TARGET_FILE:cohpsk_put_test_bits> - ; ! grep 'lost sync' log.txt"
              )
            
-   add_test(NAME test_OFDM_modem_AWGN_BER
+    add_test(NAME test_OFDM_modem_AWGN_BER
              COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ldpc 1 --testframes 60 --txbpf | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -50 | $<TARGET_FILE:ofdm_demod> --out /dev/null --testframes --ldpc 1 --verbose 1"
              )
 
-   add_test(NAME test_OFDM_modem_time_sync
+    add_test(NAME test_OFDM_modem_fading_BER
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
+    add_test(NAME test_OFDM_modem_time_sync
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
