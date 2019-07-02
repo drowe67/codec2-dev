@@ -744,7 +744,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
 
             corr_st += rx[est                       ] * csam;
             corr_en += rx[est + ofdm_samplesperframe] * csam;
-	    w *= delta;
+	    w = w * delta;
 	}
 
 	float Cabs = cabsf(corr_st) + cabsf(corr_en);
