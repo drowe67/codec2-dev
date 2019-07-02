@@ -40,9 +40,6 @@
 #include "filter.h"
 #include "wval.h"
 #include "debug_alloc.h"
-#ifdef __EMBEDDED__
-#define PROFILE
-#endif
 #include "machdep.h"
 
 /* Static Prototypes */
@@ -620,7 +617,7 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
     }
 
 #define __REAL__
-#if defined(__EMEBDDED__) && defined(__REAL__)
+#if defined(__EMBEDDED__) && defined(__REAL__)
     float rx_real[length];
     float wvec_pilot_real[ofdm_m + ofdm_ncp];
     float wvec_pilot_imag[ofdm_m + ofdm_ncp];
