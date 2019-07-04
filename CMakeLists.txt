@@ -376,4 +376,8 @@ if(UNITTEST)
              COMMAND sh -c "dd bs=1280 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
 
+    add_test(NAME test_fifo
+             COMMAND $<TARGET_FILE:tfifo>
+             )
+
 endif(UNITTEST)
