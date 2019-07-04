@@ -60,7 +60,7 @@ int main(void){
     #endif
 
     usb_vcp_init();
-    adc_open(ADC_FS_96KHZ, 4*N);
+    adc_open(ADC_FS_96KHZ, 4*N, NULL, NULL);
     sm1000_leds_switches_init();
 
     /* set up test buffer, lets us test USB comms indep of ADC, record to a file

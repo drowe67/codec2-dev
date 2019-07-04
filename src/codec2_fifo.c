@@ -51,7 +51,7 @@ struct FIFO *codec2_fifo_create(int nshort) {
 // alternate create function where buffer is externally supplied
 struct FIFO *codec2_fifo_create_buf(int nshort, short* buf) {
     struct FIFO *fifo;
-
+    assert(buf != NULL);
     fifo = (struct FIFO *)malloc(sizeof(struct FIFO));
     assert(fifo != NULL);
 

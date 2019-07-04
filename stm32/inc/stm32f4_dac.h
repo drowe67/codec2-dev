@@ -37,7 +37,7 @@
 #define DAC_FS_48KHZ 1750
 #define DAC_FS_96KHZ 875
 
-void dac_open(int fs_divisor, int fifo_sz);
+void dac_open(int fs_divisor, int fifo_sz, short *buf1, short *buf2);
 int dac1_write(short buf[], int n); /* DAC1 pin PA4 */
 int dac1_free();
 int dac2_write(short buf[], int n); /* DAC2 pin PA5 */

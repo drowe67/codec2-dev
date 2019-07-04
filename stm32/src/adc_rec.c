@@ -63,7 +63,7 @@ int main(void){
     bufs = FS*REC_TIME_SECS/N;
 
     printf("Starting!\n");
-    adc_open(ADC_FS_16KHZ, 4*N);
+    adc_open(ADC_FS_16KHZ, 4*N, NULL, NULL);
 
     for(i=0; i<bufs; i++) {
         while(adc2_read(buf, N) == -1);

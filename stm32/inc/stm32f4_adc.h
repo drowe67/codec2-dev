@@ -37,7 +37,7 @@
 #define ADC_FS_48KHZ 1750
 #define ADC_FS_96KHZ 875
 
-void adc_open(int fs_divisor, int fifo_sz);
+void adc_open(int fs_divisor, int fifo_sz, short *buf1, short *buf2);
 int adc1_read(short buf[], int n); /* ADC1 Pin PA1 */
 int adc2_read(short buf[], int n); /* ADC2 Pin PA2 */
 int adc1_samps();

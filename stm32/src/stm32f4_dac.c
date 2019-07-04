@@ -62,18 +62,22 @@ static void dac2_config(void);
 
 int dac_underflow;
 
-
-void dac_open(int fs_divisor, int fifo_size) {
+// You can optionally supply your own storage for the FIFO buffers bu1 and buf2,
+// or set them to NULL and they will be malloc-ed for you
+void dac_open(int fs_divisor, int fifo_size, short *buf1, short *buf2) {
 
     memset(dac1_buf, 32768, sizeof(short)*DAC_BUF_SZ);
     memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
 
     /* Create fifos */
 
-    dac1_fifo = codec2_fifo_create(fifo_size);
-    dac2_fifo = codec2_fifo_create(fifo_size);
-    assert(dac1_fifo != NULL);
-    assert(dac2_fifo != NULL);
+    if ((buf1 == NULL) && (buf2 == NULL)) {
+        dac1_fifo = codec2_fifo_create(fifo_size);
+        dac2_fifo = codec2_fifo_create(fifo_size);
+    } else {
+        dac1_fifo = codec2_fifo_create_buf(fifo_size, buf1);
+        dac2_fifo = codec2_fifo_create_buf(fifo_size, buf2);
+    }
 
     /* Turn on the clocks we need -----------------------------------------------*/
 

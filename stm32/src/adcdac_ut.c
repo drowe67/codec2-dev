@@ -48,8 +48,8 @@ int main(void) {
     short buf[SINE_SAMPLES];
     int   i;
 
-    dac_open(ADC_FS_16KHZ,4*DAC_BUF_SZ);
-    adc_open(ADC_FS_16KHZ, 4*ADC_BUF_SZ);
+    dac_open(ADC_FS_16KHZ,4*DAC_BUF_SZ, 0, 0);
+    adc_open(ADC_FS_16KHZ, 4*ADC_BUF_SZ, 0, 0);
     sm1000_leds_switches_init();
 
     while (1) {
