@@ -28,9 +28,10 @@ else
   UT_SH_FIO="enable"
 fi
 
-rm gdb_cmds
+rm -f gdb_cmds
 
-if [ ${ARGS[--openocd]+_} ] ; then
+if [ ! ${ARGS[--st-util]+_} ] ; then
+   # OpenOCD
    if [ -n "$UT_SSH" ]; then
         cat <<-EEOOFF >> gdb_cmds
         shell ${UT_SSH} killall -q openocd\; sleep 1\; openocd -d0 -f board/stm32f4discovery.cfg 2> >(tee stderr.log >&2) | tee stdout.log & 
@@ -51,6 +52,7 @@ if [ ${ARGS[--openocd]+_} ] ; then
     
        SHUTDOWN="monitor shutdown"
 else
+    # ST-Util
     echo "---------------------- STARTING gdb/st-util ------------------------------"
     cat <<-EEOOFF >> gdb_cmds
         shell st-util --verbose=0 --semihosting 2>stutil_stderr.log >stutil_stdout.log &
