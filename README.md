@@ -185,6 +185,10 @@ $ ctest -V
 ```
 $ ctest -R test_OFDM_modem_octave_port
 ```
+5/ To list the available tests:
+```
+$ ctest -N
+```
 ## Directories
 ```
 cmake       - cmake support files

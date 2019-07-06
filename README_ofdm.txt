@@ -134,6 +134,23 @@ FreeDV 2020 extensions
     BER......: 0.0505 Tbits: 874020 Terrs: 44148
     Coded BER: 0.0096 Tbits: 649272 Terrs:  6230
 
+15. Acquisition tests:
+
+    Acquisition (getting sync) can be problematic in fading channels.
+    Some special tests have been developed, that measure acquisition
+    time on off air 700D samples at different time offsets:
+    
+    octave:61> ofdm_ldpc_rx("../wav/vk2tpm_004.wav", "700D", 1, "", 5, 4)
+    build_linux/src$ ./ofdm_demod --in ../../wav/vk2tpm_004.wav --out /dev/null --verbose 2 --ldpc 1 --start_secs 5 --len_secs 4
+
+    Different time offsets effectively tests the ability to sync on
+    fading channel in different states.
+
+    Stats for a series of these tests can be obtained with:
+    
+    octave:61> ofdm_time_sync("../wav/vk2tpm_004.wav", 30)
+    <snip>pass: 30 fails: 0 mean: 1.35 var 0.51
+    
 Octave Acceptance Tests
 -----------------------
 

@@ -1,17 +1,9 @@
 % ofdm_ldpc_rx.m
 % David Rowe April 2017
 %
-% OFDM file based rx, with LDPC and interleaver
+% OFDM file based rx, with LDPC and interleaver, Octave version of src/ofdm_demod.c
 
-#{
-  TODO: 
-    [ ] proper EsNo estimation
-    [ ] some sort of real time GUI display to watch signal evolving
-    [ ] est SNR or Eb/No of recieved signal
-    [ ] way to fall out of sync
-#}
-
-function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename)
+function time_to_sync = ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_pattern_filename, start_secs, len_secs)
   ofdm_lib;
   ldpc;
   gp_interleaver;
@@ -19,12 +11,11 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
 
   % init modem
 
-  bps = 2; Ns = 8; Tcp = 0.002;
-  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode, Ns);
+  [bps Rs Tcp Ns Nc] = ofdm_init_mode(mode);
   states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
   ofdm_load_const;
   states.verbose = 1;
-
+  
   mod_order = 4; bps = 2; modulation = 'QPSK'; mapping = 'gray';
   demod_type = 0; decoder_type = 0; max_iterations = 100;
 
@@ -39,6 +30,8 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
 
   Ascale= states.amp_scale/2.0;  % /2 as real signal has half amplitude
   frx=fopen(filename,"rb"); rx = fread(frx, Inf, "short")/Ascale; fclose(frx);
+  if (nargin >= 5) printf("start_secs: %d\n", start_secs); rx = rx(start_secs*Fs+1:end); end
+  if (nargin >= 6) printf("len_secs: %d\n", len_secs); rx = rx(1:len_secs*Fs); end
   Nsam = length(rx); Nframes = floor(Nsam/Nsamperframe);
   prx = 1;
 
@@ -101,7 +94,9 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
   Nerrs_coded_log = Nerrs_log = [];
   error_positions = [];
   Nerrs_coded = Nerrs_raw = zeros(1, interleave_frames);
-
+  paritychecks = [0];
+  time_to_sync = -1;
+  
   #{
   % 'prime' rx buf to get correct coarse timing (for now)
   
@@ -178,8 +173,8 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
           % using LDPC decoder to obtain interleaver sync only supported for 700D so far, lets assume 2200 only works
           % with interleave_frames = 1.
           st = 1; en = Ncodedbitsperframe/bps;
-          [rx_codeword parity_checks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
-          Nerrs = code_param.data_bits_per_frame - max(parity_checks);
+          [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
+          Nerrs = code_param.data_bits_per_frame - max(paritychecks);
           %printf("Nerrs: %d\n", Nerrs);
         end
         
@@ -228,7 +223,7 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
 
           if strcmp(mode, "700D")
             st = (ff-1)*Nsymbolsperframe+1; en = st + Nsymbolsperframe-1;
-            rx_codeword  = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
+            [rx_codeword paritychecks] = ldpc_dec(code_param, max_iterations, demod_type, decoder_type, rx_np_de(st:en)/mean_amp, min(EsNo,30), rx_amp_de(st:en)/mean_amp);
             arx_bits = rx_codeword(1:code_param.data_bits_per_frame);
             errors = xor(codec_bits, arx_bits);
             Nerrs  = sum(errors);
@@ -289,9 +284,20 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
 
     if states.verbose
       r = mod(states.frame_count_interleaver,  interleave_frames)+1;
-      printf("f: %3d st: %-6s uw_errs: %2d %1d inter_st: %-6s inter_fr: %2d Nerrs_raw: %3d Nerrs_coded: %3d foff: %4.1f\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver, states.frame_count_interleaver,
-             Nerrs_raw(r), Nerrs_coded(r), states.foff_est_hz);
+      pcc = max(paritychecks);
+      iter = 0;
+      for i=1:length(paritychecks)
+        if paritychecks(i) iter=i; end
+      end
+      printf("f: %3d st: %-6s euw: %2d %1d ist: %-6s eraw: %3d ecdd: %3d iter: %3d pcc: %3d foff: %4.1f nin: %d\n",
+             f, states.last_sync_state, states.uw_errors, states.sync_counter, states.last_sync_state_interleaver,
+             Nerrs_raw(r), Nerrs_coded(r), iter, pcc, states.foff_est_hz, states.nin);
+      % detect a sucessful sync
+      if (time_to_sync < 0) && (strcmp(states.sync_state,'synced') || strcmp(states.sync_state,'trial'))
+        if (pcc > 80) && (iter != 100)
+          time_to_sync = f*Nsamperframe/Fs;
+        end
+      end
     end
 
     % act on any events returned by modem sync state machine
@@ -310,33 +316,35 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
   printf("Raw BER..: %5.4f Tbits: %5d Terrs: %5d\n", Terrs/(Tbits+1E-12), Tbits, Terrs);
   printf("Coded BER: %5.4f Tbits: %5d Terrs: %5d\n", Terrs_coded/(Tbits_coded+1E-12), Tbits_coded, Terrs_coded);
 
-  figure(1); clf; 
-  plot(rx_np_log,'+');
-  mx = max(abs(rx_np_log));
-  axis([-mx mx -mx mx]);
-  title('Scatter');
+  if length(rx_np_log)
+      figure(1); clf; 
+      plot(rx_np_log,'+');
+      mx = max(abs(rx_np_log));
+      axis([-mx mx -mx mx]);
+      title('Scatter');
 
-  figure(2); clf;
-  plot(phase_est_pilot_log,'g+', 'markersize', 5); 
-  title('Phase est');
-  axis([1 length(phase_est_pilot_log) -pi pi]);  
+      figure(2); clf;
+      plot(phase_est_pilot_log,'g+', 'markersize', 5); 
+      title('Phase est');
+      axis([1 length(phase_est_pilot_log) -pi pi]);
 
-  figure(3); clf;
-  subplot(211)
-  stem(delta_t_log)
-  title('delta t');
-  subplot(212)
-  plot(timing_est_log);
-  title('timing est');
+      figure(3); clf;
+      subplot(211)
+      stem(delta_t_log)
+      title('delta t');
+      subplot(212)
+      plot(timing_est_log);
+      title('timing est');
 
-  figure(4); clf;
-  plot(foff_est_hz_log)
-  mx = max(abs(foff_est_hz_log));
-  axis([1 max(Nframes,2) -mx mx]);
-  title('Fine Freq');
-  ylabel('Hz')
-
-  if length(Nerrs_log)
+      figure(4); clf;
+      plot(foff_est_hz_log)
+      mx = max(abs(foff_est_hz_log));
+      axis([1 max(Nframes,2) -mx mx]);
+      title('Fine Freq');
+      ylabel('Hz')
+  end
+   
+  if length(Nerrs_log) > 1
     figure(5); clf;
     subplot(211)
     stem(Nerrs_log);
@@ -356,8 +364,10 @@ function ofdm_ldpc_rx(filename, mode="700D", interleave_frames = 1, error_patter
   plot(snr_smoothed_estdB);
   title('Signal and Noise Power estimates');
   ylabel('SNR (dB)')
-  
-  if nargin == 4
+
+  figure(7); clf; plot_specgram(rx); axis([0 len_secs 500 2500])
+
+  if (nargin == 4) && strlen(error_pattern_filename)
     fep = fopen(error_pattern_filename, "wb");
     fwrite(fep, error_positions, "uchar");
     fclose(fep);

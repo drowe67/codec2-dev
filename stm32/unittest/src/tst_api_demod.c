@@ -54,8 +54,6 @@
 #include <math.h>
 #include <errno.h>
 
-#define PROFILE
-
 #include "freedv_api.h"
 #include "modem_stats.h"
 #include "codec2.h"

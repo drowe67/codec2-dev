@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
     }
     else {
         fprintf(stderr, "usage: %s InputRealModemRawFile OutputRealModemRawFile No(dB/Hz) [--Fs SampleRateHz]"
-                        " [-f FoffHz] [--slow] [--fast] [--clip 0to1] [--ssbfilt 0|1]\n", argv[0]);
+                        " [-f FoffHz] [--slow] [--fast] [--clip 0to1] [--ssbfilt 0|1] [--raw_dir Path]\n", argv[0]);
         exit(1);
     }
     fprintf(stderr, "cohpsk_ch ----------------------------------------------------------------------------------\n");

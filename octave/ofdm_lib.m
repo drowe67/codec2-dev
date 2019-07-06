@@ -47,10 +47,12 @@ endfunction
   samples to determine the most likely timing offset.  Combines two
   frames pilots so we need at least Nsamperframe+M+Ncp samples in rx.
 
-  Can be used for acquisition (coarse timing), and fine timing.
+  Can be used for acquisition (coarse timing), and fine timing.  Tends
+  to break down when freq offset approaches +/- symbol rate (e.g +/-
+  25 Hz for 700D).
 #}
 
-function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples)
+function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_fs_pilot_samples, step)
     ofdm_load_const;
     Npsam = length(rate_fs_pilot_samples);
 
@@ -64,7 +66,7 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
 
     % correlate with pilots at start and end of frame to determine timing offset
     
-    for i=1:Ncorr
+    for i=1:step:Ncorr
       rx1     = rx(i:i+Npsam-1); rx2 = rx(i+Nsamperframe:i+Nsamperframe+Npsam-1);
       corr_st = rx1 * rate_fs_pilot_samples'; corr_en = rx2 * rate_fs_pilot_samples';
       corr(i) = (abs(corr_st) + abs(corr_en))/av_level;
@@ -83,18 +85,17 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
       figure(4); clf; plot(real(rate_fs_pilot_samples));
     end
 
-
 endfunction
+
 
 #{
   Determines frequency offset at current timing estimate, used for
   coarse freq offset estimation during acquisition.
 
-  Freq offset is based on an averaged statistic that was found to be
-  necessary to generate good quality estimates.
-
-  Keep calling it when in trial or actual sync to keep statistic
-  updated, in case we lose sync.
+  This estimator works well for AWGN channels but has problems with
+  fading channels.  With stationary/slow fading channels (say a notch
+  in the spectrum), ot exhibits bias which can delay sync for 10's of
+  seconds.
 #}
 
 function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, t_est)
@@ -113,9 +114,7 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
    
     Fs1 = Fs/(Npsam/2);
 
-    % averaging metric was found to be really important for reliable acquisition at low SNRs
-
-    states.foff_metric = 0.9*states.foff_metric + 0.1*(conj(p1)*p2 + conj(p3)*p4);
+    states.foff_metric = (conj(p1)*p2 + conj(p3)*p4);
     foff_est = Fs1*angle(states.foff_metric)/(2*pi);
 
     if states.verbose > 1
@@ -123,6 +122,50 @@ function [foff_est states] = est_freq_offset(states, rx, rate_fs_pilot_samples, 
     end
  
 endfunction
+
+
+#{
+  Determines frequency offset at current timing estimate, used for
+  coarse freq offset estimation during acquisition.
+
+  This is an alternative algorithm to est_freq_offset() above that is less noisey
+  and performs better on HF channels using the acquistion tests in ofdm_dev.m
+#}
+
+function foff_est = est_freq_offset_pilot_corr(states, rx, rate_fs_pilot_samples, t_est)
+    ofdm_load_const;
+    Npsam = length(rate_fs_pilot_samples);
+
+    % extract pilot samples from either end of frame
+    rx1  = rx(t_est:t_est+Npsam-1); rx2 = rx(t_est+Nsamperframe:t_est+Nsamperframe+Npsam-1);
+
+    % "mix" these down (correlate) with 0 Hz offset pilot samples
+    corr_st = rx1 .* conj(rate_fs_pilot_samples);
+    corr_en = rx2 .* conj(rate_fs_pilot_samples);
+
+    % sample sum of DFT magnitude of correlated signals at each freq offset and look for peak
+    st = -20; en = 20; foff_est = 0; Cabs_max = 0;
+
+    for f=st:en
+       w = 2*pi*f/Fs;
+       C_st = corr_st * exp(j*w*(0:Npsam-1))';
+       C_en = corr_en * exp(j*w*(0:Npsam-1))';
+       Cabs = abs(C_st) + abs(C_en);
+       if Cabs > Cabs_max
+         Cabs_max = Cabs;
+         foff_est = f;
+       end
+    end
+    
+    if states.verbose > 1
+      printf("  foff_est: %f\n", foff_est);
+    end
+    if verbose > 2
+      figure(10); clf;
+      plot(st:en,C(Fs/2+st:Fs/2+en)); grid;
+    end 
+endfunction
+
 
 %
 %  Helper function to set up modems for various FreeDV modes, and parse mode string
@@ -220,7 +263,7 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   rand('seed',1);
   states.pilots = 1 - 2*(rand(1,Nc+2) > 0.5);
-  printf("number of pilots total: %d\n", length(states.pilots));
+  %printf("number of pilots total: %d\n", length(states.pilots));
   
   % carrier tables for up and down conversion
 
@@ -253,8 +296,9 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
   states.timing_en = 1;
   states.foff_est_en = 1;
   states.phase_est_en = 1;
+  states.phase_est_bandwidth = "high";
 
-  states.foff_est_gain = 0.05;
+  states.foff_est_gain = 0.1;
   states.foff_est_hz = 0;
   states.sample_point = states.timing_est = 1;
   states.nin = states.Nsamperframe;
@@ -282,13 +326,14 @@ function states = ofdm_init(bps, Rs, Tcp, Ns, Nc)
 
   % sync state machine
 
-  states.sync_state = states.last_sync_state = 'search';
+  states.sync_state = states.last_sync_state = 'search'; 
   states.uw_errors = 0;
   states.sync_counter = 0;
   states.frame_count = 0;
   states.sync_start = 0;
   states.sync_end = 0;
   states.sync_state_interleaver = 'search';
+  states.last_sync_state_interleaver = 'search';
   states.frame_count_interleaver = 0;
    
   % LDPC code is optionally enabled
@@ -388,11 +433,47 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.rxbuf(1:Nrxbuf-states.nin) = states.rxbuf(states.nin+1:Nrxbuf);
   states.rxbuf(Nrxbuf-states.nin+1:Nrxbuf) = rxbuf_in;
 
-  % Attempt coarse timing estimate (i.e. detect start of frame)
+  % Attempt coarse timing estimate (i.e. detect start of frame) at a range of frequency offsets
 
-  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe; 
-  [ct_est timing_valid timing_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples);
-  [foff_est states] = est_freq_offset(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+  st = M+Ncp + Nsamperframe + 1; en = st + 2*Nsamperframe;
+  timing_mx = 0; fcoarse = 0; timing_valid = 0; 
+  for afcoarse=-40:40:40
+    % vector of local oscillator samples to shift input vector
+    % these could be computed on the fly to save memory, or pre-computed in flash at tables as they are static
+
+    if afcoarse != 0
+      w = 2*pi*afcoarse/Fs;
+      wvec = exp(-j*w*(0:2*Nsamperframe));
+
+      % choose best timing offset metric at this freq offset
+      [act_est atiming_valid atiming_mx] = est_timing(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+    else
+      % exp(-j*0) is just 1 when afcoarse is 0
+      [act_est atiming_valid atiming_mx] = est_timing(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, 2);
+    end
+    
+    %printf("afcoarse: %f atiming_mx: %f\n", afcoarse, atiming_mx);
+    
+    if atiming_mx > timing_mx
+      ct_est = act_est;
+      timing_valid = atiming_valid;
+      timing_mx = atiming_mx;
+      fcoarse = afcoarse;
+    end
+  end
+  
+  % refine freq est within -/+ 20 Hz window  
+
+  if fcoarse != 0
+    w = 2*pi*fcoarse/Fs;
+    wvec = exp(-j*w*(0:2*Nsamperframe));
+    foff_est = est_freq_offset_pilot_corr(states, wvec .* states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+    foff_est += fcoarse;
+  else
+    % exp(-j*0) is just 1 when fcoarse is 0
+    foff_est = est_freq_offset_pilot_corr(states, states.rxbuf(st:en), states.rate_fs_pilot_samples, ct_est);
+  end
+ 
   if verbose
     printf("  ct_est: %d mx: %3.2f coarse_foff: %4.1f\n", ct_est, timing_mx, foff_est);
   end
@@ -416,7 +497,6 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
   states.timing_mx = timing_mx;
   states.coarse_foff_est_hz = foff_est;
 endfunction
-
 
 % ------------------------------------------
 % ofdm_demod - Demodulates one frame of bits
@@ -459,17 +539,7 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     st = M+Ncp + Nsamperframe + 1 - floor(ftwindow_width/2) + (timing_est-1);
     en = st + Nsamperframe-1 + M+Ncp + ftwindow_width-1;
           
-    [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples);
-
-    % keep the freq est statistic updated in case we lose sync, note
-    % we supply it with uncorrected rxbuf
-    
-    [coarse_foff_est_hz states] = est_freq_offset(states, rxbuf(st:en), states.rate_fs_pilot_samples, ft_est);
-    if states.frame_count == 0
-       % first frame in trial sync will have a better freq offset est - lets use it
-       foff_est_hz = states.foff_est_hz = coarse_foff_est_hz;
-       woff_est = 2*pi*foff_est_hz/Fs;
-    end
+    [ft_est timing_valid timing_mx] = est_timing(states, rxbuf(st:en) .* exp(-j*woff_est*(st:en)), rate_fs_pilot_samples, 1);
     
     if timing_valid
       timing_est = timing_est + ft_est - ceil(ftwindow_width/2);
@@ -551,21 +621,22 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     % ---
     % PPP  <-- frame+2
     
-    if isfield(states, "high_doppler")
-      high_doppler = states.high_doppler;
+    if isfield(states, "phase_est_bandwidth")
+      phase_est_bandwidth = states.phase_est_bandwidth;
     else
-      high_doppler = 0;
+      phase_est_bandwidth = "low";
     end
     
-    if (high_doppler)
+    if strcmp(phase_est_bandwidth, "high")
       % Only use pilots at start and end of this frame to track quickly changes in phase
-      % present in high Doppler channels.  As less pilots are averaged, low SNR performance
+      % present.  Useful for initial sync where freq offset est may be a bit off, and
+      % for high Doppler channels.  As less pilots are averaged, low SNR performance
       % will be poorer.
       achannel_est_rect(c) =  sum(rx_sym(2,c)*pilots(c)');      % frame    
       achannel_est_rect(c) += sum(rx_sym(2+Ns,c)*pilots(c)');   % frame+1
     else
       % Average over a bunch of pilots in adjacent carriers, and past and future frames, good
-      % low SNR performance, but will fall over with high Doppler.
+      % low SNR performance, but will fall over with high Doppler of freq offset.
       cr = c-1:c+1;
       achannel_est_rect(c) =  sum(rx_sym(2,cr)*pilots(cr)');      % frame    
       achannel_est_rect(c) += sum(rx_sym(2+Ns,cr)*pilots(cr)');   % frame+1
@@ -577,9 +648,14 @@ function [rx_bits states aphase_est_pilot_log rx_np rx_amp] = ofdm_demod(states,
     end
   end
   
+  if strcmp(phase_est_bandwidth, "high")
+    achannel_est_rect /= 2;
+  else
+    achannel_est_rect /= 12;
+  end
+  
   % pilots are estimated over 12 pilot symbols, so find average
 
-  achannel_est_rect /= 12;
   aphase_est_pilot = angle(achannel_est_rect);
   aamp_est_pilot = abs(achannel_est_rect);
 
@@ -904,9 +980,12 @@ function states = sync_state_machine(states, rx_uw)
       if states.sync_counter == 2
         next_state = "search";
         states.sync_state_interleaver = "search";
+        states.phase_est_bandwidth = "high";
       end
       if states.frame_count == 4
         next_state = "synced";
+        % change to low bandwidth, but more accurate phase estimation
+        states.phase_est_bandwidth = "low";
       end
     end
 
@@ -920,6 +999,7 @@ function states = sync_state_machine(states, rx_uw)
       if states.sync_counter == 12
         next_state = "search";
         states.sync_state_interleaver = "search";
+        states.phase_est_bandwidth = "high";
       end
     end
   end    

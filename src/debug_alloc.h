@@ -19,7 +19,7 @@ register char * sp asm ("sp");
 
   static inline void * DEBUG_MALLOC(const char *func, size_t size) {
     void *ptr = malloc(size);
-    fprintf(stderr, "MALLOC: %s %p %ld", func, ptr, size);
+    fprintf(stderr, "MALLOC: %s %p %d", func, ptr, (int)size);
 #ifdef CORTEX_M4
 
     fprintf(stderr, " : sp %p ", sp);
@@ -31,7 +31,7 @@ register char * sp asm ("sp");
 
   static inline void * DEBUG_CALLOC(const char *func, size_t nmemb, size_t size) {
     void *ptr = calloc(nmemb, size);
-    fprintf(stderr, "CALLOC: %s %p %d %ld", func, ptr, nmemb, size);
+    fprintf(stderr, "CALLOC: %s %p %d %d", func, ptr, (int)nmemb, (int)size);
 #ifdef CORTEX_M4
     fprintf(stderr, " : sp %p ", sp);
 #endif

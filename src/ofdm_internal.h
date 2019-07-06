@@ -50,6 +50,7 @@ extern "C"
 #define cmplx(value) (cosf(value) + sinf(value) * I)
 #define cmplxconj(value) (cosf(value) + sinf(value) * -I)
 
+/* modem state machine states */
 typedef enum {
     search,
     trial,
@@ -61,6 +62,14 @@ typedef enum {
     autosync,           /* falls out of sync automatically */
     manualsync          /* fall out of sync only under operator control */
 } Sync;
+
+/* phase estimator bandwidth options */
+
+typedef enum {
+    auto_bw,            /* future mode */
+    low_bw,             /* can only track a narrow freq offset, but accurate         */
+    high_bw             /* can track wider freq offset, but less accurate at low SNR */
+} PhaseEstBandwidth;
 
 /*
  * Contains user configuration for OFDM modem
@@ -79,7 +88,7 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
-    int high_doppler; /* boolean for high Doppler mode */
+    int phase_est_bandwidth; /* force low of high phase est bandwidth, rather than letting state machine decide */
     int ftwindowwidth;
 };
 
@@ -108,9 +117,12 @@ struct OFDM {
     // Sync enums
     Sync sync_mode;
 
+    // Phase enums
+    PhaseEstBandwidth phase_est_bandwidth;
+    
     // Complex
     complex float foff_metric;
-    
+     
     // Float
     float foff_est_gain;
     float foff_est_hz;
@@ -152,6 +164,8 @@ void ofdm_assemble_modem_frame_symbols(complex float [], COMP [], uint8_t []);
 void ofdm_disassemble_modem_frame(struct OFDM *, uint8_t [], COMP [], float [], short []);
 void ofdm_rand(uint16_t [], int);
 void ofdm_generate_payload_data_bits(uint8_t [], int);
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *);
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *, int);
 
 #ifdef __cplusplus
 }
