@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # 
 # David June 2019
 # Tests ofdm modem fading channel performance, using a sinulated channel
