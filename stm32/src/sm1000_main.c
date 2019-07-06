@@ -295,6 +295,7 @@ int main(void) {
     /* Enable CRC clock */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
 
+#ifdef __NEW
     /* Briefly open FreeDV 700D to determine buffer sizes we need
        (700D has the largest buffers) */
     f = freedv_open(FREEDV_MODE_700D);
@@ -326,6 +327,14 @@ int main(void) {
     pccm += 2*n_samples_16k;
     usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
+#else
+    int n_samples_16k = FORTY_MS_16K;
+    int n_speech_samples_16k = FORTY_MS_16K;
+    int n_speech_samples =  n_speech_samples_16k/2;
+    f = NULL;
+    dac_open(DAC_FS_16KHZ, n_samples_16k, 0, 0);
+    adc_open(ADC_FS_16KHZ, n_samples_16k, 0, 0);
+#endif
     
     /* Some local buffering of samples from ADC/DAC FIFOs used for I/O
        to FreeDV
@@ -450,11 +459,13 @@ int main(void) {
             if (f) freedv_close(f);
             switch(op_mode) {
             case ANALOG:
-                n_speech_samples = FORTY_MS_16K;
-                n_nom_modem_samples = FORTY_MS_16K;              
+                usart_printf("Analog\n");
+                n_speech_samples = FORTY_MS_16K/2;
+                n_nom_modem_samples = FORTY_MS_16K/2;              
                 dac_limit = FORTY_MS_16K;
                 break;
             case DV1600:
+                usart_printf("FreeDV 1600\n");
                 f = freedv_open(FREEDV_MODE_1600);
                 assert(f != NULL);
                 n_speech_samples = freedv_get_n_speech_samples(f);
@@ -466,6 +477,7 @@ int main(void) {
                 dac_limit = FORTY_MS_16K;
                break;
             case DV700D:
+                usart_printf("FreeDV 700D\n");
                 f = freedv_open(FREEDV_MODE_700D);
                 assert(f != NULL);
                 n_speech_samples = freedv_get_n_speech_samples(f);
@@ -478,6 +490,7 @@ int main(void) {
             n_nom_modem_samples_16k = 2*n_nom_modem_samples;
 
             /* empty ADC fifos as a starting point for kicking off new mode */
+            usart_printf("Empty ADC FIFOs\n");
             while(adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_speech_samples_16k) == 0);
             while(adc2_read(&adc16k[FDMDV_OS_TAPS_16K], n_speech_samples_16k) == 0);
         }
