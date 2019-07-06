@@ -343,6 +343,7 @@ int main(void) {
     short dac16k[n_samples_16k];
     short adc8k[n_samples];
     short dac8k[FDMDV_OS_TAPS_8K+n_samples];
+    int dac_limit = FORTY_MS_16K;
 
     int adc_dac_buffer_bytes = 2*(FDMDV_OS_TAPS_16K+n_samples_16k
                                   + n_samples_16k
@@ -364,7 +365,6 @@ int main(void) {
         /* Play tone to acknowledge, wait for release */
         tone_reset(&tone_gen, 1200, 1000);
         while(!switch_back()) {
-            /* TODO: make this a brief tone */
             int dac_rem = dac2_free();
             if (dac_rem) {
                 if (dac_rem > n_samples_16k)
@@ -372,7 +372,7 @@ int main(void) {
 
                 for (i = 0; i < dac_rem; i++)
                     dac16k[i] = tone_next(&tone_gen);
-                dac2_write(dac16k, dac_rem);
+                dac2_write(dac16k, dac_rem, dac_limit);
             }
             if (!menuLEDTicker) {
                 menuLEDTicker = MENU_LED_PERIOD;
@@ -442,32 +442,40 @@ int main(void) {
         
         /* if mode has changed, re-open freedv */
         if (op_mode != prev_op_mode) {
-            usart_printf("Re-opening FreeDV prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
+            usart_printf("Mode change prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
             if (f) freedv_close(f);
             switch(op_mode) {
             case ANALOG:
                 n_speech_samples = FORTY_MS_16K;
                 n_nom_modem_samples = FORTY_MS_16K;              
+                dac_limit = FORTY_MS_16K;
                 break;
             case DV1600:
                 f = freedv_open(FREEDV_MODE_1600);
                 assert(f != NULL);
                 n_speech_samples = freedv_get_n_speech_samples(f);
                 n_nom_modem_samples = freedv_get_n_nom_modem_samples(f);
+                /* When running 1600 we don't want too many samples
+                   buffered in the rather large DAC FIFOs we have allocated
+                   to cater for 700D, so we artificially limit the number
+                   of samples we can store in the DAC FIFOs */
+                dac_limit = FORTY_MS_16K;
                break;
             case DV700D:
                 f = freedv_open(FREEDV_MODE_700D);
                 assert(f != NULL);
                 n_speech_samples = freedv_get_n_speech_samples(f);
                 n_nom_modem_samples = freedv_get_n_nom_modem_samples(f);
+                /* use all of the FIFO size */
+                dac_limit = 0;
                 break;
             }
             n_speech_samples_16k = 2*n_speech_samples;
             n_nom_modem_samples_16k = 2*n_nom_modem_samples;
-            /* TODO clear speech samples and empty FIFOs here.  We
-               don't want excessive delay for 1600 when we switch
-               modes.  Will this happen automatically due to while
-               loops? */
+
+            /* empty ADC fifos as a starting point for kicking off new mode */
+            while(adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_speech_samples_16k) == 0);
+            while(adc2_read(&adc16k[FDMDV_OS_TAPS_16K], n_speech_samples_16k) == 0);
         }
         
         /* Acknowledge switch events */
@@ -489,7 +497,7 @@ int main(void) {
                 /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
                 if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], n_speech_samples_16k) == 0) {
-                    GPIOE->ODR = (1 << 3);
+                    GPIOE->ODR = (1 << 3); /* blink GPIO to time processing with an oscilliscope */
 
                     /* clipping indicator */
 
@@ -505,15 +513,13 @@ int main(void) {
                         for(i=0; i<n_speech_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_speech_samples);
-                        dac1_write(dac16k, n_speech_samples_16k);
-                    }
-                    if (op_mode == DV1600) {
-
+                        dac1_write(dac16k, n_speech_samples_16k, dac_limit);
+                    } else {
                         freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         for(i=0; i<n_nom_modem_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_nom_modem_samples);
-                        dac1_write(dac16k, n_nom_modem_samples_16k);
+                        dac1_write(dac16k, n_nom_modem_samples_16k, dac_limit);
                     }
 
                     led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
@@ -612,7 +618,7 @@ int main(void) {
                 if (spk_nsamples < n_rem)
                     n_rem = spk_nsamples;
                 /* Play the audio */
-                dac2_write(play_ptr, n_rem);
+                dac2_write(play_ptr, n_rem, dac_limit);
                 spk_nsamples -= n_rem;
                 play_ptr += n_rem;
             }

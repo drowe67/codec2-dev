@@ -63,7 +63,7 @@ int main(void) {
                 buf[i] = aSine[i];
         }
 
-        dac2_write(buf, SINE_SAMPLES);
+        dac2_write(buf, SINE_SAMPLES, 0);
     }
 
 }

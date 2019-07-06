@@ -48,8 +48,8 @@ int main(void) {
         printf("Starting!\n");
 
         while(fread(buf, sizeof(short), N, fplay) == N) {
-            while(dac1_write(buf, N) == -1);
-            while(dac2_write(buf, N) == -1);
+            while(dac1_write(buf, N, 0) == -1);
+            while(dac2_write(buf, N, 0) == -1);
         }
 
         printf("Finished!\n");

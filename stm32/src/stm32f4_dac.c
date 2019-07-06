@@ -105,14 +105,31 @@ void dac_open(int fs_divisor, int fifo_size, short *buf1, short *buf2) {
     init_debug_blinky();
 }
 
-/* Call these puppies to send samples to the DACs.  For your
-   convenience they accept signed 16 bit samples. */
+/* Call these functions to send samples to the DACs.  For your
+   convenience they accept signed 16 bit samples.  You can optionally
+   limit how much data to store in the fifo */
 
-int dac1_write(short buf[], int n) {
+int dac1_write(short buf[], int n, int limit) {
+    /* artificial limit < FIFO size */
+    if (limit) {
+        if ((codec2_fifo_used(dac1_fifo) + n) < limit)
+            return codec2_fifo_write(dac1_fifo, buf, n);
+        else
+            return -1;
+    }
+    /* normal operation */
     return codec2_fifo_write(dac1_fifo, buf, n);
 }
 
-int dac2_write(short buf[], int n) {
+int dac2_write(short buf[], int n, int limit) {
+    /* artificial limit < FIFO size */
+    if (limit) {
+        if ((codec2_fifo_used(dac1_fifo) + n) < limit)
+            return codec2_fifo_write(dac1_fifo, buf, n);
+        else
+            return -1;
+    }
+    /* normal operation */
     return codec2_fifo_write(dac2_fifo, buf, n);
 }
 
