@@ -303,6 +303,8 @@ int main(void) {
     int n_modem_samples = freedv_get_n_max_modem_samples(f);
     int n_modem_samples_16k = 2*n_modem_samples;
     freedv_close(f); f = NULL;
+    usart_printf("n_speech_samples: %d n_modem_samples: %d\n",
+                 n_speech_samples, n_modem_samples);
 
     /* both speech and modem buffers will be about the same size, but
        choose the largest and add a little extra padding */
@@ -313,14 +315,16 @@ int main(void) {
         n_samples_16k = n_modem_samples_16k;
     n_samples_16k += FORTY_MS_16K;
 
-    usart_printf("n_samples: %d storage for 4 FIFOs: %d bytes\n",
+    usart_printf("n_samples_16k: %d storage for 4 FIFOs: %d bytes\n",
                  n_samples_16k, 4*2*n_samples_16k);
     
     /* Set up ADCs/DACs and their FIFOs, note storage is in CCM memory */
+    usart_printf("pccm before dac/adc open: %p\n", pccm);
     dac_open(DAC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
     pccm += 2*n_samples_16k;
     adc_open(ADC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
     pccm += 2*n_samples_16k;
+    usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
     
     /* Some local buffering of samples from ADC/DAC FIFOs used for I/O
