@@ -30,7 +30,7 @@ case "${TEST_OPT}" in
     	echo "71000010" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
-        dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
+        dd bs=1280 count=100 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
 	freedv_tx 700D spch_in.raw stm_in.raw --testframes --txbpf 0 \
 		>> setup.log 2>&1
@@ -69,17 +69,18 @@ case "${TEST_OPT}" in
         freedv_rx 700D stm_in.raw ref_demod.raw -v --testframes  2>&1 --discard | tee ref_gen.log
 	;;
 
-    700D_plain_codec )
+    700D_AWGN_codec )
     	# Config is <mode>, <teswtframes> 
-    	echo "70000010" > stm_cfg.txt
+    	echo "70000020" > stm_cfg.txt
 	#
         # Copy N frames of a raw audio file to stm_in.raw. 
         dd bs=1280 count=48 if=../../../../raw/hts1.raw of=spch_in.raw \
 		> setup.log 2>&1
-	freedv_tx 700D spch_in.raw stm_in.raw --txbpf 0 \
+	freedv_tx 700D spch_in.raw mod_bits.raw --txbpf 0 \
 		>> setup.log 2>&1
 	#
-        # Reference
+        # Reference - give it a hard time with some noise to exercise the LDPC codec and get us to max CPU
+	cohpsk_ch mod_bits.raw stm_in.raw -20 --Fs 8000 -f -5  2>&1 | tee setup.log
         freedv_rx 700D stm_in.raw ref_demod.raw -v \
 		> ref_gen.log 2>&1
 	;;
@@ -98,7 +99,7 @@ case "${TEST_OPT}" in
 	;;
     
     *)
-	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_plain_codec\n\n  1600_plain_codec\n"
+	printf "ERROR: invalid test option. Valid options are:\n  700D_plain_test\n  700D_AWGN_test\n  700D_AWGN_codec\n  1600_plain_codec\n"
 	exit 1
       	;;
 

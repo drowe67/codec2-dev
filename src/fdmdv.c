@@ -1731,8 +1731,6 @@ float calc_snr(int Nc, float sig_est[], float noise_est[])
 
 void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct MODEM_STATS *stats)
 {
-    int   c;
-
     assert(fdmdv->Nc <= MODEM_STATS_NC_MAX);
 
     stats->Nc = fdmdv->Nc;
@@ -1742,10 +1740,12 @@ void fdmdv_get_demod_stats(struct FDMDV *fdmdv, struct MODEM_STATS *stats)
     stats->rx_timing = fdmdv->rx_timing;
     stats->clock_offset = 0.0; /* TODO - implement clock offset estimation */
 
+#ifndef __EMBEDDED__
     stats->nr = 1;
-    for(c=0; c<fdmdv->Nc+1; c++) {
+    for(int c=0; c<fdmdv->Nc+1; c++) {
 	stats->rx_symbols[0][c] = fdmdv->phase_difference[c];
     }
+#endif
 }
 
 /*---------------------------------------------------------------------------*\

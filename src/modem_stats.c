@@ -40,16 +40,19 @@ void modem_stats_open(struct MODEM_STATS *f)
 
     /* init the FFT */
     
+#ifndef __EMBEDDED__
     for(i=0; i<2*MODEM_STATS_NSPEC; i++)
 	f->fft_buf[i] = 0.0;
     f->fft_cfg = kiss_fft_alloc (2*MODEM_STATS_NSPEC, 0, NULL, NULL);
     assert(f->fft_cfg != NULL);
-
+#endif
 }
 
 void modem_stats_close(struct MODEM_STATS *f)
 {
+#ifndef __EMBEDDED__
     KISS_FFT_FREE(f->fft_cfg);
+#endif
 }
 
 /*---------------------------------------------------------------------------*\
@@ -81,6 +84,7 @@ void modem_stats_close(struct MODEM_STATS *f)
 
 \*---------------------------------------------------------------------------*/
 
+#ifndef __EMBEDDED__
 void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COMP rx_fdm[], int nin)
 {
     int   i,j;
@@ -116,3 +120,4 @@ void modem_stats_get_rx_spectrum(struct MODEM_STATS *f, float mag_spec_dB[], COM
 	mag_spec_dB[i] -= full_scale_dB;
     }
 }
+#endif

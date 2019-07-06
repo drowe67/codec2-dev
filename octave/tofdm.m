@@ -53,7 +53,9 @@ Ns = 8;
 states = ofdm_init(bps, Rs, Tcp, Ns, Nc);
 states.verbose = 0;
 ofdm_load_const;
+
 printf("Nbitsperframe: %d\n", Nbitsperframe);
+
 if cml_support
   Nuwtxtsymbolsperframe = (states.Nuwbits+states.Ntxtbits)/bps;
   S_matrix = [1, j, -j, -1];

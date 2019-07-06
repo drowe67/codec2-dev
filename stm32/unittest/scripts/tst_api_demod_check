@@ -24,11 +24,11 @@ cd "${RUN_DIR}"
 function compare_energy() {
     energy_ref=$(python -c "import numpy as np; x=np.fromfile(\"ref_demod.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
     energy_target=$(python -c "import numpy as np; x=np.fromfile(\"stm_out.raw\",dtype=\"int16\").astype(float); print(10*np.log10(np.dot(x,x)))")
-    printf "ref: %f target: %f\n" $energy_ref $energy_target
+    printf "ref energy: %f target energy: %f\n" $energy_ref $energy_target
 	
     python -c "import sys; sys.exit(1) if abs($energy_ref-$energy_target) < 1 else sys.exit(0)"
-    if [[ $? -eq 1 ]]; then echo "OK"; 
-    else echo "BAD"; 
+    if [[ $? -eq 1 ]]; then echo "energy compare OK"; 
+    else echo "energy compare BAD"; 
      	 let Fails=($Fails + 1)
     fi
 }
@@ -85,7 +85,7 @@ case "${TEST_OPT}" in
      	fi
 	;;
 
-    700D_plain_codec)
+    700D_AWGN_codec)
 	# 1/ The two output files sound OK, and when plotted look very
 	#    similar, but they don't match on a sample-sample basis.
 	
@@ -98,13 +98,23 @@ case "${TEST_OPT}" in
 	#    tests work.  However there is value in running the test
 	#    to ensure no asserts are hit and the code doesn't crash
 	#    (e.g. due to an out of memory issues). A simple energy
-	#    comparison is used on the output speech files , which
+	#    comparison is used on the output speech files, which
 	#    will trap any large errors.
 
 	# 4/ We can also manually evaulate the ouput decoded speech by
 	#    listening to the output speech files.
 
 	compare_energy;
+
+	# make sure execution time stays within bounds
+	execution_time=mktmp
+	cat stdout.log | sed  -n "s/.*freedv_rx \([0-9..]*\) msecs/\1/p" > $execution_time
+	python -c "import sys; import numpy as np;  x=np.loadtxt(\"$execution_time\"); print(\"execution time max:: %5.2f mean: %5.2f ms\" % (np.max(x), np.mean(x))); sys.exit(1) if np.max(x) < 80.0 else sys.exit(0)"
+	if [[ $? -eq 1 ]]; then echo "execution time OK"; 
+        else echo "BAD"; 
+     	   let Fails=($Fails + 1)
+        fi
+
 	;;
 
     1600_plain_codec)

@@ -3,10 +3,9 @@
 %
 % Octave script for testing the cohpsk freq offset estimator
 
-graphics_toolkit ("gnuplot");
 more off;
 
-cohpsk;
+cohpsk_dev;
 fdmdv;
 autotest;
 

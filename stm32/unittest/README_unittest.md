@@ -25,9 +25,8 @@ $ make
 $ ctest -V
 ```
 
-You should see tests executing (and mostly passing). They are slow to
-execute (30 to 180 seconds each), due to the speed of the semihosting
-system.
+You should see tests executing (and passing). They are slow to execute
+(30 to 180 seconds each), due to the speed of the semihosting system.
 
 ## If a Test fails
 
@@ -40,30 +39,32 @@ When each test runs, a directory is created, and several log files generated.
 1. Tests can be run using the ctest utility (part of cmake)
    ```
    $ cd ~/codec2/stm32/build_stm32
-   $ ctest 
+   $ ctest
    ```  
    You can pass -V to see more output:
    ```
    $ ctest -V
-   ```` 
+   ``` 
    You can pass -R <pattern> to run test matching <pattern>. Please note,
    that some test have dependencies and will have to run other tests before
    being executed
    ```
    $ ctest -R ofdm
    ```
-   
-1. To run a single test (example): 
+   To list the available ctests:
+   ```
+   $ ctest -N
+   ```
+1. To run a single test.  This test exercises the entire 700D receive side,
+   and measures CPU load and memory:
    ```
    $ cd ~/codec2/stm32/unittest
-   $ ./scripts/run_stm32_tst tst_ofdm_demod quick
+   $ ./scripts/run_stm32_tst tst_ofdm_api_demod 700D_AWGN_codec
    ```
    In general:
    ```
    $ ./scripts/run_stm32_test <name_of_test> <test_option>
    ```
-   (Note when running a single test you can choose not to reload the flash every
-   time if using the same bits.  The *_all_* scripts manage this themselves.)
 
 1. To run a test set (example):
    ```
