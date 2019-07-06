@@ -687,8 +687,8 @@ static int est_timing(struct OFDM *ofdm, complex float *rx, int length,
         }
     }
 
-    *timing_valid = (*timing_mx > ofdm_timing_mx_thresh); /* bool but used as external int */
-
+    // only declare timing valid if there are enough samples in rxbuf to demodulate a frame
+    *timing_valid = (cabsf(rx[timing_est]) > 0.0) && (*timing_mx > ofdm_timing_mx_thresh); 
     if (ofdm->verbose > 2) {
         fprintf(stderr, "  av_level: %f  max: %f timing_est: %d timing_valid: %d\n", (double) av_level,
              (double) *timing_mx, timing_est, *timing_valid);
@@ -852,7 +852,7 @@ int ofdm_get_samples_per_frame() {
 }
 
 int ofdm_get_max_samples_per_frame() {
-    return 2 * ofdm_max_samplesperframe;
+    return ofdm_max_samplesperframe;
 }
 
 int ofdm_get_bits_per_frame() {
@@ -1038,7 +1038,7 @@ static int ofdm_sync_search_core(struct OFDM *ofdm) {
 
         /* calculate number of samples we need on next buffer to get into sync */
 
-        ofdm->nin = ofdm_samplesperframe + ct_est;
+        ofdm->nin = ct_est;
 
         /* reset modem states */
 

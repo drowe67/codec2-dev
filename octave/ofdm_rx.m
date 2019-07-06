@@ -99,9 +99,9 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
     states = sync_state_machine(states, rx_uw);
 
     if states.verbose
-      printf("f: %2d state: %-10s uw_errors: %2d %1d Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
-             f, states.last_sync_state, states.uw_errors, states.sync_counter, Nerrs, states.foff_est_hz,
-             states.clock_offset_est*1E6);
+      printf("f: %2d nin: %4d state: %-10s uw_errors: %2d %1d pbw: %-4s Nerrs: %3d foff: %5.1f clkOff: %5.0f\n",
+             f, states.nin, states.last_sync_state, states.uw_errors, states.sync_counter, states.phase_est_bandwidth, Nerrs,
+             states.foff_est_hz, states.clock_offset_est*1E6);
     end
 
     % act on any events returned by state machine
@@ -132,6 +132,7 @@ function ofdm_rx(filename, mode="700D", error_pattern_filename)
   printf("Es/No est dB: % -4.1f SNR3k: %3.2f %f %f\n", EsNo_estdB, SNR_estdB, mean(sig_var_log), mean(noise_var_log));
   
   figure(1); clf; 
+  plot(rx_np_log,'+');
   plot(rx_np_log(floor(end/2):end),'+');
   mx = 2*max(abs(rx_np_log));
   axis([-mx mx -mx mx]);

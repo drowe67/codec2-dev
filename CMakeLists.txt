@@ -317,7 +317,7 @@ if(UNITTEST)
     add_test(NAME test_OFDM_modem_octave_port_Nc_31
              COMMAND sh -c "NC=31 PATH_TO_TOFDM=${CMAKE_CURRENT_BINARY_DIR}/unittest/tofdm octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tofdm.m"
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/octave)
-             set_tests_properties(test_OFDM_modem_octave_port PROPERTIES
+             set_tests_properties(test_OFDM_modem_octave_port_Nc_31 PROPERTIES
              PASS_REGULAR_EXPRESSION "fails: 0")
 
     add_test(NAME test_COHPSK_modem_AWGN_BER
