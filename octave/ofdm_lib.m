@@ -73,7 +73,8 @@ function [t_est timing_valid timing_mx av_level] = est_timing(states, rx, rate_f
     end
 
     [timing_mx t_est] = max(corr);
-    timing_valid = timing_mx > timing_mx_thresh;
+    % only declare timing valid if there are enough samples in rxbuf to demodulate a frame
+    timing_valid = (abs(rx(t_est)) > 0) && (timing_mx > timing_mx_thresh);
     
     if verbose > 1
       printf("  av_level: %5.4f mx: %4.3f timing_est: %4d timing_valid: %d\n", av_level, timing_mx, t_est, timing_valid);
@@ -483,7 +484,7 @@ function [timing_valid states] = ofdm_sync_search(states, rxbuf_in)
 
     % calculate number of samples we need on next buffer to get into sync
 
-    states.nin = Nsamperframe + ct_est - 1;
+    states.nin = ct_est - 1;
 
     % reset modem states
 
