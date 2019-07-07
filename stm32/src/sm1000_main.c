@@ -334,10 +334,14 @@ int main(void) {
     usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
     
-    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
-    short          dac16k[n_samples_16k];
+    //short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
+    short          *adc16k = pccm; pccm += FDMDV_OS_TAPS_16K+n_samples_16k;
+    //short          dac16k[n_samples_16k];
+    short          *dac16k = pccm; pccm += n_samples_16k;
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
+    usart_printf("pccm after buffers: %p\n", pccm);
+    assert((void*)pccm < CCM+CCM_LEN);
 
     usart_printf("drivers initialised...stack: %p\n", memtools_sp);
     memtools_find_unused(usart_printf);
@@ -447,12 +451,17 @@ int main(void) {
                 n_samples = FORTY_MS_16K/4;
                 break;
             case DV1600:
-            case DV700D:
                 usart_printf("FreeDV 1600\n");
                 f = freedv_open(FREEDV_MODE_1600);
                 assert(f != NULL);
                 n_samples = freedv_get_n_speech_samples(f);
-               break;
+                break;
+            case DV700D:
+                usart_printf("FreeDV 700D\n");
+                f = freedv_open(FREEDV_MODE_700D);
+                assert(f != NULL);
+                n_samples = freedv_get_n_speech_samples(f);
+                break;
             }
             n_samples_16k = 2*n_samples;
             usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
@@ -529,11 +538,11 @@ int main(void) {
                 }
                 else {
                     if (ms > lastms+5000) {
-                        usart_printf("1600 Rx\n");
+                        usart_printf("Digital Voice\n");
                         lastms = ms;
                     }
                     
-                    /* regular DV mode */
+                    /* 1600 or 700D DV mode */
 
                     nin = freedv_nin(f);
                     nout = nin;
@@ -541,7 +550,14 @@ int main(void) {
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                         GPIOE->ODR = (1 << 3);
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
-                        nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                        if (op_mode == 1) {
+                            nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
+                        } else {
+                        nout = nin;
+                        for(i=0; i<nin; i++)
+                            dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+                        }
+                        //usart_printf("nin: %d nout: %d\n", nin, nout);
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
                         spk_nsamples = 2*nout;
                         led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
@@ -604,7 +620,7 @@ int main(void) {
             }
 
             /* Clear out buffer */
-            memset(dac16k, 0, sizeof(dac16k));
+            memset(dac16k, 0, n_samples_16k);
         }
 
     } /* while(1) ... */
