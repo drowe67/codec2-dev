@@ -497,6 +497,9 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
     FREE(ofdm->tx_uw);
+    FREE(tx_uw_syms);
+    FREE(uw_ind);
+    FREE(uw_ind_sym);
     FREE(ofdm);
 }
 
@@ -896,7 +899,8 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 }
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
-    if (val == true) {
+    //fprintf(stderr, "ofdm_set_tx_bpf: val: %d\n", val);
+    if ((val == true) && (ofdm->ofdm_tx_bpf == NULL)) {
     	allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;
     } else {

@@ -387,7 +387,7 @@ if(UNITTEST)
              )
 
      add_test(NAME test_FreeDV_1600_tx_memory_leak
-             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes $<TARGET_FILE:freedv_tx> 1600 ../../raw/hts1a.raw /dev/null"
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_FreeDV_1600_tx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
@@ -398,5 +398,18 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
              )
              set_tests_properties(test_FreeDV_1600_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_FreeDV_700D_tx_memory_leak
+             COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 700D ../../raw/hts1a.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_FreeDV_700D_tx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
+
+     add_test(NAME test_FreeDV_700D_rx_memory_leak
+             COMMAND sh -c "./freedv_tx 1600 ../../raw/hts1a.raw t.raw; \
+                            valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_rx 700D t.raw /dev/null"
+             WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src
+             )
+             set_tests_properties(test_FreeDV_700D_rx_memory_leak PROPERTIES PASS_REGULAR_EXPRESSION "ERROR SUMMARY: 0 errors")
 
 endif(UNITTEST)

@@ -137,6 +137,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     f->frames = 0;
     f->speech_sample_rate = FS_VOICE_8K;
     f->stats.snr_est = 0.0;
+    f->tx_bits = f->rx_bits = NULL;
     
     /* -----------------------------------------------------------------------------------------------*\
     |                     Init states for this mode, and set up samples in/out                         |
