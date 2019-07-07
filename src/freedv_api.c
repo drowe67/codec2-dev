@@ -162,8 +162,8 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
         if (f->fdmdv_bits == NULL)
             return NULL;
         nbit = 2*fdmdv_bits_per_frame(f->fdmdv);
-        f->tx_bits = (int*)MALLOC(nbit*sizeof(int));
-        f->rx_bits = (int*)MALLOC(nbit*sizeof(int));
+        f->tx_bits = (int*)CALLOC(1, nbit*sizeof(int));
+        f->rx_bits = (int*)CALLOC(1, nbit*sizeof(int));
         if ((f->tx_bits == NULL) || (f->rx_bits == NULL)) {
             if (f->tx_bits != NULL) {
               FREE(f->tx_bits);
@@ -671,8 +671,11 @@ void freedv_close(struct freedv *freedv) {
     FREE(freedv->packed_codec_bits);
     FREE(freedv->codec_bits);
     FREE(freedv->tx_bits);
-    if (FDV_MODE_ACTIVE(FREEDV_MODE_1600, freedv->mode))
+    FREE(freedv->rx_bits);
+    if (FDV_MODE_ACTIVE(FREEDV_MODE_1600, freedv->mode)) {
+        FREE(freedv->fdmdv_bits);
         fdmdv_destroy(freedv->fdmdv);
+    }
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700B, freedv->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700C, freedv->mode))
         cohpsk_destroy(freedv->cohpsk);
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, freedv->mode)) {
