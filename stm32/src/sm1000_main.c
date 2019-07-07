@@ -300,6 +300,36 @@ int main(void) {
     /* Enable CRC clock */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
 
+    /* Briefly open FreeDV 700D to determine buffer sizes we need
+       (700D has the largest buffers) */
+
+#ifdef __TEST
+    for(i=0; i<10; i++) {
+        void *p = malloc(10000);
+        usart_printf("10k buf f: %p\n", p);
+        free(p);
+    }
+    for(i=0; i<10; i++) {
+        f = freedv_open(FREEDV_MODE_1600);
+        usart_printf("1600 f: %p\n", f);
+        freedv_close(f);
+        }
+    for(i=0; i<10; i++) {
+        f = freedv_open(FREEDV_MODE_700D);
+        usart_printf("700D f: %p\n", f);
+        freedv_close(f);
+    }
+   
+#endif
+    f = freedv_open(FREEDV_MODE_700D);
+    int n_speech_samples = freedv_get_n_speech_samples(f);
+    int n_speech_samples_16k = 2*n_speech_samples;
+    int n_modem_samples = freedv_get_n_max_modem_samples(f);
+    int n_modem_samples_16k = 2*n_modem_samples;
+    freedv_close(f); f = NULL;
+    usart_printf("n_speech_samples: %d n_modem_samples: %d\n",
+                 n_speech_samples, n_modem_samples);
+
     /* Set up ADCs/DACs */
     short *pccm = CCM;
     usart_printf("pccm before dac/adc open: %p\n", pccm);
