@@ -333,22 +333,13 @@ int main(void) {
     pccm += 2*n_samples_16k;
     usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
-    int dac_limit = 4*DAC_BUF_SZ;
-    usart_printf("n_samples_16k: %d dac_limit: %d\n", n_samples_16k, dac_limit);
     
     short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
     short          dac16k[n_samples_16k];
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
-    /* Set up FreeDV modem */
-    f = freedv_open(FREEDV_MODE_1600);
-    usart_printf("FreeDV f = 0x%x\n", (int)f);
-    n_samples = freedv_get_n_speech_samples(f);
-    n_samples_16k = 2*n_samples;
-
-    usart_printf("drivers and FreeDV 1600 initialised...stack: 0x%x (%d)\n",
-                 (int)dac8k, (uint32_t)0x20001ffff - (uint32_t)dac8k);
+    usart_printf("drivers initialised...stack: %p\n", memtools_sp);
     memtools_find_unused(usart_printf);
     
     /* put outputs into a known state */
@@ -438,6 +429,7 @@ int main(void) {
         tot_update(&tot);
 
         /* iterate core state machine based on switch events */
+        int prev_op_mode = op_mode;
         core_state = process_core_state_machine(core_state, &menu, &op_mode);
 
         /* Acknowledge switch events */
@@ -445,7 +437,26 @@ int main(void) {
         switch_ack(&sw_back);
         switch_ack(&sw_ptt);
 
-        /* if mode has changed, re-init freedv */
+        /* if mode has changed, re-open freedv */
+        if (op_mode != prev_op_mode) {
+            usart_printf("Mode change prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
+            if (f) freedv_close(f); f = NULL;
+            switch(op_mode) {
+            case ANALOG:
+                usart_printf("Analog\n");
+                n_samples = FORTY_MS_16K/4;
+                break;
+            case DV1600:
+            case DV700D:
+                usart_printf("FreeDV 1600\n");
+                f = freedv_open(FREEDV_MODE_1600);
+                assert(f != NULL);
+                n_samples = freedv_get_n_speech_samples(f);
+               break;
+            }
+            n_samples_16k = 2*n_samples;
+            usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
+        }
         
         /* perform signal processing based on core state */
         switch (core_state) {
