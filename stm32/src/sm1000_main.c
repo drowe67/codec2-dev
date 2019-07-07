@@ -422,7 +422,9 @@ int main(void) {
     usart_printf("entering main loop...\n");
 
     uint32_t lastms = ms;
-    
+    n_samples = FORTY_MS_16K/4;
+    n_samples_16k = 2*n_samples;
+   
     while(1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
@@ -550,14 +552,7 @@ int main(void) {
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
                         GPIOE->ODR = (1 << 3);
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
-                        if (op_mode == 1) {
-                            nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
-                        } else {
-                        nout = nin;
-                        for(i=0; i<nin; i++)
-                            dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
-                        }
-                        //usart_printf("nin: %d nout: %d\n", nin, nout);
+                        nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
                         spk_nsamples = 2*nout;
                         led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
