@@ -112,7 +112,7 @@ void dac_open(int fs_divisor, int fifo_size, short *buf1, short *buf2) {
 int dac1_write(short buf[], int n, int limit) {
     /* artificial limit < FIFO size */
     if (limit) {
-        if ((codec2_fifo_used(dac1_fifo) + n) < limit)
+        if ((codec2_fifo_used(dac1_fifo) + n) <= limit)
             return codec2_fifo_write(dac1_fifo, buf, n);
         else
             return -1;
@@ -124,8 +124,8 @@ int dac1_write(short buf[], int n, int limit) {
 int dac2_write(short buf[], int n, int limit) {
     /* artificial limit < FIFO size */
     if (limit) {
-        if ((codec2_fifo_used(dac1_fifo) + n) < limit)
-            return codec2_fifo_write(dac1_fifo, buf, n);
+        if ((codec2_fifo_used(dac2_fifo) + n) <= limit)
+            return codec2_fifo_write(dac2_fifo, buf, n);
         else
             return -1;
     }

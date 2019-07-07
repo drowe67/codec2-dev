@@ -48,6 +48,7 @@ ite  TODO
 #include "menu.h"
 #include "tot.h"
 
+#define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
 #define CCM_LEN         0x10000              /* start of 64k CCM memory   */
@@ -303,24 +304,6 @@ int main(void) {
     /* Briefly open FreeDV 700D to determine buffer sizes we need
        (700D has the largest buffers) */
 
-#ifdef __TEST
-    for(i=0; i<10; i++) {
-        void *p = malloc(10000);
-        usart_printf("10k buf f: %p\n", p);
-        free(p);
-    }
-    for(i=0; i<10; i++) {
-        f = freedv_open(FREEDV_MODE_1600);
-        usart_printf("1600 f: %p\n", f);
-        freedv_close(f);
-        }
-    for(i=0; i<10; i++) {
-        f = freedv_open(FREEDV_MODE_700D);
-        usart_printf("700D f: %p\n", f);
-        freedv_close(f);
-    }
-   
-#endif
     f = freedv_open(FREEDV_MODE_700D);
     int n_speech_samples = freedv_get_n_speech_samples(f);
     int n_speech_samples_16k = 2*n_speech_samples;
@@ -330,26 +313,39 @@ int main(void) {
     usart_printf("n_speech_samples: %d n_modem_samples: %d\n",
                  n_speech_samples, n_modem_samples);
 
-    /* Set up ADCs/DACs */
+    /* both speech and modem buffers will be about the same size, but
+       choose the largest and add a little extra padding */
+    if (n_speech_samples_16k > n_modem_samples_16k)
+        n_samples_16k = n_speech_samples_16k;
+    else
+        n_samples_16k = n_modem_samples_16k;
+    n_samples_16k += FORTY_MS_16K;
+    usart_printf("n_samples_16k: %d storage for 4 FIFOs: %d bytes\n",
+                 n_samples_16k, 4*2*n_samples_16k);
+
+    /* Set up ADCs/DACs and their FIFOs, note storage is in CCM memory */
     short *pccm = CCM;
     usart_printf("pccm before dac/adc open: %p\n", pccm);
-    dac_open(DAC_FS_16KHZ, 4*DAC_BUF_SZ, pccm, pccm+4*DAC_BUF_SZ);
-    pccm += 4*DAC_BUF_SZ;  pccm += 4*DAC_BUF_SZ;
-    adc_open(ADC_FS_16KHZ, 4*ADC_BUF_SZ, pccm, pccm+4*DAC_BUF_SZ);
-    pccm += 4*DAC_BUF_SZ;  pccm += 4*DAC_BUF_SZ;
+    n_samples = n_samples_16k/2;
+    dac_open(DAC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
+    pccm += 2*n_samples_16k;
+    adc_open(ADC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
+    pccm += 2*n_samples_16k;
     usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
+    int dac_limit = 4*DAC_BUF_SZ;
+    usart_printf("n_samples_16k: %d dac_limit: %d\n", n_samples_16k, dac_limit);
+    
+    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
+    short          dac16k[n_samples_16k];
+    short          adc8k[n_samples];
+    short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
     /* Set up FreeDV modem */
     f = freedv_open(FREEDV_MODE_1600);
     usart_printf("FreeDV f = 0x%x\n", (int)f);
     n_samples = freedv_get_n_speech_samples(f);
     n_samples_16k = 2*n_samples;
-
-    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
-    short          dac16k[n_samples_16k];
-    short          adc8k[n_samples];
-    short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
 
     usart_printf("drivers and FreeDV 1600 initialised...stack: 0x%x (%d)\n",
                  (int)dac8k, (uint32_t)0x20001ffff - (uint32_t)dac8k);
@@ -372,6 +368,7 @@ int main(void) {
         while(!switch_back()) {
             int dac_rem = dac2_free();
             if (dac_rem) {
+                // TODO this might need fixing for larger FIFOs
                 if (dac_rem > n_samples_16k)
                     dac_rem = n_samples_16k;
 
@@ -505,6 +502,10 @@ int main(void) {
                 /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
                 if (op_mode == ANALOG) {
+                    if (ms > lastms+5000) {
+                        usart_printf("Analog\n");
+                        lastms = ms;
+                    }
 
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
