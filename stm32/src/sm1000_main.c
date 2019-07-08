@@ -6,10 +6,6 @@
 
   Main program for SM1000.
 
-ite  TODO
-
-  [ ] make led blink 1-2-3 times for "mode"
-
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -334,9 +330,7 @@ int main(void) {
     usart_printf("pccm after dac/adc open: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
     
-    //short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
     short          *adc16k = pccm; pccm += FDMDV_OS_TAPS_16K+n_samples_16k;
-    //short          dac16k[n_samples_16k];
     short          *dac16k = pccm; pccm += n_samples_16k;
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
@@ -436,6 +430,7 @@ int main(void) {
 
         /* iterate core state machine based on switch events */
         int prev_op_mode = op_mode;
+        int prev_core_state = core_state;
         core_state = process_core_state_machine(core_state, &menu, &op_mode);
 
         /* Acknowledge switch events */
@@ -468,7 +463,12 @@ int main(void) {
             n_samples_16k = 2*n_samples;
             usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
         }
-        
+
+        /* if we have moved from tx to rx reset sync state of rx so we re-start acquisition */
+        if ((op_mode == DV1600) || (op_mode == DV700D))
+            if ((prev_core_state == STATE_TX) && (core_state == STATE_RX))
+                freedv_set_sync(f, FREEDV_SYNC_UNSYNC);
+            
         /* perform signal processing based on core state */
         switch (core_state) {
             case STATE_MENU:
@@ -501,7 +501,7 @@ int main(void) {
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                         dac1_write(dac16k, n_samples_16k, 0);
                     }
-                    if (op_mode == DV1600) {
+                    else {
                         freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
