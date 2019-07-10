@@ -2247,7 +2247,19 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
          //f->snr_est = 0.0;
     }
     
-    //fprintf(stderr, "sync: %d valid: %d snr: %3.2f\n", f->sync, *valid, f->snr_est);
+    /* We normally use a narrow timing search window when in sync.
+
+       If we are getting a bunch of errors and no FEC decode enable
+       wide timing search.  This could be due to a deep fade, the end
+       of an over and start of a new one, or a large timing slip
+       through a Web based SDR. In the case of a deep fade, the wide
+       search isn't neccesary, but hopefully won't hurt. */
+    if (ofdm->sync_state == synced) {
+        if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false))
+            ofdm_set_timing_range(ofdm, WIDE_TIMING);
+        else
+            ofdm_set_timing_range(ofdm, NARROW_TIMING);
+    }
     
     return nout;
 }
