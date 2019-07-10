@@ -352,6 +352,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_en = true;
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
+    ofdm->fine_timing_range = narrow;
 
     if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST) {
         ofdm->phase_est_bandwidth = auto_bw;
@@ -886,6 +887,13 @@ void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
     }
 }
  
+void ofdm_set_timing_range(struct OFDM *ofdm, int val) {
+    if (val == NARROW_TIMING)
+        ofdm->fine_timing_range = narrow;
+    else
+        ofdm->fine_timing_range = wide;
+}
+ 
 void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
@@ -1123,11 +1131,24 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
     /* update timing estimate ---------------------------------------------- */
 
-    if (ofdm->timing_en == true) {
+    if (ofdm->timing_en) {
         /* update timing at start of every frame */
 
-        st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
-        en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
+        if (ofdm->fine_timing_range == narrow) {
+            st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
+            en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
+        } else {
+
+            /* Wide option useful for fast resync at end of over or
+               large timing slip from Web based SDR Rx.  Same range as
+               initial acquisition, but offset back by
+               ofdm_ftwindowwidth/2 so it includes same range as
+               narrow.  Typically only used if frames are not FEC
+               decoding and lots of UW errors */
+
+            st = ofdm_m + ofdm_ncp + ofdm_samplesperframe - floorf(ofdm_ftwindowwidth / 2);
+            en = st + 2 * ofdm_samplesperframe;
+        }
 
         complex float work[(en - st)];
 

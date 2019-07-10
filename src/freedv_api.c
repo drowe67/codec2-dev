@@ -212,13 +212,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode) ) {
-        /*
-          TODO:
-            [ ] how to set up interleaver, prob init time option best, as many arrays depend on it
-            [ ] clip option?  Haven't tried clipping OFDM waveform yet
-            [ ] support for uncoded and coded error patterns
-        */
-        
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700C;
@@ -2240,10 +2233,14 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
     
-    /* no valid FreeDV signal - squelch output */
-    
+    /* check if OFDM modem has sync */    
     bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
-    if (sync == false) {
+
+    /* if LDPC code has too many errors it may be the end of an over or a very deep fade */
+    bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc->NumberParityBits;
+
+    /* squelch if out of sync or too many LDPC decode errors */
+    if ((sync == false) || (ldpc_decode_ok == false)) {
          if (f->squelch_en == true) {
  	    *valid = 0;
          }

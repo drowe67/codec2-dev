@@ -46,14 +46,20 @@ extern "C" {
 #define OFDM_AMP_SCALE (2E5*1.1491/1.06)   /* use to scale to 16 bit short */
 #define OFDM_CLIP (32767*0.35)             /* experimentally derived constant to reduce PAPR to about 8dB */
 
-#define UN_SYNC      0  /* Used with the ofdm_set_sync() */
+/* ofdm_set_sync() options */
+#define UN_SYNC      0 
 #define AUTO_SYNC    1
 #define MANUAL_SYNC  2
     
+/* ofdm_set_phase_est_bandwidth_mode options */
 #define AUTO_PHASE_EST 0
 #define LOW_PHASE_EST  1
 #define HIGH_PHASE_EST 2
 
+/* ofdm_set_timing_range options */
+#define NARROW_TIMING 0
+#define WIDE_TIMING 0
+    
 struct OFDM_CONFIG;
 struct OFDM;
 
@@ -89,7 +95,9 @@ void ofdm_set_phase_est_enable(struct OFDM *, bool);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *, int);
 void ofdm_set_tx_bpf(struct OFDM *, bool);
-
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val);
+void ofdm_set_timing_range(struct OFDM *ofdm, int val);
+    
 void ofdm_print_info(struct OFDM *);
 
 #ifdef __cplusplus
