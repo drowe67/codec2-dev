@@ -2222,17 +2222,8 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     /* iterate state machine and update nin for next call */
     
     f->nin = ofdm_get_nin(ofdm);
-    //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
-    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
-		(double)ofdm->foff_est_hz,
-                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
-                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
-    }
-    
     /* check if OFDM modem has sync */    
     bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
 
@@ -2241,10 +2232,10 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
 
     /* squelch if out of sync or too many LDPC decode errors */
     if ((sync == false) || (ldpc_decode_ok == false)) {
-         if (f->squelch_en == true) {
+        if (f->squelch_en == true) {
  	    *valid = 0;
-         }
-         //f->snr_est = 0.0;
+        }
+        //f->snr_est = 0.0;
     }
     
     /* We normally use a narrow timing search window when in sync.
@@ -2255,10 +2246,20 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
        through a Web based SDR. In the case of a deep fade, the wide
        search isn't neccesary, but hopefully won't hurt. */
     if (ofdm->sync_state == synced) {
-        if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false))
+        if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false)) {
             ofdm_set_timing_range(ofdm, WIDE_TIMING);
-        else
+        }
+        else {
             ofdm_set_timing_range(ofdm, NARROW_TIMING);
+        }
+    }
+    
+    if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+                f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
+		(double)ofdm->foff_est_hz,
+                statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
+                Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
     
     return nout;
