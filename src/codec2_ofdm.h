@@ -58,7 +58,7 @@ extern "C" {
 
 /* ofdm_set_timing_range options */
 #define NARROW_TIMING 0
-#define WIDE_TIMING 0
+#define WIDE_TIMING 1
     
 struct OFDM_CONFIG;
 struct OFDM;

@@ -1134,22 +1134,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     if (ofdm->timing_en) {
         /* update timing at start of every frame */
 
-        if (ofdm->fine_timing_range == narrow) {
-            st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
-            en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
-        } else {
-
-            /* Wide option useful for fast resync at end of over or
-               large timing slip from Web based SDR Rx.  Same range as
-               initial acquisition, but offset back by
-               ofdm_ftwindowwidth/2 so it includes same range as
-               narrow.  Typically only used if frames are not FEC
-               decoding and lots of UW errors */
-
-            st = ofdm_m + ofdm_ncp + ofdm_samplesperframe - floorf(ofdm_ftwindowwidth / 2);
-            en = st + 2 * ofdm_samplesperframe;
-        }
-
+        st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
+        en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
         complex float work[(en - st)];
 
         /*
@@ -1166,7 +1152,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,
-                ofdm->sample_point);
+                    ofdm->sample_point);
         }
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
