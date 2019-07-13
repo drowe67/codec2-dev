@@ -241,7 +241,7 @@ int main(int argc, char *argv[]) {
                 nout = freedv_comprx(freedv, speech_out, demod_in_complex);
            }
             else {
-                // most common interface - real shorts on, real shorts out
+                // most common interface - real shorts in, real shorts out
                 nout = freedv_rx(freedv, speech_out, demod_in);
             }
         } else {

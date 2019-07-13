@@ -1607,7 +1607,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 ofdm->sync_counter = 0;
             }
 
-            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter == 12)) {
+            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter > 6)) {
                 /* run of consecutive bad frames ... drop sync */
 
                 next_state = search;

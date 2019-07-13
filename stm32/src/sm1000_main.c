@@ -6,10 +6,6 @@
 
   Main program for SM1000.
 
-  TODO
-
-  [ ] make led blink 1-2-3 times for "mode"
-
 \*---------------------------------------------------------------------------*/
 
 /*
@@ -32,9 +28,12 @@
 #include "stm32f4_adc.h"
 #include "stm32f4_dac.h"
 #include "stm32f4_vrom.h"
+#include "stm32f4_usart.h"
 #include "freedv_api.h"
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
+#include "memtools.h"
+#include <assert.h>
 #include <stm32f4xx_gpio.h>
 #include <stm32f4xx_rcc.h>
 #include <stdlib.h>
@@ -45,8 +44,12 @@
 #include "menu.h"
 #include "tot.h"
 
+#define VERSION         "V2"
+#define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
-
+#define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
+#define CCM_LEN         0x10000              /* start of 64k CCM memory   */
+                                
 #define MENU_LED_PERIOD  100
 #define ANNOUNCE_DELAY  1500
 #define HOLD_DELAY      1000
@@ -130,8 +133,8 @@ uint8_t core_state = STATE_RX;
 
 #define MAX_MODES  3
 #define ANALOG     0
-#define DV         1
-#define TONE       2
+#define DV1600     1
+#define DV700D     2
 
 struct switch_t sw_select;  /*!< Switch driver for SELECT button */
 struct switch_t sw_back;    /*!< Switch driver for BACK button */
@@ -143,6 +146,8 @@ unsigned int announceTicker = 0;
 unsigned int menuLEDTicker = 0;
 unsigned int menuTicker = 0;
 unsigned int menuExit = 0;
+
+uint32_t ms = 0;           /* increments once per ms */
 
 /*!
  * User preferences
@@ -265,11 +270,17 @@ int load_prefs()
     return 0;
 }
 
+int process_core_state_machine(int core_state, struct menu_t  *menu, int *op_mode);
+
 int main(void) {
     struct freedv *f;
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
+    usart_init(); usart_printf("SM1000 VERSION: %s\n", VERSION);
+    usart_printf("SM1000 main()... stack 0x%x (%d)\n", &n_samples_16k, (uint32_t)0x2001ffff - (uint32_t)&n_samples_16k);
+    memtools_find_unused(usart_printf);
+    
     /* Menu data */
     struct menu_t   menu;
 
@@ -287,30 +298,63 @@ int main(void) {
     /* Enable CRC clock */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
 
-    /* Set up ADCs/DACs */
-    dac_open(DAC_FS_16KHZ, 4*DAC_BUF_SZ);
-    adc_open(ADC_FS_16KHZ, 4*ADC_BUF_SZ);
+    /* Briefly open FreeDV 700D to determine buffer sizes we need
+       (700D has the largest buffers) */
 
-    /* Set up FreeDV modem */
-    f = freedv_open(FREEDV_MODE_1600);
-    n_samples = freedv_get_n_speech_samples(f);
-    n_samples_16k = 2*n_samples;
+    f = freedv_open(FREEDV_MODE_700D);
+    int n_speech_samples = freedv_get_n_speech_samples(f);
+    int n_speech_samples_16k = 2*n_speech_samples;
+    int n_modem_samples = freedv_get_n_max_modem_samples(f);
+    int n_modem_samples_16k = 2*n_modem_samples;
+    freedv_close(f); f = NULL;
+    usart_printf("n_speech_samples: %d n_modem_samples: %d\n",
+                 n_speech_samples, n_modem_samples);
 
-    short          adc16k[FDMDV_OS_TAPS_16K+n_samples_16k];
-    short          dac16k[n_samples_16k];
+    /* both speech and modem buffers will be about the same size, but
+       choose the largest and add a little extra padding */
+    if (n_speech_samples_16k > n_modem_samples_16k)
+        n_samples_16k = n_speech_samples_16k;
+    else
+        n_samples_16k = n_modem_samples_16k;
+    n_samples_16k += FORTY_MS_16K;
+    usart_printf("n_samples_16k: %d storage for 4 FIFOs: %d bytes\n",
+                 n_samples_16k, 4*2*n_samples_16k);
+
+    /* Set up ADCs/DACs and their FIFOs, note storage is in CCM memory */
+    short *pccm = CCM;
+    usart_printf("pccm before dac/adc open: %p\n", pccm);
+    n_samples = n_samples_16k/2;
+    dac_open(DAC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
+    pccm += 2*n_samples_16k;
+    adc_open(ADC_FS_16KHZ, n_samples_16k, pccm, pccm+n_samples_16k);
+    pccm += 2*n_samples_16k;
+    usart_printf("pccm after dac/adc open: %p\n", pccm);
+    assert((void*)pccm < CCM+CCM_LEN);
+    
+    short          *adc16k = pccm; pccm += FDMDV_OS_TAPS_16K+n_samples_16k;
+    short          *dac16k = pccm; pccm += n_samples_16k;
     short          adc8k[n_samples];
     short          dac8k[FDMDV_OS_TAPS_8K+n_samples];
+    usart_printf("pccm after buffers: %p\n", pccm);
+    assert((void*)pccm < CCM+CCM_LEN);
 
+    /* clear buffers */
+
+    for(i=0; i<FDMDV_OS_TAPS_16K+n_samples_16k; i++)
+        adc16k[i] = 0; 
+    for(i=0; i<n_samples_16k; i++)
+        dac16k[i] = 0; 
+    for(i=0; i<n_samples; i++)
+        adc8k[i] = 0;
+    for(i=0; i<FDMDV_OS_TAPS_8K+n_samples; i++)
+        dac8k[i] = 0; 
+
+    usart_printf("drivers initialised...stack: %p\n", memtools_sp);
+    memtools_find_unused(usart_printf);
+    
     /* put outputs into a known state */
 
     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
-
-    /* clear filter memories */
-
-    for(i=0; i<FDMDV_OS_TAPS_16K; i++)
-        adc16k[i] = 0.0;
-    for(i=0; i<FDMDV_OS_TAPS_8K; i++)
-        dac8k[i] = 0.0;
 
     if (!switch_back()) {
         /* Play tone to acknowledge, wait for release */
@@ -318,12 +362,13 @@ int main(void) {
         while(!switch_back()) {
             int dac_rem = dac2_free();
             if (dac_rem) {
+                // TODO this might need fixing for larger FIFOs
                 if (dac_rem > n_samples_16k)
                     dac_rem = n_samples_16k;
 
                 for (i = 0; i < dac_rem; i++)
                     dac16k[i] = tone_next(&tone_gen);
-                dac2_write(dac16k, dac_rem);
+                dac2_write(dac16k, dac_rem, 0);
             }
             if (!menuLEDTicker) {
                 menuLEDTicker = MENU_LED_PERIOD;
@@ -338,6 +383,8 @@ int main(void) {
     led_rt(LED_OFF);
     tone_reset(&tone_gen, 0, 0);
     tot_reset(&tot);
+
+    usart_printf("loading preferences from flash....\n");
 
     /* Try to load preferences from flash */
     if (load_prefs() < 0) {
@@ -369,179 +416,77 @@ int main(void) {
     op_mode = prefs.op_mode;
 
     /* play a start-up tune. */
-    sfx_play(&sfx_player, sound_startup);
+    morse_play(&morse_player, VERSION);
+    //sfx_play(&sfx_player, sound_startup);
 
+    usart_printf("entering main loop...\n");
+
+    uint32_t lastms = ms;
+    n_samples = FORTY_MS_16K/4;
+    n_samples_16k = 2*n_samples;
+   
     while(1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
         switch_update(&sw_back,     (!switch_back()) ? 1 : 0);
-        switch_update(&sw_ptt,      (switch_ptt() ||
-                                        (!ext_ptt())) ? 1 : 0);
+        switch_update(&sw_ptt,      (switch_ptt() || (!ext_ptt())) ? 1 : 0);
 
         /* Update time-out timer state */
         tot_update(&tot);
 
-        /* State machine updates */
-        switch(core_state) {
-            case STATE_RX:
-                {
-                    uint8_t mode_changed = 0;
-
-                    if (!menuTicker) {
-                        if (menuExit) {
-                            /* We've just exited a menu, wait for release of BACK */
-                            if (switch_released(&sw_back))
-                                menuExit = 0;
-                        } else if (switch_pressed(&sw_ptt)) {
-                            /* Cancel any announcement if scheduled */
-                            if (announceTicker && morse_player.msg) {
-                                announceTicker = 0;
-                                morse_play(&morse_player, NULL);
-                            }
-                            /* Start time-out timer if enabled */
-                            if (prefs.tot_period)
-                                tot_start(&tot, prefs.tot_period*10,
-                                        prefs.tot_warn_period*10);
-                            /* Enter transmit state */
-                            core_state = STATE_TX;
-                        } else if (switch_pressed(&sw_select) > HOLD_DELAY) {
-                            /* Enter the menu */
-                            led_pwr(1); led_ptt(0); led_rt(0);
-                            led_err(0); not_cptt(1);
-
-                            menu_enter(&menu, &menu_root);
-                            menuTicker = MENU_DELAY;
-                            core_state = STATE_MENU;
-                            prefs_changed = 0;
-                        } else if (switch_released(&sw_select)) {
-                            /* Shortcut: change current mode */
-                            op_mode = (op_mode + 1) % MAX_MODES;
-                            mode_changed = 1;
-                        } else if (switch_released(&sw_back)) {
-                            /* Shortcut: change current mode */
-                            op_mode = (op_mode - 1) % MAX_MODES;
-                            mode_changed = 1;
-                        }
-
-                        if (mode_changed) {
-                            /* Announce the new mode */
-                            if (op_mode == ANALOG)
-                                morse_play(&morse_player, "ANA");
-                            else if (op_mode == DV)
-                                morse_play(&morse_player, "1600");
-                            else if (op_mode == TONE)
-                                morse_play(&morse_player, "TONE");
-                            sfx_play(&sfx_player, sound_click);
-                        }
-                    }
-                }
-                break;
-            case STATE_TX:
-                {
-                    if (!switch_pressed(&sw_ptt)) {
-                        /* PTT released, leave transmit mode */
-                        tot_reset(&tot);
-                        core_state = STATE_RX;
-                    } else if (tot.event & TOT_EVT_TIMEOUT) {
-                        /* Time-out reached */
-                        sfx_play(&sfx_player, sound_death_march);
-                        tot.event &= ~TOT_EVT_TIMEOUT;
-                        core_state = STATE_RX_TOT;
-                    } else if (tot.event & TOT_EVT_WARN_NEXT) {
-                        /* Re-set warning flag */
-                        tot.event &= ~TOT_EVT_WARN_NEXT;
-                        /* Schedule a click tone */
-                        sfx_play(&sfx_player, sound_click);
-                    }
-                }
-                break;
-            case STATE_RX_TOT:
-                if (switch_released(&sw_ptt)) {
-                    /* PTT released, leave transmit mode */
-                    tot_reset(&tot);
-                    core_state = STATE_RX;
-                }
-                break;
-            case STATE_MENU:
-                if (!menuTicker) {
-                    /* We are in a menu */
-                    static uint8_t press_ack = 0;
-                    uint8_t save_settings = 0;
-
-                    if (press_ack == 1) {
-                        if ((sw_select.state == SW_STEADY)
-                                && (!sw_select.sw))
-                            press_ack = 0;
-                    } else if (press_ack == 2) {
-                        if ((sw_back.state == SW_STEADY)
-                                && (!sw_back.sw))
-                            press_ack = 0;
-                    } else {
-                        if (switch_pressed(&sw_select) > HOLD_DELAY) {
-                            menu_exec(&menu, MENU_EVT_SELECT);
-                            press_ack = 1;
-                            menuTicker = MENU_DELAY;
-                        } else if (switch_pressed(&sw_back) > HOLD_DELAY) {
-                            menu_exec(&menu, MENU_EVT_BACK);
-                            press_ack = 2;
-                            menuTicker = MENU_DELAY;
-
-                            if (!menu.stack_depth)
-                                save_settings = prefs_changed;
-
-                        } else if (switch_released(&sw_select)) {
-                            menu_exec(&menu, MENU_EVT_NEXT);
-                            menuTicker = MENU_DELAY;
-                        } else if (switch_released(&sw_back)) {
-                            menu_exec(&menu, MENU_EVT_PREV);
-                            menuTicker = MENU_DELAY;
-                        } else if (switch_released(&sw_ptt)) {
-                            while(menu.stack_depth > 0)
-                                menu_exec(&menu, MENU_EVT_EXIT);
-                            sfx_play(&sfx_player, sound_returned);
-                        }
-
-                        /* If exited, put the LED back */
-                        if (!menu.stack_depth) {
-                            menuLEDTicker = 0;
-                            menuTicker = 0;
-                            led_pwr(LED_ON);
-                            morse_play(&morse_player, NULL);
-                            menuExit = 1;
-                            if (save_settings) {
-                                int oldest = -1;
-                                int res;
-                                /* Copy the settings in */
-                                prefs.menu_freq = morse_player.freq;
-                                prefs.menu_speed = morse_player.dit_time;
-                                /* Increment serial number */
-                                prefs.serial++;
-                                /* Find the oldest image */
-                                find_prefs(&oldest, NULL);
-                                if (oldest < 0)
-                                    oldest = 0; /* No current image */
-
-                                /* Write new settings over it */
-                                res = vrom_write(oldest + PREFS_IMG_BASE, 0,
-                                        sizeof(prefs), &prefs);
-                                if (res >= 0)
-                                    prefs_serial[oldest] = prefs.serial;
-                            }
-                            /* Go back to receive state */
-                            core_state = STATE_RX;
-                        }
-                    }
-                }
-                break;
-            default:
-                break;
-        }
+        /* iterate core state machine based on switch events */
+        int prev_op_mode = op_mode;
+        int prev_core_state = core_state;
+        core_state = process_core_state_machine(core_state, &menu, &op_mode);
 
         /* Acknowledge switch events */
         switch_ack(&sw_select);
         switch_ack(&sw_back);
         switch_ack(&sw_ptt);
 
+        /* if mode has changed, re-open freedv */
+        if (op_mode != prev_op_mode) {
+            usart_printf("Mode change prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
+            if (f) freedv_close(f); f = NULL;
+            switch(op_mode) {
+            case ANALOG:
+                usart_printf("Analog\n");
+                n_samples = FORTY_MS_16K/4;
+                break;
+            case DV1600:
+                usart_printf("FreeDV 1600\n");
+                f = freedv_open(FREEDV_MODE_1600);
+                assert(f != NULL);
+                n_samples = freedv_get_n_speech_samples(f);
+                break;
+            case DV700D:
+                usart_printf("FreeDV 700D\n");
+                f = freedv_open(FREEDV_MODE_700D);
+                assert(f != NULL);
+                n_samples = freedv_get_n_speech_samples(f);
+                break;
+            }
+            n_samples_16k = 2*n_samples;
+            usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
+
+            /* clear buffers */
+
+            for(i=0; i<FDMDV_OS_TAPS_16K+n_samples_16k; i++)
+                adc16k[i] = 0; 
+            for(i=0; i<n_samples_16k; i++)
+                dac16k[i] = 0; 
+            for(i=0; i<n_samples; i++)
+                adc8k[i] = 0;
+            for(i=0; i<FDMDV_OS_TAPS_8K+n_samples; i++)
+                dac8k[i] = 0; 
+        }
+
+        /* if we have moved from tx to rx reset sync state of rx so we re-start acquisition */
+        if ((op_mode == DV1600) || (op_mode == DV700D))
+            if ((prev_core_state == STATE_TX) && (core_state == STATE_RX))
+                freedv_set_sync(f, FREEDV_SYNC_UNSYNC);
+            
+        /* perform signal processing based on core state */
         switch (core_state) {
             case STATE_MENU:
                 if (!menuLEDTicker) {
@@ -571,29 +516,14 @@ int main(void) {
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
-                        dac1_write(dac16k, n_samples_16k);
+                        dac1_write(dac16k, n_samples_16k, 0);
                     }
-                    if (op_mode == DV) {
+                    else {
                         freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
-                        dac1_write(dac16k, n_samples_16k);
-                    }
-                    if (op_mode == TONE) {
-                        if (!tone_gen.remain)
-                            /*
-                             * Somewhat ugly, but UINT16_MAX is effectively
-                             * infinite.
-                             */
-                            tone_reset(&tone_gen, 500, UINT16_MAX);
-                        int len = dac1_free();
-                        if (len > n_samples_16k)
-                            len = n_samples_16k;
-                        for(i=0; i<len; i++)
-                            /* 8dB back off from peak */
-                            dac16k[i] = tone_next(&tone_gen)*0.398;
-                        dac1_write(dac16k, len);
+                        dac1_write(dac16k, n_samples_16k, 0);
                     }
 
                     led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
@@ -611,6 +541,10 @@ int main(void) {
                 /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
                 if (op_mode == ANALOG) {
+                    if (ms > lastms+5000) {
+                        usart_printf("Analog\n");
+                        lastms = ms;
+                    }
 
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
@@ -622,8 +556,12 @@ int main(void) {
                    }
                 }
                 else {
-
-                    /* regular DV mode */
+                    if (ms > lastms+5000) {
+                        usart_printf("Digital Voice\n");
+                        lastms = ms;
+                    }
+                    
+                    /* 1600 or 700D DV mode */
 
                     nin = freedv_nin(f);
                     nout = nin;
@@ -688,13 +626,13 @@ int main(void) {
                 if (spk_nsamples < n_rem)
                     n_rem = spk_nsamples;
                 /* Play the audio */
-                dac2_write(play_ptr, n_rem);
+                dac2_write(play_ptr, n_rem, 0);
                 spk_nsamples -= n_rem;
                 play_ptr += n_rem;
             }
 
             /* Clear out buffer */
-            memset(dac16k, 0, sizeof(dac16k));
+            memset(dac16k, 0, n_samples_16k*sizeof(short));
         }
 
     } /* while(1) ... */
@@ -706,6 +644,7 @@ int main(void) {
 
 void SysTick_Handler(void)
 {
+    ms++;
     switch_tick(&sw_select);
     switch_tick(&sw_back);
     switch_tick(&sw_ptt);
@@ -721,13 +660,175 @@ void SysTick_Handler(void)
     tot_tick(&tot);
 }
 
+
+int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode) {
+    /* State machine updates */
+    switch(core_state) {
+    case STATE_RX:
+        {
+            uint8_t mode_changed = 0;
+
+            if (!menuTicker) {
+                if (menuExit) {
+                    /* We've just exited a menu, wait for release of BACK */
+                    if (switch_released(&sw_back))
+                        menuExit = 0;
+                } else if (switch_pressed(&sw_ptt)) {
+                    /* Cancel any announcement if scheduled */
+                    if (announceTicker && morse_player.msg) {
+                        announceTicker = 0;
+                        morse_play(&morse_player, NULL);
+                    }
+                    /* Start time-out timer if enabled */
+                    if (prefs.tot_period)
+                        tot_start(&tot, prefs.tot_period*10,
+                                  prefs.tot_warn_period*10);
+                    /* Enter transmit state */
+                    core_state = STATE_TX;
+                } else if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                    /* Enter the menu */
+                    led_pwr(1); led_ptt(0); led_rt(0);
+                    led_err(0); not_cptt(1);
+
+                    menu_enter(menu, &menu_root);
+                    menuTicker = MENU_DELAY;
+                    core_state = STATE_MENU;
+                    prefs_changed = 0;
+                } else if (switch_released(&sw_select)) {
+                    /* Shortcut: change current mode */
+                    *op_mode = (*op_mode + 1) % MAX_MODES;
+                    mode_changed = 1;
+                } else if (switch_released(&sw_back)) {
+                    /* Shortcut: change current mode */
+                    *op_mode = (*op_mode - 1) % MAX_MODES;
+                    mode_changed = 1;
+                }
+
+                if (mode_changed) {
+                    /* Announce the new mode */
+                    if (*op_mode == ANALOG)
+                        morse_play(&morse_player, "ANA");
+                    else if (*op_mode == DV1600)
+                        morse_play(&morse_player, "1600");
+                    else if (*op_mode == DV700D)
+                        morse_play(&morse_player, "700D");
+                    sfx_play(&sfx_player, sound_click);
+                }
+            }
+        }
+        break;
+    case STATE_TX:
+        {
+            if (!switch_pressed(&sw_ptt)) {
+                /* PTT released, leave transmit mode */
+                tot_reset(&tot);
+                core_state = STATE_RX;
+            } else if (tot.event & TOT_EVT_TIMEOUT) {
+                /* Time-out reached */
+                sfx_play(&sfx_player, sound_death_march);
+                tot.event &= ~TOT_EVT_TIMEOUT;
+                core_state = STATE_RX_TOT;
+            } else if (tot.event & TOT_EVT_WARN_NEXT) {
+                /* Re-set warning flag */
+                tot.event &= ~TOT_EVT_WARN_NEXT;
+                /* Schedule a click tone */
+                sfx_play(&sfx_player, sound_click);
+            }
+        }
+        break;
+    case STATE_RX_TOT:
+        if (switch_released(&sw_ptt)) {
+            /* PTT released, leave transmit mode */
+            tot_reset(&tot);
+            core_state = STATE_RX;
+        }
+        break;
+    case STATE_MENU:
+        if (!menuTicker) {
+            /* We are in a menu */
+            static uint8_t press_ack = 0;
+            uint8_t save_settings = 0;
+
+            if (press_ack == 1) {
+                if ((sw_select.state == SW_STEADY)
+                    && (!sw_select.sw))
+                    press_ack = 0;
+            } else if (press_ack == 2) {
+                if ((sw_back.state == SW_STEADY)
+                    && (!sw_back.sw))
+                    press_ack = 0;
+            } else {
+                if (switch_pressed(&sw_select) > HOLD_DELAY) {
+                    menu_exec(menu, MENU_EVT_SELECT);
+                    press_ack = 1;
+                    menuTicker = MENU_DELAY;
+                } else if (switch_pressed(&sw_back) > HOLD_DELAY) {
+                    menu_exec(menu, MENU_EVT_BACK);
+                    press_ack = 2;
+                    menuTicker = MENU_DELAY;
+
+                    if (!menu->stack_depth)
+                        save_settings = prefs_changed;
+
+                } else if (switch_released(&sw_select)) {
+                    menu_exec(menu, MENU_EVT_NEXT);
+                    menuTicker = MENU_DELAY;
+                } else if (switch_released(&sw_back)) {
+                    menu_exec(menu, MENU_EVT_PREV);
+                    menuTicker = MENU_DELAY;
+                } else if (switch_released(&sw_ptt)) {
+                    while(menu->stack_depth > 0)
+                        menu_exec(menu, MENU_EVT_EXIT);
+                    sfx_play(&sfx_player, sound_returned);
+                }
+
+                /* If exited, put the LED back */
+                if (!menu->stack_depth) {
+                    menuLEDTicker = 0;
+                    menuTicker = 0;
+                    led_pwr(LED_ON);
+                    morse_play(&morse_player, NULL);
+                    menuExit = 1;
+                    if (save_settings) {
+                        int oldest = -1;
+                        int res;
+                        /* Copy the settings in */
+                        prefs.menu_freq = morse_player.freq;
+                        prefs.menu_speed = morse_player.dit_time;
+                        /* Increment serial number */
+                        prefs.serial++;
+                        /* Find the oldest image */
+                        find_prefs(&oldest, NULL);
+                        if (oldest < 0)
+                            oldest = 0; /* No current image */
+
+                        /* Write new settings over it */
+                        res = vrom_write(oldest + PREFS_IMG_BASE, 0,
+                                         sizeof(prefs), &prefs);
+                        if (res >= 0)
+                            prefs_serial[oldest] = prefs.serial;
+                    }
+                    /* Go back to receive state */
+                    core_state = STATE_RX;
+                }
+            }
+        }
+        break;
+    default:
+        break;
+    }
+
+    return core_state;
+}
+
+
 /* ---------------------------- Menu data ---------------------------
  *
  * MENU -
  * 	|- "MODE"       Select operating mode
  * 	|   |- "ANA"    - Analog
- * 	|   |- "1600"   - DV - 1600
- * 	|   |- "TONE"   - A test mode, sends a tone on PTT
+ * 	|   |- "DV1600" - FreeDV 1600 
+ * 	|   |- "DV700D" - FreeDV 700D
  *      |
  * 	|- "TOT"        Timer Out Timer options
  * 	|   |- "TIME"   - Set timeout time (a sub menu)
@@ -841,38 +942,28 @@ static const struct menu_item_t menu_op_mode_analog = {
         .ui         = ANALOG,
     },
 };
-static const struct menu_item_t menu_op_mode_dv16k = {
+static const struct menu_item_t menu_op_mode_dv1600 = {
     .label          = "1600",
     .event_cb       = NULL,
     .children       = NULL,
     .num_children   = 0,
     .data           = {
-        .ui         = DV,
+        .ui         = DV1600,
     },
 };
-/* static const struct menu_item_t menu_op_mode_dv700b
-    .label          = "700",
+static const struct menu_item_t menu_op_mode_dv700D = {
+    .label          = "700D",
     .event_cb       = NULL,
     .children       = NULL,
     .num_children   = 0,
     .data           = {
-        .ui         = DV,
-    },
-};*/
-static const struct menu_item_t menu_op_mode_tone = {
-    .label          = "TONE",
-    .event_cb       = NULL,
-    .children       = NULL,
-    .num_children   = 0,
-    .data           = {
-        .ui         = TONE,
+        .ui         = DV700D,
     },
 };
 static struct menu_item_t const* menu_op_mode_children[] = {
     &menu_op_mode_analog,
-    &menu_op_mode_dv16k,
-    /* &menu_op_mode_dv700b, */
-    &menu_op_mode_tone,
+    &menu_op_mode_dv1600,
+    &menu_op_mode_dv700D,
 };
 /* Callback function */
 static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
@@ -885,10 +976,10 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
             sfx_play(&sfx_player, sound_startup);
             /* Choose current item */
             switch(prefs.op_mode) {
-                case DV:
+                case DV1600:
                     menu->current = 1;
                     break;
-                case TONE:
+                case DV700D:
                     menu->current = 2;
                     break;
                 default:

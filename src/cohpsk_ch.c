@@ -57,8 +57,8 @@
 #define SLOW_FADING_DELAY_MS  0.5
 #define PAPR_TARGET           7.0
 
-/* This file gets generated using the function write_noise_file in tcohpsk.m.  You have to run
-   tcohpsk first (any variant) to load the function into Octave, e.g. for Fs=7500Hz:
+/*  
+  Use Octave to generate the fading channel models:
 
      octave:26> cohpsk_ch_fading("../raw/fast_fading_samples.float", 8000, 1.0, 8000*60)
      octave:27> cohpsk_ch_fading("../raw/slow_fading_samples.float", 8000, 0.1, 8000*60)

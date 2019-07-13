@@ -45,7 +45,7 @@ register char * sp asm ("sp");
     }
 
 #ifdef DEBUG_ALLOC
-  #define MALLOC(size) DEBUG_MALLOC(__func__, size
+  #define MALLOC(size) DEBUG_MALLOC(__func__, size)
   #define CALLOC(nmemb, size) DEBUG_CALLOC(__func__, nmemb, size)
   #define FREE(ptr) DEBUG_FREE(__func__, ptr)
 #else //DEBUG_ALLOC

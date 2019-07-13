@@ -76,9 +76,16 @@ When each test runs, a directory is created, and several log files generated.
    $ ./scripts/run_all_<set_name>_tests
    ```
 
-1. If a test fails, explore the files in the ```test_run``` directory for that test.
+## When tests fail
 
-### Running the tests remotely
+1. If a test fails, explore the files in the ```test_run``` directory for that test.
+1. Try building with ALLOC_DEBUG can be helpful with heap issues:
+   ```
+   $ CFLAGS=-DEBUG_ALLOC cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake \
+     -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
+   ```
+   
+## Running the tests remotely
 
 If the stm32 hardware is connected on a different pc with linux, the tests can be run remotely.
 Test will run slower, roughly 3 times.

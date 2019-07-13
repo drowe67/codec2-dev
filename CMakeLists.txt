@@ -386,6 +386,9 @@ if(UNITTEST)
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
 
+    add_test(NAME test_fifo
+             COMMAND $<TARGET_FILE:tfifo>
+             )
      add_test(NAME test_FreeDV_1600_tx_memory_leak
              COMMAND sh -c " valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./freedv_tx 1600 ../../raw/hts1a.raw /dev/null"
              WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/src

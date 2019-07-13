@@ -5,6 +5,7 @@
 % function to write float fading samples for use by C programs
 
 function cohpsk_ch_fading(raw_file_name, Fs, dopplerSpreadHz, len_samples)
+  randn('seed',1);
   spread = doppler_spread(dopplerSpreadHz, Fs, len_samples);
   spread_2ms = doppler_spread(dopplerSpreadHz, Fs, len_samples);
   hf_gain = 1.0/sqrt(var(spread)+var(spread_2ms));

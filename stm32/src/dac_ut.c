@@ -44,14 +44,14 @@ short aSine[] = {
 
 int main(void) {
 
-    dac_open(DAC_FS_16KHZ, 4*DAC_BUF_SZ);
+    dac_open(DAC_FS_16KHZ, 4*DAC_BUF_SZ, 0, 0);
 
     while (1) {
 
         /* keep DAC FIFOs topped up */
 
-        dac1_write((short*)aSine, SINE_SAMPLES);
-        dac2_write((short*)aSine, SINE_SAMPLES);
+        dac1_write((short*)aSine, SINE_SAMPLES, 0);
+        dac2_write((short*)aSine, SINE_SAMPLES, 0);
     }
 
 }

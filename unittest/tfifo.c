@@ -3,7 +3,7 @@
    David Rowe
    Nov 19 2012
 
-   Takes FIFOs, in particular thread safety.
+   Tests FIFOs, in particular thread safety.
 */
 
 #include <assert.h>
@@ -32,7 +32,7 @@ int main() {
     int    i,j;
     short  read_buf[READ_SZ];
     int    n_out = 0;
-    int    sucess;
+    int    success;
 
     f = codec2_fifo_create(FIFO_SZ);
     #ifdef USE_THREADS
@@ -47,15 +47,17 @@ int main() {
         #ifdef USE_MUTEX
         pthread_mutex_lock(&mutex);
         #endif
-        sucess = (codec2_fifo_read(f, read_buf, READ_SZ) == 0);
+        success = (codec2_fifo_read(f, read_buf, READ_SZ) == 0);
         #ifdef USE_MUTEX
         pthread_mutex_unlock(&mutex);
         #endif
 
-	if (sucess) {
+	if (success) {
 	    for(j=0; j<READ_SZ; j++) {
-                if (read_buf[j] != n_out)
+                if (read_buf[j] != n_out) {
                     printf("error: %d %d\n", read_buf[j], n_out);
+                    return(1);
+                }
                 n_out++;
                 if (n_out == N_MAX)
                     n_out = 0;
@@ -70,6 +72,7 @@ int main() {
     pthread_join(awriter_thread,NULL);
     #endif
 
+    printf("%d loops tested OK\n", LOOPS);
     return 0;
 }
 

@@ -94,6 +94,10 @@ void opt_help() {
     fprintf(stderr, "  --ldpc           [1|2]   Run LDPC decoder In (224,112) 700D or (504, 396) 2020 mode.\n");
     fprintf(stderr, "  --databits     numBits   Number of data bits used in LDPC codeword.\n");
     fprintf(stderr, "\n");
+    fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
+    fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
+    fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
+    fprintf(stderr, "\n");
     
     exit(-1);
 }
@@ -146,6 +150,7 @@ int main(int argc, char *argv[]) {
     float time_to_sync = -1;
     float start_secs = 0.0;
     float len_secs = 0.0;
+    float skip_secs = 0.0;
     struct optparse options;
 
     struct optparse_long longopts[] = {
@@ -167,6 +172,7 @@ int main(int argc, char *argv[]) {
         {"databits", 'p', OPTPARSE_REQUIRED},        
         {"start_secs", 'x', OPTPARSE_REQUIRED},        
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
+        {"skip_secs", 'z', OPTPARSE_REQUIRED},        
         {0, 0, 0}
     };
 
@@ -247,6 +253,9 @@ int main(int argc, char *argv[]) {
                  break;
             case 'y':
                  len_secs = atoi(options.optarg);
+                 break;
+            case 'z':
+                 skip_secs = atoi(options.optarg);
                  break;
                  
        }
@@ -651,14 +660,29 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        if (verbose == 2) {
+        #ifdef TT
+        if (ldpc_en) {
+            /* experimental timing gear switching based on LDPC TODO: move into shared function */
+            bool ldpc_decode_ok = parityCheckCount[0] > 0.8*ldpc.NumberParityBits;
+            if (ofdm->sync_state == synced) {
+                if ((ofdm->sync_counter>2) && (ldpc_decode_ok == false)) {
+                    ofdm_set_timing_range(ofdm, WIDE_TIMING);
+                }
+                else {
+                    ofdm_set_timing_range(ofdm, NARROW_TIMING);
+                }
+            }
+        }
+        #endif
+        
+        if (verbose >= 2) {
             int r = 0;
 
             if (testframes == true) {
                 r = (ofdm->frame_count_interleaver - 1) % interleave_frames;
             }
 
-            fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
+           fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d\n",
                     f, nin_frame, 
                     statemode[ofdm->last_sync_state],
                     ofdm->uw_errors,
@@ -717,6 +741,16 @@ int main(int argc, char *argv[]) {
             if (secs >= len_secs) finish = 1;
         }
         
+        if (skip_secs != 0.0) {
+            /* big nasty timing error */
+            float secs = (float)f*ofdm_get_samples_per_frame()/FS;
+            if (secs >= skip_secs) {
+                assert(fread(rx_scaled, sizeof (short), nin_frame/2, fin) == nin_frame/2);
+                fprintf(stderr,"  Skip!  Just introduced a nasty big timing slip\n");
+                skip_secs = 0.0; /* make sure we just introduce one error */
+            }
+        }
+         
         f++;
     }
 

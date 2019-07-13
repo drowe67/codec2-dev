@@ -60,7 +60,7 @@ int main(void){
     short  buf[N];
     float  sd1, sd2;
 
-    adc_open(ADC_FS_16KHZ, 2*N);
+    adc_open(ADC_FS_16KHZ, 2*N, NULL, NULL);
 
     printf("Starting!\n");
     while(1) {

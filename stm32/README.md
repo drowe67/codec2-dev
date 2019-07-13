@@ -35,14 +35,16 @@
 5. Configure the build system by running cmake:
 
    ```
-   $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
+   $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/STM32_Toolchain.cmake \
+     -DPERIPHLIBDIR=~/Downloads/STM32F4xx_DSP_StdPeriph_Lib_V1.8.0 ..
    ```
    Or a more general case:
    ```
-   $ cmake /path/to/codec2-dev/stm32 -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x ..
+   $ cmake /path/to/codec2-dev/stm32 -DCMAKE_TOOLCHAIN_FILE=/path/to/codec2-dev/stm32/cmake/STM32_Toolchain.cmake \
+     -DPERIPHLIBDIR=/path/to/unzipped/STM32F4xx_DSP_StdPeriph_Lib_Vx.x.x ..
    ```
    
-6. Build binaries
+6. Build binaries (including sm1000.bin)
 
    Finally:
    ```
@@ -52,7 +54,16 @@
    ```
    $ make VERBOSE=1
    ```
+   
+## Flashing your SM1000
 
+1. Power up your SM1000 with the PTT button down.  Then flash it with:
+   
+2. ```
+   sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000.bin
+   ```
+3. Power cycle to reboot.
+   
 ## Loading and Debugging stm32 programs
 
 1. See unitest/README.md for information on how to set up openocd.
@@ -80,9 +91,7 @@
 Directory | Notes 
 ---|---
 cmake | cmake support files for the stm32
+doc | SM1000 documentation
 inc | top level sm1000 source, drivers, and some legacy test code
 src | top level sm1000 source, drivers, and some legacy test code
 unittest | comprehensive set of automated unit tests for the stm32 700D port
-usb_lib | TBC 
-stlink | TBC
-usb_conf | TBC

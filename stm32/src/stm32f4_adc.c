@@ -53,12 +53,17 @@ void adc_configure();
 
 static void tim2_config(int fs_divisor);
 
-void adc_open(int fs_divisor, int fifo_sz) {
-    adc1_fifo = codec2_fifo_create(fifo_sz);
-    assert(adc1_fifo != NULL);
-    adc2_fifo = codec2_fifo_create(fifo_sz);
-    assert(adc2_fifo != NULL);
-
+// You can optionally supply your own storage for the FIFO buffers bu1 and buf2,
+// or set them to NULL and they will be malloc-ed for you
+void adc_open(int fs_divisor, int fifo_sz, short *buf1, short *buf2) {
+    if (buf1 == NULL) {
+        adc1_fifo = codec2_fifo_create(fifo_sz);
+        adc2_fifo = codec2_fifo_create(fifo_sz);
+    } else {
+        adc1_fifo = codec2_fifo_create_buf(fifo_sz, buf1);
+        adc2_fifo = codec2_fifo_create_buf(fifo_sz, buf2);
+    }
+    
     tim2_config(fs_divisor);
     adc_configure();
     init_debug_blinky();

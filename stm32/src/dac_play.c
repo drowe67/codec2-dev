@@ -36,7 +36,7 @@ int main(void) {
     short  buf[N];
     FILE  *fplay;
 
-    dac_open(DAC_FS_16KHZ, 2*N);
+    dac_open(DAC_FS_16KHZ, 2*N, NULL, NULL);
 
     while(1) {
         fplay = fopen("stm_in.raw", "rb");
@@ -48,8 +48,8 @@ int main(void) {
         printf("Starting!\n");
 
         while(fread(buf, sizeof(short), N, fplay) == N) {
-            while(dac1_write(buf, N) == -1);
-            while(dac2_write(buf, N) == -1);
+            while(dac1_write(buf, N, 0) == -1);
+            while(dac2_write(buf, N, 0) == -1);
         }
 
         printf("Finished!\n");

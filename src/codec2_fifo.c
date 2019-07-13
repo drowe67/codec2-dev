@@ -41,14 +41,21 @@ struct FIFO {
     int    nshort;
 };
 
+// standard create function
 struct FIFO *codec2_fifo_create(int nshort) {
-    struct FIFO *fifo;
+    short *buf = (short*)malloc(sizeof(short)*nshort);
+    assert(buf != NULL);
+    return codec2_fifo_create_buf(nshort, buf);
+}
 
+// alternate create function where buffer is externally supplied
+struct FIFO *codec2_fifo_create_buf(int nshort, short* buf) {
+    struct FIFO *fifo;
+    assert(buf != NULL);
     fifo = (struct FIFO *)malloc(sizeof(struct FIFO));
     assert(fifo != NULL);
 
-    fifo->buf = (short*)malloc(sizeof(short)*nshort);
-    assert(fifo->buf != NULL);
+    fifo->buf = buf;
     fifo->pin = fifo->buf;
     fifo->pout = fifo->buf;
     fifo->nshort = nshort;

@@ -62,18 +62,22 @@ static void dac2_config(void);
 
 int dac_underflow;
 
-
-void dac_open(int fs_divisor, int fifo_size) {
+// You can optionally supply your own storage for the FIFO buffers bu1 and buf2,
+// or set them to NULL and they will be malloc-ed for you
+void dac_open(int fs_divisor, int fifo_size, short *buf1, short *buf2) {
 
     memset(dac1_buf, 32768, sizeof(short)*DAC_BUF_SZ);
     memset(dac2_buf, 32768, sizeof(short)*DAC_BUF_SZ);
 
     /* Create fifos */
 
-    dac1_fifo = codec2_fifo_create(fifo_size);
-    dac2_fifo = codec2_fifo_create(fifo_size);
-    assert(dac1_fifo != NULL);
-    assert(dac2_fifo != NULL);
+    if ((buf1 == NULL) && (buf2 == NULL)) {
+        dac1_fifo = codec2_fifo_create(fifo_size);
+        dac2_fifo = codec2_fifo_create(fifo_size);
+    } else {
+        dac1_fifo = codec2_fifo_create_buf(fifo_size, buf1);
+        dac2_fifo = codec2_fifo_create_buf(fifo_size, buf2);
+    }
 
     /* Turn on the clocks we need -----------------------------------------------*/
 
@@ -101,14 +105,31 @@ void dac_open(int fs_divisor, int fifo_size) {
     init_debug_blinky();
 }
 
-/* Call these puppies to send samples to the DACs.  For your
-   convenience they accept signed 16 bit samples. */
+/* Call these functions to send samples to the DACs.  For your
+   convenience they accept signed 16 bit samples.  You can optionally
+   limit how much data to store in the fifo */
 
-int dac1_write(short buf[], int n) {
+int dac1_write(short buf[], int n, int limit) {
+    /* artificial limit < FIFO size */
+    if (limit) {
+        if ((codec2_fifo_used(dac1_fifo) + n) <= limit)
+            return codec2_fifo_write(dac1_fifo, buf, n);
+        else
+            return -1;
+    }
+    /* normal operation */
     return codec2_fifo_write(dac1_fifo, buf, n);
 }
 
-int dac2_write(short buf[], int n) {
+int dac2_write(short buf[], int n, int limit) {
+    /* artificial limit < FIFO size */
+    if (limit) {
+        if ((codec2_fifo_used(dac2_fifo) + n) <= limit)
+            return codec2_fifo_write(dac2_fifo, buf, n);
+        else
+            return -1;
+    }
+    /* normal operation */
     return codec2_fifo_write(dac2_fifo, buf, n);
 }
 

@@ -212,13 +212,6 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
    
     if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, mode) ) {
-        /*
-          TODO:
-            [ ] how to set up interleaver, prob init time option best, as many arrays depend on it
-            [ ] clip option?  Haven't tried clipping OFDM waveform yet
-            [ ] support for uncoded and coded error patterns
-        */
-        
         f->snr_squelch_thresh = 0.0;
         f->squelch_en = 0;
         codec2_mode = CODEC2_MODE_700C;
@@ -2229,28 +2222,28 @@ static int freedv_comp_short_rx_700d(struct freedv *f, void *demod_in_8kHz, int 
     /* iterate state machine and update nin for next call */
     
     f->nin = ofdm_get_nin(ofdm);
-    //fprintf(stderr, "nin: %d\n", ofdm_get_nin(ofdm));
     ofdm_sync_state_machine(ofdm, rx_uw);
 
+    /* check if OFDM modem has sync */    
+    bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
+
+    /* if LDPC code has too many errors it may be the end of an over or a very deep fade */
+    bool ldpc_decode_ok = parityCheckCount > 0.8*ldpc->NumberParityBits;
+
+    /* squelch if out of sync or too many LDPC decode errors */
+    if ((sync == false) || (ldpc_decode_ok == false)) {
+        if (f->squelch_en == true) {
+ 	    *valid = 0;
+        }
+    }
+        
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
-                f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
-		(double)ofdm->foff_est_hz,
+        fprintf(stderr, "%3d nin: %4d st: %-6s euw: %2d %1d f: %5.1f phbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+                f->frames++, ofdm->nin, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
+		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
-    
-    /* no valid FreeDV signal - squelch output */
-    
-    bool sync = ((ofdm->sync_state == synced) || (ofdm->sync_state == trial));
-    if (sync == false) {
-         if (f->squelch_en == true) {
- 	    *valid = 0;
-         }
-         //f->snr_est = 0.0;
-    }
-    
-    //fprintf(stderr, "sync: %d valid: %d snr: %3.2f\n", f->sync, *valid, f->snr_est);
     
     return nout;
 }

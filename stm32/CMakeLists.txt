@@ -388,15 +388,17 @@ src/sm1000_leds_switches.c
 ../src/codec2_fifo.c
 src/debugblinky.c
 src/stm32f4_vrom.c
+src/stm32f4_usart.c
+src/memtools.c
 )
 
 list(APPEND SM1000_SRCS ${CODEC2_SRCS})
 
 
-add_mapped_executable(sm1000 ${SM1000_SRCS} ${SYSTEM_SRCS})
-target_link_libraries(sm1000 stm32f4_adac stm32f4 CMSIS)
-target_compile_options(sm1000 PRIVATE "-O3")
-elf2bin(sm1000)
+add_mapped_executable(sm1000v2 ${SM1000_SRCS} ${SYSTEM_SRCS})
+target_link_libraries(sm1000v2 stm32f4_adac stm32f4 CMSIS)
+target_compile_options(sm1000v2 PRIVATE "-O3")
+elf2bin(sm1000v2)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
