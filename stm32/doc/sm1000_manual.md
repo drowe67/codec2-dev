@@ -169,6 +169,6 @@ To perform a factory reset, hold down BACK whilst powering the device on. A loud
 
 The SM1000 hardware was developed by David Rowe VK5DGR and Rick Barnich KA8BMA. It is being manufactured, tested and shipped by our good friend Edwin at Dragino in Shenzhen, China.
 
-Steve (K5OKC) helped develop the fine OFDM modem used for FreeDV 700D. Don (W7DMR), spearheaded the port of FreeDV 700D to the SM1000.  Don, Danilo (DB4PLE), and Richard (KF5OIM) have done some fantastic work on the cmake build and test system for the stm32 port of 700D. Stuart VK4MSL developed the morse menu system for the SM1000.
+Steve (K5OKC) helped develop the fine OFDM modem used for FreeDV 700D. Don (W7DMR), spearheaded the port of FreeDV 700D to the SM1000, including code optimisation and a comprehensive unit test system.  Don, Danilo (DB4PLE), and Richard (KF5OIM) have done some fantastic work on the cmake build and test system for the stm32 port of 700D. Stuart VK4MSL developed the morse menu system for the SM1000.
 
 This is an open source/open hardware project, developed by Hams - for Hams.  Thanks!

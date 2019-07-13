@@ -91,9 +91,7 @@
 Directory | Notes 
 ---|---
 cmake | cmake support files for the stm32
+doc | SM1000 documentation
 inc | top level sm1000 source, drivers, and some legacy test code
 src | top level sm1000 source, drivers, and some legacy test code
 unittest | comprehensive set of automated unit tests for the stm32 700D port
-usb_lib | TBC 
-stlink | TBC
-usb_conf | TBC
