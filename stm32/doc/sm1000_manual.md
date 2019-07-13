@@ -1,4 +1,4 @@
-# SM1000 User Manual
+# SM1000 Manual
 
 ![SM1000 front view](sm1000_enc_sm.jpg)
 
