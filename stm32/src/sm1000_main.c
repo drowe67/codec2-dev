@@ -337,19 +337,23 @@ int main(void) {
     usart_printf("pccm after buffers: %p\n", pccm);
     assert((void*)pccm < CCM+CCM_LEN);
 
+    /* clear buffers */
+
+    for(i=0; i<FDMDV_OS_TAPS_16K+n_samples_16k; i++)
+        adc16k[i] = 0; 
+    for(i=0; i<n_samples_16k; i++)
+        dac16k[i] = 0; 
+    for(i=0; i<n_samples; i++)
+        adc8k[i] = 0;
+    for(i=0; i<FDMDV_OS_TAPS_8K+n_samples; i++)
+        dac8k[i] = 0; 
+
     usart_printf("drivers initialised...stack: %p\n", memtools_sp);
     memtools_find_unused(usart_printf);
     
     /* put outputs into a known state */
 
     led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
-
-    /* clear filter memories */
-
-    for(i=0; i<FDMDV_OS_TAPS_16K; i++)
-        adc16k[i] = 0.0;
-    for(i=0; i<FDMDV_OS_TAPS_8K; i++)
-        dac8k[i] = 0.0;
 
     if (!switch_back()) {
         /* Play tone to acknowledge, wait for release */
@@ -458,10 +462,22 @@ int main(void) {
                 f = freedv_open(FREEDV_MODE_700D);
                 assert(f != NULL);
                 n_samples = freedv_get_n_speech_samples(f);
+                freedv_set_squelch_en(f, 1);
                 break;
             }
             n_samples_16k = 2*n_samples;
             usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
+
+            /* clear buffers */
+
+            for(i=0; i<FDMDV_OS_TAPS_16K+n_samples_16k; i++)
+                adc16k[i] = 0; 
+            for(i=0; i<n_samples_16k; i++)
+                dac16k[i] = 0; 
+            for(i=0; i<n_samples; i++)
+                adc8k[i] = 0;
+            for(i=0; i<FDMDV_OS_TAPS_8K+n_samples; i++)
+                dac8k[i] = 0; 
         }
 
         /* if we have moved from tx to rx reset sync state of rx so we re-start acquisition */
@@ -615,7 +631,7 @@ int main(void) {
             }
 
             /* Clear out buffer */
-            memset(dac16k, 0, n_samples_16k);
+            memset(dac16k, 0, n_samples_16k*sizeof(short));
         }
 
     } /* while(1) ... */
