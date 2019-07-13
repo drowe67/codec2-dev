@@ -64,17 +64,12 @@ typedef enum {
 } Sync;
 
 /* phase estimator bandwidth options */
+
 typedef enum {
     auto_bw,            /* future mode */
     low_bw,             /* can only track a narrow freq offset, but accurate         */
     high_bw             /* can track wider freq offset, but less accurate at low SNR */
 } PhaseEstBandwidth;
-
-/* timimg estimator search range options */
-typedef enum {
-    narrow,            /* when in sync we only anticipate small changes in timing due to clock drift */
-    wide               /* allows us to cope with big jumps in timing e.g. at end of over             */
-} TimingEstRange;
 
 /*
  * Contains user configuration for OFDM modem
@@ -122,9 +117,8 @@ struct OFDM {
     // Sync enums
     Sync sync_mode;
 
-    // Estimator range enums
+    // Phase enums
     PhaseEstBandwidth phase_est_bandwidth;
-    TimingEstRange fine_timing_range; 
     
     // Complex
     complex float foff_metric;

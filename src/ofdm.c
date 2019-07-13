@@ -352,7 +352,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_en = true;
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
-    ofdm->fine_timing_range = narrow;
 
     if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST) {
         ofdm->phase_est_bandwidth = auto_bw;
@@ -887,13 +886,6 @@ void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
     }
 }
  
-void ofdm_set_timing_range(struct OFDM *ofdm, int val) {
-    if (val == NARROW_TIMING)
-        ofdm->fine_timing_range = narrow;
-    else
-        ofdm->fine_timing_range = wide;
-}
- 
 void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
@@ -1131,11 +1123,12 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
     /* update timing estimate ---------------------------------------------- */
 
-    if (ofdm->timing_en) {
+    if (ofdm->timing_en == true) {
         /* update timing at start of every frame */
 
         st = ((ofdm_m + ofdm_ncp) + ofdm_samplesperframe) - floorf(ofdm_ftwindowwidth / 2) + ofdm->timing_est;
         en = st + ofdm_samplesperframe - 1 + (ofdm_m + ofdm_ncp) + ofdm_ftwindowwidth;
+
         complex float work[(en - st)];
 
         /*
@@ -1152,7 +1145,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
         if (ofdm->verbose > 2) {
             fprintf(stderr, "  ft_est: %2d timing_est: %2d sample_point: %2d\n", ft_est, ofdm->timing_est,
-                    ofdm->sample_point);
+                ofdm->sample_point);
         }
 
         /* Black magic to keep sample_point inside cyclic prefix.  Or something like that. */
@@ -1614,7 +1607,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 ofdm->sync_counter = 0;
             }
 
-            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter == 12)) {
+            if ((ofdm->sync_mode == autosync) && (ofdm->sync_counter > 6)) {
                 /* run of consecutive bad frames ... drop sync */
 
                 next_state = search;
