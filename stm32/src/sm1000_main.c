@@ -44,6 +44,7 @@
 #include "menu.h"
 #include "tot.h"
 
+#define VERSION         "V2"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
@@ -276,7 +277,7 @@ int main(void) {
     int            nin, nout, i;
     int            n_samples, n_samples_16k;
 
-    usart_init();
+    usart_init(); usart_printf("SM1000 VERSION: %s\n", VERSION);
     usart_printf("SM1000 main()... stack 0x%x (%d)\n", &n_samples_16k, (uint32_t)0x2001ffff - (uint32_t)&n_samples_16k);
     memtools_find_unused(usart_printf);
     
@@ -415,7 +416,8 @@ int main(void) {
     op_mode = prefs.op_mode;
 
     /* play a start-up tune. */
-    sfx_play(&sfx_player, sound_startup);
+    morse_play(&morse_player, VERSION);
+    //sfx_play(&sfx_player, sound_startup);
 
     usart_printf("entering main loop...\n");
 
@@ -462,7 +464,6 @@ int main(void) {
                 f = freedv_open(FREEDV_MODE_700D);
                 assert(f != NULL);
                 n_samples = freedv_get_n_speech_samples(f);
-                freedv_set_squelch_en(f, 1);
                 break;
             }
             n_samples_16k = 2*n_samples;
