@@ -425,21 +425,28 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     idft(ofdm, temp, ofdm->pilots);
 
     /*
-     * pilot_samples is 160 samples, but timing and freq offset est
-     * were found by experiment to work better without a cyclic
-     * prefix, so we uses zeroes instead.
+     * Timing and freq offset est were found by experiment to
+     * work better with cyclic prefix using zeroes instead.
      */
 
-    /* zero out Cyclic Prefix (CP) time-domain values */
+    if (ofdm_ncp == 0) {
+        /* With no cyclic prefix just fill the symbol part */
 
-    for (i = 0; i < ofdm_ncp; i++) {
-        ofdm->pilot_samples[i] = 0.0f;
-    }
+        for (i = 0; i < ofdm_m; i++) {
+            ofdm->pilot_samples[i] = temp[i];
+        }
+    } else {
+        /* zero out Cyclic Prefix (CP) time-domain values */
 
-    /* Now copy the whole thing after the above */
+        for (i = 0; i < ofdm_ncp; i++) {
+            ofdm->pilot_samples[i] = 0.0f;
+        }
 
-    for (i = ofdm_ncp, j = 0; j < ofdm_m; i++, j++) {
-        ofdm->pilot_samples[i] = temp[j];
+        /* Now copy the whole thing after the above */
+
+        for (i = ofdm_ncp, j = 0; j < ofdm_m; i++, j++) {
+            ofdm->pilot_samples[i] = temp[j];
+        }
     }
 
     FREE(temp);    /* finished with temp */
@@ -809,22 +816,28 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     for (i = 0, m = 0; i < ofdm_ns; i++, m += (ofdm_m + ofdm_ncp)) {
         idft(ofdm, asymbol, aframe[i]);
 
-        /* Copy the last Ncp samples to the front */
+        if (ofdm_ncp == 0) {
+            for (j = 0; j < ofdm_m; j++) {
+                tx[m + j] = asymbol[j];
+            }
+        } else {
+            /* Copy the last Ncp samples to the front */
 
-        for (j = (ofdm_m - ofdm_ncp), k = 0; j < ofdm_m; j++, k++) {
-            asymbol_cp[k] = asymbol[j];
-        }
+            for (j = (ofdm_m - ofdm_ncp), k = 0; j < ofdm_m; j++, k++) {
+                asymbol_cp[k] = asymbol[j];
+            }
 
-        /* Now copy the all samples for this row after it */
+            /* Now copy the all samples for this row after it */
 
-        for (j = ofdm_ncp, k = 0; k < ofdm_m; j++, k++) {
-            asymbol_cp[j] = asymbol[k];
-        }
+            for (j = ofdm_ncp, k = 0; k < ofdm_m; j++, k++) {
+                asymbol_cp[j] = asymbol[k];
+            }
 
-        /* Now move row to the tx output */
+            /* Now move row to the tx output */
 
-        for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
-            tx[m + j] = asymbol_cp[j];
+            for (j = 0; j < (ofdm_m + ofdm_ncp); j++) {
+                tx[m + j] = asymbol_cp[j];
+            }
         }
     }
 
@@ -872,7 +885,7 @@ void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     if (ofdm->timing_en == false) {
         /* manually set ideal timing instant */
 
-        ofdm->sample_point = (ofdm_ncp - 1);
+        ofdm->sample_point = max(0, (ofdm_ncp - 1));
     }
 }
 
