@@ -57,7 +57,7 @@ void opt_help() {
     fprintf(stderr, "\nusage: %s [options]\n\n", progname);
     fprintf(stderr, "  --in      filename    Name of InputOneCharPerBitFile\n");
     fprintf(stderr, "  --out     filename    Name of OutputModemRawFile\n");
-    fprintf(stderr, "  --nc      [1..62]     Number of Carriers (17 default, 62 max)\n");
+    fprintf(stderr, "  --nc       [1..62]    Number of Carriers (17 default, 62 max)\n");
     fprintf(stderr, "  --ns       Nframes    Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp        Nsecs    Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts         Nsecs    Symbol Duration (.018 default)\n");

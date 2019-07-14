@@ -111,6 +111,7 @@ static float ofdm_doc; /* division of radian circle */
 static float ofdm_timing_mx_thresh;
 
 static int ofdm_nc;
+static int ofdm_pilotc; /* Number of pilot carriers */
 static int ofdm_ns;	/* NS-1 = data symbols between pilots  */
 static int ofdm_bps; 	/* Bits per symbol */
 static int ofdm_m; 	/* duration of each symbol in samples */
@@ -252,6 +253,12 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
 
+    if (ofdm_nc == 1) {
+        ofdm_pilotc = 1;
+    } else {
+        ofdm_pilotc = (ofdm_nc + 2);
+    }
+
     /*
      * Calculate sample rate of phase samples,
      * we are sampling phase of pilot at
@@ -269,7 +276,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->rxbuf = MALLOC(sizeof (complex float) * ofdm_rxbuf);
     assert(ofdm->rxbuf != NULL);
 
-    ofdm->pilots = MALLOC(sizeof (complex float) * (ofdm_nc + 2));
+    ofdm->pilots = MALLOC(sizeof (complex float) * ofdm_pilotc);
     assert(ofdm->pilots !=  NULL);
 
     /*
@@ -283,7 +290,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     /* allocate rx_sym column storage */
 
     for (i = 0; i < (ofdm_ns + 3); i++) {
-        ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * (ofdm_nc + 2));
+        ofdm->rx_sym[i] = (complex float *) MALLOC(sizeof(complex float) * ofdm_pilotc);
 	assert(ofdm->rx_sym[i] != NULL);
     }
 
@@ -298,23 +305,16 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->aphase_est_pilot_log = MALLOC(sizeof (float) * (ofdm_rowsperframe * ofdm_nc));
     assert(ofdm->aphase_est_pilot_log != NULL);
 
-    ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm_nuwbits);
-    assert(ofdm->tx_uw != NULL);
-
-    for (i = 0; i < ofdm_nuwbits; i++) {
-        ofdm->tx_uw[i] = 0;
-    }
-
     /* Null pointers to unallocated buffers */
     ofdm->ofdm_tx_bpf = NULL;
 
     /* store complex BPSK pilot symbols */
 
-    assert(sizeof (pilotvalues) >= (ofdm_nc + 2) * sizeof (int8_t));
+    assert(sizeof (pilotvalues) >= ofdm_pilotc * sizeof (int8_t));
 
     /* There are only 64 pilot values available */
 
-    for (i = 0; i < (ofdm_nc + 2); i++) {
+    for (i = 0; i < ofdm_pilotc; i++) {
         ofdm->pilots[i] = ((float) pilotvalues[i]) + 0.0f * I;
     }
 
@@ -322,15 +322,21 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 
     ofdm_doc = (TAU / (ofdm_fs / ofdm_rs));
     tval = ((float) ofdm_nc / 2);
-    ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval) - 1;
-    ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval) - 1;
+
+    if (ofdm_nc == 1) {
+        ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval);
+        ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval);
+    } else {
+        ofdm_tx_nlower = roundf((ofdm_tx_centre / ofdm_rs) - tval) - 1;
+        ofdm_rx_nlower = roundf((ofdm_rx_centre / ofdm_rs) - tval) - 1;
+    }
 
     for (i = 0; i < ofdm_rxbuf; i++) {
         ofdm->rxbuf[i] = 0.0f;
     }
 
     for (i = 0; i < (ofdm_ns + 3); i++) {
-        for (j = 0; j < (ofdm_nc + 2); j++) {
+        for (j = 0; j < ofdm_pilotc; j++) {
             ofdm->rx_sym[i][j] = 0.0f;
         }
     }
@@ -371,35 +377,44 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->mean_amp = 0.0f;
     ofdm->foff_metric = 0.0f;
 
-    /*
-     * Unique Word symbol placement, designed to get no false syncs at any
-     * freq offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we
-     * need to pair the UW bits so they fit into symbols.  The LDPC decoder
-     * works on symbols so we can't break up any symbols into UW/LDPC bits.
-     */
-    uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
-    assert(uw_ind != NULL);
+    if (ofdm_nc != 1) {
+        ofdm->tx_uw = MALLOC(sizeof (uint8_t) * ofdm_nuwbits);
+        assert(ofdm->tx_uw != NULL);
 
-    uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
-    assert(uw_ind_sym != NULL);
+        for (i = 0; i < ofdm_nuwbits; i++) {
+            ofdm->tx_uw[i] = 0;
+        }
 
-    /*
-     * The Unique Word is placed in different indexes based on
-     * the number of carriers requested.
-     */
-    for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
-        int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
-        uw_ind_sym[i] = val;             // symbol index
+        /*
+         * Unique Word symbol placement, designed to get no false syncs at any
+         * freq offset.  Use ofdm_dev.m, debug_false_sync() to test.  Note we
+         * need to pair the UW bits so they fit into symbols.  The LDPC decoder
+         * works on symbols so we can't break up any symbols into UW/LDPC bits.
+         */
+        uw_ind = MALLOC(sizeof (int) * ofdm_nuwbits);
+        assert(uw_ind != NULL);
 
-        uw_ind[j    ] = (val * 2);       // bit index 1
-        uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
-    }
+        uw_ind_sym = MALLOC(sizeof (int) * (ofdm_nuwbits / 2));
+        assert(uw_ind_sym != NULL);
 
-    tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
-    assert(tx_uw_syms != NULL);
+        /*
+         * The Unique Word is placed in different indexes based on
+         * the number of carriers requested.
+         */
+        for (i = 0, j = 0; i < (ofdm_nuwbits / 2); i++, j += 2) {
+            int val = floorf((i + 1) * (ofdm_nc + 1) / 2);
+            uw_ind_sym[i] = val;             // symbol index
 
-    for (i = 0; i < (ofdm_nuwbits / 2); i++) {
-        tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+            uw_ind[j    ] = (val * 2);       // bit index 1
+            uw_ind[j + 1] = (val * 2) + 1;   // bit index 2
+        }
+
+        tx_uw_syms = MALLOC(sizeof (complex float) * (ofdm_nuwbits / 2));
+        assert(tx_uw_syms != NULL);
+
+        for (i = 0; i < (ofdm_nuwbits / 2); i++) {
+            tx_uw_syms[i] = 1.0f;      // qpsk_mod(0:0)
+        }
     }
 
     /* sync state machine */
@@ -503,10 +518,15 @@ void ofdm_destroy(struct OFDM *ofdm) {
     FREE(ofdm->rx_np);
     FREE(ofdm->rx_amp);
     FREE(ofdm->aphase_est_pilot_log);
-    FREE(ofdm->tx_uw);
-    FREE(tx_uw_syms);
-    FREE(uw_ind);
-    FREE(uw_ind_sym);
+
+
+    if (ofdm_nc != 1) {
+        FREE(ofdm->tx_uw);
+        FREE(tx_uw_syms);
+        FREE(uw_ind);
+        FREE(uw_ind_sym);
+    }
+
     FREE(ofdm);
 }
 
@@ -520,7 +540,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 
     result[0] = 0.0f;
 
-    for (col = 0; col < (ofdm_nc + 2); col++) {
+    for (col = 0; col < ofdm_pilotc; col++) {
         result[0] += vector[col];    // cexp(j0) == 1
     }
 
@@ -532,7 +552,7 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 
         result[row] = 0.0f;
 
-        for (col = 0; col < (ofdm_nc + 2); col++) {
+        for (col = 0; col < ofdm_pilotc; col++) {
             result[row] += (vector[col] * c);
             c *= delta;
         }
@@ -549,11 +569,11 @@ static void idft(struct OFDM *ofdm, complex float *result, complex float *vector
 static void dft(struct OFDM *ofdm, complex float *result, complex float *vector) {
     int row, col;
 
-    for (col = 0; col < (ofdm_nc + 2); col++) {
+    for (col = 0; col < ofdm_pilotc; col++) {
         result[col] = vector[0];                 // conj(cexp(j0)) == 1
     }
 
-    for (col = 0; col < (ofdm_nc + 2); col++) {
+    for (col = 0; col < ofdm_pilotc; col++) {
         float tval = (ofdm_rx_nlower + col) * ofdm_doc;
         complex float c = cmplxconj(tval);
         complex float delta = c;
@@ -779,7 +799,7 @@ static float est_freq_offset_pilot_corr(struct OFDM *ofdm, complex float *rx, in
  * ----------------------------------------------
  */
 void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_lin) {
-    complex float aframe[ofdm_ns][ofdm_nc + 2];
+    complex float aframe[ofdm_ns][ofdm_pilotc];
     complex float asymbol[ofdm_m];
     complex float asymbol_cp[ofdm_m + ofdm_ncp];
     int i, j, k, m;
@@ -787,27 +807,31 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     /* initialize aframe to complex zero */
 
     for (i = 0; i < ofdm_ns; i++) {
-        for (j = 0; j < (ofdm_nc + 2); j++) {
+        for (j = 0; j < ofdm_pilotc; j++) {
             aframe[i][j] = 0.0f;
         }
     }
 
     /* copy in a row of complex pilots to first row */
 
-    for (i = 0; i < (ofdm_nc + 2); i++) {
+    for (i = 0; i < ofdm_pilotc; i++) {
         aframe[0][i] = ofdm->pilots[i];
     }
+
 
     /*
      * Place symbols in multi-carrier frame with pilots
      * This will place boundary values of complex zero around data
      */
     for (i = 1; i <= ofdm_rowsperframe; i++) {
+        if (ofdm_nc == 1) {
+            aframe[i][0] = tx_sym_lin[(i - 1)];
+        } else {
+            /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
 
-        /* copy in the Nc complex values with [0 Nc 0] or (Nc + 2) total */
-
-        for (j = 1; j < (ofdm_nc + 1); j++) {
-            aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
+            for (j = 1; j < (ofdm_nc + 1); j++) {
+                aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
+            }
         }
     }
 
@@ -1206,7 +1230,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
      * The average of the four pilot symbols is our phase estimation.
      */
     for (i = 0; i < (ofdm_ns + 3); i++) {
-        for (j = 0; j < (ofdm_nc + 2); j++) {
+        for (j = 0; j < ofdm_pilotc; j++) {
             ofdm->rx_sym[i][j] = 0.0f;
         }
     }
@@ -1333,8 +1357,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          * by the change in phase over time.
          */
         complex float freq_err_rect =
-                conjf(vector_sum(ofdm->rx_sym[1], ofdm_nc + 2)) *
-                vector_sum(ofdm->rx_sym[ofdm_ns + 1], ofdm_nc + 2);
+                conjf(vector_sum(ofdm->rx_sym[1], ofdm_pilotc) *
+                vector_sum(ofdm->rx_sym[ofdm_ns + 1], ofdm_pilotc));
 
         /* prevent instability in atan(im/re) when real part near 0 */
 
@@ -1347,10 +1371,10 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     /* OK - now estimate and correct pilot phase  -------------------------- */
 
     complex float aphase_est_pilot_rect;
-    float aphase_est_pilot[ofdm_nc + 2];
-    float aamp_est_pilot[ofdm_nc + 2];
+    float aphase_est_pilot[ofdm_pilotc];
+    float aamp_est_pilot[ofdm_pilotc];
 
-    for (i = 0; i < (ofdm_nc + 2); i++) {
+    for (i = 0; i < ofdm_pilotc; i++) {
         aphase_est_pilot[i] = 10.0f;
         aamp_est_pilot[i] = 0.0f;
     }
