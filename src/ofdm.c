@@ -1357,8 +1357,8 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          * by the change in phase over time.
          */
         complex float freq_err_rect =
-                conjf(vector_sum(ofdm->rx_sym[1], ofdm_pilotc) *
-                vector_sum(ofdm->rx_sym[ofdm_ns + 1], ofdm_pilotc));
+                conjf(vector_sum(ofdm->rx_sym[1], ofdm_pilotc)) *
+                vector_sum(ofdm->rx_sym[ofdm_ns + 1], ofdm_pilotc);
 
         /* prevent instability in atan(im/re) when real part near 0 */
 
