@@ -140,7 +140,7 @@ Thanks Walter K5WH for this procedure.
 
 1. You may notice background noise from the SM1000 with no signal connected, especially at high volume levels. This becomes inaudible when the SM1000 is connected to a SSB radio in either analog or digital mode.
 
-1. The is fixed at 2dB for FreeDV 1600 and is off for 700D to optimise low SNR reception.  However 70D will squelch if the Forward Error Correction (FEC) fails to decode.
+1. The squelch threshold is fixed at 2dB for FreeDV 1600 and is off for 700D to optimise low SNR reception.  However 700D will squelch if the Forward Error Correction (FEC) fails to decode.
 
 # Building the Firmware and Development
 
