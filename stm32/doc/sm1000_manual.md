@@ -19,6 +19,8 @@
 
 1. Adjust ***RIG SPKR Trimmer*** on the top of the SM1000 with a screwdriver until the clip/error LED on the front stops blinking.  Occasional blinks are OK.  If it blinks all the time you are clipping.
 
+1. If all is well you will hear decoded speech from the SM1000 speaker.
+
 1. Change modes to 700D with SELECT and try the [ve9qrp_700d.wav](https://github.com/drowe67/freedv-gui/tree/master/wav) sample.
 
 # Connection to your Radio
