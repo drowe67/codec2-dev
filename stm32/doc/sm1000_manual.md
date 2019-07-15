@@ -76,7 +76,7 @@ The menu structure looks like this:
         |---> "MODE": Boot-up Operating mode
         |       |---> "ANA":    Analogue mode
         |       |---> "1600":   FreeDV 1600
-        |       '---> "TONE":   Test tone
+        |       '---> "700D":   FreeDV 700D
         |
         |---> "TOT": Time-out timer
         |       |---> "TIME":   Total time-out period (0 == disabled)
