@@ -117,7 +117,7 @@ Creating a DFU File
 From .hex files
 1. Find and open the "Dfu file manager" program. It should appear in the programs menu under ```STMicroelectronics```. Select ```I want to generate a DFU file```.
 1. Click on the ```S19 or Hex...``` button to select the .hex file.
-1. Click ```Generate...```
+1. Click ```Generate...```   
 You now have a DFU file!
 
 From .bin files
@@ -125,7 +125,7 @@ From .bin files
 1, Click on ```Multi BIN...``` button to select the .bin file.
 1. Change the address to ```08000000```
 1. Click on the ```Add to list >>``` button then click the ```OK``` button.
-1. Click ```Generate...```
+1. Click ```Generate...```   
 You now have a DFU file!
 
 Here are the steps:
