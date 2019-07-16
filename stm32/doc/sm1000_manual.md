@@ -130,12 +130,22 @@ From .bin files
 
 You now have a DFU file!
 
-Here are the steps:
-1. Apply power with PTT held down, then release PTT. Connect the SM1000 to a Windows PC.
-1. To create an image in the DFU format: Upload Action (to create a DFU file image). Choose, and then enter a file name to save the image. Select Upload, and select Yes.
-1. To Flash: Choose, to select the DFU flash file image. Select Upgrade to start the process, and select Yes.
-1. It will begin the erase process, then the flash. It should see a message when completed that it was successful
-1. Power cycle the SM1000 and the new firmware will run.
+Here are the firmware upload steps:
+1. Apply power with PTT held down, then release PTT.
+1. Connect the SM1000 USB to a Windows PC.
+
+TODO: I think maybe this is an alternative method?   
+start---
+
+To create an image in the DFU format: Upload Action (to create a DFU file image). Choose, and then enter a file name to save the image. Select Upload, and select Yes.   
+
+----end
+
+1. To Flash DFU Image: ```Choose```, to select the DFU flash file image. Select ```Upgrade``` to start the process, and select ```Yes```.
+1. It will begin the erase process, then the flash.
+1. A message when complete that it was successful
+
+Power cycle the SM1000 and the new firmware will run.
 
 Thanks Walter K5WH for this procedure.
 
