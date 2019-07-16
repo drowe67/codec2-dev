@@ -114,19 +114,19 @@ Find and install the **DfuSeDemo** software by searching on the [ST web site](ht
 Creating a DFU File
 1. You can create DFU files from .hex or .bin files using the DFU file manager software which is part of the DfuSe USB device firmware upgrade software downloaded above. The instructions are slightly different depending on whether you are starting with a .hex or .bin file.
 
-1. From .hex files
-2. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select I want to generate a DFU file.
-2. Click on the S19 or Hex... button to select the .hex file.
-2. Click Generate...
-1. You now have a DFU file!
+From .hex files
+1. Find and open the "Dfu file manager" program. It should appear in the programs menu under ```STMicroelectronics```. Select ```I want to generate a DFU file```.
+1. Click on the ```S19 or Hex...``` button to select the .hex file.
+1. Click ```Generate...```
+You now have a DFU file!
 
-1. From .bin files
-2. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select I want to generate a DFU file.
-2, Click on Multi BIN... button to select the .bin file.
-2. Change the address to 08000000
-2. Click on the Add to list >> button then click the OK button.
-2. Click Generate...
-1. You now have a DFU file!
+From .bin files
+1. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select ```I want to generate a DFU file```.
+1, Click on ```Multi BIN...``` button to select the .bin file.
+1. Change the address to 08000000
+1. Click on the ```Add to list >>``` button then click the OK button.
+1. Click ```Generate...```
+You now have a DFU file!
 
 Here are the steps:
 1. Apply power with PTT held down, then release PTT. Connect the SM1000 to a Windows PC.
