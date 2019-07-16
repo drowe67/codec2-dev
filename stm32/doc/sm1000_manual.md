@@ -111,6 +111,23 @@ Flashing on Windows is a two step process:
 
 Find and install the **DfuSeDemo** software by searching on the [ST web site](http://www.st.com).
 
+Creating a DFU File
+1. You can create DFU files from .hex or .bin files using the DFU file manager software which is part of the DfuSe USB device firmware upgrade software downloaded above. The instructions are slightly different depending on whether you are starting with a .hex or .bin file.
+
+1. From .hex files
+2. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select I want to generate a DFU file.
+2. Click on the S19 or Hex... button to select the .hex file.
+2. Click Generate...
+1. You now have a DFU file!
+
+1. From .bin files
+2. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select I want to generate a DFU file.
+2, Click on Multi BIN... button to select the .bin file.
+2. Change the address to 08000000
+2. Click on the Add to list >> button then click the OK button.
+2. Click Generate...
+1. You now have a DFU file!
+
 Here are the steps:
 1. Apply power with PTT held down, then release PTT. Connect the SM1000 to a Windows PC.
 1. To create an image in the DFU format: Upload Action (to create a DFU file image). Choose, and then enter a file name to save the image. Select Upload, and select Yes.
