@@ -141,7 +141,7 @@ To create an image in the DFU format: Upload Action (to create a DFU file image)
 
 ----end
 
-1. To Flash DFU Image: ```Choose```, to select the DFU flash file image. Select ```Upgrade``` to start the process, and select ```Yes```.
+1. Flash DFU Image: ```Choose```, to select the DFU flash file image. Select ```Upgrade``` to start the process, and select ```Yes```.
 1. It will begin the erase process, then the flash.
 1. A message when complete that it was successful
 
