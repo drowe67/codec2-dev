@@ -19,6 +19,8 @@
 
 1. Adjust ***RIG SPKR Trimmer*** on the top of the SM1000 with a screwdriver until the clip/error LED on the front stops blinking.  Occasional blinks are OK.  If it blinks all the time you are clipping.
 
+1. If all is well you will hear decoded speech from the SM1000 speaker.
+
 1. Change modes to 700D with SELECT and try the [ve9qrp_700d.wav](https://github.com/drowe67/freedv-gui/tree/master/wav) sample.
 
 # Connection to your Radio
@@ -76,7 +78,7 @@ The menu structure looks like this:
         |---> "MODE": Boot-up Operating mode
         |       |---> "ANA":    Analogue mode
         |       |---> "1600":   FreeDV 1600
-        |       '---> "TONE":   Test tone
+        |       '---> "700D":   FreeDV 700D
         |
         |---> "TOT": Time-out timer
         |       |---> "TIME":   Total time-out period (0 == disabled)
@@ -131,7 +133,7 @@ Power cycle the SM1000 and the new firmware will run.
 1. To flash the SM1000
    ```
    $ sudo apt-get install dfu-util
-   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000.bin
+   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v2.bin
    ```
    After about 10 seconds you will be returned to the command line.
 1. Power cycle the SM1000 and the new firmware will run.
@@ -144,7 +146,7 @@ Power cycle the SM1000 and the new firmware will run.
 
 1. You may notice background noise from the SM1000 with no signal connected, especially at high volume levels. This becomes inaudible when the SM1000 is connected to a SSB radio in either analog or digital mode.
 
-1. The is fixed at 2dB for FreeDV 1600 and is off for 700D to optimise low SNR reception.  However 70D will squelch if the Forward Error Correction (FEC) fails to decode.
+1. The squelch threshold is fixed at 2dB for FreeDV 1600 and is off for 700D to optimise low SNR reception.  However 700D will squelch if the Forward Error Correction (FEC) fails to decode.
 
 # Building the Firmware and Development
 
