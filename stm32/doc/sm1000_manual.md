@@ -100,19 +100,16 @@ Settings are saved when you hold down BACK to leave the root menu.
 
 You can program the flash memory on your SM1000 via USB using a Windows or Linux PC. Download the latest SM1000 firmware here:
 
-   Version | Date | Download
-   :---: | --- | ---
+   Version | Date | Download .bin | Download .dfu
+   :---: | --- | --- | --- |
    1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin)
-   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin)
-   3   | July 2019 | [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu)
+   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu)
    
 ## Windows
 
 Find and install the **DfuSeDemo** software by searching on the [ST web site](http://www.st.com).
 
-The SM1000 build system will generate a new .dfu file for upload to your hardware. There is no need to create a DFU file from the binary, but there is a tool ```DfuFileMgr``` in the STM software package designed to do this, but it requires advanced skills.
-
-Normally you will use the .dfu file provided above. After installing the STM software, use the following firmware upload procedure:
+For Windows use the ```.dfu``` firmware file provided above:
 
 1. Connect the SM1000 USB to a Windows PC.
 1. Run the ```DfuSeDemo``` Application.
