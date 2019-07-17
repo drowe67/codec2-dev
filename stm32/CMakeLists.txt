@@ -109,6 +109,16 @@ macro(elf2bin target)
     ADDITIONAL_MAKE_CLEAN_FILES ${target}.bin)
 endmacro()
 
+# Macro for elf->bin
+macro(elf2dfu target)
+    add_custom_command(TARGET ${target}
+            POST_BUILD COMMAND ${CMAKE_OBJCOPY} -O ihex ${target}.elf ${target}.hex && ${CMAKE_SOURCE_DIR}/support/hex2dfu.py ${target}.hex ${target}.dfu
+    COMMENT "Creating dfu file for ${target}")
+    set_source_files_properties(${target}.bin PROPERTIES GENERATED TRUE)
+    set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" APPEND PROPERTY
+    ADDITIONAL_MAKE_CLEAN_FILES ${target}.hex ${target}.dfu)
+endmacro()
+
 # This macro just adds generation of a map file with the same name as the executable and .map suffix
 # to the linker command line. This works in older Cmake version (versions >= 3.13 have target_link_options)
 # it should be a one to one replacement for add_executable
@@ -399,6 +409,7 @@ add_mapped_executable(sm1000v2 ${SM1000_SRCS} ${SYSTEM_SRCS})
 target_link_libraries(sm1000v2 stm32f4_adac stm32f4 CMSIS)
 target_compile_options(sm1000v2 PRIVATE "-O3")
 elf2bin(sm1000v2)
+elf2dfu(sm1000v2)
 
 set(FREEDV_TX_PROFILE_SRCS
 src/freedv_tx_profile.c
