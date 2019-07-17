@@ -102,51 +102,27 @@ You can program the flash memory on your SM1000 via USB using a Windows or Linux
    :---: | --- | ---
    1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin)
    2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin)
+   3   | July 2019 | [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu)
    
 ## Windows
 
-Flashing on Windows is a two step process:
-1. Create sm1000.dfu from sm1000.bin
-1. Flash sm1000.dfu
-
 Find and install the **DfuSeDemo** software by searching on the [ST web site](http://www.st.com).
 
-Creating a DFU File
-1. You can create DFU files from .hex or .bin files using the DFU file manager software which is part of the DfuSe USB device firmware upgrade software downloaded above. The instructions are slightly different depending on whether you are starting with a .hex or .bin file.
+The SM1000 build system will generate a new .dfu file for upload to your hardware. There is no need to create a DFU file from the binary, but there is a tool ```DfuFileMgr``` in the STM software package designed to do this, but it requires advanced skills.
 
-From .hex files
-1. Find and open the "Dfu file manager" program. It should appear in the programs menu under ```STMicroelectronics```. Select ```I want to generate a DFU file```.
-1. Click on the ```S19 or Hex...``` button to select the .hex file.
-1. Click ```Generate...```   
+Normally you will use the .dfu file provided above. After installing the STM software, use the following firmware upload procedure:
 
-You now have a DFU file!
-
-From .bin files
-1. Find and open the "Dfu file manager" program. It should appear in the programs menu under STMicroelectronics. Select ```I want to generate a DFU file```.
-1, Click on ```Multi BIN...``` button to select the .bin file.
-1. Change the address to ```08000000```
-1. Click on the ```Add to list >>``` button then click the ```OK``` button.
-1. Click ```Generate...```   
-
-You now have a DFU file!
-
-TODO: I think maybe this is an alternative method?   
-start---
-
-To create an image in the DFU format: Upload Action (to create a DFU file image). Choose, and then enter a file name to save the image. Select Upload, and select Yes.   
-
-----end
-
-Here are the firmware upload steps:
-1. Apply power with PTT held down, then release PTT.
 1. Connect the SM1000 USB to a Windows PC.
-1. Flash DFU Image: ```Choose```, to select the DFU flash file image. Select ```Upgrade``` to start the process, and select ```Yes```.
-1. It will begin the erase process, then the flash.
-1. A message when complete that it was successful
+1. Run the ```DfuSeDemo``` Application.
+1. Apply power with PTT held down, then release PTT.
+1. The ```Available DFU Devices``` window should show ```STM Device in DFU Mode```. If not, use the arrow to select that option. Verify it shows a ```Vender ID``` of 0483, and a ```Product ID``` of DF11.
+1. In the lower right quadrant of the screen, under ```Upgrade or Verify Action``` select ```Choose```.
+1. Locate your DFU file you want to program into the SM1000, and press ```Open```.
+1. Select ```Verify after download``` option.
+1. Select ```Upgrade``` and confirm ```Yes``` when asked, and the firmware procedure will commence.
+1. A message when complete that it was successful. If the message returns that it was unsuccessful, then first try the ```Upgrade``` again. If the upgrade fails twice, you may have to start this complete procedure again.
 
 Power cycle the SM1000 and the new firmware will run.
-
-Thanks Walter K5WH for this procedure.
 
 ## Linux
 
