@@ -129,7 +129,7 @@ Thanks Walter K5WH for this procedure.
 1. To flash the SM1000
    ```
    $ sudo apt-get install dfu-util
-   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000.bin
+   $ sudo dfu-util -d 0483:df11 -c 1 -i 0 -a 0 -s 0x08000000 -D sm1000v2.bin
    ```
    After about 10 seconds you will be returned to the command line.
 1. Power cycle the SM1000 and the new firmware will run.
