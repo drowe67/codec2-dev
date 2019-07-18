@@ -5,3 +5,4 @@ stm32/unittest/lib/python/__pycache__/
 stm32/unittest/src/libstm32f4.a
 stm32/unittest/src/*.map
 stm32/unittest/test_run/
+*.pyc

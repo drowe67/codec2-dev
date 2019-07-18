@@ -100,27 +100,28 @@ Settings are saved when you hold down BACK to leave the root menu.
 
 You can program the flash memory on your SM1000 via USB using a Windows or Linux PC. Download the latest SM1000 firmware here:
 
-   Version | Date | Download | Notes
-   :---: | --- | --- | ---
-   1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin) | FreeDV 1600
-   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) | Morse menus and FreeDV 700D
+   Version | Date | Download .bin | Download .dfu
+   :---: | --- | --- | --- |
+   1   | May 2015 | [sm1000.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000.bin)
+   2   | July 2019 | [sm1000v2.bin](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.bin) |  [sm1000v2.dfu](http://www.rowetel.com/downloads/codec2/smartmic/sm1000v2.dfu)
    
 ## Windows
 
-Flashing on Windows is a two step process:
-1. Create sm1000.dfu from sm1000.bin
-1. Flash sm1000.dfu
+Find and install the **DfuSeDemo** software by searching on the [ST web site](http://www.st.com).
 
-Find and install the **DfuSeDemo** software by searching the [ST web site](http://www.st.com).
+For Windows use the ```.dfu``` firmware file provided above:
 
-Here are the steps:
-1. Apply power with PTT held down, then release PTT. Connect the SM1000 to a Windows PC.
-1. To create an image in the DFU format: Upload Action (to create a DFU file image). Choose, and then enter a file name to save the image. Select Upload, and select Yes.
-1. To Flash: Choose, to select the DFU flash file image. Select Upgrade to start the process, and select Yes.
-1. It will begin the erase process, then the flash. It should see a message when completed that it was successful
-1. Power cycle the SM1000 and the new firmware will run.
+1. Connect the SM1000 USB to a Windows PC.
+1. Run the ```DfuSeDemo``` Application.
+1. Apply power with PTT held down, then release PTT.
+1. The ```Available DFU Devices``` window should show ```STM Device in DFU Mode```. If not, use the arrow to select that option. Verify it shows a ```Vender ID``` of 0483, and a ```Product ID``` of DF11.
+1. In the lower right quadrant of the screen, under ```Upgrade or Verify Action``` select ```Choose```.
+1. Locate your DFU file you want to program into the SM1000, and press ```Open```.
+1. Select ```Verify after download``` option.
+1. Select ```Upgrade``` and confirm ```Yes``` when asked, and the firmware procedure will commence.
+1. A message when complete that it was successful. If the message returns that it was unsuccessful, then first try the ```Upgrade``` again. If the upgrade fails twice, you may have to start this complete procedure again.
 
-Thanks Walter K5WH for this procedure.
+Power cycle the SM1000 and the new firmware will run.
 
 ## Linux
 
