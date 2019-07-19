@@ -141,7 +141,7 @@ function table_across_samples
   vq2 = load(sprintf("%s_2.txt", vq_name));
   
   printf("----------------------------------------------------------------------------------\n");
-  printf("Sample            Initial  vqs1  vqsg1_eq  vq1_adapeq  vqs2  vqs2_eq  vqs2_adapeq \n");
+  printf("Sample                Initial  vq1  vq1_eq2  vq1_eq2  vq2  vq2_eq1  vq2_eq2 \n");
   printf("----------------------------------------------------------------------------------\n");
             
   fn_targets = { "cq_freedv_8k_lfboost" "cq_freedv_8k_hfcut" "cq_freedv_8k" "hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
@@ -151,41 +151,39 @@ function table_across_samples
 
     % load target and estimate eq
     [targets e] = load_targets(fn_targets{i});
-    eq = est_eq(vq1, targets);
+    eq1 = est_eq(vq1, targets);
+
+    % simple EQ based on difference between mean of inout and mean of vq1 (stage 1 VQ)
+    eq2 = mean(targets)-mean(vq1);
 
     % first stage VQ -----------------
     
     errors1 = vq_targets(vq1, targets);
-    errors1_eq = vq_targets(vq1, targets-eq);
-
-    % two passes to allow time for adaption, we use results from 2nd pas
-    [errors1_adap_eq eqs] = vq_targets_adap_eq(vq1, targets, zeros(1,K));
-    errors1_adap_eq = vq_targets_adap_eq(vq1, targets, eqs(end,:));
+    eqav = mean(targets);
+    errors1_eq1 = vq_targets(vq1, targets-eq1);    
+    errors1_eq2 = vq_targets(vq1, targets-eq2);
     
     % two stage mbest VQ --------------
     
     [errors2 targets_] = vq_targets2(vq1, vq2, targets);
-    [errors2_eq targets_eq_] = vq_targets2(vq1, vq2, targets-eq);
-
-    % two passes to allow time for adaption, we use results from 2nd pass
-    [errors2_adap_eq targets_adap_eq_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, zeros(1,K));
-    [errors2_adap_eq targets_adap_eq_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, eq);
+    [errors2_eq1 targets_eq1_] = vq_targets2(vq1, vq2, targets-eq1);
+    [errors2_eq2 targets_eq2_] = vq_targets2(vq1, vq2, targets-eq2);
 
     % save to .f32 files for listening tests
     if strcmp(vq_name,"train_120")
       save_f32(sprintf("../script/%s_vq2.f32", fn_targets{i}), targets_);
-      save_f32(sprintf("../script/%s_vq2_eq.f32", fn_targets{i}), targets_eq_);
-      save_f32(sprintf("../script/%s_vq2_adap_eq.f32", fn_targets{i}), targets_adap_eq_);
+      save_f32(sprintf("../script/%s_vq2_eq1.f32", fn_targets{i}), targets_eq1_);
+      save_f32(sprintf("../script/%s_vq2_eq2.f32", fn_targets{i}), targets_eq2_);
     else
       save_f32(sprintf("../script/%s_vq2_as.f32", fn_targets{i}), targets_);
       save_f32(sprintf("../script/%s_vq2_as_eq.f32", fn_targets{i}), targets_eq_);
     end 
     printf("%-21s %6.2f  %6.2f  %6.2f  %6.2f     %6.2f  %6.2f  %6.2f\n", fn_targets{i},
-            var(targets(:)), var(errors1(:)), var(errors1_eq(:)), var(errors1_adap_eq(:)),
-            var(errors2(:)), var(errors2_eq(:)), var(errors2_adap_eq(:)));
+            var(targets(:)), var(errors1(:)), var(errors1_eq1(:)), var(errors1_eq2(:)),
+            var(errors2(:)), var(errors2_eq1(:)), var(errors2_eq2(:)));
 
     figure(figs++); 
-    plot(var(errors2'),'b;vq;'); hold on; plot(var(errors2_eq'),'g;vq_eq;'); plot(var(errors2_adap_eq'),'r;adap_eq;'); hold off;
+    plot(var(errors2'),'b;vq2;'); hold on; plot(var(errors2_eq1'),'g;vq2_eq1;'); plot(var(errors2_eq2'),'r;vq2_eq2;'); hold off;
     title(fn_targets{i});
    end
 endfunction
@@ -197,19 +195,16 @@ function interactive(fn_vq_txt, fn_target_f32)
   K = 20;
   vq = load("train_120_1.txt");
   [targets e] = load_targets(fn_target_f32);
-  hi_energy_frames = find(e>20);
-  [eq1 eq2] = est_eq(vq, targets);
-
-  % two passes ....
-  [tmp adap_eq1] = vq_targets_adap_eq(vq, targets, zeros(1,K));
-  [tmp adap_eq1] = vq_targets_adap_eq(vq, targets, adap_eq1(end,:));
+  eq1 = est_eq(vq, targets);
+  eq2 = mean(targets) - mean(vq);
   
   figure(1); clf;
   mesh(e+targets)
   figure(2); clf;
-  %plot(eq1,'b;eq1;')
-  %hold on; plot(adap_eq1,'c;adap eq1;'); hold off;
-  mesh(adap_eq1);
+  plot(eq1,'b;eq;')
+  hold on;
+  plot(eqav,'c;eqav;'); plot(vqav,'r;vqav;'); plot(eq2,'g;eq2;');
+  hold off;
   figure(3); clf; plot(e(:,1)); title('Energy')
 
   % enter single step loop
@@ -240,7 +235,7 @@ function interactive(fn_vq_txt, fn_target_f32)
     if neq == 3 neq = 0; end
     if neq == 0 eq = zeros(1,K); end
     if neq == 1 eq = eq1; end
-    if neq == 2 eq = adap_eq1(f,:); end
+    if neq == 2 eq = eq2; end
     if k == 'b' f-=1; end
   until (k == 'q')
   printf("\n");
@@ -251,6 +246,6 @@ more off
 % choose one of these to run first
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
-%interactive("train_120_1.txt", "cq_ref.f32")
+%interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
 table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
