@@ -48,9 +48,9 @@ endfunction
 
 % single stage vq a target matrix with adaptive EQ
 
-function [errors eqs] = vq_targets_adap_eq(vq, targets)
-  errors = []; [tmp K] = size(vq); gain=0.1;
-  eqs = []; eq = prev_eq = zeros(1,K);
+function [errors eqs] = vq_targets_adap_eq(vq, targets, eq)
+  errors = []; gain=0.02;
+  eqs = []; prev_eq = eq;
   for i=1:length(targets)
     [mse_list index_list] = search_vq(vq, targets(i,:)-eq, 1);
     error = targets(i,:) - eq - vq(index_list(1),:);
@@ -61,7 +61,7 @@ function [errors eqs] = vq_targets_adap_eq(vq, targets)
 endfunction
 
 
-% two stage mbest vq a target matrix
+% two stage mbest VQ a target matrix
 
 function [errors targets_] = vq_targets2(vq1, vq2, targets)
   vqset(:,:,1)= vq1; vqset(:,:,2)=vq2; m=5;
@@ -69,20 +69,24 @@ function [errors targets_] = vq_targets2(vq1, vq2, targets)
 endfunction
 
 
-% two stage mbest vq a target matrix, with adap_eq
+% two stage mbest VQ a target matrix, with adap_eq
 
-function [errors targets_] = vq_targets2_adap_eq(vq1, vq2, targets)
-  vqset(:,:,1)= vq1; vqset(:,:,2)=vq2; m=5; [tmp K] = size(targets); gain=0.1;
-  eq = zeros(1, K); errors = []; targets_ = [];
+function [errors targets_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, eq)
+  vqset(:,:,1)= vq1; vqset(:,:,2)=vq2; m=5; gain=0.02;
+  errors = []; targets_ = [];
   for i=1:length(targets)
-    [error target_ ] = mbest(vqset, targets(i,:)-eq, m);
-    eq = (1-gain)*eq + gain*error;
+    t = targets(i,:)-eq;
+    [error target_ indexes] = mbest(vqset, t, m);
+    % use first stage VQ as error driving adaptive EQ
+    eq_error = t - vq1(indexes(1),:);
+    eq = (1-gain)*eq + gain*eq_error;
     errors = [errors; error]; targets_ = [targets_; target_];
   end
 endfunction
 
 
-% given target and vq matrices, estimate eq via two metrics
+% Given target and vq matrices, estimate eq via two metrics.  First
+% metric seems to work best.  Both uses first stage VQ error for EQ
 
 function [eq1 eq2] = est_eq(vq, targets)
   [ntargets K] = size(targets);
@@ -140,34 +144,49 @@ function table_across_samples
   printf("Sample            Initial  vqs1  vqsg1_eq  vq1_adapeq  vqs2  vqs2_eq  vqs2_adapeq \n");
   printf("----------------------------------------------------------------------------------\n");
             
-  fn_targets = {"hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01" "cq_freedv_8k"};
+  fn_targets = { "cq_freedv_8k_lfboost" "cq_freedv_8k_hfcut" "cq_freedv_8k" "hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
   %fn_targets = {"hts1a"};
+  figs=1;
   for i=1:length(fn_targets)
 
     % load target and estimate eq
     [targets e] = load_targets(fn_targets{i});
     eq = est_eq(vq1, targets);
 
-    % first stage VQ
+    % first stage VQ -----------------
+    
     errors1 = vq_targets(vq1, targets);
     errors1_eq = vq_targets(vq1, targets-eq);
-    errors1_adap_eq = vq_targets_adap_eq(vq1, targets);
-    % two stage mbest VQ
+
+    % two passes to allow time for adaption, we use results from 2nd pas
+    [errors1_adap_eq eqs] = vq_targets_adap_eq(vq1, targets, zeros(1,K));
+    errors1_adap_eq = vq_targets_adap_eq(vq1, targets, eqs(end,:));
+    
+    % two stage mbest VQ --------------
+    
     [errors2 targets_] = vq_targets2(vq1, vq2, targets);
     [errors2_eq targets_eq_] = vq_targets2(vq1, vq2, targets-eq);
-    [errors2_adap_eq targets_eq_] = vq_targets2_adap_eq(vq1, vq2, targets);
+
+    % two passes to allow time for adaption, we use results from 2nd pass
+    [errors2_adap_eq targets_adap_eq_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, zeros(1,K));
+    [errors2_adap_eq targets_adap_eq_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, eq);
 
     % save to .f32 files for listening tests
     if strcmp(vq_name,"train_120")
       save_f32(sprintf("../script/%s_vq2.f32", fn_targets{i}), targets_);
       save_f32(sprintf("../script/%s_vq2_eq.f32", fn_targets{i}), targets_eq_);
+      save_f32(sprintf("../script/%s_vq2_adap_eq.f32", fn_targets{i}), targets_adap_eq_);
     else
       save_f32(sprintf("../script/%s_vq2_as.f32", fn_targets{i}), targets_);
       save_f32(sprintf("../script/%s_vq2_as_eq.f32", fn_targets{i}), targets_eq_);
     end 
-    printf("%-17s %6.2f  %6.2f  %6.2f  %6.2f     %6.2f  %6.2f  %6.2f\n", fn_targets{i},
+    printf("%-21s %6.2f  %6.2f  %6.2f  %6.2f     %6.2f  %6.2f  %6.2f\n", fn_targets{i},
             var(targets(:)), var(errors1(:)), var(errors1_eq(:)), var(errors1_adap_eq(:)),
             var(errors2(:)), var(errors2_eq(:)), var(errors2_adap_eq(:)));
+
+    figure(figs++); 
+    plot(var(errors2'),'b;vq;'); hold on; plot(var(errors2_eq'),'g;vq_eq;'); plot(var(errors2_adap_eq'),'r;adap_eq;'); hold off;
+    title(fn_targets{i});
    end
 endfunction
 
@@ -180,7 +199,10 @@ function interactive(fn_vq_txt, fn_target_f32)
   [targets e] = load_targets(fn_target_f32);
   hi_energy_frames = find(e>20);
   [eq1 eq2] = est_eq(vq, targets);
-  [tmp adap_eq1] =  vq_targets_adap_eq(vq, targets);
+
+  % two passes ....
+  [tmp adap_eq1] = vq_targets_adap_eq(vq, targets, zeros(1,K));
+  [tmp adap_eq1] = vq_targets_adap_eq(vq, targets, adap_eq1(end,:));
   
   figure(1); clf;
   mesh(e+targets)
@@ -229,6 +251,6 @@ more off
 % choose one of these to run first
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
-interactive("train_120_1.txt", "vk5qi.f32")
-%table_across_samples;
+%interactive("train_120_1.txt", "cq_ref.f32")
+table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
