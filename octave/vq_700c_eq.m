@@ -48,14 +48,16 @@ endfunction
 
 % single stage vq a target matrix with adaptive EQ
 
-function [errors eqs] = vq_targets_adap_eq(vq, targets, eq)
+function [errors eqs] = vq_targets_adap_eq(vq, targets, eqs)
   errors = []; gain=0.02;
-  eqs = []; prev_eq = eq;
+  eq = eqs(end,:);
   for i=1:length(targets)
-    [mse_list index_list] = search_vq(vq, targets(i,:)-eq, 1);
-    error = targets(i,:) - eq - vq(index_list(1),:);
-    eq = (1-gain)*prev_eq + gain*error;
-    prev_eq = eq;
+    t = targets(i,:) - eq;
+    mean(t)
+    %t -= mean(t);
+    [mse_list index_list] = search_vq(vq, t, 1);
+    error = t - vq(index_list(1),:);
+    eq = (1-gain)*eq + gain*error;
     errors = [errors; error]; eqs = [eqs; eq];
   end
 endfunction
@@ -76,6 +78,7 @@ function [errors targets_ eq] = vq_targets2_adap_eq(vq1, vq2, targets, eq)
   errors = []; targets_ = [];
   for i=1:length(targets)
     t = targets(i,:)-eq;
+    t -= mean(t')';
     [error target_ indexes] = mbest(vqset, t, m);
     % use first stage VQ as error driving adaptive EQ
     eq_error = t - vq1(indexes(1),:);
@@ -141,11 +144,11 @@ function table_across_samples
   vq2 = load(sprintf("%s_2.txt", vq_name));
   
   printf("----------------------------------------------------------------------------------\n");
-  printf("Sample                Initial  vq1  vq1_eq2  vq1_eq2  vq2  vq2_eq1  vq2_eq2 \n");
+  printf("Sample                Initial  vq1     vq1_eq2  vq1_eq2  vq2  vq2_eq1  vq2_eq2 \n");
   printf("----------------------------------------------------------------------------------\n");
             
   fn_targets = { "cq_freedv_8k_lfboost" "cq_freedv_8k_hfcut" "cq_freedv_8k" "hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
-  %fn_targets = {"hts1a"};
+  #fn_targets = {"hts1a"};
   figs=1;
   for i=1:length(fn_targets)
 
@@ -153,21 +156,19 @@ function table_across_samples
     [targets e] = load_targets(fn_targets{i});
     eq1 = est_eq(vq1, targets);
 
-    % simple EQ based on difference between mean of inout and mean of vq1 (stage 1 VQ)
-    eq2 = mean(targets)-mean(vq1);
-
     % first stage VQ -----------------
     
     errors1 = vq_targets(vq1, targets);
-    eqav = mean(targets);
     errors1_eq1 = vq_targets(vq1, targets-eq1);    
-    errors1_eq2 = vq_targets(vq1, targets-eq2);
+    [errors1_eq2 eqs2] = vq_targets_adap_eq(vq1, targets, zeros(1,K));
+    [errors1_eq2 eqs2] = vq_targets_adap_eq(vq1, targets, eqs2(end,:));
     
     % two stage mbest VQ --------------
     
     [errors2 targets_] = vq_targets2(vq1, vq2, targets);
     [errors2_eq1 targets_eq1_] = vq_targets2(vq1, vq2, targets-eq1);
-    [errors2_eq2 targets_eq2_] = vq_targets2(vq1, vq2, targets-eq2);
+    [errors2_eq2 targets_eq2_ eq2] = vq_targets2_adap_eq(vq1, vq2, targets, zeros(1,K));
+    [errors2_eq2 targets_eq2_ eq2] = vq_targets2_adap_eq(vq1, vq2, targets, eq2);
 
     % save to .f32 files for listening tests
     if strcmp(vq_name,"train_120")
@@ -183,7 +184,8 @@ function table_across_samples
             var(errors2(:)), var(errors2_eq1(:)), var(errors2_eq2(:)));
 
     figure(figs++); 
-    plot(var(errors2'),'b;vq2;'); hold on; plot(var(errors2_eq1'),'g;vq2_eq1;'); plot(var(errors2_eq2'),'r;vq2_eq2;'); hold off;
+    %plot(var(errors2'),'b;vq2;'); hold on; plot(var(errors2_eq1'),'g;vq2_eq1;'); plot(var(errors2_eq2'),'r;vq2_eq2;'); hold off;
+    plot(eq2)
     title(fn_targets{i});
    end
 endfunction
@@ -196,16 +198,19 @@ function interactive(fn_vq_txt, fn_target_f32)
   vq = load("train_120_1.txt");
   [targets e] = load_targets(fn_target_f32);
   eq1 = est_eq(vq, targets);
-  eq2 = mean(targets) - mean(vq);
+
+  [errors1_eq2 eqs2] = vq_targets_adap_eq(vq, targets, zeros(1,K));
+  [errors1_eq2 eqs2] = vq_targets_adap_eq(vq, targets, eqs2(end,:));
+  eq2 = eqs2(end,:);
   
   figure(1); clf;
   mesh(e+targets)
   figure(2); clf;
-  plot(eq1,'b;eq;')
+  plot(eq1,'b;eq1;')
   hold on;
-  plot(eqav,'c;eqav;'); plot(vqav,'r;vqav;'); plot(eq2,'g;eq2;');
+  plot(mean(targets),'c;mean(targets);'); plot(eq2,'g;eq2;');
   hold off;
-  figure(3); clf; plot(e(:,1)); title('Energy')
+  figure(3); clf; mesh(eqs2); title('eq2 evolving')
 
   % enter single step loop
   f = 20; neq = 0; eq=zeros(1,K);
@@ -235,11 +240,61 @@ function interactive(fn_vq_txt, fn_target_f32)
     if neq == 3 neq = 0; end
     if neq == 0 eq = zeros(1,K); end
     if neq == 1 eq = eq1; end
-    if neq == 2 eq = eq2; end
+    if neq == 2 eq = eqs2(f,:); end
     if k == 'b' f-=1; end
   until (k == 'q')
   printf("\n");
 endfunction
+
+
+% Experiment to test iterative approach of block update and remove
+% mean (ie frame energy), shows some promise at reducing HF energy
+% over several iterations while not affecting alreayd good samples
+
+function experiment_iterate_block(fn_vq_txt, fn_target_f32)
+  K = 20;
+  vq = load("train_120_1.txt");
+  [targets e] = load_targets(fn_target_f32);
+
+  figure(1); clf;
+  plot(mean(targets),'b;mean(targets);');
+  hold on;
+  plot(mean(vq), 'g;mean(vq);');
+  figure(2); clf; hold on;
+  eq = zeros(1,K);
+  for i=1:3
+    t = targets - eq;
+    errors = vq_targets(vq, t);    
+    eq += est_eq(vq, t);
+    figure(1); plot(mean(t));
+    figure(2); plot(eq);
+    printf("i: %d %6.2f\n", i, var(errors(:)))
+  end
+endfunction
+
+% adaptive version of above
+
+function experiment_iterate_adap(fn_vq_txt, fn_target_f32)
+  K = 20;
+  vq = load("train_120_1.txt");
+  [targets e] = load_targets(fn_target_f32);
+
+  figure(3); clf;
+  plot(mean(targets),'b;mean(targets);');
+  hold on;
+  plot(mean(vq), 'g;mean(vq);');
+  figure(4); clf; hold on;
+  eqs = zeros(1,K);
+  for i=1:3
+    [errors eqs] = vq_targets_adap_eq(vq, targets, eqs);
+    t = targets - eqs(end,:);
+    figure(3); plot(mean(t));
+    figure(4); plot(eqs(end,:));
+    printf("i: %d %6.2f\n", i, var(errors(:)))
+  end
+  figure(5); clf; mesh(eqs);
+endfunction
+
 
 more off
 
@@ -247,5 +302,8 @@ more off
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-table_across_samples;
+%table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
+%vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_freedv_8k_hfcut.f32" "cq_freedv_8k.f32"})
+experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
+%experiment_iterate_adap("train_120_1.txt", "cq_freedv_8k_lfboost.f32")

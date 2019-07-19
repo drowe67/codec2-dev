@@ -10,7 +10,7 @@
 SRC=~/Downloads/all_speech_8k.sw
 CODEC2_BUILD=/home/david/codec2/build_linux
 K=20
-SAMPLES=~/tmp/c2vec_pass
+SAMPLES=~/tmp/c2vec_pass2
 
 # train a new VQ
 function train() {
