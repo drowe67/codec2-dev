@@ -159,16 +159,19 @@ function table_across_samples
     % first stage VQ -----------------
     
     errors1 = vq_targets(vq1, targets);
-    errors1_eq1 = vq_targets(vq1, targets-eq1);    
-    [errors1_eq2 eqs2] = vq_targets_adap_eq(vq1, targets, zeros(1,K));
-    [errors1_eq2 eqs2] = vq_targets_adap_eq(vq1, targets, eqs2(end,:));
+    errors1_eq1 = vq_targets(vq1, targets-eq1);
+    eq2 = zeros(1,K);
+    for it=1:3
+      t = targets - eq2;
+      errors1_eq2 = vq_targets(vq1, t);    
+      eq2 += est_eq(vq1, t);
+    end
     
     % two stage mbest VQ --------------
     
     [errors2 targets_] = vq_targets2(vq1, vq2, targets);
     [errors2_eq1 targets_eq1_] = vq_targets2(vq1, vq2, targets-eq1);
-    [errors2_eq2 targets_eq2_ eq2] = vq_targets2_adap_eq(vq1, vq2, targets, zeros(1,K));
-    [errors2_eq2 targets_eq2_ eq2] = vq_targets2_adap_eq(vq1, vq2, targets, eq2);
+    [errors2_eq2 targets_eq2_] = vq_targets2(vq1, vq2, targets-eq2);
 
     % save to .f32 files for listening tests
     if strcmp(vq_name,"train_120")
@@ -179,13 +182,13 @@ function table_across_samples
       save_f32(sprintf("../script/%s_vq2_as.f32", fn_targets{i}), targets_);
       save_f32(sprintf("../script/%s_vq2_as_eq.f32", fn_targets{i}), targets_eq_);
     end 
-    printf("%-21s %6.2f  %6.2f  %6.2f  %6.2f     %6.2f  %6.2f  %6.2f\n", fn_targets{i},
+    printf("%-21s %6.2f  %6.2f  %6.2f   %6.2f     %6.2f  %6.2f  %6.2f\n", fn_targets{i},
             var(targets(:)), var(errors1(:)), var(errors1_eq1(:)), var(errors1_eq2(:)),
             var(errors2(:)), var(errors2_eq1(:)), var(errors2_eq2(:)));
 
-    figure(figs++); 
+    figure(figs++); clf;
     %plot(var(errors2'),'b;vq2;'); hold on; plot(var(errors2_eq1'),'g;vq2_eq1;'); plot(var(errors2_eq2'),'r;vq2_eq2;'); hold off;
-    plot(eq2)
+    plot(mean(targets); hold on; plot(mean(vq)); plot(eq2); hold off;
     title(fn_targets{i});
    end
 endfunction
@@ -302,8 +305,8 @@ more off
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-%table_across_samples;
+table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_freedv_8k_hfcut.f32" "cq_freedv_8k.f32"})
-experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
+%experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
 %experiment_iterate_adap("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
