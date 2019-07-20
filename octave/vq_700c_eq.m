@@ -176,11 +176,15 @@ function table_across_samples
     [targets e] = load_targets(fn_targets{i});
     eq1 = est_eq(vq1, targets);
 
+    ideal = [ 8 10 12 14 14*ones(1,K-4) ];
+    eq2 = mean(targets) - ideal;
+    eq2(find(eq2 < 0)) = 0;
+    
     % first stage VQ -----------------
     
     errors1 = vq_targets(vq1, targets);
     errors1_eq1 = vq_targets(vq1, targets-eq1);
-    [errors1_eq2 eq2] = vq_targets_block_eq(vq1, targets, zeros(1,K), 10);
+    errors1_eq2 = vq_targets(vq1, targets-eq2);
     
     % two stage mbest VQ --------------
     
@@ -296,9 +300,11 @@ function experiment_input_eq(fn_vq_txt, fn_target_f32)
   vq = load("train_120_1.txt");
   [targets e] = load_targets(fn_target_f32);
 
-  slope = -12/K;
-  ideal = 6:slope:-6-slope;
+  %slope = -12/K; const = 10;
+  %ideal = const + (6:slope:-6-slope);
+  ideal = [ 8 10 12 14 14*ones(1,K-4) ];
   eq = mean(targets) - ideal;
+  eq(find(eq < 0)) = 0;
   
   figure(1); clf;
   plot(mean(targets),'b;mean(targets);');
@@ -319,4 +325,4 @@ table_across_samples;
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
 %experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
 %experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-experiment_input_eq("train_120_1.txt", "ve9qrp_10s.f32")
+%experiment_input_eq("train_120_1.txt", "vk5qi.f32")
