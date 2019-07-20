@@ -67,7 +67,7 @@ endfunction
 % well with nblock == 10
 
 function [errors eq] = vq_targets_block_eq(vq, targets, eq, nblock)
-  errors = []; n = 0; [tmp K] = size(vq); error_eq = zeros(1,K);
+  errors = []; n = 0; [tmp K] = size(vq); error_eq = zeros(1,K); gain=0.20;
   for i=1:length(targets)
     t = targets(i,:) - eq;
     [mse_list index_list] = search_vq(vq, t, 1);
@@ -76,7 +76,7 @@ function [errors eq] = vq_targets_block_eq(vq, targets, eq, nblock)
     errors = [errors; error];
     n++;
     if n == nblock
-      eq += error_eq/nblock;
+      eq = 0.99*eq + gain*error_eq/nblock;
       n = 0; error_eq = zeros(1,K);
     end  
   end
@@ -288,13 +288,35 @@ function experiment_iterate_block(fn_vq_txt, fn_target_f32)
   end
 endfunction
 
+% Experiment to test EQ of input (before) VQ.  We set a threshold on
+% when to equalise, so we don't upset already flat-ish samples.
+
+function experiment_input_eq(fn_vq_txt, fn_target_f32)
+  K = 20;
+  vq = load("train_120_1.txt");
+  [targets e] = load_targets(fn_target_f32);
+
+  slope = -12/K;
+  ideal = 6:slope:-6-slope;
+  eq = mean(targets) - ideal;
+  
+  figure(1); clf;
+  plot(mean(targets),'b;mean(targets);');
+  hold on;
+  plot(ideal, 'g;ideal;');
+  plot(eq, 'r;eq;');
+  plot(mean(targets)-eq, 'c;equalised;');
+endfunction
+
 more off
 
 % choose one of these to run first
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-%table_across_samples;
+table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
-%vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_freedv_8k_hfcut.f32" "cq_freedv_8k.f32"})
-experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
+%vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
+%experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
+%experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
+experiment_input_eq("train_120_1.txt", "ve9qrp_10s.f32")
