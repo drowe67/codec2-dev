@@ -35,10 +35,12 @@
 #}
 
 function tnewamp1(input_prefix="../build_linux/src/hts1a")
+  printf("starting tnewamp1.c input_prefix: %s\n", input_prefix);
+  
   newamp_700c;
   autotest;
   more off;
-
+    
   max_amp = 80;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
