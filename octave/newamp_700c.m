@@ -346,6 +346,6 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
 endfunction
 
 
-function [rate_K_vec eq] = front_eq(rate_vec, eq)
+function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
 endfunction
 
