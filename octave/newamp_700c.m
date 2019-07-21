@@ -1,14 +1,11 @@
-% newamp.m
+% newamp_700c.m
 %
-% Copyright David Rowe 2015
+% Copyright David Rowe 2017
 % This program is distributed under the terms of the GNU General Public License 
 % Version 2
 %
-% Library of Octave functions to explore new ideas in amplitude
-% (spectral envelope) modelling.  See newamp_fby (frame by frame
-% analysis) and newamp_batch (batch processing for listening tests)
-%
-% Code here to support a bunch of experimental ideas, many that didn't work out.
+% Library of Octave functions to explore rate K, mel spaced
+% quantisation of spectral magntides used in Codec 2 700C mode.
 
 1;
 melvq; % mbest VQ functions
@@ -349,6 +346,10 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
 endfunction
 
 
+function [rate_K_vec eq] = front_eq(rate_vec, eq)
+endfunction
+
+#{
 % --------------------------------------------------------------------------------
 % Experimental functions used for masking, piecewise models, not part of newamp1
 % --------------------------------------------------------------------------------
@@ -1263,5 +1264,6 @@ function lmin = abys(AmdB_, AmdB, Wo, L, mask_sample_freqs_kHz)
   subplot(212)
   plot(mask_sample_freqs_kHz*1000, e)
 endfunction
+#}
 
 

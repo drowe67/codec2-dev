@@ -72,10 +72,12 @@ function tnewamp1(input_prefix="../build_linux/src/hts1a")
   load train_120_1.txt; load train_120_2.txt;
   train_120_vq(:,:,1)= train_120_1; train_120_vq(:,:,2)= train_120_2; m=5;
   m=5;
-       
+
+  eq = zeros(1,K);
   for f=1:frames
     mean_f(f) = mean(rate_K_surface(f,:));
     rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
+    % [rate_K_surface_no_mean(f,:) eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
   end
 
   [res rate_K_surface_no_mean_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
