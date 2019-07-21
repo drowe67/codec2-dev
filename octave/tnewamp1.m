@@ -34,7 +34,7 @@
                                       | play -q -t raw -r 8000 -s -2 -
 #}
 
-function tnewamp1(input_prefix="../build_linux/src/hts1a")
+function tnewamp1(input_prefix)
   printf("starting tnewamp1.c input_prefix: %s\n", input_prefix);
   
   newamp_700c;
