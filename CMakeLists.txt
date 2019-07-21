@@ -80,7 +80,7 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 endif()
 
-set(CMAKE_C_FLAGS_DEBUG "-g -O2")
+set(CMAKE_C_FLAGS_DEBUG "-g -O2 -DDUMP")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 #
@@ -295,6 +295,15 @@ install(
 if(UNITTEST)
     include(CTest)
     enable_testing()
+
+    add_test(NAME test_codec2_700c_octave_port
+             COMMAND sh -c "cd ${CMAKE_CURRENT_BINARY_DIR}/src;
+                            ./c2sim ../../raw/hts1a.raw --phase0 --postfilter --dump hts1a --lpc 10 --dump_pitch_e hts1a_pitche.txt; \
+                            cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ../../raw/hts1a.raw; \
+                            cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; \
+                            octave --no-gui -qf tnewamp1.m")
+             set_tests_properties(test_codec2_700c_octave_port PROPERTIES
+             PASS_REGULAR_EXPRESSION "passes: 8")
 
     add_test(NAME test_FDMDV_modem_octave_port
              COMMAND sh -c "$<TARGET_FILE:tfdmdv> && octave --no-gui -qf ${CMAKE_CURRENT_SOURCE_DIR}/octave/tfdmdv.m"

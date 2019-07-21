@@ -20,7 +20,7 @@
     3/ Run C version which generates a file of Octave test vectors as ouput:
 
       $ cd codec2-dev/build_linux/unittest
-      $ ./tnewamp1 ../../raw/hts1a
+      $ ./tnewamp1 ../../raw/hts1a.raw
             
     4/ Run Octave script to generate Octave test vectors and compare with C.
 
@@ -34,8 +34,7 @@
                                       | play -q -t raw -r 8000 -s -2 -
 #}
 
-
-function tnewamp1(input_prefix)
+function tnewamp1(input_prefix="../build_linux/src/hts1a")
   newamp_700c;
   autotest;
   more off;
@@ -176,15 +175,17 @@ function tnewamp1(input_prefix)
   figure(3); clf;
   mesh(abs(H - H_c(:,1:max_amp)));
 
-  check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
-  check(mean_f, mean_c, 'mean', 0.01);
-  check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01);
-  check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
-  check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
-  check(voicing_, voicing__c, 'interpolated voicing');
-  check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
-  check(H, H_c(:,1:max_amp), 'phase surface');
-
+  passes = 0;
+  passes += check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
+  passes += check(mean_f, mean_c, 'mean', 0.01);
+  passes += check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01);
+  passes += check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
+  passes += check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
+  passes += check(voicing_, voicing__c, 'interpolated voicing');
+  passes += check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
+  passes += check(H, H_c(:,1:max_amp), 'phase surface');
+  printf("passes: %d\n", passes);
+ 
   % Save to disk to check synthesis is OK with c2sim  
 
   output_prefix = input_prefix;
@@ -238,8 +239,6 @@ function tnewamp1(input_prefix)
     fprintf(fv,"%d\n", voicing__c(f));
   end
   fclose(fv);
-
-  printf("\n")
 
 endfunction
  
