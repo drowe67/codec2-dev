@@ -30,7 +30,8 @@ script:
 - mkdir -p $BUILDSTD
 - cd $BUILDSTD
 - cmake $CODEC2DEV
-- CTEST_OUTPUT_ON_FAILURE=1 make -j4 all test
+- ctest -V -R test_codec2_700c_octave_port
+#- CTEST_OUTPUT_ON_FAILURE=1 make -j4 all test
 - mkdir -p $BUILDSTM
 - cd $BUILDSTM
 - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 

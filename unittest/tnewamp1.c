@@ -159,6 +159,7 @@ int main(int argc, char *argv[]) {
                                       &mean_[f],
                                       &indexes[f][0], NULL, 1);
 
+        #ifdef VERBOSE
         fprintf(stderr,"f: %d Wo: %4.3f L: %d v: %d\n", f, model.Wo, model.L, model.voiced);
         if ((f % M) == 0) {
             for(i=0; i<5; i++) {
@@ -167,6 +168,7 @@ int main(int argc, char *argv[]) {
             fprintf(stderr,"\n");
             fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
         }
+        #endif
         /* log vectors */
  
         model_octave[f][0] = model.Wo;
@@ -212,6 +214,7 @@ int main(int argc, char *argv[]) {
                                  &indexes[f][0],
                                  NULL, 1);
 
+        #ifdef VERBOSE
         fprintf(stderr,"f: %d\n", f);
         fprintf(stderr,"  %d %d %d %d\n", indexes[f][0], indexes[f][1], indexes[f][2], indexes[f][3]);
         for(i=0; i<M; i++) {
@@ -233,7 +236,8 @@ int main(int argc, char *argv[]) {
         }
 
         fprintf(stderr,"\n\n");
-
+        #endif
+        
         //if (f == 7)
         //  exit(0);
 

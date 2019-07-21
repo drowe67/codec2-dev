@@ -129,6 +129,7 @@ function tnewamp1(input_prefix="../build_linux/src/hts1a")
     voicing_right = voicing(f);
     [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
 
+    #{
     for i=1:4
       fprintf(stderr, "  Wo: %4.3f L: %d v: %d\n", Wo_(i), floor(pi/Wo_(i)), avoicing_(i));
     end
@@ -137,6 +138,7 @@ function tnewamp1(input_prefix="../build_linux/src/hts1a")
       fprintf(stderr,"%5.3f  ", rate_K_surface_(f,i));
     end
     fprintf(stderr,"\n");
+    #}
     
     if f > M
       model_(f-M:f-1,1) = Wo_;
@@ -189,7 +191,8 @@ function tnewamp1(input_prefix="../build_linux/src/hts1a")
   passes += check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
   passes += check(H, H_c(:,1:max_amp), 'phase surface');
   printf("passes: %d\n", passes);
- 
+
+  #{
   % Save to disk to check synthesis is OK with c2sim  
 
   output_prefix = input_prefix;
@@ -243,7 +246,8 @@ function tnewamp1(input_prefix="../build_linux/src/hts1a")
     fprintf(fv,"%d\n", voicing__c(f));
   end
   fclose(fv);
-
+  #}
+  
 endfunction
  
 
