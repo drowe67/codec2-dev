@@ -346,6 +346,14 @@ function [Wo_ voicing_] = interp_Wo_v(Wo1, Wo2, voicing1, voicing2)
 endfunction
 
 
+% Equaliser in front of EQ, see vq_70c_eq.m for development version
+
 function [rate_K_vec eq] = front_eq(rate_K_vec, eq)
+  [tmp K] = size(rate_K_vec);
+  ideal = [ 8 10 12 14 14*ones(1,K-1-4) -20];
+  gain = 0.02;
+  update = rate_K_vec - ideal;
+  eq = (1-gain)*eq + gain*update;
+  eq(find(eq < 0)) = 0;
 endfunction
 

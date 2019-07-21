@@ -301,7 +301,7 @@ if(UNITTEST)
                             ./c2sim ../../raw/hts1a.raw --phase0 --postfilter --dump hts1a --lpc 10 --dump_pitch_e hts1a_pitche.txt; \
                             cd ${CMAKE_CURRENT_BINARY_DIR}/unittest; ./tnewamp1 ../../raw/hts1a.raw; \
                             cd ${CMAKE_CURRENT_SOURCE_DIR}/octave; pwd; \
-                            octave --no-gui -qf tnewamp1.m")
+                            octave --no-gui -qf  ${CMAKE_CURRENT_SOURCE_DIR}/octave/tnewamp1.m")
              set_tests_properties(test_codec2_700c_octave_port PROPERTIES PASS_REGULAR_EXPRESSION "passes: 8")
 
     add_test(NAME test_FDMDV_modem_octave_port
