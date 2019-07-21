@@ -152,6 +152,20 @@ function [targets e] = load_targets(fn_target_f32)
   targets = feat(:,2:K+1);
 endfunction
 
+% rather simple EQ in front of VQ
+
+function [eqs ideal] = est_eq_front(targets)
+  [tmp K] = size(targets);
+  ideal = [ 8 10 12 14 14*ones(1,K-1-4) -20];
+  eq = zeros(1,K); gain = 0.02;
+  eqs = [];
+  for i=1:length(targets)
+    update = targets(i,:) - ideal;
+    eq = (1-gain)*eq + gain*update;
+    eq(find(eq < 0)) = 0;
+    eqs = [eqs; eq];
+  end
+endfunction
 
 function table_across_samples
   K = 20;
@@ -168,17 +182,15 @@ function table_across_samples
   printf("----------------------------------------------------------------------------------\n");
             
   fn_targets = { "cq_freedv_8k_lfboost" "cq_freedv_8k_hfcut" "cq_freedv_8k" "hts1a" "hts2a" "cq_ref" "ve9qrp_10s" "vk5qi" "c01_01_8k" "ma01_01"};
-  #fn_targets = {"hts1a"};
+  #fn_targets = {"cq_freedv_8k_lfboost"};
   figs=1;
   for i=1:length(fn_targets)
 
     % load target and estimate eq
     [targets e] = load_targets(fn_targets{i});
     eq1 = est_eq(vq1, targets);
-
-    ideal = [ 8 10 12 14 14*ones(1,K-4) ];
-    eq2 = mean(targets) - ideal;
-    eq2(find(eq2 < 0)) = 0;
+    eq2s = est_eq_front(targets);
+    eq2 = eq2s(end,:);
     
     % first stage VQ -----------------
     
@@ -295,23 +307,22 @@ endfunction
 % Experiment to test EQ of input (before) VQ.  We set a threshold on
 % when to equalise, so we don't upset already flat-ish samples.
 
-function experiment_input_eq(fn_vq_txt, fn_target_f32)
+function experiment_front_eq(fn_vq_txt, fn_target_f32)
   K = 20;
   vq = load("train_120_1.txt");
   [targets e] = load_targets(fn_target_f32);
 
-  %slope = -12/K; const = 10;
-  %ideal = const + (6:slope:-6-slope);
-  ideal = [ 8 10 12 14 14*ones(1,K-4) ];
-  eq = mean(targets) - ideal;
-  eq(find(eq < 0)) = 0;
+  [eqs ideal] = est_eq_front(targets);
   
   figure(1); clf;
   plot(mean(targets),'b;mean(targets);');
   hold on;
   plot(ideal, 'g;ideal;');
-  plot(eq, 'r;eq;');
-  plot(mean(targets)-eq, 'c;equalised;');
+  plot(eqs(end,:), 'r;eq;');
+  plot(mean(targets)-eqs(end,:), 'c;equalised;');
+  plot(mean(vq),'b--;mean(vq);');
+  hold off;
+  figure(2); clf; mesh(eqs);
 endfunction
 
 more off
@@ -325,4 +336,4 @@ table_across_samples;
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
 %experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
 %experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-%experiment_input_eq("train_120_1.txt", "vk5qi.f32")
+%experiment_front_eq("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
