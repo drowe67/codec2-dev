@@ -55,7 +55,8 @@ void newamp1_model_to_indexes(C2CONST *c2const,
                               float *mean,
                               float  rate_K_vec_no_mean[], 
                               float  rate_K_vec_no_mean_[],
-                              float *se);
+                              float *se,
+                              float *eq);
 void newamp1_indexes_to_rate_K_vec(float  rate_K_vec_[],  
                                    float  rate_K_vec_no_mean_[],
                                    float  rate_K_sample_freqs_kHz[], 

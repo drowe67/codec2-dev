@@ -88,7 +88,11 @@ int main(int argc, char *argv[]) {
     COMP  H[FRAMES][MAX_AMP];
     int indexes[FRAMES][NEWAMP1_N_INDEXES];
     float se = 0.0;
-
+    float eq[K];
+        
+    for(k=0; k<K; k++)
+        eq[k] = 0.0;
+    
     for(f=0; f<FRAMES; f++) {
         for(m=0; m<MAX_AMP+2; m++) {
             model_octave[f][m] = 0.0;
@@ -150,7 +154,8 @@ int main(int argc, char *argv[]) {
                                  &mean[f],
                                  &rate_K_surface_no_mean[f][0],
                                  &rate_K_surface_no_mean_[f][0],
-                                 &se);
+                                 &se,
+                                 eq);
 
         newamp1_indexes_to_rate_K_vec(&rate_K_surface_[f][0],
                                       &rate_K_surface_no_mean_[f][0],
@@ -178,7 +183,7 @@ int main(int argc, char *argv[]) {
         }        
     }
 
-     /* Decoder */
+    /* Decoder */
 
     MODEL model__[M];
     float prev_rate_K_vec_[K];
@@ -278,6 +283,7 @@ int main(int argc, char *argv[]) {
     fprintf(fout, "# Created by tnewamp1.c\n");
     octave_save_float(fout, "rate_K_surface_c", (float*)rate_K_surface, FRAMES, K, K);
     octave_save_float(fout, "mean_c", (float*)mean, 1, FRAMES, 1);
+    octave_save_float(fout, "eq_c", eq, 1, K, K);
     octave_save_float(fout, "rate_K_surface_no_mean_c", (float*)rate_K_surface_no_mean, FRAMES, K, K);
     octave_save_float(fout, "rate_K_surface_no_mean__c", (float*)rate_K_surface_no_mean_, FRAMES, K, K);
     octave_save_float(fout, "mean__c", (float*)mean_, FRAMES, 1, 1);

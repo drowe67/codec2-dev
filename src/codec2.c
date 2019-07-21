@@ -221,6 +221,7 @@ struct CODEC2 * codec2_create(int mode)
         int k;
         for(k=0; k<NEWAMP1_K; k++) {
             c2->prev_rate_K_vec_[k] = 0.0;
+            c2->eq[k] = 0.0;
         }
         c2->Wo_left = 0.0;
         c2->voicing_left = 0;;
@@ -1987,7 +1988,7 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              K,
                              &mean,
                              rate_K_vec_no_mean,
-                             rate_K_vec_no_mean_, &c2->se);
+                             rate_K_vec_no_mean_, &c2->se, c2->eq);
     c2->nse += K;
 
 #ifndef CORTEX_M4

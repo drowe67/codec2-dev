@@ -80,7 +80,7 @@ function tnewamp1(input_prefix)
     [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
     rate_K_surface_no_mean(f,:) = rate_K_vec;
   end
-
+  
   [res rate_K_surface_no_mean_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
 
   for f=1:frames
@@ -182,16 +182,17 @@ function tnewamp1(input_prefix)
   figure(3); clf;
   mesh(abs(H - H_c(:,1:max_amp)));
 
-  passes = 0;
-  passes += check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
-  passes += check(mean_f, mean_c, 'mean', 0.01);
-  passes += check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01);
-  passes += check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
-  passes += check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
-  passes += check(voicing_, voicing__c, 'interpolated voicing');
-  passes += check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
-  passes += check(H, H_c(:,1:max_amp), 'phase surface');
-  printf("passes: %d\n", passes);
+  passes = 0; tests = 0;
+  passes += check(eq, eq_c, 'Equaliser', 0.01); tests++;
+  passes += check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01); tests++;
+  passes += check(mean_f, mean_c, 'mean', 0.01); tests++;
+  passes += check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01); tests++;
+  passes += check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01); tests++;
+  passes += check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);  tests++;
+  passes += check(voicing_, voicing__c, 'interpolated voicing'); tests++;
+  passes += check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1); tests++;
+  passes += check(H, H_c(:,1:max_amp), 'phase surface'); tests++;
+  printf("passes: %d fails: %d\n", passes, tests - passes);
 
   #{
   % Save to disk to check synthesis is OK with c2sim  

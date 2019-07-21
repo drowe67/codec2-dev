@@ -415,7 +415,8 @@ void newamp1_model_to_indexes(C2CONST *c2const,
                               float *mean,
                               float  rate_K_vec_no_mean[], 
                               float  rate_K_vec_no_mean_[],
-                              float *se
+                              float *se,
+                              float *eq
                               )
 {
     int k;
@@ -429,9 +430,24 @@ void newamp1_model_to_indexes(C2CONST *c2const,
     float sum = 0.0;
     for(k=0; k<K; k++)
         sum += rate_K_vec[k];   
-    *mean = sum/K;;
+    *mean = sum/K;
     for(k=0; k<K; k++)
         rate_K_vec_no_mean[k] = rate_K_vec[k] - *mean;
+
+    /* optionally run "front eq" equaliser on before VQ */
+
+    if (eq != NULL) {
+        static float ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
+        float gain = 0.02;
+        float update;
+        
+        for(k=0; k<K; k++) {
+            update = rate_K_vec_no_mean[k] - ideal[k];
+            eq[k] = (1.0-gain)*eq[k] + gain*update;
+            if (eq[k] < 0.0) eq[k] = 0.0;
+        }
+    }
+    
     rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
 
     /* running sum of squared error for variance calculation */

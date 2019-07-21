@@ -31,9 +31,7 @@ script:
 - cd $BUILDSTD
 - cmake $CODEC2DEV
 - make -j4
-- ctest -V -R test_codec2_700c_octave_port
-- ctest -V -R test_FDMDV_modem_octave_port
-#- CTEST_OUTPUT_ON_FAILURE=1 make -j4 all test
+- CTEST_OUTPUT_ON_FAILURE=1 make -j4 all test
 - mkdir -p $BUILDSTM
 - cd $BUILDSTM
 - if [ -e $STDLIBDIR ]; then  (ln -s $STDLIBDIR . && cmake $CODEC2DEV/stm32 -DPERIPHLIBDIR="$STDLIBDIR" 
