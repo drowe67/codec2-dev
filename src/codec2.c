@@ -223,6 +223,7 @@ struct CODEC2 * codec2_create(int mode)
             c2->prev_rate_K_vec_[k] = 0.0;
             c2->eq[k] = 0.0;
         }
+        c2->eq_en = 0;
         c2->Wo_left = 0.0;
         c2->voicing_left = 0;;
         c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 0, NULL, NULL);
@@ -1988,7 +1989,7 @@ void codec2_encode_700c(struct CODEC2 *c2, unsigned char * bits, short speech[])
                              K,
                              &mean,
                              rate_K_vec_no_mean,
-                             rate_K_vec_no_mean_, &c2->se, c2->eq);
+                             rate_K_vec_no_mean_, &c2->se, c2->eq, c2->eq_en);
     c2->nse += K;
 
 #ifndef CORTEX_M4
@@ -2719,4 +2720,8 @@ float *codec2_enable_user_ratek(struct CODEC2 *codec2_state, int *K) {
 
 void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
     codec2_state->post_filter_en = en;
+}
+
+void codec2_700c_eq(struct CODEC2 *codec2_state, int en) {
+    codec2_state->eq_en = en;
 }

@@ -2,7 +2,7 @@
 % David Rowe May 2019
 %
 % Researching Codec 2 700C VQ equaliser ideas
-% See also scripts/train_700c_quant.sh
+% See also scripts/train_700c_quant.sh, tnewamp1.m
 
 melvq;
 
@@ -190,6 +190,7 @@ function table_across_samples
     [targets e] = load_targets(fn_targets{i});
     eq1 = est_eq(vq1, targets);
     eq2s = est_eq_front(targets);
+    % for these simulation uses fixed EQ sample, rather than letting it vary frame by frame
     eq2 = eq2s(end,:);
     
     % first stage VQ -----------------

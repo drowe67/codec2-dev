@@ -83,6 +83,7 @@ struct CODEC2 {
     float         *user_rate_K_vec_no_mean_; /* optional, user supplied vector for quantisation experiments */
     int            post_filter_en;
     float          eq[NEWAMP1_K];            /* optional equaliser */
+    int            eq_en;
     
     /*newamp2 states (also uses newamp1 states )*/
     float 	   energy_prev;

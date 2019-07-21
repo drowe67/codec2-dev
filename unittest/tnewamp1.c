@@ -155,7 +155,7 @@ int main(int argc, char *argv[]) {
                                  &rate_K_surface_no_mean[f][0],
                                  &rate_K_surface_no_mean_[f][0],
                                  &se,
-                                 eq);
+                                 eq, 0);
 
         newamp1_indexes_to_rate_K_vec(&rate_K_surface_[f][0],
                                       &rate_K_surface_no_mean_[f][0],
