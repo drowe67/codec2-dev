@@ -20,7 +20,7 @@
     3/ Run C version which generates a file of Octave test vectors as ouput:
 
       $ cd codec2-dev/build_linux/unittest
-      $ ./tnewamp1 ../../raw/hts1a
+      $ ./tnewamp1 ../../raw/hts1a.raw
             
     4/ Run Octave script to generate Octave test vectors and compare with C.
 
@@ -34,12 +34,13 @@
                                       | play -q -t raw -r 8000 -s -2 -
 #}
 
-
 function tnewamp1(input_prefix)
+  printf("starting tnewamp1.c input_prefix: %s\n", input_prefix);
+  
   newamp_700c;
   autotest;
   more off;
-
+    
   max_amp = 80;
   postfilter = 0;   % optional postfiler that runs on Am, not used atm
   synth_phase = 1;
@@ -71,12 +72,15 @@ function tnewamp1(input_prefix)
   load train_120_1.txt; load train_120_2.txt;
   train_120_vq(:,:,1)= train_120_1; train_120_vq(:,:,2)= train_120_2; m=5;
   m=5;
-       
+
+  eq = zeros(1,K);
   for f=1:frames
     mean_f(f) = mean(rate_K_surface(f,:));
     rate_K_surface_no_mean(f,:) = rate_K_surface(f,:) - mean_f(f);
+    [rate_K_vec eq] = front_eq(rate_K_surface_no_mean(f,:), eq);
+    rate_K_surface_no_mean(f,:) = rate_K_vec;
   end
-
+  
   [res rate_K_surface_no_mean_ ind] = mbest(train_120_vq, rate_K_surface_no_mean, m);
 
   for f=1:frames
@@ -126,6 +130,7 @@ function tnewamp1(input_prefix)
     voicing_right = voicing(f);
     [Wo_ avoicing_] = interp_Wo_v(Wo_left, Wo_right, voicing_left, voicing_right);
 
+    #{
     for i=1:4
       fprintf(stderr, "  Wo: %4.3f L: %d v: %d\n", Wo_(i), floor(pi/Wo_(i)), avoicing_(i));
     end
@@ -134,6 +139,7 @@ function tnewamp1(input_prefix)
       fprintf(stderr,"%5.3f  ", rate_K_surface_(f,i));
     end
     fprintf(stderr,"\n");
+    #}
     
     if f > M
       model_(f-M:f-1,1) = Wo_;
@@ -176,15 +182,19 @@ function tnewamp1(input_prefix)
   figure(3); clf;
   mesh(abs(H - H_c(:,1:max_amp)));
 
-  check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01);
-  check(mean_f, mean_c, 'mean', 0.01);
-  check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01);
-  check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01);
-  check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);
-  check(voicing_, voicing__c, 'interpolated voicing');
-  check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1);
-  check(H, H_c(:,1:max_amp), 'phase surface');
+  passes = 0; tests = 0;
+  passes += check(eq, eq_c, 'Equaliser', 0.01); tests++;
+  passes += check(rate_K_surface, rate_K_surface_c, 'rate_K_surface', 0.01); tests++;
+  passes += check(mean_f, mean_c, 'mean', 0.01); tests++;
+  passes += check(rate_K_surface_, rate_K_surface__c, 'rate_K_surface_', 0.01); tests++;
+  passes += check(interpolated_surface_, interpolated_surface__c, 'interpolated_surface_', 0.01); tests++;
+  passes += check(model_(:,1), model__c(:,1), 'interpolated Wo_', 0.001);  tests++;
+  passes += check(voicing_, voicing__c, 'interpolated voicing'); tests++;
+  passes += check(model_(:,3:max_amp+2), model__c(:,3:max_amp+2), 'rate L Am surface ', 0.1); tests++;
+  passes += check(H, H_c(:,1:max_amp), 'phase surface'); tests++;
+  printf("passes: %d fails: %d\n", passes, tests - passes);
 
+  #{
   % Save to disk to check synthesis is OK with c2sim  
 
   output_prefix = input_prefix;
@@ -238,9 +248,8 @@ function tnewamp1(input_prefix)
     fprintf(fv,"%d\n", voicing__c(f));
   end
   fclose(fv);
-
-  printf("\n")
-
+  #}
+  
 endfunction
  
 

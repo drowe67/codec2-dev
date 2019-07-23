@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash -x
 # train_700C_quant.sh
 # David Rowe May 2019
 #
@@ -10,7 +10,7 @@
 SRC=~/Downloads/all_speech_8k.sw
 CODEC2_BUILD=/home/david/codec2/build_linux
 K=20
-SAMPLES=~/tmp/c2vec_pass
+SAMPLES=~/tmp/c2vec_pass2
 
 # train a new VQ
 function train() {
@@ -58,9 +58,14 @@ function test_uq() {
   $CODEC2_BUILD/src/c2dec 700C $b'.bin' - --loadratek $b'_ratek.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$b'_uq.wav'
 }
 
+# extract features for use in octave octave/vq_700c_eq.m
 function feat() {
-  b=$(basename "$1" .raw)
-  $CODEC2_BUILD/src/c2enc 700C $1'.raw' /dev/null --mlfeat $b.f32
+  RAW_FILES="../raw/hts1a ../raw/hts2a ../raw/vk5qi ../raw/cq_ref ../raw/ve9qrp_10s $HOME/Downloads/ma01_01 $HOME/Downloads/c01_01_8k $HOME/Downloads/cq_freedv_8k $HOME/Downloads/cq_freedv_8k_lfboost $HOME/Downloads/cq_freedv_8k_hfcut "
+  for f in $RAW_FILES
+  do
+    b=$(basename "$f" .raw)
+    $CODEC2_BUILD/src/c2enc 700C $f'.raw' $b'.bin' --mlfeat $b'_feat.f32'
+  done
 }
 
 # generate a bunch of test samples for a listening test
@@ -79,15 +84,16 @@ function listen() {
 # Generate a bunch of test samples for VQ equalisation listening tests.  Assumes
 # Octave has generated rate K quantised .f32 files 
 function listen_vq_eq() {
-  FILES="hts1a hts2a vk5qi cq_ref ve9qrp_10s ma01_01 c01_01_8k cq_freedv_8k"
+  FILES="hts1a hts2a vk5qi cq_ref ve9qrp_10s ma01_01 c01_01_8k cq_freedv_8k cq_freedv_8k_lfboost cq_freedv_8k_hfcut"
   for f in $FILES
   do
     # try equaliser wth train_120 VQ
     $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2.wav'
-    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq.wav'
+    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq1.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq1.wav'
+    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_eq2.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_eq2.wav'
     # try equaliser wth train_all_speech VQ
-    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as.wav'
-    $CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as_eq.wav'
+    #$CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as.wav'
+    #$CODEC2_BUILD/src/c2dec 700C $f'.bin' - --loadratek $f'_vq2_as_eq.f32' | sox -q -t .s16 -c 1 -r 8000 -b 16  - $SAMPLES/$f'_vq2_as_eq.wav'
   done
 }
 
@@ -96,5 +102,6 @@ mkdir -p $SAMPLES
 # choose which function to run here
 #train
 #listen
+#feat
 listen_vq_eq
 

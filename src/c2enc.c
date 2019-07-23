@@ -48,9 +48,10 @@ int main(int argc, char *argv[])
     char          *unpacked_bits_char;
     int            bit, byte,i;
     int            report_var = 0;
+    int            eq = 0;
     
     if (argc < 4) {
-	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename] [--var]\n");
+	printf("usage: c2enc 3200|2400|1600|1400|1300|1200|700|700B|700C|450|450PWB InputRawspeechFile OutputBitFile [--natural] [--softdec] [--bitperchar] [--mlfeat] [--loadcb stageNum Filename] [--var] [--eq]\n");
 	printf("e.g    c2enc 1400 ../raw/hts1a.raw hts1a.c2\n");
 	printf("e.g    c2enc 1300 ../raw/hts1a.raw hts1a.c2 --natural\n");
 	exit(1);
@@ -144,10 +145,14 @@ int main(int argc, char *argv[])
         if (strcmp(argv[i], "--var") == 0) {
             report_var = 1;
         }
-
+        if (strcmp(argv[i], "--eq") == 0) {
+            eq = 1;
+        }
         
     }
     codec2_set_natural_or_gray(codec2, gray);
+    codec2_700c_eq(codec2, eq);
+    
     //fprintf(stderr,"gray: %d softdec: %d\n", gray, softdec);
 
     while(fread(buf, sizeof(short), nsam, fin) == (size_t)nsam) {
@@ -186,7 +191,7 @@ int main(int argc, char *argv[])
 
     if (report_var) {
         float var = codec2_get_var(codec2);
-        fprintf(stderr, "%s var: %f std: %f\n", argv[2], var, sqrt(var));
+        fprintf(stderr, "%s var: %5.2f std: %5.2f\n", argv[2], var, sqrt(var));
     }
     codec2_destroy(codec2);
 

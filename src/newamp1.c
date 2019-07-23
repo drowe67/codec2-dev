@@ -415,23 +415,38 @@ void newamp1_model_to_indexes(C2CONST *c2const,
                               float *mean,
                               float  rate_K_vec_no_mean[], 
                               float  rate_K_vec_no_mean_[],
-                              float *se
+                              float *se,
+                              float *eq,
+                              int    eq_en
                               )
 {
     int k;
 
     /* convert variable rate L to fixed rate K */
-
     resample_const_rate_f(c2const, model, rate_K_vec, rate_K_sample_freqs_kHz, K);
 
-    /* remove mean and two stage VQ */
-
+    /* remove mean */
     float sum = 0.0;
     for(k=0; k<K; k++)
         sum += rate_K_vec[k];   
-    *mean = sum/K;;
+    *mean = sum/K;
     for(k=0; k<K; k++)
         rate_K_vec_no_mean[k] = rate_K_vec[k] - *mean;
+
+    /* update and optionally run "front eq" equaliser on before VQ */
+    static float ideal[] = {8,10,12,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,14,-20};
+    float gain = 0.02;
+    float update;
+        
+    for(k=0; k<K; k++) {
+        update = rate_K_vec_no_mean[k] - ideal[k];
+        eq[k] = (1.0-gain)*eq[k] + gain*update;
+        if (eq[k] < 0.0) eq[k] = 0.0;
+        if (eq_en)
+            rate_K_vec_no_mean[k] -= eq[k];
+    }
+
+    /* two stage VQ */
     rate_K_mbest_encode(indexes, rate_K_vec_no_mean, rate_K_vec_no_mean_, K, NEWAMP1_VQ_MBEST_DEPTH);
 
     /* running sum of squared error for variance calculation */
@@ -439,7 +454,6 @@ void newamp1_model_to_indexes(C2CONST *c2const,
         *se += pow(rate_K_vec_no_mean[k]-rate_K_vec_no_mean_[k],2.0);
 
     /* scalar quantise mean (effectively the frame energy) */
-
     float w[1] = {1.0};
     float se_mean;
     indexes[2] = quantise(newamp1_energy_cb[0].cb, 
@@ -451,7 +465,6 @@ void newamp1_model_to_indexes(C2CONST *c2const,
 
     /* scalar quantise Wo.  We steal the smallest Wo index to signal
        an unvoiced frame */
-
     if (model->voiced) {
         int index = encode_log_Wo(c2const, model->Wo, 6);
         if (index == 0) {
