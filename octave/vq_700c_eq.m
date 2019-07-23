@@ -306,7 +306,8 @@ function experiment_iterate_block(fn_vq_txt, fn_target_f32)
 endfunction
 
 % Experiment to test EQ of input (before) VQ.  We set a threshold on
-% when to equalise, so we don't upset already flat-ish samples.
+% when to equalise, so we don't upset already flat-ish samples.  This
+% is the algorithm used for C at the time of writing (newamp1.c, newamp_700c.m)
 
 function experiment_front_eq(fn_vq_txt, fn_target_f32)
   K = 20;
@@ -323,7 +324,8 @@ function experiment_front_eq(fn_vq_txt, fn_target_f32)
   plot(mean(targets)-eqs(end,:), 'c;equalised;');
   plot(mean(vq),'b--;mean(vq);');
   hold off;
-  figure(2); clf; mesh(eqs);
+  figure(2); clf; mesh(eqs(1:100,:)); title('EQ weights over time');
+  ylabel('Time (frames'); xlabel('Freq (mel)');
 endfunction
 
 more off
@@ -332,9 +334,9 @@ more off
 % You'll need to run scripts/train_700C_quant.sh first to generate the .f32 files
 
 %interactive("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-table_across_samples;
+%table_across_samples;
 %vq_700c_plots({"hts1a.f32" "hts2a.f32" "ve9qrp_10s.f32" "ma01_01.f32" "train_120_1.txt"})
 %vq_700c_plots({"ve9qrp_10s.f32" "cq_freedv_8k_lfboost.f32" "cq_ref.f32" "hts1a.f32" "vk5qi.f32"})
 %experiment_iterate_block("train_120_1.txt", "ve9qrp_10s.f32")
 %experiment_iterate_block("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
-%experiment_front_eq("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
+experiment_front_eq("train_120_1.txt", "cq_freedv_8k_lfboost.f32")
