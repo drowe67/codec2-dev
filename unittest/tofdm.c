@@ -104,24 +104,23 @@ static int ofdm_nuwbits;            /* Unique word, used for positive indication
 static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
     double f;
     double tin = 0.0;
+    double step = 1.0 + sample_rate_ppm/1E6;
     int t1, t2;
     int tout = 0;
 
     while (tin < (double) (n-1)) {
       t1 = (int) floor(tin);
       t2 = (int) ceil(tin);
-      assert(t2 < n);
+      f = tin - (double) t1;
 
-      f = (tin - (double) t1);
+      out[tout].real = ((double)1.0-f)*(double)in[t1].real + f*(double)in[t2].real;
+      out[tout].imag = ((double)1.0-f)*(double)in[t1].imag + f*(double)in[t2].imag;
 
-      out[tout].real = (1.0 - f) * in[t1].real + f * in[t2].real;
-      out[tout].imag = (1.0 - f) * in[t1].imag + f * in[t2].imag;
-
-      tout += 1;
-      tin  += 1.0 + sample_rate_ppm / 1E6;
+      tin += step;
+      tout++;
+      //printf("tin: %f tout: %d f: %f\n", tin, tout, f);
     }
-    //printf("n: %d tout: %d tin: %f\n", n, tout, tin);
-    
+
     return tout;
 }
 
