@@ -111,6 +111,7 @@ static int fs_offset(COMP out[], COMP in[], int n, float sample_rate_ppm) {
     while (tin < (double) (n-1)) {
       t1 = (int) floor(tin);
       t2 = (int) ceil(tin);
+      assert(t2 < n);
       f = tin - (double) t1;
 
       out[tout].real = ((double)1.0-f)*(double)in[t1].real + f*(double)in[t2].real;
