@@ -44,7 +44,7 @@
 #include "menu.h"
 #include "tot.h"
 
-#define VERSION         "V2"
+#define VERSION         "V3"
 #define FORTY_MS_16K    (0.04*16000)         /* 40ms of samples at 16 kHz */
 #define FREEDV_NSAMPLES_16K (2*FREEDV_NSAMPLES)
 #define CCM             (void*)0x10000000    /* start of 64k CCM memory   */
@@ -908,7 +908,7 @@ static const struct menu_item_t menu_root = {
     .label          = "MENU",
     .event_cb       = menu_default_cb,
     .children       = menu_root_children,
-    .num_children   = 2,
+    .num_children   = 3,
 };
 
 /* Child declarations */
