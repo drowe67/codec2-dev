@@ -205,7 +205,7 @@ src/startup_stm32f4xx.s
 src/gdb_stdio.c
 )
 
-add_library(sm1000base STATIC src/sm1000_leds_switches.c src/debugblinky.c ${SYSTEM_SRCS})
+add_library(sm1000base STATIC src/sm1000_leds_switches.c ${SYSTEM_SRCS})
 
 set(PROFILE_SYSTEM_SRCS
 src/stm32f4_machdep.c
@@ -248,9 +248,9 @@ elf2bin(dac_ut)
 set(FAST_DAC_UT_SRCS
 src/fast_dac_ut.c
 ../src/codec2_fifo.c
+src/sm1000_leds_switches.c
 src/iir_duc.c
 src/stm32f4_dacduc.c
-src/debugblinky.c
 )
 
 add_mapped_executable(fast_dac_ut ${FAST_DAC_UT_SRCS} ${SYSTEM_SRCS})
@@ -396,7 +396,6 @@ src/menu.c
 src/tot.c
 src/sm1000_leds_switches.c
 ../src/codec2_fifo.c
-src/debugblinky.c
 src/stm32f4_vrom.c
 src/stm32f4_usart.c
 src/memtools.c
@@ -475,7 +474,6 @@ elf2bin(adc_sfdr_ut)
 #gdb_stdio.c
 #../src/codec2_fifo.c
 #../src/fm.c
-#src/debugblinky.c
 #src/system_stm32f4xx.c
 #src/startup_stm32f4xx.s
 #)

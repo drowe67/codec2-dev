@@ -1,11 +1,10 @@
 /*---------------------------------------------------------------------------*\
 
-  FILE........: debugblinky.h
+  FILE........: sm1000_leds_switches_ut.c
   AUTHOR......: David Rowe
-  DATE CREATED: 12 August 2014
+  DATE CREATED: August 5 2014
 
-  Configures Port E GPIO pins used for debug blinkies, and control lines
-  for SM2000 +12V switching.
+  Unit Test program for the SM1000 switches and LEDs driver.
 
 \*---------------------------------------------------------------------------*/
 
@@ -26,10 +25,18 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef __DEBUGBLINKY__
-#define __DEBUGBLINKY__
+#include <assert.h>
 
-void init_debug_blinky(void);
-void txrx_12V(int state);
+#include "sm1000_leds_switches.h"
 
-#endif
+int main(void) {
+    sm1000_leds_switches_init();
+
+    while(1) {
+        led_pwr(switch_select());
+        led_ptt(switch_ptt());
+        led_sync(switch_back());
+        led_err(!switch_back());
+    }
+}
+
