@@ -26,6 +26,7 @@
 */
 
 #include <assert.h>
+
 #include "sm1000_leds_switches.h"
 
 int main(void) {
@@ -34,7 +35,7 @@ int main(void) {
     while(1) {
         led_pwr(switch_select());
         led_ptt(switch_ptt());
-        led_rt(switch_back());
+        led_sync(switch_back());
         led_err(!switch_back());
     }
 }

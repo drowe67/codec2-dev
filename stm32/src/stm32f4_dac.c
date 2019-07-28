@@ -29,10 +29,11 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include "stm32f4xx.h"
 #include "codec2_fifo.h"
 #include "stm32f4_dac.h"
-#include "debugblinky.h"
+#include "sm1000_leds_switches.h"
 
 /* write to these registers for 12 bit left aligned data, as per data sheet
    make sure 4 least sig bits set to 0 */
@@ -101,8 +102,6 @@ void dac_open(int fs_divisor, int fifo_size, short *buf1, short *buf2) {
     tim6_config(fs_divisor);
     dac1_config();
     dac2_config();
-
-    init_debug_blinky();
 }
 
 /* Call these functions to send samples to the DACs.  For your
@@ -320,7 +319,7 @@ void DMA1_Stream5_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
-    GPIOE->ODR |= (1 << 1);
+    led_debug1(LED_ON);
 
     /* Transfer half empty interrupt - refill first half */
 
@@ -366,7 +365,7 @@ void DMA1_Stream5_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA1_Stream5, DMA_IT_TCIF5);
     }
 
-    GPIOE->ODR &= ~(1 << 1);
+    led_debug1(LED_OFF);
 }
 
 /*
@@ -377,7 +376,7 @@ void DMA1_Stream6_IRQHandler(void) {
     int i, j, sam;
     short signed_buf[DAC_BUF_SZ/2];
 
-    GPIOE->ODR |= (1 << 2);
+    led_debug2(LED_ON);
 
     /* Transfer half empty interrupt - refill first half */
 
@@ -423,5 +422,5 @@ void DMA1_Stream6_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA1_Stream6, DMA_IT_TCIF6);
     }
 
-    GPIOE->ODR &= ~(1 << 2);
+    led_debug2(LED_OFF);
 }

@@ -31,12 +31,17 @@
 #include "stm32f4_dacduc.h"
 #include "iir_duc.h"
 #include "stm32f4xx.h"
+#include "sm1000_leds_switches.h"
+
 #include <stm32f4xx_tim.h>
 #include <stm32f4xx_rcc.h>
+
 #include "gdb_stdio.h"
 #include "comp.h"
+
 #include <string.h> 
 //#include "gmsk_test_dat_m4.h"
+
 #define SINE_SAMPLES  32
 
 
@@ -81,6 +86,8 @@ void setup_timer()
 
 int main(void) {
     int tstart,tup,tend,cyc,i;
+
+    sm1000_leds_switches_init();
 
     memset((void*)outbuf,0,sizeof(short)*DAC_DUC_BUF_SZ);
     setup_timer();

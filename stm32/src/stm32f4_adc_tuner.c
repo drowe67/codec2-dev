@@ -38,8 +38,8 @@
 
 #include "codec2_fifo.h"
 #include "stm32f4_adc_tuner.h"
-#include "debugblinky.h"
 #include "iir_tuner.h"
+#include "sm1000_leds_switches.h"
 
 struct FIFO *adc1_fifo;
 unsigned short adc_buf[ADC_TUNER_BUF_SZ], *padc_buf;
@@ -67,7 +67,6 @@ void adc_open(int fifo_sz) {
 
     tim2_config();
     adc_configure();
-    init_debug_blinky();
 }
 
 
@@ -237,7 +236,7 @@ void DMA2_Stream0_IRQHandler(void) {
 
     /* PE0 is asserted high for the duration of this ISR */
 
-    GPIOE->ODR |= (1 << 0);
+    led_debug0(LED_ON);
 
     /* Half transfer interrupt */
 
@@ -284,6 +283,6 @@ void DMA2_Stream0_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
     }
 
-    GPIOE->ODR &= ~(1 << 0);
+    led_debug0(LED_OFF);
 }
 

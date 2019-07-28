@@ -33,10 +33,9 @@
 #include "stm32f4xx_adc.h"
 #include "stm32f4xx_gpio.h"
 #include "stm32f4xx_rcc.h"
-
 #include "codec2_fifo.h"
 #include "stm32f4_adc.h"
-#include "debugblinky.h"
+#include "sm1000_leds_switches.h"
 
 struct FIFO *adc1_fifo;
 struct FIFO *adc2_fifo;
@@ -66,7 +65,6 @@ void adc_open(int fs_divisor, int fifo_sz, short *buf1, short *buf2) {
     
     tim2_config(fs_divisor);
     adc_configure();
-    init_debug_blinky();
 }
 
 /* n signed 16 bit samples in buf[] if return != -1 */
@@ -224,7 +222,7 @@ void DMA2_Stream0_IRQHandler(void) {
     short signed_buf1[ADC_BUF_SZ/2];
     short signed_buf2[ADC_BUF_SZ/2];
 
-    GPIOE->ODR |= (1 << 0);
+    led_debug0(LED_ON);
 
     /* Half transfer interrupt */
 
@@ -281,6 +279,6 @@ void DMA2_Stream0_IRQHandler(void) {
         DMA_ClearITPendingBit(DMA2_Stream0, DMA_IT_TCIF0);
     }
 
-    GPIOE->ODR &= ~(1 << 0);
+    led_debug0(LED_OFF);
 }
 

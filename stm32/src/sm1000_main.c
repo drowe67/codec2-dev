@@ -33,6 +33,7 @@
 #include "codec2_fdmdv.h"
 #include "sm1000_leds_switches.h"
 #include "memtools.h"
+
 #include <assert.h>
 #include <stm32f4xx_gpio.h>
 #include <stm32f4xx_rcc.h>
@@ -204,16 +205,17 @@ static const struct menu_item_t menu_root;
  */
 int16_t software_mix(int16_t a, int16_t b) {
     int32_t s = a + b;
+
     if (s < INT16_MIN)
         return INT16_MIN;   /* Clip! */
     if (s > INT16_MAX)
         return INT16_MAX;   /* Clip! */
+
     return s;
 }
 
 /*! Compare current serial with oldest and newest */
-void compare_prefs(int* const oldest, int* const newest, int idx)
-{
+void compare_prefs(int* const oldest, int* const newest, int idx) {
     if (newest && prefs_serial[idx]) {
         if ((*newest < 0)
                 || (prefs_serial[idx] > prefs_serial[*newest])
@@ -233,26 +235,29 @@ void compare_prefs(int* const oldest, int* const newest, int idx)
 }
 
 /*! Find oldest and newest images */
-void find_prefs(int* const oldest, int* const newest)
-{
+void find_prefs(int* const oldest, int* const newest) {
     int i;
-    if (newest) *newest = -1;
-    if (oldest) *oldest = -1;
+
+    if (newest)
+        *newest = -1;
+
+    if (oldest)
+        *oldest = -1;
+
     for (i = 0; i < PREFS_IMG_NUM; i++)
         compare_prefs(oldest, newest, i);
 }
 
 /*! Load preferences from flash */
-int load_prefs()
-{
+int load_prefs() {
     struct prefs_t image[PREFS_IMG_NUM];
     int newest = -1;
     int i;
 
     /* Load all copies into RAM */
     for (i = 0; i < PREFS_IMG_NUM; i++) {
-        int res = vrom_read(PREFS_IMG_BASE + i, 0,
-                sizeof(image[i]), &image[i]);
+        int res = vrom_read(PREFS_IMG_BASE + i, 0, sizeof(image[i]), &image[i]);
+
         if (res == sizeof(image[i])) {
             prefs_serial[i] = image[i].serial;
             compare_prefs(NULL, &newest, i);
@@ -267,6 +272,7 @@ int load_prefs()
 
     /* Load from the latest image */
     memcpy(&prefs, &image[newest], sizeof(prefs));
+
     return 0;
 }
 
@@ -293,7 +299,8 @@ int main(void) {
     /* init all the drivers for various peripherals */
 
     SysTick_Config(SystemCoreClock/1000); /* 1 kHz SysTick */
-    sm1000_leds_switches_init();
+
+    sm1000_leds_switches_init(); /* Initialize LED and switches */
 
     /* Enable CRC clock */
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
@@ -307,6 +314,7 @@ int main(void) {
     int n_modem_samples = freedv_get_n_max_modem_samples(f);
     int n_modem_samples_16k = 2*n_modem_samples;
     freedv_close(f); f = NULL;
+
     usart_printf("n_speech_samples: %d n_modem_samples: %d\n",
                  n_speech_samples, n_modem_samples);
 
@@ -316,6 +324,7 @@ int main(void) {
         n_samples_16k = n_speech_samples_16k;
     else
         n_samples_16k = n_modem_samples_16k;
+
     n_samples_16k += FORTY_MS_16K;
     usart_printf("n_samples_16k: %d storage for 4 FIFOs: %d bytes\n",
                  n_samples_16k, 4*2*n_samples_16k);
@@ -354,13 +363,19 @@ int main(void) {
     
     /* put outputs into a known state */
 
-    led_pwr(1); led_ptt(0); led_rt(0); led_err(0); not_cptt(1);
+    led_pwr(LED_ON);
+    led_ptt(LED_OFF);
+    led_sync(LED_OFF);
+    led_err(LED_OFF);
+    rig_ptt(0);
 
     if (!switch_back()) {
         /* Play tone to acknowledge, wait for release */
         tone_reset(&tone_gen, 1200, 1000);
+
         while(!switch_back()) {
             int dac_rem = dac2_free();
+
             if (dac_rem) {
                 // TODO this might need fixing for larger FIFOs
                 if (dac_rem > n_samples_16k)
@@ -368,11 +383,13 @@ int main(void) {
 
                 for (i = 0; i < dac_rem; i++)
                     dac16k[i] = tone_next(&tone_gen);
+
                 dac2_write(dac16k, dac_rem, 0);
             }
+
             if (!menuLEDTicker) {
                 menuLEDTicker = MENU_LED_PERIOD;
-                led_rt(LED_INV);
+                led_sync(LED_TOGGLE);
             }
         }
 
@@ -380,7 +397,8 @@ int main(void) {
         for (i = 0; i < PREFS_IMG_NUM; i++)
             vrom_erase(i + PREFS_IMG_BASE);
     }
-    led_rt(LED_OFF);
+
+    led_sync(LED_OFF);
     tone_reset(&tone_gen, 0, 0);
     tot_reset(&tot);
 
@@ -425,11 +443,11 @@ int main(void) {
     n_samples = FORTY_MS_16K/4;
     n_samples_16k = 2*n_samples;
    
-    while(1) {
+    while (1) {
         /* Read switch states */
         switch_update(&sw_select,   (!switch_select()) ? 1 : 0);
         switch_update(&sw_back,     (!switch_back()) ? 1 : 0);
-        switch_update(&sw_ptt,      (switch_ptt() || (!ext_ptt())) ? 1 : 0);
+        switch_update(&sw_ptt,      (switch_ptt() || ext_ptt()) ? 1 : 0);
 
         /* Update time-out timer state */
         tot_update(&tot);
@@ -445,9 +463,15 @@ int main(void) {
         switch_ack(&sw_ptt);
 
         /* if mode has changed, re-open freedv */
+
         if (op_mode != prev_op_mode) {
             usart_printf("Mode change prev_op_mode: %d op_mode: %d\n", prev_op_mode, op_mode);
-            if (f) freedv_close(f); f = NULL;
+
+            if (f)
+                freedv_close(f);
+
+            f = NULL;
+
             switch(op_mode) {
             case ANALOG:
                 usart_printf("Analog\n");
@@ -466,6 +490,7 @@ int main(void) {
                 n_samples = freedv_get_n_speech_samples(f);
                 break;
             }
+
             n_samples_16k = 2*n_samples;
             usart_printf("FreeDV f = 0x%x n_samples: %d n_samples_16k: %d\n", (int)f, n_samples, n_samples_16k);
 
@@ -490,7 +515,7 @@ int main(void) {
         switch (core_state) {
             case STATE_MENU:
                 if (!menuLEDTicker) {
-                    led_pwr(LED_INV);
+                    led_pwr(LED_TOGGLE);
                     menuLEDTicker = MENU_LED_PERIOD;
                 }
                 break;
@@ -500,14 +525,15 @@ int main(void) {
                 /* ADC2 is the SM1000 microphone, DAC1 is the modulator signal we send to radio tx */
 
                 if (adc2_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
-                    GPIOE->ODR = (1 << 3);
+                    led_debug3(LED_ON);
 
                     /* clipping indicator */
 
-                    led_err(0);
+                    led_err(LED_OFF);
+
                     for (i=0; i<n_samples_16k; i++) {
                         if (abs(adc16k[FDMDV_OS_TAPS_16K+i]) > 28000)
-                            led_err(1);
+                            led_err(LED_ON);
                     }
 
                     fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
@@ -515,10 +541,10 @@ int main(void) {
                     if (op_mode == ANALOG) {
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                         dac1_write(dac16k, n_samples_16k, 0);
-                    }
-                    else {
+                    } else {
                         freedv_tx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] *= 0.398; /* 8dB back off from peak */
@@ -526,8 +552,12 @@ int main(void) {
                         dac1_write(dac16k, n_samples_16k, 0);
                     }
 
-                    led_ptt(1); led_rt(0); led_err(0); not_cptt(0);
-                    GPIOE->ODR &= ~(1 << 3);
+                    led_ptt(LED_ON);
+                    led_sync(LED_OFF);
+                    led_err(LED_OFF);
+                    rig_ptt(1);
+
+                    led_debug3(LED_OFF);
                 }
                 break;
 
@@ -535,8 +565,8 @@ int main(void) {
             case STATE_RX_TOT:
                 /* Receive --------------------------------------------------------------------------*/
 
-                not_cptt(1);
-                led_ptt(0);
+                rig_ptt(0);
+                led_ptt(LED_OFF);
 
                 /* ADC1 is the demod in signal from the radio rx, DAC2 is the SM1000 speaker */
 
@@ -548,11 +578,15 @@ int main(void) {
 
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], n_samples_16k) == 0) {
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], n_samples);
+
                         for(i=0; i<n_samples; i++)
                             dac8k[FDMDV_OS_TAPS_8K+i] = adc8k[i];
+
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], n_samples);
                         spk_nsamples = n_samples_16k;
-                        led_rt(0); led_err(0);
+
+                        led_sync(LED_OFF);
+                        led_err(LED_OFF);
                    }
                 }
                 else {
@@ -566,14 +600,19 @@ int main(void) {
                     nin = freedv_nin(f);
                     nout = nin;
                     freedv_set_total_bit_errors(f, 0);
+
                     if (adc1_read(&adc16k[FDMDV_OS_TAPS_16K], 2*nin) == 0) {
-                        GPIOE->ODR = (1 << 3);
+                        led_debug3(LED_ON);
+
                         fdmdv_16_to_8_short(adc8k, &adc16k[FDMDV_OS_TAPS_16K], nin);
                         nout = freedv_rx(f, &dac8k[FDMDV_OS_TAPS_8K], adc8k);
                         fdmdv_8_to_16_short(dac16k, &dac8k[FDMDV_OS_TAPS_8K], nout);
                         spk_nsamples = 2*nout;
-                        led_rt(freedv_get_sync(f)); led_err(freedv_get_total_bit_errors(f));
-                        GPIOE->ODR &= ~(1 << 3);
+
+                        led_sync(freedv_get_sync(f));
+                        led_err(freedv_get_total_bit_errors(f));
+
+                        led_debug3(LED_OFF);
                     }
                 }
                 break;
@@ -642,12 +681,12 @@ int main(void) {
  * SysTick Interrupt Handler
  */
 
-void SysTick_Handler(void)
-{
+void SysTick_Handler(void) {
     ms++;
     switch_tick(&sw_select);
     switch_tick(&sw_back);
     switch_tick(&sw_ptt);
+
     if (menuTicker > 0) {
         menuTicker--;
     }
@@ -687,8 +726,11 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
                     core_state = STATE_TX;
                 } else if (switch_pressed(&sw_select) > HOLD_DELAY) {
                     /* Enter the menu */
-                    led_pwr(1); led_ptt(0); led_rt(0);
-                    led_err(0); not_cptt(1);
+                    led_pwr(LED_ON);
+                    led_ptt(LED_OFF);
+                    led_sync(LED_OFF);
+                    led_err(LED_OFF);
+                    rig_ptt(0);
 
                     menu_enter(menu, &menu_root);
                     menuTicker = MENU_DELAY;
@@ -856,8 +898,7 @@ int process_core_state_machine(int core_state, struct menu_t *menu, int *op_mode
 /*!
  * Default handler for menu callback.
  */
-static void menu_default_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_default_cb(struct menu_t* const menu, uint32_t event) {
     /* Get the current menu item */
     const struct menu_item_t* item = menu_item(menu, 0);
     uint8_t announce = 0;
@@ -903,6 +944,7 @@ static void menu_default_cb(struct menu_t* const menu, uint32_t event)
 
 /* Root menu item forward declarations */
 static const struct menu_item_t* menu_root_children[];
+
 /* Root item definition */
 static const struct menu_item_t menu_root = {
     .label          = "MENU",
@@ -915,6 +957,7 @@ static const struct menu_item_t menu_root = {
 static const struct menu_item_t menu_op_mode;
 static const struct menu_item_t menu_tot;
 static const struct menu_item_t menu_ui;
+
 static const struct menu_item_t * menu_root_children[] = {
     &menu_op_mode,
     &menu_tot,
@@ -925,6 +968,7 @@ static const struct menu_item_t * menu_root_children[] = {
 /* Operation Mode menu forward declarations */
 static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event);
 static struct menu_item_t const* menu_op_mode_children[];
+
 /* Operation mode menu */
 static const struct menu_item_t menu_op_mode = {
     .label          = "MODE",
@@ -932,6 +976,7 @@ static const struct menu_item_t menu_op_mode = {
     .children       = menu_op_mode_children,
     .num_children   = 3,
 };
+
 /* Children */
 static const struct menu_item_t menu_op_mode_analog = {
     .label          = "ANA",
@@ -942,6 +987,7 @@ static const struct menu_item_t menu_op_mode_analog = {
         .ui         = ANALOG,
     },
 };
+
 static const struct menu_item_t menu_op_mode_dv1600 = {
     .label          = "1600",
     .event_cb       = NULL,
@@ -951,6 +997,7 @@ static const struct menu_item_t menu_op_mode_dv1600 = {
         .ui         = DV1600,
     },
 };
+
 static const struct menu_item_t menu_op_mode_dv700D = {
     .label          = "700D",
     .event_cb       = NULL,
@@ -960,14 +1007,15 @@ static const struct menu_item_t menu_op_mode_dv700D = {
         .ui         = DV700D,
     },
 };
+
 static struct menu_item_t const* menu_op_mode_children[] = {
     &menu_op_mode_analog,
     &menu_op_mode_dv1600,
     &menu_op_mode_dv700D,
 };
+
 /* Callback function */
-static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event) {
     const struct menu_item_t* item = menu_item(menu, 0);
     uint8_t announce = 0;
 
@@ -1027,6 +1075,7 @@ static void menu_op_mode_cb(struct menu_t* const menu, uint32_t event)
 
 /* Time-out timer menu forward declarations */
 static struct menu_item_t const* menu_tot_children[];
+
 /* Operation mode menu */
 static const struct menu_item_t menu_tot = {
     .label          = "TOT",
@@ -1034,9 +1083,11 @@ static const struct menu_item_t menu_tot = {
     .children       = menu_tot_children,
     .num_children   = 2,
 };
+
 /* Children */
 static const struct menu_item_t menu_tot_time;
 static const struct menu_item_t menu_tot_warn;
+
 static struct menu_item_t const* menu_tot_children[] = {
     &menu_tot_time,
     &menu_tot_warn,
@@ -1044,6 +1095,7 @@ static struct menu_item_t const* menu_tot_children[] = {
 
 /* TOT time menu forward declarations */
 static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event);
+
 /* TOT time menu */
 static const struct menu_item_t menu_tot_time = {
     .label          = "TIME",
@@ -1053,8 +1105,7 @@ static const struct menu_item_t menu_tot_time = {
 };
 
 /* Callback function */
-static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_tot_time_cb(struct menu_t* const menu, uint32_t event) {
     uint8_t announce = 0;
 
     switch(event) {
@@ -1116,8 +1167,7 @@ static const struct menu_item_t menu_tot_warn = {
 };
 
 /* Callback function */
-static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event) {
     uint8_t announce = 0;
 
     switch(event) {
@@ -1173,6 +1223,7 @@ static void menu_tot_warn_cb(struct menu_t* const menu, uint32_t event)
 
 /* UI menu forward declarations */
 static struct menu_item_t const* menu_ui_children[];
+
 /* Operation mode menu */
 static const struct menu_item_t menu_ui = {
     .label          = "UI",
@@ -1180,10 +1231,12 @@ static const struct menu_item_t menu_ui = {
     .children       = menu_ui_children,
     .num_children   = 3,
 };
+
 /* Children */
 static const struct menu_item_t menu_ui_freq;
 static const struct menu_item_t menu_ui_speed;
 static const struct menu_item_t menu_ui_vol;
+
 static struct menu_item_t const* menu_ui_children[] = {
     &menu_ui_freq,
     &menu_ui_speed,
@@ -1192,6 +1245,7 @@ static struct menu_item_t const* menu_ui_children[] = {
 
 /* UI Frequency menu forward declarations */
 static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event);
+
 /* UI Frequency menu */
 static const struct menu_item_t menu_ui_freq = {
     .label          = "FREQ",
@@ -1199,9 +1253,9 @@ static const struct menu_item_t menu_ui_freq = {
     .children       = NULL,
     .num_children   = 0,
 };
+
 /* Callback function */
-static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event) {
     uint8_t announce = 0;
 
     switch(event) {
@@ -1254,6 +1308,7 @@ static void menu_ui_freq_cb(struct menu_t* const menu, uint32_t event)
 
 /* UI Speed menu forward declarations */
 static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event);
+
 /* UI Speed menu */
 static const struct menu_item_t menu_ui_speed = {
     .label          = "WPM",
@@ -1261,9 +1316,9 @@ static const struct menu_item_t menu_ui_speed = {
     .children       = NULL,
     .num_children   = 0,
 };
+
 /* Callback function */
-static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event) {
     uint8_t announce = 0;
 
     /* Get the current WPM */
@@ -1321,6 +1376,7 @@ static void menu_ui_speed_cb(struct menu_t* const menu, uint32_t event)
 
 /* UI volume menu forward declarations */
 static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event);
+
 /* UI volume menu */
 static const struct menu_item_t menu_ui_vol = {
     .label          = "VOL",
@@ -1328,9 +1384,9 @@ static const struct menu_item_t menu_ui_vol = {
     .children       = NULL,
     .num_children   = 0,
 };
+
 /* Callback function */
-static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
-{
+static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event) {
     uint8_t announce = 0;
 
     switch(event) {
@@ -1378,4 +1434,5 @@ static void menu_ui_vol_cb(struct menu_t* const menu, uint32_t event)
         /* Announce the volume level */
         morse_play(&morse_player, vol);
     }
-};
+}
+
