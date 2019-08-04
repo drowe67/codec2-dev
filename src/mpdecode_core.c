@@ -591,7 +591,7 @@ void sd_to_llr(float llr[], double sd[], int n) {
 
     estEsN0 = 1.0/(2.0L * estvar + 1E-3);
     for(i=0; i<n; i++)
-        llr[i] = 4.0L * estEsN0 * sd[i];
+        llr[i] = 4.0L * estEsN0 * sd[i] / mean;
 }
 
 
