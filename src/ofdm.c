@@ -869,7 +869,7 @@ int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
     return ofdm->phase_est_bandwidth_mode;    /* int version of enum */
 }
 
-int ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
     if (val == LOW_BW) {
         ofdm->phase_est_bandwidth_mode = low_bw;    /* int version of enum */
     } else if (val == HIGH_BW) {
