@@ -66,7 +66,7 @@ typedef enum {
 /* phase estimator bandwidth options */
 
 typedef enum {
-    auto_bw,            /* future mode */
+    lock_high_bw,       /* lock wide track */
     low_bw,             /* can only track a narrow freq offset, but accurate         */
     high_bw             /* can track wider freq offset, but less accurate at low SNR */
 } PhaseEstBandwidth;
@@ -88,7 +88,7 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
-    int phase_est_bandwidth; /* force low of high phase est bandwidth, rather than letting state machine decide */
+    int phase_est_bandwidth; /* select low, high, or locked high phase est bandwidth, rather than letting state machine decide */
     int ftwindowwidth;
 };
 

@@ -83,7 +83,7 @@ void opt_help() {
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --bandwidth    [0|1|2]   Select Auto Phase Estimate (0) Low (1) High (2) RX mode (default 2)\n");
+    fprintf(stderr, "  --bandwidth    [0|1|2]   Select Lock High Phase Estimate (0) Low (1) High (2) RX mode (default 2)\n");
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
@@ -400,7 +400,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Phase Estimate Mode: ");
 
         switch (phase_est_bandwidth) {
-        case 0: fprintf(stderr, "Auto\n");
+        case 0: fprintf(stderr, "High Locked\n");
                 break;
         case 1: fprintf(stderr, "Low\n");
                 break;

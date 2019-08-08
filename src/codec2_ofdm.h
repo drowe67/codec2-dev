@@ -50,7 +50,7 @@ extern "C" {
 #define AUTO_SYNC    1
 #define MANUAL_SYNC  2
     
-#define AUTO_PHASE_EST 0
+#define LOCK_HIGH_PHASE_EST 0
 #define LOW_PHASE_EST  1
 #define HIGH_PHASE_EST 2
 

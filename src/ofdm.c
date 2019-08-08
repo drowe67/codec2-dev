@@ -353,8 +353,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
 
-    if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST) {
-        ofdm->phase_est_bandwidth = auto_bw;
+    if (ofdm_phase_est_bandwidth == LOCK_HIGH_PHASE_EST) {
+        ofdm->phase_est_bandwidth = lock_high_bw;
     } else if (ofdm_phase_est_bandwidth == LOW_PHASE_EST) {
         ofdm->phase_est_bandwidth = low_bw;
     } else if (ofdm_phase_est_bandwidth == HIGH_PHASE_EST) {
@@ -881,11 +881,11 @@ void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
         ofdm->phase_est_bandwidth = low_bw;
     } else if (val == HIGH_PHASE_EST) {
         ofdm->phase_est_bandwidth = high_bw;
-    } else if (val == AUTO_PHASE_EST) {
-        ofdm->phase_est_bandwidth = auto_bw;
+    } else if (val == LOCK_HIGH_PHASE_EST) {
+        ofdm->phase_est_bandwidth = lock_high_bw;
     }
 }
- 
+
 void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
@@ -1384,7 +1384,9 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
             aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
         } else {
-            assert(ofdm->phase_est_bandwidth == high_bw);
+            /* high_bw or lock_high_bw */
+            assert(ofdm->phase_est_bandwidth == high_bw || ofdm->phase_est_bandwidth == lock_high_bw);
+
             /*
              * Use only symbols at 'this' and 'next' to quickly track changes
              * in phase due to high Doppler spread in propagation (no neighbor averaging).
@@ -1593,8 +1595,10 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
                 next_state = synced;
                 /* change to low bandwidth, but more accurate phase estimation */
-                ofdm->phase_est_bandwidth = low_bw;
+                /* but only if not locked to high */
 
+                if (ofdm_phase_est_bandwidth != lock_high_bw)
+                    ofdm->phase_est_bandwidth = low_bw;
             }
         }
 
@@ -1850,7 +1854,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
         "manualsync"
     };
     char *phase_est_bandwidth_mode[] = {
-        "auto_bw",
+        "high_lock_bw",
         "low_bw",
         "high_bw"
     };
