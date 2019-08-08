@@ -1854,7 +1854,7 @@ void ofdm_print_info(struct OFDM *ofdm) {
         "manualsync"
     };
     char *phase_est_bandwidth_mode[] = {
-        "high_lock_bw",
+        "lock_high_bw",
         "low_bw",
         "high_bw"
     };
