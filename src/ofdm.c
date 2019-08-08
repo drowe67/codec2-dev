@@ -116,7 +116,7 @@ static int ofdm_bps; 	/* Bits per symbol */
 static int ofdm_m; 	/* duration of each symbol in samples */
 static int ofdm_ncp; 	/* duration of CP in samples */
 
-static int ofdm_phase_est_bandwidth;
+static int ofdm_phase_est_bandwidth; /* Auto 0 or Locked 1 */
 static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
@@ -193,7 +193,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ntxtbits = 4;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
-        ofdm_phase_est_bandwidth = HIGH_PHASE_EST;
+        ofdm_phase_est_bandwidth = AUTO_PHASE_EST;
     } else {
         /* Use the users values */
 
@@ -213,8 +213,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_fs = config->fs; /* Sample Frequency */
         ofdm_ntxtbits = config->txtbits;
 
-        if ((config->phase_est_bandwidth != LOW_PHASE_EST) && (config->phase_est_bandwidth != HIGH_PHASE_EST)) {
-            ofdm_phase_est_bandwidth = HIGH_PHASE_EST;   /* pick high */
+        if ((config->phase_est_bandwidth != AUTO_PHASE_EST) && (config->phase_est_bandwidth != LOCKED_PHASE_EST)) {
+            ofdm_phase_est_bandwidth = AUTO_PHASE_EST;   /* pick auto */
         } else {
             ofdm_phase_est_bandwidth = config->phase_est_bandwidth;
         }
@@ -352,14 +352,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_en = true;
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
-
-    if (ofdm_phase_est_bandwidth == LOCK_HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = lock_high_bw;
-    } else if (ofdm_phase_est_bandwidth == LOW_PHASE_EST) {
-        ofdm->phase_est_bandwidth = low_bw;
-    } else if (ofdm_phase_est_bandwidth == HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = high_bw;
-    }
+    ofdm->phase_est_bandwidth_mode = high_bw;
 
     ofdm->foff_est_gain = 0.1f;
     ofdm->foff_est_hz = 0.0f;
@@ -842,10 +835,6 @@ struct OFDM_CONFIG *ofdm_get_config_param() {
     return &ofdm_config;
 }
 
-int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
-    return ofdm->phase_est_bandwidth;    /* int version of enum */
-}
-
 int ofdm_get_nin(struct OFDM *ofdm) {
     return ofdm->nin;
 }
@@ -876,13 +865,23 @@ void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     }
 }
 
-void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
-    if (val == LOW_PHASE_EST) {
-        ofdm->phase_est_bandwidth = low_bw;
-    } else if (val == HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = high_bw;
-    } else if (val == LOCK_HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = lock_high_bw;
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
+    return ofdm->phase_est_bandwidth_mode;    /* int version of enum */
+}
+
+int ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
+    if (val == LOW_BW) {
+        ofdm->phase_est_bandwidth_mode = low_bw;    /* int version of enum */
+    } else if (val == HIGH_BW) {
+        ofdm->phase_est_bandwidth_mode = high_bw;
+    }
+}
+
+void ofdm_set_phase_est_bandwidth(struct OFDM *ofdm, int val) {
+    if (val == AUTO_PHASE_EST) {
+        ofdm->phase_est_bandwidth = AUTO_PHASE_EST;
+    } else if (val == LOCKED_PHASE_EST) {
+        ofdm->phase_est_bandwidth = LOCKED_PHASE_EST;
     }
 }
 
@@ -1343,7 +1342,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
     }
 
     for (i = 1; i < (ofdm_nc + 1); i++) { /* ignore first and last carrier for count */
-        if (ofdm->phase_est_bandwidth == low_bw) {
+        if (ofdm->phase_est_bandwidth_mode == low_bw) {
             complex float symbol[3];
 
             /*
@@ -1384,8 +1383,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
 
             aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
         } else {
-            /* high_bw or lock_high_bw */
-            assert(ofdm->phase_est_bandwidth == high_bw || ofdm->phase_est_bandwidth == lock_high_bw);
+            assert(ofdm->phase_est_bandwidth_mode == high_bw);
 
             /*
              * Use only symbols at 'this' and 'next' to quickly track changes
@@ -1587,7 +1585,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
                 next_state = search;
                 ofdm->sync_state_interleaver = search;
-                ofdm->phase_est_bandwidth = high_bw;
+                ofdm->phase_est_bandwidth_mode = high_bw;
             }
 
             if (ofdm->frame_count == 4) {
@@ -1597,8 +1595,8 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 /* change to low bandwidth, but more accurate phase estimation */
                 /* but only if not locked to high */
 
-                if (ofdm_phase_est_bandwidth != lock_high_bw)
-                    ofdm->phase_est_bandwidth = low_bw;
+                if (ofdm_phase_est_bandwidth != LOCKED_PHASE_EST)
+                    ofdm->phase_est_bandwidth_mode = low_bw;
             }
         }
 
@@ -1616,7 +1614,7 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
                 next_state = search;
                 ofdm->sync_state_interleaver = search;
-                ofdm->phase_est_bandwidth = high_bw;
+                ofdm->phase_est_bandwidth_mode = high_bw;
             }
         }
     }
@@ -1854,7 +1852,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
         "manualsync"
     };
     char *phase_est_bandwidth_mode[] = {
-        "lock_high_bw",
         "low_bw",
         "high_bw"
     };
@@ -1908,5 +1905,5 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
-    fprintf(stderr, "ofdm->phase_est_bandwidth = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth]);
+    fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
