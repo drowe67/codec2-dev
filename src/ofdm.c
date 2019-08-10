@@ -1584,8 +1584,9 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
                 /* change to low bandwidth, but more accurate phase estimation */
                 /* but only if not locked to high */
 
-                if (ofdm_phase_est_bandwidth_mode != LOCKED_PHASE_EST)
+                if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
                     ofdm->phase_est_bandwidth = low_bw;
+                }
             }
         }
 
