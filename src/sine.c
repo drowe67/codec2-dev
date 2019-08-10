@@ -62,7 +62,7 @@ C2CONST c2const_create(int Fs, float framelength_s) {
     assert((Fs == 8000) || (Fs = 16000));
     c2const.Fs = Fs;
     c2const.n_samp = round(Fs*framelength_s);
-    c2const.max_amp = floor(Fs*P_MIN_S/2);
+    c2const.max_amp = floor(Fs*P_MAX_S/2);
     c2const.p_min = floor(Fs*P_MIN_S);
     c2const.p_max = floor(Fs*P_MAX_S);
     c2const.m_pitch = floor(Fs*M_PITCH_S);
@@ -421,7 +421,7 @@ void estimate_amplitudes(MODEL *model, COMP Sw[], COMP W[], int est_phase)
     bm = (int)((m + 0.5)*model->Wo*one_on_r + 0.5);
     b = (int)(m*model->Wo/r + 0.5);
 
-    /* Estimate ampltude of harmonic */
+    /* Estimate amplitude of harmonic */
 
     den = 0.0;
     Am.real = Am.imag = 0.0;
