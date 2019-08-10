@@ -422,7 +422,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
 
     /* Malloc something to appease freedv_destroy */
-    f->codec_bits = MALLOC(1);
+    f->codec_bits = NULL;
 #endif
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) {

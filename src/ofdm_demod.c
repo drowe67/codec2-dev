@@ -83,7 +83,7 @@ void opt_help() {
     fprintf(stderr, "  --ns           Nframes   Number of Symbol Frames (8 default)\n");
     fprintf(stderr, "  --tcp            Nsecs   Cyclic Prefix Duration (.002 default)\n");
     fprintf(stderr, "  --ts             Nsecs   Symbol Duration (.018 default)\n");
-    fprintf(stderr, "  --bandwidth      [0|1]   Select bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
+    fprintf(stderr, "  --bandwidth      [0|1]   Select phase est bw mode AUTO low or high (0) or LOCKED high (1) (default 0)\n");
     fprintf(stderr, "  --interleave     depth   Interleaver for LDPC frames, e.g. 1,2,4,8,16 (default is 1)\n");
     fprintf(stderr, "                           Must also specify --ldpc option\n");
     fprintf(stderr, "  --tx_freq         freq   Set modulation TX centre Frequency (1500.0 default)\n");
@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
     int nc = 17;
     int ns = 8;
     int verbose = 0;
-    int phase_est_bandwidth = AUTO_PHASE_EST;
+    int phase_est_bandwidth_mode = AUTO_PHASE_EST;
     int ldpc_en = 0;
     int data_bits_per_frame = 0;
 
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
                 ns = atoi(options.optarg);
                 break;
             case 'o':
-                phase_est_bandwidth = atoi(options.optarg);
+                phase_est_bandwidth_mode = atoi(options.optarg);
                 break;
             case 'p':
                 data_bits_per_frame = atoi(options.optarg);
@@ -310,10 +310,10 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = FS; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
-    if ((phase_est_bandwidth <= 1) && (phase_est_bandwidth >= 0)) {
-        ofdm_config->phase_est_bandwidth = phase_est_bandwidth;
+    if ((phase_est_bandwidth_mode <= 1) && (phase_est_bandwidth_mode >= 0)) {
+        ofdm_config->phase_est_bandwidth_mode = phase_est_bandwidth_mode;
     } else {
-        ofdm_config->phase_est_bandwidth = AUTO_PHASE_EST;
+        ofdm_config->phase_est_bandwidth_mode = AUTO_PHASE_EST;
     }
 
     ofdm_config->ftwindowwidth = 11;
@@ -399,7 +399,7 @@ int main(int argc, char *argv[]) {
         
         fprintf(stderr, "Phase Estimate Switching: ");
 
-        switch (phase_est_bandwidth) {
+        switch (phase_est_bandwidth_mode) {
         case 0: fprintf(stderr, "Auto\n");
                 break;
         case 1: fprintf(stderr, "Locked\n");

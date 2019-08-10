@@ -118,9 +118,9 @@ struct OFDM {
     Sync sync_mode;
 
     // Phase enums
-    PhaseEstBandwidth phase_est_bandwidth_mode;
+    PhaseEstBandwidth phase_est_bandwidth;
 
-    int phase_est_bandwidth;
+    int phase_est_bandwidth_mode;
 
     // Complex
     complex float foff_metric;
