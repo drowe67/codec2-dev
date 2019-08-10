@@ -113,6 +113,8 @@ int main(int argc, char *argv[])
     float framelength_s = N_S;
     int   lspEWov = 0;
     int   ten_ms_centre = 0;
+    FILE  *fphasenn = NULL;
+    int   dumpphasenn = 0;
     
     char* opt_string = "ho:";
     struct option long_options[] = {
@@ -155,6 +157,7 @@ int main(int argc, char *argv[])
         { "Woread", required_argument, &Woread, 1 },
         { "pahw", required_argument, &pahw, 1 },
         { "lspEWov", required_argument, &lspEWov, 1 },
+        { "dumpphasenn", required_argument, &dumpphasenn, 1 },
         { "ten_ms_centre", required_argument, &ten_ms_centre, 1 },
         { "framelength_s", required_argument, NULL, 0 },
         #ifdef DUMP
@@ -304,6 +307,13 @@ int main(int argc, char *argv[])
 		        optarg, strerror(errno));
                     exit(1);
                 }                 
+	    } else if(strcmp(long_options[option_index].name, "dumpphasenn") == 0) {
+                /* another feature file for phasenn  experiments */
+	        if ((fphasenn = fopen(optarg,"wb")) == NULL) {
+	            fprintf(stderr, "Error opening phasenn binary file: %s: %s\n",
+		        optarg, strerror(errno));
+                    exit(1);
+                }
 	    } else if(strcmp(long_options[option_index].name, "ten_ms_centre") == 0) {
                 /* dump 10ms of audio centred on analysis frame to check time alignment with 
                    16 kHz source audio */
@@ -476,6 +486,8 @@ int main(int argc, char *argv[])
     ex_phase[0] = 0;
     Woe_[0] = Woe_[1] = 1.0;
 
+    if (dumpphasenn)
+        fprintf(stderr, "nb_features: %d \n", (c2const.max_amp+1)*3);
     /*
       printf("lspd: %d lspdt: %d lspdt_mode: %d  phase0: %d postfilt: %d "
 	   "decimate: %d dt: %d\n",lspd,lspdt,lspdt_mode,phase0,postfilt,
@@ -591,6 +603,33 @@ int main(int argc, char *argv[])
 	two_stage_pitch_refinement(&c2const, &model, Sw);
 	estimate_amplitudes(&model, Sw, W, 1);
 
+        /* 
+           Machine learning features for phasenn experiments.
+        */
+        if (dumpphasenn) {
+            /* 0 ..... Fs/2 mapped to 0...max_amp */
+            float r = TWO_PI/c2const.max_amp;
+            float sparse_A[c2const.max_amp+1];   /* log amplitude, small dynamic range */
+            float sparse_cos[c2const.max_amp+1]; /* cos() of phase */
+            float sparse_sin[c2const.max_amp+1]; /* sin() of phase */
+            int   m,b;
+
+            for(b=0; b<=c2const.max_amp; b++) {
+                sparse_A[b] = 0.0;
+                sparse_cos[b] = 0.0;
+                sparse_sin[b] = 0.0;
+            }
+            for(m=1; m<=model.L; m++) {
+                b = (int)(m*model.Wo/r + 0.5);
+                assert(b <= c2const.max_amp);
+                sparse_A[b] = log10(model.A[m]);
+                sparse_cos[b] = cos(model.phi[m]);
+                sparse_sin[b] = sin(model.phi[m]);
+            }
+            fwrite(&sparse_A,   sizeof(float), c2const.max_amp+1, fphasenn);
+            fwrite(&sparse_cos, sizeof(float), c2const.max_amp+1, fphasenn);
+            fwrite(&sparse_sin, sizeof(float), c2const.max_amp+1, fphasenn);
+        }
         #ifdef DUMP
         dump_Sn(m_pitch, Sn); dump_Sw(Sw); dump_model(&model);
         #endif
@@ -1027,6 +1066,7 @@ int main(int argc, char *argv[])
     if (fhm     != NULL) fclose(fhm);
     if (fjvm    != NULL) fclose(fjvm);
     if (flspEWov != NULL) fclose(flspEWov);
+    if (fphasenn != NULL) fclose(fphasenn);
     if (ften_ms_centre != NULL) fclose(ften_ms_centre);
     
     return 0;
