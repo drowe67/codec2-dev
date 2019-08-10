@@ -2841,6 +2841,12 @@ void freedv_set_tx_bpf(struct freedv *f, int val) {
     }
 }
 
+void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        ofdm_set_phase_est_bandwidth_mode(f->ofdm, val);
+    }
+}
+
 
 void freedv_set_verbose(struct freedv *f, int verbosity) {
     f->verbose = verbosity;
