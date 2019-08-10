@@ -2847,6 +2847,11 @@ void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
     }
 }
 
+void freedv_set_eq(struct freedv *f, int val) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+        codec2_700c_eq(f->codec2, val);
+    }
+}
 
 void freedv_set_verbose(struct freedv *f, int verbosity) {
     f->verbose = verbosity;

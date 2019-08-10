@@ -182,6 +182,7 @@ void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
 void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
+void freedv_set_eq                      (struct freedv *f, int val);
       
 // Get parameters -------------------------------------------------------------------------
 
