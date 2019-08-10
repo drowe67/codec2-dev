@@ -71,7 +71,8 @@ typedef enum {
 } PhaseEstBandwidth;
 
 /*
- * Contains user configuration for OFDM modem
+ * User-defined configuration for OFDM modem.  Used to set up
+ * constants at init time, e.g. for different bit rate modems.
  */
 
 struct OFDM_CONFIG {
@@ -87,8 +88,6 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
-    int phase_est_bandwidth; /* select auto or locked high phase est bandwidth */
-    int phase_est_bandwidth_mode; /* low 0 or high 1 bw */
     int ftwindowwidth;
 };
 

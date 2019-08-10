@@ -310,12 +310,6 @@ int main(int argc, char *argv[]) {
     ofdm_config->fs = FS; /* Sample Frequency */
     ofdm_config->txtbits = 4; /* number of auxiliary data bits */
 
-    if ((phase_est_bandwidth_mode <= 1) && (phase_est_bandwidth_mode >= 0)) {
-        ofdm_config->phase_est_bandwidth_mode = phase_est_bandwidth_mode;
-    } else {
-        ofdm_config->phase_est_bandwidth_mode = AUTO_PHASE_EST;
-    }
-
     ofdm_config->ftwindowwidth = 11;
     ofdm_config->ofdm_timing_mx_thresh = 0.30f;
 
@@ -324,6 +318,8 @@ int main(int argc, char *argv[]) {
 
     free(ofdm_config);
 
+    ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
+    
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
 

@@ -84,7 +84,7 @@ static const int8_t pilotvalues[] = {
    1, 1, 1, 1,-1, 1,-1, 1
 };
 
-/* static variables */
+/* static variables - used as storage for constants that are unchanged after init-time */
 
 static struct OFDM_CONFIG ofdm_config;
 
@@ -116,7 +116,6 @@ static int ofdm_bps; 	/* Bits per symbol */
 static int ofdm_m; 	/* duration of each symbol in samples */
 static int ofdm_ncp; 	/* duration of CP in samples */
 
-static int ofdm_phase_est_bandwidth_mode; /* Auto 0 or Locked 1 */
 static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
@@ -193,7 +192,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ntxtbits = 4;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
-        ofdm_phase_est_bandwidth_mode = AUTO_PHASE_EST;
     } else {
         /* Use the users values */
 
@@ -212,12 +210,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_rx_centre = config->rx_centre; /* RX Centre Audio Frequency */
         ofdm_fs = config->fs; /* Sample Frequency */
         ofdm_ntxtbits = config->txtbits;
-
-        if ((config->phase_est_bandwidth_mode != AUTO_PHASE_EST) && (config->phase_est_bandwidth_mode != LOCKED_PHASE_EST)) {
-            ofdm_phase_est_bandwidth_mode = AUTO_PHASE_EST;   /* pick auto */
-        } else {
-            ofdm_phase_est_bandwidth_mode = config->phase_est_bandwidth_mode;
-        }
 
         ofdm_ftwindowwidth = config->ftwindowwidth;
         ofdm_timing_mx_thresh = config->ofdm_timing_mx_thresh;
@@ -353,6 +345,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
     ofdm->phase_est_bandwidth = high_bw;
+    ofdm->phase_est_bandwidth_mode = AUTO_PHASE_EST;
 
     ofdm->foff_est_gain = 0.1f;
     ofdm->foff_est_hz = 0.0f;
