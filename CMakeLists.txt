@@ -345,6 +345,11 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    add_test(NAME test_OFDM_modem_phase_est_bw
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_phase_est_bw.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
     add_test(NAME test_OFDM_modem_time_sync
              COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_time_sync.sh
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
