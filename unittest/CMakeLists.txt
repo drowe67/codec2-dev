@@ -31,14 +31,13 @@ target_link_libraries(ofdm_mem m)
 
 add_library(function_trace STATIC ../unittest/function_trace.c)
 
-if (NOT APPLE) 
 add_executable(ofdm_stack ofdm_stack.c ../src/ofdm.c ../src/octave.c ../src/kiss_fft.c ../src/modem_probe.c ../src/mpdecode_core.c ../src/phi0.c ../src/filter.c)
 if (CMAKE_C_COMPILER MATCHES "gcc$")
+    target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
     target_compile_options(ofdm_stack PUBLIC -fstack-usage -finstrument-functions -no-pie)
 else()
+    target_link_libraries(ofdm_stack function_trace m -no-pie)
     target_compile_options(ofdm_stack PUBLIC -finstrument-functions -no-pie)
-endif()
-target_link_libraries(ofdm_stack function_trace m -no-pie "-Wl,-Map=ofdm_stack.map")
 endif()
 add_definitions(-D__UNITTEST__)
 
