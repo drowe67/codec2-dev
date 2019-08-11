@@ -2724,4 +2724,5 @@ void codec2_700c_post_filter(struct CODEC2 *codec2_state, int en) {
 
 void codec2_700c_eq(struct CODEC2 *codec2_state, int en) {
     codec2_state->eq_en = en;
+    codec2_state->se = 0.0; codec2_state->nse = 0;
 }
