@@ -84,7 +84,7 @@ static const int8_t pilotvalues[] = {
    1, 1, 1, 1,-1, 1,-1, 1
 };
 
-/* static variables */
+/* static variables - used as storage for constants that are unchanged after init-time */
 
 static struct OFDM_CONFIG ofdm_config;
 
@@ -116,7 +116,6 @@ static int ofdm_bps; 	/* Bits per symbol */
 static int ofdm_m; 	/* duration of each symbol in samples */
 static int ofdm_ncp; 	/* duration of CP in samples */
 
-static int ofdm_phase_est_bandwidth;
 static int ofdm_ftwindowwidth;
 static int ofdm_bitsperframe;
 static int ofdm_rowsperframe;
@@ -193,7 +192,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_ntxtbits = 4;
         ofdm_ftwindowwidth = 11;
         ofdm_timing_mx_thresh = 0.30f;
-        ofdm_phase_est_bandwidth = HIGH_PHASE_EST;
     } else {
         /* Use the users values */
 
@@ -212,12 +210,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
         ofdm_rx_centre = config->rx_centre; /* RX Centre Audio Frequency */
         ofdm_fs = config->fs; /* Sample Frequency */
         ofdm_ntxtbits = config->txtbits;
-
-        if ((config->phase_est_bandwidth != LOW_PHASE_EST) && (config->phase_est_bandwidth != HIGH_PHASE_EST)) {
-            ofdm_phase_est_bandwidth = HIGH_PHASE_EST;   /* pick high */
-        } else {
-            ofdm_phase_est_bandwidth = config->phase_est_bandwidth;
-        }
 
         ofdm_ftwindowwidth = config->ftwindowwidth;
         ofdm_timing_mx_thresh = config->ofdm_timing_mx_thresh;
@@ -352,14 +344,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->timing_en = true;
     ofdm->foff_est_en = true;
     ofdm->phase_est_en = true;
-
-    if (ofdm_phase_est_bandwidth == AUTO_PHASE_EST) {
-        ofdm->phase_est_bandwidth = auto_bw;
-    } else if (ofdm_phase_est_bandwidth == LOW_PHASE_EST) {
-        ofdm->phase_est_bandwidth = low_bw;
-    } else if (ofdm_phase_est_bandwidth == HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = high_bw;
-    }
+    ofdm->phase_est_bandwidth = high_bw;
+    ofdm->phase_est_bandwidth_mode = AUTO_PHASE_EST;
 
     ofdm->foff_est_gain = 0.1f;
     ofdm->foff_est_hz = 0.0f;
@@ -461,6 +447,7 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
 }
 
 static void allocate_tx_bpf(struct OFDM *ofdm) {
+    //fprintf(stderr, "allocate_tx_bpf()\n");
     ofdm->ofdm_tx_bpf = MALLOC(sizeof(struct quisk_cfFilter));
     assert(ofdm->ofdm_tx_bpf != NULL);
     
@@ -471,6 +458,7 @@ static void allocate_tx_bpf(struct OFDM *ofdm) {
 }
 
 static void deallocate_tx_bpf(struct OFDM *ofdm) {
+    //fprintf(stderr, "deallocate_tx_bpf()\n");
     assert(ofdm->ofdm_tx_bpf != NULL);
     quisk_filt_destroy(ofdm->ofdm_tx_bpf);
     FREE(ofdm->ofdm_tx_bpf);
@@ -831,6 +819,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
     /* optional Tx Band Pass Filter */
 
     if (ofdm->tx_bpf_en == true) {
+        assert(ofdm->ofdm_tx_bpf != NULL);
         complex float tx_filt[ofdm_samplesperframe];
 
         quisk_ccfFilter(tx, tx_filt, ofdm_samplesperframe, ofdm->ofdm_tx_bpf);
@@ -840,10 +829,6 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
 struct OFDM_CONFIG *ofdm_get_config_param() {
     return &ofdm_config;
-}
-
-int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
-    return ofdm->phase_est_bandwidth;    /* int version of enum */
 }
 
 int ofdm_get_nin(struct OFDM *ofdm) {
@@ -876,16 +861,15 @@ void ofdm_set_timing_enable(struct OFDM *ofdm, bool val) {
     }
 }
 
-void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
-    if (val == LOW_PHASE_EST) {
-        ofdm->phase_est_bandwidth = low_bw;
-    } else if (val == HIGH_PHASE_EST) {
-        ofdm->phase_est_bandwidth = high_bw;
-    } else if (val == AUTO_PHASE_EST) {
-        ofdm->phase_est_bandwidth = auto_bw;
-    }
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm) {
+    return ofdm->phase_est_bandwidth_mode;    /* int version of enum */
 }
- 
+
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val) {
+    assert((val == AUTO_PHASE_EST) || (val == LOCKED_PHASE_EST));
+    ofdm->phase_est_bandwidth_mode = val;
+}
+
 void ofdm_set_foff_est_enable(struct OFDM *ofdm, bool val) {
     ofdm->foff_est_en = val;
 }
@@ -899,14 +883,15 @@ void ofdm_set_off_est_hz(struct OFDM *ofdm, float val) {
 }
 
 void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
-    //fprintf(stderr, "ofdm_set_tx_bpf: val: %d\n", val);
-    if ((val == true) && (ofdm->ofdm_tx_bpf == NULL)) {
-    	allocate_tx_bpf(ofdm);
+    //fprintf(stderr, "ofdm_set_tx_bpf: val: %d ofdm_tx_bpf: %p \n", val, ofdm->ofdm_tx_bpf);
+    if (val == true) {
+    	 if (ofdm->ofdm_tx_bpf == NULL)
+             allocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = true;
-    } else {
-    	if (ofdm->ofdm_tx_bpf)
+    }
+    else {
+    	if (ofdm->ofdm_tx_bpf != NULL)
             deallocate_tx_bpf(ofdm);
-
     	ofdm->tx_bpf_en = false;
     }
 }
@@ -1385,6 +1370,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             aamp_est_pilot[i] = cabsf(aphase_est_pilot_rect / 12.0f);
         } else {
             assert(ofdm->phase_est_bandwidth == high_bw);
+
             /*
              * Use only symbols at 'this' and 'next' to quickly track changes
              * in phase due to high Doppler spread in propagation (no neighbor averaging).
@@ -1593,8 +1579,11 @@ void ofdm_sync_state_machine(struct OFDM *ofdm, uint8_t *rx_uw) {
 
                 next_state = synced;
                 /* change to low bandwidth, but more accurate phase estimation */
-                ofdm->phase_est_bandwidth = low_bw;
+                /* but only if not locked to high */
 
+                if (ofdm->phase_est_bandwidth_mode != LOCKED_PHASE_EST) {
+                    ofdm->phase_est_bandwidth = low_bw;
+                }
             }
         }
 
@@ -1850,9 +1839,8 @@ void ofdm_print_info(struct OFDM *ofdm) {
         "manualsync"
     };
     char *phase_est_bandwidth_mode[] = {
-        "auto_bw",
-        "low_bw",
-        "high_bw"
+        "auto",
+        "locked_high"
     };
 
     fprintf(stderr, "ofdm_tx_centre = %g\n", (double)ofdm_tx_centre);
@@ -1904,5 +1892,5 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
-    fprintf(stderr, "ofdm->phase_est_bandwidth = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth]);
+    fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }

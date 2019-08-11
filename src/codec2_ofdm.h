@@ -49,10 +49,12 @@ extern "C" {
 #define UN_SYNC      0  /* Used with the ofdm_set_sync() */
 #define AUTO_SYNC    1
 #define MANUAL_SYNC  2
-    
-#define AUTO_PHASE_EST 0
-#define LOW_PHASE_EST  1
-#define HIGH_PHASE_EST 2
+
+#define AUTO_PHASE_EST   0 
+#define LOCKED_PHASE_EST 1
+
+#define LOW_BW       0
+#define HIGH_BW      1
 
 struct OFDM_CONFIG;
 struct OFDM;
@@ -79,6 +81,7 @@ int ofdm_get_samples_per_frame(void);
 int ofdm_get_max_samples_per_frame(void);
 int ofdm_get_bits_per_frame(void);
 void ofdm_get_demod_stats(struct OFDM *ofdm, struct MODEM_STATS *stats);
+int ofdm_get_phase_est_bandwidth_mode(struct OFDM *ofdm);
 
 /* option setters */
 
@@ -86,6 +89,7 @@ void ofdm_set_verbose(struct OFDM *, int);
 void ofdm_set_timing_enable(struct OFDM *, bool);
 void ofdm_set_foff_est_enable(struct OFDM *, bool);
 void ofdm_set_phase_est_enable(struct OFDM *, bool);
+void ofdm_set_phase_est_bandwidth_mode(struct OFDM *ofdm, int val);
 void ofdm_set_off_est_hz(struct OFDM *, float);
 void ofdm_set_sync(struct OFDM *, int);
 void ofdm_set_tx_bpf(struct OFDM *, bool);

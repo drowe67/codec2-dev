@@ -1,7 +1,7 @@
 #!/bin/bash -x
 # 
 # David June 2019
-# Tests ofdm modem fading channel performance, using a sinulated channel
+# Tests 700D OFDM modem fading channel performance, using a sinulated channel
 
 PATH=$PATH:../build_linux/src
 RAW=$PWD/../raw

@@ -422,7 +422,7 @@ struct freedv *freedv_open_advanced(int mode, struct freedv_advanced *adv) {
     }
 
     /* Malloc something to appease freedv_destroy */
-    f->codec_bits = MALLOC(1);
+    f->codec_bits = NULL;
 #endif
     
     if (FDV_MODE_ACTIVE( FREEDV_MODE_2400A, mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2400B, mode)) {
@@ -2422,9 +2422,9 @@ static int freedv_comprx_2020(struct freedv *f, COMP demod_in[], int *valid) {
     ofdm_sync_state_machine(ofdm, rx_uw);
 
     if ((f->verbose && (ofdm->last_sync_state == search)) || (f->verbose == 2)) {
-        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
+        fprintf(stderr, "%3d st: %-6s euw: %2d %1d f: %5.1f pbw: %d ist: %-6s %2d eraw: %3d ecdd: %3d iter: %3d pcc: %3d vld: %d, nout: %4d\n",
                 f->frames++, statemode[ofdm->last_sync_state], ofdm->uw_errors, ofdm->sync_counter, 
-		(double)ofdm->foff_est_hz,
+		(double)ofdm->foff_est_hz, ofdm->phase_est_bandwidth,
                 statemode[ofdm->last_sync_state_interleaver], ofdm->frame_count_interleaver,
                 Nerrs_raw, Nerrs_coded, iter, parityCheckCount, *valid, nout);
     }
@@ -2841,6 +2841,17 @@ void freedv_set_tx_bpf(struct freedv *f, int val) {
     }
 }
 
+void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_2020, f->mode)) {
+        ofdm_set_phase_est_bandwidth_mode(f->ofdm, val);
+    }
+}
+
+void freedv_set_eq(struct freedv *f, int val) {
+    if (FDV_MODE_ACTIVE( FREEDV_MODE_700C, f->mode) || FDV_MODE_ACTIVE( FREEDV_MODE_700D, f->mode)) {
+        codec2_700c_eq(f->codec2, val);
+    }
+}
 
 void freedv_set_verbose(struct freedv *f, int verbosity) {
     f->verbose = verbosity;

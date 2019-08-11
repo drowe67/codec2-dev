@@ -66,13 +66,13 @@ typedef enum {
 /* phase estimator bandwidth options */
 
 typedef enum {
-    auto_bw,            /* future mode */
     low_bw,             /* can only track a narrow freq offset, but accurate         */
     high_bw             /* can track wider freq offset, but less accurate at low SNR */
 } PhaseEstBandwidth;
 
 /*
- * Contains user configuration for OFDM modem
+ * User-defined configuration for OFDM modem.  Used to set up
+ * constants at init time, e.g. for different bit rate modems.
  */
 
 struct OFDM_CONFIG {
@@ -88,7 +88,6 @@ struct OFDM_CONFIG {
     int ns;  /* Number of Symbol frames */
     int bps;   /* Bits per Symbol */
     int txtbits; /* number of auxiliary data bits */
-    int phase_est_bandwidth; /* force low of high phase est bandwidth, rather than letting state machine decide */
     int ftwindowwidth;
 };
 
@@ -119,7 +118,9 @@ struct OFDM {
 
     // Phase enums
     PhaseEstBandwidth phase_est_bandwidth;
-    
+
+    int phase_est_bandwidth_mode;
+
     // Complex
     complex float foff_metric;
      
