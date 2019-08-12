@@ -28,10 +28,6 @@
   along with this program; if not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifdef __cplusplus
-  extern "C" {
-#endif
-
 #ifndef __FREEDV_API__
 #define __FREEDV_API__
 
@@ -40,6 +36,10 @@
 
 #include "comp.h"
 #include "codec2_ofdm.h"
+
+#ifdef __cplusplus
+  extern "C" {
+#endif
 
 #define FREEDV_MODE_1600        0
 #define FREEDV_MODE_700         1
