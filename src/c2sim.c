@@ -608,7 +608,7 @@ int main(int argc, char *argv[])
         */
         if (dumpphasenn) {
             /* 0 ..... Fs/2 mapped to 0...max_amp */
-            float r = TWO_PI/c2const.max_amp;
+            float r = M_PI/c2const.max_amp;
             float sparse_A[c2const.max_amp+1];   /* log amplitude, small dynamic range */
             float sparse_cos[c2const.max_amp+1]; /* cos() of phase */
             float sparse_sin[c2const.max_amp+1]; /* sin() of phase */
