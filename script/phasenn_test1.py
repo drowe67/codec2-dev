@@ -14,30 +14,39 @@ from keras import initializers
 
 # constants
 
-N                 = 80    # number of samples in frames
-nb_samples        = 1000
-nb_epochs         = 10
+N                 = 80      # number of samples in frames
+nb_samples        = 100000 
+nb_epochs         = 80
 np_input          = 3
-np_output         = 2
+nb_output         = 2
+levels            = 16
 
 # Generate training data.  Given the phase at the start of the frame,
 # and the frequency, determine the phase at the end of the frame
 
+def quant(val, levels):
+    return np.round(val*levels)/levels
+
+w  = np.zeros(nb_samples)
 phase_start = np.zeros(nb_samples)
 phase_end = np.zeros(nb_samples)
 for i in range(nb_samples):
     x=np.random.rand(2)
-    w = x[0]*np.pi
-    phase_start[i] = x[1]*np.pi
-    phase_end[i] = phase_start[i] + N*w
+    w[i] = x[0]*np.pi
+    w[i] = quant(w[i], levels)
+    phase_start[i] = -np.pi + x[1]*2*np.pi
+    phase_start[i] = quant(phase_start[i], levels)
+    phase_end[i] = phase_start[i] + N*w[i]
+    phase_end[i] = quant(phase_end[i], levels)
                      
-train  = np.concatenate((w, cos(phase_start), sin(phase_start))
-target = np.concatenate(cos(phase_end), sin(phase_end))
+train  = np.column_stack((w, np.cos(phase_start), np.sin(phase_start)))
+target = np.column_stack((np.cos(phase_end), np.sin(phase_end)))
 print(train.shape)                       
 print(target.shape)
                         
 model = models.Sequential()
 model.add(layers.Dense(256, activation='relu', input_dim=np_input))
+model.add(layers.Dense(256, activation='relu'))
 model.add(layers.Dense(256, activation='relu'))
 model.add(layers.Dense(nb_output, activation='linear'))
 
@@ -63,3 +72,6 @@ if plot_en:
     plt.legend(['train', 'valid'], loc='upper right')
     plt.show()
 
+    #plt.figure(2)
+    #plt.hist(target)
+    #plt.show()
