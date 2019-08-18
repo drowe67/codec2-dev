@@ -192,21 +192,22 @@ include_directories(${PROJECT_BINARY_DIR})
 #
 if(LPCNET)
     if(LPCNET_BUILD_DIR)
-        find_package(lpcnet REQUIRED
+        find_package(lpcnetfreedv REQUIRED
             PATHS ${LPCNET_BUILD_DIR}
             NO_DEFAULT_PATH
             CONFIGS lpcnetfreedv.cmake
         )
-        if(lpcnet_FOUND)
+        if(lpcnetfreedv_FOUND)
             message(STATUS "liblpcnetfreedv found in build tree.")
             add_definitions("-D__LPCNET__")
         else()
             message(FATAL_ERROR "LPCNet include/library not found in build tree.")
         endif()
     else()
-        find_package(lpcnet REQUIRED)
-        if(lpcnet_FOUND)
+        find_package(lpcnetfreedv REQUIRED)
+        if(lpcnetfreedv_FOUND)
             add_definitions("-D__LPCNET__")
+            message(STATUS "liblpcnetfreedv found.")
         else()
             message(FATAL_ERROR "lpcnetfreedv library not found.")
         endif()
