@@ -16,8 +16,9 @@ import matplotlib.pyplot as plt
 # constants
 
 N                 = 80      # number of samples in frames
-nb_samples        = 100000
-nb_epochs         = 20
+nb_samples        = 1000000
+nb_batch          = 512
+nb_epochs         = 400
 np_input          = 3
 nb_output         = 2
 
@@ -32,8 +33,7 @@ phase_start = np.zeros(nb_samples)
 phase_end = np.zeros(nb_samples)
 for i in range(nb_samples):
     x=np.random.rand(2)
-    #w[i] = np.pi/4 + 0.1*x[0]*np.pi
-    w[i] = np.pi/8 + x[0]*np.pi/8
+    w[i] =  x[0]*np.pi/4
     phase_start[i] = -np.pi + x[1]*2*np.pi
     phase_end[i] = phase_start[i] + N*w[i];
                      
@@ -55,7 +55,7 @@ model.compile(loss='mse', optimizer='adam')
 
 # fit model, using 20% of our data for validation
 
-history = model.fit(train, target, validation_split=0.2, batch_size=32, epochs=nb_epochs)
+history = model.fit(train, target, validation_split=0.2, batch_size=nb_batch, epochs=nb_epochs)
 
 # test actual error in angle over training data
 
@@ -80,7 +80,7 @@ if plot_en:
     plt.legend(['train', 'valid'], loc='upper right')
  
     plt.figure(2)
-    plt.hist(err_angle)
+    plt.hist(err_angle, bins=20)
     plt.show()
    
     #plt.figure(2)
