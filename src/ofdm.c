@@ -1416,10 +1416,7 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
             if (ofdm->phase_est_en == true) {
                 if (ofdm->dpsk) {
                     /* differential detection, using pilot as reference at start of frame */
-                    /* note cmplxconj() macro didn't work here */
-                    //rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(ofdm->rx_sym[rr + 1][i]);
-                    complex float c = crealf(ofdm->rx_sym[rr + 1][i]) - I*cimagf(ofdm->rx_sym[rr + 1][i]);
-                    rx_corr = ofdm->rx_sym[rr + 2][i] * c;
+                    rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(cargf(ofdm->rx_sym[rr + 1][i]));
                 }
                 else  {
                     /* regular coherent detection */

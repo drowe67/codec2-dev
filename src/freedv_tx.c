@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     int                       n_speech_samples;
     int                       n_nom_modem_samples;
     int                       use_codectx, use_datatx, use_testframes, interleave_frames, use_clip, use_txbpf;
-    int                       use_ext_vco;
+    int                       use_ext_vco, use_dpsk;
     struct CODEC2             *c2;
     int                       i;
 
@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
         sprintf(f2020,"|2020");
         #endif     
         printf("usage: %s 1600|700|700B|700C|700D|2400A|2400B|800XA%s InputRawSpeechFile OutputModemRawFile\n"
-               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco]\n", argv[0], f2020);
+               " [--testframes] [--interleave depth] [--codectx] [--datatx] [--clip 0|1] [--txbpf 0|1] [--extvco] [--dpsk]\n", argv[0], f2020);
         printf("e.g    %s 1600 hts1a.raw hts1a_fdmdv.raw\n", argv[0]);
         exit(1);
     }
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     }
 
     use_codectx = 0; use_datatx = 0; use_testframes = 0; interleave_frames = 1; use_clip = 0; use_txbpf = 1;
-    use_ext_vco = 0;
+    use_ext_vco = 0; use_dpsk = 0;
     
     if (argc > 4) {
         for (i = 4; i < argc; i++) {
@@ -189,6 +189,9 @@ int main(int argc, char *argv[]) {
             if (strcmp(argv[i], "--extvco") == 0) {
                 use_ext_vco = 1;
             }
+            if (strcmp(argv[i], "--dpsk") == 0) {
+                use_dpsk = 1;
+            }
         }
     }
 
@@ -212,6 +215,7 @@ int main(int argc, char *argv[]) {
     freedv_set_squelch_en(freedv, 1);
     freedv_set_clip(freedv, use_clip);
     freedv_set_tx_bpf(freedv, use_txbpf);
+    freedv_set_dpsk(freedv, use_dpsk);
     freedv_set_ext_vco(freedv, use_ext_vco);
     freedv_set_verbose(freedv, 1);
     

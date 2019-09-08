@@ -180,7 +180,7 @@ void freedv_set_carrier_ampl            (struct freedv *freedv, int c, float amp
 void freedv_set_sync                    (struct freedv *freedv, int sync_cmd);
 void freedv_set_verbose                 (struct freedv *freedv, int verbosity);
 void freedv_set_tx_bpf                  (struct freedv *freedv, int val);
-void freedv_set_tx_dpsk                 (struct freedv *freedv, int val);
+void freedv_set_dpsk                    (struct freedv *freedv, int val);
 void freedv_set_ext_vco                 (struct freedv *f, int val);
 void freedv_set_phase_est_bandwidth_mode(struct freedv *f, int val);
 void freedv_set_eq                      (struct freedv *f, int val);
