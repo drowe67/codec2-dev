@@ -182,7 +182,7 @@ Here are some useful tests for the LDPC coded C version of the modem, useful to 
 
 1/ AWGN channel, -2dB:
 
-./ofdm_mod --in /dev/zero --ldpc --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc 1
+./ofdm_mod --in /dev/zero --ldpc 1 --testframes 60 --txbpf | ./cohpsk_ch - - -20 --Fs 8000 -f -10 | ./ofdm_demod --out /dev/null --testframes --verbose 1 --ldpc 1
 
 SVN Rev 3671:
   SNR3k(dB): -1.85 C/No: 32.9 PAPR:  9.8

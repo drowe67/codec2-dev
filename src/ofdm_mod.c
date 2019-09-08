@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
         assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
         assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
         
-        if (verbose) {
+        if (verbose > 1) {
             fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
@@ -352,7 +352,7 @@ int main(int argc, char *argv[]) {
     int nvaricode_bits = 0;
     int varicode_bit_index = 0;
 
-    if (verbose) {
+    if (verbose > 1) {
 	ofdm_print_info(ofdm);
     }
 
