@@ -442,7 +442,8 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm->clock_offset_counter = 0;
     ofdm->sig_var = ofdm->noise_var = 1.0f;
     ofdm->tx_bpf_en = false;
-
+    ofdm->dpsk = false;
+    
     return ofdm; /* Success */
 }
 
@@ -789,6 +790,9 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
         for (j = 1; j < (ofdm_nc + 1); j++) {
             aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
+            if (ofdm->dpsk) {
+                aframe[i][j] *= aframe[i-1][j];
+            }
         }
     }
 
@@ -894,6 +898,10 @@ void ofdm_set_tx_bpf(struct OFDM *ofdm, bool val) {
             deallocate_tx_bpf(ofdm);
     	ofdm->tx_bpf_en = false;
     }
+}
+
+void ofdm_set_dpsk(struct OFDM *ofdm, bool val) {
+    ofdm->dpsk = val;
 }
 
 /*
@@ -1406,7 +1414,17 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          */
         for (i = 1; i < (ofdm_nc + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(aphase_est_pilot[i]);
+                if (ofdm->dpsk) {
+                    /* differential detection, using pilot as reference at start of frame */
+                    /* note cmplxconj() macro didn't work here */
+                    //rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(ofdm->rx_sym[rr + 1][i]);
+                    complex float c = crealf(ofdm->rx_sym[rr + 1][i]) - I*cimagf(ofdm->rx_sym[rr + 1][i]);
+                    rx_corr = ofdm->rx_sym[rr + 2][i] * c;
+                }
+                else  {
+                    /* regular coherent detection */
+                    rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(aphase_est_pilot[i]);
+                }
             } else {
                 rx_corr = ofdm->rx_sym[rr + 2][i];
             }

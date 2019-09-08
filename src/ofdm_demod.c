@@ -97,6 +97,7 @@ void opt_help() {
     fprintf(stderr, "  --start_secs      secs   Number of seconds delay before we start to demod\n");
     fprintf(stderr, "  --len_secs        secs   Number of seconds to run demod\n");
     fprintf(stderr, "  --skip_secs   timeSecs   At timeSecs introduce a large timing error by skipping half a frame of samples\n");
+    fprintf(stderr, "  --dpsk                   Differential PSK.\n");
     fprintf(stderr, "\n");
     
     exit(-1);
@@ -141,7 +142,8 @@ int main(int argc, char *argv[]) {
     bool log_active = false;
     bool ldpc_check = false;
     bool llr_en = false;
-
+    bool dpsk = false;
+    
     float tcp = 0.002f;
     float ts = 0.018f;
     float rx_centre = 1500.0f;
@@ -173,6 +175,7 @@ int main(int argc, char *argv[]) {
         {"start_secs", 'x', OPTPARSE_REQUIRED},        
         {"len_secs", 'y', OPTPARSE_REQUIRED},        
         {"skip_secs", 'z', OPTPARSE_REQUIRED},        
+        {"dpsk", 'q', OPTPARSE_NONE},        
         {0, 0, 0}
     };
 
@@ -242,6 +245,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 data_bits_per_frame = atoi(options.optarg);
+                break;
+            case 'q':
+                dpsk = true;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -319,6 +325,7 @@ int main(int argc, char *argv[]) {
     free(ofdm_config);
 
     ofdm_set_phase_est_bandwidth_mode(ofdm, phase_est_bandwidth_mode);
+    ofdm_set_dpsk(ofdm, dpsk);
     
     /* Get a copy of the actual modem config */
     ofdm_config = ofdm_get_config_param();
