@@ -356,6 +356,11 @@ if(UNITTEST)
              WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
              )
            
+    add_test(NAME test_OFDM_modem_fading_DPSK_BER
+             COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/unittest/ofdm_fade_dpsk.sh
+             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/unittest
+             )
+           
     add_test(NAME test_horus_binary
              COMMAND sh -c "sox ${CMAKE_CURRENT_SOURCE_DIR}/wav/horus_binary_ebno_4.5db.wav -r 48000 -t raw - | $<TARGET_FILE:horus_demod> -m binary - -"
              )

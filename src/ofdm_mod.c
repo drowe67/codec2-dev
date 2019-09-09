@@ -71,6 +71,7 @@ void opt_help() {
     fprintf(stderr, "  -i --ldpc    [1|2]    Run LDPC decoder (1 -> (224,112) 700D code, 2 -> (504,396) 2020 code).\n"
                     "                        In testframe mode raw and coded errors will be counted.\n");
     fprintf(stderr, "  -p --databits numBits Number of data bits used in LDPC codeword.\n");
+    fprintf(stderr, "  --dpsk                Differential PSK.\n");
     fprintf(stderr, "\n");
     exit(-1);
 }
@@ -111,6 +112,7 @@ int main(int argc, char *argv[]) {
     int txbpf_en = 0;
     int testframes = 0;
     int use_text = 0;
+    int dpsk = 0;
 
     int Nframes = 0;
     int Nsec = 0;
@@ -142,6 +144,7 @@ int main(int argc, char *argv[]) {
         {"text", 'l', OPTPARSE_NONE},
         {"verbose", 'v', OPTPARSE_REQUIRED},
         {"databits", 'p', OPTPARSE_REQUIRED},        
+        {"dpsk", 'q', OPTPARSE_NONE},        
         {0, 0, 0}
     };
 
@@ -206,6 +209,9 @@ int main(int argc, char *argv[]) {
                 break;
             case 'p':
                 data_bits_per_frame = atoi(options.optarg);
+                break;
+            case 'q':
+                dpsk = 1;
                 break;
             case 'v':
                 verbose = atoi(options.optarg);
@@ -291,7 +297,7 @@ int main(int argc, char *argv[]) {
         assert(data_bits_per_frame <= ldpc.ldpc_data_bits_per_frame);
         assert(coded_bits_per_frame <= ldpc.ldpc_coded_bits_per_frame);
         
-        if (verbose) {
+        if (verbose > 1) {
             fprintf(stderr, "ldpc_data_bits_per_frame = %d\n", ldpc.ldpc_data_bits_per_frame);
             fprintf(stderr, "ldpc_coded_bits_per_frame  = %d\n", ldpc.ldpc_coded_bits_per_frame);
             fprintf(stderr, "data_bits_per_frame = %d\n", data_bits_per_frame);
@@ -335,6 +341,9 @@ int main(int argc, char *argv[]) {
     if (txbpf_en) {
         ofdm_set_tx_bpf(ofdm, 1);
     }
+    if (dpsk) {
+        ofdm_set_dpsk(ofdm, 1);
+    }
 
     char text_str[] = "cq cq cq hello world\r"; // Add text bits to match other tests
     char *ptr_text = text_str;
@@ -343,7 +352,7 @@ int main(int argc, char *argv[]) {
     int nvaricode_bits = 0;
     int varicode_bit_index = 0;
 
-    if (verbose) {
+    if (verbose > 1) {
 	ofdm_print_info(ofdm);
     }
 
