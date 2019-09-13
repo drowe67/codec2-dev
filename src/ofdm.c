@@ -95,7 +95,6 @@ static int *uw_ind_sym;
 static float ofdm_tx_centre; /* TX Center frequency */
 static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
-static float ofdm_fs1;
 static float ofdm_ts; /* Symbol cycle time */
 static float ofdm_rs; /* Symbol rate */
 static float ofdm_tcp; /* Cyclic prefix duration */
@@ -243,13 +242,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
-
-    /*
-     * Calculate sample rate of phase samples,
-     * we are sampling phase of pilot at
-     * half a symbol intervals
-     */
-    ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
 
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
