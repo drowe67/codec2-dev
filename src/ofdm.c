@@ -95,7 +95,6 @@ static int *uw_ind_sym;
 static float ofdm_tx_centre; /* TX Center frequency */
 static float ofdm_rx_centre; /* RX Center frequency */
 static float ofdm_fs; /* Sample rate */
-static float ofdm_fs1;
 static float ofdm_ts; /* Symbol cycle time */
 static float ofdm_rs; /* Symbol rate */
 static float ofdm_tcp; /* Cyclic prefix duration */
@@ -243,13 +242,6 @@ struct OFDM *ofdm_create(const struct OFDM_CONFIG *config) {
     ofdm_max_samplesperframe = ofdm_samplesperframe + (ofdm_m + ofdm_ncp) / 4;
     ofdm_rxbuf = 3 * ofdm_samplesperframe + 3 * (ofdm_m + ofdm_ncp);
     ofdm_nuwbits = (ofdm_ns - 1) * ofdm_bps - ofdm_ntxtbits;    // 10
-
-    /*
-     * Calculate sample rate of phase samples,
-     * we are sampling phase of pilot at
-     * half a symbol intervals
-     */
-    ofdm_fs1 = ofdm_fs / ((ofdm_m + ofdm_ncp) / 2);
 
     /* Were ready to start filling in the OFDM structure now */
     ofdm = (struct OFDM *) MALLOC(sizeof (struct OFDM));
@@ -790,7 +782,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
         for (j = 1; j < (ofdm_nc + 1); j++) {
             aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
-            if (ofdm->dpsk) {
+            if (ofdm->dpsk == true) {
                 aframe[i][j] *= aframe[i-1][j];
             }
         }
@@ -1414,11 +1406,10 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          */
         for (i = 1; i < (ofdm_nc + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                if (ofdm->dpsk) {
+                if (ofdm->dpsk == true) {
                     /* differential detection, using pilot as reference at start of frame */
                     rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(cargf(ofdm->rx_sym[rr + 1][i]));
-                }
-                else  {
+                } else  {
                     /* regular coherent detection */
                     rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(aphase_est_pilot[i]);
                 }
@@ -1907,5 +1898,6 @@ void ofdm_print_info(struct OFDM *ofdm) {
     fprintf(stderr, "ofdm->foff_est_en = %s\n", ofdm->foff_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_en = %s\n", ofdm->phase_est_en ? "true" : "false");
     fprintf(stderr, "ofdm->tx_bpf_en = %s\n", ofdm->tx_bpf_en ? "true" : "false");
+    fprintf(stderr, "ofdm->dpsk = %s\n", ofdm->dpsk ? "true" : "false");
     fprintf(stderr, "ofdm->phase_est_bandwidth_mode = %s\n", phase_est_bandwidth_mode[ofdm->phase_est_bandwidth_mode]);
 }
