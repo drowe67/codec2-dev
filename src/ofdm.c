@@ -782,7 +782,7 @@ void ofdm_txframe(struct OFDM *ofdm, complex float *tx, complex float *tx_sym_li
 
         for (j = 1; j < (ofdm_nc + 1); j++) {
             aframe[i][j] = tx_sym_lin[((i - 1) * ofdm_nc) + (j - 1)];
-            if (ofdm->dpsk) {
+            if (ofdm->dpsk == true) {
                 aframe[i][j] *= aframe[i-1][j];
             }
         }
@@ -1406,11 +1406,10 @@ static void ofdm_demod_core(struct OFDM *ofdm, int *rx_bits) {
          */
         for (i = 1; i < (ofdm_nc + 1); i++) {
             if (ofdm->phase_est_en == true) {
-                if (ofdm->dpsk) {
+                if (ofdm->dpsk == true) {
                     /* differential detection, using pilot as reference at start of frame */
                     rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(cargf(ofdm->rx_sym[rr + 1][i]));
-                }
-                else  {
+                } else  {
                     /* regular coherent detection */
                     rx_corr = ofdm->rx_sym[rr + 2][i] * cmplxconj(aphase_est_pilot[i]);
                 }
