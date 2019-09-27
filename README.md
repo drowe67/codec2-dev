@@ -49,9 +49,17 @@ $ ./src/c2dec 700C hts1a_c2.bit hts1a_c2_700.raw
 ```
 $ play -t raw -r 8000 -e signed-integer -b 16 ./hts1a_c2_700.raw
 ```
-3/ Same thing with pipes:
+3/ If you prefer a one-liner without saving to files:
 ```
-$ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -s -2 -
+$ ./src/c2enc 1300 ../raw/hts1a.raw - | ./src/c2dec 1300 - - | play -t raw -r 8000 -b 16 -e signed-integer -
+```
+   Same at 450 bit/s:
+```
+$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450 - - | play -t raw -r 8000 -e signed-integer -b 16 -
+```
+   Please note that 450PWB (pseudo-wideband) can be chosen for decoding, providing a bandwidth extension to 8kHz/16ksps from a 4kHz/8ksps encoded 450bit/s file:
+```
+$ ./src/c2enc 450 ../raw/ve9qrp.raw - | ./src/c2dec 450PWB - - | play -t raw -r 16000 -e signed-integer -b 16 -
 ```
 ## Programs
 
