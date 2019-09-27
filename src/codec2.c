@@ -114,7 +114,7 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-#ifndef CORTEX_M4
+#ifdef CORTEX_M4
     if (( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, mode)) || 
         ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)) ) {
         return NULL;
