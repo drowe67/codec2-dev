@@ -29,6 +29,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <string.h>
 #include <math.h>
 
@@ -114,12 +115,25 @@ struct CODEC2 * codec2_create(int mode)
     struct CODEC2 *c2;
     int            i,l;
 
-#ifdef CORTEX_M4
-    if (( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, mode)) || 
-        ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)) ) {
+    // ALL POSSIBLE MODES MUST BE CHECKED HERE!
+    // we test if the desired mode is enabled at compile time
+    // and return NULL if not
+
+    if (false == ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, mode) 
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_700, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_450, mode)
+		   || CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, mode)
+		) ) 
+    {
         return NULL;
     }  
-#endif
 
     c2 = (struct CODEC2*)MALLOC(sizeof(struct CODEC2));
     if (c2 == NULL)
@@ -230,7 +244,6 @@ struct CODEC2 * codec2_create(int mode)
         c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP1_PHASE_NFFT, 1, NULL, NULL);
     }
 
-#ifndef CORTEX_M4
     /* newamp2 initialisation */
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode)) {
@@ -257,7 +270,6 @@ struct CODEC2 * codec2_create(int mode)
         c2->phase_fft_fwd_cfg = codec2_fft_alloc(NEWAMP2_PHASE_NFFT, 0, NULL, NULL);
         c2->phase_fft_inv_cfg = codec2_fft_alloc(NEWAMP2_PHASE_NFFT, 1, NULL, NULL);
     }
-#endif
 
     c2->fmlfeat = NULL;
 
@@ -304,7 +316,6 @@ struct CODEC2 * codec2_create(int mode)
 	c2->decode = codec2_decode_1200;
     }
 
-#ifndef CORTEX_M4
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
     {
 	c2->encode = codec2_encode_700;
@@ -316,13 +327,13 @@ struct CODEC2 * codec2_create(int mode)
 	c2->encode = codec2_encode_700b;
 	c2->decode = codec2_decode_700b;
     }
-#endif
+
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
     {
 	c2->encode = codec2_encode_700c;
 	c2->decode = codec2_decode_700c;
     }
-#ifndef CORTEX_M4
+
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
     {
 	c2->encode = codec2_encode_450;
@@ -336,7 +347,6 @@ struct CODEC2 * codec2_create(int mode)
 	c2->decode = codec2_decode_450pwb;
     }
 
-#endif
     
     return c2;
 }
@@ -1520,7 +1530,6 @@ void codec2_decode_1200(struct CODEC2 *c2, short speech[], const unsigned char *
 }
 
 
-#ifndef CORTEX_M4
 /*---------------------------------------------------------------------------*\
 
   FUNCTION....: codec2_encode_700
@@ -1928,7 +1937,6 @@ void codec2_decode_700b(struct CODEC2 *c2, short speech[], const unsigned char *
     for(i=0; i<LPC_ORD_LOW; i++)
 	c2->prev_lsps_dec[i] = lsps[3][i];
 }
-#endif
 
 
 /*---------------------------------------------------------------------------*\
@@ -2094,7 +2102,6 @@ float codec2_energy_700c(struct CODEC2 *c2, const unsigned char * bits)
     return POW10F(mean/10.0);
 }
 
-#ifndef CORTEX_M4
 float codec2_energy_450(struct CODEC2 *c2, const unsigned char * bits)
 {
     int     indexes[4];
@@ -2420,7 +2427,6 @@ void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char
    }
 }
 
-#endif
 
 /*---------------------------------------------------------------------------* \
 
