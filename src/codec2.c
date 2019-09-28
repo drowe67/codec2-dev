@@ -54,6 +54,7 @@
 
 #include "debug_alloc.h"
 
+
 /*---------------------------------------------------------------------------* \
 
                              FUNCTION HEADERS
@@ -85,6 +86,34 @@ void codec2_encode_450(struct CODEC2 *c2, unsigned char * bits, short speech[]);
 void codec2_decode_450(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 void codec2_decode_450pwb(struct CODEC2 *c2, short speech[], const unsigned char * bits);
 static void ear_protection(float in_out[], int n);
+
+
+/*---------------------------------------------------------------------------* \
+
+                             INTERNAL DATA STRUCTS 
+
+\*---------------------------------------------------------------------------*/
+
+typedef struct
+{
+    void (*encode)(struct CODEC2 *c2, unsigned char * bits, short speech[]);
+    void (*decode)(struct CODEC2 *c2, short speech[], const unsigned char * bits);
+    void (*decode_ber)(struct CODEC2 *c2, short speech[], const unsigned char * bits, float ber_est);
+    int bits_per_frame;
+    int samples_per_frame;
+} codec2_config_t;
+
+static const codec2_config_t codec2_3200    = { .encode = codec2_encode_3200, .decode = codec2_decode_3200,   .decode_ber = NULL,               .bits_per_frame = 64, .samples_per_frame = 160};  
+static const codec2_config_t codec2_2400    = { .encode = codec2_encode_2400, .decode = codec2_decode_2400,   .decode_ber = NULL,               .bits_per_frame = 48, .samples_per_frame = 160};  
+static const codec2_config_t codec2_1600    = { .encode = codec2_encode_1600, .decode = codec2_decode_1600,   .decode_ber = NULL,               .bits_per_frame = 64, .samples_per_frame = 320};  
+static const codec2_config_t codec2_1400    = { .encode = codec2_encode_1400, .decode = codec2_decode_1400,   .decode_ber = NULL,               .bits_per_frame = 56, .samples_per_frame = 320};  
+static const codec2_config_t codec2_1300    = { .encode = codec2_encode_1300, .decode = NULL,                 .decode_ber = codec2_decode_1300, .bits_per_frame = 54, .samples_per_frame = 320};  
+static const codec2_config_t codec2_1200    = { .encode = codec2_encode_1200, .decode = codec2_decode_1200,   .decode_ber = NULL,               .bits_per_frame = 48, .samples_per_frame = 320};  
+static const codec2_config_t codec2_700     = { .encode = codec2_encode_700,  .decode = codec2_decode_700,    .decode_ber = NULL,               .bits_per_frame = 28, .samples_per_frame = 320};  
+static const codec2_config_t codec2_700b    = { .encode = codec2_encode_700b, .decode = codec2_decode_700b,   .decode_ber = NULL,               .bits_per_frame = 28, .samples_per_frame = 320};  
+static const codec2_config_t codec2_700c    = { .encode = codec2_encode_700c, .decode = codec2_decode_700c,   .decode_ber = NULL,               .bits_per_frame = 28, .samples_per_frame = 320};  
+static const codec2_config_t codec2_450     = { .encode = codec2_encode_450,  .decode = codec2_decode_450,    .decode_ber = NULL,               .bits_per_frame = 18, .samples_per_frame = 320};  
+static const codec2_config_t codec2_450pwb  = { .encode = codec2_encode_450,  .decode = codec2_decode_450pwb, .decode_ber = NULL,               .bits_per_frame = 18, .samples_per_frame = 320};  
 
 
 
@@ -273,80 +302,76 @@ struct CODEC2 * codec2_create(int mode)
 
     c2->fmlfeat = NULL;
 
-    // make sure that one of the two decode function pointers is empty
-    // for the encode function pointer this is not required since we always set it
-    // to a meaningful value
-  
-    c2->decode = NULL;
-    c2->decode_ber = NULL;
+    
+
+    const codec2_config_t* c2cfg = NULL;
+    // using if instead of switch/case ensures that the
+    // compiler is able to optimize out disabled modes
+    // as we will have no reference to the functions
+    // of that mode anywhere in the active code
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
     {
-	c2->encode = codec2_encode_3200;
-	c2->decode = codec2_decode_3200;
+	c2cfg = &codec2_3200;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
     {
-	c2->encode = codec2_encode_2400;
-	c2->decode = codec2_decode_2400;
+	c2cfg = &codec2_2400;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
     {
-	c2->encode = codec2_encode_1600;
-	c2->decode = codec2_decode_1600;
+	c2cfg = &codec2_1600;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
     {
-	c2->encode = codec2_encode_1400;
-	c2->decode = codec2_decode_1400;
+	c2cfg = &codec2_1400;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
     {
-	c2->encode = codec2_encode_1300;
-	c2->decode_ber = codec2_decode_1300;
+	c2cfg = &codec2_1300;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
     {
-	c2->encode = codec2_encode_1200;
-	c2->decode = codec2_decode_1200;
+	c2cfg = &codec2_1200;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
     {
-	c2->encode = codec2_encode_700;
-	c2->decode = codec2_decode_700;
+	c2cfg = &codec2_700;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
     {
-	c2->encode = codec2_encode_700b;
-	c2->decode = codec2_decode_700b;
+	c2cfg = &codec2_700b;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
     {
-	c2->encode = codec2_encode_700c;
-	c2->decode = codec2_decode_700c;
+	c2cfg = &codec2_700c;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
     {
-	c2->encode = codec2_encode_450;
-	c2->decode = codec2_decode_450;
+	c2cfg = &codec2_450;
     }
 
     if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
     {
-    	//Encode PWB doesnt make sense
-	c2->encode = codec2_encode_450;
-	c2->decode = codec2_decode_450pwb;
+	c2cfg = &codec2_450pwb;
     }
 
+    assert(c2cfg != NULL);
+
+    c2->encode = c2cfg->encode;
+    c2->decode = c2cfg->decode;
+    c2->decode_ber = c2cfg->decode_ber;
+    c2->bits_per_frame = c2cfg->bits_per_frame;
+    c2->samples_per_frame = c2cfg->samples_per_frame;
     
     return c2;
 }
@@ -399,30 +424,7 @@ void codec2_destroy(struct CODEC2 *c2)
 \*---------------------------------------------------------------------------*/
 
 int codec2_bits_per_frame(struct CODEC2 *c2) {
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
-	return 64;
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
-	return 48;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
-	return 64;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
-	return 56;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
-	return 52;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
-	return 48;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
-	return 28;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
-	return 28;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
-	return 28;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
-	return 18;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
-	return 18;
-
-    return 0; /* shouldn't get here */   
+    return(c2->bits_per_frame);
 }
 
 
@@ -437,29 +439,7 @@ int codec2_bits_per_frame(struct CODEC2 *c2) {
 \*---------------------------------------------------------------------------*/
 
 int codec2_samples_per_frame(struct CODEC2 *c2) {
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_3200, c2->mode))
-	return 160;
-    if ( CODEC2_MODE_ACTIVE(CODEC2_MODE_2400, c2->mode))
-	return 160;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1600, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1400, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1300, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_1200, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700B, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_700C, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450, c2->mode))
-	return 320;
-    if  ( CODEC2_MODE_ACTIVE(CODEC2_MODE_450PWB, c2->mode))
-	return 640;
-    return 0; /* shouldnt get here */
+    return c2->samples_per_frame; 
 }
 
 void codec2_encode(struct CODEC2 *c2, unsigned char *bits, short speech[])
