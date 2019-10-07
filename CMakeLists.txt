@@ -405,14 +405,6 @@ if(UNITTEST)
              COMMAND sh -c "dd bs=2560 count=120 if=/dev/zero | $<TARGET_FILE:freedv_tx> 700D - - --interleave 8 --testframes | $<TARGET_FILE:cohpsk_ch> - - -20 --Fs 8000 -f -10 | $<TARGET_FILE:freedv_rx> 700D - /dev/null --interleave 8 --testframes"
              )
 
-    add_test(NAME test_FreeDV_API_2020_to_ofdm_demod
-             COMMAND sh -c "$<TARGET_FILE:freedv_tx> 2020 ~/LPCNet/wav/david.wav - --testframes | $<TARGET_FILE:ofdm_demod> --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes > /dev/null"
-             )
-
-    add_test(NAME test_ofdm_mod_to_FreeDV_API_2020
-             COMMAND sh -c "$<TARGET_FILE:ofdm_mod> --in /dev/zero --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 --testframes 10 | $<TARGET_FILE:freedv_rx> 2020 - /dev/null --testframes"
-             )
-           
      add_test(NAME test_fifo
              COMMAND $<TARGET_FILE:tfifo>
              )
