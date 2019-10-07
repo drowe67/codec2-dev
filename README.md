@@ -126,13 +126,13 @@ NOTE: Instructions assume you are creating a build_linux directory from within
 
 Reference: Plugging together lpcnet_enc -> ofdm_mod -> ofdm_demod -> lpcnet_dec:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 We are trying to integrate all of the above into FreeDV API.
 
 Listen the reference tx:
 ```
-$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
+$ cat ~/LPCNet/wav/wia.wav | ~/LPCNet/build_linux/src/lpcnet_enc -s | ./ofdm_mod --ts 0.0205 --nc 31 --ldpc 2 --verbose 1 -p 312 | aplay -f S16_LE
 ```
 
 Listen the freedv_tx:
@@ -142,13 +142,13 @@ $ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | aplay -f S16_LE
 
 FreeDV API tx, with reference rx from above:
 ```
-$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/wia.wav - | ./ofdm_demod --ts 0.0205 --nc 31 --verbose 1 --ldpc 2 -p 312 | ~/LPCNet/build_linux/src/lpcnet_dec -s | aplay -f S16_LE -r 16000
 ```
 
 FreeDV API tx and rx:
 ```
-$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
-$ ./freedv_tx 2020 ~/Downloads/wianews-2019-01-20.s16 - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - | ./freedv_rx 2020 - - | aplay -f S16_LE -r 16000
+$ ./freedv_tx 2020 ~/LPCNet/wav/all.wav - --testframes | ./freedv_rx 2020 - /dev/null --testframes -vv
 ```
 
 Simulated HF slow fading channel, 10.8dB SNR:
