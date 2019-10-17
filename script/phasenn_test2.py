@@ -15,16 +15,17 @@ import sys
 from keras.layers import Dense
 from keras import models,layers
 from keras import initializers
+import keras.backend as K
+
 import matplotlib.pyplot as plt
 
 # constants
 
 N                 = 80      # number of time domain samples in frames
-nb_samples        = 100000
+nb_samples        = 20000
 nb_batch          = 512
 nb_epochs         = 10
-nb_input          = 256     # frequency bins, width of input/output vectors
-nb_output         = nb_input
+width             = 256     # frequency bins, width of input/output vectors
 fo_min            = 50.0
 fo_max            = 400.0
 Fs                = 8000.0
@@ -32,13 +33,9 @@ Fs                = 8000.0
 # Generate training data.  Given the phase at the start of the frame,
 # and the frequency, determine the phase at the end of the frame
 
-def quant(val, levels):
-    return np.round(val*levels)/levels
-
-phase_start = np.zeros((nb_samples, nb_input))
-phase_end = np.zeros((nb_samples, nb_output))
-train = np.zeros((nb_samples, 2*nb_input))
-target = np.zeros((nb_samples, 2*nb_output))
+# phase encoded as cos,sin pairs
+phase_start = np.zeros((nb_samples, 2*width))
+phase_end = np.zeros((nb_samples, 2*width))
 
 Wo = np.zeros(nb_samples)
 L = np.zeros(nb_samples).astype(int)
@@ -51,69 +48,63 @@ for i in range(nb_samples):
     # generate L random phases and build sparse vectors
     for m in range(1,L[i]+1):
         Wm = m*Wo[i]
-        bin = int(np.floor(Wm*nb_input/np.pi))
+        bin = int(Wm*width/np.pi)
         r = np.random.rand(1)
-        phase_start[i][bin] = -np.pi + r[0]*2*np.pi
-        #phase_start[i][bin] = 0
-        phase_end[i][bin] = phase_start[i][bin] + N*Wm;
-        train[i][bin] = np.cos(phase_start[i][bin])
-        train[i][nb_input+bin] = np.sin(phase_start[i][bin])
-        target[i][bin] = np.cos(phase_end[i][bin])
-        target[i][nb_output+bin] = np.sin(phase_end[i][bin])
-                     
-print(train.shape)                       
-print(target.shape)
+        phase_start_pol = -np.pi + r[0]*2*np.pi
+        phase_start[i,2*bin] = np.cos(phase_start_pol)
+        phase_start[i,2*bin+1] = np.sin(phase_start_pol)
+        phase_end_pol = phase_start_pol + N*Wm
+        phase_end[i,2*bin] = np.cos(phase_end_pol)
+        phase_end[i,2*bin+1] = np.sin(phase_end_pol)
+        
+print(phase_start.shape)                       
+print(phase_end.shape)
 
 model = models.Sequential()
-model.add(layers.Dense(256, activation='relu', input_dim=2*nb_input))
-model.add(layers.Dense(256, activation='relu', input_dim=2*nb_input))
-model.add(layers.Dense(2*nb_output, activation='linear'))
+model.add(layers.Dense(width*20, activation='relu', input_dim=2*width))
+model.add(layers.Dense(width*20, activation='relu'))
+model.add(layers.Dense(2*width, activation='linear'))
 model.summary()
 
-# Compile our model 
+# Compile and fit our model 
 
 from keras import optimizers
 model.compile(loss='mse', optimizer='adam')
-
-# fit model, using 20% of our data for validation
-
-history = model.fit(train, target, validation_split=0.2, batch_size=nb_batch, epochs=nb_epochs)
+history = model.fit(phase_start, phase_end, batch_size=nb_batch, epochs=nb_epochs)
 
 # measure error over all samples
 
-target_est = model.predict(train)
-err = (target_est - target)
-print(err.shape)
+phase_end_est = model.predict(phase_start)
+err = (phase_end_est - phase_end)
 var = np.var(err)
 std = np.std(err)
-print("rect coord var: %f std: %f" % (var,std))
+print("rect var: %f std: %f" % (var,std))
 
-# measure error over sparse samples
+err_angle = np.arctan2(err[:,1::2],err[:,::2])
+print(err_angle.shape)
+var = np.var(err_angle)
+std = np.std(err_angle)
+print("angle var: %f std: %f" % (var,std))
 
-train_out = model.predict(train)
-
-err_sparse = 0
-nb_sparse = 0
 for i in range(nb_samples):
     print("Wo: %f L: %d\n" % (Wo[i], L[i]))
     for m in range(1,L[i]+1):
         Wm = m*Wo[i]
-        bin = int(np.floor(Wm*nb_input/np.pi))
-        print("bin: %3d target: % 5.4f % 5.4f est: % 5.4f % 5.4f" %
-              (bin, target[i][bin], target[i][nb_input+bin], target_est[i][bin], target_est[i][nb_input+bin]))
-    if i == 0:
+        bin = int(np.floor(Wm*width/np.pi))
+        print("bin: %3d phase_end: % 5.4f % 5.4f est: % 5.4f % 5.4f err: % 5.4f % 5.4f" %
+              (bin, phase_end[i][2*bin], phase_end[i][2*bin+1],
+               phase_end_est[i][2*bin], phase_end_est[i][2*bin+1], err[i][2*bin], err[i][2*bin+1]))
+    if i == 1:
         exit()      
 
-plot_en = 1;
+plot_en = 0;
 if plot_en:
     plt.figure(1)
     plt.plot(10*np.log10(history.history['loss']))
-    plt.plot(10*np.log10(history.history['val_loss']))
     plt.title('model loss (dB)')
     plt.xlabel('epoch')
-    plt.legend(['train', 'valid'], loc='upper right')
  
-    plt.figure(2)
-    plt.hist(err_angle, bins=20)
-    plt.show()
+    #plt.figure(2)
+    #plt.hist(err_angle, bins=20)
+    #plt.show()
    
