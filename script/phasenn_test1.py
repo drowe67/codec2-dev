@@ -4,7 +4,7 @@
 # David Rowe August 2019
 
 # Keras model for testing phase modelling using NNs.  Self contained, generates
-# it's own training data
+# it's own training data.  Can model linear phase at freq up to pi/4
 
 import numpy as np
 import sys
