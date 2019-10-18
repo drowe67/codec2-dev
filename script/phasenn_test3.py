@@ -1,10 +1,11 @@
 #!/usr/bin/python3
-# phasenn_test4.py
+# phasenn_test3.py
 #
 # David Rowe Oct 2019
 
-# Keras model for testing phase modelling using NNs.  Extending test3
-# to sparse model, which is now codec 2 phases are generated
+# Keras model for testing phase modelling using NNs.  Extending four
+# weights per phase test2 to a vector of phases, each with a different
+# shift across the frame
 
 import numpy as np
 import sys
@@ -46,8 +47,8 @@ for i in range(nb_samples):
 print(phase_start.shape)                       
 print(phase_end.shape)
 
-# note most of these weights whould end up being 0, as we only need two wieghts to map each phase
-# rotation
+# note most of these weights whould end up being 0, as we only need 4 weights to map each phase
+# rotation from an input to output pair
 model = models.Sequential()
 model.add(layers.Dense(pairs, bias=False, input_dim=pairs))
 model.summary()

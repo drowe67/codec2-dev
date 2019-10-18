@@ -3,9 +3,9 @@
 #
 # David Rowe Oct 2019
 
-# Keras model for testing phase modelling using NNs.  Extending four
-# weights per phase test2 to a vector of phases, each with a different
-# shift across the frame
+# Keras model for testing phase modelling using NNs.  Like test3 but
+# with sparse input vectors of harmonic phases, as this is how phases
+# will be presented from Codec 2.
 
 import numpy as np
 import sys
