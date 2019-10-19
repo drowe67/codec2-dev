@@ -3,7 +3,7 @@
 #
 # David Rowe Oct 2019
 
-# Keras model for testing phase modelling using NNs. Extending test6
+# Keras model for testing phase modelling using NNs. Extending test5
 # to deal with input/output vectors that have slightly different "rates", i.e.
 # Wo changing across the frame which is usual for voiced speech.
 
@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 10000
-nb_batch          = 1
-nb_epochs         = 10
+nb_batch          = 64
+nb_epochs         = 100
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -33,7 +33,8 @@ Fs                = 8000
 # Generate training data.  Given the phase at the start of the frame,
 # and the frequency, determine the phase at the end of the frame
 
-# phase encoded as cos,sin pairs
+# phase encoded as cos,sin pairs ref:
+#   https://datascience.stackexchange.com/questions/24986/parameterization-regression-of-rotation-angle
 phase_start = np.zeros((nb_samples, pairs))
 phase_end = np.zeros((nb_samples, pairs))
 
@@ -45,19 +46,21 @@ for i in range(nb_samples):
     Wo_0 = fo_0*2*np.pi/Fs
     L_0 = int(np.floor(np.pi/Wo_0))
 
-    # parameters at time N (end of current frame), allow a 10% freq change
+    # parameters at time N (end of current frame), allow a +/10% freq change
     # across frame, typical of voiced speech
     r = np.random.rand(1)
-    fo_N = fo_0 + 0.1*f_0*r[0]
+    fo_N = fo_0 + (-0.1 + 0.2*r[0])*fo_0
     fo_N = np.max((fo_min, fo_N))
     fo_N = np.min((fo_max, fo_N))
     Wo_N = fo_N*2*np.pi/Fs
     L_N = int(np.floor(np.pi/Wo_N))
-
-    for m in range(np.min(L_0,L_N)):
+    L = np.min((L_0, L_N))
+    #print("fo: %f %f L: %d %d min: %d" % (fo_0, fo_N, L_0, L_N, L))
+    
+    for m in range(1,L):
         bin_0 = int(np.floor(m*Wo_0*width/np.pi))
         bin_N = int(np.floor(m*Wo_N*width/np.pi))
-        print("fo: %f %f bin: %d %d" % (fo_0, fo_N, bin_0, bin_N))
+        #print("fo: %f %f bin: %d %d" % (fo_0, fo_N, bin_0, bin_N))
 
         r = np.random.rand(1)
         phase_start_pol = -np.pi + r[0]*2*np.pi
@@ -74,8 +77,7 @@ print(phase_start.shape)
 print(phase_end.shape)
 
 model = models.Sequential()
-model.add(layers.Dense(2*pairs, activation='relu', input_dim=pairs))
-model.add(layers.Dense(2*pairs, activation='relu', input_dim=pairs))
+model.add(layers.Dense(pairs, activation='relu', input_dim=pairs))
 model.add(layers.Dense(pairs, input_dim=pairs))
 model.summary()
 
@@ -86,7 +88,7 @@ sgd = optimizers.SGD(lr=0.04, decay=1e-6, momentum=0.9, nesterov=True)
 model.compile(loss='mse', optimizer=sgd)
 history = model.fit(phase_start, phase_end, batch_size=nb_batch, epochs=nb_epochs)
 
-# measure error over all samples
+# measure error in rectangular coordinates over all samples
 
 phase_end_est = model.predict(phase_start)
 err = (phase_end_est - phase_end)
@@ -95,13 +97,16 @@ std = np.std(err)
 print("rect var: %f std: %f" % (var,std))
 #print(err[:5,:])
 
-# approximation if error is small
+# approximation of angular error (for small angles) is y coord (sin) or error.  We
+# don't actually care how close the (x,y) points are, just the error in angle.  This implies
+# there is probably a better cost function that min MSE on rect coords.
 err_angle = np.arctan2(err[:,1], 1)
 #print(err[:5,:])
 print(err_angle.shape)
 var = np.var(err_angle)
 std = np.std(err_angle)
-print("angle var: %f std: %f" % (var,std))
+print("angle var: %4.2f std: %4.2f rads" % (var,std))
+print("angle var: %4.2f std: %4.2f degs" % (var*180/np.pi,std*180/np.pi))
 
 plot_en = 1;
 if plot_en:
@@ -111,7 +116,7 @@ if plot_en:
     plt.xlabel('epoch')
  
     plt.figure(2)
-    plt.hist(err_angle, bins=20)
-    plt.title('phase angle error')
+    plt.hist(err_angle*180/np.pi, bins=20)
+    plt.title('phase angle error (deg)')
     plt.show()
    
