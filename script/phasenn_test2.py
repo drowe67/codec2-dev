@@ -7,6 +7,9 @@
 # linear model to map a constant phase shift, arriving at the same model as
 # linear algera.  Good sanity check
 
+# | cos(end) | = | cos(Nw) -sin(Nw) | | cos(start) |
+# | sin(end) |   | sin(Nw)  cos(Nw) | | sin(start) |
+
 import numpy as np
 import sys
 from keras.layers import Dense
@@ -32,13 +35,13 @@ phase_start = np.zeros((nb_samples, 2))
 phase_end = np.zeros((nb_samples, 2))
 
 # a shift of pi/4 across the frame of N samples
-Wo = np.pi/(4*N);
+w = np.pi/(4*N);
 for i in range(nb_samples):
     r = np.random.rand(1)
     phase_start_pol = -np.pi + r[0]*2*np.pi
     phase_start[i,0] = np.cos(phase_start_pol)
     phase_start[i,1] = np.sin(phase_start_pol)
-    phase_end_pol = phase_start_pol + N*Wo
+    phase_end_pol = phase_start_pol + N*w
     phase_end[i,0] = np.cos(phase_end_pol)
     phase_end[i,1] = np.sin(phase_end_pol)
         
