@@ -211,9 +211,8 @@ int freedv_get_sz_error_pattern     (struct freedv *freedv);
 int freedv_get_protocol_bits        (struct freedv *freedv);
 int freedv_get_speech_sample_rate   (struct freedv *freedv);
 
-
-#endif
-
 #ifdef __cplusplus
 }
 #endif
+
+#endif //__FREEDV_API__
