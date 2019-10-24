@@ -17,14 +17,15 @@ import matplotlib.pyplot as plt
 # constants
 
 N                 = 80      # number of time domain samples in frame
-nb_samples        = 100000
+nb_samples        = 1000000
 nb_batch          = 32
-nb_epochs         = 50
+nb_epochs         = 10
 width             = 256
 pairs             = 2*width
 fo_min            = 50
 fo_max            = 400
 Fs                = 8000
+dfo               = 0.05
 
 # Generate training data.  Given the phase at the start of the frame,
 # and the frequency, determine the phase at the end of the frame
@@ -44,10 +45,10 @@ for i in range(nb_samples):
     Wo_0[i] = fo_0*2*np.pi/Fs
     L_0 = int(np.floor(np.pi/Wo_0[i]))
  
-    # parameters at time N (end of current frame), allow a +/10% freq change
+    # parameters at time N (end of current frame), allow a df0 freq change
     # across frame, typical of voiced speech
     r = np.random.rand(1)
-    fo_N = fo_0 + (-0.01 + 0.005*r[0])*fo_0
+    fo_N = fo_0 + (-2*dfo + dfo*r[0])*fo_0
     fo_N = np.max((fo_min, fo_N))
     fo_N = np.min((fo_max, fo_N))
     #fo_N = fo_0
@@ -127,17 +128,24 @@ if plot_en:
     plt.title('phase angle error (deg)')
 
     plt.figure(3)
-    r = 0
-    phase = np.zeros(width)
-    phase_est = np.zeros(width)
-    for m in range(1,L[r]):
-        wm = m*Wo_N[r]
-        bin = int(np.round(wm*width/np.pi))
-        phase[m] = np.arctan2(phase_end[r,2*bin+1], phase_end[r,2*bin])
-        phase_est[m] = np.arctan2(phase_end_est[r,2*bin+1], phase_end_est[r,2*bin])
+    plt.title('sample vectors and error')
+    for r in range(12):
+        plt.subplot(3,4,r+1)
+        phase = np.zeros(width)
+        phase_est = np.zeros(width)
+        for m in range(1,L[r]):
+            wm = m*Wo_N[r]
+            bin = int(np.round(wm*width/np.pi))
+            phase[m] = np.arctan2(phase_end[r,2*bin+1], phase_end[r,2*bin])
+            phase_est[m] = np.arctan2(phase_end_est[r,2*bin+1], phase_end_est[r,2*bin])
     
-    plt.plot(phase[1:L[r]+1],'g')
-    plt.plot(phase_est[1:L[r]+1],'r')
-
+        plt.plot(phase[1:L[r]+1]*180/np.pi,'g')
+        #err = phase[1:L[r]+1] - phase_est[1:L[r]+1]
+        #err = err + 2*np.pi*np.floor(err/(2*np.pi))
+        if r == 0:
+            err = phase[1:L[r]+1] - phase_est[1:L[r]+1]
+            print(err)
+            print(np.round(err/(2*np.pi)))
+        plt.plot(phase_est[1:L[r]+1]*180/np.pi,'r')
     plt.show()
    
