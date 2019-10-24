@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 N                 = 80      # number of time domain samples in frame
 nb_samples        = 10000
 nb_batch          = 64
-nb_epochs         = 100
+nb_epochs         = 10
 width             = 256
 pairs             = 2*width
 fo_min            = 50
@@ -36,7 +36,7 @@ Fs                = 8000
 # Generate training data.  Sparse log magnitude spectrum is input,
 # phase spectrum of 2nd order system the output/target
 
-magnitude = np.zeros((nb_samples, width))
+mag = np.zeros((nb_samples, width))
 phase = np.zeros((nb_samples, pairs))
 
 for i in range(nb_samples):
@@ -47,16 +47,19 @@ for i in range(nb_samples):
     Wo = fo*2*np.pi/Fs
     L = int(np.floor(np.pi/Wo))
 
-    # sample 2nd order IIR filter
+    # sample 2nd order IIR filter with random peak freq and amplitude
 
-    w,h = signal.freqz(1, [1,0,0.81], range(1,L)*Wo)
+    r = np.random.rand(2)
+    alpha = 0.1*np.pi + 0.8*np.pi*r[0]
+    gamma = r[1]
+    w,h = signal.freqz(1, [1, -2*gamma*np.cos(alpha), gamma*gamma], range(1,L)*Wo)
 
-    # map to sparse input and ouput arrays
+    # map to sparse input and output arrays
     
     for m in range(1,L):
         bin = int(np.floor(m*Wo*width/np.pi))
-        mag[i,b] = np.log10(np.abs(h[m]))
-        phase_rect = h[m]/np.abs(h[m])        
+        mag[i,bin] = np.log10(np.abs(h[m-1]))
+        phase_rect = h[m-1]/np.abs(h[m-1])        
         phase[i,2*bin]   = phase_rect.real
         phase[i,2*bin+1] = phase_rect.imag
         
@@ -73,7 +76,7 @@ model.summary()
 from keras import optimizers
 sgd = optimizers.SGD(lr=0.04, decay=1e-6, momentum=0.9, nesterov=True)
 model.compile(loss='mse', optimizer=sgd)
-history = model.fit(phase_start, phase_end, batch_size=nb_batch, epochs=nb_epochs)
+history = model.fit(mag, phase, batch_size=nb_batch, epochs=nb_epochs)
 
 # measure error in rectangular coordinates over all samples
 
@@ -82,13 +85,8 @@ err = (phase_est - phase)
 var = np.var(err)
 std = np.std(err)
 print("rect var: %f std: %f" % (var,std))
-#print(err[:5,:])
 
-# approximation of angular error (for small angles) is y coord (sin) or error.  We
-# don't actually care how close the (x,y) points are, just the error in angle.  This implies
-# there is probably a better cost function that min MSE on rect coords.
 err_angle = np.arctan2(err[:,1], 1)
-#print(err[:5,:])
 print(err_angle.shape)
 var = np.var(err_angle)
 std = np.std(err_angle)
@@ -105,5 +103,15 @@ if plot_en:
     plt.figure(2)
     plt.hist(err_angle*180/np.pi, bins=20)
     plt.title('phase angle error (deg)')
+
+    fig = plt.figure(3)
+    ax1 = fig.add_subplot(111)
+    plt.plot(20*mag[1,:])
+    ax2 = ax1.twinx()
+    phase = np.unwrap(np.arctan2(phase[1::2], phase[::2]))
+    plt.plot(phase, 'g')
+    phase_est = np.unwrap(np.arctan2(phase_est[1::2], phase_est[::2]))
+    plt.plot(phase, 'r')
+    
     plt.show()
    
