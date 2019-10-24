@@ -17,15 +17,15 @@ import matplotlib.pyplot as plt
 # constants
 
 N                 = 80      # number of time domain samples in frame
-nb_samples        = 1000000
+nb_samples        = 100000
 nb_batch          = 32
-nb_epochs         = 10
+nb_epochs         = 100
 width             = 256
 pairs             = 2*width
 fo_min            = 50
 fo_max            = 400
 Fs                = 8000
-dfo               = 0.05
+dfo               = 0.02
 
 # Generate training data.  Given the phase at the start of the frame,
 # and the frequency, determine the phase at the end of the frame
@@ -40,8 +40,10 @@ L = np.zeros(nb_samples, dtype=int)
 for i in range(nb_samples):
 
     # parameters at time 0 (start of current frame)
+    # distribute fo randomnly on a log scale
     r = np.random.rand(1)
-    fo_0 = fo_min + (fo_max-fo_min)*r[0]
+    log_fo_0 = np.log10(fo_min) + (np.log10(fo_max)-np.log10(fo_min))*r[0]
+    fo_0 = 10 ** log_fo_0
     Wo_0[i] = fo_0*2*np.pi/Fs
     L_0 = int(np.floor(np.pi/Wo_0[i]))
  
@@ -82,7 +84,6 @@ print(phase_end.shape)
 
 model = models.Sequential()
 model.add(layers.Dense(pairs, activation='relu', input_dim=(pairs+2)))
-#model.add(layers.Dense(pairs, activation='relu', input_dim=pairs))
 model.add(layers.Dense(pairs))
 model.summary()
 
@@ -97,20 +98,18 @@ history = model.fit(input, phase_end, batch_size=nb_batch, epochs=nb_epochs)
 
 phase_end_est = model.predict(input)
 ind = np.nonzero(phase_end)
-err = (phase_end_est[ind] - phase_end[ind])
+err = (phase_end[ind] - phase_end_est[ind])
 var = np.var(err)
 std = np.std(err)
 print("rect var: %f std: %f" % (var,std))
-print("angle var: %4.2f std: %4.2f degs" % (var*180/np.pi,std*180/np.pi))
-#print(err[:5,:])
 
-# approximation of angular error (for small angles) is y coord (sin)
-# or error.  We don't actually care how close the (x,y) points are,
-# just the error in angle.  This implies there is probably a better
-# cost function that min MSE on rect coords.
+print(phase_end_est.shape, err.shape)
+c1 = phase_end[ind]; c1 = c1[::2] + 1j*c1[1::2]
+c2 = phase_end_est[ind]; c2 = c2[::2] + 1j*c2[1::2]
+err_angle = np.angle(c1 * np.conj(c2))
 
-err_angle = np.arctan2(err[1::2], 1)
-print(err_angle.shape)
+print(err_angle[:5],err_angle.shape)
+
 var = np.var(err_angle)
 std = np.std(err_angle)
 print("angle var: %4.2f std: %4.2f rads" % (var,std))
@@ -124,28 +123,27 @@ if plot_en:
     plt.xlabel('epoch')
  
     plt.figure(2)
+    plt.subplot(211)
     plt.hist(err_angle*180/np.pi, bins=20)
-    plt.title('phase angle error (deg)')
+    plt.subplot(212)
+    plt.hist(Wo_0*(Fs/2)/np.pi, bins=20)
+    plt.title('phase angle error (deg) and fo (Hz)')
 
     plt.figure(3)
     plt.title('sample vectors and error')
     for r in range(12):
         plt.subplot(3,4,r+1)
-        phase = np.zeros(width)
-        phase_est = np.zeros(width)
+        phase = np.zeros(width, dtype=complex)
+        phase_est = np.zeros(width, dtype=complex)
+        phase_err = np.zeros(width, dtype=complex)
         for m in range(1,L[r]):
             wm = m*Wo_N[r]
             bin = int(np.round(wm*width/np.pi))
-            phase[m] = np.arctan2(phase_end[r,2*bin+1], phase_end[r,2*bin])
-            phase_est[m] = np.arctan2(phase_end_est[r,2*bin+1], phase_end_est[r,2*bin])
+            phase[m] = phase_end[r,2*bin] + 1j*phase_end[r,2*bin+1]
+            phase_est[m] = phase_end_est[r,2*bin] + 1j*phase_end_est[r,2*bin+1]
+            phase_err[m] = phase[m] * np.conj(phase_est[m])
     
-        plt.plot(phase[1:L[r]+1]*180/np.pi,'g')
-        #err = phase[1:L[r]+1] - phase_est[1:L[r]+1]
-        #err = err + 2*np.pi*np.floor(err/(2*np.pi))
-        if r == 0:
-            err = phase[1:L[r]+1] - phase_est[1:L[r]+1]
-            print(err)
-            print(np.round(err/(2*np.pi)))
-        plt.plot(phase_est[1:L[r]+1]*180/np.pi,'r')
+        plt.plot(np.angle(phase[1:L[r]+1])*180/np.pi,'g')
+        plt.plot(np.angle(phase_err[1:L[r]+1])*180/np.pi,'r')
     plt.show()
    
