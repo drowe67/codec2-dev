@@ -44,6 +44,7 @@ for i in range(nb_samples):
     r = np.random.rand(1)
     log_fo = np.log10(fo_min) + (np.log10(fo_max)-np.log10(fo_min))*r[0]
     fo = 10 ** log_fo
+    fo = fo_min
     Wo[i] = fo*2*np.pi/Fs
     L[i] = int(np.floor(np.pi/Wo[i]))
  
@@ -51,7 +52,7 @@ for i in range(nb_samples):
 
     r = np.random.rand(1)
     alpha = 0.1*np.pi + 0.8*np.pi*r[0]
-    gamma = 0.8; alpha = np.pi/4
+    gamma = 0.8;
     w,h = signal.freqz(1, [1, -2*gamma*np.cos(alpha), gamma*gamma], range(1,L[i])*Wo[i])
     
     for m in range(1,L[i]):
@@ -65,6 +66,7 @@ for i in range(nb_samples):
 
 model = models.Sequential()
 model.add(layers.Dense(pairs, activation='relu', input_dim=width))
+model.add(layers.Dense(pairs, activation='relu'))
 model.add(layers.Dense(pairs))
 model.summary()
 
